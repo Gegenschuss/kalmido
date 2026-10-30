@@ -15256,5 +15256,15 @@
   "For a supplement with only the new items, untick this: both quotations stay valid.": "En un suplemento solo con las partidas nuevas, desmarca esta casilla: ambos presupuestos siguen vigentes.",
   "This quotation was superseded": "Este presupuesto fue reemplazado",
   "Menu points": "Puntos del menú",
-  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Un punto desactivado aquí desaparece para todos en esta oficina. No se borra nada: al activarlo de nuevo vuelve todo."
+  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Un punto desactivado aquí desaparece para todos en esta oficina. No se borra nada: al activarlo de nuevo vuelve todo.",
+  "Comments in other projects": "Comentarios en otros proyectos",
+  "Channel messages": "Mensajes de canales",
+  "Tasks in other projects": "Tareas en otros proyectos",
+  "Tasks I take part in": "Tareas en las que participo",
+  "Received notifications": "Notificaciones recibidas",
+  "Sign-ins": "Inicios de sesión",
+  "Push devices": "Dispositivos push",
+  "Agent chat settings": "Ajustes de los chats de agentes",
+  "Deleting account #{0}: {1} files kept by law stay in an administrator's trash until their period ends.": "Al eliminar la cuenta #{0}: {1} archivos conservados por ley permanecen en la papelera de un administrador hasta el fin del plazo.",
+  "After the restore, {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log).": "Tras la restauración se eliminaron de nuevo {0} organizaciones y entradas borradas antes; {1} de los últimos {2} días permanecen, por si la restauración debía recuperarlas; {3} no se pudieron eliminar de nuevo (véase el registro del servidor)."
 }

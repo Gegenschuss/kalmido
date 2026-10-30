@@ -659,7 +659,14 @@ deleted rows and columns of a table, pipeline deals, invoice series, the placeho
 the emptied rows of deleted comments, absences, disposition bookings, scheduling polls (with the votes of their guests),
 appointment types and file requests (*since 2.223.3*; the files received stay in their folder). The file store's trash names the period. Projects, tasks and events have their own
 trash periods. Legal retention wins: a booked receipt or the logbook is locked until its period ends, never deleted early
-(such a node stays in the trash and is counted as `files_locked`).
+(such a node stays in the trash and is counted as `files_locked`). Deleting an organisation or an account never fails on
+such a file: the organisation is retired until the lock ends, a private file moves into the account's retired office.
+
+**Restoring a backup keeps deletions.** Organisations and entries deleted for good (projects, tasks, files, knowledge
+pages, events, tables, contacts, clients, e-mails, deals) are noted by table and number only, like deleted accounts. A
+restore deletes them again when the backup brings them back. What went in the last 7 days stays, in case the restore was
+meant to bring it back; the admin alert and the log give the numbers. The list follows the backups' period in the log
+clean-up. Retiring an organisation also ends its calendars' subscription links and the booking pages that work for it.
 
 Expired credentials (sessions, tokens, codes past their end) are no data of a person any more and go without the switch.
 
@@ -1126,6 +1133,9 @@ A short checklist for a new server:
   database errors without the values of the row. `KALMIDO_LOG_FULL_IP=1` keeps the addresses in full (for fail2ban,
   below). The shipped `docker-compose.yml` rotates every container log (`driver: local`, 3 files of 10 MB), so old lines
   are gone after a while; keep that (or set your own limit) when you change the logging driver.
+- **Two kinds of address limits.** Sign-in with a known name from a known address is only slowed down when an address has
+  many failures (2.282). Every other way in keeps the hard limit per address: the OIDC start, setup codes, invitations, the
+  password reset, the agent setup and API tokens have no "known name" to tell a person from a flood.
 - **fail2ban for failed logins.** Kalmido logs `login failed for user#<hash> from <address>` and has its own lockout.
   2.148.1: the log names a short hash of the typed name (never the name: it may be a password typed into the wrong field).
   fail2ban needs the full address: set `KALMIDO_LOG_FULL_IP=1` in `.env` (2.239: shortened by default). To block repeat

@@ -130,7 +130,7 @@ UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is
     (N_("Household budget"), ("budgets",)), (N_("Focus sessions"), ("pomos",)), (N_("Notepads"), ("list_notepads",)),
     (N_("Playbooks"), ("playbooks", "playbook_proposals")), (N_("Staying in touch"), ("contact_care",)),
     (N_("Saved arrangements"), ("view_layouts", "list_layouts", "view_layout_offers")), (N_("Task bells"), ("task_bell",)),
-    (N_("History"), ("activity",)), (N_("Direct messages"), ("direct_messages",)), (N_("Agent chats"), ("agent_chats", "agent_chat_prefs")),
+    (N_("History"), ("activity",)), (N_("Direct messages"), ("direct_messages",)), (N_("Agent chats"), ("agent_chats",)),
     (N_("My files"), ("private_files",)), (N_("Absences"), ("absences",)), (N_("Timesheets"), ("timesheets",)),
     (N_("Shared with me"), ("shared_lists", "shared_comments")), (N_("Notifications"), ("list_notif", "folder_notif")),
     (N_("Environments"), ("list_envs", "env_deploys")), (N_("Devices"), ("device_links",)),
@@ -140,6 +140,11 @@ UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is
     (N_("Karakeep connection"), ("karakeep",)), (N_("Newsletter connection"), ("newsletter_connection",)),
     (N_("Newsletter"), ("newsletter_segments", "newsletter_runs")), (N_("Planned agent jobs"), ("agent_schedules",)),
     (N_("Public links"), ("public_links",)), (N_("Feeds"), ("feeds",)),  # 2.85.0 B (#1162): moved by OPML export / import
+    # 2.360.4 (#3248): what I wrote or got elsewhere; the preview showed the technical names of these parts
+    (N_("Comments in other projects"), ("written_comments",)), (N_("Channel messages"), ("channel_messages",)),
+    (N_("Tasks in other projects"), ("other_tasks",)), (N_("Tasks I take part in"), ("task_people",)), (N_("Reactions"), ("reactions",)),
+    (N_("Stars"), ("kid_stars",)), (N_("Received notifications"), ("notifications",)), (N_("Sign-ins"), ("sessions",)),
+    (N_("Push devices"), ("push_devices",)), (N_("Agent chat settings"), ("agent_chat_prefs",)),
 )
 
 _UMI = {}  # user id -> running check / import thread

@@ -28,7 +28,7 @@ import uuid
 from flask import g, has_request_context
 
 from ..core.config import ATT_DIR, MAX_FILE_MB
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import insert_id, iso, now_utc, write_lock, db
 from ..core.access import Denied, acx_of, collab_all
 from ..core.orgcrypt import oc_read_file, oc_write_file, oc_user_space
@@ -731,13 +731,41 @@ def fs_user_purge(c, uid):
                 c.execute("UPDATE fs_nodes SET owner_id=? WHERE owner_id=? AND org_id=?", (heir[0], uid, oid))
         roots = [r[0] for r in c.execute("SELECT id FROM fs_nodes WHERE owner_id=? AND (parent_id IS NULL OR parent_id NOT IN "
                                          "(SELECT id FROM fs_nodes WHERE owner_id=?))", (uid, uid))]
+        kept = []
         for nid in roots:
-            for i in fs_subtree(c, nid):
-                for f in fs_on_delete:
-                    paths += f(c, i) or []  # 2.306.0 D3 (#2875): a hook's own files go after the commit too
-                paths += [r[0] for r in c.execute("SELECT path FROM fs_versions WHERE node_id=?", (i,))]
-            c.execute("DELETE FROM fs_nodes WHERE id=?", (nid,))
+            for i in reversed(fs_subtree(c, nid)):  # 2.360.4 (#3243): below first, one node at a time, so a lock costs only its branch
+                try:
+                    with c.savepoint():
+                        found = []
+                        for f in fs_on_delete:
+                            found += f(c, i) or []  # 2.306.0 D3 (#2875): a hook's own files go after the commit too
+                        found += [r[0] for r in c.execute("SELECT path FROM fs_versions WHERE node_id=?", (i,))]
+                        c.execute("DELETE FROM fs_nodes WHERE id=?", (i,))
+                except Denied as e:
+                    if e.code != 409:
+                        raise
+                    kept.append((i, e))
+                    continue
+                paths += found
+        if kept:
+            fs_keep_nodes(c, uid, kept)
     return paths
+
+
+def fs_keep_nodes(c, uid, kept):
+    """2.360.4 (#3243): locked nodes of the deleted account uid stay with an instance admin (owner_id cascades), in the trash
+    until their period ends (files/trashpurge.py). Only nodes of an organisation: they are sealed with its key; a private one
+    (the personal office took those over, orgretain.upg_personal) needs the account key, so its 409 stands."""
+    from ..accounts.orgretain import odl_custodian
+    from ..notify.alerts import aa_now
+    keeper = odl_custodian(c, uid)
+    q = ",".join("?" * len(kept))
+    ids = [i for i, _ in kept]
+    if not keeper or c.execute(f"SELECT 1 FROM fs_nodes WHERE id IN ({q}) AND org_id IS NULL LIMIT 1", ids).fetchone():
+        raise kept[0][1]
+    c.execute(f"UPDATE fs_nodes SET owner_id=?, deleted_at=COALESCE(deleted_at, ?) WHERE id IN ({q})", (keeper, iso(now_utc()), *ids))
+    print(f"account deletion: {len(ids)} locked node(s) kept (#3243)", flush=True)
+    aa_now("storage", f"fs-kept:{int(uid)}", N_("Deleting account #{0}: {1} files kept by law stay in an administrator's trash until their period ends."), [str(int(uid)), str(len(ids))])
 
 
 def fs_org_live(c, oid):
@@ -757,7 +785,8 @@ def fs_org_live(c, oid):
 
 
 def fs_org_purge(c, oid):
-    """The trash of organisation oid before the organisation is deleted: hooks, rows; returns the files to unlink."""
+    """The trash of organisation oid before the organisation is deleted: hooks, rows; returns the files to unlink. 2.360.4
+    (#3243): a 409 here stays one: the rows cascade with the organisation; orgretain.odl_retention retires it before."""
     paths = []
     with system_ctx(c):  # see fs_org_live
         for (nid,) in c.execute("SELECT id FROM fs_nodes WHERE org_id=? AND parent_id IS NULL", (int(oid),)).fetchall():

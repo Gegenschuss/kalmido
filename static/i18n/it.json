@@ -15256,5 +15256,15 @@
   "For a supplement with only the new items, untick this: both quotations stay valid.": "Per un supplemento con le sole nuove voci, togli la spunta: entrambi i preventivi restano validi.",
   "This quotation was superseded": "Questo preventivo è stato sostituito",
   "Menu points": "Voci di menu",
-  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Una voce disattivata qui scompare per tutti in questo ufficio. Non viene eliminato nulla: riattivandola torna tutto."
+  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Una voce disattivata qui scompare per tutti in questo ufficio. Non viene eliminato nulla: riattivandola torna tutto.",
+  "Comments in other projects": "Commenti in altri progetti",
+  "Channel messages": "Messaggi dei canali",
+  "Tasks in other projects": "Attività in altri progetti",
+  "Tasks I take part in": "Attività a cui partecipo",
+  "Received notifications": "Notifiche ricevute",
+  "Sign-ins": "Accessi",
+  "Push devices": "Dispositivi push",
+  "Agent chat settings": "Impostazioni delle chat degli agenti",
+  "Deleting account #{0}: {1} files kept by law stay in an administrator's trash until their period ends.": "Eliminazione dell’account #{0}: {1} file conservati per legge restano nel cestino di un amministratore fino alla scadenza.",
+  "After the restore, {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log).": "Dopo il ripristino {0} organizzazioni e voci eliminate in precedenza sono state eliminate di nuovo; {1} degli ultimi {2} giorni restano, nel caso il ripristino dovesse recuperarle; {3} non si sono potute eliminare di nuovo (vedi il log del server)."
 }

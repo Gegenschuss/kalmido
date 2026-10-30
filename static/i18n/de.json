@@ -15256,5 +15256,15 @@
   "For a supplement with only the new items, untick this: both quotations stay valid.": "Bei einem Nachtrag mit nur den neuen Posten das Häkchen entfernen: Beide Angebote bleiben gültig.",
   "This quotation was superseded": "Dieses Angebot wurde ersetzt",
   "Menu points": "Menüpunkte",
-  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Ein hier abgeschalteter Punkt verschwindet für alle in diesem Büro. Gelöscht wird nichts: Wieder einschalten bringt alles zurück."
+  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Ein hier abgeschalteter Punkt verschwindet für alle in diesem Büro. Gelöscht wird nichts: Wieder einschalten bringt alles zurück.",
+  "Comments in other projects": "Kommentare in anderen Projekten",
+  "Channel messages": "Kanal-Nachrichten",
+  "Tasks in other projects": "Aufgaben in anderen Projekten",
+  "Tasks I take part in": "Aufgaben, an denen ich beteiligt bin",
+  "Received notifications": "Erhaltene Benachrichtigungen",
+  "Sign-ins": "Anmeldungen",
+  "Push devices": "Push-Geräte",
+  "Agent chat settings": "Einstellungen der Agenten-Chats",
+  "Deleting account #{0}: {1} files kept by law stay in an administrator's trash until their period ends.": "Löschen von Konto #{0}: {1} gesetzlich aufbewahrte Dateien bleiben bis zum Fristende im Papierkorb einer Administration.",
+  "After the restore, {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log).": "Nach der Wiederherstellung wurden {0} früher gelöschte Organisationen und Einträge erneut gelöscht; {1} aus den letzten {2} Tagen bleiben, falls die Wiederherstellung sie zurückholen sollte; {3} ließen sich nicht erneut löschen (siehe Server-Protokoll)."
 }

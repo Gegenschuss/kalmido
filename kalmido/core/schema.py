@@ -2186,6 +2186,10 @@ CREATE TABLE IF NOT EXISTS deleted_accounts (
 -- 2.360.0 R (#2496): hashes of API tokens / app passwords that went (trigger REVOKED_TRIGGER); a restore deletes them again
 -- when the backup brings them back. New table only: older versions never read it
 CREATE TABLE IF NOT EXISTS revoked_creds (hash TEXT PRIMARY KEY, at TEXT NOT NULL);
+-- 2.360.4 (#3243): organisations and entries deleted for good, by table and id only (trigger PURGED_TRIGGER); a restore
+-- deletes them again when the backup brings them back. New table only: older versions never read it
+CREATE TABLE IF NOT EXISTS purged_rows (tbl TEXT NOT NULL, ref_id BIGINT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (tbl, ref_id));
+CREATE INDEX IF NOT EXISTS purged_rows_at ON purged_rows(at);
 -- 2.97.0 A (#1950): bookmarks (new tables below this line)
 -- bookmarks: links with a preview (module "reading", life/bookmarks.py). org_id NULL = private (only user_id sees it), else
 -- every member of the organisation reads it (writes: user_id or an admin of it). url_key = the normalised link (no double per
@@ -2809,6 +2813,22 @@ CREATE OR REPLACE TRIGGER kalmido_revoked_api_tokens AFTER DELETE ON api_tokens 
   EXECUTE FUNCTION kalmido_revoked_note('token_hash');
 CREATE OR REPLACE TRIGGER kalmido_revoked_app_passwords AFTER DELETE ON app_passwords FOR EACH ROW
   EXECUTE FUNCTION kalmido_revoked_note('pw_hash')"""
+# 2.360.4 (#3243): the same for what is deleted for good (cascades included): table + id into purged_rows; a row that comes
+# back with its id (an undo, an import) leaves the list again, so only what stayed gone counts. Re-created on every start.
+PURGED_TABLES = ("orgs", "lists", "tasks", "fs_nodes", "wiki_pages", "events", "sheets", "contacts", "clients", "hub_mails", "office_deals")
+PURGED_TRIGGER = """CREATE OR REPLACE FUNCTION kalmido_purged_note() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    DELETE FROM purged_rows WHERE tbl=TG_TABLE_NAME AND ref_id=NEW.id;
+  ELSE
+    INSERT INTO purged_rows(tbl, ref_id, at)
+      VALUES (TG_TABLE_NAME, OLD.id, to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"'))
+      ON CONFLICT (tbl, ref_id) DO UPDATE SET at=excluded.at;
+  END IF;
+  RETURN NULL;
+END $fn$;
+""" + ";\n".join(f"CREATE OR REPLACE TRIGGER kalmido_purged_{t} AFTER INSERT OR DELETE ON {t} FOR EACH ROW EXECUTE FUNCTION kalmido_purged_note()"
+                 for t in PURGED_TABLES)
 # 2.390.0 (#3353): the running ticket number of a task in a project with a key (lists.ticket_key). Every way a task is
 # made or moves (app, API, import, agents, rules) passes here: a new task in such a project gets the next number
 # (list_ticket_seq), a task that leaves its project keeps its old key as an alias (task_keys) and gets a new number in the

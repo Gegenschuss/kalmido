@@ -428,7 +428,9 @@ def login_gate(keys, username, pre=""):
 
 
 def login_wait(keys, username, pre=""):
-    """2.282.0 (#3111): the gate of a sign-in step: None (go on, after the delay when "slow") or a 429 response."""
+    """2.282.0 (#3111): the gate of a sign-in step: None (go on, after the delay when "slow") or a 429 response.
+    2.360.4 (#3248): on purpose only for the sign-in routes: the OIDC start, setup codes, invitations, the password reset, the
+    agent setup and API tokens keep the hard address lock (_rate_blocked): they have no "known name" and guard against floods."""
     gate = login_gate(keys, username, pre)
     if gate == "ok":
         return None

@@ -15256,5 +15256,15 @@
   "For a supplement with only the new items, untick this: both quotations stay valid.": "Bij een aanvulling met alleen de nieuwe posten: vinkje weghalen, beide offertes blijven geldig.",
   "This quotation was superseded": "Deze offerte is vervangen",
   "Menu points": "Menu-items",
-  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Een hier uitgeschakeld item verdwijnt voor iedereen in dit kantoor. Er wordt niets verwijderd: weer inschakelen brengt alles terug."
+  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Een hier uitgeschakeld item verdwijnt voor iedereen in dit kantoor. Er wordt niets verwijderd: weer inschakelen brengt alles terug.",
+  "Comments in other projects": "Opmerkingen in andere projecten",
+  "Channel messages": "Kanaalberichten",
+  "Tasks in other projects": "Taken in andere projecten",
+  "Tasks I take part in": "Taken waaraan ik meedoe",
+  "Received notifications": "Ontvangen meldingen",
+  "Sign-ins": "Aanmeldingen",
+  "Push devices": "Pushapparaten",
+  "Agent chat settings": "Instellingen van agentchats",
+  "Deleting account #{0}: {1} files kept by law stay in an administrator's trash until their period ends.": "Account #{0} verwijderen: {1} wettelijk bewaarde bestanden blijven tot het einde van de termijn in de prullenbak van een beheerder.",
+  "After the restore, {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log).": "Na het herstel zijn {0} eerder verwijderde organisaties en items opnieuw verwijderd; {1} van de laatste {2} dagen blijven, voor het geval het herstel ze moest terughalen; {3} konden niet opnieuw worden verwijderd (zie het serverlogboek)."
 }
