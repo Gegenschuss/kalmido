@@ -5731,7 +5731,7 @@ body.lydragging,body.lydragging *{cursor:grabbing!important;-webkit-user-select:
 /* 2.40.0 (#1382): building blocks of a number scheme (buttons, insert at the caret) and its preview */
 /* 2.36.1 C: Office & finance (#1021) -- quotations: the list, the editor (head, positions, automatic lines, totals, rights) */
 .ofdbar select{min-height:2.25rem}
-.rotag.st-sent{color:var(--accent)} .rotag.st-accepted{color:var(--ok,#2a8a4a)} .rotag.st-declined{color:var(--muted);text-decoration:line-through}
+.rotag.st-sent{color:var(--accent)} .rotag.st-accepted{color:var(--ok,#2a8a4a)} .rotag.st-declined,.rotag.st-superseded{color:var(--muted);text-decoration:line-through}
 .ofdsec{border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);padding:.5rem .75rem}
 .ofdsec>summary{cursor:pointer;display:flex;align-items:center;gap:.5rem;min-height:2.5rem;list-style:none}
 .ofdsec>summary::-webkit-details-marker{display:none}
