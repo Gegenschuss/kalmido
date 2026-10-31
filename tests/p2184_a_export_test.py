@@ -267,6 +267,14 @@ check(gf == ["Stand"], f"undo removes the field it made, the target's own stays 
 # 2.369.0 (#2734): the option the import added goes again, the target's stay
 go = [o["name"] for o in json.loads(one("SELECT options FROM doc_fields WHERE id=?", (GFS,))[0])["options"]]
 check(go == ["Offen", "Später"], f"undo takes back the option the import added {go}")
+# 2.369.0 (review): only added options in a run: the undo still asks for an admin of the target; a several-column ALTER is never skipped
+code = (f"from kalmido.core.db import connect, col_present\nfrom kalmido.core.access import Denied\nfrom kalmido.admin.orgimport import oi_undo_check\n"
+        f"c = connect()\ncr = {{'oi': [['doc_fields', {GFS}, 'o{GAM}', ['x']]]}}\n"
+        "try:\n    oi_undo_check(c, 999999, cr, '')\n    print('allowed')\nexcept Denied:\n    print('denied')\n"
+        "print(col_present(c, 'ALTER TABLE users ADD COLUMN IF NOT EXISTS id INT'), "
+        "col_present(c, 'ALTER TABLE users ADD COLUMN IF NOT EXISTS id INT, ADD COLUMN IF NOT EXISTS zz INT'))\nc.close()")
+ct = subprocess.run(["docker", "exec", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test"), "python3", "-c", code], capture_output=True, text=True)
+check(ct.stdout.split() == ["denied", "True", "False"], f"undo right + col_present {ct.stdout} {ct.stderr[-300:]}")
 check(not sql("SELECT 1 FROM doc_field_values WHERE ws=?", (f"o{GAM}",)), "undo removes the values")
 A.delete(B + f"/api/account/import/{iid}")
 

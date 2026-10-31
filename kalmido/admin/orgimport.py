@@ -15,6 +15,7 @@ office (office/model.py pb_personal), "user" = the private space (organisation c
 (named in the preview)."""
 import json
 import os
+import re
 import uuid
 
 from ..core.config import ATT_DIR, MAX_FILE_MB, OFFICE_DIR
@@ -382,7 +383,8 @@ def oi_undo_check(c, uid, cr, since):
     administered by uid now (a personal office: uid's own); no row was finalised after the import (since = its created_at),
     lies in a month locked by a lock not of this import, or (cash entries) up to a day closing not of this import."""
     items = [x for x in cr.get("oi") or [] if isinstance(x, list) and len(x) == 3]
-    for sp in {x[2] for x in items if isinstance(x[2], int)}:
+    opts = [x[2] for x in cr.get("oi") or [] if isinstance(x, list) and len(x) == 4 and isinstance(x[2], str)]  # 2.369.0 (#2734): by ws
+    for sp in {x[2] for x in items if isinstance(x[2], int)} | {int(w[1:]) for w in opts if re.fullmatch(r"o\d{1,18}", w)}:
         r = c.execute("SELECT personal_of FROM orgs WHERE id=?", (sp,)).fetchone()
         if not (r and r["personal_of"] == uid) and org_role(c, uid, sp) != "admin":
             raise Denied(403, tr("Only an admin of this organisation can do this"))
