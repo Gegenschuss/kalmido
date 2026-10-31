@@ -15267,7 +15267,7 @@
   "Invited. With an account at this address, the person sees the table once they may get it.": "Invitation enregistrée. Avec un compte à cette adresse, la personne verra le tableau dès qu'elle pourra le recevoir.",
   "The invitation stops working.": "L'invitation ne fonctionnera plus.",
   "The table is full (at most {0} MB)": "Le tableau est plein ({0} Mo au maximum)",
-  "Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.": "Votre page de réservation a atteint aujourd'hui sa limite de {0} e-mails de confirmation. Les réservations reprennent demain.",
+  "Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.": "Ta page de réservation a atteint aujourd'hui sa limite de {0} e-mails de confirmation. Les réservations reprennent demain.",
   "{0} monthly timesheet of an organisation stays, without the name.": ["{0} relevé mensuel d'une organisation est conservé, sans le nom.", "{0} relevés mensuels d'une organisation sont conservés, sans le nom."],
   "Approvals of deleted videos": "Validations de vidéos supprimées",
   "This record is kept until {0} by law": "Cette preuve est conservée légalement jusqu'au {0}",
@@ -15275,7 +15275,7 @@
   "Polls": "Sondages",
   "Holiday allowance": "Solde de congés",
   "Privacy contact": "Contact confidentialité",
-  "Links on the login page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).": "Liens sur la page de connexion, dans l'aide et sur les pages publiques (formulaires, portail, validations, réservations), p. ex. vers votre politique de confidentialité. Vide = pas de lien (ou la valeur de la configuration du serveur).",
+  "Links on the login page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).": "Liens sur la page de connexion, dans l'aide et sur les pages publiques (formulaires, portail, validations, réservations), p. ex. vers ta politique de confidentialité. Vide = pas de lien (ou la valeur de la configuration du serveur).",
   "Bad request": "Requête non valide",
   "Something went wrong": "Une erreur s’est produite",
   "Please go back and try again.": "Reviens en arrière et réessaie."
