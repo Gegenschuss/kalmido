@@ -30,7 +30,7 @@ if (process.env.P2233C_NOSTART !== '1') execFileSync('bash', [path.join(__dirnam
     for (const theme of ['dark', 'light']) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
       await nav(B + 'static/icon.svg');
-      await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
+      await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
       await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.ok)`);
       await nav(B + '#news');
       check(await ready(ev, `typeof lookSet === 'function' && !!S.settings && !!document.querySelector('#kbar')`, 80), theme + ': the app is up');
