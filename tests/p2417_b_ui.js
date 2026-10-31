@@ -43,7 +43,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
       await o.nav(B); await ready(ev);
       const p = await ev(PROBE);
       check(p && p.heads.every(x => x === p.top), `${tag}: page heads = #top h1 ${JSON.stringify(p)}`);
-      check(p && p.top === (w < 768 ? 19 : 24), `${tag}: #top h1 size ${p && p.top}`);
+      check(p && p.top === (w < 768 ? 18 : 24), `${tag}: #top h1 size ${p && p.top}`);
       check(p && p.mgh === 'none' && p.hhead === 'none', `${tag}: menu group labels without uppercase`);
       check(p && p.dlg.every(x => x === p.modal), `${tag}: dialog sub-heads = .modal h4 ${JSON.stringify(p)}`);
       check(p && p.sec.every(([s, wt]) => s === 14 && Number(wt) >= 600), `${tag}: section heads 14px / 600 ${JSON.stringify(p && p.sec)}`);

@@ -91,7 +91,8 @@ function swRun(src, {failLazy = false} = {}) {
   check(w.eval('settingsModal.name') === 'settingsModal' && !/loadModule/.test(w.eval('String(settingsModal)')), 'after loading: the real settingsModal');
   d.querySelector('.smodal')?.remove();
   // the gear in the sidebar works too (already loaded: opens at once)
-  d.querySelector('[data-act="settings"]')?.click(); await until(() => d.querySelector('.smodal'));
+  // #3400: the gear lives in a menu now, a stand-in button takes the same way through the click handler
+  const gear = d.createElement('button'); gear.dataset.act = 'settings'; d.body.append(gear); gear.click(); gear.remove(); await until(() => d.querySelector('.smodal'));
   check(!!d.querySelector('.smodal'), 'the gear opens the settings');
   d.querySelector('.smodal')?.remove();
   // contacts view
@@ -129,7 +130,7 @@ function swRun(src, {failLazy = false} = {}) {
     // settings.js may come later on its own (the idle preload 5 s after the start): only what started before counts
     const fetched = await ev(`JSON.stringify(performance.getEntriesByType('resource').filter(e => /\\/static\\/js\\/(settings|contacts|office[a-z_]*)\\.js/.test(e.name) && (e.startTime < 4500 || !/settings/.test(e.name))).map(e => e.name.split('/').pop() + '@' + Math.round(e.startTime)))`);
     check(fetched === '[]', 'Firefox: the start fetches no on-demand module ' + fetched);
-    await ev(`(document.querySelector('[data-act="settings"]').click(), 1)`);
+    await ev(`(() => { const b = document.createElement('button'); b.dataset.act = 'settings'; document.body.append(b); b.click(); b.remove(); return 1; })()`);  // #3400: the gear lives in a menu now
     for (let i = 0; i < 40 && !(await ev('!!document.querySelector(".smodal")')); i++) await sleep(150);
     check(await ev('!!document.querySelector(".smodal")'), 'Firefox: the gear loads + opens the settings');
     // 2.149.0 (#2506): the worker keeps a file as <url>?v=<hash> (ignoreSearch)
