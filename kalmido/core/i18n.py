@@ -57,7 +57,7 @@ def lang(c=None, uid=None):
     from ..core.db import connect, db, default_uid
     try:
         if uid is None and has_request_context():
-            if not getattr(g, "user", None):
+            if not getattr(g, "user", None) or not g.user["id"]:  # id 0: the visitor of a public link (PUB_ACTOR)
                 return browser_lang() or "en"
             uid = g.user["id"]
         own = c is None and not has_request_context()

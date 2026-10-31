@@ -4,6 +4,7 @@ first admin's. Signed in: the person's language. Errors of a browser outside the
 # kalmido-suite: fresh
 import os
 import re
+import subprocess
 import sys
 
 import requests
@@ -44,6 +45,12 @@ check(r.status_code == 405 and 'lang="fr"' in r.text and "Méthode" in r.text an
 check("<html" not in anon().get(B + "/api/test/boom").text.lower(), "the API stays JSON")
 r = anon().post(B + "/api/auth/login", data="{", headers={"Content-Type": "application/json"})
 check(r.status_code in (400, 401) and "<html" not in r.text.lower(), f"a broken body on the API: no Flask page {r.status_code}")
+
+CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+code = ("import app\nfrom flask import g\nfrom kalmido.core.i18n import lang\n"
+        "with app.app.test_request_context('/s/x', headers={'Accept-Language': 'fr'}):\n    g.user = {'id': 0}\n    print('LANG', lang())")
+out = subprocess.run(["docker", "exec", "-w", "/app", CT, "python", "-c", code], capture_output=True, text=True)
+check("LANG fr" in out.stdout, "the visitor of a public link (user id 0) follows the browser " + (out.stdout + out.stderr)[-200:])
 
 A.headers.update({**FR, **PAGE})
 r = A.get(B + "/does-not-exist")

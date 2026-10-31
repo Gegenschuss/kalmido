@@ -1686,7 +1686,7 @@ def err_page(code, title, text):
 
 
 def wants_page():
-    return "text/html" in (request.headers.get("Accept") or "") and not request.path.startswith(("/static/", "/api/", PUB_PREFIX))
+    return "text/html" in (request.headers.get("Accept") or "") and not request.path.startswith(("/static/", "/api/"))
 
 
 @app.errorhandler(400)
