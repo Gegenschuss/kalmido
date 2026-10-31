@@ -252,4 +252,15 @@ d = dbx("SELECT data FROM activity WHERE task_id=? AND kind='attach'", (tid,))[0
 d = json.loads(d) if isinstance(d, str) else d
 check(d.get("enc") == 1 and d.get("names") == ["Encrypted file"], f"stored as the key, not the writer's French {d}")
 
+# ================================================================ proposal title in a task's history (2.454.0, #3808)
+tid = Fr.post(B + "/api/tasks", json={"title": "Plan"}).json()["id"]
+r = Fr.post(B + "/api/proposals", json={"agent_id": AG, "kind": "subtasks", "task_id": tid})
+check(r.status_code == 201, "a proposal " + r.text[:200])
+check(r.json()["title"] == "Découper : Plan", f"the job keeps the asker's words {r.json()['title']}")
+r = Fr.post(B + f"/api/agents/jobs/{r.json()['id']}/action", json={"action": "reject"})
+check(r.ok, "the proposal is rejected " + r.text[:200])
+d = dbx("SELECT data FROM activity WHERE task_id=? AND kind='agent_job'", (tid,))[0][0]
+d = json.loads(d) if isinstance(d, str) else d
+check(d.get("title_key") == ["Break down: {0}", "Plan"], f"#3808: the history keeps the key, each reader's app translates it {d}")
+
 sys.exit(done("p2448_a_lang"))
