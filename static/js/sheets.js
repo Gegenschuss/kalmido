@@ -300,7 +300,7 @@ function shvSideHtml(sh) {
       ${w && (isF || c.frozen) ? `<button type="button" class="btn sm" data-shv="freeze">${ic(c.frozen ? 'sync' : 'snow', 's')}${c.frozen ? tr('Live again') : tr('Freeze value')}</button>` : ''}
       <h5>${tr('Comes from')}</h5>${from.length ? `<ul class="shvrefs">${from.join('')}</ul>` : `<p class="muted mhint">${tr('Nothing – an own value.')}</p>`}
       <h5>${tr('Goes into')}</h5>${into.length ? `<ul class="shvrefs">${into.join('')}</ul>` : `<p class="muted mhint">${tr('No other cell uses it.')}</p>`}`
-      : `<p class="muted mhint">${w ? tr('Empty. Type a value or a formula starting with =, e.g. {0}', '=B2*C2 · =SUMME(C2:C9) · =hier.zeit_gesamt') : tr('Empty.')}</p>`}</section>`;
+      : `<p class="muted mhint">${w ? tr('Empty. Type a value or a formula starting with =, e.g. {0}', tr('=B2*C2 · =SUM(C2:C9) · =here.total_time')) : tr('Empty.')}</p>`}</section>`;
   } else cell = `<section class="shvsec"><p class="muted mhint">${tr('Choose a cell to see where its value comes from.')}</p></section>`;
   const srcs = sh.sources || [];
   const src = srcs.length ? `<section class="shvsec"><h4>${tr('Kalmido sources')}</h4><ul class="shvrefs">${srcs.map(s => `<li>${s.denied ? `<span class="shverr">${ic('lock', 's')}${tr('No access')}</span>` : `<a href="${s.type === 'k' ? '#client/' + +s.id : '#l/' + +s.id}" class="shvsrc">${ic(s.type === 'k' ? 'brief' : s.type === 'p' ? 'rocket' : 'list', 's')}${esc(s.label || '')}</a>`}

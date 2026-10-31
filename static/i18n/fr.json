@@ -12671,7 +12671,6 @@
   "Task link": "Lien vers une tâche",
   "Links one other task. Everyone sees its title only if they may see that task.": "Relie une autre tâche. Seules les personnes qui peuvent voir cette tâche voient son titre.",
   "Allowed: + - * / ( ), numbers, field names in braces, comparisons (= <> < > <= >=) and the functions of tables:": "Autorisé : + - * / ( ), nombres, noms de champ entre accolades, comparaisons (= <> < > <= >=) et les fonctions des tableaux :",
-  "Separate the values with ; or , e.g. WENN({Hours} > 8; {Hours} * 1.5; {Hours}). Division by 0 shows as an error in the field.": "Séparez les valeurs par ; ou , p. ex. SI({Heures} > 8; {Heures} * 1,5; {Heures}). Une division par 0 s'affiche comme erreur dans le champ.",
   "{0}: a rating from 0 to {1}": "{0} : une évaluation de 0 à {1}",
   "{0}: task not found": "{0} : tâche introuvable",
   "unknown function “{0}”": "fonction inconnue « {0} »",
@@ -15428,5 +15427,8 @@
   "A file was left out because your storage is full": "Un fichier manque car ton stockage est plein",
   "A saved filter pointed at projects or people that did not come along and was left out: {0}": "Un filtre enregistré visait des projets ou des personnes qui n’ont pas été repris, il a été laissé de côté : {0}",
   "A template could not be taken over: {0}": "Un modèle n’a pas pu être repris : {0}",
-  "A formula could not be taken over": "Une formule n’a pas pu être reprise"
+  "A formula could not be taken over": "Une formule n’a pas pu être reprise",
+  "Separate the values with ; or , e.g. IF({Hours} > 8; {Hours} * 1.5; {Hours}). Division by 0 shows as an error in the field.": "Séparez les valeurs par ; ou , p. ex. IF({Heures} > 8; {Heures} * 1,5; {Heures}). Une division par 0 s'affiche comme erreur dans le champ.",
+  "=B2*C2 · =SUM(C2:C9) · =here.total_time": "=B2*C2 · =SUM(C2:C9) · =here.total_time",
+  "IF SUM ROUND MIN MAX AVERAGE COUNT": "IF SUM ROUND MIN MAX AVERAGE COUNT"
 }

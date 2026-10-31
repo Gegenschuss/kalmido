@@ -114,7 +114,7 @@ for a, (f, want) in F.items():
     else:
         check(x.get("value") == want and not x.get("error"), f"{f} = {want!r} " + json.dumps(x)[:200])
 check(cell(d, "D8").get("error_text") == "Not found", "not found reads 'Not found' " + str(cell(d, "D8").get("error_text")))
-check(cell(d, "D7").get("raw") == '=SVERWEIS("cherry";A1:C4;2;FALSCH)', "the formula shows as typed")
+check(cell(d, "D7").get("raw") == '=VLOOKUP("cherry";A1:C4;2;FALSE)', "the formula shows in the person's language")
 # a change answers the lookups that read it
 r = put(A, SID, [{"cell": "B3", "raw": "4"}])
 check(r.ok and any(x["addr"] == "D7" and x["value"] == 4 for x in r.json()["cells"]), "changing B3 answers the SVERWEIS again " + r.text[:300])
@@ -172,7 +172,7 @@ check(r.ok and cell(get(A, T2), "B5").get("value") == 15, "the column 'Tag' by n
 # the completion offers the new functions with a help
 v = A.get(B + f"/api/sheets/{T2}/vars", params={"q": "sver"}).json()
 items = v if isinstance(v, list) else v.get("items") or v.get("vars") or []
-check(any(x.get("token") == "SVERWEIS" and x.get("kind") == "function" and x.get("help") for x in items), "completion: SVERWEIS with help " + json.dumps(v)[:300])
+check(any(x.get("token") == "VLOOKUP" and x.get("kind") == "function" and x.get("help") for x in items), "completion: SVERWEIS with help " + json.dumps(v)[:300])
 
 # ================================================================== #2109 import / export
 def xlsx(rows):

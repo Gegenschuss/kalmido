@@ -13,8 +13,8 @@ function fxModalExtra(lid, f) {
   return `<div class="row fxrow"><label for="fd-fx">${tr('Formula')}</label><textarea id="fd-fx" rows="2" maxlength="500" spellcheck="false" placeholder="${esc(tr('e.g. {Amount} - {Refunded}'))}">${esc(o.formula || '')}</textarea></div>
     <div class="fxins" role="group" aria-label="${esc(tr('Insert a field'))}">${fs.length ? fs.map(x => `<button type="button" class="btn sm" data-fxins="${esc(x.name)}">${esc(x.name)}</button>`).join('') : `<span class="muted">${esc(tr('Add a number field first.'))}</span>`}</div>
     <details class="shelp sdet fxhelp"><summary>${tr('Formula help')}</summary><div class="muted">${esc(tr('Allowed: + - * / ( ), numbers, field names in braces, comparisons (= <> < > <= >=) and the functions of tables:'))}
-      <code>WENN/IF</code> <code>SUMME/SUM</code> <code>RUNDEN/ROUND</code> <code>MIN</code> <code>MAX</code> <code>MITTELWERT/AVERAGE</code> <code>ANZAHL/COUNT</code>.
-      ${esc(tr('Separate the values with ; or , e.g. WENN({Hours} > 8; {Hours} * 1.5; {Hours}). Division by 0 shows as an error in the field.'))}</div></details>
+      ${tr('IF SUM ROUND MIN MAX AVERAGE COUNT').split(' ').map(x => `<code>${esc(x)}</code>`).join(' ')}.
+      ${esc(tr('Separate the values with ; or , e.g. IF({Hours} > 8; {Hours} * 1.5; {Hours}). Division by 0 shows as an error in the field.'))}</div></details>
     <div class="row"><label for="fd-fxe">${tr('Empty fields')}</label><select id="fd-fxe"><option value="zero">${tr('count as 0')}</option><option value="blank" ${o.empty === 'blank' ? 'selected' : ''}>${tr('leave the result empty')}</option></select></div>
     <div class="row"><label for="fd-unit">${tr('Unit')}</label><input id="fd-unit" value="${esc(o.unit || '')}" maxlength="12" placeholder="${tr('optional, e.g. € or h')}" style="max-width:8.75rem"></div>`;
 }

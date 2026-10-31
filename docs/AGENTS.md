@@ -3897,7 +3897,9 @@ strict way: `409` (`error.cells` = all current cells, `error.rev`) as soon as th
   display = the file name) - people upload files into cells in the app.
 - **Kalmido variables**: `projekt.<name>.<field>`, `liste.<name>.<field>` (fields `zeit_gesamt` hours, `aufgaben`, `offen`,
   `erledigt`, `budget_h`), `kunde.<name>.<field>` (`satz`, `budget_h`, `budget_betrag`, `zeit_gesamt`), `hier.<field>`
-  (the attached project). `<name>` is the lower-case name with `_` for spaces; `sheet_vars` lists them with their
+  (the attached project). English works the same: `project.`, `list.`, `client.`, `task.`, `here.` with `total_time`, `tasks`,
+  `open`, `done`, `rate`, `budget_amount`; cells come back in your language (German names only for a German account), both
+  are always accepted. `<name>` is the lower-case name with `_` for spaces; `sheet_vars` lists them with their
   current value. Only sources of the table's space count (an organisation's table: that organisation's).
 - **Example - birthdays in the next 4 weeks**: `search_contacts` (scope `contacts`; each contact has `bday` as
   `YYYY-MM-DD` or `--MM-DD` without a year), keep the people whose birthday falls into the next 28 days, then ONE

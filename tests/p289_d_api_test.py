@@ -228,7 +228,7 @@ for rid in B1["rows"]:
         row_of[x["display"]] = rid
 g = row_of.get("Grade")
 cg = {k: cell(ls, g, cols[k]) for k in cols} if g else {}
-check(g and cg["Title"]["raw"] == f"=aufgabe.{tl[0]}.titel" and cg["Title"]["origin"] == "kalmido", "a live Kalmido value: =aufgabe.<id>.titel "
+check(g and cg["Title"]["raw"] == f"=task.{tl[0]}.title" and cg["Title"]["origin"] == "kalmido", "a live Kalmido value: =aufgabe.<id>.titel "
       + str(cg.get("Title")))
 check(g and cg["Status"]["display"] == "Open" and cg["Due"]["value"] == "2026-12-01" and float(cg["Time"]["value"]) == 1.5,
       "status, due, booked hours " + str({k: (v or {}).get("value") for k, v in cg.items()}))

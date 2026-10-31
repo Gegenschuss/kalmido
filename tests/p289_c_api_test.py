@@ -117,7 +117,7 @@ check(c1.get("D1", {}).get("value") == 950 and c1.get("D2", {}).get("value") == 
 check(c1.get("F1", {}).get("value") == 1 and c1.get("F1", {}).get("origin") == "kalmido", "liste.garden.offen = 1 open task " + str(c1.get("F1")))
 check(c1.get("F2", {}).get("value") == 1, "hier.offen = the attached list " + str(c1.get("F2")))
 check(c1.get("E1", {}).get("display") == "Offen" and (c1["E1"].get("agent") or {}).get("batch") == BATCH0, "a choice by label, the cell marked with the agent")
-check(c1.get("D1", {}).get("raw") == "=B1*C1" and c1.get("F1", {}).get("raw") == "=liste.garden.offen", "formulas shown with names")
+check(c1.get("D1", {}).get("raw") == "=B1*C1" and c1.get("F1", {}).get("raw") == "=list.garden.open", "formulas shown with names")
 check(S1["columns"][4]["color_mode"] == "row" and S1["columns"][4]["options"][0]["color"] == "#f5b041", "choices with colours, colour per row")
 r = Bo.get(B + f"/api/sheets/{SID}")
 check(r.ok and r.json()["batches"] and r.json()["batches"][0]["agent_id"] == TA, "the person sees the table and the agent's call " + r.text[:200])
@@ -150,7 +150,7 @@ check(r.status_code == 201 and r.json()["col_id"], "add a column " + r.text[:200
 check(ta.patch(V + f"/sheets/{SID}", json={"title": "Angebot Garten 2"}).json()["title"] == "Angebot Garten 2", "rename")
 vs = ta.get(V + f"/sheets/{SID}/vars").json()["data"]
 toks = {v["token"] for v in vs}
-check("liste.garden.offen" in toks and "hier.offen" in toks, "vars: the shared list and hier")
+check("list.garden.open" in toks and "here.open" in toks, "vars: the shared list and hier")
 check(not any("secret" in t for t in toks), "vars: never a list not shared with the agent")
 S9 = Bo.post(B + "/api/sheets", json={"title": "Orchard", "space": f"org:{ORG}", "list_id": W2}).json()["id"]
 check(ro.get(V + f"/sheets/{S9}").ok and ro.put(V + f"/sheets/{S9}/cells", json={"cells": [{"cell": "A1", "raw": "x"}]}).status_code == 403,
@@ -252,7 +252,7 @@ fx = {c.get("r"): c.find(NS + "f").text for c in ws.iter(NS + "c") if c.find(NS 
 vals = {c.get("r"): (c.find(NS + "v").text if c.find(NS + "v") is not None else None) for c in ws.iter(NS + "c")}
 check(fx.get("D2") == "B2*C2" and fx.get("D4") == "SUM(D2:D3)", "formulas in Excel form (header row 1) " + str(fx))
 check("F2" not in fx and vals.get("F2") == "1", "a Kalmido variable as its value")
-check("liste.garden.offen" in z.read("xl/comments1.xml").decode(), "... with a note naming it")
+check("list.garden.open" in z.read("xl/comments1.xml").decode(), "... with a note naming it")
 check(vals.get("D2") == "950", "the formula's value is stored too")
 dv = [x for x in ws.iter(NS + "dataValidation")]
 check(dv and dv[0].get("type") == "list" and dv[0].find(NS + "formula1").text == '"Offen,Fix,Neu"' and dv[0].get("sqref").startswith("E2:E"),
@@ -278,7 +278,7 @@ check([c["kind"] for c in d["columns"]][:6] == ["text", "number", "currency", "c
       "kinds back " + str([c["kind"] for c in d["columns"]]))
 check([(o["label"], o["color"]) for o in d["columns"][4]["options"]][:2] == [("Offen", "#f5b041"), ("Fix", "#58d68d")]
       and d["columns"][4]["color_mode"] == "row", "choices + colours + colour per row back")
-check(ci["D1"]["raw"] == "=B1*C1" and ci["D1"]["value"] == 950 and ci["D3"]["raw"] == "=SUMME(D1:D2)" and ci["D3"]["value"] == 2238,
+check(ci["D1"]["raw"] == "=B1*C1" and ci["D1"]["value"] == 950 and ci["D3"]["raw"] == "=SUM(D1:D2)" and ci["D3"]["value"] == 2238,
       "formulas back as formulas " + str((ci["D1"]["raw"], ci["D3"]["raw"])))
 check(ci["F1"]["value"] == 1 and ci["F1"]["origin"] == "own" and ci["E2"]["display"] == "Fix", "a variable's value as a value, choices")
 csv_in = "Name;Betrag;Datum\r\nKabel;12,50;18.10.2026\r\nStativ;1.234,00;01.11.2026\r\n=HYPERLINK(\"http://example.com\");3;\r\n".encode()

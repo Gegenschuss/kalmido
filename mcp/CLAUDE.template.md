@@ -553,7 +553,7 @@ colours, rows with inputs and formulas - all in ONE call), `sheet_update`, `shee
 `sheet_append_rows`, `sheet_add_column`, `sheet_undo_batch`. You see only tables attached to a project shared with you, those
 you created, tables a person shared with you one by one and (2.199.0) tables in a folder shared with you (`shared_in`,
 `folder_in`; role `read` = never write them). Every write call is one batch the person can take back; a cell with error `denied` is a source not shared with
-you: never guess its value. Formulas: `=SUMME(B2:B9)`, `=stunden*satz`, `=projekt.<name>.zeit_gesamt` (arguments with `;`).
+you: never guess its value. Formulas: `=SUM(B2:B9)`, `=hours*rate`, `=project.<name>.total_time` (arguments with `;`; the German names `SUMME`, `projekt.`, `zeit_gesamt` work as well, cells come back in your language).
 Column kinds also `checkbox` (1 / 0), `person` (account id of someone who sees the table), `link` (http(s) / mailto only)
 and `file` (read only for you: the file name; people upload files in the app).
 2.124.0: a table can have several sheets (`sheet_tabs` lists them, `sheet_add_tab` adds one); read and fill one sheet with
