@@ -145,7 +145,7 @@ check(r.status_code == 201, "a second series " + r.text[:200])
 dbx("UPDATE office_inv_series SET created_by=? WHERE id=?", (FID, r.json()["id"]))
 in_ct("import app\nfrom kalmido.core.db import connect\nfrom kalmido.office import recurring as x\nx._RIN_LAST['at'] = -1e12\n"
       "c = connect()\nx.rin_tick(c)\nc.close()")
-t = dict(dbx("SELECT created_by, content FROM tasks WHERE title LIKE '%Zweite%'"))
+t = dict(dbx("SELECT created_by, content FROM tasks WHERE content LIKE '%Zweite%'"))  # 2.367.4 (#2972): the series of one day share a task
 check("Vor dem Festschreiben fehlt" in t.get(ALICE, "") and "Steuernummer oder USt-IdNr." in t.get(ALICE, ""), f"#3808: the German admin reads the check in German {t}")
 check("Manque avant la clôture" in t.get(BOB, "") and "numéro fiscal" in t.get(BOB, ""), f"#3808: the French admin in French, the field names too {t}")
 
