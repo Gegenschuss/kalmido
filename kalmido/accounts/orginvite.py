@@ -41,7 +41,8 @@ OINV_RESEND_DAY = 3  # 2.148.1 A (#2486): resends per invitation and day
 OJN_DAYS = 14  # 2.148.1 A (#2480): an invitation of an existing account stays open this long
 # 2.453.0 (#3780): open: young enough, or the person set up the account with its link lately (a new account's link lasts as
 # long as the invitation: whoever uses it on the last day still gets the full time to accept). Params: the same cut twice.
-OJN_LIVE = "(j.created_at>? OR EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=j.user_id AND v.kind='invite' AND v.used_at>?))"
+# Only a link of this invitation or newer counts (created_at): an older link does not bring an expired invitation back.
+OJN_LIVE = "(j.created_at>? OR EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=j.user_id AND v.kind='invite' AND v.used_at>? AND v.created_at>=j.created_at))"
 OINV_REF = "org-invite"  # 2.360.2 M (#2561): purpose of the sealed row reference
 
 
@@ -239,6 +240,10 @@ def org_invite_resend(oid, ref):
             with system_ctx(c):  # the row of a person who is no member
                 c.execute("UPDATE org_joins SET created_at=? WHERE org_id=? AND user_id=?", (iso(now_utc()), oid, uid))
         inv = _no_link_if_sent(invite_new(c, uid, me(), send=True, days=OJN_DAYS if joined else None), uid)
+        if not g.user["is_admin"]:  # 2.453.0 (#3780): the answer of an existing account, it must not tell the two apart (a failed mail: log only)
+            if inv.get("error"):
+                print("organisation invitation: resend for account", uid, "not mailed:", inv["error"], flush=True)
+            inv = {"sent": True, "email": inv.get("email") or ""}
     bump(c)
     c.commit()
     return jsonify(ok=True, invitation=inv, invites=oinv_list(c, oid))
@@ -359,10 +364,11 @@ def ojn_waiting(c, uid, plain=False):
 
 
 def ojn_org_name(c, uid):
-    """2.453.0 (#3780): the organisation of uid's latest invitation (mail + invitation page of a new account, no member yet)."""
+    """2.453.0 (#3780): the organisation of uid's latest open invitation (mail + invitation page of a new account, no member yet)."""
+    cut = iso(now_utc() - timedelta(days=OJN_DAYS))
     with system_ctx(c):  # read before any sign-in
-        r = c.execute("""SELECT o.name FROM org_joins j JOIN orgs o ON o.id=j.org_id WHERE j.user_id=? AND o.retired_at IS NULL
-                         ORDER BY j.created_at DESC LIMIT 1""", (uid,)).fetchone()
+        r = c.execute(f"""SELECT o.name FROM org_joins j JOIN orgs o ON o.id=j.org_id WHERE j.user_id=? AND {OJN_LIVE} AND o.retired_at IS NULL
+                          ORDER BY j.created_at DESC LIMIT 1""", (uid, cut, cut)).fetchone()
     return r[0] if r else ""
 
 

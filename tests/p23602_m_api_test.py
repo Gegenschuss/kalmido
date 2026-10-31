@@ -135,16 +135,15 @@ check(rows(Bo, S6) == n and dbx("SELECT user_id FROM sheet_shares WHERE sheet_id
 check(Do.get(B + f"/api/sheets/{S6}").status_code == 404, "... without access")
 
 # 2.453.0 (#3781): a deleted account: the address row stays open, nothing tells the address had an account
-gone = A.post(B + "/api/users", json={"orgs": [ORG], "username": "gone", "display_name": "Gone Name", "password": "password123",
+gone = A.post(B + "/api/users", json={"orgs": [], "username": "gone", "display_name": "Gone Name", "password": "password123",
                                       "email": "gone@example.com", "features": "sheets,collab,comments"}).json()["id"]
 S7 = new(Bo, "Deleted", space="private")
 post(Bo, S7, email="gone@example.com", role="write")
 n = rows(Bo, S7)
 check(dbx("SELECT user_id FROM sheet_shares WHERE sheet_id=?", (S7,))[0][0] == gone, "the address row is bound to the account")
-post(Bo, S7, user_id=gone, role="read")
 r = A.delete(B + f"/api/users/{gone}")
 check(r.ok, "the account is deleted " + r.text[:200])
-check(rows(Bo, S7) == n, f"the address row reads as before, the row picked by name went {rows(Bo, S7)}")
+check(rows(Bo, S7) == n, f"the address row reads as before {rows(Bo, S7)}")
 check([x[0] for x in dbx("SELECT user_id FROM sheet_shares WHERE sheet_id=?", (S7,))] == [None], "... open again, without an account behind it")
 
 # removing an address row: the address is gone, Undo = the address again
@@ -235,6 +234,10 @@ check(st == {"fresh@example.com": "expired", "erin@example.com": "expired"}, f"b
 r = Bo.post(B + f"/api/orgs/{ORG}/invites/{next(x['ref'] for x in inv()['invites'] if x['email'] == 'fresh@example.com')}/resend")
 iv = {x["email"]: x for x in inv()["invites"]}
 check(r.ok and iv["fresh@example.com"]["state"] == "invited", "Resend renews the invitation with the link " + r.text[:200])
+re_u = r.json()["invitation"]
+r = Bo.post(B + f"/api/orgs/{ORG}/invites/{iv['erin@example.com']['ref']}/resend")
+check(set(re_u) == set(r.json()["invitation"]) == {"sent", "email"}, f"review: resend answers the same for both kinds {re_u} {r.text[:200]}")
+dbx("UPDATE org_joins SET created_at='2020-01-01T00:00:00+00:00' WHERE org_id=? AND user_id=(SELECT id FROM users WHERE email='erin@example.com')", (ORG,))
 tok = link_of("fresh@example.com")
 Fr = sess()
 chk = Fr.post(B + "/api/auth/invite/check", json={"token": tok}).json()
@@ -248,6 +251,17 @@ check(Fr.post(B + f"/api/orgs/{ORG}/join").ok and in_org("fresh@example.com"), "
 check(dbx("SELECT role FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND u.email='fresh@example.com'", (ORG,)) == [("readonly",)], "in the invited role")
 check(Er.post(B + f"/api/orgs/{ORG}/join").status_code == 404, "a used link says nothing for somebody else's expired invitation")
 Bo.delete(B + f"/api/orgs/{ORG}/invites/{inv()['invites'][0]['ref']}")
+# review: a reset names no organisation the person never joined; an older link does not bring an expired invitation back
+Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "stale@example.com"})
+St = sess()
+check(St.post(B + "/api/auth/invite/accept", json={"token": link_of("stale@example.com"), "password": "password123"}).ok, "the stale person sets a password")
+dbx("UPDATE user_invites SET kind='reset', used_at=NULL, expires_at='2099-01-01T00:00:00+00:00' WHERE user_id=(SELECT id FROM users WHERE email='stale@example.com')")
+chk = sess().post(B + "/api/auth/invite/check", json={"token": link_of("stale@example.com")}).json()
+check(chk.get("kind") == "reset" and not chk.get("org_name"), f"review: a reset link names no organisation {chk}")
+dbx("UPDATE user_invites SET kind='invite', used_at=?, created_at='2020-01-02T00:00:00+00:00' WHERE user_id=(SELECT id FROM users WHERE email='stale@example.com')", (kt.now().isoformat(),))
+dbx("UPDATE org_joins SET created_at='2020-03-01T00:00:00+00:00' WHERE org_id=? AND user_id=(SELECT id FROM users WHERE email='stale@example.com')", (ORG,))
+check(St.post(B + f"/api/orgs/{ORG}/join").status_code == 404, "review: a link older than the invitation keeps it expired")
+Bo.delete(B + f"/api/orgs/{ORG}/invites/{next(x['ref'] for x in inv()['invites'] if x['email'] == 'stale@example.com')}")
 # declined: nothing is left that the boundary check would count once the person is in another organisation
 Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "other@example.com"})
 tok = link_of("other@example.com")

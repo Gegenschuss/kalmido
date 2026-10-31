@@ -101,7 +101,7 @@ def invite_mail(c, u, link, kind, inviter, days=INVITE_DAYS):
     acc, bg, muted = MAIL_ACC, MAIL_BG, MAIL_MUTED  # 2.300.0 (#3198): petrol (was violet); 2.420.0 B (#3499): from the mail frame
     from ..accounts.orgs import org_names  # 2.22.0 (#752): "Example · Kalmido"
     from ..accounts.orginvite import ojn_org_name  # 2.453.0 (#3780): a new account is no member before it accepts
-    org = (org_names(c, u["id"]) or [ojn_org_name(c, u["id"])])[0]
+    org = (org_names(c, u["id"]) or [ojn_org_name(c, u["id"]) if kind == "invite" else ""])[0]  # a reset or a registration names no organisation the person never joined
     brand = f"{org} · {APP_NAME}" if org else APP_NAME
     if kind == "signup":  # 2.23.0 (#711): confirm the address of a registration
         subject = t(N_("Confirm your registration at {0}"), APP_NAME)
@@ -185,7 +185,7 @@ def invite_check():
                           "ORDER BY (i.org_id IS NULL), (b.user_id IS NULL), m.org_id LIMIT 1", (r["created_by"], u["id"])).fetchone()
         by_name = (by["display_name"] or by["username"]) if by else ""
         from ..accounts.orginvite import ojn_org_name  # 2.453.0 (#3780): a new account is no member before it accepts
-        org_name = o["name"] if o else ojn_org_name(c, u["id"])
+        org_name = o["name"] if o else (ojn_org_name(c, u["id"]) if r["kind"] == "invite" else "")
     return jsonify(username=u["username"], display_name=u["display_name"] or u["username"], kind=r["kind"],
                    lang=usettings(c, u["id"]).get("lang") or "en", min_password=MIN_PASSWORD, invited_by=by_name, org_name=org_name)
 
