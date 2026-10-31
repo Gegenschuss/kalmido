@@ -13,7 +13,7 @@ from flask import g, jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import body, bump, db, err, iso, now_utc
+from ..core.db import body, bump, db, err, iso, now_utc, trigger_skip_present
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_list, need_task, task_visible, vis_sql, WRITE_ROLES
 
@@ -48,7 +48,7 @@ CREATE OR REPLACE TRIGGER kalmido_ml_list AFTER UPDATE OF org_id ON lists FOR EA
 
 def ml_setup(c):
     """init_db (every start, after the migrations: lists.org_id is one): the pruning triggers (idempotent)."""
-    c.executescript(ML_TRIGGERS)
+    c.executescript(trigger_skip_present(c, ML_TRIGGERS))
 
 
 def ml_locked(c, lid):

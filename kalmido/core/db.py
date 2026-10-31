@@ -736,6 +736,76 @@ def ix_skip_present(script, have):
     return _IX_LINE.sub(lambda m: "" if m.group(1).lower() in have else m.group(0), script)
 
 
+# 2.369.0 B (#2731): ALTER TABLE takes its ACCESS EXCLUSIVE lock (until the start's COMMIT) before it finds the column
+_ADD_LINE = re.compile(r"^[ \t]*ALTER[ \t]+TABLE[ \t]+(\w+)[ \t]+ADD[ \t]+COLUMN[ \t]+IF[ \t]+NOT[ \t]+EXISTS[ \t]+(\w+)[ \t]", re.M)
+
+
+def col_present(c, stmt):
+    """2.369.0 B (#2731): is stmt an ALTER TABLE .. ADD COLUMN IF NOT EXISTS whose column exists (the same no-op)?"""
+    m = _ADD_LINE.search(stmt)
+    return bool(m and c.execute("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() "
+                                "AND table_name=? AND column_name=?", m.groups()).fetchone())
+
+
+def ix_ensure(c, sql, have=None):
+    """2.369.0 B (#2731): one CREATE INDEX IF NOT EXISTS (without its ";") through ix_skip_present; have = ix_have(c) of the
+    caller for a series."""
+    if ix_skip_present(sql + ";", ix_have(c) if have is None else have):
+        c.execute(sql)
+
+
+# 2.369.0 B (#2731): CREATE OR REPLACE TRIGGER locks its table (SHARE ROW EXCLUSIVE, until the start's COMMIT) and replaces the
+# trigger even when nothing differs. The wanted statement is compared with pg_get_triggerdef: a false match would keep a changed
+# trigger, so what cannot be read counts as different (a needless replace is only the lock of before)
+_TG_STR = re.compile(r"('(?:[^']|'')*')")
+_TG_DEF = re.compile(r"^create (?:or replace )?trigger (\S+) (before|after|instead of) (.+?) on (\S+) (.+)$", re.S)
+_TG_LINE = re.compile(r"^[ \t]*CREATE[ \t]+OR[ \t]+REPLACE[ \t]+TRIGGER[ \t]+(\w+)\b[^;]*?\bON[ \t]+(\w+)\b[^;]*(?:;|\Z)", re.M)
+
+
+def tg_norm(sql, schema="public"):
+    """A trigger statement in one form, so that the wanted text and pg_get_triggerdef(oid, true) compare: words in lower case
+    and spaces evened out (string literals, the trigger's arguments, stay as they are), the events and the columns of UPDATE OF
+    sorted, the schema off the table and the function, EXECUTE PROCEDURE = FUNCTION. WHEN stays as written apart from that
+    (only the pretty form drops its redundant brackets). None when it cannot be read."""
+    parts = _TG_STR.split(sql.strip().rstrip(";").rstrip())
+    parts[::2] = [re.sub(r"\s*([(),])\s*", r"\1", re.sub(r"\s+", " ", p)).lower() for p in parts[::2]]
+    m = _TG_DEF.match("".join(parts))
+    if not m:
+        return None
+    name, when, events, table, rest = m.groups()
+    ev = sorted("update of " + ",".join(sorted(e[10:].split(","))) if e.startswith("update of ") else e for e in events.split(" or "))
+    pre = schema.lower() + "."
+    table = table[len(pre):] if table.startswith(pre) else table
+    rest = re.sub(r"\bexecute (?:procedure|function) ", "execute function ", rest)
+    return " ".join((name, when, " or ".join(ev), "on", table, rest.replace("execute function " + pre, "execute function ")))
+
+
+def tg_same(c, name, table, sql):
+    """Is trigger name of table in place as sql says, and switched on (a replace would switch it on again)?"""
+    r = c.execute("SELECT pg_get_triggerdef(t.oid, true), t.tgenabled='O', current_schema() FROM pg_trigger t "
+                  "JOIN pg_class k ON k.oid=t.tgrelid WHERE t.tgname=? AND k.relname=? "
+                  "AND k.relnamespace=current_schema()::regnamespace AND NOT t.tgisinternal", (name, table)).fetchone()
+    if not r or not r[1]:
+        return False
+    want = tg_norm(sql, r[2])
+    return want is not None and want == tg_norm(r[0], r[2])
+
+
+def trigger_ensure(c, name, table, sql):
+    """2.369.0 B (#2731): creates a start trigger only when it is missing or differs. The function behind it stays a
+    CREATE OR REPLACE FUNCTION on every start (no table lock). True = sql ran."""
+    if tg_same(c, name, table, sql):
+        return False
+    c.execute(sql)
+    return True
+
+
+def trigger_skip_present(c, script):
+    """2.369.0 B (#2731): trigger_ensure for a script of functions and triggers: the script without the CREATE OR REPLACE
+    TRIGGER statements in place, the others run where they stand (after their function)."""
+    return _TG_LINE.sub(lambda m: "" if tg_same(c, m.group(1), m.group(2), m.group(0)) else m.group(0), script)
+
+
 def mig_apply(c):
     """2.102.0 D (#1996): runs the MIGRATIONS steps whose column is missing and records every step in kalmido_migrations
     ("applied", or "present" for a column that existed already: every database before 2.102 on its first start, or one an
@@ -836,7 +906,7 @@ def init_db(guard=True, load=None):
         write_lock(c, "kalmido-init")
         for ext in ("unaccent", "pg_trgm"):  # message search (collab/msgsearch.py); both ship with the postgres image
             c.execute(f"CREATE EXTENSION IF NOT EXISTS {ext}")
-        c.executescript(ix_skip_present(SCHEMA, ix_have(c)))  # 2.183.0 B (#2666): only the missing indexes
+        c.executescript(trigger_skip_present(c, ix_skip_present(SCHEMA, ix_have(c))))  # 2.183.0 B (#2666): only the missing indexes; 2.369.0 B (#2731): and triggers
         clk("schema")
         flags0 = mig_flags_sync(c)  # 2.102.0 D (#1996): the one-shots done before this start (recorded if not yet)
         mig_apply(c)  # 2.102.0 D (#1996): only the MIGRATIONS steps not yet recorded in kalmido_migrations
@@ -851,14 +921,14 @@ def init_db(guard=True, load=None):
         # 2.352.0 A (#2748): not a row only a folder's share gives (frole)
         c.execute("UPDATE list_members SET own_role=role WHERE own_role IS NULL AND grole IS NULL AND frole IS NULL")
         clk("list_members_own_role")
-        c.execute("CREATE INDEX IF NOT EXISTS tasks_agroup ON tasks(assignee_group_id) WHERE assignee_group_id IS NOT NULL")
+        ix_ensure(c, "CREATE INDEX IF NOT EXISTS tasks_agroup ON tasks(assignee_group_id) WHERE assignee_group_id IS NOT NULL")
         c.execute("DROP INDEX IF EXISTS tasks_tt")  # tt_id is unique per user now (tasks_tt_user)
-        c.executescript(TIME_TITLE_TRIGGER)
-        c.executescript(LIST_E2E_TRIGGER)  # 2.64.1 (#1817): members of lists with the lock
-        c.executescript(WIKI_E2E_TRIGGER)  # 2.64.3 (#1817): members of organisations whose knowledge space has the lock
-        c.executescript(REVOKED_TRIGGER)  # 2.360.0 R (#2496): what was revoked stays revoked after a restore
-        c.executescript(PURGED_TRIGGER)  # 2.360.4 (#3243): what was deleted for good stays deleted after a restore
-        c.executescript(TICKET_NO_TRIGGER)  # 2.390.0 (#3353): running ticket numbers of projects with a key
+        c.executescript(trigger_skip_present(c, TIME_TITLE_TRIGGER))
+        c.executescript(trigger_skip_present(c, LIST_E2E_TRIGGER))  # 2.64.1 (#1817): members of lists with the lock
+        c.executescript(trigger_skip_present(c, WIKI_E2E_TRIGGER))  # 2.64.3 (#1817): members of organisations whose knowledge space has the lock
+        c.executescript(trigger_skip_present(c, REVOKED_TRIGGER))  # 2.360.0 R (#2496): what was revoked stays revoked after a restore
+        c.executescript(trigger_skip_present(c, PURGED_TRIGGER))  # 2.360.4 (#3243): what was deleted for good stays deleted after a restore
+        c.executescript(trigger_skip_present(c, TICKET_NO_TRIGGER))  # 2.390.0 (#3353): running ticket numbers of projects with a key
         clk("triggers")
         from ..tasks.delta import dl_setup
         dl_setup(c)  # 2.42.0 (#1376): the change triggers of the delta state
@@ -870,12 +940,12 @@ def init_db(guard=True, load=None):
         ml_setup(c)  # 2.71.0 B (#1459): links never cross a workspace boundary
         clk("ml_setup")
         # 2.410.0 B (#3515): when a task came into its board column (a test server: on its test clock)
-        c.executescript(SEC_AT_TRIGGER.replace("{off}", str(round(_TEST_OFFSET.total_seconds()) if _TEST_OFFSET is not None else 0)))
+        c.executescript(trigger_skip_present(c, SEC_AT_TRIGGER.replace("{off}", str(round(_TEST_OFFSET.total_seconds()) if _TEST_OFFSET is not None else 0))))
         clk("sec_at_trigger")
         have_ix = ix_have(c)  # 2.183.0 B (#2666): only the missing indexes
         for stmt in INDEXES.strip().split(";"):
             m = _IX_LINE.search(stmt + ";")
-            if stmt.strip() and not (m and m.group(1).lower() in have_ix):
+            if stmt.strip() and not (m and m.group(1).lower() in have_ix) and not col_present(c, stmt):
                 c.execute(stmt)
         clk("indexes")
         from ..life.rss import p2172b_feed_unique
@@ -1156,7 +1226,7 @@ def init_db(guard=True, load=None):
                 print("tidy: assigned the tidy agent of", n, "list(s)", flush=True)
         # 2.18.0 (#430): the milestones of the project overview (list_milestones, 2.7.1) become milestone tasks. Runs whenever
         # rows exist (no flag): a restored backup from before 2.18.0 brings them back and is migrated again
-        c.execute("CREATE INDEX IF NOT EXISTS tasks_msid ON tasks(milestone_id) WHERE milestone_id IS NOT NULL")
+        ix_ensure(c, "CREATE INDEX IF NOT EXISTS tasks_msid ON tasks(milestone_id) WHERE milestone_id IS NOT NULL")
         n = ms_migrate(c)
         clk("ms_migrate")
         if n:

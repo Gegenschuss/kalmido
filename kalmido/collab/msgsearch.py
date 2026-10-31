@@ -21,7 +21,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import db, gset, gsetting
+from ..core.db import db, gset, gsetting, ix_ensure
 from ..accounts.session import me
 from ..core.access import collab_all, Denied, FULL_ROLES, list_role, tvis, vis_sql
 from ..tasks.validation import as_int
@@ -68,7 +68,7 @@ def msg_index_init(c):
     for t in MSG_TABLES:
         if new:
             c.execute(f"DROP INDEX IF EXISTS msg_trgm_{t}")
-        c.execute(f"CREATE INDEX IF NOT EXISTS msg_trgm_{t} ON {t} USING gin (kalmido_fold(body) gin_trgm_ops)")
+        ix_ensure(c, f"CREATE INDEX IF NOT EXISTS msg_trgm_{t} ON {t} USING gin (kalmido_fold(body) gin_trgm_ops)")
     if new:
         gset(c, "msg_fts_v", INDEX_VERSION)
         print("message search: index (re)built", flush=True)
