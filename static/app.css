@@ -5303,8 +5303,8 @@ body.msel #view .qdock{visibility:hidden}
 .wsagrp .mgn{display:inline-flex;align-items:center;gap:.375rem}
 /* 2.147.2 B (#2501): role select: 44 px high, the longest role name fits */
 select.orgrolesel,.wsorg .mrow select.orgrolesel{min-height:2.75rem;min-width:8.5rem;max-width:100%}
-/* 2.455.0 (#3852): phone widths: a member's name gets the whole first line (beside the picture), the role choice and the buttons wrap below; hint lines in rows wrap instead of ending in dots */
-@media (max-width:30rem){.wsorg .mrow .n{flex:1 1 calc(100% - 2.75rem);white-space:normal;overflow-wrap:anywhere}.mrow .n small.muted{display:block;white-space:normal;overflow-wrap:anywhere}}
+/* 2.455.0 (#3852): phone: a member's name gets the first line, role and buttons wrap below; hint lines wrap */
+@media (max-width:30rem){.wsorg .mrow .n{flex:1 1 calc(100% - 2.75rem)}.wsorg .mrow .n,.mrow .n small.muted{white-space:normal;overflow-wrap:anywhere}.mrow .n small.muted{display:block}}
 .wsadd{gap:.375rem}.wsadd input{flex:1;min-width:8rem}
 .row input.unin{max-width:14rem}
 /* 2.28.0 (#985): the robot badge on an agent's picture */
