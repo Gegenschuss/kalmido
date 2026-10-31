@@ -355,7 +355,10 @@ def csv_row(r, m, title_max=CSV_TEXT_MAX, cp_max=CSV_TEXT_MAX, amount_max=CSV_AM
         elif a_out:  # the debit column: written with or without a minus, always out
             amt = -abs(a_out)
     title = (col("title") or col("counterpart")).strip()
-    out["title"] = re.sub(r"\s+", " ", title)[:title_max]
+    full = re.sub(r"\s+", " ", title)
+    out["title"] = full[:title_max]
+    if len(full) > title_max:
+        out["cut"] = True  # 2.363.3 (#3134): the import dialog says so
     if out["day"] is None:
         out["error"] = tr("The date cannot be read")
     elif m.get("sign") is not None and m.get("amount") is not None and amt is None and csv_sign(col("sign")) is None:

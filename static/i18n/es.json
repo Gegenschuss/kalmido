@@ -10967,7 +10967,6 @@
   "{0} (copy)": "{0} (copia)",
   "Duplicate “{0}”": "Duplicar «{0}»",
   "Copy completed tasks too": "Copiar también las tareas completadas",
-  "Sections, tasks with subtasks and dates, fields, notepads and the page arrangement come along. Members, shares and assignees do not: the copy is yours alone.": "Se copian las secciones, las tareas con subtareas y fechas, los campos, los blocs de notas y la disposición de la página. Los miembros, los permisos compartidos y los responsables no: la copia es solo tuya.",
   "This account is not linked to the login provider yet. Log in with your password first, then use the provider's button once in the same browser.": "Esta cuenta aún no está vinculada al proveedor de inicio de sesión. Inicia sesión primero con tu contraseña y luego usa una vez el botón del proveedor en el mismo navegador.",
   "A login with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).": "Un inicio de sesión con el proveedor OIDC coincidió con {0} por {1}, pero no se vinculó (administrador, segundo factor o ningún correo verificado coincidente).",
   "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Aún no se ha comprobado si tiene malware: el archivo se podrá abrir cuando el antivirus lo haya comprobado",
@@ -13949,7 +13948,6 @@
   "With hints": "Con avisos",
   "Me, {0} and job results": "Yo, {0} y resultados de jobs",
   "To the job chat": "Al chat del job",
-  "The CSV has no comments, attachments, repeats, reminders or dependencies. For everything, use the account export.": "El CSV no incluye comentarios, adjuntos, repeticiones, recordatorios ni dependencias. Para todo, usa la exportación de la cuenta.",
   "The files together are larger than {0} MB: send fewer files at once": "Los archivos juntos superan {0} MB: envía menos archivos a la vez",
   "{0} is larger than {1} MB": "{0} es mayor de {1} MB",
   "{0} person coming along": ["{0} persona que acompaña", "{0} personas que acompañan"],
@@ -15371,5 +15369,12 @@
   "{0} page in the trash goes along": ["{0} página de la papelera se mueve también", "{0} páginas de la papelera se mueven también"],
   "The task was moved meanwhile: it is shown in that project again if it moves back within 24 hours.": "La tarea se ha movido entretanto: volverá a mostrarse en ese proyecto si regresa en 24 horas.",
   "Your order of My tasks was changed on another device: that order stays, this change was not applied.": "Tu orden de Mis tareas se cambió en otro dispositivo: ese orden se mantiene y este cambio no se aplicó.",
-  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.": "Las tareas de la organización asignadas a esa persona quedan sin asignar y deja de acompañar en ellas; si vuelve a unirse en 24 horas, se recupera para las tareas que pueda ver entonces."
+  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.": "Las tareas de la organización asignadas a esa persona quedan sin asignar y deja de acompañar en ellas; si vuelve a unirse en 24 horas, se recupera para las tareas que pueda ver entonces.",
+  "{0} purpose is longer than {1} characters and is cut off on import.": ["{0} concepto supera los {1} caracteres y se recortará al importar.", "{0} conceptos superan los {1} caracteres y se recortarán al importar."],
+  "Recognising again": "Reconociendo de nuevo",
+  "The recognition is still running. Please try again in a moment.": "El reconocimiento sigue en marcha. Inténtalo de nuevo en un momento.",
+  "This recognition can no longer be taken back": "Este reconocimiento ya no se puede deshacer",
+  "The CSV counts comments and attachments but does not contain them. For everything, use the account export.": "El CSV cuenta los comentarios y adjuntos, pero no los contiene. Para tenerlo todo, usa la exportación de la cuenta.",
+  "Everything except comments and times comes along, files too. Members and shares do not: assignees stay only where they may see the copy.": "Se copia todo salvo comentarios y tiempos, también los archivos. Los miembros y los accesos compartidos no: las asignaciones solo se mantienen si la persona puede ver la copia.",
+  "Not copied: {0}": "No copiado: {0}"
 }

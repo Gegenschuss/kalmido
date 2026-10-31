@@ -627,9 +627,10 @@ def docs_redo(nid):
     """Recognise again (text, date, amount; the sorting keeps what is set)."""
     c = db()
     _no_agent()
-    _doc(c, nid, write=True)
+    m, _n = _doc(c, nid, write=True)
     from ..office.periodlock import pl_receipt_need_open
     pl_receipt_need_open(c, nid)  # 2.148.0 A (#2471): a new recognition could change a locked receipt's amount
+    S.redo_save(c, m, nid)  # 2.363.3 (#3134): for "Undo"
     c.execute("UPDATE doc_meta SET state='wait', tries=0, error='', updated_at=? WHERE node_id=?", (_now(), nid))
     c.commit()
     docs_kick()
@@ -637,6 +638,22 @@ def docs_redo(nid):
     out = doc_json(c, m, n, role=n["role"])
     out["kept"] = out["hand"]  # 2.273.0 C (#3047): the values set by hand the new run does not replace
     return jsonify(out)
+
+
+@app.post("/api/docs/<int:nid>/redo/undo")
+def docs_redo_undo(nid):
+    """2.363.3 (#3134): takes the last "Recognise again" back (within 24 h): the values, the text and the tags from before;
+    values set by hand since then stay. 400 when it is too late or the run is still busy."""
+    c = db()
+    _no_agent()
+    _doc(c, nid, write=True)
+    from ..office.periodlock import pl_receipt_need_open
+    pl_receipt_need_open(c, nid)  # like the recognition itself: it could change a locked receipt's amount
+    S.redo_back(c, nid)
+    bump(c)
+    c.commit()
+    m, n = _doc(c, nid)
+    return jsonify(doc_json(c, m, n, role=n["role"]))
 
 
 @app.get("/api/docs/<int:nid>/thumb")

@@ -68,7 +68,8 @@ def ua8_admin_dicts(c, rows):
                 f"SELECT user_id, COALESCE(SUM(size),0) FROM budget_files WHERE user_id IN ({q}) GROUP BY user_id",
                 f"SELECT created_by, COALESCE(SUM(size),0) FROM wiki_files WHERE created_by IN ({q}) GROUP BY created_by",  # 2.99.0 A (#2182)
                 f"SELECT created_by, COALESCE(SUM(size),0) FROM sheet_files WHERE created_by IN ({q}) GROUP BY created_by",  # 2.124.0 B (#2110)
-                f"SELECT user_id, COALESCE(SUM(size),0) FROM tchat_files WHERE user_id IN ({q}) GROUP BY user_id"):  # 2.113.1 (#2059)
+                f"SELECT user_id, COALESCE(SUM(size),0) FROM tchat_files WHERE user_id IN ({q}) GROUP BY user_id",  # 2.113.1 (#2059)
+                f"SELECT user_id, COALESCE(SUM(size),0) FROM template_files WHERE user_id IN ({q}) GROUP BY user_id"):  # 2.363.3 (#3134)
         for uid, n in c.execute(sql, ids):  # admin/hosting._user_bytes, per account
             used[uid] = used.get(uid, 0) + int(n or 0)
     out = []

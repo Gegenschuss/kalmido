@@ -3505,7 +3505,7 @@ with the scope it needs). The tools:
   tasks), `get_key_figures` (2.43.0: the key figures of a project, `GET /api/v1/lists/{id}/kpis`, read-only, never of a health project)
 - project tags: `list_list_tags`, `create_list_tag`, `update_list_tag`, `delete_list_tag`
 - templates and filters: `list_templates`, `create_template`, `update_template`, `delete_template`, `apply_template`,
-  `duplicate_list` (2.78.0: a copy of a project with its tasks, dates and notepads, without members),
+  `duplicate_list` (2.78.0: a copy of a project with its tasks, dates and notepads, without members; 2.363.3: everything except comments and times, files as copies, people only where they may be assigned in the copy),
   `list_filters`, `create_filter`, `update_filter`, `delete_filter`
 - comments and reactions: `add_comment`, `update_comment`, `delete_comment`, `react`
 - files: `list_attachments`, `get_attachment` (task, chat or project files), `read_attachment` (2.34.0: PDF / text as text; 2.92.0: Word / Excel too), `upload_attachment`, `create_text_file` (2.30.0), `delete_attachment`,

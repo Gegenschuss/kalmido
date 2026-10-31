@@ -10967,7 +10967,6 @@
   "{0} (copy)": "{0} (kopie)",
   "Duplicate “{0}”": "„{0}” dupliceren",
   "Copy completed tasks too": "Ook voltooide taken kopiëren",
-  "Sections, tasks with subtasks and dates, fields, notepads and the page arrangement come along. Members, shares and assignees do not: the copy is yours alone.": "Secties, taken met subtaken en datums, velden, notitieblokken en de indeling van de pagina gaan mee. Leden, delingen en toegewezen personen niet: de kopie is alleen van jou.",
   "This account is not linked to the login provider yet. Log in with your password first, then use the provider's button once in the same browser.": "Dit account is nog niet gekoppeld aan de inlogdienst. Log eerst in met je wachtwoord en gebruik daarna één keer de knop van de inlogdienst in dezelfde browser.",
   "A login with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).": "Een aanmelding bij de OIDC-provider kwam via {1} overeen met {0}, maar is niet gekoppeld (beheerder, tweede factor of geen overeenkomend geverifieerd e-mailadres).",
   "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Nog niet op malware gecontroleerd: het bestand kan worden geopend zodra de virusscanner het heeft gecontroleerd",
@@ -13949,7 +13948,6 @@
   "With hints": "Met opmerkingen",
   "Me, {0} and job results": "Ik, {0} en jobresultaten",
   "To the job chat": "Naar de jobchat",
-  "The CSV has no comments, attachments, repeats, reminders or dependencies. For everything, use the account export.": "De CSV bevat geen opmerkingen, bijlagen, herhalingen, herinneringen of afhankelijkheden. Gebruik voor alles de accountexport.",
   "The files together are larger than {0} MB: send fewer files at once": "De bestanden samen zijn groter dan {0} MB: stuur minder bestanden tegelijk",
   "{0} is larger than {1} MB": "{0} is groter dan {1} MB",
   "{0} person coming along": ["{0} persoon die meegaat", "{0} personen die meegaan"],
@@ -15371,5 +15369,12 @@
   "{0} page in the trash goes along": ["{0} pagina in de prullenbak verhuist mee", "{0} pagina's in de prullenbak verhuizen mee"],
   "The task was moved meanwhile: it is shown in that project again if it moves back within 24 hours.": "De taak is intussen verplaatst: ze verschijnt weer in dat project als ze binnen 24 uur terugkomt.",
   "Your order of My tasks was changed on another device: that order stays, this change was not applied.": "Je volgorde van Mijn taken is op een ander apparaat gewijzigd: die volgorde blijft, deze wijziging is niet toegepast.",
-  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.": "Aan deze persoon toegewezen taken van de organisatie worden niet meer toegewezen en deze persoon komt bij geen enkele meer mee; wie binnen 24 uur terugkeert, krijgt dat terug voor de taken die dan zichtbaar zijn."
+  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.": "Aan deze persoon toegewezen taken van de organisatie worden niet meer toegewezen en deze persoon komt bij geen enkele meer mee; wie binnen 24 uur terugkeert, krijgt dat terug voor de taken die dan zichtbaar zijn.",
+  "{0} purpose is longer than {1} characters and is cut off on import.": ["{0} omschrijving is langer dan {1} tekens en wordt bij het importeren ingekort.", "{0} omschrijvingen zijn langer dan {1} tekens en worden bij het importeren ingekort."],
+  "Recognising again": "Opnieuw herkennen",
+  "The recognition is still running. Please try again in a moment.": "De herkenning loopt nog. Probeer het zo meteen opnieuw.",
+  "This recognition can no longer be taken back": "Deze herkenning kan niet meer ongedaan worden gemaakt",
+  "The CSV counts comments and attachments but does not contain them. For everything, use the account export.": "De CSV telt opmerkingen en bijlagen, maar bevat ze niet. Gebruik voor alles de accountexport.",
+  "Everything except comments and times comes along, files too. Members and shares do not: assignees stay only where they may see the copy.": "Alles behalve opmerkingen en tijden gaat mee, ook bestanden. Leden en delingen niet: toewijzingen blijven alleen als de persoon de kopie mag zien.",
+  "Not copied: {0}": "Niet gekopieerd: {0}"
 }

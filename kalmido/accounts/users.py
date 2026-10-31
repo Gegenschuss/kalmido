@@ -531,6 +531,8 @@ def _user_purge(c, uid):
     files += wka_user_files(c, uid)  # 2.99.0 A (#2182): the files of its private pages (the rows go with the account)
     from ..sheets.shkinds import shk_user_files
     files += shk_user_files(c, uid)  # 2.124.0 B (#2110): the files of its private tables' file cells
+    from ..lists.tplextra import tx_user_files
+    files += tx_user_files(c, uid)  # 2.363.3 (#3134): the files of its templates
     from ..wiki.wikie2e import wke_user_purge
     wke_user_purge(c, uid)  # 2.64.3 A (#1817): knowledge spaces with the lock whose key the person held: rotation pending
     av = (c.execute("SELECT avatar FROM users WHERE id=?", (uid,)).fetchone() or [None])[0]

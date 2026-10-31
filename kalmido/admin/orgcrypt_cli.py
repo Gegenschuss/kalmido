@@ -290,6 +290,7 @@ def all_files(c):
                          "UNION ALL SELECT path FROM chat_files UNION ALL SELECT path FROM budget_files "  # 2.72.0 (#1333)
                          "UNION ALL SELECT path FROM wiki_files "  # 2.99.0 A (#2182)
                          "UNION ALL SELECT path FROM sheet_files "  # 2.124.0 B (#2110)
+                         "UNION ALL SELECT path FROM template_files "  # 2.363.3 (#3134)
                          "UNION ALL SELECT path FROM tchat_files").fetchall()  # 2.113.1 (#2059): team chat files
     out = [os.path.join(ATT_DIR, r[0]) for r in rows if r[0]] + list(f8f_icon_files(c))  # 2.58.0 (#1805)
     if os.path.isdir(OFFICE_DIR):

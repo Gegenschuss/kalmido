@@ -312,7 +312,7 @@ function lexCsv(lid) {
   a.href = `/api/lists/${lid}/export.csv?done=${LS.get('lexDone', true) ? 1 : 0}`;
   a.download = ''; a.hidden = true;
   document.body.appendChild(a); a.click(); a.remove();
-  toast(tr('The CSV has no comments, attachments, repeats, reminders or dependencies. For everything, use the account export.'), null, 9000);  // 2.273.0 D (#3051)
+  toast(tr('The CSV counts comments and attachments but does not contain them. For everything, use the account export.'), null, 9000);  // 2.273.0 D (#3051), 2.363.3 (#3134)
 }
 const pv_attr = o => ` data-pview="${esc(JSON.stringify(o))}"`;
 // 2.92.0 C (#1926): a Word / Excel file opens in the document preview (docpreview.js, module pdf) like a PDF:

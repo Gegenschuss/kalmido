@@ -845,6 +845,7 @@ ROUTES = {
     "POST /api/v1/tasks/{}/comments": "task", "POST /api/v1/tasks/{}/take": "task", "GET /api/tasks/{}/timeline": "task",
     "POST /api/tasks/{}/seen": "task", "POST /api/tasks/{}/comments": "task", "GET /api/tasks/{}": "task",
     "POST /api/tasks/{}/git-undo": "task", "POST /api/tasks/{}/take": "task",
+    "POST /api/tasks/{}/duplicate": "task",  # 2.363.3 (#3134): also p2363_3_b_api_test
     "GET /api/tasks/{}/milestone": "task", "POST /api/tasks/reorder": "task", "POST /api/tasks/batch": "task",
     "GET /api/tasks/{}/deps": "task", "DELETE /api/deps/{}/{}": "task", "POST /api/tasks/{}/complete": "task",
     "POST /api/tasks/{}/undo": "task", "POST /api/tasks/{}/skip": "task", "POST /api/tasks/{}/reopen": "task",
@@ -1025,7 +1026,7 @@ ROUTES = {
     "POST /api/disc/connections/{}/restore": "discover", "POST /api/disc/blocks/{}": "discover", "DELETE /api/disc/blocks/{}": "discover",
     # 2.48.0 (#1111): documents
     "GET /api/docs": "document", "POST /api/docs": "document", "GET /api/docs/{}": "document", "PATCH /api/docs/{}": "document",
-    "POST /api/docs/{}/accept": "document", "POST /api/docs/{}/review": "document", "POST /api/docs/{}/redo": "document",
+    "POST /api/docs/{}/accept": "document", "POST /api/docs/{}/review": "document", "POST /api/docs/{}/redo": "document", "POST /api/docs/{}/redo/undo": "document",
     "GET /api/docs/{}/thumb": "document", "GET /api/docs/{}/file": "document", "POST /api/docs/{}/task": "document",
     "DELETE /api/docs/{}/task": "document", "GET /api/docs/settings": "document", "PUT /api/docs/settings": "document",
     "POST /api/docs/rules": "document", "PATCH /api/docs/rules/{}": "document", "DELETE /api/docs/rules/{}": "document",

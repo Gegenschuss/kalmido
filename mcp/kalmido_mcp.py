@@ -1498,7 +1498,8 @@ TOOLS += [
            "start": {"type": "string"}, "end": {"type": "string"}}, ["template_id"]),
      lambda api, a: api.call("POST", f"/templates/{_id(a, 'template_id')}/apply", body=_without(a, "template_id"))),
     ("duplicate_list", "2.78.0: duplicate a project into a new project of yours: sections, tasks with their dates and subtasks, fields, "
-                       "dependencies, Playbook, notepads and page arrangement (members, shares and assignees stay). name optional "
+                       "dependencies, Playbook, notepads and page arrangement; 2.363.3: everything except comments and times, files as copies "
+                       "(members and shares stay behind, people only where they may be assigned in the copy). name optional "
                        "(default \"<project> (copy)\"), done = also the completed tasks, folder optional (default your folder of the project).",
      _obj({"list_id": S_ID, "name": {"type": "string"}, "done": {"type": "boolean"}, "folder": {"type": "string"}}, ["list_id"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/duplicate", body=_without(a, "list_id"))),

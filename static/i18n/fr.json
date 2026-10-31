@@ -10967,7 +10967,6 @@
   "{0} (copy)": "{0} (copie)",
   "Duplicate “{0}”": "Dupliquer « {0} »",
   "Copy completed tasks too": "Copier aussi les tâches terminées",
-  "Sections, tasks with subtasks and dates, fields, notepads and the page arrangement come along. Members, shares and assignees do not: the copy is yours alone.": "Les sections, les tâches avec sous-tâches et dates, les champs, les blocs-notes et la disposition de la page sont copiés. Les membres, les partages et les responsables non : la copie n’appartient qu’à toi.",
   "This account is not linked to the login provider yet. Log in with your password first, then use the provider's button once in the same browser.": "Ce compte n’est pas encore lié au fournisseur de connexion. Connecte-toi d’abord avec ton mot de passe, puis utilise une fois le bouton du fournisseur dans le même navigateur.",
   "A login with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).": "Une connexion via le fournisseur OIDC correspondait à {0} par {1}, mais n’a pas été liée (admin, second facteur ou aucune adresse e-mail vérifiée correspondante).",
   "Not checked for malware yet: the file can be opened once the virus scanner has checked it": "Pas encore vérifié contre les logiciels malveillants : le fichier pourra être ouvert dès que l’antivirus l’aura vérifié",
@@ -13949,7 +13948,6 @@
   "With hints": "Avec remarques",
   "Me, {0} and job results": "Moi, {0} et résultats des jobs",
   "To the job chat": "Vers le chat du job",
-  "The CSV has no comments, attachments, repeats, reminders or dependencies. For everything, use the account export.": "Le CSV ne contient ni commentaires, ni pièces jointes, ni répétitions, ni rappels, ni dépendances. Pour tout avoir, utilisez l'export du compte.",
   "The files together are larger than {0} MB: send fewer files at once": "Les fichiers ensemble dépassent {0} Mo : envoyez moins de fichiers à la fois",
   "{0} is larger than {1} MB": "{0} dépasse {1} Mo",
   "{0} person coming along": ["{0} personne qui accompagne", "{0} personnes qui accompagnent"],
@@ -15371,5 +15369,12 @@
   "{0} page in the trash goes along": ["{0} page de la corbeille suit le déplacement", "{0} pages de la corbeille suivent le déplacement"],
   "The task was moved meanwhile: it is shown in that project again if it moves back within 24 hours.": "La tâche a été déplacée entre-temps : elle réapparaît dans ce projet si elle revient dans les 24 heures.",
   "Your order of My tasks was changed on another device: that order stays, this change was not applied.": "Votre ordre de Mes tâches a été modifié sur un autre appareil : cet ordre reste, cette modification n'a pas été appliquée.",
-  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.": "Les tâches de l'organisation qui lui sont attribuées ne le sont plus et cette personne ne suit plus aucune d'elles ; si elle revient dans les 24 heures, cela est rétabli pour les tâches qu'elle peut alors voir."
+  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.": "Les tâches de l'organisation qui lui sont attribuées ne le sont plus et cette personne ne suit plus aucune d'elles ; si elle revient dans les 24 heures, cela est rétabli pour les tâches qu'elle peut alors voir.",
+  "{0} purpose is longer than {1} characters and is cut off on import.": ["{0} motif dépasse {1} caractères et sera tronqué à l’import.", "{0} motifs dépassent {1} caractères et seront tronqués à l’import."],
+  "Recognising again": "Nouvelle reconnaissance",
+  "The recognition is still running. Please try again in a moment.": "La reconnaissance est encore en cours. Réessayez dans un instant.",
+  "This recognition can no longer be taken back": "Cette reconnaissance ne peut plus être annulée",
+  "The CSV counts comments and attachments but does not contain them. For everything, use the account export.": "Le CSV compte les commentaires et les pièces jointes, mais ne les contient pas. Pour tout récupérer, utilisez l’export du compte.",
+  "Everything except comments and times comes along, files too. Members and shares do not: assignees stay only where they may see the copy.": "Tout est copié sauf les commentaires et les temps, fichiers compris. Les membres et les partages non : les attributions restent seulement si la personne peut voir la copie.",
+  "Not copied: {0}": "Non copié : {0}"
 }
