@@ -229,7 +229,7 @@ def topic_prefix():
 
 
 def random_topic():
-    # 2.306.0 C (#2889): was "kalmido-" + secrets ...; the export table (kalmido-export.sh) still lists that line
+    # 2.306.0 C (#2889): the prefix comes from PUBLIC_URL
     return topic_prefix() + "-tasks-" + secrets.token_urlsafe(9).replace("_", "").replace("-", "").lower()
 
 
