@@ -127,6 +127,11 @@ r = A.post(B + "/api/files/move-space", json={"ids": [R1], "to": "private"})
 check(r.status_code == 409 and "booked receipt" in r.text and sql("SELECT org_id FROM fs_nodes WHERE id=?", (R1,)) == [(ORG,)],
       "#2600: the move of a booked receipt 409, it stays in the organisation " + r.text[:200])
 R_FREE = receipt(A, WSO, "frei.pdf", None)
+# 2.360.3 (#2733): a running recognition blocks the move as well (fsmove.py): through first, then this check is about the lock only
+for _ in range(120):
+    if not sql("SELECT 1 FROM doc_meta WHERE node_id=? AND state='run' UNION ALL SELECT 1 FROM file_text WHERE kind='fs' AND node_id=? AND state='run'", (R_FREE, R_FREE)):
+        break
+    time.sleep(0.25)
 r = A.post(B + "/api/files/move-space", json={"ids": [R_FREE], "to": "private", "dry": True})
 check(r.ok and not r.json().get("block"), "#2600: a receipt without booking can still move " + r.text[:200])
 
