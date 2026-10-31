@@ -27,7 +27,7 @@ from ..core.access import list_role, task_visible, vis_sql
 from ..tasks.validation import NAG_HOUR_CAP, NAG_MINUTES, valid_hm
 from ..tasks.tasks import _wd_followups
 from ..collab.comments import collab_on, task_push_tick
-from ..collab.news import news_cleanup, news_unread, notif_ok
+from ..collab.news import news_cleanup, news_unread_me, notif_ok
 from ..personal.habits import habit_times, pomo_close, pomo_elapsed, pomo_planned_end
 from ..personal.timetrack import _num, time_watchdog
 from ..core.env import env_bool
@@ -103,6 +103,7 @@ for _e in (x.strip().lower() for x in os.environ.get("KALMIDO_WEBPUSH_HOSTS", ""
 VAPID_SUBJECT = os.environ.get("KALMIDO_VAPID_SUBJECT", "").strip() or \
     (PUBLIC_URL if PUBLIC_URL.startswith("https://") else "mailto:admin@example.com")
 WEBPUSH_MAX_SUBS = 20       # devices per user
+WEBPUSH_SHORT_BODY = 200  # 2.367.5 (#2980): characters of the second try after a 413
 WEBPUSH_MAX_PAYLOAD = 3000  # bytes of JSON (one aes128gcm record, the push services accept 4096 bytes in total)
 PUSH_CHANNELS = ("ntfy", "webpush", "both")
 _VAPID = {}
@@ -241,6 +242,8 @@ def webpush_user(uid, payload, prio="4", ttl=86400, topic=None, only=None, stats
             continue
         drop = drops[sub["id"]]
         st, retry = webpush_send(sub, {**payload, "dismiss": drop} if drop else payload, prio, ttl, topic)
+        if st == 413:  # 2.367.5 (#2980): this push service takes less: once more with a short text
+            st, retry = webpush_send(sub, {**payload, "body": (payload.get("body") or "")[:WEBPUSH_SHORT_BODY]}, prio, ttl, topic)
         host = urllib.parse.urlsplit(sub["endpoint"]).hostname
         if (st == 0 and webpush_endpoint_ok(sub["endpoint"])) or st >= 500:
             aa_fail("webpush:" + (host or "?"), f"HTTP {st}" if st else "network")
@@ -267,6 +270,13 @@ def webpush_user(uid, payload, prio="4", ttl=86400, topic=None, only=None, stats
     return ok
 
 
+def _webpush_rejected(c, uid, sub, st, aa_count):
+    """A push service refused the subscription: the fifth time in a row it goes."""
+    c.execute("UPDATE push_subs SET fails=fails+1 WHERE id=?", (sub["id"],))
+    if c.execute("DELETE FROM push_subs WHERE id=? AND fails>=5", (sub["id"],)).rowcount:
+        aa_count("webpush", "removed", f"{uid}|{sub['label'][:60]}|{st}")
+
+
 def _webpush_result(c, uid, sub, drop, st, retry, host, payload, now, aa_count):
     if 200 <= st < 300:
         c.execute("UPDATE push_subs SET last_ok=?, fails=0 WHERE id=?", (iso(now_utc()), sub["id"]))
@@ -284,9 +294,7 @@ def _webpush_result(c, uid, sub, drop, st, retry, host, payload, now, aa_count):
         c.execute("UPDATE push_subs SET backoff_until=? WHERE id=?", (now + wait, sub["id"]))
         print(f"webpush: rate limited by {host}, pausing subscription {sub['id']} for {wait} s", flush=True)
     elif st in (400, 401, 403):
-        c.execute("UPDATE push_subs SET fails=fails+1 WHERE id=?", (sub["id"],))
-        if c.execute("DELETE FROM push_subs WHERE id=? AND fails>=5", (sub["id"],)).rowcount:
-            aa_count("webpush", "removed", f"{uid}|{sub['label'][:60]}|{st}")
+        _webpush_rejected(c, uid, sub, st, aa_count)
         print(f"webpush: {host} rejected the push for subscription {sub['id']} ({st})", flush=True)
     else:
         print(f"webpush: {host} answered {st} for subscription {sub['id']}" +
@@ -383,16 +391,22 @@ def push_dismiss_tick(c):
         if st in (404, 410):
             c.execute("DELETE FROM push_subs WHERE id=?", (s["id"],))
             c.commit()
+        elif st in (400, 401, 403):  # 2.367.5 (#2980): counts like a real push
+            from ..notify.alerts import aa_count
+            _webpush_rejected(c, s["user_id"], s, st, aa_count)
+            c.commit()
 
 
 def badge_count(uid):
-    """2.19.0 (#668): the number on the app icon (Badging API): unread News + unread team chat messages."""
-    from ..collab.teamchat import tchat_unread
+    """2.19.0 (#668): the number on the app icon (Badging API). 2.367.5 (#2980): the same number as the app (setcore.js
+    badgeSync, workspace.js bellCount): News for me + unread direct messages, without collaboration all unread chat."""
+    from ..collab.teamchat import tchat_unread_both
     c = connect()
     try:
         with system_ctx(c):  # 2.37.0 (#1150): the recipient's counts, whoever's request sends the push
             s = usettings(c, uid)
-            return (news_unread(c, uid, s) if collab_on(s) else 0) + tchat_unread(c, uid)
+            chat, dm = tchat_unread_both(c, uid)
+            return news_unread_me(c, uid, s) + dm if collab_on(s) else chat
     except Exception:  # noqa: BLE001 - a badge never stops a push
         return 0
     finally:
@@ -415,7 +429,7 @@ def push_reachable(c, uid, s):
     return bool(s.get("ntfy_topic")) or webpush_count(c, uid) > 0 or chn_reachable(c, uid)
 
 
-def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=None, due=None):
+def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=None, due=None, lang=None):
     """What the notification shows, nothing more: title, text, the in-app link (hash only), buttons."""
     hash_ = urllib.parse.urlsplit(click).fragment if click else ""
     from ..collab.liste2eguard import le2b_net
@@ -423,6 +437,8 @@ def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=N
     title, msg = md_plain(title), md_plain(msg)  # 2.40.0 (#1409): no Markdown marks in the push
     p = {"title": (title or APP_NAME)[:200], "body": (msg or "")[:1000], "url": "/#" + hash_ if hash_ else "/",
          "prio": int(prio) if str(prio).isdigit() else 4, "ts": int(time.time() * 1000)}
+    if lang:  # 2.367.5 (#2980): the notification's language (sw.js pushOptions)
+        p["lang"] = lang
     if tag:
         p["tag"] = tag[:64]
     if task:
@@ -461,21 +477,24 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
     title, msg = le2b_net(title, lg), le2b_net(msg, lg)  # 2.64.2 D (#1817): the neutral word in the recipient's language
     from .channels import chn_kind, chn_push
     queued = chn_push(uid, title, msg, prio, click, chn_kind(kind, tag), s, task, scope, chn_msg)  # 2.142.0 A (#2145): queued, sent in the background (2.240.0 B: + task, B2: + scope)
+    if s.get("push_title_only") == "1":  # 2.367.5 (#2980): the lock screen shows no excerpt; the channels stay as they are (they are no lock screen)
+        msg = ""
+    nmsg = msg or tr("New notification in {0}", APP_NAME, lg=lg)  # ntfy shows a placeholder for an empty message
     ch = push_channel(s)
     sent = 0
     if WEBPUSH_ON and ch in ("webpush", "both"):
         tag = tag or (urllib.parse.urlsplit(click).fragment.replace("/", "-") if click else None) or None
         st = {}
-        sent = webpush_user(uid, {**webpush_payload(title, msg, prio, click, actions, tag, task, due), "badge": badge_count},  # 2.281.0 B
+        sent = webpush_user(uid, {**webpush_payload(title, msg, prio, click, actions, tag, task, due, lang=lg), "badge": badge_count},  # 2.281.0 B
                             prio, ttl, topic=tag, stats=st)
         if not sent and st.get("subs"):  # devices exist but none accepted it (admin alert, counted per window)
             aa_count("webpush", "fallback", uid)
     if ch in ("ntfy", "both"):
-        return ntfy(title, msg, prio, click, topic=s.get("ntfy_topic"), actions=actions) or sent > 0 or queued
+        return ntfy(title, nmsg, prio, click, topic=s.get("ntfy_topic"), actions=actions) or sent > 0 or queued
     if not sent:
         if ntfy_public():  # 2.148.1 C (#2494): the fallback to the public ntfy.sh carries no content (the person did not choose ntfy)
             return ntfy(APP_NAME, tr("New notification in {0}", APP_NAME, lg=lg), prio, ntfy_plain_click(click), topic=s.get("ntfy_topic")) or queued
-        return ntfy(title, msg, prio, click, topic=s.get("ntfy_topic"), actions=actions) or queued
+        return ntfy(title, nmsg, prio, click, topic=s.get("ntfy_topic"), actions=actions) or queued
     return True
 
 
@@ -830,7 +849,6 @@ def _wd_reminder(c, t, users, S, LG, now, memo=None):
 # the due date + the time of the last nag (a reminder that fires counts as one), so a tick, a restart or a second worker
 # never sends one twice; a new date (snooze, repeat, edit) starts over. Completed, deleted, archived and undated tasks
 # are not looked at, so the nags stop with them. At most NAG_HOUR_CAP nag pushes per person and hour.
-_NAG_SENT = {}
 
 
 def nag_minutes(task_nag, list_nag):
@@ -902,13 +920,11 @@ def _wd_nag(c, t, users, S, LG, now):
         return
     if in_quiet(s, now) or not notif_ok(c, rcpt, s, "nag", "push", t["list_id"], own=True):
         return
-    sent = [x for x in _NAG_SENT.get(rcpt, []) if x > time.time() - 3600]
     c.execute("UPDATE tasks SET nag_at=? WHERE id=?", (f"{key}|{now.isoformat()}", t["id"]))  # before sending: never twice
     c.commit()
-    if len(sent) >= NAG_HOUR_CAP:
-        _NAG_SENT[rcpt] = sent
+    from ..api.common import hit_limit
+    if hit_limit(f"nag:{rcpt}", NAG_HOUR_CAP, 3600):  # 2.367.5 (#2980): counted in the database, a restart does not forget it
         return
-    _NAG_SENT[rcpt] = sent + [time.time()]
     when = tr("all day", lg=lg) if not t["due_time"] else tr("at {0}", hm_text(t["due_time"], s), lg=lg)
     day = tr("today", lg=lg) if t["due"] == user_now(s, now).date().isoformat() else \
         short_day(date.fromisoformat(t["due"]), lg)

@@ -220,7 +220,7 @@ function newsText(it, U) {
       + (d.lists ? ' ' + esc(trn('Your {0} project of the organisation stayed with it ({1}).', 'Your {0} projects of the organisation stayed with it ({1}).', d.lists, d.to || '')) : '')  // 2.148.1 A (#2480)
       + (d.back ? ' ' + esc(trn('{0} project you had brought in is back in your private space.', '{0} projects you had brought in are back in your private space.', d.back)) : '')  // 2.361.0 (#2922)
       : tr('{0} removed you from the project {1}', who, q(newsListName(it)));
-    case 'owner': return (d.self ? tr('You took over the project {1} from {0}', who, q(newsListName(it))) : tr('{0} made you the owner of the project {1}', who, q(newsListName(it))))  // 2.1.2 (#349)
+    case 'owner': return (d.given != null ? tr('{0} handed your project {1} to {2}', who, q(newsListName(it)), d.given) : d.self ? tr('You took over the project {1} from {0}', who, q(newsListName(it))) : tr('{0} made you the owner of the project {1}', who, q(newsListName(it))))  // 2.1.2 (#349)
       + ((d.reset || []).includes('link') ? ' ' + esc(tr('Its public link was reset: share the new link again if needed.')) : '')  // 2.148.1 A (#2478)
       + ((d.reset || []).includes('hook') ? ' ' + esc(tr('Its deploy webhooks were switched off: switch them on again under environments if needed.')) : '');
     case 'orglist': return ({archive: tr('{0} archived the project {1} (admin of {2})', who, q(d.name || ''), q(d.org || '')),  // 2.35.0 (#1101)

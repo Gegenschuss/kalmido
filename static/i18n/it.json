@@ -15457,5 +15457,14 @@
   "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Fallo solo dopo aver verificato con il destinatario o il tuo provider che la fattura non è arrivata. Poi potrai inviarla di nuovo.",
   "Field values not taken over": "Valori dei campi non trasferiti",
   "The attachments or office folder is a mount of its own, so a restore cannot swap it. Nothing was changed. Mount the data folder as a whole, see SELF-HOSTING.md.": "La cartella degli allegati o dell'ufficio è un mount a sé, quindi un ripristino non può sostituirla. Non è stato modificato nulla. Monta la cartella dati per intero, vedi SELF-HOSTING.md.",
-  "Folders from a restore are lying next to the data folder ({0}). After a hard stop the database and the files may not match: check them, a successful restore removes them.": "Accanto alla cartella dati ci sono cartelle di un ripristino ({0}). Dopo un arresto brusco il database e i file potrebbero non corrispondere: controllali, un ripristino riuscito li rimuove."
+  "Folders from a restore are lying next to the data folder ({0}). After a hard stop the database and the files may not match: check them, a successful restore removes them.": "Accanto alla cartella dati ci sono cartelle di un ripristino ({0}). Dopo un arresto brusco il database e i file potrebbero non corrispondere: controllali, un ripristino riuscito li rimuove.",
+  "You get this summary every day. Change or turn it off in Settings > Notifications:": "Ricevi questo riepilogo ogni giorno. Modificalo o disattivalo in Impostazioni > Notifiche:",
+  "Daily summary by e-mail": "Riepilogo giornaliero via e-mail",
+  "E-mails for assignments and mentions": "E-mail per assegnazioni e menzioni",
+  "You can turn them on again in Settings > Notifications.": "Puoi riattivarle in Impostazioni > Notifiche.",
+  "Only the title in the push": "Solo il titolo nel push",
+  "Lock screen": "Schermata di blocco",
+  "Hides the text of comments and messages on the lock screen. Your notification channels stay as they are.": "Nasconde il testo di commenti e messaggi sulla schermata di blocco. I tuoi canali di notifica restano invariati.",
+  "{0} handed your project to {1}": "{0} ha passato il tuo progetto a {1}",
+  "{0} handed your project {1} to {2}": "{0} ha passato il tuo progetto {1} a {2}"
 }

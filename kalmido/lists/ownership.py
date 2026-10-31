@@ -142,6 +142,9 @@ def owner_transfer(c, lr, new, force=False):
         news_add(c, new, "owner", list_id=lid, data={"name": lr["name"], "from": names.get(old, ""), "reset": reset, "self": True}, actor=old)
     who = names.get(me(), "?")
     list_push(c, new, "share", lid, lambda lg: tr("{0} made you the owner of a project", who, lg=lg), lambda lg: lr["name"])
+    if old and old != me() and c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (old,)).fetchone():  # 2.367.5 (#2980): someone else moved my project
+        news_add(c, old, "owner", list_id=lid, data={"name": lr["name"], "given": names.get(new, "")})
+        list_push(c, old, "share", lid, lambda lg: tr("{0} handed your project to {1}", who, names.get(new, ""), lg=lg), lambda lg: lr["name"])
     return old, names.get(new, "")
 
 

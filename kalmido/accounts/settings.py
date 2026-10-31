@@ -8,7 +8,7 @@ import urllib.request
 from cryptography.hazmat.primitives.asymmetric import ec
 from flask import g, jsonify, Response
 
-from ..core.config import app, PUBLIC_URL
+from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.schema import USER_DEFAULTS
 from ..core.i18n import LANGS, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, uset, usettings
@@ -19,20 +19,23 @@ from ..tasks.validation import clean_reminders, valid_hm
 from ..collab.news import NEWS_GROUPS, notif_update
 from ..core.errors import BadInput
 from ..core.numtext import user_num  # 2.263.0 (#2976)
+from ..api.common import hit_limit  # 2.367.5 (#2980)
 from .layouts import LAYOUT_KEYS
 
 
 # ---------------------------------------------------------------- settings / export (per user)
 
-SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "purpose_ask", "agent_share",
+SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "digest_mail_try", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "purpose_ask", "agent_share",
                         "purpose", "evcals_hidden", "care_sent",
                         "brief_sent", "brief_read",  # 2.34.0 (#264)
                         "fav_asked",  # 2.46.1 (#1361): lists already offered as a favourite
                         "evmail_at", "evmail_day")  # 2.142.0 A (#2146): the bundled event mails sent
 SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "areas", "team")  # 2.25.0 (UX-03); 2.39.1 (#1185): areas
+PUSH_TEST_LIMIT = 40  # 2.367.5 (#2980): test pushes (ntfy and device) per person and hour
 SIDE_PEOPLE_MAX = 5  # 2.99.0 E (#2187): people pinned to the sidebar (static/js/sbnav.js SB_PINS)
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family", "kpi")  # 2.17.0 (#475), 2.19.0; 2.55.1: kpi (2.50.0 #1197, office admins)
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "celebrate", "cal_today",
+                  "push_title_only",  # 2.367.5 (#2980)
                   "date_confirm", "digest_mail", "mail_from_me", "mail_trim_fwd", "mail_trim_eml",  # 2.49.0 (#971)
                   "today_inbox", "agent_push",  # 2.28.0 (#987): agent_push
                   "detail_cm_fold",  # 2.31.0 (#344)
@@ -653,7 +656,9 @@ def settings_update():
 def ntfy_test():
     from ..notify.push import ntfy, push_prio
     s = usettings(db(), me())
-    ok = ntfy("Kalmido: Test", tr("Notifications are arriving."), push_prio(s), PUBLIC_URL, topic=s["ntfy_topic"])
+    if hit_limit(f"pushtest:{me()}", PUSH_TEST_LIMIT, 3600):  # 2.367.5 (#2980): like the channel and mail tests
+        return err(tr("Too many tests, please wait a few minutes"), 429)
+    ok = ntfy(tr("{0}: test", APP_NAME), tr("Notifications are arriving."), push_prio(s), PUBLIC_URL, topic=s["ntfy_topic"])
     return jsonify(ok=ok)
 
 
@@ -763,14 +768,17 @@ def push_test():
     from ..notify.push import notify, push_channel, push_prio, webpush_count, webpush_payload, webpush_user
     c = db()
     s = usettings(c, me())
+    if hit_limit(f"pushtest:{me()}", PUSH_TEST_LIMIT, 3600):  # 2.367.5 (#2980): like the channel and mail tests
+        return err(tr("Too many tests, please wait a few minutes"), 429)
     sid = body().get("id")
+    title = tr("{0}: test", APP_NAME)
     if sid is not None:
         if not isinstance(sid, int) or not c.execute("SELECT 1 FROM push_subs WHERE id=? AND user_id=?", (sid, me())).fetchone():
             return err(tr("Not found"), 404)
-        n = webpush_user(me(), webpush_payload("Kalmido: Test", tr("Notifications are arriving."), push_prio(s), tag="test"),
+        n = webpush_user(me(), webpush_payload(title, tr("Notifications are arriving."), push_prio(s), tag="test", lang=s.get("lang") if s.get("lang") in LANGS else "en"),
                          push_prio(s), ttl=600, topic="test", only=sid)
         return jsonify(ok=n > 0, webpush=n)
-    ok = notify(me(), "Kalmido: Test", tr("Notifications are arriving."), push_prio(s), PUBLIC_URL, s=s, tag="test")
+    ok = notify(me(), title, tr("Notifications are arriving."), push_prio(s), PUBLIC_URL, s=s, tag="test")
     return jsonify(ok=ok, channel=push_channel(s), devices=webpush_count(c, me()))
 
 

@@ -7,7 +7,7 @@
   oversize refused), served only to the user, admins and people sharing a list; a new picture replaces the file;
   DELETE; admins can set a preset for someone else; the avatars map in /api/state; deleting the user removes the file.
 - Tags: count, delete (only my own tag rows, trash included, tasks stay), restore (undo), CSRF, bad input.
-- News: news_kinds setting (default without "complete"), validation, filter=me, dismiss (only own items).
+- News: news_kinds setting (2.367.5 (#2980): default with "complete", like its push), validation, filter=me, dismiss (only own items).
 - Update check: a cached release older than the running version is not reported (admin status + about)."""
 import io, json, os, dbx, sys, time, uuid, zipfile
 import requests
@@ -201,12 +201,12 @@ check(r.ok and r.json()["ids"] == [] and r.json()["count"] == 0, "unknown tag: n
 
 # ================================================================== news
 st = Bb.get(B + "/api/state").json()
-check(st["settings"]["news_kinds"] == "mention,assign,comment,unblock,share,status", "default news kinds without complete")
+check(st["settings"]["news_kinds"] == "mention,assign,comment,complete,unblock,share,status", "default news kinds with complete")  # 2.367.5 (#2980)
 check(Bb.patch(B + "/api/settings", json={"news_kinds": "mention,bogus"}).status_code == 400, "unknown kind refused")
 tc = Bb.post(B + "/api/tasks", json={"title": "Bob's", "list_id": L}).json()["id"]
 A.post(B + f"/api/tasks/{tc}/complete", json={})
 kinds = [x["kind"] for x in Bb.get(B + "/api/news").json()["items"]]
-check("complete" not in kinds, f"default: no complete item {kinds}")
+check("complete" in kinds, f"default: a complete item {kinds}")  # 2.367.5 (#2980)
 Bb.patch(B + "/api/settings", json={"news_kinds": "mention,assign,comment,unblock,share,status,complete"})
 tc2 = Bb.post(B + "/api/tasks", json={"title": "Bob's 2", "list_id": L}).json()["id"]
 A.post(B + f"/api/tasks/{tc2}/complete", json={})

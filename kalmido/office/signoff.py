@@ -20,6 +20,7 @@ from datetime import date, datetime, timedelta
 from flask import g, jsonify, redirect, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
+from ..collab.comments import lang_of  # 2.367.5 (#2980)
 from ..core.i18n import browser_lang, lang, LANGS, N_, tr
 from ..core.db import body, db, err, iso, local_now, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
@@ -271,7 +272,7 @@ def sig_notify(c, r, st, name):
         except Exception as e:  # noqa: BLE001 - a broken setting never blocks the customer's answer
             print("signoff notify failed:", type(e).__name__, e, flush=True)
             continue
-        lg = s.get("lang") or "en"
+        lg = lang_of(s)
         title = tr("Approved by the customer", lg=lg) if st == "accepted" else tr("Declined by the customer", lg=lg)
         if r["kind"] == "document" and st == "accepted":  # 2.93.0 A (#1927)
             title = tr("Signed by the customer", lg=lg)

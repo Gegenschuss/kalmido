@@ -24,6 +24,7 @@ from flask import g, jsonify, redirect, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
 from ..core.i18n import browser_lang, LANGS, N_, short_day, tr
+from ..collab.comments import lang_of  # 2.367.5 (#2980)
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_token_bind, Denied, need_feat
@@ -598,7 +599,7 @@ def apb_clean(v, mx):
 
 def apb_lang(c, uid):
     """The customer's language: Accept-Language if the app has it, else the person's language."""
-    lg = browser_lang() or usettings(c, uid).get("lang") or "en"
+    lg = browser_lang() or lang_of(usettings(c, uid))
     return lg if lg in LANGS else "en"
 
 
@@ -1026,7 +1027,7 @@ def apb_make(c, p, t, r):
     office area chosen) of a confirmed booking -> (event id, contact id | None, deal id | None)."""
     from ..events.model import default_cal, ev_store
     uid = r["user_id"]
-    olg = usettings(c, uid).get("lang") or "en"
+    olg = lang_of(usettings(c, uid))
     cid = p["cal_id"] if p["cal_id"] and apb_cal_ok(c, uid, p["cal_id"]) else default_cal(c, uid)
     zone = apb_zone(p)
     s, e = parse_iso(r["start"]).astimezone(zone), parse_iso(r["end"]).astimezone(zone)
@@ -1190,7 +1191,7 @@ def apb_push(c, r, what):
     from ..notify.push import push_prio
     uid = r["user_id"]
     s = usettings(c, uid)
-    lg = s.get("lang") or "en"
+    lg = lang_of(s)
     msg = apb_line(c, r, lg)
     news_add(c, uid, "apbooking", actor=0, data={"what": what, "line": msg[:300], "event_id": r["event_id"]}, s=None)
     if not notif_ok(c, uid, s, "assign", "push"):

@@ -15457,5 +15457,14 @@
   "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Fais-le seulement après avoir vérifié auprès du destinataire ou de ton fournisseur que la facture n’est pas arrivée. Tu pourras ensuite la renvoyer.",
   "Field values not taken over": "Valeurs de champ non reprises",
   "The attachments or office folder is a mount of its own, so a restore cannot swap it. Nothing was changed. Mount the data folder as a whole, see SELF-HOSTING.md.": "Le dossier des pièces jointes ou du bureau est un point de montage distinct : une restauration ne peut pas l'échanger. Rien n'a été modifié. Montez le dossier de données en entier, voir SELF-HOSTING.md.",
-  "Folders from a restore are lying next to the data folder ({0}). After a hard stop the database and the files may not match: check them, a successful restore removes them.": "Des dossiers issus d'une restauration se trouvent à côté du dossier de données ({0}). Après un arrêt brutal, la base de données et les fichiers peuvent ne pas correspondre : vérifiez-les, une restauration réussie les supprime."
+  "Folders from a restore are lying next to the data folder ({0}). After a hard stop the database and the files may not match: check them, a successful restore removes them.": "Des dossiers issus d'une restauration se trouvent à côté du dossier de données ({0}). Après un arrêt brutal, la base de données et les fichiers peuvent ne pas correspondre : vérifiez-les, une restauration réussie les supprime.",
+  "You get this summary every day. Change or turn it off in Settings > Notifications:": "Tu reçois ce résumé chaque jour. Modifie-le ou désactive-le dans Paramètres > Notifications :",
+  "Daily summary by e-mail": "Résumé quotidien par e-mail",
+  "E-mails for assignments and mentions": "E-mails pour les attributions et mentions",
+  "You can turn them on again in Settings > Notifications.": "Tu peux les réactiver dans Paramètres > Notifications.",
+  "Only the title in the push": "Seulement le titre dans le push",
+  "Lock screen": "Écran verrouillé",
+  "Hides the text of comments and messages on the lock screen. Your notification channels stay as they are.": "Masque le texte des commentaires et messages sur l'écran verrouillé. Tes canaux de notification restent inchangés.",
+  "{0} handed your project to {1}": "{0} a transmis ton projet à {1}",
+  "{0} handed your project {1} to {2}": "{0} a transmis ton projet {1} à {2}"
 }

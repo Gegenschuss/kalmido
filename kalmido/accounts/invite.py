@@ -73,7 +73,7 @@ def invite_new(c, uid, by, send=True, kind=None, days=None):
         try:
             with c.savepoint():  # 2.37.0 (#1150): a failure here must not abort the caller's transaction
                 inviter = c.execute("SELECT display_name, username FROM users WHERE id=?", (by,)).fetchone()
-                subject, text, body_html = invite_mail(c, u, link, kind, (inviter["display_name"] or inviter["username"]) if inviter else "", days)
+                subject, text, body_html = invite_mail(c, u, link, kind, (inviter["display_name"] or inviter["username"]) if inviter else "", days, by=by)
             try:
                 logo = {"logo": (open(os.path.join(APP_DIR, "static", "icon-192.png"), "rb").read(), "png")}
             except OSError:
@@ -91,7 +91,18 @@ def invite_new(c, uid, by, send=True, kind=None, days=None):
     return out
 
 
-def invite_mail(c, u, link, kind, inviter, days=INVITE_DAYS):
+def invite_org(c, u, kind, by):
+    """2.367.5 (#2980): the organisation a mail names. With several it is the one shared with whoever sent the mail, or none."""
+    from ..accounts.orgs import org_names
+    from ..accounts.orginvite import ojn_org_name  # 2.453.0 (#3780): a new account is no member before it accepts
+    names = org_names(c, u["id"])
+    if len(names) > 1:
+        names = [x for x in names if by and x in org_names(c, by)]
+        return names[0] if len(names) == 1 else ""
+    return (names or [ojn_org_name(c, u["id"]) if kind == "invite" else ""])[0]  # a reset or a registration names no organisation the person never joined
+
+
+def invite_mail(c, u, link, kind, inviter, days=INVITE_DAYS, by=None):
     """(subject, text, html) of the invitation / reset mail in the person's language (the design of the welcome mail)."""
     lg = lang(c, u["id"])
     t = lambda s, *a: tr(s, *a, lg=lg)  # noqa: E731
@@ -99,9 +110,7 @@ def invite_mail(c, u, link, kind, inviter, days=INVITE_DAYS):
     name = u["display_name"] or u["username"]
     host = PUBLIC_URL.split("://", 1)[-1].rstrip("/")
     acc, bg, muted = MAIL_ACC, MAIL_BG, MAIL_MUTED  # 2.300.0 (#3198): petrol (was violet); 2.420.0 B (#3499): from the mail frame
-    from ..accounts.orgs import org_names  # 2.22.0 (#752): "Example · Kalmido"
-    from ..accounts.orginvite import ojn_org_name  # 2.453.0 (#3780): a new account is no member before it accepts
-    org = (org_names(c, u["id"]) or [ojn_org_name(c, u["id"]) if kind == "invite" else ""])[0]  # a reset or a registration names no organisation the person never joined
+    org = invite_org(c, u, kind, by)  # 2.22.0 (#752): "Example · Kalmido"
     brand = f"{org} · {APP_NAME}" if org else APP_NAME
     if kind == "signup":  # 2.23.0 (#711): confirm the address of a registration
         subject = t(N_("Confirm your registration at {0}"), APP_NAME)

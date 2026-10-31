@@ -19,7 +19,7 @@ for u, n, topic in (("bob", "Bob", "t-bob"), ("carol", "Carol", "t-carol"), ("da
     r = A.post(B + "/api/users", json={"username": u, "display_name": n, "password": "password123", "ntfy_topic": topic}); assert r.ok, r.text
     ids[u] = r.json()["id"]
 A.patch(B + f"/api/users/{ids['frank']}", json={"ntfy_topic": ""})
-# 1.9.0: "completed by others" is off by default (setting news_kinds); this suite checks those items too
+# 2.367.5 (#2980): "completed by others" is on by default (setting news_kinds, off before); this suite checks those items too
 A.patch(B + "/api/settings", json={"news_kinds": "mention,assign,comment,unblock,share,status,complete"})
 Bb, C, D, E, F = (sess(u) for u in ("bob", "carol", "dave", "eve", "frank"))
 st = E.get(B + "/api/state").json()

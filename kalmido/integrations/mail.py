@@ -4,6 +4,7 @@ import email.parser
 import email.policy
 import email.utils
 import hashlib
+import hmac
 import html
 import imaplib
 import os
@@ -16,8 +17,8 @@ from datetime import date, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app, APP_NAME, MAX_FILE_MB, PUBLIC_URL
-from ..core.pg import insert_id, table_exists
-from ..core.i18n import lang, md_plain, tr, trn
+from ..core.pg import insert_id, system_ctx, table_exists
+from ..core.i18n import browser_lang, lang, md_plain, tr, trn
 from ..core.db import body, bump, connect, db, err, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import GATE, me
 from ..accounts.bgjobs import bgj_fn
@@ -26,11 +27,11 @@ from ..core.pages import new_inbox_task, save_attachment_bytes, split_link, vali
 from ..tasks.validation import as_int, log_act
 from ..collab.news import news_unread
 from ..accounts.users import need_admin
-from ..notify.alerts import aa_err, aa_fail, aa_ok
+from ..notify.alerts import aa_count, aa_err, aa_fail, aa_ok
 from ..agents.core import is_agent
 from ..collab.teamchat import tchat_unread
 from ..core.env import env_bool
-from ..core.mailframe import Safe, mail_html  # noqa: F401  2.420.0 B (#3499): the one mail frame (re-exported here)
+from ..core.mailframe import MAIL_ACC, Safe, mail_html  # noqa: F401  2.420.0 B (#3499): the one mail frame (re-exported here)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 
 
@@ -537,8 +538,9 @@ def smtp_open(smtp=None):
     return S_
 
 
-def mail_message(to, subject, text, html_body=None, images=None, from_name=None, attachments=None, cc=None, reply_to=None, smtp=None):
-    """2.141.0 A (#2141): the message mail_send sends (built first so the e-mail filing can keep it before it goes out)."""
+def mail_message(to, subject, text, html_body=None, images=None, from_name=None, attachments=None, cc=None, reply_to=None, smtp=None, unsub=None):
+    """2.141.0 A (#2141): the message mail_send sends (built first so the e-mail filing can keep it before it goes out).
+    2.367.5 (#2975): unsub = the one-click link of a notification mail (RFC 8058), never on a security mail or an invoice."""
     from ..collab.liste2eguard import le2b_net
     subject, text = le2b_net(subject), le2b_net(text)  # 2.64.1 B (#1817): never a ciphertext of a list with the lock in a mail
     html_body = le2b_net(html_body) if html_body else html_body
@@ -549,6 +551,8 @@ def mail_message(to, subject, text, html_body=None, images=None, from_name=None,
         m["Cc"] = cc
     if reply_to:
         m["Reply-To"] = reply_to
+    if unsub:
+        m["List-Unsubscribe"], m["List-Unsubscribe-Post"] = f"<{unsub}>", "List-Unsubscribe=One-Click"
     m["Date"] = email.utils.formatdate(localtime=True)
     m["Message-ID"] = email.utils.make_msgid(domain=(frm.rpartition("@")[2] or "kalmido.local"))
     m.set_content(text)
@@ -574,12 +578,12 @@ def mail_deliver(m, smtp=None):
             pass
 
 
-def mail_send(to, subject, text, html_body=None, images=None, from_name=None, attachments=None, cc=None, reply_to=None, smtp=None):
+def mail_send(to, subject, text, html_body=None, images=None, from_name=None, attachments=None, cc=None, reply_to=None, smtp=None, unsub=None):
     """Sends one mail with KALMIDO_SMTP_*; raises on failure. images: {cid: (bytes, subtype)} shown in the HTML part
     (2.22.0: the logo of the invitation); from_name: a display name for the sender. 2.38.0 (#1021): attachments =
     [(file name, bytes, mime type)] (invoice PDF / XML), cc = a second address, reply_to = the sender's own address.
     2.141.0 A (#2141): smtp = a workspace's own SMTP access instead (hub/mailbox.py mbx_smtp); returns the message sent."""
-    m = mail_message(to, subject, text, html_body, images, from_name, attachments, cc, reply_to, smtp=smtp)
+    m = mail_message(to, subject, text, html_body, images, from_name, attachments, cc, reply_to, smtp=smtp, unsub=unsub)
     mail_deliver(m, smtp)
     return m
 
@@ -636,29 +640,112 @@ def digest_mail_content(c, uid, today):
     if not parts:
         return None
     subj = f"{APP_NAME}: " + (trn("{0} task today", "{0} tasks today", len(tod) + len(over), lg=lg) if tod or over else tr("Your day", lg=lg))
-    text = "\n\n".join(parts) + f"\n\n{PUBLIC_URL}/#today\n"
-    return subj, text, mail_html(subj, parts, tr("Open {0}", APP_NAME, lg=lg), f"{PUBLIC_URL}/#today", lang=lg)  # 2.420.0 B (#3499)
+    foot = tr("You get this summary every day. Change or turn it off in Settings > Notifications:", lg=lg)  # 2.367.5 (#2975): the footer of the event mail
+    text = "\n\n".join(parts) + f"\n\n{PUBLIC_URL}/#today\n\n-- \n{foot} {PUBLIC_URL}/#settings/notify\n"
+    hfoot = Safe(f'{html.escape(foot)} <a href="{html.escape(PUBLIC_URL)}/#settings/notify" style="color:{MAIL_ACC}">{html.escape(tr("Settings", lg=lg))}</a>')
+    return subj, text, mail_html(subj, parts, tr("Open {0}", APP_NAME, lg=lg), f"{PUBLIC_URL}/#today", foot=hfoot, lang=lg)  # 2.420.0 B (#3499)
+
+
+DIGEST_MAIL_TRIES, DIGEST_MAIL_GAP = 3, 900  # 2.367.5 (#2975): a failed summary is tried again, at most 3 times a day, 15 minutes apart
 
 
 def digest_mail_user(c, uid, s, today):
+    """2.367.5 (#2975): "sent" only after the mail went out; every try is noted before it (no transaction open while the mail
+    server is asked). A crash right after sending can repeat the mail once the gap is over: rather twice than not at all.
+    The day's limit of the address counts the summary once, the person's own sending quota not at all."""
     if not MAIL_OUT_ON or s.get("digest_mail") != "1" or s.get("digest_mail_sent") == today:
         return False
     u = c.execute("SELECT email, disabled FROM users WHERE id=?", (uid,)).fetchone()
     if not u or u["disabled"] or not (u["email"] or "").strip():
         return False
-    uset(c, uid, "digest_mail_sent", today)
-    c.commit()
-    m = digest_mail_content(c, uid, today)
-    if not m:
+    day, _, rest = str(s.get("digest_mail_try") or "").partition(":")
+    n, _, at = rest.partition(":")
+    tries = int(n) if day == today and n.isdigit() else 0
+    if tries >= DIGEST_MAIL_TRIES or (tries and time.time() - float(at or 0) < DIGEST_MAIL_GAP):
         return False
+    m = digest_mail_content(c, uid, today)
+    from ..admin.hosting import mail_budget
+    over = bool(m) and not tries and not mail_budget(c, None, u["email"])
+    if not m or over:
+        uset(c, uid, "digest_mail_sent", today)  # nothing to say, or the day's mails are used up: not again today
+        c.commit()
+        if over:
+            aa_count("watchdog", "daily mail over the limit", uid)
+        return False
+    uset(c, uid, "digest_mail_try", f"{today}:{tries + 1}:{int(time.time())}")
+    off = mail_off_url(c, uid, "digest")
+    c.commit()
     try:
-        mail_send(u["email"].strip(), *m)
-        aa_ok("smtp")
-        return True
+        mail_send(u["email"].strip(), *m, from_name=APP_NAME, unsub=off)
     except Exception as e:  # noqa: BLE001
         print("mail: summary for user", uid, "failed:", type(e).__name__, flush=True)  # 2.240.0 A (#2883): no addresses
         aa_fail("smtp", aa_err(e))
         return False
+    uset(c, uid, "digest_mail_sent", today)
+    c.commit()
+    aa_ok("smtp")
+    return True
+
+
+# ---- 2.367.5 (#2975): one-click off of the notification mails (headers List-Unsubscribe, RFC 8058). The link carries the person,
+# what it turns off and a signature, it needs no sign-in. GET only shows a page with one button (mail scanners open every
+# link of a mail, like the portal's off link), POST turns the mails off; the mail client's own button posts directly.
+MAIL_OFF = {"digest": {"digest_mail": "0"}, "event": {"mail_assign": "off", "mail_mention": "off"}}
+MAIL_OFF_PATH = "/mail/off/"
+
+
+def mail_off_sig(c, uid, what):
+    from ..accounts.login import auth_key
+    return hmac.new(auth_key(c), f"mailoff|{uid}|{what}".encode(), hashlib.sha256).hexdigest()[:40]
+
+
+def mail_off_url(c, uid, what):
+    return f"{PUBLIC_URL.rstrip('/')}{MAIL_OFF_PATH}{uid}.{what}.{mail_off_sig(c, uid, what)}"
+
+
+def mail_off_open(c, token):
+    """(user id, what) of a valid off link, else (None, None): the same answer for every wrong link."""
+    uid, what, sig = (str(token).split(".") + ["", ""])[:3]
+    if not (uid.isascii() and uid.isdigit()) or len(uid) > 18 or what not in MAIL_OFF or not hmac.compare_digest(sig.encode(), mail_off_sig(c, int(uid), what).encode()):
+        return None, None
+    return int(uid), what
+
+
+def _mail_off_page(token, done):
+    from ..accounts.session import rate_ip
+    from ..collab.comments import lang_of
+    from ..lists.public import pub_html
+    if hit_limit(f"mailoff:{rate_ip()}", 30):
+        return pub_html(tr("Too many requests"), f'<div class="msg"><h1>{html.escape(tr("Too many requests"))}</h1></div>', browser_lang() or "en", 429)
+    c = db()
+    with system_ctx(c):  # nobody is signed in: the person of the link, nothing else
+        uid, what = mail_off_open(c, token)
+        lg = lang_of(usettings(c, uid)) if uid else (browser_lang() or "en")
+        if not uid or not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent'", (uid,)).fetchone():
+            return pub_html(tr("Not found", lg=lg), f'<div class="msg"><h1>{html.escape(tr("Not found", lg=lg))}</h1></div>', lg, 404)
+        if done:
+            for k, v in MAIL_OFF[what].items():
+                uset(c, uid, k, v)
+    c.commit()
+    e = html.escape
+    name = tr("Daily summary by e-mail", lg=lg) if what == "digest" else tr("E-mails for assignments and mentions", lg=lg)
+    if done:
+        title, body_ = tr("Mails turned off", lg=lg), (f'<p>{e(name)}</p><p>{e(tr("You can turn them on again in Settings > Notifications.", lg=lg))}</p>'
+                                                         f'<a class="btn" href="{e(PUBLIC_URL)}/#settings/notify">{e(tr("Settings", lg=lg))}</a>')
+    else:
+        title, body_ = tr("Turn mails off", lg=lg), (f'<p>{e(name)}</p><form method="post" class="fform">'
+                                                       f'<button type="submit">{e(tr("Turn mails off", lg=lg))}</button></form>')
+    return pub_html(title, f'<div class="msg"><h1>{e(title)}</h1>{body_}</div>', lg)
+
+
+@app.get("/mail/off/<token>")
+def mail_off_ask(token):
+    return _mail_off_page(token, False)
+
+
+@app.post("/mail/off/<token>")
+def mail_off(token):
+    return _mail_off_page(token, True)
 
 
 @app.post("/api/me/mail/test")
@@ -680,7 +767,7 @@ def mail_test():
     lg = lang(c, me())
     m = digest_mail_content(c, me(), local_now().date().isoformat()) or (f"{APP_NAME}: " + tr("Test", lg=lg), tr("E-mails from {0} are arriving.", APP_NAME, lg=lg), None)
     try:
-        mail_send(u["email"].strip(), *m)
+        mail_send(u["email"].strip(), *m, from_name=APP_NAME)
     except Exception as e:  # noqa: BLE001
         return err(tr("Sending failed: {0}", type(e).__name__), 502)
     return jsonify(ok=True, to=u["email"].strip())

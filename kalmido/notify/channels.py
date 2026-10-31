@@ -769,6 +769,7 @@ def evm_note(c, uid, kind, tid, actor, s, cid=None):
         if not u or u["kind"] == "agent" or u["disabled"] or not (u["email"] or "").strip():
             return
         if c.execute("SELECT COUNT(*) FROM notify_mail_queue WHERE user_id=?", (uid,)).fetchone()[0] >= 200:
+            aa_count("watchdog", "event mail queue full", uid)  # 2.367.5 (#2980): the admin hears of it
             return
         c.execute("INSERT INTO notify_mail_queue(user_id,kind,task_id,comment_id,actor_id,created_at) VALUES(?,?,?,?,?,?)",
                   (uid, kind, tid, cid, actor, time.time()))
@@ -806,7 +807,7 @@ def evm_user(c, uid, s, lg, now):
     from ..admin.hosting import mail_budget
     from ..collab.comments import user_names
     from ..collab.liste2e import le2e_mode, le2e_neutral
-    from ..integrations.mail import MAIL_OUT_ON, mail_send
+    from ..integrations.mail import MAIL_OUT_ON, mail_off_url, mail_send
     if time.time() - float(s.get("evmail_at") or 0) < EVM_GAP:
         return
     q = c.execute("SELECT * FROM notify_mail_queue WHERE user_id=? ORDER BY id", (uid,)).fetchall()
@@ -856,8 +857,10 @@ def evm_user(c, uid, s, lg, now):
     uset(c, uid, "evmail_day", f"{day}:{sent_today + 1}")
     c.commit()
     m = evm_content(lines[:EVM_LINES], len(lines), lg)
+    off = mail_off_url(c, uid, "event")  # 2.367.5 (#2975): with the sender's name and the one-click off link
+    c.commit()
     try:
-        mail_send(to, *m)
+        mail_send(to, *m, from_name=APP_NAME, unsub=off)
         aa_ok("smtp")
     except Exception as e:  # noqa: BLE001
         print("mail: event mail for user", uid, "failed:", type(e).__name__, flush=True)  # 2.240.0 A (#2883): no addresses

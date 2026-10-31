@@ -15457,5 +15457,14 @@
   "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Doe dit alleen nadat je bij de ontvanger of je provider hebt gecontroleerd dat de factuur niet is aangekomen. Daarna kun je hem opnieuw versturen.",
   "Field values not taken over": "Veldwaarden niet overgenomen",
   "The attachments or office folder is a mount of its own, so a restore cannot swap it. Nothing was changed. Mount the data folder as a whole, see SELF-HOSTING.md.": "De map met bijlagen of kantoorbestanden is een eigen mount, daardoor kan een herstel deze niet wisselen. Er is niets gewijzigd. Koppel de gegevensmap als geheel, zie SELF-HOSTING.md.",
-  "Folders from a restore are lying next to the data folder ({0}). After a hard stop the database and the files may not match: check them, a successful restore removes them.": "Naast de gegevensmap staan mappen van een herstel ({0}). Na een harde stop kloppen de database en de bestanden mogelijk niet: controleer ze, een geslaagd herstel ruimt ze op."
+  "Folders from a restore are lying next to the data folder ({0}). After a hard stop the database and the files may not match: check them, a successful restore removes them.": "Naast de gegevensmap staan mappen van een herstel ({0}). Na een harde stop kloppen de database en de bestanden mogelijk niet: controleer ze, een geslaagd herstel ruimt ze op.",
+  "You get this summary every day. Change or turn it off in Settings > Notifications:": "Je krijgt deze samenvatting elke dag. Wijzig of schakel haar uit via Instellingen > Meldingen:",
+  "Daily summary by e-mail": "Dagelijkse samenvatting per e-mail",
+  "E-mails for assignments and mentions": "E-mails bij toewijzingen en vermeldingen",
+  "You can turn them on again in Settings > Notifications.": "Je kunt ze weer inschakelen via Instellingen > Meldingen.",
+  "Only the title in the push": "Alleen de titel in de push",
+  "Lock screen": "Vergrendelscherm",
+  "Hides the text of comments and messages on the lock screen. Your notification channels stay as they are.": "Verbergt de tekst van opmerkingen en berichten op het vergrendelscherm. Je meldingskanalen blijven zoals ze zijn.",
+  "{0} handed your project to {1}": "{0} heeft je project overgedragen aan {1}",
+  "{0} handed your project {1} to {2}": "{0} heeft je project {1} overgedragen aan {2}"
 }

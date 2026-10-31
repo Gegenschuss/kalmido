@@ -289,6 +289,11 @@ def _pt_denied(lg):
     return _pt_rt().pub_html(tr("Not allowed", lg=lg), f'<div class="msg"><h1>{html.escape(tr("Not allowed", lg=lg))}</h1></div>', lg, 403)
 
 
+def _pt_one_click():
+    from flask import request
+    return request.form.get("List-Unsubscribe") == "One-Click"
+
+
 def _pt_post_ok(c, p, what):
     from flask import request
     return request.headers.get("Sec-Fetch-Site", "") != "cross-site" and hmac.compare_digest(request.form.get("f") or "", pt_key(c, p, what))
@@ -372,7 +377,8 @@ def pt_stop(token):
     if bad:
         return bad
     lg = pt_lang(c, p)
-    if not _pt_post_ok(c, p, "s"):
+    # 2.367.5 (#2975): the mail client's one-click button (RFC 8058) posts this field; the link is the credential
+    if not _pt_one_click() and not _pt_post_ok(c, p, "s"):
         return _pt_denied(lg)
     c.execute("UPDATE portal_tickets SET notify=0 WHERE id=?", (p["id"],))
     c.commit()
@@ -402,10 +408,10 @@ def pt_notify_on(token):
 # ---- the portal: a sign-in link by mail (one-time, PT_LOGIN_TTL), then a cookie for /portal (signed, PT_COOKIE_DAYS days)
 # that lists every ticket of the same address in the same space. The request always gets the same answer.
 @bgj_fn("mail:portal", tries=1)
-def _pt_mail_bg(to, subject, text, html_body):
+def _pt_mail_bg(to, subject, text, html_body, unsub=None):
     from ..integrations.mail import mail_send
     try:
-        mail_send(to, subject, text, html_body, from_name=APP_NAME)
+        mail_send(to, subject, text, html_body, from_name=APP_NAME, unsub=unsub)  # 2.367.5 (#2975): unsub on the answers only
     except Exception as ex:  # noqa: BLE001  (nobody waits for this; the reporter can ask again)
         print("portal mail failed:", type(ex).__name__, flush=True)
 
@@ -783,7 +789,7 @@ def pt_mail_tick(c):
             text = "\n\n".join([head, *body_, tr("Status and answers: {0}", url, lg=lg), foot])
             hfoot = html.escape(tr("You get this mail because you sent the report.", lg=lg)) + \
                 f' <a href="{html.escape(stop)}">{html.escape(tr("No more mails about this report", lg=lg))}</a>'
-            mails.append((em, subj, text, _pt_mail_html([head, *body_], url, tr("Show the report", lg=lg), hfoot, subj)))
+            mails.append((em, subj, text, _pt_mail_html([head, *body_], url, tr("Show the report", lg=lg), hfoot, subj), stop))
         c.commit()
     for m in mails:
         bgj_add("mail:portal", *m)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
