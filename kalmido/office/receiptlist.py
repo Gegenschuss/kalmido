@@ -27,7 +27,7 @@ from flask import Response, jsonify, request
 from ..core.access import Denied, list_role
 from ..core.config import app
 from ..core.db import body, local_now, now_iso
-from ..core.i18n import tr
+from ..core.i18n import csv_dialect, tr
 from ..core.orgcrypt import OrgCryptError
 from ..files.store import fs_chain, fs_deleted, fs_role
 from ..personal.timetrack import BadInput
@@ -251,7 +251,7 @@ def rcl_csv_text(c, oid, rows):
     format follows the country pack: decimal comma -> semicolon, DD.MM.YYYY; else comma, decimal point, ISO days."""
     from .packs import office_pack_for
     comma = ((office_pack_for(office_settings(c, oid)) or {}).get("formats") or {}).get("decimal") == ","
-    num = _de if comma else (lambda v: v)  # noqa: E731
+    num = csv_dialect("de")[1] if comma else (lambda v: v)  # noqa: E731
     day = (lambda v: f"{v[8:10]}.{v[5:7]}.{v[:4]}" if v and DAY_RE.match(v) else "") if comma else (lambda v: v if v and DAY_RE.match(v) else "")  # noqa: E731
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";" if comma else ",", lineterminator="\r\n")
