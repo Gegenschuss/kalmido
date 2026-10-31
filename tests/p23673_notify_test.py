@@ -125,26 +125,29 @@ check("own" in Fi.get(B + "/api/me/channels").json()["events"], "#2973: the choi
 check(A.post(B + f"/api/orgs/{ORG}/channels", json={"kind": "slack", "url": STUB + "/x", "events": ["own"]}).status_code == 400, "#2973: not to an organisation")
 
 # ================================================================ #2973: own changes (a person without an organisation)
+AL = A.post(B + "/api/lists", json={"name": "Alice private", "org_id": None}).json()["id"]
+check(A.put(B + f"/api/lists/{AL}/members", json={"user_id": uid["bob"], "role": "edit"}).ok, "setup: alice shares her project with bob")
+channel(A, "/al", ["lists"])
+task(A, AL, "Written by alice")
+task(Bo, AL, "Written by bob")
+check(arrives("/al", "Written by bob"), "#2973: someone else's change arrives")
+check(not [t for t in texts("/al") if "Written by alice" in t], "#2973: the own change stays out (the later message came first)")
+
 FL = Fi.post(B + "/api/lists", json={"name": "Studio", "org_id": None}).json()["id"]
-check(Fi.put(B + f"/api/lists/{FL}/members", json={"user_id": uid["bob"], "role": "edit"}).ok, "setup: frida shares her project with bob")
 FC = channel(Fi, "/fr", ["lists"])
 task(Fi, FL, "Written by me")
-task(Bo, FL, "Written by bob")
-check(arrives("/fr", "Written by bob"), "#2973: someone else's change arrives")
-check(not [t for t in texts("/fr") if "Written by me" in t], "#2973: the own change stays out (the later message of the channel came first)")
+# an inbound webhook acts as its owner, and is news to them
+r = Fi.post(B + f"/api/lists/{FL}/hooks-in", json={"name": "Form"})
+check(r.status_code == 201, f"setup: an inbound webhook {r.text[:200]}")
+r = requests.post(B + "/api/hooks/in", headers={"X-Kalmido-Hook-Token": r.json()["token"]}, json={"title": "From the form"})
+check(r.status_code == 201, f"the hook takes a task {r.text[:200]}")
+check(arrives("/fr", "From the form"), "#2973: a task of the own inbound webhook arrives")
+check(not [t for t in texts("/fr") if "Written by me" in t], "#2973: a person without an organisation: the own change stays out")
 r = Fi.patch(B + f"/api/me/channels/{FC}", json={"events": ["lists", "own"]})
 check(r.ok and "own" in r.json()["events"], "#2973: 'own' is saved")
 task(Fi, FL, "Mine again")
 check(arrives("/fr", "Mine again"), "#2973: with the choice the own change arrives")
 Fi.patch(B + f"/api/me/channels/{FC}", json={"events": ["lists"]})
-
-# an inbound webhook acts as its owner, and is news to them
-r = Fi.post(B + f"/api/lists/{FL}/hooks-in", json={"name": "Form"})
-check(r.status_code == 201, f"setup: an inbound webhook {r.text[:200]}")
-HK, HT = r.json()["id"], r.json()["token"]
-r = requests.post(B + "/api/hooks/in", headers={"X-Kalmido-Hook-Token": HT}, json={"title": "From the form"})
-check(r.status_code == 201, f"the hook takes a task {r.text[:200]}")
-check(arrives("/fr", "From the form"), "#2973: a task of the own inbound webhook arrives")
 
 # an organisation's channel is a team feed
 OL = A.post(B + "/api/lists", json={"name": "Alpha board", "org_id": ORG}).json()["id"]
@@ -163,10 +166,10 @@ check(arrives("/alpha", "completed: Weekly report"), "#2973: an organisation's c
 Fi.patch(B + f"/api/me/channels/{FC}", json={"events": ["lists"]})
 
 # ================================================================ #2973: a rule run of the watchdog
-r = Fi.post(B + f"/api/lists/{FL}/rules", json={"name": "Hand over at due date", "trigger": {"kind": "due"}, "action": {"kind": "assign", "user_id": uid["bob"]}})
+r = Fi.post(B + f"/api/lists/{FL}/rules", json={"name": "Hand over at due date", "trigger": {"kind": "due"}, "action": {"kind": "assign", "user_id": FID}})
 check(r.status_code == 201, f"setup: rule 'due date reached' {r.text[:200]}")
 task(Fi, FL, "Handed over by the rule", due=time.strftime("%Y-%m-%d"))
-check(arrives("/fr", "Bob: Handed over by the rule"), "#2973: a rule run of the watchdog reaches the channel (and counts as no own change)")
+check(arrives("/fr", "Frida: Handed over by the rule"), "#2973: a rule run of the watchdog reaches the channel (and counts as no own change)")
 Fi.delete(B + f"/api/lists/{FL}/rules/{r.json()['id']}")
 
 # ================================================================ #2971: one more try
@@ -217,15 +220,15 @@ check(until(lambda: news(Fi, "webhook"), 30), "#2971: the webhook's owner gets a
 check(news(Fi, "webhook") and "Dead hook" in news(Fi, "webhook")[0]["data"]["text"] and news(Fi, "webhook")[0]["data"]["focus"] == "webhooks", "#2971: it names the webhook")
 
 # ================================================================ #2971: an inbound webhook pauses
-r = Bo.post(B + f"/api/lists/{FL}/hooks-in", json={"name": "Bob's form"})
-check(r.status_code == 201, f"setup: bob's inbound webhook in frida's project {r.text[:200]}")
+r = Bo.post(B + f"/api/lists/{AL}/hooks-in", json={"name": "Bob's form"})
+check(r.status_code == 201, f"setup: bob's inbound webhook in alice's project {r.text[:200]}")
 HT2 = r.json()["token"]
-check(Fi.put(B + f"/api/lists/{FL}/members", json={"user_id": uid["bob"], "role": "view"}).ok, "setup: bob can only read now")
+check(A.put(B + f"/api/lists/{AL}/members", json={"user_id": uid["bob"], "role": "view"}).ok, "setup: bob can only read now")
 for i in range(2):
     check(requests.post(B + "/api/hooks/in", headers={"X-Kalmido-Hook-Token": HT2}, json={"title": "No way"}).status_code == 403, f"the hook refuses ({i})")
-for s, who in ((Bo, "who set it up"), (Fi, "the project's owner")):
+for s, who in ((Bo, "who set it up"), (A, "the project's owner")):
     it = news(s, "hookin")
-    check(len(it) == 1 and "Bob's form" in it[0]["data"]["text"] and it[0]["data"]["list"] == FL, f"#2971: {who} hears it once {it}")
+    check(len(it) == 1 and "Bob's form" in it[0]["data"]["text"] and it[0]["data"]["list"] == AL, f"#2971: {who} hears it once {it}")
 
 # ================================================================ #2971: polled connections
 now = "2026-10-01T10:00:00Z"
