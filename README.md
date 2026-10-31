@@ -19,6 +19,13 @@
 
 ## What's new
 
+**2.458.0** (2026-10-31):
+- **Menus**: arrange every area menu yourself - hide, bring back, drag; the same on phone and computer.
+- **Settings**: new areas "Company & office" (the office settings, also for your private office) and "Documents"; Karakeep, newsletter service, bookmark button, CardDAV birthdays and booking page are set up in Settings > Integrations.
+- **Office**: client short code `{kuerzel}` in number schemes; invoice corrections optionally count in the invoice series; credit card statements - PDF positions read locally, a receipt per position, bank total matched, DATEV account of its own.
+- **File store**: only the file store's own folders; files of knowledge pages, tables and projects as read-only collections "From <area>".
+- **Self-employed**: create your own company from the workspace menu (work apart from private); optional private registration without an invitation per server.
+
 **2.457.0** (2026-10-31):
 - **Workspaces**: each workspace remembers its own view (page, open task, scroll position, sidebar) on every device.
 - **Fields and board**: choice fields as a stage bar ("Ordered (stages)") and the board's time per card with yellow / red limits per column.
@@ -341,7 +348,7 @@ setup); an existing server keeps its setting. *Back up now* makes one at any tim
 **Restore** a listed backup or an uploaded file (larger files: copy them into the backup folder, they show up in the
 project). You type `RESTORE` to confirm. Kalmido then:
 
-1. checks the archive completely: only the expected members (`manifest.json`, `kalmido.dump`, `attachments/<task>/<file>`, 2.46.0: `attachments/avatars|listicons/<file>` - a 2.45 server refuses such an archive; 2.79.0: `attachments/chat|budget|docthumbs/...` - a 2.78 server refuses such an archive;
+1. checks the archive completely: only the expected members (listed in docs/SELF-HOSTING.md, *Moving to a new server*),
    no paths outside, no links, no folders), size and member limits (`KALMIDO_BACKUP_MAX_MB`), compression ratio (zip
    bombs), free disk space, every SHA-256 while extracting, the dump's table of contents and statements (only tables,
    data, sequences, indexes, constraints and plain defaults are taken; functions, triggers and access rules are always
@@ -353,10 +360,10 @@ project). You type `RESTORE` to confirm. Kalmido then:
    if anything fails, the previous database and attachments are put back. Backups from before 2.37 (`tasks.db`) are
    moved over into PostgreSQL the same way as on the first start of 2.37;
 5. ends every session except yours (you get a fresh one; with single sign-on nothing changes). The backup settings
-   themselves stay as they are.
+   (`bk_` keys) stay as they are.
 
-Restoring the safety backup undoes a restore. Without the app: see *Backup* in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)
-(`pg_restore` of `kalmido.dump`, attachments unzipped into `./data`).
+Restoring the safety backup undoes a restore. Without the app: see *Moving to a new server* in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)
+(`pg_restore` of `kalmido.dump`, attachments unzipped into `./data`, `office/` into `./data/office`, `PGOPTIONS="-c app.role=system"`).
 
 </details>
 
