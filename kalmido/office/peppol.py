@@ -19,7 +19,9 @@ ein_ubl_build: Peppol BIS Billing 3.0, XRechnung UBL for a document in the XRech
 in office_peppol_sends records it (status sending -> sent -> delivered | rejected | error, the provider's reference, the
 message of a failure), the office log has peppol_send / peppol_status. Never twice: a document with a send that is not
 failed or rejected answers 409; after a failure or a rejection "send again" is a new row. The status is fetched when the
-document's Peppol view opens or on "refresh" (no polling in the background). Agents never send (office_gate refuses
+document's Peppol view opens or on "refresh" (no polling in the background). A provider that reports no rejections
+(PEP_NO_REJECT): a person marks the send as not delivered (POST .../peppol/undelivered), then "send again" is free
+(2.370.0, #2778; no public webhook). Agents never send (office_gate refuses
 their tokens); they read the status in the document (doc_public "peppol"). Receiving invoices is not part of 2.154."""
 import base64
 import hashlib
@@ -486,12 +488,13 @@ def pep_view(c, oid, uid, r):
     miss = pep_missing(c, oid, r, conf)
     sends = pep_sends(c, oid, r["id"])
     live = next((x for x in sends if x["status"] in PEP_LIVE), None)
+    unconf = live is not None and live["status"] == "sent" and live["provider"] in PEP_NO_REJECT
     return {"configured": bool(conf["provider"]), "missing": [{"key": k, "text": tr(PEP_NEED[k])} for k in miss],
             "receiver_id": (cl["peppol_id"] if cl is not None else "") or "", "client_id": r["client_id"],
             "receiver_suggest": pep_id_suggest(cl["vat_id"]) if cl is not None and not cl["peppol_id"] else "",
             "sandbox": int(conf["sandbox"] or 0), "provider_name": tr(PEP_PROVIDERS[conf["provider"]]["name"]) if conf["provider"] in PEP_PROVIDERS else "",
             "can_send": not miss and live is None, "can_retry": not miss and live is None and bool(sends),
-            "note": tr(PEP_NOTE_NO_REJECT) if live is not None and live["status"] == "sent" and live["provider"] in PEP_NO_REJECT else "",
+            "note": tr(PEP_NOTE_NO_REJECT) if unconf else "", "can_mark_undelivered": unconf,  # 2.370.0 (#2778)
             "sends": [_send_public(x) for x in sends]}
 
 
@@ -521,6 +524,22 @@ def pep_refresh(c, oid, did):
         from .ledger import ofx_log
         ofx_log(c, oid, "peppol_status", doc_id=did, detail={"status": st["status"], **({"message": st["message"]} if st.get("message") else {})})
     return True
+
+
+def pep_undelivered(c, oid, uid, did):
+    """2.370.0 (#2778): a person found out that a send of a provider without rejection reports did not arrive: the newest
+    send becomes an error, so "send again" is free (a new send with its own idempotency key); once only, in one statement
+    against a status fetch at the same moment. 409 when no such send is on its way."""
+    from .ledger import ofx_log
+    who = c.execute("SELECT display_name, username FROM users WHERE id=?", (uid,)).fetchone()
+    msg = tr("Marked as not delivered by {0}", who["display_name"] or who["username"])
+    q = ",".join("?" * len(PEP_NO_REJECT))
+    x = c.execute(f"""UPDATE office_peppol_sends SET status='error', message=?, updated_at=? WHERE id=(SELECT id FROM office_peppol_sends WHERE org_id=? AND
+                      doc_id=? ORDER BY id DESC LIMIT 1) AND status='sent' AND provider IN ({q}) RETURNING id""",
+                  (msg, iso(now_utc()), oid, did, *PEP_NO_REJECT)).fetchone()
+    if not x:
+        raise Denied(409, tr("No send waits for a confirmation"))
+    ofx_log(c, oid, "peppol_status", doc_id=did, detail={"status": "error", "message": msg})
 
 
 def pep_send(c, oid, uid, r, again=False):
@@ -678,6 +697,19 @@ def pep_refresh_post(did):
         raise Denied(409, tr(PEP_NEED["kind"]))
     if pep_refresh(c, oid, did):
         c.commit()
+    return jsonify(pep_view(c, oid, uid, r))
+
+
+@app.post("/api/office/docs/<int:did>/peppol/undelivered")
+def pep_undelivered_post(did):
+    """2.370.0 (#2778): "Mark as not delivered" -> the Peppol view as GET (people only, the right to send, like sending)."""
+    c, uid, oid = _ctx()
+    r = _doc(c, oid, did)
+    if r["kind"] not in ("invoice", "credit"):
+        raise Denied(409, tr(PEP_NEED["kind"]))
+    pep_undelivered(c, oid, uid, did)
+    bump(c)
+    c.commit()
     return jsonify(pep_view(c, oid, uid, r))
 
 

@@ -15449,5 +15449,10 @@
   "ntfy inbox {0} cannot fetch, failing since {1}.": "ntfy-Eingang {0} kann nicht abrufen, Fehler seit {1}.",
   "Integration problem": "Problem mit einer Anbindung",
   "a forwarding, webhook, mailbox or git connection of yours stopped working": "eine Weiterleitung, ein Webhook, Postfach oder eine Git-Verbindung von dir funktioniert nicht mehr",
-  "Left out, locked by the virus scanner:": "Weggelassen, vom Virenscanner gesperrt:"
+  "Left out, locked by the virus scanner:": "Weggelassen, vom Virenscanner gesperrt:",
+  "Marked as not delivered by {0}": "Von {0} als nicht zugestellt markiert",
+  "No send waits for a confirmation": "Keine Sendung wartet auf eine Bestätigung",
+  "Mark as not delivered": "Als nicht zugestellt markieren",
+  "Mark as not delivered?": "Als nicht zugestellt markieren?",
+  "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Mach das nur, wenn du beim Empfänger oder deinem Anbieter geprüft hast, dass die Rechnung nicht angekommen ist. Danach kannst du sie erneut senden."
 }

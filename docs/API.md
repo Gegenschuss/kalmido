@@ -1477,6 +1477,8 @@ accept books the payment like *Record payment*), the settings key `agents_read` 
 the key is never returned, `key_set` only), `POST /api/office/peppol/check`, `GET /api/office/docs/{id}/ubl` (the UBL file),
 `GET /api/office/docs/{id}/peppol` (what is missing, the client's id or a suggestion, the sends), `POST
 /api/office/docs/{id}/peppol/refresh` (the same after fetching the status of a send on its way, 2.306.0), `POST
+/api/office/docs/{id}/peppol/undelivered` (2.370.0: a provider without rejection reports: the send on its way becomes an
+error, so `again` is free; the same view, `409` when no such send waits), `POST
 /api/office/docs/{id}/peppol/lookup` (`{reachable}`), `POST /api/office/docs/{id}/peppol` (`{again?: 1}` -> `201`; `409` when
 something is missing or it went already, `502` when the provider failed). The client's billing field `peppol_id`.
 

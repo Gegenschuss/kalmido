@@ -532,6 +532,7 @@ ROUTES = {
     "GET /api/office/peppol": "office", "PUT /api/office/peppol": "office", "POST /api/office/peppol/check": "office",
     "GET /api/office/docs/{}/ubl": "office", "GET /api/office/docs/{}/peppol": "office", "POST /api/office/docs/{}/peppol": "office",
     "POST /api/office/docs/{}/peppol/lookup": "office",
+    "POST /api/office/docs/{}/peppol/undelivered": "office",  # 2.370.0 (#2778)
     "POST /api/office/docs/{}/peppol/refresh": "office",  # 2.306.0 D2 (#2875): the status fetch moved off the GET
     # 2.47.0 (#1215): the parts of a quotation
     "POST /api/office/docs/{}/parts": "office", "PATCH /api/office/docs/{}/parts/{}": "office", "DELETE /api/office/docs/{}/parts/{}": "office",

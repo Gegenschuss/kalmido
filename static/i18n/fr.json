@@ -15449,5 +15449,10 @@
   "ntfy inbox {0} cannot fetch, failing since {1}.": "La boîte ntfy {0} ne peut pas récupérer les données, en échec depuis {1}.",
   "Integration problem": "Problème d'intégration",
   "a forwarding, webhook, mailbox or git connection of yours stopped working": "un de tes transferts, webhooks, boîtes ou connexions Git ne fonctionne plus",
-  "Left out, locked by the virus scanner:": "Omis, bloqué par l’antivirus :"
+  "Left out, locked by the virus scanner:": "Omis, bloqué par l’antivirus :",
+  "Marked as not delivered by {0}": "Marqué comme non remis par {0}",
+  "No send waits for a confirmation": "Aucun envoi n’attend de confirmation",
+  "Mark as not delivered": "Marquer comme non remis",
+  "Mark as not delivered?": "Marquer comme non remis ?",
+  "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Fais-le seulement après avoir vérifié auprès du destinataire ou de ton fournisseur que la facture n’est pas arrivée. Tu pourras ensuite la renvoyer."
 }

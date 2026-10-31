@@ -184,6 +184,22 @@ check(A.post(B + f"{D}/{DID}/peppol", json={}).status_code == 409 and A.post(B +
 v = view(A, DID, refresh=True).json()
 check(v["sends"][0]["status"] == "sent" and v["sends"][0]["checked_at"], "refresh: still on its way")
 check("rejections" in v["note"], f"2.209.0 C (#2589): Storecove send on its way says rejections are not reported back: {v['note']!r}")
+# 2.370.0 (#2778): a send that did not arrive is marked, "send again" is free; once only, never by another organisation or an agent
+check(v["can_mark_undelivered"] and not v["can_send"], "#2778: the button shows while a Storecove send waits")
+DU = invoice(A, CL)
+check(A.post(B + f"{D}/{DU}/peppol/undelivered").status_code == 409, "#2778: nothing sent yet: 409")
+check(A.post(B + f"{D}/{DU}/peppol", json={}).status_code == 201, "#2778: (setup) sent")
+check(Ca.post(B + f"{D}/{DU}/peppol/undelivered").status_code == 404, "#2778: another organisation: 404")
+r = A.post(B + f"{D}/{DU}/peppol/undelivered")
+v = r.json() if r.ok else {}
+check(r.ok and v["sends"][0]["status"] == "error" and "not delivered" in v["sends"][0]["message"] and v["can_retry"] and v["can_send"]
+      and not v["can_mark_undelivered"] and v["note"] == "", f"#2778: marked, send again is free: {r.text[:300]}")
+check(A.post(B + f"{D}/{DU}/peppol/undelivered").status_code == 409, "#2778: only once")
+check(("peppol_status",) in [tuple(x) for x in dbx("SELECT action FROM office_doc_log WHERE doc_id=?", (DU,))], "#2778: in the office log")
+r = A.post(B + f"{D}/{DU}/peppol", json={"again": 1})
+check(r.status_code == 201 and len(r.json()["sends"]) == 2 and r.json()["sends"][0]["status"] == "sent", f"#2778: sent again: {r.text[:200]}")
+idm = [x[0] for x in dbx("SELECT idem FROM office_peppol_sends WHERE doc_id=?", (DU,))]
+check(len(set(idm)) == 2, "#2778: the new send has its own idempotency key (the provider must not drop it as a repeat)")
 stub_file("peppol_delivered", "1")
 v = view(A, DID, refresh=True).json()
 check(v["sends"][0]["status"] == "delivered" and not v["can_send"], f"refresh: delivered: {v['sends'][0]}")
@@ -211,6 +227,7 @@ r = A.post(B + "/api/my/agents", json={"username": "pepbot", "display_name": "Pe
 if r.status_code == 201:
     AH = {**H, "Authorization": "Bearer " + r.json()["token"]}
     check(requests.post(B + f"{D}/{DID}/peppol", json={"again": 1}, headers=AH).status_code in (401, 403), "an agent never sends")
+    check(requests.post(B + f"{D}/{DID}/peppol/undelivered", headers=AH).status_code in (401, 403), "#2778: an agent never marks")
     check(requests.put(B + O + "/peppol", json={"provider": ""}, headers=AH).status_code in (401, 403), "an agent never sets up")
 else:
     check(False, "setup: an agent " + r.text[:200])
@@ -265,6 +282,13 @@ FD = invoice(Fr, FCL)
 r = Fr.post(B + f"{D}/{FD}/peppol", json={})
 check(r.status_code == 201 and r.json()["sends"][0]["status"] == "sent", f"freelancer: sent: {r.text[:200]}")
 check(Fr.get(B + f"{D}/{FD}/ubl").ok, "freelancer: UBL download")
+check(not r.json()["can_mark_undelivered"] and Fr.post(B + f"{D}/{FD}/peppol/undelivered").status_code == 409, "#2778: an own endpoint reports rejections itself: no mark")
+assert Fr.put(B + O + "/peppol", json={"provider": "storecove", "api_key": "good-key", "account": "4711", "sender_id": g["sender_suggest"]}).ok
+FD2 = invoice(Fr, FCL)
+r = Fr.post(B + f"{D}/{FD2}/peppol", json={})
+check(r.status_code == 201 and r.json()["can_mark_undelivered"], f"#2778: freelancer: Storecove send waits: {r.text[:200]}")
+r = Fr.post(B + f"{D}/{FD2}/peppol/undelivered")
+check(r.ok and r.json()["can_retry"], f"#2778: freelancer: marked (own admin): {r.text[:200]}")
 check(A.get(B + f"{D}/{FD}/peppol").status_code == 404, "the freelancer's document is not Alpha's")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")

@@ -2540,6 +2540,8 @@ with
   every other file of the office folder (archived PDFs, accepted quotations, entertainment bills ...). Settings and working
   data (price lists, text blocks, cash flow, bank rules ...) stay out: a static test names each such table with its reason;
 - `00-index.txt` (contents, the retention note, files that could not be read) and `manifest.json` (SHA-256 of every file).
+  A file the virus scanner locked stays out and is listed with its reason under `locked_files` (2.370.0), apart from
+  `missing`; a receipt keeps its line in `receipts.csv`.
 
 Who downloads it: the person themself for their own records (*Office -> Settings -> Data*, also without an organisation)
 and the admins of an organisation for its office (*Settings -> Organisation*). Nobody else -- an instance admin neither
@@ -2674,7 +2676,8 @@ with a sandbox key, and your own Peppol ID. **Check connection** asks the provid
   (`document_submissions`, the raw document parsed by the provider), asks before sending whether the recipient is
   reachable (`discovery/receives`) and reads the delivery evidence when you refresh the status. Storecove reports a
   rejection or a failed delivery only through a webhook, which Kalmido does not receive: such a send stays *Sent over
-  Peppol*, and the Peppol view says so - check the status with the recipient or in your Storecove account.
+  Peppol*, and the Peppol view says so - check the status with the recipient or in your Storecove account. Did it not
+  arrive, *Mark as not delivered* in that view frees *Send again* (2.370.0).
 - *Own endpoint (URL)*: any bridge to an access point (your own one, another provider's API behind a small adapter) that
   speaks this protocol, `https` (plain `http` only for a host the instance admin allowed like a calendar host); every call
   carries `Authorization: Bearer <API key>`:
