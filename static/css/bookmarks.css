@@ -36,6 +36,7 @@
 .bmlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .bmrow{display:flex;align-items:center;gap:.625rem;padding:.5rem 0;border-bottom:1px solid var(--line)}
 .bmrow .bmbody{padding:0}
+@media (max-width:30rem){ .bmrow{flex-wrap:wrap}.bmrow .bmbody{flex:1 1 calc(100% - 3.625rem)}.bmrow .bmacts{flex:1 0 100%;justify-content:flex-end} }  /* 2.458.0 (#3855): the buttons below the title, it keeps the width */
 .bmthumb{width:3rem;height:3rem;border-radius:var(--r-s);object-fit:cover;flex:none;background:var(--bg3)}
 .bmmore{align-self:center}
 .bmdlg .bmdpic{width:100%;max-height:12rem;object-fit:cover;border-radius:var(--r-s);margin-bottom:.5rem}

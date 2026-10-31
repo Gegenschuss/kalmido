@@ -12596,8 +12596,6 @@
   "third|nth": "tercer",
   "fourth|nth": "cuarto",
   "last|nth": "último",
-  "on the last {0}": "el último {0}",
-  "on the {0} {1}": "el {0} {1}",
   "on the": "el",
   "Weekday": "Día de la semana",
   "Team absences": "Ausencias del equipo",
@@ -15431,5 +15429,11 @@
   "=B2*C2 · =SUM(C2:C9) · =here.total_time": "=B2*C2 · =SUM(C2:C9) · =here.total_time",
   "IF SUM ROUND MIN MAX AVERAGE COUNT": "IF SUM ROUND MIN MAX AVERAGE COUNT",
   "This device is in {0}, your setting says {1}.": "Este dispositivo está en {0}, tu ajuste indica {1}.",
-  "Reminders, the daily summary and the briefing come at this time zone's hours; time tracking counts its days by it.": "Los recordatorios, el resumen diario y el briefing siguen esta zona horaria; el registro de tiempo cuenta sus días según ella."
+  "Reminders, the daily summary and the briefing come at this time zone's hours; time tracking counts its days by it.": "Los recordatorios, el resumen diario y el briefing siguen esta zona horaria; el registro de tiempo cuenta sus días según ella.",
+  "Monthly on day {0}": "Mensualmente el día {0}",
+  "Every {0} months on day {1}": "Cada {0} meses el día {1}",
+  "Monthly on the {0} {1}": "Mensualmente el {0} {1}",
+  "Every {0} months on the {1} {2}": "Cada {0} meses el {1} {2}",
+  "Monthly on the last {0}": "Mensualmente el último {0}",
+  "Every {0} months on the last {1}": "Cada {0} meses el último {1}"
 }

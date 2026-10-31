@@ -12596,8 +12596,6 @@
   "third|nth": "derde",
   "fourth|nth": "vierde",
   "last|nth": "laatste",
-  "on the last {0}": "op de laatste {0}",
-  "on the {0} {1}": "op de {0} {1}",
   "on the": "op de",
   "Weekday": "Weekdag",
   "Team absences": "Afwezigheid van het team",
@@ -15431,5 +15429,11 @@
   "=B2*C2 · =SUM(C2:C9) · =here.total_time": "=B2*C2 · =SUM(C2:C9) · =here.total_time",
   "IF SUM ROUND MIN MAX AVERAGE COUNT": "IF SUM ROUND MIN MAX AVERAGE COUNT",
   "This device is in {0}, your setting says {1}.": "Dit apparaat staat op {0}, je instelling zegt {1}.",
-  "Reminders, the daily summary and the briefing come at this time zone's hours; time tracking counts its days by it.": "Herinneringen, de dagsamenvatting en de briefing volgen deze tijdzone; de tijdregistratie telt haar dagen ernaar."
+  "Reminders, the daily summary and the briefing come at this time zone's hours; time tracking counts its days by it.": "Herinneringen, de dagsamenvatting en de briefing volgen deze tijdzone; de tijdregistratie telt haar dagen ernaar.",
+  "Monthly on day {0}": "Maandelijks op dag {0}",
+  "Every {0} months on day {1}": "Elke {0} maanden op dag {1}",
+  "Monthly on the {0} {1}": "Maandelijks op de {0} {1}",
+  "Every {0} months on the {1} {2}": "Elke {0} maanden op de {1} {2}",
+  "Monthly on the last {0}": "Maandelijks op de laatste {0}",
+  "Every {0} months on the last {1}": "Elke {0} maanden op de laatste {1}"
 }

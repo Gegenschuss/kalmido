@@ -6,6 +6,7 @@ odoc_render(c, doc_id) builds the print model (see docs/OFFICE.md) that the PDF 
 import json
 import os
 import re
+import unicodedata
 from datetime import date, timedelta
 
 from flask import g, jsonify, request
@@ -1248,6 +1249,32 @@ def odoc_groups():
     return jsonify(clients=clients[:300], projects=projects, years=years)
 
 
+def _odoc_text_key(s):
+    """Like the list's localeCompare (numeric, base): no case, no accents, "RE-9" before "RE-10"."""
+    s = unicodedata.normalize("NFKD", str(s)).casefold()
+    return [int(x) if i % 2 else x for i, x in enumerate(re.split(r"(\d+)", "".join(ch for ch in s if not unicodedata.combining(ch))))]
+
+
+def odoc_sorted(rows, k, d):
+    """2.458.0 (#3839): rows as office_docs.js lst_sorted shows them: the same value per kind, rows without one last in both directions."""
+    def val(r):
+        if k == "date":
+            return r["date"] or None
+        if k == "name":
+            s = r["project_title"] or r["number"]
+            return _odoc_text_key(s) if s else None
+        if k == "client":
+            s = _j(r["recipient"], {}).get("name")
+            return _odoc_text_key(s) if s else None
+        if r["kind"] == "delivery":
+            return None
+        return dec(_j(r["totals"], {}).get("gross" if r["kind"] in ("invoice", "credit") else "net") or 0)
+    vals = [(val(r), r) for r in rows]
+    full = [x for x in vals if x[0] is not None]
+    full.sort(key=lambda x: x[0], reverse=(d or ("asc" if k in ("client", "name") else "desc")) != "asc")
+    return [x[1] for x in full] + [x[1] for x in vals if x[0] is None]
+
+
 @app.get("/api/office/docs")
 def odoc_list():
     """?kind=offer&status=&q= -> the organisation's documents, newest first (brief rows)."""
@@ -1290,10 +1317,18 @@ def odoc_list():
             args.append(local_now().date().isoformat())
         elif st == "partial":  # 2.356.0 D (#3007): not for the open items
             sql += " AND EXISTS (SELECT 1 FROM office_payments p WHERE p.doc_id=office_docs.id AND p.org_id=office_docs.org_id)"
-    raw = c.execute(sql + " ORDER BY date DESC, id DESC" + ("" if derived else " LIMIT 500"), args).fetchall()
-    pm = inv_paid_map(c, oid, [r["id"] for r in raw]) if kind in ("invoice", "credit") else {}
+    srt = request.args.get("sort")  # 2.458.0 (#3839): the sort chosen in the list, decided before the 500
+    srt = srt if srt in ("date", "client", "amount", "name") else None
+    raw = c.execute(sql + " ORDER BY date DESC, id DESC" + ("" if derived or srt else " LIMIT 500"), args).fetchall()
+    paid = kind in ("invoice", "credit")
+    pm = inv_paid_map(c, oid, [r["id"] for r in raw]) if paid and derived else {}
     if derived:
-        raw = [r for r in raw if (dec(inv_money_fields(r, pm)["open"]) > 0 if st == "open" else inv_state(r, pm) == st)][:500]
+        raw = [r for r in raw if (dec(inv_money_fields(r, pm)["open"]) > 0 if st == "open" else inv_state(r, pm) == st)]
+    if srt and len(raw) >= 500:
+        raw = odoc_sorted(raw, srt, request.args.get("dir"))
+    raw = raw[:500]
+    if paid and not derived:
+        pm = inv_paid_map(c, oid, [r["id"] for r in raw])
     lg = lang()
     rows = [doc_brief(r, pm, lg) for r in raw]
     if kind == "offer":

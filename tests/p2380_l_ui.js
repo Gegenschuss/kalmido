@@ -84,7 +84,7 @@ const line = (d, k) => (d.totals?.lines || []).find(x => x.kind === k);
       '#3420: with the pack on the older quotation shows the switch (off) and the position marks');
     await ev(`(() => { document.getElementById('ofd-producing_on').click(); return 1; })()`);
     const autos = `[...document.querySelectorAll('.ofdautos .ofdauto')].map(x => x.textContent).join(' | ')`;
-    check(await ready(ev, `/Producing/.test(${autos}) && /4\\.000,00 €/.test(${autos}) && !!document.querySelector('#ofd-prod_quotient')`, 60), '#3420: switched on: the Producing line by amount ' + await ev(autos));
+    check(await ready(ev, `/Producing/.test(${autos}) && /4\\.000,00\\s€/.test(${autos}) && !!document.querySelector('#ofd-prod_quotient')`, 60), '#3420: switched on: the Producing line by amount ' + await ev(autos));
     await shot('p2380-l-producing.png');
   });
   const sf = await call(CF, 'GET', `/api/office/docs/${qf.id}`);

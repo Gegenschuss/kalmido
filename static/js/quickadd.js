@@ -413,8 +413,15 @@ function crr_nthOf(p) {
   const pos = m ? +m[1] : /^[A-Z]{2}$/.test(p.BYDAY || '') && /^-?\d$/.test(p.BYSETPOS || '') ? +p.BYSETPOS : 0, wd = m ? m[2] : p.BYDAY;
   return pos && RR_WD.includes(wd) ? {pos: pos > 0 && pos < 5 ? pos : -1, wd} : null;
 }
-// "the second Tuesday" / "the last Friday" for the monthly label
-const crr_nthLabel = (pos, wd) => (pos < 0 ? tr('on the last {0}', WDL[RR_WD.indexOf(wd)]) : tr('on the {0} {1}', tr(CRR_ORD[pos - 1]), WDL[RR_WD.indexOf(wd)]));
+// 2.458.0 (#3838): the monthly label as one whole text per form, each language orders its own words
+function crr_monthLabel(n, p, nth) {
+  const one = n === 1, wd = nth && WDL[RR_WD.indexOf(nth.wd)];
+  if (p.BYMONTHDAY) return one ? tr('Monthly on day {0}', p.BYMONTHDAY) : tr('Every {0} months on day {1}', n, p.BYMONTHDAY);
+  if (!nth) return one ? tr('Monthly') : tr('Every {0} months', n);
+  if (nth.pos < 0) return one ? tr('Monthly on the last {0}', wd) : tr('Every {0} months on the last {1}', n, wd);
+  const ord = tr(CRR_ORD[nth.pos - 1]);
+  return one ? tr('Monthly on the {0} {1}', ord, wd) : tr('Every {0} months on the {1} {2}', n, ord, wd);
+}
 function repeatLabelBase(r) {
   if (!r) return '';
   const p = Object.fromEntries(r.replace(/^RRULE:/, '').split(';').map(x => x.split('=')));
@@ -427,8 +434,7 @@ function repeatLabelBase(r) {
     return (n === 1 ? tr('Weekly') : tr('Every {0} weeks', n)) + (days ? ` (${days})` : '');
   }
   if (p.FREQ === 'MONTHLY') {
-    const nth = crr_nthOf(p);  // 2.155.0 C (#2075): "on the second Tuesday" (calrrule.js)
-    return (n === 1 ? tr('Monthly') : tr('Every {0} months', n)) + (p.BYMONTHDAY ? ' ' + tr('on day {0}', p.BYMONTHDAY) : nth ? ' ' + crr_nthLabel(nth.pos, nth.wd) : '');
+    return crr_monthLabel(n, p, crr_nthOf(p));  // 2.155.0 C (#2075): "on the second Tuesday" (calrrule.js)
   }
   if (p.FREQ === 'YEARLY') return n === 1 ? tr('Yearly') : tr('Every {0} years', n);
   return tr('Repeats');
