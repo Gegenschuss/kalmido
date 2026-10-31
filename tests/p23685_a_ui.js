@@ -46,12 +46,12 @@ const qty = async (lid, title, text) => { const t = await call('POST', '/api/tas
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await nav(B + '#today');
     const sel = `#srail .srb .srbn`;
-    for (let i = 0; i < 60 && !(await ev(`[...document.querySelectorAll('${sel}')].length > 2`).catch(() => false)); i++) await sleep(200);
+    for (let i = 0; i < 60 && !(await ev(`[...document.querySelectorAll('${sel}')].filter(x => x.offsetParent).length > 2`).catch(() => false)); i++) await sleep(200);
     // the widest word of the bar: an extra line of text means the word broke
     const lines = await ev(`(() => {
       const e = document.createElement('span'); e.className = 'srbn'; e.textContent = 'Knowledge';
-      const b = document.querySelector('#srail .srb'); b.appendChild(e);
-      const h = e.getBoundingClientRect().height, lh = parseFloat(getComputedStyle(e).lineHeight); e.remove();
+      const b = [...document.querySelectorAll('#srail .srb')].find(x => x.offsetParent && x.querySelector('.srbn')); b.appendChild(e);
+      const h = e.getBoundingClientRect().height, lh = parseFloat(getComputedStyle(e).fontSize) * 1.15; e.remove();
       return Math.round(h / lh);
     })()`);
     check(lines === 1, 'the bar at 1280 px: Knowledge on one line: ' + lines);
