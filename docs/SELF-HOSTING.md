@@ -1846,7 +1846,7 @@ Notes:
 <!-- backup-folders -->
 **What a backup archive holds:** `kalmido.dump`, `manifest.json`, `office/<organisation>/` and below `attachments/`:
 `<task>/` for task attachments; the folders `avatars/`, `listicons/`, `docthumbs/`, `listheads/` and `bookmarks/` with
-their files directly inside; the folders `files/`, `lists/`, `budget/`, `wiki/`, `tchat/` and `sheets/` with one folder per
+their files directly inside; the folders `files/`, `lists/`, `budget/`, `wiki/`, `tchat/`, `sheets/` and `tplfiles/` with one folder per
 entry; and `chat/<agent>-<person>/`. Without the app: unpack `attachments/` to `./data/attachments` and `office/` to
 `./data/office`, restore the dump with `PGOPTIONS="-c app.role=system"` as in the backup section above. Restoring keeps
 the backup settings (`bk_` keys) of the running server; every other setting comes from the backup.
