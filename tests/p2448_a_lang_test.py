@@ -17,11 +17,14 @@ key + values. The first admin speaks German here, so a text that silently falls 
 import base64
 import email
 import email.policy
+import hashlib
+import io
 import json
 import os
 import shutil
 import subprocess
 import sys
+import zipfile
 from datetime import date, datetime, timedelta, timezone
 
 import requests
@@ -181,6 +184,49 @@ check("kein Kalmido-Export" in (st.get("error") or ""), f"German while German {s
 speak(Fr, "fr")
 st = Fr.get(B + f"/api/account/import/{IID}").json()
 check("export Kalmido" in (st.get("error") or ""), f"the same state read in French {st}")
+
+# ================================================================ account import: what stays behind (2.454.0, #3808)
+def sha(b):
+    return hashlib.sha256(b).hexdigest()
+
+
+def areas_zip():
+    entries = {f"data/{t}.json": json.dumps(rows).encode() for t, rows in {"lists": [], "tasks": [], "wiki_pages": [{"id": 1}]}.items()}
+    flist = [{"path": p, "size": len(x), "sha256": sha(x)} for p, x in entries.items()]
+    m = json.dumps({"format": "kalmido-account", "v": 1, "kalmido_version": "test", "created_at": "2026-10-20T06:00:00Z",
+                    "source": {"url": "https://example.com", "hosted": True}, "user": {"id": 1000, "name": "Test Person", "email": "test@example.com"},
+                    "tables": {}, "files": flist, "client_encrypted": {}, "export_id": os.urandom(16).hex()}).encode()
+    bio = io.BytesIO()
+    with zipfile.ZipFile(bio, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("manifest.json", m)
+        z.writestr("checksum.sha256", (f"{sha(m)}  manifest.json\n" + "".join(f"{f['sha256']}  {f['path']}\n" for f in flist)).encode())
+        for p, x in entries.items():
+            z.writestr(p, x)
+    return bio.getvalue()
+
+
+check(Fr.delete(B + f"/api/account/import/{IID}").ok, "the junk upload goes")
+ZIP = areas_zip()
+speak(Fr, "de")
+r = Fr.post(B + "/api/account/import", json={"size": len(ZIP), "name": "x.zip"})
+check(r.ok, "an upload " + r.text[:200])
+IID = r.json()["id"]
+Fr.put(B + f"/api/account/import/{IID}?offset=0", data=ZIP, headers={"Content-Type": "application/octet-stream"})
+st = until(lambda: (lambda j: j if j.get("state") == "preview" else None)(Fr.get(B + f"/api/account/import/{IID}").json()), 60) or {}
+left = lambda j: [x["what"] for x in (j.get("preview") or {}).get("not_taken") or []]  # noqa: E731
+check("Wissensseiten" in left(st), f"#3808: the preview in German {st}")
+speak(Fr, "fr")
+st = Fr.get(B + f"/api/account/import/{IID}").json()
+check("Pages de connaissances" in left(st), f"#3808: the same preview read in French {left(st)}")
+r = Fr.post(B + f"/api/account/import/{IID}/run", json={"target": "private", "people": {}})
+check(r.status_code == 202, f"the run starts {r.text[:200]}")
+st = until(lambda: (lambda j: j if j.get("state") == "done" else None)(Fr.get(B + f"/api/account/import/{IID}").json()), 60) or {}
+speak(Fr, "de")
+st = Fr.get(B + f"/api/account/import/{IID}").json()
+w = " | ".join(x["text"] for x in (st.get("result") or {}).get("warnings") or [])
+check("Diese Bereiche bleiben" in w and "Wissensseiten (1)" in w, f"#3808: the warning written under French, read in German {w}")
+imp = Fr.get(B + "/api/imports").json()["imports"][0]["counts"]
+check({"what": "Wissensseiten", "count": 1} in imp.get("not_taken", []), f"#3808: the import's record in German too {imp}")
 
 # ================================================================ history: the key, the reader's app translates it
 tid = Fr.post(B + "/api/tasks", json={"title": "Sealed"}).json()["id"]
