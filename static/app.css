@@ -8786,3 +8786,26 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 .uptrack{height:.25rem;margin-top:.375rem;border-radius:.25rem;background:var(--bg4);overflow:hidden}
 .uptrack>i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
 @media (pointer:coarse){ .upbar button{min-height:2.75rem;min-width:2.75rem;padding:0 .75rem} }
+/* 2.459.0 (#3853): phone 320 px - button bars wrap instead of running over the edge, long labels take the whole row, tab bars
+   fit the page (only the bar itself scrolls). Kept to narrow screens, desktop is unchanged. */
+@media (max-width:420px){
+  .timev .tvseg{max-width:100%;min-width:0;flex:1 1 100%}
+  .timev .tvseg button{flex:1 1 auto;justify-content:center}
+  .tvr-acts .btn{flex:1 1 100%;white-space:normal;text-align:center}
+  .calbar>*{min-width:0;max-width:100%}
+  .calbar .seg{flex:1 1 100%;overflow-x:auto;scrollbar-width:none}
+  .calbar .seg button{flex:1 0 auto;white-space:nowrap}
+  .ntbar{flex-wrap:wrap}
+  .ntbar .ssearch{flex:1 1 100%}
+  .povh .btn,.povbar .btn{max-width:100%;white-space:normal;text-align:center;justify-content:center;flex:1 1 100%}
+  .povh .spacer{display:none}
+  .povs.povs-empty .povh{flex-wrap:wrap}
+  .povs-empty .povemh{flex:1 1 100%;min-width:0}
+  #mbar.mb4{flex-wrap:wrap;row-gap:0}
+  #mbar.mb4 .mcount{order:-1;flex:1 1 100%;min-width:0;overflow:hidden;text-overflow:ellipsis;padding:0 .5rem .125rem}
+  #mbar.mb4 .mbb{min-width:2.5rem}
+  .ppseg{max-width:100%;overflow-x:auto;scrollbar-width:none}
+  .ppseg button{flex:none;white-space:nowrap}
+  #dc-h{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .msvbtns .btn{flex:1 1 100%;max-width:100%;white-space:normal;text-align:center;justify-content:center}
+}

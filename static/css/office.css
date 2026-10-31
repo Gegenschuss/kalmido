@@ -1140,3 +1140,11 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
   .agr-li .ofcrow>svg:last-child{display:none}
   .agr-li .ofcrow,.rin-it,.brlrow,.dma-open,.dsbsec .ctlinks li{-webkit-touch-callout:none}
 }
+/* 2.459.0 (#3853): phone 320 px - the long ZIP button takes the whole row; the meal dialog's lines fit (kind on its own row) */
+@media (max-width:420px){
+  .rcl-exp .btn{flex:1 1 100%;max-width:100%;white-space:normal;text-align:center}
+  .rcl-exp .btn span{min-width:0}
+  .bwln{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 2.75rem}
+  .bwln>select[data-bwl="kind"]{grid-column:1/-1}
+  .bwfoot .btn{flex:1 1 100%;max-width:100%;white-space:normal;justify-content:center}
+}
