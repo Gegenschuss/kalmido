@@ -15,10 +15,12 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 
 // a loader that holds one script back (the others come at once)
 class SlowLoader extends PooledLoader {
-  async fetch(url) {  // 2.360.3 (#2916): jsdom 30: the answer is a Response
-    const p = super.fetch(url);
-    if (/\/static\/js\/listcolor\.js/.test(String(url))) await new Promise(r => setTimeout(r, 2500));
-    return p;
+  fetch(url, opts = {}) {
+    const p = super.fetch(url, opts);
+    if (!/\/static\/js\/listcolor\.js/.test(String(url))) return p;
+    const q = new Promise(r => setTimeout(r, 2500)).then(() => p).then(b => { q.response = p.response; return b; });
+    q.abort = () => p.abort && p.abort(); q.href = p.href; q.getHeader = () => undefined;
+    return q;
   }
 }
 
