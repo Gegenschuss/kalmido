@@ -42,7 +42,7 @@ from flask import g, jsonify, Response
 from ..core.config import app, APP_VERSION, ATT_DIR, PUBLIC_URL, SECRET_KEY
 from ..core.db import connect, db, err, iso, now_utc
 from ..core.pg import system_ctx
-from ..core.i18n import tr
+from ..core.i18n import N_, lang, tr
 from ..core.access import Denied, acx_lists_sql, acx_of
 from ..accounts.pictures import avatar_path
 from ..accounts.session import me
@@ -63,20 +63,20 @@ UMZ_SUFFIX = ".zip"
 UMZ_SPACE_SPARE = 64 * 1024 * 1024  # free disk space kept on top of the expected size
 UMZ_NOT_INCLUDED = (
     # 2.239.0 A (#2882): sessions and push devices are in the file without their secrets
-    "passwords, session tokens, API tokens (only their names), two-factor data, push addresses and keys, webhook secrets and addresses",
-    "server-side settings (such as the ntfy topic an admin set)",
-    "access data of connections (calendar and address book subscriptions, Karakeep, newsletter, Git, server accounts)",
+    N_("passwords, session tokens, API tokens (only their names), two-factor data, push addresses and keys, webhook secrets and addresses"),
+    N_("server-side settings (such as the ntfy topic an admin set)"),
+    N_("access data of connections (calendar and address book subscriptions, Karakeep, newsletter, Git, server accounts)"),
     # 2.239.0 A (#2882): what you wrote elsewhere is in the file, the rest of those lists is not
-    "lists of other people (only a reference, your own comments and messages there and the tasks you created or are assigned to)",
-    "organisation data that is not yours (use the organisation export for a whole organisation)",
-    "the receipt files of household budgets (their entries are included)",  # 2.72.0 (#1333)
+    N_("lists of other people (only a reference, your own comments and messages there and the tasks you created or are assigned to)"),
+    N_("organisation data that is not yours (use the organisation export for a whole organisation)"),
+    N_("the receipt files of household budgets (their entries are included)"),  # 2.72.0 (#1333)
     # 2.148.1 C (#2494): what is not in the file either (the manifest names it honestly)
-    "older versions of your private files (the current one is in the file), files of knowledge pages and tables",  # 2.360.2 D (#2561)
-    "messages and comments of other people in direct messages, channels and lists (only what you wrote yourself)",  # 2.239.0 A (#2882)
+    N_("older versions of your private files (the current one is in the file), files of knowledge pages and tables"),  # 2.360.2 D (#2561)
+    N_("messages and comments of other people in direct messages, channels and lists (only what you wrote yourself)"),  # 2.239.0 A (#2882)
     # 2.239.0 A (#2882): tasks of lists you no longer see; what you wrote inside an organisation you left stays with it
-    "tasks of lists you can no longer see, and your comments and messages inside an organisation you left",
-    "the network addresses of people who booked with you and the e-mail addresses of people who voted in your polls",  # 2.360.2 D (#2561)
-    "the organisation's office (documents, receipts, cash book) and organisation knowledge pages: the organisation export",
+    N_("tasks of lists you can no longer see, and your comments and messages inside an organisation you left"),
+    N_("the network addresses of people who booked with you and the e-mail addresses of people who voted in your polls"),  # 2.360.2 D (#2561)
+    N_("the organisation's office (documents, receipts, cash book) and organisation knowledge pages: the organisation export"),
 )
 
 # 2.278.0 C (#3091): what the manifest says about browser-encrypted content (only what the import really does)
@@ -536,7 +536,7 @@ def umz_build(c, uid, stream, export_id):
             "people_salt": salt,  # 2.239.0 A (#2882): email_hash = HMAC-SHA256 with this key (umz_email_hash)
             "tables": out.tables, "files": out.files,
             "client_encrypted": {**client_enc, "keys": bool(out.tables.get("e2e_keys")), "note": UMZ_ENC_NOTE},  # 2.278.0 C (#3091)
-            "export_id": export_id, "not_included": list(UMZ_NOT_INCLUDED),
+            "export_id": export_id, "not_included": [tr(x, lg=lang(c, uid)) for x in UMZ_NOT_INCLUDED],  # 2.449.0 (#3768): in the person's language
             "locked_files": locked,  # 2.209.0 D (#1856)
         }
         mb = json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode()

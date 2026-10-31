@@ -358,6 +358,7 @@ ORDER = (
     "office.cards",  # 2.444.0 (#3447): credit card statements: cards, PDF positions
     "office.cardlines",  # 2.444.0 (#3447): their positions, the search for the receipts, the match
     "office.cardnorc",  # 2.444.0 (#3447): the reminder of the positions without a receipt, the rows of the exports
+    "office.doctpl_samples_es", "office.doctpl_samples_fr", "office.doctpl_samples_it", "office.doctpl_samples_nl",  # 2.449.0 (#3768): the samples in other languages (data)
     "office.doctpl_samples",  # 2.117.0 B (#2283): the letter samples of the document templates (data, no routes)
     "office.doctpl",  # 2.93.0 A (#1927): document templates with variables, documents as PDF, signature by customer link
     "office.privacy",  # 2.154.0 C (#2192): data protection sheets of a client (DPA, information, consent): mail, ways back, status

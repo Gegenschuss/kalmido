@@ -467,7 +467,7 @@ PRD_INTERNAL_DETAIL = ("producing", "surcharge")
 
 def prd_label(v, lang):
     """2.113.1 (#2251): a line title {de, en} (dict or JSON text, as stored on the document) in the document's language
-    (2.185.0 C: any other language takes the English title)."""
+    (2.185.0 C: a language the title lacks takes the English one; 2.449.0 (#3768): a pack may carry more languages)."""
     if isinstance(v, str):
         try:
             v = json.loads(v)
@@ -475,8 +475,8 @@ def prd_label(v, lang):
             return v.strip()[:80]
     if not isinstance(v, dict):
         return ""
-    lg = "de" if calc_lang(lang) == "de" else "en"
-    t = v.get(lg) or v.get("de") or v.get("en") or ""
+    lg = calc_lang(lang)
+    t = v.get(lg) or (v.get("de") if lg == "de" else v.get("en")) or v.get("de") or v.get("en") or ""
     return t.strip()[:80] if isinstance(t, str) else ""
 
 

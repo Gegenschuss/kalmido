@@ -67,7 +67,7 @@ function bkTabHtml() {
   for (let y = yNow + 1; y >= yNow - 6; y--) years.push([y, String(y)]);
   const head = `<div class="ofcbar bk-bar"><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('bk-year', BK.year, years)}</label><span class="spacer"></span>
     ${ofcFeat('books.datev') ? `<a class="btn sm ghost" href="#office/books/archive" data-bk-archive>${ic('archive', 's')}<span>${tr('Booking archive')}</span></a>` : ''}
-    <a class="btn sm ghost" href="#office/books/procdoc" data-bk-procdoc>${ic('file', 's')}<span>${tr('Procedure documentation')}</span></a></div>
+    ${OFC.info?.procdoc !== false ? `<a class="btn sm ghost" href="#office/books/procdoc" data-bk-procdoc>${ic('file', 's')}<span>${tr('Procedure documentation')}</span></a>` : ''}</div>
     ${bkPhotoHtml()}`;
   // 2.365.2 D (#2789): tax reserve, VAT basis and tax dates are set in Settings > Company & office > Bank & taxes (ost_taxHtml)
   const set = ofcSetLink('tax', ofcFeat('books.tax_dates') ? tr('Tax reserve, VAT basis and tax dates') : tr('Tax reserve and VAT basis'));

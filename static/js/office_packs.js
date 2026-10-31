@@ -8,7 +8,9 @@
 const PKC = {oid: null, q: '', kind: '', data: null, loading: false, seq: 0, packs: null, packsBusy: false, busy: '', err: {}, open: {}, t: null};
 const pkc_key = it => `${it.kind}/${it.code}`;
 const pkc_de = () => /^de/i.test(LOCALE());
-const pkc_nm = p => { const n = p.name && typeof p.name === 'object' ? (pkc_de() ? p.name.de : p.name.en) || p.name.en || p.name.de : pkc_de() ? p.name : p.name_en || p.name; return n || p.code; };  // (a pack file's name may be {de, en})
+// 2.449.0 (#3768): a pack file's name in the app language, the built-in packs' English names through the language files
+N_('Germany'); N_('International (base pack)'); N_('Film & Video');
+const pkc_nm = p => { const n = p.name && typeof p.name === 'object' ? p.name[LOCALE().slice(0, 2).toLowerCase()] || (pkc_de() ? p.name.de : tr(p.name.en)) || p.name.de : pkc_de() ? p.name : tr(p.name_en || p.name || ''); return n || p.code; };  // (a pack file's name may be {de, en})
 const pkc_when = iso => iso ? (typeof ofdWhen === 'function' ? ofdWhen(iso) : iso) : '';
 OFC_II.packs = N_('Packs bring the tax rates, formats and texts of a country or the calculation of an industry. They are pure data, never program code. Finalised documents keep the pack version they were made with.');
 // a new office (workspace switch): forget the lists of the previous one
@@ -219,7 +221,7 @@ function ocf_settingsHtml(dis) {
   const mine = OCF_FEATS.filter(f => of[f[0]] === 'ready' && !f[0].startsWith('money.')), not = OCF_FEATS.filter(f => of[f[0]] !== 'ready');
   const rt = p.retention || {};
   return `<h3>${tr('Functions')}</h3>${ofcII('functions')}
-    <p class="muted">${esc(tr('Country pack: {0}', `${pkc_de() ? p.name : p.name_en || p.name} (${p.code})`))} · <button type="button" class="linkbtn" data-ostgo="packs">${tr('Change country')}</button></p>
+    <p class="muted">${esc(tr('Country pack: {0}', `${pkc_nm(p)} (${p.code})`))} · <button type="button" class="linkbtn" data-ostgo="packs">${tr('Change country')}</button></p>
     <div class="ocf-list">${mine.map(([k, i, n, d]) => {
       const fixed = OCF_FIXED.includes(k), on = fixed || !off.includes(k);
       return `<div class="row ocf-row"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="ocf-${esc(k.replace('.', '-'))}" data-feat="${esc(k)}" ${on ? 'checked' : ''} ${fixed ? 'disabled' : dis}><span class="swt" aria-hidden="true"></span></span><span>${ic(i, 's')} ${esc(tr(n))}</span></label><span class="muted ofchint">${esc(tr(d))}</span></div>`;
@@ -283,6 +285,6 @@ async function ocf_confirmSwitch(code) {
   if (j.open_docs) lines.push(tr('{0} open documents will be calculated with the new rates and texts.', j.open_docs));
   if (j.hidden?.length) lines.push(tr('Hidden (nothing is deleted): {0}', j.hidden.map(nm).join(', ')));
   if (j.shown?.length) lines.push(tr('New: {0}', j.shown.map(nm).join(', ')));
-  return askConfirm(tr('Change the country to “{0}”?', pkc_de() ? j.name : j.name_en || j.name), lines.join(' '), {ok: tr('Change')});
+  return askConfirm(tr('Change the country to “{0}”?', pkc_nm(j)), lines.join(' '), {ok: tr('Change')});
 }
 document.addEventListener('click', e => { const b = e.target.closest?.('[data-ocf="choose"]'); if (b) { e.preventDefault(); ocf_choose(); } });

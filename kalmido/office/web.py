@@ -41,12 +41,14 @@ def office_settings_get():
     s = office_settings(c, oid)
     pack = office_pack_for(s)
     feats = office_features(s, pack)  # 2.147.0 (#2459, #2460): before the member view strips anything
+    from .procdoc import pd_offered
+    procdoc = pd_offered(c, oid, s)  # 2.449.0 (#3768)
     role = office_role(c, uid, oid)
     cf = ofx_company(c, oid)
     rights = ofr_mine(c, uid, oid)  # 2.187.0 A (#2476): menu, tabs and buttons follow the office rights
     if role != "admin" and not (not rights["legacy"] and office_can(c, uid, oid, "settings", "manage")):  # 2.86.0 (N15): members never get the bank lines and the DATEV master data (admins only); 2.187.0 A (#2476): + a group that manages the settings
         s, cf = h6c_member_settings(s), {k: ("" if k in H6C_BANK_COLS else v) for k, v in cf.items()}
-    return jsonify(settings=s, company_fields=cf, org_id=oid, role=role, pack=office_pack_info(pack, s),
+    return jsonify(settings=s, company_fields=cf, org_id=oid, role=role, pack=office_pack_info(pack, s), procdoc=procdoc,
                    rights={**{k: rights[k] for k in ("levels", "specials", "manager", "legacy")},
                            "adm": [k for k, v in AREA_LEGACY.items() if v == "admin"]},  # the areas that were the admins' before
                    features=feats,  # 2.147.0 (#2459, #2460): {key: on} -- menus, tabs and buttons follow it, the routes check it too

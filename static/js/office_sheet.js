@@ -20,7 +20,7 @@ function dkSheetHtml(part, doc, adm) {
   const ie = (k, v) => adm ? `<select data-dk="${k}" aria-label="${esc(tr('intern / extern'))}"><option value="intern" ${v === 'intern' ? 'selected' : ''}>${tr('intern')}</option><option value="extern" ${v !== 'intern' ? 'selected' : ''}>${tr('extern')}</option></select>` : '';
   const mk = (k, v) => adm ? `<label class="dkmk">${tr('Markup %')} <input data-dk="${k}" inputmode="decimal" class="numin" value="${esc(ofdNumIn(v || 0))}"></label>` : '';
   const head = DK_HEAD.map(([k, n]) => dkNum('head.' + k, h[k], tr(n))).join('');
-  const staff = (s.staff || []).map((r, i) => `<li class="ofdit dkrow"><div class="ofditb"><b class="dkn">${esc(dkName(r, d))}</b>
+  const staff = (s.staff || []).map((r, i) => `<li class="ofdit dkrow"><div class="ofditb"><b class="dkn">${esc(dkLine(c, r.uid)?.label || dkName(r, d))}</b>
     <span class="ofdnums"><input data-dk="staff.${i}.qty" inputmode="decimal" class="numin" value="${esc(ofdNumIn(r.qty))}" aria-label="${esc(tr('Number of people'))}"><span class="muted">×</span><span class="muted">${esc(m(r.rate))} ${tr('per day')}</span><b class="ofdlt">${esc(tot(r.uid))}</b></span>
     <span class="ofdflags"><label class="chkl"><input type="checkbox" data-dk="staff.${i}.prep" ${r.prep ? 'checked' : ''}> ${tr('with preparation')}</label>${ie(`staff.${i}.intext`, r.intext)}${mk(`staff.${i}.markup_pct`, r.markup_pct)}</span></div>${del('staff', i)}</li>`).join('');
   const p = s.producing || {}, k = s.km || {}, st = s.set;

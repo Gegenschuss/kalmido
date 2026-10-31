@@ -48,7 +48,7 @@ from flask import g, jsonify, send_file
 from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR
 from ..core.db import connect, db, err, iso, now_utc
 from ..core.pg import system_ctx
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..core.access import Denied
 from ..accounts.session import me
 from ..core.orgcrypt import _org_admin, oc_dec, oc_dec_row, oc_enabled, oc_read_file, oc_status  # 2.149.0 G (#2517): pulled up from functions
@@ -397,25 +397,24 @@ OX_AREAS = (
     ("bookmarks.json", "bookmarks", "org_id=?"),
 )
 OX_NOT_INCLUDED = (
-    "private lists and private sharing of the members (lists without the organisation), other organisations",
+    N_("private lists and private sharing of the members (lists without the organisation), other organisations"),
     # 2.223.3 B (#2880): the same rule as in the app (accounts/orglists.py ol_shared)
-    "lists of the organisation a member shares with nobody (each member exports them with the own account export)",
-    "deleted rows and files (the trash, undone entries)",  # 2.223.3 B (#2879)
-    "passwords, sessions, API tokens, app passwords, two-factor data, push subscriptions, webhooks and their secrets",
-    "connections with credentials (Git, Paperless, calendar and address book subscriptions, mail-in addresses, public links)",
+    N_("lists of the organisation a member shares with nobody (each member exports them with the own account export)"),
+    N_("deleted rows and files (the trash, undone entries)"),  # 2.223.3 B (#2879)
+    N_("passwords, sessions, API tokens, app passwords, two-factor data, push subscriptions, webhooks and their secrets"),
+    N_("connections with credentials (Git, Paperless, calendar and address book subscriptions, mail-in addresses, public links)"),
     # 2.380 H (#2398): the polls come along, their links do not
-    "the links of the scheduling polls (the import makes new ones; the old links stop working)",
-    "personal data of the members: settings, own tags, filters, templates, habits, News, direct messages, agent chats",
+    N_("the links of the scheduling polls (the import makes new ones; the old links stop working)"),
+    N_("personal data of the members: settings, own tags, filters, templates, habits, News, direct messages, agent chats"),
     # 2.362.0 (#3092): group conversations belong to their people like direct messages; channels like in the app (teamchan.py tcx_room_ok)
-    "group conversations of the team chat (like direct messages they belong to their people, not to the organisation)",
-    "channels of the organisation that are not open and that the exporting admin is not a member of",
+    N_("group conversations of the team chat (like direct messages they belong to their people, not to the organisation)"),
+    N_("channels of the organisation that are not open and that the exporting admin is not a member of"),
     # 2.362.0 (#3096): what else stays out on purpose (OX_LEFT names every table with an organisation column that does)
-    "notification channels (their targets are secrets), invitations and join requests, the organisation's and the lists' "
-    "pictures (icons, cover pictures), synchronisation data of calendar and task apps (CalDAV), groups of people and their shares",
-    "feeds of the organisation (not yet in this export)",
-    "booking pages of other members that the office does not bill (only their owner reads the bookings), archived channels",
+    N_("notification channels (their targets are secrets), invitations and join requests, the organisation's and the lists' pictures (icons, cover pictures), synchronisation data of calendar and task apps (CalDAV), groups of people and their shares"),
+    N_("feeds of the organisation (not yet in this export)"),
+    N_("booking pages of other members that the office does not bill (only their owner reads the bookings), archived channels"),
     # 2.190.0 D (#2561): the same rule as in the app (hub/hubmail.py hbm_can)
-    "filed e-mails (and their files) the exporting admin cannot open in the app: other members' inboxes, projects without them",
+    N_("filed e-mails (and their files) the exporting admin cannot open in the app: other members' inboxes, projects without them"),
 )
 
 # 2.362.0 (#3096): every table with an organisation or a list column that is NOT in OX_AREAS, with the reason (the static guard
@@ -558,6 +557,12 @@ def _safe_part(s, n=80):
     s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode()
     s = re.sub(r"[^A-Za-z0-9._-]+", "-", s).strip("-.")[:n]
     return s or "file"
+
+
+def ox_not_included(c, by, texts):
+    """2.449.0 (#3768): what the export leaves out, in the language of the person who runs it (without one: English)."""
+    lg = lang(c, by["id"]) if by else "en"
+    return [tr(x, lg=lg) for x in texts]
 
 
 def ox_file_name(org_name, oid, when):
@@ -763,7 +768,7 @@ def ox_build(c, oid, out, by=None):
             "counts": man.counts, "files": man.files,
             "client_encrypted": {**man.client_enc, "note": "Encrypted in the browser by their author: stored here as ciphertext, only the author can open them."},
             "decrypted": "Fields and files the server encrypts with the organisation key are in plain text here; the archive itself is encrypted.",
-            "not_included": list(OX_NOT_INCLUDED),
+            "not_included": ox_not_included(c, by, OX_NOT_INCLUDED),  # 2.449.0 (#3768)
             "locked_files": man.locked,  # 2.209.0 D (#1856)
         }
         _put_bytes(zf, man, "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode())
@@ -810,7 +815,7 @@ def ox_build_personal(c, oid, out, org, have, by=None):
             "org": {"id": int(oid), "name": org["name"]}, "created_at": iso(now_utc()), "created_by": by, "personal_office": 1,
             "counts": man.counts, "files": man.files, "client_encrypted": {"note": "none"},
             "decrypted": "Fields and files the server encrypts with the office key are in plain text here; the archive itself is encrypted.",
-            "not_included": ["everything of the private space but the office and its clients", *OX_NOT_INCLUDED[1:2]],
+            "not_included": ox_not_included(c, by, [N_("everything of the private space but the office and its clients"), *OX_NOT_INCLUDED[1:2]]),  # 2.449.0 (#3768)
             "locked_files": man.locked,  # 2.209.0 D (#1856)
         }
         _put_bytes(zf, man, "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode())

@@ -216,7 +216,7 @@ function prd_opts() {
   for (const p of OFC.info?.industry || []) for (const k of Object.keys(o)) if (!o[k] && p?.calc?.[k]) o[k] = p.calc[k];
   return o;
 }
-const prd_lbl = (l, d) => l ? (ofdLang(d) === 'en' ? l.en : l.de) || l.de || l.en || '' : '';
+const prd_lbl = (l, d) => l ? l[(d || OFD.doc)?.lang] || (ofdLang(d) === 'en' ? l.en : l.de) || l.de || l.en || '' : '';  // 2.449.0 (#3768): + the pack's other languages
 const prd_prodShown = d => (d.producing_on != null && d.producing_on !== 0) || (d.producing_on == null && d.kind === 'offer') || (d.producing_mode === 'amount' && !!prd_opts().share)
   || (d.kind === 'offer' && !d.locked && !!prd_opts().share);  // 2.380.0 (#3420): also a quotation made before the pack was on
 const prd_slotShown = (d, k) => d.kind === 'offer' && (d[k + '_pct'] != null || !!prd_opts()[k]);

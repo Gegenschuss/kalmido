@@ -6,7 +6,7 @@ Import, two steps (office_gate + office_org with the admin of the office area, l
      first sheet below its header row -> new / dup / error with a reason. Nothing is stored.
   2. POST /api/office/fixed-costs/import {items: [...]}: the rows the person kept (VAT rates changed there); every row is
      checked again with rk_fixed_clean (nothing from the client unchecked), MAX_FIXED counted, one transaction.
-Format: a header row with "Name", "Betrag (netto)" (also "Betrag", "netto"), "fällig Monat" (also "Monat"); optional
+Format: a header row with "Name", "Betrag (netto)" (also "Betrag", "netto"), "fällig Monat" (also "Monat", 2.449.0 (#3768): the same in fr / es / it / nl); optional
 "Kategorie", "USt", "Wiederholung". A row with a name but no amount is a group row: the category of the rows below it.
 Month 0 = monthly from 2026-01-01, 1..12 = yearly in that month (2026-MM-01); quarterly (by the name or the column
 "Wiederholung") with a month X = four yearly rows X, X+3, X+6, X+9; a contradiction name / month: the month wins.
@@ -40,6 +40,10 @@ FCI_HEAD = {  # normalised header (letters / digits only) -> field
     "name": "label", "bezeichnung": "label", "posten": "label",
     "betragnetto": "amount", "betrag": "amount", "netto": "amount", "nettobetrag": "amount", "amountnet": "amount", "amount": "amount",
     "fälligmonat": "month", "faelligmonat": "month", "monat": "month", "duemonth": "month", "month": "month",
+    # 2.449.0 (#3768): the headers of the template in fr / es / it / nl
+    "nom": "label", "nombre": "label", "nome": "label", "naam": "label", "montantnet": "amount", "montant": "amount", "importeneto": "amount",
+    "importe": "amount", "importonetto": "amount", "importo": "amount", "bedrag": "amount", "moisdéchéance": "month", "mois": "month",
+    "mesdevencimiento": "month", "mes": "month", "mesediscadenza": "month", "mese": "month", "vervalmaand": "month", "maand": "month",
     "kategorie": "category", "category": "category", "gruppe": "category",
     "ust": "vat_rate", "ustsatz": "vat_rate", "mwst": "vat_rate", "mwstsatz": "vat_rate", "vat": "vat_rate", "vatrate": "vat_rate",
     "wiederholung": "repeat", "rhythmus": "repeat", "turnus": "repeat", "repeat": "repeat",
@@ -85,7 +89,7 @@ def fci_num(v):
 
 
 def fci_norm(s):
-    return re.sub(r"[^0-9a-zäöüß]", "", str(s or "").lower())
+    return re.sub(r"[\W_]", "", str(s or "").lower())  # 2.449.0 (#3768): every letter ("mois d'échéance"), was a-z + German
 
 
 def fci_key(label, amount, repeat, start):
@@ -349,7 +353,7 @@ def fci_xlsx(rows, sheet="Sheet1"):
 def fci_template():
     """Office admin. The template: a header row and three made-up example rows."""
     _ctx()
-    head = ["Name", "Betrag (netto)", "fällig Monat"] if lang() == "de" else ["Name", "Amount (net)", "Due month"]  # what the import reads
+    head = [tr("Name"), tr("Amount (net)"), tr("Due month")]  # what the import reads (FCI_HEAD); 2.449.0 (#3768): every app language
     rows = [head,
             [tr("Software subscription"), 29.9, 0],
             [tr("Insurances")],
