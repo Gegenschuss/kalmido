@@ -15511,5 +15511,6 @@
   "Show logo": "Mostrar logotipo",
   "Send through": "Enviar por",
   "E-mails leave from the server's address so they do not land in spam; answers go to the answer address. An own sender address needs a mailbox with SMTP (E-mail filing).": "Los correos salen de la dirección del servidor para no acabar en spam; las respuestas van a la dirección de respuesta. Una dirección de remitente propia necesita un buzón con SMTP (archivo de correos).",
-  "E-mails leave from {0} through your mailbox.": "Los correos salen de {0} a través de tu buzón."
+  "E-mails leave from {0} through your mailbox.": "Los correos salen de {0} a través de tu buzón.",
+  "The organisation keeps its symbol: the one in the file was not taken over.": "La organización conserva su símbolo: el del archivo no se ha transferido."
 }

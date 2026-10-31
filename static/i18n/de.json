@@ -15511,5 +15511,6 @@
   "Show logo": "Logo zeigen",
   "Send through": "Senden über",
   "E-mails leave from the server's address so they do not land in spam; answers go to the answer address. An own sender address needs a mailbox with SMTP (E-mail filing).": "Mails gehen von der Adresse des Servers raus, damit sie nicht im Spam landen; Antworten kommen an die Antwort-Adresse. Eine eigene Absenderadresse braucht ein Postfach mit SMTP (E-Mail-Ablage).",
-  "E-mails leave from {0} through your mailbox.": "Mails gehen von {0} über dein Postfach raus."
+  "E-mails leave from {0} through your mailbox.": "Mails gehen von {0} über dein Postfach raus.",
+  "The organisation keeps its symbol: the one in the file was not taken over.": "Die Organisation behält ihr Symbol: das aus der Datei wurde nicht übernommen."
 }

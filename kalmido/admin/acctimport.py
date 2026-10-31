@@ -45,6 +45,7 @@ from ..tasks.snippets import snip_clean  # 2.273.0 A (#3030)
 from ..core.i18n import lang, LANGS, N_, stored_join, tr as _tr_base, tr_stored
 from ..core.access import Denied, ROLES, list_role, my_inbox, my_max_sort, WRITE_ROLES
 from ..accounts.session import me
+from ..lists.listhead import HEAD_STYLES  # 2.459.0 (#3849)
 from ..lists.lists import LIST_COLOR_RE
 from ..lists.fields import fx_tpl_fix  # 2.362.4 (#3100)
 from ..lists.formula import fx_display  # 2.362.4 (#3100)
@@ -105,7 +106,8 @@ UMZ_SETTINGS = ("lang", "allday_time", "default_reminder", "work_start", "work_e
 # columns never taken from a file, in addition to ids, *_id / *_by columns, foreign keys and OX_SECRET_COLS
 UMZ_DROP = {
     "lists": {"is_inbox", "family", "agent_tidy", "agent_listen", "agent_members", "agent_peers", "agent_followup", "tidy_agent",
-              "org_visibility", "org_edit", "git_folder_off", "icon"},
+              "org_visibility", "org_edit", "git_folder_off", "icon",
+              "header_file"},  # 2.459.0 (#3849): a token of the old server (orgimport.oi_pictures makes a new one with the picture)
     "tasks": {"rotation", "approval", "fam", "tt_id", "nag_at", "wait_fired"},
     "comments": {"mentions", "suggestion", "choices", "choice", "ext_name", "client_ref"},  # 2.370.2 (#3088): client_ref like the notes'
     "attachments": {"path", "enc_by"},
@@ -439,6 +441,7 @@ def umz_org_open(zf, names, man, mraw, full):
                 what = what or p[:-5]
                 if n:
                     skipped[what] = skipped.get(what, 0) + n
+    data["pictures"] = [p for p in sorted(files) if p.startswith("files/pictures/")]  # 2.459.0 (#3849): orgimport.oi_pictures
     # 2.278.0 A (#3095): the members' roles of the file (admin / member) -> a suggestion in the preview
     roles = {_oid(m.get("id")): m.get("role") for m in data.get("members", []) if isinstance(m, dict)}
     for kind, table in (("attachments", "attachments"), ("list_files", "list_files")):
@@ -1251,8 +1254,10 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         if org and man.get("kind") != "org" and _txt(L.get("life"), 20):  # Home & life lists (health, contracts ...) stay private
             lorg = None
             run.warning(N_("Personal project kept in your private workspace: {0}"), _txt(L.get("name"), 80))
+        hst = L.get("header_style")  # 2.459.0 (#3849): "image" only comes back with its picture (oi_pictures)
         d = umz_row(c, "lists", L, {"owner_id": uid, "org_id": lorg, "is_inbox": 0, "sort": sort, "folder": folder,
-                                     "name": _txt(L.get("name"), LIST_NAME_MAX).strip() or tr("Import")}, ts)
+                                     "name": _txt(L.get("name"), LIST_NAME_MAX).strip() or tr("Import"),
+                                     "header_style": hst if hst in HEAD_STYLES and hst != "image" else ""}, ts)
         lid = umz_insert(c, "lists", d) if d else None
         if not lid:
             run.warning(N_("A project could not be taken over: {0}"), _txt(L.get("name"), 80))
@@ -1549,6 +1554,9 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         from .orgimport import oi_write
         oi_write(c, run, uid, man, zf, files, data, who)
         run.created["oi_done"] = True  # 2.362.3 (#3098, review): a run stopped inside (quota) took only a part of the areas
+    if man.get("kind") == "org":  # 2.459.0 (#3849): also on a second run: the lists it creates anew
+        from .orgimport import oi_pictures
+        oi_pictures(c, run, uid, zf, files, data)
 
 
 def umz_share(c, run, uid, data, picks, can_invite, salt=None):

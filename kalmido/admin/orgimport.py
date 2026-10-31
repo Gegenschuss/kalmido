@@ -10,19 +10,24 @@ list_tags, list_milestones, books, contacts, ev_cals, events; and every table of
 through who() (only people ticked in the preview), the organisation columns are set to the target. Fields the server
 encrypts (core/orgcrypt.py FIELDS) come decrypted from the archive and are encrypted again with the target's key.
 Every created row is recorded as [table, id, space] in run.created["oi"]; oi_undo removes them again (newest first).
+2.459.0 (#3849): the pictures of files/pictures (oi_pictures) are recorded in run.created["oi_pics"].
 Into the private space (#1941) an area goes where the private space has the same thing: "office" = the person's own
 office (office/model.py pb_personal), "user" = the private space (organisation column NULL); False = not taken over
 (named in the preview)."""
 import json
 import os
 import re
+import secrets
 import uuid
 
+from ..accounts.pictures import AVATAR_MAX_MB, LIST_ICON_DIR, ORG_ICON_RE, list_icon_path, list_icon_process, org_icon_path
 from ..core.config import ATT_DIR, MAX_FILE_MB, OFFICE_DIR
+from ..core.errors import BadInput
 from ..core.i18n import N_
+from ..lists.listhead import HEAD_DIR, HEAD_MAX_MB, o3c_head_process, o3c_head_rel
 from .acctimport import UMZ_NO_SPACE, _BAD, _coerce, _oid, _read_entry, _txt, tr, umz_cols, umz_insert, umz_row
 from .acctimport import UMZ_ORG_SKIP  # 2.278.0 B (#3094)
-from ..core.orgcrypt import oc_enc_fields, oc_user_space, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_enc_fields, oc_list_org, oc_list_space, oc_user_space, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.db import iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import Denied  # 2.237.0 D (#2870)
 from ..accounts.orgs import org_role  # 2.237.0 D (#2870)
@@ -334,6 +339,81 @@ def oi_write(c, run, uid, man, zf, files, data, who):
             fn(c, run, uid, data, who)
 
 
+# 2.459.0 (#3849): the only names of files/pictures (orgexport.py ox_build); a list id strictly as a number
+OI_PIC_RE = re.compile(r"files/pictures/(?:organisation\.png|list-([1-9][0-9]{0,17})-(icon\.png|header\.jpg))")
+
+
+def _oi_pic(c, run, uid, zf, files, path, max_mb, process):
+    """The re-encoded picture of an archive entry (only what the app's own upload would keep: its size limit, its image types,
+    no metadata), or None with a warning."""
+    from .acctimport import _file_bytes
+    from .hosting import quota_fits
+    what = tr(N_("Pictures"))
+    if not 0 < files[path][0].file_size <= min(max_mb, MAX_FILE_MB) * 1024 * 1024:
+        run.warning(N_("A file is empty or too large and was skipped: {0}"), what)
+        return None
+    try:
+        out = process(_file_bytes(zf, files, path))
+    except BadInput:
+        run.warning(N_("A file could not be taken over: {0}"), what)
+        return None
+    if not quota_fits(c, uid, len(out)):
+        run.warning(N_("A file is empty or too large and was skipped: {0}"), what)
+        return None
+    return out
+
+
+def oi_pictures(c, run, uid, zf, files, data):
+    """2.459.0 (#3849): the organisation's symbol and the lists' icons and header pictures of files/pictures, as new files with
+    new tokens: of the archive only the id in the name counts, mapped through run.maps, and only lists this run created. The
+    symbol only into an organisation that has none yet (nothing to restore on an undo). Recorded as [kind, id, token, space]."""
+    made = set(run.created["lists"])
+    styles = {_oid(L.get("id")): L.get("header_style") for L in data.get("lists", [])}
+    pics = run.created.setdefault("oi_pics", [])
+    for path in data.get("pictures") or []:
+        run.step()
+        m = OI_PIC_RE.fullmatch(path)
+        if not m:
+            run.warning(N_("A file could not be taken over: {0}"), tr(N_("Pictures")))
+            continue
+        tok = secrets.token_urlsafe(12)
+        if m[1] is None:
+            if not run.org:
+                run.warning(N_("Not taken over into the private space: {0}"), tr(N_("Symbol")))
+                continue
+            png = _oi_pic(c, run, uid, zf, files, path, AVATAR_MAX_MB, list_icon_process)
+            if png is None:
+                continue
+            if not c.execute("UPDATE orgs SET icon=? WHERE id=? AND icon=''", ("u:" + tok, run.org)).rowcount:
+                run.warning(N_("The organisation keeps its symbol: the one in the file was not taken over."))
+                continue
+            full, kind, sealed = org_icon_path(run.org, tok), "org", run.org
+            space = run.org
+        else:
+            old = int(m[1])
+            lid = run.m("lists", old)
+            if lid not in made:
+                continue  # another list id, the inbox, a list of an earlier import, a list that stayed behind
+            space = run.list_org.get(lid)
+            if m[2] == "icon.png":
+                png = _oi_pic(c, run, uid, zf, files, path, AVATAR_MAX_MB, list_icon_process)
+                if png is None:
+                    continue
+                c.execute("UPDATE lists SET icon=? WHERE id=?", ("u:" + tok, lid))
+                full, kind, sealed = list_icon_path(lid, tok), "icon", oc_list_org(c, lid)  # as users.list_icon_store
+            else:
+                png = _oi_pic(c, run, uid, zf, files, path, HEAD_MAX_MB, o3c_head_process)
+                if png is None:
+                    continue
+                c.execute("UPDATE lists SET header_file=?" + (", header_style='image'" if styles.get(old) == "image" else "") + " WHERE id=?", (tok, lid))
+                full, kind, sealed = os.path.join(ATT_DIR, o3c_head_rel(lid, tok)), "head", oc_list_space(c, lid)  # as listhead.o3c_head_upload
+        os.makedirs(HEAD_DIR if kind == "head" else LIST_ICON_DIR, exist_ok=True)
+        run.written.append(full)
+        oc_write_file(c, sealed, full, png, fresh=True)
+        pics.append([kind, lid if kind != "org" else run.org, tok, space])
+        run.count("pictures")
+
+
 def oi_counts(data):
     """[{what, count}] of the areas this engine takes over (the preview)."""
     out = {}
@@ -341,6 +421,9 @@ def oi_counts(data):
         n = len((data.get("oi") or {}).get(s.path) or [])
         if n and s.label:
             out[s.label] = out.get(s.label, 0) + n
+    n = sum(1 for p in data.get("pictures") or [] if OI_PIC_RE.fullmatch(p))  # 2.459.0 (#3849)
+    if n:
+        out[N_("Pictures")] = n
     return [{"what": k, "count": n} for k, n in out.items()]  # 2.454.0 (#3808): the key, acctimport.umz_areas_tr translates it
 
 
@@ -369,7 +452,32 @@ def oi_undo(c, cr):
                 n += c.execute(f"DELETE FROM {table} WHERE id=? AND {col}=?", (rid, space)).rowcount
         else:
             n += c.execute(f"DELETE FROM {table} WHERE id=?", (rid,)).rowcount
+    _oi_undo_pics(c, cr)
     return n
+
+
+def _oi_undo_pics(c, cr):
+    """2.459.0 (#3849): takes the pictures of oi_pictures back: only a picture still set (changed since = it stays the person's),
+    a list only still in its space. The files of what went join cr["oi_files"] (oi_undo_files, after the commit)."""
+    for item in reversed(cr.get("oi_pics") or []):
+        if not (isinstance(item, list) and len(item) == 4 and isinstance(item[1], int) and isinstance(item[2], str) and ORG_ICON_RE.fullmatch("u:" + item[2])):
+            continue
+        kind, rid, tok, space = item
+        where, args = (" AND org_id IS NULL", ()) if space is None else (" AND org_id=?", (space,))
+        if kind == "org":
+            n = c.execute("UPDATE orgs SET icon='' WHERE id=? AND icon=?", (rid, "u:" + tok)).rowcount
+            full = org_icon_path(rid, tok)
+        elif kind == "icon":
+            n = c.execute("UPDATE lists SET icon=NULL WHERE id=? AND icon=?" + where, (rid, "u:" + tok, *args)).rowcount
+            full = list_icon_path(rid, tok)
+        elif kind == "head":
+            n = c.execute("UPDATE lists SET header_file='', header_style=CASE WHEN header_style='image' THEN '' ELSE header_style END "
+                          "WHERE id=? AND header_file=?" + where, (rid, tok, *args)).rowcount
+            full = os.path.join(ATT_DIR, o3c_head_rel(rid, tok))
+        else:
+            continue
+        if n:
+            cr.setdefault("oi_files", []).append(full)
 
 
 # 2.237.0 D (#2870): rows frozen in the target (finalised, a day closing, a locked month) are never removed by an undo
@@ -384,7 +492,8 @@ def oi_undo_check(c, uid, cr, since):
     lies in a month locked by a lock not of this import, or (cash entries) up to a day closing not of this import."""
     items = [x for x in cr.get("oi") or [] if isinstance(x, list) and len(x) == 3]
     opts = [x[2] for x in cr.get("oi") or [] if isinstance(x, list) and len(x) == 4 and isinstance(x[2], str)]  # 2.369.0 (#2734): by ws
-    for sp in {x[2] for x in items if isinstance(x[2], int)} | {int(w[1:]) for w in opts if re.fullmatch(r"o\d{1,18}", w)}:
+    pics = {x[1] for x in cr.get("oi_pics") or [] if isinstance(x, list) and x[:1] == ["org"] and isinstance(x[1], int)}  # 2.459.0 (#3849)
+    for sp in {x[2] for x in items if isinstance(x[2], int)} | {int(w[1:]) for w in opts if re.fullmatch(r"o\d{1,18}", w)} | pics:
         r = c.execute("SELECT personal_of FROM orgs WHERE id=?", (sp,)).fetchone()
         if not (r and r["personal_of"] == uid) and org_role(c, uid, sp) != "admin":
             raise Denied(403, tr("Only an admin of this organisation can do this"))
@@ -462,5 +571,5 @@ def oi_undo_files(cr):
                 pass
 
 
-__all__ = ["OiT", "OiFix", "OiCtx", "oi_specs", "oi_covers", "oi_write", "oi_prepare", "oi_drop_empty_pb", "oi_counts", "oi_undo", "oi_undo_check", "oi_undo_files",
+__all__ = ["OiT", "OiFix", "OiCtx", "oi_specs", "oi_covers", "oi_write", "oi_pictures", "oi_prepare", "oi_drop_empty_pb", "oi_counts", "oi_undo", "oi_undo_check", "oi_undo_files",
            "_BAD", "_coerce", "_oid", "_read_entry", "_txt", "umz_cols", "umz_insert", "umz_row"]

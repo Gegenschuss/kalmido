@@ -691,7 +691,7 @@ def ox_build(c, oid, out, by=None):
         return ox_build_personal(c, oid, out, org, have, by)
     with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
         o = _clean(c, oid, "orgs", org)
-        if str(o.get("icon") or "").startswith("u:"):  # 2.87.9 (#1913): the picture file is not in the ZIP -> no dead link
+        if str(o.get("icon") or "").startswith("u:"):  # 2.87.9 (#1913): a token of this server -> no dead link (2.459.0, #3849: the picture is files/pictures/organisation.png)
             o["icon"] = ""
         _put_json(zf, man, "organisation.json", [o])
         members = c.execute("""SELECT u.id, u.username, u.display_name, u.email, COALESCE(u.kind,'user') AS kind, u.disabled, u.color, m.role
@@ -768,7 +768,7 @@ def ox_build(c, oid, out, by=None):
                 full = _under(ATT_DIR, r.get("path"))
                 if not lk("tchat", r, r.get("name")):
                     _put_file(c, zf, man, f"files/tchat/{int(r['id'])}-{_safe_part(r.get('name'))}", full)
-        # 2.363.2 (#3106): the pictures of the organisation and of the lists the admin sees, as files (the import does not set them)
+        # 2.363.2 (#3106): the pictures of the organisation and of the lists the admin sees, as files
         tok = org_icon_tok(org["icon"])
         if tok:
             _put_file(c, zf, man, "files/pictures/organisation.png", _under(ATT_DIR, os.path.relpath(org_icon_path(oid, tok), ATT_DIR)))

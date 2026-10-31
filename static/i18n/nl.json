@@ -15511,5 +15511,6 @@
   "Show logo": "Logo tonen",
   "Send through": "Verzenden via",
   "E-mails leave from the server's address so they do not land in spam; answers go to the answer address. An own sender address needs a mailbox with SMTP (E-mail filing).": "Mails gaan uit vanaf het serveradres zodat ze niet in de spam belanden; antwoorden gaan naar het antwoordadres. Een eigen afzenderadres vereist een mailbox met SMTP (e-mailarchief).",
-  "E-mails leave from {0} through your mailbox.": "Mails gaan uit vanaf {0} via je mailbox."
+  "E-mails leave from {0} through your mailbox.": "Mails gaan uit vanaf {0} via je mailbox.",
+  "The organisation keeps its symbol: the one in the file was not taken over.": "De organisatie behoudt haar symbool: dat uit het bestand is niet overgenomen."
 }

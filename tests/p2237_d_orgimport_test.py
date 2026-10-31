@@ -10,16 +10,25 @@ Invented names only.
  - undo after a document of the import was finalised in the target: 409, nothing removed
  - undo by the admin of another target (the finalised invoice of the file was finalised there before): works, nothing left
  - a person without organisation (freelancer) imports it privately: unchanged (no rows of others)
+ - 2.459.0 (#3849): the organisation's symbol, a list icon and a header picture come back from files/pictures (new tokens, sealed,
+   served): a target with a symbol keeps it, into the private space the list pictures only, the undo removes them (a picture
+   changed since stays), a doctored archive (foreign ids, odd names, no picture, tokens in lists.json) sets nothing of its own
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY (P2237D_NOSTART=1 = the server already runs like that).
 usage: p2237_d_orgimport_test.py <datadir>"""
 # freelancer-matrix: admin
 # tenant-matrix: own
 import base64
+import glob
 import hashlib
+import io
+import json
 import os
+import struct
 import subprocess
 import sys
 import time
+import zipfile
+import zlib
 
 import requests
 
@@ -33,6 +42,14 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
 O, D = "/api/office", "/api/office/docs"
+
+
+def png(rgb, size=16):
+    """A small PNG (no Pillow in the test environment needed)."""
+    def chunk(k, d):
+        return struct.pack(">I", len(d)) + k + d + struct.pack(">I", zlib.crc32(k + d))
+    raw = (b"\0" + bytes(rgb) * size) * size
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
 
 
 def EH(email):
@@ -180,11 +197,21 @@ check(ok(A.post(B + f"{D}/{INV}/finalize"), "finalise").get("locked"), "the invo
 ok(A.post(B + D, json={"kind": "invoice", "client_id": CL, "project_title": "Entwurf", "service_from": "2026-06-01",
                        "items": [{"title": "Schnitt", "qty": 1, "rate": 500}]}), "a draft")
 
+# 2.459.0 (#3849): the pictures of the organisation and of the list
+ok(A.post(B + f"/api/orgs/{ORG}/icon", files={"file": ("o.png", png((10, 120, 130)), "image/png")}), "organisation symbol")
+ok(A.post(B + f"/api/lists/{LO}/icon", files={"file": ("i.png", png((200, 40, 40)), "image/png")}), "list icon")
+ok(A.post(B + f"/api/lists/{LO}/header", files={"file": ("h.png", png((40, 40, 200), 64), "image/png")}), "header picture")
+OLD_ICON = one("SELECT icon FROM lists WHERE id=?", (LO,))
+OLD_HEAD = one("SELECT header_file FROM lists WHERE id=?", (LO,))
+
 OX, RK = export(A, ORG)
 dbx("DELETE FROM time_sheets WHERE org_id=?", (ORG,))  # one timesheet per person and month on the whole server (like a move to another server)
 
 # ---------------------------------------------------------------- import into the empty organisation, bob ticked
-j = run(A, opened(A, OX, RK), ORG3, people={EH("bob@example.com"): {"share": True}})
+iid = opened(A, OX, RK)
+pv = A.get(B + f"/api/account/import/{iid}").json().get("preview") or {}
+check({"what": "Pictures", "count": 3} in pv.get("taken_areas", []), f"#3849: the preview names the pictures {pv.get('taken_areas')}")
+j = run(A, iid, ORG3, people={EH("bob@example.com"): {"share": True}})
 NL = one("SELECT id FROM lists WHERE org_id=? AND name='Alpha Projekt'", (ORG3,))
 NT = one("SELECT id FROM tasks WHERE list_id=? AND title='Dreh vorbereiten'", (NL,))
 NR = one("SELECT id FROM tchat_rooms WHERE kind='list' AND list_id=?", (NL,))
@@ -211,6 +238,39 @@ check({x["doc_id"] for x in lg} >= {nd.get("Fertig"), nd.get("Entwurf")} and all
       f"the office log says the documents were imported, by alice {[dict(x) for x in lg]}")
 IMP3 = (j.get("result") or {}).get("import_id")
 
+
+# ---------------------------------------------------------------- 2.459.0 (#3849): the pictures came along
+def pics(lid):
+    return dbx("SELECT icon, header_file, header_style FROM lists WHERE id=?", (lid,))[0]
+
+
+def icon_of(oid):
+    return one("SELECT icon FROM orgs WHERE id=?", (oid,))
+
+
+def stored(pattern):
+    return glob.glob(os.path.join(DATA, "attachments", pattern))
+
+
+def got(s, url, magic):
+    r = s.get(B + url)
+    return r.status_code == 200 and r.content[:len(magic)] == magic
+
+
+PNGM, JPGM = b"\x89PNG", b"\xff\xd8\xff"
+p3, ic3 = pics(NL), icon_of(ORG3)
+check(ic3.startswith("u:") and got(A, f"/api/org-icon/{ORG3}/{ic3[2:]}.png", PNGM), f"#3849: the organisation's symbol is back and served {ic3}")
+check(str(p3["icon"]).startswith("u:") and p3["icon"] != OLD_ICON and got(A, f"/api/list-icon/{NL}/{p3['icon'][2:]}.png", PNGM),
+      f"#3849: the list icon is back under a new token and served {p3['icon']}")
+check(p3["header_file"] and p3["header_file"] != OLD_HEAD and p3["header_style"] == "image"
+      and got(A, f"/api/list-header/{NL}/{p3['header_file']}.jpg", JPGM), f"#3849: the header picture is back and served {dict(p3)}")
+files3 = stored(f"listicons/o{ORG3}-*") + stored(f"listicons/l{NL}-*") + stored(f"listheads/l{NL}-*")
+check(len(files3) == 3, f"#3849: three new files {files3}")
+for f in files3:
+    with open(f, "rb") as fh:
+        head = fh.read(4)
+    check(head[:3] not in (PNGM[:3], JPGM), f"#3849: sealed with the target's key {os.path.basename(f)}")
+
 # ---------------------------------------------------------------- undo: only admins of the target now, nothing frozen since
 check(A.put(B + f"/api/orgs/{ORG3}/members", json={"email": "bob@example.com", "role": "admin"}).ok, "bob becomes admin of the target")
 check(Bo.put(B + f"/api/orgs/{ORG3}/members", json={"email": "alice@example.com", "role": "member"}).ok, "alice is no admin there any more")
@@ -231,6 +291,10 @@ check(one("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NOT 
 r = A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
 check(r.ok, f"undo by the admin {r.status_code} {r.text[:160]}")
 check(not any(counts(ORG4).values()), f"the undo removed everything {counts(ORG4)}")
+L4 = one("SELECT id FROM lists WHERE org_id=? AND name='Alpha Projekt'", (ORG4,))
+p4 = pics(L4)
+check(icon_of(ORG4) == "" and not p4["icon"] and p4["header_file"] == "" and p4["header_style"] == "", f"#3849: the undo clears the pictures {icon_of(ORG4)!r} {dict(p4)}")
+check(not stored(f"listicons/o{ORG4}-*") + stored(f"listicons/l{L4}-*") + stored(f"listheads/l{L4}-*"), "#3849: ... and removes their files")
 check(not dbx("SELECT 1 FROM office_doc_log WHERE org_id=? AND action='import'", (ORG4,)), "... and its 'imported' log entries")
 
 # ---------------------------------------------------------------- a freelancer imports it privately (unchanged)
@@ -242,9 +306,100 @@ check(one("SELECT COUNT(*) FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_i
           (FL, FID)) == 0, "freelancer: no chat message under another account")
 check(one("SELECT COUNT(*) FROM time_entries WHERE list_id=?", (FL,)) == 0, "freelancer: no time entries of others")
 check(not dbx("SELECT 1 FROM org_members WHERE user_id=?", (FID,)), "freelancer: still in no organisation")
+pf = pics(FL)
+check(str(pf["icon"]).startswith("u:") and got(Fr, f"/api/list-icon/{FL}/{pf['icon'][2:]}.png", PNGM)
+      and got(Fr, f"/api/list-header/{FL}/{pf['header_file']}.jpg", JPGM), f"#3849 freelancer: the list keeps its pictures {dict(pf)}")
+check(any("private space: Symbol" in str(x.get("text")) for x in (j.get("result") or {}).get("warnings", [])),
+      f"#3849 freelancer: the result names the symbol that stayed behind {(j.get('result') or {}).get('warnings')}")
 r = Fr.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
 check(r.ok and r.json().get("trash") and not dbx("SELECT 1 FROM lists WHERE id=? AND deleted_at IS NULL", (FL,)),
       f"freelancer: own undo works (the list in the trash, 2.272.0 C) {r.status_code} {r.text[:160]}")
+
+check(not stored(f"listicons/l{FL}-*") and not stored(f"listheads/l{FL}-*"), "#3849 freelancer: the undo removes the pictures")
+
+
+# ---------------------------------------------------------------- 2.459.0 (#3849): a target that has a symbol keeps it, a newer picture stays
+def new_org(name):
+    r = A.post(B + "/api/admin/orgs", json={"name": name, "admin_id": ALICE})
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+ORG5 = new_org("Epsilon Eigen")
+dbx("UPDATE orgs SET icon=? WHERE id=?", ("star", ORG5))
+j = run(A, opened(A, OX, RK), ORG5)
+check(icon_of(ORG5) == "star", f"#3849: an existing symbol is not overwritten {icon_of(ORG5)}")
+check(any("keeps its symbol" in str(x.get("text")) for x in (j.get("result") or {}).get("warnings", [])), "#3849: ... and the result says so")
+L5 = one("SELECT id FROM lists WHERE org_id=? AND name='Alpha Projekt'", (ORG5,))
+check(str(pics(L5)["icon"]).startswith("u:"), "#3849: the list keeps its picture there")
+A.patch(B + "/api/settings", json={"workspace": f"org:{ORG5}"})
+ok(A.post(B + f"/api/lists/{L5}/icon", files={"file": ("n.png", png((1, 200, 1)), "image/png")}), "a new list icon after the import")
+NEW5 = pics(L5)["icon"]
+r = A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
+check(r.ok, f"undo {r.status_code} {r.text[:160]}")
+check(icon_of(ORG5) == "star", "#3849: the undo leaves the existing symbol alone")
+check(pics(L5)["icon"] == NEW5 and len(stored(f"listicons/l{L5}-*")) == 1, "#3849: the undo leaves a picture set since the import")
+
+# ---------------------------------------------------------------- 2.459.0 (#3849): a doctored archive
+TOOL = os.path.join(N, "..", "tools", "kalmido_export_decrypt.py")
+ARC, ZIP = os.path.join(DATA, "p3849.arc"), os.path.join(DATA, "p3849.zip")
+with open(ARC, "wb") as f:
+    f.write(OX)
+r = subprocess.run([sys.executable, TOOL, ARC, "-o", ZIP], input=RK + "\n", capture_output=True, text=True, timeout=300)
+assert r.returncode == 0, r.stdout + r.stderr
+
+
+def doctor(put, drop=()):
+    """The opened archive, entries put / dropped, the manifest rebuilt: a plain ZIP any person can upload."""
+    with zipfile.ZipFile(ZIP) as z:
+        parts = {n: z.read(n) for n in z.namelist()}
+    parts.update(put)
+    man = json.loads(parts.pop("manifest.json"))
+    for n in drop:
+        parts.pop(n, None)
+    man["files"] = {n: {"sha256": hashlib.sha256(b).hexdigest(), "size": len(b)} for n, b in parts.items()}
+    bio = io.BytesIO()
+    with zipfile.ZipFile(bio, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("manifest.json", json.dumps(man))
+        for n, b in parts.items():
+            z.writestr(n, b)
+    return bio.getvalue()
+
+
+def plain(s, data):
+    iid = upload(s, data)
+    return iid, wait(s, iid)
+
+
+ORG6 = new_org("Zeta Leer")
+with zipfile.ZipFile(ZIP) as z:
+    rows = json.loads(z.read("lists.json"))
+for x in rows:
+    if x.get("id") == LO:
+        x.update(header_file="../../../etc/passwd", header_style="image", icon="u:aaaaaaaaaaaa")
+good = png((9, 9, 9))
+data = doctor({"lists.json": json.dumps(rows).encode(),
+               "files/pictures/organisation.png": b"<svg xmlns='http://www.w3.org/2000/svg' onload='alert(1)'/>",
+               f"files/pictures/list-{LO}-header.jpg": b"no picture at all",
+               f"files/pictures/list-{NL}-icon.png": good,  # a list of the target (import 1), not of this file
+               "files/pictures/list-999999999-icon.png": good, "files/pictures/list-0-icon.png": good,
+               f"files/pictures/list-0{LO}-header.jpg": good, f"files/pictures/list-{LO}x-header.jpg": good,
+               f"files/pictures/sub/list-{LO}-header.jpg": good, "files/pictures/passwd": good}, drop=(f"files/pictures/list-{LO}-icon.png",))
+before3 = pics(NL)["icon"]
+n_files = len(stored("listicons/*")) + len(stored("listheads/*"))
+iid, st = plain(A, data)
+check(st.get("state") == "preview", f"#3849: the doctored archive opens {st.get('state')} {st.get('error')}")
+j = run(A, iid, ORG6)
+L6 = one("SELECT id FROM lists WHERE org_id=? AND name='Alpha Projekt'", (ORG6,))
+p6 = pics(L6) if L6 else {}
+check(L6 and not p6["icon"] and p6["header_file"] == "" and p6["header_style"] == "", f"#3849: nothing of the file's tokens or a dead picture stays {dict(p6) if L6 else None}")
+check(icon_of(ORG6) == "", f"#3849: something that is no picture does not become the symbol {icon_of(ORG6)}")
+check(pics(NL)["icon"] == before3, "#3849: a list id of the target in a file name changes nothing there")
+check(len(stored("listicons/*")) + len(stored("listheads/*")) == n_files, "#3849: not one file written")
+check(any("could not be taken over" in str(x.get("text")) for x in (j.get("result") or {}).get("warnings", [])), "#3849: the result names what was refused")
+ok(A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo"), "undo of the doctored import")
+iid, st = plain(A, doctor({"files/pictures/../evil.png": good}))
+check(st.get("state") == "invalid", f"#3849: a path trick in a name is refused as a whole {st.get('state')}")
 
 if FAILS:  # the container log once
     ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
