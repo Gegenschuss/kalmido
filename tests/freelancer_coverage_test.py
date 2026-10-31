@@ -1194,7 +1194,6 @@ PATCH /api/list-tags/{}
 PATCH /api/lists/{}/error-hook
 PATCH /api/lists/{}/links/{}
 PATCH /api/lists/{}/milestones/{}
-PATCH /api/me
 PATCH /api/me/tokens/{}
 PATCH /api/me/webhooks/{}
 PATCH /api/newsletter/segments/{}
