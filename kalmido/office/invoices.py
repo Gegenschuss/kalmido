@@ -1715,6 +1715,7 @@ def fd_reminder_extra(c, oid, rows):
         pm = inv_paid_map(c, oid, refs) if refs else {}
         st = {x["id"]: inv_state(x, pm) for x in c.execute(
             "SELECT * FROM office_docs WHERE org_id=? AND id IN (" + ",".join("?" * len(refs)) + ")", [oid] + refs)} if refs else {}
+        settled_txt = tr("Settled")  # 2.369.0 A (#3200): once per list (the language is a query)
         for d in rems:
             x = meta.get(d["id"])
             if x is None:
@@ -1728,7 +1729,7 @@ def fd_reminder_extra(c, oid, rows):
             d["fee_open_text"] = fmt_money(d["fee_open"], x["lang"], x["currency"])
             if d["settled"]:
                 d["state"] = "done"
-                d["status_text"] = tr("Settled")
+                d["status_text"] = settled_txt
     if invs:
         open_fees = {}
         for x in c.execute("SELECT id, number, ref_doc_ids, reminder_fee FROM office_docs WHERE org_id=? AND kind='reminder' AND locked_at IS NOT NULL "

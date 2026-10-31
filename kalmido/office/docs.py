@@ -1248,9 +1248,13 @@ def odoc_groups():
     return jsonify(clients=clients[:300], projects=projects, years=years)
 
 
+ODOC_PAGE_MAX = 500
+
+
 @app.get("/api/office/docs")
 def odoc_list():
-    """?kind=offer&status=&q= -> the organisation's documents, newest first (brief rows)."""
+    """?kind=offer&status=&q=&limit=&before= -> the organisation's documents, newest first (brief rows); 2.369.0 A (#3200):
+    a page of limit rows (1-500, default 500), next_cursor (null = the last page) is the before= of the next one."""
     c, uid, oid = _ctx()
     kind = request.args.get("kind") or "offer"
     if kind not in DOC_KINDS:
@@ -1276,8 +1280,19 @@ def odoc_list():
     q = (request.args.get("q") or "").strip()
     if q:
         like = f"%{like_escape(q)}%"
-        sql += " AND (number ILIKE ? ESCAPE '\\' OR project_title ILIKE ? ESCAPE '\\' OR project_ref ILIKE ? ESCAPE '\\' OR recipient ILIKE ? ESCAPE '\\')"
-        args += [like, like, like, like]
+        # 2.369.0 A (#3200): the search of a paged list runs here; some recipients are stored with \\uXXXX escapes
+        like_esc = f"%{like_escape(json.dumps(q)[1:-1])}%"
+        sql += " AND (number ILIKE ? ESCAPE '\\' OR project_title ILIKE ? ESCAPE '\\' OR project_ref ILIKE ? ESCAPE '\\' OR recipient ILIKE ? ESCAPE '\\' OR recipient ILIKE ? ESCAPE '\\')"
+        args += [like, like, like, like, like_esc]
+    # 2.369.0 A (#3200): a page by (date, id), the order of the list: date is NOT NULL, ties and empty dates stay stable
+    n = request.args.get("limit") or ""
+    n = max(1, min(int(n), ODOC_PAGE_MAX)) if re.fullmatch(r"\d{1,6}", n) else ODOC_PAGE_MAX
+    if request.args.get("before"):
+        cur = re.fullmatch(r"([^\x00]{0,40}),(\d{1,18})", request.args["before"])
+        if not cur:
+            raise BadInput(tr("Invalid value: {0}", "before"))
+        sql += " AND (date, id) < (?, ?)"
+        args += [cur[1], int(cur[2])]
     # 2.281.0 C (#3115): the derived states are narrowed in SQL and decided before the 500 (an old overdue invoice was
     # missing behind the 500 newest); payments only of the rows shown; the language once
     derived = st in ("partial", "overdue", "open")  # 2.356.0 D (#3007): open = the open items (open + overdue, as kpi.py kpi_open)
@@ -1290,10 +1305,12 @@ def odoc_list():
             args.append(local_now().date().isoformat())
         elif st == "partial":  # 2.356.0 D (#3007): not for the open items
             sql += " AND EXISTS (SELECT 1 FROM office_payments p WHERE p.doc_id=office_docs.id AND p.org_id=office_docs.org_id)"
-    raw = c.execute(sql + " ORDER BY date DESC, id DESC" + ("" if derived else " LIMIT 500"), args).fetchall()
+    raw = c.execute(sql + " ORDER BY date DESC, id DESC" + ("" if derived else f" LIMIT {n + 1}"), args).fetchall()
     pm = inv_paid_map(c, oid, [r["id"] for r in raw]) if kind in ("invoice", "credit") else {}
     if derived:
-        raw = [r for r in raw if (dec(inv_money_fields(r, pm)["open"]) > 0 if st == "open" else inv_state(r, pm) == st)][:500]
+        raw = [r for r in raw if (dec(inv_money_fields(r, pm)["open"]) > 0 if st == "open" else inv_state(r, pm) == st)]
+    next_cursor = f"{raw[n - 1]['date']},{raw[n - 1]['id']}" if len(raw) > n else None
+    raw = raw[:n]
     lg = lang()
     rows = [doc_brief(r, pm, lg) for r in raw]
     if kind == "offer":
@@ -1301,9 +1318,10 @@ def odoc_list():
         oil_list_marks(c, oid, rows)  # 2.356.0 C (#3005)
     role = office_role(c, uid, oid)
     if kind == "offer" and role == "admin":  # 2.114.2 A (#2263): which finalised quotations the row menu may delete
+        blocks = bga_offer_blocks(c, oid, [r for b, r in zip(rows, raw) if b["locked"] and r["status"] == "draft"])  # 2.369.0 A (#3200)
         for b, r in zip(rows, raw):
             if b["locked"] and r["status"] == "draft":
-                b["can_delete"] = b["can_unlock"] = not bga_offer_block(c, oid, r)
+                b["can_delete"] = b["can_unlock"] = not blocks[r["id"]]
             elif not b["locked"]:  # 2.417.0 C (#2604, #2574): an open quotation past draft or mailed stays (a signed draft: the server's 409)
                 b["can_delete"] = r["status"] == "draft" and not r["sent_at"]
         used = {b["id"] for b, r in zip(rows, raw) if b.get("can_delete") and not b["locked"]}
@@ -1325,7 +1343,7 @@ def odoc_list():
     dun = dun_list_extra(c, oid, kind, rows)  # 2.147.1 B (#2054): suggested reminder drafts (count + mark)
     if st in ("partial", "overdue"):  # derived states: filtered after the fact
         rows = [x for x in rows if x["state"] == st]
-    return jsonify(docs=rows, role=role, org_id=oid, **trial_summary(c, oid), **({"dunning": dun} if dun else {}))
+    return jsonify(docs=rows, next_cursor=next_cursor, role=role, org_id=oid, **trial_summary(c, oid), **({"dunning": dun} if dun else {}))
 
 
 def trial_summary(c, oid):
@@ -1649,20 +1667,33 @@ def bga_offer_block(c, oid, r):
     """2.114.2 A (#2263): why finalised document r cannot be deleted (None = it can): only a quotation still in draft that
     was never sent (sent_at, a logged mail), never answered by the client (signoffs) and that nothing was made from (an
     invoice's source_doc_id, an order confirmation in office_gen_docs). Open signoff links go with it (ON DELETE CASCADE)."""
-    if r["kind"] in ODOC_SEQ_KINDS:
-        return ODOC_INV_KEPT
-    if r["kind"] != "offer":
-        return OFX_LOCKED
-    if r["status"] != "draft":  # 2.417.0 (#2604 review F2): an open quotation past draft is kept as sent, not "finalised"
-        return OFX_LOCKED if ofx_locked(r) else BGA_SENT
-    if r["sent_at"] or c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? AND doc_id=? AND action='send' LIMIT 1",
-                                 (oid, r["id"])).fetchone():
-        return BGA_SENT
-    if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (r["id"], oid)).fetchone():
-        return N_("The customer has signed this quotation; the record is kept")
-    if bga_offer_used(c, oid, r):
-        return BGA_USED
-    return None
+    return bga_offer_blocks(c, oid, [r])[r["id"]]
+
+
+def bga_offer_blocks(c, oid, rs):
+    """2.369.0 A (#3200): bga_offer_block for a whole list, {id: reason or None}, in one query per check (not per row)."""
+    open_ids = [r["id"] for r in rs if r["kind"] == "offer" and r["status"] == "draft" and not r["sent_at"]]
+    sent, signed, used = set(), set(), set()
+    if open_ids:
+        q, a = ",".join("?" * len(open_ids)), (oid, *open_ids)
+        sent = {x[0] for x in c.execute(f"SELECT doc_id FROM office_doc_log WHERE org_id=? AND action='send' AND doc_id IN ({q})", a)}
+        signed = {x[0] for x in c.execute(f"SELECT doc_id FROM office_signoffs WHERE org_id=? AND state <> 'open' AND doc_id IN ({q})", a)}
+        used = {x[0] for x in c.execute(f"SELECT source_doc_id FROM office_docs WHERE org_id=? AND source_doc_id IN ({q}) "
+                                        f"UNION SELECT doc_id FROM office_gen_docs WHERE org_id=? AND doc_id IN ({q})", a + a)}
+
+    def why(r):
+        if r["kind"] in ODOC_SEQ_KINDS:
+            return ODOC_INV_KEPT
+        if r["kind"] != "offer":
+            return OFX_LOCKED
+        if r["status"] != "draft":  # 2.417.0 (#2604 review F2): an open quotation past draft is kept as sent, not "finalised"
+            return OFX_LOCKED if ofx_locked(r) else BGA_SENT
+        if r["sent_at"] or r["id"] in sent:
+            return BGA_SENT
+        if r["id"] in signed:
+            return N_("The customer has signed this quotation; the record is kept")
+        return BGA_USED if r["id"] in used else None
+    return {r["id"]: why(r) for r in rs}
 
 
 def bga_offer_used(c, oid, r):
