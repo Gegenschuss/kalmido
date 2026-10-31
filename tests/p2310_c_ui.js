@@ -184,7 +184,7 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
     } else check(false, `${tag}: #1056 a row to swipe`);
     // #1056 the task panel on the phone: date and priority are in its header (visible), so its "…" leaves them out
     await ev(`(() => { openDetail(${T1}); return 1; })()`); await sleep(900);
-    check(await ev(`['date', 'prio'].every(k => { const b = document.querySelector('#detail .dtop [data-act="' + k + '"]'); if (!b) return false; const r = b.getBoundingClientRect(); return r.width >= 24 && r.height >= 24 && r.right <= innerWidth && getComputedStyle(b).visibility !== 'hidden'; })`), `${tag}: #1056 date + priority visible in the panel header on the phone`);
+    check(await ev(`['date', 'prio'].every(k => { const b = document.querySelector('#detail :is(.dtop, .dthumb) [data-act="' + k + '"]'); if (!b) return false; const r = b.getBoundingClientRect(); return r.width >= 24 && r.height >= 24 && r.right <= innerWidth && getComputedStyle(b).visibility !== 'hidden'; })`), `${tag}: #1056 date + priority visible on the phone (2.365.0 #2824: the date in the bottom bar)`);
     await tap(o, '#detail .dtop [data-act="task-menu"]'); await sleep(700);
     check(await ev(`!!document.querySelector('#pop .mgh') && ![...document.querySelectorAll('#pop [role="menuitem"]')].some(b => /New date|High/.test(b.textContent))`), `${tag}: #1056 the panel's "…" without date / priority`);
     await shot('p2310c-390-task-menu.png');
