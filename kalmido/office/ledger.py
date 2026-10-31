@@ -30,7 +30,7 @@ from flask import g, jsonify, request, has_app_context
 
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import N_, tr
-from ..core.db import bump, db, iso, now_utc
+from ..core.db import bump, db, iso, now_utc, ix_ensure
 from ..core.pg import write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_json_store, oc_log_detail
 from ..core.access import Denied
@@ -453,7 +453,7 @@ def ofx_migrate(c):
                  "AND column_name='org_id' AND is_nullable='YES'").fetchone() \
             and not c.execute("SELECT 1 FROM office_doc_items WHERE org_id IS NULL LIMIT 1").fetchone():
         c.execute("ALTER TABLE office_doc_items ALTER COLUMN org_id SET NOT NULL")
-    c.execute("CREATE INDEX IF NOT EXISTS office_doc_items_org ON office_doc_items(org_id, doc_id)")
+    ix_ensure(c, "CREATE INDEX IF NOT EXISTS office_doc_items_org ON office_doc_items(org_id, doc_id)")
 
 
 # ---------------------------------------------------------------- routes

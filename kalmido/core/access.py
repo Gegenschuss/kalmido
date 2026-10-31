@@ -9,7 +9,7 @@ from flask import g, has_request_context, jsonify
 from ..core.config import app
 from ..core.schema import MAX_DEPTH
 from ..core.i18n import N_, tr
-from ..core.db import db, ensure_inbox, err, usettings
+from ..core.db import db, ensure_inbox, err, trigger_ensure, usettings
 from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
 from ..core.errors import Denied  # noqa: F401  2.149.0 G (#2517): moved to core/errors.py, re-exported here
 from .pg import set_ctx_hook, st_ids, system_ctx as pg_system  # 2.149.0 G (#2517): pulled up from functions
@@ -233,7 +233,7 @@ def acx_gen_setup(c):
     """2.149.0 C (#2508), init_db (every start): the triggers that renew 'acx_gen' (idempotent; one per statement)."""
     c.execute(ACX_GEN_FN)
     for t, ev in ACX_GEN_TRIGGERS.items():
-        c.execute(f"CREATE OR REPLACE TRIGGER kalmido_acx_{t} AFTER {ev} ON {t} FOR EACH STATEMENT EXECUTE FUNCTION kalmido_acx_bump()")
+        trigger_ensure(c, f"kalmido_acx_{t}", t, f"CREATE OR REPLACE TRIGGER kalmido_acx_{t} AFTER {ev} ON {t} FOR EACH STATEMENT EXECUTE FUNCTION kalmido_acx_bump()")
     # 2.149.0 review: a new generation on every start / after a restore (the dump brings an old value along)
     c.execute("INSERT INTO kalmido_meta(key, value) VALUES ('acx_gen', md5(random()::text || clock_timestamp()::text)) "
               "ON CONFLICT (key) DO UPDATE SET value = excluded.value")

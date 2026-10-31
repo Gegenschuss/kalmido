@@ -2696,7 +2696,7 @@ SCHEMA_TRIGGERS = {"time_task_list", "time_task_title", "list_e2e_members", "tim
       # 2.33.0 (#1080): FTS5 triggers of SQLite backups 2.33-2.36 (Postgres 2.37: no triggers, see msgsearch.py)
     f"msg_fts_{t}_{w}" for t in ("comments", "tchat_msgs", "agent_chat") for w in ("ai", "au", "ad")}
 # time_entries.task_title follows a rename only for entries of users who still see the task (a former
-# member keeps the old snapshot and never learns new titles). Re-created on every start (init_db).
+# member keeps the old snapshot and never learns new titles). Function re-created, trigger checked on every start (init_db).
 TIME_TITLE_TRIGGER = """CREATE OR REPLACE FUNCTION kalmido_time_task_title() RETURNS trigger LANGUAGE plpgsql AS $fn$
 BEGIN UPDATE time_entries SET task_title=NEW.title WHERE task_id=NEW.id AND user_id IN
   (SELECT owner_id FROM lists WHERE id=NEW.list_id UNION SELECT user_id FROM list_members WHERE list_id=NEW.list_id
@@ -2712,7 +2712,7 @@ CREATE OR REPLACE TRIGGER time_title_e2e BEFORE INSERT OR UPDATE OF task_title O
 # (the task dialog, dragging, batch moves, rules, imports, a deleted section's ON DELETE SET NULL ...) passes this trigger, so
 # no path can forget it; a task's place in a further list (task_links) the same, and since when a custom field has its value
 # (task_field_values.set_at, the detail's "since" of #3514). {off} = the seconds of a test server's test
-# clock (0 elsewhere). Re-created on every start (init_db), like the time trigger.
+# clock (0 elsewhere). Function re-created, trigger checked on every start (init_db), like the time trigger.
 SEC_AT_TRIGGER = """CREATE OR REPLACE FUNCTION kalmido_sec_at() RETURNS trigger LANGUAGE plpgsql AS $fn$
 BEGIN
   IF TG_OP = 'INSERT' OR NEW.section_id IS DISTINCT FROM OLD.section_id OR NEW.list_id IS DISTINCT FROM OLD.list_id THEN
@@ -2738,7 +2738,7 @@ CREATE OR REPLACE TRIGGER kalmido_field_at BEFORE INSERT OR UPDATE OF value ON t
 # - a member who goes loses their wrapped keys and the list is marked "rotation pending" (e2e_rotate = the current generation;
 #   the rotation itself comes in 2.64b);
 # - agents and the participant role are refused (fail closed: the app checks before and answers with a clear text).
-# Re-created on every start (init_db), like the time trigger.
+# Function re-created, trigger checked on every start (init_db), like the time trigger.
 LIST_E2E_TRIGGER = """CREATE OR REPLACE FUNCTION kalmido_list_e2e_members() RETURNS trigger LANGUAGE plpgsql AS $fn$
 DECLARE m TEXT; g BIGINT;
 BEGIN
@@ -2773,7 +2773,7 @@ CREATE OR REPLACE TRIGGER list_e2e_members BEFORE INSERT OR UPDATE OF role, user
 # - a new member (a person, not an agent: agents never read a locked space) without a key of the current generation lands
 #   on the waiting list (wiki_key_pending); the next unlocked organisation admin wraps the key for them;
 # - a member who goes loses their wrapped keys; when they held one, the space is marked "rotation pending" (e2e_rotate).
-# Re-created on every start (init_db), like the list trigger.
+# Function re-created, trigger checked on every start (init_db), like the list trigger.
 WIKI_E2E_TRIGGER = """CREATE OR REPLACE FUNCTION kalmido_wiki_e2e_members() RETURNS trigger LANGUAGE plpgsql AS $fn$
 DECLARE sid BIGINT; g BIGINT; prev TEXT := current_setting('app.role', true);
 BEGIN
@@ -2810,7 +2810,7 @@ CREATE OR REPLACE TRIGGER wiki_e2e_members BEFORE INSERT OR UPDATE OF org_id, us
   EXECUTE FUNCTION kalmido_wiki_e2e_members()"""
 # 2.360.0 R (#2496): every API token / app password that goes (revoked, its account deleted, expired and cleaned up) is
 # noted in revoked_creds by its hash; a restore keeps the list as it was before and deletes only these hashes again
-# (admin/backup.py bkr_revoked_*). Re-created on every start (init_db); a restore leaves functions / triggers out.
+# (admin/backup.py bkr_revoked_*). Function re-created, trigger checked on every start (init_db); a restore leaves functions / triggers out.
 REVOKED_TRIGGER = """CREATE OR REPLACE FUNCTION kalmido_revoked_note() RETURNS trigger LANGUAGE plpgsql AS $fn$
 BEGIN
   INSERT INTO revoked_creds(hash, at)
@@ -2825,7 +2825,7 @@ CREATE OR REPLACE TRIGGER kalmido_revoked_app_passwords AFTER DELETE ON app_pass
 # 2.360.4 (#3243): the same for what is deleted for good (cascades included): table + id into purged_rows; a row that comes
 # back with its id (an undo, an import) leaves the list again, so only what stayed gone counts; of fs_nodes only files (a
 # folder also goes when it is merged or dissolved, its content lives on); a merge takes its losers off the list. made = the
-# row's created_at: ids are given out again after a restore. Re-created on every start.
+# row's created_at: ids are given out again after a restore. Function re-created, trigger checked on every start.
 PURGED_TABLES = ("orgs", "lists", "tasks", "fs_nodes", "wiki_pages", "events", "sheets", "contacts", "clients", "hub_mails", "office_deals")
 PURGED_TRIGGER = """CREATE OR REPLACE FUNCTION kalmido_purged_note() RETURNS trigger LANGUAGE plpgsql AS $fn$
 BEGIN
@@ -2849,7 +2849,7 @@ END $fn$;
 # made or moves (app, API, import, agents, rules) passes here: a new task in such a project gets the next number
 # (list_ticket_seq), a task that leaves its project keeps its old key as an alias (task_keys) and gets a new number in the
 # new project if that one has a key (else none; back in a project it had a number in, that number again while it is free).
-# A number given on insert stays (restores). Re-created on every
+# A number given on insert stays (restores). Function re-created, trigger checked on every
 # start (init_db); a restore leaves functions / triggers out.
 TICKET_NO_TRIGGER = """CREATE OR REPLACE FUNCTION kalmido_ticket_no() RETURNS trigger LANGUAGE plpgsql AS $fn$
 DECLARE k TEXT; n BIGINT;

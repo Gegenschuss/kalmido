@@ -16,7 +16,7 @@ NULL would make a gone author's text the owner's own text, which the agent follo
 """
 import json
 
-from .db import gset, gsetting
+from .db import gset, gsetting, ix_ensure, ix_have
 from .pg import system_ctx
 
 FK_2103 = (
@@ -60,9 +60,10 @@ def fk_ensure(c):
     done = {}
     # system: the clean-up and the keys span every organisation (row-level security would hide the rows of the others)
     with system_ctx(c):
+        have_ix = ix_have(c)  # 2.369.0 B (#2731): only the missing indexes
         for table, col, ref, act in FK_2103:
             if (table, col) not in FK_INDEXED:  # also on a new database (its key comes from schema.py)
-                c.execute(f"CREATE INDEX IF NOT EXISTS fk2103_{table}_{col}_ix ON {table}({col}) WHERE {col} IS NOT NULL")
+                ix_ensure(c, f"CREATE INDEX IF NOT EXISTS fk2103_{table}_{col}_ix ON {table}({col}) WHERE {col} IS NOT NULL", have_ix)
             if fk_has(c, table, col):
                 continue
             n = fk_orphans(c, table, col, ref)
