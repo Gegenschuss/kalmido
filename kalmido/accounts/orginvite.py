@@ -288,6 +288,16 @@ def ojn_later(c, oid, uid, by, pairs):
             c.execute("UPDATE org_joins SET pending_lists=? WHERE org_id=? AND user_id=?", (json.dumps(list(have.values())), oid, uid))
 
 
+def ojn_drop_later(c, oid, uid, by):
+    """2.363.0 (#3132): the undo of an import: an invitation another admin took over meanwhile stays, the notes of "by" go."""
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # the row of a person who is no member yet
+        r = c.execute("SELECT pending_lists FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
+        if r and r["pending_lists"]:
+            keep = [x for x in json.loads(r["pending_lists"]) if x[2] != by]
+            c.execute("UPDATE org_joins SET pending_lists=? WHERE org_id=? AND user_id=?", (json.dumps(keep), oid, uid))
+
+
 def ojn_share_later(c, oid, uid, r):
     """2.363.0 (#3132): at the accepted invitation r: the noted projects are shared, as long as each is still there, in this
     organisation and the importing admin's own. -> how many. The caller holds the system context."""

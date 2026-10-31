@@ -197,7 +197,7 @@ def _fmt_zeros(z, names, budget):
         return {}
     try:
         st = _xml(z, "xl/styles.xml", budget)
-    except ET.ParseError:
+    except (ET.ParseError, BadInput):
         return {}  # only a nicety: a broken style part does not stop the import
     fmts = {x.get("numFmtId"): x.get("formatCode") or "" for x in st.iter() if _local(x.tag) == "numFmt"}
     out = {}

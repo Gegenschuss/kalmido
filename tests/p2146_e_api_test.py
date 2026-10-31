@@ -302,7 +302,7 @@ check(c0.get("row") == 3, f"#3103: the row number of the file, below an empty fi
 # the leading zeros: a number with the format 00000, as Excel stores a postcode column
 
 
-def restyle(raw):
+def restyle(raw, styles=None):
     """The first number cell of each row gets the cell style 1 = format 00000."""
     src = zipfile.ZipFile(io.BytesIO(raw))
     z = io.BytesIO()
@@ -312,13 +312,16 @@ def restyle(raw):
             if n == "xl/worksheets/sheet1.xml":
                 d = d.replace(b'<c r="C2">', b'<c r="C2" s="1">')
             f.writestr(n, d)
-        f.writestr("xl/styles.xml", '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        f.writestr("xl/styles.xml", styles or '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
                    '<numFmts count="1"><numFmt numFmtId="164" formatCode="00000"/></numFmts>'
                    '<cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="164"/></cellXfs></styleSheet>')
     return z.getvalue()
 
 
 Z = restyle(make_xlsx([["Firma", "Straße", "PLZ", "Ort"], ["Null Vorn GmbH", "Weg 2", 1067, "Dresden"]], table="Kunden"))
+r = preview(Fr, "kunden.xlsx", restyle(make_xlsx([["Firma", "Straße", "PLZ", "Ort"], ["Stil Kaputt GmbH", "Weg 3", 1067, "Dresden"]], table="Kunden"),
+                                       '<?xml version="1.0"?><!DOCTYPE x><styleSheet/>'))
+check(r.ok, f"#3103: a style part the reader refuses does not stop the import {r.status_code} {r.text[:120]}")
 P = preview(Fr, "kunden.xlsx", Z).json()
 c0 = next((c for c in P.get("clients", []) if c.get("name") == "Null Vorn GmbH"), {})
 check(c0.get("zip") == "01067", f"#3103: a postcode with the format 00000 keeps its leading zero {c0}")

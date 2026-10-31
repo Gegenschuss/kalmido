@@ -238,9 +238,16 @@ iv = {x["email"]: x for x in Dv.get(B + f"/api/orgs/{GAMMA}/invites").json()["in
 check(iv.get("gina@example.com", {}).get("state") == "invited" and iv["gina@example.com"]["user_id"] is None, f"the admin sees it in the open invitations {iv}")
 check(not one("SELECT 1 FROM list_members WHERE user_id=?", (NG,)), "no project shared before the person accepts")
 IMP = one("SELECT max(id) FROM imports WHERE user_id=?", (DAVE,))
+# 2.363.0 (#3132): another admin took the invitation over: it stays, the undone import's notes go
+dbx("INSERT INTO org_joins(org_id,user_id,role,created_by,created_at,pending_lists) VALUES(?,?,'member',?,?,?)",
+    (GAMMA, CAROL, BOB, "2026-10-31T00:00:00+00:00", json.dumps([[1, "edit", DAVE], [2, "edit", BOB]])))
+CR = json.loads(one("SELECT created FROM imports WHERE id=?", (IMP,)))
+CR["org_joins"].append([GAMMA, CAROL])
+dbx("UPDATE imports SET created=? WHERE id=?", (json.dumps(CR), IMP))
 r = Dv.post(B + f"/api/imports/{IMP}/undo")
 check(r.ok, f"the import is undone {r.status_code} {r.text[:200]}")
 check(not one("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, NG)), "the undo withdraws the invitation")
+check(json.loads(one("SELECT pending_lists FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, CAROL)) or "[]") == [[2, "edit", BOB]], "#3132: the undo drops only its own notes")
 Dv.delete(B + f"/api/account/import/{iid}")
 dbx("UPDATE users SET is_admin=0 WHERE id=?", (DAVE,))
 

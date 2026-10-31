@@ -54,7 +54,7 @@ from .acctexport import (UMZ_BLOCK, UMZ_FORMAT, UMZ_HEAD, UMZ_V, UmzReader, UmzW
 from ..core.orgcrypt import oc_user_space, oc_write_file, rck_parse  # 2.149.0 G (#2517): pulled up from functions
 from ..core.schema import MAX_DEPTH  # 2.149.0 G (#2517): pulled up from functions
 from ..life.model import jr_seal  # 2.306.0 A (#2885)
-from ..accounts.orginvite import ojn_invite, ojn_later  # 2.278.0 A (#3095)
+from ..accounts.orginvite import ojn_drop_later, ojn_invite, ojn_later  # 2.278.0 A (#3095)
 from ..collab.e2e import e2e_has_keys, e2e_import_keys, e2e_same_keys  # 2.278.0 C (#3091)
 
 UMZ_IN_DIR = os.path.join(EXPORT_DIR, "account-import")
@@ -1844,6 +1844,7 @@ def umz_undo(c, uid, r):
             uset(c, uid, k, v.get("old") if v.get("old") is not None else "")
     for oid, who in cr.get("org_joins") or []:  # 2.360.2 M (#2561): an invitation not accepted yet goes with the import
         c.execute("DELETE FROM org_joins WHERE org_id=? AND user_id=? AND created_by=?", (int(oid), int(who), uid))
+        ojn_drop_later(c, int(oid), int(who), uid)
     c.execute("UPDATE imports SET undone_at=? WHERE id=?", (iso(now_utc()), r["id"]))
     bump(c)
     c.commit()
