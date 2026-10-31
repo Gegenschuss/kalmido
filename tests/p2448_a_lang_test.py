@@ -2,12 +2,12 @@
 """2.448.0 (#3765): whoever reads a text decides its language. Texts kept for later are built for their reader or stored as
 key + values. The first admin speaks German here, so a text that silently falls back to them shows.
  - poll: the mail about the chosen time in the language the voter saw when voting; an older vote without one: the owner's
- - invoice series: the reason in the task follows the person, also from the timer (no request)
- - agent card: the person's language, not the agent's
+ - invoice series: the reason in the task follows each admin, also from the timer
+ - agent card: the person's language, not the agent's (guard: the office context already acts as the person)
  - planned proposal: the title in the language of the person the plan works for
  - import: the stored state keeps key + values, the status answers in the language of who asks
  - history: an encrypted file is stored as the key, the reader's app translates it
- All of it for a person without an organisation (tests/freelancer_fixture.py)."""
+ The cases without the series run for a person without an organisation (tests/freelancer_fixture.py)."""
 # kalmido-suite: fresh
 import base64
 import email
@@ -23,8 +23,8 @@ import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
-from freelancer_fixture import freelancer  # noqa: E402
-from kt import B, DATA, check, dbx, done, fresh, H, setup, until  # noqa: E402
+from freelancer_fixture import FEATURES, freelancer  # noqa: E402
+from kt import B, DATA, check, dbx, done, fresh, H, sess, setup, until  # noqa: E402
 
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 O = "/api/office"
@@ -104,22 +104,34 @@ check(sub["anne"] == "Date fixée : Lunch", "French voter: French mail " + str(s
 check(sub["bert"] == "Termin steht: Lunch", "German voter: German mail " + str(sub))
 check(sub["cleo"] == "Date set: Lunch", "no language stored: the owner's (English) " + str(sub))
 
-# ================================================================ invoice series: the timer has no reader
-speak(Fr, "fr")
-Fr.get(B + O + "/settings")
-Fr.put(B + O + "/settings", json={"company_fields": {"name": "Frida Film", "street": "Weg 1", "zip": "10115", "city": "Berlin", "country": "DE"}})
-CL = Fr.post(B + "/api/clients", json={"name": "Example Ltd", "street": "Marktweg 5", "zip": "50667", "city": "Koeln", "country": "DE"}).json()["id"]
-Q = Fr.post(B + O + "/docs", json={"client_id": CL, "project_title": "Retainer"}).json()["id"]
-Fr.put(B + f"{O}/docs/{Q}/items", json={"items": [{"kind": "service", "title": "Care", "qty": 1, "unit": "flat", "rate": 500}]})
-TPL = Fr.post(B + f"{O}/docs/{Q}/invoice", json={}).json()["id"]
-r = Fr.post(B + O + "/series", json={"template_id": TPL, "every": "monthly", "start": date.today().isoformat(), "auto_send": True, "title": "Rente"})
+# ================================================================ invoice series: two admins, two languages, one timer
+r = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob Admin", "password": "password123", "email": "bob@example.com"})
+assert r.ok, r.text
+BOB = r.json()["id"]
+ALICE = A.get(B + "/api/state").json()["me"]["id"]
+ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE}).json()["id"]
+assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com", "role": "admin"}).ok
+Bo = sess("bob")
+for s in (A, Bo):
+    assert s.patch(B + "/api/settings", json={"features": FEATURES, "tour": "done", "workspace": f"org:{ORG}"}).ok
+speak(Bo, "fr")
+A.get(B + O + "/settings")
+A.put(B + O + "/settings", json={"company_fields": {"name": "Alpha GmbH", "street": "Weg 1", "zip": "10115", "city": "Berlin", "country": "DE"}})
+CL = A.post(B + "/api/clients", json={"name": "Example Ltd", "org_id": ORG, "street": "Marktweg 5", "zip": "50667", "city": "Koeln", "country": "DE"}).json()["id"]
+Q = A.post(B + O + "/docs", json={"client_id": CL, "project_title": "Retainer"}).json()["id"]
+A.put(B + f"{O}/docs/{Q}/items", json={"items": [{"kind": "service", "title": "Care", "qty": 1, "unit": "flat", "rate": 500}]})
+TPL = A.post(B + f"{O}/docs/{Q}/invoice", json={}).json()["id"]
+r = A.post(B + O + "/series", json={"template_id": TPL, "every": "monthly", "start": date.today().isoformat(), "auto_send": True, "title": "Rente"})
 check(r.status_code == 201, "a series " + r.text[:200])
+dbx("UPDATE office_inv_series SET created_by=? WHERE id=?", (FID, r.json()["id"]))  # its creator left: every admin of the area hears of it
 in_ct("import app\nfrom kalmido.core.db import connect\nfrom kalmido.office import recurring as x\nx._RIN_LAST['at'] = -1e12\n"
       "c = connect()\nx.rin_tick(c)\nc.close()")
-t = dbx("SELECT title, content FROM tasks WHERE title LIKE '%Rente%' AND created_by=?", (FID,))
-check(t and "Le client n’a pas d’adresse e-mail" in t[0][1], f"the reason in the person's language, not the first admin's {t}")
+t = dict(dbx("SELECT created_by, content FROM tasks WHERE title LIKE '%Rente%'"))
+check("Der Kunde hat keine E-Mail-Adresse" in t.get(ALICE, ""), f"the German admin reads German {t}")
+check("Le client n’a pas d’adresse e-mail" in t.get(BOB, ""), f"the French admin reads French, whoever came first {t}")
 
 # ================================================================ agent card: the person reads it
+Fr.get(B + O + "/settings")
 speak(Fr, "de")
 r = Fr.post(B + "/api/my/agents", json={"username": "lang-bot", "display_name": "Lang Bot", "scopes": ["read", "tasks:write", "comments", "office"]})
 check(r.status_code == 201, "an agent, it takes over German " + r.text[:200])

@@ -11,7 +11,7 @@ from flask import jsonify
 
 from ..core.config import app
 from ..core.db import body, bump, db
-from ..core.i18n import N_, lang, tr
+from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from ..api.v1 import v1_view
@@ -174,10 +174,9 @@ def _notify(c, aid, uid, d):
     """The card in the person's chat with the agent: "Letter draft from <agent>: <subject>", "Open in the office"."""
     from ..agents.chat import chat_post
     u = c.execute("SELECT display_name, username FROM users WHERE id=?", (aid,)).fetchone()
-    lg = lang(c, uid)  # 2.448.0 (#3765): the person reads the card, the agent's request made it
-    name = (u["display_name"] or u["username"]) if u else tr("an agent", lg=lg)
-    text = tr("Letter draft from {0}: “{1}”. A draft; you check and send it.", name, d.get("subject") or tr("without title", lg=lg), lg=lg)
-    ch = [{"id": "open", "label": tr("Open in the office", lg=lg), "style": "primary", "href": f"#office/letters/{d['id']}"}]
+    name = (u["display_name"] or u["username"]) if u else tr("an agent")
+    text = tr("Letter draft from {0}: “{1}”. A draft; you check and send it.", name, d.get("subject") or tr("without title"))
+    ch = [{"id": "open", "label": tr("Open in the office"), "style": "primary", "href": f"#office/letters/{d['id']}"}]
     return chat_post(c, aid, uid, "agent", {"body": text, "choices": ch}, None)["id"]
 
 
