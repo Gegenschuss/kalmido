@@ -2,7 +2,7 @@
 // 2.368.5 (#2991) tests for the English wording pass. Own container (start.sh). API + Firefox (layout).
 // freelancer-matrix: personal -- alice has no organisation
 // - a shopping amount typed as text: "1,000" in English is 1000, in German 1 (the server read 1 in every language)
-// - the app bar: "Knowledge" stays one word at 1280 px
+// - the app bar: "Knowledge" stays one word at 1280 px (the fix came with #3880, this keeps it)
 // - no German examples or quotation marks in the English source, the manifest says what the server hands out
 const {execFileSync} = require('child_process');
 const fs = require('fs');
