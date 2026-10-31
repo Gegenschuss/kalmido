@@ -851,8 +851,8 @@ def v1_template_apply(tid):
 @app.post("/api/v1/lists/<int:lid>/duplicate")
 @v1_view
 def v1_list_duplicate(lid):
-    """2.78.0 (#1881): a copy of the list ({name?, done?, folder?}): sections, tasks with their dates, fields, dependencies,
-    Playbook, notepads, page; without members, shares and assignees. done = the completed tasks too."""
+    """2.78.0 (#1881): a copy of the list ({name?, done?, folder?}): everything except comments and times (2.363.3, #3134), without
+    members and shares; assignees stay where they may be assigned in the copy. done = the completed tasks too."""
     v1_args(())
     b = _v1_body(("name", "done", "folder"))
     if "done" in b and not isinstance(b["done"], bool):

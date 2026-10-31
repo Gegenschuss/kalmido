@@ -815,7 +815,8 @@ Two tabs for the admins of the office area (a personal office: its owner; member
   *Create quotation* makes a draft with the office's own quotation code (client and name taken over), binds it to the
   deal and moves an inquiry to *Quotation sent*. When the quotation's status becomes *accepted* - by hand or by the
   client's sign-off - the server moves its deal to *Order* (`pl2_offer_status`). A declined quotation leaves the deal
-  where it is: the card is marked and the admin sets *Lost* or makes a new quotation. *Create project* (a won deal)
+  where it is: the card is marked and the admin sets *Lost* or makes a new quotation. When a quotation that replaces
+  another one is accepted, the deal of the old one moves to it (2.437). *Create project* (a won deal)
   makes a project (type "Agency") named like the deal, in the office's workspace (a personal office: private),
   with the deal's client. Every change is one undo step; a deleted deal can be restored.
 - **Figures** - one view the server computes (`GET /api/office/kpi?year=`): revenue = payments received on invoices,
@@ -880,11 +881,20 @@ service (else its start, else their date); a sent one is marked **open quotation
 share apart). "Duplicate" on a quotation makes the copy its next **version** (`version_of` = the first quotation of the
 chain; a copy given to another client is a quotation of its own). Per chain one version counts:
 
-- **Automatic** (default): the newest sent or accepted version; drafts and declined versions never count.
+- **Automatic** (default): the newest sent or accepted version; drafts, declined and superseded versions never count.
 - **Yes**: when a version of the chain says yes, exactly the yes versions count (several are possible).
 - **No**: this version never counts.
 - Once a finalised invoice exists for any version of the chain, the whole chain is left out (the invoice is in the plan
   itself); a draft invoice does not take it out yet. Before 2.88 only the invoiced part was taken off.
+
+**Superseded** (2.437): "Duplicate" on a sent or accepted quotation asks *Mark the old quotation as superseded?* (ticked by
+default). Yes: the old quotation gets the status *Superseded* at once and the copy carries `replaces_id`; both show the link
+to each other (*Replaced by* / *Replaces*). A copy that replaces a quotation still sent or accepted (set back by hand)
+supersedes it again the moment it is accepted, by hand or by the client. Unticked = a supplement with only the new items: no
+reference, both quotations may be accepted. A superseded quotation counts nowhere (cash flow, purchases, invoice picker) like
+a declined one, its approval link is void, the client portal keeps showing it as superseded; there is no rejection rate it
+could fall into. Deleting the draft of the copy gives the old quotation its status back. By hand the status can be set from
+sent or accepted, and back. Freelancers without an organisation have the same in their personal office.
 
 The choice **In the cash flow** sits in the quotation (also when it is sent or finalised: it is planning, not printed and
 not part of the approval) with a line which version counts; everyone who may edit the area's quotations may change it, one
@@ -1503,6 +1513,17 @@ allowed) and `org_offices` (`[{id, name}]` while it is empty and the person has 
 `GET /api/office/mail-status` (see "Invoices and credit notes" below); 2.40.0 adds `POST /api/office/docs/<id>/fee`
 (see "Payments and reminders"). Agents never reach `/api/office/*` (their routes are `/api/v1/office`, see "Agents").
 
+## Lists on the phone and their sort
+
+*Since 2.451.*
+
+- **Phones**: the rows of quotations, invoices, the archive, trips and entertainment receipts show no symbols; the row
+  uses the full width. A tap opens as before, a long press opens the row menu. In the archive the PDF view has *Correct*
+  on a phone, an open document has its *More* menu.
+- **Sort**: quotations, invoices, credit notes, reminders, delivery notes, the archive and the pipeline have one choice of
+  *Date*, *Client*, *Amount* and *Name*, on computer and phone alike, remembered per list on the device. Choosing the
+  same entry again reverses the direction. The pipeline starts in its own order (*Standard*).
+
 ## Quotations and the calculator
 
 (Stage 1: quotations. See the editor's tab "Quotations".) The calculator is a pure function over the document, its
@@ -1731,7 +1752,7 @@ count as plural).
   page's direct positions, then per printed part a heading and its positions with quantity x part quantity, its producing /
   raw data / discount as positions; a part not printed stays one line), `title` (the title page; a part becomes a
   position with its amount, one per tax rate) or `summary` (one position per tax rate with a title, default
-  "Filmherstellung" / "Film production"). Net and gross equal the quotation's in every form, to the cent: with a
+  without one the neutral "Leistungen" / "Services" in the document's language). Net and gross equal the quotation's in every form, to the cent: with a
   fractional part quantity (1.5 shooting days) and mixed tax rates the part line is exactly rate x quantity, and the
   rest cent of the rounded positions goes on the last position of that rate, which then shows as one amount with its
   quantity x rate in the description (2.58.0). The preset is an office
@@ -2514,8 +2535,10 @@ with
 - `receipts/`: the receipts of the documents space with their files (also those in the trash) and `receipts.csv`;
   `project-receipts/`: the receipt files of lists and projects;
 - `cashbook/`: every cash book as PDF and CSV over its whole time (entries, day closings, change log);
-- `bank/`, `expenses/`, `archive/`, `logs/` (the office log and the change logs, GoBD) as CSV; `office-files/`: every other
-  file of the office folder (archived PDFs, accepted quotations, entertainment bills ...);
+- `books/` (procedure documentation, number ranges, opening balances, locked periods, equipment), `contracts/` (contracts,
+  agreements), `bank/`, `expenses/`, `archive/`, `logs/` (the office log and the change logs, GoBD) as CSV; `office-files/`:
+  every other file of the office folder (archived PDFs, accepted quotations, entertainment bills ...). Settings and working
+  data (price lists, text blocks, cash flow, bank rules ...) stay out: a static test names each such table with its reason;
 - `00-index.txt` (contents, the retention note, files that could not be read) and `manifest.json` (SHA-256 of every file).
 
 Who downloads it: the person themself for their own records (*Office -> Settings -> Data*, also without an organisation)

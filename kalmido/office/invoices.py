@@ -19,10 +19,10 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, write_lock
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, stored_join, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, vis_sql
-from ..core.errors import BadInput
+from ..core.errors import BadInput, BadKey, DeniedKey
 from .calc import INV_VAT_NOTES, TAX_KEYS, dec, dstr, fmt_money, inv_calc, inv_open, money, pack_tax
 from .homecur import hc_code, hc_home, hc_office_rate, hc_rate_missing  # 2.189.0 (#2475); 2.355.0 C (#2844): hc_rate_missing
 from .packs import office_pack_for
@@ -252,51 +252,51 @@ def inv_refund_open(c, oid, r):
 
 # ---------------------------------------------------------------- finalising (called by ledger.ofx_finalize)
 def inv_missing(c, oid, r, s, pack, items):
-    """The required fields of an invoice that are still missing (names in the signed-in person's language)."""
+    """The required fields of an invoice that are still missing (stored texts: 2.454.0, #3808, the reader's language, tr_stored)."""
     miss = []
     rec = _j(r["recipient"], {})
     cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone() if r["client_id"] else None
     if not (rec.get("name") or "").strip():
-        miss.append(tr("recipient name"))
+        miss.append([N_("recipient name")])
     addr_ok = cl is not None and all((cl[k] if k in cl.keys() else "") for k in ("street", "zip", "city"))
     # 2.97.0 B (#1951): with a client only its fields count (its name + attn. line are no address)
     if not addr_ok and (cl is not None or len([x for x in (rec.get("lines") or []) if x.strip()]) < 2):
-        miss.append(tr("recipient address (street, postcode and city)"))
+        miss.append([N_("recipient address (street, postcode and city)")])
     if not r["date"]:
-        miss.append(tr("date"))
+        miss.append([N_("date")])
     if r["kind"] == "reminder":
         if not _j(_col(r, "ref_doc_ids") or "[]", []):
-            miss.append(tr("invoices to remind of"))
+            miss.append([N_("invoices to remind of")])
         return miss
     if r["kind"] == "delivery":  # 2.120.0 D (#2089): no tax, bank or period needed: recipient, date and one position
         if not any(it.get("kind") == "service" for it in items):
-            miss.append(tr("at least one position"))
+            miss.append([N_("at least one position")])
         return miss
     if not (_col(r, "service_from") or _col(r, "service_to")):
-        miss.append(tr("period of service"))
+        miss.append([N_("period of service")])
     if not any(it.get("kind") == "service" for it in items):
-        miss.append(tr("at least one position"))
+        miss.append([N_("at least one position")])
     co = ofx_company(c, oid)
     free = s.get("company") or {}
     if not (co.get("name") or free.get("name")):
-        miss.append(tr("company name"))
+        miss.append([N_("company name")])
     if not ((co.get("street") and co.get("zip") and co.get("city")) or free.get("lines")):
-        miss.append(tr("company address"))
+        miss.append([N_("company address")])
     if not (co.get("tax_number") or co.get("vat_id")):
-        miss.append(tr("tax number or VAT ID"))
+        miss.append([N_("tax number or VAT ID")])
     if not co.get("iban"):
-        miss.append(tr("IBAN"))
+        miss.append([N_("IBAN")])
     from .countries import fk_country_code  # 2.40.0 (#1372): an unknown country code stops here, never silently DE
     if co.get("country") and fk_country_code(co["country"]) is None:
-        miss.append(tr("valid country of the company (ISO code, now {0})", co["country"]))
+        miss.append([N_("valid country of the company (ISO code, now {0})"), co["country"]])
     elif not co.get("country") and (pack or {}).get("neutral"):  # 2.147.0 (#2461): the base pack assumes no country (the e-invoice needs one)
-        miss.append(tr("country of the company"))
+        miss.append([N_("country of the company")])
     if cl is not None and "country" in cl.keys() and cl["country"] and fk_country_code(cl["country"]) is None:
-        miss.append(tr("valid country of the client (ISO code, now {0})", cl["country"]))
+        miss.append([N_("valid country of the client (ISO code, now {0})"), cl["country"]])
     if r["kind"] == "invoice" and not (_col(r, "due_date") or _col(r, "payment_days")) and not s.get("payment_days"):
-        miss.append(tr("due date or payment days"))
+        miss.append([N_("due date or payment days")])
     if r["kind"] in ("invoice", "credit") and hc_rate_missing(r, hc_home(s)):  # 2.355.0 C (#2844): a foreign currency needs its rate (the tax in the home currency)
-        miss.append(tr("the exchange rate of {0} (document or office settings)", r["currency"]))
+        miss.append([N_("the exchange rate of {0} (document or office settings)"), r["currency"]])
     if r["kind"] == "invoice" and dec(_col(r, "skonto_pct") or 0) > 0 and int(_col(r, "skonto_days") or 0) > 0 and r["date"]:
         # 2.355.0 C (#2840): the cash discount period ends on the due day at the latest (else the PDF and BT-20 contradict the terms)
         due = _col(r, "due_date") or ""
@@ -306,38 +306,38 @@ def inv_missing(c, oid, r, s, pack, items):
         except ValueError:
             days = None
         if days is not None and int(_col(r, "skonto_days")) > days:
-            miss.append(tr("a cash discount period no longer than the payment terms ({0} days)", days))
+            miss.append([N_("a cash discount period no longer than the payment terms ({0} days)"), days])
     if r["vat_mode"] == "novat" and (_col(r, "vat_note") or "") not in INV_VAT_NOTES:
-        miss.append(tr("VAT note (reverse charge / not taxable / small business)"))
+        miss.append([N_("VAT note (reverse charge / not taxable / small business)")])
     if r["vat_mode"] == "novat" and _col(r, "vat_note") == "reverse":  # 2.296.0 B (#3168): both VAT ids (section 14a (1) UStG, BR-AE-02)
         # 2.296.0 F (#3168): a stale note of a taxed invoice counts no more; at home (section 13b) the tax number will do and
         # the client needs a VAT id only for the EU case or when the e-invoice is built (BR-AE-02 asks for BT-48)
         case = fk_reverse_case(cl["country"] if cl is not None and "country" in cl.keys() else "", co.get("country") or "DE")
         if not (co.get("vat_id") or (case != "eu" and co.get("tax_number"))):
-            miss.append(tr("your VAT ID (reverse charge)"))
+            miss.append([N_("your VAT ID (reverse charge)")])
         if (case == "eu" or (office_feature(c, oid, "docs.einvoice", s) and not _col(r, "trial"))) and not (
                 cl is not None and "vat_id" in cl.keys() and str(cl["vat_id"] or "").strip()):
-            miss.append(tr("the client's VAT ID (reverse charge)"))
+            miss.append([N_("the client's VAT ID (reverse charge)")])
     # 2.354.0 A (#2834): "abroad" without a register number is category G in the e-invoice, which needs the seller's VAT id (BR-G-02);
     # 2.357.0 (#3218): with the tax number it is O (einvoice._doc_cat), which needs no VAT id
     if r["vat_mode"] == "novat" and _col(r, "vat_note") == "abroad" and office_feature(c, oid, "docs.einvoice", s) and not _col(r, "trial") and not (
             co.get("vat_id") or str(co.get("register_no") or "").strip() or str(co.get("tax_number") or "").strip()):
-        miss.append(tr("your VAT ID or register number (not taxable domestically)"))
+        miss.append([N_("your VAT ID or register number (not taxable domestically)")])
     if r["vat_mode"] == "novat" and _col(r, "vat_note") in ("eu_goods", "export"):
         # 2.355.0 C (#2844): goods to a business in another EU state (section 6a UStG: both VAT ids, BR-IC-02) / to a third
         # country (section 6 UStG; BR-G-02 the seller's VAT id in the e-invoice); the delivery date = the period of service
         case = fk_reverse_case(cl["country"] if cl is not None and "country" in cl.keys() else "", co.get("country") or "DE")
         eu = _col(r, "vat_note") == "eu_goods"
         if case != ("eu" if eu else "other"):
-            miss.append(tr("a client in another EU country (intra-Community supply)") if eu else tr("a client outside the EU (export)"))
+            miss.append([N_("a client in another EU country (intra-Community supply)") if eu else N_("a client outside the EU (export)")])
         if not co.get("vat_id") and (eu or (office_feature(c, oid, "docs.einvoice", s) and not _col(r, "trial"))):
-            miss.append(tr("your VAT ID"))
+            miss.append([N_("your VAT ID")])
         if eu and not (cl is not None and "vat_id" in cl.keys() and str(cl["vat_id"] or "").strip()):
-            miss.append(tr("the client's VAT ID"))
+            miss.append([N_("the client's VAT ID")])
     # 2.296.0 B (#3169): a 0 % position of a taxed invoice needs the reason of its exemption (section 14 (4) no. 8 UStG, BT-120)
     if r["vat_mode"] != "novat" and not str(s.get("exempt_reason") or "").strip() and any(
             it.get("kind") in ("service", "discount") and it.get("tax") == "exempt" and pack_tax(pack, "exempt") == 0 for it in items):  # 2.357.0 (#3217): a 0 % standard / reduced rate is zero rated (Z), no reason
-        miss.append(tr("reason for the tax exemption of the 0 % positions (office settings, invoices)"))
+        miss.append([N_("reason for the tax exemption of the 0 % positions (office settings, invoices)")])
     return miss
 
 
@@ -347,7 +347,7 @@ def inv_before_finalize(c, oid, r, s, pack):
     items = doc_items(c, r["id"], oid)
     miss = inv_missing(c, oid, r, s, pack, items)
     if miss:
-        raise BadInput(tr("Missing before finalising: {0}", ", ".join(miss)))
+        raise BadKey(N_("Missing before finalising: {0}"), stored_join(miss))
     if r["kind"] in ("invoice", "credit"):
         inv_check_date(c, oid, r, s)
     from .abschlag import abs_before_finalize
@@ -356,7 +356,7 @@ def inv_before_finalize(c, oid, r, s, pack):
     # invoice (progress invoices above the work done leave a negative rest; a credit note needs a finalised invoice)
     if r["kind"] in ("invoice", "credit") and _col(r, "inv_type") != "final":
         if money(dec(doc_totals(c, oid, r).get("gross") or 0)) < 0:
-            raise BadInput(tr("A negative total can only be finalised as a credit note with positive amounts"))
+            raise BadKey(N_("A negative total can only be finalised as a credit note with positive amounts"))
     if r["kind"] == "invoice" and not _col(r, "due_date"):
         days = _col(r, "payment_days")
         if days is None:
@@ -372,10 +372,10 @@ def inv_check_date(c, oid, r, s):
     from .model import office_scheme_period
     d = r["date"]
     if d > local_now().date().isoformat():
-        raise BadInput(tr("The date must not lie in the future"))
+        raise BadKey(N_("The date must not lie in the future"))
     due = _col(r, "due_date")
     if due and due < d:
-        raise BadInput(tr("The due date must not lie before the date"))
+        raise BadKey(N_("The due date must not lie before the date"))
     scheme = inv_scheme(s, r["kind"])
     period = office_scheme_period(scheme, date.fromisoformat(d))
     # 2.144.10 B (#2576): trial documents have their own series; they neither count for real ones nor the other way round
@@ -383,7 +383,7 @@ def inv_check_date(c, oid, r, s):
                          "ORDER BY date DESC", (oid, r["kind"], r["id"], d, 1 if _col(r, "trial") else 0)):
         try:
             if office_scheme_period(scheme, date.fromisoformat(row["date"])) == period:
-                raise BadInput(tr("The date must not lie before the last finalised document of this series ({0})", row["date"]))
+                raise BadKey(N_("The date must not lie before the last finalised document of this series ({0})"), row["date"])
         except ValueError:
             continue
 
@@ -403,7 +403,7 @@ def inv_after_finalize(c, oid, uid, r):
                 (oid, inv_["id"], r["id"]))), Decimal(0))
             inv_credit_check(c, oid, r, inv_)  # 2.354.0 D (#2838): its currency and rate, and per VAT rate
             if credited + money(dec(tc.get("gross") or 0)) > money(dec(ti.get("gross") or 0)):  # 2.38.0 review: credits never exceed the invoice
-                raise Denied(409, tr("The credit notes would exceed the amount of the invoice"))
+                raise DeniedKey(409, N_("The credit notes would exceed the amount of the invoice"))
             if money(dec(tc.get("gross") or 0)) >= money(dec(ti.get("gross") or 0)) and inv_["status"] != "cancelled":
                 c.execute("UPDATE office_docs SET status='cancelled', updated_at=? WHERE id=? AND org_id=?", (ts, inv_["id"], oid))
                 ofx_log(c, oid, "status", doc_id=inv_["id"], detail={"before": {"status": inv_["status"]}, "after": {"status": "cancelled"}, "credit_id": r["id"]})
@@ -626,7 +626,7 @@ def inv_credit_check(c, oid, r, inv_):
     if list(have) == [""]:  # an invoice without tax lines: the sum only
         got = {"": sum(got.values(), Decimal(0))}
     if any(money(v) > money(have.get(k, Decimal(0))) for k, v in got.items() if money(v) > 0):
-        raise Denied(409, tr("The credit notes would exceed the amount of the invoice"))
+        raise DeniedKey(409, N_("The credit notes would exceed the amount of the invoice"))
 
 
 def inv_credit_of(c, oid, uid, inv_):
@@ -1122,13 +1122,13 @@ def inv_datev_ready(c, oid, r, s):
     from ..integrations.mail import MAIL_OUT_ON
     office_need_feature(c, oid, "books.datev", s)  # 2.147.0 (#2459, #2460)
     if not MAIL_OUT_ON:
-        raise Denied(409, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
+        raise DeniedKey(409, N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
     if not s.get("datev_email"):
-        raise Denied(409, tr("No DATEV inbox address in the settings"))
+        raise DeniedKey(409, N_("No DATEV inbox address in the settings"))
     if not ofx_locked(r):
-        raise Denied(409, tr("Finalise the document first"))
+        raise DeniedKey(409, N_("Finalise the document first"))
     if _col(r, "trial"):  # 2.144.10 B (#2576)
-        raise Denied(409, tr("Trial documents do not go to the accounting"))
+        raise DeniedKey(409, N_("Trial documents do not go to the accounting"))
 
 
 INV_CC_MAX = 5  # 2.433.0 (#3599): copy addresses of one mail (= contacts_cl.FK_CC_MAX)
@@ -1144,18 +1144,18 @@ def inv_send(c, oid, uid, r, b, later=False):
     before the commit; a refused mail marks nothing)."""
     from ..integrations.mail import MAIL_OUT_ON
     if not MAIL_OUT_ON:
-        raise Denied(409, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
+        raise DeniedKey(409, N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
     if not ofx_locked(r):
-        raise Denied(409, tr("Finalise the document first"))
+        raise DeniedKey(409, N_("Finalise the document first"))
     to = (b.get("to") or "").strip() if isinstance(b.get("to"), str) else ""
     cc = (b.get("cc") or "").strip() if isinstance(b.get("cc"), str) else ""
     mail_re = r"[^@\s,]+@[^@\s,]+\.[^@\s,]+"
     # 2.433.0 (#3599): several copy addresses, comma separated (the send dialog fills the contact persons in); each once
     ccs = list(dict.fromkeys(x.strip() for x in cc.replace(";", ",").split(",") if x.strip() and x.strip().lower() != to.lower()))
     if not re.fullmatch(mail_re, to):
-        raise BadInput(tr("Invalid value: {0}", "to"))
+        raise BadKey(N_("Invalid value: {0}"), "to")
     if len(ccs) > INV_CC_MAX or any(not re.fullmatch(mail_re, x) for x in ccs):
-        raise BadInput(tr("Invalid value: {0}", "cc"))
+        raise BadKey(N_("Invalid value: {0}"), "cc")
     cc = ", ".join(ccs)
     s = office_settings(c, oid)
     explicit = b.get("datev") in (1, True, "1", "true")
@@ -1270,14 +1270,14 @@ def h6c_send_budget(c, oid, uid, rcpts):
     n_org, n_me = c.execute("SELECT COUNT(*), COUNT(*) FILTER (WHERE user_id=?) FROM office_doc_log WHERE org_id=? AND action='send' AND at>=?",
                             (uid, oid, since)).fetchone()
     if n_org >= H6C_SEND_DAY_ORG or n_me >= H6C_SEND_DAY_PERSON:
-        raise Denied(429, tr("The day's limit of document mails is reached ({0}); please try again tomorrow",
-                             H6C_SEND_DAY_PERSON if n_me >= H6C_SEND_DAY_PERSON else H6C_SEND_DAY_ORG))
+        raise DeniedKey(429, N_("The day's limit of document mails is reached ({0}); please try again tomorrow"),
+                        H6C_SEND_DAY_PERSON if n_me >= H6C_SEND_DAY_PERSON else H6C_SEND_DAY_ORG)
     day = since[:10]
     keys = [f"o:{int(oid)}:{x.strip().lower()}"[:300] for x in rcpts if x]
     for k in keys:
         r = c.execute("SELECT n FROM mail_counts WHERE k=? AND day=?", (k, day)).fetchone()
         if r and r[0] >= H6C_SEND_DAY_RCPT:
-            raise Denied(429, tr("This address already got {0} mails from your organisation today; please try again tomorrow", H6C_SEND_DAY_RCPT))
+            raise DeniedKey(429, N_("This address already got {0} mails from your organisation today; please try again tomorrow"), H6C_SEND_DAY_RCPT)
     for k in keys:
         c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET
                      n=CASE WHEN mail_counts.day=excluded.day THEN mail_counts.n+1 ELSE 1 END, day=excluded.day""", (k, day))
@@ -1356,13 +1356,15 @@ def inv_offer_invoice(c, oid, uid, r, b, parts_mode=None, parts_title=None):
 def inv_from_offer_post(did):
     """An invoice draft from quotation did (every quotation line becomes a position; rights, framework contract, recipient,
     project, language, currency, rate and PO number are taken over; source_doc_id). 201 the invoice.
-    2.149.0 A (#2521): from every status on purpose (#2235: the app asks first, no block); the agents' route needs an
+    2.149.0 A (#2521): from every status but superseded on purpose (#2235: the app asks first, no block); the agents' route needs an
     accepted quotation."""
     from .docs import doc_row
     c, uid, oid = _ctx()
     r = doc_row(c, oid, did)
     if r["kind"] != "offer":
         raise Denied(409, tr("Only a quotation can be turned into an invoice"))
+    if r["status"] == "superseded":  # 2.437.0 (#3621): it counts nowhere; the newer quotation is the one to invoice
+        raise Denied(409, tr("This quotation was superseded"))
     b = body()  # 2.47.0 (#1215): {parts_mode?: full|title|summary, parts_title?} for a quotation with parts
     b = b if isinstance(b, dict) else {}
     ref, hit = ofi_ref_doc(c, oid, uid, b)  # 2.269.0 D (#3046): sent again = the invoice made the first time
@@ -1511,7 +1513,7 @@ def inv_pay_add(c, oid, uid, did, b, ref=None):
         raise BadInput(tr("Invalid value: {0}", "amount"))
     d = _date(b.get("date"), "date") or local_now().date().isoformat()
     if d > local_now().date().isoformat():
-        raise BadInput(tr("The date must not lie in the future"))
+        raise BadKey(N_("The date must not lie in the future"))
     from .periodlock import period_need_open
     period_need_open(c, oid, d)  # 2.148.0 A (#2471): also for the bank reconciliation and the agents' payment proposals
     if refund:

@@ -245,7 +245,7 @@ async function dtStartersModal() {
   try { j = await api('GET', '/api/office/doc-templates/starters'); } catch (x) { toast(x.message || ''); return; }
   const md = modal(`<h3>${tr('Use sample')}</h3><p class="muted">${esc(j.note || '')}</p>
     ${ofcRowF('dt-slang', tr('Language'), ofcSel('dt-slang', j.lang, (S.languages || []).map(L => [L.code, L.name])))}
-    <ul class="ofclist dtp-starters" role="list">${j.starters.map(s => `<li><div class="ofcrow dtp-srow"><span class="ofcn"><b>${esc(s.name)}</b><small class="muted">${esc([s.kind !== 'other' ? s.kind_label : '', s.legal ? tr('Legal text: please have it checked') : ''].filter(Boolean).join(' · '))}</small></span><button type="button" class="btn sm pri" data-m="take" data-k="${esc(s.key)}">${tr('Take over')}</button></div></li>`).join('')}</ul>
+    <ul class="ofclist dtp-starters" role="list">${j.starters.map(s => `<li><div class="ofcrow dtp-srow"><span class="ofcn"><b>${esc(s.name)}</b><small class="muted">${esc([s.kind !== 'other' ? s.kind_label : '', s.legal ? tr('Legal text: please have it checked') : '', s.machine ? tr('Machine translated, check before use') : ''].filter(Boolean).join(' · '))}</small></span><button type="button" class="btn sm pri" data-m="take" data-k="${esc(s.key)}">${tr('Take over')}</button></div></li>`).join('')}</ul>
     <div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('ofcdlg');
   const close = fgModal(md);

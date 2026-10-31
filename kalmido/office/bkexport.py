@@ -99,7 +99,7 @@ def bx_rows(c, oid, frm, to, gaps=None):
             parts.append((dec(0), dec(t.get("gross") or 0), dec(0)))
         for pct, base, tax in parts:
             net, tx = money(base / fx) * sign, money(tax / fx) * sign
-            rows.append({"type": r["kind"], "date": r["date"], "number": r["number"], "counterparty": who, "text": r["project_title"] or "",
+            rows.append({"type": r["kind"], "date": r["date"], "number": r["number"], "counterparty": who, "text": " ".join((r["project_title"] or "").split()),  # 2.431.0 B (#3594): the subject on one line
                          "category": "", "tax_pct": pct.normalize(), "net": net, "tax": tx, "gross": net + tx, "currency": home, "file": f})
             mine.append(rows[-1])
         docs.append((r["id"], r, mine))

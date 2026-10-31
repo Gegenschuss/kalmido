@@ -366,7 +366,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - **Reports** as `report_length` / `report_lang` / `report_tables` / `report_jargon` say; results go where `results_to`
   says (comment, chat or both: the comment + one line in the chat).
 - **Pushes**: with `push` "limits" only a limit disturbs - send such a message (a one-way step, a refusal, a stop, an error)
-  with `limit: true` in `send_chat`. With `next_step` on, end every chat answer with the next step as `next_step` (one button).
+  with `limit: true` in `send_chat`. A question or approval card on a task always reaches the person: ask only what waits for them. With `next_step` on, end every chat answer with the next step as `next_step` (one button).
 
 ### Standing rules (2.235.0)
 - **"From now on always ..." becomes a rule**: when the person you work for gives you a lasting instruction ("from now on

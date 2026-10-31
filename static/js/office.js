@@ -44,10 +44,11 @@ const pb_clOrg = () => OFC.info?.personal ? null : (OFC.info?.org_id || null);  
 const ofcWs = () => pb_clOrg() ? 'org:' + pb_clOrg() : 'private';  // 2.87.9 (#1940): the workspace of the shown office (importTargetConfirm)
 // 2.380.0 B (#3409): the documents' two tabs (office_docs.js): quotations and invoices
 const ofcDocTab = t => t === 'offers' || t === 'invoices';
-const ofcTab = () => OFC_TABS.some(t => t[0] === S.route.tab && (!t[6] || ofcFeat(t[6]))) ? S.route.tab : S.route.tab === 'import' ? 'settings'
+const ofcTab = () => ofm_menuOff(S.route.tab) ? 'start' : OFC_TABS.some(t => t[0] === S.route.tab && (!t[6] || ofcFeat(t[6]))) ? S.route.tab : S.route.tab === 'import' ? 'settings'
   : S.route.tab === 'rights' ? 'settings'  // 2.187.0 A (#2476): the rights page sits under Settings
   : S.route.tab === 'start' || (!S.route.tab && isMobile()) ? 'start' : (OFC_TABS.some(t => t[0] === ofm_entry().key) ? ofm_entry().key : 'offers');  // 2.39.1 (#1182): the import page sits under Settings; 2.87.9 (#1917): the start page (phone without a tab)
 // 2.147.0 (#2459): a tab with [6] = a function of the country pack that is off is no tab (a direct link opens the quotations)
+// 2.440.0 (#3609): a point the office switched off opens the start page (viewOffice puts the address right)
 // money / numbers of the master data: in the person's locale, the organisation's currency
 // 2.189.0 (#2475): the home currency (price list, books, cash flow) and the short sign of a currency (office/homecur.py)
 const ofcHome = () => OFC.info?.settings?.home_currency || 'EUR';
@@ -102,7 +103,7 @@ async function ofcLoad(kind, force) {
   OFC.loading[kind] = false;
   ofcDraw();
 }
-function ofcDraw() { if ($('#s-biz')) biz_paint(); if (S.route.mod !== 'office') return; const el = $('#view'); if (el) keepFocus(el, () => ofcPaint(el)); }
+function ofcDraw() { if ($('#s-biz')) biz_paint(); if (S.route.mod !== 'office') return; const el = $('#view'); if (el) keepFocus(el, () => ofcPaint(el)); ost_markBack(); }
 // 2.122.2 (#2327): a reload of the same office view (save, archive switch, year) keeps the old content until the new data
 // is there -- no short "Loading…" page that made the browser lose the scroll position -- and the scroll position stays.
 // A view that is still loading after 4 s is drawn anyway (a part that never loads must not freeze the old page).
@@ -123,6 +124,7 @@ function ofcPaint(el, force) {
   const ob = $('.ofbody', el); if (same && ob && btop && ob.scrollTop !== btop) ob.scrollTop = btop;  // 2.144.1 A (#2445): touch tablets scroll the page in .ofbody
   const r = OFCP.replay; OFCP.replay = null;
   if (r && same) { const b = el.querySelector(r); if (b) setTimeout(() => b.click(), 0); }
+  ost_markBack();
 }
 document.addEventListener('click', e => {
   const v = $('#view'); if (!OFCP.stale || !v || !v.contains(e.target) || !v.querySelector('.dash.office')) return;
@@ -141,10 +143,11 @@ function viewOffice() {
   if (!officeOn()) return `<div class="empty">${tr('Office & finance is off (Settings > Modules)')}</div>`;
   const tab = ofcTab();
   if (OFC.tab !== tab) { OFC.tab = tab; OFC.q = ''; }  // the search belongs to one tab
+  if (tab === 'start' && ofm_menuOff(S.route.tab)) setTimeout(() => { if (ofm_menuOff(S.route.tab)) location.replace('#office/start'); }, 0);  // 2.440.0 (#3609)
   pb_wsFollow();
   if (!OFC.info && !OFC.infoErr && !OFC.infoLoading) setTimeout(ofcInfo, 0);
   // 2.87.9 (#1917): no tab row any more -- the office menu (areas.js ofm_menuHtml, via mg_wrap) leads to every tab
-  if (OFC.info) ofm_admSeen(OFC.info.role === 'admin', OFC.info.rights, OFC.info.used);  // 2.276.0 A (#3039): + used
+  if (OFC.info) ofm_admSeen(OFC.info.role === 'admin', OFC.info.rights, OFC.info.used, OFC.info.settings?.menu_off);  // 2.276.0 A (#3039): + used; 2.440.0 (#3609): + the points switched off
   let body;
   if (OFC.infoErr) body = `<div class="empty nempty eact">${ic('building')}<span>${esc(OFC.infoErr)}</span><a class="btn" href="#settings">${tr('Settings')}</a></div>`;
   else if (!OFC.info) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
@@ -267,6 +270,11 @@ const ofcChk = (id, label, on) => `<div class="row"><label class="chkl" style="m
 // 2.40.0 (#1381): the choice shows the text in the field's language (lg); a block without English text says so
 const ofcTextOpts = (kind, lg) => ofcRows('texts').filter(t => t.kind === kind && !t.archived).map(t => [t.id, (t.key ? t.key + ': ' : '') + (lg === 'en' ? (t.text_en ? t.text_en.slice(0, 70) : tr('(no English text)') + ' ' + (t.text_de || '').slice(0, 50)) : (t.text_de || t.text_en).slice(0, 70))]);
 function ofcModal(kind, r) {
+  // 2.451.0 (#3809): the service dialog waits for the roles: built before them its choice read "none" and Save wiped the role
+  if (kind === 'services' && !OFC.data.roles) {
+    if (!OFC.modalWait) { OFC.modalWait = true; (async () => { for (let i = 0; i < 60 && !OFC.data.roles; i++) { if (!OFC.loading.roles) ofcLoad('roles'); await sleep(150); } OFC.modalWait = false; if (!OFC.data.roles) OFC.data.roles = {error: tr('unknown')}; ofcModal(kind, r); })(); }
+    return;
+  }
   const adm = ofcAdmin(['roles', 'crew', 'sets'].includes(kind) ? 'equipment' : undefined), rate = v => v != null ? fmtNum(v, 2) : '';  // 2.187.1 A (#2735): roles / crew / sets = equipment area
   const titles = {services: [N_('New service'), N_('Edit service')], equipment: [N_('New device'), N_('Edit device')], sets: [N_('New set'), N_('Edit set')],
     texts: [N_('New text block'), N_('Edit text block')], contracts: [N_('New contract'), N_('Edit contract')],
@@ -357,7 +365,7 @@ function ofcModal(kind, r) {
       }
       const v = id => $(id, md)?.value ?? '';
       const body = {};
-      if (kind === 'services') Object.assign(body, {name_de: v('#of-name_de'), name_en: v('#of-name_en'), category: v('#of-category'), unit: v('#of-unit'), daily_rate: ofcNum(v('#of-daily_rate')), hourly_rate: ofcNum(v('#of-hourly_rate')), tax: v('#of-tax'), raw_fee: $('#of-raw_fee', md).checked ? 1 : 0, producing: $('#of-producing', md).checked ? 1 : 0, intext: v('#of-intext'), role: v('#of-role'), role_id: +v('#of-role_id') || null, sort: ofcNum(v('#of-sort')) ?? 0});
+      if (kind === 'services') Object.assign(body, {name_de: v('#of-name_de'), name_en: v('#of-name_en'), category: v('#of-category'), unit: v('#of-unit'), daily_rate: ofcNum(v('#of-daily_rate')), hourly_rate: ofcNum(v('#of-hourly_rate')), tax: v('#of-tax'), raw_fee: $('#of-raw_fee', md).checked ? 1 : 0, producing: $('#of-producing', md).checked ? 1 : 0, intext: v('#of-intext'), role: v('#of-role'), ...(Array.isArray(OFC.data.roles) ? {role_id: +v('#of-role_id') || null} : {}) /* 2.451.0 (#3809): roles not readable: the choice is empty, the stored role stays */, sort: ofcNum(v('#of-sort')) ?? 0});
       else if (kind === 'roles') Object.assign(body, {name_de: v('#of-name_de'), name_en: v('#of-name_en'), cost_day: ofcNum(v('#of-cost_day')), cost_hour: ofcNum(v('#of-cost_hour')), sort: ofcNum(v('#of-sort')) ?? 0});  // 2.47.0 (#1649)
       else if (kind === 'crew') Object.assign(body, {name_de: v('#of-name_de'), name_en: v('#of-name_en'), rate_day: ofcNum(v('#of-rate_day')), intext: v('#of-intext'), markup_pct: ofcNum(v('#of-markup_pct')), sort: ofcNum(v('#of-sort')) ?? 0});
       else if (kind === 'equipment') Object.assign(body, {name: v('#of-name'), name_en: v('#of-name_en'), category: v('#of-category'), daily_rate: ofcNum(v('#of-daily_rate')), ...astBody(md)});
@@ -588,11 +596,11 @@ function ofcCompanyFieldsHtml(cf, dis) {
   return `<div class="ofcco">${OFC_CO_FIELDS.map(([k, n, mx]) => ofcCoHint(k, k === 'country' ? ofcRowF('osc-country-q', tr(n), ctyField('osc-country', cf.country, {attrs: 'data-co="country"', dis, label: tr(n)})) : ofcRowF('osc-' + k, tr(n), `<input id="osc-${k}" data-co="${k}" value="${esc(cf[k] || '')}" maxlength="${mx}" ${k === 'country' ? 'class="numin" autocapitalize="characters"' : ''}${k === 'website' ? ' inputmode="url" autocapitalize="off" spellcheck="false" placeholder="www.example.com"' : ''} ${dis}>`))).join('')}${ofcMdLabelHtml(cf, dis)}</div>`;
 }
 // 2.40.0 (#1377): the word printed before the management's names (Geschäftsführung, Gesellschafter, ...); the options show the
-// German and English print word, the document's language picks one; '' = Geschäftsführung as before
+// print word of the document's language (German in the German interface, otherwise English; 2.446.0 #3763); '' = Geschäftsführung as before
 const OFC_MD_LABELS = [['', 'Geschäftsführung', 'Managing directors'], ['shareholders', 'Gesellschafter', 'Shareholders'], ['owner_m', 'Inhaber', 'Owner'],
   ['owner_f', 'Inhaberin', 'Owner'], ['board', 'Vorstand', 'Executive board'], ['partners', 'Partner', 'Partners'],
   ['gbr_partners', 'Gesellschafter (GbR)', 'Partners (GbR)']];  // 2.138.0 E (#2242): prints Gesellschafter / Partners
-const ofcMdLabelHtml = (cf, dis) => ofcRowF('osc-md_label', tr('Printed as'), `<select id="osc-md_label" data-co="md_label" ${dis}>${OFC_MD_LABELS.map(([v, de, en]) => `<option value="${v}" ${(cf.md_label || '') === v ? 'selected' : ''}>${esc(de)} · ${esc(en)}</option>`).join('')}</select>`)
+const ofcMdLabelHtml = (cf, dis) => ofcRowF('osc-md_label', tr('Printed as'), `<select id="osc-md_label" data-co="md_label" ${dis}>${OFC_MD_LABELS.map(([v, de, en]) => `<option value="${v}" ${(cf.md_label || '') === v ? 'selected' : ''}>${esc(I18N.code === 'de' ? de : en)}</option>`).join('')}</select>`)
   + `<div class="shint">${esc(tr('The word before the names in the footer, e.g. GmbH: Geschäftsführung, sole proprietor: Inhaber/in.'))}</div>`;
 // 2.40.0 (#1382): the number schemes explained -- building blocks as buttons (inserted at the caret), a table behind (i),
 // the next number of each scheme with its counter (restarts every year or never), errors in plain words from the server
@@ -851,6 +859,7 @@ function ost_part(el, full) {
   if (OST_SUB[id] && OST_SUB[id][0] === 'tax_rates') return {tax_rates: full.tax_rates || {}};  // 2.147.0 (#2461): both rates at once (an empty one = the pack's)
   if (OST_SUB[id]) { const [k, f] = OST_SUB[id]; return {[k]: {[f]: full[k][f]}}; }
   if (el.dataset.feat) return {features_off: ocf_off(el.dataset.feat, !el.checked)};  // 2.147.0 (#2460): one function on / off
+  if (el.dataset.ocm) return {menu_off: ocm_off(el.dataset.ocm, !el.checked)};  // 2.440.0 (#3609): one point of the office menu
   if (el.dataset.ccb) return {client_blocks_off: ccb_off(el.dataset.ccb, !el.checked)};  // 2.435.0 A (#3600): one block of the client card
   // an industry pack box: only this pack switches (the list of the others stays as saved, also when not all boxes are drawn)
   if (id.startsWith('os-ind-')) return {industry_packs: ost_packs(el.dataset.ind || id.slice(7), el.checked)};
@@ -880,7 +889,7 @@ async function ost_put(b) {
   return j.settings?.pack !== pk;
 }
 // what changes more than the field itself is drawn again (pack: its tax rates; currency: the symbols; industry packs: the cards)
-const ost_redraw = (part, pk) => pk ? ofcInfo(true) : ['currency', 'home_currency', 'industry_packs', 'features_off', 'tax_rates', 'retention_years', 'credit_shared'].some(k => k in part) ? ofcDraw() : null;  // 2.147.0 (#2460, #2461)
+const ost_redraw = (part, pk) => pk ? ofcInfo(true) : ['currency', 'home_currency', 'industry_packs', 'features_off', 'menu_off', 'tax_rates', 'retention_years', 'credit_shared'].some(k => k in part) ? ofcDraw() : null;  // 2.147.0 (#2460, #2461)
 const OST = {q: Promise.resolve()};
 function ost_save(el) {
   const form = el.closest?.('#ofc-set');
@@ -928,6 +937,13 @@ function ost_mark(el, st, x) {
   m.innerHTML = st === 'err' ? `${ic('alert', 's')}<span>${esc(x)}</span>` : `${ic('check', 's')}<span>${esc(tr('Saved'))}</span>${x ? `<button type="button" class="linkbtn" data-ost-undo>${esc(tr('Undo'))}</button>` : ''}`;
   m._e = st === 'ok' ? x : null; m.classList.add('on');
   clearTimeout(m._t); if (st === 'ok') m._t = setTimeout(() => { m.classList.remove('on'); m._e = null; }, 4000);
+  OST.mk = st === 'ok' && el.id ? {m, id: el.id} : null;
+}
+// 2.440.0 (#3782): a redraw after the save (a part that finished loading) took "Saved" away: the mark goes back to its field
+function ost_markBack() {
+  const k = OST.mk; if (!k || k.m.isConnected || !k.m.classList.contains('on')) return;
+  const row = $('#ofc-set #' + CSS.escape(k.id))?.closest('.row, .pkc-on');
+  if (row && !row.querySelector(':scope > .ostok')) row.append(k.m);
 }
 // 2.40.0 (#1378): one upload helper for the office (FormData + the CSRF header X-Requested-With via rawFetch, the server's error text)
 const ofcUpload = (url, file) => { const fd = new FormData(); fd.append('file', file); return rawFetch('POST', url, fd); };
@@ -991,8 +1007,9 @@ document.addEventListener('focusout', e => { if (e.target.closest?.('#ofc-set'))
 document.addEventListener('focusout', e => { const t = e.target; if (/^(INPUT|TEXTAREA)$/.test(t.tagName) && !/^(checkbox|radio|file|hidden)$/.test(t.type) && t.closest('#ofc-set') && t.value !== t.defaultValue) ost_save(t); });
 // 2.138.2 B (#2395): a short multi-line field (company name) grows with its text up to `max` rows, no inner scrollbar
 function ofcGrow(ta, max = 3) {
-  ta.rows = 1;
-  const n = Math.max(1, String(ta.value).split('\n').length);
+  const lo = Math.max(1, +ta.dataset.growMin || 1);  // 2.431.0 B (#3594): a field may start with more than one row
+  ta.rows = lo;
+  const n = Math.max(lo, String(ta.value).split('\n').length);
   ta.rows = Math.min(max, n);
   while (ta.rows < max && ta.scrollHeight > ta.clientHeight + 1) ta.rows++;
 }

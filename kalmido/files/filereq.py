@@ -34,7 +34,7 @@ from flask import g, jsonify, request, Response
 
 from ..core.config import app, MAX_FILE_MB, PUBLIC_URL
 from ..core.pg import insert_id, system_ctx
-from ..core.i18n import lang, LANGS, N_, tr, trn
+from ..core.i18n import browser_lang, lang, N_, tr, trn
 from ..core.db import body, bump, db, err, iso, now_utc, write_lock
 from ..core.access import acx_anon_bind, Denied
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
@@ -350,11 +350,7 @@ def frq_find(c, token):
 
 
 def frq_lang(c, r):
-    for part in (request.headers.get("Accept-Language") or "").split(","):
-        code = part.split(";")[0].strip().lower()[:2]
-        if code in LANGS:
-            return code
-    return lang(c, r["created_by"])
+    return browser_lang() or lang(c, r["created_by"])
 
 
 def frq_headers(resp):

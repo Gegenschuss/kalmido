@@ -49,7 +49,8 @@ def box(code, env=()):
         cmd += ["-e", e]
     out = subprocess.run(cmd + [CT, "python", "-c", "import app\nfrom kalmido.core.db import connect\nc = connect()\n" + code + "\nc.commit()\nc.close()"],
                          capture_output=True, text=True)
-    return (out.stdout + out.stderr).strip()
+    # 2.447.0 (#3785): `import app` in a one-off process prints the init_db start log (#3729) with its timings: never part of the answer
+    return "\n".join(x for x in (out.stdout + out.stderr).strip().splitlines() if not x.startswith("migrations:")).strip()
 
 
 def ago(days):

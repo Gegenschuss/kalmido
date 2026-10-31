@@ -97,6 +97,106 @@ def lc_fav_quiet(c, uid, lid, row):
 LC_SUG_WINDOW, LC_SUG_DAYS, LC_SUG_ACTS = 14, 5, 20
 
 
+# 2.441.0 (#3592): what can be a favourite beyond the client's own state: the kinds of files/fsref.py (their name, route and space
+# come from its registry) and, as nodes of the file store, files and documents. Trash: the two kinds whose base role ignores it.
+FV2_REF_KINDS = ("office_doc", "office_letter", "office_gendoc", "office_receipt", "wiki", "sheet", "contact", "address_book")
+FV2_AREA = {"office_doc": "office", "office_letter": "office", "office_gendoc": "office", "office_receipt": "office", "wiki": "wiki",
+            "sheet": "sheets", "contact": "contacts", "address_book": "contacts"}  # the area an organisation can switch off (orgs.areas_off)
+
+
+def _fv2_ws(c, uid, org_id, owner_id):
+    """The workspace an object opens in; '' = none of the person's own (shared from outside: nothing to switch)."""
+    from ..accounts.orgs import user_orgs
+    if org_id:
+        return "org:%d" % org_id if org_id in user_orgs(c, uid) else ""
+    return "private" if owner_id == uid else ""
+
+
+def _fv2_ref(c, uid, kind, rid):
+    """The public form of an object the person may read now, else None (gone, in the trash, no right, area locked)."""
+    from ..files.fsref import FSR, fs_ref_role
+    reg = FSR.get(kind)
+    if reg is None or kind not in FV2_REF_KINDS:
+        return None
+    if kind == "wiki" and (x := _fv2_locked_page(c, uid, rid, reg)):
+        return x
+    if fs_ref_role(c, uid, kind, rid) is None:
+        return None
+    sp = reg["space"](c, rid)
+    if sp is None or _fv2_off(c, sp[0], kind):
+        return None
+    if reg.get("content_gate"):
+        reg["content_gate"](c, uid, rid)
+    return {"name": _fv2_name(reg["title"](c, rid) if reg.get("title") else "", reg["label"]), "label": tr(reg["label"]),
+            "to": reg["open_url"](rid), "ws": _fv2_ws(c, uid, sp[0], sp[1])}
+
+
+def _fv2_off(c, org_id, kind):
+    """Has the organisation's admins' switch taken the object's area away?"""
+    from ..accounts.wsareas import wsa_org_off
+    return bool(org_id) and FV2_AREA[kind] in wsa_org_off(c, org_id)
+
+
+def _fv2_name(name, label):
+    """The shown name; a name that is ciphertext (a page or folder with a lock) means nothing here: the kind's name."""
+    return tr(label) if not name or name.startswith("e2e1:") else name
+
+
+def _fv2_locked_page(c, uid, rid, reg):
+    """A page of a locked space has no reference (a folder opens nothing there): the area's own role alone, never a title."""
+    from ..wiki.wkfolder import wkf_base, wkf_locked
+    r = c.execute("SELECT * FROM wiki_pages WHERE id=?", (rid,)).fetchone()
+    if not r or r["deleted_at"] or not wkf_locked(c, r) or wkf_base(c, uid, r) is None:
+        return None
+    if _fv2_off(c, r["org_id"], "wiki"):
+        return None
+    return {"name": tr(reg["label"]), "label": tr(reg["label"]), "to": reg["open_url"](rid), "ws": _fv2_ws(c, uid, r["org_id"], r["owner_id"])}
+
+
+def _fv2_node(c, uid, kind, nid):
+    """A file or folder of the file store / a document, by the same check as opening it."""
+    from ..files.store import need_node
+    n = need_node(c, nid)
+    if kind == "doc":
+        from ..docs import store as doc_store
+        if not doc_store.meta_row(c, nid):
+            return None
+    label = "Document" if kind == "doc" else "File store"
+    return {"name": _fv2_name(n["name"], label), "folder": n["kind"] == "folder", "label": tr(label),
+            "to": ("docs/%d" if kind == "doc" else "ablage/%d") % nid, "ws": _fv2_ws(c, uid, n["org_id"], n["owner_id"])}
+
+
+@app.get("/api/favorites/targets")
+def fv2_targets():
+    """The person's favourites that live on the server: {items: {key: {name, label, to, ws}}, gone: [key]}. A key is checked here
+    each time with the rights of the object's own area, so nothing of a target the person cannot read (any more) leaves."""
+    import json
+    if g.user["kind"] == "agent":
+        raise Denied(403, tr("Favourites are a personal setting of a person"))
+    c, uid = db(), me()
+    try:
+        keys = [x for x in json.loads(usettings(c, uid).get("fav_items") or "[]") if isinstance(x, str)]
+    except ValueError:
+        keys = []
+    items, gone = {}, []
+    for key in keys:
+        p = key.split(":")
+        try:
+            if p[0] == "r" and len(p) == 3:
+                x = _fv2_ref(c, uid, p[1], int(p[2]))
+            elif p[0] in ("file", "doc"):
+                x = _fv2_node(c, uid, p[0], int(p[1]))
+            else:
+                continue
+        except Denied:
+            x = None
+        if x:
+            items[key] = x
+        else:
+            gone.append(key)
+    return jsonify(items=items, gone=gone)
+
+
 @app.post("/api/favorites/suggestion")
 def lc_fav_suggestion():
     """The one list to ask about now ({list_id, name} or list_id null); the list counts as asked from here on."""

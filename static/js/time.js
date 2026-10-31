@@ -353,8 +353,8 @@ function viewTime() {
   let tot = jt.total, hasAmt = jt.lists.some(l => l.rate);
   // U20: one tile for the range (time and decimal hours together), "today" only when the range is longer than today
   const tiles = [[hmm(tot.seconds), tr('tracked'), [rm ? tr('rounded: {0}', `${hmm(tot.rounded)} (${hoursDec(tot.rounded)} h)`) : `${hoursDec(tot.rounded)} h`, trn('{0} entry', '{0} entries', tot.count)].join(' · ')]];
-  if (!(f === t && f === today())) tiles.push([hmm(jt.today.seconds), tr('today'), tgt ? tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), String(tgt).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : tr('your time')]);
-  else if (tgt) tiles[0][2] += ' · ' + tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), String(tgt).replace('.', LOCALE().startsWith('de') ? ',' : '.'));
+  if (!(f === t && f === today())) tiles.push([hmm(jt.today.seconds), tr('today'), tgt ? tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), fmtNum(tgt, 2)) : tr('your time')]);
+  else if (tgt) tiles[0][2] += ' · ' + tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), fmtNum(tgt, 2));
   if (hasAmt) tiles.push([money(tot.amount, j.currency), tr('amount'), tr('hourly rates of the projects')]);
   P.tiles = lyo_note(jt.lyoLabel) + `<div class="sttiles">${tiles.map(([v, l, s]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span><small>${esc(s)}</small></div>`).join('')}</div>`;
   // per day (per week for long ranges)

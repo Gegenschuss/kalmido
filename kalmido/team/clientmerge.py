@@ -224,6 +224,7 @@ def clm_merge(c, uid, target, ids, pick=None, dry=False):
         if want is not None:
             c.execute("UPDATE office_client_contacts SET is_default=CASE WHEN id=? THEN 1 ELSE 0 END WHERE client_id=?", (want, target))
         c.execute(f"DELETE FROM clients WHERE id IN ({','.join('?' * len(others))})", others)
+        c.execute(f"DELETE FROM purged_rows WHERE tbl='clients' AND ref_id IN ({','.join('?' * len(others))})", others)  # 2.360.4 (#3243): merged, not deleted
     if any(rows[i]["import_run_id"] for i in ids if "import_run_id" in cols):
         new["import_run_id"] = None  # an undo of the legacy import must not delete the merged target
     ts = iso(now_utc())

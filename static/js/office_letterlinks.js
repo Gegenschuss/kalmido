@@ -19,7 +19,7 @@ async function ltkLoad() {
 }
 function ltkDraw() { const el = $(`.ltk[data-lid="${LTK.id}"]`); if (el) el.innerHTML = ltkHtml(); }
 const ltkDay = v => v ? dayLabel(v, true) : '';
-const LTK_KIND = {answers: 'Answer to', reply: 'Answer'};
+const LTK_KIND = {answers: N_('Answer to'), reply: N_('Answer')}  // 2.446.0 (#3763): marked for the language files;
 function ltkHtml() {
   const x = LTK.x, d = LTK.d; if (!x || !d) return '';
   const sent = d.status !== 'draft';

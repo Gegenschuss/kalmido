@@ -30,7 +30,7 @@ from flask import g, has_request_context, jsonify, make_response, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
 from ..core.pg import insert_id, system_ctx
-from ..core.i18n import LANGS, N_, lang, short_day, tr
+from ..core.i18n import browser_lang, LANGS, N_, lang, short_day, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
@@ -450,7 +450,7 @@ def tpo_mail_rcpts(c, r, opt_id):
         e = (v["email"] or "").strip()
         if e and e.lower() not in seen and _answers(v).get(str(opt_id)) in ("y", "m"):
             seen.add(e.lower())
-            out.append((v["name"], e))
+            out.append((v["name"], e, v["lang"]))  # 2.448.0 (#3765): + the language the voter saw
     return out[:TPO_MAIL_MAX]
 
 
@@ -508,7 +508,7 @@ def tpo_decide(pid):
     c.commit()
     if sent:
         from .apptbook import apb_owner_name
-        who = apb_owner_name(c, uid) or tr("Someone", lg=olg)  # 2.190.0 R (#2496): never the login name, like the public pages
+        who = apb_owner_name(c, uid) or ""  # 2.190.0 R (#2496): never the login name, like the public pages; none = "Someone" in the mail's language
         bgj_add("mail:polls", sent, {k: r[k] for k in r.keys()}, {k: o[k] for k in o.keys()}, who, olg, user_id=uid)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
     return jsonify(poll=tpo_dict(c, tpo_need(c, pid), uid), event_id=eid, event_ref=ref, mailed=len(sent))
 
@@ -577,10 +577,12 @@ def tpo_mail(rcpts, r, o, who, lg):
     f = {"title": r["title"], "location": r["location"], "description": r["description"], "all_day": False,
          "start": wall(o["start"]).replace(tzinfo=z), "end": wall(o["end"]).replace(tzinfo=z), "tz": r["tz"] or getattr(TZ, "key", "UTC")}
     ics = cdw_new_ics(f, f"poll-{r['id']}-{o['id']}@kalmido").encode()
-    when = tpo_when(o["start"], o["end"], r["tz"], lg) + f" ({f['tz']})"
-    for name, addr in rcpts:
+    olg = lg
+    for name, addr, *voter in rcpts:  # 2.448.0 (#3765): the reader's language; a vote without one (older, or a queued pair) the owner's
+        lg = voter[0] if voter and voter[0] in LANGS else olg
+        when = tpo_when(o["start"], o["end"], r["tz"], lg) + f" ({f['tz']})"
         text = "\n\n".join(x for x in (tr("Hello {0},", name, lg=lg),
-                                       tr("{0} has chosen a time for “{1}”:", who, r["title"], lg=lg) + "\n" + when
+                                       tr("{0} has chosen a time for “{1}”:", who or tr("Someone", lg=lg), r["title"], lg=lg) + "\n" + when
                                        + (("\n" + r["location"]) if r["location"] else ""),
                                        tr("The event is attached: open it to add it to your calendar.", lg=lg),
                                        tr("You get this mail because you entered this address when you voted. If that was not you, you can ignore it.", lg=lg)) if x)
@@ -672,11 +674,7 @@ def tpo_find(c, token):
 
 
 def tpo_lang(c, r):
-    for part in (request.headers.get("Accept-Language") or "").split(","):
-        code = part.split(";")[0].strip().lower()[:2]
-        if code in LANGS:
-            return code
-    return lang(c, r["user_id"])
+    return browser_lang() or lang(c, r["user_id"])
 
 
 # the page's only script (served by GET /s/v/time.js; the public pages allow no inline script): the proposed times in the
@@ -880,8 +878,8 @@ def tpo_vote(token):
         return tpo_page(c, r, token, lg, mine, vals, tr("Please answer at least one time.", lg=lg))
     ts, iph = iso_ms(now_utc()), _ip_hash(c)
     if mine is not None:
-        c.execute("UPDATE sched_poll_votes SET name=?, email=?, answers=?, updated_at=? WHERE id=?",
-                  (name, email, json.dumps(answers), ts, mine["id"]))
+        c.execute("UPDATE sched_poll_votes SET name=?, email=?, answers=?, lang=?, updated_at=? WHERE id=?",
+                  (name, email, json.dumps(answers), lg, ts, mine["id"]))
         vid, key_out = mine["id"], key
     else:
         n_all = c.execute("SELECT COUNT(*) FROM sched_poll_votes WHERE poll_id=?", (r["id"],)).fetchone()[0]
@@ -890,8 +888,8 @@ def tpo_vote(token):
             c.commit()
             return tpo_msg(tr("Too many requests", lg=lg), tr("This poll takes no more votes.", lg=lg), lg, 429)
         sec = secrets.token_urlsafe(18)
-        vid = insert_id(c, "INSERT INTO sched_poll_votes(poll_id,name,email,answers,edit_hash,ip_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                        (r["id"], name, email, json.dumps(answers), _token_hash(sec), iph, ts, ts))
+        vid = insert_id(c, "INSERT INTO sched_poll_votes(poll_id,name,email,answers,lang,edit_hash,ip_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                        (r["id"], name, email, json.dumps(answers), lg, _token_hash(sec), iph, ts, ts))
         key_out = f"{vid}.{sec}"
     c.execute("UPDATE sched_polls SET updated_at=? WHERE id=?", (ts, r["id"]))  # the owner's app reloads it
     bump(c)

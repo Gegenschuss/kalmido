@@ -50,6 +50,8 @@ drop in a file and it shows up under *Settings > Language*.
 
 Keys that start with `_` are settings, everything else is a translation.
 
+The app addresses people informally in every language (German "du", French "tu"); the formal form is used only for outsiders, customer mails and documents, as in German.
+
 | Key | Meaning |
 |---|---|
 | `_meta.name` | Name of the language in the language itself, shown in the language selector (`Deutsch`, `Français`) |
@@ -148,8 +150,9 @@ missing, removed ones as unused.
 The natural-language quick add (`tomorrow 3pm !!! #tag ~list`) always understands English and German keywords, and
 since 2.12.0 also the words of the interface language for French, Spanish, Italian and Dutch. Those words are not
 translations but parser patterns in `static/js/quickadd.js`: the table `QL` (one entry per language: today / tomorrow / day after
-tomorrow, next week / month, weekend, weekday names, "next <weekday>", "in N days", time words, repeat words; regular
+tomorrow, next week / month, weekend, weekday names, "next <weekday>", "in N days", time words, repeat words, the list word with its
+prepositions and articles ("dans la liste X"); regular
 expression parts, matched case-insensitively between spaces). To teach quick add a new language, add its entry to `QL`
-and cases to `tests/quick_lang_test.js`. Priority, tags and the list stay symbols (`!!!` / `!!` / `!`, `#tag`, `~list`).
+and cases to `tests/quick_lang_test.js`. The month names for dates ("5 octobre", "5 de octubre", "5. Oktober") are not in `QL`: they are read from `_months` / `_months_short` of the language file, so every language with a language file understands them (a month name alone stays text). Priority, tags and the list stay symbols (`!!!` / `!!` / `!`, `#tag`, `~list`).
 Keep the quick-add hints (the keys that start with `today, tomorrow, day after tomorrow`, `tomorrow 3pm ·` and
 `Add task: “Dentist`) in line with what the parser really understands, in the language's own words.

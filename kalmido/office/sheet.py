@@ -4,7 +4,8 @@ Three layers, no code plugin:
  1. this core: head values + rows with fixed rules (kinds staff, share, km, meals, hotel, set, free);
  2. the crew master data (office_roles kind 'crew': name, day rate = the client's price, intern | extern, markup_pct);
  3. an industry pack (kalmido/office/packs/industry/<code>.json): data only -- labels DE/EN, print order of the blocks,
-    default values (meal rates, weekend surcharges, producing share, km rate), suggested crew functions. Switched on per
+    default values (meal rates, weekend surcharges, producing share, km rate), suggested crew functions (2.449.0 (#3768): a
+    pack may carry more languages, each with all the words; a language it lacks takes English). Switched on per
     organisation in the office settings (industry_packs); without a pack there is no shoot calculation.
 
 Rules (the spreadsheet the module replaces):
@@ -508,8 +509,19 @@ def dk_sheet_public(sheet, admin):
 
 
 # ---------------------------------------------------------------- calc
+def dk_lg(pack, lang):
+    """2.449.0 (#3768): the language of a pack's words for a document in lang: lang when the pack has it, else English."""
+    lg = calc_lang(lang)
+    return lg if lg in ("de", "en") or isinstance(((pack or {}).get("labels") or {}).get(lg), dict) else "en"
+
+
+def _roles_in(pack, lg):
+    """2.449.0 (#3768): {the pack's de / en name of a role, lower case: its name in lg}, for rows of the crew master data."""
+    return {str(r.get(k) or "").strip().lower(): r[lg] for r in (pack or {}).get("roles") or [] if r.get(lg) for k in ("de", "en")}
+
+
 def _lab(pack, lang, key, **kw):
-    lg = "de" if calc_lang(lang) == "de" else "en"  # 2.185.0 C (#2520): the pack's words are de / en; other languages take English
+    lg = dk_lg(pack, lang)  # 2.449.0 (#3768)
     L = (((pack or {}).get("labels") or {}).get(lg) or {})
     s = L.get(key) or (((pack or {}).get("labels") or {}).get("de") or {}).get(key) or key
     if kw:
@@ -534,8 +546,9 @@ def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1, home="EUR")
     sheet = sheet if isinstance(sheet, dict) else {}
     if not (isinstance(pack, dict) and pack.get("blocks")):
         pack = dk_pack(sheet.get("pack") or "film") or {}
-    lg = calc_lang(lang)  # 2.185.0 C (#2520): every app language (numbers); names / words of the pack: de, else English (plg)
-    plg = "de" if lg == "de" else "en"
+    lg = calc_lang(lang)  # 2.185.0 C (#2520): every app language (numbers); 2.449.0 (#3768): names / words of the pack: plg
+    plg = dk_lg(pack, lg)
+    roles = _roles_in(pack, plg) if plg not in ("de", "en") else {}
     home = calc_code(home)
     cur = calc_code(currency, home)
     usd = cur != home  # 2.189.0 (#2475): "foreign", was USD
@@ -554,7 +567,10 @@ def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1, home="EUR")
     lines = {b: [] for b in DK_BLOCKS}
 
     def name(r):
-        return (r.get("name_en") or r.get("name") or "") if plg == "en" else (r.get("name") or "")
+        if plg == "de":
+            return r.get("name") or ""
+        s = r.get("name_en") or r.get("name") or ""
+        return roles.get(s.strip().lower()) or roles.get(str(r.get("name") or "").strip().lower()) or s
 
     # staff
     people = Decimal(0)

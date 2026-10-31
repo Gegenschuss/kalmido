@@ -20,7 +20,7 @@ from flask import g, jsonify
 
 from ..core.config import app
 from ..core.db import bump, db, iso, now_utc
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..core.pg import insert_id, write_lock
 from ..core.access import Denied, list_role, my_max_sort, list_other_agent
 from ..accounts.session import me
@@ -166,12 +166,12 @@ def pk2_input(c, uid, kind, b):
         _p_keys(b, "", ("agent_id", "kind", "text"))
         inp = pk2_make_input(c, uid, aid, kind)
         inp["text"] = _p_str(b.get("text"), "text", PROP_TEXT_MAX, line=False) or None
-        return inp, tr(PK2_TITLES["setup"]), None, None
+        return inp, tr(PK2_TITLES["setup"], lg=lang(c, uid)), None, None
     _p_keys(b, "", ("agent_id", "kind", "text", "file_name", "offer_id"))
     oid = None if b.get("offer_id") in (None, "") else _p_int(b.get("offer_id"), "offer_id")
     text = _p_str(b.get("text"), "text", PROP_TEXT_MAX, oid is None, line=False) or None
     inp = pk2_make_input(c, uid, aid, kind, text, _p_str(b.get("file_name"), "file_name", 200) or None, oid)
-    return inp, tr(PK2_TITLES["inquiry"]), None, None
+    return inp, tr(PK2_TITLES["inquiry"], lg=lang(c, uid)), None, None
 
 
 # ---------------------------------------------------------------- validation (BadInput -> 400)

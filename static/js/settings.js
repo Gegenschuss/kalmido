@@ -585,8 +585,9 @@ function hostHtml(hint) {
     <div class="row"><label for="s-qpool">${tr('Shared by')}</label><select id="s-qpool"><option value="user">${tr('each person on their own')}</option><option value="org" ${a.storage_pool === 'org' ? 'selected' : ''}>${tr('the organisation (amount × members)')}</option></select></div>
     <div class="row"><label for="s-support">${tr('Support address')}</label><input id="s-support" type="email" value="${esc(a.support_email || '')}" placeholder="${esc(a.support_email_env || 'support@example.com')}" autocomplete="off"></div>
     <h4 id="s-legal-h">${tr('Privacy and imprint')}</h4>
-    ${hint(tr('Links on the login page and under Help, e.g. to your privacy statement. Empty = no link (or the value from the server configuration).'))}
+    ${hint(tr('Links on the login page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).'))}
     <div class="row"><label for="s-privacy">${tr('Privacy statement')}</label><input id="s-privacy" type="url" value="${esc(a.privacy_url || '')}" placeholder="${esc(a.privacy_url_env || 'https://example.com/privacy')}" autocomplete="off"></div>
+    <div class="row"><label for="s-privmail">${tr('Privacy contact')}</label><input id="s-privmail" type="email" value="${esc(a.privacy_email || '')}" placeholder="${esc(a.privacy_email_env || 'privacy@example.com')}" autocomplete="off"></div>
     <div class="row"><label for="s-imprint">${tr('Imprint')}</label><input id="s-imprint" type="url" value="${esc(a.imprint_url || '')}" placeholder="${esc(a.imprint_url_env || 'https://example.com/imprint')}" autocomplete="off"></div>
     <h4 id="s-maillim-h">${tr('E-mails per day')}</h4>
     ${hint(tr('Per person and day (at most 5 a day to one address). Over the limit the link is shown to copy.'))}
@@ -620,6 +621,7 @@ function hostWire(md) {
     if (id === 's-quota') { const v = e.target.value.trim(); if (v !== '' && !/^\d+$/.test(v)) { toast(tr('Invalid value: {0}', tr('Storage per person'))); return; } hostSave(md, {storage_quota_mb: v === '' ? null : +v}, tr('Saved')); return; }
     if (id === 's-qpool') { hostSave(md, {storage_pool: e.target.value}, tr('Saved')); return; }
     if (id === 's-support') { hostSave(md, {support_email: e.target.value.trim()}, tr('Saved')); return; }
+    if (id === 's-privmail') { hostSave(md, {privacy_email: e.target.value.trim()}, tr('Saved')); return; }  // 2.360.2 D (#2561)
     if (id === 's-privacy' || id === 's-imprint') { hostSave(md, {[id === 's-privacy' ? 'privacy_url' : 'imprint_url']: e.target.value.trim()}, tr('Saved')); return; }  // 2.306.0 B (#2887)
     if (id === 's-maillim') { const v = +e.target.value; if (!(v >= 1 && v <= 1000)) { toast(tr('Invalid value: {0}', tr('E-mails per day'))); e.target.value = S.about?.mail_day_limit || 30; return; } hostSave(md, {mail_day_limit: v}, tr('Saved')); }
   });
@@ -750,7 +752,7 @@ function settingsModal(focus) {
       <h4 id="s-mail-h">${tr('Tasks by e-mail')}</h4><div id="s-mail"></div>
       ${shareHtml(hint)}
       <ul class="slist">
-        ${S.ntfyInbox?.enabled && S.me?.ntfy_inbox ? `<li>${tr('Single files also via the ntfy app:')} ${tr('In the ntfy app, add server {0} once', `<code class="topic">${esc(S.ntfyInbox.server)}</code>`)}${tr(' and log in with the ntfy login your admin gave you.')} ${tr('Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.', `<code class="topic">${esc(S.ntfyInbox.topic)}</code>`)}</li>` : ''}</ul>
+        ${S.ntfyInbox?.enabled && S.me?.ntfy_inbox ? `<li>${tr('Single files also via the ntfy app:')} ${tr('In the ntfy app, add server {0} once and log in with the ntfy login your admin gave you.', `<code class="topic">${esc(S.ntfyInbox.server)}</code>`)} ${tr('Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.', `<code class="topic">${esc(S.ntfyInbox.topic)}</code>`)}</li>` : ''}</ul>
       ${bmls_html()}
       ${acz_linkHtml(S.webhooks?.enabled)}`,  // 2.166.0 (#2633): the webhooks moved to Access
     access: acz_html(),  // 2.166.0 (#2633): API tokens, webhooks and agent tokens in one place
@@ -966,9 +968,9 @@ function settingsModal(focus) {
   // plus a few synonyms (words people search for that the labels do not use); a hit inside a sub-tab (Administration,
   // Agents) or a folded section opens it; nothing found hides the panes behind one clear line
   const sres = $('#s-search', md) && $('#s-sres', md);
-  const SYN = [[['logout', 'log out', 'sign out', 'abmelden', 'ausloggen'], '[data-acc="logout"]'], [['push', 'benachrichtigung', 'notification', 'glocke', 'bell'], '[data-pane="notify"] h4'],
-    [['sidebar', 'seitenleiste'], '#s-side-h'], [['navigation', 'menü anpassen', 'ausblenden', 'reihenfolge'], '#s-nav-h'], [['menü', 'menu', 'tab bar', 'tab-leiste'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort'], '#a-cur'],
-    [['speicher', 'storage', 'quota', 'kontingent'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme'], '#s-lookin h4'], [['sprache', 'language'], '#s-lang-h'], [['region', 'wochenstart', 'week start', 'uhrzeit', '12 h', '24 h'], '#s-fmt-h']];
+  const SYN = [[['logout', 'log out', 'sign out', 'abmelden', 'ausloggen', 'déconnexion', 'cerrar sesión', 'esci', 'uitloggen'], '[data-acc="logout"]'], [['push', 'benachrichtigung', 'notification', 'glocke', 'bell', 'notificación', 'notifica', 'melding', 'cloche', 'campana', 'campanella'], '[data-pane="notify"] h4'],
+    [['sidebar', 'seitenleiste', 'barre latérale', 'barra lateral', 'zijbalk'], '#s-side-h'], [['navigation', 'menü anpassen', 'ausblenden', 'reihenfolge'], '#s-nav-h'], [['menü', 'menu', 'tab bar', 'tab-leiste'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort', 'mot de passe', 'contraseña', 'wachtwoord'], '#a-cur'],
+    [['speicher', 'storage', 'quota', 'kontingent', 'stockage', 'almacenamiento', 'archiviazione', 'opslag'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme', 'sombre', 'oscuro', 'scuro', 'donker', 'thème', 'tema', 'thema'], '#s-lookin h4'], [['sprache', 'language', 'langue', 'idioma', 'lingua', 'taal'], '#s-lang-h'], [['region', 'région', 'regione', 'wochenstart', 'week start', 'uhrzeit', '12 h', '24 h'], '#s-fmt-h']];
   const shown = el => !el.closest('[hidden]') || el.closest('[data-admp], [data-aisp]');
   // 2.46.2 (#1651): readonly until focus keeps password managers out; a value nobody typed is cleared
   const sq = $('#s-search', md);
@@ -1173,7 +1175,7 @@ function impHelp(src) {
     asana: tr('<b>Asana:</b> open the project > arrow next to its name > Export / Print > CSV. Sections, subtasks, tags, start and due dates and completion are taken over, other fields go into the notes. An assignee is assigned when they are a member of the target project (same e-mail or name), otherwise their name goes into the notes.'),
     mstodo: tr('<b>Microsoft To Do</b> has no export of its own. Recommended: classic Outlook for Windows > File > Open & Export > Import/Export > Export to a file > Comma Separated Values > your Tasks folder (Outlook for Mac: File > Export > Tasks). CSV files of export tools (columns such as Title, List, Status, Importance, Due) and ICS files work too. English and German Outlook columns are recognized, also in Windows-1252.'),
     ics: tr('<b>ICS files with tasks (VTODO):</b> Nextcloud Tasks (calendar > … > Export), Thunderbird (right-click the calendar > Export), Apple Reminders via an export app or a CalDAV server, Tasks.org via its CalDAV account. Each calendar becomes a project; subtasks, repetitions, reminders, categories (tags), priorities and completion are taken over.'),
-    ticktick: tr('<b>TickTick:</b> Settings > Account > Generate backup (CSV). Imported directly, without a preview.'),
+    ticktick: tr('<b>TickTick:</b> Settings > Account > Generate backup (CSV). Lists, sections, subtasks, tags, dates and reminders are taken over.'),
     // 2.142.0 B (#2147)
     notion: tr('<b>Notion:</b> Settings > Workspace > Export all workspace content (or … on a page > Export) > Markdown & CSV, include subpages. Choose the ZIP as it is (parts inside it are read too). Every database becomes a project (name, status, date, tags and priority are recognized, other properties go into the notes), pages with checkboxes become projects with tasks. People stay names in the notes.'),
     gtasks: tr('<b>Google Tasks:</b> takeout.google.com > deselect all > select Tasks > create the export, then choose the ZIP (or the Tasks.json inside it). Lists, subtasks, due dates, notes and completion are taken over.'),
@@ -1236,7 +1238,7 @@ function impInit(md) {
     const box = $('#s-imp-hist', md); if (!box) return;
     let j; try { j = await api('GET', '/api/imports'); } catch { return; }
     const rows = j.imports.filter(x => x.can_undo).slice(0, 5);
-    box.innerHTML = rows.length ? `<div class="muted mhint">${tr('Recent imports')}</div>` + rows.map(x => `<div class="mrow"><span class="n">${esc(x.source_name)}${x.file_name ? ' · ' + esc(x.file_name) : ''}</span><span class="muted">${trn('{0} task', '{0} tasks', x.counts.tasks || 0)}</span><button class="btn sm" data-imp="undo" data-id="${+x.id}">${tr('Undo')}</button></div>`).join('') : '';
+    box.innerHTML = rows.length ? `<div class="muted mhint">${tr('Recent imports')}</div>` + rows.map(x => `<div class="mrow"><span class="n">${esc(x.source_name)}${x.file_name ? ' · ' + esc(x.file_name) : ''}</span><span class="muted">${x.source === 'newsletter' ? trn('{0} contact', '{0} contacts', x.counts.contacts || 0) : trn('{0} task', '{0} tasks', x.counts.tasks || 0)}</span><button class="btn sm" data-imp="undo" data-id="${+x.id}" data-src="${esc(x.source)}">${tr('Undo')}</button></div>`).join('') : '';
   }
   hist();
   $('#s-imp-src', md).addEventListener('change', e => {
@@ -1245,14 +1247,6 @@ function impInit(md) {
   });
   inp.addEventListener('change', async e => {
     const f = e.target.files[0]; if (!f) return;
-    if (I.src === 'ticktick') {
-      // 2.87.9 (#1940): TickTick's lists always become private lists of the person
-      if (!await importTargetConfirm({what: tr('the tasks'), ws: 'private'})) { inp.value = ''; const fn = $('#s-import-name', md); if (fn) fn.textContent = tr('No file chosen'); return; }
-      const fd = new FormData(); fd.append('file', f);
-      const j = await api('POST', '/api/import/ticktick', fd);
-      toast(tr('Import: {0} tasks, {1} new projects', j.tasks, j.lists) + (j.skipped ? tr(', {0} already there', j.skipped) : ''));
-      inp.value = ''; await load(); render(); return;
-    }
     // 2.87.9 (#1940): new lists go into the workspace shown in the sidebar
     // 2.144.5 B (#2002): "All" = the private space (the dialog offers the first organisation instead)
     const cur = wsCur();
@@ -1264,7 +1258,13 @@ function impInit(md) {
     if (k === 'target' && e.target.value !== 'new') delete I.opts.list_name;
     if (k !== 'list_name') preview();
   });
-  const undo = async id => {
+  const undo = async (id, src) => {
+    if (src === 'newsletter') {  // 2.363.2 (#3104)
+      if (!await askConfirm(tr('Undo this import?'), tr('The contacts go back to their earlier newsletter status, unless their consent changed since.'), {ok: tr('Undo'), danger: true})) return;
+      const j = await api('POST', `/api/imports/${id}/undo`);
+      toast(trn('Import undone: {0} contact reset', 'Import undone: {0} contacts reset', j.contacts || 0));
+      hist(); return;
+    }
     // 2.272.0 C (#3027): the undo moves into the trash and keeps what changed since -- the texts say exactly that
     if (!await askConfirm(tr('Undo this import?'), tr('The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.'), {ok: tr('Undo'), danger: true})) return;
     const j = await api('POST', `/api/imports/${id}/undo`);
@@ -1277,7 +1277,7 @@ function impInit(md) {
     const b = e.target.closest('[data-imp]'); if (!b || !md.contains(b)) return;
     const a = b.dataset.imp;
     if (a === 'cancel') { out.innerHTML = ''; I.file = null; inp.value = ''; return; }
-    if (a === 'undo') { await undo(+b.dataset.id); return; }
+    if (a === 'undo') { await undo(+b.dataset.id, b.dataset.src); return; }
     if (a === 'go') {
       // 2.87.9 (#1940): where the tasks go, in words; new lists from an organisation can go into the private space instead
       const tl = I.opts.target && I.opts.target !== 'new' ? listById(+I.opts.target) : null, n = I.last?.created?.tasks;
@@ -1298,10 +1298,12 @@ function impInit(md) {
 }
 // Settings > Administration: the instance-wide switches, applied at once
 // 2.45.0 (#1515): no server key = tokens, the sign-on secret and organisation encryption cannot be stored: say so loudly
+// 2.359.3 (#2945): pg_dump older than the database server: every backup would fail
+const shToolsWarn = a => { const [t, sv] = String(a.backup_tools_problem || '').split('|'); return sv ? `<div class="shint warn shkey shtools" role="alert"><b>${tr('Backups are not possible')}</b> ${esc(tr('No backup is possible: pg_dump {0} refuses the newer PostgreSQL {1} of this server. Use a Kalmido image with postgresql-client {1} (see SELF-HOSTING.md).', t, sv))}</div>` : ''; };
 const shKeyWarn = a => a.secret_key === false ? `<div class="shint warn shkey" role="alert"><b>${tr('The server key is missing')}</b> ${esc(a.secret_key_problem === 'invalid' ? tr('KALMIDO_SECRET_KEY (or the key file) is not valid: it must be 32 random bytes, base64.') : a.secret_key_problem === 'file_in_data' ? tr('KALMIDO_SECRET_FILE lies inside the data or backup folder and was ignored. Put it on its own volume.') : a.secret_key_problem === 'file_error' ? tr('The key file KALMIDO_SECRET_FILE cannot be read or written, see the server log. After an update: create the folder secret next to data and give it to the user 1000 (mkdir secret && chown 1000 secret), then restart.') : tr('Without KALMIDO_SECRET_KEY or KALMIDO_SECRET_FILE no access token can be stored and organisation data stays unencrypted. See SELF-HOSTING.md.'))}</div>` : a.secret_key_src === 'file' ? `<div class="shint shkey">${esc(tr('The server key is kept in the key file. Keep a copy of it apart from the backups: without it the encrypted data of a backup cannot be read.'))}</div>` : '';  // 2.45.0 (#1515): review: a new key file is announced
 function instanceHtml(chk, hint) {
   const a = S.about || {};
-  return `${shKeyWarn(a)}<h4 id="s-instance-h">${tr('Whole server')}</h4>
+  return `${shKeyWarn(a)}${shToolsWarn(a)}<h4 id="s-instance-h">${tr('Whole server')}</h4>
     ${hint(tr('Apply to every user at once. Nothing is deleted: switched back on, everything is there again.'))}
     <div class="featgrid">${ad_allSwHtml()}
       <label class="wide"><input type="checkbox" id="s-publinks" ${a.public_links !== false && a.public_links_env !== false ? 'checked' : ''} ${a.public_links_env === false ? 'disabled' : ''}><span>${tr('Public links to projects')}<small class="muted">${a.public_links_env === false ? `<span title="KALMIDO_PUBLIC_LINKS=0">${tr('Switched off by the server operator.')}</span>` : tr('Projects and files of the file store can be shared with people without an account through a secret link. Off: every public link stops working at once; nothing is deleted.')}</small></span></label>
@@ -1366,7 +1368,7 @@ async function aaDraw(md, j) {
     <div class="row"><button class="btn sm" data-aa="test" ${j.env ? '' : 'disabled'}>${ic('bell', 's')} ${tr('Send test alert')}</button></div>`;
   const st = j.storage || {}, qc = j.quick_check || {};
   if (j.rls_off) h += hint(tr('Row-level security is OFF: the database user bypasses it and the role kalmido_app cannot be used. Allow the database user to create roles or create the role (see SELF-HOSTING), then restart.'));  // 2.37.0 (review W2-2)
-  if (st.total || qc.at) h += hint([st.total ? tr('Data volume: {0} free ({1} %).', st.free >= 1e9 ? (st.free / 1e9).toFixed(1) + ' GB' : Math.round(st.free / 1e6) + ' MB', st.pct) : '', qc.at ? (!qc.ok ? tr('Database check FAILED ({0}).', aaWhen(qc.at)) : qc.checksums === false ? tr('Database check: data checksums are off ({0}).', aaWhen(qc.at)) : tr('Database check ok ({0}).', aaWhen(qc.at))) : ''].filter(Boolean).join(' '));
+  if (st.total || qc.at) h += hint([st.total ? tr('Data volume: {0} free ({1} %).', fmtBytes(st.free), st.pct) : '', qc.at ? (!qc.ok ? tr('Database check FAILED ({0}).', aaWhen(qc.at)) : qc.checksums === false ? tr('Database check: data checksums are off ({0}).', aaWhen(qc.at)) : tr('Database check ok ({0}).', aaWhen(qc.at))) : ''].filter(Boolean).join(' '));
   h += `<h4>${tr('Recent admin alerts')}</h4>`;
   h += j.items.length ? `<div class="members aalist">${j.items.map(a => `<div class="mrow aarow ${a.delivered || a.state === 'queued' ? '' : 'off'}" data-aaid="${a.id}"><span class="n"><b>${esc(a.label)}</b> · ${esc(a.message)}<small class="muted" style="display:block">${esc(aaWhen(a.created_at))} · ${tr(AA_STATE[a.state] || a.state)}${a.repeats ? ' · ' + trn('repeated {0} time since', 'repeated {0} times since', a.repeats) : ''}</small></span></div>`).join('')}</div>
     <div class="row"><button class="btn sm" data-aa="clear">${ic('trash', 's')} ${tr('Clear list')}</button></div>` : `<div class="muted mhint">${tr('No admin alerts yet.')}</div>`;
@@ -1513,7 +1515,7 @@ function tabAddGroups() {
   })]);
   grp('f', N_('Filters'), S.filters.map(f => it('f:' + f.id, f.name, {ic: 'filter'})));
   grp('folder', N_('Folders'), folderNames().map(f => it('folder:' + f, fDisp(f), {ic: 'folder'})));
-  grp('tag', N_('Tags'), Object.keys(counts().tags).sort((a, b) => a.localeCompare(b, 'de')).map(t => it('tag:' + t, '#' + t, {ic: 'tag'})));
+  grp('tag', N_('Tags'), Object.keys(counts().tags).sort(cmpText).map(t => it('tag:' + t, '#' + t, {ic: 'tag'})));
   grp('o', N_('Other'), [it('home', tr('Start|home')), teamOn() && it('team', tr('Team chat')), collab() && it('news', tr('News')), feat('agents') && agentsOn() && it('agents', tr('Agents')),
     overviewOn() && it('overview', tr('Project status')), feat('wiki') && it('wiki', tr('Knowledge pages')), it('search', tr('Search')), it('lists', tr('Projects')), it('settings', tr('Settings'))]);
   return out;
@@ -1620,7 +1622,7 @@ function ss_hits(md, q, shown, SYN) {
 // per window: src = the functions that draw it (tests/p2353_e_setsearch_guard_test.py: every area settings window has an
 // entry here), on = its module is on and the person may open it, open = its area + the window, root = the window once drawn,
 // secs = its sections [label, words people type (German + English), the element (else the heading with that label), office pane, gate]
-const ss_ofm = k => { const i = typeof OFM_ITEMS !== 'undefined' && OFM_ITEMS.find(x => x.key === k); return !!i && i.on() && ofm_ok(i); };
+const ss_ofm = k => { const i = typeof OFM_ITEMS !== 'undefined' && OFM_ITEMS.find(x => x.key === k); return !!i && i.on() && ofm_ok(i) && !ofm_menuOff(k); };  // 2.440.0 (#3609)
 const ss_ofcFeat = k => typeof ofcFeat !== 'function' || ofcFeat(k);  // office.js loads with the area
 const SS_AREA = [
   // 2.365.2 B (#2789): Settings > Documents (docs.js dcs_paneHtml, drawn by dc_sDraw); the lists and fields open from there in the module
@@ -1630,10 +1632,10 @@ const SS_AREA = [
       [N_('Rules'), ['regel', 'rule'], '#s-dcs-rules-h'], [N_('Senders, types and tags'), ['absender', 'sender', 'dokumenttyp', 'schlagwort', 'tags', 'feld', 'felder', 'field', 'fields'], '#s-dcs-lists-h'],
       [N_('Inboxes'), ['eingang', 'eingänge', 'inbox', 'mail', 'e-mail', 'scanner', 'wächter', 'watcher'], '#s-dcs-in-h']]},
   {src: ['ofcSettingsHtml', 'agbSettingsHtml', 'bp_settingsHtml', 'dun_settingsHtml', 'tpSettingsHtml', 'pep_settingsHtml', 'dx_settingsHtml', 'dv_settingsHtml', 'brl_settingsHtml', 'bnr_settingsHtml',
-    'rcm_settingsHtml', 'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['büro', 'office', 'firma', 'company'],
+    'rcm_settingsHtml', 'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml', 'ocm_settingsHtml', 'ccn_settingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['büro', 'office', 'firma', 'company'],
     on: () => modOn('office') && ss_ofm('settings'), open: () => settingsModal('biz'), root: '#s-biz #ofc-set',  // 2.365.2 (#2789): Settings > Company & office
     secs: [[N_('Company'), ['firma', 'adresse', 'address', 'logo', 'bank', 'iban', 'bankverbindung', 'bank details', 'konto', 'steuernummer', 'ust-idnr', 'vat id', 'register'], '', 'company'], [N_('Terms and conditions (PDF)'), ['agb', 'terms'], '#agb-box', 'company'], [N_('Letterhead'), ['briefpapier', 'briefkopf', 'letterhead'], '#bp-h', 'company'],
-      [N_('Master data file'), ['stammdaten', 'master data'], '', 'data'],
+      [N_('Master data file'), ['stammdaten', 'master data'], '', 'data'], [N_('Card positions without a receipt'), ['karte', 'kartenposten', 'card', 'beleg', 'receipt', 'erinnerung', 'reminder'], '#ccn-h', 'data'],
       [N_('Bank & taxes'), ['steuer', 'steuerrücklage', 'tax reserve', 'ust', 'vat', 'ist', 'soll', 'steuertermine', 'tax dates', 'kasse', 'kassen', 'cash box', 'anfangsbestand', 'kilometer', 'km', 'pauschale', 'mileage', 'bank'], '#s-biz-tax', 'tax'],
       [N_('Documents & numbers'), ['nummer', 'nummern', 'nummernkreis', 'number', 'numbering', 'angebot', 'quotation', 'währung', 'currency'], '', 'docs'], [N_('Invoices'), ['rechnung', 'invoice', 'zahlungsziel', 'payment terms', 'skonto'], '', 'docs'],
       [N_('Suggest payment reminders for overdue invoices'), ['mahnung', 'mahnungen', 'mahnwesen', 'zahlungserinnerung', 'reminder', 'dunning', 'girocode'], '#os-dun-on', 'docs'],
@@ -1645,7 +1647,7 @@ const SS_AREA = [
       [N_('Receipts by e-mail'), ['weiterleitung', 'forwarding', 'gmail', 'e-mail', 'mail'], '#rcm-h', 'data'],  // 2.424.0 B (#3450)
       [N_('Country pack'), ['land', 'country', 'paket', 'pack'], '', 'packs'], [N_('Travel expenses'), ['reise', 'reisekosten', 'travel'], '#rkp-h', 'packs'],
       [N_('Entertainment receipts'), ['bewirtung', 'entertainment', 'meals'], '#bwc-h', 'packs'], [N_('Cash flow'), ['liquidität', 'cashflow', 'cash flow', 'startsaldo', 'starting balance'], '#cfs-h', 'tax'],
-      [N_('Functions'), ['funktion', 'function', 'module'], '', 'functions'], [N_('Agents'), ['agent', 'agenten', 'ki', 'ai'], '', 'access'],
+      [N_('Functions'), ['funktion', 'function', 'module'], '', 'functions'], [N_('Menu points'), ['menüpunkt', 'menu point', 'menü', 'ausblenden', 'abschalten'], '', 'functions'], [N_('Agents'), ['agent', 'agenten', 'ki', 'ai'], '', 'access'],
       [N_('E-mail'), ['imap', 'smtp', 'postfach', 'mailbox', 'absender', 'sender', 'mailserver'], '#s-bizmail-h', '']]},  // 2.365.2 (#2789): the workspace's mailbox
   {src: ['bkSettingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['buchhaltung', 'bookkeeping', 'euer', 'ustva'],  // 2.365.2 D (#2789): in Bank & taxes
     on: () => modOn('office') && ss_ofm('books'), open: () => settingsModal('biz-tax'), root: '#s-biz #bk-sh', secs: [[N_('Tax reserve and VAT basis'), ['einstellungen', 'settings', 'buchhaltung', 'bookkeeping', 'steuerrücklage', 'tax reserve'], '#bk-sh']]}];

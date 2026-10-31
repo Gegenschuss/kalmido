@@ -233,8 +233,9 @@ def fsm_plan(c, uid, b, to, dry, office=False):
         # 2.148.1 B (#2483): receipts the cash book or the equipment list points to stay in their workspace
         plan["block"], plan["code"] = tr(FSM_RECEIPT_STAYS), 409
     if big and not plan["block"] and not office:
-        from ..receipts.suggest import olk_fs_locked
-        for i in big:  # 2.186.0 B (#2600): a booked receipt stays in the books of its workspace for the legal period
+        from ..receipts.suggest import olk_fs_locked, olk_fs_maybe
+        maybe = olk_fs_maybe(c, big)  # 2.360.3 (#2733): one query instead of five per node, a folder can hold thousands of files
+        for i in (x for x in big if x in maybe):  # 2.186.0 B (#2600): a booked receipt stays in the books of its workspace for the legal period
             until = olk_fs_locked(c, i)
             if until:
                 plan["block"], plan["code"] = tr(FSM_BOOKED_STAYS, short_day(date.fromisoformat(until), year=True)), 409
@@ -344,6 +345,8 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths, df_define=None):
     sender = S.label_name(c, old, "sender", m["sender_id"])
     typ = S.label_name(c, old, "type", m["type_id"])
     tags = S.node_tags(c, nid)
+    if m["asn"]:
+        S.asn_lock(c, new, nid)  # 2.363.3 (#3133): a save with "next" in the target waits for the commit (the rows are locked already: fsm_apply)
     asn = m["asn"] if m["asn"] and not S.asn_taken(c, new, m["asn"], nid) else None
     c.execute("""UPDATE doc_meta SET ws=?, org_id=?, text=?, amount=?, summary=?, sender_id=?, type_id=?, suggest='', trained='', asn=?, updated_at=?
                  WHERE node_id=?""",
@@ -431,7 +434,8 @@ def fsm_text(c, nid, to, owner):
         _index(c, r["id"], new, v or "")
 
 
-# 2.273.0 B (#3042): what a move into another workspace ends (shares, openings to the organisation, the project of a receipt)
+# 2.273.0 B (#3042): what a move into another workspace ends (shares, openings to the organisation, the project of a receipt
+# or, 2.363.3 (#3133), of an agent's suggestion)
 # and where the items that stay behind lay (the trash below a moved folder goes to the top of the source) are kept per moved
 # item (space_moves kind 'files', obj_id = the item); moving it back (the undo step) within FSM_KEEP_H hours brings that back
 # where it still fits the workspace.
@@ -445,7 +449,7 @@ def fsm_memo(c, plan, to, uid):
     ids = [r["id"] for r, _ in plan["moved"]]
 
     def at(nid):
-        return per.setdefault(rof.get(nid, nid), {"access": {}, "shares": [], "receipts": {}, "under": []})
+        return per.setdefault(rof.get(nid, nid), {"access": {}, "shares": [], "receipts": {}, "suggest": {}, "under": []})
     for r, _ in plan["moved"]:
         if r["org_access"]:
             at(r["id"])["access"][str(r["id"])] = r["org_access"]
@@ -459,6 +463,11 @@ def fsm_memo(c, plan, to, uid):
         for x in c.execute(f"SELECT node_id, list_id FROM rc_receipts WHERE node_id IN ({q}) AND list_id IS NOT NULL", part).fetchall():
             if not fsm_list_ok(c, x["list_id"], to, uid):
                 at(x["node_id"])["receipts"][str(x["node_id"])] = x["list_id"]
+        # 2.363.3 (#3133): the projects of an agent's suggestions are dropped the same way (fsm_doc); the row stays with its id
+        for x in c.execute(f"SELECT id, node_id, list_id, prev_list_id FROM rc_suggest WHERE node_id IN ({q})", part).fetchall():
+            keep = {k: x[k] for k in ("list_id", "prev_list_id") if x[k] and not fsm_list_ok(c, x[k], to, uid)}
+            if keep:
+                at(x["node_id"])["suggest"][str(x["id"])] = keep
     for r in plan["stay"]:
         at(r["id"])["under"].append([r["id"], r["parent_id"], r["name"]])
     for rid, d in per.items():
@@ -504,6 +513,10 @@ def fsm_memo_apply(c, back, to, uid):
         for nid, lid in (d.get("receipts") or {}).items():
             if fsm_list_ok(c, lid, to, uid):
                 n += c.execute("UPDATE rc_receipts SET list_id=? WHERE node_id=? AND list_id IS NULL", (lid, int(nid))).rowcount
+        for sid, keep in (d.get("suggest") or {}).items():  # 2.363.3 (#3133): an open suggestion ended by the move is gone for good (never sent back)
+            for k, lid in keep.items():
+                if k in ("list_id", "prev_list_id") and fsm_list_ok(c, lid, to, uid):
+                    n += c.execute(f"UPDATE rc_suggest SET {k}=? WHERE id=? AND {k} IS NULL", (lid, int(sid))).rowcount
         for nid, pid, name in d.get("under") or []:  # still at the top of the folder's workspace (and owner when private)
             p = c.execute("SELECT org_id, owner_id, deleted_at FROM fs_nodes WHERE id=?", (pid,)).fetchone() if pid else None
             r = c.execute("SELECT parent_id, org_id, owner_id, deleted_at FROM fs_nodes WHERE id=?", (nid,)).fetchone()

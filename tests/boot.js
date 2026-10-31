@@ -106,7 +106,8 @@ exports.clientSource = async () => {
 // object, thrown in the app's own scripts. Anything else (open windows, the suite's own code) still fails the run.
 const closedRealms = [];
 const lateAppError = e => !!e && closedRealms.some(T => e instanceof T) && /Cannot read propert(y|ies) of (undefined|null)/.test(e.message || '')
-  && /\/static\/(js\/)?[\w.-]+\.js/.test(String(e.stack || '').split('\n').slice(0, 2).join('\n'));
+  && /\/static\/(js\/)?[\w.-]+\.js/.test(String(e.stack || '').split('\n').slice(0, 2).join('\n'))
+  || !!e && closedRealms.length > 0 && /reading '_location'/.test(e.message || '');  // 2.442.0 (#3744): jsdom's own location getter on a closed window; its TypeError is of this realm (p2440_d_ui)
 process.on('unhandledRejection', e => {
   if (lateAppError(e)) { console.log('late app rejection after a window was closed (ignored):', String(e.stack).split('\n').slice(0, 2).join(' | ')); return; }
   console.error(e); process.exit(1);
@@ -165,6 +166,7 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
       w.matchMedia = q => ({matches: q in media ? media[q] : /max-width/.test(q) ? mobile : false, addEventListener() {}, addListener() {}});  // media: {'(prefers-reduced-motion: reduce)': true}
       const told = k => { for (const o of shared ? shared.wins : []) if (o !== w) { const e = new o.Event('storage'); e.key = k; o.dispatchEvent(e); } };
       Object.defineProperty(w, 'localStorage', {value: {getItem: k => k in store ? store[k] : null, setItem: (k, v) => { store[k] = String(v); told(k); }, removeItem: k => { delete store[k]; told(k); }, key: i => Object.keys(store)[i], get length() { return Object.keys(store).length; }}});
+      w.visualViewport = null;  // 2.456.0 (#3837): jsdom has none; a drag's scrollBox (dnd.js tdBox) asks for it
       w.__offline = false;
       w.fetch = (u, o = {}) => { if (w.__offline) return Promise.reject(new TypeError('Failed to fetch')); const hd = {...(o.headers || {}), ...(proxy ? {'Remote-User': proxy} : {Cookie: cookie})}; const sg = o.signal && (ac => { if (o.signal.aborted) ac.abort(); else o.signal.addEventListener('abort', () => ac.abort()); return ac.signal; })(new AbortController());  // 2.116.0 (#2065): a jsdom signal -> Node's
         return fetch(new URL(String(u), B), {...o, headers: hd, ...(sg ? {signal: sg} : {})}); };

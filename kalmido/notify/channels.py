@@ -68,6 +68,8 @@ _CH_TL = threading.local()  # .wd = True while the watchdog runs (its pushes are
 
 EVM_CHOICES = ("off", "nopush", "always")
 EVM_KINDS = {"assign": "mail_assign", "mention": "mail_mention"}
+EVM_KINDS.update(aprequest="mail_assign", apdecide="mail_assign")  # 2.367.2 (#2968): an approval follows the assignment mail's setting
+EVM_KINDS["apbook"] = "mail_assign"  # 2.367.2 (#2969): a booking too (comment_id = the booking, no task)
 EVM_DELAY = _env_int("KALMIDO_EVENT_MAIL_DELAY", 600)   # seconds after the first event
 EVM_GAP = _env_int("KALMIDO_EVENT_MAIL_GAP", 600)       # at least this long between two mails to one person
 EVM_DAY_MAX = 20
@@ -771,6 +773,14 @@ def evm_tick(c, users, S, LG, now):
             _wd_fail(c, "event mail of user", uid, e)
 
 
+def evm_line(kind, who, title, lg):
+    if kind == "aprequest":  # 2.367.2 (#2968)
+        return tr("Approval needed: {0} (from {1})", title, who, lg=lg)
+    if kind == "apdecide":
+        return tr("{0} decided on your approval request: {1}", who, title, lg=lg)
+    return tr("{0} assigned you: {1}", who, title, lg=lg) if kind == "assign" else tr("{0} mentioned you: {1}", who, title, lg=lg)
+
+
 def evm_user(c, uid, s, lg, now):
     from ..admin.hosting import mail_budget
     from ..collab.comments import user_names
@@ -795,7 +805,14 @@ def evm_user(c, uid, s, lg, now):
     names = user_names(c, list({x["actor_id"] for x in q if x["actor_id"]}))
     lines, seen = [], set()
     for x in q:
-        if (x["kind"], x["task_id"]) in seen or not evm_wanted(c, uid, s, x["kind"]):
+        if (x["kind"], x["task_id"] or x["comment_id"]) in seen or not evm_wanted(c, uid, s, x["kind"]):
+            continue
+        if x["kind"] == "apbook":  # 2.367.2 (#2969)
+            from ..calendars.apptbook import apb_mail_line
+            seen.add((x["kind"], x["comment_id"]))
+            line = apb_mail_line(c, x["comment_id"], uid, lg)
+            if line:
+                lines.append(line)
             continue
         t = c.execute("""SELECT t.id, t.title, t.deleted_at, t.list_id, l.name AS lname, l.is_inbox FROM tasks t JOIN lists l ON l.id=t.list_id
                          WHERE t.id=?""", (x["task_id"],)).fetchone()
@@ -805,7 +822,7 @@ def evm_user(c, uid, s, lg, now):
         who = names.get(x["actor_id"]) or tr("Someone via the public link", lg=lg)
         title = le2e_neutral(lg) if le2e_mode(c, t["list_id"]) else md_plain(t["title"] or "")
         lname = tr("Basket", lg=lg) if t["is_inbox"] and inbox_default(t["lname"]) else t["lname"]
-        what = tr("{0} assigned you: {1}", who, title, lg=lg) if x["kind"] == "assign" else tr("{0} mentioned you: {1}", who, title, lg=lg)
+        what = evm_line(x["kind"], who, title, lg)
         lines.append((what, lname, f"{PUBLIC_URL}/#t/{t['id']}"))
     if not lines:
         drop()

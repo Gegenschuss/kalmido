@@ -56,6 +56,7 @@ const ml_pick = (anchor, t) => tch_listPicker(anchor, {title: tr('Show also in p
 async function ml_req(m, tid, lid, b) {
   const r = await api(m, `/api/tasks/${tid}/links` + (m === 'POST' ? '' : '/' + lid), b);
   if (r && r.id) { putTask(r); render(); if (S.sel === tid) renderDetail(); }
+  if (r?.link_waits) toast(tr(ML_WAITS));  // 2.363.3 (#3133)
   return r;
 }
 async function ml_add(tid, lid, quiet) {

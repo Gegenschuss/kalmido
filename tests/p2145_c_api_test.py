@@ -103,7 +103,7 @@ r = A.get(B + f"/api/lists/{L}/export.csv")
 check(r.status_code == 200, f"csv 200 {r.status_code} {r.text[:200]}")
 head, by = table(r)
 check(head[:11] == ["Title", "Status", "Due", "Priority", "Tags", "Assignee", "Section", "Parent task", "Description", "Completed", "Created"]  # 2.165.3 (#2629): Description instead of Notes
-      and head[11:] == ["Ref"] + NEW, f"old columns in order, custom field, the new ones appended {head}")
+      and head[11:-5] == ["Ref"] + NEW, f"old columns in order, custom field, the new ones appended {head}")
 t1 = by["Paint walls"]
 check(t1["Start date"] == "2031-05-01" and t1["Deadline"] == "2031-05-10", f"start + deadline {t1}")
 check(t1["Duration (h)"] == "1.50" and t1["Tracked time (h)"] == "2.00", f"duration 90 min, tracked 2 h (en: point) {t1}")
@@ -140,7 +140,7 @@ patch(Fl, FT, duration=30)
 Fl.post(B + "/api/time/entries", json={"task_id": FT, "start": "2026-01-05T09:00", "minutes": 45})
 hf, bf = table(Fl.get(B + f"/api/lists/{PL}/export.csv"))
 f1 = bf.get("Own task", {})
-check(hf[-9:] == NEW and f1.get("Duration (h)") == "0.50" and f1.get("Checklist") == "[ ] first" and f1.get("Created by"),
+check(hf[-14:-5] == NEW and f1.get("Duration (h)") == "0.50" and f1.get("Checklist") == "[ ] first" and f1.get("Created by"),
       f"freelancer: new columns on the own list {f1}")
 check(f1.get("Tracked time (h)") == "0.75", f"freelancer: tracked time {f1}")
 check(Fl.get(B + f"/api/lists/{L}/export.csv").status_code == 404, "freelancer: an organisation's list: 404")

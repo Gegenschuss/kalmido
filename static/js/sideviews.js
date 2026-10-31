@@ -138,7 +138,7 @@ function sv_delete(id) {
 }
 function sv_move(id, d) {
   const arr = [...sv_views()], i = arr.findIndex(x => x.id === id), j = i + d; if (i < 0 || j < 0 || j >= arr.length) return;
-  [arr[i], arr[j]] = [arr[j], arr[i]];
+  arr.splice(j, 0, arr.splice(i, 1)[0]);
   sv_saveViews(arr);
 }
 
@@ -162,7 +162,7 @@ function sv_entries() {
     views: () => sideViewEntries().filter(x => !hid('e:' + x[0])).map(x => it('m:' + x[0], tr(/** @type {string} */ (x[1])))),  // 2.409.0: feat() is a boolean now, the entries [id, name, on]
     areas: () => SIDE_AREA_KEYS.map(k => MG_IDS.includes(k) ? (mg_on(k) ? it('m:' + k, tr(/** @type {any} */ (mg_area(k))[2])) : null) : (x => x ? it('m:' + k, tr(/** @type {string} */ (x[1]))) : null)(sideModEntries().find(x => x[0] === k))).filter(Boolean),
     filters: () => S.filters.map(f => it('f:' + f.id, f.name)),
-    tags: () => Object.keys(counts().tags).sort((a, b) => a.localeCompare(b, 'de')).map(t => it('tag:' + t, t)),
+    tags: () => Object.keys(counts().tags).sort(cmpText).map(t => it('tag:' + t, t)),
     team: () => [...(collab() ? (S.groups || []).filter(gr => myGroup(gr.id)).map(gr => it('g:' + gr.id, gr.name)) : []),
       ...sbp_people().map(p => it('p:' + p.id, p.name)), ...sbp_agents().map(a => it('a:' + a.id, a.name))],
     more: () => SV_MORE_V.filter(k => k !== 'archived' || S.lists.some(l => l.archived && inWs(l))).map(k => it('v:' + k, tr(FV2_VIEWS[k][1])))};
@@ -244,6 +244,7 @@ function sv_tileMenu(b) {
   const act = sv_cur()?.id === id;
   menu(b, [{label: v.name, dis: true, cls: 'mhead'}, '-',
     act ? {label: tr('Back to “Everything”'), icon: 'all', fn: () => sv_activate('', false)} : {label: tr('Open'), icon: 'right', fn: () => sv_activate(id)},
+    ...fv2_menuRow('sv:' + id),  // 2.441.0 (#3592)
     ...(act ? [{label: tr('Update view “{0}”', v.name), icon: 'check', dis: !sv_changed(), fn: sv_update}] : []),
     {label: tr('Edit view “{0}”…', v.name), icon: 'edit', fn: () => sv_edit(id)},
     '-', {label: tr('Delete'), icon: 'trash', fn: () => sv_delete(id)}]);
@@ -261,13 +262,15 @@ function sv_setFill() {
   const box = $('#s-sv'); if (!box) return;
   const vs = sv_views(), act = S.settings.side_view || '', n = vs.length;
   if (n) box.setAttribute('role', 'list'); else box.removeAttribute('role');  // 2.220.0 A (#2811): a list role needs listitem children
-  box.innerHTML = n ? vs.map((v, i) => `<div class="svrow" role="listitem" data-svid="${esc(v.id)}"><span class="svr-ic" aria-hidden="true">${ic(SV_ICONS.includes(v.icon) ? v.icon : 'panel', 's')}</span><span class="svr-n">${esc(v.name)}${act === v.id ? ` <small class="muted">${tr('active')}</small>` : ''}</span>
-      <button type="button" class="iconbtn" data-sv="up" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + v.name)}" title="${esc(tr('Move up'))}">${ic('up', 's')}</button>
-      <button type="button" class="iconbtn" data-sv="down" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + v.name)}" title="${esc(tr('Move down'))}">${ic('down', 's')}</button>
+  box.innerHTML = n ? vs.map((v, i) => `<div class="svrow" role="listitem" data-svid="${esc(v.id)}">${rowd_grip('sv')}<span class="svr-ic" aria-hidden="true">${ic(SV_ICONS.includes(v.icon) ? v.icon : 'panel', 's')}</span><span class="svr-n">${esc(v.name)}${act === v.id ? ` <small class="muted">${tr('active')}</small>` : ''}</span>
+      ${rowd_arrows(`<button type="button" class="iconbtn" data-sv="up" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + v.name)}" title="${esc(tr('Move up'))}">${ic('up', 's')}</button>
+      <button type="button" class="iconbtn" data-sv="down" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + v.name)}" title="${esc(tr('Move down'))}">${ic('down', 's')}</button>`)}
       <button type="button" class="iconbtn" data-sv="edit" aria-label="${esc(tr('Edit') + ': ' + v.name)}" title="${esc(tr('Edit'))}">${ic('edit', 's')}</button>
       <button type="button" class="iconbtn" data-sv="del" aria-label="${esc(tr('Delete') + ': ' + v.name)}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></div>`).join('')
     : `<p class="muted">${esc(tr('No views yet.'))}</p>`;
 }
+
+rowd_attach(document, {kind: 'sv', row: '.svrow', move: (from, to, r) => sv_move(r.dataset.svid, to - from)});  // 2.456.0 (#3837)
 
 // ---- clicks, the tile's menu (right click / long press)
 document.addEventListener('click', e => {

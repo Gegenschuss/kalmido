@@ -68,7 +68,8 @@ def ua8_admin_dicts(c, rows):
                 f"SELECT user_id, COALESCE(SUM(size),0) FROM budget_files WHERE user_id IN ({q}) GROUP BY user_id",
                 f"SELECT created_by, COALESCE(SUM(size),0) FROM wiki_files WHERE created_by IN ({q}) GROUP BY created_by",  # 2.99.0 A (#2182)
                 f"SELECT created_by, COALESCE(SUM(size),0) FROM sheet_files WHERE created_by IN ({q}) GROUP BY created_by",  # 2.124.0 B (#2110)
-                f"SELECT user_id, COALESCE(SUM(size),0) FROM tchat_files WHERE user_id IN ({q}) GROUP BY user_id"):  # 2.113.1 (#2059)
+                f"SELECT user_id, COALESCE(SUM(size),0) FROM tchat_files WHERE user_id IN ({q}) GROUP BY user_id",  # 2.113.1 (#2059)
+                f"SELECT user_id, COALESCE(SUM(size),0) FROM template_files WHERE user_id IN ({q}) GROUP BY user_id"):  # 2.363.3 (#3134)
         for uid, n in c.execute(sql, ids):  # admin/hosting._user_bytes, per account
             used[uid] = used.get(uid, 0) + int(n or 0)
     out = []
@@ -305,7 +306,7 @@ def ua8_delete_info(uid):
     from .orgretain import upg_info
     purge = upg_info(c, uid)  # 2.152.0 A (#2164): personal office (deleted / kept by law until), agents, calendars, time, DMs
     if by != "instance":  # an organisation admin: nothing about the person's private office (privat bleibt privat)
-        purge = {k: v for k, v in purge.items() if k in ("calendars", "time_kept", "agents", "dms")}
+        purge = {k: v for k, v in purge.items() if k in ("calendars", "time_kept", "sheets_kept", "agents", "dms", "no_heir")}
     return jsonify(**base, can_delete=True, by="instance" if by == "instance" else "org", org_id=None if by == "instance" else by,
                    username=u["username"], lists=ua8_list_info(c, lists, by), candidates=ua8_candidates(c, lists, uid) if lists else [],
                    retention=ret,

@@ -232,7 +232,7 @@ function ccn_settingsHtml(dis) {
   if (d === false) return '';
   if (!d) { if (!CC.remLoading) setTimeout(ccn_load, 0); return ''; }
   const ppl = d.people || [], opt = (v, t) => `<option value="${v}" ${d.every === v ? 'selected' : ''}>${esc(t)}</option>`;
-  return `<h3>${tr('Card positions without a receipt')}</h3>
+  return `<h3 id="ccn-h">${tr('Card positions without a receipt')}</h3>
     ${ofcRowF('ccn-every', tr('Reminder'), `<select id="ccn-every" data-ccn="every" ${dis}>${opt('off', tr('Off'))}${opt('week', tr('Weekly'))}${opt('month', tr('Monthly'))}</select>`, tr('a task for the card holder while positions without a receipt are open; done by itself once they have their receipts'))}
     ${ppl.length > 1 && d.every !== 'off' ? ofcRowF('ccn-user', tr('Cards of people without an account'), `<select id="ccn-user" data-ccn="user" ${dis}>${ppl.map(p => `<option value="${p.id}" ${p.id === (d.user || S.me?.id) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>`) : ''}`;
 }

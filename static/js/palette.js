@@ -132,7 +132,7 @@ window.addEventListener('keydown', e => {
     const b = k === 'x' || k === ' ' ? $('#mbar [data-act="mb-done"]') : $(`#detail.multi [data-act="me-f"][data-f="${k === 'm' ? 'list' : 'date'}"]:not([disabled])`);
     if (b) { e.preventDefault(); b.click(); }
     else if (k === 'd') { e.preventDefault(); multiDateMenu($('#mbar .mcount') || document.body); }
-    else if (k === 'm') { e.preventDefault(); menu($('#mbar .mcount') || document.body, S.lists.filter(l => !l.archived && canEditList(l.id)).map(l => ({label: lname(l), lic: l, fn: () => batch('patch', {list_id: l.id, section_id: null})}))); }
+    else if (k === 'm') { e.preventDefault(); mv_batch($('#mbar .mcount') || document.body); }  // 2.455.0 (#3848)
     return;
   }
   if (e.shiftKey && (k === 'X' || k === 'J' || k === 'K' || k === 'ArrowDown' || k === 'ArrowUp')) {  // select / extend
@@ -311,7 +311,7 @@ function palAll() {
   for (const l of S.lists.filter(x => !x.archived && !x.is_inbox && inWs(x))) add('l:' + l.id, 'list', lname(l), 'list', () => go('l/' + l.id), {sw: cssColor(lp_col(l)), img: liconOk(l.icon) ? l.icon : '', lic: l, ...(l.folder ? {sub: fDisp(l.folder)} : {})});
   for (const f of folderNames()) add('folder:' + f, 'folder', fDisp(f), 'folder', () => go('folder/' + encodeURIComponent(f)));  // 2.4.0 (#361)
   for (const f of S.filters) add('f:' + f.id, 'filter', f.name, 'filter', () => go('f/' + f.id));
-  for (const g of Object.keys(counts().tags).sort()) add('tag:' + g, 'tag', '#' + g, 'tag', () => go('tag/' + encodeURIComponent(g)));
+  for (const g of Object.keys(counts().tags).sort(cmpText)) add('tag:' + g, 'tag', '#' + g, 'tag', () => go('tag/' + encodeURIComponent(g)));
   // settings tabs
   for (const [k, icon, n] of SET_SECS) {
     if (k === 'account' && !S.me) continue;
@@ -417,9 +417,13 @@ function palItems() {
   if (PAL.mode === 'ref') return rf_palItems(q);  // 2.53.0 (#1449): pick a reference for the comment / description (refs.js)
   if (PAL.mode === 'move') {
     const t = curTask(); if (!t) return [];
-    return (canEditList(t.list_id) ? S.lists : []).filter(l => !l.archived && canEditList(l.id) && l.id !== t.list_id).map(l => ({id: 'mv:' + l.id, kind: 'list', label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, sw: cssColor(lp_col(l)),
-      fn: () => patchUndoable(t.id, {list_id: l.id, section_id: null}, tr('Moved to {0}', lname(l)))}))
+    // 2.455.0 (#3848): like the picker: the task's workspace (All: every project, its workspace beside it), the others through the entry
+    const ws = mv_scope([t.id]), o = {filter: l => canEditList(l.id) && l.id !== t.list_id, pick: l => patchUndoable(t.id, {list_id: l.id, section_id: null}, tr('Moved to {0}', lname(l)))};
+    const it = (canEditList(t.list_id) ? S.lists : []).filter(l => !l.archived && o.filter(l) && (!ws || inWs(l, ws))).map(l => ({id: 'mv:' + l.id, kind: 'list', label: lname(l), ...(ws === 'all' && !l.is_inbox ? {sub: wsName(wsOf(l))} : {}), icon: l.is_inbox ? 'inbox' : 'list', lic: l, sw: cssColor(lp_col(l)),
+      fn: async () => { if (await mv_ask([t.id], l)) o.pick(l); }}))
       .map(x => ({...x, score: fuzzy(q, x.label)})).filter(x => x.score > 0).map(x => ({...x, score: x.score + lc_favBoost(x)})).sort((a, b) => b.score - a.score);
+    const more = canEditList(t.list_id) && mv_wsItem($(`#view .trow[data-id="${t.id}"]`) || $('#top h1'), [t.id], o);
+    return more ? [...it, {...more, id: 'mv:ws', kind: 'action', score: 1}] : it;
   }
   const all = palAll();
   if (!q) {  // recently viewed tasks / lists, recent commands, then the actions for the current task, the rest of the actions + views
@@ -709,7 +713,7 @@ async function quipsLoad() {
 }
 function nextQuip() {
   const d = QUIPS.data; if (!d) return '';
-  const arr = d[I18N.code] || d.en || []; if (!arr.length) return '';
+  const arr = d[I18N.code] || []; if (!arr.length) return '';  // 2.446.0 (#3763): no block for the language = no line (never an English one)
   let i = Math.floor(Math.random() * arr.length);
   if (arr.length > 1 && i === QUIPS.last) i = (i + 1 + Math.floor(Math.random() * (arr.length - 1))) % arr.length;  // no immediate repeat
   QUIPS.last = i; LS.set('quipLast', i);

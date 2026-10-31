@@ -145,9 +145,11 @@ const NOTIF_ROWS = [
   ['errreport', N_('New error reports'), N_('a new error from a project’s error-report webhook became a ticket (repeats stay quiet)')]];  // 2.18.0
 // 2.425.0 (#3453 review): the receipt fetcher's row lives here (docfetch.js comes lazily with the documents: the row was missing until then)
 NOTIF_ROWS.push(['fetcher', N_('Receipt fetcher'), N_('a portal of your receipt fetcher reports an error, for example a sign-in that ran out'), 'office']);
+NOTIF_ROWS.push(['limits', N_('Mail limits of public pages'), N_('your customer portal or booking page used up its sign-in or confirmation mails')]);  // 2.453.0 (#3781): News only
+NOTIF_ROWS.push(['calsub', N_('Calendar subscriptions'), N_('a calendar you subscribed to failed three times in a row')]);  // 2.367.2 (#2969): News only
 const NM_GROUP = {comment: 'comment', reply: 'comment', follow: 'comment', mention: 'mention', assign: 'assign', complete: 'complete', status: 'status', share: 'share', unblock: 'unblock'};
 const NM_PRIMARY = ['comment', 'mention', 'assign', 'complete', 'status', 'share', 'unblock'];
-const NM_NEWS_NEW = {newtask: 0, approval: 0, followup: 1, usage: 1, proposal: 1, errreport: 1, signoff: 1};  // 2.266.0 (#2965): signoff
+const NM_NEWS_NEW = {newtask: 0, approval: 1, followup: 1, usage: 1, proposal: 1, errreport: 1, signoff: 1, limits: 1, calsub: 1};  // 2.266.0 (#2965): signoff
 const NM_PUSH = {comment: 1, reply: 1, follow: 1, mention: 1, assign: 1, newtask: 0, complete: 1, status: 0, share: 0, unblock: 1, approval: 1, followup: 1, reminder: 1, usage: 1, proposal: 1, nag: 1, chat: 1, errreport: 1, signoff: 1};
 const NM_SOCIAL = ['comment', 'reply', 'follow', 'mention', 'assign', 'newtask', 'complete', 'status', 'share', 'unblock', 'approval', 'proposal', 'chat', 'errreport'];
 const nmStored = s => { try { const o = JSON.parse(s.notify || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
@@ -156,7 +158,7 @@ function notifMatrix(s) {
   for (const [r] of NOTIF_ROWS) {
     const x = o[r] && typeof o[r] === 'object' ? o[r] : {};
     const news = r === 'reminder' || r === 'nag' || r === 'chat' ? null : NM_PRIMARY.includes(r) ? nk.has(NM_GROUP[r]) : 'news' in x ? !!x.news : r in NM_GROUP ? nk.has(NM_GROUP[r]) : !!NM_NEWS_NEW[r];
-    out[r] = {news, push: 'push' in x ? !!x.push : !!NM_PUSH[r]};
+    out[r] = {news, push: r === 'limits' || r === 'calsub' ? null : 'push' in x ? !!x.push : !!NM_PUSH[r]};
   }
   return out;
 }
@@ -285,7 +287,7 @@ function wsPaneWire(md) {
       else if (b.dataset.wsrm) {
         const uid = +b.dataset.wsrm, self = uid === S.me?.id, o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === oid), m = o?.members.find(x => x.id === uid);
         const li = await api('GET', `/api/orgs/${oid}/leave-info${self ? '' : '?uid=' + uid}`).catch(() => null);  // 2.361.0 (#2922): what goes where
-        if (!await askConfirm(self ? tr('Leave the organisation “{0}”?', o?.name || '') : tr('Remove {0} from the organisation?', m?.name || ''), li ? '' : (self ? tr('Your projects of this workspace go to one of its admins and you leave every project of the organisation.') : tr('The person’s projects of this workspace come to you and the person leaves every project of the organisation.')) + ' ' + tr('Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again does not bring that back.'), {ok: self ? tr('Leave') : tr('Remove'), danger: true, ...(li ? {html: olvLeaveHtml(li, self)} : {})})) return;  // 2.273.0 B (#3042): + what ends
+        if (!await askConfirm(self ? tr('Leave the organisation “{0}”?', o?.name || '') : tr('Remove {0} from the organisation?', m?.name || ''), li ? '' : (self ? tr('Your projects of this workspace go to one of its admins and you leave every project of the organisation.') : tr('The person’s projects of this workspace come to you and the person leaves every project of the organisation.')) + ' ' + tr('Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.'), {ok: self ? tr('Leave') : tr('Remove'), danger: true, ...(li ? {html: olvLeaveHtml(li, self)} : {})})) return;  // 2.273.0 B (#3042): + what ends
         await api('DELETE', `/api/orgs/${oid}/members/${uid}`); toast(self ? tr('You left the organisation') : tr('Removed'));
       }
       await load(); render();
@@ -1008,7 +1010,7 @@ async function stoCheck(md) {
 }
 const bkHtml = () => `<h4 id="s-bk-h">${tr('Backups')}</h4><div class="shint">${tr('The server key KALMIDO_SECRET_KEY is not part of a backup: keep it separately. A backup restores the encrypted organisation data only with that key (or with the organisations’ recovery keys).')}</div><div id="s-bk"><div class="muted mhint">${tr('Loading…')}</div></div><h4 id="s-bko-h">${tr('Off-site backup')}</h4><div id="s-bko"></div>`;  // 2.143.0 B (#2152): + the off-site target
 const BK_KIND = {auto: N_('automatic'), manual: N_('manual'), safety: N_('before a restore')};
-const fmtBytes = n => n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round((n || 0) / 1e3)) + ' kB';
+const fmtBytes = n => fmtSize(Math.max(n || 0, 1024));  // 2.450.0 (#3770): fmtSize, at least "1 KB"
 async function bkDraw(md, j) {
   const box = $('#s-bk', md); if (!box) return;
   scnStatus(md);  // 2.61.0 (#1818): the virus scanner's line (once)

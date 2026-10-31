@@ -3,7 +3,9 @@
 // - after loading: no styling (app.css missing, e.g. the server was restarting) -> reload again after a few seconds, at most
 //   3 times (counter in sessionStorage); then a plain notice with a "Reload" button (inline style, readable without app.css)
 const RL_KEY = 'kalmido-rl-n', RL_MAX = 3;
-const RL_TXT = {en: ['Kalmido could not be loaded completely.', 'Reload'], de: ['Kalmido konnte nicht vollständig geladen werden.', 'Neu laden']};
+const RL_TXT = {en: ['Kalmido could not be loaded completely.', 'Reload'], de: ['Kalmido konnte nicht vollständig geladen werden.', 'Neu laden'],
+  fr: ['Kalmido n’a pas pu être chargé entièrement.', 'Recharger'], es: ['Kalmido no se ha podido cargar por completo.', 'Recargar'],
+  it: ['Kalmido non è stato caricato completamente.', 'Ricarica'], nl: ['Kalmido kon niet volledig worden geladen.', 'Opnieuw laden']};
 const rl_sleep = ms => new Promise(r => setTimeout(r, ms));
 async function rl_ok(url, css) {
   try {

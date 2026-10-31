@@ -12,7 +12,7 @@ import urllib.request
 from datetime import timedelta
 from flask import g, jsonify
 
-from ..core.config import app, ATT_DIR, DB, NTFY_URL, PUBLIC_URL
+from ..core.config import app, ATT_DIR, DB, NTFY_URL, PUBLIC_URL, SECRET_KEY, SECRET_KEY_PROBLEM
 from ..core.schema import GLOBAL_DEFAULTS
 from ..core.i18n import lang, LANGS, N_, tr, trn
 from ..core.db import body, connect, db, default_uid, err, gset, gsetting, iso, local_now, now_utc, usettings
@@ -105,6 +105,20 @@ def aa_now(kind, key, text, args=(), n=None, click=None):
                 _AA["q"].append((kind, str(key)[:200], text, list(args), n, click))
     except Exception:  # noqa: BLE001
         pass
+
+
+# 2.359.3 (#2510): an existing install without a server key keeps starting (a refusal would lock it out with the update);
+# next to the warning in the settings (settings.js shKeyWarn, the same texts) the admins get an alert at every instance start
+AA_KEY_TEXT = {"invalid": N_("KALMIDO_SECRET_KEY (or the key file) is not valid: it must be 32 random bytes, base64."),
+               "file_in_data": N_("KALMIDO_SECRET_FILE lies inside the data or backup folder and was ignored. Put it on its own volume."),
+               "file_error": N_("The key file KALMIDO_SECRET_FILE cannot be read or written, see the server log. After an update: create the folder secret next to data and give it to the user 1000 (mkdir secret && chown 1000 secret), then restart.")}
+AA_KEY_NONE = N_("Without KALMIDO_SECRET_KEY or KALMIDO_SECRET_FILE no access token can be stored and organisation data stays unencrypted. See SELF-HOSTING.md.")
+
+
+def aa_secret_key():
+    """No alert with KALMIDO_NO_SECRET_KEY=1: then running without a key was decided on purpose."""
+    if not SECRET_KEY and not env_bool("KALMIDO_NO_SECRET_KEY", False):
+        aa_now("security", "secret-key:missing", AA_KEY_TEXT.get(SECRET_KEY_PROBLEM, AA_KEY_NONE))
 
 
 AA_IP_KEYS = ("logins", "api", "drop", "ics", "publink")  # security counters whose items are client addresses

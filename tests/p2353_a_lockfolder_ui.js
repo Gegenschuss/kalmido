@@ -98,7 +98,12 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwA
     await ev(`(() => { fslInfo = window.__keep.info; fslRelease = window.__keep.rel; FSL.wait = {}; return 1; })()`);
 
     // ---- unlock with the password
-    const s = await ev(`fslStop(${BOX}, 'password123').then(x => ({x}), e => ({err: e.message}))`);
+    // 2.456.0 (#3851): a second run ends the switch first (here: the finish goes out twice): that is no error of the unlock
+    const s = await ev(`(() => {
+      const keep = rawFetch;
+      rawFetch = async (m, u, b, k) => { if (/\\/finish$/.test(u)) await keep(m, u, b, k); return keep(m, u, b, k); };
+      return fslStop(${BOX}, 'password123').then(x => ({x}), e => ({err: e.message})).finally(() => { rawFetch = keep; });
+    })()`);
     check(s && s.x === true, 'fslStop: unlocked ' + JSON.stringify(s));
     const n2 = await names();
     check(n2.sort().join(',') === 'hello.txt,pic.png', 'plain names on the server again ' + n2.join(','));

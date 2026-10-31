@@ -66,7 +66,7 @@ const RM = '(prefers-reduced-motion: reduce)';
   check(busy.querySelector('svg.bot.b-arbeitet') && /working on it/.test(busy.querySelector('.ttx').textContent), '#2610: "working on it": the bot too');
   const task = P.parseFromString(w.typingHtml([{name: 'Bob', typing: Infinity}], 'd-typing'), 'text/html');
   check(task.querySelector('.atdots') && !task.querySelector('svg.bot'), '#2610: the task panel (people) keeps the dots');
-  check(P.parseFromString(w.typingHtml([], 'chat-typing'), 'text/html').querySelector('#chat-typing.hidden') && !P.parseFromString(w.typingHtml([], 'chat-typing'), 'text/html').querySelector('svg.bot'), '#2610: nobody working: no figure');
+  check(P.parseFromString(w.typingHtml([], 'chat-typing'), 'text/html').querySelector('#chat-typing.atyrow:empty') && !P.parseFromString(w.typingHtml([], 'chat-typing'), 'text/html').querySelector('svg.bot'), '#2610: nobody working: no figure');
 
   // ================= #2611: long jobs
   const mv = P.parseFromString(w.umzImpHtml({state: 'running', progress: {done: 3, total: 10}}), 'text/html');

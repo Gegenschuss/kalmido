@@ -26,7 +26,7 @@ from urllib.parse import quote
 from flask import g, jsonify, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ, ATT_DIR
-from ..core.i18n import lang, LANGS, short_day, tr
+from ..core.i18n import browser_lang, lang, short_day, tr
 from ..core.db import body, bump, db, iso, local_day, local_now, now_utc
 from ..core.pg import insert_id, system_ctx
 from ..core.access import Denied, acx_anon_bind
@@ -619,11 +619,7 @@ def wsh_pub_pages(c, s):
 
 
 def wsh_lang(c, s):
-    for part in (request.headers.get("Accept-Language") or "").split(","):
-        code = part.split(";")[0].strip().lower()[:2]
-        if code in LANGS:
-            return code
-    return lang(c, s["owner_id"] or s["created_by"])
+    return browser_lang() or lang(c, s["owner_id"] or s["created_by"])
 
 
 def wsh_open(c, token, files=False):

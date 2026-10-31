@@ -52,7 +52,9 @@ NEWS_KINDS += ("signoff",)  # 2.266.0 (#2965): a customer approved / declined th
 NEWS_KINDS += ("orgdelnotice", "orggone")  # 2.361.0 (#2920): my organisation is deleted on a day / was deleted (always, no push; accounts/orgleave.py)
 NEWS_KINDS += ("whorgcut",)  # 2.380 G (#3391): my personal webhook no longer delivers an organisation's lists (always, no push; integrations/webhooks.py)
 NEWS_KINDS += ("fetcherr",)  # 2.425.0 C (#3453): a portal of my receipt fetcher reports a new error (row "fetcher", docs/fetcher.py)
-NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
+NEWS_KINDS += ("evchange", "apbooking", "calsub")  # 2.367.2 (#2969): an event I am invited to changed (row "assign"); a booking on my page (row "assign"); my calendar subscription keeps failing (row "calsub", no push)
+NEWS_KINDS += ("aprequest",)  # 2.367.2 (#2968): someone asks ME for an approval (row "assign", team/approvals.py)
+NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evchange", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
 NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign", "take"), "comment": ("comment",), "complete": ("complete",),
@@ -72,13 +74,16 @@ NEWS_FOR_ME += ("orgjoin",)  # 2.148.1 A (#2480)
 NEWS_FOR_ME += ("signoff",)  # 2.266.0 (#2965)
 NEWS_FOR_ME += ("orgdelnotice", "orggone")  # 2.361.0 (#2920)
 NEWS_FOR_ME += ("whorgcut",)  # 2.380 G (#3391)
+NEWS_FOR_ME += ("aprequest",)  # 2.367.2 (#2968)
 
 
 def news_to_me(kind, actor_id, data, agents, s=None):
     # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
-    if kind in ("upscan", "filereq", "orgkey", "ptlimit", "fetcherr"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
+    if kind in ("upscan", "filereq", "orgkey", "ptlimit", "apblimit", "fetcherr", "evchange", "apbooking", "calsub"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
         return True
-    if kind == "approval":  # 2.147.1 C (#2405): an agent waits for MY approval (my own row): "For you", counted by the bell
+    if kind in ("approval", "aprequest"):  # 2.147.1 C (#2405): an agent waits for MY approval (my own row): "For you", counted by the bell
+        return True
+    if kind == "review" and (data or {}).get("pr"):  # 2.367.2 (#2968): a linked pull request approved my task (no actor)
         return True
     if not actor_id:
         return False
@@ -96,7 +101,7 @@ def news_to_me(kind, actor_id, data, agents, s=None):
 
 def agent_push_ok(c, uid, s, actor):
     """2.28.0 (#987): a push about what an AGENT did (its comments, completions, new tasks, status) only when the person
-    switched "Pushes for what agents do" on (setting agent_push); mentions by agents and approval requests are not affected."""
+    switched "Pushes for what agents do" on (setting agent_push); mentions by agents, approval requests and (2.367.2, #2968) their questions on a task are not affected."""
     from ..agents.core import agent_ids
     if not actor or actor not in agent_ids(c):
         return True
@@ -145,6 +150,7 @@ def news_wanted(s, kind):
 # default to its "comment"), everything else in the setting "notify" (json {event: {news?: 0|1, push?: 0|1}}). Defaults
 # = the behaviour up to 2.0.8: pushes for comments, mentions, assignments, completions, unblocked tasks, approvals and
 # reminders; no pushes for status and sharing; newtask off; reply on (as comment); followup on.
+# 2.367.2 (#2968): the News of "approval" are on by default (an agent waits for the person).
 # The bell of a list (table list_bell, per user): all = every event of that list (also every comment and new task) as
 # News and push; default = the matrix; mute = nothing from that list except mentions of me and assignments to me (these
 # follow the matrix). Reminders and follow-ups are my own and never muted by a bell.
@@ -160,16 +166,20 @@ NOTIF_ROWS += ("leave",)  # 2.125.0 A (#2117): vacation requests (admins) and th
 NOTIF_ROWS += ("timesheet",)  # 2.125.0 B (#2119): timesheets: a member's closed month (admins), the decision on mine (News + push on by default)
 NOTIF_ROWS += ("signoff",)  # 2.266.0 (#2965): a customer decided through a link (sign-off, video review; News + push on by default, was "approval")
 NOTIF_ROWS += ("fetcher",)  # 2.425.0 C (#3453): a portal of my receipt fetcher has a new error (News + push on by default)
+NOTIF_ROWS += ("limits",)  # 2.453.0 (#3781): my customer portal / booking page used up its mails (News only, on by default)
+NOTIF_ROWS += ("calsub",)  # 2.367.2 (#2969): my calendar subscription failed 3 times in a row (News only, on by default)
 NOTIF_NEWS_GROUP = {"comment": "comment", "reply": "comment", "follow": "comment", "mention": "mention", "assign": "assign",
                     "complete": "complete", "status": "status", "share": "share", "unblock": "unblock"}
 NOTIF_NEWS_PRIMARY = ("comment", "mention", "assign", "complete", "status", "share", "unblock")  # News = news_kinds
-NOTIF_NEWS_NEW = {"newtask": 0, "approval": 0, "followup": 1, "usage": 1, "proposal": 1, "errreport": 1}
+NOTIF_NEWS_NEW = {"newtask": 0, "approval": 1, "followup": 1, "usage": 1, "proposal": 1, "errreport": 1}
 NOTIF_NEWS_NEW["review"] = 1  # 2.60.0 C (#1512)
 NOTIF_NEWS_NEW["filereq"] = 1  # 2.122.0 A (#2097)
 NOTIF_NEWS_NEW["leave"] = 1  # 2.125.0 A (#2117)
 NOTIF_NEWS_NEW["timesheet"] = 1  # 2.125.0 B (#2119)
 NOTIF_NEWS_NEW["signoff"] = 1  # 2.266.0 (#2965)
 NOTIF_NEWS_NEW["fetcher"] = 1  # 2.425.0 C (#3453)
+NOTIF_NEWS_NEW["limits"] = 1  # 2.453.0 (#3781)
+NOTIF_NEWS_NEW["calsub"] = 1  # 2.367.2 (#2969)
 NOTIF_PUSH_DEFAULT = {"comment": 1, "reply": 1, "follow": 1, "mention": 1, "assign": 1, "newtask": 0, "complete": 1,
                       "status": 0, "share": 0, "unblock": 1, "approval": 1, "followup": 1, "reminder": 1, "usage": 1,
                       "proposal": 1, "nag": 1, "chat": 1, "errreport": 1}
@@ -179,7 +189,10 @@ NOTIF_PUSH_DEFAULT["leave"] = 1  # 2.125.0 A (#2117)
 NOTIF_PUSH_DEFAULT["timesheet"] = 1  # 2.125.0 B (#2119)
 NOTIF_PUSH_DEFAULT["signoff"] = 1  # 2.266.0 (#2965)
 NOTIF_PUSH_DEFAULT["fetcher"] = 1  # 2.425.0 C (#3453)
+NOTIF_PUSH_DEFAULT["limits"] = 0  # 2.453.0 (#3781)
+NOTIF_PUSH_DEFAULT["calsub"] = 0  # 2.367.2 (#2969)
 NOTIF_NO_NEWS = ("reminder", "nag", "chat")
+NOTIF_NO_PUSH = ("limits", "calsub")  # 2.453.0 (#3781): News only (the notes promise no push, no mail)
 NOTIF_UNMUTED = ("mention", "assign")        # still come through a muted list
 NOTIF_NO_BELL = ("reminder", "followup", "usage", "proposal")  # never changed by a list bell
 BELL_MODES = ("all", "default", "mute", "custom")
@@ -194,11 +207,15 @@ KIND_ROW = {"mention": "mention", "comment": "comment", "assign": "assign", "una
             "proposal": "proposal", "take": "assign", "errreport": "errreport", "apdecide": "assign", "signup": "usage",
             "orglist": "share", "playbook_proposal": "proposal", "connreq": "share", "connok": "share", "lytpl": "share"}  # 2.35.0 (#1101): an organisation admin archived / restored / deleted / handed over a list
 KIND_ROW["review"] = "review"  # 2.60.0 C (#1512)
+KIND_ROW["evchange"] = KIND_ROW["apbooking"] = "assign"  # 2.367.2 (#2969): like the invitation and the booking's push
+KIND_ROW["calsub"] = "calsub"
+KIND_ROW["aprequest"] = "assign"  # 2.367.2 (#2968): like the assignment it replaces
 KIND_ROW["filereq"] = "filereq"  # 2.122.0 A (#2097)
 KIND_ROW["leavereq"] = KIND_ROW["leavedecide"] = "leave"  # 2.125.0 A (#2117): its own row (switchable)
 KIND_ROW["tsheet"] = "timesheet"  # 2.125.0 B (#2119)
 KIND_ROW["signoff"] = "signoff"  # 2.266.0 (#2965)
 KIND_ROW["fetcherr"] = "fetcher"  # 2.425.0 C (#3453)
+KIND_ROW["ptlimit"] = KIND_ROW["apblimit"] = "limits"  # 2.453.0 (#3781): one row for both
 KIND_ROW["wiki_shared"] = "share"  # 2.126.2 B (#2355): switched with the sharing row (News on, no push by default)
 
 
@@ -211,7 +228,7 @@ def notif_stored(s):
 
 
 def notif_matrix(s):
-    """{event: {"news": bool|None, "push": bool}} of a user's settings (None = the event has no News)."""
+    """{event: {"news": bool|None, "push": bool|None}} of a user's settings (None = the event has no News / no push)."""
     s = s or USER_DEFAULTS
     nk = set((s.get("news_kinds") if s.get("news_kinds") is not None else USER_DEFAULTS["news_kinds"]).split(","))
     o = notif_stored(s)
@@ -226,7 +243,7 @@ def notif_matrix(s):
             news = bool(x["news"])
         else:
             news = NOTIF_NEWS_GROUP[r] in nk if r in NOTIF_NEWS_GROUP else bool(NOTIF_NEWS_NEW[r])
-        out[r] = {"news": news, "push": bool(x["push"]) if "push" in x else bool(NOTIF_PUSH_DEFAULT[r])}
+        out[r] = {"news": news, "push": None if r in NOTIF_NO_PUSH else bool(x["push"]) if "push" in x else bool(NOTIF_PUSH_DEFAULT[r])}
     return out
 
 
@@ -244,7 +261,7 @@ def notif_update(s, v):
     nk = [x for x in (s.get("news_kinds") or "").split(",") if x]
     for r, x in v.items():
         if r not in NOTIF_ROWS or not isinstance(x, dict) or not x or any(k not in ("news", "push") for k in x) or \
-                any(y not in (0, 1, True, False) for y in x.values()) or (r in NOTIF_NO_NEWS and "news" in x):
+                any(y not in (0, 1, True, False) for y in x.values()) or (r in NOTIF_NO_NEWS and "news" in x) or (r in NOTIF_NO_PUSH and "push" in x):
             raise bad
         cur = o.setdefault(r, {})
         if "push" in x:
@@ -301,7 +318,7 @@ def notif_ok(c, uid, s, row, ch, lid=None, own=False):
     own (2.266.0, #2962): the due reminder / nag / follow-up is uid's own (uid = the task's reminder recipient, e.g. its
     assignee) - the owner's template does not limit it (it is meant for the noise of others, not one's own due dates)."""
     m = notif_matrix(s)[row]
-    if ch == "news" and m["news"] is None:
+    if m[ch] is None:  # 2.453.0 (#3781): was news only; a row without pushes (NOTIF_NO_PUSH) too
         return False
     if ch == "push" and lid and not (own and row in ("reminder", "nag", "followup")):  # 2.33.0 (#927): the list owner's template is a ceiling for pushes (the News stay complete)
         from ..notify.caps import cap_ok
@@ -434,6 +451,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
     out, uids = [], set()
     agents = {x[0] for x in c.execute("SELECT id FROM users WHERE kind='agent'")}
     s = s or usettings(c, uid)  # 2.66.1 (#1943): agent_comments decides whether an agent's plain comment is "For you"
+    evc_seen = set()  # 2.367.2 (#2969): only the newest time / place change of an event (the rows come newest first)
     for r in rows:
         kind = r["kind"]
         if (mentions_only and kind != "mention") or (to_me and kind not in NEWS_TO_ME):
@@ -478,6 +496,19 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 k = c.execute("SELECT k.org_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?", (dd.get("event_id"),)).fetchone()
                 if not k or not ev_att_ok(c, uid, k["org_id"]):
                     continue
+        elif kind == "evchange":  # 2.367.2 (#2969): a cancellation stands; a change while I am invited, the newest only
+            dd = json.loads(r["data"] or "{}")
+            if dd.get("what") in ("time", "place"):
+                if dd.get("event_id") in evc_seen or not c.execute(
+                        """SELECT 1 FROM event_attendees a JOIN events e ON e.id=a.event_id
+                           WHERE a.event_id=? AND a.user_id=? AND e.deleted_at IS NULL""", (dd.get("event_id"), uid)).fetchone():
+                    continue
+                evc_seen.add(dd.get("event_id"))
+        elif kind == "apbooking":  # 2.367.2 (#2969): my booking page (no task, no list)
+            pass
+        elif kind == "calsub":  # 2.367.2 (#2969): while that subscription of mine still fails
+            if not c.execute("SELECT 1 FROM cal_subs WHERE id=? AND user_id=? AND fails>0", (json.loads(r["data"] or "{}").get("sub_id"), uid)).fetchone():
+                continue
         elif kind == "connreq":  # 2.49.0 (#1106): while the request is still open
             from ..accounts.discover import disc_request_open
             if not disc_request_open(c, uid, r["actor_id"]):
@@ -532,7 +563,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             from ..office.signoff import sig_news_live
             if not sig_news_live(c, uid, r["data"]):
                 continue
-        elif kind == "ptlimit":  # 2.138.4 C (#2380): the portal's sign-in mails of my space were used up (no task, no list)
+        elif kind in ("ptlimit", "apblimit"):  # 2.138.4 C (#2380): the portal's sign-in mails of my space were used up (no task, no list); 2.360.2 L (#2561): the booking page's
             pass
         elif kind == "orgjoin":  # 2.148.1 A (#2480): while the invitation is open
             from ..accounts.orginvite import ojn_open
@@ -550,6 +581,9 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             pass  # 2.380 G (#3391): whorgcut = webhook + organisation names in data, no task, no list
         elif kind == "fetcherr":  # 2.425.0 C (#3453): my receipt fetcher's portal error (no task, no list)
             pass
+        elif kind == "approval" and r["task_id"] is None:  # 2.367.2 (#2968): an agent asks about a whole list (or about none)
+            if r["list_id"] and not sees(r["list_id"]):
+                continue
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):
                 continue

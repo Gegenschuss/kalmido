@@ -16,6 +16,9 @@ services:
       - traefik.http.routers.kalmido.rule=Host(`kalmido.example.com`)
       - traefik.http.routers.kalmido.entrypoints=websecure
       - traefik.http.routers.kalmido.tls.certresolver=letsencrypt
+      # Kalmido packs its scripts, styles and JSON itself; this also covers the rest
+      - traefik.http.routers.kalmido.middlewares=kalmido-compress
+      - traefik.http.middlewares.kalmido-compress.compress=true
       - traefik.http.services.kalmido.loadbalancer.server.port=3040
 
 networks:

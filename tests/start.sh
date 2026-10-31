@@ -15,6 +15,7 @@
 #   KALMIDO_TEST_PROXY_PORT host port -> proxy port 3045        (default 3041, trusts Remote-User)
 #   KALMIDO_TEST_DATA       data dir, bind-mounted to /data    (default tests/.data)
 #   KALMIDO_ONBOARDING      1 = sample list + welcome tour for new accounts (default 0: suites start from empty accounts)
+#   KALMIDO_TEST_TIMING_ALL 0 = Server-Timing only for instance admins as in production (default 1: the statement-count suites measure every account, 2.360.2 #2561)
 #   KALMIDO_ADMIN_ALERTS    1 = admin alerts via ntfy on (default 0: they would add pushes to the admin's topic)
 #   KALMIDO_TIDY_QUIET_S    seconds a new task waits for its tidy event (default 0 here: at once, as the suites before 2.27 expect)
 #   KALMIDO_TEST_NOW        2.149.0 (#2512): ISO instant the server's clock starts at (default unset: the real time); the
@@ -82,7 +83,7 @@ docker run -d --name "$NAME" --network bridge --user "$(id -u):$(id -g)" --secur
   --link "$DBC:db" -e DATABASE_URL="postgresql://$DBU:kalmido@db/$DBN" \
   -e AUTH_PROXY_HEADER=Remote-User -e AUTH_TRUSTED_PROXIES="$GW" -e AUTH_PROXY_PORT=3045 \
   -e KALMIDO_SETUP_CODE="${KALMIDO_SETUP_CODE-off}" -e KALMIDO_NO_SECRET_KEY="${KALMIDO_NO_SECRET_KEY-1}" -e KALMIDO_SECRET_KEY_CHANGED="${KALMIDO_SECRET_KEY_CHANGED-1}" \
-  -e KALMIDO_UPDATE_CHECK=0 -e KALMIDO_ONBOARDING="${KALMIDO_ONBOARDING:-0}" -e KALMIDO_ADMIN_ALERTS="${KALMIDO_ADMIN_ALERTS:-0}" -e NTFY_URL=http://127.0.0.1:9999 -e TASKS_PUSH_GAP=3 -e TASKS_WATCHDOG_INTERVAL=1 -e KALMIDO_TIDY_QUIET_S=${KALMIDO_TIDY_QUIET_S:-0} -e KALMIDO_LOGIN_SLOW_S=${KALMIDO_LOGIN_SLOW_S:-0.3} -e KALMIDO_NOTIF_TEMPLATE=${KALMIDO_NOTIF_TEMPLATE:-all} -e TASKS_MAX_FILE_MB=1 \
+  -e KALMIDO_UPDATE_CHECK=0 -e KALMIDO_ONBOARDING="${KALMIDO_ONBOARDING:-0}" -e KALMIDO_ADMIN_ALERTS="${KALMIDO_ADMIN_ALERTS:-0}" -e KALMIDO_TEST_TIMING_ALL="${KALMIDO_TEST_TIMING_ALL-1}" -e NTFY_URL=http://127.0.0.1:9999 -e TASKS_PUSH_GAP=3 -e TASKS_WATCHDOG_INTERVAL=1 -e KALMIDO_TIDY_QUIET_S=${KALMIDO_TIDY_QUIET_S:-0} -e KALMIDO_LOGIN_SLOW_S=${KALMIDO_LOGIN_SLOW_S:-0.3} -e KALMIDO_NOTIF_TEMPLATE=${KALMIDO_NOTIF_TEMPLATE:-all} -e TASKS_MAX_FILE_MB=1 \
   -p "127.0.0.1:$PPORT:3045" -p "127.0.0.1:$PORT:3040" -v "$D":/data ${EXTRA:-} "$IMG" 2>&1 >/dev/null | { grep -v "Links on the default bridge" >&2 || true; }
 [[ ${PIPESTATUS[0]} -eq 0 ]] || exit 1  # (the --link deprecation warning is noise here)
 # START_WAIT_S (#3506): an upgrade from an old dump runs every migration at the first start - it may take longer than 30 s

@@ -22,7 +22,8 @@ import use the same function."""
 from datetime import date, timedelta
 from decimal import Decimal
 
-from .calc import dstr, money
+from .calc import dstr, fmt_point, money
+from .countries import fk_country_names
 
 
 # The tables: CODE;place ('' = the whole country / "im Uebrigen");full day;partial day (EUR). Germany is the law's rate.
@@ -694,7 +695,9 @@ def vma_country_name(code, lg="de"):
     n = VMA_NAMES.get(code)
     if not n:
         return code or ""
-    return n[0] if lg == "de" else n[1]
+    if lg in ("de", "en"):
+        return n[0] if lg == "de" else n[1]
+    return fk_country_names(lg).get(code) or n[1]  # 2.449.0 (#3766): nl / fr / es / it (was the English name)
 
 
 def vma_table_year(year):
@@ -868,7 +871,7 @@ def vma_breakdown(v, lg="de", cur="EUR"):
     def num(s):
         d = Decimal(s)
         t = format(d.quantize(Decimal(1)) if d == d.to_integral() else d, "f")
-        return t.replace(".", ",") if lg == "de" else t
+        return fmt_point(t, lg)  # 2.449.0 (#3766): every comma language (was de alone)
     for (code, place), lns in by.items():
         name = vma_country_name(code, lg) + (f" ({place})" if place else "")
         parts = " + ".join(f"{x['n']} × {num(x['rate'])} {sym}" for x in lns)

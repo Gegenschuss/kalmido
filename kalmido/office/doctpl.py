@@ -1,7 +1,7 @@
 """2.93.0 A (#1927): document templates with variables, documents as PDF filed with client / project, signature by customer link.
 
 Templates (office_doc_templates): kind contract | confirmation | nda | other, name, language, text with {{variables}} and
-"can be signed". Three samples (service contract, order confirmation, non-disclosure agreement) in German and English live
+"can be signed". Three samples (service contract, order confirmation, non-disclosure agreement) in every app language live
 in the code (DT_STARTERS) and become an own template with "Use sample". Documents (office_gen_docs) are made from a template
 for a client (required), optionally a project list and a quotation of the same client. A draft keeps the text WITH its
 variables (the preview fills them from the current client / project / quotation / company, unknown or empty ones are
@@ -30,7 +30,7 @@ from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, need_list, vis_sql
 from ..core.errors import BadInput
 from .model import office_gate, office_org, office_settings, pb_cl_sql, pb_owner, trial_flag
-from .doctpl_samples import DMA_SAMPLES  # 2.117.0 B (#2283)
+from .doctpl_samples import DMA_SAMPLES, SAMPLE_MT, sample_langs, sample_text  # 2.117.0 B (#2283); 2.449.0 (#3768)
 from .doclang import DOC_LANGS, doc_lg  # 2.185.0 C (#2520)
 from .oftref import GD_KIND, oft_renamed  # 2.351.0 A (#2823)
 
@@ -56,7 +56,7 @@ CTRL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 NAME_MAX, TITLE_MAX, BODY_MAX = 200, 300, 60000
 LIST_MAX = 500
 
-# ---------------------------------------------------------------- the samples (German and English, kept short)
+# ---------------------------------------------------------------- the samples (German and English here, kept short; 2.449.0 (#3768): the others in doctpl_samples_<lang>.py)
 DT_STARTERS = {
     "contract": {
         "de": ("Vertrag über Leistungen", """# Vertrag über Leistungen
@@ -167,6 +167,7 @@ The obligations do not apply to information that is public, that a party already
 This agreement applies from {{today}} and ends three years after the end of the cooperation."""),
     },
 }
+sample_langs(DT_STARTERS)  # 2.449.0 (#3768)
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
@@ -310,7 +311,7 @@ def dt_values(c, oid, lang, client_id=None, list_id=None, doc_id=None):
             v["offer.gross"] = v["offer.total"]  # 2.296.0 C (#3165)
             v["offer.net"] = fmt_money(t["net"], lang, r["currency"] or "EUR") if t.get("net") is not None else ""
             if not list_id:
-                v["project.title"] = r["project_title"] or ""
+                v["project.title"] = " ".join((r["project_title"] or "").split())  # 2.431.0 B (#3594): the subject on one line
     if list_id:
         v["project.title"] = dt_list_ok(c, oid, list_id)["name"] or ""
     # a value never brings variables of its own (no second round of replacing) nor markup: "# ", "- ", "* " at its start
@@ -756,7 +757,9 @@ def dt_meta(c, oid):
 
 # 2.357.0 D (#3219): a small business (section 19, no VAT) gets the samples with the total instead of "net plus VAT"; only
 # when a sample is taken -- templates already saved stay as they are
-DT_SMALL = (("{{offer.net}} zzgl. USt", "{{offer.gross}}"), ("{{offer.net}} plus VAT", "{{offer.gross}}"))
+DT_SMALL = (("{{offer.net}} zzgl. USt", "{{offer.gross}}"), ("{{offer.net}} plus VAT", "{{offer.gross}}"),
+            ("{{offer.net}} hors TVA", "{{offer.gross}}"), ("{{offer.net}} más IVA", "{{offer.gross}}"),  # 2.449.0 (#3768)
+            ("{{offer.net}} più IVA", "{{offer.gross}}"), ("{{offer.net}} excl. btw", "{{offer.gross}}"))
 
 
 def dt_sample_body(c, oid, text):
@@ -769,16 +772,17 @@ def dt_sample_body(c, oid, text):
 
 @app.get("/api/office/doc-templates/starters")
 def dt_starters_get():
-    """?lang=de|en (default: the office's document language) -> {starters: [{key, kind, name, lang, body}], note}."""
+    """?lang= (default: the office's document language) -> {starters: [{key, kind, name, lang, body, machine}], note}.
+    2.449.0 (#3768): machine = a legal sample whose translation must be checked before use."""
     c, uid, oid = _ctx()
     lg = dt_lang(c, oid, request.args.get("lang") or None)
+    mt = lambda k: int(k in SAMPLE_MT and lg not in ("de", "en"))  # noqa: E731
     # 2.117.0 B (#2283): the letters of doctpl_samples after the contract samples; legal = the picker says to check it
-    sl = "de" if lg == "de" else "en"  # 2.185.0 C (#2520): the samples are de / en; other languages take the English one
-    return jsonify(starters=[{"key": k, "kind": k, "kind_label": dt_kind_label(k), "name": v[sl][0], "lang": lg, "body": dt_sample_body(c, oid, v[sl][1]),
-                              "legal": int(k != "confirmation")}
+    return jsonify(starters=[{"key": k, "kind": k, "kind_label": dt_kind_label(k), "name": sample_text(v, lg)[0], "lang": lg,
+                              "body": dt_sample_body(c, oid, sample_text(v, lg)[1]), "legal": int(k != "confirmation"), "machine": mt(k)}
                              for k, v in DT_STARTERS.items()] +
-                   [{"key": k, "kind": v["kind"], "kind_label": dt_kind_label(v["kind"]), "name": v[sl][0], "lang": lg, "body": v[sl][1],
-                     "legal": v["legal"]} for k, v in DMA_SAMPLES.items()], note=tr(DT_NOTE), lang=lg)
+                   [{"key": k, "kind": v["kind"], "kind_label": dt_kind_label(v["kind"]), "name": sample_text(v, lg)[0], "lang": lg,
+                     "body": sample_text(v, lg)[1], "legal": v["legal"], "machine": mt(k)} for k, v in DMA_SAMPLES.items()], note=tr(DT_NOTE), lang=lg)
 
 
 @app.post("/api/office/doc-templates")
@@ -794,11 +798,11 @@ def dt_tpl_post():
         if not st and not sm:
             raise BadInput(tr("Invalid value: {0}", "starter"))
         lg = dt_lang(c, oid, b.get("lang"))
-        sl = "de" if lg == "de" else "en"  # 2.185.0 C (#2520): English sample for nl / fr / es / it
         if sm:
-            b = {"kind": sm["kind"], "name": sm[sl][0], "lang": lg, "body": sm[sl][1], "sign": sm["sign"]}
+            b = {"kind": sm["kind"], "name": sample_text(sm, lg)[0], "lang": lg, "body": sample_text(sm, lg)[1], "sign": sm["sign"]}
         else:
-            b = {"kind": b["starter"], "name": st[sl][0], "lang": lg, "body": dt_sample_body(c, oid, st[sl][1]), "sign": 0 if b["starter"] == "confirmation" else 1}
+            nm, tx = sample_text(st, lg)  # 2.449.0 (#3768)
+            b = {"kind": b["starter"], "name": nm, "lang": lg, "body": dt_sample_body(c, oid, tx), "sign": 0 if b["starter"] == "confirmation" else 1}
     row = dt_tpl_clean(c, oid, b)
     ts = iso(now_utc())
     row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)

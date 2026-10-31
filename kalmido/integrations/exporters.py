@@ -160,7 +160,7 @@ def ex_zip(kind):
     ext, fn = (".csv", ex_todoist_csv) if kind == "todoist" else (".md", ex_markdown)
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for l in lists:
-            z.writestr(ex_file_name("Inbox" if l["is_inbox"] else l["name"], used, ext), fn(c, uid, l))
+            z.writestr(ex_file_name(tr("Basket") if l["is_inbox"] else l["name"], used, ext), fn(c, uid, l))
         if locked:
             z.writestr(ex_file_name("README-locked-lists", used, ".txt"),
                        tr("These projects are locked with a password (end-to-end encrypted). The server only holds them as ciphertext, so they cannot be exported here:") +

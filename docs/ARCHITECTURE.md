@@ -335,13 +335,14 @@ registering the ones of its area.
 | `chatwins.js` | 2.47.1 (#1720): several chats at once in the chat side panel, one above the other (agents, team chats, direct messages): Ctrl / Cmd + click or *Open in split window*, a divider between them, fold, close, reorder, remembered per device; one window holds the usual ids and state (`S.chat` / `S.tc`), the others are parked. Phones: a row of the open chats above the chat. |
 | `favorites.js` | 2.40.0: favourite lists (#1361): the star, the *Favourites* section of the sidebar, *Only favourites* and the favourites filter of views. |
 | `sideviews.js` | 2.156.0 D (#2186): saved views of the sidebar (`side_views` / `side_view`), loaded on demand (favtiles.js has the stand-ins): the view tiles apart from the favourites, "Others (N)" for what a view hides, folding inside a view only for now ("Update view"), the editor and the list in Settings > Sidebar. |
-| `favtiles.js` | 2.57.0 (#1798): favourites of every kind (lists, folders, views, areas, filters, tags, people, groups, agents) as icon tiles in the sidebar's fixed head: the star in the row menus, one order (`fav_items`), the tile menu (Move left / right) and dragging. |
+| `favtiles.js` | 2.57.0 (#1798): favourites of every kind (lists, folders, views, areas, filters, tags, people, groups, agents) as icon tiles in the sidebar's fixed head: the star in the row menus, one order (`fav_items`), the tile menu (Move left / right) and dragging. 2.441.0 (#3592): the row moved into the head bar (`#kbar .fv2bar`, phones `#favrow`, page `#favorites`) and takes anything with an address (`fv2_hashKey`, `GET /api/favorites/targets`), with +N, dividers, an own look (`fav_meta`) and the workspace's dot. |
 | `mineorder.js` | 2.40.0: your own order of *My tasks* (#1344), kept per person on the server (`user_task_order`). |
 | `mdtitle.js` | 2.40.0: inline Markdown in task titles (`mdTitle`) and the plain text for attributes, tabs and notifications (`mdPlain`). |
 | `formguard.js` | 2.40.0: keeps unsaved form input in Office & finance across redraws and view switches, *Save / Discard*, a question before leaving (#1371). |
 | `countries.js` | 2.40.0: the country picker (names from the browser, ISO 3166 alpha-2 codes) of the client card, company data and import preview. |
 | `collab.js` | News and comments + activity (module "collab"). |
 | `attachments.js` | Attachments and the share target. |
+| `upbar.js` | 2.363.3 (#3134): upload progress with Cancel. `rawFetch0` sends every form with at least 1 MB of files through `upSend` (XHR), so all file dialogs share one bar; Cancel ends only while the body is on its way. `upLimit` in `attachments.js` holds the server's limit for all file dialogs. |
 | `pdfview.js` | 2.48.0 (#1367): the PDF preview `pdfView({url, name, size, dlUrl})` (lightbox: pages drawn on demand, turn pages, zoom, swipe, a clear message offline or for a damaged file) for attachments, project files, office documents and archive PDFs; links carry `data-pview`. Uses the bundled pdf.js (`static/vendor/pdfjs/`, loaded on first use, `isEvalSupported: false`, no scripting). |
 | `undo.js` | Undo / redo history. |
 | `popovers.js` | Popovers (date, priority, list, tags, reminders, repeat ...). |
@@ -494,6 +495,13 @@ a second finger or a cancel event, and swallows the click after a drag. The call
 2.193.0 A (#2219): the calendar (`caldrag.js`: the 15-minute grid in `onMove`, `scroll` = the hours, touch after a 0.4 s
 hold) and the mind map (`mindmap.js`: rehanging a branch, the drop target in map coordinates; moving the map and pinch stay
 its own pointer handling) use it.
+
+2.456.0 (#3837): the order of the rows of a list is the same gesture everywhere: `rowd_attach(root, {kind, row, move})` in
+`drag.js` on `drg_attach`. The grip (`data-rowd="kind"`, `rowd_grip` / `rowd_attr`; a position's symbol where the row is full
+of fields) drags with a mouse at once, with a finger after a 0.38 s hold; a line shows where the row lands, `move(from, to,
+row, list)` saves with the same code as the arrows. `rowd_arrows` keeps the arrows on a computer for the keyboard and leaves
+them out on a touch screen (no hover). Used by quotation positions and parts, form questions, budget categories, the
+arrangements, sidebar views, key links, scanned pages and the phone list of "Arrange blocks".
 
 2.193.0 C (#2219): task rows and chips (`dnd.js`, list / board / matrix / calendar, the selection's grip) drag by finger
 on `drg_attach`: the long press is `hold` (0.38 s, 8 px; 0 on the grip), `onHold` lifts the row at once (ghost, "Move to

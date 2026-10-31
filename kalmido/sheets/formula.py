@@ -39,7 +39,7 @@ _IDREF = re.compile(r"\{(c|col|p|l|k|t|x):(\d{1,18})\}((?:\.\w+)?)")  # 2.124.0 
 _XREF = re.compile(r"(?:'((?:[^']|''){1,100})'|([^\W\d][\w.]{0,99}))!\$?([A-Za-z]{1,3})\$?(\d{1,6})(?::\$?([A-Za-z]{1,3})\$?(\d{1,6}))?(?![\w.$(])")
 _IDENT = re.compile(r"[^\W\d]\w*(?:\.\w+)*")
 _NUM = re.compile(r"\d+(?:[.,]\d+)?(?:[eE][+-]?\d+)?|[.,]\d+")
-_DATE_DE = re.compile(r"(\d{1,2})\.(\d{1,2})\.(\d{4})")
+_DATE_DE = re.compile(r"(\d{1,2})([.-])(\d{1,2})\2(\d{4})")  # 2.450.0 (#3770): + the Dutch 15-10-2026
 _DATE_ISO = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
 
 
@@ -341,7 +341,7 @@ def sh_parse_date(s):
     m = _DATE_DE.fullmatch(t)
     try:
         if m:
-            return date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+            return date(int(m.group(4)), int(m.group(3)), int(m.group(1)))
         m = _DATE_ISO.fullmatch(t[:10]) if len(t) in (10, 19, 20, 24, 25) else None
         if m:
             return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))

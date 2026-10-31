@@ -713,6 +713,7 @@ fresh; run p2466_d_ui node p2466_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.6 part A: #1722 #1714 #1715 #1717 #1445 the reference launcher: cut buttons, one suggestion, the fixed rules block,
 # WORKFLOW-KALMIDO.md, a wake run after a job and a lost job resumed once (pure Python, no server)
 run p2466_a_launcher "$PY" p2466_a_launcher_test.py
+run p2450_c_starter_lang "$PY" p2450_c_starter_lang_test.py
 # 2.46.6 part B: #1680 #1708 #1709 #1716 personal agent hint at the members switch, an agent's lists, setup offer, which agent when
 fresh; run p2466_b_api "$PY" p2466_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2466_b_ui node p2466_b_ui.js "$KALMIDO_TEST_DATA"
@@ -731,6 +732,7 @@ fresh; run p2470_d_cost_ui node p2470_d_cost_ui.js "$KALMIDO_TEST_DATA"
 # 2.47.0 part A: #1648 fill instead of skip, #1649 masters Freelancer-Rollen / Drehpersonal + their import, #1645 import columns
 fresh; run p2470_a_import_api "$PY" p2470_a_import_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2470_a_roles_ui node p2470_a_roles_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2451_a_office_rows_ui node p2451_a_office_rows_ui.js "$KALMIDO_TEST_DATA"
 # 2.47.0 part B: #1215 parts of a quotation (title page calculation, rights, PDF pages, invoice forms; the editor)
 fresh; run p2470_b_parts_api "$PY" p2470_b_parts_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2470_b_parts_ui node p2470_b_parts_ui.js "$KALMIDO_TEST_DATA"
@@ -1401,6 +1403,8 @@ fresh; run p2137_c_api "$PY" p2137_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2137_d_api "$PY" p2137_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.278.0 part B: org / account import keeps billed time billed, maps chat threads, names left-out rows (#3094)
 fresh; run p2278_b_import_ids "$PY" p2278_b_import_ids_test.py "$KALMIDO_TEST_DATA"
+# 2.455.0 part C: feeds in the organisation export, sprints / placements / rules / customer reports in the account export (#3469)
+fresh; run p2455_c_export "$PY" p2455_c_export_test.py "$KALMIDO_TEST_DATA"
 # 2.124.0 part A: formulas, chart (#2109 #2115)
 now wed 10:00; fresh; run p2124_a_api "$PY" p2124_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2124_a_ui node p2124_a_ui.js "$KALMIDO_TEST_DATA"
@@ -1993,6 +1997,7 @@ fresh; run p2272_a_retention "$PY" p2272_a_retention_test.py "$KALMIDO_TEST_DATA
 fresh; run p22233_a_trash_runs "$PY" p22233_a_trash_runs_test.py "$KALMIDO_TEST_DATA"
 # 2.272.0 C (#3027): import undo into the trash, keeps what changed since (task import, account import, trips, fixed costs; freelancer)
 fresh; run p2272_c_import_undo "$PY" p2272_c_import_undo_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2363_2_runs "$PY" p2363_2_runs_test.py "$KALMIDO_TEST_DATA"
 # 2.272.0 E1 (#3038): contacts (app, CardDAV, bulk, import), address books and notes go to the trash, restore with notes / links, run with switch; freelancer-matrix: pim
 fresh; run p2272_e1_contacts_trash "$PY" p2272_e1_contacts_trash_test.py "$KALMIDO_TEST_DATA"
 # 2.270.0 A (#3019): stale dialogs write no old full states back (list _prev for every setting, organisation member operations, user orgs _prev, project description expect_updated_at + history); freelancer-matrix: lists
@@ -2224,3 +2229,16 @@ fresh; run p2380_l_ui node p2380_l_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2365_2_c_ui node p2365_2_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.435.0 A (#3600): the client card blocks fold (open / folded with the number, kept per person), the office switches blocks off; freelancer-matrix: office
 fresh; run p2435_a_ui node p2435_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.437.0 (#3729): init_db names its steps and milliseconds in the start log
+fresh; run p2437_l_start "$PY" p2437_l_start_test.py "$KALMIDO_TEST_DATA"
+# 2.431.0 A (#3593): the task header keeps every icon whole; its words fall away step by step
+fresh; run p2431_a_ui node p2431_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.360.2 (#2561 #2912 #2913): Server-Timing only for instance admins, pinned actions, third-party notices; freelancer-matrix: public
+fresh; run p23602_a_api "$PY" p23602_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.442.0: agent token at setup (#1762), packed static files (#2808) (UI: p2442_c_ui.js)
+fresh; run p2442_a_token "$PY" p2442_a_token_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2442_b_static_pack "$PY" p2442_b_static_pack_test.py "$KALMIDO_TEST_DATA"
+# 2.363.3 C (#3134): upload progress with Cancel, the server's limit in all file dialogs
+fresh; run p2363_3_c_ui node p2363_3_c_ui.js "$KALMIDO_TEST_DATA"
+# 2.455.0 (#3847 #3852): the phone drawer stays on a workspace switch, names/file names get the first line at 320 px
+fresh; run p2455_a_phone_ui node p2455_a_phone_ui.js "$KALMIDO_TEST_DATA"

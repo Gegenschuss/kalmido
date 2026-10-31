@@ -14,6 +14,8 @@ freelancer-matrix: office, contacts
    another person's book is refused
  - a person without an organisation: all of it in the personal office / own address book; an organisation's admin too,
    a member 403 on the legacy preview
+ - 2.363.0 (#3103): e-mail, phone, customer number, VAT ID from their columns (also beside a one-cell address), the columns
+   nothing takes over are named, UTF-16 CSV, leading zeros of a 00000 format, file row numbers, six-digit dates in file names
 usage: p2146_e_api_test.py <datadir>      (P2146E_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import io
 import json
@@ -269,6 +271,64 @@ for who, s in (("freelancer", Fr), ("org admin", A)):
         r = Ca.post(B + f"/api/books/{ZB}/import", files=[("files", ("x.vcf", card("u-x", "Xaver Fremd").encode(), "text/vcard")),
                                                          ("files", ("y.vcf", card("u-y", "Yara Fremd").encode(), "text/vcard"))])
         check(r.status_code in (403, 404) and "Xaver Fremd" not in fns(s, ZB), f"another person's book is refused ({r.status_code})")
+
+# ---------------------------------------------------------------- 2.363.0 (#3103): the rest of the audit's findings
+CL = "\r\n".join(["Firma;Straße;PLZ;Ort;E-Mail;Telefon;Kundennummer;USt-IdNr.;Kunde seit;Telefon",
+                   "Spalten Studio GmbH;Spaltweg 1;10115;Berlin;info@spalten.example;030 123;K-77;de 123456789;2019;0170 1",
+                   "Schlecht Mail KG;Spaltweg 2;10115;Berlin;keine adresse;;;;;"]) + "\r\n"
+r = preview(Fr, "kunden.csv", CL.encode("utf-16"), ctype="text/csv")
+P = r.json() if r.ok else {}
+check(r.ok, f"#3103: UTF-16 with BOM (Excel Unicode text) is read {r.status_code} {r.text[:160]}")
+cl = {c["name"]: c for c in P.get("clients", [])}
+c0 = cl.get("Spalten Studio GmbH", {})
+check((c0.get("email"), c0.get("phone"), c0.get("customer_no"), c0.get("vat_id")) == ("info@spalten.example", "030 123", "K-77", "DE123456789"),
+      f"#3103: e-mail, phone, customer number and VAT ID come over {c0}")
+check(P.get("columns", {}).get("unused") == ["Kunde seit", "Telefon"], f"#3103: the columns nothing takes over are named, also the second Telefon {P.get('columns')}")
+c1 = cl.get("Schlecht Mail KG", {})
+check(c1.get("email") == "" and "bad_email" in c1.get("flags", []), f"#3103: a bad address stays out with a reason, no stop of the file {c1}")
+send = [{k: c[k] for k in ("row", "name", "street", "zip", "city", "country", "email", "phone", "customer_no", "vat_id", "action")} for c in P.get("clients", [])]
+r = Fr.post(B + L + "/import", json={"clients": send})
+check(r.status_code in (200, 201), f"#3103: the import stores them {r.status_code} {r.text[:200]}")
+row = next((x for x in Fr.get(B + "/api/clients").json().get("clients", []) if x.get("name") == "Spalten Studio GmbH"), {})
+check((row.get("email"), row.get("phone")) == ("info@spalten.example", "030 123"), f"#3103: e-mail and phone stored {row}")
+check((row.get("billing") or {}).get("customer_no") == "K-77" and (row.get("billing") or {}).get("vat_id") == "DE123456789", f"#3103: customer number and VAT ID stored {row.get('billing')}")
+# one-cell address beside an e-mail column, and the row number below a title row
+P = preview(Fr, "alt.csv", "Adresse;E-Mail\r\nEinzel Mail GmbH, Zellweg 7, 80331 München;zelle@mail.example\r\n".encode(), ctype="text/csv").json()
+c0 = (P.get("clients") or [{}])[0]
+check(P.get("columns", {}).get("mode") == "one" and c0.get("email") == "zelle@mail.example", f"#3103: the e-mail also beside a one-cell address {c0}")
+TITLE = make_xlsx([[""], ["Firma", "Straße", "PLZ", "Ort"], ["Titel GmbH", "Weg 1", "10115", "Berlin"]], table="Kunden")
+c0 = next((c for c in preview(Fr, "kunden.xlsx", TITLE).json().get("clients", []) if c.get("name") == "Titel GmbH"), {})
+check(c0.get("row") == 3, f"#3103: the row number of the file, below an empty first row {c0.get('row')}")
+# the leading zeros: a number with the format 00000, as Excel stores a postcode column
+
+
+def restyle(raw, styles=None):
+    """The first number cell of each row gets the cell style 1 = format 00000."""
+    src = zipfile.ZipFile(io.BytesIO(raw))
+    z = io.BytesIO()
+    with zipfile.ZipFile(z, "w", zipfile.ZIP_DEFLATED) as f:
+        for n in src.namelist():
+            d = src.read(n)
+            if n == "xl/worksheets/sheet1.xml":
+                d = d.replace(b'<c r="C2">', b'<c r="C2" s="1">')
+            f.writestr(n, d)
+        f.writestr("xl/styles.xml", styles or '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                   '<numFmts count="1"><numFmt numFmtId="164" formatCode="00000"/></numFmts>'
+                   '<cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="164"/></cellXfs></styleSheet>')
+    return z.getvalue()
+
+
+Z = restyle(make_xlsx([["Firma", "Straße", "PLZ", "Ort"], ["Null Vorn GmbH", "Weg 2", 1067, "Dresden"]], table="Kunden"))
+r = preview(Fr, "kunden.xlsx", restyle(make_xlsx([["Firma", "Straße", "PLZ", "Ort"], ["Stil Kaputt GmbH", "Weg 3", 1067, "Dresden"]], table="Kunden"),
+                                       '<?xml version="1.0"?><!DOCTYPE x><styleSheet/>'))
+check(r.ok, f"#3103: a style part the reader refuses does not stop the import {r.status_code} {r.text[:120]}")
+P = preview(Fr, "kunden.xlsx", Z).json()
+c0 = next((c for c in P.get("clients", []) if c.get("name") == "Null Vorn GmbH"), {})
+check(c0.get("zip") == "01067", f"#3103: a postcode with the format 00000 keeps its leading zero {c0}")
+r = Fr.post(B + L + "/archive/parse", json={"names": ["0815_Nordwind_KV02_311225_AB.pdf", "0815_Nordwind_KV02_250131_AB.pdf", "0815_Nordwind_KV02_120625_AB.pdf"]})
+it = r.json().get("items") or r.json().get("files") or [] if r.ok else []
+check(r.ok and [(x.get("date"), x.get("sure")) for x in it] == [("2025-12-31", True), ("2025-01-31", True), ("2025-06-12", False)],
+      f"#3103: six digits in a file name: DDMMYY first, no future date, two readings = not sure {[(x.get('date'), x.get('sure')) for x in it]} {r.text[:120]}")
 
 print(f"p2146_e_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

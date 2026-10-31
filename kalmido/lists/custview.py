@@ -8,6 +8,7 @@ import os
 
 from ..core.config import ATT_DIR, OFFICE_DIR
 from ..core.i18n import tr
+from ..core.numtext import dec_char
 from ..core.errors import BadInput
 
 CV_FLAGS = ("progress", "sections", "due", "assignees", "tags", "files", "brand", "feedback")
@@ -214,8 +215,9 @@ def cv_brand(c, link):
 
 def cv_size(n, lg):
     n = n or 0
+    b, k, m = ("o", "Ko", "Mo") if lg == "fr" else ("B", "KB", "MB")  # 2.450.0 (#3770): the same as fmtSize of the client
     if n < 1024:
-        return f"{n} B"
+        return f"{n} {b}"
     if n < 1 << 20:
-        return f"{n / 1024:.0f} KB"
-    return f"{n / (1 << 20):.1f} MB".replace(".", "," if lg == "de" else ".")
+        return f"{n / 1024:.0f} {k}"
+    return f"{n / (1 << 20):.1f} {m}".replace(".", dec_char(lg))

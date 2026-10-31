@@ -8,7 +8,9 @@
 const PKC = {oid: null, q: '', kind: '', data: null, loading: false, seq: 0, packs: null, packsBusy: false, busy: '', err: {}, open: {}, t: null};
 const pkc_key = it => `${it.kind}/${it.code}`;
 const pkc_de = () => /^de/i.test(LOCALE());
-const pkc_nm = p => { const n = p.name && typeof p.name === 'object' ? (pkc_de() ? p.name.de : p.name.en) || p.name.en || p.name.de : pkc_de() ? p.name : p.name_en || p.name; return n || p.code; };  // (a pack file's name may be {de, en})
+// 2.449.0 (#3768): a pack file's name in the app language, the built-in packs' English names through the language files
+N_('Germany'); N_('International (base pack)'); N_('Film & Video');
+const pkc_nm = p => { const n = p.name && typeof p.name === 'object' ? p.name[LOCALE().slice(0, 2).toLowerCase()] || (pkc_de() ? p.name.de : tr(p.name.en)) || p.name.de : pkc_de() ? p.name : tr(p.name_en || p.name || ''); return n || p.code; };  // (a pack file's name may be {de, en})
 const pkc_when = iso => iso ? (typeof ofdWhen === 'function' ? ofdWhen(iso) : iso) : '';
 OFC_II.packs = N_('Packs bring the tax rates, formats and texts of a country or the calculation of an industry. They are pure data, never program code. Finalised documents keep the pack version they were made with.');
 // a new office (workspace switch): forget the lists of the previous one
@@ -216,17 +218,32 @@ function ocf_settingsHtml(dis) {
   pkc_sync();
   if (!PKC.packs && !PKC.packsBusy) setTimeout(pkc_loadPacks, 0);
   const p = OFC.info.pack || {}, of = ocf_offers(), off = OFC.info.settings?.features_off || [];
-  const mine = OCF_FEATS.filter(f => of[f[0]] === 'ready'), not = OCF_FEATS.filter(f => of[f[0]] !== 'ready');
+  const mine = OCF_FEATS.filter(f => of[f[0]] === 'ready' && !f[0].startsWith('money.')), not = OCF_FEATS.filter(f => of[f[0]] !== 'ready');
   const rt = p.retention || {};
   return `<h3>${tr('Functions')}</h3>${ofcII('functions')}
-    <p class="muted">${esc(tr('Country pack: {0}', `${pkc_de() ? p.name : p.name_en || p.name} (${p.code})`))} · <button type="button" class="linkbtn" data-ostgo="packs">${tr('Change country')}</button></p>
+    <p class="muted">${esc(tr('Country pack: {0}', `${pkc_nm(p)} (${p.code})`))} · <button type="button" class="linkbtn" data-ostgo="packs">${tr('Change country')}</button></p>
     <div class="ocf-list">${mine.map(([k, i, n, d]) => {
       const fixed = OCF_FIXED.includes(k), on = fixed || !off.includes(k);
       return `<div class="row ocf-row"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="ocf-${esc(k.replace('.', '-'))}" data-feat="${esc(k)}" ${on ? 'checked' : ''} ${fixed ? 'disabled' : dis}><span class="swt" aria-hidden="true"></span></span><span>${ic(i, 's')} ${esc(tr(n))}</span></label><span class="muted ofchint">${esc(tr(d))}</span></div>`;
     }).join('')}</div>
     ${not.length ? `<p class="muted ofchint">${esc(tr('Not part of this country pack: {0}', not.map(f => tr(f[2])).join(', ')))}</p>` : ''}
-    <p class="muted ofchint">${esc(tr('Receipts are kept {0} years, books {1} years.', rt.receipts ?? 10, rt.books ?? 10))}</p>${ccb_settingsHtml(dis)}`;
+    <p class="muted ofchint">${esc(tr('Receipts are kept {0} years, books {1} years.', rt.receipts ?? 10, rt.books ?? 10))}</p>${ocm_settingsHtml(dis)}${ccb_settingsHtml(dis)}`;
 }
+// 2.440.0 (#3609): the points of the office menu, one switch each for the whole office. Off = only hidden, the data stays. The
+// points with a function of the country pack (2.380 F, #3411) stand here with their function's switch: one switch per point
+const OCM_POINTS = ['pipeline', 'gendocs', 'letters', 'time', 'contracts', 'cashbook', 'meals', 'travel', 'subs', 'bank', 'cards', 'cashflow', 'kpi', 'equipment', 'agreements'];
+function ocm_settingsHtml(dis) {
+  const off = OFC.info.settings?.menu_off || [], foff = OFC.info.settings?.features_off || [], of = ocf_offers();
+  const row = k => {
+    const i = OFM_ITEMS.find(x => x.key === k), f = i.need && OCF_FEATS.find(x => x[0] === i.need);
+    if (i.need && of[i.need] !== 'ready') return '';
+    const sw = i.need ? `id="ocf-${esc(i.need.replace('.', '-'))}" data-feat="${esc(i.need)}" ${foff.includes(i.need) ? '' : 'checked'}` : `id="ocm-${k}" data-ocm="${k}" ${off.includes(k) ? '' : 'checked'}`;
+    return `<div class="row ocf-row"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" ${sw} ${dis}><span class="swt" aria-hidden="true"></span></span><span>${ic(i.icon, 's')} ${esc(tr(i.name))}</span></label>${f ? `<span class="muted ofchint">${esc(tr(f[3]))}</span>` : ''}</div>`;
+  };
+  return `<h3>${tr('Menu points')}</h3><p class="muted ofchint">${esc(tr('A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.'))}</p>
+    <div class="ocf-list">${OCM_POINTS.map(row).join('')}</div>`;
+}
+const ocm_off = (k, off) => { const l = (OFC.info.settings?.menu_off || []).filter(x => x !== k); return off ? [...l, k] : l; };
 // 2.435.0 A (#3600): the blocks of the client card for the whole office (off = nobody of the office sees it at a client;
 // each person shows / hides and folds the others for themselves at the card; the details always show)
 function ccb_settingsHtml(dis) {
@@ -268,6 +285,6 @@ async function ocf_confirmSwitch(code) {
   if (j.open_docs) lines.push(tr('{0} open documents will be calculated with the new rates and texts.', j.open_docs));
   if (j.hidden?.length) lines.push(tr('Hidden (nothing is deleted): {0}', j.hidden.map(nm).join(', ')));
   if (j.shown?.length) lines.push(tr('New: {0}', j.shown.map(nm).join(', ')));
-  return askConfirm(tr('Change the country to “{0}”?', pkc_de() ? j.name : j.name_en || j.name), lines.join(' '), {ok: tr('Change')});
+  return askConfirm(tr('Change the country to “{0}”?', pkc_nm(j)), lines.join(' '), {ok: tr('Change')});
 }
 document.addEventListener('click', e => { const b = e.target.closest?.('[data-ocf="choose"]'); if (b) { e.preventDefault(); ocf_choose(); } });

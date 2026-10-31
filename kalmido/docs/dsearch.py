@@ -109,7 +109,7 @@ def dsr_ids(args, key):
     out = []
     for v in vals:
         for grp in str(v or "").split(";"):  # "1,7;3" = two names in one value (the API v1 takes each key once)
-            ids = [int(x) for x in grp.split(",") if x.strip().isdigit()][:50]
+            ids = [int(x) for x in grp.split(",") if x.strip().isdecimal()][:50]  # 2.443.0 (#2338 review): isdigit lets "²" through, int() then fails
             if ids:
                 out.append(ids)
     return out[:30]

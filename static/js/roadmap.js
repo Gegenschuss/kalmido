@@ -195,7 +195,7 @@ function rmChips(M) {
 function rmPeople() {
   const m = new Map();
   for (const l of S.lists) if (l.shared && !l.archived && inWs(l)) for (const p of listPeople(l)) if (p.user_id && !m.has(p.user_id)) m.set(p.user_id, p);
-  return [...m.values()].filter(p => !S.me || p.user_id !== S.me.id).sort((a, b) => a.name.localeCompare(b.name));
+  return [...m.values()].filter(p => !S.me || p.user_id !== S.me.id).sort((a, b) => cmpText(a.name, b.name));
 }
 function viewRoadmap() {
   const G = rmGeo(), M = rmModel(), t0 = today();

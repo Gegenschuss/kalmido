@@ -1,5 +1,6 @@
 """The REST API of an agent itself (token of an agent account)."""
 import json
+import re
 import time
 from datetime import timedelta
 from flask import g, jsonify
@@ -64,16 +65,20 @@ def v1_agent():
     return jsonify(agent_self(db(), aid))
 
 
+STATUS_KEY_RE = re.compile(r"[a-z0-9_]{1,40}")
+STATUS_AT_RE = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d+)?)?(?:Z|[+-]\d\d:\d\d)?")
+
+
 @app.put("/api/v1/agent/status")
 @v1_view
 def v1_agent_status():
-    """{status: idle|working|waiting|error, text?, task_id?, model?, permission_mode?, host_permission_mode?, host? (2.44.0)} -- shown as the dot on the agent's avatar and in the header chip;
+    """{status: idle|working|waiting|error, text?, task_id?, model?, permission_mode?, host_permission_mode?, permission_fixed? (2.437.0), host? (2.44.0), text_key?, text_at? (2.450.0)} -- shown as the dot on the agent's avatar and in the header chip;
     while "working", the task_id's panel (else every task of its lists) shows "<agent> is working on it" (2.0.2; "is writing
     ..." only with a typing signal since 2.13.2)."""
     v1_args(())
     aid = need_agent()
     b = v1_json()
-    unknown = sorted(k for k in b if k not in ("status", "text", "task_id", "model", "permission_mode", "host_permission_mode", "host"))
+    unknown = sorted(k for k in b if k not in ("status", "text", "task_id", "model", "permission_mode", "host_permission_mode", "permission_fixed", "host", "text_key", "text_at"))
     if unknown:
         raise UnknownFields(unknown)
     from ..agents.steps import host_info_in, host_info_set, steps_end
@@ -83,6 +88,12 @@ def v1_agent_status():
     text = b.get("text") or ""
     if not isinstance(text, str) or (b["status"] == "paused" and not text.strip()):  # 2.26.0 (#949): a pause needs its reason
         raise BadInput(tr("Invalid value: {0}", "text"))
+    # 2.450.0 (#3769): a known status text as a key the app translates, with the time in it; text stays the fallback
+    tkey, tat = b.get("text_key") or "", b.get("text_at") or ""
+    if not isinstance(tkey, str) or (tkey and not STATUS_KEY_RE.fullmatch(tkey)):
+        raise BadInput(tr("Invalid value: {0}", "text_key"))
+    if not isinstance(tat, str) or (tat and not STATUS_AT_RE.fullmatch(tat)):
+        raise BadInput(tr("Invalid value: {0}", "text_at"))
     c = db()
     tid = b.get("task_id")
     if tid is not None:
@@ -90,15 +101,15 @@ def v1_agent_status():
             raise BadInput(tr("Invalid value: {0}", "task_id"))
     tid = tid if b["status"] in ("working", "waiting") else None
     old = agent_row(c, aid)
-    c.execute("UPDATE agents SET status=?, status_text=?, status_at=?, status_task=? WHERE user_id=?",
-              (b["status"], text.strip()[:STATUS_TEXT_MAX], iso(now_utc()), tid, aid))
+    c.execute("UPDATE agents SET status=?, status_text=?, status_at=?, status_task=?, status_key=?, status_key_at=? WHERE user_id=?",
+              (b["status"], text.strip()[:STATUS_TEXT_MAX], iso(now_utc()), tid, tkey, tat, aid))
     hchg = host_info_set(c, old, hinfo)
     if "host" in b:  # 2.44.0 (#1517): the computer name the starter reports, kept on the token it uses
         from ..agents.setup import ains_host_set
         hchg = ains_host_set(c, g.get("token"), b["host"]) or hchg
     if b["status"] in ("idle", "error", "paused"):
         steps_end(c, aid)  # 2.32.0 (#1081): a run without a chat answer leaves no live steps behind
-    if hchg or (old["status"], old["status_text"], old["status_task"]) != (b["status"], text.strip()[:STATUS_TEXT_MAX], tid):
+    if hchg or (old["status"], old["status_text"], old["status_task"], old["status_key"], old["status_key_at"]) != (b["status"], text.strip()[:STATUS_TEXT_MAX], tid, tkey, tat):
         bump(c)  # clients reload only when something visible changed (agents may report often)
     c.commit()
     return jsonify(agent_self(c, aid))
@@ -371,7 +382,7 @@ def job_notify(c, j, old_state):
     if not s or not job_visible(c, j, uid):
         return
     lid = None
-    if j["task_id"]:  # 2.1.0 (#317): "agent waits for me" as News (off by default) + the push per the settings
+    if j["task_id"]:  # 2.1.0 (#317): "agent waits for me" as News (2.367.2, #2968: on by default) + the push per the settings
         lr = c.execute("SELECT list_id FROM tasks WHERE id=?", (j["task_id"],)).fetchone()
         lid = lr[0] if lr else None
         news_add(c, uid, "approval", task_id=j["task_id"], data={"title": (j["title"] or "")[:200], "job": j["id"]}, actor=j["agent_id"], s=s)

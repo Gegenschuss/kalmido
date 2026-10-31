@@ -73,7 +73,7 @@ def _oi_name(name):
     return "files/office/" + _safe_part(name)
 
 
-def _oi_put(ctx, old, new, seal=True, mime="", keep=False):
+def _oi_put(ctx, old, new, seal=True, mime="", keep=False, strict=False):
     """Archive file `old` (a bare name below the source's office folder) -> `new` below the target's office folder. keep:
     a content-addressed name (logo / letterhead snapshots): an existing file of that name stays. -> new or None."""
     if not old or not new or os.path.basename(old) != old or os.path.basename(new) != new:
@@ -84,7 +84,7 @@ def _oi_put(ctx, old, new, seal=True, mime="", keep=False):
     done = ctx.run.__dict__.setdefault("oi_office_files", set())
     if (ctx.space, new) in done:
         return new
-    r = ctx.file(_oi_name(old), None, new, base=_oi_dir(ctx.space), mime=mime, seal=seal)
+    r = ctx.file(_oi_name(old), None, new, base=_oi_dir(ctx.space), mime=mime, seal=seal, strict=strict)
     if not r:
         return None
     done.add((ctx.space, new))
@@ -93,11 +93,11 @@ def _oi_put(ctx, old, new, seal=True, mime="", keep=False):
 
 def _oi_logo_ok(ctx, name):
     """2.137.0 review L4: a content-addressed logo copy only under the name of its own content (never a file that a
-    later logo of the target would be taken for)."""
+    later logo of the target would be taken for). 2.453.0 (#3781): the frozen letterhead (lhs-<sha16>.pdf) likewise."""
     import hashlib
     from .acctimport import _file_bytes
     raw = _file_bytes(ctx.zf, ctx.files, _oi_name(name))
-    return raw is not None and hashlib.sha256(raw).hexdigest()[:16] == name[5:21]
+    return raw is not None and hashlib.sha256(raw).hexdigest()[:16] == name.split("-", 1)[1][:16]
 
 
 def _oi_number_taken(c, space, number):
@@ -143,7 +143,7 @@ def _p_settings(c, run, src, d, ctx):
     if isinstance(lh, dict) and lh.get("file"):
         from ..office.letterhead import BP_FILE_RE
         f = str(lh["file"])
-        lh["file"] = (_oi_put(ctx, f, f"letterhead-{uuid.uuid4().hex[:16]}.pdf", mime="application/pdf") or "") if BP_FILE_RE.fullmatch(f) else ""
+        lh["file"] = (_oi_put(ctx, f, f"letterhead-{uuid.uuid4().hex[:16]}.pdf", mime="application/pdf", strict=True) or "") if BP_FILE_RE.fullmatch(f) else ""
     d["data"] = json.dumps(oc_json_store(c, ctx.space, "office_settings", "data", j), ensure_ascii=False)
     return d
 
@@ -231,8 +231,8 @@ def _a_doc(c, run, src, nid, ctx):
         if isinstance(snd.get("logo"), str) and re.fullmatch(r"logo-[0-9a-f]{16}\.png", snd["logo"]) and _oi_logo_ok(ctx, snd["logo"]):
             _oi_put(ctx, snd["logo"], snd["logo"], seal=False, mime="image/png", keep=True)
         lh = snd.get("letterhead")
-        if isinstance(lh, dict) and isinstance(lh.get("file"), str) and re.fullmatch(r"lhs-[0-9a-f]{16}\.pdf", lh["file"]):
-            _oi_put(ctx, lh["file"], lh["file"], mime="application/pdf", keep=True)
+        if isinstance(lh, dict) and isinstance(lh.get("file"), str) and re.fullmatch(r"lhs-[0-9a-f]{16}\.pdf", lh["file"]) and _oi_logo_ok(ctx, lh["file"]):
+            _oi_put(ctx, lh["file"], lh["file"], mime="application/pdf", keep=True, strict=True)  # 2.453.0 (#3781): strict like the letterhead of the settings
 
 
 def _p_part(c, run, src, d, ctx):
@@ -491,7 +491,7 @@ SPECS = [
     OiT("office/contract_files.json", "office_contract_files", refs={"contract_id": "office_contracts"}, need=("contract_id",),
         people=_P, private="office", prep=_p_contract_file),
     OiT("office/documents.json", "office_docs", refs={"client_id": "clients", "contract_id": "office_contracts", "contact_id": "office_client_contacts",
-        "list_id": "lists"}, late={"version_of": "office_docs", "cancels_id": "office_docs", "source_doc_id": "office_docs",
+        "list_id": "lists"}, late={"version_of": "office_docs", "replaces_id": "office_docs", "cancels_id": "office_docs", "source_doc_id": "office_docs",
         "series_id": "office_inv_series"}, people={**_P, "locked_by": "null", "agent_id": "null"}, private="office", prep=_p_doc, after=_a_doc),
     OiT("office/document_parts.json", "office_doc_parts", refs={"doc_id": "office_docs"}, need=("doc_id",), private="office", prep=_p_part),
     OiT("office/document_items.json", "office_doc_items", refs={"doc_id": "office_docs", "service_id": "office_services",
@@ -516,7 +516,7 @@ SPECS = [
     OiT("office/letter_profiles.json", "office_letter_profiles", people={"user_id": "need"}, private="office", label=N_("Letters"),
         prep=_p_letter_profile),
     OiT("office/trip_purposes.json", "office_trip_purposes", people=_P, private="office"),
-    OiT("office/trips.json", "office_trips", refs={"client_id": "clients"}, people=_P, private="office"),
+    OiT("office/trips.json", "office_trips", refs={"client_id": "clients", "import_run_id": "office_import_runs"}, people=_P, private="office"),
     OiT("office/trip_items.json", "office_trip_items", refs={"trip_id": "office_trips", "billed_doc_id": "office_docs"}, need=("trip_id",),
         private="office"),
     OiT("office/vehicles.json", "office_vehicles", people=_P, private="office"),
@@ -564,7 +564,7 @@ SPECS = [
         prep=_p_meal_file),
     OiT("office/meal_log.json", "office_meal_log", refs={"meal_id": "office_meals"}, need=("meal_id",), people={"user_id": "null"},
         private="office"),
-    OiT("office/fixed_costs.json", "office_fixed_costs", people={**_P, "remind_user": "null"}, private="office"),
+    OiT("office/fixed_costs.json", "office_fixed_costs", refs={"import_run_id": "office_import_runs"}, people={**_P, "remind_user": "null"}, private="office"),
     OiT("office/sub_reminders.json", "office_sub_reminders", refs={"fixed_id": "office_fixed_costs", "task_id": "tasks"}, need=("fixed_id",),
         people={"user_id": "null"}, private="office"),
     OiT("office/dunning_marks.json", "office_dunning_marks", refs={"doc_id": "office_docs", "reminder_id": "office_docs"}, need=("doc_id",),
@@ -588,7 +588,7 @@ SPECS = [
     OiT("office/bank_tx.json", "office_bank_tx", refs={"import_id": "office_bank_imports", "payment_id": "office_payments"},
         people={"matched_by": "null"}, private="office", prep=_p_tx),
     OiT("office/bank_balances.json", "office_bank_balances", refs={"import_id": "office_bank_imports"}, private="office", prep=_p_bank_balance),
-    OiT("office/deals.json", "office_deals", refs={"client_id": "clients", "offer_id": "office_docs", "list_id": "lists",
+    OiT("office/deals.json", "office_deals", refs={"import_run_id": "office_import_runs", "client_id": "clients", "offer_id": "office_docs", "list_id": "lists",
         "lead_client_id": "clients"}, people=_P, private="office"),
     OiT("office/archive.json", "office_archive", refs={"run_id": "office_import_runs", "client_id": "clients"}, people=_P, private="office",
         prep=_p_archive, after=_a_archive),

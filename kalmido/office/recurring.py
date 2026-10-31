@@ -22,12 +22,12 @@ from flask import g, jsonify, request
 from ..core.config import PUBLIC_URL, app, WATCHDOG_INTERVAL
 from ..core.db import IntegrityError, body, bump, db, iso, local_now, now_utc
 from ..core.access import Denied, my_inbox
-from ..core.i18n import LANGS, N_, lang, tr
+from ..core.i18n import LANGS, N_, lang, tr, tr_stored
 from .doclang import doc_lg  # 2.185.0 C (#2520)
 from .pdfweb import epdf_sweep  # 2.355.0 A (#2847)
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_item_store, oc_dec_fields
-from ..core.errors import BadInput
+from ..core.errors import BadInput, err_stored
 from .calc import dec, dstr, fmt_money, money
 from .model import office_gate, office_on, office_org, office_role, office_settings, onc_ready, pb_cl_sql, pb_owner
 from .contacts_cl import fk_send_rcpts  # 2.433.0 (#3599)
@@ -301,7 +301,8 @@ def rin_client_mail(c, oid, cid):
 
 def rin_send(c, oid, uid, did):
     """auto_send: finalise and mail invoice did (its client's invoice address) like the routes /finalize and /send do. On
-    any failed check nothing is kept (savepoint): the invoice stays a draft. (ok, reason text, datev due, mail).
+    any failed check nothing is kept (savepoint): the invoice stays a draft. (ok, reason, datev due, mail). 2.448.0 (#3765):
+    reason = a stored text (tr_stored): the timer has no reader, each person gets it in their own language.
     2.269.0 D (#3046): only finalised and checked here (number, the day's counters); the mail goes out after the caller's
     commit (rin_mail), so a failed commit never leaves a mailed invoice whose number is given again."""
     from ..integrations.mail import MAIL_OUT_ON
@@ -309,11 +310,11 @@ def rin_send(c, oid, uid, did):
     from .invoices import inv_send
     from .ledger import ofx_finalize
     if not MAIL_OUT_ON:
-        return False, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"), False, None
+        return False, [N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)")], False, None
     cid = doc_row(c, oid, did)["client_id"]
     to = rin_client_mail(c, oid, cid)
     if not to:
-        return False, tr("The client has no e-mail address for invoices"), False, None
+        return False, [N_("The client has no e-mail address for invoices")], False, None
     cc = ", ".join(fk_send_rcpts(c, cid, oid, "invoice")["cc"])  # 2.433.0 (#3599): the contact persons for invoices in copy
     try:
         with c.savepoint():
@@ -321,18 +322,18 @@ def rin_send(c, oid, uid, did):
             _files, datev, m = inv_send(c, oid, uid, r, {"to": to, "cc": cc}, later=True)
     except (BadInput, Denied) as e:
         epdf_sweep(c)  # 2.355.0 A (#2847): the files of the finalising just rolled back
-        return False, (e.text() if hasattr(e, "text") else str(e)) or tr("unknown"), False, None
+        return False, err_stored(e) or [N_("unknown")], False, None  # 2.454.0 (#3808): key + values, every person's own language
     except Exception as e:  # noqa: BLE001 -- a broken file / check: the draft stays, the reason goes to the person
         epdf_sweep(c)
         print("invoice series: sending", did, "failed:", e, flush=True)  # 2.91.0 review L3: the raw error (host, port) only in the log
-        return False, tr("The mail server refused the mail or could not be reached"), False, None
+        return False, [N_("The mail server refused the mail or could not be reached")], False, None
     c.__dict__.pop("epdf_new", None)  # 2.355.0 A (#2847): kept -- the caller commits them
     return True, "", datev, m
 
 
 def rin_mail(c, oid, uid, m):
     """2.269.0 D (#3046): the customer mail of a finalised series invoice after its commit (marked sent, committed);
-    (ok, reason text). A refused mail leaves the invoice finalised and not sent (the person sends it from the invoice)."""
+    (ok, reason: a stored text). A refused mail leaves the invoice finalised and not sent (the person sends it from the invoice)."""
     try:
         m["send"](c, oid, uid, m)  # invoices.inv_send_mail
         bump(c)
@@ -340,11 +341,11 @@ def rin_mail(c, oid, uid, m):
         return True, ""
     except (BadInput, Denied) as e:
         c.rollback()
-        return False, (e.text() if hasattr(e, "text") else str(e)) or tr("unknown")
+        return False, err_stored(e) or [N_("unknown")]
     except Exception as e:  # noqa: BLE001 -- a mail server error
         c.rollback()
         print("invoice series: mailing", m.get("did"), "failed:", e, flush=True)
-        return False, tr("The mail server refused the mail or could not be reached")
+        return False, [N_("The mail server refused the mail or could not be reached")]
 
 
 def rin_datev(c, oid, did):
@@ -426,14 +427,14 @@ def rin_step(c, oid, uid, s, period, people, missed=()):
     pt = _period_txt(period, nxt)
     gone = (lambda lg: "\n" + tr("Missed periods without an invoice: {0}", ", ".join(missed), lg=lg)) if missed else (lambda lg: "")
     if s["auto_send"] and not sent:
-        _tell(c, people, RIN_TASK_FAIL, name, lambda lg: tr("Period {0}. The invoice stays a draft: {1}", pt, why, lg=lg) + gone(lg), did)
+        _tell(c, people, RIN_TASK_FAIL, name, lambda lg: tr("Period {0}. The invoice stays a draft: {1}", pt, tr_stored(why, lg), lg=lg) + gone(lg), did)
     elif not sent:
         _tell(c, people, RIN_TASK_DRAFT, name, lambda lg: tr("Period {0}. Open the draft, check it and send it like any invoice.", pt, lg=lg) + gone(lg), did)
 
     def post():  # 2.269.0 D (#3046): the mail after the number's commit, then its task
         ok, why2 = rin_mail(c, oid, uid, m)
         if not ok:
-            _tell(c, people, RIN_TASK_FAIL, name, lambda lg: tr("Period {0}. The invoice is finalised, the mail did not go out: {1}", pt, why2, lg=lg) + gone(lg), did)
+            _tell(c, people, RIN_TASK_FAIL, name, lambda lg: tr("Period {0}. The invoice is finalised, the mail did not go out: {1}", pt, tr_stored(why2, lg), lg=lg) + gone(lg), did)
         elif missed:
             _tell(c, people, RIN_TASK_DRAFT, name, lambda lg: tr("Period {0} was sent.", pt, lg=lg) + gone(lg), did)
         bump(c)
@@ -676,10 +677,10 @@ def rin_run(sid):
     c.commit()
     if nid is None:
         raise Denied(409, tr("This period has its invoice already"))
-    error = tr("The invoice stays a draft: {0}", why) if s["auto_send"] and not sent else None
+    error = tr("The invoice stays a draft: {0}", tr_stored(why)) if s["auto_send"] and not sent else None
     if post:  # 2.269.0 D (#3046): number committed, now the mail
         sent, why = post()
-        error = None if sent else tr("The invoice is finalised, the mail did not go out: {0}", why)
+        error = None if sent else tr("The invoice is finalised, the mail did not go out: {0}", tr_stored(why))
     if sent and datev:
         rin_datev(c, oid, nid)
     return jsonify(series=rin_public(c, oid, rin_row(c, oid, sid)), doc_id=nid, sent=bool(sent), prev_next_date=prev, error=error)

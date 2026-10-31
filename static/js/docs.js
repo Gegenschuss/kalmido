@@ -168,7 +168,7 @@ async function dc_upload(files, ws, source) {
       redo: async () => { for (const id of ids) await api('POST', `/api/files/nodes/${id}/restore`); dc_load(); return {}; }}));
   }
   const dup = (j.dups || [])[0];  // 2.146.0 B (#2452): the same file is not stored twice -- Open shows the one there
-  if (dup) toast(j.dups.length === 1 ? tr('This file already exists: {0}', dup.name) : tr('{0} files already exist', j.dups.length), () => dc_open(dup.id), 8000, tr('Open'));
+  if (dup) toast(j.dups.length === 1 ? tr('This file already exists: {0}', dup.name) : trn('{0} file already exists', '{0} files already exist', j.dups.length), () => dc_open(dup.id), 8000, tr('Open'));
   if (S.route.mod === 'docs') dc_load();
   return j.ids || [];
 }
@@ -293,7 +293,7 @@ function dc_mdDraw(md) {
       ${field('date', tr('Date'), dateIn('dc-date', d.date || '', {label: tr('Date'), ro: !!ro, attrs: 'data-dcp="date"'}))}${typeof pmeta_takenHtml === 'function' ? pmeta_takenHtml(d) : ''}
       ${opt('due', tr('Due'), dateIn('dc-due', d.due || '', {label: tr('Due'), ro: !!ro, attrs: 'data-dcp="due"'}), noDue)}
       ${field('asn', tr('Archive number'), `<span class="dc-amt"><input type="number" min="1" id="dc-asn" data-dcp="asn" value="${esc(d.asn || '')}" ${ro}>${w && !d.asn ? `<button type="button" class="btn sm" data-dc="asnnext">${tr('Next free number')}</button>` : ''}</span>`)}
-      ${opt('amount', tr('Amount'), `<span class="dc-amt"><input id="dc-amount" data-dcp="amount" inputmode="decimal" value="${esc(d.amount ? String(d.amount).replace('.', LOCALE().startsWith('en') ? '.' : ',') : '')}" ${ro}><input id="dc-currency" data-dcp="currency" value="${esc(d.currency || '')}" maxlength="3" aria-label="${esc(tr('Currency'))}" placeholder="EUR" ${ro}></span>`, noAmt)}
+      ${opt('amount', tr('Amount'), `<span class="dc-amt"><input id="dc-amount" data-dcp="amount" inputmode="decimal" value="${esc(d.amount ? numField(d.amount) : '')}" ${ro}><input id="dc-currency" data-dcp="currency" value="${esc(d.currency || '')}" maxlength="3" aria-label="${esc(tr('Currency'))}" placeholder="EUR" ${ro}></span>`, noAmt)}
       ${!ro && (noDue || noAmt) ? `<div class="row dc-f dc-optbtn"><button type="button" class="linkbtn" data-dc="showopt">${tr('Add')}: ${tr('Due')} / ${tr('Amount')}</button></div>` : ''}
       ${(d.custom_fields || []).map(f => dc_cfRow(d, f, ro)).join('')}
     </div>
@@ -336,8 +336,8 @@ function dc_cfRow(d, f, ro) {  // 2.153.0 (#2179): one custom field of the docum
   const input = f.type === 'checkbox' ? `<input type="checkbox" id="${id}" ${a} ${v === '1' ? 'checked' : ''} ${ro}>`
     : f.type === 'select' ? `<select id="${id}" ${a} ${ro}><option value=""></option>${(f.options || []).map(o => `<option value="${esc(o.id)}" ${o.id === v ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`
     : f.type === 'date' ? dateIn(id, v, {label: f.name, ro: !!ro, attrs: a})
-    : f.type === 'money' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? (LOCALE().startsWith('en') ? v : v.replace('.', ',')) : '')}" placeholder="0,00 EUR" ${ro}>`
-    : f.type === 'number' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? (LOCALE().startsWith('en') ? v : v.replace('.', ',')) : '')}" ${ro}>`
+    : f.type === 'money' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? v.replace(/^-?[\d.]+/, x => numField(x, 2, 2)) : '')}" placeholder="${esc(curMoney(0, 'EUR'))}" ${ro}>`
+    : f.type === 'number' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? numField(v) : '')}" ${ro}>`
     : f.type === 'url' ? `<span class="dc-amt"><input type="url" id="${id}" ${a} value="${esc(v)}" placeholder="https://" ${ro}>${v && /^https?:\/\//i.test(v) ? `<a class="iconbtn" href="${esc(v)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(tr('Open'))}">${ic('link')}</a>` : ''}</span>`
     : `<input id="${id}" ${a} value="${esc(v)}" maxlength="1000" ${ro}>`;
   return `<div class="row dc-f dc-cf"><label for="${id}">${esc(f.name)}</label>${input}${dc_auto(d, 'cf' + f.id)}</div>`;
@@ -423,7 +423,13 @@ async function dc_mdClick(e) {
     if (hand && !await askConfirm(tr('Recognise again?'), tr('Values set by hand stay: {0}', hand), {ok: tr('Recognise again')})) return;
     const r = await api('POST', `/api/docs/${d.id}/redo`).catch(() => null);
     DC.doc = r || d; dc_mdDraw(md); dc_load();
-    if (r?.kept?.length) toast(tr('Not replaced, set by hand: {0}', r.kept.map(f => names[f]).filter(Boolean).join(', ')));
+    if (!r) return;
+    const redraw = x => { if (DC.doc?.id === d.id) { DC.doc = x; if (md.isConnected) dc_mdDraw(md); } dc_load(); return {}; };
+    // 2.363.3 (#3134): the run can be taken back (server: the values from before, kept 24 h)
+    histToast(r.kept?.length ? tr('Not replaced, set by hand: {0}', r.kept.map(f => names[f]).filter(Boolean).join(', ')) : tr('Recognising again'),
+      histAdd({label: tr('Recognising again'),
+        undo: async () => redraw(await api('POST', `/api/docs/${d.id}/redo/undo`)),
+        redo: async () => redraw(await api('POST', `/api/docs/${d.id}/redo`))}));
     return;
   }
   if (a === 'take' || a.startsWith('take:') || a === 'takeall') {

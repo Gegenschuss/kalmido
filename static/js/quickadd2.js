@@ -26,7 +26,10 @@ const qa2_words = M => qa2_langs().map(k => M[k]).join('|');
 // short weekdays inside a reminder phrase only ("erinnere mich Di 9:00"): in a title "so" or "do" stay words
 const QA2_WD = {mo: 'montag', di: 'dienstag', mi: 'mittwoch', do: 'donnerstag', fr: 'freitag', sa: 'samstag', so: 'sonntag',
   mon: 'monday', tue: 'tuesday', tues: 'tuesday', wed: 'wednesday', thu: 'thursday', thur: 'thursday', thurs: 'thursday', fri: 'friday', sat: 'saturday', sun: 'sunday'};
-const qa2_wdLong = s => s.replace(/\S+/g, w => QA2_WD[w.toLowerCase().replace(/\.$/, '')] || w);
+// 2.452.0 (#3772): and the short weekdays of the app language from its language file ("lun." -> "lundi"), when it is not one of the above
+const qa2_wdLocal = () => { const o = {}, sh = typeof i18nGet === 'function' ? i18nGet('_weekdays_short') : null, lg = typeof i18nGet === 'function' ? i18nGet('_weekdays') : null;
+  if (sh && lg && (I18N.code || 'en') !== 'en' && !(I18N.code || '').startsWith('de')) sh.forEach((x, i) => { o[String(x).replace(/\.$/, '').toLowerCase()] = String(lg[i]).toLowerCase(); }); return o; };
+const qa2_wdLong = s => { const loc = qa2_wdLocal(); return s.replace(/\S+/g, w => { const k = w.toLowerCase().replace(/\.$/, ''); return QA2_WD[k] || loc[k] || w; }); };
 const qa2_durLabel = v => tr('Duration {0}', v < 60 ? v + ' min' : fmtNum(v / 60) + ' h');  // as the date dialog says it
 
 // the reminder ("erinnere mich 15 min vorher" / "remind me tomorrow 9am") and the duration ("30 min", "für 2 Std")

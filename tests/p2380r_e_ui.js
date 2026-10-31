@@ -41,7 +41,7 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
     check(g[1] > 100 && g[0] >= 0 && g[0] <= 4, '#3416: after scrolling the head is still at the top ' + JSON.stringify(g));
     check(!/rgba\(0, 0, 0, 0\)|transparent/.test(g[2]), '#3416: the head has its own background ' + g[2]);
     await shot('p2380r-e-colhead.png');
-    await ev(`localStorage.setItem('tasks.theme', '"dark"'); 1`);
+    await ev(`localStorage.setItem('tasks.theme', '"dark"'); localStorage.setItem('tasks.lookLocal', 'true'); 1`);
     await nav(B + '#l/' + P);
     await ready(ev, `!!document.querySelector('.fcolhead')`);
     await ev(`(() => { document.querySelector('#view').scrollTop = 600; return 1; })()`);

@@ -28,7 +28,7 @@ from ..core.i18n import N_, lang, tr
 from ..core.db import bump, db, iso, local_day, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
-from .calc import dec, dstr, money
+from .calc import calc_lang, dec, dstr, money
 from .logbook import _body, _day, _id, _text
 from .model import ofx_name1, office_gate, office_org, office_settings
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
@@ -530,6 +530,9 @@ def cb_entry_patch(eid):
         if "day" in prev:
             _day_rules(c, book, row["day"])
         _neg_check(book["opening"], [dict(r, **row) if r["id"] == eid else r for r in rows])
+        if "node_id" in prev and cur.get("node_id"):  # 2.360.3 (#2733): taking the receipt off the entry keeps its lock
+            from ..receipts.suggest import olk_rc_keep
+            olk_rc_keep(c, cur["node_id"])
         row["updated_at"] = iso(now_utc())
         row = oc_enc_fields(c, oid, "office_cash_entries", row)
         c.execute(f"UPDATE office_cash_entries SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [eid, oid])
@@ -820,7 +823,7 @@ def cb_pdf_bytes(c, oid, book, frm, to, y, ents, closings, log, start, end, lg):
     ppr = pdf_paper_ns(s.get("paper"))  # 2.357.0 A (#3156): the office's paper size
     A4_H, A4_W, _Page = ppr.A4_H, ppr.A4_W, ppr._Page
     company = ofx_name1(ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name"))
-    lg = "de" if lg == "de" else "en"
+    lg = calc_lang(lg)  # 2.449.0 (#3766): every app language (was de, else en)
     cur = hc_home(s)  # 2.189.0 B (#2475): the home currency
     x0, x1 = 40, A4_W - 40
     pages, st = [], {"pg": None, "y": 0}

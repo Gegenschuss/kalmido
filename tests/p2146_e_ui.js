@@ -43,6 +43,10 @@ const card = (uid, fn) => `BEGIN:VCARD\r\nVERSION:3.0\r\nUID:${uid}\r\nFN:${fn}\
   check([...(sel('street')?.options || [])].map(o => o.textContent).join('|') === 'not in the file|Firma|Straße|PLZ|Ort|Land', '#2456: the choice lists the columns as written');
   const val = k => d.querySelector(`.oimpv .oimcard input[data-k="${k}"]`)?.value;
   check(val('name') === 'Beispiel Ton GmbH' && val('street') === 'Lindenallee 7' && val('zip') === '50667' && val('city') === 'Köln', '#2456: the card is filled from the columns');
+  // 2.363.0 (#3103): the new fields can be chosen, the preview names what stays out and a cut file
+  check(!!sel('email') && !!sel('phone') && !!sel('customer_no') && !!sel('vat_id'), '#3103: e-mail, phone, customer number, VAT ID in the column choice');
+  const h3103 = await w.eval(`e46_mapHtml({columns: {head: ['A'], map: {}, mode: 'one', unused: ['Kunde seit'], cut: 2000}, clients: []})`);
+  check(/Kunde seit/.test(h3103) && /2000|2\.000|2,000/.test(h3103), '#3103: the columns nothing takes over and the row limit are named: ' + h3103.slice(-200));
   // a change reads the file again with the new choice; the column moves away from the field that had it
   let got = null;
   await w.eval(`window.__e46 = oimPreview; oimPreview = (f, m) => { window.__e46got = {name: f && f.name, m}; }`);

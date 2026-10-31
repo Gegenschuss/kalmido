@@ -17,6 +17,7 @@ import hashlib
 import hmac
 import json
 import re
+from datetime import timedelta
 
 from ..core.config import SECRET_KEY, ATT_DIR
 from ..core.db import insert_id, iso, now_utc
@@ -876,6 +877,69 @@ def apply_values(c, m, node, values, auto, how=None):
     if "tags" in values:
         ta = auto.get("tags") if isinstance(auto.get("tags"), dict) else {}
         set_tags(c, nid, values["tags"], {t: ta.get(t, how or "") for t in values["tags"]})
+
+
+# 2.363.3 (#3134): "Recognise again" can be taken back for 24 h: the row's recognised values as stored (sealed ones stay sealed)
+# and the tags are kept in doc_meta.redo_prev until the undo or the queue's clean-up (redo_purge). A folder the run filed the
+# document into stays: the document may be used there already.
+REDO_COLS = ("state", "error", "method", "pages", "text", "doc_date", "due_date", "amount", "currency", "sender_id", "type_id",
+             "auto", "suggest", "review", "version", "done_at", "extracted", "asn")
+REDO_HOURS = 24
+
+
+def redo_save(c, m, nid):
+    """Keeps what the new run replaces. Only from a finished state: a second press while it waits keeps the first copy."""
+    if m["state"] not in ("done", "failed"):
+        return
+    prev = {k: m[k] for k in REDO_COLS}
+    prev["ws"], prev["tags"] = m["ws"], [t["id"] for t in node_tags(c, nid)]
+    c.execute("UPDATE doc_meta SET redo_prev=?, redo_at=? WHERE node_id=?", (json.dumps(prev, separators=(",", ":")), _now(), nid))
+
+
+def redo_back(c, nid):
+    """Puts the kept values back; values set by hand since then stay. Raises BadInput when it is too late or still running.
+    The caller holds no lock: the row is locked here, so the queue cannot take it up meanwhile."""
+    from ..core.errors import BadInput
+    m = c.execute("SELECT * FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,)).fetchone()
+    node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+    if m["state"] == "run":
+        raise BadInput(tr("The recognition is still running. Please try again in a moment."))
+    try:
+        prev = json.loads(m["redo_prev"] or "{}")
+    except ValueError:
+        prev = {}
+    fresh = m["redo_at"] and m["redo_at"] > iso(now_utc() - timedelta(hours=REDO_HOURS))
+    # a new version of the file since then: the old text would not belong to it
+    stale = prev.get("state") == "done" and int(prev.get("version") or 0) != int(node["cur_version"] or 0)
+    if not prev or not fresh or stale or prev.get("ws") != m["ws"]:
+        raise BadInput(tr("This recognition can no longer be taken back"))
+    try:  # 2.363.3 (#3134, review): a key rotation since then: the kept copy is sealed with a key that is gone
+        doc_open_as(c, m["ws"], "doc_meta.text", prev["text"])
+    except OrgCryptError:
+        raise BadInput(tr("This recognition can no longer be taken back")) from None
+    auto, hand = json.loads(prev["auto"] or "{}"), hand_fields(meta_json(c, m, "auto", {}))
+    auto.pop("_hand", None)
+    auto.pop("_was", None)
+    now_auto = meta_json(c, m, "auto", {})
+    auto.update({k: now_auto[k] for k in ("_hand", "_was") if k in now_auto})
+    vals = {k: prev[k] for k in REDO_COLS if k != "auto"}
+    for f in hand:
+        vals[HAND_FIELDS[f]] = m[HAND_FIELDS[f]]
+    if vals["asn"] and vals["asn"] != m["asn"]:  # 2.363.3 (#3134, review): the old number may belong to another document by now
+        write_lock(c, f"doc-asn:{m['ws']}")  # the row is locked already: same order as asn_lock
+        if asn_taken(c, m["ws"], vals["asn"], nid):
+            vals["asn"] = m["asn"]
+    sets = ", ".join(f"{k}=?" for k in vals)
+    c.execute(f"UPDATE doc_meta SET {sets}, auto=?, redo_prev='', redo_at='', updated_at=? WHERE node_id=?",
+              (*vals.values(), json.dumps(auto, separators=(",", ":")), _now(), nid))
+    set_tags(c, nid, prev["tags"], {t: "" for t in prev["tags"]})
+    m = meta_row(c, nid)
+    doc_index(c, nid, m["ws"], index_text(c, dict(m), node["name"], doc_open(c, m["ws"], "doc_meta.text", m["text"]) or ""))
+
+
+def redo_purge(c):
+    """The queue's clean-up: what can no longer be taken back goes (the old texts stay no longer than needed)."""
+    c.execute("UPDATE doc_meta SET redo_prev='', redo_at='' WHERE redo_at<>'' AND redo_at<?", (iso(now_utc() - timedelta(hours=REDO_HOURS)),))
 
 
 def thumb_store(c, m, node, data, kind):

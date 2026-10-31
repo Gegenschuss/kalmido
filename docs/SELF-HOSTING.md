@@ -38,6 +38,7 @@ addresses and paths to your setup.
 - [Trash period of tasks (2.116)](#trash-period-of-tasks)
 - [Outgoing connections (2.223.3)](#outgoing-connections)
 - [Production updates](#production-updates)
+  - [Back to the previous version](#back-to-the-previous-version)
   - [Update, downgrade and restore (2.149)](#update-downgrade-and-restore)
 - [Run by a hoster: the operator interface (2.144)](#run-by-a-hoster-the-operator-interface)
 - [Support Kalmido (supporter licence)](#support-kalmido-supporter-licence)
@@ -108,6 +109,11 @@ the app). Keep a copy of the key apart from the backups (a password manager): ba
 backup alone does not reveal the encrypted data. Without any key *Administration > Server* shows a red warning, no
 token can be stored and organisation data stays unencrypted.
 
+**An existing server without a key (#2510)** keeps starting, because a refusal would lock it out with an update:
+*Settings > Administration* shows the warning, and at every start the admins get an alert (none with
+`KALMIDO_NO_SECRET_KEY=1`, which says you decided so). The image sets no key path of its own on purpose: a path inside the
+container would be gone with the container, so without Compose the way stays the volume at `/secret` described above.
+
 A new key never makes data unreadable that was readable before: without a key nothing can be sealed. Since 2.149 the
 server also never creates a new key file for a database that already holds organisation or account keys (the key
 file got lost, a container was recreated without its `/secret` volume): it names the reason and the file in the log
@@ -168,10 +174,13 @@ dialog's history (old and new value) and the owner and the members get a News en
 
 **Inviting by e-mail (2.115).** An organisation's admin can invite somebody who has no account yet: *Settings >
 Organisation > Invite by e-mail* (address and role). Kalmido creates an account without a password (the user name is made
-from the address), makes it a member of that organisation in the chosen role and mails the invitation link (the link is
-shown, too, to pass on without mail). An address that already has an account is added as with *Add by e-mail address*.
-Open invitations are listed below with *Resend* (a new link, the old one stops working) and *Withdraw* (deletes the account,
-only while it never signed in and belongs to this organisation alone). Limits: 20 new invitations per inviting person and
+from the address) and mails the invitation link, valid for two weeks; the link goes to an organisation admin only by mail,
+an instance admin also gets it on the screen when no mail went. An address that already has an account is added as with
+*Add by e-mail address*. Since 2.453 a person with a new account joins like one with an existing account: by accepting the
+invitation in their News (after choosing a password), in the chosen role, so the member list does not tell the two apart.
+An instance admin still adds directly (on a hosted instance the operator invites, too). Open invitations are listed below
+with *Resend* (a new link and two more weeks, the old link stops working) and *Withdraw* (deletes the account, only while it
+never signed in and belongs to this organisation alone). Limits: 20 new invitations per inviting person and
 day, plus the daily mail budget. Instance admins switch it off under *Settings > Users > Registration on the login page*
 (*Organisation admins may invite new people by e-mail*, on by default); adding existing accounts stays possible.
 
@@ -276,6 +285,9 @@ the Caddyfile (or nginx configuration) instead.
 **Compression (2.65).** Kalmido compresses its JSON answers itself (gzip, from 1 KB on) when the client accepts it; with
 many tasks the start state shrinks to about a twentieth. A proxy that compresses too (Caddy `encode`, nginx `gzip`) sees the
 `Content-Encoding` header and leaves those answers alone, so it can stay on for the static files.
+Since 2.442 the Docker image also carries its scripts and styles packed ahead of time (gzip and brotli) and sends them by
+`Accept-Encoding`, so the first load is about a third of the size without any proxy setting. The nginx and Traefik examples
+in `examples/` compress the rest as well.
 
 **Two host names (internal and single sign-on).** Links in mails, push messages and calendar feeds use `PUBLIC_URL`,
 so set it to the name people should open. Logging out of Kalmido does not log you out of the sign-on portal. Point API
@@ -550,9 +562,13 @@ docker compose up -d kalmido
   (`KALMIDO_SECRET_KEY` or `secret/kalmido.key`), on purpose: a backup that carries its own key protects nothing. Keep a
   copy of the key apart from the backups (a password manager). To restore on another server (a move, a new disk, a lost
   server), put the old key in place **before the new server's first start**: in `.env` as `KALMIDO_SECRET_KEY=…`, or as the
-  file `secret/kalmido.key`. Then start it and restore the backup. Restored with a different key, the database comes back but
-  attachments, private files, organisation files, office documents and fields and the wiki history cannot be decrypted
-  (the app answers with the code `orgcrypt`); with the old key back in place they are readable again. Account keys have
+  file `secret/kalmido.key`. Then start it and restore the backup. A backup whose organisation or account keys do not open with
+  this server's key is refused before anything changes (#2893; *Verify* warns about it too): put the old key in place,
+  restart and restore again. Only when the old key is lost for good, start with `KALMIDO_SECRET_KEY_CHANGED=1` to restore
+  anyway: the database comes back with a red warning, but attachments, private files, organisation files, office documents
+  and fields and the wiki history cannot be decrypted (the app answers with the code `orgcrypt`); remove the variable
+  afterwards. A backup without such keys but from another key restores with a warning: its stored access tokens (Git,
+  documents, single sign-on) may be unreadable; enter them again. Account keys have
   no recovery key: without the old server key private files are lost for good. The backup passphrase and the off-site
   access data set on the restoring server stay usable after the restore (2.359.0; before, encrypted backups failed until
   the passphrase was entered again).
@@ -659,7 +675,14 @@ deleted rows and columns of a table, pipeline deals, invoice series, the placeho
 the emptied rows of deleted comments, absences, disposition bookings, scheduling polls (with the votes of their guests),
 appointment types and file requests (*since 2.223.3*; the files received stay in their folder). The file store's trash names the period. Projects, tasks and events have their own
 trash periods. Legal retention wins: a booked receipt or the logbook is locked until its period ends, never deleted early
-(such a node stays in the trash and is counted as `files_locked`).
+(such a node stays in the trash and is counted as `files_locked`). Deleting an organisation or an account never fails on
+such a file: the organisation is retired until the lock ends, a private file moves into the account's retired office.
+
+**Restoring a backup keeps deletions.** Organisations and entries deleted for good (projects, tasks, files, knowledge
+pages, events, tables, contacts, clients, e-mails, deals) are noted by table and number only, like deleted accounts. A
+restore deletes them again when the backup brings them back. What went in the last 7 days stays, in case the restore was
+meant to bring it back; the admin alert and the log give the numbers. The list follows the backups' period in the log
+clean-up. Retiring an organisation also ends its calendars' subscription links and the booking pages that work for it.
 
 Expired credentials (sessions, tokens, codes past their end) are no data of a person any more and go without the switch.
 
@@ -770,6 +793,8 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
   docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli rotate --org <id> --recovery-out /data/rk-<id>.txt
   ```
 
+  Around the key switch the server takes no writes on any process, up to about half a minute: writes get a 503 and wait
+  in the app's queue, reading and signing in go on (a run that dies frees the server after two minutes; 2.360.2).
   A new key is made, every encrypted value and file of the organisation is encrypted again with it, then the old key
   is removed and a new recovery key is written (to stdout, or with `--recovery-out` into a new file with mode 0600: move
   it offline and delete the file). On this server all earlier recovery keys, including the earlier format, stop
@@ -951,7 +976,8 @@ organisation.
   address; never the status link, a new server would send new links) and the members with their roles (name, user
   name, e-mail address). Since 2.362 also the organisation's channels of the team chat (the open ones and the ones the
   exporting admin is a member of, like in the app) with their members, the files and voice messages of the team chat
-  (`files/tchat/`), the closed months of the logbook, the tasks and events made from filed e-mails, section templates,
+  (`files/tchat/`), knowledge pages, tables, documents, absences, filed e-mails, the newsletter, video sign-offs, letters,
+  the closed months of the logbook, the tasks and events made from filed e-mails, section templates,
   contacts on tasks, the newsletter's suppression list and consent log (address hashes only) and the booking pages the
   office bills plus the exporting admin's own one with their kinds of appointment and bookings (in the archive; the
   import does not take them over, a booking page belongs to one person). An open channel stays open in the target
@@ -962,7 +988,7 @@ organisation.
   the app (2.190): only the mails (and their files) the exporting admin can open there, not other members' inboxes or
   mails of projects the admin is not part of. Projects of the organisation follow the same rule (2.223.3): only the ones
   the admin sees in the app (shared with at least one more person or open to the organisation, the admin's own and the
-  ones shared with them); a member exports a project shared with nobody with the own account export. Deleted items (the
+  ones shared with them); a member exports a project shared with nobody with the own account export (2.362.3: the other admins get a News with the number of projects, once a day; the list history names them). Deleted items (the
   trash, undone entries) are not in it, nor in the retention export; removed logbook drives stay (the change log).
   Since 2.362 the manifest also names what stays out on purpose: group conversations of the team chat (like direct
   messages they belong to their people), closed channels the admin is not a member of, notification channels,
@@ -987,8 +1013,10 @@ organisation.
 
   The tool checks every block (a wrong key, a damaged or shortened file is refused) and then the checksums of the
   manifest.
-- **Without `KALMIDO_SECRET_KEY`** the organisation data is not encrypted and the export is refused: set the server key
-  first (see the section on the encryption of the organisation data).
+- **Without `KALMIDO_SECRET_KEY`** nothing is encrypted on this server, so since 2.362.2 the export is a plain ZIP
+  (`.zip`, mode 0600, same content, `manifest.json` says so) with a warning in the app: anyone who gets the file can read
+  everything in it. No recovery key is needed; the import reads it as it is. Set the server key to get encrypted archives
+  (see the section on the server key).
 - **Import** (2.73; every area since 2.139.1): see [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom) -- an
   admin of an organisation on the other server uploads the archive under *Settings > Data* and opens it with the recovery
   key. Best into a new, empty organisation. Since 2.139.1 the whole organisation moves: projects and tasks, office (master
@@ -1029,6 +1057,13 @@ and 20). Agents and API tokens cannot do this; it is a person's step in the app.
    hash in the file, otherwise nobody is invited; everybody else invites them later as usual. Assignments to people that
    are not taken over stay empty; comments of such people keep their name.
 
+**Importing twice (2.362.3):** the preview says when an export of the same account was imported already (the import's
+number, undo until when), also for a newer export of that account. Importing again needs a tick and takes over only what
+the chosen place does not have yet, row by row: a newer export adds its new tasks to the imported project. Rows deleted or
+in the trash since count as gone and come back; a project that went to another person or organisation is taken over anew;
+another target is a separate copy. An organisation export counts by its file. The import keeps this record with its last
+20 imports.
+
 **What moves:** your projects (sections, fields, tags, status updates, links, milestones, project files, project notes),
 their tasks with subtasks, dependencies, field values and your tags, comments, attachments, your encrypted task notes
 (2.362), time entries, habits, filters, templates,
@@ -1047,11 +1082,26 @@ access data of connections (calendar and address book subscriptions, Karakeep, n
 set them up again), lists of other people (the file names them and contains your own comments there), the trash, and
 organisation data that is not yours (use the organisation export for a whole organisation).
 
+**Your own office (2.362.2).** With a personal office the file also holds a readable copy of it under `personal-office/`:
+the same parts as *Export the office* in the office settings, with the receipts and filed documents of the office. The
+account import names it as staying behind; to take the office to another server use *Export the office* (that archive now
+carries the receipts, filed letters, contract, equipment and cash book documents, and the import points the office at them
+again; files in the trash or below a browser-locked folder stay out).
+
+**Files of knowledge pages and tables (2.362.2).** They are in the file (`files/wiki_files/`, `files/sheet_files/`), the rows
+of `data/wiki_files.json` and `sheet_files.json` name them under `file`. A file that does not open is listed under
+`locked_files`, the export goes on.
+
 **2.148.1 (Art. 15):** the file also holds the list of your private files (name, type, size, dates; not their content),
 your private knowledge pages, your chats with agents, what you wrote in direct messages, your absences and timesheets
 (`private_files`, `wiki_pages`, `agent_chats`, `direct_messages`, `absences`, `timesheets`; the import does not take them
-over yet). `not_included` in the manifest names what is still missing (content of private files, other people's chat
-messages, booking pages, polls and forms, holiday allowances, the organisation's office).
+over yet). `not_included` in the manifest names what is still missing (older versions of private files, other people's chat
+messages, the organisation's office).
+
+**2.360.2:** also the current content of your private files (`files/private_files/`), your booking page with its
+bookings (`appt_pages`, `appt_types`, `appt_bookings`, without network addresses), your private polls (`polls`,
+`poll_options`, `poll_votes`, without voters' e-mail addresses), the forms of your projects with their entries (`forms`,
+`form_entries`) and your holiday allowances (`leave_quota`). The import does not take them over: the preview names them.
 
 **The file** (`kalmido-account-<date>.zip`, readable without Kalmido):
 
@@ -1074,7 +1124,7 @@ Other people's addresses never leave the server in plain text: `email_hash` is t
 you may see on the new server. Your own address in `manifest.json` stays readable. Files of 2.73 test builds with a plain
 `email` field are still read.
 
-**A whole organisation** (2.73, stage 1): upload its organisation export (see above) the same way and enter the organisation's
+**A whole organisation**: upload its organisation export (see above) the same way and enter the organisation's
 recovery key of the old server. The archive is opened on the server (a wrong key is refused, ten attempts per upload),
 checked and shown as a preview; it goes into an organisation you administer or (2.96) into your private space. Into the
 private space nobody joins an organisation: ticked people only get the projects shared, the organisation's own address
@@ -1084,10 +1134,13 @@ new organisation's key), the organisation's calendars with events and its addres
 projects belong to you as the importing admin. Members are matched by e-mail address. Since 2.278 a ticked person
 with an account here does not join directly: they get an invitation to the organisation (with the role of the file,
 admin or member, which you confirm in the preview) and join only when they accept it. Until then their content stays
-with you as the importing admin (names as text) and no project is shared with them; a ticked person who is already a
-member gets their projects shared again. Not yet taken over (the preview names them with their counts): the
-office, the file store, team chat, knowledge pages, documents, newsletter, clients, absences and bookings, forms,
-playbooks, project notes and notepads, time entries, customer reports and browser-encrypted notes.
+with you as the importing admin (names as text) and no project is shared with them. Since 2.363 the projects ticked for
+that person are noted on the invitation and shared with their role when the person accepts (a project deleted or handed
+on meanwhile is left out); declining, withdrawing the invitation or undoing the import drops the note, and tasks keep
+their creator and assignee. A ticked person who is already a member gets their projects shared again. What moves with
+it is listed under [Organisation export](#organisation-export) (*Import*); the preview names everything with its counts.
+Memberships of people groups do not move, and mails and chat messages of people who are not ticked come over without
+their account (their name as text).
 
 2.278: a member without an address in the file (or not found by it) can be matched by the exact user name of an account
 you can see on this server (no search; an unknown and a hidden name give the same answer). Time entries billed on an
@@ -1126,6 +1179,9 @@ A short checklist for a new server:
   database errors without the values of the row. `KALMIDO_LOG_FULL_IP=1` keeps the addresses in full (for fail2ban,
   below). The shipped `docker-compose.yml` rotates every container log (`driver: local`, 3 files of 10 MB), so old lines
   are gone after a while; keep that (or set your own limit) when you change the logging driver.
+- **Two kinds of address limits.** Sign-in with a known name from a known address is only slowed down when an address has
+  many failures (2.282). Every other way in keeps the hard limit per address: the OIDC start, setup codes, invitations, the
+  password reset, the agent setup and API tokens have no "known name" to tell a person from a flood.
 - **fail2ban for failed logins.** Kalmido logs `login failed for user#<hash> from <address>` and has its own lockout.
   2.148.1: the log names a short hash of the typed name (never the name: it may be a password typed into the wrong field).
   fail2ban needs the full address: set `KALMIDO_LOG_FULL_IP=1` in `.env` (2.239: shortened by default). To block repeat
@@ -1774,8 +1830,13 @@ Notes:
 ## Moving to a new server
 
 1. **Before:** lower the DNS TTL of the name a day ahead; make a backup (*Back up now*).
-2. **Copy:** the data folder (attachments, backups) and the database (`pg_dump`, see above, or the database folder
-   with PostgreSQL stopped), the `.env` and above all **`KALMIDO_SECRET_KEY`** (or the file `secret/kalmido.key`).
+2. **Copy:** the data folder (attachments, office files, backups; the files keep owner uid 1000) and the database
+   (`pg_dump`, see above, or the database folder with PostgreSQL stopped), the `.env` and above all
+   **`KALMIDO_SECRET_KEY`** (or the file `secret/kalmido.key`).
+   Also what lives outside the data folder or only in the environment: the files behind `KALMIDO_AI_KEY_FILE` and
+   `KALMIDO_OPERATOR_TOKEN_FILE`, `KALMIDO_BACKUP_PASSPHRASE` when it is set that way, and any folder you moved with
+   `TASKS_ATTACHMENTS`, `TASKS_OFFICE_DIR`, `TASKS_TEXT_CACHE` or `KALMIDO_PAPERLESS_ZIP_DIR`.
+   `KALMIDO_FOLDERWATCH_DIR` comes with the image: nothing to copy.
    **Without the old server key everything encrypted is lost for good:** it wraps the organisation and account keys, and
    with them every sealed file and field - attachments, private files, organisation files, office documents (PDF / XML)
    and office fields, the wiki history - plus the stored secrets (repository tokens, sign-on client secret). Account keys
@@ -1788,7 +1849,18 @@ Notes:
    `curl --resolve tasks.example.com:443:<new address> https://tasks.example.com/api/health`.
 5. **Tell people what to redo,** because it is bound to the old server or name: passkeys (if the name changed), the
    installed app and push permissions (reinstall), calendar and contact accounts (CalDAV / CardDAV), shortcut URLs for
-   sharing, and calendar subscription (ICS) links.
+   sharing, and calendar subscription (ICS) links. With a new name also: the redirect address at your single sign-on
+   provider, incoming webhooks and Git webhooks, mail-in addresses at other services, the ntfy inbox address, and public,
+   form and portal links people have saved. With a new off-site target: its SFTP host fingerprint.
+
+<!-- backup-folders -->
+**What a backup archive holds:** `kalmido.dump`, `manifest.json`, `office/<organisation>/` and below `attachments/`:
+`<task>/` for task attachments; the folders `avatars/`, `listicons/`, `docthumbs/`, `listheads/` and `bookmarks/` with
+their files directly inside; the folders `files/`, `lists/`, `budget/`, `wiki/`, `tchat/`, `sheets/` and `tplfiles/` with one folder per
+entry; and `chat/<agent>-<person>/`. Without the app: unpack `attachments/` to `./data/attachments` and `office/` to
+`./data/office`, restore the dump with `PGOPTIONS="-c app.role=system"` as in the backup section above. Restoring keeps
+the backup settings (`bk_` keys) of the running server; every other setting comes from the backup.
+<!-- /backup-folders -->
 
 ## Trash period of tasks
 
@@ -1856,9 +1928,38 @@ stay blocked until you allow them.
 - **Pin the version** (`KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:<version>`, not `latest`), so an update happens when
   you decide.
 - **A safe order:** backup, then pull and start, then check `GET /api/health` and a few counts (users, projects, tasks,
-  attachments) against the values before. If anything is off, roll back automatically to the previous version and the
-  backup.
+  attachments) against the values before. If anything is off, go back by hand, no tool does it for you: see
+  [Back to the previous version](#back-to-the-previous-version).
 - **Keep the previous image** until the new version has proven itself; do not prune images right after an update.
+
+- **Read [UPGRADING.md](UPGRADING.md) first:** it lists every version that needs a step from you.
+
+### Back to the previous version
+
+*Since 2.359.3 (#2896).* Note the version you run before an update (Settings > Help). The installer keeps it in
+`.kalmido-version.prev` and names it at the end of `update.sh`. Which way to take:
+
+- **Only the image** is enough for every patch of the same minor and for **one step back** to the version that ran before
+  the last upgrade. The data stays as it is, also what was entered since; newer columns and tables are left alone. Check
+  the [format limits](UPGRADING.md#format-limits-going-back) first.
+
+  ```bash
+  KALMIDO_VERSION=vX.Y.Z ~/kalmido/update.sh
+  ```
+
+  With your own `.env`: set `KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:X.Y.Z`, then `docker compose up -d`.
+- **The database copy as well** when you go further back, or when the update damaged data: `update.sh` writes one to
+  `data/backups/kalmido-*.dump` before every update (the last 10 stay). **Everything entered since is lost.** The copy
+  holds no attachments: files added since stay unused in the folder, files removed since do not come back. For those
+  restore an in-app backup instead (*Back up now* before the update), on the version that made it.
+
+  ```bash
+  docker compose stop kalmido
+  docker compose exec -T db sh -c 'PGOPTIONS="-c app.role=system" pg_restore --clean --if-exists --no-owner --no-privileges --single-transaction --enable-row-security -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < data/backups/kalmido-YYYYMMDD.dump
+  ```
+
+  Then set the old version as above and start it.
+- **Never below 2.149,** see [UPGRADING.md](UPGRADING.md#format-limits-going-back).
 
 ### Update, downgrade and restore
 
@@ -1869,15 +1970,22 @@ stay blocked until you allow them.
   (`app_version_prev`). Going back changes neither, so the next upgrade works as before.
 - **Downgrade guard.** An image of an older minor version (2.148 on a database 2.150 ran on) refuses to start with a
   clear message: older code does not know newer columns and data and could damage them. Allowed are every patch of the
-  same minor (2.150.0 on 2.150.3 and back) and **one step back** to the version that ran before the last upgrade (the
-  automatic rollback of an update, or keeping the previous image as above). In an emergency `KALMIDO_ALLOW_DOWNGRADE=1`
+  same minor (2.150.0 on 2.150.3 and back) and **one step back** to the version that ran before the last upgrade
+  (keeping the previous image as above). In an emergency `KALMIDO_ALLOW_DOWNGRADE=1`
   starts anyway; go back to the newer image soon. The first version with the guard is 2.149: a database is stamped on
   its first start with it.
+- **Format limits (2.359.3, #2896).** The guard also knows the [format limits](UPGRADING.md#format-limits-going-back): an
+  image below the limit of its database refuses to start and names the step, even as the one step back.
 - **Installer.** The first start after an update migrates the database, which can take minutes on a big one; the
   installer keeps waiting (up to 30 minutes) while the container runs and stops at once when it exits.
 - **Restore.** A backup made with a newer minor version than the running server is refused ("update Kalmido first, then
   restore it"); older backups restore as before. The same `KALMIDO_ALLOW_DOWNGRADE=1` lets a newer backup through.
   The database schema number in the backup (`schema_version`) stays a second, independent guard.
+- **A newer PostgreSQL (#2945).** `pg_dump` refuses a server of a newer major version, so `postgresql-client` has to move
+  along with the server: the image carries version 17. Before every backup Kalmido compares the major versions of
+  `pg_dump` and the server. Is `pg_dump` older, the backup stops with a clear message instead of failing later,
+  *Settings > Administration* names it and the admins get an alert. Upgrade the database server only together with a
+  Kalmido image that has the matching client (`postgresql-client-<major>` in the `Dockerfile`).
 - **Back to 2.147 or older after a DATEV import (2.188.0, #2498).** 2.148 added the DATEV import of the office area; its
   runs are kept in the import history for undo. Versions before 2.148 do not know these runs: their *Undo* of such a run
   would delete the imported customers but keep the suppliers and opening balances. Do not undo a DATEV import on an

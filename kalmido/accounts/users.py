@@ -531,6 +531,8 @@ def _user_purge(c, uid):
     files += wka_user_files(c, uid)  # 2.99.0 A (#2182): the files of its private pages (the rows go with the account)
     from ..sheets.shkinds import shk_user_files
     files += shk_user_files(c, uid)  # 2.124.0 B (#2110): the files of its private tables' file cells
+    from ..lists.tplextra import tx_user_files
+    files += tx_user_files(c, uid)  # 2.363.3 (#3134): the files of its templates
     from ..wiki.wikie2e import wke_user_purge
     wke_user_purge(c, uid)  # 2.64.3 A (#1817): knowledge spaces with the lock whose key the person held: rotation pending
     av = (c.execute("SELECT avatar FROM users WHERE id=?", (uid,)).fetchone() or [None])[0]
@@ -554,6 +556,8 @@ def _user_purge(c, uid):
             h = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone()
             if h:
                 c.execute("UPDATE bookmarks SET user_id=? WHERE user_id=? AND org_id=?", (h[0], uid, o))
+        from ..sheets.shshare import shs_forget
+        shs_forget(c, uid)  # 2.453.0 (#3781)
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions
     return files
 

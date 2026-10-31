@@ -34,7 +34,7 @@ from ..core.db import bump, db, iso, now_utc
 from ..core.pg import write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_json_store, oc_log_detail
 from ..core.access import Denied
-from ..core.errors import BadInput
+from ..core.errors import BadInput, DeniedKey
 from .model import ofx_name1, ofx_name_clean, ofx_name_lines, office_gate, office_org, office_role, office_settings, pb_cl_sql
 from .packs import office_pack_for
 from .doclang import doc_lg, doc_pack
@@ -76,9 +76,9 @@ def ofx_need_editable(r):
     """409 with a readable reason when document row r is finalised (head, positions, number, delete). 2.38.0: a sent
     document (quotations too, decision of 2026-10-10) is locked the same way; a new version = duplicate."""
     if ofx_locked(r):
-        raise Denied(409, tr(OFX_LOCKED))
+        raise DeniedKey(409, OFX_LOCKED)
     if r is not None and r["status"] == "sent":
-        raise Denied(409, tr(OFX_SENT))
+        raise DeniedKey(409, OFX_SENT)
 
 
 def ofx_number_at_finalize(s, kind):
@@ -413,6 +413,9 @@ def ofx_finalize(c, oid, uid, did):
              "texts": {k: {lang: v.get(lang) or ""} for k, v in (pack.get("texts") or {}).items() if isinstance(v, dict) and isinstance(v.get(lang) or "", str)}}
     from .catalog import pkc_origin  # 2.76.0 (#1023): which pack file exactly (built in or installed from a catalogue)
     tsnap["pack_sha256"], tsnap["pack_source"] = pkc_origin("country", tsnap["pack"])
+    if r["kind"] == "offer":  # 2.453.0 (#3816): the heading in the document's language, frozen (an industry pack may name its own)
+        from .docs import _offer_title
+        tsnap["offer_title"] = _offer_title(s, (pack.get("labels") or {}).get(lang) or {}, lang)
     from .terms import agb_freeze
     agb_freeze(c, oid, r)  # 2.113.2 (#2253): the terms of the document's language, before the stored PDF is written
     ts = iso(now_utc())

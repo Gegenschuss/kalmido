@@ -158,7 +158,7 @@ check(bo == [("O", "0", "4240.00", "0.00", bo[0][4], "VATEX-EU-O")] and bo[0][4]
 check(vat_ids(xo) == [], f"abroad: no VAT id of seller or buyer (BR-O-02): {vat_ids(xo)}")
 check(ein.ein_check(xo) == [] and ein.ein_check(ein.ein_build(dict(mo, recipient=dict(CH, buyer_reference="04011000-1-03")), "xrechnung")) == [],
       f"abroad: own check clean (CII, XRechnung): {ein.ein_check(xo)}")
-uo = ein.ein_ubl_build(mo, "peppol")
+uo = ein.ein_ubl_build(mo, "peppol", "0208:0123456749", "0208:0123456749")  # 2.446.0 (#3783): Peppol ids, the own check now names EM
 check(b"<cbc:ID>O</cbc:ID>" in uo and b"DE123456789" not in uo and ein.ein_ubl_check(uo) == [], "abroad UBL: O, no seller VAT id")
 mg = copy.deepcopy(mo)
 mg["sender_fields"]["register_no"] = ""

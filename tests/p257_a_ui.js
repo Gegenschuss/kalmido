@@ -82,30 +82,30 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   await star(`#side .srow[data-go="who/${BOB}"]`, 'p:' + BOB, 'a person');
   if (AG && d.querySelector(`#side .srow[data-aid="${AG}"]`)) await star(`#side .srow[data-aid="${AG}"]`, 'a:' + AG, 'an agent');
   else console.log('agent row not in the sidebar here, agent star skipped');
-  const tiles = () => [...d.querySelectorAll('#side .sg-favs .fv2-tile')];
+  const tiles = () => [...d.querySelectorAll('.fv2bar .fv2-tile')];
   const order = () => tiles().map(t => t.dataset.fv2).join();
   await until(() => tiles().length >= 7);
-  const want = ['v:today', 'l:' + TEAM, 'folder:Work', 'm:matrix', 'f:' + FLT, 'tag:errand', 'p:' + BOB, ...(AG && d.querySelector(`#side .fv2-tile[data-fv2="a:${AG}"]`) ? ['a:' + AG] : [])].join();  // 2.152.2 (#2622): the calendar is an icon of the bar (no row menu there); a Views row (Matrix) carries the module star
+  const want = ['v:today', 'l:' + TEAM, 'folder:Work', 'm:matrix', 'f:' + FLT, 'tag:errand', 'p:' + BOB, ...(AG && d.querySelector(`.fv2bar .fv2-tile[data-fv2="a:${AG}"]`) ? ['a:' + AG] : [])].join();  // 2.152.2 (#2622): the calendar is an icon of the bar (no row menu there); a Views row (Matrix) carries the module star
   check(order() === want, 'the tiles in the order of the stars, across kinds: ' + order());
   check(tiles().every(t => (t.textContent.trim() === '' || t.querySelector('.avatar')) && !t.querySelector('.n') && t.title && t.getAttribute('aria-label') === t.title), 'tiles: icon only (a person: the avatar), the name as title + aria-label');
-  check(!/\d/.test(tiles().map(t => t.textContent).join('')) && !d.querySelector('#side .fv2-tile .c'), 'tiles: no numbers');
-  check(d.querySelector('#side .fv2-tile[data-fv2="v:today"]')?.title === 'Today' && d.querySelector('#side .fv2-tile[data-fv2="v:today"]').classList.contains('on'), 'the tile of the open view is marked');
+  check(!/\d/.test(tiles().map(t => t.textContent).join('')) && !d.querySelector('.fv2bar .fv2-tile .c'), 'tiles: no numbers');
+  check(d.querySelector('.fv2bar .fv2-tile[data-fv2="v:today"]')?.title === 'Today' && d.querySelector('.fv2bar .fv2-tile[data-fv2="v:today"]').classList.contains('on'), 'the tile of the open view is marked');
   check(!d.querySelector('#side .sg-favs .srow'), 'no list rows in the favourites any more');
   rclick(w, d.querySelector('#side .srow[data-go="today"]'));
   check(await until(() => menuItem(d, /^Remove from favourites/)), 'a starred row offers "Remove from favourites"');
   d.body.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); await sleep(200);
   // a tile opens its target
-  click(w, d.querySelector('#side .fv2-tile[data-fv2="folder:Work"]'));
+  click(w, d.querySelector('.fv2bar .fv2-tile[data-fv2="folder:Work"]'));
   check(await until(() => w.eval('S.route.key') === 'folder:Work'), 'a tile opens its target');
 
   // ================= arranging: the tile menu
-  rclick(w, d.querySelector('#side .fv2-tile[data-fv2="m:matrix"]'));  // 2.152.2 (#2622): the calendar is an icon of the bar (no row menu there); a Views row (Matrix) carries the module star
+  rclick(w, d.querySelector('.fv2bar .fv2-tile[data-fv2="m:matrix"]'));  // 2.152.2 (#2622): the calendar is an icon of the bar (no row menu there); a Views row (Matrix) carries the module star
   const left = await until(() => menuItem(d, /^Move left/));
   check(left && menuItem(d, /^Move right/) && menuItem(d, /^Remove from favourites/) && menuItem(d, /^Open/), 'the tile menu: Open, Move left / right, Remove');
   click(w, left);
   check(await until(async () => (await items()).join().startsWith(`v:today,l:${TEAM},m:matrix,folder:Work`)), 'Move left: one place to the left, stored ' + (await items()).join());  // 2.152.2 (#2622): the calendar is an icon of the bar (no row menu there); a Views row (Matrix) carries the module star
   check(await until(() => order().startsWith(`v:today,l:${TEAM},m:matrix,folder:Work`)), 'Move left: drawn');  // 2.152.2 (#2622): the calendar is an icon of the bar (no row menu there); a Views row (Matrix) carries the module star
-  rclick(w, d.querySelector('#side .fv2-tile[data-fv2="v:today"]'));
+  rclick(w, d.querySelector('.fv2bar .fv2-tile[data-fv2="v:today"]'));
   check(await until(() => menuItem(d, /^Move left/)?.disabled), 'the first tile cannot move further left');
   d.body.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); await sleep(200);
   // undo = one step
@@ -113,17 +113,17 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check(await until(async () => (await items()).join().startsWith(`v:today,l:${TEAM},folder:Work,m:matrix`)), 'Undo puts it back (one step)');  // 2.152.2 (#2622): the calendar is an icon of the bar (no row menu there); a Views row (Matrix) carries the module star
   // a second session of the same person follows without reload
   const w2 = await boot({user: 'alice', hash: 'today'}), d2 = w2.document;
-  const order2 = () => [...d2.querySelectorAll('#side .sg-favs .fv2-tile')].map(t => t.dataset.fv2).join();
+  const order2 = () => [...d2.querySelectorAll('.fv2bar .fv2-tile')].map(t => t.dataset.fv2).join();
   check(order2() === order(), 'the second session shows the same order: ' + order2());
-  rclick(w, d.querySelector('#side .fv2-tile[data-fv2="tag:errand"]'));
+  rclick(w, d.querySelector('.fv2bar .fv2-tile[data-fv2="tag:errand"]'));
   click(w, await until(() => menuItem(d, /^Move right/)));
   check(await until(async () => (await items()).indexOf('tag:errand') === 6), 'Move right: stored');
   check(await until(() => order2() === order(), 120), 'the second session gets the new order without reload: ' + order2());
   w2.close();
   // remove from the tile
-  rclick(w, d.querySelector('#side .fv2-tile[data-fv2="tag:errand"]'));
+  rclick(w, d.querySelector('.fv2bar .fv2-tile[data-fv2="tag:errand"]'));
   click(w, await until(() => menuItem(d, /^Remove from favourites/)));
-  check(await until(async () => !(await items()).includes('tag:errand')) && await until(() => !d.querySelector('#side .fv2-tile[data-fv2="tag:errand"]')), 'Remove from favourites: gone');
+  check(await until(async () => !(await items()).includes('tag:errand')) && await until(() => !d.querySelector('.fv2bar .fv2-tile[data-fv2="tag:errand"]')), 'Remove from favourites: gone');
 
   // ================= "Only favourites" stays for lists
   const onlyBtn = () => d.querySelector('#side .sg-favs [data-fav-only]');
@@ -133,10 +133,10 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check(d.querySelector('#side .sg-lists .sfavmore') && !d.querySelector(`#side .sg-lists .srow[data-list="${HOME}"]`), '"Only favourites" folds the other lists');
   check(d.querySelector(`#side .srow[data-go="f/${FLT}"]`) && d.querySelector('#side .srow[data-go="today"]'), '"Only favourites" leaves filters and Plan alone');
   click(w, onlyBtn()); await sleep(300);
-  rclick(w, d.querySelector('#side .fv2-tile[data-fv2="l:' + TEAM + '"]'));
+  rclick(w, d.querySelector('.fv2bar .fv2-tile[data-fv2="l:' + TEAM + '"]'));
   click(w, await until(() => menuItem(d, /^Remove from favourites/)));
   check(await until(async () => (await call('GET', '/api/state')).settings.fav_lists === ''), 'removing a list tile removes its star');
-  check(await until(() => !onlyBtn() && d.querySelector('#side .sg-favs')), 'without a starred list no "Only favourites" button, the other tiles stay');
+  check(await until(() => !onlyBtn() && d.querySelector('.fv2bar .fv2-tile')), 'without a starred list no "Only favourites" button, the other tiles stay');  // 2.441.0 (#3592): the tiles live in the head bar
 
   // ================= targets the person cannot see now: left out, kept
   await call('PUT', `/api/lists/${HOME}/favorite`, {});
@@ -146,8 +146,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   await call('PATCH', `/api/lists/${HOME}`, {archived: true});
   await call('DELETE', `/api/lists/${TEAM}/members/${BOB}`);
   w.close(); w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  check(!d.querySelector(`#side .fv2-tile[data-fv2="l:${HOME}"]`), 'an archived list: no tile');
-  check(!d.querySelector(`#side .fv2-tile[data-fv2="p:${BOB}"]`), 'a person no longer in the team: no tile');
+  check(!d.querySelector(`.fv2bar .fv2-tile[data-fv2="l:${HOME}"]`), 'an archived list: no tile');
+  check(!d.querySelector(`.fv2bar .fv2-tile[data-fv2="p:${BOB}"]`), 'a person no longer in the team: no tile');
   check((await items()).includes('p:' + BOB), 'the hidden favourite stays stored');
   await call('PATCH', `/api/lists/${HOME}`, {archived: false});
   await call('PUT', `/api/lists/${TEAM}/members`, {user_id: BOB, role: 'edit'});
@@ -163,31 +163,31 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
     check(st === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await nav(B + '#today');
-    for (let i = 0; i < 100 && !(await ev(`!!document.querySelector('#side .fv2-tile') && document.querySelectorAll('#side .srow[data-list]').length > 25 && document.querySelector('#side').scrollHeight - document.querySelector('#side').clientHeight > 300`).catch(() => false)); i++) await sleep(300);  // the extra lists drawn and the sidebar really scrolls
+    for (let i = 0; i < 100 && !(await ev(`!!document.querySelector('.fv2bar .fv2-tile') && document.querySelectorAll('#side .srow[data-list]').length > 25 && document.querySelector('#side').scrollHeight - document.querySelector('#side').clientHeight > 300`).catch(() => false)); i++) await sleep(300);  // the extra lists drawn and the sidebar really scrolls
     await sleep(600);
     if (touch) { await ev(`(() => { sideOpenDrawer(); return 1; })()`); await sleep(600); }
-    const m = await ev(`(() => { const s = document.querySelector('#side'), f = document.querySelector('#side .sbfix'), t = document.querySelector('#side .fv2-tile'); if (!f || !t) return null;
+    const m = await ev(`(() => { const s = document.querySelector('#side'), f = document.querySelector('#side .sbfix-m .sbhead') || document.querySelector('#side .sbfix') /* 2.442.0 (#3739): on a phone .sbfix has no box of its own */, t = document.querySelector('.fv2bar .fv2-tile'); if (!f || !t) return null;
       const top0 = f.getBoundingClientRect().top, r = t.getBoundingClientRect(); s.scrollTop = 600;
-      return new Promise(res => requestAnimationFrame(() => { const top1 = f.getBoundingClientRect().top, ft = document.elementFromPoint(r.left + r.width / 2, f.getBoundingClientRect().top + 8);
-        res({scroll: s.scrollTop, sh: s.scrollHeight, ch: s.clientHeight, rows: document.querySelectorAll('#side .srow').length, top0, top1, h: f.getBoundingClientRect().height, vh: innerHeight, w: r.width, th: r.height, rem: parseFloat(getComputedStyle(document.documentElement).fontSize), front: !!ft && !!ft.closest('.sbfix'), flow: f.classList.contains('sbfix-flow')}); })); })()`);
+      return new Promise(res => requestAnimationFrame(() => { const top1 = f.getBoundingClientRect().top, fr = f.getBoundingClientRect(), ft = document.elementFromPoint(fr.left + fr.width / 2, fr.top + 8);
+        res({scroll: s.scrollTop, sh: s.scrollHeight, ch: s.clientHeight, rows: document.querySelectorAll('#side .srow').length, top0, top1, h: f.getBoundingClientRect().height, vh: innerHeight, w: r.width, th: r.height, rem: parseFloat(getComputedStyle(document.documentElement).fontSize), front: !!ft && !!ft.closest('.sbfix'), flow: !!f.closest('.sbfix-flow')}); })); })()`);
     check(m, tag + ': head and tiles drawn');
     if (m) {
       check(m.scroll > 100, tag + ': the sidebar scrolls ' + JSON.stringify({...m, extra}));
       if (m.flow) check(Math.abs(m.top1 - (m.top0 - m.scroll)) < 2, tag + ': sidebar B: the head scrolls along (#3303) ' + JSON.stringify(m));  // 2.331.0 A (#3303): in sidebar B the head is no longer fixed
       else check(Math.abs(m.top1 - m.top0) < 2 && m.top1 >= -1 && m.front, tag + ': the head stays in place while the sidebar scrolls ' + JSON.stringify(m));
-      check(Math.abs(m.w - m.th) < 2 && m.w >= 2.75 * m.rem - 1, tag + ': tiles square, at least 2.75 rem ' + JSON.stringify(m));
+      check(Math.abs(m.w - m.th) < 2 && m.w >= 1.875 * m.rem - 1, tag + ': tiles square, at least 1.875 rem '  /* 2.441.0 (#3592): the row of the head bar */ + JSON.stringify(m));
       check(m.h < m.vh * 0.6, tag + ': the head stays below 60 % of the height ' + JSON.stringify(m));
     }
     await ev(`(() => { document.querySelector('#side').scrollTop = 0; return 1; })()`);
     await shot(`p257a-${tag}.png`);
     if (touch) return;
     // drag the first tile behind the third one (synthetic HTML5 events, laid out for real)
-    const before = await ev(`[...document.querySelectorAll('#side .fv2-tile')].map(t => t.dataset.fv2).join()`);
-    const res = await ev(`(async () => { const ts = [...document.querySelectorAll('#side .fv2-tile')], a = ts[0], c = ts[2], r = c.getBoundingClientRect(), dt = new DataTransfer();
+    const before = await ev(`[...document.querySelectorAll('.fv2bar .fv2-tile')].map(t => t.dataset.fv2).join()`);
+    const res = await ev(`(async () => { const ts = [...document.querySelectorAll('.fv2bar .fv2-tile')], a = ts[0], c = ts[2], r = c.getBoundingClientRect(), dt = new DataTransfer();
       const fire = (type, el, x, y) => el.dispatchEvent(new DragEvent(type, {bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: dt}));
       fire('dragstart', a, 0, 0); const x = r.right - 4, y = r.top + r.height / 2; fire('dragover', document.elementFromPoint(x, y), x, y);
       const mark = c.className; fire('drop', document.elementFromPoint(x, y), x, y); fire('dragend', a, 0, 0);
-      await new Promise(res => setTimeout(res, 900)); return {mark, order: [...document.querySelectorAll('#side .fv2-tile')].map(t => t.dataset.fv2).join()}; })()`);
+      await new Promise(res => setTimeout(res, 900)); return {mark, order: [...document.querySelectorAll('.fv2bar .fv2-tile')].map(t => t.dataset.fv2).join()}; })()`);
     const b = before.split(','), exp = [b[1], b[2], b[0], ...b.slice(3)].join();
     check(/fv2-after/.test(res.mark), tag + ': dragging over a tile marks the place ' + res.mark);
     check(res.order === exp, tag + ': a drag moves the tile ' + res.order + ' / ' + exp);

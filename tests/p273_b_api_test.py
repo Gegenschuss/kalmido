@@ -537,7 +537,8 @@ qz = mkzip({"lists": [{"id": 1, "name": "Kontingent Test", "created_at": ts}],
             "comments": [{"id": 1, "task_id": 1, "user_id": 55, "body": "Bob im Kontingent", "created_at": ts}],
             "people": [{"user_id": 55, "name": "Bob aus der Datei", "email": "bob@example.com", "lists": {"1": "edit"}}],
             "attachments": [{"id": i, "task_id": i, "name": f"q{i}.txt", "file": f"files/attachments/{i}-q{i}.txt", "created_at": ts} for i in (1, 2, 3)]},
-           files={f"files/attachments/{i}-q{i}.txt": big for i in (1, 2, 3)})
+           files={f"files/attachments/{i}-q{i}.txt": big for i in (1, 2, 3)},
+           man={"source": {"url": "https://kontingent.example.com", "hosted": True}})  # 2.362.3 (#3098): an own source, its ids are new
 iid = upload(Da, qz)
 j = wait(Da, iid)
 j = run(Da, iid, people={"bob@example.com": {"share": True}}) if j.get("state") == "preview" else j

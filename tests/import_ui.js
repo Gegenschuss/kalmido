@@ -115,12 +115,17 @@ async function dataPane(w) {
   pick(w, md.querySelector('#s-import'), 'Work.csv'); await sleep(1200);
   check(!out().querySelector('.impbox') && /not an Asana CSV/.test(d.querySelector('#toast').textContent), 'wrong file: error toast');
 
-  // ---- TickTick: direct import (no preview)
+  // ---- TickTick: 2.363.2 (#3104): the shared way, a preview first
+  const until = async (ok, what) => { for (let i = 0; i < 150 && !ok(); i++) await sleep(100); check(ok(), what); };
   set(w, md.querySelector('#s-imp-src'), 'ticktick'); await sleep(50);
   const tt = '"Folder Name","List Name","Title","Kind","Tags","Content","Is Check list","Start Date","Due Date","Reminder","Repeat","Priority","Status","Created Time","Completed Time","Order","Timezone","Is All Day","Is Floating","Column Name","Column Order","View Mode","taskId","parentId"\n'
     + '"","TT list","From TickTick","TEXT","","","N","","","","","0","0","2026-09-01T10:00:00+0000","","1","Europe/Berlin","","false","","","list","tt1",""\n';
-  pick(w, md.querySelector('#s-import'), 'tt.csv', tt); await sleep(1500);  // 2.87.9 (#1940): the dialog bridge answers the target question
-  check(!out().querySelector('.impbox') && w.eval(`[...S.tasks.values()].some(t => t.title === 'From TickTick')`), 'TickTick: imported directly');
+  pick(w, md.querySelector('#s-import'), 'tt.csv', tt);
+  await until(() => out().querySelector('[data-imp="go"]'), 'TickTick: preview');
+  check(!w.eval(`[...S.tasks.values()].some(t => t.title === 'From TickTick')`), 'TickTick: the preview stores nothing');
+  out().querySelector('[data-imp="go"]').click();  // 2.87.9 (#1940): the dialog bridge answers the target question
+  await until(() => w.eval(`[...S.tasks.values()].some(t => t.title === 'From TickTick')`), 'TickTick: imported');
+  check(out().querySelector('[data-imp="undo"]'), 'TickTick: the undo is offered');
   w.close();
 
   // ---- German

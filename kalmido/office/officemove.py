@@ -719,7 +719,7 @@ def ofm_notes(c, what, p, copy):
     if p["docs"]:
         notes.append(trn("{0} draft moves", "{0} drafts move", len(p["docs"])))
         notes.append(tr("Drafts get their number in the target when they are issued"))
-        refs = sum(1 for d in p["docs"] if any(d[k] for k in ("contract_id", "list_id", "source_doc_id", "version_of") if k in d.keys()))
+        refs = sum(1 for d in p["docs"] if any(d[k] for k in ("contract_id", "list_id", "source_doc_id", "version_of", "replaces_id") if k in d.keys()))
         if refs:  # 2.273.0 B (#3051): what ofm_move_doc clears is named before
             notes.append(trn("{0} draft loses its links in the old workspace (project, framework contract, earlier version or source document)",
                              "{0} drafts lose their links in the old workspace (project, framework contract, earlier version or source document)", refs))
@@ -791,7 +791,7 @@ def ofm_move_doc(c, rec, r, src, dst, cmap, kmap, ts):
     ofm_move_row(c, rec, "office_docs", r, src, dst, dst, {
         "number": "", "client_id": cmap.get(r["client_id"]) if r["client_id"] else None,
         "contact_id": kmap.get(r["contact_id"]) if r["contact_id"] else None, "contract_id": None, "list_id": None,
-        "agent_id": None, "source_doc_id": None, "version_of": None, "updated_at": ts})
+        "agent_id": None, "source_doc_id": None, "version_of": None, "replaces_id": None, "updated_at": ts})
     for it in c.execute("SELECT * FROM office_doc_items WHERE doc_id=? ORDER BY id", (r["id"],)).fetchall():
         # 2.144.5 A2 (#1523, review R10): the list a position came from belongs to the old office
         ofm_move_row(c, rec, "office_doc_items", it, src, dst, dst, {"service_id": None, "list_id": None})

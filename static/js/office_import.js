@@ -33,7 +33,7 @@ function oimHtml() {
   if (OIM.runs === null && !OIM.loading) { OIM.loading = true; setTimeout(async () => { await oimLoad(); OIM.loading = false; }, 0); }
   setTimeout(oim_jump, 0);  // 2.122.3 A (#2335)
   const back = `<div class="ofcbar"><a class="btn sm" href="#office/settings">${ic('back', 's')} ${tr('Settings')}</a></div>`;
-  return `<div class="oim">${back}<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('You see everything before it is saved; every import can be undone.')}</p>
+  return `<div class="oim">${back}<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('You see everything before it is saved. Undo an import under Import runs; some imports only within 24 hours.')}</p>
     <section class="oimsec" id="oim-master"><h4>${ic('list', 's')} ${tr('Master data from a spreadsheet')}</h4><div class="shint">${tr('Contacts: the address in one cell or in the columns street, postcode, city.')}</div>
     <p class="muted">${tr('Excel or CSV with the sheets Contacts, Services, Equipment.')}</p>
     <div class="lacts"><input type="file" id="oim-xlsx" accept=".xlsx,.csv,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden><button type="button" class="btn sm pri" data-oim="pick-xlsx" ${OIM.busy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose file')}</button>${OIM.busy ? `<span class="muted">${tr('Reading…')}</span>` : ''}</div>
@@ -50,7 +50,7 @@ function oimHtml() {
 // every section has an anchor: #office/import/<area> scrolls there and marks it briefly
 function oim_moreHtml() {
   return `<section class="oimsec" id="oim-fixed"><h4>${ic('trend', 's')} ${tr('Fixed costs from a spreadsheet')}</h4>
-    <div class="shint">${tr('An .xlsx file with name, net amount and due month; you see a preview before anything is saved.')}</div>
+    <div class="shint">${tr('A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.')}</div>
     <div class="lacts"><a class="btn sm ghost" href="/api/office/fixed-costs/import/template" download>${ic('download', 's')}<span>${tr('Download template')}</span></a><button type="button" class="btn sm" data-rkf="fimp">${ic('upload', 's')}<span>${tr('Import from Excel')}</span></button></div></section>
     <section class="oimsec" id="oim-leads"><h4>${ic('target', 's')} ${tr('Leads from a CSV file')}</h4>
     <div class="shint">${tr('A CSV file with name, company, e-mail and phone; leads with an e-mail that is already there are skipped.')}</div>
@@ -114,12 +114,13 @@ function bk_skipAll(k) {  // "Skip all" of an area (and back: every row gets the
 // 2.146.0 E (#2456): which column holds what (found from the header; the person may change it): the whole address in one
 // column, or company / street / postcode / city / country in columns of their own. A change reads the file again.
 const E46_FIELDS = [['name', N_('Company')], ['contact', N_('Contact person')], ['address', N_('Whole address')], ['street', N_('Street')],
-  ['house', N_('House number')], ['zip', N_('Postcode')], ['city', N_('City')], ['country', N_('Country')]];
+  ['house', N_('House number')], ['zip', N_('Postcode')], ['city', N_('City')], ['country', N_('Country')],
+  ['email', N_('E-mail')], ['phone', N_('Phone')], ['customer_no', N_('Customer number')], ['vat_id', N_('VAT ID')]];  // 2.363.0 (#3103)
 function e46_mapHtml(p) {
   const c = p.columns; if (!c?.head?.length) return '';
   const m = c.map || {}, opts = cur => `<option value="">${esc(tr('not in the file'))}</option>` + c.head.map((h, j) => `<option value="${j}" ${m[cur] === j ? 'selected' : ''}>${esc(h || tr('Column {0}', j + 1))}</option>`).join('');
   return `<details class="e46map" ${c.mode === 'columns' || !(p.clients || []).length ? 'open' : ''}><summary>${esc(tr('Columns'))} <span class="muted">${esc(c.mode === 'columns' ? tr('Address in separate columns') : tr('Address in one column'))}</span></summary>
-    <div class="oimgrid">${E46_FIELDS.map(([k, t]) => `<label class="oimfl"><span>${esc(tr(t))}</span><select data-e46-map="${k}" ${OIM.busy ? 'disabled' : ''}>${opts(k)}</select></label>`).join('')}</div></details>`;
+    <div class="oimgrid">${E46_FIELDS.map(([k, t]) => `<label class="oimfl"><span>${esc(tr(t))}</span><select data-e46-map="${k}" ${OIM.busy ? 'disabled' : ''}>${opts(k)}</select></label>`).join('')}</div>${c.unused?.length ? `<p class="muted">${esc(tr('Not taken over: {0}', c.unused.join(', ')))}</p>` : ''}</details>${c.cut ? `<p class="oimwarn">${ic('alert', 's')} ${esc(tr('At most {0} rows per sheet are read: please split a longer file.', c.cut))}</p>` : ''}`;
 }
 function e46_remap(k, v) {
   const p = OIM.pv; if (!p?.columns || !OIM.file) return;
@@ -133,10 +134,11 @@ function oimClientCard(c, i) {
   const fld = (k, label, mx, cls = '') => `<label class="oimfl ${cls}"><span>${esc(label)}</span><input data-oim-c="${i}" data-k="${k}" value="${esc(c[k] || '')}" maxlength="${mx}" ${on ? '' : 'disabled'}></label>`;
   const dup = c.dup ? `<p class="oimdup">${ic('copy', 's')} ${esc(c.dup.kind === 'existing' ? tr('Already a client: {0}', c.dup.name) : tr('Twice in the file (row {0})', c.dup.row))}</p>
     <select data-oim-act="${i}" aria-label="${esc(tr('What to do'))}">${oimActs(c).map(([v, n]) => `<option value="${v}" ${c.action === v ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select>` : '';
+  const xm = OIM.pv?.columns?.map || {}, xf = (k, label, mx) => k in xm ? fld(k, label, mx) : '';  // 2.363.0 (#3103): only what the file has
   return `<li class="oimcard ${on ? '' : 'off'} ${c.flags?.length ? 'warn' : ''}"><div class="oimhd"><label class="chkl"><input type="checkbox" data-oim-on="c" data-i="${i}" ${on ? 'checked' : ''}> <b>${esc(c.name || tr('(no name)'))}</b></label><span class="muted">${tr('row {0}', c.row)}</span></div>
     ${c.reasons?.length ? `<p class="oimwarn">${ic('alert', 's')} ${esc(c.reasons.join(' · '))}</p>` : ''}${dup}
     <div class="oimgrid">${fld('name', tr('Company'), 80, 'w2')}${fld('contact', tr('Contact person'), 120, 'w2')}${fld('street', tr('Street'), 200, 'w2')}${fld('zip', tr('Postcode'), 20)}${fld('city', tr('City'), 120)}<div class="oimfl"><span>${esc(tr('Country'))}</span>${ctyField('oim-cty-' + i, c.country, {attrs: `data-oim-c="${i}" data-k="country"`, dis: on ? '' : 'disabled', label: tr('Country')})}</div></div>
-    <details class="oimraw"><summary>${tr('Original text')}</summary><pre>${esc(c.address || '')}</pre></details></li>`;
+    ${xf('email', tr('E-mail'), 200)}${xf('phone', tr('Phone'), 60)}${xf('customer_no', tr('Customer number'), 40)}${xf('vat_id', tr('VAT ID'), 20)}<details class="oimraw"><summary>${tr('Original text')}</summary><pre>${esc(c.address || '')}</pre></details></li>`;
 }
 
 function oimSimpleCard(kind, s, i, title, sub) {
@@ -236,9 +238,9 @@ function oimRunsHtml() {
   const r = OIM.runs;
   if (r === null) return `<p class="muted">${tr('Loading…')}</p>`;
   if (!r.length) return `<p class="muted">${tr('No imports yet.')}</p>`;
-  const kn = {data: N_('Master data'), archive: N_('Archive|documents'), datev: N_('DATEV data')};  // 2.148.0 D (#2458)
+  const kn = {data: N_('Master data'), archive: N_('Archive|documents'), datev: N_('DATEV data'), fixed_costs: N_('Fixed costs'), trips: N_('Trips'), leads: N_('Leads')};  // 2.148.0 D (#2458)
   return `<ul class="ofclist" role="list">${r.map(x => `<li class="oimrun"><span class="ofcn"><b>${esc(tr(kn[x.kind] || x.kind))} · ${esc(trn('{0} entry', '{0} entries', x.total || 0))}</b><small class="muted">${esc([typeof ofdWhen === 'function' ? ofdWhen(x.created_at) : x.created_at, x.user_name].filter(Boolean).join(' · '))}</small></span>
-    ${x.undone_at ? `<span class="rotag">${tr('undone')}</span>` : `<button type="button" class="btn sm" data-oim="undo" data-id="${x.id}">${ic('undo', 's')} ${tr('Undo')}</button>`}${bk_runAreas(x)}${imr_tidyBtn(x)}</li>`).join('')}</ul>`;
+    ${x.undone_at ? `<span class="rotag">${tr('undone')}</span>` : `<button type="button" class="btn sm" data-oim="undo" data-id="${x.id}" data-run="${esc(x.kind)}">${ic('undo', 's')} ${tr('Undo')}</button>`}${bk_runAreas(x)}${imr_tidyBtn(x)}</li>`).join('')}</ul>`;
 }
 
 // ---- the archive in the documents tab (office_docs.js asks for it when the kind "Archive" is chosen)
@@ -262,17 +264,24 @@ function oim_sumHtml(items) {
 function oimArchiveListHtml(q) {
   if (!OIM.list) { setTimeout(oimLoadList, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const inv = oim_secKind() === 'invoice', paid = inv ? OIM.paid || '' : '';
-  const items = oim_secItems().filter(r => (!q || [r.number, r.client, r.client_name, r.project].some(v => (v || '').toLowerCase().includes(q))) && (!OIM.cl || String(r.client_id) === OIM.cl)
-    && (!paid || (paid === 'paid') === !!r.paid));
+  const items = lst_sorted(oim_secItems().filter(r => (!q || [r.number, r.client, r.client_name, r.project].some(v => (v || '').toLowerCase().includes(q))) && (!OIM.cl || String(r.client_id) === OIM.cl)
+    && (!paid || (paid === 'paid') === !!r.paid)), ofd_listKey('archive'), r => ({date: r.date, client: r.client || r.client_name, amount: r.amount, name: r.project || r.number || r.file_name}));  // 2.451.0 (#3834)
   const sum = oim_sumHtml(items);
   const imp = ofcAdmin() ? `<a class="btn sm" href="#office/import/archive">${ic('upload', 's')} ${tr('Import legacy data')}</a>` : '';
   const pf = inv && oim_secItems().length ? `<div class="seg oimpaid" role="group" aria-label="${esc(tr('Status'))}">${OIM_PAID.map(([v, n]) => `<button type="button" data-oim-paid="${v}" aria-pressed="${v === paid}" class="${v === paid ? 'on' : ''}">${tr(n)}</button>`).join('')}</div>` : '';
   const sum0 = r81b_clFilter(pf) + sum;  // 2.81.0 (#1834): the client filter above the list
   if (!items.length) return (OIM.cl || paid ? sum0 : '') + `<div class="empty nempty eact">${ic('archive')}<span>${q || OIM.cl || paid ? tr('Nothing matches.') : tr('No archived documents. Old invoices and quotations are added under Settings > Import legacy data.')}</span>${q ? '' : imp}</div>`;
   // 2.40.0 (#1366): the row shows the PDF in the browser, the button next to it downloads it
-  return sum0 + `<ul class="ofclist ofdlist oimarch" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener"${typeof pv_attr === 'function' ? pv_attr({url: `/api/office/legacy/archive/${r.id}/pdf`, name: (r.number || tr('Document')) + '.pdf', dlUrl: `/api/office/legacy/archive/${r.id}/pdf?download=1`}) : ''}>
+  return sum0 + `<ul class="ofclist ofdlist oimarch" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" data-arch="${r.id}" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener"${typeof pv_attr === 'function' ? pv_attr({url: `/api/office/legacy/archive/${r.id}/pdf`, name: (r.number || tr('Document')) + '.pdf', dlUrl: `/api/office/legacy/archive/${r.id}/pdf?download=1`, arch: isMobile() && !r.copy ? r.id : undefined /* 2.451.0 (#3834): the phone's way to Correct without a long press */}) : ''}>
     <span class="ofcn"><b>${esc(r.number || r.copy?.number || r.file_name)}${r.client || r.client_name ? ` · ${esc(r.client || r.client_name)}` : ''}</b><small class="muted">${esc([r.kind === 'offer' ? tr('Quotation') : tr('Invoice'), r.project, r.date ? fmtDateLoc(r.date) : ''].filter(Boolean).join(' · '))}</small></span>
     <span class="ofdsum"><b>${r.amount != null ? esc(ofcMoney(r.amount)) : ''}</b><small class="rotag">${ic('archive', 's')}${r.copy ? esc(oim_copyLabel(r.copy)) : tr('Archive|documents') + (r.kind === 'invoice' ? ' · ' + (r.paid ? tr('Paid') : tr('open')) : '')}</small></span>${ic('file', 's')}</a><a class="ib oimdl" href="/api/office/legacy/archive/${r.id}/pdf?download=1" download aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('download', 's')}</a>${r.copy ? '' : `<button type="button" class="ib oimdl" data-oim="arch-edit" data-id="${r.id}" aria-label="${esc(tr('Correct archived document'))}" title="${esc(tr('Correct archived document'))}">${ic('edit', 's')}</button>`}</li>`).join('')}</ul>` + `<div class="lacts">${imp}</div>`;
+}
+
+// 2.451.0 (#3834): the row menu (long press, right click): what the phone hides from the row
+function oim_rowMenu(id, row) {
+  const r = oim_secItems().find(x => String(x.id) === String(id)); if (!r) return;
+  menu(row, [{label: tr('Preview (PDF)'), icon: 'eye', fn: () => row.click()}, {label: tr('Download PDF'), icon: 'download', fn: () => row.closest('li').querySelector('a.oimdl').click()},
+    r.copy ? null : {label: tr('Correct archived document'), icon: 'edit', fn: () => r81b_archEdit(r.id)}].filter(Boolean));
 }
 
 // 2.97.0 C (#2049): a read-only copy taken along by a move between offices (office/officemove.py): view and PDF only
@@ -295,6 +304,7 @@ async function oimPreview(file, map) {
 async function oimImport() {
   const p = OIM.pv; if (!p) return;
   const cl = (p.clients || []).map(c => ({row: c.row, name: c.name, contact: c.contact, street: c.street, zip: c.zip, city: c.city, country: (c.country || '').toUpperCase(), address: c.address,
+    email: c.email, phone: c.phone, customer_no: c.customer_no, vat_id: c.vat_id,
     action: c.action, merge_id: (c.action === 'merge' || c.action === 'contact') && c.dup?.kind === 'existing' ? c.dup.id : undefined,
     contact_row: c.action === 'contact' && c.dup?.kind === 'file' ? c.dup.row : undefined,
     dup_ok: c.action === 'new' && c.dup?.kind === 'existing' ? 1 : undefined}));  // 2.269.0 D (#3046): "new" on purpose for a found client
@@ -373,13 +383,15 @@ document.addEventListener('click', async e => {
   } else if (a === 'area-skip') bk_skipAll(b.dataset.area);
   else if (a === 'undo') {
     const kind = b.dataset.kind;  // 2.46.1 (#1557): one area only; 2.138.0 E (#2241): the texts say that used services / devices are archived
-    if (!await askConfirm(kind ? tr(BK_UNDO[kind]) + '?' : tr('Undo this import?'), kind ? tr('Only the entries of this area are removed; services and devices in use are archived. The rest of the import stays.') : tr('Everything it added is removed. A client in use stays; a service or device in use is archived (documents keep showing it). Clients that were merged lose the fields the import filled in.') + (!kind || kind === 'clients' ? ' ' + tr('Its new clients go to the trash of the clients (only within 24 hours of the import).') : ''), {ok: tr('Undo'), danger: true})) return;  // 2.272.0 D (#3027)
+    const fx = ['fixed_costs', 'trips', 'leads'].includes(b.dataset.run);  // 2.363.2 (#3104)
+    if (!await askConfirm(fx ? tr('Undo this import?') : kind ? tr(BK_UNDO[kind]) + '?' : tr('Undo this import?'), fx ? tr('Everything it added is removed, within 24 hours of the import. Entries changed since stay; leads go to the trash.') : kind ? tr('Only the entries of this area are removed; services and devices in use are archived. The rest of the import stays.') : tr('Everything it added is removed. A client in use stays; a service or device in use is archived (documents keep showing it). Clients that were merged lose the fields the import filled in.') + (!kind || kind === 'clients' ? ' ' + tr('Its new clients go to the trash of the clients (only within 24 hours of the import).') : ''), {ok: tr('Undo'), danger: true})) return;  // 2.272.0 D (#3027)
     try {
       const j = await api('POST', `/api/office/legacy/runs/${b.dataset.id}/undo`, kind ? {kinds: [kind]} : undefined);
-      const k = j.kept || {}, kept = (k.clients || 0) + (k.services || 0) + (k.equipment || 0) + (k.roles || 0) + (k.crew || 0);
+      const k = j.kept || {}, kept = (k.clients || 0) + (k.services || 0) + (k.equipment || 0) + (k.roles || 0) + (k.crew || 0) + (k.entries || 0);
       OIM.arcd = (j.archived || []).length ? j.archived : null;  // 2.138.0 E (#2241): the used entries the undo archived
       toast(tr('Import undone') + (kept ? ' · ' + trn('{0} entry stays because it is in use', '{0} entries stay because they are in use', kept) : '')
         + (OIM.arcd ? ' · ' + trn('{0} entry in use archived', '{0} entries in use archived', OIM.arcd.length) : ''));
+      if (fx) { if (typeof rk_cfReload === 'function') rk_cfReload(); if (typeof rk_reload === 'function') rk_reload(); if (typeof pp_reload === 'function') pp_reload(); }
       OIM.list = null; ofcReload('services'); ofcReload('equipment'); ofcReload('roles'); ofcReload('crew'); await oimLoad();
     } catch (x) { toast(x.message || ''); }
   }
@@ -420,7 +432,7 @@ function r81b_clFilter(more = '') {
   const seen = new Map();
   for (const r of oim_secItems()) if (r.client_id && !seen.has(r.client_id)) seen.set(r.client_id, r.client || r.client_name || '#' + r.client_id);  // 2.380.0 B (#3409): the clients of the area's documents
   if (!seen.size && !OIM.cl) return more ? `<div class="ofcbar r81b-clf">${more}</div>` : '';
-  const opts = [...seen].sort((a, b) => a[1].localeCompare(b[1])).map(([v, n]) => `<option value="${v}" ${String(v) === OIM.cl ? 'selected' : ''}>${esc(n)}</option>`).join('');
+  const opts = [...seen].sort((a, b) => cmpText(a[1], b[1])).map(([v, n]) => `<option value="${v}" ${String(v) === OIM.cl ? 'selected' : ''}>${esc(n)}</option>`).join('');
   return `<div class="ofcbar r81b-clf"><select id="oim-cl" aria-label="${esc(tr('Client'))}"><option value="">${esc(tr('All clients'))}</option>${opts}</select>${more}</div>`;
 }
 document.addEventListener('change', e => { if (e.target.id === 'oim-cl') { OIM.cl = e.target.value || ''; if (typeof ofdDraw === 'function') ofdDraw(); } });

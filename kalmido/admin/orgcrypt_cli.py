@@ -290,6 +290,7 @@ def all_files(c):
                          "UNION ALL SELECT path FROM chat_files UNION ALL SELECT path FROM budget_files "  # 2.72.0 (#1333)
                          "UNION ALL SELECT path FROM wiki_files "  # 2.99.0 A (#2182)
                          "UNION ALL SELECT path FROM sheet_files "  # 2.124.0 B (#2110)
+                         "UNION ALL SELECT path FROM template_files "  # 2.363.3 (#3134)
                          "UNION ALL SELECT path FROM tchat_files").fetchall()  # 2.113.1 (#2059): team chat files
     out = [os.path.join(ATT_DIR, r[0]) for r in rows if r[0]] + list(f8f_icon_files(c))  # 2.58.0 (#1805)
     if os.path.isdir(OFFICE_DIR):
@@ -1059,7 +1060,7 @@ ROT_WS = (("doc_rules", "id", "data", "doc_rules.data"), ("doc_models", "id", "d
           ("doc_meta", "node_id", "summary", "doc_meta.summary"),  # 2.138.0 (#1972): document summaries of 2.126.1 (#2123)
           ("pl_uploads", "id", "mapping", "pl_sources.mapping"),  # 2.138.0 (#1972): the mapping chosen for an uploaded export
           ("doc_field_values", "id", "value", "doc_field_values.value"))  # 2.153.0 (#2179): custom field values (docs/fields.py)
-ROT_SETTLE = float(os.environ.get("KALMIDO_ORGCRYPT_ROT_SETTLE", "5"))  # seconds after the key switch (requests that hold the old key end)
+ROT_SETTLE = float(os.environ.get("KALMIDO_ORGCRYPT_ROT_SETTLE", "30"))  # 2.360.2 L (#2561): longest wait for running writers (0 = none)
 
 
 # 2.138.0 C (#1972): tables with one row per organisation (no id column; office_cf_start since 2.123)
@@ -1231,6 +1232,73 @@ def rot_indexes(c, oid):
     return n
 
 
+def _rot_lock_keep(done):
+    """2.360.2 L (#2561): renews the write lock while the run lives; a dead process stops this, the lock runs out."""
+    while not done.wait(oc.ROT_LOCK_S / 3):
+        try:
+            c = connect()
+            try:
+                gset(c, oc.ROT_LOCK_KEY, time.time() + oc.ROT_LOCK_S)
+                c.commit()
+            finally:
+                c.close()
+        except Exception as ex:  # the next turn tries again; until then the lock still holds
+            print(TAG, "rotate: renewing the write lock failed:", type(ex).__name__, flush=True)
+
+
+def _rot_older_xacts(c, mark):
+    """Transactions of this database begun before mark. The app role sees no times of the login role's sessions, so the
+    query runs as the login role."""
+    role = c.execute("SELECT current_user").fetchone()[0]
+    c.execute("RESET ROLE")
+    n = c.execute("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() "
+                  "AND xact_start < ?", (mark,)).fetchone()[0]
+    c.execute(f'SET ROLE "{role}"')
+    c.commit()  # (the view is a snapshot per transaction)
+    return n
+
+
+def rot_lock_on(c):
+    """2.360.2 L (#2561): writes stop on every process (503 in the request gate, background loops wait). Then the wait for
+    the writers already under way: the gate's cache runs out, every transaction older than that ends. -> the renewing thread."""
+    gset(c, oc.ROT_LOCK_KEY, time.time() + oc.ROT_LOCK_S)
+    c.commit()
+    done = threading.Event()
+    done.keep = threading.Thread(target=_rot_lock_keep, args=(done,), daemon=True)
+    done.keep.start()
+    try:
+        rot_lock_wait(c)
+    except Exception:
+        rot_lock_off(c, done)  # review: no lock left behind by a failed wait
+        raise
+    return done
+
+
+def rot_lock_wait(c):
+    if ROT_SETTLE <= 0:
+        return
+    time.sleep(oc.ROT_LOCK_TTL + 0.5)
+    mark = c.execute("SELECT now()").fetchone()[0]
+    c.commit()
+    end = time.monotonic() + ROT_SETTLE
+    while True:
+        n = _rot_older_xacts(c, mark)
+        if not n:
+            return
+        if time.monotonic() >= end:
+            print(TAG, "rotate:", n, "older transactions still run; the two empty rounds below catch what they write", flush=True)
+            return
+        time.sleep(0.5)
+
+
+def rot_lock_off(c, done):
+    done.set()
+    done.keep.join(30)
+    c.rollback()  # (a failed run may leave its transaction broken)
+    gset(c, oc.ROT_LOCK_KEY, "")
+    c.commit()
+
+
 def rotate_org(c, oid, stop=None, rounds=3, force=False):
     """orgcrypt_cli rotate --org N: a new key K2 for organisation oid; every value / file re-encrypted from K1 to K2, the
     task vectors dropped; while it runs the server reads with K2 and falls back to K1 (core/orgcrypt.py _ROT). Restartable
@@ -1242,10 +1310,12 @@ def rotate_org(c, oid, stop=None, rounds=3, force=False):
     c.commit()
     if not got:
         raise oc.OrgCryptError("a key rotation runs already")
+    lock = None
     try:
+        lock = rot_lock_on(c)  # 2.360.2 L (#2561): before the key switch; no writer holds the earlier key after it
         k1, k2, started = oc.rck_rot_begin(c, oid)
-        if started and ROT_SETTLE > 0:
-            time.sleep(ROT_SETTLE)
+        rot_lock_off(c, lock)  # review: only the switch needs it: a writer from here on reads the new key row, the run may take hours
+        lock = None
         out = {"org": oid, "fields": 0, "files": 0, "unreadable": 0, "finished": False, "secret": None}
         empty = 0
         for _ in range(rounds + 1 if rounds else 0):  # (rounds=0: stop right after the key switch)
@@ -1260,11 +1330,9 @@ def rotate_org(c, oid, stop=None, rounds=3, force=False):
                 empty = 0
                 continue
             empty += 1
-            # 2.148.1 C (#2481): K1 goes only after two empty rounds with a settle pause between them (a request that
-            # still held K1 during the last round has ended and its value is re-encrypted in the second one)
+            # 2.148.1 C (#2481): K1 goes only after two empty rounds (a writer that outlived rot_lock_on is caught in the second)
             if empty >= 2 or ROT_SETTLE <= 0:
                 break
-            time.sleep(ROT_SETTLE)
         else:
             return out  # still changing: K1 stays, the next run continues
         if out["unreadable"] and not force:
@@ -1277,6 +1345,8 @@ def rotate_org(c, oid, stop=None, rounds=3, force=False):
         out["finished"] = True
         return out
     finally:
+        if lock:
+            rot_lock_off(c, lock)
         with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
             c.execute("SELECT pg_advisory_unlock(hashtext(?))", ("orgcrypt-rotate",))
         c.commit()

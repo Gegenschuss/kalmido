@@ -87,6 +87,19 @@ function o3b_splitBtn(room, rid) {
   if (!rid || room?.kind !== 'list' || typeof cw_split !== 'function' || (typeof cw_ren !== 'undefined' && cw_ren === 't:' + rid)) return '';
   return `<button type="button" class="iconbtn" data-act="tc-split" data-rid="${+rid}" title="${esc(tr('Open in split window'))}" aria-label="${esc(tr('Open in split window'))}">${ic('panel', 's')}</button>`;
 }
+// 2.446.0 (#3334): the header on the phone is one row like the agent chat's (2.350.0 A): right only the ⋯ menu; search,
+// project, split window, settings, encryption and mute sit in it. The search button stays hidden as the anchor of the search bar.
+function tc_headItems() {
+  if (!isMobile()) return [];
+  const rid = S.tc.rid, room = S.tc.room, e2e = room?.kind === 'dm' && !!globalThis.crypto?.subtle;
+  return [{label: tr('Search in this chat'), icon: 'search', fn: () => msSearchToggle('t', rid)},
+    ...room?.kind === 'list' ? [{label: tr('Open the project'), icon: 'list', fn: () => go('l/' + room.list_id)}] : [],
+    ...o3b_splitBtn(room, rid) ? [{label: tr('Open in split window'), icon: 'panel', fn: () => cw_split('t:' + rid)}] : [],
+    ...tcx_isX(room) ? [{label: room.kind === 'channel' ? tr('Channel settings') : tr('Group settings'), icon: 'gear', fn: () => tcx_settings()}] : [],
+    ...e2e ? [{label: tr('Encrypted conversation'), icon: 'lock', on: !!room.e2e, fn: () => e2eDmToggle()}] : [],
+    ...e2e && room.e2e ? [{label: tr('Safety number'), icon: 'key', fn: () => e2eSafetyDlg()}] : [],
+    {label: tr('Mute|button'), icon: room?.muted ? 'belloff' : 'bell', on: !!room?.muted, fn: () => tcMute()}];
+}
 function tcRoomHtml() {
   if (S.tc.th && !tth_wide()) return tth_html();  // 2.139.0 A (#2127): phones and the chat panel: the thread full size
   const rid = S.tc.rid, r = (S.tc.rooms || []).find(x => x.id === rid), room = S.tc.room;
@@ -94,11 +107,11 @@ function tcRoomHtml() {
   // 2.139.0 B (#2128): the microphone takes room in the composer: the placeholder's name gets shorter beside it
   // 2.147.2 (#2523): the touch button "Insert reference" takes the same room again: the name gets shorter once more ("Web…" beside the microphone)
   const rfb = typeof rf_btnHtml === 'function' ? rf_btnHtml('tc-in') : '';
-  const mic = typeof tvc_micHtml === 'function' ? tvc_micHtml(room, rid) : '', cut = isMobile() ? 18 : (mic ? 14 : 18) - (rfb ? 10 : 0);  // 2.213.0 (#2788): phones: the tools sit in the plus menu
+  const mic = typeof tvc_micHtml === 'function' ? tvc_micHtml(room, rid) : '', ph = isMobile(), cut = ph ? 18 : (mic ? 14 : 18) - (rfb ? 10 : 0);  // 2.213.0 (#2788): phones: the tools sit in the plus menu
   const head = `<div class="tcrhead"><button type="button" class="iconbtn tcback" data-act="tc-back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>
     ${r ? roomIcon(r) : ''}<div class="tcrt"><b>${esc(name)}</b>${room && room.kind !== 'dm' ? `<span class="muted">${esc(room.members.map(m => m.name).slice(0, 6).join(', '))}${room.members.length > 6 ? ' +' + (room.members.length - 6) : ''}</span>` : ''}</div>
-    <span class="spacer"></span>${msgSearchBtn('t', rid)}${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the project'))}" aria-label="${esc(tr('Open the project'))}">${ic('list')}</button>` : ''}
-    ${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${o3b_splitBtn(room, rid)}${tcx_headBtn(room)}${e2eRoomBtns(room)}${isTouch() ? `<button type="button" class="iconbtn" data-act="tc-more" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute|button'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button>${typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
+    <span class="spacer"></span>${msgSearchBtn('t', rid)}${!ph && room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the project'))}" aria-label="${esc(tr('Open the project'))}">${ic('list')}</button>` : ''}
+    ${ph ? '' : `${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${o3b_splitBtn(room, rid)}${tcx_headBtn(room)}${e2eRoomBtns(room)}`}${isTouch() ? `<button type="button" class="iconbtn" data-act="tc-more" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}${ph ? '' : `<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute|button'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button>`}${typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
   return `${typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}${e2eRoomNotice(room)}${le2eChanNotice(room)}${cpnBarHtml('t:' + rid)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
     <button type="button" class="chnew hidden" id="tc-new">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${room?.archived ? tcx_archivedHtml(room) : room?.closed ? tcx_closedHtml() /* 2.266.0 (#2970) */ : `${replyBarHtml('t:' + rid)}${tcx_filesBarHtml(room, rid)}<div class="chcomp tccomp">${chToolsHtml([tcx_clipHtml(room), mic, rfb /* 2.147.1 A (#2523) */])}${typeof tvc_barSlot === 'function' ? tvc_barSlot(rid) : ''}<div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(name.length > cut ? tr('Message to {0}', name.slice(0, cut - 1).trimEnd() + '…') : tr('Message to {0}…', name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="enter" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
@@ -162,6 +175,7 @@ function tcMentions(text) {
 async function tcSend() {
   const ta = $('#tc-in'), rid = S.tc.rid; if (!ta || !rid) return;
   const text = ta.value.trim(), files = tcx_filesOk(S.tc.room) ? S.tc.files[rid] || [] : []; if (!text && !files.length) return;  // 2.113.1 (#2059): + files
+  const lim = upLimit(files); if (lim) { toast(lim); return; }  // 2.363.3 (#3134): the text stays in the box
   chatSentOnce();
   const hadF = document.activeElement === ta, ck = 't:' + rid; if (csdBusy(ck)) return;  // 2.62.0 (#1530): one send at a time
   const p = csdAdd(ck, text, S.tc.msgs), sb = () => $('[data-act="tc-send"]');  // shown as "Sending…", the box empties at once
@@ -299,7 +313,7 @@ document.addEventListener('click', e => {
   else if (act === 'tc-edit-save') tcEditSave(+a.dataset.mid);
   else if (act === 'tc-edit-cancel') { S.tc.edit = null; S.tc.editTh = false; tcPatch(); }
   else if (act === 'tc-mute') tcMute();
-  else if (act === 'tc-more') menu(a, kbd_item('team'));  // 2.380 E (#3449)
+  else if (act === 'tc-more') menu(a, [...tc_headItems(), ...kbd_item('team')]);  // 2.380 E (#3449); 2.446.0 (#3334): the phone's header
   else if (act === 'tc-new') tcNewMenu(a);
   else if (act === 'tc-list') go('l/' + a.dataset.id);
   else if (act === 'tc-split') cw_split('t:' + +a.dataset.rid);  // 2.83.0 (#1774)
@@ -457,10 +471,12 @@ function trd_pick(list) {
   return null;
 }
 function trd_lineHtml(m, th) {
-  const rb = m.read_by, U = S.tc.users;
-  if (S.tc.room?.kind === 'dm') return `<div class="trdline" role="status">${ic('check', 's')}<span>${tr('Read|receipt')}</span></div>`;
+  const rb = m.read_by;
+  // 2.437.0 A (#3318): two ticks in the accent colour (+ the count in a group); the words only as title / aria-label
+  const two = `<span class="cdlv on" aria-hidden="true">${ic('check', 's')}${ic('check', 's')}</span>`;
+  if (S.tc.room?.kind === 'dm') { const w = tr('Read|receipt'); return `<div class="trdline" role="img" title="${esc(w)}" aria-label="${esc(w)}">${two}</div>`; }
   const txt = tr('Read by {0}', rb.count);
-  return `<button type="button" class="trdline" data-act="trd-show" data-rmid="${m.id}" aria-haspopup="dialog" title="${esc(txt)}"><span class="tthav" aria-hidden="true">${rb.users.slice(0, 3).map(u => av(u, uname(u, U), 'avatar')).join('')}</span><span>${esc(txt)}</span></button>`;
+  return `<button type="button" class="trdline" data-act="trd-show" data-rmid="${m.id}" aria-haspopup="dialog" title="${esc(txt)}" aria-label="${esc(txt)}">${two}<span>${rb.count}</span></button>`;
 }
 async function trd_show(mid, inTh) {
   const m = (inTh ? tth_all() : S.tc.msgs).find(x => x.id === mid), rb = m?.read_by; if (!rb) return;
@@ -520,8 +536,8 @@ function tcx_chipsSync() { const b = $('#tc-files'); if (b) b.innerHTML = tcx_ch
 function tcx_addFiles(files, rid = S.tc.rid) {
   if (!rid || !tcx_filesOk(S.tc.room)) { if (files?.length) toast(S.tc.room?.archived ? tr('This channel is archived') : tr('Files cannot be sent in an end-to-end encrypted conversation')); return; }
   files = noEmpty(files); if (!files.length) return;
-  const big = files.find(f => f.size > 50 * 1024 * 1024);
-  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); files = files.filter(f => f !== big); }
+  const lim = upLimit(files, true);  // 2.363.3 (#3134)
+  if (lim) { toast(lim); files = files.filter(upFits); }
   const arr = S.tc.files[rid] ||= [];
   arr.push(...files.slice(0, Math.max(0, 10 - arr.length)));
   if (arr.length >= 10 && files.length) toast(tr('At most {0} files per message', 10));

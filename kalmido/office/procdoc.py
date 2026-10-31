@@ -12,7 +12,8 @@ texts of that moment (data, JSON, encrypted at rest like the other office free t
 The current view = the prefilled texts of now + the own texts of the latest version. Markdown and PDF of the current state
 or of a version carry the version, its date and the company.
 
-The template texts are document content in German and English (like doctpl_samples; other app languages get English).
+The template texts are document content in German and English; other app languages get English. 2.449.0 (#3768): GoBD is
+German law, so only an office on the German pack is offered it (pd_offered); an area that already has versions keeps them.
 Reading: everybody with office access (members, read-only, accounting); saving: the area's admin (office_org admin=True:
 accounting / read-only answer 403 on writes). A person without an organisation is the admin of the personal office.
 Agents never reach it (office_gate)."""
@@ -69,10 +70,19 @@ PD_ROLE_NAMES = {"admin": ("Admin", "Admin"), "member": ("Mitglied", "Member"), 
 PD_EINV = {"zugferd": "ZUGFeRD", "xrechnung": "XRechnung", "none": "-", "": "-"}
 
 
+def pd_offered(c, oid, s=None):
+    """2.449.0 (#3768): the German pack, or an area that saved versions before it changed its pack."""
+    s = s if s is not None else office_settings(c, oid)
+    return (s.get("pack") or "DE").upper() == "DE" or bool(c.execute("SELECT 1 FROM office_procdocs WHERE org_id=? LIMIT 1", (oid,)).fetchone())
+
+
 def _ctx(admin=False):
     c = db()
     uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=admin)
+    oid = office_org(c, uid, admin=admin)
+    if not pd_offered(c, oid):
+        raise Denied(404)
+    return c, uid, oid
 
 
 def _lg(v=None):
@@ -166,14 +176,14 @@ def pd_auto(c, oid, L):
         t("Angebot -> Rechnung (oder Abschlags-/Schlussrechnung) -> Finalisieren -> Versand per Mail oder als PDF.",
           "Quotation -> invoice (or progress / final invoice) -> finalise -> sending by mail or as PDF."),
         t("Beim Finalisieren werden Nummer, Absender, Empfänger, Positionen und Steuersätze eingefroren; danach sind Kopf, Positionen, "
-          "Nummer und Löschen gesperrt. Korrekturen nur über eine Gutschrift bzw. Stornorechnung.",
+          "Nummer und Löschen gesperrt. Korrekturen nur über eine Rechnungskorrektur bzw. Stornorechnung.",
           "Finalising freezes number, sender, recipient, positions and tax rates; afterwards the head, the positions, the number and "
           "deleting are blocked. Corrections only by a credit note / cancellation invoice."),
         t("E-Rechnungsformat: ", "E-invoice format: ") + PD_EINV.get(s.get("einvoice_format") or "", s.get("einvoice_format") or "-") + "; "
         + t("Zahlungsziel: ", "Payment term: ") + str(s.get("payment_days") or 0) + t(" Tage", " days")])
     num = pack.get("numbering") or {}
     labels = (("offer", "Angebote", "Quotations", "offer_scheme"), ("invoice", "Rechnungen", "Invoices", "invoice_scheme"),
-              ("credit", "Gutschriften", "Credit notes", "credit_scheme"), ("reminder", "Mahnungen", "Reminders", "reminder_scheme"),
+              ("credit", "Rechnungskorrekturen", "Credit notes", "credit_scheme"), ("reminder", "Mahnungen", "Reminders", "reminder_scheme"),
               ("delivery", "Lieferscheine", "Delivery notes", "delivery_scheme"))
     out["numbers"] = "\n".join([f"- {t(de, en)}: {s.get(k) or num.get(kind) or '-'}" for kind, de, en, k in labels] + [
         t("Nummern werden fortlaufend je Nummernkreis vergeben und sind je Büro eindeutig.",
@@ -195,7 +205,7 @@ def pd_auto(c, oid, L):
         (t("Festgeschrieben bis einschließlich ", "Locked up to and including ") + pl_label(thr)) if thr
         else t("Noch kein Monat festgeschrieben.", "No month locked yet."),
         t("Festschreiben gilt pro Monat und lässt sich nicht zurücknehmen. In einem festgeschriebenen Monat lehnt Kalmido jede Änderung "
-          "mit Datum ab; Korrekturen werden in einem offenen Monat gebucht (z. B. Gutschrift mit heutigem Datum).",
+          "mit Datum ab; Korrekturen werden in einem offenen Monat gebucht (z. B. Rechnungskorrektur mit heutigem Datum).",
           "Locking works per month and cannot be taken back. In a locked month Kalmido refuses every change with a date in it; "
           "corrections are booked in an open month (e.g. a credit note dated today).")])
     dx = s.get("datev_extf") or {}
@@ -241,7 +251,7 @@ def pd_auto(c, oid, L):
               "(section 147 AO, section 257 HGB), each from the end of the calendar year.") if (s.get("pack") or "DE").upper() == "DE"
             else t("Aufbewahrungsfristen des Landes: ", "Retention periods of the country: ") + gap)
     out["retention"] = "\n".join([keep, t(
-        "Finalisierte Rechnungen und Gutschriften lassen sich in Kalmido nicht löschen; Kasseneinträge werden nie gelöscht; genehmigte "
+        "Finalisierte Rechnungen und Rechnungskorrekturen lassen sich in Kalmido nicht löschen; Kasseneinträge werden nie gelöscht; genehmigte "
         "Bewirtungsbelege bleiben 8 Jahre nach Ende ihres Jahres erhalten.",
         "Finalised invoices and credit notes cannot be deleted in Kalmido; cash entries are never deleted; approved entertainment "
         "receipts are kept for 8 years after the end of their year.")])

@@ -145,7 +145,6 @@ APP_TO_API = {
     "GET /api/lists/{}/status-report": ["GET /lists/{}/status-report"],  # 2.34.0 (#265)
     "GET /api/export.json": ["GET /export"],
     "POST /api/import/{}": ["POST /import/{}"],
-    "POST /api/import/ticktick": ["POST /import/{}"],
     "POST /api/imports/{}/undo": ["POST /imports/{}/undo"],
     "GET /api/me/app-passwords": ["GET /me/app-passwords"],
     "POST /api/me/app-passwords": ["POST /me/app-passwords"],
@@ -347,10 +346,12 @@ APP_ONLY = [
     ("2.48.0 (#1111): documents -- a person's own steps (upload by hand / share sheet, review and accept, recognise again, the "
      "preview image, a task for the due date, the workspace's levels / rules / labels / mail address); agents read and set fields "
      "with /documents and add files with /files; 2.122.0 (#2098): create_document; (#2100) the CSV of chosen documents is a person's download", ("=POST /api/docs", "=POST /api/docs/export.csv", "=POST /api/docs/{}/accept", "=POST /api/docs/{}/review",
-                                                   "=POST /api/docs/{}/redo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
+                                                   "=POST /api/docs/{}/redo", "=POST /api/docs/{}/redo/undo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
                                                    "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
                                                    "* /api/docs/mail", "* /api/docs/fields")),  # 2.153.0 (#2179): agents fill in custom fields via /documents, never define them
     # 2.154.0 A (#1111): splitting a stack and linking a document with a task are a person's steps (an agent suggests, a person confirms)
+    ("2.363.3 (#3134): \"Duplicate\" of a task is a person's step in the task menu; agents create tasks with POST /tasks and copy a whole project with /lists/{id}/duplicate",
+     ("=POST /api/tasks/{}/duplicate",)),
     ("2.154.0 A (#1111): a stack scan split into documents (its pages, previews, split, undo, \"no stack\", the separator sheet) and a "
      "document linked with an existing task / the documents of a task are a person's steps in the app; agents read documents with "
      "/documents and never split, link or delete", ("* /api/docs/{}/split", "=POST /api/docs/{}/unsplit", "=GET /api/docs/split-sheet.pdf",
@@ -503,6 +504,8 @@ APP_ONLY = [
     # 2.73.0 B (#1473): moving an account between servers: export and import of a person's own data, people only (agents 403)
     ("2.73.0 B (#1473): the account export / import (moving to an own server and back): a person's own data, people only",
      ("* /api/account/export", "* /api/account/import")),
+    ("2.360.2 D (#2561): a person's own step in the settings: approval records of deleted videos hold customers' data (agents: 403)",
+     ("* /api/videos/signoffs/orphaned",)),
     ("2.146.0 D (#2468): the retention export before deleting an account / organisation: a person's own records or an "
      "organisation's admins, people only (an API token 403)", ("* /api/retention",)),
     ("2.42.0 (#828, #909): end-to-end encryption happens in a person's browser (keys, encrypted note / files, the switch of an encrypted DM); "
@@ -546,7 +549,7 @@ APP_ONLY = [
      "(the same visibility)", ("=GET /api/fields/task-refs",)),
     ("2.40.0 (#1344 / #1361): the own order of My tasks and the favourite star are personal app settings of a person; "
      "agents never set them; 2.46.1: the favourite suggestion asks the person", ("PUT /api/tasks/mine-order", "* /api/lists/{}/favorite",
-                                                                                   "POST /api/favorites/suggestion")),
+                                                                                   "POST /api/favorites/suggestion", "GET /api/favorites/targets")),
     ("2.41.0 (#1365 / #1205): \"Show in My tasks\" per list and the person's Waiting-on suggestions are personal app "
      "settings of a person; agents never set them (an agent writes the waiting text itself with PUT /tasks/{id}/waiting)",
      ("PUT /api/lists/{}/in-mine", "* /api/me/wait-suggestions")),

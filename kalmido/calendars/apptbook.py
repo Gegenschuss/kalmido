@@ -23,7 +23,7 @@ from datetime import date, datetime, timedelta, timezone
 from flask import g, jsonify, redirect, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
-from ..core.i18n import LANGS, N_, short_day, tr
+from ..core.i18n import browser_lang, LANGS, N_, short_day, tr
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_token_bind, Denied, need_feat
@@ -598,11 +598,7 @@ def apb_clean(v, mx):
 
 def apb_lang(c, uid):
     """The customer's language: Accept-Language if the app has it, else the person's language."""
-    for part in (request.headers.get("Accept-Language") or "").split(","):
-        code = part.split(";")[0].strip().lower()[:2]
-        if code in LANGS:
-            return code
-    lg = usettings(c, uid).get("lang") or "en"
+    lg = browser_lang() or usettings(c, uid).get("lang") or "en"
     return lg if lg in LANGS else "en"
 
 
@@ -623,6 +619,14 @@ def apb_live(c, uid):
     return apb_mail_on() and public_links_on(c) and "events" in (usettings(c, uid).get("features") or "").split(",")
 
 
+def apb_retired(c, p):
+    """2.360.4 (#3243): page p works for a retired organisation's office: closed too when it was switched on again."""
+    if not p["office_org_id"]:
+        return False
+    with system_ctx(c):  # instance structure, as acx_anon_bind
+        return bool(c.execute("SELECT 1 FROM orgs WHERE id=? AND retired_at IS NOT NULL", (p["office_org_id"],)).fetchone())
+
+
 def apb_open(c, slug):
     """(page, None) or (None, the 404 / rate-limit answer): the same answer for unknown and switched-off pages."""
     from ..lists.public import pub_gone, pub_limited
@@ -632,7 +636,7 @@ def apb_open(c, slug):
         return None, pub_limited(apb_lang_hdr())
     bad = [("pubbad:" + ip, APB_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
     p = c.execute("SELECT * FROM appt_pages WHERE slug=? AND enabled=1", (slug,)).fetchone() if SLUG_RE.fullmatch(slug or "") else None
-    if not p or not apb_live(c, p["user_id"]):
+    if not p or not apb_live(c, p["user_id"]) or apb_retired(c, p):
         if _rate_blocked(bad):
             return None, pub_limited(apb_lang_hdr())
         _rate_fail(bad)
@@ -878,6 +882,20 @@ def apb_pub_book(slug, tid, slot):
     return apb_msg(c, p, lg, tr("Almost done: please check your e-mail", lg=lg), [tr("We sent you a link. Your booking counts once you confirm it there (within 30 minutes).", lg=lg)])
 
 
+def apb_limit_note(c, uid, day):
+    """2.360.2 L (#2561): the page's mails of today are used up: a News item for its owner, at most once a day on all
+    processes (like team/portal.py pt_limit_note: no push, no mail). Caller commits."""
+    if not c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET day=excluded.day
+                        WHERE mail_counts.day<>excluded.day RETURNING k""", (f"apbn:{uid}", day)).fetchone():
+        return
+    from ..collab.news import notif_ok
+    with system_ctx(c):  # the owner's own notice; the public page has no person signed in, the notice names no customer
+        if not notif_ok(c, uid, usettings(c, uid), "limits", "news"):  # 2.453.0 (#3781): can be switched off
+            return
+        c.execute("INSERT INTO notifications(user_id,kind,task_id,list_id,actor_id,comment_id,data,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                  (uid, "apblimit", None, None, None, None, json.dumps({"limit": APB_MAIL_DAY}), iso(now_utc())))
+
+
 def apb_mail_quota(c, uid):
     """2.148.1 D (#2485): True and counted if the booking page of uid may send one more confirmation mail today. A quota of
     its own (APB_MAIL_DAY), apart from the owner's daily mail budget, so strangers cannot use that up."""
@@ -885,6 +903,7 @@ def apb_mail_quota(c, uid):
     k = f"apb:{uid}"
     r = c.execute("SELECT n, day FROM mail_counts WHERE k=?", (k,)).fetchone()
     if r and r[1] == day and r[0] >= APB_MAIL_DAY:
+        apb_limit_note(c, uid, day)  # 2.360.2 L (#2561)
         return False
     c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET
                  n=CASE WHEN mail_counts.day=excluded.day THEN mail_counts.n+1 ELSE 1 END, day=excluded.day""", (k, day))
@@ -1147,18 +1166,37 @@ def apb_mail_cancelled(c, r, reason):
             apb_mail_html(lines, url, tr("Book an appointment", lg=lg) if url else None, "", subj, fn, lg), rt, fn)
 
 
+def apb_line(c, r, lg):
+    """Customer · type · time of booking r in language lg (push, News, mail)."""
+    p = apb_page_row(c, r["user_id"])
+    t = c.execute("SELECT name FROM appt_types WHERE id=?", (r["type_id"],)).fetchone() if r["type_id"] else None
+    return f'{r["name"]} · {t[0] if t else ""} · {apb_when(p, parse_iso(r["start"]), parse_iso(r["end"]), lg)}'
+
+
+def apb_mail_line(c, bid, uid, lg):
+    """2.367.2 (#2969): the line of the bundled event mail about booking bid (still mine), else None; the state at sending time."""
+    r = c.execute("SELECT * FROM appt_bookings WHERE id=? AND user_id=?", (bid, uid)).fetchone()
+    if not r:
+        return None
+    what = tr("Booking cancelled by the customer", lg=lg) if r["status"] == "cancelled" else tr("New booking", lg=lg)
+    return what, apb_line(c, r, lg), f"{PUBLIC_URL}/#calendar"
+
+
 def apb_push(c, r, what):
-    """Push to the person (the switch "assign" like an event invitation): a new confirmed booking / a cancel by the customer."""
-    from ..collab.news import notif_ok
+    """News, mail (2.367.2, #2969) + push to the person (the switch "assign" like an event invitation): a new confirmed booking /
+    a cancel by the customer. Without a push device a booking used to stay unnoticed."""
+    from ..collab.news import news_add, notif_ok
+    from ..notify.channels import evm_note
     from ..notify.push import push_prio
     uid = r["user_id"]
     s = usettings(c, uid)
+    lg = s.get("lang") or "en"
+    msg = apb_line(c, r, lg)
+    news_add(c, uid, "apbooking", actor=0, data={"what": what, "line": msg[:300], "event_id": r["event_id"]}, s=None)
     if not notif_ok(c, uid, s, "assign", "push"):
         return
-    lg = s.get("lang") or "en"
+    evm_note(c, uid, "apbook", None, None, s, r["id"])
     p = apb_page_row(c, uid)
-    t = c.execute("SELECT name FROM appt_types WHERE id=?", (r["type_id"],)).fetchone() if r["type_id"] else None
     title = tr("New booking", lg=lg) if what == "new" else tr("Booking cancelled by the customer", lg=lg)
-    msg = f'{r["name"]} · {t[0] if t else ""} · {apb_when(p, parse_iso(r["start"]), parse_iso(r["end"]), lg)}'
     click = f"{PUBLIC_URL}/#ev/{r['event_id']}" if r["event_id"] and what == "new" else f"{PUBLIC_URL}/#calendar"
     g.setdefault("pushes", []).append((uid, title, msg, click, push_prio(s), {"scope": f"o:{p['office_org_id'] if p else None}"}))  # 2.240.0 B2 (#2867)

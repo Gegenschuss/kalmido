@@ -164,7 +164,7 @@ const FEATURES = 'cal,collab,comments,contacts,files,clients,office';
   // ================= Firefox: 390 px, dark and light
   const ffLogin = async ({ev, nav}, theme) => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'frida', password: 'password123'})}).then(r => r.status)`);
   };
   const LUM = `const rgb = s => { const m = String(s).match(/[\\d.]+/g) || []; const v = m.slice(0, 3).map(Number); return /color\\(srgb/.test(s) ? v.map(x => x * 255) : v; };

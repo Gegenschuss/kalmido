@@ -236,6 +236,7 @@ function newsText(it, U) {
       lrename: tr('{0} renamed your project {1} to {2} (project admin)', who, q(d.old || ''), q(d.name || '')),  // 2.40.0 (#1431)
       owner: tr('{0} handed the project {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || '')),
       moveout: tr('{0} moved {1} out of the organisation {2}', who, q(d.name || ''), q(d.org || '')),  // 2.148.1 B (#2483)
+      export: trn('{1} exported {0} project of the organisation {2} with an account export', '{1} exported {0} projects of the organisation {2} with an account export', d.count || 1, who, q(d.org || '')),  // 2.362.3 (#3101)
       // 2.361.2 (#2923): a member asks back what they brought in; an admin releases / declines it
       outreq: tr('{0} asks to take {1} back into their private space (organisation {2})', who, q(d.name || ''), q(d.org || '')),
       outok: tr('{0} released {1}: you can move it into your private space now (within {2} days)', who, q(d.name || ''), d.days || 14),
@@ -260,7 +261,8 @@ function newsText(it, U) {
     case 'leavereq': return tr('{0} asks for vacation ({1})', who, d.start ? esc(fmtDayAbs(d.start) + (d.end && d.end !== d.start ? ' – ' + fmtDayAbs(d.end) : '')) : '');  // 2.125.0 A (#2117)
     case 'leavedecide': return (d.state === 'approved' ? tr('{0} approved your vacation ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : '') : tr('{0} rejected your vacation ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : ''));
     case 'errreport': return d.title ? tr('New error reported: {0}', q(d.title)) : tr('A new error was reported');  // 2.18.0
-    case 'approval': return tr('{0} is waiting for your approval', who);
+    case 'approval': return d.title ? tr('{0} is waiting for your approval: {1}', who, q(d.title)) : tr('{0} is waiting for your approval', who);  // 2.367.2 (#2968): a list-wide one has no task title
+    case 'aprequest': return tr('Approval needed: {0} (from {1})', q(it.task_title || ''), who) + (d.note ? ': ' + q(d.note) : '');  // 2.367.2 (#2968)
     case 'signoff': return d.state === 'accepted' ? (d.sk === 'document' ? tr('{0} signed {1}', q(d.name || ''), q(d.title || '')) : tr('{0} approved {1}', q(d.name || ''), q(d.title || '')))
       : d.sk === 'video' ? tr('{0} asks for changes to {1}', q(d.name || ''), q(d.title || '')) : tr('{0} rejected {1}', q(d.name || ''), q(d.title || ''));  // 2.266.0 (#2965): a customer through a link
     case 'review': return rvw_newsText(it, d, who, q);  // 2.60.0 C (#1512)
@@ -278,10 +280,13 @@ function newsText(it, U) {
     case 'filereq': { const d = it.data || {}; return trn('{0} file arrived through {1}', '{0} files arrived through {1}', d.n || 1, q(d.title || '')) + (d.name ? ' · ' + q(d.name) : ''); }  // 2.122.0 A (#2097)
     case 'fetcherr': return tr('Receipt fetcher {0}: {1}', q(d.portal || ''), esc(d.error || ''));  // 2.425.0 C (#3453): docfetch.js
     case 'orgkey': return ocNewsText(d, it.actor_id ? who : q(tr('The server admin')), q);  // 2.138.0 C (#1972): orgcrypt.js
+    case 'apblimit': return tr('Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.', d.limit || '?');  // 2.360.2 L (#2561)
     case 'ptlimit': return d.org ? tr('The customer portal of {0} reached its limit of {1} sign-in mails per hour. Further customers get a link again later.', q(d.org), d.limit || '?')
       : tr('Your customer portal reached its limit of {0} sign-in mails per hour. Further customers get a link again later.', d.limit || '?');  // 2.138.4 C (#2380)
     case 'playbook_proposal': return pbNewsText(it, who, q);  // 2.39.0 (#1168)
-    case 'evinvite': case 'evshare': return evNewsText(it, who, q);  // 2.21.0 (#659)
+    case 'evinvite': case 'evshare': case 'evchange': return evNewsText(it, who, q);  // 2.21.0 (#659)
+    case 'apbooking': return (d.what === 'new' ? tr('New booking: {0}', q(d.line || '')) : tr('Booking cancelled by the customer: {0}', q(d.line || '')));  // 2.367.2 (#2969)
+    case 'calsub': return tr('Your calendar subscription {0} keeps failing. Its events may be out of date.', q(d.name || ''));  // 2.367.2 (#2969)
     case 'abshare': return d.role === 'edit' ? tr('{0} shared the address book {1} with you', who, q(d.name || '')) : tr('{0} shared the address book {1} with you (view only)', who, q(d.name || ''));  // 2.21.0 (#658)
     case 'status': return d.status ? tr('{0} set {1} to {2}', who, q(newsListName(it)), `<span class="stpill st-${esc(d.status)} inl"><i></i>${esc(statusLabel(d.status))}</span>`) : tr('{0} cleared the status of {1}', who, q(newsListName(it)));
   }
@@ -450,6 +455,9 @@ async function newsOpen(i, opts) {
   if (it.kind === 'proposal') { propOpen(it.data?.job); return; }  // 2.3.0
   if (it.kind === 'playbook_proposal') { pbNewsOpen(it); return; }  // 2.39.0 (#1168)
   if (it.kind === 'evinvite' && it.data?.event_id) { evOpen(it.data.event_id); return; }  // 2.21.0 (#659 / #658)
+  if (it.kind === 'evchange') { if (['time', 'place', 'occ'].includes(it.data?.what)) evOpen(it.data.event_id); else go('cal'); return; }  // 2.367.2 (#2969)
+  if (it.kind === 'apbooking') { if (it.data?.what === 'new' && it.data.event_id) evOpen(it.data.event_id); else go('cal'); return; }
+  if (it.kind === 'calsub') { settingsModal('calendars'); return; }
   if (it.kind === 'evshare') { go('cal'); setTimeout(evCalsModal, 150); return; }
   if (it.kind === 'abshare') { go('contacts'); return; }
   if (it.kind === 'orgjoin') { ojn_open(it.data || {}); return; }  // 2.148.1 A (#2480): accept or decline
@@ -488,7 +496,7 @@ async function newsOpen(i, opts) {
 // ---- 2.122.0 (#2314): phones: a sideways swipe on the task opened from the news goes to the next (left) / previous (right)
 // UNREAD news in the order and with the filter (tab, kind, workspace) of the list; it is marked read like on opening. None left:
 // a short notice, the view stays. Same exceptions as the swipe on tasks (detail.js, #1071); the swipe on the list rows stays.
-const NSW_SKIP = /^(proposal|playbook_proposal|evinvite|evshare|abshare|connreq|connok|orgjoin|lytpl|dispo|usage|upscan|signup|leavereq|leavedecide|tsheet|wiki_shared|orgdelnotice|orggone|whorgcut)$/;  // 2.125.0 A (#2117) + B (#2119): + leave, timesheets
+const NSW_SKIP = /^(proposal|playbook_proposal|evinvite|evchange|apbooking|calsub|evshare|abshare|connreq|connok|orgjoin|lytpl|dispo|usage|upscan|signup|leavereq|leavedecide|tsheet|wiki_shared|orgdelnotice|orggone|whorgcut)$/;  // 2.125.0 A (#2117) + B (#2119): + leave, timesheets
 const nswOn = () => !!S.nswTask && S.sel === S.nswTask;
 function nswTarget(dir) {
   const its = S.nf.items || [], cur = its.findIndex(x => x.id === S.nswId);
@@ -620,7 +628,7 @@ function actText0(a, U) {
     case 'wont': return tr("{0} marked the task as won’t do", who);
     case 'reopen': return tr('{0} reopened the task', who);
     case 'skip': return tr('{0} skipped an occurrence, next one {1}', who, q(fmtDayAbs(d.next)));
-    case 'attach': return (d.n || 1) === 1 ? tr('{0} added the attachment {1}', who, q((d.names || [])[0] || '')) : trn('{1} added {0} attachment', '{1} added {0} attachments', d.n, who);
+    case 'attach': return (d.n || 1) === 1 ? tr('{0} added the attachment {1}', who, q(d.enc ? tr('Encrypted file') : (d.names || [])[0] || '')) : trn('{1} added {0} attachment', '{1} added {0} attachments', d.n, who);
     case 'attach_rm': return tr('{0} removed the attachment {1}', who, q(d.name || ''));
     case 'waiting': return d.until ? tr('{0} set the task to waiting on someone ({1}), follow up on {2}', who, q(d.note || '–'), q(dayLabel(d.until))) : tr('{0} set the task to waiting on someone ({1})', who, q(d.note || '–'));
     case 'waiting_rm': return tr('{0} ended the waiting on someone', who);
@@ -635,8 +643,11 @@ function actText0(a, U) {
       rejected: tr('{0} rejected the task', who), cancelled: tr('{0} withdrew the approval request', who)}[d.state] + (d.note ? ': ' + q(d.note) : '');  // 2.23.0 (#463)
     case 'review': return rvw_actText(d, who, q, U);  // 2.60.0 C (#1512)
     case 'approval': return d.ok ? tr('{0} approved the comment of {1}', who, q(uname(d.agent, U))) : tr('{0} rejected the comment of {1}', who, q(uname(d.agent, U)));
-    case 'agent_job': return d.action === 'approve' ? tr('{0} approved the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || ''))
-      : d.action === 'reject' ? tr('{0} rejected the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || '')) : tr('{0} stopped the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || ''));
+    case 'agent_job': {
+      const jt = q(d.title_key ? tr(...d.title_key) : d.title || '');  // 2.454.0 (#3808): a proposal's title in the reader's language
+      return d.action === 'approve' ? tr('{0} approved the job {2} of {1}', who, q(uname(d.agent, U)), jt)
+        : d.action === 'reject' ? tr('{0} rejected the job {2} of {1}', who, q(uname(d.agent, U)), jt) : tr('{0} stopped the job {2} of {1}', who, q(uname(d.agent, U)), jt);
+    }
     case 'tidy': return tr('{0} tidied up the task (the original text is at the top of the notes)', who);
     case 'ltags': return d.tags?.length ? tr('{0} set the project tags {1}', who, q(d.tags.map(g => '#' + g).join(' '))) : tr('{0} removed the project tags', who);
     case 'delete': return tr('{0} moved the task to the trash', who);
@@ -687,7 +698,7 @@ function personCard(anchor, id) {
   const p = listPeople(l).find(x => x.user_id === id), a = agentById(id);
   const name = p?.name || a?.name || anchor.dataset.mname || personNameAny(id) || anchor.textContent.replace(/^@/, ''), meId = S.me?.id;
   const role = p ? roleLabel(p.role) : '', U = S.tl.users || {};
-  const st = a ? `<span class="mcst st-${esc(!a.enabled ? 'paused' : agentOffline(a) ? 'offline' : a.status || 'idle')}">${esc(agentSt(a))}${a.status_text ? ' · ' + esc(a.status_text) : ''}</span>` : '';
+  const st = a ? `<span class="mcst st-${esc(!a.enabled ? 'paused' : agentOffline(a) ? 'offline' : a.status || 'idle')}">${esc(agentSt(a))}${a.status_text ? ' · ' + esc(agentStTx(a)) : ''}</span>` : '';
   const mine = l ? openTasks().filter(x => x.list_id === l.id && x.assignee_id === id && x.id !== t?.id).sort(bySort) : [];
   const acts = [];
   if (a && a.enabled && typeof chatOpen === 'function') acts.push(['chat', 'comment', tr('Open chat')]);
@@ -853,8 +864,7 @@ async function sendComment() {
   if (tid < 0) { toast(tr('Task is still syncing, try again in a moment')); return; }
   const raw = ta.value.trim(), files = S.cfiles[tid] || [];
   if (!raw && !files.length) { ta.focus(); return; }
-  const big = files.find(f => f.size > 50 * 1024 * 1024);
-  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
+  const lim = upLimit(files); if (lim) { toast(lim); return; }  // 2.363.3 (#3134)
   const text = encodeMentions(raw, S.tl.id === tid ? S.tl.people : []);
   const rto = replyTo('c:' + tid);  // 2.33.0 (#1076)
   const pub = typeof ptl_take === 'function' && ptl_take(tid);  // 2.63.0 B (#1513): "To the customer"

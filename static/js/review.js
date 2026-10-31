@@ -128,6 +128,7 @@ NTF_CUSTOM.push('review'); NTF_WORK.push('review');
 NEWS_ICON.review = 'eye';
 NEWS_CHIPS.find(x => x[0] === 'assign')?.[3].push('review');
 function rvw_newsText(it, d, who, q) {
+  if (d.state === 'approved') return (d.pr ? tr('A linked pull request approved {0}', q(it.task_title || '')) : tr('{0} approved the review of {1}', who, q(it.task_title || ''))) + (d.note ? ': ' + q(d.note) : '');  // 2.367.2 (#2968)
   return d.state === 'changes' ? tr('{0} sent back {1} from review', who, q(it.task_title || '')) + (d.note ? ': ' + q(d.note) : '')
     : tr('{0} asks you to review {1}', who, q(it.task_title || ''));
 }

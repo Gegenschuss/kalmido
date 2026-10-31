@@ -1,5 +1,6 @@
 // 2.33.0 UI tests, part B (#1080 search in conversations), own container (start.sh). Firefox, 390 x 844 touch:
-// - the magnifier in a team chat's header opens a search bar under it (not there before); typing finds the hits of this
+// - the ⋯ menu's Search in a team chat's header (2.446.0, #3334: phones; before a magnifier) opens a search bar under it
+//   (not there before); typing finds the hits of this
 //   conversation, the newest is opened (older pages loaded until it is there), the words are marked in the message, "1 of 2",
 //   the arrows go to the older / newer hit; Escape / X closes it and the marks go
 // - the same in the chat with an agent
@@ -62,9 +63,10 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     await until(ev, `!!document.querySelector('#tc-msgs .cmsg')`);
 
     // ================= team chat: the magnifier, the bar, hits, arrows
-    const b0 = await ev(`(() => { const b = document.querySelector('.tcrhead [data-act="ms-toggle"]'); if (!b) return null; const r = b.getBoundingClientRect(); return {w: r.width, h: r.height, bar: !!document.querySelector('.mqbar'), in: r.right <= innerWidth}; })()`);
-    check(b0 && b0.w >= 24 && b0.h >= 24 && !b0.bar && b0.in, '#1080: a magnifier in the team chat header, no search bar before ' + JSON.stringify(b0));
-    await ev(`(() => { document.querySelector('.tcrhead [data-act="ms-toggle"]').click(); return 1; })()`); await sleep(300);
+    const b0 = await ev(`(() => { const b = document.querySelector('.tcrhead [data-act="tc-more"]'); if (!b) return null; const r = b.getBoundingClientRect(); return {w: r.width, h: r.height, bar: !!document.querySelector('.mqbar'), in: r.right <= innerWidth}; })()`);
+    check(b0 && b0.w >= 24 && b0.h >= 24 && !b0.bar && b0.in, '#1080: the ⋯ menu in the team chat header, no search bar before ' + JSON.stringify(b0));
+    await ev(`(() => { document.querySelector('.tcrhead [data-act="tc-more"]').click(); return 1; })()`); await until(ev, `!!document.querySelector('#pop:not(.hidden) [role=menuitem]')`);
+    await ev(`(() => { [...document.querySelectorAll('#pop:not(.hidden) [role=menuitem]')].find(x => /^Search in this chat$/.test(x.textContent.trim())).click(); return 1; })()`); await sleep(300);
     const b1 = await ev(`(() => { const bar = document.querySelector('.mqbar'); return {bar: !!bar, h: Math.round(bar?.getBoundingClientRect().height || 0), under: bar?.previousElementSibling?.classList.contains('tcrhead'), foc: document.activeElement?.id, over: document.documentElement.scrollWidth <= 390}; })()`);
     check(b1.bar && b1.h >= 44 && b1.h <= 64 && b1.under && b1.foc === 'ms-q' && b1.over, '#1080: the bar opens under the header, the field has the focus ' + JSON.stringify(b1));
     await type(ev, '#ms-q', 'spülmaschine');

@@ -96,7 +96,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     d.querySelector('.lightbox')?.remove();
     const clip = d.querySelector('.tccomp [data-act="tc-attach"]');
     check(clip && clip.getAttribute('aria-label') === 'Attach images or files' && d.querySelector('.tccomp #tc-file[type="file"][multiple]'), `${tag}: paperclip + file input`);
-    check(d.querySelector('.tcrhead [data-act="tc-set"]'), `${tag}: the channel settings in the head`);
+    check(mobile ? w.eval(`tc_headItems().some(x => x.label === 'Channel settings')`) : d.querySelector('.tcrhead [data-act="tc-set"]'), `${tag}: the channel settings in the head (2.446.0, #3334: the phone: in its menu)`);
     w.eval(`tcx_addFiles([new File(['a'], 'one.txt', {type: 'text/plain'}), new File(['b'], 'two.txt', {type: 'text/plain'})])`);
     check(d.querySelectorAll('#tc-files .cfile').length === 2, `${tag}: two files wait in the box`);
     click(w, d.querySelector('#tc-files [data-act="tc-file-rm"][data-i="0"]'));

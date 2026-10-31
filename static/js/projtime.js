@@ -76,7 +76,7 @@ async function tz_wipe(lid, name) {
   if (!pv.count) { toast(pv.billed ? tr('Nothing to delete: {0} already billed, they stay', pv.billed) : tr('No time tracked in this project.')); return; }
   const md = modal(`<h3>${tr('Delete all times of this project')}</h3>
     <p>${pv.all ? tr('{0} entries ({1}) of everybody in {2} will be deleted.', pv.count, fmtDur(pv.seconds), esc(name)) : tr('Your {0} entries ({1}) in {2} will be deleted. Entries of others stay.', pv.count, fmtDur(pv.seconds), esc(name))}</p>
-    ${pv.billed ? `<p class="muted">${tr('{0} entries are already billed and stay.', pv.billed)}</p>` : ''}
+    ${pv.billed ? `<p class="muted">${trn('{0} entry is already billed and stays.', '{0} entries are already billed and stay.', pv.billed)}</p>` : ''}
     <p class="muted">${tr('Save a CSV first: it is the only copy afterwards.')} <a href="/api/time/export.csv?${esc(tz_query([lid], 'all', '', ''))}" download>CSV</a></p>
     <label class="shint keep">${tr('Type the project name to confirm')}<input type="text" id="tz-conf" autocomplete="off" placeholder="${esc(name)}"></label>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" data-m="go" disabled>${tr('Delete')}</button></div>`);

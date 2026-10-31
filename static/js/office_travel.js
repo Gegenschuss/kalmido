@@ -132,6 +132,9 @@ async function rk_dup(t) {  // a new trip with the same data, without the receip
     toast(tr('Copy created'), async () => { await api('DELETE', `/api/office/trips/${j.id}`); RK.open = null; rk_reload(); });
   } catch (x) { toast(x.message || tr('unknown')); }
 }
+// 2.451.0 (#3834): on a phone the arrow is hidden (office.css), a long press opens the menu like on the quotations
+const rk_lp = ms_longPress('.rklist .ofcrow[data-rk="open"]', () => false, r => rk_rowMenu(r.dataset.id, r));
+window.addEventListener('click', e => { if (ms_lpRecent(rk_lp) && e.target.closest?.('.rklist .ofcrow[data-rk="open"]')) { e.preventDefault(); e.stopPropagation(); } }, true);
 document.addEventListener('contextmenu', e => {  // right click on a trip row: the same menu
   const r = e.target.closest?.('.rklist .ofcrow[data-rk="open"]'); if (!r) return;
   e.preventDefault(); rk_rowMenu(r.dataset.id, r);
@@ -184,6 +187,8 @@ function rk_settingsHtml() {
     ${!ls ? `<p class="muted">${tr('Loading…')}</p>` : `<ul class="rkplist" role="list">${ls.map(p => `<li><input value="${esc(p.name)}" maxlength="120" data-rkp="name" data-id="${p.id}" aria-label="${esc(tr('Purpose'))}"><button type="button" class="iconbtn" data-rkp="del" data-id="${p.id}" aria-label="${esc(tr('Remove {0}', p.name))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>
     <div class="lacts"><input id="rkp-new" maxlength="120" enterkeyhint="done" autocomplete="off" placeholder="${esc(tr('Add another purpose…'))}" aria-label="${esc(tr('New purpose'))}"><button type="button" class="btn sm" data-rkp="add">${ic('plus', 's')}<span>${tr('Add')}</span></button></div>`}</section>`;
 }
+// 2.452.0 (#3836): on a phone the row has no symbols (office.css), a long press opens the Remove (also the places and people of office_meals.js)
+ms_rowMenu('.rkplist li', r => menu(r, [{label: tr('Remove'), icon: 'trash', cls: 'danger', fn: () => $('[data-rkp="del"],[data-bwc="del"]', r).click()}]));
 async function rk_purposeAct(a, el) {
   const sec = el.closest('.rkpset');
   try {
@@ -612,7 +617,7 @@ function rk_impModal(j, name) {
     const b = e.target.closest('button[data-rki]'); if (!b) return;
     if (b.dataset.rki === 'close') { md.remove(); return; }
     if (b.dataset.rki !== 'go') return;
-    const trips = sheets.flatMap(s => s.rows.filter(ok).map(r => ({date_from: r.date_from, date_to: r.date_to, dest: r.dest, overnight: r.overnight,
+    const trips = sheets.flatMap(s => s.rows.filter(ok).map(r => ({row: r.row, date_from: r.date_from, date_to: r.date_to, dest: r.dest, overnight: r.overnight,
       people: [s.pv === 'n' ? {name: s.person?.name || s.sheet} : {id: +s.pv.slice(1)}], purpose: r.purpose, project: r.project, note: r.note,
       country: r.country, place: r.place, t_start: r.t_start, t_end: r.t_end, vma_days: r.vma_days, ...(r.status === 'dup' ? {dup_ok: 1} : {})})));  // 2.269.0 D (#3046): dup_ok = ticked on purpose
     if (!await importTargetConfirm({what: trn('{0} trip', '{0} trips', trips.length), ws: ofcWs(), place: tr('Office')})) return;

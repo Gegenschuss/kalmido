@@ -256,7 +256,7 @@ ROUTES = {
     # 2.112.1 A (#2058): several nodes into the trash / back, the ZIP download, the phone scan (p21121_a_api_test.py)
     "POST /api/files/trash": "files", "POST /api/files/restore": "files", "GET /api/files/zip": "files", "POST /api/files/scan": "files",
     "POST /api/docs": "files", "POST /api/docs/labels/{}": "files", "POST /api/docs/mail": "files",
-    "POST /api/docs/rules": "files", "POST /api/docs/{}/accept": "files", "POST /api/docs/{}/redo": "files",
+    "POST /api/docs/rules": "files", "POST /api/docs/{}/accept": "files", "POST /api/docs/{}/redo": "files", "POST /api/docs/{}/redo/undo": "files",
     "POST /api/docs/{}/review": "files", "POST /api/docs/{}/task": "files", "POST /api/files/folders": "files",
     "POST /api/files/links": "files", "POST /api/files/nodes/{}/restore": "files", "POST /api/files/nodes/{}/shares": "files",
     "POST /api/files/nodes/{}/order": "files", "POST /api/files/refs": "files", "GET /api/files/refs/{}/{}": "files",  # 2.199.0 A (#2742): p2199_a_fsref_test.py
@@ -488,6 +488,7 @@ ROUTES = {
     "POST /api/office/docs/{}/peppol/refresh": "office",  # 2.306.0 D2 (#2875)
     "POST /api/office/docs/{}/cashflow": "office", "POST /api/office/docs/{}/duplicate": "office", "POST /api/office/docs/{}/fee": "office",
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
+    "GET /api/office/docs/{}/number-preview": "office",  # 2.431.0 B (#3605): the number of the finalise dialog
     "POST /api/office/docs/{}/invoice": "office",
     "GET /api/office/docs/{}/progress": "office",  # 2.120.0 A (#2087): progress invoices of a quotation (p2120_a_api_test.py)
     "POST /api/office/docs/{}/number": "office", "POST /api/office/docs/{}/parts": "office",
@@ -626,6 +627,7 @@ ROUTES = {
     "DAV /": "pim", "DAV /.well-known/caldav": "pim", "DAV /.well-known/caldav/": "pim", "DAV /.well-known/carddav": "pim",
     "DAV /.well-known/carddav/": "pim", "DAV /dav": "pim", "DAV /dav/": "pim", "DAV /dav/{}": "pim",
     "DAV /api/test/boom": "test",  # 2.359.0 (#3023): tests/p2359_a_api_test.py
+    "DAV /test/boom": "test",  # 2.447.0 (#3761): tests/p2447_a_lang_test.py
     "DELETE /api/books/{}": "pim", "DELETE /api/books/{}/members/{}": "pim", "DELETE /api/books/{}/org": "pim",
     "POST /api/books/{}/restore": "pim", "POST /api/books/{}/purge": "pim", "POST /api/contacts/{}/restore": "pim",  # 2.272.0 E1 (#3038)
     "DELETE /api/calendars/{}": "pim", "DELETE /api/calendars/{}/events": "pim", "DELETE /api/contacts/{}": "pim",
@@ -716,8 +718,8 @@ ROUTES = {
     "POST /api/briefing/read": "tasks", "POST /api/chat-save": "tasks", "POST /api/comments/{}/apply": "tasks",
     "POST /api/comments/{}/choice": "tasks", "POST /api/comments/{}/decide": "tasks",
     "POST /api/comments/{}/reactions": "tasks", "POST /api/deps": "tasks", "POST /api/envs/{}/deploy": "tasks",
-    "POST /api/envs/{}/restore": "tasks", "POST /api/favorites/suggestion": "tasks", "POST /api/ical": "tasks",
-    "POST /api/import/ticktick": "tasks", "POST /api/import/{}": "tasks", "POST /api/imports/{}/undo": "tasks",
+    "POST /api/envs/{}/restore": "tasks", "POST /api/favorites/suggestion": "tasks", "GET /api/favorites/targets": "tasks", "POST /api/ical": "tasks",
+    "POST /api/import/{}": "tasks", "POST /api/imports/{}/undo": "tasks",
     "POST /api/list-checks/{}/run": "tasks", "POST /api/news/dismiss": "tasks", "POST /api/news/read": "tasks",
     "POST /api/pdf-text": "tasks", "POST /api/pomo/start": "tasks", "POST /api/pomo/{}/{}": "tasks",
     "POST /api/repos/{}/refresh": "tasks", "POST /api/sample": "tasks", "POST /api/sprints/{}/close": "tasks",
@@ -727,7 +729,7 @@ ROUTES = {
     "POST /api/tasks/{}/attachments": "tasks", "POST /api/tasks/{}/bell/undo": "tasks",
     "POST /api/tasks/{}/chain/pull": "tasks", "POST /api/tasks/{}/comments": "tasks", "POST /api/tasks/{}/complete": "tasks",
     "POST /api/tasks/{}/contacts": "tasks", "POST /api/tasks/{}/editing": "tasks",
-    "POST /api/tasks/{}/enc-attachments": "tasks", "POST /api/tasks/{}/git-undo": "tasks", "POST /api/tasks/{}/links": "tasks",
+    "POST /api/tasks/{}/duplicate": "tasks", "POST /api/tasks/{}/enc-attachments": "tasks", "POST /api/tasks/{}/git-undo": "tasks", "POST /api/tasks/{}/links": "tasks",
     "POST /api/tasks/{}/list-attachments": "tasks", "POST /api/tasks/{}/reopen": "tasks",
     "POST /api/tasks/{}/restore": "tasks", "POST /api/tasks/{}/review": "tasks", "POST /api/tasks/{}/seen": "tasks",
     "POST /api/tasks/{}/skip": "tasks", "POST /api/tasks/{}/take": "tasks", "POST /api/tasks/{}/to-shopping": "tasks",
@@ -837,6 +839,7 @@ ROUTES = {
     "POST /api/time/entries": "time", "POST /api/time/start": "time", "POST /api/time/stop": "time",
     "POST /api/v1/habits": "time", "POST /api/v1/habits/{}/checkin": "time", "POST /api/v1/time/entries": "time",
     "POST /api/v1/time/timer": "time",
+    "GET /api/videos/signoffs/orphaned": "own", "DELETE /api/videos/signoffs/orphaned/{}": "own",  # 2.360.2 D (#2561)
     "GET /api/time/sheets": "time", "POST /api/time/sheets": "time", "POST /api/time/sheets/decide": "time",  # 2.125.0 B (#2119)
     # ---- token (3)
     "POST /api/hooks/deploy/{}/{}": "token", "POST /api/hooks/git/{}": "token", "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/issues/{}": "token",
@@ -1051,6 +1054,11 @@ def path_rx(path):
     return re.compile(r"(?:" + body + r")(?![\w/.-])")
 
 
+def open_call(prev, mw):
+    """2.449.0 (#3800): the line above counts only as an open multi-line call: the method on it, no path of its own, brackets open"""
+    return bool(mw.search(prev)) and "/api/" not in prev and prev.count("(") > prev.count(")")
+
+
 def write_proven(route, texts):
     """route "METHOD /path": called in one of texts (expanded suite sources)?"""
     m, path = route.split(" ", 1)
@@ -1061,7 +1069,7 @@ def write_proven(route, texts):
         while i >= 0:
             a, b = t.rfind("\n", 0, i) + 1, t.find("\n", i)
             b = len(t) if b < 0 else b
-            if rx.search(t[a:b]) and (mw.search(t[a:b]) or mw.search(t[t.rfind("\n", 0, max(0, a - 1)) + 1:a])):
+            if rx.search(t[a:b]) and (mw.search(t[a:b]) or open_call(t[t.rfind("\n", 0, max(0, a - 1)) + 1:a], mw)):
                 return True
             i = t.find(anchor, b + 1) if b < len(t) else -1
     return False
@@ -1138,7 +1146,6 @@ DELETE /api/tasks/{}/enc-note
 DELETE /api/tasks/{}/links/{}
 DELETE /api/tasks/{}/note-lock
 DELETE /api/tasks/{}/waiting
-DELETE /api/templates/{}
 DELETE /api/v1/address-books/{}
 DELETE /api/v1/address-books/{}/members/{}
 DELETE /api/v1/attachments/{}
@@ -1192,7 +1199,6 @@ PATCH /api/list-tags/{}
 PATCH /api/lists/{}/error-hook
 PATCH /api/lists/{}/links/{}
 PATCH /api/lists/{}/milestones/{}
-PATCH /api/me
 PATCH /api/me/tokens/{}
 PATCH /api/me/webhooks/{}
 PATCH /api/newsletter/segments/{}
@@ -1202,7 +1208,6 @@ PATCH /api/office/meals/choices/{}
 PATCH /api/office/trips/purposes/{}
 PATCH /api/office/trips/{}/items/{}
 PATCH /api/office/vehicles/{}
-PATCH /api/sections/{}
 PATCH /api/servers/self
 PATCH /api/servers/{}
 PATCH /api/servers/{}/tasks/{}
@@ -1210,7 +1215,6 @@ PATCH /api/supporter/nudge
 PATCH /api/tasks/{}/links/{}
 PATCH /api/tasks/{}/ticket
 PATCH /api/team/dispo/bookings/{}
-PATCH /api/templates/{}
 PATCH /api/v1/address-books/{}
 PATCH /api/v1/clients/{}
 PATCH /api/v1/comments/{}
@@ -1312,7 +1316,6 @@ POST /api/lists/{}/folder-reset
 POST /api/lists/{}/header
 POST /api/lists/{}/icon
 POST /api/lists/{}/join
-POST /api/lists/{}/links
 POST /api/lists/{}/milestones
 POST /api/lists/{}/notepads
 POST /api/lists/{}/playbook/proposals/{}/apply
@@ -1356,7 +1359,6 @@ POST /api/office/drives/{}/trip
 POST /api/office/gen-docs/tree/folders
 POST /api/office/import
 POST /api/office/legacy/archive/address
-POST /api/office/legacy/archive/parse
 POST /api/office/legacy/counter
 POST /api/office/legacy/runs/{}/tidy
 POST /api/office/legacy/split
@@ -1405,7 +1407,6 @@ POST /api/tags/delete
 POST /api/tags/restore
 POST /api/tasks/purge-done
 POST /api/tasks/similar
-POST /api/tasks/{}/approval
 POST /api/tasks/{}/bell/undo
 POST /api/tasks/{}/chain/pull
 POST /api/tasks/{}/contacts
@@ -1630,6 +1631,12 @@ def main():
                           f"with its ids): call it there as the person without an organisation")
     for r in sorted(WRITE_UNPROVEN - set(ROUTES)):
         check(False, f"WRITE_UNPROVEN names {r}, which is no route of ROUTES: remove it")
+
+    # 2.449.0 (#3800) self-test of the rule: a method on the line above counts only for an open call without a path of its own
+    check(not write_proven("PATCH /api/me", ['A.patch(B + "/api/settings")\nA.get(B + "/api/me")']),
+          "write_proven: a method on a line above with its own path must not count")
+    check(write_proven("PATCH /api/me", ['A.patch(\n    B + "/api/me", json={})']),
+          "write_proven: an open multi-line call must count")
 
     n_m = sum(1 for k in ROUTES.values() if KINDS.get(k, ("",))[0] == "matrix")
     print(f"freelancer_coverage: {oks[0]} ok, {len(fails)} failed -- {len(found)} routes, {n_m} checked without an organisation, "

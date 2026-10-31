@@ -96,31 +96,44 @@ function nextWeekday(wd, fromNextWeek) {
 // matched case-insensitively between spaces. Priority, tags and the list stay symbols (!!! / #tag / ~list) in every language.
 //   wd: weekday names (Sunday first, like Date.getDay()), pre: "on / this <weekday>", next / nextPost: "next <weekday>" /
 //   "<weekday> next", inN + one + units: "in 3 days" / "in a week", at / atH: times ("à 15h30", "a las 9", "om 15 uur"),
+//   listW / prep / art: "in the list X" words (2.452.0, #3772); the month names come from the language file (_months)
 //   rep: repeat words (daily, weekdays, weekly, monthly, yearly; every: "every <weekday>", everyN: "every 2 weeks")
 const QL = {
   fr: {today: "aujourd['’]hui", tomorrow: 'demain', after: 'après-demain', nextWeek: '(?:la )?semaine prochaine', nextMonth: '(?:le )?mois prochain', weekend: '(?:ce |le )?week-end',
     wd: ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'], pre: 'le|ce', next: '', nextPost: 'prochain',
-    inN: 'dans', one: 'une?', units: ['jours?', 'semaines?', 'mois'], at: 'à', atH: true, datePre: 'le',
+    inN: 'dans', one: 'une?', units: ['jours?', 'semaines?', 'mois'], at: 'à', atH: true, datePre: 'le', listW: 'liste|projet', prep: 'dans|à|sur|vers', art: 'la|ma|le|mon|les|mes',
     rep: {daily: 'tous les jours|chaque jour|quotidiennement', weekdays: 'en semaine|chaque jour ouvré|les jours ouvrés', weekly: 'chaque semaine|toutes les semaines|hebdomadaire',
       monthly: 'chaque mois|tous les mois|mensuellement', yearly: 'chaque année|tous les ans|annuellement', every: '(?:chaque|tous les)', everyN: '(?:tous|toutes) les', unitsN: ['jours', 'semaines', 'mois']}},
   es: {today: 'hoy', tomorrow: 'mañana', after: 'pasado mañana', nextWeek: '(?:la )?(?:próxima semana|semana que viene)', nextMonth: '(?:el )?(?:próximo mes|mes que viene)', weekend: '(?:este |el )?fin de semana',
     wd: ['domingo', 'lunes', 'martes', 'mi[ée]rcoles', 'jueves', 'viernes', 's[áa]bado'], pre: 'el|este', next: '(?:el )?próximo', nextPost: 'que viene',
-    inN: 'en|dentro de', one: 'una?', units: ['d[íi]as?', 'semanas?', 'mes(?:es)?'], at: 'a las?', atH: false, datePre: 'el',
+    inN: 'en|dentro de', one: 'una?', units: ['d[íi]as?', 'semanas?', 'mes(?:es)?'], at: 'a las?', atH: false, datePre: 'el', listW: 'lista|proyecto', prep: 'en|a|hacia', art: 'la|mi|el|mis|las',
     rep: {daily: 'todos los días|cada día|a diario|diariamente', weekdays: 'entre semana|cada día laborable|días laborables', weekly: 'cada semana|todas las semanas|semanalmente',
       monthly: 'cada mes|todos los meses|mensualmente', yearly: 'cada año|todos los años|anualmente', every: '(?:cada|todos los)', everyN: 'cada', unitsN: ['días', 'semanas', 'meses']}},
   it: {today: 'oggi', tomorrow: 'domani', after: 'dopodomani', nextWeek: '(?:la )?(?:settimana prossima|prossima settimana)', nextMonth: '(?:il )?(?:mese prossimo|prossimo mese)', weekend: '(?:questo |il |nel )?fine settimana',
     wd: ['domenica', 'luned[ìi]', 'marted[ìi]', 'mercoled[ìi]', 'gioved[ìi]', 'venerd[ìi]', 'sabato'], pre: 'il|la|questo|questa', next: 'prossim[oa]', nextPost: 'prossim[oa]',
-    inN: 'tra|fra', one: 'una?', units: ['giorni|giorno', 'settimane|settimana', 'mesi|mese'], at: 'alle(?: ore)?', atH: false, datePre: 'il',
+    inN: 'tra|fra', one: 'una?', units: ['giorni|giorno', 'settimane|settimana', 'mesi|mese'], at: 'alle(?: ore)?', atH: false, datePre: 'il', listW: 'lista|progetto', prep: 'in|nella|nel|su|a|alla|al', art: 'la|mia|il|mio|le',
     rep: {daily: 'ogni giorno|tutti i giorni|quotidianamente', weekdays: 'nei giorni feriali|ogni giorno feriale|giorni feriali', weekly: 'ogni settimana|settimanalmente',
       monthly: 'ogni mese|mensilmente', yearly: 'ogni anno|annualmente', every: 'ogni', everyN: 'ogni', unitsN: ['giorni', 'settimane', 'mesi']}},
   nl: {today: 'vandaag', tomorrow: 'morgen', after: 'overmorgen', nextWeek: 'volgende week', nextMonth: 'volgende maand', weekend: '(?:dit |het )?weekend',
     wd: ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'], pre: 'op|deze', next: 'volgende|aanstaande', nextPost: '',
-    inN: 'over', one: 'een|één', units: ['dagen|dag', 'weken|week', 'maanden|maand'], at: 'om', atH: false, uur: true, datePre: 'op',
+    inN: 'over', one: 'een|één', units: ['dagen|dag', 'weken|week', 'maanden|maand'], at: 'om', atH: false, uur: true, datePre: 'op', listW: 'lijst|project', prep: 'in|op|naar|aan', art: 'de|mijn|het',
     rep: {daily: 'dagelijks|elke dag|iedere dag', weekdays: 'elke werkdag|op werkdagen|doordeweeks', weekly: 'wekelijks|elke week|iedere week',
       monthly: 'maandelijks|elke maand|iedere maand', yearly: 'jaarlijks|elk jaar|ieder jaar', every: '(?:elke|iedere)', everyN: '(?:elke|iedere|om de)', unitsN: ['dagen', 'weken', 'maanden']}},
 };
 // the weekday number of a name matched by one of the QL patterns
 const qlWd = (L, w) => L.wd.findIndex(p => new RegExp(`^(?:${p})$`, 'i').test(w));
+// 2.452.0 (#3772): the month names of the app language from its language file (_months, plus the short forms of _months_short
+// that are no weekday of that language, "mar" in Spanish); the longest names first; none in English (MON_EN)
+function qlMonths() {
+  if ((I18N.code || 'en') === 'en') return null;
+  const clean = x => String(x).replace(/\.$/, '').toLowerCase(), esc = x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const longN = (i18nGet('_months') || []).map(clean), shortN = (i18nGet('_months_short') || []).map(clean), wds = new Set((i18nGet('_weekdays_short') || []).map(clean));
+  const names = [];
+  longN.forEach((n, i) => { names.push([n, i]); if (shortN[i] && shortN[i] !== n && shortN[i].length >= 3 && !wds.has(shortN[i])) names.push([shortN[i], i]); });
+  if (!names.length) return null;
+  names.sort((a, b) => b[0].length - a[0].length);
+  return {re: names.map(([n]) => esc(n)).join('|'), idx: w => { const k = clean(w), h = names.find(([n]) => n === k); return h ? h[1] : -1; }};
+}
 function parseQuick(text, ignore = new Set(), sub = false) {  // sub: a reminder's date words only (quickadd2.js)
   const out = {title: text, chips: []};
   let s = ' ' + text + ' ';
@@ -208,6 +221,10 @@ function parseQuick(text, ignore = new Set(), sub = false) {  // sub: a reminder
   });
   // 2.263.0 (#2981): English months and ordinals (English / German app; Spanish "mar." is a weekday): "Oct 5", "October 5th, 2027", "5 October", "the 5th of May", "the 5th"
   const dayOf = (mo, dd, yr) => { const t = pd(today()); let y = yr ? +yr : t.getFullYear(); const d = new Date(y, mo, dd); if (isNaN(d) || d.getDate() !== dd || mo < 0) return false; if (!yr && ds(d) < today()) d.setFullYear(y + 1); out.due = ds(d); return dayLabel(out.due); };
+  // 2.452.0 (#3772): "5. Oktober", "5 octobre", "5 de octubre de 2027", "1er octobre": day, month name of the app language, optional year;
+  // a month name alone ("Mai", "mars") stays text
+  const ML = qlMonths();
+  if (ML && (!out.due || ignore.has('date'))) take(new RegExp(`\\s(?:(?:am|le|el|il|op|on)\\s)?(\\d{1,2})(?:\\.|er|º|°)?\\s(?:(?:de|del|di|d['’])\\s?)?(${ML.re})\\.?(?:,?\\s(?:(?:de|del)\\s)?(\\d{4}))?(?=[\\s,])`, 'i'), 'date', m => dayOf(ML.idx(m[2]), +m[1], m[3]));
   if (!L && (!out.due || ignore.has('date'))) take(new RegExp(`\\s(?:on\\s)?(${MON_EN_RE})\\.?\\s(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s(\\d{4}))?(?=[\\s,])`, 'i'), 'date', m => dayOf(monEn(m[1]), +m[2], m[3]));
   if (!L && (!out.due || ignore.has('date'))) take(new RegExp(`\\s(?:on\\s)?(?:the\\s)?(\\d{1,2})(?:st|nd|rd|th)?\\s(?:of\\s)?(${MON_EN_RE})\\.?(?:,?\\s(\\d{4}))?(?=[\\s,])`, 'i'), 'date', m => dayOf(monEn(m[2]), +m[1], m[3]));
   if (!L && (!out.due || ignore.has('date'))) take(/\s(?:on\s)?the\s(\d{1,2})(?:st|nd|rd|th)(?=\s)/i, 'date', m => {
@@ -276,9 +293,11 @@ function quickListWords(s) {
   const eqOne = (j, nw) => nw.length && j + nw.length <= toks.length && norm(toks.slice(j, j + nw.length).map(t => t.w).join('')) === norm(nw.join('')) ? nw.length : 0;
   const eqAt = (j, l) => Math.max(0, ...quickNames(l).map(n => eqOne(j, n.split(/\s+/).filter(w => norm(w)))));
   const hit = (a, j, n, l) => ({list: l, start: toks[a].i, end: toks[j + n - 1].e, phrase: s.slice(toks[a].i, toks[j + n - 1].e)});
-  const PREP = /^(in|auf|to|into|zur|onto)$/i, ART = /^(die|der|the|meine|my)$/i;
+  // 2.452.0 (#3772): the list words, prepositions and articles of the app language next to the English / German ones
+  const LQ = QL[I18N.code] || {}, wr = (base, extra) => new RegExp(`^(?:${base}${extra ? '|' + extra : ''})$`, 'i');
+  const PREP = wr('in|auf|to|into|zur|onto', LQ.prep), ART = wr('die|der|the|meine|my', LQ.art), KW = wr('liste|list|projekt|project', LQ.listW), KWBARE = wr('liste|projekt', LQ.listW);
   for (let k = 0; k < toks.length - 1; k++) {
-    if (!/^(liste|list|projekt|project)$/i.test(toks[k].w)) continue;
+    if (!KW.test(toks[k].w)) continue;
     let a = k;
     if (a > 1 && ART.test(toks[a - 1].w) && PREP.test(toks[a - 2].w)) a -= 2;
     else if (a > 0 && PREP.test(toks[a - 1].w)) a--;
@@ -286,7 +305,7 @@ function quickListWords(s) {
     const j = k + 1;
     let best = null;
     for (const l of W) { const n = eqAt(j, l); if (n && (!best || n > best.n)) best = {l, n}; }
-    if (!best && (a < k || /^(liste|projekt)$/i.test(toks[k].w))) {
+    if (!best && (a < k || KWBARE.test(toks[k].w))) {
       const q = norm(toks[j].w), fit = q.length >= 3 ? W.filter(x => quickNames(x).some(n => norm(n).startsWith(q)) || norm(x.name).startsWith(q)) : [];
       if (fit.length === 1) best = {l: fit[0], n: 1};
     }
@@ -296,7 +315,7 @@ function quickListWords(s) {
   for (const l of W) {
     for (const nm of quickNames(l)) {
       const n = nm.split(/\s+/).filter(w => norm(w)).length, j = toks.length - n;
-      if (n && j >= 2 && /^(in|auf|into)$/i.test(toks[j - 1].w) && eqOne(j, nm.split(/\s+/).filter(w => norm(w))) && (!best || n > best.n)) best = {l, n, j};
+      if (n && j >= 2 && wr('in|auf|into', LQ.prep).test(toks[j - 1].w) && eqOne(j, nm.split(/\s+/).filter(w => norm(w))) && (!best || n > best.n)) best = {l, n, j};
     }
   }
   return best ? hit(best.j - 1, best.j, best.n, best.l) : null;
@@ -426,7 +445,7 @@ function remDur(m) {  // "3 weeks", "90 minutes"
   return a % 10080 === 0 ? trn('{0} week', '{0} weeks', a / 10080) : a % 1440 === 0 ? trn('{0} day', '{0} days', a / 1440) : a % 60 === 0 ? trn('{0} hour', '{0} hours', a / 60) : trn('{0} minute', '{0} minutes', a);
 }
 const fmtRem = m => !+m ? tr('On time') : +m < 0 ? tr('{0} after', remDur(m)) : tr('{0} before', remDur(m));
-const fmtNum = (n, d = 1) => (+n).toLocaleString(LOCALE(), {maximumFractionDigits: d});
+const fmtNum = (n, d = 1, min = 0) => (+n).toLocaleString(LOCALE(), {minimumFractionDigits: min, maximumFractionDigits: d});  // 2.450.0 (#3770): min = fixed decimals (fmtNum(0, 2, 2) = "0,00" / "0.00")
 const remChip = v => { const o = REM_OPTS.find(x => x[0] === String(v)); return o ? tr(o[1]) : +v < 0 ? fmtRem(v) : remDur(v); };
 const remLabel = m => { const o = REM_OPTS.find(x => x[0] === String(m)); return o ? tr(o[1]) : fmtRem(m); };
 // ---- 2.7.0 (#412): a due date can be a deadline: the rows and the task panel count down ("12 days left") and highlight

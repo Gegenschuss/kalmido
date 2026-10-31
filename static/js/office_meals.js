@@ -321,6 +321,9 @@ document.addEventListener('click', e => {
   else return;
   e.preventDefault();
 });
+// 2.451.0 (#3834): on a phone the arrow is hidden (office.css), a long press opens the menu like on the quotations
+const bw_lp = ms_longPress('.bwlist .ofcrow[data-bw="open"]', () => false, r => bw_rowMenu(r.dataset.id, r));
+window.addEventListener('click', e => { if (ms_lpRecent(bw_lp) && /** @type {any} */ (e.target).closest?.('.bwlist .ofcrow[data-bw="open"]')) { e.preventDefault(); e.stopPropagation(); } }, true);
 document.addEventListener('contextmenu', e => {  // right click on a row: the same menu
   const r = /** @type {any} */ (e.target).closest?.('.bwlist .ofcrow[data-bw="open"]'); if (!r) return;
   e.preventDefault(); bw_rowMenu(r.dataset.id, r);

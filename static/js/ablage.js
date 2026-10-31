@@ -319,6 +319,7 @@ function ab_menuItems(n, tree) {
   const w = ab_canWrite(n.role), own = n.role === 'owner', f = n.kind !== 'folder', ref = n.kind === 'ref';
   return [
     f ? {label: tr('Open'), icon: 'eye', fn: () => ab_openFile(n)} : null,
+    ...(ref ? [] : fv2_menuRow('file:' + n.id)),  // 2.441.0 (#3592)
     f && !ref ? {label: tr('Download'), icon: 'download', fn: () => { if (n._enc && typeof fsl_open === 'function') return fsl_open(n, true); const a = document.createElement('a'); a.href = ab_url(n, true); a.download = n.name; document.body.appendChild(a); a.click(); a.remove(); }} : null,
     tree && w && !f ? {label: tr('New folder…'), icon: 'plus', fn: () => ab_newFolder(n.id)} : null,
     n.kind === 'folder' ? {label: tr('Download as ZIP'), icon: 'download', fn: () => abm_download([n])} : null,  // 2.112.1 A (#2058)

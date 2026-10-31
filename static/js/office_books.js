@@ -67,7 +67,7 @@ function bkTabHtml() {
   for (let y = yNow + 1; y >= yNow - 6; y--) years.push([y, String(y)]);
   const head = `<div class="ofcbar bk-bar"><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('bk-year', BK.year, years)}</label><span class="spacer"></span>
     ${ofcFeat('books.datev') ? `<a class="btn sm ghost" href="#office/books/archive" data-bk-archive>${ic('archive', 's')}<span>${tr('Booking archive')}</span></a>` : ''}
-    <a class="btn sm ghost" href="#office/books/procdoc" data-bk-procdoc>${ic('file', 's')}<span>${tr('Procedure documentation')}</span></a></div>
+    ${OFC.info?.procdoc !== false ? `<a class="btn sm ghost" href="#office/books/procdoc" data-bk-procdoc>${ic('file', 's')}<span>${tr('Procedure documentation')}</span></a>` : ''}</div>
     ${bkPhotoHtml()}`;
   // 2.365.2 D (#2789): tax reserve, VAT basis and tax dates are set in Settings > Company & office > Bank & taxes (ost_taxHtml)
   const set = ofcSetLink('tax', ofcFeat('books.tax_dates') ? tr('Tax reserve, VAT basis and tax dates') : tr('Tax reserve and VAT basis'));
@@ -86,7 +86,7 @@ function bkExportHtml() {
   const y = BK.year, q = `from=${y}-01-01&to=${y}-12-31`;
   return `<section class="bk-sec" aria-labelledby="bk-exh"><div class="ofcbar"><h3 class="ofcgrp" id="bk-exh">${tr('Export for the tax advisor {0}', y)}</h3><div class="shint">${tr('All invoices, credit notes, payments, receipts and travel expenses of the year in one list; the ZIP also holds the invoice PDFs and the receipt files.')}</div><span class="spacer"></span>
     <a class="btn sm ghost" href="/api/office/books/export?${q}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/books/export?${q}&zip=1" download>${ic('download', 's')}<span>ZIP</span></a></div>
-    ${BK.info.incomplete ? `<p class="shint bk-exgap"><a href="#office/receipts">${tr('{0} receipts without date or amount are not in the export - complete them', BK.info.incomplete)}</a></p>` : ''}</section>`;  // 2.356.0 (#3097)
+    ${BK.info.incomplete ? `<p class="shint bk-exgap"><a href="#office/receipts">${trn('{0} receipt without date or amount is not in the export - complete it', '{0} receipts without date or amount are not in the export - complete them', BK.info.incomplete)}</a></p>` : ''}</section>`;  // 2.356.0 (#3097)
 }
 
 function bkRcRow(r) {
@@ -228,7 +228,7 @@ async function bkMerge(files) {  // the photos -> one PDF (abscan.js: smaller on
 function bkDups(dups) {
   if (!dups.length) return;
   if (dups.length === 1) { toast(tr('This file already exists: {0}', dups[0].name), () => bkSheet(dups[0].id, false), 8000, tr('Open')); return; }
-  toast(tr('{0} files already exist', dups.length), () => {
+  toast(trn('{0} file already exists', '{0} files already exist', dups.length), () => {
     const md = modal(`<h3>${tr('Already there')}</h3><ul class="ofclist" role="list">${dups.map(d => `<li><button type="button" class="ofcrow" data-bk="rc" data-id="${+d.id}"><span class="ofcn"><b>${esc(d.name)}</b></span>${ic('chev', 's')}</button></li>`).join('')}</ul>
       <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
     md.classList.add('ofcdlg'); fgModal(md);

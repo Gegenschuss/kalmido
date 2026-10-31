@@ -6,20 +6,20 @@
 'use strict';
 
 const MSC = {items: null, loading: false, seq: 0, q: '', arch: false, pick: null, last: null, inv: null, invLoading: false, trash: false, tItems: null, tDays: 0};
-async function ms_clLoad() {
+async function ms_clLoad(q) {  // 2.431.0 C (#3602): q = quietly for ms_clLive (no draw)
   const seq = ++MSC.seq;
   MSC.loading = true;
   try { const j = await api('GET', '/api/clients?archived=1'); if (seq === MSC.seq) MSC.items = (j.clients || []).filter(ms_inWs); }
   catch { if (seq === MSC.seq) MSC.items = MSC.items || []; }
   MSC.loading = false;
-  if (seq === MSC.seq) ms_clDraw();
+  if (seq === MSC.seq && !q) ms_clDraw();
 }
 // open invoices per client (office on): the organisation's invoices, loaded once per visit of the page
-async function ms_clInvLoad() {
+async function ms_clInvLoad(q) {
   MSC.invLoading = true;
-  try { MSC.inv = (await rawFetch('GET', '/api/office/docs?kind=invoice')).docs || []; } catch { MSC.inv = []; }  // quiet: without an office (400) no section
+  try { MSC.inv = (await rawFetch('GET', '/api/office/docs?kind=invoice')).docs || []; } catch { if (!q) MSC.inv = []; }  // quiet: without an office (400) no section
   MSC.invLoading = false;
-  ms_clDraw();
+  if (!q) ms_clDraw();
 }
 // 2.119.1 B (#2086): an address opens the map app on a tap (Apple devices: Apple Maps, else Google Maps); nothing is
 // embedded or fetched before the tap (here: the contacts module loads on demand, the client card uses it too)
@@ -37,11 +37,11 @@ function ms_clGdHtml(c) {
   const st = {draft: tr('Draft'), final: tr('Finished'), signed: tr('Signed'), declined: tr('Declined')};
   return `<div class="ctsec"><h4>${tr('Documents')}</h4>${ds.length ? `<ul class="ctlinks">${ds.map(x => `<li><a class="linkbtn" href="#office/gendocs/${x.id}">${ic('file', 's')} ${esc(x.title || x.kind_label)}</a><span class="muted"> · ${esc([x.list_name, st[x.status] || x.status].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No documents yet.')}</p>`}<a class="btn sm" href="#office/gendocs">${ic('plus', 's')} ${tr('New document')}</a></div>`;
 }
-async function ms_clGdLoad(id) {
+async function ms_clGdLoad(id, q) {
   MSC.gdLoading = true;
   try { MSC.gd = {id, docs: (await rawFetch('GET', `/api/office/gen-docs?client_id=${id}&brief=1`)).docs || []}; } catch { MSC.gd = {id, docs: null}; }  // quiet: members (403) see no section
   MSC.gdLoading = false;
-  ms_clDraw();
+  if (!q) ms_clDraw();
 }
 // 2.153.0 (#2028): the client's letters (office/letters.py; admins of the office only, else no section)
 function ms_clLtHtml(c) {
@@ -51,14 +51,28 @@ function ms_clLtHtml(c) {
   const st = {draft: tr('Draft'), sent: tr('Sent'), delivered: tr('Delivered')};
   return `<div class="ctsec"><h4>${tr('Letters')}</h4>${ls.length ? `<ul class="ctlinks">${ls.slice(0, 20).map(x => `<li><a class="linkbtn" href="#office/letters/${x.id}">${ic('mail', 's')} ${esc(x.subject || x.rcpt_name || tr('Letter'))}</a><span class="muted"> · ${esc([fmtDateLoc(x.letter_date), st[x.status] || x.status].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No letters yet.')}</p>`}</div>`;
 }
-async function ms_clLtLoad(id) {
+async function ms_clLtLoad(id, q) {
   MSC.ltLoading = true;
   try { MSC.lt = {id, letters: (await rawFetch('GET', `/api/office/letters?client_id=${id}&brief=1`)).letters || []}; } catch { MSC.lt = {id, letters: null}; }  // quiet: members (403) see no section
   MSC.ltLoading = false;
-  ms_clDraw();
+  if (!q) ms_clDraw();
 }
-function ms_clDraw() { if (S.route.mod === 'clients') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('clients', viewClients()))); } }
+function ms_clDraw() { if (S.route.mod === 'clients') { const el = $('#view'); if (el) { const ck = ct_scrollKeep(el); keepFocus(el, () => setHtml(el, mg_wrap('clients', viewClients()))); ck(); } } }  // 2.431.0 C (#3598): + the columns' scroll
 const ms_clDirty = () => { MSC.items = null; MSC.inv = null; };
+// 2.431.0 C (#3602): a change elsewhere (a full state of the poll, the return to the tab): the page fetches quietly what it
+// shows and keeps the old until the new is there; drawn only when the page changed (morphed: scroll, open blocks, selection
+// stay). Invoices, documents and letters are fetched again only when the office moved (or what moved is unknown: tab return)
+async function ms_clLive() {
+  if (S.route.mod !== 'clients') return;
+  if (MSC.trash || S.route.client === 'mailhub' || !MSC.items) return clReload();
+  const ch = S.lpUnk ? null : [...S.lpPend], off = !ch?.length || ch.includes('office') || ch.includes('other'), id = S.route.client || null;
+  await Promise.allSettled([ms_clLoad(1), id && CLV.id === id && clLoad(1), off && MSC.inv && ms_clInvLoad(1), off && id && MSC.gd?.id === id && ms_clGdLoad(id, 1), off && id && MSC.lt?.id === id && ms_clLtLoad(id, 1)]);
+  if (S.route.mod !== 'clients' || S.route.client !== id) return;
+  const was = MSC.html; viewClients(); S.lpN.clLive = (S.lpN.clLive || 0) + 1;  // clLive / clDraw: for the tests
+  if (MSC.html === was) return;  // the same page: nothing drawn
+  if (lpBusy()) { S.viewStale = true; return; }  // a field / form in use: drawn once it is left (the poll)
+  S.lpN.clDraw = (S.lpN.clDraw || 0) + 1; ms_clDraw();
+}
 const ms_clShown = () => (MSC.items || []).filter(c => (MSC.arch || !c.archived) && (!MSC.q.trim() || [c.name, c.name_extra, c.display_name, c.label, c.contact, c.email, c.phone, c.note, c.billing?.customer_no]
   .some(v => (v || '').toLowerCase().includes(MSC.q.trim().toLowerCase()))) && dsb_clPass(c));  // 2.154.0 C (#2192): + the data protection filter
 const ms_clAv = (c, big) => `<span class="avatar ctav mscav ${big ? 'big' : ''}" style="${cssColor(c.color) ? '--cc:' + cssColor(c.color) : ''}" aria-hidden="true">${c.icon ? clSymHtml(c.icon, big ? '' : 's') : ic('brief', big ? '' : 's')}</span>`;
@@ -98,7 +112,7 @@ function ms_clView() {
     : !MSC.items.length ? `<div class="empty nempty eact msclempty">${ic('brief')}<span>${tr('Clients are everyone you write quotations and invoices for: companies or private people.')}</span><button class="btn pri" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button>${feat('contacts') ? `<a class="btn" href="#contacts">${ic('users', 's')} ${tr('Contacts')}</a>` : ''}${oim_link('master', true)}</div>`
     : !items.length ? `<div class="empty">${ic('brief')}${tr('No client matches.')}</div>`
     : `<ul class="ctlist" role="list" aria-label="${esc(tr('Clients'))}">${items.map(c => `<li><button type="button" class="ctrow ${c.id === id ? 'on' : ''} ${MSC.pick?.has(c.id) ? 'picked' : ''} ${c.archived ? 'msarch' : ''}" data-clopen="${c.id}" ${MSC.pick ? `aria-pressed="${MSC.pick.has(c.id)}"` : `aria-current="${c.id === id}"`}>${MSC.pick ? `<span class="ctchk ${MSC.pick.has(c.id) ? 'on' : ''}" aria-hidden="true">${MSC.pick.has(c.id) ? ic('check', 's') : ''}</span>` : ''}${ms_clAv(c)}<span class="ctn"><b>${esc(cdn_label(c))}</b><small class="muted">${esc([cdn_label(c) !== c.name ? c.name : '', c.archived ? tr('archived') : '', c.contact, c.email].filter(Boolean).join(' · '))}</small></span>${c.budget && c.budget.level !== 'none' ? `<i class="msbud lv-${c.budget.level}" title="${esc(tr(BUDGET_TXT[c.budget.level]))}"></i>` : ''}</button></li>`).join('')}</ul>`;
-  return `<div class="ctview msclients ${id ? 'withcard' : ''} ${MSC.pick ? 'ctpicking' : ''}">${mob && id ? '' : head}${MSC.pick && !(mob && id) ? ms_clBar() : ''}${mob && id ? '' : bar}<div class="ctcols">${mob && id ? '' : `<div class="ctlistw">${list}${MSC.items?.length && !MSC.pick ? oim_link('master') : ''}</div>`}${card}</div></div>`;
+  return MSC.html = `<div class="ctview msclients ${id ? 'withcard' : ''} ${MSC.pick ? 'ctpicking' : ''}">${mob && id ? '' : head}${MSC.pick && !(mob && id) ? ms_clBar() : ''}${mob && id ? '' : bar}<div class="ctcols">${mob && id ? '' : `<div class="ctlistw">${list}${MSC.items?.length && !MSC.pick ? oim_link('master') : ''}</div>`}${card}</div></div>`;
 }
 // 2.435.0 A (#3600): the blocks of the client card like the blocks of a list: the office admin switches blocks off for the
 // office (office setting client_blocks_off, sent with the client: blocks_off), each person shows / hides the others for
@@ -128,7 +142,7 @@ function ms_clCard(c) {
   const bud = [c.budget_h ? `${fmtNum(c.budget_h, 1)} h` : '', c.budget_amount ? curMoney(c.budget_amount, cur) : ''].filter(Boolean).join(' · ');
   const inv = (MSC.inv || []).filter(x => x.client_id === c.id && x.open > 0 && !['draft', 'cancelled'].includes(x.status));
   const ks = (c.contacts || []).filter(k => k.name);
-  return `<article class="ctcard msclcard" aria-labelledby="mscl-h">
+  return `<article class="ctcard msclcard" aria-labelledby="mscl-h" data-ck="${c.id}">
     <div class="cthead">${isMobile() ? `<button class="iconbtn" data-mscl="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ms_clAv(c, true)}<div class="cthn"><h3 id="mscl-h">${esc(cdn_label(c))}</h3>${cdn_label(c) !== c.name ? `<small class="muted cdnlegal">${esc(c.name)}</small>` : ''}<div class="mstags">${ms_tag('client')}${c.archived ? `<span class="rotag">${tr('Archived')}</span>` : ''}${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}</div></div>
       <span class="ctacts"><button class="btn sm" data-act="client-edit" data-id="${c.id}">${ic('edit', 's')} ${tr('Edit')}</button><button class="iconbtn" data-mscl="cmenu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></span></div>
     <div class="mscly msclstats cldetail">${S.ly.view === 'clients' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('clients')}</div>`}${lyHtml('clients', ms_clFoldAll(c, ks, inv, {  // 2.55.0 (#1067): the card's sections are blocks of the view builder
@@ -366,7 +380,7 @@ function dsb_clHtml(c) {
   if (typeof officeOn !== 'function' || !officeOn()) return '';
   if (DSB.cl?.id !== c.id) { if (!DSB.cl?.busy) { DSB.cl = {id: c.id, busy: 1}; dsb_clLoad(c.id); } return ''; }
   const ss = DSB.cl.sheets; if (!ss) return '';
-  const li = x => `<li>${ic('shield', 's')} <b>${esc(x.kind_label)}</b> <span class="rotag dsb-st dsb-st-${esc(x.status)}${x.review ? ' dsb-rev' : ''}">${esc(x.gen_status === 'draft' ? tr('Draft') : x.status_label)}</span><button type="button" class="iconbtn" data-dsb="menu" data-id="${x.id}" aria-haspopup="menu" aria-label="${esc(tr('More'))}: ${esc(x.kind_label)}" title="${esc(tr('More'))}">${ic('dots', 's')}</button>${dsb_replyHtml(x.reply)}</li>`;
+  const li = x => `<li data-dsb="row" data-id="${x.id}">${ic('shield', 's')} <b>${esc(x.kind_label)}</b> <span class="rotag dsb-st dsb-st-${esc(x.status)}${x.review ? ' dsb-rev' : ''}">${esc(x.gen_status === 'draft' ? tr('Draft') : x.status_label)}</span><button type="button" class="iconbtn" data-dsb="menu" data-id="${x.id}" aria-haspopup="menu" aria-label="${esc(tr('More'))}: ${esc(x.kind_label)}" title="${esc(tr('More'))}">${ic('dots', 's')}</button>${dsb_replyHtml(x.reply)}</li>`;
   return `<div class="ctsec dsbsec"><h4>${tr('Data protection')}</h4>${ss.length ? `<ul class="ctlinks">${ss.map(li).join('')}</ul>` : ''}<button type="button" class="btn sm" data-dsb="new" data-cl="${c.id}">${ic('plus', 's')} ${tr('Data protection sheet')}</button></div>`;
 }
 // 2.209.0 C (#2589): the newest reply mail that was not filed (e.g. a revocation) at its sheet -- the customer's text, escaped
@@ -402,8 +416,10 @@ document.addEventListener('change', async e => {
   if (DSB.f) { try { DSB.all = (await rawFetch('GET', '/api/office/privacy-sheets?brief=1')).sheets || []; } catch { DSB.f = ''; DSB.no = true; } }  // fresh on every choice (another device may have changed a sheet)
   ms_clDraw();
 });
+ms_rowMenu('#view .dsbsec li[data-dsb="row"]', async r => { await loadModule('office'); dsb_menu(r, (DSB.cl?.sheets || []).find(x => x.id === +r.dataset.id)); });  // 2.452.0 (#3836)
 document.addEventListener('click', async e => {
   const b = e.target.closest?.('#view [data-dsb]'); if (!b) return;
+  if (b.dataset.dsb === 'row' && (!isMobile() || e.target.closest('a,button'))) return;  // 2.452.0 (#3836): on a phone a tap on the row opens its menu, the dots are hidden
   await loadModule('office');
   if (b.dataset.dsb === 'new') dsb_new(+b.dataset.cl);
   else dsb_menu(b, (DSB.cl?.sheets || []).find(x => x.id === +b.dataset.id));

@@ -111,13 +111,14 @@ function ofm_adm() {
     OFM_ASKED.add(ws);
     rawFetch('GET', '/api/office/settings').then(j => {
       if (!j || ofm_ws() !== ws) return;
-      const was = ofm_adm() + JSON.stringify(ofm_lv()) + JSON.stringify(ofm_used()); ofm_admSeen(j.role === 'admin', j.rights, j.used);
-      if (was !== ofm_adm() + JSON.stringify(ofm_lv()) + JSON.stringify(ofm_used()) && mg_areaOf(S.route.mod)?.[0] === 'office') renderView();
+      const seen = () => ofm_adm() + JSON.stringify([ofm_lv(), ofm_used(), ofm_offList()]), was = seen(); ofm_admSeen(j.role === 'admin', j.rights, j.used, j.settings?.menu_off);
+      if (was !== seen() && mg_areaOf(S.route.mod)?.[0] === 'office') renderView();
     }, () => {});
   }
   return !!(LS.get('ofmAdm', {}) || {})[ws];
 }
-function ofm_admSeen(adm, rights, used) {
+function ofm_admSeen(adm, rights, used, menuOff = []) {
+  const f = LS.get('ofmOff', {}) || {}; if (JSON.stringify(f[ofm_ws()] || []) !== JSON.stringify(menuOff)) { f[ofm_ws()] = menuOff; LS.set('ofmOff', f); }  // 2.440.0 (#3609)
   const o = LS.get('ofmAdm', {}) || {}; if (!!o[ofm_ws()] !== adm) { o[ofm_ws()] = adm; LS.set('ofmAdm', o); }
   const u = LS.get('ofmUsed', {}) || {}; if (used && JSON.stringify(u[ofm_ws()] || null) !== JSON.stringify(used)) { u[ofm_ws()] = used; LS.set('ofmUsed', u); }  // 2.276.0 A (#3039)
   // 2.187.0 A (#2476): + the levels of a person ruled by office groups (null = as before), so #clients / #contacts show the right menu
@@ -137,10 +138,8 @@ const ofm_ok = i => { if (MV_OFM.includes(i.key) && mvOfc()) return false; const
 // 2.276.0 A (#3039): what the office already holds (GET /api/office/settings used: invoice, receipt, inquiry, meal, travel,
 // sub, fixed), per person and workspace like the role (LS ofmUsed); null = not known yet (everything as before)
 function ofm_used() { return typeof OFC !== 'undefined' && OFC.info ? OFC.info.used || null : (LS.get('ofmUsed', {}) || {})[ofm_ws()] || null; }
-// points of Money not used yet (2.276.0 A, #3039: they waited behind "More"); 2.418.0 (#3560): they start under "Hidden" of
-// the menu's editor instead (nav_defHid), until used or brought back by hand
-// 2.380 F (#3411): a point of Money nobody needs is switched off under Settings > Functions (need: money.*, office_packs.js OCF_FEATS)
-const OFM_LATER = {cashflow: u => u.invoice || u.receipt || u.fixed, kpi: u => u.invoice, travel: u => u.travel, meals: u => u.meal, subs: u => u.sub};
+// 2.380 F (#3411): every point of Money shows at once; 2.448.0 (#3784): also before its first use, a point nobody needs is
+// switched off under Settings > Functions (need: money.*, office_packs.js OCF_FEATS) or hidden in the menu's editor
 // ---- 2.418.0 (#3560): each person arranges the menus of the areas (navmenu.js draws the editor): the order, the points
 // hidden (only not in the menu: data, function and rights stay, the search finds them) and the points that start hidden but
 // were brought back. User setting nav_menus, json {area: {order, hidden, shown}} (accounts/navmenus.py), the same on phone
@@ -154,10 +153,9 @@ function nav_pref(area) {
   return {order: Array.isArray(m.order) ? m.order : [], hidden: new Set(m.hidden || []), shown: new Set(m.shown || [])};
 }
 const nav_orgOff = (area, key) => { const w = typeof wsCur === 'function' ? wsCur() : ''; return w.startsWith('org:') && (wsOrg(w.slice(4))?.nav_off || []).includes(area + ':' + key); };
-const nav_defHid = (area, key) => { if (area !== 'office' || !OFM_LATER[key]) return false; const u = ofm_used(); return !!u && !OFM_LATER[key](u); };
-// hidden by the person: by hand, or starting hidden and not brought back; the parts hidden in the old sidebar settings
+// hidden by the person: by hand; the parts hidden in the old sidebar settings
 // (sidebar "e:<part>", before 2.418.0) count as hidden too until shown again
-const nav_hid = (area, key) => { const p = nav_pref(area); return p.hidden.has(key) || !p.shown.has(key) && (nav_defHid(area, key) || area !== 'office' && sideHidden('e:' + key)); };
+const nav_hid = (area, key) => { const p = nav_pref(area); return p.hidden.has(key) || !p.shown.has(key) && area !== 'office' && sideHidden('e:' + key); };
 const nav_open = (area, key) => area === 'office' ? S.route?.mod === 'office' && S.route.tab === key || S.route?.mod === key && key !== 'office' : S.route?.mod === key;
 // the menus that can be arranged (the editor: navmenu.js, loaded on the first use)
 const NAV_AREAS = ['office', 'life', 'reading', 'time', 'review', 'ablage'];
@@ -182,13 +180,8 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act="nav-edit"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation(); nav_edit(b.dataset.area);
 }, true);
-// the choices of the "More" of the office (LS ofmAll / ofmSeen, one device, before 2.418.0) move once into the setting
-function nav_legacy() {
-  const all = LS.get('ofmAll', false), seen = LS.get('ofmSeen', null); if (!all && !seen || !S.settings) return;
-  LS.del('ofmAll'); LS.del('ofmSeen');
-  const ks = Object.keys(OFM_LATER).filter(k => all || (seen || []).includes(k)), p = nav_pref('office');
-  if (ks.length && !p.shown.size && !p.hidden.size) { NAV.o.office = {...(NAV.o.office || {}), shown: ks}; const v = JSON.stringify(NAV.o); S.settings.nav_menus = v; api('PATCH', '/api/settings', {nav_menus: v}).catch(() => {}); }
-}
+// the choices of the "More" of the office (LS ofmAll / ofmSeen, one device, before 2.418.0): 2.448.0 (#3784) nothing starts hidden any more
+function nav_legacy() { LS.del('ofmAll'); LS.del('ofmSeen'); }
 // the person's order: named keys first in that order, the others after them in their usual order (rank)
 const nav_sort = (area, xs, key = x => x.key, rank = () => 0) => { const o = nav_pref(area).order, r = x => { const n = o.indexOf(key(x)); return n < 0 ? o.length + rank(x) : n; }; return xs.map((x, i) => [x, i]).sort((a, b) => r(a[0]) - r(b[0]) || a[1] - b[1]).map(a => a[0]); };
 // a tab of the office (OFC_TABS: [key, icon, name, admins only, html, group]) without an entry here joins its group
@@ -201,9 +194,13 @@ const OFR_ORDER = ['pipeline', 'offers', 'invoices', 'gendocs', 'clients', 'cont
 const ofr_rank = i => { const n = OFR_ORDER.indexOf(i.key); return n < 0 ? OFR_ORDER.length : n; };
 // 2.147.0 (#2459): need = a function of the country pack ('books.…'); off in this office = no menu point (office.js ofcFeat)
 const ofm_need = i => !i.need || typeof ofcFeat !== 'function' || ofcFeat(i.need);
+// 2.440.0 (#3609): points the office switched off for everybody (office setting menu_off, Settings > Functions > Menu points):
+// not in the menu, the tiles or the search, a link opens the start page (office.js ofcTab); per workspace like the role (LS ofmOff)
+const ofm_offList = () => (typeof OFC !== 'undefined' && OFC.info ? OFC.info.settings?.menu_off : (LS.get('ofmOff', {}) || {})[ofm_ws()]) || [];
+const ofm_menuOff = k => ofm_offList().includes(k);
 // 2.418.0 (#3560): every point that may show (switched on, the country pack, the rights, not off in the organisation), in
 // the person's order; ofm_items = those in the menu, ofm_hidden = those under "Hidden" of the editor
-const ofm_avail = () => (nav_legacy(), nav_sort('office', ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i) && !nav_orgOff('office', i.key)).sort((a, b) => ofr_rank(a) - ofr_rank(b))));
+const ofm_avail = () => (nav_legacy(), nav_sort('office', ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i) && !nav_orgOff('office', i.key) && !ofm_menuOff(i.key)).sort((a, b) => ofr_rank(a) - ofr_rank(b))));
 const ofm_items = () => ofm_avail().filter(i => !nav_hid('office', i.key) || nav_open('office', i.key));
 const ofm_hidden = () => ofm_avail().filter(i => nav_hid('office', i.key) && !nav_open('office', i.key));
 // the point shown: the office's tab (import sits under Settings; no tab = the start page on a phone, quotations on a computer)
@@ -291,7 +288,7 @@ function ofm_startHtml() {
   if (NAV.edit === 'office') return `<div class="ofmstart">${nav_editSlot('office')}</div>`;
   const head = g => g[0] !== 'money' ? `<h3>${esc(tr(g[2]))}</h3>` : `<h3><button type="button" class="oflgt" data-act="ofm-group" aria-expanded="${!sbb_folded('office:money')}">${ic('chev', 's fcar')}<span>${esc(tr(g[2]))}</span></button></h3>`;
   const fold = g => g[0] === 'money' && sbb_folded('office:money');
-  const norc = typeof bnr_startHtml === 'function' && ofm_adm() ? bnr_startHtml() : '';  // 2.299.0 C (#3192): "12 bookings without a receipt"
+  const norc = typeof bnr_startHtml === 'function' && ofm_adm() && !ofm_menuOff('bank') ? bnr_startHtml() : '';  // 2.299.0 C (#3192): "12 bookings without a receipt"
   return `<div class="ofmstart">${nav_penHtml('office')}${fig}${norc}<div class="ofl">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<section class="oflg${fold(g) ? ' closed' : ''}" data-ofmg="${g[0]}">${head(g)}${fold(g) ? '' : `<div class="oflc">${gi.map(row).join('')}</div>`}</section>` : ''; }).join('')}</div></div>`;
 }
 // ---- the sidebar row of an area. Hidden (Settings > Appearance > Sidebar) while every part is ("e:<route>" of each part,
@@ -474,7 +471,8 @@ function sbb_render(hid) {
 // one history entry, the next ones replace it, so one Back closes the drawer (route() closes it on that entry)
 const SBM = {keep: false, focus: ''};
 // the row is one tab stop of its own (a scrolling region reachable by keyboard; its icons rove with the sidebar)
-const sbm_rowHtml = hid => { const cur = sbb_area(), aw = sbb_aw(); return `<div class="sbmr" role="group" tabindex="0" aria-label="${esc(tr('Areas|nav'))}">${SBB_RAIL.map(r => sbb_btnHtml(r[0], cur, hid, aw)).join('')}</div>`; };
+// 2.442.0 (#3739): --sbmc = columns: never more than two rows (with up to 5 areas one row of the usual width)
+const sbm_rowHtml = hid => { const cur = sbb_area(), aw = sbb_aw(), bs = SBB_RAIL.map(r => sbb_btnHtml(r[0], cur, hid, aw)).filter(Boolean); return `<div class="sbmr" style="--sbmc:${Math.max(Math.ceil(bs.length / 2), Math.min(bs.length, 5))}" role="group" tabindex="0" aria-label="${esc(tr('Areas|nav'))}">${bs.join('')}</div>`; };
 // route() asks once whether this route came from the row (the drawer stays open)
 const sbm_hold = () => { const k = SBM.keep; SBM.keep = false; return k && !!$('#side.open'); };
 function sbm_go(b) {
@@ -510,18 +508,20 @@ function sbb_barHtml() {
   const cur = wsOn() ? wsCur() : 'private', nm = wsName(cur);
   const acct = S.me ? `<button type="button" class="kbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}</button>` : '';
   return `<button type="button" class="kbsw" data-act="sbb-ws" aria-haspopup="menu" aria-label="${esc(APP_NAME + ' · ' + tr('Workspace') + ': ' + nm)}" title="${esc(tr('Switch to'))}"${wsp_attr(cur)}><span class="kbbrand">${logoSvg(28)}${wordSvg()}</span><span class="kbfirm">${cur === 'all' ? ic('grid', 's') : wsp_dot(cur)}<span class="wsn">${esc(nm)}</span>${ic('chev', 's')}</span>${updDot() ? `<span class="kbupd" title="${esc(tr('Update available'))}"></span>` : ''}</button>`
+    + '<div class="fv2bar" role="group"></div>'  // 2.441.0 (#3592): the favourites, only in the free room (favtiles.js fv2_barDraw)
     + `<button type="button" class="kbsrch" data-act="palette" title="${esc(tr('Search and commands'))} (${kbText('Mod+K')})" aria-label="${esc(tr('Search and commands'))}">${ic('search', 's')}<span>${esc(tr('Search'))}</span></button>`
     + `<span class="kbend">${bellBtn()}${netDotHtml()}${acct}</span>`;
 }
 // drawn with the sidebar and with the page's header (the bell's number); only when something changed, the account keeps its <img>
 function sbb_bar() {
   const k = $('#kbar'); if (!k) return;
-  if (!sbb_on()) { if (k.innerHTML) { k.innerHTML = ''; sbb_barLast = ''; } return; }
-  const html = sbb_barHtml(); if (html === sbb_barLast && k.firstChild) return;
+  if (!sbb_on()) { if (k.innerHTML) { k.innerHTML = ''; sbb_barLast = ''; } fv2_barDraw(); return; }
+  const html = sbb_barHtml(); if (html === sbb_barLast && k.firstChild) { fv2_barDraw(); return; }
   sbb_barLast = html; k.setAttribute('aria-label', APP_NAME);
   const old = $('.kbacct', k);
   keepFocus(k, () => setHtml(k, html));
   const nu = $('.kbacct', k); if (old && nu && old !== nu && old.innerHTML === nu.innerHTML && old.title === nu.title) nu.replaceWith(old);
+  fv2_barDraw();
 }
 // the workspace menu of the bar: "Switch to", each company with its own sign (picture / symbol / initial), Private (house),
 // the shown one ticked; then "Add a company" and, while a company is shown, its settings. The switch itself is wsSet.

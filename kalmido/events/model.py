@@ -6,7 +6,7 @@ import secrets
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from dateutil.rrule import rrulestr
-from flask import has_request_context
+from flask import g, has_request_context
 
 from ..core.config import PUBLIC_URL, TZ
 from ..core.pg import insert_id, system_ctx
@@ -788,8 +788,12 @@ def ev_store(c, uid, cal_id, f, eid=None, uid_=None, href=None, attendees=None, 
     retime = old is None or any(k in f and str(old[k] or "") != str(r[k] or "") for k in timing)
     a, b_ = ev_span_days(r)
     c.execute("UPDATE events SET first_day=?, last_day=? WHERE id=?", (a, b_, eid))
+    was = {x[0] for x in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL", (eid,))} if old is not None else set()
     if attendees is not None:
         att_set(c, eid, attendees, r)
+    what = ev_change_what(old, r) if old is not None else None  # 2.367.2 (#2969): whoever stayed invited hears of it (new ones: the invitation)
+    if what:
+        ev_tell(c, r, what, was)
     if retime and ("start" in f or "reminders" in f or "rrule" in f):
         c.execute("DELETE FROM ev_reminded WHERE event_id=?", (eid,))
     cal_touch(c, r["cal_id"])
@@ -880,10 +884,72 @@ def att_set(c, eid, rows, r=None):
             news_add(c, a["user_id"], "evinvite", data={"event_id": eid, "title": r["title"][:200], "start": r["start"],
                                                          "all_day": bool(r["all_day"])}, row="assign")
             invite_push(c, a["user_id"], r)
+    gone = set(old) - {a["user_id"] for a in rows}  # 2.367.2 (#2969): off the list (who had declined does not wait for it)
+    ev_tell(c, r, "removed", {u for u in gone if old[u]["partstat"] != "declined"}, attending=False)
     evi_restore(c, eid, keep)
 
 
 EV_INVITE_PUSH_HOUR = 10  # 2.148.1 D (#2495): invitation pushes from one person to another per hour
+EV_CHANGE_PUSH_HOUR = 20  # 2.367.2 (#2969): change pushes from one person to another per hour (News still list them)
+EV_CHANGE_PUSH_GAP = 60   # one push per event and person in this many seconds (dragging an event around)
+
+
+def ev_change_what(old, r):
+    """2.367.2 (#2969): what changed for the people invited: cancelled | occ | time | place, None = nothing they wait for.
+    Overrides are compared by their content (a device writes the same ones back in another form)."""
+    ovs = lambda x: sorted((str(o.get("rid")), str(o.get("start")), str(o.get("end")), str(o.get("location")), str(o.get("status"))) for o in ov_list(x))
+    ex = lambda x: {y for y in (x["exdates"] or "").split(",") if y}
+    if r["status"] == "cancelled":
+        return "cancelled" if old["status"] != "cancelled" else None
+    if ex(r) - ex(old):
+        return "occ"
+    if any(str(old[k] or "") != str(r[k] or "") for k in ("start", "end", "all_day", "rrule")) or ex(r) != ex(old) or ovs(old) != ovs(r):
+        return "time"
+    return "place" if (old["location"] or "") != (r["location"] or "") else None
+
+
+def ev_tell(c, r, what, among=None, attending=True):
+    """2.367.2 (#2969): News + push (row "assign", like the invitation) to the people of the server invited to event r:
+    among = only these; attending = only who still is on the list and did not decline."""
+    from ..agents.core import agent_ids
+    from ..collab.news import news_add
+    u = g.get("user") if has_request_context() else None
+    actor = u["id"] if u else None
+    who = set(among) if among is not None else None
+    if attending:
+        have = {x[0] for x in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL AND partstat<>'declined'", (r["id"],))}
+        who = have if who is None else who & have
+    if not who:
+        return
+    k = c.execute("SELECT org_id FROM ev_cals WHERE id=?", (r["cal_id"],)).fetchone()
+    bots = agent_ids(c)
+    for uid in sorted(who - bots - {actor}):
+        if k and ev_att_ok(c, uid, k["org_id"]):
+            news_add(c, uid, "evchange", actor=actor or 0, row="assign", data={
+                "event_id": r["id"], "title": r["title"][:200], "start": r["start"], "all_day": bool(r["all_day"]), "what": what})
+            ev_change_push(c, uid, r, what, actor)
+
+
+def ev_change_push(c, uid, r, what, actor):
+    from ..api.common import hit_limit
+    from ..collab.comments import lang_of
+    from ..collab.news import notif_ok
+    from ..notify.push import push_prio
+    if not has_request_context():
+        return
+    s = usettings(c, uid)
+    if not notif_ok(c, uid, s, "assign", "push"):
+        return
+    if hit_limit(f"evc1:{r['id']}:{uid}", 1, EV_CHANGE_PUSH_GAP) or hit_limit(f"evcp:{actor}:{uid}", EV_CHANGE_PUSH_HOUR, 3600):
+        return
+    lg = lang_of(s)
+    t = r["title"]
+    title = {"time": tr("Time changed: {0}", t, lg=lg), "place": tr("Place changed: {0}", t, lg=lg), "cancelled": tr("Cancelled: {0}", t, lg=lg),
+             "occ": tr("One date cancelled: {0}", t, lg=lg), "removed": tr("You are no longer invited: {0}", t, lg=lg)}[what]
+    detail = (r["location"] or tr("No place", lg=lg)) if what == "place" else when_text(r, lg)
+    name = user_names(c, [actor]).get(actor) if actor else None
+    g.setdefault("pushes", []).append((uid, title, " · ".join(x for x in (detail, name) if x),
+                                       f"{PUBLIC_URL}/#ev/{r['id']}" if what in ("time", "place", "occ") else f"{PUBLIC_URL}/#calendar", push_prio(s)))
 
 
 def invite_push(c, uid, r):
@@ -919,6 +985,7 @@ def ev_delete(c, r):
     who_note("event.deleted", "event", r["id"])  # 2.115.0 A (#2061)
     cal_touch(c, r["cal_id"])
     bump(c)
+    ev_tell(c, r, "cancelled")  # 2.367.2 (#2969): the people of the server invited to it
 
 
 def is_occ(r, occ):

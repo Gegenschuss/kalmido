@@ -501,8 +501,8 @@ def openapi_spec():
         "WaitingInput": {"type": "object", "additionalProperties": False, "properties": {
             "note": {"type": "string", "maxLength": WAIT_NOTE_MAX}, "until": nul("string", format="date", description="Follow-up day (reminder, News, agent event followup_due)")}},
         "Notifications": {"type": "object", "properties": {
-            "events": {"type": "object", "description": "Per event: news (null = the event has no News) and push. Events: " + ", ".join(NOTIF_ROWS),
-                       "additionalProperties": {"type": "object", "properties": {"news": nul("boolean"), "push": {"type": "boolean"}}}},
+            "events": {"type": "object", "description": "Per event: news (null = the event has no News) and push (null = the event has no push). Events: " + ", ".join(NOTIF_ROWS),
+                       "additionalProperties": {"type": "object", "properties": {"news": nul("boolean"), "push": nul("boolean")}}},
             "lists": {"type": "object", "description": "Project id -> bell (projects on default are left out)",
                       "additionalProperties": {"type": "string", "enum": list(BELL_MODES)}},
             "custom": {"type": "object", "description": "Project id -> the own event choice of projects on custom (events: "

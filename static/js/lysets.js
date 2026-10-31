@@ -190,14 +190,15 @@ function lyv_manage(v) {
   const draw = () => {
     if (!md.isConnected) return;
     const rows = lyv_rows(key), n = rows.length;
-    $('.lyvlist', md).innerHTML = rows.length ? rows.map((r, i) => `<div class="lyvrow" role="listitem" data-id="${r.id}"><span class="lyvrn">${esc(r.name)}${r.active ? ` <small class="muted">${tr('active')}</small>` : ''}</span>
-      <button type="button" class="iconbtn" data-lyvm="up" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + r.name)}">${ic('up', 's')}</button>
-      <button type="button" class="iconbtn" data-lyvm="down" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + r.name)}">${ic('down', 's')}</button>
+    $('.lyvlist', md).innerHTML = rows.length ? rows.map((r, i) => `<div class="lyvrow" role="listitem" data-id="${r.id}">${rowd_grip('lyv')}<span class="lyvrn">${esc(r.name)}${r.active ? ` <small class="muted">${tr('active')}</small>` : ''}</span>
+      ${rowd_arrows(`<button type="button" class="iconbtn" data-lyvm="up" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + r.name)}">${ic('up', 's')}</button>
+      <button type="button" class="iconbtn" data-lyvm="down" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + r.name)}">${ic('down', 's')}</button>`)}
       <button type="button" class="iconbtn" data-lyvm="ren" aria-label="${esc(tr('Rename') + ': ' + r.name)}" title="${esc(tr('Rename'))}">${ic('edit', 's')}</button>
       <button type="button" class="iconbtn" data-lyvm="del" aria-label="${esc(tr('Delete') + ': ' + r.name)}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></div>`).join('')
       : `<p class="muted">${esc(tr('No saved arrangements yet.'))}</p>`;
   };
   draw();
+  rowd_attach(md, {kind: 'lyv', row: '.lyvrow', move: (from, to, r) => lyv_move(+r.dataset.id, to - from, draw)});  // 2.456.0 (#3837)
   md.addEventListener('click', e => {
     const b = e.target.closest('[data-lyvm]'); if (!b) return;
     const w = b.dataset.lyvm, id = +b.closest('[data-id]')?.dataset.id;

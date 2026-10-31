@@ -773,16 +773,19 @@ noted in the server log).
 
 ## Joining an organisation needs your yes
 
-*Since 2.148.1.*
+*Since 2.148.1, for new addresses too since 2.453.*
 
 An organisation admin who adds an existing account (by e-mail address under *Settings > Workspaces*, or with *Invite by
 e-mail*) no longer makes the person a member at once: the person gets an invitation in their News (*X invites you to join
 the organisation Y*, no push) and chooses *Join*, *Later* or *Decline the invitation*. Only after *Join* are they a member
 in the chosen role. An open invitation ends after two weeks; inviting again renews it. The answer to the admin is the same
 for every address (with or without an account), so nobody learns through it who has an account. The instance admin still
-adds people directly. A new address (without an account) works as before: a new account in the organisation and the
-invitation mail; the link to choose a password goes only by e-mail, an organisation admin never sees it (also not when the
-mail failed); *Resend* works three times a day per invitation.
+adds people directly (on a hosted instance the operator invites, too). A new address (without an account) gets a new account
+and the invitation mail; the link to choose a password goes only by e-mail, an organisation admin never sees it (also not when
+the mail failed); *Resend* works three times a day per invitation. Since 2.453 such a person also joins only with *Join*
+(the invitation is in their News after they chose a password), so the member list looks the same for both. The link lasts
+as long as the invitation, two weeks, and *Resend* renews both; whoever sets the password late still has two weeks to answer.
+Accounts invited before stay members.
 
 Related changes in the same release:
 

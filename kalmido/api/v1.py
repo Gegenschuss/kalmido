@@ -13,10 +13,10 @@ from flask import g, has_request_context, jsonify, request, Response
 
 from ..core.config import API_PREFIX, app, APP_NAME, APP_VERSION, PUB_PREFIX, TZ
 from ..core.pg import insert_id, like_escape, st_ids, system_ctx
-from ..core.i18n import N_, tr
+from ..core.i18n import lang, N_, tr
 from ..core.numtext import user_num
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, test_seconds, uset, usettings
-from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, FAIL_WINDOW, client_ip, me, rate_ip
+from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, FAIL_WINDOW, client_ip, me, rate_ip
 from ..accounts.login import twofa_methods
 from ..core.access import collab_all, Denied, list_role, my_inbox, need_collab, need_list, need_task, need_time, time_all, token_lists, tvis, vis_sql
 from ..core.serializers import load_tasks
@@ -1678,19 +1678,36 @@ def v1_admin_orgs_activity():
     return jsonify(org_activity(db()))
 
 
+def err_page(code, title, text):
+    """2.447.0 (#3761): the error page of a browser in the visitor's language (lang()): the figure, the text, a way back."""
+    from ..lists.public import BOT_ERROR, pub_html
+    return pub_html(title, f'<div class="msg">{BOT_ERROR}<h1>{html.escape(title)}</h1><p>{html.escape(text)}</p><p><a class="btn" href="/">'
+                    f'{html.escape(tr("Open {0}", APP_NAME))}</a></p></div>', lang(), code, foot=False)
+
+
+def wants_page():
+    return "text/html" in (request.headers.get("Accept") or "") and not request.path.startswith(("/static/", "/api/"))
+
+
+@app.errorhandler(400)
+def bad_request(e):
+    """2.447.0 (#3761): JSON for /api/*, a page in the visitor's language for a browser, Flask's page only for other clients."""
+    if request.path.startswith(API_PREFIX):
+        return v1_err(400, tr("Bad request"))
+    if request.path.startswith("/api/"):
+        return err(tr("Bad request"), 400)
+    return err_page(400, tr("Bad request"), tr("Please go back and try again.")) if wants_page() else e
+
+
 @app.errorhandler(404)
 def not_found(e):
-    from ..lists.public import BOT_ERROR, pub_gone, pub_html
+    from ..lists.public import pub_gone
     if request.path.startswith(API_PREFIX):
         return v1_err(404, tr("Not found"))
     if request.path.startswith(PUB_PREFIX):
         return pub_gone()
     if request.method == "GET" and "text/html" in (request.headers.get("Accept") or "") and not request.path.startswith("/static/"):
-        lg = _accept_lang()  # 2.14.0: a page that does not exist: the figure (2.136.0: the bot) + a way back (no user data, like /s/)
-        r = pub_html(tr("Page not found", lg=lg), f'<div class="msg">{BOT_ERROR}<h1>{html.escape(tr("Page not found", lg=lg))}</h1>'
-                     f'<p>{html.escape(tr("This address does not exist.", lg=lg))}</p><p><a class="btn" href="/">'
-                     f'{html.escape(tr("Open {0}", APP_NAME, lg=lg))}</a></p></div>', lg, 404, foot=False)
-        return r
+        return err_page(404, tr("Page not found"), tr("This address does not exist."))  # 2.14.0: the figure (2.136.0: the bot) + a way back (no user data, like /s/)
     if request.path.startswith("/api/"):  # 2.359.0 A (#3023): JSON, never Flask's HTML page (the client took it for "session expired")
         return err(tr("Not found"), 404)
     return e
@@ -1702,22 +1719,27 @@ def not_allowed(e):
         return v1_err(405, tr("Method not allowed"))
     if request.path.startswith("/api/"):  # 2.359.0 A (#3023)
         return err(tr("Method not allowed"), 405)
+    if wants_page():  # 2.447.0 (#3761)
+        r = err_page(405, tr("Method not allowed"), tr("Please go back and try again."))
+        r.headers["Allow"] = ", ".join(e.valid_methods or ())
+        return r
     return e
 
 
 @app.errorhandler(500)
 def server_error(e):
     """2.359.0 A (#3023): an error nobody caught answers /api/* with JSON (the client keeps the change and sends it again
-    later); every other address keeps Flask's page. Flask has logged the exception already."""
+    later); 2.447.0 (#3761): a browser gets a page in its language, other clients Flask's page. Flask has logged the exception already."""
     if request.path.startswith(API_PREFIX):
         return v1_err(500, tr("Server error, please try again later"))
     if request.path.startswith("/api/"):
         return err(tr("Server error, please try again later"), 500)
-    return e
+    return err_page(500, tr("Something went wrong"), tr("Server error, please try again later")) if wants_page() else e
 
 
 if os.environ.get("KALMIDO_TEST") == "1":  # test containers only (tests/start.sh): an uncaught error on purpose
     @app.route("/api/test/boom", methods=["GET", "POST", "PATCH"])
+    @app.route("/test/boom", methods=["GET"])
     def _test_boom():
         raise RuntimeError("test: uncaught error on purpose")
 

@@ -18,6 +18,9 @@ check(/qn\(toastClip\(t\.title\)\)/.test(und), '#2801: swipe / tick message cuts
 check(/#toast\.one>span\{display:-webkit-box;[^}]*line-clamp:2/.test(app), '#2801: up to two lines');
 check(/addEventListener\('hashchange'[^]*?dataset\.page/.test(ev) && /dataset\.page = undo && !label \? toastPage\(\) \|\| '#' : ''/.test(ev), '#2801: undo message ends with its page');  // 2.350.0 D (#3242): an empty hash is '#'
 check(/\^#t\\\//.test(ev.slice(ev.indexOf('function toastPage'))), '#2801: an open detail is not another page');
+// --- #3840 (2.453.0): the message is as wide as its content (up to the screen minus margin), words are not split mid-word
+check(/#toast\{[^}]*width:max-content;max-width:calc\(100vw - 2rem\)/.test(app), '#3840: toast is max-content wide, capped to the screen');
+check(/#toast\.one>span\{display:-webkit-box;[^}]*overflow-wrap:break-word/.test(app) && !/#toast[^{]*\{[^}]*overflow-wrap:anywhere/.test(app), '#3840: toast text breaks at words, not mid-word');
 // --- #2805
 const off = rd('static/css/office.css'), od = rd('static/js/office_docs.js'), pp = rd('static/js/popovers.js');
 check(/\.ofdkinds button\{min-height:2\.75rem\}/.test(off), '#2805: document kind tabs 2.75rem on phones');

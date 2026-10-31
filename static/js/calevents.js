@@ -51,7 +51,7 @@ async function evPop(anchor, e) {
     <div class="cevm">${ic('clock', 's')}<span>${esc(evWhen(e))}</span></div>
     ${e.recurring ? `<div class="cevm">${ic('repeat', 's')}<span>${esc(repeatLabel(ev.rrule) || tr('Repeats'))}${e.changed ? ' · ' + esc(tr('this date changed')) : ''}</span></div>` : ''}
     ${e.location ? `<div class="cevm">${ic('mappin', 's')}<span>${esc(e.location)}</span></div>` : ''}
-    <div class="cevm">${ic('cal', 's')}<span>${esc(evCalName(e))}${w ? '' : ' · ' + esc(tr('read-only'))}</span></div>
+    <div class="cevm">${ic('cal', 's')}<span>${esc(evCalName(e))}${w ? '' : ' · ' + esc(tr('read-only'))}</span>${cvxTodayBtn(e)}</div>
     ${att.length ? `<div class="cevm evatt">${ic('users', 's')}<span>${att.slice(0, 8).map(a => `<span class="evap ps-${esc(a.partstat)}" title="${esc(tr(EV_PS_WORD[a.partstat] || ''))}">${esc(a.name || a.email)}</span>`).join(', ')}${att.length > 8 ? ' …' : ''}</span></div>` : ''}
     ${ev.reminders?.length ? `<div class="cevm">${ic('bell', 's')}<span>${esc(ev.reminders.map(m => evRemLabel(m, ev.all_day)).join(', '))}</span></div>` : ''}
     ${desc ? `<div class="cevdesc">${cevLinkify(desc)}</div>` : ''}
@@ -508,6 +508,8 @@ function davGuide() {
 function evNewsText(it, who, q) {
   const d = it.data || {};
   if (it.kind === 'evinvite') return tr('{0} invited you: {1}', who, q(d.title || ''));
+  if (it.kind === 'evchange') return {time: tr('{0} changed the time of {1}', who, q(d.title || '')), place: tr('{0} changed the place of {1}', who, q(d.title || '')),  // 2.367.2 (#2969)
+    cancelled: tr('{0} cancelled {1}', who, q(d.title || '')), occ: tr('{0} cancelled one date of {1}', who, q(d.title || '')), removed: tr('{0} took you off the guest list of {1}', who, q(d.title || ''))}[d.what] || '';
   if (it.kind === 'evshare') return d.role === 'edit' ? tr('{0} shared the calendar {1} with you', who, q(d.name || '')) : tr('{0} shared the calendar {1} with you (view only)', who, q(d.name || ''));
   return '';
 }

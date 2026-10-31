@@ -47,6 +47,7 @@ from ..core.i18n import LANGS, N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, local_now, now_utc
 from ..core.retention import ret_on, ret_report  # 2.272.0 A (#3026)
 from ..core.access import Denied
+from ..core.errors import DeniedKey
 from ..core.orgcrypt import oc_read_file, oc_write_file
 from .model import office_gate, office_org, office_role, office_settings, office_settings_lock, office_settings_save
 from .doclang import doc_lg
@@ -279,7 +280,7 @@ def agb_mail_files(c, oid, r, b, files):
                 break
         if joined:
             if sum(len(f[1]) for f in out) > AGB_MAIL_MAX_MB * 1024 * 1024:
-                raise Denied(413, tr("The attachments are too large for one mail (at most {0} MB)", AGB_MAIL_MAX_MB))
+                raise DeniedKey(413, N_("The attachments are too large for one mail (at most {0} MB)"), AGB_MAIL_MAX_MB)
             return out, agb_doc_terms(c, oid, r)
     want = b.get("terms")
     want = r["kind"] == "offer" if want is None else want in (1, True, "1", "true")
@@ -288,12 +289,15 @@ def agb_mail_files(c, oid, r, b, files):
     if not a:
         return files, None
     if sum(len(f[1]) for f in files) + len(a[1]) > AGB_MAIL_MAX_MB * 1024 * 1024:
-        raise Denied(413, tr("The attachments are too large for one mail (at most {0} MB)", AGB_MAIL_MAX_MB))
+        raise DeniedKey(413, N_("The attachments are too large for one mail (at most {0} MB)"), AGB_MAIL_MAX_MB)
     return list(files) + [a], t
 
 
 def agb_public(meta):
-    return {k: meta.get(k) for k in ("date", "sha256", "name", "bytes", "uploaded_at")} if meta else None
+    if not meta:
+        return None
+    from ..files.scan import sc_size_mark
+    return {**{k: meta.get(k) for k in ("date", "sha256", "name", "bytes", "uploaded_at")}, "up": sc_size_mark(int(meta.get("bytes") or 0))}  # 2.453.0 (#3781)
 
 
 def agb_clean_name(v):

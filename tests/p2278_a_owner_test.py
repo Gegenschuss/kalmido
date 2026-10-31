@@ -7,6 +7,9 @@ Invented names only.
  - #3095: dave (admin of Gamma, no member of Alpha) imports alice's archive into Gamma: the preview names the roles of the
    file (bob admin, carol member); the ticked existing accounts are NOT added but invited with the confirmed role (an
    unknown role = member); their rows stay with dave, no project is shared with them; bob accepts and is admin.
+ - 2.363.0 (#3132): the ticked projects are noted on the invitation (a resend keeps them), accepting shares them, owner and
+   creator stay with dave; a project in the trash is skipped; declining drops the note.
+ - 2.456.0 (#3821): the former owner of a project is no row of list_members and gets it shared all the same.
  - P4: a person without organisation imports the same archive into the private space: nobody is invited, the ticked
    person gets the projects shared as before.
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY.
@@ -15,6 +18,7 @@ usage: p2278_a_owner_test.py <datadir>"""
 # tenant-matrix: own
 import base64
 import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -88,8 +92,8 @@ def opened(s, data, rk):
     return iid, j.get("preview") or {}
 
 
-def run(s, iid, target, people=None):
-    r = s.post(B + f"/api/account/import/{iid}/run", json={"target": target, "people": people or {}})
+def run(s, iid, target, people=None, **more):
+    r = s.post(B + f"/api/account/import/{iid}/run", json={"target": target, "people": people or {}, **more})
     check(r.status_code == 202, f"run starts {r.status_code} {r.text[:200]}")
     return wait(s, iid)
 
@@ -125,6 +129,11 @@ assert r.ok, r.text
 ERIN = r.json()["id"]
 assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": "erin@example.com", "role": "admin"}).ok
 assert A.patch(B + f"/api/users/{ERIN}", json={"email": ""}).ok
+# 2.360.2 (#2561): gina is in the file, not on the server any more when dave imports: a missing person who gets invited
+r = A.post(B + "/api/users", json={"username": "gina", "display_name": "Gina Fehlt", "password": "password123", "email": "gina@example.com"})
+assert r.ok, r.text
+GINA = r.json()["id"]
+assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": "gina@example.com", "role": "admin"}).ok
 r = A.post(B + "/api/admin/orgs", json={"name": "Gamma Ziel", "admin_id": DAVE})
 assert r.status_code == 201, r.text
 GAMMA = r.json()["id"]
@@ -145,6 +154,8 @@ check(Bo.post(B + "/api/tasks", json={"title": "Aufgabe von Bob", "list_id": L})
 # 2.305 (#2880): the export takes only the projects the exporting admin sees -> bob shares his project with alice
 dbx("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')",
     (L, ALICE, "edit", "edit"))
+dbx("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,0,'2026-01-01T00:00:00+00:00')",
+    (L, CAROL, "edit", "edit"))  # 2.363.0 (#3132)
 
 # ---------------------------------------------------------------- #3093: the archive belongs to its starter
 P = f"/api/orgs/{ORG}/export"
@@ -190,7 +201,58 @@ check(NL and one("SELECT created_by FROM tasks WHERE list_id=? AND title='Aufgab
 check(NL and not one("SELECT 1 FROM list_members WHERE list_id=? AND user_id IN (?,?,?)", (NL, ALICE, BOB, CAROL)), "no project shared with the invited")
 check(Bo.post(B + f"/api/orgs/{GAMMA}/join").ok, "bob accepts the invitation")
 check(one("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (GAMMA, BOB)) == "admin", "bob: member of Gamma as admin")
+check(one("SELECT role FROM list_members WHERE list_id=? AND user_id=?", (NL, BOB)) == "edit" and one("SELECT owner_id FROM lists WHERE id=?", (NL,)) == DAVE,
+      "#3821: bob, the project's owner in the file, gets it shared like the members; the owner stays dave")
+# 2.363.0 (#3132): the ticked projects are noted on the invitation and shared on accepting
+PEND = one("SELECT pending_lists FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, ALICE)) or ""
+check(json.loads(PEND or "[]") == [[NL, "edit", DAVE]], f"#3132: the ticked project is noted with its role and the importing admin {PEND}")
+JID = one("SELECT id FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, ALICE))
+REF = next(x["ref"] for x in Dv.get(B + f"/api/orgs/{GAMMA}/invites").json()["invites"] if x.get("email") == "alice@example.com")
+r = Dv.post(B + f"/api/orgs/{GAMMA}/invites/{REF}/resend")
+check(r.ok and one("SELECT pending_lists FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, ALICE)) == PEND, f"#3132: sending the invitation again keeps the note {r.status_code} {r.text[:120]}")
+GONE = Dv.post(B + "/api/lists", json={"name": "Im Papierkorb", "org_id": GAMMA}).json()["id"]
+MOVED = Dv.post(B + "/api/lists", json={"name": "Weitergegeben", "org_id": GAMMA}).json()["id"]
+dbx("UPDATE lists SET deleted_at='2026-01-01T00:00:00+00:00' WHERE id=?", (GONE,))
+dbx("UPDATE lists SET owner_id=? WHERE id=?", (BOB, MOVED))
+dbx("UPDATE org_joins SET pending_lists=? WHERE id=?", (json.dumps([[NL, "edit", DAVE], [GONE, "edit", DAVE], [MOVED, "edit", DAVE], [999999, "edit", DAVE]]), JID))
+r = A.post(B + f"/api/orgs/{GAMMA}/join")
+check(r.ok and r.json().get("shared") == 1 and one("SELECT role FROM list_members WHERE list_id=? AND user_id=?", (NL, ALICE)) == "edit",
+      f"#3132: accepting shares the noted project in its role {r.status_code} {r.text[:200]}")
+check(not one("SELECT 1 FROM list_members WHERE user_id=? AND list_id IN (?,?)", (ALICE, GONE, MOVED)), "#3132: a project in the trash or handed on is not shared")
+check(one("SELECT owner_id FROM lists WHERE id=?", (NL,)) == DAVE and one("SELECT created_by FROM tasks WHERE list_id=? AND title='Aufgabe von Bob'", (NL,)) == DAVE,
+      "#3132: owner and creator stay with the importing admin")
+r = Ca.delete(B + f"/api/orgs/{GAMMA}/join")
+check(r.ok and not one("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, CAROL)) and not one("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (NL, CAROL)),
+      f"#3132: declining drops the note, nothing is shared {r.status_code}")
 Dv.delete(B + f"/api/account/import/{iid}")
+
+# ---------------------------------------------------------------- 2.360.2 M (#2561): a NEW account joins by accepting, too
+dbx("DELETE FROM org_members WHERE user_id=?", (GINA,))
+dbx("DELETE FROM users WHERE id=?", (GINA,))
+dbx("UPDATE users SET is_admin=1 WHERE id=?", (DAVE,))  # missing people are invited by instance admins
+iid, pv = opened(Dv, OX, RK)
+j = run(Dv, iid, GAMMA, people={EH("gina@example.com"): {"invite": True, "email": "gina@example.com", "role": "admin"}}, again=True)
+st = {p.get("name"): p.get("state") for p in (j.get("result") or {}).get("people", [])}
+check(j.get("state") == "done" and st.get("Gina Fehlt") == "org_invited", f"the new person is invited {st} {j.get('error')}")
+NG = one("SELECT id FROM users WHERE lower(email)='gina@example.com'")
+check(NG and not one("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (GAMMA, NG)), "a new account, no member yet")
+check(one("SELECT role FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, NG)) == "admin", "the invitation with the confirmed role")
+iv = {x["email"]: x for x in Dv.get(B + f"/api/orgs/{GAMMA}/invites").json()["invites"]}
+check(iv.get("gina@example.com", {}).get("state") == "invited" and iv["gina@example.com"]["user_id"] is None, f"the admin sees it in the open invitations {iv}")
+check(not one("SELECT 1 FROM list_members WHERE user_id=?", (NG,)), "no project shared before the person accepts")
+IMP = one("SELECT max(id) FROM imports WHERE user_id=?", (DAVE,))
+# 2.363.0 (#3132): another admin took the invitation over: it stays, the undone import's notes go
+dbx("INSERT INTO org_joins(org_id,user_id,role,created_by,created_at,pending_lists) VALUES(?,?,'member',?,?,?)",
+    (GAMMA, CAROL, BOB, "2026-10-31T00:00:00+00:00", json.dumps([[1, "edit", DAVE], [2, "edit", BOB]])))
+CR = json.loads(one("SELECT created FROM imports WHERE id=?", (IMP,)))
+CR["org_joins"].append([GAMMA, CAROL])
+dbx("UPDATE imports SET created=? WHERE id=?", (json.dumps(CR), IMP))
+r = Dv.post(B + f"/api/imports/{IMP}/undo")
+check(r.ok, f"the import is undone {r.status_code} {r.text[:200]}")
+check(not one("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, NG)), "the undo withdraws the invitation")
+check(json.loads(one("SELECT pending_lists FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, CAROL)) or "[]") == [[2, "edit", BOB]], "#3132: the undo drops only its own notes")
+Dv.delete(B + f"/api/account/import/{iid}")
+dbx("UPDATE users SET is_admin=0 WHERE id=?", (DAVE,))
 
 # ---------------------------------------------------------------- P4: a person without organisation, into the private space
 FID, Fr = freelancer(B, A)

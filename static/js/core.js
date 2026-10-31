@@ -60,6 +60,11 @@ function parseNum(v, frac) {
   const n = parseFloat(sign + s); return Number.isFinite(n) ? n : null;
 }
 // a typed number for a request body: '' = null, a number = the number, anything else = the text (the server names the field)
+// 2.450.0 (#3770): a stored number as the text of an input field in the app language, without groups ("1234,5"); parseNum reads it back
+const numField = (v, d = 6, min = 0) => v == null || v === '' ? '' : Number.isFinite(+v) ? (+v).toLocaleString(LOCALE(), {useGrouping: false, minimumFractionDigits: min, maximumFractionDigits: d}) : String(v);
+// 2.450.0 (#3770): ONE order for names, tags and titles: the app language's (Spanish ñ after n, Swedish ä at the end), never a fixed one
+const cmpColl = {};
+const cmpText = (a, b) => (cmpColl[LOCALE()] ||= new Intl.Collator(LOCALE())).compare(String(a ?? ''), String(b ?? ''));
 const numBody = v => { const t = String(v ?? '').trim(); if (!t) return null; const n = parseNum(t); return n == null ? t : n; };
 // weekday / month names + date patterns come from the language file (i18n.js: WD, WDL, MON, MONS, fmtDay), weeks still start on Monday
 const WD_MO = () => [1, 2, 3, 4, 5, 6, 0].map(i => WD[i]);  // calendar header, Monday first
@@ -156,7 +161,7 @@ const updDot = () => !!(S.me?.is_admin && S.about?.available);
 const modOn = m => m === 'tasks' || m === 'home' || m === 'msv' || m === 'notes' || m === 'tags' || (m === 'team' ? teamOn() : m === 'agents' ? agentsTab() : m === 'news' ? collab() : m === 'overview' ? overviewOn() : m === 'time' ? timeOn() : m === 'family' ? feat(m) || !!S.me?.kid : m === 'life' ? lifeOn() : m === 'bookmarks' ? feat('reading') : m === 'workload' ? workloadOn() : m === 'office' ? officeOn() : m === 'ablage' ? ab_on() : m === 'docs' ? typeof viewDocs === 'function' && feat('docs') : feat(m));  // 2.48.0 (#1207, #1111); 2.97.0 A (#1950): bookmarks = module reading
 // no "+" button on views without tasks
 // views of the tasks module that are not a task list (no quick add, no selection, no open-count)
-const NOLIST_KEYS = ['done', 'trash', 'search', 'archived', 'projects'];  // 2.417.0 A (#3559): + the start page of Projects
+const NOLIST_KEYS = ['done', 'trash', 'search', 'archived', 'projects', 'favorites'];  // 2.417.0 A (#3559): + the start page of Projects
 // 2.0.6 (#188): tablets in portrait (phone layout, but >= 600 x 600 px) get the docked composer of the desktop instead of
 // the "+" button wherever a view has one; phones keep the "+"
 // 2.19.0 (#669, a regression of 2.7.2): the tablet layout with the docked "Add task" bar (600-899 px wide, 600 px high) is
@@ -344,6 +349,8 @@ function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.sta
 // offline get a negative temp id that is mapped to the real id during replay. The last server state is
 // cached for offline start. Every queued op carries the user id: ops of another user are never replayed.
 class Offline extends Error {}
+const ML_WAITS = N_('The task was moved meanwhile: it is shown in that project again if it moves back within 24 hours.');  // 2.363.3 (#3133): POST .../links answers link_waits
+const MO_KEPT = N_('Your order of My tasks was changed on another device: that order stays, this change was not applied.');  // 2.363.3 (#3133): PUT /api/tasks/mine-order answers order_kept
 // 2.306.0 B (#2889): the session ended (401 / the login proxy's page): the stored state of the account (cache, tabs, chat
 // windows, session keys) goes like at logout, so the next person on this browser does not find it. Changes still waiting
 // to be sent (outbox, conflicts) keep everything as before: they go out after the next login of the same account.
@@ -486,18 +493,20 @@ function wkoDrop() {
   return new Promise(ok => { try { const r = indexedDB.deleteDatabase('kalmido-wiki'); r.onsuccess = r.onerror = r.onblocked = () => ok(); } catch { ok(); } });
 }
 function outDrop() { LS.del('outbox'); if (OBX.on) return obxClear(); for (const o of OUT.q) o.done = true; OUT.q = []; return Promise.resolve(); }
+function startDrop() { LS.del('cache'); S.lpCache = null; }
 const wkoOld = m => !m || !(Date.now() - Date.parse(m.at) < WKO_MAX_AGE);
 function sessGuard(me) {
   if (!me) return;
   const m = LS.get('wko', null);
-  if (wkoOld(m) || m.g !== (me.sgen || '')) { wkoDrop(); LS.set('wko', {g: me.sgen || '', at: new Date().toISOString()}); }
+  if (wkoOld(m) || m.g !== (me.sgen || '')) { wkoDrop(); startDrop(); LS.set('wko', {g: me.sgen || '', at: new Date().toISOString()}); }
   const ids = (me.workspaces || []).map(w => w.id), was = LS.get('orgIds', null);
   if (Array.isArray(was) && was.some(id => !ids.includes(id))) outDrop();  // removed from an organisation
   LS.set('orgIds', ids);
 }
 // the session is gone (401 / account disabled at /api/state): the knowledge pages' copy goes before the sign-in page.
 // 2.306.0 B (#2889): the outbox stays (authGone keeps what waits; it goes out after the next login of the same account)
-function sessGone() { return Promise.race([wkoDrop(), new Promise(ok => setTimeout(ok, 3000))]); }
+// 2.360.2 (#3226): the offline start state (LS "cache", S.lpCache: all tasks of the last load) goes the same way; load() writes it anew
+function sessGone() { startDrop(); return Promise.race([wkoDrop(), new Promise(ok => setTimeout(ok, 3000))]); }
 function obxSyncReg() { if (OBX.on && navigator.serviceWorker?.ready) navigator.serviceWorker.ready.then(r => r.sync?.register('kalmido-outbox')).catch(() => {}); }
 if (globalThis.navigator?.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data?.type === 'outbox-flush' && OUT.q.length) flush(); });
 // 2.21.0 (#673): before the first render there is no top bar to update (renderTop on an empty state threw, so a start while
@@ -531,13 +540,15 @@ async function rawFetch0(method, url, body, key) {
   if (body instanceof FormData) opt.body = body;
   else if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
   let r;
-  try { r = await fetch(url, opt); } catch { const ch = OUT.down; OUT.down = false; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('offline'); }
+  // 2.363.3 (#3134): a form with files of some size goes with a progress bar and Cancel (upbar.js); Cancel is no lost connection
+  try { r = await (body instanceof FormData && typeof upSend === 'function' && upWanted(body) ? upSend(url, opt, body) : fetch(url, opt)); } catch (e) { if (e.cancelled) throw e; const ch = OUT.down; OUT.down = false; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('offline'); }
   // 2.21.0 (#673): the device is online but the server is not (a proxy answers 502 / 503 / 504 without Kalmido's JSON): the
   // same as offline (cached data, changes wait), the hint says "server not reachable"; never a reload loop on a proxy page
   // 2.24.0 (#907): 503 (the proxy's maintenance page) or a notice of the kind "maintenance": "server in maintenance"
   // 2.359.0 A (#3023): an HTML page with a server error (500, a database restart) the same way (the change waits, no reload)
+  // 2.360.2 L (#2561): the write lock of a key rotation too (JSON for API clients, the header X-Kalmido-Maint marks it)
   const ctype = r.headers.get('content-type') || '';
-  if (([502, 503, 504].includes(r.status) || (r.status >= 500 && ctype.includes('text/html'))) && !ctype.includes('application/json')) { const ch = !OUT.down; OUT.down = true; OUT.maint = r.status === 503 || S.announce?.level === 'maintenance'; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('down'); }
+  if (([502, 503, 504].includes(r.status) || (r.status >= 500 && ctype.includes('text/html'))) && (!ctype.includes('application/json') || r.headers.get('X-Kalmido-Maint'))) { const ch = !OUT.down; OUT.down = true; OUT.maint = r.status === 503 || S.announce?.level === 'maintenance'; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('down'); }
   if (OUT.down) { OUT.down = false; if (S.booted && !OUT.online) renderTop(); }
   setOnline(true);
   // 2.359.0 A (#3023): an HTML 404 / 405 / 4xx (an address without a route, e.g. a temporary id; a proxy's page) is an error
@@ -685,6 +696,9 @@ function enqueue(method, url, body) {
     const q = outSync().find((x, i) => (i > 0 || !OUT.flushing) && !x.sending && x.method === 'PATCH' && x.url === url && !x.done && Object.keys(x.body || {}).filter(k => !k.startsWith('_')).join() === tk[0]);  // 2.126.0 D (#1989): sending = on its way from another tab
     if (q) { outSave(() => { q.body = {...q.body, [tk[0]]: body[tk[0]]}; }); return applyLocal({method, url, body}); }  // 2.143.0 C (#2153): outSave (IndexedDB)
   }
+  // 2.363.3 (#3133): a whole new order of "My tasks" replaces the one still waiting, whose _prev stays the base the server confirmed
+  const mo = method === 'PUT' && url === '/api/tasks/mine-order' && outSync().find((x, i) => (i > 0 || !OUT.flushing) && !x.sending && !x.done && x.url === url);
+  if (mo) { outSave(() => { mo.body = {...mo.body, ids: body.ids}; }); return {ok: true}; }
   const e = {method, url, body, uid: S.me?.id, k: outKey()};
   if (method === 'POST' && (url === '/api/tasks' || /^\/api\/lists\/\d+\/notes$/.test(url))) e.tmp = -Date.now() - Math.floor(Math.random() * 1000);  // 2.143.0 C (#2153): + a note
   outSave(() => OUT.q.push(e));  // 2.126.0 D (#1989)
@@ -792,6 +806,8 @@ async function outFlush() {
           addConflicts(j.id, j.conflicts, j.title);
         }
         if (j && j.skipped) skipped++;
+        if (j?.link_waits) toast(tr(ML_WAITS));  // 2.363.3 (#3133): "also in" sent after a move: kept for the way back
+        if (j?.order_kept) toast(tr(MO_KEPT));  // 2.363.3 (#3133)
         outSave(() => { OUT.q = OUT.q.filter(x => x !== e); });  // 2.126.0 D (#1989): out of the shared queue first
         e.res = j;
       } catch (err) {
@@ -1039,7 +1055,8 @@ function applyState(j) {
   S.clients = j.clients || [];  // 2.23.0 (#463): the clients I see, with their lists
   if (S.booted && typeof OIM !== 'undefined' && OIM.clients && S.route?.mod === 'office' && S.route.tab === 'import') fx8a_oimClients(true);  // 2.80.0 (#1836): the import's client choice too
   if (S.booted && S.route?.mod === 'office' && typeof onumListFresh === 'function') onumListFresh();  // 2.138.0 D (#2256): the document list follows changes made elsewhere
-  if (S.booted && S.route?.mod === 'clients') clReload();  // a change elsewhere: the client's sums again
+  if (S.booted && S.route?.mod === 'clients') ms_clLive();  // a change elsewhere: the client's sums again; 2.431.0 C (#3602): quietly, drawn only when changed
+  if (S.booted && S.route?.mod === 'contacts' && typeof ct_live === 'function') ct_live();  // 2.431.0 C (#3602)
   // 2.50.0 (#1195, #1194); 2.50.1: the shown tab loads again and keeps its rows until the new ones are there (a null
   // without a redraw left absence and booking rows that no longer opened on a tap)
   if (S.booted && S.route?.mod === 'workload') { const t = WLV.tab === 'dispo' && !dp_on() ? 'wl' : WLV.tab, ld = typeof AB2 !== 'undefined'; if (ld && t !== 'abs') AB2.data = null; if (ld && t !== 'dispo') DPV.data = null; if (t !== 'wl') WLV.data = null; if (t === 'wl') wlLoad(); else if (ld) { if (t === 'abs') ab2_load(); else dp_load(); } }  // 2.149.0 F (#2518): absence.js / dispo.js load on demand (not there yet: their stand-in loads and fetches); lazy-ok: ld = the module is loaded
@@ -1339,6 +1356,7 @@ function parseHash() {
   if (a === 't' && b) return {mod: 'tasks', key: S.route.key || START_KEY, task: +b};
   if (a === 'home') return {mod: 'home', key: 'home'};  // 2.17.0 (#475): the dashboard (the logo)
   if (a === 'projects') return {mod: 'tasks', key: 'projects'};  // 2.417.0 A (#3559): the start page of Projects (render.js viewProjStart)
+  if (a === 'favorites') return {mod: 'tasks', key: 'favorites'};  // 2.441.0 (#3592): the page of a phone (favtiles.js viewFavPage)
   if (a === 'team') return {mod: 'team', key: 'team', rid: +b || null};  // 2.17.0 (#419)
   if (a === 'msg' && (b === 'a' || b === 't')) { const p = h.split('/'); return {mod: 'tasks', key: S.route.key || LS.get('lastKey', START_KEY), msg: {art: b, place: +p[2], id: +p[3]}}; }  // 2.37.0 (#1159): link back to a saved message
   if (a === 'notes' && +b) return {mod: 'notes', key: 'notes', lid: +b};  // 2.17.0 (#442)

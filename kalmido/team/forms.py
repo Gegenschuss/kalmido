@@ -13,7 +13,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.pg import insert_id, system_ctx
-from ..core.i18n import lang, LANGS, N_, tr
+from ..core.i18n import browser_lang, lang, N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc, usettings
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
@@ -265,11 +265,7 @@ def _find(c, token):
 def _lang(c, f):
     if g.user:
         return lang(c, g.user["id"])
-    for part in (request.headers.get("Accept-Language") or "").split(","):
-        code = part.split(";")[0].strip().lower()[:2]
-        if code in LANGS:
-            return code
-    return lang(c, f["l_owner"])
+    return browser_lang() or lang(c, f["l_owner"])
 
 
 def _gone(lg=None):

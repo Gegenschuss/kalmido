@@ -17,6 +17,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, db, iso, local_now, now_utc
 from ..core.pg import write_lock
 from ..core.access import Denied
+from ..core.errors import DeniedKey
 from ..personal.timetrack import BadInput
 from .model import office_gate, office_org, office_role
 from .rights import ofr_rights
@@ -73,7 +74,7 @@ def period_need_open(c, oid, *days):
     for d in days:
         m = pl_month(d)
         if m and m <= t:
-            raise Denied(409, tr(PL_LOCKED, pl_label(m)))
+            raise DeniedKey(409, PL_LOCKED, pl_label(m))
 
 
 def _add_month(m, n=1):

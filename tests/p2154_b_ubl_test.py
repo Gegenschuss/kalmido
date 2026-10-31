@@ -133,6 +133,13 @@ m3["recipient"]["customer_no"] = ""
 x3 = ein.ein_ubl_build(m3, "peppol", "9930:DE123456789", "0208:0123456749")
 check(any("R003" in f for f in ein.ein_ubl_check(x3)), "ein_ubl_check names R003 without any reference")
 
+# 2.446.0 (#3783): without Peppol ids the e-mail stands in (EM): not in the Peppol list, XRechnung takes it
+xem = ein.ein_ubl_build(fixture(), "peppol")
+fem = [f for f in ein.ein_ubl_check(xem) if "CL008" in f]
+check(b'schemeID="EM"' in xem and len(fem) == 2 and "BT-34" in fem[0] and "BT-49" in fem[1], f"own check names EM on both sides: {fem}")
+check(any("CL008" in f for f in ein.ein_ubl_check(ein.ein_ubl_build(fixture(), "peppol", "9930:DE123456789"))), "EM of the buyer alone is named")
+check(not any("CL008" in f for f in ein.ein_ubl_check(ein.ein_ubl_build(fixture(), "xrechnung"))), "XRechnung keeps EM")
+
 # ---------------------------------------------------------------- 2. XRechnung UBL
 try:
     ein.ein_ubl_build(fixture(rc={**RECIPIENT, "buyer_reference": ""}), "xrechnung")

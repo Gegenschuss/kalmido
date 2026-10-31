@@ -156,7 +156,7 @@ function rk_fixedModal(f) {
 // ---- 2.67.0 (#1838): fixed costs from a spreadsheet: pick a file -> preview (nothing stored) -> take over the ticked rows
 const FCI_VATS = [0, 7, 19];
 function fci_pick() {
-  const i = document.createElement('input'); i.type = 'file'; i.accept = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const i = document.createElement('input'); i.type = 'file'; i.accept = '.xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv';
   i.onchange = () => { if (i.files[0]) fci_preview(i.files[0]); }; i.click();
 }
 async function fci_preview(file) {
@@ -194,7 +194,7 @@ function fci_modal(rows, name) {
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-fci]'); if (!b) return;
     if (b.dataset.fci === 'close') { md.remove(); return; }
-    const items = rows.filter(r => r.sel && r.status !== 'error').map(r => ({label: r.label, amount: r.amount, repeat: r.repeat, start: r.start, category: r.category, vat_rate: r.vat_rate, sub: r.sub || 0, notice_days: r.notice_days || 0, ...(r.status === 'dup' ? {dup_ok: 1} : {})}));  // 2.91.0 B (#1924): + sub, notice_days; 2.269.0 D (#3046): + dup_ok (ticked on purpose)
+    const items = rows.filter(r => r.sel && r.status !== 'error').map(r => ({row: r.row, label: r.label, amount: r.amount, repeat: r.repeat, start: r.start, category: r.category, vat_rate: r.vat_rate, sub: r.sub || 0, notice_days: r.notice_days || 0, ...(r.status === 'dup' ? {dup_ok: 1} : {})}));  // 2.91.0 B (#1924): + sub, notice_days; 2.269.0 D (#3046): + dup_ok (ticked on purpose)
     if (!await importTargetConfirm({what: trn('{0} fixed cost', '{0} fixed costs', items.length), ws: ofcWs(), place: tr('Office')})) return;  // 2.87.9 (#1940)
     b.disabled = true;
     try {

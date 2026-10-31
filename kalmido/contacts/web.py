@@ -19,7 +19,7 @@ from ..core.errors import BadInput, UnknownFields
 from ..contacts.model import (
     book_create, book_fields, book_member_set, book_public, book_role, book_touch, books_for, contact_brief, contact_dict, contact_fields,
     contact_copy, contact_store, contacts_query, CT_KEYS, default_book, import_vcards, link_remove, link_set, my_book_ids, need_book, need_contact,
-    occ_sync, render_vcard, split_vcards, CONTACTS_PER_BOOK, IMPORT_BATCH,
+    occ_sync, render_vcard, split_vcards, CONTACTS_PER_BOOK, IMPORT_BATCH, VC_BAD_MAX,
 )
 from ..core.retention import ret_days
 from ..contacts.bulk import bk_occ_drop, ctt_relink, ctt_restore, ctt_trash, ctt_unlink  # 2.272.0 E1 (#3038)
@@ -299,10 +299,7 @@ def op_import(c, uid, bid, raw, bg=False, csv_ok=False, mapping=None, preview=Fa
             return ctx_preview(raw)
         cards = ctx_cards(raw, mapping)
     else:
-        try:
-            text = raw.decode("utf-8-sig")
-        except UnicodeDecodeError:
-            text = raw.decode("latin-1")
+        text = _vcf_text(raw)
         if "BEGIN:VCARD" not in text.upper():
             raise BadInput(tr("This is not a contacts file (vCard or CSV)") if csv_ok else tr("This is not a contacts file (vCard)"))
         if preview:
@@ -327,7 +324,7 @@ _IMP, _IMP_LOCK = {}, threading.Lock()
 
 def lv_import_public(st):
     d = {k: st[k] for k in ("import_id", "book_id", "state", "total", "done", "created", "updated", "unchanged", "errors", "error")}
-    d.update({k: st[k] for k in ("dupes", "dupe_groups") if k in st})  # 2.119.1 A (#2084)
+    d.update({k: st[k] for k in ("dupes", "dupe_groups", "bad", "over_limit") if k in st})  # 2.119.1 A (#2084), 2.363.2 (#3106)
     for k in ("started_at", "ended_at"):
         d[k] = iso(datetime.fromtimestamp(st[k], timezone.utc)) if st[k] else None
     return d
@@ -359,8 +356,11 @@ def lv_import_start(c, uid, bid, cards, since=None, photos=True):
 def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True):
     # 2.138.4 C (#2377): a pool connection per batch (taken, given back after the batch's commit) instead of one for the
     # whole run, each with the starter's row-level-security context; the photo budget and the counts run across the batches.
+    over = len(cards) - CONTACTS_PER_BOOK
     cards = cards[:CONTACTS_PER_BOOK]
     res = {"created": 0, "updated": 0, "unchanged": 0, "errors": 0}
+    if over > 0:                             # 2.363.2 (#3106)
+        res["over_limit"] = over
     t_end = time.monotonic() + 900
     c = None
     try:
@@ -369,12 +369,14 @@ def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True):
             c.set_ctx(*ctx)
             # batch: a block that hits the book's limit keeps what it stored; photos > 0: a used-up budget keeps old pictures
             part = import_vcards(c, uid, bid, None, batch=IMPORT_BATCH, cards=cards[i:i + IMPORT_BATCH],
-                                 photos=max(1e-3, t_end - time.monotonic()) if photos else 0)
+                                 photos=max(1e-3, t_end - time.monotonic()) if photos else 0, before=res["created"] + res["updated"])
             c.commit()
             c.close()
             c = None
-            for k in res:
+            for k in ("created", "updated", "unchanged", "errors"):
                 res[k] += part[k]
+            if part.get("bad"):              # 2.363.2 (#3106)
+                res["bad"] = (res.get("bad", []) + part["bad"])[:VC_BAD_MAX]
             if part.get("kept_newer"):       # 2.273.0 C (#3048)
                 res["kept_newer"] = res.get("kept_newer", 0) + part["kept_newer"]
             with _IMP_LOCK:
@@ -493,7 +495,7 @@ def _vcf_text(data):
     try:
         return data.decode("utf-8-sig")
     except UnicodeDecodeError:
-        return data.decode("latin-1")
+        return data.decode("cp1252", "replace")  # 2.363.2 (#3106): Outlook's umlauts and the Euro sign (was latin-1)
 
 
 def ct_gather(ups):

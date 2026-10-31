@@ -18,8 +18,8 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from flask import g, jsonify, redirect, request
 
 from ..core.config import app, APP_NAME, APP_VERSION, COOKIE, PUBLIC_URL, SECRET_KEY, USERNAME_RE
-from ..core.i18n import N_, tr
-from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc
+from ..core.i18n import browser_lang, N_, tr
+from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip, set_cookie, start_session
 from ..accounts.login import _reauth, _user, pend_ip_cap
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -382,8 +382,10 @@ def _oidc_account(c, claims, sess_uid=None):
             raise OidcError("taken", uname)
         name = str(claims.get("name") or "").strip()[:60] or uname
         uid = create_user(c, uname, name, None, None, admin_want, onboard=True)
+        if browser_lang():  # 2.447.0 (#3761): the new account starts in the language of the login, like a registration
+            uset(c, uid, "lang", browser_lang())
         ensure_inbox(c, uid)
-        c.execute("UPDATE users SET oidc_subject=?, email=? WHERE id=?", (subject, email or None, uid))
+        c.execute("UPDATE users SET oidc_subject=?, email=?, email_proved=? WHERE id=?", (subject, email or None, email, uid))
         bump(c)
         aa_now("security", f"oidc:new:{uname}", N_("{0} was created by the first login with the OIDC provider."), [uname])
         grp_oidc_sync(c, uid, groups)  # 2.10.0 (#441)
@@ -406,6 +408,8 @@ def _oidc_account(c, claims, sess_uid=None):
                    N_("{0} is now an admin (set by {1}).") if want else N_("{0} is no longer an admin (OIDC group)."),
                    [u["username"], "OIDC"] if want else [u["username"]])
     grp_oidc_sync(c, u["id"], groups)  # 2.10.0 (#441): synced groups follow the provider's group claim
+    if email:  # 2.360.2 (#2561): the provider vouches for this address
+        c.execute("UPDATE users SET email_proved=? WHERE id=? AND lower(email)=?", (email, u["id"], email))
     return _user(c, u["id"])
 
 

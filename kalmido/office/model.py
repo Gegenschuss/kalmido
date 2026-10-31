@@ -39,6 +39,7 @@ TEXT_KINDS = ("rights_time", "rights_territory", "rights_media", "intro", "closi
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|kuerzel|date|isodate|initials|version)\}")  # 2.118.0 A (#2265): version; 2.138.2 A (#2391): isodate; 2.433.0 (#3604): kuerzel
 NAME_MAX = 200
+PT_MAX = 1000  # 2.431.0 B (#3594): the subject (project_title) of a document may have several lines
 # 2.99.0 D (#2188, decision 18.10.2026): the own company name may have up to three lines (stored with line breaks); the
 # letterhead and the footer print them one under the other, the sender line, mails and the e-invoice (BT-27) on one line
 OFX_NAME_LINES = 3
@@ -63,6 +64,10 @@ def ofx_name_clean(v, mx=NAME_MAX):
 
 
 TEXT_MAX = 8000
+
+# 2.449.0 (#3766): the former app defaults of parts_summary_title_*; the settings form saved them along, so a stored one was
+# not chosen: outside an office with the film pack it counts as empty (office_settings)
+PARTS_TITLE_FILM = {"de": "Filmherstellung", "en": "Film production"}
 
 # ---- settings (office_settings.data), defaults filled from the country pack
 SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact_lines": [], "register_lines": [], "bank_lines": []},
@@ -94,7 +99,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "industry_packs": [],
                      # 2.47.0 (#1215): an invoice from a quotation with parts: "full" (like the quotation), "title" (the title
                      # page with its positions) or "summary" (one position per tax rate with this title)
-                     "parts_invoice_mode": "full", "parts_summary_title_de": "Filmherstellung", "parts_summary_title_en": "Film production",
+                     "parts_invoice_mode": "full", "parts_summary_title_de": "", "parts_summary_title_en": "",
                      # 2.47.3 (#1460): the DATEV booking batch export (office.datev: advisor / client number, chart, accounts)
                      "datev_extf": {},
                      # 2.51.0 A (#1348): agents may read office data (clients, prices) -- they go to the agent's AI model; off by
@@ -142,6 +147,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.147.0 (#2460): office functions the admin switched off (keys of packs.PACK_FEATURES that may be
                      # switched); empty = everything the country pack offers is on, so offices from before stay as they were
                      "features_off": [],
+                     "menu_off": [],  # 2.440.0 (#3609): points of the office menu the office switched off (OFFICE_MENU_OFF)
                      # 2.189.0 (#2475): the home currency (ISO 4217; office/homecur.py: fixed by the pack, chosen only in an
                      # editable one, resolved on every read) and the office rates of foreign currencies {code: per one home unit}
                      "home_currency": "", "fx_rates": {},
@@ -153,6 +159,9 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 # 2.435.0 A (#3600): the blocks of the client card an office admin may switch off (static/js/dashboard.js LY_CL_BLOCKS;
 # the details always show)
+# 2.440.0 (#3609): the points of the office menu that can be switched off for the whole office; off = only hidden (data and
+# routes stay). The other points of Money have a function of their own (features_off, packs.PACK_FEATURES money.*)
+OFFICE_MENU_OFF = ("pipeline", "gendocs", "letters", "time", "contracts", "cashbook", "bank", "cards", "equipment", "agreements")
 CLIENT_BLOCKS = ("persons", "invoices", "month", "lists", "note", "tickets", "gendocs", "letters", "privacy")
 
 
@@ -343,6 +352,10 @@ def office_settings(c, oid):
                 out[k].update(d[k])
             else:
                 out[k] = d[k]
+    if "film" not in (out.get("industry_packs") or []):
+        for lg, w in PARTS_TITLE_FILM.items():
+            if out["parts_summary_title_" + lg] == w:
+                out["parts_summary_title_" + lg] = ""
     from .catalog import pkc_bind
     pkc_bind(c, oid)  # 2.76.0 (#1023): office_pack / dk_pack resolve the packs installed in this office area from here on
     pack = office_pack(out["pack"]) or office_pack("DE")
@@ -353,7 +366,7 @@ def office_settings(c, oid):
             out["lang"] = pack.get("lang") if pack.get("lang") in LANGS else SETTINGS_DEFAULTS["lang"]
         if not out.get("offer_scheme"):  # 2.368.0 (#2979): the default is empty, so QUO-… of the International pack applies
             out["offer_scheme"] = (pack.get("numbering") or {}).get("offer") or "KVA-{yyyy}-{seq:03}"
-        for k, dflt in (("invoice", "RE-{yyyy}-{seq:03}"), ("credit", "GS-{yyyy}-{seq:03}"), ("reminder", "MA-{yyyy}-{seq:03}"), ("delivery", "LS-{yyyy}-{seq:03}")):  # 2.38.0; 2.120.0 D (#2089)
+        for k, dflt in (("invoice", "RE-{yyyy}-{seq:03}"), ("credit", "RK-{yyyy}-{seq:03}"), ("reminder", "MA-{yyyy}-{seq:03}"), ("delivery", "LS-{yyyy}-{seq:03}")):  # 2.38.0; 2.120.0 D (#2089); 2.431.0 B (#3595): RK- (was GS-)
             if not out.get(k + "_scheme"):
                 out[k + "_scheme"] = (pack.get("numbering") or {}).get(k) or dflt
     return out
@@ -425,7 +438,7 @@ def _credit_shared_switch(c, oid, out, cur, b):
     corrections' own counter continues above every number the shared counter gave (a counter never goes back). Numbers
     already given stay; the change goes into the office log with the settings' diff."""
     if out.get("credit_shared"):
-        dflt = ((office_pack(out.get("pack")) or office_pack("DE") or {}).get("numbering") or {}).get("credit") or "GS-{yyyy}-{seq:03}"
+        dflt = ((office_pack(out.get("pack")) or office_pack("DE") or {}).get("numbering") or {}).get("credit") or "RK-{yyyy}-{seq:03}"
         if (b.get("credit_scheme") in (None, cur.get("credit_scheme"))) and out.get("credit_scheme") in ("", dflt):  # (the whole form sends it unchanged)
             out["credit_scheme"] = office_scheme_clean(credit_rk_scheme(out.get("invoice_scheme") or ""), FE_SCHEME_NAMES["credit_scheme"], offer=False)
         return
@@ -557,6 +570,10 @@ def office_settings_clean(c, oid, b, cur):
             if not isinstance(v, list) or any(x not in CLIENT_BLOCKS for x in v):
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = [x for x in CLIENT_BLOCKS if x in v]
+        elif k == "menu_off":  # 2.440.0 (#3609): only known points; switching off hides, never deletes
+            if not isinstance(v, list) or any(x not in OFFICE_MENU_OFF for x in v):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = [x for x in OFFICE_MENU_OFF if x in v]
         elif k == "features_off":  # 2.147.0 (#2460): only switchable functions; switching off hides, never deletes
             from .packs import PACK_FEATURES
             if not isinstance(v, list) or any(not isinstance(x, str) or not PACK_FEATURES.get(x, {}).get("switch") for x in v):
@@ -833,14 +850,15 @@ def _slug(s):
     return s[:40]
 
 
-def office_number_next(c, oid, kind, scheme, d=None, peek=False, start=0, pscheme=None, **ctx):
+def office_number_next(c, oid, kind, scheme, d=None, peek=False, start=0, ahead=0, pscheme=None, **ctx):
     """Reserves (or peeks at) the next number of kind for organisation oid: counter per (org, kind, period).
     2.118.0 A (#2265): start = the value a counter row that does not exist yet starts from (onc_next).
+    2.431.0 B (#3605): ahead = a peek that many values further (the number after taken ones, docs.doc_next_number).
     2.433.0 (#3597): pscheme = the scheme whose year gives the period (a shared counter: the invoices'), default scheme."""
     period = office_scheme_period(pscheme or scheme, d)
     if peek:
         r = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (oid, kind, period)).fetchone()
-        seq = (r["last"] if r else start) + 1
+        seq = (r["last"] if r else start) + 1 + ahead
     else:  # one atomic statement: two parallel requests never get the same counter value
         seq = c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,?,?) ON CONFLICT(org_id, kind, period) "
                         "DO UPDATE SET last=office_numbers.last+1 RETURNING last", (oid, kind, period, start + 1)).fetchone()[0]
@@ -857,12 +875,17 @@ def trial_flag(v):
     return 1 if v in (1, True, "1", "true") else 0
 
 
-def office_trial_number(c, oid, did):
-    """Reserves the next free TEST number of office oid for document did (the caller holds the number lock)."""
+def office_trial_number(c, oid, did, peek=False):
+    """Reserves the next free TEST number of office oid for document did (the caller holds the number lock).
+    2.431.0 B (#3605): peek = the one it would get, the counter does not move (the finalise dialog)."""
     from .legacyimport import fi_number_taken
-    for _ in range(50):
-        seq = c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,'',1) ON CONFLICT(org_id, kind, period) "
-                        "DO UPDATE SET last=office_numbers.last+1 RETURNING last", (oid, TRIAL_KIND)).fetchone()[0]
+    last = None
+    if peek:
+        r = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=''", (oid, TRIAL_KIND)).fetchone()
+        last = r["last"] if r else 0
+    for i in range(50):
+        seq = last + 1 + i if peek else c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,'',1) ON CONFLICT(org_id, kind, period) "
+                                                  "DO UPDATE SET last=office_numbers.last+1 RETURNING last", (oid, TRIAL_KIND)).fetchone()[0]
         num = f"TEST-{seq:03d}"
         if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() \
                 and not fi_number_taken(c, oid, num):
@@ -950,16 +973,16 @@ def onc_start(c, oid, s, r, key, scheme, d=None):
     return high
 
 
-def onc_next(c, oid, s, r, scheme, d=None, peek=False, **ctx):
+def onc_next(c, oid, s, r, scheme, d=None, peek=False, ahead=0, **ctx):
     """office_number_next for document row r: a quotation counts per organisation, client or project (settings s)."""
     if r["kind"] != "offer":  # 2.433.0 (#3597): an invoice correction may count with the invoices (num_kind)
-        return office_number_next(c, oid, num_kind(s, r["kind"]), scheme, d, peek, pscheme=num_scheme(s, r["kind"]), **ctx)
+        return office_number_next(c, oid, num_kind(s, r["kind"]), scheme, d, peek, ahead=ahead, pscheme=num_scheme(s, r["kind"]), **ctx)
     key = onc_key(s, r) or "offer"
     start = 0
     if key != "offer" and not c.execute("SELECT 1 FROM office_numbers WHERE org_id=? AND kind=? AND period=?",
                                         (oid, key, office_scheme_period(scheme, d))).fetchone():
         start = onc_start(c, oid, s, r, key, scheme, d)
-    return office_number_next(c, oid, key, scheme, d, peek, start=start, **ctx)
+    return office_number_next(c, oid, key, scheme, d, peek, start=start, ahead=ahead, **ctx)
 
 
 def onc_version(c, oid, r, scheme, ctx_of):

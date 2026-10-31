@@ -172,8 +172,8 @@ async function suAsk(d, title) {
   if (d.need === 'passkey') { try { b.credential = await pkGet(await api('POST', '/api/stepup/passkey')); } catch (e) { if (e?.name) toast(pkErr(e)); return null; } }
   return b;
 }
-async function suApi(method, url, body, title) {
-  const shout = e => { if (e instanceof Offline) toast(tr('Offline: only works again with a connection')); else if (e.message !== 'auth' && !e.shown) toast(e.message); throw e; };
+async function suApi(method, url, body, title, quiet) {  // quiet: 2.446.0 (#3613) error codes the caller answers itself
+  const shout = e => { if (quiet?.includes(e.data?.code)) throw e; if (e instanceof Offline) toast(tr('Offline: only works again with a connection')); else if (e.message !== 'auth' && !e.shown) toast(e.message); throw e; };
   try { return await rawFetch(method, url, body); } catch (e) {
     if (!(e.status === 403 && SU_NEEDS.includes(e.data?.need))) shout(e);
     const b = await suAsk(e.data, title);
@@ -181,12 +181,22 @@ async function suApi(method, url, body, title) {
     try { return await rawFetch(method, url, {...(body || {}), ...b}); } catch (e2) { return shout(e2); }
   }
 }
+const SU_PASS = ['old_passphrase', 'need_passphrase', 'passphrase'];
 // a download link with data-sudl: POST (with the step-up) -> a one-time ticket, then the file with it
 document.addEventListener('click', async e => {
   const a = e.target.closest?.('a[data-sudl]'); if (!a) return;
   e.preventDefault();
   const url = a.getAttribute('href');
-  let j; try { j = await suApi('POST', url, {}, tr('Download')); } catch { return; }
+  // 2.446.0 (#3613): a backup of an earlier passphrase asks for it in the same step, the ticket carries it to the download
+  let j, x0 = {};
+  while (!j) {
+    try { j = await suApi('POST', url, x0, tr('Download'), SU_PASS); } catch (err) {
+      if (!SU_PASS.includes(err.data?.code)) return;
+      const pass = await askPrompt(tr('Passphrase of this backup'), '', {body: err.data.error, input: {type: 'password'}});
+      if (!pass) return;
+      x0 = {passphrase: pass};
+    }
+  }
   const x = document.createElement('a');
   x.href = `${url}?t=${encodeURIComponent(j.ticket)}`; x.download = ''; x.hidden = true;
   document.body.append(x); x.click(); x.remove();

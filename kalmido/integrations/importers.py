@@ -26,8 +26,8 @@ from ..core.serializers import csv_uncell
 from ..core.pages import valid_url
 from ..lists.lists import FOLDER_MAX, folder_seg, LIST_NAME_MAX
 from ..tasks.validation import (
-    ancestors, as_int, clean_reminders, clean_task, CONTENT_MAX, depth, descendants, DURATION_MAX, PRIORITIES,
-    REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm, rr_problem, subtree_height, TITLE_MAX, valid_date, valid_hm,
+    as_int, clean_reminders, clean_task, CONTENT_MAX, depth, DURATION_MAX, PRIORITIES,
+    REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm, rr_problem, TITLE_MAX, valid_date, valid_hm,
 )
 from ..tasks.tasks import set_tags
 from ..core.errors import BadInput, UnknownFields
@@ -36,13 +36,18 @@ from ..lists.listtrash import otr_trash  # 2.272.0 C (#3027)
 from ..collab.liste2e import le2e_mode
 
 
-# ---------------------------------------------------------------- TickTick import
+# ---------------------------------------------------------------- TickTick import (parse_ticktick, below the other parsers)
 
-def tt_date(s, all_day):
-    """TickTick '2026-10-14T22:00:00+0000' -> (local date, local HH:MM | None)."""
+def tt_date(plan, s, all_day, title=None):
+    """TickTick '2026-10-14T22:00:00+0000' -> (local date, local HH:MM | None). 2.363.2 (#3104): an unreadable date is a
+    warning of the preview, no raw parser error."""
     if not s:
         return None, None
-    dt = datetime.strptime(s, "%Y-%m-%dT%H:%M:%S%z").astimezone(TZ)
+    try:
+        dt = datetime.strptime(s.strip(), "%Y-%m-%dT%H:%M:%S%z").astimezone(TZ)
+    except (ValueError, OverflowError):
+        imp_warn(plan, N_("Invalid date removed"), title)
+        return None, None
     if all_day:
         return dt.date().isoformat(), None
     return dt.date().isoformat(), dt.strftime("%H:%M")
@@ -70,135 +75,6 @@ def tt_reminders(s):
     return ",".join(dict.fromkeys(out))
 
 
-def import_ticktick(c, text, uid):
-    """Imports into the lists of user uid (matched by name among the lists they own)."""
-    text = text.lstrip("﻿")
-    i = text.find('"Folder Name"')
-    if i < 0:
-        raise ValueError(tr("Not a TickTick CSV (header 'Folder Name' missing)", lg=lang(c, uid)))
-    rows = list(csv.DictReader(io.StringIO(text[i:])))
-    if len(rows) > IMPORT_MAX_TASKS:  # 2.148.1 E (#2496)
-        raise ValueError(tr("Too many rows (more than {0} tasks)", IMPORT_MAX_TASKS, lg=lang(c, uid)))
-    # 2.273.0 D (#3051): never match archived / deleted lists (tasks would be invisible, gone after the keep period)
-    lists = {r["name"]: r["id"] for r in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND e2e IS NULL "
-                                 "AND archived=0 AND deleted_at IS NULL", (uid,))}
-    inbox = my_inbox(c, uid)
-    sections = {}
-    stats = dict(tasks=0, skipped=0, lists=0)
-    idmap = {}
-    ts = iso(now_utc())
-    now = local_now()
-    # list order = first appearance; task order = TickTick "Order" within list
-    rows.sort(key=lambda r: int(r.get("Order") or 0))
-    for r in rows:
-        name = (r.get("List Name") or "").strip()
-        if name.lower() == "inbox" or not name:
-            lid = inbox
-        elif name in lists:
-            lid = lists[name]
-        else:
-            srt = my_max_sort(c, uid) + 1
-            lid = insert_id(c, "INSERT INTO lists(name,folder,sort,view,created_at,owner_id) VALUES(?,?,?,?,?,?)",
-                            (name[:LIST_NAME_MAX], folder_seg(r.get("Folder Name") or ""), srt,
-                             "kanban" if r.get("View Mode") == "kanban" else "list", ts, uid))
-            from ..accounts.orgs import ws_apply_default
-            ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
-            list_created(c, uid, lid)  # 2.25.0 (#931): agents, groups and people of a shared folder
-            lists[name] = lid
-            stats["lists"] += 1
-        tt = r.get("taskId") or None
-        old = c.execute("SELECT id FROM tasks WHERE tt_id=? AND created_by=?", (tt, uid)).fetchone() if tt else None
-        if old:
-            idmap[tt] = old[0]
-            stats["skipped"] += 1
-            continue
-        sec = None
-        col = (r.get("Column Name") or "").strip()
-        if col:
-            key = (lid, col)
-            if key not in sections:
-                row = c.execute("SELECT id FROM sections WHERE list_id=? AND name=?", key).fetchone()
-                sections[key] = row[0] if row else insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)",
-                    (lid, col, float(r.get("Column Order") or 0)))
-            sec = sections[key]
-        all_day = (r.get("Is All Day") or "").lower() == "true"
-        due, due_time = tt_date(r.get("Due Date") or r.get("Start Date"), all_day)
-        start = None
-        if r.get("Start Date") and r.get("Due Date"):
-            sd, _ = tt_date(r["Start Date"], all_day)
-            start = sd if sd and due and sd < due else None
-        content = (r.get("Content") or "").replace("\\!", "!").replace("\r", "")
-        if (r.get("Is Check list") or "N") == "Y":  # checklist lines -> content bullets
-            content = "\n".join("- " + ln.lstrip("▫▪ ").strip() for ln in content.split("\n") if ln.strip())
-        status = int(r.get("Status") or 0)
-        status = 2 if status == 2 else (-1 if status == -1 else 0)
-        completed = None
-        if status and r.get("Completed Time"):
-            completed = iso(datetime.strptime(r["Completed Time"], "%Y-%m-%dT%H:%M:%S%z"))
-        created = r.get("Created Time")
-        created = iso(datetime.strptime(created, "%Y-%m-%dT%H:%M:%S%z")) if created else ts
-        rems = tt_reminders(r.get("Reminder"))
-        # don't fire reminders that are already in the past at import time
-        reminded = []
-        if due and rems:
-            base = datetime.fromisoformat(f"{due}T{due_time or '09:00'}").replace(tzinfo=TZ)
-            for off in rems.split(","):
-                if base - timedelta(minutes=int(off)) <= now:
-                    reminded.append(f"{due} {due_time or ''}|{off}")
-        repeat = rr_norm(r.get("Repeat") or "")
-        if repeat and (rr_problem(repeat) or (due and not rr_feasible(repeat, due))):
-            repeat = ""  # ERULE / custom date lists / sub-daily or never matching rules are not supported
-        try:
-            rems = clean_reminders(rems)
-        except BadInput:
-            rems = ""
-        if due and not valid_date(due):
-            due, due_time, start = None, None, None
-        cur_id = insert_id(c, 
-            """INSERT INTO tasks(list_id,section_id,title,content,priority,status,due,due_time,reminders,
-               reminded,repeat,sort,created_at,updated_at,completed_at,tt_id,start,created_by,completed_by)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (lid, sec, (r.get("Title") or tr("(untitled)", lg=lang(c, uid))).strip(), content, int(r.get("Priority") or 0),
-             status, due, due_time, rems, json.dumps(reminded), repeat, stats["tasks"], created, ts, completed, tt,
-             start, uid, uid if completed else None))
-        idmap[tt] = cur_id
-        tags = [t.strip() for t in (r.get("Tags") or "").split(",") if t.strip()]
-        if tags:
-            set_tags(c, cur_id, tags, uid)
-        stats["tasks"] += 1
-        r["_id"] = cur_id
-    for r in rows:  # second pass: parents (same list only, never a cycle: see check_parent)
-        p = r.get("parentId")
-        if p and r.get("_id") and p in idmap and idmap[p] != r["_id"]:
-            pl = c.execute("SELECT list_id FROM tasks WHERE id=?", (idmap[p],)).fetchone()
-            me_l = c.execute("SELECT list_id FROM tasks WHERE id=?", (r["_id"],)).fetchone()
-            if not pl or not me_l or pl[0] != me_l[0] or r["_id"] in ancestors(c, idmap[p]) \
-                    or idmap[p] in descendants(c, r["_id"]) \
-                    or depth(c, idmap[p]) + 1 + subtree_height(c, r["_id"]) >= MAX_DEPTH:  # 2.156.0 review (#1949): no task below level 5
-                stats.setdefault("parents_skipped", 0)
-                stats["parents_skipped"] += 1
-                continue
-            c.execute("UPDATE tasks SET parent_id=? WHERE id=?", (idmap[p], r["_id"]))
-    bump(c)
-    c.commit()
-    return stats
-
-
-@app.post("/api/import/ticktick")
-def import_api():
-    f = request.files.get("file")
-    if not f:
-        return err(tr("File missing"))
-    raw = f.read(IMPORT_MAX_MB * 1048576 + 1)  # 2.148.1 E (#2496): the limits of the other importers
-    if len(raw) > IMPORT_MAX_MB * 1048576:
-        return err(tr("The file is too large (at most {0} MB)", IMPORT_MAX_MB), 413)
-    try:
-        stats = import_ticktick(db(), raw.decode("utf-8-sig"), me())
-    except (ValueError, KeyError) as e:
-        return err(str(e))
-    return jsonify(stats)
-
-
 # ---------------------------------------------------------------- package C: importers
 # Todoist (CSV per project, the backup ZIP of those CSVs, Sync API JSON), Trello (board JSON), Asana (CSV), Microsoft To Do
 # (Outlook / export tool CSV, or ICS) and ICS / VTODO (Apple Reminders exports, Nextcloud Tasks, Thunderbird, any CalDAV
@@ -224,10 +100,12 @@ IMPORT_ZIP_RATIO = 200                    # max. uncompressed / compressed per m
 IMPORT_JSON_DEPTH = 40                    # nesting of a JSON file (Trello: ~6)
 IMPORT_UNDO_HOURS = 24
 IMPORT_RATE = _imp_env("KALMIDO_IMPORT_RATE", 30)  # imports + previews per user and 10 minutes
-IMPORT_KEEP = 20                          # import records (undo) kept per user
+IMPORT_KEEP = 20                          # import records kept per user (2.363.2 #3106: + all that can still be undone, imp_prune)
+IMPORT_KEEP_ALWAYS = "Kalmido"            # 2.452.0 (#3810): an account import stays until undone, it is the memory of what is here already
 IMPORT_SOURCES = {"todoist": "Todoist", "trello": "Trello", "asana": "Asana", "mstodo": "Microsoft To Do", "ics": "ICS",
                   # 2.142.0 B (#2147): file imports only (no API / OAuth connection, nothing fetched from the files)
-                  "notion": "Notion", "gtasks": "Google Tasks", "clickup": "ClickUp", "jira": "Jira", "csv": "CSV", "markdown": "Markdown"}
+                  "notion": "Notion", "gtasks": "Google Tasks", "clickup": "ClickUp", "jira": "Jira", "csv": "CSV", "markdown": "Markdown",
+                  "ticktick": "TickTick"}  # 2.363.2 (#3104): the shared way (preview, undo, limits)
 IMPORT_OPTS = ("dry_run", "target", "mode", "archived", "completed", "list_name", "priority_scale", "space")
 IMPORT_SAMPLES = 8
 csv.field_size_limit(max(csv.field_size_limit(), 4 * CONTENT_MAX))
@@ -1331,10 +1209,13 @@ def imp_done(v):
 
 
 def imp_prio_any(v):
-    """Priority words of Jira / ClickUp / other apps -> 0, 1, 3, 5 (None = not understood). The two top levels are high."""
+    """Priority words of Jira / ClickUp / other apps -> 0, 1, 3, 5 (None = not understood). The two top levels are high.
+    2.363.2 (#3106): a number 0-5 counts upwards like the priority here (0 none, 1 low, 3 medium, 5 high; 2 low, 4 high)."""
     v = re.sub(r"\s+", " ", str(v or "").strip().lower())
     if not v or v in ("none", "keine", "-", "no priority", "ohne"):
         return 0
+    if v in ("0", "1", "2", "3", "4", "5"):
+        return {"0": 0, "1": 1, "2": 1, "3": 3, "4": 5, "5": 5}[v]
     for words, p in ((("highest", "blocker", "critical", "urgent", "dringend", "kritisch", "high", "hoch", "höchste", "wichtig",
                        "important", "p1", "!!!"), 5),
                      (("medium", "mittel", "normal", "major", "p2", "!!"), 3),
@@ -1996,10 +1877,66 @@ def parse_jira(data, fname, opts, plan):
                 imp_warn(plan, N_("Parent task not found, imported as a main task"), t["title"])
 
 
+def tt_int(v):
+    try:
+        return int(str(v or 0).strip())
+    except ValueError:
+        return 0
+
+
+def tt_iso(v):
+    """TickTick's time stamp -> our iso text, None when unreadable."""
+    try:
+        return iso(datetime.strptime((v or "").strip(), "%Y-%m-%dT%H:%M:%S%z")) if v else None
+    except (ValueError, OverflowError):
+        return None
+
+
+def parse_ticktick(data, fname, opts, plan):
+    """2.363.2 (#3104): TickTick's backup CSV on the shared way (was an own import without preview, undo or rate limit): a few
+    lines of preamble, then the header with "Folder Name". The tasks keep their taskId (imp_run also skips the ids the former
+    import stored without the source prefix)."""
+    text = imp_decode(data)
+    m = re.search(r'^"?Folder Name"?', text, re.M)
+    if not m:
+        imp_fail(N_("Not a TickTick CSV (header 'Folder Name' missing)"))
+    _keys, rows, _orig = imp_csv(text[m.start():])
+    rows.sort(key=lambda r: tt_int(r.get("order")))  # the task order within a list is TickTick's "Order"
+    lists, sec_order = {}, {}
+    for n, r in enumerate(rows, 1):
+        name = (r.get("list name") or "").strip()
+        inbox = not name or name.lower() == "inbox"
+        L = lists.get("" if inbox else name)
+        if L is None:
+            L = lists[("" if inbox else name)] = imp_list(plan, "Inbox" if inbox else name, r.get("folder name") or "", inbox=inbox)
+            L["view"] = "kanban" if r.get("view mode") == "kanban" else "list"
+        title = r.get("title") or ""
+        all_day = (r.get("is all day") or "").lower() == "true"
+        due_s, start_s = r.get("due date") or "", r.get("start date") or ""
+        due, due_time = tt_date(plan, due_s or start_s, all_day, title)
+        start = tt_date(plan, start_s, all_day, title)[0] if start_s and due_s else None
+        notes = (r.get("content") or "").replace("\\!", "!").replace("\r", "")
+        if (r.get("is check list") or "N") == "Y":  # checklist lines -> content bullets
+            notes = "\n".join("- " + ln.lstrip("▫▪ ").strip() for ln in notes.split("\n") if ln.strip())
+        status = tt_int(r.get("status"))
+        status = status if status in (2, -1) else 0
+        col = (r.get("column name") or "").strip()
+        if col:
+            sec_order.setdefault((id(L), col), tt_int(r.get("column order")))
+        rems = tt_reminders(r.get("reminder"))
+        imp_task(L, r.get("taskid") or f"row:{n}", title, notes=imp_textblock(notes), priority=tt_int(r.get("priority")), status=status,
+                 due=due, due_time=due_time, start=start if start and due and start < due else None, repeat=r.get("repeat") or "",
+                 reminders=[int(x) for x in rems.split(",")] if rems else [], tags=imp_tags(r.get("tags") or ""), section=col or None,
+                 parent=r.get("parentid") or None, created_at=tt_iso(r.get("created time")),
+                 completed_at=tt_iso(r.get("completed time")) if status else None)
+    for L in plan["lists"]:
+        L["sections"].sort(key=lambda x: sec_order.get((id(L), x), 0))
+
+
 IMPORT_PARSERS = {"todoist": parse_todoist, "trello": parse_trello, "asana": parse_asana, "mstodo": parse_mstodo, "ics": parse_ics,
                   # 2.142.0 B (#2147)
                   "notion": parse_notion, "gtasks": parse_gtasks, "clickup": parse_clickup, "jira": parse_jira, "csv": parse_csv,
-                  "markdown": parse_markdown}
+                  "markdown": parse_markdown, "ticktick": parse_ticktick}
 
 
 # ---- writing a plan
@@ -2080,7 +2017,7 @@ def imp_run(c, uid, plan, opts, dry):
     s_all = usettings(c, uid)
     base_t = s_all.get("allday_time") or "09:00"
     own, space = {}, opts.get("space", False)
-    for r in c.execute("SELECT id, name, org_id FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND e2e IS NULL ORDER BY id", (uid,)):
+    for r in c.execute("SELECT id, name, org_id FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND deleted_at IS NULL AND e2e IS NULL ORDER BY id", (uid,)):
         if space is False or r["org_id"] == space:  # 2.87.9 (#1940): a chosen workspace reuses only its own lists
             own.setdefault(r["name"], r["id"])  # 2.64.1 B (#1817): never into a list with the lock (a new list of that name instead)
     tl = token_lists()
@@ -2146,7 +2083,8 @@ def imp_run(c, uid, plan, opts, dry):
             rl = {"name": L["name"], "list_id": lid, "existing": existing, "tasks": 0, "skipped": 0, "sections": 0}
             for i, t in enumerate(L["tasks"]):
                 key = f"{src}:{t['ext']}"
-                old = c.execute("SELECT id FROM tasks WHERE created_by=? AND tt_id=?", (uid, key)).fetchone()
+                # 2.363.2 (#3104): the former TickTick import stored the bare taskId
+                old = c.execute("SELECT id FROM tasks WHERE created_by=? AND tt_id IN (?,?)", (uid, key, t["ext"] if src == "ticktick" else key)).fetchone()
                 if old:
                     idmap[t["ext"]] = old[0]
                     stats["skipped"] += 1
@@ -2159,8 +2097,9 @@ def imp_run(c, uid, plan, opts, dry):
                 sid = None
                 if sname:
                     if sname not in secs:
-                        sec_sort += 1
-                        secs[sname] = insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, sname, sec_sort))
+                        # 2.363.2 (#3104): the plan's order of the sections, not the order of their first tasks
+                        rank = L["sections"].index(sname) + 1 if sname in L["sections"] else 1
+                        secs[sname] = insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, sname, sec_sort + rank))
                         created["sections"].append(secs[sname])
                         stats["sections"] += 1
                         rl["sections"] += 1
@@ -2224,8 +2163,7 @@ def imp_run(c, uid, plan, opts, dry):
         if created["tasks"] or created["lists"] or created["sections"]:
             iid = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
                             (uid, src, opts.get("_fname", "")[:200], json.dumps(created), json.dumps(stats), ts))
-            c.execute("""DELETE FROM imports WHERE user_id=? AND id NOT IN
-                         (SELECT id FROM imports WHERE user_id=? ORDER BY id DESC LIMIT ?)""", (uid, uid, IMPORT_KEEP))
+            imp_prune(c, uid)
             rep["import_id"] = iid
             rep["undo_until"] = iso(now_utc() + timedelta(hours=IMPORT_UNDO_HOURS))
         bump(c)
@@ -2299,8 +2237,6 @@ def imp_request(source):
 
 @app.post("/api/import/<source>")
 def import_any(source):
-    if source == "ticktick":
-        return import_api()
     return jsonify(imp_request(source))
 
 
@@ -2312,6 +2248,9 @@ def imp_undo(c, uid, iid):
         raise Denied(409, tr("This import was already undone"))
     if (now_utc() - parse_iso(r["created_at"])).total_seconds() > IMPORT_UNDO_HOURS * 3600:
         raise Denied(409, tr("An import can only be undone within {0} hours", IMPORT_UNDO_HOURS))
+    if r["source"] == "newsletter":  # 2.363.2 (#3104): a consent import
+        from ..newsletter.web import nwl_import_undo
+        return nwl_import_undo(c, uid, r)
     if r["source"] == "Kalmido":  # 2.73.0 B (#1473): an account import undoes everything it created
         from ..admin.acctimport import umz_undo
         from ..admin.orgimport import oi_undo_check
@@ -2427,18 +2366,34 @@ def imp_undo_trash(c, ids, back, iid):
                   [f"undone{int(iid)}:"] + part)
 
 
+def imp_prune(c, uid):
+    """2.363.2 (#3106): the user's import records beyond the last IMPORT_KEEP go, but only past their undo time.
+    #3810: an account import that is not undone stays (umz_again reads those)."""
+    c.execute("""DELETE FROM imports WHERE user_id=? AND created_at<? AND NOT (source=? AND undone_at IS NULL) AND id NOT IN
+                 (SELECT id FROM imports WHERE user_id=? ORDER BY id DESC LIMIT ?)""",
+              (uid, iso(now_utc() - timedelta(hours=IMPORT_UNDO_HOURS)), IMPORT_KEEP_ALWAYS, uid, IMPORT_KEEP))
+
+
 @app.post("/api/imports/<int:iid>/undo")
 def import_undo(iid):
     return jsonify(imp_undo(db(), me(), iid))
+
+
+def _imp_report(raw):
+    """2.454.0 (#3808): the report of an import; the account import keeps the areas that stayed behind as keys."""
+    rep = json.loads(raw or "{}")
+    if rep.get("not_taken"):
+        rep["not_taken"] = [{**x, "what": tr(x["what"])} for x in rep["not_taken"]]
+    return rep
 
 
 @app.get("/api/imports")
 def imports_list():
     """The user's recent imports (Settings > Data): source, file, counts, undo possible until."""
     c, out = db(), []
-    for r in c.execute("SELECT * FROM imports WHERE user_id=? ORDER BY id DESC LIMIT ?", (me(), IMPORT_KEEP)):
+    for r in c.execute("SELECT * FROM imports WHERE user_id=? ORDER BY id DESC", (me(),)):  # bounded by imp_prune
         until = parse_iso(r["created_at"]) + timedelta(hours=IMPORT_UNDO_HOURS)
-        out.append({"id": r["id"], "source": r["source"], "source_name": IMPORT_SOURCES.get(r["source"], r["source"]),
-                    "file_name": r["file_name"], "created_at": r["created_at"], "counts": json.loads(r["report"] or "{}"),
+        out.append({"id": r["id"], "source": r["source"], "source_name": "Newsletter" if r["source"] == "newsletter" else IMPORT_SOURCES.get(r["source"], r["source"]),
+                    "file_name": r["file_name"], "created_at": r["created_at"], "counts": _imp_report(r["report"]),
                     "undone_at": r["undone_at"], "can_undo": not r["undone_at"] and until > now_utc(), "undo_until": iso(until)})
     return jsonify(imports=out, max_mb=IMPORT_MAX_MB, max_tasks=IMPORT_MAX_TASKS)

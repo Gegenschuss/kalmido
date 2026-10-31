@@ -167,8 +167,17 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
   }
   const ffLogin = async ({ev, nav}, theme, accent = null) => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); ${accent ? `localStorage.setItem('tasks.accent', '"${accent}"');` : ''} return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); localStorage.setItem('tasks.accentMig280', '1'); /* mint is the pre-2.8.0 default: a fresh device would drop it once */ ${accent ? `localStorage.setItem('tasks.accent', '"${accent}"');` : ''} return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
+  };
+  // 2.454.0 (#3824): this device keeps its own look (lookLocal), else the account's look (the first, light run uploaded it) overrides
+  // the dark / accent runs; lookIs proves the page really runs in the wanted theme (dark = a dark page background) and accent
+  const lum = c => { const v = (c.match(/\d+(\.\d+)?/g) || [255, 255, 255]).slice(0, 3).map(x => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+  const lookIs = async (ev, tag, theme, accent = null) => {
+    const r = await ev(`({t: document.documentElement.dataset.theme, a: document.documentElement.dataset.accent, bg: getComputedStyle(document.body).backgroundColor})`);
+    check(r.t === theme, tag + ': data-theme is ' + theme + ' (' + r.t + ')');
+    check(theme === 'dark' ? lum(r.bg) < 0.1 : lum(r.bg) > 0.5, tag + ': page background really ' + theme + ' (' + r.bg + ')');
+    if (accent) check(r.a === accent, tag + ': data-accent is ' + accent + ' (' + r.a + ')');
   };
   // 2.358.0 C (#2782): settle = the page's requests done (ff.js idle) + two frames drawn, instead of fixed sleeps after an action;
   // rsz after a viewport change: the app's resize handlers wait 150 ms, then two frames
@@ -223,6 +232,7 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
 
   const pass = async (o, tag, phone) => {
     const {ev, nav} = o;
+    await nav(B + '#' + VIEWS[0][1]); await ready(ev, o.idle); await lookIs(ev, tag, tag.split(' ')[0]);
     for (const [name, hash] of VIEWS) {
       await nav(B + '#' + hash); await ready(ev, o.idle);
       await axe(ev, `${tag} ${name}`);
@@ -285,6 +295,7 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
       await ffLogin(o, theme, acc);
       await o.nav(B + '#l/' + L); await ready(o.ev, o.idle);
       await o.ev(`(() => { openDetail(${H1}); return 1; })()`); await settle(o.ev, o.idle);
+      await lookIs(o.ev, `${theme} accent ${acc}`, theme, acc);
       await axe(o.ev, `${theme} accent ${acc}`, 'document', []);
     }
   }, false);
@@ -316,7 +327,7 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
       return out; })()`;
     check(await ffLogin(o, theme) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 720}});
-    await o.nav(B + '#l/' + L); await ready(ev, o.idle);
+    await o.nav(B + '#l/' + L); await ready(ev, o.idle); await lookIs(ev, tag, theme);
     await ev(`(() => { document.activeElement?.blur(); return 1; })()`);
     await press(K.Tab); let f = await ev(FOC);
     check(f && f.id === 'skip' && f.ring, tag + ': the first stop is "Skip to content", with a focus ring ' + JSON.stringify(f));
