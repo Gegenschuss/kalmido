@@ -15435,5 +15435,18 @@
   "Monthly on the {0} {1}": "Monatlich am {0} {1}",
   "Every {0} months on the {1} {2}": "Alle {0} Monate am {1} {2}",
   "Monthly on the last {0}": "Monatlich am letzten {0}",
-  "Every {0} months on the last {1}": "Alle {0} Monate am letzten {1}"
+  "Every {0} months on the last {1}": "Alle {0} Monate am letzten {1}",
+  "Including my own changes": "Auch meine eigenen Änderungen",
+  "Please check the backup settings.": "Bitte prüfe die Einstellungen der Sicherung.",
+  "Open settings": "Einstellungen öffnen",
+  "Forwarding {0} was turned off after repeated failed sends.": "Weiterleitung {0} wurde nach wiederholten Sendefehlern abgeschaltet.",
+  "Forwarding {0} was turned off: the person who set it up is no admin of the organisation any more.": "Weiterleitung {0} wurde abgeschaltet: Die Person, die sie eingerichtet hat, ist kein Admin der Organisation mehr.",
+  "Webhook {0} was turned off: its events could not be delivered.": "Webhook {0} wurde abgeschaltet: Seine Ereignisse konnten nicht zugestellt werden.",
+  "Webhook {0} was turned off: the person who set it up is no admin of the organisation any more.": "Webhook {0} wurde abgeschaltet: Die Person, die ihn eingerichtet hat, ist kein Admin der Organisation mehr.",
+  "Inbound webhook {0} is paused: {1}": "Eingehender Webhook {0} ist pausiert: {1}",
+  "Mailbox {0} cannot fetch mail, failing since {1}.": "Postfach {0} kann keine Mails abrufen, Fehler seit {1}.",
+  "Git connection {0} cannot fetch, failing since {1}.": "Git-Verbindung {0} kann nicht abrufen, Fehler seit {1}.",
+  "ntfy inbox {0} cannot fetch, failing since {1}.": "ntfy-Eingang {0} kann nicht abrufen, Fehler seit {1}.",
+  "Integration problem": "Problem mit einer Anbindung",
+  "a forwarding, webhook, mailbox or git connection of yours stopped working": "eine Weiterleitung, ein Webhook, Postfach oder eine Git-Verbindung von dir funktioniert nicht mehr"
 }

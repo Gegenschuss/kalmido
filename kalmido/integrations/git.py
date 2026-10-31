@@ -30,6 +30,7 @@ from ..tasks.lifecycle import do_complete, signed, undo_status
 from ..core.errors import BadInput, UnknownFields
 from ..notify.push import _b64u, _b64u_dec
 from ..notify.alerts import _env_int, aa_count
+from ..collab.integfail import INTEG_FAILS, integ_tell
 from ..calendars.subscriptions import _cal_opener, cal_allow, cal_err_text, cal_host_allowed, cal_rate, CAL_TIMEOUT, CalError
 from ..agents.core import agent_row, agent_runtime, git_author_clean, git_author_str, is_agent
 from ..tasks.ticketkey import tk_find, tk_has_key, tk_prefixes, tk_text_pairs, tk_text_re  # 2.390.0 (#3353)
@@ -762,6 +763,10 @@ def git_poll(c, cid):
         fails = (r["fails"] or 0) + 1
         c.execute(f"UPDATE git_conns SET etags=?, fails=?, last_error=?, next_at=? WHERE {same}",
                   (json.dumps(keep), fails, e.stored(), time.time() + min(GIT_POLL_S * 2 ** min(fails, 5), GIT_BACKOFF_MAX), *same_args))
+        if fails == INTEG_FAILS:  # 2.367.3 (#2971): the person who connected it and the project's owner
+            lo = c.execute("SELECT owner_id FROM lists WHERE id=?", (r["list_id"],)).fetchone()
+            integ_tell(c, [r["created_by"], lo["owner_id"] if lo else None], "git", f"{r['owner']}/{r['repo']}",
+                       (r["polled_at"] or r["created_at"] or "")[:10], click=f"l/{r['list_id']}", list=r["list_id"])
     if changed:
         bump(c)
     c.commit()

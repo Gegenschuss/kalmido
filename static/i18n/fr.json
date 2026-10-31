@@ -15435,5 +15435,18 @@
   "Monthly on the {0} {1}": "Tous les mois le {0} {1}",
   "Every {0} months on the {1} {2}": "Tous les {0} mois le {1} {2}",
   "Monthly on the last {0}": "Tous les mois le dernier {0}",
-  "Every {0} months on the last {1}": "Tous les {0} mois le dernier {1}"
+  "Every {0} months on the last {1}": "Tous les {0} mois le dernier {1}",
+  "Including my own changes": "Y compris mes propres modifications",
+  "Please check the backup settings.": "Vérifie les réglages de la sauvegarde.",
+  "Open settings": "Ouvrir les réglages",
+  "Forwarding {0} was turned off after repeated failed sends.": "Le transfert {0} a été désactivé après plusieurs échecs d'envoi.",
+  "Forwarding {0} was turned off: the person who set it up is no admin of the organisation any more.": "Le transfert {0} a été désactivé : la personne qui l'a configuré n'est plus admin de l'organisation.",
+  "Webhook {0} was turned off: its events could not be delivered.": "Le webhook {0} a été désactivé : ses événements n'ont pas pu être livrés.",
+  "Webhook {0} was turned off: the person who set it up is no admin of the organisation any more.": "Le webhook {0} a été désactivé : la personne qui l'a configuré n'est plus admin de l'organisation.",
+  "Inbound webhook {0} is paused: {1}": "Le webhook entrant {0} est en pause : {1}",
+  "Mailbox {0} cannot fetch mail, failing since {1}.": "La boîte {0} ne peut pas relever le courrier, en échec depuis {1}.",
+  "Git connection {0} cannot fetch, failing since {1}.": "La connexion Git {0} ne peut pas récupérer les données, en échec depuis {1}.",
+  "ntfy inbox {0} cannot fetch, failing since {1}.": "La boîte ntfy {0} ne peut pas récupérer les données, en échec depuis {1}.",
+  "Integration problem": "Problème d'intégration",
+  "a forwarding, webhook, mailbox or git connection of yours stopped working": "un de tes transferts, webhooks, boîtes ou connexions Git ne fonctionne plus"
 }

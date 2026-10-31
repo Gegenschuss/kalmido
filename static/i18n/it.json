@@ -15435,5 +15435,18 @@
   "Monthly on the {0} {1}": "Ogni mese il {0} {1}",
   "Every {0} months on the {1} {2}": "Ogni {0} mesi il {1} {2}",
   "Monthly on the last {0}": "Ogni mese l’ultimo {0}",
-  "Every {0} months on the last {1}": "Ogni {0} mesi l’ultimo {1}"
+  "Every {0} months on the last {1}": "Ogni {0} mesi l’ultimo {1}",
+  "Including my own changes": "Incluse le mie modifiche",
+  "Please check the backup settings.": "Controlla le impostazioni del backup.",
+  "Open settings": "Apri impostazioni",
+  "Forwarding {0} was turned off after repeated failed sends.": "L'inoltro {0} è stato disattivato dopo ripetuti invii non riusciti.",
+  "Forwarding {0} was turned off: the person who set it up is no admin of the organisation any more.": "L'inoltro {0} è stato disattivato: chi l'ha configurato non è più amministratore dell'organizzazione.",
+  "Webhook {0} was turned off: its events could not be delivered.": "Il webhook {0} è stato disattivato: i suoi eventi non sono stati recapitati.",
+  "Webhook {0} was turned off: the person who set it up is no admin of the organisation any more.": "Il webhook {0} è stato disattivato: chi l'ha configurato non è più amministratore dell'organizzazione.",
+  "Inbound webhook {0} is paused: {1}": "Il webhook in entrata {0} è in pausa: {1}",
+  "Mailbox {0} cannot fetch mail, failing since {1}.": "La casella {0} non riesce a scaricare la posta, errore dal {1}.",
+  "Git connection {0} cannot fetch, failing since {1}.": "La connessione Git {0} non riesce a scaricare, errore dal {1}.",
+  "ntfy inbox {0} cannot fetch, failing since {1}.": "La casella ntfy {0} non riesce a scaricare, errore dal {1}.",
+  "Integration problem": "Problema con un'integrazione",
+  "a forwarding, webhook, mailbox or git connection of yours stopped working": "un tuo inoltro, webhook, casella o connessione Git ha smesso di funzionare"
 }

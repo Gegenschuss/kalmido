@@ -115,6 +115,8 @@ VARS = (
     _v("KALMIDO_CHANNELS", "1", "Switch: notification channels (Slack, Matrix, Telegram, Signal).", "notify"),
     _v("KALMIDO_CHANNEL_FAILS", "5", "Failed deliveries in a row after which a channel is switched off.", "notify"),
     _v("KALMIDO_CHANNEL_TICK", "5", "Seconds between two deliveries rounds of the channels.", "notify"),
+    _v("KALMIDO_CHANNEL_RETRY", "60", "Seconds until a failed channel message gets its one more try.", "notify"),
+    _v("KALMIDO_INTEG_FAILS", "5", "Failed polls in a row of a mailbox, git connection or ntfy inbox after which its people get a notice.", "notify"),
     _v("KALMIDO_TELEGRAM_API", "https://api.telegram.org", "Address of the Telegram bot API.", "notify"),
     _v("KALMIDO_EVENT_MAIL_DELAY", "600", "Seconds after the first event before a summary mail goes out.", "notify"),
     _v("KALMIDO_EVENT_MAIL_GAP", "600", "Least seconds between two summary mails to one person.", "notify"),

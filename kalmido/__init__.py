@@ -89,6 +89,7 @@ ORDER = (
     "collab.replies",  # 2.33.0 (#1076): before comments / teamchat / agents.chat (they import it)
     "collab.comments",
     "collab.news",
+    "collab.integfail",  # 2.367.3 (#2971): an integration stopped working: News + push to who can repair it
     "personal.habits",
     "personal.timetrack",
     "personal.timewipe",  # 2.43.0 (#1434)

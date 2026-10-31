@@ -100,14 +100,14 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_ADMIN_TOPIC` | `(empty)` | ntfy topic for the admin alerts (empty = the admins' own topics). |
 | `KALMIDO_CHANNELS` | `1` | Switch: notification channels (Slack, Matrix, Telegram, Signal). |
 | `KALMIDO_CHANNEL_FAILS` | `5` | Failed deliveries in a row after which a channel is switched off. |
-| `KALMIDO_CHANNEL_TICK` | `5` | Seconds between two deliveries rounds of the channels. |
 | `KALMIDO_CHANNEL_RETRY` | `60` | Seconds until a failed channel message gets its one more try. |
-| `KALMIDO_INTEG_FAILS` | `5` | Failed polls in a row of a mailbox, git connection or ntfy inbox after which its people get a notice. |
+| `KALMIDO_CHANNEL_TICK` | `5` | Seconds between two deliveries rounds of the channels. |
 | `KALMIDO_DISMISS_DAY` | `30` | Removals per person and day. |
 | `KALMIDO_DISMISS_GAP` | `60` | Seconds between two such removals per person. |
 | `KALMIDO_DISMISS_WAIT` | `30` | Seconds before a read notification is removed from the other devices. |
 | `KALMIDO_EVENT_MAIL_DELAY` | `600` | Seconds after the first event before a summary mail goes out. |
 | `KALMIDO_EVENT_MAIL_GAP` | `600` | Least seconds between two summary mails to one person. |
+| `KALMIDO_INTEG_FAILS` | `5` | Failed polls in a row of a mailbox, git connection or ntfy inbox after which its people get a notice. |
 | `KALMIDO_NOTIF_TEMPLATE` | `read` | Notification template of a share without one: read, work or all. |
 | `KALMIDO_TELEGRAM_API` | `https://api.telegram.org` | Address of the Telegram bot API. |
 | `KALMIDO_VAPID_SUBJECT` | `(empty)` | Contact of the push keys (empty = PUBLIC_URL if https, else mailto:admin@example.com). |

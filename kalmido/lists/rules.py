@@ -729,12 +729,17 @@ def rul_due_tick(c):
 
 
 def _due_flush(c):
-    """The webhooks a rule run noted (a request flushes them after its response)."""
+    """The webhooks and channel events a rule run noted (a request flushes them after its response)."""
     n = g.pop("wh", None)
     if n:
         from ..integrations.webhooks import wh_enqueue
         with pg_system(c):  # 2.71.0 A (#1457): the watchdog queues what the rule run (as its creator) noted, like after_request
             wh_enqueue(c, n)
+    n = g.pop("chn", None)
+    if n:  # 2.367.3 (#2973): chn_flush hangs on after_request, which a rule run of the watchdog never reaches
+        from ..notify.channels import chn_list_events
+        with pg_system(c):
+            chn_list_events(c, n, auto=True)
 
 
 # ---------------------------------------------------------------- agents: read (API v1) + propose (kind "rule")

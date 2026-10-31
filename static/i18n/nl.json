@@ -15435,5 +15435,18 @@
   "Monthly on the {0} {1}": "Maandelijks op de {0} {1}",
   "Every {0} months on the {1} {2}": "Elke {0} maanden op de {1} {2}",
   "Monthly on the last {0}": "Maandelijks op de laatste {0}",
-  "Every {0} months on the last {1}": "Elke {0} maanden op de laatste {1}"
+  "Every {0} months on the last {1}": "Elke {0} maanden op de laatste {1}",
+  "Including my own changes": "Ook mijn eigen wijzigingen",
+  "Please check the backup settings.": "Controleer de back-upinstellingen.",
+  "Open settings": "Instellingen openen",
+  "Forwarding {0} was turned off after repeated failed sends.": "Doorsturen {0} is uitgeschakeld na herhaald mislukt verzenden.",
+  "Forwarding {0} was turned off: the person who set it up is no admin of the organisation any more.": "Doorsturen {0} is uitgeschakeld: wie het instelde is geen beheerder van de organisatie meer.",
+  "Webhook {0} was turned off: its events could not be delivered.": "Webhook {0} is uitgeschakeld: de gebeurtenissen konden niet worden afgeleverd.",
+  "Webhook {0} was turned off: the person who set it up is no admin of the organisation any more.": "Webhook {0} is uitgeschakeld: wie hem instelde is geen beheerder van de organisatie meer.",
+  "Inbound webhook {0} is paused: {1}": "Inkomende webhook {0} is gepauzeerd: {1}",
+  "Mailbox {0} cannot fetch mail, failing since {1}.": "Postvak {0} kan geen mail ophalen, mislukt sinds {1}.",
+  "Git connection {0} cannot fetch, failing since {1}.": "Git-verbinding {0} kan niet ophalen, mislukt sinds {1}.",
+  "ntfy inbox {0} cannot fetch, failing since {1}.": "ntfy-inbox {0} kan niet ophalen, mislukt sinds {1}.",
+  "Integration problem": "Probleem met een koppeling",
+  "a forwarding, webhook, mailbox or git connection of yours stopped working": "een doorstuuractie, webhook, postvak of git-verbinding van jou werkt niet meer"
 }
