@@ -11905,7 +11905,6 @@
   "yes|document": "ja",
   "Page {x} of {y}|document": "Pagina {x} van {y}",
   "Part|document": "Deel",
-  "Film production|document": "Filmproductie",
   "Progress invoice|document": "Voorschotfactuur",
   "Final invoice|document": "Eindfactuur",
   "Progress payment no. {n} on quotation {num}|document": "Voorschot nr. {n} op offerte {num}",
@@ -15299,5 +15298,9 @@
   "Outside working hours": "Buiten werktijd",
   "Outside working hours, back {0}": "Buiten werktijd, terug {0}",
   "Plan limit reached": "Limiet van het abonnement bereikt",
-  "Plan limit reached, back at {0}": "Limiet van het abonnement bereikt, terug om {0}"
+  "Plan limit reached, back at {0}": "Limiet van het abonnement bereikt, terug om {0}",
+  "Services|document": "Diensten",
+  "euer|file name": "resultatenrekening",
+  "logbook|file name": "rittenregistratie",
+  "per-diem|file name": "dagvergoeding"
 }

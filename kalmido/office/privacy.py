@@ -34,6 +34,7 @@ from ..accounts.login import seal, unseal
 from ..personal.timetrack import BadInput
 from .doctpl import (DT_NOTE, _ctx, _iid, dt_client, dt_doc, dt_fill, dt_file, dt_hash, dt_kick, dt_lang, dt_pdf, dt_signed_sync,
                      dt_tpl, dt_values)
+from .doclang import doc_lg
 from .doctpl_samples import DMA_SAMPLES
 from .model import pb_owner
 
@@ -235,7 +236,7 @@ def dsb_post():
         title, text = t["name"], t["body"]
     else:
         lang = dt_lang(c, oid, b.get("lang") or None)
-        title, text = DMA_SAMPLES[skey][lang]
+        title, text = DMA_SAMPLES[skey]["de" if lang == "de" else "en"]  # 2.449.0 (#3766): English sample for nl / fr / es / it, like doctpl (was a 500)
     ts = iso(now_utc())
     row = {"org_id": oid, "template_id": tid, "kind": "other",
            "title": title[:300], "body": text, "client_id": cl["id"], "lang": lang, "sign": int(sign), "status": "draft",
@@ -321,7 +322,7 @@ def dsb_mail_parts(c, oid, r, d, link):
     k = fk_contact(c, cl["id"])
     to = (k or {}).get("email") or cl.get("email_invoice") or cl.get("email") or ""
     sign = DSB_KINDS.get(r["kind"], DSB_KINDS["info"])[2]
-    lg = "en" if d.get("lang") == "en" else "de"
+    lg = doc_lg(d.get("lang"))  # 2.449.0 (#3766): every document language (was en, else de)
     co = ofx_company(c, oid).get("name") or ""
     title = d.get("title") or tr(DSB_KINDS[r["kind"]][0], lg=lg)
     rin = sign and MAIL_IN_ON
@@ -463,7 +464,7 @@ def dsb_file(c, r, uid, name, data, mime, ext):
 
 
 def dsb_signed_name(r, d, ext):
-    lg = "en" if (d or {}).get("lang") == "en" else "de"  # the sheet's language (also from the mail poller, no request)
+    lg = doc_lg((d or {}).get("lang"))  # the sheet's language (also from the mail poller, no request)
     base = re.sub(r'[\\/:*?"<>|\x00-\x1f\x7f]+', "-", (d or {}).get("title") or tr(DSB_KINDS[r["kind"]][0], lg=lg))[:120]
     return f"{base} ({tr('signed', lg=lg)}){ext}"
 

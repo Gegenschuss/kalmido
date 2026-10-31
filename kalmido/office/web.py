@@ -18,6 +18,7 @@ from .model import (
     office_number_next, office_scheme_clean, office_scheme_period, sr_public, pb_info, onc_preview, OFFER_COUNTERS, num_kind, num_scheme,
 )
 from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, ofx_log
+from .doclang import doc_lg
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from .rights import AREA_LEGACY, ofr_area_of, ofr_mine, ofr_rights, office_can  # 2.187.0 A (#2476)
@@ -179,6 +180,8 @@ def office_settings_put():
     cur = office_settings(c, oid)
     fresh = "pack" in b and of_pack_choice(c, oid, "admin", None)["pack_choose"]  # 2.147.0 (#2462): the first choice of the country
     new = office_settings_clean(c, oid, b, cur)
+    if fresh and "lang" not in b and (office_pack(new["pack"]) or {}).get("neutral"):  # 2.449.0 (#3766): no country pack: the admin's language, not the base pack's English
+        new["lang"] = doc_lg(lg_base())
     if "company_fields" in b:
         cf = ofx_company(c, oid)
         ncf = ofx_company_clean(b["company_fields"], cf)

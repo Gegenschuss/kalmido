@@ -28,7 +28,7 @@ from ..core.i18n import N_, lang, tr
 from ..core.db import bump, db, iso, local_day, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
-from .calc import dec, dstr, money
+from .calc import calc_lang, dec, dstr, money
 from .logbook import _body, _day, _id, _text
 from .model import ofx_name1, office_gate, office_org, office_settings
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
@@ -820,7 +820,7 @@ def cb_pdf_bytes(c, oid, book, frm, to, y, ents, closings, log, start, end, lg):
     ppr = pdf_paper_ns(s.get("paper"))  # 2.357.0 A (#3156): the office's paper size
     A4_H, A4_W, _Page = ppr.A4_H, ppr.A4_W, ppr._Page
     company = ofx_name1(ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name"))
-    lg = "de" if lg == "de" else "en"
+    lg = calc_lang(lg)  # 2.449.0 (#3766): every app language (was de, else en)
     cur = hc_home(s)  # 2.189.0 B (#2475): the home currency
     x0, x1 = 40, A4_W - 40
     pages, st = [], {"pg": None, "y": 0}

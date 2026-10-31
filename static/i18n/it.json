@@ -11905,7 +11905,6 @@
   "yes|document": "sì",
   "Page {x} of {y}|document": "Pagina {x} di {y}",
   "Part|document": "Parte",
-  "Film production|document": "Produzione audiovisiva",
   "Progress invoice|document": "Fattura di acconto",
   "Final invoice|document": "Fattura finale",
   "Progress payment no. {n} on quotation {num}|document": "Acconto n. {n} sul preventivo {num}",
@@ -15299,5 +15298,9 @@
   "Outside working hours": "Fuori dall'orario di lavoro",
   "Outside working hours, back {0}": "Fuori dall'orario di lavoro, di ritorno {0}",
   "Plan limit reached": "Limite del piano raggiunto",
-  "Plan limit reached, back at {0}": "Limite del piano raggiunto, di ritorno alle {0}"
+  "Plan limit reached, back at {0}": "Limite del piano raggiunto, di ritorno alle {0}",
+  "Services|document": "Servizi",
+  "euer|file name": "conto-economico",
+  "logbook|file name": "registro-viaggi",
+  "per-diem|file name": "diaria"
 }

@@ -11905,7 +11905,6 @@
   "yes|document": "sí",
   "Page {x} of {y}|document": "Página {x} de {y}",
   "Part|document": "Parte",
-  "Film production|document": "Producción audiovisual",
   "Progress invoice|document": "Factura parcial",
   "Final invoice|document": "Factura final",
   "Progress payment no. {n} on quotation {num}|document": "Pago parcial n.º {n} del presupuesto {num}",
@@ -15299,5 +15298,9 @@
   "Outside working hours": "Fuera del horario de trabajo",
   "Outside working hours, back {0}": "Fuera del horario de trabajo, vuelve {0}",
   "Plan limit reached": "Límite del plan alcanzado",
-  "Plan limit reached, back at {0}": "Límite del plan alcanzado, vuelve a las {0}"
+  "Plan limit reached, back at {0}": "Límite del plan alcanzado, vuelve a las {0}",
+  "Services|document": "Servicios",
+  "euer|file name": "cuenta-de-resultados",
+  "logbook|file name": "libro-de-ruta",
+  "per-diem|file name": "dietas"
 }

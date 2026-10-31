@@ -10,6 +10,9 @@ Invented companies, people and figures only, addresses @example.com.
    country pack, payment note), its PDF too, the e-invoice XML is built with French notes and unchanged codes; German and
    English documents print as before; a language switch of a draft swaps the standard texts into French
  - a person without an organisation (personal office, her own admin): an invoice in French, finalised, PDF + XML
+ - 2.449.0 (#3766) the switches "de, else en": the privacy sheet's mail and sample, the neutral summary position of an
+   invoice from parts (never "Film production"), the language of a new office without a country pack, the PDF reports and
+   file names in the person's language
 usage: p2185_c_doclang_test.py <datadir>
 freelancer-matrix: office"""
 import importlib.util
@@ -17,6 +20,7 @@ import io
 import json
 import os
 import sys
+import zipfile
 import xml.etree.ElementTree as ET
 
 import requests
@@ -63,7 +67,7 @@ OLD_PDF = {  # office/pdf.py PDF_LABELS up to 2.167
 for k, (de, en) in OLD_PDF.items():
     check(pdf.tr(pdf.PDF_LABELS[k], lg="de") == de and pdf.tr(pdf.PDF_LABELS[k], lg="en") == en, f"pdf label {k}: de / en as before")
 # 2.357.0 C (#3182): + accept_text (the order sentence above the signature lines of a quotation)
-NEW_PDF = {"accept_text"}
+NEW_PDF = {"accept_text", "ov_title", "ov_part", "ov_page", "ov_hint"}  # 2.449.0 (#3766): + the overview of #3622 (this check was red since then)
 check(set(pdf.PDF_LABELS) == set(OLD_PDF) | NEW_PDF, "pdf: no label lost")
 check(pdf.tr(pdf.PDF_LABELS["title"], lg="fr") == "Devis" and pdf.tr(pdf.PDF_LABELS["vat"], lg="nl") == "Btw", "pdf: fr / nl words")
 
@@ -92,6 +96,7 @@ check(calc.bwa_vat_note(calc.label(None, "fr", "vat_note"), [19], "fr") == "Tous
 check(calc.fmt_money(1234.5, "de") == "1.234,50 €" and calc.fmt_money(1234.5, "en") == "€1,234.50" and calc.fmt_money(1234.5, "fr") == "1\u00a0234,50 €"
       and calc.fmt_money(1234.5, "nl") == "€ 1.234,50", "calc: money de / en as before, fr / nl by their language")
 check(calc.fmt_qty(4.5, "nl") == "4,5" and calc.fmt_qty(4.5, "en") == "4.5", "calc: quantities")
+check(calc.fmt_point("7.5", "fr") == "7,5" and calc.fmt_point("7.5", "nl") == "7,5" and calc.fmt_point("7.5", "en-GB") == "7.5", "#3766: the decimal sign by the language")
 check(calc.calc_lang("fr") == "fr" and calc.calc_lang("en-GB") == "en" and calc.calc_lang("xx") == "de" and calc.calc_lang(None) == "de", "calc: the document language")
 
 # 2.296.0 B (#3175): pdf_money = calc.fmt_money ("€1,234.50" en like the model's texts); the pack's format only for German
@@ -254,14 +259,140 @@ def lang_checks(s, client, tag):
     s.put(B + O + "/settings", json={"lang": "de"})
 
 
+def privacy_checks(s, client, tag):
+    """#3766: the mail of a French sheet is French (it was German), its sample opens (it was a 500)."""
+    t = s.post(B + O + "/doc-templates", json={"kind": "other", "name": "Fiche", "lang": "fr", "sign": 1, "body": "# Fiche\n\nTexte."}).json()["id"]
+    r = s.post(B + O + "/privacy-sheets", json={"client_id": client, "kind": "dpa", "template_id": t})
+    check(r.status_code == 201, f"{tag}: a French sheet " + r.text[:200])
+    m = s.get(B + O + f"/privacy-sheets/{r.json()['sheet']['id']}/mail").json()
+    check(m.get("text", "").startswith(LG["fr"]["Hello,"]) and LG["fr"]["Kind regards"] in m["text"], f"{tag}: the sheet's mail in French ({m.get('text', '')[:80]!r})")
+    r = s.post(B + O + "/privacy-sheets", json={"client_id": client, "kind": "info"})
+    check(r.status_code == 201, f"{tag}: a sheet from the sample in an office in French ({r.status_code})")
+
+
+def summary_invoice(s, lang, tag):
+    """A quotation with one part in lang -> the positions of its summary invoice."""
+    did = s.post(B + D, json={"kind": "offer", "lang": lang, "project_title": f"Parts {tag}",
+                              "items": [{"kind": "service", "title": "Concept", "qty": 1, "unit": "day", "rate": 800}]}).json()["id"]
+    r = s.post(B + f"{D}/{did}/parts", json={"title": "Module"})
+    check(r.status_code == 201, f"{tag}: a part " + r.text[:160])
+    s.put(B + f"{D}/{did}/parts/{r.json()['part']['id']}/items", json={"items": [{"kind": "service", "title": "Animation", "qty": 1, "unit": "day", "rate": 500}]})
+    r = s.post(B + f"{D}/{did}/invoice", json={"parts_mode": "summary"})
+    check(r.status_code == 201, f"{tag}: summary invoice {lang} " + r.text[:200])
+    return r.json()["items"] if r.ok else []
+
+
+def position_checks(s, tag):
+    """#3766: the summary position is neutral and in the document's language; the former default stored by the form counts as empty."""
+    st = s.get(B + O + "/settings").json()["settings"]
+    check(st["parts_summary_title_de"] == "" and st["parts_summary_title_en"] == "", f"{tag}: the default is empty ({st['parts_summary_title_en']!r})")
+    for lg, word in (("fr", "Prestations"), ("de", "Leistungen"), ("en", "Services"), ("nl", "Diensten")):
+        ti = [x["title"] for x in summary_invoice(s, lg, f"{tag} {lg}")]
+        check(ti and set(ti) == {word}, f"{tag}: summary position in {lg} {ti}")
+    s.put(B + O + "/settings", json={"parts_summary_title_de": "Filmherstellung", "parts_summary_title_en": "Film production"})
+    ti = [x["title"] for x in summary_invoice(s, "fr", f"{tag} old")]
+    check(ti and set(ti) == {"Prestations"}, f"{tag}: a stored former default is no title of the office {ti}")
+    r = s.put(B + O + "/settings", json={"industry_packs": ["film"], "parts_summary_title_de": "Filmherstellung", "parts_summary_title_en": "Film production"})
+    check(r.ok, f"{tag}: the film pack " + r.text[:160])
+    ti = [x["title"] for x in summary_invoice(s, "de", f"{tag} film")]
+    check(ti and set(ti) == {"Filmherstellung"}, f"{tag}: an office with the film pack keeps it {ti}")
+    ti = [x["title"] for x in summary_invoice(s, "fr", f"{tag} film fr")]
+    check(ti and set(ti) == {"Prestations"}, f"{tag}: never the English film word on a French invoice {ti}")
+    s.put(B + O + "/settings", json={"industry_packs": [], "parts_summary_title_de": "", "parts_summary_title_en": "Motion design"})
+    ti = [x["title"] for x in summary_invoice(s, "fr", f"{tag} own")]
+    check(ti and set(ti) == {"Motion design"}, f"{tag}: an own title stays {ti}")
+    s.put(B + O + "/settings", json={"parts_summary_title_en": ""})
+
+
+def report(s, path, tag):
+    """(text of the PDF, Content-Disposition) of a report."""
+    from pypdf import PdfReader
+    r = s.get(B + O + path)
+    check(r.ok and r.content[:5] == b"%PDF-", f"{tag}: {path} ({r.status_code})")
+    return ("\n".join(p.extract_text() or "" for p in PdfReader(io.BytesIO(r.content)).pages) if r.ok else ""), r.headers.get("Content-Disposition", "")
+
+
+def report_checks(s, uid, tag):
+    """#3766: a person working in French gets the reports with French numbers, dates and file names (they were English)."""
+    check(s.patch(B + "/api/settings", json={"lang": "fr"}).ok, f"{tag}: French")
+    r = s.post(B + O + "/equipment", json={"name": "Licht", "serial_no": "L-1", "purchase_date": "2026-02-01", "purchase_net": "300"})
+    check(r.status_code == 201, f"{tag}: equipment " + r.text[:160])
+    t, _ = report(s, "/equipment/value.pdf", tag)
+    check("février" in t, f"{tag}: equipment value: French date ({t[:200]!r})")
+    t, cd = report(s, f"/books/euer.pdf?year={TODAY[:4]}", tag)
+    check("0,00" in t and "0.00" not in t, f"{tag}: EUeR: French money ({t[:200]!r})")
+    check("compte-de-resultat-" in cd, f"{tag}: EUeR PDF: file name {cd}")
+    r = s.get(B + O + f"/books/euer.csv?year={TODAY[:4]}")
+    check("compte-de-resultat-" in r.headers.get("Content-Disposition", ""), f"{tag}: EUeR CSV: file name")
+    vid = s.post(B + O + "/vehicles", json={"name": "Kombi", "kind": "private", "odo_start": "10000"}).json()["id"]
+    r = s.post(B + O + "/drives", json={"vehicle_id": vid, "day": "2026-03-02", "start_place": "Hamburg", "dest": "Lübeck", "purpose": "Dreh", "odo_start": "10000",
+                                        "odo_end": "10120.5", "kind": "business"})
+    check(r.status_code == 201, f"{tag}: a drive " + r.text[:200])
+    t, cd = report(s, "/logbook.pdf?year=2026", tag)
+    check("10120,5" in t and "10120.5" not in t, f"{tag}: logbook: the French decimal comma ({t[:300]!r})")
+    check("carnet-de-bord-2026.pdf" in cd, f"{tag}: logbook PDF: file name {cd}")
+    r = s.get(B + O + "/logbook.csv?year=2026")
+    check("carnet-de-bord-2026.csv" in r.headers.get("Content-Disposition", ""), f"{tag}: logbook CSV: file name")
+    r = s.post(B + O + "/cashbooks", json={"name": "Caisse", "opening": "500.00", "opening_day": "2026-01-01"})
+    check(r.status_code == 201, f"{tag}: a cash book " + r.text[:160])
+    t, _ = report(s, f"/cashbook.pdf?book_id={r.json()['id']}&year=2026", tag)
+    check("500,00" in t and "€500" not in t, f"{tag}: cash book: French money ({t[:200]!r})")
+    r = s.post(B + O + "/trips", json={"date_from": "2025-09-03", "date_to": "2025-09-05", "dest": "Athènes", "overnight": True, "country": "GR",
+                                       "people": [{"id": uid}], "purpose": "job"})
+    check(r.status_code == 201, f"{tag}: a trip " + r.text[:200])
+    j = s.get(B + O + "/trips/vma?year=2025").json()
+    lines = str(j.get("people"))
+    check("Grèce" in lines, f"{tag}: per diem: the country in French ({lines[:300]!r})")
+    t, cd = report(s, "/trips/vma.pdf?year=2025", tag)
+    check("septembre 2025" in t, f"{tag}: per diem: French date ({t[:200]!r})")
+    check("indemnites-repas-2025" in cd, f"{tag}: per diem: file name {cd}")
+    m = s.post(B + O + "/meals", json={}).json()
+    r = s.patch(B + O + f"/meals/{m['id']}", json={"date": "2025-05-14", "place_name": "Trattoria Esempio", "place_address": "Beispielweg 1\n12345 Musterstadt",
+                                                   "occasion": "Negotiation of the follow-up order", "host": {"id": uid}, "guests": [{"name": "Gina Gast"}],
+                                                   "amounts": [{"kind": "food", "rate": 7.5, "gross": "107.50"}]})
+    check(r.ok, f"{tag}: a meal " + r.text[:200])
+    t, _ = report(s, f"/meals/{m['id']}/pdf", tag)
+    check("mai 2025" in t and "7,5 %" in t, f"{tag}: meal: French date and rate ({t[:300]!r})")
+    r = s.get(B + O + "/subs.csv")
+    check(r.ok and ";" in r.text.splitlines()[0], f"{tag}: subscriptions CSV: the semicolon of a comma language")
+    names = zipfile.ZipFile(io.BytesIO(s.get(B + "/api/export/markdown.zip").content)).namelist()
+    check(LG["fr"]["Basket"] + ".md" in names, f"{tag}: export: the inbox's file in French {names}")
+    s.patch(B + "/api/settings", json={"lang": "en"})
+
+
+def new_office_checks(s, tag):
+    """#3766: a new office without a country pack takes the person's language (it was the base pack's English)."""
+    check(s.patch(B + "/api/settings", json={"lang": "fr"}).ok, f"{tag}: French")
+    r = s.put(B + O + "/settings", json={"pack": "XX"})
+    check(r.ok and r.json()["settings"]["lang"] == "fr", f"{tag}: a new office without a country pack takes the person's language ({r.text[:120]})")
+    r = s.put(B + O + "/settings", json={"pack": "DE"})
+    check(r.ok and r.json()["settings"]["lang"] == "de", f"{tag}: the German pack brings its language back")
+    s.patch(B + "/api/settings", json={"lang": "en"})
+
+
 CL = office_setup(A, "Beispiel Studio GmbH", "Exemple SARL")
 lang_checks(A, CL, "org")
+A.put(B + O + "/settings", json={"lang": "fr"})
+privacy_checks(A, CL, "org")
+A.put(B + O + "/settings", json={"lang": "de"})
+position_checks(A, "org")
+report_checks(A, ALICE, "org")
+ORG2 = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": ALICE}).json()["id"]
+A.patch(B + "/api/settings", json={"workspace": f"org:{ORG2}"})
+new_office_checks(A, "org")
 
 # ---------------------------------------------------------------- a person without an organisation
 # freelancer-matrix: office
 FID, F = freelancer(B, A)
 CLF = office_setup(F, "Frida Film", "Exemple Studio")
 lang_checks(F, CLF, "freelancer")
+F.put(B + O + "/settings", json={"lang": "fr"})
+privacy_checks(F, CLF, "freelancer")
+F.put(B + O + "/settings", json={"lang": "de"})
+position_checks(F, "freelancer")
+report_checks(F, FID, "freelancer")
+_, F2 = freelancer(B, A, name="gaston")
+new_office_checks(F2, "freelancer")
 
 print(f"p2185_c_doclang: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

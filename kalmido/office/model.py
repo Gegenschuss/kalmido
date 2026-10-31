@@ -65,6 +65,10 @@ def ofx_name_clean(v, mx=NAME_MAX):
 
 TEXT_MAX = 8000
 
+# 2.449.0 (#3766): the former app defaults of parts_summary_title_*; the settings form saved them along, so a stored one was
+# not chosen: outside an office with the film pack it counts as empty (office_settings)
+PARTS_TITLE_FILM = {"de": "Filmherstellung", "en": "Film production"}
+
 # ---- settings (office_settings.data), defaults filled from the country pack
 SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact_lines": [], "register_lines": [], "bank_lines": []},
                      "logo": "", "color": "", "lang": "de", "currency": "EUR", "fx_usd": 1.09, "offer_scheme": "",
@@ -95,7 +99,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "industry_packs": [],
                      # 2.47.0 (#1215): an invoice from a quotation with parts: "full" (like the quotation), "title" (the title
                      # page with its positions) or "summary" (one position per tax rate with this title)
-                     "parts_invoice_mode": "full", "parts_summary_title_de": "Filmherstellung", "parts_summary_title_en": "Film production",
+                     "parts_invoice_mode": "full", "parts_summary_title_de": "", "parts_summary_title_en": "",
                      # 2.47.3 (#1460): the DATEV booking batch export (office.datev: advisor / client number, chart, accounts)
                      "datev_extf": {},
                      # 2.51.0 A (#1348): agents may read office data (clients, prices) -- they go to the agent's AI model; off by
@@ -348,6 +352,10 @@ def office_settings(c, oid):
                 out[k].update(d[k])
             else:
                 out[k] = d[k]
+    if "film" not in (out.get("industry_packs") or []):
+        for lg, w in PARTS_TITLE_FILM.items():
+            if out["parts_summary_title_" + lg] == w:
+                out["parts_summary_title_" + lg] = ""
     from .catalog import pkc_bind
     pkc_bind(c, oid)  # 2.76.0 (#1023): office_pack / dk_pack resolve the packs installed in this office area from here on
     pack = office_pack(out["pack"]) or office_pack("DE")

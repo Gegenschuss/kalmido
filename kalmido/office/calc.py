@@ -198,11 +198,15 @@ def label(pack, lang, key, **kw):
     return s
 
 
+def fmt_point(s, lang="de"):
+    """2.449.0 (#3766): a plain number text ("4.5") with the decimal sign of the language (CALC_LOCALE: was a comma for German alone)."""
+    return str(s).replace(".", CALC_LOCALE.get(calc_lang(lang), CALC_LOCALE["de"])[1])
+
+
 def fmt_qty(d, lang="de"):
     """A quantity for a line: 3 -> "3", 4.5 -> "4,5" (de) / "4.5" (en)."""
     d = dec(d).normalize()
-    s = str(int(d)) if d == d.to_integral() else format(d, "f")
-    return s if (lang or "de").lower().startswith("en") else s.replace(".", ",")
+    return fmt_point(str(int(d)) if d == d.to_integral() else format(d, "f"), lang)
 
 
 def fmt_money(d, lang="de", currency="EUR", places=2):

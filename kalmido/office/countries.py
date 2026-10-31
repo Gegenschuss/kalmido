@@ -43,6 +43,19 @@ FK_NAME_LANG = {"DE": "de", "AT": "de", "CH": "de", "LI": "de", "LU": "de", "FR"
 _FK_NAMES = {}
 
 
+def fk_country_names(lg):
+    """{ISO code: name} of countrynames.json in language lg ({} for one it has not)."""
+    if not _FK_NAMES:
+        import json
+        import os
+        try:
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "countrynames.json"), encoding="utf-8") as fh:
+                _FK_NAMES.update(json.load(fh))
+        except (OSError, ValueError):
+            _FK_NAMES["en"] = {}
+    return _FK_NAMES.get(lg) or {}
+
+
 def fk_country_label(code, home):
     """The printed country of an address in a document of a sender in home (ISO code): '' for the sender's own country, the
     name in capitals in home's language (English for other countries), the text as it was for an unknown code."""
@@ -54,15 +67,7 @@ def fk_country_label(code, home):
         return str(code).strip()
     if c == h:
         return ""
-    if not _FK_NAMES:
-        import json
-        import os
-        try:
-            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "countrynames.json"), encoding="utf-8") as fh:
-                _FK_NAMES.update(json.load(fh))
-        except (OSError, ValueError):
-            _FK_NAMES["en"] = {}
-    names = _FK_NAMES.get(FK_NAME_LANG.get(h, "en")) or _FK_NAMES.get("en") or {}
+    names = fk_country_names(FK_NAME_LANG.get(h, "en")) or fk_country_names("en")
     return str(names.get(c) or c).upper()
 
 

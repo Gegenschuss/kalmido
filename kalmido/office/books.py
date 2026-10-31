@@ -29,7 +29,7 @@ from ..core.access import Denied
 from ..core.i18n import N_, tr, lang
 from ..core.errors import BadInput
 from .abschlag import abs_skonto_rows  # 2.355.0 C (#2840)
-from .calc import dec, dstr, money
+from .calc import calc_lang, dec, dstr, money
 from .countries import fk_reverse_case  # 2.355.0 C (#2844)
 from .einvoice_in import ei_amount, ei_details, ei_rc_offer  # 2.237.0 C (#2865)
 from .homecur import hc_code, hc_doc_fx, hc_home, hc_office_rate
@@ -572,7 +572,7 @@ def bk_euer_csv():
     ofx_log(c, oid, "export", target="books", detail={"what": "euer.csv", "year": d["year"]})
     c.commit()
     return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": f'attachment; filename="euer-{d["year"]}.csv"', "Cache-Control": "no-store"})
+                    headers={"Content-Disposition": f'attachment; filename="{tr("euer|file name")}-{d["year"]}.csv"', "Cache-Control": "no-store"})
 
 
 def bk_euer_pdf_bytes(c, oid, d, lang):
@@ -584,7 +584,7 @@ def bk_euer_pdf_bytes(c, oid, d, lang):
     A4_H, A4_W, _Page = ppr.A4_H, ppr.A4_W, ppr._Page
     company = ofx_name1(ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name"))  # 2.99.0 D (#2188): one line
     cur = d["currency"]
-    lg = "de" if lang == "de" else "en"
+    lg = calc_lang(lang)  # 2.449.0 (#3766): every app language (was de, else en)
     m = lambda v: pdf_money(v, lg, cur)  # noqa: E731
     x0, x1 = 56, A4_W - 56
     cols = [x1 - 230, x1 - 140, x1 - 50]  # right edges of net / VAT / gross minus their width
@@ -652,4 +652,4 @@ def bk_euer_pdf():
     ofx_log(c, oid, "export", target="books", detail={"what": "euer.pdf", "year": d["year"]})
     c.commit()
     return Response(data, mimetype="application/pdf",
-                    headers={"Content-Disposition": f'attachment; filename="euer-{d["year"]}.pdf"', "Cache-Control": "no-store"})
+                    headers={"Content-Disposition": f'attachment; filename="{tr("euer|file name")}-{d["year"]}.pdf"', "Cache-Control": "no-store"})

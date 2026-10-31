@@ -11881,7 +11881,6 @@
   "yes|document": "ja",
   "Page {x} of {y}|document": "Seite {x} von {y}",
   "Part|document": "Teil",
-  "Film production|document": "Filmherstellung",
   "Progress invoice|document": "Abschlagsrechnung",
   "Final invoice|document": "Schlussrechnung",
   "Progress payment no. {n} on quotation {num}|document": "Abschlag Nr. {n} auf Angebot {num}",
@@ -15299,5 +15298,9 @@
   "Outside working hours": "Außerhalb der Arbeitszeit",
   "Outside working hours, back {0}": "Außerhalb der Arbeitszeit, zurück {0}",
   "Plan limit reached": "Tarifgrenze erreicht",
-  "Plan limit reached, back at {0}": "Tarifgrenze erreicht, zurück um {0}"
+  "Plan limit reached, back at {0}": "Tarifgrenze erreicht, zurück um {0}",
+  "Services|document": "Leistungen",
+  "euer|file name": "euer",
+  "logbook|file name": "fahrtenbuch",
+  "per-diem|file name": "verpflegungspauschale"
 }

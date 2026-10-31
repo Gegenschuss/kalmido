@@ -85,7 +85,7 @@ OLD = {
     "Payable by {date} without deduction.|document": ("Zahlbar bis {date} ohne Abzug.", "Payable by {date} without deduction."),
     "Quotation no.|document": ("Angebot Nr.", None), "Valid until|document": ("Gültig bis", None), "Exceptions|document": ("Ausnahmen", None),
     "Exclusive|document": ("Exklusiv", None), "yes|document": ("ja", "yes"), "Page {x} of {y}|document": ("Seite {x} von {y}", "Page {x} of {y}"),
-    "Part|document": ("Teil", "Part"), "Film production|document": ("Filmherstellung", "Film production"),
+    "Part|document": ("Teil", "Part"), "Services|document": ("Leistungen", "Services"),  # 2.449.0 (#3766): was "Film production"
     "Progress invoice|document": ("Abschlagsrechnung", "Progress invoice"), "Final invoice|document": ("Schlussrechnung", "Final invoice"),
     "Progress payment no. {n} on quotation {num}|document": ("Abschlag Nr. {n} auf Angebot {num}", "Progress payment no. {n} on quotation {num}"),
     "Share at {pct} % VAT|document": ("Anteil {pct} % USt", "Share at {pct} % VAT"),

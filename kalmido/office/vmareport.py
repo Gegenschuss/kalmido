@@ -16,7 +16,7 @@ from ..core.config import app
 from ..core.db import local_now
 from ..core.i18n import lang, tr, trn
 from ..core.errors import BadInput
-from .calc import dstr, money
+from .calc import calc_lang, dstr, fmt_point, money
 from .ledger import ofx_log
 from .model import office_settings
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
@@ -143,7 +143,7 @@ def vmr_report(c, oid, year, person=None, lg="de"):
 def vmr_num(v, lg):
     d = Decimal(v)
     t = format(d.quantize(Decimal(1)) if d == d.to_integral() else d.quantize(Decimal("0.01")), "f")
-    return t.replace(".", ",") if lg == "de" else t
+    return fmt_point(t, lg)  # 2.449.0 (#3766): every comma language (was de alone)
 
 
 def vmr_args():
@@ -155,12 +155,12 @@ def vmr_args():
     own = ofr_own_uid("travel")
     if own is not None:  # 2.187.1 B (#2735): level "own": only the person's own per diem (rk_trips: their trips)
         person = "u%s" % own
-    lg = "de" if lang(c, uid) == "de" else "en"
+    lg = calc_lang(lang(c, uid))  # 2.449.0 (#3766): every app language (was de, else en)
     return c, uid, oid, year, person, lg
 
 
 def vmr_fname(year, person, ext):
-    return f"per-diem-{year}{'-' + re.sub(r'[^a-z0-9]+', '-', person.lower()).strip('-') if person else ''}.{ext}"
+    return f"{tr('per-diem|file name')}-{year}{'-' + re.sub(r'[^a-z0-9]+', '-', person.lower()).strip('-') if person else ''}.{ext}"
 
 
 def vmr_send(raw, mime, name):
