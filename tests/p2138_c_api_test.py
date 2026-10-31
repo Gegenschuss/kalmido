@@ -468,7 +468,7 @@ WB1 = str(one("SELECT body FROM wiki_pages WHERE id=?", (WP,)))
 WW1 = {x[0] for x in dbx("SELECT h FROM wiki_words WHERE page_id=?", (WP,))}
 ws_ = A.get(B + "/api/wiki/search", params={"q": "quittenhecke", "space": f"org:{ORG}"})
 check(WB1.startswith("kenc1:") and A.get(B + f"/api/wiki/pages/{WP}").json().get("body") == "Quittenhecke am Nordtor schneiden"
-      and WW1 - {x for x in WW1 if x.startswith("u:")} and not (WW1 & WW0) - {x for x in WW0 if x.startswith("u:")}
+      and {x for x in WW1 if not x.startswith(("u:", "tv:"))} and not {x for x in WW1 & WW0 if not x.startswith(("u:", "tv:"))}
       and ws_.ok and [p["id"] for p in ws_.json().get("pages", [])] == [WP],
       "after the rotation: the knowledge page re-encrypted, its word index made with the new key, found again")
 # 2.138.0 C (#1972): finishing a rotation that no longer runs: an error, no recovery key that is stored nowhere

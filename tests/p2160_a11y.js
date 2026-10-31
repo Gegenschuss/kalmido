@@ -120,8 +120,8 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
   const fl = [...md.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea')].filter(x => x.type !== 'hidden');
   fl[fl.length - 1].focus(); key(w, fl[fl.length - 1], 'Tab');
   check(md.contains(d.activeElement), 'Tab from the last control stays in the dialog');
-  key(w, d.activeElement, 'Escape'); await sleep(150);
-  check(!md.isConnected && d.activeElement === opener, 'Esc closes it and the focus goes back to the opener');
+  key(w, d.activeElement, 'Escape');  // #3049: the project dialog closes once its save is through, so wait for that state
+  check(await until(() => !md.isConnected && d.activeElement === opener), 'Esc closes it and the focus goes back to the opener');
   // errors in words (3.3.1)
   w.eval(`tokModal(null, [])`); await sleep(300);
   md = [...d.querySelectorAll('.modal')].pop();

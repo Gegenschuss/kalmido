@@ -14,7 +14,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (process.env.P2220B_NOSTART !== '1') execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return Array.isArray(j) ? j : {...j, http: r.status}; };
 const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents,habits';
-const LONG = 'Großprojekt Tausend';
+const LONG = 'Großprojekt 1000';  // shorter since 2.408 (#3518): the count 2/3 takes more of the row than a plain number
 
 (async () => {
   await sleep(600);

@@ -51,6 +51,7 @@ const WS_VIEWS = {
   'static/js/agentview.js': 'helper',         // 2.361.4 (#2928): av_ownArea - whether the shown workspace is one's own area (texts and offers while drawing, no view keeping data)
   'static/js/clients.js': 'helper',           // 2.361 (#2938): wsCur only picks the empty-state text for Private (no view keeping data)
   'static/js/dispo.js': 'helper',             // 2.361 (#2938): wsCur only picks the empty-row text for Private (no view keeping data)
+  'static/js/acctset.js': 'helper',           // 2.365.2 C (#2789): wsCur only preselects the organisation of Settings > Absences and vacation (the dialog has its own picker, no view keeping data)
   'static/js/polls.js': 'helper',            // 2.98.1: the default workspace of a new poll (the dialog shows all polls, with their workspace)
   'static/js/palette.js': 'draw',
   'static/js/areas.js': 'draw',               // 2.87.0: private areas hidden in an organisation's view (o3a_hid while drawing, #1845)
@@ -104,7 +105,8 @@ function scan() {
   const found = scan();
   const missing = found.filter(f => !(f in WS_VIEWS));
   check(found.length > 10 && !missing.length, 'guard: views with a workspace link without an entry in WS_VIEWS (add them with a check): ' + missing.join(', '));
-  const stale = Object.keys(WS_VIEWS).filter(f => !found.includes(f));
+  const NOT_ON_TRAIN = ['static/js/acctset.js'];  // 2.365.2 C (#2789) sits in main, the live train does not have it yet: drop this once it is live
+  const stale = Object.keys(WS_VIEWS).filter(f => !found.includes(f) && !NOT_ON_TRAIN.includes(f));
   check(!stale.length, 'guard: entries whose file has no workspace link any more (remove them): ' + stale.join(', '));
   const CHECKED = new Set();
 
