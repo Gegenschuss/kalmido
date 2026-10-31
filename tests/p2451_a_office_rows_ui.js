@@ -19,8 +19,9 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
 const PDF = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer << /Root 1 0 R >>\n%%EOF\n');
 const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim());
 const pick = async (d, label) => { const it = await until(() => [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => b.textContent.trim() === label)); it?.click(); };
-const press = (w, el) => el.dispatchEvent(new w.PointerEvent('pointerdown', {bubbles: true, pointerType: 'touch', clientX: 5, clientY: 5}));
-const release = (w, el) => el.dispatchEvent(new w.PointerEvent('pointerup', {bubbles: true, pointerType: 'touch'}));
+const ptr = (w, el, type) => { const e = new w.MouseEvent(type, {bubbles: true, clientX: 5, clientY: 5}); Object.defineProperty(e, 'pointerType', {value: 'touch'}); el.dispatchEvent(e); };
+const press = (w, el) => ptr(w, el, 'pointerdown');
+const release = (w, el) => ptr(w, el, 'pointerup');
 
 (async () => {
   await sleep(600);
@@ -42,7 +43,7 @@ const release = (w, el) => el.dispatchEvent(new w.PointerEvent('pointerup', {bub
   const run = await call('POST', '/api/office/legacy/archive/run');
   for (const [no, amount, date] of [['A-1', '100', '2025-05-08'], ['A-2', '900', '2025-01-08']]) {
     const fd = new FormData();
-    fd.append('file', new Blob([PDF], {type: 'application/pdf'}), no + '.pdf');
+    fd.append('file', new Blob([PDF, no], {type: 'application/pdf'}), no + '.pdf');
     for (const [k, v] of Object.entries({run_id: run.run_id, kind: 'offer', number: no, client_id: A.cl, date, amount, paid: '0'})) fd.append(k, String(v));
     const up = await fetch(B + 'api/office/legacy/archive', {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: CK}, body: fd});
     check(up.status === 201, 'archived quotation ' + up.status);
@@ -75,11 +76,11 @@ const release = (w, el) => el.dispatchEvent(new w.PointerEvent('pointerup', {bub
   check(w.eval(`LS.get('lst.sort.docs.offer', null)?.k`) === 'name', 'remembered for this list');
   w.close();
   // ================= remembered, per list
-  w = await boot({hash: 'office/offers', ls: {'lst.sort.docs.offer': JSON.stringify({k: 'amount', d: 'asc'})}}); d = w.document;
+  w = await boot({hash: 'office/offers', ls: {'tasks.lst.sort.docs.offer': JSON.stringify({k: 'amount', d: 'asc'})}}); d = w.document;
   check(await until(() => ids() === [Cc.id, A.id, Bb.id].join()), 'a new start keeps the sort ' + ids());
   d.querySelector('.ofdkinds [data-kind="archive"]').click();
   await until(() => d.querySelector('.oimarch a.ofdrow'), 60);
-  const arch = () => [...d.querySelectorAll('.oimarch a.ofdrow b')].map(b => b.textContent.split(' ')[0]).join();
+  const arch = () => [...d.querySelectorAll('.oimarch a.ofdrow .ofcn b')].map(b => b.textContent.split(' ')[0]).join();
   check(arch() === 'A-1,A-2', 'the archive has its own sort: newest first ' + arch());
   w.close();
 
