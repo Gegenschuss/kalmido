@@ -168,8 +168,8 @@ check(Bo.delete(B + f"{D}/{DOC}").status_code == 403, "finalised: a member still
 check(A.get(B + f"{D}/{DOC}").json()["project_title"] == "Imagefilm", "finalised: unchanged")
 r = A.post(B + f"{D}/{DOC}/status", json={"status": "sent"})
 check(r.ok and r.json()["status"] == "sent", "finalised quotation: status still changes")
-# 2.144.8 (#2573) test phase: a sent quotation may be deleted too (not done here: DOC is used below); undo finalising stays 409
-check(A.get(B + f"{D}/{DOC}").json()["can_delete"] is True and A.post(B + f"{D}/{DOC}/unlock").status_code == 409, "finalised + sent: can_delete (test phase), unlock 409")
+# 2.417.0 C (#2604): the test phase of 2.144.8 (#2573) is over: a sent quotation stays; undo finalising stays 409
+check(A.get(B + f"{D}/{DOC}").json()["can_delete"] is False and A.post(B + f"{D}/{DOC}/unlock").status_code == 409, "finalised + sent: no delete (#2604), unlock 409")
 items = dbx("SELECT tax_pct, net, tax_amount FROM office_doc_items WHERE doc_id=? ORDER BY sort", (DOC,))
 check(items == [("19", "3000.00", "570.00"), ("7", "100.00", "7.00")], f"positions carry tax_pct / net / tax_amount as decimal text: {items}")
 snap = dbx("SELECT pack_version, sender IS NOT NULL AS s1, recipient_snapshot IS NOT NULL AS s2, tax_snapshot IS NOT NULL AS s3 FROM office_docs WHERE id=?", (DOC,))[0]

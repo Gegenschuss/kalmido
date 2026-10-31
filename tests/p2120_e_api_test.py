@@ -295,7 +295,7 @@ r = A.put(B + LH, json={"m1": [60, 20, 40, 35], "m2": [40, 20, 40, 30], "hide_he
 check(r.ok and r.json()["letterhead"]["m1"] == [60, 20, 40, 35] and r.json()["letterhead"]["hide_head"] == 0, "#2091: margins saved " + r.text[:200])
 r2 = reader(pdf(A, D1))
 ops2, ops2b = page_ops(r2, 0), page_ops(r2, 1)
-sender_y = A4[1] - 60 * MM - 7 * 0.78
+sender_y = A4[1] - 60 * MM - 6 * 0.78  # 2.434.0 A (#3603): invoices in look A print the 7 pt sender line at 6 pt
 check(f"{x(35 * MM)} {x(sender_y)} Td".encode() in ops2, "#2091: page 1: left 35 mm, the address field 60 mm from the top")
 check(f"q 1 0 0 1 {x(-5 * MM)} 0 cm".encode() in ops2b, "#2091: following pages moved by the left margin difference")
 check(f"{x(5 * MM)} {x(A4[1] - 105 * MM)} m".encode() in ops2, "#2091: hide_head off: the fold marks again")

@@ -855,7 +855,7 @@ function tri_settingsHtml() {
   const on = tri_on(), adm = OFC.info?.role === 'admin';
   if (TRI.office !== tri_office()) { TRI.office = tri_office(); TRI.count = null; }
   if (adm && TRI.count == null) { TRI.count = 0; api('GET', '/api/office/trial').then(j => { TRI.count = +j.trial_count || 0; const b = $('#tri-del-all'); if (b) { b.hidden = !TRI.count; $('span', b).textContent = tri_delLabel(); } }).catch(() => { /* the button stays hidden */ }); }
-  return `<h3>${tr('Test mode')}</h3><div class="row tri-row"><label class="chkl swl" data-fg-skip><span class="swc"><input type="checkbox" role="switch" id="tri-mode" ${on ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Test mode')}</span></label>
+  return `<h3 id="tri-h">${tr('Test mode')}</h3><div class="row tri-row"><label class="chkl swl" data-fg-skip><span class="swc"><input type="checkbox" role="switch" id="tri-mode" ${on ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Test mode')}</span></label>
     <div class="shint keep">${tr('New documents get a TEST number and the watermark MUSTER, no e-invoice and no bookkeeping. Only for you; colleagues do not see it.')}</div></div>
     ${adm ? `<div class="lacts"><button type="button" class="btn sm danger" id="tri-del-all" data-tri="del-all" ${TRI.count ? '' : 'hidden'}>${ic('trash', 's')}<span>${esc(tri_delLabel())}</span></button></div>` : ''}`;
 }
