@@ -660,7 +660,7 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/
 
 The importers of *Settings > Data > Import* are available to scripts. `source` is one of `todoist`, `trello`,
 `asana`, `mstodo` (Outlook / Microsoft To Do CSV or ICS), `ics` and (2.142.0) `notion` (the export ZIP "Markdown & CSV",
-ZIPs inside it too, or one database CSV / page), `gtasks` (Google Takeout ZIP or its `Tasks.json`), `clickup` (CSV),
+ZIPs inside it too, or one database CSV / page), `gtasks` (Google Takeout ZIP or its `Tasks.json`), `ticktick` (its backup CSV), `clickup` (CSV),
 `jira` (CSV, repeated columns such as `Labels` kept), `csv` (any CSV: columns detected by name in English and German,
 unknown columns go into the notes) and `markdown` (checklists: headings = projects / sections, `- [ ]` / `- [x]` tasks,
 indentation = subtasks). These six never match people of the file to accounts: their names go into the notes. The body
