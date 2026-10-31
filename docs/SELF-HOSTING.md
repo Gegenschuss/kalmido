@@ -1057,6 +1057,10 @@ and 20). Agents and API tokens cannot do this; it is a person's step in the app.
    hash in the file, otherwise nobody is invited; everybody else invites them later as usual. Assignments to people that
    are not taken over stay empty; comments of such people keep their name.
 
+**When the storage is full:** the import leaves out the files that no longer fit; everything else still comes, and the result says so.
+Ids of the old server never stay behind: mentions become the new account or plain `@name`, saved filters follow the new projects (a filter
+on something that did not come along is left out and named), person and task fields and formulas are rewritten.
+
 **Importing twice (2.362.3):** the preview says when an export of the same account was imported already (the import's
 number, undo until when), also for a newer export of that account. Importing again needs a tick and takes over only what
 the chosen place does not have yet, row by row: a newer export adds its new tasks to the imported project. Rows deleted or

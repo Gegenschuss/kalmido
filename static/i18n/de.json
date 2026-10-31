@@ -10799,7 +10799,6 @@
   "This upload is complete already": "Dieser Upload ist bereits vollständig",
   "Uploading… {0} of {1}": "Wird hochgeladen… {0} von {1}",
   "Your export is already running": "Dein Export läuft bereits",
-  "Your storage is full: the import stopped. What came over so far can be undone.": "Dein Speicher ist voll: Der Import wurde angehalten. Was bisher übernommen wurde, lässt sich rückgängig machen.",
   "Organisation export of {0}": "Organisations-Export von {0}",
   "You are not the admin of an organisation on this server. Create one or ask its admin first.": "Du bist auf diesem Server nicht Admin einer Organisation. Lege eine an oder frag zuerst ihren Admin.",
   "The file is encrypted. Enter the recovery key of the organisation (on the old server: Settings > Organisation > Encryption).": "Die Datei ist verschlüsselt. Gib den Wiederherstellungsschlüssel der Organisation ein (auf dem alten Server: Einstellungen > Organisation > Verschlüsselung).",
@@ -15424,5 +15423,10 @@
   "Admin {0} signed in from a new address: {1}": "Admin {0} hat sich von einer neuen Adresse angemeldet: {1}",
   "{0} accepted your invitation to {1}": "{0} hat deine Einladung in {1} angenommen",
   "{0} declined your invitation to {1}": "{0} hat deine Einladung in {1} abgelehnt",
-  "{0} changed your role in {1}: {2}": "{0} hat deine Rolle in {1} geändert: {2}"
+  "{0} changed your role in {1}: {2}": "{0} hat deine Rolle in {1} geändert: {2}",
+  "Your storage is full: some files were left out, everything else came over. The import can be undone.": "Dein Speicher ist voll: Einige Dateien fehlen, alles andere wurde übernommen. Du kannst den Import rückgängig machen.",
+  "A file was left out because your storage is full": "Eine Datei fehlt, weil dein Speicher voll ist",
+  "A saved filter pointed at projects or people that did not come along and was left out: {0}": "Ein gespeicherter Filter verwies auf Projekte oder Personen, die nicht mitgekommen sind, und wurde nicht übernommen: {0}",
+  "A template could not be taken over: {0}": "Eine Vorlage konnte nicht übernommen werden: {0}",
+  "A formula could not be taken over": "Eine Formel konnte nicht übernommen werden"
 }

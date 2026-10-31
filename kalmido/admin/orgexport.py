@@ -45,6 +45,7 @@ from decimal import Decimal
 
 from flask import g, jsonify, send_file
 
+from .exportleft import left_lines  # 2.362.4 (#3107)
 from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR
 from ..core.db import connect, db, err, iso, now_utc
 from ..core.pg import system_ctx
@@ -467,6 +468,7 @@ OX_LEFT = {
     "kk_conns": _SECRET, "list_bell": _PERSONAL, "list_envs": _SECRET, "list_key_pending": "list keys (client_encrypted)",
     "list_keys": "list keys (client_encrypted)", "list_layouts": _PERSONAL, "list_mine_hide": _PERSONAL, "list_notif": _PERSONAL,
     "list_paperless": _SECRET, "mail_tokens": _SECRET, "notifications": _PERSONAL, "playbook_proposals": _AGENT, "public_links": _SECRET,
+    "agent_schedules": _AGENT, "budget_meta": _PERSONAL, "issue_hooks": _SECRET, "issue_reports": "not yet in the export",  # 2.362.4 (#3107)
     "shop_memory": _PERSONAL, "list_ticket_seq": _DERIVED, "task_keys": _LATER2, "list_folder_skip": _LATER2,
 }
 
@@ -827,7 +829,7 @@ def ox_build(c, oid, out, by=None):
             "counts": man.counts, "files": man.files,
             "client_encrypted": {**man.client_enc, "note": "Encrypted in the browser by their author: stored here as ciphertext, only the author can open them."},
             "decrypted": ox_decrypted_note("organisation"),
-            "not_included": ox_not_included(c, by, OX_NOT_INCLUDED),  # 2.449.0 (#3768)
+            "not_included": [*ox_not_included(c, by, OX_NOT_INCLUDED), *left_lines(OX_LEFT)],  # 2.449.0 (#3768), 2.362.4 (#3107)
             "locked_files": man.locked,  # 2.209.0 D (#1856)
             "missing": man.missing,  # 2.363.2 (#3106)
         }

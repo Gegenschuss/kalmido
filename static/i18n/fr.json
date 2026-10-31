@@ -10823,7 +10823,6 @@
   "This upload is complete already": "Ce téléversement est déjà complet",
   "Uploading… {0} of {1}": "Téléversement… {0} sur {1}",
   "Your export is already running": "Ton export est déjà en cours",
-  "Your storage is full: the import stopped. What came over so far can be undone.": "Ton stockage est plein : l’import s’est arrêté. Ce qui a été repris jusqu’ici peut être annulé.",
   "Organisation export of {0}": "Export d’organisation de {0}",
   "You are not the admin of an organisation on this server. Create one or ask its admin first.": "Tu n’es administrateur d’aucune organisation sur ce serveur. Crées-en une ou demande d’abord à son administrateur.",
   "The file is encrypted. Enter the recovery key of the organisation (on the old server: Settings > Organisation > Encryption).": "Le fichier est chiffré. Saisissez la clé de récupération de l’organisation (sur l’ancien serveur : Réglages > Organisation > Chiffrement).",
@@ -15424,5 +15423,10 @@
   "Admin {0} signed in from a new address: {1}": "L'admin {0} s'est connecté depuis une nouvelle adresse : {1}",
   "{0} accepted your invitation to {1}": "{0} a accepté ton invitation à {1}",
   "{0} declined your invitation to {1}": "{0} a refusé ton invitation à {1}",
-  "{0} changed your role in {1}: {2}": "{0} a modifié ton rôle dans {1} : {2}"
+  "{0} changed your role in {1}: {2}": "{0} a modifié ton rôle dans {1} : {2}",
+  "Your storage is full: some files were left out, everything else came over. The import can be undone.": "Ton stockage est plein : certains fichiers manquent, tout le reste a été repris. Tu peux annuler l’import.",
+  "A file was left out because your storage is full": "Un fichier manque car ton stockage est plein",
+  "A saved filter pointed at projects or people that did not come along and was left out: {0}": "Un filtre enregistré visait des projets ou des personnes qui n’ont pas été repris, il a été laissé de côté : {0}",
+  "A template could not be taken over: {0}": "Un modèle n’a pas pu être repris : {0}",
+  "A formula could not be taken over": "Une formule n’a pas pu être reprise"
 }

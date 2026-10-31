@@ -402,7 +402,7 @@ ORDER = (
     "agents.agentpin",  # 2.51.0 C (#1352): agents on the pin board + the weekly status of a project
     "agents.agenttime",  # 2.51.0 C (#1353): agents check time tracking + propose entries from events
     "agents.lyprop",  # 2.55.0 B (#1066): agents propose arrangements of views (the person accepts)
-    "admin.orgexport",  # 2.42.0 (#833): organisation export (encrypted archive)
+    "admin.exportleft", "admin.orgexport",  # 2.42.0 (#833): organisation export (encrypted archive)
     "admin.retexport",  # 2.146.0 D (#2468): the retention export before deleting an account / organisation
     "admin.acctexport",  # 2.73.0 B (#1473): account export (moving between servers, GDPR copy)
     "admin.acctimport",  # 2.73.0 B (#1473): account import with the mapping of people

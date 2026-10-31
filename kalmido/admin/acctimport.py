@@ -46,6 +46,9 @@ from ..core.i18n import lang, LANGS, N_, stored_join, tr as _tr_base, tr_stored
 from ..core.access import Denied, ROLES, list_role, my_inbox, my_max_sort, WRITE_ROLES
 from ..accounts.session import me
 from ..lists.lists import LIST_COLOR_RE
+from ..lists.fields import fx_tpl_fix  # 2.362.4 (#3100)
+from ..lists.formula import fx_display  # 2.362.4 (#3100)
+from ..lists.templates import tpl_clean  # 2.362.4 (#3100)
 from ..tasks.validation import (DATE_MAX_Y, DATE_MIN_Y, DURATION_MAX, PRIORITIES, REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm,
                                 rr_problem, valid_date, valid_hm, valid_plan_start)
 from .orgexport import EXPORT_DIR, OX_SECRET_COLS
@@ -175,10 +178,6 @@ class UmzBad(Exception):
     def __init__(self, text, *a):
         super().__init__(text)
         self.text, self.args_ = text, a
-
-
-class UmzStop(Exception):
-    pass
 
 
 # ---------------------------------------------------------------- the folder of an upload
@@ -943,6 +942,64 @@ def umz_have(c, run, uid, rows, mine=False):
             run.sprint_list.update({n: x["up"] for n, x in here.items()})
 
 
+UMZ_MENTION_RE = re.compile(r"<@(\d{1,18})>")  # as in collab/comments.py
+UMZ_NO_SPACE = N_("A file was left out because your storage is full")  # 2.362.4 (#3100)
+
+
+def umz_mentions(text, names, who):
+    """2.362.4 (#3100): <@old id> of a text from the file -> <@new id> of a person who came along, else plain @name: an old id
+    would name whoever has that number on this server."""
+    if not isinstance(text, str) or "<@" not in text:
+        return text
+
+    def sub(m):
+        n = who(m.group(1))
+        return f"<@{n}>" if n else "@" + (names.get(int(m.group(1))) or "?")
+    return UMZ_MENTION_RE.sub(sub, text)
+
+
+def umz_filter_rules(run, v, who):
+    """2.362.4 (#3100): the rules of a saved filter (static/js filterMatch) with the ids of this server -> JSON text. An id that
+    did not come along goes; None when a category loses all its ids: an empty category means "everything", the filter would
+    show something else than it did."""
+    try:
+        r = json.loads(v) if isinstance(v, str) else v
+    except (ValueError, RecursionError):
+        return None
+    if not isinstance(r, dict):
+        return None
+    out = dict(r)
+
+    def person(x):
+        n = who(x)
+        return "me" if n and n == run.uid else n
+
+    for key, fn in (("lists", lambda x: run.m("lists", x)),
+                    ("secs", lambda x: x if x == "none" else run.m("sections", x)),
+                    ("ms", lambda x: x if x == "none" else run.m("list_milestones", x)),
+                    ("who", lambda x: x if x in ("me", "none") else person(x)),
+                    ("sprints", lambda x: x if x in ("cur", "none") else None)):  # 2.390.0 B (#3355): never a sprint id
+        old = r.get(key)
+        if isinstance(old, list) and old:
+            out[key] = list(dict.fromkeys(y for y in map(fn, old) if y is not None))
+            if not out[key]:
+                return None
+    if isinstance(r.get("cf"), dict) and r["cf"]:  # {field id: rule}
+        out["cf"] = {str(run.m("list_fields", k)): x for k, x in r["cf"].items() if run.m("list_fields", k)}
+        if not out["cf"]:
+            return None
+    return json.dumps(out, ensure_ascii=False)
+
+
+def umz_template_data(kind, v):
+    """2.362.4 (#3100): the data of a template from the file as a new template stores it: tpl_clean keeps only the known parts
+    (names, offsets, node keys), so no id of the old server stays. None = not a template."""
+    try:
+        return json.dumps(tpl_clean(kind, json.loads(v) if isinstance(v, str) else v), ensure_ascii=False)
+    except (ValueError, TypeError, AttributeError, KeyError, RecursionError):
+        return None
+
+
 class _Run:
     def __init__(self, uid, iid, eid, org, total):
         self.uid, self.iid, self.eid, self.org = uid, iid, eid, org
@@ -955,6 +1012,7 @@ class _Run:
         self.done, self.total, self.tick = 0, max(1, total), 0
         self.task_list, self.field_list, self.list_org = {}, {}, {}
         self.sprint_list = {}  # 2.455.0 (#3469): new sprint id -> its list
+        self.field_type, self.names = {}, {}  # 2.362.4 (#3100)
         self.written = []  # full paths of files written (removed again when the run fails)
         self.stopped = None
         self.kind = "account"  # or "org": an organisation export (part 4)
@@ -1058,14 +1116,107 @@ def umz_list_parts(c, run, uid, inbox, data, who):
             run.count("portal_tickets")
 
 
-def umz_write(c, run, uid, man, zf, files, data, people):
-    """Creates everything in the open transaction (the caller commits). people: {old user id: new user id} for authors
-    and assignees (only people ticked for sharing)."""
+def umz_formulas(c, run, data):
+    """2.362.4 (#3100): a formula names the fields of its list by id: rewritten for the new ids through the field names, as a
+    template does (fx_tpl_fix: a formula that does not fit stays empty)."""
+    rows, lists = data.get("list_fields", []), set()
+    for r in rows:
+        nid = run.m("list_fields", r.get("id"))
+        if not nid or r.get("type") != "formula":
+            continue
+        try:
+            o = json.loads(r.get("options") or "{}")
+            o["formula"] = fx_display(o.get("expr"), [{"id": _oid(x.get("id")), "name": _txt(x.get("name"))} for x in rows if x.get("list_id") == r.get("list_id")])
+        except (ValueError, TypeError, AttributeError, RecursionError):
+            o = {"expr": "", "formula": ""}
+        c.execute("UPDATE list_fields SET options=? WHERE id=?", (json.dumps(o, ensure_ascii=False), nid))
+        lists.add(run.field_list[nid])
+    for lid in lists:
+        try:
+            with c.savepoint():
+                fx_tpl_fix(c, lid)
+        except (ValueError, TypeError, AttributeError, RecursionError):  # another field's options from the file are no JSON object
+            run.warning(N_("A formula could not be taken over"))
+
+
+def umz_files(c, run, uid, me_old, zf, files, data):
+    """Attachments and project files of a run."""
     from ..admin.hosting import QuotaExceeded, quota_guard
     from ..files.upsafe import up_after_store, up_check, UploadRefused
-    from ..lists.lists import clean_folder, list_created, LIST_NAME_MAX
     from ..lists.projects import LIST_FILES_SUB
     from ..tasks.attachments import safe_name
+    ts = iso(now_utc())
+    # files: attachments + project files, sealed like an upload (orgcrypt) and counted against the quota
+    for table, kind in (("attachments", "tasks"), ("list_files", "lists")):
+        for r in data.get(table, []):
+            run.step()
+            parent = run.m(kind, r.get("task_id" if kind == "tasks" else "list_id"))
+            if not parent or run.there(table, r.get("id")):
+                continue
+            enc = _coerce(r.get("enc"), "bigint") if table == "attachments" else 0
+            if enc and _oid(r.get("enc_by")) != me_old:
+                run.warning(N_("Encrypted file of another person not taken over: {0}"), _txt(r.get("name"), 80))
+                continue
+            if run.stopped:  # 2.362.4 (#3100): the storage is full, the rows without a file still come
+                run.warning(UMZ_NO_SPACE)
+                continue
+            raw = _file_bytes(zf, files, r.get("file"))
+            if raw is None:
+                run.warning(N_("A file is missing in the export: {0}"), _txt(r.get("name"), 80))
+                continue
+            if not raw or len(raw) > MAX_FILE_MB * 1024 * 1024:
+                run.warning(N_("A file is empty or too large and was skipped: {0}"), _txt(r.get("name"), 80))
+                continue
+            try:
+                quota_guard(c, uid, len(raw))
+            except QuotaExceeded:
+                run.stopped = "quota"
+                run.warning(UMZ_NO_SPACE)
+                continue
+            name = safe_name(_txt(r.get("name"), 150))
+            if enc and raw[:5] != b"KENC\x01":  # 2.148.1 C (#2492): only a real browser-encrypted file (collab/e2e.py) skips the checks
+                enc = 0
+            mime, info = "application/octet-stream", None
+            if not enc:  # 2.61.0 (#1818 #1819): a taken-over file is new content for this server: virus scan + photo metadata
+                try:
+                    raw, mime, info = up_check(c, name, raw, _txt(r.get("mime"), 120) or "application/octet-stream", uid,
+                                               run.list_org.get(run.task_list.get(parent) if kind == "tasks" else parent), "att")
+                except UploadRefused:
+                    run.warning(N_("A file could not be taken over: {0}"), name)
+                    continue
+            sub = os.path.join(str(parent)) if kind == "tasks" else os.path.join(LIST_FILES_SUB, str(parent))
+            os.makedirs(os.path.join(ATT_DIR, sub), exist_ok=True)
+            rel = os.path.join(sub, f"{uuid.uuid4().hex[:12]}-{name}")
+            full = os.path.join(ATT_DIR, rel)
+            run.written.append(full)
+            lorg = run.list_org.get(run.task_list.get(parent) if kind == "tasks" else parent)
+            # 2.42.0 (#828), 2.64.0 (#1864): sealed with the key of the list's space (organisation, else my account: I own the
+            # taken-over lists); bytes from outside
+            oc_write_file(c, lorg or oc_user_space(uid), full, raw, fresh=True)
+            fixed = {"name": name, "size": len(raw), "path": rel, "user_id": uid, "created_at": _txt(r.get("created_at"), 40) or ts,
+                     "mime": mime[:120]}  # 2.148.1 C (#2492): the type found in the content, not the one in the file
+            if kind == "tasks":
+                fixed.update({"task_id": parent, "comment_id": run.m("comments", r.get("comment_id")), "enc": 1 if enc else 0,
+                              "enc_by": uid if enc else None,  # 2.278.0 C (#3091): the AAD of the old task + person
+                              "legacy_aad": umz_legacy_aad("kalmido-file:v1", r.get("legacy_aad"), r.get("task_id"), me_old) if enc else None})
+            else:
+                fixed["list_id"] = parent
+            d = umz_row(c, table, r, fixed, ts)
+            nid = umz_insert(c, table, d) if d else None
+            if not nid:
+                run.warning(N_("A file could not be taken over: {0}"), name)
+                continue
+            run.put(table, r.get("id"), nid)  # 2.137.0 B (#2344): the links of the file store point at them (oi_store.py)
+            up_after_store(c, "att" if kind == "tasks" else "list", nid, lorg or None, info)  # 2.148.1 C (#2492): unchecked = scanned later
+            if kind == "tasks":
+                run.created["files"].append(rel)
+            run.count(table)
+
+
+def umz_write(c, run, uid, man, zf, files, data, people):
+    """Creates everything in the open transaction (the caller commits). people: {old user id: new user id} for authors
+    and assignees (only people ticked for sharing). 2.362.4 (#3100): the files come last: a full storage stops only them."""
+    from ..lists.lists import clean_folder, list_created, LIST_NAME_MAX
     from ..tasks.validation import CONTENT_MAX, TITLE_MAX
     ts = iso(now_utc())
     me_old = _oid((man.get("user") or {}).get("id"))
@@ -1126,6 +1277,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
                 run.put(kind, r.get("id"), nid)
                 if kind == "list_fields":
                     run.field_list[nid] = lid
+                    run.field_type[nid] = r.get("type")  # 2.362.4 (#3100)
                 elif kind == "sprints":  # 2.455.0 (#3469)
                     run.sprint_list[nid] = lid
                     umz_part(run, lid, "sprints", nid)
@@ -1133,6 +1285,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
                 run.created["sections"].append(nid)
             if nid:
                 run.count(table)
+    umz_formulas(c, run, data)
     # tasks (the trash stays behind), then their parents
     rows = []
     for t in data.get("tasks", []):
@@ -1191,7 +1344,12 @@ def umz_write(c, run, uid, man, zf, files, data, people):
     for r in data.get("task_field_values", []):
         tid, fid = run.m("tasks", r.get("task_id")), run.m("list_fields", r.get("field_id"))
         if tid and fid and run.field_list.get(fid) == run.task_list.get(tid):
-            umz_insert(c, "task_field_values", {"task_id": tid, "field_id": fid, "value": _coerce(r.get("value"), "text") or ""}, rid=False)
+            val = _coerce(r.get("value"), "text") or ""
+            if run.field_type.get(fid) in ("person", "task"):  # 2.362.4 (#3100): the value is an id of the old server
+                val = who(val) if run.field_type[fid] == "person" else run.m("tasks", val.strip().lstrip("#"))
+                if not val:
+                    continue
+            umz_insert(c, "task_field_values", {"task_id": tid, "field_id": fid, "value": str(val)}, rid=False)
     for r in data.get("task_tags", []):
         tid = run.m("tasks", r.get("task_id"))
         tag = _txt(r.get("tag"), 100).strip()
@@ -1236,7 +1394,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             run.warning(N_("Encryption keys taken over: open locked notes and encrypted files with your passphrase from before."))
         else:
             run.warning(N_("The encryption keys in the export are broken: encrypted content stays unreadable."))
-    names = {_oid(p.get("user_id")): _txt(p.get("name"), 100) for p in data.get("people", [])}
+    names = run.names = {_oid(p.get("user_id")): _txt(p.get("name"), 100) for p in data.get("people", [])}
     for r in sorted(data.get("comments", []), key=lambda x: _oid(x.get("id")) or 0):
         run.step()
         tid = run.m("tasks", r.get("task_id"))
@@ -1250,71 +1408,12 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         ext = None if au else (names.get(_oid(r.get("user_id"))) or _txt(r.get("ext_name"), 100) or tr("Unknown"))
         d = umz_row(c, "comments", r, {"task_id": tid, "user_id": au, "ext_name": ext, "reply_to": run.m("comments", r.get("reply_to")),
                                         "mentions": ""}, ts)
+        if d and d.get("body"):  # 2.362.4 (#3100)
+            d["body"] = umz_mentions(d["body"], names, who)
         nid = umz_insert(c, "comments", d) if d else None
         if nid:
             run.put("comments", r.get("id"), nid)
             run.count("comments")
-    # files: attachments + project files, sealed like an upload (orgcrypt) and counted against the quota
-    for table, kind in (("attachments", "tasks"), ("list_files", "lists")):
-        for r in data.get(table, []):
-            run.step()
-            parent = run.m(kind, r.get("task_id" if kind == "tasks" else "list_id"))
-            if not parent or run.there(table, r.get("id")):
-                continue
-            enc = _coerce(r.get("enc"), "bigint") if table == "attachments" else 0
-            if enc and _oid(r.get("enc_by")) != me_old:
-                run.warning(N_("Encrypted file of another person not taken over: {0}"), _txt(r.get("name"), 80))
-                continue
-            raw = _file_bytes(zf, files, r.get("file"))
-            if raw is None:
-                run.warning(N_("A file is missing in the export: {0}"), _txt(r.get("name"), 80))
-                continue
-            if not raw or len(raw) > MAX_FILE_MB * 1024 * 1024:
-                run.warning(N_("A file is empty or too large and was skipped: {0}"), _txt(r.get("name"), 80))
-                continue
-            try:
-                quota_guard(c, uid, len(raw))
-            except QuotaExceeded:
-                run.stopped = "quota"
-                raise UmzStop() from None
-            name = safe_name(_txt(r.get("name"), 150))
-            if enc and raw[:5] != b"KENC\x01":  # 2.148.1 C (#2492): only a real browser-encrypted file (collab/e2e.py) skips the checks
-                enc = 0
-            mime, info = "application/octet-stream", None
-            if not enc:  # 2.61.0 (#1818 #1819): a taken-over file is new content for this server: virus scan + photo metadata
-                try:
-                    raw, mime, info = up_check(c, name, raw, _txt(r.get("mime"), 120) or "application/octet-stream", uid,
-                                               run.list_org.get(run.task_list.get(parent) if kind == "tasks" else parent), "att")
-                except UploadRefused:
-                    run.warning(N_("A file could not be taken over: {0}"), name)
-                    continue
-            sub = os.path.join(str(parent)) if kind == "tasks" else os.path.join(LIST_FILES_SUB, str(parent))
-            os.makedirs(os.path.join(ATT_DIR, sub), exist_ok=True)
-            rel = os.path.join(sub, f"{uuid.uuid4().hex[:12]}-{name}")
-            full = os.path.join(ATT_DIR, rel)
-            run.written.append(full)
-            lorg = run.list_org.get(run.task_list.get(parent) if kind == "tasks" else parent)
-            # 2.42.0 (#828), 2.64.0 (#1864): sealed with the key of the list's space (organisation, else my account: I own the
-            # taken-over lists); bytes from outside
-            oc_write_file(c, lorg or oc_user_space(uid), full, raw, fresh=True)
-            fixed = {"name": name, "size": len(raw), "path": rel, "user_id": uid, "created_at": _txt(r.get("created_at"), 40) or ts,
-                     "mime": mime[:120]}  # 2.148.1 C (#2492): the type found in the content, not the one in the file
-            if kind == "tasks":
-                fixed.update({"task_id": parent, "comment_id": run.m("comments", r.get("comment_id")), "enc": 1 if enc else 0,
-                              "enc_by": uid if enc else None,  # 2.278.0 C (#3091): the AAD of the old task + person
-                              "legacy_aad": umz_legacy_aad("kalmido-file:v1", r.get("legacy_aad"), r.get("task_id"), me_old) if enc else None})
-            else:
-                fixed["list_id"] = parent
-            d = umz_row(c, table, r, fixed, ts)
-            nid = umz_insert(c, table, d) if d else None
-            if not nid:
-                run.warning(N_("A file could not be taken over: {0}"), name)
-                continue
-            run.put(table, r.get("id"), nid)  # 2.137.0 B (#2344): the links of the file store point at them (oi_store.py)
-            up_after_store(c, "att" if kind == "tasks" else "list", nid, lorg or None, info)  # 2.148.1 C (#2492): unchecked = scanned later
-            if kind == "tasks":
-                run.created["files"].append(rel)
-            run.count(table)
     # personal parts
     for r in data.get("time_entries", []):
         run.step()
@@ -1342,7 +1441,18 @@ def umz_write(c, run, uid, man, zf, files, data, people):
                 fixed = {**fixed, "owner_org_id": org}  # an address book of the organisation itself (2.52.0 C, #1438)
                 if not org:  # 2.96.0 D (#1941): into the private space it becomes the person's own address book
                     run.warning(N_("An address book of the organisation became your own address book: {0}"), _txt(r.get("name"), 80))
-            d = umz_row(c, table, r, {**fixed, "updated_at": ts, "changed_at": ts}, ts)
+            extra = {}
+            if table == "filters":  # 2.362.4 (#3100): their ids are the old server's
+                extra["rules"] = umz_filter_rules(run, r.get("rules"), who)
+                if extra["rules"] is None:
+                    run.warning(N_("A saved filter pointed at projects or people that did not come along and was left out: {0}"), _txt(r.get("name"), 80))
+                    continue
+            elif table == "templates":
+                extra["data"] = umz_template_data(_txt(r.get("kind"), 10) or "task", r.get("data"))
+                if extra["data"] is None:
+                    run.warning(N_("A template could not be taken over: {0}"), _txt(r.get("name"), 80))
+                    continue
+            d = umz_row(c, table, r, {**fixed, **extra, "updated_at": ts, "changed_at": ts}, ts)
             nid = umz_insert(c, table, d) if d else None
             if not nid:
                 continue
@@ -1432,6 +1542,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         if v != (cur.get(k) or ""):
             run.created["settings"][k] = {"old": cur.get(k), "new": v}
             uset(c, uid, k, v)
+    umz_files(c, run, uid, me_old, zf, files, data)
     if man.get("kind") == "org" and data.get("oi") and run.oi_done:  # 2.362.3 (#3098): these areas came with the same file
         run.warning(N_("Office, file store, chat and the other areas of this export are here already: they were skipped."))
     elif man.get("kind") == "org" and data.get("oi"):  # 2.137.0 (#2344): office, file store, chat ... (admin/orgimport.py)
@@ -1509,6 +1620,15 @@ def umz_fix_people(c, run, uid, names):
                       part + [uid]).rowcount
         if n:
             run.warning(N_("Assignment not taken over (the person is not on this server or was not chosen)"))
+        # 2.362.4 (#3100): the same for person fields and mentions
+        c.execute(f"""DELETE FROM task_field_values v USING list_fields f, tasks t WHERE f.id=v.field_id AND t.id=v.task_id AND t.id IN ({q})
+                      AND f.type='person' AND v.value!=? AND NOT EXISTS (SELECT 1 FROM list_members m WHERE m.list_id=t.list_id AND m.user_id::text=v.value)""",
+                  part + [str(uid)])
+        for r in c.execute(f"SELECT c.id, c.body, t.list_id FROM comments c JOIN tasks t ON t.id=c.task_id WHERE t.id IN ({q}) AND c.body ILIKE '%<@%'", part).fetchall():
+            mem = {x[0] for x in c.execute("SELECT user_id FROM list_members WHERE list_id=?", (r["list_id"],)).fetchall()} | {uid}
+            body = UMZ_MENTION_RE.sub(lambda m: m.group(0) if int(m.group(1)) in mem else "@" + (names.get(int(m.group(1))) or "?"), r["body"])
+            if body != r["body"]:
+                c.execute("UPDATE comments SET body=? WHERE id=?", (body, r["id"]))
 
 
 def umz_invite(c, run, uid, email, name, role="member"):
@@ -1536,6 +1656,15 @@ def umz_invite(c, run, uid, email, name, role="member"):
     except Denied:
         return None
     return nid
+
+
+def umz_unwrite(run):
+    """Removes the files of rows that were never committed."""
+    for p in run.written if run else ():
+        try:
+            os.remove(p)
+        except OSError:
+            pass
 
 
 def umz_run(uid, iid, opts):
@@ -1579,10 +1708,7 @@ def umz_run(uid, iid, opts):
             if run.kind == "org":  # 2.137.0 (#2344): the personal office for office parts going into the private space
                 from .orgimport import oi_prepare
                 oi_prepare(c, run, uid, data)
-            try:
-                umz_write(c, run, uid, man, zf, files, data, people)
-            except UmzStop:
-                pass
+            umz_write(c, run, uid, man, zf, files, data, people)
             # 2.273.0 A (#3030): what stays on the old server, in the result and the import's report too
             left = [{"what": w, "count": n} for w, n in (man.get("org_skipped") or {}).items()] if run.kind == "org" else umz_left(data)
             if left:  # 2.454.0 (#3808): as stored texts, umz_view translates the names too
@@ -1599,13 +1725,12 @@ def umz_run(uid, iid, opts):
             c.commit()
             run.written = []  # committed: the files belong to their rows now
             shared = []
-            if not run.stopped:
-                try:
-                    shared = umz_share(c, run, uid, data, opts["people"], opts["can_invite"], umz_salt(man))
-                except Exception as e:  # noqa: BLE001 -- the import stays (and can be undone); the sharing is reported
-                    c.heal() or c.rollback()
-                    print(f"account import of user {uid}: sharing failed: {type(e).__name__}", flush=True)
-                    run.warning(N_("Sharing with the chosen people failed. Share the projects by hand."))
+            try:
+                shared = umz_share(c, run, uid, data, opts["people"], opts["can_invite"], umz_salt(man))
+            except Exception as e:  # noqa: BLE001 -- the import stays (and can be undone); the sharing is reported
+                c.heal() or c.rollback()
+                print(f"account import of user {uid}: sharing failed: {type(e).__name__}", flush=True)
+                run.warning(N_("Sharing with the chosen people failed. Share the projects by hand."))
             names = {}
             for p in data.get("people", []):  # the new account ids of the mapped people -> their names from the file
                 o = _oid(p.get("user_id"))
@@ -1622,11 +1747,12 @@ def umz_run(uid, iid, opts):
                   "undo_until": iso(umz_undo_until(now_utc())) if iid_db else None,
                   "warnings": [{"text": list(k), "count": n} for k, n in list(run.warn.items())[:50]]}  # 2.448.0 (#3765): key + values, umz_view translates
         if run.stopped == "quota":
-            result["stopped"] = [N_("Your storage is full: the import stopped. What came over so far can be undone.")]
+            result["stopped"] = [N_("Your storage is full: some files were left out, everything else came over. The import can be undone.")]
         _set(uid, iid, state="stopped" if run.stopped else "done", result=result, progress=None)
         print(f"account import of user {uid}: {run.stats.get('tasks', 0)} tasks", flush=True)
     except UmzBad as e:
         c.rollback()
+        umz_unwrite(run)  # 2.362.4 (#3100)
         from .orgimport import oi_drop_empty_pb
         oi_drop_empty_pb(c, run, uid)  # 2.137.1 review (#2399): also when the file turns out bad while writing
         _set(uid, iid, state="invalid", error=[e.text, *e.args_])
@@ -1635,11 +1761,7 @@ def umz_run(uid, iid, opts):
             c.rollback()
         except Exception:  # noqa: BLE001
             pass
-        for p in run.written if run else ():  # files of rows that were never committed
-            try:
-                os.remove(p)
-            except OSError:
-                pass
+        umz_unwrite(run)
         from .orgimport import oi_drop_empty_pb
         oi_drop_empty_pb(c, run, uid)  # 2.137.1 (#2399): the personal office made for this run, if it stayed empty
         print(f"account import of user {uid} failed: {type(e).__name__}", flush=True)

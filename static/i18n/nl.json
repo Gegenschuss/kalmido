@@ -10823,7 +10823,6 @@
   "This upload is complete already": "Deze upload is al compleet",
   "Uploading… {0} of {1}": "Bezig met uploaden… {0} van {1}",
   "Your export is already running": "Je export loopt al",
-  "Your storage is full: the import stopped. What came over so far can be undone.": "Je opslag is vol: de import is gestopt. Wat tot nu toe is overgenomen, kun je ongedaan maken.",
   "Organisation export of {0}": "Organisatie-export van {0}",
   "You are not the admin of an organisation on this server. Create one or ask its admin first.": "Je bent op deze server geen beheerder van een organisatie. Maak er een aan of vraag eerst de beheerder.",
   "The file is encrypted. Enter the recovery key of the organisation (on the old server: Settings > Organisation > Encryption).": "Het bestand is versleuteld. Voer de herstelsleutel van de organisatie in (op de oude server: Instellingen > Organisatie > Versleuteling).",
@@ -15424,5 +15423,10 @@
   "Admin {0} signed in from a new address: {1}": "Beheerder {0} meldde zich aan vanaf een nieuw adres: {1}",
   "{0} accepted your invitation to {1}": "{0} heeft je uitnodiging voor {1} geaccepteerd",
   "{0} declined your invitation to {1}": "{0} heeft je uitnodiging voor {1} geweigerd",
-  "{0} changed your role in {1}: {2}": "{0} heeft je rol in {1} gewijzigd: {2}"
+  "{0} changed your role in {1}: {2}": "{0} heeft je rol in {1} gewijzigd: {2}",
+  "Your storage is full: some files were left out, everything else came over. The import can be undone.": "Je opslag is vol: er ontbreken enkele bestanden, al het andere is overgenomen. Je kunt de import ongedaan maken.",
+  "A file was left out because your storage is full": "Er ontbreekt een bestand omdat je opslag vol is",
+  "A saved filter pointed at projects or people that did not come along and was left out: {0}": "Een opgeslagen filter verwees naar projecten of personen die niet zijn meegekomen en is weggelaten: {0}",
+  "A template could not be taken over: {0}": "Een sjabloon kon niet worden overgenomen: {0}",
+  "A formula could not be taken over": "Een formule kon niet worden overgenomen"
 }

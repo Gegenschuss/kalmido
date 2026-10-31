@@ -548,8 +548,9 @@ na = dbx("SELECT COUNT(*) AS n FROM attachments a JOIN tasks t ON t.id=a.task_id
 check(na == 1, f"one file fitted ({na})")
 qa = dbx("SELECT t.assignee_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE l.owner_id=? AND l.name='Kontingent Test'", (DAVE,))
 qc = dbx("SELECT c.user_id, c.ext_name FROM comments c WHERE c.body='Bob im Kontingent'")
-check(qa and all(x["assignee_id"] is None for x in qa) and qc and qc[0]["user_id"] is None and qc[0]["ext_name"] == "Bob aus der Datei",
-      "stopped before the sharing: bob is neither assignee nor author in a list he cannot see")
+# 2.362.4 (#3100): a full storage stops only the files, the sharing still runs: bob joins and stays assignee
+check(qa and all(x["assignee_id"] == ids["bob"] for x in qa) and qc and qc[0]["user_id"] is None and qc[0]["ext_name"] == "Bob aus der Datei",
+      f"the sharing ran after the stop: bob is assignee, the comment keeps his name as text {qa}")
 check(Da.post(B + f"/api/imports/{j['result'].get('import_id')}/undo").ok and not dbx("SELECT 1 FROM lists WHERE owner_id=? AND name='Kontingent Test' AND deleted_at IS NULL", (DAVE,)),  # 2.272.0 (#3027): trash
       "undo after the stop")
 A.patch(B + f"/api/users/{DAVE}", json={"storage_quota_mb": None})

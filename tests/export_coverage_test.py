@@ -31,7 +31,8 @@ TYPES = "BIGINT|TEXT|INTEGER|DOUBLE|NUMERIC|BOOLEAN|JSONB|BYTEA|REAL|SMALLINT|DA
 schema = re.sub(r"--[^\n]*", "", open(os.path.join(ROOT, "kalmido", "core", "schema.py"), encoding="utf-8").read())
 tables = {}
 for m in re.finditer(r"CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\);", schema, re.S):
-    tables.setdefault(m.group(1), set()).update(re.findall(rf"(?:^|,|\()\s*\"?(\w+)\"? (?:{TYPES})", m.group(2)))
+    body = re.sub(r"--[^\n]*", "", m.group(2))  # 2.362.4 (#3107): a comment must not hide the column after it
+    tables.setdefault(m.group(1), set()).update(re.findall(rf"(?:^|,|\()\s*\"?(\w+)\"?\s+(?:{TYPES})", body))
 for m in re.finditer(r'\("(\w+)", "(\w+)", "ALTER TABLE', schema):
     tables.setdefault(m.group(1), set()).add(m.group(2))
 check(len(tables) > 200, f"schema.py read ({len(tables)} tables)")

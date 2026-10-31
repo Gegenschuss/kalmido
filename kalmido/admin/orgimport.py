@@ -18,7 +18,7 @@ import uuid
 
 from ..core.config import ATT_DIR, MAX_FILE_MB, OFFICE_DIR
 from ..core.i18n import N_
-from .acctimport import UmzStop, _BAD, _coerce, _oid, _read_entry, _txt, tr, umz_cols, umz_insert, umz_row
+from .acctimport import UMZ_NO_SPACE, _BAD, _coerce, _oid, _read_entry, _txt, tr, umz_cols, umz_insert, umz_row
 from .acctimport import UMZ_ORG_SKIP  # 2.278.0 B (#3094)
 from ..core.orgcrypt import oc_enc_fields, oc_user_space, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.db import iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
@@ -177,6 +177,9 @@ def oi_file(ctx, path, sub, name, space=None, base=ATT_DIR, check=True, mime="",
     from ..tasks.attachments import safe_name
     from .acctimport import _file_bytes
     c, run = ctx.c, ctx.run
+    if run.stopped:  # 2.362.4 (#3100): a full storage stops the files, not the rest of the areas
+        run.warning(UMZ_NO_SPACE)
+        return None
     raw = _file_bytes(ctx.zf, ctx.files, path)
     name = safe_name(_txt(name, 150)) or "file"
     if raw is None:
@@ -189,7 +192,8 @@ def oi_file(ctx, path, sub, name, space=None, base=ATT_DIR, check=True, mime="",
         quota_guard(c, ctx.uid, len(raw))
     except QuotaExceeded:
         run.stopped = "quota"
-        raise UmzStop() from None
+        run.warning(UMZ_NO_SPACE)
+        return None
     if check:
         try:
             raw, _m, _i = up_check(c, name, raw, mime or "application/octet-stream", ctx.uid, space if space and space > 0 else None, "att")

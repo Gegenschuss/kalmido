@@ -25,6 +25,7 @@ import zipfile
 
 from flask import Response, g, jsonify, request, stream_with_context
 
+from .exportleft import RX_LEFT_TABLES, left_lines  # 2.362.4 (#3107)
 from ..core.access import Denied
 from ..core.config import app, APP_VERSION, ATT_DIR, OFFICE_DIR
 from ..core.db import connect, db, iso, now_utc
@@ -592,7 +593,8 @@ def rx_stream(sub, uid, by, title, lg):
             when = iso(now_utc())
             idx = _index(z, sub, title, by, when)
             man = {"format": "kalmido-retention-export", "format_version": 1, "kalmido_version": APP_VERSION, "subject": sub["key"],
-                   "created_at": when, "created_by": by, "files": dict(z.files), "missing": z.missing}
+                   "created_at": when, "created_by": by, "files": dict(z.files), "missing": z.missing,
+                   "not_included": left_lines(RX_LEFT_TABLES)}  # 2.362.4 (#3107)
             yield z.put("00-index.txt", idx)
             yield z.put("manifest.json", json.dumps(man, ensure_ascii=False, indent=1))
             z.zf.close()

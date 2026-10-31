@@ -24,6 +24,7 @@ from .orgexport import _safe_part  # 2.380 H (#2398)
 from .acctimport import umz_legacy_aad  # 2.362.0 (#3090)
 from ..life.rss import _norm, RSS_MAX_FEEDS  # 2.455.0 (#3469)
 from ..lists.rules import RUL_ACTIONS, RUL_DAYS_MAX, RUL_LIST_MAX, RUL_NAME_MAX, RUL_PRIO, RUL_TEXT_MAX, RUL_TRIGGERS  # 2.455.0 (#3469)
+from .acctimport import umz_mentions  # 2.362.4 (#3100)
 
 # the person columns of the rows of one person (the row is left out when the person does not map)
 _W_PEOPLE = N_("Entries of people who were not chosen were not taken over: {0}")
@@ -143,6 +144,8 @@ def _chat_file(c, run, src, d, ctx):
 def _msg(c, run, src, d, ctx):
     if _txt(src.get("enc"), 10):
         run.warning(N_("Chat messages encrypted in the browser were taken over as they are: they open with the keys of their channel."))
+    elif d.get("body"):  # 2.362.4 (#3100)
+        d["body"] = umz_mentions(d["body"], run.names, ctx.who)
     return d
 
 
