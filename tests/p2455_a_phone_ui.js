@@ -49,7 +49,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     let d = await ev(drawer);
     check(d.open && d.scrim, '#3847: no kept view: the drawer stays open ' + JSON.stringify(d));
     // a view in the organisation, then away and back: the kept view is restored, the drawer still stays
-    await ev(`(() => { go('cal'); return 1; })()`); await sleep(700);
+    await ev(`(() => { go('cal'); return 1; })()`);
+    check(await ready(ev, `!document.querySelector('#side.open')`, 20), '#3847: an entry tapped right after a switch without a route closes the drawer');
     await open(ev);
     await ev(`(() => { wsSet('private'); return 1; })()`); await sleep(700);
     d = await ev(drawer);
@@ -65,6 +66,11 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     await open(ev);
     await ev(`(() => { document.querySelector('#scrim').click(); return 1; })()`); await sleep(300);
     check(!(await ev(drawer)).open, '#3847: the scrim still closes the drawer');
+    await open(ev);
+    await ev(`(() => { wsSet('private'); return 1; })()`);
+    check(await ready(ev, `wsCur() === 'private' && !SBM.keep`, 20), '#3847: the hold ends with the switch');
+    await ev(`(() => { history.back(); return 1; })()`);
+    check(await ready(ev, `!document.querySelector('#side.open')`, 20), '#3847: Back closes the drawer after a switch');
 
     // #3852 at 320 x 640
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 320, height: 640}});
