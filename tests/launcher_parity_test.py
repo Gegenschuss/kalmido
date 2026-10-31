@@ -15,16 +15,8 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MCP = os.path.join(HERE, "..", "mcp")
-F, ok = [], 0
-
-
-def check(c, what):
-    global ok
-    if c:
-        ok += 1
-    else:
-        F.append(what)
-        print("FAIL:", what)
+import kt  # noqa: E402
+from kt import check  # noqa: E402  2.358.0 D (#2783): shared helpers (tests/kt.py)
 
 
 def read(name):
@@ -137,6 +129,47 @@ os.chdir(tempfile.mkdtemp(prefix="kalmido-parity-"))  # no .claude/settings.json
 r = ar.Runner(["claude", "--permission-mode", "acceptEdits"], os.path.join(os.getcwd(), "state"))
 check((r.pmode, r.host_pmode) == ("auto", "ask"), f"permission modes: {(r.pmode, r.host_pmode)}")
 check(ar.permission_modes(["claude", "--permission-mode=plan"])[0] == "ask", "plan = ask")
+# 2.437.0 (#2931): the switch in the chat header reaches the run, unless this computer fixed the mode
+check(r.mode_args(["claude"]) == ["claude"] and r.host()["permission_fixed"] is True, "a fixed mode in the command: no second flag")
+r.agent = {"runtime": {"permission_mode": "ask"}}
+check(r.mode_args(["claude"]) == ["claude"] and r.pmode == "auto", "a fixed mode wins over the switch")
+r2 = ar.Runner(["claude", "-p", "x"], os.path.join(os.getcwd(), "state2"))
+check(r2.mode_args(["claude"]) == ["claude"] and r2.host()["permission_fixed"] is False, "no switch: no flag")
+r2.agent = {"runtime": {"permission_mode": "auto"}}
+check(r2.mode_args(["claude"]) == ["claude", "--permission-mode", "auto"] and r2.host()["permission_mode"] == "auto", "auto = --permission-mode auto")
+r2.agent = {"runtime": {"permission_mode": "ask"}}
+check(r2.mode_args(["claude"]) == ["claude", "--permission-mode", "default"] and r2.pmode == "ask", "ask = --permission-mode default")
+r2.agent = {"runtime": {"permission_mode": ""}}
+check(r2.mode_args(["claude"]) == ["claude"] and r2.pmode == "ask", "Host default: the flag goes again")
+r2.agent = {"runtime": {"permission_mode": "ask"}}
+check("--permission-mode" in r2.run_args(["claude"]), "run_args carries the flag")
+os.environ["KALMIDO_PERMISSION_MODE"] = "auto"
+check(r2.mode_args(["claude"]) == ["claude", "--permission-mode", "auto"] and r2.pmode == "auto" and r2.mode_fixed(), "KALMIDO_PERMISSION_MODE fixes it and applies")
+del os.environ["KALMIDO_PERMISSION_MODE"]
+check(ar.permission_fixed(["claude", "--dangerously-skip-permissions"]), "skipping all permissions is a fixed mode")
+check(ar.permission_modes(["claude", "--dangerously-skip-permissions"])[0] == "auto", "and it never reads as ask")
+r2.refresh_due, r2.refresh_agent = True, lambda: (setattr(r2, "agent", {"runtime": {"permission_mode": "auto"}}), setattr(r2, "refresh_due", False))
+check(r2.mode_args(["claude"]) == ["claude", "--permission-mode", "auto"], "a change before the run is read first (task runs too)")
+r3 = ar.Runner(["codex"], os.path.join(os.getcwd(), "state3"))
+r3.agent = {"runtime": {"permission_mode": "ask"}}
+check(r3.mode_args(["codex"]) == ["codex"] and r3.mode_fixed(), "another command takes no flag and counts as fixed")
+
+
+class _SApi(ar.Api):
+    def __init__(self):
+        self.no_fixed, self.host_ok, self.sent = False, None, []
+
+    def soft(self, _m, _p, b, **_kw):
+        self.sent.append(b)
+        return 400 if "permission_fixed" in b else 200
+
+
+api = _SApi()
+api.status("idle", host={"model": "M", "permission_fixed": False})
+check(api.sent[0].get("permission_fixed") is False and "permission_fixed" not in api.sent[1] and api.sent[1]["model"] == "M" and api.host_ok,
+      "a server before 2.437: the field goes, the model stays")
+api.status("idle", host={"model": "M", "permission_fixed": False})
+check("permission_fixed" not in api.sent[2], "and it is not sent again")
 g = r.groups([{"event": "chat", "data": {"user": {"id": 7}, "message": {"id": 1}}}, {"event": "chat", "data": {"user": {"id": 7}, "message": {"id": 2}}},
               {"event": "comment", "data": {"task": {"id": 1}}}, {"event": "reset"}, {"event": "chat", "data": {"user": {"id": 8}, "message": {"id": 3}}},
               {"event": "reaction", "data": {"chat_message": {"id": 1}, "approval": "approved"}}])
@@ -340,5 +373,170 @@ check(aj.job_name("x", parent=5, jobs=JS) == "Alma B", "a part job: the leader's
 check(aj.job_name("x", jobs=JS) in aj.JOB_NAMES and aj.job_name("x", jobs=JS) != "Alma", "else a free name of the list")
 check(all(aj.NAME_RE.match(n + ": ") for n in aj.JOB_NAMES) and len(set(aj.JOB_NAMES)) == len(aj.JOB_NAMES), "every listed name is read back as a name")
 
-print(f"launcher_parity: {ok} ok, {len(F)} failed")
-sys.exit(1 if F else 0)
+# ---- 2.443.0 (#2940): the two launchers do the same, checked by running them (the .ps1 with pwsh when there is one) against a stub
+import shutil  # noqa: E402
+import signal  # noqa: E402
+import subprocess  # noqa: E402
+import threading  # noqa: E402
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer  # noqa: E402
+
+AGENT_RT = {"code": 200, "runtime": {"reset_seq": 0, "timezone": "Europe/Berlin", "nightly_reset": None}, "polls": 0}
+
+
+class AgentStub(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def answer(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        if n:
+            self.rfile.read(n)
+        if self.path == "/api/v1/agent" and self.command == "GET":
+            AGENT_RT["polls"] += 1
+        b = json.dumps({"id": 9, "enabled": True, "runtime": AGENT_RT["runtime"]} if AGENT_RT["code"] == 200 else {"error": "no"}).encode()
+        self.send_response(AGENT_RT["code"])
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(b)))
+        self.end_headers()
+        self.wfile.write(b)
+
+    do_GET = do_PUT = do_POST = do_PATCH = answer
+
+
+srv = ThreadingHTTPServer(("127.0.0.1", 0), AgentStub)
+threading.Thread(target=srv.serve_forever, daemon=True).start()
+STUB = f"http://127.0.0.1:{srv.server_address[1]}"
+TMP = tempfile.mkdtemp(prefix="kalmido-parity-beh-")
+SH = os.path.join(MCP, "agent_launcher.sh")
+PS1 = os.path.join(MCP, "agent_launcher.ps1")
+PWSH = os.environ.get("PWSH") or shutil.which("pwsh")
+LAUNCHERS = [("sh", ["bash", SH])] + ([("ps1", [PWSH, "-NoProfile", "-NonInteractive", "-File", PS1])] if PWSH else [])
+if not PWSH:
+    print("launcher_parity: .ps1 behaviour SKIP (no pwsh)")
+ENV = {k: v for k, v in os.environ.items() if not k.startswith("KALMIDO_")}
+
+
+def envfile(name, *lines):
+    p = os.path.join(TMP, name)
+    with open(p, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    return p
+
+
+def alive(pid):
+    st = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+    return bool(st) and not st.startswith("Z")
+
+
+BASE = (f"KALMIDO_URL={STUB}", "KALMIDO_TOKEN=abk_parity", "KALMIDO_POLL=1", "KALMIDO_RESTART_DELAY=1")
+GOOD = envfile("good.env", *BASE)
+# a fake agent: writes its env and the pids of itself and a child, then waits until it is ended
+FAKE2 = os.path.join(TMP, "treeagent")
+with open(FAKE2, "w") as f:
+    f.write("#!/usr/bin/env python3\nimport json, os, subprocess, sys, time\n"
+            "c = subprocess.Popen(['sleep', '600'])\n"
+            "t = os.environ['FAKE_OUT'] + '.tmp'\n"
+            "json.dump({'pid': os.getpid(), 'child': c.pid, 'env': {k: v for k, v in os.environ.items() if k.startswith('PAR_')}}, open(t, 'w'))\n"
+            "os.replace(t, os.environ['FAKE_OUT'])\ntime.sleep(600)\n")
+os.chmod(FAKE2, 0o755)
+
+
+def run_fake(cmd, name, envf, extra=()):
+    out = os.path.join(TMP, name + ".json")
+    if os.path.exists(out):
+        os.remove(out)
+    p = subprocess.Popen(cmd + ["-e", envf, "--", FAKE2, *extra], env=dict(ENV, FAKE_OUT=out), stdout=subprocess.DEVNULL,
+                         stderr=open(os.path.join(TMP, name + ".err"), "w"))
+    kt.until(lambda: os.path.exists(out), 45)
+    with open(out) as f:
+        return p, json.load(f)
+
+
+def stop(p):
+    p.send_signal(signal.SIGTERM)
+    try:
+        return p.wait(45)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        p.wait()
+        return "hung"
+
+
+helps = {}
+for nm, cmd in LAUNCHERS:
+    # exit code 2 with a log line (the .sh ended with 127 and no prefix)
+    for f_, what in ((envfile("nourl.env", "KALMIDO_TOKEN=x"), "KALMIDO_URL missing"), (envfile("notok.env", f"KALMIDO_URL={STUB}"), "KALMIDO_TOKEN missing"),
+                     (os.path.join(TMP, "gone.env"), "cannot read")):
+        r = subprocess.run(cmd + ["-e", f_, "--once"], env=ENV, capture_output=True, text=True, timeout=60)
+        check(r.returncode == 2 and what in r.stderr and "agent_launcher:" in r.stderr, f"{nm}: {what}: exit 2 with a log line: {r.returncode} {r.stderr[-200:]}")
+    r = subprocess.run(cmd + ["-e"], env=ENV, capture_output=True, text=True, timeout=60)
+    check(r.returncode == 2 and "-e needs a file" in r.stderr, f"{nm}: -e without a file: exit 2: {r.returncode} {r.stderr[-200:]}")
+    helps[nm] = subprocess.run(cmd + ["--help"], env=ENV, capture_output=True, text=True, timeout=60).stdout
+    for var in ("KALMIDO_APPROVAL_CHECK", "KALMIDO_NOTICE_COMPACTED", "KALMIDO_HOST", "KALMIDO_PYTHON", "KALMIDO_USAGE_LIMIT", "KALMIDO_PROMPT_FILE"):
+        check(var in helps[nm], f"{nm}: the help names {var}")
+    check("Exit codes" in helps[nm] and "Needs" in helps[nm], f"{nm}: the whole help is printed")
+    # a comment behind a value is not part of it, a # inside a word is
+    envf = envfile("comment.env", *BASE, "PAR_A=plain # a comment", 'PAR_B="two words" # a comment', "PAR_C=a#b", "PAR_D='single'  # x")
+    p, got = run_fake(cmd, f"comment-{nm}", envf)
+    check(got.get("env") == {"PAR_A": "plain", "PAR_B": "two words", "PAR_C": "a#b", "PAR_D": "single"}, f"{nm}: comments in the env file: {got.get('env')}")
+    # TERM: the command and what it started end, exit 0
+    rc = stop(p)
+    check(rc == 0, f"{nm}: TERM: exit 0: {rc}")
+    check(kt.until(lambda: not alive(got["pid"]) and not alive(got["child"]), 15), f"{nm}: TERM ends the command and its child")
+    # TERM while it waits with a revoked token, before anything runs: a clean end too
+    AGENT_RT["code"] = 401
+    p = subprocess.Popen(cmd + ["-e", GOOD, "--", FAKE2], env=dict(ENV, FAKE_OUT=os.path.join(TMP, "never.json")), stdout=subprocess.DEVNULL,
+                         stderr=(ef := open(os.path.join(TMP, f"revoked-{nm}.err"), "w+")))
+    kt.until(lambda: os.path.getsize(ef.name) > 0, 45)
+    check(stop(p) == 0, f"{nm}: TERM in the first polling loop: exit 0")
+    ef.close()
+    AGENT_RT["code"] = 200
+    # no such time as 25:00: no restart, the launcher goes on (the .ps1 ended)
+    AGENT_RT["runtime"]["nightly_reset"] = "25:00"
+    p, got = run_fake(cmd, f"night-{nm}", GOOD)
+    seen = AGENT_RT["polls"]
+    check(kt.until(lambda: AGENT_RT["polls"] >= seen + 3, 45) and p.poll() is None, f"{nm}: an invalid nightly time is skipped")
+    check(alive(got["pid"]), f"{nm}: the agent keeps running past an invalid nightly time")
+    stop(p)
+    AGENT_RT["runtime"]["nightly_reset"] = None
+    # KALMIDO_PYTHON instead of a fixed python3
+    calls = os.path.join(TMP, f"py-{nm}.log")
+    wrap = os.path.join(TMP, f"mypy-{nm}")
+    with open(wrap, "w") as f:
+        f.write(f'#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "{calls}"\nexec {shutil.which("python3")} "$@"\n')
+    os.chmod(wrap, 0o755)
+    r = subprocess.run(cmd + ["-e", envfile("py.env", *BASE, f"KALMIDO_PYTHON={wrap}"), "--events", "--once", "--", "claude"], env=ENV, capture_output=True, text=True, timeout=60)
+    check(r.returncode == 0 and f"{wrap} " in r.stdout, f"{nm}: the event runner starts with KALMIDO_PYTHON: {r.stdout[-200:]} {r.stderr[-200:]}")
+    if nm == "sh":
+        check(os.path.exists(calls) and "work_style" in open(calls).read(), "sh: the settings are read with KALMIDO_PYTHON")
+if PWSH:
+    var = {k: {x for x in re.findall(r"KALMIDO_[A-Z_]+", v)} for k, v in helps.items()}
+    check(var["sh"] == var["ps1"], f"the helps name the same variables: {sorted(var['sh'] ^ var['ps1'])}")
+
+# the event runner: TERM ends the running command (in a session of its own, the launcher cannot reach it) and what that started
+out = os.path.join(TMP, "run.json")
+evf = os.path.join(TMP, "ev.jsonl")
+with open(evf, "w") as f:
+    f.write(json.dumps({"event": "chat", "seq": 1, "data": {"user": {"id": 7, "name": "Ann"}, "message": {"id": 1, "body": "x"}}}) + "\n")
+p = subprocess.Popen([sys.executable, os.path.join(MCP, "agent_run.py"), "--state", os.path.join(TMP, "st"), "--once-event", evf, "--", FAKE2],
+                     env=dict(ENV, KALMIDO_URL=STUB, KALMIDO_TOKEN="abk_parity", FAKE_OUT=out), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+check(kt.until(lambda: os.path.exists(out), 45), "the runner starts the command")
+with open(out) as f:
+    got = json.load(f)
+check(stop(p) == 0, "agent_run.py: TERM: exit 0")
+check(kt.until(lambda: not alive(got["pid"]) and not alive(got["child"]), 15), "agent_run.py: TERM ends the running command and its child")
+
+# the setup scripts: read here, run in p2440_c_setup_test.py (setup.ps1 only runs on Windows)
+with open(os.path.join(STATIC, "setup.sh"), encoding="utf-8") as f:
+    ssh = f.read()
+with open(os.path.join(STATIC, "setup.ps1"), encoding="utf-8") as f:
+    sps = f.read()
+check("shlex.quote" in ssh and "KALMIDO_STATE_DIR=`\"" in sps, "both setups quote the state folder")
+check("$env:KALMIDO_PYTHON" in sps and "KALMIDO_PYTHON=" in ssh, "both setups take KALMIDO_PYTHON and keep it for the autostart")
+check('"$EnvF.new"' in sps and "*.new" in ssh and "*.new" in sps, "both setups write the env file whole and clear old .new files")
+check("while (`$true)" in sps and "$LoopArgs\"" in sps, "the Startup folder entry starts the launcher again like the service")
+srv.shutdown()
+shutil.rmtree(TMP, ignore_errors=True)
+
+print(f"launcher_parity: {kt.OKS[0]} ok, {len(kt.FAILS)} failed")
+sys.exit(1 if kt.FAILS else 0)

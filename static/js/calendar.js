@@ -21,7 +21,7 @@ function viewKanban() {
   return `${listHead(listById(lid))}${swlBar(lid)}<div class="kanban">${cols.map(c => `
     <div class="kcol" data-kcol="${c.id ?? ''}">
       ${head(c)}
-      <div class="kcards">${c.tasks.map(t => taskRow(t, {compact: true})).join('')}</div>
+      <div class="kcards">${c.tasks.map(t => taskRow(t, {compact: true, dwell: lid})).join('')}</div>
       ${add(c)}
     </div>`).join('')}
     ${knew}</div>`;
@@ -194,7 +194,7 @@ function cevPop(anchor, id) {
     <div class="cevh"><i class="cevdot"></i><b>${esc(cevTitle(e))}</b></div>
     <div class="cevm">${ic('clock', 's')}<span>${esc(cevWhen(e))}</span></div>
     ${e.location ? `<div class="cevm">${ic('mappin', 's')}<span>${esc(e.location)}</span></div>` : ''}
-    <div class="cevm">${ic('cal', 's')}<span>${esc(cevCal(e))} · ${tr('read-only')}</span></div>
+    <div class="cevm">${ic('cal', 's')}<span>${esc(cevCal(e))} · ${tr('read-only')}</span>${cvxTodayBtn(e)}</div>
     ${desc ? `<div class="cevdesc">${cevLinkify(desc)}${e.description.length > 2000 ? '…' : ''}</div>` : ''}
     ${abcX(e) ? '' : `<div class="cevact"><button class="btn sm pri" data-cevtask>${ic('plus', 's')} ${tr('Create task from event')}</button></div>`}</div>`);  // 2.155.0 B (#2076)
   p.onclick = ev => { if (ev.target.closest('[data-cevtask]')) { closePop(); cevToTask(e); } };
@@ -340,11 +340,29 @@ function cvxTlMenu(anchor, key, name) {
     {label: tr('Calendars…'), icon: 'cal', fn: evCalsModal}]);
 }
 // Today: the "…" of "Events today" switches single calendars off / on in this block only
-function cvxTodayMenu(anchor) {
-  const cs = cvxVisibleCals(), off = cvxList('today_cals_hidden');
-  menu(anchor, [...cs.map(c => ({label: c.name, on: !off.includes(c.key), fn: async () => { await cvxOff('today_cals_hidden', c.key, !off.includes(c.key)); renderView(); }})),
+// 2.443.0 (#3740): every calendar of "Events today" with its switch: + holidays and absences, also in the block's own menu
+// (widgets.js, the "…" of the phone); invitations have no calendar and stay until they are declined
+function cvxTodayItems() {
+  if (!feat('cal') || !calEvOn()) return [];
+  const off = cvxList('today_cals_hidden'), team = (S.me?.workspaces || []).length > 0;
+  const cs = [...cvxVisibleCals(), ...[['hol', tr('Public holidays'), S.settings.cal_holidays !== '0'], ['abs', tr('My absences'), S.settings.cal_abs !== '0'],
+    ['team', tr('Team absences'), team && S.settings.cal_abs_team === '1']].filter(x => x[2]).map(([k, name]) => ({key: `x:${k}`, name}))];
+  return [...cs.map(c => ({label: c.name, on: !off.includes(c.key), fn: async () => { await cvxOff('today_cals_hidden', c.key, !off.includes(c.key)); renderView(); }})),
     cs.length ? '-' : null, off.length ? {label: tr('Show all calendars'), icon: 'all', fn: async () => { await cvxSave('today_cals_hidden', []); renderView(); }} : null,
-    {label: tr('Calendars…'), icon: 'cal', fn: evCalsModal}].filter(Boolean));
+    {label: tr('Calendars…'), icon: 'cal', fn: evCalsModal}].filter(Boolean);
+}
+function cvxTodayMenu(anchor) { menu(anchor, cvxTodayItems()); }
+// 2.443.0 (#3740): the switch in an event's window, only "Events today" (the calendar view and planning stay); '' = no calendar to switch
+function cvxTodayBtn(e) {
+  const k = cvxKey(e);
+  if (!/^([es]:\d+|x:(hol|abs|team))$/.test(k)) return '';
+  const off = cvxList('today_cals_hidden').includes(k);
+  return `<button type="button" class="btn sm cvxthide" data-act="cvx-today-flip" data-key="${esc(k)}" data-name="${esc(cevCal(e))}">${ic(off ? 'eye' : 'eyeoff', 's')} ${off ? tr('Show on Today') : tr('Hide on Today')}</button>`;
+}
+async function cvxTodayFlip(key, name, off = !cvxList('today_cals_hidden').includes(key)) {
+  await cvxOff('today_cals_hidden', key, off);
+  renderView();
+  toast(off ? tr('“{0}” is hidden on Today', name) : tr('“{0}” is shown on Today', name), () => cvxTodayFlip(key, name, !off));
 }
 // the day plan dialog (#956): a fold-out "Calendars" line, each switch = counts as busy when planning (also for an agent)
 function cvxPlanRow(open) {

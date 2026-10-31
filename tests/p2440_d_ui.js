@@ -17,7 +17,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const change = (w, el) => el.dispatchEvent(new w.Event('change', {bubbles: true}));
 const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,comments,contacts,clients,workload,review,family,contracts,home';
@@ -53,9 +53,11 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   click(w, d.querySelector('#view .mgtabs [data-go="pomo"]'));  // 2.224.0 (#2817)
   await until(() => w.eval('S.route.mod') === 'pomo');
   check(tabs() === 'time,pomo*' && d.querySelector('#srail [data-sbb="time"].on'), 'the focus timer entry: the area icon stays lit');  // 2.152.2 (#2622)
-  check(d.querySelector('#srail [data-sbb="time"]').dataset.go === 'pomo', 'the area remembers its last page');  // 2.152.2 (#2622)
+  // 2.417 (#3559): the area keeps its last page (sbb_target); the button of the OPEN area leads to its start page
+  check(w.eval(`sbb_target('time')`) === 'pomo' && d.querySelector('#srail [data-sbb="time"]').dataset.go === 'time', 'the area remembers its last page');  // 2.152.2 (#2622)
   w.eval(`go('review')`); await until(() => w.eval('S.route.mod') === 'review');
   check(tabs() === 'review*,stats', 'Review: Review & journal and Statistics ' + tabs());
+  check(d.querySelector('#srail [data-sbb="time"]').dataset.go === 'pomo', 'another area open: the Time button leads back to its last page');  // 2.417 (#3559)
   w.eval(`go('life')`); await until(() => w.eval('S.route.mod') === 'life');
   check(sideTabs() === 'life*,family', 'Home: Home & life and Family ' + sideTabs());  // 2.224.0 (#2817): Home keeps its panel
   w.eval(`go('contacts')`); await until(() => w.eval('S.route.mod') === 'contacts');

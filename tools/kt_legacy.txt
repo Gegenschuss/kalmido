@@ -1,17 +1,5 @@
 # Python suites with their own check()/sess()/until() from before tests/kt.py (tools/check_kt.py).
 # Frozen 2.192.0 (#2514): delete a line when its suite moves to kt.py, never add new suites here.
-agent_docs_coverage_test.py
-launcher_parity_test.py
-p210_api_test.py
-p2115_b_api_test.py
-p2126_c_api_test.py
-p2180_git_api_test.py
-p220_api_test.py
-p2362_b_api_test.py
-p2370_m_api_test.py
-p273_a_api_test.py
-p273_b_api_test.py
-p286_a_api_test.py
-p296_d_api_test.py
+# 2.358.0 D (#2783): 14 suites moved to kt.py. pg_layer_test.py stays: its check() lives in a code string that runs inside the
+# container (python -c via docker exec), where tests/kt.py does not exist.
 pg_layer_test.py
-twofa_test.py

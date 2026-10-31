@@ -21,7 +21,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2169A_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const clone = v => v === undefined ? v : JSON.parse(JSON.stringify(v));
 
 // one browser: the copy's store and localStorage, shared by its windows
@@ -189,7 +189,10 @@ function browser() {
   br.db.set('s:org:9999', {k: 's:org:9999', sp: 'org:9999', uid: st0.me.id, pages: [{id: 1, path: 'Old', body: 'old'}]});
   br.db.set('s:private-other', {k: 's:private-other', sp: 'private', uid: 999999, pages: []});
   // 2.280.0 C (#3114): the tidying runs at the first space opened in a session (no start sync any more)
-  await w.eval(`WKO.swept = null; wk_load('private', true)`);
+  // 2.438.0 (#3625): a load of this space may still run (a redraw after the flush above) and wk_load then returns without
+  // syncing: WKO.swept stayed null and the check ran before any tidying. Asked again until the tidying really started
+  await w.eval(`WKO.swept = null; 1`);
+  await until(() => w.eval(`wk_load('private', true); !!WKO.swept`), 40);
   await w.eval(`WKO.swept`);
   check(!br.db.has('s:org:9999') && !br.db.has('s:private-other') && br.db.has('s:private'), 'sync: a space no longer mine and another account\'s record leave the copy');
   // review: my own text sent twice (the first answer got lost) is no conflict

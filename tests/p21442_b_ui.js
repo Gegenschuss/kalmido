@@ -22,7 +22,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P21442B_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {http: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true}));
 const sql = (q, a = []) => JSON.parse(execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, q, JSON.stringify(a)]).toString() || '[]');
@@ -173,14 +173,14 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
   check(tb, '#2375: the hint "Vacation approved" has Undo ' + (d.querySelector('#toast')?.textContent || ''));
   click(w, tb?.querySelector('button:not(.tx)'));
   check(await until(async () => (await call('GET', `/api/team/absences?start=${D1}&end=${D2}`)).items?.[0]?.status === 'pending'), '#2375: Undo in the hint: the request is open again');
+  // 2.365.2 C (#2789): the approval switch moved from the vacation accounts to Settings > Organisation
   const box = await until(() => w.eval('!!(LV.data && LV.data.people)') && d.querySelector('#view details.lvbox'), 60);
-  if (box) { box.open = true; box.dispatchEvent(new w.Event('toggle')); }
-  await sleep(100);
-  const sw = d.querySelector('#view #lv-approval');
+  check(!!box && !d.querySelector('#view #lv-approval') && !!d.querySelector('#view [data-act="mod-settings"][data-sec="org"]'), '#2789: the vacation accounts hold a link to Settings, not the switch');
+  w.eval(`settingsModal('org')`);
+  const sw = await until(() => d.querySelector('.smodal #s-wsr-appr'), 80);
+  check(!!sw && sw.checked, '#2789: Settings > Organisation shows the approval switch on');
   if (sw) { sw.checked = false; sw.dispatchEvent(new w.Event('change', {bubbles: true})); }
   check(await until(async () => (await call('GET', `/api/team/leave?org=${ORG}&year=${mon.getFullYear()}`)).approval === false), '#2375: the approval switch saved');
-  await until(() => w.eval('!!(LV.data && LV.data.people)') && d.querySelector('#view details.lvbox') && !d.querySelector('#view #lv-approval')?.checked, 60);
-  check(d.querySelector('#view details.lvbox')?.open === true, '#2375: the vacation accounts stay open after the save');
   w.close();
 
   w = await boot({user: 'alice'}); d = w.document;

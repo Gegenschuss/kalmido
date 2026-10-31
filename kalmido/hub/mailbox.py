@@ -184,7 +184,7 @@ class _SafeIMAP_SSL(imaplib.IMAP4_SSL):
 
 def _allow(c):
     from ..calendars.subscriptions import cal_allow
-    return cal_allow(c)
+    return cal_allow(c, "mail")  # 2.380 G (#3389)
 
 
 def _imap_open(c, r, secret, timeout=30, allow=None):

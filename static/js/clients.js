@@ -9,6 +9,12 @@
 // waits for one person's decision). Everything stays within the organisation; the server decides what each person sees.
 const clientsOn = () => feat('clients');
 const workloadOn = () => feat('workload') && collab();
+// 2.380.2 (#3407): the Einsatzplan follows the shown workspace: a company = that organisation (no picker), Private = not in
+// the menus (one person, nothing to plan; a link or a notification still opens it), All = the picker as before
+const wlWsOrg = () => { const ws = wsOn() ? wsCur() : 'all'; return ws.startsWith('org:') ? +ws.slice(4) : null; };
+const wlOrg = () => wlWsOrg() || WLV.org;
+const wlShown = () => workloadOn() && !(wsOn() && wsCur() === 'private');
+if (typeof p61b_wsOn === 'function') p61b_wsOn('workload', after => { if (!after) return; WLV.data = null; if (S.route?.mod === 'workload' && WLV.tab === 'wl') wlLoad(); });
 const formsOn = () => feat('forms');
 const CLV = {data: null, id: null, loading: false, seq: 0, month: null};
 const WLV = {data: null, start: null, weeks: 4, org: null, loading: false, seq: 0, tab: 'wl'};  // 2.50.0 (#1195, #1194): tab wl | abs | dispo
@@ -38,14 +44,14 @@ function clientsSideHtml(onTasks) {
 }
 
 // ---- the view: all clients / one client
-async function clLoad() {
+async function clLoad(quiet) {  // 2.431.0 C (#3602): quietly for ms_clLive (no draw, a failure keeps the card)
   const seq = ++CLV.seq, id = S.route.client || null;
   CLV.loading = true;
   const q = CLV.month ? `?month=${CLV.month}` : '';
   try { const j = await api('GET', id ? `/api/clients/${id}${q}` : `/api/clients${q}`); if (seq === CLV.seq) { CLV.data = j; CLV.id = id; } }
-  catch { if (seq === CLV.seq) { CLV.data = {error: true}; CLV.id = id; } }
+  catch { if (seq === CLV.seq && !quiet) { CLV.data = {error: true}; CLV.id = id; } }
   CLV.loading = false;
-  if (S.route.mod === 'clients' && seq === CLV.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('clients', viewClients()))); }
+  if (S.route.mod === 'clients' && seq === CLV.seq && !quiet) ms_clDraw();  // 2.431.0 C (#3598): the same draw (+ the columns' scroll)
 }
 const clReload = () => { CLV.data = null; ms_clDirty(); if (S.route.mod === 'clients') ms_clDraw(); };  // 2.47.3 (#1734): the page loads what it shows
 function budgetBar(c) {
@@ -112,6 +118,9 @@ function clientSheet(c) {  // the time view of the client's month, then its prin
 }
 
 // ---- the client dialog
+// 2.433.0 (#3604): the automatic short code of a name, as the server's client_short_code: the first three letters in capitals, umlauts written out
+const CL_UML = {'Ä': 'AE', 'Ö': 'OE', 'Ü': 'UE', 'ß': 'SS'};
+const cl_autoCode = n => String(n || '').toUpperCase().replace(/[ÄÖÜß]/g, m => CL_UML[m]).normalize('NFKD').replace(/[^A-Z]/g, '').slice(0, 3);
 function cl_iconPickHtml(cur) {
   const old = cur && !cur.startsWith('ic:') ? `<button type="button" class="avopt on" data-clico="${esc(cur)}" aria-pressed="true" aria-label="${esc(cur)}"><span class="semo" aria-hidden="true">${esc(cur)}</span></button>` : '';
   return `<input type="hidden" id="cl-icon" value="${esc(cur)}"><div class="lipick clico" role="group" aria-labelledby="cl-icon-l"><button type="button" class="avopt none ${cur ? '' : 'on'}" data-clico="" aria-pressed="${!cur}" title="${esc(tr('No icon'))}" aria-label="${esc(tr('No icon'))}">${ic('ban', 's')}</button>${old}${CL_ICONS.map(k => `<button type="button" class="avopt ${cur === 'ic:' + k ? 'on' : ''}" data-clico="ic:${k}" aria-pressed="${cur === 'ic:' + k}" aria-label="${k}">${ic(k)}</button>`).join('')}</div>`;
@@ -124,14 +133,19 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
     <div class="shint lhint" id="cl-nx-h">${tr('Printed as its own line under the name, e.g. the legal form or the partners.')}</div>`;
   const em = `<div class="row"><label for="cl-email">${tr('E-mail')}</label><input id="cl-email" type="email" maxlength="200" value="${esc(c?.email || '')}" autocomplete="email"></div>`;
   const short = !c && !o.quick, bb = c?.billing || {};
+  // 2.433.0 (#3599): the e-mail for invoices sits next to E-mail / Phone (also when adding), no longer in the billing details
+  const emi = cdn_invMailOk(bb, c) ? cdn_fieldHtml(bb)(OFX_CL_FIELDS.find(([k]) => k === 'email_invoice')) : '';
   const city = short ? cdn_fieldHtml(bb)(OFX_CL_FIELDS.find(([k]) => k === 'city')) : '';
   const addr = short ? `<div class="cdnaddr">${OFX_CL_FIELDS.filter(([k]) => CDN_ADDR.includes(k) && k !== 'city').map(cdn_fieldHtml(bb)).join('')}</div>` : cdn_addrHtml(bb);
   const dn = `<div class="row"><label for="cl-dname">${tr('Display name (optional)')}</label><input id="cl-dname" maxlength="80" value="${esc(c?.display_name || '')}" autocomplete="off" aria-describedby="cl-dname-h"></div>
     <div class="shint lhint" id="cl-dname-h">${tr('Shown in pickers and lists, not on the invoice.')}</div>`;
+  // 2.433.0 (#3604): the short code for the number block {kuerzel} (with the office); empty = the first three letters of the name
+  const sc = typeof officeOn === 'function' && officeOn() ? `<div class="row"><label for="cl-sc">${tr('Short code')}</label><input id="cl-sc" maxlength="6" value="${esc(c?.short_code || '')}" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="${esc(cl_autoCode(c?.name || ''))}" aria-describedby="cl-sc-h"></div>
+    <div class="shint lhint" id="cl-sc-h">${tr('In numbers as {kuerzel}, e.g. 673_TNP_R. Empty = the first three letters of the name.')}</div>` : '';
   const ico = `<div class="row"><label id="cl-icon-l">${tr('Symbol')}</label>${cl_iconPickHtml(c?.icon || '')}</div>`;
   const rest = `${ico}
     <div class="row clkrow"><label>${tr('Contact persons')}</label><div class="clk" id="cl-contacts"></div></div>
-    ${short ? '' : em}
+    ${short ? '' : em + emi}
     <div class="row"><label for="cl-phone">${tr('Phone')}</label><input id="cl-phone" type="tel" maxlength="60" value="${esc(c?.phone || '')}" autocomplete="tel"></div>
     ${addr}${timeOn() ? `<div class="row"><label for="cl-rate">${tr('Hourly rate')}</label><input id="cl-rate" inputmode="decimal" class="numin" value="${c?.rate != null ? esc(fmtNum(c.rate, 2)) : ''}" placeholder="${esc(tr('optional'))}"><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('for projects without their own rate')}</span></div>
     <div class="row"><label for="cl-bh">${tr('Budget')}</label><span class="lacts"><input id="cl-bh" inputmode="decimal" class="numin" value="${c?.budget_h != null ? esc(fmtNum(c.budget_h, 2)) : ''}" placeholder="–" aria-label="${esc(tr('Budget in hours'))}"><span class="muted">h</span><input id="cl-ba" inputmode="decimal" class="numin" value="${c?.budget_amount != null ? esc(fmtNum(c.budget_amount, 2)) : ''}" placeholder="–" aria-label="${esc(tr('Budget as an amount'))}"><span class="muted">${esc(S.settings.time_currency || '€')}</span></span></div>
@@ -141,12 +155,14 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
     ${c ? `<div class="row"><label>${tr('Archive')}</label><label class="chkl"><input type="checkbox" id="cl-arch" ${c.archived ? 'checked' : ''}> ${tr('Archived (hidden from the sidebar)')}</label></div>` : ''}`;
   const md = modal(`<h3>${c ? tr('Edit client') : tr('New client')}</h3>
     ${nm}
-    ${o.quick ? `${nx}${addr}` : short ? `${em}${city}<details class="clmore" id="cl-more"><summary>${ic('chev', 's fcar')}<span>${tr('More details')}</span></summary>${nx}${dn}${rest}</details>` : `${nx}${dn}${rest}`}
+    ${o.quick ? `${nx}${addr}` : short ? `${em}${emi}${city}<details class="clmore" id="cl-more"><summary>${ic('chev', 's fcar')}<span>${tr('More details')}</span></summary>${nx}${dn}${sc}${rest}</details>` : `${nx}${dn}${sc}${rest}`}
     <div class="aerr" role="alert"></div>
     <div class="foot ${short ? 'clfoot' : ''}">${c?.can_delete ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${c ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('cldlg');
-  if (c && c.bill_edit === false) for (const el of md.querySelectorAll('.clbill [data-clb]')) { el.disabled = true; el.removeAttribute('data-clb'); }  // 2.187.1 A (#2735): read only, never sent
+  if (c && c.bill_edit === false) for (const el of md.querySelectorAll('.clbill [data-clb], [data-clb="email_invoice"]')) { el.disabled = true; el.removeAttribute('data-clb'); }  // 2.187.1 A (#2735): read only, never sent
   clkInit(md, c);
+  const scIn = $('#cl-sc', md), nmIn = $('#cl-name', md);  // 2.433.0 (#3604): capitals while typing, the automatic code as placeholder
+  if (scIn) { scIn.addEventListener('input', () => { scIn.value = scIn.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); }); nmIn?.addEventListener('input', () => { scIn.placeholder = cl_autoCode(nmIn.value); }); }
   const close = fgModal(md);  // 2.40.0 (#1371): the client card asks before unsaved input is lost
   const num = numBody;  // 2.263.0 (#2976)
   md.addEventListener('click', async e => {
@@ -177,6 +193,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
       const v = s => $(s, md)?.value ?? '';  // 2.97.0 B (#1951): the quick dialog (a document's "Add client") has name + address only
       const body = o.quick ? {name: v('#cl-name'), name_extra: v('#cl-nx')} : {name: v('#cl-name'), name_extra: v('#cl-nx'), icon: v('#cl-icon'), contacts: clkValue(md), email: v('#cl-email'),
         phone: v('#cl-phone'), display_name: v('#cl-dname'), note: v('#cl-note')};  // 2.99.0 D (#2188): + name_extra
+      if ($('#cl-sc', md)) body.short_code = v('#cl-sc').trim().toUpperCase();  // 2.433.0 (#3604)
       if (!c && 'org_id' in o) body.org_id = o.org_id;
       if (c?.updated_at) body.expect_updated_at = c.updated_at;  // 2.269.0 C (#3017): saved elsewhere meanwhile -> 409, never overwritten
       if (!o.quick && md._clkRm?.length) body.contacts_removed = md._clkRm.slice();  // only these are deleted (missing ones stay)
@@ -231,7 +248,7 @@ function clkInit(md, c) {
   clkDraw(md);
 }
 function clkRead(md) {
-  for (const el of md.querySelectorAll('[data-clk]')) { const k = md._clk[+el.dataset.i]; if (k) k[el.dataset.clk] = el.type === 'radio' ? el.checked : el.value; }
+  for (const el of md.querySelectorAll('[data-clk]')) { const k = md._clk[+el.dataset.i]; if (k) k[el.dataset.clk] = el.type === 'radio' || el.type === 'checkbox' ? el.checked : el.value; }
 }
 function clkDraw(md) {
   const box = $('#cl-contacts', md); if (!box) return;
@@ -239,7 +256,7 @@ function clkDraw(md) {
   if (ks.length && !ks.some(k => k.is_default)) ks[0].is_default = true;
   const f = (i, k, label, v, mx, attrs = '') => `<label class="oimfl"><span>${esc(label)}</span><input data-clk="${k}" data-i="${i}" maxlength="${mx}" value="${esc(v || '')}" ${attrs}></label>`;
   box.innerHTML = ks.map((k, i) => `<div class="clkc"><div class="oimgrid">${f(i, 'name', tr('Name'), k.name, 120, 'autocomplete="off"')}${f(i, 'role', tr('Function or department'), k.role, 120)}${f(i, 'email', tr('E-mail'), k.email, 200, 'type="email" autocomplete="off"')}${f(i, 'phone', tr('Phone'), k.phone, 60, 'type="tel" autocomplete="off"')}</div>
-    <div class="lacts"><label class="chkl"><input type="radio" name="cl-kdef" data-clk="is_default" data-i="${i}" ${k.is_default ? 'checked' : ''}> ${tr('Default')}</label>${ckl_html(md, k, i)}<span class="spacer"></span><button type="button" class="btn sm ghost" data-clk-rm="${i}" aria-label="${esc(tr('Remove {0}', k.name || tr('contact person')))}">${ic('trash', 's')} ${tr('Remove')}</button></div></div>`).join('')
+    <div class="lacts"><label class="chkl"><input type="radio" name="cl-kdef" data-clk="is_default" data-i="${i}" ${k.is_default ? 'checked' : ''}> ${tr('Default')}</label>${clk_invOn() ? `<label class="chkl"><input type="checkbox" data-clk="gets_invoices" data-i="${i}" ${k.gets_invoices ? 'checked' : ''}> ${tr('Gets invoices')}</label>` : ''}${ckl_html(md, k, i)}<span class="spacer"></span><button type="button" class="btn sm ghost" data-clk-rm="${i}" aria-label="${esc(tr('Remove {0}', k.name || tr('contact person')))}">${ic('trash', 's')} ${tr('Remove')}</button></div></div>`).join('')
     + `<button type="button" class="btn sm" data-clk-add>${ic('plus', 's')} ${tr('Add contact person')}</button>`;
   if (!box._clkOn) {
     box._clkOn = true;
@@ -259,8 +276,11 @@ function clkDraw(md) {
 function clkValue(md) {
   clkRead(md);
   for (const k of md._clk) if (k.id && !(k.name || '').trim() && !md._clkRm.includes(k.id)) md._clkRm.push(k.id);  // 2.269.0 C (#3017): a cleared name = removed
-  return md._clk.filter(k => (k.name || '').trim()).map(k => ({...(k.id ? {id: k.id} : {}), name: k.name.trim(), role: (k.role || '').trim(), email: (k.email || '').trim(), phone: (k.phone || '').trim(), is_default: !!k.is_default, contact_id: k.contact_id || null}));
+  return md._clk.filter(k => (k.name || '').trim()).map(k => ({...(k.id ? {id: k.id} : {}), name: k.name.trim(), role: (k.role || '').trim(), email: (k.email || '').trim(), phone: (k.phone || '').trim(), is_default: !!k.is_default, contact_id: k.contact_id || null,
+    ...(clk_invOn() ? {gets_invoices: !!k.gets_invoices} : {})}));  // 2.433.0 (#3599): without the office the mark stays as saved
 }
+// 2.433.0 (#3599): "Gets invoices" -- this contact person gets invoices and reminders in copy (with the office only)
+const clk_invOn = () => typeof officeOn === 'function' && officeOn();
 // 2.59.0 (#1735): a contact person linked to a contact of the address book -- "From the address book" searches the address
 // books the server allows for this client (the organisation's, a freelancer's own) and copies name, function, e-mail and
 // phone into the fields; the link is saved with the client (Cancel drops it again). Later changes of the contact do not follow.
@@ -321,7 +341,7 @@ document.addEventListener('change', async e => {
 async function wlLoad() {
   const seq = ++WLV.seq;
   WLV.loading = true;
-  const q = new URLSearchParams({weeks: WLV.weeks, ...(WLV.start ? {start: WLV.start} : {}), ...(WLV.org ? {org: WLV.org} : {})});
+  const q = new URLSearchParams({weeks: WLV.weeks, ...(WLV.start ? {start: WLV.start} : {}), ...(wlOrg() ? {org: wlOrg()} : {})});
   try { const j = await api('GET', '/api/workload?' + q); if (seq === WLV.seq) WLV.data = j; } catch { if (seq === WLV.seq) WLV.data = {error: true}; }
   WLV.loading = false;
   if (S.route.mod === 'workload' && seq === WLV.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, viewWorkload())); }
@@ -344,9 +364,9 @@ function viewWorkload() {
   };
   const rows = d.people.map(p => `<tr><th scope="row"><span class="wlp">${av(p.id, p.display_name)}<span class="wln"><b>${esc(p.display_name)}</b><button type="button" class="linkbtn wlcap" data-act="wl-cap" data-uid="${p.id}" ${p.own || S.me?.is_admin ? '' : 'disabled'} title="${esc(tr('Hours per week'))}">${esc(tr('{0} h / week', fmtNum(p.capacity_h, 1)))}</button></span></span></th>${p.weeks.map((c, i) => cell(p, c, i)).join('')}<td class="wlc wlnd">${p.nodate.tasks ? `<button type="button" class="wlb" data-act="wl-cell" data-uid="${p.id}" data-w="nd"><span class="wlt">${esc(trn('{0} task', '{0} tasks', p.nodate.tasks))}</span></button>` : ''}</td></tr>`).join('');
   return `<div class="dash wload">${ab2_tabs('wl')}<div class="clhead"><span class="spacer"></span>
-      ${d.orgs.length > 1 ? `<select id="wl-org" aria-label="${esc(tr('Workspace'))}">${d.orgs.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
+      ${d.orgs.length > 1 && !wlWsOrg() ? `<select id="wl-org" aria-label="${esc(tr('Workspace'))}">${d.orgs.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
       <button class="iconbtn" data-act="wl-move" data-d="-1" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><button class="btn sm" data-act="wl-move" data-d="0">${tr('This week')}</button><button class="iconbtn" data-act="wl-move" data-d="1" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
-      <a class="btn sm" href="/api/workload/export.xlsx?${new URLSearchParams({weeks: WLV.weeks, ...(WLV.start ? {start: WLV.start} : {}), ...(WLV.org ? {org: WLV.org} : {})})}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a></div>
+      <a class="btn sm" href="/api/workload/export.xlsx?${new URLSearchParams({weeks: WLV.weeks, ...(WLV.start ? {start: WLV.start} : {}), ...(wlOrg() ? {org: wlOrg()} : {})})}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a></div>
     <div class="muted wlnote">${tr('Only what you can see.')}<div class="shint">${tr('Open tasks assigned to each person, by their planned start, else their due date (overdue ones count this week), with their duration as the estimate.')}</div></div>
     <div class="wlwrap"><table class="wltable"><thead><tr><th scope="col">${tr('Person')}</th>${d.weeks.map(w => `<th scope="col" title="${esc(pd(w.start).toLocaleDateString(LOCALE(), {day: 'numeric', month: 'short'}) + ' – ' + pd(w.end).toLocaleDateString(LOCALE(), {day: 'numeric', month: 'short'}))}">${wk(w)}</th>`).join('')}<th scope="col">${tr('No date')}</th></tr></thead><tbody>${rows || `<tr><td colspan="${d.weeks.length + 2}" class="muted">${tr('Nobody to show.')}</td></tr>`}</tbody></table></div>
     <p class="muted wllegend"><span class="wlk lv-ok"></span>${tr('below 80 %')} <span class="wlk lv-warn"></span>${tr('80–100 %')} <span class="wlk lv-over"></span>${tr('over capacity')}</p></div>`;
@@ -540,9 +560,11 @@ const OFX_CL_FIELDS = [['street', N_('Street'), 200], ['address_extra', N_('Addr
 const CDN_ADDR = ['street', 'address_extra', 'zip', 'city', 'country'];
 const cdn_fieldHtml = b => ([k, n, mx]) => (k === 'country' ? `<div class="row"><label for="clb-country-q">${esc(tr(n))}</label>${ctyField('clb-country', b.country, {attrs: 'data-clb="country"', label: tr(n)})}</div>` : `<div class="row"><label for="clb-${k}">${esc(tr(n))}</label><input id="clb-${k}" data-clb="${k}" maxlength="${mx}" value="${esc(b[k] ?? '')}" ${k === 'payment_terms_days' ? 'inputmode="numeric" class="numin"' : k === 'country' ? 'class="numin" autocapitalize="characters"' : k === 'email_invoice' ? 'type="email" autocomplete="off"' : ''}></div>`) + (typeof ofcII === 'function' ? ofcII('cl_' + k) : '');  // 2.40.0 (#1382): (i) of the terms
 const cdn_addrHtml = b => `<div class="cdnaddr">${OFX_CL_FIELDS.filter(([k]) => CDN_ADDR.includes(k)).map(cdn_fieldHtml(b)).join('')}</div>`;
+// 2.433.0 (#3599): the e-mail for invoices is shown (next to E-mail) with the office and the rights of its billing details
+const cdn_invMailOk = (b, c) => typeof officeOn === 'function' && officeOn() && (c ? 'email_invoice' in b : !(typeof ofr_grp === 'function' && ofr_grp() && !['edit', 'manage'].includes(ofr_lvOf('offers'))));
 function ofxClientBillingHtml(b, c) {
   // 2.187.1 A (#2735): without the office area "Quotes & invoices" the server leaves the invoicing keys out -> no block (never saved empty)
-  let rest = OFX_CL_FIELDS.filter(([k]) => !CDN_ADDR.includes(k));
+  let rest = OFX_CL_FIELDS.filter(([k]) => !CDN_ADDR.includes(k) && k !== 'email_invoice');  // 2.433.0 (#3599): email_invoice above
   if (c) rest = rest.filter(([k]) => k in b);
   else if (typeof ofr_grp === 'function' && ofr_grp() && !['edit', 'manage'].includes(ofr_lvOf('offers'))) rest = [];
   if (!rest.length) return '';

@@ -72,6 +72,8 @@ $MsgEn = @{
   nolistfetch = 'cannot fetch the starter file list ({0}starter_files.txt); this version may not be published yet - try again later or use -From DIR'
   skippath = '  skipped {0} (no paths allowed)'
   nofetch = 'cannot fetch {0}'
+  shabad = '{0} does not match the checksum Kalmido sent - not installed. The download address serves another file than this version; ask your Kalmido admin'
+  shanone = '  (Kalmido sent no checksums of the starter files: an older version, not checked)'
   skipfile = '  {0} not available (skipped)'
   dry_mcp = '  (dry run) write {0} (MCP server kalmido: {1} {2})'
   s_auto = 'Starting it at every login'
@@ -126,6 +128,8 @@ $MsgDe = @{
   nolistfetch = 'die Liste der Starter-Dateien ({0}starter_files.txt) kann nicht geladen werden; diese Version ist vielleicht noch nicht veröffentlicht – versuche es später noch einmal oder nimm -From ORDNER'
   skippath = '  {0} übersprungen (keine Pfade erlaubt)'
   nofetch = '{0} kann nicht geladen werden'
+  shabad = '{0} weicht von der Prüfsumme ab, die Kalmido geschickt hat – nicht installiert. Die Download-Adresse liefert eine andere Datei als diese Version; frag deinen Kalmido-Admin'
+  shanone = '  (Kalmido hat keine Prüfsummen der Starter-Dateien geschickt: ältere Version, nicht geprüft)'
   skipfile = '  {0} nicht verfügbar (übersprungen)'
   dry_mcp = '  (Probelauf) {0} schreiben (MCP-Server kalmido: {1} {2})'
   s_auto = 'Starte bei jeder Anmeldung'
@@ -154,7 +158,8 @@ if (-not $OnWindows -and -not $DryRun) { Die (M 'wrongos') }
 Step (M 's_prereq')
 $missing = @()
 $Py = $null; $PyArgs = @()
-foreach ($n in @('py', 'python', 'python3')) {  # python3 may be the Microsoft Store stub: the version check sorts it out
+# 2.443.0 (#2940): KALMIDO_PYTHON first and alone, as in setup.sh
+foreach ($n in $(if ($env:KALMIDO_PYTHON) { @($env:KALMIDO_PYTHON) } else { @('py', 'python', 'python3') })) {  # python3 may be the Microsoft Store stub: the version check sorts it out
   $c = Get-Command $n -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
   if (-not $c) { continue }
   $pa = @(); if ($n -eq 'py') { $pa = @('-3') }
@@ -246,6 +251,7 @@ if (-not $AllowHttp -and $Url -notmatch '^https://' -and $Url -notmatch '^http:/
 Step (M 's_connect')
 $HostN = ([Environment]::MachineName -split '\.')[0]
 $StarterBase = ''
+$StarterSha = @{}  # 2.380 G (#3390): file name -> sha256 from the redeem answer (empty: an older Kalmido, nothing checked)
 if ($DryRun) { Say (M 'dry_redeem' @($Url, $HostN)) }
 else {
   New-Item -ItemType Directory -Force -Path $Inst | Out-Null
@@ -268,7 +274,8 @@ else {
   $AgUser = [string]$r.agent.username -replace '[\x00-\x1f\x7f]', ' '
   $lines = @("# Kalmido agent $AgName ($AgUser), set up by agent-setup.ps1 -- keep this file private",
              "KALMIDO_URL=$Url", "KALMIDO_TOKEN=$($r.token)", 'KALMIDO_EVENTS=1',
-             "KALMIDO_STATE_DIR=$(Join-Path $Inst 'state')")  # one state folder per instance (cursor, approvals, lock)
+             "KALMIDO_STATE_DIR=`"$(Join-Path $Inst 'state')`"")  # one state folder per instance (cursor, approvals, lock); 2.443.0 (#2940): quoted, a " #" in a value starts a comment
+  if ($env:KALMIDO_PYTHON) { $lines += "KALMIDO_PYTHON=`"$env:KALMIDO_PYTHON`"" }  # 2.443.0 (#2940): the autostart runs without this shell's variables
   # 2.306.0 E (#2927): who answers permission questions -- kept from an earlier setup of this folder, else (team agent) the
   # person who made the code (operator_id), as KALMIDO_PERM_USER; KALMIDO_OWNER_IDS would also narrow who gives orders
   $keep = @()
@@ -278,11 +285,15 @@ else {
   elseif ($null -ne $op -and "$op" -match '^\d+$') { $perm = "$op"; $keep = @("KALMIDO_PERM_USER=$op") }
   elseif ($r.agent.team) { $perm = 'none' }
   else { $perm = 'owner' }
-  [IO.File]::WriteAllLines($EnvF, @($lines + $keep))
+  [IO.File]::WriteAllLines("$EnvF.new", @($lines + $keep))  # 2.443.0 (#2940): written whole, then moved into place, as in setup.sh
+  Move-Item -LiteralPath "$EnvF.new" -Destination $EnvF -Force
   # 2.306.0 (#2927): the server's version next to the starter files (the MCP server reports it; they have no VERSION file)
   if ([string]$r.version -match '^\d+(\.\d+){1,3}$') { [IO.File]::WriteAllText((Join-Path $Inst 'VERSION'), "$($r.version)`n") }
   $script:Redeemed = $true
   $StarterBase = [string]$r.starter_base
+  if ($r.starter_sha256) {
+    foreach ($p in $r.starter_sha256.PSObject.Properties) { if ([string]$p.Value -match '^[0-9a-f]{64}$') { $StarterSha[$p.Name] = [string]$p.Value } }
+  }
   Say (M 'agent' @($AgName, $EnvF))
   switch ($perm) {
     'kept' { Say (M 'perm_kept' @($EnvF)) }
@@ -299,13 +310,29 @@ function Fetch([string]$name, [string]$dest) {
   if ($From) { $src = Join-Path $From $name; if (Test-Path -LiteralPath $src) { Copy-Item -LiteralPath $src -Destination $dest -Force; return $true }; return $false }
   try { Invoke-WebRequest -Uri ($StarterBase + $name) -OutFile $dest -UseBasicParsing -TimeoutSec 60; return $true } catch { return $false }
 }
+# 2.380 G (#3390): a downloaded starter file must have the checksum Kalmido sent with the token; a file that differs or is not
+# in the list stops the setup before it is installed. -From DIR (a local copy) and an older Kalmido without checksums: no check
+function ShaOk([string]$name, [string]$file) {
+  if ($From -or $StarterSha.Count -eq 0) { return $true }
+  if (-not $StarterSha.ContainsKey($name)) { return $false }
+  return (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLower() -eq $StarterSha[$name]
+}
+function InstallStarter([string]$name, [string]$dest) {  # fetch into dest.new, check, then move into place -> $true when installed
+  $tmp = "$dest.new"
+  if (-not (Fetch $name $tmp)) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue; return $false }
+  if (-not (ShaOk $name $tmp)) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue; Die (M 'shabad' @($name)) }
+  Move-Item -LiteralPath $tmp -Destination $dest -Force
+  return $true
+}
 if ($DryRun) { Say (M 'dry_files' @($(if ($From) { $From } else { 'starter' }), $Inst)) }
 else {
   if (-not $From -and -not $StarterBase) { Die (M 'nobase') }
   # 2.360.0 C (#2496): the starter files (they run here) only over https or from this Kalmido itself
   if (-not $From -and $StarterBase -notmatch '^https://' -and -not $StarterBase.StartsWith($Url + '/')) { Die (M 'basehttp' @($StarterBase)) }
+  if (-not $From -and $StarterSha.Count -eq 0) { Say (M 'shanone') }
+  Get-ChildItem -LiteralPath $Inst -Filter '*.new' | Remove-Item -Force  # 2.443.0 (#2940): what a broken earlier setup left, as in setup.sh
   $list = Join-Path $Inst 'starter_files.txt'
-  if (-not (Fetch 'starter_files.txt' $list)) {
+  if (-not (InstallStarter 'starter_files.txt' $list)) {
     if ($From) { Die (M 'nolist' @($From)) }
     # 2.44.0 (review): no fallback to another branch -- the starter must match this instance's version
     Die (M 'nolistfetch' @($StarterBase))
@@ -314,7 +341,7 @@ else {
     $f = ($raw -replace '#.*$', '').Trim()
     if (-not $f) { continue }
     if ($f.Contains('/') -or $f.Contains('\') -or $f.StartsWith('..')) { Say (M 'skippath' @($f)); continue }
-    if (Fetch $f (Join-Path $Inst $f)) { Say "  $f" }
+    if (InstallStarter $f (Join-Path $Inst $f)) { Say "  $f" }
     elseif ($Required -contains $f) { Die (M 'nofetch' @($f)) }
     else { Say (M 'skipfile' @($f)) }
   }
@@ -360,6 +387,8 @@ $PsExe = (Get-Process -Id $PID).Path
 $Log = Join-Path $Inst 'agent.log'
 $Inner = "Set-Location -LiteralPath $(Q $Dir); & $(Q (Join-Path $Inst 'agent_launcher.ps1')) -e $(Q $EnvF) --events -- $(Q $(if ($Agent) { $Agent } else { $Cmd })) --mcp-config $(Q $McpJ) *>> $(Q $Log)"
 $PsArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command `"$Inner`""
+# 2.443.0 (#2940): the Startup folder has no restart of its own: this loop does what RestartSec=30 / ThrottleInterval do in setup.sh
+$LoopArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command `"while (`$true) { $Inner; Start-Sleep -Seconds 30 }`""
 if ($NoAutostart) { Say (M 'noauto'); Say "  $Inner" }
 else {
   Stop-Autostart
@@ -380,8 +409,8 @@ else {
     } catch { Say (M 'taskfail' @($_.Exception.Message)) }
     if (-not $done) {
       New-Item -ItemType Directory -Force -Path $StartupDir | Out-Null
-      [IO.File]::WriteAllLines($StartupCmd, @('@echo off', "start `"`" /min `"$PsExe`" $PsArgs"))
-      Start-Process -FilePath $PsExe -ArgumentList $PsArgs -WindowStyle Hidden
+      [IO.File]::WriteAllLines($StartupCmd, @('@echo off', "start `"`" /min `"$PsExe`" $LoopArgs"))
+      Start-Process -FilePath $PsExe -ArgumentList $LoopArgs -WindowStyle Hidden
       Say (M 'startupok' @($StartupCmd, $Log))
     }
   }

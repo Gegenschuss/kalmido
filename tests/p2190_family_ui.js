@@ -34,7 +34,7 @@ const fetchR = async (u, o) => { for (let i = 0; ; i++) { try { const r = await 
   if (i === 2) console.log('p2190_family_ui: server not reachable (' + (e.cause?.code || e.message) + '), waiting');
   await new Promise(r => setTimeout(r, i < 2 ? 1500 : 2000)); } } };
 const call = async (method, url, body, ck = CK) => { const r = await fetchR(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const change = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
 const day = n => TC.day(n);  // 2.85.0 (#1863): the Berlin day, as the app

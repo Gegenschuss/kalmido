@@ -76,6 +76,9 @@ const FEAT = 'cal,comments,collab,office,clients,docs,contacts,time,travel';
     await ev(`(() => { document.querySelector('.orr [data-orr="sub"][data-k="groups"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.orr [data-orr="copy"][data-ref="tpl:staff"]')`), 'Groups: the templates with "Copy"');
     check(await ev(`!document.querySelector('.orr [data-orr="copy"][data-ref="tpl:legacy"]')`), '"Previous access" is no template to copy');
+    // 2.433.0 (#3607): a template shows its levels as text (no select that looks active), the note "copy it to adjust" with Copy next to it
+    check(await ev(`(() => { const t = document.querySelector('.orr details[data-orr-open="tpl:staff"]'); return !!t && !t.querySelector('select') && t.querySelectorAll('.orr-lv-ro').length > 3
+      && /Template - copy it to adjust/.test(t.querySelector('.orr-tpln')?.textContent || '') && !!t.querySelector('.orr-tpln [data-orr="copy"]'); })()`), 'Templates: levels as text, note with Copy');
     await ev(`(() => { document.querySelector('.orr [data-orr="copy"][data-ref="tpl:staff"]').click(); return 1; })()`);
     let gid = 0;
     for (let i = 0; i < 40 && !gid; i++) { gid = ((await rights()).groups || [])[0]?.id || 0; if (!gid) await sleep(200); }

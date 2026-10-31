@@ -35,6 +35,7 @@ FIELD_RATING_MAX = (3, 10, 5)  # 2.156.0 B (#2069): lowest, highest, default max
 FIELD_MAX = 20          # per list
 FIELD_PINNED_MAX = 2    # chips on the task rows
 COLOR_RE = re.compile(r"#[0-9a-fA-F]{3,8}")
+FIELD_STAGE_SPECIAL = ("red", "orange")  # 2.410.0 A (#3514): the signal colours of a special state of a stage field
 
 
 def field_dict(r, c=None):
@@ -77,6 +78,9 @@ def field_clean_def(b, old=None):
         opts["max"] = min(max(mx, FIELD_RATING_MAX[0]), FIELD_RATING_MAX[1])
     if ftype in ("select", "multiselect"):  # 2.156.0 B (#2069): + multiselect, the same options
         items, seen = [], set()
+        # 2.410.0 A (#3514): a client that leaves out "stages" / an option's "special" (API, MCP) keeps the stored ones
+        was = json.loads(old["options"] or "{}") if old else {}
+        was_sp = {o.get("id"): o.get("special") for o in was.get("options", []) if isinstance(o, dict)}
         for o in (raw.get("options") if isinstance(raw.get("options"), list) else [])[:50]:
             if not isinstance(o, dict):
                 continue
@@ -89,9 +93,16 @@ def field_clean_def(b, old=None):
             seen.add(oid)
             col = str(o.get("color") or "")
             items.append({"id": oid, "name": nm, "color": col if COLOR_RE.fullmatch(col) else ""})
+            sp = o.get("special") if "special" in o else was_sp.get(oid)
+            if ftype == "select" and sp in FIELD_STAGE_SPECIAL:  # 2.410.0 A (#3514): a special state (signal colour)
+                items[-1]["special"] = sp
+            elif ftype == "select" and sp:
+                raise BadInput(tr("Unknown signal colour"))
         if not items:
             raise BadInput(tr("A selection field needs at least one option"))
         opts["options"] = items
+        if ftype == "select" and (raw.get("stages") if "stages" in raw else was.get("stages")):  # 2.410.0 A (#3514): ordered = a stage bar
+            opts["stages"] = 1
     return name, ftype, opts
 
 

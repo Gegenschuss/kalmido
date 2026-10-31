@@ -94,7 +94,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   check(!md.querySelector('[data-pane="general"] #s-theme') && !md.querySelector('[data-pane="general"] #s-density'), 'theme + density moved out of General');
   const pane = () => md.querySelector('[data-pane="look"]');
   check(['#s-theme', '#s-density', '#s-fsize', '#s-font', '#s-accent'].every(s => pane().querySelector(s)), 'pane: theme, density, font size, font, accent');
-  check(pane().querySelector('.devtag'), 'pane tagged "This device"');
+  check(pane().querySelector('#s-tabbar-h') && !pane().querySelector('#s-tabbar-h .devtag'), 'tab bar heading without "This device" (2.418.0, #3560: per person now)');
   check(pane().querySelector('#s-fsize').type === 'range' && pane().querySelector('#s-fsize').min === '75' && pane().querySelector('#s-fsize').max === '150' && pane().querySelector('#s-fsize').step === '5' && pane().querySelectorAll('#s-font button').length === 3 && pane().querySelectorAll('#s-accent button').length === 8, 'font size: a slider 75-150 % in 5 % steps (2.13.0 #429, 2.13.2 #478: from 75); fonts 3, accents 7');
   const pv = pane().querySelector('.lookpv');
   check(pv && pv.hasAttribute('inert') && pv.querySelector('.trow .chk') && pv.querySelector('.trow .meta .dt') && pv.querySelector('.btn.pri') && pv.querySelector('.lpv-link'), 'live preview: sample rows, date, button, link (inert)');

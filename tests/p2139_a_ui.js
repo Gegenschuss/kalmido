@@ -14,7 +14,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2139A_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 
 (async () => {
@@ -88,7 +88,7 @@ const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click'
     check(!d.querySelector('.tcview.inthread') && !d.querySelector('.tthpane'), 'close: the pane goes');
     // "Read by" under my latest read message (bob read "Agenda is up", carol did not)
     const rl = await until(() => d.querySelector(`#tc-msgs .cmsg[data-mid="t:${M}"] .trdline`));
-    check(rl && /Read by 1/.test(rl.textContent) && rl.querySelectorAll('.avatar').length === 1, '"Read by 1" with one face ' + (rl?.textContent || '').trim());
+    check(rl && rl.getAttribute('aria-label') === 'Read by 1' && rl.title === 'Read by 1' && rl.querySelectorAll('svg').length === 2 && rl.textContent.trim() === '1', '"Read by 1": two ticks + the count, the words as title / aria-label (2.437.0 #3318) ' + (rl?.textContent || '').trim());
     check(d.querySelectorAll('#tc-msgs .trdline').length === 1, 'only one "Read by" line (no ticks at every message)');
     click(w, rl);
     await until(() => d.querySelector('.modal .trdl'));
@@ -137,7 +137,7 @@ const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click'
     await call('POST', `/api/team/rooms/${DM}/read`, {}, cks.bob);
     const w = await boot({user: 'alice', hash: 'team/' + DM}), d = w.document;
     const rl = await until(() => d.querySelector(`#tc-msgs .cmsg[data-mid="t:${D1}"] .trdline`));
-    check(rl && rl.tagName === 'DIV' && /^\s*Read\s*$/.test(rl.textContent), 'DM: "Read" (no list behind it) ' + (rl?.outerHTML || '').slice(0, 120));
+    check(rl && rl.tagName === 'DIV' && rl.getAttribute('aria-label') === 'Read' && rl.textContent.trim() === '' && rl.querySelectorAll('svg').length === 2, 'DM: two ticks, "Read" as aria-label (no list behind it; 2.437.0 #3318) ' + (rl?.outerHTML || '').slice(0, 120));
     check(!errs.length, `DM: no JS errors ${errs.join(' | ')}`);
     await sleep(500); w.close();
   }

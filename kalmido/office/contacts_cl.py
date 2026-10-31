@@ -15,6 +15,7 @@ from ..core.db import iso, now_utc
 from ..core.i18n import tr
 from ..core.pg import insert_id, like_escape
 from ..core.errors import BadInput
+from .model import pb_cl_sql
 
 FK_MAX = {"name": 120, "role": 120, "email": 200, "phone": 60}
 FK_LIMIT = 50  # contact persons per client
@@ -38,8 +39,42 @@ def fk_contacts(c, cid, oid=None):
         if not here:
             return []
     return [{"id": r["id"], "name": r["name"], "role": r["role"], "email": r["email"], "phone": r["phone"], "is_default": bool(r["is_default"]),
-             "contact_id": r["contact_id"]}  # 2.59.0 (#1735): the linked address book contact (None = not linked)
+             "contact_id": r["contact_id"],  # 2.59.0 (#1735): the linked address book contact (None = not linked)
+             "gets_invoices": bool(r["gets_invoices"]) if "gets_invoices" in r.keys() else False}  # 2.433.0 (#3599)
             for r in c.execute("SELECT * FROM office_client_contacts WHERE client_id=? ORDER BY is_default DESC, sort, id", (cid,))]
+
+
+FK_CC_MAX = 5  # 2.433.0 (#3599): copy addresses of one mail (invoices.inv_send checks the same)
+FK_MAIL_RE = re.compile(r"[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+")
+FK_INVOICE_KINDS = ("invoice", "credit", "reminder")  # 2.433.0 (#3599): invoices, corrections and reminders go to the invoice address
+
+
+def fk_send_rcpts(c, cid, oid, kind):
+    """2.433.0 (#3599): the recipients a document of kind for client cid is sent to first -> {to, cc: [addresses]}.
+    Invoices, corrections, reminders: to = the e-mail for invoices (else the client's e-mail), copy = the contact persons
+    ticked "gets invoices" (none ticked: the default contact person). Quotations: to = the default contact person (else the
+    client's e-mail), copy = the e-mail for invoices. Delivery notes as before (the invoice address, no copy). An address
+    only once, empty ones left out."""
+    cl = c.execute(f"SELECT email, email_invoice FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (cid,)).fetchone() if cid else None
+    if cl is None:
+        return {"to": "", "cc": []}
+    ks = [k for k in fk_contacts(c, cid, oid) if FK_MAIL_RE.fullmatch(k["email"] or "")]  # only addresses a mail can carry
+    inv, mail = (cl["email_invoice"] or "").strip(), (cl["email"] or "").strip()
+    dflt = next((k["email"] for k in ks if k["is_default"]), "")
+    if kind in FK_INVOICE_KINDS:
+        to, cc = inv or mail, [k["email"] for k in ks if k["gets_invoices"]] or [dflt]
+    elif kind == "offer":
+        to, cc = dflt or mail, [inv]
+    else:
+        to, cc = inv or mail, []
+    if not FK_MAIL_RE.fullmatch(to):
+        to = ""
+    seen, out = {to.lower()}, []
+    for x in cc:
+        if x and FK_MAIL_RE.fullmatch(x) and x.lower() not in seen and len(out) < FK_CC_MAX:
+            seen.add(x.lower())
+            out.append(x)
+    return {"to": to, "cc": out}
 
 
 def fk_contact(c, cid, kid=None):
@@ -109,12 +144,13 @@ def fk_put(c, cid, oid, items, removed=None):
         if kid is not None and (not isinstance(kid, int) or isinstance(kid, bool) or kid not in have):
             raise BadInput(tr("Invalid value: {0}", "contacts"))
         link = ckl_want(c, cl, x, links.get(kid))
+        gi = (1 if x["gets_invoices"] in (1, True, "1", "true") else 0) if "gets_invoices" in x else None  # 2.433.0 (#3599): missing = unchanged
         if kid:
-            c.execute("UPDATE office_client_contacts SET name=?, role=?, email=?, phone=?, sort=?, contact_id=?, updated_at=? WHERE id=? AND client_id=?",
-                      (f["name"], f["role"], f["email"], f["phone"], i + 1, link, ts, kid, cid))
+            c.execute("UPDATE office_client_contacts SET name=?, role=?, email=?, phone=?, sort=?, contact_id=?, gets_invoices=COALESCE(?, gets_invoices), updated_at=? "
+                      "WHERE id=? AND client_id=?", (f["name"], f["role"], f["email"], f["phone"], i + 1, link, gi, ts, kid, cid))
         else:
-            kid = insert_id(c, "INSERT INTO office_client_contacts(org_id, client_id, name, role, email, phone, is_default, sort, contact_id, created_at, updated_at) "
-                               "VALUES(?,?,?,?,?,?,0,?,?,?,?)", (oid, cid, f["name"], f["role"], f["email"], f["phone"], i + 1, link, ts, ts))
+            kid = insert_id(c, "INSERT INTO office_client_contacts(org_id, client_id, name, role, email, phone, is_default, sort, contact_id, gets_invoices, created_at, updated_at) "
+                               "VALUES(?,?,?,?,?,?,0,?,?,?,?,?)", (oid, cid, f["name"], f["role"], f["email"], f["phone"], i + 1, link, gi or 0, ts, ts))
         keep.add(kid)
         if x.get("is_default") and want_default is None:
             want_default = kid

@@ -325,6 +325,62 @@ function moreSummary(t, ks) {
   if (has('snippets') && snipCount(t)) out.push(trn('{0} code snippet', '{0} code snippets', snipCount(t)));  // 2.35.0 (#1095)
   return out.join(' · ');
 }
+// ---- 2.380 F (#3435): every section with a heading folds on its own (not the description); the folded ones are ONE account
+// setting for all tasks and lists, on every device (detail_fold: the keys, comma separated). A folded head says in short what
+// it holds ("2 open", "3 files", "12:00 of 10 h", red when over, "blocked"). Nothing opens by itself; "Fold all sections" /
+// "Unfold all sections" in the task's "…" menu. The comments of the desktop's split keep their own fold (detail_cm_fold).
+const DFOLD_KEYS = ['subtasks', 'deps', 'links', 'attachments', 'video', 'tags', 'custom', 'time', 'comments'];
+const DFOLD_BUDGET = ['budget h', 'budget (h)', 'budget hours', 'budget std', 'budget (std)', 'budget-stunden', 'budgetstunden'];  // timetrack.py BUDGET_FIELD_NAMES
+let dfPend = null;  // a change of this device until the server has it (a state reload in between keeps it)
+const dfSet = () => new Set(String(dfPend ?? S.settings?.detail_fold ?? '').split(',').filter(k => DFOLD_KEYS.includes(k)));
+function dfSave(set) {
+  const v = DFOLD_KEYS.filter(k => set.has(k)).join(',');
+  dfPend = v; if (S.settings) S.settings.detail_fold = v;
+  renderDetail();
+  api('PATCH', '/api/settings', {detail_fold: v}).then(() => { if (dfPend === v) dfPend = null; }, () => { /* api() showed it; the local value stays */ });
+}
+// the short line of a folded section: [text, class]
+function dfSum(k, t, ncm) {
+  const n = (x, txt) => x ? [txt, ''] : ['', ''];  // (literal tr / trn calls: tools/i18n_check.py finds the keys)
+  if (k === 'subtasks') { const ks = children(t.id), o = ks.filter(x => x.status === 0).length; return !ks.length ? ['', ''] : o ? [tr('{0} open', o), ''] : [tr('all done'), '']; }
+  if (k === 'attachments') { const c = (t.attachments || []).length; return n(c, trn('{0} file', '{0} files', c)); }
+  if (k === 'tags') { const c = (t.tags || []).length + (t.ltags || []).length; return n(c, trn('{0} tag', '{0} tags', c)); }
+  if (k === 'custom') { const c = fieldsOf(t.list_id).filter(f => { const v = (t.fields || {})[f.id]; return v !== undefined && v !== null && v !== ''; }).length; return n(c, trn('{0} field', '{0} fields', c)); }
+  if (k === 'deps') { const c = (t.blockers || []).length; return t.blocked && !t.status ? [tr('blocked'), 'dfbad'] : c ? [trn('{0} dependency', '{0} dependencies', c), ''] : t.waiting_at ? [tr('Waiting'), 'dfwait'] : ['', '']; }
+  if (k === 'links') { const c = ((S.tcontacts || {})[t.id] || []).length + ((S.evlinks || {})[t.id] || []).length; return n(c, trn('{0} entry', '{0} entries', c)); }
+  if (k === 'video') { const c = typeof vdr_count === 'function' ? vdr_count(t) : 0; return n(c, trn('{0} sign-off', '{0} sign-offs', c)); }
+  if (k === 'comments') return n(ncm, trn('{0} comment', '{0} comments', ncm));
+  if (k === 'time') {
+    const sec = typeof taskTime === 'function' ? taskTime(t.id)[0] : 0, f = fieldsOf(t.list_id).find(x => x.type === 'number' && DFOLD_BUDGET.includes(String(x.name || '').trim().toLowerCase()));
+    const b = f ? +((t.fields || {})[f.id]) || 0 : 0, hm = `${Math.floor(sec / 3600)}:${pad(Math.floor(sec % 3600 / 60))}`;
+    if (!b) return sec >= 60 ? [hm, ''] : ['', ''];
+    return [tr('{0} of {1} h', hm, fmtNum(b, 1)), sec > b * 3600 ? 'dfbad' : ''];
+  }
+  return ['', ''];
+}
+// a section's html with the fold: data-dfold on its element, the chevron in front of its heading, the short line when folded
+function dfWrap(k, html, t, ncm) {
+  if (!html || !html.trim()) return html;
+  const i = html.indexOf('<h5'), d = i < 0 ? -1 : html.lastIndexOf('class="dsec', i), j = i < 0 ? -1 : html.indexOf('>', i), e = j < 0 ? -1 : html.indexOf('</h5>', j);
+  if (d < 0 || e < 0) return html;
+  const on = dfSet().has(k), [sum, cls] = on ? dfSum(k, t, ncm) : ['', ''], lab = on ? tr('Unfold') : tr('Fold');
+  const btn = `<button type="button" class="iconbtn dfbtn" data-dfb="${k}" aria-expanded="${!on}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('chev', 's fcar')}</button>`;
+  const inner = html.slice(j + 1, e), sp = inner.indexOf('<span class="spacer">'), sm = sum ? `<span class="dfsum muted ${cls}">${esc(sum)}</span>` : '';
+  return html.slice(0, d) + `data-dfold="${k}" class="dsec dfold${on ? ' dfolded' : ''}` + html.slice(d + 11, i) + html.slice(i, j + 1) + btn
+    + (sp < 0 ? inner + sm : inner.slice(0, sp) + sm + inner.slice(sp)) + html.slice(e);
+}
+const df_menuItem = () => {  // both while some are folded and some open
+  const f = dfSet(), ks = $$('#detail [data-dfold]').map(x => x.dataset.dfold), out = [];
+  if (ks.some(k => f.has(k))) out.push({label: tr('Unfold all sections'), icon: 'chev', fn: () => dfSave(new Set([...f].filter(k => !ks.includes(k))))});
+  if (ks.some(k => !f.has(k))) out.push({label: tr('Fold all sections'), icon: 'chev', fn: () => dfSave(new Set([...f, ...ks]))});
+  return out;
+};
+document.addEventListener('click', e => {
+  const h = e.target.closest?.('#detail .dfold > h5'); if (!h) return;
+  const b = e.target.closest('button, a, input, select, label, textarea'); if (b && !b.matches('.dfbtn')) return;
+  const k = h.parentElement.dataset.dfold, f = dfSet(); if (f.has(k)) f.delete(k); else f.add(k);
+  dfSave(f);
+});
 // 2.7.2 (#424): where a task lives, at the top of its panel: Folder › List › Section › (parent task). Every part jumps
 // there (the list, scrolled to the section / the parent) and closes the bell's dropdown. Only lists the viewer has.
 function crumbsHtml(t, l, parent) {
@@ -494,7 +550,31 @@ function renderDetail() {
   const s = cmxScrollGet(), r = keepFocus($('#detail'), renderDetail0);
   cmxShown = S.sel; cmxScrollSet(s);
   wsc_detail();  // 2.53.0 (#1474): the comment field framed in the colour of the task's workspace
+  fitDtop();
   return r;
+}
+// 2.431.0 A (#3593): the header's words fall away step by step (dtl1..dtl5: -1 day, +1 day / Tomorrow, Today, Lock / Time / Pin,
+// Priority) until nothing is cut or overflows; the words stay as tooltips. Like fitTop() for #top.
+const DTOP_LVLS = 5;
+let dtopW = 0, dtopRO = null;
+function fitDtop() {
+  const d = document.getElementById('detail'), t = d && d.querySelector('.dtop');
+  if (!t || !t.clientWidth) return;  // no layout (hidden, jsdom)
+  dtopW = t.clientWidth;
+  const br = t.querySelector('.dbr');  // touch below 28rem: the second row (words included) is the CSS's job
+  if (br && getComputedStyle(br).display !== 'none') { for (let i = 1; i <= DTOP_LVLS; i++) t.classList.remove('dtl' + i); }
+  else {
+  const cut = () => { const c = t.querySelector('.dchip .dct'); return t.scrollWidth > t.clientWidth + 1 || (c && c.scrollWidth > c.clientWidth + 1); };
+  let l = 0;
+  for (; l <= DTOP_LVLS; l++) {
+    for (let i = 1; i <= DTOP_LVLS; i++) t.classList.toggle('dtl' + i, i <= l);
+    if (!cut()) break;
+  }
+  }
+  if (typeof ResizeObserver === 'function' && !dtopRO) {
+    dtopRO = new ResizeObserver(() => { const x = document.querySelector('#detail .dtop'); if (x && x.clientWidth !== dtopW) fitDtop(); });
+  }
+  if (dtopRO) { dtopRO.disconnect(); dtopRO.observe(t); }
 }
 // 2.280.0 A (#3108): a long note is not in the start state (no content, content_n = its length): the detail loads it
 // (GET /api/tasks/<id>). Until it is there - or offline - the detail shows no note field at all, so an empty note is never
@@ -595,13 +675,21 @@ function renderDetail0() {
     life: ck ? '' : lifeDetailHtml(t, l, ro),  // 2.22.0 (#663)
     video: ck || typeof vdr_taskHtml !== 'function' || !pz_show(t, 'video', typeof vdr_count === 'function' && vdr_count(t)) ? '' : vdr_taskHtml(t, ro),  // 2.99.1 A (#1959): video sign-offs (videorev.js, loaded on demand)
     links: ck ? '' : linksDetailHtml(t, ro)};  // 2.21.0 (#659 / #658): events + contacts of the task
+  // 2.365.0 (#2824): on a phone (touch, below 900 px) Complete, the date with Today / Tomorrow and the project sit in a bar at the
+  // bottom above the comment field (thumb reach); the header keeps Back, Priority and "…"
+  const thumb = !ck && isMobile() && isTouch() && t.id > 0;
+  const dChk = `<button class="chk ${t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + t.priority}${msT ? ' ms' : ''}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(msT ? tr('Complete milestone: {0}', mdPlain(t.title)) : tr('Complete: {0}', mdPlain(t.title)))}" title="${esc(kt(msT ? tr('Complete milestone') : tr('Complete task'), 'x'))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : ''}</button>`;
+  const dDate = `${ck ? '' : `<button class="dchip ${t.due ? 'set ' + dueClass(t) : ''}" data-act="date" data-id="${t.id}" title="${esc((t.due ? dueTxt + ' · ' : '') + kt(tr('Change date'), 'd'))}" ${ro ? 'disabled' : ''}>${ic('cal', 's')}<span class="dct">${dueTxt}</span>${t.repeat ? ' ' + ic('repeat', 's') : ''}${rat_has(t) ? ' ' + ic('bell', 's') : ''}</button>`}
+      ${ck || tlkR ? '' : [[0, 'sun', tr('Today')], [1, 'sunrise', qdLabel(t)], [-1, 'back', tr('-1 day')]].filter(([n]) => (n === -1 ? qdMinus(t) : n || t.due !== today())).map(([n, i, lab]) => `<button class="iconbtn dq ${t.due === addDays(today(), n) && n >= 0 ? 'on' : ''}" data-act="due-q" data-d="${n}" data-id="${t.id}" title="${esc(n === -1 ? tr('Set to {0}', dayLabel(addDays(t.due, -1))) : kt(n ? qdTitle(t) : tr('Due: {0}', lab), n ? 'Shift+T' : 't'))}" aria-label="${esc(n === -1 ? lab + ': ' + tr('Set to {0}', dayLabel(addDays(t.due, -1))) : n ? (qdPlus(t) ? lab + ': ' : '') + qdTitle(t) : tr('Due: {0}', lab))}">${ic(i, 's')}<span class="dql">${esc(lab)}</span></button>`).join('')}`;
+  // the bar's Complete: a button with its word (a 44 px target), the same action as the round box of the header
+  const dDone = !thumb ? '' : `<button type="button" class="btn dtdone${t.status === 2 ? ' on' : ''}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" title="${esc(kt(msT ? tr('Complete milestone') : tr('Complete task'), 'x'))}" ${ro ? 'disabled' : ''}>${ic('check', 's')}<span>${esc(t.status === 2 ? tr('Completed') : tr('Complete'))}</span></button>`;
+  const dProj = !thumb || !l ? '' : (mv => `<button type="button" class="dtproj" data-act="${mv ? 'crumb-menu' : 'crumb'}" data-k="list" data-id="${l.id}" ${mv ? 'aria-haspopup="menu"' : ''} title="${esc(tr('Project') + ': ' + lname(l))}" aria-label="${esc(tr('Project') + ': ' + lname(l))}">${l.is_inbox ? ic('inbox', 's') : licMark(l, 's', true) || ic('list', 's')}<span class="dtpn">${esc(lname(l))}</span></button>`)(canEdit(t) && canEditList(t.list_id) && t.status === 0 && !t.context);
   setHtml($('#detail'), `
     <div class="dtop">
       <button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button>
-      <button class="chk ${t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + t.priority}${msT ? ' ms' : ''}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" aria-label="${esc(msT ? tr('Complete milestone: {0}', mdPlain(t.title)) : tr('Complete: {0}', mdPlain(t.title)))}" title="${esc(kt(msT ? tr('Complete milestone') : tr('Complete task'), 'x'))}" ${ro ? 'disabled' : ''}>${t.status === 2 ? ic('check') : ''}</button>
-      ${ck ? '' : `<button class="dchip ${t.due ? 'set ' + dueClass(t) : ''}" data-act="date" data-id="${t.id}" title="${esc((t.due ? dueTxt + ' · ' : '') + kt(tr('Change date'), 'd'))}" ${ro ? 'disabled' : ''}>${ic('cal', 's')}<span class="dct">${dueTxt}</span>${t.repeat ? ' ' + ic('repeat', 's') : ''}${rat_has(t) ? ' ' + ic('bell', 's') : ''}</button>`}
-      ${ck || tlkR ? '' : [[0, 'sun', tr('Today')], [1, 'sunrise', qdLabel(t)], [-1, 'back', tr('-1 day')]].filter(([n]) => (n === -1 ? qdMinus(t) : n || t.due !== today())).map(([n, i, lab]) => `<button class="iconbtn dq ${t.due === addDays(today(), n) && n >= 0 ? 'on' : ''}" data-act="due-q" data-d="${n}" data-id="${t.id}" title="${esc(n === -1 ? tr('Set to {0}', dayLabel(addDays(t.due, -1))) : kt(n ? qdTitle(t) : tr('Due: {0}', lab), n ? 'Shift+T' : 't'))}" aria-label="${esc(n === -1 ? lab + ': ' + tr('Set to {0}', dayLabel(addDays(t.due, -1))) : n ? (qdPlus(t) ? lab + ': ' : '') + qdTitle(t) : tr('Due: {0}', lab))}">${ic(i, 's')}<span class="dql">${esc(lab)}</span></button>`).join('')}
-      ${''/* 2.218.0 A (#2799): "Today" is left out when the task is due today (the date chip says it); "Tomorrow" stays, a further click adds a day */}${ck ? '' : '<span class="dbr" aria-hidden="true"></span>'}<span class="spacer"></span>
+      ${thumb ? '' : dChk}
+      ${thumb ? '' : dDate}
+      ${''/* 2.218.0 A (#2799): "Today" is left out when the task is due today (the date chip says it); "Tomorrow" stays, a further click adds a day */}${ck || thumb ? '' : '<span class="dbr" aria-hidden="true"></span>'}<span class="spacer"></span>
       ${ro ? (t.context ? `<span class="rotag" title="${esc(tr('The main task of a subtask assigned to you: read-only, without notes, files and comments'))}">${ic('sub', 's')}${tr('Context')}</span>`
         : `<span class="rotag" title="${esc(tr('View only, shared by {0}', l?.owner_name || ''))}">${ic('eye', 's')}${tr('View only')}</span>`) : `${ck ? '' : `<button class="iconbtn ${t.pinned ? 'on' : ''}" data-act="pin" data-id="${t.id}" title="${t.pinned ? tr('Unpin') : tr('Pin')}" aria-label="${tr('Pin')}" aria-pressed="${!!t.pinned}">${ic(t.pinned ? 'pinf' : 'pin')}<span class="dpw dpin">${esc(t.pinned ? tr('Pinned') : tr('Pin'))}</span></button>
       <button class="iconbtn ${t.priority ? 'flag-' + t.priority : ''}" data-act="prio" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Priority') + ': ' + prioWord(t.priority))}" aria-label="${esc(tr('Priority') + ': ' + prioWord(t.priority))}">${ic('flag')}<span class="dpw">${esc(t.priority ? prioWord(t.priority) : tr('Priority'))}</span></button>`}
@@ -638,8 +726,13 @@ function renderDetail0() {
       ${ck || typeof rt9_detailHtml !== 'function' ? '' : rt9_detailHtml(t)}${''/* 2.59.0 B (#1375): related tasks (related.js) */}
       ${msT && t.id > 0 ? `<div class="dsec mssec" id="d-ms">${msReportHtml(t)}</div>` : ''}
       ${(() => {  // 2.24.0 (UX-41)
+        // 2.380 F (#3435): every section with content stands on its own above "More details" (it holds only the empty ones)
+        for (const k of DFOLD_KEYS) if (k !== 'comments' || !split) SEC[k] = dfWrap(k, SEC[k], t, ncm);
         const keep = k => (k === 'snippets' && (snipCount(t) || S.snip?.tid === t.id || (listById(t.list_id)?.ptype === 'software' && pz_on(t.list_id, 'repo'))))  // 2.35.0 (#1095)
-          || (k === 'attachments' && (t.attachments || []).length) || (k === 'video' && typeof vdr_count === 'function' && vdr_count(t)) || (k === 'deps' && (t.waiting_at || (t.blockers || []).length)) || (k === 'links' && (((S.tcontacts || {})[t.id] || []).length || ((S.evlinks || {})[t.id] || []).length));
+          || (k === 'custom' && (dfSum('custom', t)[0] || fieldsOf(t.list_id).some(cfst_on)))  // 2.410.0 A (#3514): a stage bar is seen at once
+          || (k === 'attachments' && (t.attachments || []).length) || (k === 'video' && typeof vdr_count === 'function' && vdr_count(t)) || (k === 'deps' && (t.waiting_at || (t.blockers || []).length)) || (k === 'links' && (((S.tcontacts || {})[t.id] || []).length || ((S.evlinks || {})[t.id] || []).length))
+          || (k === 'tags' && (t.tags || []).length + (t.ltags || []).length) || (k === 'time' && dfSum('time', t)[0])
+          || (k === 'fields' && (t.url || t.ttype || t.milestone_id || isMs(t)));
         const top = DETAIL_TOP.map(k => SEC[k]).concat(DETAIL_MORE.filter(keep).map(k => SEC[k]));
         const rest = DETAIL_MORE.filter(k => !keep(k)).map(k => SEC[k]).filter(x => x && x.trim());
         const sum = moreSummary(t, DETAIL_MORE.filter(k => !keep(k)));
@@ -647,7 +740,7 @@ function renderDetail0() {
       })()}
     </div>
     ${split ? `<div class="dsgrip" id="d-sgrip" role="separator" tabindex="0" aria-orientation="horizontal" aria-controls="d-cpane" aria-label="${esc(tr('Size of the comments area'))}" title="${esc(tr('Drag to resize; double-click or Enter folds the comments'))}" aria-valuemin="${CSPL_MIN}" aria-valuemax="${CSPL_MAX}" aria-valuenow="${dsTop()}"></div><div class="dcpane" id="d-cpane">${SEC.comments}</div>` : ''}
-    <div class="dbot">${cmOk && !(cm === 'full' && cmtNew()) ? cmComposer(t) : ''}<div class="dfoot"><span class="dfc" title="${esc(createdLine(t))}">${esc(createdLine(t))}</span>
+    <div class="dbot">${thumb ? `<div class="dthumb" role="group" aria-label="${esc(tr('Task'))}">${dDate}<span class="dtbr" aria-hidden="true"></span>${dProj}${dDone}</div>` : ''}${cmOk && !(cm === 'full' && cmtNew()) ? cmComposer(t) : ''}<div class="dfoot"><span class="dfc" title="${esc(createdLine(t))}">${esc(createdLine(t))}</span>
       <span class="spacer"></span>
       ${ck ? '' : runItems().filter(x => x.tid === t.id).map(x => `<button class="drun k-${x.k}" data-act="run-pop" title="${esc(tr(RUN_KIND[x.k][1]))}">${ic(RUN_KIND[x.k][0], 's')}<span ${x.attr}>${x.txt}</span><span class="drl">${tr(RUN_KIND[x.k][1])}</span></button>`).join('')}
       </div></div>`);

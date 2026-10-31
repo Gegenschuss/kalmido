@@ -206,7 +206,7 @@ check(line and re.search(r"login failed for user#[0-9a-f]{8} ", line[-1]) and ha
       and "Nobody2190" not in tail, f"#2561: the name tag is keyed {line[-1:]}")
 
 # ================================================================== a person without an organisation
-# freelancer-matrix: account
+# freelancer-matrix: account, own
 FID, F1 = freelancer(B, A)
 F2 = sess("frida")
 f1, f2 = subscribe(F1), subscribe(F2)

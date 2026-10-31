@@ -183,7 +183,7 @@ document.addEventListener('click', async e => {
   }
   if (a === 'stop') { PL.d = await api('POST', '/api/paperless/stop', {ws: PL.ws}).catch(() => PL.d); pl_draw(); return; }
   if (a === 'preview') pl_preview();
-  if (a === 'goset') { b.closest('.dc-smd')?.remove(); pl_openSettings(); return; }  // 2.87.9 (#1936)
+  if (a === 'goset') { const m = b.closest('.modal'); if (m) modalClose(m); pl_openSettings(); return; }  // 2.87.9 (#1936); 2.365.2 B (#2789): from Settings > Documents too
   if (a === 'zip-pick' || a === 'zip-go') $('#plh-file', root)?.click();
   if (a === 'zip-preview') pl_preview(true);
   if (a === 'zip-cancel') { if (PL.up) PL.up.abort = true; }

@@ -17,6 +17,7 @@ never stand alone on a page (the last position comes along); no carry-over lines
 Nothing here reads the database: office.web / office.docs render the model and call office_pdf(model)."""
 import contextvars
 import datetime
+import decimal
 import functools
 import hashlib
 import io
@@ -66,8 +67,8 @@ PDF_ADDR_W = 85 * MM
 PDF_INFO_X = 125 * MM    # 2.390.0 A (#3350): the info block begins 125 mm from the sheet edge (DIN 5008 form B)
 PDF_FOOT_H = 20 * MM     # footer (four columns + page line) reserved at the bottom of every page
 PDF_BODY_BOTTOM = A4_H - 12 * MM - PDF_FOOT_H
-PDF_SUM_GAP = 11 * MM      # 2.294.0 (#3154): wished gap table -> totals when the closing still fits on the page
-PDF_SUM_GAP_MIN = 4 * MM   # ... reduced step by step down to this before the page breaks
+PDF_SUM_GAP = 18 * MM      # 2.294.0 (#3154): wished gap table -> totals when the closing still fits on the page; 2.380.0 A (#3415): was 11 mm
+PDF_SUM_GAP_MIN = 8 * MM   # ... reduced step by step down to this before the page breaks; 2.380.0 A (#3415): was 4 mm
 PDF_SUM_AFTER = 3 * MM     # ... and a little air below the totals (given up first as well)
 # 2.406.0 (#3491): look A of the quotation PDF (chosen 27.10.2026), only while a quotation is laid out (PDF_LOOK_A);
 # 2.434.0 A (#3603): also invoices, credit notes and reminders (PDF_LOOK_A_KINDS), delivery notes keep the old look
@@ -75,6 +76,7 @@ PDF_LOOK_A_KINDS = ("offer", "invoice", "credit", "reminder")
 PDF_FS_DELTA = -2.0       # every text of the quotation 2 pt smaller ...
 PDF_FS_MIN = 6.0          # ... but never below 6 pt (footer, small captions)
 PDF_SUM_FILL = 1.0        # share of the free room of the last main page put ABOVE the totals (1 = totals + closing sit at the bottom)
+PDF_OV_KINDS = ("offer", "invoice")  # 2.438.0 B (#3622): the documents with an overview of the part totals (progress and final invoices are invoices)
 PDF_LOOK_A = contextvars.ContextVar("pdf_look_a", default=False)  # per request: parallel PDFs never see each other's look
 PDF_MARK_GREY = "0.85 0.86 0.88"  # 2.294.0 (#3155): the draft watermark (was 0.88 0.89 0.91, fill only)
 PDF_NEXT_TOP = 30 * MM   # body top on following pages (below the small head)
@@ -106,7 +108,10 @@ PDF_LABELS = {"title": N_("Quotation|pdf"), "number": N_("Quotation No.|pdf"), "
               "accept": N_("Order confirmation|pdf"), "place_date": N_("Place, date|pdf"), "sign": N_("Signature, stamp of the client|pdf"),
               "accept_text": N_("We hereby place the order on the terms of this quotation.|pdf"),  # 2.357.0 C (#3182)
               "page": N_("Page {0} of {1}|pdf"), "contact": N_("Contact|pdf"), "register": N_("Registration|pdf"), "bank": N_("Bank|pdf"),
-              "discount": N_("Discount|pdf"), "producing": N_("Producing|pdf")}
+              "discount": N_("Discount|pdf"), "producing": N_("Producing|pdf"),
+              # 2.438.0 B (#3622): the overview of the part totals on page 1
+              "ov_title": N_("Overview|pdf"), "ov_part": N_("Part|pdf"), "ov_page": N_("Page {0}|pdf"),
+              "ov_hint": N_("The individual items of each part start on page {0}.|pdf")}
 PDF_COMMA = ("de", "fr", "es", "it", "nl")  # 2.185.0 C (#2520): decimal comma (English: the point)
 
 
@@ -406,6 +411,7 @@ class _Page:
     def __init__(self):
         self.ops = []
         self.images = set()
+        self.links = []  # 2.438.0 B (#3622): internal links (x, y, w, h, target page, target y), see pdf_write
 
     def text(self, x, y, s, size, bold=False, color=C_INK, align="l", spacing=0.0, width=None):
         """Draws one line; y is the top of the line box (the baseline sits 0.78 * size below it)."""
@@ -456,6 +462,10 @@ class _Page:
     def image(self, name, x, y, w, h):
         self.images.add(name)
         self.ops.append(f"q {w:.2f} 0 0 {h:.2f} {x:.2f} {self.H - y - h:.2f} cm /{name} Do Q")
+
+    def link(self, x, y, w, h, to, to_y):
+        """2.438.0 B (#3622): the box x, y, w, h jumps to height to_y of page `to` (a _Page of the same document)."""
+        self.links.append((x, y, w, h, to, to_y))
 
 
 def qac_sig_block_h(rows):
@@ -680,11 +690,15 @@ def pdf_write(pages, images, title="", author="", xml=None, meta=None):
                 form_ids[n] = emit(objs)
     pages_id = len(objs) + 1 + 2 * len(pages)  # the Pages object comes after all page + content objects
     page_ids = []
+    # 2.438.0 B (#3622): every page's object number is known here; a link is a /Dest (no action) with the Print flag (PDF/A)
+    page_at = {id(p): len(objs) + 2 * (n + 1) for n, p in enumerate(pages)}
     for p in pages:
         content = zlib.compress("\n".join(p.ops).encode("latin-1"), 6)
         cid = add(f"<< /Length {len(content)} /Filter /FlateDecode >>\nstream\n".encode() + content + b"\nendstream")
         xo = " ".join([f"/{n} {img_ids[n]} 0 R" for n in sorted(p.images) if n in img_ids] + [f"/{n} {form_ids[n]} 0 R" for n in sorted(getattr(p, "forms", None) or {})])
-        pid = add(f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {p.W:.2f} {p.H:.2f}] "
+        ann = " ".join(f"<< /Type /Annot /Subtype /Link /F 4 /Border [0 0 0] /Rect [{x:.2f} {p.H - y - h:.2f} {x + w:.2f} {p.H - y:.2f}] "
+                       f"/Dest [{page_at[id(to)]} 0 R /XYZ null {to.H - to_y:.2f} null] >>" for x, y, w, h, to, to_y in getattr(p, "links", None) or [])
+        pid = add(f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {p.W:.2f} {p.H:.2f}] {f'/Annots [{ann}] ' if ann else ''}"
                   f"/Resources << /Font << /F1 {font_ids[False]} 0 R /F2 {font_ids[True]} 0 R >> /XObject << {xo} >> "
                   f"/ProcSet [/PDF /Text /ImageC] >> /Contents {cid} 0 R >>".encode())
         page_ids.append(pid)
@@ -1307,7 +1321,10 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             info.append((L["ref"], str(m["project_ref"])))
     # 2.144.9 (#2575): the number's label of this document (the head row that carries the number: "Rechnung Nr." on an
     # invoice) for the part pages and the rights appendix -- not the quotation's label; own fields do not count
-    num_l = next((k for k, v in info if number and v == number), L["number"])
+    # 2.380 E (#3417): the number row is always the head's first row (docs / invoices build it so); its label, not a match on the
+    # value (a draft / sample number carries a suffix there)
+    _m0 = (m.get("meta") or [None])[0]
+    num_l = str(_m0[0]) if isinstance(_m0, (list, tuple)) and len(_m0) >= 2 and str(_m0[0]).strip() else L["number"]
     for f in m.get("fields") or []:
         if isinstance(f, dict) and str(f.get("name") or "").strip():
             info.append((str(f["name"]), str(f.get("value") or "")))
@@ -1371,7 +1388,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     t_step = 18 if look_a else 20  # 2.406.0 (#3491): look A a little tighter
     block((30 if look_a else 34) + (len(t_lines) - 1) * t_step, draw_title, keep_next=True)
     if m.get("project_title"):
-        pt = str(m["project_title"])
+        pt = str(m["project_title"]).replace("\r", "")  # 2.431.0 B (#3594): its line breaks stay (pdf_wrap splits them)
         n = len(pdf_wrap(pt, 10.4, PDF_CW, True))
         block(n * 10.4 * 1.42 + 8, lambda p, y, t=pt: p.para(PDF_L, y + 2, t, 10.4, PDF_CW, True), keep_next=True)
     if m.get("intro"):
@@ -1383,7 +1400,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     air=(0.0, max(0.0, PDF_SUM_GAP - (lh + 12 - body)), 0.0), air_kind="intro")
 
     # -- the table: columns Pos. | Service | Qty | Unit price | VAT | Total
-    c_pos, c_qty, c_rate, c_vat, c_tot = 22, 64, 70, 36, 76
+    c_pos, c_qty, c_rate, c_vat, c_tot = 22, 64, 70, 56, 76  # 2.380.0 A (#3415): c_vat was 36 (the price and VAT columns almost touched)
     np_ = bool(m.get("noprice"))  # 2.120.0 D (#2089): delivery note / timesheet: no price, VAT or total columns
     if np_:
         c_pos, c_rate, c_vat, c_tot = int(m.get("pos_w") or 22), 0, 0, 0
@@ -1436,11 +1453,21 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     p3s_cap = ((BP["bottom"][1] if BP["hide_footer"] else min(BP["bottom"][1], body_bottom)) if BP else body_bottom) - PDF_NEXT_TOP - thead_h - 8
     have_table = False
     last_item_idx = None
+    # 2.438.0 B (#3622): "PAGE n" behind a part's name, filled in after the layout. Headings of the positions: an overview on page 1
+    # (ov_plan); printed parts (their own pages): the row of the part on the title page carries it, the title page is the overview
+    ov_tag_w = pdf_text_width(L["ov_page"].format(99).upper(), 7.4, False, 0.8) + 6
+    ov_tags, ov_at, ov_pg, line_at = [], {}, {}, {}  # (page, x, y, key) of the tags; key -> block; key -> (page, y); id(line) -> its first block
+    ov_on = (m.get("kind") or "offer") in PDF_OV_KINDS and not np_
+    pp_ids = {pt.get("id") for pt in m.get("parts") or [] if isinstance(pt, dict) and pt.get("id") is not None} if ov_on else set()
+
+    def ov_tag(p, x, y, key):
+        ov_tags.append((p, x, y + (pdf_fs(body) - pdf_fs(7.4)) * 0.78, key))
 
     def table_rows(lines):  # 2.47.0 (#1215): the rows of the title page and of every printed part
         nonlocal have_table, last_item_idx
         for i, ln in enumerate(lines):
             k = ln.get("kind") or "item"
+            line_at[id(ln)] = len(blocks)
             if k == "heading":
                 t = str(ln.get("title") or "")
                 hl = pb_wrap(t.upper(), 8, c_title + c_qty + c_rate + c_vat + c_tot - 6, True, 0.8)  # 2.296.0 E (#3170): a long heading wraps
@@ -1468,15 +1495,18 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 if np_:
                     rate_s = vat_s = tot_s = ""
                 pos_s = str(ln.get("pos") or "") if k in ("item", "producing", "surcharge") else ""  # 2.114.4 A (#2276): producing numbered too; surcharges like it
-                t_lines = pdf_wrap(t, body, c_title - 6)
+                tag = ln["part_id"] if ln.get("part_id") in pp_ids and k == "item" else None  # 2.438.0 B (#3622)
+                t_lines = pdf_wrap(t, body, c_title - 6 - (ov_tag_w if tag is not None else 0))
                 d_lines = pdf_wrap(detail, 8.4, c_title + c_qty + c_rate + c_vat + c_tot - 6) if detail else []
                 h = 8 + max(len(t_lines), len(q_lines)) * lh + (len(d_lines) * 8.4 * 1.42 + 2 if d_lines else 0)
 
-                def draw_row(p, y, t_lines=t_lines, d_lines=d_lines, pos_s=pos_s, q_lines=q_lines, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s, h=h):
+                def draw_row(p, y, t_lines=t_lines, d_lines=d_lines, pos_s=pos_s, q_lines=q_lines, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s, h=h, tag=tag):
                     yy = y + 4
                     p.text(x_pos + 3, yy + 1, pos_s, 8, False, C_INK2)
                     for j, s in enumerate(t_lines):
                         p.text(x_title + 3, yy + j * lh, s, body)
+                    if tag is not None and t_lines:
+                        ov_tag(p, x_title + 3 + pdf_text_width(t_lines[-1], body) + 6, yy + (len(t_lines) - 1) * lh, tag)
                     for j, s in enumerate(q_lines):
                         p.text(x_qty, yy + j * lh, s, 8.8, align="r", width=c_qty - 3)
                     p.text(x_rate, yy, rate_s, 8.8, align="r", width=c_rate - 3)
@@ -1508,6 +1538,49 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     block(h, draw_row, table=True)
                 have_table = True
                 last_item_idx = len(blocks) - 1
+    # -- 2.438.0 B (#3622): the overview of the part totals: slots of height 0 before the table, filled in by ov_fill when the
+    # document has two pages or more without it (else it prints exactly as without an overview)
+
+    def ov_plan():
+        """The rows of the overview [(number, name, amount, id(line))], or None: no two parts with positions, positions before the
+        first heading, printed parts (see ov_tag), or the rows do not add up to the document's net total."""
+        tn = (m.get("abs_full") or {}).get("net") or (m.get("totals") or {}).get("net")
+        if not ov_on or m.get("parts") or tn in (None, ""):
+            return None
+        last = max([i for i, x in enumerate(lines) if (x.get("kind") or "item") == "item"], default=-1)
+        rows_, head_, cur_, nr = [], None, None, 0
+        for i, x in enumerate(lines):
+            k = x.get("kind") or "item"
+            if k == "heading":
+                head_, cur_ = x, None
+                continue
+            if k not in ("item", "producing", "surcharge", "raw", "discount") or (k == "raw" and x.get("optional")):
+                continue
+            try:
+                amt = decimal.Decimal(str(x.get("total")))
+            except decimal.InvalidOperation:
+                return None
+            if i > last:  # what the calculation adds after the positions belongs to no part: a row of its own, without a number
+                t_ = str(x.get("title") or (L["producing"] if k == "producing" else L["discount"] if k == "discount" else ""))
+                if k == "discount" and x.get("pct") not in (None, "", 0):
+                    t_ = f"{t_} {pdf_num(x['pct'], lang, fmt)} %"
+                rows_.append(["", t_, amt, id(x)])
+            elif head_ is None:
+                return None
+            elif cur_ is None:
+                nr += 1
+                cur_ = [str(nr), str(head_.get("title") or ""), amt, id(head_)]
+                rows_.append(cur_)
+            else:
+                cur_[2] += amt
+        if nr < 2 or abs(sum(r[2] for r in rows_) - decimal.Decimal(str(tn))) >= decimal.Decimal("0.005"):
+            return None
+        return rows_
+    ov_rows = ov_plan()
+    ov_first = len(blocks)
+    for _ in range(len(ov_rows) + 3 if ov_rows else 0):
+        block(0, lambda p, y: None, keep_next=True)  # the title keeps staying with the first row of the table
+    ov_after = len(blocks)
     table_rows(lines)
     # 2.38.0 (#1021): a payment reminder lists the open invoices (number, date, due, open amount) instead of positions
     rem = m.get("reminder") if isinstance(m.get("reminder"), dict) else None
@@ -1544,6 +1617,16 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         last_item_idx = len(blocks) - 1
     if not have_table:
         thead_h = 0
+
+    # 2.438.0 B (#3622): printed parts: the hint below their rows on the title page
+    ov_hint = pdf_wrap(L["ov_hint"].format(99), 8.6, PDF_CW)
+    ov_hint_at = []
+
+    def draw_ov_hint(p, y):
+        ov_hint_at.append((p, y))
+    pp_on = [x["part_id"] for x in lines if x.get("part_id") in pp_ids and (x.get("kind") or "item") == "item"]
+    if pp_on:
+        block(8 + len(ov_hint) * pdf_fs(8.6) * 1.45, draw_ov_hint, keep_prev=True)
 
     # -- totals block (right column) + VAT note (left column); never alone on a page
     tot = m.get("totals") or {}
@@ -1837,7 +1920,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         if not isinstance(part, dict):
             continue
         ptitle = str(part.get("title") or "")
-        psub = " · ".join(x for x in (f"{num_l} {number}" if number else "", str(m.get("project_title") or "")) if x)
+        psub = " · ".join(x for x in (f"{num_l} {number}" if number else "", " ".join(str(m.get("project_title") or "").split())) if x)  # 2.431.0 B (#3594): the subject on one line
 
         # 2.138.0 A (#2240): number + project as a small line above the title (was right beside it, a long title ran over it);
         # the title wraps over the full width, the accent line under its last line
@@ -1853,6 +1936,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 p.text(PDF_L, y + pt_top + j * 17.5, s, 14, True, C_INK, spacing=0.8)
             p.line(PDF_L, y + pt_line, PDF_L + 14 * MM, y + pt_line, 1.6, accent)
         block(pt_line + 8, draw_part_head, keep_next=True, brk=True)
+        ov_at[part.get("id")] = len(blocks) - 1  # 2.438.0 B (#3622)
         for hr in part.get("head") or []:
             if isinstance(hr, (list, tuple)) and len(hr) >= 2:
                 block(lh, lambda p, y, a=str(hr[0]), b=str(hr[1]): (p.text(PDF_L, y, a, 9, False, C_INK2), p.text(PDF_L + 112, y, b, 9)), keep_next=True)
@@ -1883,7 +1967,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     rh_at = []
     if bfc_rights:
         rtitle = str(rights.get("title") or L["rights"])
-        rsub = " · ".join(x for x in (f"{num_l} {number}" if number else "", str(m.get("project_title") or "")) if x)
+        rsub = " · ".join(x for x in (f"{num_l} {number}" if number else "", " ".join(str(m.get("project_title") or "").split())) if x)  # 2.431.0 B (#3594): the subject on one line
 
         # 2.296.0 E (#3170): a long number / project line wraps right of the heading, below the accent line when no room is left
         rs_w = PDF_CW - pdf_text_width(rtitle.upper(), 14, True, 0.8) - 6 * MM
@@ -1974,12 +2058,20 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             nd = need(i, j, first_on_page)
             sqa = room_sq(i, j)
             aira = room_air(i, j)
+            # 2.380.0 A (#3415): the totals' gap never goes below its minimum: if the closing is still too long with the air at its
+            # minimum (no top gap given up either), it breaks (the totals with the last position on the next page)
+            hold = any(blocks[k]["air_kind"] == "sum" for k in range(i, j + 1))
+            if hold:
+                aira = room_air(i, j, True)
+                sqa = sum(blocks[k]["sq"] - blocks[k]["sq_used"] for k in range(i, j + 1) if not blocks[k]["air"])
             if y + nd > bot + 0.01 and sqa + aira > 0 and y + nd - sqa - aira <= bot + 0.01:
                 # 2.294.0 (#3154): first the air around the totals down to its minimum, then (2.138.0 E #2238) the group a little
                 # tighter (top gaps only, same font sizes), the air below its minimum last -- instead of breaking the page
                 over = cut_air(i, j, y + nd - bot, True)
                 for with_air in (False, True):  # the top gaps of the blocks with air (the totals' own) only with the air below its minimum
                     ks = [k for k in range(i, j + 1) if bool(blocks[k]["air"]) == with_air]
+                    if with_air and hold:
+                        break
                     if with_air and over > 0:
                         over = cut_air(i, j, over, False)
                     sqk = sum(blocks[k]["sq"] - blocks[k]["sq_used"] for k in ks)
@@ -2032,39 +2124,101 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # 2.380.0 A (#3415) + 2.357.0 C (#3182), rescue #1592: the totals' air held at its minimum gap (the least #3415 allows); the
     # appendix decision and the last fallback count with it instead of with no air at all
     air_min = {"sum": max(0.0, PDF_SUM_GAP_MIN - 8) / max(1.0, PDF_SUM_GAP - 8 + PDF_SUM_AFTER)}
-    if rh_at:  # 2.357.0 C (#3182): the appendix without its page break when that saves a page and it stays whole on one page;
-        # then without the reference lines ("see appendix", "order confirmation on page n") and with the compact order confirmation
-        keep = [(i, dict(blocks[i])) for i in rh_ref + rh_acc]
-        for i in rh_ref:
-            blocks[i].update(h=0.0, draw=lambda p, y: None)
-        for i, h, fn in q3_alt:  # 2.406.0 (#3491): look A: the closing without its reference lines
-            keep.append((i, dict(blocks[i])))
-            blocks[i].update(h=h, draw=fn)
-        for i in rh_acc:
-            blocks[i].update(h=16 + 40 + acc_dy + 16, draw=lambda p, y: draw_accept(p, y))
-        blocks[rh_at[0]]["brk"] = False
-        app_hs = [b["h"] for b in blocks[rh_at[0]:]]
-        for b in blocks[rh_at[0]:]:
-            b["h"] = 0.0
-        n_main = lay(True, air_min)[0]  # the pages without the appendix
-        for b, h in zip(blocks[rh_at[0]:], app_hs):
-            b["h"] = h
-        if lay(True, air_min)[0] > n_main:  # it does not fit completely on the last page: as before on a page of its own
-            blocks[rh_at[0]]["brk"] = True
-            for i, b in keep:
-                blocks[i].update(b)
-    # 2.294.0 (#3154): the full air unless that costs a page or presses the totals below their minimum gap; then less intro air
-    # step by step, the totals' air last (it already shrinks on its own page before a break) -- never more pages than without air
-    tries = [{"intro": 1.0, "sum": 1.0}, {"intro": 2 / 3, "sum": 1.0}, {"intro": 1 / 3, "sum": 1.0}, {"sum": 1.0}, {}]
-    if any(b["air"] for b in blocks):
-        base = lay(True, {})[0]
-        res = [(t, lay(True, t)) for t in tries]
-        # all of them tight: the totals' air alone (presses the totals no more than the old layout did) or none
-        tries = [next((t for t, (n, tight) in res if n <= base and not tight), None) or next((t for t, (n, _) in res[-2:] if n <= base), {})]
-    lay(False, tries[0])
+    def ov_fill():  # 2.438.0 B (#3622): the slots of the overview get their heights and the table starts on the next page
+        num_w = 16
+        amt_w = 86
+        name_w = PDF_CW - num_w - amt_w - ov_tag_w
+
+        def draw_ov_head(p, y):
+            p.text(PDF_L, y + 6, L["ov_title"].upper(), 8, True, pdf_text_color(accent), spacing=0.8)
+            p.text(PDF_L, y + 24, L["ov_part"].upper(), 7.4, True, C_INK2, spacing=0.6)
+            p.text(PDF_L + PDF_CW, y + 24, L["net_suffix"].upper(), 7.4, True, C_INK2, align="r", spacing=0.6)
+            p.line(PDF_L, y + 37, PDF_L + PDF_CW, y + 37, 1.1, C_INK)
+        slots = [(38, draw_ov_head, True)]
+        for q, (nr, name, amt, key) in enumerate(ov_rows):
+            nl = pdf_wrap(name, body, name_w) or [""]
+            hr = 8 + len(nl) * lh
+
+            def draw_ov_row(p, y, nr=nr, nl=nl, amt=amt, key=key, hr=hr):
+                p.text(PDF_L, y + 4, nr, body, False, C_INK2)
+                for j_, s_ in enumerate(nl):
+                    p.text(PDF_L + num_w, y + 4 + j_ * lh, s_, body)
+                p.text(PDF_L + PDF_CW, y + 4, money(amt), 8.8, align="r")
+                ov_tag(p, PDF_L + num_w + pdf_text_width(nl[-1], body) + 6, y + 4 + (len(nl) - 1) * lh, key)
+                p.line(PDF_L, y + hr - 0.5, PDF_L + PDF_CW, y + hr - 0.5, 0.5, C_RULE2)
+            slots.append((hr, draw_ov_row, q == len(ov_rows) - 1))
+        slots.append((sum_h, draw_sum, True))
+        slots.append((10 + len(ov_hint) * pdf_fs(8.6) * 1.45, lambda p, y: draw_ov_hint(p, y + 10), False))
+        for b_, (h_, fn_, kn_) in zip(blocks[ov_first:ov_after], slots):
+            b_.update(h=h_, draw=fn_, keep_next=kn_)
+        blocks[ov_after]["brk"] = True
+
+    # 2.438.0 B (#3622): where each part of the overview landed (the page of its first block)
+    ov_at.update({key: line_at[key] for *_, key in ov_rows or []})
+    if ov_rows or pp_on:
+        ov_at["start"] = ov_after if ov_rows else min(ov_at[k] for k in pp_on)  # the first part printed, not the first row of the title page
+    for key, i_ in ov_at.items():
+        blocks[i_]["draw"] = lambda p, y, fn=blocks[i_]["draw"], key=key: (ov_pg.setdefault(key, (p, y)), fn(p, y))[1]
+
+    def settle():  # the appendix decision and the air; -> the air to lay out with
+        if rh_at:  # 2.357.0 C (#3182): the appendix without its page break when that saves a page and it stays whole on one page;
+            # then without the reference lines ("see appendix", "order confirmation on page n") and with the compact order confirmation
+            keep = [(i, dict(blocks[i])) for i in rh_ref + rh_acc]
+            for i in rh_ref:
+                blocks[i].update(h=0.0, draw=lambda p, y: None)
+            for i, h, fn in q3_alt:  # 2.406.0 (#3491): look A: the closing without its reference lines
+                keep.append((i, dict(blocks[i])))
+                blocks[i].update(h=h, draw=fn)
+            for i in rh_acc:
+                blocks[i].update(h=16 + 40 + acc_dy + 16, draw=lambda p, y: draw_accept(p, y))
+            blocks[rh_at[0]]["brk"] = False
+            app_hs = [b["h"] for b in blocks[rh_at[0]:]]
+            for b in blocks[rh_at[0]:]:
+                b["h"] = 0.0
+            n_main = lay(True, air_min)[0]  # the pages without the appendix
+            for b, h in zip(blocks[rh_at[0]:], app_hs):
+                b["h"] = h
+            if lay(True, air_min)[0] > n_main:  # it does not fit completely on the last page: as before on a page of its own
+                blocks[rh_at[0]]["brk"] = True
+                for i, b in keep:
+                    blocks[i].update(b)
+        # 2.294.0 (#3154): the full air unless that costs a page or presses the totals below their minimum gap; then less intro air
+        # step by step, the totals' air last (it already shrinks on its own page before a break) -- never more pages than without air
+        tries = [{"intro": 1.0, "sum": 1.0}, {"intro": 2 / 3, "sum": 1.0}, {"intro": 1 / 3, "sum": 1.0}, {"sum": 1.0}, {}]
+        if any(b["air"] for b in blocks):
+            base = lay(True, {})[0]
+            res = [(t, lay(True, t)) for t in tries]
+            # 2.380.0 A (#3415): the totals' air never goes below its minimum (a break instead); the first try without an extra page,
+            # else the one with the fewest pages (the full air, then less intro air); the totals at their minimum gap last, as the
+            # appendix decision above counts with it (else the order confirmation slides onto a page of its own, p2406_lead_pdf)
+            ns = [(t, lay(True, t)[0]) for t in tries[:4] + [air_min]]
+            tries = [next((t for t, n in ns if n <= base), None) or min(ns, key=lambda x: x[1])[0]]
+        return tries[0]
+
+    ov_snap = [dict(b) for b in blocks]
+    ov_scale = settle()
+    if ov_rows and lay(True, ov_scale)[0] >= 2:  # the pages without the overview decide
+        for b, was in zip(blocks, ov_snap):
+            b.update(was)
+        ov_fill()
+        ov_scale = settle()
+    lay(False, ov_scale)
     total = len(pages)
     for n, p in enumerate(pages, 1):
         draw_footer(p, n, total)
+
+    def ov_page_no(q):
+        return next(n for n, x in enumerate(pages, 1) if x is q)
+    for p, x, y, key in ov_tags:  # 2.438.0 B (#3622): the pages are known now; the row heights never depended on them
+        to = ov_pg.get(key)
+        if to:
+            t_ = L["ov_page"].format(ov_page_no(to[0])).upper()
+            w_ = pdf_text_width(t_, 7.4, False, 0.8)
+            p.text(x, y, t_, 7.4, False, C_INK2, spacing=0.8)
+            p.link(x - 3, y - 3, w_ + 6, pdf_fs(7.4) + 6, to[0], to[1])
+    for p, y in ov_hint_at:
+        if ov_pg.get("start"):
+            p.para(PDF_L, y, L["ov_hint"].format(ov_page_no(ov_pg["start"][0])), 8.6, PDF_CW, color=C_INK2, lh=pdf_fs(8.6) * 1.45)
     for p, at, yy, t, *ex in reversed(p3a_ref):  # 2.114.5 (#2300): the page the order confirmation landed on
         tmp = _Page()
         rx, rs, ra, rw = ex or (PDF_L, 8.6, "l", None)  # 2.406.0 (#3491): x, size, align, width of the line
@@ -2120,6 +2274,7 @@ def bp_finish(pages, bp):
         if n and bp["dx"]:
             p.ops.insert(0, f"q 1 0 0 1 {bp['dx']:.2f} 0 cm")
             p.ops.append("Q")
+            p.links = [(x + bp["dx"], *r) for x, *r in p.links]  # 2.438.0 B (#3622)
         if bp["pages"] and bp["emit"]:
             i = min(1 if n else 0, bp["pages"] - 1)
             name = f"BP{i + 1}"

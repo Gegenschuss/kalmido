@@ -149,7 +149,8 @@ function modalSub(parent, open) {
   };
   Promise.resolve(open()).then(ch => { if (ch && ch.isConnected) onRemove(ch, show); else show(); }, show);
 }
-function askDialog({title, body = '', html = '', ok, danger = false, input = null, cancel, after}) {  // after(md): 2.47.3 (#1729) extra wiring of an html body
+// 2.359.2 B (#3049): submit(value) = the write behind "OK": the dialog closes once it worked; false / an error keeps it open with its text
+function askDialog({title, body = '', html = '', ok, danger = false, input = null, cancel, after, submit = null}) {  // after(md): 2.47.3 (#1729) extra wiring of an html body
   return new Promise(res => {
     let done = false;
     const md = modal(`<form class="cdlg-f" novalidate><h3 id="cdlg-t">${esc(title)}</h3>${body || html ? `<div class="cdlg-b" id="cdlg-b">${html || esc(body)}</div>` : ''}
@@ -161,7 +162,15 @@ function askDialog({title, body = '', html = '', ok, danger = false, input = nul
     if (body || html) md.setAttribute('aria-describedby', 'cdlg-b');
     const prev = document.activeElement;
     const fin = v => { if (done) return; done = true; res(v); if (md.isConnected) md.remove(); try { if (prev && prev.isConnected) prev.focus({preventScroll: true}); } catch { /* gone */ } };
-    md.querySelector('form').addEventListener('submit', e => { e.preventDefault(); fin(input ? $('#cdlg-in', md).value : true); });
+    md.querySelector('form').addEventListener('submit', async e => {
+      e.preventDefault(); const v = input ? $('#cdlg-in', md).value : true;
+      if (submit) {
+        if (md._busy) return;
+        md._busy = 1; let r; try { r = await submit(v); } catch { r = false; } md._busy = 0;
+        if (r === false) return;
+      }
+      fin(v);
+    });
     md.addEventListener('click', e => { if (e.target.closest('[data-cd="no"]')) fin(input ? null : false); });
     md.addEventListener('keydown', e => {  // keep Tab inside the dialog
       if (e.key !== 'Tab') return;
@@ -425,7 +434,7 @@ function listMenuItems(id, anchor) {
   // 2.17.0 (#442 #419): the list's notes and (shared) its team chat
   if (notesOn(l) && !l.archived) { const n = notesOf(id).length; items.push({label: n ? tr('Notes ({0})', n) : tr('Notes'), icon: 'edit', fn: () => go('notes/' + id)}); }
   if (teamOn() && l.shared && !l.archived && l.role !== 'participant') items.push({label: tr('Team chat'), icon: 'comment', fn: () => listChat(id)});
-  if (feat('sheets') && !l.is_inbox && !l.archived && !l.e2e) items.push({label: tr('Tables'), icon: 'sheet', cls: 'msheets', fn: () => go('sheets/l/' + id)});  // 2.89.0 (#1916): the tables attached to it
+  if (feat('sheets') && !l.is_inbox && !l.archived && !l.e2e) items.push({label: tr('Attached tables'), icon: 'sheet', cls: 'msheets', fn: () => go('sheets/l/' + id)});  // 2.89.0 (#1916): the tables attached to it
   if (!l.archived && typeof mw_ok === 'function' && mw_ok()) items.push({label: tr('Open in its own window'), icon: 'panel', cls: 'mminiwin', fn: () => mw_open(id)});  // 2.39.1 (#1294): desktop, miniwin.js
   if (!l.is_inbox && !l.archived) items.push({label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(at(), id)});
   // 2.116.0 C (#2064): the list as a CSV file / a printable page (listprint.js); a list with the lock has only ciphertext on the server
@@ -480,11 +489,11 @@ function bellCustomOf(l) {
   for (const [r] of BELL_ROWS) out[r] = {news: 'news' in (c[r] || {}) ? !!c[r].news : !!m[r]?.news, push: 'push' in (c[r] || {}) ? !!c[r].push : !!m[r]?.push};
   return out;
 }
-async function bellSet(id, mode, custom) {
-  const l = listById(id); if (!l || ((l.bell || 'default') === mode && !custom)) return;
+async function bellSet(id, mode, custom) {  // 2.359.2 B (#3049): true = saved (or nothing to save)
+  const l = listById(id); if (!l || ((l.bell || 'default') === mode && !custom)) return true;
   const prev = l.bell || 'default', prevC = l.bell_custom || {};
   let j;
-  try { j = await api('PUT', `/api/lists/${id}/bell`, custom ? {mode, custom} : {mode}); } catch { return; }
+  try { j = await api('PUT', `/api/lists/${id}/bell`, custom ? {mode, custom} : {mode}); } catch { return false; }
   l.bell = mode; if (j?.custom) l.bell_custom = j.custom;
   renderSide(); render();
   const sel = $('#l-bell'); if (sel) { sel.value = mode; sel.dispatchEvent(new Event('bell-sync')); }
@@ -492,6 +501,7 @@ async function bellSet(id, mode, custom) {
     const r = await api('PUT', `/api/lists/${id}/bell`, prev === 'custom' || custom ? {mode: prev, custom: prevC} : {mode: prev});
     l.bell = prev; l.bell_custom = r?.custom || prevC; renderSide(); render(); const s2 = $('#l-bell'); if (s2) { s2.value = prev; s2.dispatchEvent(new Event('bell-sync')); }
   });
+  return true;
 }
 function bellMenu(anchor, id) {
   const l = listById(id); if (!l) return;
@@ -517,8 +527,11 @@ function bellCustomModal(id) {
     if (b.dataset.bcq === 'cancel') { md.remove(); return; }
     const custom = {};
     for (const x of $$('[data-bc]', md)) (custom[x.dataset.bc] ||= {})[x.dataset.ch] = x.checked ? 1 : 0;
-    md.remove();
-    await bellSet(id, 'custom', custom);
+    if (b.disabled) return;
+    b.disabled = true;  // 2.359.2 B (#3049): closed once saved; on an error the ticks stay (api() said why)
+    const ok = await bellSet(id, 'custom', custom);
+    b.disabled = false;
+    if (ok) md.remove();
   });
   setTimeout(() => $('[data-bc]', md)?.focus(), 30);
 }
@@ -930,7 +943,7 @@ function listModal(id, folder = '', o = {}) {
     ${id ? `<div class="row lmtrow"><label>${tr('My tasks')}</label><label class="chkl"><input type="checkbox" id="l-inmine" ${mtShown(id) ? 'checked' : ''}> ${tr('Show in My tasks')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
     ${id && progressOn() ? `<div class="row"><label>${tr('Progress')}</label><label class="chkl"><input type="checkbox" id="l-showprog" ${progHidden(id) ? '' : 'checked'}> ${tr('Show the progress bar')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
     ${own ? `<div class="row ldabrow"><label>${tr('Completed')}</label><span class="lchks"><label class="chkl"><input type="checkbox" id="l-dab" ${l.checklist ? 'checked' : ''}> ${tr('Show completed at the bottom')}</label>${id && !l.is_inbox ? `<label class="chkl ldsxrow"><input type="checkbox" id="l-dsx" ${dsxOn(l) ? 'checked' : ''} ${dsxFixedOff(l) ? 'disabled' : ''}> ${tr('Keep completed in their section')}</label>` : ''}</span></div>
-    <div class="shint lhint" id="l-dsxhint">${tr('What you tick off stays visible at the bottom and comes back with one tap: handy for shopping and packing lists.')}${id && !l.is_inbox ? ' ' + tr('Completed tasks stay crossed out at their place, for everyone in the project. Not with “Show completed at the bottom” or for shopping lists.') : ''}</div>` : ''}
+    <div class="shint lhint" id="l-dsxhint">${ic('donedown', 's')} ${tr('What you tick off stays visible at the bottom and comes back with one tap, for example in shopping lists.')}${id && !l.is_inbox ? ' ' + tr('Completed tasks stay crossed out at their place, for everyone in the project. Not with “Show completed at the bottom” or for shopping lists.') : ''}</div>` : ''}
     ${id ? tp_rowHtml(l) : ''}
     ${id ? rvw_rowHtml(l) : ''}${''/* 2.60.0 C (#1512): review step (review.js) */}
     ${id ? o3c_rowHtml(l) : ''}${''/* 2.83.0 C (#1427): header strip (listhead.js) */}
@@ -1039,9 +1052,10 @@ function listModal(id, folder = '', o = {}) {
     const keep = force ? [] : [['l-name', 'name'], ['l-folder', 'folder'], ['l-rate', 'rate'], ['l-dayh', 'day_hours']].filter(([e]) => document.activeElement === $('#' + e, md)).map(([, k]) => k);
     lbase = {...x, ...Object.fromEntries(keep.map(k => [k, lbase[k]]))};  // 2.270.0 A (#3019): a field being typed keeps its base
   };
-  let saving = Promise.resolve();
+  let saving = Promise.resolve(), lbusy = 0;
   const autosave = () => {
     if (!id) return saving;
+    lbusy++;
     saving = saving.then(async () => {
       for (const t of pend.values()) clearTimeout(t);
       pend.clear();
@@ -1057,19 +1071,41 @@ function listModal(id, folder = '', o = {}) {
       if (diff.folder && !folderNames().includes(diff.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [diff.folder]}}}).catch(() => {});  // 2.269.0 B (#3014): only the new folder
       let cfl = null;
       const e = await listPatch(id, {...diff, _prev: prev}, null, {post: lsync, conflicts: c => { cfl = c; }});
-      if (e === false) { lfail = true; lsync(); return; }
+      if (e === false) { lfail = true; return; }  // 2.359.2 B (#3049): the form keeps what was typed (the next save sends it again)
       lfail = false;
       for (const k in diff) lbase[k] = diff[k];
       if (cfl) { for (const c of cfl) lbase[c.field] = c.server; lsync(true); }  // the form shows what stayed
       lsaved(e);
-    }).catch(() => { lfail = true; toast(tr('Could not save')); }).then(() => { if (!pend.size) fl_nameEnd(id); });  // 2.270.0 A (#3019): not swallowed  // 2.46.2 (#1659): saved (or not): the live name ends
+    }).catch(() => { lfail = true; toast(tr('Could not save')); }).then(() => { lbusy--; if (!pend.size) fl_nameEnd(id); });  // 2.270.0 A (#3019): not swallowed  // 2.46.2 (#1659): saved (or not): the live name ends
     return saving;
   };
   const later = el => { clearTimeout(pend.get(el.id)); pend.set(el.id, setTimeout(autosave, 900)); };
+  // 2.359.2 B (#3049): the save failed: the dialog stays unless the person discards what is not saved
+  const lDiscard = async () => {
+    toast(tr('Could not save'));
+    if (md._asking) return false;
+    md._asking = true;
+    const ok = await askConfirm(tr('Discard changes?'), tr('Your changes in this dialog are not saved yet.'), {ok: tr('Discard'), danger: true, cancel: tr('Keep editing')});
+    md._asking = false; return ok;
+  };
   if (id) {
     md.addEventListener('input', e => { if (['l-name', 'l-folder', 'l-rate', 'l-dayh'].includes(e.target.id)) later(e.target); if (e.target.id === 'l-name') fl_nameLive(id, formBody().name); });  // 2.46.2 (#1659)
     md.addEventListener('focusout', e => { if (['l-name', 'l-folder', 'l-rate', 'l-dayh'].includes(e.target.id)) { const empty = e.target.id === 'l-name' && !e.target.value.trim().replace(EMO_RE, ''); autosave().then(() => { if (empty) lsync(true); }); } });
-    onRemove(md, () => { if (pend.size) autosave(); else fl_nameEnd(id); });
+    // 2.422.0 A (#3468): the page goes away within the 0.9 s of typing: the fields waiting go out with keepalive (core.js
+    // keepSend; a list has no queue, so closing / reloading asks while one waits or a save runs). A folder is not sent then
+    // (a new one / one with other defaults asks first in autosave); the question keeps it. 2.440.0 (#3654): + after a failed save (the text is only in the form)
+    const leave = () => {
+      if (!pend.size) return;
+      const ks = [...pend.keys()].map(e => ({'l-name': 'name', 'l-rate': 'rate', 'l-dayh': 'day_hours'})[e]).filter(Boolean);
+      const cur = listById(id); if (!cur || !ks.length) return;  // the timers stay: a page kept for "back" saves the rest then
+      const body = formBody(), diff = {}, prev = {};
+      for (const k of ks) if (k in body && lv(k, lbase[k]) !== lv(k, body[k]) && lv(k, cur[k]) !== lv(k, body[k])) { diff[k] = body[k]; prev[k] = lbase[k] ?? null; }
+      if (Object.keys(diff).length && keepSend('PATCH', '/api/lists/' + id, {...diff, _prev: prev})) for (const k in diff) lbase[k] = diff[k];
+    };
+    const fgOff = typeof fgPending === 'function' ? fgPending(leave, () => pend.size > 0 || lbusy > 0 || lfail) : () => {};
+    onRemove(md, () => { fgOff(); if (pend.size) autosave(); else fl_nameEnd(id); });
+    // 2.359.2 B (#3049): Esc / the backdrop like "Close" when something is not saved yet (else at once, as before)
+    md._close = async () => { if (pend.size || lfail || lbusy) { await autosave(); if (lfail && !await lDiscard()) return; } md.remove(); };
   }
   md.addEventListener('change', e => {
     if (id && e.target.id === 'l-status') { lmStatusSet(id, e.target); return; }  // 2.352.0 C (#2751): the status instead of the switch "Progress and status"
@@ -1192,8 +1228,9 @@ function listModal(id, folder = '', o = {}) {
       return;
     }
     const a = b.dataset.m;
-    if (a === 'close') {  // 2.270.0 A (#3019): a failed save keeps the dialog open once (the second tap closes it)
-      if (id) { await autosave(); if (lfail && !md._lkeep) { md._lkeep = 1; toast(tr('Could not save')); return; } }
+    if (a === 'close') {  // 2.270.0 A (#3019): a failed save keeps the dialog open
+      // 2.359.2 B (#3049): also on the next tap: closing without the save only after "Discard changes?"
+      if (id) { await autosave(); if (lfail && !await lDiscard()) return; }
       md.remove();
     }
     if (a === 'dup') { await autosave(); md.remove(); listDuplicate(id); return; }  // 2.78.0 (#1881)
@@ -1216,9 +1253,11 @@ function listModal(id, folder = '', o = {}) {
         // 2.411.0 (#3516): no type in a folder that has one = chosen so (ptype ""), the server would give it the folder's type
         try { n = await api('POST', '/api/lists', pt ? {name: b0.name, folder: b0.folder, color: b0.color, ptype: pt, ...($('#l-ptsecs', md)?.checked ? {sections: true} : {}), ...('org_id' in b0 ? {org_id: b0.org_id} : {})} : own && folderPtype(b0.folder) ? {...b0, ptype: ''} : b0); } catch { return; }
       }
-      if (rate || nag) await api('PATCH', '/api/lists/' + n.id, {...(rate ? {rate} : {}), ...(nag ? {nag} : {})}).catch(() => {});
+      // 2.359.2 B (#3049): the rate / reminder sent after the create: a failure says so, with the list's dialog one tap away
+      const rnFail = (rate || nag) && await api('PATCH', '/api/lists/' + n.id, {...(rate ? {rate} : {}), ...(nag ? {nag} : {})}).then(() => false, () => true);
       if ($('#l-ws', md)) LS.set('wsLastProj', $('#l-ws', md).value ? 'org:' + $('#l-ws', md).value : 'private');  // 2.364.0 D (#3033): the next one starts there
       md.remove(); await load(); go('l/' + n.id);
+      if (rnFail) toast(tr('Could not save'), () => listModal(n.id), 10000, tr('Open'));
       modulesOnToast(n.modules_on);
       if (pt === 'software') projectNextSteps(n.id);
       return;

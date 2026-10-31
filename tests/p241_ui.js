@@ -25,7 +25,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + tok}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const change = (w, el, v) => { if (!el) return; if (v !== undefined) el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields,agents,comments';
 
 async function firefox(fn) {
@@ -151,9 +151,9 @@ async function firefox(fn) {
   check(st() && /ready/.test(st().textContent) && st().querySelector('.adot.st-idle') && !st().querySelector('.atdots'), 'ready: green dot, no typing dots');
   await v1(ag.token, 'POST', '/agent/typing', {chat_user_id: me});
   w.eval('load().then(render)'); await idle(w);
-  check(!st().querySelector('.atdots') && st().classList.contains('typing') && !d.querySelector('#chat-typing').classList.contains('hidden'), 'typing signal: the line under the messages (2.13.0: the dots only once, not in the header too)');
+  check(!st().querySelector('.atdots') && st().classList.contains('typing') && d.querySelector('#chat-typing').childElementCount > 0, 'typing signal: the line under the messages (2.13.0: the dots only once, not in the header too)');
   w.eval('S.agentsAt -= 11000; agentLive()');
-  check(!st().querySelector('.atdots') && d.querySelector('#chat-typing').classList.contains('hidden'), 'after 10 s: the dots are gone (no server round trip)');
+  check(!st().querySelector('.atdots') && d.querySelector('#chat-typing').childElementCount === 0, 'after 10 s: the dots are gone (no server round trip)');
   await v1(ag.token, 'POST', `/agent/chats/${me}`, {body: 'Hi Alice'});  // the answer ends the typing signal
   await v1(ag.token, 'PUT', '/agent/status', {status: 'working', task_id: T2, text: 'Drafting'});
   w.eval('load().then(render)'); await idle(w);
@@ -163,7 +163,7 @@ async function firefox(fn) {
   check(!st().querySelector('.atdots'), 'working on a task this chat is not about: no dots');
   await v1(ag.token, 'POST', `/agent/chats/${me}`, {body: 'About this one', task_id: T2});
   w.eval('load().then(render)'); await idle(w);
-  check(d.querySelector('#chat-typing').classList.contains('hidden') && /working on/.test(st().textContent), 'working on a task of this chat: its state, no typing dots (2.13.0: dots only for typing)');
+  check(d.querySelector('#chat-typing').childElementCount === 0 && /working on/.test(st().textContent), 'working on a task of this chat: its state, no typing dots (2.13.0: dots only for typing)');
   click(w, st().querySelector('[data-act="open-id"]')); await idle(w);
   check(w.eval('S.sel') === T2, 'the #id opens the task');
   await v1(ag.token, 'PUT', '/agent/status', {status: 'waiting'});

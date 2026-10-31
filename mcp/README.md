@@ -108,7 +108,8 @@ A scheduled task (Windows) and a launchd plist (macOS): [docs/AGENTS.md](../docs
 **Set up with one command (2.44.0, #1517):** *Settings > Agents > (agent) > Set up on a computer* shows one command with a
 one-time code. The setup script of your Kalmido (`/agent-setup.sh` for macOS / Linux, `/agent-setup.ps1` for Windows)
 trades the code for the agent's token (kept in a private file), fetches the files in [`starter_files.txt`](starter_files.txt)
-(a new starter module must be listed there) and sets up the autostart (launchd / systemd --user / Task Scheduler). Both
+(a new starter module must be listed there; then run `python3 tools/starter_sha.py` so `starter_sha256.txt` carries its
+checksum -- the setup refuses a downloaded file whose SHA-256 differs from the one the server sends, 2.380) and sets up the autostart (launchd / systemd --user / Task Scheduler). Both
 scripts mark the same steps (`# kalmido-setup-step: <id>`, checked by `tests/launcher_parity_test.py`). Details:
 [docs/AGENTS.md](../docs/AGENTS.md#set-up-on-a-computer-with-one-command-2440).
 

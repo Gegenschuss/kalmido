@@ -59,6 +59,9 @@ RX_TABLES = (
     ("cashbook/closings.csv", "office_cash_closings"),
     ("bank/imports.csv", "office_bank_imports"),
     ("bank/transactions.csv", "office_bank_tx"),
+    ("bank/card-cards.csv", "office_cc_cards"),  # 2.444.0 (#3447): credit card statements
+    ("bank/card-statements.csv", "office_cc_statements"),
+    ("bank/card-positions.csv", "office_cc_lines"),
     ("expenses/meals.csv", "office_meals"),
     ("expenses/trips.csv", "office_trips"),
     ("expenses/trip-items.csv", "office_trip_items"),
@@ -68,6 +71,7 @@ RX_TABLES = (
     ("logs/archive-log.csv", "office_archive_log"),
     ("logs/meal-log.csv", "office_meal_log"),
     ("logs/drive-log.csv", "office_drive_log"),
+    ("logs/drive-closed.csv", "office_drive_closed"),  # 2.362.0 (#3096): the closed months of the logbook
     ("letters/letters.csv", "office_letters"),  # 2.184.0 A (#2628): sent letters (business letters, 6 years; RX_WHERE)
 )
 RX_WHERE = {"office_letters": "org_id=? AND status<>'draft'"}  # 2.184.0 A (#2628): a table's own rows instead of OX_AREAS'

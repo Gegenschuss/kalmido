@@ -15,7 +15,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const FEAT = 'cal,comments,collab,office,clients';
 const TEST_IBAN = 'DE02120300000000202051';
 
@@ -97,7 +97,8 @@ const TEST_IBAN = 'DE02120300000000202051';
   w.close();
   w = await boot({hash: 'office/settings'}); d = w.document;
   await until(() => d.querySelector('#ofc-set #os-inv-scheme'), 60);
-  check(d.querySelector('#os-inv-scheme')?.value === 'RE-{yyyy}-{seq:03}' && d.querySelector('#os-cr-scheme')?.value === 'GS-{yyyy}-{seq:03}' && !!d.querySelector('#os-datev') && !!d.querySelector('#os-einv') && !!d.querySelector('#os-datev-auto'), 'settings: invoice / credit note schemes, DATEV inbox, e-invoice format');
+  // 2.431.0 (#3595): credit notes are called Rechnungskorrektur, default scheme RK- (was Gutschrift / GS-)
+  check(d.querySelector('#os-inv-scheme')?.value === 'RE-{yyyy}-{seq:03}' && d.querySelector('#os-cr-scheme')?.value === 'RK-{yyyy}-{seq:03}' && !!d.querySelector('#os-datev') && !!d.querySelector('#os-einv') && !!d.querySelector('#os-datev-auto'), 'settings: invoice / credit note schemes, DATEV inbox, e-invoice format');
   w.close();
 
   console.log(`p2380_a_ui: ${ok} ok, ${F.length} failed`);

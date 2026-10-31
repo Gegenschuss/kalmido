@@ -80,7 +80,7 @@
 .pepline{margin:.25rem 0 .5rem;display:flex;flex-wrap:wrap;gap:.25rem;align-items:center}
 .pepmiss ul,.peplist{margin:.25rem 0 .75rem;padding-left:1.25rem}
 .peplist li{margin:.25rem 0}
-.pepset code,.ofddlg code{font-size:.875rem}
+.pepset code,.ofddlg code{font-size:var(--fs-b)}
 @media (prefers-reduced-motion:no-preference) { .ostok{transition:opacity .2s} }
 @media (max-width:767px) { .ofcset .ostsub button{flex:none;padding:.25rem .375rem} }
 @media (pointer:coarse) { .ofcset .ostsub button{min-height:2.75rem} }
@@ -103,7 +103,7 @@
   .ofcrow{min-height:2.75rem}
   /* 2.117.0 (#2287 #2286): with the row menu button the per diem / receipts labels stand above their amounts, the row may wrap */
   .rklist .ofcrow{flex-wrap:wrap;justify-content:flex-end;gap:.25rem .5rem}.rklist .ofcrow .ofcn{flex:1 1 8rem}
-  .rklist .rkpd,.rklist .rkrc{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2}
+  .rklist .rkpd,.rklist .rkrc{display:flex;flex-direction:column;align-items:flex-end;line-height:var(--lh-tight)}
 }
 .ofdrow .ofdsum{display:flex;flex-direction:column;align-items:flex-end;gap:.125rem;flex:0 0 auto}
 .ofdrow .ofdsum b{font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -112,9 +112,9 @@
 .ofdhead .ofdstat{min-height:var(--fld-h)}
 .ofdhead .ofdsave{font-size:var(--fs-s)}
 .ofdhead .oil_tail{display:inline-flex;align-items:center;gap:.5rem;flex-wrap:nowrap}  /* 2.356.0 C (#3004): Preview, Download and "…" stay in one line */
-.oil_link{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin:0 0 .5rem;font-size:var(--fs-s)}  /* 2.356.0 C (#3003) */
+.oil_link{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap;margin:0 0 .5rem;font-size:var(--fs-s)}  /* 2.356.0 C (#3003) */
 .oil_more{margin:.25rem 0 .5rem}  /* 2.356.0 C (#3005): language, currency, VAT, contract folded below the head */
-.oil_more>summary{display:flex;align-items:center;gap:.4rem;cursor:pointer;min-height:2.5rem;color:var(--muted);font-size:var(--fs-s);list-style:none}
+.oil_more>summary{display:flex;align-items:center;gap:.375rem;cursor:pointer;min-height:2.5rem;color:var(--muted);font-size:var(--fs-s);list-style:none}
 .oil_more>summary::-webkit-details-marker{display:none}
 .oil_more>summary .ofd_langother{color:var(--accent)}  /* 2.368.0 (#2979): the document language differs from the app language */
 .oil_more>summary .fcar{transform:rotate(-90deg)}
@@ -293,7 +293,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .tpmodes{border:0;padding:0;margin:0 0 .75rem;display:flex;flex-direction:column;gap:.375rem}
 .tpmode{display:flex;align-items:flex-start;gap:.5rem;min-height:2.75rem;padding:.5rem .625rem;border:1px solid var(--line2);border-radius:var(--radius);cursor:pointer}
 .tpmode:has(input:checked){border-color:var(--accent)}
-.tpmode input{margin-top:.2rem;flex:0 0 auto;width:auto}
+.tpmode input{margin-top:.25rem;flex:0 0 auto;width:auto}
 .tpmode span{flex:1;text-align:left}  /* 2.114.4 D (#2269) */
 /* 2.113.0 (#2248): parts open in place on the title page; each part has a fixed colour by its place (a mark, not a control) */
 .tpf-c0{--tpf-c:#79a3dc}.tpf-c1{--tpf-c:#4fc1b4}.tpf-c2{--tpf-c:#d6a54a}.tpf-c3{--tpf-c:#e5776e}.tpf-c4{--tpf-c:#6fcf86}.tpf-c5{--tpf-c:#e08fb4}
@@ -338,9 +338,9 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
   .oimfl.w2{grid-column:auto}
 }
 .rkbar select{min-height:2.25rem}
-.rkbadge{display:inline-block;min-width:1.25rem;padding:0 .3rem;border-radius:999rem;background:var(--accent);color:var(--on-accent,#fff);font-size:.75rem;line-height:1.25rem;text-align:center}
+.rkbadge{display:inline-block;min-width:1.25rem;padding:0 .375rem;border-radius:var(--r-s);background:var(--accent);color:var(--on-accent,#fff);font-size:var(--fs-xs);line-height:1.25rem;text-align:center}
 .rksum{font-variant-numeric:tabular-nums;white-space:nowrap}
-.rkpd small,.rkrc small{font-size:.75rem}  /* 2.114.4 D (#2286) */
+.rkpd small,.rkrc small{font-size:var(--fs-s)}  /* 2.114.4 D (#2286) */
 .rkpd b,.rkrc b{font-weight:600}
 .rkmiss{color:var(--accent)}
 .rkhead{margin:.25rem 0 .75rem}
@@ -380,17 +380,17 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .rkcfents{margin-top:.25rem}
 .rkcfents .ofcrow{text-decoration:none}
 .rkcfents .rkcfopen .ofcrow{border-left:.125rem dashed var(--accent);opacity:.8}
-.rkcfopenl{margin:.25rem 0 0;padding-left:.5rem;border-left:.125rem dashed var(--accent);font-size:.85em}
+.rkcfopenl{margin:.25rem 0 0;padding-left:.5rem;border-left:.125rem dashed var(--accent);font-size:var(--fs-s)}
 .cf8sec .seg{margin:.25rem 0}
 .cf8hint{margin:.25rem 0}
-.cf8vers{margin:0;font-size:.85em}
+.cf8vers{margin:0;font-size:var(--fs-s)}
 .dxset .lacts .numin{max-width:7rem}
 .ofdeditor .ib:not(.ibl),.ofdhead .ib:not(.ibl){width:1.5rem;height:1.5rem}
 .ofdeditor .ib.ibl,.ofdhead .ib.ibl{min-height:1.5rem}
 
 /* 2.90.0 C (#1922) */
 .txd .row input[type=number] { max-width: 6rem; }
-.txdnext { list-style: none; margin: .75rem 0; padding: 0; display: grid; gap: .4rem; }
+.txdnext { list-style: none; margin: .75rem 0; padding: 0; display: grid; gap: .375rem; }
 .txdnext li { padding: .5rem .75rem; border-radius: .5rem; background: var(--bg2, rgba(127,127,127,.08)); display: flex; flex-wrap: wrap; gap: .25rem .75rem; }
 /* 2.90.0 B (#1921) */
 .bnklist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.375rem}
@@ -408,6 +408,15 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .bnksn small{font-size:var(--fs-s)}
 .bnkacts{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}
 .bnkacts .btn{min-height:2.75rem}  /* 2.114.1 A (#2017): 44 px targets */
+/* 2.444.0 (#3447): credit cards */
+.ccopen{display:flex;align-items:center;gap:.625rem;width:100%;min-height:2.75rem;background:none;border:0;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.ccopen .bnkn{flex:1;min-width:0}
+.ccfacts{display:flex;flex-wrap:wrap;gap:.375rem 1.5rem;margin:0 0 .5rem}
+.ccfacts dt{font-size:var(--fs-s);color:var(--muted)}
+.ccfacts dd{margin:0;font-variant-numeric:tabular-nums}
+.ccdiff{color:var(--danger)}
+.ccsug small{flex:1 1 8rem;min-width:0}
+.ccl{margin-top:.5rem}
 .bnkm{display:inline-flex;align-items:center;gap:.25rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bnkmiss{margin:0;font-size:var(--fs-s)}
 .bnkother{display:flex;flex-direction:column;gap:.375rem}
@@ -494,7 +503,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .rkcftab .cfs-real label{font-weight:500}
 .rkcftab .cfs-realin{width:8rem;min-height:2.75rem;text-align:right}
 .rkcftab .cfs-diff td.cfs-off{color:var(--accent);font-weight:600}
-.cfs-hand{display:inline-block;padding:0 .375rem;border:.0625rem solid var(--accent);border-radius:var(--radius);color:var(--accent);font-size:var(--fs-xs);font-weight:500;line-height:1.4}
+.cfs-hand{display:inline-block;padding:0 .375rem;border:.0625rem solid var(--accent);border-radius:var(--radius);color:var(--accent);font-size:var(--fs-xs);font-weight:500;line-height:var(--lh)}
 .cfs-adj{margin-top:.25rem}
 .cfs-add{display:flex;justify-content:flex-end;margin-top:.25rem}
 .cfs-add .btn{min-height:2.75rem}
@@ -510,7 +519,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .cfb-imp{display:flex;justify-content:flex-end;margin:.5rem 0}
 .cfb-imp .btn{min-height:2.75rem}
 .bnk-hint,.bnk-files{display:flex;flex-direction:column;gap:.5rem;margin:.5rem 0;padding:0;list-style:none}
-.bnk-hint li,.bnk-files li{display:flex;align-items:flex-start;gap:.5rem;min-width:0;line-height:1.4;overflow-wrap:anywhere}
+.bnk-hint li,.bnk-files li{display:flex;align-items:flex-start;gap:.5rem;min-width:0;line-height:var(--lh);overflow-wrap:anywhere}
 .bnk-hint li span,.bnk-files li span{min-width:0}
 .bnk-hint .i,.bnk-files .i{flex:none;margin-top:.125rem;color:var(--muted)}
 .bnk-hint .ok .i{color:var(--accent)}
@@ -520,10 +529,10 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .bnk-drop.on{border-color:var(--accent)}
 .bnk-drop .btn{min-height:2.75rem}
 /* 2.91.0 B (#1924) */
-.abo-tag{display:inline-block;margin-left:.25rem;padding:0 .375rem;border-radius:.625rem;font-size:var(--fs-s);font-weight:400;color:var(--accent);border:1px solid var(--accent);vertical-align:middle}
+.abo-tag{display:inline-block;margin-left:.25rem;padding:0 .375rem;border-radius:var(--r-s);min-height:1.125rem;box-sizing:border-box;font-size:var(--fs-xs);font-weight:400;color:var(--accent);border:1px solid var(--accent);vertical-align:middle}
 .abo-sums{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin:.5rem 0}
 .abo-sum{display:flex;flex-direction:column;gap:.125rem;padding:.75rem 1rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2)}
-.abo-sum b{font-size:1.75rem;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+.abo-sum b{font-size:1.75rem;font-weight:600;font-variant-numeric:tabular-nums;line-height:var(--lh-tight)}
 .abo-low{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;margin:.25rem 0;padding:.375rem .75rem;text-align:left;border:1px dashed var(--line2);border-radius:var(--radius);background:none;color:var(--text);font:inherit;cursor:pointer}
 .abo-low span{flex:1;min-width:0}
 .abo-low.on,.abo-low:focus-visible{border-color:var(--accent);border-style:solid}
@@ -538,7 +547,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .abo-cancel.soon{color:var(--danger,#c0392b);font-weight:500}
 .abo-per{display:flex;flex-direction:column;align-items:flex-end;flex:none;font-variant-numeric:tabular-nums}
 .abo-sw{flex:none;display:flex;align-items:center;gap:.375rem;min-width:0;padding:0 .5rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);font-size:var(--fs-s)}
-.abo-empty{display:flex;flex-direction:column;align-items:flex-start;gap:.75rem;padding:1rem 0}
+.abo-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:.75rem;padding:3rem 1rem;color:var(--muted);font-size:var(--fs-m)}
 .abo-cand{display:flex;align-items:center;gap:.625rem;min-height:2.75rem;padding:.375rem .625rem;border:1px dashed var(--line2);border-radius:var(--radius)}
 .abo-cand .ofcn{flex:1;min-width:0;display:flex;flex-direction:column}
 .abo-cand .ofcn small{font-size:var(--fs-s)}
@@ -569,7 +578,7 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .rin-acts .swl{min-height:2.75rem;min-width:0}
 .rin-acts .ib,.rin-acts .btn{min-height:2.75rem}
 .rin-acts .ib{min-width:2.75rem}
-.rin-tag{display:inline-flex;align-items:center;gap:.25rem;color:var(--accent);font-size:var(--fs-s)}
+.rin-tag{display:inline-flex;align-items:center;gap:.25rem;min-height:1.125rem;color:var(--accent);font-size:var(--fs-xs)}
 .rin-box{margin:.25rem 0 .5rem}
 .rin-from{display:flex;align-items:center;flex-wrap:wrap;gap:.25rem}
 .rin-ph summary{cursor:pointer;color:var(--accent);min-height:2.75rem;display:flex;align-items:center}
@@ -602,14 +611,14 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .ast-tile b{font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ast-exp{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem}
 .ast-exp select{min-height:2.75rem;max-width:100%}
-.ast-note{margin:.375rem 0 0;font-size:.85em}
+.ast-note{margin:.375rem 0 0;font-size:var(--fs-s)}
 .ast-sec{margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--line2)}
 .ast-sec>summary{min-height:2.75rem;display:flex;align-items:center;font-weight:500;cursor:pointer}
 .ast-rc{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ast-hint:empty{display:none}
-.ast-hint{margin:.25rem 0;font-size:.85em}
+.ast-hint{margin:.25rem 0;font-size:var(--fs-s)}
 .ast-plan{width:100%;border-collapse:collapse;margin:.5rem 0;font-variant-numeric:tabular-nums}
-.ast-plan caption{text-align:left;font-size:.85em;color:var(--muted);padding-bottom:.25rem}
+.ast-plan caption{text-align:left;font-size:var(--fs-s);color:var(--muted);padding-bottom:.25rem}
 .ast-plan th,.ast-plan td{padding:.25rem .375rem;text-align:right;border-bottom:1px solid var(--line2)}
 .ast-plan th:first-child,.ast-plan td:first-child{text-align:left}
 .ast-plan tr.cur td{color:var(--accent);font-weight:500}
@@ -645,13 +654,13 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .dtp-form .row > label:not(.chkl){font-weight:600;font-size:var(--fs-s)}
 .dtp-form .row > input,.dtp-form .row > select{width:100%;box-sizing:border-box;min-height:2.5rem}
 .dtp-form .row .chkl{display:flex;align-items:center;gap:.5rem;min-height:2.75rem}
-.dtp-ta{width:100%;box-sizing:border-box;min-height:16rem;font:inherit;line-height:1.5;resize:vertical}
+.dtp-ta{width:100%;box-sizing:border-box;min-height:16rem;font:inherit;line-height:var(--lh);resize:vertical}
 .dtp-vars{display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.375rem}
 .dtp-vars .btn{min-height:2.25rem}
 .dtp-pv{position:sticky;top:.5rem;border:1px solid var(--line2);border-radius:var(--radius);padding:.75rem 1rem;background:var(--bg2)}
 .dtp-pv h4{margin:0 0 .5rem;font-size:var(--fs-s);font-weight:600}
 .dtp-pvbtn{width:100%;justify-content:center;min-height:2.75rem;margin:0 0 .75rem}  /* 2.114.4 C (#2278) */
-.dtp-doc{line-height:1.55;overflow-wrap:anywhere}
+.dtp-doc{line-height:var(--lh);overflow-wrap:anywhere}
 .dtp-doc h3{font-size:var(--fs-l);margin:.5rem 0 .75rem}
 .dtp-doc h4{font-size:var(--fs-m);margin:1rem 0 .25rem}
 .dtp-doc p{margin:0 0 .75rem}
@@ -718,7 +727,7 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .cb-quick{display:grid;gap:.5rem;background:var(--bg2);border:.0625rem solid var(--line2);border-radius:var(--radius);padding:.75rem;margin:0 0 1rem}
 .cb-quick input,.cb-quick select{min-height:2.75rem}
 .cb-dir{display:flex}.cb-dir button{flex:1 1 0;justify-content:center}  /* 2.224.0 C (#2817): a plain .seg (height + type), only wide; touch height from the shared .seg rule */
-.cb-amount{font-size:1.25rem;font-variant-numeric:tabular-nums}
+.cb-amount{font-size:var(--fs-xl);font-variant-numeric:tabular-nums}
 .cb-qrow{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
 .cb-qrow>*{flex:1 1 8rem;min-width:0}
 .cb-go{height:1.75rem;justify-self:end}  /* 2.224.0 C (#2816): 28 px on a computer, 44 px only on touch */
@@ -744,12 +753,12 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 }
 /* 2.94.0 A (#1930): leads (prefix lead-) */
 .pipcols{grid-template-columns:repeat(5,minmax(0,1fr))}
-.lead-card .lead-next{display:flex;gap:.25rem;align-items:flex-start;font-size:.875rem;overflow-wrap:anywhere}
+.lead-card .lead-next{display:flex;gap:.25rem;align-items:flex-start;font-size:var(--fs-b);overflow-wrap:anywhere}
 .lead-card .lead-next svg{flex:none;margin-top:.125rem}
 .lead-fu{display:inline-flex;gap:.25rem;align-items:center;color:var(--muted)}
 .lead-fu.due,.lead-duen{color:var(--accent);font-weight:600}
 .ppcard.lead-due{border-left:.1875rem solid var(--accent)}
-.lead-cnt{font-size:.875rem;align-self:center}
+.lead-cnt{font-family:var(--mono);font-size:var(--fs-xs);align-self:center}
 .lead-pv{max-height:50vh;overflow:auto;list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.25rem}
 .lead-pv li{display:flex;flex-direction:column;padding:.375rem .5rem;border:1px solid var(--line2);border-radius:var(--radius)}
 .lead-pv li.lead-dup,.lead-pv li.lead-err{opacity:.6}
@@ -762,14 +771,14 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 /* 2.95.0 A (#1932): the per diem of a trip, its report (rkv-) */
 .rkv-sec{border:1px solid var(--line2);border-radius:.75rem;padding:.5rem .75rem .25rem;margin:.5rem 0}
 .rkv-sec legend{padding:0 .25rem;font-weight:600}
-.rkv-tag{font-size:.8rem;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.rkv-tag{font-size:var(--fs-xs);color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
 .rkv-tag.rkv-none{opacity:.75}
 .rkv-card{border:1px solid var(--line2);border-radius:.75rem;padding:.75rem;margin:0 0 .75rem}
 .rkv-top{display:flex;align-items:center;gap:.5rem}
 .rkv-card p{margin:.25rem 0}
 .rkv-br,.rkv-hints{list-style:none;margin:.375rem 0;padding:0;display:flex;flex-direction:column;gap:.125rem;font-variant-numeric:tabular-nums}
-.rkv-hints li{color:var(--muted);font-size:.875rem}
-.rkv-src{font-size:.8rem}
+.rkv-hints li{color:var(--muted);font-size:var(--fs-b)}
+.rkv-src{font-size:var(--fs-m)}
 .rkv-act{margin-top:.5rem}
 .rkv-days{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-direction:column;gap:.5rem;max-height:60vh;overflow:auto}
 .rkv-day{border-bottom:1px solid var(--line2);padding:.5rem 0;display:flex;flex-direction:column;gap:.375rem}
@@ -803,7 +812,7 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 /* 2.97.0 B (#1951): the recipient from the client, read-only in the document head */
 .ofdgrid .row.cdnrec{align-items:flex-start;padding:.375rem 0}
 .cdnrecb{display:flex;flex-direction:column;align-items:flex-start;gap:.25rem;flex:1;min-width:8rem}
-.cdnadr{font-style:normal;line-height:1.45}
+.cdnadr{font-style:normal;line-height:var(--lh)}
 .cdnmiss{margin:0;color:var(--warn,var(--muted));font-size:var(--fs-s);display:flex;align-items:center;gap:.25rem}
 .cdnlegal{display:block}
 /* 2.117.0 B (#2285): the PDF files of a framework contract (its dialog) and the paper clip in the list */
@@ -823,11 +832,11 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 /* 2.99.0 (#2025): iOS Safari ignores min-height on a select - on touch screens every select of the document editor gets the
    shared field height as its height, so selects and text fields are the same 44 px */
 @media (pointer:coarse) {
-  .ofdeditor select,.ofdhead select{height:var(--fld-h);line-height:1.25}
+  .ofdeditor select,.ofdhead select{height:var(--fld-h);line-height:var(--lh-tight)}
 }
 /* 2.122.4 C (#2326): same for the office settings - iOS ignores min-height on a select, so it was 36 px there */
 @media (pointer:coarse) {
-  .ofcset select,.txd select{height:max(var(--fld-h),2.75rem);line-height:1.25}  /* 2.138.4 A (#2362): + the tax dates */
+  .ofcset select,.txd select{height:max(var(--fld-h),2.75rem);line-height:var(--lh-tight)}  /* 2.138.4 A (#2362): + the tax dates */
 }
 /* 2.119.0 A (#2288): entertainment receipts (office_meals.js) */
 .bwbar .bwocc{flex:0 1 12rem;min-width:7rem;min-height:2.25rem}
@@ -858,7 +867,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .bwfoot{flex-wrap:wrap}.bwfoot .btn{min-height:2.75rem}
 .bwcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.5rem;margin:0 0 .75rem}
 .bwcard{display:flex;flex-direction:column;gap:.125rem;padding:.625rem .75rem;border:.0625rem solid var(--line2);border-radius:.625rem}
-.bwcard b{font-size:1.125rem;font-variant-numeric:tabular-nums}.bwcard.bwmain b{color:var(--accent)}
+.bwcard b{font-size:var(--fs-h);font-variant-numeric:tabular-nums}.bwcard.bwmain b{color:var(--accent)}
 .bwtab{margin-bottom:.75rem}
 .bwcset h4{margin:1.25rem 0 .5rem;font-size:var(--fs-m);font-weight:600}
 .bwclist li{display:flex;gap:.25rem}.bwclist input,.bwcadd input{flex:1;min-width:0;min-height:2.75rem}
@@ -879,6 +888,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 /* 2.138.0 D (#2256): the next running number of every series (settings) and a draft's number in the editor */
 .onum h4{margin:1rem 0 .25rem}
 .onum .onumrow .numin{width:8rem}
+.onum .onumshared .numin{opacity:.6}  /* 2.433.0 (#3597): on the invoices' counter */
 .onumwhy{flex-basis:100%}
 .onumwhy input{flex:1;min-width:0}
 .onumdoc{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;font-size:var(--fs-m)}
@@ -887,10 +897,10 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .onumpen{min-height:2.25rem;min-width:2.25rem}
 /* 2.144.2 A (#2352): iOS ignores min-height on a select - cash book year / VAT and the "Bill on" quotation pick get a 44 px height on touch */
 @media (pointer:coarse) {
-  .cb-bar select,#cb-vat,#bkb-doc{height:2.75rem;line-height:1.25}
+  .cb-bar select,#cb-vat,#bkb-doc{height:2.75rem;line-height:var(--lh-tight)}
 }
 /* 2.144.10 C (#2576): trial documents - a neutral tag, the count line; 2.417.0 C (#3445): the test mode strip above the office */
-.tri-tag{display:inline-flex;align-items:center;margin-left:.375rem;padding:0 .375rem;border:1px solid var(--line2);border-radius:.375rem;color:var(--muted);font-size:var(--fs-s);font-weight:500;line-height:1.5;vertical-align:.1em}
+.tri-tag{display:inline-flex;align-items:center;margin-left:.375rem;padding:0 .375rem;border:1px solid var(--line2);border-radius:var(--r-s);color:var(--muted);font-size:var(--fs-xs);font-weight:500;line-height:var(--lh);vertical-align:.1em}
 .tri-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;margin:.25rem 0 .5rem;font-size:var(--fs-s)}
 .tri-row .swl{min-width:0}
 .tri-strip{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;margin:0 0 .5rem;padding:.25rem .75rem;border-radius:.5rem;background:var(--accent-soft);color:var(--text);font-size:var(--fs-s)}
@@ -968,7 +978,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .lt-st-delivered{background:var(--accent);border-color:var(--accent);color:#fff}
 .lt-form{max-width:46rem}
 .lt-rc{position:relative}
-.lt-addr{width:100%;box-sizing:border-box;font:inherit;line-height:1.45;resize:vertical}
+.lt-addr{width:100%;box-sizing:border-box;font:inherit;line-height:var(--lh);resize:vertical}
 .lt-sug{list-style:none;margin:-.375rem 0 .625rem;padding:.25rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);max-height:18rem;overflow:auto}
 .lt-sugb{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;padding:.375rem .5rem;border:0;border-radius:calc(var(--radius) - .125rem);background:none;color:inherit;text-align:left;cursor:pointer}
 .lt-sugb:hover,.lt-sugb:focus-visible{background:var(--bg3)}
@@ -1013,7 +1023,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .orr-p{display:flex;align-items:flex-start;flex-wrap:wrap;gap:.5rem .75rem;padding:.5rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2)}
 .orr-pn{display:flex;align-items:center;gap:.5rem;flex:1 1 12rem;min-width:0;min-height:2.25rem}.orr-pn b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .orr-pn>svg{color:var(--muted);flex:none}
-.orr-tag{display:inline-flex;align-items:center;gap:.25rem;font-size:var(--fs-xs);color:var(--muted);border:1px solid var(--line2);border-radius:var(--r-s);padding:0 .375rem}
+.orr-tag{display:inline-flex;align-items:center;gap:.25rem;min-height:1.125rem;box-sizing:border-box;font-size:var(--fs-xs);color:var(--muted);border:1px solid var(--line2);border-radius:var(--r-s);padding:0 .375rem}
 .orr-fixed{display:flex;flex-direction:column;justify-content:center;flex:1 1 14rem;min-width:0;min-height:2.25rem;font-size:var(--fs-s)}
 .orr-pick{flex:1 1 14rem;min-width:0;position:relative}
 .orr-pick>summary{display:flex;align-items:center;gap:.5rem;list-style:none;cursor:pointer;min-height:2.25rem;padding:.25rem .5625rem;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--line2)}
@@ -1036,6 +1046,11 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .orr-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;min-height:2.25rem}
 .orr-row>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .orr-row select{flex:none;width:9.5rem}
+/* 2.433.0 (#3607): fixed groups - the level as plain text, locked specials greyed, the template note with Copy */
+.orr-lv-ro{flex:none;width:9.5rem;color:var(--muted);font-size:var(--fs-s);text-align:right}
+.orr-sp .chkl:has(input:disabled){opacity:.55;cursor:default}
+.orr-tpln{display:flex;align-items:center;gap:.5rem;margin:.5rem 0;color:var(--muted)}
+.orr-tpln>span{flex:1;min-width:0}
 .orr-gb .row{display:flex;flex-direction:column;align-items:stretch;gap:.25rem;max-width:24rem;margin:.75rem 0}
 .orr-lv{font-weight:500;font-size:var(--fs-s)}.orr-lv.lv-none{color:var(--muted);font-weight:400}
 .orr-sp{display:flex;flex-direction:column;gap:.125rem;margin-top:.5rem}
@@ -1043,7 +1058,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .orr-le{padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2)}
 .orr-le>summary{cursor:pointer;min-height:2rem;display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .375rem}
 .orr-ld{margin:.375rem 0 0;padding-left:1.25rem;font-size:var(--fs-s)}
-@media (max-width:40rem){.orr-matrix{grid-template-columns:1fr}.orr-row select{width:auto;max-width:55%}.orr-pick,.orr-fixed{flex-basis:100%}}
+@media (max-width:40rem){.orr-matrix{grid-template-columns:1fr}.orr-row select,.orr-lv-ro{width:auto;max-width:55%}.orr-pick,.orr-fixed{flex-basis:100%}}
 @media (pointer:coarse){.orr .orrsub button,.orr-pick>summary,.orr-opts .chkl,.orr-sp .chkl{min-height:2.75rem}}
 /* 2.224.0 B (#2816): the country card on a page that is not the office's first one: one slim line */
 .ocf-choose.ocf-slim{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;border-style:dashed;padding:.375rem .75rem;margin:0 0 .75rem}
@@ -1052,7 +1067,6 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .oflgt .fcar{width:.75rem;height:.75rem;transition:transform .15s}
 .oflg.closed .oflgt .fcar{transform:rotate(-90deg)}
 .oflgt:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--radius)}
-.oflr.ofmmore{color:var(--muted)}
 .rcp-kinds{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1rem}
 /* 2.356.0 D (#3006, #3129): the members' line (why Money is short, the way to hand in receipts), locked company fields,
    "Submit receipt" with the person's own receipts and their status */
@@ -1067,6 +1081,11 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .rsb-st{flex:none}.rsb-paid,.rsb-processed{color:var(--accent)}.rsb-removed{color:var(--muted)}
 .rsb-in{margin:0 0 1rem}
 .rcl-sub{color:var(--muted)}
+/* 2.365.2 (#2789): the office settings inside Settings > Company & office: the areas one below the other, the workspace on top */
+.sbiz .ofcset{max-width:none}
+.sbizws{display:flex;align-items:center;gap:.5rem;margin:0 0 .75rem}
+.sbiz .ofcset>h4{margin:1.5rem 0 .5rem}
+.sbiz .ofcset>h4:first-of-type{margin-top:.5rem}
 /* 2.414.0 A (#3502): the booking archive (office_bookarch.js) */
 .bka-h{margin:.75rem 0 .25rem}
 .bka-empty{margin:1rem 0}
@@ -1091,3 +1110,11 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .bka-rawt th{color:var(--muted);width:40%}
 .bka-ro{border-left:.2rem solid var(--accent);padding:.25rem .75rem;margin:.5rem 0}
 @media (max-width:767px){.bka-row{flex-wrap:wrap}.bka-day{min-width:0;flex-basis:100%}.bka-fgrid{grid-template-columns:1fr 1fr}}
+/* 2.420.0 C (#3448): receipts ticked as checked (office_receipts.js, office_books.js) */
+.rcl-chk{color:var(--accent);flex:none}
+.rcl-chk .i{width:.875rem;height:.875rem}
+.rcl-selbar{flex-wrap:wrap;gap:.5rem;margin:.25rem 0 .5rem}
+.rcl-selbar .btn{min-height:2.75rem}
+.rcl-pick{cursor:pointer;gap:.75rem}
+.rcl-pick input{flex:none;width:1.25rem;height:1.25rem;margin:0}
+.bk-chkrow{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;min-height:2.75rem;margin:.25rem 0}

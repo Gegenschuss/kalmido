@@ -4,7 +4,7 @@
 // receipts on to a draft quotation / invoice (purchase = amount, never twice). Server: kalmido/office/travel.py.
 const rk_dv = () => typeof ofcFeat !== 'function' || ofcFeat('books.datev');  // 2.147.0 (#2460): DATEV on in this office
 const RK = {data: null, loading: false, err: null, year: String(new Date().getFullYear()), filter: 'all', person: '', open: null, view: 'trips', by: 'month', rep: null, sel: new Set(), gen: 0};
-OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['travel', 'plane', N_('Travel expenses'), 1, () => rk_travelHtml()]);  // admins only
+OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['travel', 'plane', N_('Travel expenses'), 1, () => rk_travelHtml(), 'money', 'money.travel']);  // admins only; 2.380 F (#3411): [6] the switch
 const RK_BY = [['month', N_('Month')], ['year', N_('Year')], ['person', N_('Person')], ['project', N_('Project')], ['client', N_('Client')], ['category', N_('Category')], ['purpose', N_('Purpose')]];  // 2.117.0 A (#2292): + purpose
 const rk_reload = () => { RK.data = null; RK.rep = null; RK.gen++; ofcDraw(); };  // CI of the train: gen = a load running during a reload is fetched again
 const rk_cat = k => (RK.data?.categories || []).find(c => c.key === k)?.label || k;
@@ -67,7 +67,7 @@ function rk_listHtml() {
   let trips = RK.data.trips || [];
   if (RK.filter === 'missing') trips = trips.filter(t => t.missing);
   if (RK.person) { trips = trips.filter(t => (t.people || []).some(p => rk_pkey(p) === RK.person)); if (!trips.length) return `<div class="empty nempty">${tr('No trips of this person.')}</div>`; }  // 2.117.0 A (#2291)
-  if (!trips.length) return `<div class="empty nempty eact">${ic('plane')}<span>${RK.filter === 'missing' ? tr('Every receipt is ticked as in DATEV.') : tr('No trips yet. Add the first one with its receipts.')}</span>${RK.filter === 'missing' ? '' : rk_impBtn()}</div>`;
+  if (!trips.length) return `<div class="empty nempty eact">${ic('plane')}<span>${RK.filter === 'missing' ? tr('Every receipt is ticked as in DATEV.') : tr('No trips yet. Add the first one with its receipts.')}</span>${RK.filter === 'missing' ? '' : oim_link('trips', true)}</div>`;  // 2.365.2 D (#2789): the import is on the legacy data page
   const rec = (RK.data.trips || []).some(t => (t.items || []).length);  // 2.114.4 D (#2286): receipt column only when there are receipts
   return `<ul class="ofclist rklist" role="list">${trips.map(t => `<li><button type="button" class="ofcrow" data-rk="open" data-id="${t.id}"><span class="ofcn"><b>${esc(t.dest || tr('Trip'))}</b>
     <small class="muted">${esc([rk_span(t), rk_purpose(t), (t.people || []).map(p => p.name).join(', ')].filter(Boolean).join(' · '))}</small></span>
@@ -539,7 +539,7 @@ function rk_vmaRepHtml() {  // the evaluation: per diem per person of the year (
   const ppl = d.people.map(g => `<li><details data-rkv="person" data-k="${esc(g.key)}" ${RKV.open.has(g.key) ? 'open' : ''}><summary><span class="ofcn"><b>${esc(g.label)}</b>
     <small class="muted">${esc(trn('{0} trip', '{0} trips', g.trips.length))}${g.open ? ' · ' + esc(trn('{0} without amount', '{0} without amount', g.open)) : ''}</small></span><span class="rksum">${rk_vmaEur(g.total)}</span></summary>
     <ul class="rkv-trips" role="list">${g.trips.map(trip).join('')}</ul></details></li>`).join('');
-  return `<section class="rkv-rep" aria-label="${esc(tr('Per diem allowances {0}', y))}"><div class="ofcbar"><b>${esc(tr('Per diem allowances {0}', y))}</b><span class="spacer"></span>${dl('pdf')}${dl('xlsx')}${dl('csv')}${ofr_lvOf('travel') === 'own' ? '' : rk_impBtn()}</div>
+  return `<section class="rkv-rep" aria-label="${esc(tr('Per diem allowances {0}', y))}"><div class="ofcbar"><b>${esc(tr('Per diem allowances {0}', y))}</b><span class="spacer"></span>${dl('pdf')}${dl('xlsx')}${dl('csv')}${ofr_lvOf('travel') === 'own' || !ofcAdmin() ? '' : `<a class="btn sm ghost" href="#office/import/trips">${ic('upload', 's')}<span>${tr('Import…')}</span></a>`}</div>
     ${d.people.length ? `<ul class="rkv-people" role="list">${ppl}</ul><div class="rkv-total"><b>${tr('Total')}</b><span class="spacer"></span><b class="rksum">${rk_vmaEur(d.total)}</b></div>`
       : `<div class="empty nempty">${esc(d.rates ? tr('No trips with a per diem in {0}.', y) : tr('No per diem rates for {0}', y))}</div>`}
     ${d.source.length ? `<p class="muted ofchint">${esc(tr('Rates: {0}', d.source.join('; ')))} · ${esc(tr('Kalmido does not replace tax advice.'))}</p>` : ''}</section>`;
@@ -555,7 +555,8 @@ document.addEventListener('toggle', e => {
 
 
 // ---- 2.95.0 B (#1932): the import of a per diem spreadsheet (part B fills this block; server kalmido/office/vmaimport.py).
-// rk_impBtn: the button that opens the import (empty list, evaluation view).
+// rk_impBtn: the button that opens the import; 2.365.2 D (#2789): on the legacy data page (office_import.js oim_moreHtml), the
+// trips tab links there (#office/import/trips).
 function rk_impBtn() { return `<button type="button" class="btn sm rki-btn" data-rki="pick">${ic('upload', 's')}<span>${tr('Take over from Excel')}</span></button>`; }
 function rk_impPick() {
   const i = document.createElement('input'); i.type = 'file'; i.accept = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';

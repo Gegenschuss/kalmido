@@ -183,13 +183,13 @@ def rc_set(c, node, ws, lid, cat, uid, vat=_KEEP, keep=False):
     """Write the assignment of a receipt (people only); returns the previous (list_id, category). 2.90.0 A (#1921): vat =
     the VAT rate (left as it is when not given); the row stays while a VAT rate or a payment day is set, or with keep (the
     bookkeeping's receipt sheet: a receipt without category and rate is still a receipt)."""
-    old = c.execute("SELECT list_id, category, vat_pct, paid_at, billed_doc_id FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone()
+    old = c.execute("SELECT list_id, category, vat_pct, paid_at, billed_doc_id, billed_at FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone()
     prev = (old["list_id"], old["category"]) if old else (None, "")
     vat = (old["vat_pct"] if old else None) if vat is _KEEP else vat
     # 2.121.0 review N5: a receipt billed on to a client (#2094) stays a receipt like one with a payment day
     if old and old["vat_pct"] is not None and vat is None:
         olk_rc_keep(c, node["id"])  # 2.186.0 B (#2600): removing the VAT rate keeps the lock
-    if not keep and not lid and not cat and vat is None and not (old and (old["paid_at"] or old["billed_doc_id"])):
+    if not keep and not lid and not cat and vat is None and not (old and (old["paid_at"] or old["billed_doc_id"] or old["billed_at"])):  # 2.362.0 (#3131): + billed, invoice missing
         c.execute("DELETE FROM rc_receipts WHERE node_id=?", (node["id"],))
     elif old:
         c.execute("UPDATE rc_receipts SET list_id=?, category=?, vat_pct=?, set_by=?, set_at=? WHERE node_id=?",
@@ -206,6 +206,8 @@ def rc_state(c, node, m, uid):
     cur = {"project": {"id": lid, "name": _list_name(c, lid) if list_role(c, lid, uid) else None} if lid else None,
            "category": (r["category"] or None) if r else None, "set_by": _who(c, r["set_by"]) if r else None,
            "vat_pct": r["vat_pct"] if r else None, "paid_at": r["paid_at"] if r else None, "is_receipt": bool(r)}  # 2.90.0 A (#1921)
+    cur["checked_at"] = r["checked_at"] if r else None  # 2.420.0 C (#3448): a person's tick (office/receiptlist.py)
+    cur["checked_by"] = _who(c, r["checked_by"]) if r and r["checked_at"] else None
     sugs = [rc_sug_json(c, s, uid) for s in c.execute("SELECT * FROM rc_suggest WHERE node_id=? AND state='open' ORDER BY id", (node["id"],))]
     projects = [{"id": x["id"], "name": x["name"]} for x in c.execute(
         "SELECT id, name FROM lists WHERE is_inbox=0 AND archived=0 AND org_id IS NOT DISTINCT FROM ? ORDER BY lower(name)",

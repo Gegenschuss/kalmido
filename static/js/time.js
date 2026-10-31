@@ -344,7 +344,7 @@ function viewTime() {
       <button class="btn sm" data-act="te-add">${ic('plus', 's')} ${tr('Entry|time')}</button>
       <a class="btn sm" href="/api/time/export.csv?${esc(q)}" download>${ic('download', 's')} CSV</a>
       <a class="btn sm" href="/api/time/export.xlsx?${esc(q)}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a>
-      <button class="btn sm" data-act="tv-sheet" ${j ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet')}</button>${lyCustomBtn('time')}</div>`;
+      <button class="btn sm" data-act="tv-sheet" ${j ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet')}</button>${lyCustomBtn('time')}<button type="button" class="btn sm" data-act="mod-settings" data-sec="time">${ic('gear', 's')} ${tr('Settings…')}</button></div>`;  // 2.365.2 C (#2789): the way to Settings
   if (S.ly.view === 'time') return h + lyHtml('time', {}) + '</div>';
   if (!j) return h + lyHtml('time', P) + `<div class="empty">${tv.err ? (tv.err === 'offline' ? tr('Reports are only available online.') : esc(tv.err)) : tr('Loading…')}</div></div>`;
   const rm = j.rounding, tgt = j.today.target_h;

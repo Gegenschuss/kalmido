@@ -381,7 +381,9 @@ async function e2eNoteLoad(tid) {
   let j;
   try { j = await rawFetch('GET', `/api/tasks/${tid}/enc-note`); }
   catch (x) { E2E.notes[tid] = {tid, text: '', open: true, err: x.status !== 404}; if (x.status === 404) E2E.notes[tid].err = false; if (S.sel === tid) renderDetail(); return; }
-  try { E2E.notes[tid] = {tid, text: e2eTDec().decode(await e2eOpen(E2E.ckey, j.body, e2eNoteAad(tid))), open: true}; }
+  // 2.362.0 (#3090): after an account move the note may carry the old server's AAD (sealed anew on the next save)
+  const old = /^kalmido-note:v1:\d+:\d+$/.test(j.legacy_aad) ? j.legacy_aad : '';
+  try { E2E.notes[tid] = {tid, text: e2eTDec().decode(await e2eOpenAny(E2E.ckey, j.body, [e2eNoteAad(tid), old])), open: true}; }
   catch { E2E.notes[tid] = {tid, text: '', open: true, err: true}; }
   if (S.sel === tid) renderDetail();
 }

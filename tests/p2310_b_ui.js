@@ -20,7 +20,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const key = (w, el, k, o = {}) => el && el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}));
 const V = B + 'api/v1';
@@ -240,7 +240,8 @@ const CHIP = `(() => { const a = [...document.querySelectorAll('#detail .attsec 
     const mr = await ev(`(() => { const r = document.querySelector('#d-tl [data-act="tl-menu"]').getBoundingClientRect(); return {w: Math.round(r.width), h: Math.round(r.height)}; })()`);
     check(mr.w >= 24 && mr.h >= 24, '390: #1054 the "…" of the comment head ' + JSON.stringify(mr));
     await ev(`(() => { document.querySelector('#detail .djump').click(); return 1; })()`); await sleep(700);
-    check(await ev(`(() => { const r = document.querySelector('#d-tl').getBoundingClientRect(); const h = document.querySelector('#detail .dtop').getBoundingClientRect(); return r.top >= Math.round(h.bottom) - 1 && r.top < innerHeight / 2; })()`), '390: #1054 the jump brings the comments up, below the panel header (2.31.1)');
+    const jt = await ev(`(() => { const r = document.querySelector('#d-tl').getBoundingClientRect(); const h = document.querySelector('#detail .dtop').getBoundingClientRect(); return {top: Math.round(r.top), head: Math.round(h.bottom), ih: innerHeight}; })()`);
+    check(jt.top >= jt.head - 1 && jt.top < jt.ih / 2, '390: #1054 the jump brings the comments up, below the panel header (2.31.1; 2.365.0 #2824: with the bottom bar) ' + JSON.stringify(jt));
     await ev(`(() => { document.querySelector('#d-tl [data-act="tl-menu"]').click(); return 1; })()`); await sleep(400);
     check(await ev(`(() => { const p = document.querySelector('#pop'); const r = p.getBoundingClientRect(); return !p.classList.contains('hidden') && r.left >= 0 && r.right <= innerWidth + 1 && !!p.querySelector('.mtlact'); })()`), '390: #1054 the "…" menu opens on the screen');
     await shot('p2310b-390-comments.png');

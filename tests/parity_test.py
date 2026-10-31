@@ -299,6 +299,9 @@ APP_ONLY = [
      "kinds through the table tools (a file cell read only: its name and id)",
      ("=GET /api/sheets/{}/people", "=POST /api/sheets/{}/files", "=GET /api/sheets/{}/files/{}", "=GET /api/sheets/{}/files/{}/{}",
       "=POST /api/sheets/{}/fixed", "=GET /api/sheets/{}/history", "=GET /api/sheets/{}/cells/{}/history")),
+    ("2.429.0 (#3580): the file store's collections \"From <area>\" are a view of the web app (files of knowledge pages, tables, "
+     "projects in one read-only list); agents read the same files through the areas' own tools (wiki, sheets, project files)",
+     ("=GET /api/files/collections/{}",)),
     ("2.98.0 B (#1954): the evaluation of a questionnaire (all submissions with the senders' names, addresses and answers, "
      "their CSV) stays with the people who manage the form in the app; an agent gets each submission as its task (task_added, "
      "the answers in the description) and sets the questions through the form's fields",
@@ -444,7 +447,8 @@ APP_ONLY = [
     # 2.115.0 A (#2061): inbound webhooks of a list -- a secret URL shown once to people (owner / list admins), called by the
     # other tool (n8n, Make, Zapier, Home Assistant); agents create tasks through POST /tasks with their own token
     ("2.115.0 (#2061): inbound webhooks of a list: their secret URL is shown once to people (owner / list admins); the URL is "
-     "called by another tool, not by a client; agents create tasks with POST /tasks", ("* /api/lists/{}/hooks-in", "* /api/hooks-in/", "POST /api/hooks/in/")),
+     "called by another tool, not by a client; agents create tasks with POST /tasks", ("* /api/lists/{}/hooks-in", "* /api/hooks-in/", "POST /api/hooks/in/",
+                                                                                 "POST /api/hooks/in")),  # 2.380 G (#2289): header variant
     ("2.60.0 (#1514): environments (Staging, Live) are created, renamed and removed by people in the app, their deploy-webhook token is "
      "shown once to people; agents read them (list_environments) and record deployments (set_deployment)",
      ("* /api/lists/{}/envs", "* /api/envs/", "POST /api/hooks/deploy/")),
@@ -499,6 +503,8 @@ APP_ONLY = [
     # 2.73.0 B (#1473): moving an account between servers: export and import of a person's own data, people only (agents 403)
     ("2.73.0 B (#1473): the account export / import (moving to an own server and back): a person's own data, people only",
      ("* /api/account/export", "* /api/account/import")),
+    ("2.360.2 D (#2561): a person's own step in the settings: approval records of deleted videos hold customers' data (agents: 403)",
+     ("* /api/videos/signoffs/orphaned",)),
     ("2.146.0 D (#2468): the retention export before deleting an account / organisation: a person's own records or an "
      "organisation's admins, people only (an API token 403)", ("* /api/retention",)),
     ("2.42.0 (#828, #909): end-to-end encryption happens in a person's browser (keys, encrypted note / files, the switch of an encrypted DM); "

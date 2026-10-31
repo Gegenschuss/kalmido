@@ -22,6 +22,20 @@ function nwl_open() {
   onRemove(md, () => clearTimeout(NWL.poll));
   nwl_load();
 }
+// 2.365.2 B (#2789): the connection (service, access data, who goes, daily sync) is in Settings > Integrations
+// (integrations.js nwls_html: a .nwl-md.nwl-set box); the dialog keeps the segments, the sync and the consent import
+function nwl_setOpen() {
+  const list = nwl_wsList(), cur = wsCur();
+  NWL.ws = list.includes(cur) ? cur : list.includes(NWL.ws) ? NWL.ws : list[0];
+  NWL.d = null; NWL.edit = null;
+  nwl_load();
+}
+function nwl_setRest(c) {
+  let h = '';
+  if (c.kind === 'listmonk') h += `<div class="row"><label for="nwl-mode">${tr('Who goes to the service')}</label><select id="nwl-mode" data-nwlc="mode"><option value="consented" ${c.mode === 'consented' ? 'selected' : ''}>${tr('Only contacts who consented')}</option><option value="doi" ${c.mode === 'doi' ? 'selected' : ''}>${tr('Also “double opt-in pending” (the service asks them)')}</option></select></div>`;
+  h += `<label class="chkl"><input type="checkbox" data-nwlc="auto" ${c.auto ? 'checked' : ''}> ${tr('Sync once a day')}</label>`;
+  return h;
+}
 async function nwl_load() {
   const seq = ++NWL.seq;
   let d; NWL.denied = false; try { d = await api('GET', `/api/newsletter?ws=${encodeURIComponent(NWL.ws)}`); } catch (e) { d = null; NWL.denied = e.status === 403; }  // 2.361.0 A (#2938): only a refusal means "not an admin"
@@ -29,8 +43,8 @@ async function nwl_load() {
   NWL.d = d; nwl_draw();
 }
 function nwl_draw() {
-  const el = $('.nwl-md .nwl-body'); if (!el) return;
-  el.innerHTML = nwl_html();
+  const els = $$('.nwl-md .nwl-body'); if (!els.length) return;
+  els.forEach(el => { el.innerHTML = nwl_html(!!el.closest('.nwl-set')); });
   clearTimeout(NWL.poll);
   if (NWL.d?.conn?.busy || NWL.d?.runs?.[0]?.state === 'busy') NWL.poll = setTimeout(nwl_load, 2000);
 }
@@ -45,21 +59,21 @@ function nwl_formHtml(kind, c) {
     <p class="nwl-err" role="alert"></p>
     <div class="foot">${c ? `<button type="button" class="btn" data-nwl="cancel">${tr('Cancel')}</button>` : ''}<span class="spacer"></span><button type="button" class="btn pri" data-nwl="connect">${tr('Connect')}</button></div>`;
 }
-function nwl_html() {
+function nwl_html(set) {
   const d = NWL.d;
   if (!d) return `${nwl_wsSel()}<p class="muted">${NWL.denied ? tr('Only admins of this workspace can change this') : tr('The newsletter settings could not be loaded.')}</p>`;
   // 2.298.0 A2 (#3186): one visible sentence, the why behind (i)
   const why = `<div class="muted nwl-why">${tr('Kalmido sends no newsletters; a connected service does (with proof of consent and an unsubscribe link).')}<div class="shint">${tr('It handles bounces and sends from its own well-known servers. Kalmido keeps your contacts, segments and consent and syncs them with it.')}</div></div>`;
   const c = d.conn;
-  if (!c || NWL.edit) return nwl_wsSel() + why + (d.key_ok ? nwl_formHtml(NWL.edit || c?.kind || 'listmonk', c) : `<p class="nwl-err">${tr('The server key is missing: the access data cannot be stored safely')}</p>`) + (c ? '' : nwl_impHtml());
+  if (!set && !c) return nwl_wsSel() + why + `<div class="row"><span class="muted">${tr('Connect a newsletter service first: Settings > Integrations.')}</span><button type="button" class="btn sm" data-nwl="go-set">${ic('link', 's')} ${tr('Open Integrations')}</button></div>` + nwl_impHtml();
+  if (!c || NWL.edit) return nwl_wsSel() + why + (d.key_ok ? nwl_formHtml(NWL.edit || c?.kind || 'listmonk', c) : `<p class="nwl-err">${tr('The server key is missing: the access data cannot be stored safely')}</p>`);
   const busy = c.busy || d.runs?.[0]?.state === 'busy';
   const n = d.contacts;
   let h = nwl_wsSel() + why;
   h += `<p class="nwl-conn"><b>${esc(NWL_KIND_TXT[c.kind] || c.kind)}</b>${c.preview ? ` <span class="nwl-tag">${tr('Preview')}</span>` : ''} <span class="muted">${esc(c.url || '')}</span> <span class="muted">· ${c.hint ? tr('Access data set (…{0})', c.hint) : tr('Access data set')}</span>
-    <button type="button" class="linkbtn" data-nwl="edit">${tr('Change')}</button> <button type="button" class="linkbtn" data-nwl="disconnect">${tr('Disconnect')}</button></p>`;
+    ${set ? `<button type="button" class="linkbtn" data-nwl="edit">${tr('Change')}</button> <button type="button" class="linkbtn" data-nwl="disconnect">${tr('Disconnect')}</button>` : `<button type="button" class="linkbtn" data-nwl="go-set">${tr('Settings of the service')}</button>`}</p>`;
   if (c.error_text) h += `<p class="nwl-err" role="alert">${esc(c.error_text)}</p>`;
-  if (c.kind === 'listmonk') h += `<div class="row"><label for="nwl-mode">${tr('Who goes to the service')}</label><select id="nwl-mode" data-nwlc="mode"><option value="consented" ${c.mode === 'consented' ? 'selected' : ''}>${tr('Only contacts who consented')}</option><option value="doi" ${c.mode === 'doi' ? 'selected' : ''}>${tr('Also “double opt-in pending” (the service asks them)')}</option></select></div>`;
-  h += `<label class="chkl"><input type="checkbox" data-nwlc="auto" ${c.auto ? 'checked' : ''}> ${tr('Sync once a day')}</label>`;
+  if (set) return h + nwl_setRest(c) + `<div class="row"><span class="muted">${tr('Segments, the sync by hand and the consent import: Contacts > Newsletter.')}</span><button type="button" class="btn sm" data-nwl="open-dlg">${ic('mail', 's')} ${tr('Newsletter…')}</button></div>`;
   h += `<p class="muted">${tr('{0} contacts, {1} with an e-mail address · {2} consented, {3} pending, {4} unsubscribed or bounced', n.total, n.email, n.yes, n.pending, n.blocked)}</p>`;
   h += `<h4>${tr('Segments')}</h4>`;
   h += (d.segments || []).length ? `<ul class="nwl-segs">${d.segments.map(s => `<li><div class="nwl-sn"><b>${esc(s.name)}</b> <span class="muted">→ ${s.list_name ? esc(s.list_name) : tr('no list yet')}</span>
@@ -161,6 +175,8 @@ document.addEventListener('click', async e => {
     return;
   }
   if (a === 'close') { b.closest('.nwl-md')?.remove(); return; }
+  if (a === 'go-set') { b.closest('.nwl-md')?.remove(); settingsModal('newsletter'); return; }  // 2.365.2 B (#2789)
+  if (a === 'open-dlg') { const sm = b.closest('.modal'); if (sm) modalClose(sm); nwl_open(); return; }
   if (a === 'edit') { NWL.edit = d.conn.kind; nwl_draw(); return; }
   if (a === 'cancel') { NWL.edit = null; nwl_draw(); return; }
   if (a === 'connect') {

@@ -86,7 +86,7 @@ VARS = (
     _v("KALMIDO_SECRET_KEY_CHANGED", "0", "Switch: accept a server key that differs from the one this database was used with (a key changed on purpose; rewrap afterwards, then remove it again).", "security"),  # 2.190.0 B (#2592)
     _v("KALMIDO_ORGCRYPT_PAUSE", "0.2", "Seconds between two portions of the background encryption pass.", "security"),
     _v("KALMIDO_ORGCRYPT_DELAY", "", "Seconds before the background encryption pass starts after a start (default: 300).", "security"),
-    _v("KALMIDO_ORGCRYPT_ROT_SETTLE", "5", "Seconds the key rotation waits after the switch to the new key.", "security"),
+    _v("KALMIDO_ORGCRYPT_ROT_SETTLE", "30", "Longest wait in seconds of a key rotation for running writers after it locked writes.", "security"),
     _v("KALMIDO_TENANT_CHECK", "", "Daily check of the organisation boundaries: empty = daily, always = every watchdog tick, 0 / off = never.", "security"),
     _v("KALMIDO_TENANT_CHECK_HOUR", "3", "Local hour from which the daily boundary check runs.", "security"),
     _v("KALMIDO_PUBLIC_RATE", "60", "Page views of public links per client address and minute.", "security"),
@@ -224,7 +224,7 @@ VARS = (
     _v("KALMIDO_CALDAV_HTTP", "0", "Switch: allow CalDAV logins over plain http (only in a trusted network).", "integrations"),
     _v("KALMIDO_CALDAV_DONE_DAYS", "90", "Days completed tasks stay visible over CalDAV.", "integrations"),
     _v("KALMIDO_CALENDARS", "1", "Switch: calendar subscriptions (ICS / CalDAV).", "integrations"),
-    _v("KALMIDO_CALENDAR_ALLOW_HOSTS", "", "Internal hosts calendar subscriptions may reach.", "integrations"),
+    _v("KALMIDO_CALENDAR_ALLOW_HOSTS", "", "Internal hosts every service may reach (calendars, address books, webhooks, mail, Git, newsletter, ntfy, Peppol, feeds, OIDC, Paperless, Karakeep, servers); the admin's lists per service add to it (2.380).", "integrations"),
     _v("KALMIDO_CALENDAR_MAX_MB", "10", "Size in MB of one calendar download.", "integrations"),
     _v("KALMIDO_CALENDAR_MAX_EVENTS", "5000", "Stored occurrences per subscription.", "integrations"),
     _v("KALMIDO_CALENDAR_RATE", "30", "Calendar adds, discoveries and manual refreshes per person in 15 minutes.", "integrations"),
@@ -283,6 +283,7 @@ VARS = (
     _v("KALMIDO_SUPPORT_EMAIL", "", "Support address shown when the storage is full.", "hosting"),
     _v("KALMIDO_UPLOAD_HOURLY_MB", "1024", "Uploads per person and hour in MB (0 = no limit); over it uploads get 429.", "hosting"),  # 2.281.0 E (#3117)
     _v("KALMIDO_SUPPORT_URL", "", "Support page shown in Settings > Help.", "hosting"),
+    _v("KALMIDO_PRIVACY_EMAIL", "", "Address of the operator's privacy contact, shown on public pages (forms, portal, approvals, bookings) next to the privacy link. Administration > Server overrides it.", "hosting"),  # 2.360.2 D (#2561)
     _v("KALMIDO_PRIVACY_URL", "", "Address (http/https) of the operator's privacy statement, linked on the login page and in Settings > Help; the field in Administration > Server wins.", "hosting"),  # 2.306.0 B (#2887)
     _v("KALMIDO_IMPRINT_URL", "", "Address (http/https) of the operator's imprint (legal notice), linked like the privacy statement.", "hosting"),  # 2.306.0 B (#2887)
     _v("KALMIDO_OPERATOR_TOKEN_FILE", "", "File with the token of the hosting operator interface (empty = off).", "hosting"),
@@ -291,6 +292,7 @@ VARS = (
     _v("KALMIDO_PURGE_TRASH", "", "Switch for the trash only; empty = KALMIDO_RETENTION_PURGE.", "hosting"),
 
     # ---- tests and development
+    _v("KALMIDO_TEST_TIMING_ALL", "", "Tests: Server-Timing for every account, not only instance admins (1).", "test"),  # 2.360.2 (#2561)
     _v("KALMIDO_TEST_ROT_ABORT", "", "Tests: stop the key rotation right after the switch (1).", "test"),
     _v("KALMIDO_TEST", "0", "Switch: marks a test container (set by tests/start.sh); only then KALMIDO_TEST_NOW and KALMIDO_TEST_RATE_WINDOW_S work. Never on a real server.", "test"),
     _v("KALMIDO_TEST_NOW", "", "Test containers only (with KALMIDO_TEST=1): the server clock starts at this ISO time and runs on from there.", "test"),
@@ -303,6 +305,7 @@ VARS = (
     _v("KALMIDO_TEST_DUN_TICKS", "10", "Test containers only (with KALMIDO_TEST=1): watchdog intervals between two runs of the payment reminder suggestions (2.192.0).", "test"),
     _v("KALMIDO_SHEET_RANGE_BUDGET", "15000000", "Tests: range cells one evaluation of a table may read (2.148.1).", "test"),
     _v("KALMIDO_SHEET_CELLS_MAX", "1000000", "Tests: stored cells over all sheets of one table (2.148.1).", "test"),
+    _v("KALMIDO_SHEET_MB_MAX", "200", "Tests: size in MB of the inputs over all sheets of one table (2.360.2).", "test"),
     _v("KALMIDO_PEPPOL_STORECOVE_URL", "", "Tests: the address of a stand-in for the Storecove Peppol API (empty = the real one, 2.154.0).", "test"),
     _v("KALMIDO_AGENT_BURST_S", "60", "Seconds in which several new tasks of an agent count as one burst (one summary event).", "agents"),
     _v("KALMIDO_AGENT_BURST_QUIET_S", "15", "Seconds without more new tasks after which the burst summary of an agent is sent.", "agents"),

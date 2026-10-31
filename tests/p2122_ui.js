@@ -21,7 +21,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const tcall = async (method, url, tok, body) => { const r = await fetch(B + 'api/v1' + url, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + tok}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields,agents,comments';
 
@@ -81,17 +81,17 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
     await w.eval('load().then(render).then(chatLoad)'); await sleep(300);  // 2.13.0: wait for the chat refresh load() starts (slow runners)
     same('my new message');
     const mrow = d.querySelector(`#chat-msgs .cmsg[data-mid="a:${mine.id}"]`);
-    check(mrow && /Sent/.test(mrow.textContent), `${tag}: my message, Sent`);
+    check(mrow && /Sent/.test(mrow.querySelector('.cdlv')?.getAttribute('aria-label') || '')  /* 2.437.0 (#3318) */, `${tag}: my message, Sent`);
     await tcall('GET', `/agent/chats?since=${mine.id - 1}`, TOK);
     await w.eval('chatLoad()'); await w.eval('load().then(render).then(chatLoad)'); await sleep(300);  // 2.13.0: wait for the chat refresh load() starts (slow runners)
     same('delivered');
-    check(/Delivered/.test(d.querySelector(`#chat-msgs .cmsg[data-mid="a:${mine.id}"]`)?.textContent || ''), `${tag}: Delivered in place`);
+    check(/Delivered/.test(d.querySelector(`#chat-msgs .cmsg[data-mid="a:${mine.id}"] .cdlv`)?.getAttribute('aria-label') || '')  /* 2.437.0 (#3318) */, `${tag}: Delivered in place`);
     // the agent types and works
     await tcall('POST', '/agent/typing', TOK, {chat_user_id: ME});
     await tcall('PUT', '/agent/status', TOK, {status: 'working', text: 'thinking'});
     await w.eval('agentPoll()'); await w.eval('load().then(render).then(chatLoad)'); await sleep(300);  // 2.13.0: wait for the chat refresh load() starts (slow runners)
     same('typing + working');
-    check(!d.querySelector('#chat-typing').classList.contains('hidden'), `${tag}: typing dots`);
+    check(d.querySelector('#chat-typing').childElementCount > 0, `${tag}: typing dots`);
     // its answer
     const ans = await say('Here you go ' + tag);
     await w.eval('load().then(render).then(chatLoad)'); await sleep(300);  // 2.13.0: wait for the chat refresh load() starts (slow runners)

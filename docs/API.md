@@ -300,7 +300,7 @@ had been made in the app. Webhooks fire too.
 | `POST /tasks/{id}/restore` | delete | 2.15.0: restore a task from the trash (`409` if it is not there) |
 | `GET /tasks/{id}/dependencies` · `POST …` · `DELETE …/{blocker_id}` | read · tasks:write | 2.15.0: `blocked_by` / `blocking`; add `{blocked_by}` (project lists, no cycles), remove |
 | `GET /lists/{id}/fields` · `POST …` | read · structure | 2.15.0: custom field definitions; create `{name, type, options?, pinned?}` (2.39.1: any list, owner / list admins; switches the module *Custom fields* on for the list's owner, the answer's `modules_on` names it: `["fields"]` or `[]`). Values: the task's `fields` |
-| Field types | structure | `text`, `number`, `select`, `date`, `checkbox`, `person`, `url`, `formula`; 2.156.0 B (#2069): `multiselect` (`options.options` like `select`; value = option ids joined by `,`, a list is accepted; a removed option leaves the values), `currency` (`options.currency`, ISO code, default `EUR`; value like a number), `rating` (`options.max` 3-10, default 5; value `"1"`..max, `0` / `null` clears), `task` (value = the id of a task you may see, else `400`; the web app shows its title only to people who may see that task, `GET /api/fields/task-refs?ids=` answers only those; agents read it with `GET /tasks/{id}`). Rules cannot set multiselect or task fields; a customer view never shows task fields |
+| Field types | structure | `text`, `number`, `select`, `date`, `checkbox`, `person`, `url`, `formula`; 2.156.0 B (#2069): `multiselect` (`options.options` like `select`; value = option ids joined by `,`, a list is accepted; a removed option leaves the values), `currency` (`options.currency`, ISO code, default `EUR`; value like a number), `rating` (`options.max` 3-10, default 5; value `"1"`..max, `0` / `null` clears), `task` (value = the id of a task you may see, else `400`; the web app shows its title only to people who may see that task, `GET /api/fields/task-refs?ids=` answers only those; agents read it with `GET /tasks/{id}`). Rules cannot set multiselect or task fields; a customer view never shows task fields. 2.410.0 A (#3514): a `select` with `options.stages: 1` is ordered and shows as a stage bar; an option with `special: "red"` / `"orange"` is a special state (no stage of its own, shown in its signal colour), any other `special` value is `400`; a change that leaves out `stages` / an option's `special` keeps the stored ones |
 | `PATCH /fields/{id}` · `DELETE …` | structure · delete | 2.15.0: change `{name?, options?, pinned?, sort?}` (the type stays); delete with its values (agents: approval) |
 | Formula fields | structure | 2.43.0 (#1328): `type: "formula"` with `formula` (create / change): `+ - * /`, brackets, numbers, `{Field name}` of number, formula or checkbox fields and `round(x, n)` (n 0-6). Stored with field ids (`options.expr`, `{#12}`), shown with today's names (`options.formula`), so renaming a field keeps it working; no field may use itself, circular references -> `400` naming the field, syntax errors -> `400` with the character. The server computes the value into the task's `fields` (as text like a number); empty fields count as 0 (`options.empty: "blank"`: the result stays empty), division by 0 = empty. Writing a formula value -> `400`. 2.156.0 B (#2070): the formula engine of tables: comparisons (`= <> < > <= >=`), `WENN/IF`, `SUMME/SUM`, `RUNDEN/ROUND`, `MIN`, `MAX`, `MITTELWERT/AVERAGE`, `ANZAHL/COUNT` (German and English names, `;` or `,` between arguments), `currency` / `rating` fields as numbers; an unknown function -> `400`; a calculation that fails gives `"#div0"` / `"#type"` in `fields` (empty while none of the fields it reads has a value) |
 | `GET /lists/{id}/kpis` | read | 2.43.0 (#1328): the key figures of a list (tiles of its project page): `{data: [{id, title, agg: sum\|count\|avg\|ratio, value, unit, n}]}` over the tasks you may see; `value` null = nothing to compute. Health lists: `404` for agents. Set up by people (web: `PATCH /api/lists/{id}` `{kpis: [{title, agg, field?, field2?, state: all\|open\|done, cond_field?, cond_value?}]}`, owner / list admins; the sum row of a list: `{col_sums: {"f:<id>": sum\|avg\|count\|min\|max}}`) |
@@ -559,7 +559,7 @@ after the last day), like iCalendar. Scope `calendar` for every operation.
 | `PUT /event-calendars/{id}/members/{user_id}` · `DELETE` | share `{role: view\|edit}` (owner; 2.30.0: only people you may see, else `404`; an organisation's calendar only with its members and agents, a private one never with an organisation's agent, else `409`); stop sharing, or leave it yourself |
 | `POST /event-calendars/{id}/import` · `GET …/export` | `{ics, dry_run?}`: an .ics text (the same UID is updated, so importing twice adds nothing) -> `{created, updated, skipped, errors}`; the calendar as `{ics}` |
 | `GET /events?from=&to=&calendar_id=` | the occurrences in a range (at most 400 days): repeating events expanded, changed dates applied; `start` / `end` are UTC date-times (all day: dates); `occ` = the original start of a date |
-| `POST /events` · `GET /events/{id}` | `{title, start, end?, all_day?, tz?, location?, description?, rrule?, exdates?, reminders?, status?, busy?, url?, task_id?, cal_id?, attendees?}`; the event with `overrides` (changed dates) and `attendees` |
+| `POST /events` · `GET /events/{id}` | `{title, start, end?, all_day?, tz?, location?, description?, rrule?, exdates?, reminders?, status?, busy?, url?, task_id?, cal_id?, attendees?, guests_visible?}`; the event with `overrides` (changed dates) and `attendees` |
 | `PATCH /events/{id}` | change the series (`expect`: the `updated_at` you based it on -> `409` when it changed meanwhile); with `?occurrence=<occ>` only that date: `{title?, location?, description?, all_day?, start?, end?, status?}` |
 | `DELETE /events/{id}` · `POST …/restore` | to the trash for 30 days, then gone; with `?occurrence=<occ>` that date is left out |
 | `POST /events/{id}/rsvp` | `{partstat: accepted\|tentative\|declined\|needs-action}`: your answer to an invitation |
@@ -575,6 +575,8 @@ status changed, to all of them; default `false` (nothing is mailed). Removed or 
 cancellation. At most 200 invitation mails per person and day (`429`), see [CALDAV.md](CALDAV.md). 2.148.1: deleting or
 restoring an event (or one date) with an agent's token mails nothing (no cancellation, no new invitation).
 Agent tokens get `403` with `send_invites: true`: invitations go out in the person's name, so only people send them.
+2.380: `guests_visible: true` (default `false`) lets the invitation to an external guest name all guests; off, the attached
+calendar names only its recipient. CalDAV / `.ics`: `X-KALMIDO-GUESTS-VISIBLE:TRUE|FALSE`; a client without the line keeps the value.
 
 ## Contacts
 
@@ -999,8 +1001,12 @@ a *Send test* button.
 **Which URLs are allowed.** Only `https://` to public addresses. Every address the host name resolves to is checked when
 connecting (so DNS tricks do not help): private networks (RFC 1918), loopback, link-local
 (169.254.x, cloud metadata), CGNAT (100.64.0.0/10, e.g. VPN overlays), IPv6 unique-local and similar are refused. Servers in your
-own network work once an admin lists them under *Settings > Administration > Advanced > Allowed internal hosts* (the same
-project as for calendar subscriptions) or in `KALMIDO_WEBHOOK_ALLOW_HOSTS`; only those may also use plain `http://`.
+own network work once an admin lists them under *Settings > Administration > Advanced > Allowed internal hosts*, line
+*Webhooks* (since 2.380 one line per service: a host allowed for calendars does not open webhooks; the update copied the
+former single list into every line) or in `KALMIDO_WEBHOOK_ALLOW_HOSTS`; only those may also use plain `http://`. The admin
+API: `PATCH /api/admin/settings {"allow_hosts_by_purpose": {"webhooks": "host, host:port"}}` (purposes `calendar`, `carddav`,
+`webhooks`, `mail`, `git`, `newsletter`, `ntfy`, `peppol`, `feeds`, `oidc`, `paperless`, `karakeep`, `servers`; only the
+ones named change; the older `cal_allow_hosts` sets all of them).
 Redirects are never followed. `KALMIDO_WEBHOOKS=0` turns webhooks off.
 
 ## Behind a reverse proxy
@@ -1057,7 +1063,7 @@ Requests to `/api/v1/` without a token then still get the login page of your pro
 Modules `clients`, `workload`, `forms` (per person, 409 while off); everything within the token user's organisation.
 `GET /clients` (`?month=YYYY-MM`, `?archived=1`) returns the clients with `lists`, `stats` (`seconds`, `amount`,
 `month_seconds`, `month_amount`, `estimate_min`) and `budget` (`pct_h`, `pct_amount`, `level`: ok / warn / over);
-`GET /clients/{id}` adds `per_list` (estimate vs. actual). 2.435.0 (#3600): and `blocks_off`, the blocks of the client card the client's office switched off (office setting `client_blocks_off` of `PUT /office/settings`, office admins: a list of `persons`, `invoices`, `month`, `lists`, `note`, `tickets`, `gendocs`, `letters`, `privacy`; a private client: its owner's own office). `POST /clients`, `PATCH|DELETE /clients/{id}` (`structure`; 2.152.0: `DELETE` archives a client used in quotations, invoices or contracts instead and answers `archived: true`).
+`GET /clients/{id}` adds `per_list` (estimate vs. actual). 2.435.0 (#3600): and `blocks_off`, the blocks of the client card the client's office switched off (office setting `client_blocks_off` of `PUT /office/settings`, office admins: a list of `persons`, `invoices`, `month`, `lists`, `note`, `tickets`, `gendocs`, `letters`, `privacy`; a private client: its owner's own office). 2.440.0 (#3609): `menu_off` of `PUT /office/settings` lists the points of the office menu switched off for the whole office (`pipeline`, `gendocs`, `letters`, `time`, `contracts`, `cashbook`, `bank`, `equipment`, `agreements`; only hidden, the data and these routes stay). `POST /clients`, `PATCH|DELETE /clients/{id}` (`structure`; 2.152.0: `DELETE` archives a client used in quotations, invoices or contracts instead and answers `archived: true`).
 2.47.3 (#1733): `POST /clients/bulk` `{ids, action: delete|archive|unarchive|set|restore}` several clients at once (up to 1000;
 one id you do not see: `404`, nothing changes). `delete`: a client used in quotations, invoices or framework contracts is archived
 instead, only its creator or an admin deletes (the others: `skipped`); `set`: `rate`, `budget_h`, `budget_amount`, `color` (`null`
@@ -1431,8 +1437,8 @@ number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENT
 |---|---|---|
 | `GET /office` | office | The area (`{id, personal}`), `person_id`, `role`, currency (of new documents), 2.189.0 (#2475) `home_currency` (ISO code of the price list and books), language, the rules |
 | `GET /office/{services\|texts\|contracts\|clients}` | office | Master data of the area (`q` = search); never purchase prices or markups |
-| `GET /office/docs` | office | `?kind=offer\|invoice\|credit\|reminder&client_id=&status=&open=1&trial=1\|0` -> `{data: [brief documents]}` (2.88: quotations with `version_of` = the first quotation of their chain of versions, `cashflow`; 2.144.10: every document carries `trial`, `trial=1` only trial documents, `0` only real ones) |
-| `GET /office/docs/{id}` | office | One document with positions (`agent_flag` per position: `free`, `price`, `discount:<pct>`), sums, `agent_id`; 2.88: a quotation also `version_of`, `cashflow` and `cf_chain` (which version counts in the cash flow); 2.91: an invoice made by an invoice series carries `series_id` and `series_period` (the start of its period; null / empty otherwise); 2.154: an invoice / credit note carries `peppol` = its newest send over the Peppol network `{status: sending\|sent\|delivered\|rejected\|error, status_text, message, at}` or null (read only: agents never send) |
+| `GET /office/docs` | office | `?kind=offer\|invoice\|credit\|reminder&client_id=&status=&open=1&trial=1\|0` -> `{data: [brief documents]}` (2.88: quotations with `version_of` = the first quotation of their chain of versions, `cashflow`; 2.437: quotations also `replaces_id`, `status` of a quotation = `draft`, `sent`, `accepted`, `declined` or `superseded`; 2.144.10: every document carries `trial`, `trial=1` only trial documents, `0` only real ones) |
+| `GET /office/docs/{id}` | office | One document with positions (`agent_flag` per position: `free`, `price`, `discount:<pct>`), sums, `agent_id`; 2.88: a quotation also `version_of`, `cashflow` and `cf_chain` (which version counts in the cash flow); 2.437: a quotation also `replaces` (the quotation it replaces or null) and `replaced_by` (the quotations that replace it), each `{id, number, status, status_text}`; status `superseded` counts nowhere, like `declined`; 2.91: an invoice made by an invoice series carries `series_id` and `series_period` (the start of its period; null / empty otherwise); 2.154: an invoice / credit note carries `peppol` = its newest send over the Peppol network `{status: sending\|sent\|delivered\|rejected\|error, status_text, message, at}` or null (read only: agents never send) |
 | `GET /office/docs/{id}/pdf` | office | The PDF preview of a draft (2.138.2: DRAFT / ENTWURF in bold at the number and on every page); `409` for others |
 | `POST /office/offers` | office | `{client_id?, title, intro?, items: [{service_id?, text?, detail?, qty?, unit?, price?, discount?, kind?}], list_id?, notify?, trial?}` -> `201 {doc, chat_message_id?}` (2.144.10: `trial: true` = a trial quotation: TEST number, SAMPLE on the PDF, never in bookkeeping; only at creation) |
 | `PATCH /office/offers/{id}` | office | The agent's own draft while it is a draft (`items` replaces the list; 2.88: `cashflow` auto / yes / no = its share in the cash flow plan once sent); `403` for a person's draft, `409` once sent |
@@ -1504,7 +1510,7 @@ a token sees only the documents whose file it may see (an agent: shared with it)
 | Call | Scope | What it does |
 |---|---|---|
 | `GET /documents` | files:read | `?q=` words of the text (whole words; words of 4+ letters also as a prefix), `review=1`, `state=wait\|run\|done\|failed`, `from` / `to` (document date), `limit`, `cursor` -> `{data: [Document], next_cursor}`, newest document date first. 2.122.0: `q` takes a search syntax (`tag:Name` - several = every one, `sender:` / `absender:`, `type:` / `typ:`, `date:` / `datum:` `2025` \| `2025-03` \| `2025-01..2025-06` \| `>2025-01-01`, `added:` / `eingang:` = date of arrival, `"exact phrase"`, `-word`, `-tag:Name`; names without regard to case, the whole name first, else a part); filters by id: `tag` (`1,7;3` = two tags, each with its ids in several workspaces), `tag_mode=all\|any`, `not_tag`, `sender`, `type`, `folder`, `added_from` / `added_to`, `no_tag=1`, `no_sender=1`, `no_type=1`, `ftype=pdf,image,office,text,other` |
-| `GET /documents/{id}` | files:read | One document: `date`, `due`, `amount` (decimal text), `currency`, `sender` / `type` / `folder` (`{id, name}` or null), `tags`, `auto` (feature -> `rule` \| `learn` \| `agent` \| `import` \| `code` \| `photo`), `taken_at` (2.61.0: the capture time of a photo from its EXIF, or null), `suggest` (feature -> a suggestion waiting for review), `review`, `state`, `error`, `method` (`pdf` \| `ocr` \| `text` \| `import`), `text` (the recognised text), `extracted` (2.121.0: what the recognition read off an invoice / receipt, or null: `supplier`, `vat_id`, `tax_no`, `invoice_no`, `vat_pct` `19` \| `7` \| `0`, `vat_rates` `[{pct, net, vat}]`, `net`, `vat`, `gross`, `currency`; `new` = the fields a person's take-over would change, `hidden` = dismissed. Read only: a person takes it over in the app); 2.210 (#2761): `shared` (true when the file is shared with someone or open to the whole organisation; no names) |
+| `GET /documents/{id}` | files:read | One document: `date`, `due`, `amount` (decimal text), `currency`, `sender` / `type` / `folder` (`{id, name}` or null), `tags`, `auto` (feature -> `rule` \| `learn` \| `agent` \| `import` \| `code` \| `photo` \| `einvoice`), `taken_at` (2.61.0: the capture time of a photo from its EXIF, or null), `suggest` (feature -> a suggestion waiting for review), `review`, `state`, `error`, `method` (`pdf` \| `ocr` \| `text` \| `import` \| `e-invoice`), `text` (the recognised text), `extracted` (2.121.0: what the recognition read off an invoice / receipt, or null: `supplier`, `vat_id`, `tax_no`, `invoice_no`, `vat_pct` `19` \| `7` \| `0`, `vat_rates` `[{pct, net, vat}]`, `net`, `vat`, `gross`, `currency`; `new` = the fields a person's take-over would change, `hidden` = dismissed. Read only: a person takes it over in the app); 2.210 (#2761): `shared` (true when the file is shared with someone or open to the whole organisation; no names); 2.420.0 (#3448): `receipt_checked` (`{at, by}`: a person of the bookkeeping ticked the receipt as checked, or null; read only, agents never tick it); 2.440.0 (#2243): `einvoice` (only an incoming e-invoice, XRechnung or ZUGFeRD: its fixed EN 16931 fields `format`, `kind`, `source`, `number`, `date`, `due`, `currency`, `supplier`, `vat_id`, `tax_no`, `net`, `vat`, `gross`, `payable`, `vat_rates` `[{pct, net, vat}]`, `credit_note`, `duplicate` (true: it may repeat an older document you can see too; no name, no id)) |
 | `POST /documents` | files:write | 2.122.0 (#2098): a new document, recognised like an upload. JSON `{name, content_base64, mime?}` or multipart (`file`), plus optional `title`, `parent_id` (a folder you may edit), `ws` (`private` \| `org:<id>`, people without `parent_id` only), `sender`, `type`, `tags` (names), `date`, `due`, `amount`, `currency` (taken as given; an agent's `sender`/`type`/`tags` follow the levels like `PATCH`: on level *agent* they wait as suggestions in *To review*). An agent without `parent_id` writes into its own result folder. -> `201` the document |
 | `PATCH /documents/{id}` | files:write | Role *edit*: `{date?, due?, amount?, currency?, sender?, type?, tags?: [names], text?, custom_fields?}` (`text` only while none was recognised; 2.153.0 `custom_fields` = `{field id or name: value \| null}`, only fields of the document's workspace, select by option id or name, money `"12.50 EUR"`, checkbox `true`; the single document lists them as `custom_fields: [{id, name, type, options?, value, label}]`). An agent's values are marked `agent`; a feature the workspace leaves to an agent becomes a suggestion in *To review*. Unknown fields: `400` |
 | `POST /documents/{id}/receipt-suggestion` | files:read | 2.48.0 (#1356), agents only, the document shared with you: `{project_id?, category?, amount?, currency?, vat_pct?, note?}` (at least one of project, category, amount, vat_pct; 2.121.0 (#2096): `amount` = gross, more than 0, at most two decimals, `currency` = 3 letters, `vat_pct` = `"19"`, `"7"` or `"0"`; `project_id` = a project you can see in the document's workspace) -> `201` ReceiptSuggestion `{id, document_id, agent, state, project, category, amount, currency, vat_pct, note, created_at, decided_at}`. A person accepts or rejects it in the app; your open suggestion of the same document is replaced; 2.360.0: an agent with a row in the office groups of the document's organisation needs at least *view* in its receipts area (`403`), like people |
@@ -1669,7 +1675,8 @@ the module *Tables* switched on to write). Routes: `GET /api/v1/sheets` (`?space
 `POST /api/v1/sheets` (a whole table in one call), `GET` / `PATCH /api/v1/sheets/{id}`, `PUT /api/v1/sheets/{id}/cells`,
 `POST /api/v1/sheets/{id}/rows`, `POST /api/v1/sheets/{id}/columns`, `GET /api/v1/sheets/{id}/vars`,
 `POST /api/v1/sheets/{id}/batches/{batch}/undo`. 2.124.0: a person shares one table with single people / agents
-(`GET|POST /api/sheets/{id}/shares`, `PATCH|DELETE /api/sheets/{id}/shares/{share}`, session only, role `read` | `write`);
+(`GET|POST /api/sheets/{id}/shares`, `PATCH|DELETE /api/sheets/{id}/shares/{share}`, session only, role `read` | `write`;
+2.360.2: by `email` every address gets a row `{email, state: "invited"}` with no account named, a later account of that address takes it at sign-in);
 the list then holds it with `shared_in: true` and `share_role`, `?space=shared` lists only such tables. Formulas are stored with ids and shown with the current names; every
 value is calculated with the token's visibility (`error: "denied"` for a source it does not see). An agent's write call is
 one batch (`batch` in the answer) a person can take back. The app also exports a table as CSV / .xlsx and imports both
@@ -1960,8 +1967,12 @@ themselves and have their own proposals API); child accounts get `403`.
 
 Tools like n8n, Make, Zapier or Home Assistant create tasks through a secret URL, without a login. The owner or an
 admin of a list adds one under **List settings > Inbound webhook** (up to 10 per list; not in the basket, health,
-budget or locked lists). The URL `https://kalmido.example.com/api/hooks/in/<token>` is shown **once** (Kalmido stores
-only its SHA-256); *New URL* stops the old one at once, *Delete* too (undo brings the same URL back for 30 days).
+budget or locked lists). The token is shown **once** (Kalmido stores only its SHA-256); *New URL* stops the old one at
+once, *Delete* too (undo brings the same URL back for 30 days).
+
+*Since 2.380:* send the token as the header `X-Kalmido-Hook-Token: <token>` to `POST /api/hooks/in` (recommended: the
+token stays out of reverse-proxy logs). The older form with the token in the path, `POST /api/hooks/in/<token>`, keeps
+working for tools that cannot set headers.
 
 Each `POST` creates **one task in exactly this list**, through the normal way of creating a task (history line "via
 webhook", pushes, agent events, outgoing webhooks, list rules), with the rights of the person who set the webhook up.
@@ -1982,9 +1993,9 @@ fields of other lists are **ignored** (never created) and named in `ignored`, so
 changes.
 
 ```bash
-curl -X POST -H 'Content-Type: application/json' \
+curl -X POST -H 'X-Kalmido-Hook-Token: khi_...' -H 'Content-Type: application/json' \
   -d '{"title": "Washing machine done", "due": "2026-11-02", "priority": "high", "tags": ["Home"]}' \
-  'https://kalmido.example.com/api/hooks/in/khi_...'
+  'https://kalmido.example.com/api/hooks/in'
 ```
 
 Home Assistant (`configuration.yaml`):
@@ -1992,13 +2003,15 @@ Home Assistant (`configuration.yaml`):
 ```yaml
 rest_command:
   kalmido_task:
-    url: "https://kalmido.example.com/api/hooks/in/khi_..."
+    url: "https://kalmido.example.com/api/hooks/in"
     method: POST
+    headers:
+      X-Kalmido-Hook-Token: "khi_..."
     content_type: "application/json"
     payload: '{"title": "{{ title }}"}'
 ```
 
-n8n: an *HTTP Request* node, method POST, the URL, body JSON with `title` (and the other keys). Behind a login proxy
+n8n: an *HTTP Request* node, method POST, the URL, the header `X-Kalmido-Hook-Token`, body JSON with `title` (and the other keys). Behind a login proxy
 (forward auth, single sign-on) the path `/api/hooks/` must bypass the proxy login, like the other inbound hooks.
 
 ## Settings: single entries and parallel saves (2.269.0)

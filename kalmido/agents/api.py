@@ -67,13 +67,13 @@ def v1_agent():
 @app.put("/api/v1/agent/status")
 @v1_view
 def v1_agent_status():
-    """{status: idle|working|waiting|error, text?, task_id?, model?, permission_mode?, host_permission_mode?, host? (2.44.0)} -- shown as the dot on the agent's avatar and in the header chip;
+    """{status: idle|working|waiting|error, text?, task_id?, model?, permission_mode?, host_permission_mode?, permission_fixed? (2.437.0), host? (2.44.0)} -- shown as the dot on the agent's avatar and in the header chip;
     while "working", the task_id's panel (else every task of its lists) shows "<agent> is working on it" (2.0.2; "is writing
     ..." only with a typing signal since 2.13.2)."""
     v1_args(())
     aid = need_agent()
     b = v1_json()
-    unknown = sorted(k for k in b if k not in ("status", "text", "task_id", "model", "permission_mode", "host_permission_mode", "host"))
+    unknown = sorted(k for k in b if k not in ("status", "text", "task_id", "model", "permission_mode", "host_permission_mode", "permission_fixed", "host"))
     if unknown:
         raise UnknownFields(unknown)
     from ..agents.steps import host_info_in, host_info_set, steps_end

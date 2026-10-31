@@ -1061,6 +1061,8 @@ def process(c, nid):
     node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
     # 2.273.0 C (#3047): the row locked from here on (a save waits); the values a person set by hand stay
     m2 = c.execute("SELECT * FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,)).fetchone()
+    if not m2:  # #3090: deleted along while the run went (users.user_delete / orgs.org_delete lock its row first)
+        return None
     if asn_found and not m2["asn"]:
         asn_lock(c, ws, nid)                 # 2.273.0 C (#3047); F2: only around the write
         if not asn_taken(c, ws, asn_found, nid):

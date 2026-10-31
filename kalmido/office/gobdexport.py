@@ -23,6 +23,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import db, local_now
 from ..core.orgcrypt import oc_dec_fields
+from ..collab.comments import user_names
 from ..personal.timetrack import BadInput
 from .books import bk_gaps_text
 from .calc import dec, money
@@ -112,7 +113,7 @@ def gx_tables(c, oid, frm, to, gaps=None):
     docs = c.execute("SELECT d.*, cl.name AS cl_name, cl.customer_no AS cl_no FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id "
                      "WHERE d.org_id=? AND d.kind IN ('invoice','credit') AND d.locked_at IS NOT NULL AND d.date>=? AND d.date<=? "
                      "AND d.trial=0 ORDER BY d.date, d.number", (oid, frm, to)).fetchall()
-    t = _Tbl("invoices.csv", "Rechnungen", "Festgeschriebene Rechnungen und Gutschriften",
+    t = _Tbl("invoices.csv", "Rechnungen", "Festgeschriebene Rechnungen und Rechnungskorrekturen",
              [("ID", A), ("Art", A), ("Nummer", A), ("Datum", D), ("Kunde", A), ("Kundennummer", A), ("Netto", N), ("Steuer", N),
               ("Brutto", N), ("Waehrung", A), ("Status", A), ("Festgeschrieben", D), ("Storno_von", A)])
     for r in docs:
@@ -121,7 +122,7 @@ def gx_tables(c, oid, frm, to, gaps=None):
               tt.get("gross"), r["currency"], r["status"], r["locked_at"], r["cancels_id"] or "")
     out.append(t)
 
-    t = _Tbl("positions.csv", "Positionen", "Positionen der Rechnungen und Gutschriften",
+    t = _Tbl("positions.csv", "Positionen", "Positionen der Rechnungen und Rechnungskorrekturen",
              [("ID", A), ("Rechnung_ID", A), ("Bezeichnung", A), ("Menge", N), ("Einheit", A), ("Einzelpreis", N), ("Steuersatz", N),
               ("Netto", N), ("Steuer", N)])
     ids = [r["id"] for r in docs]
@@ -141,11 +142,13 @@ def gx_tables(c, oid, frm, to, gaps=None):
     out.append(t)
 
     t = _Tbl("receipts.csv", "Belege", "Eingangsbelege (Belegfach) nach Belegdatum",
-             [("Beleg_ID", A), ("Belegdatum", D), ("Bezahlt_am", D), ("Brutto", N), ("USt_Satz", A), ("Netto", N), ("USt", N),
-              ("Kategorie", A), ("Datei", A)])
-    for r in bk_receipts(c, oid, frm, to, uid=0, by="doc", gaps=gaps):
-        t.add(r["node_id"], r["doc_date"] or r["date"], r["paid_at"] or "", r["amount"], r["vat_pct"] or "", r["net"], r["vat"],
-              r["category"], r["title"])
+             [("Beleg_ID", A), ("Belegdatum", D), ("Bezahlt_am", D), ("Geprueft_am", D), ("Geprueft_von", A), ("Brutto", N), ("USt_Satz", A),
+              ("Netto", N), ("USt", N), ("Kategorie", A), ("Datei", A)])
+    rcs = bk_receipts(c, oid, frm, to, uid=0, by="doc", gaps=gaps)
+    who = user_names(c, [r["checked_by"] for r in rcs])  # 2.420.0 C (#3448): + the person's tick "checked" (day, name)
+    for r in rcs:
+        t.add(r["node_id"], r["doc_date"] or r["date"], r["paid_at"] or "", (r["checked_at"] or "")[:10], who.get(r["checked_by"], ""),
+              r["amount"], r["vat_pct"] or "", r["net"], r["vat"], r["category"], r["title"])
     out.append(t)
 
     t = _Tbl("cashbook.csv", "Kassenbuch", "Kassenbuchungen aller Kassen",

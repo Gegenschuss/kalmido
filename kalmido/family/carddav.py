@@ -465,7 +465,7 @@ def contacts_sync(c, sid):
         c.commit()
         upd = {}
         try:
-            allow = cal_allow(c)
+            allow = cal_allow(c, "carddav")  # 2.380 G (#3389)
             url = cal_unseal(c, s["user_id"], s["url"])
             auth = (s["username"], cal_unseal(c, s["user_id"], s["password"]))
             c.commit()  # 2.37.0 (#1150): no open transaction while the address book server is asked (snapshot, pool)

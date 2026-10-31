@@ -17,7 +17,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P21521B_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const css = f => { for (const base of [path.join(__dirname, '..', 'static'), path.join(__dirname, '..', 'app', 'static')]) { try { return fs.readFileSync(path.join(base, f), 'utf8'); } catch (e) { /* next */ } } return ''; };
 const RM = '(prefers-reduced-motion: reduce)';
 
@@ -66,7 +66,7 @@ const RM = '(prefers-reduced-motion: reduce)';
   check(busy.querySelector('svg.bot.b-arbeitet') && /working on it/.test(busy.querySelector('.ttx').textContent), '#2610: "working on it": the bot too');
   const task = P.parseFromString(w.typingHtml([{name: 'Bob', typing: Infinity}], 'd-typing'), 'text/html');
   check(task.querySelector('.atdots') && !task.querySelector('svg.bot'), '#2610: the task panel (people) keeps the dots');
-  check(P.parseFromString(w.typingHtml([], 'chat-typing'), 'text/html').querySelector('#chat-typing.hidden') && !P.parseFromString(w.typingHtml([], 'chat-typing'), 'text/html').querySelector('svg.bot'), '#2610: nobody working: no figure');
+  check(P.parseFromString(w.typingHtml([], 'chat-typing'), 'text/html').querySelector('#chat-typing.atyrow:empty') && !P.parseFromString(w.typingHtml([], 'chat-typing'), 'text/html').querySelector('svg.bot'), '#2610: nobody working: no figure');
 
   // ================= #2611: long jobs
   const mv = P.parseFromString(w.umzImpHtml({state: 'running', progress: {done: 3, total: 10}}), 'text/html');

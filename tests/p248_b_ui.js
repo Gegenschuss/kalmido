@@ -15,7 +15,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P248B_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 200 : 15000, step: 200});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 
 function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
   const esc = s => s.replace(/[\\()]/g, c => '\\' + c);
@@ -108,9 +108,13 @@ const ready = id => until(async () => { const d = await call('GET', `/api/docs/$
   await until(() => d.querySelectorAll('.dc-card').length === 2);
 
   // ================= settings: rename a type (one undo step)
+  // 2.365.2 B (#2789): the levels are in Settings > Documents, the lists keep their dialog in the module
+  await w.eval(`settingsModal('docs')`);
+  check(await until(() => d.querySelectorAll('#s-dcs [data-dcl]').length === 4), 'settings: a level per feature (Settings > Documents)');
+  d.querySelectorAll('.modal').forEach(m => m.remove());
   await w.eval(`dc_settings()`);
   await until(() => d.querySelector('.dc-smd .dc-lbls'));
-  check(d.querySelectorAll('.dc-smd [data-dcl]').length === 4, 'settings: a level per feature');
+  check(!d.querySelector('.modal.dc-smd [data-dcl]'), 'the lists dialog has no levels (no second copy)');
   const tid = (await call('GET', `/api/docs/${D2}`)).type?.id;
   w.prompt = () => 'Monthly payment';
   d.querySelector(`.dc-smd [data-dcs="lren:type:${tid}"]`)?.click();

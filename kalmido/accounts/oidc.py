@@ -136,7 +136,7 @@ class OidcError(Exception):
 
 def oidc_allow(c):
     from ..calendars.subscriptions import cal_allow, cal_allow_parse
-    return frozenset(cal_allow(c) | set(cal_allow_parse(OIDC_ALLOW_ENV)[0]))
+    return frozenset(cal_allow(c, "oidc") | set(cal_allow_parse(OIDC_ALLOW_ENV)[0]))
 
 
 def _oidc_url_ok(u, allow):
@@ -383,7 +383,7 @@ def _oidc_account(c, claims, sess_uid=None):
         name = str(claims.get("name") or "").strip()[:60] or uname
         uid = create_user(c, uname, name, None, None, admin_want, onboard=True)
         ensure_inbox(c, uid)
-        c.execute("UPDATE users SET oidc_subject=?, email=? WHERE id=?", (subject, email or None, uid))
+        c.execute("UPDATE users SET oidc_subject=?, email=?, email_proved=? WHERE id=?", (subject, email or None, email, uid))
         bump(c)
         aa_now("security", f"oidc:new:{uname}", N_("{0} was created by the first login with the OIDC provider."), [uname])
         grp_oidc_sync(c, uid, groups)  # 2.10.0 (#441)
@@ -406,6 +406,8 @@ def _oidc_account(c, claims, sess_uid=None):
                    N_("{0} is now an admin (set by {1}).") if want else N_("{0} is no longer an admin (OIDC group)."),
                    [u["username"], "OIDC"] if want else [u["username"]])
     grp_oidc_sync(c, u["id"], groups)  # 2.10.0 (#441): synced groups follow the provider's group claim
+    if email:  # 2.360.2 (#2561): the provider vouches for this address
+        c.execute("UPDATE users SET email_proved=? WHERE id=? AND lower(email)=?", (email, u["id"], email))
     return _user(c, u["id"])
 
 

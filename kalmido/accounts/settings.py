@@ -66,6 +66,7 @@ SETTINGS_FLAGS += ("member_view",)  # 2.436.0 (#3620): "View as member", display
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
+DETAIL_FOLD_KEYS = ("subtasks", "deps", "links", "attachments", "video", "tags", "custom", "time", "comments")  # 2.380 F (#3435): detail.js DFOLD_KEYS
 SETTINGS_FMT = {"week_start": ("", "mon", "sun"), "time_format": ("", "24", "12"), "date_order": ("", "dmy", "mdy", "ymd")}  # 2.368.0 B (#2982)
 
 
@@ -82,6 +83,11 @@ def clean_setting(k, v):
     if isinstance(v, (dict, list)) and k not in ("folders", "folders_closed", "show_done_views", "group_order", "folder_colors", *CAL_LIST_KEYS):
         raise bad
     sv = "" if v is None else str(v).strip()
+    if k == "detail_fold":  # 2.380 F (#3435): "subtasks,tags,..." -- known keys only, each once
+        ks = [x for x in sv.split(",") if x]
+        if len(sv) > 200 or any(x not in DETAIL_FOLD_KEYS for x in ks):
+            raise bad
+        return ",".join(dict.fromkeys(ks))
     if k == "allday_time":
         if not valid_hm(sv):
             raise bad
@@ -264,6 +270,9 @@ def clean_setting(k, v):
     if k == "ws_areas_off":  # 2.409.0 (#3490): my areas switched off per workspace
         from .wsareas import wsa_clean_own
         return wsa_clean_own(v)
+    if k == "nav_menus":  # 2.418.0 (#3560): my arrangement of the areas' menus and the tab bar
+        from .navmenus import nav_clean_menus
+        return nav_clean_menus(v)
     if k == "look":  # 2.143.0 D (#2155): the appearance of all devices
         return clean_look_pref(v)
     if k == "show_done_views":
@@ -354,7 +363,8 @@ CAL_LIST_MAX = 500
 
 
 def clean_cal_list(k, v):
-    """cal_lists_hidden: list ids (ints); today_cals_hidden / plan_cals_off: calendar keys "e:<evcal id>" | "s:<sub id>".
+    """cal_lists_hidden: list ids (ints); today_cals_hidden / plan_cals_off: calendar keys "e:<evcal id>" | "s:<sub id>"
+    (today_cals_hidden also "x:hol" | "x:abs" | "x:team").
     -> stored json; BadInput if malformed. Ids of calendars / lists that no longer exist are harmless (never matched)."""
     bad = BadInput(tr("Invalid value: {0}", k))
     if v is None or (isinstance(v, str) and not v.strip()):
@@ -369,7 +379,9 @@ def clean_cal_list(k, v):
         if not all(isinstance(x, int) and not isinstance(x, bool) and 0 < x < 10 ** 12 for x in arr):
             raise bad
         return json.dumps(sorted(set(arr)))
-    if not all(isinstance(x, str) and re.fullmatch(r"[es]:[1-9][0-9]{0,11}", x) for x in arr):
+    # 2.443.0 (#3740): Today also switches holidays and absences off (x:hol | x:abs | x:team, cvxKey in calendar.js)
+    pat = r"[es]:[1-9][0-9]{0,11}|x:(hol|abs|team)" if k == "today_cals_hidden" else r"[es]:[1-9][0-9]{0,11}"
+    if not all(isinstance(x, str) and re.fullmatch(pat, x) for x in arr):
         raise bad
     return json.dumps(sorted(set(arr)))
 
@@ -763,6 +775,9 @@ def umz_export_queries(uid):
                      f"created_at FROM activity WHERE task_id IN {task_ids}", (uid,)),
         # 2.48.0 (#1642): notes locked with a password, as stored (ciphertext; their tasks have an empty note)
         "task_note_locks": (f"SELECT * FROM task_note_locks WHERE task_id IN {task_ids}", (uid,)),
+        # 2.362.0 (#3090): my encrypted task notes (ciphertext as stored, only the author's own) and the project notes of my lists
+        "task_enc_notes": ("SELECT * FROM task_enc_notes WHERE user_id=?", (uid,)),
+        "notes": (f"SELECT * FROM notes WHERE list_id IN {own} AND deleted_at IS NULL", (uid,)),
         "settings": ("SELECT key, value FROM user_settings WHERE user_id=? AND key NOT ILIKE 'sup_key%'", (uid,)),  # 2.74.0 (#338): never the licence key
         "templates": ("SELECT id, kind, name, data, created_at, updated_at FROM templates WHERE user_id=?", (uid,)),
         "time_entries": ("SELECT * FROM time_entries WHERE user_id=? ORDER BY start", (uid,)),

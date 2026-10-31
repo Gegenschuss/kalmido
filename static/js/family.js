@@ -426,11 +426,15 @@ function rewardsModal(kid) {
   });
 }
 // address books (CardDAV): birthdays + anniversaries of the contacts become yearly tasks
-async function contactsModal() {
+// 2.365.2 B (#2789): the address books live in Settings > Integrations (famDavHtml, famDavDraw); the family keeps a link
+function contactsModal() { settingsModal('carddav'); }
+const famDavHtml = () => feat('family') ? `<h4 id="s-carddav-h">${tr('Birthdays from your contacts')}</h4><div id="s-carddav" class="famdav"></div>` : '';
+function famDavDraw(sm) {
+  const box = $('#s-carddav', sm); if (!box || box._on) return;
+  box._on = true;
   const lists = S.lists.filter(l => !l.archived && canEditList(l.id) && !l.is_inbox);
   const bl = lists.find(l => l.family === 'birthdays') || lists.find(l => l.family === 'family');  // 2.46.1 (#1615): or the list "Family"
-  const md = modal(`<h3>${ic('users', 's')} ${tr('Birthdays from your contacts')}</h3>
-    <p class="muted">${tr('Kalmido reads the birthdays and anniversaries of an address book (CardDAV: Nextcloud, iCloud, Radicale, mailbox.org …) once a day and adds them as yearly tasks. Changed dates go back into an address book only when you switch that on for it. The password is stored encrypted.')}</p>
+  box.innerHTML = `<p class="muted">${tr('Kalmido reads the birthdays and anniversaries of an address book (CardDAV: Nextcloud, iCloud, Radicale, mailbox.org …) once a day and adds them as yearly tasks. Changed dates go back into an address book only when you switch that on for it. The password is stored encrypted.')}</p>
     <div id="ct-list"><div class="muted">${tr('Loading…')}</div></div>
     <h4>${tr('Add an address book')}</h4>
     <div class="row"><label for="ct-url">${tr('Server address')}</label><input id="ct-url" type="url" inputmode="url" autocapitalize="off" placeholder="https://…"></div>
@@ -438,8 +442,8 @@ async function contactsModal() {
     <div class="row"><label for="ct-pw">${tr('Password')}</label><input id="ct-pw" type="password" autocomplete="new-password" placeholder="${esc(tr('an app password, if the server offers one'))}"></div>
     <div class="row"><label for="ct-list-sel">${tr('Project')}</label><select id="ct-list-sel">${bl ? '' : `<option value="">${tr('New project: Family')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === bl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>
     <div class="aerr" role="alert" id="ct-err"></div>
-    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button><button class="btn pri" data-m="add">${ic('plus', 's')} ${tr('Connect')}</button></div>`);
-  md.classList.add('famdlg');
+    <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="add">${ic('plus', 's')} ${tr('Connect')}</button></div>`;
+  const md = box;
   const draw = j => { $('#ct-list', md).innerHTML = j.sources.length ? `<ul class="flist">${j.sources.map(s => `<li class="frow"><span class="ft"><b>${esc(s.name)}</b><span class="muted">${esc(s.url_hint)} · ${s.status === 'error' ? esc(s.error_text) : esc(trn('{0} date', '{0} dates', s.count))}${s.synced_at ? ' · ' + esc(tr('read {0}', fmtAgo(s.synced_at))) : ''}</span>${ctWbHtml(s)}</span><button type="button" class="btn sm" data-ctsync="${s.id}">${ic('sync', 's')}<span>${tr('Read now')}</span></button><button type="button" class="iconbtn" data-ctdel="${s.id}" aria-label="${esc(tr('Remove {0}', s.name))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('No address book connected.')}</p>`; };
   const reload = async () => { try { draw(await api('GET', '/api/family/contacts')); } catch { /* offline */ } };
   reload();
@@ -454,7 +458,6 @@ async function contactsModal() {
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
     const errEl = $('#ct-err', md);
-    if (b.dataset.m === 'close') { md.remove(); return; }
     b.disabled = true;
     try {
       if (b.dataset.m === 'add') {
@@ -645,8 +648,8 @@ function shopDraw() {
 document.addEventListener('submit', async e => {
   if (!e.target.matches?.('[data-shopadd]')) return;
   e.preventDefault();
-  const inp = $('#shop-in'), v = inp?.value.trim(); if (!v || !S.shop) return;
-  inp.value = '';
+  const inp = $('#shop-in'), raw = inp?.value || '', v = raw.trim(); if (!v || !S.shop || inp.dataset.qbusy) return;
+  inp.dataset.qbusy = '1';  // 2.359.2 B (#3049): the text stays until the item is saved; a second Enter sends nothing twice
   // 2.140.0 A (#2131): a clear leading amount goes to the amount field; an open item of the same name is not added twice
   // (the amount is added to it when the units match), also offline
   const sp = shopSplit(v), lid = S.shop.lid, k = shopKeyC(sp.name);
@@ -658,8 +661,10 @@ document.addEventListener('submit', async e => {
       else if (sp.qty != null && f?.qty != null && uk(f.unit) === uk(sp.unit)) await patchTask(same.id, {fam: shopFamWith(same, {qty: Math.round((f.qty + sp.qty) * 1000) / 1000})}, true);
       toast(tr('Already on the list: {0}', same.title));
     } else await createTask({title: sp.qty != null ? sp.name : v, list_id: lid, ...(sp.qty != null ? {fam: shopFamWith({}, {qty: sp.qty, unit: sp.unit})} : {})});
+    const f = $('#shop-in'); if (f && f.value === raw) f.value = '';  // saved: empty (text typed meanwhile stays)
+    if (inp.value === raw) inp.value = '';
     await load();
-  } catch { /* api() said it */ }
+  } catch { /* api() said it; the text stays in the field */ } finally { delete inp.dataset.qbusy; }
   shopDraw(); $('#shop-in')?.focus({preventScroll: true});
 });
 

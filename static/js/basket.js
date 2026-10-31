@@ -220,6 +220,7 @@ function kbMineGroup() {
   if (!ts.length) return null;
   const ord = kbListOrder().map(l => l.id);
   ts.sort((a, b) => ord.indexOf(a.list_id) - ord.indexOf(b.list_id) || (a.sort ?? 0) - (b.sort ?? 0) || a.id - b.id);
-  return {id: 'kb:mine', name: tr('From your projects, without a date'), tasks: ts, cls: 'kbmine'};
+  // 2.365.0 (#3010): named for what it is and folded until opened (not counted in "Assigned to me" either)
+  return {id: 'kb:mine', name: tr('Unassigned in your projects'), tasks: ts, cls: 'kbmine', folded: true};
 }
 

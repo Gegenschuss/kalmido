@@ -42,7 +42,7 @@ function oimHtml() {
     <p class="muted">${tr('Only archived, never renumbered or sent. Add amount and payment afterwards.')}</p>
     <div class="lacts"><input type="file" id="oim-pdf" accept="application/pdf,.pdf" multiple hidden><button type="button" class="btn sm" data-oim="pick-pdf" ${OIM.archBusy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose PDF files')}</button></div>
     ${oimArchHtml()}</section>
-    <section class="oimsec"><h4>${ic('hash', 's')} ${tr('Number counters')}</h4>${oimCounterHtml()}</section>
+    <section class="oimsec"><h4>${ic('hash', 's')} ${tr('Number counters')}</h4>${oimCounterHtml()}${ofcSetLink('docs', tr('Number schemes and the next numbers'))}</section>
     <section class="oimsec"><h4>${ic('clock', 's')} ${tr('Import runs')}</h4>${imr_archivedHtml()}${oimRunsHtml()}</section></div>`;
 }
 
@@ -54,7 +54,10 @@ function oim_moreHtml() {
     <div class="lacts"><a class="btn sm ghost" href="/api/office/fixed-costs/import/template" download>${ic('download', 's')}<span>${tr('Download template')}</span></a><button type="button" class="btn sm" data-rkf="fimp">${ic('upload', 's')}<span>${tr('Import from Excel')}</span></button></div></section>
     <section class="oimsec" id="oim-leads"><h4>${ic('target', 's')} ${tr('Leads from a CSV file')}</h4>
     <div class="shint">${tr('A CSV file with name, company, e-mail and phone; leads with an e-mail that is already there are skipped.')}</div>
-    <div class="lacts"><button type="button" class="btn sm" data-lead="import">${ic('upload', 's')}<span>${tr('Import CSV')}</span></button></div></section>`;
+    <div class="lacts"><button type="button" class="btn sm" data-lead="import">${ic('upload', 's')}<span>${tr('Import CSV')}</span></button></div></section>
+    ${typeof rk_impBtn === 'function' ? `<section class="oimsec" id="oim-trips"><h4>${ic('plane', 's')} ${tr('Trips from a per diem spreadsheet')}</h4>
+    <div class="shint">${tr('An .xlsx file with one sheet per person (date, destination, times); you see a preview before anything is saved.')}</div>
+    <div class="lacts">${rk_impBtn()}</div></section>` : ''}`;  // 2.365.2 D (#2789): was in the travel tab
 }
 function oim_jump() {
   const m = /^#office\/import\/(\w+)/.exec(location.hash); if (!m) return;

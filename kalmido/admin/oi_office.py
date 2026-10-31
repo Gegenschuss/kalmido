@@ -73,7 +73,7 @@ def _oi_name(name):
     return "files/office/" + _safe_part(name)
 
 
-def _oi_put(ctx, old, new, seal=True, mime="", keep=False):
+def _oi_put(ctx, old, new, seal=True, mime="", keep=False, strict=False):
     """Archive file `old` (a bare name below the source's office folder) -> `new` below the target's office folder. keep:
     a content-addressed name (logo / letterhead snapshots): an existing file of that name stays. -> new or None."""
     if not old or not new or os.path.basename(old) != old or os.path.basename(new) != new:
@@ -84,7 +84,7 @@ def _oi_put(ctx, old, new, seal=True, mime="", keep=False):
     done = ctx.run.__dict__.setdefault("oi_office_files", set())
     if (ctx.space, new) in done:
         return new
-    r = ctx.file(_oi_name(old), None, new, base=_oi_dir(ctx.space), mime=mime, seal=seal)
+    r = ctx.file(_oi_name(old), None, new, base=_oi_dir(ctx.space), mime=mime, seal=seal, strict=strict)
     if not r:
         return None
     done.add((ctx.space, new))
@@ -143,7 +143,7 @@ def _p_settings(c, run, src, d, ctx):
     if isinstance(lh, dict) and lh.get("file"):
         from ..office.letterhead import BP_FILE_RE
         f = str(lh["file"])
-        lh["file"] = (_oi_put(ctx, f, f"letterhead-{uuid.uuid4().hex[:16]}.pdf", mime="application/pdf") or "") if BP_FILE_RE.fullmatch(f) else ""
+        lh["file"] = (_oi_put(ctx, f, f"letterhead-{uuid.uuid4().hex[:16]}.pdf", mime="application/pdf", strict=True) or "") if BP_FILE_RE.fullmatch(f) else ""
     d["data"] = json.dumps(oc_json_store(c, ctx.space, "office_settings", "data", j), ensure_ascii=False)
     return d
 
@@ -450,6 +450,16 @@ def _p_letter(c, run, src, d, ctx):
     return d
 
 
+def _p_drive_closed(c, run, src, d, ctx):
+    """2.362.0 (#3096): a closed month of the logbook (a vehicle that did not come along: nothing to close)."""
+    if src.get("vehicle_id") and not d.get("vehicle_id"):
+        return False
+    if c.execute("SELECT 1 FROM office_drive_closed WHERE org_id=? AND COALESCE(vehicle_id, 0)=? AND month=?",
+                 (ctx.space, d.get("vehicle_id") or 0, d.get("month"))).fetchone():
+        return False
+    return d
+
+
 def _p_letter_profile(c, run, src, d, ctx):
     """2.184.0 A (#2579): the signature of a person in the target office stays theirs (one per person and office)."""
     if c.execute("SELECT 1 FROM office_letter_profiles WHERE org_id=? AND user_id=?", (ctx.space, d["user_id"])).fetchone():
@@ -481,7 +491,7 @@ SPECS = [
     OiT("office/contract_files.json", "office_contract_files", refs={"contract_id": "office_contracts"}, need=("contract_id",),
         people=_P, private="office", prep=_p_contract_file),
     OiT("office/documents.json", "office_docs", refs={"client_id": "clients", "contract_id": "office_contracts", "contact_id": "office_client_contacts",
-        "list_id": "lists"}, late={"version_of": "office_docs", "cancels_id": "office_docs", "source_doc_id": "office_docs",
+        "list_id": "lists"}, late={"version_of": "office_docs", "replaces_id": "office_docs", "cancels_id": "office_docs", "source_doc_id": "office_docs",
         "series_id": "office_inv_series"}, people={**_P, "locked_by": "null", "agent_id": "null"}, private="office", prep=_p_doc, after=_a_doc),
     OiT("office/document_parts.json", "office_doc_parts", refs={"doc_id": "office_docs"}, need=("doc_id",), private="office", prep=_p_part),
     OiT("office/document_items.json", "office_doc_items", refs={"doc_id": "office_docs", "service_id": "office_services",
@@ -514,6 +524,9 @@ SPECS = [
         people={**_P, "user_id": "null"}, private="office"),
     OiT("office/drive_log.json", "office_drive_log", refs={"drive_id": "office_drives"}, need=("drive_id",), people={"by_user": "null"},
         private="office"),
+    # 2.362.0 (#3096): the closed months of the logbook stay closed (one already closed in the target is left as it is)
+    OiT("office/drive_closed.json", "office_drive_closed", refs={"vehicle_id": "office_vehicles"}, people={"closed_by": "null"},
+        private="office", label=N_("Logbook"), prep=_p_drive_closed),
     OiT("office/cashbooks.json", "office_cashbooks", people=_P, private="office"),
     OiT("office/cash_entries.json", "office_cash_entries", refs={"book_id": "office_cashbooks", "invoice_id": "office_docs"}, need=("book_id",),
         late={"storno_of": "office_cash_entries", "node_id": "fs_nodes"}, people=_P, private="office"),
@@ -566,6 +579,12 @@ SPECS = [
     OiT("office/bank_rules.json", "office_bank_rules", people={"created_by": "null"}, private="office"),  # 2.299.0 B (#3191)
     OiT("office/bank_rule_nos.json", "office_bank_rule_nos", people={"created_by": "null"}, private="office", prep=_p_rule_no),
     OiT("office/bank_vendors.json", "office_bank_vendors", people={"updated_by": "null"}, private="office"),  # 2.425.0 B (#3451)
+    # 2.444.0 (#3447): credit card statements; holder_id of a person who did not come along: nobody (the name stays empty, the card is the admin's to fix)
+    OiT("office/cc_cards.json", "office_cc_cards", people={"created_by": "null", "holder_id": "null"}, private="office"),
+    OiT("office/cc_statements.json", "office_cc_statements", refs={"card_id": "office_cc_cards"}, need=("card_id",), late={"node_id": "fs_nodes"},
+        people={"created_by": "null", "confirmed_by": "null"}, private="office"),
+    OiT("office/cc_lines.json", "office_cc_lines", refs={"statement_id": "office_cc_statements"}, need=("statement_id",), late={"node_id": "fs_nodes"},
+        people={"matched_by": "null"}, private="office"),
     OiT("office/bank_tx.json", "office_bank_tx", refs={"import_id": "office_bank_imports", "payment_id": "office_payments"},
         people={"matched_by": "null"}, private="office", prep=_p_tx),
     OiT("office/bank_balances.json", "office_bank_balances", refs={"import_id": "office_bank_imports"}, private="office", prep=_p_bank_balance),
@@ -629,9 +648,9 @@ def _f_bank(c, run, uid, data, who):
     """The matches of the bank bookings: an invoice (document) or a receipt (file store); without its partner none."""
     for src in (data.get("oi") or {}).get("office/bank_tx.json") or []:
         nid, kind = run.m("office_bank_tx", src.get("id")), src.get("match_kind")
-        if not nid or kind not in ("invoice", "receipt"):
+        if not nid or kind not in ("invoice", "receipt", "card"):  # 2.444.0 (#3447): + card
             continue
-        mid = run.m("office_docs" if kind == "invoice" else "fs_nodes", src.get("match_id"))
+        mid = run.m({"invoice": "office_docs", "card": "office_cc_statements"}.get(kind, "fs_nodes"), src.get("match_id"))
         if mid:
             c.execute("UPDATE office_bank_tx SET match_kind=?, match_id=?, matched_at=? WHERE id=?", (kind, mid, src.get("matched_at"), nid))
         else:

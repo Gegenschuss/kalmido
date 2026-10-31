@@ -23,7 +23,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el, o = {}) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const change = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
 const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,family,team';
@@ -151,6 +151,11 @@ const V = B + 'api/v1';
   badge = await hm();
   check(/Permissions: Auto/.test(badge?.textContent || ''), '#1029: switched to Auto');
   w.eval('closePop()');
+  // 2.437.0 (#2931): the computer fixed the mode: the entry says so and opens no menu
+  w.eval(`agentById(${AG}).host = {permission_fixed: true, permission_mode: 'ask'}`);
+  const fixed = await hm();
+  check(fixed && fixed.disabled !== false && /Ask first · Set on its computer/.test(fixed.textContent) && !fixed.classList.contains('chmi-mode'), '#2931: the locked entry ' + (fixed?.outerHTML || '').slice(0, 160));
+  w.eval(`agentById(${AG}).host = null`); w.eval('closePop()');
   const agent1 = await (await fetch(V + '/agent', {headers: AGH})).json();
   check(agent1.runtime.permission_mode === 'auto', '#1029: the agent reads it in its runtime');
   w.eval('chatClose()');

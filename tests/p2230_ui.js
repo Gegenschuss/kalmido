@@ -24,7 +24,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const input = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', {bubbles: true})); };
 const change = (w, el, v) => { if (v !== undefined) el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
@@ -287,6 +287,8 @@ const BASE = 'cal,comments,collab,time,progress,agents';
     if (vw === 390) {
       await ev(`(() => { location.hash = '#l/${P}'; return 1; })()`); await ready(ev, '#view .trow');
       await ev(`(() => { openDetail(${AP}); return 1; })()`); await ready(ev, '#detail .apbar');
+      // the fixed bottom bar covers whatever the scroll position leaves below it: the field is measured free of it
+      await ev(`(() => { document.querySelector('#d-sub')?.scrollIntoView({block: 'center'}); return 1; })()`); await sleep(200);
       await axe(ev, `${tag} approval bar`);
       await shot(`p2230-${vw}-${th}-approval.png`);
       await ev(`fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}).then(() => 1)`);

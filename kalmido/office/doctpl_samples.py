@@ -168,11 +168,11 @@ Date: {{today}}
 ## Confirmation
 The client confirms receipt of the services listed above in the condition described.""")},
     "credit": {"kind": "other", "sign": 0, "legal": 0,
-               "de": ("Gutschrift-Anschreiben", """# Ihre Gutschrift [Gutschriftnummer]
+               "de": ("Rechnungskorrektur-Anschreiben", """# Ihre Rechnungskorrektur [Rechnungskorrekturnummer]
 
 Sehr geehrte Damen und Herren,
 
-anbei erhalten Sie unsere Gutschrift [Gutschriftnummer] vom {{today}} über [Betrag] zur Rechnung [Rechnungsnummer] im Projekt {{project.title}}.
+anbei erhalten Sie unsere Rechnungskorrektur [Rechnungskorrekturnummer] vom {{today}} über [Betrag] zur Rechnung [Rechnungsnummer] im Projekt {{project.title}}.
 
 Den Betrag [überweisen wir bis zum Datum auf Ihr Konto / verrechnen wir mit der nächsten Rechnung].
 

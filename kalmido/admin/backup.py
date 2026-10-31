@@ -20,12 +20,13 @@ from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from flask import Response, g, jsonify, request, send_file
 
 from ..core.config import app, APP_VERSION, ATT_DIR, DATABASE_URL, DB, OFFICE_DIR, SESSION_DAYS, TZ
-from ..core.schema import SCHEMA_TRIGGERS, SCHEMA_VERSION
+from ..core.schema import PURGED_TABLES, SCHEMA_TRIGGERS, SCHEMA_VERSION
 from ..core import pg as _pg
 from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, gset, gsetting, init_db, iso, local_now, now_utc, parse_iso
 from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database errors in the log
 from ..core.db import appver_newer_minor
+from ..core.serializers import unlink_files
 from ..core.env import env_bool
 from ..core.retention import ret_on as bk_ret_on  # 2.186.0 C (#2602)
 from ..accounts.session import _rate_fail, _rate_keys, GATE, login_wait, set_cookie, start_session
@@ -120,6 +121,16 @@ BK_FLAT = ("avatars", "listicons", "docthumbs", "listheads", "bookmarks")
 BK_PER_ID = ("files", "lists", "budget", "wiki", "tchat", "sheets")
 BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|" + "|".join(BK_FLAT) + "|(?:" + "|".join(BK_PER_ID) + r")/\d{1,12}|chat/\d{1,12}-\d{1,12})"
                           r"/([^/\\\x00-\x1f]{1,255})")
+# 2.359.2 (#2895): the own industry packs of the instance (office/sheet.py IND_DATA_DIR, /data/packs/industry): flat files
+BK_PACK_RE = re.compile(r"packs/industry/([A-Za-z0-9][A-Za-z0-9_.-]{0,250})")
+BK_PACK_PREFIX = "packs/industry/"
+
+
+def bk_pack_dir():
+    from ..office.sheet import IND_DATA_DIR
+    return IND_DATA_DIR
+
+
 BK_ERR = {"busy": N_("Another backup or restore is running, please try again in a moment."),
           "disk": N_("Not enough free disk space for the backup."),
           "io": N_("The backup could not be written ({0})."),
@@ -412,7 +423,7 @@ def bk_create(kind="manual", c=None, keep_dump=None):
         for full, rel in bk_walk()[0]:  # (only the larger files are hashed here; the small ones are read once, below)
             try:
                 st = os.stat(full)
-                if st.st_size < BK_SHARED_MIN:
+                if st.st_size < BK_SHARED_MIN or rel.startswith(BK_PACK_PREFIX):  # 2.359.2 (#2895): packs stay in the zip
                     small += st.st_size
                     continue
                 seen[full] = (st.st_size, st.st_mtime_ns, _sha256_file(full))
@@ -447,7 +458,7 @@ def bk_create(kind="manual", c=None, keep_dump=None):
                     # (a small file is hashed here first, as before 2.432: gone after the dump = FileNotFoundError, nothing written)
                     digest = old[2] if old and old[:2] == (st.st_size, st.st_mtime_ns) and not again else _sha256_file(full)
                     size = st.st_size
-                    if size >= BK_SHARED_MIN:
+                    if size >= BK_SHARED_MIN and not rel.startswith(BK_PACK_PREFIX):  # 2.359.2 (#2895): packs stay in the zip
                         got = bks.put(BK_STORE, key, full, digest, size)
                         if got is None:  # changed while it was copied: hashed once more
                             digest = _sha256_file(full)
@@ -486,9 +497,12 @@ def bk_create(kind="manual", c=None, keep_dump=None):
                 tops = sorted({"/".join(r.split("/")[:2]) if r.count("/") > 1 else r.split("/")[0] + "/." for r in gone})
                 print(f"backup: {len(gone)} file(s) vanished while the backup was written (deleted or moved after the database dump),",
                       "folders:", ", ".join(tops), flush=True)
+            npacks = sum(1 for f in files if f[0].startswith(BK_PACK_PREFIX))
             meta = {"format": "kalmido-backup", "format_version": 3 if shared else 2, "app_version": APP_VERSION, "schema_version": schema,
                     "created_at": iso(now_utc()), "kind": kind, "counts": counts, "db_bytes": files[0][1],
-                    "attachment_files": len(files) - 1 + len(shared), "attachment_bytes": att_bytes,
+                    "attachment_files": len(files) - 1 + len(shared) - npacks,
+                    "attachment_bytes": att_bytes - sum(f[1] for f in files if f[0].startswith(BK_PACK_PREFIX)),
+                    "pack_files": npacks,  # 2.359.2 (#2895)
                     "skipped_files": sum(skipped.values()),  # 2.79.0 (#476 M8)
                     "missing_files": len(gone), "missing_paths": gone[:BK_MISSING_SHOWN]}  # 2.273.0 A (#3050)
             if shared:  # 2.432.0 (#3584): the files kept once in the store, and which store (the key's salt is no secret)
@@ -531,7 +545,8 @@ def bk_walk():
     """(full path, archive name) of every file a backup takes, sorted, + {top folder: n} of the regular files outside
     the known folders (2.79.0, #476 M8: never silently). 2.432.0 (#3584): one walk for the hashing and the writing."""
     out, skipped = [], {}
-    for base, prefix in ((ATT_DIR, "attachments/"), (OFFICE_DIR, "office/")):
+    packs = bk_pack_dir()
+    for base, prefix in ((ATT_DIR, "attachments/"), (OFFICE_DIR, "office/"), (packs, BK_PACK_PREFIX)):  # 2.359.2 (#2895)
         if not os.path.isdir(base):
             continue
         for root, dirs, fns in os.walk(base):
@@ -542,7 +557,7 @@ def bk_walk():
                 rel = prefix + os.path.relpath(full, base).replace(os.sep, "/")
                 if prefix == "office/" and fn.endswith((".tmp", ".part")):  # 2.36.2 E (#1146): unfinished uploads
                     continue
-                if os.path.islink(full) or not os.path.isfile(full) or not BK_MEMBER_RE.fullmatch(rel):
+                if os.path.islink(full) or not os.path.isfile(full) or not (BK_PACK_RE if base is packs else BK_MEMBER_RE).fullmatch(rel):
                     if not os.path.islink(full) and os.path.isfile(full):
                         top = prefix + (rel[len(prefix):].split("/", 1)[0] if "/" in rel[len(prefix):] else ".")
                         skipped[top] = skipped.get(top, 0) + 1
@@ -601,8 +616,11 @@ def bk_list():
         full = os.path.join(BK_DIR, n)
         if os.path.islink(full) or not os.path.isfile(full):
             continue
-        p["size"] = os.path.getsize(full)
-        p["meta"] = bk_meta(full, p["encrypted"])
+        try:
+            p["size"] = os.path.getsize(full)
+            p["meta"] = bk_meta(full, p["encrypted"])
+        except FileNotFoundError:  # 2.358.0 A (#3279): deleted meanwhile (retention of a running backup): not listed, no 500
+            continue
         out.append(p)
     out.sort(key=lambda x: (x["at"], x["name"]), reverse=True)
     return out
@@ -613,6 +631,7 @@ def bk_public(x):
     return {"name": x["name"], "kind": x["kind"], "encrypted": x["encrypted"], "size": x["size"], "created_at": iso(x["at"]),
             "app_version": m.get("app_version", ""), "schema_version": m.get("schema_version"), "counts": m.get("counts") or {},
             "attachment_files": m.get("attachment_files"), "attachment_bytes": m.get("attachment_bytes"),
+            "pack_files": m.get("pack_files") or 0,  # 2.359.2 (#2895)
             "unreadable": bool(m.get("unreadable")), "missing_files": m.get("missing_files") or 0,  # 2.273.0 A (#3050)
             # 2.432.0 (#3584): files kept once in the shared store (size = this file only) and what this backup added there
             "shared_files": m.get("shared_files") or 0, "shared_bytes": m.get("shared_bytes") or 0,
@@ -845,7 +864,7 @@ def bk_check_zip(z, space=True):
     for i in infos:
         n = i.filename
         m = BK_MEMBER_RE.fullmatch(n)
-        ok = n in ("manifest.json", BK_DUMP, BK_LEGACY) or (m and m.group(3) not in (".", ".."))
+        ok = n in ("manifest.json", BK_DUMP, BK_LEGACY) or (m and m.group(3) not in (".", "..")) or bool(BK_PACK_RE.fullmatch(n))
         if not ok or n in seen or i.is_dir() or i.flag_bits & 0x1 or i.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
             raise BackupError("members")
         if (i.external_attr >> 16) & 0o170000 not in (0, 0o100000):  # symlinks / devices (unix mode bits)
@@ -1189,9 +1208,9 @@ def bk_scan_dump(dump):
     return {"schema_version": int(sv), "rows": rows, "users": rows.get("users", 0)}
 
 
-def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False):
+def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False, pack_dest=None):
     """Checks an archive completely; extracts the dump into work (and the attachments into att_dest, the office files into
-    office_dest, if given) and reads it through once. Returns (manifest, dump path). A format-1 archive (SQLite, before
+    office_dest, the own industry packs into pack_dest, if given) and reads it through once. Returns (manifest, dump path). A format-1 archive (SQLite, before
     2.37) is checked (members, checksums); for a restore its tasks.db is extracted (the returned path) for the move tool."""
     zp, _ = bk_open(path, pw, work)
     try:
@@ -1205,6 +1224,10 @@ def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False):
                     bk_extract(z, i, dbp, man["_listed"])
                 elif i.filename != "manifest.json":
                     m = BK_MEMBER_RE.fullmatch(i.filename)
+                    pm = BK_PACK_RE.fullmatch(i.filename)
+                    if pm and pack_dest is not None:  # 2.359.2 (#2895): flat, the name checked by BK_PACK_RE (no / and no leading dot)
+                        bk_extract(z, i, os.path.join(pack_dest, pm.group(1)), man["_listed"])
+                        continue
                     if att_dest is None or m is None:  # verify only (or the tasks.db of an old archive): hash, write nothing
                         want, h, n = man["_listed"][i.filename], hashlib.sha256(), 0
                         with z.open(i) as src:
@@ -1453,6 +1476,85 @@ def bkr_creds_after(c, creds):
 BKR_RECENT_DAYS = 7
 
 
+# ---- 2.360.4 (#3243): organisations and entries deleted for good after the backup was written stay deleted: by the list
+# of what went (purged_rows, filled by a database trigger, core/schema.py PURGED_TRIGGER; read before, written back after).
+# The account rule applies: what went in the last BKR_RECENT_DAYS days stays (the restore may be meant to bring it back,
+# the admin learns the number); only the same row counts (same made-at time: ids are given out again after a restore).
+def bkr_purged_read(c):
+    """The list now [(table, id, at)]; caller is in system_ctx."""
+    try:
+        with c.savepoint():
+            return [tuple(r) for r in c.execute("SELECT tbl, ref_id, made, at FROM purged_rows")]
+    except _pg.Error:  # a database from before 2.360.4 (no table yet)
+        return []
+
+
+def bkr_purged_note(c, rows):
+    c.executemany("INSERT INTO purged_rows(tbl, ref_id, made, at) VALUES(?,?,?,?) ON CONFLICT (tbl, ref_id) "
+                  "DO UPDATE SET made=excluded.made, at=excluded.at", rows)
+
+
+def bkr_purged_drop(c, tbl, rid):
+    """Row rid of tbl goes again; -> the files for unlink_files. Stored files of tasks and projects go along; the other
+    tables keep theirs in rows that cascade and in the storage sweep."""
+    if tbl == "orgs":
+        from ..accounts.orgretain import odl_dismantle
+        return odl_dismantle(c, rid)
+    if tbl == "fs_nodes":
+        from ..files.store import fs_purge, fs_purge_files
+        ids, paths = fs_purge(c, rid)
+        return [lambda: fs_purge_files(ids, paths)]
+    if tbl == "lists":  # as the owner's delete: the tasks go to the trash of the inbox, what became of them has its own rows
+        from ..lists.lists import list_purge
+        inbox = c.execute("SELECT i.id FROM lists i JOIN lists l ON l.owner_id=i.owner_id WHERE l.id=? AND i.is_inbox=1", (rid,)).fetchone()
+        return list_purge(c, rid, inbox[0] if inbox else None)[1]
+    files = []
+    if tbl == "tasks":
+        files = [r[0] for r in c.execute("""WITH RECURSIVE t(id) AS (SELECT id FROM tasks WHERE id=?
+                                            UNION SELECT k.id FROM tasks k JOIN t ON k.parent_id=t.id)
+                                            SELECT a.path FROM attachments a JOIN t ON t.id=a.task_id""", (rid,))]
+    c.execute(f"DELETE FROM {tbl} WHERE id=?", (rid,))
+    return files
+
+
+def bkr_purged_after(c, rows):
+    """After the accounts (own commits): the list back, then what the backup brought back goes one row at a time.
+    -> (deleted again, kept as deleted recently, could not be deleted)."""
+    gone, recent, stuck, files = 0, 0, 0, []
+    cut = iso(now_utc() - timedelta(days=BKR_RECENT_DAYS))
+    with _pg.system_ctx(c):  # entries of every organisation; numbers only
+        bkr_purged_note(c, rows)
+        c.commit()
+        for tbl in PURGED_TABLES:  # the big ones first: what goes with them needs no step of its own
+            todo = {r[1]: r for r in rows if r[0] == tbl}
+            ids = sorted(todo)
+            here = []
+            for i in range(0, len(ids), 1000):
+                part = ids[i:i + 1000]
+                here += [r[0] for r in c.execute(f"SELECT id, created_at FROM {tbl} WHERE id IN ({','.join('?' * len(part))})", part).fetchall()
+                         if r[1] == todo[r[0]][2]]
+            for rid in here:
+                at = todo[rid][3]
+                if at >= cut:
+                    recent += 1
+                    continue
+                if not c.execute(f"SELECT 1 FROM {tbl} WHERE id=?", (rid,)).fetchone():  # went with one before it
+                    continue
+                try:
+                    with c.savepoint():
+                        files += bkr_purged_drop(c, tbl, rid)
+                    c.commit()
+                    gone += 1
+                except Exception as e:  # noqa: BLE001 -- one row must not stop the others (a legal lock, a key that is gone)
+                    c.rollback()
+                    print("restore: deleting an entry again failed:", tbl, type(e).__name__, flush=True)
+                    stuck += 1
+        bkr_purged_note(c, rows)  # the deletions just now noted their own time: the first one counts
+        c.commit()
+    unlink_files(files)
+    return gone, recent, stuck
+
+
 def bkr_after_restore(c, rows):
     """After a restore: the journal written back as it was before, then every account the backup brought back that the
     journal names (same id, same user name or e-mail, created no later than it was deleted) goes again (user_purge). One that owns
@@ -1461,7 +1563,6 @@ def bkr_after_restore(c, rows):
     #2602: counted apart). The caller commits nothing: this function does."""
     from ..accounts.users import user_purge
     from ..core.pg import system_ctx
-    from ..core.serializers import unlink_files
     with system_ctx(c):  # the journal and the accounts of every organisation; nothing is shown to a person
         c.execute("DELETE FROM deleted_accounts")
         for r in rows:
@@ -1523,7 +1624,9 @@ def bk_restore(path, pw, admin, via):
     try:
         os.makedirs(att_new, mode=0o755)
         os.makedirs(off_new, mode=0o700)  # 2.39.1 (#1210 N8)
-        man, dbp = bk_prepare(path, pw, work, att_new, off_new, restore=True)
+        pack_new = os.path.join(work, "packs")  # 2.359.2 (#2895)
+        os.makedirs(pack_new, mode=0o755)
+        man, dbp = bk_prepare(path, pw, work, att_new, off_new, restore=True, pack_dest=pack_new)
         cur = connect()
         try:
             keep = {r[0]: r[1] for r in cur.execute("SELECT key, value FROM settings WHERE key ILIKE 'bk\\_%' ESCAPE '\\' OR key ILIKE 'bko\\_%' ESCAPE '\\'")}  # 2.223.2 C (#2871): bko_ = the off-site target
@@ -1541,6 +1644,7 @@ def bk_restore(path, pw, admin, via):
             with _pg.system_ctx(cur):
                 jobs = cur.execute("SELECT count(*) FROM bg_jobs WHERE state IN ('wait','run')").fetchone()[0]
                 creds = bkr_creds_read(cur)  # 2.360.0 A (#2496)
+                purged = bkr_purged_read(cur)  # 2.360.4 (#3243)
         finally:
             cur.close()
         if not GATE.begin(own=1, timeout=60):
@@ -1572,6 +1676,11 @@ def bk_restore(path, pw, admin, via):
                 with _pg.system_ctx(c):  # every session of every organisation ends
                     for k, v in keep.items():  # the backup settings stay as they are now (not the ones in the backup)
                         gset(c, k, seal(c, _BK_RESEAL[k], plain[k]) if plain.get(k) else v)  # 2.359.0 (#2894)
+                    # 2.359.2 (#2892): what this instance did not have goes too - a production backup restored on a fresh test
+                    # instance brought its off-site target and credentials along (uploads + keep-N pruning at production's target)
+                    for r in c.execute("SELECT key FROM settings WHERE key ILIKE 'bk\\_%' ESCAPE '\\' OR key ILIKE 'bko\\_%' ESCAPE '\\'").fetchall():
+                        if r[0] not in keep:
+                            c.execute("DELETE FROM settings WHERE key=?", (r[0],))
                     gset(c, "version", max(ver, int(gsetting(c, "version") or 0)) + 1)
                     c.execute("DELETE FROM sessions")
                     c.execute("DELETE FROM push_subs WHERE session_hash<>''")  # 2.190.0 R (#1991): their sessions ended just now
@@ -1610,8 +1719,9 @@ def bk_restore(path, pw, admin, via):
                 print(f"restore: kept {os.path.basename(old)}: files the backup format does not cover:", json.dumps(left, sort_keys=True), flush=True)
             else:
                 shutil.rmtree(old, ignore_errors=True)
+        bk_restore_packs(pack_new)  # 2.359.2 (#2895)
         print(f"restore: {os.path.basename(path)} restored by an admin (safety backup {safety})", flush=True)  # 2.239.0 B (#2888): no name in the log
-        man["_again"] = bkr_restore_journal(journal)  # 2.152.0 B (#2172)
+        man["_again"] = bkr_restore_journal(journal, purged)  # 2.152.0 B (#2172)
         # 2.273.0 A (#3051 p. 12, 13): what a restore cannot bring back, in the result and the log
         man["_notes"] = ([(N_("{0} waiting background jobs were not restored (a backup never holds them): start what is still needed again."), jobs)]
                          if jobs else []) + [(BK_OFFLINE_NOTE,)]
@@ -1634,12 +1744,44 @@ def bk_restore(path, pw, admin, via):
         _BK_LOCK.release()
 
 
-def bkr_restore_journal(journal):
-    """bkr_after_restore with its own connection, its numbers in the log and as an admin alert; never fails the restore."""
+def bk_restore_packs(src):
+    """2.359.2 (#2895): the own industry packs of the backup into the data folder (after the database is back). A pack added
+    since the backup stays; one the backup replaces with other content is kept in packs/industry.pre-restore-<hex>/ (never
+    deleted unseen). Never fails the restore (the log names a failure)."""
+    names = sorted(os.listdir(src)) if os.path.isdir(src) else []
+    if not names:
+        return 0
+    dest = bk_pack_dir()
+    old = dest.rstrip(os.sep) + ".pre-restore-" + secrets.token_hex(4)
+    n = 0
+    try:
+        os.makedirs(dest, mode=0o755, exist_ok=True)
+        for fn in names:
+            d = os.path.join(dest, fn)
+            if os.path.lexists(d) and os.path.isfile(d) and not os.path.islink(d) and _sha256_file(d) == _sha256_file(os.path.join(src, fn)):
+                continue
+            tmp = os.path.join(dest, "." + fn + ".restore")  # first next to it: a failed copy never leaves the pack missing
+            shutil.copyfile(os.path.join(src, fn), tmp)
+            if os.path.lexists(d):
+                os.makedirs(old, mode=0o755, exist_ok=True)
+                shutil.copy2(d, os.path.join(old, fn), follow_symlinks=False)
+            os.replace(tmp, d)
+            n += 1
+    except OSError as e:
+        print("restore: the industry packs could not all be written back:", aa_oserr(e), flush=True)
+    if os.path.isdir(old):
+        print(f"restore: kept {os.path.basename(old)}: industry packs the backup replaced", flush=True)
+    return n
+
+
+def bkr_restore_journal(journal, purged=()):
+    """bkr_after_restore with its own connection, its numbers in the log and as an admin alert; never fails the restore.
+    2.360.4 (#3243): then what purged names (bkr_purged_after), with numbers of its own."""
     try:
         c = connect()
         try:
             gone, off, recent = bkr_after_restore(c, journal)
+            pgone, precent, pstuck = bkr_purged_after(c, purged)
         finally:
             c.close()
     except Exception as e:  # noqa: BLE001 -- the restore itself is done; the admin learns it from the alert
@@ -1652,7 +1794,14 @@ def bkr_restore_journal(journal):
         aa_now("security", f"restore-journal:{int(time.time())}",
                N_("After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled; {2} deleted in the last {3} days were disabled, in case the restore was meant to bring them back (delete them in the user administration otherwise)."),
                [str(gone), str(off), str(recent), str(BKR_RECENT_DAYS)])
-    return {"deleted": gone, "disabled": off + recent, "owners": off, "recent": recent}
+    if pgone or precent or pstuck:
+        print(f"restore: entries deleted earlier: {pgone} deleted again, {precent} kept (deleted in the last {BKR_RECENT_DAYS} days), "
+              f"{pstuck} could not be deleted", flush=True)
+        aa_now("security", f"restore-purged:{int(time.time())}",
+               N_("After the restore, {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log)."),
+               [str(pgone), str(precent), str(BKR_RECENT_DAYS), str(pstuck)])
+    return {"deleted": gone, "disabled": off + recent, "owners": off, "recent": recent,
+            "entries": pgone, "entries_recent": precent, "entries_failed": pstuck}
 
 
 # ---- API (admins; CSRF header on every change)
@@ -1882,6 +2031,7 @@ def backups_verify(name):
     return jsonify(ok=True, created_at=man.get("created_at"), app_version=man.get("app_version"),
                    schema_version=man.get("schema_version"), counts=man.get("counts") or {}, legacy=man["_legacy"],
                    attachment_files=man.get("attachment_files"), attachment_bytes=man.get("attachment_bytes"),
+                   pack_files=man.get("pack_files") or 0,  # 2.359.2 (#2895)
                    missing_files=man.get("missing_files") or 0, missing_paths=man.get("missing_paths") or [])  # 2.273.0 A (#3050)
 
 

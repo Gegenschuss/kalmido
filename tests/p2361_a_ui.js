@@ -23,7 +23,7 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const change = (w, el, v) => { if (v !== undefined) el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const settings = async () => (await call('GET', '/api/state')).settings;
 const FEAT = 'cal,timeline,events,comments';
@@ -187,7 +187,7 @@ const utc = (d, h) => { const x = new Date(`${d}T${String(h).padStart(2, '0')}:0
   check(d.querySelector('.cevtoday .ghead .c')?.textContent === '2' && d.querySelector('.cevtoday [data-act="cvx-today-menu"]'), 'Today: the count follows, the head has "…"');
   click(w, d.querySelector('.cevtoday [data-act="cvx-today-menu"]')); await sleep(150);
   const mi = [...d.querySelectorAll('#pop [role="menuitem"]')];
-  check(mi.length >= 5 && mi.filter(b => b.classList.contains('on')).map(b => b.textContent.trim()).sort().join() === ['Family feed', 'Mine', 'Team feed'].join() && mi.some(b => /Private/.test(b.textContent) && !b.classList.contains('on')),
+  check(mi.length >= 5 && mi.filter(b => b.classList.contains('on')).map(b => b.textContent.trim()).sort().join() === ['Family feed', 'Mine', 'My absences', 'Public holidays', 'Team feed'].join() && mi.some(b => /Private/.test(b.textContent) && !b.classList.contains('on')),
     'Today menu: every calendar with a check where it shows ' + JSON.stringify(mi.map(b => [b.textContent.trim(), b.classList.contains('on')])));
   click(w, mi.find(b => /Team feed/.test(b.textContent))); await sleep(500);
   rowsT = [...d.querySelectorAll('.cevtoday .cevrow')].map(r => r.querySelector('.cevn').textContent);
@@ -199,6 +199,29 @@ const utc = (d, h) => { const x = new Date(`${d}T${String(h).padStart(2, '0')}:0
   click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Show all calendars/.test(b.textContent))); await sleep(500);
   rowsT = [...d.querySelectorAll('.cevtoday .cevrow')].map(r => r.querySelector('.cevn').textContent);
   check(rowsT.length === 3 && (await settings()).today_cals_hidden === '[]', 'Today menu: "Show all" ' + JSON.stringify(rowsT));
+
+  // 2.443.0 (#3740): the switch in the event's window (Today only), the block's own "…" has the calendars too (the phone's menu)
+  click(w, [...d.querySelectorAll('.cevtoday .cevrow')].find(r => /Standup today/.test(r.textContent)));
+  await until(() => d.querySelector('#pop [data-act="cvx-today-flip"]'));
+  const flip = d.querySelector('#pop [data-act="cvx-today-flip"]');
+  check(/Hide on Today/.test(flip.textContent) && flip.dataset.key === `s:${TEAM}`, '#3740: the window offers Hide on Today ' + flip.textContent);
+  click(w, flip);
+  await until(() => ![...d.querySelectorAll('.cevtoday .cevrow')].some(r => /Standup today/.test(r.textContent)));
+  check(![...d.querySelectorAll('.cevtoday .cevrow')].some(r => /Standup today/.test(r.textContent)), '#3740: gone from Today');
+  s = await settings();
+  check(JSON.parse(s.today_cals_hidden).join() === `s:${TEAM}` && (await call('GET', `/api/calendars`)).subs.find(x => x.id === TEAM).visible === true, '#3740: Today only, the calendar stays visible ' + s.today_cals_hidden);
+  check(w.eval(`cvxTodayBtn(S.cal.items.find(e => e.sub === ${TEAM}))`).includes('Show on Today'), '#3740: hidden: the window offers Show on Today');
+  check(w.eval(`cvxTodayBtn({own: true, cal: null})`) === '', '#3740: an invitation has no switch');
+  check(w.eval(`cvxTodayBtn({holiday: true})`).includes('data-key="x:hol"'), '#3740: a holiday has one');
+  click(w, d.querySelector('[data-act="wg-more"][data-lyv="today"][data-k="events"]')); await sleep(150);
+  const wmi = [...d.querySelectorAll('#pop [role="menuitem"]')];
+  check(wmi.some(b => /Team feed/.test(b.textContent) && !b.classList.contains('on')) && wmi.some(b => /Public holidays/.test(b.textContent)) && wmi.some(b => /Move|Hide/.test(b.textContent)),
+    '#3740: the calendars in the block menu ' + JSON.stringify(wmi.map(b => b.textContent.trim())));
+  click(w, wmi.find(b => /Public holidays/.test(b.textContent)));
+  await until(async () => JSON.parse((await settings()).today_cals_hidden).includes('x:hol'));
+  check(JSON.parse((await settings()).today_cals_hidden).includes('x:hol') && !w.eval(`cvxTodayOn({holiday: true})`), '#3740: holidays switched off on Today (accepted by the server)');
+  await call('PATCH', '/api/settings', {today_cals_hidden: []}); await w.eval('load()'); w.eval('renderView()');
+  await until(() => d.querySelectorAll('.cevtoday .cevrow').length === 3);
 
   // ================= the day plan dialog: the "Calendars" line
   w.eval('dayplanModal("day")'); await until(() => d.querySelector('.modal.dpm .cvxdp'));

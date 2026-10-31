@@ -88,8 +88,8 @@ def opened(s, data, rk):
     return iid, j.get("preview") or {}
 
 
-def run(s, iid, target, people=None):
-    r = s.post(B + f"/api/account/import/{iid}/run", json={"target": target, "people": people or {}})
+def run(s, iid, target, people=None, **more):
+    r = s.post(B + f"/api/account/import/{iid}/run", json={"target": target, "people": people or {}, **more})
     check(r.status_code == 202, f"run starts {r.status_code} {r.text[:200]}")
     return wait(s, iid)
 
@@ -125,6 +125,11 @@ assert r.ok, r.text
 ERIN = r.json()["id"]
 assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": "erin@example.com", "role": "admin"}).ok
 assert A.patch(B + f"/api/users/{ERIN}", json={"email": ""}).ok
+# 2.360.2 (#2561): gina is in the file, not on the server any more when dave imports: a missing person who gets invited
+r = A.post(B + "/api/users", json={"username": "gina", "display_name": "Gina Fehlt", "password": "password123", "email": "gina@example.com"})
+assert r.ok, r.text
+GINA = r.json()["id"]
+assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": "gina@example.com", "role": "admin"}).ok
 r = A.post(B + "/api/admin/orgs", json={"name": "Gamma Ziel", "admin_id": DAVE})
 assert r.status_code == 201, r.text
 GAMMA = r.json()["id"]
@@ -191,6 +196,27 @@ check(NL and not one("SELECT 1 FROM list_members WHERE list_id=? AND user_id IN 
 check(Bo.post(B + f"/api/orgs/{GAMMA}/join").ok, "bob accepts the invitation")
 check(one("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (GAMMA, BOB)) == "admin", "bob: member of Gamma as admin")
 Dv.delete(B + f"/api/account/import/{iid}")
+
+# ---------------------------------------------------------------- 2.360.2 M (#2561): a NEW account joins by accepting, too
+dbx("DELETE FROM org_members WHERE user_id=?", (GINA,))
+dbx("DELETE FROM users WHERE id=?", (GINA,))
+dbx("UPDATE users SET is_admin=1 WHERE id=?", (DAVE,))  # missing people are invited by instance admins
+iid, pv = opened(Dv, OX, RK)
+j = run(Dv, iid, GAMMA, people={EH("gina@example.com"): {"invite": True, "email": "gina@example.com", "role": "admin"}}, again=True)
+st = {p.get("name"): p.get("state") for p in (j.get("result") or {}).get("people", [])}
+check(j.get("state") == "done" and st.get("Gina Fehlt") == "org_invited", f"the new person is invited {st} {j.get('error')}")
+NG = one("SELECT id FROM users WHERE lower(email)='gina@example.com'")
+check(NG and not one("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (GAMMA, NG)), "a new account, no member yet")
+check(one("SELECT role FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, NG)) == "admin", "the invitation with the confirmed role")
+iv = {x["email"]: x for x in Dv.get(B + f"/api/orgs/{GAMMA}/invites").json()["invites"]}
+check(iv.get("gina@example.com", {}).get("state") == "invited" and iv["gina@example.com"]["user_id"] is None, f"the admin sees it in the open invitations {iv}")
+check(not one("SELECT 1 FROM list_members WHERE user_id=?", (NG,)), "no project shared before the person accepts")
+IMP = one("SELECT max(id) FROM imports WHERE user_id=?", (DAVE,))
+r = Dv.post(B + f"/api/imports/{IMP}/undo")
+check(r.ok, f"the import is undone {r.status_code} {r.text[:200]}")
+check(not one("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, NG)), "the undo withdraws the invitation")
+Dv.delete(B + f"/api/account/import/{iid}")
+dbx("UPDATE users SET is_admin=0 WHERE id=?", (DAVE,))
 
 # ---------------------------------------------------------------- P4: a person without organisation, into the private space
 FID, Fr = freelancer(B, A)

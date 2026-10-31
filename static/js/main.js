@@ -131,7 +131,13 @@ function bootDone() {
     const url = /^https?:\/\//i.test(u) ? u.slice(0, 2000) : '';
     if (title || url) quickCapture(title || (url ? urlTitle(url) : ''), url ? {url} : {});
     else captureHelp();
-  } else { st_landing(); await route(); }  // 2.364.0 B (#3031): the start page
+  } else {
+    st_landing();  // 2.364.0 B (#3031): the start page
+    // 2.365.0 (#2802): the very first start of an account opens on Today, where the tour and the "Getting started" tasks are
+    // (before: the empty Basket for a moment, then a jump to Today)
+    if (!location.hash && S.settings.tour === 'pending' && !S.setupPending && !S.me?.kid && !MW_ON && LS.get('lastKey', null) === null) history.replaceState(null, '', location.pathname + location.search + '#today');
+    await route();
+  }
   bootDone();  // 2.39.1 (#1213): the first view is drawn
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});

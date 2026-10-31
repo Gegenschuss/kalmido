@@ -14,7 +14,7 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const st = (ck = CK) => call('GET', '/api/state', null, ck);
-const until = async (fn, ms = 5000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await fn()) return true; await sleep(80); } return false; };
+const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, step: 80});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}));
 const closeW = async w => { try { w.eval('if (S.sel) closeDetail()'); } catch { /* gone */ } await sleep(1000); w.close(); };  // let late loads (timeline, deps, time) finish first
@@ -98,7 +98,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // ================= Settings > Modules (U04, U05, U06)
   w.eval(`settingsModal('layout')`); await sleep(300); md = [...d.querySelectorAll('.modal.smodal')].pop();
   const secs = [...md.querySelectorAll('.snav [data-sec]')].map(b => b.dataset.sec);
-  check(JSON.stringify(secs) === JSON.stringify(['account', 'org', 'general', 'look', 'modules', 'notify', 'integr', 'access', 'data', 'users', 'help']), 'sections (2.7.0: no Agents page without the module and agents): ' + secs);  // 2.46.0 (#1592): a server without an organisation shows no Organisation page  // 2.166.0 (#2633): + Access  // 2.364.0 C (#3041): + Organisation for a server admin
+  // 2.418.0 (#3560): the new section Navigation (Settings > Navigation) after Appearance
+  check(JSON.stringify(secs) === JSON.stringify(['account', 'org', 'general', 'look', 'nav', 'modules', 'notify', 'integr', 'access', 'data', 'users', 'help']), 'sections (2.7.0: no Agents page without the module and agents): ' + secs);  // 2.46.0 (#1592): a server without an organisation shows no Organisation page  // 2.166.0 (#2633): + Access  // 2.364.0 C (#3041): + Organisation for a server admin
   check(md.querySelector('.snav .on')?.dataset.sec === 'modules', 'old link "layout" opens Modules');
   const mp = md.querySelector('[data-pane="modules"]');
   const rows = [...mp.querySelectorAll('[data-modrow]')];

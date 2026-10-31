@@ -328,13 +328,40 @@ def tsl_review(c, uid, month):
     if not orgs:
         return None
     q = ",".join("?" * len(orgs))
-    rows = c.execute(f"""SELECT * FROM time_sheets WHERE org_id IN ({q}) AND (state='closed' OR (month=? AND (state='approved' OR decided_by IS NOT NULL)))
+    # 2.360.2 D (#2561): a deleted person's month (user_id NULL) stays on record for the month shown; nobody can decide it any more
+    rows = c.execute(f"""SELECT * FROM time_sheets WHERE org_id IN ({q}) AND ((state='closed' AND user_id IS NOT NULL)
+                         OR (month=? AND (state IN ('closed','approved') OR decided_by IS NOT NULL)))
                          ORDER BY month DESC, closed_at""", (*orgs, month)).fetchall()
-    rows = [r for r in rows if tsl_member(c, r["user_id"], r["org_id"])][:200]
-    names = user_names(c, [r["user_id"] for r in rows])
-    return [{"user_id": r["user_id"], "name": names.get(r["user_id"], ""), "month": r["month"], "state": r["state"],
+    rows = [r for r in rows if r["user_id"] is None or tsl_member(c, r["user_id"], r["org_id"])][:200]
+    names = user_names(c, [r["user_id"] for r in rows if r["user_id"]])
+    return [{"user_id": r["user_id"], "name": names.get(r["user_id"], "") if r["user_id"] else tr("Deleted user"), "month": r["month"], "state": r["state"],
              "closed_at": r["closed_at"], "decided_at": r["decided_at"], "note": tsl_note(c, r), "org_id": r["org_id"],
-             "seconds": tsl_org_seconds(c, r["user_id"], r["month"], r["org_id"])} for r in rows]
+             "seconds": tsl_org_seconds(c, r["user_id"], r["month"], r["org_id"]) if r["user_id"] else tsl_kept_seconds(r)} for r in rows]
+
+
+def tsl_kept_seconds(r):
+    """2.360.2 D (#2561): the hours noted when the account was deleted (its time entries carry no person any more)."""
+    try:
+        return next((int(x.get("seconds") or 0) for x in reversed(json.loads(r["log"] or "[]")) if x.get("action") == "account_deleted"), 0)
+    except (ValueError, AttributeError):
+        return 0
+
+
+def tsl_user_gone(c, uid):
+    """2.360.2 D (#2561): before an account's deletion (accounts/orgretain.upg_rest, its time entries still carry it): the
+    months of an organisation stay with their decision, without the person (their id leaves the history, the hours are
+    noted there); the private ones, and those of the personal office, go with the account."""
+    rows = c.execute("""SELECT t.* FROM time_sheets t JOIN orgs o ON o.id=t.org_id
+                             WHERE t.user_id=? AND o.personal_of IS NULL""", (uid,)).fetchall()
+    for r in rows:
+        try:
+            log = json.loads(r["log"] or "[]")
+        except ValueError:
+            log = []
+        log = [{**x, "by": None if x.get("by") == uid else x.get("by")} for x in log]
+        log.append({"at": iso(now_utc()), "by": None, "action": "account_deleted", "seconds": tsl_org_seconds(c, uid, r["month"], r["org_id"])})
+        c.execute("UPDATE time_sheets SET user_id=NULL, log=? WHERE id=?", (json.dumps(log[-TSL_LOG_MAX:], ensure_ascii=False), r["id"]))
+    c.execute("DELETE FROM time_sheets WHERE user_id=?", (uid,))
 
 
 def tsl_notify(c, rcpt, data, title_fn, msg_fn):

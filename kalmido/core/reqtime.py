@@ -22,6 +22,7 @@ try:
 except ValueError:
     REQ_SLOW_MS = 500
 REQ_RING = 1000
+_TIMING_ALL = os.environ.get("KALMIDO_TEST") == "1" and os.environ.get("KALMIDO_TEST_TIMING_ALL") == "1"  # tests only: suites count statements of any account
 _RING = deque(maxlen=REQ_RING)  # (ms, statements, db ms); append / list() are atomic, the lock only guards a consistent copy
 _RLOCK = threading.Lock()
 
@@ -45,7 +46,10 @@ def rt_out(resp):
     ms = (time.perf_counter() - t0) * 1000
     n, dbs = st if st else (0, 0.0)
     dbms = dbs * 1000
-    if getattr(g, "user", None):  # 2.149.0 review: only for signed-in people (counts would differ on login / reset paths)
+    # 2.149.0 review: only for signed-in people (counts would differ on login / reset paths). 2.360.2 (#2561): only for instance
+    # admins: the statement count told a known address from an unknown one on every invite / share route
+    u = getattr(g, "user", None)
+    if u and (u["is_admin"] or _TIMING_ALL):
         resp.headers["Server-Timing"] = f'app;dur={ms:.1f}, db;dur={dbms:.1f};desc="n={n}"'
     if not _skip_ring(request.path):
         with _RLOCK:

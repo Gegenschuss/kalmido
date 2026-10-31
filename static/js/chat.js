@@ -98,7 +98,7 @@ function tcRoomHtml() {
   const head = `<div class="tcrhead"><button type="button" class="iconbtn tcback" data-act="tc-back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>
     ${r ? roomIcon(r) : ''}<div class="tcrt"><b>${esc(name)}</b>${room && room.kind !== 'dm' ? `<span class="muted">${esc(room.members.map(m => m.name).slice(0, 6).join(', '))}${room.members.length > 6 ? ' +' + (room.members.length - 6) : ''}</span>` : ''}</div>
     <span class="spacer"></span>${msgSearchBtn('t', rid)}${room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the project'))}" aria-label="${esc(tr('Open the project'))}">${ic('list')}</button>` : ''}
-    ${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${o3b_splitBtn(room, rid)}${tcx_headBtn(room)}${e2eRoomBtns(room)}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute|button'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button>${typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
+    ${typeof dw_winBtn === 'function' ? dw_winBtn('team', rid) : ''}${o3b_splitBtn(room, rid)}${tcx_headBtn(room)}${e2eRoomBtns(room)}${isTouch() ? `<button type="button" class="iconbtn" data-act="tc-more" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}<button type="button" class="iconbtn ${room?.muted ? 'on' : ''}" data-act="tc-mute" aria-pressed="${!!room?.muted}" title="${esc(room?.muted ? tr('Muted: only mentions notify you') : tr('Mute (only mentions notify you)'))}" aria-label="${esc(tr('Mute|button'))}">${ic(room?.muted ? 'belloff' : 'bell')}</button>${typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
   return `${typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}${e2eRoomNotice(room)}${le2eChanNotice(room)}${cpnBarHtml('t:' + rid)}${msBarHtml('t', rid)}<div class="chmsgs tcmsgs" id="tc-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${tcMsgsHtml()}</div>
     <button type="button" class="chnew hidden" id="tc-new">${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${room?.archived ? tcx_archivedHtml(room) : room?.closed ? tcx_closedHtml() /* 2.266.0 (#2970) */ : `${replyBarHtml('t:' + rid)}${tcx_filesBarHtml(room, rid)}<div class="chcomp tccomp">${chToolsHtml([tcx_clipHtml(room), mic, rfb /* 2.147.1 A (#2523) */])}${typeof tvc_barSlot === 'function' ? tvc_barSlot(rid) : ''}<div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tc-in" rows="1" name="kalmido-team-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(name.length > cut ? tr('Message to {0}', name.slice(0, cut - 1).trimEnd() + '…') : tr('Message to {0}…', name))}" aria-label="${esc(tr('Message to {0}…', name))}" enterkeyhint="enter" maxlength="8000">${esc(S.drafts['team:' + rid] || '')}</textarea>
@@ -124,7 +124,8 @@ function tcMsgsHtml(list = S.tc.msgs, o = {}) {
     const body = m.deleted ? `<div class="cbub del"><span class="muted">${tr('Message deleted')}</span></div>` : lb ? lb
       : editing ? `<div class="cbub tcedit"><div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea class="tc-edit" enterkeyhint="enter" aria-label="${esc(tr('Edit message'))}" rows="2">${esc(m.body.replace(/<@(\d+)>/g, (_, id) => '@' + uname(+id, U)))}</textarea><div class="tcebtn"><button type="button" class="btn sm" data-act="tc-edit-cancel">${tr('Cancel')}</button><button type="button" class="btn sm pri" data-act="tc-edit-save" data-mid="${m.id}">${tr('Save')}</button></div></div>`
         : `${replyQuoteHtml(m, 't')}${m.body || !m.attachments?.length ? `<div class="cbub">${commentBody(m.body, U)}</div>` : ''}${tcx_attHtml(m)}`;  // 2.33.0 (#1076): the quote of the answered message; 2.113.1 (#2059): + files
-    h += `<div class="cmsg ${mine ? 'me' : 'ag'}${!mine && ags.has(m.user_id) ? ' agc' : ''} ${first ? 'first' : ''}${rxShow('t' + m.id)}${!th && S.tc.th?.id === m.id ? ' tthon' : ''}" data-k="m${m.id}" data-mid="t:${m.id}">
+    const agcol = !mine && ags.has(m.user_id) ? ac_color(m.user_id) : '';  // 2.438.0 A (#3322): the agent's own colour tints its bubbles here too
+    h += `<div class="cmsg ${mine ? 'me' : 'ag'}${!mine && ags.has(m.user_id) ? ' agc' : ''} ${first ? 'first' : ''}${rxShow('t' + m.id)}${!th && S.tc.th?.id === m.id ? ' tthon' : ''}" data-k="m${m.id}" data-mid="t:${m.id}"${agcol ? ` data-agid="${m.user_id}" style="--agcol:${agcol}"` : ''}>
       ${first && !mine ? `<div class="tcwho">${av(m.user_id, uname(m.user_id, U), 'avatar sm')}<b>${esc(uname(m.user_id, U))}</b>${ags.has(m.user_id) ? agentBadge() : ''}</div>` : ''}
       ${body}${m.task ? `<button class="runtask" data-act="open-id" data-id="${m.task.id}">${ic('arrow', 's')}<span>${esc(m.task.title)}</span></button>` : ''}
       <div class="cmeta"><time title="${esc(fmtWhen(m.created_at))}">${fmtWhen(m.created_at)}</time>${m.edited_at && !m.deleted ? `<span class="muted">${tr('edited')}</span>` : ''}${cpnMark(m)}${rxr}${m.deleted || editing ? '' : replyBtn('chrbtn mreply')}${m.deleted ? '' : chatSavedMark(m)}${!m.deleted ? `<button type="button" class="rx rxtog" data-act="tc-msg-menu" data-mid="${m.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div>${!th && m.thread_count ? tth_lineHtml(m) : ''}${rd === m.id ? trd_lineHtml(m, th) : ''}</div>`;
@@ -298,6 +299,7 @@ document.addEventListener('click', e => {
   else if (act === 'tc-edit-save') tcEditSave(+a.dataset.mid);
   else if (act === 'tc-edit-cancel') { S.tc.edit = null; S.tc.editTh = false; tcPatch(); }
   else if (act === 'tc-mute') tcMute();
+  else if (act === 'tc-more') menu(a, kbd_item('team'));  // 2.380 E (#3449)
   else if (act === 'tc-new') tcNewMenu(a);
   else if (act === 'tc-list') go('l/' + a.dataset.id);
   else if (act === 'tc-split') cw_split('t:' + +a.dataset.rid);  // 2.83.0 (#1774)
@@ -455,10 +457,12 @@ function trd_pick(list) {
   return null;
 }
 function trd_lineHtml(m, th) {
-  const rb = m.read_by, U = S.tc.users;
-  if (S.tc.room?.kind === 'dm') return `<div class="trdline" role="status">${ic('check', 's')}<span>${tr('Read|receipt')}</span></div>`;
+  const rb = m.read_by;
+  // 2.437.0 A (#3318): two ticks in the accent colour (+ the count in a group); the words only as title / aria-label
+  const two = `<span class="cdlv on" aria-hidden="true">${ic('check', 's')}${ic('check', 's')}</span>`;
+  if (S.tc.room?.kind === 'dm') { const w = tr('Read|receipt'); return `<div class="trdline" role="img" title="${esc(w)}" aria-label="${esc(w)}">${two}</div>`; }
   const txt = tr('Read by {0}', rb.count);
-  return `<button type="button" class="trdline" data-act="trd-show" data-rmid="${m.id}" aria-haspopup="dialog" title="${esc(txt)}"><span class="tthav" aria-hidden="true">${rb.users.slice(0, 3).map(u => av(u, uname(u, U), 'avatar')).join('')}</span><span>${esc(txt)}</span></button>`;
+  return `<button type="button" class="trdline" data-act="trd-show" data-rmid="${m.id}" aria-haspopup="dialog" title="${esc(txt)}" aria-label="${esc(txt)}">${two}<span>${rb.count}</span></button>`;
 }
 async function trd_show(mid, inTh) {
   const m = (inTh ? tth_all() : S.tc.msgs).find(x => x.id === mid), rb = m?.read_by; if (!rb) return;
@@ -861,6 +865,16 @@ window.addEventListener('pagehide', () => {
   clearTimeout(S.nt.saveT); S.nt.dirty = false;
   if (n.id < 0) delete patch.expect_updated_at;
   outKeep('PATCH', `/api/notes/${n.id}`, patch);
+});
+// 2.380 H (#3387): back from the back-forward cache the note's base (updated_at) is old - the change sent at pagehide moved it
+// on: the notes load again (changes still waiting drawn on top), so the next key press is no false conflict
+window.addEventListener('pageshow', e => {
+  const lid = S.nt.lid; if (!e.persisted || !lid || S.nt.dirty) return;
+  loadNotes(lid).then(() => {
+    if (S.nt.lid !== lid) return;
+    for (const o of OUT.q) if (NT_URL.test(o.url) && !o.done) ntLocal(o);
+    if (S.route.mod === 'notes' && !S.nt.dirty) renderView();
+  });
 });
 async function noteFlush() {
   clearTimeout(S.nt.saveT);

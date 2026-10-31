@@ -38,34 +38,40 @@
 #             chat answers that ask to decide without an ```approval block), KALMIDO_NOTICE_COMPACTED (2.41.0: the notice
 #             in the chat when a run compacts its conversation, {0} = the time). Without --events: the command runs as it is.
 #   KALMIDO_HOST  the computer name shown in Kalmido (2.44.0; default: hostname without the domain), sent once at start
+#   KALMIDO_PYTHON  the Python to use (default: python3)
+# Exit codes: 0 stopped (TERM / INT end the command with everything it started, KILL after 30 s), 1 Kalmido not reachable at
+# the start, 2 a wrong start (no env file, KALMIDO_URL / KALMIDO_TOKEN missing, event mode without agent_run.py).
 # Needs: bash (3.2 is enough, the macOS one), curl, python3 (JSON, time zones, a new process group). 2.44.0 (#962): no GNU
 # date, setsid or other GNU-only tools any more, so it runs on macOS and Linux alike. /agent-setup.sh of your Kalmido sets it up with an
 # autostart (launchd LaunchAgent / systemd --user); see docs/AGENTS.md "Runtime settings" for a hand-made systemd unit.
 set -uo pipefail
 
+log() { printf '%s agent_launcher: %s\n' "$(date '+%F %T')" "$*" >&2; }
 ENV_FILE=./kalmido-agent.env
 ONCE=0
 EVENTS=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -e|--env) ENV_FILE=${2:?-e needs a file}; shift 2 ;;
+    -e|--env) [[ $# -ge 2 ]] || { log "-e needs a file"; exit 2; }; ENV_FILE=$2; shift 2 ;;
     --once) ONCE=1; shift ;;
     --events) EVENTS=1; shift ;;
     --) shift; break ;;
-    -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
+    -h|--help) awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0"; exit 0 ;;
     *) break ;;
   esac
 done
 CMD=("$@")
 [[ ${#CMD[@]} -gt 0 ]] || CMD=(claude)
 AGENT0=${CMD[0]}  # the agent command itself (event mode puts python3 agent_run.py in front)
-[[ -r "$ENV_FILE" ]] || { echo "agent_launcher: cannot read $ENV_FILE" >&2; exit 2; }
+[[ -r "$ENV_FILE" ]] || { log "cannot read $ENV_FILE"; exit 2; }
 [[ "$ENV_FILE" == */* ]] || ENV_FILE=./$ENV_FILE  # "." would search PATH for a bare name
 set -a
 # shellcheck disable=SC1090
 . "$ENV_FILE"
 set +a
-: "${KALMIDO_URL:?KALMIDO_URL missing in $ENV_FILE}" "${KALMIDO_TOKEN:?KALMIDO_TOKEN missing in $ENV_FILE}"
+# 2.443.0 (#2940): exit 2 with a log line like the .ps1 (":?" ended it with 127)
+[[ -n "${KALMIDO_URL:-}" ]] || { log "KALMIDO_URL missing in $ENV_FILE"; exit 2; }
+[[ -n "${KALMIDO_TOKEN:-}" ]] || { log "KALMIDO_TOKEN missing in $ENV_FILE"; exit 2; }
 [[ "${KALMIDO_EVENTS:-0}" == 1 ]] && EVENTS=1
 # kalmido-capability: steps, model, permission_mode, quota, reply_ref, status_typing, approval, old_server, proposals, message_edited, playbook, approval_check, notice, comment_answer, comment_blocks
 # kalmido-capability: outbox, jobs, event_bundling (2.44.0: mcp/agent_extras.py and mcp/agent_job.py, loaded by agent_run.py)
@@ -100,7 +106,7 @@ set +a
 # (event mode: mcp/agent_run.py does them for both launchers, so .sh and .ps1 cannot drift apart)
 if [[ $EVENTS == 1 ]]; then
   RUNNER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent_run.py"
-  [[ -r "$RUNNER" ]] || { echo "agent_launcher: $RUNNER missing (event mode)" >&2; exit 2; }
+  [[ -r "$RUNNER" ]] || { log "$RUNNER missing (event mode)"; exit 2; }
   CMD=("${KALMIDO_PYTHON:-python3}" "$RUNNER" -- "${CMD[@]}")
 fi
 PY=${KALMIDO_PYTHON:-python3}
@@ -110,13 +116,13 @@ if command -v setsid >/dev/null 2>&1; then NEWSESS=(setsid)
 else NEWSESS=("$PY" -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])'); fi
 POLL=${KALMIDO_POLL:-60}
 RESTART_DELAY=${KALMIDO_RESTART_DELAY:-10}
-log() { printf '%s agent_launcher: %s\n' "$(date '+%F %T')" "$*" >&2; }
 
 # GET /api/v1/agent -> one tab-separated line: model autocompact pct nightly reset_seq timezone enabled working resumes_at
 # git_name git_mail coauthor (2.236.0: the work window of the work style, 1 = inside or none set; 2.396.0 #3386: the git author,
 # "-" = not sent). A paused agent's token is refused (403): that prints
 # "- - - - - - 0 1 - - - -" (stop the agent). The token goes to curl on stdin, never on its
 # command line. Exit 1: Kalmido not reachable (or another error); exit 2 (2.157.0, #1517): the token is revoked (401).
+# 2.443.0 (#2940): the JSON goes through KALMIDO_PYTHON too, not a fixed python3.
 fetch() {
   local out code
   out=$(printf 'header = "Authorization: Bearer %s"\n' "$KALMIDO_TOKEN" |
@@ -125,7 +131,7 @@ fetch() {
   if [[ "$code" == 403 ]]; then printf -- '-\t-\t-\t-\t%s\tUTC\t0\t1\t-\t-\t-\t-\n' "${SEQ:-0}"; return 0; fi
   [[ "$code" == 401 ]] && return 2
   [[ "$code" == 200 ]] || { log "GET /api/v1/agent: HTTP $code"; return 1; }
-  printf '%s' "${out%$'\n'*}" | python3 -c '
+  printf '%s' "${out%$'\n'*}" | "$PY" -c '
 import json, re, sys
 a = json.load(sys.stdin)
 r = a.get("runtime") or {}

@@ -114,7 +114,8 @@ def _uid_filter(uid):
 # ---------------------------------------------------------------- receipts (contract with part B)
 def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None):
     """The receipts of office area oid in [frm, to] (ISO days, both included) ->
-    [{node_id, date, amount (Decimal gross, office currency), vat_pct, net, vat, category, title, paid_at, doc_date}].
+    [{node_id, date, amount (Decimal gross, office currency), vat_pct, net, vat, category, title, paid_at, doc_date, checked_at,
+    checked_by (2.420.0 C, #3448: a person's tick, the user id)}].
     A receipt = a document of the office's documents space with a row in rc_receipts and an amount, not in the trash.
     by="paid": the day = paid_at, else the document date (cash principle, the EUeR); by="doc": the document date, else
     paid_at (input tax). uid: only documents this person sees (default: the signed-in person; 0 = all, for jobs).
@@ -126,7 +127,7 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None):
     s = office_settings(c, oid)
     uid = _uid_filter(uid)
     day = "COALESCE(NULLIF(r.paid_at, ''), d.doc_date)" if by == "paid" else "COALESCE(NULLIF(d.doc_date, ''), NULLIF(r.paid_at, ''))"
-    rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.paid_at, r.category, d.doc_date, d.amount, d.currency, d.ws, n.name, "
+    rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.paid_at, r.checked_at, r.checked_by, r.category, d.doc_date, d.amount, d.currency, d.ws, n.name, "
                      f"{day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
                      f"WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND {day}>=? AND {day}<=? ORDER BY {day}, r.node_id",
                      (ws, frm, to)).fetchall()
@@ -151,7 +152,8 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None):
         net, vat = _split(gross, vat_pct)
         out.append({"node_id": r["node_id"], "date": r["day"], "amount": gross, "vat_pct": vat_pct, "net": net, "vat": vat,
                     "category": r["category"] or "", "title": r["name"] or "", "paid_at": r["paid_at"], "doc_date": r["doc_date"],
-                    "unrated": cur if rate is None else None})  # 2.189.0 B (#2475): a foreign receipt without office rate
+                    "unrated": cur if rate is None else None,  # 2.189.0 B (#2475): a foreign receipt without office rate
+                    "checked_at": r["checked_at"], "checked_by": r["checked_by"] if r["checked_at"] else None})  # 2.420.0 C (#3448)
     if gaps is not None:  # 2.356.0 (#3097): receipts without any date belong to no period -- every export names them
         for r in c.execute("SELECT r.node_id, n.name FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
                            "WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND COALESCE(NULLIF(r.paid_at, ''), NULLIF(d.doc_date, '')) IS NULL "

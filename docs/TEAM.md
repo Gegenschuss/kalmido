@@ -612,7 +612,7 @@ form does not put reports into that person's list; 2.360). Nobody needs an accou
 
 *Since 2.120.0.*
 
-With *Office > Settings > Invoices > Show documents in the customer portal* (off by default; the office's admin, or the
+With *Settings > Company & office > Data > Show documents in the customer portal* (off by default; the office's admin, or the
 person in their own personal office) the portal also lists the client's **documents**: sent quotations (with the button
 *Review and approve* while an approval link is open), invoices with their payment state (open, partly paid with the open
 amount, overdue, paid; the due date) and credit notes. Each opens as the PDF that was sent. The customer is every client

@@ -130,7 +130,8 @@ def sheets_move_space(sid):
         from .shshare import _agent_row, shs_drop_cache, shs_fits
         r2 = sh_reload(c, sid)
         for x in c.execute("SELECT id, org_id, user_id FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NOT NULL", (sid,)).fetchall():
-            if x["id"] in back["shares"] and (x["org_id"] or None) == (to or None) and shs_fits(c, x["user_id"], r2, _agent_row(c, x["user_id"])):
+            if x["id"] in back["shares"] and (x["org_id"] or None) == (to or None) and (
+                    x["user_id"] is None or shs_fits(c, x["user_id"], r2, _agent_row(c, x["user_id"]))):  # 2.360.2 M (#2561): an open address row
                 c.execute("UPDATE sheet_shares SET revoked_at=NULL WHERE id=?", (x["id"],))
                 sback += 1
         shs_drop_cache()

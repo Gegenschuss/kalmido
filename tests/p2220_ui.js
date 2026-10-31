@@ -25,7 +25,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const input = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', {bubbles: true})); };
 const change = (w, el, v) => { if (v !== undefined) el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
@@ -107,9 +107,10 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   check(/Rome/.test(d.querySelector('#view .lifebar')?.textContent || '') && d.querySelector('#view [data-act="life-tripedit"]'), 'trip: its list opens with the trip bar');
   // Karakeep dialog
   w.location.hash = '#life'; await until(() => d.querySelector('#view .lc-reading'));
-  await w.eval('kkModal()'); await sleep(300); md = d.querySelector('.modal.lifedlg');
-  check(md && md.querySelector('#kk-url') && md.querySelector('#kk-tok').type === 'password', 'Karakeep: address + API key (password field)');
-  md.remove();
+  // 2.365.2 B (#2789): Karakeep is set up in Settings > Integrations, the module opens it there
+  await w.eval('kkModal()'); md = await until(() => d.querySelector('.smodal #s-kk #kk-url') && d.querySelector('.smodal'));
+  check(md && md.querySelector('#kk-tok').type === 'password' && !md.querySelector('[data-pane="integr"]').classList.contains('hidden'), 'Karakeep: address + API key (password field) in Settings > Integrations');
+  md?.remove();
   // health list bar
   const HL = st.lists.find(l => l.life === 'health').id;
   w.location.hash = '#l/' + HL; await until(() => d.querySelector('#view .lifebar'));
@@ -349,7 +350,7 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
         const a = [...document.querySelectorAll('.smodal a:not(.btn):not(.linkbtn)')].filter(x => x.offsetParent).map(x => getComputedStyle(x).textDecorationLine);
         const ib = document.querySelector('.smodal .lkfs')?.previousElementSibling?.querySelector('.ib') || null;
         return {h: Math.round(c.height), w: Math.round(c.width), bg, under: a.filter(x => x.includes('underline')).length, fsInfo: !!ib, prio: !!document.querySelector('.lookpv .lpv-prio.flag-5 svg'),
-          link: getComputedStyle(document.querySelector('.lookpv .lpv-link')).textDecorationLine, dev: getComputedStyle(document.querySelector('.smodal .devtag')).fontFamily}; })()`);
+          link: getComputedStyle(document.querySelector('.lookpv .lpv-link')).textDecorationLine, dev: (x => getComputedStyle(x).fontFamily)(document.querySelector('.smodal .devtag') || document.querySelector('.smodal #s-tabbar-h'))}; })()`);  // 2.418.0 (#3560): the tab bar lost its "This device" tag (per person now): its heading instead
       check(sd.h >= 0.8 * vh && sd.w >= 900, '#679: the dialog is tall and wide (~85 % of the height) ' + JSON.stringify(sd));
       check(+(sd.bg.match(/[\d.]+(?=\))/) || [0])[0] >= 0.5 && !sd.under && sd.link === 'none', '#679: a darker backdrop, links without an underline ' + JSON.stringify(sd));
       check(sd.fsInfo && sd.prio && !/mono/i.test(sd.dev), '#679: (i) at the "Font size" heading, "!high" as a flag, no monospace for words ' + JSON.stringify(sd));

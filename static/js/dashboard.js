@@ -33,7 +33,7 @@ function newsSummaryLine(g) {
     share: () => tr('shared with you'), approval: n => trn('{0} approval waits', '{0} approvals wait', n), proposal: () => tr('a proposal is ready'),
     followup: () => tr('follow up today'), unblock: () => tr('unblocked'), take: () => tr('taken'), role: () => tr('your role changed'), owner: () => tr('you own it now'),
     unshare: () => tr('removed'), usage: () => tr('usage limit'), errreport: () => tr('new error'), agentjoin: () => tr('an agent joined'), review: () => tr('review'), wiki_shared: () => tr('shared with you'),
-    orgjoin: () => tr('Invitation'), evinvite: () => tr('Invitation'), connreq: () => tr('Request'), leavereq: () => tr('Request'), filereq: () => tr('Request'), signoff: () => tr('Customer decisions'), orgdelnotice: () => tr('Organisation'), orggone: () => tr('Organisation'), fetcherr: () => tr('Receipt fetcher')};  // 2.361.0 (#2920)  // 2.266.0 (#2965): signoff  // 2.60.0 C (#1512): review; 2.126.2 B (#2355): wiki_shared; 2.183.0 A (#2623): never the raw kind
+    orgjoin: () => tr('Invitation'), evinvite: () => tr('Invitation'), connreq: () => tr('Request'), leavereq: () => tr('Request'), filereq: () => tr('Request'), signoff: () => tr('Customer decisions'), orgdelnotice: () => tr('Organisation'), orggone: () => tr('Organisation'), whorgcut: () => tr('Organisation'), fetcherr: () => tr('Receipt fetcher')};  // 2.361.0 (#2920)  // 2.266.0 (#2965): signoff  // 2.60.0 C (#1512): review; 2.126.2 B (#2355): wiki_shared; 2.183.0 A (#2623): never the raw kind
   return Object.entries(c).map(([k, n]) => (L[k] || (() => ''))(n)).filter((t, i, a) => t && a.indexOf(t) === i).join(' · ');  // 2.183.0 A (#2623): unknown kinds say nothing
 }
 function newsGroupHtml(g, pop) {
@@ -294,7 +294,8 @@ document.addEventListener('drop', e => {
 
 // Today and Time tracking (2.32.0): the first views on the builder; the blocks a view does not show right now simply stay out
 LY.today = {key: 'view_today', empty: '', title: () => tr('Customize Today'), blocks: () => [['brief', N_('Briefing'), 'sunrise', 'full'], ['wait', N_('Waiting for you'), 'hourglass', 'full'], ['review', N_('Daily review'), 'journal', 'full'],
-  ['overdue', N_('Overdue'), 'alert', 'full'], ['events', N_('Events today'), 'cal', 'full'], ['tasks', N_('Tasks'), 'list', 'full', true], ['inbox', N_('Basket'), 'inbox', 'full']]};
+  ['overdue', N_('Overdue'), 'alert', 'full'], ['events', N_('Events today'), 'cal', 'full'], ['tasks', N_('Tasks'), 'list', 'full', true], ['inbox', N_('Basket'), 'inbox', 'full']],
+  blockItems: k => { const c = k === 'events' ? cvxTodayItems() : []; return c.length ? [{head: tr('Calendars on Today')}, ...c] : []; }};  // 2.443.0 (#3740): the block's "…" is the one the phone shows
 LY.time = {key: 'view_time', empty: '', title: () => tr('Customize time tracking'), blocks: () => [['tiles', N_('Totals'), 'clock', 'full'],
   ['chart', N_('Per day'), 'chart', 'full'], ['lists', N_('By project and task'), 'list', 'full'], ['entries', N_('Entries'), 'rows', 'full']]};
 // the Agents overview (status, usage, jobs; not the settings) and the projects overview ("Where is it stuck?")
@@ -382,7 +383,7 @@ function dashCard(k) {
     // 2.45.0 (#1504): only active projects (not complete, not on hold), at most 5; none at all = no card
     // 2.55.0 (#1065): settings (lyopts.js): all projects or only active ones, the order, how many
     const act = lyo_get('home', 'projects', 'active', true), srt = lyo_get('home', 'projects', 'sort', 'side');
-    const all = S.lists.filter(l => !l.archived && isTracked(l)),  // 2.352.0 B (#2752): tracked = has a status
+    const all = S.lists.filter(l => !l.archived && isTracked(l) && inWs(l)),  // 2.352.0 B (#2752): tracked = has a status; 2.380.2 (#3407): the shown workspace
       ps = all.filter(l => !act || !['complete', 'on_hold'].includes(l.status));
     if (!all.length) return '';
     if (!ps.length) return slim(tr('Active projects: nothing'));

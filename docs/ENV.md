@@ -81,7 +81,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_NO_SECRET_KEY` | `0` | Switch: let a NEW server start without a server key (data then stays unencrypted). Tests and demos only. |
 | `KALMIDO_ORGCRYPT_DELAY` | `(empty)` | Seconds before the background encryption pass starts after a start (default: 300). |
 | `KALMIDO_ORGCRYPT_PAUSE` | `0.2` | Seconds between two portions of the background encryption pass. |
-| `KALMIDO_ORGCRYPT_ROT_SETTLE` | `5` | Seconds the key rotation waits after the switch to the new key. |
+| `KALMIDO_ORGCRYPT_ROT_SETTLE` | `30` | Longest wait in seconds of a key rotation for running writers after it locked writes. |
 | `KALMIDO_PUBLIC_BURST` | `300` | Views of one public link in a short time that raise a security alert. |
 | `KALMIDO_PUBLIC_RATE` | `60` | Page views of public links per client address and minute. |
 | `KALMIDO_SECRET_FILE` | `(empty)` | File that holds the server key; created once when missing. Must not lie inside the data or backup folder. In the image: /secret/kalmido.key when /secret is a mounted volume. |
@@ -231,7 +231,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_CALDAV_DONE_DAYS` | `90` | Days completed tasks stay visible over CalDAV. |
 | `KALMIDO_CALDAV_HTTP` | `0` | Switch: allow CalDAV logins over plain http (only in a trusted network). |
 | `KALMIDO_CALENDARS` | `1` | Switch: calendar subscriptions (ICS / CalDAV). |
-| `KALMIDO_CALENDAR_ALLOW_HOSTS` | `(empty)` | Internal hosts calendar subscriptions may reach. |
+| `KALMIDO_CALENDAR_ALLOW_HOSTS` | `(empty)` | Internal hosts every service may reach (calendars, address books, webhooks, mail, Git, newsletter, ntfy, Peppol, feeds, OIDC, Paperless, Karakeep, servers); the admin's lists per service add to it (2.380). |
 | `KALMIDO_CALENDAR_MAX_EVENTS` | `5000` | Stored occurrences per subscription. |
 | `KALMIDO_CALENDAR_MAX_MB` | `10` | Size in MB of one calendar download. |
 | `KALMIDO_CALENDAR_RATE` | `30` | Calendar adds, discoveries and manual refreshes per person in 15 minutes. |
@@ -306,6 +306,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_HOSTED` | `0` | Switch: a server run as a service for others; integrations may only reach public HTTPS addresses. |
 | `KALMIDO_IMPRINT_URL` | `(empty)` | Address (http/https) of the operator's imprint (legal notice), linked like the privacy statement. |
 | `KALMIDO_OPERATOR_TOKEN_FILE` | `(empty)` | File with the token of the hosting operator interface (empty = off). |
+| `KALMIDO_PRIVACY_EMAIL` | `(empty)` | Address of the operator's privacy contact, shown on public pages (forms, portal, approvals, bookings) next to the privacy link. Administration > Server overrides it. |
 | `KALMIDO_PRIVACY_URL` | `(empty)` | Address (http/https) of the operator's privacy statement, linked on the login page and in Settings > Help; the field in Administration > Server wins. |
 | `KALMIDO_PURGE_TRASH` | `(empty)` | Switch for the trash only; empty = KALMIDO_RETENTION_PURGE. |
 | `KALMIDO_RETENTION_PURGE` | `0` | Switch: really delete what is past its retention time (off = only count and report; the trash then says nothing is deleted). The installer writes 1 into a new .env. |
@@ -321,6 +322,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 |---|---|---|
 | `KALMIDO_PEPPOL_STORECOVE_URL` | `(empty)` | Tests: the address of a stand-in for the Storecove Peppol API (empty = the real one, 2.154.0). |
 | `KALMIDO_SHEET_CELLS_MAX` | `1000000` | Tests: stored cells over all sheets of one table (2.148.1). |
+| `KALMIDO_SHEET_MB_MAX` | `200` | Tests: size in MB of the inputs over all sheets of one table (2.360.2). |
 | `KALMIDO_SHEET_RANGE_BUDGET` | `15000000` | Tests: range cells one evaluation of a table may read (2.148.1). |
 | `KALMIDO_TEST` | `0` | Switch: marks a test container (set by tests/start.sh); only then KALMIDO_TEST_NOW and KALMIDO_TEST_RATE_WINDOW_S work. Never on a real server. |
 | `KALMIDO_TEST_BK_IDLE_TX_MS` | `(empty)` | Test containers only (with KALMIDO_TEST=1): idle-in-transaction limit of the backup's connection (2.281.0, #3118). |
@@ -331,4 +333,5 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_TEST_NOW` | `(empty)` | Test containers only (with KALMIDO_TEST=1): the server clock starts at this ISO time and runs on from there. |
 | `KALMIDO_TEST_NOW_AT` | `(empty)` | Test containers only: the real Unix second KALMIDO_TEST_NOW belongs to (app and worker share one shifted clock). |
 | `KALMIDO_TEST_ROT_ABORT` | `(empty)` | Tests: stop the key rotation right after the switch (1). |
+| `KALMIDO_TEST_TIMING_ALL` | `(empty)` | Tests: Server-Timing for every account, not only instance admins (1). |
 | `KALMIDO_TEST_UMZ_END_DELAY` | `(empty)` | Test containers only (with KALMIDO_TEST=1): seconds an account import's worker waits before it ends (2.308.0, #3261). |

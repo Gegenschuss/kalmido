@@ -778,7 +778,7 @@ function taskMenu(anchor, id, o = {}) {
   const l = listById(t.list_id), open = t.status === 0;
   // 2.31.0 (#1056): groups with small headings (Plan, Organize, Time, Structure); won't do + delete last, set apart. In the task
   // panel date and priority are not repeated: the panel's header has both (the date chip, Today / Tomorrow, the flag)
-  const inPanel = !!anchor?.closest?.('#detail .dtop') && !!$('#detail .dtop [data-act="date"]') && !!$('#detail .dtop [data-act="prio"]');
+  const inPanel = !!anchor?.closest?.('#detail .dtop') && !!$('#detail :is(.dtop, .dthumb) [data-act="date"]') && !!$('#detail .dtop [data-act="prio"]');  // 2.365.0 (#2824): the phone's date sits in the bottom bar
   menu(anchor, [
     // 2.25.0 (UX-11): opened by a long press: the title on top, then "Select" (more tasks follow with a tap)
     ...(o.select ? [{label: t.title.length > 60 ? t.title.slice(0, 59) + '…' : t.title, cls: 'mhead', dis: true, fn: () => {}}, {label: tr('Select'), icon: 'select', fn: () => { S.multiMode = true; S.multi.add(id); S.multiLast = id; render(); }}, '-'] : []),
@@ -837,6 +837,7 @@ function taskMenu(anchor, id, o = {}) {
     ...(t.id > 0 && !t.context && listRepos(t.list_id).length && !codeShown(t) && pz_on(t.list_id, 'repo') ? [{label: tr('Link code…'), icon: 'git', title: tr('Copies a branch name for this task; commits and pull requests that name #{0} are linked too', t.id), fn: () => gitCopyBranch(t)}] : []),  // 2.4.2 (#387)
     ...msvvMoveItem(t),  // 2.73.0 C (#661): "Move to another server…"
     ...(t.id > 0 ? [{label: tr('Copy link') + ' · ' + (tkOf(t) ? tkOf(t) + ' · ' : '') + '#' + id, icon: 'link', title: tr('Copy the link to this task'), fn: () => copyTaskLink(id)}] : []),  // 2.390.0 (#3353): + the key  // 2.218.0 A (#2799): the task number lives here
+    ...(inPanel && typeof df_menuItem === 'function' ? df_menuItem() : []),  // 2.380 F (#3435): fold / unfold all sections
     '-',
     {label: t.status === -1 ? tr('Reopen') : tr("Won’t do (discard)"), icon: 'ban', fn: () => t.status === -1 ? toggleTask(id) : wontDo(id)},
     ...(canDelete(t) ? [{label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}] : []),
@@ -897,11 +898,11 @@ function sortMenu(anchor) {
     {label: !crOn ? tr('Created|sort') : cur === 'created' ? tr('Created: newest first') : tr('Created: oldest first'), on: crOn, cls: 'sortcr', title: crOn ? tr('Click again to reverse the direction') : '', fn: () => set(cur === 'created' ? 'created_asc' : 'created')},
     ...(cfs.length ? ['-', ...cfs.map(f => ({label: tr('Field: {0}', f.name), icon: FT_ICON[f.type], on: cur === 'cf:' + f.id, fn: () => set('cf:' + f.id)}))] : []),
     ...(doneToggleView() ? ['-', doneItem(), ...lmDoneResetItems()] : []),  // 2.39.1 (#1214)
-    ...(l && isOwner(l) && listView(l) === 'list' && !isOverview() ? ['-', dabItem(l), ...(dsxFixedOff(l) || l.is_inbox ? [] : [dsxItem(l)])] : []),
+    ...(l && canManage(l) && listView(l) === 'list' && !isOverview() ? ['-', dabItem(l), ...(dsxFixedOff(l) || l.is_inbox ? [] : [dsxItem(l)])] : []),
     ...(l && !isOverview() ? lgfItems(l) : [])]);  // 2.144.0 C (#2414): group by a custom field
 }
 // 2.7.2 (#414): the list option "Show completed at the bottom" (owner; for everyone in the list, one undo step)
-const dabItem = l => ({label: tr('Show completed at the bottom'), icon: 'cart', on: !!l.checklist, cls: 'dabitem', fn: () => setDab(l.id, !l.checklist)});
+const dabItem = l => ({label: tr('Show completed at the bottom'), icon: 'donedown', on: !!l.checklist, cls: 'dabitem', fn: () => setDab(l.id, !l.checklist)});  // 2.410.0 (#3440): donedown, not the cart (every project uses it)
 // 2.36.2 (#1136): "Keep completed in their section" (owner / list admins; for everyone in the list)
 const dsxItem = l => ({label: tr('Keep completed in their section'), icon: 'done', on: dsxOn(l), cls: 'dsxitem', fn: () => dsxSet(l.id, !dsxOn(l))});
 // 2.396.0 (#3385): the hint "Use as a shopping list?" (render.js): list kind shopping + ticked at the bottom, one undo step

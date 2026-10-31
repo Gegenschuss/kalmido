@@ -22,7 +22,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields,agents,comments';
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22a', 'wcag22aa'];
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}));
 const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol default
@@ -170,7 +170,12 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); ${accent ? `localStorage.setItem('tasks.accent', '"${accent}"');` : ''} return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
-  const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(700); };
+  // 2.358.0 C (#2782): settle = the page's requests done (ff.js idle) + two frames drawn, instead of fixed sleeps after an action;
+  // rsz after a viewport change: the app's resize handlers wait 150 ms, then two frames
+  const frames = ev => ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))`).catch(() => 0);
+  const settle = async (ev, idle) => { await idle({quiet: 300}); await frames(ev); };
+  const rsz = async ev => { await sleep(400); await frames(ev); };
+  const ready = async (ev, idle, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await settle(ev, idle); };
   const seen = new Map();  // rule -> [where]
   const axe = async (ev, where, ctx = 'document', skip = []) => {
     if (!(await ev(`typeof axe`)) || (await ev(`typeof axe`)) === 'undefined') await ev(AXE + '\n;1');
@@ -219,48 +224,48 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
   const pass = async (o, tag, phone) => {
     const {ev, nav} = o;
     for (const [name, hash] of VIEWS) {
-      await nav(B + '#' + hash); await ready(ev);
+      await nav(B + '#' + hash); await ready(ev, o.idle);
       await axe(ev, `${tag} ${name}`);
       if (name === 'list') await o.shot(`p2160-${tag.replace(/\W+/g, '-')}-list.png`);
     }
     // 2.17.0: a team chat conversation, a note (read and edit)
-    if (ROOM) { await nav(B + '#team/' + ROOM); await ready(ev); await sleep(900); await axe(ev, `${tag} team chat room`); }
-    await nav(B + '#note/' + NOTE); await ready(ev); await sleep(900); await axe(ev, `${tag} note`);
-    await ev(`(() => { document.querySelector('[data-act="nt-mode"][data-m="edit"]')?.click(); return 1; })()`); await sleep(500); await axe(ev, `${tag} note editing`);
+    if (ROOM) { await nav(B + '#team/' + ROOM); await ready(ev, o.idle); await axe(ev, `${tag} team chat room`); }
+    await nav(B + '#note/' + NOTE); await ready(ev, o.idle); await axe(ev, `${tag} note`);
+    await ev(`(() => { document.querySelector('[data-act="nt-mode"][data-m="edit"]')?.click(); return 1; })()`); await settle(ev, o.idle); await axe(ev, `${tag} note editing`);
     // calendar week
-    await ev(`(() => { S.calMode = 'week'; LS.set('calMode', 'week'); render(); return 1; })()`); await sleep(500);
-    await nav(B + '#cal'); await ready(ev); await axe(ev, `${tag} calendar week`);
+    await ev(`(() => { S.calMode = 'week'; LS.set('calMode', 'week'); render(); return 1; })()`); await settle(ev, o.idle);
+    await nav(B + '#cal'); await ready(ev, o.idle); await axe(ev, `${tag} calendar week`);
     // the task panel
-    await nav(B + '#l/' + P); await ready(ev);
-    await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await sleep(1200);
+    await nav(B + '#l/' + P); await ready(ev, o.idle);
+    await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await settle(ev, o.idle);
     await axe(ev, `${tag} task panel`);
     await ev(`(() => { closeDetail(); return 1; })()`); await sleep(300);
     // the agent chat
-    await nav(B + '#agents/' + ag.id); await ready(ev); await sleep(600);
+    await nav(B + '#agents/' + ag.id); await ready(ev, o.idle);
     await axe(ev, `${tag} agent chat`);
     // settings
     for (const tab of ['appearance', 'account', 'modules', 'general', 'sidebar', 'collab', 'calendars', 'users', 'org']) {  // 2.220.0 A (#2811): + the other tabs
-      await nav(B + '#today'); await ready(ev);
+      await nav(B + '#today'); await ready(ev, o.idle);
       await ev(`(() => { [...document.querySelectorAll('.modal')].forEach(m => m.remove()); closePop(); if (typeof chatClose === 'function') chatClose(); return 1; })()`); await sleep(200);
-      await ev(`(() => { settingsModal('${tab}'); return 1; })()`); await sleep(900);
+      await ev(`(() => { settingsModal('${tab}'); return 1; })()`); await settle(ev, o.idle);
       await axe(ev, `${tag} settings ${tab}`);
     }
     // more dialogs: list, habit, filter, the share dialog, a new user, the new token, the quick add sheet / composer
     for (const [name, js] of [['list dialog', `listModal(${L})`], ['new list', 'listModal()'], ['habit dialog', 'habitModal()'], ['filter dialog', 'filterModal()'],
       ['share dialog', `shareModal(${P})`], ['user dialog', 'userModal()'], ['token dialog', 'tokModal(null, [])'], ['shortcuts', 'shortcutsModal()']]) {
-      await nav(B + '#today'); await ready(ev);
+      await nav(B + '#today'); await ready(ev, o.idle);
       await ev(`(() => { [...document.querySelectorAll('.modal')].forEach(m => m.remove()); closePop(); if (typeof chatClose === 'function') chatClose(); return 1; })()`); await sleep(200);
       const okJs = await ev(`(() => { try { if (typeof ${js.split('(')[0]} !== 'function') return 0; ${js}; return 1; } catch (e) { return 'E ' + e.message; } })()`);
       if (okJs !== 1) { rep(`[${tag}] ${name}: not opened (${okJs})`); continue; }
       await sleep(800);
       await axe(ev, `${tag} ${name}`);
     }
-    await ev(`(() => { [...document.querySelectorAll('.modal')].forEach(m => m.remove()); openPalette(); return 1; })()`); await sleep(500);
+    await ev(`(() => { [...document.querySelectorAll('.modal')].forEach(m => m.remove()); openPalette(); return 1; })()`); await settle(ev, o.idle);
     await axe(ev, `${tag} palette`);
     await ev(`(() => { closePalette(); return 1; })()`);
     if (phone) {
-      await nav(B + '#today'); await ready(ev);
-      await ev(`(() => { document.querySelector('#top [data-act="side"]').click(); return 1; })()`); await sleep(600);
+      await nav(B + '#today'); await ready(ev, o.idle);
+      await ev(`(() => { document.querySelector('#top [data-act="side"]').click(); return 1; })()`); await settle(ev, o.idle);
       await axe(ev, `${tag} drawer`);
     }
   };
@@ -278,8 +283,8 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
     await o.cmd('browsingContext.setViewport', {context: o.ctx, viewport: {width: 1280, height: 800}});
     for (const theme of ['light', 'dark']) for (const acc of ACCENTS) {
       await ffLogin(o, theme, acc);
-      await o.nav(B + '#l/' + L); await ready(o.ev);
-      await o.ev(`(() => { openDetail(${H1}); return 1; })()`); await sleep(900);
+      await o.nav(B + '#l/' + L); await ready(o.ev, o.idle);
+      await o.ev(`(() => { openDetail(${H1}); return 1; })()`); await settle(o.ev, o.idle);
       await axe(o.ev, `${theme} accent ${acc}`, 'document', []);
     }
   }, false);
@@ -311,7 +316,7 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
       return out; })()`;
     check(await ffLogin(o, theme) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 720}});
-    await o.nav(B + '#l/' + L); await ready(ev);
+    await o.nav(B + '#l/' + L); await ready(ev, o.idle);
     await ev(`(() => { document.activeElement?.blur(); return 1; })()`);
     await press(K.Tab); let f = await ev(FOC);
     check(f && f.id === 'skip' && f.ring, tag + ': the first stop is "Skip to content", with a focus ring ' + JSON.stringify(f));
@@ -331,7 +336,7 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
     check(!!rowHit, tag + ': Tab reaches a task row (its title)');
     // the row: focus it, ↓, Enter opens, Esc back
     await ev(`(() => { const t = document.querySelector('#view .trow[data-id="${H1}"] .ttl[data-kt]'); t.tabIndex = 0; t.focus(); return 1; })()`);
-    await press(K.Enter); await sleep(700);
+    await press(K.Enter); await settle(ev, o.idle);
     f = await ev(FOC);
     check(f && f.inDetail && await ev(`S.sel`) === H1, tag + ': Enter on the row opens the task, the focus is in the panel');
     await o.shot(`p2160-${theme}-kbd-panel.png`);
@@ -339,13 +344,13 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
     f = await ev(FOC);
     check(f && f.row === String(H1) && f.ring && !(await ev(`S.sel`)), tag + ': Esc closes it, the focus is back on the row with a ring ' + JSON.stringify(f));
     // a long list: walking down never hides the focused row under the composer
-    await o.nav(B + '#all'); await ready(ev);
+    await o.nav(B + '#all'); await ready(ev, o.idle);
     await ev(`(() => { const t = document.querySelector('#view .trow .ttl[data-kt]'); t.focus(); return 1; })()`);
     let worst = null;
     for (let i = 0; i < 14; i++) { await press(K.Down); await sleep(80); const x = await ev(FOC); if (x && (x.covered || !x.inView)) worst = x; }
     check(!worst, tag + ': ↓ through the list keeps the focused row in view and uncovered ' + JSON.stringify(worst));
     // a menu: "…" of the list opened with Enter, ↓, Esc returns
-    await o.nav(B + '#l/' + L); await ready(ev);
+    await o.nav(B + '#l/' + L); await ready(ev, o.idle);
     await ev(`(() => { const b = document.querySelector('#top [data-act="top-more"]'); if (!b) return 0; b.focus(); b.click(); return 1; })()`); await sleep(300);
     f = await ev(FOC);
     if (f && f.inPop) {
@@ -359,7 +364,7 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
     } else check(false, tag + ': the list menu opens with Enter and takes the focus ' + JSON.stringify(f));
     // a dialog: Settings (g s), Tab stays inside, Esc returns
     await ev(`(() => { document.querySelector('#view .trow .ttl[data-kt]').focus(); return 1; })()`);
-    await press('g'); await press('s'); await sleep(900);
+    await press('g'); await press('s'); await settle(ev, o.idle);
     f = await ev(FOC);
     check(f && f.inModal, tag + ': Settings opened with g s, the focus is in the dialog ' + JSON.stringify(f));
     let out = 0;
@@ -385,16 +390,16 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     const OVER = `(() => { const o = document.documentElement.scrollWidth - innerWidth; const wide = [...document.querySelectorAll('#app *, .modal *')].filter(e => { const r = e.getBoundingClientRect(); return r.width && r.right > innerWidth + 1 && !e.closest('.kcols,.kanban,#tlscroll,.tl-scroll,.wgrid,#wbody,.cal,.hscroll,.dtabs,.chips,.seg,.ovscroll,[data-hscroll],.snav,.tnav,.matrix,.rm') && getComputedStyle(e).position !== 'fixed'; }).slice(0, 3).map(e => e.tagName + '.' + String(e.className).slice(0, 30) + ':' + Math.round(e.getBoundingClientRect().right)); return {o, wide}; })()`;
     for (const [name, hash] of [['today', 'today'], ['list', 'l/' + L], ['news', 'news'], ['stats', 'stats']]) {
-      await o.nav(B + '#' + hash); await ready(ev);
+      await o.nav(B + '#' + hash); await ready(ev, o.idle);
       const x = await ev(OVER);
       check(x.o <= 0 && !x.wide.length, `${tag} ${name}: nothing sideways ` + JSON.stringify(x));
     }
-    await ev(`(() => { openDetail(${H1}); return 1; })()`); await sleep(900);
+    await ev(`(() => { openDetail(${H1}); return 1; })()`); await settle(ev, o.idle);
     let x = await ev(OVER); check(x.o <= 0 && !x.wide.length, `${tag} task panel: fits ` + JSON.stringify(x));
     await o.shot(`p2160-${vw}-panel.png`);
-    await ev(`(() => { closeDetail(); settingsModal('appearance'); return 1; })()`); await sleep(900);
+    await ev(`(() => { closeDetail(); settingsModal('appearance'); return 1; })()`); await settle(ev, o.idle);
     x = await ev(OVER); check(x.o <= 0 && !x.wide.length, `${tag} settings: fits ` + JSON.stringify(x));
-    await ev(`(() => { [...document.querySelectorAll('.modal')].forEach(m => m.remove()); listModal(${L}); return 1; })()`); await sleep(700);
+    await ev(`(() => { [...document.querySelectorAll('.modal')].forEach(m => m.remove()); listModal(${L}); return 1; })()`); await settle(ev, o.idle);
     x = await ev(OVER); check(x.o <= 0 && !x.wide.length, `${tag} list dialog: fits ` + JSON.stringify(x));
     await o.shot(`p2160-${vw}-dialog.png`);
   }, vw < 600);

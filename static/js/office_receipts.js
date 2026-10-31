@@ -6,7 +6,8 @@
 // pack has the export on, books.export_csv; the whole booking list of the year stays in the bookkeeping, #2461). A tap on a row opens
 // the receipt sheet of office_books.js (bkSheet); after saving the list reloads (rclReload). The filters stay for the
 // session (sessionStorage). Server: kalmido/office/receiptlist.py.
-const RCL = {oid: null, f: null, data: null, rows: [], err: null, seq: 0, key: '', loading: false, open: null};
+// 2.420.0 C (#3448): sel = the receipts ticked in the multiple choice (null: not choosing), busy = a check request running
+const RCL = {oid: null, f: null, data: null, rows: [], err: null, seq: 0, key: '', loading: false, open: null, sel: null, busy: false};
 const RCL_PERIODS = [['year', N_('This year')], ['lastyear', N_('Last year')], ['quarter', N_('This quarter')], ['lastquarter', N_('Last quarter')],
   ['month', N_('This month')], ['lastmonth', N_('Last month')], ['custom', N_('Custom period')]];
 const rclIso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -20,7 +21,7 @@ function rclPeriod(k) {  // a quick choice -> [from, to] (ISO days, local time)
   if (k === 'lastmonth') return span(new Date(y, m - 1, 1), new Date(y, m, 0));
   return span(new Date(y, 0, 1), new Date(y, 11, 31));
 }
-const rclDefault = () => { const [from, to] = rclPeriod('year'); return {per: 'year', from, to, by: 'doc', status: 'all', category: '', supplier: '', project: '', novat: false, hints: false, q: ''}; };
+const rclDefault = () => { const [from, to] = rclPeriod('year'); return {per: 'year', from, to, by: 'doc', status: 'all', checked: 'all', category: '', supplier: '', project: '', novat: false, hints: false, q: ''}; };
 const rclStoreKey = () => `kalmido.rcl.${OFC.info?.org_id || 0}`;
 function rclRestore() {
   let f = null;
@@ -35,6 +36,7 @@ function rclQuery() {
   for (const k of ['category', 'supplier', 'project', 'q']) if (f[k]) p.set(k, f[k]);
   if (f.novat) p.set('novat', '1');
   if (f.hints) p.set('hints', '1');  // 2.299.0 D (#3193)
+  if (f.checked && f.checked !== 'all') p.set('checked', f.checked);  // 2.420.0 C (#3448)
   return p.toString();
 }
 let rclPend = Infinity;  // 2.299.0 D (#3193): receipts the last request left unchecked
@@ -69,13 +71,14 @@ function rclHtml(own) {  // 2.276.0 A (#3039): own = the page Office > Receipts 
 function rclFiltersHtml() {
   const f = RCL.f, d = RCL.data || {}, all = tr('All');
   const opt = (list, cur, name) => { const o = list.map(x => [String(x.id ?? x), x.name ?? x]); if (cur && !o.some(([v]) => v === String(cur))) o.push([String(cur), name ?? String(cur)]); return o; };
-  const n = ['category', 'supplier', 'project', 'q'].filter(k => f[k]).length + (f.novat ? 1 : 0) + (f.hints ? 1 : 0) + (f.status !== 'all' ? 1 : 0);
-  const seg = (k, opts) => `<div class="seg" role="group" aria-label="${esc(tr(k === 'status' ? 'Status' : 'Day'))}">${opts.map(([v, t]) => `<button type="button" data-rcl="${k}" data-v="${v}" class="${f[k] === v ? 'on' : ''}" aria-pressed="${f[k] === v}">${esc(t)}</button>`).join('')}</div>`;
+  const n = ['category', 'supplier', 'project', 'q'].filter(k => f[k]).length + (f.novat ? 1 : 0) + (f.hints ? 1 : 0) + (f.status !== 'all' ? 1 : 0) + (f.checked && f.checked !== 'all' ? 1 : 0);
+  const seg = (k, opts) => `<div class="seg" role="group" aria-label="${esc(tr(k === 'status' ? 'Status' : k === 'checked' ? 'Checked' : 'Day'))}">${opts.map(([v, t]) => `<button type="button" data-rcl="${k}" data-v="${v}" class="${f[k] === v ? 'on' : ''}" aria-pressed="${f[k] === v}">${esc(t)}</button>`).join('')}</div>`;
   return `<details class="rcl-filters" ${RCL.open ? 'open' : ''}><summary>${ic('filter', 's')}<span>${tr('Filters')}</span>${n ? `<span class="rotag">${n}</span>` : ''}</summary>
     <div class="rcl-grid">
       <label class="rcl-f"><span class="muted">${tr('Period')}</span>${ofcSel('rcl-per', f.per, RCL_PERIODS.map(([k, t]) => [k, tr(t)]))}</label>
       ${f.per === 'custom' ? `<span class="rcl-f rcl-days"><span class="muted">${tr('From')}</span>${dateIn('rcl-from', f.from, {label: tr('From'), clear: false})}<span class="muted">${tr('To')}</span>${dateIn('rcl-to', f.to, {label: tr('To'), clear: false})}</span>` : ''}
       <span class="rcl-f"><span class="muted">${tr('Status')}</span>${seg('status', [['all', all], ['paid', tr('Paid')], ['open', tr('Not paid')]])}</span>
+      <span class="rcl-f rcl-chkf"><span class="muted">${tr('Checked')}</span>${seg('checked', [['all', all], ['yes', tr('Checked')], ['no', tr('Not checked')]])}</span>
       <span class="rcl-f"><span class="muted">${tr('Day')}</span>${seg('by', [['doc', tr('Receipt date')], ['paid', tr('Payment date')]])}</span>
       <label class="rcl-f"><span class="muted">${tr('Category')}</span>${ofcSel('rcl-cat', f.category, opt(d.categories || [], f.category), all)}</label>
       <label class="rcl-f"><span class="muted">${tr('Supplier')}</span>${ofcSel('rcl-sup', f.supplier, opt(d.suppliers || [], f.supplier, tr('(none in this period)')), all)}</label>
@@ -87,22 +90,55 @@ function rclFiltersHtml() {
     </div></details>`;
 }
 
+const rclChkTxt = r => r.checked_at ? tr('Checked by {0} on {1}', r.checked_by || '?', fmtDateLoc(String(r.checked_at).slice(0, 10))) : '';  // 2.420.0 C (#3448)
 function rclRow(r) {
   const sub = [fmtDateLoc(r.date), r.supplier, r.number, r.category, r.project?.name, bkVatLabel(r.vat_pct)].filter(Boolean).join(' · ');
   const orig = r.orig_currency ? ` <small class="muted">(${esc(fmtNum(+r.orig_amount, 2))} ${esc(r.orig_currency)})</small>` : '';
+  const chk = r.checked_at ? `<span class="rotag rcl-chk" title="${esc(rclChkTxt(r))}">${ic('check', 's')}${tr('Checked')}</span>` : '';  // 2.420.0 C (#3448)
+  if (RCL.sel) {  // 2.420.0 C (#3448): the multiple choice -- a tap ticks the row instead of opening the receipt
+    return `<li><label class="ofcrow rcl-pick"><input type="checkbox" class="rcl-pickin" data-id="${r.node_id}" ${RCL.sel.has(r.node_id) ? 'checked' : ''}>
+      <span class="ofcn"><b>${esc(r.title || tr('Receipt'))}</b><small class="muted">${esc(sub)}</small></span>${chk}<span class="rksum">${ofcMoney(r.amount)}${orig}</span></label></li>`;
+  }
   return `<li><button type="button" class="ofcrow" data-rcl="rc" data-id="${r.node_id}"><span class="ofcn"><b>${esc(r.title || tr('Receipt'))}</b>
-    <small class="muted">${esc(sub)}</small></span>${r.einvoice ? `<span class="rotag">${tr('E-invoice')}</span>` : ''}${r.dup ? `<span class="rotag bk-dup">${tr('Possible duplicate')}</span>` : ''}${r.hints > (r.dup ? 1 : 0) ? `<span class="rotag rcl-hint">${tr('With hints')}</span>` : ''}${r.paid_at || !RCL.paidMark ? '' : `<span class="rotag rcl-open">${tr('Not paid')}</span>`}${r.submitted_by ? `<span class="rotag rcl-sub">${esc(tr('Handed in by {0}', r.submitted_by))}</span>` : ''}
+    <small class="muted">${esc(sub)}</small></span>${chk}${r.einvoice ? `<span class="rotag">${tr('E-invoice')}</span>` : ''}${r.dup ? `<span class="rotag bk-dup">${tr('Possible duplicate')}</span>` : ''}${r.hints > (r.dup ? 1 : 0) ? `<span class="rotag rcl-hint">${tr('With hints')}</span>` : ''}${r.paid_at || !RCL.paidMark ? '' : `<span class="rotag rcl-open">${tr('Not paid')}</span>`}${r.submitted_by ? `<span class="rotag rcl-sub">${esc(tr('Handed in by {0}', r.submitted_by))}</span>` : ''}
     <span class="rksum">${ofcMoney(r.amount)}${orig}</span>${ic('chev', 's')}</button></li>`;
+}
+// 2.420.0 C (#3448): the bar of the multiple choice: "Select" -> {n} selected, Mark as checked, Remove check, Cancel
+function rclSelBar() {
+  if (!RCL.sel) return `<div class="ofcbar rcl-selbar"><button type="button" class="btn sm ghost" data-rcl="sel">${ic('check', 's')}<span>${tr('Select')}</span></button><span class="spacer"></span></div>`;
+  const n = RCL.sel.size, off = !n || RCL.busy ? 'disabled' : '';
+  return `<div class="ofcbar rcl-selbar on" role="toolbar" aria-label="${esc(tr('Select'))}"><button type="button" class="btn sm ghost" data-rcl="selall">${tr('Select all')}</button>
+    <span class="muted rcl-seln" aria-live="polite">${esc(tr('{0} selected', n))}</span><span class="spacer"></span>
+    <button type="button" class="btn sm pri" data-rcl="chk" ${off}>${ic('check', 's')}<span>${tr('Mark as checked')}</span></button>
+    <button type="button" class="btn sm ghost" data-rcl="unchk" ${off}>${tr('Remove check')}</button>
+    <button type="button" class="btn sm ghost" data-rcl="selx">${tr('Cancel')}</button></div>`;
+}
+// tick / untick receipts as checked (one undo step: only the receipts whose state changed go back)
+async function rclChecked(ids, on) {
+  const j = await api('POST', '/api/office/books/receipts/checked', {node_ids: ids, checked: on});
+  if (typeof bkReload === 'function') bkReload(); else rclReload();  // (bkReload reads the receipts list again too)
+  return j;
+}
+async function rclCheckSel(on) {
+  const ids = [...(RCL.sel || [])]; if (!ids.length || RCL.busy) return;
+  RCL.busy = true; ofcDraw();
+  let j; try { j = await rclChecked(ids, on); } catch (x) { RCL.busy = false; ofcDraw(); toast(x.message || tr('unknown')); return; }
+  RCL.busy = false; RCL.sel = null; ofcDraw();
+  const ch = j.changed || [];
+  if (!ch.length) { toast(on ? tr('Already checked') : tr('Not checked')); return; }
+  const label = on ? trn('{0} receipt marked as checked', '{0} receipts marked as checked', ch.length) : trn('Check removed from {0} receipt', 'Check removed from {0} receipts', ch.length);
+  histToast(label, histAdd({label, undo: async () => { await rclChecked(ch, !on); return {}; }, redo: async () => { await rclChecked(ch, on); return {}; }}));
 }
 function rclListHtml() {
   const d = RCL.data, t = d.total, q = rclQuery();
   const exp = !ofcFeat('books.export_csv') ? '' : `<div class="ofcbar rcl-exp"><span class="spacer"></span>
     <a class="btn sm ghost" id="rcl-csv" href="/api/office/books/receipts.csv?${esc(q)}" download>${ic('download', 's')}<span>CSV</span></a>
     <a class="btn sm" id="rcl-zip" href="/api/office/books/receipts.zip?${esc(q)}" download>${ic('download', 's')}<span>${tr('ZIP for the tax adviser')}</span></a></div>`;
+  if (!t.count) RCL.sel = null;
   if (!t.count) return `${exp}<p class="muted lempty rcl-empty">${tr('No receipts match these filters.')}</p>${bkNote()}`;
   // the mark "Not paid" only where payments are recorded at all (bank reconciliation) and the list mixes both
   RCL.paidMark = RCL.f.status === 'all' && RCL.rows.some(r => r.paid_at);
-  return `${exp}<ul class="ofclist rcl-list" role="list" aria-labelledby="rcl-h">${RCL.rows.map(rclRow).join('')}</ul>
+  return `${exp}${rclSelBar()}<ul class="ofclist rcl-list${RCL.sel ? ' rcl-choosing' : ''}" role="list" aria-labelledby="rcl-h">${RCL.rows.map(rclRow).join('')}</ul>
     ${d.more ? `<p class="rcl-more"><button type="button" class="btn ghost" data-rcl="more" ${RCL.loading ? 'disabled' : ''}>${tr('Load more')}</button></p>` : ''}
     <div class="bk-profit rcl-sum"><span>${esc(trn('{0} receipt', '{0} receipts', t.count))} <small class="muted">· ${tr('Net')} ${ofcMoney(t.net)} · ${tr('VAT')} ${ofcMoney(t.vat)}</small></span><b>${ofcMoney(t.gross)}</b></div>
     ${bkNote()}`;
@@ -133,7 +169,8 @@ document.addEventListener('change', e => {
   if (t.id === 'rcl-sup') { rclSet({supplier: t.value}); return; }
   if (t.id === 'rcl-pro') { rclSet({project: t.value}); return; }
   if (t.id === 'rcl-novat') { rclSet({novat: t.checked}); return; }
-  if (t.id === 'rcl-hints') { rclSet({hints: t.checked}); }  // 2.299.0 D (#3193)
+  if (t.id === 'rcl-hints') { rclSet({hints: t.checked}); return; }  // 2.299.0 D (#3193)
+  if (t.classList?.contains('rcl-pickin') && RCL.sel) { const id = +t.dataset.id; if (t.checked) RCL.sel.add(id); else RCL.sel.delete(id); ofcDraw(); }  // 2.420.0 C (#3448)
 });
 document.addEventListener('toggle', e => { const t = /** @type {any} */ (e.target); if (t.classList?.contains('rcl-filters')) RCL.open = t.open; }, true);
 document.addEventListener('click', e => {
@@ -141,8 +178,13 @@ document.addEventListener('click', e => {
   const k = b.dataset.rcl;
   if (k === 'rc') { bkSheet(+b.dataset.id, false); return; }
   if (k === 'more') { b.disabled = true; rclLoad(true); return; }
-  if (k === 'reset') { const d = rclDefault(); rclSet({category: '', supplier: '', project: '', novat: false, hints: false, q: '', status: d.status}); return; }
-  if ((k === 'status' || k === 'by') && RCL.f[k] !== b.dataset.v) rclSet({[k]: b.dataset.v});
+  if (k === 'reset') { const d = rclDefault(); rclSet({category: '', supplier: '', project: '', novat: false, hints: false, q: '', status: d.status, checked: d.checked}); return; }
+  // 2.420.0 C (#3448): the multiple choice
+  if (k === 'sel') { RCL.sel = new Set(); ofcDraw(); return; }
+  if (k === 'selx') { RCL.sel = null; ofcDraw(); return; }
+  if (k === 'selall' && RCL.sel) { const all = RCL.rows.every(r => RCL.sel.has(r.node_id)); RCL.sel = new Set(all ? [] : RCL.rows.map(r => r.node_id)); ofcDraw(); return; }
+  if (k === 'chk' || k === 'unchk') { rclCheckSel(k === 'chk'); return; }
+  if ((k === 'status' || k === 'by' || k === 'checked') && (RCL.f[k] || 'all') !== b.dataset.v) rclSet({[k]: b.dataset.v});
 });
 
 // ---- 2.276.0 A (#3039): the menu point Office > Receipts (#office/receipts, group Money, everybody with the bookkeeping):

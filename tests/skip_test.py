@@ -5,6 +5,7 @@ Python standard library only."""
 import datetime
 import os
 import re
+import subprocess
 import sys
 from zoneinfo import ZoneInfo
 
@@ -47,6 +48,13 @@ def main():
     if bad:
         print("skip_test: self check failed:", bad, got)
         return 1
+    # 2.358.0 (#3281): ONLY with an unknown suite is an error (exit 2), not "ALL SUITES PASSED"; a known one is listed (list mode: no container)
+    env = dict(os.environ, KALMIDO_LIST_ONLY="1")
+    for only, rc, txt in (("no_such_suite_3281", 2, "unknown suite no_such_suite_3281"), ("backup", 0, "ALL SUITES PASSED")):
+        r = subprocess.run(["bash", os.path.join(HERE, "run_all.sh")], env=dict(env, ONLY=only), capture_output=True, text=True, timeout=120)
+        if r.returncode != rc or txt not in r.stdout:
+            print(f"skip_test: run_all.sh ONLY={only}: exit {r.returncode}, want {rc} and {txt!r}:", r.stdout[-300:], r.stderr[-300:])
+            return 1
     out = problems(open(os.path.join(HERE, "skip.txt")).read(), suites, today)
     for x in out:
         print("tests/skip.txt " + x)

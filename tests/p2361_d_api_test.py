@@ -177,8 +177,8 @@ nl = len(rl.pages)
 check(nl >= 2, f"30 positions: several pages ({nl})")
 check(all(f"Seite {i + 1} von {nl}".replace(" ", "") in t.replace(" ", "") for i, t in enumerate(Tl)), "every page carries 'Seite x von y'")
 check(all(("LEISTUNG" in t and "GESAMT" in t) for t in Tl if "Zusatzleistung" in t), "the table head is repeated on every page with positions")
-tot_page = next((t for t in Tl if "Summe netto" in t), "")  # 2.357.0 (#3183): Summe netto
-check("Zusatzleistung" in tot_page or "Producing" in tot_page, "the totals never stand alone on a page")
+tot_page = next((t for t in reversed(Tl) if "Summe netto" in t), "")  # 2.357.0 (#3183): Summe netto; the last one: the overview on page 1 has its own
+check("Zusatzleistung" in tot_page or "Producing" in tot_page, f"the totals never stand alone on a page: {nl} pages, {[len(t) for t in Tl]}, {tot_page[:500]!r}")
 
 # ---------------------------------------------------------------- tenant matrix (tenant-matrix: office)
 check(Ca.get(B + f"{D}/{DOC}/pdf").status_code == 404, "the second organisation: 404 for the PDF")

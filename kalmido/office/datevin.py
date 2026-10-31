@@ -13,7 +13,9 @@ dialog can leave it out (?in=0).
    ("Reisekosten Unternehmer"), an organisation = the employees' ones.
  - hints (dv_hints, shown by the check before the download): receipts without an amount (not exported), without a category
    (booked on the "other expenses" account), without a rate (booked without input tax).
-More kinds of receipts later: one more function in DV_SOURCES (c, oid, d_from, d_to, st, s) -> (rows, hints)."""
+More kinds of receipts later: one more function in DV_SOURCES (c, oid, d_from, d_to, st, s) -> (rows, hints).
+ - 2.444.0 (#3447): credit cards are an account of their own ("card", default SKR03 1730 / SKR04 3610): a receipt matched with a
+   position is booked against it instead of the creditor; fees, private positions and the bank booking of the total: office/cardnorc.py."""
 import re
 
 from flask import jsonify
@@ -57,7 +59,9 @@ DV_TRAVEL = {
 DV_RK_KEY = {"car": "fares", "train": "fares", "flight": "fares", "rental_car": "fares", "taxi": "fares", "parking": "fares",
              "hotel": "hotel", "meals": "other", "other": "other"}
 DV_BU_IN = {"19": "9", "7": "8"}  # Vorsteuer keys
-DV_DEFAULTS = {"in_on": 1, "creditor": "", "in_counter": "creditor", "in_other": "", "cat_accounts": {}, "travel": {}, "bu_in": {}}
+DV_DEFAULTS = {"in_on": 1, "creditor": "", "in_counter": "creditor", "in_other": "", "cat_accounts": {}, "travel": {}, "bu_in": {}, "card": "", "card_private": ""}
+DV_CARD = {"SKR03": "1730", "SKR04": "3610"}  # 2.444.0 (#3447): Kreditkartenabrechnung
+DV_CARD_PRIVATE = {"SKR03": "1800", "SKR04": "2100"}  # Privatentnahmen
 DV_CAT_MAX = 200
 DV_NO_AMOUNT = N_("{0} receipts without an amount are not exported")
 DV_NO_AMOUNT_1 = N_("1 receipt without an amount is not exported")
@@ -73,6 +77,8 @@ DV_DUP = N_("{0} possibly duplicate receipts are not exported")
 DV_DUP_1 = N_("1 possibly duplicate receipt is not exported")
 DV_DUP_IN = N_("{0} possibly duplicate receipts are exported")
 DV_DUP_IN_1 = N_("1 possibly duplicate receipt is exported")
+DV_CC_OPEN = N_("{0} card positions without a receipt are not exported")  # 2.444.0 (#3447)
+DV_CC_OPEN_1 = N_("1 card position without a receipt is not exported")
 
 
 def _len(st, n, plus=0):
@@ -119,6 +125,15 @@ def dv_counter(st):
     return st.get("creditor") or _len(st, DV_CREDITOR, 1)
 
 
+def dv_card_account(st):
+    """2.444.0 (#3447): the account of the credit cards."""
+    return st.get("card") or _len(st, DV_CARD[_chart(st)])
+
+
+def dv_card_private(st):
+    return st.get("card_private") or _len(st, DV_CARD_PRIVATE[_chart(st)])
+
+
 # ---------------------------------------------------------------- settings
 def dv_settings(v, out):
     """Fills the input side defaults into the DATEV settings dict out (from the stored dict v)."""
@@ -142,6 +157,9 @@ def dv_settings_clean(v, out):
         out["creditor"] = _digits(v["creditor"], "creditor", 1, n + 1)
     if "in_other" in v:
         out["in_other"] = _digits(v["in_other"], "in_other", 1, n)
+    for k in ("card", "card_private"):  # 2.444.0 (#3447)
+        if k in v:
+            out[k] = _digits(v[k], k, 1, n)
     if "cat_accounts" in v:
         a = v["cat_accounts"]
         if not isinstance(a, dict) or len(a) > DV_CAT_MAX:
@@ -168,9 +186,13 @@ def _eur(amount, s):
     return money(amount)
 
 
-def _line(amount, konto, gegen, bu, day, beleg, text, node=None):
+def _line(amount, konto, gegen, bu, day, beleg, text, node=None, checked=None):
     from .datev import dx_beleg, _amt, _ddmm
-    return {"Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": "S" if amount > 0 else "H", "WKZ Umsatz": "EUR",
+    # 2.420.0 C (#3448): a receipt a person ticked as checked carries it as additional information (Art "Geprueft", Inhalt =
+    # DD.MM.YYYY of the tick): the booking batch has no field of its own for it
+    extra = ({"Zusatzinformation - Art 1": "Geprueft", "Zusatzinformation - Inhalt 1": f"{checked[8:10]}.{checked[5:7]}.{checked[:4]}"}
+             if checked and len(checked) >= 10 else {})
+    return {**extra, "Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": "S" if amount > 0 else "H", "WKZ Umsatz": "EUR",
             "Konto": konto, "Gegenkonto (ohne BU-Schlüssel)": gegen, "BU-Schlüssel": bu, "Belegdatum": _ddmm(day),
             "Belegfeld 1": dx_beleg(beleg), "Buchungstext": (text or "").strip()[:60], "Festschreibung": "0",
             "_date": day, "_kind": "in", **({"_node": node} if node else {})}  # 2.148.0 B (#2470): _node = the receipt's file
@@ -240,9 +262,11 @@ def _dup_of_receipt(c, ids):
 def dv_receipt_rows(c, oid, d_from, d_to, st, s):
     from .books import bk_receipts
     small = bool(s.get("small_business"))
+    from .cardnorc import cc_dv_nodes
     gegen = dv_counter(st)
     receipts = bk_receipts(c, oid, d_from, d_to, by="doc")
     own = dv_supplier_accounts(c, oid, st, [rc["node_id"] for rc in receipts])  # 2.148.0 D (#2458)
+    own.update(dict.fromkeys(cc_dv_nodes(c, oid), dv_card_account(st)))  # 2.444.0 (#3447): paid by card: the card account, not the creditor
     bu_in = {**DV_BU_IN, **(st.get("bu_in") or {})}
     rows, no_cat, no_vat = [], 0, 0
     from flask import has_request_context, request
@@ -262,7 +286,8 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
         no_vat += rc["vat_pct"] is None and not small
         bu = "" if small else bu_in.get(rc["vat_pct"] or "", "")
         rows.append(_line(amount, dv_cat_account(st, rc["category"]), own.get(rc["node_id"], gegen), bu, rc["date"], f"B{rc['node_id']}",
-                          (rc["category"] + " " + rc["title"]) if rc["category"] else rc["title"], node=rc["node_id"]))
+                          (rc["category"] + " " + rc["title"]) if rc["category"] else rc["title"], node=rc["node_id"],
+                          checked=rc.get("checked_at")))
     hints = []
     na = _no_amount(c, oid, d_from, d_to)
     if na:
@@ -316,7 +341,12 @@ def dv_travel_rows(c, oid, d_from, d_to, st, s):
 
 
 # the sources of the input side, in this order; 2.119.0 (hospitality receipts) and later kinds add one function here
-DV_SOURCES = [dv_receipt_rows, dv_travel_rows]
+def _dv_cards(c, oid, d_from, d_to, st, s):
+    from .cardnorc import cc_dv_rows
+    return cc_dv_rows(c, oid, d_from, d_to, st, s)
+
+
+DV_SOURCES = [dv_receipt_rows, dv_travel_rows, _dv_cards]  # 2.444.0 (#3447): + credit cards
 
 
 def dv_rows(c, oid, d_from, d_to, st, s):
@@ -344,7 +374,8 @@ def dv_accounts(c, oid, st):
     cats += sorted(k for k in mine if k not in known)  # an assignment of a category no receipt uses any more stays editable
     return {"categories": [{"name": x, "default": dv_cat_default(st, x), "account": mine.get(x.casefold(), "")} for x in cats],
             "travel": [{"key": k, "default": dv_travel_default(st, k, own), "account": (st.get("travel") or {}).get(k, "")} for k in DV_TRAVEL_KEYS],
-            "other": _len(st, DV_OTHER[_chart(st)]), "creditor": _len(st, DV_CREDITOR, 1), "bu_in": DV_BU_IN}
+            "other": _len(st, DV_OTHER[_chart(st)]), "creditor": _len(st, DV_CREDITOR, 1), "bu_in": DV_BU_IN,
+            "card": _len(st, DV_CARD[_chart(st)]), "card_private": _len(st, DV_CARD_PRIVATE[_chart(st)])}  # 2.444.0 (#3447)
 
 
 @app.get("/api/office/datev/accounts")

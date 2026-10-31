@@ -123,7 +123,8 @@ OLD_KEYS = {  # the other former tables (ledger, terms, girocode, invoices mail)
     "Scan with banking app|girocode": "Mit Banking-App scannen",
     "Dear Sir or Madam,\n\nPlease find attached {0} {1}.\n\nKind regards\n{2}|document mail": "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie {0} {1}.\n\nMit freundlichen Grüßen\n{2}",
     "the document|mail": "das Dokument", "the document|mail, quotation": "das Angebot", "the document|mail, invoice": "die Rechnung",
-    "the document|mail, credit note": "die Gutschrift", "the document|mail, reminder": "die Mahnung", "the document|mail, delivery note": "den Lieferschein",
+    # 2.431.0 (#3595): credit notes are called Rechnungskorrektur, default scheme RK- (was Gutschrift / GS-)
+    "the document|mail, credit note": "die Rechnungskorrektur", "the document|mail, reminder": "die Mahnung", "the document|mail, delivery note": "den Lieferschein",
     "Re quotation No.|pack": "zu Angebot Nr."}
 for k, de in OLD_KEYS.items():
     check(LG["de"].get(k) == de, f"de.json {k!r} = the old German ({LG['de'].get(k)!r})")

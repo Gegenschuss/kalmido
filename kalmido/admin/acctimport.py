@@ -84,7 +84,7 @@ UMZ_TEXT_MAX = 1_000_000  # characters of one text value
 UMZ_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._\-/]{0,250}")
 UMZ_EID_RE = re.compile(r"[0-9a-f]{8,64}")
 # 2.278.0 C (#3091): the AAD a browser ciphertext of the old server carries (collab/e2e.py, notelock.js, e2e.js)
-UMZ_AAD_RE = re.compile(r"kalmido-(locknote|file):v1:[0-9]{1,19}:[0-9]{1,19}|kalmido-e2e:v1:[0-9]{1,19}")
+UMZ_AAD_RE = re.compile(r"kalmido-(locknote|note|file):v1:[0-9]{1,19}:[0-9]{1,19}|kalmido-e2e:v1:[0-9]{1,19}")
 
 
 def umz_legacy_aad(prefix, old, *ids):
@@ -109,6 +109,7 @@ UMZ_DROP = {
     "list_files": {"path"},
     "events": {"href"},
     "contacts": {"href"},
+    "notes": {"client_ref"},  # 2.362.0 (#3090, review): the offline outbox mark of the old server (unique per person)
     # 2.278.0 B (#3094): time_entries.billed_at is kept (umz_billed): a billed entry never comes open again (billed twice)
 }
 # 2.273.0 A (#3030): the parts of an account export the import reads (umz_write; people + list_members through the sharing
@@ -120,6 +121,7 @@ UMZ_READ = frozenset((
     "time_entries", "habits", "habit_logs", "filters", "templates", "address_books", "contacts", "event_calendars", "events",
     "event_attendees", "journal", "mailbox", "settings", "people", "server_links",
     "e2e_keys",  # 2.278.0: the browser keys
+    "notes", "task_enc_notes",  # 2.362.0 (#3090): project notes, my encrypted task notes
 ))
 UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is empty; a name used twice adds up
     (N_("Tables"), ("sheets", "sheet_columns", "sheet_rows", "sheet_cells", "sheet_files", "sheet_hist")),
@@ -128,16 +130,23 @@ UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is
     (N_("Household budget"), ("budgets",)), (N_("Focus sessions"), ("pomos",)), (N_("Notepads"), ("list_notepads",)),
     (N_("Playbooks"), ("playbooks", "playbook_proposals")), (N_("Staying in touch"), ("contact_care",)),
     (N_("Saved arrangements"), ("view_layouts", "list_layouts", "view_layout_offers")), (N_("Task bells"), ("task_bell",)),
-    (N_("History"), ("activity",)), (N_("Direct messages"), ("direct_messages",)), (N_("Agent chats"), ("agent_chats", "agent_chat_prefs")),
+    (N_("History"), ("activity",)), (N_("Direct messages"), ("direct_messages",)), (N_("Agent chats"), ("agent_chats",)),
     (N_("My files"), ("private_files",)), (N_("Absences"), ("absences",)), (N_("Timesheets"), ("timesheets",)),
     (N_("Shared with me"), ("shared_lists", "shared_comments")), (N_("Notifications"), ("list_notif", "folder_notif")),
     (N_("Environments"), ("list_envs", "env_deploys")), (N_("Devices"), ("device_links",)),
     (N_("Assistant"), ("assistant_access", "assistant_log")),
+    (N_("Booking page"), ("appt_pages", "appt_types", "appt_bookings")), (N_("Polls"), ("polls", "poll_options", "poll_votes")),  # 2.360.2 D (#2561)
+    (N_("Forms"), ("forms", "form_entries")), (N_("Holiday allowance"), ("leave_quota",)),
     (N_("Log"), ("agent_steps",)), (N_("Log"), ("org_list_actions",)), (N_("Log"), ("merge_runs",)),
     (N_("API tokens"), ("api_tokens",)), (N_("Webhooks"), ("webhooks",)), (N_("Calendar subscriptions"), ("calendar_subscriptions",)),
     (N_("Karakeep connection"), ("karakeep",)), (N_("Newsletter connection"), ("newsletter_connection",)),
     (N_("Newsletter"), ("newsletter_segments", "newsletter_runs")), (N_("Planned agent jobs"), ("agent_schedules",)),
     (N_("Public links"), ("public_links",)), (N_("Feeds"), ("feeds",)),  # 2.85.0 B (#1162): moved by OPML export / import
+    # 2.360.4 (#3248): what I wrote or got elsewhere; the preview showed the technical names of these parts
+    (N_("Comments in other projects"), ("written_comments",)), (N_("Channel messages"), ("channel_messages",)),
+    (N_("Tasks in other projects"), ("other_tasks",)), (N_("Tasks I take part in"), ("task_people",)), (N_("Reactions"), ("reactions",)),
+    (N_("Stars"), ("kid_stars",)), (N_("Received notifications"), ("notifications",)), (N_("Sign-ins"), ("sessions",)),
+    (N_("Push devices"), ("push_devices",)), (N_("Agent chat settings"), ("agent_chat_prefs",)),
 )
 
 _UMI = {}  # user id -> running check / import thread
@@ -381,6 +390,7 @@ UMZ_ORG_SKIP = (  # archive prefix -> what the preview names as not taken over
     ("sheets/", N_("Tables")), ("videos/", N_("Video sign-offs")),  # 2.137.0 (#2344): named too
     ("lists/sprints.json", N_("Sprints")), ("tasks/people.json", N_("People on tasks")),  # 2.273.0 A (#3030)
     ("lists/history.json", N_("History")), ("tasks/history.json", N_("History")),
+    ("bookings/", N_("Booking page")),  # 2.362.0 (#3096): in the archive, not taken over (a booking page is one person's)
 )
 
 
@@ -619,7 +629,7 @@ def umz_preview(c, uid, man, data, can_invite):
         "user": {"name": _txt(u.get("name"), 100), "email": _email(u.get("email"))},  # the own address (plain in the file)
         "counts": {k: tables.get(k, 0) for k in ("lists", "sections", "tasks", "comments", "attachments", "list_files", "habits",
                                                   "filters", "templates", "time_entries", "event_calendars", "events", "address_books",
-                                                  "contacts", "journal")},
+                                                  "contacts", "journal", "notes")},  # 2.362.0 (#3090): + project notes
         "lists": lists[:500], "people": people[:500], "can_invite": bool(can_invite),
         "people_salt": umz_salt(man) or "",  # 2.239.0 A (#2882): the client checks a typed address against the keyed hash
         "server_links": [_txt(x.get("name"), 100) or _txt(x.get("base_url"), 200) for x in data.get("server_links", [])][:20],
@@ -1017,6 +1027,21 @@ def umz_write(c, run, uid, man, zf, files, data, people):
                 "kalmido-locknote:v1", r.get("legacy_aad"), r.get("task_id"), me_old)}, ts)
             if d:
                 umz_insert(c, "task_note_locks", d, rid=False)
+    for r in data.get("task_enc_notes", []):  # 2.362.0 (#3090): browser-encrypted with my content key: only my own
+        tid = run.m("tasks", r.get("task_id"))
+        if tid and _oid(r.get("user_id")) == me_old:
+            d = umz_row(c, "task_enc_notes", r, {"task_id": tid, "user_id": uid, "legacy_aad": umz_legacy_aad(
+                "kalmido-note:v1", r.get("legacy_aad"), r.get("task_id"), me_old)}, ts)
+            if d and umz_insert(c, "task_enc_notes", d, rid=False):
+                run.count("task_enc_notes")
+    for r in data.get("notes", []):  # 2.362.0 (#3090): the project notes of my lists (the trash stays behind)
+        run.step()
+        lid = run.m("lists", r.get("list_id"))
+        if not lid or lid == inbox or r.get("deleted_at"):
+            continue
+        d = umz_row(c, "notes", r, {"list_id": lid, "created_by": uid, "updated_by": uid}, ts)
+        if d and umz_insert(c, "notes", d):
+            run.count("notes")
     keys = [r for r in data.get("e2e_keys", []) if _oid(r.get("user_id")) == me_old] if run.kind != "org" else []
     if keys:  # 2.278.0 C (#3091): my key bundle -- taken while I have none here, never replacing my own keys
         k = e2e_import_keys(c, uid, keys[0], me_old)
@@ -1246,14 +1271,18 @@ def umz_share(c, run, uid, data, picks, can_invite, salt=None):
             # with the role the admin confirmed; until then nothing of the organisation is shared with it
             if run.org and run.kind == "org" and not umz_in_org(c, run.org, hit["id"]):
                 ojn_invite(c, run.org, hit["id"], umz_role(pick.get("role") or p.get("role")), by=uid)
+                run.created.setdefault("org_joins", []).append([run.org, hit["id"]])  # 2.360.2 M (#2561): the undo withdraws it
                 target, state = None, "org_invited"
                 run.warning(N_("Person invited to the organisation: until they accept, their content stays with you as the importing admin."))
         elif not hit and pick.get("invite") and can_invite:
             if not em or umz_email_hash(em, salt) != h:
                 state = "mismatch"  # review M1: the typed address is not the one of the file -- nobody is invited
             else:
-                target = umz_invite(c, run, uid, em, _txt(p.get("name"), 60))
+                target = umz_invite(c, run, uid, em, _txt(p.get("name"), 60), umz_role(pick.get("role") or p.get("role")))
                 state = "invited" if target else "failed"
+                if target and run.org:  # 2.360.2 M (#2561): like an existing account: nothing shared before the person accepts
+                    target, state = None, "org_invited"
+                    run.warning(N_("Person invited to the organisation: until they accept, their content stays with you as the importing admin."))
         n = 0
         if target:
             for old, role in lists.items():
@@ -1289,8 +1318,9 @@ def umz_fix_people(c, run, uid, names):
             run.warning(N_("Assignment not taken over (the person is not on this server or was not chosen)"))
 
 
-def umz_invite(c, run, uid, email, name):
-    """A new account for a missing person (instance admin) and the invitation link by e-mail (#697)."""
+def umz_invite(c, run, uid, email, name, role="member"):
+    """A new account for a missing person (instance admin) and the invitation link by e-mail (#697). 2.360.2 M (#2561): into an
+    organisation only by accepting an invitation (org_joins, in the admins' list of open invitations), in the confirmed role."""
     from ..accounts.invite import invite_new
     if c.execute("SELECT 1 FROM users WHERE lower(email)=?", (email,)).fetchone():
         return None  # the address exists but the admin does not see it: never a second account
@@ -1305,9 +1335,9 @@ def umz_invite(c, run, uid, email, name):
     c.execute("UPDATE users SET email=? WHERE id=?", (email, nid))
     uset(c, nid, "lang", usettings(c, uid).get("lang") or "en")
     if run.org:
-        from ..accounts.orgs import org_member_add
-        with system_ctx(c):  # the organisation's admin places the invited person in it (structure)
-            org_member_add(c, run.org, nid, "member")
+        with system_ctx(c):  # the organisation's admin invites a person who is no member (structure)
+            ojn_invite(c, run.org, nid, role, by=uid)
+        run.created.setdefault("org_joins", []).append([run.org, nid])
     try:
         invite_new(c, nid, uid, send=True)
     except Denied:
@@ -1385,6 +1415,8 @@ def umz_run(uid, iid, opts):
                 if o in people:
                     names[people[o]] = _txt(p.get("name"), 100)
             umz_fix_people(c, run, uid, names)
+            if iid_db and run.created.get("org_joins"):  # 2.360.2 M (#2561): made by the sharing, after the import was recorded
+                c.execute("UPDATE imports SET created=? WHERE id=?", (json.dumps(run.created), iid_db))
             bump(c)
             c.commit()
         finally:
@@ -1696,6 +1728,8 @@ def umz_undo(c, uid, r):
     for k, v in (cr.get("settings") or {}).items():
         if k in UMZ_SETTINGS and isinstance(v, dict) and cur.get(k) == v.get("new"):
             uset(c, uid, k, v.get("old") if v.get("old") is not None else "")
+    for oid, who in cr.get("org_joins") or []:  # 2.360.2 M (#2561): an invitation not accepted yet goes with the import
+        c.execute("DELETE FROM org_joins WHERE org_id=? AND user_id=? AND created_by=?", (int(oid), int(who), uid))
     c.execute("UPDATE imports SET undone_at=? WHERE id=?", (iso(now_utc()), r["id"]))
     bump(c)
     c.commit()

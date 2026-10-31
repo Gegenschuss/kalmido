@@ -20,7 +20,7 @@ function sg_draw(box, j, list) {
 }
 // the quotation (office_docs.js draws the placeholder for sent and decided quotations)
 const SG_ACTIONS = {signoff_link: N_('approval link created'), signoff_revoke: N_('approval link stopped'), signoff_accepted: N_('accepted by the customer'),
-  signoff_declined: N_('declined by the customer')};
+  signoff_declined: N_('declined by the customer'), signoff_delete: N_('approval record of a deleted video deleted')};
 function sg_box(d) {
   if (typeof OFD_ACTIONS === 'object') Object.assign(OFD_ACTIONS, SG_ACTIONS);  // the office log's words (office_docs.js loads later)
   if (d.kind !== 'offer' || d.status === 'draft') return '';

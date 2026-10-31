@@ -201,7 +201,13 @@ const OCF_FEATS = [
   ['books.vat_return', 'chart', N_('VAT return figures'), N_('The figures of the advance VAT return in the bookkeeping; filing stays with your tax software')],
   ['books.tax_dates', 'cal', N_('Tax dates'), N_('Deadlines of the VAT return and tax prepayments as recurring tasks')],
   ['books.export_csv', 'download', N_('Export for the tax advisor'), N_('Booking list as CSV, with invoices and receipts as ZIP - readable by any tax advisor')],
-  ['books.gobd', 'lock', N_('Finalising rules'), N_('Finalised documents stay locked, number gaps need a reason. Always on.')]];
+  ['books.gobd', 'lock', N_('Finalising rules'), N_('Finalised documents stay locked, number gaps need a reason. Always on.')],
+  // 2.380 F (#3411): points of Money in every country pack; off = no menu point, the data stays
+  ['money.cashflow', 'trend', N_('Cash flow'), N_('Expected income and expenses of the next months')],
+  ['money.kpi', 'chart', N_('Figures'), N_('Revenue, open items and margin per client')],
+  ['money.travel', 'plane', N_('Travel expenses'), N_('Trips with per diem allowances and receipts')],
+  ['money.meals', 'meal', N_('Entertainment receipts'), N_('Business meals with guests and reason')],
+  ['money.subs', 'repeat', N_('Subscriptions & tools'), N_('Running subscriptions, seats and what they cost')]];
 const OCF_FIXED = ['books.gobd'];  // cannot be switched off (packs.PACK_FEATURES switch false)
 const ocf_offers = () => OFC.info?.pack?.offers || {};
 const ocf_name = code => { const p = (PKC.packs?.country || []).find(x => x.code === code); return p ? pkc_nm(p) : code; };
@@ -210,7 +216,7 @@ function ocf_settingsHtml(dis) {
   pkc_sync();
   if (!PKC.packs && !PKC.packsBusy) setTimeout(pkc_loadPacks, 0);
   const p = OFC.info.pack || {}, of = ocf_offers(), off = OFC.info.settings?.features_off || [];
-  const mine = OCF_FEATS.filter(f => of[f[0]] === 'ready'), not = OCF_FEATS.filter(f => of[f[0]] !== 'ready');
+  const mine = OCF_FEATS.filter(f => of[f[0]] === 'ready' && !f[0].startsWith('money.')), not = OCF_FEATS.filter(f => of[f[0]] !== 'ready');
   const rt = p.retention || {};
   return `<h3>${tr('Functions')}</h3>${ofcII('functions')}
     <p class="muted">${esc(tr('Country pack: {0}', `${pkc_de() ? p.name : p.name_en || p.name} (${p.code})`))} · <button type="button" class="linkbtn" data-ostgo="packs">${tr('Change country')}</button></p>
@@ -219,8 +225,23 @@ function ocf_settingsHtml(dis) {
       return `<div class="row ocf-row"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="ocf-${esc(k.replace('.', '-'))}" data-feat="${esc(k)}" ${on ? 'checked' : ''} ${fixed ? 'disabled' : dis}><span class="swt" aria-hidden="true"></span></span><span>${ic(i, 's')} ${esc(tr(n))}</span></label><span class="muted ofchint">${esc(tr(d))}</span></div>`;
     }).join('')}</div>
     ${not.length ? `<p class="muted ofchint">${esc(tr('Not part of this country pack: {0}', not.map(f => tr(f[2])).join(', ')))}</p>` : ''}
-    <p class="muted ofchint">${esc(tr('Receipts are kept {0} years, books {1} years.', rt.receipts ?? 10, rt.books ?? 10))}</p>${ccb_settingsHtml(dis)}`;
+    <p class="muted ofchint">${esc(tr('Receipts are kept {0} years, books {1} years.', rt.receipts ?? 10, rt.books ?? 10))}</p>${ocm_settingsHtml(dis)}${ccb_settingsHtml(dis)}`;
 }
+// 2.440.0 (#3609): the points of the office menu, one switch each for the whole office. Off = only hidden, the data stays. The
+// points with a function of the country pack (2.380 F, #3411) stand here with their function's switch: one switch per point
+const OCM_POINTS = ['pipeline', 'gendocs', 'letters', 'time', 'contracts', 'cashbook', 'meals', 'travel', 'subs', 'bank', 'cards', 'cashflow', 'kpi', 'equipment', 'agreements'];
+function ocm_settingsHtml(dis) {
+  const off = OFC.info.settings?.menu_off || [], foff = OFC.info.settings?.features_off || [], of = ocf_offers();
+  const row = k => {
+    const i = OFM_ITEMS.find(x => x.key === k), f = i.need && OCF_FEATS.find(x => x[0] === i.need);
+    if (i.need && of[i.need] !== 'ready') return '';
+    const sw = i.need ? `id="ocf-${esc(i.need.replace('.', '-'))}" data-feat="${esc(i.need)}" ${foff.includes(i.need) ? '' : 'checked'}` : `id="ocm-${k}" data-ocm="${k}" ${off.includes(k) ? '' : 'checked'}`;
+    return `<div class="row ocf-row"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" ${sw} ${dis}><span class="swt" aria-hidden="true"></span></span><span>${ic(i.icon, 's')} ${esc(tr(i.name))}</span></label>${f ? `<span class="muted ofchint">${esc(tr(f[3]))}</span>` : ''}</div>`;
+  };
+  return `<h3>${tr('Menu points')}</h3><p class="muted ofchint">${esc(tr('A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.'))}</p>
+    <div class="ocf-list">${OCM_POINTS.map(row).join('')}</div>`;
+}
+const ocm_off = (k, off) => { const l = (OFC.info.settings?.menu_off || []).filter(x => x !== k); return off ? [...l, k] : l; };
 // 2.435.0 A (#3600): the blocks of the client card for the whole office (off = nobody of the office sees it at a client;
 // each person shows / hides and folds the others for themselves at the card; the details always show)
 function ccb_settingsHtml(dis) {

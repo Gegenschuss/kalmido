@@ -36,7 +36,7 @@ def capacity_h(c, uid):
 
 
 def wl_people(c, uid, org=None):
-    """[(id, row)] of the people of the workload view for uid: the organisation (org, else uid's first), visible to uid."""
+    """[(id, row)] of the people of the workload view for uid: the organisation (org, else the saved workspace's, else uid's first), visible to uid."""
     from ..accounts.orgs import user_orgs, visible_people
     u = g.user
     from ..accounts.orgroles import user_orgs_full
@@ -45,8 +45,10 @@ def wl_people(c, uid, org=None):
         if org not in mine and not u["is_admin"]:
             raise Denied(404)
         orgs = [org]
-    else:
-        orgs = mine[:1]
+    else:  # 2.380.2 (#3407): the saved workspace's organisation (the sidebar switch), else the first one
+        ws = str(usettings(c, uid).get("workspace") or "")
+        wo = int(ws[4:]) if ws.startswith("org:") and ws[4:].isdigit() else None
+        orgs = [wo] if wo in mine else mine[:1]
     vis = visible_people(c, uid)
     q = "SELECT * FROM users WHERE disabled=0 AND kid=0 AND COALESCE(kind,'user')!='agent'"
     if orgs:

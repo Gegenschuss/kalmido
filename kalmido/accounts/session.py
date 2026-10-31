@@ -16,7 +16,8 @@ from ..core.config import (
     OPEN_PATHS, PROXY_IGNORE, PUB_PREFIX, SESSION_DAYS, TRUSTED_PROXIES, TRUSTED_PROXY_COUNT, TRUSTED_PROXY_HEADERS,
 )
 from ..core.i18n import LANGS, tr
-from ..core.db import db, err, iso, now_utc
+from ..core.db import connect, db, err, gsetting, iso, now_utc
+from ..core.orgcrypt import ROT_LOCK_KEY, ROT_LOCK_TTL
 from ..core.ratedb import rate_clear, rate_counts  # 2.306.0 D1 (#2875): failures counted for every process
 from ..core.ratedb import rate_known_add, rate_known_at  # 2.312.0 C (#3265): known addresses for every process
 
@@ -147,6 +148,7 @@ app.wsgi_app = proxy_mw(app.wsgi_app)
 # ---- maintenance gate (restore of a backup). Every request and every background tick is an "active holder"; a
 # restore switches maintenance on, waits until it is the only holder left, swaps the data and switches it off.
 # Meanwhile new requests get 503 (except the health check and static files) and background threads wait.
+_PROXY_SHS = {}  # 2.360.2 M (#2561): account id -> when a proxy sign-in looks for tables shared with its address again
 _BG_TURN = {"f": None}  # 2.102.0 D (#1997): admin/worker.py wrk_turn -- a background loop runs in one process at a time
 
 
@@ -154,6 +156,27 @@ def bg_here():
     """2.193.0 D (#2220): False in the role web (admin/worker.py sets "web"): the queues start no thread there, the worker
     takes their rows from the tables."""
     return not _BG_TURN.get("web")
+
+
+# 2.360.2 L (#2561): the write lock of a key rotation holds for every process (the gate below only for its own one). Reads
+# never look; a write or a background tick asks the database at most once per ROT_LOCK_TTL seconds.
+_ROT_LOCK = {"at": 0.0, "until": 0.0}
+_ROT_READS = ("GET", "HEAD", "OPTIONS", "PROPFIND", "REPORT")
+
+
+def rot_locked():
+    now = time.time()
+    if now - _ROT_LOCK["at"] >= ROT_LOCK_TTL:
+        _ROT_LOCK["at"] = now
+        try:
+            c = connect()
+            try:
+                _ROT_LOCK["until"] = float(gsetting(c, ROT_LOCK_KEY) or 0)
+            finally:
+                c.close()
+        except Exception as ex:  # a database that does not answer fails the request itself; the gate stays open
+            print("rot_locked:", type(ex).__name__, flush=True)
+    return _ROT_LOCK["until"] > now
 
 
 class _Gate:
@@ -180,6 +203,8 @@ class _Gate:
     def bg(self):
         if _BG_TURN["f"] is not None:  # 2.102.0 D (#1997): waits while another process runs this loop
             _BG_TURN["f"]()
+        while rot_locked():  # 2.360.2 L (#2561): a background writer waits like a request (a dead run ends by its expiry)
+            time.sleep(1)
         self.enter(True)
         try:
             yield
@@ -226,6 +251,13 @@ def maint_gate():
         return jsonify(error=tr("The server is restoring a backup, please try again in a minute", lg=_accept_lang()),
                        maint=True), 503
     g.gate = True
+    # 2.360.2 L (#2561): signing in stays open, it seals nothing with an organisation's key. The header tells the client to
+    # keep the change in its queue (static/js/core.js), like a proxy's maintenance page.
+    if request.method not in _ROT_READS and not request.path.startswith("/api/auth/") and rot_locked():
+        r = jsonify(error=tr("Server in maintenance", lg=_accept_lang()), maint=True)
+        r.status_code = 503
+        r.headers["Retry-After"], r.headers["X-Kalmido-Maint"] = "30", "1"
+        return r
     return None
 
 
@@ -247,7 +279,8 @@ def authenticate():
         return api_authenticate()  # bearer token only (package B)
     if request.path.startswith(("/dav/", "/.well-known/")) or request.path == "/dav":
         return None  # 2.9.0 (#435): CalDAV: HTTP Basic with an app password (dav_login), never a cookie or the proxy header
-    if request.path.startswith(("/api/hooks/git/", "/api/hooks/issues/", "/api/hooks/deploy/", "/api/hooks/in/")) and request.method == "POST":
+    if (request.path.startswith(("/api/hooks/git/", "/api/hooks/issues/", "/api/hooks/deploy/", "/api/hooks/in/"))
+            or request.path == "/api/hooks/in") and request.method == "POST":  # 2.380 G (#2289): token in the header
         return None  # 2.2.0: inbound Git webhook: no user, no proxy header, the HMAC signature is the credential
         # (2.18.0: also the error-report webhook: the secret token in its URL is the credential; 2.60.0: and the deploy hook)
         # (2.115.0 A (#2061): and the inbound webhook of a list)
@@ -261,6 +294,10 @@ def authenticate():
         u = c.execute("SELECT * FROM users WHERE lower(proxy_login)=lower(?)", (val,)).fetchone()
         if u and not u["disabled"] and not is_agent(u):
             g.user, g.auth_via = u, "proxy"
+            if u["email"] and time.monotonic() > _PROXY_SHS.get(u["id"], 0):  # 2.360.2 M (#2561): no sign-in step with a proxy
+                _PROXY_SHS[u["id"]] = time.monotonic() + 3600
+                _shs_signin(c, u)
+                c.commit()
         else:
             g.auth_error, g.proxy_login = ("disabled" if u else "no_account"), val
     if not g.user and not g.auth_error:
@@ -427,7 +464,9 @@ def login_gate(keys, username, pre=""):
 
 
 def login_wait(keys, username, pre=""):
-    """2.282.0 (#3111): the gate of a sign-in step: None (go on, after the delay when "slow") or a 429 response."""
+    """2.282.0 (#3111): the gate of a sign-in step: None (go on, after the delay when "slow") or a 429 response.
+    2.360.4 (#3248): on purpose only for the sign-in routes: the OIDC start, setup codes, invitations, the password reset, the
+    agent setup and API tokens keep the hard address lock (_rate_blocked): they have no "known name" and guard against floods."""
     gate = login_gate(keys, username, pre)
     if gate == "ok":
         return None
@@ -478,6 +517,13 @@ def _rate_fail(keys):
     return out
 
 
+def _shs_signin(c, u):
+    """2.360.2 M (#2561): tables shared with the address of the account that signs in (sheets/shshare.py)."""
+    from ..sheets.shshare import shs_redeem
+    if u:
+        shs_redeem(c, u)
+
+
 def start_session(c, uid, remember, via="password"):
     """A new session (always a new random token: a login never adopts a token the browser brought along).
     via: password | 2fa | passkey | oidc | link (sign-in link) | restore (the admin after a backup restore)."""
@@ -491,6 +537,7 @@ def start_session(c, uid, remember, via="password"):
                ses_ua() if has_request_context() else ""))
     from ..admin.clientip import login_seen
     login_seen(c, uid)  # 2.33.0 (#834): many accounts from one private address = the proxy hides the client addresses
+    _shs_signin(c, c.execute("SELECT id, email, email_proved, kind FROM users WHERE id=?", (uid,)).fetchone())
     from flask import has_request_context
     from ..notify.sev import sev_login
     sev_login(c, uid, client_ip() if has_request_context() else "", via)  # 2.36.2 (#1133): an admin from a new address

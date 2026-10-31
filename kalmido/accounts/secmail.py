@@ -12,7 +12,6 @@ Nothing without outgoing e-mail (MAIL_OUT_ON), for agents or without an address.
 (bgjobs kind "mail:security", one try: never twice; integrations/mail.py registers it) after the request. A new device = a browser (User-Agent) that is not among the last
 SEC_DEVICES of the account (setting sec_devices, hashes only); the first sign-in after the update only stores it."""
 import hashlib
-import html
 import ipaddress
 import json
 
@@ -20,6 +19,7 @@ from ..core.config import APP_NAME, PUBLIC_URL
 from ..core.db import uset, usettings
 from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database errors in the log
 from ..core.i18n import N_, lang, tr
+from ..core.mailframe import mail_html
 from .bgjobs import BGJ_FNS, bgj_add
 
 SEC_DEVICES = 10
@@ -60,9 +60,8 @@ def sec_content(c, uid, ev, args, lg):
     lines = [line] + ([] if ev == "approved" else [t(SEC_NOT_ME)])
     subject = f"{APP_NAME}: {t(subj)}"
     text = "\n\n".join(lines) + f"\n\n{link}\n"
-    hb = "".join(f"<p>{html.escape(x)}</p>" for x in lines)
-    hb += f'<p><a href="{html.escape(link)}">{html.escape(t(N_("Open {0}"), APP_NAME) if ev == "approved" else t(N_("Security settings")))}</a></p>'
-    return subject, text, f"<!doctype html><html lang=\"{lg}\"><body style=\"font-family:sans-serif\">{hb}</body></html>"
+    button = t(N_("Open {0}"), APP_NAME) if ev == "approved" else t(N_("Security settings"))
+    return subject, text, mail_html(subject, lines, button, link, lang=lg)  # 2.420.0 B (#3499): the shared mail frame
 
 
 def sec_mask_ip(ip):

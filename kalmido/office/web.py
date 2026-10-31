@@ -15,13 +15,14 @@ from .packs import office_features, office_pack, office_pack_codes, office_pack_
 from .model import (
     MD_KINDS, office_create, office_delete, office_export, office_gate, office_import, office_org, office_role, office_row,
     office_rows, office_seed_texts, office_settings, office_settings_clean, office_settings_lock, office_settings_save, office_update, office_number_format,
-    office_number_next, office_scheme_clean, office_scheme_period, sr_public, pb_info, onc_preview, OFFER_COUNTERS,
+    office_number_next, office_scheme_clean, office_scheme_period, sr_public, pb_info, onc_preview, OFFER_COUNTERS, num_kind, num_scheme,
 )
 from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, ofx_log
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from .rights import AREA_LEGACY, ofr_area_of, ofr_mine, ofr_rights, office_can  # 2.187.0 A (#2476)
 from .rcsubmit import rsb_flag  # 2.356.0 D (#3129)
+from .cards import cc_flag  # 2.444.0 (#3447)
 
 IMPORT_MAX = 4 * 1024 * 1024
 
@@ -52,6 +53,7 @@ def office_settings_get():
                    industry=_industry(s), home_locked=of_home_locked(c, oid, pack),  # 2.189.0 (#2475)
                    used=of_used(c, oid),  # 2.276.0 A (#3039): what the office already holds (start page, folded group, menu points)
                    submit=rsb_flag(c, uid, oid),  # 2.356.0 D (#3129): "Submit receipt" (may hand in, does not see the bookkeeping)
+                   cards=cc_flag(c, uid, oid),  # 2.444.0 (#3447): the person holds a card here
                    **of_pack_choice(c, oid, role, cf), **pb_info(c, uid, oid))
 
 
@@ -212,9 +214,11 @@ def office_number_preview():
         return jsonify(preview="", valid=False, error=str(e))
     if kind == "offer":  # 2.118.0 A (#2265): ?counter=org|client|project (the choice on the page), example client / project from 1
         cnt = request.args.get("counter")
-        pv = onc_preview(c, oid, office_settings(c, oid), scheme, cnt if cnt in OFFER_COUNTERS else None, project=tr("Project"), client=tr("Client"), initials="AB")
+        pv = onc_preview(c, oid, office_settings(c, oid), scheme, cnt if cnt in OFFER_COUNTERS else None, project=tr("Project"), client=tr("Client"), initials="AB", kuerzel="ABC")
     else:
-        pv = office_number_next(c, oid, kind, scheme, peek=True, project=tr("Project"), client=tr("Client"), initials="AB")[0]
+        s = office_settings(c, oid)  # 2.433.0 (#3597): a correction on the shared counter peeks at the invoices' one
+        pv = office_number_next(c, oid, num_kind(s, kind), scheme, peek=True, pscheme=num_scheme(s, kind) if num_kind(s, kind) != kind else None,
+                                project=tr("Project"), client=tr("Client"), initials="AB", kuerzel="ABC")[0]
     return jsonify(preview=pv, valid=True, yearly=bool(office_scheme_period(scheme)))
 
 
@@ -390,9 +394,10 @@ def pb_move_post():
     """Body {name, confirm: true}: the owner of the personal office shown turns it into a new organisation named name, with
     themselves as its admin -- the same area id, so numbers, keys, files and the log stay as they are (no duplicate
     numbers); the owner's private clients move with it. One way, no undo. Only where organisations can be created: the
-    mode workspaces and an instance admin (the rule of POST /api/admin/orgs). Into an existing organisation: not yet."""
+    mode workspaces and an instance admin (the rule of POST /api/admin/orgs). Into an existing organisation: not yet.
+    2.422.0 (#2937): the owner herself too (the rule of POST /api/orgs: a company of her own, at most ORG_SELF_MAX)."""
     from flask import g
-    from ..accounts.orgs import ORG_NAME_MAX, instance_mode, org_member_add
+    from ..accounts.orgs import ORG_NAME_MAX, ORG_SELF_MAX, instance_mode, org_member_add, org_self_made_n
     from .model import pb_owner
     from .pbtransfer import pb_letter_detach
     c, uid, oid = _ctx(admin=True)
@@ -401,15 +406,18 @@ def pb_move_post():
         return err(tr("Only a personal office can move into an organisation"), 409)
     if not isinstance(b, dict) or b.get("confirm") is not True:
         return err(tr("Please confirm the move"))
-    if instance_mode(c) != "workspaces" or not g.user["is_admin"]:
+    if instance_mode(c) != "workspaces":
         raise Denied(403, tr("Only an admin of this server can create an organisation"))
+    own = not g.user["is_admin"]  # 2.422.0 (#2937): a company of her own (self_made: its e-mail domains only by a server admin)
     name = " ".join(str(b.get("name") or "").split())[:ORG_NAME_MAX]
     if not name:
         return err(tr("Name missing"))
     with system_ctx(c):  # creating an organisation (instance structure) out of the caller's own area
         if c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?) AND personal_of IS NULL", (name,)).fetchone():
             return err(tr("An organisation with this name exists"), 409)
-        if c.execute("UPDATE orgs SET name=?, personal_of=NULL WHERE id=? AND personal_of=?", (name, oid, uid)).rowcount != 1:
+        if own and org_self_made_n(c, uid) >= ORG_SELF_MAX:
+            return err(tr("You already have {0} companies of your own", ORG_SELF_MAX), 409)
+        if c.execute("UPDATE orgs SET name=?, personal_of=NULL, self_made=? WHERE id=? AND personal_of=?", (name, uid if own else 0, oid, uid)).rowcount != 1:
             return err(tr("Only a personal office can move into an organisation"), 409)
         org_member_add(c, oid, uid, "admin")
         moved = [r[0] for r in c.execute("SELECT id FROM clients WHERE org_id IS NULL AND created_by=?", (uid,))]

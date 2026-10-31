@@ -44,10 +44,11 @@ const pb_clOrg = () => OFC.info?.personal ? null : (OFC.info?.org_id || null);  
 const ofcWs = () => pb_clOrg() ? 'org:' + pb_clOrg() : 'private';  // 2.87.9 (#1940): the workspace of the shown office (importTargetConfirm)
 // 2.380.0 B (#3409): the documents' two tabs (office_docs.js): quotations and invoices
 const ofcDocTab = t => t === 'offers' || t === 'invoices';
-const ofcTab = () => OFC_TABS.some(t => t[0] === S.route.tab && (!t[6] || ofcFeat(t[6]))) ? S.route.tab : S.route.tab === 'import' ? 'settings'
+const ofcTab = () => ofm_menuOff(S.route.tab) ? 'start' : OFC_TABS.some(t => t[0] === S.route.tab && (!t[6] || ofcFeat(t[6]))) ? S.route.tab : S.route.tab === 'import' ? 'settings'
   : S.route.tab === 'rights' ? 'settings'  // 2.187.0 A (#2476): the rights page sits under Settings
   : S.route.tab === 'start' || (!S.route.tab && isMobile()) ? 'start' : (OFC_TABS.some(t => t[0] === ofm_entry().key) ? ofm_entry().key : 'offers');  // 2.39.1 (#1182): the import page sits under Settings; 2.87.9 (#1917): the start page (phone without a tab)
 // 2.147.0 (#2459): a tab with [6] = a function of the country pack that is off is no tab (a direct link opens the quotations)
+// 2.440.0 (#3609): a point the office switched off opens the start page (viewOffice puts the address right)
 // money / numbers of the master data: in the person's locale, the organisation's currency
 // 2.189.0 (#2475): the home currency (price list, books, cash flow) and the short sign of a currency (office/homecur.py)
 const ofcHome = () => OFC.info?.settings?.home_currency || 'EUR';
@@ -102,7 +103,7 @@ async function ofcLoad(kind, force) {
   OFC.loading[kind] = false;
   ofcDraw();
 }
-function ofcDraw() { if (S.route.mod !== 'office') return; const el = $('#view'); if (el) keepFocus(el, () => ofcPaint(el)); }
+function ofcDraw() { if ($('#s-biz')) biz_paint(); if (S.route.mod !== 'office') return; const el = $('#view'); if (el) keepFocus(el, () => ofcPaint(el)); ost_markBack(); }
 // 2.122.2 (#2327): a reload of the same office view (save, archive switch, year) keeps the old content until the new data
 // is there -- no short "Loading…" page that made the browser lose the scroll position -- and the scroll position stays.
 // A view that is still loading after 4 s is drawn anyway (a part that never loads must not freeze the old page).
@@ -123,6 +124,7 @@ function ofcPaint(el, force) {
   const ob = $('.ofbody', el); if (same && ob && btop && ob.scrollTop !== btop) ob.scrollTop = btop;  // 2.144.1 A (#2445): touch tablets scroll the page in .ofbody
   const r = OFCP.replay; OFCP.replay = null;
   if (r && same) { const b = el.querySelector(r); if (b) setTimeout(() => b.click(), 0); }
+  ost_markBack();
 }
 document.addEventListener('click', e => {
   const v = $('#view'); if (!OFCP.stale || !v || !v.contains(e.target) || !v.querySelector('.dash.office')) return;
@@ -141,10 +143,11 @@ function viewOffice() {
   if (!officeOn()) return `<div class="empty">${tr('Office & finance is off (Settings > Modules)')}</div>`;
   const tab = ofcTab();
   if (OFC.tab !== tab) { OFC.tab = tab; OFC.q = ''; }  // the search belongs to one tab
+  if (tab === 'start' && ofm_menuOff(S.route.tab)) setTimeout(() => { if (ofm_menuOff(S.route.tab)) location.replace('#office/start'); }, 0);  // 2.440.0 (#3609)
   pb_wsFollow();
   if (!OFC.info && !OFC.infoErr && !OFC.infoLoading) setTimeout(ofcInfo, 0);
   // 2.87.9 (#1917): no tab row any more -- the office menu (areas.js ofm_menuHtml, via mg_wrap) leads to every tab
-  if (OFC.info) ofm_admSeen(OFC.info.role === 'admin', OFC.info.rights, OFC.info.used);  // 2.276.0 A (#3039): + used
+  if (OFC.info) ofm_admSeen(OFC.info.role === 'admin', OFC.info.rights, OFC.info.used, OFC.info.settings?.menu_off);  // 2.276.0 A (#3039): + used; 2.440.0 (#3609): + the points switched off
   let body;
   if (OFC.infoErr) body = `<div class="empty nempty eact">${ic('building')}<span>${esc(OFC.infoErr)}</span><a class="btn" href="#settings">${tr('Settings')}</a></div>`;
   else if (!OFC.info) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
@@ -421,6 +424,7 @@ function ofcSettingsHtml() {
     <p class="muted" id="os-color-note"${ofcColorLight(s.color) ? '' : ' hidden'}>${esc(tr('Text in a light brand colour is printed in a darker variant of it.'))}</p>
     ${ofcRowF('os-paper', tr('Paper size'), ofcSel('os-paper', s.paper === 'letter' ? 'letter' : 'a4', [['a4', tr('A4 (DIN 5008)')], ['letter', tr('US-Letter (8.5 × 11 in)')]]))}${/* 2.357.0 A (#3156) */ ''}
     ${typeof bp_settingsHtml === 'function' ? bp_settingsHtml(s, dis) : ''}
+    </fieldset>${ost_p('tax', dis)}${ost_taxHtml()}${/* 2.365.2 D (#2789) */ ''}
     </fieldset>${ost_p('docs', dis)}
     <h3>${tr('Documents & numbers')}</h3>
     ${ofcRowF('os-lang', tr('Document language'), ofcSel('os-lang', s.lang, (S.languages || []).map(L => [L.code, L.name])))}
@@ -436,6 +440,7 @@ function ofcSettingsHtml() {
     ${ofcChk('os-small', p.code === 'DE' ? tr('Small business: no VAT (section 19 UStG)') : tr('Small business: no VAT'), s.small_business)}${typeof ux_info === 'function' ? ux_info('small_business') : ''}
     ${ofcSchemeHtml('os-inv-scheme', 'invoice', tr('Invoice numbers'), s.invoice_scheme, dis)}
     ${ofcSchemeHtml('os-cr-scheme', 'credit', tr('Credit note numbers'), s.credit_scheme, dis)}
+    ${ofcChk('os-cr-shared', tr('Invoice corrections count in the invoice series'), s.credit_shared)}${ofcII('credit_shared')/* 2.433.0 (#3597) */}
     ${ofcSchemeHtml('os-rm-scheme', 'reminder', tr('Reminder numbers'), s.reminder_scheme, dis)}
     ${ofcFeat('docs.delivery') ? ofcSchemeHtml('os-ls-scheme', 'delivery', tr('Delivery note numbers'), s.delivery_scheme, dis) : ''}
     ${typeof onumHtml === 'function' ? onumHtml() : ''}
@@ -455,6 +460,7 @@ function ofcSettingsHtml() {
     ${typeof dx_settingsHtml === 'function' && ofcFeat('books.datev') ? dx_settingsHtml(s, dis) : ''}
     ${typeof brl_settingsHtml === 'function' ? brl_settingsHtml() : '' /* 2.299.0 B (#3191): bank rules */}
     ${typeof bnr_settingsHtml === 'function' ? bnr_settingsHtml(dis) : '' /* 2.299.0 C (#3192): the reminder of the bank bookings without a receipt */}
+    ${typeof ccn_settingsHtml === 'function' ? ccn_settingsHtml(dis) : '' /* 2.444.0 (#3447): the reminder of the card positions without a receipt */}
     ${typeof rcm_settingsHtml === 'function' ? rcm_settingsHtml() : '' /* 2.424.0 B (#3450): receipts by e-mail */}
     </fieldset>${ost_p('docs', dis)}
     ${ofcRowF('os-inv-close-de', tr('Invoice closing (German)'), `<textarea id="os-inv-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.invoice_closing_de || '')}</textarea>`)}
@@ -496,10 +502,9 @@ function ofcSettingsHtml() {
     ${typeof pkc_html === 'function' ? pkc_html() : ''}
     ${typeof rk_settingsHtml === 'function' ? rk_settingsHtml() : ''}
     ${typeof bw_settingsHtml === 'function' ? bw_settingsHtml() : ''}
-    ${typeof cfs_settingsHtml === 'function' ? cfs_settingsHtml() : ''}
     </fieldset>${ost_p('docs')}${''/* 2.417.0 C (#3445): the test mode, per person (members too: a fieldset of its own, never disabled) */}
     ${typeof tri_settingsHtml === 'function' ? tri_settingsHtml() : ''}
-    </fieldset>${ost_p('company')}
+    </fieldset>${ost_p('data')}${''/* 2.365.2 D (#2789): the start balance moved to Bank & taxes, the master data file to Data */}
     <h3>${tr('Master data file')}</h3>
     <p class="muted">${tr('Services, equipment, sets, text blocks, contracts and these settings as a JSON file. Import adds what is missing.')}</p>
     <div class="lacts"><a class="btn sm" href="/api/office/export" download="office-master-data.json">${ic('download', 's')} ${tr('Export')}</a>
@@ -595,8 +600,8 @@ const ofcMdLabelHtml = (cf, dis) => ofcRowF('osc-md_label', tr('Printed as'), `<
 // 2.40.0 (#1382): the number schemes explained -- building blocks as buttons (inserted at the caret), a table behind (i),
 // the next number of each scheme with its counter (restarts every year or never), errors in plain words from the server
 const OFC_BB = [['{yyyy}', N_('Year'), '2026'], ['{yy}', N_('Year, short'), '26'], ['{seq:03}', N_('Running number, 3 digits'), '001'], ['{seq}', N_('Running number'), '1'],
-  ['{project}', N_('Project'), 'Imagefilm'], ['{client}', N_('Client'), 'Beispiel-AG'], ['{date}', N_('Date'), '20261014'],
-  ['{isodate}', N_('Date with hyphens'), '2026-10-14'], ['{initials}', N_('Initials of the person'), 'AB']];  // 2.138.2 A (#2391)
+  ['{project}', N_('Project'), 'Imagefilm'], ['{client}', N_('Client'), 'Beispiel-AG'], ['{kuerzel}', N_('Short code of the client'), 'TNP'], ['{date}', N_('Date'), '20261014'],
+  ['{isodate}', N_('Date with hyphens'), '2026-10-14'], ['{initials}', N_('Initials of the person'), 'AB']];  // 2.138.2 A (#2391); 2.433.0 (#3604): {kuerzel}
 const OFC_BB_VER = ['{version}', N_('Version'), '2'];  // 2.118.0 A (#2265): quotations only (the duplicate of a quotation = the next version)
 OFC.pv = OFC.pv || {};
 function ofcSchemeHtml(id, kind, label, val, dis) {
@@ -659,6 +664,7 @@ Object.assign(OFC_II, {
   indfilm: N_('Adds the shoot calculation (shooting days, crew, equipment) to quotations. Only useful for film and video productions.'),
   lines: N_('Free text for letterhead and footer, only used where the single fields above are empty.'),
   datev_auto: N_('Every invoice you send by e-mail is also mailed to the DATEV inbox, so you need not forward it by hand.'),
+  credit_shared: N_('On: a correction takes the next number of the invoice counter (e.g. 423_R, 424_RK, 425_R) and keeps its own scheme. Off: corrections have their own counter. Numbers already given stay.'),
   texts: N_('Introduction and closing are text blocks (tab Text blocks) that new quotations start with; each quotation can change them.'),
   small_business: N_('Under the small business rule (§ 19 UStG) you charge no VAT and print a note on your invoices instead. It applies only below the turnover limit; ask your tax advisor.'),
   cl_customer_no: N_('The customer number you give this client in your accounting (e.g. K-1042).'),
@@ -735,6 +741,7 @@ function ofcSettingsBody(form) {
     industry_packs: typeof pkc_indBody === 'function' ? pkc_indBody(form) : $('#os-ind-film', form)?.checked ? ['film'] : [],  // 2.47.0 (#1216), 2.76.0 (#1023): every os-ind-*
     intro_text_id: {de: +v('#os-intro-de') || null, en: +v('#os-intro-en') || null}, closing_text_id: {de: +v('#os-closing-de') || null, en: +v('#os-closing-en') || null},
     rights_default: {time_id: +v('#os-rt') || null, territory_id: +v('#os-rr') || null, media_id: +v('#os-rm') || null}, pack: v('#os-pack'),
+    ...($('#os-cr-shared', form) ? {credit_shared: $('#os-cr-shared', form).checked ? 1 : 0} : {}),  // 2.433.0 (#3597)
     invoice_scheme: v('#os-inv-scheme'), credit_scheme: v('#os-cr-scheme'), reminder_scheme: v('#os-rm-scheme'), payment_days: ofcNum(v('#os-paydays')), reminder_fee: ofcNum(v('#os-rmfee')),
     ...($('#os-skonto', form) ? {skonto_pct: ofcNum(v('#os-skonto')) || 0, skonto_days: ofcNum(v('#os-skonto-days')) || 0} : {}),  // 2.120.0 A (#2087)
     ...($('#os-exempt', form) ? {exempt_reason: v('#os-exempt').trim()} : {}),  // 2.296.0 B (#3169)
@@ -754,7 +761,21 @@ function ofcSettingsBody(form) {
 // ---- 2.113.0 (#2247): the settings in five areas (the pattern of Settings > Administration): one shown, the last one
 // remembered per device; an area may have several parts in the page's order (ost_p), fields sit in a fieldset that is
 // disabled for members
-const OST_SUBS = [['company', 'building', N_('Company')], ['docs', 'file', N_('Documents & numbers')], ['packs', 'pack', N_('Packs')], ['functions', 'sliders', N_('Functions')], ['data', 'archive', N_('Data')], ['access', 'shield', N_('Access')]];  // 2.147.0 (#2460): Functions
+const OST_SUBS = [['company', 'building', N_('Company')], ['tax', 'wallet', N_('Bank & taxes')], ['docs', 'file', N_('Documents & numbers')], ['packs', 'pack', N_('Packs')], ['functions', 'sliders', N_('Functions')], ['data', 'archive', N_('Data')], ['access', 'shield', N_('Access')]];  // 2.147.0 (#2460): Functions
+// 2.365.2 D (#2789): Bank & taxes -- what the tabs Bookkeeping, Logbook, Cash flow and Cash book set before (tax reserve and VAT
+// basis, tax dates, mileage allowance, start balance and monthly check of the cash flow, cash boxes). Every part keeps its own
+// route, autosave and undo (data-fg-skip: not a field of this form); the tabs keep a link here (ofcSetLink).
+function ost_taxHtml() {
+  if (!ofcAdmin()) return `<p class="muted">${tr('Only admins and the bookkeeping change this.')}</p>`;
+  return `<div class="ostax" data-fg-skip>${[typeof bkSettingsHtml === 'function' ? bkSettingsHtml() : '',
+    typeof txdSectionHtml === 'function' && ofcFeat('books.tax_dates') ? txdSectionHtml() : '',
+    typeof lb_rateSetHtml === 'function' ? lb_rateSetHtml() : '', typeof cfs_settingsHtml === 'function' ? cfs_settingsHtml() : '',
+    typeof fci_setHtml === 'function' ? fci_setHtml() : '', typeof cb_setHtml === 'function' ? cb_setHtml() : ''].join('')}</div>`;
+}
+// Enter in one of these fields saves it (blur = its change), never the whole settings form
+document.addEventListener('keydown', e => { const x = e.target; if (e.key === 'Enter' && !e.isComposing && x.tagName === 'INPUT' && x.closest?.('#ofc-set .ostax')) { e.preventDefault(); x.blur(); } }, true);
+// where a setting of a tab moved: a quiet line with the way into Settings > Company & office (events.js data-setgo)
+const ofcSetLink = (k, what) => `<p class="muted ofchint ofcsetl">${ic('gear', 's')} <span>${esc(what)}:</span> <button type="button" class="linkbtn" data-setgo="biz-${k}">${esc(tr('Settings › Company & office › {0}', tr(OST_SUBS.find(x => x[0] === k)?.[2] || 'Company & office')))}</button></p>`;
 const ost_cur = want => { const k = want || LS.get('ofcSetSub', 'company'); return OST_SUBS.some(x => x[0] === k) ? k : 'company'; };
 function ost_subsHtml() {
   const cur = ost_cur();
@@ -763,15 +784,51 @@ function ost_subsHtml() {
 const ost_p = (k, dis) => `<fieldset class="ostp" data-ostp="${k}" role="tabpanel" aria-labelledby="osts-${k}" ${ost_cur() === k ? '' : 'hidden'} ${dis || ''}>`;
 function ost_show(want, save) {
   const k = ost_cur(want); if (save) LS.set('ofcSetSub', k);
+  if ($('#s-biz #ofc-set')) { $('#s-biz-' + k)?.scrollIntoView?.({block: 'start'}); return; }  // 2.365.2 (#2789): Settings shows the areas one below the other
   $$('#ofc-set [data-ostsub]').forEach(b => { const on = b.dataset.ostsub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
   $$('#ofc-set [data-ostp]').forEach(p => { p.hidden = p.dataset.ostp !== k; });
   const b = $(`#ofc-set [data-ostsub="${k}"]`);
   if (typeof segReveal === 'function') segReveal(b); else b?.scrollIntoView?.({block: 'nearest', inline: 'nearest'});  // (settings.js loads lazily)
 }
+// ---- 2.365.2 (#2789): the settings live in Settings > Company & office (settings.js biz_draw): the same form #ofc-set with its
+// autosave for the current workspace (private = the person's own office), the areas one below the other with a heading each
+// (no tab row) and the office's rights as a link; the workspace badge switches the workspace like in the office
+function biz_paint() {
+  const box = $('#s-biz'); if (!box) return;
+  pb_wsFollow();
+  if (OFC.infoErr) { box.innerHTML = `<p class="muted">${esc(OFC.infoErr)}</p>`; return; }
+  if (!OFC.info) { if (!OFC.infoLoading && !OFC.pbWait) setTimeout(ofcInfo, 0); box.innerHTML = `<div class="muted mhint">${tr('Loading…')}</div>`; return; }
+  const rights = typeof orr_html === 'function' && OFC.info.role === 'admin' && OFC.info.rights;
+  keepFocus(box, () => {
+    box.innerHTML = `<div class="sbizws"><span class="muted">${esc(tr('Applies to'))}</span> ${ofcAreaHtml()}</div>${ofcSettingsHtml()}
+      ${rights ? `<h4 id="s-biz-rights">${esc(tr('Rights|office'))}</h4><p class="shint">${esc(tr('Who may see and change which part of the office.'))}</p><div class="row"><a class="btn sm" href="#office/rights" data-bizgo>${ic('shield', 's')} ${esc(tr('Rights in the office'))}</a></div>` : ''}`;
+    const form = $('#ofc-set', box); if (!form) return;
+    $('.ostsub', form)?.remove();
+    for (const [k, , n] of OST_SUBS) {
+      const fs = $$(`[data-ostp="${k}"]`, form).filter(f => f.children.length); if (!fs.length) continue;
+      const h = document.createElement('h4'); h.id = 's-biz-' + k; h.textContent = tr(n);
+      form.append(h, ...fs);
+      fs.forEach(f => { f.hidden = false; f.removeAttribute('role'); f.setAttribute('aria-labelledby', h.id); });
+    }
+  });
+  if (S.bizJump) biz_jump(box);
+}
+// 2.365.2 D (#2789): settingsModal('biz-<part>') (settings.js sets S.bizJump) scrolls once to the part's heading or to one of
+// these places, with the soft ring of the settings search
+const BIZ_AT = {peppol: '#pep-set', agents: '#os-agents-read', datev: '.dxset'};
+function biz_jump(box) {
+  const k = S.bizJump; S.bizJump = null;
+  const at = () => $(BIZ_AT[k] || '#s-biz-' + k, box) || $('#s-biz-' + (k === 'peppol' ? 'docs' : k === 'agents' ? 'access' : k === 'datev' ? 'data' : k), box);
+  setTimeout(() => {
+    const el = at(), r = el && (el.closest('.row, details, h3, h4') || el); if (!r) return;
+    for (let det = r.closest('details'); det; det = det.parentElement?.closest('details')) det.open = true;
+    r.scrollIntoView?.({block: el.matches('h4') ? 'start' : 'center'}); r.classList.add('sflash'); setTimeout(() => r.classList.remove('sflash'), 1600);
+  }, 30);
+}
 // every field saves itself: the part of the PUT body that belongs to it (null = no setting: the country's text field, search, ...);
 // a group the server keeps together goes as one (the DATEV booking export)
 const OST_FLAT = {'os-color': 'color', 'os-lang': 'lang', 'os-currency': 'currency', 'os-home': 'home_currency', 'os-scheme': 'offer_scheme', 'os-numat': 'offer_number_at',
-  'os-valid': 'offer_valid_days', 'os-small': 'small_business', 'os-inv-scheme': 'invoice_scheme', 'os-cr-scheme': 'credit_scheme', 'os-rm-scheme': 'reminder_scheme',
+  'os-valid': 'offer_valid_days', 'os-small': 'small_business', 'os-inv-scheme': 'invoice_scheme', 'os-cr-scheme': 'credit_scheme', 'os-cr-shared': 'credit_shared', 'os-rm-scheme': 'reminder_scheme',
   'os-paydays': 'payment_days', 'os-rmfee': 'reminder_fee', 'os-rmdays': 'reminder_deadline_days', 'os-einv': 'einvoice_format', 'os-datev': 'datev_email',
   'os-datev-auto': 'datev_auto', 'os-inv-close-de': 'invoice_closing_de', 'os-inv-close-en': 'invoice_closing_en', 'os-dl-close-de': 'delivery_closing_de', 'os-dl-close-en': 'delivery_closing_en', 'os-rm-text-de': 'reminder_text_de',
   'os-rm-text-en': 'reminder_text_en', 'os-prod-on': 'producing_on', 'os-pq': 'prod_quotient', 'os-ps': 'producing_service_id', 'os-pr': 'producing_rate',
@@ -797,6 +854,7 @@ function ost_part(el, full) {
   if (OST_SUB[id] && OST_SUB[id][0] === 'tax_rates') return {tax_rates: full.tax_rates || {}};  // 2.147.0 (#2461): both rates at once (an empty one = the pack's)
   if (OST_SUB[id]) { const [k, f] = OST_SUB[id]; return {[k]: {[f]: full[k][f]}}; }
   if (el.dataset.feat) return {features_off: ocf_off(el.dataset.feat, !el.checked)};  // 2.147.0 (#2460): one function on / off
+  if (el.dataset.ocm) return {menu_off: ocm_off(el.dataset.ocm, !el.checked)};  // 2.440.0 (#3609): one point of the office menu
   if (el.dataset.ccb) return {client_blocks_off: ccb_off(el.dataset.ccb, !el.checked)};  // 2.435.0 A (#3600): one block of the client card
   // an industry pack box: only this pack switches (the list of the others stays as saved, also when not all boxes are drawn)
   if (id.startsWith('os-ind-')) return {industry_packs: ost_packs(el.dataset.ind || id.slice(7), el.checked)};
@@ -826,7 +884,7 @@ async function ost_put(b) {
   return j.settings?.pack !== pk;
 }
 // what changes more than the field itself is drawn again (pack: its tax rates; currency: the symbols; industry packs: the cards)
-const ost_redraw = (part, pk) => pk ? ofcInfo(true) : ['currency', 'home_currency', 'industry_packs', 'features_off', 'tax_rates', 'retention_years'].some(k => k in part) ? ofcDraw() : null;  // 2.147.0 (#2460, #2461)
+const ost_redraw = (part, pk) => pk ? ofcInfo(true) : ['currency', 'home_currency', 'industry_packs', 'features_off', 'menu_off', 'tax_rates', 'retention_years', 'credit_shared'].some(k => k in part) ? ofcDraw() : null;  // 2.147.0 (#2460, #2461)
 const OST = {q: Promise.resolve()};
 function ost_save(el) {
   const form = el.closest?.('#ofc-set');
@@ -874,6 +932,13 @@ function ost_mark(el, st, x) {
   m.innerHTML = st === 'err' ? `${ic('alert', 's')}<span>${esc(x)}</span>` : `${ic('check', 's')}<span>${esc(tr('Saved'))}</span>${x ? `<button type="button" class="linkbtn" data-ost-undo>${esc(tr('Undo'))}</button>` : ''}`;
   m._e = st === 'ok' ? x : null; m.classList.add('on');
   clearTimeout(m._t); if (st === 'ok') m._t = setTimeout(() => { m.classList.remove('on'); m._e = null; }, 4000);
+  OST.mk = st === 'ok' && el.id ? {m, id: el.id} : null;
+}
+// 2.440.0 (#3782): a redraw after the save (a part that finished loading) took "Saved" away: the mark goes back to its field
+function ost_markBack() {
+  const k = OST.mk; if (!k || k.m.isConnected || !k.m.classList.contains('on')) return;
+  const row = $('#ofc-set #' + CSS.escape(k.id))?.closest('.row, .pkc-on');
+  if (row && !row.querySelector(':scope > .ostok')) row.append(k.m);
 }
 // 2.40.0 (#1378): one upload helper for the office (FormData + the CSRF header X-Requested-With via rawFetch, the server's error text)
 const ofcUpload = (url, file) => { const fd = new FormData(); fd.append('file', file); return rawFetch('POST', url, fd); };
@@ -904,7 +969,7 @@ document.addEventListener('click', async e => {
   if (a === 'pb-move') { pb_move(); return; }  // 2.47.3 (#1360)
   if (a === 'pb-transfer') { pb_transfer(); return; }  // 2.137.0 D (#1981)
   if (a === 'org-out') { ofc_orgOut(); return; }  // 2.356.0 A (#2926)
-  if (a === 'pb-ws') { if (typeof wsSet === 'function') wsSet(b.dataset.ws); return; }  // 2.47.3 (#1360)
+  if (a === 'pb-ws') { if (typeof wsSet === 'function') wsSet(b.dataset.ws, {keep: true}); return; }  // 2.47.3 (#1360); 2.397.0 (#3404): the office stays
   if (a === 'new') { e.preventDefault(); ofcModal(b.dataset.kind, null); }
   else if (a === 'open') { e.preventDefault(); const r = ofcRow(b.dataset.kind, +b.dataset.id); if (r) ofcModal(b.dataset.kind, r); }
   else if (a === 'log-all' || a === 'log-ag') { e.preventDefault(); OFC.logAg = a === 'log-ag'; ofcDraw(); }  // 2.51.0 A (#1348)
@@ -937,8 +1002,9 @@ document.addEventListener('focusout', e => { if (e.target.closest?.('#ofc-set'))
 document.addEventListener('focusout', e => { const t = e.target; if (/^(INPUT|TEXTAREA)$/.test(t.tagName) && !/^(checkbox|radio|file|hidden)$/.test(t.type) && t.closest('#ofc-set') && t.value !== t.defaultValue) ost_save(t); });
 // 2.138.2 B (#2395): a short multi-line field (company name) grows with its text up to `max` rows, no inner scrollbar
 function ofcGrow(ta, max = 3) {
-  ta.rows = 1;
-  const n = Math.max(1, String(ta.value).split('\n').length);
+  const lo = Math.max(1, +ta.dataset.growMin || 1);  // 2.431.0 B (#3594): a field may start with more than one row
+  ta.rows = lo;
+  const n = Math.max(lo, String(ta.value).split('\n').length);
   ta.rows = Math.min(max, n);
   while (ta.rows < max && ta.scrollHeight > ta.clientHeight + 1) ta.rows++;
 }

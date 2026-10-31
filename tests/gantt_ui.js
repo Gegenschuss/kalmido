@@ -12,7 +12,7 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return r.json(); };
-const until = async (fn, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await fn()) return true; await sleep(100); } return false; };
+const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, step: 100});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const ds = n => TC.day(n);
 const lastModal = d => [...d.querySelectorAll('.modal')].pop();
 const change = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
@@ -213,7 +213,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   md = lastModal(d);
   // 2.352.0 C (#2751): no switch "Progress and status" any more; the project features are a folding part, closed at first
   check(md.querySelector('#l-kind').value === 'list' && !md.querySelector('#l-kindp') && md.querySelector('#lm-sec-proj:not([open]) .lptype'), 'new list dialog: no switch, the project features folded (2.352.0)');
-  check(md.querySelector('#l-dab') && /shopping and packing/i.test(md.textContent), '2.7.2: "Show completed at the bottom" instead of a type');
+  check(md.querySelector('#l-dab') && /for example in shopping lists/i.test(md.textContent), '2.7.2: "Show completed at the bottom" instead of a type');
   md.remove();
   const srow = d.querySelector(`#side .srow[data-list="${PL}"]`);
   srow.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true})); await sleep(100);

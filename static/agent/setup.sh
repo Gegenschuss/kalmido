@@ -95,6 +95,8 @@ msg_de() {
     nolistfetch) echo "die Liste der Starter-Dateien (%sstarter_files.txt) kann nicht geladen werden; diese Version ist vielleicht noch nicht veröffentlicht – versuche es später noch einmal oder nimm --from ORDNER" ;;
     skippath) echo "  %s übersprungen (keine Pfade erlaubt)" ;;
     nofetch) echo "%s kann nicht geladen werden" ;;
+    shabad) echo "%s weicht von der Prüfsumme ab, die Kalmido geschickt hat – nicht installiert. Die Download-Adresse liefert eine andere Datei als diese Version; frag deinen Kalmido-Admin" ;;
+    shanone) echo "  (Kalmido hat keine Prüfsummen der Starter-Dateien geschickt: ältere Version, nicht geprüft)" ;;
     skipfile) echo "  %s nicht verfügbar (übersprungen)" ;;
     dry_mcp) echo "  (Probelauf) %s schreiben (MCP-Server kalmido: %s %s)" ;;
     s_auto) echo "Starte bei jeder Anmeldung" ;;
@@ -162,6 +164,8 @@ msg_en() {
     nolistfetch) echo "cannot fetch the starter file list (%sstarter_files.txt); this version may not be published yet - try again later or use --from DIR" ;;
     skippath) echo "  skipped %s (no paths allowed)" ;;
     nofetch) echo "cannot fetch %s" ;;
+    shabad) echo "%s does not match the checksum Kalmido sent - not installed. The download address serves another file than this version; ask your Kalmido admin" ;;
+    shanone) echo "  (Kalmido sent no checksums of the starter files: an older version, not checked)" ;;
     skipfile) echo "  %s not available (skipped)" ;;
     dry_mcp) echo "  (dry run) write %s (MCP server kalmido: %s %s)" ;;
     s_auto) echo "Starting it at every login" ;;
@@ -278,10 +282,17 @@ stop_autostart() {
   if [ "$OS" = mac ]; then
     [ -f "$PLIST" ] && run launchctl bootout "gui/$(id -u)" "$PLIST" 2>/dev/null
     # 2.157.0 (#1517): the background copy of a setup without a screen login (see launch_bg)
-    [ -f "$INST/launchd-now.plist" ] && run launchctl bootout "user/$(id -u)/$LABEL.now" 2>/dev/null
+    if [ -f "$INST/launchd-now.plist" ]; then
+      run launchctl bootout "user/$(id -u)/$LABEL.now" 2>/dev/null
+      run rm -f "$INST/launchd-now.plist"
+    fi
   else
     [ -f "$UNITF" ] && run systemctl --user disable --now "$UNIT" 2>/dev/null
   fi
+  # 2.443.0 (#2940): a launcher of this instance that is still running (started by hand), as in setup.ps1; its TERM trap ends the agent
+  stale=$( { ps -A -o pid= -o args= | KALMIDO_INST=$INST awk 'index($0, ENVIRON["KALMIDO_INST"] "/agent_launcher.sh") { print $1 }'; } 2>/dev/null)
+  # shellcheck disable=SC2086 -- a list of numbers
+  [ -z "$stale" ] || run kill -TERM $stale 2>/dev/null
   return 0
 }
 
@@ -323,7 +334,7 @@ else
   # the code goes to python in the environment, the token straight into the env file (mode 600) -- neither is printed
   out=$(KALMIDO_SETUP_CODE=$CODE KALMIDO_SETUP_URL=$URL KALMIDO_SETUP_ENV=$ENVF KALMIDO_SETUP_HOST=$HOSTN \
         KALMIDO_SETUP_DIR=$DIR KALMIDO_SETUP_OS=$OS KALMIDO_M_REF="$(msg refused)" KALMIDO_M_DEF="$(msg refused_def)" KALMIDO_M_REACH="$(msg noreach)" "$PY" - <<'PYEOF'
-import json, os, re, sys, urllib.error, urllib.request
+import json, os, re, shlex, sys, urllib.error, urllib.request
 e = os.environ
 body = json.dumps({"code": e["KALMIDO_SETUP_CODE"].strip(), "host": e["KALMIDO_SETUP_HOST"][:80], "folder": e["KALMIDO_SETUP_DIR"][:300],
                    "os": e["KALMIDO_SETUP_OS"]}).encode()
@@ -358,13 +369,25 @@ with open(e["KALMIDO_SETUP_ENV"] + ".new", "w", encoding="utf-8") as f:
     f.write("# Kalmido agent %s (%s), set up by agent-setup.sh -- keep this file private\n" % (nm, un))
     f.write("KALMIDO_URL=%s\nKALMIDO_TOKEN=%s\nKALMIDO_EVENTS=1\n" % (e["KALMIDO_SETUP_URL"], r["token"]))  # the address that worked here
     # one state folder per instance (event cursor, approvals, lock): two project folders on one computer never share one
-    f.write("KALMIDO_STATE_DIR=%s\n" % os.path.join(os.path.dirname(e["KALMIDO_SETUP_ENV"]), "state"))
+    # 2.443.0 (#2940): quoted, the launcher reads this file as shell (a space in the home folder)
+    f.write("KALMIDO_STATE_DIR=%s\n" % shlex.quote(os.path.join(os.path.dirname(e["KALMIDO_SETUP_ENV"]), "state")))
+    if e.get("KALMIDO_PYTHON"):  # 2.443.0 (#2940): the autostart runs without this shell's variables
+        f.write("KALMIDO_PYTHON=%s\n" % shlex.quote(e["KALMIDO_PYTHON"]))
     f.write("".join(ln + "\n" for ln in keep))
 os.umask(old)
 os.chmod(e["KALMIDO_SETUP_ENV"] + ".new", 0o600)
 os.replace(e["KALMIDO_SETUP_ENV"] + ".new", e["KALMIDO_SETUP_ENV"])
 # 2.306.0 (#2927): the server's version next to the starter files (the MCP server reports it; they have no VERSION file)
 ver = str(r.get("version") or "")
+# 2.380 G (#3390): the checksums of the starter files ("<sha256>  <name>" lines; none from an older Kalmido = no file, no check)
+shaf = os.path.join(os.path.dirname(e["KALMIDO_SETUP_ENV"]), "starter_sha256.txt")
+sha = r.get("starter_sha256") if isinstance(r.get("starter_sha256"), dict) else {}
+sha = {k: v for k, v in sha.items() if re.fullmatch(r"[A-Za-z0-9._-]{1,80}", str(k)) and re.fullmatch(r"[0-9a-f]{64}", str(v))}
+if sha:
+    with open(shaf, "w", encoding="utf-8") as f:
+        f.write("".join("%s  %s\n" % (v, k) for k, v in sorted(sha.items())))
+elif os.path.exists(shaf):
+    os.remove(shaf)
 if re.fullmatch(r"\d+(\.\d+){1,3}", ver):
     with open(os.path.join(os.path.dirname(e["KALMIDO_SETUP_ENV"]), "VERSION"), "w", encoding="utf-8") as f:
         f.write(ver + "\n")
@@ -389,22 +412,39 @@ fetch() {  # fetch NAME DEST -> 0 when it worked
   if [ -n "$FROM" ]; then [ -f "$FROM/$1" ] && cp "$FROM/$1" "$2"; return; fi
   curl -fsSL --max-time 60 "$STARTER_BASE$1" -o "$2" 2>/dev/null
 }
+# 2.380 G (#3390): a downloaded starter file must have the checksum Kalmido sent with the token (starter_sha256.txt); a file
+# that differs or is not in the list stops the setup before it is installed. --from DIR (a local copy) and an older Kalmido
+# without checksums are not checked
+SHAF=$INST/starter_sha256.txt
+shaok() {  # shaok NAME FILE -> 0 when FILE may be installed as NAME
+  [ -z "$FROM" ] && [ -s "$SHAF" ] || return 0
+  "$PY" -c 'import hashlib, sys
+want = dict(reversed(ln.split()) for ln in open(sys.argv[1], encoding="utf-8") if len(ln.split()) == 2)
+sys.exit(0 if want.get(sys.argv[2]) == hashlib.sha256(open(sys.argv[3], "rb").read()).hexdigest() else 1)' "$SHAF" "$1" "$2" 2>/dev/null
+}
 if [ "$DRY" = 1 ]; then
   sayf dry_files "${FROM:-starter}" "$INST"
 else
   [ -n "$FROM" ] || [ -n "$STARTER_BASE" ] || dief nobase
   # 2.360.0 C (#2496): the starter files (they run here) only over https or from this Kalmido itself
   case "$STARTER_BASE" in ""|https://*|"$URL"/*) ;; *) [ -n "$FROM" ] || dief basehttp "$STARTER_BASE" ;; esac
-  if ! fetch starter_files.txt "$INST/starter_files.txt"; then
+  [ -n "$FROM" ] || [ -s "$SHAF" ] || sayf shanone
+  rm -f "$INST"/*.new  # 2.443.0 (#2940): what a broken earlier setup left, as in setup.ps1
+  if ! fetch starter_files.txt "$INST/starter_files.txt.new"; then
+    rm -f "$INST/starter_files.txt.new"
     [ -z "$FROM" ] || dief nolist "$FROM"
     # 2.44.0 (review): no fallback to another branch -- the starter must match this instance's version
     dief nolistfetch "$STARTER_BASE"
   fi
+  shaok starter_files.txt "$INST/starter_files.txt.new" || { rm -f "$INST/starter_files.txt.new"; dief shabad starter_files.txt; }
+  mv "$INST/starter_files.txt.new" "$INST/starter_files.txt"
   while IFS= read -r f || [ -n "$f" ]; do
     f=${f%%#*}; f=$(printf '%s' "$f" | tr -d ' \r')
     [ -n "$f" ] || continue
     case "$f" in */*|..*) sayf skippath "$f"; continue ;; esac
-    if fetch "$f" "$INST/$f.new"; then mv "$INST/$f.new" "$INST/$f"; say "  $f"
+    if fetch "$f" "$INST/$f.new"; then
+      shaok "$f" "$INST/$f.new" || { rm -f "$INST/$f.new"; dief shabad "$f"; }
+      mv "$INST/$f.new" "$INST/$f"; say "  $f"
     else rm -f "$INST/$f.new"
       case " $REQUIRED " in *" $f "*) dief nofetch "$f" ;; esac
       sayf skipfile "$f"

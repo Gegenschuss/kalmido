@@ -1,56 +1,5 @@
 # Third-party notices
 
-## Lucide icons
-
-The interface icons (SVG paths in `static/app.js`) are taken from [Lucide](https://lucide.dev), used under the ISC license. Some of them derive from Feather (MIT). Full license text:
-
-```
-ISC License
-
-Copyright (c) 2026 Lucide Icons and Contributors
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
----
-
-The following Lucide icons are derived from the Feather project:
-
-airplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out
-
-The MIT License (MIT) (for the icons listed above)
-
-Copyright (c) 2013-present Cole Bemis
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-```
-
 ## Geist and Geist Mono fonts
 
 The interface fonts in `static/fonts/` (`Geist-Variable.woff2`, `GeistMono-Variable.woff2`, from the
@@ -101,10 +50,27 @@ Kalmido itself and only loaded when a page has a formula or a diagram; the brows
   [niccokunzmann/x-wr-timezone](https://github.com/niccokunzmann/x-wr-timezone)
 - click (BSD-3-Clause), dependency of x-wr-timezone
 - Pillow (MIT-CMU / HPND), profile photos (resize, orientation, metadata removal)
-- pypdf 6.19.0 (BSD-3-Clause), reads the text layer of PDF attachments for agents and the briefing field
-- pi-heif 1.4.0 (BSD-3-Clause; bundles libheif and libde265, LGPL-3.0, used unmodified as shared libraries, decoding only),
+- pypdf (BSD-3-Clause), reads the text layer of PDF attachments for agents and the briefing field
+- pi-heif (BSD-3-Clause; bundles libheif and libde265, LGPL-3.0, used unmodified as shared libraries, decoding only),
   reads HEIC / HEIF photos of receipts (2.146.0); source: [bigcat88/pillow_heif](https://github.com/bigcat88/pillow_heif)
-- xlrd 2.0.2 (BSD), reads old Excel files (.xls) in the legacy import of the office (2.185.0)
+- xlrd (BSD-3-Clause), reads old Excel files (.xls) in the legacy import of the office (2.185.0)
+- psycopg, psycopg-binary and psycopg-pool (LGPL-3.0-only), the PostgreSQL driver, used unmodified as installed libraries;
+  source: [psycopg/psycopg](https://github.com/psycopg/psycopg) and [psycopg/psycopg-pool](https://github.com/psycopg/psycopg-pool).
+  psycopg-binary bundles libpq (PostgreSQL License) and OpenSSL (Apache-2.0)
+- webauthn (BSD-3-Clause), passkeys
+- cbor2 (MIT), passkey data
+- segno (BSD-3-Clause), QR codes
+- pyasn1 and pyasn1-modules (BSD-2-Clause), pyOpenSSL (Apache-2.0), dependencies of webauthn
+- typing-extensions (PSF-2.0)
+- Dependencies installed along with the above: Jinja2, MarkupSafe, itsdangerous, blinker, cffi, pycparser, six (BSD-3-Clause / MIT)
+
+The version of every package is pinned in the `Dockerfile`; each package carries its license file in the image.
+
+## System packages in the image (Debian)
+
+The published image is based on Debian and installs, among others, poppler-utils (GPL-2.0 / GPL-3.0), tesseract-ocr
+(Apache-2.0), libzbar0t64 (LGPL-2.1), postgresql-client-17 (PostgreSQL License) and openssh-client (BSD). Their license
+texts are in the image under `/usr/share/doc/<package>/copyright`, the sources at [sources.debian.org](https://sources.debian.org).
 
 ## Optional embedding service kalmido-embed (embed/, 2.59.0)
 

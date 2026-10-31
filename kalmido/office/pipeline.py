@@ -242,11 +242,20 @@ def _update(c, oid, did, row):
 def pl2_offer_status(c, oid, doc_id, status):
     """A quotation of office area oid got status: accepted moves the deals bound to it to won (probability 100). Called
     after the status change by docs.odoc_status and by part C's sign-off over the client link (the caller commits).
-    Declined / others: nothing (the view shows the quotation's state). Returns the ids of the deals moved."""
+    Declined / others: nothing (the view shows the quotation's state). 2.437.0 B (#3621): a deal bound to a quotation this one
+    replaces follows to it. Returns the ids of the deals moved."""
     if status != "accepted":
         return []
     if c.execute("SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND trial<>0", (doc_id, oid)).fetchone():
         return []  # 2.144.10 B (#2576): a trial quotation never wins a deal
+    seen, cur = set(), doc_id
+    while cur and cur not in seen:
+        seen.add(cur)
+        x = c.execute("SELECT replaces_id FROM office_docs WHERE id=? AND org_id=?", (cur, oid)).fetchone()
+        cur = x[0] if x else None
+    seen.discard(doc_id)
+    if seen:
+        c.execute(f"UPDATE office_deals SET offer_id=? WHERE org_id=? AND deleted_at IS NULL AND offer_id IN ({','.join('?' * len(seen))})", [doc_id, oid, *seen])
     ids = [r[0] for r in c.execute("SELECT id FROM office_deals WHERE org_id=? AND offer_id=? AND deleted_at IS NULL AND stage!='won'",
                                    (oid, doc_id)).fetchall()]
     for did in ids:

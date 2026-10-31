@@ -42,7 +42,7 @@ const WANT = '## Intro\n[[Other]]\n![pic](/api/files/nodes/999/content)\n- Alpha
     check(lg === 200, `${tag}: login`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await nav(B + `#wiki/${run.id}`);
-    const until = async (expr, n = 40) => { for (let i = 0; i < n; i++) { const x = await ev(expr).catch(() => null); if (x) return x; await sleep(250); } return ev(expr).catch(() => null); };
+    const until = (expr, n) => require('./boot').until(() => ev(expr).catch(() => null), {timeout: n ? n * 250 : 15000, step: 250});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
     await until(`!!document.querySelector('[data-wk="mode"][data-m="edit"]')`);
     await ev(`(() => { document.querySelector('[data-wk="mode"][data-m="edit"]').click(); return 1; })()`);
     await until(`!!document.querySelector('#wk-body') && !!document.querySelector('.wembar [data-wemf]')`);

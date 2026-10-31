@@ -26,7 +26,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(150); } return fn(); };
+const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el, o = {}) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const change = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
 const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,family,team';
@@ -97,7 +97,8 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   w.eval(`openDetail(${T1})`); await until(() => d.querySelector('#d-tl .cm'));
   const kids = [...d.querySelectorAll('#detail .dbody > *, #detail .dcpane > *')].map(x => x.id || x.className);
   check(kids.indexOf('d-more') >= 0 && kids.indexOf('d-tl') === kids.length - 1 && kids.indexOf('d-more') < kids.indexOf('d-tl'), '#957: "More details" above, the comments last ' + kids.join('|').slice(0, 200));
-  check(/1 tag/.test(d.querySelector('#d-more .dmsum')?.textContent || ''), '#957: the folded details say what they hold ' + d.querySelector('#d-more summary')?.textContent);
+  // 2.380 F (#3435): a section with content stands on its own above "More details", which holds only the empty ones
+  check(!d.querySelector('#d-more .tagpill') && [...d.querySelectorAll('#detail .dsec .tagpill')].some(x => /outside/.test(x.textContent)), '#957 #3435: the tag stands above the folded details');
   check(d.querySelector('#d-md.clamp') && w.getComputedStyle(d.querySelector('#d-md')).maxHeight !== 'none', '#994: a 12-line description still folds');
   w.eval('closeDetail()');
   w.close();

@@ -133,6 +133,7 @@ The most used helpers:
 | `core/csvimport.py` | 2.140.0 (#2134): the statement reader of the household budget and the office's bank reconciliation: CSV (delimiter, header row, guess, known bank layouts, mapping, rows), CAMT.052 / .053 (no DOCTYPE / ENTITY), the duplicate count. |
 | `core/compress.py` | 2.65.0 (#1505): JSON answers from 1 KB on go out gzip-compressed when the client accepts it (not files, streams, HEAD, 304 or answers that already carry a Content-Encoding). |
 | `core/pages.py` | HTML pages, security headers, /api/version, the share target, quick capture, /drop and the ntfy share inbox. |
+| `core/mailframe.py` | 2.420.0 (#3499): the one HTML frame of every mail (mail_html: table layout, 560 px card, petrol button, escaped texts); the text parts stay with their callers. |
 | `core/instance.py` | Version, update check and instance settings (admins). |
 | `core/state.py` | GET /api/state: everything the web client loads at start and after a change. |
 | `lists/lists.py` | Lists: create, change, share (people + agents), members, sidebar order. |
@@ -395,6 +396,7 @@ registering the ones of its area.
 | `wiki.js` | 2.49.0 (#1199): `#wiki` / `#wiki/<id>` = the knowledge pages of a space (an organisation or private): tree from the paths, editor with `[[` suggestions and autosave, backlinks, templates, ZIP export / import. 2.169.0 (#2671): the offline copy per space (`wko_*`, IndexedDB `kalmido-wiki`), offline edits via the outbox, conflicts at the page. |
 | `mindmap.js` | 2.49.0 (#1201): the list view "Mind map" (SVG, keys like Mindjet, drag to rehang, pan / pinch, outline, export Markdown / SVG / PNG, outline import) and the ```mindmap block of knowledge pages. |
 | `notesall.js` | 2.45.0 (#1516): `#notes` = the notes of all lists and projects (pinned first, a filter by list, a search in title and text, a new note in a picked list). |
+| `navmenu.js` | 2.418.0 (#3560): the editor of the areas' menus and the tab bar (Minus / Plus / grip, Hidden, Done), in place of a panel / the office's start page and under Settings > Navigation; the org admins' menu points (`nav_orgDraw`). Loaded on demand (module `navmenu`); the model (`nav_pref`, `nav_hid`, `nav_sort`) is in `areas.js`, the setting `nav_menus` and `orgs.nav_off` in `kalmido/accounts/navmenus.py`. |
 | `lazyload.js` | 2.53.0 (#1410): modules loaded on demand (`loadModule`, the stand-ins of their functions, `officeOn`), see below. |
 | `setcore.js` | 2.53.0 (#1410): the parts of the settings needed from the start: Web Push on this device, the app badge, the service worker's messages, the settings sections and modules, the project links. |
 | `ctlinks.js` | 2.53.0 (#1410): the contacts in the task panel ("People and dates", linking a contact). |
