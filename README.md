@@ -19,6 +19,12 @@
 
 ## What's new
 
+**2.451.0** (2026-10-31):
+- **Workspaces**: each workspace remembers its own view (page, open task, scroll position, sidebar) on every device.
+- **Fields and board**: choice fields as a stage bar ("Ordered (stages)") and the board's time per card with yellow / red limits per column.
+- **Moving**: the account export now includes project notes and encrypted task notes; the organisation export includes the team chat channels with their files.
+- **Self-hosting**: on Windows `update.ps1` also makes a `pg_dump` into `data/backups/` before the update.
+
 **2.436.0** (2026-10-31):
 - **Office**: receipts by e-mail - forward invoice mails to your office address, Kalmido fetches linked invoice PDFs by itself; the client card's blocks fold and can be switched off per office.
 - **Documents**: the list can be sorted (date, arrival, sender, amount, due date, title).
