@@ -8,6 +8,7 @@ organisation is told to its admins. Invented names only (example.com).
    new task, into the project of the first import; a row deleted since comes back; into an organisation the same file is a
    wanted copy (another target); a project that went to somebody else gets nothing more, one in the trash is not there;
    after the undo the file counts as new
+ - 2.452.0 (#3810): the account import stays remembered after more than 20 other imports, through both places that tidy up
  - #3101: bob exports his project of the organisation: its admin gets ONE News (the count, no name), the log has the row, a
    second export of the day tells nobody again; bob's private project does not count
 Starts its OWN container (start.sh). usage: p2362_3_import_again_test.py <datadir>"""
@@ -197,11 +198,38 @@ j = run(F, iid)
 check(one("SELECT COUNT(*) FROM lists WHERE owner_id=? AND name='Umzug Probe' AND id>? AND deleted_at IS NULL", (FID, LID)) >= 1,
       "a project in the trash is not there: it comes back")
 
+# 2.452.0 (#3810): 20 other imports later the source is still known; both places that tidy up (the list import, the account import)
+def others(n=25):
+    db = dbxm.connect(DATA)
+    db.execute("INSERT INTO imports(user_id,source,file_name,created,report,created_at,undone_at) VALUES(?,?,?,?,?,?,?)",
+               (FID, "Kalmido", "undone.kalmido-export", "{}", "{}", "2026-01-01T00:00:00", "2026-01-02T00:00:00"))
+    for i in range(n):
+        db.execute("INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
+                   (FID, "todoist", f"other{i}.csv", "{}", "{}", "2026-01-01T00:00:00"))
+
+
+kept = one("SELECT COUNT(*) FROM imports WHERE user_id=? AND source='Kalmido' AND undone_at IS NULL", (FID,))
+check(kept >= 1, f"account imports on record {kept}")
+others()
+ok(F.post(B + "/api/import/todoist", files={"file": ("Andere Liste.csv", b"TYPE,CONTENT\ntask,Eine Zeile\n")}), "a list import")
+check(one("SELECT COUNT(*) FROM imports WHERE user_id=? AND source='Kalmido' AND undone_at IS NULL", (FID,)) == kept, "the list import tidies up, the account imports stay")
+check(one("SELECT COUNT(*) FROM imports WHERE user_id=? AND undone_at IS NOT NULL", (FID,)) == 0, "an undone account import goes like any other")
+check(one("SELECT COUNT(*) FROM imports WHERE user_id=? AND source<>'Kalmido'", (FID,)) <= 20, "the others stay limited")
+iid, j = upload(F, FILE1)
+check(j["preview"]["again"] is True, "the file still counts as imported before")
+F.delete(B + f"/api/account/import/{iid}")
+others()
+dbxm.connect(DATA).execute("UPDATE lists SET deleted_at=created_at WHERE owner_id=? AND name='Umzug Probe' AND id>? AND deleted_at IS NULL", (FID, LID))
+iid, j = upload(F, FILE3)
+j = run(F, iid)
+check(one("SELECT COUNT(*) FROM imports WHERE user_id=? AND source='Kalmido' AND undone_at IS NULL", (FID,)) == kept + 1, "the account import tidies up, the earlier ones stay")
+iid, j = upload(F, FILE1)
+check(j["preview"]["again"] is True, "still known after that")
+F.delete(B + f"/api/account/import/{iid}")
+
 # after the undo the file counts as new
-imports = F.get(B + "/api/imports").json()["imports"]
-for x in imports:
-    if x["source"] == "Kalmido" and x["can_undo"]:
-        ok(F.post(B + f"/api/imports/{x['id']}/undo"), "undo", codes=(200, 201, 202, 204, 409))
+for x in dbxm.connect(DATA).execute("SELECT id FROM imports WHERE user_id=? AND source='Kalmido' AND undone_at IS NULL", (FID,)).fetchall():  # 2.452.0 (#3810): also those beyond the shown list
+    ok(F.post(B + f"/api/imports/{x[0]}/undo"), "undo", codes=(200, 201, 202, 204, 409))
 iid, j = upload(F, FILE1)
 check(j["preview"]["again"] is False, "after the undo the file is new again")
 F.delete(B + f"/api/account/import/{iid}")
