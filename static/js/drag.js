@@ -32,7 +32,7 @@
  *   (2.193.0 B, #2219; same edge / step, together with scroll)
  * @property {number|(() => number)} [scrollXInset]  px at the scroller's left that are not content (a sticky name column):
  *   the left edge zone starts right of them
- * @property {{el: HTMLElement, cls?: string}} [ghost]  a copy of el follows the pointer (fixed, by transform)
+ * @property {{el: HTMLElement|((d: any) => HTMLElement), cls?: string}} [ghost]  a copy of el follows the pointer (fixed, by transform)
  * @property {(d: any, x: number, y: number) => void} [onStart]
  * @property {(d: any, x: number, y: number, dx: number, dy: number) => void} [onMove]
  * @property {(d: any, x: number, y: number) => void} [onDrop]
