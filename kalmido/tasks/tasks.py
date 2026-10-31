@@ -1,4 +1,6 @@
 """Creating and changing tasks: milestones, moving subtrees, tags, assignees, waiting on external."""
+from datetime import timedelta
+
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app, PUBLIC_URL
@@ -6,6 +8,7 @@ from ..core.pg import insert_id, st_ids, write_lock
 from ..core.schema import MAX_DEPTH, USER_DEFAULTS
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, inbox_default, iso, now_utc
+from ..core.usertz import user_now
 from ..accounts.session import me
 from ..core.access import (
     Denied, list_people, list_role, my_inbox, need_collab, need_list, need_task, ov_open, ov_role, task_visible,
@@ -446,7 +449,7 @@ def mt_wait_suggestions_hide():
 def _wd_followups(c, users, S, LG, now):
     """The follow-up day of waiting tasks: push + News to the person it is for, followup_due to the following agents."""
     from ..notify.push import _wd_fail
-    today = now.date().isoformat()
+    today = (now + timedelta(days=1)).date().isoformat()  # 2.368.3 (#2985): a clock ahead of the server's; _wd_followup decides
     rows = c.execute("""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox, l.owner_id AS list_owner FROM tasks t
                         JOIN lists l ON l.id=t.list_id WHERE t.waiting_at IS NOT NULL AND t.wait_until IS NOT NULL
                         AND t.wait_until<=? AND t.wait_fired!=t.wait_until AND t.status=0 AND t.deleted_at IS NULL
@@ -469,8 +472,10 @@ def _wd_followup(c, t, users, S, LG, now):
                  if u and u in users and u not in ag and (u == t["list_owner"] or task_visible(c, t["id"], u, full=True))), None)
     s, lg = S.get(rcpt, USER_DEFAULTS), LG.get(rcpt, "en")
     allday = s.get("allday_time") if valid_hm(s.get("allday_time")) else "09:00"
-    if t["wait_until"] == now.date().isoformat() and now.strftime("%H:%M") < allday:
-        return  # today, but not yet the time of day
+    pn = user_now(s, now)  # 2.368.3 (#2985)
+    day = pn.date().isoformat()
+    if t["wait_until"] > day or (t["wait_until"] == day and pn.strftime("%H:%M") < allday):
+        return  # not yet the day, or today but not yet the time of day
     c.execute("UPDATE tasks SET wait_fired=? WHERE id=?", (t["wait_until"], t["id"]))
     push = None
     if rcpt and task_visible(c, t["id"], rcpt, full=True):

@@ -38,7 +38,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `TASKS_MAX_FILE_MB` | `50` | Largest upload in MB. |
 | `TASKS_OFFICE_DIR` | `<data dir>/office` | Folder of the office files (logos, documents); part of the backups. |
 | `TASKS_TEXT_CACHE` | `<data dir>/textcache` | Folder of the extracted text of attachments (search, previews). |
-| `TZ` | `Europe/Berlin` | Time zone of the server (due dates, daily jobs, reminders). |
+| `TZ` | `Europe/Berlin` | Time zone of the server (due dates, daily jobs; people without their own time zone follow it). |
 
 ## Login, accounts and proxy
 

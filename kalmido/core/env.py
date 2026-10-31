@@ -29,7 +29,7 @@ VARS = (
     _v("KALMIDO_THREADS", "16", "Web server threads per process (2-256).", "core"),
     _v("PUBLIC_URL", "http://localhost:3040", "The address people use to open Kalmido (https://tasks.example.com). Used for links in notifications and mails, passkeys and the origin check; set it on every server.", "core"),
     _v("PORT", "3040", "Port the web server listens on inside the container.", "core"),
-    _v("TZ", "Europe/Berlin", "Time zone of the server (due dates, daily jobs, reminders).", "core"),
+    _v("TZ", "Europe/Berlin", "Time zone of the server (due dates, daily jobs; people without their own time zone follow it).", "core"),
     _v("TASKS_ATTACHMENTS", "<data dir>/attachments", "Folder of the uploaded files.", "core"),
     _v("TASKS_OFFICE_DIR", "<data dir>/office", "Folder of the office files (logos, documents); part of the backups.", "core"),
     _v("TASKS_EXPORT_DIR", "<data dir>/exports", "Folder of the organisation exports while they are offered for download.", "core"),

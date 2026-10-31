@@ -12,6 +12,7 @@ from ..core.config import PUBLIC_URL, TZ
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, short_day, tr, lang
 from ..core.db import bump, gset, gsetting, iso, iso_ms, now_utc, usettings
+from ..core.usertz import hm_text, tz_gap, tz_of_s
 from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..accounts.session import me
 from ..core.access import acx_org_ok, collab_all, Denied, task_visible
@@ -946,7 +947,7 @@ def ev_change_push(c, uid, r, what, actor):
     t = r["title"]
     title = {"time": tr("Time changed: {0}", t, lg=lg), "place": tr("Place changed: {0}", t, lg=lg), "cancelled": tr("Cancelled: {0}", t, lg=lg),
              "occ": tr("One date cancelled: {0}", t, lg=lg), "removed": tr("You are no longer invited: {0}", t, lg=lg)}[what]
-    detail = (r["location"] or tr("No place", lg=lg)) if what == "place" else when_text(r, lg)
+    detail = (r["location"] or tr("No place", lg=lg)) if what == "place" else when_text(r, lg, s=s)
     name = user_names(c, [actor]).get(actor) if actor else None
     g.setdefault("pushes", []).append((uid, title, " · ".join(x for x in (detail, name) if x),
                                        f"{PUBLIC_URL}/#ev/{r['id']}" if what in ("time", "place", "occ") else f"{PUBLIC_URL}/#calendar", push_prio(s)))
@@ -967,16 +968,17 @@ def invite_push(c, uid, r):
     lg = lang_of(s)
     who = user_names(c, [me()]).get(me(), "?")
     from flask import g
-    g.pushes.append((uid, tr("{0} invited you", who, lg=lg), f"{r['title']} · {when_text(r, lg)}", f"{PUBLIC_URL}/#ev/{r['id']}",
+    g.pushes.append((uid, tr("{0} invited you", who, lg=lg), f"{r['title']} · {when_text(r, lg, s=s)}", f"{PUBLIC_URL}/#ev/{r['id']}",
                      push_prio(s)))
 
 
-def when_text(r, lg=None, occ=None):
-    s, _ = _span(r, occ or r["start"])
+def when_text(r, lg=None, occ=None, s=None):
+    """s: the settings of the person who reads it (2.368.3, #2985: their time zone and time format)."""
+    a, _ = _span(r, occ or r["start"])
     if r["all_day"]:
-        return short_day(s, lg)
-    loc = s.astimezone(TZ)
-    return f"{short_day(loc.date(), lg)} {loc:%H:%M}"
+        return short_day(a, lg)
+    loc = a.astimezone(tz_of_s(s))
+    return f"{short_day(loc.date(), lg)} {hm_text(loc, s)}"
 
 
 def ev_delete(c, r):
@@ -1080,7 +1082,7 @@ def ev_occ_change(c, r, occ, b):
 
 # ---- reminders (watchdog): the calendar's owner and members who see it (not hidden) + attendees who accepted /
 # have not answered, once per occurrence and offset, missed by more than 6 h = skipped
-def ev_wd_maybe(r, lo, hi, now):
+def ev_wd_maybe(r, lo, hi, now, margin=timedelta(0)):
     """2.191.0 C (#2516): False only when no reminder offset of any occurrence in [lo, hi] has come yet (at > now): then
     _wd_events sends and marks nothing for this event and skips its calendar / member / attendee lookups. An event the
     check cannot read takes the old path (same errors, same logging)."""
@@ -1089,7 +1091,7 @@ def ev_wd_maybe(r, lo, hi, now):
         for o in ev_expand(r, lo, hi, 200):
             if (o["ov"] or {}).get("status") == "cancelled":
                 continue
-            st = o["s"] if isinstance(o["s"], datetime) else datetime(o["s"].year, o["s"].month, o["s"].day, tzinfo=TZ)
+            st = o["s"] if isinstance(o["s"], datetime) else datetime(o["s"].year, o["s"].month, o["s"].day, tzinfo=TZ) - margin
             if any(st - timedelta(minutes=off) <= now for off in offs):
                 return True
         return False
@@ -1102,10 +1104,11 @@ def _wd_events(c, users, S, LG, now):
     from ..notify.push import notify, push_prio
     lo = now.date() - timedelta(days=1)
     hi = now.date() + timedelta(days=8)
+    margin = tz_gap(S, now) + timedelta(hours=2)  # 2.368.3 (#2985): an all-day event starts at midnight of each person's clock
     rows = c.execute("""SELECT * FROM events WHERE deleted_at IS NULL AND reminders!='' AND status!='cancelled' AND first_day<=?
                         AND (last_day='' OR last_day>=?)""", (hi.isoformat(), lo.isoformat())).fetchall()
     for r in rows:
-        if not ev_wd_maybe(r, lo, hi, now):
+        if not ev_wd_maybe(r, lo, hi, now, margin):
             continue  # 2.191.0 C (#2516): no reminder of this event is due yet -- the lookups below would only read
         try:
             cal = c.execute("SELECT * FROM ev_cals WHERE id=?", (r["cal_id"],)).fetchone()
@@ -1124,14 +1127,15 @@ def _wd_events(c, users, S, LG, now):
             for o in ev_expand(r, lo, hi, 200):
                 if (o["ov"] or {}).get("status") == "cancelled":
                     continue
-                st = o["s"] if isinstance(o["s"], datetime) else datetime(o["s"].year, o["s"].month, o["s"].day, tzinfo=TZ)
                 for off in offs:
-                    at = st - timedelta(minutes=off)
-                    if at > now:
-                        continue
                     key = f"{o['occ']}|{off}"
                     for u in who:
                         if (u, key) in done:
+                            continue
+                        zone = tz_of_s(S[u])  # 2.368.3 (#2985): the time of the reminder, its text and "today" on the person's clock
+                        st = o["s"] if isinstance(o["s"], datetime) else datetime(o["s"].year, o["s"].month, o["s"].day, tzinfo=zone)
+                        at = st - timedelta(minutes=off)
+                        if at > now:
                             continue
                         # 2.191.0 F1 (#2516): a row another run wrote since the read above is no error and no second reminder
                         n = c.execute("INSERT INTO ev_reminded(event_id,user_id,k,at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
@@ -1144,9 +1148,9 @@ def _wd_events(c, users, S, LG, now):
                             continue
                         lg = LG.get(u, "en")
                         title = (o["ov"] or {}).get("title") or r["title"]
-                        when = tr("all day", lg=lg) if o["all_day"] else st.astimezone(TZ).strftime("%H:%M")
-                        d0 = st.astimezone(TZ).date() if isinstance(o["s"], datetime) else o["s"]
-                        day = tr("today", lg=lg) if d0 == now.date() else short_day(d0, lg)
+                        when = tr("all day", lg=lg) if o["all_day"] else hm_text(st.astimezone(zone), S[u])
+                        d0 = st.astimezone(zone).date() if isinstance(o["s"], datetime) else o["s"]
+                        day = tr("today", lg=lg) if d0 == now.astimezone(zone).date() else short_day(d0, lg)
                         loc = (o["ov"] or {}).get("location", r["location"])
                         notify(u, title, " · ".join(x for x in (f"{day} {when}".strip(), loc) if x), push_prio(S[u]),
                                f"{PUBLIC_URL}/#ev/{r['id']}", s=S[u], tag=f"ev-{r['id']}")

@@ -234,7 +234,8 @@ function fmtSetHtml(s, hint) {
       <div class="row"><label for="s-wkst">${tr('First day of the week')}</label>${sel('s-wkst', 'week_start', [['', auto], ['mon', WDL[1]], ['sun', WDL[0]]])}</div>
       <div class="row"><label for="s-tfmt">${tr('Time format')}</label>${sel('s-tfmt', 'time_format', [['', auto], ['24', tr('24 hours ({0})', '14:30')], ['12', tr('12 hours ({0})', '2:30 PM')]])}</div>
       <div class="row"><label for="s-dord">${tr('Date format')}</label>${sel('s-dord', 'date_order', [['', auto], ['dmy', '31.12.2026'], ['mdy', '12/31/2026'], ['ymd', '2026-12-31']])}</div>
-      ${hint(tr('Automatic follows the language and the region of this browser.'))}`;
+      ${hint(tr('Automatic follows the language and the region of this browser.'))}
+      ${tsl_tzRows(s, hint) /* 2.368.3 (#2985) */}`;
 }
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
 // 2.44.0 (#1187): Office, Time, Review and Home are ONE switch each ("a:<area>", areas.js), their parts below it
@@ -286,7 +287,7 @@ function modulesHtmlMain(hint) {
       <div class="row"><label for="s-tcur">${tr('Currency')}</label><input id="s-tcur" value="${esc(s.time_currency ?? '€')}" maxlength="8" class="numin"></div>
       <div class="row"><label for="s-ttarget">${tr('Daily target')}</label><input type="number" id="s-ttarget" value="${esc(s.time_target || '0')}" min="0" max="24" step="0.25" class="numin"><span class="muted">${tr('hours, 0 = none')}</span></div>
       <div class="row"><label for="s-trem">${tr('Reminder after')}</label><input type="number" id="s-trem" value="${esc(s.time_remind_h ?? '4')}" min="0" max="48" step="0.5" class="numin"><span class="muted">${tr('hours, push “still running?”, 0 = off')}</span></div>
-      ${tsl_setRows(s, hint)}
+      ${tsl_setRows(s)}
       <div class="row"><label for="s-tstop">${tr('Stop automatically after')}</label><input type="number" id="s-tstop" value="${esc(s.time_autostop_h ?? '12')}" min="0" max="72" step="0.5" class="numin"><span class="muted">${tr('hours, end = start + value, 0 = off')}</span></div>
       <div class="row"><label>${tr('Focus sessions')}</label><label class="chkl wtfocus"><input type="checkbox" id="s-tfocus" ${s.time_focus !== '0' ? 'checked' : ''}> ${tr('count as time entries (not while a timer runs)')}</label></div></details>` : '';
   const row = k => k.startsWith('a:') ? mg_modAreaHtml(k.slice(2), x => modRowHtml(x, opt)) : modRowHtml(k, opt);  // 2.44.0 (#1187)

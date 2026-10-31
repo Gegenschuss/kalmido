@@ -12,7 +12,8 @@ from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL, TZ
 from ..core.i18n import tr, trn
-from ..core.db import db, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
+from ..core.db import db, inbox_default, iso, now_utc, parse_iso, uset, usettings
+from ..core.usertz import user_now
 from ..core.access import Denied, list_role, tvis, vis_sql, task_visible
 from ..accounts.session import me
 from ..tasks.validation import valid_hm
@@ -51,9 +52,9 @@ def brief_lists(c, uid, agent_id=None):
 def brief_since(s, now=None):
     """UTC datetime from which changes count: the moment of the last briefing read on an earlier day (stored in brief_read),
     else 18:00 yesterday; never more than BRIEF_SINCE_MAX_DAYS back."""
-    now = now or local_now()
+    now = now or user_now(s)
     floor = now - timedelta(days=BRIEF_SINCE_MAX_DAYS)
-    evening = datetime(now.year, now.month, now.day, BRIEF_EVENING, tzinfo=TZ) - timedelta(days=1)
+    evening = datetime(now.year, now.month, now.day, BRIEF_EVENING, tzinfo=now.tzinfo) - timedelta(days=1)  # 2.368.3 (#2985)
     st = brief_state(s)
     v = st.get("prev") if st.get("day") == now.date().isoformat() else st.get("at")
     try:
@@ -84,9 +85,9 @@ def _task_row(r, extra=None):
 def briefing_data(c, uid, *, agent_id=None, since=None):
     """The briefing of person uid (see the module text). agent_id: only lists shared with that agent. since: a UTC datetime
     overriding the start of "changed". Works with and without a request (the watchdog's push, scheduled jobs)."""
-    now = local_now()
-    today = now.date().isoformat()
     s = usettings(c, uid)
+    now = user_now(s)  # 2.368.3 (#2985): the person's "today" and "overdue"
+    today = now.date().isoformat()
     since_dt = since or brief_since(s, now)
     since_iso = iso(since_dt)
     lids = brief_lists(c, uid, agent_id)
@@ -244,7 +245,7 @@ def briefing_read():
         raise BadInput(tr("Invalid value: {0}", "read"))
     c, uid = db(), me()
     s = usettings(c, uid)
-    now = local_now()
+    now = user_now(s)
     today, st = now.date().isoformat(), brief_state(s)
     if b.get("read", True):
         if st.get("day") != today:  # the first read today: the start of today's "changed" is kept for re-reading
@@ -292,14 +293,15 @@ def _wd_briefing(c, users, S, LG, now):
     """Watchdog: the morning briefing push at the person's brief_time (once a day, only with something to say)."""
     from ..agents.core import agent_ids
     ag = agent_ids(c)
-    today = now.date().isoformat()
     for uid in users:
         if uid in ag:
             continue
         try:
             s, lg = S[uid], LG[uid]
             bt = s.get("brief_time") or ""
-            if not valid_hm(bt) or s.get("brief_sent") == today or now.strftime("%H:%M") < bt:
+            pn = user_now(s, now)  # 2.368.3 (#2985)
+            today = pn.date().isoformat()
+            if not valid_hm(bt) or s.get("brief_sent") == today or pn.strftime("%H:%M") < bt:
                 continue
             uset(c, uid, "brief_sent", today)
             c.commit()

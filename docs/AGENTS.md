@@ -917,7 +917,7 @@ free. Every task in events and in the API has `"locked": true | false`.
 *Since 2.138.1.*
 
 Besides `reminders` (minutes before the due time) a task can have **one reminder at a fixed time**: `remind_at`, the local
-date and time `YYYY-MM-DDTHH:MM` (the server's time zone, like `due` / `due_time`), also without a due date ("remind me
+date and time `YYYY-MM-DDTHH:MM` (like `due` / `due_time` read on the clock of the person it reminds: their time zone setting, else the server's), also without a due date ("remind me
 on Tuesday at 9:00"). Set or clear it with `POST` / `PATCH /api/v1/tasks` (MCP `create_task` / `update_task`, `null` =
 none). It goes out once, to the same people and over the same channels as the other reminders, and follows the person's
 notification switches; on a recurring task it moves along with the due date when the task is ticked or skipped. People

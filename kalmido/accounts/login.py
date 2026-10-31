@@ -25,6 +25,7 @@ from werkzeug.security import check_password_hash
 from ..core.config import app, APP_NAME, COOKIE, MIN_PASSWORD, NTFY_TOPIC, PUBLIC_URL, USERNAME_RE
 from ..core.pg import insert_id
 from ..core.i18n import lang, languages, N_, tr, LANGS
+from ..core.usertz import tz_names
 from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, local_now, now_utc, uset, write_lock
 from ..accounts.session import (
     _DUMMY_HASH, _peer_trusted, _rate_fail, _rate_keys, _rate_reset, _token_hash,
@@ -128,6 +129,18 @@ def _org_label(c):
     return org_label(c)
 
 
+def first_tz(c, uid, name):
+    """2.368.3 (#2985): the time zone of the browser at a person's very first login, unless they chose one (Settings > General shows
+    a later difference and offers the change); nothing else ever writes it."""
+    if not isinstance(name, str) or name not in tz_names():
+        return
+    if c.execute("SELECT 1 FROM sessions WHERE user_id=? LIMIT 1", (uid,)).fetchone() \
+            or c.execute("SELECT value FROM user_settings WHERE user_id=? AND key='tz' AND value<>''", (uid,)).fetchone():
+        return
+    uset(c, uid, "tz", name)
+    c.commit()
+
+
 def finish_login(c, u, remember, via, extra=None):
     """Last step of every login: ends the session this browser brought along (if any), starts a new one, resets
     the failure counter of the user name."""
@@ -178,6 +191,7 @@ def auth_login():
         print("login failed for", login_log_name(username, c), "from", login_log_ip(client_ip()), flush=True)  # 2.148.1 C (#2494)
         return err(tr("Wrong username or password"), 401)  # 2.13.0 (#453 P7): the page's language
     remember = bool(b.get("remember", True))
+    first_tz(c, u["id"], b.get("tz"))
     methods = twofa_methods(c, u)
     if methods:  # second step: a code, a passkey or a recovery code (POST /api/auth/2fa...)
         tok = pend_new("2fa", u["id"], remember=remember)
@@ -221,6 +235,7 @@ def auth_setup():
     if b.get("lang") in LANGS:  # 2.24.0 (UX-22): the language of the setup page (a reload in step 2 keeps it, the sample too)
         uset(c, uid, "lang", b["lang"])
         gset(c, "default_lang", b["lang"])
+    first_tz(c, uid, b.get("tz"))
     if b.get("wizard") is True:  # 2.13.0 (#453 A16): the setup page's step 2 comes back after a reload until it is finished
         gset(c, "setup_step2", "pending")
     if not gsetting(c, "bk_enabled_at") and not gsetting(c, "bk_last_ok"):  # 2.45.0 (#1515): a new server backs up daily

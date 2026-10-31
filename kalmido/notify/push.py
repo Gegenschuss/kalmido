@@ -20,6 +20,7 @@ from ..core.config import _origin, APP_NAME, NTFY_TOKEN, NTFY_URL, PUBLIC_URL, s
 from ..core.schema import USER_DEFAULTS
 from ..core.i18n import LANGS, md_plain, short_day, tr, trn
 from ..core.pg import system_ctx
+from ..core.usertz import hm_text, tz_gap, tz_of_s, user_now
 from ..core.db import bump, connect, DbError, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
 from ..accounts.session import GATE
 from ..core.access import list_role, task_visible, vis_sql
@@ -727,10 +728,10 @@ def _wd_reminders(c, users, S, LG, now):
                         FROM tasks t JOIN lists l ON l.id=t.list_id
                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL
                           AND t.reminders!='' AND l.archived=0""").fetchall()  # 1.5.1: none for archived lists
-    early = wd_early_allday(S)
+    early, margin = wd_early_allday(S), WD_EARLY_MARGIN + tz_gap(S, now)  # 2.368.3 (#2985): + the distance to the people's clocks
     memo = {}  # 2.281.0 B (#3117): list roles / push settings per person, once per tick (a wave of 100 reminders)
     for t in rows:
-        if not wd_rem_maybe(t, early, now):
+        if not wd_rem_maybe(t, early, now, margin):
             continue  # 2.191.0 C (#2516): nothing of this task can be due yet -- _wd_reminder would only read
         try:
             _wd_reminder(c, t, users, S, LG, now, memo)
@@ -751,10 +752,10 @@ def wd_early_allday(S):
     return min([s.get("allday_time") if valid_hm(s.get("allday_time")) else "09:00" for s in (*S.values(), USER_DEFAULTS)])
 
 
-def wd_rem_maybe(t, early, now):
+def wd_rem_maybe(t, early, now, margin=WD_EARLY_MARGIN):
     """False only when _wd_reminder(t) surely does nothing now: every offset is fired already or still in the future."""
     try:
-        base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or early}").replace(tzinfo=TZ) - WD_EARLY_MARGIN
+        base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or early}").replace(tzinfo=TZ) - margin
         fired = json.loads(t["reminded"] or "[]")
         for off in t["reminders"].split(","):
             if off.strip() and f"{t['due']} {t['due_time'] or ''}|{off}" not in fired and base - timedelta(minutes=int(off)) <= now:
@@ -764,14 +765,14 @@ def wd_rem_maybe(t, early, now):
         return True
 
 
-def wd_nag_maybe(t, early, now):
+def wd_nag_maybe(t, early, now, margin=WD_EARLY_MARGIN):
     """False only when _wd_nag(t) surely returns before doing anything: no interval, the nags have not begun yet, or the
     last nag is younger than the interval."""
     try:
         mins = nag_minutes(t["nag"], t["list_nag"])
         if not mins:
             return False
-        if now < nag_start(t, {"allday_time": early}) - WD_EARLY_MARGIN:
+        if now < nag_start(t, {"allday_time": early}) - margin:
             return False
         last = nag_last(t["nag_at"], nag_key(t))
         return not (last and now < last + timedelta(minutes=mins) - timedelta(seconds=20))
@@ -785,7 +786,7 @@ def _wd_reminder(c, t, users, S, LG, now, memo=None):
     rcpt = reminder_recipient(c, t, users, memo)
     s = S.get(rcpt, USER_DEFAULTS)
     allday = s.get("allday_time") if valid_hm(s.get("allday_time")) else "09:00"
-    base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or allday}").replace(tzinfo=TZ)
+    base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or allday}").replace(tzinfo=tz_of_s(s))  # 2.368.3 (#2985)
     fired = json.loads(t["reminded"] or "[]")
     changed = False
     for off in t["reminders"].split(","):
@@ -804,8 +805,8 @@ def _wd_reminder(c, t, users, S, LG, now, memo=None):
             sw, lgw = S.get(who, USER_DEFAULTS), LG.get(who, "en")
             if not _wd_notif_ok(c, who, sw, t["list_id"], memo, own=who == rcpt):  # 2.33.0 (#927): + the list (owner's template); 2.266.0 (#2962): not for rcpt's own
                 continue  # 2.1.0 (#317): reminders can be switched off in the notification settings
-            when = tr("all day", lg=lgw) if not t["due_time"] else tr("at {0}", t["due_time"], lg=lgw)
-            day = tr("today", lg=lgw) if t["due"] == now.date().isoformat() else \
+            when = tr("all day", lg=lgw) if not t["due_time"] else tr("at {0}", hm_text(t["due_time"], sw), lg=lgw)
+            day = tr("today", lg=lgw) if t["due"] == user_now(sw, now).date().isoformat() else \
                 short_day(date.fromisoformat(t["due"]), lgw)
             lname = tr("Basket", lg=lgw) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
             notify(who, t["title"], tr("Due {0} {1} · {2}", day, when, lname, lg=lgw),
@@ -861,14 +862,14 @@ def in_quiet(s, now):
     a, b = s.get("quiet_from") or "", s.get("quiet_to") or ""
     if not (valid_hm(a) and valid_hm(b)) or a == b:
         return False
-    hm = now.strftime("%H:%M")
+    hm = user_now(s, now).strftime("%H:%M")  # 2.368.3 (#2985)
     return a <= hm < b if a < b else hm >= a or hm < b
 
 
 def nag_start(t, s):
     """When the nags begin: the first reminder (the largest offset), else the due time."""
     allday = s.get("allday_time") if valid_hm(s.get("allday_time")) else "09:00"
-    base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or allday}").replace(tzinfo=TZ)
+    base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or allday}").replace(tzinfo=tz_of_s(s))  # 2.368.3 (#2985)
     offs = [int(x) for x in str(t["reminders"] or "").split(",") if re.fullmatch(r"-?\d{1,7}", x.strip())]
     return base - timedelta(minutes=max(offs)) if offs else base
 
@@ -878,9 +879,9 @@ def _wd_nags(c, users, S, LG, now):
                         FROM tasks t JOIN lists l ON l.id=t.list_id
                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND l.archived=0
                           AND ((t.nag NOT IN ('', 'off')) OR (t.nag='' AND l.nag!=''))""").fetchall()
-    early = wd_early_allday(S)
+    early, margin = wd_early_allday(S), WD_EARLY_MARGIN + tz_gap(S, now)  # 2.368.3 (#2985): + the distance to the people's clocks
     for t in rows:
-        if not wd_nag_maybe(t, early, now):
+        if not wd_nag_maybe(t, early, now, margin):
             continue  # 2.191.0 C (#2516): see wd_rem_maybe
         try:
             _wd_nag(c, t, users, S, LG, now)
@@ -908,8 +909,8 @@ def _wd_nag(c, t, users, S, LG, now):
         _NAG_SENT[rcpt] = sent
         return
     _NAG_SENT[rcpt] = sent + [time.time()]
-    when = tr("all day", lg=lg) if not t["due_time"] else tr("at {0}", t["due_time"], lg=lg)
-    day = tr("today", lg=lg) if t["due"] == now.date().isoformat() else \
+    when = tr("all day", lg=lg) if not t["due_time"] else tr("at {0}", hm_text(t["due_time"], s), lg=lg)
+    day = tr("today", lg=lg) if t["due"] == user_now(s, now).date().isoformat() else \
         short_day(date.fromisoformat(t["due"]), lg)
     lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
     head = tr("Deadline", lg=lg) if t["deadline"] else tr("Still open", lg=lg)
@@ -967,6 +968,7 @@ def _wd_habits(c, users, S, LG, now):
 
 
 def _wd_habit(c, h, users, S, LG, now):
+    now = user_now(S.get(h["user_id"]), now)  # 2.368.3 (#2985): the owner's day and time
     today = now.date().isoformat()
     wd = str(now.isoweekday())
     # 2.140.0 C (#2135): several times a day; the latest slot that is due and not yet reminded today fires once
@@ -1003,8 +1005,9 @@ def _wd_digest(c, users, S, LG, now):
 
 def _wd_digest_user(c, uid, S, LG, now):
     from ..integrations.mail import digest_mail_user
-    today = now.date().isoformat()
     s, lg = S[uid], LG[uid]
+    now = user_now(s, now)  # 2.368.3 (#2985): the person's digest time and "today"
+    today = now.date().isoformat()
     dt = s.get("digest_time") or ""
     if valid_hm(dt) and now.strftime("%H:%M") >= dt:  # 2.17.0 (#443): the summary by e-mail too (its own "sent" day)
         digest_mail_user(c, uid, s, today)

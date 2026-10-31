@@ -106,7 +106,7 @@ headers: call the API from a server, a script or an app, not from JavaScript on 
 | Base URL | `https://tasks.example.com/api/v1` |
 | Format | JSON in and out (`Content-Type: application/json`) |
 | Compression | 2.65: with `Accept-Encoding: gzip` JSON answers from 1 KB on come gzip-compressed (`curl --compressed`, most HTTP libraries decode it on their own); without the header they stay plain |
-| Dates | `YYYY-MM-DD`, local dates in the server's time zone (`TZ`) |
+| Dates | `YYYY-MM-DD`, local dates in the server's time zone (`TZ`); reminders, digest and briefing read them on the person's clock (setting `tz`) |
 | Times | `HH:MM`, local; `due_time: null` = all day |
 | Timestamps | ISO 8601 in UTC (`2026-09-29T08:15:00+00:00`) |
 | Priorities | `none`, `low`, `medium`, `high` (numbers 0, 1, 3, 5 are accepted on input) |

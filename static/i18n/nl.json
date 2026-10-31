@@ -9242,7 +9242,6 @@
   "Locks the entries and sends the timesheet to the admins": "Vergrendelt de registraties en stuurt de staat naar de beheerders",
   "Locks the entries of this month": "Vergrendelt de registraties van deze maand",
   "Closed on {0}": "Afgesloten op {0}",
-  "Decides on which day an entry counts and the periods of the report, the CSV and the timesheet.": "Bepaalt op welke dag een invoer telt en de periodes van het rapport, de CSV en de urenstaat.",
   "Entries of this month can still be changed": "Invoer van deze maand kan nog worden gewijzigd",
   "Entries over midnight": "Invoer over middernacht",
   "Month closed: {0}": "Maand afgesloten: {0}",
@@ -15430,5 +15429,7 @@
   "A formula could not be taken over": "Een formule kon niet worden overgenomen",
   "Separate the values with ; or , e.g. IF({Hours} > 8; {Hours} * 1.5; {Hours}). Division by 0 shows as an error in the field.": "Scheid waarden met ; of , bijv. IF({Uren} > 8; {Uren} * 1,5; {Uren}). Delen door 0 verschijnt als fout in het veld.",
   "=B2*C2 · =SUM(C2:C9) · =here.total_time": "=B2*C2 · =SUM(C2:C9) · =here.total_time",
-  "IF SUM ROUND MIN MAX AVERAGE COUNT": "IF SUM ROUND MIN MAX AVERAGE COUNT"
+  "IF SUM ROUND MIN MAX AVERAGE COUNT": "IF SUM ROUND MIN MAX AVERAGE COUNT",
+  "This device is in {0}, your setting says {1}.": "Dit apparaat staat op {0}, je instelling zegt {1}.",
+  "Reminders, the daily summary and the briefing come at this time zone's hours; time tracking counts its days by it.": "Herinneringen, de dagsamenvatting en de briefing volgen deze tijdzone; de tijdregistratie telt haar dagen ernaar."
 }

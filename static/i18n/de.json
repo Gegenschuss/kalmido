@@ -9220,7 +9220,6 @@
   "Locks the entries and sends the timesheet to the admins": "Sperrt die Einträge und schickt den Nachweis an die Admins",
   "Locks the entries of this month": "Sperrt die Einträge dieses Monats",
   "Closed on {0}": "Abgeschlossen am {0}",
-  "Decides on which day an entry counts and the periods of the report, the CSV and the timesheet.": "Bestimmt, an welchem Tag ein Eintrag zählt, und die Zeiträume von Bericht, CSV und Stundennachweis.",
   "Entries of this month can still be changed": "Einträge dieses Monats lassen sich noch ändern",
   "Entries over midnight": "Einträge über Mitternacht",
   "Month closed: {0}": "Monat abgeschlossen: {0}",
@@ -15430,5 +15429,7 @@
   "A formula could not be taken over": "Eine Formel konnte nicht übernommen werden",
   "Separate the values with ; or , e.g. IF({Hours} > 8; {Hours} * 1.5; {Hours}). Division by 0 shows as an error in the field.": "Werte mit ; oder , trennen, z. B. WENN({Stunden} > 8; {Stunden} * 1,5; {Stunden}). Division durch 0 erscheint als Fehler im Feld.",
   "=B2*C2 · =SUM(C2:C9) · =here.total_time": "=B2*C2 · =SUMME(C2:C9) · =hier.zeit_gesamt",
-  "IF SUM ROUND MIN MAX AVERAGE COUNT": "WENN SUMME RUNDEN MIN MAX MITTELWERT ANZAHL"
+  "IF SUM ROUND MIN MAX AVERAGE COUNT": "WENN SUMME RUNDEN MIN MAX MITTELWERT ANZAHL",
+  "This device is in {0}, your setting says {1}.": "Dieses Gerät ist in {0}, deine Einstellung sagt {1}.",
+  "Reminders, the daily summary and the briefing come at this time zone's hours; time tracking counts its days by it.": "Erinnerungen, Tageszusammenfassung und Briefing kommen nach dieser Zeitzone; die Zeiterfassung zählt ihre Tage danach."
 }

@@ -262,7 +262,7 @@ questions stays the classic form.
 
 - **Your own time zone** (Settings > Modules > Time tracking > *Time zone*; empty = the server's, the device's zone is offered
   as a suggestion) decides on which day an entry counts, the periods of the report, the CSV and the timesheet, "today" and
-  the month of the lock above. The calendar, reminders, workload and absences keep the server's time zone. With *All members*
+  the month of the lock above. Reminders, the digest, the briefing and the review follow it too (Settings > General > Region and formats, set from the browser at the first login); the calendar, workload and absences keep the server's time zone. With *All members*
   the report uses your time zone for everyone's entries.
 - **Entries over midnight** (on by default): an entry from 23:30 to 00:30 counts with 30 minutes on each day in the days of
   the report and the timesheet, and the CSV has one row per day. The entry itself stays one entry, the totals stay the same.

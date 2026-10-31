@@ -184,7 +184,7 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
   w.close();
 
   w = await boot({user: 'alice'}); d = w.document;
-  w.eval(`settingsModal('time')`);
+  w.eval(`settingsModal('general')`);  // 2.368.3 (#2985): the zone moved to Region and formats
   const tz = await until(() => d.querySelector('.smodal #s-ttz'));
   const dev = w.eval('tsl_deviceTz()');
   if (tz && dev) {

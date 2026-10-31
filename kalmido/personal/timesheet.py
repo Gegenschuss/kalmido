@@ -2,27 +2,26 @@
 import json
 import re
 from datetime import date, datetime, timedelta
-from functools import lru_cache
-from zoneinfo import ZoneInfo, available_timezones
 
 from flask import g, jsonify, request
 
-from ..core.config import app, PUBLIC_URL, TZ
+from ..core.config import app, PUBLIC_URL
 from ..core.db import body, bump, db, iso, now_utc, parse_iso, usettings, inbox_default
 from ..core.i18n import tr
 from ..core.access import Denied, need_time
 from ..core.pg import insert_id
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.schema import USER_DEFAULTS
+from ..core.usertz import tz_names, tz_of_s, tz_zone  # noqa: F401  2.368.3 (#2985): moved down to the core
 from ..accounts.session import me
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.125.0 B (#2120): the person's time zone
 # usettings "tz": an IANA name (zoneinfo) or '' = the server's time zone (TZ) as before. It decides, for that person's time
-# tracking only: the local day of an entry, the periods of the report / CSV / timesheet (from / to are their local dates), "today"
-# and the month of the timesheet lock. Elsewhere (calendar, reminders, workload, absences, agents' default ranges) the
-# server's time zone stays (2.368.2 #2984: and the logged times of the office's CSV files follow it). A report with "All members" uses the viewer's time zone for everyone's entries.
+# tracking: the local day of an entry, the periods of the report / CSV / timesheet (from / to are their local dates), "today"
+# and the month of the timesheet lock; 2.368.3 (#2985) also their reminders and summaries (core/usertz.py). Elsewhere (calendar,
+# workload, absences) the server's time zone stays (2.368.2 #2984: the logged times of the office's CSV files follow the person's). A report with "All members" uses the viewer's time zone for everyone's entries.
 # "time_split_midnight" (default on): an entry that runs over midnight (in that time zone) counts on each day with its share
 # in the report's days, the CSV (one row per day) and the timesheet. The stored entry stays one entry; totals stay the same.
 # The rounding stays per entry (rounded once as a whole); the day shares of the seconds and of the rounded seconds are split
@@ -32,32 +31,12 @@ USER_DEFAULTS.setdefault("time_split_midnight", "1")
 TZ_NAME_MAX = 64
 
 
-@lru_cache(maxsize=1)
-def tz_names():
-    return frozenset(available_timezones())
-
-
-@lru_cache(maxsize=128)
-def tz_zone(name):
-    """A stored name -> ZoneInfo; '' or unknown (e.g. removed from the system's tzdata) -> the server's TZ."""
-    if not name or name not in tz_names():
-        return TZ
-    try:
-        return ZoneInfo(name)
-    except (KeyError, ValueError, OSError):
-        return TZ
-
-
 def tz_clean(sv):
     """The setting tz from the client -> the stored string; BadInput if it is no known IANA name."""
     sv = (sv or "").strip()
     if sv and (len(sv) > TZ_NAME_MAX or sv not in tz_names()):
         raise BadInput(tr("Invalid value: {0}", "tz"))
     return sv
-
-
-def tz_of_s(s):
-    return tz_zone((s or {}).get("tz") or "")
 
 
 def tz_of(c, uid):

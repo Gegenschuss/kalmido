@@ -822,7 +822,7 @@ def time_watchdog(c, users, S, LG):
 
 def _time_watch_one(c, r, users, S, LG, ref):
     from ..notify.push import notify, push_prio
-    from .timesheet import tz_zone  # 2.125.0 B (#2120): the stop time in the person's time zone
+    from ..core.usertz import hm_text, tz_of_s  # 2.125.0 B (#2120): the stop time in the person's time zone
     uid = r["user_id"]
     if uid not in users:
         return
@@ -846,7 +846,7 @@ def _time_watch_one(c, r, users, S, LG, ref):
         if n:
             notify(uid, tr("Timer stopped automatically", lg=lg),
                    tr("{0} ran {1} h and was stopped at {2}. Correct the end time if needed.", label, fnum(stop_h),
-                      end.astimezone(tz_zone(s.get("tz") or "")).strftime("%H:%M"), lg=lg), push_prio(s, 4), f"{PUBLIC_URL}/#time", s=s, scope=sc)
+                      hm_text(end.astimezone(tz_of_s(s)), s), lg=lg), push_prio(s, 4), f"{PUBLIC_URL}/#time", s=s, scope=sc)
     elif rem_h > 0 and hrs >= rem_h and not r["reminded"]:
         c.execute("UPDATE time_entries SET reminded=1 WHERE id=?", (r["id"],))
         c.commit()
