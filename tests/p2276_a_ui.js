@@ -67,10 +67,12 @@ const today = TC.today();
     check(await ev(`!!document.querySelector('#view .ofmstart [data-ofmg="sell"] [data-ofm="offers"]')`), 'phone: Sell stays open');
     await shot('p2276a-phone-start.png');
     await click(ev, '#view [data-act="ofm-group"]');
-    check(await ready(ev, `(() => { const s = document.querySelector('#view .ofmstart [data-ofmg="money"]'); return !!s && !s.classList.contains('closed') && s.querySelector('[data-act="ofm-group"]').getAttribute('aria-expanded') === 'true' && !!s.querySelector('[data-ofm="receipts"]') && !s.querySelector('[data-act="ofm-more"]') && !s.querySelector('[data-ofm="kpi"]'); })()`, 20), 'phone: a tap opens Money (Receipts, no figures yet, no "Show more")');
-    // 2.418.0 (#3560): the pen on top of the start page opens the menu's editor; the waiting points are under Hidden, Plus brings one back
+    check(await ready(ev, `(() => { const s = document.querySelector('#view .ofmstart [data-ofmg="money"]'); return !!s && !s.classList.contains('closed') && s.querySelector('[data-act="ofm-group"]').getAttribute('aria-expanded') === 'true' && !!s.querySelector('[data-ofm="receipts"]') && !s.querySelector('[data-act="ofm-more"]') && !!s.querySelector('[data-ofm="kpi"]'); })()`, 20), 'phone: a tap opens Money (Receipts and Figures at once, 2.448.0 #3784, no "Show more")');
+    // 2.418.0 (#3560): the pen on top of the start page opens the menu's editor; 2.448.0 (#3784): Minus hides a point, Plus brings it back
     await click(ev, '#view [data-act="nav-edit"][data-area="office"]');
-    check(await ready(ev, `!!document.querySelector('#view .naved[data-naved="office"] .navoffl [data-k="kpi"] [data-act="nav-show"]')`, 40), '#3560 phone: the pen opens the editor, Figures under Hidden');
+    check(await ready(ev, `!!document.querySelector('#view .naved[data-naved="office"] .navl:not(.navoffl) [data-k="kpi"] [data-act="nav-hide"]')`, 40), '#3560 phone: the pen opens the editor, Figures in the menu');
+    await click(ev, '#view .naved .navl:not(.navoffl) [data-k="kpi"] [data-act="nav-hide"]');
+    check(await ready(ev, `!!document.querySelector('#view .naved .navoffl [data-k="kpi"] [data-act="nav-show"]')`, 40), '#3560 phone: Minus puts Figures under Hidden');
     await click(ev, '#view .naved .navoffl [data-k="kpi"] [data-act="nav-show"]');
     check(await ready(ev, `!!document.querySelector('#view .naved .navl:not(.navoffl) [data-k="kpi"]')`, 40), '#3560 phone: Plus brings Figures back');
     await click(ev, '#view .naved [data-act="nav-done"]');

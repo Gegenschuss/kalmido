@@ -138,10 +138,8 @@ const ofm_ok = i => { if (MV_OFM.includes(i.key) && mvOfc()) return false; const
 // 2.276.0 A (#3039): what the office already holds (GET /api/office/settings used: invoice, receipt, inquiry, meal, travel,
 // sub, fixed), per person and workspace like the role (LS ofmUsed); null = not known yet (everything as before)
 function ofm_used() { return typeof OFC !== 'undefined' && OFC.info ? OFC.info.used || null : (LS.get('ofmUsed', {}) || {})[ofm_ws()] || null; }
-// points of Money not used yet (2.276.0 A, #3039: they waited behind "More"); 2.418.0 (#3560): they start under "Hidden" of
-// the menu's editor instead (nav_defHid), until used or brought back by hand
-// 2.380 F (#3411): a point of Money nobody needs is switched off under Settings > Functions (need: money.*, office_packs.js OCF_FEATS)
-const OFM_LATER = {cashflow: u => u.invoice || u.receipt || u.fixed, kpi: u => u.invoice, travel: u => u.travel, meals: u => u.meal, subs: u => u.sub};
+// 2.380 F (#3411): every point of Money shows at once; 2.448.0 (#3784): also before its first use, a point nobody needs is
+// switched off under Settings > Functions (need: money.*, office_packs.js OCF_FEATS) or hidden in the menu's editor
 // ---- 2.418.0 (#3560): each person arranges the menus of the areas (navmenu.js draws the editor): the order, the points
 // hidden (only not in the menu: data, function and rights stay, the search finds them) and the points that start hidden but
 // were brought back. User setting nav_menus, json {area: {order, hidden, shown}} (accounts/navmenus.py), the same on phone
@@ -155,10 +153,9 @@ function nav_pref(area) {
   return {order: Array.isArray(m.order) ? m.order : [], hidden: new Set(m.hidden || []), shown: new Set(m.shown || [])};
 }
 const nav_orgOff = (area, key) => { const w = typeof wsCur === 'function' ? wsCur() : ''; return w.startsWith('org:') && (wsOrg(w.slice(4))?.nav_off || []).includes(area + ':' + key); };
-const nav_defHid = (area, key) => { if (area !== 'office' || !OFM_LATER[key]) return false; const u = ofm_used(); return !!u && !OFM_LATER[key](u); };
-// hidden by the person: by hand, or starting hidden and not brought back; the parts hidden in the old sidebar settings
+// hidden by the person: by hand; the parts hidden in the old sidebar settings
 // (sidebar "e:<part>", before 2.418.0) count as hidden too until shown again
-const nav_hid = (area, key) => { const p = nav_pref(area); return p.hidden.has(key) || !p.shown.has(key) && (nav_defHid(area, key) || area !== 'office' && sideHidden('e:' + key)); };
+const nav_hid = (area, key) => { const p = nav_pref(area); return p.hidden.has(key) || !p.shown.has(key) && area !== 'office' && sideHidden('e:' + key); };
 const nav_open = (area, key) => area === 'office' ? S.route?.mod === 'office' && S.route.tab === key || S.route?.mod === key && key !== 'office' : S.route?.mod === key;
 // the menus that can be arranged (the editor: navmenu.js, loaded on the first use)
 const NAV_AREAS = ['office', 'life', 'reading', 'time', 'review', 'ablage'];
@@ -183,13 +180,8 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act="nav-edit"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation(); nav_edit(b.dataset.area);
 }, true);
-// the choices of the "More" of the office (LS ofmAll / ofmSeen, one device, before 2.418.0) move once into the setting
-function nav_legacy() {
-  const all = LS.get('ofmAll', false), seen = LS.get('ofmSeen', null); if (!all && !seen || !S.settings) return;
-  LS.del('ofmAll'); LS.del('ofmSeen');
-  const ks = Object.keys(OFM_LATER).filter(k => all || (seen || []).includes(k)), p = nav_pref('office');
-  if (ks.length && !p.shown.size && !p.hidden.size) { NAV.o.office = {...(NAV.o.office || {}), shown: ks}; const v = JSON.stringify(NAV.o); S.settings.nav_menus = v; api('PATCH', '/api/settings', {nav_menus: v}).catch(() => {}); }
-}
+// the choices of the "More" of the office (LS ofmAll / ofmSeen, one device, before 2.418.0): 2.448.0 (#3784) nothing starts hidden any more
+function nav_legacy() { LS.del('ofmAll'); LS.del('ofmSeen'); }
 // the person's order: named keys first in that order, the others after them in their usual order (rank)
 const nav_sort = (area, xs, key = x => x.key, rank = () => 0) => { const o = nav_pref(area).order, r = x => { const n = o.indexOf(key(x)); return n < 0 ? o.length + rank(x) : n; }; return xs.map((x, i) => [x, i]).sort((a, b) => r(a[0]) - r(b[0]) || a[1] - b[1]).map(a => a[0]); };
 // a tab of the office (OFC_TABS: [key, icon, name, admins only, html, group]) without an entry here joins its group
