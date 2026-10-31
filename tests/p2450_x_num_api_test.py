@@ -5,6 +5,7 @@ organisation (freelancer-matrix: files).
  - a document's amount: "1.234,56" and "1,234.56" keep their value (the first was refused, "1,500" in English was 1.5), a
    wrong amount is 400 and leaves the stored one, an amount with three decimals is not cut
  - tables: a date column reads the Dutch 15-10-2026 (the server knew dots and ISO only)
+ - 2.456.0 (#3819): a money field of a document reads like the amount
 Invented documents only (the PDF is made here)."""
 import os
 import sys
@@ -35,10 +36,11 @@ def amount(s, did):
     return s.get(B + f"/api/docs/{did}").json().get("amount")
 
 
+DOCS = {}
 # ---- a document's amount, English and Dutch (a comma language)
 for s, who, cases in ((Fr, "en", (("1.234,56", "1234.56"), ("1,234.56", "1234.56"), ("1,500", "1500.00"), ("1234,5", "1234.50"), (19.5, "19.5"), ("119.00", "119.00"))),
                       (Fn, "nl", (("1.234,56", "1234.56"), ("1,234.56", "1234.56"), ("12,5", "12.50"), ("1,500", "1.50"), ("1,234", None)))):
-    did = doc(s, f"beleg-{who}.pdf")
+    did = DOCS[who] = doc(s, f"beleg-{who}.pdf")
     for raw, want in cases:
         r = s.patch(B + f"/api/docs/{did}", json={"amount": raw})
         if want is None:  # 1,234 in a comma language: three decimals, not cut to 1.23
@@ -51,6 +53,21 @@ for s, who, cases in ((Fr, "en", (("1.234,56", "1234.56"), ("1,234.56", "1234.56
         r = s.patch(B + f"/api/docs/{did}", json={"amount": bad})
         check(r.status_code == 400 and float(amount(s, did)) == 119, f"#3770: {who} {bad!r} = 400, the amount stays ({r.status_code} {amount(s, did)!r})")
     check(s.patch(B + f"/api/docs/{did}", json={"amount": ""}).ok and not amount(s, did), f"#3770: {who} an empty amount clears it")
+
+# ---- 2.456.0 (#3819): a money field of a document reads like the amount, by language; too many decimals are refused
+for s, who, cases in ((Fr, "en", (("1,500", "1500.00"), ("1,5 €", "1.50 EUR"), ("1.234,50", "1234.50"), ("USD 1,234.56", "1234.56 USD"))),
+                      (Fn, "nl", (("1,500", "1.50"), ("1.234,50 €", "1234.50 EUR"), ("1500", "1500.00"), ("1,234", None), ("12.345", None), ("abc", None)))):
+    f = s.post(B + "/api/docs/fields", json={"ws": "private", "name": "Kaution", "type": "money"})
+    check(f.status_code == 201, f"#3819: {who} a money field {f.status_code} {f.text[:160]}")
+    did = DOCS[who]
+    key = str(f.json().get("id"))
+    for raw, want in cases:
+        r = s.patch(B + f"/api/docs/{did}", json={"custom_fields": {key: raw}})
+        got = next((x.get("value") for x in s.get(B + f"/api/docs/{did}").json().get("custom_fields") or [] if x.get("name") == "Kaution"), None)
+        if want is None:
+            check(r.status_code == 400, f"#3819: {who} {raw!r} is refused, never reinterpreted {r.status_code} {got!r}")
+        else:
+            check(r.ok and got == want, f"#3819: {who} {raw!r} = {want} ({r.status_code} {got!r} {r.text[:120] if not r.ok else ''})")
 
 # ---- tables: the Dutch date
 r = Fn.post(B + "/api/sheets", json={"title": "Datums"})
