@@ -32,6 +32,7 @@ from ..core.orgcrypt import oc_enc_fields
 from ..core.pg import insert_id, write_lock
 from ..core.errors import BadInput
 from .calc import dstr, money
+from .legacyimport import fx_run, fx_settle  # 2.363.2 (#3104)
 from .vma import VMA_HOME, VMA_NAMES, vma_dates, vma_places, vma_rate, vma_table_year, vma_trip
 
 VMI_FILE_MAX = 2 * 1024 * 1024
@@ -529,7 +530,6 @@ def vmi_import_post():
         row = oc_enc_fields(c, oid, "office_trips", row)
         ids.append(insert_id(c, f"INSERT INTO office_trips({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())))
     ofx_log(c, oid, "import", target="trips", detail={"count": len(ids)})
-    from .legacyimport import fx_run
     fx_run(c, oid, uid, "trips", ids)  # 2.363.2 (#3104)
     bump(c)
     c.commit()
@@ -577,7 +577,6 @@ def vmi_delete_many():
     if not isinstance(ids, list) or len(ids) > VMI_IMPORT_MAX or not all(isinstance(x, int) and not isinstance(x, bool) for x in ids):
         raise BadInput(tr("Invalid data"))
     out = vmi_remove(c, oid, sorted(set(ids)))
-    from .legacyimport import fx_settle
     fx_settle(c, oid, uid, "trips")  # 2.363.2 (#3104)
     bump(c)
     c.commit()

@@ -23,6 +23,7 @@ from ..core.csvimport import amount_text, csv_table_numbered
 from .calc import dec, dstr, money
 from .model import office_on, office_role, pb_cl_org, pb_cl_sql
 from .rights import ofr_rights
+from .legacyimport import fx_run, fx_settle  # 2.363.2 (#3104)
 from ..team.clients import cl_trash
 from .pipeline import (EMAIL_RE, LEAD_SOURCES, MAX_DEALS, PL2_PROB, _client_ok, _ctx, _one, _row, _txt, _update,
                        pl2_clean, pl2_list, pl2_public)
@@ -339,7 +340,6 @@ def lead_import():
                         | {"stage": "lead"})
         row["sort"] = base - len(ok) + i
         ids.append(lead_insert(c, oid, uid, row))
-    from .legacyimport import fx_run
     fx_run(c, oid, uid, "leads", ids)  # 2.363.2 (#3104)
     bump(c)
     c.commit()
@@ -363,7 +363,6 @@ def lead_import_undo():
     if not isinstance(ids, list) or not ids or len(ids) > LEAD_IMPORT_MAX or any(not isinstance(i, int) or isinstance(i, bool) for i in ids):
         raise BadInput(tr("Invalid value: {0}", "ids"))
     n = lead_bin(c, oid, ids)
-    from .legacyimport import fx_settle
     fx_settle(c, oid, uid, "leads")  # 2.363.2 (#3104)
     bump(c)
     c.commit()
