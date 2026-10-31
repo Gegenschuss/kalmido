@@ -211,7 +211,8 @@ def contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                   body={"type": "object", "properties": {"role": {"type": "string", "enum": list(BOOK_ROLES)}}}, scope=S),
         "delete": op("Stop sharing (owner) or leave a shared address book", K, {"204": {"description": "Removed"}} | errs("403", "404"), [bid_p, uid_p], scope=S)}
     paths["/address-books/{id}/import"] = {"post": op("Import a vCard file (3.0 / 4.0): the same UID is updated", K,
-                                                      ok({"type": "object", "properties": {k: {"type": "integer"} for k in ("created", "updated", "unchanged", "errors")}})
+                                                      ok({"type": "object", "properties": {**{k: {"type": "integer"} for k in ("created", "updated", "unchanged", "errors", "over_limit")},
+                                                                                           "bad": {"type": "array", "items": {"type": "object"}}}})  # 2.363.2 (#3106)
                                                       | errs("400", "403", "404"), [bid_p],
                                                       body={"type": "object", "required": ["vcf"], "properties": {"vcf": {"type": "string"}}}, scope=S)}
     paths["/address-books/{id}/export"] = {"get": op("The address book as a vCard text", K, ok({"type": "object", "properties": {"vcf": {"type": "string"}}})

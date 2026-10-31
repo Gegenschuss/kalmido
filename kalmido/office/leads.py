@@ -260,12 +260,12 @@ def _source_of(s):
 
 def lead_parse(c, oid, text):
     """CSV text -> (columns {field: header}, rows): every row {n, title, contact, company, email, phone, source,
-    next_step, follow_up, note, value, error, dup}. Duplicates: the e-mail of a deal of the area or of an earlier row;
-    2.363.2 (#3104): a row without an e-mail by lead_key (it came in new on every run)."""
-    from ..life.budget import bud_csv_table
+    next_step, follow_up, note, value, error, dup}. Duplicates: the e-mail of a deal of the area or of an earlier row."""
+    from ..life.budget import BUD_ROWS_MAX
+    from ..core.csvimport import csv_table_numbered
     if not isinstance(text, str) or not text.strip():
         raise BadInput(tr("The file is empty"))
-    _d, header, rows = bud_csv_table(text)
+    _d, header, rows, nums = csv_table_numbered(text, BUD_ROWS_MAX)
     cols = {}
     for i, h in enumerate(header):
         f = LEAD_COLS.get(_norm(h))
@@ -279,7 +279,7 @@ def lead_parse(c, oid, text):
     have = {(d.get("email") or "").strip().lower() for d in deals} - {""}
     keys = {lead_key(d) for d in deals}
     out = []
-    for n, r in enumerate(rows, 1):
+    for n, r in zip(nums, rows):             # 2.363.2 (#3106): n = the row in Excel
         cell = {f: (r[i] if i < len(r) else "").strip() for f, i in cols.items()}
         x = {"n": n, "error": None, "dup": False}
         for k, m in (("title", 200), ("contact", 200), ("company", 200), ("phone", 60), ("next_step", 300), ("note", 4000)):
@@ -294,11 +294,11 @@ def lead_parse(c, oid, text):
         if not x["title"]:
             x["error"] = tr("Name missing")
         elif x["email"] and not EMAIL_RE.match(x["email"]):
-            x["error"] = tr("Invalid value: {0}", "email")
+            x["error"] = tr("Invalid value: {0}", tr("E-mail"))
         elif fu is None:
-            x["error"] = tr("Invalid value: {0}", "follow_up")
+            x["error"] = tr("Invalid value: {0}", tr("Follow-up"))
         elif v is None:
-            x["error"] = tr("Invalid value: {0}", "value")
+            x["error"] = tr("Invalid value: {0}", tr("Value"))
         em = x["email"].lower()
         if not x["error"] and em:
             x["dup"] = em in have

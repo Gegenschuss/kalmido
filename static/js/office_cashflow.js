@@ -156,7 +156,7 @@ function rk_fixedModal(f) {
 // ---- 2.67.0 (#1838): fixed costs from a spreadsheet: pick a file -> preview (nothing stored) -> take over the ticked rows
 const FCI_VATS = [0, 7, 19];
 function fci_pick() {
-  const i = document.createElement('input'); i.type = 'file'; i.accept = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const i = document.createElement('input'); i.type = 'file'; i.accept = '.xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv';
   i.onchange = () => { if (i.files[0]) fci_preview(i.files[0]); }; i.click();
 }
 async function fci_preview(file) {

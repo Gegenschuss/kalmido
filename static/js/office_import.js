@@ -50,7 +50,7 @@ function oimHtml() {
 // every section has an anchor: #office/import/<area> scrolls there and marks it briefly
 function oim_moreHtml() {
   return `<section class="oimsec" id="oim-fixed"><h4>${ic('trend', 's')} ${tr('Fixed costs from a spreadsheet')}</h4>
-    <div class="shint">${tr('An .xlsx file with name, net amount and due month; you see a preview before anything is saved.')}</div>
+    <div class="shint">${tr('A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.')}</div>
     <div class="lacts"><a class="btn sm ghost" href="/api/office/fixed-costs/import/template" download>${ic('download', 's')}<span>${tr('Download template')}</span></a><button type="button" class="btn sm" data-rkf="fimp">${ic('upload', 's')}<span>${tr('Import from Excel')}</span></button></div></section>
     <section class="oimsec" id="oim-leads"><h4>${ic('target', 's')} ${tr('Leads from a CSV file')}</h4>
     <div class="shint">${tr('A CSV file with name, company, e-mail and phone; leads with an e-mail that is already there are skipped.')}</div>

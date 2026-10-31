@@ -2,15 +2,15 @@
 actual state".
 
 Import, two steps (office_gate + office_org with the admin of the office area, like every route of the cash flow):
-  1. POST /api/office/fixed-costs/import/preview (multipart 'file', .xlsx up to 2 MB, at most 500 rows): every row of the
-     first sheet below its header row -> new / dup / error with a reason. Nothing is stored.
+  1. POST /api/office/fixed-costs/import/preview (multipart 'file', .xlsx / .xls / CSV up to 2 MB, at most 500 rows): every row
+     of the first sheet with a header row below it -> new / dup / error with a reason. Nothing is stored.
   2. POST /api/office/fixed-costs/import {items: [...]}: the rows the person kept (VAT rates changed there); every row is
      checked again with rk_fixed_clean (nothing from the client unchecked), MAX_FIXED counted, one transaction.
 Format: a header row with "Name", "Betrag (netto)" (also "Betrag", "netto"), "fällig Monat" (also "Monat", 2.449.0 (#3768): the same in fr / es / it / nl); optional
 "Kategorie", "USt", "Wiederholung". A row with a name but no amount is a group row: the category of the rows below it.
 Month 0 = monthly from 2026-01-01, 1..12 = yearly in that month (2026-MM-01); quarterly (by the name or the column
 "Wiederholung") with a month X = four yearly rows X, X+3, X+6, X+9; a contradiction name / month: the month wins.
-The spreadsheet is read by legacyimport.fi_xlsx_read (zip budget, entity guard, only the cells' text; formulas are never
+The spreadsheet is read by legacyimport.fi_book (zip budget, entity guard, only the cells' text; formulas are never
 evaluated, their stored value is the text)."""
 import io
 import math
@@ -118,14 +118,8 @@ def _vat(v):
     return r if abs(f - r) < 0.01 and r in (0, 7, 19) else "bad"
 
 
-def fci_preview(c, oid, raw):
-    """{rows: [{row, label, amount, gross, repeat, start, month, category, vat_rate, status new|dup|error, reason, sel,
-    part}], counts: {new, dup, error}, header: [...]}."""
-    from .legacyimport import fi_xlsx_read
-    sheets = fi_xlsx_read(raw)
-    grid = next(iter(sheets.values()), None) if sheets else None
-    if not grid:
-        raise BadInput(tr("The spreadsheet is empty"))
+def fci_head(grid):
+    """(column map, index of the header row) of a sheet's rows, (None, 0) without a header row."""
     cols, hi = None, 0
     heads = []
     for i, row in enumerate(grid[:20]):
@@ -146,6 +140,23 @@ def fci_preview(c, oid, raw):
                 if j is not None:
                     cols, hi = {**m, "label": j}, i
                     break
+    return cols, hi
+
+
+def fci_preview(c, oid, raw, name=""):
+    """{rows: [{row, label, amount, gross, repeat, start, month, category, vat_rate, status new|dup|error, reason, sel,
+    part}], counts: {new, dup, error}, header: [...]}.
+    2.363.2 (#3106): also .xls / CSV (fi_book); the first sheet with a header row counts, not simply the first sheet."""
+    from .legacyimport import fi_book
+    grids = [g for g in fi_book(raw, name).values() if g]
+    if not grids:
+        raise BadInput(tr("The spreadsheet is empty"))
+    grid, cols, hi = grids[0], None, 0
+    for g in grids:
+        cols, hi = fci_head(g)
+        if cols is not None:
+            grid = g
+            break
     if cols is None:
         raise BadInput(tr("No header row with the columns Name and Amount (net) found"))
     body_rows = [(hi + 2 + k, r) for k, r in enumerate(grid[hi + 1:])]
@@ -225,11 +236,11 @@ def fci_preview(c, oid, raw):
 
 @app.post("/api/office/fixed-costs/import/preview")
 def fci_preview_post():
-    """Office admin. multipart 'file' (.xlsx) -> fci_preview. Nothing is stored."""
+    """Office admin. multipart 'file' (.xlsx, .xls, CSV) -> fci_preview. Nothing is stored."""
     from .legacyimport import _upload
     c, uid, oid = _ctx()
-    _f, raw = _upload("file", FCI_FILE_MAX)
-    return jsonify(fci_preview(c, oid, raw))
+    f, raw = _upload("file", FCI_FILE_MAX)
+    return jsonify(fci_preview(c, oid, raw, f.filename or ""))
 
 
 def fci_seen(c, oid):

@@ -1517,10 +1517,10 @@ def umz_run(uid, iid, opts):
             report = {**run.stats, "export_id": eid, "src": src, "target": run.org, "tasks": run.stats.get("tasks", 0), "not_taken": left}
             iid_db = None
             if any(run.created[k] for k in run.created):  # recorded with the rows (2.137.0, #2344: + "oi"): whatever happens next, undo works
-                from ..integrations.importers import imports_trim
+                from ..integrations.importers import imp_prune
                 iid_db = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
                                    (uid, UMZ_SOURCE, _txt(st.get("name"), 200), json.dumps({**run.created, "src": run.src}), json.dumps(report), iso(now_utc())))
-                imports_trim(c, uid)
+                imp_prune(c, uid)
             c.commit()
             run.written = []  # committed: the files belong to their rows now
             shared = []

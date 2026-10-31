@@ -512,7 +512,8 @@ def vmi_import_post():
         try:
             rows.append(rk_trip_clean(c, oid, uid, {k: t.get(k) for k in VMI_FIELDS}))
         except BadInput as x:
-            raise BadInput(tr("Row {0}: {1}", i + 1, str(x.args[0] if x.args else x))) from None
+            # 2.363.2 (#3106): the row of the sheet (the preview's row), not the position among the ticked trips
+            raise BadInput(tr("Row {0}: {1}", t["row"] if isinstance(t.get("row"), int) else i + 1, str(x.args[0] if x.args else x))) from None
     from .periodlock import period_need_open
     period_need_open(c, oid, *[d for r in rows for d in (r.get("date_from"), r.get("date_to"))])  # 2.148.0 A (#2471)
     write_lock(c, f"office_trips_import_{int(oid)}")  # 2.269.0 D (#3046): check and write in one go (two tabs)

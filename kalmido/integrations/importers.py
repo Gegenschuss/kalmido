@@ -100,8 +100,7 @@ IMPORT_ZIP_RATIO = 200                    # max. uncompressed / compressed per m
 IMPORT_JSON_DEPTH = 40                    # nesting of a JSON file (Trello: ~6)
 IMPORT_UNDO_HOURS = 24
 IMPORT_RATE = _imp_env("KALMIDO_IMPORT_RATE", 30)  # imports + previews per user and 10 minutes
-IMPORT_KEEP = 20                          # import records (undo) kept per user
-IMPORT_KEEP_ALWAYS = "Kalmido"            # 2.452.0 (#3810): an account import stays until undone, it is the memory of what is here already
+IMPORT_KEEP = 20                          # import records kept per user (2.363.2 #3106: + all that can still be undone, imp_prune)
 IMPORT_SOURCES = {"todoist": "Todoist", "trello": "Trello", "asana": "Asana", "mstodo": "Microsoft To Do", "ics": "ICS",
                   # 2.142.0 B (#2147): file imports only (no API / OAuth connection, nothing fetched from the files)
                   "notion": "Notion", "gtasks": "Google Tasks", "clickup": "ClickUp", "jira": "Jira", "csv": "CSV", "markdown": "Markdown",
@@ -1209,10 +1208,13 @@ def imp_done(v):
 
 
 def imp_prio_any(v):
-    """Priority words of Jira / ClickUp / other apps -> 0, 1, 3, 5 (None = not understood). The two top levels are high."""
+    """Priority words of Jira / ClickUp / other apps -> 0, 1, 3, 5 (None = not understood). The two top levels are high.
+    2.363.2 (#3106): a number 0-5 counts upwards like the priority here (0 none, 1 low, 3 medium, 5 high; 2 low, 4 high)."""
     v = re.sub(r"\s+", " ", str(v or "").strip().lower())
     if not v or v in ("none", "keine", "-", "no priority", "ohne"):
         return 0
+    if v in ("0", "1", "2", "3", "4", "5"):
+        return {"0": 0, "1": 1, "2": 1, "3": 3, "4": 5, "5": 5}[v]
     for words, p in ((("highest", "blocker", "critical", "urgent", "dringend", "kritisch", "high", "hoch", "höchste", "wichtig",
                        "important", "p1", "!!!"), 5),
                      (("medium", "mittel", "normal", "major", "p2", "!!"), 3),
@@ -2160,7 +2162,7 @@ def imp_run(c, uid, plan, opts, dry):
         if created["tasks"] or created["lists"] or created["sections"]:
             iid = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
                             (uid, src, opts.get("_fname", "")[:200], json.dumps(created), json.dumps(stats), ts))
-            imports_trim(c, uid)
+            imp_prune(c, uid)
             rep["import_id"] = iid
             rep["undo_until"] = iso(now_utc() + timedelta(hours=IMPORT_UNDO_HOURS))
         bump(c)
@@ -2363,6 +2365,13 @@ def imp_undo_trash(c, ids, back, iid):
                   [f"undone{int(iid)}:"] + part)
 
 
+def imp_prune(c, uid):
+    """2.363.2 (#3106): the user's import records beyond the last IMPORT_KEEP go, but only past their undo time."""
+    c.execute("""DELETE FROM imports WHERE user_id=? AND created_at<? AND id NOT IN
+                 (SELECT id FROM imports WHERE user_id=? ORDER BY id DESC LIMIT ?)""",
+              (uid, iso(now_utc() - timedelta(hours=IMPORT_UNDO_HOURS)), uid, IMPORT_KEEP))
+
+
 @app.post("/api/imports/<int:iid>/undo")
 def import_undo(iid):
     return jsonify(imp_undo(db(), me(), iid))
@@ -2386,7 +2395,7 @@ def _imp_report(raw):
 def imports_list():
     """The user's recent imports (Settings > Data): source, file, counts, undo possible until."""
     c, out = db(), []
-    for r in c.execute("SELECT * FROM imports WHERE user_id=? ORDER BY id DESC LIMIT ?", (me(), IMPORT_KEEP)):
+    for r in c.execute("SELECT * FROM imports WHERE user_id=? ORDER BY id DESC", (me(),)):  # bounded by imp_prune
         until = parse_iso(r["created_at"]) + timedelta(hours=IMPORT_UNDO_HOURS)
         out.append({"id": r["id"], "source": r["source"], "source_name": "Newsletter" if r["source"] == "newsletter" else IMPORT_SOURCES.get(r["source"], r["source"]),
                     "file_name": r["file_name"], "created_at": r["created_at"], "counts": json.loads(r["report"] or "{}"),
