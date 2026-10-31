@@ -2535,8 +2535,10 @@ with
 - `receipts/`: the receipts of the documents space with their files (also those in the trash) and `receipts.csv`;
   `project-receipts/`: the receipt files of lists and projects;
 - `cashbook/`: every cash book as PDF and CSV over its whole time (entries, day closings, change log);
-- `bank/`, `expenses/`, `archive/`, `logs/` (the office log and the change logs, GoBD) as CSV; `office-files/`: every other
-  file of the office folder (archived PDFs, accepted quotations, entertainment bills ...);
+- `books/` (procedure documentation, number ranges, opening balances, locked periods, equipment), `contracts/` (contracts,
+  agreements), `bank/`, `expenses/`, `archive/`, `logs/` (the office log and the change logs, GoBD) as CSV; `office-files/`:
+  every other file of the office folder (archived PDFs, accepted quotations, entertainment bills ...). Settings and working
+  data (price lists, text blocks, cash flow, bank rules ...) stay out: a static test names each such table with its reason;
 - `00-index.txt` (contents, the retention note, files that could not be read) and `manifest.json` (SHA-256 of every file).
 
 Who downloads it: the person themself for their own records (*Office -> Settings -> Data*, also without an organisation)

@@ -1003,8 +1003,10 @@ organisation.
 
   The tool checks every block (a wrong key, a damaged or shortened file is refused) and then the checksums of the
   manifest.
-- **Without `KALMIDO_SECRET_KEY`** the organisation data is not encrypted and the export is refused: set the server key
-  first (see the section on the encryption of the organisation data).
+- **Without `KALMIDO_SECRET_KEY`** nothing is encrypted on this server, so since 2.362.2 the export is a plain ZIP
+  (`.zip`, mode 0600, same content, `manifest.json` says so) with a warning in the app: anyone who gets the file can read
+  everything in it. No recovery key is needed; the import reads it as it is. Set the server key to get encrypted archives
+  (see the section on the server key).
 - **Import** (2.73; every area since 2.139.1): see [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom) -- an
   admin of an organisation on the other server uploads the archive under *Settings > Data* and opens it with the recovery
   key. Best into a new, empty organisation. Since 2.139.1 the whole organisation moves: projects and tasks, office (master
@@ -1069,6 +1071,16 @@ export their content.
 access data of connections (calendar and address book subscriptions, Karakeep, newsletter, Git, other Kalmido servers:
 set them up again), lists of other people (the file names them and contains your own comments there), the trash, and
 organisation data that is not yours (use the organisation export for a whole organisation).
+
+**Your own office (2.362.2).** With a personal office the file also holds a readable copy of it under `personal-office/`:
+the same parts as *Export the office* in the office settings, with the receipts and filed documents of the office. The
+account import names it as staying behind; to take the office to another server use *Export the office* (that archive now
+carries the receipts, filed letters, contract, equipment and cash book documents, and the import points the office at them
+again; files in the trash or below a browser-locked folder stay out).
+
+**Files of knowledge pages and tables (2.362.2).** They are in the file (`files/wiki_files/`, `files/sheet_files/`), the rows
+of `data/wiki_files.json` and `sheet_files.json` name them under `file`. A file that does not open is listed under
+`locked_files`, the export goes on.
 
 **2.148.1 (Art. 15):** the file also holds the list of your private files (name, type, size, dates; not their content),
 your private knowledge pages, your chats with agents, what you wrote in direct messages, your absences and timesheets

@@ -3,8 +3,10 @@
 // checked on the server, a preview with the people (found by e-mail, shared only when ticked) and the target, the run in
 // the background, the result with undo (kalmido/admin/acctimport.py). One undo step = the whole import.
 const UMZ = {timer: 0, up: null};
+const UMZ_OFFICE_COPY = N_('Your own office (invoices, receipts, cash book) is in the file as a copy. To take it to another server, use “Export the office” in the office settings.');  // 2.362.2 (#3099)
 const umzHtml = hint => `<h4 id="s-umz-h">${tr('Move and export everything')}</h4>
   ${hint(tr('One file with everything that is yours: projects, tasks, comments, files, calendars, contacts, habits and settings. Use it to move to your own Kalmido server (or back) or as your own copy of your data.'))}
+  ${hint(tr(UMZ_OFFICE_COPY))}
   <div id="s-umz-exp" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div id="s-umz-sig"></div>
   <div class="row"><label for="s-umz-file">${tr('Take over from a Kalmido export')}</label>${fileBtn('s-umz-file', '.zip,application/zip')}${''/* lazy-ok: 2.149.0 F (#2519): settings.js draws this section */}</div>
@@ -62,7 +64,8 @@ function umzPreviewHtml(j) {
       : tr('The export has no encryption keys: locked notes and encrypted files arrive unreadable.')) : '',  // 2.278.0 C (#3091): only what the import does
     p.encrypted.locked_lists ? hintK(trn('{0} encrypted project is not taken over: switch its encryption off before the export or export its content.', '{0} encrypted projects are not taken over: switch their encryption off before the export or export their content.', p.encrypted.locked_lists)) : '',
     (p.taken_areas || []).length ? hintK(tr('Also taken over: {0}', p.taken_areas.map(x => `${esc(x.what)} (${x.count})`).join(', '))) : '',  // 2.137.0 (#2344)
-    p.not_taken.length ? hintK(tr('These areas stay on the old server: {0}', p.not_taken.map(x => `${esc(x.what)} (${x.count})`).join(', '))) : ''].join('');  // 2.273.0 A (#3030)
+    p.not_taken.length ? hintK(tr('These areas stay on the old server: {0}', p.not_taken.map(x => `${esc(x.what)} (${x.count})`).join(', '))) : '',  // 2.273.0 A (#3030)
+    p.office_copy ? hintK(tr(UMZ_OFFICE_COPY)) : ''].join('');  // 2.362.2 (#3099)
   const tgt = p.targets.length > 1 || org ? `<div class="row"><label for="s-umz-tgt">${tr('Into')}</label><select id="s-umz-tgt">${p.targets.map(t => `<option value="${esc(String(t.id))}">${esc(t.id === 'private' ? tr('Private|workspace') : t.name)}</option>`).join('')}</select></div>` : '';
   const none = org && !p.targets.length;  // 2.73.0 B (part 4): an organisation export needs an organisation I administer here
   return `<div class="impbox umzbox" role="status"><div class="imphead"><b>${org ? tr('Organisation export of {0}', esc(p.user.name)) : tr('Export of {0}', esc(p.user.name || p.user.email))}</b></div>

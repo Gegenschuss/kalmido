@@ -51,7 +51,7 @@ from ..core.pg import system_ctx
 from ..core.i18n import N_, lang, tr
 from ..core.access import Denied
 from ..accounts.session import me
-from ..core.orgcrypt import _org_admin, oc_dec, oc_dec_row, oc_enabled, oc_read_file, oc_status  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import OrgCryptError, _org_admin, oc_dec, oc_dec_row, oc_enabled, oc_read_file, oc_status  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
 from .offsite import stepup_download  # 2.223.2 C (#2871): the step-up before a download
 from ..accounts.orgretain import odl_ids  # 2.278.0 A (#3093)
@@ -65,7 +65,9 @@ OX_BLOCK = 1 << 20  # 1 MiB of plaintext per block
 OX_FK_AAD = b"kalmido-orgx-fk|1|"
 OX_SUFFIX = ".kalmido-export"
 OX_PAGE = 1000  # rows per query of the big tables (keyset paging)
-OX_NO_KEY = N_("The organisation export needs the server key KALMIDO_SECRET_KEY (the archive is encrypted with the organisation’s key), see SELF-HOSTING.md.")
+# 2.362.2 (#3099): without a server key nothing here is encrypted, so the archive is a plain ZIP (mode 0600) with a warning, not a 409
+OX_PLAIN_SUFFIX = ".zip"
+OX_FILES = (OX_SUFFIX, OX_PLAIN_SUFFIX)
 # never in an archive, whatever table they are in (credentials, secrets, hashes of them, push keys, 2FA)
 OX_SECRET_COLS = frozenset((
     "password_hash", "password", "pw_hash", "pw_rev", "token", "token_hash", "secret", "hook_secret", "totp_secret", "totp_step",
@@ -565,9 +567,16 @@ def ox_not_included(c, by, texts):
     return [tr(x, lg=lg) for x in texts]
 
 
-def ox_file_name(org_name, oid, when):
+def ox_file_name(org_name, oid, when, suffix=OX_SUFFIX):
     slug = _safe_part(org_name, 40).lower()
-    return f"{slug if slug != 'file' else 'org' + str(int(oid))}-{when.strftime('%Y-%m-%d')}{OX_SUFFIX}"
+    return f"{slug if slug != 'file' else 'org' + str(int(oid))}-{when.strftime('%Y-%m-%d')}{suffix}"
+
+
+def ox_decrypted_note(what):
+    """The manifest's word on what is readable (2.362.2 #3099: a server without key has no encryption at all)."""
+    if not oc_enabled():
+        return "This server has no server key: nothing is encrypted, neither the fields nor this archive."
+    return f"Fields and files the server encrypts with the {what} key are in plain text here; the archive itself is encrypted."
 
 
 class _Man:
@@ -767,7 +776,7 @@ def ox_build(c, oid, out, by=None):
             "org": {"id": int(oid), "name": org["name"]}, "created_at": iso(now_utc()), "created_by": by,
             "counts": man.counts, "files": man.files,
             "client_encrypted": {**man.client_enc, "note": "Encrypted in the browser by their author: stored here as ciphertext, only the author can open them."},
-            "decrypted": "Fields and files the server encrypts with the organisation key are in plain text here; the archive itself is encrypted.",
+            "decrypted": ox_decrypted_note("organisation"),
             "not_included": ox_not_included(c, by, OX_NOT_INCLUDED),  # 2.449.0 (#3768)
             "locked_files": man.locked,  # 2.209.0 D (#1856)
         }
@@ -780,6 +789,110 @@ def ox_build(c, oid, out, by=None):
 # no other areas of the private space, nobody else. The import takes it into an organisation or into a personal office.
 OX_PB_CLIENTS = {"clients": "org_id IS NULL AND created_by=?",
                  "office_client_contacts": "org_id IS NULL AND client_id IN (SELECT id FROM clients WHERE org_id IS NULL AND created_by=?)"}
+OX_PB_LEFT = N_("everything of the private space but the office, its clients and the documents the office stands on (receipts, filed letters, contract and equipment documents, cash book receipts); files below a browser-locked folder stay out")
+
+
+def ox_pb_nodes(c, oid, owner, have):
+    """2.362.2 (#3099): the files of the owner's private documents space the personal office stands on: everything an office
+    table points at (receipts of cash entries, filed letters, contracts, equipment, statements ...) and the receipts of the
+    space -> (file ids, those + their folders). Only the owner's own nodes, nothing of the trash, nothing below a browser-locked
+    folder (only its key holders read it)."""
+    from ..docs.store import doc_ws
+    refs = {r[0] for r in c.execute("SELECT node_id FROM rc_receipts WHERE ws=?", (doc_ws(None, owner),))}
+    for t, col in c.execute("""SELECT table_name, column_name FROM information_schema.columns WHERE table_schema=current_schema()
+                               AND table_name ILIKE 'office%' AND column_name ILIKE '%node_id'""").fetchall():
+        if "org_id" in _table_cols(c, t):
+            refs |= {r[0] for r in c.execute(f"SELECT {col} FROM {t} WHERE org_id=? AND {col} IS NOT NULL", (oid,))}
+    nodes, todo = {}, set(refs)
+    while todo:  # upwards: the folders above the files (each id once)
+        q = ",".join(str(int(x)) for x in todo)
+        rs = c.execute(f"SELECT id, parent_id, kind, deleted_at FROM fs_nodes WHERE id IN ({q}) AND owner_id=? AND org_id IS NULL", (owner,)).fetchall()
+        nodes.update((r["id"], r) for r in rs)
+        todo = {r["parent_id"] for r in rs if r["parent_id"]} - set(nodes)
+    locked = {r[0] for r in c.execute("SELECT node_id FROM fs_locks WHERE org_id IS NULL AND e2e IS NOT NULL")} if "fs_locks" in have else set()
+
+    def chain(nid):
+        out = []
+        while nid in nodes and nid not in out:
+            out.append(nid)
+            nid = nodes[nid]["parent_id"]
+        return out
+    files, tree = set(), set()
+    for nid in refs & set(nodes):
+        ups = chain(nid)
+        if nodes[nid]["kind"] == "file" and not any(nodes[x]["deleted_at"] or x in locked for x in ups):
+            files.add(nid)
+            tree.update(ups)
+    return files, tree
+
+
+def ox_pb_read(c, man, area, rid, name, full):
+    """2.362.2 (#3099, review): one file that does not open (a lost key, a damaged file) is named in the manifest and never
+    stops the copy of a person's data. -> its bytes or None."""
+    try:
+        return _read(c, full)
+    except (OSError, OrgCryptError) as e:
+        print(f"personal office export: {area} file not readable: {type(e).__name__}", flush=True)
+        man.locked.append({"area": area, "id": int(rid), "name": name or "", "signature": "", "unreadable": True})
+        return None
+
+
+def ox_pb_store(c, zf, man, lk, oid, owner, have, pre=""):
+    """2.362.2 (#3099): the entries of the file store and the documents for those files, in the shape of an organisation's
+    (the import takes them over the same way and sets the office's references to them, admin/oi_store.py)."""
+    from ..docs.store import doc_ws
+    files, tree = ox_pb_nodes(c, oid, owner, have)
+    if not files:
+        return
+    ws, k, t = doc_ws(None, owner), ",".join(str(int(x)) for x in sorted(files)), ",".join(str(int(x)) for x in sorted(tree))
+    for name, table, where, args in (
+            ("store/nodes.json", "fs_nodes", f"id IN ({t})", ()),
+            ("store/area_roots.json", "fs_area_roots", f"ws=? AND node_id IN ({t})", (ws,)),
+            ("store/versions.json", "fs_versions", f"node_id IN ({k})", ()),
+            ("documents/senders.json", "doc_senders", "ws=?", (ws,)),
+            ("documents/types.json", "doc_types", "ws=?", (ws,)),
+            ("documents/tags.json", "doc_tags", "ws=?", (ws,)),
+            ("documents/document_tags.json", "doc_node_tags", f"node_id IN ({k})", ()),
+            ("documents/fields.json", "doc_fields", "ws=?", (ws,)),
+            ("documents/field_values.json", "doc_field_values", f"node_id IN ({k})", ()),
+            ("documents/meta.json", "doc_meta", f"node_id IN ({k})", ()),
+            ("documents/receipts.json", "rc_receipts", f"node_id IN ({k})", ())):
+        if table in have:
+            _put_json(zf, man, pre + name, _rows(c, oid, table, where, args))
+    names = {r[0]: r[1] for r in c.execute(f"SELECT id, name FROM fs_nodes WHERE id IN ({k})")}
+    for r in _rows(c, oid, "fs_versions", f"node_id IN ({k})", ()):
+        full, nm = _under(ATT_DIR, r.get("path")), names.get(r["node_id"])
+        if full and not lk("fs", {"id": r["node_id"]}, nm, r["no"]):
+            data = ox_pb_read(c, man, "fs", r["node_id"], nm, full)
+            if data is not None:
+                _put_bytes(zf, man, f"{pre}files/store/{int(r['node_id'])}-v{int(r['no'])}-{_safe_part(nm)}", data)
+
+
+def ox_pb_parts(c, zf, man, oid, owner, have, pre=""):
+    """The parts of a personal office into the open ZIP zf, below pre (2.362.2 #3099: the account export carries them too)."""
+    for name, table, where in OX_AREAS:
+        if table not in have or not (name.startswith("office/") or name == "clients.json"):
+            continue
+        if table in OX_PB_CLIENTS:
+            _put_json(zf, man, pre + name, _rows(c, oid, table, ox_live(c, table, OX_PB_CLIENTS[table]), (owner,)))  # 2.223.3 B (#2879)
+        else:
+            where = ox_live(c, table, where)  # 2.223.3 B (#2879): without the trash
+            _put_json(zf, man, pre + name, _rows(c, oid, table, where, (oid,) * where.count("?")))
+    odir = os.path.join(OFFICE_DIR, str(int(oid)))
+    lk = _ox_locked(c, oid, man)
+    dead = ox_dead_office_files(c, oid, have)  # 2.223.3 B (#2879)
+    if os.path.isdir(odir):
+        for fn in sorted(os.listdir(odir)):  # the office keeps its files in one folder (no sub folders)
+            full = os.path.join(odir, fn)
+            if os.path.islink(full) or not os.path.isfile(full) or fn in dead:
+                continue
+            if fn in lk.office:  # 2.209.0 D (#1856): a file the virus scanner locked stays out, listed in the manifest
+                lk(*lk.office[fn][:2], fn)
+                continue
+            data = ox_pb_read(c, man, "office", 0, fn, full)
+            if data is not None:
+                _put_bytes(zf, man, f"{pre}files/office/" + _safe_part(fn), data)
+    ox_pb_store(c, zf, man, lk, oid, owner, have, pre)
 
 
 def ox_build_personal(c, oid, out, org, have, by=None):
@@ -790,32 +903,13 @@ def ox_build_personal(c, oid, out, org, have, by=None):
         o["icon"] = ""
         _put_json(zf, man, "organisation.json", [o])
         _put_json(zf, man, "members.json", [])
-        for name, table, where in OX_AREAS:
-            if table not in have or not (name.startswith("office/") or name == "clients.json"):
-                continue
-            if table in OX_PB_CLIENTS:
-                _put_json(zf, man, name, _rows(c, oid, table, ox_live(c, table, OX_PB_CLIENTS[table]), (owner,)))  # 2.223.3 B (#2879)
-            else:
-                where = ox_live(c, table, where)  # 2.223.3 B (#2879): without the trash
-                _put_json(zf, man, name, _rows(c, oid, table, where, (oid,) * where.count("?")))
-        odir = os.path.join(OFFICE_DIR, str(int(oid)))
-        lk = _ox_locked(c, oid, man)
-        dead = ox_dead_office_files(c, oid, have)  # 2.223.3 B (#2879)
-        if os.path.isdir(odir):
-            for fn in sorted(os.listdir(odir)):  # the office keeps its files in one folder (no sub folders)
-                full = os.path.join(odir, fn)
-                if os.path.islink(full) or not os.path.isfile(full) or fn in dead:
-                    continue
-                if fn in lk.office:  # 2.209.0 D (#1856): a file the virus scanner locked stays out, listed in the manifest
-                    lk(*lk.office[fn][:2], fn)
-                    continue
-                _put_bytes(zf, man, "files/office/" + _safe_part(fn), _read(c, full))
+        ox_pb_parts(c, zf, man, oid, owner, have)
         manifest = {
             "format": "kalmido-org-export", "format_version": OX_FORMAT, "kalmido_version": APP_VERSION,
             "org": {"id": int(oid), "name": org["name"]}, "created_at": iso(now_utc()), "created_by": by, "personal_office": 1,
             "counts": man.counts, "files": man.files, "client_encrypted": {"note": "none"},
-            "decrypted": "Fields and files the server encrypts with the office key are in plain text here; the archive itself is encrypted.",
-            "not_included": ox_not_included(c, by, [N_("everything of the private space but the office and its clients"), *OX_NOT_INCLUDED[1:2]]),  # 2.449.0 (#3768)
+            "decrypted": ox_decrypted_note("office"),
+            "not_included": ox_not_included(c, by, [OX_PB_LEFT, *OX_NOT_INCLUDED[1:2]]),  # 2.449.0 (#3768)
             "locked_files": man.locked,  # 2.209.0 D (#1856)
         }
         _put_bytes(zf, man, "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode())
@@ -858,36 +952,42 @@ def ox_run(oid, uid):
         with system_ctx(c):  # the organisation's rows only (every query names it); the starter is its admin
             from ..core.orgcrypt import oc_key
             org = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()
-            okey = oc_key(c, oid, create=True)
-            if not org or not okey:
+            plain = not oc_enabled()  # 2.362.2 (#3099)
+            okey = None if plain else oc_key(c, oid, create=True)
+            if not org or not (okey or plain):
                 raise RuntimeError("no organisation key")
             u = c.execute("SELECT id, display_name, username FROM users WHERE id=?", (uid,)).fetchone()
             when = now_utc()
-            from ..core.orgcrypt import rck_wrapped
-            if c.execute("SELECT 1 FROM org_keys WHERE org_id=? AND rot_started_at IS NOT NULL", (oid,)).fetchone():
-                raise RuntimeError("key renewal running")  # 2.138.0 C (#1972, review F2)
-            rw = rck_wrapped(c, oid)  # 2.138.0 C (#1972): the recovery key opens the archive (made when there is none yet)
-            c.commit()
-            head, fk, prefix = ox_header(oid, org["name"], okey, iso(when), rw)
-            name = ox_file_name(org["name"], oid, when)
+            if not plain:
+                from ..core.orgcrypt import rck_wrapped
+                if c.execute("SELECT 1 FROM org_keys WHERE org_id=? AND rot_started_at IS NOT NULL", (oid,)).fetchone():
+                    raise RuntimeError("key renewal running")  # 2.138.0 C (#1972, review F2)
+                rw = rck_wrapped(c, oid)  # 2.138.0 C (#1972): the recovery key opens the archive (made when there is none yet)
+                c.commit()
+                head, fk, prefix = ox_header(oid, org["name"], okey, iso(when), rw)
+            name = ox_file_name(org["name"], oid, when, OX_PLAIN_SUFFIX if plain else OX_SUFFIX)
+            by = {"id": uid, "name": (u["display_name"] or u["username"]) if u else ""}
             part = os.path.join(_odir(oid), secrets.token_hex(8) + ".part")
             fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(fd, "wb") as f:
-                f.write(head)
-                w = OxWriter(f, fk, prefix, hashlib.sha256(head).digest())
-                man = ox_build(c, oid, w, by={"id": uid, "name": (u["display_name"] or u["username"]) if u else ""})
-                w.finish()
+                if plain:
+                    man = ox_build(c, oid, f, by=by)
+                else:
+                    f.write(head)
+                    w = OxWriter(f, fk, prefix, hashlib.sha256(head).digest())
+                    man = ox_build(c, oid, w, by=by)
+                    w.finish()
                 f.flush()
                 os.fsync(f.fileno())
             for old in os.listdir(_odir(oid)):  # one archive per organisation: the new one replaces the last
-                if old.endswith(OX_SUFFIX):
+                if old.endswith(OX_FILES):
                     os.remove(os.path.join(_odir(oid), old))
             os.replace(part, os.path.join(_odir(oid), name))
             part = None
             size = os.path.getsize(os.path.join(_odir(oid), name))
             done = now_utc()
             _state_set(oid, {"state": "done", "by": uid, "started_at": _state(oid).get("started_at") if _state(oid) else iso(when),
-                             "done_at": iso(done), "expires_at": iso(done + timedelta(hours=OX_KEEP_H)), "file": name, "bytes": size,
+                             "done_at": iso(done), "expires_at": iso(done + timedelta(hours=OX_KEEP_H)), "file": name, "bytes": size, "plain": plain,
                              "files": sum(1 for k in man["files"] if k.startswith("files/")), "rows": sum(man["counts"].values())})
             c.execute("INSERT INTO office_doc_log(org_id, doc_id, user_id, at, action, target, detail) VALUES(?,?,?,?,?,?,?)",
                       (oid, None, uid, iso(done), "export", "org", json.dumps({"bytes": size, "file": name})))
@@ -916,7 +1016,7 @@ def ox_status(oid):
         p = os.path.join(_odir(oid), st.get("file") or "")
         if not st.get("file") or not os.path.isfile(p) or st.get("expires_at", "") <= iso(now_utc()):
             st = {"state": "none"}
-    out = {k: st.get(k) for k in ("state", "started_at", "done_at", "expires_at", "file", "bytes", "files") if st.get(k) is not None}
+    out = {k: st.get(k) for k in ("state", "started_at", "done_at", "expires_at", "file", "bytes", "files", "plain") if st.get(k) is not None}
     if st.get("state") == "failed":
         out["error"] = tr("The export was interrupted. Please start it again.") if st.get("error") == "interrupted" else tr("The export failed. Please try again later or ask the server admin (server log).")
     return out
@@ -957,7 +1057,7 @@ def ox_cleanup(c=None, force=False):
                 old = time.time() - os.path.getmtime(fp) > OX_KEEP_H * 3600
                 # 2.148.1 C (#2482): a .part only when stale (a run of another process writes it right now)
                 if (fn.endswith(".part") and time.time() - os.path.getmtime(fp) > PART_STALE_S) or (
-                        fn.endswith(OX_SUFFIX) and (fn != st.get("file") or st.get("expires_at", "") <= now or old)):
+                        fn.endswith(OX_FILES) and (fn != st.get("file") or st.get("expires_at", "") <= now or old)):
                     os.remove(fp)
                     n += 1
             if st.get("state") == "done" and not os.path.isfile(os.path.join(p, st.get("file") or "-")):
@@ -1033,11 +1133,11 @@ def ox_get(oid):
 
 @app.post("/api/orgs/<int:oid>/export")
 def ox_start(oid):
-    """Starts the export in the background (one at a time per organisation; 409 while one runs, or without the server key)."""
+    """Starts the export in the background (one at a time per organisation; 409 while one runs). 2.362.2 (#3099): without
+    the server key a plain ZIP (the state says plain, the app warns), never a dead end: Art. 20 holds on every server."""
     c = db()
     oid, own = _ox_area(c, oid)
-    if not _need(c, oid, own):
-        return err(tr(OX_NO_KEY), 409)
+    _need(c, oid, own)
     if oc_status(c, oid).get("rotating"):  # 2.138.0 C (#1972, review F2): the archive's recovery header needs the finished key
         return err(tr("The organisation’s key is being renewed on the server. Try again when that is finished."), 409)
     with _OX_LOCK:
@@ -1076,7 +1176,7 @@ def ox_download(oid):
         ofx_log(c, oid, "export", target="org_download", detail={"file": st["file"]}, dedupe_min=10)
     c.commit()
     return send_file(os.path.join(_odir(oid), st["file"]), as_attachment=True, download_name=st["file"],
-                     mimetype="application/octet-stream", conditional=False, max_age=0)
+                     mimetype="application/zip" if st["file"].endswith(OX_PLAIN_SUFFIX) else "application/octet-stream", conditional=False, max_age=0)
 
 
 @app.delete("/api/orgs/<int:oid>/export")

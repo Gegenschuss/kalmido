@@ -51,30 +51,73 @@ RX_TABLES = (
     ("invoices/payments.csv", "office_payments"),
     ("invoices/clients.csv", "clients"),
     ("invoices/company.csv", "office_company"),
+    # 2.362.2 (#3105): every other record of the office the books and the tax office ask for; RX_LEFT names the rest with its reason
+    ("invoices/client-contacts.csv", "office_client_contacts"),
+    ("invoices/document-parts.csv", "office_doc_parts"),
+    ("invoices/dunning.csv", "office_dunning_marks"),
+    ("invoices/purchases.csv", "office_purchases"),
+    ("invoices/suppliers.csv", "office_suppliers"),
+    ("invoices/peppol-sends.csv", "office_peppol_sends"),
+    ("invoices/signoffs.csv", "office_signoffs"),
+    ("invoices/generated-documents.csv", "office_gen_docs"),
+    ("invoices/privacy-sheets.csv", "office_privacy_sheets"),
+    ("contracts/contracts.csv", "office_contracts"),
+    ("contracts/contract-files.csv", "office_contract_files"),
+    ("contracts/agreements.csv", "office_agreements"),
+    ("books/procedure-documentation.csv", "office_procdocs"),
+    ("books/number-ranges.csv", "office_numbers"),
+    ("books/opening-balances.csv", "office_opening_balances"),
+    ("books/period-locks.csv", "office_period_locks"),
+    ("books/equipment.csv", "office_equipment"),
     ("archive/archive.csv", "office_archive"),
     ("archive/bookarch.csv", "office_bookarch"),  # 2.414.0 (#3502): the booking archive of past DATEV years (books, 10 years)
     ("archive/bookarch-accounts.csv", "office_bookarch_accts"),
+    ("archive/bookarch-files.csv", "office_bookarch_files"),  # 2.362.2 (#3105)
+    ("archive/bookarch-documents.csv", "office_bookarch_docs"),
+    ("archive/datev-guids.csv", "office_datev_guids"),
     ("cashbook/cashbooks.csv", "office_cashbooks"),
     ("cashbook/entries.csv", "office_cash_entries"),
     ("cashbook/closings.csv", "office_cash_closings"),
     ("bank/imports.csv", "office_bank_imports"),
     ("bank/transactions.csv", "office_bank_tx"),
+    ("bank/balances.csv", "office_bank_balances"),  # 2.362.2 (#3105)
     ("bank/card-cards.csv", "office_cc_cards"),  # 2.444.0 (#3447): credit card statements
     ("bank/card-statements.csv", "office_cc_statements"),
     ("bank/card-positions.csv", "office_cc_lines"),
     ("expenses/meals.csv", "office_meals"),
+    ("expenses/meal-files.csv", "office_meal_files"),  # 2.362.2 (#3105)
     ("expenses/trips.csv", "office_trips"),
     ("expenses/trip-items.csv", "office_trip_items"),
     ("expenses/drives.csv", "office_drives"),
+    ("expenses/vehicles.csv", "office_vehicles"),  # 2.362.2 (#3105): the logbook names them
     ("logs/office-log.csv", "office_doc_log"),
     ("logs/cashbook-log.csv", "office_cash_log"),
     ("logs/archive-log.csv", "office_archive_log"),
     ("logs/meal-log.csv", "office_meal_log"),
     ("logs/drive-log.csv", "office_drive_log"),
     ("logs/drive-closed.csv", "office_drive_closed"),  # 2.362.0 (#3096): the closed months of the logbook
+    ("logs/rights-log.csv", "office_rights_log"),  # 2.362.2 (#3105)
+    ("logs/import-runs.csv", "office_import_runs"),
     ("letters/letters.csv", "office_letters"),  # 2.184.0 A (#2628): sent letters (business letters, 6 years; RX_WHERE)
+    ("letters/letter-links.csv", "office_letter_links"),  # 2.362.2 (#3105)
 )
-RX_WHERE = {"office_letters": "org_id=? AND status<>'draft'"}  # 2.184.0 A (#2628): a table's own rows instead of OX_AREAS'
+RX_WHERE = {"office_letters": "org_id=? AND status<>'draft'",  # 2.184.0 A (#2628): a table's own rows instead of OX_AREAS'
+            # 2.362.2 (#3105): the links of a draft stay out with the draft
+            "office_letter_links": "org_id=? AND letter_id IN (SELECT id FROM office_letters WHERE org_id=? AND status<>'draft')"}
+RX_DROP = {"office_signoffs": ("ip", "user_agent")}  # 2.362.2 (#3105, review): a signer's network address is no business record
+# 2.362.2 (#3105): every office table that is NOT in RX_TABLES, with the reason (the static guard tests/export_coverage_test.py
+# fails on a new office_* table until it is in RX_TABLES or here -- so no record goes missing silently)
+_RX_SETUP = "settings and working data of the office, no record to keep (in the organisation export)"
+RX_LEFT = {
+    "office_settings": _RX_SETUP, "office_services": _RX_SETUP, "office_roles": _RX_SETUP, "office_sets": _RX_SETUP, "office_texts": _RX_SETUP,
+    "office_doc_templates": _RX_SETUP, "office_letter_blocks": _RX_SETUP, "office_letter_profiles": _RX_SETUP, "office_inv_series": _RX_SETUP,
+    "office_fixed_costs": _RX_SETUP, "office_cf_actual": _RX_SETUP, "office_cf_adjust": _RX_SETUP, "office_cf_start": _RX_SETUP,
+    "office_bank_rules": _RX_SETUP, "office_bank_rule_nos": _RX_SETUP, "office_bank_vendors": _RX_SETUP, "office_deals": _RX_SETUP,
+    "office_sub_reminders": _RX_SETUP, "office_trip_purposes": _RX_SETUP, "office_pack_installs": _RX_SETUP, "office_rgroups": _RX_SETUP,
+    "office_rgroup_members": _RX_SETUP, "office_meal_choices": _RX_SETUP, "office_pay_props": "agents' suggestions, not the booked payments",
+    "office_peppol": "the Peppol connection and its key (a secret; the sends are in the export)",
+    "office_trash": "the trash (deleted items are not in the export)", "office_undo": "undo steps of one day",
+}
 
 
 # ---------------------------------------------------------------- the subject: whose records, who may download them
@@ -322,6 +365,7 @@ def _tables(c, z, sub):
         else:  # 2.223.3 B (#2879): without the trash and undone entries (ox_live; removed drives stay for the change log)
             w = ox_live(c, table, RX_WHERE.get(table) or where[table])
             rows = _rows(c, oid, table, w, (oid,) * w.count("?"))
+        rows = [{k: v for k, v in r.items() if k not in RX_DROP.get(table, ())} for r in rows]
         rows = [dict(r, user_name=name(r.get("user_id") or r.get("by_user"))) if ("user_id" in r or "by_user" in r) else r for r in rows]
         if not rows:
             continue
@@ -498,6 +542,8 @@ RX_SECTIONS = (
     ("receipts", N_("Receipts with their files and receipts.csv")),
     ("project-receipts", N_("Receipts of projects")),
     ("project-bookings", N_("Bookings of projects (CSV)")),  # 2.186.1 (#2732): a kept project's export (rx_list_download)
+    ("books", N_("Procedure documentation, number ranges, opening balances, locked periods, equipment (CSV)")),  # 2.362.2 (#3105)
+    ("contracts", N_("Contracts and agreements (CSV; the files are under office-files)")),  # 2.362.2 (#3105)
     ("cashbook", N_("Cash books (PDF and CSV with day closings and change log)")),
     ("bank", N_("Imported bank statements (CSV)")),
     ("expenses", N_("Entertainment receipts, travel expenses, logbook (CSV)")),
