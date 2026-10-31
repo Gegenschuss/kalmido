@@ -30,7 +30,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 from freelancer_fixture import FEATURES, freelancer  # noqa: E402
-from kt import FAILS, OKS, check, sess  # noqa: E402
+from kt import FAILS, OKS, check, sess, until  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -69,18 +69,8 @@ def mails(to):
         return []
 
 
-def until(f, timeout=20):
-    t0 = time.time()
-    while time.time() - t0 < timeout:
-        x = f()
-        if x:
-            return x
-        time.sleep(0.2)
-    return f()
-
-
 def arrives(path, word):
-    return until(lambda: [t for t in texts(path) if word in t])
+    return until(lambda: [t for t in texts(path) if word in t], 20)
 
 
 def news(s, what=None):
