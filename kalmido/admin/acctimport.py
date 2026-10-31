@@ -449,6 +449,9 @@ def umz_org_open(zf, names, man, mraw, full):
     lists = {}
     for m in data.pop("list_members", []):
         lists.setdefault(_oid(m.get("user_id")), {})[str(_oid(m.get("list_id")))] = m.get("role")
+    for r in data.get("lists", []):  # 2.456.0 (#3821): the owner is no row of list_members; the project is shared like with a member
+        if _oid(r.get("owner_id")):
+            lists.setdefault(_oid(r.get("owner_id")), {}).setdefault(str(_oid(r.get("id"))), "edit")
     data["people"] = [{"user_id": _oid(m.get("id")), "name": _txt(m.get("display_name"), 100) or _txt(m.get("username"), 100),
                        "email": "" if m.get("kind") == "agent" else _txt(m.get("email"), 200), "lists": lists.get(_oid(m.get("id")), {}),
                        **({"agent": True} if m.get("kind") == "agent" else {})} for m in data.pop("members", [])]
