@@ -1301,7 +1301,8 @@ function ntbFit() {
   let below = 0;
   for (let e = (ta.parentElement?.classList.contains('wkedwrap') ? ta.parentElement : ta).nextElementSibling; e; e = e.nextElementSibling) below += e.getBoundingClientRect().height + 10;
   const fh = below;
-  const top = ta.getBoundingClientRect().top, fs = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  // 2.459.0 (#3883): measured as if #view were not scrolled: every change on the page (the "Saved" hint) refits, and the field grew or shrank by what was scrolled away
+  const top = ta.getBoundingClientRect().top + (ta.closest('#view')?.scrollTop || 0), fs = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
   const h = Math.max(12 * fs, Math.floor(Math.min(bottom, tabsTop) - top - fh - 8));
   ta.style.height = h + 'px';
 }
