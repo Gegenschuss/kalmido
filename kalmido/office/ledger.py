@@ -34,7 +34,7 @@ from ..core.db import bump, db, iso, now_utc
 from ..core.pg import write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_json_store, oc_log_detail
 from ..core.access import Denied
-from ..core.errors import BadInput
+from ..core.errors import BadInput, DeniedKey
 from .model import ofx_name1, ofx_name_clean, ofx_name_lines, office_gate, office_org, office_role, office_settings, pb_cl_sql
 from .packs import office_pack_for
 from .doclang import doc_lg, doc_pack
@@ -76,9 +76,9 @@ def ofx_need_editable(r):
     """409 with a readable reason when document row r is finalised (head, positions, number, delete). 2.38.0: a sent
     document (quotations too, decision of 2026-10-10) is locked the same way; a new version = duplicate."""
     if ofx_locked(r):
-        raise Denied(409, tr(OFX_LOCKED))
+        DeniedKey(409, OFX_LOCKED)
     if r is not None and r["status"] == "sent":
-        raise Denied(409, tr(OFX_SENT))
+        raise DeniedKey(409, OFX_SENT)
 
 
 def ofx_number_at_finalize(s, kind):

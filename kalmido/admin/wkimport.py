@@ -31,7 +31,7 @@ from flask import jsonify, request
 from ..core.config import app, ATT_DIR
 from ..core.db import body, connect, db, err, iso, now_utc
 from ..core.access import Denied
-from ..core.errors import BadInput
+from ..core.errors import BadInput, BadKey
 from ..core.i18n import N_, lang, tr_stored
 from ..core.pg import system_ctx
 from ..core.serializers import unlink_files
@@ -201,10 +201,10 @@ def wki_run(uid, iid):
             z = zipfile.ZipFile(io.BufferedReader(UmzReader(path, key, st["size"]), UMZ_BLOCK))
             infos = [i for i in z.infolist() if not i.is_dir()]
         except (zipfile.BadZipFile, ValueError, OSError):
-            raise BadInput(tr("This is not a ZIP file"))
+            raise BadKey(N_("This is not a ZIP file"))
         prog["total"] = len(infos)
         if not umz_space_ok(ATT_DIR, min(WKI_MAX_MB * 1024 * 1024, sum(i.file_size for i in infos))):  # review M1: unpacked
-            raise BadInput(tr("There is not enough space on the server for the import. Please ask the server admin."))
+            raise BadKey(N_("There is not enough space on the server for the import. Please ask the server admin."))
         _set(uid, iid, progress=dict(prog))
         with z:
             res = wikiatt._wka_import(c, uid, oid, bool(st.get("replace")), z, infos, saved, total=WKI_MAX_MB * 1024 * 1024,
@@ -217,8 +217,9 @@ def wki_run(uid, iid):
     except (BadInput, Denied) as e:
         c.rollback()
         unlink_files(saved)
-        msg = str(e) if isinstance(e, BadInput) else getattr(e, "msg", None)
-        _set(uid, iid, state="failed", error=msg if isinstance(msg, str) and msg else [N_("The import failed.")])
+        # 2.454.0 (#3808): key + values, translated for who asks (wki_state)
+        msg = getattr(e, "stored", None) or (str(e) if isinstance(e, BadInput) else getattr(e, "msg", None))
+        _set(uid, iid, state="failed", error=msg or [N_("The import failed.")])
     except Exception as e:  # noqa: BLE001
         c.rollback()
         unlink_files(saved)

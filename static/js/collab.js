@@ -637,8 +637,11 @@ function actText0(a, U) {
       rejected: tr('{0} rejected the task', who), cancelled: tr('{0} withdrew the approval request', who)}[d.state] + (d.note ? ': ' + q(d.note) : '');  // 2.23.0 (#463)
     case 'review': return rvw_actText(d, who, q, U);  // 2.60.0 C (#1512)
     case 'approval': return d.ok ? tr('{0} approved the comment of {1}', who, q(uname(d.agent, U))) : tr('{0} rejected the comment of {1}', who, q(uname(d.agent, U)));
-    case 'agent_job': return d.action === 'approve' ? tr('{0} approved the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || ''))
-      : d.action === 'reject' ? tr('{0} rejected the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || '')) : tr('{0} stopped the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || ''));
+    case 'agent_job': {
+      const jt = q(d.title_key ? tr(...d.title_key) : d.title || '');  // 2.454.0 (#3808): a proposal's title in the reader's language
+      return d.action === 'approve' ? tr('{0} approved the job {2} of {1}', who, q(uname(d.agent, U)), jt)
+        : d.action === 'reject' ? tr('{0} rejected the job {2} of {1}', who, q(uname(d.agent, U)), jt) : tr('{0} stopped the job {2} of {1}', who, q(uname(d.agent, U)), jt);
+    }
     case 'tidy': return tr('{0} tidied up the task (the original text is at the top of the notes)', who);
     case 'ltags': return d.tags?.length ? tr('{0} set the project tags {1}', who, q(d.tags.map(g => '#' + g).join(' '))) : tr('{0} removed the project tags', who);
     case 'delete': return tr('{0} moved the task to the trash', who);

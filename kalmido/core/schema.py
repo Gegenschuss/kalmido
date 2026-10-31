@@ -3988,6 +3988,9 @@ MIGRATIONS = [
     # 2.448.0 (#3765): the language a voter saw when voting, for the mail about the chosen time ('' = not known: the mail
     # follows the poll's owner). Older versions ignore it
     ("sched_poll_votes", "lang", "ALTER TABLE sched_poll_votes ADD COLUMN IF NOT EXISTS lang TEXT NOT NULL DEFAULT ''"),
+    # 2.454.0 (#3808): a proposal's title as JSON [key, *values] for the task's history: every reader gets it in their own
+    # language, title stays the asker's. NULL = no key (an agent's own title). Older versions ignore it
+    ("agent_jobs", "title_key", "ALTER TABLE agent_jobs ADD COLUMN IF NOT EXISTS title_key TEXT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

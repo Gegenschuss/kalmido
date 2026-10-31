@@ -26,7 +26,7 @@ from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..core.pg import write_lock  # 2.360.0 B (#2496)
-from ..core.errors import BadInput
+from ..core.errors import BadInput, BadKey
 from .calc import TAX_KEYS, calc_lang, dec, dstr, fmt_money, fmt_qty, inv_calc, label, money
 from .homecur import hc_code, hc_home  # 2.189.0 (#2475)
 from . import invoices as _inv  # 2.355.0 C (#2840); 2.354.0 B (#2836): the module, invoices imports abschlag too (cycle)
@@ -414,7 +414,7 @@ def abs_before_finalize(c, oid, r, items=None):
         return
     now = sorted(x["id"] for x in abs_progress_of(c, oid, r["source_doc_id"], locked_only=True))
     if now != sorted(int(x) for x in _j(_col(r, "abs_refs") or "[]", [])) or (items is not None and _stale_deductions(c, oid, r, items)):
-        raise BadInput(tr("The progress invoices of the quotation changed since this final invoice was drafted; create the final invoice again"))
+        BadKey(N_("The progress invoices of the quotation changed since this final invoice was drafted; create the final invoice again"))
 
 
 def abs_prepaid_view(m, L, lang, pack=None):

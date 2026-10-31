@@ -25,20 +25,21 @@ from urllib.parse import quote, unquote
 from flask import jsonify, request, send_file
 
 from ..core.config import app, ATT_DIR
-from ..core.i18n import tr as _tr_base
+from ..core.i18n import N_, tr as _tr_base
 from ..core.db import bump, db, err, insert_id, iso_ms, now_utc
 from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..accounts.session import me
 from ..core.access import Denied
 from ..core.orgcrypt import OrgCryptError, oc_read_file, oc_send_file, oc_user_space, oc_write_file
 from ..core.serializers import unlink_files
-from ..core.errors import BadInput
+from ..core.errors import BadInput, BadKey
 from ..tasks.attachments import file_ext, safe_name, send_stored
 from .pages import (WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, wiki_clean_path, wiki_fit_paths, wiki_path_parts, wiki_frontmatter, wiki_insert, wiki_need,
                     wiki_set_links, wiki_space_sql)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 WKA_LANG = threading.local()  # 2.177.0 (#2685): the language of the person a background import (wkimport.py) works for
+WKA_TOO_LARGE = N_("The archive is too large")
 
 
 def tr(key, *a, lg=None):
@@ -408,7 +409,7 @@ def _wka_read(z, info, cap, budget):
         data = fh.read(min(cap, budget[0]) + 1)
     budget[0] -= len(data)
     if budget[0] < 0:
-        raise BadInput(tr("The archive is too large"))
+        raise BadKey(WKA_TOO_LARGE)
     return None if len(data) > cap else data
 
 
@@ -459,9 +460,9 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
     from ..admin.hosting import QuotaExceeded
     tick = tick or (lambda n=1: None)
     if len(infos) > max_files:
-        raise BadInput(tr("Too many files (at most {0})", max_files))
+        raise BadKey(N_("Too many files (at most {0})"), max_files)  # 2.454.0 (#3808): the background import keeps key + values
     if sum(i.file_size for i in infos) > total:
-        raise BadInput(tr("The archive is too large"))
+        raise BadKey(WKA_TOO_LARGE)
     w, a = wiki_space_sql(oid, uid)
     created, updated, skipped, ts = [], [], [], iso_ms(now_utc())
     budget, md_left = [total], [WKA_MD_TOTAL]
@@ -504,7 +505,7 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
                 if text.startswith("e2e1:"):  # 2.64.3 (#1817, review M1): no ciphertext-like text in an open space
                     raise BadInput(tr("Invalid value: {0}", "body"))
             except BadInput as e:
-                if str(e) == tr("The archive is too large"):
+                if getattr(e, "stored", None) == (WKA_TOO_LARGE,):
                     raise
                 skip(name, str(e))
                 continue
