@@ -18,7 +18,7 @@ function bellBtn() {
 const NEWS_CHIPS = [['mention', 'at', N_('Mentions'), ['mention']], ['comment', 'comment', N_('Comments'), ['comment']],
   ['assign', 'user', N_('Assignments'), ['assign', 'unassign', 'take']], ['newtask', 'plus', N_('New tasks'), ['newtask', 'errreport']],
   ['complete', 'check', N_('Completed'), ['complete', 'unblock']], ['status', 'pulse', N_('Status'), ['status']],
-  ['agents', 'bot', N_('Agents'), ['approval', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner', 'orgjoin', 'orgdelnotice', 'orggone', 'whorgcut']],
+  ['agents', 'bot', N_('Agents'), ['approval', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner', 'orgjoin', 'orgjoinres', 'orgrole', 'orgdelnotice', 'orggone', 'whorgcut']],
   ['followup', 'hourglass', N_('Follow-ups'), ['followup']]];
 const newsKindOk = (it, k = S.nf.kind) => { const c = k && NEWS_CHIPS.find(x => x[0] === k); return !c || c[3].includes(it.kind); };
 function newsChipsHtml(items, attr) {
@@ -270,7 +270,10 @@ function newsText(it, U) {
     case 'wiki_shared': return d.folder ? tr('{0} shared the pages of the folder {1} with you', who, q(String(d.path || '').split('/').pop())) : tr('{0} shared the page {1} with you', who, q(String(d.path || '').split('/').pop()));  // 2.126.2 B (#2355)
     case 'apdecide': return {approved: tr('{0} approved {1}', who, q(it.task_title || '')), changes: tr('{0} asks for changes to {1}', who, q(it.task_title || '')),
       rejected: tr('{0} rejected {1}', who, q(it.task_title || ''))}[d.state] || tr('{0} decided on your approval request', who);  // 2.23.0 (#463)
-    case 'signup': return tr('{0} registered and waits for your approval', q(d.name || d.username || ''));  // 2.23.0 (#711)
+    case 'signup': return d.org_id ? tr('{0} registered with the address of your organisation and waits for the server admin’s approval', q(d.name || d.username || '')) : tr('{0} registered and waits for your approval', q(d.name || d.username || ''));  // 2.23.0 (#711); 2.367.4 (#2974): only an instance admin approves
+    case 'orglogin': return tr('Admin {0} signed in from a new address: {1}', q(d.name || ''), esc(d.ip || ''));  // 2.367.4 (#2974)
+    case 'orgjoinres': return d.yes ? tr('{0} accepted your invitation to {1}', who, q(d.name || '')) : tr('{0} declined your invitation to {1}', who, q(d.name || ''));
+    case 'orgrole': return tr('{0} changed your role in {1}: {2}', who, q(d.name || ''), esc(({admin: tr('Admin'), readonly: tr('Read-only'), accounting: tr('Accounting'), guest: tr('Guest')})[d.role] || tr('Member')));
     case 'agentjoin': return d.provider ? tr('{0} added the agent {1} to {2}. It runs at {3}. What it reads in the project goes there.', who, q(d.agent || ''), q(newsListName(it)), q(d.provider))
       : tr('{0} added the agent {1} to {2}. What it reads in the project goes to its AI provider.', who, q(d.agent || ''), q(newsListName(it)));  // 2.24.0 (#896)
     case 'followup': return d.note ? tr('Follow up today: waiting on {0}', q(d.note)) : tr('Follow up today: the task is waiting on someone');
@@ -286,6 +289,8 @@ function newsText(it, U) {
     case 'playbook_proposal': return pbNewsText(it, who, q);  // 2.39.0 (#1168)
     case 'evinvite': case 'evshare': case 'evchange': return evNewsText(it, who, q);  // 2.21.0 (#659)
     case 'apbooking': return (d.what === 'new' ? tr('New booking: {0}', q(d.line || '')) : tr('Booking cancelled by the customer: {0}', q(d.line || '')));  // 2.367.2 (#2969)
+    case 'docpaid': return tr('Payment received: {0}', q([d.number, d.client].filter(Boolean).join(', ')));  // 2.367.4 (#2972)
+    case 'docoverdue': return d.n > 1 ? tr('{0} invoices are overdue', d.n) : tr('Invoice overdue: {0}', q([d.number, d.client].filter(Boolean).join(', ')));
     case 'calsub': return tr('Your calendar subscription {0} keeps failing. Its events may be out of date.', q(d.name || ''));  // 2.367.2 (#2969)
     case 'abshare': return d.role === 'edit' ? tr('{0} shared the address book {1} with you', who, q(d.name || '')) : tr('{0} shared the address book {1} with you (view only)', who, q(d.name || ''));  // 2.21.0 (#658)
     case 'status': return d.status ? tr('{0} set {1} to {2}', who, q(newsListName(it)), `<span class="stpill st-${esc(d.status)} inl"><i></i>${esc(statusLabel(d.status))}</span>`) : tr('{0} cleared the status of {1}', who, q(newsListName(it)));
@@ -481,8 +486,10 @@ async function newsOpen(i, opts) {
   if (it.kind === 'tsheet') { tsl_open(it.data); return; }  // 2.125.0 B (#2119): the time page on that month
   if (it.kind === 'wiki_shared') { if (feat('wiki')) { S.wshFocus = true; go('wiki'); } else toast(tr('Turn on the knowledge pages in the settings to read it.')); return; }  // 2.126.2 B (#2355): "Shared with me"
   if (it.kind === 'upscan' && it.data?.where === 'chat') { if (feat('agents') && agentsOn()) go('agents'); return; }
-  if (it.kind === 'signoff') { const k = String(it.data?.click || ''); if (k.startsWith('#') && k.length > 1) go(k.slice(1)); return; }  // 2.266.0 (#2965): the quotation / document / video
+  if (it.kind === 'signoff' || it.kind === 'docpaid' || it.kind === 'docoverdue') { const k = String(it.data?.click || ''); if (k.startsWith('#') && k.length > 1) go(k.slice(1)); return; }  // 2.266.0 (#2965): the quotation / document / video
   if (it.kind === 'whorgcut') { settingsModal('webhooks'); return; }  // 2.380 G (#3391): Settings > Access, the webhooks
+  if (it.kind === 'signup' && it.data?.org_id) return;  // 2.367.4 (#2974): the server's admin decides
+  if (it.kind === 'orglogin' || it.kind === 'orgjoinres' || it.kind === 'orgrole') return;
   if (it.kind === 'signup') { settingsModal('users'); return; }  // 2.23.0 (#711): approve it under Users  // 2.15.0 (#479): an agent's request
   if (!it.task_id) { if (it.list_id && listById(it.list_id)) go('l/' + it.list_id); return; }
   if (!taskById(it.task_id)) {  // e.g. completed long ago: not in the state
@@ -496,7 +503,7 @@ async function newsOpen(i, opts) {
 // ---- 2.122.0 (#2314): phones: a sideways swipe on the task opened from the news goes to the next (left) / previous (right)
 // UNREAD news in the order and with the filter (tab, kind, workspace) of the list; it is marked read like on opening. None left:
 // a short notice, the view stays. Same exceptions as the swipe on tasks (detail.js, #1071); the swipe on the list rows stays.
-const NSW_SKIP = /^(proposal|playbook_proposal|evinvite|evchange|apbooking|calsub|evshare|abshare|connreq|connok|orgjoin|lytpl|dispo|usage|upscan|signup|leavereq|leavedecide|tsheet|wiki_shared|orgdelnotice|orggone|whorgcut)$/;  // 2.125.0 A (#2117) + B (#2119): + leave, timesheets
+const NSW_SKIP = /^(orglogin|orgjoinres|orgrole|proposal|playbook_proposal|evinvite|evchange|apbooking|calsub|docpaid|docoverdue|evshare|abshare|connreq|connok|orgjoin|lytpl|dispo|usage|upscan|signup|leavereq|leavedecide|tsheet|wiki_shared|orgdelnotice|orggone|whorgcut)$/;  // 2.125.0 A (#2117) + B (#2119): + leave, timesheets
 const nswOn = () => !!S.nswTask && S.sel === S.nswTask;
 function nswTarget(dir) {
   const its = S.nf.items || [], cur = its.findIndex(x => x.id === S.nswId);

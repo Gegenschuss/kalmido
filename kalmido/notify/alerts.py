@@ -96,13 +96,14 @@ def Nn_(one, other):
     return [one, other]
 
 
-def aa_now(kind, key, text, args=(), n=None, click=None):
+def aa_now(kind, key, text, args=(), n=None, click=None, skip=None):
     """One alert, sent by the next watchdog tick. text: a text marked with N_ (or a plural pair from Nn_, + n); args: plain
-    values or {"t": key} (translated when sent)."""
+    values or {"t": key} (translated when sent). 2.367.4 (#2974): skip = the admin whose own harmless action this is (not for
+    what weakens an account: on a taken-over session that alert is the point)."""
     try:
         with _AA_LOCK:
             if len(_AA["q"]) < 200:
-                _AA["q"].append((kind, str(key)[:200], text, list(args), n, click))
+                _AA["q"].append((kind, str(key)[:200], text, list(args), n, click, skip))
     except Exception:  # noqa: BLE001
         pass
 
@@ -223,14 +224,23 @@ def aa_admin_via(c, uid, s=None):
     return {"ntfy": t if t_ok else "", "webpush": 0 if t_ok and ch == "webpush" else dev}
 
 
-def aa_recipients(c, cfg):
+def aa_org_event(c, key, people):
+    """2.367.4 (#2974): an organisation's event went to people: an instance admin who is not among them gets only a number."""
+    q = ",".join("?" * len(people)) or "0"
+    if c.execute(f"SELECT 1 FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' AND id NOT IN ({q}) LIMIT 1", list(people)).fetchone():
+        aa_count("security", key)
+
+
+def aa_recipients(c, cfg, skip=None):
     """[(via, target, language)]: ("ntfy", the shared admin topic, the first admin's language), else per enabled admin
     ("ntfy", own topic, language) and / or ("webpush", user id, language), see aa_admin_via (a topic shared by two admins
-    gets one message)."""
+    gets one message). 2.367.4 (#2974): without the admin skip (a shared topic reaches everyone)."""
     if cfg["topic"]:
         return [("ntfy", cfg["topic"], lang(c, default_uid(c)))] if NTFY_TOPIC_RE.fullmatch(cfg["topic"]) else []
     out, seen = [], set()
     for (uid,) in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 ORDER BY id").fetchall():
+        if uid == skip:
+            continue
         s = usettings(c, uid)
         lg = s.get("lang") if s.get("lang") in LANGS else "en"
         v = aa_admin_via(c, uid, s)
@@ -242,10 +252,10 @@ def aa_recipients(c, cfg):
     return out
 
 
-def aa_deliver(c, cfg, title_fn, body_fn, click=None):
+def aa_deliver(c, cfg, title_fn, body_fn, click=None, skip=None):
     """ntfy / Web Push to every recipient, each in their language. Returns the number of recipients that accepted it."""
     ok, click = 0, click or f"{PUBLIC_URL}/#settings"
-    for via, target, lg in aa_recipients(c, cfg):
+    for via, target, lg in aa_recipients(c, cfg, skip):
         if via == "ntfy":
             ok += 1 if ntfy(title_fn(lg), body_fn(lg), cfg["prio"], click, topic=target, admin=True) else 0
         else:
@@ -258,7 +268,7 @@ def aa_title(kind, lg):
     return tr("Kalmido test alert", lg=lg) if kind == "test" else tr("Kalmido admin: {0}", tr(AA_LABEL[kind], lg=lg), lg=lg)
 
 
-def aa_emit(c, cfg, kind, key, text, args=(), n=None, click=None):
+def aa_emit(c, cfg, kind, key, text, args=(), n=None, click=None, skip=None):
     """Cooldown per (kind, key), then the daily summary queue or the hourly cap, then ntfy. Stores the alert
     (the settings list) and returns its state: sent | failed | queued | capped | cooldown | '' (off)."""
     if not cfg["on"] or (kind != "test" and kind not in cfg["kinds"]):
@@ -277,10 +287,10 @@ def aa_emit(c, cfg, kind, key, text, args=(), n=None, click=None):
     elif kind != "test" and c.execute("SELECT COUNT(*) FROM admin_alerts WHERE kind!='test' AND state IN ('sent','failed') "
                                       "AND sent_at>?", (iso(now - timedelta(hours=1)),)).fetchone()[0] >= cfg["max_hour"]:
         state = "capped"
-    elif not aa_recipients(c, cfg):  # 2.5.2 (K04): nobody to send it to yet (no device / topic): only listed
+    elif not aa_recipients(c, cfg, skip):  # 2.5.2 (K04): nobody to send it to yet (no device / topic): only listed
         state = "listed"
     else:
-        ok = aa_deliver(c, cfg, lambda lg: aa_title(kind, lg), lambda lg: aa_text(text, n, args, lg), click)
+        ok = aa_deliver(c, cfg, lambda lg: aa_title(kind, lg), lambda lg: aa_text(text, n, args, lg), click, skip)
         state, sent = ("sent" if ok else "failed"), iso(now_utc())
     c.execute("INSERT INTO admin_alerts(kind,key,message,tmpl,created_at,sent_at,delivered,state) VALUES(?,?,?,?,?,?,?,?)",
               (kind, key[:200], aa_text(text, n, args, "en")[:1000],
@@ -349,6 +359,16 @@ def _aa_build(c, kind, key, b):
                                        "{0} uploads (/drop) with an invalid token within {1} min, from {2}"), [mins, _aa_list(items)], b["n"])
         return ("ics:" + top, Nn_("{0} calendar feed request with an invalid link within {1} min, from {2}",
                                   "{0} calendar feed requests with an invalid link within {1} min, from {2}"), [mins, _aa_list(items)], b["n"])
+    if kind == "security" and key == "2fa_on":  # 2.367.4 (#2974): a duty to turn it on is one alert; one person is not told of their own step
+        ids = list(b["extra"].get("uid", {}))
+        return ("2fa_on:" + ",".join(sorted(items))[:150], Nn_("{0} person turned on two-factor authentication: {1}",
+                                                              "{0} people turned on two-factor authentication: {1}"),
+                [_aa_list(items)], len(items), None, int(ids[0]) if len(ids) == 1 else None)
+    if kind == "security" and key == "org_usage":  # 2.367.4 (#2974): the instance admins' number; names stay in the organisation
+        return (key, Nn_("{0} agent limit message went to organisations within {1} min", "{0} agent limit messages went to organisations within {1} min"), [mins], b["n"])
+    if kind == "security" and key == "org_login":
+        return (key, Nn_("{0} organisation admin signed in from a new address within {1} min (their organisation was told)",
+                         "{0} organisation admins signed in from a new address within {1} min (their organisations were told)"), [mins], b["n"])
     if kind == "security" and key == "rls":  # 2.37.0 (review K2-1): row-level security refused a write (an app check missed it)
         return ("rls:" + ",".join(sorted(items))[:150], Nn_("{0} request was refused by the database's row-level security within {1} min ({2}; users: {3})",
                                                           "{0} requests were refused by the database's row-level security within {1} min ({2}; users: {3})"),
@@ -459,8 +479,8 @@ def _aa_take(now):
 def _aa_send(c, cfg, q, due):
     if not cfg["on"]:
         return
-    for kind, key, text, args, n, click in q:
-        aa_emit(c, cfg, kind, key, text, args, n, click)
+    for kind, key, text, args, n, click, skip in q:
+        aa_emit(c, cfg, kind, key, text, args, n, click, skip)
     for (kind, key), b in due:
         a = _aa_build(c, kind, key, b)
         if a:

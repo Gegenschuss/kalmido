@@ -233,7 +233,9 @@ def kp_link_send(cid):
               (eh, org_id, owner_id, _token_hash(tok), iso(now), iso(now + timedelta(seconds=PT_LOGIN_TTL))))
     co = ofx_company(c, oid)
     name = (co.get("name") or "").split("\n")[0].strip() or (office_settings(c, oid).get("company") or {}).get("name") or APP_NAME
-    lg = doc_lg(office_settings(c, oid).get("lang"))  # 2.185.0 C (#2520): every app language
+    # 2.367.4 (#2972): the language of the client's newest document, the office's without one
+    dl = c.execute("SELECT lang FROM office_docs WHERE org_id=? AND client_id=? AND COALESCE(lang, '')<>'' ORDER BY id DESC LIMIT 1", (oid, cid)).fetchone()
+    lg = doc_lg(dl["lang"] if dl else office_settings(c, oid).get("lang"))  # 2.185.0 C (#2520): every app language
     url = f"{PUBLIC_URL}/portal/login/{tok}"
     lines = [tr("Hello,", lg=lg), tr("{0} sends you the link to your quotations, invoices and their payment status. It is valid for 30 minutes and can be used once.", name, lg=lg),
              tr("If you did not expect it, you can ignore this mail.", lg=lg)]

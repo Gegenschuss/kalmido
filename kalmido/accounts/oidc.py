@@ -654,7 +654,7 @@ def oidc_reauth(c, b):
 def _oidc_alert():
     """The security alert of a changed provider setting (the admins' news)."""
     from ..notify.alerts import aa_now
-    aa_now("security", f"oidc:cfg:{int(time.time())}", N_("{0} changed the OIDC login settings."), [g.user["username"]])
+    aa_now("security", "oidc:cfg", N_("{0} changed the OIDC login settings."), [g.user["username"]])
 
 
 def _oidc_store(c, vals):

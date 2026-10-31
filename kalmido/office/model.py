@@ -138,7 +138,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "terms": {},
                      # 2.147.1 B (#2054): suggest payment reminders for overdue invoices (office/dunning.py: on, days after
                      # the due date / the last reminder's deadline) and the GiroCode on invoices + reminders (office/girocode.py)
-                     "dunning_suggest": 1, "dunning_grace_days": 7, "girocode": 1,
+                     "dunning_suggest": 1, "overdue_notice": 1, "dunning_grace_days": 7, "girocode": 1,
                      # 2.355.0 D (#2846): default interest (section 288 BGB: base rate + 5 points, + 9 for businesses) and the
                      # 40 EUR flat fee (section 288 (5), businesses only) on reminders, both off by default; the base rate in percent
                      # (Bundesbank, valid from 1 July 2026: 1.52; set by hand each half year, never fetched); who counts as a
@@ -544,7 +544,7 @@ def office_settings_clean(c, oid, b, cur):
         elif k == "industry_packs":  # 2.47.0 (#1216)
             from .sheet import dk_packs_clean
             out[k] = dk_packs_clean(v)
-        elif k in ("dunning_suggest", "girocode"):  # 2.147.1 B (#2054)
+        elif k in ("dunning_suggest", "overdue_notice", "girocode"):  # 2.147.1 B (#2054); 2.367.4 (#2972): overdue_notice
             out[k] = 1 if v in (1, True, "1", "true") else 0
         elif k in ("dunning_interest", "dunning_flat_fee"):  # 2.355.0 D (#2846)
             out[k] = 1 if v in (1, True, "1", "true") else 0

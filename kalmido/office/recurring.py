@@ -20,9 +20,9 @@ from datetime import date, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import PUBLIC_URL, app, WATCHDOG_INTERVAL
-from ..core.db import IntegrityError, body, bump, db, iso, local_now, now_utc
+from ..core.db import IntegrityError, body, bump, db, iso, local_now, now_utc, uset, usettings
 from ..core.access import Denied, my_inbox
-from ..core.i18n import LANGS, N_, lang, tr, tr_stored
+from ..core.i18n import LANGS, N_, lang, tr, tr_stored, trn
 from .doclang import doc_lg  # 2.185.0 C (#2520)
 from .pdfweb import epdf_sweep  # 2.355.0 A (#2847)
 from ..core.pg import insert_id, system_ctx, write_lock
@@ -385,10 +385,30 @@ def rin_task(c, person, title, text, doc_id=None):
     return tid
 
 
+def rin_bundle(c, person, title, text, doc_id=None):
+    """2.367.4 (#2972): the series of one day share ONE task per person: the first keeps its own title and link, the next ones
+    turn it into "3 invoice series need you" with a line each and the link to the invoices. Setting rin_open = day:task:count."""
+    day = local_now().date().isoformat()
+    o = str(usettings(c, person).get("rin_open") or "").split(":")
+    t = None
+    if len(o) == 3 and o[0] == day and o[1].isdigit() and o[2].isdigit():
+        t = c.execute("SELECT id, title, content FROM tasks WHERE id=? AND created_by=? AND completed_at IS NULL AND deleted_at IS NULL",
+                      (int(o[1]), person)).fetchone()
+    if t is None:
+        uset(c, person, "rin_open", f"{day}:{rin_task(c, person, title, text, doc_id)}:1")
+        return
+    n = int(o[2]) + 1
+    old = t["content"] if n > 2 else f"{t['title']}\n{t['content']}"
+    c.execute("UPDATE tasks SET title=?, content=?, url=?, updated_at=? WHERE id=?",
+              (trn("{0} invoice series needs you", "{0} invoice series need you", n, lg=lang(c, person)), f"{old}\n\n{title}\n{text}"[:4000],
+               PUBLIC_URL.rstrip("/") + "/#office/invoices", iso(now_utc()), t["id"]))
+    uset(c, person, "rin_open", f"{day}:{t['id']}:{n}")
+
+
 def _tell(c, people, key, name, text, doc_id=None):
     for p in people:
         lg = lang(c, p)
-        rin_task(c, p, tr(key, name, lg=lg), text(lg), doc_id)
+        rin_bundle(c, p, tr(key, name, lg=lg), text(lg), doc_id)
 
 
 def _name(c, oid, s):

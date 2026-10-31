@@ -5,7 +5,6 @@ import os
 import re
 import uuid
 import secrets
-import time
 import zipfile
 from flask import g, jsonify, request, Response, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -389,8 +388,8 @@ def user_update(uid):
     if nu["disabled"] and not u["disabled"] and not u["signup"]:
         sec_mail(c, uid, "disabled")
     if reset:
-        aa_now("security", f"2fareset:{u['username']}:{int(time.time())}", N_("{0} reset the two-factor authentication of {1}."),
-               [g.user["username"], u["username"]])
+        aa_now("security", f"2fareset:{u['username']}", N_("{0} reset the two-factor authentication of {1}."),
+               [g.user["username"], u["username"]], skip=g.user["id"])  # 2.367.4 (#2974): the key without a time keeps the cooldown; the person gets a mail
     if b.get("is_admin") and not u["is_admin"]:
         aa_now("security", f"admin:{u['username']}", N_("{0} is now an admin (set by {1})."), [u["username"], g.user["username"]])
     return jsonify(user_admin_dict(c, c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()))
@@ -626,7 +625,7 @@ def me_update():
             return err(tr("Password: at least {0} characters", MIN_PASSWORD))
         if not u["password_hash"]:
             from ..notify.alerts import aa_now
-            aa_now("security", f"pw-first:{u['username']}:{int(time.time())}",
+            aa_now("security", f"pw-first:{u['username']}",
                    N_("{0} set a first local password (the account signed in by single sign-on before)."), [u["username"]])
         c.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(pw), u["id"]))
         tok = request.cookies.get(COOKIE)  # other sessions end, this one stays

@@ -18,6 +18,8 @@ from ..core.access import Denied, list_role, need_collab, need_list, task_visibl
 from ..tasks.validation import as_int, valid_date
 from ..collab.comments import att_dicts, collab_on, comment_dict, lang_of, need_live_comment, user_names
 from ..collab.news import news_add, notif_ok
+from ..core.access import org_admin_people  # 2.367.4 (#2974)
+from ..notify.alerts import aa_org_event  # 2.367.4 (#2974)
 from ..personal.timetrack import _csv_cell
 from ..core.errors import BadInput, reject_unknown, UnknownFields
 from ..accounts.users import need_admin
@@ -244,8 +246,17 @@ def usage_refused(c, aid):
     return v1_err(429, msg, {"Retry-After": str(wait)})
 
 
+def usage_people(c, a):
+    """2.367.4 (#2974): who hears of agent row a: the owner and the admins of its organisation; the instance admins only for an
+    agent that has neither (or no such person left). They get a number of the others (aa_org_event)."""
+    rcpt = org_admin_people(c, a["org_id"]) if a["org_id"] else []
+    if a["owner_id"] and a["owner_id"] not in rcpt:
+        rcpt = rcpt + [a["owner_id"]]
+    return rcpt or [r["id"] for r in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent'").fetchall()]
+
+
 def usage_alerts(c, aid):
-    """After a report: News + push to the admins (and the owner of a personal agent) when the agent crosses 80 % / 100 % of its soft limit or its hard limit
+    """After a report: News + push to the people of usage_people when the agent crosses 80 % / 100 % of its soft limit or its hard limit
     (the highest new level only, each level once per period)."""
     a = c.execute("SELECT a.*, u.username, u.display_name FROM agents a JOIN users u ON u.id=a.user_id WHERE a.user_id=?",
                   (aid,)).fetchone()
@@ -274,9 +285,8 @@ def usage_alerts(c, aid):
     data = {"agent_id": aid, "name": name, "level": level, "used": st["used"], "limit": lim, "metric": st["metric"],
             "period": st["period"]}
     print("agent", aid, "usage", level, st["used"], "/", lim, st["metric"], st["period"], flush=True)
-    rcpt = [r["id"] for r in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent'").fetchall()]
-    if a["owner_id"] and a["owner_id"] not in rcpt:  # 2.361.4 (#2928): the owner of a personal agent sets its limits and hears of them
-        rcpt.append(a["owner_id"])
+    rcpt = usage_people(c, a)  # 2.361.4 (#2928): the owner of a personal agent sets its limits and hears of them
+    aa_org_event(c, "org_usage", rcpt)
     for uid in rcpt:
         s = usettings(c, uid)
         news_add(c, uid, "usage", data=data, actor=aid, row="usage", s=s if collab_on(s) else None)
@@ -292,8 +302,8 @@ def usage_alerts(c, aid):
 
 
 def budget_alerts(c, aid):
-    """2.236.0 B (#2904): after a report: News + push to the owner of a personal agent (the instance admins for a team
-    agent) once its budget reaches budget_warn_pct and once it is used up -- each once per period (agents.usage_alerted
+    """2.236.0 B (#2904): after a report: News + push to the owner of a personal agent (2.367.4, #2974: the admins of a team
+    agent's organisation, see usage_people) once its budget reaches budget_warn_pct and once it is used up -- each once per period (agents.usage_alerted
     key "budget": {key, levels})."""
     a = c.execute("SELECT a.*, u.username, u.display_name FROM agents a JOIN users u ON u.id=a.user_id WHERE a.user_id=?",
                   (aid,)).fetchone()
@@ -318,8 +328,8 @@ def budget_alerts(c, aid):
     data = {"agent_id": aid, "name": name, "level": level, "used": bs["used"], "limit": bs["limit"], "metric": bs["metric"],
             "period": bs["period"], "budget": True, "warn_pct": ws_get(a)["budget_warn_pct"]}
     print("agent", aid, "budget", level, bs["used"], "/", bs["limit"], bs["metric"], bs["period"], flush=True)
-    rcpt = [a["owner_id"]] if a["owner_id"] else [r["id"] for r in c.execute(
-        "SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent'").fetchall()]
+    rcpt = [a["owner_id"]] if a["owner_id"] else usage_people(c, a)
+    aa_org_event(c, "org_usage", rcpt)
     for uid in rcpt:
         s = usettings(c, uid)
         news_add(c, uid, "usage", data=data, actor=aid, row="usage", s=s if collab_on(s) else None)

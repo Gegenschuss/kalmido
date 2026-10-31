@@ -661,7 +661,7 @@ def auth_2fa():
     pend_drop()
     left = rc_left(c, u["id"])
     if via == "recovery":
-        aa_now("security", f"recovery:{u['username']}:{int(time.time())}",
+        aa_now("security", f"recovery:{u['username']}",
                N_("{0} logged in with a recovery code ({1} left)."), [u["username"], left])
         from .secmail import sec_mail
         sec_mail(c, u["id"], "code_used", left)  # 2.266.0 (#2963)
@@ -853,7 +853,7 @@ def me_totp_begin():
 
 @app.post("/api/me/2fa/totp/confirm")
 def me_totp_confirm():
-    from ..notify.alerts import aa_now
+    from ..notify.alerts import aa_count
     u, c = g.user, db()
     keys = _rate_keys(u["username"])
     e = login_wait(keys, u["username"])  # 2.282.0 (#3111): signed in as this name
@@ -874,8 +874,7 @@ def me_totp_confirm():
     if first:
         _end_other_sessions(c, u["id"])
     c.commit()
-    aa_now("security", f"2fa:{u['username']}:{int(time.time())}", N_("{0} turned on two-factor authentication ({1})."),
-           [u["username"], {"t": N_("authenticator app")}])
+    aa_count("security", "2fa_on", u["username"], uid=u["id"])  # 2.367.4 (#2974): summed up per window
     return jsonify(recovery_codes=codes, **twofa_state(c, _user(c, u["id"])))
 
 
@@ -908,7 +907,7 @@ def me_totp_disable():
     c.commit()
     from .secmail import sec_mail
     sec_mail(c, u["id"], "2fa_off")  # 2.266.0 (#2963)
-    aa_now("security", f"2faoff:{u['username']}:{int(time.time())}", N_("{0} turned off two-factor authentication ({1})."),
+    aa_now("security", f"2faoff:{u['username']}", N_("{0} turned off two-factor authentication ({1})."),
            [u["username"], {"t": N_("authenticator app")}])
     return jsonify(twofa_state(c, _user(c, u["id"])))
 
@@ -941,7 +940,7 @@ def me_pk_options():
 
 @app.post("/api/me/passkeys")
 def me_pk_add():
-    from ..notify.alerts import aa_now
+    from ..notify.alerts import aa_count
     u, c, b = g.user, db(), body()
     p = pend_take(f"wareg:{u['id']}")
     if not p:
@@ -956,8 +955,7 @@ def me_pk_add():
     if first:
         _end_other_sessions(c, u["id"])
     c.commit()
-    aa_now("security", f"2fa:{u['username']}:{int(time.time())}", N_("{0} turned on two-factor authentication ({1})."),
-           [u["username"], {"t": N_("passkey")}])
+    aa_count("security", "2fa_on", u["username"], uid=u["id"])  # 2.367.4 (#2974): summed up per window
     return jsonify(recovery_codes=codes, **twofa_state(c, _user(c, u["id"])))
 
 

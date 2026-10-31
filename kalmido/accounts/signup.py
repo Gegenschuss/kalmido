@@ -124,16 +124,24 @@ def _cleanup(c):
 
 
 def _notify_admins(c, uid):
-    """News + push to every admin: a registration waits for approval."""
-    from ..collab.news import news_add
+    """News + push to every admin: a registration waits for approval. 2.367.4 (#2974): only an instance admin can approve, so
+    they keep it; a person who joined an organisation by the address's domain tells its admins too (data.org_id: they know
+    who it is, the text says who approves). The push follows the row "usage", like the News."""
+    from ..collab.news import news_add, notif_ok
+    from ..core.access import org_admin_people
+    from ..core.pg import system_ctx
     from ..notify.push import push_prio, push_reachable
     from ..collab.comments import lang_of
     u = c.execute("SELECT username, display_name, email FROM users WHERE id=?", (uid,)).fetchone()
-    for (aid,) in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0").fetchall():
+    data = {"user_id": uid, "name": u["display_name"], "username": u["username"], "email": u["email"] or ""}
+    with system_ctx(c):  # the new account joined by its domain; nobody is signed in
+        oids = [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=?", (uid,)).fetchall()]
+        ops = [r[0] for r in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0").fetchall()]
+        org = {x: oid for oid in oids for x in org_admin_people(c, oid) if x not in ops}
+    for aid in ops + list(org):
         s = usettings(c, aid)
-        news_add(c, aid, "signup", data={"user_id": uid, "name": u["display_name"], "username": u["username"], "email": u["email"] or ""},
-                 actor=uid, s=s)
-        if push_reachable(c, aid, s):
+        news_add(c, aid, "signup", data={**data, **({"org_id": org[aid]} if aid in org else {})}, actor=uid, s=s)
+        if notif_ok(c, aid, s, "usage", "push") and push_reachable(c, aid, s) and aid not in org:
             lg = lang_of(s)
             g.pushes.append((aid, tr("Registration waits for approval: {0}", u["display_name"] or u["username"], lg=lg),
                              tr("Settings > Organisation > People", lg=lg), f"{PUBLIC_URL}/#settings/users", push_prio(s)))

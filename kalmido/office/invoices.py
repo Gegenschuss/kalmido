@@ -1531,6 +1531,9 @@ def inv_pay_add(c, oid, uid, did, b, ref=None):
                     (oid, did, d, float(money(amt)), method, note, uid, iso(now_utc()), ref))
     inv_refresh_paid(c, oid, did)
     ofx_log(c, oid, "payment", doc_id=did, detail={"id": pid, "date": d, "amount": dstr(amt), "method": method})
+    if not refund:
+        from .dunning import dun_paid_news
+        dun_paid_news(c, oid, r, uid)  # 2.367.4 (#2972)
     return pid
 
 

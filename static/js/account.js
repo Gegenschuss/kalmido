@@ -139,25 +139,27 @@ const NOTIF_ROWS = [
   ['followup', N_('Follow-up day of a task waiting on someone')],
   ['reminder', N_('Reminders'), N_('due dates of my tasks')],
   ['nag', N_('Repeated reminders'), N_('until the task is done; not during your quiet hours')],  // 2.7.0 (#413)
-  ['usage', N_('An agent reached a usage limit'), N_('admins: 80 % and 100 % of a limit'), 'admin'],  // 2.1.1 (#326)
+  ['usage', N_('An agent reached a usage limit'), N_('admins: 80 % and 100 % of a limit, sign-ins of organisation admins from a new address, registrations'), 'admin'],  // 2.1.1 (#326)
   ['proposal', N_('A proposal I asked an agent for is ready'), '', 'propose'],  // 2.3.0: only with an agent I may ask
   ['chat', N_('Team chat'), N_('direct messages; in channels only when you are mentioned (or the project bell is “All”)')],  // 2.17.0 (#419)
   ['errreport', N_('New error reports'), N_('a new error from a project’s error-report webhook became a ticket (repeats stay quiet)')]];  // 2.18.0
 // 2.425.0 (#3453 review): the receipt fetcher's row lives here (docfetch.js comes lazily with the documents: the row was missing until then)
 NOTIF_ROWS.push(['fetcher', N_('Receipt fetcher'), N_('a portal of your receipt fetcher reports an error, for example a sign-in that ran out'), 'office']);
 NOTIF_ROWS.push(['limits', N_('Mail limits of public pages'), N_('your customer portal or booking page used up its sign-in or confirmation mails')]);  // 2.453.0 (#3781): News only
+NOTIF_ROWS.push(['notice', N_('Notices from the server'), N_('a maintenance notice sent as a push')]);  // 2.367.4 (#2974): push only
+NOTIF_ROWS.push(['office', N_('Payments and overdue invoices'), N_('a payment was booked on an invoice of your office, an invoice is past its due date (no push for that)'), 'office']);  // 2.367.4 (#2972)
 NOTIF_ROWS.push(['calsub', N_('Calendar subscriptions'), N_('a calendar you subscribed to failed three times in a row')]);  // 2.367.2 (#2969): News only
 const NM_GROUP = {comment: 'comment', reply: 'comment', follow: 'comment', mention: 'mention', assign: 'assign', complete: 'complete', status: 'status', share: 'share', unblock: 'unblock'};
 const NM_PRIMARY = ['comment', 'mention', 'assign', 'complete', 'status', 'share', 'unblock'];
-const NM_NEWS_NEW = {newtask: 0, approval: 1, followup: 1, usage: 1, proposal: 1, errreport: 1, signoff: 1, limits: 1, calsub: 1};  // 2.266.0 (#2965): signoff
-const NM_PUSH = {comment: 1, reply: 1, follow: 1, mention: 1, assign: 1, newtask: 0, complete: 1, status: 0, share: 0, unblock: 1, approval: 1, followup: 1, reminder: 1, usage: 1, proposal: 1, nag: 1, chat: 1, errreport: 1, signoff: 1};
+const NM_NEWS_NEW = {newtask: 0, approval: 1, followup: 1, usage: 1, proposal: 1, errreport: 1, signoff: 1, limits: 1, calsub: 1, office: 1};  // 2.266.0 (#2965): signoff
+const NM_PUSH = {comment: 1, reply: 1, follow: 1, mention: 1, assign: 1, newtask: 0, complete: 1, status: 0, share: 0, unblock: 1, approval: 1, followup: 1, reminder: 1, usage: 1, proposal: 1, nag: 1, chat: 1, errreport: 1, signoff: 1, office: 1, notice: 1};
 const NM_SOCIAL = ['comment', 'reply', 'follow', 'mention', 'assign', 'newtask', 'complete', 'status', 'share', 'unblock', 'approval', 'proposal', 'chat', 'errreport'];
 const nmStored = s => { try { const o = JSON.parse(s.notify || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
 function notifMatrix(s) {
   const nk = new Set(String(s.news_kinds ?? 'mention,assign,comment,unblock,share,status').split(',')), o = nmStored(s), out = {};
   for (const [r] of NOTIF_ROWS) {
     const x = o[r] && typeof o[r] === 'object' ? o[r] : {};
-    const news = r === 'reminder' || r === 'nag' || r === 'chat' ? null : NM_PRIMARY.includes(r) ? nk.has(NM_GROUP[r]) : 'news' in x ? !!x.news : r in NM_GROUP ? nk.has(NM_GROUP[r]) : !!NM_NEWS_NEW[r];
+    const news = r === 'reminder' || r === 'nag' || r === 'chat' || r === 'notice' ? null : NM_PRIMARY.includes(r) ? nk.has(NM_GROUP[r]) : 'news' in x ? !!x.news : r in NM_GROUP ? nk.has(NM_GROUP[r]) : !!NM_NEWS_NEW[r];
     out[r] = {news, push: r === 'limits' || r === 'calsub' ? null : 'push' in x ? !!x.push : !!NM_PUSH[r]};
   }
   return out;

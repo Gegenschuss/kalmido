@@ -700,9 +700,11 @@ def _member_ops(c, oid, b):
             org_join_or_add(c, oid, u, "admin" if have[u] != "agent" and u in ops.get("admins_add", []) else "member")
     # 2.306.0 D1 (#2875): the new admins first, so the people taken out leave their lists to them (not to the operator)
     for u in ops.get("admins_add", []):
-        c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND user_id IN (SELECT id FROM users WHERE kind!='agent')", (oid, u))
+        if c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND role!='admin' AND user_id IN (SELECT id FROM users WHERE kind!='agent')", (oid, u)).rowcount:
+            org_role_news(c, oid, u, "admin")  # 2.367.4 (#2974)
     for u in ops.get("admins_remove", []):  # only an admin becomes a member; guest / read-only / accounting keep their role (#2151)
-        c.execute("UPDATE org_members SET role='member' WHERE org_id=? AND user_id=? AND role='admin'", (oid, u))
+        if c.execute("UPDATE org_members SET role='member' WHERE org_id=? AND user_id=? AND role='admin'", (oid, u)).rowcount:
+            org_role_news(c, oid, u, "member")
     gone = [u for u in ops.get("members_remove", []) if c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, u)).fetchone()]
     for u in gone:
         c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, u))
@@ -1284,6 +1286,8 @@ def org_member_put(oid):
         c.execute("UPDATE org_members SET role=? WHERE org_id=? AND user_id=?", (role, oid, uid))
         from ..core.access import acx_drop
         acx_drop()  # 2.143.0 A (#2151): the cached roles of this request
+        if cur["role"] != role:
+            org_role_news(c, oid, uid, role)  # 2.367.4 (#2974)
     elif uid != me() and (not g.user["is_admin"] or _operator_apart()):  # 2.148.1 A (#2480): an existing account joins only by accepting an invitation (2.306.0 D1, #2875: also the operator's)
         from .orginvite import ojn_invite
         ojn_invite(c, oid, uid, role)
@@ -1298,6 +1302,13 @@ def org_member_put(oid):
         return jsonify(ok=True, by_email=True)
     return jsonify(ok=True, by_email=False, **({"pending": True} if pending else {}),
                    org=org_mine_dict(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone(), me()))
+
+
+def org_role_news(c, oid, uid, role):
+    """2.367.4 (#2974): the person's role in the organisation changed: a News item (row "share"), never for one's own change."""
+    from ..collab.news import news_add
+    name = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]
+    news_add(c, uid, "orgrole", row="share", data={"org_id": oid, "name": name, "role": role})
 
 
 def _admins(c, oid):

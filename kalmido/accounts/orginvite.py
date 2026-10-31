@@ -24,7 +24,7 @@ from datetime import timedelta
 
 from flask import g, jsonify
 
-from ..core.config import app, EMAIL_RE
+from ..core.config import PUBLIC_URL, app, EMAIL_RE
 from ..core.i18n import LANGS, tr
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, iso, iso_ms, now_utc, uset, usettings, write_lock
 from ..core.access import Denied
@@ -293,7 +293,8 @@ def org_invite_withdraw(oid, ref):
 # ---- 2.148.1 A (#2480): an existing account invited into an organisation joins only when the person accepts
 def ojn_invite(c, oid, uid, role, by=None):
     """An organisation admin (checked by the caller) invites the existing account uid: one open invitation per organisation
-    and person (a repeat updates the role); the person gets a News item (at most one a day), no push. The caller commits.
+    and person (a repeat updates the role); the person gets a News item, a push (row "assign") and a mail, at most one a day
+    (2.367.4, #2974: it was only the bell, easily missed). The caller commits.
     2.278.0 A (#3095): by = the inviting admin outside a request (the org import's thread)."""
     now = now_utc()
     by = by or me()
@@ -307,7 +308,33 @@ def ojn_invite(c, oid, uid, role, by=None):
         name = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]
         c.execute("INSERT INTO notifications(user_id,kind,actor_id,data,created_at) VALUES(?,?,?,?,?)",
                   (uid, "orgjoin", by, json.dumps({"org_id": oid, "name": name, "role": role}, ensure_ascii=False), iso_ms(now)))
+        who = (c.execute("SELECT display_name, username FROM users WHERE id=?", (by,)).fetchone() or {"display_name": "", "username": "?"})
+        who = who["display_name"] or who["username"]
+        from ..accounts.secmail import sec_mail
+        sec_mail(c, uid, "orgjoin", who, name)
+    ojn_push(c, uid, who, name)
     print("organisation", oid, "invited account", uid, "to join, by", login_log_who(by), flush=True)
+
+
+def ojn_push(c, uid, who, org):
+    """2.367.4 (#2974): the push of an invitation (none in the org import's thread: its people get the mail and the bell)."""
+    from flask import has_request_context
+    from ..collab.news import notif_ok
+    from ..collab.comments import lang_of
+    from ..notify.push import push_prio, push_reachable
+    if not has_request_context() or g.get("pushes") is None:
+        return
+    s = usettings(c, uid)
+    if notif_ok(c, uid, s, "assign", "push") and push_reachable(c, uid, s):
+        g.pushes.append((uid, tr("{0} invites you to join the organisation {1}", who, org, lg=lang_of(s)), "", f"{PUBLIC_URL}/", push_prio(s)))
+
+
+def ojn_answer(c, r, oid, uid, yes):
+    """2.367.4 (#2974): whoever invited hears the answer (row "share"); system context, the person is no member yet or just became one."""
+    from ..collab.news import news_add
+    name = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]
+    if r["created_by"]:
+        news_add(c, r["created_by"], "orgjoinres", actor=uid, row="share", data={"org_id": oid, "name": name, "yes": bool(yes)})
 
 
 def ojn_later(c, oid, uid, by, pairs):
@@ -400,6 +427,7 @@ def org_join_accept(oid):
         org_member_add(c, oid, uid, r["role"])
         shared = ojn_share_later(c, oid, uid, r)  # 2.363.0 (#3132)
         c.execute("DELETE FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid))
+        ojn_answer(c, r, oid, uid, True)
         name = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]
     bump(c)
     c.commit()
@@ -411,9 +439,11 @@ def org_join_accept(oid):
 def org_join_decline(oid):
     """The invited person declines the open invitation into organisation oid (404 without one)."""
     c, uid = db(), me()
-    if not ojn_open(c, oid, uid):
+    r = ojn_open(c, oid, uid)
+    if not r:
         raise Denied(404)
     with system_ctx(c):  # declining an invitation: the person is not a member
+        ojn_answer(c, r, oid, uid, False)
         c.execute("DELETE FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid))
         c.execute("DELETE FROM org_invites WHERE org_id=? AND user_id=?", (oid, uid))  # 2.453.0 (#3780): a new account's row ends with it
     c.commit()

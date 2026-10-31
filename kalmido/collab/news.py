@@ -54,6 +54,8 @@ NEWS_KINDS += ("whorgcut",)  # 2.380 G (#3391): my personal webhook no longer de
 NEWS_KINDS += ("fetcherr",)  # 2.425.0 C (#3453): a portal of my receipt fetcher reports a new error (row "fetcher", docs/fetcher.py)
 NEWS_KINDS += ("evchange", "apbooking", "calsub")  # 2.367.2 (#2969): an event I am invited to changed (row "assign"); a booking on my page (row "assign"); my calendar subscription keeps failing (row "calsub", no push)
 NEWS_KINDS += ("aprequest",)  # 2.367.2 (#2968): someone asks ME for an approval (row "assign", team/approvals.py)
+NEWS_KINDS += ("docpaid", "docoverdue")  # 2.367.4 (#2972): a payment on an invoice / invoices past their due date (row "office", office/dunning.py)
+NEWS_KINDS += ("orglogin", "orgjoinres", "orgrole")  # 2.367.4 (#2974): an organisation admin signed in from a new address (row "usage"); the answer to my invitation; my role changed (row "share")
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evchange", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
@@ -75,11 +77,13 @@ NEWS_FOR_ME += ("signoff",)  # 2.266.0 (#2965)
 NEWS_FOR_ME += ("orgdelnotice", "orggone")  # 2.361.0 (#2920)
 NEWS_FOR_ME += ("whorgcut",)  # 2.380 G (#3391)
 NEWS_FOR_ME += ("aprequest",)  # 2.367.2 (#2968)
+NEWS_FOR_ME += ("docpaid",)  # 2.367.4 (#2972)
+NEWS_FOR_ME += ("orgjoinres", "orgrole")  # 2.367.4 (#2974)
 
 
 def news_to_me(kind, actor_id, data, agents, s=None):
     # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
-    if kind in ("upscan", "filereq", "orgkey", "ptlimit", "apblimit", "fetcherr", "evchange", "apbooking", "calsub"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
+    if kind in ("upscan", "filereq", "orgkey", "ptlimit", "apblimit", "fetcherr", "evchange", "apbooking", "calsub", "docoverdue", "orglogin"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
         return True
     if kind in ("approval", "aprequest"):  # 2.147.1 C (#2405): an agent waits for MY approval (my own row): "For you", counted by the bell
         return True
@@ -119,13 +123,29 @@ def bl9_agent_comment_ok(s, uid, author, agents, prev, replied, mentioned):
 
 def ws_budget_news_mine(c, uid, r):
     """2.236.0 B (#2904): a budget notice (data.budget) about uid's own personal agent. 2.361.4 (#2928): its usage limits
-    too (the owner sets them)."""
+    too (the owner sets them). 2.367.4 (#2974): an agent of an organisation uid is an admin of too."""
     try:
         d = json.loads(r["data"] or "{}")
     except ValueError:
         return False
-    return bool(isinstance(d, dict) and c.execute(
-        "SELECT 1 FROM agents WHERE user_id=? AND owner_id=?", (r["actor_id"], uid)).fetchone())
+    if not isinstance(d, dict):
+        return False
+    a = c.execute("SELECT owner_id, org_id FROM agents WHERE user_id=?", (r["actor_id"],)).fetchone()
+    return bool(a and (a["owner_id"] == uid or (a["org_id"] and news_org_admin(c, uid, a["org_id"]))))
+
+
+def news_org_admin(c, uid, oid):
+    """2.367.4 (#2974): uid is an admin of organisation oid now (what a person heard as its admin ends with the role)."""
+    from ..accounts.orgs import is_org_admin
+    return is_org_admin(c, uid, oid)
+
+
+def news_org_data(r):
+    """2.367.4 (#2974): the organisation id in a News row's data, 0 without one."""
+    try:
+        return int(json.loads(r["data"] or "{}").get("org_id") or 0)
+    except (ValueError, TypeError, AttributeError):
+        return 0
 
 
 def news_wanted(s, kind):
@@ -168,6 +188,8 @@ NOTIF_ROWS += ("signoff",)  # 2.266.0 (#2965): a customer decided through a link
 NOTIF_ROWS += ("fetcher",)  # 2.425.0 C (#3453): a portal of my receipt fetcher has a new error (News + push on by default)
 NOTIF_ROWS += ("limits",)  # 2.453.0 (#3781): my customer portal / booking page used up its mails (News only, on by default)
 NOTIF_ROWS += ("calsub",)  # 2.367.2 (#2969): my calendar subscription failed 3 times in a row (News only, on by default)
+NOTIF_ROWS += ("office",)  # 2.367.4 (#2972): payments and overdue invoices of my office (News + push on by default; overdue: News only)
+NOTIF_ROWS += ("notice",)  # 2.367.4 (#2974): the server's maintenance notice sent as a push (push only, on by default)
 NOTIF_NEWS_GROUP = {"comment": "comment", "reply": "comment", "follow": "comment", "mention": "mention", "assign": "assign",
                     "complete": "complete", "status": "status", "share": "share", "unblock": "unblock"}
 NOTIF_NEWS_PRIMARY = ("comment", "mention", "assign", "complete", "status", "share", "unblock")  # News = news_kinds
@@ -180,6 +202,7 @@ NOTIF_NEWS_NEW["signoff"] = 1  # 2.266.0 (#2965)
 NOTIF_NEWS_NEW["fetcher"] = 1  # 2.425.0 C (#3453)
 NOTIF_NEWS_NEW["limits"] = 1  # 2.453.0 (#3781)
 NOTIF_NEWS_NEW["calsub"] = 1  # 2.367.2 (#2969)
+NOTIF_NEWS_NEW["office"] = 1  # 2.367.4 (#2972)
 NOTIF_PUSH_DEFAULT = {"comment": 1, "reply": 1, "follow": 1, "mention": 1, "assign": 1, "newtask": 0, "complete": 1,
                       "status": 0, "share": 0, "unblock": 1, "approval": 1, "followup": 1, "reminder": 1, "usage": 1,
                       "proposal": 1, "nag": 1, "chat": 1, "errreport": 1}
@@ -191,7 +214,9 @@ NOTIF_PUSH_DEFAULT["signoff"] = 1  # 2.266.0 (#2965)
 NOTIF_PUSH_DEFAULT["fetcher"] = 1  # 2.425.0 C (#3453)
 NOTIF_PUSH_DEFAULT["limits"] = 0  # 2.453.0 (#3781)
 NOTIF_PUSH_DEFAULT["calsub"] = 0  # 2.367.2 (#2969)
-NOTIF_NO_NEWS = ("reminder", "nag", "chat")
+NOTIF_PUSH_DEFAULT["office"] = 1  # 2.367.4 (#2972)
+NOTIF_PUSH_DEFAULT["notice"] = 1  # 2.367.4 (#2974)
+NOTIF_NO_NEWS = ("reminder", "nag", "chat", "notice")
 NOTIF_NO_PUSH = ("limits", "calsub")  # 2.453.0 (#3781): News only (the notes promise no push, no mail)
 NOTIF_UNMUTED = ("mention", "assign")        # still come through a muted list
 NOTIF_NO_BELL = ("reminder", "followup", "usage", "proposal")  # never changed by a list bell
@@ -209,6 +234,9 @@ KIND_ROW = {"mention": "mention", "comment": "comment", "assign": "assign", "una
 KIND_ROW["review"] = "review"  # 2.60.0 C (#1512)
 KIND_ROW["evchange"] = KIND_ROW["apbooking"] = "assign"  # 2.367.2 (#2969): like the invitation and the booking's push
 KIND_ROW["calsub"] = "calsub"
+KIND_ROW["docpaid"] = KIND_ROW["docoverdue"] = "office"  # 2.367.4 (#2972)
+KIND_ROW["orglogin"] = "usage"  # 2.367.4 (#2974)
+KIND_ROW["orgjoinres"] = KIND_ROW["orgrole"] = "share"
 KIND_ROW["aprequest"] = "assign"  # 2.367.2 (#2968): like the assignment it replaces
 KIND_ROW["filereq"] = "filereq"  # 2.122.0 A (#2097)
 KIND_ROW["leavereq"] = KIND_ROW["leavedecide"] = "leave"  # 2.125.0 A (#2117): its own row (switchable)
@@ -471,7 +499,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 su = int(json.loads(r["data"] or "{}").get("user_id") or 0)
             except (ValueError, TypeError, AttributeError):
                 su = 0
-            if not is_admin_id(c, uid) or not c.execute("SELECT 1 FROM users WHERE id=? AND signup='pending'", (su,)).fetchone():
+            so = news_org_data(r)  # 2.367.4 (#2974): an organisation's admin, by the person's domain
+            if not (news_org_admin(c, uid, so) if so else is_admin_id(c, uid)) or not c.execute("SELECT 1 FROM users WHERE id=? AND signup='pending'", (su,)).fetchone():
                 continue
         elif kind == "proposal":  # 2.3.0: while the proposal job (mine) exists
             try:
@@ -562,6 +591,17 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
         elif kind == "signoff":  # 2.266.0 (#2965): a customer's decision, while I am still in that office (or see its list)
             from ..office.signoff import sig_news_live
             if not sig_news_live(c, uid, r["data"]):
+                continue
+        elif kind in ("orglogin", "orgjoinres"):  # 2.367.4 (#2974): while I am an admin there
+            if not news_org_admin(c, uid, news_org_data(r)):
+                continue
+        elif kind == "orgrole":  # 2.367.4 (#2974): while I am in that organisation
+            from ..accounts.orgs import org_role
+            if not org_role(c, uid, news_org_data(r)):
+                continue
+        elif kind in ("docpaid", "docoverdue"):  # 2.367.4 (#2972): while I am still in that office
+            from ..office.dunning import dun_news_live
+            if not dun_news_live(c, uid, r["data"]):
                 continue
         elif kind in ("ptlimit", "apblimit"):  # 2.138.4 C (#2380): the portal's sign-in mails of my space were used up (no task, no list); 2.360.2 L (#2561): the booking page's
             pass

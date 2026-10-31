@@ -142,6 +142,13 @@ def _members_on():
 #   role         "user" | "agent" | "system" | "anon"
 #   agent_org_id the agent's workspace (None: private agent or not an agent)
 #   list_allow   frozenset of the list ids an API token is limited to (None: no limit)
+def org_admin_people(c, oid):
+    """2.367.4 (#2974): the ids of the active people who are admins of organisation oid: they hear of its events, not the operator."""
+    with pg_system(c):  # structure; the caller may be an agent or a sign-in without a context
+        return [r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' "
+                                        "AND u.disabled=0 AND COALESCE(u.kind,'')!='agent' ORDER BY m.user_id", (oid,))]
+
+
 # Background threads, the watchdog and migrations use system_ctx() (greppable). In 2.37 (Postgres) exactly these values are
 # set per transaction for the row-level policies -- see acx_session_vars(), the one place that will add
 # SET LOCAL app.user_id / app.org_ids / app.role.
