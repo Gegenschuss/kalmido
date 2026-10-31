@@ -76,9 +76,9 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     // 2.364.0 (#3040): a grid of rows (two or more), every icon in sight, nothing to swipe sideways (was one swiping row)
     check(s.rows >= 2 && !s.scrolls && s.inRow && s.minH >= 43, `${tag}: a grid of rows, all in sight, big enough to tap ` + JSON.stringify(s));
     check(s.on === 'tasks' && s.search && s.today && s.inbox && s.rowFixed && s.todayTwice === 1, `${tag}: on top search and the row, Plan (Today, Inbox) in Projects; Today only once ` + JSON.stringify(s));
-    // 2.450.0 (#3817): order search, areas, Plan; a hidden Today is missing like on a computer
+    // 2.450.0 (#3817): order search, areas, Plan; a hidden entry is missing like on a computer
     check(await ev(`(() => { const q = x => document.querySelector(x), P = (a, b) => !!(a && b && (a.compareDocumentPosition(b) & 4)); return P(q('#side .sbmsrch'), q('#side .sbmr')) && P(q('#side .sbmr'), q('#side .sg-focus')) && P(q('#side .sg-focus'), q('#side .sg-lists')); })()`), `${tag}: order search, areas, Plan, projects`);
-    check(await ev(`(() => { S.settings.sidebar = JSON.stringify({hidden: ['e:today']}); renderSide(); const r = !document.querySelector('#side .sg-focus .srow[data-go="today"]') && !!document.querySelector('#side .sg-focus .srow[data-drop="inbox"]'); S.settings.sidebar = '{}'; renderSide(); return r; })()`), `${tag}: a hidden Today is missing, Inbox stays`);
+    check(await ev(`(() => { S.settings.sidebar = JSON.stringify({hidden: ['e:inbox']}); renderSide(); const r = !document.querySelector('#side .sg-focus .srow[data-drop="inbox"]') && !!document.querySelector('#side .sg-focus .srow[data-go="today"]'); S.settings.sidebar = '{}'; renderSide(); return r; })()`), `${tag}: a hidden Inbox is missing, Today stays (the open view always shows)`);
     check(s.lists && !s.office && s.fshr && s.ws && s.inside, `${tag}: the Tasks panel: projects (shared folder with its share symbol), the workspace switch stays ` + JSON.stringify(s));
     check(s.set && s.acct && Math.abs(s.dockBottom) <= 2, `${tag}: at the bottom Settings and the account ` + JSON.stringify(s));
     await ev(`(() => { const s = document.querySelector('#side'); s.scrollTop = s.scrollHeight; return 1; })()`); await sleep(200);
