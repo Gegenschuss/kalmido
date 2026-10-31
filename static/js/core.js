@@ -1409,6 +1409,7 @@ function parseHash() {
 }
 function go(hash) { if (location.hash !== '#' + hash) location.hash = hash; else route(); }
 async function route() {
+  vm_leave();  // 2.413.0 A (#3439): the view left keeps its place (viewmem.js)
   const r = parseHash();
   if (S.me?.kid && r.mod !== 'family' && !r.complete && !r.snooze) { r.mod = 'family'; r.key = 'family'; }  // 2.19.0 (#653): a kid's home
   o3a_toPrivate(r.mod);  // 2.83.0 (#1845): a private module in an organisation's view -> Private

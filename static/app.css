@@ -313,7 +313,7 @@ body:is(.prbg-soft,.prbg-strong) .trow:is(.pr5,.pr3,.pr1):not(.sel):not(.msel):n
 #scrim.clear{background:transparent}
 #scrim.overmodal{z-index:74}#pop.overmodal{z-index:76}  /* #318: a menu opened inside a dialog shows above it */
 .menu-list{display:flex;flex-direction:column;min-width:11.25rem}
-.menu-list button{display:flex;align-items:center;gap:.625rem;padding:.375rem .5rem;border-radius:var(--r-s);text-align:left;font-size:var(--fs-m);color:var(--text2)}
+.menu-list button{display:flex;align-items:center;gap:.625rem;padding-inline:.5rem;border-radius:var(--r-s);text-align:left;color:var(--text2)}
 .menu-list button:hover{background:var(--bg3);color:var(--text)}
 .menu-list button.on{color:var(--accent)}
 .menu-list button kbd{margin-left:auto}
@@ -532,7 +532,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .ptasks div{display:flex;justify-content:space-between;padding:.375rem .25rem;border-bottom:1px solid var(--line)}
 
 /* ---------- search ---------- */
-.search input{width:100%;font-size:var(--fs-l);padding:.5625rem .75rem;margin-bottom:.75rem}
+.search input{width:100%;margin-bottom:.75rem}
 
 /* ================= mobile ================= */
 @media (max-width:767px){
@@ -3519,8 +3519,7 @@ svg.kword{display:block;height:.82em;width:auto;aspect-ratio:371.8/81;color:#EEE
 .authscreen .alogo svg.logo,#app .authscreen .alogo svg.logo{color:#1a7f8e}  /* 2.233.0 C (#3195): sign-in keeps the brand colour; 2.300.0 (#3198): petrol */
 /* P20: settings search (every tab), the phone's tab row shows that it scrolls */
 .shdr{position:relative}
-.ssearch{display:flex;align-items:center;gap:.375rem;padding:0 .5rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg);color:var(--muted);min-width:0;flex:0 1 14rem}
-.ssearch input{border:0;background:none;padding:.375rem 0;min-height:2.25rem;flex:1;min-width:0}
+.ssearch{flex:0 1 14rem}  /* look: shared build with .ctsearch */
 @media (max-width:767px){
   .shdr{flex-wrap:wrap}
   .ssearch{order:3;flex:1 1 100%}
@@ -3926,7 +3925,7 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 input:focus-visible,select:focus-visible,textarea:focus-visible{box-shadow:0 0 0 1px var(--accent)}
 /* 2.18.0: composite input bars (quick add inline / sheet / dock, comment box, search fields, the palette) show the focus
    ONCE, on the bar (2 px: border + 1 px ring, 3:1 against the background), never a second box around the inner field */
-:is(.qadd .box,.qadd.dock,.ccomp,.ssearch,.sssearch,.pqbar) :is(input,textarea):focus-visible{box-shadow:none;outline:0}
+:is(.qadd .box,.qadd.dock,.ccomp,.ssearch,.ctsearch,.sssearch,.pqbar) :is(input,textarea):focus-visible{box-shadow:none;outline:0}
 .qadd .box:focus-within,.ccomp:focus-within,.ssearch:focus-within,.selsheet .sssearch:focus-within{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .qadd.dock:focus-within{box-shadow:0 0 0 1px var(--accent),0 .5rem 2rem rgba(0,0,0,.18)}
 .qadd.dock .box:focus-within{box-shadow:none}
@@ -3957,7 +3956,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{b
 input:not([type=checkbox]):not([type=radio]):focus,select:focus,textarea:focus{border-color:var(--accent)}
 #detail:focus{outline:none}
 /* the boxes around borderless fields (composer, comment / chat box, settings search, palette, subtask / tag fields) */
-.qadd .box,.qadd.dock,.ccomp,.ssearch,.chcomp textarea{border-color:var(--field-line)}
+.qadd .box,.qadd.dock,.ccomp,.ssearch,.ctsearch,.chcomp textarea{border-color:var(--field-line)}
 .qadd.dock .box{border-color:transparent}
 .pqbar{border-bottom-color:var(--field-line)}
 .subadd input,#d-tag{border:0;border-bottom:1px solid var(--field-line);border-radius:0}
@@ -4176,7 +4175,7 @@ button.trdline:hover,button.trdline:focus-visible{background:var(--bg3);color:va
 .ntview{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem}
 .ntview.open{grid-template-columns:minmax(14rem,22rem) minmax(0,1fr)}
 .ntbar{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem}
-.ntbar .ssearch{flex:1 1 auto}
+.ntbar .ssearch,.ntbar .ctsearch{flex:1 1 auto}
 .ntcards{list-style:none;margin:0;padding:0;display:grid;gap:.375rem}
 .ntcard{display:flex;flex-direction:column;gap:.25rem;padding:.625rem .75rem;border:1px solid var(--line2);border-radius:var(--radius);color:var(--text2);text-decoration:none;background:var(--bg)}
 .ntcard:hover{border-color:var(--field-line)}
@@ -4447,7 +4446,7 @@ a.tref:hover{background:var(--accent-soft)}
 .fam .dgrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,21rem),1fr))}
 .fam .dashhead .btn .i{color:var(--accent)}
 .flist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.125rem}
-.frow{display:flex;align-items:center;gap:.625rem;min-height:2.5rem;padding:.25rem .375rem;border-radius:var(--radius);color:var(--text);text-decoration:none;min-width:0}
+.frow{display:flex;align-items:center;gap:.625rem;padding-inline:.375rem;border-radius:var(--radius);color:var(--text);text-decoration:none;min-width:0}
 a.frow:hover,.frow a:hover{background:var(--bg3)}
 .frow .ft{display:flex;flex-direction:column;min-width:0;flex:1;color:inherit;text-decoration:none}
 .frow .ft b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -4509,7 +4508,7 @@ a.frow:hover,.frow a:hover{background:var(--bg3)}
 .tpurp .purposes{grid-template-columns:1fr 1fr;margin:0}
 .tpurp .ptcard small{display:none}
 @media (pointer:coarse){
-  .frow,.fday,.fperson,.purposes .ptcard{min-height:2.75rem}
+  .fday,.fperson,.purposes .ptcard{min-height:2.75rem}
   .fmeal .iconbtn{width:2.75rem;height:2.75rem}
   .fmeal a,.fshop a.ft{min-height:2.75rem;display:flex;align-items:center}
   .fshop a.ft{flex-direction:column;align-items:flex-start;justify-content:center}
@@ -4654,9 +4653,11 @@ button.lkchip:hover{border-color:var(--accent)}
 /* contacts view */
 .ctview{display:flex;flex-direction:column;gap:.5rem;min-height:0;height:100%}
 .ctbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
-.ctsearch{display:flex;align-items:center;gap:.375rem;flex:1 1 14rem;background:var(--bg3);border:1px solid var(--line2);border-radius:var(--radius);padding:0 .5rem}
+/* 2.413.0 B (#3496): one search field build: icon left, height --fld-h (contacts, files, knowledge, settings, notes); the border is the fields' --field-line (3:1 against the page) */
+.ctsearch,.ssearch{display:flex;align-items:center;gap:.375rem;background:var(--bg3);color:var(--muted);border:1px solid var(--field-line);border-radius:var(--radius);padding:0 .5rem;min-width:0;min-height:var(--fld-h);box-sizing:border-box}
+.ctsearch{flex:1 1 14rem}
 .ctsearch:focus-within{border-color:var(--accent)}
-.ctsearch input{border:0;background:transparent;flex:1;padding:.375rem 0;min-height:2.25rem}
+.ctsearch input,.ssearch input{border:0;background:transparent;flex:1;min-width:0;padding:0;min-height:0;align-self:stretch}
 /* 2.122.2 (#2329): the sheet "Add tab" (settings.js tabAddSheet): search, folded sections, lists below their folder */
 .tapick .card{width:min(28rem,100%)}
 .tapick .ctsearch{flex:none;margin:.25rem 0 .5rem}
@@ -4679,7 +4680,7 @@ button.lkchip:hover{border-color:var(--accent)}
 .ctcols{display:grid;grid-template-columns:minmax(16rem,22rem) 1fr;gap:1rem;min-height:0;flex:1}
 .ctlistw{overflow:auto;min-height:0}
 .ctlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
-.ctrow{display:flex;align-items:center;gap:.625rem;width:100%;text-align:left;padding:.375rem .5rem;border-radius:var(--radius);min-height:2.75rem}
+.ctrow{display:flex;align-items:center;gap:.625rem;width:100%;text-align:left;padding-inline:.5rem;border-radius:var(--radius)}
 .ctrow:hover{background:var(--bg2)}
 .ctrow.on{background:var(--bg3)}
 .ctn{display:flex;flex-direction:column;min-width:0;flex:1}
@@ -4735,7 +4736,7 @@ button.lkchip:hover{border-color:var(--accent)}
   .lksec .lklab{min-width:100%;padding-top:0}
 }
 @media (pointer:coarse){
-  .evchip,.lkchip,.evatp,.ctsearch input{min-height:2.75rem}
+  .evchip,.lkchip,.evatp,.ctsearch input,.ssearch input{min-height:2.75rem}  /* 2.413.0 (#3496): the search input itself is the 44 px target (its frame adds 2 px) */
   .evchip{min-width:2.75rem;justify-content:center}
   .ctf a,.ctf .tagchip,.ctlinks .linkbtn{min-height:2.75rem;display:inline-flex;align-items:center}
   .ctlk .iconbtn,.evatp .iconbtn{min-width:2.75rem;min-height:2.75rem}
@@ -6462,7 +6463,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .seg.ofctabs button{flex:none;white-space:nowrap;border-radius:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:.375rem .75rem}
 .seg.ofctabs button.on{background:none;border-bottom-color:var(--accent);color:var(--text)}
 .ofdkinds{margin-bottom:.5rem}  /* 2.224.0 C (#2817): the document-kind tabs are a plain .seg now (same height + type as every switch) */
-.ofdbar .ctsearch,.ofdbar select,.ofdbar .btn{min-height:2.25rem;box-sizing:border-box}
+.ofdbar .ctsearch,.ofdbar select,.ofdbar .btn{min-height:var(--fld-h);box-sizing:border-box}
 .office .ofchead{margin-bottom:.375rem}.office .ofchead:empty{display:none}
 
 /* 2.46.1 E (#1558) phones: sheets and dialogs fold up from the bottom (220 ms) and fold away (180 ms) while the dimming layer
@@ -8750,6 +8751,9 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
   .chath .avb::before{content:"";position:absolute;inset:calc(50% - 1.375rem)}
 }
 time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-family:inherit;font-variant-numeric:tabular-nums}
+/* 2.413.0 B (#3496): one row rule: every list row (files, contacts, settings, menus, search hits) is as tall as a task row; Compact / Comfortable follow */
+.frow,.ctrow,.navrow,.menu-list button,.ssres button{box-sizing:border-box;min-height:var(--row-h);padding-block:var(--row-py);font-size:var(--row-fs)}
+@media (pointer:coarse){ .frow,.ctrow,.navrow,.menu-list button,.ssres button{min-height:max(2.75rem,var(--row-h))} }
 /* 2.410.0 A (#3514): the stage bar of an ordered choice field (cfstage.js); a phone shows only the dots */
 .cfst{display:inline-flex;align-items:center;gap:.375rem;max-width:100%;vertical-align:middle;font-weight:500}
 .cfst svg{flex:none}

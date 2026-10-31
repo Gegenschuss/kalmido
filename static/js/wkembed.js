@@ -310,7 +310,7 @@ function wem_pick(p, at) {
   const st = {parent: null, q: '', n: 0};
   /** @type {any} */
   const md = modal(`<div class="lhdr"><h3>${ic('folder', 's')} ${esc(tr('From the file store'))}</h3><span class="spacer"></span><button type="button" class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x')}</button></div>
-    <div class="ssearch">${ic('search', 's')}<input id="wem-q" type="search" placeholder="${esc(tr('Find a file'))}" aria-label="${esc(tr('Find a file'))}" autocomplete="off"></div>
+    <div class="ctsearch">${ic('search', 's')}<input id="wem-q" type="search" placeholder="${esc(tr('Find a file'))}" aria-label="${esc(tr('Find a file'))}" autocomplete="off"></div>
     <nav class="wemcrumbs" id="wem-crumbs" aria-label="${esc(tr('Path'))}"></nav>
     <div class="wempick" id="wem-pick" role="list"></div>
     <p class="muted wemhint">${esc(tr('Only files of this workspace. Readers of the page see a file only if they may open it in the file store.'))}</p>`);

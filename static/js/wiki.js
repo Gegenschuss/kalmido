@@ -171,8 +171,8 @@ function viewWiki() {
   if (typeof sbb_on === 'function' && sbb_on()) { const h = wk_deskHtml(sp, d, id, cur, sel, op); return wst ? h.replace(/^(<div class="ntwrap[^>]*>)/, '$1' + wst) : h; }  // 2.152.3 B (#2620): a computer: the folders are in the panel
   const side = `<div class="ntlist wkside">
     ${all && op ? `<div class="ntbar wkspbar"><a href="#wiki" class="iconbtn" aria-label="${esc(tr('Back'))}">${ic('back')}</a><b>${esc(wk_spaceName(op))}</b>${sel}</div>` : sel ? `<div class="ntbar">${sel}</div>` : ''}
-    <div class="ntbar"><div class="ssearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
-      <button type="button" class="btn sm pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button>${!all || op ? wk_dayBtn() : ''}${wk_canFolder(sp) && (!all || op) ? wk_folderBtn() + wk_selBtn(sp, !q && vis.length) : ''}</div>
+    <div class="ntbar"><div class="ctsearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
+      <button type="button" class="btn pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button>${!all || op ? wk_dayBtn() : ''}${wk_canFolder(sp) && (!all || op) ? wk_folderBtn() + wk_selBtn(sp, !q && vis.length) : ''}</div>
     ${op && d?.off ? wko_offHtml(d.off, d.more) : op ? wk_moreHtml(d) : ''}${op && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}${all && q ? wk_allHitsHtml(q) : all && !op ? `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${wk_spacesHtml()}</nav>` : `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${typeof wkeLockHtml === 'function' && d?.pages && wkeLockHtml(sp) ? wkeLockHtml(sp) : !d?.pages ? `<div class="muted mhint">${d?.err ? esc(d.err) : tr('Loading…')}</div>`
       : vis.length ? (q ? `<ul class="wktree">${vis.map((p, i) => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}${wk_hitName(p, i)}</a></li>`).join('')}</ul>` : wk_treeHtml(wk_treeOf(sp), cur, vis.length > 30))  // 2.200.0 A (#2747): with the folders
       : q ? `<div class="empty">${tr('No page matches.')}</div>` : symEmpty('book', tr('No pages yet.'), (sp === 'private' ? tr('Processes, checklists, how-tos: write down what you need to know.') : tr('Processes, checklists, how-tos: write down what the team needs to know.')))}${q && d?.pages && !d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, vis) : ''}</nav>${wk_selBar(sp)}`}${!q && (!all || op) && typeof wkt_sideHtml === 'function' ? wkt_sideHtml(sp) : ''}${typeof wsh_sideHtml === 'function' ? wsh_sideHtml() : ''}</div>`;  // 2.123.0 A (#2106): + found in the text (wkhist.js); 2.371 (#3150): + the tags
@@ -206,7 +206,7 @@ const wk_leaves = n => [...n.kids.values()].filter(k => k.page).sort((a, b) => w
 // workspace = the area's name ("Knowledge", like "Files"), several = the space's name (like the file store's spaces)
 const wk_rootName = sp => wk_all() ? wk_spaceName(sp) : tr('Knowledge|area');
 const wk_canFolder = sp => { const d = WK.idx[sp]; return !!d?.pages && d.mayWrite !== false && !wk_e2e(sp) && !S.me?.kid; };
-const wk_folderBtn = () => `<button type="button" class="btn sm" data-wk="newfolder">${ic('folder', 's')}${tr('New folder')}</button>`;
+const wk_folderBtn = () => `<button type="button" class="btn" data-wk="newfolder">${ic('folder', 's')}${tr('New folder')}</button>`;
 const wk_kidsN = n => wk_dirs(n).length + wk_leaves(n).length;
 function wk_rowMore(sp, nid, when) {
   const w = when ? `<small class="muted wkwhen">${esc(fmtDay('short', new Date(when)))}</small>` : '';
@@ -294,7 +294,7 @@ const wk_selOk = sp => WK.selOn && WK.selSp === sp && wk_canFolder(sp);
 function wk_selBtn(sp, any) {
   if (WK.selOn && WK.selSp !== sp) wk_selEnd();
   WK.selVis = []; WK.selHere = any ? sp : null;  // 2.428.0 A (#3581): where "Select" is offered the rows' boxes show on hover too
-  return any ? `<button type="button" class="btn sm ${WK.selOn ? 'on' : ''}" data-wksel="mode" data-wsp="${esc(sp)}" aria-pressed="${!!WK.selOn}">${ic('check', 's')} ${tr('Select')}</button>` : '';
+  return any ? `<button type="button" class="btn ${WK.selOn ? 'on' : ''}" data-wksel="mode" data-wsp="${esc(sp)}" aria-pressed="${!!WK.selOn}">${ic('check', 's')} ${tr('Select')}</button>` : '';
 }
 function wk_selBox(sp, nid, name) {
   if (!nid || !(wk_selOk(sp) || !WK.selOn && WK.selHere === sp && wk_canFolder(sp))) return '';
@@ -410,8 +410,8 @@ sbb_treeReg('wk', {
 function wk_deskHtml(sp, d, id, cur, sel, op) {
   const q = WK.q.trim().toLowerCase(), pages = d?.pages || [], all = wk_all();
   if (all && !op) d = null;  // 2.198.0 A (#2743): no space open: no space's menu, offline mark or lock bar
-  const bar = `<div class="wkbar">${sel}<div class="ssearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
-    <button type="button" class="btn sm pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button>${!all || op ? wk_dayBtn() : ''}${wk_canFolder(sp) && (!all || op) ? wk_folderBtn() + wk_selBtn(sp, !q && !id && !!pages.length) : ''}
+  const bar = `<div class="wkbar">${sel}<div class="ctsearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
+    <button type="button" class="btn pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button>${!all || op ? wk_dayBtn() : ''}${wk_canFolder(sp) && (!all || op) ? wk_folderBtn() + wk_selBtn(sp, !q && !id && !!pages.length) : ''}
     ${S.me?.kid || !op ? '' : `<button type="button" class="iconbtn" data-wk="amenu" aria-haspopup="menu" title="${esc(tr('Workspace'))}" aria-label="${esc(tr('Workspace'))}">${ic('dots')}</button>`}</div>${d?.off ? wko_offHtml(d.off, d.more) : wk_moreHtml(d)}${d && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}`;  // 2.169 (#2671): the offline mark; 2.210 A (#2755): the cap online
   const hits = all && q ? wk_allHitsHtml(q, 'wkdlist') : q && d?.pages ? `<nav id="wk-res" class="wkdlist" aria-label="${esc(tr('Pages'))}">${(v => v.length ? `<ul class="wktree">${v.map((p, i) => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}${wk_hitName(p, i)}</a></li>`).join('')}</ul>` : `<div class="empty">${tr('No page matches.')}</div>`)(pages.filter(p => p.path.toLowerCase().includes(q) || d.off && String(p.body || '').toLowerCase().includes(q)))}${!d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, pages.filter(p => p.path.toLowerCase().includes(q))) : ''}</nav>` : '';  // 2.169 (#2671): offline the texts are searched here
   if (id && !hits) return `<div class="ntwrap wkwrap wkdesk">${bar}<article class="ntedit wkpage${typeof wkst_cls === 'function' ? wkst_cls(cur?.space || sp) : ''}" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : (WK.pgErr && WK.pgLost === id ? wk_lostHtml() : `<div class="muted mhint">${WK.pgErr ? esc(WK.pgErr) : tr('Loading…')}</div>`)}</article></div>`;

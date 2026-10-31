@@ -1,6 +1,6 @@
 /* Kalmido web client: the styles of the module "settings" (2.65.0, #1824), loaded with it (static/js/lazyload.js LD_CSS).
    Moved unchanged from app.css (same order); later than app.css in the cascade. */
-.navrow{display:flex;align-items:center;gap:.625rem;padding:.25rem .25rem .25rem .625rem;border-radius:var(--radius)}
+.navrow{display:flex;align-items:center;gap:.625rem;padding-inline:.625rem .25rem;border-radius:var(--radius)}
 .navrow:hover{background:var(--bg3)}
 .navrow span{flex:1}
 .navrow input{accent-color:var(--accent);width:1rem;height:1rem}
@@ -63,7 +63,7 @@
 .aboutapp.off>span>b{color:var(--p3)}
 .ssres{position:absolute;right:.875rem;top:calc(100% - .25rem);z-index:5;width:min(24rem,calc(100% - 1.75rem));max-height:60dvh;overflow-y:auto;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--radius);box-shadow:var(--shadow);padding:.25rem;display:flex;flex-direction:column}
 .ssres.hidden{display:none}
-.ssres button{display:block;text-align:left;padding:.5rem .625rem;min-height:2.75rem;border-radius:var(--r-s);font-size:var(--fs-m)}
+.ssres button{display:block;text-align:left;padding-inline:.625rem;border-radius:var(--r-s)}
 .ssres button:hover,.ssres button:focus-visible{background:var(--bg3)}
 @media (max-width:767px) {
   .sbody{position:relative}

@@ -63,6 +63,7 @@ const WS_VIEWS = {
   'static/js/newsletter.js': 'helper',        // a dialog with its own workspace choice
   'static/js/workspace.js': 'helper',         // the switch itself
   'static/js/wscolor.js': 'helper',
+  'static/js/viewmem.js': 'helper',           // 2.413.0 (#3439): the shown workspace is part of the key of a view's kept place (a switch starts its views from the top, no data kept)
   // 2.380.2 (#3407): the views under Projects read the shown workspace too (they did not, so this guard missed them)
   'static/js/roadmap.js': 'check:projects',   // the roadmap's lists and people (inWs while drawing)
   'static/js/projects.js': 'check:projects',  // project status: the projects, the risk counter (inWs while drawing)

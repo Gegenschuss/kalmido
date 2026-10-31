@@ -75,6 +75,14 @@ PDF_SUM_AFTER = 3 * MM     # ... and a little air below the totals (given up fir
 PDF_LOOK_A_KINDS = ("offer", "invoice", "credit", "reminder")
 PDF_FS_DELTA = -2.0       # every text of the quotation 2 pt smaller ...
 PDF_FS_MIN = 6.0          # ... but never below 6 pt (footer, small captions)
+# 2.413.0 (#3500): one font size scale for every office PDF instead of 17 loose sizes between 6.8 and 16 pt (each call
+# takes the nearest step; the footer's own fitting sizes 6.5-6.9 pt and the 120 pt draft mark stay as they are)
+FS_FOOT = 7.0     # footer, sender line, small captions
+FS_SMALL = 8.0    # table heads, notes, details, info block, bank lines
+FS_BODY = 9.6     # running text, positions, numbers, rights rows
+FS_SUM = 10.4     # grand total, section titles
+FS_TITLE = 14.0   # document / appendix titles
+FS_BRAND = 15.0   # the company name in the head
 PDF_SUM_FILL = 1.0        # share of the free room of the last main page put ABOVE the totals (1 = totals + closing sit at the bottom)
 PDF_OV_KINDS = ("offer", "invoice")  # 2.438.0 B (#3622): the documents with an overview of the part totals (progress and final invoices are invoices)
 PDF_LOOK_A = contextvars.ContextVar("pdf_look_a", default=False)  # per request: parallel PDFs never see each other's look
@@ -477,13 +485,13 @@ def qac_sig_block(p, y, rows, head, foot, accent):
     """2.99.0 C (#2195): the box of a simple electronic signature at y (the signed document of office.doctpl, the
     quotation accepted online): head in the accent colour, rows [(label, value)], a closing line."""
     p.rect(PDF_L, y, PDF_CW, qac_sig_block_h(rows), C_RULE, stroke=True, lw=0.6)
-    p.text(PDF_L + 10, y + 9, head.upper(), 7.4, True, pdf_text_color(accent), spacing=0.8)  # 2.296.0 D (#3172)
+    p.text(PDF_L + 10, y + 9, head.upper(), FS_FOOT, True, pdf_text_color(accent), spacing=0.8)  # 2.296.0 D (#3172)
     yy = y + 26
     for a, b in rows:
-        p.text(PDF_L + 10, yy, a, 8.4, False, C_INK2)
-        p.text(PDF_L + 120, yy, b, 8 if len(b) > 40 else 8.6, True, C_INK)
+        p.text(PDF_L + 10, yy, a, FS_SMALL, False, C_INK2)
+        p.text(PDF_L + 120, yy, b, FS_SMALL if len(b) > 40 else FS_SMALL, True, C_INK)
         yy += 12
-    p.text(PDF_L + 10, yy + 2, foot, 7.6, False, C_INK2)
+    p.text(PDF_L + 10, yy + 2, foot, FS_SMALL, False, C_INK2)
 
 
 def pdf_logo_frame(co):
@@ -1136,7 +1144,7 @@ def pdf_draw_footer(p, cols, right="", fit=None, foot_h=None, x0=None, width=Non
             p.text(x0, yy, ln, fs, color=C_INK2)
             yy += fs * 1.39
     if right:
-        p.text(x0 + width, A4_H - 9 * MM, right, 6.8, False, C_INK2, align="r")
+        p.text(x0 + width, A4_H - 9 * MM, right, FS_FOOT, False, C_INK2, align="r")
 
 
 def pdf_sender_line(sender, name="", name1="", width=PDF_ADDR_W, size=7):
@@ -1234,7 +1242,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         else:
             nl = co_lines or [""]  # 2.99.0 D (#2188): up to three name lines, one under the other
             for i, ln in enumerate(nl):
-                p.text(PDF_L + PDF_CW, PDF_TOP + 4 * MM + i * 18, ln, 15, True, C_INK, align="r", spacing=1.2)
+                p.text(PDF_L + PDF_CW, PDF_TOP + 4 * MM + i * 18, ln, FS_BRAND, True, C_INK, align="r", spacing=1.2)
             p.rect(A4_W - PDF_R - 12 * MM, PDF_TOP + 4 * MM + 24 + (len(nl) - 1) * 18, 12 * MM, 2.2, accent)
         for y in PDF_MARKS:  # fold and punch marks (DIN 5008 form B; 2.357.0 A (#3156): of the paper size)
             p.line(5 * MM, y, 9 * MM, y, 0.4, C_RULE)
@@ -1249,18 +1257,18 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             p.image("Logo", A4_W - PDF_R - w, y, w, h)
             rw = w
         else:
-            p.text(PDF_L + PDF_CW, y, co.get("name") or "", 9, True, C_INK, align="r", spacing=0.6)
-            rw = pdf_text_width(co.get("name") or "", 9, True, 0.6)
+            p.text(PDF_L + PDF_CW, y, co.get("name") or "", FS_BODY, True, C_INK, align="r", spacing=0.6)
+            rw = pdf_text_width(co.get("name") or "", FS_BODY, True, 0.6)
         # 2.217.0 B (#2800): title · recipient wraps left of the logo / name (at most two lines, the rest cut with "…")
         sw = PDF_CW - rw - (6 * MM if rw else 0)
-        sl = pdf_wrap(f"{title} {number}".strip() + (" · " + rc["name"] if rc.get("name") else ""), 8, sw)
+        sl = pdf_wrap(f"{title} {number}".strip() + (" · " + rc["name"] if rc.get("name") else ""), FS_SMALL, sw)
         if len(sl) > 2:
             t2 = sl[1]
-            while t2 and pdf_text_width(t2 + "…", 8) > sw:
+            while t2 and pdf_text_width(t2 + "…", FS_SMALL) > sw:
                 t2 = t2[:-1]
             sl = [sl[0], t2.rstrip() + "…"]
         for i, ln in enumerate(sl):
-            p.text(PDF_L, y + 2 + i * 10, ln, 8, False, C_INK2)
+            p.text(PDF_L, y + 2 + i * 10, ln, FS_SMALL, False, C_INK2)
         ry = 24.5 * MM if not BP else y + 12.5 * MM
         p.line(PDF_L, ry, PDF_L + PDF_CW, ry, 0.5, accent)
 
@@ -1274,7 +1282,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         # 2.114.4 A (#2282): the page count only from two pages on, the number stays
         right = " · ".join(x for x in (number, L["page"].format(n, total) if total >= 2 else "") if x)
         if BP and BP["hide_footer"]:  # 2.120.0 E (#2091): the letterhead has its own footer; number + page under the body
-            return p.text(PDF_L + PDF_CW, BP["bottom"][n > 1] + 3 * MM, right, 6.8, False, C_INK2, align="r")
+            return p.text(PDF_L + PDF_CW, BP["bottom"][n > 1] + 3 * MM, right, FS_FOOT, False, C_INK2, align="r")
         pdf_draw_footer(p, cols, right, p3f, foot_h)
 
     # -- blocks: (height, draw(page, y), keep_next, keep_prev, table)
@@ -1303,7 +1311,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                   keep_next=keep_next if q == n - 1 else q in (0, n - 2), pk=soft and q < n - 1, sq=sq if q == 0 else 0,
                   air=air if q == n - 1 else None, air_kind=air_kind if q == n - 1 else "", **kw)
 
-    body = 9.6
+    body = FS_BODY
     lh = pdf_fs(body) * 1.42  # 2.406.0 (#3491): the line height of the printed size
 
     # -- page 1 head: address field left, key data right
@@ -1330,7 +1338,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             info.append((str(f["name"]), str(f.get("value") or "")))
     info_x = PDF_INFO_X  # 2.390.0 A (#3350): 125 mm from the sheet edge (was 118 mm); runs to the right margin
     info_w = PDF_L + PDF_CW - PDF_INFO_X
-    info_lh = pdf_fs(8.6) * 1.45  # 2.406.0 (#3491)
+    info_lh = pdf_fs(FS_SMALL) * 1.42  # 2.406.0 (#3491)
     addr_lines = [str(x) for x in (rc.get("lines") or []) if str(x).strip()]
     if rc.get("name") and (not addr_lines or addr_lines[0].strip() != str(rc["name"]).strip()):
         addr_lines.insert(0, str(rc["name"]))
@@ -1345,7 +1353,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     def draw_head(p, y):
         sender = str(co.get("sender_line") or "") or " · ".join(dict.fromkeys(str(x) for x in [co.get("name") or ""] + list(co.get("lines") or []) if str(x).strip()))
         sender = pdf_sender_line(sender, co.get("name"), co_lines[0] if len(co_lines) > 1 else "")  # 2.296.0 E (#3170): the address first
-        p.text(PDF_L, y, sender, 7, False, C_INK2)
+        p.text(PDF_L, y, sender, FS_FOOT, False, C_INK2)
         p.line(PDF_L, y + 11, PDF_L + PDF_ADDR_W, y + 11, 0.5, C_RULE2)
         yy = y + 16
         for ln in addr_lines:
@@ -1354,23 +1362,23 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         yy = y + 2
         for kl, vl, below in info_rows:
             for j, kk in enumerate(kl):
-                p.text(info_x, yy + j * info_lh, kk, 8.6, False, C_INK2)
+                p.text(info_x, yy + j * info_lh, kk, FS_SMALL, False, C_INK2)
             if below:
                 yy += len(kl) * info_lh
             for j, vv in enumerate(vl):
-                p.text(info_x, yy + j * info_lh, vv, 8.6, True, C_INK, align="r", width=info_w)
+                p.text(info_x, yy + j * info_lh, vv, FS_SMALL, True, C_INK, align="r", width=info_w)
             yy += (len(vl) if below else max(len(kl), len(vl))) * info_lh
 
     # 2.296.0 E (#3170): a long label wraps (at most ~half the width), the value below it when too little room is left beside it
     # (was: the label never wrapped and ran under the value / over the margin)
     info_rows = []
     for k, v in info:
-        kl = pdf_wrap(k, 8.6, info_w * 0.55) if pdf_text_width(k, 8.6) > info_w * 0.55 else [k]
-        vw = info_w - max(pdf_text_width(x, 8.6) for x in kl) - 10
+        kl = pdf_wrap(k, FS_SMALL, info_w * 0.55) if pdf_text_width(k, FS_SMALL) > info_w * 0.55 else [k]
+        vw = info_w - max(pdf_text_width(x, FS_SMALL) for x in kl) - 10
         # 2.357.0 B (#3180): also a value that would need more than two lines beside its label goes below it (a long order
         # reference was four right-aligned lines); wrapped bold as it is drawn (was measured regular)
-        below = (vw < 60 or len(pdf_wrap(v, 8.6, max(vw, 40), True)) > 2) and pdf_text_width(v, 8.6, True) > vw
-        info_rows.append((kl, pdf_wrap(v, 8.6, info_w if below else max(vw, 40), True), below))
+        below = (vw < 60 or len(pdf_wrap(v, FS_SMALL, max(vw, 40), True)) > 2) and pdf_text_width(v, FS_SMALL, True) > vw
+        info_rows.append((kl, pdf_wrap(v, FS_SMALL, info_w if below else max(vw, 40), True), below))
     head_h = max(PDF_ADDR_H, 16 + len(addr_lines) * lh + 4,
                  2 + sum(len(kl) + len(vl) if below else max(1, len(kl), len(vl)) for kl, vl, below in info_rows) * info_lh + 4)
     block(head_h, draw_head)
@@ -1378,19 +1386,19 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # -- title line, project title, intro
 
     # 2.138.0 A (#2240): a long title wraps over the full width (the page count sits in the footer); the accent line under its last line
-    t_lines = pb_wrap(title.upper(), 16, PDF_CW, True, 1.0)
+    t_lines = pb_wrap(title.upper(), FS_TITLE, PDF_CW, True, 1.0)
 
     def draw_title(p, y):
         for j, s in enumerate(t_lines):
-            p.text(PDF_L, y + 6 + j * t_step, s, 16, True, C_INK, spacing=1.0)
+            p.text(PDF_L, y + 6 + j * t_step, s, FS_TITLE, True, C_INK, spacing=1.0)
         ly = y + 6 + (len(t_lines) - 1) * t_step + (19 if look_a else 22)
         p.line(PDF_L, ly, PDF_L + 14 * MM, ly, 1.6, accent)
     t_step = 18 if look_a else 20  # 2.406.0 (#3491): look A a little tighter
     block((30 if look_a else 34) + (len(t_lines) - 1) * t_step, draw_title, keep_next=True)
     if m.get("project_title"):
         pt = str(m["project_title"]).replace("\r", "")  # 2.431.0 B (#3594): its line breaks stay (pdf_wrap splits them)
-        n = len(pdf_wrap(pt, 10.4, PDF_CW, True))
-        block(n * 10.4 * 1.42 + 8, lambda p, y, t=pt: p.para(PDF_L, y + 2, t, 10.4, PDF_CW, True), keep_next=True)
+        n = len(pdf_wrap(pt, FS_SUM, PDF_CW, True))
+        block(n * FS_SUM * 1.42 + 8, lambda p, y, t=pt: p.para(PDF_L, y + 2, t, FS_SUM, PDF_CW, True), keep_next=True)
     if m.get("intro"):
         it = str(m["intro"])
         # 2.294.0 (#3154): the same air between the intro and the table as before the totals (today lh + 8 + 4 - body = ~5.7 mm
@@ -1417,9 +1425,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # the position column as wide as its widest entry (a timesheet's dates); was a fixed width the text ran over
     p3q_rows = [x for x in list(m.get("lines") or []) + [y for pt in (m.get("parts") or []) if isinstance(pt, dict) for y in (pt.get("lines") or [])]
                 if isinstance(x, dict) and (x.get("kind") or "item") in ("item", "producing", "surcharge", "raw", "discount")]
-    p3q_w = [pdf_text_width(" ".join(x for x in qty_two(x) if x).strip(), 8.8) for x in p3q_rows]
+    p3q_w = [pdf_text_width(" ".join(x for x in qty_two(x) if x).strip(), FS_BODY) for x in p3q_rows]
     c_qty = max(c_qty, min(P3Q_MAX, max(p3q_w or [0]) + 6))
-    c_pos = max(c_pos, max([pdf_text_width(str(x.get("pos") or ""), 8) + 6 for x in p3q_rows] or [0]))
+    c_pos = max(c_pos, max([pdf_text_width(str(x.get("pos") or ""), FS_SMALL) + 6 for x in p3q_rows] or [0]))
     # 2.114.5 (#2300): a quotation whose positions (parts too) all carry the same rate prints no VAT column
     p3v = {pdf_num(x.get("tax_pct"), "en") for x in list(m.get("lines") or []) + [y for pt in (m.get("parts") or []) if isinstance(pt, dict) for y in (pt.get("lines") or [])]
            if isinstance(x, dict) and (x.get("kind") or "item") in ("item", "producing", "raw", "discount") and x.get("tax_pct") not in (None, "")}
@@ -1438,14 +1446,14 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
 
     def draw_thead(p, y):
         yy = y + 4
-        p.text(x_pos + 3, yy, L["pos"].upper(), 7.4, True, C_INK2, spacing=0.6)
-        p.text(x_title + 3, yy, L["service"].upper(), 7.4, True, C_INK2, spacing=0.6)
-        p.text(x_qty, yy, L["qty"].upper(), 7.4, True, C_INK2, align="r", width=c_qty - 3, spacing=0.6)
+        p.text(x_pos + 3, yy, L["pos"].upper(), FS_FOOT, True, C_INK2, spacing=0.6)
+        p.text(x_title + 3, yy, L["service"].upper(), FS_FOOT, True, C_INK2, spacing=0.6)
+        p.text(x_qty, yy, L["qty"].upper(), FS_FOOT, True, C_INK2, align="r", width=c_qty - 3, spacing=0.6)
         if not np_:  # 2.120.0 D (#2089): no price columns on a delivery note
-            p.text(x_rate, yy, L["rate"].upper(), 7.4, True, C_INK2, align="r", width=c_rate - 3, spacing=0.6)
+            p.text(x_rate, yy, L["rate"].upper(), FS_FOOT, True, C_INK2, align="r", width=c_rate - 3, spacing=0.6)
             if c_vat:
-                p.text(x_vat, yy, L["vat"].upper(), 7.4, True, C_INK2, align="c", width=c_vat, spacing=0.6)
-            p.text(x_tot, yy, L["total"].upper(), 7.4, True, C_INK2, align="r", width=c_tot - 3, spacing=0.6)
+                p.text(x_vat, yy, L["vat"].upper(), FS_FOOT, True, C_INK2, align="c", width=c_vat, spacing=0.6)
+            p.text(x_tot, yy, L["total"].upper(), FS_FOOT, True, C_INK2, align="r", width=c_tot - 3, spacing=0.6)
         p.line(PDF_L, y + thead_h - 1, PDF_L + PDF_CW, y + thead_h - 1, 1.1, C_INK)
 
     lines = [x for x in (m.get("lines") or []) if isinstance(x, dict)]
@@ -1455,7 +1463,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     last_item_idx = None
     # 2.438.0 B (#3622): "PAGE n" behind a part's name, filled in after the layout. Headings of the positions: an overview on page 1
     # (ov_plan); printed parts (their own pages): the row of the part on the title page carries it, the title page is the overview
-    ov_tag_w = pdf_text_width(L["ov_page"].format(99).upper(), 7.4, False, 0.8) + 6
+    ov_tag_w = pdf_text_width(L["ov_page"].format(99).upper(), FS_FOOT, False, 0.8) + 6
     ov_tags, ov_at, ov_pg, line_at = [], {}, {}, {}  # (page, x, y, key) of the tags; key -> block; key -> (page, y); id(line) -> its first block
     ov_on = (m.get("kind") or "offer") in PDF_OV_KINDS and not np_
     pp_ids = {pt.get("id") for pt in m.get("parts") or [] if isinstance(pt, dict) and pt.get("id") is not None} if ov_on else set()
@@ -1470,8 +1478,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             line_at[id(ln)] = len(blocks)
             if k == "heading":
                 t = str(ln.get("title") or "")
-                hl = pb_wrap(t.upper(), 8, c_title + c_qty + c_rate + c_vat + c_tot - 6, True, 0.8)  # 2.296.0 E (#3170): a long heading wraps
-                block(22 + (len(hl) - 1) * 11, lambda p, y, hl=hl: [p.text(x_title + 3, y + 11 + j * 11, t_, 8, True, pdf_text_color(accent), spacing=0.8)
+                hl = pb_wrap(t.upper(), FS_SMALL, c_title + c_qty + c_rate + c_vat + c_tot - 6, True, 0.8)  # 2.296.0 E (#3170): a long heading wraps
+                block(22 + (len(hl) - 1) * 11, lambda p, y, hl=hl: [p.text(x_title + 3, y + 11 + j * 11, t_, FS_SMALL, True, pdf_text_color(accent), spacing=0.8)
                                                                for j, t_ in enumerate(hl)], keep_next=True, table=True)  # 2.296.0 D (#3172): readable text colour
                 have_table = True
             elif k == "text":
@@ -1488,7 +1496,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 detail = str(ln.get("detail") or "") if k != "producing" else ""  # 2.114.4 A (#2276): the formula only in the app
                 qty_s = " ".join(x for x in qty_two(ln) if x).strip()
                 # 2.296.0 E (#3170): too wide for the column: number and unit on two lines (each wrapped to the column)
-                q_lines = [qty_s] if pdf_text_width(qty_s, 8.8) <= c_qty - 6 else [w for x in qty_two(ln) if x for w in pdf_wrap(x, 8.8, c_qty - 6)]
+                q_lines = [qty_s] if pdf_text_width(qty_s, FS_BODY) <= c_qty - 6 else [w for x in qty_two(ln) if x for w in pdf_wrap(x, FS_BODY, c_qty - 6)]
                 rate_s = str(ln.get("rate_text") or "") if "rate_text" in ln else (pdf_money(ln["rate"], lang, cur, fmt, pdf_rate_places(ln["rate"])) if ln.get("rate") not in (None, "") else "")  # 2.354.0 A (#2831)
                 vat_s = (pdf_num(ln["tax_pct"], lang, fmt) + " %") if ln.get("tax_pct") not in (None, "") and c_vat else ""
                 tot_s = str(ln.get("total_text") or "") if ln.get("total_text") else money(ln.get("total") or 0)
@@ -1497,39 +1505,39 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 pos_s = str(ln.get("pos") or "") if k in ("item", "producing", "surcharge") else ""  # 2.114.4 A (#2276): producing numbered too; surcharges like it
                 tag = ln["part_id"] if ln.get("part_id") in pp_ids and k == "item" else None  # 2.438.0 B (#3622)
                 t_lines = pdf_wrap(t, body, c_title - 6 - (ov_tag_w if tag is not None else 0))
-                d_lines = pdf_wrap(detail, 8.4, c_title + c_qty + c_rate + c_vat + c_tot - 6) if detail else []
-                h = 8 + max(len(t_lines), len(q_lines)) * lh + (len(d_lines) * 8.4 * 1.42 + 2 if d_lines else 0)
+                d_lines = pdf_wrap(detail, FS_SMALL, c_title + c_qty + c_rate + c_vat + c_tot - 6) if detail else []
+                h = 8 + max(len(t_lines), len(q_lines)) * lh + (len(d_lines) * FS_SMALL * 1.42 + 2 if d_lines else 0)
 
                 def draw_row(p, y, t_lines=t_lines, d_lines=d_lines, pos_s=pos_s, q_lines=q_lines, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s, h=h, tag=tag):
                     yy = y + 4
-                    p.text(x_pos + 3, yy + 1, pos_s, 8, False, C_INK2)
+                    p.text(x_pos + 3, yy + 1, pos_s, FS_SMALL, False, C_INK2)
                     for j, s in enumerate(t_lines):
                         p.text(x_title + 3, yy + j * lh, s, body)
                     if tag is not None and t_lines:
                         ov_tag(p, x_title + 3 + pdf_text_width(t_lines[-1], body) + 6, yy + (len(t_lines) - 1) * lh, tag)
                     for j, s in enumerate(q_lines):
-                        p.text(x_qty, yy + j * lh, s, 8.8, align="r", width=c_qty - 3)
-                    p.text(x_rate, yy, rate_s, 8.8, align="r", width=c_rate - 3)
-                    p.text(x_vat, yy + 1, vat_s, 8, False, C_INK2, align="c", width=c_vat)
-                    p.text(x_tot, yy, tot_s, 8.8, align="r", width=c_tot - 3)
+                        p.text(x_qty, yy + j * lh, s, FS_BODY, align="r", width=c_qty - 3)
+                    p.text(x_rate, yy, rate_s, FS_BODY, align="r", width=c_rate - 3)
+                    p.text(x_vat, yy + 1, vat_s, FS_SMALL, False, C_INK2, align="c", width=c_vat)
+                    p.text(x_tot, yy, tot_s, FS_BODY, align="r", width=c_tot - 3)
                     dy = yy + max(len(t_lines), len(q_lines)) * lh
                     for s in d_lines:
-                        p.text(x_title + 3, dy, s, 8.4, False, C_INK2)
-                        dy += 8.4 * 1.42
+                        p.text(x_title + 3, dy, s, FS_SMALL, False, C_INK2)
+                        dy += FS_SMALL * 1.42
                     p.line(PDF_L, y + h - 0.5, PDF_L + PDF_CW, y + h - 0.5, 0.5, C_RULE2)
                 if h > p3s_cap:  # 2.296.0 E (#3166): a row higher than a page: its title and detail lines one by one (the amounts on the first)
-                    rr = [(s_, body, C_INK) for s_ in t_lines] + [("", body, C_INK)] * (len(q_lines) - len(t_lines)) + [(s_, 8.4, C_INK2) for s_ in d_lines]
-                    rs = [lh] * max(len(t_lines), len(q_lines)) + [8.4 * 1.42] * len(d_lines)
+                    rr = [(s_, body, C_INK) for s_ in t_lines] + [("", body, C_INK)] * (len(q_lines) - len(t_lines)) + [(s_, FS_SMALL, C_INK2) for s_ in d_lines]
+                    rs = [lh] * max(len(t_lines), len(q_lines)) + [FS_SMALL * 1.42] * len(d_lines)
                     rb = 4 + (2 if d_lines else 0)
 
                     def draw_row(p, y, r, q, n=len(rr), rs=rs, rb=rb, pos_s=pos_s, q_lines=q_lines, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s):
                         if q == 0:
-                            p.text(x_pos + 3, y + 1, pos_s, 8, False, C_INK2)
+                            p.text(x_pos + 3, y + 1, pos_s, FS_SMALL, False, C_INK2)
                             for j, s_ in enumerate(q_lines):
-                                p.text(x_qty, y + j * lh, s_, 8.8, align="r", width=c_qty - 3)
-                            p.text(x_rate, y, rate_s, 8.8, align="r", width=c_rate - 3)
-                            p.text(x_vat, y + 1, vat_s, 8, False, C_INK2, align="c", width=c_vat)
-                            p.text(x_tot, y, tot_s, 8.8, align="r", width=c_tot - 3)
+                                p.text(x_qty, y + j * lh, s_, FS_BODY, align="r", width=c_qty - 3)
+                            p.text(x_rate, y, rate_s, FS_BODY, align="r", width=c_rate - 3)
+                            p.text(x_vat, y + 1, vat_s, FS_SMALL, False, C_INK2, align="c", width=c_vat)
+                            p.text(x_tot, y, tot_s, FS_BODY, align="r", width=c_tot - 3)
                         p.text(x_title + 3, y, r[0], r[1], False, r[2])
                         if q == n - 1:
                             p.line(PDF_L, y + rs[q] + rb - 0.5, PDF_L + PDF_CW, y + rs[q] + rb - 0.5, 0.5, C_RULE2)
@@ -1594,7 +1602,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
 
         def draw_rem_head(p, y):
             for j, (x, lab) in enumerate(zip(xs, rcols)):
-                p.text(x + 3, y + 4, lab.upper(), 7.4, True, C_INK2, align="l" if j == 0 else "r", width=(c_r1 if j == 0 else c_r4) - 6, spacing=0.6)
+                p.text(x + 3, y + 4, lab.upper(), FS_FOOT, True, C_INK2, align="l" if j == 0 else "r", width=(c_r1 if j == 0 else c_r4) - 6, spacing=0.6)
             p.line(PDF_L, y + 19, PDF_L + PDF_CW, y + 19, 1.1, C_INK)
         # 2.296.0 D (#3174): the head of the open invoices is the table head of the page layout (it comes back on every following
         # page like the position table's); only when no position table is drawn (a reminder has none)
@@ -1619,7 +1627,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         thead_h = 0
 
     # 2.438.0 B (#3622): printed parts: the hint below their rows on the title page
-    ov_hint = pdf_wrap(L["ov_hint"].format(99), 8.6, PDF_CW)
+    ov_hint = pdf_wrap(L["ov_hint"].format(99), FS_SMALL, PDF_CW)
     ov_hint_at = []
 
     def draw_ov_hint(p, y):
@@ -1675,12 +1683,12 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     note = "\n".join(notes)
     tot_w = 230 if raw_opt or m.get("abs_prepaid") else 190  # 2.114.5 (#2300): room for the option's name; 2.408.0 (#3520): the progress invoices
     left_w = PDF_CW - tot_w - 20
-    note_lines = pdf_wrap(note, 8.4, left_w) if note else []
+    note_lines = pdf_wrap(note, FS_SMALL, left_w) if note else []
     # 2.114.5 (#2300): a long label (the option's name) wraps beside its amount, the option's detail small below it
-    p3w = {lab: (pdf_wrap(lab, 9, tot_w - pdf_text_width(val, 8.8) - 10), pdf_wrap(p3o[lab], 7.8, tot_w - 10) if lab in p3o else [])
+    p3w = {lab: (pdf_wrap(lab, FS_BODY, tot_w - pdf_text_width(val, FS_BODY) - 10), pdf_wrap(p3o[lab], FS_SMALL, tot_w - 10) if lab in p3o else [])
            for lab, val, g in rows if g is not True}
-    tot_h = 10 + sum(pdf_fs(10.4) * 1.5 + 5 + 1 if g is True else len(p3w[lab][0]) * pdf_fs(9) * 1.5 + len(p3w[lab][1]) * pdf_fs(7.8) * 1.4 for lab, _, g in rows)
-    sum_h = max(tot_h, len(note_lines) * pdf_fs(8.4) * 1.42 + 10)
+    tot_h = 10 + sum(pdf_fs(FS_SUM) * 1.5 + 5 + 1 if g is True else len(p3w[lab][0]) * pdf_fs(FS_BODY) * 1.5 + len(p3w[lab][1]) * pdf_fs(FS_SMALL) * 1.42 for lab, _, g in rows)
+    sum_h = max(tot_h, len(note_lines) * pdf_fs(FS_SMALL) * 1.42 + 10)
 
     def draw_sum(p, y):
         yy = y + 8
@@ -1688,21 +1696,21 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             if grand is True:
                 p.line(PDF_L + PDF_CW - tot_w, yy, PDF_L + PDF_CW, yy, 1.1, C_INK)
                 yy += 5
-                p.text(PDF_L + PDF_CW - tot_w, yy, lab, 10.4, True)
-                p.text(PDF_L + PDF_CW - tot_w, yy, val, 10.4, True, align="r", width=tot_w)
-                yy += pdf_fs(10.4) * 1.5
+                p.text(PDF_L + PDF_CW - tot_w, yy, lab, FS_SUM, True)
+                p.text(PDF_L + PDF_CW - tot_w, yy, val, FS_SUM, True, align="r", width=tot_w)
+                yy += pdf_fs(FS_SUM) * 1.5
             else:
-                p.text(PDF_L + PDF_CW - tot_w, yy, val, 8.8, bool(grand), align="r", width=tot_w)
+                p.text(PDF_L + PDF_CW - tot_w, yy, val, FS_BODY, bool(grand), align="r", width=tot_w)
                 for s_ in p3w[lab][0]:
-                    p.text(PDF_L + PDF_CW - tot_w, yy, s_, 9, bool(grand))
-                    yy += pdf_fs(9) * 1.5
+                    p.text(PDF_L + PDF_CW - tot_w, yy, s_, FS_BODY, bool(grand))
+                    yy += pdf_fs(FS_BODY) * 1.5
                 for s_ in p3w[lab][1]:
-                    p.text(PDF_L + PDF_CW - tot_w, yy - 2, s_, 7.8, False, C_INK2)
-                    yy += pdf_fs(7.8) * 1.4
+                    p.text(PDF_L + PDF_CW - tot_w, yy - 2, s_, FS_SMALL, False, C_INK2)
+                    yy += pdf_fs(FS_SMALL) * 1.42
         ny = y + 8
         for s in note_lines:
-            p.text(PDF_L, ny, s, 8.4, False, C_INK2)
-            ny += pdf_fs(8.4) * 1.42
+            p.text(PDF_L, ny, s, FS_SMALL, False, C_INK2)
+            ny += pdf_fs(FS_SMALL) * 1.42
     if not (np_ and not (isinstance(tot.get("rows"), list) and tot["rows"])):  # 2.120.0 D (#2089): a delivery note has no totals
         # 2.294.0 (#3154): air between table and totals (wish ~11 mm, at least ~4 mm visible; 8 pt are in draw_sum) and a little below
         sum_air = (PDF_SUM_GAP - 8, PDF_SUM_AFTER, PDF_SUM_GAP_MIN - 8) if last_item_idx is not None else None
@@ -1722,8 +1730,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         if gcq:  # imported only then: this module also runs on its own (no package; tests/office_einvoice_test.py)
             from .girocode import GCQ_SIZE, gcq_block_h, gcq_draw
         pt_lines = pdf_wrap(str(pay.get("text") or ""), body, PDF_CW) if pay.get("text") else []
-        pb_lines = pdf_wrap(bank, 8.4, PDF_CW - GCQ_SIZE - 14 if gcq else PDF_CW) if bank else []
-        pb_lh = pdf_fs(8.4) * 1.42
+        pb_lines = pdf_wrap(bank, FS_SMALL, PDF_CW - GCQ_SIZE - 14 if gcq else PDF_CW) if bank else []
+        pb_lh = pdf_fs(FS_SMALL) * 1.42
         if pt_lines:
             pay_h = 6 + len(pt_lines) * lh
 
@@ -1743,7 +1751,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     gcq_draw(p, PDF_L + PDF_CW - GCQ_SIZE, y + 10, gcq, lang, C_INK, C_INK2)
                 yy = y + 10
                 for t_ in pb_lines:
-                    p.text(PDF_L, yy, t_, 8.4, False, C_INK2)
+                    p.text(PDF_L, yy, t_, FS_SMALL, False, C_INK2)
                     yy += pb_lh
             pay_end.append((10 + max(len(pb_lines) * pb_lh + 2, gcq_block_h() if gcq else 0), draw_bank))
 
@@ -1754,17 +1762,17 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # 2.122.4 B (#2261): exceptions / exclusive are already in rights.rows (docs.py print model), not appended again
     if r_rows or rights.get("note"):
         lab_w = 112
-        r_lines = [(a, pdf_wrap(b, 10, PDF_CW - lab_w - 12)) for a, b in r_rows]  # 2.138.2 B (#2388): rows 10 pt, label = value size
-        rn_lines = pdf_wrap(str(rights.get("note") or ""), 8.5, PDF_CW) if rights.get("note") else []  # 2.114.1 C (#2258): small note
+        r_lines = [(a, pdf_wrap(b, FS_BODY, PDF_CW - lab_w - 12)) for a, b in r_rows]  # 2.138.2 B (#2388): rows 10 pt, label = value size
+        rn_lines = pdf_wrap(str(rights.get("note") or ""), FS_SMALL, PDF_CW) if rights.get("note") else []  # 2.114.1 C (#2258): small note
 
         def draw_rights():  # 2.114.1 C (#2258): the title is the appendix heading, rows with more air
             # 2.296.0 E (#3166): every row line by line (was one block for all rows: ran over the footer and the page edge); the
             # appendix heading keeps only the first row's first lines
             for j, (a, b) in enumerate(r_lines):
-                para_blocks(b, 10 * 1.6, 14 if j == 0 else 0, 10, lambda p, y, s_, q, a=a: (p.text(PDF_L, y, a, 10, False, C_INK2) if q == 0 else None,
-                                                                                           p.text(PDF_L + lab_w, y, s_, 10)))
+                para_blocks(b, 10 * 1.6, 14 if j == 0 else 0, 10, lambda p, y, s_, q, a=a: (p.text(PDF_L, y, a, FS_BODY, False, C_INK2) if q == 0 else None,
+                                                                                           p.text(PDF_L + lab_w, y, s_, FS_BODY)))
             if rn_lines:
-                para_blocks(rn_lines, 8.5 * 1.42, 12 + (0 if r_lines else 14), 2, lambda p, y, s_, q: p.text(PDF_L, y, s_, 8.5, False, C_INK2))
+                para_blocks(rn_lines, FS_SMALL * 1.42, 12 + (0 if r_lines else 14), 2, lambda p, y, s_, q: p.text(PDF_L, y, s_, FS_SMALL, False, C_INK2))
         bfc_rights.append(draw_rights)
 
     acc = m.get("accepted") if isinstance(m.get("accepted"), dict) else None
@@ -1786,11 +1794,11 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             def draw_ref(p, y, ref=ref):
                 for q, t in enumerate(ref):
                     if "{0}" in t:
-                        p3a_ref.append((p, len(p.ops), y + 8 + q * 8.6 * 1.45, t))  # filled in at this place of the stream
+                        p3a_ref.append((p, len(p.ops), y + 8 + q * FS_SMALL * 1.42, t))  # filled in at this place of the stream
                     else:
-                        p.text(PDF_L, y + 8 + q * 8.6 * 1.45, t, 8.6, False, C_INK2)
+                        p.text(PDF_L, y + 8 + q * FS_SMALL * 1.42, t, FS_SMALL, False, C_INK2)
             rh_ref.append(len(blocks))  # 2.357.0 C (#3182): left out when the appendix stays on the page
-            block(len(ref) * 8.6 * 1.45 + 8, draw_ref, keep_next=True, tail=True)
+            block(len(ref) * FS_SMALL * 1.42 + 8, draw_ref, keep_next=True, tail=True)
 
 
     # 2.406.0 (#3491): the closing of a quotation in look A, two columns; other documents keep the old closing
@@ -1814,12 +1822,12 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         q3_rx = PDF_L + PDF_CW * 0.64
         q3_rw = PDF_CW - (q3_rx - PDF_L)
         q3_cl = pdf_wrap(q3_ct, body, q3_lw) if q3_ct else []
-        q3_slh = pdf_fs(8.6) * 1.45
+        q3_slh = pdf_fs(FS_SMALL) * 1.42
         q3_sgl = pdf_wrap(q3_sg, body, q3_rw) if q3_sg else []
         q3_nl = [(t, i == 0) for i, n in enumerate(q3_names) for t in pdf_wrap(n, body, q3_rw, i == 0)]
 
         def q3_small(refs):  # the small grey lines, each wrapped ("{0}" lines are short and filled in after the layout)
-            return [ln for t in refs + ([q3_tl] if q3_tl else []) for ln in ([t] if "{0}" in t else pdf_wrap(t, 8.6, q3_lw))]
+            return [ln for t in refs + ([q3_tl] if q3_tl else []) for ln in ([t] if "{0}" in t else pdf_wrap(t, FS_SMALL, q3_lw))]
 
         def q3_block(refs):
             sm = q3_small(refs)
@@ -1834,7 +1842,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     yy += lh
                 yy += 4 if q3_cl else 0
                 for t in sm:  # small and grey, one under the other
-                    q3_line(p, PDF_L, yy, t, 8.6)
+                    q3_line(p, PDF_L, yy, t, FS_SMALL)
                     yy += q3_slh
                 yy = y + 12
                 for t in q3_sgl:
@@ -1901,14 +1909,14 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     def draw_accept(p, y, gap=0):
         # 2.138.2 B (#2388): after the rights appendix (gap > 0) a section of its own: air above, heading and captions one step larger
         p3a_at.append(p)
-        p.text(PDF_L, y + gap + 16, str(m.get("receipt_label") or L["accept"]).upper(), 10 if gap else 7.4, True, C_INK if gap else C_INK2, spacing=0.8)  # 2.120.0 D (#2089): + receipt label
+        p.text(PDF_L, y + gap + 16, str(m.get("receipt_label") or L["accept"]).upper(), FS_BODY if gap else FS_FOOT, True, C_INK if gap else C_INK2, spacing=0.8)  # 2.120.0 D (#2089): + receipt label
         if acc_txt:  # 2.357.0 C (#3182): what the signature means, above the lines of a quotation
-            p.text(PDF_L, y + gap + 16 + (16 if gap else 12), acc_txt, 8.6, False, C_INK)
+            p.text(PDF_L, y + gap + 16 + (16 if gap else 12), acc_txt, FS_SMALL, False, C_INK)
         yl = y + gap + 16 + 40 + acc_dy + (6 if gap else 0)
         p.line(PDF_L, yl, PDF_L + half, yl, 0.6, C_INK)
-        p.text(PDF_L, yl + 3, L["place_date"], 8.6 if gap else 7.6, False, C_INK2)
+        p.text(PDF_L, yl + 3, L["place_date"], FS_SMALL if gap else FS_SMALL, False, C_INK2)
         p.line(PDF_L + half + 28, yl, PDF_L + PDF_CW, yl, 0.6, C_INK)
-        p.text(PDF_L + half + 28, yl + 3, L["sign"], 8.6 if gap else 7.6, False, C_INK2)
+        p.text(PDF_L + half + 28, yl + 3, L["sign"], FS_SMALL if gap else FS_SMALL, False, C_INK2)
     if (p3a_on and not p3a_end) or (m.get("kind") == "delivery" and np_):  # 2.120.0 D (#2089): the receipt box of a delivery note
         block(16 + 40 + acc_dy + 16, draw_accept, tail=True, sq=8)
     bfc_see_ref()  # no signature, no order confirmation: the line ends the main pages
@@ -1924,22 +1932,22 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
 
         # 2.138.0 A (#2240): number + project as a small line above the title (was right beside it, a long title ran over it);
         # the title wraps over the full width, the accent line under its last line
-        pt_lines = pb_wrap(ptitle, 14, PDF_CW, True, 0.8)  # 2.144.9 (#2575): as typed, the same spelling as on the title page
-        ps_lines = pdf_wrap(psub, 8.6, PDF_CW) if psub else []
+        pt_lines = pb_wrap(ptitle, FS_TITLE, PDF_CW, True, 0.8)  # 2.144.9 (#2575): as typed, the same spelling as on the title page
+        ps_lines = pdf_wrap(psub, FS_SMALL, PDF_CW) if psub else []
         pt_top = 4 + 12 * len(ps_lines) if ps_lines else 6
         pt_line = pt_top + (len(pt_lines) - 1) * 17.5 + 20
 
         def draw_part_head(p, y, pt_lines=pt_lines, ps_lines=ps_lines, pt_top=pt_top, pt_line=pt_line):
             for j, s in enumerate(ps_lines):
-                p.text(PDF_L, y + 2 + j * 12, s, 8.6, False, C_INK2)
+                p.text(PDF_L, y + 2 + j * 12, s, FS_SMALL, False, C_INK2)
             for j, s in enumerate(pt_lines):
-                p.text(PDF_L, y + pt_top + j * 17.5, s, 14, True, C_INK, spacing=0.8)
+                p.text(PDF_L, y + pt_top + j * 17.5, s, FS_TITLE, True, C_INK, spacing=0.8)
             p.line(PDF_L, y + pt_line, PDF_L + 14 * MM, y + pt_line, 1.6, accent)
         block(pt_line + 8, draw_part_head, keep_next=True, brk=True)
         ov_at[part.get("id")] = len(blocks) - 1  # 2.438.0 B (#3622)
         for hr in part.get("head") or []:
             if isinstance(hr, (list, tuple)) and len(hr) >= 2:
-                block(lh, lambda p, y, a=str(hr[0]), b=str(hr[1]): (p.text(PDF_L, y, a, 9, False, C_INK2), p.text(PDF_L + 112, y, b, 9)), keep_next=True)
+                block(lh, lambda p, y, a=str(hr[0]), b=str(hr[1]): (p.text(PDF_L, y, a, FS_BODY, False, C_INK2), p.text(PDF_L + 112, y, b, FS_BODY)), keep_next=True)
         table_rows([x for x in (part.get("lines") or []) if isinstance(x, dict)])
         prow = [(str(r[0]), str(r[1])) for r in ((part.get("totals") or {}).get("rows") or []) if isinstance(r, (list, tuple)) and len(r) >= 2]
         # 2.144.9 (#2575): the part's optional raw data as a row of its own before "net total with option", as on the title page
@@ -1957,10 +1965,10 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     if j == 0:
                         p.line(PDF_L + PDF_CW - pw_, yy, PDF_L + PDF_CW, yy, 1.1, C_INK)
                         yy += 5
-                    p.text(PDF_L + PDF_CW - pw_, yy, lab, 10.4 if j == 0 else 9, j == 0)
-                    p.text(PDF_L + PDF_CW - pw_, yy, val, 10.4 if j == 0 else 8.8, j == 0, align="r", width=pw_)
-                    yy += (10.4 if j == 0 else 9) * 1.5
-            block(14 + sum((10.4 if j == 0 else 9) * 1.5 for j in range(len(prow))) + 5, draw_part_sum, keep_prev=True)
+                    p.text(PDF_L + PDF_CW - pw_, yy, lab, FS_SUM if j == 0 else FS_BODY, j == 0)
+                    p.text(PDF_L + PDF_CW - pw_, yy, val, FS_SUM if j == 0 else FS_BODY, j == 0, align="r", width=pw_)
+                    yy += (FS_SUM if j == 0 else FS_BODY) * 1.5
+            block(14 + sum((FS_SUM if j == 0 else FS_BODY) * 1.5 for j in range(len(prow))) + 5, draw_part_sum, keep_prev=True)
 
     # -- 2.114.1 C (#2258): the rights block as an appendix on its own last page, after the parts; 2.357.0 C (#3182): on the
     # last page itself when it fits there completely (with the order confirmation behind it), see rh_at below
@@ -1970,15 +1978,15 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         rsub = " · ".join(x for x in (f"{num_l} {number}" if number else "", " ".join(str(m.get("project_title") or "").split())) if x)  # 2.431.0 B (#3594): the subject on one line
 
         # 2.296.0 E (#3170): a long number / project line wraps right of the heading, below the accent line when no room is left
-        rs_w = PDF_CW - pdf_text_width(rtitle.upper(), 14, True, 0.8) - 6 * MM
-        rs_low = bool(rsub) and rs_w < 100 and pdf_text_width(rsub, 8) > rs_w
-        rs_lines = pdf_wrap(rsub, 8, PDF_CW if rs_low else max(rs_w, 100)) if rsub else []
+        rs_w = PDF_CW - pdf_text_width(rtitle.upper(), FS_TITLE, True, 0.8) - 6 * MM
+        rs_low = bool(rsub) and rs_w < 100 and pdf_text_width(rsub, FS_SMALL) > rs_w
+        rs_lines = pdf_wrap(rsub, FS_SMALL, PDF_CW if rs_low else max(rs_w, 100)) if rsub else []
 
         def bfc_draw_rights_head(p, y, rtitle=rtitle, rs_lines=rs_lines, rs_low=rs_low):
-            p.text(PDF_L, y + 6, rtitle.upper(), 14, True, C_INK, spacing=0.8)
+            p.text(PDF_L, y + 6, rtitle.upper(), FS_TITLE, True, C_INK, spacing=0.8)
             p.line(PDF_L, y + 6 + 20, PDF_L + 14 * MM, y + 6 + 20, 1.6, accent)
             for j, s_ in enumerate(rs_lines):  # 2.138.2 B (#2388): not larger than the body text
-                p.text(PDF_L + PDF_CW, y + (34 if rs_low else 8) + j * 10, s_, 8, False, C_INK2, align="r")
+                p.text(PDF_L + PDF_CW, y + (34 if rs_low else 8) + j * 10, s_, FS_SMALL, False, C_INK2, align="r")
         rh_at.append(len(blocks))
         block(34 + 12 + max(0, len(rs_lines) * 10 + 6 if rs_low else (len(rs_lines) - 2) * 10), bfc_draw_rights_head, keep_next=True, brk=True)
         bfc_rights[0]()
@@ -2130,9 +2138,9 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         name_w = PDF_CW - num_w - amt_w - ov_tag_w
 
         def draw_ov_head(p, y):
-            p.text(PDF_L, y + 6, L["ov_title"].upper(), 8, True, pdf_text_color(accent), spacing=0.8)
-            p.text(PDF_L, y + 24, L["ov_part"].upper(), 7.4, True, C_INK2, spacing=0.6)
-            p.text(PDF_L + PDF_CW, y + 24, L["net_suffix"].upper(), 7.4, True, C_INK2, align="r", spacing=0.6)
+            p.text(PDF_L, y + 6, L["ov_title"].upper(), FS_SMALL, True, pdf_text_color(accent), spacing=0.8)
+            p.text(PDF_L, y + 24, L["ov_part"].upper(), FS_FOOT, True, C_INK2, spacing=0.6)
+            p.text(PDF_L + PDF_CW, y + 24, L["net_suffix"].upper(), FS_FOOT, True, C_INK2, align="r", spacing=0.6)
             p.line(PDF_L, y + 37, PDF_L + PDF_CW, y + 37, 1.1, C_INK)
         slots = [(38, draw_ov_head, True)]
         for q, (nr, name, amt, key) in enumerate(ov_rows):
@@ -2143,7 +2151,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                 p.text(PDF_L, y + 4, nr, body, False, C_INK2)
                 for j_, s_ in enumerate(nl):
                     p.text(PDF_L + num_w, y + 4 + j_ * lh, s_, body)
-                p.text(PDF_L + PDF_CW, y + 4, money(amt), 8.8, align="r")
+                p.text(PDF_L + PDF_CW, y + 4, money(amt), FS_SMALL, align="r")
                 ov_tag(p, PDF_L + num_w + pdf_text_width(nl[-1], body) + 6, y + 4 + (len(nl) - 1) * lh, key)
                 p.line(PDF_L, y + hr - 0.5, PDF_L + PDF_CW, y + hr - 0.5, 0.5, C_RULE2)
             slots.append((hr, draw_ov_row, q == len(ov_rows) - 1))
@@ -2213,15 +2221,15 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
         to = ov_pg.get(key)
         if to:
             t_ = L["ov_page"].format(ov_page_no(to[0])).upper()
-            w_ = pdf_text_width(t_, 7.4, False, 0.8)
-            p.text(x, y, t_, 7.4, False, C_INK2, spacing=0.8)
+            w_ = pdf_text_width(t_, FS_FOOT, False, 0.8)
+            p.text(x, y, t_, FS_FOOT, False, C_INK2, spacing=0.8)
             p.link(x - 3, y - 3, w_ + 6, pdf_fs(7.4) + 6, to[0], to[1])
     for p, y in ov_hint_at:
         if ov_pg.get("start"):
-            p.para(PDF_L, y, L["ov_hint"].format(ov_page_no(ov_pg["start"][0])), 8.6, PDF_CW, color=C_INK2, lh=pdf_fs(8.6) * 1.45)
+            p.para(PDF_L, y, L["ov_hint"].format(ov_page_no(ov_pg["start"][0])), FS_SMALL, PDF_CW, color=C_INK2, lh=pdf_fs(FS_SMALL) * 1.45)
     for p, at, yy, t, *ex in reversed(p3a_ref):  # 2.114.5 (#2300): the page the order confirmation landed on
         tmp = _Page()
-        rx, rs, ra, rw = ex or (PDF_L, 8.6, "l", None)  # 2.406.0 (#3491): x, size, align, width of the line
+        rx, rs, ra, rw = ex or (PDF_L, FS_SMALL, "l", None)  # 2.406.0 (#3491): x, size, align, width of the line
         tmp.text(rx, yy, t.format(next((n for n, q in enumerate(pages, 1) if p3a_at and q is p3a_at[0]), total)), rs, False, C_INK2, align=ra, width=rw)
         p.ops[at:at] = tmp.ops
     # 2.114.4 A (#2273): no "Page 1 of n" next to the title any more, the footer has it

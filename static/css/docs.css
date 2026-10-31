@@ -4,9 +4,9 @@
 .dc-up,.dc-acts2 [data-dc="scan"]{min-height:2.75rem}
 .dc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.75rem 0 .25rem}
 .dc-acts2{display:inline-flex;align-items:center;gap:.25rem;margin-left:auto}
-.dc-bar #dc-q{flex:1 1 14rem;min-height:2.75rem}
-.dc-seg button{min-height:2.75rem}
-.dc-sortb{min-height:2.75rem}  /* 2.428.0 (#3579) */  /* 2.138.4 A (#2362): 44 px */
+.dc-bar .ctsearch{flex:1 1 14rem}  /* 2.413.0 B (#3496): the shared search field build */
+.dc-seg button{min-height:2.75rem}  /* 2.138.4 A (#2362): 44 px */
+.dc-sortb{min-height:2.75rem}  /* 2.428.0 (#3579) */
 .dc-count{display:inline-block;min-width:1.25rem;padding:0 .375rem;border-radius:99rem;background:var(--accent);color:var(--accent-ink);font-size:var(--fs-xs);text-align:center}
 .dc-filters{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.25rem 0 .5rem}
 .dc-filters select,.dc-filters input{min-height:2.75rem}
