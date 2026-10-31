@@ -93,6 +93,12 @@ def tr(key, *a, lg=None):
     return s.format(*a) if a else s
 
 
+def tr_stored(v, lg=None):
+    """2.448.0 (#3765): a text kept for later, translated for its reader: [key, *values] (see tr), or a str as it is (an old
+    row, a text the person or another system wrote)."""
+    return tr(*v, lg=lg) if isinstance(v, (list, tuple)) and v else (v or "")
+
+
 def plural_one(n, lg):
     """The "one" form for n? 1 everywhere; 2.11.0: French also uses it for 0 (like the browser's Intl.PluralRules)."""
     return n == 1 or (n == 0 and str(lg or "").split("-")[0] == "fr")

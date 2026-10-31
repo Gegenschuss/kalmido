@@ -32,7 +32,7 @@ from ..core.config import app, ATT_DIR
 from ..core.db import body, connect, db, err, iso, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
-from ..core.i18n import lang
+from ..core.i18n import N_, lang, tr_stored
 from ..core.pg import system_ctx
 from ..core.serializers import unlink_files
 from ..accounts.session import me
@@ -113,6 +113,8 @@ def _view(uid, iid, st):
     for k in ("progress", "result", "error"):
         if st.get(k) is not None and k not in out:
             out[k] = st[k]
+    if "error" in out:
+        out["error"] = tr_stored(out["error"])
     return out
 
 
@@ -215,12 +217,12 @@ def wki_run(uid, iid):
         c.rollback()
         unlink_files(saved)
         msg = str(e) if isinstance(e, BadInput) else getattr(e, "msg", None)
-        _set(uid, iid, state="failed", error=msg if isinstance(msg, str) and msg else tr("The import failed."))
+        _set(uid, iid, state="failed", error=msg if isinstance(msg, str) and msg else [N_("The import failed.")])
     except Exception as e:  # noqa: BLE001
         c.rollback()
         unlink_files(saved)
         print(f"wiki import of user {uid} failed: {type(e).__name__}", flush=True)
-        _set(uid, iid, state="failed", error=tr("The import failed."))
+        _set(uid, iid, state="failed", error=[N_("The import failed.")])  # 2.448.0 (#3765): key, translated for who asks
     finally:
         c.close()
         for fn in ("upload.bin", "saved.json"):  # the ZIP is not kept after the run; the stored files are in rows or gone

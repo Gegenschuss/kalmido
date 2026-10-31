@@ -24,7 +24,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..core.access import Denied, list_role
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_log_detail
@@ -587,10 +587,11 @@ def _notify(c, aid, uid, did, oid, what):
     from ..agents.chat import chat_post
     from .docs import doc_public, doc_row
     d = doc_public(c, oid, doc_row(c, oid, did), False, items=False)
-    title = d.get("project_title") or tr("without title")
-    text = tr("{0} “{1}”: {2} net, {3} gross. A draft; you finalise and send it.", tr(what), title, d["net_text"], d["gross_text"])
-    ch = [{"id": "open", "label": tr("Open in the office"), "style": "primary", "href": f"#office/offers/{did}"},
-          {"id": "pdf", "label": tr("PDF preview"), "href": f"/api/office/docs/{did}/pdf?inline=1"}]
+    lg = lang(c, uid)  # 2.448.0 (#3765): the person reads the card, the agent's request made it
+    title = d.get("project_title") or tr("without title", lg=lg)
+    text = tr("{0} “{1}”: {2} net, {3} gross. A draft; you finalise and send it.", tr(what, lg=lg), title, d["net_text"], d["gross_text"], lg=lg)
+    ch = [{"id": "open", "label": tr("Open in the office", lg=lg), "style": "primary", "href": f"#office/offers/{did}"},
+          {"id": "pdf", "label": tr("PDF preview", lg=lg), "href": f"/api/office/docs/{did}/pdf?inline=1"}]
     r = chat_post(c, aid, uid, "agent", {"body": text, "choices": ch}, None)
     return r["id"]
 

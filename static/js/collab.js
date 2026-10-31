@@ -621,7 +621,7 @@ function actText0(a, U) {
     case 'wont': return tr("{0} marked the task as won’t do", who);
     case 'reopen': return tr('{0} reopened the task', who);
     case 'skip': return tr('{0} skipped an occurrence, next one {1}', who, q(fmtDayAbs(d.next)));
-    case 'attach': return (d.n || 1) === 1 ? tr('{0} added the attachment {1}', who, q((d.names || [])[0] || '')) : trn('{1} added {0} attachment', '{1} added {0} attachments', d.n, who);
+    case 'attach': return (d.n || 1) === 1 ? tr('{0} added the attachment {1}', who, q(d.enc ? tr('Encrypted file') : (d.names || [])[0] || '')) : trn('{1} added {0} attachment', '{1} added {0} attachments', d.n, who);
     case 'attach_rm': return tr('{0} removed the attachment {1}', who, q(d.name || ''));
     case 'waiting': return d.until ? tr('{0} set the task to waiting on someone ({1}), follow up on {2}', who, q(d.note || '–'), q(dayLabel(d.until))) : tr('{0} set the task to waiting on someone ({1})', who, q(d.note || '–'));
     case 'waiting_rm': return tr('{0} ended the waiting on someone', who);

@@ -42,7 +42,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.errors import BadInput  # 2.273.0 A (#3030)
 from ..accounts.settings import clean_look_pref  # 2.273.0 A (#3030)
 from ..tasks.snippets import snip_clean  # 2.273.0 A (#3030)
-from ..core.i18n import lang, LANGS, N_, tr as _tr_base
+from ..core.i18n import lang, LANGS, N_, tr as _tr_base, tr_stored
 from ..core.access import Denied, ROLES, list_role, my_inbox, my_max_sort, WRITE_ROLES
 from ..accounts.session import me
 from ..lists.lists import LIST_COLOR_RE
@@ -1424,16 +1424,16 @@ def umz_run(uid, iid, opts):
         from ..integrations.importers import IMPORT_UNDO_HOURS
         result = {"created": run.stats, "people": shared, "import_id": iid_db,
                   "undo_until": iso(now_utc() + timedelta(hours=IMPORT_UNDO_HOURS)) if iid_db else None,
-                  "warnings": [{"text": tr(k[0], *k[1:]), "count": n} for k, n in list(run.warn.items())[:50]]}
+                  "warnings": [{"text": list(k), "count": n} for k, n in list(run.warn.items())[:50]]}  # 2.448.0 (#3765): key + values, umz_view translates
         if run.stopped == "quota":
-            result["stopped"] = tr("Your storage is full: the import stopped. What came over so far can be undone.")
+            result["stopped"] = [N_("Your storage is full: the import stopped. What came over so far can be undone.")]
         _set(uid, iid, state="stopped" if run.stopped else "done", result=result, progress=None)
         print(f"account import of user {uid}: {run.stats.get('tasks', 0)} tasks", flush=True)
     except UmzBad as e:
         c.rollback()
         from .orgimport import oi_drop_empty_pb
         oi_drop_empty_pb(c, run, uid)  # 2.137.1 review (#2399): also when the file turns out bad while writing
-        _set(uid, iid, state="invalid", error=tr(e.text, *e.args_))
+        _set(uid, iid, state="invalid", error=[e.text, *e.args_])
     except Exception as e:  # noqa: BLE001 -- the state says it failed; never content in the message
         try:
             c.rollback()
@@ -1447,7 +1447,7 @@ def umz_run(uid, iid, opts):
         from .orgimport import oi_drop_empty_pb
         oi_drop_empty_pb(c, run, uid)  # 2.137.1 (#2399): the personal office made for this run, if it stayed empty
         print(f"account import of user {uid} failed: {type(e).__name__}", flush=True)
-        _set(uid, iid, state="failed", error=tr("The import failed. Nothing was taken over. Please try again later or ask the server admin (server log)."))
+        _set(uid, iid, state="failed", error=[N_("The import failed. Nothing was taken over. Please try again later or ask the server admin (server log).")])
     finally:
         try:
             p = os.path.join(_dir(uid, iid), "upload.bin")
@@ -1480,14 +1480,14 @@ def umz_check(uid, iid, can_invite):
         c.rollback()
         _set(uid, iid, state="preview", preview=pv, export_id=pv["export_id"])
     except UmzBad as e:
-        _set(uid, iid, state="invalid", error=tr(e.text, *e.args_))
+        _set(uid, iid, state="invalid", error=[e.text, *e.args_])
         try:
             os.remove(os.path.join(_dir(uid, iid), "upload.bin"))
         except OSError:
             pass
     except Exception as e:  # noqa: BLE001
         print(f"account import check of user {uid} failed: {type(e).__name__}", flush=True)
-        _set(uid, iid, state="invalid", error=tr("The file could not be read."))
+        _set(uid, iid, state="invalid", error=[N_("The file could not be read.")])
     finally:
         c.close()
         with _UMI_LOCK:
@@ -1599,11 +1599,11 @@ def umz_unlock(uid, iid, okey, can_invite):
         _set(uid, iid, state="checking", size=w.size, key_error=False)
         umz_check(uid, iid, can_invite)  # the opened ZIP is checked like any other file (same thread)
     except UmzBad as e:
-        _set(uid, iid, state="invalid", error=tr(e.text, *e.args_))
+        _set(uid, iid, state="invalid", error=[e.text, *e.args_])
         return
     except Exception as e:  # noqa: BLE001
         print(f"account import unlock of user {uid} failed: {type(e).__name__}", flush=True)
-        _set(uid, iid, state="invalid", error=tr("The file could not be read."))
+        _set(uid, iid, state="invalid", error=[N_("The file could not be read.")])
         return
     finally:
         with _UMI_LOCK:
@@ -1752,6 +1752,13 @@ def _view(uid, iid, st):
     for k in ("preview", "error", "progress", "result"):
         if st.get(k) is not None and k not in out:
             out[k] = st[k]
+    if "error" in out:  # 2.448.0 (#3765): translated for who asks; a state written before keeps its text
+        out["error"] = tr_stored(out["error"])
+    if out.get("result"):
+        res = out["result"]
+        out["result"] = {**res, "warnings": [{**x, "text": tr_stored(x["text"])} for x in res.get("warnings") or []]}
+        if res.get("stopped"):
+            out["result"]["stopped"] = tr_stored(res["stopped"])
     return out
 
 

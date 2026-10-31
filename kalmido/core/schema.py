@@ -3982,6 +3982,9 @@ MIGRATIONS = [
     ("sheet_shares", "email_seal", "ALTER TABLE sheet_shares ADD COLUMN IF NOT EXISTS email_seal TEXT NOT NULL DEFAULT ''"),
     ("sheet_shares", "email_key", "ALTER TABLE sheet_shares ADD COLUMN IF NOT EXISTS email_key TEXT NOT NULL DEFAULT ''"),
     ("sheet_shares", "email_key", "ALTER TABLE sheet_shares ALTER COLUMN user_id DROP NOT NULL"),
+    # 2.448.0 (#3765): the language a voter saw when voting, for the mail about the chosen time ('' = not known: the mail
+    # follows the poll's owner). Older versions ignore it
+    ("sched_poll_votes", "lang", "ALTER TABLE sched_poll_votes ADD COLUMN IF NOT EXISTS lang TEXT NOT NULL DEFAULT ''"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

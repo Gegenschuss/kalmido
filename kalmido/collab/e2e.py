@@ -26,7 +26,7 @@ import re
 from flask import g, jsonify
 
 from ..core.config import app
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..core.pg import st_ids
 from ..accounts.session import me
@@ -338,7 +338,7 @@ def e2e_attachment_upload(tid):
         return err(e)
     aid = ids[0]  # the row save_attachments inserted (not "the newest row": a parallel upload may be newer)
     c.execute("UPDATE attachments SET enc=1, enc_by=?, mime='application/octet-stream' WHERE id=?", (uid, aid))
-    log_act(c, tid, "attach", {"names": [tr("Encrypted file")], "n": 1})
+    log_act(c, tid, "attach", {"names": [N_("Encrypted file")], "n": 1, "enc": 1})  # 2.448.0 (#3765): the key, the reader's app translates it
     bump(c)
     c.commit()
     return jsonify(one_task(c, tid))
