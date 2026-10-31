@@ -649,7 +649,7 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
                              (pid, fname.lower(), hashlib.sha256(data).hexdigest())).fetchone()
             fid = same["id"] if same else wka_store(c, pg, fname, mime, data, uid, saved)
         except BadInput as e:
-            if str(e) == tr("The archive is too large"):
+            if getattr(e, "stored", None) == (WKA_TOO_LARGE,):  # 2.454.0 (#3808): str(e) is in the first admin's language in the background run
                 raise
             skip(name, str(e))
             continue
