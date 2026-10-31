@@ -140,8 +140,9 @@ def _jdef(v):
     return str(v)
 
 
-# 2.455.0 (#3469): a query parameter that makes a feed's address a secret (a private feed); rss_url refuses user:password@ already
-OX_FEED_KEY_RE = re.compile(r"[?&;](?:[\w.-]*(?:token|key|secret|auth|pass|password|pwd|sig|signature|session)[\w.-]*)=", re.I)
+# 2.455.0 (#3469): what makes a feed's address a secret (a private feed): a query parameter or a path of the known forms; rss_url refuses user:password@ already
+OX_FEED_KEY_RE = re.compile(r"[?&;](?:[\w.-]*(?:token|key|secret|auth|pass|password|pwd|sig|signature|session|hash|code)[\w.-]*)="
+                            r"|/(?:private-|secret:)|/[0-9a-f]{32,}(?:[/?.]|$)", re.I)
 
 
 def _ox_dec_row(c, oid, table, row):

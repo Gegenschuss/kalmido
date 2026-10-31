@@ -90,18 +90,20 @@ async function wsSet(ws, o = {}) {
   const from = wsCur();
   if (WSV.ws === from) wsv_save(from, wsv_hashNow());  // 2.397.0 (#3404)
   S.settings.workspace = ws; LS.set('ws', ws);
-  closeSide?.();
+  // 2.455.0 (#3847): the phone's open drawer stays and shows the new workspace; route() (a kept view / go) must not close it either
+  const hold = !!$('#side.open') && typeof SBM !== 'undefined';
+  if (hold) SBM.keep = true; else closeSide?.();
   if (typeof pb_wsChanged === 'function') pb_wsChanged(true);  // 2.47.3 (#1360): the office follows once the server knows it
   p61b_wsRun(false);  // 2.66.1 (#1945)
   const to = wsCur(), kept = !o.keep && to !== 'all' ? (LS.get('wsView', {}) || {})[to] : null;
   WSV.ws = '';  // the page shown now belongs to the old workspace: route() must not keep it for the new one
-  if (kept) await wsv_restore(kept, to);  // 2.397.0 (#3404): the workspace as it was left
+  if (kept) { await wsv_restore(kept, to); if (hold) SBM.keep = false; }  // 2.397.0 (#3404): the workspace as it was left
   else {
     if (S.sel && !wsv_taskIn(S.sel, to)) wsv_close();
     // 2.49.0 (#1770): the open list does not stay when it is not part of the new workspace -> that workspace's inbox
     // 2.397.0 (#3404): the first visit without a kept view: the same page when the workspace has it, else the start
     const ol = S.route?.mod === 'tasks' && String(S.route.key || '').startsWith('l:') ? listById(+S.route.key.slice(2)) : null;
-    if (ol && !inWs(ol, to)) go(keyToHash(START_KEY)); else { render(); WSV.ws = to; WSV.hash = wsv_hashNow(); }
+    if (ol && !inWs(ol, to)) go(keyToHash(START_KEY)); else { if (hold) SBM.keep = false; render(); WSV.ws = to; WSV.hash = wsv_hashNow(); }  // no route follows: the next tap on an entry closes the drawer
   }
   try { await api('PATCH', '/api/settings', {workspace: ws}); } catch { /* api() said it */ }
   if (typeof AB2 !== 'undefined') { AB2.org = null; ab2_reload(); }  // 2.96.0 D (#1941): absences follow the switch (server reads it)

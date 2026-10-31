@@ -399,8 +399,8 @@ def _rule(c, run, src, d, ctx):
 
 def sprint_finish(c, run, rows):
     """2.455.0 (#3469): after the tasks: the close-out of an imported sprint names the new tasks (an old id would count a task of
-    this server); at most one running sprint per list, the app keeps that (a state it does not know: planned)."""
-    active = set()
+    this server); at most one running sprint per list, also with one already there, the app keeps that (a state it does not know:
+    planned)."""
     for r in rows:
         nid = run.m("sprints", r.get("id"))
         if not nid:
@@ -413,12 +413,17 @@ def sprint_finish(c, run, rows):
             rv.update({k: [n for n in (run.m("tasks", x) for x in rv.get(k) or [] if not isinstance(x, (list, dict))) if n]
                        for k in ("done", "moved", "added") if isinstance(rv.get(k) or [], list)})
             rv["next_id"] = run.m("sprints", rv.get("next_id"))
-        state, lid = r.get("state"), _oid(r.get("list_id"))
-        if state not in ("planned", "active", "closed") or (state == "active" and lid in active):
+        state = r.get("state")
+        if state not in ("planned", "active", "closed") or (state == "active" and c.execute(
+                "SELECT 1 FROM sprints WHERE state='active' AND id<>? AND list_id=(SELECT list_id FROM sprints WHERE id=?)", (nid, nid)).fetchone()):
             state = "planned"
-        if state == "active":
-            active.add(lid)
         c.execute("UPDATE sprints SET state=?, review=? WHERE id=?", (state, json.dumps(rv) if isinstance(rv, dict) else None, nid))
+
+
+def _sprint(c, run, src, d, ctx):
+    """2.455.0 (#3469): state and close-out only from sprint_finish: a stop before it keeps no old id."""
+    d.update(review=None, state="planned")
+    return d
 
 
 def _sprints(c, run, uid, data, who):
@@ -578,7 +583,7 @@ SPECS = [
     # 2.362.0 (#3096): section templates of the organisation (into the private space: the importing person's own)
     OiT("lists/section_templates.json", "section_templates", people={"user_id": "me"}, enc=False, label=N_("Section templates")),
     OiT("lists/sprints.json", "sprints", refs={"list_id": "lists"}, need=("list_id",), people={"created_by": "null"}, space=(),
-        label=N_("Sprints")),
+        label=N_("Sprints"), prep=_sprint),
     OiT("lists/rules.json", "list_rules", refs={"list_id": "lists", "target_list_id": "lists"}, need=("list_id",),
         people={"created_by": "null"}, label=N_("Rules"), prep=_rule),
     OiT("lists/history.json", "list_activity", refs={"list_id": "lists"}, need=("list_id",), people={"user_id": "null"}, space=(),

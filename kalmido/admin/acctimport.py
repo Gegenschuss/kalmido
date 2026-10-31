@@ -1011,6 +1011,9 @@ def umz_list_parts(c, run, uid, inbox, data, who):
         tid, lid = run.m("tasks", r.get("task_id")), run.m("lists", r.get("list_id"))
         if not tid or not lid or lid == inbox or lid == run.task_list.get(tid):
             continue
+        both = c.execute("SELECT org_id, life FROM lists WHERE id IN (?,?)", (lid, run.task_list.get(tid))).fetchall()  # the app's rule (ml_add)
+        if len(both) < 2 or both[0][0] != both[1][0] or any(x[1] in ("health", "budget") for x in both):
+            continue
         sid = run.m("sections", r.get("section_id"))
         if sid and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (sid, lid)).fetchone():
             sid = None
@@ -1102,7 +1105,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
     # what hangs on a list
     for table, kind, fixed in (("sections", "sections", {}), ("list_fields", "list_fields", {}), ("list_tags", "list_tags", {}),
                                ("list_status", "list_status", {"user_id": uid}), ("list_links", "list_links", {"created_by": uid}),
-                               ("list_milestones", "list_milestones", {"created_by": uid}), ("sprints", "sprints", {"created_by": uid})):
+                               ("list_milestones", "list_milestones", {"created_by": uid}), ("sprints", "sprints", {"created_by": uid, "review": None, "state": "planned"})):  # 2.455.0 (#3469): both from sprint_finish, a stop before it keeps no old id
         for r in data.get(table, []):
             run.step()
             lid = run.m("lists", r.get("list_id"))

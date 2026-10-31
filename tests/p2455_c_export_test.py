@@ -162,7 +162,9 @@ dbx("INSERT INTO sprints(list_id,num,start,end_day,state,review,closed_at,create
 dbx("INSERT INTO sprints(list_id,num,start,end_day,state,created_at,created_by) VALUES(?,3,'kaputt','2026-11-08','planned',?,?)", (L1, TS, FID))
 dbx("UPDATE tasks SET sprint_id=?, sprint_at=? WHERE id=?", (ACT, TS, K1))
 dbx("UPDATE tasks SET sprint_id=?, sprint_at=? WHERE id=?", (OLD, TS, K2))  # a sprint that does not exist: the backlog
-for lid, sid in ((L2, S2), (ALIEN, None)):  # the second one must stay out of the file
+L3 = ok(Fr.post(B + "/api/lists", json={"name": "Frei Gesund"}), "list 3")["id"]
+dbx("UPDATE lists SET life='health' WHERE id=?", (L3,))  # review: a placement the app refuses (ml_add) stays out of the import
+for lid, sid in ((L2, S2), (L3, None), (ALIEN, None)):  # the last one must stay out of the file
     dbx("INSERT INTO task_links(task_id,list_id,section_id,sort,added_by,created_at) VALUES(?,?,?,7,?,?)", (K1, lid, sid, FID, TS))
 rule(L1, "move", "section", S1, "move", {"list_id": L2, "section_id": S2}, L2, by=FID)
 rule(L1, "assign", "assigned", FID, "assign", {"user_id": FID}, by=FID)
@@ -181,7 +183,7 @@ zf = zipfile.ZipFile(io.BytesIO(AX))
 blob = b"".join(zf.read(n) for n in zf.namelist() if n.endswith(".json"))
 table = lambda t: json.loads(zf.read(f"data/{t}.json"))  # noqa: E731
 check(len(table("sprints")) == 3 and len(table("list_rules")) == 9, "sprints and rules are in the file, the trash is not")
-check([(x["task_id"], x["list_id"]) for x in table("task_links")] == [(K1, L2)], "a placement only between my own lists")
+check(sorted((x["task_id"], x["list_id"]) for x in table("task_links")) == sorted([(K1, L2), (K1, L3)]), "a placement only between my own lists")
 check(b"old-status-link" not in blob and b"old-status-hash" not in blob, "a customer report's status link stays out of the file")
 fr = next(x for x in table("list_rules") if x["name"] == "foreign target")
 check(fr["target_list_id"] is None and json.loads(fr["act_val"]) == {}, "the id of another person's list stays out of the file")
@@ -219,21 +221,24 @@ nt = dbx("SELECT task_id, list_id, owner_id, name, token_hash FROM portal_ticket
 check(len(nt) == 1 and tuple(nt[0])[:4] == (NK2, N1, GID, "Kundin Beispiel") and nt[0][4] != "old-status-hash", f"the customer report with a new status link {nt}")
 
 # ---------------------------------------------------------------- a newer export: what is there is skipped, undo takes only the new rows
-NEW = dbx("INSERT INTO sprints(list_id,num,start,end_day,state,created_at,created_by) VALUES(?,4,'2026-11-09','2026-11-22','planned',?,?) RETURNING id", (L1, TS, FID))[0][0]
+dbx("UPDATE sprints SET state='closed' WHERE id=?", (ACT,))
+NEW = dbx("INSERT INTO sprints(list_id,num,start,end_day,state,created_at,created_by) VALUES(?,4,'2026-11-09','2026-11-22','active',?,?) RETURNING id", (L1, TS, FID))[0][0]
 rule(L1, "later", "done", "", "due", {"days": 3}, by=FID)
 dbx("UPDATE tasks SET sprint_id=? WHERE id=?", (None, K2))
 AX2 = acct_export(Fr)
 iid = upload(Gr, AX2, "alpha2.zip")
 check(wait(Gr, iid).get("state") == "preview", "the newer file opens")
 dbx("UPDATE sprints SET state='closed' WHERE list_id=? AND num=2", (N1,))  # changed on the target since
+dbx("INSERT INTO sprints(list_id,num,start,end_day,state,created_at,created_by) VALUES(?,9,'2026-11-09','2026-11-22','active',?,?)", (N1, TS, GID))  # review: the list runs a sprint already
 j = run(Gr, iid, "private")
-check(one("SELECT COUNT(*) FROM sprints WHERE list_id=?", (N1,)) == 3 and len(rules(N1)) == 9, "nothing twice, only the new sprint and rule")
+check(one("SELECT COUNT(*) FROM sprints WHERE list_id=?", (N1,)) == 4 and len(rules(N1)) == 9, "nothing twice, only the new sprint and rule")
+check(one("SELECT state FROM sprints WHERE list_id=? AND num=4", (N1,)) == "planned", "at most one running sprint per list, also with one already there")
 check(one("SELECT state FROM sprints WHERE list_id=? AND num=2", (N1,)) == "closed", "a sprint that is there keeps what happened to it")
 check(one("SELECT COUNT(*) FROM portal_tickets WHERE list_id=?", (N1,)) == 1, "the customer report not twice")
 imp = (j.get("result") or {}).get("import_id")
 ok(Gr.post(B + f"/api/imports/{imp}/undo"), "the undo of the second import")
 check(one("SELECT COUNT(*) FROM sprints WHERE list_id=? AND num=4", (N1,)) == 0 and "later" not in rules(N1), "the undo takes the rows it added")
-check(one("SELECT COUNT(*) FROM sprints WHERE list_id=?", (N1,)) == 2 and len(rules(N1)) == 8, "the first import's rows stay")
+check(one("SELECT COUNT(*) FROM sprints WHERE list_id=?", (N1,)) == 3 and len(rules(N1)) == 8, "the first import's rows stay")
 
 # ---------------------------------------------------------------- organisation: feeds, read-later project, mapped rules and sprints
 orgs = {n: ok(A.post(B + "/api/admin/orgs", json={"name": n, "admin_id": ALICE}), n)["id"] for n in ("Alpha Quelle", "Gamma Leer")}
@@ -244,7 +249,7 @@ dbx("UPDATE lists SET org_id=? WHERE id IN (?,?)", (ORG, OL, ORD))
 OS, OT, OF = parts(OL)
 OK1 = ok(A.post(B + "/api/tasks", json={"title": "Org Eins", "list_id": OL}), "org task")["id"]
 dbx("INSERT INTO reading_orgs(org_id,list_id,created_at) VALUES(?,?,?)", (ORG, ORD, TS))
-for url, etag in (("https://feeds.example.com/news.xml", "etag-1"), ("https://feeds.example.com/private.xml?access_token=geheim", ""), ("https://feeds.example.com/twice.xml", "")):
+for url, etag in (("https://feeds.example.com/news.xml", "etag-1"), ("https://feeds.example.com/private.xml?access_token=geheim", ""), ("https://feeds.example.com/private-0a1b2c/basic.xml", ""), ("https://feeds.example.com/twice.xml", "")):
     dbx("INSERT INTO rss_feeds(user_id,org_id,url,title,etag,last_fetch,fails,created_at) VALUES(?,?,?,'Quelle',?,?,3,?)", (ALICE, ORG, url, etag, TS, TS))
 dbx("INSERT INTO rss_feeds(user_id,org_id,url,created_at) VALUES(?,?,'https://feeds.example.com/twice.xml',?)", (ALICE, ORG2, TS))
 rule(OL, "o field", "field", OF, "tag", {"tag_id": OT}, org=ORG, by=ALICE)

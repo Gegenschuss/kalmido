@@ -109,6 +109,8 @@
   .ofcset .row label{min-width:100%}
   .ofcbar .chkl{font-size:var(--fs-s)}
   .ofcrow{min-height:2.75rem}
+  /* 2.455.0 (#3852): a receipt row with labels: the file name takes the whole first line, the labels, the amount and the arrow follow below */
+  .ofcrow:has(.rotag){flex-wrap:wrap;row-gap:.25rem}.ofcrow:has(.rotag) .ofcn{flex:1 1 100%}
   /* 2.117.0 (#2287 #2286): with the row menu button the per diem / receipts labels stand above their amounts, the row may wrap */
   .rklist .ofcrow{flex-wrap:wrap;justify-content:flex-end;gap:.25rem .5rem}.rklist .ofcrow .ofcn{flex:1 1 8rem}
   .rklist .rkpd,.rklist .rkrc{display:flex;flex-direction:column;align-items:flex-end;line-height:var(--lh-tight)}
