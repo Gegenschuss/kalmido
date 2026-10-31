@@ -1054,6 +1054,11 @@ def path_rx(path):
     return re.compile(r"(?:" + body + r")(?![\w/.-])")
 
 
+def open_call(prev, mw):
+    """2.449.0 (#3800): the line above counts only as an open multi-line call: the method on it, no path of its own, brackets open"""
+    return bool(mw.search(prev)) and "/api/" not in prev and prev.count("(") > prev.count(")")
+
+
 def write_proven(route, texts):
     """route "METHOD /path": called in one of texts (expanded suite sources)?"""
     m, path = route.split(" ", 1)
@@ -1064,7 +1069,7 @@ def write_proven(route, texts):
         while i >= 0:
             a, b = t.rfind("\n", 0, i) + 1, t.find("\n", i)
             b = len(t) if b < 0 else b
-            if rx.search(t[a:b]) and (mw.search(t[a:b]) or mw.search(t[t.rfind("\n", 0, max(0, a - 1)) + 1:a])):
+            if rx.search(t[a:b]) and (mw.search(t[a:b]) or open_call(t[t.rfind("\n", 0, max(0, a - 1)) + 1:a], mw)):
                 return True
             i = t.find(anchor, b + 1) if b < len(t) else -1
     return False
@@ -1632,6 +1637,12 @@ def main():
                           f"with its ids): call it there as the person without an organisation")
     for r in sorted(WRITE_UNPROVEN - set(ROUTES)):
         check(False, f"WRITE_UNPROVEN names {r}, which is no route of ROUTES: remove it")
+
+    # 2.449.0 (#3800) self-test of the rule: a method on the line above counts only for an open call without a path of its own
+    check(not write_proven("PATCH /api/me", ['A.patch(B + "/api/settings")\nA.get(B + "/api/me")']),
+          "write_proven: a method on a line above with its own path must not count")
+    check(write_proven("PATCH /api/me", ['A.patch(\n    B + "/api/me", json={})']),
+          "write_proven: an open multi-line call must count")
 
     n_m = sum(1 for k in ROUTES.values() if KINDS.get(k, ("",))[0] == "matrix")
     print(f"freelancer_coverage: {oks[0]} ok, {len(fails)} failed -- {len(found)} routes, {n_m} checked without an organisation, "
