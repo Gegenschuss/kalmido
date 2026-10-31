@@ -230,9 +230,10 @@ rep = r.json().get("report") or {} if r.status_code == 201 else {}
 check(rep.get("formulas") == 5 and not rep.get("as_value"), "all five taken over as formulas " + json.dumps(rep))
 if IM:
     d = get(A, IM)
-    want = {"C1": ("=SUMMEWENN(A1:A3;\"a\";B1:B3)", 4), "C2": ("=SVERWEIS(\"b\";A1:B3;2;FALSCH)", 2),
-            "C3": ("=SVERWEIS(2;B1:B3;1;WAHR)", 2), "C4": ("=XVERWEIS(\"b\";A1:A3;B1:B3;\"-\")", 2),
-            "C5": ("=LINKS(A1;1)&GROSS(A2)&ZÄHLENWENN(A1:A3;\"a\")", "aB2")}
+    # 2.368.3 (#2988): shown in the person's language
+    want = {"C1": ("=SUMIF(A1:A3;\"a\";B1:B3)", 4), "C2": ("=VLOOKUP(\"b\";A1:B3;2;FALSE)", 2),
+            "C3": ("=VLOOKUP(2;B1:B3;1;TRUE)", 2), "C4": ("=XLOOKUP(\"b\";A1:A3;B1:B3;\"-\")", 2),
+            "C5": ("=LEFT(A1;1)&UPPER(A2)&COUNTIF(A1:A3;\"a\")", "aB2")}
     for a, (raw, val) in want.items():
         x = cell(d, a)
         check(x.get("raw") == raw and x.get("value") == val, f"import {a}: {raw} = {val!r} " + json.dumps(x)[:250])

@@ -252,7 +252,7 @@ fx = {c.get("r"): c.find(NS + "f").text for c in ws.iter(NS + "c") if c.find(NS 
 vals = {c.get("r"): (c.find(NS + "v").text if c.find(NS + "v") is not None else None) for c in ws.iter(NS + "c")}
 check(fx.get("D2") == "B2*C2" and fx.get("D4") == "SUM(D2:D3)", "formulas in Excel form (header row 1) " + str(fx))
 check("F2" not in fx and vals.get("F2") == "1", "a Kalmido variable as its value")
-check("list.garden.open" in z.read("xl/comments1.xml").decode(), "... with a note naming it")
+check("liste.garden.offen" in z.read("xl/comments1.xml").decode(), "... with a note naming it")
 check(vals.get("D2") == "950", "the formula's value is stored too")
 dv = [x for x in ws.iter(NS + "dataValidation")]
 check(dv and dv[0].get("type") == "list" and dv[0].find(NS + "formula1").text == '"Offen,Fix,Neu"' and dv[0].get("sqref").startswith("E2:E"),
@@ -278,7 +278,7 @@ check([c["kind"] for c in d["columns"]][:6] == ["text", "number", "currency", "c
       "kinds back " + str([c["kind"] for c in d["columns"]]))
 check([(o["label"], o["color"]) for o in d["columns"][4]["options"]][:2] == [("Offen", "#f5b041"), ("Fix", "#58d68d")]
       and d["columns"][4]["color_mode"] == "row", "choices + colours + colour per row back")
-check(ci["D1"]["raw"] == "=B1*C1" and ci["D1"]["value"] == 950 and ci["D3"]["raw"] == "=SUM(D1:D2)" and ci["D3"]["value"] == 2238,
+check(ci["D1"]["raw"] == "=B1*C1" and ci["D1"]["value"] == 950 and ci["D3"]["raw"] == "=SUMME(D1:D2)" and ci["D3"]["value"] == 2238,
       "formulas back as formulas " + str((ci["D1"]["raw"], ci["D3"]["raw"])))
 check(ci["F1"]["value"] == 1 and ci["F1"]["origin"] == "own" and ci["E2"]["display"] == "Fix", "a variable's value as a value, choices")
 csv_in = "Name;Betrag;Datum\r\nKabel;12,50;18.10.2026\r\nStativ;1.234,00;01.11.2026\r\n=HYPERLINK(\"http://example.com\");3;\r\n".encode()
