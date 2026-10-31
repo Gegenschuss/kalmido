@@ -19,13 +19,30 @@
 
 ## What's new
 
-**2.409.0** (2026-10-29):
+**2.436.0** (2026-10-31):
+- **Office**: receipts by e-mail - forward invoice mails to your office address, Kalmido fetches linked invoice PDFs by itself; the client card's blocks fold and can be switched off per office.
+- **Documents**: the list can be sorted (date, arrival, sender, amount, due date, title).
+- **Settings**: "View as member" (Settings > Account) shows Kalmido as a member of your organisation sees it; the rights stay, the way back is in the account menu.
+- **Projects**: properties per project type (software, agency, personal), switchable in the project options under Properties.
+- **Agents**: git author for AI commits is a setting (agent settings, per project overridable).
+- **Backups and restore**: larger files are kept once in `data/backups/.store` for all backups (2.432); copy the backup folder WITH `.store`; *Download* always gives one complete file; a copy elsewhere is made complete with `python3 -I kalmido/admin/bkstore.py assemble` (see SELF-HOSTING.md).
+
+**2.430.0** (2026-10-30):
+- **Projects**: ticket keys APP-123 (project dialog), linked from commits, branches and pull requests; saved filters by assignee, column, sprint, milestone and text; the agent API filters and sorts tasks by every field; "Project type" in folder settings.
+- **Agents**: a live "working on it" mark on tasks (dot, name, time, last line) through the API / MCP.
+- **Knowledge**: tags (#word) with a list in the panel, live query blocks, `![[Page]]` embeds, daily notes and template placeholders.
+- **Office**: missing invoices of recurring providers with a link to their portal, a receipt fetcher for portal invoices, a booking archive for past DATEV years, final invoices after the BMF letter of 15.10.2026.
+- **Documents**: the open document stands in a pane beside the list, arrow keys go through the list.
+- **Moving**: office data moves between workspaces now also with deals, letter drafts and equipment sets.
+
+**2.409.0** (2026-10-30):
 - **Projects**: one kind of project; project folders live in the file store tree with shares that apply at runtime.
 - **File store**: one area for files and documents (list or cards per folder, recognition per folder), locked end-to-end encrypted folders.
 - **First start**: a short "What do you use Kalmido for?" for added accounts, Start as home page, tablets with the computer navigation, one Organisation area for people, agents and data.
 - **Workspaces**: areas can be switched on and off per workspace (Private by each person, an organisation by its admins).
 - **Knowledge**: reading styles, a "/" task picker, formulas (LaTeX) and Mermaid diagrams.
 - **Office**: Quotations and Invoices as two areas, with a paid filter in the invoice archive.
+- **Office PDFs**: quotation PDF with a compact closing and the totals at the bottom; logo size and side selectable in the office settings.
 - **Entertainment receipts**: optional signature picture on the approval line, drawn in the app.
 - **Software projects**: ticket keys like APP-123, linked from commits, branches and pull requests; saved filters by assignee, column, sprint, milestone and text.
 - **Office**: receipts by e-mail, a booking archive for past DATEV years, final invoices after the BMF letter of 15.10.2026, quotation PDF with a compact closing.
