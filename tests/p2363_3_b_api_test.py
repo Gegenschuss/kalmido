@@ -268,6 +268,20 @@ def run_docs(s, ws, who):
     until(lambda: one("SELECT state FROM doc_meta WHERE node_id=?", (nid,)) == "done", 90)
     dbw("UPDATE doc_meta SET redo_at='2020-01-01T00:00:00Z' WHERE node_id=?", (nid,))
     check(s.post(B + f"/api/docs/{nid}/redo/undo").status_code == 400, who + ": after 24 h: 400")
+    # 2.363.3 (#3134, review): a kept number given away meanwhile stays with the other document; a copy no key opens = 400, nothing written back
+    other = doc(s, ws, f"r2-{who}.txt")
+    dbw("UPDATE doc_meta SET asn=4711 WHERE node_id=?", (nid,))
+    s.post(B + f"/api/docs/{nid}/redo")
+    until(lambda: one("SELECT state FROM doc_meta WHERE node_id=?", (nid,)) == "done", 90)
+    dbw("UPDATE doc_meta SET asn=NULL WHERE node_id=?", (nid,))
+    dbw("UPDATE doc_meta SET asn=4711 WHERE node_id=?", (other,))
+    r = s.post(B + f"/api/docs/{nid}/redo/undo")
+    check(r.ok and one("SELECT asn FROM doc_meta WHERE node_id=?", (nid,)) is None, who + ": the number stays with the other document " + r.text[:160])
+    dbw("UPDATE doc_meta SET asn=NULL WHERE node_id=?", (other,))
+    s.post(B + f"/api/docs/{nid}/redo")
+    until(lambda: one("SELECT state FROM doc_meta WHERE node_id=?", (nid,)) == "done", 90)
+    dbw("""UPDATE doc_meta SET redo_prev=jsonb_set(redo_prev::jsonb, '{text}', '"kenc1:gone"')::text WHERE node_id=?""", (nid,))
+    check(s.post(B + f"/api/docs/{nid}/redo/undo").status_code == 400, who + ": a key that is gone: 400")
     return nid
 
 

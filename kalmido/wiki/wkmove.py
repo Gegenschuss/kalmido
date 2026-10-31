@@ -172,7 +172,7 @@ def wiki_move_space():
              trn("{0} page links files of the file store: the files stay in the old workspace",
                  "{0} pages link files of the file store: the files stay in the old workspace", files) if files else ""]
     from .wkshare import wsh_end_moved
-    shares = wsh_end_moved(c, src, None if src else uid, [r["path"] for r, _ in moves], folder, dry=True)
+    shares = wsh_end_moved(c, src, None if src else uid, [r["path"] for r, _ in moves + tmoves], folder, dry=True)
     trash = len(tmoves) + trash_stays
     all_ids = ids + [r["id"] for r, _ in tmoves]
     vers = wkm_vers_dropped(c, all_ids, to)

@@ -38,7 +38,7 @@ async function moSave(ids) {
   try {
     const r = await api('PUT', '/api/tasks/mine-order', {ids: send, ...(seen ? {_prev: {ids: seen}} : {})});
     if (r?.order_kept) { toast(tr(MO_KEPT)); await load(); render(); }
-  } catch { /* api() showed it; offline it waits in the outbox */ }
+  } catch { if (S.mineBase === send) S.mineBase = seen; /* api() showed it; the server never confirmed this order; offline it waits in the outbox */ }
 }
 // dnd.js dropTask0: a drop onto a row of "My tasks" -> true when handled here (never a change of tasks.sort)
 async function moDrop(t, row, after) {

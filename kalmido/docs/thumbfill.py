@@ -76,6 +76,7 @@ def p61a_thumb_fill(c):
                 c.commit()  # 2.363.3 (#3133): the number lock is held for this one write, not over the next documents of the portion
                 with c.savepoint():
                     _fill_asn(c, S, nid, code, node)
+                c.commit()  # the number lock ends here (review): the rest of the portion renders previews without it
         except Exception as e:  # noqa: BLE001 -- a missing file, a key that does not open, a broken image: skip it
             print("docs: preview catch-up", nid, type(e).__name__, e, flush=True)
     gset(c, FILL_KEY, json.dumps({"below": rows[-1][0]}))

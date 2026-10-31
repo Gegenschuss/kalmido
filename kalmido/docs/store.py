@@ -913,6 +913,10 @@ def redo_back(c, nid):
     stale = prev.get("state") == "done" and int(prev.get("version") or 0) != int(node["cur_version"] or 0)
     if not prev or not fresh or stale or prev.get("ws") != m["ws"]:
         raise BadInput(tr("This recognition can no longer be taken back"))
+    try:  # 2.363.3 (#3134, review): a key rotation since then: the kept copy is sealed with a key that is gone
+        doc_open_as(c, m["ws"], "doc_meta.text", prev["text"])
+    except OrgCryptError:
+        raise BadInput(tr("This recognition can no longer be taken back")) from None
     auto, hand = json.loads(prev["auto"] or "{}"), hand_fields(meta_json(c, m, "auto", {}))
     auto.pop("_hand", None)
     auto.pop("_was", None)
@@ -921,6 +925,10 @@ def redo_back(c, nid):
     vals = {k: prev[k] for k in REDO_COLS if k != "auto"}
     for f in hand:
         vals[HAND_FIELDS[f]] = m[HAND_FIELDS[f]]
+    if vals["asn"] and vals["asn"] != m["asn"]:  # 2.363.3 (#3134, review): the old number may belong to another document by now
+        write_lock(c, f"doc-asn:{m['ws']}")  # the row is locked already: same order as asn_lock
+        if asn_taken(c, m["ws"], vals["asn"], nid):
+            vals["asn"] = m["asn"]
     sets = ", ".join(f"{k}=?" for k in vals)
     c.execute(f"UPDATE doc_meta SET {sets}, auto=?, redo_prev='', redo_at='', updated_at=? WHERE node_id=?",
               (*vals.values(), json.dumps(auto, separators=(",", ":")), _now(), nid))
