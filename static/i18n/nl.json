@@ -14016,7 +14016,6 @@
   "a former admin": "een voormalige beheerder",
   "Invite to the organisation (projects are shared with members only)": "Uitnodigen voor de organisatie (projecten worden alleen met leden gedeeld)",
   "Invited to the organisation": "Uitgenodigd voor de organisatie",
-  "Person invited to the organisation: until they accept, their content stays with you as the importing admin.": "Persoon uitgenodigd voor de organisatie: tot die accepteert, blijft de inhoud bij jou als importerende beheerder.",
   "Your encryption keys come along: locked notes and your encrypted files open with your passphrase from before.": "Je versleutelingssleutels gaan mee: vergrendelde notities en je versleutelde bestanden open je met je wachtwoordzin van voorheen.",
   "You already have your own encryption keys here: locked notes and encrypted files from the export arrive unreadable.": "Je hebt hier al eigen versleutelingssleutels: vergrendelde notities en versleutelde bestanden uit de export komen onleesbaar aan.",
   "The export has no encryption keys: locked notes and encrypted files arrive unreadable.": "De export bevat geen versleutelingssleutels: vergrendelde notities en versleutelde bestanden komen onleesbaar aan.",
@@ -15341,5 +15340,10 @@
   "You can undo that until {0}.": "Ongedaan maken kan tot {0}.",
   "This export was imported already.": "Deze export is al geïmporteerd.",
   "Already here from an earlier import, skipped: {0} entries": "Al aanwezig uit een eerdere import, overgeslagen: {0} items",
-  "Office, file store, chat and the other areas of this export are here already: they were skipped.": "Kantoor, bestanden, chat en de andere onderdelen van deze export zijn er al: ze zijn overgeslagen."
+  "Office, file store, chat and the other areas of this export are here already: they were skipped.": "Kantoor, bestanden, chat en de andere onderdelen van deze export zijn er al: ze zijn overgeslagen.",
+  "Person invited to the organisation: their content stays with you as the importing admin, the ticked projects are shared when they accept.": "Persoon uitgenodigd voor de organisatie: de inhoud blijft bij jou als importerende beheerder, de aangevinkte projecten worden gedeeld zodra de persoon accepteert.",
+  "E-mail address not readable, left out": "E-mailadres niet leesbaar, weggelaten",
+  "VAT ID too long, left out": "Btw-nummer te lang, weggelaten",
+  "Not taken over: {0}": "Niet overgenomen: {0}",
+  "At most {0} rows per sheet are read: please split a longer file.": "Per blad worden maximaal {0} rijen gelezen: splits een langer bestand."
 }

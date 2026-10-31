@@ -54,7 +54,7 @@ from .acctexport import (UMZ_BLOCK, UMZ_FORMAT, UMZ_HEAD, UMZ_V, UmzReader, UmzW
 from ..core.orgcrypt import oc_user_space, oc_write_file, rck_parse  # 2.149.0 G (#2517): pulled up from functions
 from ..core.schema import MAX_DEPTH  # 2.149.0 G (#2517): pulled up from functions
 from ..life.model import jr_seal  # 2.306.0 A (#2885)
-from ..accounts.orginvite import ojn_invite  # 2.278.0 A (#3095)
+from ..accounts.orginvite import ojn_invite, ojn_later  # 2.278.0 A (#3095)
 from ..collab.e2e import e2e_has_keys, e2e_import_keys, e2e_same_keys  # 2.278.0 C (#3091)
 
 UMZ_IN_DIR = os.path.join(EXPORT_DIR, "account-import")
@@ -1373,7 +1373,7 @@ def umz_share(c, run, uid, data, picks, can_invite, salt=None):
         lists = p.get("lists") if isinstance(p.get("lists"), dict) else {}
         hit = umz_find(c, uid, umz_phash(p), seen) or umz_find_login(c, uid, pick.get("login"))
         em = pick.get("email") or _email(p.get("email"))  # typed by the admin, or the plain address of an older file
-        target, state = None, "skipped"
+        target, joins, state = None, None, "skipped"
         if hit and pick.get("share"):
             target, state = hit["id"], "shared"
             # 2.278.0 A (#3095): an organisation export: an existing account joins only by accepting an invitation (#2480),
@@ -1381,8 +1381,8 @@ def umz_share(c, run, uid, data, picks, can_invite, salt=None):
             if run.org and run.kind == "org" and not umz_in_org(c, run.org, hit["id"]):
                 ojn_invite(c, run.org, hit["id"], umz_role(pick.get("role") or p.get("role")), by=uid)
                 run.created.setdefault("org_joins", []).append([run.org, hit["id"]])  # 2.360.2 M (#2561): the undo withdraws it
-                target, state = None, "org_invited"
-                run.warning(N_("Person invited to the organisation: until they accept, their content stays with you as the importing admin."))
+                joins, target, state = hit["id"], None, "org_invited"
+                run.warning(N_("Person invited to the organisation: their content stays with you as the importing admin, the ticked projects are shared when they accept."))
         elif not hit and pick.get("invite") and can_invite:
             if not em or umz_email_hash(em, salt) != h:
                 state = "mismatch"  # review M1: the typed address is not the one of the file -- nobody is invited
@@ -1390,14 +1390,15 @@ def umz_share(c, run, uid, data, picks, can_invite, salt=None):
                 target = umz_invite(c, run, uid, em, _txt(p.get("name"), 60), umz_role(pick.get("role") or p.get("role")))
                 state = "invited" if target else "failed"
                 if target and run.org:  # 2.360.2 M (#2561): like an existing account: nothing shared before the person accepts
-                    target, state = None, "org_invited"
-                    run.warning(N_("Person invited to the organisation: until they accept, their content stays with you as the importing admin."))
+                    joins, target, state = target, None, "org_invited"
+                    run.warning(N_("Person invited to the organisation: their content stays with you as the importing admin, the ticked projects are shared when they accept."))
         n = 0
+        pairs = [(lid, role if role in ROLES else "edit") for lid, role in ((run.m("lists", old), role) for old, role in lists.items())
+                 if lid and lid in run.created["lists"]]
         if target:
-            for old, role in lists.items():
-                lid = run.m("lists", old)
-                if lid and lid in run.created["lists"] and _folder_member_add(c, lid, target, role if role in ROLES else "edit", uid):
-                    n += 1
+            n = sum(1 for lid, role in pairs if _folder_member_add(c, lid, target, role, uid))
+        elif joins:  # 2.363.0 (#3132): noted on the invitation, shared when the person accepts
+            ojn_later(c, run.org, joins, uid, pairs)
         out.append({"key": h, "name": _txt(p.get("name"), 100), "state": state, "lists": n})
     return out
 

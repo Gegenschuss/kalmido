@@ -14016,7 +14016,6 @@
   "a former admin": "un ex amministratore",
   "Invite to the organisation (projects are shared with members only)": "Invita nell’organizzazione (i progetti sono condivisi solo con i membri)",
   "Invited to the organisation": "Invitato nell’organizzazione",
-  "Person invited to the organisation: until they accept, their content stays with you as the importing admin.": "Persona invitata nell’organizzazione: finché non accetta, i suoi contenuti restano a te come amministratore che importa.",
   "Your encryption keys come along: locked notes and your encrypted files open with your passphrase from before.": "Le tue chiavi di cifratura vengono con te: note bloccate e i tuoi file cifrati si aprono con la passphrase di prima.",
   "You already have your own encryption keys here: locked notes and encrypted files from the export arrive unreadable.": "Qui hai già le tue chiavi di cifratura: note bloccate e file cifrati dell’esportazione arrivano illeggibili.",
   "The export has no encryption keys: locked notes and encrypted files arrive unreadable.": "L’esportazione non contiene chiavi di cifratura: note bloccate e file cifrati arrivano illeggibili.",
@@ -15341,5 +15340,10 @@
   "You can undo that until {0}.": "Annullabile fino al {0}.",
   "This export was imported already.": "Questa esportazione è già stata importata.",
   "Already here from an earlier import, skipped: {0} entries": "Già presenti da un’importazione precedente, saltate: {0} voci",
-  "Office, file store, chat and the other areas of this export are here already: they were skipped.": "Ufficio, archivio file, chat e le altre aree di questa esportazione sono già presenti: sono state saltate."
+  "Office, file store, chat and the other areas of this export are here already: they were skipped.": "Ufficio, archivio file, chat e le altre aree di questa esportazione sono già presenti: sono state saltate.",
+  "Person invited to the organisation: their content stays with you as the importing admin, the ticked projects are shared when they accept.": "Persona invitata nell'organizzazione: i suoi contenuti restano a te come admin dell'importazione, i progetti selezionati vengono condivisi quando accetta.",
+  "E-mail address not readable, left out": "Indirizzo e-mail non leggibile, omesso",
+  "VAT ID too long, left out": "Partita IVA troppo lunga, omessa",
+  "Not taken over: {0}": "Non importato: {0}",
+  "At most {0} rows per sheet are read: please split a longer file.": "Per foglio vengono lette al massimo {0} righe: dividi i file più lunghi."
 }

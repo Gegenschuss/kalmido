@@ -276,6 +276,30 @@ def ojn_invite(c, oid, uid, role, by=None):
     print("organisation", oid, "invited account", uid, "to join, by", login_log_who(by), flush=True)
 
 
+def ojn_later(c, oid, uid, by, pairs):
+    """2.363.0 (#3132): the org import's projects [(list id, role)] of an invited person, noted on the open invitation (a repeat
+    invitation keeps them, a second import adds to them; a declined or withdrawn invitation takes them along)."""
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # the row of a person who is no member yet
+        r = c.execute("SELECT pending_lists FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
+        if r and pairs:
+            have = {x[0]: x for x in json.loads(r["pending_lists"] or "[]")}
+            have.update({lid: [lid, role, by] for lid, role in pairs})
+            c.execute("UPDATE org_joins SET pending_lists=? WHERE org_id=? AND user_id=?", (json.dumps(list(have.values())), oid, uid))
+
+
+def ojn_share_later(c, oid, uid, r):
+    """2.363.0 (#3132): at the accepted invitation r: the noted projects are shared, as long as each is still there, in this
+    organisation and the importing admin's own. -> how many. The caller holds the system context."""
+    from ..lists.lists import _folder_member_add
+    n = 0
+    for lid, role, by in json.loads(r["pending_lists"] or "[]"):
+        l = c.execute("SELECT owner_id, org_id, deleted_at FROM lists WHERE id=?", (lid,)).fetchone()
+        if l and not l["deleted_at"] and l["org_id"] == oid and l["owner_id"] == by and _folder_member_add(c, lid, uid, role, by):
+            n += 1
+    return n
+
+
 def ojn_open(c, oid, uid):
     """The open invitation row of uid into organisation oid (None: none, expired or already a member)."""
     from ..core.pg import system_ctx
@@ -315,12 +339,13 @@ def org_join_accept(oid):
         raise Denied(404)
     with system_ctx(c):  # accepting an invitation: the person is not a member yet
         org_member_add(c, oid, uid, r["role"])
+        shared = ojn_share_later(c, oid, uid, r)  # 2.363.0 (#3132)
         c.execute("DELETE FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid))
         name = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]
     bump(c)
     c.commit()
     print("organisation", oid, "invitation accepted by", login_log_who(g.user), flush=True)
-    return jsonify(ok=True, org_id=oid, name=name, role=r["role"])
+    return jsonify(ok=True, org_id=oid, name=name, role=r["role"], shared=shared)
 
 
 @app.delete("/api/orgs/<int:oid>/join")

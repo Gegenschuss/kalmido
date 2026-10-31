@@ -4162,6 +4162,9 @@ CREATE TABLE IF NOT EXISTS org_joins (
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, role TEXT NOT NULL DEFAULT 'member',
   created_by BIGINT REFERENCES users(id) ON DELETE SET NULL, created_at TEXT NOT NULL, UNIQUE (org_id, user_id));
 CREATE INDEX IF NOT EXISTS org_joins_user ON org_joins(user_id);
+-- 2.363.0 (#3132): the org import's projects noted on an open invitation (JSON [[list id, role, importing admin]], shared on
+-- accepting, accounts/orginvite.py). Here, not in MIGRATIONS: those run before this table exists. Older versions ignore it
+ALTER TABLE org_joins ADD COLUMN IF NOT EXISTS pending_lists TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS ix2281_org_joins_created_by ON org_joins(created_by) WHERE created_by IS NOT NULL;
 -- 2.151.0 A (#2558): branches of a connection that carry a task (kalmido-<id>, task-<id>, <id>-slug, or the branch of an open
 -- pull request of a task) and how far they are ahead of the default branch (NULL = not compared yet, 0 = merged). cmp_sha /
