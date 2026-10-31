@@ -84,7 +84,7 @@ document.addEventListener('click', e => {
 function lmOadmBody(j, row) {
   const by = new Map();
   for (const x of j.lists) { if (!by.has(x.owner_id)) by.set(x.owner_id, []); by.get(x.owner_id).push(x); }
-  const groups = [...by.values()].sort((a, b) => (a[0].owner_agent - b[0].owner_agent) || (a[0].owner_name || '').localeCompare(b[0].owner_name || ''));
+  const groups = [...by.values()].sort((a, b) => (a[0].owner_agent - b[0].owner_agent) || cmpText(a[0].owner_name, b[0].owner_name));
   return groups.map(g => `<div class="lmoown"><h4 class="lmoh">${av(g[0].owner_id, g[0].owner_name)} ${esc(g[0].owner_name || '?')}${g[0].owner_agent ? ' ' + agentBadge() : ''} <span class="muted">${esc(trn('{0} project', '{0} projects', g.length))}</span></h4>${g.map(row).join('')}</div>`).join('');
 }
 // ---- #1214 "Hide completed": the view's own entry (show_done_views), else the nearest folder default, else the person's default

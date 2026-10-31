@@ -61,9 +61,8 @@ function ofdMoney(n, d) {
 const ofdCurOpts = d => [...new Set([...(OFC.info?.pack?.currencies || ['EUR', 'USD']), d.currency].filter(Boolean))].map(c => [c, c]);
 const ofdFxHint = d => ofcHome() === 'EUR' && d.currency === 'USD' ? tr('1 € in USD; rates stay in EUR and are converted')
   : tr('1 {0} in {1}; prices stay in {0} and are converted', ofcHome(), d.currency);
-const ofdQty = (n, d) => { const s = String(+(+n || 0).toFixed(4)); return ofdNumEn(d) ? s : s.replace('.', ','); };
-const ofdDec = () => { try { return (1.1).toLocaleString(LOCALE()).includes(',') ? ',' : '.'; } catch { return '.'; } };
-const ofdNumIn = v => v == null || v === '' ? '' : String(+(+v).toFixed(4)).replace('.', ofdDec());
+const ofdQty = (n, d) => (+n || 0).toLocaleString(OFD_LOCS.includes((d || OFD.doc)?.lang) ? (d || OFD.doc).lang : 'de', {useGrouping: false, maximumFractionDigits: 4});  // 2.450.0 (#3770): the document's language
+const ofdNumIn = v => numField(v, 4);
 const ofdUnit = (u, d) => { const L = OFC.info?.pack?.labels?.[ofdLang(d)]?.units; return L?.[u] || tr(OFC_UNITS.find(x => x[0] === u)?.[1] || u); };
 // 2.138.0 A (#2249): unit option text by quantity (singular only for exactly 1, like calc.unit_text; plural otherwise)
 const OFU_PLURAL = { day: N_('Days|unit'), hour: N_('Hours|unit'), piece: N_('Pieces|unit'), minute: N_('Minutes|unit') };

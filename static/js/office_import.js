@@ -420,7 +420,7 @@ function r81b_clFilter(more = '') {
   const seen = new Map();
   for (const r of oim_secItems()) if (r.client_id && !seen.has(r.client_id)) seen.set(r.client_id, r.client || r.client_name || '#' + r.client_id);  // 2.380.0 B (#3409): the clients of the area's documents
   if (!seen.size && !OIM.cl) return more ? `<div class="ofcbar r81b-clf">${more}</div>` : '';
-  const opts = [...seen].sort((a, b) => a[1].localeCompare(b[1])).map(([v, n]) => `<option value="${v}" ${String(v) === OIM.cl ? 'selected' : ''}>${esc(n)}</option>`).join('');
+  const opts = [...seen].sort((a, b) => cmpText(a[1], b[1])).map(([v, n]) => `<option value="${v}" ${String(v) === OIM.cl ? 'selected' : ''}>${esc(n)}</option>`).join('');
   return `<div class="ofcbar r81b-clf"><select id="oim-cl" aria-label="${esc(tr('Client'))}"><option value="">${esc(tr('All clients'))}</option>${opts}</select>${more}</div>`;
 }
 document.addEventListener('change', e => { if (e.target.id === 'oim-cl') { OIM.cl = e.target.value || ''; if (typeof ofdDraw === 'function') ofdDraw(); } });

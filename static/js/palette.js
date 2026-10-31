@@ -311,7 +311,7 @@ function palAll() {
   for (const l of S.lists.filter(x => !x.archived && !x.is_inbox && inWs(x))) add('l:' + l.id, 'list', lname(l), 'list', () => go('l/' + l.id), {sw: cssColor(lp_col(l)), img: liconOk(l.icon) ? l.icon : '', lic: l, ...(l.folder ? {sub: fDisp(l.folder)} : {})});
   for (const f of folderNames()) add('folder:' + f, 'folder', fDisp(f), 'folder', () => go('folder/' + encodeURIComponent(f)));  // 2.4.0 (#361)
   for (const f of S.filters) add('f:' + f.id, 'filter', f.name, 'filter', () => go('f/' + f.id));
-  for (const g of Object.keys(counts().tags).sort()) add('tag:' + g, 'tag', '#' + g, 'tag', () => go('tag/' + encodeURIComponent(g)));
+  for (const g of Object.keys(counts().tags).sort(cmpText)) add('tag:' + g, 'tag', '#' + g, 'tag', () => go('tag/' + encodeURIComponent(g)));
   // settings tabs
   for (const [k, icon, n] of SET_SECS) {
     if (k === 'account' && !S.me) continue;

@@ -293,7 +293,7 @@ function dc_mdDraw(md) {
       ${field('date', tr('Date'), dateIn('dc-date', d.date || '', {label: tr('Date'), ro: !!ro, attrs: 'data-dcp="date"'}))}${typeof pmeta_takenHtml === 'function' ? pmeta_takenHtml(d) : ''}
       ${opt('due', tr('Due'), dateIn('dc-due', d.due || '', {label: tr('Due'), ro: !!ro, attrs: 'data-dcp="due"'}), noDue)}
       ${field('asn', tr('Archive number'), `<span class="dc-amt"><input type="number" min="1" id="dc-asn" data-dcp="asn" value="${esc(d.asn || '')}" ${ro}>${w && !d.asn ? `<button type="button" class="btn sm" data-dc="asnnext">${tr('Next free number')}</button>` : ''}</span>`)}
-      ${opt('amount', tr('Amount'), `<span class="dc-amt"><input id="dc-amount" data-dcp="amount" inputmode="decimal" value="${esc(d.amount ? String(d.amount).replace('.', LOCALE().startsWith('en') ? '.' : ',') : '')}" ${ro}><input id="dc-currency" data-dcp="currency" value="${esc(d.currency || '')}" maxlength="3" aria-label="${esc(tr('Currency'))}" placeholder="EUR" ${ro}></span>`, noAmt)}
+      ${opt('amount', tr('Amount'), `<span class="dc-amt"><input id="dc-amount" data-dcp="amount" inputmode="decimal" value="${esc(d.amount ? numField(d.amount) : '')}" ${ro}><input id="dc-currency" data-dcp="currency" value="${esc(d.currency || '')}" maxlength="3" aria-label="${esc(tr('Currency'))}" placeholder="EUR" ${ro}></span>`, noAmt)}
       ${!ro && (noDue || noAmt) ? `<div class="row dc-f dc-optbtn"><button type="button" class="linkbtn" data-dc="showopt">${tr('Add')}: ${tr('Due')} / ${tr('Amount')}</button></div>` : ''}
       ${(d.custom_fields || []).map(f => dc_cfRow(d, f, ro)).join('')}
     </div>
@@ -336,8 +336,8 @@ function dc_cfRow(d, f, ro) {  // 2.153.0 (#2179): one custom field of the docum
   const input = f.type === 'checkbox' ? `<input type="checkbox" id="${id}" ${a} ${v === '1' ? 'checked' : ''} ${ro}>`
     : f.type === 'select' ? `<select id="${id}" ${a} ${ro}><option value=""></option>${(f.options || []).map(o => `<option value="${esc(o.id)}" ${o.id === v ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`
     : f.type === 'date' ? dateIn(id, v, {label: f.name, ro: !!ro, attrs: a})
-    : f.type === 'money' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? (LOCALE().startsWith('en') ? v : v.replace('.', ',')) : '')}" placeholder="0,00 EUR" ${ro}>`
-    : f.type === 'number' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? (LOCALE().startsWith('en') ? v : v.replace('.', ',')) : '')}" ${ro}>`
+    : f.type === 'money' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? v.replace(/^-?[\d.]+/, x => numField(x, 2, 2)) : '')}" placeholder="${esc(curMoney(0, 'EUR'))}" ${ro}>`
+    : f.type === 'number' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? numField(v) : '')}" ${ro}>`
     : f.type === 'url' ? `<span class="dc-amt"><input type="url" id="${id}" ${a} value="${esc(v)}" placeholder="https://" ${ro}>${v && /^https?:\/\//i.test(v) ? `<a class="iconbtn" href="${esc(v)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(tr('Open'))}">${ic('link')}</a>` : ''}</span>`
     : `<input id="${id}" ${a} value="${esc(v)}" maxlength="1000" ${ro}>`;
   return `<div class="row dc-f dc-cf"><label for="${id}">${esc(f.name)}</label>${input}${dc_auto(d, 'cf' + f.id)}</div>`;

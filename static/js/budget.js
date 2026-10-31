@@ -18,7 +18,7 @@ function bg_num(s) {
   let v = String(s ?? '').trim().replace(/\s|€/g, ''); if (!v) return null;
   const n = parseNum(v); return n != null && n > 0 && n <= 10000000 && Math.abs(Math.round(n * 100) - n * 100) < 1e-6 ? n : null;  // 2.263.0 (#2976)
 }
-const bg_numStr = n => n == null ? '' : String(n).replace('.', LOCALE().startsWith('en') ? '.' : ',');
+const bg_numStr = n => numField(n);  // 2.450.0 (#3770)
 const bg_lidOfHash = () => +(/^#budget\/(\d+)/.exec(location.hash)?.[1] || 0) || null;
 const bg_url = (p = '') => `/api/budget/${BG.lid}${p}`;
 
@@ -129,7 +129,7 @@ function bg_entryModal(e) {
     ${w ? `<label class="btn sm bgup">${ic('upload', 's')}<span>${tr('Add a receipt')}</span><input type="file" multiple data-bgf-up hidden></label>` : ''}${!w && !(x.files || []).length ? `<span class="muted">${tr('none')}</span>` : ''}</div></div>`;
   const md = bg_modal(`<h3>${ic('wallet', 's')} ${e ? tr('Edit entry') : tr('New entry')}</h3>
     <div class="row"><label>${tr('Kind')}</label>${bg_kindSeg(kind)}</div>
-    <div class="row"><label for="bg-amt">${tr('Amount')}</label><input id="bg-amt" inputmode="decimal" class="numin" autocomplete="off" value="${esc(bg_numStr(e?.amount))}" placeholder="0,00"></div>
+    <div class="row"><label for="bg-amt">${tr('Amount')}</label><input id="bg-amt" inputmode="decimal" class="numin" autocomplete="off" value="${esc(bg_numStr(e?.amount))}" placeholder="${esc(fmtNum(0, 2, 2))}"></div>
     <div class="row"><label id="bg-dayl">${tr('Date')}</label>${dateIn('bg-day', day0, {label: tr('Date')})}</div>
     <div class="row"><label for="bg-title">${tr('What')}</label><input id="bg-title" maxlength="200" autocomplete="off" value="${esc(e?.title || '')}" placeholder="${esc(tr('e.g. Groceries, rent, salary'))}"></div>
     <div class="row"><label for="bg-cat">${tr('Category')}</label><select id="bg-cat">${bg_catOpts(kind, e?.cat_id)}</select></div>
@@ -277,7 +277,7 @@ async function bg_recModal() {
   const formHtml = r => `<div class="bgrform" data-rid="${r?.id || ''}"><h4>${r ? tr('Edit recurring entry') : tr('New recurring entry')}</h4>
     <div class="row"><label>${tr('Kind')}</label>${bg_kindSeg(r?.kind || 'out', 'bg-rkind')}</div>
     <div class="row"><label for="bg-rt">${tr('What')}</label><input id="bg-rt" maxlength="200" autocomplete="off" value="${esc(r?.title || '')}" placeholder="${esc(tr('e.g. Rent'))}"></div>
-    <div class="row"><label for="bg-ra">${tr('Amount')}</label><input id="bg-ra" class="numin" inputmode="decimal" value="${esc(bg_numStr(r?.amount))}" placeholder="0,00"></div>
+    <div class="row"><label for="bg-ra">${tr('Amount')}</label><input id="bg-ra" class="numin" inputmode="decimal" value="${esc(bg_numStr(r?.amount))}" placeholder="${esc(fmtNum(0, 2, 2))}"></div>
     <div class="row"><label for="bg-rper">${tr('How often')}</label><select id="bg-rper">${Object.entries(BG_PER).map(([k, w]) => `<option value="${k}" ${(r?.per || 'month') === k ? 'selected' : ''}>${tr(w)}</option>`).join('')}</select></div>
     <div class="row"><label for="bg-rc">${tr('Category')}</label><select id="bg-rc">${bg_catOpts(r?.kind || 'out', r?.cat_id)}</select></div>
     <div class="row"><label for="bg-rs">${tr('From')}</label><select id="bg-rs">${bg_monthOpts(r?.start || BG.data?.month || bg_month())}</select></div>

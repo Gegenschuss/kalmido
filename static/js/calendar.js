@@ -140,7 +140,7 @@ function calInvalidate() { S.cal.key = ''; S.cal.loading = ''; S.cal.seq = (S.ca
 // 2.30.0 (#1036): an own event of a calendar outside the shown workspace is left out (subscriptions and invitations stay)
 const cevWs = e => !e.own || e.cal == null || wsObjIn(evCal(e.cal));
 const cevOn = d => S.cal.items.filter(e => e.d0 <= d && e.d1 >= d && cevWs(e));
-const cevSort = (a, b) => (b.all_day - a.all_day) || a.start.localeCompare(b.start) || a.title.localeCompare(b.title);
+const cevSort = (a, b) => (b.all_day - a.all_day) || a.start.localeCompare(b.start) || cmpText(a.title, b.title);
 const cevColor = e => e.booking ? 'var(--accent)' : abcX(e) ? 'var(--muted)' : e.own ? evCalColor(e) : cssColor(S.cal.subs[e.sub]?.color) || '#94a3b8';  // 2.50.0 (#1194): bookings
 const cevCal = e => e.booking ? tr('Disposition') : e.holiday ? tr('Public holidays') : e.absence ? (e.absence === 'team' ? tr('Team absences') : tr('Absences')) : e.own ? evCalName(e) : S.cal.subs[e.sub]?.name || tr('Calendar');
 const cevTitle = e => e.title || tr('(no title)');

@@ -448,7 +448,7 @@ function shvOptimistic(sh, chg) {
 async function shvPut(chg, label) {
   const sh = SHV.sh; if (!sh || !sh.can_write) return null;
   // 2.263.0 (#2977): a slash date in a date column goes as YYYY-MM-DD in the order of the region (en-US 10/23/2026)
-  chg = chg.map(x => sh._col.get(x.col_id)?.kind === 'date' && /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test((x.raw || '').trim()) ? {...x, raw: sgDay(x.raw) || x.raw} : x);
+  chg = chg.map(x => sh._col.get(x.col_id)?.kind === 'date' && /^\d{1,2}([/-])\d{1,2}\1\d{2,4}$/.test((x.raw || '').trim()) ? {...x, raw: sgDay(x.raw) || x.raw} : x);
   chg = chg.filter(x => (x.raw ?? '') !== shvRaw(x.row_id, x.col_id));
   if (!chg.length) return null;
   const sid = sh.id, old = chg.map(x => ({row_id: x.row_id, col_id: x.col_id, raw: shvRaw(x.row_id, x.col_id)}));

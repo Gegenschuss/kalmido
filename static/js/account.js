@@ -1008,7 +1008,7 @@ async function stoCheck(md) {
 }
 const bkHtml = () => `<h4 id="s-bk-h">${tr('Backups')}</h4><div class="shint">${tr('The server key KALMIDO_SECRET_KEY is not part of a backup: keep it separately. A backup restores the encrypted organisation data only with that key (or with the organisations’ recovery keys).')}</div><div id="s-bk"><div class="muted mhint">${tr('Loading…')}</div></div><h4 id="s-bko-h">${tr('Off-site backup')}</h4><div id="s-bko"></div>`;  // 2.143.0 B (#2152): + the off-site target
 const BK_KIND = {auto: N_('automatic'), manual: N_('manual'), safety: N_('before a restore')};
-const fmtBytes = n => n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round((n || 0) / 1e3)) + ' kB';
+const fmtBytes = n => fmtSize(Math.max(n || 0, 1024));  // 2.450.0 (#3770): fmtSize, at least "1 KB"
 async function bkDraw(md, j) {
   const box = $('#s-bk', md); if (!box) return;
   scnStatus(md);  // 2.61.0 (#1818): the virus scanner's line (once)

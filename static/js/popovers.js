@@ -422,12 +422,12 @@ function fmtDateNum(d, year = true) {
   const o = fmtPref('date_order');
   if (o) { const D = pad(d.getDate()), M = pad(d.getMonth() + 1), Y = d.getFullYear();
     return o === 'ymd' ? (year ? `${Y}-${M}-${D}` : `${M}-${D}`) : o === 'mdy' ? `${M}/${D}${year ? '/' + Y : ''}` : `${D}.${M}.${year ? Y : ''}`; }
-  try { return d.toLocaleDateString(LOCALE(), {day: '2-digit', month: '2-digit', ...(year ? {year: 'numeric'} : {})}); } catch { return ds(d); }
+  try { return d.toLocaleDateString(dpLocale(), {day: '2-digit', month: '2-digit', ...(year ? {year: 'numeric'} : {})}); } catch { return ds(d); }  // 2.450.0 (#3770): the region of the times, no 28/10 next to 2:05 PM
 }
 // a moment as numbers: date + time ("28/10/2026 14:05")
 const fmtStamp = (d, year = true) => `${fmtDateNum(d, year)} ${fmtTimeAt(d)}`;
 // a moment with the date in words: "28 Oct 2026, 14:05" (activity logs, versions)
-const fmtMoment = d => { try { return d.toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short', hour12: hour12()}); } catch { return fmtStamp(d); } };
+const fmtMoment = d => { try { return d.toLocaleString(dpLocale(), {dateStyle: 'medium', timeStyle: 'short', hour12: hour12()}); } catch { return fmtStamp(d); } };
 // weeks that keep Monday when automatic (dispatch, habit weeks), the chosen first day otherwise
 const weekOf = s => fmtPref('week_start') ? weekStartOf(s) : mondayOf(s);
 const fmtDateLoc = s => !/^\d{4}-\d\d-\d\d$/.test(s || '') ? '' : fmtDay(pd(s).getFullYear() !== new Date().getFullYear() ? 'year' : 'short', pd(s));

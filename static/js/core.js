@@ -60,6 +60,11 @@ function parseNum(v, frac) {
   const n = parseFloat(sign + s); return Number.isFinite(n) ? n : null;
 }
 // a typed number for a request body: '' = null, a number = the number, anything else = the text (the server names the field)
+// 2.450.0 (#3770): a stored number as the text of an input field in the app language, without groups ("1234,5"); parseNum reads it back
+const numField = (v, d = 6, min = 0) => v == null || v === '' ? '' : Number.isFinite(+v) ? (+v).toLocaleString(LOCALE(), {useGrouping: false, minimumFractionDigits: min, maximumFractionDigits: d}) : String(v);
+// 2.450.0 (#3770): ONE order for names, tags and titles: the app language's (Spanish ñ after n, Swedish ä at the end), never a fixed one
+const cmpColl = {};
+const cmpText = (a, b) => (cmpColl[LOCALE()] ||= new Intl.Collator(LOCALE())).compare(String(a ?? ''), String(b ?? ''));
 const numBody = v => { const t = String(v ?? '').trim(); if (!t) return null; const n = parseNum(t); return n == null ? t : n; };
 // weekday / month names + date patterns come from the language file (i18n.js: WD, WDL, MON, MONS, fmtDay), weeks still start on Monday
 const WD_MO = () => [1, 2, 3, 4, 5, 6, 0].map(i => WD[i]);  // calendar header, Monday first

@@ -251,7 +251,7 @@ function teamPeople() {
   if (!collab()) return [];
   const seen = new Map();
   for (const l of S.lists) for (const p of listPeople(l)) if (p.user_id && (!S.me || p.user_id !== S.me.id) && !agentById(p.user_id) && !seen.has(p.user_id)) seen.set(p.user_id, p.name || personNameAny(p.user_id));
-  return [...seen.entries()].map(([id, name]) => ({id, name})).sort((a, b) => a.name.localeCompare(b.name));
+  return [...seen.entries()].map(([id, name]) => ({id, name})).sort((a, b) => cmpText(a.name, b.name));
 }
 // 2.36.0 (#1117): the sidebar's list icons (line | emoji | dot) and its progress bars, per person on every device
 const sbiMode = () => ['line', 'emoji', 'dot'].includes(S.settings?.side_icons) ? S.settings.side_icons : 'line';
@@ -403,7 +403,7 @@ function renderSide0() {
   sbb_treeReg('lf', LF_TREE_H);
   lh += sbb_treeHtml(folderNames().filter(x => !fParent(x) && fShown(x)).map(fnode));
   const archived = S.lists.filter(l => l.archived && inWs(l));
-  const tags = Object.keys(c.tags).sort((a, b) => a.localeCompare(b, 'de'));
+  const tags = Object.keys(c.tags).sort(cmpText);
   // Focus: the smart lists
   // 2.25.0 (UX-03 / UX-49): Plan (the smart lists) as [key, html]: each entry can be hidden in Settings > Appearance > Sidebar;
   // (UX-47) the team chat and News moved to the group "Conversations" with the people and agents
@@ -1879,7 +1879,7 @@ function viewListBody() {
 // shared list): Open, Restore (owner, undoable) and Delete permanently (owner; 2.39.1 #1188: also list admins and organisation admins)
 function viewArchived() {
   const ls = S.lists.filter(l => l.archived && inWs(l)).sort((a, b) =>  // 2.380.2 (#3407): the shown workspace
-    (b.archived_at || '').localeCompare(a.archived_at || '') || lname(a).localeCompare(lname(b)));
+    (b.archived_at || '').localeCompare(a.archived_at || '') || cmpText(lname(a), lname(b)));
   if (!ls.length) return `<div class="empty">${ic('archive')}${tr('No archived projects.')}<br><span class="muted">${tr('Archive a project from its “…” menu; it disappears from the sidebar and its tasks from Today and the calendar.')}</span></div>`;
   return `<div class="archv">${ls.map(l => {
     const p = l.progress || {done: 0, total: 0}, own = isOwner(l), em = leadEmoji(l.name), name = em ? l.name.slice(em.length).trim() : listName(l.name);
