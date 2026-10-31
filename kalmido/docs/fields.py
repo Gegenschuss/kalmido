@@ -185,7 +185,7 @@ def df_value(f, v):
         if not m:
             raise ValueError(tr("{0}: number expected", name))
         amount, cur = (m.group(1), m.group(2)) if m.re is MONEY_RE else (m.group(2), m.group(1))
-        x = doc_amount(amount)  # 2.456.0 (#3819): read like a document's amount, by language; too many decimals are refused
+        x = len(amount) <= 20 and doc_amount(amount)  # 2.456.0 (#3819): read like a document's amount, by language; too many decimals are refused
         if not x:
             raise ValueError(tr("{0}: number expected", name))
         return f"{float(x):.2f} {cur.upper()}".strip()

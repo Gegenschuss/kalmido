@@ -56,7 +56,7 @@ for s, who, cases in ((Fr, "en", (("1.234,56", "1234.56"), ("1,234.56", "1234.56
 
 # ---- 2.456.0 (#3819): a money field of a document reads like the amount, by language; too many decimals are refused
 for s, who, cases in ((Fr, "en", (("1,500", "1500.00"), ("1,5 €", "1.50 EUR"), ("1.234,50", "1234.50"), ("USD 1,234.56", "1234.56 USD"))),
-                      (Fn, "nl", (("1,500", "1.50"), ("1.234,50 €", "1234.50 EUR"), ("1500", "1500.00"), ("1,234", None), ("12.345", None), ("abc", None)))):
+                      (Fn, "nl", (("1,500", "1.50"), ("1.234,50 €", "1234.50 EUR"), ("1500", "1500.00"), ("1,234", None), ("12.345", None), ("abc", None), ("0" * 22 + "12", None)))):
     f = s.post(B + "/api/docs/fields", json={"ws": "private", "name": "Kaution", "type": "money"})
     check(f.status_code == 201, f"#3819: {who} a money field {f.status_code} {f.text[:160]}")
     did = DOCS[who]
