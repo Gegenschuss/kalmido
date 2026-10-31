@@ -19,6 +19,7 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FILES = ("Dockerfile", "embed/Dockerfile")
 LOCKS = {"Dockerfile": "tools/requirements.lock", "embed/Dockerfile": "embed/requirements.lock"}
+STATIC_LOCK = "tools/requirements.static.lock"  # the build stage staticpack of Dockerfile
 FROM_RE = re.compile(r"^FROM\s+(?:--platform=\S+\s+)?(\S+)", re.M)
 IMAGE_RE = re.compile(r"^([a-z0-9._/-]+):([A-Za-z0-9._-]+)@(sha256:[0-9a-f]{64})$")
 # a multi-platform image: the digest of its index, the same for every platform
@@ -64,6 +65,8 @@ def problems():
         if re.search(r"pip install[^\n]*==", text):
             out.append(f"{rel}: packages named in the pip install line instead of the lock file")
         out += lock_problems(LOCKS[rel], read(LOCKS[rel]))
+    if os.path.exists(os.path.join(ROOT, STATIC_LOCK)):
+        out += lock_problems(STATIC_LOCK, read(STATIC_LOCK))
     ci = ".github/workflows/ci.yml"
     if os.path.exists(os.path.join(ROOT, ci)):
         for line in read(ci).split("\n"):

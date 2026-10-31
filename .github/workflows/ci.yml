@@ -139,7 +139,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Image key (build inputs + week)
         id: key
-        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
       - name: Image in the cache?
         id: cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -231,6 +231,7 @@ jobs:
       - name: pip-audit (image and embedding service)
         run: |
           pip-audit --strict --disable-pip --require-hashes -r tools/requirements.lock
+          pip-audit --strict --disable-pip --require-hashes -r tools/requirements.static.lock
           pip-audit --strict --disable-pip --require-hashes -r embed/requirements.lock
       # 2.360.3 (#2915): nothing of tests/ ships, so a finding there is reported without stopping the build
       - name: pip-audit of the test tools (informational)
@@ -360,7 +361,7 @@ jobs:
       # 2.180.0 A (#2692): the image of the job "image" (same key) when it is in the cache, else built here
       - name: Image key
         id: imgkey
-        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
       - name: Image cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         continue-on-error: true
@@ -433,7 +434,7 @@ jobs:
       # 2.180.0 A (#2692): the image of the job "image" (same key) when it is in the cache, else built here
       - name: Image key
         id: imgkey
-        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
       - name: Image cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         continue-on-error: true

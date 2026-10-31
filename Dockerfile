@@ -22,7 +22,8 @@ RUN set -e; go vet ./...; go test ./...; v="$(cat /VERSION)"; \
 # 2.360.3 (#2915): base images by digest (the tag stays readable), kept current with tools/pins.py --update
 # 2.442.0 (#2808): JS / CSS packed ahead of time (gzip, brotli) on the build machine, the app sends them by Accept-Encoding
 FROM --platform=${BUILDPLATFORM:-linux/amd64} python:3.12-slim@sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159 AS staticpack
-RUN pip install --no-cache-dir brotli==1.2.1
+COPY tools/requirements.static.lock /tmp/requirements.lock
+RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock
 COPY static /src/static
 COPY kalmido/core/strip.py tools/pack_static.py /src/tools/
 RUN python /src/tools/pack_static.py /src/static /out
