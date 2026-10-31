@@ -496,6 +496,13 @@ a second finger or a cancel event, and swallows the click after a drag. The call
 hold) and the mind map (`mindmap.js`: rehanging a branch, the drop target in map coordinates; moving the map and pinch stay
 its own pointer handling) use it.
 
+2.456.0 (#3837): the order of the rows of a list is the same gesture everywhere: `rowd_attach(root, {kind, row, move})` in
+`drag.js` on `drg_attach`. The grip (`data-rowd="kind"`, `rowd_grip` / `rowd_attr`; a position's symbol where the row is full
+of fields) drags with a mouse at once, with a finger after a 0.38 s hold; a line shows where the row lands, `move(from, to,
+row, list)` saves with the same code as the arrows. `rowd_arrows` keeps the arrows on a computer for the keyboard and leaves
+them out on a touch screen (no hover). Used by quotation positions and parts, form questions, budget categories, the
+arrangements, sidebar views, key links, scanned pages and the phone list of "Arrange blocks".
+
 2.193.0 C (#2219): task rows and chips (`dnd.js`, list / board / matrix / calendar, the selection's grip) drag by finger
 on `drg_attach`: the long press is `hold` (0.38 s, 8 px; 0 on the grip), `onHold` lifts the row at once (ghost, "Move to
 project", from then on the page does not scroll under the finger), let go without moving = `onTap` (select / "Move to

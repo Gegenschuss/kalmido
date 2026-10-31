@@ -12,15 +12,15 @@ const fq_kindName = k => tr((FQ_KINDS.find(x => x[0] === k) || FQ_KINDS[0])[1]);
 function fq_rowHtml(q) {
   const opts = q.kind === 'choice' || q.kind === 'multi';
   return `<div class="fqe" data-qid="${esc(q.id || '')}" data-k="${esc(q.kind)}">
-    <button type="button" class="iconbtn fqe-grip" data-fq="grip" title="${esc(tr('Drag to reorder'))}" aria-label="${esc(tr('Drag to reorder'))}">${ic('grip', 's')}</button>
+    <button type="button" class="iconbtn fqe-grip rowgrip" data-rowd="fq" data-fq="grip" title="${esc(tr('Drag to reorder'))}" aria-label="${esc(tr('Drag to reorder'))}">${ic('grip', 's')}</button>
     <div class="fqe-main">
       <div class="fqe-top"><span class="fqe-kind">${esc(fq_kindName(q.kind))}</span><input class="fqe-label" maxlength="300" value="${esc(q.label || '')}" placeholder="${esc(tr('Question'))}" aria-label="${esc(tr('Question'))}"></div>
       <input class="fqe-help" maxlength="500" value="${esc(q.help || '')}" placeholder="${esc(tr('Help text (optional)'))}" aria-label="${esc(tr('Help text (optional)'))}">
       ${opts ? `<textarea class="fqe-opts" rows="3" placeholder="${esc(tr('One option per line'))}" aria-label="${esc(tr('Options'))}">${esc((q.options || []).join('\n'))}</textarea>` : ''}
       <label class="chkl"><input type="checkbox" class="fqe-req" ${q.required ? 'checked' : ''}> ${tr('Required')}</label>
     </div>
-    <div class="fqe-btns"><button type="button" class="iconbtn" data-fq="up" title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up'))}">${ic('up', 's')}</button>
-      <button type="button" class="iconbtn" data-fq="down" title="${esc(tr('Move down'))}" aria-label="${esc(tr('Move down'))}">${ic('down', 's')}</button>
+    <div class="fqe-btns">${rowd_arrows(`<button type="button" class="iconbtn" data-fq="up" title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up'))}">${ic('up', 's')}</button>
+      <button type="button" class="iconbtn" data-fq="down" title="${esc(tr('Move down'))}" aria-label="${esc(tr('Move down'))}">${ic('down', 's')}</button>`)}
       <button type="button" class="iconbtn" data-fq="del" title="${esc(tr('Delete question'))}" aria-label="${esc(tr('Delete question'))}">${ic('trash', 's')}</button></div></div>`;
 }
 
@@ -98,21 +98,8 @@ function fq_bind(ed, f) {
       rawFetch('GET', `/api/forms/${f.id}/client-link?client=${cid}`).then(j => fq_ckCopy(j.url), x => toast(x.message || tr('Only available online.')));
     }
   });
-  // dragging by the grip: mouse, pen and touch alike (pointer events; the row follows the pointer's height; touch-action
-  // none on the grip keeps the page from scrolling)
-  list.addEventListener('pointerdown', e => {
-    const g = e.target.closest('.fqe-grip'); if (!g || e.button) return;
-    const row = g.closest('.fqe'); e.preventDefault();
-    row.classList.add('dragging');  // the listeners sit on the document: moving the row in the DOM ends a pointer capture
-    const move = ev => {
-      const rows = [...$$('.fqe', list)].filter(r => r !== row);
-      const after = rows.find(r => { const b = r.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
-      if (after) { if (after.previousElementSibling !== row) after.before(row); } else if (list.lastElementChild !== row) list.append(row);
-    };
-    const dc = list.ownerDocument;
-    const end = () => { row.classList.remove('dragging'); dc.removeEventListener('pointermove', move); dc.removeEventListener('pointerup', end); dc.removeEventListener('pointercancel', end); };
-    dc.addEventListener('pointermove', move); dc.addEventListener('pointerup', end); dc.addEventListener('pointercancel', end);
-  });
+  // 2.456.0 (#3837): the shared row drag: hold the grip on a touch screen, drag it with a mouse
+  rowd_attach(ed, {kind: 'fq', row: '.fqe', move: (from, to, row, l) => { const rs = $$('.fqe', l).filter(r => r !== row); if (rs[to]) rs[to].before(row); else l.append(row); }});
 }
 
 // the submissions of a form: newest first, the answers folded, the task one tap away, a CSV of all

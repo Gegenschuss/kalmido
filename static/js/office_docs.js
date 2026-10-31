@@ -373,21 +373,27 @@ function ofdPaymentsHtml(d, adm) {
   if (d.status === 'cancelled') return list + sum + cr;
   return list + sum + cr + (adm ? `<button type="button" class="btn sm" data-ofd="pay">${ic('plus', 's')}<span>${tr('Record payment')}</span></button>` : `<p class="muted ofchint">${tr('Only an admin of this organisation can record payments')}</p>`);  // 2.39.1 (#1210 N3)
 }
+// 2.456.0 (#3837): a position to another place, by the arrows and by dragging its symbol
+async function ofdMoveItem(d, i, j) { d.items.splice(j, 0, d.items.splice(i, 1)[0]); await ofdPutItems(); }
+rowd_attach(document, {kind: 'it', row: '.ofdit', move: (from, to, row, list) => {
+  if (typeof tpf_ctx === 'function') tpf_ctx(list);  // the open part the list belongs to
+  return ofdMoveItem(typeof tpCur === 'function' ? tpCur() : OFD.doc, from, to);
+}});
 function ofdItemsHtml(d, adm) {
   const its = d.items || [], inv = ofdIsInv(d);
-  const taxes = OFC_TAXES.map(([v, n]) => [v, ofcTax(v)]);
+  const taxes = OFC_TAXES.map(([v, n]) => [v, ofcTax(v)]), gp = rowd_attr('it');  // 2.456.0 (#3837): the position symbol is the grip
   const rows = its.map((it, i) => {
-    const mv = `<span class="ofdmv"><button type="button" class="ib" data-ofd="it-up" data-i="${i}" ${i === 0 ? 'disabled' : ''} aria-label="${esc(tr('Move up'))}">${ic('up', 's')}</button><button type="button" class="ib" data-ofd="it-down" data-i="${i}" ${i === its.length - 1 ? 'disabled' : ''} aria-label="${esc(tr('Move down'))}">${ic('down', 's')}</button><button type="button" class="ib" data-ofd="it-del" data-i="${i}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></span>`;
-    if (it.kind === 'heading') return `<li class="ofdit ofdhd"><span class="ofdpos muted">${ic('list', 's')}</span><input data-i="${i}" data-k="title" value="${esc(it.title)}" maxlength="500" placeholder="${esc(tr('Heading (category)'))}" aria-label="${esc(tr('Heading'))}">${mv}</li>`;
-    if (it.kind === 'text') return `<li class="ofdit ofdtx"><span class="ofdpos muted">${ic('note', 's')}</span><textarea data-i="${i}" data-k="detail" rows="2" maxlength="4000" placeholder="${esc(tr('Text block'))}" aria-label="${esc(tr('Text block'))}">${esc(it.detail)}</textarea>${mv}</li>`;
+    const mv = `<span class="ofdmv">${rowd_arrows(`<button type="button" class="ib" data-ofd="it-up" data-i="${i}" ${i === 0 ? 'disabled' : ''} aria-label="${esc(tr('Move up'))}">${ic('up', 's')}</button><button type="button" class="ib" data-ofd="it-down" data-i="${i}" ${i === its.length - 1 ? 'disabled' : ''} aria-label="${esc(tr('Move down'))}">${ic('down', 's')}</button>`)}<button type="button" class="ib" data-ofd="it-del" data-i="${i}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></span>`;
+    if (it.kind === 'heading') return `<li class="ofdit ofdhd"><span class="ofdpos muted rowgrip" ${gp}>${ic('list', 's')}</span><input data-i="${i}" data-k="title" value="${esc(it.title)}" maxlength="500" placeholder="${esc(tr('Heading (category)'))}" aria-label="${esc(tr('Heading'))}">${mv}</li>`;
+    if (it.kind === 'text') return `<li class="ofdit ofdtx"><span class="ofdpos muted rowgrip" ${gp}>${ic('note', 's')}</span><textarea data-i="${i}" data-k="detail" rows="2" maxlength="4000" placeholder="${esc(tr('Text block'))}" aria-label="${esc(tr('Text block'))}">${esc(it.detail)}</textarea>${mv}</li>`;
     const line = (d.totals?.lines || []).find(l => (l.kind === 'item' || l.kind === 'discount') && l.id === it.id);
     if (it.kind === 'part' && typeof tpItemRow === 'function') return tpItemRow(it, i, d, line, mv);  // 2.47.0 (#1215): a part on the title page
-    if (it.kind === 'discount') return `<li class="ofdit ofddisc"><span class="ofdpos">${line?.pos || ''}</span>
+    if (it.kind === 'discount') return `<li class="ofdit ofddisc"><span class="ofdpos rowgrip" ${gp}>${line?.pos || ''}</span>
       <div class="ofditb"><input class="ofdtt" data-i="${i}" data-k="title" value="${esc(it.title)}" maxlength="500" placeholder="${esc(tr('Discount'))}" aria-label="${esc(tr('Discount'))}">
       <span class="ofdnums"><span class="muted">−</span><input data-i="${i}" data-k="rate" inputmode="decimal" class="numin ofdrate" value="${esc(ofdNumIn(it.rate))}" aria-label="${esc(tr('Amount'))}"><span class="muted">${esc(ofcSym(ofcHome()))}</span>
       <select data-i="${i}" data-k="tax" aria-label="${esc(tr('VAT'))}">${taxes.map(([v, n]) => `<option value="${v}" ${it.tax === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
       <b class="ofdlt">${line ? esc(line.total_text || ofdMoney(line.total, d)) : ''}</b></span></div>${mv}</li>`;
-    return `<li class="ofdit${it.agent_flag ? ' oa_flag' : ''}${it.producing && !inv ? ' ofdprod' : ''}"><span class="ofdpos">${line?.pos || ''}</span>
+    return `<li class="ofdit${it.agent_flag ? ' oa_flag' : ''}${it.producing && !inv ? ' ofdprod' : ''}"><span class="ofdpos rowgrip" ${gp}>${line?.pos || ''}</span>
       <div class="ofditb"><input class="ofdtt" data-i="${i}" data-k="title" value="${esc(it.title)}" maxlength="500" placeholder="${esc(tr('Service'))}" aria-label="${esc(tr('Service'))}">
       <input class="ofddt" data-i="${i}" data-k="detail" value="${esc(it.detail)}" maxlength="4000" placeholder="${esc(tr('Detail (optional)'))}" aria-label="${esc(tr('Detail'))}">
       <span class="ofdnums">${it.unit === 'percent' ? ekUnitSel(it, i, d) + ekPctHtml(it, i, line, d) : `<input data-i="${i}" data-k="qty" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.qty))}" aria-label="${esc(tr('Quantity'))}">
@@ -835,7 +841,7 @@ async function ofdClick(e) {
     return;
   }
   if (a === 'it-del') { d.items.splice(+b.dataset.i, 1); await ofdPutItems(); return; }
-  if (a === 'it-up' || a === 'it-down') { const i = +b.dataset.i, j = a === 'it-up' ? i - 1 : i + 1; if (j < 0 || j >= d.items.length) return; [d.items[i], d.items[j]] = [d.items[j], d.items[i]]; await ofdPutItems(); setTimeout(() => $(`${sc}.ofdits [data-ofd="${a}"][data-i="${j}"]`)?.focus(), 0); return; }
+  if (a === 'it-up' || a === 'it-down') { const i = +b.dataset.i, j = a === 'it-up' ? i - 1 : i + 1; if (j < 0 || j >= d.items.length) return; await ofdMoveItem(d, i, j); setTimeout(() => $(`${sc}.ofdits [data-ofd="${a}"][data-i="${j}"]`)?.focus(), 0); return; }
   if (a === 'client-new') { if (typeof clientModal === 'function') clientModal(null, {org_id: pb_clOrg(), stay: true, quick: true, done: r => ofdPatch({client_id: r.id})}); return; }  // 2.80.0 (#1842); 2.97.0 B (#1951): set as the document's client
   if (a === 'client-edit') { await cdn_editClient(d); return; }
   if (a === 'fld-add') { d.fields = [...(d.fields || []), {name: '', value: ''}]; OFD.open.fields = true; ofdDraw(); setTimeout(() => $(`#ofd-fields [data-fld="${d.fields.length - 1}"][data-k="name"]`)?.focus(), 0); return; }

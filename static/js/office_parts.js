@@ -47,7 +47,7 @@ function tpProdNote(p) {
 // ---- the title page: a part line (title, quantity x the part's net, open)
 function tpItemRow(it, i, d, line, mv) {
   const p = tpPart(d, it.ref_part_id), pn = tpProdNote(p);
-  return `<li class="ofdit tppl"><span class="ofdpos">${line?.pos || ''}</span>
+  return `<li class="ofdit tppl"><span class="ofdpos rowgrip" ${rowd_attr('it')}>${line?.pos || ''}</span>
     <div class="ofditb"><input class="ofdtt" data-i="${i}" data-k="title" value="${esc(it.title)}" maxlength="500" placeholder="${esc(p?.title || tr('Part'))}" aria-label="${esc(tr('Part'))}">
     ${pn ? `<small class="muted tpprod">${esc(pn)}</small>` : ''}
     <span class="ofdnums"><input data-i="${i}" data-k="qty" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.qty))}" aria-label="${esc(tr('Quantity'))}">
@@ -70,12 +70,12 @@ function tpPartsHtml(d, adm) {
   const ps = d.parts || [];
   if (OFD.open.parts == null) OFD.open.parts = ps.length > 0;
   // 2.113.0 (#2248): a part opens right here (several at once), in its own colour; the row toggles it
-  const rows = ps.map((p, i) => { const on = tpf_isOpen(d, p.id); return `<li class="ofdit tprow ${tpf_cls(d, p.id)}${on ? ' tpfon' : ''}">
+  const rows = ps.map((p, i) => { const on = tpf_isOpen(d, p.id); return `<li class="ofdit tprow ${tpf_cls(d, p.id)}${on ? ' tpfon' : ''}"><span class="ofdpos rowgrip" ${rowd_attr('tp')}>${ic('grip', 's')}</span>
     <a href="#" role="button" class="tpopen" data-ofd="tp-open" data-tog="1" data-pid="${p.id}" aria-expanded="${on}"><span class="tpfdot" aria-hidden="true"></span><span class="ofcn"><b>${esc(p.title || tr('Part'))}</b><small class="muted">${esc([p.kind === 'shoot' ? tr('Shoot calculation') : tr('{0} positions', (p.items || []).filter(x => x.kind === 'service').length),
       tpProdNote(p), p.used ? (p.used > 1 ? tr('{0} times on the title page', p.used) : '') : '', p.print ? '' : tr('not printed')].filter(Boolean).join(' · '))}</small>${p.used ? '' : `<small class="tpunused">${esc(tr('not on the title page: does not count'))}</small>`}</span>
       <b class="ofdlt">${esc(tpMoney(p.totals?.net, d))}</b><span class="tpfchev" aria-hidden="true">${ic('right', 's')}</span></a>
     ${on ? '' : `<label class="chkl tpprint"><input type="checkbox" data-tp="print" data-pid="${p.id}" ${p.print ? 'checked' : ''}> ${tr('Print')}</label>`}
-    <span class="ofdmv"><button type="button" class="ib" data-ofd="tp-up" data-pid="${p.id}" ${i === 0 ? 'disabled' : ''} aria-label="${esc(tr('Move up'))}">${ic('up', 's')}</button><button type="button" class="ib" data-ofd="tp-down" data-pid="${p.id}" ${i === ps.length - 1 ? 'disabled' : ''} aria-label="${esc(tr('Move down'))}">${ic('down', 's')}</button><button type="button" class="ib" data-ofd="tp-del" data-pid="${p.id}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></span>${on ? `<div class="tpfbox" data-pid="${p.id}">${tpPartEditorHtml(d, adm, p.id)}</div>` : ''}</li>`; }).join('');
+    <span class="ofdmv">${rowd_arrows(`<button type="button" class="ib" data-ofd="tp-up" data-pid="${p.id}" ${i === 0 ? 'disabled' : ''} aria-label="${esc(tr('Move up'))}">${ic('up', 's')}</button><button type="button" class="ib" data-ofd="tp-down" data-pid="${p.id}" ${i === ps.length - 1 ? 'disabled' : ''} aria-label="${esc(tr('Move down'))}">${ic('down', 's')}</button>`)}<button type="button" class="ib" data-ofd="tp-del" data-pid="${p.id}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></span>${on ? `<div class="tpfbox" data-pid="${p.id}">${tpPartEditorHtml(d, adm, p.id)}</div>` : ''}</li>`; }).join('');
   const add = `<div class="ofdadd"><button type="button" class="btn sm" data-ofd="tp-add" data-kind="items">${ic('plus', 's')}<span>${tr('Add part')}</span></button>${d.parts_shoot && OFC.info?.industry?.length ? tpPackBtns(OFC.info.industry) : ''}</div>`;
   return ofdSec('parts', tr('Parts'), `${ps.length ? `<ul class="ofdits tplist" role="list">${rows}</ul>` : `<p class="muted">${tr('A part is an own page of the quotation (e.g. a module or a shooting day). The title page lists it with a quantity.')}</p>`}${add}`,
     ps.length ? `<span class="c muted">${ps.length}</span>` : '');
@@ -153,12 +153,17 @@ async function tpClick(a, b) {
   }
   if (a === 'tp-up' || a === 'tp-down') {
     const j = a === 'tp-up' ? i - 1 : i + 1; if (j < 0 || j >= ps.length) return;
-    const k = a === 'tp-up' ? j - 1 : j + 1, lo = ps[Math.min(j, k)]?.sort, hi = ps[Math.max(j, k)]?.sort, at = ps[j].sort;  // between the neighbour and the one behind it
-    const sort = a === 'tp-up' ? (lo != null ? (lo + at) / 2 : at - 1) : (hi != null ? (hi + at) / 2 : at + 1);
-    await ofdSave('PATCH', `/api/office/docs/${d.id}/parts/${pid}`, {sort});
+    await tpMovePart(d, i, j);
     setTimeout(() => $(`.tplist [data-ofd="${a}"][data-pid="${pid}"]`)?.focus(), 0);
   }
 }
+// 2.456.0 (#3837): a part to another place, by the arrows and by dragging: its sort between the new neighbours
+async function tpMovePart(d, i, to) {
+  const ps = d.parts || [], rest = ps.filter((_, n) => n !== i), lo = rest[to - 1]?.sort, hi = rest[to]?.sort;
+  const sort = lo != null && hi != null ? (lo + hi) / 2 : lo != null ? lo + 1 : hi != null ? hi - 1 : 0;
+  await ofdSave('PATCH', `/api/office/docs/${d.id}/parts/${ps[i].id}`, {sort});
+}
+rowd_attach(document, {kind: 'tp', row: '.tprow', move: (from, to) => { if (OFD.doc?.can_edit) return tpMovePart(OFD.doc, from, to); }});
 async function tpChange(t) {
   const d = OFD.doc, pid = +t.dataset.pid;
   if (!d || !tpPart(d, pid)) return;

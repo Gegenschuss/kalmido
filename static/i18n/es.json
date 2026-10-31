@@ -390,7 +390,6 @@
   "Computer": "Ordenador",
   "Reset to the standard": "Volver al estándar",
   "Blocks": "Bloques",
-  "Use the arrows to change the order.": "Usa las flechas para cambiar el orden.",
   "Drag a row or use the arrows.": "Arrastra la fila o usa las flechas.",
   "Alt + arrow keys move the focused row.": "Alt + flechas mueven la fila seleccionada.",
   "{0} hidden. “+ Block” brings it back.": "{0} oculto. «+ Bloque» lo recupera.",
@@ -15376,5 +15375,6 @@
   "This recognition can no longer be taken back": "Este reconocimiento ya no se puede deshacer",
   "The CSV counts comments and attachments but does not contain them. For everything, use the account export.": "El CSV cuenta los comentarios y adjuntos, pero no los contiene. Para tenerlo todo, usa la exportación de la cuenta.",
   "Everything except comments and times comes along, files too. Members and shares do not: assignees stay only where they may see the copy.": "Se copia todo salvo comentarios y tiempos, también los archivos. Los miembros y los accesos compartidos no: las asignaciones solo se mantienen si la persona puede ver la copia.",
-  "Not copied: {0}": "No copiado: {0}"
+  "Not copied: {0}": "No copiado: {0}",
+  "Hold the handle, then drag it.": "Mantén pulsada el asa y arrastra."
 }

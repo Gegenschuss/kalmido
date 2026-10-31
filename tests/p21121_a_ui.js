@@ -87,6 +87,14 @@ const png = (w, h, rgb) => {
   md?.querySelector('[data-pg="0"] [data-abp="rot"]')?.click();
   md?.querySelector('[data-pg="0"] [data-abp="down"]')?.click();
   check(/Page 2/.test(md?.querySelector('[data-pg="1"]')?.textContent || '') && !md.querySelector('[data-abs="save"]').disabled, 'turned, moved down, ready to save');
+  // 2.456.0 (#3837): the grip: a finger held drags the page back and forth (jsdom has no layout: above = the top, below = the end)
+  { const tc = (el, type, y) => { const e = new w.Event(type, {bubbles: true, cancelable: true}); e.touches = type === 'touchend' ? [] : [{clientX: 5, clientY: y}]; el.dispatchEvent(e); };
+    const first = md.querySelector('[data-pg="0"] img')?.getAttribute('src'), g = md.querySelector('[data-pg="0"] [data-rowd="pg"]');
+    tc(g, 'touchstart', 10); await sleep(450); tc(g, 'touchmove', 40); tc(g, 'touchend', 40); d.body.click();  // the browser's click after a drag, swallowed
+    check(md.querySelector('[data-pg="1"] img')?.getAttribute('src') === first, 'a held grip drags the first page to the end');
+    const g2 = md.querySelector('[data-pg="1"] [data-rowd="pg"]');
+    tc(g2, 'touchstart', 10); await sleep(450); tc(g2, 'touchmove', -40); tc(g2, 'touchend', -40); d.body.click();
+    check(md.querySelector('[data-pg="0"] img')?.getAttribute('src') === first, 'and back to the top'); }
   md.querySelector('#abs-name').value = 'UI Scan';
   const h1 = w.eval('HIST.undo.length');
   md?.querySelector('[data-abs="save"]').click();

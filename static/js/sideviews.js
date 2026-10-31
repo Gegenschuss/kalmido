@@ -138,7 +138,7 @@ function sv_delete(id) {
 }
 function sv_move(id, d) {
   const arr = [...sv_views()], i = arr.findIndex(x => x.id === id), j = i + d; if (i < 0 || j < 0 || j >= arr.length) return;
-  [arr[i], arr[j]] = [arr[j], arr[i]];
+  arr.splice(j, 0, arr.splice(i, 1)[0]);
   sv_saveViews(arr);
 }
 
@@ -262,13 +262,15 @@ function sv_setFill() {
   const box = $('#s-sv'); if (!box) return;
   const vs = sv_views(), act = S.settings.side_view || '', n = vs.length;
   if (n) box.setAttribute('role', 'list'); else box.removeAttribute('role');  // 2.220.0 A (#2811): a list role needs listitem children
-  box.innerHTML = n ? vs.map((v, i) => `<div class="svrow" role="listitem" data-svid="${esc(v.id)}"><span class="svr-ic" aria-hidden="true">${ic(SV_ICONS.includes(v.icon) ? v.icon : 'panel', 's')}</span><span class="svr-n">${esc(v.name)}${act === v.id ? ` <small class="muted">${tr('active')}</small>` : ''}</span>
-      <button type="button" class="iconbtn" data-sv="up" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + v.name)}" title="${esc(tr('Move up'))}">${ic('up', 's')}</button>
-      <button type="button" class="iconbtn" data-sv="down" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + v.name)}" title="${esc(tr('Move down'))}">${ic('down', 's')}</button>
+  box.innerHTML = n ? vs.map((v, i) => `<div class="svrow" role="listitem" data-svid="${esc(v.id)}">${rowd_grip('sv')}<span class="svr-ic" aria-hidden="true">${ic(SV_ICONS.includes(v.icon) ? v.icon : 'panel', 's')}</span><span class="svr-n">${esc(v.name)}${act === v.id ? ` <small class="muted">${tr('active')}</small>` : ''}</span>
+      ${rowd_arrows(`<button type="button" class="iconbtn" data-sv="up" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + v.name)}" title="${esc(tr('Move up'))}">${ic('up', 's')}</button>
+      <button type="button" class="iconbtn" data-sv="down" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + v.name)}" title="${esc(tr('Move down'))}">${ic('down', 's')}</button>`)}
       <button type="button" class="iconbtn" data-sv="edit" aria-label="${esc(tr('Edit') + ': ' + v.name)}" title="${esc(tr('Edit'))}">${ic('edit', 's')}</button>
       <button type="button" class="iconbtn" data-sv="del" aria-label="${esc(tr('Delete') + ': ' + v.name)}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></div>`).join('')
     : `<p class="muted">${esc(tr('No views yet.'))}</p>`;
 }
+
+rowd_attach(document, {kind: 'sv', row: '.svrow', move: (from, to, r) => sv_move(r.dataset.svid, to - from)});  // 2.456.0 (#3837)
 
 // ---- clicks, the tile's menu (right click / long press)
 document.addEventListener('click', e => {
