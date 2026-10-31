@@ -95,7 +95,7 @@ if not os.environ.get("P23673_NOSTART"):
     env = dict(os.environ, KEEP="1", EXTRA=os.environ.get("EXTRA", "") +
                " -e KALMIDO_WEBHOOK_ALLOW_HOSTS=127.0.0.1:8097 -e KALMIDO_CHANNEL_TICK=1 -e KALMIDO_CHANNEL_RETRY=1"
                f" -e KALMIDO_CHANNEL_FAILS={FAILS_MAX} -e KALMIDO_WEBHOOK_TICK=1 -e KALMIDO_WEBHOOK_BACKOFF=1 -e KALMIDO_NTFYIN_TICK=1"
-               " -e TASKS_WATCHDOG_INTERVAL=1 -e KALMIDO_IMAP_INTERVAL=10"
+               " -e TASKS_WATCHDOG_INTERVAL=1 -e KALMIDO_IMAP_INTERVAL=10 -e KALMIDO_BACKUP_TICK=1 -e KALMIDO_BACKUPS=1"
                " -e KALMIDO_SMTP_HOST=127.0.0.1 -e KALMIDO_SMTP_PORT=1025 -e KALMIDO_SMTP_TLS=none -e KALMIDO_MAIL_FROM=kalmido@example.test")
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
@@ -262,9 +262,9 @@ try:
     check(until(lambda: news(A, "backup"), 30), "#2971: the instance's admin gets a News item for a failed backup with the alerts off")
     m = until(lambda: mails("alice@example.test"), 15)
     check(len(m) == 1 and "Backup failed" in str(email.message_from_string(m[0]["raw"], policy=email.policy.default)["Subject"]), f"#2971: and a mail {m}")
-    check(until(lambda: not A.get(B + "/api/admin/backups").json().get("running")), "setup: the run ended")
-    check(A.post(B + "/api/admin/backups").status_code == 202, "setup: back up again")
-    check(until(lambda: not A.get(B + "/api/admin/backups").json().get("running") and not dbx("SELECT 1 FROM bg_jobs WHERE kind='backup' AND done_at IS NULL")), "setup: that run ended")
+    at = dbx("SELECT value FROM settings WHERE key='bk_last_error_at'")
+    check(until(lambda: A.post(B + "/api/admin/backups").status_code == 202), "setup: back up again")
+    check(until(lambda: dbx("SELECT value FROM settings WHERE key='bk_last_error_at'") != at, 30), "setup: that run failed too")
     check(len(news(A, "backup")) == 1 and len(mails("alice@example.test")) == 1, "#2971: the same error again on the same day tells nobody again")
 finally:
     os.chmod(BK, 0o700)
