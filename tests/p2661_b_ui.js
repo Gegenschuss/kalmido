@@ -84,6 +84,8 @@ const WS_VIEWS = {
   'kalmido/hub/abscal.py': 'check:calteam',   // 2.155.0 B (#2076): the colleagues' absences in the calendar for the saved
                                               // workspace (abc_team_orgs); calendar.js reloads the range once the server knows it
   'static/js/sideviews.js': 'draw',           // #2186 (bundle C): the sidebar views' editor lists the lists of the shown workspace (inWs while drawing)
+  'static/js/popovers.js': 'helper',          // 2.455.0 (#3848): the project picker lists the workspace the caller names (o.ws, inWs), no view keeping data
+  'static/js/spacemove.js': 'helper',         // 2.455.0 (#3848): mv_home - a Basket task counts as the shown workspace while the move dialog opens, no view keeping data
   'kalmido/personal/timesheet.py': 'helper',  // 2.125.0 (#2119): tsl_org - which organisation a closed month goes to (no view)
   'kalmido/accounts/orgs.py': 'helper',       // 2.148.1 (#2480): ws_chosen_org - the default workspace of a new list (no view)
   'kalmido/office/search.py': 'helper',       // 2.250.0 A (#2992): bs_office_oid - the office area of the search hits, per request
