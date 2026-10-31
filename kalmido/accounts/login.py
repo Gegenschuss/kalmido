@@ -661,7 +661,7 @@ def auth_2fa():
     pend_drop()
     left = rc_left(c, u["id"])
     if via == "recovery":
-        aa_now("security", f"recovery:{u['username']}",
+        aa_now("security", f"recovery:{u['username']}:{left}",
                N_("{0} logged in with a recovery code ({1} left)."), [u["username"], left])
         from .secmail import sec_mail
         sec_mail(c, u["id"], "code_used", left)  # 2.266.0 (#2963)
@@ -907,7 +907,7 @@ def me_totp_disable():
     c.commit()
     from .secmail import sec_mail
     sec_mail(c, u["id"], "2fa_off")  # 2.266.0 (#2963)
-    aa_now("security", f"2faoff:{u['username']}", N_("{0} turned off two-factor authentication ({1})."),
+    aa_now("security", f"2faoff:{u['username']}:{int(time.time())}", N_("{0} turned off two-factor authentication ({1})."),
            [u["username"], {"t": N_("authenticator app")}])
     return jsonify(twofa_state(c, _user(c, u["id"])))
 

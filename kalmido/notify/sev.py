@@ -126,7 +126,7 @@ def sev_login_tell(c, uid, h, name, ip):
     organisation's admins (row "usage"), a number for the instance admins."""
     from ..collab.news import news_add
     from ..core.access import org_admin_people
-    with system_ctx(c):
+    with c.savepoint(), system_ctx(c):  # a database error here must not abort the sign-in's transaction (like sev_login's own part)
         operator = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()["is_admin"]
         orgs = [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? AND role='admin'", (uid,)).fetchall()]
         if operator or not orgs:

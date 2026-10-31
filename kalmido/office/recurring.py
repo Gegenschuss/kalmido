@@ -392,8 +392,8 @@ def rin_bundle(c, person, title, text, doc_id=None):
     o = str(usettings(c, person).get("rin_open") or "").split(":")
     t = None
     if len(o) == 3 and o[0] == day and o[1].isdigit() and o[2].isdigit():
-        t = c.execute("SELECT id, title, content FROM tasks WHERE id=? AND created_by=? AND completed_at IS NULL AND deleted_at IS NULL",
-                      (int(o[1]), person)).fetchone()
+        t = c.execute("SELECT id, title, content FROM tasks WHERE id=? AND created_by=? AND assignee_id=? AND list_id=? AND completed_at IS NULL AND deleted_at IS NULL",
+                      (int(o[1]), person, person, my_inbox(c, person))).fetchone()
     if t is None:
         uset(c, person, "rin_open", f"{day}:{rin_task(c, person, title, text, doc_id)}:1")
         return

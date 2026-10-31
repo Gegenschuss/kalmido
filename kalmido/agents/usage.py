@@ -286,7 +286,8 @@ def usage_alerts(c, aid):
             "period": st["period"]}
     print("agent", aid, "usage", level, st["used"], "/", lim, st["metric"], st["period"], flush=True)
     rcpt = usage_people(c, a)  # 2.361.4 (#2928): the owner of a personal agent sets its limits and hears of them
-    aa_org_event(c, "org_usage", rcpt)
+    if a["org_id"]:
+        aa_org_event(c, "org_usage", rcpt)
     for uid in rcpt:
         s = usettings(c, uid)
         news_add(c, uid, "usage", data=data, actor=aid, row="usage", s=s if collab_on(s) else None)
@@ -329,7 +330,8 @@ def budget_alerts(c, aid):
             "period": bs["period"], "budget": True, "warn_pct": ws_get(a)["budget_warn_pct"]}
     print("agent", aid, "budget", level, bs["used"], "/", bs["limit"], bs["metric"], bs["period"], flush=True)
     rcpt = [a["owner_id"]] if a["owner_id"] else usage_people(c, a)
-    aa_org_event(c, "org_usage", rcpt)
+    if a["org_id"] and not a["owner_id"]:
+        aa_org_event(c, "org_usage", rcpt)
     for uid in rcpt:
         s = usettings(c, uid)
         news_add(c, uid, "usage", data=data, actor=aid, row="usage", s=s if collab_on(s) else None)
