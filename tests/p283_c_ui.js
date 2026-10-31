@@ -114,7 +114,7 @@ const FEAT = 'collab,comments,progress';
   // ---- Firefox: Paper (desktop) and Night (phone) with a strip
   const ffLogin = async ({ev, nav}, pack, theme) => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.pack', '"${pack}"'); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.pack', '"${pack}"'); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   await call('PUT', `/api/lists/${L}/header`, {style: 'gradient'});

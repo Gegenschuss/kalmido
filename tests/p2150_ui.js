@@ -189,7 +189,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   // ================= Firefox: phone (touch) + desktop (mouse)
   const ffLogin = async ({ev, nav}, theme) => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(700); };

@@ -49,7 +49,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
   const click = (ev, sel) => ev(`(() => { const b = document.querySelector(${JSON.stringify(sel)}); if (!b) return 0; b.click(); return 1; })()`);
   const key = (ev, k) => ev(`(() => { const a = document.activeElement; a.dispatchEvent(new KeyboardEvent('keydown', {key: '${k}', bubbles: true, cancelable: true})); return document.activeElement?.dataset?.ofm || ''; })()`);
   const noSide = `document.documentElement.scrollWidth <= window.innerWidth + 1`;
-  const theme = (ev, t) => ev(`(() => { localStorage.setItem('tasks.theme', '"${t}"'); return 1; })()`);
+  const theme = (ev, t) => ev(`(() => { localStorage.setItem('tasks.theme', '"${t}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
   // the contrast of the small caps against the page (WCAG relative luminance)  // 2.152.2 (#2617): the group headings in #side
   const contrast = `(() => { const rgb = s => (s.match(/[\\d.]+/g) || []).slice(0, 3).map(Number); const lum = c => { const [r, g, b] = c.map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * r + .7152 * g + .0722 * b; };
     const h = document.querySelector('#side [data-ofmg] .sgt > span:not(.c)'); let el = h, bg = 'rgba(0, 0, 0, 0)'; while (el && /rgba\\(0, 0, 0, 0\\)|transparent/.test(bg)) { bg = getComputedStyle(el).backgroundColor; el = el.parentElement; }

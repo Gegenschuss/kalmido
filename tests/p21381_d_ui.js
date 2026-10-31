@@ -66,7 +66,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   for (const [th, wd, ht, touch] of [['light', 390, 844, true], ['dark', 390, 844, true], ['light', 1280, 900, false], ['dark', 1280, 900, false]]) await firefox(async o => {
     const {cmd, ev, ctx, shot} = o, tag = `${wd} ${th}`;
     await o.nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${th}"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${th}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: wd, height: ht}});
     await o.nav(B + '#news'); await ready(ev);

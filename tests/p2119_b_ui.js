@@ -56,7 +56,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
         await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
         for (const theme of ['dark', 'light']) {
           await nav(B + 'static/icon.svg');
-          await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+          await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
           await nav(B + '?v=' + (++nr) + '#inbox');
           for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300);
           await ev(`(() => { openDetail(${T}); return 1; })()`); await sleep(1200);
