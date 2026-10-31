@@ -55,6 +55,20 @@ const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (aw
     await ev(`(() => { openPalette(); closePalette(); return 1; })()`);
     check(await ev(`!document.querySelector('.palette')`), '#1560: with reduced motion the search is removed at once');
 
+    // 2.454.0 (#3842): the search uses the whole visible height: down to the screen's edge without a keyboard, above a keyboard
+    // with one, and few hits stay small (the list's content is set by hand: the test server has too few hits to fill it)
+    const pal = await ev(`(async () => {
+      openPalette();
+      const p = document.querySelector('.palette .plist'), card = document.querySelector('.palette .card'), st = document.documentElement.style, was = st.getPropertyValue('--vvh');
+      const box = () => Math.round(card.getBoundingClientRect().bottom), r = {h: innerHeight};
+      p.innerHTML = '<div style="height:3000px"></div>'; r.full = box();
+      st.setProperty('--vvh', '400px'); for (let i = 0; i < 40 && box() > 400; i++) await new Promise(f => requestAnimationFrame(f)); r.kb = box(); st.setProperty('--vvh', was);
+      p.innerHTML = ''; r.few = box();
+      closePalette(true); return r; })()`);
+    check(pal.full > 800 && pal.full <= pal.h, '#3842: many hits reach the bottom of the screen ' + JSON.stringify(pal));
+    check(pal.kb <= 400, '#3842: with a keyboard it ends above it ' + JSON.stringify(pal));
+    check(pal.few < 200, '#3842: few hits stay small ' + JSON.stringify(pal));
+
     // the editor of the last column ends at the visible edge
     const geo = await ev(`(async () => {
       const sh = SHV.sh, last = sh.columns[sh.columns.length - 1], row = sh.rows[sh.rows.length - 1] || sh.rows[0];
