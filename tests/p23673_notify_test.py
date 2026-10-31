@@ -113,7 +113,7 @@ A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_
 ST = A.get(B + "/api/state").json()["me"]
 ORG = ST["workspaces"][0]["id"]
 uid = {"alice": ST["id"]}
-r = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "password": "password123"})
+r = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "password": "password123", "email": "bob@example.test", "orgs": [ORG]})
 assert r.ok, r.text
 uid["bob"] = r.json()["id"]
 Bo = sess("bob")
