@@ -288,6 +288,7 @@ check(r.ok and r.json().get("email") == "twice@example.com" and r.json().get("ro
 check(dbx("SELECT 1 FROM users WHERE id=?", (twice,)), "#3843: the account stays")
 check(dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (BETA, twice)), "#3843: the other organisation's invitation stays")
 check(not dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (ORG, twice)) and not dbx("SELECT 1 FROM org_invites WHERE org_id=? AND user_id=?", (ORG, twice)), "#3843: only this invitation ends")
+check(not dbx("SELECT 1 FROM user_invites WHERE user_id=?", (twice,)), "#3843: the link of this invitation ends with it")
 check("twice@example.com" not in {x["email"] for x in inv()["invites"]} and "twice@example.com" in {x["email"] for x in inv(Er, BETA)["invites"]}, "#3843: gone here, open there")
 # ... an expired one does not keep the account alive
 Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "thrice@example.com", "role": "member"})

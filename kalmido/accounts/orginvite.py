@@ -290,6 +290,7 @@ def org_invite_withdraw(oid, ref):
             c.execute("DELETE FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid))
             c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
             c.execute("DELETE FROM org_invites WHERE org_id=? AND user_id=?", (oid, uid))
+            c.execute("DELETE FROM user_invites WHERE user_id=? AND used_at IS NULL", (uid,))  # review: this invitation's link ends with it
         else:
             files = user_purge(c, uid)
     bump(c)
