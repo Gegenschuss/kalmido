@@ -909,6 +909,7 @@ def bw_report_get():
         co = bw_company(c, oid)
         buf = io.StringIO()
         sep, num = csv_dialect()  # 2.368.2 (#2984): separator and decimal sign of the language, times local
+        zone = tz_of(c, uid)
         w = csv.writer(buf, delimiter=sep)
         w.writerow([tr("Date"), tr("Place"), tr("Address"), tr("Occasion"), tr("Host"), tr("Guests"), tr("Food") + f" ({cur})", tr("Drinks") + f" ({cur})",
                     tr("Tip") + f" ({cur})", tr("Gross") + f" ({cur})", tr("Input VAT") + f" ({cur})", tr("Net") + f" ({cur})",
@@ -918,7 +919,7 @@ def bw_report_get():
             w.writerow([m["date"], _csv_safe(m["place_name"]), _csv_safe(m["place_address"].replace("\n", ", ")), _csv_safe(m["occasion"]),
                         _csv_safe(bw_pname(m["host"] or {"name": ""}, co)), _csv_safe(", ".join(bw_pname(p, co) for p in m["guests"])),
                         num(k["food"]), num(k["drinks"]), num(k["tip"]), num(k["gross"]), num(k["vat"]), num(k["net"]), num(k["deductible"]),
-                        num(k["not_deductible"]), _csv_safe(m["approved_name"]), local_stamp(m["approved_at"], tz_of(c, uid))[:16]])
+                        num(k["not_deductible"]), _csv_safe(m["approved_name"]), local_stamp(m["approved_at"], zone)[:16]])
         t = rep["total"]
         w.writerow([tr("Total"), rep["count"], "", "", "", "", num(t["food"]), num(t["drinks"]), num(t["tip"]), num(t["gross"]), num(t["vat"]), num(t["net"]),
                     num(t["deductible"]), num(t["not_deductible"]), "", ""])
