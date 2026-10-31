@@ -9,7 +9,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/icon-512.png', '/static/icon.svg', '/static/badge-96.png', '/static/fonts/Geist-Variable.woff2', '/static/fonts/GeistMono-Variable.woff2',
   '/static/quips.json', '/static/favicon.svg', '/static/favicon-32.png', '/static/apple-touch-icon.png', '/static/icon-maskable-512.png',
   '/static/fonts/AtkinsonHyperlegible-Regular.woff2', '/static/fonts/AtkinsonHyperlegible-Bold.woff2', '/static/js/reloadguard.js',
-  '/static/js/clienterr.js', '/static/js/icons.js', '/static/js/core.js', '/static/js/upbar.js', '/static/js/lazyload.js', '/static/js/lyopts.js',
+  '/static/js/clienterr.js', '/static/js/icons.js', '/static/js/core.js', '/static/js/lazyload.js', '/static/js/upbar.js', '/static/js/lyopts.js',
   '/static/js/workspace.js', '/static/js/sharews.js', '/static/js/spacemove.js', '/static/js/quickadd.js', '/static/js/quickadd2.js',
   '/static/js/views.js', '/static/js/render.js', '/static/js/vlist.js', '/static/js/calendar.js', '/static/js/habits.js', '/static/js/detail.js',
   '/static/js/collab.js', '/static/js/attachments.js', '/static/js/mdtitle.js', '/static/js/undo.js', '/static/js/popovers.js',

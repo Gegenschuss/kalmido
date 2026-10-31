@@ -1,6 +1,6 @@
 // @ts-check
 /* Kalmido web client: upload progress with Cancel (2.363.3, #3134). Classic script sharing the global scope (load order:
-   index.html, right after core.js). rawFetch0 sends every form with at least UP_MIN bytes of files through upSend, so all file
+   index.html, right after lazyload.js). rawFetch0 sends every form with at least UP_MIN bytes of files through upSend, so all file
    dialogs get the same bar without code of their own; smaller forms stay plain fetch calls and show nothing. A form may opt
    out with fd.upQuiet = true (pieces of an upload that draws its own progress, paperless.js). */
 'use strict';

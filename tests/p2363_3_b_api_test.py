@@ -14,6 +14,7 @@ hint on shortened purposes, taking "Recognise again" back. Invented names only.
 usage: p2363_3_b_api_test.py <datadir>"""
 import csv
 import io
+import json
 import os
 import sys
 
@@ -154,7 +155,8 @@ fid = dbx("SELECT a.id FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE t
 check(fid and A.get(B + f"/api/attachments/{fid[0][0]}").content == b"the plan\n", "the original gone: the file comes from the template")
 check(one("SELECT wip_limit FROM sections WHERE list_id=? AND name='Build'", (LT,)) == 4 and one("SELECT COUNT(*) FROM sprints WHERE list_id=?", (LT,)) == 1,
       "the template: WIP and sprint")
-check(one("SELECT state FROM sprints WHERE list_id=?", (LT,)) == "planned", "the template: a sprint is planned again")
+# #3134: the stored template, not the new list: the watchdog (spr_tick) may start the planned sprint of a list any time
+check(json.loads(one("SELECT extra FROM templates WHERE id=?", (TP,)))["list"]["sprints"][0]["state"] == "planned", "the template: a sprint is planned again")
 
 T2 = mk(A, title="Second", list_id=L, assignee_id=uid["bob"], tags=["mine"])
 assert Bo.patch(B + f"/api/tasks/{T2}", json={"tags": ["bobs-tag-2"]}).ok

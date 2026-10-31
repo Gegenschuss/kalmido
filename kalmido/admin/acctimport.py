@@ -148,6 +148,7 @@ UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is
     (N_("Tasks in other projects"), ("other_tasks",)), (N_("Tasks I take part in"), ("task_people",)), (N_("Reactions"), ("reactions",)),
     (N_("Stars"), ("kid_stars",)), (N_("Received notifications"), ("notifications",)), (N_("Sign-ins"), ("sessions",)),
     (N_("Push devices"), ("push_devices",)), (N_("Agent chat settings"), ("agent_chat_prefs",)),
+    (N_("Files of templates"), ("template_files",)),  # #3134
 )
 
 _UMI = {}  # user id -> running check / import thread

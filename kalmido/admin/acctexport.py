@@ -15,7 +15,7 @@ ZIP layout (format "kalmido-account", v 1; admin/acctimport.py reads it):
                         lists, reactions, News, devices), the people of my lists (for the mapping on import; other people's
                         e-mail addresses only as email_hash, see umz_email_hash) and the server accounts (no token)
     files/...          attachments of the tasks and project files of the lists (decrypted: oc_read_file), my profile picture;
-                        2.362.2 (#3099): the files of my knowledge pages and tables
+                        2.362.2 (#3099): the files of my knowledge pages and tables; #3134: the file copies of my templates
     personal-office/   2.362.2 (#3099): my personal office, readable, the same parts as its own export (orgexport.ox_pb_parts);
                         the import names it as staying behind, its own export takes it to another server
     checksum.sha256    "sha256  path" lines (sha256sum -c): manifest.json and every file of the manifest
@@ -370,6 +370,7 @@ def umz_extra_queries(uid):
                        "AND org_id IS NULL AND deleted_at IS NULL ORDER BY id", (uid,)),
         "wiki_files": ("SELECT id, page_id, name, mime, size, created_at FROM wiki_files WHERE owner_id=? AND org_id IS NULL "  # 2.362.2 (#3099)
                        "AND deleted_at IS NULL ORDER BY id", (uid,)),
+        "template_files": ("SELECT id, template_id, node_key, name, mime, size, scan, created_at FROM template_files WHERE user_id=? ORDER BY id", (uid,)),  # #3134
         "agent_chats": ("SELECT id, agent_id, sender, body, task_id, created_at FROM agent_chat WHERE user_id=? ORDER BY id", (uid,)),
         "agent_chat_prefs": ("SELECT agent_id, prefs, updated_at FROM agent_chat_prefs WHERE user_id=? ORDER BY agent_id", (uid,)),  # 2.233.0 A (#2848)
         "direct_messages": ("SELECT m.id, m.room_id, m.body, m.enc, m.created_at, m.edited_at FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id "
@@ -547,10 +548,11 @@ def umz_read(c, full, area, rid, name, locked):
 
 
 def umz_put_page_files(c, zf, out, uid, files, inf, locked):
-    """2.362.2 (#3099): the files of my private knowledge pages and tables (the rows name them under "file")."""
+    """2.362.2 (#3099): the files of my private knowledge pages and tables (the rows name them under "file"); #3134: of my templates."""
     for kind, table, sql in (("wiki", "wiki_files", "SELECT id, name, path FROM wiki_files WHERE owner_id=? AND org_id IS NULL AND deleted_at IS NULL ORDER BY id"),
                              ("sheet", "sheet_files", """SELECT id, name, path FROM sheet_files WHERE deleted_at IS NULL AND sheet_id IN
-                                                         (SELECT id FROM sheets WHERE org_id IS NULL AND owner_id=?) ORDER BY id""")):
+                                                         (SELECT id FROM sheets WHERE org_id IS NULL AND owner_id=?) ORDER BY id"""),
+                             ("tpl", "template_files", "SELECT id, name, path FROM template_files WHERE user_id=? ORDER BY id")):
         for r in c.execute(sql, (uid,)).fetchall():
             full = _under(ATT_DIR, r["path"])
             sig = inf.get((kind, int(r["id"]), 0))
@@ -844,6 +846,7 @@ def umz_start():
                       (uid,)).fetchone()[0] or 0
     need += c.execute("SELECT COALESCE(SUM(size),0) FROM wiki_files WHERE owner_id=? AND org_id IS NULL", (uid,)).fetchone()[0] or 0  # 2.362.2 (#3099)
     need += c.execute("SELECT COALESCE(SUM(size),0) FROM sheet_files WHERE owner_id=? AND org_id IS NULL", (uid,)).fetchone()[0] or 0
+    need += c.execute("SELECT COALESCE(SUM(size),0) FROM template_files WHERE user_id=?", (uid,)).fetchone()[0] or 0  # #3134
     if not umz_space_ok(UMZ_DIR, need * 1.1):
         return err(tr("There is not enough space on the server for the export. Please ask the server admin."), 507)
     with _UMZ_LOCK:

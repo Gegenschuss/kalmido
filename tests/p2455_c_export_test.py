@@ -260,7 +260,9 @@ j = org_import(A, OX, RK, ORG2)
 W = warns(j)
 feeds = {r[0]: r[1:] for r in dbx("SELECT url, user_id, etag, last_fetch, fails FROM rss_feeds WHERE org_id=? AND deleted_at IS NULL", (ORG2,))}
 check(set(feeds) == {"https://feeds.example.com/news.xml", "https://feeds.example.com/twice.xml"}, f"the feeds came along, none twice, none with a key {sorted(feeds)}")
-check(tuple(feeds["https://feeds.example.com/news.xml"]) == (ALICE, "", None, 0), f"no fetch state of the old server {feeds}")
+# #3469: the watchdog of this server may fetch the new feed at once: never the old server's values, not "none at all"
+nf = feeds["https://feeds.example.com/news.xml"]
+check(nf[0] == ALICE and nf[1] == "" and nf[2] != TS and nf[3] < 3, f"no fetch state of the old server {feeds}")
 check("A feed without its address" in W, f"the report names the feed without address {W[:300]}")
 NOL, NRD = (one("SELECT id FROM lists WHERE org_id=? AND name=?", (ORG2, n)) for n in ("Org Liste", "Org Lesen"))
 check(one("SELECT list_id FROM reading_orgs WHERE org_id=?", (ORG2,)) == NRD, "the read-later project is registered in the target")
