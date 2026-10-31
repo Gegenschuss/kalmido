@@ -16,7 +16,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_item_store, oc_json_store
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied
-from ..core.errors import BadInput
+from ..core.errors import BadInput, BadKey, DeniedKey
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
 from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES, TAX_KEYS, dec, fmt_money, fmt_rate, inv_calc, office_calc
 from .packs import office_pack_for
@@ -927,7 +927,7 @@ def _assign_number(c, oid, did, s=None, manual=None, reason=""):
     write_lock(c, f"office_num_{int(oid)}")  # 2.39.1 (#1210 N2): check and write of a number (manual or next) in one go
     r = doc_row(c, oid, did)
     if ofx_locked(r):  # 2.355.0 A (#2839): read again under the lock -- a document finalised meanwhile keeps its number
-        raise Denied(409, tr(OFX_LOCKED))
+        raise DeniedKey(409, OFX_LOCKED)
     if r["trial"]:  # 2.144.10 A (#2576): a trial document only ever carries a TEST number (no hand-set one, no real counter)
         if manual is not None:
             raise BadInput(tr("A trial document keeps its TEST number"))
@@ -948,7 +948,7 @@ def _assign_number(c, oid, did, s=None, manual=None, reason=""):
     else:
         num = doc_next_number(c, oid, r, s)
     if c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() or fi_number_taken(c, oid, num):
-        raise BadInput(tr("The number {0} is already used", num))
+        raise BadKey(N_("The number {0} is already used"), num)
     c.execute("UPDATE office_docs SET number=?, updated_at=? WHERE id=? AND org_id=?", (num, iso_ms(now_utc()), did, oid))
     from .docref import ofd_renamed
     ofd_renamed(c, did)  # 2.199.0 B (#2742)

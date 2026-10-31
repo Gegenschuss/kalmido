@@ -335,7 +335,7 @@ def oi_counts(data):
         n = len((data.get("oi") or {}).get(s.path) or [])
         if n and s.label:
             out[s.label] = out.get(s.label, 0) + n
-    return [{"what": tr(k), "count": n} for k, n in out.items()]
+    return [{"what": k, "count": n} for k, n in out.items()]  # 2.454.0 (#3808): the key, acctimport.umz_areas_tr translates it
 
 
 def oi_undo(c, cr):

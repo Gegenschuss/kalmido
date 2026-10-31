@@ -5,7 +5,7 @@ imports name the very same classes (except/isinstance catch either way). The err
 import time
 from flask import g, has_request_context
 
-from ..core.i18n import tr
+from ..core.i18n import tr, tr_stored
 
 
 # Permission checks raise Denied: 404 hides that a thing exists, 403 = view only / switched off, 409 = a module is off.
@@ -23,6 +23,25 @@ class Denied(Exception):
 
 class BadInput(Exception):
     pass
+
+
+# 2.454.0 (#3808): a check whose text may be kept for later (a timer's task, an import's state): as before for a request,
+# e.stored = (key, *values), so the text is built for its reader (tr_stored; values may be stored texts themselves)
+class BadKey(BadInput):
+    def __init__(self, key, *a):
+        super().__init__(tr_stored((key, *a)))
+        self.stored = (key, *a)
+
+
+class DeniedKey(Denied):
+    def __init__(self, code, key, *a):
+        super().__init__(code, tr_stored((key, *a)))
+        self.stored = (key, *a)
+
+
+def err_stored(e):
+    """The text of a BadInput / Denied to keep for later: key + values when it has them, else the text as it is."""
+    return getattr(e, "stored", None) or (e.text() if hasattr(e, "text") else str(e))
 
 
 # ---- 2.2.1 (#359): unknown JSON fields. The REST API (/api/v1) refuses them: 400 with

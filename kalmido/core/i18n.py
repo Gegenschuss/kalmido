@@ -95,8 +95,16 @@ def tr(key, *a, lg=None):
 
 def tr_stored(v, lg=None):
     """2.448.0 (#3765): a text kept for later, translated for its reader: [key, *values] (see tr), or a str as it is (an old
-    row, a text the person or another system wrote)."""
-    return tr(*v, lg=lg) if isinstance(v, (list, tuple)) and v else (v or "")
+    row, a text the person or another system wrote). 2.454.0 (#3808): a value that is a list is such a text itself."""
+    if isinstance(v, (list, tuple)) and v:
+        return tr(v[0], *[tr_stored(x, lg) if isinstance(x, (list, tuple)) else x for x in v[1:]], lg=lg)
+    return v or ""
+
+
+def stored_join(items):
+    """2.454.0 (#3808): several stored texts as one stored text, "a, b, c" (the key is only the pattern, same in every language)."""
+    items = tuple(items)
+    return (", ".join("{%d}" % i for i in range(len(items))), *items)
 
 
 def plural_one(n, lg):
