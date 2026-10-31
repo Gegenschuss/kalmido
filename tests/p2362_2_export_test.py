@@ -246,8 +246,8 @@ with open(full, "r+b") as f:
 raw = acct_export(F)
 z = zipfile.ZipFile(io.BytesIO(raw))
 man = json.loads(z.read("manifest.json"))
-bad = [x for x in man["locked_files"] if x.get("name") == "kaputt.pdf"]
-check(len(bad) >= 2 and not any("kaputt" in n for n in z.namelist()), f"#3099 the broken file is named, the export runs {man['locked_files']}")
+bad = [x for x in man["locked_files"] if x.get("name") == "kaputt.pdf"] + [x for x in man["missing"] if x["file"].endswith("kaputt.pdf")]  # 2.363.2 (#3106): the private copy is under "missing"
+check(len(bad) >= 2 and not any("kaputt" in n for n in z.namelist()), f"#3099 the broken file is named, the export runs {man['locked_files']} {man['missing']}")
 check(any(n.startswith(P + f"files/store/{R1}-") for n in z.namelist()), "#3099 the other files are there")
 with open(full, "wb") as f:  # whole again (a row delete here can meet the server's own background work)
     f.write(whole)

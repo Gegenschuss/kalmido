@@ -101,6 +101,7 @@ IMPORT_JSON_DEPTH = 40                    # nesting of a JSON file (Trello: ~6)
 IMPORT_UNDO_HOURS = 24
 IMPORT_RATE = _imp_env("KALMIDO_IMPORT_RATE", 30)  # imports + previews per user and 10 minutes
 IMPORT_KEEP = 20                          # import records kept per user (2.363.2 #3106: + all that can still be undone, imp_prune)
+IMPORT_KEEP_ALWAYS = "Kalmido"            # 2.452.0 (#3810): an account import stays until undone, it is the memory of what is here already
 IMPORT_SOURCES = {"todoist": "Todoist", "trello": "Trello", "asana": "Asana", "mstodo": "Microsoft To Do", "ics": "ICS",
                   # 2.142.0 B (#2147): file imports only (no API / OAuth connection, nothing fetched from the files)
                   "notion": "Notion", "gtasks": "Google Tasks", "clickup": "ClickUp", "jira": "Jira", "csv": "CSV", "markdown": "Markdown",
@@ -2366,29 +2367,16 @@ def imp_undo_trash(c, ids, back, iid):
 
 
 def imp_prune(c, uid):
-    """2.363.2 (#3106): the user's import records beyond the last IMPORT_KEEP go, but only past their undo time."""
-    c.execute("""DELETE FROM imports WHERE user_id=? AND created_at<? AND id NOT IN
+    """2.363.2 (#3106): the user's import records beyond the last IMPORT_KEEP go, but only past their undo time.
+    #3810: an account import that is not undone stays (umz_again reads those)."""
+    c.execute("""DELETE FROM imports WHERE user_id=? AND created_at<? AND NOT (source=? AND undone_at IS NULL) AND id NOT IN
                  (SELECT id FROM imports WHERE user_id=? ORDER BY id DESC LIMIT ?)""",
-              (uid, iso(now_utc() - timedelta(hours=IMPORT_UNDO_HOURS)), uid, IMPORT_KEEP))
+              (uid, iso(now_utc() - timedelta(hours=IMPORT_UNDO_HOURS)), IMPORT_KEEP_ALWAYS, uid, IMPORT_KEEP))
 
 
 @app.post("/api/imports/<int:iid>/undo")
 def import_undo(iid):
     return jsonify(imp_undo(db(), me(), iid))
-
-
-def imports_trim(c, uid):
-    """Keep the newest IMPORT_KEEP records of a user, and every account import that is not undone (umz_again reads those)."""
-    c.execute("""DELETE FROM imports WHERE user_id=? AND NOT (source=? AND undone_at IS NULL) AND id NOT IN
-                 (SELECT id FROM imports WHERE user_id=? ORDER BY id DESC LIMIT ?)""", (uid, IMPORT_KEEP_ALWAYS, uid, IMPORT_KEEP))
-
-
-def _imp_report(raw):
-    """2.454.0 (#3808): the report of an import; the account import keeps the areas that stayed behind as keys."""
-    rep = json.loads(raw or "{}")
-    if rep.get("not_taken"):
-        rep["not_taken"] = [{**x, "what": tr(x["what"])} for x in rep["not_taken"]]
-    return rep
 
 
 @app.get("/api/imports")

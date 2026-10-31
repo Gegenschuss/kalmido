@@ -51,8 +51,9 @@ from ..core.access import Denied, acx_lists_sql, acx_of
 from ..accounts.orgout import oo_exported  # 2.362.3 (#3101)
 from ..accounts.pictures import avatar_path
 from ..accounts.session import me
-from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _jdef, _safe_part, _under, ox_read_listed
+from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _Man, _jdef, _safe_part, _under, ox_pb_parts, ox_read_listed
 from .offsite import stepup_download  # 2.360.0 A (#2496): the step-up before the download
+from ..core.orgcrypt import OrgCryptError, oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
 from ..life.model import jr_open  # 2.306.0 A (#2885)
 
@@ -562,9 +563,6 @@ def umz_build(c, uid, stream, export_id):
             if sig is not None:
                 locked.append({"area": "private_files", "id": r["id"], "name": r["name"] or "", "signature": sig})
                 continue
-            data = umz_read(c, full, "private_files", r["id"], r["name"], locked)  # 2.362.2 (#3099, review)
-            if data is None:
-                continue
             name = umz_att_name("private_files", r["id"], r["name"])
             if _put_file(c, zf, out, name, full):
                 files[("private_files", r["id"])] = name
@@ -574,6 +572,7 @@ def umz_build(c, uid, stream, export_id):
             full = _under(ATT_DIR, os.path.relpath(avatar_path(uid, _safe_part(a[0][2:])), ATT_DIR))
             if _put_file(c, zf, out, "files/avatar.jpg", full):
                 avatar = "files/avatar.jpg"
+        umz_put_page_files(c, zf, out, uid, files, inf, locked)  # 2.362.2 (#3099)
         for table, (sql, args) in q.items():
             def rows(table=table, sql=sql, args=args):
                 for r in c.execute(sql, args):
@@ -611,6 +610,7 @@ def umz_build(c, uid, stream, export_id):
             "client_encrypted": {**client_enc, "keys": bool(out.tables.get("e2e_keys")), "note": UMZ_ENC_NOTE},  # 2.278.0 C (#3091)
             "export_id": export_id, "not_included": [tr(x, lg=lang(c, uid)) for x in UMZ_NOT_INCLUDED],  # 2.449.0 (#3768): in the person's language
             "locked_files": locked,  # 2.209.0 D (#1856)
+            **({"personal_office": office} if office else {}),
             "missing": out.missing,  # 2.363.2 (#3106): files that are gone or cannot be decrypted [{file, reason}]
         }
         mb = json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode()

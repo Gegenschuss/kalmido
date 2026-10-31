@@ -53,7 +53,7 @@ from ..core.access import Denied
 from ..accounts.pictures import list_icon_path, org_icon_path, org_icon_tok  # 2.363.2 (#3106)
 from ..accounts.session import me
 from ..lists.listhead import o3c_head_rel  # 2.363.2 (#3106)
-from ..core.orgcrypt import _org_admin, oc_dec, oc_dec_row, oc_enabled, oc_read_file, oc_status, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import OrgCryptError, _org_admin, oc_dec, oc_dec_row, oc_enabled, oc_read_file, oc_status  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
 from .offsite import stepup_download  # 2.223.2 C (#2871): the step-up before a download
 from ..accounts.orgretain import odl_ids  # 2.278.0 A (#3093)
@@ -939,26 +939,7 @@ def ox_build_personal(c, oid, out, org, have, by=None):
         o["icon"] = ""
         _put_json(zf, man, "organisation.json", [o])
         _put_json(zf, man, "members.json", [])
-        for name, table, where in OX_AREAS:
-            if table not in have or not (name.startswith("office/") or name == "clients.json"):
-                continue
-            if table in OX_PB_CLIENTS:
-                _put_json(zf, man, name, _rows(c, oid, table, ox_live(c, table, OX_PB_CLIENTS[table]), (owner,)))  # 2.223.3 B (#2879)
-            else:
-                where = ox_live(c, table, where)  # 2.223.3 B (#2879): without the trash
-                _put_json(zf, man, name, _rows(c, oid, table, where, (oid,) * where.count("?")))
-        odir = os.path.join(OFFICE_DIR, str(int(oid)))
-        lk = _ox_locked(c, oid, man)
-        dead = ox_dead_office_files(c, oid, have)  # 2.223.3 B (#2879)
-        if os.path.isdir(odir):
-            for fn in sorted(os.listdir(odir)):  # the office keeps its files in one folder (no sub folders)
-                full = os.path.join(odir, fn)
-                if os.path.islink(full) or not os.path.isfile(full) or fn in dead:
-                    continue
-                if fn in lk.office:  # 2.209.0 D (#1856): a file the virus scanner locked stays out, listed in the manifest
-                    lk(*lk.office[fn][:2], fn)
-                    continue
-                _put_file(c, zf, man, "files/office/" + _safe_part(fn), full)
+        ox_pb_parts(c, zf, man, oid, owner, have)
         manifest = {
             "format": "kalmido-org-export", "format_version": OX_FORMAT, "kalmido_version": APP_VERSION,
             "org": {"id": int(oid), "name": org["name"]}, "created_at": iso(now_utc()), "created_by": by, "personal_office": 1,
@@ -1043,7 +1024,7 @@ def ox_run(oid, uid):
             size = os.path.getsize(os.path.join(_odir(oid), name))
             done = now_utc()
             _state_set(oid, {"state": "done", "by": uid, "started_at": _state(oid).get("started_at") if _state(oid) else iso(when),
-                             "done_at": iso(done), "expires_at": iso(done + timedelta(hours=OX_KEEP_H)), "file": name, "bytes": size,
+                             "done_at": iso(done), "expires_at": iso(done + timedelta(hours=OX_KEEP_H)), "file": name, "bytes": size, "plain": plain,
                              "files": sum(1 for k in man["files"] if k.startswith("files/")), "rows": sum(man["counts"].values()),
                              "missing": len(man["missing"])})
             c.execute("INSERT INTO office_doc_log(org_id, doc_id, user_id, at, action, target, detail) VALUES(?,?,?,?,?,?,?)",
@@ -1073,7 +1054,7 @@ def ox_status(oid):
         p = os.path.join(_odir(oid), st.get("file") or "")
         if not st.get("file") or not os.path.isfile(p) or st.get("expires_at", "") <= iso(now_utc()):
             st = {"state": "none"}
-    out = {k: st.get(k) for k in ("state", "started_at", "done_at", "expires_at", "file", "bytes", "files", "missing") if st.get(k) is not None}
+    out = {k: st.get(k) for k in ("state", "started_at", "done_at", "expires_at", "file", "bytes", "files", "plain") if st.get(k) is not None}
     if st.get("state") == "failed":
         out["error"] = tr("The export was interrupted. Please start it again.") if st.get("error") == "interrupted" else tr("The export failed. Please try again later or ask the server admin (server log).")
     return out
