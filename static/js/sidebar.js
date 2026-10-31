@@ -240,8 +240,7 @@ async function filesToTasks(l, files) {
   files = noEmpty(files);
   if (!files.length) return;
   if (!OUT.online) { toast(tr('Offline: only works again with a connection')); return; }
-  const max = 50 * 1024 * 1024, big = files.find(f => f.size > max);
-  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
+  const lim = upLimit(files, true); if (lim) { toast(lim); return; }  // 2.363.3 (#3134): one request per file
   toast(files.length === 1 ? tr('Uploading…') : tr('Uploading {0} files…', files.length));
   let n = 0;
   await histGroup(async () => {

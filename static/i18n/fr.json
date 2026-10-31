@@ -661,7 +661,6 @@
   "Error": "Erreur",
   "Loading…": "Chargement…",
   "Task is still syncing, try again in a moment": "La tâche est encore en cours de synchronisation, réessayez dans un instant",
-  "{0} is larger than 50 MB": "{0} dépasse 50 Mo",
   "Uploading…": "Envoi…",
   "Uploading {0} files…": "Envoi de {0} fichiers…",
   "Attached": "Joint",
@@ -15367,5 +15366,7 @@
   "An event in the calendar file is not closed properly": "Un événement du fichier de calendrier n'est pas correctement fermé",
   "The calendar file contains no events": "Le fichier de calendrier ne contient aucun événement",
   "{0} file could not be read, the manifest in the archive names it": ["{0} fichier n'a pas pu être lu, le manifeste de l'archive le cite", "{0} fichiers n'ont pas pu être lus, le manifeste de l'archive les cite"],
-  "A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.": "Un tableur (.xlsx, .xls ou CSV) avec nom, montant net et mois d'échéance ; un aperçu s'affiche avant tout enregistrement."
+  "A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.": "Un tableur (.xlsx, .xls ou CSV) avec nom, montant net et mois d'échéance ; un aperçu s'affiche avant tout enregistrement.",
+  "Upload cancelled": "Envoi annulé",
+  "Being processed…": "Traitement en cours…"
 }

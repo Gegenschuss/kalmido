@@ -858,8 +858,7 @@ async function sendComment() {
   if (tid < 0) { toast(tr('Task is still syncing, try again in a moment')); return; }
   const raw = ta.value.trim(), files = S.cfiles[tid] || [];
   if (!raw && !files.length) { ta.focus(); return; }
-  const big = files.find(f => f.size > 50 * 1024 * 1024);
-  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
+  const lim = upLimit(files); if (lim) { toast(lim); return; }  // 2.363.3 (#3134)
   const text = encodeMentions(raw, S.tl.id === tid ? S.tl.people : []);
   const rto = replyTo('c:' + tid);  // 2.33.0 (#1076)
   const pub = typeof ptl_take === 'function' && ptl_take(tid);  // 2.63.0 B (#1513): "To the customer"

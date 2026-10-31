@@ -342,6 +342,7 @@ registering the ones of its area.
 | `countries.js` | 2.40.0: the country picker (names from the browser, ISO 3166 alpha-2 codes) of the client card, company data and import preview. |
 | `collab.js` | News and comments + activity (module "collab"). |
 | `attachments.js` | Attachments and the share target. |
+| `upbar.js` | 2.363.3 (#3134): upload progress with Cancel. `rawFetch0` sends every form with at least 1 MB of files through `upSend` (XHR), so all file dialogs share one bar; Cancel ends only while the body is on its way. `upLimit` in `attachments.js` holds the server's limit for all file dialogs. |
 | `pdfview.js` | 2.48.0 (#1367): the PDF preview `pdfView({url, name, size, dlUrl})` (lightbox: pages drawn on demand, turn pages, zoom, swipe, a clear message offline or for a damaged file) for attachments, project files, office documents and archive PDFs; links carry `data-pview`. Uses the bundled pdf.js (`static/vendor/pdfjs/`, loaded on first use, `isEvalSupported: false`, no scripting). |
 | `undo.js` | Undo / redo history. |
 | `popovers.js` | Popovers (date, priority, list, tags, reminders, repeat ...). |

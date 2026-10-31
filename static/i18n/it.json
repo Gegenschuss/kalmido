@@ -661,7 +661,6 @@
   "Error": "Errore",
   "Loading…": "Caricamento…",
   "Task is still syncing, try again in a moment": "L'attività è ancora in sincronizzazione, riprova tra un attimo",
-  "{0} is larger than 50 MB": "{0} supera i 50 MB",
   "Uploading…": "Caricamento in corso…",
   "Uploading {0} files…": "Caricamento di {0} file…",
   "Attached": "Allegato",
@@ -15367,5 +15366,7 @@
   "An event in the calendar file is not closed properly": "Un evento nel file del calendario non è chiuso correttamente",
   "The calendar file contains no events": "Il file del calendario non contiene eventi",
   "{0} file could not be read, the manifest in the archive names it": ["{0} file non è stato letto, il manifesto nell'archivio lo indica", "{0} file non sono stati letti, il manifesto nell'archivio li indica"],
-  "A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.": "Un foglio di calcolo (.xlsx, .xls o CSV) con nome, importo netto e mese di scadenza; vedi un'anteprima prima di salvare."
+  "A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.": "Un foglio di calcolo (.xlsx, .xls o CSV) con nome, importo netto e mese di scadenza; vedi un'anteprima prima di salvare.",
+  "Upload cancelled": "Caricamento annullato",
+  "Being processed…": "Elaborazione…"
 }

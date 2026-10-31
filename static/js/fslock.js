@@ -5,7 +5,7 @@
 
 // lock id = the id of the locked folder. info: GET /api/files/lock/<id>; keys: {gen: CryptoKey} once the encryption is unlocked
 const FSL = {info: {}, keys: {}, tried: {}, memo: new Map(), busy: {}, auto: {}, q: '', wait: {}};  // wait: {lock id: [{user_id, name}]} (2.353.0 F)
-const FSL_HEAD = 9, FSL_MAX = 50 * 1024 * 1024;
+const FSL_HEAD = 9;
 const fslIs = v => typeof v === 'string' && v.startsWith('e2e1:');
 const fslNameAad = (lid, g) => `kalmido-fsname:v1:${lid}:${g}`;
 const fslFileAad = (lid, g) => `kalmido-fsfile:v1:${lid}:${g}`;
@@ -177,7 +177,7 @@ async function fsl_open(n, dl, v) {
 }
 async function fsl_upload(files, target, lid0) {
   const lid = lid0 || fslLockOf(target); files = [...(files || [])].filter(f => f.size > 0); if (!lid || !files.length) return;
-  const big = files.find(f => f.size > FSL_MAX); if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
+  const lim = upLimit(files); if (lim) { toast(lim); return; }  // 2.363.3 (#3134)
   const fd = new FormData();
   try {
     await fslKeys(lid, true); const g = (await fslInfo(lid, true)).gen;

@@ -661,7 +661,6 @@
   "Error": "Fout",
   "Loading…": "Laden…",
   "Task is still syncing, try again in a moment": "De taak wordt nog gesynchroniseerd, probeer het zo opnieuw",
-  "{0} is larger than 50 MB": "{0} is groter dan 50 MB",
   "Uploading…": "Uploaden…",
   "Uploading {0} files…": "{0} bestanden uploaden…",
   "Attached": "Bijgevoegd",
@@ -15367,5 +15366,7 @@
   "An event in the calendar file is not closed properly": "Een afspraak in het agendabestand is niet goed afgesloten",
   "The calendar file contains no events": "Het agendabestand bevat geen afspraken",
   "{0} file could not be read, the manifest in the archive names it": ["{0} bestand kon niet worden gelezen, het manifest in het archief noemt het", "{0} bestanden konden niet worden gelezen, het manifest in het archief noemt ze"],
-  "A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.": "Een spreadsheet (.xlsx, .xls of CSV) met naam, nettobedrag en vervalmaand; je ziet een voorbeeld voordat er iets wordt opgeslagen."
+  "A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.": "Een spreadsheet (.xlsx, .xls of CSV) met naam, nettobedrag en vervalmaand; je ziet een voorbeeld voordat er iets wordt opgeslagen.",
+  "Upload cancelled": "Uploaden geannuleerd",
+  "Being processed…": "Wordt verwerkt…"
 }

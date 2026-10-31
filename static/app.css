@@ -8759,3 +8759,13 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
   :root{--tabs-h:2.75rem}
   #tabs button>span:not(.dot):not(.temoji):not(.tsw):not(.tico){position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%)}
 }
+/* 2.363.3 (#3134): upload progress with Cancel (upbar.js), above the toast */
+#upbars{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(4.75rem + var(--tabs-h) + var(--safe-b));z-index:80;display:flex;flex-direction:column;gap:.375rem;width:min(22rem,calc(100vw - 2rem))}
+.upbar{background:var(--bg3);border-radius:var(--radius);box-shadow:var(--shadow);padding:.5rem .625rem .5rem .875rem;font-size:var(--fs-m)}
+.uphead{display:flex;gap:.75rem;align-items:center}
+.upn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upp{color:var(--muted);flex:none;font-variant-numeric:tabular-nums}
+.upbar button{color:var(--accent);font-weight:600;flex:none}
+.uptrack{height:.25rem;margin-top:.375rem;border-radius:.25rem;background:var(--bg4);overflow:hidden}
+.uptrack>i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+@media (pointer:coarse){ .upbar button{min-height:2.75rem;min-width:2.75rem;padding:0 .75rem} }

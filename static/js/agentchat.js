@@ -501,8 +501,8 @@ S.chatFiles = {};
 const chatFilesHtml = aid => (S.chatFiles[aid] || []).map((f, i) => `<span class="cfile">${ic(/^image\//.test(f.type) ? 'clip' : 'file', 's')}<span>${esc(f.name || tr('Image'))}</span><button type="button" data-act="chat-stage-rm" data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove') + ': ' + (f.name || tr('Image')))}">${ic('x', 's')}</button></span>`).join('');
 function chatAddFiles(files, aid = S.chat.aid) {
   files = noEmpty(files); if (!files.length || !aid) return;
-  const big = files.find(f => f.size > 50 * 1024 * 1024);
-  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); files = files.filter(f => f !== big); }
+  const lim = upLimit(files, true);  // 2.363.3 (#3134)
+  if (lim) { toast(lim); files = files.filter(upFits); }
   const arr = S.chatFiles[aid] ||= [];
   arr.push(...files.slice(0, Math.max(0, 10 - arr.length)));
   if (arr.length >= 10 && files.length) toast(tr('At most {0} files per message', 10));
@@ -1029,6 +1029,7 @@ async function chatOlder() {
 async function chatSend() {
   const ta = $('#chat-in'), aid = S.chat.aid, hadF = document.activeElement === ta; if (!ta || !aid) return;
   const body = jc_send(ta.value.trim()), files = S.chatFiles[aid] || []; if (!body && !files.length) return;  // 2.56.0 (#1793): "Clara: …" in a job's history
+  const lim = upLimit(files); if (lim) { toast(lim); return; }  // 2.363.3 (#3134)
   if (typeof chatSentOnce === 'function') chatSentOnce();  // 2.298.0 C (#3187)
   // 2.13.1 (#465): with files a multipart form (the text may then be empty)
   const rto = replyTo('a:' + aid);  // 2.33.0 (#1076)

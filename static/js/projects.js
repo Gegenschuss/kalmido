@@ -360,8 +360,7 @@ function povMsModal(l, m) {
 async function povUpload(l, files) {
   files = noEmpty(files);
   if (!files.length) return;
-  const max = 50 * 1024 * 1024, big = files.find(f => f.size > max);
-  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
+  const lim = upLimit(files); if (lim) { toast(lim); return; }  // 2.363.3 (#3134)
   const fd = new FormData();
   files.forEach(f => fd.append('file', f, f.name));
   toast(files.length === 1 ? tr('Uploading…') : tr('Uploading {0} files…', files.length));

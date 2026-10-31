@@ -658,7 +658,6 @@
   "Error": "Fehler",
   "Loading…": "Lädt…",
   "Task is still syncing, try again in a moment": "Aufgabe wird noch synchronisiert, gleich nochmal versuchen",
-  "{0} is larger than 50 MB": "{0} ist größer als 50 MB",
   "Uploading…": "Lade hoch…",
   "Uploading {0} files…": "Lade {0} Dateien hoch…",
   "Attached": "Angehängt",
@@ -15367,5 +15366,7 @@
   "An event in the calendar file is not closed properly": "Ein Termin in der Kalenderdatei ist nicht richtig abgeschlossen",
   "The calendar file contains no events": "Die Kalenderdatei enthält keine Termine",
   "{0} file could not be read, the manifest in the archive names it": ["{0} Datei ließ sich nicht lesen, das Manifest im Archiv nennt sie", "{0} Dateien ließen sich nicht lesen, das Manifest im Archiv nennt sie"],
-  "A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.": "Eine Tabelle (.xlsx, .xls oder CSV) mit Name, Nettobetrag und Fälligkeitsmonat; vor dem Speichern siehst du eine Vorschau."
+  "A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.": "Eine Tabelle (.xlsx, .xls oder CSV) mit Name, Nettobetrag und Fälligkeitsmonat; vor dem Speichern siehst du eine Vorschau.",
+  "Upload cancelled": "Hochladen abgebrochen",
+  "Being processed…": "Wird verarbeitet…"
 }

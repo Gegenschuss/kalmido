@@ -538,7 +538,8 @@ async function rawFetch0(method, url, body, key) {
   if (body instanceof FormData) opt.body = body;
   else if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
   let r;
-  try { r = await fetch(url, opt); } catch { const ch = OUT.down; OUT.down = false; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('offline'); }
+  // 2.363.3 (#3134): a form with files of some size goes with a progress bar and Cancel (upbar.js); Cancel is no lost connection
+  try { r = await (body instanceof FormData && typeof upSend === 'function' && upWanted(body) ? upSend(url, opt, body) : fetch(url, opt)); } catch (e) { if (e.cancelled) throw e; const ch = OUT.down; OUT.down = false; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('offline'); }
   // 2.21.0 (#673): the device is online but the server is not (a proxy answers 502 / 503 / 504 without Kalmido's JSON): the
   // same as offline (cached data, changes wait), the hint says "server not reachable"; never a reload loop on a proxy page
   // 2.24.0 (#907): 503 (the proxy's maintenance page) or a notice of the kind "maintenance": "server in maintenance"
