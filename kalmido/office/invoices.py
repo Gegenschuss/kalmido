@@ -347,7 +347,7 @@ def inv_before_finalize(c, oid, r, s, pack):
     items = doc_items(c, r["id"], oid)
     miss = inv_missing(c, oid, r, s, pack, items)
     if miss:
-        BadKey(N_("Missing before finalising: {0}"), stored_join(miss))
+        raise BadKey(N_("Missing before finalising: {0}"), stored_join(miss))
     if r["kind"] in ("invoice", "credit"):
         inv_check_date(c, oid, r, s)
     from .abschlag import abs_before_finalize
@@ -356,7 +356,7 @@ def inv_before_finalize(c, oid, r, s, pack):
     # invoice (progress invoices above the work done leave a negative rest; a credit note needs a finalised invoice)
     if r["kind"] in ("invoice", "credit") and _col(r, "inv_type") != "final":
         if money(dec(doc_totals(c, oid, r).get("gross") or 0)) < 0:
-            BadKey(N_("A negative total can only be finalised as a credit note with positive amounts"))
+            raise BadKey(N_("A negative total can only be finalised as a credit note with positive amounts"))
     if r["kind"] == "invoice" and not _col(r, "due_date"):
         days = _col(r, "payment_days")
         if days is None:
@@ -372,10 +372,10 @@ def inv_check_date(c, oid, r, s):
     from .model import office_scheme_period
     d = r["date"]
     if d > local_now().date().isoformat():
-        BadKey(N_("The date must not lie in the future"))
+        raise BadKey(N_("The date must not lie in the future"))
     due = _col(r, "due_date")
     if due and due < d:
-        BadKey(N_("The due date must not lie before the date"))
+        raise BadKey(N_("The due date must not lie before the date"))
     scheme = inv_scheme(s, r["kind"])
     period = office_scheme_period(scheme, date.fromisoformat(d))
     # 2.144.10 B (#2576): trial documents have their own series; they neither count for real ones nor the other way round
@@ -383,7 +383,7 @@ def inv_check_date(c, oid, r, s):
                          "ORDER BY date DESC", (oid, r["kind"], r["id"], d, 1 if _col(r, "trial") else 0)):
         try:
             if office_scheme_period(scheme, date.fromisoformat(row["date"])) == period:
-                BadKey(N_("The date must not lie before the last finalised document of this series ({0})"), row["date"])
+                raise BadKey(N_("The date must not lie before the last finalised document of this series ({0})"), row["date"])
         except ValueError:
             continue
 
@@ -403,7 +403,7 @@ def inv_after_finalize(c, oid, uid, r):
                 (oid, inv_["id"], r["id"]))), Decimal(0))
             inv_credit_check(c, oid, r, inv_)  # 2.354.0 D (#2838): its currency and rate, and per VAT rate
             if credited + money(dec(tc.get("gross") or 0)) > money(dec(ti.get("gross") or 0)):  # 2.38.0 review: credits never exceed the invoice
-                DeniedKey(409, N_("The credit notes would exceed the amount of the invoice"))
+                raise DeniedKey(409, N_("The credit notes would exceed the amount of the invoice"))
             if money(dec(tc.get("gross") or 0)) >= money(dec(ti.get("gross") or 0)) and inv_["status"] != "cancelled":
                 c.execute("UPDATE office_docs SET status='cancelled', updated_at=? WHERE id=? AND org_id=?", (ts, inv_["id"], oid))
                 ofx_log(c, oid, "status", doc_id=inv_["id"], detail={"before": {"status": inv_["status"]}, "after": {"status": "cancelled"}, "credit_id": r["id"]})
@@ -626,7 +626,7 @@ def inv_credit_check(c, oid, r, inv_):
     if list(have) == [""]:  # an invoice without tax lines: the sum only
         got = {"": sum(got.values(), Decimal(0))}
     if any(money(v) > money(have.get(k, Decimal(0))) for k, v in got.items() if money(v) > 0):
-        DeniedKey(409, N_("The credit notes would exceed the amount of the invoice"))
+        raise DeniedKey(409, N_("The credit notes would exceed the amount of the invoice"))
 
 
 def inv_credit_of(c, oid, uid, inv_):
@@ -1122,13 +1122,13 @@ def inv_datev_ready(c, oid, r, s):
     from ..integrations.mail import MAIL_OUT_ON
     office_need_feature(c, oid, "books.datev", s)  # 2.147.0 (#2459, #2460)
     if not MAIL_OUT_ON:
-        DeniedKey(409, N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
+        raise DeniedKey(409, N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
     if not s.get("datev_email"):
-        DeniedKey(409, N_("No DATEV inbox address in the settings"))
+        raise DeniedKey(409, N_("No DATEV inbox address in the settings"))
     if not ofx_locked(r):
-        DeniedKey(409, N_("Finalise the document first"))
+        raise DeniedKey(409, N_("Finalise the document first"))
     if _col(r, "trial"):  # 2.144.10 B (#2576)
-        DeniedKey(409, N_("Trial documents do not go to the accounting"))
+        raise DeniedKey(409, N_("Trial documents do not go to the accounting"))
 
 
 INV_CC_MAX = 5  # 2.433.0 (#3599): copy addresses of one mail (= contacts_cl.FK_CC_MAX)
@@ -1144,18 +1144,18 @@ def inv_send(c, oid, uid, r, b, later=False):
     before the commit; a refused mail marks nothing)."""
     from ..integrations.mail import MAIL_OUT_ON
     if not MAIL_OUT_ON:
-        DeniedKey(409, N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
+        raise DeniedKey(409, N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
     if not ofx_locked(r):
-        DeniedKey(409, N_("Finalise the document first"))
+        raise DeniedKey(409, N_("Finalise the document first"))
     to = (b.get("to") or "").strip() if isinstance(b.get("to"), str) else ""
     cc = (b.get("cc") or "").strip() if isinstance(b.get("cc"), str) else ""
     mail_re = r"[^@\s,]+@[^@\s,]+\.[^@\s,]+"
     # 2.433.0 (#3599): several copy addresses, comma separated (the send dialog fills the contact persons in); each once
     ccs = list(dict.fromkeys(x.strip() for x in cc.replace(";", ",").split(",") if x.strip() and x.strip().lower() != to.lower()))
     if not re.fullmatch(mail_re, to):
-        BadKey(N_("Invalid value: {0}"), "to")
+        raise BadKey(N_("Invalid value: {0}"), "to")
     if len(ccs) > INV_CC_MAX or any(not re.fullmatch(mail_re, x) for x in ccs):
-        BadKey(N_("Invalid value: {0}"), "cc")
+        raise BadKey(N_("Invalid value: {0}"), "cc")
     cc = ", ".join(ccs)
     s = office_settings(c, oid)
     explicit = b.get("datev") in (1, True, "1", "true")
@@ -1270,14 +1270,14 @@ def h6c_send_budget(c, oid, uid, rcpts):
     n_org, n_me = c.execute("SELECT COUNT(*), COUNT(*) FILTER (WHERE user_id=?) FROM office_doc_log WHERE org_id=? AND action='send' AND at>=?",
                             (uid, oid, since)).fetchone()
     if n_org >= H6C_SEND_DAY_ORG or n_me >= H6C_SEND_DAY_PERSON:
-        DeniedKey(429, N_("The day's limit of document mails is reached ({0}); please try again tomorrow"),
+        raise DeniedKey(429, N_("The day's limit of document mails is reached ({0}); please try again tomorrow"),
                         H6C_SEND_DAY_PERSON if n_me >= H6C_SEND_DAY_PERSON else H6C_SEND_DAY_ORG)
     day = since[:10]
     keys = [f"o:{int(oid)}:{x.strip().lower()}"[:300] for x in rcpts if x]
     for k in keys:
         r = c.execute("SELECT n FROM mail_counts WHERE k=? AND day=?", (k, day)).fetchone()
         if r and r[0] >= H6C_SEND_DAY_RCPT:
-            DeniedKey(429, N_("This address already got {0} mails from your organisation today; please try again tomorrow"), H6C_SEND_DAY_RCPT)
+            raise DeniedKey(429, N_("This address already got {0} mails from your organisation today; please try again tomorrow"), H6C_SEND_DAY_RCPT)
     for k in keys:
         c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET
                      n=CASE WHEN mail_counts.day=excluded.day THEN mail_counts.n+1 ELSE 1 END, day=excluded.day""", (k, day))
@@ -1513,7 +1513,7 @@ def inv_pay_add(c, oid, uid, did, b, ref=None):
         raise BadInput(tr("Invalid value: {0}", "amount"))
     d = _date(b.get("date"), "date") or local_now().date().isoformat()
     if d > local_now().date().isoformat():
-        BadKey(N_("The date must not lie in the future"))
+        raise BadKey(N_("The date must not lie in the future"))
     from .periodlock import period_need_open
     period_need_open(c, oid, d)  # 2.148.0 A (#2471): also for the bank reconciliation and the agents' payment proposals
     if refund:

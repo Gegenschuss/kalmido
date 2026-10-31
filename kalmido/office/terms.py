@@ -280,7 +280,7 @@ def agb_mail_files(c, oid, r, b, files):
                 break
         if joined:
             if sum(len(f[1]) for f in out) > AGB_MAIL_MAX_MB * 1024 * 1024:
-                DeniedKey(413, N_("The attachments are too large for one mail (at most {0} MB)"), AGB_MAIL_MAX_MB)
+                raise DeniedKey(413, N_("The attachments are too large for one mail (at most {0} MB)"), AGB_MAIL_MAX_MB)
             return out, agb_doc_terms(c, oid, r)
     want = b.get("terms")
     want = r["kind"] == "offer" if want is None else want in (1, True, "1", "true")
@@ -289,7 +289,7 @@ def agb_mail_files(c, oid, r, b, files):
     if not a:
         return files, None
     if sum(len(f[1]) for f in files) + len(a[1]) > AGB_MAIL_MAX_MB * 1024 * 1024:
-        DeniedKey(413, N_("The attachments are too large for one mail (at most {0} MB)"), AGB_MAIL_MAX_MB)
+        raise DeniedKey(413, N_("The attachments are too large for one mail (at most {0} MB)"), AGB_MAIL_MAX_MB)
     return list(files) + [a], t
 
 

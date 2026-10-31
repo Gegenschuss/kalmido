@@ -414,7 +414,7 @@ def abs_before_finalize(c, oid, r, items=None):
         return
     now = sorted(x["id"] for x in abs_progress_of(c, oid, r["source_doc_id"], locked_only=True))
     if now != sorted(int(x) for x in _j(_col(r, "abs_refs") or "[]", [])) or (items is not None and _stale_deductions(c, oid, r, items)):
-        BadKey(N_("The progress invoices of the quotation changed since this final invoice was drafted; create the final invoice again"))
+        raise BadKey(N_("The progress invoices of the quotation changed since this final invoice was drafted; create the final invoice again"))
 
 
 def abs_prepaid_view(m, L, lang, pack=None):

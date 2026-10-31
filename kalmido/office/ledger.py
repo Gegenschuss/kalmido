@@ -76,7 +76,7 @@ def ofx_need_editable(r):
     """409 with a readable reason when document row r is finalised (head, positions, number, delete). 2.38.0: a sent
     document (quotations too, decision of 2026-10-10) is locked the same way; a new version = duplicate."""
     if ofx_locked(r):
-        DeniedKey(409, OFX_LOCKED)
+        raise DeniedKey(409, OFX_LOCKED)
     if r is not None and r["status"] == "sent":
         raise DeniedKey(409, OFX_SENT)
 

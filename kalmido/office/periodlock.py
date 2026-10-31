@@ -74,7 +74,7 @@ def period_need_open(c, oid, *days):
     for d in days:
         m = pl_month(d)
         if m and m <= t:
-            DeniedKey(409, PL_LOCKED, pl_label(m))
+            raise DeniedKey(409, PL_LOCKED, pl_label(m))
 
 
 def _add_month(m, n=1):
