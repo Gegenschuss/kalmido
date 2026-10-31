@@ -49,6 +49,7 @@ from ..core.retention import ret_on, ret_report  # 2.272.0 A (#3026)
 from ..core.access import Denied
 from ..core.errors import DeniedKey
 from ..core.orgcrypt import oc_read_file, oc_write_file
+from .pdf import pdf_date
 from .model import office_gate, office_org, office_role, office_settings, office_settings_lock, office_settings_save
 from .doclang import doc_lg
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
@@ -184,7 +185,6 @@ def agb_gen_terms(c, oid, d):
 
 def agb_fmt_date(v, lang):
     """2026-10-19 -> 19.10.2026 (de) / 19 October 2026 (en): 2.368.2 (#2986) the date of the other documents (was ISO)."""
-    from .pdf import pdf_date
     return pdf_date(v, str(lang or "de").split("-")[0])
 
 

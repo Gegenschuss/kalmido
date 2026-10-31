@@ -23,6 +23,7 @@ from ..core.i18n import N_, csv_dialect, tr
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
+from .pdf import pdf_date
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings
 from .ledger import ofx_items_brief, ofx_log, ofx_need_editable
@@ -861,7 +862,6 @@ def rk_bill_post():
 
 def _fmt_day(s, lg):
     """2.368.2 (#2986): the date of an invoice line as on the rest of the document (was ISO in every language but German)."""
-    from .pdf import pdf_date
     return pdf_date(s, str(lg).split("-")[0]) if s and DATE_RE.match(s) else s or ""
 
 
