@@ -60,7 +60,7 @@ FE_MD_LABELS = {"": N_("Managing directors|company"), "shareholders": N_("Shareh
                 "partners": N_("Partners|company"),
                 "gbr_partners": N_("Partners|company, GbR")}  # 2.138.0 E (#2242): GbR partners; "shareholders" stays as stored
 # words of the printed company lines (the document's language); a pack may override them with labels[lang]["company_<key>"]
-COMPANY_WORDS = {"phone": N_("Phone|company"), "email": N_("Email|company"), "tax_number": N_("Tax number|company"), "vat_id": N_("VAT ID|company"),
+COMPANY_WORDS = {"phone": N_("Phone|company"), "email": N_("E-mail|company"), "tax_number": N_("Tax number|company"), "vat_id": N_("VAT ID|company"),
                  "iban": "IBAN", "bic": "BIC", "register": N_("Register court|company"), "managing_directors": N_("Managing directors|company")}
 
 

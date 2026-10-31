@@ -156,7 +156,7 @@ rows = dbx("SELECT id, list_id, deleted_at IS NOT NULL FROM tasks WHERE id IN (?
 check(len(rows) == 2 and all(x[1] == TEAM and x[2] for x in rows), "#1988: its tasks stay in it (in the trash) " + str(rows))
 check(not dbx("SELECT 1 FROM tasks WHERE list_id=? AND title LIKE 'Secret%'", (BINBOX,)), "#1988: nothing in the owner's private inbox")
 check(Bo.post(B + f"/api/tasks/{T1}/restore").status_code == 409 and dbx("SELECT deleted_at IS NOT NULL FROM tasks WHERE id=?", (T1,))[0][0],
-      "#1988: the owner cannot restore a single task into the private space (409: only with the list)")
+      "#1988: the owner cannot restore a single task into the private workspace (409: only with the list)")
 nb = [x for x in news(Bo) if x["data"]["action"] == "trash"]
 check(nb and nb[0]["list_id"] is None and nb[0]["data"]["name"] == "Bob Team", "#1101: the owner is told about the delete (the name in the News)")
 check(any(x["data"]["action"] == "trash" for x in news(Ca)), "#1101: the former member is told about the delete")

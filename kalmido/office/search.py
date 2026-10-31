@@ -3,7 +3,7 @@ customer number) and documents (number, client, project title / reference) of th
 
 Visible exactly like the office lists themselves: the feature "office" on, a person (no agent, no kid, no API token),
 the office area of the workspace (office_where: private = the personal office, an organisation = its office), the
-organisation role (office_allowed: guests nothing) and the level "view" of the area "Quotes & invoices" (office_can: groups,
+organisation role (office_allowed: guests nothing) and the level "view" of the area "Quotations & invoices" (office_can: groups,
 "Previous access", admins / personal owner). Clients also need the feature "clients" (their page) and the same
 membership as GET /api/clients. A short list per kind (BS_LIMIT), ILIKE on the plain columns (no index, no migration).
 No routes of its own; the agents' API (fts_v1) never asks for it."""

@@ -458,7 +458,7 @@ def _doc_v1(c, oid, r, items=True):
     for it in d.get("items") or []:  # 2.144.5 C (#1523): the source list of a position is internal
         it.pop("list_id", None)
     oil_agent_filter(d, lambda x: ofa_doc_in_lists(c, g.user["id"], x))  # 2.356.0 C (#3003): linked documents only inside the agent's projects
-    d["app_url"] = f"#office/offers/{r['id']}"  # every kind opens in the tab "Quotes & invoices"
+    d["app_url"] = f"#office/offers/{r['id']}"  # every kind opens in the tab "Quotations & invoices"
     return d
 
 
@@ -765,7 +765,7 @@ def v1_office_reminder_post():
     c.execute("UPDATE office_docs SET agent_id=? WHERE id=? AND org_id=?", (aid, nid, oid))
     ofi_ref_keep(c, nid, ref)
     recalc(c, oid, nid)
-    return _draft_answer(c, aid, uid, oid, nid, notify, N_("Reminder draft"))
+    return _draft_answer(c, aid, uid, oid, nid, notify, N_("Payment reminder draft"))
 
 
 # ---------------------------------------------------------------- #1350: payment suggestions

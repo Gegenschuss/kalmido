@@ -791,7 +791,7 @@ def time_csv():
     num = (lambda x: f"{x:.2f}".replace(".", ",")) if de else (lambda x: f"{x:.2f}")
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";" if de else ",", lineterminator="\r\n")
-    w.writerow([tr("Project"), tr("Task"), tr("User"), tr("Start|time"), tr("End|time"), tr("Duration (h)"),
+    w.writerow([tr("Project"), tr("Task"), tr("Person"), tr("Start|time"), tr("End|time"), tr("Duration (h)"),
                 tr("Duration (h:mm)"), tr("Rounded (h)"), tr("Amount ({0})", rep["currency"]), tr("Note")])
     from .timesheet import tz_rows
     # 2.125.0 B (#2120): times in my time zone, an entry over midnight = one row per day; R (#2122): the rows shared with the XLSX

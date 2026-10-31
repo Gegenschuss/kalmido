@@ -2,7 +2,7 @@
 
 The watchdog (dun_tick, every DUN_EVERY_TICKS intervals) looks at every office area -- organisations AND the personal
 office of a person without one -- that has finalised, open invoices (issued / sent, an open amount, not cancelled) and
-makes ONE reminder draft per client + currency + level with the same steps as "Create reminder"
+makes ONE reminder draft per client + currency + level with the same steps as "Create payment reminder"
 (invoices.inv_make_reminder, recalc, the office log "create" with auto 1) when, with the setting "dunning_suggest" on:
   - level 1: the due date lies more than "dunning_grace_days" days back (default 7),
   - level n+1 (max 3): the last finalised reminder of the invoice has passed its deadline (its date + deadline days) by

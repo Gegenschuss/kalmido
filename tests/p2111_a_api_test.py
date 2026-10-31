@@ -202,9 +202,9 @@ check(r.ok and cl["name"] == "Example Studio" and one("SELECT COUNT(*) FROM offi
       f"the client as before, one contact with its old name and id ({r.status_code} {cl.get('name')})")
 r = undo(Ca, "client", CL, T7, "redo")
 check(r.status_code == 404, f"carol on bob's organisation client: 404 ({r.status_code})")
-# moved to the private space in between (a step itself): the move is not undone by a copy
+# moved to the private workspace in between (a step itself): the move is not undone by a copy
 check(Bo.patch(B + f"/api/clients/{CL}", json={"name": "Moved Studio"}, headers=U(T8)).ok, "bob: a step")
-check(Bo.patch(B + f"/api/clients/{CL}", json={"org_id": None}, headers=U(T8)).ok, "bob moves the client into his private space (step)")
+check(Bo.patch(B + f"/api/clients/{CL}", json={"org_id": None}, headers=U(T8)).ok, "bob moves the client into his private workspace (step)")
 r = undo(Bo, "client", CL, T8, "undo")
 check(r.status_code == 409 and Bo.get(B + f"/api/clients/{CL}").json().get("org_id") is None, f"undo of a move: 409, it stays private ({r.status_code} {r.text[:200]})")
 

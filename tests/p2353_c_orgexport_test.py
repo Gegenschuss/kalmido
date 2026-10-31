@@ -13,8 +13,8 @@ and table reference -- and the import rebuilds them in the target. Invented name
  - an export without the tree (a pre-2.353 archive: no knowledge nodes, no marks) still gives the pages, the tree is built
    from their paths as before
  - the organisation boundary: every row made lies in the target organisation, the source is untouched
- - freelancer-matrix: a person without an organisation imports the export into the private space: the tree in their own
-   space (the export itself is an organisation's thing; the private space has no export of its own)
+ - freelancer-matrix: a person without an organisation imports the export into the private workspace: the tree in their own
+   space (the export itself is an organisation's thing; the private workspace has no export of its own)
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY (P2353C_NOSTART=1 = the server already runs like that).
 usage: p2353_c_orgexport_test.py <datadir>"""
 # freelancer-matrix: wiki
@@ -264,13 +264,13 @@ zn = one("SELECT parent_id FROM fs_nodes WHERE kind='ref' AND ref_kind='wiki' AN
 check(r.ok and zr and zn and kids(zr).get("Alt", {}).get("id") == zn["parent_id"], "the tree is built from the page's path as before")
 A.delete(B + f"/api/account/import/{iid}")
 
-# ---------------------------------------------------------------- freelancer-matrix: into the private space
+# ---------------------------------------------------------------- freelancer-matrix: into the private workspace
 FID, Fr = freelancer(B, A)
 Fr.patch(B + "/api/settings", json={"features": FEAT})
 iid, FIMP = imp(Fr, OX, RK, "private")
 fr = root_of(f"u{FID}", "wiki")
 fk = kids(fr or 0)
-check(fr and {"Leer", "Handbuch"} <= set(fk), f"freelancer: the knowledge tree in the private space {sorted(fk)}")
+check(fr and {"Leer", "Handbuch"} <= set(fk), f"freelancer: the knowledge tree in the private workspace {sorted(fk)}")
 check(all(v["org_id"] is None and v["owner_id"] == FID for v in fk.values()), "freelancer: their own nodes")
 fp = one("SELECT id FROM wiki_pages WHERE owner_id=? AND org_id IS NULL AND path='Handbuch/Zwei'", (FID,))
 fh = kids(fk.get("Handbuch", {}).get("id") or 0)

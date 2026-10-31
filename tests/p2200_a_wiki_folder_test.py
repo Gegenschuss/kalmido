@@ -239,7 +239,7 @@ check(Ol.get(B + "/api/files", params={"parent": ROOT}).status_code == 404 and O
 check(Bo.post(B + "/api/wiki/folders", json={"space": "private", "name": "His", "parent_id": FE}).status_code == 404,
       "another person cannot name a folder of this tree")
 
-# ================================================================ a private space: shares follow, locked spaces get no nodes
+# ================================================================ a private workspace: shares follow, locked spaces get no nodes
 Q1 = page(A, "Mine/Note", space="private")
 Q2 = page(A, "Mine/Other", "[[Mine/Note]]", space="private")
 r = A.post(B + "/api/wiki/shares", json={"page_id": Q1, "kind": "person", "user_id": uid["bob"]})

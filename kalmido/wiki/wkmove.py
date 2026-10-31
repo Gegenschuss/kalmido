@@ -239,11 +239,11 @@ def wiki_move_space():
 # exactly the pages named, each with path and text; both generations as seen by the dry run (else 409, the browser tries
 # again). Names in a locked target are compared in the browser. No links are kept for a locked target, its history line
 # keeps no names. Only a person in the web app (agents, API tokens: 403).
-WKR_BUSY = N_("This space is being encrypted. Try again in a moment.")
-WKR_NOKEY = N_("You cannot unlock the target space: you have no key for it yet. An admin of the organisation can give it to you.")
-WKR_NOKEY_SRC = N_("You have no key for this space yet.")
+WKR_BUSY = N_("This workspace is being encrypted. Try again in a moment.")
+WKR_NOKEY = N_("You cannot unlock the target workspace: you have no key for it yet. An admin of the organisation can give it to you.")
+WKR_NOKEY_SRC = N_("You have no key for this workspace yet.")
 WKR_PLAIN = N_("The pages are no longer end-to-end encrypted in the target.")
-WKR_GEN = N_("The key of a space was changed meanwhile. Please try again.")
+WKR_GEN = N_("The key of a workspace was changed meanwhile. Please try again.")
 
 
 def wkr_state(c, oid, uid, lock=False):
@@ -329,8 +329,8 @@ def wkr_move(c, uid, src, to, b, dry):
     shares = wsh_end_moved(c, src, None if src else uid, [r["path"] for r in rows], dry=True)
     q = ",".join("?" * len(ids))
     vers = c.execute(f"SELECT COUNT(*) FROM wiki_versions WHERE page_id IN ({q})", ids).fetchone()[0] if tst["mode"] else 0
-    notes += [wkm_share_note(shares), trn("{0} earlier version is deleted: a space with the lock keeps no history",
-                                          "{0} earlier versions are deleted: a space with the lock keeps no history", vers) if vers else "",
+    notes += [wkm_share_note(shares), trn("{0} earlier version is deleted: a workspace with the lock keeps no history",
+                                          "{0} earlier versions are deleted: a workspace with the lock keeps no history", vers) if vers else "",
               oo_into_note(c, src, to)]  # 2.361.2 B (#2923)
     if not tst["mode"]:  # 2.360.0 D (#2496): an open organisation as the target keeps no history either (wkm_vers_note)
         vers = wkm_vers_dropped(c, ids, to)
@@ -341,7 +341,7 @@ def wkr_move(c, uid, src, to, b, dry):
         e2e_deny = {}
     from .wikiatt import wka_pages_have_files
     if not block and tst["mode"] and wka_pages_have_files(c, [r["id"] for r in rows]):  # 2.99.0 (#2182): no plain files
-        block = tr("The pages of this space have files. Files cannot be encrypted in the browser yet: delete them first.")
+        block = tr("The pages of this workspace have files. Files cannot be encrypted in the browser yet: delete them first.")
     if dry:  # 2.273.0 B (#3042): + updated_at per page (the move sends it back as expect_updated_at)
         return jsonify(smv_answer(notes, block, count=len(rows), e2e=e2e, taken=[], shares=shares,
                                   pages=[{"id": r["id"], "updated_at": r["updated_at"]} for r in rows], **e2e_deny))
@@ -420,7 +420,7 @@ def wkr_place(c, oid, by_id, viewer):
         return None, tr("Organisation")
     if by_id == viewer:
         return "private", tr("Private")
-    return None, tr("private space")
+    return None, tr("private workspace")
 
 def wkm_last(c, pid):
     """The last move of page pid between workspaces (its history line), or None. The caller checked the page is visible."""

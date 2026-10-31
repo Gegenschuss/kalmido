@@ -275,7 +275,7 @@ APP_ONLY = [
      ("=POST /api/videos", "=PATCH /api/videos/{}", "=DELETE /api/videos/{}", "=POST /api/videos/{}/restore", "* /api/videos/{}/versions",
       "=DELETE /api/videos/{}/comments/{}", "=POST /api/videos/{}/comments/{}/restore", "=POST /api/videos/{}/signoff",
       "=POST /api/videos/{}/signoffs/{}/revoke", "=POST /api/videos/{}/move-space")),
-    ("2.96.0 (#1941): moving data between the private space and an organisation stays with people in the app -- an agent belongs "
+    ("2.96.0 (#1941): moving data between the private workspace and an organisation stays with people in the app -- an agent belongs "
      "to ONE workspace and never moves data across its boundary (the routes answer 403 to agents)",
      ("=POST /api/files/move-space", "=POST /api/sheets/{}/move-space", "=POST /api/wiki/move-space",
       "=POST /api/lists/{}/move-space")),  # 2.401.0 (#2924): the dry run of a project's workspace change

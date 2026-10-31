@@ -283,7 +283,7 @@ def may_see(c, uid, other):
 def need_visible(c, other):
     """404 (as for an unknown user) when the current person must not see `other`."""
     if not may_see(c, me(), other):
-        raise Denied(404, tr("unknown user"))
+        raise Denied(404, tr("unknown person"))
 
 
 def org_icon_fields(r, member=True):
@@ -744,7 +744,7 @@ def org_join_or_add(c, oid, uid, role="member"):
     if _operator_apart() and c.execute("SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'user')!='agent'", (uid,)).fetchone():
         if uid == me():  # 2.306.0 Fix-1 (#2875 review): the operator does not invite itself into a customer's organisation
             c.rollback()
-            raise Denied(409, tr("On a hosted instance the operator does not join the organisations of its customers"))
+            raise Denied(409, tr("On a hosted instance the operator does not join the organisations of its clients"))
         from .orginvite import ojn_invite
         ojn_invite(c, oid, uid, role)
         return True
@@ -915,7 +915,7 @@ def wsc_clean_color(v):
     if v in ("", None):
         return ""
     if not isinstance(v, str) or not LIST_COLOR_RE.fullmatch(v):
-        raise Denied(400, tr("Invalid value: {0}", tr("Color")))
+        raise Denied(400, tr("Invalid value: {0}", tr("Colour")))
     return v
 
 
@@ -1277,7 +1277,7 @@ def org_member_put(oid):
         return err(tr("Invalid value: {0}", "user_id"))
     u = c.execute("SELECT id, kind FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
     if not u or (u["kind"] or "user") == "agent" or (uid != me() and not by_mail and not may_see(c, me(), uid)):
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     cur = c.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
     if cur and uid == me() and role != "admin" and _admins(c, oid) <= 1:
         return err(tr("The last admin of an organisation cannot step down: make somebody else an admin first"), 409)

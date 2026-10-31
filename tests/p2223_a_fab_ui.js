@@ -56,7 +56,7 @@ const FABCHK = `(async () => {
   check(((await call(CF, 'GET', '/api/state')).me?.workspaces || []).length === 0, 'frida is in no organisation');
   const me = (await call(CA, 'GET', '/api/state')).me;
   const BOB = (await call(CB, 'GET', '/api/state')).me.id;
-  // an agent alice and frida share a list with (in alice's private space, frida is admin there): the round button shows for both
+  // an agent alice and frida share a list with (in alice's private workspace, frida is admin there): the round button shows for both
   const AG = (await call(CA, 'POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'})).id;
   const LS = (await call(CA, 'POST', '/api/lists', {name: 'Shared with Frida'})).id;
   await call(CA, 'PUT', `/api/lists/${LS}/members`, {user_id: AG, role: 'edit'});

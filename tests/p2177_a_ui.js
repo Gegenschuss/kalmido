@@ -3,7 +3,7 @@
 // - the window shows "Uploading: x of y" and then "Unpacking: x of y files" with a bar; "In the background" closes it
 // - an import that ended while the app was closed is reported the next time the knowledge pages open (the pages, one
 //   Undo step) and its result is cleared on the server
-// freelancer-matrix: wiki (the import runs in the private space of a person without an organisation)
+// freelancer-matrix: wiki (the import runs in the private workspace of a person without an organisation)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');

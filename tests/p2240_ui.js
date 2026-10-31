@@ -13,7 +13,7 @@
 // #907 the notice above the app (hide per device, comes back when it changes), "server in maintenance" on a 503
 // #910 the storage meter in Account, the dialog "Storage full" with "Contact support" when an upload is refused
 // #896 the organisation setting "Members may connect agents", "Where it runs", the News line when an agent joins
-// UX-01 Views folded below the lists, UX-06 no doubled app name, UX-08 no "Person" under every name, UX-21 Log out at the end
+// UX-01 Views folded below the lists, UX-06 no doubled app name, UX-08 no "Person" under every name, UX-21 Sign out at the end
 // UX-09 one task menu in a fixed order, the swipe menu names its task and ends with "All…", UX-35 Today: one slim
 // overdue line, the planners in "…", UX-36 the default tab bar, UX-41 the assignee in the task header + "More details"
 // UX-22 / UX-23 the first-run setup: the language sticks, the organisation is asked only for a team
@@ -236,7 +236,7 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   check(!md.querySelector('[data-admp="server"]').hidden, 'UX-16: a hit opens its sub-tab');
   input(w, sq, 'abmelden'); await sleep(50);
   hits = [...md.querySelectorAll('#s-sres [data-hit]')];
-  check(hits.some(h => /Log out/.test(h.textContent)), 'UX-16: a synonym ("abmelden") finds "Log out"');
+  check(hits.some(h => /Sign out/.test(h.textContent)), 'UX-16: a synonym ("abmelden") finds "Sign out"');
   input(w, sq, 'xyzzy'); await sleep(50);
   check(md.querySelector('.sbody').classList.contains('snores') && /Nothing found/.test(md.querySelector('#s-sres').textContent), 'UX-16: nothing found: one line, the panes step back');
   input(w, sq, ''); await sleep(50);
@@ -254,7 +254,7 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   const sto = md.querySelector('.stoq');
   check(sto && sto.classList.contains('warn') && md.querySelector('.stobar[role="meter"]')?.getAttribute('aria-valuenow') === '86', '#910: the storage meter in Account (86 %, warn) ' + (sto?.textContent || ''));
   const pane = md.querySelector('[data-pane="account"]');
-  check(pane.lastElementChild.classList.contains('alogout') || !pane.querySelector('[data-acc="logout"]'), 'UX-21: "Log out" at the very end of Account');
+  check(pane.lastElementChild.classList.contains('alogout') || !pane.querySelector('[data-acc="logout"]'), 'UX-21: "Sign out" at the very end of Account');
   closeAll(w);
   // a refused upload: the dialog with "Contact support"
   w.__dialogs = 'manual';

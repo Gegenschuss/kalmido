@@ -79,7 +79,7 @@ def Nn_(one, other):  # a plural pair for trn (marked for tools/i18n_check.py, l
 
 
 ODL_MORE = (
-    ("mails", Nn_("{0} mail", "{0} mails"), "hub_mails"),
+    ("mails", Nn_("{0} e-mail", "{0} e-mails"), "hub_mails"),
     ("mailboxes", Nn_("{0} mailbox", "{0} mailboxes"), "hub_mailboxes"),
     ("mail_addresses", Nn_("{0} mail-in address", "{0} mail-in addresses"), "hub_tokens"),
     ("deals", Nn_("{0} deal", "{0} deals"), "office_deals"),
@@ -589,7 +589,7 @@ UPG_MENTION = "<@{0}>"
 def upg_mentions(c, uid):
     """Mentions of the deleted person in comments and chat messages (plain text; locked ones the server cannot read stay)
     become the words "@Deleted user"; the id leaves the comments' mention lists."""
-    tok, word = UPG_MENTION.format(int(uid)), "@" + tr("Deleted user")
+    tok, word = UPG_MENTION.format(int(uid)), "@" + tr("Deleted person")
     for table in ("comments", "tchat_msgs"):
         extra = " AND enc IS NULL" if table == "tchat_msgs" else ""
         c.execute(f"UPDATE {table} SET body=replace(body, ?, ?) WHERE body LIKE ?{extra}", (tok, word, f"%{tok}%"))  # pg-ok: the token is <@digits>, case does not matter

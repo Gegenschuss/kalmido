@@ -2,7 +2,7 @@
 """2.123.0 A API tests (#2105, #2102, #2106), own container (start.sh) with a server key (encryption at rest on). Invented
 names and texts only.
  - #2105 the text of a page is sealed at rest ("kenc1:" in the database, never the plain text) in an organisation and in a
-   private space; reading, template, rename with relink, mentions, export / import, the move private <-> organisation work;
+   private workspace; reading, template, rename with relink, mentions, export / import, the move private <-> organisation work;
    sealing is off until encrypt-wiki; a plain page from before (written straight into the database) is read and sealed by encrypt-wiki; the way back
    decrypt-wiki (wiki_encrypt=0) leaves every page text and version plain, new saves stay plain, encrypt-wiki seals again
  - #2102 the history: saves of one person within 10 minutes share a version, another person / later = a new one, at most
@@ -163,7 +163,7 @@ rq = Bo.post(B + f"/api/orgs/{ORG}/out-requests", json={"kind": "wiki", "id": MV
 check(A.post(B + f"/api/orgs/{ORG}/out-requests/{rq}", json={"decision": "approve"}).ok, "#2923: alice releases bob's request")
 r = Bo.post(B + "/api/wiki/move-space", json={"pages": [MV], "space": SP, "to": "private", "dest": ""})
 check(r.ok and Bo.get(B + f"/api/wiki/pages/{MV}").json().get("body", "").endswith("dritte Fassung")
-      and A.get(B + f"/api/wiki/pages/{MV}").status_code == 404, "#2105: and back into the private space " + r.text[:200])
+      and A.get(B + f"/api/wiki/pages/{MV}").status_code == 404, "#2105: and back into the private workspace " + r.text[:200])
 vv = vers(Bo, MV) or []
 check(len(vv) >= 1 and all(Bo.get(B + f"/api/wiki/pages/{MV}/versions/{v['id']}").ok for v in vv), "#2102: versions readable after the way back")
 check(all(x[0].startswith("kenc1:") for x in sql("SELECT body FROM wiki_versions WHERE page_id=? AND body<>''", (MV,))),

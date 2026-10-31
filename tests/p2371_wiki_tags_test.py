@@ -11,7 +11,7 @@
    errors; open checkboxes only ("- [x]" and code blocks left out) with their line
  - rights: another organisation's space 404 (tags and query), a guest reading through a folder share sees only the shared
    pages in a query; a space with the lock: {e2e: true} from both routes (the browser runs them)
- - freelancer-matrix: wiki (a person without an organisation: tags and queries in her private space)
+ - freelancer-matrix: wiki (a person without an organisation: tags and queries in her private workspace)
  - tenant-matrix: wiki (not in the organisation / another person's private page: 404 for tags and query)
 usage: p2371_wiki_tags_test.py <datadir>      (P2371_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import base64

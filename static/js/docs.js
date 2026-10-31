@@ -547,7 +547,7 @@ function dc_sDraw(md) {
 function dc_cfSettings(s) {  // 2.153.0 (#2179): the custom fields of the workspace (nothing preset)
   const fs = s.fields || [];
   return `<h4>${tr('Custom fields')}</h4>
-    <p class="muted">${tr('Extra fields every document of this workspace can have, e.g. a contract or customer number.')}</p>
+    <p class="muted">${tr('Extra fields every document of this workspace can have, e.g. a contract or client number.')}</p>
     ${fs.length ? `<ul class="dc-rules">${fs.map(f => `<li class="dc-rule"><span>${esc(f.name)} <span class="muted">${esc(tr(DC_CFTYPES.find(t => t[0] === f.type)?.[1] || f.type))}${f.type === 'select' ? `: ${esc((f.options || []).map(o => o.name).join(', '))}` : ''}</span></span><span>
       ${f.type === 'select' ? `<button type="button" class="iconbtn" data-dcs="fopt:${f.id}" aria-label="${esc(tr('Options'))}" title="${esc(tr('Options'))}">${ic('list')}</button>` : ''}
       <button type="button" class="iconbtn" data-dcs="fren:${f.id}" aria-label="${esc(tr('Rename'))}" title="${esc(tr('Rename'))}">${ic('edit')}</button>

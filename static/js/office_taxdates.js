@@ -23,7 +23,7 @@ function txdSectionHtml() {
     <label class="chkl"><input type="checkbox" data-txd="est" ${d.est ? 'checked' : ''}><span>${tr('Income tax prepayments (10 Mar, 10 Jun, 10 Sep, 10 Dec)')}</span></label>
     <label class="chkl"><input type="checkbox" data-txd="gewst" ${d.gewst ? 'checked' : ''}><span>${tr('Trade tax prepayments (15 Feb, 15 May, 15 Aug, 15 Nov)')}</span></label>
     <div class="row"><label for="txd-lead">${tr('Days in advance')}</label><input id="txd-lead" type="number" min="0" max="30" inputmode="numeric" data-txd="lead_days" value="${+d.lead_days}"></div>
-    ${ppl.length > 1 ? `<div class="row"><label for="txd-user">${tr('Responsible person')}</label><select id="txd-user" data-txd="user">${ppl.map(p => `<option value="${p.id}" ${p.id === (d.user || S.me?.id) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>` : ''}
+    ${ppl.length > 1 ? `<div class="row"><label for="txd-user">${tr('Assignee|person')}</label><select id="txd-user" data-txd="user">${ppl.map(p => `<option value="${p.id}" ${p.id === (d.user || S.me?.id) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>` : ''}
     ${d.lost ? `<p class="aerr" role="alert">${tr('The person responsible is no longer an administrator. Please choose someone else.')}</p>` : ''}
     ${nxt ? `<ul class="txdnext" role="list">${nxt}</ul>` : ''}
     ${tasksOn ? `<p class="muted ofchint"><a href="#inbox">${tr('The tasks are in the Basket of the person.')}</a></p>` : ''}

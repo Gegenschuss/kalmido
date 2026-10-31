@@ -5,7 +5,7 @@
 // to accepted moves its deal to "Order" on the server. Every change is one undo step. Server: kalmido/office/pipeline.py.
 const PPS = {data: null, err: null, oid: null, stage: 'inquiry', loading: false, drag: null};
 // 2.94.0 A (#1930): + the first column "Leads" (office_leads.js: its cards, fields, convert, CSV import)
-const PP_STAGES = [['lead', N_('Leads')], ['inquiry', N_('Inquiry')], ['offer', N_('Quotation sent')], ['won', N_('Order|pipeline')], ['lost', N_('Lost|pipeline')]];
+const PP_STAGES = [['lead', N_('Leads')], ['inquiry', N_('Enquiry')], ['offer', N_('Quotation sent')], ['won', N_('Order|pipeline')], ['lost', N_('Lost|pipeline')]];
 OFC_TABS.splice(Math.max(0, OFC_TABS.findIndex(t => t[0] === 'cashflow' || t[0] === 'settings')), 0, ['pipeline', 'target', N_('Pipeline'), 1, () => pp_html()]);  // admins only
 
 const pp_stageName = k => tr(PP_STAGES.find(s => s[0] === k)?.[1] || k);
@@ -26,12 +26,12 @@ function pp_html() {
   if (PPS.err) return `<div class="empty">${esc(PPS.err)}</div>`;
   if (!PPS.data) { setTimeout(() => { if (!PPS.data) pp_load(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const d = PPS.data, s = d.summary, items = d.items || [];
-  const top = `<div class="ofcbar">${lst_sortBtn('pipeline', LST_MANUAL)}<span class="spacer"></span>${typeof leadBar === 'function' ? leadBar() : ''}<button class="btn sm pri" data-pp="new">${ic('plus', 's')}<span>${tr('New inquiry')}</span></button></div>
+  const top = `<div class="ofcbar">${lst_sortBtn('pipeline', LST_MANUAL)}<span class="spacer"></span>${typeof leadBar === 'function' ? leadBar() : ''}<button class="btn sm pri" data-pp="new">${ic('plus', 's')}<span>${tr('New enquiry')}</span></button></div>
     <div class="pptiles"><div class="pptile"><small class="muted">${tr('Open|pipeline')}</small><b>${ofcMoney(s.open)}</b><small class="muted">${esc(trn('{0} deal', '{0} deals', s.count_open))}</small></div>
     <div class="pptile"><small class="muted">${tr('Weighted')}</small><b>${ofcMoney(s.weighted)}</b><small class="muted">${tr('value × probability')}</small></div></div>
     <section class="pipfc" aria-label="${esc(tr('Expected to come in'))}"><h3 class="ofcgrp">${tr('Expected to come in')}</h3><ol class="ppfcl" role="list">${s.forecast.map(f => `<li class="${f.next ? 'next' : ''}"><small>${esc(pp_month(f.month))}${f.next ? ` <span class="rotag">${tr('next month')}</span>` : ''}</small><b>${ofcMoney(f.weighted)}</b></li>`).join('')}</ol>
     ${+s.undated ? `<p class="muted ofchint">${tr('Without an expected date: {0}', ofcMoney(s.undated))}</p>` : ''}</section>`;
-  if (!items.length) return top + `<div class="empty nempty eact">${ic('target')}<span>${tr('No deals yet. Note every inquiry here and follow it to the order.')}</span><button class="btn pri" data-pp="new">${ic('plus', 's')}<span>${tr('New inquiry')}</span></button>${oim_link('leads', true, true)}</div>`;  // 2.122.3 A (#2335): + the leads import
+  if (!items.length) return top + `<div class="empty nempty eact">${ic('target')}<span>${tr('No deals yet. Note every enquiry here and follow it to the order.')}</span><button class="btn pri" data-pp="new">${ic('plus', 's')}<span>${tr('New enquiry')}</span></button>${oim_link('leads', true, true)}</div>`;  // 2.122.3 A (#2335): + the leads import
   const sw = `<div class="seg ppseg" role="tablist" aria-label="${esc(tr('Stage'))}">${PP_STAGES.map(([k, n]) => `<button type="button" role="tab" data-pp="stage" data-v="${k}" aria-selected="${PPS.stage === k}" class="${PPS.stage === k ? 'on' : ''}">${tr(n)} <span class="muted">${items.filter(x => x.stage === k).length}</span></button>`).join('')}</div>`;
   const cols = PP_STAGES.map(([k, n]) => {
     const lead = k === 'lead' && typeof leadCard === 'function';  // 2.94.0 A (#1930): leads by follow-up day, no sum
@@ -73,7 +73,7 @@ function pp_modal(x, stage) {
   const cls = typeof ofdClientOpts === 'function' ? ofdClientOpts() : [];
   const st = x?.stage || stage || 'inquiry';
   const lf = typeof leadFields === 'function', isL = lf && st === 'lead';  // 2.94.0 A (#1930): the lead's rows instead of client / probability / date
-  const md = modal(`<h3>${x ? (x.stage === 'lead' ? tr('Edit lead') : tr('Edit deal')) : isL ? tr('New lead') : tr('New inquiry')}</h3>
+  const md = modal(`<h3>${x ? (x.stage === 'lead' ? tr('Edit lead') : tr('Edit deal')) : isL ? tr('New lead') : tr('New enquiry')}</h3>
     ${ofcRowF('pp-title', tr('Name'), ofcIn('pp-title', x?.title, {ph: tr('e.g. Image film for the spring')}))}
     ${cls.length ? `<div class="ppnolead" ${isL ? 'hidden' : ''}>${ofcRowF('pp-client', tr('Client'), ofcSel('pp-client', x?.client_id, cls, tr('none')))}</div>` : ''}
     ${ofcRowF('pp-contact', tr('Contact|person'), ofcIn('pp-contact', x?.contact, {ph: tr('Name, if there is no client yet')}))}

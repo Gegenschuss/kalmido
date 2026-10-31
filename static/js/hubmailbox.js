@@ -29,7 +29,7 @@ function hmb_hubSection() {
       ${x.manage ? `<button type="button" class="btn sm" data-hmba="edit" data-ws="${esc(x.ws)}">${ic('gear', 's')}<span>${tr(x.set ? 'Change' : 'Set up')}</span></button>` : ''}</li>`;
   }).join('');
   if (!rows) return '';
-  return `<h4>${tr('Mailbox')}</h4><p class="muted">${tr('A workspace can fetch its own mailbox: its mails are filed here like forwarded ones, and replies go out from its address.')}</p><ul class="hbmspaces hmbspaces" role="list">${rows}</ul>`;
+  return `<h4>${tr('Mailbox')}</h4><p class="muted">${tr('A workspace can fetch its own mailbox: its e-mails are filed here like forwarded ones, and replies go out from its address.')}</p><ul class="hbmspaces hmbspaces" role="list">${rows}</ul>`;
 }
 
 // ---- the mailbox dialog
@@ -53,7 +53,7 @@ function hmb_formHtml(b) {
     <div class="row"><label for="hmb-sw">${tr('Password')}</label><input id="hmb-sw" type="password" autocomplete="new-password" placeholder="${pw(x.smtp_password_set)}"></div>
     ${inp('hmb-fa', tr('Sender address'), x.from_addr, 'type="email" placeholder="office@example.com" spellcheck="false"')}
     ${inp('hmb-fn', tr('Sender name'), x.from_name, 'maxlength="120"')}
-    <div class="row hmbonrow" ${b ? '' : 'hidden'}><label for="hmb-on">${tr('Fetch mails')}</label><select id="hmb-on"><option value="1" ${!b || x.active ? 'selected' : ''}>${tr('On')}</option><option value="0" ${!b || x.active ? '' : 'selected'}>${tr('Paused')}</option></select></div>`;
+    <div class="row hmbonrow" ${b ? '' : 'hidden'}><label for="hmb-on">${tr('Fetch e-mails')}</label><select id="hmb-on"><option value="1" ${!b || x.active ? 'selected' : ''}>${tr('On')}</option><option value="0" ${!b || x.active ? '' : 'selected'}>${tr('Paused')}</option></select></div>`;
 }
 function hmb_checkHtml(j) {
   const ch = j?.check, b = j?.box;
@@ -68,7 +68,7 @@ async function hmb_dialog(ws) {
   const name = (HMB.j?.spaces || []).find(x => x.ws === ws)?.name || wsName(ws);
   /** @type {any} */
   const md = modal(`<div class="lhdr"><h3>${tr('Mailbox')} · ${esc(name)}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
-    <p class="muted">${tr('Mails of this mailbox are filed in this workspace only; the passwords are stored encrypted and never shown again.')}</p>
+    <p class="muted">${tr('E-mails of this mailbox are filed in this workspace only; the passwords are stored encrypted and never shown again.')}</p>
     <div class="hmbform">${hmb_formHtml(j.box)}</div><div class="hmbres">${hmb_checkHtml(j)}</div><p class="hmb-err" role="alert"></p>
     <div class="foot">${hmb_footHtml(j.box)}</div>`);
   md.classList.add('hmbdlg');
@@ -101,7 +101,7 @@ async function hmb_dialog(ws) {
     const b = /** @type {any} */ (e.target).closest('[data-hmbd]'); if (!b || b.disabled) return;
     errEl.textContent = '';
     if (b.dataset.hmbd === 'del') {
-      if (!await askConfirm(tr('Remove the mailbox?'), tr('Its mails are no longer fetched and nothing is sent from it. The filed e-mails stay.'), {ok: tr('Remove'), danger: true})) return;
+      if (!await askConfirm(tr('Remove the mailbox?'), tr('Its e-mails are no longer fetched and nothing is sent from it. The filed e-mails stay.'), {ok: tr('Remove'), danger: true})) return;
       try { await api('DELETE', `/api/hubmail/mailbox?ws=${encodeURIComponent(ws)}`); } catch { return; }
       modalClose(md); hmb_load(); return;
     }
@@ -162,7 +162,7 @@ async function hmb_compose(src) {
     <div class="row"><label for="hmb-sub">${tr('Subject')}</label><input id="hmb-sub" type="text" maxlength="300" value="${esc(j.subject || '')}"></div>
     <textarea id="hmb-text" class="hmbtext" rows="12" aria-label="${esc(tr('Text'))}">${esc(j.text || '')}</textarea>
     <p class="hmb-err" role="alert"></p>
-    <div class="foot"><span class="muted hmbnote">${tr('Plain text; the mail is filed here after sending.')}</span><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button type="button" class="btn pri" data-hmbc="send" ${j.can_send ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button></div>`);
+    <div class="foot"><span class="muted hmbnote">${tr('Plain text; the e-mail is filed here after sending.')}</span><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button type="button" class="btn pri" data-hmbc="send" ${j.can_send ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button></div>`);
   md.classList.add('hmbcdlg');
   const ta = hmb_q(md, '#hmb-text');
   setTimeout(() => { if (j.reply) { ta.focus(); ta.setSelectionRange(0, 0); ta.scrollTop = 0; } else hmb_q(md, to ? '#hmb-sub' : '#hmb-to')?.focus(); }, 0);

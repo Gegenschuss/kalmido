@@ -42,13 +42,13 @@ function hbm_headHtml(key) {
   const j = HBM.s[key]?.j;
   const nw = typeof hmb_newBtn === 'function' ? hmb_newBtn(key, j) : '';  // 2.141.0 A (#2138): hubmailbox.js
   if (!j || key.startsWith('inbox') || !j.can_address) return nw;
-  return `${nw}<button type="button" class="btn sm" data-hbma="copy" data-hbmk="${key}" title="${esc(tr('Mails to this address are filed here'))}">${ic('copy', 's')}<span>${tr('Copy address')}</span></button>${j.address ? `<button type="button" class="iconbtn" data-hbma="menu" data-hbmk="${key}" aria-haspopup="menu" aria-label="${esc(tr('Address'))}" title="${esc(tr('Address'))}">${ic('dots', 's')}</button>` : ''}`;
+  return `${nw}<button type="button" class="btn sm" data-hbma="copy" data-hbmk="${key}" title="${esc(tr('E-mails to this address are filed here'))}">${ic('copy', 's')}<span>${tr('Copy address')}</span></button>${j.address ? `<button type="button" class="iconbtn" data-hbma="menu" data-hbmk="${key}" aria-haspopup="menu" aria-label="${esc(tr('Address'))}" title="${esc(tr('Address'))}">${ic('dots', 's')}</button>` : ''}`;
 }
 function hbm_listHtml(key) {
   const s = HBM.s[key], j = s?.j, inbox = key.startsWith('inbox');
   if (!j) return `<p class="muted">${tr('Loading…')}</p>`;
   if (!j.mails.length) return `<p class="muted hbmempty">${(s.q || '').trim() ? tr('No e-mail matches.') : inbox ? tr('Nothing waits here: every e-mail found its client.')
-    : j.enabled ? tr('No e-mails yet. Send or forward mails to the address of this client or project (Copy address), they are filed here.') : tr('No e-mails yet.')}</p>`;
+    : j.enabled ? tr('No e-mails yet. Send or forward e-mails to the address of this client or project (Copy address), they are filed here.') : tr('No e-mails yet.')}</p>`;
   const more = j.total > j.mails.length ? `<p class="muted">${tr('{0} more: search to narrow them down', j.total - j.mails.length)}</p>` : '';
   return `<ul class="hbmlist" role="list">${j.mails.map(m => `<li class="hbmrow">
     <button type="button" class="hbmopen" data-hbmopen="${m.id}" data-hbmk="${key}">
@@ -83,7 +83,7 @@ function hbm_hubView() {
       <button type="button" class="btn sm" data-hbma="copy" data-hbmk="${key}" data-ws="${esc(x.ws)}">${ic('copy', 's')}<span>${tr(x.address ? 'Copy address' : 'Create address')}</span></button>
       ${x.address ? `<button type="button" class="iconbtn" data-hbma="menu" data-hbmk="${key}" data-ws="${esc(x.ws)}" aria-haspopup="menu" aria-label="${esc(tr('Address'))}" title="${esc(tr('Address'))}">${ic('dots', 's')}</button>` : ''}</li>`).join('');
   // 2.298.0 C (#3187): the introduction only while nothing waits here
-  const intro = !j ? '' : j.enabled ? j.total ? '' : `<p class="muted">${tr('Forward e-mails to your filing address (or send it a copy): a mail from the address of a client or of one of its contact persons is filed with that client, everything else waits here until you assign it.')}</p>`
+  const intro = !j ? '' : j.enabled ? j.total ? '' : `<p class="muted">${tr('Forward e-mails to your filing address (or send it a copy): a e-mail from the address of a client or of one of its contact persons is filed with that client, everything else waits here until you assign it.')}</p>`
     : `<p class="muted">${tr('Receiving e-mail is not set up on this server (an admin sets up the mailbox).')}</p>`;
   return `<div class="ctview hbmhub"><h2 class="msclh"><a href="#clients" class="linkbtn">${ic('back', 's')}<span>${tr('Clients')}</span></a><span class="muted" aria-hidden="true">›</span><span>${tr('E-mail filing')}</span></h2>
     ${intro}${sp ? `<h4>${tr('Your filing addresses')}</h4><ul class="hbmspaces" role="list">${sp}</ul>` : ''}${typeof hmb_hubSection === 'function' ? hmb_hubSection() : ''}
@@ -126,7 +126,7 @@ function hbm_viewHtml(m, key) {
   const seg = m.html ? `<div class="seg hbmseg" role="group" aria-label="${esc(tr('Show as'))}">${[['text', N_('Text')], ['html', N_('HTML')]].map(([k, n]) =>
     `<button type="button" data-hbmv="${k}" class="${st.v === k ? 'on' : ''}" aria-pressed="${st.v === k}">${tr(n)}</button>`).join('')}</div>` : '';
   const anyShort = m.html_short || (m.body_short ?? m.body) !== (m.body || '');
-  const whole = anyShort ? `<label class="hbmwhole"><input type="checkbox" data-hbmv="whole"${st.full ? ' checked' : ''}> <span>${tr('Whole mail')}</span></label>` : '';
+  const whole = anyShort ? `<label class="hbmwhole"><input type="checkbox" data-hbmv="whole"${st.full ? ' checked' : ''}> <span>${tr('Whole e-mail')}</span></label>` : '';
   const img = html && m.html_ext && !st.img ? `<div class="hbmimg muted">${ic('picture', 's')}<span>${tr('External images are blocked.')}</span><button type="button" class="linkbtn" data-hbmv="img">${tr('Load images')}</button></div>` : '';
   const q = [!st.full && m.html_short ? 'short=1' : '', st.img ? 'images=1' : ''].filter(Boolean).join('&');
   const body = html ? `<iframe class="hbmframe" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="${esc(m.subject || tr('E-mail'))}"
@@ -245,7 +245,7 @@ function hbm_addrMenu(b, key, ws) {
   menu(b, [{label: tr('New address'), icon: 'sync', fn: async () => {
     if (await askConfirm(tr('Make a new address?'), tr('The old address stops working at once.'), {ok: tr('New address')})) hbm_addr(key, ws, true);
   }}, {label: tr('Turn the address off'), icon: 'x', fn: async () => {
-    if (!await askConfirm(tr('Turn the address off?'), tr('Mails to it are no longer filed. The filed e-mails stay.'), {ok: tr('Turn off'), danger: true})) return;
+    if (!await askConfirm(tr('Turn the address off?'), tr('E-mails to it are no longer filed. The filed e-mails stay.'), {ok: tr('Turn off'), danger: true})) return;
     const t = hbm_target(key, ws), qs = Object.entries(t).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
     try { await api('DELETE', `/api/hubmail/address?${qs}`); } catch { return; }
     hbm_load(key);

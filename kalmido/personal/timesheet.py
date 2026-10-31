@@ -313,7 +313,7 @@ def tsl_review(c, uid, month):
                          ORDER BY month DESC, closed_at""", (*orgs, month)).fetchall()
     rows = [r for r in rows if r["user_id"] is None or tsl_member(c, r["user_id"], r["org_id"])][:200]
     names = user_names(c, [r["user_id"] for r in rows if r["user_id"]])
-    return [{"user_id": r["user_id"], "name": names.get(r["user_id"], "") if r["user_id"] else tr("Deleted user"), "month": r["month"], "state": r["state"],
+    return [{"user_id": r["user_id"], "name": names.get(r["user_id"], "") if r["user_id"] else tr("Deleted person"), "month": r["month"], "state": r["state"],
              "closed_at": r["closed_at"], "decided_at": r["decided_at"], "note": tsl_note(c, r), "org_id": r["org_id"],
              "seconds": tsl_org_seconds(c, r["user_id"], r["month"], r["org_id"]) if r["user_id"] else tsl_kept_seconds(r)} for r in rows]
 

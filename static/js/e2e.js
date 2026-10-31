@@ -322,7 +322,7 @@ async function e2eRemove() {
 // ------------------------------------------------------------------ Settings > Account > End-to-end encryption
 const e2eHtml = () => S.me?.kind === 'agent' ? '' : `<h4 id="s-e2e-h">${tr('End-to-end encryption')}</h4><div id="s-e2e"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 // 2.64.3 (#1817): help text on exporting encrypted content (same statements as the self-hosting guide); 2.298.0 C (#3187): its own fold-out
-const e2eExportHelp = () => `<details class="e2einfo"><summary>${esc(tr('Exporting encrypted content'))}</summary><p class="muted">${esc(tr('Encrypted content can only be read in Kalmido, after you unlocked your encryption. An encrypted knowledge space is exported as a ZIP of plain Markdown files from the browser (menu of the unlocked space). Exports of your account or organisation and backups contain the encrypted texts, which only the members can read in Kalmido with their passphrase; for a plain copy of a project, switch its lock off first. Print the recovery code. If passphrase and recovery code are both lost, the content is gone; in a project or an organisation space another member can release the key again, in a private space nobody can.'))}</p></details>`;
+const e2eExportHelp = () => `<details class="e2einfo"><summary>${esc(tr('Exporting encrypted content'))}</summary><p class="muted">${esc(tr('Encrypted content can only be read in Kalmido, after you unlocked your encryption. An encrypted knowledge workspace is exported as a ZIP of plain Markdown files from the browser (menu of the unlocked workspace). Exports of your account or organisation and backups contain the encrypted texts, which only the members can read in Kalmido with their passphrase; for a plain copy of a project, switch its lock off first. Print the recovery code. If passphrase and recovery code are both lost, the content is gone; in a project or an organisation workspace another member can release the key again, in a private workspace nobody can.'))}</p></details>`;
 async function e2eDraw(md) {
   const box = $('#s-e2e', md); if (!box) return;
   if (!globalThis.crypto?.subtle) { box.innerHTML = `<div class="shint">${tr('This browser cannot encrypt here (it needs HTTPS and a current browser).')}</div>`; return; }
@@ -340,7 +340,7 @@ async function e2eDraw(md) {
     ${E2E.badPub ? `<div class="e2ewarn" role="alert">${tr('Your public key on the server does not match your keys. Encrypted messages are blocked.')} ${tr('Change your passphrase in Settings > Account to store your correct key again, then compare the safety number.')}</div>` : ''}
     <div class="row"><label>${tr('Passphrase')}</label><button class="btn sm" data-e2e="pass">${tr('Change')}</button><button class="btn sm" data-e2e="reset">${tr('Reset with the recovery code')}</button></div>
     <div class="row"><label>${tr('Keys')}</label><button class="btn sm danger" data-e2e="remove">${ic('trash', 's')} ${tr('Remove')}</button></div>
-    <div class="shint">${tr('Stays unlocked until you lock or log out (“Remember on this device”: in this browser).')}</div>${limits}`;
+    <div class="shint">${tr('Stays unlocked until you lock or sign out (“Remember on this device”: in this browser).')}</div>${limits}`;
 }
 function e2eWire(md) {
   md.addEventListener('click', async e => {

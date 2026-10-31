@@ -11,7 +11,7 @@ freelancer-matrix: admin
    (prev = the older one); a newer patch of the same minor starts and keeps its stamp
  - TASKS_WATCHDOG: true = on (the watchdog loop runs, was off before 2.149), 0 = off, unset = on
  - restore: an archive whose manifest names a newer minor is refused with code "newer" (upload check), an older one is not
-   refused for its version; a person without an organisation (own admin of the private space only) gets 403
+   refused for its version; a person without an organisation (own admin of the private workspace only) gets 403
  - server key: a new database without a key refuses to start unless KALMIDO_NO_SECRET_KEY=1; a key file created during a
    start next to a database that holds account keys stays (2.190.0 B, #2592: was removed) and the start is refused; the old key file starts it
  - data folder without write access: a clear FATAL with the uid instead of a traceback

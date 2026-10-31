@@ -182,7 +182,7 @@ def list_owner_set(lid):
     # unknown user, the same answer as for an id that does not exist
     if not u or u["disabled"] or not (may_see(c, me(), new)
                                       or c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, new)).fetchone()):
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     if is_agent(u):
         return err(tr("An agent cannot own a project"))
     if new == lr["owner_id"]:

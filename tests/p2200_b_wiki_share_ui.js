@@ -3,7 +3,7 @@
 // organisation: the hint instead of "Whole organisation"; a space encrypted in the browser: no dialog, the lock hint; a guest
 // finds a shared folder under "Shared with me" (its pages, New page / New folder with 'edit') and edits a page in the reading
 // dialog. Own container (start.sh), jsdom. Invented names only.
-// freelancer-matrix: wiki (alice's private space is the private case; the routes run in p2200_b_wiki_share_test.py)
+// freelancer-matrix: wiki (alice's private workspace is the private case; the routes run in p2200_b_wiki_share_test.py)
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');

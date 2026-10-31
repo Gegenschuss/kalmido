@@ -84,7 +84,7 @@ PEP_NEED = {"feature": N_("E-invoices are switched off in this office"),
                "sender": N_("Your own Peppol ID is missing (office settings)"),
                "client": N_("The document has no client"),
                "receiver": N_("The client has no Peppol ID"),
-               "reference": N_("Peppol needs a buyer reference, an order number or a customer number (client or document)")}
+               "reference": N_("Peppol needs a buyer reference, an order number or a client number (client or document)")}
 
 
 class PepError(Exception):

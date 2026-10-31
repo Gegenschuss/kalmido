@@ -66,7 +66,7 @@ const srv = http.createServer((req, res) => {
   check(!!card && /Wofür nutzt du Kalmido/.test(card.textContent) && card.querySelectorAll('[data-su-preset]').length >= 5 && card.querySelectorAll('[data-su-lang]').length === 6,
     'intro: purpose, presets and the six languages: ' + (card ? card.textContent.slice(0, 160) : d.body.textContent.slice(0, 200)));
   check(d.querySelector('#app')?.hasAttribute('inert') && !d.querySelector('.tour'), 'intro: the app waits behind it, no tour yet');
-  // every module: "Switch on all modules" + every box under "Customize…"
+  // every module: "Switch on all modules" + every box under "Customise…"
   const all = d.querySelector('#su-modsall');
   check(!!all, 'intro: switch "all modules"');
   if (all) { all.checked = true; all.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(200); }

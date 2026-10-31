@@ -263,7 +263,7 @@ const lifeOn = () => LIFE_MODS.some(m => feat(m));
 // 2.312.0 B (#3264): the notes on health data (Art. 9 GDPR) of the modules health and review (2.306.0 B #2887, moved here
 // from settings.js): the module row, the area switch (areas.js mg_modAreaHtml) and the first-run setup (account.js)
 const MOD_PRIV = {health: N_('Health data is specially protected. Only you see it, unless you share a list.'),
-  review: N_('Journal and mood entries can be health data and are specially protected. Only you see them; the encryption of your private space protects them on the server too.')};
+  review: N_('Journal and mood entries can be health data and are specially protected. Only you see them; the encryption of your private workspace protects them on the server too.')};
 const modPrivHtml = ks => ks.filter(k => MOD_PRIV[k]).map(k => `<small class="modpriv">${ic('info', 's')} ${tr(MOD_PRIV[k])}</small>`).join('');
 const fmtMoney = n => curMoney(n, S.settings.time_currency ?? '€');  // 2.368.0 C (#2983): one money format (i18n.js curMoney)
 window.lifeBar = l => { if (l?.life && !l.archived && (lifeOn() || (l.life === 'reading' && feat('reading')))) ld_later('life'); return ''; };  // 2.172.0 B (#2679): + a read-later project

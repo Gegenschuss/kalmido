@@ -418,7 +418,7 @@ function viewReview() {
 // ---- 2.140.0 C (#2133): the journal history: all entries (newest first), search, mood filter, export, mood statistics
 const JH = {q: '', mood: 0, days: 30, from: '', to: '', items: [], next: null, loaded: false, loading: false, stats: null, seq: 0, t: null, sealed: null};
 // 2.306.0 A (#2885): the privacy line says what is true -- sealed with the key of the private space, or private in the app only
-const rvPrivHtml = sealed => `${ic('lock', 's')} ${sealed ? tr('Private: only you see your journal. It is stored encrypted on the server.') : tr('Private: only you see your journal in the app. On the server it is stored unencrypted until the administrator turns on the encryption of private spaces.')}`;
+const rvPrivHtml = sealed => `${ic('lock', 's')} ${sealed ? tr('Private: only you see your journal. It is stored encrypted on the server.') : tr('Private: only you see your journal in the app. On the server it is stored unencrypted until the administrator turns on the encryption of private workspaces.')}`;
 const jhParams = () => { const p = new URLSearchParams(); if (JH.q) p.set('q', JH.q); if (JH.mood) p.set('mood', JH.mood); if (JH.from) p.set('from', JH.from); if (JH.to) p.set('to', JH.to); return p; };
 const jhMood = v => (MOODS.find(m => m[0] === v) || [])[1] || '';
 function jhHit(text) {  // a short excerpt around the first match, the match marked

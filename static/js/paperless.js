@@ -55,8 +55,8 @@ function pl_jumpNow() {  // 2.87.9 (#1936): the jump from the search / the docum
 }
 // 2.87.9 (#1940): where a run files the documents, in words
 function pl_toText(r) {
-  if (r?.target === 'private') return r.mine ? tr('your private space') : tr('the private space of the person who started it');
-  return PL.ws === 'private' ? tr('your private space') : tr('the organisation {0}', wsName(PL.ws));
+  if (r?.target === 'private') return r.mine ? tr('your private workspace') : tr('the private workspace of the person who started it');
+  return PL.ws === 'private' ? tr('your private workspace') : tr('the organisation {0}', wsName(PL.ws));
 }
 // a running import: bar, count, target (#1940), Stop and the line that it runs on without the window (#1935)
 function pl_runHtml(r, stop) {

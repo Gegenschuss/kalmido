@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
 """2.361.2 (#2923): the way back out of an organisation for a member -- the member asks, an admin releases it with one
-click, then the member moves it into the private space themselves (once, within the grant days). Invented names only,
+click, then the member moves it into the private workspace themselves (once, within the grant days). Invented names only,
 addresses @example.com. tenant-matrix: org
  - projects: a member's own project moved into the organisation -> moving it back is 403 with out_request; asking
    (POST /api/orgs/<oid>/out-requests) only for the maker (another member / an admin 403); the admins get a News item and see
@@ -32,7 +32,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 from kt import FAILS, OKS, check, sess  # noqa: E402
 
-BACK = "Back into your private space only after an admin of the organisation releases it"
+BACK = "Back into your private workspace only after an admin of the organisation releases it"
 
 
 def usess(user):
@@ -141,7 +141,7 @@ check(decide(Er, RL, "decline").status_code == 409, "a decided request is not de
 check(any(d.get("kind") == "list" and d.get("obj") == LP for d in news(BOB, "outok")), "bob is told it is released")
 check(any(x["name"] == "Brought plan" for x in log("outok", "list")), "the release is in the organisation's log")
 r = Bo.patch(B + f"/api/lists/{LP}", json={"org_id": None})
-check(r.ok and sql("SELECT org_id FROM lists WHERE id=?", (LP,))[0][0] is None, "now bob moves it into his private space " + r.text[:200])
+check(r.ok and sql("SELECT org_id FROM lists WHERE id=?", (LP,))[0][0] is None, "now bob moves it into his private workspace " + r.text[:200])
 check(sql("SELECT owner_id FROM lists WHERE id=?", (LP,))[0][0] == BOB, "it is bob's (not an admin's)")
 check(any(x.get("released") and x.get("to") == "private" for x in log("moveout", "list")), "the move is logged as released")
 check(any(d.get("name") == "Brought plan" for d in news(ERIN, "moveout")), "the admins are told about the move")
@@ -190,7 +190,7 @@ check(decide(Er, ask(Bo, "file", FB).json().get("id"), "approve").ok, "asked and
 r = Bo.post(B + "/api/files/move-space", json={"ids": [FB], "to": "private", "dry": 1})
 check(r.ok and not r.json().get("block"), "the block is gone " + r.text[:200])
 r = Bo.post(B + "/api/files/move-space", json={"ids": [FB], "to": "private"})
-check(r.ok and sql("SELECT org_id FROM fs_nodes WHERE id=?", (FB,))[0][0] is None, "the folder is in bob's private space " + r.text[:200])
+check(r.ok and sql("SELECT org_id FROM fs_nodes WHERE id=?", (FB,))[0][0] is None, "the folder is in bob's private workspace " + r.text[:200])
 
 # ================================================================ released after an admin took it out
 r = Bo.post(B + "/api/sheets", json={"title": "Second table", "space": f"org:{ORG}"})

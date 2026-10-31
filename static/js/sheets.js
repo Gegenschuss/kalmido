@@ -482,7 +482,7 @@ async function shvStep(label, doFn, undoFn, msg, redoFn) {  // redoFn(res): the 
 async function shvNew(lid, fid) {  // 2.199.0 C (#2742): fid = into this folder (its workspace)
   const l = lid ? listById(lid) : null, sps = shvSpaces(), f = fid ? shf_folder(fid) : null;
   SHV.newSp = f ? f.space : l ? shvListSpace(l) : shvNewSpace();
-  const sel = !l && !f && sps.length > 1 ? `<label class="shvnsp">${tr('Space')}<select data-shv-sp aria-label="${esc(tr('Space'))}">${sps.map(s => `<option value="${esc(s)}" ${s === SHV.newSp ? 'selected' : ''}>${esc(shvSpaceName(s))}</option>`).join('')}</select></label>` : '';
+  const sel = !l && !f && sps.length > 1 ? `<label class="shvnsp">${tr('Workspace')}<select data-shv-sp aria-label="${esc(tr('Workspace'))}">${sps.map(s => `<option value="${esc(s)}" ${s === SHV.newSp ? 'selected' : ''}>${esc(shvSpaceName(s))}</option>`).join('')}</select></label>` : '';
   const hint = l ? `<p class="muted mhint">${esc(tr('Attached to {0}: “here.” in a formula means this project.', lname(l)))}</p>` : '';
   const t = await askDialog({title: tr('New table'), html: sel + hint, input: {value: '', placeholder: tr('e.g. Quotation shoot, Equipment, Budget'), max: 120}, ok: tr('Create')});
   if (t == null) return;
@@ -522,7 +522,7 @@ async function shvDelete(id, title, lid) {
 async function shvAttach(sh) {  // attach to a project / list of the same space (or detach)
   const sp = sh.space || (sh.org_id ? 'org:' + sh.org_id : 'private');
   const ls = (S.lists || []).filter(l => !l.is_inbox && !l.archived && !l.e2e && shvListSpace(l) === sp && canEditList(l.id));
-  if (!ls.length) { toast(tr('No project of this space to attach it to')); return; }
+  if (!ls.length) { toast(tr('No project of this workspace to attach it to')); return; }
   const items = [...(sh.list_id ? [{label: tr('Detach from {0}', sh.list_title || ''), icon: 'x', fn: () => shvSetList(sh, null)}, '-'] : []),
     ...ls.slice(0, 60).map(l => ({label: lname(l), icon: 'list', on: l.id === sh.list_id, fn: () => shvSetList(sh, l.id)}))];
   menu($('[data-shv="menu"]') || $('#view'), items, null, null, tr('Attach to a project'));
@@ -624,7 +624,7 @@ function shvColModal(col, afterId) {  // a new column (col = null) or its settin
   const extra = () => {
     const x = $('#shv-cx', md);
     if (st.kind !== 'select') { x.innerHTML = st.kind === 'date' ? `<p class="muted mhint">${mdFirst() ? tr('Dates as MM/DD/YYYY or YYYY-MM-DD; a date plus a number gives a date that many days later.') : tr('Dates as DD.MM.YYYY or YYYY-MM-DD; a date plus a number gives a date that many days later.')}</p>` : ''; return; }
-    x.innerHTML = `<h4>${tr('Options')}</h4><div class="optlist" role="list">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}" role="listitem"><button type="button" class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${esc(tr('Color'))}" aria-label="${esc(tr('Color'))}" aria-expanded="${st.pal === i}"></button><input data-oname="${i}" value="${esc(o.label)}" maxlength="60" placeholder="${esc(tr('Option'))}"><button type="button" class="iconbtn" data-orm="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></div>${st.pal === i ? `<div class="colors lrpal" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map((c, k) => `<button type="button" data-opal="${esc(c)}" style="background:${c || 'var(--bg4)'}" class="${(o.color || '') === c ? 'on' : ''}" aria-pressed="${(o.color || '') === c}" aria-label="${esc(c ? tr('Color {0}', k) : tr('No color'))}"></button>`).join('')}</div>` : ''}`).join('')}</div>
+    x.innerHTML = `<h4>${tr('Options')}</h4><div class="optlist" role="list">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}" role="listitem"><button type="button" class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${esc(tr('Colour'))}" aria-label="${esc(tr('Colour'))}" aria-expanded="${st.pal === i}"></button><input data-oname="${i}" value="${esc(o.label)}" maxlength="60" placeholder="${esc(tr('Option'))}"><button type="button" class="iconbtn" data-orm="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></div>${st.pal === i ? `<div class="colors lrpal" role="group" aria-label="${esc(tr('Colour'))}">${LCOLORS.map((c, k) => `<button type="button" data-opal="${esc(c)}" style="background:${c || 'var(--bg4)'}" class="${(o.color || '') === c ? 'on' : ''}" aria-pressed="${(o.color || '') === c}" aria-label="${esc(c ? tr('Colour {0}', k) : tr('No colour'))}"></button>`).join('')}</div>` : ''}`).join('')}</div>
       <button type="button" class="btn sm" data-m="opt-add">${ic('plus', 's')}${tr('Add option')}</button>
       <fieldset class="shvmode"><legend>${tr('Colour of the option')}</legend><label class="chkl"><input type="radio" name="shv-cm" value="cell" ${st.mode !== 'row' ? 'checked' : ''}> ${tr('Colour for the cell')}</label><label class="chkl"><input type="radio" name="shv-cm" value="row" ${st.mode === 'row' ? 'checked' : ''}> ${tr('Colour for the whole row')}</label></fieldset>`;
   };

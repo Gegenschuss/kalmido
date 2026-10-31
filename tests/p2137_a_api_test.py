@@ -6,7 +6,7 @@
    values, the references, the finalised state and the numbers come along, the files are readable and sealed at rest
    where the app seals them; the source organisation stays unchanged; the undo removes everything again
  - the same export into the source organisation itself: existing document numbers are skipped with a warning, never twice
- - a person without an organisation imports it into the private space: it lands in the personal office
+ - a person without an organisation imports it into the private workspace: it lands in the personal office
  - that person exports the personal office (only the owner; others 404) and an admin imports it into an organisation:
    the office and the private clients come along, the private lists do not
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY (P2137A_NOSTART=1 = the server already runs like that).

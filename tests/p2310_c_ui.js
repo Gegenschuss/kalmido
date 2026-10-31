@@ -100,7 +100,7 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
   // ================= jsdom: the task menu (#1056): from the row: everything; from the panel: no date / priority
   const tmenu = async anchorJs => { w.eval(`taskMenu(${anchorJs}, ${T1})`); await until(() => d.querySelector('#pop [role="menuitem"]')); const x = {items: [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => (b.querySelector('.ml')?.firstChild?.textContent || b.textContent).trim()), heads: [...d.querySelectorAll('#pop .mgh')].map(h => h.textContent)}; w.eval('closePop()'); return x; };
   const row = await tmenu(`document.querySelector('#view .trow[data-id="${T1}"] .ttl') || document.querySelector('#top h1')`);
-  check(row.heads.join('|') === 'Plan|Organize|Time|Structure', '#1056 task menu headings ' + row.heads.join('|'));
+  check(row.heads.join('|') === 'Plan|Organise|Time|Structure', '#1056 task menu headings ' + row.heads.join('|'));
   check(row.items.includes('New date…') && row.items.includes('High') && row.items.includes('Today'), '#1056 task menu from the row: date + priority');
   check(row.items.slice(-2).join('|') === "Won’t do (discard)|Delete", "#1056 won't do + delete last " + row.items.slice(-3).join('|'));
   w.eval(`openDetail(${T1})`);
@@ -111,12 +111,12 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
   const lost = row.items.filter(x => !pan.items.includes(x) && !['New date…', 'Today', 'Tomorrow', 'High', 'Medium', 'Low', 'None', 'Move up', 'Move down'].includes(x));
   check(!lost.length, '#1056 the panel menu lost nothing else ' + lost.join('|'));
   check(pan.items.includes('Skip this occurrence') && pan.items.includes('Assign…'), '#1056 panel: skip + assign stay under Plan');
-  // "More" in the tab bar: Views / Conversations, "Customize tab bar" last
+  // "More" in the tab bar: Views / Conversations, "Customise tab bar" last
   w.eval(`tabsMore(document.querySelector('#top h1'))`);
   await until(() => d.querySelector('#pop [role="menuitem"]'));
   const mh = [...d.querySelectorAll('#pop .mgh')].map(h => h.textContent), mi = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim());
   // 2.364.0 (#3040): the areas as in the drawer, the conversations, Search, the tab bar, Settings fixed at the end
-  check(mh[0] === 'Areas' && mh.includes('Conversations') && mi.includes('Customize tab bar') && mi[mi.length - 1] === 'Settings', '#1056 "More": groups ' + mh.join('|') + ' / ' + mi.join('|'));
+  check(mh[0] === 'Areas' && mh.includes('Conversations') && mi.includes('Customise tab bar') && mi[mi.length - 1] === 'Settings', '#1056 "More": groups ' + mh.join('|') + ' / ' + mi.join('|'));
   w.eval('closePop()');
   // #1057: the tab "Search" opens the palette (no page "Search")
   check(w.eval(`tabItem('search').act`) === 'palette', '#1057 the tab "Search" opens the search');

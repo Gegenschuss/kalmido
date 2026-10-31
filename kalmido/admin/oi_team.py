@@ -304,7 +304,7 @@ def ticket_seal(c, run, uid, src, d):
     org = run.list_org.get(d["list_id"], run.org)
     d.update(org_id=org, owner_id=None if org else uid, email=seal(c, "portal-email", e) if e else "", email_hash=pt_email_hash(c, e) if e else "",
              token=seal(c, "portal-token", tok), token_hash=_token_hash(tok), notify=d.get("notify", 1) if e else 0)
-    run.warning(N_("Customer reports got new status links: the old links no longer open."))
+    run.warning(N_("Client reports got new status links: the old links no longer open."))
     return d
 
 
@@ -489,7 +489,7 @@ def _act_data(run, who, kind, v):
         if new:
             v[k] = new
         elif kind == "assign" and k == "to":
-            v[k] = -1  # still "assigned to" (the history shows "Deleted user"), not "removed the assignee"
+            v[k] = -1  # still "assigned to" (the history shows "Deleted person"), not "removed the assignee"
         else:
             del v[k]
     return v
@@ -594,7 +594,7 @@ SPECS = [
     OiT("lists/admin_log.json", "org_list_log", refs={"list_id": "lists"},
         people={"by_id": "null", "owner_id": "null", "to_id": "null"}, private=False, label=N_("History")),
     OiT("portal/tickets.json", "portal_tickets", refs={"task_id": "tasks", "list_id": "lists", "form_id": "forms", "client_id": "clients"},
-        need=("task_id", "list_id"), fixed=_NEW_TOKEN, label=N_("Customer reports"), prep=_ticket),
+        need=("task_id", "list_id"), fixed=_NEW_TOKEN, label=N_("Client reports"), prep=_ticket),
     # tasks
     OiT("tasks/people.json", "task_people", refs={"task_id": "tasks"}, need=("task_id",), people={"user_id": "member"}, space=(), rid=False,
         label=N_("People")),

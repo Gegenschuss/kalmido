@@ -46,7 +46,7 @@ const V = B + 'api/v1';
   const AG = ag.id, AGH = {Authorization: 'Bearer ' + ag.token, 'Content-Type': 'application/json'};
   const my = await call('POST', '/api/admin/agents', {scopes: ['read', 'comments'], username: 'mybot', display_name: 'My bot', owner_id: 1});
   const bb = await call('POST', '/api/admin/agents', {scopes: ['read', 'comments'], username: 'bobbot', display_name: 'Bob bot', owner_id: BOB});
-  await call('PATCH', `/api/admin/agents/${my.id}`, {org_id: null});  // my personal agent works in my private space
+  await call('PATCH', `/api/admin/agents/${my.id}`, {org_id: null});  // my personal agent works in my private workspace
   await call('PATCH', '/api/settings', {folders: '["Office", "Private"]'});
   const W1 = (await call('POST', '/api/lists', {name: 'Website', folder: 'Office', org_id: ORG})).id;
   const W2 = (await call('POST', '/api/lists', {name: 'Shop', folder: 'Office', org_id: ORG})).id;

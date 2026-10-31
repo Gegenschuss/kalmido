@@ -628,7 +628,7 @@ def dt_pdf(c, oid, d, signed=None, client=None):
         bh = P.qac_sig_block_h(rows)
         room(bh + 8)
         y += 8
-        P.qac_sig_block(page, y, rows, tr("Simple electronic signature", lg=lang), tr("Signed through a customer link of {0}.", co.get("name") or "", lg=lang), accent)  # 2.99.0 C (#2195): shared with accepted quotations
+        P.qac_sig_block(page, y, rows, tr("Simple electronic signature", lg=lang), tr("Signed through a client link of {0}.", co.get("name") or "", lg=lang), accent)  # 2.99.0 C (#2195): shared with accepted quotations
         y += bh
     total = len(pages)
     for n, p in enumerate(pages, 1):

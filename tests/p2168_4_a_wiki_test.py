@@ -148,7 +148,7 @@ check(mk(Fr, "/".join(f"M{i}" for i in range(33))).status_code == 400, "33 level
 for p in Fr.get(B + "/api/wiki", params={"space": "private"}).json()["pages"]:
     Fr.delete(B + f"/api/wiki/pages/{p['id']}")
 
-# ---- freelancer-matrix: wiki -- a person without an organisation, the private space
+# ---- freelancer-matrix: wiki -- a person without an organisation, the private workspace
 check_import(Fr, "private", "freelancer")
 
 # ---- tenant-matrix: wiki -- an organisation's space

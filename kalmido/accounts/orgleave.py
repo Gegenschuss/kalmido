@@ -42,7 +42,7 @@ OLV_STAYS = (
      "SELECT COUNT(*) FROM office_docs WHERE org_id=? AND created_by=? AND status='draft'"),
     ("clients", Nn_("{0} client", "{0} clients"), "SELECT COUNT(*) FROM clients WHERE org_id=? AND created_by=? AND deleted_at IS NULL"),
     ("absences", Nn_("{0} absence", "{0} absences"), "SELECT COUNT(*) FROM hub_absences WHERE org_id=? AND user_id=? AND deleted_at IS NULL"),
-    ("leave_quota", Nn_("{0} vacation account", "{0} vacation accounts"), "SELECT COUNT(*) FROM hub_leave_quota WHERE org_id=? AND user_id=?"),
+    ("leave_quota", Nn_("{0} holiday account", "{0} holiday accounts"), "SELECT COUNT(*) FROM hub_leave_quota WHERE org_id=? AND user_id=?"),
     ("timesheets", Nn_("{0} timesheet", "{0} timesheets"), "SELECT COUNT(*) FROM time_sheets WHERE org_id=? AND user_id=?"),
     ("time", Nn_("{0} time entry", "{0} time entries"),
      "SELECT COUNT(*) FROM time_entries WHERE list_id IN (SELECT id FROM lists WHERE org_id=?) AND user_id=?"),

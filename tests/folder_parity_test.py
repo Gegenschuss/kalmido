@@ -4,7 +4,7 @@ folders of the file store (fs_nodes / fs_shares), a folder share works like a fi
  1. a share view / edit on a folder gives that role on what lies in it, in its subfolders and on what is added LATER
  2. withdrawing the share takes it away; moving the item out of the folder takes it away
  3. an agent only with a share on exactly it (the organisation's "every member" access gives it nothing)
- 4. the same in a private space -- a person WITHOUT an organisation (tests/freelancer_fixture.py) with her private agent
+ 4. the same in a private workspace -- a person WITHOUT an organisation (tests/freelancer_fixture.py) with her private agent
 An area is one entry of AREAS (functions, below); 2.199 B (office) / C (sheets) fill their sections, 2.200 (knowledge),
 2.201 (lists / projects), 2.202 (address books, contracts) add theirs. Invented names only.
 freelancer-matrix: files  freelancer-matrix: office  freelancer-matrix: wiki  freelancer-matrix: lists  freelancer-matrix: pim
@@ -138,7 +138,7 @@ check(_of_role(Bo, _OQ) is None and Bo.get(B + f"/api/fsref/office_doc/{_OQ}/pdf
 # --- area: office documents and letters (2.351.0 A, #2823): a generated document / a letter of the office of ws filed by a
 # reference node (office_gendoc / office_letter); role = GET /api/files/refs/<kind>/<id> (the higher one of the office's area
 # and the folder: bob's group Staff has neither Documents nor Correspondence), agent_role = the node over /api/v1. Agents: in
-# a private space the personal office's agent with its switch; in an organisation an agent reaches these areas only through
+# a private workspace the personal office's agent with its switch; in an organisation an agent reaches these areas only through
 # an office group for them (2.223.2 B, #2862), which gives the area itself -- no organisation agent case here
 # (p2351_a_officetree_test.py (e): the switch alone keeps them hidden even with a share).
 OFX_NODE, OFX_CL = {}, {}
@@ -484,7 +484,7 @@ AREAS["contract_file"] = _rf_area("contract_file", _cf_item, top="view", agent_o
 
 def parity(area, f, ws, owner, other=None, other_id=None, agent_h=None, agent_id=None, tag=""):
     """The cases of one area in one workspace. other = a person of the workspace without a role of their own (None in a
-    private space without people: only the agent's cases)."""
+    private workspace without people: only the agent's cases)."""
     root = f["folder"](owner, ws, f"Shared {tag}")
     sub = f["folder"](owner, ws, f"Sub {tag}", root)
     away = f["folder"](owner, ws, f"Away {tag}")

@@ -204,7 +204,7 @@ function placeGrips() {
     g.setAttribute('aria-label', tr(GRIP_LAB[k]));
     g.setAttribute('aria-valuenow', String(v)); g.setAttribute('aria-valuemin', String(PW[k][1])); g.setAttribute('aria-valuemax', String(Math.round(panelMax(k) * 4) / 4));
     g.setAttribute('aria-valuetext', tr('{0} rem', String(v)));
-    g.dataset.tip = tr(GRIP_LAB[k]) + ' · ' + tr('drag; double-click = standard width');  // 2.99.0 B (#2185): own label (w299_gripTip), no native title
+    g.dataset.tip = tr(GRIP_LAB[k]) + ' · ' + tr('drag; double-click = default width');  // 2.99.0 B (#2185): own label (w299_gripTip), no native title
   }
 }
 // 2.99.0 B (#2185): label left of / above the grip so it never covers the send button
@@ -227,7 +227,7 @@ function gripWire(g) {
     const step = (e.shiftKey ? 4 : 1) * (k === 'side' ? -1 : 1), v = panelEff(k);  // the sidebar grows to the right
     const to = {ArrowLeft: v + step, ArrowRight: v - step, Home: PW[k][1], End: panelMax(k)}[e.key];
     if (to != null) { e.preventDefault(); e.stopPropagation(); panelSet(k, to); announce(tr('{0} rem', String(panelEff(k)))); }
-    else if (e.key === 'Enter') { e.preventDefault(); panelSet(k, null); announce(tr('Standard width')); }
+    else if (e.key === 'Enter') { e.preventDefault(); panelSet(k, null); announce(tr('Default width')); }
   });
   g.addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
@@ -250,7 +250,7 @@ function gripWire(g) {
       g.classList.remove('drag'); document.body.classList.remove('pgdrag');
       if (moved) panelSet(k, w, true); fitLayout(); placeGrips();
       // a tap without dragging: a small menu (the way without dragging, WCAG 2.5.7); a double-click resets instead
-      if (!moved) { clearTimeout(g._mt); g._mt = setTimeout(() => { if (Date.now() - (g._dbl || 0) < 400) return; menu(g, [{label: tr('Wider'), icon: k === 'side' ? 'right' : 'left', fn: () => panelSet(k, panelEff(k) + 4)}, {label: tr('Narrower'), icon: k === 'side' ? 'left' : 'right', fn: () => panelSet(k, panelEff(k) - 4)}, {label: tr('Standard width'), icon: 'undo', fn: () => panelSet(k, null)}]); }, 320); } };
+      if (!moved) { clearTimeout(g._mt); g._mt = setTimeout(() => { if (Date.now() - (g._dbl || 0) < 400) return; menu(g, [{label: tr('Wider'), icon: k === 'side' ? 'right' : 'left', fn: () => panelSet(k, panelEff(k) + 4)}, {label: tr('Narrower'), icon: k === 'side' ? 'left' : 'right', fn: () => panelSet(k, panelEff(k) - 4)}, {label: tr('Default width'), icon: 'undo', fn: () => panelSet(k, null)}]); }, 320); } };
     g.addEventListener('pointermove', mv2); g.addEventListener('pointerup', up, {once: true}); g.addEventListener('pointercancel', up, {once: true});
   });
 }
@@ -452,7 +452,7 @@ function dupHintHtml(t) {
 function dWhoChip(t, ro) {
   const name = t.assignee_group_id ? (S.groups || []).find(g => g.id === t.assignee_group_id)?.name || tr('Group') : t.assignee_id ? personName(t.list_id, t.assignee_id) || personNameAny(t.assignee_id) || '?' : '';
   const inner = t.assignee_id ? av(t.assignee_id, name, 'avatar who') : ic(t.assignee_group_id ? 'users' : 'user', 's');
-  const lab = name ? tr('Assigned to {0}', name) : tr('Nobody assigned');
+  const lab = name ? tr('Assigned to {0}', name) : tr('Unassigned|nobody');
   const lock = (ro || !canAssign(t)) && !myGroup(t.assignee_group_id);  // 2.31.0 (#1054): the only assignee control: says when it is locked
   return `<button type="button" class="dchip dwho ${name ? 'set' : ''} ${lock ? 'ro' : ''}" data-act="assign" data-id="${t.id}" aria-haspopup="menu" ${lock ? 'aria-disabled="true"' : ''} title="${esc(lab + (lock ? '' : ' · ' + tr('Assign…')))}" aria-label="${esc(lab + (lock ? '' : ' · ' + tr('Assign…')))}">${inner}<span class="dct">${esc(name || tr('Assign'))}</span></button>`;
 }

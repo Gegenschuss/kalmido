@@ -1,7 +1,7 @@
 // 2.276.0 A UI test (#3039): the office for the first day. Own container (start.sh), Firefox, 1280 px and 390 px. Invented
 // people only. freelancer-matrix: office (no new route; GET /api/office/settings has a new field "used") -- carol and dave
 // have no organisation (each the admin of the own office, P4).
-// - computer: a fresh office without a kept point opens on Quotes & invoices; the group Money is folded; opened by hand it
+// - computer: a fresh office without a kept point opens on Quotations & invoices; the group Money is folded; opened by hand it
 //   shows Receipts first and every other point of Money (2.448.0 #3784, #3411: nothing waits until used, no "Show more");
 //   the hand's choice stays after reloading
 // - Receipts (#office/receipts): the upload of the bookkeeping, the kinds (entertainment, travel) and the list; a file through
@@ -82,7 +82,7 @@ const today = TC.today();
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await fresh(ev, nav, 'carol');
     await nav(B + '#office');
-    check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && !!document.querySelector('.office[data-ofctab="offers"]') && /Quotations/.test(document.querySelector('#top h1')?.textContent || '')`, 80), '#3039: a fresh admin office opens on Quotations (2.380.0 #3409: was Quotes & invoices) ' + await ev(`document.querySelector('.office')?.dataset.ofctab`));
+    check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && !!document.querySelector('.office[data-ofctab="offers"]') && /Quotations/.test(document.querySelector('#top h1')?.textContent || '')`, 80), '#3039: a fresh admin office opens on Quotations (2.380.0 #3409: was Quotations & invoices) ' + await ev(`document.querySelector('.office')?.dataset.ofctab`));
     check(await ready(ev, `${money} === 'false'`, 40), '#3039: Money folded at first');
     check(await ev(`!document.querySelector('#side [data-ofm="receipts"]') && !!document.querySelector('#side [data-ofm="offers"]')`), '#3039: folded = no points of Money, Sell open');
     await shot('p2276a-desktop-start.png');
@@ -126,7 +126,7 @@ const today = TC.today();
     check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && ${money} === 'true' && !!document.querySelector('#side [data-ofm="cashflow"]')`, 80), '#3039: with a receipt Money is open on its own and shows the cash flow');
 
     // ================= Pipeline only with an inquiry
-    check(await ev(`(() => { localStorage.removeItem('tasks.ofmLast'); return ofm_entry().key; })()`) === 'offers', '#3039: no inquiry: still Quotes & invoices');
+    check(await ev(`(() => { localStorage.removeItem('tasks.ofmLast'); return ofm_entry().key; })()`) === 'offers', '#3039: no inquiry: still Quotations & invoices');
     const deal = await call(CK.carol, 'POST', '/api/office/deals', {title: 'Example inquiry', contact: 'Erika Example', value: 1000});
     check(deal.http < 300, 'an inquiry for carol ' + deal.http);
     await nav(B + 'static/icon.svg');

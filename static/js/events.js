@@ -152,7 +152,7 @@ function updateChips(input) {
   const chips = input.closest('.qadd').querySelector('.chips');
   if (!chips) return;
   const r = parseQuick(input.value, S.quick.ignore);
-  chips.innerHTML = r.chips.map(c => `<button class="qchip ${c.off ? 'off' : ''}" data-qtype="${esc(c.type)}" title="${c.off ? tr('recognize again') : tr("don't recognize")}">${esc(c.label)}</button>`).join('') + qMismatch(r) + (input.id === 'qsheet' && !S.quickPreset?.capture ? dsxWhoChip() : '');  // 2.36.2 (#1138)
+  chips.innerHTML = r.chips.map(c => `<button class="qchip ${c.off ? 'off' : ''}" data-qtype="${esc(c.type)}" title="${c.off ? tr('recognise again') : tr("don't recognise")}">${esc(c.label)}</button>`).join('') + qMismatch(r) + (input.id === 'qsheet' && !S.quickPreset?.capture ? dsxWhoChip() : '');  // 2.36.2 (#1138)
 }
 // U21: a date that is not on the repeat's own days ("tomorrow … every monday"): say what happens
 function qMismatch(r) {
@@ -515,7 +515,7 @@ document.addEventListener('click', async e => {
       {label: tr('Account'), icon: 'user', fn: () => { closeSide(); settingsModal('account'); }},
       {label: tr('Settings'), icon: 'gear', keys: 'g s', fn: () => { closeSide(); settingsModal(); }},
       ...(mvOn() ? [{label: tr('Show administration again'), icon: 'eye', fn: () => { closeSide(); loadModule('settings').then(() => mvSet(false), () => {}); }}] : []),  // 2.436.0 (#3620)
-      ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])]); break; }
+      ...(S.me?.auth === 'session' ? ['-', {label: tr('Sign out'), icon: 'logout', fn: logout}] : [])]); break; }
     case 'tabs-more': tabsMore(a); break;
     case 'list-chat': listChat(+a.dataset.id); break;  // 2.17.0 (#419)
     case 'rows-more': rowsMore(); break;  // 2.17.0 (#649)

@@ -1,6 +1,6 @@
 // 2.142.0 UI tests, part C, own container (start.sh, mail address set). Invented names only.
 // #2148: Settings > Data: next to "Download JSON" the links "Todoist CSV" and "Markdown" (the two ZIP routes, as downloads) + a hint.
-// #2149: Settings > Integrations > Tasks by e-mail: an admin sees "Fetch mails now", a click locks it while it runs and shows a short
+// #2149: Settings > Integrations > Tasks by e-mail: an admin sees "Fetch e-mails now", a click locks it while it runs and shows a short
 //        result; a member does not see the button.
 // #2150: Settings > Notifications: "Share inbox (ntfy)": off by default; the switch gives a long topic, copy + "New topic" (asks first,
 //        a different topic), "Own ntfy server" with server + read token (token field empty and hidden after saving: "set (hidden)",
@@ -46,7 +46,7 @@ const until = (fn, n, ms = 150) => require('./boot').until(fn, {timeout: n ? n *
   w = await boot({user: 'alice'}); d = w.document;
   w.eval(`settingsModal('integr')`);
   const pb = await until(() => d.querySelector('#s-mailpoll'));
-  check(pb && /Fetch mails now/.test(pb.textContent), 'admin: the button is there');
+  check(pb && /Fetch e-mails now/.test(pb.textContent), 'admin: the button is there');
   pb?.click();
   const res = await until(() => { const x = (d.querySelector('#s-mailpoll-r')?.textContent || '').trim(); return x && x !== 'Fetching…' ? x : ''; });
   check(/Started|fetched/.test(res || ''), 'admin: a short result: ' + res);

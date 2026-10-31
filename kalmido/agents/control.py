@@ -51,7 +51,7 @@ from ..agents.workstyle import ws_need_editor
 
 CTL_LEVELS = ("approve_all", "routine", "free")
 CTL_ONE_WAY_FIXED = ("delete", "costs", "login", "migration")  # #2900: fixed, cannot be switched off
-CTL_ONE_WAY_TEXT = {"delete": N_("Deleting"), "costs": N_("Anything that costs money"), "login": N_("Login and registration"),
+CTL_ONE_WAY_TEXT = {"delete": N_("Deleting"), "costs": N_("Anything that costs money"), "login": N_("Sign-in and registration"),
                     "migration": N_("Migrations without a way back")}
 CTL_ONE_WAY_MAX, CTL_ONE_WAY_LEN = 20, 120
 CTL_DEADLINES = {"off": None, "1h": 3600, "4h": 4 * 3600, "1d": 86400, "3d": 3 * 86400}

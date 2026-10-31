@@ -2,12 +2,12 @@
 """2.141.0 part A (#2141, #2138): the own mailbox of a workspace and sending from the e-mail filing, own container (start.sh)
 with two stub mail servers inside (stub_mail.py: IMAP 1143 + SMTP 1025 = the server's fallback; a copy on IMAP 1144 + SMTP 1026).
 The server has NO mailbox of its own here (no KALMIDO_IMAP_*): the workspace mailboxes work alone.
- - set up: an organisation's admins (members 403, others 404, agents 403), a person for the own private space; passwords
+ - set up: an organisation's admins (members 403, others 404, agents 403), a person for the own private workspace; passwords
    sealed, never sent back ("set"), an empty field keeps them, another server needs them again; check = IMAP + SMTP login
    (wrong password = "auth", an internal port that is not allowed = "blocked"), errors as codes without the server's words
  - fetching: the mails of Alpha's mailbox land in Alpha only (client by sender, "Not assigned" with the admin who set it up,
    a hub token of another workspace counts as none, Alpha's own token files with its client, an answer to a sent mail joins
-   its client), each Message-ID once, \\Seen; the freelancer's private mailbox files into the private space
+   its client), each Message-ID once, \\Seen; the freelancer's private mailbox files into the private workspace
  - sending: Reply (to the sender, "Re: ...", In-Reply-To / References) and a new mail from a client (suggested recipients),
    through the workspace's SMTP; filed with direction out; no SMTP in the workspace = the server's (sender = the server,
    Reply-To = the person); an SMTP that fails = 502 and the filed mail "failed"; bad recipients 400; other workspaces 404;
@@ -201,7 +201,7 @@ r = Er.put(B + "/api/hubmail/mailbox", json={"ws": "private", "imap_host": "127.
                                               "imap_password": "secret", "smtp_host": "127.0.0.1", "smtp_port": 1026, "smtp_tls": "none",
                                               "from_addr": "erin@example.test", "check": True})
 check(r.ok and js(r)["check"]["imap"]["ok"] and js(r)["check"]["smtp"]["ok"], f"freelancer: her own mailbox works ({r.text[:200]})")
-check(dbx("SELECT org_id, owner_id FROM hub_mailboxes WHERE ws=?", (f"u{ERIN}",)) == [(None, ERIN)], "freelancer: stored as her private space's")
+check(dbx("SELECT org_id, owner_id FROM hub_mailboxes WHERE ws=?", (f"u{ERIN}",)) == [(None, ERIN)], "freelancer: stored as her private workspace's")
 check(Er.put(B + "/api/hubmail/mailbox", json={**BOX}).status_code == 404, "freelancer: Alpha's mailbox is not hers (404)")
 
 # ---- fetching

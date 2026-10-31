@@ -250,7 +250,7 @@ def fsm_plan(c, uid, b, to, dry, office=False):
             notes.append(trn("{0} document: sender, type and tags go along", "{0} documents: sender, type and tags go along", docs))
         if src and not to and oc_active_for(c, src) and not oc_active_for(c, fs_space(None, uid)):
             # review 2.96 (L3): the organisation seals its files, the private space does not (private encryption is off)
-            notes.append(tr("In your private space the files are stored without the organisation's encryption"))
+            notes.append(tr("In your private workspace the files are stored without the organisation's encryption"))
         shas = [r[0] for r in c.execute(f"""SELECT v.sha256 FROM fs_versions v JOIN fs_nodes n ON n.id=v.node_id AND v.no=n.cur_version
                                              WHERE n.id IN ({q}) AND v.sha256<>''""", big)]
         if shas:

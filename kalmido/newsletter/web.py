@@ -131,7 +131,7 @@ def nwl_put_conn():
     if "user" in d:
         u = _str(d, "user", NWL_SECRET_MAX)
         if not u:
-            return err(tr("Invalid value: {0}", tr("User")))
+            return err(tr("Invalid value: {0}", tr("Person")))
         secret["user"] = u
     if not secret.get("token") or (kind in ("listmonk", "cleverreach") and not secret.get("user")):
         return err(tr("Please enter the access data"))

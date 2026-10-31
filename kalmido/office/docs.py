@@ -1165,7 +1165,7 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
     else:
         cno = ""
     if cno:
-        meta.append([L.get("customer_no", tr("Customer no.|document", lg=lang)), cno])
+        meta.append([L.get("customer_no", tr("Client no.|document", lg=lang)), cno])
     if r["project_ref"]:
         # 2.357.0 B (#3180): a quotation asks for the client's reference ("Ihre Referenz"); the invoice keeps "Bestellnr. / Referenz"
         meta.append([L.get("offer_ref") or tr("Your reference|pdf", lg=lang), r["project_ref"]])
@@ -1735,7 +1735,7 @@ def bga_offer_blocks(c, oid, rs):
         if r["sent_at"] or r["id"] in sent:
             return BGA_SENT
         if r["id"] in signed:
-            return N_("The customer has signed this quotation; the record is kept")
+            return N_("The client has signed this quotation; the record is kept")
         return BGA_USED if r["id"] in used else None
     return {r["id"]: why(r) for r in rs}
 
@@ -1790,7 +1790,7 @@ def odoc_delete(did):
         if odoc_seq_numbered(r):  # 2.126.0 A (#1966)
             raise Denied(409, tr(ODOC_SEQ_KEPT))
     if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (did, oid)).fetchone():
-        raise Denied(409, tr("The customer has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
+        raise Denied(409, tr("The client has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net"),
                                                   **({"locked": True} if locked else {})})  # 2.114.2 A (#2263): the number gap stays traceable
     if not locked and r["status"] == "draft":  # 2.272.0 E2 (#3038): a draft goes to the office trash (restore), with the

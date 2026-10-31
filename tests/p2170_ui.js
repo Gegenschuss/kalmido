@@ -116,7 +116,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   click(w, d.querySelector('[data-act="news-bundle"]')); await sleep(200);
   // Summarize -> the agent's chat
   click(w, d.querySelector('[data-act="news-sum"]'));
-  const msgs = await until(async () => { const j = await call('GET', `/api/agents/${ag.id}/chat`); return (j.messages || []).find(m => /summarize my \d+ unread news/.test(m.body)); });
+  const msgs = await until(async () => { const j = await call('GET', `/api/agents/${ag.id}/chat`); return (j.messages || []).find(m => /summarise my \d+ unread news/.test(m.body)); });
   check(msgs && /Call the printer/.test(msgs.body), '#452: Summarize sends the unread news to the agent\'s chat');
   check(await until(() => w.eval('S.chat.aid') === ag.id), '… and opens it');
   w.eval('chatClose()'); w.close();

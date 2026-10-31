@@ -9,7 +9,7 @@ freelancer-matrix: office, files  tenant-matrix: office, receipt
  - an e-invoice uploaded without the office module: no receipt and no offer; office switched on: the offer, "Recognise
    again" keeps the offer (2.237.0, #2865), POST /api/docs/<id>/receipt/einvoice makes it (409 the second time, 404 for others,
    400 for no e-invoice), a receipt taken away again stays away after a new run
- - an e-invoice moved from the private space into the documents of an organisation's office is offered there (2.237.0)
+ - an e-invoice moved from the private workspace into the documents of an organisation's office is offered there (2.237.0)
 usage: p2185_a_receipts_test.py <datadir>   (P2185A_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import os
 import subprocess

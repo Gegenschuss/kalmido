@@ -125,7 +125,7 @@ def list_layout_put(lid):
     v = clean_layout(b.get("layout"))
     if scope in ("standard", "promote"):
         if role not in ("owner", "admin"):
-            raise Denied(403, tr("Only the owner or an admin of the project can change the standard"))
+            raise Denied(403, tr("Only the owner or an admin of the project can change the default"))
         c.execute("UPDATE lists SET page_layout=? WHERE id=?", (v, lid))
         if scope == "promote":  # 2.43.0 (#1452): my arrangement becomes the standard, I follow it from now on
             c.execute("DELETE FROM list_layouts WHERE list_id=? AND user_id=?", (lid, me()))
@@ -180,7 +180,7 @@ def wg_std_put(key):
     if key not in WG_STD_KEYS:
         raise BadInput(tr("Invalid layout"))
     if not g.user["is_admin"]:
-        raise Denied(403, tr("Only an admin can change the standard"))
+        raise Denied(403, tr("Only an admin can change the default"))
     b = body()
     if set(b) - {"layout", "promote"}:
         raise BadInput(tr("Invalid layout"))

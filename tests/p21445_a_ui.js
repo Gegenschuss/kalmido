@@ -53,7 +53,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   // ---- #2387: the step-up of an SSO account
   w.eval(`window._p = ocStepUp(5, 'fresh', 'Show recovery key', {stepup: 'oidc', fresh: false})`);
   const dl = await until(() => w.document.querySelector('.cdlg'));
-  check(dl && /login provider/.test(dl.textContent) && dl.querySelector('[data-cd="yes"]')?.textContent === 'Sign in again', '#2387: without a fresh sign-in it asks first: ' + (dl ? dl.textContent.slice(0, 160) : 'no dialog'));
+  check(dl && /sign-in provider/.test(dl.textContent) && dl.querySelector('[data-cd="yes"]')?.textContent === 'Sign in again', '#2387: without a fresh sign-in it asks first: ' + (dl ? dl.textContent.slice(0, 160) : 'no dialog'));
   dl?.querySelector('[data-cd="no"]').click();
   const r1 = await w.eval('window._p');
   check(r1 === null && w.location.pathname === '/', '#2387: cancelled = nothing sent, no navigation');

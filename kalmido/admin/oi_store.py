@@ -343,7 +343,7 @@ def _video_version(c, run, src, d, ctx):
     return d
 
 
-_W_LOCKED = N_("Knowledge pages encrypted in the browser were not taken over: export them as Markdown from the unlocked space and import that file into the knowledge pages.")
+_W_LOCKED = N_("Knowledge pages encrypted in the browser were not taken over: export them as Markdown from the unlocked workspace and import that file into the knowledge pages.")
 
 
 def _page(c, run, src, d, ctx):
@@ -355,7 +355,7 @@ def _page(c, run, src, d, ctx):
         return None
     if _wiki_locked(c, ctx):
         if not st.get("w_dst"):
-            st["w_dst"] = run.warning(N_("The knowledge pages of this space are encrypted in the browser")) or 1
+            st["w_dst"] = run.warning(N_("The knowledge pages of this workspace are encrypted in the browser")) or 1
         return None
     d["owner_id"] = _owner(ctx)
     d["body"] = wkh_seal(c, ctx.space, d["owner_id"], d.get("body") or "")  # ids inside are put right in _finish

@@ -10,7 +10,7 @@
    does not see the project gets "denied" without its name or value; a source of another space cannot be chosen; a deleted
    project shows "deleted" with the last value only for whoever saw it; freezing keeps a copy
  - select column (option ids, labels as values), currency display, column / row / table trash + restore, presence, completion
- - a person without an organisation ("dave") does everything in the private space
+ - a person without an organisation ("dave") does everything in the private workspace
 usage: p289_a_api_test.py <datadir>      (a fresh container; P289A_NOSTART=1 = the server already runs)"""
 import json
 import os
@@ -333,7 +333,7 @@ check(Fr.post(B + f"/api/sheets/{SID}/restore").status_code == 404, "another org
 check(A.post(B + f"/api/sheets/{SID}/restore").ok and A.get(B + f"/api/sheets/{SID}").status_code == 200, "restored")
 check(A.patch(B + f"/api/sheets/{SID}", json={"title": "Budget 2027"}).json()["title"] == "Budget 2027", "renamed")
 
-# ---- a person without an organisation: everything in the private space
+# ---- a person without an organisation: everything in the private workspace
 r = Da.post(B + "/api/sheets", json={"title": "Freelance", "space": "private"})
 check(r.status_code == 201, "dave creates a private table " + r.text[:200])
 DS = r.json()["id"]

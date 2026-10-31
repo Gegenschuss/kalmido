@@ -748,7 +748,7 @@ def git_author_clean(name, email):
         raise BadInput(tr("Invalid value: {0}", "git_author_email"))
     email = email.strip()
     if email and (len(email) > 200 or any(ch in "<>,\x7f" or ord(ch) < 32 for ch in email) or not EMAIL_RE.fullmatch(email)):
-        raise BadInput(tr("Git author: please enter a valid email address"))
+        raise BadInput(tr("Git author: please enter a valid e-mail address"))
     return name.strip(), email
 
 

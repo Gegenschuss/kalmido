@@ -1,6 +1,6 @@
 // kalmido-suite: fresh
 // 2.368.0 B UI tests (#2982 dates and times in one way, the setting "Region and formats"), own container (start.sh), jsdom.
-// freelancer-matrix: settings -- alice has no organisation: everything below runs in her private space (the same for everyone)
+// freelancer-matrix: settings -- alice has no organisation: everything below runs in her private workspace (the same for everyone)
 // - English dates in the order of en-GB ("Mon 26 Oct", "Mon 26 Oct 2026", "Monday 26 October"), the week title without the weekday
 // - the settings week_start / time_format / date_order: stored by PATCH /api/settings, a wrong value = 400, '' = automatic
 // - a time shown raw before (the due time of a task) follows 12 / 24 h; the time picker's labels too

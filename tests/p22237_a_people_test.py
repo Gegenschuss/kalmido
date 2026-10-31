@@ -7,7 +7,7 @@ shared), Anna's private agent P (only Lp1), Frida's freelancer agent F (only Lf1
  - GET /api/v1/groups and /groups/{id}: the agent knows no group of the organisation it is not in (Carl's name never shows)
  - GET /api/v1/absences: Bert (shares L1) in people / items, Carl (shares nothing) not; a person (Anna) still sees Carl
  - a mention <@carl> by the agent becomes '@?', no News for Carl; <@bert> stays
- - event attendees: Carl is an unknown user (400), Bert works (201)
+ - event attendees: Carl is an unknown person (400), Bert works (201)
  - PUT /api/v1/lists/{own}/members/{carl}: 404 without a waiting job naming Carl; Bert: 202 approval
  - private agent P and freelancer agent F: their owner and the people of their projects only
  - #2941: a server without organisations: a person sees everyone (household), an agent only its owner / projects
@@ -163,7 +163,7 @@ check(f"<@{ANNA}>" in body, f"#2917: the private agent mentions its owner ({body
 
 # ---- event attendees
 r = attendee(GH, CARL, "c")
-check(r.status_code == 400 and "Carl" not in r.text, f"#2917: Carl as attendee: unknown user 400 ({r.status_code} {r.text[:120]})")
+check(r.status_code == 400 and "Carl" not in r.text, f"#2917: Carl as attendee: unknown person 400 ({r.status_code} {r.text[:120]})")
 r = attendee(GH, BERT, "b")
 check(r.status_code == 201, f"#2917: Bert as attendee: 201 ({r.status_code} {r.text[:120]})")
 check(attendee(PH, CARL, "pc").status_code == 400, "#2917: the private agent: Carl unknown")

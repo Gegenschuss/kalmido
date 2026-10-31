@@ -57,8 +57,8 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
 
   // ---- Administration: users first
   d.querySelector(`[data-sec="org"]`).click(); await sleep(300);  // 2.364.0 C (#3041): the people are under Organisation > People
-  const h4 = [...d.querySelectorAll('#admp-users h4')].find(h => h.textContent === 'Users');
-  check(h4 && d.querySelector('#admp-users [data-acc="user-new"]') && !d.querySelector('#admp-users').hidden, 'Organisation > People has Users (+ New user): ' + h4?.textContent);
+  const h4 = [...d.querySelectorAll('#admp-users h4')].find(h => h.textContent === 'People');
+  check(h4 && d.querySelector('#admp-users [data-acc="user-new"]') && !d.querySelector('#admp-users').hidden, 'Organisation > People has Users (+ New person): ' + h4?.textContent);
   await sleep(400);
   const brow = [...d.querySelectorAll('#a-users .mrow')].find(r => /Bob Builder/.test(r.textContent));
   check(brow?.querySelector('.avatar.pic img')?.getAttribute('src') === '/static/avatars/headphones.svg', 'admin user list shows Bob\'s picture');

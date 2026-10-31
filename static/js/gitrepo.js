@@ -138,7 +138,7 @@ function repoWire(md, lid, folder) {
       edit = null; await reload();
     } else if (k === 'auth-save') {  // 2.396.0 A (#3386): an invalid mail = the error at the field, nothing saved
       const n = $('#rp-an', box), m = $('#rp-am', box), er = $('#rp-aerr', box), mail = m.value.trim();
-      const bad = /[<>]/.test(n.value) ? tr('Invalid value: {0}', tr('Name')) : mail && !RP_MAIL_RE.test(mail) ? tr('Git author: please enter a valid email address') : '';
+      const bad = /[<>]/.test(n.value) ? tr('Invalid value: {0}', tr('Name')) : mail && !RP_MAIL_RE.test(mail) ? tr('Git author: please enter a valid e-mail address') : '';
       if (er) { er.textContent = bad; er.hidden = !bad; }
       if (bad) { (/[<>]/.test(n.value) ? n : m).focus(); return; }
       try { await api('PATCH', `/api/repos/${aedit}`, {author_name: n.value.trim(), author_email: mail}); toast(tr('Saved')); }

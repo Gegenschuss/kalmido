@@ -773,7 +773,7 @@ ROUTES = {
     "GET /api/account/export/file": "own", "POST /api/account/export/file": "own", "GET /api/account/import": "own", "POST /api/account/import": "own",
     "GET /api/account/import/{}": "own", "PUT /api/account/import/{}": "own", "DELETE /api/account/import/{}": "own",
     "POST /api/account/import/{}/run": "own", "POST /api/account/import/{}/key": "own",
-    # 2.96.0 D (#1941 / #1918): an organisation export into the private space (p296_d_api_test.py)
+    # 2.96.0 D (#1941 / #1918): an organisation export into the private workspace (p296_d_api_test.py)
     "POST /api/me/mail/token": "own", "DELETE /api/me/mail/token": "own", "POST /api/me/mail/test": "own",
     "GET /api/v1/life": "own", "GET /api/v1/life/upkeep-presets": "own",
     "POST /api/v1/life/contracts": "own", "POST /api/v1/life/devices": "own", "POST /api/v1/life/upkeep": "own",
@@ -1170,7 +1170,7 @@ ROUTES = {
     # 2.141.0 B (#2140, #2139): the HTML view, a task / an event from a mail (only into lists / calendars of the mail's workspace), the mail of a task / event
     "GET /api/hubmail/mails/{}/html": "hubmail", "GET /api/hubmail/mails/{}/make": "hubmail", "POST /api/hubmail/mails/{}/task": "hubmail",
     "POST /api/hubmail/mails/{}/event": "hubmail", "GET /api/hubmail/links": "hubmail",
-    # 2.141.0 A (#2141, #2138): the mailbox of a workspace (its admins / the own private space), compose + send (hbm_can write)
+    # 2.141.0 A (#2141, #2138): the mailbox of a workspace (its admins / the own private workspace), compose + send (hbm_can write)
     "GET /api/hubmail/mailboxes": "hubmail", "GET /api/hubmail/mailbox": "hubmail", "PUT /api/hubmail/mailbox": "hubmail", "DELETE /api/hubmail/mailbox": "hubmail",
     "POST /api/hubmail/mailbox/check": "hubmail", "POST /api/hubmail/mailbox/poll": "hubmail", "GET /api/hubmail/compose": "hubmail", "POST /api/hubmail/send": "hubmail",
     # 2.85.0 B (#1162): feeds; 2.172.0 B (#2677): private or per organisation (p2172_b_reading_scope_test.py), was "own"

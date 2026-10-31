@@ -440,20 +440,20 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-counter', tr('Counter for quotations'), ofcSel('os-counter', s.offer_counter || 'org', [['org', OFC.info.personal ? tr('one for all quotations') : tr('per organisation')], ['client', tr('per client')], ['project', tr('per project')]]))}${ofcII('counter')}
     ${ofcRowF('os-valid', tr('Quotation valid for'), `<span class="lacts"><input id="os-valid" value="${esc(String(s.offer_valid_days ?? 30))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}${ofcII('valid')}
     ${ofcChk('os-accept-on', tr('Print the order confirmation with signature line'), s.accept_on ?? 1)}
-    ${ofcChk('os-sign-offers', tr('Signature under quotations and reminders'), s.sign_offers)}<p class="muted ofchint">${esc(tr('The signature picture of the person who finalises the document (Correspondence > Signature); drafts stay without.'))}</p>
+    ${ofcChk('os-sign-offers', tr('Signature under quotations and payment reminders'), s.sign_offers)}<p class="muted ofchint">${esc(tr('The signature picture of the person who finalises the document (Correspondence > Signature); drafts stay without.'))}</p>
     <h3>${tr('Invoices')}</h3>
     ${ofcChk('os-small', p.code === 'DE' ? tr('Small business: no VAT (section 19 UStG)') : tr('Small business: no VAT'), s.small_business)}${typeof ux_info === 'function' ? ux_info('small_business') : ''}
     ${ofcSchemeHtml('os-inv-scheme', 'invoice', tr('Invoice numbers'), s.invoice_scheme, dis)}
     ${ofcSchemeHtml('os-cr-scheme', 'credit', tr('Credit note numbers'), s.credit_scheme, dis)}
     ${ofcChk('os-cr-shared', tr('Invoice corrections count in the invoice series'), s.credit_shared)}${ofcII('credit_shared')/* 2.433.0 (#3597) */}
-    ${ofcSchemeHtml('os-rm-scheme', 'reminder', tr('Reminder numbers'), s.reminder_scheme, dis)}
+    ${ofcSchemeHtml('os-rm-scheme', 'reminder', tr('Payment reminder numbers'), s.reminder_scheme, dis)}
     ${ofcFeat('docs.delivery') ? ofcSchemeHtml('os-ls-scheme', 'delivery', tr('Delivery note numbers'), s.delivery_scheme, dis) : ''}
     ${typeof onumHtml === 'function' ? onumHtml() : ''}
     ${ofcRowF('os-paydays', tr('Payment terms'), `<span class="lacts"><input id="os-paydays" value="${esc(String(s.payment_days ?? 14))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}${ofcII('paydays')}
     ${ofcRowF('os-skonto', tr('Cash discount'), `<span class="lacts"><input id="os-skonto" value="${esc(+s.skonto_pct ? fmtNum(s.skonto_pct, 2) : '')}" inputmode="decimal" class="numin" ${dis}><span class="muted">%</span><input id="os-skonto-days" aria-label="${esc(tr('days'))}" value="${esc(+s.skonto_days ? String(s.skonto_days) : '')}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`, tr('default for new invoices; empty = none'))}
     ${ofcRowF('os-exempt', tr('Reason for tax exemption'), `<input id="os-exempt" value="${esc(s.exempt_reason || '')}" maxlength="300" ${dis}>`, tr('printed on invoices with tax-exempt positions (0 %), required for them'))/* 2.296.0 B (#3169) */}
     ${ofcRowF('os-rmfee', tr('Reminder fee'), `<span class="lacts"><input id="os-rmfee" value="${esc(fmtNum(s.reminder_fee ?? 0, 2))}" inputmode="decimal" class="numin" ${dis}><span class="muted">${ofcCur() === 'USD' ? '$' : '€'}</span></span>`)}${ofcII('rmfee')}
-    ${ofcRowF('os-rmdays', tr('Payment deadline in reminders'), `<span class="lacts"><input id="os-rmdays" value="${esc(String(s.reminder_deadline_days ?? 10))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}${ofcII('rmdays')}
+    ${ofcRowF('os-rmdays', tr('Payment deadline in payment reminders'), `<span class="lacts"><input id="os-rmdays" value="${esc(String(s.reminder_deadline_days ?? 10))}" inputmode="numeric" class="numin" ${dis}><span class="muted">${tr('days')}</span></span>`)}${ofcII('rmdays')}
     ${typeof dun_settingsHtml === 'function' ? dun_settingsHtml(s, dis) : '' /* 2.147.1 B (#2054) */}
     ${typeof tpSettingsHtml === 'function' ? tpSettingsHtml(s, dis) : ''}
     ${ofcFeat('docs.einvoice') ? ofcEinvRow(s) : ''}
@@ -461,19 +461,19 @@ function ofcSettingsHtml() {
     </fieldset>${ost_p('data', dis)}
     ${ofcFeat('books.datev') ? `${ofcRowF('os-datev', tr('DATEV inbox'), `<input id="os-datev" type="email" value="${esc(s.datev_email || '')}" maxlength="200" placeholder="${esc(tr('e-mail address of the document inbox'))}" ${dis}>`)}${ofcII('datev')}
     ${ofcChk('os-datev-auto', tr('Send every invoice to the DATEV inbox when it is sent'), s.datev_auto)}${ofcII('datev_auto')}` : ''}
-    ${ofcChk('os-portal-docs', tr('Show documents in the customer portal'), s.portal_docs)}<p class="shint">${tr('You send the access at the client via “Send portal link”.')}</p>
+    ${ofcChk('os-portal-docs', tr('Show documents in the client portal'), s.portal_docs)}<p class="shint">${tr('You send the access at the client via “Send portal link”.')}</p>
     ${typeof dx_settingsHtml === 'function' && ofcFeat('books.datev') ? dx_settingsHtml(s, dis) : ''}
     ${typeof brl_settingsHtml === 'function' ? brl_settingsHtml() : '' /* 2.299.0 B (#3191): bank rules */}
     ${typeof bnr_settingsHtml === 'function' ? bnr_settingsHtml(dis) : '' /* 2.299.0 C (#3192): the reminder of the bank bookings without a receipt */}
     ${typeof ccn_settingsHtml === 'function' ? ccn_settingsHtml(dis) : '' /* 2.444.0 (#3447): the reminder of the card positions without a receipt */}
     ${typeof rcm_settingsHtml === 'function' ? rcm_settingsHtml() : '' /* 2.424.0 B (#3450): receipts by e-mail */}
     </fieldset>${ost_p('docs', dis)}
-    ${ofcRowF('os-inv-close-de', tr('Invoice closing (German)'), `<textarea id="os-inv-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.invoice_closing_de || '')}</textarea>`)}
-    ${ofcRowF('os-inv-close-en', tr('Invoice closing (English)'), `<textarea id="os-inv-close-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.invoice_closing_en || '')}</textarea>`)}
-    ${ofcFeat('docs.delivery') ? ofcRowF('os-dl-close-de', tr('Delivery note closing (German)'), `<textarea id="os-dl-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.delivery_closing_de || '')}</textarea>`) : ''}
-    ${ofcFeat('docs.delivery') ? ofcRowF('os-dl-close-en', tr('Delivery note closing (English)'), `<textarea id="os-dl-close-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.delivery_closing_en || '')}</textarea>`) : ''}
-    ${ofcRowF('os-rm-text-de', tr('Reminder closing (German)'), `<textarea id="os-rm-text-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.reminder_text_de || '')}</textarea>`)}
-    ${ofcRowF('os-rm-text-en', tr('Reminder closing (English)'), `<textarea id="os-rm-text-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the standard text'))}" ${dis}>${esc(s.reminder_text_en || '')}</textarea>`)}
+    ${ofcRowF('os-inv-close-de', tr('Invoice closing (German)'), `<textarea id="os-inv-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the default text'))}" ${dis}>${esc(s.invoice_closing_de || '')}</textarea>`)}
+    ${ofcRowF('os-inv-close-en', tr('Invoice closing (English)'), `<textarea id="os-inv-close-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the default text'))}" ${dis}>${esc(s.invoice_closing_en || '')}</textarea>`)}
+    ${ofcFeat('docs.delivery') ? ofcRowF('os-dl-close-de', tr('Delivery note closing (German)'), `<textarea id="os-dl-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the default text'))}" ${dis}>${esc(s.delivery_closing_de || '')}</textarea>`) : ''}
+    ${ofcFeat('docs.delivery') ? ofcRowF('os-dl-close-en', tr('Delivery note closing (English)'), `<textarea id="os-dl-close-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the default text'))}" ${dis}>${esc(s.delivery_closing_en || '')}</textarea>`) : ''}
+    ${ofcRowF('os-rm-text-de', tr('Payment reminder closing (German)'), `<textarea id="os-rm-text-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the default text'))}" ${dis}>${esc(s.reminder_text_de || '')}</textarea>`)}
+    ${ofcRowF('os-rm-text-en', tr('Payment reminder closing (English)'), `<textarea id="os-rm-text-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the default text'))}" ${dis}>${esc(s.reminder_text_en || '')}</textarea>`)}
     <h3>${tr('Calculation rules')}</h3>
     <p class="shint">${tr('Default for new quotations, can be changed in each quotation')}</p>
     ${psh ? `${ofcChk('os-prod-on', tr('{0} by amount', pshl), s.producing_on)}
@@ -642,7 +642,7 @@ const OFC_II = {
   numat: N_('At once: the draft shows its number. When finalised: drafts have no number, so discarded drafts leave no gaps.'),
   counter: N_('Per client or per project each one counts on its own, e.g. KV-{client}-{yyyy}-{seq:02} gives KV-ACME-2026-03. A new quotation gets its number once the client or project is set. Invoices always keep one counter.'),  // 2.118.0 A (#2265)
   paydays: N_('Payment terms: the days a client has to pay an invoice, printed as the due date (e.g. 14 days). A client\'s own payment terms win.'),
-  rmdays: N_('Payment deadline: the new, shorter period a reminder gives, counted from its date (e.g. 10 days).'),
+  rmdays: N_('Payment deadline: the new, shorter period a payment reminder gives, counted from its date (e.g. 10 days).'),
   einv: N_('ZUGFeRD is a normal PDF with the invoice data inside, fine for most clients. XRechnung is pure XML, required by public authorities (they give you a routing ID, the Leitweg-ID).'),
   datev: N_('The e-mail address of the document inbox your tax advisor gives you (DATEV Unternehmen online). Finalised invoices go there as PDF (ZUGFeRD with the invoice data inside, XRechnung also as XML) and land in the accounting by themselves.'),  // 2.434.0 (#3616): ZUGFeRD as PDF alone  // 2.298.0 A1 (#3186): + PDF + XML (the line under the field is gone)
   pq: N_('Example: 6 production days with quotient 3 make 2 producing days, charged at the producing rate. A markup for organising the production.'),
@@ -663,7 +663,7 @@ Object.assign(OFC_II, {
   home: N_('The currency of your price list, books, cash flow and travel expenses. Documents in another currency are converted with their exchange rate; the tax is also shown in the home currency.'),  // 2.189.0 (#2475)
   color: N_('The colour of headings and lines in your printed documents, as a hex code, e.g. #2f5d8a.'),
   valid: N_('How long a quotation stays valid after its date; printed on it, e.g. 30 days.'),
-  rmfee: N_('A flat fee added to every reminder for late payment, e.g. 5 €. 0 = no fee.'),
+  rmfee: N_('A flat fee added to every payment reminder for late payment, e.g. 5 €. 0 = no fee.'),
   prod_rate: N_('What one producing day costs: taken from a service of your price list, or a fixed amount (e.g. 600 € per day).'),
   rights: N_('Default usage rights printed in quotations: how long, where and in which media the client may use the result (e.g. 1 year, Germany, online).'),
   indfilm: N_('Adds the shoot calculation (shooting days, crew, equipment) to quotations. Only useful for film and video productions.'),
@@ -672,10 +672,10 @@ Object.assign(OFC_II, {
   credit_shared: N_('On: a correction takes the next number of the invoice counter (e.g. 423_R, 424_RK, 425_R) and keeps its own scheme. Off: corrections have their own counter. Numbers already given stay.'),
   texts: N_('Introduction and closing are text blocks (tab Text blocks) that new quotations start with; each quotation can change them.'),
   small_business: N_('Under the small business rule (§ 19 UStG) you charge no VAT and print a note on your invoices instead. It applies only below the turnover limit; ask your tax advisor.'),
-  cl_customer_no: N_('The customer number you give this client in your accounting (e.g. K-1042).'),
+  cl_customer_no: N_('The client number you give this client in your accounting (e.g. K-1042).'),
   ed_order_ref: N_('The client\'s own order number; printed on the invoice so their accounting can match it (e.g. PO-4711).'),
   ed_payment_days: N_('Days until the invoice is due, e.g. 14. Empty = the client\'s payment terms, else the ones from the settings.'),
-  ed_vat_mode: N_('Without VAT is for reverse charge (a company in another EU country with a VAT ID) or customers outside the EU; a note on the invoice then says why.'),
+  ed_vat_mode: N_('Without VAT is for reverse charge (a company in another EU country with a VAT ID) or clients outside the EU; a note on the invoice then says why.'),
   ed_contract_id: N_('A framework contract holds the special rates and standard rights agreed with one client (e.g. a yearly agreement); it presets new positions.'),
   ed_raw_mode: N_('Raw data = the unedited material. Optional: shown as an extra line, not counted. Included: counted in the total. None: no line.'),
   ed_reminder_level: N_('Level 1 is a friendly payment reminder, 2 a reminder, 3 the final reminder before further steps.'),
@@ -942,7 +942,7 @@ function ost_mark(el, st, x) {
 // 2.440.0 (#3782): a redraw after the save (a part that finished loading) took "Saved" away: the mark goes back to its field
 function ost_markBack() {
   const k = OST.mk; if (!k || k.m.isConnected || !k.m.classList.contains('on')) return;
-  const row = $('#ofc-set #' + CSS.escape(k.id))?.closest('.row, .pkc-on');
+  const row = $(`#ofc-set [id="${k.id}"]`)?.closest('.row, .pkc-on');  // 2.368.4: an own id (os-...), no CSS.escape needed
   if (row && !row.querySelector(':scope > .ostok')) row.append(k.m);
 }
 // 2.40.0 (#1378): one upload helper for the office (FormData + the CSRF header X-Requested-With via rawFetch, the server's error text)

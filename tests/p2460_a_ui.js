@@ -1,5 +1,5 @@
 // 2.46.0 UI tests, part A (#1561 #1592), own container (start.sh), jsdom only. Invented names only.
-// "New user" in Settings > Users: the organisation (none / each one; exactly one = preselected as a member) and the role
+// "New person" in Settings > Users: the organisation (none / each one; exactly one = preselected as a member) and the role
 // in it; saved as orgs [{id, role}]; with two organisations nothing is preselected; the user list shows every account
 // (also people outside the admin's organisations); Administration > Organisations offers "New organisation".
 const path = require('path');

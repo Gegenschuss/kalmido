@@ -869,7 +869,7 @@ def _file_sent(c, uid, org, cid, lid, ws, m, raw, plain):
             eml_id = fs_put(c, uid, folder, name, raw, "message/rfc822", org)
     except (Denied, ValueError, UploadRefused, QuotaExceeded) as e:
         print("hubmail: sent mail without .eml", type(e).__name__, flush=True)
-        notes.append(tr("The original mail and its attachments could not be filed", lg=lg))
+        notes.append(tr("The original e-mail and its attachments could not be filed", lg=lg))
     if eml_id:  # 2.148.1 G (#2488): the filed nodes follow the mail's rights, as for received mail
         c.execute("UPDATE fs_nodes SET hub_mail_id=? WHERE id=?", (mid, eml_id))
     if folder:
@@ -906,7 +906,7 @@ def mbx_send():
     subj = re.sub(r"\s+", " ", _CTRL.sub(" ", subj)).strip()
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     if not subj and not text.strip():
-        return err(tr("The mail is empty"))
+        return err(tr("The e-mail is empty"))
     smtp, name, reply_to, via = _sender(c, org, uid)
     if not via:
         return jsonify(error=tr("Sending is not set up: an admin of the workspace enters the mailbox's SMTP access (E-mail filing > Mailbox)."),

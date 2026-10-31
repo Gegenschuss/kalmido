@@ -56,15 +56,15 @@ AA_LIST = 50          # rows shown in the settings
 AA_STORAGE_EVERY = 600
 AA_QC_EVERY = 86400
 # names of the watchdog parts in _wd_fail (shown in the alert)
-AA_WD_WHAT = {"section": N_("a whole watchdog part"), "settings of user": N_("user settings"),
+AA_WD_WHAT = {"section": N_("a whole watchdog part"), "settings of user": N_("account settings"),
               "reminder of task": N_("reminders"), "focus session": N_("focus sessions"), "habit": N_("habit reminders"),
               "digest of user": N_("daily digests"),
               "collab push": N_("collaboration pushes"), "time entry": N_("time tracking"), "tick": N_("the watchdog loop")}
 AA_SWITCH_LABEL = {"collab_all": N_("Collaboration for everyone"), "time_all": N_("Time tracking for everyone"),
                    "update_check": N_("Check daily for a new version"), "aa_on": N_("Admin alerts"),
-                   "twofa_required": N_("Require two-factor authentication for built-in logins"),
-                   "passkey_login": N_("Allow logging in with a passkey without the password"),
-                   "oidc_autocreate": N_("Create accounts on the first OIDC login"), "bk_on": N_("Automatic backups"),
+                   "twofa_required": N_("Require two-factor authentication for built-in sign-ins"),
+                   "passkey_login": N_("Allow signing in with a passkey without the password"),
+                   "oidc_autocreate": N_("Create accounts on the first OIDC sign-in"), "bk_on": N_("Automatic backups"),
                    "public_links": N_("Public links to projects")}
 _AA_LOCK = threading.Lock()
 _AA = {"q": [], "b": {}, "int": {}, "disk_at": 0.0, "qc_at": 0.0, "storage": {}, "qc": {}}
@@ -340,8 +340,8 @@ def _aa_build(c, kind, key, b):
         if b["n"] < AA_BURST:
             return None
         top = max(items, key=items.get) if items else "?"
-        return ("logins:" + top, Nn_("{0} failed login within {1} min (users: {2}; IPs: {3})",
-                                     "{0} failed logins within {1} min (users: {2}; IPs: {3})"),
+        return ("logins:" + top, Nn_("{0} failed sign-in within {1} min (users: {2}; IPs: {3})",
+                                     "{0} failed sign-ins within {1} min (users: {2}; IPs: {3})"),
                 [mins, _aa_list(b["extra"].get("user", {})), _aa_list(items)], b["n"])
     if kind == "security" and key in ("drop", "ics", "api", "publink"):
         if b["n"] < AA_BURST:
@@ -426,7 +426,7 @@ def _aa_integrations(c, cfg, ints, now):
             st = aa_emit(c, cfg, "integration", "inbox:" + s["err"],
                          N_("The ntfy share inbox has not reached its ntfy server for {0} min ({1})."), [mins, s["err"]])
         elif s["n"] >= AA_FAIL_ROW and name == "oidc":
-            st = aa_emit(c, cfg, "integration", "oidc:" + s["err"], N_("{0} logins with the OIDC provider in a row failed ({1})."),
+            st = aa_emit(c, cfg, "integration", "oidc:" + s["err"], N_("{0} sign-ins with the OIDC provider in a row failed ({1})."),
                          [s["n"], s["err"]])
         elif s["n"] >= AA_FAIL_ROW and name == "ntfy":
             st = aa_emit(c, cfg, "integration", "ntfy:" + s["err"], N_("{0} ntfy pushes in a row failed ({1})."), [s["n"], s["err"]])

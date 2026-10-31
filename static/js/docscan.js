@@ -61,15 +61,15 @@ function dsc_mailHtml(s, sc) {
   if (!m.enabled) return '';
   const big = !sc.mail_notice;
   return `<div class="dsc-way"><h5>${ic('mail', 's')} ${tr('By e-mail')}</h5>
-    <p class="muted">${tr('PDFs and images attached to mails sent to this address become documents here.')}</p>
+    <p class="muted">${tr('PDFs and images attached to e-mails sent to this address become documents here.')}</p>
     ${m.address ? `<div class="dsc-row dc-mail"><code>${esc(m.address)}</code><button type="button" class="btn sm" data-dsc="mailcopy">${ic('copy', 's')} ${tr('Copy')}</button></div>
       <p><button type="button" class="linkbtn" data-dsc="mailnew">${tr('New address')}</button> · <button type="button" class="linkbtn" data-dsc="maildel">${tr('Turn off')}</button></p>
       <p class="muted">${tr('Scanner: in the scan software choose “Send by e-mail” and send to this address.')}</p>`
       : `<button type="button" class="btn sm" data-dsc="mailnew">${tr('Create address')}</button>`}
-    ${big ? `<div class="dsc-note" role="note">${ic('info', 's')}<div><p>${tr('E-mail is not end-to-end encrypted. Mail providers on the way can read the content and the attachments, like a postcard. For confidential papers use the folder watcher.')}</p>
+    ${big ? `<div class="dsc-note" role="note">${ic('info', 's')}<div><p>${tr('E-mail is not end-to-end encrypted. E-mail providers on the way can read the content and the attachments, like a postcard. For confidential papers use the folder watcher.')}</p>
       <button type="button" class="btn sm" data-dsc="notice">${tr('Got it')}</button></div></div>`
-      : `<p class="muted dsc-hint">${tr('Mail is not end-to-end encrypted; confidential papers better via the folder watcher.')}</p>`}
-    ${sc.encrypted ? `<p class="muted">${tr('Mails into this encrypted area were unencrypted on their way before they were filed.')}</p>` : ''}</div>`;
+      : `<p class="muted dsc-hint">${tr('E-mail is not end-to-end encrypted; confidential papers better via the folder watcher.')}</p>`}
+    ${sc.encrypted ? `<p class="muted">${tr('E-mails into this encrypted area were unencrypted on their way before they were filed.')}</p>` : ''}</div>`;
 }
 async function dsc_reload(md) {
   const s = DSCN.es; if (!s) return;
@@ -97,7 +97,7 @@ document.addEventListener('click', async e => {
     return;
   }
   if (a === 'maildel') {
-    if (!await askConfirm(tr('Turn off the address?'), tr('Mails to it no longer arrive.'), {ok: tr('Turn off'), danger: true})) return;
+    if (!await askConfirm(tr('Turn off the address?'), tr('E-mails to it no longer arrive.'), {ok: tr('Turn off'), danger: true})) return;
     await api('DELETE', `/api/docs/mail?ws=${encodeURIComponent(s.ws)}`).catch(() => null);
     s.mail.address = ''; dsc_embedDraw(md);
     return;

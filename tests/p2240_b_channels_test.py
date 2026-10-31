@@ -290,7 +290,7 @@ poid = in_app(f"from kalmido.office.model import pb_personal\nwith system_ctx(c)
 check(poid.isdigit(), f"setup: frida's personal office {poid}")
 check(scope(FID, scope=f"o:{poid}") == repr(""), "#2867 B2 (3): the own personal office: the full text")
 check(scope(uid["carol"], scope=f"o:{poid}") == repr("Kalmido"), "#2867 B2 (3): another person's personal office: neutral, no name")
-push(FID, "Approved by the customer", "Studio client: offer words", click=f"{B}/#office/offers/1", scope=f"o:{poid}")
+push(FID, "Approved by the client", "Studio client: offer words", click=f"{B}/#office/offers/1", scope=f"o:{poid}")
 check(wait_for(FM, "Studio client: offer words"), "#2867 B2 (3): a customer's approval in the personal office arrives in full")
 push(FID, "Plain", "Frida words without a reference", click=f"{B}/#workload")
 check(wait_for(FM, "New notification in Kalmido") and not [t for t in texts(FM) if "Frida words without" in t],

@@ -218,7 +218,7 @@ function newsText(it, U) {
     case 'role': return tr('{0} changed your role in {1} to {2}', who, q(newsListName(it)), q(roleLabel(d.role)));
     case 'unshare': return d.org ? tr('{0} removed you from the organisation {1}', who, q(d.name || ''))  // 2.28.0 (#935)
       + (d.lists ? ' ' + esc(trn('Your {0} project of the organisation stayed with it ({1}).', 'Your {0} projects of the organisation stayed with it ({1}).', d.lists, d.to || '')) : '')  // 2.148.1 A (#2480)
-      + (d.back ? ' ' + esc(trn('{0} project you had brought in is back in your private space.', '{0} projects you had brought in are back in your private space.', d.back)) : '')  // 2.361.0 (#2922)
+      + (d.back ? ' ' + esc(trn('{0} project you had brought in is back in your private workspace.', '{0} projects you had brought in are back in your private workspace.', d.back)) : '')  // 2.361.0 (#2922)
       : tr('{0} removed you from the project {1}', who, q(newsListName(it)));
     case 'owner': return (d.given != null ? tr('{0} handed your project {1} to {2}', who, q(newsListName(it)), d.given) : d.self ? tr('You took over the project {1} from {0}', who, q(newsListName(it))) : tr('{0} made you the owner of the project {1}', who, q(newsListName(it))))  // 2.1.2 (#349)
       + ((d.reset || []).includes('link') ? ' ' + esc(tr('Its public link was reset: share the new link again if needed.')) : '')  // 2.148.1 A (#2478)
@@ -238,8 +238,8 @@ function newsText(it, U) {
       moveout: tr('{0} moved {1} out of the organisation {2}', who, q(d.name || ''), q(d.org || '')),  // 2.148.1 B (#2483)
       export: trn('{1} exported {0} project of the organisation {2} with an account export', '{1} exported {0} projects of the organisation {2} with an account export', d.count || 1, who, q(d.org || '')),  // 2.362.3 (#3101)
       // 2.361.2 (#2923): a member asks back what they brought in; an admin releases / declines it
-      outreq: tr('{0} asks to take {1} back into their private space (organisation {2})', who, q(d.name || ''), q(d.org || '')),
-      outok: tr('{0} released {1}: you can move it into your private space now (within {2} days)', who, q(d.name || ''), d.days || 14),
+      outreq: tr('{0} asks to take {1} back into their private workspace (organisation {2})', who, q(d.name || ''), q(d.org || '')),
+      outok: tr('{0} released {1}: you can move it into your private workspace now (within {2} days)', who, q(d.name || ''), d.days || 14),
       outno: tr('{0} declined to give {1} back (organisation {2})', who, q(d.name || ''), q(d.org || '')),
       takeover: tr('{0} (server admin) handed your project {1} to {2}', who, q(d.name || ''), q(d.to || '')),  // 2.148.1 B (#2491)
       // 2.56.0 (#1795): an organisation admin renamed it / changed its icon or colour
@@ -258,8 +258,8 @@ function newsText(it, U) {
     case 'connok': return tr('{0} accepted your connection request', who);
     case 'lytpl': return tr('{0} sent you the arrangement {1}', who, q(d.name || ''));  // 2.55.0 (#1068)
     case 'dispo': return tr('{0} booked you: {1} ({2})', who, q(d.title || ''), d.start ? esc(fmtDayAbs(d.start.slice(0, 10))) : '');  // 2.50.0 (#1194)
-    case 'leavereq': return tr('{0} asks for vacation ({1})', who, d.start ? esc(fmtDayAbs(d.start) + (d.end && d.end !== d.start ? ' – ' + fmtDayAbs(d.end) : '')) : '');  // 2.125.0 A (#2117)
-    case 'leavedecide': return (d.state === 'approved' ? tr('{0} approved your vacation ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : '') : tr('{0} rejected your vacation ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : ''));
+    case 'leavereq': return tr('{0} asks for holiday ({1})', who, d.start ? esc(fmtDayAbs(d.start) + (d.end && d.end !== d.start ? ' – ' + fmtDayAbs(d.end) : '')) : '');  // 2.125.0 A (#2117)
+    case 'leavedecide': return (d.state === 'approved' ? tr('{0} approved your holiday ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : '') : tr('{0} rejected your holiday ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : ''));
     case 'errreport': return d.title ? tr('New error reported: {0}', q(d.title)) : tr('A new error was reported');  // 2.18.0
     case 'approval': return d.title ? tr('{0} is waiting for your approval: {1}', who, q(d.title)) : tr('{0} is waiting for your approval', who);  // 2.367.2 (#2968): a list-wide one has no task title
     case 'aprequest': return tr('Approval needed: {0} (from {1})', q(it.task_title || ''), who) + (d.note ? ': ' + q(d.note) : '');  // 2.367.2 (#2968)
@@ -284,12 +284,12 @@ function newsText(it, U) {
     case 'integfail': return esc(d.text || '');  // 2.367.3 (#2971): written in the person's language by the server (collab/integfail.py)
     case 'fetcherr': return tr('Receipt fetcher {0}: {1}', q(d.portal || ''), esc(d.error || ''));  // 2.425.0 C (#3453): docfetch.js
     case 'orgkey': return ocNewsText(d, it.actor_id ? who : q(tr('The server admin')), q);  // 2.138.0 C (#1972): orgcrypt.js
-    case 'apblimit': return tr('Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.', d.limit || '?');  // 2.360.2 L (#2561)
-    case 'ptlimit': return d.org ? tr('The customer portal of {0} reached its limit of {1} sign-in mails per hour. Further customers get a link again later.', q(d.org), d.limit || '?')
-      : tr('Your customer portal reached its limit of {0} sign-in mails per hour. Further customers get a link again later.', d.limit || '?');  // 2.138.4 C (#2380)
+    case 'apblimit': return tr('Your booking page reached its limit of {0} confirmation e-mails today. Further bookings work again tomorrow.', d.limit || '?');  // 2.360.2 L (#2561)
+    case 'ptlimit': return d.org ? tr('The client portal of {0} reached its limit of {1} sign-in e-mails per hour. Further clients get a link again later.', q(d.org), d.limit || '?')
+      : tr('Your client portal reached its limit of {0} sign-in e-mails per hour. Further clients get a link again later.', d.limit || '?');  // 2.138.4 C (#2380)
     case 'playbook_proposal': return pbNewsText(it, who, q);  // 2.39.0 (#1168)
     case 'evinvite': case 'evshare': case 'evchange': return evNewsText(it, who, q);  // 2.21.0 (#659)
-    case 'apbooking': return (d.what === 'new' ? tr('New booking: {0}', q(d.line || '')) : tr('Booking cancelled by the customer: {0}', q(d.line || '')));  // 2.367.2 (#2969)
+    case 'apbooking': return (d.what === 'new' ? tr('New booking: {0}', q(d.line || '')) : tr('Booking cancelled by the client: {0}', q(d.line || '')));  // 2.367.2 (#2969)
     case 'docpaid': return tr('Payment received: {0}', q([d.number, d.client].filter(Boolean).join(', ')));  // 2.367.4 (#2972)
     case 'docoverdue': return d.n > 1 ? tr('{0} invoices are overdue', d.n) : tr('Invoice overdue: {0}', q([d.number, d.client].filter(Boolean).join(', ')));
     case 'calsub': return tr('Your calendar subscription {0} keeps failing. Its events may be out of date.', q(d.name || ''));  // 2.367.2 (#2969)
@@ -308,7 +308,7 @@ const OLV_WORDS = {files: n => trn('{0} file', '{0} files', n), wiki_pages: n =>
   tables: n => trn('{0} table', '{0} tables', n), bookmarks: n => trn('{0} bookmark', '{0} bookmarks', n), polls: n => trn('{0} poll', '{0} polls', n),
   videos: n => trn('{0} video review', '{0} video reviews', n), drafts: n => trn('{0} office draft', '{0} office drafts', n),
   clients: n => trn('{0} client', '{0} clients', n), absences: n => trn('{0} absence', '{0} absences', n),
-  leave_quota: n => trn('{0} vacation account', '{0} vacation accounts', n), timesheets: n => trn('{0} timesheet', '{0} timesheets', n),
+  leave_quota: n => trn('{0} holiday account', '{0} holiday accounts', n), timesheets: n => trn('{0} timesheet', '{0} timesheets', n),
   time: n => trn('{0} time entry', '{0} time entries', n), drives: n => trn('{0} drive', '{0} drives', n)};
 const olvText = c => Object.keys(OLV_WORDS).filter(k => (c || {})[k]).map(k => OLV_WORDS[k](c[k])).join(', ');
 /** @type {any} */ (NEWS_ICON).signoff = 'check';  // 2.266.0 (#2965)
@@ -333,7 +333,7 @@ function viewNews() {
   // 2.13.0 (#453 P9): ONE filter row: "All" (clears both), "Mentions & assigned to me" (server filter) and the kinds
   const k0 = S.nf.kind, fchips = (items) => { const h = newsChipsHtml(items || [], 'data-nk').replace(/^<div class="nchips"[^>]*>/, '').replace(/<\/div>$/, '').replace(/<button type="button" class="nchip [^"]*" data-act="news-kind" data-nk="" aria-pressed="[^"]*">[^<]*<\/button>/, '');
     return `<div class="nchips nfrow" role="group" aria-label="${esc(tr('Show only'))}"><button type="button" class="nchip ${f || k0 ? '' : 'on'}" data-act="news-filter" data-f="" data-nk="" aria-pressed="${!f && !k0}">${tr('All')}</button><button type="button" class="nchip ${f ? 'on' : ''}" data-act="news-filter" data-f="me" data-fme aria-pressed="${!!f}">${ic('at', 's')}${tr('Mentions & assigned to me')}</button>${h}</div>`; };
-  const bar0 = `<div class="nbar"><button class="btn sm ntog ${S.nf.unread ? 'on' : ''}" data-act="news-unread" aria-pressed="${S.nf.unread}" title="${esc(tr('Hide news you have already read'))}">${ic('eye', 's')}${tr('Unread only')}</button><button class="btn sm ntog ${newsBundled() ? 'on' : ''}" data-act="news-bundle" aria-pressed="${newsBundled()}" title="${esc(tr('Group by task, what needs you first'))}">${ic('columns', 's')}${tr('Bundled')}</button><span class="spacer"></span>${S.news?.unread && (S.agents || []).some(x => x.enabled) ? `<button class="btn sm" data-act="news-sum" aria-haspopup="menu" title="${esc(tr('An agent summarizes your unread news in its chat'))}">${ic('bot', 's')}${tr('Summarize')}</button>` : ''}${S.news?.unread ? `<button class="btn sm" data-act="news-readall" title="${esc(tr('Mark all as read'))}">${ic('check', 's')}${tr('All read')}</button>` : ''}<button class="iconbtn" data-act="news-settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
+  const bar0 = `<div class="nbar"><button class="btn sm ntog ${S.nf.unread ? 'on' : ''}" data-act="news-unread" aria-pressed="${S.nf.unread}" title="${esc(tr('Hide news you have already read'))}">${ic('eye', 's')}${tr('Unread only')}</button><button class="btn sm ntog ${newsBundled() ? 'on' : ''}" data-act="news-bundle" aria-pressed="${newsBundled()}" title="${esc(tr('Group by task, what needs you first'))}">${ic('columns', 's')}${tr('Bundled')}</button><span class="spacer"></span>${S.news?.unread && (S.agents || []).some(x => x.enabled) ? `<button class="btn sm" data-act="news-sum" aria-haspopup="menu" title="${esc(tr('An agent summarises your unread news in its chat'))}">${ic('bot', 's')}${tr('Summarise')}</button>` : ''}${S.news?.unread ? `<button class="btn sm" data-act="news-readall" title="${esc(tr('Mark all as read'))}">${ic('check', 's')}${tr('All read')}</button>` : ''}<button class="iconbtn" data-act="news-settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
   const mine0 = S.nf.items && S.nf.f === f ? S.nf.items : null;
   // 2.28.0 (#987): "For you" (people: mentions, assignments, replies, direct messages) | "Activity" (changes, agents) | All
   const tab = newsTab(), nMe = (mine0 || []).filter(it => !it.read && newsForMe(it)).length + dmRows().reduce((a, r) => a + r.unread, 0), nAct = (mine0 || []).filter(it => !it.read && !newsForMe(it)).length;
@@ -585,7 +585,7 @@ async function cmtOrderToggle() {
   S.settings.comment_order = v; renderDetail(); if (f) $('#c-input')?.focus();
   try { await api('PATCH', '/api/settings', {comment_order: v}); } catch { /* api() showed it; the local choice stays until the next load */ }
 }
-const uname = (id, U) => (U || {})[id] || (id ? tr('Deleted user') : tr('Someone'));
+const uname = (id, U) => (U || {})[id] || (id ? tr('Deleted person') : tr('Someone'));
 function fmtWhen(iso) {
   const d = new Date(iso), hmTxt = fmtTimeAt(d);  // 2.368.0 B (#2982)
   if (ds(d) === today()) return hmTxt;
@@ -597,7 +597,7 @@ function actText(a, U) {  // "via API" after lines written through a personal ac
   return actText0(a, U) + (a.data?.via === 'api' ? ` <span class="via">${tr('via API')}</span>` : a.data?.via === 'caldav' ? ` <span class="via">${tr('via CalDAV')}</span>`
     : a.data?.via === 'webhook' ? ` <span class="via">${tr('via webhook')}</span>` : '');  // 2.115.0 A (#2061)
 }
-const viaName = (d, id, U) => d?.rule ? tr('Rule {0}', d.rule.name || '') : d?.via === 'public_link' && !id ? (d.ext_name ? tr('{0} (customer, via the link)', d.ext_name) : tr('Someone via the public link')) : uname(id, U);  // 2.50.0 (#329): + the customer's name
+const viaName = (d, id, U) => d?.rule ? tr('Rule {0}', d.rule.name || '') : d?.via === 'public_link' && !id ? (d.ext_name ? tr('{0} (client, via the link)', d.ext_name) : tr('Someone via the public link')) : uname(id, U);  // 2.50.0 (#329): + the customer's name
 function actText0(a, U) {
   const d = a.data || {}, who = `<b>${esc(viaName(d, a.user_id, U))}</b>`, q = x => `<b>${esc(x)}</b>`;
   const due = () => q((d.start && d.start < d.due ? fmtDayAbs(d.start) + ' – ' : '') + fmtDayAbs(d.due) + (d.time ? ', ' + d.time : ''));

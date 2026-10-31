@@ -703,7 +703,7 @@ def office_logo_set(c, oid, name):
 # ---------------------------------------------------------------- number scheme
 # 2.40.0 (#1382): plain-language errors of a number scheme, with the name of the scheme
 FE_SCHEME_NAMES = {"offer_scheme": N_("Quotation numbers"), "invoice_scheme": N_("Invoice numbers"), "credit_scheme": N_("Credit note numbers"),
-                   "reminder_scheme": N_("Reminder numbers"), "delivery_scheme": N_("Delivery note numbers")}  # 2.120.0 D (#2089)
+                   "reminder_scheme": N_("Payment reminder numbers"), "delivery_scheme": N_("Delivery note numbers")}  # 2.120.0 D (#2089)
 
 
 def office_scheme_clean(v, name=None, offer=True):
@@ -716,7 +716,7 @@ def office_scheme_clean(v, name=None, offer=True):
     if "{seq" not in v:
         bad(N_("The running number is missing: add {seq} (or {seq:03} for 001)"))
     if not offer and "{version}" in v:  # 2.118.0 A (#2265): invoices, credit notes and reminders keep one gapless counter
-        bad(N_("{version} is only possible in quotation numbers: invoices, credit notes and reminders count without gaps"))
+        bad(N_("{version} is only possible in quotation numbers: invoices, credit notes and payment reminders count without gaps"))
     rest = SCHEME_RE.sub("", v)
     if "{" in rest or "}" in rest:
         m = re.search(r"\{[^{}]*\}?", rest)

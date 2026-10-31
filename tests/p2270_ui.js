@@ -4,7 +4,7 @@
 // #957 the comments come last in the task panel again ("More details" folded above them, with a summary line)
 // #966 / #975 / #977 the list dialog: Type = Simple list | Project at the top; "Used for" only for a simple list; the family
 //      fields of a task only in family lists (never in a project)
-// #972 New project: the box "With the standard sections" (off) names the type's sections; #990 "+ Section" in an empty list
+// #972 New project: the box "With the default sections" (off) names the type's sections; #990 "+ Section" in an empty list
 //      and "Add section…" in the list's menu; #974 "Agent: <name>…" opens the share dialog at its agents
 // #964 Settings > Agents > Lists grouped by folder, a filter, one agent for a whole folder (one undo); the one agent's
 //      "Agent reads every comment" is a switch

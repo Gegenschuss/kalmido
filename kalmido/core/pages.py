@@ -14,7 +14,7 @@ from flask import g, jsonify, redirect, request, Response, send_from_directory
 
 from ..core.config import app, APP_VERSION, ATT_DIR, ICAL_PREFIX, PUB_PREFIX, SEARCH_INDEX, MAX_FILE_MB, ntfy_attachment_url, NTFY_IN, PUBLIC_URL, safe_urlopen
 from .pg import insert_id
-from ..core.i18n import lang, N_, tr, trn
+from ..core.i18n import browser_lang, lang, N_, tr, trn
 from ..core.db import bump, connect, db, default_uid, err, gset, gsetting, iso, now_utc, usettings
 from ..accounts.session import client_ip, GATE, me
 from ..core.access import Denied, my_inbox, time_all, acx_token_bind, collab_all
@@ -508,7 +508,7 @@ def drop_post():
         aa_count("security", "drop", client_ip())
         print("drop: 403, auth header", "missing" if not auth else
               f"len {len(auth)} starts {auth[:7]!r} ends-with-space {auth != auth.rstrip()}", flush=True)
-        return Response(tr("not allowed") + "\n", 403, mimetype="text/plain")
+        return Response(tr("not allowed", lg=browser_lang() or "en") + "\n", 403, mimetype="text/plain")  # 2.368.4 (#2989)
     acx_token_bind(u["id"])  # 2.37.0 (#1150): reads and writes with the token owner's context (row-level security)
     lg = lang(c, u["id"])
     files = [f for key in request.files for f in request.files.getlist(key) if f and f.filename]

@@ -88,7 +88,7 @@ function xl_newDlg(nid, done) {
       <label for="xl-pw">${tr('Password (optional)')}</label>
       <input id="xl-pw" type="password" autocomplete="new-password" maxlength="200">
       <label for="xl-lbl">${tr('Label (optional, only you see it)')}</label>
-      <input id="xl-lbl" maxlength="80" placeholder="${esc(tr('e.g. the customer’s name'))}">
+      <input id="xl-lbl" maxlength="80" placeholder="${esc(tr('e.g. the client’s name'))}">
     </div>
     <div class="xl-out" hidden><label for="xl-url">${tr('Link')}</label><div class="row"><input id="xl-url" readonly><button type="button" class="btn sm pri" data-xn="copy">${ic('copy', 's')} ${tr('Copy')}</button></div></div>
     <div class="calerr" role="alert" id="xl-err" hidden></div>

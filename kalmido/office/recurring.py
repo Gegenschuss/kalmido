@@ -326,7 +326,7 @@ def rin_send(c, oid, uid, did):
     except Exception as e:  # noqa: BLE001 -- a broken file / check: the draft stays, the reason goes to the person
         epdf_sweep(c)
         print("invoice series: sending", did, "failed:", e, flush=True)  # 2.91.0 review L3: the raw error (host, port) only in the log
-        return False, [N_("The mail server refused the mail or could not be reached")], False, None
+        return False, [N_("The e-mail server refused the e-mail or could not be reached")], False, None
     c.__dict__.pop("epdf_new", None)  # 2.355.0 A (#2847): kept -- the caller commits them
     return True, "", datev, m
 
@@ -345,7 +345,7 @@ def rin_mail(c, oid, uid, m):
     except Exception as e:  # noqa: BLE001 -- a mail server error
         c.rollback()
         print("invoice series: mailing", m.get("did"), "failed:", e, flush=True)
-        return False, [N_("The mail server refused the mail or could not be reached")]
+        return False, [N_("The e-mail server refused the e-mail or could not be reached")]
 
 
 def rin_datev(c, oid, did):
@@ -455,7 +455,7 @@ def rin_step(c, oid, uid, s, period, people, missed=()):
     def post():  # 2.269.0 D (#3046): the mail after the number's commit, then its task
         ok, why2 = rin_mail(c, oid, uid, m)
         if not ok:
-            _tell(c, people, RIN_TASK_FAIL, name, lambda lg: tr("Period {0}. The invoice is finalised, the mail did not go out: {1}", pt(lg), tr_stored(why2, lg), lg=lg) + gone(lg), did)
+            _tell(c, people, RIN_TASK_FAIL, name, lambda lg: tr("Period {0}. The invoice is finalised, the e-mail did not go out: {1}", pt(lg), tr_stored(why2, lg), lg=lg) + gone(lg), did)
         elif missed:
             _tell(c, people, RIN_TASK_DRAFT, name, lambda lg: tr("Period {0} was sent.", pt(lg), lg=lg) + gone(lg), did)
         bump(c)
@@ -701,7 +701,7 @@ def rin_run(sid):
     error = tr("The invoice stays a draft: {0}", tr_stored(why)) if s["auto_send"] and not sent else None
     if post:  # 2.269.0 D (#3046): number committed, now the mail
         sent, why = post()
-        error = None if sent else tr("The invoice is finalised, the mail did not go out: {0}", tr_stored(why))
+        error = None if sent else tr("The invoice is finalised, the e-mail did not go out: {0}", tr_stored(why))
     if sent and datev:
         rin_datev(c, oid, nid)
     return jsonify(series=rin_public(c, oid, rin_row(c, oid, sid)), doc_id=nid, sent=bool(sent), prev_next_date=prev, error=error)

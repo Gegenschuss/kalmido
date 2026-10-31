@@ -124,10 +124,42 @@ the web client (`static/js/*.js`) and the server (`app.py`, `kalmido/`) and comp
 - **placeholder mismatch**: `{0}` in the key but not in the translation, or the other way round -> error
 - **plural shape**: a plural key needs `[one, other]`, all other keys a string -> error
 - **_meta / names / date formats**: missing name or locale, wrong number of names, unknown tokens -> error
+- **glossary**: a key with a word the glossary below replaces -> error
 - **unused**: in the file but no longer used by the code -> warning, just delete it
 
 Exit code 1 on any error. When the English texts change, run it for every language: new keys show up as
 missing, removed ones as unused.
+
+## Glossary (English, en-GB)
+
+One English word for one thing, also in new texts. `tools/i18n_check.py` reports the common variants as errors; a text in
+the wording of an office pack (key ending in `|pack`) is checked by the pack, not here.
+
+| German | English | Not |
+| --- | --- | --- |
+| Aufgabe, Liste, Projekt, Ordner | task, list, project, folder | |
+| Organisation | organisation | org |
+| Arbeitsbereich | workspace | space |
+| Kunde | client | customer |
+| Person / Personen, Konto | person / people, account | user (a technical user name stays "user name") |
+| Zuständig | assignee, unassigned | responsible, nobody assigned |
+| Anmelden / Abmelden | sign in / sign out, noun sign-in | log in, login, log out, logout |
+| Büro, Beleg | office, receipt | |
+| Angebot | quotation | quote, offer |
+| Rechnung | invoice (bill only for a received one) | |
+| Mahnung | payment reminder (the level names keep "Reminder" / "Final reminder") | reminder alone in new texts |
+| Erinnerung (Aufgabe) | reminder | |
+| Storno, Freigabe, Abnahme | cancellation, approval, sign-off | |
+| Papierkorb | trash | bin |
+| Zeiteintrag, Einstellungen | time entry, settings | |
+| E-Mail | e-mail | mail, email |
+| Farbe | colour | color |
+| Urlaub, Feiertag | holiday, public holiday | vacation |
+| Anfrage | enquiry | inquiry |
+| Standard | default (a standard VAT rate stays standard) | |
+| Endgültig | permanently | |
+
+Spelling is British, with -ise: customise, organise, recognise, summarise.
 
 ## For developers
 

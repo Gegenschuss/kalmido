@@ -6,7 +6,7 @@
    other members keep their roles; to a non-member: at the end of their sidebar, top level
  - the list keeps working for everyone (the new owner, the old owner as admin, a member, a participant, the agent)
  - history (list_activity, GET /api/lists/{id}/owner) "from X to Y", News kind owner for the new owner (not for the actor)
- - refused: an agent as the new owner, a disabled / unknown user, the owner themselves, the inbox (409), a member who is
+ - refused: an agent as the new owner, a disabled / unknown person, the owner themselves, the inbox (409), a member who is
    not the owner (403), someone who does not see the list (404)
  - admins take over lists of an AGENT or a DISABLED user (for themselves or another person); the old owner stays: an
    agent as edit (never a list admin), a person as admin; GET /api/admin/lists/orphaned (admins only); a non-admin
@@ -113,7 +113,7 @@ check(Da.get(B + f"/api/lists/{L1}/owner").status_code == 404, "someone outside:
 
 check(xfer(A, L1, AG).status_code == 400, "an agent cannot become the owner")
 check(xfer(A, L1, 1).status_code == 400, "the owner themselves: 400")
-check(xfer(A, L1, 9999).status_code == 404, "unknown user: 404")
+check(xfer(A, L1, 9999).status_code == 404, "unknown person: 404")
 check(xfer(Bo, L1, ids["bob"]).status_code == 403, "a member cannot transfer (403)")
 check(xfer(Da, L1, ids["dave"]).status_code == 404, "someone outside the list: 404")
 inbox = next(x for x in A.get(B + "/api/state").json()["lists"] if x["is_inbox"])["id"]

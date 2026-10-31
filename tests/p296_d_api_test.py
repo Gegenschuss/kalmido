@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.96.0 part D (#1941, findings of #1918): an organisation export into the private space, and absences in the personal
+"""2.96.0 part D (#1941, findings of #1918): an organisation export into the private workspace, and absences in the personal
 area when the workspace switch is on "Private". Invented names only.
  - an organisation export (the existing export route + recovery key) offers "private" as a target; an admin imports it
    there: the lists / tasks / calendar are private (org_id NULL, owned by the importer), the attachment is readable, the
@@ -134,7 +134,7 @@ OX = su_get(A, B + f"/api/orgs/{ORG}/export/file").content  # 2.360.0 (#2496): t
 RK = A.post(B + f"/api/orgs/{ORG}/encryption/recovery", json={"password": "password123"}).json().get("recovery_key", "")
 check(OX[:13] == b"KALMIDO-ORGX\n" and RK, "organisation export + recovery key")
 
-# ---------------------------------------------------------------- the admin imports it into the private space
+# ---------------------------------------------------------------- the admin imports it into the private workspace
 iid, pv = opened(A, OX, RK)
 tg = [t["id"] for t in pv.get("targets", [])]
 check(pv.get("kind") == "org" and "private" in tg and ORG in tg and ORG2 not in tg, f"targets: private + own organisation {tg}")
@@ -156,7 +156,7 @@ mem = {r["user_id"] for r in dbx("SELECT user_id FROM list_members WHERE list_id
 check(ids["bob"] in mem and ids["dora"] not in mem, f"bob (ticked) gets the list shared, dora (not ticked) not {mem}")
 check(dbx("SELECT org_id, user_id FROM org_members ORDER BY org_id, user_id") == orgs_before, "nobody joined an organisation")
 w = " | ".join(x.get("text", "") for x in (j.get("result") or {}).get("warnings", []))
-check("private space" in w and "nobody joins an organisation" in w, f"the warning names the private space {w}")
+check("private workspace" in w and "nobody joins an organisation" in w, f"the warning names the private workspace {w}")
 check(PL not in {x.get("id") for x in Do.get(B + "/api/state").json().get("lists", [])}, "dora does not see the private list")
 r = A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
 check(r.ok and not dbx("SELECT 1 FROM lists WHERE id=? AND deleted_at IS NULL", (PL,)), f"undo puts the private import into the trash (#3027) {r.text[:160]}")
@@ -172,12 +172,12 @@ Bo.delete(B + f"/api/account/import/{iid}")
 # ---------------------------------------------------------------- a freelancer (no organisation) imports it privately
 FID, Fr = freelancer(B, A)
 iid, pv = opened(Fr, OX, RK)
-check([t["id"] for t in pv.get("targets", [])] == ["private"], f"freelancer: the private space is the target {pv.get('targets')}")
+check([t["id"] for t in pv.get("targets", [])] == ["private"], f"freelancer: the private workspace is the target {pv.get('targets')}")
 check(Fr.post(B + f"/api/account/import/{iid}/run", json={"target": ORG}).status_code == 404, "freelancer: an organisation 404")
 j = run(Fr, iid, "private")
 check(j.get("state") == "done", f"freelancer: import done {j.get('error')}")
 fl = dbx("SELECT id, org_id FROM lists WHERE owner_id=? AND name='Alpha Orgliste'", (FID,))
-check(len(fl) == 1 and fl[0]["org_id"] is None, "freelancer: the list is in the private space")
+check(len(fl) == 1 and fl[0]["org_id"] is None, "freelancer: the list is in the private workspace")
 check(not dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id!=?", (fl[0]["id"] if fl else 0, FID)), "freelancer: shared with nobody")
 check(not dbx("SELECT 1 FROM org_members WHERE user_id=?", (FID,)), "freelancer: still in no organisation")
 check(Fr.get(B + "/api/state").json()["me"].get("workspaces") == [], "freelancer: no workspace appeared")

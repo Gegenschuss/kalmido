@@ -90,7 +90,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // appearance (per device) goes into the history too
   w.eval(`settingsModal('look')`); await sleep(300); md = [...d.querySelectorAll('.modal.smodal')].pop();
   click(w, md.querySelector('[data-look="theme"][data-v="light"]'));
-  check(d.documentElement.dataset.theme === 'light' && /Color scheme/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), 'theme applies at once and is a history step');
+  check(d.documentElement.dataset.theme === 'light' && /Colour scheme/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), 'theme applies at once and is a history step');
   await w.eval(`histStep('undo')`);
   check(d.documentElement.dataset.theme !== 'light', 'undo of the theme');
   md.remove();

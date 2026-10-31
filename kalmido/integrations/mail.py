@@ -19,7 +19,7 @@ from flask import g, jsonify, request
 from ..core.config import app, APP_NAME, MAX_FILE_MB, PUBLIC_URL
 from ..core.pg import insert_id, system_ctx, table_exists
 from ..core.i18n import browser_lang, lang, md_plain, tr, trn
-from ..core.db import body, bump, connect, db, err, iso, local_now, now_utc, uset, usettings
+from ..core.db import body, bump, connect, db, err, inbox_default, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import GATE, me
 from ..accounts.bgjobs import bgj_fn
 from ..core.access import Denied, list_role, need_list, vis_sql, WRITE_ROLES
@@ -603,7 +603,7 @@ if MAIL_OUT_ON:  # registered only with outgoing mail: accounts/secmail.py queue
 def digest_mail_content(c, uid, today):
     """(subject, text, html) of a person's daily summary: due today / overdue, tomorrow, what waits for them, unread."""
     lg = lang(c, uid)
-    rows = c.execute(f"""SELECT t.id, t.title, t.due, t.due_time, t.priority, l.name AS lname, l.e2e AS le2e FROM tasks t JOIN lists l ON l.id=t.list_id
+    rows = c.execute(f"""SELECT t.id, t.title, t.due, t.due_time, t.priority, l.name AS lname, l.is_inbox, l.e2e AS le2e FROM tasks t JOIN lists l ON l.id=t.list_id
                          WHERE t.status=0 AND t.deleted_at IS NULL AND t.parent_id IS NULL AND t.due IS NOT NULL AND t.due<=? AND l.archived=0
                            AND ((l.owner_id=? AND (t.assignee_id IS NULL OR t.assignee_id=?)) OR (t.assignee_id=? AND t.list_id IN {vis_sql()}))
                          ORDER BY t.due, t.due_time IS NULL, t.due_time, t.priority DESC LIMIT 60""",
@@ -616,7 +616,9 @@ def digest_mail_content(c, uid, today):
         if table_exists(c, "agent_jobs") else 0
     unread = news_unread(c, uid)
     chat = tchat_unread(c, uid)
-    line = lambda r: f"- {md_plain(r['title'])}" + (f" ({r['due_time']})" if r["due_time"] else "") + f" · {r['lname']}"  # noqa: E731
+    # 2.368.4 (#2989): the default inbox in the reader's language, as in a push (notify/channels.py), not its stored name
+    lname = lambda r: tr("Basket", lg=lg) if r["is_inbox"] and inbox_default(r["lname"]) else r["lname"]  # noqa: E731
+    line = lambda r: f"- {md_plain(r['title'])}" + (f" ({r['due_time']})" if r["due_time"] else "") + f" · {lname(r)}"  # noqa: E731
     parts = []
     for head, xs in ((tr("Overdue", lg=lg), over), (tr("Today", lg=lg), tod), (tr("Tomorrow", lg=lg), tmr)):
         if xs:
@@ -624,7 +626,7 @@ def digest_mail_content(c, uid, today):
             lk = {}
             for r in xs:
                 if r["le2e"]:
-                    lk[r["lname"]] = lk.get(r["lname"], 0) + 1
+                    lk[lname(r)] = lk.get(lname(r), 0) + 1
             shown = [line(r) for r in xs if not r["le2e"]][:25]
             shown += ["- " + trn("{0} task in {1} (encrypted)", "{0} tasks in {1} (encrypted)", k, ln, lg=lg) for ln, k in lk.items()]
             parts.append(f"{head} ({len(xs)})\n" + "\n".join(shown))
@@ -730,11 +732,11 @@ def _mail_off_page(token, done):
     e = html.escape
     name = tr("Daily summary by e-mail", lg=lg) if what == "digest" else tr("E-mails for assignments and mentions", lg=lg)
     if done:
-        title, body_ = tr("Mails turned off", lg=lg), (f'<p>{e(name)}</p><p>{e(tr("You can turn them on again in Settings > Notifications.", lg=lg))}</p>'
+        title, body_ = tr("E-mails turned off", lg=lg), (f'<p>{e(name)}</p><p>{e(tr("You can turn them on again in Settings > Notifications.", lg=lg))}</p>'
                                                          f'<a class="btn" href="{e(PUBLIC_URL)}/#settings/notify">{e(tr("Settings", lg=lg))}</a>')
     else:
-        title, body_ = tr("Turn mails off", lg=lg), (f'<p>{e(name)}</p><form method="post" class="fform">'
-                                                       f'<button type="submit">{e(tr("Turn mails off", lg=lg))}</button></form>')
+        title, body_ = tr("Turn e-mails off", lg=lg), (f'<p>{e(name)}</p><form method="post" class="fform">'
+                                                       f'<button type="submit">{e(tr("Turn e-mails off", lg=lg))}</button></form>')
     return pub_html(title, f'<div class="msg"><h1>{e(title)}</h1>{body_}</div>', lg)
 
 

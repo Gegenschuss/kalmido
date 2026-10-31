@@ -160,7 +160,7 @@ function kbSortDraw() {
   const acts = KB_ACTS.filter(([a]) => kbActOn(a)).map(([a, k, i, lab]) => `<button type="button" class="btn kbact kba-${a}" data-kbs="${a}" aria-keyshortcuts="${k}"><kbd aria-hidden="true">${k}</kbd>${ic(i, 's')}<span>${esc(tr(lab))}</span></button>`).join('');
   box.innerHTML = `<div class="kbhead"><h3>${ic('inbox', 's')} ${tr('Sort the basket')}</h3><span class="kbpos">${esc(tr('{0} of {1}', pos, n))}</span><button type="button" class="iconbtn" data-kbs="end" title="${esc(tr('End (Esc)'))}" aria-label="${esc(tr('End (Esc)'))}">${ic('x', 's')}</button></div>
     <div class="kbtask"><b class="kbttl">${mdTitleNL(t.title)}</b>${t.notes ? `<p class="kbnotes muted">${esc(String(t.notes).slice(0, 280))}</p>` : ''}${t.due ? `<span class="muted">${esc(tr('Date: {0}', dayLabel(t.due)))}</span>` : ''}</div>
-    ${KB.waitOpen ? `<div class="kbwait"><label for="kb-wn">${tr('Waiting on')}</label><input id="kb-wn" maxlength="300" placeholder="${esc(tr('who or what, e.g. offer from the carpenter'))}" enterkeyhint="done"><button type="button" class="btn pri" data-kbs="wait-ok">${tr('OK')}</button></div>` : ''}
+    ${KB.waitOpen ? `<div class="kbwait"><label for="kb-wn">${tr('Waiting on')}</label><input id="kb-wn" maxlength="300" placeholder="${esc(tr('who or what, e.g. quotation from the carpenter'))}" enterkeyhint="done"><button type="button" class="btn pri" data-kbs="wait-ok">${tr('OK')}</button></div>` : ''}
     <div class="kbacts" role="group" aria-label="${esc(tr('Sort the basket'))}">${acts}</div>
     ${isTouch() ? '' : `<div class="kbleg muted">${esc(tr('Keys: the numbers on the buttons, Esc ends'))}</div>`}`;
   if (KB.waitOpen) $('#kb-wn', box)?.focus(); else box.focus?.();

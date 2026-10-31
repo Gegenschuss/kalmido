@@ -139,7 +139,7 @@ Ca.patch(B + "/api/settings", json={"workspace": f"org:{ORG2}"})
 FID, Fr = freelancer(B, A)  # freelancer-matrix: files (her private documents)
 OCR = "deu" in subprocess.run(["docker", "exec", CT, "tesseract", "--list-langs"], capture_output=True, text=True).stdout
 
-# ================================================================ #1111 the stack (as the freelancer, private space)
+# ================================================================ #1111 the stack (as the freelancer, private workspace)
 PAGES = ["Deckblatt ohne Code\nBeispiel Sammlung", "qr:ASN00101\nRechnung Eins\nBeispiel Strom GmbH", "Seite zwei der Rechnung\nSumme 12,00 EUR",
          "", "qr:ASN00102\nVertrag Zwei\nBeispiel Versicherung AG", "qr:KALMIDO-SPLIT\nTrennblatt", "Brief Drei\nBeispiel Verein e.V."]
 SID = up(Fr, "stapel.pdf", stack_pdf(PAGES))

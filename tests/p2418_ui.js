@@ -1,6 +1,6 @@
 // kalmido-suite: fresh
 // 2.418.0 (#3560) UI test (jsdom), own container (start.sh): the menus of the areas, arranged per person
-//  - computer: the office's panel ends with "Customize"; it opens the editor in place (Minus, grip, Hidden with Plus,
+//  - computer: the office's panel ends with "Customise"; it opens the editor in place (Minus, grip, Hidden with Plus,
 //    Done); 2.448.0 (#3784): every point of Money shows before its first use (#3411), no "More"
 //  - Minus hides a point (only the menu: its route still opens), Plus brings one back, the arrow keys on the grip move a
 //    point inside its group; everything lands in the setting nav_menus (the same on every device) and can be undone
@@ -49,7 +49,7 @@ const menus = async ck => JSON.parse((await call('GET', '/api/state', null, ck))
   check(['cashflow', 'kpi', 'travel', 'meals', 'subs', 'receipts'].every(k => side().includes(k)), '#3784: the unused points are in the menu ' + side());
   check(!d.querySelector('#side [data-act="ofm-more"]'), '#3560: no "Show more" any more');
   const cust = d.querySelector('#side [data-act="nav-edit"][data-area="office"]');
-  check(cust && /Customize/.test(cust.textContent), '#3560: "Customize" ends the panel');
+  check(cust && /Customise/.test(cust.textContent), '#3560: "Customise" ends the panel');
   cust.click();
   const ed = () => d.querySelector('#side .naved[data-naved="office"]');
   check(await until(() => ed()), '#3560: Customize opens the editor in place (navmenu.js loads)');

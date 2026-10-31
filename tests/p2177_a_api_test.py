@@ -13,7 +13,7 @@ not compressible), two of them above the per-file limit -- never real documents.
  - the old single POST /api/wiki/import keeps working for small ZIPs
  - rights (tenant-matrix: wiki): another organisation's space 404 at the start, another person's upload 404 (read, piece,
    delete); a member of the organisation imports into it. A person without an organisation (freelancer-matrix: wiki)
-   imports into the own private space.
+   imports into the own private workspace.
 usage: p2177_a_api_test.py <datadir>"""
 import base64
 import io
@@ -211,13 +211,13 @@ check(r.ok and len(r.json().get("created", [])) == 1 and r.json().get("files_n")
 
 # ---------------------------------------------------------------- a person without an organisation (freelancer-matrix: wiki)
 r, last = upload(Fr, "private", small_zip("Frei"))
-check(r.ok and last is not None and last.ok, "#2685: a freelancer uploads into the private space " + (last.text[:200] if last is not None else r.text[:200]))
+check(r.ok and last is not None and last.ok, "#2685: a freelancer uploads into the private workspace " + (last.text[:200] if last is not None else r.text[:200]))
 if r.ok:
     J = wait_end(Fr, r.json()["id"])
     check(J.get("state") == "done" and len((J.get("result") or {}).get("created", [])) == 1 and (J.get("result") or {}).get("files_n") == 1,
           f"#2685: the freelancer's import {J}")
     fp = {p["path"] for p in Fr.get(B + "/api/wiki", params={"space": "private"}).json()["pages"]}
-    check("Frei/Start" in fp, f"#2685: the page is in the freelancer's private space {fp}")
+    check("Frei/Start" in fp, f"#2685: the page is in the freelancer's private workspace {fp}")
     check("Frei/Start" not in {p["path"] for p in A.get(B + "/api/wiki", params={"space": "private"}).json()["pages"]}, "#2685: nobody else sees it")
 r = Fr.post(U, json={"size": 1000, "space": SP})
 check(r.status_code == 404, f"#2685: the freelancer cannot import into an organisation {r.status_code}")

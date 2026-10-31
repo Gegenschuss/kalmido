@@ -1134,7 +1134,7 @@ def apb_mail_confirm(c, p, t, r, tok):
     when = apb_when(p, parse_iso(r["start"]), parse_iso(r["end"]), lg)
     lines = [tr("Hello {0},", r["name"], lg=lg), tr("please confirm your booking: {0}, {1}.", t["name"], when, lg=lg),
              tr("Without your confirmation the time is released after 30 minutes.", lg=lg)]
-    foot = tr("If you did not book this, you can ignore this mail.", lg=lg)
+    foot = tr("If you did not book this, you can ignore this e-mail.", lg=lg)
     rt, fn = apb_mail_meta(c, r["user_id"])
     subj = tr("Please confirm your booking", lg=lg)
     return (r["email"], subj, "\n\n".join(lines) + f"\n\n{url}\n\n{foot}",
@@ -1179,7 +1179,7 @@ def apb_mail_line(c, bid, uid, lg):
     r = c.execute("SELECT * FROM appt_bookings WHERE id=? AND user_id=?", (bid, uid)).fetchone()
     if not r:
         return None
-    what = tr("Booking cancelled by the customer", lg=lg) if r["status"] == "cancelled" else tr("New booking", lg=lg)
+    what = tr("Booking cancelled by the client", lg=lg) if r["status"] == "cancelled" else tr("New booking", lg=lg)
     return what, apb_line(c, r, lg), f"{PUBLIC_URL}/#calendar"
 
 
@@ -1198,6 +1198,6 @@ def apb_push(c, r, what):
         return
     evm_note(c, uid, "apbook", None, None, s, r["id"])
     p = apb_page_row(c, uid)
-    title = tr("New booking", lg=lg) if what == "new" else tr("Booking cancelled by the customer", lg=lg)
+    title = tr("New booking", lg=lg) if what == "new" else tr("Booking cancelled by the client", lg=lg)
     click = f"{PUBLIC_URL}/#ev/{r['event_id']}" if r["event_id"] and what == "new" else f"{PUBLIC_URL}/#calendar"
     g.setdefault("pushes", []).append((uid, title, msg, click, push_prio(s), {"scope": f"o:{p['office_org_id'] if p else None}"}))  # 2.240.0 B2 (#2867)

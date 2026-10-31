@@ -44,7 +44,7 @@ DSB_KINDS = {"dpa": (N_("Data processing agreement"), "privacy_dpa", True),
              "consent": (N_("Consent"), "privacy_consent", True)}
 DSB_STATUS = {"open": N_("Open"), "sent": N_("Sent"), "handed": N_("Handed over"), "signed": N_("Signed"), "declined": N_("Declined")}
 DSB_HINT_DPA = N_("Only needed when you process personal data on behalf of the client (Art. 28 GDPR).")
-DSB_REVIEW = N_("Signed (by mail, please check)")
+DSB_REVIEW = N_("Signed (by e-mail, please check)")
 DSB_REPLY = N_("Reply received (please check)")  # 2.154.0 E (#2192): review=2, a reply that was not filed
 DSB_CODE_ABC = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0 / O / 1 / I
 DSB_CODE_LEN = 12
@@ -333,7 +333,7 @@ def dsb_mail_parts(c, oid, r, d, link):
     if sign and link:
         parts.append(tr("You can sign it online here: {0}", DSB_LINK, lg=lg))
     if sign and rin:
-        parts.append(tr("Or reply to this mail with the signed document as a PDF attached; please keep the subject as it is.", lg=lg))
+        parts.append(tr("Or reply to this e-mail with the signed document as a PDF attached; please keep the subject as it is.", lg=lg))
     parts.append(tr("Kind regards", lg=lg) + ("\n" + co if co else ""))
     return to, subject, "\n\n".join(parts), reply, code
 

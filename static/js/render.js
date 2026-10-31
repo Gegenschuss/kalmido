@@ -178,7 +178,7 @@ function tabsMore(anchor) {
   // bar and Settings fixed at the end
   const grp = t => rest.includes(t) ? 0 : ['team', 'news'].includes(t.id) ? 2 : t.id === 'search' ? 3 : t.id === 'settings' ? 4 : 1;
   const head = [{head: tr('Views')}, {head: tr('Areas|nav')}, {head: tr('Conversations|nav')}, '-', null];
-  const ord = [0, 1, 2, 3, 4].flatMap(g => { const ts = more.filter(t => grp(t) === g); return ts.length || g === 3 ? [...(head[g] ? [head[g]] : []), ...ts, ...(g === 3 ? [{label: tr('Customize tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}] : [])] : []; });
+  const ord = [0, 1, 2, 3, 4].flatMap(g => { const ts = more.filter(t => grp(t) === g); return ts.length || g === 3 ? [...(head[g] ? [head[g]] : []), ...ts, ...(g === 3 ? [{label: tr('Customise tab bar'), icon: 'edit', fn: () => settingsModal('tabbar')}] : [])] : []; });
   menu(anchor, [...wk.map(a => ({label: tr('{0} is working', a.name) + (a.status_text ? ' · ' + a.status_text : ''), dot: 'working', fn: () => go('agents')})), ...(wk.length ? ['-'] : []), ...ord.map(t => t === '-' || t.head || t.fn ? t : ({label: t.id === 'news' && S.news?.unread && bellCount() ? `${t.label} (${bellCount()})` : t.label, icon: t.ico ? t.ico : t.id === 'settings' ? 'gear' : t.id === 'search' ? 'search' : t.id === 'news' ? 'bell' : t.id === 'stats' ? 'chart' : t.id === 'time' ? 'clock' : t.id === 'overview' ? 'pulse' : t.id === 'agents' ? 'bot' : t.mod ? MODS.find(x => x[0] === t.mod)?.[1] || ({team: 'comment', home: 'home', notes: 'file'}[t.mod]) || 'dots' : t.id.startsWith('f:') ? 'filter' : t.id.startsWith('tag:') ? 'tag' : t.id.startsWith('s:') ? SMART[t.key].icon : 'list',
     fn: () => t.act === 'side' ? sideOpenDrawer() : t.act === 'palette' ? openPalette() : t.act ? settingsModal() : go(t.area && t.area === sbb_area() ? sbb_home(t.area) : t.go)}))]);  // 2.417.0 A (#3559)
 }
@@ -417,7 +417,7 @@ function renderSide0() {
   const smName = x => tr((SIDE_PLAN.find(y => y[0] === x) || [x, x])[1]);
   const focus = planP.filter(([x, h]) => h && (!hid('e:' + x) || (onTasks && k === x))).map(([, h]) => h).join('')
     + (planHidden ? `<button class="srow smore" data-act="side-more" aria-expanded="${smOpen ? 'true' : 'false'}">${ic('plus')}<span class="n">${esc(trn('{0} more view', '{0} more views', planHidden))}</span></button>`
-      + (smOpen ? `<div class="smorebox">${planHiddenRows.map(([x, h]) => `<div class="smrow"><input type="checkbox" data-side-show="${esc(x)}" aria-label="${esc(tr('Show {0}', smName(x)))}" title="${esc(tr('Show {0}', smName(x)))}">${h}</div>`).join('')}<button type="button" class="smcust" data-act="side-customize" title="${esc(tr('Settings > Appearance > Sidebar'))}">${esc(tr('Customize…'))}</button></div>` : '') : '');
+      + (smOpen ? `<div class="smorebox">${planHiddenRows.map(([x, h]) => `<div class="smrow"><input type="checkbox" data-side-show="${esc(x)}" aria-label="${esc(tr('Show {0}', smName(x)))}" title="${esc(tr('Show {0}', smName(x)))}">${h}</div>`).join('')}<button type="button" class="smcust" data-act="side-customize" title="${esc(tr('Settings > Appearance > Sidebar'))}">${esc(tr('Customise…'))}</button></div>` : '') : '');
   const convo = [sb_msgRows(),  // 2.45.0 (#1509): "Messages" (always while the team chat is on) + the last conversations (sbnav.js)
     collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news" title="${esc(tr('Assignments, @mentions, comments and follow-ups for you'))}">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${bellCount() ? 'nunread' : ''}">${bellCount() || ''}</span></button>` : ''].join('');  // 2.28.0 (#987): the number = "For you"
   // Views: every switched-on module (the rail's old job)
@@ -690,15 +690,15 @@ function topMoreItems() {  // 2.99.0 B (#2183): + the knowledge pages' "Space" s
 }
 function topMoreItems0() {
   if (S.me?.kid) return [{label: tr('Account'), icon: 'user', fn: () => settingsModal('account')}, {label: tr('Settings'), icon: 'gear', fn: () => settingsModal()},
-    ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])];  // 2.19.0: a child's "…": its account only
+    ...(S.me?.auth === 'session' ? ['-', {label: tr('Sign out'), icon: 'logout', fn: logout}] : [])];  // 2.19.0: a child's "…": its account only
   const m = S.route.mod, k = S.route.key, fold = topFolded(), out = [], sec = [];
   if (isMobile()) for (const dir of ['undo', 'redo']) { const b = histBtn(dir); if (b.off && !b.p) continue; out.push({label: b.lab, icon: dir, dis: b.off, cls: 'hmi' + (b.p ? ' pend' : ''), title: b.p ? tr('waiting for the connection') : '', fn: () => histStep(dir)}); }
   // 2.24.0 (UX-35): Today's planners live here now (the header keeps its room for the tasks)
   if (m === 'tasks' && k === 'today') out.push({label: tr('Plan my day'), icon: 'cal', fn: () => dayplanModal('day')}, {label: tr('Fill free time'), icon: 'clock', fn: () => dayplanModal('fill')});
   if (m === 'tasks' && k === 'today' && asst_ready()) out.push({label: tr('Assistant plan'), icon: 'sparkle', fn: () => asst_go({kind: 'dayplan', day: today()})});  // 2.75.0 (#1411)
-  if (m === 'tasks' && k === 'today') out.push({label: tr('Customize Today…'), icon: 'sliders', fn: () => lyOpen('today', true)});  // 2.32.0 (#1063)
+  if (m === 'tasks' && k === 'today') out.push({label: tr('Customise Today…'), icon: 'sliders', fn: () => lyOpen('today', true)});  // 2.32.0 (#1063)
   if (m === 'tasks' && k === 'today' && typeof lyv_viewMenu === 'function') out.push(...lyv_viewMenu('today'));  // 2.55.0 (#1069): Today has no header switch
-  if (m === 'time') out.push({label: tr('Customize…'), icon: 'sliders', fn: () => lyOpen('time', true)});
+  if (m === 'time') out.push({label: tr('Customise…'), icon: 'sliders', fn: () => lyOpen('time', true)});
   if (m === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview())
     sec.push({label: S.multiMode ? tr('End selection') : tr('Select multiple'), icon: 'select', on: S.multiMode, fn: () => { S.multiMode = !S.multiMode; if (!S.multiMode) S.multi.clear(); render(); }},
       {label: tr('Sort…'), icon: 'sort', fn: () => sortMenu($('#top [data-act="top-more"]') || $('#top h1'))});
@@ -1184,7 +1184,7 @@ async function takeTask(id) {
 function whoCell(t) {
   if (t.assignee_group_id) return grpChip(t);
   const name = t.assignee_id ? personName(t.list_id, t.assignee_id) : '', me = !!S.me && t.assignee_id === S.me.id;
-  const tip = t.assignee_id ? tr('Assigned to {0}', name || '?') : tr('Nobody assigned');
+  const tip = t.assignee_id ? tr('Assigned to {0}', name || '?') : tr('Unassigned|nobody');
   // 2.6.0 (K11): nobody assigned = no icon in checklists and on subtasks; elsewhere the dashed circle only shows on hover /
   // keyboard focus (desktop) and not at all on touch screens (assign from the task panel or the task's menu there)
   if (!t.assignee_id && (listById(t.list_id)?.checklist || t.parent_id)) return '';  // 2.7.2: lists with completed at the bottom (shopping) too
@@ -1550,7 +1550,7 @@ function lcHead(l, lc) {  // the column titles above the rows (wide layouts)
   const cur = sortMode();
   return `<div class="lchead" data-lid="${l.id}" role="table" aria-label="${esc(tr('Column titles'))}"><div class="lcrow" role="row"><span class="spacer" role="presentation"></span>${ks.map((k, i) => { const n = colName(l, k), p = colSorts(k), on = p.includes(cur), dir = on ? sortDir(cur) : '';
     const tip = on ? (cur === p[0] ? tr('Sorted by {0}. Click again to reverse the direction', n) : tr('Sorted by {0}. Click again to go back to the project sort', n)) : tr('Sort by {0}', n);
-    return `<span class="lc ${lcCls(k)} ${lcOvf(i)}${on ? ' sorted' : ''}" data-k="${esc(k)}" role="columnheader"${on ? ` aria-sort="${dir}"` : ''} title="${esc(n)}"><button type="button" class="lcs" data-colsort="${esc(k)}" title="${esc(tip)}" aria-label="${esc(n)}"><span class="lcn" aria-hidden="true">${k === 'who' || k === 'prio' ? ic(COL_ICON[k], 's') : `<span>${esc(colShort(l, k))}</span>`}</span>${on ? `<span class="lcsa" aria-hidden="true">${ic('chev', dir === 'ascending' ? 's cup' : 's')}</span>` : ''}</button>${isTouch() ? '' : `<button type="button" class="lcmb" data-colmenu="${esc(k)}" tabindex="-1" aria-haspopup="menu" title="${esc(tr('Column menu: {0}', n))}" aria-label="${esc(tr('Column menu: {0}', n))}">${ic('chev', 's')}</button>`}${isTouch() ? '' : `<i class="lcg" data-lcg="${esc(k)}" title="${esc(tr('Drag the column width · double-click = standard width'))}" role="separator" aria-orientation="vertical" tabindex="0" aria-label="${esc(tr('Width of the column {0}', n))}" ${lcwGet(l.id)[k] ? `aria-valuenow="${lcwGet(l.id)[k]}" aria-valuetext="${esc(tr('{0} rem', String(lcwGet(l.id)[k])))}"` : `aria-valuenow="7" aria-valuetext="${esc(tr('Standard width'))}"`} aria-valuemin="${LCW_MIN}" aria-valuemax="${LCW_MAX}"></i>`}</span>`; }).join('')}</div></div>`;
+    return `<span class="lc ${lcCls(k)} ${lcOvf(i)}${on ? ' sorted' : ''}" data-k="${esc(k)}" role="columnheader"${on ? ` aria-sort="${dir}"` : ''} title="${esc(n)}"><button type="button" class="lcs" data-colsort="${esc(k)}" title="${esc(tip)}" aria-label="${esc(n)}"><span class="lcn" aria-hidden="true">${k === 'who' || k === 'prio' ? ic(COL_ICON[k], 's') : `<span>${esc(colShort(l, k))}</span>`}</span>${on ? `<span class="lcsa" aria-hidden="true">${ic('chev', dir === 'ascending' ? 's cup' : 's')}</span>` : ''}</button>${isTouch() ? '' : `<button type="button" class="lcmb" data-colmenu="${esc(k)}" tabindex="-1" aria-haspopup="menu" title="${esc(tr('Column menu: {0}', n))}" aria-label="${esc(tr('Column menu: {0}', n))}">${ic('chev', 's')}</button>`}${isTouch() ? '' : `<i class="lcg" data-lcg="${esc(k)}" title="${esc(tr('Drag the column width · double-click = default width'))}" role="separator" aria-orientation="vertical" tabindex="0" aria-label="${esc(tr('Width of the column {0}', n))}" ${lcwGet(l.id)[k] ? `aria-valuenow="${lcwGet(l.id)[k]}" aria-valuetext="${esc(tr('{0} rem', String(lcwGet(l.id)[k])))}"` : `aria-valuenow="7" aria-valuetext="${esc(tr('Default width'))}"`} aria-valuemin="${LCW_MIN}" aria-valuemax="${LCW_MAX}"></i>`}</span>`; }).join('')}</div></div>`;
 }
 // 2.427.0 B (#3551): phones / narrow containers (where .lchead is hidden): the shown fields as a swipeable strip of names
 // above the rows (the sorted one with its arrow), a tap opens the column menu (lcMenu) at the name; "Fields" at the end

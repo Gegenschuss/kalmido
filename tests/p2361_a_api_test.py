@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """2.36.1 API tests, part A (#1127 #956): which calendars show where. Own container (start.sh).
- - the four user settings cal_tasks ("1"|"0"), cal_lists_hidden (json list of list ids), today_cals_hidden and plan_cals_off
+ - the four account settings cal_tasks ("1"|"0"), cal_lists_hidden (json list of list ids), today_cals_hidden and plan_cals_off
    (json lists of calendar keys "e:<own calendar id>" | "s:<subscription id>"): defaults (everything on), stored per user,
    doubles dropped, bad values 400, lists accepted as json text or as a list
  - GET /api/dayplan: the events of subscriptions AND own calendars count as busy; a calendar in plan_cals_off is left out

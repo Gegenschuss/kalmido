@@ -209,7 +209,7 @@ def kp_link_send(cid):
     b = body()
     b = b if isinstance(b, dict) else {}
     if not public_links_on(c) or not office_settings(c, oid).get("portal_docs"):
-        raise Denied(409, tr("Documents in the customer portal are switched off in the office settings"))
+        raise Denied(409, tr("Documents in the client portal are switched off in the office settings"))
     if not MAIL_OUT_ON:
         raise Denied(409, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
     inv, main = pt_email_norm(cl["email_invoice"]), pt_email_norm(cl["email"])
@@ -238,7 +238,7 @@ def kp_link_send(cid):
     lg = doc_lg(dl["lang"] if dl else office_settings(c, oid).get("lang"))  # 2.185.0 C (#2520): every app language
     url = f"{PUBLIC_URL}/portal/login/{tok}"
     lines = [tr("Hello,", lg=lg), tr("{0} sends you the link to your quotations, invoices and their payment status. It is valid for 30 minutes and can be used once.", name, lg=lg),
-             tr("If you did not expect it, you can ignore this mail.", lg=lg)]
+             tr("If you did not expect it, you can ignore this e-mail.", lg=lg)]
     rt = co.get("email") or ""
     rt = rt if re.fullmatch(r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+", rt) else None
     ofx_log(c, oid, "portal_link", target="client", detail={"client": cid, "to": em})

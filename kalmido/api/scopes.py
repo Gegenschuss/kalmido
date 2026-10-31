@@ -104,7 +104,7 @@ SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, searc
               "files:read": N_("List and read the folders and files shared with you"),  # 2.48.0 (#1207)
               "files:write": N_("Add files and new versions where you may edit"),
               # 2.51.0 A (#1348): also needs the agent's switch and the office's privacy switch
-              "office": N_("Read clients, services and prices of the office; quotation, invoice and reminder drafts, payment suggestions"),
+              "office": N_("Read clients, services and prices of the office; quotation, invoice and payment reminder drafts, payment suggestions"),
               "pinboard": N_("Write notepads on project pages (an agent changes only its own, e.g. a weekly status)"),  # 2.51.0 (#1352)
               "layouts": N_("See how your views are arranged (blocks only, never their content) and propose arrangements you accept or decline"),  # 2.55.0 (#1066)
               "import": N_("Read your old data (for example fixed costs) and send it as an import proposal you check and take over into the office; never sees the office itself"),  # 2.68.0 (#1839)
@@ -113,7 +113,7 @@ SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, searc
               "docs:upload": N_("Only upload documents into one place; reads nothing, deletes nothing"),  # 2.207.0 A (#2763)
               "wiki:read": N_("Knowledge pages shared with you (the page or a folder above it): their text"),  # 2.200.0 C (#1781)
               "wiki:write": N_("Change the text of knowledge pages shared with you to edit and add pages in such folders; every save stays in the page history"),
-              "account": N_("Notification settings and app passwords (an app password gives calendar apps full access to your tasks)"), "admin-read": N_("Users and server status (admins only)")}
+              "account": N_("Notification settings and app passwords (an app password gives calendar apps full access to your tasks)"), "admin-read": N_("People and server status (admins only)")}
 ROLE_WORD = {"admin": N_("Admin"), "edit": N_("Member"), "participant": N_("Participant"), "view": N_("Read-only")}  # 2.364.0 C (#3041): one role word
 BATCH_TITLE = {"update": N_("Change {0} tasks at once"), "complete": N_("Complete {0} tasks at once"), "reopen": N_("Reopen {0} tasks at once"),
                "wont_do": N_("Mark {0} tasks as won’t do"), "delete": N_("Move {0} tasks to the trash"),

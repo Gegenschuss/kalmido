@@ -177,7 +177,7 @@ function caldavHtml(hint) {
     ${hint(tr('Your projects as task lists in Reminders, Thunderbird, Evolution or on Android with Tasks.org or DAVx⁵; changes go both ways. Completed tasks stay for {0} days.', d.done_days))}
     ${cp(tr('Server'), d.server, 'dav-srv')}${cp(tr('CalDAV address'), d.url, 'dav-url')}${cp(tr('User name'), d.username, 'dav-user')}
     <div class="row"><label>${tr('Password')}</label><button class="btn sm pri" data-apw="new">${ic('key', 's')} ${tr('New app password')}</button><button class="linkbtn" data-apw="list">${tr('Manage app passwords')}</button></div>
-    ${hint(tr('Log in with your user name and an app password, never with your Kalmido password.'))}
+    ${hint(tr('Sign in with your user name and an app password, never with your Kalmido password.'))}
     ${feat('events') || feat('contacts') ? `${hint(tr('Your events and address books come along in the same account: calendars next to the task lists, contacts over CardDAV.'))}<div class="row"><button class="btn sm" data-act="dav-guide">${ic('phone', 's')} ${tr('Calendar and contacts on the phone')}</button></div>` : ''}
     <details class="shelp sdet"><summary>${tr('Step by step')}</summary><ul class="slist">
       <li>${tr('<b>iPhone / iPad:</b> Settings > Apps > Calendar > Calendar Accounts > Add Account > Other > Add CalDAV Account. Server {0}, your user name and the app password. Then switch on Reminders in the new account. Not found? Advanced Settings > Account URL {1}.', srv, prin)}</li>
@@ -191,8 +191,8 @@ function caldavHtml(hint) {
       <li>${tr('Title, notes, due date and time, start, priority, done / won\'t do, tags, subtasks, repeat rules (daily to yearly), reminders and the link. Assignee, sections, comments, files and custom fields stay in Kalmido; other details a calendar app saves come back to it unchanged.')}</li>
       <li>${tr('Projects you may only view are read-only there. Deleting a task in a calendar app moves it to the trash in Kalmido. New projects are created in Kalmido.')}</li>
       <li>${tr('Reminders on iPhone and Mac keep tags and subtasks to themselves: what you set in Kalmido stays.')}</li></ul></details>
-    ${S.me.is_admin && feat('contacts') ? hint(tr('Admins: contacts apps look for /.well-known/carddav; it must bypass a login proxy like /dav/.')) : ''}
-    ${S.me.is_admin ? hint(tr('Admins: behind a login proxy (forward auth, single sign-on) the paths /dav/ and /.well-known/caldav must bypass the proxy login, because calendar apps cannot log in there. Kalmido checks the app password itself.')) + `<a class="slink" href="${DAV_DOCS}" target="_blank" rel="noopener noreferrer">${tr('CalDAV guide')}</a>` : ''}`;
+    ${S.me.is_admin && feat('contacts') ? hint(tr('Admins: contacts apps look for /.well-known/carddav; it must bypass a sign-in proxy like /dav/.')) : ''}
+    ${S.me.is_admin ? hint(tr('Admins: behind a sign-in proxy (forward auth, single sign-on) the paths /dav/ and /.well-known/caldav must bypass the proxy sign-in, because calendar apps cannot sign in there. Kalmido checks the app password itself.')) + `<a class="slink" href="${DAV_DOCS}" target="_blank" rel="noopener noreferrer">${tr('CalDAV guide')}</a>` : ''}`;
 }
 // Settings > Integrations > Webhooks
 const WH_EV_NAMES = {'task.created': N_('Task created'), 'task.updated': N_('Task changed'), 'task.completed': N_('Task completed'), 'task.reopened': N_('Task reopened'),
@@ -212,7 +212,7 @@ const whHtml = () => S.webhooks?.enabled ? `<h4 id="s-wh-h">${tr('Webhooks')}</h
 // the tokens of my personal agents (also on their rows in Agents) in one place; the old places link here (acz_linkHtml)
 const acz_on = () => !!(S.api?.enabled || S.webhooks?.enabled || aiPaneOn());
 const acz_html = () => acz_on() ? `${apiHtml()}${whHtml()}${aiPaneOn() ? `<h4 id="s-acz-ag-h">${tr('Agents')}</h4>
-  <div class="shint">${tr('Each of your agents logs in with its own API token. A new token replaces the old one at once; “Set up on a computer” connects it on another machine.')}</div>
+  <div class="shint">${tr('Each of your agents signs in with its own API token. A new token replaces the old one at once; “Set up on a computer” connects it on another machine.')}</div>
   <div class="members" id="s-acz-ags"><div class="muted mhint">${tr('Loading…')}</div></div>` : ''}` : '';
 // 2.364.0 C (#3044): Access is listed only with an own API token / webhook (acz_mine); else it waits under "For advanced users"
 const acz_mine = () => !!(S.api?.mine || S.webhooks?.mine);
@@ -451,7 +451,7 @@ function chn_mailHtml(m) {
   return `<h4 id="s-evmail-h">${tr('E-mail for single events')}</h4>
     <div class="row"><label for="s-evm-assign">${tr('Assigned to me')}</label>${chn_mailSel('s-evm-assign', m.assign)}</div>
     <div class="row"><label for="s-evm-mention">${tr('Mentioned')}</label>${chn_mailSel('s-evm-mention', m.mention)}</div>
-    <div class="shint">${esc(!m.address ? tr('No e-mail address is stored for you: an admin adds it (Settings > Organisation > People)') : m.device ? tr('You have a push device, so “Only without a push device” sends nothing at the moment.') : tr('Collected and sent as one e-mail at most every 10 minutes, with links to the tasks.') + ' ' + tr('The e-mail leaves Kalmido through the mail server of this instance.'))}</div>`;  // 2.306.0 C (#2889)
+    <div class="shint">${esc(!m.address ? tr('No e-mail address is stored for you: an admin adds it (Settings > Organisation > People)') : m.device ? tr('You have a push device, so “Only without a push device” sends nothing at the moment.') : tr('Collected and sent as one e-mail at most every 10 minutes, with links to the tasks.') + ' ' + tr('The e-mail leaves Kalmido through the e-mail server of this instance.'))}</div>`;  // 2.306.0 C (#2889)
 }
 async function chn_meDraw(md) {  // Settings > Notifications (settings.js: the box #s-chn)
   const box = $('#s-chn', md); if (!box) return;

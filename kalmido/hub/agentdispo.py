@@ -31,7 +31,7 @@ from ..accounts.session import me
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_err, v1_json, v1_view
 from .dispo import DSP_DAYS_MAX, DSP_KINDS, dsp_conflicts, dsp_public, dsp_resources, dsp_units, _res_index, _ts
-from .absence import abs_days, abs_holidays, abs_org, abs_state
+from .absence import abs_days, abs_holidays, abs_holidays_shown, abs_org, abs_state
 
 ADZ_DAYS_MAX = 31          # shoot days of one proposal
 ADZ_CREW_MAX = 120         # crew / equipment rows of one proposal
@@ -179,7 +179,7 @@ def v1_adz_dispo():
     return jsonify(org_id=oid, start=first.isoformat(), end=last.isoformat(), resources=res,
                    bookings=[adz_mask({k: v for k, v in dsp_public(r, conf.get(r["id"])).items() if k != "note"}, c, known) for r in rows],
                    away={str(k): sorted(v) if isinstance(v, (set, dict, list)) else v for k, v in gone.items()},
-                   holidays=[{"date": k, "name": v} for k, v in sorted(hol.items())])
+                   holidays=abs_holidays_shown(hol))
 
 
 def adz_free(c, viewer, oid, personal, day):

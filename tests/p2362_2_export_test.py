@@ -172,7 +172,7 @@ dbx("""INSERT INTO office_signoffs(org_id, doc_id, title, token_hash, token, ip,
        VALUES(?,?,?,?,?,?,?,?,?)""", (PB, INV, "Freigabe", "h1", "t1", "203.0.113.9", "Testbrowser", "Kim Kundin", now))
 dbx("INSERT INTO office_agreements(org_id, name, created_at, updated_at) VALUES(?,?,?,?)", (PB, "Versicherung Studio", now, now))
 
-# a knowledge page with a picture in the private space
+# a knowledge page with a picture in the private workspace
 zb = io.BytesIO()
 with zipfile.ZipFile(zb, "w") as z:
     z.writestr("Plan.md", "# Plan\n\n![[skizze.png]]\n")

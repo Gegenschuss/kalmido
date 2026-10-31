@@ -178,14 +178,14 @@ def auth_login():
         # admin alerts: only real usernames are named (a typo in the name field could be a password)
         for k in _rate_fail(keys):
             if k.startswith("ip:"):  # 2.282.0 (#3111): delayed, not refused
-                aa_now("security", "ratelimit:" + k, N_("Many failed logins from IP {0}: logins from there are slowed down for {1} min, right passwords still work. Behind a shared address (office, NAT) everyone there is affected."),
+                aa_now("security", "ratelimit:" + k, N_("Many failed sign-ins from IP {0}: sign-ins from there are slowed down for {1} min, right passwords still work. Behind a shared address (office, NAT) everyone there is affected."),
                        [fx2_mask_ip(client_ip()), FAIL_WINDOW // 60])
             elif u:
-                aa_now("security", "ratelimit:" + k, N_("Login rate limit reached for user {0} (logins refused for {1} min)."),
+                aa_now("security", "ratelimit:" + k, N_("Sign-in rate limit reached for user {0} (sign-ins refused for {1} min)."),
                        [username, FAIL_WINDOW // 60])
             else:
                 aa_now("security", "ratelimit:u:?",
-                       N_("Login rate limit reached for an unknown user name (logins refused for {0} min)."), [FAIL_WINDOW // 60])
+                       N_("Sign-in rate limit reached for an unknown user name (sign-ins refused for {0} min)."), [FAIL_WINDOW // 60])
         aa_count("security", "logins", client_ip(), user=username if u else "?")
         print("login failed for", login_log_name(username, c), "from", login_log_ip(client_ip()), flush=True)  # 2.148.1 C (#2494)
         return err(tr("Wrong username or password"), 401)  # 2.13.0 (#453 P7): the page's language
@@ -493,11 +493,11 @@ def _ticket(kinds):
     """(ticket, user) of this browser or an error response."""
     p = pend_get(kinds)
     if not p:
-        return None, None, (jsonify(error=tr("The login has expired, please log in again"), expired=True), 401)
+        return None, None, (jsonify(error=tr("The sign-in has expired, please sign in again"), expired=True), 401)
     u = _user(db(), p["uid"])
     if not u or u["disabled"] or not u["password_hash"]:
         pend_drop()
-        return None, None, (jsonify(error=tr("The login has expired, please log in again"), expired=True), 401)
+        return None, None, (jsonify(error=tr("The sign-in has expired, please sign in again"), expired=True), 401)
     e = login_wait(_rate_keys(u["username"]), u["username"])  # 2.282.0 (#3111)
     if e:
         return None, None, e
@@ -676,7 +676,7 @@ def auth_2fa():
     left = rc_left(c, u["id"])
     if via == "recovery":
         aa_now("security", f"recovery:{u['username']}:{left}",
-               N_("{0} logged in with a recovery code ({1} left)."), [u["username"], left])
+               N_("{0} signed in with a recovery code ({1} left)."), [u["username"], left])
         from .secmail import sec_mail
         sec_mail(c, u["id"], "code_used", left)  # 2.266.0 (#2963)
     return finish_login(c, u, p.get("remember", True), "2fa", {"recovery_left": left} if via == "recovery" else None)
@@ -769,7 +769,7 @@ def auth_enrol_pk():
 def auth_pk_options():
     c = db()
     if gsetting(c, "passkey_login") == "0":
-        return err(tr("Logging in with a passkey is turned off on this server"), 403)
+        return err(tr("Signing in with a passkey is turned off on this server"), 403)
     # 2.282.0 (#3111): no address lock here any more; POST /api/auth/passkey delays above the address limit
     chal, rp, opts = wa_auth_options(c, None, uv=True)
     tok = pend_new("pk", None, chal=chal, rp=rp, remember=bool(body().get("remember", True)))
@@ -782,7 +782,7 @@ def auth_pk():
     c = db()
     keys = [("ip:" + rate_ip(), 20)]
     if gsetting(c, "passkey_login") == "0":
-        return err(tr("Logging in with a passkey is turned off on this server"), 403)
+        return err(tr("Signing in with a passkey is turned off on this server"), 403)
     e = login_wait(keys, "")  # 2.282.0 (#3111): no name, so never "known": delayed above the address limit
     if e:
         return e
@@ -807,7 +807,7 @@ def _reauth(u, b):
     if e:
         return e
     if not u["password_hash"]:
-        return err(tr("Two-factor authentication is only for logins with a password"), 409)
+        return err(tr("Two-factor authentication is only for sign-ins with a password"), 409)
     pw = b.get("password") if isinstance(b.get("password"), str) else ""
     if not check_password_hash(u["password_hash"], pw):
         _rate_fail(keys)

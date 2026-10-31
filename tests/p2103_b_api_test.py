@@ -11,7 +11,7 @@ addresses only (example.com).
    KALMIDO_BACKUP_ENCRYPT_REQUIRED=1 without a passphrase writes no backup; the journal of deleted accounts: an account
    deleted after a backup is deleted again after restoring that backup (one that owns lists is disabled), the journal
    itself survives the restore
-Selbstständige: the trash objects of the private space belong to a person without an organisation (frida). The backups are
+Selbstständige: the trash objects of the private workspace belong to a person without an organisation (frida). The backups are
 the instance admin's alone (no organisation, no freelancer side): n/a.
 usage: p2103_b_api_test.py <datadir>      (P2103B_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import io

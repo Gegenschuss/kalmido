@@ -161,7 +161,7 @@ const nav_open = (area, key) => area === 'office' ? S.route?.mod === 'office' &&
 const NAV_AREAS = ['office', 'life', 'reading', 'time', 'review', 'ablage'];
 const nav_canEdit = id => NAV_AREAS.includes(id) && !S.me?.kid && !!S.settings;
 // a computer: "Customize" as the last row of the area's panel; a phone: a pen on top of the area's menu
-const nav_editBtn = (id, cls = 'srow smod sbbi navedb') => nav_canEdit(id) && !isMobile() && NAV.edit !== id ? `<button type="button" class="${cls}" data-act="nav-edit" data-area="${id}">${ic('edit')}<span class="n">${esc(tr('Customize'))}</span></button>` : '';
+const nav_editBtn = (id, cls = 'srow smod sbbi navedb') => nav_canEdit(id) && !isMobile() && NAV.edit !== id ? `<button type="button" class="${cls}" data-act="nav-edit" data-area="${id}">${ic('edit')}<span class="n">${esc(tr('Customise'))}</span></button>` : '';
 const nav_penHtml = id => nav_canEdit(id) && isMobile() && NAV.edit !== id ? `<div class="navpen"><button type="button" class="iconbtn" data-act="nav-edit" data-area="${id}" title="${esc(tr('Edit menu'))}" aria-label="${esc(tr('Edit menu'))}">${ic('edit', 's')}</button></div>` : '';
 // the editor in place of the menu (its script first loads, then the panel / page draws again)
 const nav_editSlot = id => typeof nav_edHtml === 'function' ? nav_edHtml(id) : (loadModule('navmenu').then(() => { renderSide(); if (id === 'office' && S.route.mod === 'office') renderView(); }, () => {}), `<p class="muted navedl0">${esc(tr('Loading…'))}</p>`);

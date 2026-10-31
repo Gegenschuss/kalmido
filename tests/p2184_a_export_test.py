@@ -8,7 +8,7 @@ fields; sent letters count as records to keep. Invented names only.
  - #2628: the sent letter (not the draft) counts in the retention info, the retention ZIP has letters/letters.csv and the
    PDF; the organisation's delete info keeps it by law
  - undo removes the letters, the made field and the values (the target's own field stays)
- - a person without any organisation imports the same export into the private space: letters in the personal office,
+ - a person without any organisation imports the same export into the private workspace: letters in the personal office,
    fields in the private documents; the retention info of the person counts the sent letter
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY (P2184A_NOSTART=1 = the server already runs like that).
 usage: p2184_a_export_test.py <datadir>"""

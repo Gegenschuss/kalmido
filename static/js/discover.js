@@ -42,7 +42,7 @@ function dsc_html() {
   const checkHtml = !chk ? '' : `<div class="dsc-check" role="status">${chk.people.length ? chk.people.map(p => dsc_personRow(p, dsc_stateHtml(p))).join('')
     : `<div class="muted mhint">${chk.books ? tr('None of your contacts can be found yet.') : tr('You have no contacts with e-mail addresses yet.')}</div>`}
     ${chk.skipped ? `<div class="shint">${trn('{0} address was not checked today (daily limit).', '{0} addresses were not checked today (daily limit).', chk.skipped)}</div>` : ''}</div>`;
-  const st = !pr.on ? '' : pr.confirmed ? tr('Findable by {0}', pr.email) : pr.pending ? tr('Waiting for your confirmation: open the link in the mail to {0}.', pr.email)
+  const st = !pr.on ? '' : pr.confirmed ? tr('Findable by {0}', pr.email) : pr.pending ? tr('Waiting for your confirmation: open the link in the e-mail to {0}.', pr.email)
     : tr('Your address changed or was not confirmed: switch off and on again to confirm it.');
   return `<div class="lhdr"><h3>${ic('users', 's')} ${tr('Find people')}</h3><span class="spacer"></span><button class="iconbtn" data-dsc="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <form class="row dsc-find" data-dsc-form><input id="dsc-email" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="200"
@@ -93,7 +93,7 @@ async function dsc_open() {
   md.addEventListener('change', async e => {
     if (e.target.id !== 'dsc-findable') return;
     const on = e.target.checked;
-    try { const r = await api('PUT', '/api/disc', {on}); DSC.data.profile = r.profile; if (r.sent) toast(tr('We sent you a mail: confirm your address with its link.')); }
+    try { const r = await api('PUT', '/api/disc', {on}); DSC.data.profile = r.profile; if (r.sent) toast(tr('We sent you a e-mail: confirm your address with its link.')); }
     catch { e.target.checked = !on; return; }
     dsc_draw(md);
   });

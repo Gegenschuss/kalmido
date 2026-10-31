@@ -115,7 +115,7 @@ function bk_skipAll(k) {  // "Skip all" of an area (and back: every row gets the
 // column, or company / street / postcode / city / country in columns of their own. A change reads the file again.
 const E46_FIELDS = [['name', N_('Company')], ['contact', N_('Contact person')], ['address', N_('Whole address')], ['street', N_('Street')],
   ['house', N_('House number')], ['zip', N_('Postcode')], ['city', N_('City')], ['country', N_('Country')],
-  ['email', N_('E-mail')], ['phone', N_('Phone')], ['customer_no', N_('Customer number')], ['vat_id', N_('VAT ID')]];  // 2.363.0 (#3103)
+  ['email', N_('E-mail')], ['phone', N_('Phone')], ['customer_no', N_('Client number|customer')], ['vat_id', N_('VAT ID')]];  // 2.363.0 (#3103)
 function e46_mapHtml(p) {
   const c = p.columns; if (!c?.head?.length) return '';
   const m = c.map || {}, opts = cur => `<option value="">${esc(tr('not in the file'))}</option>` + c.head.map((h, j) => `<option value="${j}" ${m[cur] === j ? 'selected' : ''}>${esc(h || tr('Column {0}', j + 1))}</option>`).join('');
@@ -138,7 +138,7 @@ function oimClientCard(c, i) {
   return `<li class="oimcard ${on ? '' : 'off'} ${c.flags?.length ? 'warn' : ''}"><div class="oimhd"><label class="chkl"><input type="checkbox" data-oim-on="c" data-i="${i}" ${on ? 'checked' : ''}> <b>${esc(c.name || tr('(no name)'))}</b></label><span class="muted">${tr('row {0}', c.row)}</span></div>
     ${c.reasons?.length ? `<p class="oimwarn">${ic('alert', 's')} ${esc(c.reasons.join(' · '))}</p>` : ''}${dup}
     <div class="oimgrid">${fld('name', tr('Company'), 80, 'w2')}${fld('contact', tr('Contact person'), 120, 'w2')}${fld('street', tr('Street'), 200, 'w2')}${fld('zip', tr('Postcode'), 20)}${fld('city', tr('City'), 120)}<div class="oimfl"><span>${esc(tr('Country'))}</span>${ctyField('oim-cty-' + i, c.country, {attrs: `data-oim-c="${i}" data-k="country"`, dis: on ? '' : 'disabled', label: tr('Country')})}</div></div>
-    ${xf('email', tr('E-mail'), 200)}${xf('phone', tr('Phone'), 60)}${xf('customer_no', tr('Customer number'), 40)}${xf('vat_id', tr('VAT ID'), 20)}<details class="oimraw"><summary>${tr('Original text')}</summary><pre>${esc(c.address || '')}</pre></details></li>`;
+    ${xf('email', tr('E-mail'), 200)}${xf('phone', tr('Phone'), 60)}${xf('customer_no', tr('Client number|customer'), 40)}${xf('vat_id', tr('VAT ID'), 20)}<details class="oimraw"><summary>${tr('Original text')}</summary><pre>${esc(c.address || '')}</pre></details></li>`;
 }
 
 function oimSimpleCard(kind, s, i, title, sub) {

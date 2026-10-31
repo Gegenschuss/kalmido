@@ -580,7 +580,7 @@ CL_REF_WORDS = {
     "office_privacy_sheets": Nn_("{0} data protection sheet", "{0} data protection sheets"),
     "video_reviews": Nn_("{0} video review", "{0} video reviews"),
     "hub_tokens": Nn_("{0} mail-in address", "{0} mail-in addresses"),
-    "hub_mails": Nn_("{0} mail", "{0} mails"),
+    "hub_mails": Nn_("{0} e-mail", "{0} e-mails"),
     "office_deals": Nn_("{0} deal", "{0} deals"),
     "office_letters": Nn_("{0} letter", "{0} letters"),
     "office_gen_docs": Nn_("{0} document", "{0} documents"),

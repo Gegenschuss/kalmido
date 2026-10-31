@@ -173,7 +173,7 @@ def check_assignee(c, lid, aid):
     try:
         aid = int(aid)
     except (TypeError, ValueError):
-        return tr("unknown user")
+        return tr("unknown person")
     # 2.83.0 (#1725): + a member of the organisation who may edit the list without joining (org_edit; ov_role: people only,
     # current members of the list's organisation) -- a read-only reader could not tick the task off
     if aid not in list_people(c, lid) and ov_role(c, lid, aid) != "edit":

@@ -154,7 +154,7 @@ function ms_clCard(c) {
       ${f('at', tr('E-mail'), c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}
       ${f('phone', tr('Phone'), c.phone ? `<a href="tel:${esc(c.phone.replace(/[^\d+]/g, ''))}">${esc(c.phone)}</a>` : '')}
       ${f('mappin', tr('Address'), ctk_mapLink(adr))}${''/* 2.119.1 B (#2086): a map link */}
-      ${f('hash', tr('Customer number'), esc(b.customer_no || ''), 'cl_customer_no')}
+      ${f('hash', tr('Client number|customer'), esc(b.customer_no || ''), 'cl_customer_no')}
       ${f('receipt', tr('VAT ID'), esc(b.vat_id || ''), 'cl_vat_id')}
       ${f('tag', tr('Buyer reference (e.g. routing ID)'), esc(b.buyer_reference || ''), 'cl_buyer_reference')}
       ${f('send', tr('Peppol ID'), esc(b.peppol_id || ''), 'cl_peppol_id')}${''/* 2.154.0 B (#1960) */}

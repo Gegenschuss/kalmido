@@ -547,7 +547,7 @@ def _share(c, uid, n, strict):
     r = _row(c, n["ref_id"]) if n["kind"] == "ref" and n["ref_kind"] == WKF_KIND else None
     if _space_locked(c, oid, owner) or (r is not None and wkf_locked(c, r)):
         if strict:
-            raise Denied(409, tr("Pages of a space encrypted in the browser cannot be shared."))
+            raise Denied(409, tr("Pages of a workspace encrypted in the browser cannot be shared."))
         return False
     if acx_of(c, uid).role == "agent":
         return False
@@ -571,7 +571,7 @@ def wkf_folder_new():
     b = body()
     oid = wiki_space(c, uid, b.get("space"), write=True)
     if _space_locked(c, oid, uid):
-        raise Denied(409, tr("This space is end-to-end encrypted: its folders come from the page names"))
+        raise Denied(409, tr("This workspace is end-to-end encrypted: its folders come from the page names"))
     wkf_name(c, None, b.get("name"))  # the name's shape before anything is made
     root = wkf_sync(c, uid, oid) or wkf_root(c, uid, oid, create=True)
     pid = b.get("parent_id")

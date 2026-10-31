@@ -134,7 +134,7 @@ MV = r.json()["id"]
 assert Bo.patch(B + f"/api/wiki/pages/{MV}", json={"body": "bereinigt"}).ok
 assert Bo.patch(B + f"/api/wiki/pages/{MV}", json={"body": "bereinigt, zweite Fassung"}).ok
 nv = dbx("SELECT COUNT(*) FROM wiki_versions WHERE page_id=?", (MV,))[0][0]
-check(nv >= 1, f"earlier versions in the private space ({nv})")
+check(nv >= 1, f"earlier versions in the private workspace ({nv})")
 r = Bo.post(B + "/api/wiki/move-space", json={"pages": [MV], "space": "private", "to": f"org:{ORG}", "dest": "", "dry": True})
 check(r.ok and r.json().get("versions") == nv and any("earlier version" in x for x in r.json().get("notes", [])),
       "#2496: the dry run names the versions that stay behind " + r.text[:300])

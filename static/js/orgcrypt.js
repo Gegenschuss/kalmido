@@ -41,9 +41,9 @@ async function ocLoad(box) {
 // 2.144.5 A (#2387): an SSO account (st.stepup 'oidc') signs in again at its login provider (prompt=login), unless this
 // session did that in the last minutes (st.fresh); the provider sends it back to #rck-stepup/<org>/<show|new> (ocStepUpBack)
 async function ocStepUp(oid, step, title, st = {}, isNew = false) {
-  if (step === 'proxy') { toast(tr('You are signed in through the server’s login proxy. Ask the server admin for the recovery key (command line, SELF-HOSTING.md).')); return null; }
+  if (step === 'proxy') { toast(tr('You are signed in through the server’s sign-in proxy. Ask the server admin for the recovery key (command line, SELF-HOSTING.md).')); return null; }
   if (step === 'fresh' && st.stepup === 'oidc' && !(isNew ? st.fresh_new : st.fresh)) {
-    if (!await askConfirm(title, tr('Sign in again with your login provider to confirm. Kalmido then shows the key.'), {ok: tr('Sign in again')})) return null;
+    if (!await askConfirm(title, tr('Sign in again with your sign-in provider to confirm. Kalmido then shows the key.'), {ok: tr('Sign in again')})) return null;
     // 2.144.5 A2 (#2387, review R1): only a step-up started here counts on the way back (ocStepUpBack), never a bare link
     try { sessionStorage.setItem('rck-stepup', `${+oid || 0}:${isNew ? 'new' : 'show'}`); } catch { /* storage off: the way back does nothing */ }
     location.href = `/api/auth/oidc/start?stepup=${isNew ? 'new' : 'show'}&org=${+oid || 0}`;
@@ -87,11 +87,11 @@ function ocDraw(root) {
 }
 // 2.144.5 A (#2387): back from the step-up sign-in at the login provider (oidc.py _oidc_stepup_done): show the key (the
 // "new" was confirmed before leaving) or say why the sign-in did not count
-const OC_STEPUP_ERR = {auth_time: N_('Your login provider did not say when you signed in, so it cannot confirm a fresh sign-in. Ask the server admin (the provider must send auth_time).'),
-  old: N_('Your login provider did not ask for a new sign-in. Try again; if it keeps happening, ask the server admin.'),
+const OC_STEPUP_ERR = {auth_time: N_('Your sign-in provider did not say when you signed in, so it cannot confirm a fresh sign-in. Ask the server admin (the provider must send auth_time).'),
+  old: N_('Your sign-in provider did not ask for a new sign-in. Try again; if it keeps happening, ask the server admin.'),
   account: N_('That sign-in belongs to another account. Sign in again with your own account.'),
   denied: N_('The sign-in was cancelled.'),
-  group: N_('Your account at the login provider is no longer allowed to use this app.')};  // 2.144.5 A2 (#2387, review R4)
+  group: N_('Your account at the sign-in provider is no longer allowed to use this app.')};  // 2.144.5 A2 (#2387, review R4)
 function ocStepUpBack() {
   const h = location.hash, m = h.match(/^#rck-stepup\/(\d+)\/(show|new|su)$/), e = (h.match(/^#rck-stepup-error=([a-z_]+)$/) || [])[1];
   if (!m && !e) return;
@@ -160,7 +160,7 @@ const SU_NEEDS = ['password', 'totp', 'passkey', 'fresh', 'proxy'];
 async function suAsk(d, title) {
   if (d.need === 'proxy' || (d.need === 'fresh' && d.stepup !== 'oidc')) { toast(d.error || tr('Please sign in again, then try again.')); return null; }
   if (d.need === 'fresh') {  // a login-provider account: a sign-in there again (for the own office, oidc.py), then the step again
-    if (!await askConfirm(title, tr('Sign in again with your login provider to confirm, then try again.'), {ok: tr('Sign in again')})) return null;
+    if (!await askConfirm(title, tr('Sign in again with your sign-in provider to confirm, then try again.'), {ok: tr('Sign in again')})) return null;
     try { sessionStorage.setItem('rck-stepup', '0:su'); } catch { /* storage off: no message on the way back */ }
     location.href = '/api/auth/oidc/start?stepup=su&org=0';  // 2.223.2 (#2871, review): own purpose (no office needed)
     return null;

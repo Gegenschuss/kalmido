@@ -185,7 +185,7 @@ def cal_fields(b, create=False):
     if "color" in b:
         v = b["color"]
         if not isinstance(v, str) or not (v == "" or re.fullmatch(r"#[0-9a-fA-F]{6}", v)):
-            raise BadInput(tr("Invalid value: {0}", tr("Color")))
+            raise BadInput(tr("Invalid value: {0}", tr("Colour")))
         out["color"] = v.lower()
     if "description" in b:
         if not isinstance(b["description"], str):
@@ -233,7 +233,7 @@ def cal_member_set(c, cid, uid, role):
     u = c.execute("SELECT id FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
     cal = c.execute("SELECT * FROM ev_cals WHERE id=?", (cid,)).fetchone()
     if not u or uid == cal["owner_id"] or personal_agent_foreign(c, uid, me()):
-        raise Denied(404, tr("unknown user"))
+        raise Denied(404, tr("unknown person"))
     from ..accounts.orgs import need_visible, ws_fit_problem
     if not c.execute("SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id=?", (cid, uid)).fetchone():  # a new member
         need_visible(c, uid)  # 2.30.0 (#1036, B2): only people one may see (404 as for an unknown id)
@@ -832,11 +832,11 @@ def att_clean(c, items, eid=None, cal_id=None):
             from ..accounts.orgs import may_see
             if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (u,)).fetchone() or (me_ and personal_agent_foreign(c, u, me_)) \
                     or (me_ and u not in had_u and not may_see(c, me_, u)):  # 2.22.0 (#752): only people one may see; 2.30.0 (#1036): also newly invited ones of an existing event
-                raise BadInput(tr("unknown user"))
+                raise BadInput(tr("unknown person"))
             if cal_org and not ev_att_ok(c, u, cal_org):
                 if u not in had_u:  # visible (checked above), but not of the calendar's organisation: say why (2.87.0, #1983)
                     from ..accounts.orgs import ws_fit_problem
-                    raise Denied(409, ws_fit_problem(c, cal_org, u, "cal") or tr("unknown user"))
+                    raise Denied(409, ws_fit_problem(c, cal_org, u, "cal") or tr("unknown person"))
                 continue
             row["user_id"], key = u, ("u", u)
             if u != me_:

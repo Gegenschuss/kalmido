@@ -107,7 +107,7 @@ function ab2_sheet(it) {
         histAdd({label: tr('Absence entered'), undo: async () => { await api('DELETE', `/api/team/absences/${r.id}`); ab2_reload(); },
           redo: async () => { await api('POST', `/api/team/absences/${r.id}/restore`); ab2_reload(); }});
       }
-      md.remove(); ab2_reload(); toast(!it && AB2.req ? tr('Vacation requested') : tr('Saved'));
+      md.remove(); ab2_reload(); toast(!it && AB2.req ? tr('Holiday requested') : tr('Saved'));
     } catch { b.disabled = false; /* api() said it */ }
   });
 }

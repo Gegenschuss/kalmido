@@ -378,7 +378,7 @@ check(A.post(B + f"/api/account/import/{iid}/key", json={"recovery_key": RK}).st
 j = wait(A, iid)
 pv = j.get("preview") or {}
 check(j.get("state") == "preview" and pv.get("kind") == "org", f"opened: preview {j.get('state')} {j.get('error')}")
-# 2.96.0 (#1941): an organisation export may go into the private space too (p296_d_api_test.py runs it)
+# 2.96.0 (#1941): an organisation export may go into the private workspace too (p296_d_api_test.py runs it)
 check("private" in [t["id"] for t in pv.get("targets", [])] and GAMMA in [t["id"] for t in pv.get("targets", [])], "targets: private + organisations")
 check(any(x["key"] == EH("bob@example.com") and x["found"] for x in pv.get("people", [])) and
       not any(x["key"] == EH("alice@example.com") for x in pv.get("people", [])) and not any("email" in x for x in pv.get("people", [])),

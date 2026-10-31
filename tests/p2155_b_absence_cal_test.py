@@ -106,7 +106,7 @@ check(Bo.put(B + "/api/team/absences/holidays", json={"state": "BY"}).ok, "the a
 hol = {e["start"]: e for e in cal(Ca, "2027-01-01", "2027-01-10") if e.get("holiday")}
 check(set(hol) == {"2027-01-01", "2027-01-06"}, f"Bavaria: New Year + Epiphany ({sorted(hol)})")
 h = hol.get("2027-01-01") or {}
-check(h.get("all_day") is True and h.get("end") == "2027-01-02" and h.get("title") == "Neujahr" and not h.get("own"),
+check(h.get("all_day") is True and h.get("end") == "2027-01-02" and h.get("title") == "New Year's Day" and not h.get("own"),
       "a holiday is a read-only all-day entry with its name " + str(h))
 check(not [e for e in cal(Da, "2027-01-01", "2027-01-10") if e.get("holiday")], "Beta has no state: none for dave")
 check(Ca.patch(B + "/api/settings", json={"holiday_state": "XX"}).status_code == 400, "an unknown own state: 400")
@@ -143,7 +143,7 @@ check(Bo.patch(B + "/api/settings", json={"cal_abs_team": "1"}).ok, "bob switche
 tm = [e for e in cal(Bo, DS, D2) if e.get("absence")]
 check(len(tm) == 2 and all(e["absence"] == "team" and e["user_id"] == CAROL and e["title"].startswith("Carol: away") for e in tm),
       "bob sees carol away, by name " + str([e.get("title") for e in tm]))
-check("Sick" not in str(tm) and "Grippe" not in str(tm) and "Vacation" not in str(tm), "never the kind or the note of a colleague (not even for the admin)")
+check("Sick" not in str(tm) and "Grippe" not in str(tm) and "Holiday" not in str(tm), "never the kind or the note of a colleague (not even for the admin)")
 check(Da.patch(B + "/api/settings", json={"cal_abs_team": "1"}).ok and not [e for e in cal(Da, DS, D2) if e.get("absence")],
       "another organisation never sees them")
 check(Bo.patch(B + "/api/settings", json={"workspace": "private"}).ok and not [e for e in cal(Bo, DS, D2) if e.get("absence") == "team"],
@@ -163,7 +163,7 @@ ics = r.text.replace("\r\n ", "")
 check("BEGIN:VCALENDAR" in ics and f"UID:absence-{SICK}@kalmido" in ics and f"DTSTART;VALUE=DATE:{DS.replace('-', '')}" in ics,
       "her sick leave is in it as an all-day event")
 check("SUMMARY:Away" in ics and "Sick" not in ics and "Grippe" not in ics, "a sick leave says Away; no note")
-check("SUMMARY:Neujahr" in ics and "TRANSP:TRANSPARENT" in ics, "the holidays of her state, shown as free")
+check("SUMMARY:New Year's Day" in ics and "TRANSP:TRANSPARENT" in ics, "the holidays of her state, shown as free")
 D5 = (D + timedelta(days=5)).isoformat()  # not the day of the free / busy checks below
 r = Bo.post(B + "/api/team/absences", json={"kind": "vacation", "start_date": D5, "end_date": D5})
 BOBABS = r.json().get("id")
@@ -220,17 +220,17 @@ check(r.ok and r.json()["tz"] != "../../etc/passwd", "a bad time zone falls back
 # freelancer-matrix: hub, pim
 check(Fr.patch(B + "/api/settings", json={"holiday_state": "AT"}).ok, "the freelancer picks Austria")
 hol = {e["start"]: e["title"] for e in cal(Fr, "2027-10-20", "2027-12-31") if e.get("holiday")}
-check(hol.get("2027-10-26") == "Nationalfeiertag" and hol.get("2027-12-08") == "Mariä Empfängnis" and "2027-10-31" not in hol,
+check(hol.get("2027-10-26") == "Austrian National Day" and hol.get("2027-12-08") == "Immaculate Conception" and "2027-10-31" not in hol,
       f"Austria offline: national day + Immaculate Conception, no Reformation Day ({hol})")
 r = Fr.post(B + "/api/team/absences", json={"kind": "vacation", "start_date": DS, "end_date": D2})
 check(r.status_code in (200, 201), "the freelancer enters a vacation " + r.text[:200])
 fa = [e for e in cal(Fr, DS, D2) if e.get("absence")]
-check(len(fa) == 1 and fa[0]["absence"] == "own" and fa[0]["title"] == "Vacation", "her vacation in her calendar " + str(fa))
+check(len(fa) == 1 and fa[0]["absence"] == "own" and fa[0]["title"] == "Holiday", "her vacation in her calendar " + str(fa))
 check(Fr.patch(B + "/api/settings", json={"cal_abs_team": "1"}).ok and not [e for e in cal(Fr, DS, D2) if e.get("absence") == "team"],
       "no colleagues without an organisation")
 fu = Fr.post(B + "/api/team/absences/feed", json={"action": "create"}).json()["url"]
 fx = requests.get(B + urllib.parse.urlparse(fu).path).text
-check("SUMMARY:Vacation" in fx and "Nationalfeiertag" in fx and f"absence-{SICK}@" not in fx, "her link: her vacation + Austria's holidays only")
+check("SUMMARY:Holiday" in fx and "Austrian National Day" in fx and f"absence-{SICK}@" not in fx, "her link: her vacation + Austria's holidays only")
 CF = Fr.post(B + "/api/evcals", json={"name": "Fiona", "org_id": None}).json()["id"]
 ev(Fr, CF, "Kunde", f"{DS}T09:00", f"{DS}T09:30")
 r = fb(Fr, DS, [FID, BOB, CAROL, DAVE])

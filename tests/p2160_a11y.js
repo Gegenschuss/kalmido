@@ -135,7 +135,7 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
   w.eval(`habitModal()`); await sleep(300);
   md = [...d.querySelectorAll('.modal')].pop();
   const sw = [...md.querySelectorAll('#h-col button')];
-  check(sw.length > 3 && sw.every(b => /^Color \d+$/.test(b.getAttribute('aria-label'))) && sw.filter(b => b.getAttribute('aria-pressed') === 'true').length === 1, 'colour swatches: a name each, one pressed');
+  check(sw.length > 3 && sw.every(b => /^Colour \d+$/.test(b.getAttribute('aria-label'))) && sw.filter(b => b.getAttribute('aria-pressed') === 'true').length === 1, 'colour swatches: a name each, one pressed');
   click(w, sw[2]);
   check(sw[2].getAttribute('aria-pressed') === 'true' && sw.filter(b => b.getAttribute('aria-pressed') === 'true').length === 1, 'picking one moves the pressed state');
   md.remove();

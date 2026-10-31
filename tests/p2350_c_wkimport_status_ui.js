@@ -5,7 +5,7 @@
 // - while it runs: "Import running · 33 %" on top of the knowledge pages and the percent at Knowledge in the bar, also after
 //   a redraw; a click on either opens the window again; gone once the import ended (its report comes as before)
 // - after a reload (wki_resume) and for a locked space (the browser import) the same; computer and phone
-// freelancer-matrix: wiki (the import runs in the private space of a person without an organisation)
+// freelancer-matrix: wiki (the import runs in the private workspace of a person without an organisation)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');

@@ -292,7 +292,7 @@ tokf = F1["url"].rsplit("/", 1)[1]
 check(len(tokf) >= 30 and not dbx("SELECT 1 FROM forms WHERE token=?", (tokf,)), "the token is stored sealed")
 anon = requests.Session()
 p = anon.get(B + "/f/" + tokf)
-check(p.status_code == 401 and "log in" in p.text.lower(), "an org form: log in first")
+check(p.status_code == 401 and "sign in" in p.text.lower(), "an org form: log in first")
 p = Bo.get(B + "/f/" + tokf)
 check(p.ok and "IT request" in p.text and "Tell us what is broken." in p.text and 'name="subject"' in p.text and "<script" not in p.text
       and "default-src 'none'" in p.headers.get("Content-Security-Policy", ""), "Bob (same organisation) sees the form, no scripts, a strict CSP")

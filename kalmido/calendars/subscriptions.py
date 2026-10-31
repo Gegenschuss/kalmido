@@ -73,7 +73,7 @@ CAL_NET_LIMIT = _env_int("KALMIDO_CALENDAR_RATE", 30)  # adds / discoveries / ma
 CAL_COLORS = ("#6d8cff", "#2dd4bf", "#f5b041", "#f87171", "#c084fc", "#4ade80", "#f472b6", "#94a3b8", "#6ee7b7")
 CAL_TEXT = {"title": 300, "location": 300, "description": 4000}
 CAL_ERR = {"blocked": N_("This address is in a private network. An admin can allow the host under Settings > Server > Server > Advanced."),
-           "auth": N_("Access denied: wrong username or password, or the link needs a login"),
+           "auth": N_("Access denied: wrong username or password, or the link needs a sign-in"),
            "not_found": N_("Not found: check the link"),
            "http": N_("The server answered with an error ({0})"),
            "too_large": N_("The calendar is larger than {0} MB"),
@@ -1023,7 +1023,7 @@ def _cal_fields(b, old=None):
     if "color" in b:
         v = b["color"]
         if not isinstance(v, str) or not (v == "" or re.fullmatch(r"#[0-9a-fA-F]{6}", v)):
-            raise BadInput(tr("Invalid value: {0}", tr("Color")))
+            raise BadInput(tr("Invalid value: {0}", tr("Colour")))
         out["color"] = v.lower()
     if "visible" in b:
         if not isinstance(b["visible"], bool):

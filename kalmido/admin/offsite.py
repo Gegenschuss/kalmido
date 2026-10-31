@@ -716,7 +716,7 @@ def stepup_need(c, b, proxy_ok=False):
     if step == "proxy" and proxy_ok:
         return None
     if step == "proxy":
-        return jsonify(error=tr("You are signed in through the server’s login proxy. This step needs a sign-in with a password."),
+        return jsonify(error=tr("You are signed in through the server’s sign-in proxy. This step needs a sign-in with a password."),
                        need="proxy"), 403
     tok = request.cookies.get(COOKIE) if g.auth_via == "session" else None
     if tok and step != "fresh":

@@ -1,6 +1,6 @@
 // kalmido-suite: fresh
 // 2.353.0 A (#2758): locked folders of the file store -- the browser side (static/js/fslock.js + hooks in ablage.js), own
-// container (start.sh), Firefox (real WebCrypto). A person without an organisation (her private space, freelancer-matrix: files):
+// container (start.sh), Firefox (real WebCrypto). A person without an organisation (her private workspace, freelancer-matrix: files):
 // - locks a folder holding a plain file: the server keeps cipher names and KENC files only, the folder view shows the plain
 //   names and the bar of the locked folder, the menu offers "Locked folder…"
 // - uploads a picture: encrypted here, opened here (the viewer shows it from memory, a data: URL)

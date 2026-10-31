@@ -258,13 +258,13 @@ def grp_set_members(c, gid, ids, actor=None):
         try:
             x = int(x)
         except (TypeError, ValueError):
-            raise BadInput(tr("unknown user")) from None
+            raise BadInput(tr("unknown person")) from None
         u = c.execute("SELECT kind FROM users WHERE id=?", (x,)).fetchone()
         if not u or u["kind"] == "agent":
             raise BadInput(tr("Only people can be group members"))
         from ..accounts.users import admin_sees
         if has_request_context() and getattr(g, "user", None) is not None and not admin_sees(c, x):  # 2.28.0 (#935): mode workspaces
-            raise BadInput(tr("unknown user"))
+            raise BadInput(tr("unknown person"))
         want.add(x)
     before = grp_list_ids(c, gid)
     cur = set(grp_members(c, gid))

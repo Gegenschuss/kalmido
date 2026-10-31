@@ -275,7 +275,7 @@ def tbl_put(tid):
         except (TypeError, ValueError):
             return err(tr("Invalid value: {0}", "users"))
         if any(u not in ppl for u in targets):  # not in this list / an agent / does not see the task: one answer for all
-            return err(tr("unknown user"), 404)
+            return err(tr("unknown person"), 404)
     changed = []
     for u in targets:
         prev = rows.get(u)

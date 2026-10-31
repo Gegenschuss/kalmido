@@ -402,7 +402,7 @@ function agTeamWhy(adm) {
 function agAdminPaneHtml(hint) {
   return `${hint(tr('Server-wide rules for every agent. Agents themselves are created under Settings > Agents: Status (team) or Set up (personal).'))}
     <h4 id="s-uag-h">${tr('Personal agents for everyone')}</h4>
-    <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-uag"><span class="swt" aria-hidden="true"></span></span><span>${tr('Users may create their own agents')}</span></label></div>
+    <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-uag"><span class="swt" aria-hidden="true"></span></span><span>${tr('People may create their own agents')}</span></label></div>
     <div class="row"><label for="s-uagmax">${tr('Per person at most')}</label><input id="s-uagmax" type="number" inputmode="numeric" min="1" max="20" value="2" class="numin"></div>
     ${hint(tr('On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Workspaces), in the private area each person themselves.') + ' ' + tr('You see every agent under Status and can pause or delete it.'))}
     <h4 id="s-sclim-h">${tr('Permission limit')}</h4>
@@ -421,7 +421,7 @@ async function agSetupDraw(md) {
     <span class="agacts">${av_setupBtn(a)}<button class="iconbtn" data-myag-act="work" title="${esc(tr('Work style and notifications'))}" aria-label="${esc(tr('Work style and notifications'))}">${ic('cog', 's')}</button><button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="log" title="${esc(tr('Log and usage limit'))}" aria-label="${esc(tr('Log and usage limit of {0}', a.name))}">${ic('chart', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
       <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
       <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
-  const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" title="${esc(tr('for the login and @mentions'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
+  const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" title="${esc(tr('for the sign-in and @mentions'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
     <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself and are responsible for the provider; everyone in the project sees where it runs.'))}</div>${av_whichHtml()}` : '';  // 2.46.6 (#1716)
   box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${j.api === false ? tr('The agent interface is switched off on this server.') : tr('Personal agents are switched off on this server (a server admin can allow them: Settings > Organisation > Agents).')}</div>`)) + add;  // 2.361.4 (#2928); 2.364.0 C (#3041): the agents moved to Settings > Organisation
   userNameFollow(box, 'myag-name', 'myag-user');  // 2.28.0 (#926)
@@ -587,7 +587,7 @@ function hostHtml(hint) {
     <div class="row"><label for="s-qpool">${tr('Shared by')}</label><select id="s-qpool"><option value="user">${tr('each person on their own')}</option><option value="org" ${a.storage_pool === 'org' ? 'selected' : ''}>${tr('the organisation (amount × members)')}</option></select></div>
     <div class="row"><label for="s-support">${tr('Support address')}</label><input id="s-support" type="email" value="${esc(a.support_email || '')}" placeholder="${esc(a.support_email_env || 'support@example.com')}" autocomplete="off"></div>
     <h4 id="s-legal-h">${tr('Privacy and imprint')}</h4>
-    ${hint(tr('Links on the login page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).'))}
+    ${hint(tr('Links on the sign-in page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).'))}
     <div class="row"><label for="s-privacy">${tr('Privacy statement')}</label><input id="s-privacy" type="url" value="${esc(a.privacy_url || '')}" placeholder="${esc(a.privacy_url_env || 'https://example.com/privacy')}" autocomplete="off"></div>
     <div class="row"><label for="s-privmail">${tr('Privacy contact')}</label><input id="s-privmail" type="email" value="${esc(a.privacy_email || '')}" placeholder="${esc(a.privacy_email_env || 'privacy@example.com')}" autocomplete="off"></div>
     <div class="row"><label for="s-imprint">${tr('Imprint')}</label><input id="s-imprint" type="url" value="${esc(a.imprint_url || '')}" placeholder="${esc(a.imprint_url_env || 'https://example.com/imprint')}" autocomplete="off"></div>
@@ -721,7 +721,7 @@ function settingsModal(focus) {
       <div id="s-ntfy"><h4>${S.webpush?.enabled ? 'ntfy' : tr('Notifications (ntfy)')}</h4>
       <div class="row"><label>${tr('Topic')}</label><code class="topic">${esc(s.ntfy_topic)}</code><button class="btn sm" data-m="test">${ic('bell', 's')} ${tr('Send test')}</button></div>
       ${S.webpush?.enabled ? '' : prio}
-      ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}${/ntfy\.sh/.test(S.ntfyUrl) || !S.me?.ntfy_inbox ? '' : tr(', logged in with the ntfy login your admin gave you')}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
+      ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}${/ntfy\.sh/.test(S.ntfyUrl) || !S.me?.ntfy_inbox ? '' : tr(', signed in with the ntfy sign-in your admin gave you')}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
       <div id="s-ntfyin"></div>
       <div id="s-chn"></div>${''/* 2.142.0 A (#2145, #2146): channels + e-mail for single events (integrations.js chn_meDraw) */}
       ${notifMatrixHtml(s, hint)}${bl9SetHtml(s, hint)}${typeof tbl_setHtml === 'function' ? tbl_setHtml(chk, hint) : ''}
@@ -756,7 +756,7 @@ function settingsModal(focus) {
       <h4 id="s-mail-h">${tr('Tasks by e-mail')}</h4><div id="s-mail"></div>
       ${shareHtml(hint)}
       <ul class="slist">
-        ${S.ntfyInbox?.enabled && S.me?.ntfy_inbox ? `<li>${tr('Single files also via the ntfy app:')} ${tr('In the ntfy app, add server {0} once and log in with the ntfy login your admin gave you.', `<code class="topic">${esc(S.ntfyInbox.server)}</code>`)} ${tr('Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.', `<code class="topic">${esc(S.ntfyInbox.topic)}</code>`)}</li>` : ''}</ul>
+        ${S.ntfyInbox?.enabled && S.me?.ntfy_inbox ? `<li>${tr('Single files also via the ntfy app:')} ${tr('In the ntfy app, add server {0} once and sign in with the ntfy sign-in your admin gave you.', `<code class="topic">${esc(S.ntfyInbox.server)}</code>`)} ${tr('Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.', `<code class="topic">${esc(S.ntfyInbox.topic)}</code>`)}</li>` : ''}</ul>
       ${bmls_html()}
       ${acz_linkHtml(S.webhooks?.enabled)}`,  // 2.166.0 (#2633): the webhooks moved to Access
     access: acz_html(),  // 2.166.0 (#2633): API tokens, webhooks and agent tokens in one place
@@ -1108,7 +1108,7 @@ function settingsModal(focus) {
     if (b.dataset.vmode) { vpSet(md, b.dataset.vmode); return; }  // 2.310.0 (#3270)
     if (b.dataset.look === 'pack') { o3c_packPick(md, b.dataset.v); return; }  // 2.83.0 C (#1427): theme + scheme in one step
     if (b.dataset.look) {
-      const k = b.dataset.look, v = b.dataset.v, n = {theme: N_('Color scheme'), density: N_('Density'), densitySide: N_('Density'), densityRows: N_('Density'), fsize: N_('Font size'), font: N_('Font'), accent: N_('Accent color'), chatHuman: N_('Messages from people'), chatAgent: N_('Messages from agents')}[k];
+      const k = b.dataset.look, v = b.dataset.v, n = {theme: N_('Colour scheme'), density: N_('Density'), densitySide: N_('Density'), densityRows: N_('Density'), fsize: N_('Font size'), font: N_('Font'), accent: N_('Accent colour'), chatHuman: N_('Messages from people'), chatAgent: N_('Messages from agents')}[k];
       setLocal(tr(n), () => lookCur(k), x => { lookSet(k, x); lookRedraw(md, `[data-look="${k}"][data-v="${x}"]`); }, v); return;
     }
     if (b.dataset.m === 'look-reset') {
@@ -1177,15 +1177,15 @@ function impHelp(src) {
     todoist: tr('<b>Todoist:</b> open the project > … > Export as a CSV file (one file per project), or Settings > Backups > download a backup (a ZIP with every project). Sections, subtasks, @labels, priorities, dates (English and German date texts, also recurring ones), durations and comments are taken over; attachments stay links. The project is named after the file.'),
     trello: tr('<b>Trello:</b> open the board > Menu > Print, export and share > Export as JSON. Lists become sections of one project (or one project each, see below), cards tasks, checklists subtasks, labels tags, due dates and “complete” are kept; comments and attachment links go into the notes. Archived cards are skipped unless you choose otherwise.'),
     asana: tr('<b>Asana:</b> open the project > arrow next to its name > Export / Print > CSV. Sections, subtasks, tags, start and due dates and completion are taken over, other fields go into the notes. An assignee is assigned when they are a member of the target project (same e-mail or name), otherwise their name goes into the notes.'),
-    mstodo: tr('<b>Microsoft To Do</b> has no export of its own. Recommended: classic Outlook for Windows > File > Open & Export > Import/Export > Export to a file > Comma Separated Values > your Tasks folder (Outlook for Mac: File > Export > Tasks). CSV files of export tools (columns such as Title, List, Status, Importance, Due) and ICS files work too. English and German Outlook columns are recognized, also in Windows-1252.'),
+    mstodo: tr('<b>Microsoft To Do</b> has no export of its own. Recommended: classic Outlook for Windows > File > Open & Export > Import/Export > Export to a file > Comma Separated Values > your Tasks folder (Outlook for Mac: File > Export > Tasks). CSV files of export tools (columns such as Title, List, Status, Importance, Due) and ICS files work too. English and German Outlook columns are recognised, also in Windows-1252.'),
     ics: tr('<b>ICS files with tasks (VTODO):</b> Nextcloud Tasks (calendar > … > Export), Thunderbird (right-click the calendar > Export), Apple Reminders via an export app or a CalDAV server, Tasks.org via its CalDAV account. Each calendar becomes a project; subtasks, repetitions, reminders, categories (tags), priorities and completion are taken over.'),
     ticktick: tr('<b>TickTick:</b> Settings > Account > Generate backup (CSV). Lists, sections, subtasks, tags, dates and reminders are taken over.'),
     // 2.142.0 B (#2147)
-    notion: tr('<b>Notion:</b> Settings > Workspace > Export all workspace content (or … on a page > Export) > Markdown & CSV, include subpages. Choose the ZIP as it is (parts inside it are read too). Every database becomes a project (name, status, date, tags and priority are recognized, other properties go into the notes), pages with checkboxes become projects with tasks. People stay names in the notes.'),
+    notion: tr('<b>Notion:</b> Settings > Workspace > Export all workspace content (or … on a page > Export) > Markdown & CSV, include subpages. Choose the ZIP as it is (parts inside it are read too). Every database becomes a project (name, status, date, tags and priority are recognised, other properties go into the notes), pages with checkboxes become projects with tasks. People stay names in the notes.'),
     gtasks: tr('<b>Google Tasks:</b> takeout.google.com > deselect all > select Tasks > create the export, then choose the ZIP (or the Tasks.json inside it). Lists, subtasks, due dates, notes and completion are taken over.'),
     clickup: tr('<b>ClickUp:</b> open the list or space > … > Export > CSV, all columns. Lists (in folders), subtasks, checklists, tags, priorities, start and due dates, estimates and comments are taken over; assignees stay names in the notes.'),
     jira: tr('<b>Jira:</b> Filters > search the issues > Export > Export CSV (all fields). Each Jira project becomes a project; sub-tasks and child issues become subtasks, labels tags, priorities and due dates are kept; the issue key, description, sprint and components go into the notes, assignees stay names.'),
-    csv: tr('<b>Any CSV file</b> (also from a spreadsheet): one row per task. Columns such as Title / Name / Task, Due / Date, Notes / Description, List / Project, Section, Priority, Tags and Done / Status are recognized in English and German; every other column goes into the notes. The preview shows which column went where.'),
+    csv: tr('<b>Any CSV file</b> (also from a spreadsheet): one row per task. Columns such as Title / Name / Task, Due / Date, Notes / Description, List / Project, Section, Priority, Tags and Done / Status are recognised in English and German; every other column goes into the notes. The preview shows which column went where.'),
     markdown: tr('<b>Markdown checklist</b> (Obsidian, Logseq, a README …): headings become projects (deeper headings sections), - [ ] and - [x] tasks, indented items subtasks, text below a task its notes. Only clear dates (2025-01-15 or 15.01.2025) and #tags are read.'),
   }[src] || '';
 }
@@ -1308,7 +1308,7 @@ const shKeyWarn = a => a.secret_key === false ? `<div class="shint warn shkey" r
 function instanceHtml(chk, hint) {
   const a = S.about || {};
   return `${shKeyWarn(a)}${shToolsWarn(a)}<h4 id="s-instance-h">${tr('Whole server')}</h4>
-    ${hint(tr('Apply to every user at once. Nothing is deleted: switched back on, everything is there again.'))}
+    ${hint(tr('Apply to every person at once. Nothing is deleted: switched back on, everything is there again.'))}
     <div class="featgrid">${ad_allSwHtml()}
       <label class="wide"><input type="checkbox" id="s-publinks" ${a.public_links !== false && a.public_links_env !== false ? 'checked' : ''} ${a.public_links_env === false ? 'disabled' : ''}><span>${tr('Public links to projects')}<small class="muted">${a.public_links_env === false ? `<span title="KALMIDO_PUBLIC_LINKS=0">${tr('Switched off by the server operator.')}</span>` : tr('Projects and files of the file store can be shared with people without an account through a secret link. Off: every public link stops working at once; nothing is deleted.')}</small></span></label>
       <label class="wide"><input type="checkbox" id="s-updcheck" ${a.update_check !== false && a.update_env !== false ? 'checked' : ''} ${a.update_env === false ? 'disabled' : ''}><span>${tr('Check daily for a new version')}<small class="muted">${a.update_env === false ? `<span title="KALMIDO_UPDATE_CHECK=0">${tr('Switched off by the server operator.')}</span>` : tr('The server asks GitHub once a day for the latest release; nothing is installed automatically and the browser never contacts GitHub. The result shows below.')}</small></span></label>
@@ -1323,7 +1323,7 @@ function instanceHtml(chk, hint) {
     </details>` : ''}`;
 }
 // 2.380 G (#3389): the allowed internal hosts per service (server: calendars/subscriptions.py ALLOW_PURPOSES), saved in calview.js
-const ALLOWP = [['calendar', N_('Calendars')], ['carddav', N_('Address books (CardDAV)')], ['webhooks', N_('Webhooks')], ['mail', N_('Mail (IMAP / SMTP)')],
+const ALLOWP = [['calendar', N_('Calendars')], ['carddav', N_('Address books (CardDAV)')], ['webhooks', N_('Webhooks')], ['mail', N_('E-mail (IMAP / SMTP)')],
   ['git', N_('Git')], ['newsletter', N_('Newsletter')], ['ntfy', N_('ntfy')], ['peppol', N_('Peppol')], ['feeds', N_('Feeds (RSS)')],
   ['oidc', N_('Single sign-on (OIDC)')], ['paperless', N_('Paperless')], ['karakeep', N_('Karakeep')], ['servers', N_('Servers')]];
 // 2.102.0 E (#1999): the browser's own errors (static/js/clienterr.js) as bug tickets in one project list with error reports
@@ -1442,7 +1442,7 @@ function ad_updHtml(hint) {
   return h ? `<h4 id="s-upd-h">${tr('Updates')}</h4>${h}` : '';
 }
 const ADMIN_SW = {'s-collaball': ['collab_all', N_('Collaboration for everyone')], 's-timeall': ['time_all', N_('Time tracking for everyone')], 's-updcheck': ['update_check', N_('Check daily for a new version')],
-  's-2fareq': ['twofa_required', N_('Require two-factor authentication')], 's-pklogin': ['passkey_login', N_('Passkey login')], 's-oidcauto': ['oidc_autocreate', N_('Create accounts on first OIDC login')], 's-publinks': ['public_links', N_('Public links to projects')],
+  's-2fareq': ['twofa_required', N_('Require two-factor authentication')], 's-pklogin': ['passkey_login', N_('Passkey sign-in')], 's-oidcauto': ['oidc_autocreate', N_('Create accounts on first OIDC sign-in')], 's-publinks': ['public_links', N_('Public links to projects')],
   's-collaball-a': ['collab_all', N_('Collaboration for everyone')], 's-timeall-a': ['time_all', N_('Time tracking for everyone')]};  // 2.46.6 (#1710): the same switches under Administration > Server
 async function adminSwitch(md, el, fromHist) {
   const on = el.checked;
@@ -1450,7 +1450,7 @@ async function adminSwitch(md, el, fromHist) {
   const key = ADMIN_SW[el.id][0];
   if (key === 'collab_all' && !on && !await ask(tr('Turn collaboration off for everyone?'), tr('Shared projects are then only visible to their owner; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
   if (key === 'time_all' && !on && !await ask(tr('Turn time tracking off for everyone?'), tr('Running timers are stopped now; entries are kept.'), tr('Turn off'))) { el.checked = true; return; }
-  if (el.id === 's-2fareq' && on && !await ask(tr('Require two-factor authentication?'), tr('Everyone who logs in with a password must set it up at the next login (sessions that are open now stay open).'), tr('Require'))) { el.checked = false; return; }
+  if (el.id === 's-2fareq' && on && !await ask(tr('Require two-factor authentication?'), tr('Everyone who signs in with a password must set it up at the next sign-in (sessions that are open now stay open).'), tr('Require'))) { el.checked = false; return; }
   if (el.id === 's-publinks' && !on && !await ask(tr('Turn public links off for everyone?'), tr('Every public link stops working at once; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
   try {
     // 2.306.0 Fix-1 (#2875 review): accounts by the sign-on's admin rule: switched on with the account password.
@@ -1710,7 +1710,7 @@ async function biz_mailDraw(md) {
   if (!box.isConnected) return;
   if (!x || !(x.manage || x.set)) { box.innerHTML = ''; return; }
   const what = !x.set ? tr('No mailbox yet') : [x.receive ? tr('receives') : '', x.send ? tr('sends') : ''].filter(Boolean).join(' · ') + (x.active ? '' : ' · ' + tr('paused'));
-  box.innerHTML = `<h4 id="s-bizmail-h">${tr('E-mail')}</h4><p class="shint">${tr('A workspace can fetch its own mailbox: its mails are filed here like forwarded ones, and replies go out from its address.')}</p>
+  box.innerHTML = `<h4 id="s-bizmail-h">${tr('E-mail')}</h4><p class="shint">${tr('A workspace can fetch its own mailbox: its e-mails are filed here like forwarded ones, and replies go out from its address.')}</p>
     <div class="row"><span class="muted">${x.address ? esc(x.address) + ' · ' : ''}${esc(what)}</span>${x.manage ? `<button type="button" class="btn sm" data-hmba="edit" data-ws="${esc(x.ws)}">${ic('gear', 's')}<span>${tr(x.set ? 'Change' : 'Set up')}</span></button>` : ''}</div>
     ${x.error_text ? `<p class="hmberr" role="status">${ic('info', 's')} ${esc(x.error_text)}</p>` : ''}`;
 }

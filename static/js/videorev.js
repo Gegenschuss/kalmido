@@ -240,7 +240,7 @@ function vdr_cmsDraw(st) {
     const mine = c.author_id && c.author_id === uid, can = r.can_write || mine;
     return `<li class="vdrc ${c.done ? 'done' : ''} ${c.customer ? 'cust' : ''}" data-cid="${c.id}">
       <div class="vdrch">${!reply && c.at_sec != null ? `<button type="button" class="vdrtc" data-vdr="seek" data-at="${c.at_sec}" aria-label="${esc(tr('Jump to {0}', vdr_tc(c.at_sec)))}">${esc(vdr_tc(c.at_sec))}</button>` : ''}
-        <b>${esc(c.author || tr('Unknown'))}</b>${c.customer ? `<span class="rotag">${tr('Customer')}</span>` : ''}<small class="muted">${esc(fmtWhen(c.created_at))}</small><span class="spacer"></span>
+        <b>${esc(c.author || tr('Unknown'))}</b>${c.customer ? `<span class="rotag">${tr('Client')}</span>` : ''}<small class="muted">${esc(fmtWhen(c.created_at))}</small><span class="spacer"></span>
         ${!reply ? `<button type="button" class="iconbtn" data-vdr="reply" data-id="${c.id}" aria-label="${esc(tr('Reply'))}" title="${esc(tr('Reply'))}">${ic('reply', 's')}</button>` : ''}
         ${!reply && can ? `<button type="button" class="iconbtn vdrdone ${c.done ? 'on' : ''}" data-vdr="done" data-id="${c.id}" aria-pressed="${c.done}" aria-label="${esc(c.done ? tr('Mark as open') : tr('Mark as done'))}" title="${esc(c.done ? tr('Mark as open') : tr('Mark as done'))}">${ic('check', 's')}</button>` : ''}
         ${can ? `<button type="button" class="iconbtn" data-vdr="del" data-id="${c.id}" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button>` : ''}</div>
@@ -252,15 +252,15 @@ function vdr_cmsDraw(st) {
 function vdr_sigDraw(st) {
   const r = st.r, el = $('.vdrsig', st.md);
   if (!r.can_write) { el.innerHTML = ''; return; }
-  const sw = {open: tr('Waiting for the customer'), accepted: tr('Approved|video'), declined: tr('Changes requested')};
+  const sw = {open: tr('Waiting for the client'), accepted: tr('Approved|video'), declined: tr('Changes requested')};
   const rows = (r.signoffs || []).slice(0, 5).map(x => {
     const s = x.revoked_at && x.state === 'open' ? tr('Turned off') : !x.live && x.state === 'open' ? tr('Expired') : sw[x.state] || x.state;
     return `<li class="sgrow st-${esc(x.state)}"><div class="sghead"><b>${esc(s)}</b><small class="muted"> · ${esc(fmtWhen(x.created_at))}</small>${x.signer_name ? ` <span class="muted">${esc(x.signer_name)}</span>` : ''}</div>
-      ${x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Customer link'))}" data-vdrurl="${x.id}"><button type="button" class="btn sm pri" data-vdr="sigcopy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-vdr="sigstop" data-id="${x.id}">${tr('Turn off')}</button></div>` : ''}
+      ${x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Client link'))}" data-vdrurl="${x.id}"><button type="button" class="btn sm pri" data-vdr="sigcopy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-vdr="sigstop" data-id="${x.id}">${tr('Turn off')}</button></div>` : ''}
       ${x.reason ? `<div class="muted">${esc(tr('Reason: {0}', x.reason))}</div>` : ''}</li>`;
   }).join('');
-  el.innerHTML = `<h4>${tr('Customer link')}</h4><p class="muted mhint">${esc(tr('Your customer watches the newest version without an account, comments at a time and approves or requests changes.'))}</p>
-    ${rows ? `<ul class="sglist" role="list">${rows}</ul>` : ''}<button type="button" class="btn sm" data-vdr="signew">${ic('link', 's')} ${(r.signoffs || []).some(x => x.live) ? tr('New customer link') : tr('Create customer link')}</button>`;
+  el.innerHTML = `<h4>${tr('Client link')}</h4><p class="muted mhint">${esc(tr('Your client watches the newest version without an account, comments at a time and approves or requests changes.'))}</p>
+    ${rows ? `<ul class="sglist" role="list">${rows}</ul>` : ''}<button type="button" class="btn sm" data-vdr="signew">${ic('link', 's')} ${(r.signoffs || []).some(x => x.live) ? tr('New client link') : tr('Create client link')}</button>`;
 }
 
 // ---- actions
@@ -326,10 +326,10 @@ async function vdr_click(e, st) {
       histToast(tr(VDR_ST[b.dataset.st]), histAdd({label: tr(VDR_ST[b.dataset.st]), ids: [], snaps: [], lids: [],
         undo: async () => { await set(was); return {skipped: []}; }, redo: async () => { await set(b.dataset.st); return {skipped: []}; }}));
     }
-    if (a === 'signew') { await rawFetch('POST', `/api/videos/${rid}/signoff`, {expires: null}); await vdr_after(rid, 'GET', `/api/videos/${rid}`); toast(tr('Customer link created')); }
+    if (a === 'signew') { await rawFetch('POST', `/api/videos/${rid}/signoff`, {expires: null}); await vdr_after(rid, 'GET', `/api/videos/${rid}`); toast(tr('Client link created')); }
     if (a === 'sigstop') {
-      if (!await askConfirm(tr('Stop the customer link?'), tr('It stops working at once.'), {ok: tr('Turn off'), danger: true})) return;
-      await rawFetch('POST', `/api/videos/${rid}/signoffs/${id}/revoke`); await vdr_after(rid, 'GET', `/api/videos/${rid}`); toast(tr('Customer link stopped'));
+      if (!await askConfirm(tr('Stop the client link?'), tr('It stops working at once.'), {ok: tr('Turn off'), danger: true})) return;
+      await rawFetch('POST', `/api/videos/${rid}/signoffs/${id}/revoke`); await vdr_after(rid, 'GET', `/api/videos/${rid}`); toast(tr('Client link stopped'));
     }
     if (a === 'sigcopy') { const i = $(`[data-vdrurl="${id}"]`, st.md); try { await navigator.clipboard.writeText(i.value); toast(tr('Link copied')); } catch { i.focus(); i.select(); toast(tr('Copy the selected link')); } }
   } catch (x) { toast(x.message); }

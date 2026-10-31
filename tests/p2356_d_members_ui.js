@@ -1,7 +1,7 @@
 // kalmido-suite:
 // 2.356.0 D UI test (#3129, #3006, #3007): the office for members. Own container (start.sh), Firefox, 1280 px. Invented
 // people only. freelancer-matrix: office -- fiona has no organisation (her own admin): no members' line, no "Submit receipt".
-// - bob (member of Alpha Studio): Quotes & invoices shows the line "Bookkeeping, cash book and receipts are only seen by admins
+// - bob (member of Alpha Studio): Quotations & invoices shows the line "Bookkeeping, cash book and receipts are only seen by admins
 //   and the bookkeeping" with "Submit receipt"; the menu point Receipts is "Submit receipt" (#office/receipts), no Bookkeeping; the page takes a
 //   file (POST /api/office/receipts/submit) -> toast "Receipt handed in" -> a row "Handed in" under "My receipts handed in"
 // - a direct link to #office/cashbook: the same explanation with the way to hand in, no dead end
@@ -61,7 +61,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,docs,files';
     // ================= bob, member: the line on the start, the menu point, hand in a receipt
     await fresh(ev, nav, 'bob');
     await nav(B + '#office/offers');
-    check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && !!document.querySelector('.office .ofcmbr [data-ofc-submit]')`, 80), '#3006: the members\' line with "Submit receipt" on Quotes & invoices');
+    check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && !!document.querySelector('.office .ofcmbr [data-ofc-submit]')`, 80), '#3006: the members\' line with "Submit receipt" on Quotations & invoices');
     check(await ev(`/only seen by admins and the bookkeeping/.test(document.querySelector('.office .ofcmbr')?.textContent || '')`), '#3006: the line says why');
     check(await ev(`OFC.info.submit === true && ofm_items().some(i => i.key === 'receipts' && i.name === 'Submit receipt') && !ofm_items().some(i => ['books', 'cashbook'].includes(i.key))`), '#3129: the menu point Receipts is "Submit receipt", no Bookkeeping / Cash book');
     await shot('p2356d-member-offers.png');

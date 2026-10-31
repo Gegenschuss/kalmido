@@ -161,7 +161,7 @@ check(ro.get(V + f"/sheets/{SID}").status_code == 404, "another agent's list: 40
 r = ta.post(V + "/sheets", json={"title": "Scratch", "space": f"org:{ORG}"})
 S2, b4 = r.json()["id"], r.json()["batch"]
 check(r.status_code == 201 and Bo.get(B + f"/api/sheets/{S2}").ok, "an agent's table in its workspace: the members see it")
-check(ta.post(V + "/sheets", json={"title": "Mine", "space": "private"}).status_code == 400, "a team agent has no private space: 400")
+check(ta.post(V + "/sheets", json={"title": "Mine", "space": "private"}).status_code == 400, "a team agent has no private workspace: 400")
 r = ta.post(V + f"/sheets/{S2}/batches/{b4}/undo")
 check(r.ok and ta.get(V + f"/sheets/{S2}").status_code == 404 and Bo.get(B + f"/api/sheets/{S2}").status_code == 404,
       "taking back the creating call: the table is in the trash " + r.text[:200])
@@ -208,7 +208,7 @@ check(Ca.get(B + f"/api/sheets/{S5}/export.xlsx").status_code == 404, "a colleag
 # freelancer-matrix: sheets
 r = da.post(V + "/sheets", json={"title": "Dave list", "columns": [{"title": "Name"}], "rows": [["Ann"]]})
 S6 = r.json().get("id")
-check(r.status_code == 201 and r.json()["space"] == "private", "dave's agent creates in dave's private space " + r.text[:200])
+check(r.status_code == 201 and r.json()["space"] == "private", "dave's agent creates in dave's private workspace " + r.text[:200])
 check(S6 in [x["id"] for x in Da.get(B + "/api/sheets", params={"space": "private"}).json()["sheets"]], "dave sees his agent's table")
 check(A.get(B + f"/api/sheets/{S6}").status_code == 404 and Bo.get(B + f"/api/sheets/{S6}").status_code == 404, "nobody else sees it")
 check(ta.get(V + f"/sheets/{S6}").status_code == 404, "another agent does not see it")

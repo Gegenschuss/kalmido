@@ -63,7 +63,7 @@ def clean_color(v):
     if v in ("", None):
         return ""
     if not isinstance(v, str) or not LIST_COLOR_RE.fullmatch(v):
-        raise BadInput(tr("Invalid value: {0}", tr("Color")))
+        raise BadInput(tr("Invalid value: {0}", tr("Colour")))
     return v
 
 
@@ -825,10 +825,10 @@ def member_set(lid):
             return jsonify(ok=True, by_email=True)
         uid = r[0]
     elif not may_see(c, me(), uid):
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     u = c.execute("SELECT id FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
     if not u or uid == me() or personal_agent_foreign(c, uid, me()):  # 2.7.2 (#420): only the owner shares with a personal agent
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     if uid == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("The owner’s role cannot be changed"), 403)
     from ..collab.liste2eguard import le2b_agent_problem
@@ -992,7 +992,7 @@ def folder_people_diff():
         uid = 0
     if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone() or uid == me() \
             or personal_agent_foreign(c, uid, me()) or not may_see(c, me(), uid):
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     return jsonify(lists=fg_people_diff(c, me(), f, uid, role))
 
 
@@ -1020,7 +1020,7 @@ def folder_people_put():
         uid = r[0]
     elif not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone() or uid == me() or personal_agent_foreign(c, uid, me()) \
             or not may_see(c, me(), uid):  # 2.22.0 (#752)
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     from ..agents.core import is_agent
     if role == "admin" and is_agent(c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()):
         return err(tr("An agent cannot be a project admin"))
@@ -1164,7 +1164,7 @@ def agent_share_target(c, aid):
     if not u or u["kind"] == "agent":
         raise Denied(403)
     if not c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent' AND disabled=0", (aid,)).fetchone() or personal_agent_foreign(c, aid, me()):
-        raise Denied(404, tr("unknown user"))
+        raise Denied(404, tr("unknown person"))
 
 
 @app.get("/api/agents/<int:aid>/share")

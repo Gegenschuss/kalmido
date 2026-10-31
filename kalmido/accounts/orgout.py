@@ -17,7 +17,7 @@ from ..accounts.session import me
 
 OO_ADMIN_ONLY = N_("Only organisation admins can move data out of the organisation. Ask an admin of the organisation to do it.")  # 2.190.0 C (#2561)
 # 2.361.2 (#2923): the note of every move into an organisation (the dry run / the workspace field)
-OO_INTO_NOTE = N_("Back into your private space only after an admin of the organisation releases it (you ask for it).")
+OO_INTO_NOTE = N_("Back into your private workspace only after an admin of the organisation releases it (you ask for it).")
 OO_GRANT_DAYS = 14  # an approved request is good for this many days
 
 # 2.361.2 (#2923): what a member may ask back -- kind -> (table, name column, the columns naming who brought it in / made it)

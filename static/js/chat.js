@@ -595,7 +595,7 @@ async function tcx_chanNew() {
   const spaces = [...j.orgs.map(o => ({id: o.id, name: o.name, people: o.people, agents: o.agents})), {id: 0, name: tr('Private|workspace'), people: j.people, agents: j.agents}];
   const cur = spaces.find(s => s.id && wsCur() === 'org:' + s.id) || spaces[0];
   const sp = md => spaces.find(s => s.id === +($('#tcx-sp', md)?.value || 0)) || cur;
-  const draw = md => { const s = sp(md), op = $('#tcx-open', md); op.disabled = !s.id; if (!s.id) op.checked = false; $('#tcx-mem', md).innerHTML = tcx_pick(s.people, U, s.agents); $('#tcx-oh', md).textContent = s.id ? tr('Everyone in {0} can find and join it.', s.name) : tr('Channels of your own space are for invited people only.'); };
+  const draw = md => { const s = sp(md), op = $('#tcx-open', md); op.disabled = !s.id; if (!s.id) op.checked = false; $('#tcx-mem', md).innerHTML = tcx_pick(s.people, U, s.agents); $('#tcx-oh', md).textContent = s.id ? tr('Everyone in {0} can find and join it.', s.name) : tr('Channels of your own workspace are for invited people only.'); };
   const v = await tcx_dlg(tr('New channel'), `<div class="row"><label for="tcx-name">${tr('Name')}</label><input type="text" id="tcx-name" maxlength="80" autocomplete="off" placeholder="${esc(tr('e.g. General'))}"></div>
     ${spaces.length > 1 ? `<div class="row"><label for="tcx-sp">${tr('Workspace')}</label><select id="tcx-sp">${spaces.map(s => `<option value="${s.id}" ${s === cur ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>` : ''}
     <div class="row"><label class="chkl"><input type="checkbox" id="tcx-open" ${cur.id ? 'checked' : ''}> ${tr('Open to the whole organisation')}</label></div><p class="muted tcxhint" id="tcx-oh"></p>

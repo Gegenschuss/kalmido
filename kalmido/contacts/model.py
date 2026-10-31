@@ -212,7 +212,7 @@ def book_fields(b, create=False):
     if "color" in b:
         v = b["color"]
         if not isinstance(v, str) or not (v == "" or re.fullmatch(r"#[0-9a-fA-F]{6}", v)):
-            raise BadInput(tr("Invalid value: {0}", tr("Color")))
+            raise BadInput(tr("Invalid value: {0}", tr("Colour")))
         out["color"] = v.lower()
     return out
 
@@ -254,9 +254,9 @@ def book_member_set(c, bid, uid, role):
     b = c.execute("SELECT * FROM books WHERE id=?", (bid,)).fetchone()
     u = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
     if not u or (uid == b["owner_id"] and not obk_org(b)) or personal_agent_foreign(c, uid, me()):  # 2.52.0 C (#1438): an org book's manager may be shared with
-        raise Denied(404, tr("unknown user"))
+        raise Denied(404, tr("unknown person"))
     if is_agent(u) and not has_request_context():
-        raise Denied(404, tr("unknown user"))
+        raise Denied(404, tr("unknown person"))
     if not c.execute("SELECT 1 FROM book_members WHERE book_id=? AND user_id=?", (bid, uid)).fetchone():  # a new member
         from ..accounts.orgs import need_visible, ws_fit_problem
         need_visible(c, uid)  # 2.30.0 (#1036, B2): only people one may see (404 as for an unknown id)

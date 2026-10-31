@@ -3,7 +3,7 @@
 //   the start every space with every text)
 // - opening the knowledge pages asks for the space's texts (in pages: bn=), the copy holds them, offline the space reads from it
 // - an earlier visit's copy stays and is read offline without the space being opened online first
-// freelancer-matrix: wiki (the pages are in the private space of a person without an organisation)
+// freelancer-matrix: wiki (the pages are in the private workspace of a person without an organisation)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');

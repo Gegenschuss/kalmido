@@ -18,7 +18,7 @@ from .orgretain import _until  # 2.186.0 A (#2566)
 UA8_FILTERS = ("people", "active", "disabled", "admin", "invited", "pending", "agents", "all")
 UA8_MAX_PAGE = 200
 UA8_MAX_BULK = 200
-UA8_PRIVATE = N_("The account still has things in its private space (projects, basket, calendars, files ...): only a server admin can delete it. You can remove it from your organisation.")
+UA8_PRIVATE = N_("The account still has things in its private workspace (projects, basket, calendars, files ...): only a server admin can delete it. You can remove it from your organisation.")
 
 
 def ua8_where(q, flt):
@@ -133,7 +133,7 @@ def ua8_may_delete(c, u, uid):
     from ..accounts.users import om_admin_all
     if g.user["is_admin"]:
         if not u or not om_admin_all(c, uid):
-            raise Denied(404, tr("unknown user"))
+            raise Denied(404, tr("unknown person"))
         return "instance"
     if is_agent(g.user):
         raise Denied(403)
@@ -144,7 +144,7 @@ def ua8_may_delete(c, u, uid):
     theirs = user_orgs(c, uid) if u else []
     shared = [o for o in theirs if o in mine]
     if not shared:
-        raise Denied(404, tr("unknown user"))
+        raise Denied(404, tr("unknown person"))
     if len(theirs) != 1 or u["is_admin"] or is_agent(u):
         raise Denied(403, tr("Only a server admin can delete this account (it belongs to another organisation too or is a server admin). You can remove it from your organisation."))
     areas = ua8_private_areas(c, uid)  # review N1: deleting the account would delete its private space too
@@ -249,7 +249,7 @@ UA8_AREAS = (
     (N_("direct messages"), "SELECT 1 FROM tchat_rooms r WHERE r.kind='dm' AND ? IN (r.a, r.b) "
         "AND EXISTS (SELECT 1 FROM tchat_msgs m WHERE m.room_id=r.id) LIMIT 1"),
 )
-UA8_PRIVATE_AREAS = N_("The account still has things in its private space ({0}): only a server admin can delete it. You can remove it from your organisation.")
+UA8_PRIVATE_AREAS = N_("The account still has things in its private workspace ({0}): only a server admin can delete it. You can remove it from your organisation.")
 
 
 # 2.239.0 C (#2866): office tables that hold the office's settings / structure (made by itself), not the person's records
@@ -358,7 +358,7 @@ def ua8_lists_settle(c, u, by, rx_how=None):
         need_visible(c, to)  # a person the caller may not see: as unknown
         t = c.execute("SELECT * FROM users WHERE id=?", (to,)).fetchone()
         if not t:
-            return err(tr("unknown user"), 404), None
+            return err(tr("unknown person"), 404), None
         if to == uid or t["disabled"] or is_agent(t):
             return err(tr("The projects can only go to another active person (not an agent)")), None
         ok = {x["id"] for x in ua8_candidates(c, lists, uid)}

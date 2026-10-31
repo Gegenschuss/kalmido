@@ -254,13 +254,13 @@ function palAll() {
   const dens = document.documentElement.dataset.density;
   add('a:density', 'action', dens === 'compact' ? tr('Density: comfortable') : tr('Density: compact'), 'sliders', () => { LS.set('density', dens === 'compact' ? 'comfortable' : 'compact'); applyDensity(); });
   // appearance (per device): only listed when searching, e.g. "font", "accent", "size", "theme"
-  for (const [k, n] of THEMES) add('a:theme-' + k, 'action', tr('Color scheme: {0}', tr(n)), 'eye', () => lookSet('theme', k), {qonly: true});
+  for (const [k, n] of THEMES) add('a:theme-' + k, 'action', tr('Colour scheme: {0}', tr(n)), 'eye', () => lookSet('theme', k), {qonly: true});
   if (fsPct() < FS_MAX) add('a:fsize-up', 'action', tr('Font size: larger'), 'plus', () => fsStep(5), {qonly: true, keys: 'Mod+='});
   if (fsPct() > FS_MIN) add('a:fsize-down', 'action', tr('Font size: smaller'), 'sliders', () => fsStep(-5), {qonly: true, keys: 'Mod+-'});
   for (const v of FSIZE_ORDER) { const [, n, z] = LOOK.fsize.find(x => x[0] === v); add('a:fsize-' + v, 'action', tr('Font size: {0}', `${tr(n)} (${zPct(z)})`), 'sliders', () => lookSet('fsize', v), {qonly: true}); }
   for (const [v, n] of LOOK.pack) add('a:pack-' + v, 'action', tr('Design: {0}', tr(n)), 'eye', () => o3c_packPick(null, v), {qonly: true});  // 2.83.0 C (#1427)
   for (const [v, n] of LOOK.font) add('a:font-' + v, 'action', tr('Font: {0}', tr(n)), 'edit', () => lookSet('font', v), {qonly: true});
-  for (const [v, n, d, l] of LOOK.accent) add('a:accent-' + v, 'action', tr('Accent color: {0}', tr(n)), 'palette', () => lookSet('accent', v), {qonly: true, sw: light ? l : d});
+  for (const [v, n, d, l] of LOOK.accent) add('a:accent-' + v, 'action', tr('Accent colour: {0}', tr(n)), 'palette', () => lookSet('accent', v), {qonly: true, sw: light ? l : d});
   add('a:look-reset', 'action', tr('Reset appearance to the defaults'), 'undo', () => { for (const k of LOOK_KEYS) LS.del(k); applyTheme(); applyDensity(); applyLook(); render(); }, {qonly: true});
   add('a:keys', 'action', tr('Keyboard shortcuts'), 'help', shortcutsModal, {keys: '?'});
   add('a:tour', 'action', tr('Restart the welcome tour'), 'arrow', () => tourStart());
@@ -368,7 +368,7 @@ function pg_actions(add) {
   if (workloadOn() && !S.me?.kid) add('a:abs-new', 'action', tr('Enter an absence'), 'cal', () => {
     WLV.tab = 'abs'; go('workload');
     loadModule('team').then(() => ab2_load()).then(() => ab2_sheet(null));  // the sheet takes the people of the loaded month (admins pick one)
-  }, {sub: tr('Workload & absences'), kw: tr('vacation sick leave day off away absence')});  // 2.250.0 B (#2996)
+  }, {sub: tr('Workload & absences'), kw: tr('holiday vacation sick leave day off away absence')});  // 2.250.0 B (#2996)
 }
 // 2.250.0 B (#2993): the sections of the settings (only when typing): the same headings the settings search finds; the focus
 // names are the ones settingsModal knows, the heading is scrolled to once it is there
@@ -575,7 +575,7 @@ function tourSteps() {
     : {id: 'side', sel: '#side .sg-focus .srow', t: N_('Smart lists'), d: N_('New tasks without a project land in the Basket. Today, Tomorrow and Next 7 days collect from all projects.'),
       r: () => unionRect($$('#side .sg-focus .srow').slice(0, 4))});
   const org = tourOrg(), wsEl = () => $$('[data-act="ws-menu"]').find(e => e.getBoundingClientRect().width) || null;
-  if (org) s.push({id: 'org', sel: '[data-act="ws-menu"]', t: N_('You are in {0}'), targs: [org.name], d: N_('Your projects and the team chat of {0} are in the menu. Here at the top you switch between {0} and your private space.'), args: [org.name], r: rect(wsEl)});
+  if (org) s.push({id: 'org', sel: '[data-act="ws-menu"]', t: N_('You are in {0}'), targs: [org.name], d: N_('Your projects and the team chat of {0} are in the menu. Here at the top you switch between {0} and your private workspace.'), args: [org.name], r: rect(wsEl)});
   s.push({id: 'add', sel: m ? '#fab' : '#view .qadd .box', t: N_('Quick add'), d: N_('Type the way you think: “Dentist tomorrow 3pm !high #private”. Date, priority, tags and project are picked up as you type.'), r: rect(m ? '#fab' : '#view .qadd .box')});
   s.push({id: 'detail', sel: '#view .trow', t: N_('Details'), d: touch ? N_('Tap a task for its details. Swipe right to complete, left to reschedule.') : N_('Click a task for its details. Drag it onto a day or a project to move it.'), r: rect('#view .trow')});
   // steps only name modules that are on (a "Simple list" setup has no habits / focus)

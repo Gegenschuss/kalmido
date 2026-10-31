@@ -518,7 +518,7 @@ async function ctEditor(c) {
     <div class="row"><label for="ct-title">${tr('Job title')}</label><input id="ct-title" value="${esc(st.title || '')}" autocomplete="off" maxlength="300"></div>
     ${multi('phones', tr('Phone'), '+49 …', 'tel')}${multi('emails', tr('E-mail'), 'name@example.org', 'email')}${adrs()}
     ${dateRow('bday', tr('Birthday'))}${dateRow('anniversary', tr('Anniversary'))}
-    <div class="row"><label for="ct-groups">${tr('Groups')}</label><input id="ct-groups" value="${esc((st.groups || []).join(', '))}" list="ct-gl" placeholder="${esc(tr('e.g. Family, Customers'))}" autocomplete="off"><datalist id="ct-gl">${CT.groups.map(g => `<option value="${esc(g)}"></option>`).join('')}</datalist></div>
+    <div class="row"><label for="ct-groups">${tr('Groups')}</label><input id="ct-groups" value="${esc((st.groups || []).join(', '))}" list="ct-gl" placeholder="${esc(tr('e.g. Family, Clients'))}" autocomplete="off"><datalist id="ct-gl">${CT.groups.map(g => `<option value="${esc(g)}"></option>`).join('')}</datalist></div>
     <div class="row ppcol"><label for="ct-note">${tr('Notes')}</label><textarea id="ct-note" rows="3" maxlength="20000">${esc(st.note || '')}</textarea></div>
     <details class="evmore" ${custom || st.nickname || st.dept || (st.urls || []).length ? 'open' : ''}><summary>${tr('More')}</summary>
       <div class="row"><label for="ct-fn">${tr('Display name')}</label><input id="ct-fn" value="${esc(custom ? st.fn : '')}" placeholder="${esc(tr('from the name parts'))}" autocomplete="off" maxlength="300"></div>

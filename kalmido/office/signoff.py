@@ -273,11 +273,11 @@ def sig_notify(c, r, st, name):
             print("signoff notify failed:", type(e).__name__, e, flush=True)
             continue
         lg = lang_of(s)
-        title = tr("Approved by the customer", lg=lg) if st == "accepted" else tr("Declined by the customer", lg=lg)
+        title = tr("Approved by the client", lg=lg) if st == "accepted" else tr("Declined by the client", lg=lg)
         if r["kind"] == "document" and st == "accepted":  # 2.93.0 A (#1927)
-            title = tr("Signed by the customer", lg=lg)
+            title = tr("Signed by the client", lg=lg)
         if r["kind"] == "video":  # 2.99.1 A (#1959)
-            title = tr("Video approved by the customer", lg=lg) if st == "accepted" else tr("Changes requested by the customer", lg=lg)
+            title = tr("Video approved by the client", lg=lg) if st == "accepted" else tr("Changes requested by the client", lg=lg)
         sends.append((uid, title, s))
     msg, url = f"{name}: {r['title'] or ''}", f"{PUBLIC_URL}/{click}"
     if not sends:

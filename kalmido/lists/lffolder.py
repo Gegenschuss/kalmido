@@ -791,7 +791,7 @@ def lf_tree_move():
         raise Denied(404)
     pchain = _need_folder(c, uid, pid)
     if pchain[-1]["id"] != nchain[-1]["id"]:
-        raise Denied(409, tr("Files can only be moved within the same space"))
+        raise Denied(409, tr("Files can only be moved within the same workspace"))
     if any(x["id"] == nid for x in pchain):
         return err(tr("A folder cannot go into itself"))
     if n["kind"] == "ref":

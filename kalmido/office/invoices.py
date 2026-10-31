@@ -704,7 +704,7 @@ def inv_reminder_rows(c, oid, ids):
             raise BadInput(tr("Only open, finalised invoices can be reminded of ({0})", r["number"] or did))
         trial.add(bool(_col(r, "trial")))
         if len(trial) > 1:  # 2.144.10 B (#2576): one reminder never mixes trial and real invoices
-            raise BadInput(tr("A reminder cannot mix trial and real invoices"))
+            raise BadInput(tr("A payment reminder cannot mix trial and real invoices"))
         mf = inv_money_fields(r, pm)
         rows.append({"kind": "ref", "id": r["id"], "number": r["number"], "date": r["date"], "due_date": _col(r, "due_date") or "", "gross": _j(r["totals"], {}).get("gross"),
                      "open": mf["open"], "currency": r["currency"]})
@@ -818,7 +818,7 @@ def inv_check_reminder(c, oid, ids, rows):
         who = r["client_id"] if r["client_id"] else (_j(r["recipient"], {}).get("name") or "").strip().lower()
         keys.add((who, r["currency"]))
     if len(keys) > 1:
-        raise BadInput(tr("A reminder covers invoices of one client in one currency only"))
+        raise BadInput(tr("A payment reminder covers invoices of one client in one currency only"))
 
 
 def inv_check_reminder_due(rows, today=None):
@@ -827,7 +827,7 @@ def inv_check_reminder_due(rows, today=None):
     day0 = today or local_now().date().isoformat()
     early = [ln for ln in rows if ln.get("due_date") and ln["due_date"] >= day0]
     if early:
-        raise Denied(409, tr("Not yet overdue: {0}. A reminder can follow once the due date has passed.",
+        raise Denied(409, tr("Not yet overdue: {0}. A payment reminder can follow once the due date has passed.",
                              ", ".join(str(ln.get("number") or ln.get("id")) for ln in early[:10])))
 
 
@@ -968,7 +968,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
         meta.append([L.get("ref", tr("Ref./PO no.|document", lg=lang)), m["order_ref"]])
     # 2.357.0 B (#3181): no "Betreff" row in the head -- the project title is printed in bold below the title (was twice)
     if m["recipient"].get("customer_no"):
-        meta.append([L.get("customer_no", tr("Customer no.|document", lg=lang)), m["recipient"]["customer_no"]])
+        meta.append([L.get("customer_no", tr("Client no.|document", lg=lang)), m["recipient"]["customer_no"]])
     if kind in ("invoice", "credit") and m["recipient"].get("vat_id"):  # 2.296.0 B (#3168): section 14a (1) UStG
         meta.append([L.get("customer_vat_id", tr("Client VAT ID|document", lg=lang)), m["recipient"]["vat_id"]])
     if kind in ("invoice", "credit") and m["recipient"].get("buyer_reference"):  # 2.296.0 B (#3173): BT-10 visible as well
@@ -1115,7 +1115,7 @@ def _mail(to, subject, text, **kw):
         return mail_send(to, subject, text, **kw)  # 2.153.0 (#2029): the message sent (a letter keeps its Message-ID)
     except (smtplib.SMTPException, OSError) as e:
         app.logger.warning("office mail failed: %s", type(e).__name__)  # 2.39.0 (#1209 audit N6): no addresses in the log
-        raise Denied(409, tr("Mail server refused the message"))
+        raise Denied(409, tr("E-mail server refused the message"))
 
 
 def inv_datev_ready(c, oid, r, s):
@@ -1251,7 +1251,7 @@ def inv_own_text_quota(c, oid, uid):
     n = c.execute("SELECT COUNT(*) FROM office_doc_log WHERE org_id=? AND action='send' AND at>=? AND detail LIKE ?",  # pg-ok: own JSON, exact case
                   (oid, since, '%"own_text": 1%')).fetchone()[0]
     if n >= INV_OWN_TEXT_DAY:
-        raise Denied(429, tr("Your organisation sent {0} mails with an own text today; members can send more tomorrow or with the standard text", INV_OWN_TEXT_DAY))
+        raise Denied(429, tr("Your organisation sent {0} e-mails with an own text today; members can send more tomorrow or with the standard text", INV_OWN_TEXT_DAY))
 
 
 # 2.86.0 (N27): the day's budget of document mails (any text), generous so month-end billing never hits it
@@ -1281,14 +1281,14 @@ def h6c_send_budget(c, oid, uid, rcpts):
     n_org, n_me = c.execute("SELECT COUNT(*), COUNT(*) FILTER (WHERE user_id=?) FROM office_doc_log WHERE org_id=? AND action='send' AND at>=?",
                             (uid, oid, since)).fetchone()
     if n_org >= H6C_SEND_DAY_ORG or n_me >= H6C_SEND_DAY_PERSON:
-        raise DeniedKey(429, N_("The day's limit of document mails is reached ({0}); please try again tomorrow"),
+        raise DeniedKey(429, N_("The day's limit of document e-mails is reached ({0}); please try again tomorrow"),
                         H6C_SEND_DAY_PERSON if n_me >= H6C_SEND_DAY_PERSON else H6C_SEND_DAY_ORG)
     day = since[:10]
     keys = [f"o:{int(oid)}:{x.strip().lower()}"[:300] for x in rcpts if x]
     for k in keys:
         r = c.execute("SELECT n FROM mail_counts WHERE k=? AND day=?", (k, day)).fetchone()
         if r and r[0] >= H6C_SEND_DAY_RCPT:
-            raise DeniedKey(429, N_("This address already got {0} mails from your organisation today; please try again tomorrow"), H6C_SEND_DAY_RCPT)
+            raise DeniedKey(429, N_("This address already got {0} e-mails from your organisation today; please try again tomorrow"), H6C_SEND_DAY_RCPT)
     for k in keys:
         c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET
                      n=CASE WHEN mail_counts.day=excluded.day THEN mail_counts.n+1 ELSE 1 END, day=excluded.day""", (k, day))
@@ -1775,7 +1775,7 @@ def fd_fee_post(did):
         raise Denied(403, tr("Only an admin of this workspace can do this"))
     r = doc_row(c, oid, did)
     if r["kind"] != "reminder" or not ofx_locked(r) or money(dec(_col(r, "reminder_fee") or 0)) <= 0:
-        raise Denied(409, tr("Only the fee of a finalised reminder can be waived or marked as paid"))
+        raise Denied(409, tr("Only the fee of a finalised payment reminder can be waived or marked as paid"))
     b = body()
     st = b.get("state") if isinstance(b, dict) else None
     if st not in FEE_STATES:

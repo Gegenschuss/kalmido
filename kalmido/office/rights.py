@@ -43,7 +43,7 @@ SPECIAL_KEYS = tuple(k for k, _ in SPECIALS)
 # legacy: what an org member had before 2.187 ("member" = the routes without the admin check, "admin" = none)
 OFFICE_AREAS = (
     ("pipeline", N_("Pipeline"), "sell", ("deals", "leads"), False, "admin"),
-    ("offers", N_("Quotes & invoices"), "sell", ("docs", "series", "signoffs", "number-preview", "trial", "mail-status",
+    ("offers", N_("Quotations & invoices"), "sell", ("docs", "series", "signoffs", "number-preview", "trial", "mail-status",
                                                   "peppol", "undo", "catalog", "clients", "trash"), False, "member"),  # trash: 2.304 (#3038, the route asks for manage)
     ("time", N_("Times to bill"), "sell", ("time-open",), True, "member"),
     ("gendocs", N_("Documents"), "sell", ("gen-docs", "doc-templates", "privacy-sheets"), False, "admin"),
@@ -173,7 +173,7 @@ TEMPLATES = {
     "bookkeeping": (N_("Bookkeeping"), N_("Works in the finance areas and the invoices, exports for the tax adviser"),
                     _mix(_all("view"), edit=MONEY + ("offers",)), ("pay", "lock", "export")),
     # 2.187.1 A (#2735): equipment "edit" -- the project management plans sets / crew (they moved out of the quotes' area)
-    "projects": (N_("Project management"), N_("Quotes, invoices, documents and correspondence; own expenses like everybody"),
+    "projects": (N_("Project management"), N_("Quotations, invoices, documents and correspondence; own expenses like everybody"),
                  _mix(_all("none"), edit=SELL + ("receipts", "travel", "logbook", "meals", "equipment"), view=("kpi", "services", "texts", "settings")),
                  ("release",)),
     "staff": (N_("Staff"), N_("Only their own receipts, travel expenses, drives, entertainment receipts and times"),

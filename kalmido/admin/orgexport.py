@@ -842,7 +842,7 @@ def ox_build(c, oid, out, by=None):
 # no other areas of the private space, nobody else. The import takes it into an organisation or into a personal office.
 OX_PB_CLIENTS = {"clients": "org_id IS NULL AND created_by=?",
                  "office_client_contacts": "org_id IS NULL AND client_id IN (SELECT id FROM clients WHERE org_id IS NULL AND created_by=?)"}
-OX_PB_LEFT = N_("everything of the private space but the office, its clients and the documents the office stands on (receipts, filed letters, contract and equipment documents, cash book receipts); files below a browser-locked folder stay out")
+OX_PB_LEFT = N_("everything of the private workspace but the office, its clients and the documents the office stands on (receipts, filed letters, contract and equipment documents, cash book receipts); files below a browser-locked folder stay out")
 
 
 def ox_pb_nodes(c, oid, owner, have):

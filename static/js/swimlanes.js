@@ -35,7 +35,7 @@ function swlLanes(lid, m, tasks) {
     const by = (a, b) => a.name.localeCompare(b.name, LOCALE());
     return [...[...us].map(u => ({key: 'u' + u, name: personName(lid, u) || personNameAny(u) || '?', uid: u, has: t => t.assignee_id === u})).sort(by),
       ...[...gs].map(g => ({key: 'g' + g, name: (listGroups(lid).find(x => x.group_id === g)?.name || '?') + ' · ' + tr('Group'), has: t => !t.assignee_id && t.assignee_group_id === g})).sort(by),
-      {key: 'n', name: tr('Nobody assigned'), has: t => !t.assignee_id && !t.assignee_group_id}];
+      {key: 'n', name: tr('Unassigned|nobody'), has: t => !t.assignee_id && !t.assignee_group_id}];
   }
   const f = m ? fieldById(+m.slice(1)) : null; if (!f) return [];
   const v = t => String(t.fields?.[f.id] ?? '');

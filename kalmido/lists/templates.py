@@ -831,7 +831,7 @@ def ptype_template(k, lg, sections=False):
 
 def ptype_create(c, uid, k, name, folder="", color="", start=None, sections=False, org_id="auto"):
     """A new project list of type k for uid; returns (list id, [modules switched on]). 2.27.0 (#972): the type's standard
-    sections only when asked for (sections=True: the box "With the standard sections" / API sections: true); without them
+    sections only when asked for (sections=True: the box "With the default sections" / API sections: true); without them
     the project starts empty (modules, ticket types, fields and the view still come with the type)."""
     if k not in PTYPES:
         raise BadInput(tr("Invalid value: {0}", tr("Project type")))

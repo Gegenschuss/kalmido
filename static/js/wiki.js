@@ -154,7 +154,7 @@ function wk_scrollAfter(id, ready) {
   requestAnimationFrame(() => { const v = $('#view'); if (v && S.route.mod === 'wiki') v.scrollTop = y; });
 }
 // 2.210 A (#2755): more pages than the index carries (WIKI_INDEX_MAX on the server): said, not silently cut
-const wk_moreHtml = d => d?.more ? `<div class="muted mhint wkcapped" role="status">${ic('info', 's')}${esc(tr('Only the first {0} pages of this space are shown here.', 5000))}</div>` : '';
+const wk_moreHtml = d => d?.more ? `<div class="muted mhint wkcapped" role="status">${ic('info', 's')}${esc(tr('Only the first {0} pages of this workspace are shown here.', 5000))}</div>` : '';
 // ---- the view
 function viewWiki() {
   const all = wk_all(), op = wk_open(), sp = op || wk_cur(), d = WK.idx[sp];
@@ -284,7 +284,7 @@ function wk_moveTo(nid, anchor) {  // "Move to …": the folders of the space (n
     .sort((a, b) => a.path.localeCompare(b.path, LOCALE()));
   const items = [...(x.parent !== d.root ? [{label: tr('Top level'), icon: 'up', fn: () => wk_nodeMove(nid, {parent_id: d.root})}] : []),
     ...fs.map(f => ({label: f.path, icon: 'folder', fn: () => wk_nodeMove(nid, {parent_id: f.id})}))];
-  if (!items.length) { toast(tr('No other folder in this space')); return; }
+  if (!items.length) { toast(tr('No other folder in this workspace')); return; }
   menu(anchor || document.body, [{head: tr('Move to …')}, ...items.slice(0, 80)], null, null, tr('Move to …'));
 }
 // ---- 2.353.0 C (#2829, audit B 2): "Select" next to "New folder": several folders / pages (their nodes) moved or put into the
@@ -412,7 +412,7 @@ function wk_deskHtml(sp, d, id, cur, sel, op) {
   if (all && !op) d = null;  // 2.198.0 A (#2743): no space open: no space's menu, offline mark or lock bar
   const bar = `<div class="wkbar">${sel}<div class="ssearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
     <button type="button" class="btn sm pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button>${!all || op ? wk_dayBtn() : ''}${wk_canFolder(sp) && (!all || op) ? wk_folderBtn() + wk_selBtn(sp, !q && !id && !!pages.length) : ''}
-    ${S.me?.kid || !op ? '' : `<button type="button" class="iconbtn" data-wk="amenu" aria-haspopup="menu" title="${esc(tr('Space'))}" aria-label="${esc(tr('Space'))}">${ic('dots')}</button>`}</div>${d?.off ? wko_offHtml(d.off, d.more) : wk_moreHtml(d)}${d && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}`;  // 2.169 (#2671): the offline mark; 2.210 A (#2755): the cap online
+    ${S.me?.kid || !op ? '' : `<button type="button" class="iconbtn" data-wk="amenu" aria-haspopup="menu" title="${esc(tr('Workspace'))}" aria-label="${esc(tr('Workspace'))}">${ic('dots')}</button>`}</div>${d?.off ? wko_offHtml(d.off, d.more) : wk_moreHtml(d)}${d && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}`;  // 2.169 (#2671): the offline mark; 2.210 A (#2755): the cap online
   const hits = all && q ? wk_allHitsHtml(q, 'wkdlist') : q && d?.pages ? `<nav id="wk-res" class="wkdlist" aria-label="${esc(tr('Pages'))}">${(v => v.length ? `<ul class="wktree">${v.map((p, i) => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}${wk_hitName(p, i)}</a></li>`).join('')}</ul>` : `<div class="empty">${tr('No page matches.')}</div>`)(pages.filter(p => p.path.toLowerCase().includes(q) || d.off && String(p.body || '').toLowerCase().includes(q)))}${!d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, pages.filter(p => p.path.toLowerCase().includes(q))) : ''}</nav>` : '';  // 2.169 (#2671): offline the texts are searched here
   if (id && !hits) return `<div class="ntwrap wkwrap wkdesk">${bar}<article class="ntedit wkpage${typeof wkst_cls === 'function' ? wkst_cls(cur?.space || sp) : ''}" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : (WK.pgErr && WK.pgLost === id ? wk_lostHtml() : `<div class="muted mhint">${WK.pgErr ? esc(WK.pgErr) : tr('Loading…')}</div>`)}</article></div>`;
   if (!hits && S.route.wtag != null && typeof wkt_viewHtml === 'function' && (!all || op)) return `<div class="ntwrap wkwrap wkdesk">${bar}<section class="wkfolder wktagview" aria-label="${esc(tr('Tags'))}">${wkt_viewHtml(sp, S.route.wtag)}</section></div>`;  // 2.371 (#3150): a tag's pages
@@ -700,7 +700,7 @@ async function wk_new(path0 = '', dir = '', spx = '') {  // 2.210 B (#2757): dir
   const pre = dir || path0 || (S.route.mod === 'wiki' && S.route.wdir ? S.route.wdir + '/' : '') || (WK.pg && WK.pg.space === sp0 && WK.pg.path.includes('/') ? WK.pg.path.split('/').slice(0, -1).join('/') + '/' : '');  // 2.152.3 B (#2620): + the open folder
   WK.tplPick = 0;
   const tsel = (tpls.length || ask) && !path0 ? `<label class="wktpl ${tpls.length ? '' : 'hidden'}">${tr('Template')}<select data-wk-tpl aria-label="${esc(tr('Template'))}">${wk_tplOpts(sp0)}</select></label>` : '';
-  const ssel = ask ? `<label class="wktpl">${tr('Space')}<select data-wk-sp aria-label="${esc(tr('Space'))}">${sps.map(s => `<option value="${esc(s)}" ${s === sp0 ? 'selected' : ''}>${esc(wk_spaceName(s))}</option>`).join('')}</select></label>` : '';
+  const ssel = ask ? `<label class="wktpl">${tr('Workspace')}<select data-wk-sp aria-label="${esc(tr('Workspace'))}">${sps.map(s => `<option value="${esc(s)}" ${s === sp0 ? 'selected' : ''}>${esc(wk_spaceName(s))}</option>`).join('')}</select></label>` : '';
   const path = path0 || await askDialog({title: tr('New page'), html: ssel + tsel, input: {value: pre, placeholder: tr('Name, folders with / (e.g. Processes/Checklist)'), max: 500}, ok: tr('Create')});
   if (!path || !path.trim()) return;
   const tpl = +WK.tplPick || 0, sp = ask && wk_spaces().includes(WK.spPick) ? WK.spPick : sp0;
@@ -909,7 +909,7 @@ function wk_acPick(i) {
 }
 // 2.99.0 B (#2183): the former sidebar menu, now the "Space" section (de: Bereich) of the header "…" menu (same rights as before)
 function w299_areaItems() {
-  return [{head: tr('Space')}, {label: tr('Export as ZIP'), icon: 'download', fn: wk_export}, ...(WK.idx[wk_cur()]?.mayWrite !== false ? [{label: tr('Import ZIP…'), icon: 'upload', fn: wk_import}, {label: tr('Trash'), icon: 'trash', fn: () => wk_trashDlg()}] : []),  // 2.143.0 B (#2211): + Trash
+  return [{head: tr('Workspace')}, {label: tr('Export as ZIP'), icon: 'download', fn: wk_export}, ...(WK.idx[wk_cur()]?.mayWrite !== false ? [{label: tr('Import ZIP…'), icon: 'upload', fn: wk_import}, {label: tr('Trash'), icon: 'trash', fn: () => wk_trashDlg()}] : []),  // 2.143.0 B (#2211): + Trash
     ...(typeof wkeDlg === 'function' && S.me?.kind !== 'agent' && globalThis.crypto?.subtle ? [{label: tr('Encryption…'), icon: 'lock', fn: () => wkeDlg(wk_cur())}] : []),
     ...(typeof wkst_items === 'function' && WK.idx[wk_cur()]?.may_style ? wkst_items({space: wk_cur()}) : [])];  // 2.371.3 (#3152): the space's reading style
 }
@@ -1166,7 +1166,7 @@ async function wko_queue(p, patch) {
   const url = '/api/wiki/pages/' + p.id;
   let b = {...patch};
   if (wk_e2e(p.space)) {
-    if (typeof wkeReady !== 'function' || !wkeReady(p.space)) { WK.dirty = true; toast(tr('Unlock first: this space is encrypted in the browser.')); return; }
+    if (typeof wkeReady !== 'function' || !wkeReady(p.space)) { WK.dirty = true; toast(tr('Unlock first: this workspace is encrypted in the browser.')); return; }
     b = await wkeSeal(p.space, {body: patch.body}); b.expect_updated_at = patch.expect_updated_at;
   }
   const q = outSync().find((x, i) => (i > 0 || !OUT.flushing) && !x.sending && !x.done && x.method === 'PATCH' && x.url === url);
@@ -1209,7 +1209,7 @@ async function wko_cfShow(p) {
   await wk_loadPage(p.id, true);
   const cur = WK.pg; if (!cur || cur.id !== p.id || cur._off) return;
   let mine = r.mine;
-  if (typeof wkeIs === 'function' && wkeIs(mine)) { mine = await wkeDec(cur.space, 'body', mine).catch(() => null); if (mine == null) { toast(tr('Unlock first: this space is encrypted in the browser.')); return; } }
+  if (typeof wkeIs === 'function' && wkeIs(mine)) { mine = await wkeDec(cur.space, 'body', mine).catch(() => null); if (mine == null) { toast(tr('Unlock first: this workspace is encrypted in the browser.')); return; } }
   if (await wk_conflict(cur, {...cur}, {body: mine, expect_updated_at: cur.updated_at}) === true) { delete WKO.cf[p.id]; await wko_del(r.k); renderView(); }  // closed without a choice: mine keeps waiting
 }
 // 2.169.1 (#2672): a space with more pages than the index holds says that only the first ones are kept here

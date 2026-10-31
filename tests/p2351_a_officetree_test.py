@@ -15,7 +15,7 @@
      its folder goes into the trash
  (e) an agent: only through a share with exactly it AND the office's area -- the organisation's agent with the office
      switch but without a group for letters: hidden even with its share
- (f) a person without an organisation: her personal office's tree (private space), her folder, her quotation and
+ (f) a person without an organisation: her personal office's tree (private workspace), her folder, her quotation and
      document in it, her agent reads the document through its share
  (h) another organisation's admin: her own office's tree only, no folder in alpha's folders
  (f2) the lists of Documents / Correspondence show what another office (a personal office's folder) shares with the person

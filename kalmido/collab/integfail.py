@@ -21,7 +21,7 @@ INTEG_TEXT = {
     "webhook": N_("Webhook {0} was turned off: its events could not be delivered."),
     "webhook_admin": N_("Webhook {0} was turned off: the person who set it up is no admin of the organisation any more."),
     "hookin": N_("Inbound webhook {0} is paused: {1}"),
-    "mailbox": N_("Mailbox {0} cannot fetch mail, failing since {1}."),
+    "mailbox": N_("Mailbox {0} cannot fetch e-mail, failing since {1}."),
     "git": N_("Git connection {0} cannot fetch, failing since {1}."),
     "ntfy": N_("ntfy inbox {0} cannot fetch, failing since {1}."),
     "backup": N_("Backup failed: {0}"),

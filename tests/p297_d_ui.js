@@ -1,7 +1,7 @@
 // 2.97.0 part D UI test (#2050), own container (start.sh), Firefox (real WebCrypto): a knowledge page of a space with the lock to
-// another workspace. Alice locks her private space; the page menu offers "Move to another workspace…", the dialog warns that
+// another workspace. Alice locks her private workspace; the page menu offers "Move to another workspace…", the dialog warns that
 // the pages are no longer end-to-end encrypted in the open organisation, a second question confirms it, the server then holds
-// the plain page there; Undo encrypts it again for the private space (the old name, readable with the key). Lock -> lock:
+// the plain page there; Undo encrypts it again for the private workspace (the old name, readable with the key). Lock -> lock:
 // both pages of a folder re-encrypted for the organisation's key, the link between them follows. A person without an
 // organisation: there is no other workspace (409). P297D_NOSTART=1 = the server already runs.
 const path = require('path');
@@ -50,7 +50,7 @@ const M = 'QXZmark';  // every plain text of the moved pages carries it
   await session('alice', async ({ev, waitFor, boot, unlock}) => {
     check(await unlock(), 'Alice sets up encryption');
     const st = await ev(`wkeStart('private').then(r => ({r, mode: wkeMode('private')})).catch(e => ({err: e.message}))`);
-    check(st.r === true && st.mode === 'on', 'the private space is locked ' + JSON.stringify(st));
+    check(st.r === true && st.mode === 'on', 'the private workspace is locked ' + JSON.stringify(st));
     let idx = (await call('GET', '/api/wiki?space=private&bodies=1')).j;
     check((idx.pages || []).length === 2 && idx.pages.every(x => x.path.startsWith('e2e1:')) && !JSON.stringify(idx).includes(M), 'the server keeps ciphers only');
 
@@ -73,10 +73,10 @@ const M = 'QXZmark';  // every plain text of the moved pages carries it
     const moved = await until(async () => { const g = (await call('GET', '/api/wiki/pages/' + P1)).j; return g.space === SP && g; });
     check(moved && moved.path === 'Plan' && moved.body === `${M} plan, see [[Box/Other]]`, 'the page is plain and readable in the organisation ' + JSON.stringify(moved).slice(0, 200));
 
-    // ---- Undo: encrypted again for the private space, the old name
+    // ---- Undo: encrypted again for the private workspace, the old name
     await ev(`histStep('undo')`);
     const back = await until(async () => { const g = (await call('GET', '/api/wiki/pages/' + P1)).j; return g.space === 'private' && g; });
-    check(back && back.path.startsWith('e2e1:') && back.body.startsWith('e2e1:') && !JSON.stringify(back).includes(M), 'Undo: back in the private space as ciphers');
+    check(back && back.path.startsWith('e2e1:') && back.body.startsWith('e2e1:') && !JSON.stringify(back).includes(M), 'Undo: back in the private workspace as ciphers');
     const op = await ev(`(async () => { const p = await wkePage(await rawFetch('GET', '/api/wiki/pages/${P1}')); return {path: p.path, body: p.body, locked: !!p._wke}; })()`);
     check(op && op.path === 'Box/Plan' && op.body === `${M} plan, see [[Box/Other]]` && !op.locked, 'Undo: the old name and text open with the key ' + JSON.stringify(op));
 

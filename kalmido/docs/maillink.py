@@ -35,7 +35,7 @@ ML_MAX_BYTES = min(MAX_FILE_MB, 20) * 1024 * 1024
 ML_TIMEOUT, ML_DEADLINE = 10, 25  # s per socket operation / for one download
 ML_MAIL_DEADLINE = 40  # 2.424.0 B2 (#3450): s for all the downloads of one mail
 ML_HOUR_LINKS, ML_HOUR_EML = 30, 60  # 2.424.0 B2 (#3450): per document address and hour: downloads / mails filed without a file
-ML_TAG = N_("Receipt link needs a login")
+ML_TAG = N_("Receipt link needs a sign-in")
 ML_UA = f"{APP_NAME}/{APP_VERSION} (receipt link)"
 # invoice / receipt hosts whose mails carry a download link instead of the PDF (exactly these hosts). 2.424.0 B2 (#3450,
 # review): only the hosts that serve the invoice itself -- no whole provider domains (google.com, apple.com, paypal.com

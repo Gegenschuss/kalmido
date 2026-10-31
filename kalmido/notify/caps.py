@@ -274,7 +274,7 @@ def list_tpl_put(lid):
     except BadInput as e:
         return err(str(e))
     if uid and (uid == me() or not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()):
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     if tpl is None:
         c.execute("DELETE FROM list_notif WHERE list_id=? AND user_id=?", (lid, uid))
     else:
@@ -321,7 +321,7 @@ def folder_tpl_put():
     except BadInput as e:
         return err(str(e))
     if uid and not c.execute("SELECT 1 FROM folder_people WHERE owner_id=? AND folder=? AND user_id=?", (me(), f, uid)).fetchone():
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     if "tpl" in b:
         if tpl is None:
             c.execute("DELETE FROM folder_notif WHERE owner_id=? AND folder=? AND user_id=?", (me(), f, uid))

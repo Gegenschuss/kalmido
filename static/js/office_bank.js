@@ -74,14 +74,14 @@ function bnkOtherHtml(t) {
   const rows = !c ? `<p class="muted">${tr('Loading…')}</p>` : !c.length ? `<p class="muted">${tr('Nothing found')}</p>`
     : `<ul class="ofclist" role="list">${c.map(x => `<li><button type="button" class="ofcrow" data-bnk="match" data-id="${t.id}" data-kind="${x.kind}" data-mid="${x.id}"><span class="ofcn"><b>${esc(x.label || tr(BNK_KIND[x.kind]))}</b><small class="muted">${esc(fmtDateLoc(x.date))}${x.kind === 'invoice' ? ` · ${x.refund ? tr('refund open') : tr('open')}` : ''}</small></span><span class="rksum">${ofcMoney(x.amount)}</span></button></li>`).join('')}</ul>`;
   const sp = +t.amount > 0 ? `<button type="button" class="btn sm ghost" data-bnk="split" data-id="${t.id}">${tr('Split across invoices…')}</button>` : '';
-  return `<div class="bnkother"><input type="search" class="bnkq" data-bnk-q="${t.id}" value="${esc(BNK.candQ)}" placeholder="${esc(+t.amount > 0 ? tr('Number or customer') : tr('Name of the receipt'))}" aria-label="${esc(tr('Search'))}">${rows}${sp}</div>`;
+  return `<div class="bnkother"><input type="search" class="bnkq" data-bnk-q="${t.id}" value="${esc(BNK.candQ)}" placeholder="${esc(+t.amount > 0 ? tr('Number or client') : tr('Name of the receipt'))}" aria-label="${esc(tr('Search'))}">${rows}${sp}</div>`;
 }
 // 2.355.0 B (#2843): one booking on several invoices (a collective transfer) or more than the open amount: an amount per
 // invoice, the rest of the booking stays visible as overpaid (server: bank.py bnk_parts)
 function bnkSplitHtml(t, c) {
   const rows = !c ? `<p class="muted">${tr('Loading…')}</p>` : !c.length ? `<p class="muted">${tr('Nothing found')}</p>`
     : `<ul class="ofclist" role="list">${c.map(x => `<li class="ofcrow"><span class="ofcn"><b>${esc(x.label)}</b><small class="muted">${esc(fmtDateLoc(x.date))} · ${tr('open')} ${ofcMoney(x.amount)}</small></span><input class="numin" inputmode="decimal" maxlength="16" data-bnk-part="${x.id}" data-open="${esc(x.amount)}" value="${esc(BNK.parts?.[x.id] ?? '')}" aria-label="${esc(tr('Amount for {0}', x.label))}" placeholder="${esc(ofcMoney(x.amount))}"></li>`).join('')}</ul>`;
-  return `<div class="bnkother"><input type="search" class="bnkq" data-bnk-q="${t.id}" value="${esc(BNK.candQ)}" placeholder="${esc(tr('Number or customer'))}" aria-label="${esc(tr('Search'))}">${rows}
+  return `<div class="bnkother"><input type="search" class="bnkq" data-bnk-q="${t.id}" value="${esc(BNK.candQ)}" placeholder="${esc(tr('Number or client'))}" aria-label="${esc(tr('Search'))}">${rows}
     <div class="bnkacts"><span class="muted" data-bnk-rest="${t.id}" data-amount="${esc(t.amount)}">${esc(bnkSplitRest(t.amount))}</span><span class="spacer"></span><button type="button" class="btn sm ghost" data-bnk="split" data-id="${t.id}">${tr('Cancel')}</button><button type="button" class="btn sm pri" data-bnk="splitgo" data-id="${t.id}">${tr('Assign match')}</button></div></div>`;
 }
 function bnkSplitRest(amount) {

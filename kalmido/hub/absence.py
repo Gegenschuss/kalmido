@@ -20,7 +20,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, system_ctx
-from ..core.i18n import tr
+from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, iso, local_now, now_utc, usettings
 from ..core.access import Denied
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
@@ -37,23 +37,24 @@ ABS_RANGE_MAX = 370  # days of one view
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # ---------------------------------------------------------------- German public holidays
-ABS_STATES = {"BW": "Baden-Württemberg", "BY": "Bayern", "BE": "Berlin", "BB": "Brandenburg", "HB": "Bremen",
-              "HH": "Hamburg", "HE": "Hessen", "MV": "Mecklenburg-Vorpommern", "NI": "Niedersachsen",
-              "NW": "Nordrhein-Westfalen", "RP": "Rheinland-Pfalz", "SL": "Saarland", "SN": "Sachsen",
-              "ST": "Sachsen-Anhalt", "SH": "Schleswig-Holstein", "TH": "Thüringen",
-              "AT": "Österreich"}  # 2.155.0 B (#2076): Austria (nationwide holidays only)
-# names stay German (they are German holidays); regional ones only where they hold in the whole state
-_FIXED = ((1, 1, "Neujahr", None), (1, 6, "Heilige Drei Könige", "BW BY ST"), (3, 8, "Internationaler Frauentag", "BE MV"),
-          (5, 1, "Tag der Arbeit", None), (8, 15, "Mariä Himmelfahrt", "SL"), (9, 20, "Weltkindertag", "TH"),
-          (10, 3, "Tag der Deutschen Einheit", None), (10, 31, "Reformationstag", "BB HB HH MV NI SN ST SH TH"),
-          (11, 1, "Allerheiligen", "BW BY NW RP SL"), (12, 25, "1. Weihnachtstag", None), (12, 26, "2. Weihnachtstag", None))
-_EASTER = ((-2, "Karfreitag", None), (0, "Ostersonntag", "BB"), (1, "Ostermontag", None), (39, "Christi Himmelfahrt", None),
-           (49, "Pfingstsonntag", "BB"), (50, "Pfingstmontag", None), (60, "Fronleichnam", "BW BY HE NW RP SL"))
+# 2.368.4 (#2989): states and holidays as translation keys, shown in the reader's language (abs_states_shown, abs_holidays_shown)
+ABS_STATES = {"BW": N_("Baden-Württemberg"), "BY": N_("Bavaria"), "BE": N_("Berlin"), "BB": N_("Brandenburg"), "HB": N_("Bremen"),
+              "HH": N_("Hamburg"), "HE": N_("Hesse"), "MV": N_("Mecklenburg-Vorpommern"), "NI": N_("Lower Saxony"),
+              "NW": N_("North Rhine-Westphalia"), "RP": N_("Rhineland-Palatinate"), "SL": N_("Saarland"), "SN": N_("Saxony"),
+              "ST": N_("Saxony-Anhalt"), "SH": N_("Schleswig-Holstein"), "TH": N_("Thuringia"),
+              "AT": N_("Austria")}  # 2.155.0 B (#2076): Austria (nationwide holidays only)
+# regional ones only where they hold in the whole state
+_FIXED = ((1, 1, N_("New Year's Day"), None), (1, 6, N_("Epiphany"), "BW BY ST"), (3, 8, N_("International Women's Day"), "BE MV"),
+          (5, 1, N_("Labour Day"), None), (8, 15, N_("Assumption Day"), "SL"), (9, 20, N_("World Children's Day"), "TH"),
+          (10, 3, N_("German Unity Day"), None), (10, 31, N_("Reformation Day"), "BB HB HH MV NI SN ST SH TH"),
+          (11, 1, N_("All Saints' Day"), "BW BY NW RP SL"), (12, 25, N_("Christmas Day"), None), (12, 26, N_("Boxing Day"), None))
+_EASTER = ((-2, N_("Good Friday"), None), (0, N_("Easter Sunday"), "BB"), (1, N_("Easter Monday"), None), (39, N_("Ascension Day"), None),
+           (49, N_("Whit Sunday"), "BB"), (50, N_("Whit Monday"), None), (60, N_("Corpus Christi"), "BW BY HE NW RP SL"))
 # 2.155.0 B (#2076): Austria's nationwide public holidays (Good Friday is none since 2019)
-_AT_FIXED = ((1, 1, "Neujahr"), (1, 6, "Heilige Drei Könige"), (5, 1, "Staatsfeiertag"), (8, 15, "Mariä Himmelfahrt"),
-             (10, 26, "Nationalfeiertag"), (11, 1, "Allerheiligen"), (12, 8, "Mariä Empfängnis"), (12, 25, "Christtag"),
-             (12, 26, "Stefanitag"))
-_AT_EASTER = ((1, "Ostermontag"), (39, "Christi Himmelfahrt"), (50, "Pfingstmontag"), (60, "Fronleichnam"))
+_AT_FIXED = ((1, 1, N_("New Year's Day")), (1, 6, N_("Epiphany")), (5, 1, N_("State Holiday")), (8, 15, N_("Assumption Day")),
+             (10, 26, N_("Austrian National Day")), (11, 1, N_("All Saints' Day")), (12, 8, N_("Immaculate Conception")),
+             (12, 25, N_("Christmas Day|Austria")), (12, 26, N_("St Stephen's Day")))
+_AT_EASTER = ((1, N_("Easter Monday")), (39, N_("Ascension Day")), (50, N_("Whit Monday")), (60, N_("Corpus Christi")))
 
 
 def abs_easter(y):
@@ -71,7 +72,7 @@ def abs_easter(y):
 
 
 def abs_holidays_year(y, state):
-    """{ISO day: name} of the public holidays of year y in state (one of ABS_STATES; '' = none)."""
+    """{ISO day: name key} of the public holidays of year y in state (one of ABS_STATES; '' = none)."""
     if state not in ABS_STATES:
         return {}
     if state == "AT":  # 2.155.0 B (#2076)
@@ -95,16 +96,28 @@ def abs_holidays_year(y, state):
             out[(e + timedelta(days=off)).isoformat()] = name
     if state == "SN":  # Buss- und Bettag: the Wednesday before 23 November
         d = date(y, 11, 22)
-        out[(d - timedelta(days=(d.weekday() - 2) % 7)).isoformat()] = "Buß- und Bettag"
+        out[(d - timedelta(days=(d.weekday() - 2) % 7)).isoformat()] = N_("Day of Repentance and Prayer")
     return out
 
 
 def abs_holidays(state, first, last):
-    """{ISO day: name} within [first, last] (dates)."""
+    """{ISO day: name key} within [first, last] (dates)."""
     out = {}
     for y in range(first.year, last.year + 1):
         out.update({k: v for k, v in abs_holidays_year(y, state).items() if first.isoformat() <= k <= last.isoformat()})
     return out
+
+
+def abs_holidays_shown(hol, lg=None):
+    """2.368.4 (#2989): {ISO day: name key} as the sorted list of an answer, the names in the reader's language."""
+    lg = lg or lang()
+    return [{"date": k, "name": tr(v, lg=lg)} for k, v in sorted(hol.items())]
+
+
+def abs_states_shown(lg=None):
+    """2.368.4 (#2989): the states to choose from, in the reader's language."""
+    lg = lg or lang()
+    return {k: tr(v, lg=lg) for k, v in ABS_STATES.items()}
 
 
 def abs_state(c, oid):
@@ -294,7 +307,7 @@ def abs_mine_today(c, uid, day):
         return None
     if r:
         r = oc_dec_fields(c, r["org_id"], "hub_absences", r)
-    return {"kind": r["kind"] if r else "", "half_day": (r["half_day"] or "") if r else "", "holiday": hol}
+    return {"kind": r["kind"] if r else "", "half_day": (r["half_day"] or "") if r else "", "holiday": tr(hol) if hol else ""}
 
 
 # ---------------------------------------------------------------- routes
@@ -327,13 +340,13 @@ def abs_list():
     with_org = [{"id": r[0], "name": r[1]} for r in c.execute(
         "SELECT id, name FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id") if r[0] in mine]
     # 2.96.0 D (#1941): the personal area (when there is one) is offered next to the organisations
-    return jsonify(org_id=oid, orgs=with_org, personal=pb_personal(c, uid, create=False), admin=adm, state=st, states=ABS_STATES, today=today.isoformat(),
+    return jsonify(org_id=oid, orgs=with_org, personal=pb_personal(c, uid, create=False), admin=adm, state=st, states=abs_states_shown(), today=today.isoformat(),
                    start=first.isoformat(), end=last.isoformat(),
                    people=[{**user_public(p), "own": p["id"] == uid} for p in people],
                    items=[{**abs_public(r, adm or r["user_id"] == uid, c), "can_edit": adm or r["user_id"] == uid}
                           for r in rows if r["user_id"] in pids
                           and (r["status"] == "approved" or adm or r["user_id"] == uid)],  # 2.125.0 A (#2117): requests only for them
-                   holidays=[{"date": k, "name": v} for k, v in sorted(abs_holidays(st, first, last).items())])
+                   holidays=abs_holidays_shown(abs_holidays(st, first, last)))
 
 
 @app.post("/api/team/absences")
@@ -352,7 +365,7 @@ def abs_create():
         if not abs_admin(c, uid, oid):
             raise Denied(403, tr("Only admins of this workspace can enter absences for other people"))
         if who not in {p["id"] for p in abs_people(c, oid)}:
-            raise Denied(404, tr("unknown user"))
+            raise Denied(404, tr("unknown person"))
     v = abs_clean(b)
     e = oc_enc_fields(c, oid, "hub_absences", {"kind": v["kind"], "note": v.get("note", "")})
     from .leave import lv_requested, lv_status_new
@@ -484,7 +497,7 @@ def v1_absences():
                      (oid, last.isoformat(), first.isoformat())).fetchall()
     return jsonify(org_id=oid, people=[{"id": p["id"], "display_name": p["display_name"] or p["username"]} for p in people],
                    items=[{k: v for k, v in abs_public(r, False).items() if k not in ("id", "status")} for r in rows if r["user_id"] in pids],
-                   holidays=[{"date": k, "name": v} for k, v in sorted(abs_holidays(abs_state(c, oid), first, last).items())])
+                   holidays=abs_holidays_shown(abs_holidays(abs_state(c, oid), first, last)))
 
 
 def abs_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):

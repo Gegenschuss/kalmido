@@ -11,7 +11,7 @@ const PB_SRC = {edit: N_('edited|playbook'), restore: N_('restored|playbook'), p
 // the three examples of the help and of the empty editor (made up, general texts; the person adapts them)
 const PB_EX = [
   {k: 'receipts', t: N_('Receipts and insurance refunds'),
-    intro: N_('Each task is a receipt (a photo or a mail) that should be refunded by the health insurance.'),
+    intro: N_('Each task is a receipt (a photo or a e-mail) that should be refunded by the health insurance.'),
     steps: [N_('Read amount, date and issuer from the attachment and write them into the notes as a short list.'),
       N_('Add the project tag #submitted once the receipt is in the insurance portal; ask in a comment if anything is unclear.'),
       N_('When a refund arrives, compare the amount and complete the task; a difference goes into a comment.')],
@@ -26,7 +26,7 @@ const PB_EX = [
     intro: N_('Each task is an error report for our software.'),
     steps: [N_('Make the title short and clear: where, what happens, what was expected.'),
       N_('Ask in a comment for the missing steps to reproduce, the version and the device.'),
-      N_('Set the priority: high for data loss or a blocked login, else medium or low.')],
+      N_('Set the priority: high for data loss or a blocked sign-in, else medium or low.')],
     rules: [N_('Do not close a ticket without a fix or a reply from the reporter.'), N_('Code changes go through a merge request with a review.')]}];
 function pbExText(x) {
   return `## ${tr(x.t)}\n\n${tr(x.intro)}\n\n### ${tr('How to work here')}\n${x.steps.map((s, i) => `${i + 1}. ${tr(s)}`).join('\n')}\n\n### ${tr('Rules')}\n${x.rules.map(s => '- ' + tr(s)).join('\n')}\n`;

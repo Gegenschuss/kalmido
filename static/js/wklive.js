@@ -321,9 +321,9 @@ function wkst_items(p) {
 function wkst_menu(sp) {
   const own = LS.get('wkSt', ''), d = WK.idx[sp]?.style || '', clear = tr('Clear|reading style'), name = k => k ? tr(WKST[k]) : clear;
   const mine = (k, label) => ({label, on: own === k, fn: () => { if (k) LS.set('wkSt', k); else LS.del('wkSt'); renderView(); }});
-  const items = [{head: tr('For me')}, mine('', tr('Like the space ({0})', name(d))), mine('clear', name('')), ...Object.keys(WKST).map(k => mine(k, name(k)))];
+  const items = [{head: tr('For me')}, mine('', tr('Like the workspace ({0})', name(d))), mine('clear', name('')), ...Object.keys(WKST).map(k => mine(k, name(k)))];
   if (WK.idx[sp]?.may_style) {
-    items.push({head: tr('Default of the space')}, ...['', ...Object.keys(WKST)].map(k => ({label: name(k), on: d === k, fn: async () => {
+    items.push({head: tr('Default of the workspace')}, ...['', ...Object.keys(WKST)].map(k => ({label: name(k), on: d === k, fn: async () => {
       try { await api('PUT', '/api/wiki/style', {space: sp, style: k}); } catch (e) { toast(e.message); return; }
       if (WK.idx[sp]) WK.idx[sp].style = k;
       renderView();

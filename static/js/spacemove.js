@@ -76,7 +76,7 @@ async function oor_ask(req) {
   if (!req?.org) return false;
   try {
     const r = await api('POST', `/api/orgs/${req.org}/out-requests`, {kind: req.kind, id: req.id});
-    toast(r.again ? (r.state === 'approved' ? tr('Already released: move it into your private space now') : tr('Already asked: the admins have not decided yet'))
+    toast(r.again ? (r.state === 'approved' ? tr('Already released: move it into your private workspace now') : tr('Already asked: the admins have not decided yet'))
       : tr('Asked: the admins of the organisation decide. You hear about it in the News.'), null, 6000);
     return true;
   } catch { return false; /* api() showed it */ }

@@ -439,7 +439,8 @@ def frq_page(token):
     c = db()
     from ..api.common import hit_limit  # 2.124.1: inside (layers: files is a domain module)
     if hit_limit("frqv:" + rate_ip(), FRQ_VIEW_RATE):
-        return _msg(tr("Too many requests"), tr("Please wait a minute and try again."), _accept_lang(), 429)
+        lg = _accept_lang()  # 2.368.4 (#2989): the visitor's language, also on the block page
+        return _msg(tr("Too many requests", lg=lg), tr("Please wait a minute and try again.", lg=lg), lg, 429)
     r = frq_find(c, token)
     if not r:
         return frq_gone()

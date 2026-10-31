@@ -73,7 +73,7 @@ OLD = {
     "Invoice no.|document": ("Rechnung Nr.", None), "{0} No.|document": ("{0} Nr.", "{0} No."), "Draft|document number": ("Entwurf", "Draft"),
     "Credit note for invoice no.|document": ("zu Rechnung Nr.", "Credit note for invoice no."), "Ref./PO no.|document": ("Bestellnr. / Referenz", None),  # 2.152.4 (#2630): was Ref./PO-Nr.
     # 2.357.0 B (#3181): "Project title|document" is gone (no Betreff row in the head, the bold project title stays)
-    "Customer no.|document": ("Kunden-Nr.", "Customer no."), "Date|document": ("Datum", None),
+    "Client no.|document": ("Kunden-Nr.", "Client no."), "Date|document": ("Datum", None),
     "Service period|document": ("Leistungszeitraum", "Service period"), "Period of service|document": ("Leistungszeitraum", "Period of service"),
     "Due on|document": ("Fällig am", "Due on"), "Exchange rate €1|document": ("Wechselkurs 1 €", "Exchange rate €1"),
     "Tax amount equals EUR {tax}, rate EUR 1 = USD {rate}|document": ("Steuerbetrag entspricht {tax} EUR, Kurs 1 EUR = {rate} USD",

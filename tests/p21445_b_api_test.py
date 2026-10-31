@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.144.5 part B, own container (start.sh with KALMIDO_SECRET_KEY, mode workspaces). Invented names only.
  - #2410 the mailbox of a workspace (hub_mailboxes) moves with the exports: the organisation export carries servers, user
-   names and sender but never the passwords; imported into an empty organisation and into the private space (org ->
+   names and sender but never the passwords; imported into an empty organisation and into the private workspace (org ->
    private) it keeps server / user and asks for the passwords again (error "password", *_password_set false); the account
    export carries the private mailbox (no passwords), its import into an organisation (private -> org) keeps server / user,
    undo removes it again (2.144.5 A2, review R6/R7: imported switched off, undo keeps a changed one); a workspace that has a mailbox keeps its own (warning); the boundary check reports a mailbox whose

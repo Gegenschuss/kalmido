@@ -10,7 +10,7 @@ tenant-matrix: office, budget
    with another day and text is found again by its reference; camt052 tells the dialog to recommend CAMT.053
  - #2455 shared reader: the S/H mark column (guessed next to the amount, by its name, the Volksbank layout with S/H),
    an unreadable mark = an error row, DD-MM-YYYY and YYYYMMDD
- - #2455 household (the person without organisation in its private space, and an organisation's member): several files and
+ - #2455 household (the person without organisation in its private workspace, and an organisation's member): several files and
    a ZIP in one multipart parse, pending rows apart and refused on commit, duplicates across files by reference, a CSV row
    with the counterpart IBAN found again in a CAMT file with another text (day + amount + IBAN), more than 3000 rows read
    and taken over in two parts under one run, 20001 rows refused; an import run listed and taken back (an entry changed

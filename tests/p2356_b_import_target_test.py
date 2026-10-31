@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # kalmido-suite: nodata
 """2.356.0 B (#2934): every importer names its target workspace before it starts (#1940: importTargetConfirm, "Import into
-the organisation X?" / "Import into your private space?"). A static check of the web client, no server.
+the organisation X?" / "Import into your private workspace?"). A static check of the web client, no server.
  - KNOWN: the import calls that store something; in its top-level block (function / handler) importTargetConfirm comes first
    (bank statement, DATEV, leads, newsletter consents - the four of #2934 - and the importers that already had it)
  - discovery: every POST / PUT to an /import route in static/js sits in a block that asks importTargetConfirm, or is a step

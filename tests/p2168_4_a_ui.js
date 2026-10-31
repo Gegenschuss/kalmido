@@ -7,7 +7,7 @@
 //   together show every page, each folder its subfolders and its own pages
 // - more pages than the index carries: said above the list (.wkcapped), not silently cut
 // - the import report names shortened names apart from skipped ones
-// freelancer-matrix: wiki (the pages are in the private space of a person without an organisation)
+// freelancer-matrix: wiki (the pages are in the private workspace of a person without an organisation)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');

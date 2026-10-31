@@ -246,7 +246,7 @@ def wka_upload(pid):
     uid = me()
     pg = wiki_need(c, pid, write=True)  # 2.200.0 A (#2747): edit on the page
     if wka_locked(c, pg):
-        raise Denied(403, tr("Files cannot be added to an encrypted space yet."))
+        raise Denied(403, tr("Files cannot be added to an encrypted workspace yet."))
     files = request.files.getlist("file")
     if not files:
         return err(tr("File missing"))

@@ -169,8 +169,8 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
   const okb = await until(() => d.querySelector('#view .lvreq [data-act="lv-ok"]'), 60);
   click(w, okb);
   check(await until(async () => (await call('GET', `/api/team/absences?start=${D1}&end=${D2}`)).items?.[0]?.status === 'approved'), '#2375: approved on the server');
-  const tb = await until(() => { const el = d.querySelector('#toast:not(.hidden)'); return el && /Vacation approved/.test(el.textContent) && el.querySelector('button:not(.tx)') && el; });
-  check(tb, '#2375: the hint "Vacation approved" has Undo ' + (d.querySelector('#toast')?.textContent || ''));
+  const tb = await until(() => { const el = d.querySelector('#toast:not(.hidden)'); return el && /Holiday approved/.test(el.textContent) && el.querySelector('button:not(.tx)') && el; });
+  check(tb, '#2375: the hint "Holiday approved" has Undo ' + (d.querySelector('#toast')?.textContent || ''));
   click(w, tb?.querySelector('button:not(.tx)'));
   check(await until(async () => (await call('GET', `/api/team/absences?start=${D1}&end=${D2}`)).items?.[0]?.status === 'pending'), '#2375: Undo in the hint: the request is open again');
   // 2.365.2 C (#2789): the approval switch moved from the vacation accounts to Settings > Organisation

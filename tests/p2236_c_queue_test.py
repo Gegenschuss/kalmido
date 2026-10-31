@@ -10,7 +10,7 @@ freelancer-matrix: agents
  - GET /api/agents/<aid>/queue: the same queue for an instance admin (team agent) / the owner (personal agent); someone
    else 404, the agent's token refused
  - the event "assigned" carries queue {position, active, max_parallel} and priority_rule
- - a person without an organisation: the own agent's queue in the private space, the same rules
+ - a person without an organisation: the own agent's queue in the private workspace, the same rules
 usage: p2236_c_queue_test.py <datadir>      (P2236C_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import os
 import subprocess
@@ -180,7 +180,7 @@ FL = F.post(B + "/api/lists", json={"name": "Private work"}).json()["id"]
 check(F.put(B + f"/api/lists/{FL}/members", json={"user_id": FA, "role": "edit"}).ok, "freelancer: share the private list with the agent")
 F1 = task(F, FL, "Invoice", 1, assignee=FA)
 F2 = task(F, FL, "Offer", 5, assignee=FA)
-check(ids(queue(FT, V + "/agent/queue")) == [F2, F1], "freelancer: the own agent's queue in the private space")
+check(ids(queue(FT, V + "/agent/queue")) == [F2, F1], "freelancer: the own agent's queue in the private workspace")
 check(F.patch(B + f"/api/agents/{FA}/work-style", json={"max_parallel": 1}).ok, "freelancer: sets max_parallel of the own agent")
 r = FT.put(V + "/agent/queue", json={"order": [F1]})
 check(r.ok and ids(r.json()) == [F1, F2], f"freelancer: the agent's own order {r.status_code} {r.text[:200]}")

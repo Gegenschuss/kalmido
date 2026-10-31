@@ -156,7 +156,7 @@ function meWaitDialog() {
   const ts = meTasks(), notes = new Set(ts.map(t => t.wait_note || '')), n0 = notes.size === 1 ? [...notes][0] : '';
   const md = modal(`<h3>${tr('Waiting on someone')}</h3>
     <div class="shint">${trn('For {0} selected task.', 'For all {0} selected tasks.', ts.length)}</div>
-    <div class="row"><label for="mw-note">${tr('Waiting on')}</label><input id="mw-note" maxlength="300" value="${esc(n0)}" placeholder="${esc(tr('who or what, e.g. offer from the carpenter'))}" enterkeyhint="done"></div>
+    <div class="row"><label for="mw-note">${tr('Waiting on')}</label><input id="mw-note" maxlength="300" value="${esc(n0)}" placeholder="${esc(tr('who or what, e.g. quotation from the carpenter'))}" enterkeyhint="done"></div>
     <div class="row"><label for="mw-until">${tr('Follow up on')}</label>${dateIn('mw-until', addDays(today(), 7), {min: today(), label: tr('Follow up on'), empty: tr('none')})}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
   md.classList.add('waitmodal');

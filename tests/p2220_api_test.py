@@ -533,7 +533,7 @@ check(ZOE not in seen_b and BOB not in seen_z and ZOE in seen_z, "#752: people s
 check(EVE not in {u["id"] for u in Zo.get(B + "/api/users").json()["users"]} and {ZOE, EVE} <= {u["id"] for u in A.get(B + "/api/users?all=1").json()["users"]},
       "#1592: the user management (?all=1) lists everyone")
 BL = Bo.post(B + "/api/lists", json={"name": "Bob's list", "org_id": None}).json()["id"]  # 2.28.0: a private list (an organisation's list is shared only inside it)
-check(Bo.put(B + f"/api/lists/{BL}/members", json={"user_id": ZOE, "role": "edit"}).status_code == 404, "#752: sharing with someone outside: like an unknown user (404)")
+check(Bo.put(B + f"/api/lists/{BL}/members", json={"user_id": ZOE, "role": "edit"}).status_code == 404, "#752: sharing with someone outside: like an unknown person (404)")
 check(Bo.put(B + "/api/folders/people", json={"folder": "X", "user_id": ZOE}).status_code in (400, 404), "#752: … also a folder")
 check(Bo.post(B + "/api/events", json={"title": "Meet", "start": D(1) + "T10:00", "attendees": [{"user_id": ZOE}]}).status_code in (400, 409), "#752: … also as an attendee")
 check(A.put(B + "/api/admin/orgs/visibility", json={"mode": "contacts"}).status_code == 403, "#1592: no visibility switch")

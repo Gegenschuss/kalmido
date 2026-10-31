@@ -1,5 +1,5 @@
 // 2.16.0 UI tests (the small things next to #473), own container (start.sh, isolated test database).
-// jsdom: the account picture at the right of the Kalmido row (#641: menu Account / Settings / Log out, the old account rows
+// jsdom: the account picture at the right of the Kalmido row (#641: menu Account / Settings / Sign out, the old account rows
 // gone), Today = a sun with rays, Tomorrow = a half sun (#645), the grips between list | task | chat (#639: separator,
 // keys, remembered per device, double-click / Enter = standard), column widths (#634: grip in the column title, keys,
 // per device and list, double-click = standard), density "Custom" for the sidebar and the task rows (#642), a visible
@@ -54,7 +54,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(d.querySelector('#kbar .kbsw') && !d.querySelector('#srail .sset'), 'the workspace switch (with Settings in its menu) stays'); // 2.380.2 (#3400): Settings moved from the bottom of the bar into the Kalmido menu (#kbar .kbsw)  // 2.152.3 (#2619): the workspace switch moved from the panel head into the head bar  // 2.152.2 (#2622): Settings at the bottom of the bar  // 2.138.2 (#2392): no logo in the sidebar
   click(w, acct); await sleep(150);
   let mi = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => (b.querySelector('.ml') || b).textContent.trim());
-  check(mi[0] === 'Alice · alice' && mi.includes('Account') && mi.includes('Settings') && mi.includes('Log out'), '#641: the menu: who, Account, Settings, Log out ' + mi.join('|'));
+  check(mi[0] === 'Alice · alice' && mi.includes('Account') && mi.includes('Settings') && mi.includes('Sign out'), '#641: the menu: who, Account, Settings, Sign out ' + mi.join('|'));
   click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /^Settings/.test(b.textContent.trim()))); await sleep(400);
   check(d.querySelector('.modal .smodal, .modal [data-pane]') || d.querySelector('.modal'), '#641: Settings opens from it');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
@@ -257,7 +257,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     check(p && p.w >= 44 && p.h >= 44, `${tag}: the account picture in the drawer's bottom dock, a 44 px target ` + JSON.stringify(p));
     await tap(p.x, p.y); await sleep(600);
     const m = await ev(`[...document.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].map(b => (b.querySelector('.ml') || b).textContent.trim())`);
-    check(m.includes('Account') && m.includes('Settings') && m.includes('Log out'), `${tag}: a tap opens Account / Settings / Log out ` + m.join('|'));
+    check(m.includes('Account') && m.includes('Settings') && m.includes('Sign out'), `${tag}: a tap opens Account / Settings / Sign out ` + m.join('|'));
     await shot(`p2160-${tag}-account.png`);
     // #648: the pin button in the task header, a real tap
     await ev(`(() => { closePop(); closeSide(); openDetail(${T[3]}); return 1; })()`); await sleep(900);

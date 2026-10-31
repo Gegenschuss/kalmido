@@ -41,7 +41,7 @@ function nav_setHid(area, key, hide, name) {
 /** @param {Element} b */
 function nav_rowMenu(b) {
   const [area, key] = (b.dataset.navk || '').split(':'), name = b.querySelector('.n')?.textContent || key;
-  menu(b, [{label: tr('Hide from menu'), icon: 'eyeoff', fn: () => nav_setHid(area, key, true, name)}, {label: tr('Customize'), icon: 'edit', fn: () => nav_edit(area)}]);
+  menu(b, [{label: tr('Hide from menu'), icon: 'eyeoff', fn: () => nav_setHid(area, key, true, name)}, {label: tr('Customise'), icon: 'edit', fn: () => nav_edit(area)}]);
 }
 // the names of the menus (the areas' names; the tab bar)
 const nav_title = id => id === 'tabbar' ? tr('Tab bar') : tr(mg_nameKey(nav_area(id)));

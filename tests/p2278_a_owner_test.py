@@ -10,7 +10,7 @@ Invented names only.
  - 2.363.0 (#3132): the ticked projects are noted on the invitation (a resend keeps them), accepting shares them, owner and
    creator stay with dave; a project in the trash is skipped; declining drops the note.
  - 2.456.0 (#3821): the former owner of a project is no row of list_members and gets it shared all the same.
- - P4: a person without organisation imports the same archive into the private space: nobody is invited, the ticked
+ - P4: a person without organisation imports the same archive into the private workspace: nobody is invited, the ticked
    person gets the projects shared as before.
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY.
 usage: p2278_a_owner_test.py <datadir>"""
@@ -254,14 +254,14 @@ check(json.loads(one("SELECT pending_lists FROM org_joins WHERE org_id=? AND use
 Dv.delete(B + f"/api/account/import/{iid}")
 dbx("UPDATE users SET is_admin=0 WHERE id=?", (DAVE,))
 
-# ---------------------------------------------------------------- P4: a person without organisation, into the private space
+# ---------------------------------------------------------------- P4: a person without organisation, into the private workspace
 FID, Fr = freelancer(B, A)
 connect_people(Fr, FID, (CAROL,))
 iid, _pv = opened(Fr, OX, RK)
 j = run(Fr, iid, "private", people={EH("carol@example.com"): {"share": True, "role": "admin"}})
 st = {p.get("name"): p.get("state") for p in (j.get("result") or {}).get("people", [])}
-check(j.get("state") == "done" and st.get("Carol Mitglied") == "shared", f"private space: carol shared as before {st}")
-check(not one("SELECT 1 FROM org_joins WHERE user_id=? AND created_by=?", (CAROL, FID)), "private space: nobody invited into an organisation")
+check(j.get("state") == "done" and st.get("Carol Mitglied") == "shared", f"private workspace: carol shared as before {st}")
+check(not one("SELECT 1 FROM org_joins WHERE user_id=? AND created_by=?", (CAROL, FID)), "private workspace: nobody invited into an organisation")
 
 # ---------------------------------------------------------------- #3093: the starter left -> another admin may replace it
 check(Bo.delete(B + f"/api/orgs/{ORG}/members/{ALICE}").ok, "bob removes alice from Alpha")

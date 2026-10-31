@@ -166,7 +166,7 @@ def section_case(s, who):
           and one("SELECT trash_section FROM tasks WHERE id=?", (t1,)) is None, f"{who}: back in a section 'Shoot' made anew")
 
 
-# ---- files, office, sections: alice (instance admin, private space) and frida (no organisation, P4)
+# ---- files, office, sections: alice (instance admin, private workspace) and frida (no organisation, P4)
 fa = files_case(A, "alice")
 ff = files_case(Fr, "frida")
 oa = office_case(A, "alice")

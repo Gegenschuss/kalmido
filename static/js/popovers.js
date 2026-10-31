@@ -648,7 +648,7 @@ function waitDialog(id) {
   if (!canEdit(t)) { roToast(); return; }
   const md = modal(`<h3>${tr('Waiting on someone')}</h3>
     <div class="shint">${tr('The task waits for someone outside (a client, an office, a delivery). On the follow-up day you get a reminder and a News item; agents that follow the task are told too.')}</div>
-    <div class="row"><label for="w-note">${tr('Waiting on')}</label><input id="w-note" maxlength="300" value="${esc(t.wait_note || '')}" placeholder="${esc(tr('who or what, e.g. offer from the carpenter'))}" enterkeyhint="done"></div>
+    <div class="row"><label for="w-note">${tr('Waiting on')}</label><input id="w-note" maxlength="300" value="${esc(t.wait_note || '')}" placeholder="${esc(tr('who or what, e.g. quotation from the carpenter'))}" enterkeyhint="done"></div>
     <div class="row"><label for="w-until">${tr('Follow up on')}</label>${dateIn('w-until', t.wait_until || addDays(today(), 7), {min: today(), label: tr('Follow up on'), empty: tr('none')})}</div>
     <div class="foot">${t.waiting_at ? `<button class="btn" data-m="clear">${ic('x', 's')} ${tr('No longer waiting')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
   md.classList.add('waitmodal');
@@ -805,7 +805,7 @@ function taskMenu(anchor, id, o = {}) {
     // priority, assignee
     ...(inPanel ? [] : [PRIO_ROW(id)]),
     ...(collab() && l?.shared && t.id > 0 && !t.context && canAssign(t) && pz_show(t, 'who', t.assignee_id || t.assignee_group_id) ? [{label: tr('Assign…'), icon: 'user', fn: () => assignMenu(anchor, id)}] : []),
-    {head: tr('Organize')},
+    {head: tr('Organise')},
     // where it lives
     ...(open ? [moveListItem(anchor, id), moveWsItem(anchor, id)] : []),
     ...(open ? ml_menuItems(anchor, t) : []),  // 2.71.0 B (#1459): show also in another list / remove from it

@@ -592,7 +592,7 @@ def _move(c, n, target, uid, fsl_ok=False):
             raise Denied(409, tr("Folders can be nested at most {0} levels deep", DEPTH_MAX))
         if (t["org_id"] or None) != (n["org_id"] or None) or t["owner_id"] != n["owner_id"]:
             # 2.48.0 (#1207): never into another workspace / someone else's tree (the key and the owner would change)
-            raise Denied(409, tr("Files can only be moved within the same space"))
+            raise Denied(409, tr("Files can only be moved within the same workspace"))
     elif n["owner_id"] != uid and not (n["org_id"] and n["role"] == "owner"):
         raise Denied(403)
     nm = _free_name(c, tid, n["owner_id"], n["org_id"], n["name"], skip=n["id"])

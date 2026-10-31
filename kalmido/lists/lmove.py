@@ -51,7 +51,7 @@ def lmv_notes(c, lid, lr, to):
     tickets = c.execute("""SELECT COUNT(*) FROM portal_tickets WHERE task_id IN (SELECT id FROM tasks WHERE list_id=? AND deleted_at IS NULL)
                            AND org_id IS NOT DISTINCT FROM ?""", (lid, lr["org_id"])).fetchone()[0]
     if tickets:
-        notes.append(trn("{0} customer report moves along", "{0} customer reports move along", tickets))
+        notes.append(trn("{0} client report moves along", "{0} client reports move along", tickets))
     stay = []
     n = c.execute("SELECT COUNT(*) FROM sheets WHERE list_id=? AND deleted_at IS NULL AND org_id IS DISTINCT FROM ?", (lid, to)).fetchone()[0]
     if n:

@@ -30,7 +30,7 @@ from ..lists.lists import list_created, clean_color, clean_folder, FOLDER_MAX
 from ..api.common import v1_err  # 2.149.0 G (#2517): pulled up from functions
 
 PK2_KINDS = ("inquiry", "setup")
-PK2_TITLES = {"inquiry": N_("Project from an inquiry"), "setup": N_("Set up Kalmido")}
+PK2_TITLES = {"inquiry": N_("Project from an enquiry"), "setup": N_("Set up Kalmido")}
 PK2_SHOOT_MAX, PK2_OFFER_ITEMS_MAX, PK2_LISTS_MAX, PK2_CLIENTS_MAX = 30, 100, 20, 500
 PK2_SHOOT_KEY, PK2_OFFER_KEY, PK2_LIST_KEY, PK2_PROJECT_KEY = 300, 400, 100, 200
 # the modules a setup proposal may switch (the keys of the client's FEATS, static/js/core.js)

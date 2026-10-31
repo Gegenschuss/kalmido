@@ -49,8 +49,8 @@ FSL_MSG = {
     "fs_locked_nest": N_("A locked folder cannot lie in another locked folder."),
     "fs_locked_agent": N_("Locked folders are never shared with agents or API tokens."),
     "fs_locked_link": N_("Locked folders have no links for external people and no file requests."),
-    "fs_locked_space": N_("Locked folders stay in their space. Unlock the folder first."),
-    "fs_locked_place": N_("A locked folder cannot be moved here (an area, an agent's or a mail's folder, a share with an agent or a link for external people)."),
+    "fs_locked_space": N_("Locked folders stay in their workspace. Unlock the folder first."),
+    "fs_locked_place": N_("A locked folder cannot be moved here (an area, an agent's or a e-mail's folder, a share with an agent or a link for external people)."),
 }
 
 
@@ -385,7 +385,7 @@ def _fsl_above_block(c, chain, move=False):
         return tr(FSL_MSG["fs_locked_agent"])
     if move and c.execute(f"SELECT 1 FROM fs_nodes WHERE id IN ({uq}) AND (agent_id IS NOT NULL OR hub_mail_id IS NOT NULL) LIMIT 1",
                           up).fetchone():
-        return tr("The folder holds links, filed objects, mails or an agent's folder. Move them out first.")
+        return tr("The folder holds links, filed objects, e-mails or an agent's folder. Move them out first.")
     if move and c.execute(f"SELECT 1 FROM fs_ext_links WHERE node_id IN ({uq}) AND revoked_at IS NULL LIMIT 1", up).fetchone():
         return tr(FSL_MSG["fs_locked_link"])
     return None
@@ -397,7 +397,7 @@ def _fsl_inner_block(c, ids):
     q = ",".join("?" * len(ids))
     if c.execute(f"SELECT 1 FROM fs_nodes WHERE id IN ({q}) AND (kind NOT IN ('file', 'folder') OR agent_id IS NOT NULL "
                  "OR hub_mail_id IS NOT NULL) LIMIT 1", ids).fetchone():
-        return tr("The folder holds links, filed objects, mails or an agent's folder. Move them out first.")
+        return tr("The folder holds links, filed objects, e-mails or an agent's folder. Move them out first.")
     for sql in (f"SELECT 1 FROM doc_meta WHERE node_id IN ({q}) LIMIT 1", f"SELECT 1 FROM rc_receipts WHERE node_id IN ({q}) LIMIT 1"):
         if c.execute(sql, ids).fetchone():
             return tr("The folder holds documents or receipts with recognition. Move them out first.")

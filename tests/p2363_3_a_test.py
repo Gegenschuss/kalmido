@@ -154,7 +154,7 @@ check(Fr.patch(B + f"/api/tasks/{FU}", json={"parent_id": FP}).ok, "setup: a tas
 check(Fr.post(B + f"/api/tasks/{FU}/links", json={"list_id": Fb}).status_code == 400, "#3133: without a memo of the move the refusal stands")
 OT = new_task(A, P, "Across")
 Q, PV = new_list(A, "Target", ORG), new_list(A, "Private")
-check(A.post(B + f"/api/tasks/{OT}/links", json={"list_id": Q}).ok and A.patch(B + f"/api/tasks/{OT}", json={"list_id": PV}).ok, "setup: moved to the private space")
+check(A.post(B + f"/api/tasks/{OT}/links", json={"list_id": Q}).ok and A.patch(B + f"/api/tasks/{OT}", json={"list_id": PV}).ok, "setup: moved to the private workspace")
 r = A.post(B + f"/api/tasks/{OT}/links", json={"list_id": PV + 999999})
 check(r.status_code in (403, 404), f"#3133: a list the person has no right in stays refused {r.status_code}")
 

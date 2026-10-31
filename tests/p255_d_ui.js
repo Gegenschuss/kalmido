@@ -1,5 +1,5 @@
 // 2.55.0 UI tests, part D (#1067 more views on the view builder), own container (start.sh). jsdom:
-// - statistics, the client card and family are built from blocks: "Customize" opens the editor, hiding a block and the
+// - statistics, the client card and family are built from blocks: "Customise" opens the editor, hiding a block and the
 //   order are stored (view_stats / view_clients / view_family) and survive a reload
 // - without an own arrangement every view shows its blocks in the order it had before (the default)
 // - the roadmap, the calendar and the habits stay as they are (one surface): no Customize button

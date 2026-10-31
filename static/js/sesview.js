@@ -17,9 +17,9 @@ async function sesDraw(md) {
   box.innerHTML = (j.sessions.length ? `<div class="members seslist">${j.sessions.map(s => `<div class="mrow sesrow" data-sid="${esc(s.sid)}"><span class="avatar">${sesIcon(s)}</span>
       <span class="n"><b>${esc(sesName(s))}</b>${s.current ? ` <span class="tfastate on sescur">${tr('This device')}</span>` : ''}
       <small class="muted">${esc([s.current ? tr('active now') : tr('last active {0}', relTime(s.last_seen_at)), tr('signed in since {0}', day(s.created_at)), tr(SES_VIA[s.via] || SES_VIA.password)].join(' · '))}</small></span>
-      <button class="btn sm" data-ses="end" aria-label="${esc(tr('Log out {0}', sesName(s)))}">${ic('logout', 's')} ${tr('Log out')}</button></div>`).join('')}</div>`
+      <button class="btn sm" data-ses="end" aria-label="${esc(tr('Sign out {0}', sesName(s)))}">${ic('logout', 's')} ${tr('Sign out')}</button></div>`).join('')}</div>`
     : `<div class="muted mhint">${tr('No other sessions.')}</div>`)
-    + (others ? `<div class="row"><button class="btn sm" data-ses="others">${ic('logout', 's')} ${tr('Log out everywhere else')}</button></div>` : '')
+    + (others ? `<div class="row"><button class="btn sm" data-ses="others">${ic('logout', 's')} ${tr('Sign out everywhere else')}</button></div>` : '')
     + `<div class="shint">${tr('Every browser or app you are signed in with. Do you not recognise one? Log it out and change your password.')}</div>`;
 }
 document.addEventListener('click', async e => {
@@ -31,13 +31,13 @@ document.addEventListener('click', async e => {
     if (b.dataset.ses === 'end') {
       const s = j.sessions.find(x => x.sid === b.closest('[data-sid]').dataset.sid); if (!s) return;
       if (s.current) { logout(); return; }  // this device: the ordinary log out
-      if (!await askConfirm(tr('Log out {0}?', sesName(s)), tr('This browser or app has to sign in again.'), {ok: tr('Log out'), danger: true})) return;
+      if (!await askConfirm(tr('Sign out {0}?', sesName(s)), tr('This browser or app has to sign in again.'), {ok: tr('Sign out'), danger: true})) return;
       await api('DELETE', '/api/me/sessions/' + encodeURIComponent(s.sid));
-      toast(tr('Logged out'));
+      toast(tr('Signed out'));
     } else {
-      if (!await askConfirm(tr('Log out everywhere else?'), tr('Every other browser and app has to sign in again. This device stays signed in.'), {ok: tr('Log out'), danger: true})) return;
+      if (!await askConfirm(tr('Sign out everywhere else?'), tr('Every other browser and app has to sign in again. This device stays signed in.'), {ok: tr('Sign out'), danger: true})) return;
       const r = await api('POST', '/api/me/sessions/others');
-      toast(trn('{0} session logged out', '{0} sessions logged out', r.ended));
+      toast(trn('{0} session signed out', '{0} sessions signed out', r.ended));
     }
     await sesDraw(md);
   } catch { /* api() showed it */ } finally { b.disabled = false; }

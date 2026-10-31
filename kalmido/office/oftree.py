@@ -217,7 +217,7 @@ def _folder_new(c, uid, oid, area):
         owner, org = _place(c, uid, None, sorg)
         pid = oft_root(c, uid, oid, area, create=True)
     if (org or None) != (oft_space(c, oid)[0] or None):
-        raise Denied(409, tr("Files can only be moved within the same space"))
+        raise Denied(409, tr("Files can only be moved within the same workspace"))
     ts = _now()
     nid = insert_id(c, "INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
                     (pid, "folder", fs_area_folder_name(c, pid, owner, org, safe_fs_name(raw)), owner, org, uid, ts, ts))

@@ -70,10 +70,10 @@ const lv_cls = it => (it.status === 'pending' ? ' req' : '');
 const lv_mark = it => (it.status === 'pending' ? ' · ' + tr('requested') : it.status === 'rejected' ? ' · ' + tr('rejected') + (it.decision_note ? ': ' + it.decision_note : '') : '');
 function lv_sheetHint() {
   const d = LV.data;
-  return d && d.approval && !d.admin ? `<div class="shint keep lvhint">${tr('Vacation goes to the admins of the organisation as a request; it counts as away once it is approved.')}</div>` : '';
+  return d && d.approval && !d.admin ? `<div class="shint keep lvhint">${tr('Holiday goes to the admins of the organisation as a request; it counts as away once it is approved.')}</div>` : '';
 }
 function lv_accLine(p) {
-  if (!p.quota) return `<span class="muted">${tr('No vacation account')}</span>`;
+  if (!p.quota) return `<span class="muted">${tr('No holiday account')}</span>`;
   const tot = (p.quota.days || 0) + (p.quota.carry || 0);
   return `<span class="lvnums"><span>${tr('Entitlement')} <b>${lv_num(tot)}</b>${p.quota.carry ? ` <small class="muted">(${esc(tr('incl. {0} carried over', lv_num(p.quota.carry)))})</small>` : ''}</span>
     <span>${tr('taken|vacation')} <b>${lv_num(p.taken)}</b></span>${p.requested ? `<span>${tr('requested')} <b>${lv_num(p.requested)}</b></span>` : ''}<span class="${p.rest < 0 ? 'lvneg' : ''}">${tr('left')} <b>${lv_num(p.rest)}</b></span></span>`;
@@ -90,13 +90,13 @@ function lv_html(ad) {
     const btns = d.admin ? `<span class="lvbtns"><button type="button" class="btn sm pri" data-act="lv-ok" data-id="${it.id}">${ic('check', 's')} ${tr('Approve|vacation')}</button><button type="button" class="btn sm" data-act="lv-no" data-id="${it.id}">${tr('Reject')}</button></span>` : '';
     return `<li class="lvreq">${av(it.user_id, p?.display_name || '?')}<span class="ab2lt"><b>${esc(p?.display_name || '?')}</b><span class="muted">${esc(ab2_span(it))} · ${esc(it.days === 1 ? tr('1 working day') : tr('{0} working days', lv_num(it.days)))}${it.note ? ' · ' + esc(it.note) : ''}</span></span>${btns}</li>`;
   }).join('');
-  const pendHtml = pend ? `<h4 class="ab2h">${d.admin ? tr('Open vacation requests') : tr('Your open vacation requests')}</h4><ul class="ab2list lvlist">${pend}</ul>` : '';
+  const pendHtml = pend ? `<h4 class="ab2h">${d.admin ? tr('Open holiday requests') : tr('Your open holiday requests')}</h4><ul class="ab2list lvlist">${pend}</ul>` : '';
   if (!d.admin) {
-    return (own?.quota ? `<div class="lvacc"><span class="lvt">${esc(tr('Your vacation {0}', String(year)))}</span>${lv_accLine(own)}</div>` : '') + pendHtml;
+    return (own?.quota ? `<div class="lvacc"><span class="lvt">${esc(tr('Your holiday {0}', String(year)))}</span>${lv_accLine(own)}</div>` : '') + pendHtml;
   }
   const rows = d.people.map(p => `<li><button type="button" class="ab2li" data-act="lv-edit" data-uid="${p.id}">${av(p.id, p.display_name)}<span class="ab2lt"><b>${esc(p.display_name)}</b><span class="muted">${esc(lv_wtText(p))}</span>${lv_accLine(p)}</span>${ic('edit', 's')}</button></li>`).join('');
-  const sw = d.personal ? '' : `<div class="row lvsw"><button type="button" class="linkbtn" data-act="mod-settings" data-sec="org">${tr('Vacation approval: in Settings > Organisation')}</button></div>`;  // 2.365.2 C (#2789): the switch moved to Settings
-  return `${pendHtml}<details class="lvbox" ${LV.open ? 'open' : ''}><summary>${esc(tr('Vacation accounts {0}', String(year)))}</summary>
+  const sw = d.personal ? '' : `<div class="row lvsw"><button type="button" class="linkbtn" data-act="mod-settings" data-sec="org">${tr('Holiday approval: in Settings > Organisation')}</button></div>`;  // 2.365.2 C (#2789): the switch moved to Settings
+  return `${pendHtml}<details class="lvbox" ${LV.open ? 'open' : ''}><summary>${esc(tr('Holiday accounts {0}', String(year)))}</summary>
       <ul class="ab2list">${rows}</ul>${sw}</details>`;
 }
 const lv_wtText = p => { const wd = p.workdays || WT_DEFAULT; return `${wd.map(i => wt_dayName(i)).join(' ')} · ${tr('{0} h / week', fmtNum(p.capacity_h, 1))}`; };
@@ -104,10 +104,10 @@ const lv_wtText = p => { const wd = p.workdays || WT_DEFAULT; return `${wd.map(i
 // an admin (or a person without an organisation for themselves): the account, the working days and hours of one person
 function lv_sheet(p) {
   const d = LV.data, year = d.year, q = p.quota || {days: '', carry: ''};
-  const md = modal(`<h3>${esc(tr('Working time and vacation of {0}', p.display_name))}</h3>
-    <div class="row"><label for="lv-days">${esc(tr('Vacation days {0}', String(year)))}</label><input id="lv-days" class="numin" inputmode="decimal" value="${esc(q.days === '' ? '' : fmtNum(q.days, 1))}" placeholder="${esc(tr('none'))}"></div>
+  const md = modal(`<h3>${esc(tr('Working time and holiday of {0}', p.display_name))}</h3>
+    <div class="row"><label for="lv-days">${esc(tr('Holiday days {0}', String(year)))}</label><input id="lv-days" class="numin" inputmode="decimal" value="${esc(q.days === '' ? '' : fmtNum(q.days, 1))}" placeholder="${esc(tr('none'))}"></div>
     <div class="row"><label for="lv-carry">${tr('Carry-over from last year')}</label><input id="lv-carry" class="numin" inputmode="decimal" value="${esc(q.carry ? fmtNum(q.carry, 1) : '')}" placeholder="0"></div>
-    <div class="shint keep">${tr('Empty = no vacation account. Half days are fine (for example 27.5).')}</div>
+    <div class="shint keep">${tr('Empty = no holiday account. Half days are fine (for example 27.5).')}</div>
     <div class="row"><span class="lbl">${tr('Working days')}</span>${wt_daysHtml('lv-wd', p.workdays || WT_DEFAULT, 'wt-mday')}</div>
     <div class="row"><label for="lv-hours">${tr('Hours per week')}</label><input id="lv-hours" class="numin" inputmode="decimal" value="${esc(p.capacity_set ? fmtNum(p.capacity_h, 2) : '')}" placeholder="${esc(fmtNum(p.capacity_h, 1))}"><span class="muted">${tr('Empty = 5 × the hours per day of the server')}</span></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${ic('check', 's')} ${tr('Save')}</button></div>`);
@@ -118,8 +118,8 @@ function lv_sheet(p) {
     const b = /** @type {any} */ (e.target).closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     const days = numOf($('#lv-days', mq).value), carry = numOf($('#lv-carry', mq).value) || 0, hours = $('#lv-hours', mq).value.trim().replace(',', '.');
-    if (days !== null && !(days >= 0 && days <= 366 && Number.isInteger(days * 2))) { toast(tr('Vacation days: whole or half days')); return; }
-    if (!(carry >= 0 && carry <= 366 && Number.isInteger(carry * 2))) { toast(tr('Vacation days: whole or half days')); return; }
+    if (days !== null && !(days >= 0 && days <= 366 && Number.isInteger(days * 2))) { toast(tr('Holiday days: whole or half days')); return; }
+    if (!(carry >= 0 && carry <= 366 && Number.isInteger(carry * 2))) { toast(tr('Holiday days: whole or half days')); return; }
     const org = d.org_id, wd = wt_str(wt_daysOf($('#lv-wd', mq)));
     const before = {q: p.quota ? {days: p.quota.days, carry: p.quota.carry} : null, wd: wt_str(p.workdays || WT_DEFAULT), hours: p.capacity_set ? String(p.capacity_h) : ''};
     const after = {q: days === null ? null : {days, carry}, wd, hours};
@@ -130,18 +130,18 @@ function lv_sheet(p) {
       ab2_reload();
     };
     b.disabled = true;
-    try { await put(after)(); histAdd({label: tr('Vacation account changed'), undo: put(before), redo: put(after)}); md.remove(); toast(tr('Saved')); } catch { b.disabled = false; /* api() said it */ }
+    try { await put(after)(); histAdd({label: tr('Holiday account changed'), undo: put(before), redo: put(after)}); md.remove(); toast(tr('Saved')); } catch { b.disabled = false; /* api() said it */ }
   });
 }
 
 async function lv_decide(it, ok) {
   let note = '';
-  if (!ok) { note = await askPrompt(tr('Reject the vacation request?'), '', {body: tr('An optional note for the person (only they and the admins see it).'), ok: tr('Reject'), input: {placeholder: tr('optional'), max: 500}}); if (note === null) return; }
+  if (!ok) { note = await askPrompt(tr('Reject the holiday request?'), '', {body: tr('An optional note for the person (only they and the admins see it).'), ok: tr('Reject'), input: {placeholder: tr('optional'), max: 500}}); if (note === null) return; }
   const step = (action, n) => async () => { await api('POST', `/api/team/absences/${it.id}/decide`, {action, note: n}); ab2_reload(); };
   try {
     await step(ok ? 'approve' : 'reject', note)();
     // 2.144.2 B (#2375): the hint carries Undo (the same history step)
-    histToast(ok ? tr('Vacation approved') : tr('Vacation rejected'), histAdd({label: ok ? tr('Vacation approved') : tr('Vacation rejected'), undo: step('reopen', ''), redo: step(ok ? 'approve' : 'reject', note)}));
+    histToast(ok ? tr('Holiday approved') : tr('Holiday rejected'), histAdd({label: ok ? tr('Holiday approved') : tr('Holiday rejected'), undo: step('reopen', ''), redo: step(ok ? 'approve' : 'reject', note)}));
   } catch { /* api() said it */ }
 }
 

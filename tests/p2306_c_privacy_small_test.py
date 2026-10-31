@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """2.306.0 C (#2889 #2946): small data protection items.
-freelancer-matrix: accounts, contacts, news (a person without an organisation keeps every function in the own private space)
+freelancer-matrix: accounts, contacts, news (a person without an organisation keeps every function in the own private workspace)
  - new ntfy topics start with the host name of the address, not a fixed word; the account list shows no foreign topics
  - the contact import fetches linked photos only with the tick box on (photos=0 in the form: no fetch)
  - a deleted comment takes the excerpt copy out of its News items

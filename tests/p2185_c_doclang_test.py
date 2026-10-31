@@ -122,7 +122,7 @@ for k, (de, en) in {"project": ("Projekt: X", "Project: X"), "transfer": ("Über
     check(ein.tr(ein.EIN_WORDS[k], *a, lg="de") == de and ein.tr(ein.EIN_WORDS[k], *a, lg="en") == en, f"e-invoice word {k}: de / en as before")
 
 OLD_KEYS = {  # the other former tables (ledger, terms, girocode, invoices mail): German as before, English = the key
-    "Phone|company": "Tel.", "Email|company": "E-Mail", "Tax number|company": "Steuernummer", "VAT ID|company": "USt-IdNr.",
+    "Phone|company": "Tel.", "E-mail|company": "E-Mail", "Tax number|company": "Steuernummer", "VAT ID|company": "USt-IdNr.",
     "Register court|company": "Registergericht", "Managing directors|company": "Geschäftsführung", "Shareholders|company": "Gesellschafter",
     "Owner|company, male": "Inhaber", "Owner|company, female": "Inhaberin", "Executive board|company": "Vorstand", "Partners|company": "Partner",
     "Partners|company, GbR": "Gesellschafter", "Our terms and conditions (as of {0}) apply, see attachment.|terms": "Es gelten unsere AGB (Stand {0}), siehe Anhang.",

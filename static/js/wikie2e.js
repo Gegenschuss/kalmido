@@ -24,7 +24,7 @@ function wkeMode(sp) { return WKE.st[sp]?.mode || null; }
 function wkeReady(sp) { const s = WKE.st[sp]; return !!(s && s.mode && WKE.keys[sp]?.[s.gen]); }
 const wkeChange = sp => document.dispatchEvent(new CustomEvent('wke:change', {detail: {space: sp}}));
 function wkeErr(msg, code) { const e = new Error(msg); e.code = code; return e; }
-const wkeErrLocked = () => wkeErr(tr('Unlock first: this space is encrypted in the browser.'), 'wiki_e2e_locked');
+const wkeErrLocked = () => wkeErr(tr('Unlock first: this workspace is encrypted in the browser.'), 'wiki_e2e_locked');
 const wkeName = (sp, uid) => (WKE.info[sp]?.members || []).find(m => m.user_id === uid)?.name || personNameAny?.(uid) || '?';
 // the state of a space from the index (e2e: null = open) or from the e2e route
 function wkeSet(sp, e) {
@@ -74,7 +74,7 @@ async function wkeDec(sp, field, c) {
   if (!wkeIs(c)) return c ?? '';
   if (typeof e2eUnlocked === 'function' && !e2eUnlocked()) throw wkeErrLocked();  // 2.64.3 E (#1817, review 2 L1): locked meanwhile, not "unreadable"
   const s = await wkeTry(sp, c, field, await wkeKeys(sp));
-  if (s == null) throw wkeErr(s === undefined ? tr('You do not have the key of this space yet.') : tr('The space key could not be opened.'), 'wiki_e2e_key');
+  if (s == null) throw wkeErr(s === undefined ? tr('You do not have the key of this workspace yet.') : tr('The workspace key could not be opened.'), 'wiki_e2e_key');
   return s;
 }
 
@@ -98,7 +98,7 @@ async function wkeRaw(sp, sid, k) {
   let pub;
   if (w === me) pub = E2E.own;
   else { pub = k.wrapper_pub; if (!le2eSeenOk(w, pub)) throw wkeErr(tr('The key of {0} has changed. Compare the safety number before you continue.', wkeName(sp, w)), 'wiki_e2e_keychanged'); }
-  if (!pub) throw wkeErr(tr('The space key could not be opened.'), 'wiki_e2e_key');
+  if (!pub) throw wkeErr(tr('The workspace key could not be opened.'), 'wiki_e2e_key');
   const wr = typeof k.wrapped === 'string' ? JSON.parse(k.wrapped) : k.wrapped;
   return e2eOpen(await wkeKek(pub, sid, k.gen), wr, wkeWrapAad(sid, k.gen, me, w));
 }
@@ -154,7 +154,7 @@ async function wkeRelease(sp, userIds) {
   wkeBadPub();
   const info = await wkeInfo(sp, true), gen = info.gen, sid = info.space_id;
   const held = (info.keys || []).filter(k => k.gen <= gen);
-  if (!held.some(k => k.gen === gen)) throw wkeErr(tr('You do not have the key of this space yet.'), 'wiki_e2e_key');
+  if (!held.some(k => k.gen === gen)) throw wkeErr(tr('You do not have the key of this workspace yet.'), 'wiki_e2e_key');
   const raws = [], keys = [];
   try {
     for (const k of held) { try { raws.push([k.gen, await wkeRaw(sp, sid, k)]); } catch (e) { if (k.gen === gen) throw e; } }
@@ -179,7 +179,7 @@ async function wkeRotate(sp, byHand) {
   const info = await wkeInfo(sp, true);
   if (info.mode !== 'on' || !info.can_manage) return false;
   const cur = info.gen, gen = cur + 1, sid = info.space_id;
-  if (!(info.keys || []).some(k => k.gen === cur)) throw wkeErr(tr('You do not have the key of this space yet.'), 'wiki_e2e_key');
+  if (!(info.keys || []).some(k => k.gen === cur)) throw wkeErr(tr('You do not have the key of this workspace yet.'), 'wiki_e2e_key');
   await wkeKeys(sp, true);
   const people = (info.members || []).filter(m => m.has_keys && (m.key_gens || []).includes(cur));
   // like the lists (2.64.2 review M1): the automatic change does not wrap for a key this device sees for the first time
@@ -458,7 +458,7 @@ async function wkeExport(sp) {
   if (!wkeReady(sp)) { if (!await e2eEnsure()) return false; await wkeKeys(sp, true); }
   if (!wkeReady(sp)) throw wkeErrLocked();
   await wk_load(sp, true);
-  if (WKE.locked[sp]) throw wkeErr(trn('{0} page of this space cannot be opened with your key.', '{0} pages of this space cannot be opened with your key.', WKE.locked[sp]), 'wiki_e2e_unreadable');
+  if (WKE.locked[sp]) throw wkeErr(trn('{0} page of this workspace cannot be opened with your key.', '{0} pages of this workspace cannot be opened with your key.', WKE.locked[sp]), 'wiki_e2e_unreadable');
   const te = e2eTEnc(), pages = wk_pages(sp).filter(p => p.path);
   wkeSave(wkeZip(pages.map(p => ({name: p.path + '.md', data: te.encode(p.body || '')}))), 'wiki.zip');
   return pages.length;
@@ -495,7 +495,7 @@ async function wkeImport(sp, file, onProg = null) {  // 2.177.0 (#2685): onProg(
     if (onProg && onProg(k, files.length) === false) break;
     const nm = x.name.slice(0, 200);
     if (!x.name.toLowerCase().endsWith('.md')) {  // 2.99.0 A (#2182): the files of a locked space are not taken over yet (decision 2.99)
-      skipped.push(nm); detail.push({name: nm, reason: /\.(pdf|png|jpe?g|gif|webp|svg)$/i.test(x.name) ? tr('Encrypted space: files are not taken over yet') : tr('Only PDF files and pictures (PNG, JPEG, GIF, WebP, SVG)')});
+      skipped.push(nm); detail.push({name: nm, reason: /\.(pdf|png|jpe?g|gif|webp|svg)$/i.test(x.name) ? tr('Encrypted workspace: files are not taken over yet') : tr('Only PDF files and pictures (PNG, JPEG, GIF, WebP, SVG)')});
       continue;
     }
     if (x.usize > WKE_ZIP.file || x.csize > WKE_ZIP.file + 4096 || x.name.includes('__MACOSX') || (x.flags & 1) || ![0, 8].includes(x.method)) { skipped.push(nm); continue; }
@@ -552,7 +552,7 @@ async function wkeMigrate(sp, onProgress, opts = {}) {
         total = Math.max(total, left);
         prog(total - left, total);
         if (!left) break;
-        if (left === last && ++spins > 2) throw wkeErr(tr('Encryption of this space stopped without progress. Try again later.'), 'wiki_e2e_stuck');
+        if (left === last && ++spins > 2) throw wkeErr(tr('Encryption of this workspace stopped without progress. Try again later.'), 'wiki_e2e_stuck');
         if (typeof e2eUnlocked !== 'function' || !e2eUnlocked() || !S.me) throw wkeErrLocked();  // 2.64.3 E (#1817, review 2 L1)
         if (mode !== 'decrypting') await wkeKeys(sp, !wkeReady(sp));
         const rows = [];
@@ -575,12 +575,12 @@ async function wkeMigrate(sp, onProgress, opts = {}) {
         if (!rows.length) {
           if (mode !== 'encrypting' && bad.size && !blank && (mode === 'decrypting' || opts.ask)) {
             const yes = typeof askConfirm === 'function' && await askConfirm(tr('Texts that cannot be decrypted'),
-              trn('{0} text of this space cannot be decrypted with the keys you hold. Take it over as an empty text? It cannot be restored.', '{0} texts of this space cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
+              trn('{0} text of this workspace cannot be decrypted with the keys you hold. Take it over as an empty text? It cannot be restored.', '{0} texts of this workspace cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
             if (yes) { blank = true; last = -1; bad.clear(); continue; }
-            if (mode === 'decrypting') throw wkeErr(trn('{0} text of this space cannot be decrypted. The space stays locked until it is taken over as empty.', '{0} texts of this space cannot be decrypted. The space stays locked until they are taken over as empty.', bad.size), 'wiki_e2e_unreadable');
+            if (mode === 'decrypting') throw wkeErr(trn('{0} text of this workspace cannot be decrypted. The workspace stays locked until it is taken over as empty.', '{0} texts of this workspace cannot be decrypted. The workspace stays locked until they are taken over as empty.', bad.size), 'wiki_e2e_unreadable');
           }
           if (mode === 'on' && bad.size) { WKE.unread[sp] = bad.size; wkeChange(sp); }
-          throw wkeErr(trn('{0} text of this space cannot be decrypted with the keys you hold.', '{0} texts of this space cannot be decrypted with the keys you hold.', bad.size), 'wiki_e2e_unreadable');
+          throw wkeErr(trn('{0} text of this workspace cannot be decrypted with the keys you hold.', '{0} texts of this workspace cannot be decrypted with the keys you hold.', bad.size), 'wiki_e2e_unreadable');
         }
         last = left;
         const j = await rawFetch('POST', '/api/wiki/e2e/bulk', {space: sp, pages: rows});
@@ -728,7 +728,7 @@ function wkeLockHtml(sp, page) {
   if (s.mine === false && s.mode === 'on') return `<div class="wkelock"><div class="lnph">${ic('lock')}<div><b>${esc(tr('Encrypted in the browser'))}</b><span class="muted">${esc(tr('Key pending – an admin of the organisation releases it'))}</span></div></div></div>`;
   if (!wkeReady(sp)) {
     if (s.mode !== 'on' && !page && !WKE.locked[sp]) return '';  // a switch is running: the pages not converted yet stay readable
-    return `<div class="wkelock"><button type="button" class="lnph lnopen" data-wke="unlock" data-sp="${esc(sp)}">${ic('lock')}<div><b>${esc(tr('Locked'))}</b><span class="muted">${esc(tr('The pages of this space are encrypted in the browser. Unlock to read them.'))}</span></div></button></div>`;
+    return `<div class="wkelock"><button type="button" class="lnph lnopen" data-wke="unlock" data-sp="${esc(sp)}">${ic('lock')}<div><b>${esc(tr('Locked'))}</b><span class="muted">${esc(tr('The pages of this workspace are encrypted in the browser. Unlock to read them.'))}</span></div></button></div>`;
   }
   if (page) return `<div class="wkelock"><div class="lnph">${ic('lock')}<div><b>${esc(tr('Locked'))}</b><span class="muted">${esc(tr('This page cannot be opened with your key.'))}</span></div></div></div>`;
   return '';
@@ -746,9 +746,9 @@ function wkeBarHtml(sp, inDlg) {
     const run = r && r.kind === 'reenc';
     const btn = !s.can_manage || run ? '' : s.rotate > 0 ? `<button type="button" class="btn sm" data-wke="rotate" data-sp="${esc(sp)}">${esc(tr('Change the key now'))}</button>` : `<button type="button" class="btn sm" data-wke="reenc" data-sp="${esc(sp)}">${esc(tr('Continue'))}</button>`;
     out.push(`<div class="shint lhint keep wkebar wkerot" data-sp="${esc(sp)}">${ic('alert', 's')} <span>${esc(tr('A member has left the organisation. The key of the knowledge pages is being changed; until everything is encrypted again, former members can still decrypt older pages with their old key.'))}</span>`
-      + (run ? `<span class="wkeprog">${wkePbar(r)}</span>` : '') + (!run && WKE.unread[sp] ? `<span class="e2ewarn" role="alert">${esc(trn('{0} text of this space cannot be decrypted with the keys you hold.', '{0} texts of this space cannot be decrypted with the keys you hold.', WKE.unread[sp]))}</span>` : '') + btn + '</div>');
+      + (run ? `<span class="wkeprog">${wkePbar(r)}</span>` : '') + (!run && WKE.unread[sp] ? `<span class="e2ewarn" role="alert">${esc(trn('{0} text of this workspace cannot be decrypted with the keys you hold.', '{0} texts of this workspace cannot be decrypted with the keys you hold.', WKE.unread[sp]))}</span>` : '') + btn + '</div>');
   }
-  if (wkeReady(sp) && WKE.locked[sp]) out.push(`<div class="e2ewarn wkebar" role="alert">${ic('alert', 's')} ${esc(trn('{0} page of this space cannot be opened with your key.', '{0} pages of this space cannot be opened with your key.', WKE.locked[sp]))}</div>`);
+  if (wkeReady(sp) && WKE.locked[sp]) out.push(`<div class="e2ewarn wkebar" role="alert">${ic('alert', 's')} ${esc(trn('{0} page of this workspace cannot be opened with your key.', '{0} pages of this workspace cannot be opened with your key.', WKE.locked[sp]))}</div>`);
   return out.join('');
 }
 document.addEventListener('wke:progress', e => {
@@ -767,7 +767,7 @@ document.addEventListener('click', async e => {
   try {
     if (a === 'unlock') {
       const ok = await wkeUnlock(sp);
-      if (!ok && WKE.st[sp]?.mine !== false && e2eUnlocked()) toast(tr('The space key could not be opened. Compare the safety numbers with the members.'));
+      if (!ok && WKE.st[sp]?.mine !== false && e2eUnlocked()) toast(tr('The workspace key could not be opened. Compare the safety numbers with the members.'));
     } else if (a === 'resume') wkeRun(sp, 'resume');
     else if (a === 'release') await wkeReleaseAll(sp);
     else if (a === 'rotate' || a === 'reenc') {
@@ -798,7 +798,7 @@ async function wkeRun(sp, kind, password) {
     wkeChange(sp);
     await (kind === 'stop' ? wkeStop(sp, password) : kind === 'start' ? wkeStart(sp) : wkeResume(sp));
     ok = true;
-    toast(kind === 'stop' || (kind === 'resume' && !wkeOn(sp)) ? tr('The knowledge pages of this space are readable on the server again') : tr('The knowledge pages of this space are encrypted in the browser'));
+    toast(kind === 'stop' || (kind === 'resume' && !wkeOn(sp)) ? tr('The knowledge pages of this workspace are readable on the server again') : tr('The knowledge pages of this workspace are encrypted in the browser'));
     if (WKE.lost?.length) { toast(trn('{0} page skipped: {1} (not readable)', '{0} pages skipped: {1} (not readable)', WKE.lost.length, WKE.lost.slice(0, 5).join(', ') + (WKE.lost.length > 5 ? ' …' : ''))); WKE.lost = null; }  // 2.139.0 C (#2386)
     if (WKE.renamed) { toast(trn('{0} page got a new name (the name was taken)', '{0} pages got a new name (the names were taken)', WKE.renamed)); WKE.renamed = 0; }
     if (WKE.defused) { toast(trn('{0} name or text began like an encrypted value and got a character in front', '{0} names or texts began like an encrypted value and got a character in front', WKE.defused)); WKE.defused = 0; }  // 2.64.3 E (#1817)
@@ -827,8 +827,8 @@ function wkeMembersHtml(j, chg) {
 const wkeRuleHtml = () => `<p class="shint lhint keep le2uexp">${esc(tr('End-to-end in the browser: the server only sees encrypted pages. Limit: a manipulated server could deliver changed app code; members keep what they have seen.'))}</p>`;
 function wkeNoteHtml() {
   return `<ol class="le2unote">
-    <li>${esc(tr('Title and text of every page of this space are encrypted in the browser. Search, backlinks and “Mentioned in” then only work in the browser.'))}</li>
-    <li><b>${esc(tr('Agents have no access to this space.'))}</b></li>
+    <li>${esc(tr('Title and text of every page of this workspace are encrypted in the browser. Search, backlinks and “Mentioned in” then only work in the browser.'))}</li>
+    <li><b>${esc(tr('Agents have no access to this workspace.'))}</b></li>
     <li>${esc(tr('The keys hang on your passphrase and your recovery code. Without both the pages are lost; nobody can restore them, not even the operator.'))}</li>
     <li>${esc(tr('Exporting and importing a ZIP runs in the browser.'))}</li>
   </ol><details class="e2einfo le2uwhat"><summary>${esc(tr('What it protects, and what not'))}</summary><p class="muted">${esc(tr('Protects against a database leak, backups and the operator. Does not protect against a manipulated server (the app code comes from the server) or against members who have already seen the pages.'))}</p></details>`;  // 2.298.0 C (#3187)
@@ -960,7 +960,7 @@ async function wkr_check(src, dst, plan) {
 async function wkr_text(src, id, ix) {
   let x = ix.get(id);
   if (!x || typeof x.body !== 'string' || x._wke) x = await wkePage(await rawFetch('GET', '/api/wiki/pages/' + id));
-  if (!x || x._wke) throw wkeErr(tr('The space key could not be opened.'), 'wiki_e2e_key');
+  if (!x || x._wke) throw wkeErr(tr('The workspace key could not be opened.'), 'wiki_e2e_key');
   return x;
 }
 async function wkr_run(src, dst, plan, tries = 2) {

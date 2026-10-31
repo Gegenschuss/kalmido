@@ -138,7 +138,7 @@ def data_checks(E, tag):
         same(sorted(c["name"] for c in s.get(B + "/api/clients").json()["clients"]), E["clients"][u], f"{tag}: {u}'s clients")
         same(minutes(s), E["minutes"][u], f"{tag}: {u}'s time entries")
     same(sorted(a["username"] for a in A.get(B + "/api/my/agents").json()["agents"]), E["agents"], f"{tag}: the personal agent")
-    # the boundary between the organisation, alice's private space and frida (no organisation)
+    # the boundary between the organisation, alice's private workspace and frida (no organisation)
     check(Fr.get(B + f"/api/tasks/{ids['t1']}").status_code in (403, 404), f"{tag}: frida cannot read the org task")
     check(Fr.get(B + f"/api/office/docs/{ids['invoice']}").status_code in (403, 404), f"{tag}: frida cannot read the org invoice")
     check(A.get(B + f"/api/tasks/{ids['frida_task']}").status_code in (403, 404), f"{tag}: alice cannot read frida's task")

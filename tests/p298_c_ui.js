@@ -65,7 +65,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     await nav(B + '#office/offers');
     check(await ready(ev, `!document.querySelector('#view .ofrail') && !!document.querySelector('#view .ofwrap > .ofbody') && !!document.querySelector('#side .sbbp[data-ofmg]') && typeof OFC === 'object' && !!OFC.info`, 80), '#2180: the points in the panel left of the page');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     const pts = await ev(`[...document.querySelectorAll('#side .sbbp[data-ofmg]')].map(g => g.dataset.ofmg + ':' + [...g.querySelectorAll('[data-ofm]')].map(b => b.dataset.ofm).join('+')).join(' ')`);  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
-    // 2.161.2 (#2616): Documents follow Quotes & invoices; 2.380.0 (#3409): Quotations + Invoices are two points
+    // 2.161.2 (#2616): Documents follow Quotations & invoices; 2.380.0 (#3409): Quotations + Invoices are two points
     // 2.153.0 (#2028): + letters (tab Correspondence) at the end of 'sell'
     check(pts === 'sell:pipeline+offers+invoices+gendocs+clients+contacts+contracts+letters money:receipts+cashflow+kpi+bank+cards+books+subs+travel+meals+cashbook admin:equipment+agreements+settings', '#2180: groups and points in order (P4: all of them) ' + pts);  // 2.444.0 (#3447): + cards under Money  // 2.121.0 (#2095): + cashbook under Money  // 2.119.0 (#2288): + meals (entertainment receipts) under Money
     check(await ev(`[...document.querySelectorAll('#side [data-ofmg] .sgt > span:not(.c)')].map(h => h.textContent.trim()).join('|') === 'Sell|Money|Administration' && document.querySelectorAll('#side [data-ofmg] .sgt[data-act="sbb-group"]').length === 3`), '#2180: three small caps headings (each folds)');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
@@ -83,11 +83,11 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     await ev(`(() => { document.querySelector('#side [data-ofm]').focus(); return 1; })()`);  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
     // 2.308.0 (#3273): the panel draws again when its folders arrive (later, by a timer): the focused point keeps the focus
     check(await ev(`(() => { renderSide(); return document.activeElement?.dataset?.ofm || document.activeElement?.tagName; })()`) === 'pipeline', '#2180: a redraw of the panel keeps the focus on the point');
-    // 2.351.0 (#3312): Quotes & invoices is a tree node; 2.406.0 (#3492): its name comes first, then its arrow (at the row's end)
+    // 2.351.0 (#3312): Quotations & invoices is a tree node; 2.406.0 (#3492): its name comes first, then its arrow (at the row's end)
     check(await key(ev, 'ArrowDown') === 'offers' && await key(ev, 'ArrowDown') === '' && await ev(`document.activeElement?.dataset?.k === 'of:a:offers'`), '#2180: ArrowDown = the next point');
     check(await key(ev, 'ArrowUp') === 'offers' && await key(ev, 'ArrowUp') === 'pipeline', '#2180: ArrowUp = the point before');  // 2.351.0 (#3312): over the tree arrow
     // 2.351.0 (#3312): no group "Folders" any more (the document areas are trees): End = the last point of the panel
-    // 2.418.0 (#3560): "Customize" (the menu's editor) is the panel's last button now, the last point right before it
+    // 2.418.0 (#3560): "Customise" (the menu's editor) is the panel's last button now, the last point right before it
     check(await key(ev, 'End') === '' && await ev(`document.activeElement?.dataset?.act === 'nav-edit'`) && await key(ev, 'ArrowUp') === 'settings', '#2180: End = the panel\'s last button (Customize), the last point before it');
     await ev(`(() => { document.querySelector('#side [data-ofm="settings"]').focus(); return 1; })()`);
     check(await key(ev, 'ArrowUp') === 'agreements', '#2180: ArrowUp from the last point = the one before');  // 2.152.2 (#2617): Home leaves the office points (the panel's first button)

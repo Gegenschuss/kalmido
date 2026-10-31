@@ -300,7 +300,7 @@ async function tagPromote(t, g) {
 // list dialog: the list tags (members with edit rights manage them) and "Agent may tidy up entries"
 function ltagsBoxHtml(l) {
   const lt = listTags(l.id), may = canEditList(l.id);
-  return `${lt.length ? lt.map(x => `<div class="mrow" data-ltid="${x.id}"><span class="ltsw" style="${cssColor(x.color) ? 'background:' + cssColor(x.color) : ''}"></span><span class="n">#${esc(x.name)}</span>${may ? `<button class="iconbtn" data-lt="color" title="${tr('Color')}">${ic('palette', 's')}</button><button class="iconbtn" data-lt="ren" title="${tr('Rename')}">${ic('edit', 's')}</button><button class="iconbtn danger" data-lt="del" title="${tr('Delete')}">${ic('trash', 's')}</button>` : ''}</div>`).join('')
+  return `${lt.length ? lt.map(x => `<div class="mrow" data-ltid="${x.id}"><span class="ltsw" style="${cssColor(x.color) ? 'background:' + cssColor(x.color) : ''}"></span><span class="n">#${esc(x.name)}</span>${may ? `<button class="iconbtn" data-lt="color" title="${tr('Colour')}">${ic('palette', 's')}</button><button class="iconbtn" data-lt="ren" title="${tr('Rename')}">${ic('edit', 's')}</button><button class="iconbtn danger" data-lt="del" title="${tr('Delete')}">${ic('trash', 's')}</button>` : ''}</div>`).join('')
     : `<div class="muted mhint">${tr('No project tags yet.')}</div>`}${may ? `<div class="row"><input id="l-ltnew" placeholder="${tr('New project tag')}" maxlength="60"><button class="btn sm" data-lt="new">${ic('plus', 's')} ${tr('Add')}</button></div>` : ''}`;
 }
 // 2.41.2 (#1501): a list tag renamed (to = new name) or deleted (to = null) in the list and on its tasks, locally
@@ -323,7 +323,7 @@ function ltagsWire(md, lid) {
       if (a === 'new') { const v = $('#l-ltnew', md).value.trim().replace(/^#/, ''); if (!v) return; const t = await api('POST', `/api/lists/${lid}/tags`, {name: v}); const l = listById(lid); if (l && t?.id) l.tags = [...(l.tags || []).filter(y => y.id !== t.id), {id: t.id, name: t.name, color: t.color || ''}]; }
       if (a === 'ren' && x) { const v = await askPrompt(tr('Rename the project tag'), x.name, {ok: tr('Rename')}); if (!v || v.trim() === x.name) return; const nn = v.trim().replace(/^#/, ''); await optWrite(ltagPut(lid, x.name, nn), () => api('PATCH', `/api/list-tags/${tid}`, {name: nn})); redraw(); return; }
       if (a === 'color' && x) {
-        const p = openPop(b, `<div class="colors ltcols" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map(c => `<button data-c="${c}" style="background:${c || 'var(--bg4)'}" class="${(x.color || '') === c ? 'on' : ''}" aria-label="${esc(c || tr('No color'))}"></button>`).join('')}</div>`);
+        const p = openPop(b, `<div class="colors ltcols" role="group" aria-label="${esc(tr('Colour'))}">${LCOLORS.map(c => `<button data-c="${c}" style="background:${c || 'var(--bg4)'}" class="${(x.color || '') === c ? 'on' : ''}" aria-label="${esc(c || tr('No colour'))}"></button>`).join('')}</div>`);
         p.onclick = async ev => {
           const cb = ev.target.closest('[data-c]'); if (!cb) return;
           closePop();
@@ -870,8 +870,8 @@ const AG_SAFE = [
   [N_('Look at the access log'), N_('The project menu > Agent access shows which agents read or changed the project in the last 30 days. Every member of the project sees it.')],
   [N_('End access when it is no longer needed'), N_('Pause the agent or create a new token (the old one stops at once); give tokens an expiry date.')]];
 const AG_SAFE_ADMIN = [N_('By default members may not connect their own agents: allow it only when there is a rule for it.'),
-  N_('Agree which AI providers are allowed (privacy, customer data).'),
-  N_('Share projects with customer data only with agents whose provider has a data processing agreement, or with a local model.')];
+  N_('Agree which AI providers are allowed (privacy, client data).'),
+  N_('Share projects with client data only with agents whose provider has a data processing agreement, or with a local model.')];
 function agSafeHtml() {
   return `<div class="agsafe"><p class="agsafe-lead">${esc(tr('An agent sees only what you share with it. Share as little as needed, and keep private and shared work apart.'))}</p>
     <ol class="agsafe-rules">${AG_SAFE.map(([h, t]) => `<li><b>${esc(tr(h))}</b> <span>${esc(tr(t))}</span></li>`).join('')}</ol>

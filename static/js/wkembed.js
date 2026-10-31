@@ -285,7 +285,7 @@ function wem_insert(txt, at) {
 }
 async function wem_upload(p, files, at) {
   if (!p || !files.length) return;
-  if (wk_e2e(p.space)) { toast(tr('Files cannot be added to a page of a locked space yet')); return; }
+  if (wk_e2e(p.space)) { toast(tr('Files cannot be added to a page of a locked workspace yet')); return; }
   const fd = new FormData(); files.forEach(f => fd.append('file', f));
   toast(trn('Uploading {0} file…', 'Uploading {0} files…', files.length));
   let r; try { r = await rawFetch('POST', `/api/wiki/pages/${p.id}/files`, fd); } catch (e) { toast(e.message); return; }
@@ -313,7 +313,7 @@ function wem_pick(p, at) {
     <div class="ssearch">${ic('search', 's')}<input id="wem-q" type="search" placeholder="${esc(tr('Find a file'))}" aria-label="${esc(tr('Find a file'))}" autocomplete="off"></div>
     <nav class="wemcrumbs" id="wem-crumbs" aria-label="${esc(tr('Path'))}"></nav>
     <div class="wempick" id="wem-pick" role="list"></div>
-    <p class="muted wemhint">${esc(tr('Only files of this space. Readers of the page see a file only if they may open it in the file store.'))}</p>`);
+    <p class="muted wemhint">${esc(tr('Only files of this workspace. Readers of the page see a file only if they may open it in the file store.'))}</p>`);
   md.classList.add('wemdlg');
   const list = $('#wem-pick', md), crumbs = $('#wem-crumbs', md);
   const load = async () => {

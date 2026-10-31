@@ -27,7 +27,7 @@ function fx_portalHtml(f, p) {
     <label class="chkl"><input type="checkbox" data-fxp="${f.id}:${esc(p.key)}" ${p.enabled ? 'checked' : ''} aria-label="${esc(tr('Fetch from {0}', p.name))}"> ${tr('On')}</label></li>`;
 }
 function fx_bodyHtml(j) {
-  const intro = `<p class="muted">${tr('A helper program on your computer fetches invoices from portals like Amazon and uploads them as PDFs into these documents; they are recognised like any upload. You sign in to the portals only in the helper: Kalmido never stores passwords, cookies or logins.')}</p>`;
+  const intro = `<p class="muted">${tr('A helper program on your computer fetches invoices from portals like Amazon and uploads them as PDFs into these documents; they are recognised like any upload. You sign in to the portals only in the helper: Kalmido never stores passwords, cookies or sign-ins.')}</p>`;
   if (!j.api) return intro + `<p class="muted">${tr('The API is turned off on this server, so there are no receipt fetchers.')}</p>`;
   const one = f => `<div class="dsc-way fx-one${f.ok ? '' : ' off'}"><div class="fx-head"><span><b>${esc(f.name)}</b> <span class="muted">${esc(f.target)}</span>
       <small class="muted">${f.last_seen_at ? esc(tr('last report {0}', relTime(f.last_seen_at))) : tr('not connected yet')}</small></span>

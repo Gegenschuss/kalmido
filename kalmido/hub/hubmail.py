@@ -51,7 +51,7 @@ HBM_AUTHSERV = os.environ.get("KALMIDO_MAIL_AUTHSERV_ID", "").strip().lower()
 _AR_RE = re.compile(r"\s*(dkim|spf|dmarc)\s*=\s*([a-z]+)(.*)", re.I | re.S)
 _AR_PROP_RE = re.compile(r"([a-z][\w.-]*)\s*=\s*(\"[^\"]*\"|[^\s;()]+)", re.I)
 ROOT = "E-Mails"        # the folder at the root of the workspace's file tree (its name before 2.368)
-ROOT_KEY = N_("Emails|folder")  # 2.368.0 (#2987): since then named in the person's language (hbm_root)
+ROOT_KEY = N_("E-mails|folder")  # 2.368.0 (#2987): since then named in the person's language (hbm_root)
 ADDR_RE = re.compile(r"[\w.!#$%&'*+/=?^`{|}~-]+@[\w-]+(?:\.[\w-]+)+")
 
 
@@ -851,7 +851,7 @@ def _import(c, r, msg, raw, mail_text):
             folder = fs_folder(c, uid, org, [hbm_root(c, uid, org, lg), cn or ln or tr("Not assigned", lg=lg), f"{day} {label}"[:120]])
     except (Denied, ValueError) as e:
         print("hubmail: no folder", type(e).__name__, flush=True)
-        notes.append(tr("The original mail and its attachments could not be filed", lg=lg))  # 2.84.0 review
+        notes.append(tr("The original e-mail and its attachments could not be filed", lg=lg))  # 2.84.0 review
     # 2.190.0 D (#2561): only a folder made for this mail follows its rule (a reused day folder holds another mail's files)
     fresh = bool(folder) and not c.execute("SELECT 1 FROM fs_nodes WHERE parent_id=? LIMIT 1", (folder,)).fetchone()
     if folder:

@@ -26,7 +26,7 @@ function wsh_menuItems(p) {
 }
 // 2.200.0 B (#2747): the one Share dialog on the node (fsshare.js), the links / older shares as its own section
 const wsh_lockedSp = sp => typeof wk_locked === 'function' && !!wk_locked(sp);
-const wsh_lockHint = () => toast(tr('This space is encrypted in the browser: the server cannot show its pages to others, so they cannot be shared.'));
+const wsh_lockHint = () => toast(tr('This workspace is encrypted in the browser: the server cannot show its pages to others, so they cannot be shared.'));
 /** @param {number} nodeId @param {{space: string, path: string, folder?: boolean, page_id?: number}} t */
 function wkfs_share(nodeId, t) {
   if (wsh_lockedSp(t.space)) { wsh_lockHint(); return; }
@@ -76,7 +76,7 @@ function wsh_fill(md, tgt, sp, folder, legacy) {
   const exp = s => s.ended ? `<span class="calerr">${tr('Ended')}</span> · ${esc(tr('Its creator is no longer in the organisation'))}` : s.expired ? `<span class="calerr">${tr('Expired')}</span>` : s.expires_at ? esc(tr('valid until {0}', fmtDate(wsh_day(s.expires_at)))) : '';
   const draw = () => {
     const box = wsh$('.wsh-body', md); if (!box || !j) return;
-    if (j.locked) { box.innerHTML = `<div class="shint keep" role="note">${ic('lock', 's')} ${esc(tr('This space is encrypted in the browser: the server cannot show its pages to others, so they cannot be shared.'))}</div>`; return; }
+    if (j.locked) { box.innerHTML = `<div class="shint keep" role="note">${ic('lock', 's')} ${esc(tr('This workspace is encrypted in the browser: the server cannot show its pages to others, so they cannot be shared.'))}</div>`; return; }
     const ppl = j.shares.filter(s => s.kind === 'person'), links = j.shares.filter(s => s.kind === 'link');
     const cand = legacy ? [] : (users || []).filter(u => !ppl.some(s => s.direct && s.user?.id === u.id));  // 2.200.0 B (#2747): people are chosen above, by e-mail address here
     const people = j.person ? `<div class="members" id="wsh-ppl" aria-labelledby="wsh-ppl-h">${ppl.length ? ppl.map(s => `<div class="mrow"><span class="n"><b>${esc(s.user?.name || '?')}</b>${via(s)}<small class="muted">${tr('Read only')}${exp(s) ? ' · ' + exp(s) : ''}${img(s)}</small></span>${s.direct ? `<button type="button" class="iconbtn" data-wsh="end" data-id="${s.id}" aria-label="${esc(tr('Stop sharing with {0}|wiki', s.user?.name || '?'))}" title="${esc(tr('Stop sharing|wiki'))}">${ic('x', 's')}</button>` : ''}</div>`).join('') : `<div class="muted mhint">${tr('Not shared with anyone yet.')}</div>`}</div>

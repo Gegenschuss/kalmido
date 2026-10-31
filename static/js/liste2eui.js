@@ -430,7 +430,7 @@ document.addEventListener('click', e => {
 const le2u_pubHtml = () => le2u_grey(tr('Public link'));
 // the playbook area of the list dialog (dialogs.js listModal) and the e-mail address of a list (dashboard.js mailHtml)
 const le2u_pbHtml = () => `<h4>${tr('Playbook')}</h4>${le2u_grey(tr('Playbook'))}`;
-const le2u_mailRow = x => `<div class="row mailrow"><label>${esc(x.name)}</label>${le2u_grey(tr('Create tasks by e-mail'), tr('Mails cannot be encrypted in the browser: the address of this project is off.'))}</div>`;
+const le2u_mailRow = x => `<div class="row mailrow"><label>${esc(x.name)}</label>${le2u_grey(tr('Create tasks by e-mail'), tr('E-mails cannot be encrypted in the browser: the address of this project is off.'))}</div>`;
 // News: the key was released to me (part A, kind e2e_key) and entries of a locked list without text (part B, enc: true)
 function le2u_newsText(it, who, q) {
   return tr('{0} released the key for {1} to you', who, q(newsListName(it)));

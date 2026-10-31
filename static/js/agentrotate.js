@@ -73,7 +73,7 @@ async function agg_save(md, a, base, el) {
   const k = el.dataset.agzk; if (!k) return;
   const rt = a.runtime || (a.runtime = {}), err = $('#agg-err', md);
   const v = k === 'git_coauthor' ? !!el.checked : String(el.value).trim();
-  const bad = k === 'git_author_email' && v && !AGG_MAIL.test(String(v)) ? tr('Git author: please enter a valid email address')
+  const bad = k === 'git_author_email' && v && !AGG_MAIL.test(String(v)) ? tr('Git author: please enter a valid e-mail address')
     : k === 'git_author_name' && /[<>]/.test(String(v)) ? tr('Invalid value: {0}', tr('Name')) : '';
   if (err) { err.textContent = bad; err.hidden = !bad; }
   el.setAttribute('aria-invalid', bad ? 'true' : 'false');

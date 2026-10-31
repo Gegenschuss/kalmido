@@ -387,7 +387,7 @@ UMZ_ORG_SKIP = (  # archive prefix -> what the preview names as not taken over
     ("lists/forms.json", N_("Forms")), ("lists/playbooks.json", N_("Playbooks")), ("lists/notes.json", N_("Project notes")),
     ("lists/notepads.json", N_("Notepads")), ("time_entries.json", N_("Time entries")),
     ("tasks/encrypted_notes.json", N_("Encrypted notes")), ("tasks/locked_notes.json", N_("Encrypted notes")),
-    ("portal/", N_("Customer reports")),  # 2.81.0 (#1866)
+    ("portal/", N_("Client reports")),  # 2.81.0 (#1866)
     ("sheets/", N_("Tables")), ("videos/", N_("Video sign-offs")),  # 2.137.0 (#2344): named too
     ("lists/sprints.json", N_("Sprints")), ("tasks/people.json", N_("People on tasks")),  # 2.273.0 A (#3030)
     ("lists/history.json", N_("History")), ("tasks/history.json", N_("History")),
@@ -1250,7 +1250,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         lorg = org
         if org and man.get("kind") != "org" and _txt(L.get("life"), 20):  # Home & life lists (health, contracts ...) stay private
             lorg = None
-            run.warning(N_("Personal project kept in your private space: {0}"), _txt(L.get("name"), 80))
+            run.warning(N_("Personal project kept in your private workspace: {0}"), _txt(L.get("name"), 80))
         d = umz_row(c, "lists", L, {"owner_id": uid, "org_id": lorg, "is_inbox": 0, "sort": sort, "folder": folder,
                                      "name": _txt(L.get("name"), LIST_NAME_MAX).strip() or tr("Import")}, ts)
         lid = umz_insert(c, "lists", d) if d else None
@@ -1703,7 +1703,7 @@ def umz_run(uid, iid, opts):
             umz_have(c, run, uid, umz_earlier(c, uid, src, st.get("export_id") or ""),  # 2.362.3 (#3098)
                      mine=src == umz_src({"format": UMZ_FORMAT, "source": {"url": PUBLIC_URL}, "user": {"id": uid}}, ""))
             if run.kind == "org" and not run.org:  # 2.96.0 D (#1941): an organisation export into the private space
-                run.warning(N_("Imported into your private space: nobody joins an organisation, projects are only shared with the people you ticked."))
+                run.warning(N_("Imported into your private workspace: nobody joins an organisation, projects are only shared with the people you ticked."))
             c.commit()
             if run.kind == "org":  # 2.137.0 (#2344): the personal office for office parts going into the private space
                 from .orgimport import oi_prepare

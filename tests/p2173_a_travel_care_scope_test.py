@@ -183,7 +183,7 @@ check(r.status_code == 404, f"a guest does not see the organisation's contact ({
 r = Fr.put(B + f"/api/contacts/{OC}/care", json={"every_days": 14})
 check(r.status_code == 404, f"another organisation: 404 ({r.status_code})")
 
-# ================================================================ agents and API tokens: the private space only
+# ================================================================ agents and API tokens: the private workspace only
 for who, hd in (("agent", AGH), ("API token", PTH)):
     check(requests.get(B + "/api/life", headers=hd, params={"space": SP}).status_code in (401, 403, 404), f"{who}: no organisation view")
     check(requests.post(B + "/api/life/trips", headers=hd, json={"name": "X", "from": D1, "to": D2, "space": SP}).status_code in (401, 403, 404),

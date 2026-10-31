@@ -123,7 +123,7 @@ const release = (w, el) => ptr(w, el, 'pointerup');
   await pick(d, 'Amount');
   check(await until(() => cards() === 'Big deal,Small deal'), 'pipeline by amount ' + cards());
   d.querySelector('[data-lsort="pipeline"]').click();
-  await pick(d, 'Standard');
+  await pick(d, 'Default');
   check(await until(() => cards() === manual), 'pipeline: Standard is the order from before ' + cards());
   w.close();
 

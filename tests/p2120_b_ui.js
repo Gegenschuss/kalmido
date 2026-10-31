@@ -1,9 +1,9 @@
 // 2.120.0 UI tests, part B (#2088 the customer portal with quotations, invoices and their payment status), own container
 // (start.sh, mode workspaces, no mail server), Firefox (desktop + phone width). Invented companies, people and figures only.
-// - the office settings show the switch "Show documents in the customer portal" (off by default, on after saving it)
+// - the office settings show the switch "Show documents in the client portal" (off by default, on after saving it)
 // - the client's menu "More" offers "Send portal link"; it asks first (the address in the question) and says plainly
 //   when mail is not set up on the server
-// - the portal /portal (signed in by a sign-in link): heading "Customer portal", the documents with their payment state,
+// - the portal /portal (signed in by a sign-in link): heading "Client portal", the documents with their payment state,
 //   the open amount and the due date; on a phone the list stays inside the screen, the rows are big targets
 // - a person without organisation: the switch in the personal office and "Send portal link" on a private client
 const path = require('path');
@@ -96,7 +96,7 @@ const signinLink = (mail, org) => execFileSync('docker', ['exec', CT, 'python', 
         wide: document.documentElement.scrollWidth <= 390, inside: li.every(x => x.getBoundingClientRect().right <= W + 1),
         rows: Math.min(...li.map(x => x.querySelector('a').getBoundingClientRect().height)),
         go: Math.min(...[...document.querySelectorAll('a.kpgo')].map(x => x.getBoundingClientRect().height))}; })()`);
-    check(p && p.h1 === 'Customer portal' && p.n === 2, '#2088: the heading and both documents ' + JSON.stringify(p && {h1: p.h1, n: p.n}));
+    check(p && p.h1 === 'Client portal' && p.n === 2, '#2088: the heading and both documents ' + JSON.stringify(p && {h1: p.h1, n: p.n}));
     check(p && /Partly paid/.test(p.text) && /open/.test(p.text) && /due/.test(p.text), '#2088: the payment state, the open amount and the due date ' + (p && p.text));
     check(p && /Review and approve/.test(p.text), '#2088: the open quotation offers its approval page');
     check(p && p.wide && p.inside, '#2088: the list fits the phone ' + JSON.stringify(p));

@@ -28,7 +28,7 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   check(w.eval(`lyv_menuItems('home').some(x => x.label === 'Save as arrangement…')`), '#1069: "Save as arrangement…" in a block menu');
   w.close();
 
-  // ---- two saved arrangements: the switch shows "Standard", switching changes the blocks, undo goes back
+  // ---- two saved arrangements: the switch shows "Default", switching changes the blocks, undo goes back
   const L1 = JSON.stringify({order: ['notes', 'today', 'wait', 'news'], hidden: ['news']});
   const f = await req(ca, 'POST', '/api/layouts/saved', {key: 'dashboard', name: 'Focus', layout: L1});
   await req(ca, 'POST', '/api/layouts/saved', {key: 'dashboard', name: 'Overview', layout: JSON.stringify({order: ['wait', 'today'], hidden: ['notes']})});
@@ -36,7 +36,7 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   w = await boot({user: 'alice', hash: 'home', wait: WAIT}); d = w.document;
   check(await until(() => d.querySelector('#view .lyvsw')), '#1069: the switch appears in the header');
   const sw = d.querySelector('#view .lyvsw');
-  check(sw && /Standard/.test(sw.textContent), '#1069: it says Standard: ' + sw?.textContent);
+  check(sw && /Default/.test(sw.textContent), '#1069: it says Standard: ' + sw?.textContent);
   const before = w.eval(`lyPref('home').order.filter(k => !lyPref('home').hidden.has(k)).join(',')`);
   click(w, sw); await sleep(200);
   const items = [...d.querySelectorAll('#pop [role="menuitem"]')];
@@ -51,7 +51,7 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   check(await until(() => !d.querySelector('#view .lyb[data-lyk="news"]') && !!d.querySelector('#view .lyb[data-lyk="search"]')), '#1069: News is hidden now: ' + [...d.querySelectorAll('#view .lyb')].map(x => x.dataset.lyk).join(','));
   w.eval(`histStep('undo')`);
   check(await until(() => !w.eval(`S.settings.dashboard`)), '#1069: undo goes back to the standard');
-  check(await until(() => /Standard/.test(d.querySelector('#view .lyvsw')?.textContent || '')), '#1069: ... and the header says so');
+  check(await until(() => /Default/.test(d.querySelector('#view .lyvsw')?.textContent || '')), '#1069: ... and the header says so');
   // save as (a prompt), then manage: rename, delete with undo
   let asked = '';
   w.prompt = t => { asked = t; return 'Evening'; };  // boot.js answers the app's own prompt dialog with this
@@ -78,7 +78,7 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   w = await boot({user: 'alice', hash: 'today', wait: WAIT}); d = w.document;
   await req(ca, 'POST', '/api/layouts/saved', {key: 'view_today', name: 'Morning', layout: JSON.stringify({order: ['tasks', 'brief']})});
   w.eval(`S.lyv = null; lyv_load()`); await until(() => w.eval(`lyv_rows('view_today').length === 1`));
-  check(w.eval(`topMoreItems().some(x => /^Arrangement: Standard/.test(x.label) && x.more?.length >= 2)`), '#1069: Today: "Arrangement" in its menu');
+  check(w.eval(`topMoreItems().some(x => /^Arrangement: Default/.test(x.label) && x.more?.length >= 2)`), '#1069: Today: "Arrangement" in its menu');
   w.close();
 
   // ---- #1068 a template: bob gets a News item, sees the preview, takes it over

@@ -264,7 +264,7 @@ const FAM = 'cal,habits,comments,collab,family';
   check(kt() && kt().getAttribute('role') === 'checkbox' && /Done: Tidy up your room/.test(kt().getAttribute('aria-label')), 'its task: a big named checkbox');
   check(![...d.querySelectorAll('.kidtasks li')].some(li => /Clean the bathroom|Water the plants/.test(li.textContent)), 'only its own tasks');
   w.eval(`openDetail(${KT.id}); openPalette()`); await sleep(100);
-  check(!w.eval('S.sel') && !d.querySelector('.palette:not(.hidden)') && w.eval(`topMoreItems().filter(x => x.label).map(x => x.label).join()`) === 'Account,Settings,Log out',
+  check(!w.eval('S.sel') && !d.querySelector('.palette:not(.hidden)') && w.eval(`topMoreItems().filter(x => x.label).map(x => x.label).join()`) === 'Account,Settings,Sign out',
     'a kid gets no task panel, no command palette; "…" has only its account');
   click(w, kt());
   check(await until(() => /\+2 stars!/.test(d.querySelector('#toast')?.textContent || '')), 'ticked: "+2 stars!"');

@@ -257,7 +257,7 @@ def pub_render(c, link, token, lg):
         title = tr("Done|checklist", lg=lg) if check else tr("Recently completed", lg=lg)
         body_ += (f'<details class="donegrp"{" open" if check else ""}><summary>{e(title)} <span class="n">{len(done_top)}</span></summary>'
                   f'<ul class="tasks">{"".join(row(t) for t in done_top)}</ul></details>')
-    name = tr("Basket") if link["l_inbox"] and inbox_default(link["l_name"]) else link["l_name"]
+    name = tr("Basket", lg=lg) if link["l_inbox"] and inbox_default(link["l_name"]) else link["l_name"]
     mode = tr("You can tick off items on this page.", lg=lg) if tick else tr("View only.", lg=lg)
     brand = ""
     if show["brand"]:  # 2.50.0 (#329): the organisation's name / logo above the project name
@@ -352,7 +352,7 @@ def cv_fb_post(token):
             continue
         if lv != "mute" and (lv == "urgent" or notif_ok(c, uid, s, KIND_ROW["comment"], "push", t["list_id"])) and push_reachable(c, uid, s):
             ulg = lang_of(s)
-            g.pushes.append((uid, tr("{0} (customer, via the link)", name, lg=ulg) + ": " + t["title"], text[:200],
+            g.pushes.append((uid, tr("{0} (client, via the link)", name, lg=ulg) + ": " + t["title"], text[:200],
                              f"{PUBLIC_URL}/#t/{tid}", TBL_PRIO if lv == "urgent" else push_prio(s)))
     bump(c)
     c.commit()

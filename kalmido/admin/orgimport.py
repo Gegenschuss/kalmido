@@ -245,7 +245,7 @@ def oi_write(c, run, uid, man, zf, files, data, who):
             continue
         take, space = oi_space(c, run, spec)
         if not take:
-            run.warning(N_("Not taken over into the private space: {0}"), tr(spec.label) if spec.label else spec.path)
+            run.warning(N_("Not taken over into the private workspace: {0}"), tr(spec.label) if spec.label else spec.path)
             continue
         cols, _fks = umz_cols(c, spec.table)
         if not cols:

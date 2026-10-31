@@ -492,7 +492,7 @@ def vdr_comment_new(vid):
     if isinstance(par, int) and not isinstance(par, bool):  # 2.360.0 D (#2496): as in v1 -- the customer page shows this answer
         p = c.execute("SELECT ext_name FROM video_comments WHERE id=? AND review_id=? AND deleted_at IS NULL", (par, vid)).fetchone()
         if p and p["ext_name"] and not vdr_may(c, uid, r, write=True):
-            raise Denied(403, tr("Only people who may change the review answer the customer"))
+            raise Denied(403, tr("Only people who may change the review answer the client"))
     cid = vdr_comment_add(c, r, uid, b)
     c.commit()
     return jsonify(dict(vdr_dict(c, vdr_reload(c, vid), uid, full=True), comment_id=cid))
@@ -804,7 +804,7 @@ def vdr_pub_notify(c, s, r, name, text):
     click = vdr_click(r)
     click = click if click.startswith("http") else f"{PUBLIC_URL}/{click}"  # 2.266.0 (#2965): ntfy needs an absolute link
     sc = f"l:{lid}" if lid else f"o:{s['org_id']}"  # 2.240.0 B2 (#2867): the channels follow the list / the office
-    return lambda: [notify(uid, tr("Comment from the customer", lg=lang_of(st)), f"{name}: {text[:200]}", prio="4", click=click, s=st,
+    return lambda: [notify(uid, tr("Comment from the client", lg=lang_of(st)), f"{name}: {text[:200]}", prio="4", click=click, s=st,
                            scope=sc) for uid, st in sends]
 
 
@@ -859,8 +859,8 @@ def vdr_move_space(vid):
     notes = [{"task_id": tr("The video sign-off is no longer attached to its task"), "list_id": tr("The video sign-off is no longer attached to its project"),
               "client_id": tr("The video sign-off is no longer attached to its client")}.get(place, ""),
              tr("Every member of the organisation can then open it") if to else "",
-             tr("The customer link stops; its record stays in the old workspace") if live else
-             (tr("The customer's decision stays recorded in the old workspace") if sigs else ""),
+             tr("The client link stops; its record stays in the old workspace") if live else
+             (tr("The client's decision stays recorded in the old workspace") if sigs else ""),
              oo_into_note(c, r["org_id"], to)]  # 2.361.2 B (#2923): the way back
     dest = None
     if b.get("place") not in (None, "", 0):

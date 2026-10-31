@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.87.9 (#1919) the freelancer parity guard: every route of the server -- the web app's (/api/...), the public pages,
 CalDAV / CardDAV and the REST API's (/api/v1/...) -- is either checked for a person WITHOUT an organisation (a freelancer:
-the own private space, the own personal office, its own admin there) or listed with the reason why there is nothing to
+the own private workspace, the own personal office, its own admin there) or listed with the reason why there is nothing to
 check without an organisation. Static like tests/tenant_coverage_test.py: reads app.py + kalmido/, no container.
  1. every route has an entry in ROUTES (its area), nothing in ROUTES is stale
  2. every area is in KINDS: a matrix area names the suite that calls it as a person without an organisation, and that
@@ -30,7 +30,7 @@ SUITE = "p287b_a_freelancer_api_test.py"
 KINDS = {
     # ---- checked as a freelancer (the suites carry "freelancer-matrix: <area>")
     "tasks": ("matrix", SUITE + ": tasks, comments, subtasks, attachments, tags, notes, search, trash, day plan, roadmap, export "
-                        "and import in the private space; every GET of the area as the freelancer (no 403 / 5xx)"),
+                        "and import in the private workspace; every GET of the area as the freelancer (no 403 / 5xx)"),
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET"),
     "office": ("matrix", SUITE + ", p2199_b_office_test.py (2.199.0: a quotation of the personal office in a private folder, the folder routes, her agent), p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py, p2113c_a_api_test.py, p2110_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
@@ -38,12 +38,12 @@ KINDS = {
                          "p2137_a_api_test.py: the owner exports the personal office (export, recovery key) and imports an organisation's office into it (2.137.0); p2146_d_api_test.py: the retention export of the own records before a deletion (2.146.0)"),
     "files": ("matrix", SUITE + ", p2353_a_lockfolder_test.py, p2353_a_scanlock_test.py (2.353.0: a locked private folder, scans refused there), p2199_a_fsref_test.py (2.199.0: reference nodes, sorting by hand, protected nodes in the private tree), p21121_a_api_test.py, p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
                          "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0); "
-                         "p2154_a_api_test.py: a stack split in the private space, its undo, a private document linked with a private task (2.154.0); "
+                         "p2154_a_api_test.py: a stack split in the private workspace, its undo, a private document linked with a private task (2.154.0); "
                          "p2207_a_scan_keys_test.py: a scan inbox of the own documents, its upload key and the folder watcher downloads (2.207.0); "
-                         "p2429_a_ablage_view_test.py: only the file store's own folders, the collections \"From <area>\" of the private space (2.429.0)"),
-    "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
+                         "p2429_a_ablage_view_test.py: only the file store's own folders, the collections \"From <area>\" of the private workspace (2.429.0)"),
+    "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private workspace (create, change, search, export, trash; "
                        "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0: p2123_b_api_test.py shares of pages / folders, p2123_a_api_test.py page history, text search; 2.143.0: p2143_b_api_test.py the trash, delete for good, empty; "
-                       "2.177.0: p2177_a_api_test.py the large ZIP import in pieces into the private space; "
+                       "2.177.0: p2177_a_api_test.py the large ZIP import in pieces into the private workspace; "
                        "2.200.0: p2200_c_wiki_agent_test.py her own agent on pages / folders she shared with it, API v1)"),
     "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py, p2111_b_api_test.py, p2155_b_absence_cal_test.py, p2351_b_contacts_tree_test.py: own calendars, events, address books, contacts (2.351.0: in folders, her agent), the booking page; CalDAV / CardDAV with an app password; "
                     "invitation mails and the subscription link of an own calendar (2.111.0)"),
@@ -60,16 +60,16 @@ KINDS = {
     "videos": ("matrix", "p2991_a_api_test.py: video sign-offs (2.99.1) at a private task / list / client of a person without an "
                "organisation: create, comments, versions, customer link, export, delete + restore; p2991_c_api_test.py: the own agent "
                "of such a person reads and comments them through the API v1"),
-    "sheets": ("matrix", "p289_b_api_test.py, p289_c_api_test.py, p289_d_api_test.py: tables (2.89.0) in the private space of a "
+    "sheets": ("matrix", "p289_b_api_test.py, p289_c_api_test.py, p289_d_api_test.py: tables (2.89.0) in the private workspace of a "
                          "person without an organisation and with that person's own agent; rows to tasks / quotation drafts; "
                          "p2124_c_api_test.py: sharing a private table (2.124.0); p2199_c_sheets_test.py: tables in her "
                          "private folders, shared with her own agent (2.199.0)"),
-    "bookmarks": ("matrix", "p297_a_api_test.py: bookmarks (2.97.0) in the private space of a person without an organisation"),  # 2.97.0 A (#1950)
+    "bookmarks": ("matrix", "p297_a_api_test.py: bookmarks (2.97.0) in the private workspace of a person without an organisation"),  # 2.97.0 A (#1950)
     "life_org": ("matrix", "p2173_a_travel_care_scope_test.py: trips, staying in touch and travel expenses from a trip (2.173.0) in the "
-                 "private space and the personal office of a person without an organisation"),  # 2.173.0 A (#2680)
-    "reading": ("matrix", "p2172_b_reading_scope_test.py: feeds and read later (2.172.0) in the private space of a person without an organisation"),  # 2.172.0 B (#2677 #2679)
+                 "private workspace and the personal office of a person without an organisation"),  # 2.173.0 A (#2680)
+    "reading": ("matrix", "p2172_b_reading_scope_test.py: feeds and read later (2.172.0) in the private workspace of a person without an organisation"),  # 2.172.0 B (#2677 #2679)
     "sectpl": ("matrix", "p2156_c_api_test.py: own section templates (save from a list, add to another, change, delete) of a person without an organisation"),  # 2.156.0 C (#2073)
-    "polls": ("matrix", "p298_a_api_test.py: scheduling polls (2.98.0) in the private space of a person without an organisation"),  # 2.98.0 A (#1953)
+    "polls": ("matrix", "p298_a_api_test.py: scheduling polls (2.98.0) in the private workspace of a person without an organisation"),  # 2.98.0 A (#1953)
     # 2.138.0 (#1972): the recovery key of the own personal office (organisation id 0 in the route)
     "orgcrypt": ("matrix", "p2138_c_api_test.py: the encryption state and the recovery key (step-up) of the personal office of a "
                            "person without an organisation"),
@@ -91,7 +91,7 @@ KINDS = {
                         "instance-wide numbers and operating actions only, no content of any person or organisation (p2144_d_api_test.py)"),
     "orgadmin": ("n/a", "managing an organisation (members, admins, its lists, export, encryption): only for its members and "
                         "admins; without an organisation there is nothing to manage (the personal office is reached under "
-                        "office, the private space under every other area)"),
+                        "office, the private workspace under every other area)"),
     "link": ("n/a", "pages opened by an unguessable link (public list link, customer status page / portal, approval link, "
                     "calendar feed, the booking page of a person (2.94.0)): the same for the link of a private list or document as for an organisation's"),
     "token": ("n/a", "inbound hooks addressed by the secret of one list / environment / repository: no person, no workspace"),
@@ -291,7 +291,7 @@ ROUTES = {
     "GET /api/team/dispo": "hub", "GET /api/team/dispo/export": "hub", "GET /api/team/dispo/free": "hub", "GET /api/v1/absences": "hub", "GET /api/v1/dispo": "hub",
     "GET /api/v1/dispo/free": "hub", "PATCH /api/team/absences/{}": "hub", "PATCH /api/team/dispo/bookings/{}": "hub",
     "POST /api/hubmail/address": "hub", "POST /api/hubmail/mails/{}/assign": "hub",
-    # 2.141.0 A (#2141, #2138): the own mailbox of the private space, Reply / New e-mail (p2141_a_api_test.py, freelancer-matrix: hub)
+    # 2.141.0 A (#2141, #2138): the own mailbox of the private workspace, Reply / New e-mail (p2141_a_api_test.py, freelancer-matrix: hub)
     "GET /api/hubmail/mailboxes": "hub", "GET /api/hubmail/mailbox": "hub", "PUT /api/hubmail/mailbox": "hub", "DELETE /api/hubmail/mailbox": "hub",
     "POST /api/hubmail/mailbox/check": "hub", "POST /api/hubmail/mailbox/poll": "hub", "GET /api/hubmail/compose": "hub", "POST /api/hubmail/send": "hub",
     "POST /api/hubmail/mails/{}/restore": "hub",
@@ -563,7 +563,7 @@ ROUTES = {
     "POST /api/account/export": "own", "POST /api/account/import": "own", "POST /api/account/import/{}/key": "own",
     "POST /api/account/import/{}/run": "own", "POST /api/me/app-passwords": "own", "POST /api/me/avatar": "own",
     # 2.97.0 B (#1951): customers (p297_b_api_test.py) - routes below this line
-    # 2.96.0 D (#1941 / #1918): an organisation export into the private space
+    # 2.96.0 D (#1941 / #1918): an organisation export into the private workspace
     "POST /api/me/drop-token": "own", "POST /api/me/mail/test": "own", "POST /api/me/mail/token": "own",
     "POST /api/me/pin/lock": "own", "POST /api/me/pin/unlock": "own", "POST /api/me/purpose": "own",
     "POST /api/me/tokens": "own", "POST /api/me/webhooks": "own", "POST /api/me/webhooks/{}/secret": "own",
@@ -869,7 +869,7 @@ ROUTES = {
     "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki", "POST /api/wiki/pages": "wiki",
     "POST /api/wiki/folders": "wiki",  # 2.200.0 A (#2747): an empty knowledge folder (p2200_a_wiki_folder_test.py)
     "GET /api/wiki/tags": "wiki", "GET /api/wiki/query": "wiki",  # 2.371 (#3150): tags + the abfrage block (p2371_wiki_tags_test.py)
-    # 2.200.0 C (#1781): API v1 (p2200_c_wiki_agent_test.py: her token and her own agent in the private space)
+    # 2.200.0 C (#1781): API v1 (p2200_c_wiki_agent_test.py: her token and her own agent in the private workspace)
     "GET /api/v1/wiki/pages": "wiki", "GET /api/v1/wiki/pages/{}": "wiki", "POST /api/v1/wiki/pages": "wiki", "PATCH /api/v1/wiki/pages/{}": "wiki",
     # 2.200.0 B (#2747): a page / folder in a folder shared with me (p2200_b_wiki_share_test.py)
     "POST /api/wiki/shared/pages": "wiki", "POST /api/wiki/shared/folders": "wiki",
@@ -878,24 +878,24 @@ ROUTES = {
     "GET /api/wiki/import/upload/{}": "wiki", "DELETE /api/wiki/import/upload/{}": "wiki",
     # 2.96.0 B (#1941): wiki pages / folders to the other workspace
     "POST /api/wiki/move-space": "wiki",
-    "PUT /api/wiki/style": "wiki",  # 2.371.3 (#3152): the space's reading style (p2371_3_wiki_ui.js: frida sets her private space's)
+    "PUT /api/wiki/style": "wiki",  # 2.371.3 (#3152): the space's reading style (p2371_3_wiki_ui.js: frida sets her private workspace's)
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
-    # 2.143.0 B (#2211): the trash of the private space (p2143_b_api_test.py)
+    # 2.143.0 B (#2211): the trash of the private workspace (p2143_b_api_test.py)
     "GET /api/wiki/trash": "wiki", "POST /api/wiki/purge": "wiki",
     # 2.123.0 C (#2103, #2107): files of the file store / tables in pages (p2123_c_api_test.py: own private file store and tables)
     "POST /api/wiki/pages/{}/refs": "wiki", "GET /api/wiki/refs": "wiki",
     # 2.97.0 D (#2050 #2051): locked spaces / clean-up (p297_d_api_test.py) - routes below this line
-    # 2.99.0 A (#2182): files of knowledge pages (p299_a_api_test.py: import, upload, read, delete in the private space)
+    # 2.99.0 A (#2182): files of knowledge pages (p299_a_api_test.py: import, upload, read, delete in the private workspace)
     "GET /api/wiki/files/{}": "wiki", "GET /api/wiki/files/{}/{}": "wiki", "DELETE /api/wiki/files/{}": "wiki",
     "POST /api/wiki/pages/{}/files": "wiki",
-    # 2.123.0 B (#2104): shares of knowledge pages / folders (p2123_b_api_test.py: person + link in the private space); the public page = link
+    # 2.123.0 B (#2104): shares of knowledge pages / folders (p2123_b_api_test.py: person + link in the private workspace); the public page = link
     "GET /api/wiki/shares": "wiki", "POST /api/wiki/shares": "wiki", "PATCH /api/wiki/shares/{}": "wiki", "DELETE /api/wiki/shares/{}": "wiki",
     "POST /api/wiki/shares/{}/restore": "wiki", "GET /api/wiki/shared": "wiki", "GET /api/wiki/shared/pages/{}": "wiki",
     "GET /api/wiki/shared/files/{}": "wiki", "GET /api/wiki/shared/files/{}/{}": "wiki",
     "GET /api/wiki/shared/pages/{}/img/{}": "wiki",  # 2.380 H (#2356): p2380r_h_api_test.py (a person without an organisation)
     "GET /s/w/{}": "link", "GET /s/w/{}/p/{}": "link", "GET /s/w/{}/file/{}": "link",
     "GET /s/w/{}/img/{}/{}": "link",  # 2.380 H (#2356)
-    # 2.123.0 A (#2102): the history of a page (p2123_a_api_test.py: list, read, restore in the private space)
+    # 2.123.0 A (#2102): the history of a page (p2123_a_api_test.py: list, read, restore in the private workspace)
     "GET /api/wiki/pages/{}/versions": "wiki", "GET /api/wiki/pages/{}/versions/{}": "wiki",
     "POST /api/wiki/pages/{}/versions/{}/restore": "wiki",
     # 2.90.0 - 2.92.0: bookkeeping, bank, tax dates, invoice series, subscriptions, agreements, equipment, file preview

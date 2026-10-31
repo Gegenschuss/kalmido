@@ -206,7 +206,7 @@ s3, _ = login("bob")
 check(s3.post(B + "/api/auth/2fa", json={"recovery": codes[0]}).status_code == 401, "a recovery code works only once")
 check(s3.post(B + "/api/auth/2fa", json={"recovery": codes[1]}).ok, "another recovery code works")
 
-# ---- no user enumeration: wrong password looks the same with or without 2FA / unknown user
+# ---- no user enumeration: wrong password looks the same with or without 2FA / unknown person
 a = login("bob", "wrong-password")[1]
 b_ = login("nobody-here", "wrong-password")[1]
 c_ = login("gwen", "wrong-password")[1]

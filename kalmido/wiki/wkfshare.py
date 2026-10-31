@@ -105,7 +105,7 @@ def _need_folder(c, uid, nid):
     top = chain[-1]
     oid, owner = (top["org_id"] or None), (None if top["org_id"] else top["owner_id"])
     if _space_locked(c, oid, owner):
-        raise Denied(409, tr("This space is end-to-end encrypted: its folders come from the page names"))
+        raise Denied(409, tr("This workspace is end-to-end encrypted: its folders come from the page names"))
     return chain, oid, owner
 
 

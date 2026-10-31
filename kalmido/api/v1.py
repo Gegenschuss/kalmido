@@ -1502,7 +1502,7 @@ def v1_comment_create(tid):
         from ..team.portal import pt_comment_flag
         if pt_comment_flag(c, tid, me(), b["portal"]):
             t = c.execute("SELECT title, list_id FROM tasks WHERE id=?", (tid,)).fetchone()
-            need_approval(c, N_("Answer the customer of the task “{0}”"), (t["title"][:80],), list_id=t["list_id"], task_id=tid)
+            need_approval(c, N_("Answer the client of the task “{0}”"), (t["title"][:80],), list_id=t["list_id"], task_id=tid)
     j = v1_call(comment_create, tid, body={"body": b["body"], **{k: b[k] for k in ("suggestion", "reply_to", "choices", "multi", "approval",
                                                                                     "expires_in", "portal", "client_ref") if k in b}})
     return jsonify(v1_comment(c, {**j, "task_id": tid}, user_names(c, [me()]))), 200 if again else 201

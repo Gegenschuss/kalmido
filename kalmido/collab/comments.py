@@ -322,7 +322,7 @@ def comment_create(tid):
     except BadInput as e:
         return err(str(e))
     if portal and (sug or chs):  # 2.63.0 B (#1513): the customer sees text (and the files are not shown to them)
-        return err(tr("Suggestions and answer buttons cannot go to a customer"))
+        return err(tr("Suggestions and answer buttons cannot go to a client"))
     cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to,choices,portal,client_ref) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (tid, me(), text, ",".join(map(str, mentions)), iso_ms(now_utc()),
                      json.dumps(sug, ensure_ascii=False) if sug else None, orig["id"] if orig else None, chs, portal, ref))

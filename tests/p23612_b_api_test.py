@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
 """2.361.2 B (#2923): one rule for the other areas -- knowledge pages, office clients and drafts, video sign-offs, polls
-and bookmarks leave an organisation only through its admin, or into the maker's private space after an admin released
+and bookmarks leave an organisation only through its admin, or into the maker's private workspace after an admin released
 the maker's request (before, the maker took them out alone, without a log or a word to the admins). Invented names only,
 addresses @example.com. tenant-matrix: org
  - per area: the maker (a plain member) gets 403 with out_request (the dry run: block + out_request); asking
@@ -32,7 +32,7 @@ H = {"X-Requested-With": "kalmido"}
 from kt import FAILS, OKS, check, sess  # noqa: E402
 
 FEAT = "sheets,wiki,collab,comments,cal,events,office,clients,reading"
-BACK = "Back into your private space only after an admin of the organisation releases it"
+BACK = "Back into your private workspace only after an admin of the organisation releases it"
 TIMES = [{"start": "2031-03-10T10:00"}, {"start": "2031-03-11T14:30"}]
 
 

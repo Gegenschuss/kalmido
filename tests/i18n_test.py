@@ -142,8 +142,8 @@ check(not vous_du, f"fr: no vous/votre/vos where de says du ({len(vous_du)}): {v
 COUNTS = [
     ("static/js/liste2e.js", "{0} text of this project cannot be decrypted with the keys you hold."),
     ("static/js/liste2eui.js", "{0} text of this project cannot be opened with your key. Compare the safety numbers with the members."),
-    ("static/js/wikie2e.js", "{0} page of this space cannot be opened with your key."),
-    ("static/js/wikie2e.js", "{0} text of this space cannot be decrypted. The space stays locked until it is taken over as empty."),
+    ("static/js/wikie2e.js", "{0} page of this workspace cannot be opened with your key."),
+    ("static/js/wikie2e.js", "{0} text of this workspace cannot be decrypted. The workspace stays locked until it is taken over as empty."),
     ("static/js/paperless.js", "{0} document in Paperless-ngx"),
     ("static/js/paperless.js", "{0} rule is already here"),
     ("static/js/paperless.js", "{0} rule taken over"),

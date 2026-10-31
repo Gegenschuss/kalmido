@@ -118,7 +118,7 @@ check("sort_mode" in props and "group_field" in props, "OpenAPI ListPatch names 
 # ================================================================ a person without an organisation (freelancer-matrix: lists)
 FID, Fl = freelancer(B, A)
 FL = Fl.post(B + "/api/lists", json={"name": "Own work"}).json()["id"]
-ff = Fl.post(B + f"/api/lists/{FL}/fields", json={"name": "Customer", "type": "text"})
+ff = Fl.post(B + f"/api/lists/{FL}/fields", json={"name": "Client", "type": "text"})
 check(ff.ok, f"freelancer: field created {ff.status_code}")
 ff = ff.json().get("id") if ff.ok else 0
 check(Fl.patch(B + f"/api/lists/{FL}", json={"group_field": f"cf:{ff}"}).ok and lst(Fl, FL).get("group_field") == f"cf:{ff}",

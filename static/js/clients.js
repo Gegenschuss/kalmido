@@ -442,13 +442,13 @@ async function formsModal(lid) {
       <div class="row"><label for="fm-title">${tr('Title')}</label><input id="fm-title" maxlength="120" value="${esc(f?.title || '')}" placeholder="${esc(tr('e.g. IT request, bug report'))}"></div>
       <div class="row"><label for="fm-intro">${tr('Intro')}</label><textarea id="fm-intro" rows="3" maxlength="2000">${esc(f?.intro || '')}</textarea></div>
       ${fq_dialogHtml(f)}${''/* lazy-ok: 2.149.0 F (#2519): formsModal loaded formq first */}
-      <div class="row"><label for="fm-access">${tr('Who can send it')}</label><select id="fm-access"><option value="org">${tr('Signed-in people who see the project')}</option><option value="public" ${f?.access === 'public' ? 'selected' : ''} ${j.public_links ? '' : 'disabled'}>${tr('Anyone with the link (no login)')}</option></select></div>
+      <div class="row"><label for="fm-access">${tr('Who can send it')}</label><select id="fm-access"><option value="org">${tr('Signed-in people who see the project')}</option><option value="public" ${f?.access === 'public' ? 'selected' : ''} ${j.public_links ? '' : 'disabled'}>${tr('Anyone with the link (no sign-in)')}</option></select></div>
       ${secs.length ? `<div class="row"><label for="fm-sec">${tr('Section')}</label><select id="fm-sec"><option value="">${tr('None')}</option>${secs.map(s => `<option value="${s.id}" ${s.id === f?.section_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>` : ''}
-      <div class="row"><label>${tr('E-mail')}</label><label class="chkl"><input type="checkbox" id="fm-email" ${f?.ask_email !== false ? 'checked' : ''} ${f?.portal ? 'disabled' : ''}> ${tr('Ask for an e-mail address (without login)')}</label></div>
+      <div class="row"><label>${tr('E-mail')}</label><label class="chkl"><input type="checkbox" id="fm-email" ${f?.ask_email !== false ? 'checked' : ''} ${f?.portal ? 'disabled' : ''}> ${tr('Ask for an e-mail address (without sign-in)')}</label></div>
       <div class="row"><label for="fm-ttype">${tr('Type of report')}</label><select id="fm-ttype"><option value="">${tr('None')}</option>${TTYPES.map(([k, n]) => `<option value="${k}" ${f?.ttype === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       <div class="row"><label>${tr('Attachment')}</label><label class="chkl"><input type="checkbox" id="fm-files" ${f?.files ? 'checked' : ''}> ${tr('Allow one file (at most 10 MB)')}</label></div>
       <div class="row"><label>${tr('Status link')}</label><label class="chkl"><input type="checkbox" id="fm-portal" ${f?.portal ? 'checked' : ''}> ${tr('The sender gets a link to the status')}</label></div>
-      <div class="shint">${tr('Without login, the sender sees a link after sending and gets it by mail (e-mail becomes required).')}</div><p class="muted mhint frm-hint">${tr('It shows only their report: title, status and the answers you send to them, never internal comments or your team.')}</p>
+      <div class="shint">${tr('Without sign-in, the sender sees a link after sending and gets it by e-mail (e-mail becomes required).')}</div><p class="muted mhint frm-hint">${tr('It shows only their report: title, status and the answers you send to them, never internal comments or your team.')}</p>
       ${f ? `<div class="row"><label>${tr('Status')}</label><label class="chkl"><input type="checkbox" id="fm-on" ${f.enabled ? 'checked' : ''}> ${tr('Open (accepts requests)')}</label></div>` : ''}
       ${f ? `<div class="row"><label>${tr('Link')}</label><input readonly value="${esc(f.url)}" aria-label="${esc(tr('Link'))}"><button type="button" class="btn sm" data-m="regen">${tr('New link')}</button></div>
       <div class="row qrrow"><label>${tr('QR code')}</label><button type="button" class="btn sm" data-m="qr">${ic('eye', 's')} ${tr('Show QR code')}</button></div>` : ''}
@@ -517,7 +517,7 @@ async function signinScreen(tok) {
     const post = sw => fetch('/api/auth/link', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({token: tok, switch: sw})});
     let r = await post(false), res = await r.json().catch(() => ({}));
     if (res.switch) {  // 2.190.0 A (#2496): another account is signed in on this device: ask before it is replaced
-      if (!await askConfirm(tr('Sign in as {0}?', res.name), tr('{0} is signed in on this device. The link signs in {1} instead.', res.current, res.name), {ok: tr('Log in')})) { location.replace('/'); return; }
+      if (!await askConfirm(tr('Sign in as {0}?', res.name), tr('{0} is signed in on this device. The link signs in {1} instead.', res.current, res.name), {ok: tr('Sign in')})) { location.replace('/'); return; }
       r = await post(true); res = await r.json().catch(() => ({}));
     }
     if (r.ok && res.ok) { location.replace('/'); return; }
@@ -525,7 +525,7 @@ async function signinScreen(tok) {
     if (res.enrol) { await authEnrol(el, `<div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b></div>`); return; }  // 2.86.0 (N4): the admin's 2FA policy
     $('.card p', el).textContent = res.error || httpErrText(r.status);
   } catch { $('.card p', el).textContent = tr('Server not reachable.'); }
-  $('.card', el).insertAdjacentHTML('beforeend', `<button class="btn pri" type="button" data-au="login">${tr('To the login')}</button>`);
+  $('.card', el).insertAdjacentHTML('beforeend', `<button class="btn pri" type="button" data-au="login">${tr('To the sign-in')}</button>`);
   el.addEventListener('click', e => { if (e.target.closest('[data-au="login"]')) location.replace('/'); });
 }
 
@@ -552,7 +552,7 @@ document.addEventListener('change', e => { if (e.target.id === 'wl-org') { WLV.o
 // 2.36.2 (#1021, E): billing details of a client for office & finance (structured address, VAT ID, customer number, buyer
 // reference, invoice e-mail, payment terms); folded away, the free address above stays
 const OFX_CL_FIELDS = [['street', N_('Street'), 200], ['address_extra', N_('Address extra'), 200], ['zip', N_('Postcode'), 20], ['city', N_('City'), 120], ['country', N_('Country'), 2],
-  ['vat_id', N_('VAT ID'), 20], ['customer_no', N_('Customer number'), 40], ['buyer_reference', N_('Buyer reference (e.g. routing ID)'), 60],
+  ['vat_id', N_('VAT ID'), 20], ['customer_no', N_('Client number|customer'), 40], ['buyer_reference', N_('Buyer reference (e.g. routing ID)'), 60],
   ['email_invoice', N_('E-mail for invoices'), 200], ['payment_terms_days', N_('Payment terms (days)'), 3],
   ['peppol_id', N_('Peppol ID'), 90]];  // 2.154.0 B (#1960): e-invoices over the Peppol network
 // 2.97.0 B (#1951): the address (street, extra line, postcode, city, country) stands in the form itself, the rest of the
@@ -592,7 +592,7 @@ document.addEventListener('click', e => {
 // team). What the start needs stays here: the switch, the tabs of the workload view and their click, the kinds and the day
 // hint of "Plan my day", the notification row; stand-ins draw the tabs' own "Loading…" and load the module
 const dp_on = () => feat('dispo');
-const AB2_KINDS = [['vacation', N_('Vacation')], ['sick', N_('Sick leave')], ['off', N_('Day off')], ['other', N_('Other absence')]];
+const AB2_KINDS = [['vacation', N_('Holiday')], ['sick', N_('Sick leave')], ['off', N_('Day off')], ['other', N_('Other absence')]];
 const ab2_kindName = k => tr(AB2_KINDS.find(x => x[0] === k)?.[1] || 'Away');
 // the tabs on top of the workload view: Workload | Absences | Disposition (2.50.0, #1194, when switched on)
 function ab2_tabs(cur) {
@@ -615,5 +615,5 @@ window.dp_view = () => { ld_later('team'); return `<div class="dash wload dp">${
 // assigning: the warning when the person is away (absence.js) - only where it can apply, so a solo user loads nothing
 window.ab2_warnAssign = (uid, t) => { if (uid && collab() && (t?.due || t?.plan_start)) loadModule('team').then(() => ab2_warnAssign(uid, t), () => {}); };
 // the notification row "leave" (account.js matrix): a new request (admins), the decision on my own
-NOTIF_ROWS.push(['leave', N_('Vacation requests'), N_('admins: a new request; everybody: the decision on their own')]);
+NOTIF_ROWS.push(['leave', N_('Holiday requests'), N_('admins: a new request; everybody: the decision on their own')]);
 NM_NEWS_NEW.leave = 1; NM_PUSH.leave = 1;

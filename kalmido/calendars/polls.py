@@ -585,7 +585,7 @@ def tpo_mail(rcpts, r, o, who, lg):
                                        tr("{0} has chosen a time for “{1}”:", who or tr("Someone", lg=lg), r["title"], lg=lg) + "\n" + when
                                        + (("\n" + r["location"]) if r["location"] else ""),
                                        tr("The event is attached: open it to add it to your calendar.", lg=lg),
-                                       tr("You get this mail because you entered this address when you voted. If that was not you, you can ignore it.", lg=lg)) if x)
+                                       tr("You get this e-mail because you entered this address when you voted. If that was not you, you can ignore it.", lg=lg)) if x)
         try:
             mail_send(addr, tr("Date set: {0}", r["title"], lg=lg), text, from_name=APP_NAME,
                       attachments=[("invite.ics", ics, "text/calendar")])
@@ -819,7 +819,8 @@ def _ip_hash(c):
 def tpo_page_get(token):
     c = db()
     if hit_limit("tpov:" + rate_ip(), TPO_VIEW_RATE):
-        return tpo_msg(tr("Too many requests"), tr("Please wait a minute and try again."), _accept_lang(), 429)
+        lg = _accept_lang()  # 2.368.4 (#2989): the visitor's language, also on the block page
+        return tpo_msg(tr("Too many requests", lg=lg), tr("Please wait a minute and try again.", lg=lg), lg, 429)
     r = tpo_find(c, token)
     if not r:
         return tpo_gone()

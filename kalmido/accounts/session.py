@@ -343,7 +343,7 @@ def authenticate():
         if path.startswith("/api/office/") and (request.headers.get("Authorization") or "").lower().startswith("bearer "):
             return err(tr("Tokens cannot use this endpoint"), 403)  # 2.36.2 E (#1146): agent tokens never reach office & finance
         setup = not c.execute("SELECT 1 FROM users").fetchone()
-        return jsonify(error=tr("Please log in"), auth="setup" if setup else "login"), 401
+        return jsonify(error=tr("Please sign in"), auth="setup" if setup else "login"), 401
     return redirect("/", 303)
 
 
@@ -488,7 +488,7 @@ def login_wait(keys, username, pre=""):
     if gate == "ok":
         return None
     if gate == "blocked":
-        return jsonify(error=tr("Too many failed logins, please wait a few minutes")), 429
+        return jsonify(error=tr("Too many failed sign-ins, please wait a few minutes")), 429
     ip = rate_ip()
     with _slow_lock:
         busy = _slow.get(ip, 0) >= LOGIN_SLOW_PER_IP or sum(_slow.values()) >= LOGIN_SLOW_MAX

@@ -4,7 +4,7 @@
 // section after opening it again (the source person, the counts, the people with "found" and a tick that is off); with the
 // tick the import starts, the result names the counts and offers undo; undo asks, then removes the imported list.
 // Part 4: an uploaded organisation export asks for the recovery key in the section; a wrong key is named, the right one
-// opens the preview (organisation export, the tick adds to the organisation, no private space as target).
+// opens the preview (organisation export, the tick adds to the organisation, no private workspace as target).
 // Firefox 390 touch: the section fits the phone, screenshot.
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -133,7 +133,7 @@ async function dataPane(w) {
   click(w, md.querySelector('[data-umz="key"]'));
   await until(() => md.querySelector('#s-umz-imp .umzbox [data-umz="go"]'), 100);
   const ob = md.querySelector('#s-umz-imp .umzbox');
-  // 2.96.0 (#1941): an organisation export may go into the private space too; the tick's words follow the target
+  // 2.96.0 (#1941): an organisation export may go into the private workspace too; the tick's words follow the target
   const tg = md.querySelector('#s-umz-tgt');
   check(ob && /Organisation export of Kalmido/.test(ob.textContent) && /Private/.test(tg?.textContent || '') && tg.options.length > 1, 'opened: preview, private + organisations as target');
   if (tg && tg.options.length > 1) { tg.value = tg.options[1].value; tg.dispatchEvent(new w.Event('change', {bubbles: true})); }

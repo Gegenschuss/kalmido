@@ -10,7 +10,7 @@ freelancer-matrix: wiki
    the background job indexes every page of the space
  - POST /api/wiki/move of a folder with 300 pages: complete (every page under the new name, the links to them follow, the
    relinked count as before), the statements do not grow per page; a taken name still answers 409
- - a person without an organisation: the same in the private space; nobody else reads it
+ - a person without an organisation: the same in the private workspace; nobody else reads it
 usage: p2280_c_api_test.py <datadir>      (P2280C_NOSTART=1 / KMT_NOSTART=1: the container runs already)"""
 import re
 import sys
@@ -159,7 +159,7 @@ fm = big(Fr, "private", "freelancer")
 j, got, n = paged(Fr, "private", 100)
 check(n == 4 and len(got) == len(j["pages"]) == 302, f"freelancer: the private texts in pages of 100 ({n}, {len(got)})")
 st, j = idx(A, "private", offline="1", bn="100")
-check(st == 200 and not set(p["id"] for p in j.get("pages", [])) & set(fm), "freelancer: nobody else's private space shows the pages")
+check(st == 200 and not set(p["id"] for p in j.get("pages", [])) & set(fm), "freelancer: nobody else's private workspace shows the pages")
 h, t, _ = search(A, "", "kiwi")
 check(not set(h) & set(fm), "freelancer: another account's search never finds the private pages")
 # ---------------------------------------------------------------- 2.280.0 (#3114, review): a page whose stored text looks sealed

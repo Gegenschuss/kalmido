@@ -70,7 +70,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   for (const k of ['iPhone / iPad', 'Mac:', 'Thunderbird', 'Tasks.org', 'DAVx⁵', 'Evolution', 'Windows'])
     check(steps.includes(k), `guide for ${k}`);
   check(/\/dav\/principals\/alice\//.test(steps), 'the iPhone / Mac fallback names the principal address');
-  check(/must bypass the proxy login/.test(steps), 'admins see the proxy note');
+  check(/must bypass the proxy sign-in/.test(steps), 'admins see the proxy note');
   click(w, ig.querySelector('[data-apw="new"]'));
   await sleep(150);
   check([...d.querySelectorAll('.modal')].pop().querySelector('#apw-name'), 'the CalDAV section creates app passwords too');
@@ -117,7 +117,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'}, CKB);
   w = await boot({user: 'bob'}); d = w.document;
   w.settingsModal('caldav'); await sleep(300);
-  check(d.querySelector('#s-dav-h') && !/must bypass the proxy login/.test(d.querySelector('[data-pane="integr"]').textContent), 'members see no proxy note');
+  check(d.querySelector('#s-dav-h') && !/must bypass the proxy sign-in/.test(d.querySelector('[data-pane="integr"]').textContent), 'members see no proxy note');
   check(!d.querySelector('#s-signin'), 'members see no sign-in settings');
   w.close();
 

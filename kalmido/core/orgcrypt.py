@@ -123,8 +123,8 @@ JSON_KEYS = {("office_settings", "data"): ("company",), ("office_docs", "totals"
 PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("office_settings", "data"): N_("Bank and tax data of the company"),
                  ("office_docs", "totals"): N_("Purchase prices and margins"), "office_contracts": N_("Framework contract rates"),
                  "office_docs": N_("Senders of finished documents"), "office_doc_log": N_("The log of the documents"),
-                 "office_signoffs": N_("Signatures of customers (name, address, device)"),  # 2.50.0 (#1200)
-                 "files": N_("Files of organisations"), "private_files": N_("Files in the private space"),  # 2.64.0 (#1864)
+                 "office_signoffs": N_("Signatures of clients (name, address, device)"),  # 2.50.0 (#1200)
+                 "files": N_("Files of organisations"), "private_files": N_("Files in the private workspace"),  # 2.64.0 (#1864)
                  "tokens": N_("Stored access tokens (Git, client secret of the single sign-on)"),
                  # 2.47.0 (#1649, #1215, #1216): roles' purchase prices, purchases of accepted quotations, parts and shoot sheets
                  "office_roles": N_("Purchase prices and margins"), "office_purchases": N_("Purchase prices and margins"),
@@ -162,7 +162,7 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
 PM_CRYPT_PLAIN = (N_("Tasks"), N_("Notes"), N_("Descriptions"), N_("Comments"), N_("Contacts"), N_("Chats"))
 # 2.64.1 (#1817): what the browser encrypts in lists with a lock (collab/liste2e.py LE2E_FIELDS); the plain list holds them apart
 PM_CRYPT_BROWSER = (N_("Titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets of projects with a lock"),)
-PM_CRYPT_BROWSER += (N_("Names and texts of knowledge pages in spaces with a lock"),)  # 2.64.3 A (#1817): the lock per knowledge space
+PM_CRYPT_BROWSER += (N_("Names and texts of knowledge pages in workspaces with a lock"),)  # 2.64.3 A (#1817): the lock per knowledge space
 PM_CRYPT_PLAIN_NOTE = N_("Tasks, descriptions, notes and comments: except in projects with a lock")
 
 
@@ -1219,13 +1219,13 @@ def rck_stepup(c, u, b, want=""):
     from ..accounts.session import _rate_fail, _rate_keys
     step = rck_step(c, u)
     if step == "proxy":
-        return jsonify(error=tr("You are signed in through the server’s login proxy. Ask the server admin for the recovery key (command line, SELF-HOSTING.md)."),
+        return jsonify(error=tr("You are signed in through the server’s sign-in proxy. Ask the server admin for the recovery key (command line, SELF-HOSTING.md)."),
                        need="proxy"), 403
     if step == "fresh":
         if _rck_fresh(c, want):
             return None
         if rck_stepup_via(c, u):  # 2.144.5 A (#2387)
-            return jsonify(error=tr("Sign in again with your login provider, then try again."), need="fresh", stepup="oidc"), 403
+            return jsonify(error=tr("Sign in again with your sign-in provider, then try again."), need="fresh", stepup="oidc"), 403
         return jsonify(error=tr("Please sign in again, then try again."), need="fresh"), 403
     e = _reauth(u, b)
     if e is not None:

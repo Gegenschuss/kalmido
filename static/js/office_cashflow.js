@@ -219,7 +219,7 @@ function fci_checkHtml() {
   const ppl = k.people || [];
   return `<div class="ofcbar"><h3 class="ofcgrp">${tr('Monthly check')}</h3></div><div class="fcichk">
     <label class="chkl"><input type="checkbox" data-fcc="on" ${k.on ? 'checked' : ''} ${ppl.length ? '' : 'disabled'}><span>${tr('Monthly task: check the actual state of the cash flow')}</span></label>
-    ${k.on || ppl.length ? `<div class="row"><label for="fcc-user">${tr('Responsible person')}</label><select id="fcc-user" data-fcc="user">${k.user_id && !ppl.some(p => p.id === k.user_id) ? `<option value="${k.user_id}" selected>${esc(tr('Person without access'))}</option>` : ''}${ppl.map(p => `<option value="${p.id}" ${p.id === (k.user_id || S.me?.id) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>` : ''}
+    ${k.on || ppl.length ? `<div class="row"><label for="fcc-user">${tr('Assignee|person')}</label><select id="fcc-user" data-fcc="user">${k.user_id && !ppl.some(p => p.id === k.user_id) ? `<option value="${k.user_id}" selected>${esc(tr('Person without access'))}</option>` : ''}${ppl.map(p => `<option value="${p.id}" ${p.id === (k.user_id || S.me?.id) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>` : ''}
     ${k.lost ? `<p class="aerr" role="alert">${tr('The person responsible no longer has access to the cash flow. Please choose someone else.')}</p>` : ''}
     <p class="muted ofchint">${tr('On the 1st of every month in the Basket of the person, without amounts.')}</p></div>`;
 }

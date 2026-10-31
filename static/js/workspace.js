@@ -228,8 +228,8 @@ function importTargetConfirm({what, ws = 'private', place = '', privOk = false, 
   const body = org
     ? (place ? tr('Import {0} into “{1}” of the organisation {2}. Members of the organisation with access to it can see them.', what, place, name)
       : tr('Import {0} into the organisation {1}. Members of the organisation with access to it can see them.', what, name))
-    : (place ? tr('Import {0} into “{1}” in your private space.', what, place) : tr('Import {0} into your private space.', what));
-  return askDialog({title: org ? tr('Import into the organisation {0}?', name) : tr('Import into your private space?'), body, ok: tr('Import'),
+    : (place ? tr('Import {0} into “{1}” in your private workspace.', what, place) : tr('Import {0} into your private workspace.', what));
+  return askDialog({title: org ? tr('Import into the organisation {0}?', name) : tr('Import into your private workspace?'), body, ok: tr('Import'),
     after: md => {
       md.classList.add('itc-dlg');
       if (check) {

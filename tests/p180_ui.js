@@ -81,7 +81,7 @@ async function openSetup(jar) {  // the app with a cookie jar of its own (the se
   check(d.querySelectorAll('#view .trow .blk').length >= 3, 'waiting tasks carry the lock');
   w.eval(`go('doable')`); await sleep(300);
   const doable = [...d.querySelectorAll('#view .trow .ttl, #view .trow .title')].map(x => x.textContent).join('|') || d.querySelector('#view').textContent;
-  check(/Write the concept and treatment/.test(doable) && !/Get the quote and budget approved/.test(doable), 'Now doable: the overdue concept, not the budget that waits on it');
+  check(/Write the concept and treatment/.test(doable) && !/Get the quotation and budget approved/.test(doable), 'Now doable: the overdue concept, not the budget that waits on it');
   // ================= (3) Settings > Data: remove (dialog), create again, palette
   w.__dialogs = 'manual';
   await w.eval(`settingsModal('sample')`); await sleep(300);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())

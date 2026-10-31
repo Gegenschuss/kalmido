@@ -1,5 +1,5 @@
 """2.87.9 (#1919) the test fixture "Selbstständige": a person WITHOUT any organisation on a server that has organisations
-(a freelancer: the own private space, the own personal office, its own admin there). For every suite that checks a route
+(a freelancer: the own private workspace, the own personal office, its own admin there). For every suite that checks a route
 for freelancer parity (tests/freelancer_coverage_test.py, marker "freelancer-matrix: <area>"):
 
     from freelancer_fixture import freelancer

@@ -139,7 +139,7 @@ check(Bo.put(B + "/api/team/absences/holidays", json={"state": "XX"}).status_cod
 check(Bo.put(B + "/api/team/absences/holidays", json={"state": "SN"}).ok, "the admin sets Saxony")
 j = Ca.get(B + "/api/team/absences", params={"start": "2026-03-01", "end": "2026-12-31"}).json()
 hol = {h["date"]: h["name"] for h in j["holidays"]}
-check(hol.get("2026-04-03") == "Karfreitag" and "2026-05-25" in hol, f"Good Friday + Whit Monday 2026 ({sorted(hol)[:4]})")
+check(hol.get("2026-04-03") == "Good Friday" and "2026-05-25" in hol, f"Good Friday + Whit Monday 2026 ({sorted(hol)[:4]})")
 check("2026-10-31" in hol and "2026-11-18" in hol, "Saxony: Reformation Day + Buss- und Bettag (18.11.2026)")
 check("2026-06-04" not in hol, "Saxony: no Corpus Christi")
 check(not Da.get(B + "/api/team/absences", params={"start": "2026-03-01", "end": "2026-12-31"}).json()["holidays"], "Beta has no state: no holidays")

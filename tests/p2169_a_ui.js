@@ -10,7 +10,7 @@
 // - 2.169.1 (#949 / #2672): on a computer with sidebar B the offline mark sits in the bar above the folder and the search finds
 //   words in the texts; on a phone the same in its list; waiting conflicts are read by key range (pre), the kept lock state
 //   fills WKE.info offline, a refused page change has its own toast, the index says more=false and the mark names the 5000 cap
-// freelancer-matrix: wiki (the pages are in the private space of a person without an organisation)
+// freelancer-matrix: wiki (the pages are in the private workspace of a person without an organisation)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');

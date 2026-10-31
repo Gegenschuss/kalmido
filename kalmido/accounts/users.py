@@ -193,7 +193,7 @@ def user_create():
         return err(tr("Password: at least {0} characters", MIN_PASSWORD))
     proxy = (b.get("proxy_login") or "").strip() or None
     if _proxy_taken(c, proxy):
-        return err(tr("This proxy login is already assigned"), 409)
+        return err(tr("This proxy sign-in is already assigned"), 409)
     topic = str(b.get("ntfy_topic") or "").strip()
     if topic and not NTFY_TOPIC_RE.fullmatch(topic):
         return err(tr("ntfy topic: 1-64 characters a-z, A-Z, 0-9, dash, underscore"))
@@ -256,7 +256,7 @@ def user_update(uid):
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or not om_admin_all(c, uid):  # 2.46.0 (#1592): the user management: every account
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else {}
     for k in ("orgs", "parents"):  # 2.270.0 A (#3019): with _prev only what the dialog changed (who joined meanwhile stays)
         if all(isinstance(v, list) and all(isinstance(x, int) and not isinstance(x, bool) for x in v) for v in (b.get(k), prev.get(k))):
@@ -319,7 +319,7 @@ def user_update(uid):
     if "proxy_login" in b:
         proxy = (b["proxy_login"] or "").strip() or None
         if _proxy_taken(c, proxy, uid):
-            return err(tr("This proxy login is already assigned"), 409)
+            return err(tr("This proxy sign-in is already assigned"), 409)
         c.execute("UPDATE users SET proxy_login=? WHERE id=?", (proxy, uid))
     if "is_admin" in b:
         c.execute("UPDATE users SET is_admin=? WHERE id=?", (1 if b["is_admin"] else 0, uid))
@@ -589,7 +589,7 @@ def h6a_first_password_check(c):
     tok = request.cookies.get(COOKIE)
     r = c.execute("SELECT created_at FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone() if tok else None
     if not r or r[0] < iso(now_utc() - timedelta(seconds=FIRST_PW_FRESH)):
-        return err(tr("For a first password, please log out and sign in again (at most {0} minutes ago).", FIRST_PW_FRESH // 60), 403)
+        return err(tr("For a first password, please sign out and sign in again (at most {0} minutes ago).", FIRST_PW_FRESH // 60), 403)
     return None
 
 

@@ -12,7 +12,7 @@
    4th argument gets WAHR; the export writes them back as Excel formulas (a Kalmido VLOOKUP with 3 arguments gets FALSE)
  - the chart (#2115): no chart = null; save / read / change / remove (PUT /api/sheets/<id>/chart), bad kind / columns 400,
    a reader of the list sees it and gets 403, another organisation 404, the agents' GET has it too
- - a person without an organisation uses functions and the chart in the private space
+ - a person without an organisation uses functions and the chart in the private workspace
 tenant-matrix: sheet
 freelancer-matrix: sheets
 usage: p2124_a_api_test.py <datadir>      (a fresh container; P2124A_NOSTART=1 = the server already runs)"""

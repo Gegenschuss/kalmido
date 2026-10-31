@@ -331,7 +331,7 @@ check(r.ok and r.json()["block"] and any("no longer attached to its task" in n f
 r = A.post(B + f"{V}/{VID}/move-space", json={"to": "private", "place": L2, "dry": 1})
 check(r.status_code == 404, "a place in another workspace: 404")
 r = A.post(B + f"{V}/{VID}/move-space", json={"to": "private", "place": LP, "dry": 1})
-check(r.ok and not r.json()["block"] and any("customer link stops" in n for n in r.json()["notes"]), f"dry run into a private project {r.text[:300]}")
+check(r.ok and not r.json()["block"] and any("client link stops" in n for n in r.json()["notes"]), f"dry run into a private project {r.text[:300]}")
 check(A.post(B + f"{V}/{VID}/move-space", json={"to": f"org:{ORG2}", "place": LP}).status_code == 409, "an organisation Alice is not in: 409")
 r = A.post(B + f"{V}/{VID}/move-space", json={"to": "private", "place": LP})
 MID = r.json().get("move_id") if r.ok else 0

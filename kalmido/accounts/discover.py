@@ -151,7 +151,7 @@ def _confirm_mail(c, u, email, tok):
     t = lambda s, *a: tr(s, *a, lg=lg)  # noqa: E731
     link = f"{PUBLIC_URL}/#dsc-confirm/{tok}"
     subject = t(N_("Confirm your address to be findable at {0}"), APP_NAME)
-    intro = t(N_("You switched on that people at {0} can find you by this e-mail address. Confirm it with the button; the link works for {1} days. Not you? Ignore this mail and nothing changes."), APP_NAME, DISC_TOKEN_DAYS)
+    intro = t(N_("You switched on that people at {0} can find you by this e-mail address. Confirm it with the button; the link works for {1} days. Not you? Ignore this e-mail and nothing changes."), APP_NAME, DISC_TOKEN_DAYS)
     button = t(N_("Confirm my address"))
     text = f"{t(N_('Hello {0},'), u['display_name'] or u['username'])}\n\n{intro}\n\n{button}: {link}\n"
     # 2.420.0 B (#3499): the shared mail frame (was its own 520 px card)

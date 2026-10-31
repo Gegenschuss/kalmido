@@ -276,9 +276,9 @@ n = one("SELECT COUNT(*) FROM rss_feeds WHERE org_id=?", (ORG2,))
 ok(A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo"), "the undo of the organisation import")
 check(one("SELECT COUNT(*) FROM rss_feeds WHERE org_id=?", (ORG2,)) == n - 1 and not one("SELECT list_id FROM reading_orgs WHERE org_id=?", (ORG2,)),
       "the undo takes the new feed and the registration, the feed that was there stays")
-# into the private space: the feeds become the person's own, the organisation's project mark stays behind
+# into the private workspace: the feeds become the person's own, the organisation's project mark stays behind
 j = org_import(A, OX, RK, "private")
-check(one("SELECT COUNT(*) FROM rss_feeds WHERE user_id=? AND org_id IS NULL AND url LIKE '%feeds.example.com%'", (ALICE,)) == 2, "into the private space: the importing person's own feeds")
+check(one("SELECT COUNT(*) FROM rss_feeds WHERE user_id=? AND org_id IS NULL AND url LIKE '%feeds.example.com%'", (ALICE,)) == 2, "into the private workspace: the importing person's own feeds")
 
 print(f"p2455_c_export: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
