@@ -14,10 +14,11 @@ async function ms_clLoad(q) {  // 2.431.0 C (#3602): q = quietly for ms_clLive (
   MSC.loading = false;
   if (seq === MSC.seq && !q) ms_clDraw();
 }
-// open invoices per client (office on): the organisation's invoices, loaded once per visit of the page
+// open invoices per client (office on); 2.369.0 A (#3200): the open invoices of this client from the server, not filtered here from the newest 500
 async function ms_clInvLoad(q) {
-  MSC.invLoading = true;
-  try { MSC.inv = (await rawFetch('GET', '/api/office/docs?kind=invoice')).docs || []; } catch { if (!q) MSC.inv = []; }  // quiet: without an office (400) no section
+  const id = S.route.client; if (!id) return;
+  MSC.invLoading = true; MSC.invFor = id;
+  try { const rows = await docsAll(`/api/office/docs?kind=invoice&status=open&client_id=${id}`); if (S.route.client === id) MSC.inv = rows; } catch { if (!q) MSC.inv = []; }  // quiet: without an office (400) no section
   MSC.invLoading = false;
   if (!q) ms_clDraw();
 }
@@ -96,6 +97,7 @@ function ms_clView() {
   if (MSC.items === null && !MSC.loading) setTimeout(ms_clLoad, 0);
   const id = S.route.client || null, mob = isMobile();
   if (id && (!CLV.data || CLV.id !== id) && !CLV.loading) setTimeout(clLoad, 0);
+  if (id && MSC.invFor !== id && !MSC.invLoading) MSC.inv = null;  // 2.369.0 A (#3200): another client
   if (id && MSC.inv === null && !MSC.invLoading && typeof officeOn === 'function' && officeOn()) setTimeout(ms_clInvLoad, 0);
   const d = id && CLV.data && CLV.id === id ? CLV.data : null;
   const card = !id ? (mob ? '' : `<div class="ctcard ctnone muted">${ic('brief')}${tr('Choose a client')}</div>`)

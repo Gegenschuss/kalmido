@@ -515,6 +515,16 @@ function setOnline(b) { if (OUT.online !== b) { OUT.online = b; if (S.booted) re
 // 2.13.4 (p210 flake, a real race): every write counts up when it starts and when it ends (S.wseq), so load() can tell that
 // a write finished while its GET /api/state was on the way: that answer may predate the write and would undo it locally
 // (S.settings went back to the old value; an Undo right after then saw "changed elsewhere" and skipped the step)
+// 2.369.0 A (#3200): every page of GET /api/office/docs (a list that must not stop at one page; f: rawFetch or api)
+async function docsAll(url, f = rawFetch) {
+  const rows = [];
+  for (let cur = null, i = 0; i < 200; i++) {
+    const j = await f('GET', url + (cur ? `&before=${encodeURIComponent(cur)}` : ''));
+    rows.push(...(j.docs || [])); cur = j.next_cursor;
+    if (!cur) break;
+  }
+  return rows;
+}
 async function rawFetch(method, url, body, key) {  // key: 2.270.0 C (#3022) the outbox entry's idempotency key
   // 2.64.1 (#1817): texts of a locked list leave encrypted, ciphers in answers become plain texts in memory (liste2e.js)
   if (typeof le2eOut === 'function') body = await le2eOut(method, url, body);
