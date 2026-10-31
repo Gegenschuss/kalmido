@@ -83,10 +83,10 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,docs,agents,fields,dep
     const side = `[...document.querySelectorAll('#side [data-ofmg="money"] [data-ofm]')].map(b => b.dataset.ofm).join()`;
     check(await ready(ev, `!!document.querySelector('#side [data-ofmg="money"] [data-ofm="bank"]')`, 20), '#3411: Money open');
     const pts = await ev(side);
-    // #3560: not used yet = they start under "Hidden" of the editor; the point may show, no "Show more"
+    // 2.448.0 (#3784): back to #3411: every point shows although nothing is used yet, no "Show more"
     const may = `ofm_avail().map(i => i.key)`;
-    check(['cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => !pts.split(',').includes(k)) && (await ev(`['cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => ${may}.includes(k))`)) && await ev(`!document.querySelector('[data-act="ofm-more"]')`),
-      '#3411: every point of Money can show, no "Show more", although nothing is used yet ' + pts);
+    check(['cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => pts.split(',').includes(k)) && (await ev(`['cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => ${may}.includes(k))`)) && await ev(`!document.querySelector('[data-act="ofm-more"]')`),
+      '#3784: every point of Money shows, no "Show more", although nothing is used yet ' + pts);
     await shot('p2380rf-money.png');
     // the switches under Settings > Functions
     await nav(B + '#office/settings');

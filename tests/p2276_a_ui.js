@@ -2,8 +2,8 @@
 // people only. freelancer-matrix: office (no new route; GET /api/office/settings has a new field "used") -- carol and dave
 // have no organisation (each the admin of the own office, P4).
 // - computer: a fresh office without a kept point opens on Quotes & invoices; the group Money is folded; opened by hand it
-//   shows Receipts, Bank, Bookkeeping, Cash book (cash flow, figures, travel, entertainment, subscriptions wait until used;
-//   2.418.0 (#3560): under "Hidden" of the menu's editor, no "Show more" any more); the hand's choice stays after reloading
+//   shows Receipts first and every other point of Money (2.448.0 #3784, #3411: nothing waits until used, no "Show more");
+//   the hand's choice stays after reloading
 // - Receipts (#office/receipts): the upload of the bookkeeping, the kinds (entertainment, travel) and the list; a file through
 //   "Photograph receipt" -> POST /api/docs -> the receipt sheet -> a row in the list; then Money is open on its own
 // - the Pipeline is the start only once there is an inquiry; the first invoice opens Money and shows the figures
@@ -87,7 +87,7 @@ const today = TC.today();
     await click(ev, '#side [data-act="sbb-group"][data-g="office:money"]');
     check(await ready(ev, `${money} === 'true'`, 20), 'Money opens by hand');
     const pts = await ev(side);
-    check(pts === 'receipts,bank,cards,books,cashbook' && await ev(`!document.querySelector('#side [data-act="ofm-more"]') && !!document.querySelector('#side [data-act="nav-edit"][data-area="office"]')`), '#3039: Receipts first, points used later wait under Hidden (2.418.0 #3560: no "Show more", Customize at the end) ' + pts);
+    check(pts.startsWith('receipts,') && ['bank', 'cards', 'books', 'cashbook', 'cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => pts.split(',').includes(k)) && await ev(`!document.querySelector('#side [data-act="ofm-more"]') && !!document.querySelector('#side [data-act="nav-edit"][data-area="office"]')`), '#3784: Receipts first, every point shows, nothing under Hidden (2.418.0 #3560: no "Show more", Customize at the end) ' + pts);
     await nav(B + 'static/icon.svg'); await nav(B + '#office/offers');
     check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && ${money} === 'true'`, 80), '#3039: the hand\'s choice stays after reloading');
     await ev(`(() => { localStorage.removeItem('tasks.sbbUnfold'); return 1; })()`);
@@ -142,7 +142,7 @@ const today = TC.today();
     await fresh(ev, nav, 'dave');
     await nav(B + '#office/offers');
     check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && OFC.info.used?.invoice === true && ${money} === 'true'`, 80), '#3039: with an invoice Money is open on its own');
-    check(await ev(`!!document.querySelector('#side [data-ofm="kpi"]') && !!document.querySelector('#side [data-ofm="cashflow"]') && !document.querySelector('#side [data-ofm="travel"]')`), '#3039: the figures and the cash flow show, travel still under Hidden (2.418.0 #3560) ' + await ev(side));
+    check(await ev(`!!document.querySelector('#side [data-ofm="kpi"]') && !!document.querySelector('#side [data-ofm="cashflow"]') && !!document.querySelector('#side [data-ofm="travel"]')`), '#3784: the figures, the cash flow and travel show ' + await ev(side));
   }, false);
 
   console.log(`p2276_a_ui: ${ok} ok, ${F.length} failed`);
