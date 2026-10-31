@@ -2379,6 +2379,14 @@ def import_undo(iid):
     return jsonify(imp_undo(db(), me(), iid))
 
 
+def _imp_report(raw):
+    """2.454.0 (#3808): the report of an import; the account import keeps the areas that stayed behind as keys."""
+    rep = json.loads(raw or "{}")
+    if rep.get("not_taken"):
+        rep["not_taken"] = [{**x, "what": tr(x["what"])} for x in rep["not_taken"]]
+    return rep
+
+
 @app.get("/api/imports")
 def imports_list():
     """The user's recent imports (Settings > Data): source, file, counts, undo possible until."""
@@ -2386,6 +2394,6 @@ def imports_list():
     for r in c.execute("SELECT * FROM imports WHERE user_id=? ORDER BY id DESC", (me(),)):  # bounded by imp_prune
         until = parse_iso(r["created_at"]) + timedelta(hours=IMPORT_UNDO_HOURS)
         out.append({"id": r["id"], "source": r["source"], "source_name": "Newsletter" if r["source"] == "newsletter" else IMPORT_SOURCES.get(r["source"], r["source"]),
-                    "file_name": r["file_name"], "created_at": r["created_at"], "counts": json.loads(r["report"] or "{}"),
+                    "file_name": r["file_name"], "created_at": r["created_at"], "counts": _imp_report(r["report"]),
                     "undone_at": r["undone_at"], "can_undo": not r["undone_at"] and until > now_utc(), "undo_until": iso(until)})
     return jsonify(imports=out, max_mb=IMPORT_MAX_MB, max_tasks=IMPORT_MAX_TASKS)
