@@ -121,6 +121,20 @@ const CASES = {
   ],
 };
 
+// 2.452.0 (#3772): day + month name of the app language (from _months), a month name alone stays text
+CASES.fr.push(['Anniversaire 5 octobre', 'Anniversaire', MD(9, 5)], ['Loyer le 1er mars', 'Loyer', MD(2, 1)], ['Congé 5 octobre 2030', 'Congé', "'2030-10-05'"],
+  ['Voyage 12 févr.', 'Voyage', MD(1, 12)], ['Bureau mars', 'Bureau mars', null], ['Fête en mai', 'Fête en mai', null]);
+CASES.es.push(['Cumpleaños 5 de octubre', 'Cumpleaños', MD(9, 5)], ['Alquiler el 1 de marzo', 'Alquiler', MD(2, 1)], ['Viaje 5 de octubre de 2030', 'Viaje', "'2030-10-05'"],
+  ['Flores de mayo', 'Flores de mayo', null], ['Llamar martes 5', 'Llamar 5', NW(2)]);
+CASES.it.push(['Compleanno 5 ottobre', 'Compleanno', MD(9, 5)], ['Affitto il 1 marzo', 'Affitto', MD(2, 1)], ['Viaggio 5 ottobre 2030', 'Viaggio', "'2030-10-05'"], ['Fiori di maggio', 'Fiori di maggio', null]);
+CASES.nl.push(['Verjaardag 5 oktober', 'Verjaardag', MD(9, 5)], ['Huur op 1 maart', 'Huur', MD(2, 1)], ['Reis 5 oktober 2030', 'Reis', "'2030-10-05'"], ['Bloemen in mei', 'Bloemen in mei', null],
+  ['Afspraak 15 uur', 'Afspraak', AT('15:00'), '15:00']);
+CASES.de.push(['Geburtstag 5. Oktober', 'Geburtstag', MD(9, 5)], ['Miete am 1. März', 'Miete', MD(2, 1)], ['Reise 5. Oktober 2030', 'Reise', "'2030-10-05'"], ['Reise 5 Okt', 'Reise', MD(9, 5)],
+  ['Fest im Mai', 'Fest im Mai', null], ['Pay rent 5 October', 'Pay rent', MD(9, 5)]);
+// the list in plain words per language: [language, input, title]; the basket stands for any list (its name is read from the app)
+const LISTS = [['de', 'Brot in der Liste', 'Brot'], ['en', 'Bread to the list', 'Bread'], ['fr', 'Pain dans la liste', 'Pain'], ['fr', 'Pain dans ma liste', 'Pain'], ['es', 'Pan en la lista', 'Pan'],
+  ['it', 'Pane nella lista', 'Pane'], ['it', 'Pane nella mia lista', 'Pane'], ['nl', 'Brood in de lijst', 'Brood'], ['nl', 'Brood op mijn lijst', 'Brood']];
+
 (async () => {
   await new Promise(r => srv.listen(0, '127.0.0.1', r));
   const store = {}, errs = [];
@@ -153,6 +167,15 @@ const CASES = {
     console.log(`${key}: ${n}/${cases.length} quick add cases`);
   }
   w.__nav = 'en-GB';
+  for (const [lang, inp, title] of LISTS) {
+    await w.eval(`i18nLoad('${lang}')`);
+    const nm = w.eval(`lname(S.lists.find(l => l.is_inbox))`), id = w.eval(`S.lists.find(l => l.is_inbox).id`);
+    const r = JSON.parse(w.eval(`JSON.stringify(parseQuick(${JSON.stringify(inp + ' ' + nm)}, new Set()))`));
+    check(r.title === title && r.list_id === id, `${lang}: list words ${JSON.stringify(inp + ' ' + nm)} -> ${JSON.stringify({title: r.title, list: r.list_id})}`);
+  }
+  // a list word without a list name stays in the title
+  await w.eval(`i18nLoad('fr')`);
+  check(JSON.parse(w.eval(`JSON.stringify(parseQuick('Mettre dans la liste', new Set()))`)).title === 'Mettre dans la liste', 'fr: list word at the end stays text');
   // 2.263.0 (#2977): the project table reads a slash date in the same order as quick add
   await w.eval(`i18nLoad('en')`);
   check(w.eval(`sgDay('03/10/2026')`) === '2026-10-03', 'en-GB: table 03/10/2026 = 3 October ' + w.eval(`sgDay('03/10/2026')`));
