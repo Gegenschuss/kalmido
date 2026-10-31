@@ -88,7 +88,7 @@ function swRun(src, {failLazy = false} = {}) {
   await w.eval(`settingsModal('look')`);
   await until(() => d.querySelector('.smodal'));
   check(!!d.querySelector('.smodal [data-pane="look"]') && lazyTags().includes('settings'), 'settingsModal() loads settings.js and opens Appearance');
-  check(w.eval('settingsModal.name') === 'settingsModal' && !/loadModule/.test(w.eval('String(settingsModal)')), 'after loading: the real settingsModal');
+  check(w.eval('settingsModal.name') === 'settingsModal' && /\$\('#s-navmenus', md\)/.test(w.eval('String(settingsModal)')), 'after loading: the real settingsModal');
   d.querySelector('.smodal')?.remove();
   // the gear in the sidebar works too (already loaded: opens at once)
   // #3400: the gear lives in a menu now, a stand-in button takes the same way through the click handler

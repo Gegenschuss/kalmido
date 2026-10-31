@@ -1612,6 +1612,7 @@ def main():
 
     # ---- 3. 2.421.0 A (#2936): every write route of a matrix area is called by a suite of its area (WRITE_UNPROVEN = the old rest)
     runs = {name for name in tests if re.search(r"\s" + re.escape(name) + r"\b", run_all)}
+    NOT_ON_TRAIN = {"POST /api/imports/{}/undo"}  # #3104: p2363_2_runs calls it, in main, not on the live train yet: drop this once it is live
     texts = {}
     n_w = 0
     for r, k in sorted(ROUTES.items()):
@@ -1625,7 +1626,7 @@ def main():
         if r in WRITE_UNPROVEN:
             check(not proven, f"{r}: a suite of the area {k} calls it now: take it out of WRITE_UNPROVEN")
         else:
-            check(proven, f"{r}: no suite with the marker 'freelancer-matrix: {k}' calls it (method on the line, the path "
+            check(proven or r in NOT_ON_TRAIN, f"{r}: no suite with the marker 'freelancer-matrix: {k}' calls it (method on the line, the path "
                           f"with its ids): call it there as the person without an organisation")
     for r in sorted(WRITE_UNPROVEN - set(ROUTES)):
         check(False, f"WRITE_UNPROVEN names {r}, which is no route of ROUTES: remove it")
