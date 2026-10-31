@@ -129,11 +129,11 @@ for bad in ("x", "2026-01-01", ",abc", "2026-01-01,12;drop"):
 last = A.get(B + D, params={"kind": "invoice", "year": "2026", "limit": 500}).json()
 check(last["next_cursor"] is None and len(last["docs"]) == 231, f"the last page has no cursor ({len(last['docs'])})")
 # 2.369.0 (#3200 + #3839): a chosen sorting goes on by position: every row once over the pages, the old cut at 500 is gone
-srt, cur, pages = [], None, 0
-while pages < 12:
+srt, cur, npg = [], None, 0
+while npg < 12:
     j = A.get(B + D, params={"kind": "invoice", "limit": 200, "sort": "date", "dir": "asc", **({"before": cur} if cur else {})}).json()
     srt += [d["id"] for d in j["docs"]]
-    pages, cur = pages + 1, j["next_cursor"]
+    npg, cur = npg + 1, j["next_cursor"]
     if not cur:
         break
 days = {d["id"]: d["date"] for d in A.get(B + D, params={"kind": "invoice", "limit": 200, "sort": "date", "dir": "asc"}).json()["docs"]}
