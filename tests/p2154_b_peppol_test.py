@@ -21,6 +21,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 
 import requests
@@ -200,6 +201,21 @@ r = A.post(B + f"{D}/{DU}/peppol", json={"again": 1})
 check(r.status_code == 201 and len(r.json()["sends"]) == 2 and r.json()["sends"][0]["status"] == "sent", f"#2778: sent again: {r.text[:200]}")
 idm = [x[0] for x in dbx("SELECT idem FROM office_peppol_sends WHERE doc_id=?", (DU,))]
 check(len(set(idm)) == 2, "#2778: the new send has its own idempotency key (the provider must not drop it as a repeat)")
+# review 2.370.0: a status fetch under way when the send is marked does not put it back to "sent"
+DR = invoice(A, CL)
+check(A.post(B + f"{D}/{DR}/peppol", json={}).status_code == 201, "#2778: (setup) sent, for the race")
+stub_file("peppol_hold", "1")
+n4 = len(stub_log())
+th = threading.Thread(target=lambda: view(A, DR, refresh=True))
+th.start()
+for _ in range(100):
+    if any(x["path"].endswith("/evidence/sending") for x in stub_log()[n4:]):
+        break
+    time.sleep(0.1)
+check(A.post(B + f"{D}/{DR}/peppol/undelivered").ok, "#2778: marked while the provider is asked")
+stub_file("peppol_hold", "")
+th.join(30)
+check(view(A, DR).json()["sends"][0]["status"] == "error", "#2778: the running status fetch leaves the mark alone")
 stub_file("peppol_delivered", "1")
 v = view(A, DID, refresh=True).json()
 check(v["sends"][0]["status"] == "delivered" and not v["can_send"], f"refresh: delivered: {v['sends'][0]}")

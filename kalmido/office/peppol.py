@@ -516,10 +516,12 @@ def pep_refresh(c, oid, did):
             raise PepError("config")
         st = pep_adapter(c, oid, conf).status(x["provider_ref"])
     except PepError as e:
-        c.execute("UPDATE office_peppol_sends SET checked_at=?, message=? WHERE id=?", (ts, e.text(), x["id"]))
+        c.execute("UPDATE office_peppol_sends SET checked_at=?, message=? WHERE id=? AND status='sent'", (ts, e.text(), x["id"]))
         return True
-    c.execute("UPDATE office_peppol_sends SET status=?, message=?, checked_at=?, updated_at=? WHERE id=?",
-              (st["status"], st.get("message") or "", ts, ts if st["status"] != x["status"] else x["updated_at"], x["id"]))
+    # 2.370.0 (#2778): status='sent': marked as not delivered while the provider was asked = that stays
+    if not c.execute("UPDATE office_peppol_sends SET status=?, message=?, checked_at=?, updated_at=? WHERE id=? AND status='sent' RETURNING id",
+                     (st["status"], st.get("message") or "", ts, ts if st["status"] != x["status"] else x["updated_at"], x["id"])).fetchone():
+        return True
     if st["status"] != x["status"]:
         from .ledger import ofx_log
         ofx_log(c, oid, "peppol_status", doc_id=did, detail={"status": st["status"], **({"message": st["message"]} if st.get("message") else {})})
