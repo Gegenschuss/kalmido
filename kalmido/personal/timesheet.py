@@ -22,7 +22,7 @@ from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from function
 # usettings "tz": an IANA name (zoneinfo) or '' = the server's time zone (TZ) as before. It decides, for that person's time
 # tracking only: the local day of an entry, the periods of the report / CSV / timesheet (from / to are their local dates), "today"
 # and the month of the timesheet lock. Elsewhere (calendar, reminders, workload, absences, agents' default ranges) the
-# server's time zone stays. A report with "All members" uses the viewer's time zone for everyone's entries.
+# server's time zone stays (2.368.2 #2984: and the logged times of the office's CSV files follow it). A report with "All members" uses the viewer's time zone for everyone's entries.
 # "time_split_midnight" (default on): an entry that runs over midnight (in that time zone) counts on each day with its share
 # in the report's days, the CSV (one row per day) and the timesheet. The stored entry stays one entry; totals stay the same.
 # The rounding stays per entry (rounded once as a whole); the day shares of the seconds and of the rounded seconds are split

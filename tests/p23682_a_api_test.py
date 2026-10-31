@@ -3,8 +3,8 @@
 """2.368.2 (#2984, #2986) API tests: office CSV files and document dates follow the language, own container (start.sh).
 Invented companies and people only. freelancer-matrix: office
  - #2984 the office CSV exports (income statement, cash book, equipment, meals, travel, per diem) write "," and the point in
-   English, ";" and the decimal comma in German; the logged times of the cash book are local ("2026-10-09 14:05:33"), no raw
-   UTC stamp; the same for a person without organisation
+   English, ";" and the decimal comma in German; the logged times of the cash book are local ("2026-10-09 14:05:33") in the person's time zone,
+   no raw UTC stamp; the same for a person without organisation
  - #2986 one rule for document dates: the language of the document, the country pack only as the fallback; recurring invoice
    periods, terms, invoice lines and reminders do not write a German or ISO date into another language
 usage: p23682_a_api_test.py <datadir>"""
@@ -15,6 +15,8 @@ import re
 import subprocess
 import sys
 import time
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -88,6 +90,12 @@ for s, tag in ((A, "org"), (F, "freelancer")):
     rows = table(s.get(B + O + f"/books/euer.csv?year={Y}"), ";")
     check(any(re.fullmatch(r"-?\d+,\d\d", x[1]) for x in rows if len(x) > 1 and x[1]), f"{tag}: EUeR with the comma {rows}")
     cash_file(s, tag + " de", ";", "12,50")
+    s.patch(B + "/api/settings", json={"tz": "Pacific/Kiritimati"})
+    rows = table(s.get(B + O + f"/cashbook.csv?book_id={s.get(B + O + '/cashbooks').json()['books'][0]['id']}&year={Y}"), ";")
+    stamp = next(x[0] for x in reversed(rows) if len(x) >= 4 and re.fullmatch(r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d", x[0]))
+    away = abs(datetime.strptime(stamp, "%Y-%m-%d %H:%M:%S") - datetime.now(ZoneInfo("Pacific/Kiritimati")).replace(tzinfo=None))
+    check(away < timedelta(minutes=30), f"{tag}: the times in the person's own time zone {stamp}")
+    s.patch(B + "/api/settings", json={"tz": ""})
     s.patch(B + "/api/settings", json={"lang": "en"})
 
 r = in_app(r"""
@@ -102,6 +110,8 @@ from kalmido.office.travel import _fmt_day as trip_day
 US = {"formats": {"date": "mm/dd/yyyy"}}
 print(csv_dialect("en")[0], csv_dialect("en")[1]("1234.50"), csv_dialect("de")[0], csv_dialect("de")[1]("1234.50"), repr(csv_dialect("fr")[1](None)), repr(csv_dialect("de")[1](0)), sep="|")
 want = datetime(2026, 7, 1, 10, 0, tzinfo=timezone.utc).astimezone(TZ).strftime("%Y-%m-%d %H:%M:%S")
+from zoneinfo import ZoneInfo
+print(local_stamp("2026-07-01T10:00:00+00:00", ZoneInfo("Asia/Tokyo")))
 print(local_stamp("2026-07-01T10:00:00.000+00:00") == want, local_stamp("2026-07-01T10:00:00") == want, repr(local_stamp(None)), local_stamp("kaputt"), sep="|")
 print(_period_txt("2027-01-31", "2027-02-28", "en"), _period_txt("2027-01-31", "2027-02-28", "de"), _period_txt("2027-01-31", "2027-02-28", "fr"), sep="|")
 print(rin_fill("{period}", "2027-01-31", "2027-02-28", "en", US), rin_fill("{period}", "2027-01-31", "2027-02-28", "de", US), sep="|")
@@ -111,9 +121,10 @@ print(trip_day("2026-10-09", "en"), trip_day("2026-10-09", "de"), trip_day("", "
 print(sub_day("2026-10-09", "en"), sub_day("2026-10-09", "de"), sep="|")
 """)
 L = r.stdout.splitlines()
-check(r.returncode == 0 and len(L) == 8, "the helpers run " + r.stderr[-400:])
-if len(L) == 8:
+check(r.returncode == 0 and len(L) == 9, "the helpers run " + r.stderr[-400:])
+if len(L) == 9:
     check(L[0] == ",|1234.50|;|1234,50|''|'0'", "#2984: csv_dialect " + L[0])
+    check(L.pop(1) == "2026-07-01 19:00:00", "#2984: local_stamp in a zone")
     check(L[1] == "True|True|''|kaputt", "#2984: local_stamp " + L[1])
     check(L[2].split("|")[:2] == ["31 Jan 2027 - 27 Feb 2027", "31.01.2027 - 27.02.2027"] and ".2027" not in L[2].split("|")[2], "#2986: the period text of the reader's language " + L[2])
     check(L[3] == "31 January 2027 - 27 February 2027|01/31/2027 - 02/27/2027", "#2986: {period}: the document's language, the pack as the fallback " + L[3])

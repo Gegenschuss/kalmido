@@ -31,6 +31,7 @@ from ..core.errors import BadInput
 from .calc import calc_lang, dec, dstr, money
 from .logbook import _body, _day, _id, _text
 from .model import ofx_name1, office_gate, office_org, office_settings
+from ..personal.timesheet import tz_of
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 from .invoices import inv_pay_add, inv_pay_del  # 2.355.0 B (#2843)
 
@@ -774,18 +775,18 @@ def _prev_text(prev):
 @app.get("/api/office/cashbook.csv")
 def cb_csv():
     """?book_id=&year= | &from=&to= -> the entries (number, date, text, income, expense, VAT, balance, cancellation link),
-    the day closings and the change log (semicolon, decimal comma like the EUeR CSV)."""
+    the day closings and the change log (separator and decimal sign of the language like the EUeR CSV)."""
     from .ledger import ofx_log
     c, uid, oid = _ctx()
     book, frm, to, y, ents, closings, log, start, end = _export_data(c, oid, uid)
-    data = cb_csv_text(book, frm, to, y, ents, closings, log, start, end)
+    data = cb_csv_text(book, frm, to, y, ents, closings, log, start, end, tz_of(c, uid))
     ofx_log(c, oid, "export", target="cashbook", detail={"what": "cashbook.csv", "book_id": book["id"], "from": frm, "to": to})
     c.commit()
     return Response(data, mimetype="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="cashbook-{_label(frm, to, y).replace(" – ", "_")}.csv"', "Cache-Control": "no-store"})
 
 
-def cb_csv_text(book, frm, to, y, ents, closings, log, start, end):
+def cb_csv_text(book, frm, to, y, ents, closings, log, start, end, tz=None):
     """The cash book CSV (with the byte order mark) of cb_export_data's values; 2.146.0 D (#2468): also for the retention export."""
     from .books import bk_csv_cell as cell
     buf = io.StringIO()
@@ -802,12 +803,12 @@ def cb_csv_text(book, frm, to, y, ents, closings, log, start, end):
     w.writerow([cell(tr("Day closings"))])
     w.writerow([tr("Date"), tr("Opening balance"), tr("Income"), tr("Expense"), tr("Closing balance"), tr("Entries"), tr("By"), tr("Time")])
     for x in closings:
-        w.writerow([x["day"], num(x["opening"]), num(x["sum_in"]), num(x["sum_out"]), num(x["closing"]), x["count"], cell(x["by"]), local_stamp(x["closed_at"])])
+        w.writerow([x["day"], num(x["opening"]), num(x["sum_in"]), num(x["sum_out"]), num(x["closing"]), x["count"], cell(x["by"]), local_stamp(x["closed_at"], tz)])
     w.writerow([])
     w.writerow([cell(tr("Change log"))])
     w.writerow([tr("Time"), tr("No."), tr("Action"), tr("By"), tr("Values")])
     for r in log:
-        w.writerow([local_stamp(r["at"]), r["no"] or "", cell(tr(CB_ACTIONS.get(r["action"], r["action"]))), cell(r["by"]), cell(_prev_text(r["prev"]))])
+        w.writerow([local_stamp(r["at"], tz), r["no"] or "", cell(tr(CB_ACTIONS.get(r["action"], r["action"]))), cell(r["by"]), cell(_prev_text(r["prev"]))])
     w.writerow([cell(tr(CB_NOTE))])
     return "﻿" + buf.getvalue()
 

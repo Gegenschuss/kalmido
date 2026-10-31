@@ -38,6 +38,7 @@ from ..core.config import MAX_FILE_MB, OFFICE_DIR, app
 from ..core.db import body, bump, iso, local_now, local_stamp, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.i18n import N_, csv_dialect, tr
+from ..personal.timesheet import tz_of
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_read_file, oc_write_file
 from ..core.pg import insert_id, write_lock, system_ctx
 from ..core.errors import BadInput
@@ -917,7 +918,7 @@ def bw_report_get():
             w.writerow([m["date"], _csv_safe(m["place_name"]), _csv_safe(m["place_address"].replace("\n", ", ")), _csv_safe(m["occasion"]),
                         _csv_safe(bw_pname(m["host"] or {"name": ""}, co)), _csv_safe(", ".join(bw_pname(p, co) for p in m["guests"])),
                         num(k["food"]), num(k["drinks"]), num(k["tip"]), num(k["gross"]), num(k["vat"]), num(k["net"]), num(k["deductible"]),
-                        num(k["not_deductible"]), _csv_safe(m["approved_name"]), local_stamp(m["approved_at"])[:16]])
+                        num(k["not_deductible"]), _csv_safe(m["approved_name"]), local_stamp(m["approved_at"], tz_of(c, uid))[:16]])
         t = rep["total"]
         w.writerow([tr("Total"), rep["count"], "", "", "", "", num(t["food"]), num(t["drinks"]), num(t["tip"]), num(t["gross"]), num(t["vat"]), num(t["net"]),
                     num(t["deductible"]), num(t["not_deductible"]), "", ""])

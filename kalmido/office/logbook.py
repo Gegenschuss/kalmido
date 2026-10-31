@@ -31,6 +31,7 @@ from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import calc_lang, dec, dstr, fmt_point, money
 from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_lock, office_settings_save
+from ..personal.timesheet import tz_of
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 from .olock import olk_active, olk_until
 from .rights import ofr_own_uid
@@ -843,6 +844,7 @@ def lb_csv():
     y, vid, vs, clients, drives, log, rep = _export_data(c, oid, uid)
     buf = io.StringIO()
     sep, num = csv_dialect()
+    zone = tz_of(c, uid)
     w = csv.writer(buf, delimiter=sep, lineterminator="\r\n")
     cell = bk_csv_cell
     w.writerow([tr("Date"), tr("Vehicle"), tr("Plate"), tr("Driver"), tr("Start"), tr("Destination"), tr("Purpose"), tr("Client"), tr("Project"),
@@ -864,7 +866,7 @@ def lb_csv():
     w.writerow([tr("Time"), tr("Date"), tr("Action"), tr("By"), tr("Values before"), "ID"])  # 2.152.0 C (#2169): + the drive's number
     days = {d["id"]: d["day"] for d in drives}
     for r in log:
-        w.writerow([local_stamp(r["at"]), days.get(r["drive_id"], ""), cell(tr(LB_ACTIONS.get(r["action"], r["action"]))), cell(r["by"]), cell(r.get("text") or _prev_text(r["prev"], vs, clients)),
+        w.writerow([local_stamp(r["at"], zone), days.get(r["drive_id"], ""), cell(tr(LB_ACTIONS.get(r["action"], r["action"]))), cell(r["by"]), cell(r.get("text") or _prev_text(r["prev"], vs, clients)),
                     r["drive_id"] or ""])
     w.writerow([cell(tr(LB_NOTE))])
     ofx_log(c, oid, "export", target="logbook", detail={"what": "logbook.csv", "year": y})
