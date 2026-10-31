@@ -616,7 +616,7 @@ def bko_prune(tgt, keep, kept=None, just=None):
     return gone
 
 
-@bgj_fn("offsite")  # 2.193.0 D (#2220): "Upload now" through the queue (the worker runs it)
+@bgj_fn("offsite", gate=False)  # 2.193.0 D (#2220): "Upload now" through the queue (the worker runs it); 2.370.2 (#2779): hours of upload never hold a restore off
 def bko_upload(force=False):
     """Uploads the newest backup when it is not on the target yet (own connection; any thread). Never raises.
     -> the uploaded name or None."""

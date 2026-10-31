@@ -20,7 +20,6 @@ import hmac
 import html
 import io
 import re
-import threading
 from urllib.parse import parse_qs, quote, urlencode, urlsplit, urlunsplit
 
 from flask import Response, jsonify, redirect, request
@@ -32,7 +31,7 @@ from ..core.db import body, db, err, iso, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.i18n import N_, csv_dialect, tr
 from ..core.pg import insert_id, write_lock
-from ..accounts.session import me, rate_ip
+from ..accounts.session import gated_thread, me, rate_ip
 from ..accounts.login import auth_key
 from ..core.errors import BadInput
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
@@ -774,7 +773,7 @@ def vdr_pub_comment(token):
     c.commit()
     print("video review customer comment", r["id"], flush=True)
     if push:
-        threading.Thread(target=push, daemon=True).start()
+        gated_thread(push)  # 2.370.2 (#2779)
     return pub_headers(redirect(f"{SIG_PREFIX}{token}?sent=1#vdr-f", 303))
 
 

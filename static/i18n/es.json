@@ -2062,6 +2062,8 @@
   "Encryption needs a passphrase (at least 10 characters).": "El cifrado necesita una frase de contraseña (al menos 10 caracteres).",
   "Backup not found.": "Copia de seguridad no encontrada.",
   "Type {0} to confirm.": "Escribe {0} para confirmar.",
+  "The attachments or office folder is a mount of its own, so a restore cannot swap it. Nothing was changed. Mount the data folder as a whole, see SELF-HOSTING.md.": "La carpeta de adjuntos u oficina es un punto de montaje propio, por lo que una restauración no puede intercambiarla. No se ha cambiado nada. Monta la carpeta de datos completa, consulta SELF-HOSTING.md.",
+  "Folders from a restore are lying next to the data folder ({0}). After a hard stop the database and the files may not match: check them, a successful restore removes them.": "Junto a la carpeta de datos hay carpetas de una restauración ({0}). Tras una parada brusca, la base de datos y los archivos pueden no coincidir: revísalos, una restauración correcta los elimina.",
   "The server is still busy; the restore did not start. Please try again.": "El servidor sigue ocupado; la restauración no ha empezado. Inténtalo de nuevo.",
   "The restore failed ({0}); nothing was changed.": "La restauración ha fallado ({0}); no se ha cambiado nada.",
   "The restore failed and so did the way back: the database may be incomplete. Restore the safety backup {0} now.": "La restauración falló y también la vuelta atrás: puede que la base de datos esté incompleta. Restaura ahora la copia de seguridad {0}.",

@@ -2,16 +2,15 @@
 import json
 import os
 import re
-import threading
 import time
 from datetime import date
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.i18n import LANGS, short_day, tr, trn
 from ..core.db import body, bump, db, err, inbox_default, iso, iso_ms, local_now, now_utc, usettings
-from ..accounts.session import me
+from ..accounts.session import gated_thread, me
 from ..core.access import collab_all, Denied, list_people, list_role, MANAGE_ROLES, need_feat, need_task, task_visible, pvis
 from ..core.serializers import unlink_files
 from ..tasks.tasks import WEB_COMMENT
@@ -215,7 +214,7 @@ def timeline_seen(tid):
 def comment_input():
     """(text, files) from a JSON body or a multipart form (comment with files)."""
     if request.files or request.form:
-        web_fields({k: 1 for k in [*request.form, *request.files]}, {"body", "file", "reply_to", "portal"}, "POST /api/tasks/{tid}/comments (form)")
+        web_fields({k: 1 for k in [*request.form, *request.files]}, {"body", "file", "reply_to", "portal", "client_ref"}, "POST /api/tasks/{tid}/comments (form)")
         return (request.form.get("body") or "").strip(), [f for f in request.files.getlist("file") if f and f.filename]
     web_fields(body(), WEB_COMMENT, "POST /api/tasks/{tid}/comments")
     return (body().get("body") or "").strip(), []
@@ -224,6 +223,27 @@ def comment_input():
 def comment_reply_in():
     """2.33.0 (#1076): reply_to of a JSON body or a multipart form."""
     return request.form.get("reply_to") if (request.files or request.form) else body().get("reply_to")
+
+
+def comment_ref(c, tid):
+    """2.370.2 (#3088): (client_ref of the request or None, the person's comment already made with it or None): sent again
+    (the answer got lost) = that comment. One deleted since gives its ref free: the same text may come anew."""
+    v = request.form.get("client_ref") if (request.files or request.form) else body().get("client_ref")
+    ref = v.strip()[:64] or None if isinstance(v, str) else None
+    if not ref:
+        return None, None
+    write_lock(c, f"comment-ref-{me()}")
+    r = c.execute("SELECT * FROM comments WHERE task_id=? AND user_id=? AND client_ref=?", (tid, me(), ref)).fetchone()
+    if r and r["deleted_at"]:
+        c.execute("UPDATE comments SET client_ref=NULL WHERE id=?", (r["id"],))
+        r = None
+    return ref, r
+
+
+def comment_answer(c, tid, r):
+    from ..collab.reactions import with_reactions
+    from .cchoice import lv_with_choices
+    return jsonify(lv_with_choices(c, tid, [r], with_replies(c, "c", with_reactions(c, [comment_dict(r, att_dicts(c, "comment_id=?", (r["id"],)))])))[0])
 
 
 @app.post("/api/tasks/<int:tid>/comments")
@@ -242,6 +262,9 @@ def comment_create(tid):
     if t["deleted_at"]:
         return err(tr("The task is in the trash"), 409)
     text, files = comment_input()
+    ref, hit = comment_ref(c, tid)  # 2.370.2 (#3088)
+    if hit:
+        return comment_answer(c, tid, hit)
     from .liste2e import le2a_comment_in, le2a_text_max, le2e_mode
     if len(text) > le2a_text_max(text, MAX_COMMENT):  # 2.64.1 (#1817): a ciphertext is longer than its text
         return err(tr("The comment is too long (max. {0} characters)", MAX_COMMENT))
@@ -300,9 +323,9 @@ def comment_create(tid):
         return err(str(e))
     if portal and (sug or chs):  # 2.63.0 B (#1513): the customer sees text (and the files are not shown to them)
         return err(tr("Suggestions and answer buttons cannot go to a customer"))
-    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to,choices,portal) VALUES(?,?,?,?,?,?,?,?,?)",
+    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to,choices,portal,client_ref) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (tid, me(), text, ",".join(map(str, mentions)), iso_ms(now_utc()),
-                     json.dumps(sug, ensure_ascii=False) if sug else None, orig["id"] if orig else None, chs, portal))
+                     json.dumps(sug, ensure_ascii=False) if sug else None, orig["id"] if orig else None, chs, portal, ref))
     replied = orig["user_id"] if orig and orig["user_id"] != me() else None
     if sug and sug.get("kind") == "merge_request":
         git_merge_link(c, t, sug)
@@ -330,8 +353,7 @@ def comment_create(tid):
     bump(c)
     c.commit()
     send_pushes(pushes)
-    r = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
-    return jsonify(lv_with_choices(c, tid, [r], with_replies(c, "c", with_reactions(c, [comment_dict(r, att_dicts(c, "comment_id=?", (cid,)))])))[0])
+    return comment_answer(c, tid, c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone())
 
 
 @app.patch("/api/comments/<int:cid>")
@@ -659,8 +681,8 @@ def send_pushes(pushes):
     if pushes:
         # (uid, title, msg, click, prio[, extra]): extra = notify() keywords (2.0.8: actions + task of comment pushes)
         # 2.142.0 A (#2145): kind "other" for the notification channels unless the push names its own
-        threading.Thread(target=lambda: [notify(x[0], x[1], x[2], x[4], x[3], **{"kind": "other", **(x[5] if len(x) > 5 else {})})
-                                         for x in pushes], daemon=True).start()
+        gated_thread(lambda: [notify(x[0], x[1], x[2], x[4], x[3], **{"kind": "other", **(x[5] if len(x) > 5 else {})})
+                              for x in pushes])  # 2.370.2 (#2779): through the maintenance gate
 
 
 PUSH_BURST_SKIP = []  # 2.236.0 (#2909): f(c, uid) -> True = no push and no burst count (agents/workstyle.py ws_burst_skip)

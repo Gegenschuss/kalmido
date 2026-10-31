@@ -418,6 +418,7 @@ def openapi_spec():
             "name": {"type": "string"}, "text": {"type": "string", "description": "Plain text, at most 140 characters (+ …)"},
             "from": {"type": "string", "enum": ["user", "agent"], "description": "Agent chat only"}}},
         "CommentInput": {"type": "object", "additionalProperties": False, "required": ["body"], "properties": {"body": {"type": "string", "maxLength": MAX_COMMENT},
+                                                                                                            "client_ref": {"type": "string", "maxLength": 64, "description": "2.370.2: your own id of this comment; sent again = 200 the comment made the first time"},
                          "reply_to": {"type": "integer", "description": "2.33.0 (#1076): answer this comment of the same task (else 400); its author is notified like a mention"},
                          "portal": {"type": "boolean", "description": "2.63.0 (#1513): a public answer the customer sees on the status page and by mail "
                                     "(only on a task with a customer report and with write access; default false = internal)"},

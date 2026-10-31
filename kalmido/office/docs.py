@@ -1003,7 +1003,8 @@ def _put_items(c, oid, r, items, admin, flags=None, keep=False):
     unchanged position and drops it on a changed or confirmed one (item.confirm).
     2.269.0 A (#3012): a position sent with its id keeps it (UPDATE, so purchase price, list and marks are found again), one
     without a known id is new (INSERT), only the saved ones left out are deleted. keep = the save came without a version
-    (expect_updated_at): positions billed from receipts (and, for a person, an agent's marked ones) it left out stay at the end."""
+    (expect_updated_at): positions billed from receipts (and, for a person, an agent's marked ones) it left out stay at the end.
+    2.370.2 (#3088): -> the ids of those positions, the answer names them (kept_ids)."""
     rows = clean_items(c, oid, r, items, admin)
     if flags is None:
         from .agentdocs import ofa_keep_flags
@@ -1026,6 +1027,7 @@ def _put_items(c, oid, r, items, admin, flags=None, keep=False):
         row["org_id"] = oid
         c.execute(f"INSERT INTO office_doc_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     gone = [x for x in old if x not in seen]
+    stay = set()
     if keep and gone:
         stay = ofd_billed_items(c, oid, did, gone) | ({x for x in gone if old[x]["agent_flag"]} if keep == "person" else set())
         for k, x in enumerate(sorted(stay)):
@@ -1034,6 +1036,7 @@ def _put_items(c, oid, r, items, admin, flags=None, keep=False):
     if gone:  # 2.47.0 (#1215): never the parts' positions (part_id IS NULL above)
         c.execute(f"DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND id IN ({','.join('?' * len(gone))})", [did, oid, *gone])
         ofd_free_receipts(c, oid, did)
+    return sorted(stay)
 
 
 # 2.269.0 A (#3012): the columns a kept position gets back to their default unless the save sets them (as a new row would)
@@ -1042,13 +1045,14 @@ OFD_ITEM_RESET = {"service_id": None, "ref_part_id": None, "list_id": None, "age
 
 
 def ofd_billed_items(c, oid, did, ids):
-    """2.269.0 A (#3012): those of the positions ids that receipts (travel / outlays) were billed as."""
+    """2.269.0 A (#3012): those of the positions ids that receipts (travel / outlays) or time entries were billed as."""
     if not ids:
         return set()
     q = ",".join("?" * len(ids))
     out = {x[0] for x in c.execute(f"SELECT billed_item_id FROM office_trip_items WHERE org_id=? AND billed_doc_id=? AND billed_item_id IN ({q})", [oid, did, *ids])}
     from .books import bk_ws
     out |= {x[0] for x in c.execute(f"SELECT billed_item_id FROM rc_receipts WHERE ws=? AND billed_doc_id=? AND billed_item_id IN ({q})", [bk_ws(c, oid), did, *ids])}
+    out |= {x[0] for x in c.execute(f"SELECT billed_item_id FROM time_entries WHERE billed_doc_id=? AND billed_item_id IN ({q})", [did, *ids])}  # 2.370.2 (#3088)
     return out
 
 
@@ -1060,6 +1064,7 @@ def ofd_free_receipts(c, oid, did):
               (iso(now_utc()), oid, did))
     from .books import bk_ws
     c.execute("UPDATE rc_receipts SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL WHERE ws=? AND " + gone.format("rc_receipts"), (bk_ws(c, oid), did))
+    c.execute("UPDATE time_entries SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL, updated_at=? WHERE " + gone.format("time_entries"), (iso(now_utc()), did))  # 2.370.2 (#3088)
 
 
 class OfdConflict(Exception):
@@ -1468,7 +1473,7 @@ def odoc_items_put(did):
     items = b.get("items") if isinstance(b, dict) else b
     rows_before = doc_items(c, did, oid)
     before = ofx_items_brief(rows_before)
-    _put_items(c, oid, r, items, admin, keep=False if isinstance(b, dict) and b.get("expect_updated_at") else "person")
+    kept = _put_items(c, oid, r, items, admin, keep=False if isinstance(b, dict) and b.get("expect_updated_at") else "person")
     if isinstance(b, dict) and "parts_known" in b:  # 2.138.0 A (#2239): a list built before a part was added keeps its line
         from .parts import kva_keep_unseen_parts
         kva_keep_unseen_parts(c, oid, r, rows_before, b.get("parts_known"))
@@ -1479,7 +1484,7 @@ def odoc_items_put(did):
     bump(c)
     oun_post(c)
     c.commit()
-    return jsonify(doc_public(c, oid, doc_row(c, oid, did), admin))
+    return jsonify({**doc_public(c, oid, doc_row(c, oid, did), admin), "kept_ids": kept})  # 2.370.2 (#3088): positions left out that stayed
 
 
 @app.post("/api/office/docs/<int:did>/number")

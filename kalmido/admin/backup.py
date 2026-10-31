@@ -1,5 +1,6 @@
 """Backups and restore (admins)."""
 import contextlib
+import glob
 import hashlib
 import hmac
 import json
@@ -163,6 +164,8 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           "not_found": N_("Backup not found."),
           "confirm": N_("Type {0} to confirm."),
           "maint": N_("The server is still busy; the restore did not start. Please try again."),
+          # 2.370.2 (#2779): a folder that is a mount of its own cannot be renamed (EXDEV / EBUSY)
+          "mounts": N_("The attachments or office folder is a mount of its own, so a restore cannot swap it. Nothing was changed. Mount the data folder as a whole, see SELF-HOSTING.md."),
           # 2.148.1 C (#2482): the maintenance mode of a restore holds in this process only
           "procs": N_("A restore needs a single server process (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1). Stop the other processes first, see SELF-HOSTING.md."),
           "restore": N_("The restore failed ({0}); nothing was changed."),
@@ -171,6 +174,7 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           # 2.432.0 (#3584): the shared files of a backup (bkstore.py)
           "shared_missing": N_("{0} shared files of this backup are missing in the backup folder. Download the backup from the server that made it (a complete file), or put the shared files back."),
           "old_passphrase": N_("This backup was encrypted with an earlier passphrase. Enter that passphrase to check, restore or download it.")}
+BK_LEFTOVER_NOTE = N_("Folders from a restore are lying next to the data folder ({0}). After a hard stop the database and the files may not match: check them, a successful restore removes them.")  # 2.370.2 (#2779)
 # 2.359.3 (#2893): what a restore warns about (bk_key_state; "foreign" only gets this far with KALMIDO_SECRET_KEY_CHANGED=1)
 BK_KEY_WARN = {"foreign": N_("This backup was made with another server key: attachments, private files and encrypted fields stay unreadable until that key is back in place."),
                "secrets": N_("This backup may come from another server key: stored access tokens (Git, documents, single sign-on) may be unreadable. Enter them again or put the old key back.")}
@@ -1732,11 +1736,50 @@ def bkr_after_restore(c, rows):
 _BK_RESEAL = {"bk_pass": "backup", "bko_sec": "backup-offsite"}  # 2.359.0 (#2894): kept settings sealed with auth_secret (offsite.BKO_SEAL)
 
 
+def bk_own_mounts():
+    """2.370.2 (#2779): the folders a restore swaps by a rename that are a mount of their own (the rename always fails there)."""
+    if os.environ.get("KALMIDO_TEST") == "1" and os.environ.get("KALMIDO_TEST_BK_OWN_MOUNT"):  # tests only: a container has no second mount
+        return [ATT_DIR]
+    return [p for p in (ATT_DIR, OFFICE_DIR) if os.path.ismount(p)]
+
+
+def bk_leftovers():
+    """2.370.2 (#2779): folders of a restore next to the data folders: a hard stop left them behind, or a restore kept them
+    for files the backup format does not cover. -> [(path, prefix of bk_outside)], the packs have their own rule."""
+    out = []
+    for base, prefix in ((ATT_DIR, "attachments/"), (OFFICE_DIR, "office/")):
+        base = base.rstrip(os.sep)
+        out += [(p, prefix) for p in sorted(glob.glob(glob.escape(base) + ".pre-restore-*") + glob.glob(glob.escape(base) + ".restore-*"))
+                if os.path.isdir(p)]
+    return out
+
+
+def bk_leftovers_alert():
+    """At the start of the server: an admin alert when such folders lie around (Backups in the settings names them too)."""
+    left = [os.path.basename(p) for p, _ in bk_leftovers()]
+    if left:
+        print("restore: folders left from a restore:", ", ".join(left), flush=True)
+        aa_now("storage", "restore:leftover", BK_LEFTOVER_NOTE, [", ".join(left)])
+
+
+def bk_leftovers_clean(listed):
+    """After a good restore: what is left from earlier ones goes, unless it holds files the archive does not bring (kept like
+    the folder of before, never deleted unseen). An unfinished copy (.restore-) is nothing of value."""
+    for p, prefix in bk_leftovers():
+        left = bk_outside(p, prefix, listed) if ".pre-restore-" in os.path.basename(p) else {}
+        if left:
+            print(f"restore: kept {os.path.basename(p)}: files the backup format does not cover:", json.dumps(left, sort_keys=True), flush=True)
+        else:
+            shutil.rmtree(p, ignore_errors=True)
+
+
 def bk_restore(path, pw, admin, via):
     """The whole restore (see the section comment). Returns (new session token or None, safety backup name)."""
     from .worker import WRK_REPLICAS, WRK_ROLE
     if WRK_ROLE != "all" or WRK_REPLICAS > 1:  # 2.148.1 C (#2482): other processes would keep writing during the swap
         raise BackupError("procs")
+    if bk_own_mounts():  # 2.370.2 (#2779)
+        raise BackupError("mounts")
     if not _BK_LOCK.acquire(blocking=False):
         raise BackupError("busy")
     _BK.update(running="restore", started=time.time())
@@ -1780,12 +1823,13 @@ def bk_restore(path, pw, admin, via):
         gate = True
         pre = os.path.join(work, "pre-restore.dump")  # the current database, for a rollback if anything below fails
         safety = bk_create("safety", keep_dump=pre)
-        moved = swapped = omoved = oswapped = False
+        moved = aswapped = swapped = omoved = oswapped = False
         try:
             if os.path.isdir(ATT_DIR):
                 os.rename(ATT_DIR, att_old)
                 moved = True
             os.rename(att_new, ATT_DIR)
+            aswapped = True
             if os.path.isdir(OFFICE_DIR):
                 os.rename(OFFICE_DIR, off_old)
                 omoved = True
@@ -1831,8 +1875,9 @@ def bk_restore(path, pw, admin, via):
                     back_failed = True  # 2.273.0 A (#3050): never "nothing was changed" then
                     print("restore: rolling back to the state before FAILED:", type(e2).__name__, getattr(e2, "args_", e2),
                           f"(the safety backup {safety} holds it)", flush=True)
-            if os.path.isdir(ATT_DIR) and moved:
+            if aswapped:  # 2.370.2 (#2779): also on a fresh instance (nothing moved), and the old folder back when the new one never came in
                 os.rename(ATT_DIR, att_new)
+            if moved:
                 os.rename(att_old, ATT_DIR)
             if oswapped:
                 os.rename(OFFICE_DIR, off_new)
@@ -1841,12 +1886,7 @@ def bk_restore(path, pw, admin, via):
             if back_failed:
                 raise BackupError("rollback", safety) from None
             raise
-        for old, prefix in ((att_old, "attachments/"), (off_old, "office/")):  # 2.148.1 C (#2482): files outside the archive
-            left = bk_outside(old, prefix, man["_listed"])  # format stay in the folder of before (never deleted unseen)
-            if left:
-                print(f"restore: kept {os.path.basename(old)}: files the backup format does not cover:", json.dumps(left, sort_keys=True), flush=True)
-            else:
-                shutil.rmtree(old, ignore_errors=True)
+        bk_leftovers_clean(man["_listed"])  # 2.148.1 C (#2482): files outside the archive format stay in the folder of before; 2.370.2 (#2779): also older leftovers
         bk_restore_packs(pack_new)  # 2.359.2 (#2895)
         print(f"restore: {os.path.basename(path)} restored by an admin (safety backup {safety})", flush=True)  # 2.239.0 B (#2888): no name in the log
         man["_again"] = bkr_restore_journal(journal, purged)  # 2.152.0 B (#2172)
@@ -1950,7 +1990,7 @@ def bk_state(c):
             "last_ok": gsetting(c, "bk_last_ok"), "last_name": gsetting(c, "bk_last_name"), "last_error": gsetting(c, "bk_last_error"),
             "last_error_at": gsetting(c, "bk_last_error_at"),
             "running": _BK["running"] or ("manual" if bgj_pending(c, "backup") else ""),  # 2.193.0 D (#2220): also queued / in the worker
-            "confirm_word": BK_CONFIRM,
+            "confirm_word": BK_CONFIRM, "leftovers": [os.path.basename(p) for p, _ in bk_leftovers()],  # 2.370.2 (#2779)
             "total_bytes": sum(x["size"] for x in items) + store[1], "free_bytes": aa_disk().get("free"),
             "store_files": store[0], "store_bytes": store[1],  # 2.432.0 (#3584): the shared store (one line in the list)
             "max_mb": BK_MAX_BYTES // 1048576, "items": [bk_public(x) for x in items],

@@ -3,8 +3,9 @@ organisation keys' passes after a move) as a queue in the database (table bg_job
 process. A request adds a row (bgj_add, rights checked by the caller before); the loop "bgjobs" (admin/worker.py WRK_LOOPS:
 one process of the instance at a time) takes it. In the roles all / worker the add wakes the loop of the same process at
 once (no delay against the thread before); in the role web the worker takes it on its next round (BGJ_IDLE s). Each
-row runs in a thread of its own (at most BGJ_SLOTS at once, outside the maintenance gate as the threads before), so a long
-backup never holds the mails behind it.
+row runs in a thread of its own (at most BGJ_SLOTS at once), so a long backup never holds the mails behind it. 2.370.2 (#2779):
+the work goes through the maintenance gate, a restore waits for it and it waits for a restore (bgj_fn gate=False: a kind that
+would hold a restore off for hours and never writes to the tables it reads).
 
 A row is taken with SELECT ... FOR UPDATE SKIP LOCKED (two takers never get the same row). While it runs, its beat_at is
 renewed every BGJ_BEAT s: a row whose process is gone (no beat for BGJ_LOST s) is waiting again (at most BGJ_TRIES runs, then
@@ -49,18 +50,23 @@ _WAKE = threading.Event()
 _TOKEN = f"{os.getpid()}-{os.urandom(3).hex()}"  # the process in started_by (numbers only, for a look in the table)
 
 
+BGJ_NO_GATE = set()  # 2.370.2 (#2779): kinds of bgj_fn(gate=False)
+
+
 def _now():
     """The real clock (not the test clock of now_utc): the queue's times are about processes, a moved clock in a test
     would make a running row look lost (or a new one wait for days)."""
     return datetime.now(timezone.utc)
 
 
-def bgj_fn(kind, tries=BGJ_TRIES):
+def bgj_fn(kind, tries=BGJ_TRIES, gate=True):
     """Registers the function of a kind (decorator); it gets the arguments bgj_add was given. tries: runs at most (1 for
-    work that must not happen twice, e.g. a mail: a lost run is then failed, not repeated)."""
+    work that must not happen twice, e.g. a mail: a lost run is then failed, not repeated). gate: see the top."""
     def deco(fn):
         BGJ_FNS[kind] = fn
         BGJ_TRIES_OF[kind] = tries
+        if not gate:
+            BGJ_NO_GATE.add(kind)
         return fn
     return deco
 
@@ -186,7 +192,7 @@ def _loop():
         n = 0
         try:
             if _SLOTS["busy"] < BGJ_SLOTS:
-                with GATE.bg():  # only the taking: the work itself runs outside the gate, as the threads before
+                with GATE.bg():  # only the taking: each row goes through the gate itself (_run)
                     n = bgj_run_once()
         except Exception as e:  # noqa: BLE001 -- the loop never dies
             print("bgjobs: loop", db_log_err(e), flush=True)
@@ -250,19 +256,39 @@ def _finish(rid, state, error="", run=None):
 def _beat(rid, stop, run):
     while not stop.wait(BGJ_BEAT):
         try:
-            c = connect()
-            try:
-                with system_ctx(c):  # the queue's own row
-                    c.execute("UPDATE bg_jobs SET beat_at=? WHERE id=? AND state='run' AND attempts=?", (iso(_now()), rid, run))
-                c.commit()
-            finally:
-                c.close()
+            with GATE.work():  # 2.370.2 (#2779)
+                c = connect()
+                try:
+                    with system_ctx(c):  # the queue's own row
+                        c.execute("UPDATE bg_jobs SET beat_at=? WHERE id=? AND state='run' AND attempts=?", (iso(_now()), rid, run))
+                    c.commit()
+                finally:
+                    c.close()
         except Exception as e:  # noqa: BLE001 -- a missed beat only risks a second run after BGJ_LOST
             print("bgjobs: beat", type(e).__name__, flush=True)
 
 
+def _row_ours(rid, run):
+    """2.370.2 (#2779): this run of the row still exists (a restore in between emptied the queue, #3051 p. 12)."""
+    c = connect()
+    try:
+        with system_ctx(c):  # the queue's own row
+            return bool(c.execute("SELECT 1 FROM bg_jobs WHERE id=? AND state='run' AND attempts=?", (rid, run)).fetchone())
+    finally:
+        c.close()
+
+
 def _run(rid, kind, args, run):
-    """One row in a thread of its own (a long backup never holds the mails behind it); the row's state afterwards."""
+    """One row in a thread of its own, through the maintenance gate (2.370.2, #2779): a restore never runs next to it."""
+    if kind in BGJ_NO_GATE:
+        return _run_row(rid, kind, args, run)
+    with GATE.work():
+        _run_row(rid, kind, args, run, True)
+
+
+def _run_row(rid, kind, args, run, gated=False):
+    """The work of a row (a long backup never holds the mails behind it); the row's state afterwards. gated = it came through
+    the gate: what a restore took away meanwhile never runs."""
     stop = threading.Event()
     threading.Thread(target=_beat, args=(rid, stop, run), daemon=True, name="bgjobs-beat").start()
     state, error = "done", ""
@@ -270,7 +296,7 @@ def _run(rid, kind, args, run):
         fn = BGJ_FNS.get(kind)
         if fn is None:  # a kind of another version
             state, error = "failed", "unknown kind"
-        else:
+        elif not gated or _row_ours(rid, run):
             fn(*args)
     except Exception as e:  # noqa: BLE001 -- the kinds log their own errors as before
         print("bgjobs:", kind, "failed:", db_log_err(e), flush=True)

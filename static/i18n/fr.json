@@ -2062,6 +2062,8 @@
   "Encryption needs a passphrase (at least 10 characters).": "Le chiffrement nécessite une phrase secrète (au moins 10 caractères).",
   "Backup not found.": "Sauvegarde introuvable.",
   "Type {0} to confirm.": "Tapez {0} pour confirmer.",
+  "The attachments or office folder is a mount of its own, so a restore cannot swap it. Nothing was changed. Mount the data folder as a whole, see SELF-HOSTING.md.": "Le dossier des pièces jointes ou du bureau est un point de montage distinct : une restauration ne peut pas l'échanger. Rien n'a été modifié. Montez le dossier de données en entier, voir SELF-HOSTING.md.",
+  "Folders from a restore are lying next to the data folder ({0}). After a hard stop the database and the files may not match: check them, a successful restore removes them.": "Des dossiers issus d'une restauration se trouvent à côté du dossier de données ({0}). Après un arrêt brutal, la base de données et les fichiers peuvent ne pas correspondre : vérifiez-les, une restauration réussie les supprime.",
   "The server is still busy; the restore did not start. Please try again.": "Le serveur est encore occupé ; la restauration n'a pas démarré. Veuillez réessayer.",
   "The restore failed ({0}); nothing was changed.": "La restauration a échoué ({0}) ; rien n'a été modifié.",
   "The restore failed and so did the way back: the database may be incomplete. Restore the safety backup {0} now.": "La restauration a échoué, le retour en arrière aussi : la base de données est peut-être incomplète. Restaurez maintenant la sauvegarde de sécurité {0}.",

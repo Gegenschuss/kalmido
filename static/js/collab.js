@@ -861,6 +861,7 @@ async function loadTimeline(id) {
   if (pane && !cmtNew()) pane.scrollTop = pane.scrollHeight;
   else if (first && j.comments.some(c => c.id > (j.seen || 0) && c.user_id !== S.me?.id)) setTimeout(() => { if (S.sel === id) $('#d-tl')?.scrollIntoView?.({block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth'}); }, 60);
 }
+const CMT_REF = {};  // 2.370.2 (#3088): task id -> {text, ref} of a comment whose answer is still missing
 async function capi(method, url, body) {  // comments: never queued, clear message when offline
   try { return await rawFetch(method, url, body); }
   catch (e) {
@@ -883,10 +884,14 @@ async function sendComment() {
   let lf = null;
   if (files.length && typeof le2eFileParts === 'function') { try { lf = await le2eFileParts(taskById(tid)?.list_id, files); } catch (x) { toast(x.message); return; } }
   if (files.length) { payload = new FormData(); payload.append('body', text); if (rto) payload.append('reply_to', rto); if (pub) payload.append('portal', '1'); if (lf) lf.forEach(p => { payload.append('file', p.blob, 'encrypted.kenc'); payload.append('le2e_name', p.name); }); else files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
+  // 2.370.2 (#3088): the same text sent again after a failed answer = the same comment
+  const cr = CMT_REF[tid]?.text === raw ? CMT_REF[tid] : (CMT_REF[tid] = {text: raw, ref: Date.now().toString(36) + Math.random().toString(36).slice(2, 10)});
+  if (payload instanceof FormData) payload.append('client_ref', cr.ref); else payload.client_ref = cr.ref;
   const btn = $('[data-act="c-send"]'); if (btn) btn.disabled = true;
   try { await capi('POST', `/api/tasks/${tid}/comments`, payload); }
   catch { if (pub) { PTL.on[tid] = true; ptl_draw(); } return; }
   finally { if (btn) btn.disabled = false; }
+  delete CMT_REF[tid];
   delete S.drafts[tid]; delete S.cfiles[tid]; replySent('c:' + tid);
   if (S.sel === tid) { const i = $('#c-input'); if (i) { i.value = ''; autosize(i); } const f = $('#c-files'); if (f) f.innerHTML = ''; }
   await loadTimeline(tid);

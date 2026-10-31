@@ -126,6 +126,8 @@ def agent_case(s, who, hd, tid, cl):
     q2 = r.json()["doc"]["id"]
     r = requests.patch(V + f"/office/offers/{q2}", headers=hd, json={"items": [{"text": "Ton", "qty": 1, "unit": "day", "price": 50}]})
     check(r.ok and r.json().get("kept_ids") == [], f"{who}: the agent's save names what stayed (nothing here) {r.status_code} {r.text[:160]}")
+    r = requests.patch(V + f"/office/offers/{q2}", headers=hd, json={"title": "Film 3"})
+    check(r.ok and "kept_ids" not in r.json(), f"{who}: a save without positions works and names nothing {r.status_code} {r.text[:160]}")
 
 
 def time_case(s, who, uid, cl):

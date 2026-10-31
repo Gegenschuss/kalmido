@@ -1487,12 +1487,16 @@ def v1_comment_create(tid):
     v1_args(())
     b = v1_json()
     # 2.2.1 (#359): 400 unknown_field; 2.33.0 (#1076): reply_to; 2.41.0 (#1383): choices / multi / approval / expires_in
-    reject_unknown(b, ("body", "suggestion", "reply_to", "choices", "multi", "approval", "expires_in", "portal"))  # 2.63.0 B (#1513): + portal
+    reject_unknown(b, ("body", "suggestion", "reply_to", "choices", "multi", "approval", "expires_in", "portal", "client_ref"))  # 2.63.0 B (#1513): + portal; 2.370.2 (#3088): + client_ref
     if not isinstance(b.get("body"), str):
         raise BadInput(tr("Expected {0}", '{"body": "..."}'))
+    ref = b.get("client_ref")
+    if ref is not None and (not isinstance(ref, str) or not ref.strip() or len(ref) > 64):  # 2.370.2 (#3088): as a new task's
+        raise BadInput(tr("Invalid value: {0}", "client_ref"))
     c = db()
     _v1_live(c, tid, write=False, full=True)  # view-only members may comment (as in the app)
-    if b.get("portal") not in (None, False, 0, "0", "false", "") and not any(b.get(k) for k in ("suggestion", "choices", "approval")):
+    again = ref and c.execute("SELECT 1 FROM comments WHERE task_id=? AND user_id=? AND client_ref=? AND deleted_at IS NULL", (tid, me(), ref.strip())).fetchone()
+    if not again and b.get("portal") not in (None, False, 0, "0", "false", "") and not any(b.get(k) for k in ("suggestion", "choices", "approval")):
         # 2.126.0 B (#1979 G5): an agent's answer to a customer waits for a person (need_approval: agents only)
         from ..api.scopes import need_approval
         from ..team.portal import pt_comment_flag
@@ -1500,8 +1504,8 @@ def v1_comment_create(tid):
             t = c.execute("SELECT title, list_id FROM tasks WHERE id=?", (tid,)).fetchone()
             need_approval(c, N_("Answer the customer of the task “{0}”"), (t["title"][:80],), list_id=t["list_id"], task_id=tid)
     j = v1_call(comment_create, tid, body={"body": b["body"], **{k: b[k] for k in ("suggestion", "reply_to", "choices", "multi", "approval",
-                                                                                    "expires_in", "portal") if k in b}})
-    return jsonify(v1_comment(c, {**j, "task_id": tid}, user_names(c, [me()]))), 201
+                                                                                    "expires_in", "portal", "client_ref") if k in b}})
+    return jsonify(v1_comment(c, {**j, "task_id": tid}, user_names(c, [me()]))), 200 if again else 201
 
 
 def v1_entry(e):

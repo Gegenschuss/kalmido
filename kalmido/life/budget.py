@@ -358,8 +358,8 @@ def bud_list_create(c, uid, b):
     lid = life_list_create(c, uid, "budget", name=name)
     lg = lang(c, uid)
     for i, (n, k) in enumerate(BUD_DEFAULT_CATS):
-        c.execute("INSERT INTO budget_cats(list_id,name,kind,lim,sort,sid,created_at) VALUES(?,?,?,?,?,?,?)",
-                  (lid, tr(n, lg=lg), k, "", i, 0, _ts()))
+        c.execute("INSERT INTO budget_cats(list_id,name,kind,lim,sort,sid,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                  (lid, tr(n, lg=lg), k, "", i, 0, _ts(), _ts()))
     return lid
 
 
@@ -367,7 +367,7 @@ def bud_list_create(c, uid, b):
 def cat_out(d):
     lim = _num(d.get("lim"))
     return {"id": d["id"], "list_id": d["list_id"], "name": d["name"], "kind": d["kind"], "limit": _f(lim) if d.get("lim") else None,
-            "sort": d["sort"]}
+            "sort": d["sort"], "updated_at": d.get("updated_at") or ""}  # 2.370.2 (#3088): the base of the next save
 
 
 def _limit(v):
@@ -385,8 +385,8 @@ def cat_create(c, uid, lid, b):
     kind = _kind(b.get("kind"))
     vals, sid = bud_enc(c, "budget_cats", bud_sid(c, lid), {"lim": _limit(b.get("limit"))})
     sort = c.execute("SELECT COALESCE(MAX(sort),-1)+1 FROM budget_cats WHERE list_id=?", (lid,)).fetchone()[0]
-    cid = insert_id(c, "INSERT INTO budget_cats(list_id,name,kind,lim,sort,sid,created_at) VALUES(?,?,?,?,?,?,?)",
-                    (lid, name, kind, vals["lim"], sort, sid, _ts()))
+    cid = insert_id(c, "INSERT INTO budget_cats(list_id,name,kind,lim,sort,sid,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                    (lid, name, kind, vals["lim"], sort, sid, _ts(), _ts()))
     return cat_get(c, cid)
 
 
@@ -396,7 +396,9 @@ def cat_get(c, cid):
 
 def cat_update(c, uid, cid, b):
     bud_need_on(c, uid)
+    _ccf_lock(c, "budget_cats", cid)  # 2.370.2 (#3088): like an entry
     r = bud_obj(c, uid, "budget_cats", cid)
+    ccf_check(b, r["updated_at"], "category", lambda: cat_get(c, r["id"]))
     sets = {}
     if "name" in b:
         sets["name"] = _txt(b.get("name"), BUD_CAT_MAX, "name", need=True)
@@ -410,6 +412,7 @@ def cat_update(c, uid, cid, b):
         vals, sid = bud_enc(c, "budget_cats", bud_sid(c, r["list_id"]), {"lim": _limit(b.get("limit"))})
         sets.update(lim=vals["lim"], sid=sid)  # lim is the row's only protected column: the row's space follows it
     if sets:
+        sets["updated_at"] = _ts()
         cols = list(sets)
         c.execute(f"UPDATE budget_cats SET {', '.join(k + '=?' for k in cols)} WHERE id=?", [sets[k] for k in cols] + [r["id"]])
     return cat_get(c, r["id"])

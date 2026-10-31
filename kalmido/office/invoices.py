@@ -664,7 +664,7 @@ def inv_from_time(c, oid, uid, b):
     if not d_from or not d_to or d_to < d_from:
         raise BadInput(tr("Invalid value: {0}", "from/to"))
     # 2.144.6 A (#2053): only billable, still open entries; they are bound to the draft (office/timebill.py)
-    from .timebill import tbill_take, tbill_where
+    from .timebill import tbill_items, tbill_take, tbill_where
     sql, args = tbill_where(c, oid, uid, cid, d_from, d_to, b.get("project_id"))
     s = office_settings(c, oid)
     row = inv_new_row(c, oid, s, "invoice", s.get("lang") or "de")
@@ -688,6 +688,7 @@ def inv_from_time(c, oid, uid, b):
                      "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1,
                      "list_id": gr["list_id"]})  # 2.144.5 C (#1523): "billed, stays" (personal/timewipe.py) by the list, not its name
     _put_rows(c, oid, did, rows)
+    tbill_items(c, did)  # 2.370.2 (#3088)
     return did, len(rows)
 
 
@@ -1175,7 +1176,7 @@ def inv_send(c, oid, uid, r, b, later=False):
     own = bool(text) and text[:5000] != _mail_text(r, lang, s).strip()
     if own:
         inv_own_text_quota(c, oid, uid)
-    h6c_send_budget(c, oid, uid, [to] + ccs)  # 2.86.0 (N27); 2.433.0 (#3599): every copy address counts
+    budget = h6c_send_budget(c, oid, uid, [to] + ccs)  # 2.86.0 (N27); 2.433.0 (#3599): every copy address counts
     text = text[:5000] or _mail_text(r, lang, s)
     files = inv_files(c, oid, r["id"])
     sheet = []
@@ -1194,6 +1195,7 @@ def inv_send(c, oid, uid, r, b, later=False):
                     **({"terms": terms} if terms else {})},  # 2.113.2 (#2253)
          "base": _inv_base(r)}  # 2.269.0 review: the state the checks saw
     if later:
+        m["budget"] = budget  # 2.370.2 (#3088): committed before the mail, handed back when it is refused
         m["send"] = inv_send_mail  # 2.269.0 D (#3046): for the series (office/recurring.py), no import of its own
         return files, datev, m
     inv_send_mail(c, oid, uid, m, r)
@@ -1206,8 +1208,9 @@ def _inv_base(r):
 
 def inv_send_mail(c, oid, uid, m, r=None):
     """Mails m (inv_send) and marks its document sent (status, sent_at, webhook, log "send"); the caller commits. 409 when
-    the mail server refuses (nothing marked). 2.269.0 D (#3046): after inv_send(later=True) and its commit, the document
-    is read again under its lock (r None; only its plain columns kind / status are used)."""
+    the mail server refuses (nothing marked, the address counters back). 2.269.0 D (#3046): after inv_send(later=True) and its
+    commit, the document is read again under its lock (r None; only its plain columns kind / status are used).
+    2.370.2 (#3088): marked before the mail: whatever can fail in marking fails while nothing has gone out."""
     if r is None:  # 2.269.0 review: lock + read again BEFORE the mail (an unlock / delete in between mails nothing)
         write_lock(c, f"office_mail_{int(oid)}")  # same order as ledger.ofx_unlock
         write_lock(c, f"office_doc_{int(m['did'])}")
@@ -1216,16 +1219,23 @@ def inv_send_mail(c, oid, uid, m, r=None):
             raise Denied(404)
         if "base" in m and _inv_base(r) != m["base"]:
             raise Denied(409, tr("Changed in the meantime"))
-    _mail(m["to"], m["subject"], m["text"], attachments=m["files"], cc=m["cc"], from_name=m["from_name"], reply_to=m["reply_to"])
     if r["kind"] == "offer" and r["status"] == "draft":  # 2.113.2 (#2253): a mailed quotation is sent (purchase, pipeline as in the app)
         from .docs import odoc_set_status
         odoc_set_status(c, oid, r["id"], "sent", uid, r)
     ts = iso(now_utc())
     c.execute("UPDATE office_docs SET status=CASE WHEN status IN ('issued') THEN 'sent' ELSE status END, sent_at=COALESCE(sent_at, ?), updated_at=? "
               "WHERE id=? AND org_id=?", (ts, ts, r["id"], oid))
+    ofx_log(c, oid, "send", doc_id=r["id"], detail=m["detail"])
+    try:
+        _mail(m["to"], m["subject"], m["text"], attachments=m["files"], cc=m["cc"], from_name=m["from_name"], reply_to=m["reply_to"])
+    except Exception:
+        if m.get("budget"):
+            c.rollback()  # the marks above go, the day's count of the log with them
+            h6c_refund(c, *m["budget"])
+            c.commit()
+        raise
     from ..integrations.webhooks import who_note
     who_note("invoice.sent", "invoice", r["id"])  # 2.115.0 A (#2061): mailed
-    ofx_log(c, oid, "send", doc_id=r["id"], detail=m["detail"])
 
 
 INV_OWN_TEXT_DAY = 50  # 2.39.1 (#1210 N7): mails with an own text per organisation and day before members get 429
@@ -1264,7 +1274,8 @@ H6C_SEND_DAY_RCPT = h6r_env_int("KALMIDO_OFFICE_MAILS_DAY_ADDRESS", 20)     # pe
 def h6c_send_budget(c, oid, uid, rcpts):
     """2.86.0 (N27): 429 once the organisation / the person sent their day's document mails or one address got its share;
     counts the log's "send" entries since midnight UTC (user_id is plain, the detail may be encrypted) and per address a
-    mail_counts row (key o:<org>:<address>, cleared like the other mail limits). The DATEV copy never counts."""
+    mail_counts row (key o:<org>:<address>, cleared like the other mail limits). The DATEV copy never counts.
+    -> (keys, day) of the rows counted (h6c_refund)."""
     write_lock(c, f"office_mail_{int(oid)}")
     since = now_utc().strftime("%Y-%m-%dT00:00:00")
     n_org, n_me = c.execute("SELECT COUNT(*), COUNT(*) FILTER (WHERE user_id=?) FROM office_doc_log WHERE org_id=? AND action='send' AND at>=?",
@@ -1281,6 +1292,13 @@ def h6c_send_budget(c, oid, uid, rcpts):
     for k in keys:
         c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET
                      n=CASE WHEN mail_counts.day=excluded.day THEN mail_counts.n+1 ELSE 1 END, day=excluded.day""", (k, day))
+    return keys, day
+
+
+def h6c_refund(c, keys, day):
+    """2.370.2 (#3088): a refused mail never used up the day's share of its addresses."""
+    for k in keys:
+        c.execute("UPDATE mail_counts SET n=GREATEST(n-1, 0) WHERE k=? AND day=?", (k, day))
 
 
 def inv_datev(c, oid, r, s=None, files=None):

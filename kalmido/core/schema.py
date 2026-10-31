@@ -3818,6 +3818,14 @@ MIGRATIONS = [
     # need a cancellation); older versions never set or read it
     ("office_cash_entries", "client_ref", "ALTER TABLE office_cash_entries ADD COLUMN IF NOT EXISTS client_ref TEXT"),
     ("office_cash_entries", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS office_cash_entries_client_ref ON office_cash_entries(book_id, created_by, client_ref) WHERE client_ref IS NOT NULL"),
+    # 2.370.2 (#3088): the same for a comment and an agent's payment suggestion; which position of a document a time entry
+    # was billed as (like rc_receipts, NULL = billed before); a category's version. Nullable, older versions ignore them
+    ("comments", "client_ref", "ALTER TABLE comments ADD COLUMN IF NOT EXISTS client_ref TEXT"),
+    ("comments", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS comments_client_ref ON comments(task_id, user_id, client_ref) WHERE client_ref IS NOT NULL"),
+    ("office_pay_props", "client_ref", "ALTER TABLE office_pay_props ADD COLUMN IF NOT EXISTS client_ref TEXT"),
+    ("office_pay_props", "client_ref", "CREATE UNIQUE INDEX IF NOT EXISTS office_pay_props_client_ref ON office_pay_props(org_id, agent_id, client_ref) WHERE client_ref IS NOT NULL"),
+    ("time_entries", "billed_item_id", "ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS billed_item_id BIGINT"),  # no FK (#3012)
+    ("budget_cats", "updated_at", "ALTER TABLE budget_cats ADD COLUMN IF NOT EXISTS updated_at TEXT"),
     # 2.355.0 B (#2843): the invoice payment a cash entry "invoice paid in cash" booked (office/cashbook.py _cb_pay; its
     # cancellation takes it back). NULL = none (older entries, cash out, an invoice paid already). Older versions ignore it
     ("office_cash_entries", "payment_id", "ALTER TABLE office_cash_entries ADD COLUMN IF NOT EXISTS payment_id BIGINT"),
