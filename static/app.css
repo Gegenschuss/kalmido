@@ -8797,10 +8797,6 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
   .calbar .seg button{flex:1 0 auto;white-space:nowrap}
   .ntbar{flex-wrap:wrap}
   .ntbar .ssearch{flex:1 1 100%}
-  .povh .btn,.povbar .btn{max-width:100%;white-space:normal;text-align:center;justify-content:center;flex:1 1 100%}
-  .povh .spacer{display:none}
-  .povs.povs-empty .povh{flex-wrap:wrap}
-  .povs-empty .povemh{flex:1 1 100%;min-width:0}
   #mbar.mb4{flex-wrap:wrap;row-gap:0}
   #mbar.mb4 .mcount{order:-1;flex:1 1 100%;min-width:0;overflow:hidden;text-overflow:ellipsis;padding:0 .5rem .125rem}
   #mbar.mb4 .mbb{min-width:2.5rem}
@@ -8808,4 +8804,11 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
   .ppseg button{flex:none;white-space:nowrap}
   #dc-h{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .msvbtns .btn{flex:1 1 100%;max-width:100%;white-space:normal;text-align:center;justify-content:center}
+}
+/* 2.459.0 (#3853): the project overview only where it does not fit: a usual phone keeps an empty block on one line (#1061) */
+@media (max-width:360px){
+  .povh .btn,.povbar .btn{max-width:100%;white-space:normal;text-align:center;justify-content:center;flex:1 1 100%}
+  .povh .spacer{display:none}
+  .povs.povs-empty .povh{flex-wrap:wrap}
+  .povs-empty .povemh{flex:1 1 100%;min-width:0}
 }

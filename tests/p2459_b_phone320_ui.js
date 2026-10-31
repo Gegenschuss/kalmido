@@ -82,15 +82,13 @@ const DIAG = ev => ev(`JSON.stringify({h: location.hash, k: S?.route?.key, n: S?
     check(dm && dm.page <= dm.vw && !dm.over.length && !dm.lap.length, 'meal dialog: inside the screen, no overlap ' + JSON.stringify(dm));
     await o.shot('p2459b-meal-dialog.png');
     await nav(B + '#time');
-    await ev(`(() => { location.reload(); return 1; })()`).catch(() => 0);
-    check(await ready(ev, `typeof settingsModal === 'function' && !!S.me && !document.querySelector('.bwdlg')`, 60), 'back from the meal dialog');
+    await reload(o);
     await ev(`(() => { settingsModal('account'); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.smodal .msvbtns')`, 60), 'servers: the account section is up');
     const sv = await ev(AUDIT('.smodal', '.msvbtns'));
     check(sv && sv.page <= sv.vw && !sv.over.length && !sv.lap.length, 'servers: inside the screen, no overlap ' + JSON.stringify(sv));
     await o.shot('p2459b-servers.png');
-    await ev(`(() => { location.reload(); return 1; })()`).catch(() => 0);
-    await ready(ev, `typeof S !== 'undefined' && !!S.me && !document.querySelector('.smodal')`, 60);
+    await reload(o);
 
     // the running timer: Pause / end the focus round do not run into each other
     check((await call(CA, 'POST', '/api/pomo/start', {kind: 'focus', minutes: 25, task_id: T[0]})).http < 300, 'pomo started');
