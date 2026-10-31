@@ -15448,5 +15448,6 @@
   "Git connection {0} cannot fetch, failing since {1}.": "La connessione Git {0} non riesce a scaricare, errore dal {1}.",
   "ntfy inbox {0} cannot fetch, failing since {1}.": "La casella ntfy {0} non riesce a scaricare, errore dal {1}.",
   "Integration problem": "Problema con un'integrazione",
-  "a forwarding, webhook, mailbox or git connection of yours stopped working": "un tuo inoltro, webhook, casella o connessione Git ha smesso di funzionare"
+  "a forwarding, webhook, mailbox or git connection of yours stopped working": "un tuo inoltro, webhook, casella o connessione Git ha smesso di funzionare",
+  "Left out, locked by the virus scanner:": "Omesso, bloccato dall’antivirus:"
 }

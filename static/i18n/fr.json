@@ -15448,5 +15448,6 @@
   "Git connection {0} cannot fetch, failing since {1}.": "La connexion Git {0} ne peut pas récupérer les données, en échec depuis {1}.",
   "ntfy inbox {0} cannot fetch, failing since {1}.": "La boîte ntfy {0} ne peut pas récupérer les données, en échec depuis {1}.",
   "Integration problem": "Problème d'intégration",
-  "a forwarding, webhook, mailbox or git connection of yours stopped working": "un de tes transferts, webhooks, boîtes ou connexions Git ne fonctionne plus"
+  "a forwarding, webhook, mailbox or git connection of yours stopped working": "un de tes transferts, webhooks, boîtes ou connexions Git ne fonctionne plus",
+  "Left out, locked by the virus scanner:": "Omis, bloqué par l’antivirus :"
 }

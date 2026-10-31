@@ -15448,5 +15448,6 @@
   "Git connection {0} cannot fetch, failing since {1}.": "La conexión Git {0} no puede obtener datos, falla desde {1}.",
   "ntfy inbox {0} cannot fetch, failing since {1}.": "La bandeja ntfy {0} no puede obtener datos, falla desde {1}.",
   "Integration problem": "Problema con una integración",
-  "a forwarding, webhook, mailbox or git connection of yours stopped working": "un reenvío, webhook, buzón o conexión Git tuyo ha dejado de funcionar"
+  "a forwarding, webhook, mailbox or git connection of yours stopped working": "un reenvío, webhook, buzón o conexión Git tuyo ha dejado de funcionar",
+  "Left out, locked by the virus scanner:": "Omitido, bloqueado por el antivirus:"
 }

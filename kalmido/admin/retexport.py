@@ -26,6 +26,7 @@ import zipfile
 from flask import Response, g, jsonify, request, stream_with_context
 
 from .exportleft import RX_LEFT_TABLES, left_lines  # 2.362.4 (#3107)
+from .orgexport import _ox_locked  # 2.370.0 (#2781)
 from ..core.access import Denied
 from ..core.config import app, APP_VERSION, ATT_DIR, OFFICE_DIR
 from ..core.db import connect, db, iso, now_utc
@@ -319,6 +320,7 @@ class _Zip:
         self.pipe = _Pipe()
         self.zf = zipfile.ZipFile(self.pipe, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6)
         self.files, self.sections, self.missing, self.names = {}, {}, [], set()
+        self.locked, self.lk = [], None  # 2.370.0 (#2781): files the virus scanner locked: left out, listed (orgexport._ox_locked)
 
     def put(self, name, data, section=None):
         if isinstance(data, str):
@@ -385,6 +387,12 @@ def _checked(c, oid, z, r, ext, data, stem):
     return data
 
 
+def _fs_locked(c, z, nid, name):
+    """2.370.0 (#2781): the current version of file nid is locked by the virus scanner -> True (listed in z.locked)."""
+    r = c.execute("SELECT cur_version FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+    return bool(r) and z.lk("fs", {"id": nid}, name, r[0])
+
+
 def _invoices(c, z, sub, done):
     """Every finalised document: its stored PDF / XML (decrypted), else rendered from its snapshot."""
     from ..office.pdfweb import _render, _stored, epdf_name
@@ -424,7 +432,10 @@ def _receipts(c, z, sub):
     for r in rows:
         fn = f"receipts/{int(r['node_id'])}-{_safe_part(r['name'], 100)}"
         try:
-            data = fs_read(c, r["node_id"])
+            if _fs_locked(c, z, r["node_id"], r["name"]):
+                data, fn = None, ""
+            else:
+                data = fs_read(c, r["node_id"])
         except Exception as e:  # noqa: BLE001 -- a file without content (or held by the scan guard): named in the index
             print("retention export: receipt", r["node_id"], "not readable:", type(e).__name__, flush=True)
             z.missing.append(fn)
@@ -448,15 +459,18 @@ def _project_receipts(c, z, sub):
     for r in rows:
         fn = f"project-receipts/{int(r['list_id'])}-{_safe_part(r['list_name'], 40)}/{int(r['id'])}-{_safe_part(r['name'], 100)}"
         full = _under(ATT_DIR, r["path"])
-        try:
-            data = oc_read_file(c, full) if full else None
-        except Exception as e:  # noqa: BLE001 -- named in the index
-            print("retention export: project receipt", r["id"], "not readable:", type(e).__name__, flush=True)
-            data = None
-        if data is None:
-            z.missing.append(fn)
+        data = None
+        if z.lk("budget", {"id": r["id"]}, r["name"]):  # 2.370.0 (#2781)
             fn = ""
         else:
+            try:
+                data = oc_read_file(c, full) if full else None
+            except Exception as e:  # noqa: BLE001 -- named in the index
+                print("retention export: project receipt", r["id"], "not readable:", type(e).__name__, flush=True)
+            if data is None:
+                z.missing.append(fn)
+                fn = ""
+        if data is not None:
             yield z.put(fn, data, "project-receipts")
         out.append({"id": r["id"], "file": fn, "list_id": r["list_id"], "list": r["list_name"], "entry_id": r["entry_id"], "name": r["name"],
                     "size": r["size"], "created_at": r["created_at"]})
@@ -486,6 +500,8 @@ def _letters(c, z, sub):
                        (sub["office"],)).fetchall():
         day = "".join(ch for ch in str(r["letter_date"] or "")[:10] if ch.isdigit() or ch == "-")
         fn = f"letters/{int(r['id'])}-{day or 'letter'}.pdf"
+        if r["node_id"] and _fs_locked(c, z, r["node_id"], fn):  # 2.370.0 (#2781)
+            continue
         try:
             data = fs_read(c, r["node_id"]) if r["node_id"] else None
         except Exception as e:  # noqa: BLE001 -- named in the index
@@ -528,6 +544,9 @@ def _office_files(c, z, sub, done):
             full = os.path.join(root, fn)
             if os.path.islink(full) or not os.path.isfile(full) or os.path.realpath(full) in done or fn.endswith(".tmp"):
                 continue
+            if root == base and fn in z.lk.office:  # 2.370.0 (#2781): as orgexport, the office's uploads lie directly in its folder
+                z.lk(*z.lk.office[fn][:2], fn)
+                continue
             rel = os.path.relpath(full, base).split(os.sep)
             try:
                 data = oc_read_file(c, full)
@@ -566,6 +585,8 @@ def _index(z, sub, title, by, when):
         lines.append(tr("No records found."))
     if z.missing:
         lines += ["", tr("Could not be read (please check in Kalmido before the deletion):")] + [f"  {m}" for m in z.missing]
+    if z.locked:  # 2.370.0 (#2781)
+        lines += ["", tr("Left out, locked by the virus scanner:")] + [f"  {m['name']} ({m['signature']})" for m in z.locked]
     lines += ["", tr("manifest.json lists every file with its SHA-256 checksum."), ""]
     return "\r\n".join(lines)
 
@@ -578,6 +599,7 @@ def rx_stream(sub, uid, by, title, lg):
     ok = False
     try:
         with system_ctx(c):  # the subject's records only (every query names its office / documents space / lists); checked by rx_may_export
+            z.lk = _ox_locked(c, sub["office"], z)  # 2.370.0 (#2781): files the virus scanner locked stay out, listed in the manifest
             if sub["office"]:
                 yield from _invoices(c, z, sub, done)
             if sub["kind"] != "list":  # 2.186.1 (#2732): a kept project has no documents space of its own
@@ -593,7 +615,7 @@ def rx_stream(sub, uid, by, title, lg):
             when = iso(now_utc())
             idx = _index(z, sub, title, by, when)
             man = {"format": "kalmido-retention-export", "format_version": 1, "kalmido_version": APP_VERSION, "subject": sub["key"],
-                   "created_at": when, "created_by": by, "files": dict(z.files), "missing": z.missing,
+                   "created_at": when, "created_by": by, "files": dict(z.files), "missing": z.missing, "locked_files": z.locked,
                    "not_included": left_lines(RX_LEFT_TABLES)}  # 2.362.4 (#3107)
             yield z.put("00-index.txt", idx)
             yield z.put("manifest.json", json.dumps(man, ensure_ascii=False, indent=1))
@@ -605,7 +627,7 @@ def rx_stream(sub, uid, by, title, lg):
             try:
                 with system_ctx(c):  # the subject's log row + the office log
                     c.execute("INSERT INTO retention_log(subject, kind, by_user, at, detail) VALUES(?,?,?,?,?)",
-                              (sub["key"], "export", uid, iso(now_utc()), json.dumps({"files": len(z.files), "missing": len(z.missing)})))
+                              (sub["key"], "export", uid, iso(now_utc()), json.dumps({"files": len(z.files), "missing": len(z.missing), "locked": len(z.locked)})))
                     if sub["office"]:
                         from ..office.ledger import ofx_log
                         ofx_log(c, sub["office"], "export", target="retention", detail={"files": len(z.files), "missing": len(z.missing)})

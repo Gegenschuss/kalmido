@@ -15448,5 +15448,6 @@
   "Git connection {0} cannot fetch, failing since {1}.": "Git-Verbindung {0} kann nicht abrufen, Fehler seit {1}.",
   "ntfy inbox {0} cannot fetch, failing since {1}.": "ntfy-Eingang {0} kann nicht abrufen, Fehler seit {1}.",
   "Integration problem": "Problem mit einer Anbindung",
-  "a forwarding, webhook, mailbox or git connection of yours stopped working": "eine Weiterleitung, ein Webhook, Postfach oder eine Git-Verbindung von dir funktioniert nicht mehr"
+  "a forwarding, webhook, mailbox or git connection of yours stopped working": "eine Weiterleitung, ein Webhook, Postfach oder eine Git-Verbindung von dir funktioniert nicht mehr",
+  "Left out, locked by the virus scanner:": "Weggelassen, vom Virenscanner gesperrt:"
 }
