@@ -3,6 +3,7 @@
 // - phone CSS: no symbols in the rows of quotations and archive; the buttons stay in the page for screen readers
 // - a long press / right click on an archive row opens the row menu (preview, download, correct), no preview under it;
 //   without a long press the phone's PDF view has "Correct"
+// - 2.452.0 (#3836): the same for contracts, series, bank rules, contract PDFs, suppliers and purposes
 // - sort choice on quotations, archive and pipeline: date, client, amount, name, per list, remembered
 const {execFileSync} = require('child_process');
 const fs = require('fs');
@@ -125,6 +126,71 @@ const release = (w, el) => ptr(w, el, 'pointerup');
   await pick(d, 'Standard');
   check(await until(() => cards() === manual), 'pipeline: Standard is the order from before ' + cards());
   w.close();
+
+  // ================= 2.452.0 (#3836): the other office lists: real row HTML, a long press opens everything the row had
+  const css2 = css.slice(css.indexOf('(#3836)'));
+  check(/@media \(max-width:767px\)\{\s*\.agr-doc,\.agr-fold,\.rin-acts,\.brlrow>\.swl,\.brlrow>\.btn,\.dma-f\[data-fid\] \.dma-acts,\.dimpsup \.ib,\.rkplist \.iconbtn,\.dsbsec \.ctlinks li>\.iconbtn\{position:absolute/.test(css2), 'phones: the symbols of the other lists leave the row, for screen readers they stay');
+  const rows = async mobile => {
+    const w = await boot({hash: 'office/offers', ...(mobile ? {mobile: true} : {})}), d = w.document;
+    await until(() => d.querySelector('.office .ofcbody'), 60);
+    await until(() => w.eval(`typeof rinListHtml + typeof brl_settingsHtml + typeof dmaListHtml + typeof dimp_supHtml`) === 'functionfunctionfunctionfunction', 60);
+    w.eval(`(() => {
+      window.__c = [];
+      const spy = n => { window[n] = (...a) => __c.push([n, ...a]); return window[n]; };
+      rinSheet = spy('rinSheet'); brl_edit = spy('brl_edit'); brl_on = spy('brl_on'); brl_del = spy('brl_del'); dimp_delete = async (...a) => { __c.push(['dimp_delete', ...a]); };
+      const t = {client: 'Zeta GmbH'};
+      RIN.items = [{id: 7, title: 'Pflege', active: true, every: 'monthly', next_date: '2026-11-01', template: t, auto_send: false}];
+      RIN.open = true; RIN.oid = OFC.info?.org_id; RIN.listRef = OFD.list;  // no reload over these rows
+      BRL.oid = OFC.info?.org_id; BRL.max = 50;
+      BRL.items = [{id: 8, name: 'Miete', active: true, hits: 2, action: 'private', cond: {}, account: ''}];
+      AGR.data = {items: [{id: 12, name: 'Haftpflicht', doc: {id: 3, name: 'police.pdf'}}]};
+      DMA.items = [{id: 9, name: 'a.pdf', size: 10, date: '2026-01-01'}];
+      DIMP.sup = [{id: 11, account_no: '70001', name: 'Lieferant', zip: '', city: ''}];
+      const h = document.createElement('div'); h.id = 'tst'; h.className = 'office';  // outside #view: a redraw of the list leaves it alone
+      h.innerHTML = '<div class="modal"><div id="dma-box" data-cid="5">' + dmaListHtml(DMA.items, 5) + dmaListHtml([], 0) + '</div></div>' + rinListHtml() + brl_settingsHtml() + dimp_supHtml()
+        + agrRow({id: 12, name: 'Haftpflicht', provider: '', number: '', per: 'month', doc: {id: 3, name: 'police.pdf'}}).replace(/^/, '<ul>').replace(/$/, '</ul>')
+        + '<ul class="rkplist"><li><input value="Messe" data-rkp="name" data-id="1"><button type="button" class="iconbtn" data-rkp="del" data-id="1"></button></li></ul>';
+      document.body.append(h);
+    })()`);
+    return {w, d};
+  };
+  let {w: w2, d: d2} = await rows(true);
+  const held = async (el, what) => { d2.querySelector('#pop')?.replaceChildren(); press(w2, el); const hit = await until(() => menuItems(d2).length > 0); release(w2, el); check(hit, what + ': a long press opens the menu'); return menuItems(d2); };
+  const calls = () => w2.eval('JSON.stringify(__c)');
+  let m = await held(d2.querySelector('.rin-it'), 'series');
+  check(m.join() === 'Edit,Make now,Pause,Delete', 'series: all actions of the row ' + m);
+  m = await held(d2.querySelector('.brlrow'), 'bank rule');
+  check(m.join() === 'Edit,Pause,Undo its marks,Delete', 'bank rule: all actions of the row ' + m);
+  await pick(d2, 'Pause');
+  check(await until(() => calls().includes('["brl_on",8,false]')) && !calls().includes('brl_edit'), 'bank rule: Pause switches it and does not open the rule ' + calls());
+  m = await held(d2.querySelector('.rin-it'), 'series again');
+  const late = new w2.MouseEvent('click', {bubbles: true, cancelable: true, detail: 1});
+  d2.querySelector('.rin-it .ofcn').dispatchEvent(late);
+  check(!calls().includes('rinSheet'), 'series: the click that ends the press opens nothing ' + calls());
+  d2.querySelector('#pop').replaceChildren();
+  m = await held(d2.querySelector('.agr-li .ofcrow'), 'contract');
+  check(m.join() === 'Open,Open document police.pdf,Move to folder…', 'contract: all actions of the row ' + m);
+  m = await held(d2.querySelector('.dma-f[data-fid] .dma-open'), 'contract PDF');
+  check(m.join() === 'Open,Move to folder…,Replace,Remove', 'contract PDF: all actions of the row ' + m);
+  m = await held(d2.querySelector('.dimpsup li'), 'supplier');
+  check(m.join() === 'Delete supplier', 'supplier: the row action ' + m);
+  await pick(d2, 'Delete supplier');
+  check(await until(() => calls().includes('["dimp_delete",11]')), 'supplier: the menu deletes ' + calls());
+  m = await held(d2.querySelector('.rkplist li input'), 'purpose');
+  check(m.join() === 'Remove', 'purpose: a long press on the field opens the Remove ' + m);
+  d2.querySelector('#pop').replaceChildren();
+  w2.eval(`loadModule = async () => 0; dsb_menu = (b, x) => __c.push(['dsb_menu', b.tagName, x?.id]); DSB.cl = {id: 1, sheets: [{id: 13}]}; (() => { const h = document.createElement('div'); h.className = 'dsbsec'; h.innerHTML = '<ul class="ctlinks"><li data-dsb="row" data-id="13"><b>Sheet</b></li></ul>'; $('#view').append(h); })()`);
+  press(w2, d2.querySelector('#view .dsbsec li'));
+  check(await until(() => calls().includes('["dsb_menu","LI",13]')), 'data protection sheet: a long press opens its menu ' + calls());
+  release(w2, d2.querySelector('#view .dsbsec li'));
+  const tap = () => { w2.eval('__c.length = 0'); d2.querySelector('.rin-it .ofcn').click(); d2.querySelector('.brlrow .ofcn').click(); return calls(); };
+  const phone = tap();
+  check(phone.includes('rinSheet') && phone.includes('brl_edit'), 'phone: a tap on a series or a rule opens it ' + phone);
+  w2.close();
+  ({w: w2, d: d2} = await rows(false));
+  const desk = tap();
+  check(!desk.includes('rinSheet') && !desk.includes('brl_edit'), 'computer: a click on the row does what it did: nothing ' + desk);
+  w2.close();
 
   console.log(`\n${ok} passed, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

@@ -50,7 +50,7 @@ function rinListHtml() {
   rinFresh();
   const items = RIN.items || [];
   if (!items.length && !RIN.showBin) return '';
-  const row = s => `<li class="rin-it${s.active ? '' : ' rin-off'}" data-sid="${s.id}"><span class="ofcn"><b>${esc(s.title || tr('Invoice series'))}${s.template?.client ? ` · ${esc(s.template.client)}` : ''}</b>
+  const row = s => `<li class="rin-it${s.active ? '' : ' rin-off'}" data-rin="tap" data-sid="${s.id}"><span class="ofcn"><b>${esc(s.title || tr('Invoice series'))}${s.template?.client ? ` · ${esc(s.template.client)}` : ''}</b>
     <small class="muted">${esc([rinEvery(s.every), rinWhen(s), s.auto_send ? tr('sent automatically') : tr('as a draft')].filter(Boolean).join(' · '))}</small></span>
     <b class="rin-sum">${esc(s.template?.gross_text || '')}</b>
     <span class="rin-acts"><label class="chkl swl" title="${esc(s.active ? tr('Active') : tr('Paused'))}"><span class="swc"><input type="checkbox" role="switch" data-rin="active" data-sid="${s.id}" ${s.active ? 'checked' : ''} aria-label="${esc(tr('Active'))}"><span class="swt" aria-hidden="true"></span></span></label>
@@ -59,7 +59,7 @@ function rinListHtml() {
     <button type="button" class="ib" data-rin="del" data-sid="${s.id}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></li>`;
   const bin = RIN.showBin ? `<h4 class="ofcgrp">${tr('Deleted series')}</h4>${(RIN.bin || []).length ? `<ul class="ofclist rin-list" role="list">${RIN.bin.map(s => `<li class="rin-it rin-off"><span class="ofcn"><b>${esc(s.title || tr('Invoice series'))}</b><small class="muted">${esc(rinEvery(s.every))}</small></span><button type="button" class="btn sm" data-rin="restore" data-sid="${s.id}">${tr('Restore')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('Nothing deleted.')}</p>`}` : '';
   return `<details class="ofdsec rin-sec" ${RIN.open ? 'open' : ''} data-rin-sec><summary><h3>${tr('Invoice series')}</h3><span class="c muted">${items.length}</span></summary><div class="ofdsecb">
-    ${items.length ? `<ul class="ofclist rin-list" role="list">${items.map(row).join('')}</ul>` : ''}${bin}
+    ${items.length ? `${hintOnce('ofclp', tr('Hold a row to see what you can do with it.'))}<ul class="ofclist rin-list" role="list">${items.map(row).join('')}</ul>` : ''}${bin}
     <div class="lacts"><button type="button" class="linkbtn" data-rin="bin">${RIN.showBin ? tr('Hide deleted series') : tr('Deleted series')}</button></div>
     <p class="muted ofchint">${tr('A new series starts in the editor of an invoice: "Repeat as series".')}</p></div></details>`;
 }
@@ -124,16 +124,24 @@ async function rinDo(method, url, body) { try { await rawFetch(method, url, body
 const rinPatch = (id, b) => rinDo('PATCH', `/api/office/series/${id}`, b);
 
 // ---- clicks (the list section, the editor box, the cash flow's jump)
+// 2.452.0 (#3836): on a phone the row has no symbols (office.css), a long press opens what they did
+ms_rowMenu('.office .rin-it[data-sid][data-rin]', r => {
+  const s = rinById(r.dataset.sid), run = $('[data-rin="run"]', r); if (!s) return;
+  menu(r, [{label: tr('Edit'), icon: 'edit', fn: () => $('[data-rin="edit"]', r).click()},
+    run.disabled ? null : {label: tr('Make now'), icon: 'plus', fn: () => run.click()},
+    {label: s.active ? tr('Pause') : tr('Resume'), icon: 'clock', fn: () => $('[data-rin="active"]', r).click()},
+    '-', {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: () => $('[data-rin="del"]', r).click()}]);
+});
 async function rinClick(e) {
   const go = e.target.closest('[data-rin-go]');
   if (go) { if (typeof OFD === 'object') { OFD.kind = 'invoice'; OFD.list = null; } RIN.open = true; return; }
   const b = e.target.closest('[data-rin]'); if (!b || !b.closest('.office')) return;
   const a = b.dataset.rin, s = rinById(b.dataset.sid);
-  if (a === 'active') return;  // the change event below
+  if (a === 'active' || (a === 'tap' && !isMobile())) return;  // the change event below; 2.452.0 (#3836): only a phone opens a series by tapping its row
   e.preventDefault();
   if (a === 'new') { if (OFD.doc && OFD.doc.id === +b.dataset.did) rinSheet(OFD.doc); return; }
   if (a === 'bin') { RIN.showBin = !RIN.showBin; RIN.open = true; rinReload(); return; }
-  if (a === 'edit' && s) { rinSheet(OFD.doc && OFD.doc.id === s.template_id ? OFD.doc : {}, s); return; }
+  if ((a === 'edit' || a === 'tap') && s) { rinSheet(OFD.doc && OFD.doc.id === s.template_id ? OFD.doc : {}, s); return; }
   if (a === 'restore' && s) { await rinDo('POST', `/api/office/series/${s.id}/restore`); offerUndo(tr('Restored'), histAdd({label: tr('Invoice series restored'), undo: () => rinDo('DELETE', `/api/office/series/${s.id}`), redo: () => rinDo('POST', `/api/office/series/${s.id}/restore`)})); return; }
   if (a === 'del' && s) {
     try { await rawFetch('DELETE', `/api/office/series/${s.id}`); } catch (x) { toast(x.message || tr('unknown')); return; }

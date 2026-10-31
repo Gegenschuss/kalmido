@@ -36,6 +36,13 @@ function agrRow(a) {
   const fold = !a.archived && typeof fsr_fileMenu === 'function' ? `<button type="button" class="iconbtn agr-fold" data-agrfold="${a.id}" aria-haspopup="menu" title="${esc(tr('Move to folder…'))}" aria-label="${esc(tr('Move to folder…'))}: ${esc(a.name)}">${ic('folder', 's')}</button>` : '';  // 2.351.0 B (#2749)
   return `<li class="agr-li${a.archived ? ' agr-arch' : ''}"><button type="button" class="ofcrow" data-agr="open" data-id="${a.id}"><span class="ofcn"><b>${esc(a.name)}</b>${sub ? `<small class="muted">${sub}</small>` : ''}<small class="agr-dl">${agrDeadline(a)}</small></span>${sum}${ic('chev', 's')}</button>${doc}${fold}</li>`;
 }
+// 2.452.0 (#3836): on a phone the row has no symbols (office.css), a long press opens what they did
+ms_rowMenu('.agr-li .ofcrow', r => {
+  const a = (AGR.data?.items || []).find(x => x.id === +r.dataset.id), li = r.closest('li'); if (!a) return;
+  menu(r, [{label: tr('Open'), icon: 'eye', fn: () => r.click()},
+    a.doc ? {label: tr('Open document {0}', a.doc.name), icon: 'file', fn: () => $('.agr-doc', li).click()} : null,
+    $('.agr-fold', li) ? {label: tr('Move to folder…'), icon: 'folder', fn: () => fsr_fileMenu(r, 'office_agreement', a.id, a.name)} : null]);
+});
 function agrHtml() {
   if (AGR.oid !== OFC.info?.org_id) Object.assign(AGR, {oid: OFC.info?.org_id, data: null, err: null, opened: null});  // another office area
   if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
@@ -44,7 +51,7 @@ function agrHtml() {
   const items = AGR.data.items || [];
   const id = +S.route.id || 0;
   if (id && AGR.opened !== id) { AGR.opened = id; const a = items.find(x => x.id === id); if (a) setTimeout(() => agrModal(a), 0); }
-  const bar = `<div class="ofcbar agr-bar"><h3 class="ofcgrp">${tr('Contracts & insurance')}</h3><span class="spacer"></span>
+  const bar = `${items.length ? hintOnce('ofclp', tr('Hold a row to see what you can do with it.')) : ''}<div class="ofcbar agr-bar"><h3 class="ofcgrp">${tr('Contracts & insurance')}</h3><span class="spacer"></span>
     <label class="chkl"><input type="checkbox" data-agr="arch" ${AGR.arch ? 'checked' : ''}><span>${tr('Show archived')}</span></label>
     <button class="btn sm pri" data-agr="new">${ic('plus', 's')}<span>${tr('New contract')}</span></button></div>`;
   if (!items.length) return bar + `<p class="muted lempty">${tr('No contracts yet, e.g. business liability insurance, office rent or a leasing contract.')}</p>`;

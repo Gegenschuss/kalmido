@@ -15308,11 +15308,11 @@
   "This export was imported already.": "Deze export is al geïmporteerd.",
   "Already here from an earlier import, skipped: {0} entries": "Al aanwezig uit een eerdere import, overgeslagen: {0} items",
   "Office, file store, chat and the other areas of this export are here already: they were skipped.": "Kantoor, bestanden, chat en de andere onderdelen van deze export zijn er al: ze zijn overgeslagen.",
-  "Person invited to the organisation: their content stays with you as the importing admin, the ticked projects are shared when they accept.": "Persoon uitgenodigd voor de organisatie: de inhoud blijft bij jou als importerende beheerder, de aangevinkte projecten worden gedeeld zodra de persoon accepteert.",
   "E-mail address not readable, left out": "E-mailadres niet leesbaar, weggelaten",
   "VAT ID too long, left out": "Btw-nummer te lang, weggelaten",
   "Not taken over: {0}": "Niet overgenomen: {0}",
   "At most {0} rows per sheet are read: please split a longer file.": "Per blad worden maximaal {0} rijen gelezen: splits een langer bestand.",
+  "Person invited to the organisation: their content stays with you as the importing admin, the ticked projects are shared when they accept.": "Persoon uitgenodigd voor de organisatie: de inhoud blijft bij jou als importerende beheerder, de aangevinkte projecten worden gedeeld zodra de persoon accepteert.",
   "In the ntfy app, add server {0} once and log in with the ntfy login your admin gave you.": "Voeg in de ntfy-app eenmalig server {0} toe en log in met de ntfy-toegang die je beheerder je heeft gegeven.",
   "{0} entry is already billed and stays.": ["{0} registratie is al gefactureerd en blijft.", "{0} registraties zijn al gefactureerd en blijven."],
   "{0} formula taken over": ["{0} formule overgenomen", "{0} formules overgenomen"],
@@ -15343,5 +15343,6 @@
   "{0} text of this project cannot be decrypted with the keys you hold.": ["{0} tekst van dit project kan niet worden ontsleuteld met jouw sleutels.", "{0} teksten van dit project kunnen niet worden ontsleuteld met jouw sleutels."],
   "{0} name shortened": ["{0} naam ingekort", "{0} namen ingekort"],
   "{0} receipt lies in a folder you cannot open and is not in this export; the GoBD export holds it.": ["{0} bon staat in een map die je niet mag openen en ontbreekt in deze export; de GoBD-export bevat hem.", "{0} bonnen staan in mappen die je niet mag openen en ontbreken in deze export; de GoBD-export bevat ze."],
-  "{0} receipt without date or amount is not in the export - complete it": ["{0} bon zonder datum of bedrag ontbreekt in de export - nu aanvullen", "{0} bonnen zonder datum of bedrag ontbreken in de export - nu aanvullen"]
+  "{0} receipt without date or amount is not in the export - complete it": ["{0} bon zonder datum of bedrag ontbreekt in de export - nu aanvullen", "{0} bonnen zonder datum of bedrag ontbreken in de export - nu aanvullen"],
+  "Hold a row to see what you can do with it.": "Houd een regel ingedrukt om te zien wat je ermee kunt doen."
 }

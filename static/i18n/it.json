@@ -15308,11 +15308,11 @@
   "This export was imported already.": "Questa esportazione è già stata importata.",
   "Already here from an earlier import, skipped: {0} entries": "Già presenti da un’importazione precedente, saltate: {0} voci",
   "Office, file store, chat and the other areas of this export are here already: they were skipped.": "Ufficio, archivio file, chat e le altre aree di questa esportazione sono già presenti: sono state saltate.",
-  "Person invited to the organisation: their content stays with you as the importing admin, the ticked projects are shared when they accept.": "Persona invitata nell'organizzazione: i suoi contenuti restano a te come admin dell'importazione, i progetti selezionati vengono condivisi quando accetta.",
   "E-mail address not readable, left out": "Indirizzo e-mail non leggibile, omesso",
   "VAT ID too long, left out": "Partita IVA troppo lunga, omessa",
   "Not taken over: {0}": "Non importato: {0}",
   "At most {0} rows per sheet are read: please split a longer file.": "Per foglio vengono lette al massimo {0} righe: dividi i file più lunghi.",
+  "Person invited to the organisation: their content stays with you as the importing admin, the ticked projects are shared when they accept.": "Persona invitata nell'organizzazione: i suoi contenuti restano a te come admin dell'importazione, i progetti selezionati vengono condivisi quando accetta.",
   "In the ntfy app, add server {0} once and log in with the ntfy login your admin gave you.": "Nell'app ntfy aggiungi una volta il server {0} e accedi con le credenziali ntfy che ti ha dato l’amministratore.",
   "{0} entry is already billed and stays.": ["{0} voce è già fatturata e resta.", "{0} voci sono già fatturate e restano."],
   "{0} formula taken over": ["{0} formula ripresa", "{0} formule riprese"],
@@ -15343,5 +15343,6 @@
   "{0} text of this project cannot be decrypted with the keys you hold.": ["{0} testo di questo progetto non può essere decifrato con le tue chiavi.", "{0} testi di questo progetto non possono essere decifrati con le tue chiavi."],
   "{0} name shortened": ["{0} nome abbreviato", "{0} nomi abbreviati"],
   "{0} receipt lies in a folder you cannot open and is not in this export; the GoBD export holds it.": ["{0} ricevuta si trova in una cartella che non puoi aprire e manca in questa esportazione; l'esportazione GoBD la contiene.", "{0} ricevute si trovano in cartelle che non puoi aprire e mancano in questa esportazione; l'esportazione GoBD le contiene."],
-  "{0} receipt without date or amount is not in the export - complete it": ["{0} ricevuta senza data o importo manca nell'esportazione - completala", "{0} ricevute senza data o importo mancano nell'esportazione - completale"]
+  "{0} receipt without date or amount is not in the export - complete it": ["{0} ricevuta senza data o importo manca nell'esportazione - completala", "{0} ricevute senza data o importo mancano nell'esportazione - completale"],
+  "Hold a row to see what you can do with it.": "Tieni premuta una riga per vedere cosa puoi farci."
 }

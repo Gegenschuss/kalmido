@@ -15308,11 +15308,11 @@
   "This export was imported already.": "Dieser Export wurde schon importiert.",
   "Already here from an earlier import, skipped: {0} entries": "Schon aus einem früheren Import da, übersprungen: {0} Einträge",
   "Office, file store, chat and the other areas of this export are here already: they were skipped.": "Büro, Ablage, Chat und die anderen Bereiche dieses Exports sind schon da und wurden übersprungen.",
-  "Person invited to the organisation: their content stays with you as the importing admin, the ticked projects are shared when they accept.": "Person in die Organisation eingeladen: Ihre Inhalte bleiben bei dir als importierendem Admin, die angehakten Projekte werden bei der Annahme geteilt.",
   "E-mail address not readable, left out": "E-Mail-Adresse nicht lesbar, weggelassen",
   "VAT ID too long, left out": "USt-IdNr. zu lang, weggelassen",
   "Not taken over: {0}": "Nicht übernommen: {0}",
   "At most {0} rows per sheet are read: please split a longer file.": "Je Tabelle werden höchstens {0} Zeilen gelesen: Bitte teile eine längere Datei auf.",
+  "Person invited to the organisation: their content stays with you as the importing admin, the ticked projects are shared when they accept.": "Person in die Organisation eingeladen: Ihre Inhalte bleiben bei dir als importierendem Admin, die angehakten Projekte werden bei der Annahme geteilt.",
   "In the ntfy app, add server {0} once and log in with the ntfy login your admin gave you.": "In der ntfy-App einmal Server {0} und melde dich mit dem ntfy-Zugang an, den dein Admin dir gegeben hat.",
   "{0} entry is already billed and stays.": ["{0} Eintrag ist schon abgerechnet und bleibt.", "{0} Einträge sind schon abgerechnet und bleiben."],
   "{0} formula taken over": ["{0} Formel übernommen", "{0} Formeln übernommen"],
@@ -15343,5 +15343,6 @@
   "{0} text of this project cannot be decrypted with the keys you hold.": ["{0} Text dieses Projekts lässt sich mit deinen Schlüsseln nicht entschlüsseln.", "{0} Texte dieses Projekts lassen sich mit deinen Schlüsseln nicht entschlüsseln."],
   "{0} name shortened": ["{0} Name gekürzt", "{0} Namen gekürzt"],
   "{0} receipt lies in a folder you cannot open and is not in this export; the GoBD export holds it.": ["{0} Beleg liegt in einem Ordner, den du nicht öffnen darfst, und fehlt in diesem Export; der GoBD-Export enthält ihn.", "{0} Belege liegen in Ordnern, die du nicht öffnen darfst, und fehlen in diesem Export; der GoBD-Export enthält sie."],
-  "{0} receipt without date or amount is not in the export - complete it": ["{0} Beleg ohne Datum oder Betrag fehlt im Export - jetzt ergänzen", "{0} Belege ohne Datum oder Betrag fehlen im Export - jetzt ergänzen"]
+  "{0} receipt without date or amount is not in the export - complete it": ["{0} Beleg ohne Datum oder Betrag fehlt im Export - jetzt ergänzen", "{0} Belege ohne Datum oder Betrag fehlen im Export - jetzt ergänzen"],
+  "Hold a row to see what you can do with it.": "Halte eine Zeile gedrückt, um zu sehen, was du damit tun kannst."
 }

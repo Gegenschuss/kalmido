@@ -380,7 +380,7 @@ function dsb_clHtml(c) {
   if (typeof officeOn !== 'function' || !officeOn()) return '';
   if (DSB.cl?.id !== c.id) { if (!DSB.cl?.busy) { DSB.cl = {id: c.id, busy: 1}; dsb_clLoad(c.id); } return ''; }
   const ss = DSB.cl.sheets; if (!ss) return '';
-  const li = x => `<li>${ic('shield', 's')} <b>${esc(x.kind_label)}</b> <span class="rotag dsb-st dsb-st-${esc(x.status)}${x.review ? ' dsb-rev' : ''}">${esc(x.gen_status === 'draft' ? tr('Draft') : x.status_label)}</span><button type="button" class="iconbtn" data-dsb="menu" data-id="${x.id}" aria-haspopup="menu" aria-label="${esc(tr('More'))}: ${esc(x.kind_label)}" title="${esc(tr('More'))}">${ic('dots', 's')}</button>${dsb_replyHtml(x.reply)}</li>`;
+  const li = x => `<li data-dsb="row" data-id="${x.id}">${ic('shield', 's')} <b>${esc(x.kind_label)}</b> <span class="rotag dsb-st dsb-st-${esc(x.status)}${x.review ? ' dsb-rev' : ''}">${esc(x.gen_status === 'draft' ? tr('Draft') : x.status_label)}</span><button type="button" class="iconbtn" data-dsb="menu" data-id="${x.id}" aria-haspopup="menu" aria-label="${esc(tr('More'))}: ${esc(x.kind_label)}" title="${esc(tr('More'))}">${ic('dots', 's')}</button>${dsb_replyHtml(x.reply)}</li>`;
   return `<div class="ctsec dsbsec"><h4>${tr('Data protection')}</h4>${ss.length ? `<ul class="ctlinks">${ss.map(li).join('')}</ul>` : ''}<button type="button" class="btn sm" data-dsb="new" data-cl="${c.id}">${ic('plus', 's')} ${tr('Data protection sheet')}</button></div>`;
 }
 // 2.209.0 C (#2589): the newest reply mail that was not filed (e.g. a revocation) at its sheet -- the customer's text, escaped
@@ -416,8 +416,10 @@ document.addEventListener('change', async e => {
   if (DSB.f) { try { DSB.all = (await rawFetch('GET', '/api/office/privacy-sheets?brief=1')).sheets || []; } catch { DSB.f = ''; DSB.no = true; } }  // fresh on every choice (another device may have changed a sheet)
   ms_clDraw();
 });
+ms_rowMenu('#view .dsbsec li[data-dsb="row"]', async r => { await loadModule('office'); dsb_menu(r, (DSB.cl?.sheets || []).find(x => x.id === +r.dataset.id)); });  // 2.452.0 (#3836)
 document.addEventListener('click', async e => {
   const b = e.target.closest?.('#view [data-dsb]'); if (!b) return;
+  if (b.dataset.dsb === 'row' && (!isMobile() || e.target.closest('a,button'))) return;  // 2.452.0 (#3836): on a phone a tap on the row opens its menu, the dots are hidden
   await loadModule('office');
   if (b.dataset.dsb === 'new') dsb_new(+b.dataset.cl);
   else dsb_menu(b, (DSB.cl?.sheets || []).find(x => x.id === +b.dataset.id));
