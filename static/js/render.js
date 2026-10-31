@@ -409,7 +409,7 @@ function renderSide0() {
   // (UX-47) the team chat and News moved to the group "Conversations" with the people and agents
   const hid = x => sideHidden(x);
   const plan = sidePlan(row, c, onTasks, k);
-  const planP = sbm ? plan.filter(([x]) => x !== 'today' && x !== 'inbox') : plan;  // 2.196.0 A (#2737): the phone's drawer has Today + Inbox fixed on top
+  const planP = plan;  // 2.450.0 (#3817): the phone's drawer lists Today + Inbox in Plan like the computer (was #2737: fixed on top)
   const planHiddenRows = planP.filter(([x, h]) => h && hid('e:' + x) && !(onTasks && k === x));
   const planHidden = planHiddenRows.length;
   // 2.250.0 C (#2995): "+ N more views" unfolds in place: the hidden views with a tick (= show in the sidebar), then a small link to the settings
@@ -480,16 +480,16 @@ function renderSide0() {
   // account in the head bar over everything (sbb_barHtml); the panel of another area than Tasks shows that area's entries
   // (sbb_panelHtml) instead of the groups
   // 2.152.2 (#2622, decision of 21.10.): in sidebar B Plan (Inbox, Today …) stays fixed on top with the search, only the middle scrolls
-  const planFix = sbb && tasksP && !hid('g:focus') ? SB.focus || '' : '';
+  const planFix = (sbb || sbm) && tasksP && !hid('g:focus') ? SB.focus || '' : '';
   const pan = tasksP ? '' : sbb_panelHtml(sbbArea);  // 2.152.3 A (#2619): first, the panel's head looks whether its groups fold
-  // 2.196.0 A (#2737): the phone's drawer: search, Today, Inbox (unless hidden in Settings) and the row of the areas on top (2.442.0 #3739: they scroll along, the search alone stays)
-  const sbmTop = sbm ? `<div class="sbmtop"><div class="sbmsrch">${scmd}</div>${['today', 'inbox'].map(x => plan.find(p => p[0] === x)).filter(([x, h]) => h && !hid('g:focus') && (!hid('e:' + x) || (onTasks && k === x))).map(([, h]) => h).join('')}</div>${sbm_rowHtml(hid)}` : '';
+  // 2.450.0 (#3817): the phone's drawer: the search, the row of the areas (2.442.0 #3739: they scroll along, the search alone stays), then Plan (only in the area Projects, like planFix of sidebar B); #2737 had Today + Inbox fixed on top
+  const sbmTop = sbm ? `<div class="sbmtop"><div class="sbmsrch">${scmd}</div></div>${sbm_rowHtml(hid)}` : '';
   const sset = `<button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>`;
   const sbmX = sbm ? $('#side .sbmr')?.scrollLeft : null;
   $('#side').innerHTML = `
     <div class="sbfix${sbb ? ' sbfix-flow' : sbm ? ' sbfix-flow sbfix-m' : ''}">${'' /* 2.331.0 A (#3303): in sidebar B the head scrolls along; 2.442.0 (#3739): in the phone's drawer too, only the search stays on top */}${'' /* 2.57.0 (#1798): the fixed head (workspace, favourites) stays while the rest scrolls */}
     <div class="sbhead">${'' /* 2.138.2 C (#2392): the 4 px stripe of #2389 is #side's top border (app.css); fold + fold-all show on hover / focus, the dot only offline or while syncing. 2.161.2 A (#2607): the brand (logo + word mark) is the workspace switch, the small mark at the bottom (2.145.0 A #2437) is gone. 2.152.3 A (#2619): on a computer the brand, the switch and the dot moved into the head bar (#kbar); the panel's head is the area's name, fold all and hide the panel (sbb_headHtml) */}${sbb ? sbb_headHtml(sbbArea, pan) : `${wsBarHtml()}${netDotHtml()}<span class="spacer"></span><span class="sbtools">${tasksP ? kbFoldAllBtn() + fv2_svToolBtn() /* 2.156.0 D (#2186) */ : ''}${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</span>`}</div>
-    ${tasksP && !sbm ? favSideHtml(lists, listRow, head) : ''}${planFix}${sbmTop}</div>
+    ${tasksP && !sbm ? favSideHtml(lists, listRow, head) : ''}${sbm ? sbmTop + planFix : planFix + sbmTop}</div>
     ${tasksP && sbm ? favSideHtml(lists, listRow, head) : ''}${tasksP ? sideGroupOrder().filter(g => (!hid('g:' + g) || g === 'lists') && !(planFix && g === 'focus')).map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('') : pan}
     ${sbb ? '' : `${sbm ? '' : `<div class="sgroup sfoot">
       ${sset}
