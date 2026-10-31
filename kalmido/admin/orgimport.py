@@ -13,6 +13,7 @@ Every created row is recorded as [table, id, space] in run.created["oi"]; oi_und
 Into the private space (#1941) an area goes where the private space has the same thing: "office" = the person's own
 office (office/model.py pb_personal), "user" = the private space (organisation column NULL); False = not taken over
 (named in the preview)."""
+import json
 import os
 import uuid
 
@@ -350,6 +351,9 @@ def oi_undo(c, cr):
     n = 0
     keyed = oi_key_tables()
     for item in reversed(cr.get("oi") or []):
+        if isinstance(item, list) and len(item) == 4 and item[0] == "doc_fields":
+            _oi_undo_options(c, *item[1:])
+            continue
         if isinstance(item, list) and len(item) == 3 and item[0] in keyed and isinstance(item[1], dict):
             n += _oi_undo_key(c, item[0], keyed[item[0]], item[1], item[2], (space_cols.get(item[0]) or (None,))[0])
             continue
@@ -416,6 +420,18 @@ def oi_undo_check(c, uid, cr, since):
                                             (r["book_id"],)) if x["id"] not in own_closings), default="")
             if closed[r["book_id"]] and str(day) <= closed[r["book_id"]]:
                 raise Denied(409, tr(OI_UNDO_LOCKED))
+
+
+def _oi_undo_options(c, fid, ws, added):
+    """2.369.0 (#2734): the options the import added to a select field of the target that was there before go again."""
+    r = c.execute("SELECT options FROM doc_fields WHERE id=? AND ws=?", (fid, ws)).fetchone()
+    try:
+        o = json.loads(r["options"] or "{}") if r else None
+    except (ValueError, TypeError):
+        o = None
+    if isinstance(o, dict) and isinstance(o.get("options"), list) and isinstance(added, list):
+        o["options"] = [x for x in o["options"] if not (isinstance(x, dict) and x.get("id") in added)]
+        c.execute("UPDATE doc_fields SET options=? WHERE id=?", (json.dumps(o, ensure_ascii=False), fid))
 
 
 def _oi_undo_key(c, table, key, vals, space, col):

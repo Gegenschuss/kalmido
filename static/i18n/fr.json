@@ -15431,5 +15431,6 @@
   "=B2*C2 · =SUM(C2:C9) · =here.total_time": "=B2*C2 · =SUM(C2:C9) · =here.total_time",
   "IF SUM ROUND MIN MAX AVERAGE COUNT": "IF SUM ROUND MIN MAX AVERAGE COUNT",
   "This device is in {0}, your setting says {1}.": "Cet appareil est sur {0}, ton réglage indique {1}.",
-  "Reminders, the daily summary and the briefing come at this time zone's hours; time tracking counts its days by it.": "Les rappels, le résumé quotidien et le briefing suivent ce fuseau horaire ; le suivi du temps compte ses jours selon lui."
+  "Reminders, the daily summary and the briefing come at this time zone's hours; time tracking counts its days by it.": "Les rappels, le résumé quotidien et le briefing suivent ce fuseau horaire ; le suivi du temps compte ses jours selon lui.",
+  "Field values not taken over": "Valeurs de champ non reprises"
 }
