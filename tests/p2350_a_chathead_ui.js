@@ -60,7 +60,7 @@ const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = async (o, u, theme) => {
     await o.nav(B + 'static/icon.svg');
-    await o.ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    await o.ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     return o.ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
   };
   // the header's visible buttons right of the name (avatar, back and the usage ring are not counted)
@@ -208,7 +208,8 @@ const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 740, height: 170}});
     check(await ready(ev, `document.body.classList.contains('kb-open')`), L + ': the keyboard sets kb-open in the team chat');
     check(!await ev(shown('#tabs')) && !await ev(shown('.cwsw')), L + ': keyboard: no tab bar, no row of open chats');
-    // measured against the box, not the list's own bottom: the list may run on behind it
+    // measured against the box, not the list's own bottom: the list may run on behind it; 2.459.0 (#3857): with the device's look on, the list reaches the bottom a moment after kb-open (no lasting gap: waited for, not measured at once)
+    await ready(ev, `[...document.querySelectorAll('#tc-msgs .cmsg')].pop().getBoundingClientRect().bottom - document.querySelector('.tccomp').getBoundingClientRect().top <= 2`);
     const m = await ev(`(() => { const b = document.querySelector('#tc-msgs').getBoundingClientRect(), l = [...document.querySelectorAll('#tc-msgs .cmsg')].pop().getBoundingClientRect(), c = document.querySelector('.tccomp').getBoundingClientRect(); return {h: Math.round(b.height), over: Math.round(b.bottom - c.top), gap: Math.round(l.bottom - c.top), comp: Math.round(c.bottom), vh: innerHeight}; })()`);
     check(m.h >= 30 && m.over <= 1 && m.gap <= 2 && m.comp <= m.vh, L + ': messages stay visible, the newest above the box, the box on screen ' + JSON.stringify(m));
     await shot('p2350a-team-kb.png');
