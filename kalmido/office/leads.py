@@ -260,7 +260,8 @@ def _source_of(s):
 
 def lead_parse(c, oid, text):
     """CSV text -> (columns {field: header}, rows): every row {n, title, contact, company, email, phone, source,
-    next_step, follow_up, note, value, error, dup}. Duplicates: the e-mail of a deal of the area or of an earlier row."""
+    next_step, follow_up, note, value, error, dup}. Duplicates: the e-mail of a deal of the area or of an earlier row;
+    2.363.2 (#3104): a row without an e-mail by lead_key (it came in new on every run)."""
     from ..life.budget import BUD_ROWS_MAX
     from ..core.csvimport import csv_table_numbered
     if not isinstance(text, str) or not text.strip():

@@ -460,6 +460,8 @@ def nwl_consent_import():
             ts = iso(now_utc())
             iid = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
                             (_uid, "newsletter", fname[:200], json.dumps({"contacts": done}), json.dumps({"contacts": len(done)}), ts))
+            from ..integrations.importers import imp_prune
+            imp_prune(c, _uid)
         c.commit()
     return jsonify({"import_id": iid, "rows": len(rows), "valid": valid, "errors": errors[:NWL_IMP_SHOW], "errors_count": len(errors), "will_change": will,
                     "kept": kept, "unmatched": unmatched, "applied": len(todo) if apply_ else 0})

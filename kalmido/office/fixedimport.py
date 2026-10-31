@@ -258,7 +258,9 @@ def fci_clean_rows(items):
         try:
             rows.append(rk_fixed_clean({k: it.get(k) for k in ("label", "amount", "repeat", "start", "until", "category", "vat_rate", "sub", "notice_days")}))  # 2.91.0 B (#1924): + sub, notice_days
         except BadInput as x:
-            raise BadInput(tr("Row {0}: {1}", i + 1, str(x.args[0] if x.args else x))) from None
+            # 2.363.2 (#3106): the row of the sheet when the preview sent it
+            no = it["row"] if isinstance(it.get("row"), int) and not isinstance(it.get("row"), bool) else i + 1
+            raise BadInput(tr("Row {0}: {1}", no, str(x.args[0] if x.args else x))) from None
     return rows
 
 
