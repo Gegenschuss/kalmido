@@ -87,6 +87,7 @@ async function dropTask0(id, el, clientY) {
     else if (k === 'trash') { deleteTask(id); return; }
     else if (k === 'done') { toggleTask(id); return; }
     else return;
+    if (item.list_id && !await mv_ask([id], listById(item.list_id))) return;  // 2.455.0 (#3848): under All the sidebar has other workspaces' projects
     if (item.list_id && t.parent_id) {
       try { await patchUndoable(id, {parent_id: null, list_id: item.list_id, section_id: null}, tr('Standalone in {0}', lname(listById(item.list_id)))); } catch { return; }
       return;
@@ -368,7 +369,7 @@ function swipeEnd(e) {
   else if (dx < -90) {  // 2.25.0 (UX-37): emptying the inbox = putting tasks into lists: there "Move to list…" leads the menu
     const inb = S.tasks.get(id)?.list_id === inbox()?.id;
     // 2.31.0 (#1056): the same entries, in two groups with a small heading (Snooze / Task), delete last and set apart
-    snoozeSheet(id, r, [{head: tr('Task')}, ...(inb ? [] : [moveListItem(r, id)]), {label: tr('Completed'), icon: 'done', fn: () => toggleTask(id)}, {label: tr('All…'), icon: 'dots', fn: () => taskMenu(r, id)}, '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}], true, [...(inb ? [moveListItem(r, id)] : []), {head: tr('Snooze')}]);
+    snoozeSheet(id, r, [{head: tr('Task')}, ...(inb ? [] : [moveListItem(r, id), moveWsItem(r, id)]), {label: tr('Completed'), icon: 'done', fn: () => toggleTask(id)}, {label: tr('All…'), icon: 'dots', fn: () => taskMenu(r, id)}, '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}], true, [...(inb ? [moveListItem(r, id), moveWsItem(r, id)] : []), {head: tr('Snooze')}]);
   }
 }
 document.addEventListener('touchend', swipeEnd);

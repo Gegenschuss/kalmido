@@ -292,7 +292,7 @@ function dgDrop(e, id) {
   if (!may.length) { roToast(); return true; }
   if (side) {
     const k = side.dataset.drop;
-    if (k.startsWith('l:')) dgToList(ids, +k.slice(2));
+    if (k.startsWith('l:')) mv_ask(ids, listById(+k.slice(2))).then(y => y && dgToList(ids, +k.slice(2)));  // 2.455.0 (#3848)
     else if (k === 'inbox') dgToList(ids, inbox().id);
     else if (k === 'today' || k === 'tomorrow') batch('patch', {due: k === 'today' ? today() : addDays(today(), 1)}, false, may);
     else if (k === 'trash') batch('delete', {}, true, may);

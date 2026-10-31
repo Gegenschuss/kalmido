@@ -106,7 +106,8 @@ function overdueAct(a) {
 }
 // 2.32.0 (#1055): the lists the selection can move to (the bar's Move, the key m without the multi panel)
 function multiMoveMenu(a) {
-  tch_listPicker(a, {filter: l => canEditList(l.id), pick: l => { const ids = [...S.multi]; S.multi.clear(); S.multiMode = false; dgToList(ids, l.id); }});  // 2.38.0 (#1177); 2.43.0 (#1003): subtasks leave their parent (one batch, one undo)
+  const ids = [...S.multi];
+  mv_picker(a, ids, {filter: l => canEditList(l.id), pick: l => { S.multi.clear(); S.multiMode = false; dgToList(ids, l.id); }});  // 2.38.0 (#1177); 2.43.0 (#1003): subtasks leave their parent (one batch, one undo)
 }
 // 2.32.0 (#1055): the phone bar's More: what does not fit into the four buttons
 function multiMoreMenu(a) {
