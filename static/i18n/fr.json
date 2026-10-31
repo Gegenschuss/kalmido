@@ -15430,7 +15430,6 @@
   "IF SUM ROUND MIN MAX AVERAGE COUNT": "IF SUM ROUND MIN MAX AVERAGE COUNT",
   "This device is in {0}, your setting says {1}.": "Cet appareil est sur {0}, ton réglage indique {1}.",
   "Reminders, the daily summary and the briefing come at this time zone's hours; time tracking counts its days by it.": "Les rappels, le résumé quotidien et le briefing suivent ce fuseau horaire ; le suivi du temps compte ses jours selon lui.",
-  "Field values not taken over": "Valeurs de champ non reprises",
   "Monthly on day {0}": "Tous les mois le {0}",
   "Every {0} months on day {1}": "Tous les {0} mois le {1}",
   "Monthly on the {0} {1}": "Tous les mois le {0} {1}",
@@ -15455,5 +15454,6 @@
   "No send waits for a confirmation": "Aucun envoi n’attend de confirmation",
   "Mark as not delivered": "Marquer comme non remis",
   "Mark as not delivered?": "Marquer comme non remis ?",
-  "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Fais-le seulement après avoir vérifié auprès du destinataire ou de ton fournisseur que la facture n’est pas arrivée. Tu pourras ensuite la renvoyer."
+  "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Fais-le seulement après avoir vérifié auprès du destinataire ou de ton fournisseur que la facture n’est pas arrivée. Tu pourras ensuite la renvoyer.",
+  "Field values not taken over": "Valeurs de champ non reprises"
 }

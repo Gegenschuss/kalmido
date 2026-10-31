@@ -15430,7 +15430,6 @@
   "IF SUM ROUND MIN MAX AVERAGE COUNT": "IF SUM ROUND MIN MAX AVERAGE COUNT",
   "This device is in {0}, your setting says {1}.": "Dit apparaat staat op {0}, je instelling zegt {1}.",
   "Reminders, the daily summary and the briefing come at this time zone's hours; time tracking counts its days by it.": "Herinneringen, de dagsamenvatting en de briefing volgen deze tijdzone; de tijdregistratie telt haar dagen ernaar.",
-  "Field values not taken over": "Veldwaarden niet overgenomen",
   "Monthly on day {0}": "Maandelijks op dag {0}",
   "Every {0} months on day {1}": "Elke {0} maanden op dag {1}",
   "Monthly on the {0} {1}": "Maandelijks op de {0} {1}",
@@ -15455,5 +15454,6 @@
   "No send waits for a confirmation": "Geen verzending wacht op een bevestiging",
   "Mark as not delivered": "Markeren als niet bezorgd",
   "Mark as not delivered?": "Markeren als niet bezorgd?",
-  "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Doe dit alleen nadat je bij de ontvanger of je provider hebt gecontroleerd dat de factuur niet is aangekomen. Daarna kun je hem opnieuw versturen."
+  "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Doe dit alleen nadat je bij de ontvanger of je provider hebt gecontroleerd dat de factuur niet is aangekomen. Daarna kun je hem opnieuw versturen.",
+  "Field values not taken over": "Veldwaarden niet overgenomen"
 }
