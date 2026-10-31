@@ -94,7 +94,7 @@ const release = (w, el) => ptr(w, el, 'pointerup');
   const row = d.querySelector('.oimarch a.ofdrow');
   check(/"arch":\d+/.test(row.dataset.pview), "the phone's PDF view carries Correct");
   press(w, row);
-  const items = await until(() => menuItems(d).length && menuItems(d));
+  const items = await until(() => menuItems(d).includes('Download PDF') && menuItems(d));
   release(w, row);
   check(items && ['Preview (PDF)', 'Download PDF', 'Correct archived document'].every(t => items.includes(t)), 'a long press opens the row menu: ' + items);
   row.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
