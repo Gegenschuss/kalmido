@@ -19,7 +19,7 @@
 
 ## What's new
 
-**2.436.0** (2026-10-30):
+**2.436.0** (2026-10-31):
 - **Office**: receipts by e-mail - forward invoice mails to your office address, Kalmido fetches linked invoice PDFs by itself; the client card's blocks fold and can be switched off per office.
 - **Documents**: the list can be sorted (date, arrival, sender, amount, due date, title).
 - **Settings**: "View as member" (Settings > Account) shows Kalmido as a member of your organisation sees it; the rights stay, the way back is in the account menu.
