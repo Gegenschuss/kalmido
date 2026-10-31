@@ -3,7 +3,7 @@
 // P2459B_NOSTART=1 = the container runs. For each place of the audit: no element over the right edge, the page does not scroll
 // sideways, buttons of one bar do not overlap. Bars of tabs may scroll themselves (their own scrollWidth), the page not.
 // Places: time (+ running timer), calendar, wiki and notes bar, project overview, receipts list, pipeline, selection bar #mbar,
-// document title (ellipsis), account servers row, meal dialog.
+// document title (ellipsis), account servers row, meal dialog. In German: the audit's texts were the long ones.
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -15,25 +15,27 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2459B_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
 
-// the audit in the page: elements (visible, inside `root`) whose right edge is over the viewport, the page's own width, and
+// the audit in the page: elements (visible, inside `root`) whose right edge is over the viewport (only a bar's own scroll excuses
+// them: #view and the dialogs scroll too, but that is the page scrolling sideways), the width of the page and #view, and
 // overlapping neighbours among the buttons of one bar (`bars`)
 const AUDIT = (root, bars) => `(() => { const vw = innerWidth, R = document.querySelector(${JSON.stringify(root)}) || document.body;
   const over = [...R.querySelectorAll('*')].filter(e => e.offsetParent && getComputedStyle(e).position !== 'fixed' && !e.closest('[data-scrolls]') && e.getBoundingClientRect().width > 0
-    && e.getBoundingClientRect().right > vw + 1 && !(() => { for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) { const ox = getComputedStyle(p).overflowX; if (/auto|scroll|hidden|clip/.test(ox) && p.getBoundingClientRect().right <= vw + 1) return true; } return false; })()).map(e => (e.className || e.tagName) + ':' + Math.round(e.getBoundingClientRect().right)).slice(0, 6);
+    && e.getBoundingClientRect().right > vw + 1 && !(() => { for (let p = e.parentElement; p && p !== document.body && p !== R && p.id !== 'view' && !p.matches('.modal, .smodal'); p = p.parentElement) { const ox = getComputedStyle(p).overflowX; if (/auto|scroll|hidden|clip/.test(ox) && p.getBoundingClientRect().right <= vw + 1) return true; } return false; })()).map(e => (e.className || e.tagName) + ':' + Math.round(e.getBoundingClientRect().right)).slice(0, 6);
   const lap = []; for (const b of document.querySelectorAll(${JSON.stringify(bars)})) { const k = [...b.children].filter(e => e.offsetParent && e.getBoundingClientRect().width > 0).map(e => e.getBoundingClientRect());
     for (let i = 0; i < k.length; i++) for (let j = i + 1; j < k.length; j++) { const a = k[i], c = k[j]; if (a.left < c.right - 1 && c.left < a.right - 1 && a.top < c.bottom - 1 && c.top < a.bottom - 1) lap.push(b.className + ' ' + i + '/' + j); } }
-  return {vw, page: document.documentElement.scrollWidth, over, lap}; })()`;
+  const box = [document.querySelector('#view'), R].filter(Boolean), page = vw + Math.max(document.documentElement.scrollWidth - vw, ...box.map(e => e.scrollWidth - e.clientWidth));
+  return {vw, page, over, lap}; })()`;
 
 const DIAG = ev => ev(`JSON.stringify({h: location.hash, k: S?.route?.key, n: S?.tasks?.size, pomo: !!S?.pomo, v: (document.querySelector('#view')?.textContent || '').slice(0, 120), c: document.querySelector('#view')?.firstElementChild?.className})`).catch(e => String(e));
 (async () => {
   await sleep(600);
-  const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
+  const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'de'})});
   check(r.ok, 'setup');
   const CA = await login('alice');
-  await call(CA, 'POST', '/api/admin/setup', {org_name: 'Alpha', lang: 'en', collab_all: true, modules: ['cal', 'comments']});
+  await call(CA, 'POST', '/api/admin/setup', {org_name: 'Alpha', lang: 'de', collab_all: true, modules: ['cal', 'comments']});
   const st = await call(CA, 'GET', '/api/state'), feats = new Set(((st.settings || {}).features || '').split(',').filter(Boolean));
   ['time', 'events', 'wiki', 'notes', 'office', 'pomo'].forEach(x => feats.add(x));
-  await call(CA, 'PATCH', '/api/settings', {tour: 'done', lang: 'en', workspace: 'all', features: [...feats].join(',')});
+  await call(CA, 'PATCH', '/api/settings', {tour: 'done', lang: 'de', workspace: 'all', features: [...feats].join(',')});
   const me = (await call(CA, 'GET', '/api/state')).me, ORG = me.workspaces[0].id;
   const L1 = (await call(CA, 'POST', '/api/lists', {name: 'Work', org_id: ORG})).id;
   const T = [];
@@ -50,6 +52,9 @@ const DIAG = ev => ev(`JSON.stringify({h: location.hash, k: S?.route?.key, n: S?
     await o.shot(`p2459b-${name.replace(/\W+/g, '-')}.png`);
   };
 
+  // a real state instead of a fixed time: the old page's mark is gone and the app has its tasks again
+  const reload = async o => { await o.ev(`(() => { window.__old = 1; location.reload(); return 1; })()`).catch(() => 0); check(await ready(o.ev, `!window.__old && typeof S !== 'undefined' && !!S.me && !!document.querySelector('#view')`, 60), 'reloaded ' + await DIAG(o.ev)); };
+
   await firefox(async o => {
     const {cmd, ev, ctx, nav} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 320, height: 640}});
@@ -63,24 +68,39 @@ const DIAG = ev => ev(`JSON.stringify({h: location.hash, k: S?.route?.key, n: S?
     await place(o, 'notes', '#notes', `!!document.querySelector('#view .ntbar')`);
     await ev(`localStorage.setItem('tasks.pov', '[${L1}]')`);
     await nav(B + '#l/' + L1);
-    await ev('location.reload()');
-    await sleep(1500);
+    await reload(o);
     await place(o, 'projects', '#l/' + L1, `!!document.querySelector('#view .povh')`);
     await place(o, 'receipts', '#office/books/receipts', `!!document.querySelector('#view .rcl-exp, #view .rcl-empty')`);
     await place(o, 'pipeline', '#office/pipeline', `!!document.querySelector('#view .ofcbar, #view .ppseg')`);
-    await place(o, 'servers', '#settings', `!!document.querySelector('#view, .modal')`);
+
+    // the two places inside a dialog
+    await nav(B + '#office/meals');
+    check(await ready(ev, `!!document.querySelector('[data-bw="new"]')`, 60), 'meals: the list is up ' + await DIAG(ev));
+    await ev(`(() => { document.querySelector('[data-bw="new"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.modal.bwdlg, .bwdlg')`), 'meals: the dialog opens');
+    const dm = await ev(AUDIT('.bwdlg', '.bwfoot, .bwlines li'));
+    check(dm && dm.page <= dm.vw && !dm.over.length && !dm.lap.length, 'meal dialog: inside the screen, no overlap ' + JSON.stringify(dm));
+    await o.shot('p2459b-meal-dialog.png');
+    await nav(B + '#time');
+    await ev(`(() => { location.reload(); return 1; })()`).catch(() => 0);
+    check(await ready(ev, `typeof settingsModal === 'function' && !!S.me && !document.querySelector('.bwdlg')`, 60), 'back from the meal dialog');
+    await ev(`(() => { settingsModal('account'); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.smodal .msvbtns')`, 60), 'servers: the account section is up');
+    const sv = await ev(AUDIT('.smodal', '.msvbtns'));
+    check(sv && sv.page <= sv.vw && !sv.over.length && !sv.lap.length, 'servers: inside the screen, no overlap ' + JSON.stringify(sv));
+    await o.shot('p2459b-servers.png');
+    await ev(`(() => { location.reload(); return 1; })()`).catch(() => 0);
+    await ready(ev, `typeof S !== 'undefined' && !!S.me && !document.querySelector('.smodal')`, 60);
 
     // the running timer: Pause / end the focus round do not run into each other
     check((await call(CA, 'POST', '/api/pomo/start', {kind: 'focus', minutes: 25, task_id: T[0]})).http < 300, 'pomo started');
-    await ev('location.reload()');
-    await sleep(1500);
+    await reload(o);
     await place(o, 'time-focus', '#time', `!!document.querySelector('#view .tvpomo .tvr-acts')`);
 
     // the selection bar: "1 selected" does not lie over Move, the X is inside the screen
     await ev(`localStorage.setItem('tasks.pov', '[]')`);
     await nav(B + '#l/' + L1);
-    await ev('location.reload()');
-    await sleep(1500);
+    await reload(o);
     if (await ready(ev, `!!S && S.tasks && S.tasks.size >= 3`, 60)) {
       await ev(`(() => { S.multiMode = true; S.multi.add(${T[0]}); render(); renderMultiBar(); return 1; })()`);
       const ok2 = await ready(ev, `!!document.querySelector('#mbar:not(.hidden) .mbx')`);

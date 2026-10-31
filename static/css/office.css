@@ -1144,7 +1144,6 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 @media (max-width:420px){
   .rcl-exp .btn{flex:1 1 100%;max-width:100%;white-space:normal;text-align:center}
   .rcl-exp .btn span{min-width:0}
-  .bwln{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 2.75rem}
-  .bwln>select[data-bwl="kind"]{grid-column:1/-1}
+  .bwln{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 2.75rem;grid-template-areas:"k k k" "r g x"}
   .bwfoot .btn{flex:1 1 100%;max-width:100%;white-space:normal;justify-content:center}
 }
