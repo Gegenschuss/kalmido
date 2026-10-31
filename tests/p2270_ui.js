@@ -261,6 +261,38 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
     await shot(`p2270-${th}-1440-newversion.png`);
   }, false);
 
+  // ================= 2.370.0 (#3126): the writes that carry what this device saw
+  w = await boot({user: 'alice', hash: 'l/' + W1}); d = w.document;
+  await until(() => d.querySelector('#top h1'));
+  const STASK = (await call('POST', '/api/tasks', {title: 'Sprint task', list_id: W1})).id;
+  await w.eval('load().then(render)'); await sleep(300);
+  w.eval(`window.__calls = []; window.__cf = null; window.__api = api; api = async (m, u, b, ...x) => {
+    if (m === 'GET') return window.__api(m, u, b, ...x);
+    window.__calls.push({m, u, b}); return {count: 0, errors: [], conflicts: window.__cf || []}; }`);
+  const sent = () => w.eval('JSON.stringify(window.__calls.splice(0))');
+  await w.eval(`(async () => { const e = histDone('x', [991], [{id: 991, due: '2027-01-05', due_time: '15:00', repeat: 'FREQ=DAILY;TIMES=09:00,15:00'}], {}); await e.redo(e); })()`);
+  await w.eval(`(async () => { const e = histDone('x', [992], [{id: 992, due: '2027-01-05', due_time: '15:00', repeat: 'FREQ=DAILY'}], {}); await e.redo(e); })()`);
+  const rd = JSON.parse(await sent());
+  check(JSON.stringify(rd[0].b.data.expect) === '{"991":{"due":"2027-01-05","due_time":"15:00"}}', '#3126: the redo of a several-times-a-day task names the time ' + JSON.stringify(rd[0].b));
+  check(JSON.stringify(rd[1].b.data.expect) === '{"992":"2027-01-05"}', '#3126: another series only its date');
+  await w.eval(`(async () => { window.__cf = [{field: 'sort_mode', server: 'date'}]; await sortSet('title'); })()`);
+  const so = JSON.parse(await sent());
+  check(so[0].b.sort_mode === 'title' && so[0].b._prev?.sort_mode === '', '#3126: the sort with the one seen ' + JSON.stringify(so[0].b));
+  check(w.eval(`listById(${W1}).sort_mode`) === 'date', '#3126: a sort set elsewhere meanwhile stays');
+  w.eval('window.__cf = null');
+  await w.eval(`fxSumSave(${W1}, {'f:1': 'sum'}, {'f:1': 'avg'})`);
+  await w.eval(`fxKpiSave(${W1}, [{title: 'B'}], [{title: 'A'}])`);
+  const fx = JSON.parse(await sent());
+  check(fx[0].b._prev?.col_sums?.['f:1'] === 'sum', '#3126: the sum row with the one seen ' + JSON.stringify(fx[0].b));
+  check(fx[1].b._prev?.kpis?.[0]?.title === 'A', '#3126: the key figures with the ones seen ' + JSON.stringify(fx[1].b));
+  check(await w.eval(`(async () => { window.__cf = [{field: 'col_sums'}]; const a = await fxSumSave(${W1}, {}, {}, true), b = await fxKpiSave(${W1}, [], [], true); window.__cf = null; return !a && !b; })()`), '#3126: a conflict is said, no history step');
+  await sent();
+  await w.eval(`spr_assign([${STASK}], 77, 'x')`);
+  const spc = JSON.parse(await sent());
+  check(spc[0]?.b?.data?.sprint_id === 77 && spc[0].b.data.prev?.[STASK]?.sprint_id === null, '#3126: the sprint with the one seen ' + JSON.stringify(spc[0]));
+  w.eval('api = window.__api');
+  w.close();
+
   // ================= Firefox 390 touch: #958 typing never moves the list behind
   const many = (await call('POST', '/api/lists', {name: 'Long list'})).id;
   for (let i = 0; i < 40; i++) await call('POST', '/api/tasks', {title: 'Row ' + i, list_id: many});

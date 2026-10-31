@@ -934,6 +934,8 @@ A retry must not do the work twice. Two optional helpers (old agents keep workin
   `{"expect_due": "<the due date you read>"}` (and `expect_time` for a task due several times a day). If the task moved on
   meanwhile (your call arrived twice, or a person ticked it), it is not advanced again: the answer is `200` with
   `"skipped": true` and `next_due: null`. Recommended for every recurring task. MCP: `complete_task` with `expect_due`.
+  For many tasks: `POST /api/v1/tasks/batch` takes `expect` `{id: {expect_due, expect_time?}}` (complete, wont_do) and `_prev`
+  `{id: {field: value you read}}` (update) and lists what it skipped in `conflicts` (2.370.0; MCP: `batch_tasks`).
 - **Header `Idempotency-Key`** on any write call (`POST` / `PATCH` / `PUT` / `DELETE`, 1-100 characters `A-Z a-z 0-9 _ . : -`,
   e.g. a UUID per intended action): a repeat with the same key (same token's account, method and path) gets the first
   answer back with the header `Idempotent-Replayed: true` and changes nothing. A call that failed (4xx / 5xx) stores

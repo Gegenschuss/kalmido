@@ -12,10 +12,14 @@ async function spr_assign(ids, sid, lab) {
   if (!ids.length) return;
   const snaps = ids.map(i => snapTask(S.tasks.get(i)));
   let j;
-  try { j = await api('POST', '/api/tasks/batch', {ids, action: 'patch', data: {sprint_id: sid || null}}); } catch { return; }
+  const prev = Object.fromEntries(snaps.map(b => [b.id, {sprint_id: b.sprint_id || null}]));  // 2.370.0 (#3126): a task moved elsewhere meanwhile stays there
+  try { j = await api('POST', '/api/tasks/batch', {ids, action: 'patch', data: {sprint_id: sid || null, prev}}); } catch { return; }
   if (j?.errors?.length) toast(j.errors[0]);
+  const cf = j?.conflicts || [];
+  for (const c of cf) addConflicts(c.id, [c], c.title);
   await load(); render();
-  const pairs = snaps.map(b => [b, snapTask(S.tasks.get(b.id)), ['sprint_id']]);
+  const pairs = snaps.filter(b => !cf.some(c => c.id === b.id)).map(b => [b, snapTask(S.tasks.get(b.id)), ['sprint_id']]);
+  if (!pairs.length) return;
   const msg = lab || (sid ? tr('In {0}', spr_name(spr_byId(spr_list(snaps[0].list_id), sid))) : tr('Moved to the backlog'));
   const e = histFields(msg, pairs, {res: j, fields: ['sprint_id']});
   if (e) offerUndo(msg, e); else toast(msg);
