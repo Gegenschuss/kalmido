@@ -5,6 +5,102 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.436.0] - 2026-10-31
+
+Package 2.424 (Bündel: main rot: p2360_a_ui, p21145_api, p2113_a_ui, Büro: Belege per Mail vollautomatisch (Download-Li, Sammelpaket: Aufgaben ohne Paket ().
+### Added
+- Office > Settings > Data: "Receipts by e-mail" shows the forwarding address of this office (company and personal office each have their own) with a copy button and a short Gmail filter guide (#3450).
+- Invoice mails without a PDF attached: Kalmido follows the "Download invoice" link (Stripe, Paddle, Apple and others, or any invoice link to a PDF) and files the PDF as a document that runs through the receipt recognition; if the link needs a login, the mail itself is filed, marked "Receipt link needs a login" (#3450).
+- Links are fetched over https from public addresses only, with size, time and hourly limits per address; the same invoice by mail and by link is flagged as a duplicate (#3450).
+### Fixed
+- Office settings: changing the document language, the currency or the exchange rate is saved again (since 2.406 these fields were silently not saved) (#3572).
+- E-invoices (ZUGFeRD / XRechnung) no longer contain empty address fields when a client has no postcode or street; checked against the ZUGFeRD 2.5.2 / Factur-X 1.09.2 rules for invoices, credit notes, progress, final and reverse-charge invoices (#3524).
+- Tests follow the one sidebar text size (#3492) and the rights line on page 1 (#3491) (#3572).
+
+Package 2.434 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Office: delivery notes can be switched off under Office settings > Functions (default on). Off: the Delivery notes tab, the delivery note buttons on quotations and invoices, and their number series and closing texts disappear; creating one (also through the agent API) is refused. Existing ones stay readable; switching it on again shows everything (#3608).
+### Changed
+- Office: a quotation that says "see attachment" for the terms and conditions now carries the terms pages at the end of its PDF - in the download, the preview, the e-mail, the approval link and the customer portal. The e-mail sends one PDF instead of a separate terms file; the send dialog says so (#3619).
+- Office: a ZUGFeRD invoice is e-mailed (and copied to the DATEV inbox) as the PDF alone - the invoice data is inside it. Only an XRechnung still gets its XML as its own file. The XML download in the invoice stays (#3616).
+- Office: invoices, invoice corrections and reminders share the quotation's look (slightly smaller text, totals at the bottom, two-column closing). The GiroCode is smaller (2 x 2 cm); bank details and GiroCode moved to the end of the invoice right above the footer, the due date line stays under the totals (#3603).
+
+Package 2.428 (Bündel: Eine Auswahl-Leiste überall: Mehrfachauswahl wie i, Dokumente: Sortierung der Liste wählbar (Datum, Ei, Bündel: main rot: p2360_a_ui).
+### Added
+- Documents: a sort button next to "Filter" (it names the current sort with an arrow): document date (default, newest first), date of arrival, sender, amount, due date or title, each up or down; picking the chosen one again turns the direction round. The server sorts, so every page of the list follows; documents without the value come last. Remembered on this device; on the phone the sort sits at the top of the filter sheet (#3579).
+### Changed
+- One selection bar everywhere: documents, files, knowledge pages, the user list and the receipts of a trip now show the same floating bar as the task lists - the count on the left, the main actions as buttons, the rare ones (CSV export, another workspace, add to organisation) under "More"; X or Esc ends it (#3581).
+- Start a selection the same way everywhere: tick the box that appears when you hover over a row or card, Ctrl/Cmd- or Shift-click, or long-press on the phone (in files and knowledge a long press now selects; the row menu stays on right click and "…") (#3581).
+- Travel per diem: a year whose BMF table is not entered yet (2027) uses the newest table (2026) instead of no per diem, always with the hint "Rates of 2026 used, the BMF letter for 2027 is not entered yet" - on the trip, in the rates of the trip dialog, the per diem report (view, CSV, Excel, PDF) and the spreadsheet import (#3522).
+### Fixed
+- Documents: the selection bar is clearly visible now (it had the page colour) (#3581).
+
+Package 2.436 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- "View as member" (#3620): a personal switch under Settings > Account for admins (of the server or of an organisation). On, Kalmido looks like it does for a member of the organisation: Settings shows only what a member sees (no people, groups, organisations, server agents, data, backups or server parts), and the office of an organisation hides its Settings, Contracts & insurance and Bank - quotations, invoices and the other daily work stay. The private area and the own agents are untouched. Only the display changes: the rights stay the same on the server. Saved per person (all devices), off by default. The way back is one click: "Show administration again" at the bottom of the settings' areas and in the account menu (the picture at the top right).
+
+Package 2.373 (Ordner-Komfort und Kleinkram aus Review 2.351).
+### Changed
+- Files > Trash: restoring a folder that held a table you may not edit now says so in the message ("1 table stays in the tables' trash"); the table is not fetched back automatically, someone with the right restores it from the tables' trash (#3335).
+- Documents: learned folder sorting files an upload only into a folder the uploading person may edit and no longer suggests other folders; the document stays where it lands (#3336).
+### Fixed
+- Address book: folders that another person creates or shares appear in the panel without reloading the page (#3337).
+- Office > Correspondence > "Mark as sent": the folder choice no longer goes missing when the folders are still loading (#3337).
+- Leaving an organisation keeps the read marks of group conversations (groups belong to no organisation, you stay a member) - now covered by a test (#3337).
+
+Package 2.412 (Bündel: Eigenschaften je Projekttyp: Zuschnitt + Zuschalte).
+### Added
+- #3552 Properties per project type: every project type now hides what does not fit its tasks. Software / AI dev hides video sign-off, client and contacts, documents and invoices; Agency hides repository and ticket type; Personal hides everything business-like (task number, ticket type, repository, dependencies, assignee, story points, time tracking, video sign-off, client, documents). A hidden property shows neither in the task panel nor as a column ("Shown fields…") nor in the task's "…" menu. A blank project shows everything as before.
+- #3552 Project options > Properties: one switch per property and "As the project type" (owner and project admins only; members do not see the part). A switch saves at once with undo.
+### Changed
+- #3552 Changing the project type first says which properties it hides (nothing is deleted), then takes the new type's cut; properties switched on by hand stay on.
+- #3552 Hidden is display only: agents, import and the API keep setting values, and a task that already has something in a hidden property (tags, assignee, tracked time, dependencies, code, video sign-offs, contacts, documents) keeps showing it.
+
+Package 2.432 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- Backups keep larger files only once (#3584): attachments and office files from 64 KiB on lie once, by content, in the shared store `backups/.store` (encrypted with a store key of the passphrase when backups are encrypted); each backup holds the database, the small files and a list of the shared files it needs. A shared file goes only once no kept backup needs it. Settings > Backups shows each backup's own size (with "N shared, X newly stored") and one line for the shared files of all backups.
+- The free space check of a backup counts only the files new to the store (before: everything again, 2.2 times with encryption) (#3584).
+- Download of a backup is still one complete file (put together from the store while it downloads; encrypted backups with the same passphrase); check and restore read the shared files from the store, each checked by its SHA-256 (#3584).
+- The off-site target gets only the shared files it does not hold yet, and loses those no kept backup there needs (#3584).
+- One way: a Kalmido before 2.432 cannot check or restore the new backups (format 3) and would download only their small part; after going back to an older version, download a complete file in 2.432 or later first (#3584).
+### Added
+- `kalmido/admin/bkstore.py assemble`: one complete backup file out of a copy of a backup and its shared files (off-site target, second machine) (#3584).
+
+Package 2.435 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Client card: every block folds at its title; details, contact persons and open invoices start open, projects, time tracking, documents, letters, reports and data protection start folded with their number in the title (e.g. "Projects (3)"). Kalmido keeps your folds and hidden blocks per person, the same for every client. Letters are a block of their own (#3600).
+- Office > Settings > Functions > Client card: office admins switch blocks of the client card off for the whole office; without an organisation you switch them for your own office (#3600).
+- Quotation / invoice list: the row menu "…" has "Download PDF" right below "Preview (PDF)" for every kind of document (a draft asks first, like the editor), and "Send by mail…" for finalised documents where the editor shows its Send button (#3618).
+- Settings > Account: "Change server" inside the Kalmido desktop and mobile apps (#3578).
+### Changed
+- Quotation / invoice / credit note editor: the field "Project" is a button with the project's icon and name; it opens the project picker: "No project", the client's projects, then the other projects in the sidebar's order with folders as headings, a search from 10 entries, a sheet on phones (#3606).
+- Inside the Kalmido desktop and mobile apps there is no "Install app" hint any more, and the iPhone app no longer offers Web Push (not available there yet) (#3578).
+
+Package 2.417 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpaket Büro, Einsatzplan, Listen und Kleinkram).
+### Added
+- New Projects start page: all your views, filters and projects grouped by folder, as in the sidebar; tap a row to open it. Reach it by tapping the Projects button again while you are in Projects (#3559).
+- Office test mode: switch it on under Office > Settings > Documents & numbers. While it is on, a strip above the office says so (with "Switch off"), and every new quotation, invoice or document is a trial one (TEST number, MUSTER watermark). It is personal per office; colleagues see nothing. "Delete all trial documents" (with the count) sits in that section of the settings (#3445).
+### Changed
+- Every area button (phone tab bar and desktop sidebar) opens the page you last used in that area, Projects included: on a phone the Projects tab now opens the page instead of the side menu; the side menu stays behind the menu button at the top. Tapping the button of the area you are in takes you to the area's start page (Office: the overview) (#3559).
+- Page titles have one size in every area (dashboard, kids, shop, office, clients, calendar), also on the phone; section headings in pages and sub-headings in dialogs share one size each; group labels in the phone menu and the office are plain text instead of capitals, like in the desktop sidebar (#3497).
+- "New quotation" and "New invoice" create the draft with one tap; the menu entry "Trial document (SAMPLE)" and the one-time trial hint are gone. The trial filter and the "N trial documents" line only show while the test mode is on (#3445).
+### Fixed
+- Finalised or sent invoices and credit notes can no longer be deleted (GoBD, the test phase exception is gone); correct them with a credit note / cancellation. Sent, accepted or signed quotations stay as well. Drafts without a number and trial documents can still be deleted (#2604).
+
+Package 2.396 (Projekt-Dialog vereinfacht, Git-Autor für KI-Commits).
+### Added
+- Agents: a "Git author" block in the agent settings (below Interim summary): name and e-mail address the agent's commits are signed with (default "Kalmido <noreply@kalmido.com>"), plus a switch for a Co-Authored-By line; an invalid address shows its error at the field. It is shown publicly in GitHub. (#3386)
+- Projects with a connected repository can set their own git author for AI commits (Repository menu > Git author for AI commits). (#3386)
+- The reference launchers (sh and ps1) set GIT_AUTHOR_* / GIT_COMMITTER_* from these settings; agents get the value as runtime.git_author and per task as repo.git_author. (#3386)
+- A list named like a shopping list (Einkauf, Shopping, Groceries …) offers once "Use as a shopping list?" at its top: one tap turns on shopping mode with aisles and amounts and keeps ticked items at the bottom; one undo takes it back. (#3385)
+### Changed
+- The project dialog no longer has the row "Used for". Existing shopping lists, meal plans, birthdays and recipes keep working as before. (#3385)
+### Fixed
+- Moving a shopping list into an organisation from the dialog ends its list kind in the same step instead of being refused; the move dialog says so before anything moves. (#3385)
+
+### Fixed
+- main: the settings search finds the client card and the test mode of the office settings; five test suites follow the current behaviour (sender line of invoices in look A, sent quotations stay, agent runtime with the commit identity, documents selection bar, the retention check compares only the answer line).
+
 ## [2.430.1] - 2026-10-30
 
 ### Fixed
@@ -9371,7 +9467,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.430.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.436.0...HEAD
+[2.436.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.436.0
 [2.430.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.430.1
 [2.430.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.430.0
 [2.409.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.409.0
