@@ -1054,7 +1054,7 @@ def ox_status(oid):
         p = os.path.join(_odir(oid), st.get("file") or "")
         if not st.get("file") or not os.path.isfile(p) or st.get("expires_at", "") <= iso(now_utc()):
             st = {"state": "none"}
-    out = {k: st.get(k) for k in ("state", "started_at", "done_at", "expires_at", "file", "bytes", "files", "plain") if st.get(k) is not None}
+    out = {k: st.get(k) for k in ("state", "started_at", "done_at", "expires_at", "file", "bytes", "files", "plain", "missing") if st.get(k) is not None}
     if st.get("state") == "failed":
         out["error"] = tr("The export was interrupted. Please start it again.") if st.get("error") == "interrupted" else tr("The export failed. Please try again later or ask the server admin (server log).")
     return out
