@@ -1513,6 +1513,17 @@ allowed) and `org_offices` (`[{id, name}]` while it is empty and the person has 
 `GET /api/office/mail-status` (see "Invoices and credit notes" below); 2.40.0 adds `POST /api/office/docs/<id>/fee`
 (see "Payments and reminders"). Agents never reach `/api/office/*` (their routes are `/api/v1/office`, see "Agents").
 
+## Lists on the phone and their sort
+
+*Since 2.451.*
+
+- **Phones**: the rows of quotations, invoices, the archive, trips and entertainment receipts show no symbols; the row
+  uses the full width. A tap opens as before, a long press opens the row menu. In the archive the PDF view has *Correct*
+  on a phone, an open document has its *More* menu.
+- **Sort**: quotations, invoices, credit notes, reminders, delivery notes, the archive and the pipeline have one choice of
+  *Date*, *Client*, *Amount* and *Name*, on computer and phone alike, remembered per list on the device. Choosing the
+  same entry again reverses the direction. The pipeline starts in its own order (*Standard*).
+
 ## Quotations and the calculator
 
 (Stage 1: quotations. See the editor's tab "Quotations".) The calculator is a pure function over the document, its
