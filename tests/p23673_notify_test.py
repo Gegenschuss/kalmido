@@ -219,6 +219,7 @@ check(until(lambda: news(Fi, "webhook"), 30), "#2971: the webhook's owner gets a
 check(news(Fi, "webhook") and "Dead hook" in news(Fi, "webhook")[0]["data"]["text"] and news(Fi, "webhook")[0]["data"]["focus"] == "webhooks", "#2971: it names the webhook")
 
 # ================================================================ #2971: an inbound webhook pauses
+check(A.put(B + f"/api/lists/{AL}/members", json={"user_id": uid["bob"], "role": "admin"}).ok, "setup: bob manages alice's project")
 r = Bo.post(B + f"/api/lists/{AL}/hooks-in", json={"name": "Bob's form"})
 check(r.status_code == 201, f"setup: bob's inbound webhook in alice's project {r.text[:200]}")
 HT2 = r.json()["token"]
