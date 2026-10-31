@@ -4970,7 +4970,6 @@
   "Disconnect": "Desconectar",
   "Please enter the address": "Introduce la dirección",
   "Please enter the API key": "Introduce la clave de API",
-  "{0} bookmark fetched": ["{0} marcador obtenido", "{0} marcadores obtenidos"],
   "Disconnect Karakeep?": "¿Desconectar Karakeep?",
   "The API key is removed; the tasks stay.": "Se elimina la clave de API; las tareas se quedan.",
   "renews every {0} month": ["se renueva cada mes", "se renueva cada {0} meses"],
@@ -15344,5 +15343,8 @@
   "{0} name shortened": ["{0} nombre acortado", "{0} nombres acortados"],
   "{0} receipt lies in a folder you cannot open and is not in this export; the GoBD export holds it.": ["{0} recibo está en una carpeta que no puedes abrir y no está en esta exportación; la exportación GoBD lo contiene.", "{0} recibos están en carpetas que no puedes abrir y no están en esta exportación; la exportación GoBD los contiene."],
   "{0} receipt without date or amount is not in the export - complete it": ["{0} recibo sin fecha o importe no está en la exportación: complétalo", "{0} recibos sin fecha o importe no están en la exportación: complétalos"],
-  "Hold a row to see what you can do with it.": "Mantén pulsada una fila para ver qué puedes hacer con ella."
+  "Hold a row to see what you can do with it.": "Mantén pulsada una fila para ver qué puedes hacer con ella.",
+  "Mail limits of public pages": "Límites de correo de las páginas públicas",
+  "your customer portal or booking page used up its sign-in or confirmation mails": "tu portal de clientes o tu página de reservas ha agotado sus correos de acceso o de confirmación",
+  "Bookmarks are being fetched in the background": "Los marcadores se están obteniendo en segundo plano"
 }

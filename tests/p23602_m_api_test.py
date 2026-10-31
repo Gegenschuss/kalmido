@@ -5,6 +5,7 @@ Invented names only.
  - a table shared by address: a row with or without an account, the same answer, list, count and limit; the address sealed;
    a person outside the table's organisation gets nothing; the account made later takes the row at sign-in
  - a person picked by name beside an address row, leaving the organisation, removing an address row
+ - 2.453.0 (#3781): a deleted account leaves the address row open
  - open invitations: new account and existing account in one form (ref instead of ids); resend, withdraw, another
    organisation's ref; expired ones; with invitations switched off they stay visible and can be ended
 usage: p23602_m_api_test.py <datadir>"""
@@ -130,6 +131,19 @@ r = Bo.delete(B + f"/api/orgs/{ORG}/members/{uid['dora']}")
 check(r.ok, "dora leaves " + r.text[:200])
 check(rows(Bo, S6) == n and dbx("SELECT user_id FROM sheet_shares WHERE sheet_id=?", (S6,))[0][0] is None, "the row stays, open again")
 check(Do.get(B + f"/api/sheets/{S6}").status_code == 404, "... without access")
+
+# 2.453.0 (#3781): a deleted account: the address row stays open, nothing tells the address had an account
+gone = A.post(B + "/api/users", json={"orgs": [ORG], "username": "gone", "display_name": "Gone Name", "password": "password123",
+                                      "email": "gone@example.com", "features": "sheets,collab,comments"}).json()["id"]
+S7 = new(Bo, "Deleted", space="private")
+post(Bo, S7, email="gone@example.com", role="write")
+n = rows(Bo, S7)
+check(dbx("SELECT user_id FROM sheet_shares WHERE sheet_id=?", (S7,))[0][0] == gone, "the address row is bound to the account")
+post(Bo, S7, user_id=gone, role="read")
+r = A.delete(B + f"/api/users/{gone}")
+check(r.ok, "the account is deleted " + r.text[:200])
+check(rows(Bo, S7) == n, f"the address row reads as before, the row picked by name went {rows(Bo, S7)}")
+check([x[0] for x in dbx("SELECT user_id FROM sheet_shares WHERE sheet_id=?", (S7,))] == [None], "... open again, without an account behind it")
 
 # removing an address row: the address is gone, Undo = the address again
 x = [v for v in rows(Bo, S1) if v["email"] == "carol@example.com"][0]

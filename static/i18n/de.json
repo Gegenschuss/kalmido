@@ -4952,7 +4952,6 @@
   "Disconnect": "Trennen",
   "Please enter the address": "Bitte die Adresse eingeben",
   "Please enter the API key": "Bitte den API-Schlüssel eingeben",
-  "{0} bookmark fetched": ["{0} Lesezeichen abgerufen", "{0} Lesezeichen abgerufen"],
   "Disconnect Karakeep?": "Karakeep trennen?",
   "The API key is removed; the tasks stay.": "Der API-Schlüssel wird entfernt; die Aufgaben bleiben.",
   "renews every {0} month": ["verlängert sich monatlich", "verlängert sich alle {0} Monate"],
@@ -15344,5 +15343,8 @@
   "{0} name shortened": ["{0} Name gekürzt", "{0} Namen gekürzt"],
   "{0} receipt lies in a folder you cannot open and is not in this export; the GoBD export holds it.": ["{0} Beleg liegt in einem Ordner, den du nicht öffnen darfst, und fehlt in diesem Export; der GoBD-Export enthält ihn.", "{0} Belege liegen in Ordnern, die du nicht öffnen darfst, und fehlen in diesem Export; der GoBD-Export enthält sie."],
   "{0} receipt without date or amount is not in the export - complete it": ["{0} Beleg ohne Datum oder Betrag fehlt im Export - jetzt ergänzen", "{0} Belege ohne Datum oder Betrag fehlen im Export - jetzt ergänzen"],
-  "Hold a row to see what you can do with it.": "Halte eine Zeile gedrückt, um zu sehen, was du damit tun kannst."
+  "Hold a row to see what you can do with it.": "Halte eine Zeile gedrückt, um zu sehen, was du damit tun kannst.",
+  "Mail limits of public pages": "Mail-Grenzen öffentlicher Seiten",
+  "your customer portal or booking page used up its sign-in or confirmation mails": "dein Kundenportal oder deine Buchungsseite hat seine Anmelde- oder Bestätigungsmails aufgebraucht",
+  "Bookmarks are being fetched in the background": "Lesezeichen werden im Hintergrund abgerufen"
 }

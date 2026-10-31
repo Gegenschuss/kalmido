@@ -4970,7 +4970,6 @@
   "Disconnect": "Ontkoppelen",
   "Please enter the address": "Voer het adres in",
   "Please enter the API key": "Voer de API-sleutel in",
-  "{0} bookmark fetched": ["{0} bladwijzer opgehaald", "{0} bladwijzers opgehaald"],
   "Disconnect Karakeep?": "Karakeep ontkoppelen?",
   "The API key is removed; the tasks stay.": "De API-sleutel wordt verwijderd; de taken blijven.",
   "renews every {0} month": ["wordt maandelijks verlengd", "wordt elke {0} maanden verlengd"],
@@ -15344,5 +15343,8 @@
   "{0} name shortened": ["{0} naam ingekort", "{0} namen ingekort"],
   "{0} receipt lies in a folder you cannot open and is not in this export; the GoBD export holds it.": ["{0} bon staat in een map die je niet mag openen en ontbreekt in deze export; de GoBD-export bevat hem.", "{0} bonnen staan in mappen die je niet mag openen en ontbreken in deze export; de GoBD-export bevat ze."],
   "{0} receipt without date or amount is not in the export - complete it": ["{0} bon zonder datum of bedrag ontbreekt in de export - nu aanvullen", "{0} bonnen zonder datum of bedrag ontbreken in de export - nu aanvullen"],
-  "Hold a row to see what you can do with it.": "Houd een regel ingedrukt om te zien wat je ermee kunt doen."
+  "Hold a row to see what you can do with it.": "Houd een regel ingedrukt om te zien wat je ermee kunt doen.",
+  "Mail limits of public pages": "Mailgrenzen van openbare pagina’s",
+  "your customer portal or booking page used up its sign-in or confirmation mails": "je klantenportaal of boekingspagina heeft zijn aanmeld- of bevestigingsmails opgebruikt",
+  "Bookmarks are being fetched in the background": "Bladwijzers worden op de achtergrond opgehaald"
 }

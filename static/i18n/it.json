@@ -4970,7 +4970,6 @@
   "Disconnect": "Scollega",
   "Please enter the address": "Inserisci l’indirizzo",
   "Please enter the API key": "Inserisci la chiave API",
-  "{0} bookmark fetched": ["{0} segnalibro recuperato", "{0} segnalibri recuperati"],
   "Disconnect Karakeep?": "Scollegare Karakeep?",
   "The API key is removed; the tasks stay.": "La chiave API viene rimossa; le attività restano.",
   "renews every {0} month": ["si rinnova ogni mese", "si rinnova ogni {0} mesi"],
@@ -15344,5 +15343,8 @@
   "{0} name shortened": ["{0} nome abbreviato", "{0} nomi abbreviati"],
   "{0} receipt lies in a folder you cannot open and is not in this export; the GoBD export holds it.": ["{0} ricevuta si trova in una cartella che non puoi aprire e manca in questa esportazione; l'esportazione GoBD la contiene.", "{0} ricevute si trovano in cartelle che non puoi aprire e mancano in questa esportazione; l'esportazione GoBD le contiene."],
   "{0} receipt without date or amount is not in the export - complete it": ["{0} ricevuta senza data o importo manca nell'esportazione - completala", "{0} ricevute senza data o importo mancano nell'esportazione - completale"],
-  "Hold a row to see what you can do with it.": "Tieni premuta una riga per vedere cosa puoi farci."
+  "Hold a row to see what you can do with it.": "Tieni premuta una riga per vedere cosa puoi farci.",
+  "Mail limits of public pages": "Limiti di e-mail delle pagine pubbliche",
+  "your customer portal or booking page used up its sign-in or confirmation mails": "il tuo portale clienti o la tua pagina di prenotazione ha esaurito le e-mail di accesso o di conferma",
+  "Bookmarks are being fetched in the background": "I segnalibri vengono recuperati in background"
 }

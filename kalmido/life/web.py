@@ -6,7 +6,9 @@ from flask import jsonify, request, Response
 from ..core.config import app
 from ..core.i18n import lang, tr
 from ..core.db import body, bump, db, err, local_now
+from ..accounts.bgjobs import bgj_add
 from ..accounts.session import me
+from ..core.errors import BadInput
 from ..core.access import health_hidden
 from ..tasks.validation import valid_date
 from ..tasks.tasks import one_task
@@ -14,7 +16,7 @@ from ..life.model import (
     care_set, contract_create, device_create, health_create, journal_export, journal_list, journal_set, journal_stats, life_overview, life_space, need_life, review, trip_create,
     upkeep_create, upkeep_presets,
 )
-from ..life.karakeep import kk_delete, kk_lists, kk_public, kk_set, kk_sync
+from ..life.karakeep import kk_delete, kk_lists, kk_public, kk_row, kk_set
 
 
 def _done(c, out, code=200):
@@ -174,8 +176,12 @@ def life_kk_lists():
 
 @app.post("/api/life/karakeep/sync")
 def life_kk_sync():
-    """Fetch new bookmarks now (and archive the ticked ones in Karakeep) -> {added, archived, list_id}."""
+    """2.453.0 (#3781): queues the fetch of new bookmarks (and the archiving in Karakeep) -> {started: true}; a request no
+    longer waits up to a minute for the outside server. One job per person; an error lands in the connection (GET), new
+    bookmarks in the normal reload. The API (v1) stays synchronous with its counts."""
     c, uid = db(), me()
     need_life(c, uid, "reading")
-    out = kk_sync(c, uid)
-    return _done(c, out)
+    if not kk_row(c, uid):
+        raise BadInput(tr("Karakeep is not connected"))
+    bgj_add("life:karakeep", uid, user_id=uid, once=True)
+    return jsonify(started=True)

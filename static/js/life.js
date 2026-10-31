@@ -548,7 +548,7 @@ document.addEventListener('click', async e => {
   else if (k === 'life-tripedit') tripModal(listById(+a.dataset.lid));
   else if (k === 'life-tripcost') { a.disabled = true; await lf_tripCost(+a.dataset.lid); a.disabled = false; }  // 2.173.0 A (#2680)
   else if (k === 'life-kk') kkModal();
-  else if (k === 'life-kksync') { a.disabled = true; try { const j = await api('POST', '/api/life/karakeep/sync', {}); await load(); toast(trn('{0} bookmark fetched', '{0} bookmarks fetched', j.added)); } catch { /* api() said it */ } a.disabled = false; lifeReload(); }
+  else if (k === 'life-kksync') { a.disabled = true; try { await api('POST', '/api/life/karakeep/sync', {}); toast(tr('Bookmarks are being fetched in the background')); await load(); } catch { /* api() said it */ } a.disabled = false; lifeReload(); }
   else if (k === 'life-touch') { const cr = await careSet(+a.dataset.cid, {last: 'today'}); if (cr) toast(tr('Noted: in touch today')); }
   else if (k === 'life-mods') settingsModal('modules');
   else if (k === 'rv-period') { RV.period = a.dataset.p; RV.data = null; renderView(); }

@@ -26,7 +26,7 @@ function agbRowHtml(lg, name, t, adm) {
   const acts = t ? `<a class="btn sm" href="${agbFileUrl(lg, true)}" target="_blank" rel="noopener">${tr('Show')}</a>`
     + (adm ? `<button type="button" class="btn sm" data-agb="up" data-lg="${lg}">${tr('Replace')}</button><button type="button" class="btn sm" data-agb="del" data-lg="${lg}">${tr('Remove')}</button>` : '')
     : (adm ? `<button type="button" class="btn sm" data-agb="up" data-lg="${lg}">${ic('upload', 's')}<span>${tr('Upload')}</span></button>` : '');
-  return `<li class="agbrow" data-lg="${lg}"><span class="ofcn"><b>${esc(name)}</b><small class="muted">${esc(info)}</small></span>${acts ? `<span class="lacts">${acts}</span>` : ''}</li>`;
+  return `<li class="agbrow" data-lg="${lg}"><span class="ofcn"><b>${esc(name)}</b><small class="muted">${esc(info)}${t ? upMarkHtml(t.up) : ''}</small></span>${acts ? `<span class="lacts">${acts}</span>` : ''}</li>`;
 }
 // the block in the office settings (next to the logo); loads once per workspace
 function agbSettingsHtml() {

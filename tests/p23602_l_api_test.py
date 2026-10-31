@@ -11,6 +11,9 @@ freelancer-matrix: personal
  (5) a table has a byte cap (cell writes and sheet copies)
  (6) a booking page out of its mails: one News item per day for the owner
  (7) signature pictures and imported letterheads wait for the scanner
+ (8) 2.453.0 (#3781): the notes of the mail limits have one row of the notification settings, News only, on by default
+ (9) 2.453.0 (#3781): letterhead and terms too large for the scanner carry the mark "unchecked"
+ (10) 2.453.0 (#3781): an imported frozen letterhead only under the name of its content, with the strict scan
 usage: p23602_l_api_test.py <datadir>"""
 import json
 import os
@@ -311,6 +314,56 @@ check(j["unchecked"] != "ok", f"(7) a signature waits while the scanner cannot c
 check(j["off"] == "ok" and j["clean"] == "ok", "(7) scanner off or clean: as before")
 check(j["put"] == [True, False], "(7) _oi_put hands the strict check on")
 check(j["strict"] is None and j["warned"] == 1, "(7) an imported letterhead is left out with a warning")
+
+# ================================================================== (8) the notes of the mail limits can be switched off
+r = Fr.patch(B + "/api/settings", json={"notify": {"limits": {"push": 1}}})
+check(r.status_code == 400, f"(8) the row has no push: {r.status_code}")
+r = Fr.patch(B + "/api/settings", json={"notify": {"limits": {"news": 0}}})
+check(r.ok, "(8) switched off: " + r.text[:200])
+NOTE = f"""
+import kalmido.team.portal as pt, kalmido.calendars.apptbook as ab
+out = {{}}
+ab.apb_limit_note(c, {FID}, DAY)
+pt.pt_limit_note(c, ORG_OWNER)
+c.commit()
+"""
+n0 = len(news(Fr, "apblimit"))
+in_app(NOTE.replace("DAY", repr("2099-01-01")).replace("ORG_OWNER", f"None, {FID}"))
+check(len(news(Fr, "apblimit")) == n0 and not news(Fr, "ptlimit"), "(8) off: neither note arrives")
+check(Fr.patch(B + "/api/settings", json={"notify": {"limits": {"news": 1}}}).ok, "(8) on again")
+in_app(NOTE.replace("DAY", repr("2099-01-02")).replace("ORG_OWNER", f"{ORG}, None"))
+check(len(news(Fr, "apblimit")) == n0 + 1, "(8) on: the note of the booking page arrives")
+check(len(news(A, "ptlimit")) == 1, "(8) on by default: the organisation's admin gets the portal's note")
+
+# ================================================================== (9) too large for the scanner: marked
+j = in_app("""
+from kalmido.files import scan
+from kalmido.office import letterhead, terms
+LH = {"file": "letterhead-0000000000000000.pdf", "bytes": 11, "m1": [], "m2": []}
+scan.sc_target, scan.sc_max_bytes = (lambda: "clamav:3310"), (lambda: 10)
+out = {"lh": letterhead.bp_public(LH)["up"], "agb": terms.agb_public({"bytes": 11})["up"], "small": terms.agb_public({"bytes": 10})["up"]}
+scan.sc_target = lambda: ""
+out["off"] = terms.agb_public({"bytes": 11})["up"]
+""")
+check(j["lh"] == {"scan": "unchecked", "scan_why": "size"} == j["agb"], f"(9) both carry the mark of a normal file {j}")
+check(j["small"] is None and j["off"] is None, f"(9) no mark when it fits or the scanner is off {j}")
+
+# ================================================================== (10) the frozen letterhead of an import
+j = in_app("""
+import hashlib, types
+from kalmido.admin import acctimport, oi_office, orgimport as oi
+RAW = b"%PDF-1.4 invented"
+good = "lhs-" + hashlib.sha256(RAW).hexdigest()[:16] + ".pdf"
+acctimport._file_bytes = lambda *a: RAW
+oi_office._oi_mark = lambda *a, **k: None
+got = []
+oi_office._oi_put = lambda ctx, old, new, **k: got.append((new, k.get("strict")))
+ctx = types.SimpleNamespace(zf=None, files={})
+for f in (good, "lhs-0000000000000000.pdf"):
+    oi_office._a_doc(c, None, {"id": 5, "kind": "offer", "sender": json.dumps({"letterhead": {"file": f}})}, 6, ctx)
+out = {"got": got, "good": good}
+""")
+check(j["got"] == [[j["good"], True]], f"(10) only the file named by its content, strict: {j}")
 
 print(f"p23602_l: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

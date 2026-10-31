@@ -15,7 +15,8 @@ The read layer checks every share again (shs_may): a person must still be a memb
 must belong to the table's workspace, never a health / budget list's table, its list limit applies; a revoked share
 (revoked_at) counts nothing. A recipient only through a share may not delete / restore the table, attach it to a list, move
 it to another workspace, manage its shares or carry rows over (step 2): shs_need_own. Leaving an organisation and moving
-the table between workspaces end the shares (org_leave, sheets/shmove.py); a deleted account takes its rows along.
+the table between workspaces end the shares (org_leave, sheets/shmove.py); a deleted account takes the rows picked by name
+along, an address row stays open without access (shs_forget): a row that goes would tell the address had an account.
 """
 from flask import g, has_request_context, jsonify
 
@@ -242,6 +243,13 @@ def shs_leave(c, oid, uids):
         c.execute(f"UPDATE sheet_shares SET revoked_at=? WHERE org_id=? AND revoked_at IS NULL AND user_id IN ({','.join('?' * len(uids))})",
                   [iso_ms(now_utc()), oid, *uids])
         shs_drop_cache()
+
+
+def shs_forget(c, uid):
+    """2.453.0 (#3781): before an account is deleted its address rows open again (address kept, no access), like shs_leave;
+    the rows picked by name go with the account (foreign key)."""
+    c.execute("UPDATE sheet_shares SET user_id=NULL WHERE user_id=? AND email_key!=''", (uid,))
+    shs_drop_cache()
 
 
 def _manage(c, sid):

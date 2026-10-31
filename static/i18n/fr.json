@@ -4970,7 +4970,6 @@
   "Disconnect": "Déconnecter",
   "Please enter the address": "Veuillez saisir l’adresse",
   "Please enter the API key": "Veuillez saisir la clé d’API",
-  "{0} bookmark fetched": ["{0} favori récupéré", "{0} favoris récupérés"],
   "Disconnect Karakeep?": "Déconnecter Karakeep ?",
   "The API key is removed; the tasks stay.": "La clé d’API est supprimée ; les tâches restent.",
   "renews every {0} month": ["se renouvelle chaque mois", "se renouvelle tous les {0} mois"],
@@ -15344,5 +15343,8 @@
   "{0} name shortened": ["{0} nom raccourci", "{0} noms raccourcis"],
   "{0} receipt lies in a folder you cannot open and is not in this export; the GoBD export holds it.": ["{0} justificatif se trouve dans un dossier que tu ne peux pas ouvrir et manque dans cet export ; l'export GoBD le contient.", "{0} justificatifs se trouvent dans des dossiers que tu ne peux pas ouvrir et manquent dans cet export ; l'export GoBD les contient."],
   "{0} receipt without date or amount is not in the export - complete it": ["{0} justificatif sans date ou montant manque dans l'export - à compléter", "{0} justificatifs sans date ou montant manquent dans l'export - à compléter"],
-  "Hold a row to see what you can do with it.": "Maintiens une ligne appuyée pour voir ce que tu peux en faire."
+  "Hold a row to see what you can do with it.": "Maintiens une ligne appuyée pour voir ce que tu peux en faire.",
+  "Mail limits of public pages": "Limites d’e-mails des pages publiques",
+  "your customer portal or booking page used up its sign-in or confirmation mails": "ton portail client ou ta page de réservation a épuisé ses e-mails de connexion ou de confirmation",
+  "Bookmarks are being fetched in the background": "Les favoris sont récupérés en arrière-plan"
 }
