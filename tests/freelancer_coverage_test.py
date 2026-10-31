@@ -304,6 +304,7 @@ ROUTES = {
     "PUT /api/team/leave/worktime/{}": "hub", "POST /api/team/absences/{}/decide": "hub",
     # ---- link (22)
     "GET /ical/abs/{}.ics": "link",  # 2.155.0 B (#2076)
+    "GET /mail/off/{}": "link", "POST /mail/off/{}": "link",  # 2.367.5 (#2975): the one-click off link of a notification mail
     "GET /f/{}": "link", "GET /ical/{}.ics": "link", "GET /ical/ev/{}.ics": "link", "GET /p/{}": "link", "GET /p/{}/stop": "link", "GET /portal": "link",
     "GET /portal/login/{}": "link", "GET /s/q/{}": "link", "GET /s/q/{}/pdf": "link", "GET /s/q/{}/terms": "link", "POST /s/q/{}/comments": "link", "GET /s/{}": "link",
     "GET /s/{}/file/{}": "link", "GET /s/{}/logo": "link", "POST /f/{}": "link", "POST /p/{}/comment": "link",

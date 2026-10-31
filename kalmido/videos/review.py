@@ -25,6 +25,7 @@ from urllib.parse import parse_qs, quote, urlencode, urlsplit, urlunsplit
 from flask import Response, jsonify, redirect, request
 
 from ..core.config import app, PUBLIC_URL
+from ..collab.comments import lang_of  # 2.367.5 (#2980)
 from ..core.access import Denied, FULL_ROLES, WRITE_ROLES, acx_org_ok, list_role, task_visible
 from ..office.signoff import sig_people  # 2.266.0 (#2965)
 from ..core.db import body, db, err, iso, now_utc
@@ -803,7 +804,7 @@ def vdr_pub_notify(c, s, r, name, text):
     click = vdr_click(r)
     click = click if click.startswith("http") else f"{PUBLIC_URL}/{click}"  # 2.266.0 (#2965): ntfy needs an absolute link
     sc = f"l:{lid}" if lid else f"o:{s['org_id']}"  # 2.240.0 B2 (#2867): the channels follow the list / the office
-    return lambda: [notify(uid, tr("Comment from the customer", lg=st.get("lang") or "en"), f"{name}: {text[:200]}", prio="4", click=click, s=st,
+    return lambda: [notify(uid, tr("Comment from the customer", lg=lang_of(st)), f"{name}: {text[:200]}", prio="4", click=click, s=st,
                            scope=sc) for uid, st in sends]
 
 

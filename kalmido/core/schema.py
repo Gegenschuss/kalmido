@@ -4320,6 +4320,8 @@ USER_DEFAULTS = {
     "digest_sent": "",
     "digest_mail": "0",         # 2.17.0 (#443): the daily summary also by e-mail (at digest_time; needs SMTP + an address)
     "digest_mail_sent": "",
+    "push_title_only": "0",     # 2.367.5 (#2980): pushes show only their title (no excerpt on the lock screen)
+    "digest_mail_try": "",      # 2.367.5 (#2975): day:tries:time of the summary mail (server only)
     "sec_devices": "",         # 2.266.0 (#2963): hashes of the last browsers that signed in (a new one = a security mail)
     "mail_trim_fwd": "0",       # 2.49.0 (#971): forwarded mails shrink to one header line (off: nothing changes for existing people)
     "mail_trim_eml": "1",       # 2.49.0 (#971): ... and the original stays attached as .eml
@@ -4456,7 +4458,7 @@ USER_DEFAULTS = {
     "purpose_ask": "done",      # 2.364.0 A (#3032): "What do you use Kalmido for?" on the first start of an account an admin made
                                 # (user admin, organisation invitation, import): the preselected purpose = pending | done
     # 1.9.0: which events create a News item (groups, see NEWS_GROUPS). Default: everything but "completed by others"
-    "news_kinds": "mention,assign,comment,unblock,share,status",
+    "news_kinds": "mention,assign,comment,complete,unblock,share,status",  # 2.367.5 (#2980): complete, like its push
     # 2.1.0 (#317): the rest of the notification matrix, json {event: {news?, push?}} (see NOTIF_ROWS; '' = defaults)
     "notify": "",
     # 2.28.0 (#935): the workspace the app shows: all | private | org:<id> (the sidebar's switch; followed on every device)

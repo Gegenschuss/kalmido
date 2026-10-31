@@ -182,7 +182,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 
 ### Team chat
 - In a project's team chat you get the event `team_message` when someone @mentions you (or answers one of your
-  messages): answer there (`post_team_message`), short and in Markdown. Do not post there on your own unless someone
+  messages; 2.367.5: also when a person adds your @mention to a message later): answer there (`post_team_message`), short and in Markdown. Do not post there on your own unless someone
   asked you to report there.
 - **Channels and files (2.138.1)**: people can also add you to a channel they opened (`list_team_channels`; you
   leave with `leave_team_channel`). Messages carry `attachments`; read a file with `get_attachment` (`source: team`),

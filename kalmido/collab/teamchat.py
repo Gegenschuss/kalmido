@@ -643,9 +643,10 @@ def tchat_e2e_check(r, b):
     return enc or err(tr("Invalid value: {0}", "enc"))
 
 
-def tchat_notify(c, r, m, mentions, replied=None):
+def tchat_notify(c, r, m, mentions, replied=None, only=None):
     """Pushes (DM: always; channel: @mentions, and every message for whoever set the list bell to "all") + agent events.
-    2.33.0 (#1076): replied = the author of the answered message: it counts as a mention ("replied to your message")."""
+    2.33.0 (#1076): replied = the author of the answered message: it counts as a mention ("replied to your message").
+    2.367.5 (#2980): only = just these people (the newly @mentioned of an edited message)."""
     sender = m["user_id"]
     if replied and replied not in mentions and replied in tchat_room_members(c, r):
         mentions = [*mentions, replied]
@@ -661,7 +662,7 @@ def tchat_notify(c, r, m, mentions, replied=None):
     listen = set(listen_agents_of(c, r["list_id"])) if r["kind"] == "list" and sender not in ags else set()
     root = m["thread_of"] if "thread_of" in m.keys() else None  # 2.139.0 A (#2127): an answer in a thread notifies its people only
     follow = {x[0] for x in c.execute("SELECT user_id FROM tchat_thread_reads WHERE root_id=? AND follow=1", (root,))} if root else set()
-    for uid in sorted(members - {sender}):
+    for uid in sorted((members if only is None else members & set(only)) - {sender}):
         if uid in ags:
             if r["kind"] == "channel":  # 2.113.1 (#2059): a personal agent in a channel is addressed by its owner only (like agent_usable)
                 from .teamchan import tcx_agent_org
@@ -766,10 +767,14 @@ def tchat_edit(mid):
         return err(tr("The message is empty"))
     if len(text) > TCHAT_MAX:
         return err(tr("The message is too long (max. {0} characters)", TCHAT_MAX))
-    text, _ = tchat_clean_mentions(c, r, text.strip())
+    text, mentions = tchat_clean_mentions(c, r, text.strip())
+    known = {int(x) for x in MENTION_RE.findall(m["body"] or "")}
     c.execute("UPDATE tchat_msgs SET body=?, edited_at=? WHERE id=?", (text, iso_ms(now_utc()), mid))
     from ..agents.chat import med_team_edited  # 2.39.0 (#1179): agents that got it as team_message learn the change
     med_team_edited(c, r, c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone(), m["body"])
+    new_m = [x for x in mentions if x not in known]
+    if new_m:  # 2.367.5 (#2980): a mention added later is heard, like in a comment (comment_edit)
+        tchat_notify(c, r, c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone(), new_m, only=new_m)
     c.commit()
     m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
     return jsonify(tchat_msg_dict(c, m, tchat_rx(c, [mid])))

@@ -186,6 +186,17 @@ def newtask_events(c, tid):
                          f"{PUBLIC_URL}/#t/{tid}", push_prio(s)))
 
 
+def dep_people(c, t):
+    """2.367.5 (#2980): who hears that task t is free: its group's people, its assignee, for an agent or nobody whoever created it."""
+    from ..agents.core import agent_ids
+    ags = agent_ids(c)
+    if t["assignee_group_id"]:
+        ids = [r[0] for r in c.execute("SELECT user_id FROM group_members WHERE group_id=? ORDER BY user_id", (t["assignee_group_id"],)) if r[0] not in ags]
+        if ids:
+            return ids
+    return [x for x in (t["assignee_id"] if t["assignee_id"] and t["assignee_id"] not in ags else t["created_by"],) if x and x not in ags]
+
+
 def unblock_events(c, done_ids):
     """done_ids: tasks just completed (done / won't do, incl. subtasks completed with them). Each open task
     that waited on one of them and has no open blocker left: activity line + News / push (see above)."""
@@ -208,25 +219,25 @@ def unblock_events(c, done_ids):
         log_act(c, w, "unblocked", {"id": bl, "title": b["title"][:200]})
         t = c.execute("""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox FROM tasks t JOIN lists l ON l.id=t.list_id
                          WHERE t.id=?""", (w,)).fetchone()
-        uid = t["assignee_id"] or t["created_by"]
-        if not uid or uid == actor:
-            continue
-        s = collab_user(c, uid, t["list_id"])
-        if not s or "deps" not in (s.get("features") or "").split(",") or not task_visible(c, w, uid, full=True):
-            continue  # module "deps" off: no News / push about dependencies (the activity line stays)
-        news_add(c, uid, "unblock", task_id=w, data={"blocker": bl}, actor=actor, s=s)
-        from ..notify.taskbell import tbl_level
-        if tbl_level(c, uid, w, s):  # 2.53.0 C (#1424): muted / urgent (pushed by tbl_note of the history line above)
-            continue
-        if not notif_ok(c, uid, s, "unblock", "push", t["list_id"]) or not push_reachable(c, uid, s) or \
-                not burst_gate(c, uid, w, event=True):
-            continue
-        lg = lang_of(s)
-        who = user_names(c, [actor]).get(actor, "?") if actor else tr("Someone via the public link", lg=lg)
-        bt = b["title"] if list_role(c, b["list_id"], uid) and task_visible(c, bl, uid) else tr("a task you cannot see", lg=lg)
-        lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
-        g.pushes.append((uid, tr("Unblocked: {0}", t["title"], lg=lg),
-                         tr("{0} completed {1}", who, bt, lg=lg) + " · " + lname, f"{PUBLIC_URL}/#t/{w}", push_prio(s)))
+        for uid in dep_people(c, t):  # 2.367.5 (#2980): a group: its people; an agent: whoever created the task
+            if uid == actor:
+                continue
+            s = collab_user(c, uid, t["list_id"])
+            if not s or "deps" not in (s.get("features") or "").split(",") or not task_visible(c, w, uid, full=True):
+                continue  # module "deps" off: no News / push about dependencies (the activity line stays)
+            news_add(c, uid, "unblock", task_id=w, data={"blocker": bl}, actor=actor, s=s)
+            from ..notify.taskbell import tbl_level
+            if tbl_level(c, uid, w, s):  # 2.53.0 C (#1424): muted / urgent (pushed by tbl_note of the history line above)
+                continue
+            if not notif_ok(c, uid, s, "unblock", "push", t["list_id"]) or not push_reachable(c, uid, s) or \
+                    not burst_gate(c, uid, w, event=True):
+                continue
+            lg = lang_of(s)
+            who = user_names(c, [actor]).get(actor, "?") if actor else tr("Someone via the public link", lg=lg)
+            bt = b["title"] if list_role(c, b["list_id"], uid) and task_visible(c, bl, uid) else tr("a task you cannot see", lg=lg)
+            lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
+            g.pushes.append((uid, tr("Unblocked: {0}", t["title"], lg=lg),
+                             tr("{0} completed {1}", who, bt, lg=lg) + " · " + lname, f"{PUBLIC_URL}/#t/{w}", push_prio(s)))
 
 
 def completed_ids(c, tid):

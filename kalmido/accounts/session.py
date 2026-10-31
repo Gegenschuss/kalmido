@@ -49,7 +49,7 @@ def proxy_login_value():
     return v if v and _peer_trusted() else ""
 
 
-PT_PREFIXES = ("/p/", "/portal/")  # 2.63.0 B (#1513): a customer report's status link, the portal's sign-in / sign-out
+PT_PREFIXES = ("/p/", "/portal/", "/mail/off/")  # 2.63.0 B (#1513): a customer report's status link, the portal's sign-in / sign-out; 2.367.5 (#2975): the off link of a notification mail
 
 
 OPERATOR_PATHS = frozenset(("/api/operator/status", "/api/operator/setup-code", "/api/operator/notice"))  # 2.144.0 D2 (#797)

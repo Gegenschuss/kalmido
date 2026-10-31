@@ -676,13 +676,14 @@ def rul_comment(c, r, tid, text):
     from ..integrations.webhooks import wh_note
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     from ..collab.comments import clean_mentions
-    text, _ = clean_mentions(c, t["list_id"], text, tid)  # 2.148.1 H (#2490): mention tokens only of people of the list
+    text, ment = clean_mentions(c, t["list_id"], text, tid)  # 2.148.1 H (#2490): mention tokens only of people of the list
+    ment = ment if collab_all() else []  # 2.367.5 (#2980): the mentioned hear of it, like a person's comment
     cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,rule_name) VALUES(?,?,?,?,?,?)",
-                    (tid, me(), text, "", iso_ms(now_utc()), r["name"]))
+                    (tid, me(), text, ",".join(map(str, ment)), iso_ms(now_utc()), r["name"]))
     if collab_all():
         from ..agents.core import agent_comment_events
-        g.setdefault("pushes", []).extend(comment_pushes(c, t, cid, text, [], [], 0))
-        agent_comment_events(c, t, cid, [], [])
+        g.setdefault("pushes", []).extend(comment_pushes(c, t, cid, text, ment, ment, 0))
+        agent_comment_events(c, t, cid, ment, ment)
     wh_note(c, tid, "comment", cid=cid)
     return cid
 

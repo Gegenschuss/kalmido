@@ -15456,5 +15456,14 @@
   "No send waits for a confirmation": "Keine Sendung wartet auf eine Bestätigung",
   "Mark as not delivered": "Als nicht zugestellt markieren",
   "Mark as not delivered?": "Als nicht zugestellt markieren?",
-  "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Mach das nur, wenn du beim Empfänger oder deinem Anbieter geprüft hast, dass die Rechnung nicht angekommen ist. Danach kannst du sie erneut senden."
+  "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Mach das nur, wenn du beim Empfänger oder deinem Anbieter geprüft hast, dass die Rechnung nicht angekommen ist. Danach kannst du sie erneut senden.",
+  "You get this summary every day. Change or turn it off in Settings > Notifications:": "Du bekommst diese Zusammenfassung jeden Tag. Ändern oder abschalten kannst du sie unter Einstellungen > Benachrichtigungen:",
+  "Daily summary by e-mail": "Tägliche Zusammenfassung per E-Mail",
+  "E-mails for assignments and mentions": "E-Mails bei Zuweisungen und Erwähnungen",
+  "You can turn them on again in Settings > Notifications.": "Du kannst sie unter Einstellungen > Benachrichtigungen wieder einschalten.",
+  "Only the title in the push": "Im Push nur den Titel zeigen",
+  "Lock screen": "Sperrbildschirm",
+  "Hides the text of comments and messages on the lock screen. Your notification channels stay as they are.": "Verbirgt den Text von Kommentaren und Nachrichten auf dem Sperrbildschirm. Deine Benachrichtigungskanäle bleiben, wie sie sind.",
+  "{0} handed your project to {1}": "{0} hat dein Projekt an {1} übergeben",
+  "{0} handed your project {1} to {2}": "{0} hat dein Projekt {1} an {2} übergeben"
 }

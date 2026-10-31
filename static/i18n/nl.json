@@ -15456,5 +15456,14 @@
   "No send waits for a confirmation": "Geen verzending wacht op een bevestiging",
   "Mark as not delivered": "Markeren als niet bezorgd",
   "Mark as not delivered?": "Markeren als niet bezorgd?",
-  "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Doe dit alleen nadat je bij de ontvanger of je provider hebt gecontroleerd dat de factuur niet is aangekomen. Daarna kun je hem opnieuw versturen."
+  "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Doe dit alleen nadat je bij de ontvanger of je provider hebt gecontroleerd dat de factuur niet is aangekomen. Daarna kun je hem opnieuw versturen.",
+  "You get this summary every day. Change or turn it off in Settings > Notifications:": "Je krijgt deze samenvatting elke dag. Wijzig of schakel haar uit via Instellingen > Meldingen:",
+  "Daily summary by e-mail": "Dagelijkse samenvatting per e-mail",
+  "E-mails for assignments and mentions": "E-mails bij toewijzingen en vermeldingen",
+  "You can turn them on again in Settings > Notifications.": "Je kunt ze weer inschakelen via Instellingen > Meldingen.",
+  "Only the title in the push": "Alleen de titel in de push",
+  "Lock screen": "Vergrendelscherm",
+  "Hides the text of comments and messages on the lock screen. Your notification channels stay as they are.": "Verbergt de tekst van opmerkingen en berichten op het vergrendelscherm. Je meldingskanalen blijven zoals ze zijn.",
+  "{0} handed your project to {1}": "{0} heeft je project overgedragen aan {1}",
+  "{0} handed your project {1} to {2}": "{0} heeft je project {1} overgedragen aan {2}"
 }

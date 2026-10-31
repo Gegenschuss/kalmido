@@ -192,8 +192,8 @@ if got:
     check(len(body) <= 4096 and body[20] == 65, "record header: keyid = 65-byte server key, <= 4096 bytes")
     check(b"Kalmido" not in body and b"arriving" not in body, "payload is not readable on the wire")
     p = good.decrypt(rec)
-    check(p["title"] == "Kalmido: Test" and p["body"] == "Notifications are arriving." and p["tag"] == "test", f"decrypted payload: {p}")
-    check(set(p) <= {"title", "body", "url", "prio", "ts", "tag", "task", "due", "actions"}, f"payload holds only what the notification shows: {sorted(p)}")
+    check(p["title"] == "Kalmido: test" and p["body"] == "Notifications are arriving." and p["tag"] == "test", f"decrypted payload: {p}")
+    check(set(p) <= {"title", "body", "url", "prio", "ts", "tag", "task", "due", "actions", "lang"}, f"payload holds only what the notification shows: {sorted(p)}")
     auth = h.get("authorization", "")
     check(auth.startswith("vapid t=") and auth.endswith(", k=" + VKEY), f"Authorization: vapid t=..., k=<public key>: {auth[:40]}")
     jwt = auth[len("vapid t="):].split(",")[0]

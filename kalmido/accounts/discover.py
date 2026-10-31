@@ -545,6 +545,11 @@ def conn_unblock(other):
     return jsonify(ok=True)
 
 
+def disc_connected(c, uid, other):
+    """2.367.5 (#2980): News: an accepted request stays while the two are connected."""
+    return bool(other) and _state(c, uid, other) == "connected"
+
+
 def disc_request_open(c, uid, actor):
     """News: a request item stays while the request from actor to uid is open."""
     return bool(c.execute("SELECT 1 FROM conn_requests WHERE from_id=? AND to_id=? AND status='open'", (actor, uid)).fetchone())

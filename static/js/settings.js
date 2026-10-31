@@ -63,6 +63,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-hideblk': ['hide_blocked_today', N_('Hide tasks that are still blocked by another task'), 'chk'], 's-progsub': ['progress_subtasks', N_('Count subtasks in the progress of a project'), 'chk'],
   's-agsteps': ['agent_steps_always', N_('Always show steps'), 'chk'],  // 2.365.2 C (#2789): same setting as the switch in the agent chat
   's-pushch': ['push_channel', N_('Channel|push'), 'sel'], 's-pushprio': ['push_priority', N_('How urgent'), 'sel'],
+  's-pushtitle': ['push_title_only', N_('Only the title in the push'), 'chk'],  // 2.367.5 (#2980)
   's-allday': ['allday_time', N_('All-day reminder at'), 'time'], 's-defrem': ['default_reminder', N_('Default reminder'), 'sel'], 's-digest': ['digest_time', N_('Daily digest at'), 'time'],
   's-pf': ['pomo_focus', N_('Focus session'), 'pos'], 's-ps': ['pomo_short', N_('Short break'), 'pos'], 's-pl': ['pomo_long', N_('Long break'), 'pos'], 's-pe': ['pomo_long_every', N_('Long break after'), 'pos'],
   's-trnd': ['time_rounding', N_('Rounding'), 'sel'], 's-tcur': ['time_currency', N_('Currency'), 'text'], 's-ttarget': ['time_target', N_('Daily target'), 'num'],
@@ -644,7 +645,9 @@ function settingsModal(focus) {
   const hint = t => `<div class="shint">${t}</div>`;  // 2.418.0 (#3560): the tab bar is the person's now (no "This device")
   const chk = (id, on, label) => `<label class="chkl"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${label}</label>`;
   const prio = `<div class="row"><label for="s-pushprio">${tr('How urgent')}</label><select id="s-pushprio">${[['3', N_('Normal')], ['4', N_('Loud')], ['5', N_('Urgent')]].map(([v, n]) => `<option value="${v}" ${(s.push_priority || '4') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-      ${hint(tr('Loud rings and vibrates longer; Urgent may also break through “Do not disturb” on some phones.'))}`;
+      ${hint(tr('Loud rings and vibrates longer; Urgent may also break through “Do not disturb” on some phones.'))}
+      <div class="row"><label>${tr('Lock screen')}</label>${chk('s-pushtitle', s.push_title_only === '1', tr('Only the title in the push'))}</div>
+      ${hint(tr('Hides the text of comments and messages on the lock screen. Your notification channels stay as they are.'))}`;
   const pane = {
     account: S.me ? accountHtml() : '',
     // 2.39.1 (#1188): Settings > Organisation; 2.364.0 C (#3041): + the server admins' People, Agents and Data (was Administration)

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
+from ..core.pg import system_ctx  # 2.367.5 (#2980)
 from ..core.schema import USER_DEFAULTS
 from ..core.i18n import tr
 from ..core.db import body, db, err, iso, iso_ms, now_utc, usettings
@@ -457,6 +458,26 @@ def news_sig_fmt(r):
     return f"{r[0]}.{r[1]}"
 
 
+def news_org_mine(c, uid, data, memo):
+    """2.367.5 (#2980): False when a News item names (data.org text, or data.name of an organisation item) an organisation I
+    am not in. The items hold the name only: a name no organisation has any more (renamed, deleted) stays, so a rename hides
+    nothing from the members. memo = my names, read once per feed."""
+    from ..accounts.orgs import org_names
+    try:
+        d = json.loads(data or "{}")
+    except ValueError:
+        return True
+    name = d.get("name") if d.get("org") is True else d.get("org")
+    if not name or not isinstance(name, str):
+        return True
+    if not memo:
+        memo.extend(["", *org_names(c, uid)])
+    if name in memo:
+        return True
+    with system_ctx(c):  # does an organisation of that name exist at all (nothing of it is shown)
+        return not c.execute("SELECT 1 FROM orgs WHERE name=? LIMIT 1", (name,)).fetchone()
+
+
 def news_items(c, uid, s=None, mentions_only=False, to_me=False):
     """My visible feed, newest first, consecutive comments on one task grouped. [] if collab is off."""
     from ..agents.usage import is_admin_id
@@ -484,15 +505,18 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
     out, uids = [], set()
     agents = {x[0] for x in c.execute("SELECT id FROM users WHERE kind='agent'")}
     s = s or usettings(c, uid)  # 2.66.1 (#1943): agent_comments decides whether an agent's plain comment is "For you"
+    my_orgs = []  # 2.367.5 (#2980): filled once, by the first item that names an organisation
     evc_seen = set()  # 2.367.2 (#2969): only the newest time / place change of an event (the rows come newest first)
     for r in rows:
         kind = r["kind"]
         if (mentions_only and kind != "mention") or (to_me and kind not in NEWS_TO_ME):
             continue
         if kind in ("share", "unshare") and r["list_id"] is None and '"org"' in (r["data"] or ""):  # 2.28.0 (#935): an organisation
-            pass
+            if kind == "share" and not news_org_mine(c, uid, r["data"], my_orgs):  # 2.367.5 (#2980): while I am in it (being removed stays readable)
+                continue
         elif kind == "orglist":  # 2.35.0 (#1101): addressed to the list's people; a deleted list only lives on in data.name
-            pass
+            if not news_org_mine(c, uid, r["data"], my_orgs) or (r["list_id"] and not sees(r["list_id"])):  # 2.367.5 (#2980): no names for an ex-member
+                continue
         elif kind in ("share", "role", "status", "owner", "agentjoin", "playbook_proposal", "e2e_key"):  # 2.64.1 (#1817): e2e_key
             if not sees(r["list_id"]):
                 continue
@@ -547,8 +571,10 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             from ..accounts.discover import disc_request_open
             if not disc_request_open(c, uid, r["actor_id"]):
                 continue
-        elif kind == "connok":
-            pass
+        elif kind == "connok":  # 2.367.5 (#2980): while we are connected
+            from ..accounts.discover import disc_connected
+            if not disc_connected(c, uid, r["actor_id"]):
+                continue
         elif kind == "lytpl":  # 2.55.0 (#1068): while the template is still open (and its sender someone I exchange with)
             from ..accounts.layoutsets import lyo_open
             try:
