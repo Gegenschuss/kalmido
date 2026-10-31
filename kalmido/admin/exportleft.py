@@ -28,7 +28,7 @@ UMZ_LEFT_TABLES = {
     "doc_models": _DERIVED, "file_text": _DERIVED, "git_closes": _DERIVED, "git_links": _DERIVED, "list_activity": _DERIVED, "list_ticket_seq": _DERIVED,
     "rc_suggest": _DERIVED, "rss_items": _DERIVED, "sheet_lastvals": _DERIVED, "task_vectors": _DERIVED,
     "budget_files": _FILES,
-    "chat_saves": _LATER, "template_files": _LATER, "contact_links": _LATER, "contact_tasks": _LATER, "ctr_notices": _LATER, "folder_heads": _LATER, "folder_props": _LATER,
+    "chat_saves": _LATER, "contact_links": _LATER, "contact_tasks": _LATER, "ctr_notices": _LATER, "folder_heads": _LATER, "folder_props": _LATER,
     "fs_log": _LATER, "git_branches": _LATER, "git_folders": _LATER, "issue_reports": _LATER, "kid_rewards": _LATER, "life_trip_costs": _LATER,
     "list_rule_runs": _LATER, "section_templates": _LATER, "sheet_links": _LATER, "shop_memory": _LATER,
     "wiki_spaces": _LATER, "wiki_versions": _LATER,
