@@ -25,8 +25,9 @@ from ..core.config import ATT_DIR, MAX_FILE_MB, OFFICE_DIR
 from ..core.errors import BadInput
 from ..core.i18n import N_
 from ..lists.listhead import HEAD_DIR, HEAD_MAX_MB, o3c_head_process, o3c_head_rel
-from .acctimport import UMZ_NO_SPACE, _BAD, _coerce, _oid, _read_entry, _txt, tr, umz_cols, umz_insert, umz_row
+from .acctimport import UMZ_NO_SPACE, _BAD, _coerce, _file_bytes, _oid, _read_entry, _txt, tr, umz_cols, umz_insert, umz_row
 from .acctimport import UMZ_ORG_SKIP  # 2.278.0 B (#3094)
+from .hosting import quota_fits  # 2.459.0 (#3849)
 from ..core.orgcrypt import oc_enc_fields, oc_list_org, oc_list_space, oc_user_space, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.db import iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import Denied  # 2.237.0 D (#2870)
@@ -182,7 +183,6 @@ def oi_file(ctx, path, sub, name, space=None, base=ATT_DIR, check=True, mime="",
     from ..files.scan import sc_needs_retry
     from ..files.upsafe import up_check, UploadRefused
     from ..tasks.attachments import safe_name
-    from .acctimport import _file_bytes
     c, run = ctx.c, ctx.run
     if run.stopped:  # 2.362.4 (#3100): a full storage stops the files, not the rest of the areas
         run.warning(UMZ_NO_SPACE)
@@ -346,8 +346,6 @@ OI_PIC_RE = re.compile(r"files/pictures/(?:organisation\.png|list-([1-9][0-9]{0,
 def _oi_pic(c, run, uid, zf, files, path, max_mb, process):
     """The re-encoded picture of an archive entry (only what the app's own upload would keep: its size limit, its image types,
     no metadata), or None with a warning."""
-    from .acctimport import _file_bytes
-    from .hosting import quota_fits
     what = tr(N_("Pictures"))
     if not 0 < files[path][0].file_size <= min(max_mb, MAX_FILE_MB) * 1024 * 1024:
         run.warning(N_("A file is empty or too large and was skipped: {0}"), what)
