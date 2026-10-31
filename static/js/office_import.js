@@ -114,12 +114,13 @@ function bk_skipAll(k) {  // "Skip all" of an area (and back: every row gets the
 // 2.146.0 E (#2456): which column holds what (found from the header; the person may change it): the whole address in one
 // column, or company / street / postcode / city / country in columns of their own. A change reads the file again.
 const E46_FIELDS = [['name', N_('Company')], ['contact', N_('Contact person')], ['address', N_('Whole address')], ['street', N_('Street')],
-  ['house', N_('House number')], ['zip', N_('Postcode')], ['city', N_('City')], ['country', N_('Country')]];
+  ['house', N_('House number')], ['zip', N_('Postcode')], ['city', N_('City')], ['country', N_('Country')],
+  ['email', N_('E-mail')], ['phone', N_('Phone')], ['customer_no', N_('Customer number')], ['vat_id', N_('VAT ID')]];  // 2.363.0 (#3103)
 function e46_mapHtml(p) {
   const c = p.columns; if (!c?.head?.length) return '';
   const m = c.map || {}, opts = cur => `<option value="">${esc(tr('not in the file'))}</option>` + c.head.map((h, j) => `<option value="${j}" ${m[cur] === j ? 'selected' : ''}>${esc(h || tr('Column {0}', j + 1))}</option>`).join('');
   return `<details class="e46map" ${c.mode === 'columns' || !(p.clients || []).length ? 'open' : ''}><summary>${esc(tr('Columns'))} <span class="muted">${esc(c.mode === 'columns' ? tr('Address in separate columns') : tr('Address in one column'))}</span></summary>
-    <div class="oimgrid">${E46_FIELDS.map(([k, t]) => `<label class="oimfl"><span>${esc(tr(t))}</span><select data-e46-map="${k}" ${OIM.busy ? 'disabled' : ''}>${opts(k)}</select></label>`).join('')}</div></details>`;
+    <div class="oimgrid">${E46_FIELDS.map(([k, t]) => `<label class="oimfl"><span>${esc(tr(t))}</span><select data-e46-map="${k}" ${OIM.busy ? 'disabled' : ''}>${opts(k)}</select></label>`).join('')}</div>${c.unused?.length ? `<p class="muted">${esc(tr('Not taken over: {0}', c.unused.join(', ')))}</p>` : ''}</details>${c.cut ? `<p class="oimwarn">${ic('alert', 's')} ${esc(tr('At most {0} rows per sheet are read: please split a longer file.', c.cut))}</p>` : ''}`;
 }
 function e46_remap(k, v) {
   const p = OIM.pv; if (!p?.columns || !OIM.file) return;
@@ -133,10 +134,11 @@ function oimClientCard(c, i) {
   const fld = (k, label, mx, cls = '') => `<label class="oimfl ${cls}"><span>${esc(label)}</span><input data-oim-c="${i}" data-k="${k}" value="${esc(c[k] || '')}" maxlength="${mx}" ${on ? '' : 'disabled'}></label>`;
   const dup = c.dup ? `<p class="oimdup">${ic('copy', 's')} ${esc(c.dup.kind === 'existing' ? tr('Already a client: {0}', c.dup.name) : tr('Twice in the file (row {0})', c.dup.row))}</p>
     <select data-oim-act="${i}" aria-label="${esc(tr('What to do'))}">${oimActs(c).map(([v, n]) => `<option value="${v}" ${c.action === v ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select>` : '';
+  const xm = OIM.pv?.columns?.map || {}, xf = (k, label, mx) => k in xm ? fld(k, label, mx) : '';  // 2.363.0 (#3103): only what the file has
   return `<li class="oimcard ${on ? '' : 'off'} ${c.flags?.length ? 'warn' : ''}"><div class="oimhd"><label class="chkl"><input type="checkbox" data-oim-on="c" data-i="${i}" ${on ? 'checked' : ''}> <b>${esc(c.name || tr('(no name)'))}</b></label><span class="muted">${tr('row {0}', c.row)}</span></div>
     ${c.reasons?.length ? `<p class="oimwarn">${ic('alert', 's')} ${esc(c.reasons.join(' · '))}</p>` : ''}${dup}
     <div class="oimgrid">${fld('name', tr('Company'), 80, 'w2')}${fld('contact', tr('Contact person'), 120, 'w2')}${fld('street', tr('Street'), 200, 'w2')}${fld('zip', tr('Postcode'), 20)}${fld('city', tr('City'), 120)}<div class="oimfl"><span>${esc(tr('Country'))}</span>${ctyField('oim-cty-' + i, c.country, {attrs: `data-oim-c="${i}" data-k="country"`, dis: on ? '' : 'disabled', label: tr('Country')})}</div></div>
-    <details class="oimraw"><summary>${tr('Original text')}</summary><pre>${esc(c.address || '')}</pre></details></li>`;
+    ${xf('email', tr('E-mail'), 200)}${xf('phone', tr('Phone'), 60)}${xf('customer_no', tr('Customer number'), 40)}${xf('vat_id', tr('VAT ID'), 20)}<details class="oimraw"><summary>${tr('Original text')}</summary><pre>${esc(c.address || '')}</pre></details></li>`;
 }
 
 function oimSimpleCard(kind, s, i, title, sub) {
@@ -295,6 +297,7 @@ async function oimPreview(file, map) {
 async function oimImport() {
   const p = OIM.pv; if (!p) return;
   const cl = (p.clients || []).map(c => ({row: c.row, name: c.name, contact: c.contact, street: c.street, zip: c.zip, city: c.city, country: (c.country || '').toUpperCase(), address: c.address,
+    email: c.email, phone: c.phone, customer_no: c.customer_no, vat_id: c.vat_id,
     action: c.action, merge_id: (c.action === 'merge' || c.action === 'contact') && c.dup?.kind === 'existing' ? c.dup.id : undefined,
     contact_row: c.action === 'contact' && c.dup?.kind === 'file' ? c.dup.row : undefined,
     dup_ok: c.action === 'new' && c.dup?.kind === 'existing' ? 1 : undefined}));  // 2.269.0 D (#3046): "new" on purpose for a found client
