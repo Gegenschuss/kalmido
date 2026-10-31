@@ -23,7 +23,7 @@ from datetime import date, datetime, timedelta, timezone
 from flask import g, jsonify, redirect, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
-from ..core.i18n import LANGS, N_, short_day, tr
+from ..core.i18n import browser_lang, LANGS, N_, short_day, tr
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_token_bind, Denied, need_feat
@@ -598,11 +598,7 @@ def apb_clean(v, mx):
 
 def apb_lang(c, uid):
     """The customer's language: Accept-Language if the app has it, else the person's language."""
-    for part in (request.headers.get("Accept-Language") or "").split(","):
-        code = part.split(";")[0].strip().lower()[:2]
-        if code in LANGS:
-            return code
-    lg = usettings(c, uid).get("lang") or "en"
+    lg = browser_lang() or usettings(c, uid).get("lang") or "en"
     return lg if lg in LANGS else "en"
 
 

@@ -106,5 +106,18 @@ fi = ns["fmt_int"]
 check(fi(1234567, "en") == "1,234,567" and fi(1234567, "de") == "1.234.567" and fi(1234567, "fr") == "1\u202f234\u202f567"
       and fi(1234567, "nl") == "1.234.567", "thousands separators")
 check(all(ns["dec_comma"](x) for x in ("de", "fr", "es", "it", "nl")) and not ns["dec_comma"]("en"), "decimal comma (CSV ';') languages")
+# 2.447.0 (#3762): the app addresses everyone with "tu" in French, like "du" in German; "vous" only where the German text says "Sie"
+# (outsiders, customer mails, documents). A French text with vous / votre / vos whose German text has a du word and no Sie word fails.
+DE_DU = re.compile(r"\b(du|dir|dich|dein\w*)\b", re.I)
+DE_SIE = re.compile(r"\b(Sie|Ihr\w*|Ihnen)\b")
+FR_VOUS = re.compile(r"\b(vous|votre|vos)\b", re.I)
+join = lambda v: " ".join(v) if isinstance(v, list) else v  # noqa: E731 (plural forms)
+de_t = json.load(open(os.path.join(I18N, "de.json"), encoding="utf-8"))
+fr_t = json.load(open(os.path.join(I18N, "fr.json"), encoding="utf-8"))
+vous_du = [k for k, v in fr_t.items() if not k.startswith("_") and k in de_t
+           and FR_VOUS.search(re.sub(r"rendez-vous", "", join(v), flags=re.I))
+           and DE_DU.search(join(de_t[k])) and not DE_SIE.search(join(de_t[k]))]
+check(not vous_du, f"fr: no vous/votre/vos where de says du ({len(vous_du)}): {vous_du[:3]}")
+
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

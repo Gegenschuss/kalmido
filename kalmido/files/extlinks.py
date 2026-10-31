@@ -36,7 +36,7 @@ from flask import g, jsonify, redirect, request, Response
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..core.config import app, APP_NAME, ATT_DIR, PUBLIC_URL, TZ
-from ..core.i18n import lang, LANGS, N_, short_day, tr, trn
+from ..core.i18n import browser_lang, lang, N_, short_day, tr, trn
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso
 from ..core.pg import insert_id, system_ctx
 from ..core.access import Denied, acx_anon_bind, acx_of
@@ -163,11 +163,7 @@ def xl_open(c, token):
 
 
 def xl_lang(c, link):
-    for part in (request.headers.get("Accept-Language") or "").split(","):
-        code = part.split(";")[0].strip().lower()[:2]
-        if code in LANGS:
-            return code
-    return lang(c, link["created_by"])
+    return browser_lang() or lang(c, link["created_by"])
 
 
 def xl_cookie(link):

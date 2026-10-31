@@ -21,7 +21,7 @@ from datetime import date, datetime, timedelta
 from flask import g, jsonify, redirect, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
-from ..core.i18n import N_, tr
+from ..core.i18n import browser_lang, lang, LANGS, N_, tr
 from ..core.db import body, db, err, iso, local_now, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_anon_bind, Denied, FULL_ROLES, list_role, need_list
@@ -553,11 +553,9 @@ def sig_open(c, token):
 
 
 def sig_lang(c, r):
-    for part in (request.headers.get("Accept-Language") or "").split(","):
-        code = part.split(";")[0].strip().lower()[:2]
-        if code in ("de", "en", "es", "fr", "it", "nl"):
-            return code
-    return "de"
+    """2.447.0 (#3761): the visitor's browser, else the language of the document, else the sender's (a video has no document)."""
+    d = c.execute("SELECT lang FROM office_docs WHERE id=? AND org_id=?", (r["doc_id"], r["org_id"])).fetchone() if r["doc_id"] else None
+    return browser_lang() or (d["lang"] if d and d["lang"] in LANGS else lang(c, r["created_by"]))
 
 
 def sig_form_key(c, r):
