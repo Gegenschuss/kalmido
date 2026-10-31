@@ -138,7 +138,6 @@ def first_tz(c, uid, name):
             or c.execute("SELECT value FROM user_settings WHERE user_id=? AND key='tz' AND value<>''", (uid,)).fetchone():
         return
     uset(c, uid, "tz", name)
-    c.commit()
 
 
 def finish_login(c, u, remember, via, extra=None):
@@ -191,7 +190,6 @@ def auth_login():
         print("login failed for", login_log_name(username, c), "from", login_log_ip(client_ip()), flush=True)  # 2.148.1 C (#2494)
         return err(tr("Wrong username or password"), 401)  # 2.13.0 (#453 P7): the page's language
     remember = bool(b.get("remember", True))
-    first_tz(c, u["id"], b.get("tz"))
     methods = twofa_methods(c, u)
     if methods:  # second step: a code, a passkey or a recovery code (POST /api/auth/2fa...)
         tok = pend_new("2fa", u["id"], remember=remember)
@@ -199,6 +197,7 @@ def auth_login():
     if gsetting(c, "twofa_required") == "1":  # admin policy: enrol now, the session starts afterwards
         tok = pend_new("enrol", u["id"], remember=remember)
         return pend_cookie(jsonify(ok=False, enrol=True, methods=["totp", "passkey"]), tok)
+    first_tz(c, u["id"], b.get("tz"))  # the login is complete here (a second factor: Settings show the difference); finish_login commits
     return finish_login(c, u, remember, "password")
 
 
