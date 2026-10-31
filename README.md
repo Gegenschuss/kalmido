@@ -19,6 +19,14 @@
 
 ## What's new
 
+**2.436.0** (2026-10-30):
+- **Office**: receipts by e-mail - forward invoice mails to your office address, Kalmido fetches linked invoice PDFs by itself; the client card's blocks fold and can be switched off per office.
+- **Documents**: the list can be sorted (date, arrival, sender, amount, due date, title).
+- **Settings**: "View as member" (Settings > Account) shows Kalmido as a member of your organisation sees it; the rights stay, the way back is in the account menu.
+- **Projects**: properties per project type (software, agency, personal), switchable in the project options under Properties.
+- **Agents**: git author for AI commits is a setting (agent settings, per project overridable).
+- **Backups and restore**: larger files are kept once in `data/backups/.store` for all backups (2.432); copy the backup folder WITH `.store`; *Download* always gives one complete file; a copy elsewhere is made complete with `python3 -I kalmido/admin/bkstore.py assemble` (see SELF-HOSTING.md).
+
 **2.430.0** (2026-10-30):
 - **Projects**: ticket keys APP-123 (project dialog), linked from commits, branches and pull requests; saved filters by assignee, column, sprint, milestone and text; the agent API filters and sorts tasks by every field; "Project type" in folder settings.
 - **Agents**: a live "working on it" mark on tasks (dot, name, time, last line) through the API / MCP.
