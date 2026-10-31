@@ -4010,6 +4010,8 @@ MIGRATIONS = [
     # 2.454.0 (#3808): a proposal's title as JSON [key, *values] for the task's history: every reader gets it in their own
     # language, title stays the asker's. NULL = no key (an agent's own title). Older versions ignore it
     ("agent_jobs", "title_key", "ALTER TABLE agent_jobs ADD COLUMN IF NOT EXISTS title_key TEXT"),
+    # 2.367.3 (#2971): failed polls in a row of a mailbox (reaches INTEG_FAILS: its people are told once). Older versions ignore it
+    ("hub_mailboxes", "fails", "ALTER TABLE hub_mailboxes ADD COLUMN IF NOT EXISTS fails BIGINT NOT NULL DEFAULT 0"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.
@@ -4187,6 +4189,8 @@ CREATE INDEX IF NOT EXISTS org_joins_user ON org_joins(user_id);
 -- 2.363.0 (#3132): the org import's projects noted on an open invitation (JSON [[list id, role, importing admin]], shared on
 -- accepting, accounts/orginvite.py). Here, not in MIGRATIONS: those run before this table exists. Older versions ignore it
 ALTER TABLE org_joins ADD COLUMN IF NOT EXISTS pending_lists TEXT NOT NULL DEFAULT '';
+-- 2.367.3 (#2971): the second try of a channel message (0 = its first try, else not before this time). Older versions ignore it
+ALTER TABLE notify_channel_queue ADD COLUMN IF NOT EXISTS retry_at DOUBLE PRECISION NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS ix2281_org_joins_created_by ON org_joins(created_by) WHERE created_by IS NOT NULL;
 -- 2.151.0 A (#2558): branches of a connection that carry a task (kalmido-<id>, task-<id>, <id>-slug, or the branch of an open
 -- pull request of a task) and how far they are ahead of the default branch (NULL = not compared yet, 0 = merged). cmp_sha /
@@ -4535,7 +4539,7 @@ GLOBAL_DEFAULTS = {
     # automatic backups (see "backups"; KALMIDO_BACKUPS=0 turns the feature off)
     "bk_on": "0", "bk_time": "03:30", "bk_keep_daily": "14", "bk_keep_weekly": "8",
     "bk_encrypt": "0", "bk_pass": "",            # passphrase sealed with the server key; never sent to a client
-    "bk_last_day": "", "bk_last_ok": "", "bk_last_name": "", "bk_last_error": "", "bk_last_error_at": "", "bk_tools_problem": "",
+    "bk_last_day": "", "bk_last_ok": "", "bk_last_name": "", "bk_last_error": "", "bk_last_error_at": "", "bk_tools_problem": "", "bk_fail_told": "",
     "bk_enabled_at": "",
     "public_links": "1",        # admin: public read-only links of lists (KALMIDO_PUBLIC_LINKS=0 turns them off for good)
     "org_encrypt": "1",         # 2.42.0 (#828): admin: encrypt organisation data at rest (needs KALMIDO_SECRET_KEY; 0 = nothing new)

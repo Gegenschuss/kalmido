@@ -81,16 +81,16 @@ fs.writeFileSync(path.join(DATA, 'packs', 'industry', 'example_share.json'), JSO
     check(await ev(`document.querySelectorAll('.ofdeditor [data-k="producing"]').length === 2 && document.querySelectorAll('.ofdeditor [data-k="in_handling"]').length === 2 && document.querySelectorAll('.ofdeditor [data-k="in_markup"]').length === 2 && !document.querySelectorAll('.ofdeditor [data-k="in_handling"]')[1].checked`),
       '#2251/#2252: the marks per position (the hotel left out of the handling costs)');
     const autos = `[...document.querySelectorAll('.ofdautos .ofdauto')].map(x => x.textContent).join(' | ')`;
-    check(await ready(ev, `/Organisation.*10\\.000,00 € \\/ 500,00 € x 0,5 = 10 Tage/.test(${autos}) && /Handlungskosten.*400,00 €/.test(${autos})`),
+    check(await ready(ev, `/Organisation.*10\\.000,00\\s€ \\/ 500,00\\s€ x 0,5 = 10 Tage/.test(${autos}) && /Handlungskosten.*400,00\\s€/.test(${autos})`),
       '#2251/#2252: the share line and the handling costs line: ' + await ev(autos));
     await shot('p2113b-a-editor.png');
     // the markup switched on and renamed in the quotation
     await ev(`(() => { document.getElementById('ofd-markup_on').click(); return 1; })()`);
-    check(await ready(ev, `/Markup.*1\\.000,00 €/.test(${autos}) && !!document.querySelector('#ofd-markup_label')`, 60), '#2252: the markup switched on: 10 % of 10.000 = 1.000 ' + await ev(autos));
+    check(await ready(ev, `/Markup.*1\\.000,00\\s€/.test(${autos}) && !!document.querySelector('#ofd-markup_label')`, 60), '#2252: the markup switched on: 10 % of 10.000 = 1.000 ' + await ev(autos));
     await ev(`(() => { const s = document.getElementById('ofd-markup_stacked'); s.click(); return 1; })()`);
-    check(await ready(ev, `/Markup.*1\\.040,00 €/.test(${autos})`, 60), '#2252: stacked: 10 % of 10.000 + 400 = 1.040');
+    check(await ready(ev, `/Markup.*1\\.040,00\\s€/.test(${autos})`, 60), '#2252: stacked: 10 % of 10.000 + 400 = 1.040');
     await ev(`(() => { const i = document.getElementById('ofd-markup_label'); i.value = 'Production Fee'; i.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
-    check(await ready(ev, `/Production Fee.*1\\.040,00 €/.test(${autos}) && [...document.querySelectorAll('.ofdeditor [data-k="in_markup"]')].some(x => /Production Fee/.test(x.closest('label')?.textContent || ''))`, 60),
+    check(await ready(ev, `/Production Fee.*1\\.040,00\\s€/.test(${autos}) && [...document.querySelectorAll('.ofdeditor [data-k="in_markup"]')].some(x => /Production Fee/.test(x.closest('label')?.textContent || ''))`, 60),
       '#2252: the renamed title on the line and at the marks');
     const q1s = await call(CA, 'GET', `/api/office/docs/${q1.id}`);
     check(q1s.markup_pct === 10 && q1s.markup_stacked === 1 && q1s.markup_label?.de === 'Production Fee', '#2252: saved on the server');

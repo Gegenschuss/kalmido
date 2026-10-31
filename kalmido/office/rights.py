@@ -97,6 +97,7 @@ SPECIAL_ROUTES = {
     "POST /api/office/docs/<int:did>/finalize": "release", "GET /api/office/docs/<int:did>/number-preview": "release",  # 2.431.0 (#3605 review): who may finalise sees the number
     "POST /api/office/docs/<int:did>/unlock": "release",
     "POST /api/office/docs/<int:did>/send": "release", "POST /api/office/docs/<int:did>/peppol": "release",
+    "POST /api/office/docs/<int:did>/peppol/undelivered": "release",  # 2.370.0 (#2778): frees "send again"
     "GET /api/office/docs/<int:did>/recipients": "release",  # 2.433.0 (#3599): the send dialog's addresses (the e-mail for invoices)
     "POST /api/office/series/<int:sid>/run": "release",
     # pay: payments of invoices, reminder fees, payment proposals, the bank matching that books

@@ -885,7 +885,10 @@ async function sortSet(m) {
     LS.del('sort2.' + k); l.sort_mode = m; render();
     // fix 2.31: quick clicks on a column title send one PATCH after the other (in flight together they could land in the
     // wrong order on the server and leave the older sort)
-    const q = sortQ = sortQ.then(() => api('PATCH', '/api/lists/' + l.id, {sort_mode: m})).catch(() => { if (l.sort_mode === m) { l.sort_mode = before; render(); } });
+    const q = sortQ = sortQ.then(() => api('PATCH', '/api/lists/' + l.id, {sort_mode: m, _prev: {sort_mode: before}})).then(r => {
+      const c = r?.conflicts?.[0];  // 2.370.0 (#3126): another sort set elsewhere meanwhile stays
+      if (c && l.sort_mode === m) { l.sort_mode = c.server || ''; render(); toast(`${tr('Changed elsewhere in the meantime')}: ${tr('Sorting')}`); }
+    }).catch(() => { if (l.sort_mode === m) { l.sort_mode = before; render(); } });
     await q;
     return;
   }

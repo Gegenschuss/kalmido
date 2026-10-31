@@ -277,6 +277,27 @@ r = Bo.delete(B + f"/api/orgs/{ORG}/invites/{next(x['ref'] for x in inv()['invit
 check(r.ok and not dbx("SELECT 1 FROM users WHERE email='direct@example.com'"), "withdrawn as ever")
 # withdrawing a new account with invitations switched off: the account goes with the invitation
 Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "offnew@example.com", "role": "admin"})
+# 2.458.0 (#3843): another organisation's open invitation lies on the never used account: it stays, only this invitation ends
+Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "twice@example.com", "role": "member"})
+twice = dbx("SELECT id FROM users WHERE email='twice@example.com'")[0][0]
+r = Er.post(B + f"/api/orgs/{BETA}/invites", json={"email": "twice@example.com", "role": "member"})
+check(r.ok and dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (BETA, twice)), "#3843: the second organisation invites the same address " + r.text[:200])
+ref = {x["email"]: x for x in inv()["invites"]}["twice@example.com"]["ref"]
+r = Bo.delete(B + f"/api/orgs/{ORG}/invites/{ref}")
+check(r.ok and r.json().get("email") == "twice@example.com" and r.json().get("role") == "member", "#3843: withdrawn, the same answer for the undo " + r.text[:200])
+check(dbx("SELECT 1 FROM users WHERE id=?", (twice,)), "#3843: the account stays")
+check(dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (BETA, twice)), "#3843: the other organisation's invitation stays")
+check(not dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (ORG, twice)) and not dbx("SELECT 1 FROM org_invites WHERE org_id=? AND user_id=?", (ORG, twice)), "#3843: only this invitation ends")
+check(not dbx("SELECT 1 FROM user_invites WHERE user_id=?", (twice,)), "#3843: the link of this invitation ends with it")
+check("twice@example.com" not in {x["email"] for x in inv()["invites"]} and "twice@example.com" in {x["email"] for x in inv(Er, BETA)["invites"]}, "#3843: gone here, open there")
+# ... an expired one does not keep the account alive
+Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "thrice@example.com", "role": "member"})
+Er.post(B + f"/api/orgs/{BETA}/invites", json={"email": "thrice@example.com", "role": "member"})
+thrice = dbx("SELECT id FROM users WHERE email='thrice@example.com'")[0][0]
+dbx("UPDATE org_joins SET created_at='2020-01-01T00:00:00+00:00' WHERE org_id=? AND user_id=?", (BETA, thrice))
+ref = {x["email"]: x for x in inv()["invites"]}["thrice@example.com"]["ref"]
+check(Bo.delete(B + f"/api/orgs/{ORG}/invites/{ref}").ok and not dbx("SELECT 1 FROM users WHERE id=?", (thrice,)), "#3843: only an expired invitation elsewhere: the account goes")
+
 A.patch(B + "/api/admin/settings", json={"org_invites": False})
 iv = inv()["invites"]
 check([x["email"] for x in iv] == ["offnew@example.com"], f"off: a new account's open invitation stays visible {iv}")

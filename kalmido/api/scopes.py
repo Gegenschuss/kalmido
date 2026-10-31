@@ -39,7 +39,8 @@ from ..tasks.dependencies import dep_add, dep_remove, deps_get
 from ..lists.projects import list_status_set, LIST_STATUSES
 from ..lists.fields import field_create, field_delete, field_dict, field_update, need_field
 from ..api.v1 import (
-    _v1_live, API_SCOPES, api_scopes, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, SCOPES_WRITE, STATUS_NAMES, v1_comment, v1_entry, v1_habit, v1_limit, v1_one, v1_task, V1_TASK_IN, v1_task_in,
+    _V1_FIELD_OUT, _v1_live, API_SCOPES, api_scopes, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, SCOPES_WRITE, STATUS_NAMES, v1_comment, v1_entry, v1_habit, v1_limit, v1_one, v1_prev_in, v1_task,
+    V1_TASK_IN, v1_task_in,
 )
 from ..api.common import cursor_dec, v1_args, v1_call, v1_feature, v1_json, v1_page, v1_view
 from ..api.openapi import openapi_spec
@@ -620,13 +621,31 @@ def v1_task_move(tid):
 BATCH_ACTIONS = ("update", "complete", "reopen", "wont_do", "delete", "restore")
 
 
+def _v1_batch_per(raw, name, ids):
+    """2.370.0 (#3126): `_prev` / `expect` of a batch: an object with the ids of the batch as keys."""
+    if not isinstance(raw, dict) or any(not k.isdigit() or int(k) not in ids for k in raw):
+        raise BadInput(tr("Invalid value: {0}", name))
+    return raw
+
+
+def _v1_batch_expect(e):
+    """2.370.0 (#3126): {expect_due, expect_time?} of one task -> what the web batch compares ({due, due_time?})."""
+    if not isinstance(e, dict) or "expect_due" not in e or set(e) - {"expect_due", "expect_time"} \
+            or any(v is not None and (not isinstance(v, str) or len(v) > 32) for v in e.values()):
+        raise BadInput(tr("Invalid value: {0}", "expect"))
+    return {"due": e["expect_due"], **({"due_time": e["expect_time"]} if "expect_time" in e else {})}
+
+
 @app.post("/api/v1/tasks/batch")
 @v1_view
 def v1_task_batch():
     """{ids (1-500), action: update | complete | reopen | wont_do | delete | restore, changes? (update: task fields)} --
-    one transaction; tasks you may not change are skipped and reported in errors."""
+    one transaction; tasks you may not change are skipped and reported in errors. 2.370.0 (#3126), as the single changes:
+    update takes _prev {id: {field: value read}}: a field changed since stays and a task with nothing left is skipped;
+    complete / wont_do take expect {id: {expect_due, expect_time?}}: a task that moved on is skipped. Both are listed in
+    conflicts. Without them nothing is compared."""
     v1_args(())
-    b = _v1_body(("ids", "action", "changes"))
+    b = _v1_body(("ids", "action", "changes", "_prev", "expect"))
     ids = b.get("ids")
     if not isinstance(ids, list) or not 1 <= len(ids) <= 500 or any(isinstance(i, bool) or not isinstance(i, int) for i in ids):
         raise BadInput(tr("Invalid value: {0}", "ids"))
@@ -643,6 +662,11 @@ def v1_task_batch():
         data = v1_task_in(ch, tuple(k for k in V1_TASK_IN if k not in ("parent_id", "reviewer_id")))  # 2.390.0 B (#3355): reviewer one by one
     elif b.get("changes"):
         raise UnknownFields(["changes"])
+    for k, acts in (("_prev", ("update",)), ("expect", ("complete", "wont_do"))):
+        if k in b and act not in acts:
+            raise UnknownFields([k])
+    prev = {k: v1_prev_in(v) for k, v in _v1_batch_per(b["_prev"], "_prev", ids).items()} if "_prev" in b else {}
+    expect = {k: _v1_batch_expect(v) for k, v in _v1_batch_per(b["expect"], "expect", ids).items()} if "expect" in b else {}
     c = db()
     ids = list(dict.fromkeys(ids))
     vis = [i for i in ids if task_visible(c, i, me())]
@@ -664,13 +688,15 @@ def v1_task_batch():
         with _BATCH_LOCK:
             _BATCH_SEEN.setdefault(me(), []).append((time.time(), len(vis)))
     if act == "wont_do":
-        act, data = "complete", {"status": -1}
+        act, data = "complete", {"status": -1, "expect": expect}
     elif act == "complete":
-        data = {"status": 2}
+        data = {"status": 2, "expect": expect}
+    elif prev:
+        data = {**data, "prev": prev}
     j = v1_call(task_batch, body={"ids": vis, "action": "patch" if act == "update" else act, "data": data})
     hidden = len(ids) - len(vis)
     return jsonify(count=j.get("count", 0), errors=j.get("errors", []) + ([trn("{0} task not found", "{0} tasks not found", hidden)] if hidden else []),
-                   conflicts=j.get("conflicts", []))
+                   conflicts=[{**x, "field": _V1_FIELD_OUT.get(x["field"], x["field"])} for x in j.get("conflicts", [])])
 
 
 @app.post("/api/v1/tasks/<int:tid>/skip")
@@ -1316,9 +1342,15 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "/tasks/batch": {"post": op("Change many tasks at once", T, ok(obj) | acc | errs("400", "403"), scope="tasks:write",
                                     body={"type": "object", "required": ["ids", "action"], "properties": {
                                         "ids": {**ids, "minItems": 1, "maxItems": 500}, "action": {"type": "string", "enum": list(BATCH_ACTIONS)},
-                                        "changes": {"type": "object", "description": "update: task fields (as PATCH /tasks/{id})"}}},
+                                        "changes": {"type": "object", "description": "update: task fields (as PATCH /tasks/{id})"},
+                                        "_prev": {"type": "object", "description": "update, 2.370.0: {id: {field: the value you read}}: a field changed since "
+                                                                                   "stays as it is, a task with nothing left is skipped; listed in conflicts"},
+                                        "expect": {"type": "object", "description": "complete / wont_do, 2.370.0: {id: {expect_due, expect_time?}} (expect_due: the "
+                                                                                    "due date you read, null = none): a task that moved on or is done already is "
+                                                                                    "skipped and listed in conflicts"}}},
                                     desc="One transaction; tasks you may not change are skipped (errors). delete / restore also need the "
-                                         f"scope delete. Agents: {APPROVAL_BATCH_MIN} or more tasks wait for a person's approval (202).")},
+                                         f"scope delete. Agents: {APPROVAL_BATCH_MIN} or more tasks wait for a person's approval (202). The answer: "
+                                         "count, errors, conflicts [{id, title, field, server, mine}]. Without _prev / expect nothing is compared.")},
         "/tasks/{id}/skip": {"post": op("Skip this occurrence of a repeating task", T, ok(ref("Task")) | errs("400", "403", "404"), [pid()],
                                         scope="tasks:write")},
         "/tasks/{id}/restore": {"post": op("Restore a task from the trash", T, ok(ref("Task")) | errs("403", "404", "409"), [pid()], scope="delete")},

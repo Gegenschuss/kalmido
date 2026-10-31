@@ -110,14 +110,24 @@ async function fxSumSet(lid, k, a, quiet) {
   const prev = l.col_sums || {}, next = {...prev, [k]: a};
   if (LS.get('fxsum.' + lid)) LS.del('fxsum.' + lid);
   if (JSON.stringify(prev) === JSON.stringify(next)) return;
-  await fxSumSave(lid, prev, next);
-  const go = v => async () => { await fxSumSave(lid, null, v); return {}; };
-  const e = histAdd({label: tr('Sum row of {0}', qn(lname(l))), undo: go(prev), redo: go(next), lids: [lid]});
+  if (!await fxSumSave(lid, prev, next)) return;
+  const go = (to, from) => async () => ({skipped: await fxSumSave(lid, from, to, true) ? [] : [tr('Sum row')]});
+  const e = histAdd({label: tr('Sum row of {0}', qn(lname(l))), undo: go(prev, next), redo: go(next, prev), lids: [lid]});
   histToast(tr('Sum row saved for everyone in the project'), e);
 }
-async function fxSumSave(lid, _, v) {
-  try { await optWrite(optSet(() => listById(lid), {col_sums: v}), () => api('PATCH', '/api/lists/' + lid, {col_sums: v})); } catch { /* api() said why */ }
+// 2.370.0 (#3126): the sum row and the key figures with _prev: changed elsewhere meanwhile = stays, said, the screen follows the server
+async function fxConflict(r, what, quiet) {
+  if (!r?.conflicts?.length) return false;
+  await load();
+  if (!quiet) toast(`${tr('Changed elsewhere in the meantime')}: ${what}`);
+  return true;
+}
+async function fxSumSave(lid, was, v, quiet) {
+  let r;
+  try { r = await optWrite(optSet(() => listById(lid), {col_sums: v}), () => api('PATCH', '/api/lists/' + lid, {col_sums: v, _prev: {col_sums: was}})); } catch { render(); return false; }  // api() said why
+  const cf = await fxConflict(r, tr('Sum row'), quiet);
   render();
+  return !cf;
 }
 
 // ---- key figures of a project page: tiles on top, computed by the server (GET /api/lists/<id>/kpis) over the tasks the
@@ -187,17 +197,20 @@ function fxKpiModal(lid, add) {  // add = a new tile to start with (from the sum
     if (a === 'fxk-add') { ks.push({title: '', agg: 'sum', field: nums[0]?.id ?? null, state: 'all'}); draw(); $$('.fxkr input', md).pop()?.focus(); return; }
     if (a === 'save') {
       const prev = l.kpis || [], next = ks.map(k => ({...k, field: k.agg === 'count' ? null : k.field, field2: k.agg === 'ratio' ? k.field2 : undefined}));
-      if (!await fxKpiSave(lid, next)) return;
+      if (!await fxKpiSave(lid, next, prev)) return;
       md.remove();
-      const go = v => async () => { await fxKpiSave(lid, v); return {}; };
-      histToast(tr('Key figures saved'), histAdd({label: tr('Key figures of {0}', qn(lname(l))), undo: go(prev), redo: go(next), lids: [lid]}));
+      const go = (to, from) => async () => ({skipped: await fxKpiSave(lid, to, from, true) ? [] : [tr('Key figures')]});
+      histToast(tr('Key figures saved'), histAdd({label: tr('Key figures of {0}', qn(lname(l))), undo: go(prev, next), redo: go(next, prev), lids: [lid]}));
     }
   });
 }
 // 2.46.2 (#1659): the key figures show at once (optimistic, an error puts the old ones back), their values follow behind
-async function fxKpiSave(lid, v) {
-  try { await optWrite(optSet(() => listById(lid), {kpis: v}), async () => { const r = await api('PATCH', '/api/lists/' + lid, {kpis: v}); if (r?.kpis) Object.assign(listById(lid) || {}, {kpis: r.kpis}); }); }
+async function fxKpiSave(lid, v, was, quiet) {
+  let cf;
+  try { await optWrite(optSet(() => listById(lid), {kpis: v}), async () => { const r = await api('PATCH', '/api/lists/' + lid, {kpis: v, _prev: {kpis: was}}); cf = r; if (r?.kpis) Object.assign(listById(lid) || {}, {kpis: r.kpis}); }); }
   catch { return false; }
+  cf = await fxConflict(cf, tr('Key figures'), quiet);
+  if (cf) render();
   fxKpiLoad(lid, true).then(() => render(), () => {});
-  return true;
+  return !cf;
 }

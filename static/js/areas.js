@@ -464,7 +464,23 @@ function sbb_render(hid) {
   r.setAttribute('aria-label', tr('Areas|nav'));
   r.innerHTML = sbb_railHtml(hid);
   sbb_rove();
+  requestAnimationFrame(sbb_fit);
 }
+// 2.458.0 (#3880): an area's name never breaks inside a word (app.css .srbn): a word too wide for its icon takes a smaller
+// type, down to 9 px; wider still it ends in "…" with the whole name as title. Measured in the page, the width of a word is not in CSS
+function sbb_fit() {
+  for (const n of $$('#srail .srbn, #side .sbmr .srbn')) {
+    n.classList.remove('srcut'); n.style.fontSize = '';
+    const box = n.clientWidth, rg = document.createRange(); rg.selectNodeContents(n);
+    const need = box ? rg.getBoundingClientRect?.().width : 0;
+    if (!(need > box + .5)) continue;
+    const px = parseFloat(getComputedStyle(n).fontSize) * box / need;
+    if (px >= 9) n.style.fontSize = `${Math.floor(px * 10) / 10}px`;
+    else { n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent; }
+  }
+}
+window.addEventListener('resize', () => requestAnimationFrame(sbb_fit));
+document.fonts?.addEventListener('loadingdone', sbb_fit);
 // ---- 2.196.0 A (#2737): the phone's drawer like sidebar B. On top (fixed) search, Today, Inbox and ONE row of the area icons
 // (the bar's icons, order and rights; it scrolls sideways, never wraps), below the chosen area's panel, at the bottom Settings
 // and the account. An icon opens the page its area kept and the drawer stays open; the first change in an open drawer adds
@@ -491,6 +507,7 @@ document.addEventListener('click', e => {
 // after renderSide: the row keeps its sideways position, the open area's icon in sight; the tapped icon keeps the focus
 function sbm_after(x) {
   const r = $('#side .sbmr'); if (!r) return;
+  requestAnimationFrame(sbb_fit);
   if (x != null) r.scrollLeft = x;
   const b = $('.srb.on', r);
   const rr = r.getBoundingClientRect(), br = b?.getBoundingClientRect();

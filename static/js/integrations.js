@@ -432,7 +432,7 @@ function whoDraw(root) {
 // from the server: a row shows kind, name and a masked end; editing leaves the address empty unless a new one is typed.
 const CHN_KINDS = {slack: 'Slack', matrix: 'Matrix', telegram: 'Telegram', signal: 'Signal'};
 const CHN_EV = {reminder: N_('Reminders'), assign: N_('Assignments'), comment: N_('Mentions and comments'), digest: N_('Daily digest and briefing'),
-  other: N_('Other notifications'), lists: N_('Changes in my own projects'), newtask: N_('New task'), complete: N_('Task completed')};
+  other: N_('Other notifications'), lists: N_('Changes in my own projects'), own: N_('Including my own changes'), newtask: N_('New task'), complete: N_('Task completed')};
 const CHN_EV_ORG = {assign: N_('Assignment'), comment: N_('Comment')};
 const chn_evName = (e, org) => tr((org && CHN_EV_ORG[e]) || CHN_EV[e] || e);
 function chn_state(ch) {

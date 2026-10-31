@@ -277,6 +277,33 @@ check("books/" in idx and "contracts/" in idx, "#3105 the index names the new fo
 rows = list(csv.reader(io.StringIO(z.read("books/procedure-documentation.csv").decode("utf-8-sig")), delimiter=";"))
 check(len(rows) == 2, f"#3105 one version of the procedure documentation {len(rows)}")
 
+# ---------------------------------------------------------------- 2.370.0 (#2781): files the virus scanner locked stay out, listed
+check(any(n.startswith(f"receipts/{R1}-") for n in names), "#2781 setup: the receipt is in the export")
+check(json.loads(z.read("manifest.json"))["locked_files"] == [], "#2781 nothing locked: an empty list")
+od = os.path.join(DATA, "office", str(PB))
+os.makedirs(od, exist_ok=True)
+for fn in ("gesperrt-vertrag.pdf", "offen-vertrag.pdf"):
+    with open(os.path.join(od, fn), "wb") as f:
+        f.write(tiny_pdf(fn))
+LCF = dbx("INSERT INTO office_contract_files(org_id, contract_id, name, file, created_at) VALUES(?,1,?,?,?) RETURNING id", (PB, "Vertrag.pdf", "gesperrt-vertrag.pdf", now))[0][0]
+dbx("INSERT INTO upload_scan(kind, ref_id, ver, org_id, state, sig, created_at) VALUES('ocf',?,0,?,'infected','Test-Signatur-1',?)", (LCF, PB, now))
+RV = one("SELECT cur_version FROM fs_nodes WHERE id=?", (R1,))
+dbx("INSERT INTO upload_scan(kind, ref_id, ver, state, sig, created_at) VALUES('fs',?,?,'infected','Test-Signatur-2',?) "
+    "ON CONFLICT (kind, ref_id, ver) DO UPDATE SET state='infected', sig='Test-Signatur-2'", (R1, RV, now))
+r = su_get(F, B + "/api/retention/me/export.zip")
+check(r.ok and r.content[:2] == b"PK", f"#2781 the export runs {r.status_code}")
+z = zipfile.ZipFile(io.BytesIO(r.content))
+names = z.namelist()
+man = json.loads(z.read("manifest.json"))
+lock = {(x["area"], x["id"]): x for x in man["locked_files"]}
+check("office-files/offen-vertrag.pdf" in names and "office-files/gesperrt-vertrag.pdf" not in names, f"#2781 the locked office file stays out, the other one is in {[n for n in names if n.startswith('office-files')]}")
+check(not any(n.startswith(f"receipts/{R1}-") for n in names), "#2781 the locked receipt stays out")
+check(lock.get(("ocf", LCF), {}).get("signature") == "Test-Signatur-1" and lock.get(("fs", R1), {}).get("signature") == "Test-Signatur-2", f"#2781 both in locked_files with the reason {man['locked_files']}")
+check(not any("gesperrt-vertrag" in m or "taxi-beleg" in m for m in man["missing"]), f"#2781 locked is not missing {man['missing']}")
+rc = {x["node_id"]: x for x in csv.DictReader(io.StringIO(z.read("receipts/receipts.csv").decode("utf-8-sig")), delimiter=";")}
+check(rc.get(str(R1), {}).get("file") == "", "#2781 the receipt keeps its line in the list, without a file")
+check("Test-Signatur-2" in z.read("00-index.txt").decode(), "#2781 the index names it")
+
 # ---------------------------------------------------------------- without the server key
 A = start("")
 FID, F = freelancer(B, A)

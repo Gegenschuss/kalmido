@@ -395,6 +395,7 @@ def do_complete(c, tid, status=2, undo=None):
     """undo (dict, filled in): what POST /api/tasks/<id>/undo needs to take this completion back."""
     from ..collab.comments import assignment_events
     from ..family.family import _jparse, FAM_OCC, rot_next, stars_earn, stars_revoke
+    from ..notify.channels import chn_note
     write_lock(c, f"task-{tid}")  # 2.126.0 D (#1987): one completion of a task at a time (the row below is then current)
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if status == 2 and t["status"] != 2:  # 2.60.0 C (#1512): "done only after approval" -- every way of completing ends here
@@ -432,6 +433,7 @@ def do_complete(c, tid, status=2, undo=None):
             c.execute("INSERT INTO task_tags(task_id,user_id,tag) VALUES(?,?,?)", (cur_id, r["user_id"], r["tag"]))
         c.execute("INSERT INTO task_field_values(task_id,field_id,value) SELECT ?, field_id, value FROM task_field_values WHERE task_id=?",
                   (cur_id, tid))
+        chn_note(c, cur_id, "complete")  # 2.367.3 (#2973): the original is open again after this; its completed copy is what the channels report
         c.execute("INSERT INTO sample_items(user_id,kind,item_id) SELECT user_id, 'task', ? FROM sample_items "
                   "WHERE kind='task' AND item_id=? ON CONFLICT DO NOTHING", (cur_id, tid))
         start = t["start"]

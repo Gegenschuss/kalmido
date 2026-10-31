@@ -232,6 +232,9 @@ def task_batch():
                     if e == lock_msg:
                         skipped.append(tid)
                     continue
+                if cf and len(cf) >= sum(len(v) if k == "fields" and isinstance(v, dict) else 1 for k, v in data.items() if k != "prev"):  # 2.370.0 (#3126): nothing written: not counted
+                    back()
+                    continue
             elif action == "patch_each":  # undo / redo: every task to its own values
                 if str(tid) not in per or not isinstance(per[str(tid)], dict):
                     continue

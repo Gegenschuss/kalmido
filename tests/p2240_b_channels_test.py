@@ -102,7 +102,7 @@ for s in (A, Bo, Ca, Fi):
 
 PATH = {"bob": "/b2240-bob", "carol": "/b2240-carol", "frida": "/b2240-frida"}
 for u, s in (("bob", Bo), ("carol", Ca), ("frida", Fi)):
-    r = s.post(B + "/api/me/channels", json={"kind": "slack", "name": "Mine", "url": STUB + PATH[u], "events": ["reminder", "assign", "comment", "lists"]})
+    r = s.post(B + "/api/me/channels", json={"kind": "slack", "name": "Mine", "url": STUB + PATH[u], "events": ["reminder", "assign", "comment", "lists", "own"]})  # 2.367.3 (#2973): own = the owner's own changes too
     assert r.status_code == 201, r.text
 # 2.240.0 B2 (#2867): a second channel of carol and frida for the summary and the other pushes (team chat, office, ...)
 for s, pth in ((Ca, "/b2240-carol-more"), (Fi, "/b2240-frida-more")):

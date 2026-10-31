@@ -6,6 +6,7 @@ odoc_render(c, doc_id) builds the print model (see docs/OFFICE.md) that the PDF 
 import json
 import os
 import re
+import unicodedata
 from datetime import date, timedelta
 
 from flask import g, jsonify, request
@@ -1248,13 +1249,40 @@ def odoc_groups():
     return jsonify(clients=clients[:300], projects=projects, years=years)
 
 
+def _odoc_text_key(s):
+    """Like the list's localeCompare (numeric, base): no case, no accents, "RE-9" before "RE-10"."""
+    s = unicodedata.normalize("NFKD", str(s)).casefold()
+    return [int(x) if i % 2 else x for i, x in enumerate(re.split(r"(\d+)", "".join(ch for ch in s if not unicodedata.combining(ch))))]
+
+
+def odoc_sorted(rows, k, d):
+    """2.458.0 (#3839): rows as office_docs.js lst_sorted shows them: the same value per kind, rows without one last in both directions."""
+    def val(r):
+        if k == "date":
+            return r["date"] or None
+        if k == "name":
+            s = r["project_title"] or r["number"]
+            return _odoc_text_key(s) if s else None
+        if k == "client":
+            s = _j(r["recipient"], {}).get("name")
+            return _odoc_text_key(s) if s else None
+        if r["kind"] == "delivery":
+            return None
+        return dec(_j(r["totals"], {}).get("gross" if r["kind"] in ("invoice", "credit") else "net") or 0)
+    vals = [(val(r), r) for r in rows]
+    full = [x for x in vals if x[0] is not None]
+    full.sort(key=lambda x: x[0], reverse=(d or ("asc" if k in ("client", "name") else "desc")) != "asc")
+    return [x[1] for x in full] + [x[1] for x in vals if x[0] is None]
+
+
 ODOC_PAGE_MAX = 500
 
 
 @app.get("/api/office/docs")
 def odoc_list():
     """?kind=offer&status=&q=&limit=&before= -> the organisation's documents, newest first (brief rows); 2.369.0 A (#3200):
-    a page of limit rows (1-500, default 500), next_cursor (null = the last page) is the before= of the next one."""
+    a page of limit rows (1-500, default 500), next_cursor (null = the last page) is the before= of the next one; &sort=&dir=
+    (#3839): the whole list sorted, the pages cut from it."""
     c, uid, oid = _ctx()
     kind = request.args.get("kind") or "offer"
     if kind not in DOC_KINDS:
@@ -1287,12 +1315,18 @@ def odoc_list():
     # 2.369.0 A (#3200): a page by (date, id), the order of the list: date is NOT NULL, ties and empty dates stay stable
     n = request.args.get("limit") or ""
     n = max(1, min(int(n), ODOC_PAGE_MAX)) if re.fullmatch(r"\d{1,6}", n) else ODOC_PAGE_MAX
+    srt = request.args.get("sort")  # 2.458.0 (#3839): the sort chosen in the list, decided before the page is cut
+    srt = srt if srt in ("date", "client", "amount", "name") else None
+    off = 0
     if request.args.get("before"):
-        cur = re.fullmatch(r"([^\x00]{0,40}),(\d{1,18})", request.args["before"])
+        cur = re.fullmatch(r"@(\d{1,9})" if srt else r"([^\x00]{0,40}),(\d{1,18})", request.args["before"])
         if not cur:
             raise BadInput(tr("Invalid value: {0}", "before"))
-        sql += " AND (date, id) < (?, ?)"
-        args += [cur[1], int(cur[2])]
+        if srt:
+            off = int(cur[1])
+        else:
+            sql += " AND (date, id) < (?, ?)"
+            args += [cur[1], int(cur[2])]
     # 2.281.0 C (#3115): the derived states are narrowed in SQL and decided before the 500 (an old overdue invoice was
     # missing behind the 500 newest); payments only of the rows shown; the language once
     derived = st in ("partial", "overdue", "open")  # 2.356.0 D (#3007): open = the open items (open + overdue, as kpi.py kpi_open)
@@ -1305,12 +1339,17 @@ def odoc_list():
             args.append(local_now().date().isoformat())
         elif st == "partial":  # 2.356.0 D (#3007): not for the open items
             sql += " AND EXISTS (SELECT 1 FROM office_payments p WHERE p.doc_id=office_docs.id AND p.org_id=office_docs.org_id)"
-    raw = c.execute(sql + " ORDER BY date DESC, id DESC" + ("" if derived else f" LIMIT {n + 1}"), args).fetchall()
-    pm = inv_paid_map(c, oid, [r["id"] for r in raw]) if kind in ("invoice", "credit") else {}
+    raw = c.execute(sql + " ORDER BY date DESC, id DESC" + ("" if derived or srt else f" LIMIT {n + 1}"), args).fetchall()
+    paid = kind in ("invoice", "credit")
+    pm = inv_paid_map(c, oid, [r["id"] for r in raw]) if paid and derived else {}
     if derived:
         raw = [r for r in raw if (dec(inv_money_fields(r, pm)["open"]) > 0 if st == "open" else inv_state(r, pm) == st)]
-    next_cursor = f"{raw[n - 1]['date']},{raw[n - 1]['id']}" if len(raw) > n else None
+    if srt:  # 2.369.0 (#3200 + #3839): sorted rows go on by position, the cursor is @<rows shown>
+        raw = odoc_sorted(raw, srt, request.args.get("dir"))[off:]
+    next_cursor = (f"@{off + n}" if srt else f"{raw[n - 1]['date']},{raw[n - 1]['id']}") if len(raw) > n else None
     raw = raw[:n]
+    if paid and not derived:
+        pm = inv_paid_map(c, oid, [r["id"] for r in raw])
     lg = lang()
     rows = [doc_brief(r, pm, lg) for r in raw]
     if kind == "offer":

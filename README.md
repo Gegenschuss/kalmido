@@ -19,7 +19,7 @@
 
 ## What's new
 
-**2.458.0** (2026-10-31):
+**2.460.0** (2026-10-31):
 - **Menus**: arrange every area menu yourself - hide, bring back, drag; the same on phone and computer.
 - **Settings**: new areas "Company & office" (the office settings, also for your private office) and "Documents"; Karakeep, newsletter service, bookmark button, CardDAV birthdays and booking page are set up in Settings > Integrations.
 - **Office**: client short code `{kuerzel}` in number schemes; invoice corrections optionally count in the invoice series; credit card statements - PDF positions read locally, a receipt per position, bank total matched, DATEV account of its own.

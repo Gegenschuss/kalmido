@@ -26,6 +26,7 @@ from ..accounts.login import seal, unseal
 from ..accounts.orgs import is_org_admin
 from ..core.access import Denied, list_role, reading_sql, task_visible
 from ..collab.comments import collab_on, comment_plain, user_names
+from ..collab.integfail import integ_org_admins, integ_tell
 from ..core.errors import BadInput
 from ..notify.alerts import _env_int, aa_count, aa_now
 from ..calendars.subscriptions import (
@@ -409,6 +410,14 @@ def who_obj(c, kind, oid, event):
     return None
 
 
+def wh_off_tell(c, w, what):
+    """2.367.3 (#2971): a webhook turned itself off: its owner / the organisation's admins hear it (the instance's admins only
+    get their alert). An agent's webhook: the admins' alert, as before."""
+    if not w["agent"]:
+        integ_tell(c, integ_org_admins(c, w["org_id"]) if w["org_id"] else [w["user_id"]], what, w["name"] or wh_host(w["url"]),
+                   click="settings/webhooks", focus="webhooks")
+
+
 def who_admin_ok(c, hooks):
     """The hooks whose organisation (if any) still has their creator as an admin; the others are turned off ('admin')."""
     from ..accounts.orgs import org_role
@@ -417,6 +426,7 @@ def who_admin_ok(c, hooks):
         if w["org_id"] and org_role(c, w["user_id"], w["org_id"]) != "admin":
             c.execute("DELETE FROM webhook_queue WHERE webhook_id=?", (w["id"],))
             c.execute("UPDATE webhooks SET enabled=0, disabled_reason='admin', updated_at=? WHERE id=?", (iso(now_utc()), w["id"]))
+            wh_off_tell(c, w, "webhook_admin")
             continue
         out.append(w)
     return out
@@ -493,6 +503,7 @@ def wh_result(c, r, res):
         print(f"webhook {w['id']} of user {w['user_id']} turned off after {att} failed attempts ({errc} {status or ''})", flush=True)
         aa_now("integration", f"webhook:{w['id']}", N_("Webhook {0} of {1} was turned off after {2} failed attempts to deliver an event (last error: {3})."),
                [w["id"], w["username"], att, errc + (f" {status}" if status else "")])
+        wh_off_tell(c, w, "webhook")
     else:
         c.execute("UPDATE webhook_queue SET attempt=?, next_at=? WHERE id=?", (att, time.time() + WH_BACKOFF[att - 1], r["id"]))
     c.commit()

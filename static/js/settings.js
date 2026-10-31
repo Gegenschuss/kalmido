@@ -528,7 +528,7 @@ function aiSubShow(md, want, save) {
 const ADM_SUBS = [['users', 'users', N_('People|admin'), 'org'], ['agents', 'bot', N_('Agents'), 'org'], ['odata', 'download', N_('Data'), 'org'],
   ['signin', 'key', N_('Sign-in'), 'users'], ['server', 'grid', N_('Server'), 'users'], ['log', 'alert', N_('Log & errors'), 'users']];
 const ad_subSec = k => (ADM_SUBS.find(x => x[0] === k) || [])[3];
-const ad_admFocus = f => ({users: 'users', groups: 'users', activity: 'agents', agentpolicy: 'agents', server: 'server', signin: 'signin'})[f];  // settingsModal(focus) -> sub-tab
+const ad_admFocus = f => ({users: 'users', odata: 'odata', groups: 'users', activity: 'agents', agentpolicy: 'agents', server: 'server', signin: 'signin'})[f];  // settingsModal(focus) -> sub-tab
 const ad_subKey = sec => sec === 'org' ? 'orgSub' : 'admSub';  // remembered per device and area
 function admSubCur(sec, ks, want) { const k = (want && ad_subSec(want) === sec ? want : '') || LS.get(ad_subKey(sec), ks[0]); return ks.includes(k) ? k : ks[0]; }
 function admSubsHtml(sec, parts, want) {
@@ -814,7 +814,7 @@ function settingsModal(focus) {
   pane.data += biz_dataHtml(); pane.integr += biz_integrHtml();  // 2.365.2 D (#2789): the office's data and its Peppol access (both live in Company & office)
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', dayplan: 'general'}[focus] || (INTB_FOCUS[focus] ? 'integr' : focus);  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
+  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', odata: 'org', dayplan: 'general'}[focus] || (INTB_FOCUS[focus] ? 'integr' : focus);  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
   if (/^biz-/.test(focus || '')) { S.bizJump = focus.slice(4); cur = 'biz'; }  // 2.365.2 D (#2789): a part of Company & office (office.js biz_jump scrolls there)
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';

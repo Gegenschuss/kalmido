@@ -485,6 +485,7 @@ ROUTES = {
     "GET /api/office/peppol": "office", "PUT /api/office/peppol": "office", "POST /api/office/peppol/check": "office",
     "GET /api/office/docs/{}/ubl": "office", "GET /api/office/docs/{}/peppol": "office", "POST /api/office/docs/{}/peppol": "office",
     "POST /api/office/docs/{}/peppol/lookup": "office",
+    "POST /api/office/docs/{}/peppol/undelivered": "office",  # 2.370.0 (#2778)
     "POST /api/office/docs/{}/peppol/refresh": "office",  # 2.306.0 D2 (#2875)
     "POST /api/office/docs/{}/cashflow": "office", "POST /api/office/docs/{}/duplicate": "office", "POST /api/office/docs/{}/fee": "office",
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)

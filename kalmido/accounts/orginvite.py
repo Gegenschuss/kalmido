@@ -253,7 +253,8 @@ def org_invite_resend(oid, ref):
 def org_invite_withdraw(oid, ref):
     """Withdraws an open invitation of this organisation: the account (never signed in) is deleted. -> {email, role} for
     the undo (invite again). 2.360.2 M (#2561): an invitation of an existing account just ends (also with invitations
-    switched off; the account stays, a News item it still shows answers that the invitation is gone)."""
+    switched off; the account stays, a News item it still shows answers that the invitation is gone).
+    2.458.0 (#3843): so does a new account's while another organisation's open invitation lies on it."""
     from ..accounts.users import user_purge
     from ..accounts.orgs import _need_org_admin
     c = db()
@@ -276,13 +277,22 @@ def org_invite_withdraw(oid, ref):
     with system_ctx(c):  # structure, not content: memberships / lists in organisations this admin cannot see count too
         other_org = c.execute("SELECT 1 FROM org_members WHERE user_id=? AND org_id!=?", (uid, oid)).fetchone()
         owns = c.execute("SELECT 1 FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()
+        cut = iso(now_utc() - timedelta(days=OJN_DAYS))
+        other_join = c.execute(f"SELECT 1 FROM org_joins j JOIN orgs o ON o.id=j.org_id WHERE j.user_id=? AND j.org_id!=? AND {OJN_LIVE} AND o.retired_at IS NULL", (uid, oid, cut, cut)).fetchone()
     if other_org:
         raise Denied(409, tr("The person belongs to another organisation as well"))  # never delete across the boundary
     if owns:
         raise Denied(409, tr("The person owns projects: remove the person from the organisation instead"))  # handed over meanwhile
     u = c.execute("SELECT email, display_name FROM users WHERE id=?", (uid,)).fetchone()
+    files = []
     with system_ctx(c):  # the never used account of this organisation's own invitation (its inbox, settings, membership)
-        files = user_purge(c, uid)
+        if other_join:  # 2.458.0 (#3843): another organisation's open invitation lies on it: the account stays, only ours ends
+            c.execute("DELETE FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid))
+            c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
+            c.execute("DELETE FROM org_invites WHERE org_id=? AND user_id=?", (oid, uid))
+            c.execute("DELETE FROM user_invites WHERE user_id=? AND used_at IS NULL", (uid,))  # review: this invitation's link ends with it
+        else:
+            files = user_purge(c, uid)
     bump(c)
     c.commit()
     unlink_files(files)

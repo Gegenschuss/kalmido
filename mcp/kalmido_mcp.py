@@ -1410,10 +1410,13 @@ TOOLS += [
      lambda api, a: api.call("DELETE", f"/tasks/{int(a['task_id'])}/links/{int(a['list_id'])}")),
     ("batch_tasks", "Change many tasks at once (1-500 ids): action update (changes = task fields as in update_task) | complete | "
                     "reopen | wont_do | delete | restore. Tasks you may not change are skipped (errors). An agent's batch with 10 or "
-                    "more tasks waits for a person's approval (approval_required + job).",
+                    "more tasks waits for a person's approval (approval_required + job). Against changes since you read: _prev "
+                    "(update), expect (complete, wont_do); what changed is skipped and listed in conflicts.",
      _obj({"ids": {"type": "array", "items": {"type": "integer"}, "minItems": 1, "maxItems": 500},
            "action": {"type": "string", "enum": ["update", "complete", "reopen", "wont_do", "delete", "restore"]},
-           "changes": {"type": "object"}}, ["ids", "action"]),
+           "changes": {"type": "object"},
+           "_prev": {"type": "object", "description": "2.370.0: {task id: {field: the value you read}}"},
+           "expect": {"type": "object", "description": "2.370.0: {task id: {expect_due: the due date you read or null, expect_time?}}"}}, ["ids", "action"]),
      lambda api, a: api.call("POST", "/tasks/batch", body=a)),
     ("reopen_task", "Reopen a completed task.", _obj({"task_id": S_ID}, ["task_id"]),
      lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/reopen")),

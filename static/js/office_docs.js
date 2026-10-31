@@ -82,7 +82,9 @@ const ofdSvcName = (s, d) => (ofdLang(d) === 'en' ? s.name_en || s.name_de : s.n
 // ---- loading
 // 2.358.0 B (#3302): a switch of kind / filter while a list loads is no longer dropped: the answer of the old one is thrown
 // away and the list loaded again (before: the offers stayed under "Invoices" after a quick click on the kind)
-const ofdListUrl = () => `/api/office/docs?kind=${OFD.kind}${OFD.status ? '&status=' + OFD.status : ''}${OFD.trial ? '&trial=' + OFD.trial : ''}${ofd_grpQs()}${OFD.listQ ? '&q=' + encodeURIComponent(OFD.listQ) : ''}`;
+const ofdListUrl = () => `/api/office/docs?kind=${OFD.kind}${OFD.status ? '&status=' + OFD.status : ''}${OFD.trial ? '&trial=' + OFD.trial : ''}${ofd_grpQs()}${ofd_sortQs()}${OFD.listQ ? '&q=' + encodeURIComponent(OFD.listQ) : ''}`;
+// 2.458.0 (#3839): a list the server cuts at 500 is sorted there too (docs.py odoc_list), the newest first is its own order
+const ofd_sortQs = () => { const s = lst_sort(ofd_listKey(OFD.kind)); return s.k === 'date' && s.d === 'desc' ? '' : `&sort=${s.k}&dir=${s.d}`; };
 // 2.369.0 A (#3200): the list comes in pages; another sorting than newest first needs the rows, so it takes the largest page
 const ofd_page = () => { const s = lst_sort(ofd_listKey(OFD.kind)); return s.k === 'date' && s.d === 'desc' ? 100 : 500; };
 // a reload keeps what "Load more" has shown (to one largest page)
@@ -218,7 +220,7 @@ function lst_sorted(rows, list, get, sorts = LST_SORTS) {
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-lsort]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();
-  const l = b.dataset.lsort; lst_sortMenu(b, l, l === 'pipeline' ? LST_MANUAL : LST_SORTS, () => { ofcDraw(); if (l.startsWith('docs.') && OFD.next) ofdLoadList(true); });  // 2.369.0 A (#3200): the sorting needs the larger page
+  const l = b.dataset.lsort; lst_sortMenu(b, l, l === 'pipeline' ? LST_MANUAL : LST_SORTS, () => { ofcDraw(); if (l.startsWith('docs.') && OFD.next) ofdLoadList(true); });  // 2.369.0 A (#3200): another sorting asks the server
 });
 const ofd_listKey = k => (k === 'archive' ? 'archive.' + oim_secKind() : 'docs.' + k);
 // ---- the list

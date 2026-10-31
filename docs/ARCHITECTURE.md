@@ -177,6 +177,7 @@ The most used helpers:
 | `api/v1.py` | REST API /api/v1 with personal access tokens: token management, authentication, the routes, errors, groups. |
 | `tasks/dayplan.py` | Day planning ("Plan my day") and the evening review. |
 | `api/openapi.py` | The OpenAPI 3.1 document of /api/v1 (served at /api/v1/openapi.json, built once). |
+| `collab/integfail.py` | 2.367.3 (#2971): an integration stopped working: one News item + push to who can repair it (`integ_tell`). |
 | `integrations/webhooks.py` | Webhooks per user: collecting events during a request, delivery, settings. |
 | `agents/core.py` | Agents: accounts, event queue + long polling, runtime settings, permissions of people towards agents. |
 | `collab/reactions.py` | Reactions on comments, tidy suggestions and shared list tags. |

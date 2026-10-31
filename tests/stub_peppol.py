@@ -11,6 +11,7 @@ import base64
 import http.server
 import json
 import os
+import time
 
 LOG = "/data/peppol.log"
 N = [0]
@@ -43,6 +44,10 @@ class H(http.server.BaseHTTPRequestHandler):
         if p.startswith("/sc/api/v2/legal_entities/"):
             return self._send(200, {"id": int(p.rsplit("/", 1)[1])})
         if p.startswith("/sc/api/v2/document_submissions/") and p.endswith("/evidence/sending"):
+            for _ in range(300):  # 2.370.0 (#2778): /data/peppol_hold not empty = the answer waits (at most 15 s)
+                if not (os.path.exists("/data/peppol_hold") and os.path.getsize("/data/peppol_hold")):
+                    break
+                time.sleep(0.05)
             return self._send(200, {"network": "peppol"}) if os.path.exists("/data/peppol_delivered") else self._send(404, {})
         if p == "/own/check":
             return self._send(200, {"ok": True})

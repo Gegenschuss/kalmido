@@ -322,7 +322,7 @@ check(A.delete(B + f"/api/orgs/{ORG}/channels/{CC}").ok, "removed")
 FID, Fi = freelancer(B, A, "frida")
 check(Fi.get(B + "/api/me/channels").json()["channels"] == [], "the freelancer: no channels yet")
 check(Fi.get(B + f"/api/orgs/{ORG}/channels").status_code == 404, "the freelancer: no organisation's channels")
-r = Fi.post(B + "/api/me/channels", json={"kind": "slack", "name": "Mine", "url": STUB + "/frida", "events": ["lists", "reminder"]})
+r = Fi.post(B + "/api/me/channels", json={"kind": "slack", "name": "Mine", "url": STUB + "/frida", "events": ["lists", "own", "reminder"]})  # 2.367.3 (#2973): own = the owner's own changes too
 check(r.status_code == 201, f"the freelancer adds a channel: {r.text[:200]}")
 FC = r.json()["id"]
 check(Fi.patch(B + f"/api/me/channels/{FC}", json={"name": "My studio"}).json().get("name") == "My studio", "the freelancer renames it")

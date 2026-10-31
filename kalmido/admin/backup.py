@@ -19,23 +19,26 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from flask import Response, g, jsonify, request, send_file
 
-from ..core.config import app, APP_VERSION, ATT_DIR, DATABASE_URL, DB, OFFICE_DIR, SECRET_KEY, SESSION_DAYS, TZ
+from ..core.config import app, APP_NAME, APP_VERSION, ATT_DIR, DATABASE_URL, DB, OFFICE_DIR, PUBLIC_URL, SECRET_KEY, SESSION_DAYS, TZ
 from ..core.schema import PURGED_TABLES, SCHEMA_TRIGGERS, SCHEMA_VERSION
 from ..core import pg as _pg
-from ..core.i18n import N_, tr
-from ..core.db import body, connect, db, err, gset, gsetting, init_db, iso, local_now, now_utc, parse_iso
+from ..core.i18n import LANGS, N_, tr
+from ..core.db import body, connect, db, err, gset, gsetting, init_db, iso, local_now, now_utc, parse_iso, usettings
+from ..core.mailframe import mail_html
+from ..core.pg import system_ctx
 from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database errors in the log
 from ..core.db import appver_newer_minor, appver_parse, skfp_kek, skfp_of, skfp_row_opens, SKFP_KEY
 from ..core.serializers import unlink_files
 from ..core.env import env_bool
 from ..core.retention import ret_on as bk_ret_on  # 2.186.0 C (#2602)
 from ..accounts.session import _rate_fail, _rate_keys, GATE, login_wait, set_cookie, start_session
-from ..accounts.bgjobs import bgj_add, bgj_fn, bgj_pending
+from ..accounts.bgjobs import BGJ_FNS, bgj_add, bgj_fn, bgj_pending
 from ..accounts.login import _AUTH_KEY, _PEND, _PEND_LOCK, seal, unseal
 from ..accounts.oidc import _OIDC_LOCK, _OIDC_STATES, oidc_reset
 from ..core.access import Denied, acx_drop
 from ..tasks.validation import valid_hm
 from ..tasks.lifecycle import UNDO_KEY
+from ..collab.integfail import integ_tell
 from ..collab.news import NEWS_CLEAN
 from ..accounts.users import need_admin
 from ..calendars.caldav import _DAV_CACHE, _DAV_CACHE_LOCK, _DAV_INST
@@ -806,6 +809,7 @@ def bk_run(kind):
         print("backup FAILED:", e.text("en"), flush=True)
         aa_now("storage", f"backup:{e.code}", N_("Backup failed: {0}"), [{"t": BK_ERR.get(e.code, BK_ERR["format"])} if not e.args_
                                                                        else e.text("en")])
+        bk_fail_tell(c, e)
         return None
     finally:
         if c is not None:
@@ -871,6 +875,31 @@ def backup_tick(c):
             last = gsetting(c, "bk_last_ok")
             aa_now("storage", "backup:stale", N_("The last successful backup is older than 2 days ({0})."),
                    [last[:16].replace("T", " ") + " UTC" if last else {"t": N_("none yet")}])
+
+
+def bk_fail_tell(c, e):
+    """2.367.3 (#2971): a failed backup reaches every instance admin as a News item, a push and a mail, whatever the admin alerts
+    are set to (an error with a backup is worth a second way); once a day per error, the next try comes within the hour."""
+    key = f"{local_now().date().isoformat()}:{e.code}"
+    try:
+        if c is None or gsetting(c, "bk_fail_told") == key:
+            return
+        gset(c, "bk_fail_told", key)
+        with system_ctx(c):  # every instance admin
+            rows = c.execute("SELECT id, email FROM users WHERE is_admin=1 AND disabled=0 AND kind<>'agent' ORDER BY id").fetchall()
+            langs = {r["id"]: usettings(c, r["id"]).get("lang") for r in rows}
+        integ_tell(c, [r["id"] for r in rows], "backup", e.text, click="settings/odata", focus="odata")
+        c.commit()
+    except Exception as x:  # noqa: BLE001 -- no database: the log and the admin alert above are what is left
+        print("backup: telling the admins failed:", type(x).__name__, flush=True)
+        return
+    link = f"{PUBLIC_URL}/#settings/odata"
+    for r in rows if "mail:security" in BGJ_FNS else ():  # the background mail of integrations/mail.py: only with outgoing mail
+        if not (r["email"] or "").strip():
+            continue
+        lg = langs[r["id"]] if langs[r["id"]] in LANGS else "en"
+        subject, line = f"{APP_NAME}: {tr('Backup failed: {0}', e.text(lg), lg=lg)}", tr("Please check the backup settings.", lg=lg)
+        bgj_add("mail:security", r["email"], subject, f"{line}\n\n{link}", mail_html(subject, [line], tr("Open settings", lg=lg), link, lang=lg), user_id=r["id"])
 
 
 def backup_loop():
