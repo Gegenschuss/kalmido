@@ -83,11 +83,13 @@ const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + u
     check(it.some(x => /^Filter: Jobs/.test(x)), label + ': the entry shows which filter holds ' + JSON.stringify(it));
     // steps: the entry switches, with its state
     await pickItem(ev, '/^Always show steps/');
-    check(await ready(ev, `S.settings && S.settings.agent_steps_always === '1'`), label + ': "Always show steps" switches on');
+    // 2.456.0 (#3850): the server's value, not the local one: the next window starts from it, and the switch back must not overtake this one
+    const onServer = want => `fetch('/api/state').then(r => r.json()).then(j => (j.settings.agent_steps_always === '1') === ${want})`;
+    check(await ready(ev, `S.settings && S.settings.agent_steps_always === '1'`) && await ready(ev, onServer(true)), label + ': "Always show steps" switches on');
     await openMenu(ev); it = await ev(items);
     check(it.some(x => /^Always show steps.*\[on\]/.test(x)), label + ': ... and the entry is marked ' + JSON.stringify(it));
     await pickItem(ev, '/^Always show steps/');
-    check(await ready(ev, `S.settings.agent_steps_always !== '1'`), label + ': switches off again');
+    check(await ready(ev, `S.settings.agent_steps_always !== '1'`) && await ready(ev, onServer(false)), label + ': switches off again');
     // back to All
     await openMenu(ev); await pickItem(ev, '/^Filter/');
     await ready(ev, `[...document.querySelectorAll('#pop:not(.hidden) [role=menuitem]')].some(x => x.textContent.trim() === 'All')`);
