@@ -46,3 +46,4 @@ p269_a_api 2026-11-14 #3815 rot in der Vorprüfung über 47494c22, zweimal grün
 p252_a_ui 2026-11-14 #3822 CI 2.436.0 red (run 41171546164); Mac green 20261031-072237-1772572-s1, 20261031-072357-1780334-s1 (same code)
 p21522_c_ui 2026-11-14 #3850 Vorprüfung 2.451.0 red; Mac green 20261031-105538, 20261031-111000 (same test and chat code)
 p2353_a_lockfolder_ui 2026-11-14 #3851 Vorprüfung 2.451.0 red; Mac green 20261031-105538, 20261031-111000 (same test and lock code)
+p2233_c_chatcolor_ui 2026-11-14 #3861 rot in der Vorprüfung über bb4307e5, zweimal grün auf dem Mac bb4307e5d06f (#1814): red 31.10.2026 13:44; green Mac 20261031-134457-3477306-s1, Mac 20261031-134542-3479477-s1 (same code)
