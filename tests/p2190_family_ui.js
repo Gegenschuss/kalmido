@@ -323,7 +323,7 @@ const FAM = 'cal,habits,comments,collab,family';
   const axe = async (ev, where) => {
     if ((await ev(`typeof axe`)) === 'undefined') await ev(AXE + '\n;1');
     const r = await ev(`axe.run(document, {runOnly: {type: 'tag', values: ${JSON.stringify(TAGS)}}, resultTypes: ['violations']}).then(r => r.violations.map(v => ({id: v.id, n: v.nodes.length, nodes: v.nodes.slice(0, 2).map(x => x.target.join(' ') + ' ' + (x.failureSummary || '').slice(0, 120))})))`);
-    check(!r.length, `${where}: no axe violations: ` + r.map(v => `${v.id}(${v.n}) ${v.nodes[0]}`).join(' | ').slice(0, 700));
+    check(!r.length, `${where}: no axe violations: ` + r.map(v => `${v.id}(${v.n}) ${v.nodes[0]}`).join(' | ').replace(/\s+/g, ' ').slice(0, 700));
   };
   for (const [vw, vh, th] of [[360, 780, 'light'], [390, 844, 'dark'], [412, 915, 'light'], [904, 1080, 'dark'], [1080, 904, 'light']]) await firefox(async o => {
     const {cmd, ev, ctx, shot} = o, tap = tapper(o), tag = `${vw}x${vh} ${th}`;
@@ -354,7 +354,10 @@ const FAM = 'cal,habits,comments,collab,family';
     await call('POST', `/api/tasks/${it.id}/reopen`);
     await ev(`(() => { document.querySelector('.shopmode')?.remove(); return 1; })()`);
     // the task panel's family section
-    await o.nav(B + '#t/' + BD.id); await ready(ev, '#detail .famsec');
+    await ev(`openDetail(${BD.id}); 1`);
+    // #3506: the panel really open (the section can sit in a panel still hidden: the checks below then measured nothing),
+    // the year field clear of the sticky bottom bar (it scrolls, 96 x 13 px of it showed above the bar)
+    check(await until(() => ev(`(() => { const e = document.querySelector('#detail.open:not(.hidden) .famsec #d-fyear'); if (!e) return false; e.scrollIntoView({block: 'center'}); return e.getBoundingClientRect().height > 0; })()`), 80), `${tag}: the task panel opens`);
     check(await ev(`document.documentElement.scrollWidth - innerWidth`) <= 0, `${tag}: task panel: nothing sideways`);
     const sm3 = await ev(SMALL('#detail .famsec button'));
     check(!sm3.length, `${tag}: family section: targets 44 px ` + JSON.stringify(sm3));
