@@ -834,7 +834,7 @@ function dc_fEntries() {  // the chosen filters: [{label, not, rm}]
 function dc_fbarHtml() {
   const es = dc_fEntries(), q = DC.q.trim();
   if (!es.length && !q) return '';
-  return `<div class="tsfbar dc-fbar" role="group" aria-label="${esc(tr('Filter'))}">${q ? `<button type="button" class="tsfx" data-dcx="q" aria-label="${esc(tr('Remove filter {0}', q))}">„${esc(q)}“ ${ic('x', 's')}</button>` : ''}
+  return `<div class="tsfbar dc-fbar" role="group" aria-label="${esc(tr('Filter'))}">${q ? `<button type="button" class="tsfx" data-dcx="q" aria-label="${esc(tr('Remove filter {0}', q))}">${esc(tr('“{0}”', q))} ${ic('x', 's')}</button>` : ''}
     ${es.map((e, i) => `<button type="button" class="tsfx ${e.not ? 'not' : ''}" data-dcx="${i}" aria-label="${esc(tr('Remove filter {0}', e.label))}">${e.not ? `${tr('not')} ` : ''}${esc(e.label)} ${ic('x', 's')}</button>`).join('')}
     ${Object.values(DC.f.tg || {}).filter(x => x === 'in').length > 1 ? `<span class="tsfn">${DC.f.tmode === 'all' ? tr('every one') : tr('one of them')}</span>` : ''}
     ${DC.docs ? `<span class="tsfn" aria-live="polite">${esc(trn('{0} hit', '{0} hits', DC.total))}</span>` : ''}<button type="button" class="linkbtn" data-dc="clear">${tr('Reset filters')}</button></div>`;

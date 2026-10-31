@@ -7,6 +7,7 @@ from flask import g, has_request_context
 from ..core.config import PUBLIC_URL
 from ..core.pg import insert_id, st_ids, system_ctx
 from ..core.i18n import lang, LANGS, N_, tr
+from ..core.numtext import parse_num, user_dec
 from ..core.db import iso, local_now, now_utc, uset, usettings
 from ..accounts.session import me, user_public
 from ..core.access import collab_all, Denied, list_people, my_max_sort, need_list, vis_sql, wr_sql, task_visible, time_all
@@ -319,8 +320,8 @@ def qty_parse(s):
     m = re.fullmatch(r"(\d{1,6})\s*/\s*(\d{1,4})", s)
     if m:
         return int(m.group(1)) / int(m.group(2)) if int(m.group(2)) else None
-    m = re.fullmatch(r"\d{1,6}(?:[.,]\d{1,3})?", s)
-    return float(s.replace(",", ".")) if m else None
+    # 2.368.5 (#2991): like qtyParse in family.js: "1,000 g" in English is 1000, not 1
+    return parse_num(s, user_dec()) if re.fullmatch(r"\d{1,6}(?:[.,]\d{1,3})?", s) else None
 
 
 def clean_rotation(v):

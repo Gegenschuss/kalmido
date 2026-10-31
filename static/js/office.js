@@ -606,7 +606,7 @@ const ofcMdLabelHtml = (cf, dis) => ofcRowF('osc-md_label', tr('Printed as'), `<
 // 2.40.0 (#1382): the number schemes explained -- building blocks as buttons (inserted at the caret), a table behind (i),
 // the next number of each scheme with its counter (restarts every year or never), errors in plain words from the server
 const OFC_BB = [['{yyyy}', N_('Year'), '2026'], ['{yy}', N_('Year, short'), '26'], ['{seq:03}', N_('Running number, 3 digits'), '001'], ['{seq}', N_('Running number'), '1'],
-  ['{project}', N_('Project'), 'Imagefilm'], ['{client}', N_('Client'), 'Beispiel-AG'], ['{kuerzel}', N_('Short code of the client'), 'TNP'], ['{date}', N_('Date'), '20261014'],
+  ['{project}', N_('Project'), N_('Promo film')], ['{client}', N_('Client'), N_('Example Ltd')], ['{kuerzel}', N_('Short code of the client'), 'TNP'], ['{date}', N_('Date'), '20261014'],
   ['{isodate}', N_('Date with hyphens'), '2026-10-14'], ['{initials}', N_('Initials of the person'), 'AB']];  // 2.138.2 A (#2391); 2.433.0 (#3604): {kuerzel}
 const OFC_BB_VER = ['{version}', N_('Version'), '2'];  // 2.118.0 A (#2265): quotations only (the duplicate of a quotation = the next version)
 OFC.pv = OFC.pv || {};
@@ -615,7 +615,7 @@ function ofcSchemeHtml(id, kind, label, val, dis) {
   if (!pv || pv.scheme !== cur) setTimeout(() => { const el = $('#' + id); if (el && !OFC.pv[kind]?.busy) ofcSchemePv(el, true); }, 0);
   const pvText = pv && pv.scheme === cur ? pv.text : kind === 'offer' && OFC.info.number_preview ? tr('next: {0}', OFC.info.number_preview) : '';
   const bbs = kind === 'offer' ? [...OFC_BB, OFC_BB_VER] : OFC_BB;  // 2.118.0 A (#2265)
-  const table = tr('Building blocks of a number:') + '\n' + bbs.map(([b, n, ex]) => `${b} = ${tr(n)} (${ex})`).join('\n') + '\n' + tr('Examples: RE-{yyyy}-{seq:03} gives RE-2026-001; {yyyy}-{seq:04} gives 2026-0001; R{yy}{seq:03} gives R26001.')
+  const table = tr('Building blocks of a number:') + '\n' + bbs.map(([b, n, ex]) => `${b} = ${tr(n)} (${tr(ex)})`).join('\n') + '\n' + tr('Examples: RE-{yyyy}-{seq:03} gives RE-2026-001; {yyyy}-{seq:04} gives 2026-0001; R{yy}{seq:03} gives R26001.')
     + '\n' + tr('With a year in the scheme the counter starts again at 1 every year; without one it simply counts on.') + (kind === 'invoice' ? '\n' + tr('Invoices get their number only when they are finalised, one after the other without gaps.') : '')
     + (kind === 'offer' ? '\n' + tr('{version}: the first quotation is 1, each duplicate of it the next version with the same running number.') : '');
   return ofcRowF(id, label, `<span class="lacts ofcscheme"><input id="${id}" data-scheme="${kind}" value="${esc(cur)}" maxlength="80" autocomplete="off" spellcheck="false" ${dis}><span class="muted ofcpv" id="${ofcPvId(id)}" aria-live="polite">${esc(pvText)}</span><button type="button" class="btn sm ofcrs" id="${id}-rs" data-ofc="scheme-reset" data-for="${id}" data-kind="${kind}" hidden>${esc(tr('Reset'))}</button></span>`,  // 2.114.2 (#2264): error under the field + reset
