@@ -11,6 +11,7 @@ from ..core.config import app, PUBLIC_URL, TZ
 from ..core.pg import IntegrityError, insert_id, Row
 from ..core.i18n import dec_comma, lang, LANGS, tr
 from ..core.db import body, bump, db, err, gsetting, iso, local_now, now_utc, parse_iso, usettings
+from ..core.usertz import hm_text, tz_of_s
 from ..accounts.session import me, user_public
 from ..core.access import (
     _pset_sql, Denied, health_hidden, list_role, need_feat, need_list, need_task, need_time, plists,
@@ -822,7 +823,6 @@ def time_watchdog(c, users, S, LG):
 
 def _time_watch_one(c, r, users, S, LG, ref):
     from ..notify.push import notify, push_prio
-    from ..core.usertz import hm_text, tz_of_s  # 2.125.0 B (#2120): the stop time in the person's time zone
     uid = r["user_id"]
     if uid not in users:
         return
