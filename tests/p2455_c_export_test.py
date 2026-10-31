@@ -124,7 +124,7 @@ def parts(lid):
     """A list with what its rules can point at."""
     sec = dbx("INSERT INTO sections(list_id,name) VALUES(?,'Doing') RETURNING id", (lid,))[0][0]
     tag = dbx("INSERT INTO list_tags(list_id,name,created_at) VALUES(?,'Hot',?) RETURNING id", (lid, TS))[0][0]
-    fld = dbx("INSERT INTO list_fields(list_id,name,type) VALUES(?,'Lead','person') RETURNING id", (lid,))[0][0]
+    fld = dbx("INSERT INTO list_fields(list_id,name,type,created_at) VALUES(?,'Lead','person',?) RETURNING id", (lid, TS))[0][0]
     return sec, tag, fld
 
 
