@@ -19,7 +19,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.orgcrypt import oc_enc_fields
 from ..core.errors import BadInput
 from ..api.common import v1_view
-from ..core.csvimport import amount_text
+from ..core.csvimport import amount_text, csv_table_numbered
 from .calc import dec, dstr, money
 from .model import office_on, office_role, pb_cl_org, pb_cl_sql
 from .rights import ofr_rights
@@ -263,7 +263,6 @@ def lead_parse(c, oid, text):
     next_step, follow_up, note, value, error, dup}. Duplicates: the e-mail of a deal of the area or of an earlier row;
     2.363.2 (#3104): a row without an e-mail by lead_key (it came in new on every run)."""
     from ..life.budget import BUD_ROWS_MAX
-    from ..core.csvimport import csv_table_numbered
     if not isinstance(text, str) or not text.strip():
         raise BadInput(tr("The file is empty"))
     _d, header, rows, nums = csv_table_numbered(text, BUD_ROWS_MAX)

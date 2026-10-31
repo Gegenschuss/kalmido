@@ -30,6 +30,7 @@ from ..core.pg import insert_id
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .cashflow import MAX_FIXED, _ctx, fci_gross, rk_fixed, rk_fixed_clean
+from .legacyimport import _upload, fi_book, fx_run, fx_settle
 from .model import office_settings, office_settings_lock, office_settings_save
 from ..core.access import my_inbox  # 2.149.0 G (#2517): pulled up from functions
 
@@ -147,7 +148,6 @@ def fci_preview(c, oid, raw, name=""):
     """{rows: [{row, label, amount, gross, repeat, start, month, category, vat_rate, status new|dup|error, reason, sel,
     part}], counts: {new, dup, error}, header: [...]}.
     2.363.2 (#3106): also .xls / CSV (fi_book); the first sheet with a header row counts, not simply the first sheet."""
-    from .legacyimport import fi_book
     grids = [g for g in fi_book(raw, name).values() if g]
     if not grids:
         raise BadInput(tr("The spreadsheet is empty"))
@@ -237,7 +237,6 @@ def fci_preview(c, oid, raw, name=""):
 @app.post("/api/office/fixed-costs/import/preview")
 def fci_preview_post():
     """Office admin. multipart 'file' (.xlsx, .xls, CSV) -> fci_preview. Nothing is stored."""
-    from .legacyimport import _upload
     c, uid, oid = _ctx()
     f, raw = _upload("file", FCI_FILE_MAX)
     return jsonify(fci_preview(c, oid, raw, f.filename or ""))
@@ -290,7 +289,6 @@ def fci_write(c, uid, oid, items, detail=None, kept=None, run=False):
         ids.append(insert_id(c, f"INSERT INTO office_fixed_costs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())))
     ofx_log(c, oid, "import", target="fixed_costs", detail={"count": len(ids), **(detail or {})})
     if run:
-        from .legacyimport import fx_run
         fx_run(c, oid, uid, "fixed_costs", ids)
     return ids
 
@@ -336,7 +334,6 @@ def fci_delete_many():
     q = ",".join("?" * len(ids))
     have = c.execute(f"SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=? AND id IN ({q})", [oid] + ids).fetchone()[0] if ids else 0
     n = fci_remove(c, oid, ids)
-    from .legacyimport import fx_settle
     fx_settle(c, oid, uid, "fixed_costs")  # 2.363.2 (#3104)
     bump(c)
     c.commit()
