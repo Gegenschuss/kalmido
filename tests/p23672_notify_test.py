@@ -10,6 +10,11 @@ freelancer-matrix: tasks
  (5) the approval News are on by default; a list-wide one survives reading
  (6) a task assigned to a group: push like a plain assignment, an agent in the group gets none
  (7) a person without an organisation asks for an approval and decides on a review
+#2969
+ (8) an event moved / with another place / cancelled / deleted / one date dropped / a person taken off the list: News + push to the people of
+     the server invited; who declined and who did it get nothing; the News show the newest change of an event only
+ (9) a booking: News + mail line + push, also without a push device
+ (10) a calendar subscription failed 3 times: one News item for the person, gone once it works again; the row has no push
 usage: p23672_notify_test.py <datadir>"""
 import json
 import os
@@ -236,6 +241,115 @@ T10 = task(Fr, "Own one", FL)
 r = Fr.post(B + f"/api/tasks/{T10}/approval", json={"action": "request", "approver_id": BOB})
 check(r.ok and Bo.post(B + f"/api/tasks/{T10}/approval", json={"action": "reject"}).ok, "(7) frida asks, bob rejects")
 check([x for x in news(Fr, "apdecide") if x["data"]["state"] == "rejected"], "(7) frida hears of it")
+
+# ---- (8) events
+D = "2026-11-20"
+
+
+def event(title, **kw):
+    r = A.post(B + "/api/events", json={"title": title, "start": f"{D}T15:00", "end": f"{D}T16:00", "tz": "Europe/Berlin",
+                                        "attendees": [{"user_id": BOB}, {"user_id": CAROL}, {"user_id": DAVE}], **kw})
+    assert r.status_code < 300, r.text
+    eid = r.json()["id"]
+    assert Da.post(B + f"/api/events/{eid}/rsvp", json={"partstat": "declined"}).status_code < 300 or \
+        dbw("UPDATE event_attendees SET partstat='declined' WHERE event_id=? AND user_id=?", (eid, DAVE)) is not None
+    return eid
+
+
+def evnews(s, eid):
+    return [x for x in news(s, "evchange") if x["data"]["event_id"] == eid]
+
+
+E1 = event("Kickoff")
+check(news(Bo, "evinvite"), "(8) the invitation as before")
+clear()
+r = A.patch(B + f"/api/events/{E1}", json={"start": f"{D}T16:00", "end": f"{D}T17:00"})
+check(r.ok, f"(8) moved {r.status_code} {r.text[:200]}")
+p = pushed("t-bob", "Time changed: Kickoff")
+check(p and "Alice" in p["msg"] and p["click"].endswith(f"/#ev/{E1}"), f"(8) the push: {pushes()}")
+check(pushed("t-carol", "Time changed: Kickoff"), "(8) every invited person")
+check(not titles("t-alice") and not titles("t-dave"), f"(8) not who did it, not who declined: {titles('t-alice')} {titles('t-dave')}")
+it = evnews(Bo, E1)
+check(len(it) == 1 and it[0]["data"]["what"] == "time" and it[0]["to_me"], f"(8) News, for me: {it}")
+clear()
+A.patch(B + f"/api/events/{E1}", json={"title": "Kickoff 2"})
+check(not evnews(Bo, E1)[0]["data"]["title"] == "Kickoff 2" and len(evnews(Bo, E1)) == 1, "(8) a new title alone is no such change")
+r = A.patch(B + f"/api/events/{E1}", json={"location": "Room 2"})
+it = evnews(Bo, E1)
+check(len(it) == 1 and it[0]["data"]["what"] == "place", f"(8) the newest change only: {it}")
+clear()
+E2 = event("Workshop")
+time.sleep(0.2)
+clear()
+r = A.patch(B + f"/api/events/{E2}", json={"location": "Room 3"})
+p = pushed("t-bob", "Place changed: Workshop")
+check(p and "Room 3" in p["msg"], f"(8) the new place: {pushes()}")
+E3 = event("Lunch")
+clear()
+r = A.patch(B + f"/api/events/{E3}", json={"status": "cancelled"})
+check(r.ok and pushed("t-carol", "Cancelled: Lunch"), f"(8) called off: {r.status_code} {pushes()}")
+check(evnews(Ca, E3) and evnews(Ca, E3)[0]["data"]["what"] == "cancelled", "(8) News")
+E4 = event("Dinner")
+clear()
+r = A.delete(B + f"/api/events/{E4}")
+check(r.ok and pushed("t-bob", "Cancelled: Dinner"), f"(8) deleted: {r.status_code} {pushes()}")
+check(evnews(Bo, E4), "(8) the News stay after the event is gone")
+check(not evnews(Da, E4), "(8) who declined gets none")
+E5 = event("Standup")
+clear()
+r = A.patch(B + f"/api/events/{E5}", json={"attendees": [{"user_id": BOB}]})
+check(r.ok and pushed("t-carol", "You are no longer invited: Standup"), f"(8) off the list: {r.status_code} {pushes()}")
+check(not [x for x in titles("t-bob") if "Standup" in x], f"(8) who stays hears nothing: {titles('t-bob')}")
+E6 = event("Series", rrule="FREQ=DAILY;COUNT=5")
+clear()
+r = A.delete(B + f"/api/events/{E6}", params={"occ": f"{D}T15:00"})
+if not r.ok:
+    r = A.delete(B + f"/api/events/{E6}/occurrence", params={"occ": f"{D}T15:00"})
+check(r.ok and pushed("t-bob", "One date cancelled: Series"), f"(8) one date: {r.status_code} {r.text[:200]} {pushes()}")
+
+# ---- (9) a booking (frida: no organisation, no push device)
+dbw("""INSERT INTO appt_bookings(user_id,start,"end",name,email,status,created_at) VALUES(?,?,?,?,?,?,?)""",
+    (FID, "2026-11-21T09:00:00Z", "2026-11-21T09:30:00Z", "Pat Client", "pat@example.test", "confirmed", "2026-10-31T10:00:00Z"))
+bid = dbw("SELECT id FROM appt_bookings WHERE user_id=?", (FID,))[0][0]
+A.patch(B + f"/api/users/{FID}", json={"ntfy_topic": ""})
+out = in_app(f"""
+from flask import g
+from kalmido.calendars import apptbook as ab
+from kalmido.notify import channels as ch
+ch.MAIL_OUT_ON = True
+import kalmido.integrations.mail as im
+im.MAIL_OUT_ON = True
+r = c.execute("SELECT * FROM appt_bookings WHERE id=?", ({bid},)).fetchone()
+with flask_app.test_request_context():
+    ab.apb_push(c, r, "new")
+    n = len(g.get("pushes") or [])
+c.commit()
+q = c.execute("SELECT kind, comment_id FROM notify_mail_queue WHERE user_id=?", ({FID},)).fetchall()
+out = {{"pushes": n, "queue": [list(x) for x in q], "line": ab.apb_mail_line(c, {bid}, {FID}, "en")}}
+""")
+it = news(Fr, "apbooking")
+check(len(it) == 1 and it[0]["to_me"] and "Pat Client" in it[0]["data"]["line"] and it[0]["data"]["what"] == "new", f"(9) News: {it}")
+check(out["queue"] == [["apbook", bid]] and out["line"][0] == "New booking" and "Pat Client" in out["line"][1], f"(9) the mail line: {out}")
+check(out["pushes"] == 1, f"(9) the push stays: {out}")
+
+# ---- (10) a calendar subscription that keeps failing
+NOW = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())  # just tried, hourly: the server's own sync leaves it to the test
+dbw("INSERT INTO cal_subs(user_id,kind,name,url,status,fails,interval,tried_at,created_at) VALUES(?,?,?,?,?,?,?,?,?)", (FID, "ics", "Sport", "x", "error", 1, 60, NOW, NOW))
+sid = dbw("SELECT id FROM cal_subs WHERE user_id=?", (FID,))[0][0]
+sync = f"from kalmido.calendars.subscriptions import cal_sync\ncal_sync(c, {sid}, force=True)\nout = c.execute('SELECT fails FROM cal_subs WHERE id=?', ({sid},)).fetchone()[0]"
+check(in_app(sync) == 2 and not news(Fr, "calsub"), "(10) twice: nothing yet")
+check(in_app(sync) == 3, "(10) third failure")
+it = news(Fr, "calsub")
+check(len(it) == 1 and it[0]["data"]["name"] == "Sport" and it[0]["to_me"] and "x" not in json.dumps(it[0]["data"].get("url", "")), f"(10) one News item, the name only: {it}")
+check(in_app(sync) == 4 and len(news(Fr, "calsub")) == 1, "(10) once per streak")
+check(not news(A, "calsub"), "(10) nobody else")
+dbw("UPDATE cal_subs SET fails=0, status='ok' WHERE id=?", (sid,))
+check(not news(Fr, "calsub"), "(10) gone once it works")
+out = in_app("""
+from kalmido.collab.news import notif_matrix
+out = notif_matrix({})["calsub"]
+""")
+check(out == {"news": True, "push": None}, f"(10) a row of its own, News only: {out}")
 
 print(f"p23672_notify: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

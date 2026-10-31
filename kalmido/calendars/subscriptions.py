@@ -68,6 +68,7 @@ CAL_TIMEOUT, CAL_DEADLINE = 20, 60  # s per socket operation / for a whole downl
 CAL_MAX_SUBS = 20            # per user
 CAL_INTERVALS = (15, 60)     # minutes
 CAL_ALERT_FAILS = 5          # failed syncs in a row -> admin alert ("integration")
+CAL_USER_FAILS = 3           # 2.367.2 (#2969): failed syncs in a row -> one News item for the person
 CAL_NET_LIMIT = _env_int("KALMIDO_CALENDAR_RATE", 30)  # adds / discoveries / manual refreshes per user within FAIL_WINDOW (15 min)
 CAL_COLORS = ("#6d8cff", "#2dd4bf", "#f5b041", "#f87171", "#c084fc", "#4ade80", "#f472b6", "#94a3b8", "#6ee7b7")
 CAL_TEXT = {"title": 300, "location": 300, "description": 4000}
@@ -901,6 +902,9 @@ def cal_sync(c, sid, force=False):
             upd.update(status="error", error=ce.stored(), fails=s["fails"] + 1)
             if not s["name"]:
                 upd["name"] = (urllib.parse.urlsplit(url).hostname if url else "") or tr("Calendar", lg=lg)
+            if upd["fails"] == CAL_USER_FAILS:  # 2.367.2 (#2969): once per streak, the name only (never the link)
+                from ..collab.news import news_add
+                news_add(c, s["user_id"], "calsub", actor=0, data={"sub_id": sid, "name": upd.get("name") or s["name"]})
             if upd["fails"] >= CAL_ALERT_FAILS:
                 aa_now("integration", f"calendar:{sid}:{ce.code}",
                        N_("Calendar subscription #{0} of user {1} failed {2} times in a row ({3})."),

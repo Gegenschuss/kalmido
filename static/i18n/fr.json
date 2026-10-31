@@ -15360,5 +15360,19 @@
   "{0} is waiting for your approval: {1}": "{0} attend ton approbation : {1}",
   "A linked pull request approved {0}": "Une pull request liée a approuvé {0}",
   "{0} approved the review of {1}": "{0} a approuvé la relecture de {1}",
-  "Requested by {0}": "De {0}"
+  "Requested by {0}": "De {0}",
+  "Time changed: {0}": "Heure modifiée : {0}",
+  "Place changed: {0}": "Lieu modifié : {0}",
+  "One date cancelled: {0}": "Une date annulée : {0}",
+  "You are no longer invited: {0}": "Tu n'es plus invité : {0}",
+  "No place": "Aucun lieu",
+  "New booking: {0}": "Nouvelle réservation : {0}",
+  "Booking cancelled by the customer: {0}": "Réservation annulée par le client : {0}",
+  "Your calendar subscription {0} keeps failing. Its events may be out of date.": "Ton abonnement au calendrier {0} échoue sans cesse. Ses événements ne sont peut-être plus à jour.",
+  "{0} changed the time of {1}": "{0} a modifié l'heure de {1}",
+  "{0} changed the place of {1}": "{0} a modifié le lieu de {1}",
+  "{0} cancelled {1}": "{0} a annulé {1}",
+  "{0} cancelled one date of {1}": "{0} a annulé une date de {1}",
+  "{0} took you off the guest list of {1}": "{0} t'a retiré de la liste des invités de {1}",
+  "a calendar you subscribed to failed three times in a row": "un calendrier auquel tu es abonné a échoué trois fois de suite"
 }

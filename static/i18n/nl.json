@@ -15360,5 +15360,19 @@
   "{0} is waiting for your approval: {1}": "{0} wacht op je goedkeuring: {1}",
   "A linked pull request approved {0}": "Een gekoppelde pull request heeft {0} goedgekeurd",
   "{0} approved the review of {1}": "{0} heeft de review van {1} goedgekeurd",
-  "Requested by {0}": "Van {0}"
+  "Requested by {0}": "Van {0}",
+  "Time changed: {0}": "Tijd gewijzigd: {0}",
+  "Place changed: {0}": "Locatie gewijzigd: {0}",
+  "One date cancelled: {0}": "Eén datum afgezegd: {0}",
+  "You are no longer invited: {0}": "Je bent niet meer uitgenodigd: {0}",
+  "No place": "Geen locatie",
+  "New booking: {0}": "Nieuwe boeking: {0}",
+  "Booking cancelled by the customer: {0}": "Boeking afgezegd door de klant: {0}",
+  "Your calendar subscription {0} keeps failing. Its events may be out of date.": "Je agenda-abonnement {0} blijft mislukken. De afspraken zijn misschien niet actueel.",
+  "{0} changed the time of {1}": "{0} heeft de tijd van {1} gewijzigd",
+  "{0} changed the place of {1}": "{0} heeft de locatie van {1} gewijzigd",
+  "{0} cancelled {1}": "{0} heeft {1} afgezegd",
+  "{0} cancelled one date of {1}": "{0} heeft één datum van {1} afgezegd",
+  "{0} took you off the guest list of {1}": "{0} heeft je van de gastenlijst van {1} gehaald",
+  "a calendar you subscribed to failed three times in a row": "een geabonneerde agenda is drie keer achter elkaar mislukt"
 }

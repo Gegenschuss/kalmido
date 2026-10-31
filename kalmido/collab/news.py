@@ -52,8 +52,9 @@ NEWS_KINDS += ("signoff",)  # 2.266.0 (#2965): a customer approved / declined th
 NEWS_KINDS += ("orgdelnotice", "orggone")  # 2.361.0 (#2920): my organisation is deleted on a day / was deleted (always, no push; accounts/orgleave.py)
 NEWS_KINDS += ("whorgcut",)  # 2.380 G (#3391): my personal webhook no longer delivers an organisation's lists (always, no push; integrations/webhooks.py)
 NEWS_KINDS += ("fetcherr",)  # 2.425.0 C (#3453): a portal of my receipt fetcher reports a new error (row "fetcher", docs/fetcher.py)
+NEWS_KINDS += ("evchange", "apbooking", "calsub")  # 2.367.2 (#2969): an event I am invited to changed (row "assign"); a booking on my page (row "assign"); my calendar subscription keeps failing (row "calsub", no push)
 NEWS_KINDS += ("aprequest",)  # 2.367.2 (#2968): someone asks ME for an approval (row "assign", team/approvals.py)
-NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
+NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evchange", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
 NEWS_GROUPS = {"mention": ("mention",), "assign": ("assign", "unassign", "take"), "comment": ("comment",), "complete": ("complete",),
@@ -78,7 +79,7 @@ NEWS_FOR_ME += ("aprequest",)  # 2.367.2 (#2968)
 
 def news_to_me(kind, actor_id, data, agents, s=None):
     # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
-    if kind in ("upscan", "filereq", "orgkey", "ptlimit", "apblimit", "fetcherr"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
+    if kind in ("upscan", "filereq", "orgkey", "ptlimit", "apblimit", "fetcherr", "evchange", "apbooking", "calsub"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
         return True
     if kind in ("approval", "aprequest"):  # 2.147.1 C (#2405): an agent waits for MY approval (my own row): "For you", counted by the bell
         return True
@@ -100,7 +101,7 @@ def news_to_me(kind, actor_id, data, agents, s=None):
 
 def agent_push_ok(c, uid, s, actor):
     """2.28.0 (#987): a push about what an AGENT did (its comments, completions, new tasks, status) only when the person
-    switched "Pushes for what agents do" on (setting agent_push); mentions by agents and approval requests are not affected."""
+    switched "Pushes for what agents do" on (setting agent_push); mentions by agents, approval requests and (2.367.2, #2968) their questions on a task are not affected."""
     from ..agents.core import agent_ids
     if not actor or actor not in agent_ids(c):
         return True
@@ -166,6 +167,7 @@ NOTIF_ROWS += ("timesheet",)  # 2.125.0 B (#2119): timesheets: a member's closed
 NOTIF_ROWS += ("signoff",)  # 2.266.0 (#2965): a customer decided through a link (sign-off, video review; News + push on by default, was "approval")
 NOTIF_ROWS += ("fetcher",)  # 2.425.0 C (#3453): a portal of my receipt fetcher has a new error (News + push on by default)
 NOTIF_ROWS += ("limits",)  # 2.453.0 (#3781): my customer portal / booking page used up its mails (News only, on by default)
+NOTIF_ROWS += ("calsub",)  # 2.367.2 (#2969): my calendar subscription failed 3 times in a row (News only, on by default)
 NOTIF_NEWS_GROUP = {"comment": "comment", "reply": "comment", "follow": "comment", "mention": "mention", "assign": "assign",
                     "complete": "complete", "status": "status", "share": "share", "unblock": "unblock"}
 NOTIF_NEWS_PRIMARY = ("comment", "mention", "assign", "complete", "status", "share", "unblock")  # News = news_kinds
@@ -177,6 +179,7 @@ NOTIF_NEWS_NEW["timesheet"] = 1  # 2.125.0 B (#2119)
 NOTIF_NEWS_NEW["signoff"] = 1  # 2.266.0 (#2965)
 NOTIF_NEWS_NEW["fetcher"] = 1  # 2.425.0 C (#3453)
 NOTIF_NEWS_NEW["limits"] = 1  # 2.453.0 (#3781)
+NOTIF_NEWS_NEW["calsub"] = 1  # 2.367.2 (#2969)
 NOTIF_PUSH_DEFAULT = {"comment": 1, "reply": 1, "follow": 1, "mention": 1, "assign": 1, "newtask": 0, "complete": 1,
                       "status": 0, "share": 0, "unblock": 1, "approval": 1, "followup": 1, "reminder": 1, "usage": 1,
                       "proposal": 1, "nag": 1, "chat": 1, "errreport": 1}
@@ -187,8 +190,9 @@ NOTIF_PUSH_DEFAULT["timesheet"] = 1  # 2.125.0 B (#2119)
 NOTIF_PUSH_DEFAULT["signoff"] = 1  # 2.266.0 (#2965)
 NOTIF_PUSH_DEFAULT["fetcher"] = 1  # 2.425.0 C (#3453)
 NOTIF_PUSH_DEFAULT["limits"] = 0  # 2.453.0 (#3781)
+NOTIF_PUSH_DEFAULT["calsub"] = 0  # 2.367.2 (#2969)
 NOTIF_NO_NEWS = ("reminder", "nag", "chat")
-NOTIF_NO_PUSH = ("limits",)  # 2.453.0 (#3781): News only (the notes promise no push, no mail)
+NOTIF_NO_PUSH = ("limits", "calsub")  # 2.453.0 (#3781): News only (the notes promise no push, no mail)
 NOTIF_UNMUTED = ("mention", "assign")        # still come through a muted list
 NOTIF_NO_BELL = ("reminder", "followup", "usage", "proposal")  # never changed by a list bell
 BELL_MODES = ("all", "default", "mute", "custom")
@@ -203,6 +207,8 @@ KIND_ROW = {"mention": "mention", "comment": "comment", "assign": "assign", "una
             "proposal": "proposal", "take": "assign", "errreport": "errreport", "apdecide": "assign", "signup": "usage",
             "orglist": "share", "playbook_proposal": "proposal", "connreq": "share", "connok": "share", "lytpl": "share"}  # 2.35.0 (#1101): an organisation admin archived / restored / deleted / handed over a list
 KIND_ROW["review"] = "review"  # 2.60.0 C (#1512)
+KIND_ROW["evchange"] = KIND_ROW["apbooking"] = "assign"  # 2.367.2 (#2969): like the invitation and the booking's push
+KIND_ROW["calsub"] = "calsub"
 KIND_ROW["aprequest"] = "assign"  # 2.367.2 (#2968): like the assignment it replaces
 KIND_ROW["filereq"] = "filereq"  # 2.122.0 A (#2097)
 KIND_ROW["leavereq"] = KIND_ROW["leavedecide"] = "leave"  # 2.125.0 A (#2117): its own row (switchable)
@@ -445,6 +451,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
     out, uids = [], set()
     agents = {x[0] for x in c.execute("SELECT id FROM users WHERE kind='agent'")}
     s = s or usettings(c, uid)  # 2.66.1 (#1943): agent_comments decides whether an agent's plain comment is "For you"
+    evc_seen = set()  # 2.367.2 (#2969): only the newest time / place change of an event (the rows come newest first)
     for r in rows:
         kind = r["kind"]
         if (mentions_only and kind != "mention") or (to_me and kind not in NEWS_TO_ME):
@@ -489,6 +496,19 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 k = c.execute("SELECT k.org_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?", (dd.get("event_id"),)).fetchone()
                 if not k or not ev_att_ok(c, uid, k["org_id"]):
                     continue
+        elif kind == "evchange":  # 2.367.2 (#2969): a cancellation stands; a change while I am invited, the newest only
+            dd = json.loads(r["data"] or "{}")
+            if dd.get("what") in ("time", "place"):
+                if dd.get("event_id") in evc_seen or not c.execute(
+                        """SELECT 1 FROM event_attendees a JOIN events e ON e.id=a.event_id
+                           WHERE a.event_id=? AND a.user_id=? AND e.deleted_at IS NULL""", (dd.get("event_id"), uid)).fetchone():
+                    continue
+                evc_seen.add(dd.get("event_id"))
+        elif kind == "apbooking":  # 2.367.2 (#2969): my booking page (no task, no list)
+            pass
+        elif kind == "calsub":  # 2.367.2 (#2969): while that subscription of mine still fails
+            if not c.execute("SELECT 1 FROM cal_subs WHERE id=? AND user_id=? AND fails>0", (json.loads(r["data"] or "{}").get("sub_id"), uid)).fetchone():
+                continue
         elif kind == "connreq":  # 2.49.0 (#1106): while the request is still open
             from ..accounts.discover import disc_request_open
             if not disc_request_open(c, uid, r["actor_id"]):

@@ -508,6 +508,8 @@ function davGuide() {
 function evNewsText(it, who, q) {
   const d = it.data || {};
   if (it.kind === 'evinvite') return tr('{0} invited you: {1}', who, q(d.title || ''));
+  if (it.kind === 'evchange') return {time: tr('{0} changed the time of {1}', who, q(d.title || '')), place: tr('{0} changed the place of {1}', who, q(d.title || '')),  // 2.367.2 (#2969)
+    cancelled: tr('{0} cancelled {1}', who, q(d.title || '')), occ: tr('{0} cancelled one date of {1}', who, q(d.title || '')), removed: tr('{0} took you off the guest list of {1}', who, q(d.title || ''))}[d.what] || '';
   if (it.kind === 'evshare') return d.role === 'edit' ? tr('{0} shared the calendar {1} with you', who, q(d.name || '')) : tr('{0} shared the calendar {1} with you (view only)', who, q(d.name || ''));
   return '';
 }

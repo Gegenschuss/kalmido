@@ -1166,18 +1166,37 @@ def apb_mail_cancelled(c, r, reason):
             apb_mail_html(lines, url, tr("Book an appointment", lg=lg) if url else None, "", subj, fn, lg), rt, fn)
 
 
+def apb_line(c, r, lg):
+    """Customer · type · time of booking r in language lg (push, News, mail)."""
+    p = apb_page_row(c, r["user_id"])
+    t = c.execute("SELECT name FROM appt_types WHERE id=?", (r["type_id"],)).fetchone() if r["type_id"] else None
+    return f'{r["name"]} · {t[0] if t else ""} · {apb_when(p, parse_iso(r["start"]), parse_iso(r["end"]), lg)}'
+
+
+def apb_mail_line(c, bid, uid, lg):
+    """2.367.2 (#2969): the line of the bundled event mail about booking bid (still mine), else None; the state at sending time."""
+    r = c.execute("SELECT * FROM appt_bookings WHERE id=? AND user_id=?", (bid, uid)).fetchone()
+    if not r:
+        return None
+    what = tr("Booking cancelled by the customer", lg=lg) if r["status"] == "cancelled" else tr("New booking", lg=lg)
+    return what, apb_line(c, r, lg), f"{PUBLIC_URL}/#calendar"
+
+
 def apb_push(c, r, what):
-    """Push to the person (the switch "assign" like an event invitation): a new confirmed booking / a cancel by the customer."""
-    from ..collab.news import notif_ok
+    """News, mail (2.367.2, #2969) + push to the person (the switch "assign" like an event invitation): a new confirmed booking /
+    a cancel by the customer. Without a push device a booking used to stay unnoticed."""
+    from ..collab.news import news_add, notif_ok
+    from ..notify.channels import evm_note
     from ..notify.push import push_prio
     uid = r["user_id"]
     s = usettings(c, uid)
+    lg = s.get("lang") or "en"
+    msg = apb_line(c, r, lg)
+    news_add(c, uid, "apbooking", actor=0, data={"what": what, "line": msg[:300], "event_id": r["event_id"]}, s=None)
     if not notif_ok(c, uid, s, "assign", "push"):
         return
-    lg = s.get("lang") or "en"
+    evm_note(c, uid, "apbook", None, None, s, r["id"])
     p = apb_page_row(c, uid)
-    t = c.execute("SELECT name FROM appt_types WHERE id=?", (r["type_id"],)).fetchone() if r["type_id"] else None
     title = tr("New booking", lg=lg) if what == "new" else tr("Booking cancelled by the customer", lg=lg)
-    msg = f'{r["name"]} · {t[0] if t else ""} · {apb_when(p, parse_iso(r["start"]), parse_iso(r["end"]), lg)}'
     click = f"{PUBLIC_URL}/#ev/{r['event_id']}" if r["event_id"] and what == "new" else f"{PUBLIC_URL}/#calendar"
     g.setdefault("pushes", []).append((uid, title, msg, click, push_prio(s), {"scope": f"o:{p['office_org_id'] if p else None}"}))  # 2.240.0 B2 (#2867)
