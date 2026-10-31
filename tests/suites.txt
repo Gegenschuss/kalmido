@@ -1403,6 +1403,8 @@ fresh; run p2137_c_api "$PY" p2137_c_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2137_d_api "$PY" p2137_d_api_test.py "$KALMIDO_TEST_DATA"
 # 2.278.0 part B: org / account import keeps billed time billed, maps chat threads, names left-out rows (#3094)
 fresh; run p2278_b_import_ids "$PY" p2278_b_import_ids_test.py "$KALMIDO_TEST_DATA"
+# 2.455.0 part C: feeds in the organisation export, sprints / placements / rules / customer reports in the account export (#3469)
+fresh; run p2455_c_export "$PY" p2455_c_export_test.py "$KALMIDO_TEST_DATA"
 # 2.124.0 part A: formulas, chart (#2109 #2115)
 now wed 10:00; fresh; run p2124_a_api "$PY" p2124_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2124_a_ui node p2124_a_ui.js "$KALMIDO_TEST_DATA"

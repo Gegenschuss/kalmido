@@ -140,6 +140,10 @@ def _jdef(v):
     return str(v)
 
 
+# 2.455.0 (#3469): a query parameter that makes a feed's address a secret (a private feed); rss_url refuses user:password@ already
+OX_FEED_KEY_RE = re.compile(r"[?&;](?:[\w.-]*(?:token|key|secret|auth|pass|password|pwd|sig|signature|session)[\w.-]*)=", re.I)
+
+
 def _ox_dec_row(c, oid, table, row):
     """The row with every field the server encrypted with the organisation key in plain text (core/orgcrypt.py)."""
     if table.startswith("doc_") and row.get("ws"):  # 2.48.0 (#1111): documents seal with the workspace in the context (docs/store.py)
@@ -163,6 +167,11 @@ def _ox_dec_row(c, oid, table, row):
         except Exception:  # noqa: BLE001  (sealed under an older server key: leave the address out, not the export)
             row["email"] = ""
         row.pop("email_hash", None)
+    if table == "rss_feeds":  # 2.455.0 (#3469): the feed stays visible by its title, never its key; the import takes none without address
+        if OX_FEED_KEY_RE.search(row.get("url") or ""):
+            row["url"] = ""
+        for k in ("etag", "last_modified", "last_fetch", "last_ok", "last_error", "fails"):
+            row.pop(k, None)
     return row
 
 
@@ -397,6 +406,10 @@ OX_AREAS = (
     ("polls/options.json", "sched_poll_options", "poll_id IN (SELECT id FROM sched_polls WHERE org_id=? AND deleted_at IS NULL)"),
     ("polls/votes.json", "sched_poll_votes", "poll_id IN (SELECT id FROM sched_polls WHERE org_id=? AND deleted_at IS NULL)"),
     ("bookmarks.json", "bookmarks", "org_id=?"),
+    # 2.455.0 (#3469): the organisation's feeds (the articles are fetched again; an address with an access key stays out: _ox_dec_row)
+    # and its read-later project (the feeds of a project the admin does not see stay out with the project)
+    ("feeds/feeds.json", "rss_feeds", "org_id=?"),
+    ("feeds/reading.json", "reading_orgs", f"org_id=? AND list_id IN ({LSQ})"),
 )
 OX_NOT_INCLUDED = (
     N_("private lists and private sharing of the members (lists without the organisation), other organisations"),
@@ -413,7 +426,7 @@ OX_NOT_INCLUDED = (
     N_("channels of the organisation that are not open and that the exporting admin is not a member of"),
     # 2.362.0 (#3096): what else stays out on purpose (OX_LEFT names every table with an organisation column that does)
     N_("notification channels (their targets are secrets), invitations and join requests, the organisation's and the lists' pictures (icons, cover pictures), synchronisation data of calendar and task apps (CalDAV), groups of people and their shares"),
-    N_("feeds of the organisation (not yet in this export)"),
+    N_("the articles of feeds (fetched again on the target) and feed addresses that carry an access key"),  # 2.455.0 (#3469)
     N_("booking pages of other members that the office does not bill (only their owner reads the bookings), archived channels"),
     # 2.190.0 D (#2561): the same rule as in the app (hub/hubmail.py hbm_can)
     N_("filed e-mails (and their files) the exporting admin cannot open in the app: other members' inboxes, projects without them"),
@@ -426,7 +439,6 @@ _PERSONAL = "a person's own data (their account export)"
 _DERIVED = "derived or working data, rebuilt on the target"
 _SERVER = "state of this server (keys, jobs, scanner, queues)"
 _AGENT = "agents and their logs (never in the organisation export)"
-_LATER = "not yet in the export (named in not_included, follow-up task #3469)"
 _LATER2 = "not yet in the export (2.390 / 2.352 tables, follow-up task #3642)"
 OX_LEFT = {
     # organisation column
@@ -437,15 +449,17 @@ OX_LEFT = {
     "office_undo": "undo steps of one day", "org_invites": "invitations (not_included)", "org_joins": "join requests (not_included)",
     "org_keys": _SERVER, "org_members": "members.json (with the role)", "org_out_requests": "requests of one person, short-lived",
     "pl_imported": _SECRET, "pl_rules": _SECRET, "pl_sources": _SECRET, "pl_uploads": _SECRET, "portal_logins": _SECRET,
-    "rc_suggest": _DERIVED, "reading_orgs": _LATER, "rss_feeds": _LATER, "task_bell": _PERSONAL,
+    "rc_suggest": _DERIVED, "task_bell": _PERSONAL,
     "task_vectors": _DERIVED, "upload_scan": _SERVER, "webhooks": _SECRET, "wiki_shares": _SECRET,
     "wiki_spaces": "the lock of a space (client_encrypted names it)",
     # list column
-    "agent_audit": _AGENT, "agent_decisions": _AGENT, "agent_jobs": _AGENT, "agent_list_access": _AGENT, "agent_usage": _AGENT,
+    "agent_audit": _AGENT, "agent_decisions": _AGENT, "agent_jobs": _AGENT, "agent_list_access": _AGENT, "agent_schedules": _AGENT, "agent_usage": _AGENT,
     "assistant_access": _PERSONAL, "assistant_log": _PERSONAL, "budget_cats": _PERSONAL, "budget_entries": _PERSONAL,
-    "budget_files": _PERSONAL, "budget_recurring": _PERSONAL, "contact_srcs": _SECRET, "ctr_notices": _PERSONAL, "dav_sync": _DERIVED,
+    "budget_files": _PERSONAL, "budget_meta": _PERSONAL, "budget_recurring": _PERSONAL, "contact_srcs": _SECRET, "ctr_notices": _PERSONAL, "dav_sync": _DERIVED,
     "dl_changes": _DERIVED, "env_deploys": _SECRET, "git_conns": _SECRET, "group_shares": "groups of people (not_included)",
-    "hook_in": _SECRET, "kk_conns": _SECRET, "list_bell": _PERSONAL, "list_envs": _SECRET, "list_key_pending": "list keys (client_encrypted)",
+    "hook_in": _SECRET, "issue_hooks": _SECRET,
+    "issue_reports": "fingerprints of error reports: a counter and limit of this server, the reports themselves are tasks",  # 2.455.0 (#3469)
+    "kk_conns": _SECRET, "list_bell": _PERSONAL, "list_envs": _SECRET, "list_key_pending": "list keys (client_encrypted)",
     "list_keys": "list keys (client_encrypted)", "list_layouts": _PERSONAL, "list_mine_hide": _PERSONAL, "list_notif": _PERSONAL,
     "list_paperless": _SECRET, "mail_tokens": _SECRET, "notifications": _PERSONAL, "playbook_proposals": _AGENT, "public_links": _SECRET,
     "shop_memory": _PERSONAL, "list_ticket_seq": _DERIVED, "task_keys": _LATER2, "list_folder_skip": _LATER2,
