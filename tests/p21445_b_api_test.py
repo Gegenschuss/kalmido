@@ -215,6 +215,7 @@ bp = box(f"u{ALICE}")
 check(bp and bp["org_id"] is None and bp["owner_id"] == ALICE and bp["imap_host"] == "imap.example.com" and bp["smtp_user"] == "team@example.com"
       and bp["secret"] == "", f"#2410: organisation -> private keeps server and user {bp}")
 # again into Gamma: it has its own mailbox now, it stays
+OX, RK = org_export(A, ORG)  # 2.362.3 (#3098): a newer export (the same file again skips its areas)
 iid = opened(A, OX, RK)
 j = run(A, iid, ORG3)
 check(box(f"o{ORG3}")["secret"] != "" and "already has a mailbox" in warnings(j), f"#2410: a workspace keeps its own mailbox: {warnings(j)}")
