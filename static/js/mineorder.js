@@ -13,7 +13,9 @@ const moActive = () => S.route.mod === 'tasks' && S.route.key === 'assigned';
 const moOwn = () => moActive() && moView() === 'own';
 // what counts as mine: assigned to me or one of my groups; without collaboration every task of my lists (#1344: always shown)
 const moPred = () => collab() ? mineAssigned : mineTask;
-const moFromState = j => { mtFromState(j); return OUT.q.some(e => e.url === '/api/tasks/mine-order') ? (S.mineOrder || {}) : (j.mine_order || {}); };
+// 2.363.3 (#3133): S.mineBase = the order the server confirmed, sent as _prev: an order that waited offline does not overwrite one set elsewhere
+const moIds = o => Object.entries(o).sort((a, b) => a[1] - b[1]).map(x => +x[0]);
+const moFromState = j => { mtFromState(j); if (OUT.q.some(e => e.url === '/api/tasks/mine-order')) return S.mineOrder || {}; S.mineBase = moIds(j.mine_order || {}); return j.mine_order || {}; };
 const moPos = t => { const p = S.mineOrder?.[t.id]; return p == null ? null : +p; };
 function moCmp(a, b) {
   const x = moPos(a), y = moPos(b);
@@ -31,7 +33,12 @@ function moAll() {
 async function moSave(ids) {
   S.mineOrder = Object.fromEntries(ids.map((id, i) => [id, i]));
   render();
-  try { await api('PUT', '/api/tasks/mine-order', {ids: ids.filter(id => id > 0)}); } catch { /* api() showed it; offline it waits in the outbox */ }
+  const send = ids.filter(id => id > 0), seen = S.mineBase;
+  S.mineBase = send;  // the next drag builds on this one
+  try {
+    const r = await api('PUT', '/api/tasks/mine-order', {ids: send, ...(seen ? {_prev: {ids: seen}} : {})});
+    if (r?.order_kept) { toast(tr(MO_KEPT)); await load(); render(); }
+  } catch { /* api() showed it; offline it waits in the outbox */ }
 }
 // dnd.js dropTask0: a drop onto a row of "My tasks" -> true when handled here (never a change of tasks.sort)
 async function moDrop(t, row, after) {

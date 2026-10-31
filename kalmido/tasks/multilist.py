@@ -9,7 +9,7 @@ workspace (lists.org_id equal, NULL == NULL), no health list, no locked list, no
 at most ML_MAX further lists. A database trigger (core/schema.py kalmido_ml_prune) drops links that a move of the task
 or a workspace change of a list would carry across the boundary, whatever the write path.
 """
-from flask import jsonify
+from flask import g, jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
@@ -147,6 +147,14 @@ def ml_link(tid):
         return err(tr("Invalid value: {0}", "list_id"))
     e = ml_check(c, tid, lid)
     if e:
+        from ..tasks.movememo import tmm_wish
+        srt = b.get("sort") if isinstance(b.get("sort"), (int, float)) and not isinstance(b.get("sort"), bool) else 0
+        # 2.363.3 (#3133): a person's request that waited offline is not lost to a move made meanwhile (agents have no queue: they get the refusal)
+        if g.user["kind"] != "agent" and tmm_wish(c, tid, lid, _int(b.get("section_id")), srt):
+            bump(c)
+            c.commit()
+            from ..tasks.tasks import one_task
+            return jsonify({**one_task(c, tid), "link_waits": True})
         return err(*e)
     sid, e = _place(c, lid, b.get("section_id"))
     if e:

@@ -13961,7 +13961,6 @@
   "{0} page in the trash stays in the old workspace": ["{0} pagina in de prullenbak blijft in de oude ruimte", "{0} pagina's in de prullenbak blijven in de oude ruimte"],
   "{0} earlier version is deleted: a space with the lock keeps no history": ["{0} eerdere versie wordt verwijderd: een vergrendelde ruimte houdt geen geschiedenis bij", "{0} eerdere versies worden verwijderd: een vergrendelde ruimte houdt geen geschiedenis bij"],
   "{0} assignment of a reader": ["{0} toewijzing aan een lezer", "{0} toewijzingen aan lezers"],
-  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again does not bring that back.": "Taken van de organisatie die aan deze persoon zijn toegewezen, verliezen de toewijzing en de persoon gaat bij geen enkele meer mee; opnieuw lid worden herstelt dat niet.",
   "{0} draft loses its links in the old workspace (project, framework contract, earlier version or source document)": ["{0} concept verliest zijn koppelingen in de oude ruimte (project, raamcontract, eerdere versie of brondocument)", "{0} concepten verliezen hun koppelingen in de oude ruimte (project, raamcontract, eerdere versie of brondocument)"],
   "{0} link to your private address book ends: the contact stays there": ["{0} koppeling met je privéadresboek eindigt: het contact blijft daar", "{0} koppelingen met je privéadresboek eindigen: de contacten blijven daar"],
   "Recognise again?": "Opnieuw herkennen?",
@@ -15368,5 +15367,9 @@
   "{0} file could not be read, the manifest in the archive names it": ["{0} bestand kon niet worden gelezen, het manifest in het archief noemt het", "{0} bestanden konden niet worden gelezen, het manifest in het archief noemt ze"],
   "A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.": "Een spreadsheet (.xlsx, .xls of CSV) met naam, nettobedrag en vervalmaand; je ziet een voorbeeld voordat er iets wordt opgeslagen.",
   "Upload cancelled": "Uploaden geannuleerd",
-  "Being processed…": "Wordt verwerkt…"
+  "Being processed…": "Wordt verwerkt…",
+  "{0} page in the trash goes along": ["{0} pagina in de prullenbak verhuist mee", "{0} pagina's in de prullenbak verhuizen mee"],
+  "The task was moved meanwhile: it is shown in that project again if it moves back within 24 hours.": "De taak is intussen verplaatst: ze verschijnt weer in dat project als ze binnen 24 uur terugkomt.",
+  "Your order of My tasks was changed on another device: that order stays, this change was not applied.": "Je volgorde van Mijn taken is op een ander apparaat gewijzigd: die volgorde blijft, deze wijziging is niet toegepast.",
+  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.": "Aan deze persoon toegewezen taken van de organisatie worden niet meer toegewezen en deze persoon komt bij geen enkele meer mee; wie binnen 24 uur terugkeert, krijgt dat terug voor de taken die dan zichtbaar zijn."
 }

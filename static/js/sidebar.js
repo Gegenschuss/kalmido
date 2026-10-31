@@ -843,7 +843,7 @@ async function folderPropsModal(f, opt = {}) {
     er.hidden = !bad.length;
     saved(undo ? () => put(k, prev, false) : null);
     if (v === null && nL) toast(tr('Not set: the projects keep the value they have.'));
-    else if (r.changed) toast(trn('{0} project changed', '{0} projects changed', r.changed));  // 2.46.1 (#1422): the counter
+    else if (r.changed) toast(tmm_msg(trn('{0} project changed', '{0} projects changed', r.changed), r));  // 2.46.1 (#1422): the counter; 2.363.3 (#3133): what the workspace change ended
     await load(); render();
   };
   md.addEventListener('change', e => {

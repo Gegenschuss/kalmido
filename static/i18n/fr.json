@@ -13961,7 +13961,6 @@
   "{0} page in the trash stays in the old workspace": ["{0} page de la corbeille reste dans l'ancien espace", "{0} pages de la corbeille restent dans l'ancien espace"],
   "{0} earlier version is deleted: a space with the lock keeps no history": ["{0} version antérieure est supprimée : un espace verrouillé ne garde pas d'historique", "{0} versions antérieures sont supprimées : un espace verrouillé ne garde pas d'historique"],
   "{0} assignment of a reader": ["{0} attribution à un lecteur", "{0} attributions à des lecteurs"],
-  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again does not bring that back.": "Les tâches de l'organisation qui lui sont attribuées perdent leur attribution et la personne n'accompagne plus aucune tâche ; rejoindre à nouveau ne rétablit rien.",
   "{0} draft loses its links in the old workspace (project, framework contract, earlier version or source document)": ["{0} brouillon perd ses liens dans l'ancien espace (projet, contrat-cadre, version antérieure ou document source)", "{0} brouillons perdent leurs liens dans l'ancien espace (projet, contrat-cadre, version antérieure ou document source)"],
   "{0} link to your private address book ends: the contact stays there": ["{0} lien vers ton carnet d'adresses privé prend fin : le contact y reste", "{0} liens vers ton carnet d'adresses privé prennent fin : les contacts y restent"],
   "Recognise again?": "Reconnaître à nouveau ?",
@@ -15368,5 +15367,9 @@
   "{0} file could not be read, the manifest in the archive names it": ["{0} fichier n'a pas pu être lu, le manifeste de l'archive le cite", "{0} fichiers n'ont pas pu être lus, le manifeste de l'archive les cite"],
   "A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.": "Un tableur (.xlsx, .xls ou CSV) avec nom, montant net et mois d'échéance ; un aperçu s'affiche avant tout enregistrement.",
   "Upload cancelled": "Envoi annulé",
-  "Being processed…": "Traitement en cours…"
+  "Being processed…": "Traitement en cours…",
+  "{0} page in the trash goes along": ["{0} page de la corbeille suit le déplacement", "{0} pages de la corbeille suivent le déplacement"],
+  "The task was moved meanwhile: it is shown in that project again if it moves back within 24 hours.": "La tâche a été déplacée entre-temps : elle réapparaît dans ce projet si elle revient dans les 24 heures.",
+  "Your order of My tasks was changed on another device: that order stays, this change was not applied.": "Votre ordre de Mes tâches a été modifié sur un autre appareil : cet ordre reste, cette modification n'a pas été appliquée.",
+  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.": "Les tâches de l'organisation qui lui sont attribuées ne le sont plus et cette personne ne suit plus aucune d'elles ; si elle revient dans les 24 heures, cela est rétabli pour les tâches qu'elle peut alors voir."
 }

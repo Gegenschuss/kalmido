@@ -20,6 +20,22 @@ FILL_KEY = "docs_thumb_fill"  # settings: {"below": lowest node id handled so fa
 _Q = {"at": 0.0}
 
 
+def _fill_asn(c, S, nid, n, node):
+    """2.363.3 (#3133): archive number n from a code into a document that has none, under asn_lock: a save with "next" at the
+    same moment no longer ends in the unique index (the lock is the same one as for docs/store.py process), and a number set
+    by hand meanwhile stays."""
+    ws = S.meta_row(c, nid)["ws"]
+    S.asn_lock(c, ws, nid)
+    m = S.meta_row(c, nid)
+    if m["asn"] or S.asn_taken(c, ws, n, nid):
+        return
+    auto = S.meta_json(c, m, "auto", {})
+    auto["asn"] = "code"
+    c.execute("UPDATE doc_meta SET asn=?, auto=? WHERE node_id=?", (n, json.dumps(auto, separators=(",", ":")), nid))
+    m = S.meta_row(c, nid)
+    S.doc_index(c, nid, ws, S.index_text(c, dict(m), node["name"], S.meta_text(c, m)))
+
+
 def p61a_thumb_fill(c):
     """One portion of the catch-up (the caller runs it in the queue's system context and commits). Returns the number of
     documents looked at; 0 when it is not time yet or the catch-up is done."""
@@ -46,6 +62,7 @@ def p61a_thumb_fill(c):
         return 0
     for (nid,) in rows:
         try:
+            code = None
             with c.savepoint():  # one broken document never stops the catch-up
                 m = S.meta_row(c, nid)
                 node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
@@ -54,13 +71,11 @@ def p61a_thumb_fill(c):
                 S.thumb_store(c, m, node, data, kind)
                 if not m["asn"]:
                     from .ocr import qr_codes
-                    n = S.EX.find_asn(S.cfg_get(c, m["ws"])["asn_prefix"], qr_codes(data, kind))
-                    if n and not S.asn_taken(c, m["ws"], n, nid):
-                        auto = S.meta_json(c, m, "auto", {})
-                        auto["asn"] = "code"
-                        c.execute("UPDATE doc_meta SET asn=?, auto=? WHERE node_id=?", (n, json.dumps(auto, separators=(",", ":")), nid))
-                        m = S.meta_row(c, nid)
-                        S.doc_index(c, nid, m["ws"], S.index_text(c, dict(m), node["name"], S.meta_text(c, m)))
+                    code = S.EX.find_asn(S.cfg_get(c, m["ws"])["asn_prefix"], qr_codes(data, kind))
+            if code:
+                c.commit()  # 2.363.3 (#3133): the number lock is held for this one write, not over the next documents of the portion
+                with c.savepoint():
+                    _fill_asn(c, S, nid, code, node)
         except Exception as e:  # noqa: BLE001 -- a missing file, a key that does not open, a broken image: skip it
             print("docs: preview catch-up", nid, type(e).__name__, e, flush=True)
     gset(c, FILL_KEY, json.dumps({"below": rows[-1][0]}))

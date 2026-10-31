@@ -13961,7 +13961,6 @@
   "{0} page in the trash stays in the old workspace": ["{0} pagina nel cestino resta nel vecchio spazio", "{0} pagine nel cestino restano nel vecchio spazio"],
   "{0} earlier version is deleted: a space with the lock keeps no history": ["{0} versione precedente viene eliminata: uno spazio con lucchetto non tiene la cronologia", "{0} versioni precedenti vengono eliminate: uno spazio con lucchetto non tiene la cronologia"],
   "{0} assignment of a reader": ["{0} assegnazione a un lettore", "{0} assegnazioni a lettori"],
-  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again does not bring that back.": "Le attività dell'organizzazione assegnate alla persona perdono l'assegnazione e non partecipa più a nessuna; rientrare non le ripristina.",
   "{0} draft loses its links in the old workspace (project, framework contract, earlier version or source document)": ["{0} bozza perde i suoi collegamenti nel vecchio spazio (progetto, contratto quadro, versione precedente o documento di origine)", "{0} bozze perdono i loro collegamenti nel vecchio spazio (progetto, contratto quadro, versione precedente o documento di origine)"],
   "{0} link to your private address book ends: the contact stays there": ["{0} collegamento alla tua rubrica privata termina: il contatto resta lì", "{0} collegamenti alla tua rubrica privata terminano: i contatti restano lì"],
   "Recognise again?": "Riconoscere di nuovo?",
@@ -15368,5 +15367,9 @@
   "{0} file could not be read, the manifest in the archive names it": ["{0} file non è stato letto, il manifesto nell'archivio lo indica", "{0} file non sono stati letti, il manifesto nell'archivio li indica"],
   "A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.": "Un foglio di calcolo (.xlsx, .xls o CSV) con nome, importo netto e mese di scadenza; vedi un'anteprima prima di salvare.",
   "Upload cancelled": "Caricamento annullato",
-  "Being processed…": "Elaborazione…"
+  "Being processed…": "Elaborazione…",
+  "{0} page in the trash goes along": ["{0} pagina nel cestino si sposta anch'essa", "{0} pagine nel cestino si spostano anch'esse"],
+  "The task was moved meanwhile: it is shown in that project again if it moves back within 24 hours.": "L'attività è stata spostata nel frattempo: tornerà in quel progetto se rientra entro 24 ore.",
+  "Your order of My tasks was changed on another device: that order stays, this change was not applied.": "Il tuo ordine di Le mie attività è stato cambiato su un altro dispositivo: quell'ordine resta, questa modifica non è stata applicata.",
+  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.": "Le attività dell'organizzazione assegnate a questa persona non sono più assegnate e non partecipa più a nessuna; se rientra entro 24 ore, viene ripristinato per le attività che potrà vedere allora."
 }

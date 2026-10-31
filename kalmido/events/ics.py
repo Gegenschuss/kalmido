@@ -407,7 +407,7 @@ def _read_group(comps, raws, mi):
     v["extra"] = _cap("\n".join(x for x in keep if x))
     v["attendees_raw"] = atts
     # changed occurrences
-    ovs = []
+    ovs, ov_mod = [], {}
     for i, comp in enumerate(comps):
         if i == mi or comp.get("RECURRENCE-ID") is None:
             continue
@@ -439,6 +439,7 @@ def _read_group(comps, raws, mi):
             if oe.tzinfo is None:
                 oe = oe.replace(tzinfo=ost.tzinfo)
             okeys = (_key(ost, zone, False), _key(max(oe, ost), zone, False))
+        ov_mod[rkey] = _ics_mod(comp)  # 2.363.3 (#3133): a changed occurrence has its own LAST-MODIFIED (import_ics)
         ost_s = str(comp.get("STATUS") or "").strip().upper()
         okeep = [x for x in r2["lines"] if _prop_name(x) not in EV_MAPPED]
         for b in r2["alarms"] + r2["blocks"]:
@@ -451,6 +452,7 @@ def _read_group(comps, raws, mi):
         v["rrule"] = ""
         ovs = []
     v["overrides"] = json.dumps(ovs[:500], ensure_ascii=False) if ovs else ""
+    v["ov_mod"] = ov_mod if ovs else {}
     return v
 
 
@@ -546,6 +548,34 @@ def _ics_differs(c, uid, cal_id, v, old):
     return {key(a) for a in atts_resolve(c, uid, v["attendees_raw"], old["id"], cal_id)} != have
 
 
+def _ics_ovs(raw):
+    """2.363.3 (#3133): the changed occurrences of an event's overrides column: {rid: override}."""
+    try:
+        v = json.loads(raw or "[]")
+    except (TypeError, ValueError):
+        return {}
+    return {o["rid"]: o for o in v if isinstance(o, dict) and o.get("rid")} if isinstance(v, list) else {}
+
+
+def _ics_ov_merge(old, v, here_newer, master_kept):
+    """2.363.3 (#3133): an occurrence with its own LAST-MODIFIED decides for itself. master_kept (the series here stays): the
+    file's occurrences changed after the change here go into the stored ones -> (overrides, how many came from the file). Else
+    (the file's series wins): an occurrence changed here after the file's stays as it is here -> (overrides, 0). A file
+    occurrence without its own date goes with the series, as before."""
+    have, mine, mods = _ics_ovs(old["overrides"]), _ics_ovs(v.get("overrides")), v.get("ov_mod") or {}
+    out, took = dict(have) if master_kept else dict(mine), 0
+    for rid, o in mine.items():
+        mod = mods.get(rid)
+        if not mod or rid not in have and not master_kept or have.get(rid) == o:
+            continue
+        if master_kept and not here_newer(mod):
+            out[rid] = o
+            took += 1
+        elif not master_kept and here_newer(mod):
+            out[rid] = have[rid]
+    return (json.dumps(list(out.values())[:500], ensure_ascii=False) if out else ""), took
+
+
 # ---- ICS import (a file, e.g. an export of another calendar) into one calendar
 def import_ics(c, uid, cal_id, raw, dry=False):
     """-> {created, updated, skipped, errors}. The same UID in that calendar is updated (importing twice changes nothing).
@@ -595,11 +625,21 @@ def import_ics(c, uid, cal_id, raw, dry=False):
         if old:
             lm = _ics_mod(cs[ms[0]] if len(ms) == 1 else cs[0])
             upd = str(old["updated_at"] or "")  # 2.273.0 F2 (#3048): the own last import write is no change here (imp_at / imp_rev)
-            newer = lm < upd[:19] if old["imp_at"] is None else \
-                bool(old["imp_rev"] and lm < old["imp_rev"]) or (upd > old["imp_at"] and lm < upd[:19])
-            if lm and newer and _ics_differs(c, uid, cal_id, v, old):
-                res["kept_newer"] = res.get("kept_newer", 0) + 1
+
+            def here_newer(x, upd=upd, old=old):
+                return x < upd[:19] if old["imp_at"] is None else \
+                    bool(old["imp_rev"] and x < old["imp_rev"]) or (upd > old["imp_at"] and x < upd[:19])
+            if lm and here_newer(lm) and _ics_differs(c, uid, cal_id, v, old):
+                ovs, took = _ics_ov_merge(old, v, here_newer, True)  # 2.363.3 (#3133): a newer occurrence of the file still comes in
+                if not took:
+                    res["kept_newer"] = res.get("kept_newer", 0) + 1
+                    continue
+                if not dry:  # the series stays, so do the import marks: what was changed here still counts as changed here
+                    f = {k: old[k] for k in _parsed_cols(c, uid, v)}
+                    ev_store(c, uid, cal_id, {**f, "overrides": ovs}, eid=old["id"], uid_=old["uid"])
+                res["updated"] += 1
                 continue
+            v["overrides"] = _ics_ov_merge(old, v, here_newer, False)[0]
         if dry:
             res["updated" if old else "created"] += 1
             continue

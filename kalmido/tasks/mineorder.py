@@ -22,14 +22,38 @@ def vw_mine_order(c, uid):
         f"AND t.list_id IN {vis_sql()} AND {tvis(c, uid, 't.')}", (uid, uid, uid))}
 
 
+def _mine_done_kept(c, cur, ids):
+    """2.363.3 (#3133): ids with the completed tasks of the old order cur put back behind the task they followed: the app sends
+    open tasks only, a task opened again finds its place."""
+    have = set(ids)
+    rest = [x for x in cur if x not in have]
+    done = set()
+    for i in range(0, len(rest), 500):
+        part = rest[i:i + 500]
+        done |= {r[0] for r in c.execute(f"SELECT id FROM tasks WHERE id IN ({','.join('?' * len(part))}) AND status!=0", part)}
+    after, last = {}, None
+    for x in cur:
+        if x in done:
+            after.setdefault(last, []).append(x)
+        elif x in have:
+            last = x
+    out = list(after.get(None, ()))
+    for x in ids:
+        out += [x, *after.get(x, ())]
+    return out
+
+
 @app.put("/api/tasks/mine-order")
 def vw_mine_order_put():
-    """{ids: [task ids, top first]} replaces the signed-in person's order of "My tasks". Ids of tasks the person cannot see
-    (or that do not exist) are skipped. Agents have no own order (403)."""
+    """{ids: [task ids, top first], _prev?: {ids}} replaces the signed-in person's order of "My tasks". Ids of tasks the person
+    cannot see (or that do not exist) are skipped. Agents have no own order (403). 2.363.3 (#3133): _prev = the order the device
+    saw: when the tasks known to both stand differently now (another device, while this one waited offline) nothing changes
+    -> {order_kept: true}; only the difference counts, a task placed or gone since is none. Places of completed tasks stay."""
     from ..agents.core import is_agent
     if is_agent(g.user):
         raise Denied(403, tr("The own order of My tasks belongs to a person"))
-    ids = (body() or {}).get("ids")
+    b = body() or {}
+    ids, prev = b.get("ids"), b.get("_prev")
     if not isinstance(ids, list) or not all(isinstance(x, int) and not isinstance(x, bool) for x in ids):
         return jsonify(error=tr("Invalid value: {0}", "ids")), 400
     ids = [x for x in dict.fromkeys(ids) if 0 < x < 10 ** 12][:VW_MINE_MAX]
@@ -42,13 +66,21 @@ def vw_mine_order_put():
         ok |= {r[0] for r in c.execute(f"SELECT id FROM tasks WHERE id IN ({q}) AND list_id IN {vis_sql()} AND {tvis(c, uid)}",
                                        (*part, uid, uid))}
     write_lock(c, f"mine-order-{uid}")
+    cur = [r[0] for r in c.execute("SELECT task_id FROM user_task_order WHERE user_id=? ORDER BY pos, task_id", (uid,))]
+    seen = prev.get("ids") if isinstance(prev, dict) else None
+    if isinstance(seen, list):
+        both = set(cur) & {x for x in seen if isinstance(x, int)}
+        if [x for x in cur if x in both] != [x for x in seen if x in both]:
+            c.rollback()
+            return jsonify(ok=True, count=0, order_kept=True)
+    keep = [x for x in ids if x in ok]
     c.execute("DELETE FROM user_task_order WHERE user_id=?", (uid,))
-    rows = [(uid, t, n) for n, t in enumerate(x for x in ids if x in ok)]
+    rows = [(uid, t, n) for n, t in enumerate(_mine_done_kept(c, cur, keep)[:VW_MINE_MAX])]
     if rows:
         c.executemany("INSERT INTO user_task_order(user_id, task_id, pos) VALUES(?,?,?)", rows)
     bump(c)
     c.commit()
-    return jsonify(ok=True, count=len(rows))
+    return jsonify(ok=True, count=len(keep))
 
 
 # ---- 2.41.0 (#1365): "Show in My tasks" per person and list (table list_mine_hide: a row = switched off). The tasks of such a

@@ -13961,7 +13961,6 @@
   "{0} page in the trash stays in the old workspace": ["{0} página de la papelera se queda en el espacio anterior", "{0} páginas de la papelera se quedan en el espacio anterior"],
   "{0} earlier version is deleted: a space with the lock keeps no history": ["{0} versión anterior se elimina: un espacio con candado no guarda historial", "{0} versiones anteriores se eliminan: un espacio con candado no guarda historial"],
   "{0} assignment of a reader": ["{0} asignación a un lector", "{0} asignaciones a lectores"],
-  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again does not bring that back.": "Las tareas de la organización asignadas a esa persona quedan sin asignar y ya no participa en ninguna; volver a unirse no lo recupera.",
   "{0} draft loses its links in the old workspace (project, framework contract, earlier version or source document)": ["{0} borrador pierde sus vínculos en el espacio anterior (proyecto, contrato marco, versión anterior o documento de origen)", "{0} borradores pierden sus vínculos en el espacio anterior (proyecto, contrato marco, versión anterior o documento de origen)"],
   "{0} link to your private address book ends: the contact stays there": ["{0} vínculo con tu libreta de direcciones privada termina: el contacto se queda allí", "{0} vínculos con tu libreta de direcciones privada terminan: los contactos se quedan allí"],
   "Recognise again?": "¿Reconocer de nuevo?",
@@ -15368,5 +15367,9 @@
   "{0} file could not be read, the manifest in the archive names it": ["{0} archivo no se pudo leer, el manifiesto del archivo comprimido lo indica", "{0} archivos no se pudieron leer, el manifiesto del archivo comprimido los indica"],
   "A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.": "Una hoja de cálculo (.xlsx, .xls o CSV) con nombre, importe neto y mes de vencimiento; verás una vista previa antes de guardar nada.",
   "Upload cancelled": "Subida cancelada",
-  "Being processed…": "Procesando…"
+  "Being processed…": "Procesando…",
+  "{0} page in the trash goes along": ["{0} página de la papelera se mueve también", "{0} páginas de la papelera se mueven también"],
+  "The task was moved meanwhile: it is shown in that project again if it moves back within 24 hours.": "La tarea se ha movido entretanto: volverá a mostrarse en ese proyecto si regresa en 24 horas.",
+  "Your order of My tasks was changed on another device: that order stays, this change was not applied.": "Tu orden de Mis tareas se cambió en otro dispositivo: ese orden se mantiene y este cambio no se aplicó.",
+  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.": "Las tareas de la organización asignadas a esa persona quedan sin asignar y deja de acompañar en ellas; si vuelve a unirse en 24 horas, se recupera para las tareas que pueda ver entonces."
 }

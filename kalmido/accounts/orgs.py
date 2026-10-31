@@ -161,6 +161,9 @@ def org_member_add(c, oid, uid, role="member", keep_office=True):
     acx_drop()
     if n == 1 and keep_office:  # 2.356.0 B (#2932): a person with an own office keeps working in it (every way of joining comes here)
         _office_keep_on_join(c, uid)
+    if n == 1:  # 2.363.3 (#3133): back within a day: their assignments and "coming along" return (every way of joining comes here)
+        from .orgleave import olv_rejoin
+        olv_rejoin(c, oid, uid)
 
 
 def _office_keep_on_join(c, uid):
@@ -1344,6 +1347,8 @@ def org_leave(c, oid, uid, heir, back=None):
     become private. 2.361.0 (#2922): a list uid brought in from the private space (lists.brought_by) goes back there instead
     (its id appended to back). The caller commits. Returns the number of lists transferred."""
     from ..lists.ownership import owner_transfer
+    from .orgleave import olv_memo, olv_snap
+    snap = olv_snap(c, oid, uid)  # 2.363.3 (#3133): what the end of the membership takes away, for coming back within a day
     n, priv = 0, []
     for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND org_id=? AND is_inbox=0", (uid, oid)).fetchall():
         if lr["brought_by"] == uid and not lr["deleted_at"]:
@@ -1372,6 +1377,8 @@ def org_leave(c, oid, uid, heir, back=None):
         grp_sync(c, priv)
     # 2.83.0 (#1725): tasks assigned without joining (a list everyone in the organisation may edit)
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=? AND list_id IN (SELECT id FROM lists WHERE org_id=? AND owner_id!=?)", (uid, oid, uid))
+    # 2.363.3 (#3133): coming along without a membership too (brought back by joining again in a list open to the organisation)
+    c.execute("DELETE FROM task_people WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id IN (SELECT id FROM lists WHERE org_id=? AND owner_id!=?))", (uid, oid, uid))
     from ..contacts.orgbooks import obk_leave
     obk_leave(c, oid, uid, heir)  # 2.52.0 C (#1438): the organisation's own address books stay with it (another manager)
     # 2.30.0 (#1036): the organisation's calendars and address books follow the same way: the leaver's go to heir (else
@@ -1410,6 +1417,7 @@ def org_leave(c, oid, uid, heir, back=None):
     from ..sheets.shshare import shs_leave
     shs_leave(c, oid, [uid, *ags])  # 2.124.0 C (#2113): their shares of the organisation's tables end
     acx_drop()  # 2.36.2 (#1142): the request's access contexts follow the new memberships
+    olv_memo(c, oid, uid, snap)
     return n
 
 

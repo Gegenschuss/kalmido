@@ -349,6 +349,8 @@ function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.sta
 // offline get a negative temp id that is mapped to the real id during replay. The last server state is
 // cached for offline start. Every queued op carries the user id: ops of another user are never replayed.
 class Offline extends Error {}
+const ML_WAITS = N_('The task was moved meanwhile: it is shown in that project again if it moves back within 24 hours.');  // 2.363.3 (#3133): POST .../links answers link_waits
+const MO_KEPT = N_('Your order of My tasks was changed on another device: that order stays, this change was not applied.');  // 2.363.3 (#3133): PUT /api/tasks/mine-order answers order_kept
 // 2.306.0 B (#2889): the session ended (401 / the login proxy's page): the stored state of the account (cache, tabs, chat
 // windows, session keys) goes like at logout, so the next person on this browser does not find it. Changes still waiting
 // to be sent (outbox, conflicts) keep everything as before: they go out after the next login of the same account.
@@ -694,6 +696,9 @@ function enqueue(method, url, body) {
     const q = outSync().find((x, i) => (i > 0 || !OUT.flushing) && !x.sending && x.method === 'PATCH' && x.url === url && !x.done && Object.keys(x.body || {}).filter(k => !k.startsWith('_')).join() === tk[0]);  // 2.126.0 D (#1989): sending = on its way from another tab
     if (q) { outSave(() => { q.body = {...q.body, [tk[0]]: body[tk[0]]}; }); return applyLocal({method, url, body}); }  // 2.143.0 C (#2153): outSave (IndexedDB)
   }
+  // 2.363.3 (#3133): a whole new order of "My tasks" replaces the one still waiting, whose _prev stays the base the server confirmed
+  const mo = method === 'PUT' && url === '/api/tasks/mine-order' && outSync().find((x, i) => (i > 0 || !OUT.flushing) && !x.sending && !x.done && x.url === url);
+  if (mo) { outSave(() => { mo.body = {...mo.body, ids: body.ids}; }); return {ok: true}; }
   const e = {method, url, body, uid: S.me?.id, k: outKey()};
   if (method === 'POST' && (url === '/api/tasks' || /^\/api\/lists\/\d+\/notes$/.test(url))) e.tmp = -Date.now() - Math.floor(Math.random() * 1000);  // 2.143.0 C (#2153): + a note
   outSave(() => OUT.q.push(e));  // 2.126.0 D (#1989)
@@ -801,6 +806,8 @@ async function outFlush() {
           addConflicts(j.id, j.conflicts, j.title);
         }
         if (j && j.skipped) skipped++;
+        if (j?.link_waits) toast(tr(ML_WAITS));  // 2.363.3 (#3133): "also in" sent after a move: kept for the way back
+        if (j?.order_kept) toast(tr(MO_KEPT));  // 2.363.3 (#3133)
         outSave(() => { OUT.q = OUT.q.filter(x => x !== e); });  // 2.126.0 D (#1989): out of the shared queue first
         e.res = j;
       } catch (err) {

@@ -13961,7 +13961,6 @@
   "{0} page in the trash stays in the old workspace": ["{0} Seite im Papierkorb bleibt im alten Bereich", "{0} Seiten im Papierkorb bleiben im alten Bereich"],
   "{0} earlier version is deleted: a space with the lock keeps no history": ["{0} frühere Fassung wird gelöscht: ein gesperrter Bereich führt keinen Verlauf", "{0} frühere Fassungen werden gelöscht: ein gesperrter Bereich führt keinen Verlauf"],
   "{0} assignment of a reader": ["{0} Zuweisung an eine lesende Person", "{0} Zuweisungen an lesende Personen"],
-  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again does not bring that back.": "Aufgaben der Organisation, die der Person zugewiesen sind, verlieren die Zuweisung, und sie kommt bei keiner mehr mit; ein erneuter Beitritt stellt das nicht wieder her.",
   "{0} draft loses its links in the old workspace (project, framework contract, earlier version or source document)": ["{0} Entwurf verliert seine Verweise im alten Bereich (Projekt, Kundenvertrag, frühere Fassung oder Ausgangsbeleg)", "{0} Entwürfe verlieren ihre Verweise im alten Bereich (Projekt, Kundenvertrag, frühere Fassung oder Ausgangsbeleg)"],
   "{0} link to your private address book ends: the contact stays there": ["{0} Verweis auf dein privates Adressbuch endet: der Kontakt bleibt dort", "{0} Verweise auf dein privates Adressbuch enden: die Kontakte bleiben dort"],
   "Recognise again?": "Neu erkennen?",
@@ -15368,5 +15367,9 @@
   "{0} file could not be read, the manifest in the archive names it": ["{0} Datei ließ sich nicht lesen, das Manifest im Archiv nennt sie", "{0} Dateien ließen sich nicht lesen, das Manifest im Archiv nennt sie"],
   "A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.": "Eine Tabelle (.xlsx, .xls oder CSV) mit Name, Nettobetrag und Fälligkeitsmonat; vor dem Speichern siehst du eine Vorschau.",
   "Upload cancelled": "Hochladen abgebrochen",
-  "Being processed…": "Wird verarbeitet…"
+  "Being processed…": "Wird verarbeitet…",
+  "{0} page in the trash goes along": ["{0} Seite im Papierkorb zieht mit um", "{0} Seiten im Papierkorb ziehen mit um"],
+  "The task was moved meanwhile: it is shown in that project again if it moves back within 24 hours.": "Die Aufgabe wurde inzwischen verschoben: Sie erscheint wieder in diesem Projekt, wenn sie innerhalb von 24 Stunden zurückwandert.",
+  "Your order of My tasks was changed on another device: that order stays, this change was not applied.": "Deine Reihenfolge in Meine Aufgaben wurde auf einem anderen Gerät geändert: Sie bleibt, diese Änderung wurde nicht übernommen.",
+  "Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.": "Der Person zugewiesene Aufgaben der Organisation verlieren die Zuweisung, und sie kommt bei keiner mehr mit; wer innerhalb von 24 Stunden wieder beitritt, bekommt das für die dann sichtbaren Aufgaben zurück."
 }
