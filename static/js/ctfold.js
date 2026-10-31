@@ -156,6 +156,7 @@ function ctf_menuItems(id) {
   }
   const x = ctf_itemOf(id); if (!x) return [];
   return [{label: tr('Open'), icon: x.kind === 'book' ? 'book' : 'user', fn: () => go(x.kind === 'book' ? 'contacts/b/' + x.id : 'contacts/' + x.id)},
+    ...fv2_menuRow((x.kind === 'book' ? 'r:address_book:' : 'r:contact:') + x.id),  // 2.441.0 (#3592)
     x.may_file ? {label: tr('Move to folder…'), icon: 'folder', fn: () => ctf_moveDlg(x.kind, x.id, x.name, x.space)} : null,
     x.may_file ? {label: tr('Share…'), icon: 'users', fn: () => ctf_share(x.node)} : null,
     x.may_file ? {label: tr('Out of the folder'), icon: 'up', fn: () => ctf_place(x.kind, x.id, x.name, null)} : null];

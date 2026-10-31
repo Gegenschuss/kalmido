@@ -1368,6 +1368,17 @@ star in `fav_lists` (pushes, agents and *Only favourites* read only that); `PUT 
 project's `l:` key at the end of `fav_items` / takes it out and answers `fav_items` too. A key whose target the person cannot
 see (any more) stays stored and is simply not shown. Agents do not see `fav_items`.
 
+2.441.0 (#3592): **anything with an address of its own** can be a favourite, shown as a row of symbols in the head bar (one row for
+all workspaces, a dot shows the workspace; on a phone a row to swipe under the header, or the page `#favorites`). More keys:
+`r:<kind>:<id>` (`office_doc`, `office_letter`, `office_gendoc`, `office_receipt`, `wiki`, `sheet`, `contact`, `address_book`),
+`file:<id>` (a file or folder of the file store), `doc:<id>` (a document), `sv:<id>` (a saved view of the sidebar) and `sep:<n>` (a
+divider between favourites). The setting `fav_meta` (a json object, at most 200 entries) holds the look a person gave a favourite:
+`{key: {c: "#rrggbb", i: "<symbol>"}}`.
+
+| Route | Meaning |
+|---|---|
+| `GET /api/favorites/targets` | Web API (the signed-in person; agents `403`). Checks the stored `r:`, `file:` and `doc:` keys with the rights of the object's own area and answers `{items: {key: {name, label, to, ws}}, gone: [key]}`: `to` is the app route, `ws` the workspace (`private`, `org:<id>` or empty). A target that is gone, in the trash or not readable (any more) is only listed in `gone`, nothing of it leaves. |
+
 2.156.0 D (#2186): **saved views of the sidebar** (e.g. "On the road", "Planning"), per person and the same on every device.
 The setting `side_views` (`PATCH /api/settings`, a json list of at most 20 views) holds them: `{id, name, icon, open, fclosed,
 hide, start}` with `id` = 1-16 lowercase letters / digits, `name` up to 60 characters, `icon` = the name of an app icon

@@ -150,7 +150,7 @@ function shf_menuItems(id) {
       '-', w ? {label: tr('Move to the trash'), icon: 'trash', cls: 'danger', fn: () => shf_delete(f)} : null];
   }
   const x = shf_item(id.slice(1)); if (!x) return [];
-  return [{label: tr('Open'), icon: 'sheet', fn: () => go('sheets/' + x.id)},
+  return [{label: tr('Open'), icon: 'sheet', fn: () => go('sheets/' + x.id)}, ...fv2_menuRow('r:sheet:' + x.id) /* 2.441.0 (#3592) */,
     {label: tr('Move to folder…'), icon: 'folder', fn: () => shf_moveDlg(x)},
     x.folder_id ? {label: tr('Out of the folder'), icon: 'up', fn: () => shf_place(x, null)} : null];
 }

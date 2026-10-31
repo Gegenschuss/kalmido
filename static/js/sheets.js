@@ -892,7 +892,7 @@ document.addEventListener('click', async e => {
   else if (k === 'omenu') menu(a, SHV_HOOKS.overview.flatMap(f => { try { return f(S.route.shl ? null : (typeof wsCur === 'function' ? wsCur() : 'all'), S.route.shl || null) || []; } catch (er) { console.error(er); return []; } }));
   else if (k === 'cmenu') {
     const id = +a.dataset.id, x = Object.values(SHV.idx).flatMap(d => d.items || []).find(y => y.id === id); if (!x) return;
-    menu(a, [{label: tr('Open'), icon: 'sheet', fn: () => go('sheets/' + id)}, ...(x.shared_in && x.share_role !== 'write' ? [] : [{label: tr('Rename…'), icon: 'edit', fn: () => shvRename(id, x.title)}]),
+    menu(a, [{label: tr('Open'), icon: 'sheet', fn: () => go('sheets/' + id)}, ...fv2_menuRow('r:sheet:' + id) /* 2.441.0 (#3592) */, ...(x.shared_in && x.share_role !== 'write' ? [] : [{label: tr('Rename…'), icon: 'edit', fn: () => shvRename(id, x.title)}]),
       ...(x.shared_in ? [] : [...sh_smvItems(x),  // 2.96.0 B (#1941); 2.124.0 C (#2113): a shared table: no move / delete
       '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => shvDelete(id, x.title, S.route.shl || null)}])]);
   }

@@ -4438,6 +4438,7 @@ USER_DEFAULTS = {
     # star itself stays in fav_lists), "folder:<path>", "v:<view>" (today, tomorrow, ...), "m:<module or area>", "f:<filter id>",
     # "tag:<name>", "p:<user id>", "g:<group id>", "a:<agent id>"; synced to every device like the other settings
     "fav_items": "[]",
+    "fav_meta": "{}",  # 2.441.0 (#3592): {key of fav_items: {c: "#rrggbb", i: icon name}}, the look a person gave a favourite
     # 2.156.0 D (#2186): the sidebar's saved views, json list of {id, name, icon, open (groups shown open), fclosed (closed
     # folders), hide (keys of hidden entries, "g:<group>" or a fav_items key), start (a route, optional)}; side_view = the id of
     # the active one ('' = "Everything"); per person, the same on every device (accounts/sideviews.py)
