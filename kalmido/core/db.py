@@ -4,6 +4,7 @@ import json
 import os
 import re
 import secrets
+import sys
 import tempfile
 import threading
 import time
@@ -739,18 +740,18 @@ class StartClock:
         now = time.monotonic()
         d, self.t, self.last = now - self.t, now, name
         if d >= self.SLOW_S:
-            print(f"migrations: start step {name} {round(d * 1000)} ms", flush=True)
+            print(f"migrations: start step {name} {round(d * 1000)} ms", file=sys.stderr, flush=True)
         else:
             self.quick, self.quick_s = self.quick + 1, self.quick_s + d
 
     def watch(self):
         while not self.end.wait(self.WATCH_S):
-            print(f"migrations: start still running, {round(time.monotonic() - self.t)} s since step {self.last}", flush=True)
+            print(f"migrations: start still running, {round(time.monotonic() - self.t)} s since step {self.last}", file=sys.stderr, flush=True)
 
     def done(self):
         self.end.set()
         print(f"migrations: start total {round((time.monotonic() - self.t0) * 1000)} ms, "
-              f"{self.quick} step(s) under 1 s took {round(self.quick_s * 1000)} ms", flush=True)
+              f"{self.quick} step(s) under 1 s took {round(self.quick_s * 1000)} ms", file=sys.stderr, flush=True)  # 2.449.0 (#3807): stderr, a helper that imports the app answers on stdout
 
 
 START_CLOCK = None  # 2.437.0 (#3729): set while init_db runs: a one-shot's flag (gset migr_*) ends its step
