@@ -262,9 +262,10 @@ try:
     check(until(lambda: news(A, "backup"), 30), "#2971: the instance's admin gets a News item for a failed backup with the alerts off")
     m = until(lambda: mails("alice@example.test"), 15)
     check(len(m) == 1 and "Backup failed" in str(email.message_from_string(m[0]["raw"], policy=email.policy.default)["Subject"]), f"#2971: and a mail {m}")
-    at = dbx("SELECT value FROM settings WHERE key='bk_last_error_at'")
-    check(until(lambda: A.post(B + "/api/admin/backups").status_code == 202), "setup: back up again")
-    check(until(lambda: dbx("SELECT value FROM settings WHERE key='bk_last_error_at'") != at, 30), "setup: that run failed too")
+    done = lambda: dbx("SELECT COUNT(*) FROM bg_jobs WHERE kind='backup' AND finished_at IS NOT NULL")[0][0]  # noqa: E731
+    check(until(lambda: A.get(B + "/api/admin/backups").json().get("running") == "" and done() >= 1), "setup: the first run ended")
+    check(A.post(B + "/api/admin/backups").status_code == 202, "setup: back up again")
+    check(until(lambda: int(done()) >= 2, 30), "setup: that run ended too")
     check(len(news(A, "backup")) == 1 and len(mails("alice@example.test")) == 1, "#2971: the same error again on the same day tells nobody again")
 finally:
     os.chmod(BK, 0o700)
