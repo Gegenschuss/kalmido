@@ -168,7 +168,7 @@ async function dc_upload(files, ws, source) {
       redo: async () => { for (const id of ids) await api('POST', `/api/files/nodes/${id}/restore`); dc_load(); return {}; }}));
   }
   const dup = (j.dups || [])[0];  // 2.146.0 B (#2452): the same file is not stored twice -- Open shows the one there
-  if (dup) toast(j.dups.length === 1 ? tr('This file already exists: {0}', dup.name) : tr('{0} files already exist', j.dups.length), () => dc_open(dup.id), 8000, tr('Open'));
+  if (dup) toast(j.dups.length === 1 ? tr('This file already exists: {0}', dup.name) : trn('{0} file already exists', '{0} files already exist', j.dups.length), () => dc_open(dup.id), 8000, tr('Open'));
   if (S.route.mod === 'docs') dc_load();
   return j.ids || [];
 }

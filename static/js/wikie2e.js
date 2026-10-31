@@ -458,7 +458,7 @@ async function wkeExport(sp) {
   if (!wkeReady(sp)) { if (!await e2eEnsure()) return false; await wkeKeys(sp, true); }
   if (!wkeReady(sp)) throw wkeErrLocked();
   await wk_load(sp, true);
-  if (WKE.locked[sp]) throw wkeErr(tr('{0} pages of this space cannot be opened with your key.', WKE.locked[sp]), 'wiki_e2e_unreadable');
+  if (WKE.locked[sp]) throw wkeErr(trn('{0} page of this space cannot be opened with your key.', '{0} pages of this space cannot be opened with your key.', WKE.locked[sp]), 'wiki_e2e_unreadable');
   const te = e2eTEnc(), pages = wk_pages(sp).filter(p => p.path);
   wkeSave(wkeZip(pages.map(p => ({name: p.path + '.md', data: te.encode(p.body || '')}))), 'wiki.zip');
   return pages.length;
@@ -575,12 +575,12 @@ async function wkeMigrate(sp, onProgress, opts = {}) {
         if (!rows.length) {
           if (mode !== 'encrypting' && bad.size && !blank && (mode === 'decrypting' || opts.ask)) {
             const yes = typeof askConfirm === 'function' && await askConfirm(tr('Texts that cannot be decrypted'),
-              tr('{0} texts of this space cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
+              trn('{0} text of this space cannot be decrypted with the keys you hold. Take it over as an empty text? It cannot be restored.', '{0} texts of this space cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
             if (yes) { blank = true; last = -1; bad.clear(); continue; }
-            if (mode === 'decrypting') throw wkeErr(tr('{0} texts of this space cannot be decrypted. The space stays locked until they are taken over as empty.', bad.size), 'wiki_e2e_unreadable');
+            if (mode === 'decrypting') throw wkeErr(trn('{0} text of this space cannot be decrypted. The space stays locked until it is taken over as empty.', '{0} texts of this space cannot be decrypted. The space stays locked until they are taken over as empty.', bad.size), 'wiki_e2e_unreadable');
           }
           if (mode === 'on' && bad.size) { WKE.unread[sp] = bad.size; wkeChange(sp); }
-          throw wkeErr(tr('{0} texts of this space cannot be decrypted with the keys you hold.', bad.size), 'wiki_e2e_unreadable');
+          throw wkeErr(trn('{0} text of this space cannot be decrypted with the keys you hold.', '{0} texts of this space cannot be decrypted with the keys you hold.', bad.size), 'wiki_e2e_unreadable');
         }
         last = left;
         const j = await rawFetch('POST', '/api/wiki/e2e/bulk', {space: sp, pages: rows});
@@ -746,9 +746,9 @@ function wkeBarHtml(sp, inDlg) {
     const run = r && r.kind === 'reenc';
     const btn = !s.can_manage || run ? '' : s.rotate > 0 ? `<button type="button" class="btn sm" data-wke="rotate" data-sp="${esc(sp)}">${esc(tr('Change the key now'))}</button>` : `<button type="button" class="btn sm" data-wke="reenc" data-sp="${esc(sp)}">${esc(tr('Continue'))}</button>`;
     out.push(`<div class="shint lhint keep wkebar wkerot" data-sp="${esc(sp)}">${ic('alert', 's')} <span>${esc(tr('A member has left the organisation. The key of the knowledge pages is being changed; until everything is encrypted again, former members can still decrypt older pages with their old key.'))}</span>`
-      + (run ? `<span class="wkeprog">${wkePbar(r)}</span>` : '') + (!run && WKE.unread[sp] ? `<span class="e2ewarn" role="alert">${esc(tr('{0} texts of this space cannot be decrypted with the keys you hold.', WKE.unread[sp]))}</span>` : '') + btn + '</div>');
+      + (run ? `<span class="wkeprog">${wkePbar(r)}</span>` : '') + (!run && WKE.unread[sp] ? `<span class="e2ewarn" role="alert">${esc(trn('{0} text of this space cannot be decrypted with the keys you hold.', '{0} texts of this space cannot be decrypted with the keys you hold.', WKE.unread[sp]))}</span>` : '') + btn + '</div>');
   }
-  if (wkeReady(sp) && WKE.locked[sp]) out.push(`<div class="e2ewarn wkebar" role="alert">${ic('alert', 's')} ${esc(tr('{0} pages of this space cannot be opened with your key.', WKE.locked[sp]))}</div>`);
+  if (wkeReady(sp) && WKE.locked[sp]) out.push(`<div class="e2ewarn wkebar" role="alert">${ic('alert', 's')} ${esc(trn('{0} page of this space cannot be opened with your key.', '{0} pages of this space cannot be opened with your key.', WKE.locked[sp]))}</div>`);
   return out.join('');
 }
 document.addEventListener('wke:progress', e => {

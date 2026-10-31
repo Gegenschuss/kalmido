@@ -1015,7 +1015,7 @@ async function tbill_release(d) {
 function tbill_ftDone(t) {
   if (!t) return;
   if (!t.taken_entries) toast(tr('No open billable time in this period'));
-  else if (t.skipped_billed || t.skipped_unbillable) toast(tr('{0} entries taken; skipped: {1} already billed, {2} not billable', t.taken_entries, t.skipped_billed, t.skipped_unbillable));
+  else if (t.skipped_billed || t.skipped_unbillable) toast(trn('{0} entry taken; skipped: {1} already billed, {2} not billable', '{0} entries taken; skipped: {1} already billed, {2} not billable', t.taken_entries, t.skipped_billed, t.skipped_unbillable));
 }
 // 2.187.1 B (#2735): "Times to bill" of a person ruled by office groups (e.g. the template Staff on the level "own"): the
 // own open hours of a period per client, without the client list of the quotations (the server: time-open without client_id)

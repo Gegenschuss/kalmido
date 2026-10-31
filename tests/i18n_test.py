@@ -6,6 +6,7 @@ HTML tags as the key, no empty texts, a complete _meta (name, locale; the machin
 and 12 month names, date formats with known tokens only; the checker itself exits 0. Also: the server-side helpers that
 pick the plural form (French: 0 and 1 are singular) and format numbers / short dates per language.
 usage: i18n_test.py"""
+import glob
 import json
 import os
 import re
@@ -134,6 +135,47 @@ vous_du = [k for k, v in fr_t.items() if not k.startswith("_") and k in de_t
            and FR_VOUS.search(re.sub(r"rendez-vous", "", join(v), flags=re.I))
            and DE_DU.search(join(de_t[k])) and not DE_SIE.search(join(de_t[k]))]
 check(not vous_du, f"fr: no vous/votre/vos where de says du ({len(vous_du)}): {vous_du[:3]}")
+
+# 2.451.0 (#3771): every real count runs through trn (one / other), so one thing reads "1 rule", not "1 rules". The converted
+# counts: the code uses trn with both English forms, the old plural-only text is no tr() key any more, and every language holds
+# a singular and a plural (the two differ where the language marks the plural).
+COUNTS = [
+    ("static/js/liste2e.js", "{0} text of this project cannot be decrypted with the keys you hold."),
+    ("static/js/liste2eui.js", "{0} text of this project cannot be opened with your key. Compare the safety numbers with the members."),
+    ("static/js/wikie2e.js", "{0} page of this space cannot be opened with your key."),
+    ("static/js/wikie2e.js", "{0} text of this space cannot be decrypted. The space stays locked until it is taken over as empty."),
+    ("static/js/paperless.js", "{0} document in Paperless-ngx"),
+    ("static/js/paperless.js", "{0} rule is already here"),
+    ("static/js/paperless.js", "{0} rule taken over"),
+    ("static/js/wiki.js", "{0} page imported"),
+    ("static/js/wiki.js", "{0} name shortened"),
+    ("static/js/office_books.js", "{0} file already exists"),
+    ("static/js/office_leads.js", "{0} duplicate"),
+    ("static/js/newsletter.js", "{0} consent recorded"),
+    ("static/js/projtime.js", "{0} entry is already billed and stays."),
+    ("static/js/discover.js", "{0} address was not checked today (daily limit)."),
+    ("static/js/related.js", "{1} task computed, {2} waiting"),
+    ("static/js/office_docs.js", "{0} entry taken; skipped: {1} already billed, {2} not billable"),
+    ("kalmido/office/books.py", "{0} receipt lies in a folder you cannot open and is not in this export; the GoBD export holds it."),
+    ("kalmido/sheets/io.py", "{0} sheet imported"),
+    ("kalmido/sheets/io.py", "{0} formula taken over"),
+]
+SAME_OK = {"{0} already imported", "{0} duplicate"}  # the form does not change in some languages
+for rel, one in COUNTS:
+    src = open(os.path.join(ROOT, rel), encoding="utf-8").read()
+    check(("trn('%s'" % one) in src or ('trn("%s"' % one) in src, f"{rel}: trn with '{one[:50]}'")
+    for code in ("de", "fr", "es", "it", "nl"):
+        v = json.load(open(os.path.join(I18N, code + ".json"), encoding="utf-8")).get(one)
+        check(isinstance(v, list) and len(v) == 2 and all(x.strip() for x in v), f"{code}: singular + plural for '{one[:50]}'")
+        if code in ("de", "es", "fr") and isinstance(v, list) and one not in SAME_OK:
+            check(v[0] != v[1], f"{code}: singular differs from plural for '{one[:50]}'")
+        if isinstance(v, list):
+            check(all(x in v[0] for x in re.findall(r"\{\d+\}", one)), f"{code}: singular keeps the placeholders of '{one[:50]}'")
+OLD_TR = ["{0} rules taken over", "{0} rules not taken over", "{0} rules cannot be taken over", "{0} texts of this project cannot be decrypted with the keys you hold.",
+          "{0} pages imported", "{0} names shortened", "{0} rows with errors", "{0} consents recorded", "{0} tasks computed, {1} waiting"]
+allsrc = "".join(open(f, encoding="utf-8").read() for f in glob.glob(os.path.join(ROOT, "static", "js", "*.js")))
+for k in OLD_TR:
+    check(("tr('%s'" % k) not in allsrc, f"no plural-only tr() left for '{k[:50]}'")
 
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

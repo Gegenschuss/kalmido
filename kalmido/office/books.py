@@ -26,7 +26,7 @@ from flask import Response, g, has_request_context, jsonify, request
 from ..core.config import app
 from ..core.db import db, local_now
 from ..core.access import Denied
-from ..core.i18n import N_, tr, lang
+from ..core.i18n import N_, tr, trn, lang
 from ..core.errors import BadInput
 from .abschlag import abs_skonto_rows  # 2.355.0 C (#2840)
 from .calc import calc_lang, dec, dstr, money
@@ -181,7 +181,7 @@ def bk_gaps_text(gaps, missing=()):
         out.append(tr("Receipts without an amount (not in the export, complete them under Office > Receipts):"))
         out += [f"- {n}" for n in gaps["no_amount"]]
     if gaps.get("hidden"):
-        out.append(tr("{0} receipts lie in folders you cannot open and are not in this export; the GoBD export holds them.", gaps["hidden"]))
+        out.append(trn("{0} receipt lies in a folder you cannot open and is not in this export; the GoBD export holds it.", "{0} receipts lie in folders you cannot open and are not in this export; the GoBD export holds them.", gaps["hidden"]))
     return "\r\n".join(out) + ("\r\n" if out else "")
 
 

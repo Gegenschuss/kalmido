@@ -832,20 +832,20 @@ async function le2eMigrate(lid, onProgress, opts = {}) {
       if (!Object.keys(out).length && !made) {
         if (mode === 'on' && bad.size && !blank && opts.ask) {  // 2.64.2 review (M3): the same choice after a key change (by hand)
           const yes = typeof askConfirm === 'function' && await askConfirm(tr('Texts that cannot be decrypted'),
-            tr('{0} texts of this project cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
+            trn('{0} text of this project cannot be decrypted with the keys you hold. Take it over as an empty text? It cannot be restored.', '{0} texts of this project cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
           if (yes) { blank = true; last = -1; continue; }
         }
         if (mode === 'on' && bad.size) { LE2E.unread[lid] = bad.size; le2eChange(lid); }  // shown in the key change hint (liste2eui.js)
         if (mode === 'decrypting' && bad.size && !blank) {
           // M4: only texts no key here opens are left (a broken or foreign cipher): the owner decides, else the way back stops here
           const yes = typeof askConfirm === 'function' && await askConfirm(tr('Texts that cannot be decrypted'),
-            tr('{0} texts of this project cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
-          if (!yes) throw le2eErr(tr('{0} texts of this project cannot be decrypted. The project stays locked until they are taken over as empty.', bad.size), 'list_e2e_unreadable');
+            trn('{0} text of this project cannot be decrypted with the keys you hold. Take it over as an empty text? It cannot be restored.', '{0} texts of this project cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
+          if (!yes) throw le2eErr(trn('{0} text of this project cannot be decrypted. The project stays locked until it is taken over as empty.', '{0} texts of this project cannot be decrypted. The project stays locked until they are taken over as empty.', bad.size), 'list_e2e_unreadable');
           blank = true; last = -1;
           continue;
         }
         // nothing converts here (texts / files no key held here opens): stop, the work stays for later or another admin
-        throw le2eErr(tr('{0} texts of this project cannot be decrypted with the keys you hold.', bad.size + badF.size), 'list_e2e_unreadable');
+        throw le2eErr(trn('{0} text of this project cannot be decrypted with the keys you hold.', '{0} texts of this project cannot be decrypted with the keys you hold.', bad.size + badF.size), 'list_e2e_unreadable');
       }
       last = left;
       if (Object.keys(out).length) await rawFetch('POST', `/api/lists/${lid}/e2e/bulk`, out);

@@ -635,14 +635,14 @@ async function wka_del(p, f) {
   histToast(tr('Deleted {0}', qn(f.name)), e);
 }
 // the import report: pages, files, what was skipped and why (at most 200 lines from the server)
-const wka_sum = r => [tr('{0} pages imported', (r.created || []).length), ...(r.files_n ? [tr('{0} files', r.files_n)] : []),
-  ...(r.shortened_n ? [tr('{0} names shortened', r.shortened_n)] : []),  // 2.210 A (#2755)
+const wka_sum = r => [trn('{0} page imported', '{0} pages imported', (r.created || []).length), ...(r.files_n ? [trn('{0} file', '{0} files', r.files_n)] : []),
+  ...(r.shortened_n ? [trn('{0} name shortened', '{0} names shortened', r.shortened_n)] : []),  // 2.210 A (#2755)
   ...((r.skipped_n || r.skipped?.length) ? [tr('{0} skipped', r.skipped_n || r.skipped.length)] : [])].join(' · ');
 function wka_report(r) {
   const sk = r.skipped_detail || (r.skipped || []).map(n => ({name: n, reason: ''})), sh = r.shortened || [];
   if (!sk.length && !sh.length) return;
   const md = modal(`<h3>${esc(tr('Import'))}</h3><p>${esc(wka_sum(r))}</p>
-    ${sh.length ? `<details class="wkrep wkrep-short"><summary>${esc(tr('{0} names shortened', r.shortened_n || sh.length))}</summary><p class="muted">${esc(tr('Too long or too many folder levels: the page is there under a shorter name.'))}</p><ul>${sh.map(s => `<li><b>${esc(s.name)}</b> · ${esc(s.path)}</li>`).join('')}</ul></details>` : ''}
+    ${sh.length ? `<details class="wkrep wkrep-short"><summary>${esc(trn('{0} name shortened', '{0} names shortened', r.shortened_n || sh.length))}</summary><p class="muted">${esc(tr('Too long or too many folder levels: the page is there under a shorter name.'))}</p><ul>${sh.map(s => `<li><b>${esc(s.name)}</b> · ${esc(s.path)}</li>`).join('')}</ul></details>` : ''}
     ${sk.length ? `<details class="wkrep"><summary>${esc(tr('{0} skipped', r.skipped_n || sk.length))}</summary><ul>${sk.map(s => `<li><b>${esc(s.name)}</b>${s.reason ? ' · ' + esc(s.reason) : ''}</li>`).join('')}</ul></details>` : ''}
     <div class="foot"><button type="button" class="btn" data-m="close">${esc(tr('OK'))}</button></div>`);
   md.addEventListener('click', e => { if (e.target.closest('[data-m="close"]')) modalClose(md); });
