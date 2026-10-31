@@ -10831,7 +10831,6 @@
   "This is not a Kalmido export (no ZIP file).": "Das ist kein Kalmido-Export (keine ZIP-Datei).",
   "This upload is complete already": "Dieser Upload ist bereits vollständig",
   "Uploading… {0} of {1}": "Wird hochgeladen… {0} von {1}",
-  "You have imported this export already. Importing it again creates everything a second time.": "Du hast diesen Export schon importiert. Ein erneuter Import legt alles ein zweites Mal an.",
   "Your export is already running": "Dein Export läuft bereits",
   "Your storage is full: the import stopped. What came over so far can be undone.": "Dein Speicher ist voll: Der Import wurde angehalten. Was bisher übernommen wurde, lässt sich rückgängig machen.",
   "Organisation export of {0}": "Organisations-Export von {0}",
@@ -15333,5 +15332,14 @@
   "Due month": "fällig Monat",
   "Germany": "Deutschland",
   "International (base pack)": "International (Grundpaket)",
-  "Film & Video": "Film & Video"
+  "Film & Video": "Film & Video",
+  "{1} exported {0} project of the organisation {2} with an account export": ["{1} hat {0} Projekt der Organisation {2} mit einem Konto-Export exportiert", "{1} hat {0} Projekte der Organisation {2} mit einem Konto-Export exportiert"],
+  "This export was imported already. Confirm that you want to import it again: what is already in the chosen place is skipped.": "Dieser Export wurde schon importiert. Bestätige den erneuten Import: Was am gewählten Ort schon liegt, wird übersprungen.",
+  "Import again: what is already in the chosen place is skipped": "Erneut importieren: Was am gewählten Ort schon liegt, wird übersprungen",
+  "Tick “Import again” first: this export was imported already.": "Setze zuerst das Häkchen bei „Erneut importieren“: Dieser Export wurde schon importiert.",
+  "This export, or an older one of the same account, was imported on {0} (import {1}).": "Dieser Export oder ein älterer desselben Kontos wurde am {0} importiert (Import {1}).",
+  "You can undo that until {0}.": "Rückgängig möglich bis {0}.",
+  "This export was imported already.": "Dieser Export wurde schon importiert.",
+  "Already here from an earlier import, skipped: {0} entries": "Schon aus einem früheren Import da, übersprungen: {0} Einträge",
+  "Office, file store, chat and the other areas of this export are here already: they were skipped.": "Büro, Ablage, Chat und die anderen Bereiche dieses Exports sind schon da und wurden übersprungen."
 }

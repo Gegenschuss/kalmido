@@ -102,17 +102,29 @@ def oo_note(c, oid, real, kind, name, list_id=None, to="private", back=False, re
     detail = {"kind": kind, "to": to, **({"released": True} if released else {}), **({"back": True} if back else {})}
     c.execute("INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at,detail) VALUES(?,?,?,?,?,?,?,?,?)",
               (oid, list_id, str(name or "")[:200], "moveout", me(), None, None, iso(now_utc()), json.dumps(detail)))
+    oo_news(c, oo_admins(c, oid, me()), {"action": "moveout", "name": str(name or "")[:200], "org": real, "kind": kind})
+
+
+def oo_exported(c, oid, uid, n):
+    """2.362.3 (#3101): an export of person uid carried n lists of organisation oid: the other admins are told (the count, no
+    names: a list not shared with them stays out of their News; the list history has the rows). Also from a background thread."""
+    real = _org_name(c, oid, None)
+    if real is not None:
+        oo_news(c, oo_admins(c, oid, uid), {"action": "export", "count": n, "org": real}, actor=uid)
+
+
+def oo_admins(c, oid, but):
+    """The active admins of organisation oid other than but."""
     with system_ctx(c):  # the organisation's other admins (structure)
-        admins = [r[0] for r in c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id
-                                             WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=?""", (oid, me()))]
-    oo_news(c, admins, {"action": "moveout", "name": str(name or "")[:200], "org": real, "kind": kind})
+        return [r[0] for r in c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id
+                                           WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=?""", (oid, but))]
 
 
-def oo_news(c, uids, data, list_id=None):
+def oo_news(c, uids, data, list_id=None, actor=None):
     """A News item "orglist" with data for each of uids (2.361.2, #2923: also the requests of accounts/orgoutreq.py)."""
     from ..collab.news import news_add
     for uid in uids:
-        news_add(c, uid, "orglist", list_id=list_id, data=data)
+        news_add(c, uid, "orglist", list_id=list_id, data=data, actor=actor)
 
 
 def _org_name(c, oid, to_oid):

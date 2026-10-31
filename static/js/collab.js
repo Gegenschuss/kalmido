@@ -236,6 +236,7 @@ function newsText(it, U) {
       lrename: tr('{0} renamed your project {1} to {2} (project admin)', who, q(d.old || ''), q(d.name || '')),  // 2.40.0 (#1431)
       owner: tr('{0} handed the project {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || '')),
       moveout: tr('{0} moved {1} out of the organisation {2}', who, q(d.name || ''), q(d.org || '')),  // 2.148.1 B (#2483)
+      export: trn('{1} exported {0} project of the organisation {2} with an account export', '{1} exported {0} projects of the organisation {2} with an account export', d.count || 1, who, q(d.org || '')),  // 2.362.3 (#3101)
       // 2.361.2 (#2923): a member asks back what they brought in; an admin releases / declines it
       outreq: tr('{0} asks to take {1} back into their private space (organisation {2})', who, q(d.name || ''), q(d.org || '')),
       outok: tr('{0} released {1}: you can move it into your private space now (within {2} days)', who, q(d.name || ''), d.days || 14),

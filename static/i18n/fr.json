@@ -10855,7 +10855,6 @@
   "This is not a Kalmido export (no ZIP file).": "Ce n’est pas un export Kalmido (pas de fichier ZIP).",
   "This upload is complete already": "Ce téléversement est déjà complet",
   "Uploading… {0} of {1}": "Téléversement… {0} sur {1}",
-  "You have imported this export already. Importing it again creates everything a second time.": "Tu as déjà importé cet export. L’importer de nouveau crée tout une deuxième fois.",
   "Your export is already running": "Ton export est déjà en cours",
   "Your storage is full: the import stopped. What came over so far can be undone.": "Ton stockage est plein : l’import s’est arrêté. Ce qui a été repris jusqu’ici peut être annulé.",
   "Organisation export of {0}": "Export d’organisation de {0}",
@@ -15333,5 +15332,14 @@
   "Due month": "Mois d'échéance",
   "Germany": "Allemagne",
   "International (base pack)": "International (pack de base)",
-  "Film & Video": "Film et vidéo"
+  "Film & Video": "Film et vidéo",
+  "{1} exported {0} project of the organisation {2} with an account export": ["{1} a exporté {0} projet de l’organisation {2} avec un export de compte", "{1} a exporté {0} projets de l’organisation {2} avec un export de compte"],
+  "This export was imported already. Confirm that you want to import it again: what is already in the chosen place is skipped.": "Cet export a déjà été importé. Confirme que tu veux l’importer à nouveau : ce qui se trouve déjà à l’endroit choisi est ignoré.",
+  "Import again: what is already in the chosen place is skipped": "Importer à nouveau : ce qui se trouve déjà à l’endroit choisi est ignoré",
+  "Tick “Import again” first: this export was imported already.": "Coche d’abord « Importer à nouveau » : cet export a déjà été importé.",
+  "This export, or an older one of the same account, was imported on {0} (import {1}).": "Cet export, ou un plus ancien du même compte, a été importé le {0} (import {1}).",
+  "You can undo that until {0}.": "Annulation possible jusqu’au {0}.",
+  "This export was imported already.": "Cet export a déjà été importé.",
+  "Already here from an earlier import, skipped: {0} entries": "Déjà là grâce à un import précédent, ignorées : {0} entrées",
+  "Office, file store, chat and the other areas of this export are here already: they were skipped.": "Le bureau, les fichiers, le chat et les autres domaines de cet export sont déjà là : ils ont été ignorés."
 }

@@ -44,6 +44,7 @@ from ..core.db import connect, db, err, iso, now_utc
 from ..core.pg import system_ctx
 from ..core.i18n import N_, lang, tr
 from ..core.access import Denied, acx_lists_sql, acx_of
+from ..accounts.orgout import oo_exported  # 2.362.3 (#3101)
 from ..accounts.pictures import avatar_path
 from ..accounts.session import me
 from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _jdef, _safe_part, _under
@@ -579,15 +580,21 @@ def _running(uid):
 def umz_log_org_lists(c, uid):
     """2.148.1 C (#2492): an export that carries lists of an organisation (lists I own there) is noted in the organisation's
     list history (org_list_log "export"), the admins see it. 2.360.2 D (#2561): one row per person, list and day, however
-    often they fetched it. The caller commits."""
+    often they fetched it. 2.362.3 (#3101): a new row also tells the other admins (a re-import of the file into a private
+    space is no second way out unseen; the lists stay in the file, they are the owner's). The caller commits."""
     with system_ctx(c):  # the organisation's history (also of one I left while I still own a list there)
         rows = c.execute("SELECT id, name, org_id FROM lists WHERE owner_id=? AND org_id IS NOT NULL AND deleted_at IS NULL", (uid,)).fetchall()
         at = iso(now_utc())
+        fresh = {}
         for r in rows:
-            c.execute("""INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at)
+            n = c.execute("""INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at)
                          SELECT CAST(? AS BIGINT),CAST(? AS BIGINT),CAST(? AS TEXT),'export',CAST(? AS BIGINT),CAST(? AS BIGINT),NULL,CAST(? AS TEXT) WHERE NOT EXISTS (SELECT 1 FROM org_list_log WHERE org_id=? AND list_id=?
                          AND by_id=? AND action='export' AND substr(created_at, 1, 10)=?)""",
-                      (r["org_id"], r["id"], r["name"], uid, uid, at, r["org_id"], r["id"], uid, at[:10]))
+                      (r["org_id"], r["id"], r["name"], uid, uid, at, r["org_id"], r["id"], uid, at[:10])).rowcount
+            if n:
+                fresh[r["org_id"]] = fresh.get(r["org_id"], 0) + 1
+        for oid, n in fresh.items():
+            oo_exported(c, oid, uid, n)
     return len(rows)
 
 

@@ -974,7 +974,7 @@ organisation.
   the app (2.190): only the mails (and their files) the exporting admin can open there, not other members' inboxes or
   mails of projects the admin is not part of. Projects of the organisation follow the same rule (2.223.3): only the ones
   the admin sees in the app (shared with at least one more person or open to the organisation, the admin's own and the
-  ones shared with them); a member exports a project shared with nobody with the own account export. Deleted items (the
+  ones shared with them); a member exports a project shared with nobody with the own account export (2.362.3: the other admins get a News with the number of projects, once a day; the list history names them). Deleted items (the
   trash, undone entries) are not in it, nor in the retention export; removed logbook drives stay (the change log).
   Since 2.362 the manifest also names what stays out on purpose: group conversations of the team chat (like direct
   messages they belong to their people), closed channels the admin is not a member of, notification channels,
@@ -1040,6 +1040,13 @@ and 20). Agents and API tokens cannot do this; it is a person's step in the app.
    are missing (an account with an invitation link by e-mail): type their address in the preview -- it must match the
    hash in the file, otherwise nobody is invited; everybody else invites them later as usual. Assignments to people that
    are not taken over stay empty; comments of such people keep their name.
+
+**Importing twice (2.362.3):** the preview says when an export of the same account was imported already (the import's
+number, undo until when), also for a newer export of that account. Importing again needs a tick and takes over only what
+the chosen place does not have yet, row by row: a newer export adds its new tasks to the imported project. Rows deleted or
+in the trash since count as gone and come back; a project that went to another person or organisation is taken over anew;
+another target is a separate copy. An organisation export counts by its file. The import keeps this record with its last
+20 imports.
 
 **What moves:** your projects (sections, fields, tags, status updates, links, milestones, project files, project notes),
 their tasks with subtasks, dependencies, field values and your tags, comments, attachments, your encrypted task notes

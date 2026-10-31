@@ -10855,7 +10855,6 @@
   "This is not a Kalmido export (no ZIP file).": "Dit is geen Kalmido-export (geen ZIP-bestand).",
   "This upload is complete already": "Deze upload is al compleet",
   "Uploading… {0} of {1}": "Bezig met uploaden… {0} van {1}",
-  "You have imported this export already. Importing it again creates everything a second time.": "Je hebt deze export al geïmporteerd. Opnieuw importeren maakt alles een tweede keer aan.",
   "Your export is already running": "Je export loopt al",
   "Your storage is full: the import stopped. What came over so far can be undone.": "Je opslag is vol: de import is gestopt. Wat tot nu toe is overgenomen, kun je ongedaan maken.",
   "Organisation export of {0}": "Organisatie-export van {0}",
@@ -15333,5 +15332,14 @@
   "Due month": "Vervalmaand",
   "Germany": "Duitsland",
   "International (base pack)": "Internationaal (basispakket)",
-  "Film & Video": "Film en video"
+  "Film & Video": "Film en video",
+  "{1} exported {0} project of the organisation {2} with an account export": ["{1} heeft {0} project van de organisatie {2} geëxporteerd met een accountexport", "{1} heeft {0} projecten van de organisatie {2} geëxporteerd met een accountexport"],
+  "This export was imported already. Confirm that you want to import it again: what is already in the chosen place is skipped.": "Deze export is al geïmporteerd. Bevestig dat je opnieuw wilt importeren: wat al op de gekozen plek staat, wordt overgeslagen.",
+  "Import again: what is already in the chosen place is skipped": "Opnieuw importeren: wat al op de gekozen plek staat, wordt overgeslagen",
+  "Tick “Import again” first: this export was imported already.": "Vink eerst ‘Opnieuw importeren’ aan: deze export is al geïmporteerd.",
+  "This export, or an older one of the same account, was imported on {0} (import {1}).": "Deze export, of een oudere van hetzelfde account, is geïmporteerd op {0} (import {1}).",
+  "You can undo that until {0}.": "Ongedaan maken kan tot {0}.",
+  "This export was imported already.": "Deze export is al geïmporteerd.",
+  "Already here from an earlier import, skipped: {0} entries": "Al aanwezig uit een eerdere import, overgeslagen: {0} items",
+  "Office, file store, chat and the other areas of this export are here already: they were skipped.": "Kantoor, bestanden, chat en de andere onderdelen van deze export zijn er al: ze zijn overgeslagen."
 }

@@ -43,6 +43,9 @@ const umzCounts = o => Object.entries(o || {}).filter(([k, n]) => n && umzCount(
 // file as a suggestion the admin confirms
 const UMZ_ORG_TICK = N_('Invite to the organisation (projects are shared with members only)');
 const umzRoleSel = (x, i, hide) => `<select class="umzrole" data-umzr="${i}" aria-label="${esc(tr('Role of {0}', x.name || ''))}"${hide ? ' hidden' : ''}>${['member', 'admin'].map(r => `<option value="${r}"${x.role === r ? ' selected' : ''}>${r === 'admin' ? tr('Admin') : tr('Member')}</option>`).join('')}</select>`;
+// 2.362.3 (#3098): when it came in, and until when that can be undone
+const umzAgainText = e => e ? [tr('This export, or an older one of the same account, was imported on {0} (import {1}).', esc(fmtWhen(e.at)), '#' + (+e.id)),
+  e.undo_until ? tr('You can undo that until {0}.', esc(fmtWhen(e.undo_until))) : ''].filter(Boolean).join(' ') : tr('This export was imported already.');
 function umzPreviewHtml(j) {
   const p = j.preview, org = p.kind === 'org', src = p.source.url ? esc(p.source.url) : tr('unknown');
   const people = p.people.length ? `<div class="muted mhint">${tr('People of your projects')}</div>` + p.people.map((x, i) => `<div class="mrow umzp">
@@ -52,7 +55,7 @@ function umzPreviewHtml(j) {
       + (p.can_invite && !x.key.startsWith('id') ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="invite"> ${tr('Invite by e-mail')}</label>${x.need_address === false ? '' : `<input type="email" class="umzem" data-umze="${i}" autocomplete="off" placeholder="${esc(tr('Their e-mail address'))}" aria-label="${esc(tr('E-mail address of {0}', x.name || ''))}"><span class="muted umzmis" data-umzm="${i}" hidden>${tr('This is not the address in the file: nobody is invited.')}</span>`}` : x.by_login ? '' : `<span class="muted">${tr('Skipped')}</span>`)}</div>`).join('')
     + hintK(tr('Nothing is shared without a tick: an address on another server can belong to somebody else here.')) : '';
   const lists = p.lists.length ? `<div class="umzlists">${p.lists.slice(0, 12).map(l => `<div class="mrow"><span class="n">${esc(l.inbox ? tr('Basket') : l.name)}${l.folder ? ` <span class="muted">${esc(l.folder)}</span>` : ''}</span><span class="muted">${trn('{0} task', '{0} tasks', l.tasks)}</span></div>`).join('')}${p.lists.length > 12 ? `<div class="muted mhint">${esc(trn('and {0} more', 'and {0} more', p.lists.length - 12))}</div>` : ''}</div>` : '';
-  const notes = [p.again ? `<div class="shint warn" role="alert">${ic('alert', 's')} ${tr('You have imported this export already. Importing it again creates everything a second time.')}</div>` : '',
+  const notes = [p.again ? `<div class="shint warn" role="alert">${ic('alert', 's')} ${umzAgainText(p.earlier)}</div><label class="umzck"><input type="checkbox" data-umzagain> ${tr('Import again: what is already in the chosen place is skipped')}</label>` : '',  // 2.362.3 (#3098)
     p.server_links.length ? hintK(tr('Set up the connection to {0} again (Settings > Account > Servers): access keys never move along.', p.server_links.map(esc).join(', '))) : '',
     p.encrypted.attachments || p.encrypted.locked_notes ? hintK(p.encrypted.keys === 'take' ? tr('Your encryption keys come along: locked notes and your encrypted files open with your passphrase from before.')
       : p.encrypted.keys === 'keep' ? tr('You already have your own encryption keys here: locked notes and encrypted files from the export arrive unreadable.')
@@ -179,13 +182,14 @@ function umzInit(md) {
           people[k] = {...people[k], [x.dataset.k]: true, ...(em ? {email: em} : {}), ...(login ? {login} : {})};
           const rs = $(`[data-umzr="${i}"]`, md); if (rs && x.dataset.k === 'share') people[k].role = rs.value;  // 2.278.0 A (#3095)
         }
+        if (UMZ.cur.preview?.again && !$('[data-umzagain]', md)?.checked) { toast(tr('Tick “Import again” first: this export was imported already.')); return; }  // 2.362.3 (#3098)
         let t = $('#s-umz-tgt', md)?.value || 'private';
         // 2.87.9 (#1940): where the account's data goes, in words; from an organisation also into the private space
         const to = await importTargetConfirm({what: tr('the data of the account'), ws: t === 'private' ? 'private' : 'org:' + t, privOk: true});
         if (!to) return;
         if (to === 'private') t = 'private';
         b.disabled = true;
-        return umzImpDraw(md, await api('POST', `/api/account/import/${UMZ.cur.id}/run`, {target: t === 'private' ? 'private' : +t, people, ...(UMZ.cur.preview?.again ? {again: true} : {})}));  // 2.269.0 D (#3046): the warning was shown
+        return umzImpDraw(md, await api('POST', `/api/account/import/${UMZ.cur.id}/run`, {target: t === 'private' ? 'private' : +t, people, ...(UMZ.cur.preview?.again ? {again: true} : {})}));  // 2.269.0 D (#3046), 2.362.3 (#3098): ticked above
       }
       if (a === 'undo') {
         // 2.272.0 C (#3027): trash instead of delete, what changed since stays -- the texts say exactly that

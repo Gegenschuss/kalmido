@@ -10855,7 +10855,6 @@
   "This is not a Kalmido export (no ZIP file).": "Non è un’esportazione Kalmido (nessun file ZIP).",
   "This upload is complete already": "Questo caricamento è già completo",
   "Uploading… {0} of {1}": "Caricamento… {0} di {1}",
-  "You have imported this export already. Importing it again creates everything a second time.": "Hai già importato questa esportazione. Importarla di nuovo crea tutto una seconda volta.",
   "Your export is already running": "La tua esportazione è già in corso",
   "Your storage is full: the import stopped. What came over so far can be undone.": "Il tuo spazio è pieno: l’importazione si è fermata. Ciò che è stato importato finora può essere annullato.",
   "Organisation export of {0}": "Esportazione dell’organizzazione {0}",
@@ -15333,5 +15332,14 @@
   "Due month": "Mese di scadenza",
   "Germany": "Germania",
   "International (base pack)": "Internazionale (pacchetto base)",
-  "Film & Video": "Film e video"
+  "Film & Video": "Film e video",
+  "{1} exported {0} project of the organisation {2} with an account export": ["{1} ha esportato {0} progetto dell’organizzazione {2} con un’esportazione dell’account", "{1} ha esportato {0} progetti dell’organizzazione {2} con un’esportazione dell’account"],
+  "This export was imported already. Confirm that you want to import it again: what is already in the chosen place is skipped.": "Questa esportazione è già stata importata. Conferma che vuoi importarla di nuovo: ciò che si trova già nel posto scelto viene saltato.",
+  "Import again: what is already in the chosen place is skipped": "Importa di nuovo: ciò che si trova già nel posto scelto viene saltato",
+  "Tick “Import again” first: this export was imported already.": "Spunta prima «Importa di nuovo»: questa esportazione è già stata importata.",
+  "This export, or an older one of the same account, was imported on {0} (import {1}).": "Questa esportazione, o una precedente dello stesso account, è stata importata il {0} (importazione {1}).",
+  "You can undo that until {0}.": "Annullabile fino al {0}.",
+  "This export was imported already.": "Questa esportazione è già stata importata.",
+  "Already here from an earlier import, skipped: {0} entries": "Già presenti da un’importazione precedente, saltate: {0} voci",
+  "Office, file store, chat and the other areas of this export are here already: they were skipped.": "Ufficio, archivio file, chat e le altre aree di questa esportazione sono già presenti: sono state saltate."
 }
