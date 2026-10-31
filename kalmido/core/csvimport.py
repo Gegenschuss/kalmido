@@ -135,15 +135,21 @@ def csv_delim(lines):
 def csv_table(text, max_rows=CSV_ROWS):
     """CSV text -> (delimiter, header, rows): the header is the first row with the most common column count (bank
     exports start with a few lines about the account)."""
+    return csv_table_numbered(text, max_rows)[:3]
+
+
+def csv_table_numbered(text, max_rows=CSV_ROWS):
+    """csv_table + the spreadsheet row of each body row (2.363.2, #3106: blank rows and lines above the header count there)."""
     text = csv_decode(text)
     lines = text.split("\n")
     d = csv_delim(lines)
     try:
-        rows = [r for r in csv.reader(io.StringIO(text), delimiter=d) if any(x.strip() for x in r)]
+        numbered = [(n, r) for n, r in enumerate(csv.reader(io.StringIO(text), delimiter=d), 1) if any(x.strip() for x in r)]
     except csv.Error:
         raise _bad(tr("The file cannot be read as CSV")) from None
-    if not rows:
+    if not numbered:
         raise _bad(tr("The file is empty"))
+    nums, rows = zip(*numbered)
     if len(rows) > max_rows + 50:
         raise _bad(tr("At most {0} rows per import", max_rows))
     lens = [len(r) for r in rows]
@@ -151,7 +157,7 @@ def csv_table(text, max_rows=CSV_ROWS):
     hi = next(i for i, r in enumerate(rows) if len(r) == common)
     header = [x.strip()[:80] for x in rows[hi]]
     body = [[x.strip() for x in r] for r in rows[hi + 1:]]
-    return d, header, body
+    return d, header, body, list(nums[hi + 1:])
 
 
 def amount_text(s, dec=None):

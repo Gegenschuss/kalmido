@@ -127,6 +127,11 @@ r = A.post(B + "/api/files/move-space", json={"ids": [R1], "to": "private"})
 check(r.status_code == 409 and "booked receipt" in r.text and sql("SELECT org_id FROM fs_nodes WHERE id=?", (R1,)) == [(ORG,)],
       "#2600: the move of a booked receipt 409, it stays in the organisation " + r.text[:200])
 R_FREE = receipt(A, WSO, "frei.pdf", None)
+# 2.360.3 (#2733): a running recognition blocks the move as well (fsmove.py): through first, then this check is about the lock only
+for _ in range(120):
+    if not sql("SELECT 1 FROM doc_meta WHERE node_id=? AND state='run' UNION ALL SELECT 1 FROM file_text WHERE kind='fs' AND node_id=? AND state='run'", (R_FREE, R_FREE)):
+        break
+    time.sleep(0.25)
 r = A.post(B + "/api/files/move-space", json={"ids": [R_FREE], "to": "private", "dry": True})
 check(r.ok and not r.json().get("block"), "#2600: a receipt without booking can still move " + r.text[:200])
 
@@ -154,6 +159,19 @@ sql("INSERT INTO office_cash_entries(org_id, book_id, no, day, dir, amount, node
     (ORG, BOOK, 1, DAY(4), "out", "11.90", R_CASH, ts, ts), write=True)
 r = purge(A, R_CASH)
 check(r.status_code == 409 and "Kept by law until" in r.text, "#2600: a receipt of the cash book is kept " + r.text[:200])
+# 2.360.3 (#2733): taking the receipt off an entry keeps the lock (the entry's book day is open here), and the move's filter
+# in one query finds the same nodes as olk_fs_locked: the cash book, a booked receipt, kept_until; a plain file not
+E_CASH = sql("SELECT id FROM office_cash_entries WHERE node_id=?", (R_CASH,))[0][0]
+R_PLAIN = receipt(A, WSO, "offen.pdf", None)
+out = in_app(f"from kalmido.receipts.suggest import olk_fs_maybe\nprint('maybe', sorted(olk_fs_maybe(c, [{R_CASH}, {R2}, {R_PLAIN}])), olk_fs_maybe(c, []))")
+check(f"maybe {sorted([R_CASH, R2])} set()" in out, "#2733: the filter finds cash book + booked receipt, not an open one " + out[-300:])
+sql("UPDATE office_cashbooks SET opening='100.00' WHERE id=?", (BOOK,), write=True)
+r = A.patch(B + f"/api/office/cash-entries/{E_CASH}", json={"node_id": None})
+check(r.ok and sql("SELECT node_id FROM office_cash_entries WHERE id=?", (E_CASH,))[0][0] is None, "the receipt taken off the entry " + r.text[:200])
+r = purge(A, R_CASH)
+check(r.status_code == 409 and "Kept by law until" in r.text, "#2733: the receipt taken off a cash book entry stays kept " + r.text[:200])
+out = in_app(f"from kalmido.receipts.suggest import olk_fs_maybe\nprint('kept', sorted(olk_fs_maybe(c, [{R_CASH}])))")
+check(f"kept [{R_CASH}]" in out, "#2733: the filter also sees kept_until " + out[-300:])
 sql("INSERT INTO office_equipment(org_id, name, purchase_date, life_months, receipt_node_id, created_at, updated_at) VALUES(?,?,?,?,?,?,?)",
     (ORG, "Kamera", "2014-02-01", 36, R_EQ, ts, ts), write=True)
 r = purge(A, R_EQ)

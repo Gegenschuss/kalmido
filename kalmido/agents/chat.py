@@ -153,7 +153,8 @@ def agent_job_action(jid):
     if j["task_id"]:
         t = c.execute("SELECT * FROM tasks WHERE id=?", (j["task_id"],)).fetchone()
         if t:
-            log_act(c, t["id"], "agent_job", {"agent": j["agent_id"], "action": action, "title": j["title"][:200]})
+            log_act(c, t["id"], "agent_job", {"agent": j["agent_id"], "action": action, "title": j["title"][:200],
+                                              **({"title_key": json.loads(j["title_key"])} if j["title_key"] else {})})  # 2.454.0 (#3808)
             if task_visible(c, t["id"], j["agent_id"], full=True):
                 data.update(task=task_for(c, t, j["agent_id"]), list=lst_brief(c, t["list_id"]))
     agent_emit(c, j["agent_id"], "job", data)

@@ -32,7 +32,6 @@ KNOWN = [
     ("budget.js", r"let j = await commit\(rows\)"),  # bg_csvModal: the inner commit() posts .../import/commit
     ("paperless.js", r"\$\{base\}/import`"),
     ("move.js", r"/api/account/import/\$\{UMZ\.cur\.id\}/run"),
-    ("settings.js", r"api\('POST', '/api/import/ticktick'"),
     ("feeds.js", r"api\('POST', '/api/feeds/opml',"),  # OPML
     ("calevents.js", r"importTargetConfirm\(\{what: tr\('the events'\)"),
     ("contacts.js", r"importTargetConfirm\(\{what: tr\('the contacts'\)"),

@@ -576,7 +576,7 @@ def _finish(c, run, uid, data, who):
 _P = {"created_by": "null"}
 SPECS = [
     # file store: nodes (parents late), versions, shares, history
-    OiT("store/nodes.json", "fs_nodes", people={"owner_id": "me", "created_by": "null", "deleted_by": "null"}, late={"parent_id": "fs_nodes"},
+    OiT("store/nodes.json", "fs_nodes", people={"owner_id": "me", "created_by": "null", "deleted_by": "null"}, late={"parent_id": "fs_nodes", "hub_mail_id": "hub_mails"},  # 2.363.2 (#3106): the mark of a filed mail's nodes (the mail's reading rule)
         label=N_("File store"), prep=_node),
     OiT("store/area_roots.json", "fs_area_roots", rid=False, key=("ws", "area"), prep=_area_root),  # 2.353.0 C (#2829)
     OiT("store/versions.json", "fs_versions", refs={"node_id": "fs_nodes"}, need=("node_id",), people=_P, space=(), prep=_version),

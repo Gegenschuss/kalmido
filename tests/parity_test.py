@@ -145,7 +145,6 @@ APP_TO_API = {
     "GET /api/lists/{}/status-report": ["GET /lists/{}/status-report"],  # 2.34.0 (#265)
     "GET /api/export.json": ["GET /export"],
     "POST /api/import/{}": ["POST /import/{}"],
-    "POST /api/import/ticktick": ["POST /import/{}"],
     "POST /api/imports/{}/undo": ["POST /imports/{}/undo"],
     "GET /api/me/app-passwords": ["GET /me/app-passwords"],
     "POST /api/me/app-passwords": ["POST /me/app-passwords"],

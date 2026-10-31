@@ -51,7 +51,7 @@ from ..core.access import Denied, acx_lists_sql, acx_of
 from ..accounts.orgout import oo_exported  # 2.362.3 (#3101)
 from ..accounts.pictures import avatar_path
 from ..accounts.session import me
-from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _Man, _jdef, _safe_part, _under, ox_pb_parts
+from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _Man, _jdef, _safe_part, _under, ox_pb_parts, ox_read_listed
 from .offsite import stepup_download  # 2.360.0 A (#2496): the step-up before the download
 from ..core.orgcrypt import OrgCryptError, oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
@@ -346,7 +346,7 @@ def umz_extra_queries(uid):
                                 JOIN tasks t ON t.id=c.task_id WHERE c.user_id=? AND c.deleted_at IS NULL AND t.list_id IN {shared}""",
                             (uid, uid, uid)),
         # 2.84.0 (#1903): my own private filed e-mails (organisation mails, also the not assigned ones, are in the organisation export)
-        "hub_mails": ("""SELECT id, client_id, list_id, message_id, from_addr, from_name, to_addrs, subject, sent_at, body, created_at
+        "hub_mails": ("""SELECT id, client_id, list_id, message_id, from_addr, from_name, to_addrs, subject, sent_at, body, created_at, eml_id, files
                          FROM hub_mails WHERE owner_id=? AND org_id IS NULL AND deleted_at IS NULL""", (uid,)),
         # 2.89.0 (#1916): my private tables (organisation tables are in the organisation export)
         "sheets": (f"SELECT * FROM sheets WHERE {sheets} AND deleted_at IS NULL", (uid,)),
@@ -480,7 +480,7 @@ def _umz_plain(c, table, d, uid=None):
 
 class _Out:
     def __init__(self):
-        self.files, self.tables = [], {}
+        self.files, self.tables, self.missing = [], {}, []  # missing: 2.363.2 (#3106)
 
 
 def _put(zf, out, name, data):
@@ -508,6 +508,27 @@ def _put_rows(zf, out, table, rows):
         put("\n]\n")
     out.files.append({"path": name, "size": size, "sha256": h.hexdigest()})
     out.tables[table] = n
+
+
+def _put_file(c, zf, out, name, full):
+    """2.363.2 (#3106): a stored file into the ZIP -> False when it is listed in out.missing instead (gone, cannot be decrypted)."""
+    data = ox_read_listed(c, out.missing, name, full)
+    if data is None:
+        return False
+    _put(zf, out, name, data)
+    return True
+
+
+def _mail_files(d, files):
+    """2.363.2 (#3106): where a private filed mail's .eml and attachments are in this ZIP (paths: node ids mean nothing elsewhere)."""
+    eml = files.get(("private_files", d.pop("eml_id", None)))
+    try:
+        ids = json.loads(d.pop("files", None) or "[]")
+    except ValueError:
+        ids = []
+    if eml:
+        d["eml_file"] = eml
+    d["attachment_files"] = [files[("private_files", i)] for i in ids if isinstance(i, int) and ("private_files", i) in files]
 
 
 def umz_att_name(kind, rid, name):
@@ -575,14 +596,13 @@ def umz_build(c, uid, stream, export_id):
             sql, args = q[table]
             for r in c.execute(sql, args).fetchall():
                 full = _under(ATT_DIR, r["path"])
-                if not full:
-                    continue
                 sig = inf.get(("att" if table == "attachments" else "list", int(r["id"]), 0))
                 if sig is not None:
                     locked.append({"area": table, "id": r["id"], "name": r["name"] or "", "signature": sig})
                     continue
                 name = umz_att_name(kind, r["id"], r["name"])
-                _put(zf, out, name, oc_read_file(c, full))
+                if not _put_file(c, zf, out, name, full):
+                    continue
                 files[(table, r["id"])] = name
                 if table == "attachments" and "enc" in r.keys() and r["enc"]:
                     client_enc["attachments"].append(name)
@@ -590,25 +610,19 @@ def umz_build(c, uid, stream, export_id):
         for r in c.execute("""SELECT n.id, n.name, v.no, v.path FROM fs_nodes n JOIN fs_versions v ON v.node_id=n.id AND v.no=n.cur_version
                               WHERE n.owner_id=? AND n.org_id IS NULL AND n.kind='file' AND n.deleted_at IS NULL""", (uid,)).fetchall():
             full = _under(ATT_DIR, r["path"])
-            if not full:
-                continue
             sig = inf.get(("fs", int(r["id"]), int(r["no"])))
             if sig is not None:
                 locked.append({"area": "private_files", "id": r["id"], "name": r["name"] or "", "signature": sig})
                 continue
-            data = umz_read(c, full, "private_files", r["id"], r["name"], locked)  # 2.362.2 (#3099, review)
-            if data is None:
-                continue
             name = umz_att_name("private_files", r["id"], r["name"])
-            _put(zf, out, name, data)
-            files[("private_files", r["id"])] = name
+            if _put_file(c, zf, out, name, full):
+                files[("private_files", r["id"])] = name
         avatar = ""  # 2.239.0 A (#2882): my own profile picture
         a = c.execute("SELECT avatar FROM users WHERE id=?", (uid,)).fetchone()
         if a and (a[0] or "").startswith("u:"):
             full = _under(ATT_DIR, os.path.relpath(avatar_path(uid, _safe_part(a[0][2:])), ATT_DIR))
-            if full:
+            if _put_file(c, zf, out, "files/avatar.jpg", full):
                 avatar = "files/avatar.jpg"
-                _put(zf, out, avatar, oc_read_file(c, full))
         umz_put_page_files(c, zf, out, uid, files, inf, locked)  # 2.362.2 (#3099)
         for table, (sql, args) in q.items():
             def rows(table=table, sql=sql, args=args):
@@ -618,6 +632,8 @@ def umz_build(c, uid, stream, export_id):
                         continue
                     if table == "shared_lists":  # review M1: the owner's address only as a hash
                         d["owner_email_hash"] = umz_email_hash(d.pop("owner_email", ""), salt)
+                    if table == "hub_mails":
+                        _mail_files(d, files)
                     if (table, d.get("id")) in files:
                         d["file"] = files[(table, d["id"])]
                     yield _umz_plain(c, table, d, uid)  # 2.148.1 C (#2494); 2.306.0 A (#2885): + uid
@@ -646,6 +662,7 @@ def umz_build(c, uid, stream, export_id):
             "export_id": export_id, "not_included": [tr(x, lg=lang(c, uid)) for x in UMZ_NOT_INCLUDED],  # 2.449.0 (#3768): in the person's language
             "locked_files": locked,  # 2.209.0 D (#1856)
             **({"personal_office": office} if office else {}),
+            "missing": out.missing,  # 2.363.2 (#3106): files that are gone or cannot be decrypted [{file, reason}]
         }
         mb = json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode()
         zi = zipfile.ZipInfo("manifest.json", date_time=time.localtime()[:6])
@@ -737,7 +754,7 @@ def umz_run(uid, export_id):
         umz_write_state(_udir(uid), {"state": "done", "started_at": st.get("started_at"), "done_at": iso(done),
                                      "expires_at": iso(done + timedelta(hours=UMZ_KEEP_H)), "file": name, "bytes": w.size,
                                      "sealed": bool(key), "export_id": export_id, "rows": sum(man["tables"].values()),
-                                     "files": sum(1 for x in man["files"] if x["path"].startswith("files/"))})
+                                     "files": sum(1 for x in man["files"] if x["path"].startswith("files/")), "missing": len(man["missing"])})
         c.rollback()
         print(f"account export of user {uid}: {w.size} bytes", flush=True)
     except Exception as e:  # noqa: BLE001 -- the state says it failed; never content in the message
@@ -764,7 +781,7 @@ def umz_status(uid):
         p = os.path.join(_udir(uid), st.get("file") or "-")
         if not os.path.isfile(p) or st.get("expires_at", "") <= iso(now_utc()):
             st = {"state": "none"}
-    out = {k: st.get(k) for k in ("state", "started_at", "done_at", "expires_at", "file", "bytes", "files", "rows") if st.get(k) is not None}
+    out = {k: st.get(k) for k in ("state", "started_at", "done_at", "expires_at", "file", "bytes", "files", "rows", "missing") if st.get(k) is not None}
     if st.get("state") == "failed":
         out["error"] = tr("The export was interrupted. Please start it again.") if st.get("error") == "interrupted" else \
             tr("The export failed. Please try again later or ask the server admin (server log).")

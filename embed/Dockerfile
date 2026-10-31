@@ -1,7 +1,9 @@
 # kalmido-embed (2.59.0, #1375): the optional text embedding service for "Related tasks" (docker compose --profile embed).
 # The model is downloaded once while building (fixed revision, SHA-256 checked); the running container needs no network.
-FROM python:3.12-slim
-RUN pip install --no-cache-dir onnxruntime==1.31.0 tokenizers==0.23.3 numpy==2.5.4
+# 2.360.3 (#2915): the base image by digest, every package with version and hashes (requirements.in + .lock, tools/pins.py --update)
+FROM python:3.12-slim@sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159
+COPY requirements.lock /tmp/requirements.lock
+RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock && rm /tmp/requirements.lock
 # the model: multilingual-e5-small (intfloat, MIT) as the int8 ONNX export of Xenova/multilingual-e5-small (118 MB; measured
 # 2.59.0: as good as fp32 / larger models on our task data, ~0.15 s per task on a small 4-core CPU with one thread)
 ARG EMBED_REPO=Xenova/multilingual-e5-small

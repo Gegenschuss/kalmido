@@ -719,7 +719,7 @@ ROUTES = {
     "POST /api/comments/{}/choice": "tasks", "POST /api/comments/{}/decide": "tasks",
     "POST /api/comments/{}/reactions": "tasks", "POST /api/deps": "tasks", "POST /api/envs/{}/deploy": "tasks",
     "POST /api/envs/{}/restore": "tasks", "POST /api/favorites/suggestion": "tasks", "GET /api/favorites/targets": "tasks", "POST /api/ical": "tasks",
-    "POST /api/import/ticktick": "tasks", "POST /api/import/{}": "tasks", "POST /api/imports/{}/undo": "tasks",
+    "POST /api/import/{}": "tasks", "POST /api/imports/{}/undo": "tasks",
     "POST /api/list-checks/{}/run": "tasks", "POST /api/news/dismiss": "tasks", "POST /api/news/read": "tasks",
     "POST /api/pdf-text": "tasks", "POST /api/pomo/start": "tasks", "POST /api/pomo/{}/{}": "tasks",
     "POST /api/repos/{}/refresh": "tasks", "POST /api/sample": "tasks", "POST /api/sprints/{}/close": "tasks",

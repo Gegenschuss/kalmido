@@ -530,6 +530,9 @@ def cb_entry_patch(eid):
         if "day" in prev:
             _day_rules(c, book, row["day"])
         _neg_check(book["opening"], [dict(r, **row) if r["id"] == eid else r for r in rows])
+        if "node_id" in prev and cur.get("node_id"):  # 2.360.3 (#2733): taking the receipt off the entry keeps its lock
+            from ..receipts.suggest import olk_rc_keep
+            olk_rc_keep(c, cur["node_id"])
         row["updated_at"] = iso(now_utc())
         row = oc_enc_fields(c, oid, "office_cash_entries", row)
         c.execute(f"UPDATE office_cash_entries SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [eid, oid])

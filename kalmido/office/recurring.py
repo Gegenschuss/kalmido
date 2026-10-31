@@ -27,7 +27,7 @@ from .doclang import doc_lg  # 2.185.0 C (#2520)
 from .pdfweb import epdf_sweep  # 2.355.0 A (#2847)
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_item_store, oc_dec_fields
-from ..core.errors import BadInput
+from ..core.errors import BadInput, err_stored
 from .calc import dec, dstr, fmt_money, money
 from .model import office_gate, office_on, office_org, office_role, office_settings, onc_ready, pb_cl_sql, pb_owner
 from .contacts_cl import fk_send_rcpts  # 2.433.0 (#3599)
@@ -322,7 +322,7 @@ def rin_send(c, oid, uid, did):
             _files, datev, m = inv_send(c, oid, uid, r, {"to": to, "cc": cc}, later=True)
     except (BadInput, Denied) as e:
         epdf_sweep(c)  # 2.355.0 A (#2847): the files of the finalising just rolled back
-        return False, (e.text() if hasattr(e, "text") else str(e)) or [N_("unknown")], False, None
+        return False, err_stored(e) or [N_("unknown")], False, None  # 2.454.0 (#3808): key + values, every person's own language
     except Exception as e:  # noqa: BLE001 -- a broken file / check: the draft stays, the reason goes to the person
         epdf_sweep(c)
         print("invoice series: sending", did, "failed:", e, flush=True)  # 2.91.0 review L3: the raw error (host, port) only in the log
@@ -341,7 +341,7 @@ def rin_mail(c, oid, uid, m):
         return True, ""
     except (BadInput, Denied) as e:
         c.rollback()
-        return False, (e.text() if hasattr(e, "text") else str(e)) or [N_("unknown")]
+        return False, err_stored(e) or [N_("unknown")]
     except Exception as e:  # noqa: BLE001 -- a mail server error
         c.rollback()
         print("invoice series: mailing", m.get("did"), "failed:", e, flush=True)

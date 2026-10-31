@@ -175,7 +175,7 @@ const CONTRAST = `(() => {
       let nr = 0;
       const open = async (hash, theme) => {
         await nav(B + 'static/icon.svg');
-        await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme || 'dark'}"'); return 1; })()`);
+        await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme || 'dark'}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
         await nav(B + '?v=' + (++nr) + '#' + hash);
         for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300);
         await sleep(1000);

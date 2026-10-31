@@ -1997,6 +1997,7 @@ fresh; run p2272_a_retention "$PY" p2272_a_retention_test.py "$KALMIDO_TEST_DATA
 fresh; run p22233_a_trash_runs "$PY" p22233_a_trash_runs_test.py "$KALMIDO_TEST_DATA"
 # 2.272.0 C (#3027): import undo into the trash, keeps what changed since (task import, account import, trips, fixed costs; freelancer)
 fresh; run p2272_c_import_undo "$PY" p2272_c_import_undo_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2363_2_runs "$PY" p2363_2_runs_test.py "$KALMIDO_TEST_DATA"
 # 2.272.0 E1 (#3038): contacts (app, CardDAV, bulk, import), address books and notes go to the trash, restore with notes / links, run with switch; freelancer-matrix: pim
 fresh; run p2272_e1_contacts_trash "$PY" p2272_e1_contacts_trash_test.py "$KALMIDO_TEST_DATA"
 # 2.270.0 A (#3019): stale dialogs write no old full states back (list _prev for every setting, organisation member operations, user orgs _prev, project description expect_updated_at + history); freelancer-matrix: lists

@@ -1,0 +1,5 @@
+# 2.360.3 (#2915): the direct Python packages of the embedding service; embed/requirements.lock is generated from it, with
+# uv pip compile embed/requirements.in --universal --python-version 3.12 --generate-hashes -o embed/requirements.lock
+onnxruntime==1.31.0
+tokenizers==0.23.3
+numpy==2.5.4

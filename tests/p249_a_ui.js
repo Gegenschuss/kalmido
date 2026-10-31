@@ -31,7 +31,7 @@ const GREET = ['Good morning, nice to have you here.', 'Welcome back, nice to ha
     const {ev, nav, cmd, ctx} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: w, height: h}});
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     await nav(B);
     for (let i = 0; i < 40 && !await ev(`!!document.querySelector('.authscreen #auth-form')`).catch(() => false); i++) await sleep(250);
   };

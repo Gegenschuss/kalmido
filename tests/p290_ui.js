@@ -131,7 +131,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
         await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
         for (const theme of ['dark', 'light']) {
           await nav(B + 'static/icon.svg');
-          await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+          await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
           await nav(B + '?v=' + (++nr) + '#l/' + L);
           for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300);
           await sleep(800);

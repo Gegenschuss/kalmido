@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# kalmido-suite: fresh
 """2.448.0 (#3765): whoever reads a text decides its language. Texts kept for later are built for their reader or stored as
 key + values. The first admin speaks German here, so a text that silently falls back to them shows.
  - poll: the mail about the chosen time in the language the voter saw when voting; an older vote without one: the owner's
@@ -7,16 +8,23 @@ key + values. The first admin speaks German here, so a text that silently falls 
  - planned proposal: the title in the language of the person the plan works for
  - import: the stored state keeps key + values, the status answers in the language of who asks
  - history: an encrypted file is stored as the key, the reader's app translates it
+ 2.454.0 (#3808), the rest of it:
+ - invoice series: a failed check of finalising or sending follows each admin
+ - account import: the areas that stay behind (preview, warning) follow who reads the state
+ - wiki import: a check text of the background run follows who reads the state
+ - proposal: the title in a task's history is kept as a key, the asker's words stay in title
  The cases without the series run for a person without an organisation (tests/freelancer_fixture.py)."""
-# kalmido-suite: fresh
 import base64
 import email
 import email.policy
+import hashlib
+import io
 import json
 import os
 import shutil
 import subprocess
 import sys
+import zipfile
 from datetime import date, datetime, timedelta, timezone
 
 import requests
@@ -130,6 +138,17 @@ t = dict(dbx("SELECT created_by, content FROM tasks WHERE title LIKE '%Rente%'")
 check("Der Kunde hat keine E-Mail-Adresse" in t.get(ALICE, ""), f"the German admin reads German {t}")
 check("Le client n’a pas d’adresse e-mail" in t.get(BOB, ""), f"the French admin reads French, whoever came first {t}")
 
+# 2.454.0 (#3808): the same for a check that fails inside finalising (tax number and IBAN are missing here)
+dbx("UPDATE clients SET email_invoice='billing@example.com' WHERE id=?", (CL,))
+r = A.post(B + O + "/series", json={"template_id": TPL, "every": "monthly", "start": date.today().isoformat(), "auto_send": True, "title": "Zweite"})
+check(r.status_code == 201, "a second series " + r.text[:200])
+dbx("UPDATE office_inv_series SET created_by=? WHERE id=?", (FID, r.json()["id"]))
+in_ct("import app\nfrom kalmido.core.db import connect\nfrom kalmido.office import recurring as x\nx._RIN_LAST['at'] = -1e12\n"
+      "c = connect()\nx.rin_tick(c)\nc.close()")
+t = dict(dbx("SELECT created_by, content FROM tasks WHERE title LIKE '%Zweite%'"))
+check("Vor dem Festschreiben fehlt" in t.get(ALICE, "") and "Steuernummer oder USt-IdNr." in t.get(ALICE, ""), f"#3808: the German admin reads the check in German {t}")
+check("Manque avant la clôture" in t.get(BOB, "") and "numéro fiscal" in t.get(BOB, ""), f"#3808: the French admin in French, the field names too {t}")
+
 # ================================================================ agent card: the person reads it
 Fr.get(B + O + "/settings")
 speak(Fr, "de")
@@ -166,6 +185,66 @@ speak(Fr, "fr")
 st = Fr.get(B + f"/api/account/import/{IID}").json()
 check("export Kalmido" in (st.get("error") or ""), f"the same state read in French {st}")
 
+# ================================================================ account import: what stays behind (2.454.0, #3808)
+def sha(b):
+    return hashlib.sha256(b).hexdigest()
+
+
+def areas_zip():
+    entries = {f"data/{t}.json": json.dumps(rows).encode() for t, rows in {"lists": [{"id": 7, "name": "Moved"}], "tasks": [], "wiki_pages": [{"id": 1}]}.items()}
+    flist = [{"path": p, "size": len(x), "sha256": sha(x)} for p, x in entries.items()]
+    m = json.dumps({"format": "kalmido-account", "v": 1, "kalmido_version": "test", "created_at": "2026-10-20T06:00:00Z",
+                    "source": {"url": "https://example.com", "hosted": True}, "user": {"id": 1000, "name": "Test Person", "email": "test@example.com"},
+                    "tables": {}, "files": flist, "client_encrypted": {}, "export_id": os.urandom(16).hex()}).encode()
+    bio = io.BytesIO()
+    with zipfile.ZipFile(bio, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("manifest.json", m)
+        z.writestr("checksum.sha256", (f"{sha(m)}  manifest.json\n" + "".join(f"{f['sha256']}  {f['path']}\n" for f in flist)).encode())
+        for p, x in entries.items():
+            z.writestr(p, x)
+    return bio.getvalue()
+
+
+check(Fr.delete(B + f"/api/account/import/{IID}").ok, "the junk upload goes")
+ZIP = areas_zip()
+speak(Fr, "de")
+r = Fr.post(B + "/api/account/import", json={"size": len(ZIP), "name": "x.zip"})
+check(r.ok, "an upload " + r.text[:200])
+IID = r.json()["id"]
+Fr.put(B + f"/api/account/import/{IID}?offset=0", data=ZIP, headers={"Content-Type": "application/octet-stream"})
+st = until(lambda: (lambda j: j if j.get("state") == "preview" else None)(Fr.get(B + f"/api/account/import/{IID}").json()), 60) or {}
+left = lambda j: [x["what"] for x in (j.get("preview") or {}).get("not_taken") or []]  # noqa: E731
+check("Wissensseiten" in left(st), f"#3808: the preview in German {st}")
+speak(Fr, "fr")
+st = Fr.get(B + f"/api/account/import/{IID}").json()
+check("Pages de connaissances" in left(st), f"#3808: the same preview read in French {left(st)}")
+r = Fr.post(B + f"/api/account/import/{IID}/run", json={"target": "private", "people": {}})
+check(r.status_code == 202, f"the run starts {r.text[:200]}")
+st = until(lambda: (lambda j: j if j.get("state") == "done" else None)(Fr.get(B + f"/api/account/import/{IID}").json()), 60) or {}
+speak(Fr, "de")
+st = Fr.get(B + f"/api/account/import/{IID}").json()
+w = " | ".join(x["text"] for x in (st.get("result") or {}).get("warnings") or [])
+check("Diese Bereiche bleiben" in w and "Wissensseiten (1)" in w, f"#3808: the warning written under French, read in German {w}")
+imp = Fr.get(B + "/api/imports").json()["imports"][0]["counts"]
+check({"what": "Wissensseiten", "count": 1} in imp.get("not_taken", []), f"#3808: the import's record in German too {imp}")
+
+# ================================================================ wiki import: a check of the background run (2.454.0, #3808)
+speak(Fr, "de")
+r = Fr.post(B + "/api/wiki/import/upload", json={"size": len(JUNK), "name": "x.zip", "space": "private", "replace": False})
+check(r.ok, "a wiki upload " + r.text[:200])
+WID = r.json()["id"]
+Fr.put(B + f"/api/wiki/import/upload/{WID}?offset=0", data=JUNK, headers={"Content-Type": "application/octet-stream"})
+st = until(lambda: (lambda j: j if j.get("state") == "failed" else None)(Fr.get(B + f"/api/wiki/import/upload/{WID}").json()), 30) or {}
+check(st.get("error") == "Das ist keine ZIP-Datei", f"#3808: German while German {st}")
+speak(Fr, "fr")
+st = Fr.get(B + f"/api/wiki/import/upload/{WID}").json()
+check(st.get("error") == "Ce n'est pas un fichier ZIP", f"#3808: the same state read in French {st}")
+
+# the archive budget (zip bombs) must stop the background run in any language: there str(e) is in the first admin's language, so
+# only the key may be compared. The budget of that run is 4 GB, too much to reach here: a guard on the code (2.454.0, #3808)
+src = open(os.path.join(N, "..", "kalmido", "wiki", "wikiatt.py"), encoding="utf-8").read()
+check('str(e) == tr("The archive is too large")' not in src and src.count('getattr(e, "stored", None) == (WKA_TOO_LARGE,)') == 2, "#3808: the wiki import compares the key of the archive budget")
+
 # ================================================================ history: the key, the reader's app translates it
 tid = Fr.post(B + "/api/tasks", json={"title": "Sealed"}).json()["id"]
 r = Fr.put(B + "/api/e2e/keys", json={"pub": {"kty": "EC", "crv": "P-256", "x": b64u(32), "y": b64u(32)},
@@ -177,5 +256,16 @@ check(r.ok, "an encrypted file " + r.text[:200])
 d = dbx("SELECT data FROM activity WHERE task_id=? AND kind='attach'", (tid,))[0][0]
 d = json.loads(d) if isinstance(d, str) else d
 check(d.get("enc") == 1 and d.get("names") == ["Encrypted file"], f"stored as the key, not the writer's French {d}")
+
+# ================================================================ proposal title in a task's history (2.454.0, #3808)
+tid = Fr.post(B + "/api/tasks", json={"title": "Plan"}).json()["id"]
+r = Fr.post(B + "/api/proposals", json={"agent_id": AG, "kind": "subtasks", "task_id": tid})
+check(r.status_code == 201, "a proposal " + r.text[:200])
+check(r.json()["title"] == "Découper : Plan", f"the job keeps the asker's words {r.json()['title']}")
+r = Fr.post(B + f"/api/agents/jobs/{r.json()['id']}/action", json={"action": "reject"})
+check(r.ok, "the proposal is rejected " + r.text[:200])
+d = dbx("SELECT data FROM activity WHERE task_id=? AND kind='agent_job'", (tid,))[0][0]
+d = json.loads(d) if isinstance(d, str) else d
+check(d.get("title_key") == ["Break down: {0}", "Plan"], f"#3808: the history keeps the key, each reader's app translates it {d}")
 
 sys.exit(done("p2448_a_lang"))

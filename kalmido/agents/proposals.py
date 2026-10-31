@@ -509,6 +509,7 @@ def proposal_request():
                  (uid,)).fetchone()[0] >= PROP_OPEN_MAX:
         return err(tr("You have {0} open proposal requests: apply or discard some first", PROP_OPEN_MAX), 429)
     inp, title, tid, lid = prop_input(c, uid, kind, b)
+    tkey = [PROP_TITLES["subtasks"], inp["task"]["title"][:80]] if kind == "subtasks" else None  # 2.454.0 (#3808): only this kind has a task, so a history
     inp = dl_job_input(c, aid, kind, inp, tid, lid)  # 2.235.0 B2 (#2902): the agent's data lock narrows what the person hands over
     from ..collab.liste2eguard import le2b_list_locked, le2b_off, le2b_task_locked
     if le2b_list_locked(c, lid) or le2b_task_locked(c, tid):  # 2.64.1 B (#1817): agents never get texts of a list with the lock
@@ -517,9 +518,10 @@ def proposal_request():
     if lid and prop_mode(a) != "all" and list_role(c, lid, aid) and not agent_usable(c, aid, uid, lid):  # 2.26.0 (#928)
         return err(tr("The project owner has not opened this agent to members"), 403)
     ts = iso(now_utc())
-    jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id)
-                       VALUES(?,?,?,?,'running','',?,?,?,?,'requested',?)""",
-                    (aid, tid, uid, title[:JOB_TITLE_MAX], ts, ts, kind, json.dumps(inp, ensure_ascii=False), lid))
+    jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id,title_key)
+                       VALUES(?,?,?,?,'running','',?,?,?,?,'requested',?,?)""",
+                    (aid, tid, uid, title[:JOB_TITLE_MAX], ts, ts, kind, json.dumps(inp, ensure_ascii=False), lid,
+                     json.dumps(tkey, ensure_ascii=False) if tkey else None))
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
     agent_emit(c, aid, "job_request", {"job": job_dict(c, j), "kind": kind, "input": inp, "limits": PROP_LIMITS,
                                        "requested_by": {"id": uid, "name": user_names(c, [uid]).get(uid, "")}})

@@ -42,7 +42,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.errors import BadInput  # 2.273.0 A (#3030)
 from ..accounts.settings import clean_look_pref  # 2.273.0 A (#3030)
 from ..tasks.snippets import snip_clean  # 2.273.0 A (#3030)
-from ..core.i18n import lang, LANGS, N_, tr as _tr_base, tr_stored
+from ..core.i18n import lang, LANGS, N_, stored_join, tr as _tr_base, tr_stored
 from ..core.access import Denied, ROLES, list_role, my_inbox, my_max_sort, WRITE_ROLES
 from ..accounts.session import me
 from ..lists.lists import LIST_COLOR_RE
@@ -571,7 +571,7 @@ def umz_find_login(c, uid, login):
 def umz_left(data):
     """2.273.0 A (#3030): what of an account export stays on the old server -> [{"what": name, "count": n}]: every part of
     the file the import does not read (UMZ_LEFT names them, an unknown part keeps its technical name), the settings that
-    do not move and the tasks in the trash."""
+    do not move and the tasks in the trash. 2.454.0 (#3808): name = the key, translated for who reads it (umz_areas_tr)."""
     n = {k: len(v) for k, v in data.items() if isinstance(v, list)}
     out, known = {}, set(UMZ_READ)
     for what, parts in UMZ_LEFT:
@@ -586,7 +586,12 @@ def umz_left(data):
                     (N_("Tasks in the trash"), sum(1 for t in data.get("tasks", []) if t.get("deleted_at")))):
         if k:
             out[what] = k
-    return [{"what": tr(w), "count": k} for w, k in out.items()]
+    return [{"what": w, "count": k} for w, k in out.items()]
+
+
+def umz_areas_tr(rows):
+    """2.454.0 (#3808): [{what: key, count}] of a kept state in the language of who asks; a state written before keeps its text."""
+    return [{**x, "what": tr(x["what"])} for x in rows or []]
 
 
 def umz_preview(c, uid, man, data, can_invite):
@@ -621,7 +626,7 @@ def umz_preview(c, uid, man, data, can_invite):
     skipped = []
     org_kind = man.get("kind") == "org"
     for what, n in (man.get("org_skipped") or {}).items():  # an organisation export: the areas that do not move
-        skipped.append({"what": tr(what), "count": n})
+        skipped.append({"what": what, "count": n})
     if not org_kind:  # 2.273.0 A (#3030): every part of the file the import does not read (was a fixed list)
         skipped += umz_left(data)
     office = man.get("personal_office") if isinstance(man.get("personal_office"), dict) else {}  # 2.362.2 (#3099)
@@ -1575,18 +1580,18 @@ def umz_run(uid, iid, opts):
             except UmzStop:
                 pass
             # 2.273.0 A (#3030): what stays on the old server, in the result and the import's report too
-            left = [{"what": tr(w), "count": n} for w, n in (man.get("org_skipped") or {}).items()] if run.kind == "org" else umz_left(data)
-            if left:
-                run.warning(N_("These areas stay on the old server: {0}"), ", ".join(f"{x['what']} ({x['count']})" for x in left))
+            left = [{"what": w, "count": n} for w, n in (man.get("org_skipped") or {}).items()] if run.kind == "org" else umz_left(data)
+            if left:  # 2.454.0 (#3808): as stored texts, umz_view translates the names too
+                run.warning(N_("These areas stay on the old server: {0}"), stored_join(("{0} ({1})", (x["what"],), x["count"]) for x in left))
             if run.stats.get("skipped"):  # 2.362.3 (#3098)
                 run.warning(N_("Already here from an earlier import, skipped: {0} entries"), run.stats["skipped"])
             report = {**run.stats, "export_id": eid, "src": src, "target": run.org, "tasks": run.stats.get("tasks", 0), "not_taken": left}
             iid_db = None
             if any(run.created[k] for k in run.created):  # recorded with the rows (2.137.0, #2344: + "oi"): whatever happens next, undo works
-                from ..integrations.importers import imports_trim
+                from ..integrations.importers import imp_prune
                 iid_db = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
                                    (uid, UMZ_SOURCE, _txt(st.get("name"), 200), json.dumps({**run.created, "src": run.src}), json.dumps(report), iso(now_utc())))
-                imports_trim(c, uid)
+                imp_prune(c, uid)
             c.commit()
             run.written = []  # committed: the files belong to their rows now
             shared = []
@@ -1954,6 +1959,9 @@ def _view(uid, iid, st):
             out[k] = st[k]
     if "error" in out:  # 2.448.0 (#3765): translated for who asks; a state written before keeps its text
         out["error"] = tr_stored(out["error"])
+    if out.get("preview"):  # 2.454.0 (#3808)
+        pv = out["preview"]
+        out["preview"] = {**pv, "not_taken": umz_areas_tr(pv.get("not_taken")), "taken_areas": umz_areas_tr(pv.get("taken_areas"))}
     if out.get("result"):
         res = out["result"]
         out["result"] = {**res, "warnings": [{**x, "text": tr_stored(x["text"])} for x in res.get("warnings") or []]}

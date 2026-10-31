@@ -50,7 +50,9 @@ from ..core.db import connect, db, err, iso, now_utc
 from ..core.pg import system_ctx
 from ..core.i18n import N_, lang, tr
 from ..core.access import Denied
+from ..accounts.pictures import list_icon_path, org_icon_path, org_icon_tok  # 2.363.2 (#3106)
 from ..accounts.session import me
+from ..lists.listhead import o3c_head_rel  # 2.363.2 (#3106)
 from ..core.orgcrypt import OrgCryptError, _org_admin, oc_dec, oc_dec_row, oc_enabled, oc_read_file, oc_status  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
 from .offsite import stepup_download  # 2.223.2 C (#2871): the step-up before a download
@@ -159,6 +161,8 @@ def _ox_dec_row(c, oid, table, row):
     row.pop("cost_enc", None)
     if table == "sched_poll_votes":  # 2.380 (#2398 review): a voter's edit key hash and address hash never leave (kept empty: required columns)
         row.update(edit_hash="", ip_hash="")
+    if table == "office_privacy_sheets":  # 2.363.2 (#3106): the mail code of a sheet is a key (sealed, its hash): the target makes a new one
+        row.update(code="", code_hash="")
     if table == "appt_bookings":  # 2.362.0 (#3096): the booking customer's address on the network is no business record
         row.pop("ip", None)
     if table == "portal_tickets":  # 2.81.0 (#1866): sealed with the server key -> plain inside the encrypted archive; the
@@ -426,7 +430,7 @@ OX_NOT_INCLUDED = (
     N_("group conversations of the team chat (like direct messages they belong to their people, not to the organisation)"),
     N_("channels of the organisation that are not open and that the exporting admin is not a member of"),
     # 2.362.0 (#3096): what else stays out on purpose (OX_LEFT names every table with an organisation column that does)
-    N_("notification channels (their targets are secrets), invitations and join requests, the organisation's and the lists' pictures (icons, cover pictures), synchronisation data of calendar and task apps (CalDAV), groups of people and their shares"),
+    N_("notification channels (their targets are secrets), invitations and join requests, synchronisation data of calendar and task apps (CalDAV), groups of people and their shares"),
     N_("the articles of feeds (fetched again on the target) and feed addresses that carry an access key"),  # 2.455.0 (#3469)
     N_("booking pages of other members that the office does not bill (only their owner reads the bookings), archived channels"),
     # 2.190.0 D (#2561): the same rule as in the app (hub/hubmail.py hbm_can)
@@ -600,6 +604,7 @@ class _Man:
     def __init__(self):
         self.files, self.counts, self.client_enc = {}, {}, {"attachments": [], "task_notes": 0}
         self.locked = []  # 2.209.0 D (#1856): files left out because the virus scanner locked them
+        self.missing = []  # 2.363.2 (#3106): files that are gone or cannot be opened (manifest "missing")
 
 
 def _ox_locked(c, oid, man):
@@ -646,6 +651,28 @@ def _put_bytes(zf, man, name, data):
 
 def _read(c, full):
     return oc_read_file(c, full)
+
+
+def ox_read_listed(c, missing, name, full):
+    """2.363.2 (#3106): the plain bytes of a stored file, or None with an entry {file, reason} in missing: one file that is
+    gone or cannot be decrypted is named in the manifest, the rest of the export goes on (the retention export does the same)."""
+    if not full:
+        missing.append({"file": name, "reason": "not_found"})
+        return None
+    try:
+        return _read(c, full)
+    except (OrgCryptError, OSError):
+        missing.append({"file": name, "reason": "unreadable"})
+        return None
+
+
+def _put_file(c, zf, man, name, full):
+    """A stored file into the archive -> False when it is listed in man.missing instead."""
+    data = ox_read_listed(c, man.missing, name, full)
+    if data is None:
+        return False
+    _put_bytes(zf, man, name, data)
+    return True
 
 
 def _under(base, rel):
@@ -702,45 +729,53 @@ def ox_build(c, oid, out, by=None):
         lk = _ox_locked(c, oid, man)  # 2.209.0 D (#1856): files the virus scanner locked stay out, listed in the manifest
         for r in _rows(c, oid, "attachments", ox_live(c, "attachments", vis(f"task_id IN ({TSQ})")), (oid,)):
             full = _under(ATT_DIR, r.get("path"))
-            if not full or lk("att", r, r.get("name")):
+            if lk("att", r, r.get("name")):
                 continue
             name = f"files/attachments/{int(r['id'])}-{_safe_part(r.get('name'))}"
-            _put_bytes(zf, man, name, _read(c, full))
-            if enc and r.get("enc"):
+            if _put_file(c, zf, man, name, full) and enc and r.get("enc"):
                 man.client_enc["attachments"].append(name)
         for r in _rows(c, oid, "list_files", ox_live(c, "list_files", vis(f"list_id IN ({LSQ})")), (oid,)):
             full = _under(ATT_DIR, r.get("path"))
-            if full and not lk("list", r, r.get("name")):
-                _put_bytes(zf, man, f"files/list_files/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
+            if not lk("list", r, r.get("name")):
+                _put_file(c, zf, man, f"files/list_files/{int(r['id'])}-{_safe_part(r.get('name'))}", full)
         if "fs_versions" in have:  # 2.48.0 (#1207): every version of the file store's files (decrypted like the attachments)
             for r in _rows(c, oid, "fs_versions", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)", (oid,)):
                 full = _under(ATT_DIR, r.get("path"))
                 nm = c.execute("SELECT name, hub_mail_id FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
                 if r["node_id"] in hnodes or (nm and hidden and nm["hub_mail_id"] in hidden):
                     continue  # 2.190.0 D (#2561): a filed mail's file follows the mail (2.223.3 B (#2879): the trash too)
-                if full and nm and not lk("fs", {"id": r["node_id"]}, nm[0], r["no"]):
-                    _put_bytes(zf, man, f"files/store/{int(r['node_id'])}-v{int(r['no'])}-{_safe_part(nm[0])}", _read(c, full))
+                if nm and not lk("fs", {"id": r["node_id"]}, nm[0], r["no"]):
+                    _put_file(c, zf, man, f"files/store/{int(r['node_id'])}-v{int(r['no'])}-{_safe_part(nm[0])}", full)
         if "wiki_files" in have:  # 2.99.0 A (#2182): the files of the knowledge pages (decrypted like the attachments)
             for r in _rows(c, oid, "wiki_files", ox_live(c, "wiki_files", "org_id=?"), (oid,)):
                 full = _under(ATT_DIR, r.get("path"))
-                if full and not lk("wiki", r, r.get("name")):
-                    _put_bytes(zf, man, f"files/wiki/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
+                if not lk("wiki", r, r.get("name")):
+                    _put_file(c, zf, man, f"files/wiki/{int(r['id'])}-{_safe_part(r.get('name'))}", full)
         if "sheet_files" in have:  # 2.124.0 B (#2110): the files of table cells (decrypted like the attachments)
             for r in _rows(c, oid, "sheet_files", ox_live(c, "sheet_files", "org_id=?"), (oid,)):
                 full = _under(ATT_DIR, r.get("path"))
-                if full and not lk("sheet", r, r.get("name")):
-                    _put_bytes(zf, man, f"files/sheets/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
+                if not lk("sheet", r, r.get("name")):
+                    _put_file(c, zf, man, f"files/sheets/{int(r['id'])}-{_safe_part(r.get('name'))}", full)
         if "bookmarks" in have:  # 2.380 H (#2398): the pictures of the organisation's bookmarks (decrypted like the attachments)
             for r in _rows(c, oid, "bookmarks", ox_live(c, "bookmarks", "org_id=? AND image<>''"), (oid,)):
                 full = _under(ATT_DIR, r.get("image"))
-                if full:
-                    _put_bytes(zf, man, f"files/bookmarks/{int(r['id'])}-{_safe_part(os.path.basename(r['image']))}", _read(c, full))
+                _put_file(c, zf, man, f"files/bookmarks/{int(r['id'])}-{_safe_part(os.path.basename(r['image']))}", full)
         if "tchat_files" in have:  # 2.362.0 (#3092): the files and voice messages of the team chat (decrypted like the attachments)
             tw = ox_live(c, "tchat_files", vis(f"room_id IN ({RSQ})"))
             for r in _rows(c, oid, "tchat_files", tw, (oid,) * tw.count("?")):
                 full = _under(ATT_DIR, r.get("path"))
-                if full and not lk("tchat", r, r.get("name")):
-                    _put_bytes(zf, man, f"files/tchat/{int(r['id'])}-{_safe_part(r.get('name'))}", _read(c, full))
+                if not lk("tchat", r, r.get("name")):
+                    _put_file(c, zf, man, f"files/tchat/{int(r['id'])}-{_safe_part(r.get('name'))}", full)
+        # 2.363.2 (#3106): the pictures of the organisation and of the lists the admin sees, as files (the import does not set them)
+        tok = org_icon_tok(org["icon"])
+        if tok:
+            _put_file(c, zf, man, "files/pictures/organisation.png", _under(ATT_DIR, os.path.relpath(org_icon_path(oid, tok), ATT_DIR)))
+        for r in c.execute(vis(f"SELECT id, icon, header_file FROM lists WHERE id IN ({LSQ})"), (oid,)).fetchall():
+            if str(r["icon"] or "").startswith("u:"):
+                _put_file(c, zf, man, f"files/pictures/list-{int(r['id'])}-icon.png",
+                          _under(ATT_DIR, os.path.relpath(list_icon_path(r["id"], r["icon"][2:]), ATT_DIR)))
+            if r["header_file"]:
+                _put_file(c, zf, man, f"files/pictures/list-{int(r['id'])}-header.jpg", _under(ATT_DIR, o3c_head_rel(r["id"], r["header_file"])))
         odir = os.path.join(OFFICE_DIR, str(int(oid)))
         dead = ox_dead_office_files(c, oid, have)  # 2.223.3 B (#2879)
         if os.path.isdir(odir):
@@ -756,7 +791,7 @@ def ox_build(c, oid, out, by=None):
                     if root == odir and fn in dead:
                         continue
                     rel = os.path.relpath(full, odir).replace(os.sep, "/")
-                    _put_bytes(zf, man, "files/office/" + "/".join(_safe_part(p) for p in rel.split("/")), _read(c, full))
+                    _put_file(c, zf, man, "files/office/" + "/".join(_safe_part(p) for p in rel.split("/")), full)
         if "enc" in _table_cols(c, "tchat_msgs"):  # 2.42.0 (#909, agent A): browser-encrypted chat messages stay ciphertext
             man.client_enc["chat_messages"] = c.execute(vis(f"""SELECT COUNT(*) FROM tchat_msgs WHERE COALESCE(enc,'')!='' AND room_id IN
                 ({RSQ})"""), (oid,) * RSQ.count("?")).fetchone()[0]  # 2.362.0 (#3092): + the channels
@@ -794,6 +829,7 @@ def ox_build(c, oid, out, by=None):
             "decrypted": ox_decrypted_note("organisation"),
             "not_included": ox_not_included(c, by, OX_NOT_INCLUDED),  # 2.449.0 (#3768)
             "locked_files": man.locked,  # 2.209.0 D (#1856)
+            "missing": man.missing,  # 2.363.2 (#3106)
         }
         _put_bytes(zf, man, "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode())
     return manifest
@@ -926,6 +962,7 @@ def ox_build_personal(c, oid, out, org, have, by=None):
             "decrypted": ox_decrypted_note("office"),
             "not_included": ox_not_included(c, by, [OX_PB_LEFT, *OX_NOT_INCLUDED[1:2]]),  # 2.449.0 (#3768)
             "locked_files": man.locked,  # 2.209.0 D (#1856)
+            "missing": man.missing,  # 2.363.2 (#3106)
         }
         _put_bytes(zf, man, "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode())
     return manifest
@@ -1003,7 +1040,8 @@ def ox_run(oid, uid):
             done = now_utc()
             _state_set(oid, {"state": "done", "by": uid, "started_at": _state(oid).get("started_at") if _state(oid) else iso(when),
                              "done_at": iso(done), "expires_at": iso(done + timedelta(hours=OX_KEEP_H)), "file": name, "bytes": size, "plain": plain,
-                             "files": sum(1 for k in man["files"] if k.startswith("files/")), "rows": sum(man["counts"].values())})
+                             "files": sum(1 for k in man["files"] if k.startswith("files/")), "rows": sum(man["counts"].values()),
+                             "missing": len(man["missing"])})
             c.execute("INSERT INTO office_doc_log(org_id, doc_id, user_id, at, action, target, detail) VALUES(?,?,?,?,?,?,?)",
                       (oid, None, uid, iso(done), "export", "org", json.dumps({"bytes": size, "file": name})))
             c.commit()
@@ -1031,7 +1069,7 @@ def ox_status(oid):
         p = os.path.join(_odir(oid), st.get("file") or "")
         if not st.get("file") or not os.path.isfile(p) or st.get("expires_at", "") <= iso(now_utc()):
             st = {"state": "none"}
-    out = {k: st.get(k) for k in ("state", "started_at", "done_at", "expires_at", "file", "bytes", "files", "plain") if st.get(k) is not None}
+    out = {k: st.get(k) for k in ("state", "started_at", "done_at", "expires_at", "file", "bytes", "files", "plain", "missing") if st.get(k) is not None}
     if st.get("state") == "failed":
         out["error"] = tr("The export was interrupted. Please start it again.") if st.get("error") == "interrupted" else tr("The export failed. Please try again later or ask the server admin (server log).")
     return out

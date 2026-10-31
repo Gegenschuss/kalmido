@@ -559,14 +559,19 @@ def import_ics(c, uid, cal_id, raw, dry=False):
         text = raw.decode("latin-1")
     if "BEGIN:VCALENDAR" not in text[:4000].upper():
         raise BadInput(tr("This is not a calendar file (ICS)"))
+    # 2.363.2 (#3106): the messages tell the causes apart (cut off, a broken line, broken event blocks, nothing to import)
+    if not re.search("END:VCALENDAR", text, re.I):
+        raise BadInput(tr("The calendar file is incomplete, its end is missing"))
     raws, _ = split_events(text)
     try:
         cals = icalendar.Calendar.from_ical(text, multiple=True)
     except Exception:  # noqa: BLE001
-        raise BadInput(tr("The calendar file could not be read")) from None
+        raise BadInput(tr("The calendar file contains a line that cannot be read")) from None
     comps = [x for cal in cals for x in cal.walk("VEVENT")]
     if len(comps) != len(raws):
-        raise BadInput(tr("The calendar file could not be read"))
+        raise BadInput(tr("An event in the calendar file is not closed properly"))
+    if not comps:
+        raise BadInput(tr("The calendar file contains no events"))
     groups = {}
     for i, comp in enumerate(comps):
         groups.setdefault(str(comp.get("UID") or f"noid-{i}").strip()[:250], []).append(i)
