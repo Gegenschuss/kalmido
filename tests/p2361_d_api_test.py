@@ -177,7 +177,7 @@ nl = len(rl.pages)
 check(nl >= 2, f"30 positions: several pages ({nl})")
 check(all(f"Seite {i + 1} von {nl}".replace(" ", "") in t.replace(" ", "") for i, t in enumerate(Tl)), "every page carries 'Seite x von y'")
 check(all(("LEISTUNG" in t and "GESAMT" in t) for t in Tl if "Zusatzleistung" in t), "the table head is repeated on every page with positions")
-tot_page = next((t for t in Tl if "Summe netto" in t), "")  # 2.357.0 (#3183): Summe netto
+tot_page = next((t for t in reversed(Tl) if "Summe netto" in t), "")  # 2.357.0 (#3183): Summe netto; 2.447.0 (#3785): the last one, the overview of the parts on page 1 (#3622) carries the words as well
 check("Zusatzleistung" in tot_page or "Producing" in tot_page, "the totals never stand alone on a page")
 
 # ---------------------------------------------------------------- tenant matrix (tenant-matrix: office)
