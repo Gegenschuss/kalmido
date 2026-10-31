@@ -268,6 +268,9 @@ def privacy_checks(s, client, tag):
     check(m.get("text", "").startswith(LG["fr"]["Hello,"]) and LG["fr"]["Kind regards"] in m["text"], f"{tag}: the sheet's mail in French ({m.get('text', '')[:80]!r})")
     r = s.post(B + O + "/privacy-sheets", json={"client_id": client, "kind": "info"})
     check(r.status_code == 201, f"{tag}: a sheet from the sample in an office in French ({r.status_code})")
+    # 2.449.0 (#3768): the sample itself is French, not English text in a French frame
+    r = s.post(B + O + "/privacy-sheets", json={"client_id": client, "kind": "dpa"})
+    check(r.status_code == 201 and r.json()["sheet"]["title"] == "Contrat de sous-traitance de données", f"{tag}: the sample's text in French " + r.text[:200])
 
 
 def summary_invoice(s, lang, tag):
