@@ -126,7 +126,7 @@ check(A.post(B + f"/api/orgs/{ORG}/channels", json={"kind": "slack", "url": STUB
 
 # ================================================================ #2973: own changes (a person without an organisation)
 FL = Fi.post(B + "/api/lists", json={"name": "Studio", "org_id": None}).json()["id"]
-check(Fi.post(B + f"/api/lists/{FL}/members", json={"username": "bob", "role": "editor"}).ok, "setup: frida shares her project with bob")
+check(Fi.put(B + f"/api/lists/{FL}/members", json={"user_id": uid["bob"], "role": "edit"}).ok, "setup: frida shares her project with bob")
 FC = channel(Fi, "/fr", ["lists"])
 task(Fi, FL, "Written by me")
 task(Bo, FL, "Written by bob")
@@ -148,7 +148,7 @@ check(arrives("/fr", "From the form"), "#2973: a task of the own inbound webhook
 
 # an organisation's channel is a team feed
 OL = A.post(B + "/api/lists", json={"name": "Alpha board", "org_id": ORG}).json()["id"]
-A.patch(B + f"/api/lists/{OL}", json={"org_visibility": "all"})
+A.patch(B + f"/api/lists/{OL}", json={"org_visibility": "org"})
 channel(A, "/alpha", ["newtask", "complete"], name="Team", org=ORG)
 task(A, OL, "Team news by the admin")
 check(arrives("/alpha", "Team news by the admin"), "#2973: an organisation's channel keeps the actor's own events")
@@ -172,7 +172,7 @@ Fi.delete(B + f"/api/lists/{FL}/rules/{r.json()['id']}")
 # ================================================================ #2971: one more try
 BL = Bo.post(B + "/api/lists", json={"name": "Bob's", "org_id": None}).json()["id"]
 BC = channel(Bo, "/fail-bob", ["lists"], name="Bob's Slack")
-check(Bo.post(B + f"/api/lists/{BL}/members", json={"username": "alice", "role": "editor"}).ok, "setup: bob shares with alice")
+check(Bo.put(B + f"/api/lists/{BL}/members", json={"user_id": uid["alice"], "role": "edit"}).ok, "setup: bob shares with alice")
 task(A, BL, "First message")
 check(until(lambda: len(posts("/fail-bob")) >= 2), "#2971: the failed message is tried once more")
 time.sleep(2.5)
@@ -220,7 +220,7 @@ check(news(Fi, "webhook") and "Dead hook" in news(Fi, "webhook")[0]["data"]["tex
 r = Bo.post(B + f"/api/lists/{FL}/hooks-in", json={"name": "Bob's form"})
 check(r.status_code == 201, f"setup: bob's inbound webhook in frida's project {r.text[:200]}")
 HT2 = r.json()["token"]
-check(Fi.patch(B + f"/api/lists/{FL}/members/{uid['bob']}", json={"role": "viewer"}).ok, "setup: bob can only read now")
+check(Fi.put(B + f"/api/lists/{FL}/members", json={"user_id": uid["bob"], "role": "view"}).ok, "setup: bob can only read now")
 for i in range(2):
     check(requests.post(B + "/api/hooks/in", headers={"X-Kalmido-Hook-Token": HT2}, json={"title": "No way"}).status_code == 403, f"the hook refuses ({i})")
 for s, who in ((Bo, "who set it up"), (Fi, "the project's owner")):
