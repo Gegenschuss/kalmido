@@ -302,7 +302,7 @@ const TOUCH = `(() => {
           await v1(ag.token, 'GET', '/agent/events');  // stays connected
           await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: Wd, height: Hh}});
           await nav(B + 'static/icon.svg');
-          await ev(`localStorage.setItem('tasks.theme', ${JSON.stringify(JSON.stringify(theme))}); 1`);
+          await ev(`localStorage.setItem('tasks.theme', ${JSON.stringify(JSON.stringify(theme))}); localStorage.setItem('tasks.lookLocal', 'true'); 1`);
           // K01 / K02: the header on a long project name, Today and the calendar, with and without the task panel
           for (const [hash, name] of [['l/' + L, 'project'], ['today', 'today'], ['cal', 'calendar']]) {
             await open(hash);

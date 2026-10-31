@@ -138,7 +138,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   for (const [vw, vh, touch, th] of [[390, 844, true, 'dark'], [1440, 900, false, 'light']]) await firefox(async o => {
     const {cmd, ev, ctx, nav, shot} = o, tag = String(vw);
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.setItem('tasks.theme', '"${th}"'); return 1; })()`);
+    await ev(`(() => { localStorage.setItem('tasks.theme', '"${th}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await nav(B + '#ablage/' + FID); await ready(ev);

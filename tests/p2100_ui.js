@@ -251,7 +251,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
           // localStorage throws "SecurityError: The operation is insecure" there: navigate once more instead of a failed suite
           for (let k = 0; ; k++) {
             await nav(B + 'static/icon.svg');
-            try { await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`); break; } catch (e) {
+            try { await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`); break; } catch (e) {
               if (k >= 2 || !/SecurityError|insecure/.test(e.message)) throw e;
               console.log(`p2100_ui: the theme could not be stored yet (${e.message}), once more`); await sleep(500);
             }

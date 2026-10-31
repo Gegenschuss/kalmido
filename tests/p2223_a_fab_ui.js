@@ -97,7 +97,7 @@ const FABCHK = `(async () => {
       check(await signIn(ev, user) === 200, `${user}: login`);
       for (const [vw, vh, theme] of [[1280, 800, 'light'], [1440, 900, 'dark']]) {
         await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
-        await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+        await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
         for (const [name, hash, rdy, ...rest] of PAGES) {
           const act = rest.find(x => x.includes('(')), who = rest.filter(x => x !== act);
           if (!who.includes(user)) continue;

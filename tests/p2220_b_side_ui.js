@@ -41,7 +41,7 @@ const LONG = 'Großprojekt 1000';  // shorter since 2.408 (#3518): the count 2/3
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = async (o, u) => {
     await o.nav(B + 'static/icon.svg');
-    await o.ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"dark"'); return 1; })()`);
+    await o.ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"dark"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     return o.ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
   };
   // the project rows: the name's room, whether it is cut, the tooltip, the gap to the row's right edge
