@@ -1295,7 +1295,6 @@ POST /api/habits/{}/log
 POST /api/hubmail/mailbox/check
 POST /api/hubmail/mails/{}/assign
 POST /api/ical
-POST /api/imports/{}/undo
 POST /api/layouts/offers
 POST /api/layouts/offers/{}/accept
 POST /api/layouts/offers/{}/decline
