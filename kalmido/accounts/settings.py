@@ -67,6 +67,27 @@ SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0,
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)
 DETAIL_FOLD_KEYS = ("subtasks", "deps", "links", "attachments", "video", "tags", "custom", "time", "comments")  # 2.380 F (#3435): detail.js DFOLD_KEYS
+def fv2_clean_meta(v):
+    """2.441.0 (#3592): the stored json of fav_meta: {key: {c: "#rrggbb", i: icon name}}, the look a person gave a favourite."""
+    bad = BadInput(tr("Invalid value: {0}", "fav_meta"))
+    try:
+        d = json.loads(v or "{}") if isinstance(v, str) else v
+    except ValueError:
+        raise bad from None
+    if not isinstance(d, dict) or len(d) > FV2_META_MAX:
+        raise bad
+    out = {}
+    for k, x in d.items():
+        if not isinstance(k, str) or not 2 < len(k) <= 220 or not isinstance(x, dict) or set(x) - {"c", "i"}:
+            raise bad
+        col, icon = x.get("c", ""), x.get("i", "")
+        if not isinstance(col, str) or not isinstance(icon, str) or not FV2_META_RE.fullmatch(col) or not FV2_ICON_RE.fullmatch(icon):
+            raise bad
+        if col or icon:
+            out[k] = {**({"c": col} if col else {}), **({"i": icon} if icon else {})}
+    return json.dumps(out, ensure_ascii=False, separators=(",", ":"))
+
+
 SETTINGS_FMT = {"week_start": ("", "mon", "sun"), "time_format": ("", "24", "12"), "date_order": ("", "dmy", "mdy", "ymd")}  # 2.368.0 B (#2982)
 
 
@@ -77,6 +98,8 @@ def clean_setting(k, v):
     bad = BadInput(tr("Invalid value: {0}", k))
     if k == "fav_items":  # 2.57.0 (#1798): the sidebar's favourites of every kind, in their order (a json list)
         return fv2_clean_items(v)
+    if k == "fav_meta":  # 2.441.0 (#3592): own colour / symbol of a favourite
+        return fv2_clean_meta(v)
     if k in ("side_views", "side_view"):  # 2.156.0 D (#2186): the sidebar's saved views and the active one (accounts/sideviews.py)
         from .sideviews import sv_clean
         return sv_clean(k, v)
@@ -270,6 +293,9 @@ def clean_setting(k, v):
     if k == "ws_areas_off":  # 2.409.0 (#3490): my areas switched off per workspace
         from .wsareas import wsa_clean_own
         return wsa_clean_own(v)
+    if k == "nav_menus":  # 2.418.0 (#3560): my arrangement of the areas' menus and the tab bar
+        from .navmenus import nav_clean_menus
+        return nav_clean_menus(v)
     if k == "look":  # 2.143.0 D (#2155): the appearance of all devices
         return clean_look_pref(v)
     if k == "show_done_views":
@@ -360,7 +386,8 @@ CAL_LIST_MAX = 500
 
 
 def clean_cal_list(k, v):
-    """cal_lists_hidden: list ids (ints); today_cals_hidden / plan_cals_off: calendar keys "e:<evcal id>" | "s:<sub id>".
+    """cal_lists_hidden: list ids (ints); today_cals_hidden / plan_cals_off: calendar keys "e:<evcal id>" | "s:<sub id>"
+    (today_cals_hidden also "x:hol" | "x:abs" | "x:team").
     -> stored json; BadInput if malformed. Ids of calendars / lists that no longer exist are harmless (never matched)."""
     bad = BadInput(tr("Invalid value: {0}", k))
     if v is None or (isinstance(v, str) and not v.strip()):
@@ -375,7 +402,9 @@ def clean_cal_list(k, v):
         if not all(isinstance(x, int) and not isinstance(x, bool) and 0 < x < 10 ** 12 for x in arr):
             raise bad
         return json.dumps(sorted(set(arr)))
-    if not all(isinstance(x, str) and re.fullmatch(r"[es]:[1-9][0-9]{0,11}", x) for x in arr):
+    # 2.443.0 (#3740): Today also switches holidays and absences off (x:hol | x:abs | x:team, cvxKey in calendar.js)
+    pat = r"[es]:[1-9][0-9]{0,11}|x:(hol|abs|team)" if k == "today_cals_hidden" else r"[es]:[1-9][0-9]{0,11}"
+    if not all(isinstance(x, str) and re.fullmatch(pat, x) for x in arr):
         raise bad
     return json.dumps(sorted(set(arr)))
 
@@ -878,7 +907,13 @@ def export_json():
 FV2_MAX = 200
 FV2_VIEWS = ("inbox", "assigned", "today", "tomorrow", "week", "doable", "pinned", "waiting", "stale", "byme", "all", "done",
              "trash", "archived")
-FV2_KEY_RE = re.compile(r"(?:[lafpg]:\d{1,11}|m:[a-z]{2,16}|v:[a-z]{2,12})")
+# 2.441.0 (#3592): anything with an address of its own: r:<reference kind>:<id> (lists/favorites.py FV2_REF_KINDS), file: (a file
+# or folder of the file store), doc: (a document), sv: (a saved view of the sidebar), sep: (a divider between the favourites)
+FV2_KEY_RE = re.compile(r"(?:[lafpg]:\d{1,11}|m:[a-z]{2,16}|v:[a-z]{2,12}|(?:file|doc|sep):\d{1,11}|sv:[a-z0-9]{1,16}"
+                        r"|r:(?:office_doc|office_letter|office_gendoc|office_receipt|wiki|sheet|contact|address_book):\d{1,11})")
+FV2_META_MAX = 200
+FV2_META_RE = re.compile(r"(?:#[0-9a-fA-F]{6})?")
+FV2_ICON_RE = re.compile(r"[a-z0-9]{0,16}")
 
 
 def fv2_clean_items(v):

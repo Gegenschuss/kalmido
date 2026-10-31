@@ -39,7 +39,7 @@ function ct_prune() {
     if (S.route.mod === 'contacts' && S.route.contact) setTimeout(() => go('contacts'), 0);
   }
 }
-async function ctLoad() {
+async function ctLoad(q) {  // 2.431.0 C (#3602): q = quietly for ct_live (no draw)
   const seq = ++CT.seq;
   ct_prune();
   CT.loading = true;
@@ -60,8 +60,8 @@ async function ctLoad() {
     if (seq === CT.seq) CT.items = CT.items || [];
   }
   CT.loading = false;
-  if (S.route.mod === 'contacts') ctDraw();
-  if (fresh) for (const w of [$('#view .ctlistw'), $('#view')]) if (w) w.scrollTop = 0;  // 2.119.1 A (#2081): another search starts at the top (not at the end, which would load page two)
+  if (S.route.mod === 'contacts' && !q) ctDraw();
+  if (fresh && !q) for (const w of [$('#view .ctlistw'), $('#view')]) if (w) w.scrollTop = 0;  // 2.119.1 A (#2081): another search starts at the top (not at the end, which would load page two)
 }
 async function ctRoute(id) {
   // 2.351.0 B (#2749): #contacts/f/<folder> filters by a folder (ctfold.js), #contacts/b/<book> by an address book; the plain
@@ -77,7 +77,19 @@ async function ctOpen(id) {
   try { CT.card = await api('GET', `/api/contacts/${id}`); } catch { CT.card = null; CT.sel = null; toast(tr('This contact does not exist or you cannot see it.')); }
   if (S.route.mod === 'contacts') ctDraw();
 }
-function ctDraw() { if (S.route.mod === 'contacts') { const el = $('#view'); if (el) { keepFocus(el, () => setHtml(el, mg_wrap('contacts', viewContacts()))); vl_after(); } } }  // 2.65.0 (#1825): vl_after
+// 2.431.0 C (#3602): a change elsewhere: like the clients page (ms_clLive) - the shown page of contacts and the open card
+// fetched quietly (only when contacts may have moved: "other" or unknown), drawn only when the view changed, morphed
+async function ct_live() {
+  if (S.route.mod !== 'contacts' || CT.trash || !CT.items || CT.loading || CT.more || CT.pick) return;
+  const ch = S.lpUnk ? null : [...S.lpPend], sel = CT.sel;
+  if (!ch?.length || ch.includes('other')) await Promise.allSettled([ctLoad(1), sel && rawFetch('GET', `/api/contacts/${sel}`).then(c => { if (CT.sel === sel && c) CT.card = c; })]);
+  if (S.route.mod !== 'contacts') return;
+  const was = CT.html; viewContacts(); S.lpN.ctLive = (S.lpN.ctLive || 0) + 1;  // ctLive / ctDraw: for the tests
+  if (CT.html === was) return;  // the same view: nothing drawn
+  if (lpBusy()) { S.viewStale = true; return; }  // a field / form in use: drawn once it is left (the poll)
+  S.lpN.ctDraw = (S.lpN.ctDraw || 0) + 1; ctDraw();
+}
+function ctDraw() { if (S.route.mod === 'contacts') { const el = $('#view'); if (el) { const ck = ct_scrollKeep(el); keepFocus(el, () => setHtml(el, mg_wrap('contacts', viewContacts()))); ck(); vl_after(); } } }  // 2.65.0 (#1825): vl_after; 2.431.0 C (#3598): + the columns' scroll
 function viewContacts() {
   if (CT.trash) return ctt_html();  // 2.272.0 E1 (#3038)
   if (CT.items === null && !CT.loading) setTimeout(ctLoad, 0);
@@ -95,7 +107,7 @@ function viewContacts() {
     : `<ul class="ctlist" role="list" aria-label="${esc(tr('Contacts'))}">${ctRows(items, (c, vl) => `<li${vl}><button type="button" class="ctrow ${c.id === CT.sel ? 'on' : ''} ${bk_rowCls(c)}" data-ctopen="${c.id}" ${CT.pick ? `aria-pressed="${CT.pick.has(c.id)}"` : `aria-current="${c.id === CT.sel}"`}>${CT.pick ? bk_chk(c) : ''}${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org || '?')}</b><small class="muted">${esc([c.org !== c.fn ? c.org : '', c.email || c.phone].filter(Boolean).join(' · '))}</small></span>${(books.length > 1 && ctBook(c.book_id)) ? `<i class="cevdot" style="--cc:${cssColor(ctBook(c.book_id).color) || 'var(--accent)'}" title="${esc(ctBook(c.book_id).name)}"></i>` : ''}</button></li>`)}</ul>
       ${CT.total > CT.items.length ? `<div class="muted ctmore">${tr('{0} of {1} loaded', CT.items.length, CT.total)} <button type="button" class="linkbtn" data-ctxmore ${CT.more ? 'disabled' : ''}>${tr('Show more')}</button></div>` : ''}`;  // 2.119.1 A (#2081): the next page comes when scrolling near the end
   const fbar = typeof ctf_barHtml === 'function' && !(mob && showCard) ? ctf_barHtml() : '';  // 2.351.0 B (#2749): the folder filter
-  return `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${ct18_hintHtml()}${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}${fbar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw" data-vlsc>${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Choose a contact')}</div>`}</div></div>`;
+  return CT.html = `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${ct18_hintHtml()}${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}${fbar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw" data-vlsc>${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Choose a contact')}</div>`}</div></div>`;
 }
 // 2.364.0 B (#3018): Office & finance off: a line above the contacts that turns it on right here (instead of Settings >
 // Modules > Areas > Parts); everyone but a child switches their own modules (without an organisation they are their own admin)
@@ -190,7 +202,7 @@ function ctCardHtml(c) {
   const adr = (c.addresses || []).map(a => { const t = [a.street, [a.code, a.city].filter(Boolean).join(' '), a.region, a.country].filter(Boolean).join(', ');
     return `<div class="ctf">${ic('mappin', 's')}<span class="ctfl muted">${esc(ctTypeWord('addresses', a))}</span>${ctk_mapLink(t)}</div>`; }).join('');  // 2.119.1 B (#2086): a map link
   const kinds = Object.fromEntries(CT_LINK);
-  return `<article class="ctcard" aria-labelledby="ct-h">
+  return `<article class="ctcard" aria-labelledby="ct-h" data-ck="${c.id}">
     <div class="cthead">${isMobile() ? `<button class="iconbtn" data-ct="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ctAv(c, 'avatar ctav big')}<div class="cthn"><h3 id="ct-h">${esc(c.fn || c.org || '?')}</h3>${feat('clients') ? `<div class="mstags">${ms_tag('contact')}</div>` : ''}${[c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).length ? `<div class="muted">${esc([c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).join(' · '))}</div>` : ''}</div>
       <span class="ctacts">${w ? `<button class="btn sm" data-ct="edit">${ic('edit', 's')} ${tr('Edit')}</button>` : `<span class="rotag">${ic('eye', 's')}${tr('View only')}</span>`}<button class="iconbtn" data-ct="cmenu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></span></div>
     <div class="ctfields">
@@ -331,13 +343,13 @@ document.addEventListener('click', async e => {
       {label: tr('Import a CSV file…'), icon: 'upload', fn: () => ctImport(null, 'csv')},  // 2.119.1 A (#2080): Outlook, Google, a spreadsheet
       ...(S.books || []).map(x => ({label: tr('Export {0} (vCard)', x.name), icon: 'download', fn: () => { location.href = `/api/books/${x.id}/export.vcf`; }})),
       ...(S.books || []).map(x => ({label: tr('Export {0} (CSV)', x.name), icon: 'download', fn: () => { location.href = `/api/books/${x.id}/export.csv`; }})),
-      {label: tr('On the phone…'), icon: 'phone', fn: davGuide},
+      {label: tr('On the phone…'), icon: 'phone', fn: () => settingsModal('caldav')},  // 2.365.2 B (#2789)
       CT.groups.length && {label: tr('Manage groups…'), icon: 'tag', fn: ctx_groupsModal},  // 2.119.1 A (#2085)
       typeof nwl_open === 'function' && {label: tr('Newsletter…'), icon: 'mail', fn: nwl_open},  // 2.55.0 (#1455)
       typeof dup_open === 'function' && propOn() && dup_books().length && {label: tr('Find duplicates with an agent…'), icon: 'bot', fn: () => dup_open()}]);  // 2.70.0 B (#1357)
   } else if (k === 'cmenu' && CT.card) {
     const c = CT.card, w = ctWrite(ctBook(c.book_id));
-    menu(b, [w && {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
+    menu(b, [...fv2_menuRow('r:contact:' + c.id) /* 2.441.0 (#3592): opened beside the list a contact has no address of its own */, w && {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
       // 2.272.0 E1 (#3038): into the trash; Undo takes it out again (with its notes and links)
       if (!await askConfirm(tr('Delete the contact “{0}”?', c.fn), tr('It goes to the trash and is removed from the phones that sync this address book.'), {ok: tr('Delete'), danger: true})) return;
       try { await api('DELETE', `/api/contacts/${c.id}`); } catch { return; }
@@ -815,7 +827,7 @@ async function ctBooksModal() {
     }
     const k = e.target.closest('[data-cb]')?.dataset.cb; if (!k) return;
     if (k === 'close') md.remove();
-    if (k === 'phone') { md.remove(); davGuide(); }
+    if (k === 'phone') { md.remove(); settingsModal('caldav'); }
     if (k === 'new') {
       const n = await wsAskNew(tr('New address book'));  // 2.30.0 (#1036): with its workspace
       if (!n) return;

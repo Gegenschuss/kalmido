@@ -8,8 +8,9 @@ import urllib.parse
 import urllib.request
 
 from ..core.i18n import N_, tr
-from ..core.db import iso, now_utc, parse_iso
+from ..core.db import connect, iso, now_utc, parse_iso
 from ..core.access import Denied, list_role, WRITE_ROLES
+from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..accounts.login import seal, unseal
 from ..tasks.validation import as_int, TITLE_MAX
 from ..core.errors import BadInput
@@ -30,7 +31,7 @@ KK_ARCHIVE_MAX = 50
 KK_EVERY = 3600            # s between background syncs of one connection
 KK_TIMEOUT = 15
 KK_MAX_BYTES = 5 * 1024 * 1024
-KK_SYNC_S = 60             # 2.148.1 D (#2485): time one sync may take in all (the watchdog runs it)
+KK_SYNC_S = 60             # 2.148.1 D (#2485): time one sync may take in all
 _KK_END = threading.local()  # 2.148.1 D (#2485): the deadline of the running sync of this thread
 KK_TOKEN_MAX = 400
 
@@ -296,6 +297,18 @@ def kk_lists(c, uid):
             for x in j.get("lists") or [] if re.fullmatch(r"[A-Za-z0-9_-]{1,64}", str(x.get("id") or ""))]
 
 
+@bgj_fn("life:karakeep")
+def _bgj_kk(uid):
+    c = connect()
+    try:
+        kk_sync(c, uid)
+        c.commit()
+    except BadInput:
+        pass  # stored in the connection
+    finally:
+        c.close()
+
+
 def _wd_reading(c, users, S, LG, now):
     """Watchdog: the oldest due connection (one per tick, so a slow server never holds the watchdog up long)."""
     for r in c.execute("SELECT * FROM kk_conns ORDER BY COALESCE(synced_at, '') LIMIT 5").fetchall():
@@ -304,9 +317,5 @@ def _wd_reading(c, users, S, LG, now):
             continue
         if r["synced_at"] and (now_utc() - parse_iso(r["synced_at"])).total_seconds() < KK_EVERY:
             continue
-        try:
-            kk_sync(c, uid)
-            c.commit()
-        except BadInput:
-            pass  # stored in the connection
+        bgj_add("life:karakeep", uid, user_id=uid, once=True)  # 2.360.2 L (#2561): a slow server no longer holds the watchdog up
         break

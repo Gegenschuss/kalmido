@@ -28,7 +28,8 @@ function uiLang() {
 // load (or switch to) a language; resolves true when it is active. Offline: service worker cache,
 // then the copy of the last loaded language in localStorage.
 // 2.25.0 (UX-29): texts of the page shell outside the app's renders (the skip link on the setup / invitation pages)
-function i18nStatic() { const sk = document.getElementById('skip'); if (sk) sk.textContent = tr('Skip to content'); }
+// 2.447.0 (#3761): the page's lang follows the texts also before the login (state() sets it after it)
+function i18nStatic() { document.documentElement.lang = I18N.code; const sk = document.getElementById('skip'); if (sk) sk.textContent = tr('Skip to content'); }
 // 2.35.0 (#1094): the language file is fetched with the version of the code (?v=, index.html meta kalmido-version), so no
 // browser or service-worker cache can hand out the file of an older version. The copy in localStorage carries the version
 // it was loaded with; a copy of another version (or a file the service worker only had from an older version, header

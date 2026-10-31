@@ -344,7 +344,7 @@ function viewTime() {
       <button class="btn sm" data-act="te-add">${ic('plus', 's')} ${tr('Entry|time')}</button>
       <a class="btn sm" href="/api/time/export.csv?${esc(q)}" download>${ic('download', 's')} CSV</a>
       <a class="btn sm" href="/api/time/export.xlsx?${esc(q)}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a>
-      <button class="btn sm" data-act="tv-sheet" ${j ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet')}</button>${lyCustomBtn('time')}</div>`;
+      <button class="btn sm" data-act="tv-sheet" ${j ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet')}</button>${lyCustomBtn('time')}<button type="button" class="btn sm" data-act="mod-settings" data-sec="time">${ic('gear', 's')} ${tr('Settings…')}</button></div>`;  // 2.365.2 C (#2789): the way to Settings
   if (S.ly.view === 'time') return h + lyHtml('time', {}) + '</div>';
   if (!j) return h + lyHtml('time', P) + `<div class="empty">${tv.err ? (tv.err === 'offline' ? tr('Reports are only available online.') : esc(tv.err)) : tr('Loading…')}</div></div>`;
   const rm = j.rounding, tgt = j.today.target_h;
@@ -353,8 +353,8 @@ function viewTime() {
   let tot = jt.total, hasAmt = jt.lists.some(l => l.rate);
   // U20: one tile for the range (time and decimal hours together), "today" only when the range is longer than today
   const tiles = [[hmm(tot.seconds), tr('tracked'), [rm ? tr('rounded: {0}', `${hmm(tot.rounded)} (${hoursDec(tot.rounded)} h)`) : `${hoursDec(tot.rounded)} h`, trn('{0} entry', '{0} entries', tot.count)].join(' · ')]];
-  if (!(f === t && f === today())) tiles.push([hmm(jt.today.seconds), tr('today'), tgt ? tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), String(tgt).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : tr('your time')]);
-  else if (tgt) tiles[0][2] += ' · ' + tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), String(tgt).replace('.', LOCALE().startsWith('de') ? ',' : '.'));
+  if (!(f === t && f === today())) tiles.push([hmm(jt.today.seconds), tr('today'), tgt ? tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), fmtNum(tgt, 2)) : tr('your time')]);
+  else if (tgt) tiles[0][2] += ' · ' + tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), fmtNum(tgt, 2));
   if (hasAmt) tiles.push([money(tot.amount, j.currency), tr('amount'), tr('hourly rates of the projects')]);
   P.tiles = lyo_note(jt.lyoLabel) + `<div class="sttiles">${tiles.map(([v, l, s]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span><small>${esc(s)}</small></div>`).join('')}</div>`;
   // per day (per week for long ranges)

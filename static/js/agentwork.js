@@ -78,7 +78,7 @@ function aw_html(ws, st) {
 }
 // parses the field of key k into the value the server wants (null = invalid, shown under the field)
 function aw_read(k, el) {
-  if (k === 'budget_limit') { const s = el.value.trim().replace(',', '.'); if (!s) return null; const n = +s; return Number.isFinite(n) && n > 0 ? n : undefined; }
+  if (k === 'budget_limit') { const s = el.value.trim(); if (!s) return null; const n = parseNum(s); return n != null && n > 0 ? n : undefined; }
   if (k === 'budget_warn_pct' || k === 'max_parallel') { const s = el.value.trim(); return /^\d+$/.test(s) ? +s : undefined; }
   if (el.type === 'checkbox') return el.checked;
   return el.value;

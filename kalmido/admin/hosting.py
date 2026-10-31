@@ -12,7 +12,7 @@ from ..core.errors import Denied  # 2.281.0 E (#3117)
 from ..core.config import app, APP_NAME, PUBLIC_URL, EMAIL_RE
 from ..core.i18n import tr
 from ..core.db import body, bump, connect, db, err, gset, gsetting, iso, now_utc, parse_iso, usettings
-from ..core.instance import LEGAL_ENV, legal_url_ok  # 2.306.0 B (#2887): the legal links live in core (layers)
+from ..core.instance import LEGAL_ENV, PRIVACY_EMAIL_ENV, legal_url_ok  # 2.306.0 B (#2887): the legal links live in core (layers)
 from ..accounts.session import me
 from ..api.common import v1_args, v1_err, v1_json, v1_view
 from ..api.scopes import need_scope  # 2.360.0 A (#2496)
@@ -404,6 +404,11 @@ def hosting_settings(c, b):
         if v and not EMAIL_RE.fullmatch(v):
             return err(tr("Invalid value: {0}", "support_email"))
         gset(c, "support_email", v)
+    if "privacy_email" in b:  # 2.360.2 D (#2561)
+        v = str(b["privacy_email"] or "").strip()[:200]
+        if v and not EMAIL_RE.fullmatch(v):
+            return err(tr("Invalid value: {0}", "privacy_email"))
+        gset(c, "privacy_email", v)
     for k in LEGAL_ENV:  # 2.306.0 B (#2887)
         if k in b:
             v = str(b[k] or "").strip() if isinstance(b[k], (str, type(None))) else None
@@ -421,7 +426,8 @@ def hosting_settings(c, b):
         # 2.46.0 (#1592): renames the instance's only organisation (several: the organisation dialog)
         from ..core.pg import system_ctx
         with system_ctx(c):  # 2.46.0 (#1592, review fix): every organisation counts, not only the admin's own
-            n_orgs = c.execute("SELECT COUNT(*) FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL").fetchone()[0]  # 2.47.3 (#1360)
+            # 2.422.0 (#2937 review): companies people created themselves are not the server's organisation
+            n_orgs = c.execute("SELECT COUNT(*) FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL AND self_made=0").fetchone()[0]  # 2.47.3 (#1360)
         if not nm or instance_mode(c) == "shared" or ORG_NAME_ENV or not main_org(c) or n_orgs != 1:
             return err(tr("Invalid value: {0}", "org_name"))
         c.execute("UPDATE orgs SET name=? WHERE id=?", (nm, main_org(c)))
@@ -438,7 +444,8 @@ def hosting_admin(c):
             "storage_pool": gsetting(c, "storage_pool") or "user", "support_email": gsetting(c, "support_email"),
             "support_email_env": SUPPORT_EMAIL_ENV, "mail_day_limit": mail_day_limit(c), "announce_all": announce_get(c, True),
             "user_agents": gsetting(c, "user_agents") == "1",
-            **{k: gsetting(c, k) for k in LEGAL_ENV}, **{k + "_env": v for k, v in LEGAL_ENV.items()}}  # 2.306.0 B (#2887)
+            **{k: gsetting(c, k) for k in LEGAL_ENV}, **{k + "_env": v for k, v in LEGAL_ENV.items()},  # 2.306.0 B (#2887)
+            "privacy_email": gsetting(c, "privacy_email"), "privacy_email_env": PRIVACY_EMAIL_ENV}  # 2.360.2 D (#2561)
 
 
 def user_storage(c, uid):

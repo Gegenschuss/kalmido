@@ -182,8 +182,10 @@ function tpInvoiceDialog(d) {
   const modes = [['full', tr('Like the quotation: title page and every printed part with its positions')], ['title', tr('Title page only: every part as one position with its amount')],
     ['summary', tr('Everything in one position (one per VAT rate)')]];
   const cur = s.parts_invoice_mode || 'full';
+  // 2.449.0 (#3766): empty in nl / fr / es / it (ofdLang is 'en' there): the server picks the title for the document's language
+  const own = lg === 'de' || d?.lang === 'en' ? s['parts_summary_title_' + lg] : '';
   ofdDlg(tr('Create invoice'), `<fieldset class="tpmodes"><legend class="muted">${tr('This quotation has parts. What should the invoice show?')}</legend>${modes.map(([v, n]) => `<label class="tpmode"><input type="radio" name="tp-mode" value="${v}" ${v === cur ? 'checked' : ''}> <span>${esc(n)}</span></label>`).join('')}</fieldset>
-    ${ofdF('tp-sum-title', tr('Title of the position'), `<input id="ofd-tp-sum-title" maxlength="300" value="${esc(s['parts_summary_title_' + lg] || (lg === 'en' ? 'Film production' : 'Filmherstellung'))}">`)}`,
+    ${ofdF('tp-sum-title', tr('Title of the position'), `<input id="ofd-tp-sum-title" maxlength="300" value="${esc(own || '')}" placeholder="${esc(tr('Services|document'))}">`)}`,
     tr('Create invoice'), async md => {
       const mode = $('input[name="tp-mode"]:checked', md)?.value || cur;
       const j = await oil_post(d, {parts_mode: mode, parts_title: mode === 'summary' ? $('#ofd-tp-sum-title', md).value : ''});  // 2.269.0 D (#3046); 2.356.0 C (#3003): asks before a second invoice
@@ -194,7 +196,7 @@ function tpInvoiceDialog(d) {
 // the office settings: the preset for invoices from quotations with parts
 function tpSettingsHtml(s, dis) {
   return `${ofcRowF('os-parts-inv', tr('Invoice from a quotation with parts'), ofcSel('os-parts-inv', s.parts_invoice_mode || 'full', [['full', tr('like the quotation')], ['title', tr('title page only')], ['summary', tr('one position per VAT rate')]]), tr('preset; chosen again when the invoice is created'))}
-    ${ofcRowF('os-parts-t-de', tr('Title of the summary (German)'), `<input id="os-parts-t-de" value="${esc(s.parts_summary_title_de ?? 'Filmherstellung')}" maxlength="300" ${dis}>`)}
-    ${ofcRowF('os-parts-t-en', tr('Title of the summary (English)'), `<input id="os-parts-t-en" value="${esc(s.parts_summary_title_en ?? 'Film production')}" maxlength="300" ${dis}>`)}`;
+    ${ofcRowF('os-parts-t-de', tr('Title of the summary (German)'), `<input id="os-parts-t-de" value="${esc(s.parts_summary_title_de ?? '')}" placeholder="${esc(tr('Services|document'))}" maxlength="300" ${dis}>`)}
+    ${ofcRowF('os-parts-t-en', tr('Title of the summary (English)'), `<input id="os-parts-t-en" value="${esc(s.parts_summary_title_en ?? '')}" placeholder="${esc(tr('Services|document'))}" maxlength="300" ${dis}>`)}`;
 }
 const tpSettingsBody = form => $('#os-parts-inv', form) ? {parts_invoice_mode: $('#os-parts-inv', form).value, parts_summary_title_de: $('#os-parts-t-de', form).value, parts_summary_title_en: $('#os-parts-t-en', form).value} : {};

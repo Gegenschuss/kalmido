@@ -48,7 +48,8 @@ function rk_cashflowHtml() {
   }).join('');
   // 2.298.0 A2 (#3186): the legend of actual / planned and net / gross sits behind (i) under the bar with the net / gross
   // switch (the column heads carry a short title), no longer as a paragraph under the months
-  return bar + `<div class="shint rkcfleg">${tr('Actual = paid or already past; planned = expected (open invoices on their due date, sent and accepted quotations without an invoice at the end of their period of service, one version per quotation).')} ${d.basis === 'net' ? tr('Net: documents and fixed costs without VAT; purchases and travel receipts as entered.') : tr('Gross: documents and fixed costs incl. VAT; purchases and travel receipts as entered.')}</div>` + cfb_boxHtml(d) + `<div class="rkcfms">${cards}</div>` + rk_fixedHtml() + fci_checkHtml();
+  return bar + `<div class="shint rkcfleg">${tr('Actual = paid or already past; planned = expected (open invoices on their due date, sent and accepted quotations without an invoice at the end of their period of service, one version per quotation).')} ${d.basis === 'net' ? tr('Net: documents and fixed costs without VAT; purchases and travel receipts as entered.') : tr('Gross: documents and fixed costs incl. VAT; purchases and travel receipts as entered.')}</div>` + cfb_boxHtml(d) + `<div class="rkcfms">${cards}</div>` + rk_fixedHtml()
+    + ofcSetLink('tax', tr('Starting balance and monthly check'));  // 2.365.2 D (#2789): set in Settings > Company & office > Bank & taxes
 }
 // 2.90.0 A (#1921): with a tax reserve (Bookkeeping, tax_reserve_pct > 0): the month's reserve and what is free after all reserves so far
 const bk_cfReserveRows = r => r.reserve == null ? '' : `<tr class="bk-cfres"><th>${tr('Tax reserve')}</th><td class="num" colspan="2">${ofcMoney(r.reserve)}</td></tr>
@@ -207,6 +208,12 @@ function fci_modal(rows, name) {
 }
 
 // ---- 2.67.0 (#1838): the optional monthly task "Cash flow: check the actual state" for one person (only a link, no amounts)
+// 2.365.2 D (#2789): in Settings > Company & office > Bank & taxes (loads the check of the shown office itself)
+function fci_setHtml() {
+  if (RKF.chkOid !== OFC.info?.org_id) { RKF.chkOid = OFC.info?.org_id; RKF.check = null; setTimeout(fci_load, 0); return ''; }
+  return fci_checkHtml();
+}
+async function fci_load() { try { RKF.check = await api('GET', '/api/office/cashflow/check'); } catch (x) { RKF.check = null; } ofcDraw(); }
 function fci_checkHtml() {
   const k = RKF.check; if (!k) return '';
   const ppl = k.people || [];

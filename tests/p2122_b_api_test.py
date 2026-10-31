@@ -331,6 +331,27 @@ check(v(tag=f"{T_ST};{T_PR}", tag_mode="all") == [D1], f"API v1: tag groups, eve
 check(v(no_tag="1") == sorted([D3, D4]), f"API v1: without tag ({v(no_tag='1')} vs {sorted([D3, D4])})")
 check(AGS.get(B + "/api/v1/documents", params={"bogus": "1"}).status_code == 400, "API v1: unknown parameters still 400")
 
+# 2.443.0 (#2338): the API v1 file list and details show the tags, the filter tag= as with documents; agent: only what is shared
+fv = lambda **p: AGS.get(B + "/api/v1/files", params=p)  # noqa: E731
+fl = fv(parent_id=DOCROOT)
+check(fl.status_code == 200 and any(x["id"] == D1 and {"steuer"} <= {t["name"].lower() for t in x["tags"]} for x in fl.json()["data"]), f"#2338: the list shows a node's tags ({fl.text[:200]})")
+one = AGS.get(B + f"/api/v1/files/{D1}").json()
+check({"steuer"} <= {t["name"].lower() for t in one.get("tags", [])}, f"#2338: the details show them ({str(one)[:200]})")
+TID = next(t["id"] for t in one["tags"] if t["name"].lower() == "steuer")
+check(all({TID} & {t["id"] for t in x["tags"]} for x in fv(parent_id=DOCROOT, tag=TID).json()["data"]) and D1 in [x["id"] for x in fv(parent_id=DOCROOT, tag=TID).json()["data"]], "#2338: tag= narrows a folder's children")
+check(D1 not in [x["id"] for x in fv(parent_id=DOCROOT, not_tag=TID).json()["data"]], "#2338: not_tag= leaves it out")
+deep = [x["id"] for x in fv(tag=TID).json()["data"]]
+check(D1 in deep and DOCROOT not in deep, f"#2338: without parent_id at any depth, only with the tag ({deep})")
+check(F1 not in deep, "#2338: an unshared file with the tag stays hidden from the agent")
+check(fv(tag=f"{TID};999999").json()["data"] != [] and fv(tag=f"{TID};999999", tag_mode="all").json()["data"] == [], "#2338: tag_mode=all = every tag")
+check(fv(tag="abc").status_code == 400 and fv(tag="9" * 30).status_code == 400 and fv(not_tag="x").status_code == 400 and fv(tag="²").status_code == 400 and fv(tag=TID, tag_mode="x").status_code == 400, "#2338: a bad tag filter is 400, never the unfiltered list")
+A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
+fa = Fr.post(B + "/api/my/agents", json={"username": "fridabot2338", "display_name": "Frida's bot", "scopes": ["read", "files:read"]}).json()["id"]
+FAH = {"Authorization": "Bearer " + Fr.post(B + f"/api/my/agents/{fa}/token").json().get("token", ""), "X-Requested-With": "kalmido"}
+check(Fr.post(B + f"/api/files/nodes/{FP}/shares", json={"agent_id": fa, "role": "view"}).status_code == 201, "#2338: freelancer shares the folder with the own agent")
+r = requests.get(B + "/api/v1/files", params={"tag": FT}, headers=FAH)  # freelancer-matrix: files
+check(r.ok and [x["id"] for x in r.json()["data"]] == [FP], f"#2338: freelancer: the v1 filter finds the own tagged folder ({r.text[:200]})")
+
 # freelancer-matrix: files -- the documents of a person without an organisation
 E1 = doc_new(Fr, "honorar.txt", "Honorar Rechnung Beispiel", date="2025-05-05", sender="Kunde B GmbH", type="Rechnung", tags=["Steuer"])
 E2 = doc_new(Fr, "miete.txt", "Miete Büro Beispiel", date="2024-02-01", tags=["Privat"])

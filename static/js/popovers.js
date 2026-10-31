@@ -422,12 +422,12 @@ function fmtDateNum(d, year = true) {
   const o = fmtPref('date_order');
   if (o) { const D = pad(d.getDate()), M = pad(d.getMonth() + 1), Y = d.getFullYear();
     return o === 'ymd' ? (year ? `${Y}-${M}-${D}` : `${M}-${D}`) : o === 'mdy' ? `${M}/${D}${year ? '/' + Y : ''}` : `${D}.${M}.${year ? Y : ''}`; }
-  try { return d.toLocaleDateString(LOCALE(), {day: '2-digit', month: '2-digit', ...(year ? {year: 'numeric'} : {})}); } catch { return ds(d); }
+  try { return d.toLocaleDateString(dpLocale(), {day: '2-digit', month: '2-digit', ...(year ? {year: 'numeric'} : {})}); } catch { return ds(d); }  // 2.450.0 (#3770): the region of the times, no 28/10 next to 2:05 PM
 }
 // a moment as numbers: date + time ("28/10/2026 14:05")
 const fmtStamp = (d, year = true) => `${fmtDateNum(d, year)} ${fmtTimeAt(d)}`;
 // a moment with the date in words: "28 Oct 2026, 14:05" (activity logs, versions)
-const fmtMoment = d => { try { return d.toLocaleString(LOCALE(), {dateStyle: 'medium', timeStyle: 'short', hour12: hour12()}); } catch { return fmtStamp(d); } };
+const fmtMoment = d => { try { return d.toLocaleString(dpLocale(), {dateStyle: 'medium', timeStyle: 'short', hour12: hour12()}); } catch { return fmtStamp(d); } };
 // weeks that keep Monday when automatic (dispatch, habit weeks), the chosen first day otherwise
 const weekOf = s => fmtPref('week_start') ? weekStartOf(s) : mondayOf(s);
 const fmtDateLoc = s => !/^\d{4}-\d\d-\d\d$/.test(s || '') ? '' : fmtDay(pd(s).getFullYear() !== new Date().getFullYear() ? 'year' : 'short', pd(s));
@@ -778,7 +778,7 @@ function taskMenu(anchor, id, o = {}) {
   const l = listById(t.list_id), open = t.status === 0;
   // 2.31.0 (#1056): groups with small headings (Plan, Organize, Time, Structure); won't do + delete last, set apart. In the task
   // panel date and priority are not repeated: the panel's header has both (the date chip, Today / Tomorrow, the flag)
-  const inPanel = !!anchor?.closest?.('#detail .dtop') && !!$('#detail .dtop [data-act="date"]') && !!$('#detail .dtop [data-act="prio"]');
+  const inPanel = !!anchor?.closest?.('#detail .dtop') && !!$('#detail :is(.dtop, .dthumb) [data-act="date"]') && !!$('#detail .dtop [data-act="prio"]');  // 2.365.0 (#2824): the phone's date sits in the bottom bar
   menu(anchor, [
     // 2.25.0 (UX-11): opened by a long press: the title on top, then "Select" (more tasks follow with a tap)
     ...(o.select ? [{label: t.title.length > 60 ? t.title.slice(0, 59) + '…' : t.title, cls: 'mhead', dis: true, fn: () => {}}, {label: tr('Select'), icon: 'select', fn: () => { S.multiMode = true; S.multi.add(id); S.multiLast = id; render(); }}, '-'] : []),
@@ -1013,7 +1013,7 @@ function vvDebug(on = true) {
   if (!on) { el?.remove(); clearInterval(vvDebug.t); return; }
   if (el || !document.body) return;
   el = document.createElement('div'); el.id = 'vvdbg'; el.setAttribute('aria-live', 'off');
-  el.innerHTML = '<button type="button" class="vvdx" aria-label="Close">\u00d7</button><pre></pre>';
+  el.innerHTML = '<button type="button" class="vvdx" aria-label="' + esc(tr('Close')) + '">\u00d7</button><pre></pre>';
   document.body.appendChild(el);
   el.addEventListener('mousedown', e => e.preventDefault());  // a tap on the box keeps the focus (and the keyboard)
   el.querySelector('.vvdx').addEventListener('click', e => { e.stopPropagation(); vvDebug(false); });

@@ -151,6 +151,11 @@ const V = B + 'api/v1';
   badge = await hm();
   check(/Permissions: Auto/.test(badge?.textContent || ''), '#1029: switched to Auto');
   w.eval('closePop()');
+  // 2.437.0 (#2931): the computer fixed the mode: the entry says so and opens no menu
+  w.eval(`agentById(${AG}).host = {permission_fixed: true, permission_mode: 'ask'}`);
+  const fixed = await hm();
+  check(fixed && fixed.disabled !== false && /Ask first · Set on its computer/.test(fixed.textContent) && !fixed.classList.contains('chmi-mode'), '#2931: the locked entry ' + (fixed?.outerHTML || '').slice(0, 160));
+  w.eval(`agentById(${AG}).host = null`); w.eval('closePop()');
   const agent1 = await (await fetch(V + '/agent', {headers: AGH})).json();
   check(agent1.runtime.permission_mode === 'auto', '#1029: the agent reads it in its runtime');
   w.eval('chatClose()');

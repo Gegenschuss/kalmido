@@ -12,6 +12,14 @@
 .ofdli>.ofdrow{flex:1;min-width:0}
 .ofdrmore{flex:none;width:2.75rem;min-height:2.75rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2);color:var(--muted);display:inline-flex;align-items:center;justify-content:center}
 .ofdrmore:hover,.ofdrmore:focus-visible{border-color:var(--accent);color:var(--text)}
+/* 2.451.0 (#3834): phones: no symbols in the row, it gets the full width; a long press opens the row menu. The buttons stay for screen readers (like .sr) */
+@media (max-width:767px){
+  li>.ofdrmore,.oimarch .oimdl{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}
+  .oimarch .ofcrow>svg:last-child,.oimarch .rotag svg{display:none}
+  .oimarch a.ofdrow{-webkit-touch-callout:none}
+  .lst-sortb span{display:none}
+  .lst-sortb{min-height:2.75rem}
+}
 .rklist>li{display:flex;align-items:stretch;gap:.25rem}.rklist>li>.ofcrow{flex:1;min-width:0}  /* 2.117.0 A (#2287): the arrow = the row menu */
 .rkbar .rkperson{max-width:12rem;text-overflow:ellipsis}  /* 2.117.0 A (#2291) */
 .rkplist{list-style:none;margin:0 0 .5rem;padding:0;display:flex;flex-direction:column;gap:.25rem}  /* 2.117.0 A (#2292): own purposes */
@@ -408,6 +416,15 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .bnksn small{font-size:var(--fs-s)}
 .bnkacts{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}
 .bnkacts .btn{min-height:2.75rem}  /* 2.114.1 A (#2017): 44 px targets */
+/* 2.444.0 (#3447): credit cards */
+.ccopen{display:flex;align-items:center;gap:.625rem;width:100%;min-height:2.75rem;background:none;border:0;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.ccopen .bnkn{flex:1;min-width:0}
+.ccfacts{display:flex;flex-wrap:wrap;gap:.375rem 1.5rem;margin:0 0 .5rem}
+.ccfacts dt{font-size:var(--fs-s);color:var(--muted)}
+.ccfacts dd{margin:0;font-variant-numeric:tabular-nums}
+.ccdiff{color:var(--danger)}
+.ccsug small{flex:1 1 8rem;min-width:0}
+.ccl{margin-top:.5rem}
 .bnkm{display:inline-flex;align-items:center;gap:.25rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bnkmiss{margin:0;font-size:var(--fs-s)}
 .bnkother{display:flex;flex-direction:column;gap:.375rem}
@@ -879,6 +896,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 /* 2.138.0 D (#2256): the next running number of every series (settings) and a draft's number in the editor */
 .onum h4{margin:1rem 0 .25rem}
 .onum .onumrow .numin{width:8rem}
+.onum .onumshared .numin{opacity:.6}  /* 2.433.0 (#3597): on the invoices' counter */
 .onumwhy{flex-basis:100%}
 .onumwhy input{flex:1;min-width:0}
 .onumdoc{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;font-size:var(--fs-m)}
@@ -1036,6 +1054,11 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .orr-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;min-height:2.25rem}
 .orr-row>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .orr-row select{flex:none;width:9.5rem}
+/* 2.433.0 (#3607): fixed groups - the level as plain text, locked specials greyed, the template note with Copy */
+.orr-lv-ro{flex:none;width:9.5rem;color:var(--muted);font-size:var(--fs-s);text-align:right}
+.orr-sp .chkl:has(input:disabled){opacity:.55;cursor:default}
+.orr-tpln{display:flex;align-items:center;gap:.5rem;margin:.5rem 0;color:var(--muted)}
+.orr-tpln>span{flex:1;min-width:0}
 .orr-gb .row{display:flex;flex-direction:column;align-items:stretch;gap:.25rem;max-width:24rem;margin:.75rem 0}
 .orr-lv{font-weight:500;font-size:var(--fs-s)}.orr-lv.lv-none{color:var(--muted);font-weight:400}
 .orr-sp{display:flex;flex-direction:column;gap:.125rem;margin-top:.5rem}
@@ -1043,7 +1066,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .orr-le{padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2)}
 .orr-le>summary{cursor:pointer;min-height:2rem;display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .375rem}
 .orr-ld{margin:.375rem 0 0;padding-left:1.25rem;font-size:var(--fs-s)}
-@media (max-width:40rem){.orr-matrix{grid-template-columns:1fr}.orr-row select{width:auto;max-width:55%}.orr-pick,.orr-fixed{flex-basis:100%}}
+@media (max-width:40rem){.orr-matrix{grid-template-columns:1fr}.orr-row select,.orr-lv-ro{width:auto;max-width:55%}.orr-pick,.orr-fixed{flex-basis:100%}}
 @media (pointer:coarse){.orr .orrsub button,.orr-pick>summary,.orr-opts .chkl,.orr-sp .chkl{min-height:2.75rem}}
 /* 2.224.0 B (#2816): the country card on a page that is not the office's first one: one slim line */
 .ocf-choose.ocf-slim{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;border-style:dashed;padding:.375rem .75rem;margin:0 0 .75rem}
@@ -1066,6 +1089,11 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .rsb-st{flex:none}.rsb-paid,.rsb-processed{color:var(--accent)}.rsb-removed{color:var(--muted)}
 .rsb-in{margin:0 0 1rem}
 .rcl-sub{color:var(--muted)}
+/* 2.365.2 (#2789): the office settings inside Settings > Company & office: the areas one below the other, the workspace on top */
+.sbiz .ofcset{max-width:none}
+.sbizws{display:flex;align-items:center;gap:.5rem;margin:0 0 .75rem}
+.sbiz .ofcset>h4{margin:1.5rem 0 .5rem}
+.sbiz .ofcset>h4:first-of-type{margin-top:.5rem}
 /* 2.414.0 A (#3502): the booking archive (office_bookarch.js) */
 .bka-h{margin:.75rem 0 .25rem}
 .bka-empty{margin:1rem 0}

@@ -24,7 +24,7 @@ from ..core.i18n import N_, lang, tr
 from ..core.pg import insert_id
 from ..personal.timetrack import _csv_cell
 from ..core.errors import BadInput
-from .calc import dec, dstr, money
+from .calc import CALC_LOCALE, calc_lang, dec, dstr, fmt_point, money
 from ..core.access import my_inbox  # 2.149.0 G (#2517): pulled up from functions
 
 ABO_NOTICE_MAX = 730
@@ -273,10 +273,10 @@ def abo_csv():
     from .cashflow import _ctx
     c, uid, oid = _ctx()
     v = abo_view(c, oid)
-    de = lang() == "de"
-    num = (lambda x: x.replace(".", ",")) if de else (lambda x: x)  # noqa: E731
+    lg = calc_lang(lang())
+    num = lambda x: fmt_point(x, lg)  # noqa: E731  2.449.0 (#3766): every comma language (was de alone)
     buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";" if de else ",")
+    w = csv.writer(buf, delimiter="," if CALC_LOCALE.get(lg, ("", ","))[1] == "." else ";")
     w.writerow([tr("Name"), tr("Category"), tr("Repeat"), tr("Amount") + " (" + tr("net") + ")", tr("VAT rate"), tr("per month"),
                 tr("per year"), tr("Next renewal"), tr("Cancel by"), tr("Notice period (days)"), tr("Used by"), tr("Hardly used"), tr("Web address")])
     for f in v["items"]:

@@ -23,7 +23,11 @@ const agentAge = () => (Date.now() - (S.agentsAt || Date.now())) / 1000;
 const agentOffline = a => !!a && (a.online === false || (!a.webhook && (a.contact_age === null || a.contact_age === undefined || a.contact_age + agentAge() > 300)));
 // 2.26.0 (#949): paused with a reason ("does not answer right now: …"); (#933) "connected, but no service running": its
 // token is used (an interactive session) but nothing has collected its events for 10 minutes
-const agentSt = a => !a.enabled ? tr('paused') : a.status === 'paused' ? tr('paused: {0}', a.pause_reason || a.status_text || '') : agentOffline(a) ? tr('not connected') : a.limit_reached ? tr('limit reached') : a.no_service && (a.status || 'idle') === 'idle' ? tr('connected, but no service running') : tr(AGENT_ST[a.status] || AGENT_ST.idle);  // 2.1.1 (#326)
+const AGENT_TXT = {status_chat: N_('Answering in the chat'), status_event: N_('Working on an event'), status_no_command: N_('The agent command cannot be started'), status_run_failed: N_('The last run failed'),
+  status_outside_hours: N_('Outside working hours'), status_outside_hours_at: N_('Outside working hours, back {0}'), status_plan_limit: N_('Plan limit reached'), status_plan_limit_at: N_('Plan limit reached, back at {0}')};
+// 2.450.0 (#3769): the status text of the reference starter in the language of whoever looks; an unknown key or an older starter: its own text
+const agentStTx = a => { if (!a.status_text) return ''; const at = a.status_key_at ? new Date(a.status_key_at) : null, tim = at && !isNaN(at) ? AGENT_TXT[a.status_key + '_at'] : ''; return tim ? tr(tim, fmtStamp(at)) : AGENT_TXT[a.status_key] ? tr(AGENT_TXT[a.status_key]) : a.status_text; };
+const agentSt = a => !a.enabled ? tr('paused') : a.status === 'paused' ? tr('paused: {0}', agentStTx(a) || a.pause_reason || '') : agentOffline(a) ? tr('not connected') : a.limit_reached ? tr('limit reached') : a.no_service && (a.status || 'idle') === 'idle' ? tr('connected, but no service running') : tr(AGENT_ST[a.status] || AGENT_ST.idle);  // 2.1.1 (#326)
 const agentDot = id => { const a = agentById(id); return a ? `<i class="adot st-${!a.enabled || a.status === 'paused' ? 'paused' : agentOffline(a) ? 'offline' : esc(a.status)}" title="${esc(agentHstLine(a))}"></i>` : ''; };
 const agentBadge = () => `<span class="abadge" title="${esc(tr('Agent: an AI assistant or bot that works through the API'))}">${ic('bot', 's')}${tr('Agent')}</span>`;
 // agents of a list that can pick up this task (participant agents only their own tasks)

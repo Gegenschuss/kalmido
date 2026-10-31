@@ -30,7 +30,7 @@ from flask import Response, jsonify, request
 from ..core.config import app
 from ..core.access import need_feat
 from ..core.db import db
-from ..core.i18n import dec_comma, lang, tr
+from ..core.i18n import dec_comma, lang, tr, trn
 from ..accounts.session import me
 from ..office.legacyimport import _col_index, _local, _rels
 from ..personal.timetrack import _csv_cell
@@ -989,15 +989,15 @@ def shx_report_text(rep):
     """The import's result in words (translated)."""
     out = [tr("{0} rows and {1} columns imported", rep["rows"], rep["columns"])]
     if rep.get("sheets", 1) > 1:  # 2.124.0 E (#2116)
-        out.append(tr("{0} sheets imported", rep["sheets"]))
+        out.append(trn("{0} sheet imported", "{0} sheets imported", rep["sheets"]))
     if rep.get("sheets_total", 0) > rep.get("sheets", 1):
-        out.append(tr("{0} sheets left out (at most {1} per table)", rep["sheets_total"] - rep["sheets"], rep["sheets"]))
+        out.append(trn("{0} sheet left out (at most {1} per table)", "{0} sheets left out (at most {1} per table)", rep["sheets_total"] - rep["sheets"], rep["sheets"]))
     if rep["formulas"]:
-        out.append(tr("{0} formulas taken over", rep["formulas"]))
+        out.append(trn("{0} formula taken over", "{0} formulas taken over", rep["formulas"]))
     if rep["as_value"]:
-        out.append(tr("{0} formulas taken over as a value", rep["as_value"]))
+        out.append(trn("{0} formula taken over as a value", "{0} formulas taken over as a value", rep["as_value"]))
     if rep["options_added"]:
-        out.append(tr("{0} values added as new choices", rep["options_added"]))
+        out.append(trn("{0} value added as a new choice", "{0} values added as new choices", rep["options_added"]))
     return out
 
 

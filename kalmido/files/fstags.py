@@ -5,7 +5,7 @@ its workspace. A node with a doc_meta row is a document: its tags change through
 learn the correction as in the documents area). A plain file / folder only gets the rows: the recognition, the models
 (train / classify) and the documents' filters only ever read the tags of documents (doc_meta rows).
 
-Agents use the API v1 (their file list shows no tags yet), not these routes."""
+Agents use the API v1 (files/v1.py: tags in the list and the details, filter tag=; 2.443.0 #2338), not these routes."""
 import re
 
 from flask import g, jsonify, request
@@ -119,6 +119,17 @@ def dt_groups(args, key):
     return out[:20]
 
 
+def dt_where(groups, nots, every, where, params):
+    """Adds the tag conditions on fs_nodes n: groups of ids (each = one tag name; every: all groups, else one of them), nots: none."""
+    has = "n.id IN (SELECT node_id FROM doc_node_tags WHERE tag_id IN ({0}))"
+    if groups:
+        where.append("(" + (" AND " if every else " OR ").join(has.format(",".join("?" * len(grp))) for grp in groups) + ")")
+        params += [i for grp in groups for i in grp]
+    if nots:
+        where.append("NOT " + has.format(",".join("?" * len(nots))))
+        params += nots
+
+
 @app.get("/api/files/nodes/<int:nid>/tags")
 def files_node_tags(nid):
     """{tags: the node's [{id, name}], all: the tags of its workspace [{id, name}], ws}."""
@@ -183,16 +194,7 @@ def files_tagged():
     if not groups and not nots:
         return err(tr("Invalid value: {0}", "tag"))
     where = [f"n.id IN {fs_visible_sql(uid, c)}", cond]
-    has = "n.id IN (SELECT node_id FROM doc_node_tags WHERE tag_id IN ({0}))"
-    parts = []
-    for grp in groups:
-        parts.append(has.format(",".join("?" * len(grp))))
-    if parts:
-        where.append("(" + (" AND " if request.args.get("mode") == "all" else " OR ").join(parts) + ")")
-        params += [i for grp in groups for i in grp]
-    if nots:
-        where.append("NOT " + has.format(",".join("?" * len(nots))))
-        params += nots
+    dt_where(groups, nots, request.args.get("mode") == "all", where, params)
     rows = c.execute(f"SELECT n.* FROM fs_nodes n WHERE {' AND '.join(where)} ORDER BY lower(n.name), n.id LIMIT {DT_HITS + 1}", params).fetchall()
     more = len(rows) > DT_HITS
     items = _items(c, rows[:DT_HITS])

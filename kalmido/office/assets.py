@@ -23,7 +23,7 @@ from ..core.db import db, local_now
 from ..core.i18n import N_, lang, tr, trn
 from ..core.access import Denied
 from ..core.errors import BadInput
-from .calc import dec, dstr, money
+from .calc import calc_lang, dec, dstr, money
 from .model import ofx_name1, office_gate, office_org, office_rows, office_settings, pb_owner
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 
@@ -364,7 +364,7 @@ def ast_value_pdf():
     from .pdf import A4_H, C_INK2, C_RULE, PDF_CW, PDF_L, _Page, pdf_date, pdf_money, pdf_write
     c, uid, oid = _ctx()
     d = ast_value(c, oid, _aid_arg())
-    lg = "de" if lang(c, uid) == "de" else "en"
+    lg = calc_lang(lang(c, uid))  # 2.449.0 (#3766): every app language (was de, else en)
     cur = d["currency"]
     co = ofx_name1((office_settings(c, oid).get("company") or {}).get("name"))  # 2.99.0 D (#2188): one line
     ppr = pdf_paper_ns(office_settings(c, oid).get("paper"))  # 2.357.0 A (#3156)

@@ -10,7 +10,7 @@
    "hash", a missing one = "shared_missing" (count), nothing changed
  - encrypted: the store files lie in k-<kid>/ under a name that is not their SHA-256 and do not hold the plain bytes; the
    download is a complete .zip.enc of the same passphrase (decrypted here independently); after a new passphrase a new
-   kid; the old backup is checked with the old passphrase, its download says "old_passphrase"
+   kid; the old backup is checked with the old passphrase, its download asks for that passphrase ("old_passphrase", #3613) and then comes with it
  - deleting backups frees store files no backup needs any more; a backup without its reference file stops that clean-up
  - off-site (fake S3): the shared files go up once (kalmido-blob-<kid>-<name>), a second upload sends no file again; old
    ones go with the backups that needed them; the assembler (bkstore.py assemble) makes a complete file from the flat copy
@@ -36,7 +36,7 @@ from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
-from kt import B, CT, check, dbx, done, fresh, sess, su_get, until  # noqa: E402
+from kt import B, CT, PASSWORD, check, dbx, done, fresh, sess, su_get, until  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 BK = os.path.join(DATA, "backups")
@@ -225,6 +225,24 @@ v = A.post(B + f"/api/admin/backups/{e1['name']}/verify", json={"passphrase": PA
 check(v.ok, f"the older backup is checked with the older passphrase {v.status_code} {v.text[:160]}")
 r = su_get(A, B + f"/api/admin/backups/{e1['name']}/download")
 check(r.status_code == 400 and r.json().get("code") == "old_passphrase", f"its download asks for the older passphrase {r.status_code} {r.text[:160]}")
+# 2.446.0 (#3613): the POST with the earlier passphrase -> the ticket, a complete file encrypted with exactly that one
+dlu = B + f"/api/admin/backups/{e1['name']}/download"
+r = A.post(dlu, json={"password": PASSWORD, "passphrase": "a wrong passphrase"})
+check(r.status_code == 400 and r.json().get("code") == "passphrase", f"a wrong passphrase gets no ticket {r.status_code} {r.text[:160]}")
+r = sess("alice").post(dlu, json={"password": "wrong", "passphrase": PASS1})  # a new session: no confirmed step-up yet
+check(r.status_code == 403 and "ticket" not in r.text, f"the passphrase does not replace the step-up {r.status_code} {r.text[:160]}")
+r = A.post(dlu, json={"password": PASSWORD, "passphrase": PASS1})
+check(r.ok and r.json().get("ticket"), f"the earlier passphrase gets the ticket {r.status_code} {r.text[:160]}")
+t = r.json().get("ticket", "")
+r = A.get(dlu, params={"t": t})
+check(r.ok and r.content.startswith(MAGIC), f"download of the older backup {r.status_code}")
+dh, dplain = dec(r.content, PASS1)
+dman, dmem = members(dplain)
+check(dman.get("format_version") == 2 and BIG in dmem.values() and FBIG in dmem.values(), "the older backup comes as a complete file of the earlier passphrase")
+r = A.get(dlu, params={"t": t})
+check(r.status_code == 403, f"the ticket with the passphrase holds once {r.status_code}")
+r = A.post(B + f"/api/admin/backups/{e2['name']}/download", json={"password": PASSWORD})
+check(r.ok and r.json().get("ticket"), f"a backup of the current passphrase asks for nothing {r.status_code} {r.text[:160]}")
 
 # ============================================================== clean-up
 stray = os.path.join(ST, "plain", "ab", "ab" + "0" * 62)

@@ -2,13 +2,13 @@
   "code": "film",
   "kind": "industry",
   "version": 1,
-  "name": {"de": "Film & Video", "en": "Film & Video"},
+  "name": {"de": "Film & Video", "en": "Film & Video", "fr": "Film et vidéo", "es": "Cine y vídeo", "it": "Film e video", "nl": "Film en video"},
   "part_kind": "shoot",
   "blocks": ["staff", "share", "km", "meals", "hotel", "set", "free"],
   "calc": {
-    "share": {"label": {"de": "Producing", "en": "Producing"}, "rate": 600, "factor": 0.2},
-    "handling": {"label": {"de": "Handlungskosten", "en": "Handling costs"}, "pct": 4, "on": true},
-    "markup": {"label": {"de": "Markup", "en": "Markup"}, "pct": 10, "on": false, "stacked": false}
+    "share": {"label": {"de": "Producing", "en": "Producing", "fr": "Production", "es": "Producción", "it": "Produzione", "nl": "Productie"}, "rate": 600, "factor": 0.2},
+    "handling": {"label": {"de": "Handlungskosten", "en": "Handling costs", "fr": "Frais de gestion", "es": "Gastos de gestión", "it": "Spese di gestione", "nl": "Handlingkosten"}, "pct": 4, "on": true},
+    "markup": {"label": {"de": "Markup", "en": "Markup", "fr": "Marge", "es": "Margen", "it": "Ricarico", "nl": "Opslag"}, "pct": 10, "on": false, "stacked": false}
   },
   "defaults": {
     "shoot_days": 1, "travel_days": 0, "travel_share": 1, "prep_days": 0, "prep_share": 1, "nights": 0, "night_rate": 100,
@@ -16,19 +16,19 @@
     "producing_share": 0.2, "km": 0, "km_rate": 0.35, "km_trips": 2
   },
   "roles": [
-    {"de": "Regie", "en": "Director", "intext": "intern"},
-    {"de": "Kamera", "en": "Camera", "intext": "intern"},
-    {"de": "Kameraassistenz", "en": "Camera assistant", "intext": "intern"},
-    {"de": "Ton", "en": "Sound", "intext": "extern"},
-    {"de": "Oberbeleuchter", "en": "Gaffer", "intext": "extern"},
-    {"de": "Beleuchter", "en": "Lighting technician", "intext": "extern"},
-    {"de": "Set-Aufnahmeleitung", "en": "Set manager", "intext": "extern"},
-    {"de": "Maske", "en": "Make-up", "intext": "extern"},
-    {"de": "Kostüm", "en": "Costume", "intext": "extern"},
-    {"de": "Komparse", "en": "Extra", "intext": "extern"},
-    {"de": "Drohnen-Operator", "en": "Drone operator", "intext": "extern"}
+    {"de": "Regie", "en": "Director", "fr": "Réalisation", "es": "Dirección", "it": "Regia", "nl": "Regie", "intext": "intern"},
+    {"de": "Kamera", "en": "Camera", "fr": "Caméra", "es": "Cámara", "it": "Camera", "nl": "Camera", "intext": "intern"},
+    {"de": "Kameraassistenz", "en": "Camera assistant", "fr": "Assistant caméra", "es": "Ayudante de cámara", "it": "Assistente operatore", "nl": "Cameraassistent", "intext": "intern"},
+    {"de": "Ton", "en": "Sound", "fr": "Son", "es": "Sonido", "it": "Suono", "nl": "Geluid", "intext": "extern"},
+    {"de": "Oberbeleuchter", "en": "Gaffer", "fr": "Chef électricien", "es": "Jefe de eléctricos", "it": "Capo elettricista", "nl": "Gaffer", "intext": "extern"},
+    {"de": "Beleuchter", "en": "Lighting technician", "fr": "Électricien", "es": "Eléctrico", "it": "Elettricista", "nl": "Belichter", "intext": "extern"},
+    {"de": "Set-Aufnahmeleitung", "en": "Set manager", "fr": "Régisseur de plateau", "es": "Jefe de localización", "it": "Ispettore di produzione", "nl": "Setmanager", "intext": "extern"},
+    {"de": "Maske", "en": "Make-up", "fr": "Maquillage", "es": "Maquillaje", "it": "Trucco", "nl": "Grime", "intext": "extern"},
+    {"de": "Kostüm", "en": "Costume", "fr": "Costumes", "es": "Vestuario", "it": "Costumi", "nl": "Kostuums", "intext": "extern"},
+    {"de": "Komparse", "en": "Extra", "fr": "Figurant", "es": "Figurante", "it": "Comparsa", "nl": "Figurant", "intext": "extern"},
+    {"de": "Drohnen-Operator", "en": "Drone operator", "fr": "Télépilote de drone", "es": "Piloto de dron", "it": "Pilota di drone", "nl": "Dronepiloot", "intext": "extern"}
   ],
-  "doc_labels": {"de": {"offer": "Kostenvoranschlag"}},
+  "doc_labels": {"de": {"offer": "Kostenvoranschlag"}, "fr": {"offer": "Devis de production"}, "es": {"offer": "Presupuesto de rodaje"}, "it": {"offer": "Preventivo di produzione"}, "nl": {"offer": "Productiebegroting"}},
   "labels": {
     "de": {
       "title": "Drehkostenkalkulation", "shoot_days": "Drehtage", "travel_days": "Reisetage", "travel_share": "Anteil Tagesgage",
@@ -53,6 +53,10 @@
       "prep": "incl. preparation", "set_days_note": "differs from {days} shooting days", "set_discount": "{pct} % discount",
       "km_detail": "{km} km x {rate} x {trips} trips", "share_detail": "{pct} % of the crew costs",
       "meals_detail": "{n} people", "hotel_detail": "{n} nights"
-    }
+    },
+    "fr": {"title": "Calcul des coûts de tournage", "shoot_days": "Jours de tournage", "travel_days": "Jours de voyage", "travel_share": "Part du tarif journalier", "prep_days": "Préparation", "prep_share": "Part du tarif journalier", "nights": "Nuitées", "night_rate": "Prix par nuit", "meal_large": "Repas journée complète", "meal_small": "Repas demi-journée", "sat_days": "Samedis", "sat_pct": "Majoration samedi", "sun_days": "Dimanches / jours fériés", "sun_pct": "Majoration dimanche / jour férié", "staff": "Équipe", "share": "Production", "km": "Kilomètres véhicule", "meals": "Repas", "hotel": "Hôtel", "set": "Matériel", "free": "Frais supplémentaires", "item": "Poste", "qty": "Qté", "rate": "Prix", "total": "Total", "sum": "Somme", "discount": "Remise", "net": "Total net", "costs": "Coûts externes", "margin": "Marge", "prep": "préparation incluse", "set_days_note": "diffère des {days} jours de tournage", "set_discount": "{pct} % de remise", "km_detail": "{km} km x {rate} x {trips} trajets", "share_detail": "{pct} % des coûts d'équipe", "meals_detail": "{n} personnes", "hotel_detail": "{n} nuits"},
+    "es": {"title": "Cálculo de costes de rodaje", "shoot_days": "Días de rodaje", "travel_days": "Días de viaje", "travel_share": "Parte de la tarifa diaria", "prep_days": "Preparación", "prep_share": "Parte de la tarifa diaria", "nights": "Noches", "night_rate": "Precio por noche", "meal_large": "Comidas día completo", "meal_small": "Comidas medio día", "sat_days": "Sábados", "sat_pct": "Recargo de sábado", "sun_days": "Domingos / festivos", "sun_pct": "Recargo de domingo / festivo", "staff": "Equipo", "share": "Producción", "km": "Kilometraje de vehículo", "meals": "Comidas", "hotel": "Hotel", "set": "Equipamiento", "free": "Costes adicionales", "item": "Concepto", "qty": "Cant.", "rate": "Precio", "total": "Total", "sum": "Suma", "discount": "Descuento", "net": "Total neto", "costs": "Costes externos", "margin": "Margen", "prep": "incl. preparación", "set_days_note": "difiere de {days} días de rodaje", "set_discount": "{pct} % de descuento", "km_detail": "{km} km x {rate} x {trips} trayectos", "share_detail": "{pct} % de los costes de equipo", "meals_detail": "{n} personas", "hotel_detail": "{n} noches"},
+    "it": {"title": "Calcolo dei costi di ripresa", "shoot_days": "Giorni di ripresa", "travel_days": "Giorni di viaggio", "travel_share": "Quota della tariffa giornaliera", "prep_days": "Preparazione", "prep_share": "Quota della tariffa giornaliera", "nights": "Pernottamenti", "night_rate": "Prezzo a notte", "meal_large": "Pasti giornata intera", "meal_small": "Pasti mezza giornata", "sat_days": "Sabati", "sat_pct": "Maggiorazione sabato", "sun_days": "Domeniche / festivi", "sun_pct": "Maggiorazione domenica / festivo", "staff": "Troupe", "share": "Produzione", "km": "Chilometri veicolo", "meals": "Pasti", "hotel": "Hotel", "set": "Attrezzatura", "free": "Costi aggiuntivi", "item": "Voce", "qty": "Qtà", "rate": "Prezzo", "total": "Totale", "sum": "Somma", "discount": "Sconto", "net": "Totale netto", "costs": "Costi esterni", "margin": "Margine", "prep": "preparazione inclusa", "set_days_note": "diverso da {days} giorni di ripresa", "set_discount": "{pct} % di sconto", "km_detail": "{km} km x {rate} x {trips} tragitti", "share_detail": "{pct} % dei costi della troupe", "meals_detail": "{n} persone", "hotel_detail": "{n} notti"},
+    "nl": {"title": "Calculatie opnamekosten", "shoot_days": "Draaidagen", "travel_days": "Reisdagen", "travel_share": "Deel van het dagtarief", "prep_days": "Voorbereiding", "prep_share": "Deel van het dagtarief", "nights": "Overnachtingen", "night_rate": "Prijs per nacht", "meal_large": "Maaltijden hele dag", "meal_small": "Maaltijden halve dag", "sat_days": "Zaterdagen", "sat_pct": "Toeslag zaterdag", "sun_days": "Zon- / feestdagen", "sun_pct": "Toeslag zon- / feestdag", "staff": "Crew", "share": "Productie", "km": "Autokilometers", "meals": "Maaltijden", "hotel": "Hotel", "set": "Apparatuur", "free": "Bijkomende kosten", "item": "Post", "qty": "Aantal", "rate": "Prijs", "total": "Totaal", "sum": "Som", "discount": "Korting", "net": "Netto totaal", "costs": "Externe kosten", "margin": "Marge", "prep": "incl. voorbereiding", "set_days_note": "wijkt af van {days} draaidagen", "set_discount": "{pct} % korting", "km_detail": "{km} km x {rate} x {trips} ritten", "share_detail": "{pct} % van de crewkosten", "meals_detail": "{n} personen", "hotel_detail": "{n} nachten"}
   }
 }

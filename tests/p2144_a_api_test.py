@@ -112,6 +112,16 @@ T1.patch(V + f"/agent/jobs/{J}", json={"state": "done"})
 check(A.post(B + f"/api/agents/{CL}/abort", json={"job_id": J}).status_code == 409, "an ended job: 409")
 
 # ---------------------------------------------------------------- the agent confirms
+# 2.450.0 (#3769): a known status text as a key plus its time; text stays the fallback, a paused reason of a person clears the key
+r = T1.put(V + "/agent/status", json={"status": "working", "text": "Antwortet", "text_key": "status_plan_limit", "text_at": "2026-11-02T08:00:00Z"})
+ag = next((a for a in A.get(B + "/api/agents").json().get("agents", []) if a["id"] == CL), {})
+check(r.ok and ag.get("status_key") == "status_plan_limit" and ag.get("status_key_at") == "2026-11-02T08:00:00Z" and ag.get("status_text") == "Antwortet",
+      f"#3769: the key reaches the app, the text stays {r.status_code} {ag.get('status_key')}")
+check(T1.put(V + "/agent/status", json={"status": "working", "text": "x", "text_key": "Not a key!"}).status_code == 400, "#3769: a bad key: 400")
+check(T1.put(V + "/agent/status", json={"status": "working", "text": "x", "text_at": "tomorrow"}).status_code == 400, "#3769: a bad time: 400")
+T1.put(V + "/agent/status", json={"status": "working", "text": "Antwortet"})
+ag = next((a for a in A.get(B + "/api/agents").json().get("agents", []) if a["id"] == CL), {})
+check(ag.get("status_key") == "" and ag.get("status_text") == "Antwortet", "#3769: an older starter without a key: no old key stays")
 check(T1.put(V + "/agent/status", json={"status": "working", "text": "Answering in the chat"}).ok, "status working")
 check(T1.post(V + "/agent/typing", json={"chat_user_id": me["id"]}).ok, "typing")
 r = T1.post(V + "/agent/aborted", json={"seq": SEQ, "job_id": JO})

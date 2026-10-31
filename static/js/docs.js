@@ -122,7 +122,7 @@ function viewDocs() {
       <div class="seg dc-seg" role="tablist"><button type="button" role="tab" data-dc="all" aria-selected="${!DC.f.review}">${tr('All')}</button><button type="button" role="tab" data-dc="review" aria-selected="${DC.f.review}">${tr('To review')}${DC.review ? ` <span class="dc-count">${DC.review}</span>` : ''}</button></div>
       <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${!!DC.more}">${ic('filter', 's')} ${tr('Filter')}${active ? ` <span class="dc-count">${dc_fEntries().length}</span>` : ''}</button>${dc_sortBtn()}
       <span class="dc-acts2"><label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="application/pdf,image/*,.pdf,.txt,.xml,application/xml,text/xml" hidden></label>
-      <button type="button" class="btn sm" data-dc="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>${dc_smvBtn()}<button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
+      <button type="button" class="btn sm" data-dc="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>${dc_smvBtn()}<button type="button" class="iconbtn" data-dc="lists" aria-label="${esc(tr('Senders, types and fields'))}" title="${esc(tr('Senders, types and fields'))}">${ic('list')}</button><button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
     </div>
     ${DC.more && !isMobile() ? `<div class="dc-fpanel dc-flt">${dc_fltHtml()}</div>` : ''}${dc_fbarHtml()}${dc_underHtml()}
     ${DC.waiting ? `<p class="muted dc-wait" role="status">${ic('hourglass', 's')} ${esc(trn('{0} document is being recognised…', '{0} documents are being recognised…', DC.waiting))}</p>` : ''}`;
@@ -168,7 +168,7 @@ async function dc_upload(files, ws, source) {
       redo: async () => { for (const id of ids) await api('POST', `/api/files/nodes/${id}/restore`); dc_load(); return {}; }}));
   }
   const dup = (j.dups || [])[0];  // 2.146.0 B (#2452): the same file is not stored twice -- Open shows the one there
-  if (dup) toast(j.dups.length === 1 ? tr('This file already exists: {0}', dup.name) : tr('{0} files already exist', j.dups.length), () => dc_open(dup.id), 8000, tr('Open'));
+  if (dup) toast(j.dups.length === 1 ? tr('This file already exists: {0}', dup.name) : trn('{0} file already exists', '{0} files already exist', j.dups.length), () => dc_open(dup.id), 8000, tr('Open'));
   if (S.route.mod === 'docs') dc_load();
   return j.ids || [];
 }
@@ -293,7 +293,7 @@ function dc_mdDraw(md) {
       ${field('date', tr('Date'), dateIn('dc-date', d.date || '', {label: tr('Date'), ro: !!ro, attrs: 'data-dcp="date"'}))}${typeof pmeta_takenHtml === 'function' ? pmeta_takenHtml(d) : ''}
       ${opt('due', tr('Due'), dateIn('dc-due', d.due || '', {label: tr('Due'), ro: !!ro, attrs: 'data-dcp="due"'}), noDue)}
       ${field('asn', tr('Archive number'), `<span class="dc-amt"><input type="number" min="1" id="dc-asn" data-dcp="asn" value="${esc(d.asn || '')}" ${ro}>${w && !d.asn ? `<button type="button" class="btn sm" data-dc="asnnext">${tr('Next free number')}</button>` : ''}</span>`)}
-      ${opt('amount', tr('Amount'), `<span class="dc-amt"><input id="dc-amount" data-dcp="amount" inputmode="decimal" value="${esc(d.amount ? String(d.amount).replace('.', LOCALE().startsWith('en') ? '.' : ',') : '')}" ${ro}><input id="dc-currency" data-dcp="currency" value="${esc(d.currency || '')}" maxlength="3" aria-label="${esc(tr('Currency'))}" placeholder="EUR" ${ro}></span>`, noAmt)}
+      ${opt('amount', tr('Amount'), `<span class="dc-amt"><input id="dc-amount" data-dcp="amount" inputmode="decimal" value="${esc(d.amount ? numField(d.amount) : '')}" ${ro}><input id="dc-currency" data-dcp="currency" value="${esc(d.currency || '')}" maxlength="3" aria-label="${esc(tr('Currency'))}" placeholder="EUR" ${ro}></span>`, noAmt)}
       ${!ro && (noDue || noAmt) ? `<div class="row dc-f dc-optbtn"><button type="button" class="linkbtn" data-dc="showopt">${tr('Add')}: ${tr('Due')} / ${tr('Amount')}</button></div>` : ''}
       ${(d.custom_fields || []).map(f => dc_cfRow(d, f, ro)).join('')}
     </div>
@@ -336,8 +336,8 @@ function dc_cfRow(d, f, ro) {  // 2.153.0 (#2179): one custom field of the docum
   const input = f.type === 'checkbox' ? `<input type="checkbox" id="${id}" ${a} ${v === '1' ? 'checked' : ''} ${ro}>`
     : f.type === 'select' ? `<select id="${id}" ${a} ${ro}><option value=""></option>${(f.options || []).map(o => `<option value="${esc(o.id)}" ${o.id === v ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`
     : f.type === 'date' ? dateIn(id, v, {label: f.name, ro: !!ro, attrs: a})
-    : f.type === 'money' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? (LOCALE().startsWith('en') ? v : v.replace('.', ',')) : '')}" placeholder="0,00 EUR" ${ro}>`
-    : f.type === 'number' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? (LOCALE().startsWith('en') ? v : v.replace('.', ',')) : '')}" ${ro}>`
+    : f.type === 'money' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? v.replace(/^-?[\d.]+/, x => numField(x, 2, 2)) : '')}" placeholder="${esc(curMoney(0, 'EUR'))}" ${ro}>`
+    : f.type === 'number' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? numField(v) : '')}" ${ro}>`
     : f.type === 'url' ? `<span class="dc-amt"><input type="url" id="${id}" ${a} value="${esc(v)}" placeholder="https://" ${ro}>${v && /^https?:\/\//i.test(v) ? `<a class="iconbtn" href="${esc(v)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(tr('Open'))}">${ic('link')}</a>` : ''}</span>`
     : `<input id="${id}" ${a} value="${esc(v)}" maxlength="1000" ${ro}>`;
   return `<div class="row dc-f dc-cf"><label for="${id}">${esc(f.name)}</label>${input}${dc_auto(d, 'cf' + f.id)}</div>`;
@@ -463,16 +463,37 @@ async function dc_mdClick(e) {
   }
 }
 
-// ---- settings of a workspace: level per feature, inbox folder, rules, forwarding address
-async function dc_settings() {
-  const ws = dc_upWs();
-  let s; try { s = await api('GET', `/api/docs/settings?ws=${ws}`); } catch { return; }
+// ---- settings of a workspace: level per feature, archive numbers, rules, the lists and custom fields
+// 2.365.2 B (#2789): the settings live in Settings > Documents (dcs_paneHtml / dcs_draw, the workspace shown in the sidebar),
+// the inboxes (folder, folder watcher, mail) in Settings > Integrations (docscan.js); the module keeps the dialog for its
+// lists (senders, types, tags) and custom fields. dc_sDraw draws both, the handlers below serve both.
+async function dc_settings(ws = dc_upWs()) {
+  let s; try { s = await api('GET', `/api/docs/settings?ws=${encodeURIComponent(ws)}`); } catch { return; }
   DC.set = s;
   const md = modal('<div class="dc-sbody"></div>');
   md.classList.add('dc-smd');
   md.addEventListener('click', dc_sClick);
   md.addEventListener('change', dc_sChange);
   dc_sDraw(md);
+}
+function dcs_paneHtml() {
+  if (!feat('docs')) return '';
+  return `<div id="s-dcs" class="dc-smd dcs-pane"><p class="muted" data-dcsp="head">${tr('Loading…')}</p>
+    <h4 id="s-dcs-auto-h">${tr('Sorting automatically')}</h4><div data-dcsp="auto"></div>
+    <h4 id="s-dcs-asn-h">${tr('Archive numbers')}</h4><div data-dcsp="asn"></div>
+    <h4 id="s-dcs-rules-h">${tr('Rules')}</h4><div data-dcsp="rules"></div>
+    <h4 id="s-dcs-lists-h">${tr('Senders, types and tags')}</h4>
+    <div class="row"><span class="muted">${tr('Senders, document types, tags and custom fields are kept in Documents.')}</span><button type="button" class="btn sm" data-dcs="lists">${ic('list', 's')} ${tr('Open in Documents')}</button></div>
+    <h4 id="s-dcs-in-h">${tr('Inboxes')}</h4>
+    <div class="row"><span class="muted">${tr('The folder of the file store, the folder watcher, scan inboxes and the e-mail address: Settings > Integrations.')}</span><button type="button" class="btn sm" data-dcs="go-integr">${ic('link', 's')} ${tr('Open Integrations')}</button></div>
+    <div data-dcsp="pl"></div></div>`;
+}
+async function dcs_draw(md) {
+  const box = $('.dcs-pane', md); if (!box) return;
+  if (!box._on) { box._on = true; box.addEventListener('click', dc_sClick); box.addEventListener('change', dc_sChange); }
+  let s; try { s = await api('GET', `/api/docs/settings?ws=${encodeURIComponent(dc_upWs())}`); } catch { $('[data-dcsp="head"]', box).textContent = ''; return; }
+  if (!box.isConnected) return;
+  DC.set = s; dc_sDraw(box);
 }
 function dc_wsName(ws) {
   if (ws === 'private') return tr('Your own documents');
@@ -486,18 +507,16 @@ function dc_sDraw(md) {
     const sets = [r.sender && `${tr('Sender')}: ${r.sender}`, r.type && `${tr('Document type')}: ${r.type}`, r.tags?.length && `${tr('Tags')}: ${r.tags.join(', ')}`, r.folder && `${tr('Folder')}: ${r.folder}`].filter(Boolean);
     return `<li class="dc-rule"><span><span class="muted">${esc(tr(DC_KINDS.find(k => k[0] === r.kind)?.[1] || r.kind))}</span> <b>${esc(r.match)}</b>${r.case ? ` <span class="muted">(${tr('case-sensitive')})</span>` : ''} → ${esc(sets.join(' · '))}</span>${can ? `<button type="button" class="iconbtn" data-dcs="rdel:${r.id}" aria-label="${esc(tr('Delete rule'))}">${ic('trash')}</button>` : ''}</li>`;
   };
-  $('.dc-sbody', md).innerHTML = `<div class="lhdr"><h3>${tr('Settings of the documents')}</h3><span class="spacer"></span><button class="iconbtn" data-dcs="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
-    <p class="muted">${esc(dc_wsName(s.ws))}${can ? '' : ` · ${tr('Only admins of this workspace can change this')}`}</p>
-    <h4>${tr('Sorting automatically')}</h4>
-    <p class="shint">${tr('Per feature: rules first, then what Kalmido learnt from your corrections. Sure matches are set directly, unsure ones wait in “To review”. “Left to an agent”: a connected agent with access may fill it in.')}</p>
-    ${DC_FEATS.map(([f, n]) => `<div class="row"><label for="dcs-l-${f}">${tr(n)}</label><select id="dcs-l-${f}" data-dcl="${f}" ${dis}>${DC_LEVELS.map(([v, l]) => `<option value="${v}" ${s.levels[f] === v ? 'selected' : ''}>${tr(l)}</option>`).join('')}</select></div>`).join('')}
-    <label class="chkl"><input type="checkbox" data-dcs="inbox" ${s.inbox ? 'checked' : ''} ${dis}> ${esc(tr('Recognise files put into the folder “{0}” of the file store', s.inbox_path || tr('Documents|folder') + '/' + tr('Inbox|folder')))}</label>
-    <div class="row"><label for="dcs-asn">${tr('Prefix of the archive numbers')}</label><input id="dcs-asn" data-dcs="asnprefix" value="${esc(s.asn_prefix || 'ASN')}" maxlength="10" autocomplete="off" ${dis}></div>
-    ${s.ocr_missing?.length ? `<p class="muted">${esc(tr('Text recognition is missing: {0}', s.ocr_missing.join(', ')))}</p>` : ''}
-    <p class="muted">${esc(tr('Next free number: {0}. A QR code or text like {1} on a scan fills it in.', s.asn_next, `${s.asn_prefix || 'ASN'}${String(s.asn_next).padStart(5, '0')}`))}</p>
-    <p class="muted">${esc(tr('A stack scan with several codes can be split into documents; a separator sheet between two letters splits there too.'))} <a href="/api/docs/split-sheet.pdf" target="_blank" rel="noopener">${tr('Separator sheet to print (PDF)')}</a></p>${'' /* 2.154.0 A (#1111) */}
-    <h4>${tr('Rules')}</h4>
-    ${s.rules.length ? `<ul class="dc-rules">${s.rules.map(rule).join('')}</ul>` : `<p class="muted">${tr('No rules yet. When you correct a document, Kalmido learns from it.')}</p>`}
+  const head = `${esc(dc_wsName(s.ws))}${can ? '' : ` · ${tr('Only admins of this workspace can change this')}`}`;
+  if (md.classList.contains('dcs-pane')) {  // Settings > Documents: the parts into their places under the headings
+    const P = {head,
+      auto: `<p class="shint">${tr('Per feature: rules first, then what Kalmido learnt from your corrections. Sure matches are set directly, unsure ones wait in “To review”. “Left to an agent”: a connected agent with access may fill it in.')}</p>
+        ${DC_FEATS.map(([f, n]) => `<div class="row"><label for="dcs-l-${f}">${tr(n)}</label><select id="dcs-l-${f}" data-dcl="${f}" ${dis}>${DC_LEVELS.map(([v, l]) => `<option value="${v}" ${s.levels[f] === v ? 'selected' : ''}>${tr(l)}</option>`).join('')}</select></div>`).join('')}
+        ${s.ocr_missing?.length ? `<p class="muted">${esc(tr('Text recognition is missing: {0}', s.ocr_missing.join(', ')))}</p>` : ''}`,
+      asn: `<div class="row"><label for="dcs-asn">${tr('Prefix of the archive numbers')}</label><input id="dcs-asn" data-dcs="asnprefix" value="${esc(s.asn_prefix || 'ASN')}" maxlength="10" autocomplete="off" ${dis}></div>
+        <p class="muted">${esc(tr('Next free number: {0}. A QR code or text like {1} on a scan fills it in.', s.asn_next, `${s.asn_prefix || 'ASN'}${String(s.asn_next).padStart(5, '0')}`))}</p>
+        <p class="muted">${esc(tr('A stack scan with several codes can be split into documents; a separator sheet between two letters splits there too.'))} <a href="/api/docs/split-sheet.pdf" target="_blank" rel="noopener">${tr('Separator sheet to print (PDF)')}</a></p>${'' /* 2.154.0 A (#1111) */}`,
+      rules: `${s.rules.length ? `<ul class="dc-rules">${s.rules.map(rule).join('')}</ul>` : `<p class="muted">${tr('No rules yet. When you correct a document, Kalmido learns from it.')}</p>`}
     ${can ? `<details class="dc-radd"><summary>${tr('New rule')}</summary>
       <div class="row"><label for="dcr-kind">${tr('If the document')}</label><select id="dcr-kind">${DC_KINDS.map(([v, l]) => `<option value="${v}">${tr(l)}</option>`).join('')}</select></div>
       <div class="row"><label for="dcr-match">${tr('Words or pattern')}</label><input id="dcr-match" maxlength="200" autocomplete="off"></div>
@@ -505,16 +524,19 @@ function dc_sDraw(md) {
       <div class="row"><label for="dcr-type">${tr('then document type')}</label><input id="dcr-type" maxlength="120" list="dcr-tl" autocomplete="off"><datalist id="dcr-tl">${s.types.map(x => `<option value="${esc(x.name)}">`).join('')}</datalist></div>
       <div class="row"><label for="dcr-tags">${tr('then tags')}</label><input id="dcr-tags" maxlength="300" placeholder="${esc(tr('comma-separated'))}" autocomplete="off"></div>
       <div class="row"><label for="dcr-folder">${tr('then folder')}</label><input id="dcr-folder" maxlength="120" list="dcr-fl" autocomplete="off"><datalist id="dcr-fl">${s.folders.map(x => `<option value="${esc(x.name)}">`).join('')}</datalist></div>
-      <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-dcs="radd">${tr('Add rule')}</button></div></details>` : ''}
+      <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-dcs="radd">${tr('Add rule')}</button></div></details>` : ''}`,
+      pl: typeof pl_slot === 'function' ? pl_slot(s) : ''};  // 2.48.0 (#1152): Paperless-ngx (paperless.js), the progress of an import
+    for (const [k, h] of Object.entries(P)) { const el = $(`[data-dcsp="${k}"]`, md); if (el) el.innerHTML = h; }
+    return;
+  }
+  $('.dc-sbody', md).innerHTML = `<div class="lhdr"><h3>${tr('Senders, types and fields')}</h3><span class="spacer"></span><button class="iconbtn" data-dcs="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
+    <p class="muted">${head}</p>
     ${can ? `<h4>${tr('Senders, types and tags')}</h4>${[['sender', 'senders', N_('Senders')], ['type', 'types', N_('Document types')], ['tag', 'tags', N_('Tags')]].map(([k, key, n]) =>
       `<details class="dc-lbls"><summary>${tr(n)} (${(s[key] || []).length})</summary>${(s[key] || []).length ? `<ul class="dc-rules">${s[key].map(x => `<li class="dc-rule"><span>${esc(x.name)}</span><span>
         <button type="button" class="iconbtn" data-dcs="lren:${k}:${x.id}" aria-label="${esc(tr('Rename'))}" title="${esc(tr('Rename'))}">${ic('edit')}</button>
         <button type="button" class="iconbtn" data-dcs="ldel:${k}:${x.id}" aria-label="${esc(tr('Delete {0}', x.name))}" title="${esc(tr('Delete {0}', x.name))}">${ic('trash')}</button></span></li>`).join('')}</ul>` : ''}</details>`).join('')}` : ''}
     ${can ? dc_cfSettings(s) : ''}
-    ${typeof dsc_slot === 'function' ? dsc_slot(s) : s.mail.enabled ? `<h4>${tr('Forward by e-mail')}</h4><p class="muted">${tr('PDFs and images attached to mails sent to this address become documents here.')}</p>
-      ${s.mail.address ? `<p class="dc-mail"><code>${esc(s.mail.address)}</code> <button type="button" class="linkbtn" data-dcs="mailnew">${tr('New address')}</button> <button type="button" class="linkbtn" data-dcs="maildel">${tr('Turn off')}</button></p>`
-        : `<button type="button" class="btn sm" data-dcs="mailnew">${tr('Create address')}</button>`}` : ''}${'' /* 2.207.0 A (#2763): docscan.js = scans from your computer + mail */}
-    ${typeof pl_slot === 'function' ? pl_slot(s) : ''}`;  // 2.48.0 (#1152): Paperless-ngx (paperless.js, self-hosted only)
+    <div class="row dcs-to"><span class="muted">${tr('Sorting automatically, archive numbers and rules: Settings > Documents.')}</span><button type="button" class="btn sm" data-dcs="go-set">${ic('gear', 's')} ${tr('Settings of the documents')}</button></div>`;
 }
 function dc_cfSettings(s) {  // 2.153.0 (#2179): the custom fields of the workspace (nothing preset)
   const fs = s.fields || [];
@@ -586,12 +608,14 @@ async function dc_sChange(e) {
     return;
   }
   if (e.target.matches('[data-dcs="ftype"]')) { const o = md.querySelector('.dcf-opts'); if (o) o.hidden = e.target.value !== 'select'; return; }  // 2.153.0 (#2179)
-  if (e.target.matches('[data-dcs="inbox"]')) { DC.set = await api('PUT', '/api/docs/settings', {ws: s.ws, inbox: e.target.checked}).catch(() => s); dc_sDraw(md); }
 }
 async function dc_sClick(e) {
   const b = e.target.closest('[data-dcs]'); if (!b || b.matches('input')) return;
   const s = DC.set, md = b.closest('.dc-smd'), a = b.dataset.dcs;
   if (a === 'close') { md.remove(); return; }
+  // 2.365.2 B (#2789): the ways between Settings > Documents, Integrations and the lists of the module
+  if (a === 'go-set') { md.remove(); settingsModal('docs'); return; }
+  if (a === 'lists' || a === 'go-integr') { const sm = md.closest('.modal'); if (sm) modalClose(sm); if (a === 'lists') { go('docs'); dc_settings(s?.ws); } else settingsModal('scans'); return; }
   if (a === 'fadd' || /^f(ren|opt|del):/.test(a)) return dc_cfAct(a, s, md);  // 2.153.0 (#2179)
   if (a === 'radd') {
     const v = id => ($(`#${id}`, md)?.value || '').trim();
@@ -632,17 +656,6 @@ async function dc_sClick(e) {
       redo: async () => { await api('DELETE', `/api/docs/labels/${kind}/${st.id}`); await reload(); return {}; }}));
     return;
   }
-  if (a === 'mailnew') {
-    if (s.mail.address && !await askConfirm(tr('New address?'), tr('The old address stops working.'), {ok: tr('New address')})) return;
-    const j = await api('POST', '/api/docs/mail', {ws: s.ws}).catch(() => null); if (!j) return;
-    s.mail.address = j.address; dc_sDraw(md);
-    return;
-  }
-  if (a === 'maildel') {
-    if (!await askConfirm(tr('Turn off the address?'), tr('Mails to it no longer arrive.'), {ok: tr('Turn off'), danger: true})) return;
-    await api('DELETE', `/api/docs/mail?ws=${encodeURIComponent(s.ws)}`).catch(() => null);
-    s.mail.address = ''; dc_sDraw(md);
-  }
 }
 
 // ---- events of the view (delegated once)
@@ -659,7 +672,8 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-dc]'); if (!b) return;
   const a = b.dataset.dc;
   if (a === 'scan') { abm_scanOpen({docs: true}); return; }  // 2.112.1 A (#2058): photographed pages -> one PDF -> a document
-  if (a === 'settings') dc_settings();
+  if (a === 'settings') settingsModal('docs');  // 2.365.2 B (#2789): Settings > Documents
+  else if (a === 'lists') dc_settings();
   else if (a === 'all' || a === 'review') { const rv = a === 'review'; if (S.route.mod === 'docs' && !!S.route.review !== rv) { go(rv ? 'docs/review' : 'docs'); return; } DC.f.review = rv; dc_load(); dc_draw(); }  // 2.353.0 D (#2759): the route = the saved filter (viewDocs takes it over and loads)
   else if (a === 'sort') dc_sortMenu(b);  // 2.428.0 (#3579)
   else if (a === 'more') { if (isMobile()) dc_fSheet(); else { DC.more = !DC.more; dc_draw(); } }  // 2.122.0 B (#2294): phones: a sheet

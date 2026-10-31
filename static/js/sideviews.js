@@ -162,7 +162,7 @@ function sv_entries() {
     views: () => sideViewEntries().filter(x => !hid('e:' + x[0])).map(x => it('m:' + x[0], tr(/** @type {string} */ (x[1])))),  // 2.409.0: feat() is a boolean now, the entries [id, name, on]
     areas: () => SIDE_AREA_KEYS.map(k => MG_IDS.includes(k) ? (mg_on(k) ? it('m:' + k, tr(/** @type {any} */ (mg_area(k))[2])) : null) : (x => x ? it('m:' + k, tr(/** @type {string} */ (x[1]))) : null)(sideModEntries().find(x => x[0] === k))).filter(Boolean),
     filters: () => S.filters.map(f => it('f:' + f.id, f.name)),
-    tags: () => Object.keys(counts().tags).sort((a, b) => a.localeCompare(b, 'de')).map(t => it('tag:' + t, t)),
+    tags: () => Object.keys(counts().tags).sort(cmpText).map(t => it('tag:' + t, t)),
     team: () => [...(collab() ? (S.groups || []).filter(gr => myGroup(gr.id)).map(gr => it('g:' + gr.id, gr.name)) : []),
       ...sbp_people().map(p => it('p:' + p.id, p.name)), ...sbp_agents().map(a => it('a:' + a.id, a.name))],
     more: () => SV_MORE_V.filter(k => k !== 'archived' || S.lists.some(l => l.archived && inWs(l))).map(k => it('v:' + k, tr(FV2_VIEWS[k][1])))};
@@ -244,6 +244,7 @@ function sv_tileMenu(b) {
   const act = sv_cur()?.id === id;
   menu(b, [{label: v.name, dis: true, cls: 'mhead'}, '-',
     act ? {label: tr('Back to “Everything”'), icon: 'all', fn: () => sv_activate('', false)} : {label: tr('Open'), icon: 'right', fn: () => sv_activate(id)},
+    ...fv2_menuRow('sv:' + id),  // 2.441.0 (#3592)
     ...(act ? [{label: tr('Update view “{0}”', v.name), icon: 'check', dis: !sv_changed(), fn: sv_update}] : []),
     {label: tr('Edit view “{0}”…', v.name), icon: 'edit', fn: () => sv_edit(id)},
     '-', {label: tr('Delete'), icon: 'trash', fn: () => sv_delete(id)}]);

@@ -713,6 +713,7 @@ fresh; run p2466_d_ui node p2466_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.6 part A: #1722 #1714 #1715 #1717 #1445 the reference launcher: cut buttons, one suggestion, the fixed rules block,
 # WORKFLOW-KALMIDO.md, a wake run after a job and a lost job resumed once (pure Python, no server)
 run p2466_a_launcher "$PY" p2466_a_launcher_test.py
+run p2450_c_starter_lang "$PY" p2450_c_starter_lang_test.py
 # 2.46.6 part B: #1680 #1708 #1709 #1716 personal agent hint at the members switch, an agent's lists, setup offer, which agent when
 fresh; run p2466_b_api "$PY" p2466_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2466_b_ui node p2466_b_ui.js "$KALMIDO_TEST_DATA"
@@ -731,6 +732,7 @@ fresh; run p2470_d_cost_ui node p2470_d_cost_ui.js "$KALMIDO_TEST_DATA"
 # 2.47.0 part A: #1648 fill instead of skip, #1649 masters Freelancer-Rollen / Drehpersonal + their import, #1645 import columns
 fresh; run p2470_a_import_api "$PY" p2470_a_import_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2470_a_roles_ui node p2470_a_roles_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2451_a_office_rows_ui node p2451_a_office_rows_ui.js "$KALMIDO_TEST_DATA"
 # 2.47.0 part B: #1215 parts of a quotation (title page calculation, rights, PDF pages, invoice forms; the editor)
 fresh; run p2470_b_parts_api "$PY" p2470_b_parts_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2470_b_parts_ui node p2470_b_parts_ui.js "$KALMIDO_TEST_DATA"
@@ -2220,5 +2222,16 @@ fresh; run p2235_d_kbd_ui node p2235_d_kbd_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2354_c_ui node p2354_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.380.0 (#3420): the film pack offers Producing by amount, also switchable in a quotation made before the pack; freelancer-matrix: office
 fresh; run p2380_l_ui node p2380_l_ui.js "$KALMIDO_TEST_DATA"
+# 2.365.2 C (#2789): module settings moved to Settings (time/focus link, agent steps, letter signature, organisation rules, own holiday state); freelancer-matrix: none
+fresh; run p2365_2_c_ui node p2365_2_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.435.0 A (#3600): the client card blocks fold (open / folded with the number, kept per person), the office switches blocks off; freelancer-matrix: office
 fresh; run p2435_a_ui node p2435_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.437.0 (#3729): init_db names its steps and milliseconds in the start log
+fresh; run p2437_l_start "$PY" p2437_l_start_test.py "$KALMIDO_TEST_DATA"
+# 2.431.0 A (#3593): the task header keeps every icon whole; its words fall away step by step
+fresh; run p2431_a_ui node p2431_a_ui.js "$KALMIDO_TEST_DATA"
+# 2.360.2 (#2561 #2912 #2913): Server-Timing only for instance admins, pinned actions, third-party notices; freelancer-matrix: public
+fresh; run p23602_a_api "$PY" p23602_a_api_test.py "$KALMIDO_TEST_DATA"
+# 2.442.0: agent token at setup (#1762), packed static files (#2808) (UI: p2442_c_ui.js)
+fresh; run p2442_a_token "$PY" p2442_a_token_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2442_b_static_pack "$PY" p2442_b_static_pack_test.py "$KALMIDO_TEST_DATA"

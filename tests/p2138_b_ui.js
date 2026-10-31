@@ -50,7 +50,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   };
   const ready = async ev => { for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(250); await sleep(800); };
   const GEO = `(() => { const q = s => document.querySelector(s), r = e => e && e.getBoundingClientRect(), se = q('#kbar .kbsrch') || q('#side .scmd'), s = r(se), sd = r(q('#side')), a = r(q('#kbar .kbacct') || q('#side .sbacct')) /* 2.152.3 (#2619): the head bar on a computer */, ws = r(q('#kbar .kbsw') || q('#side .wsbar'));
-    return {sv: !!s && s.width > 0 && getComputedStyle(se).display !== 'none', sdt: sd && Math.round(sd.top), sb: s && Math.round(s.bottom), st: s && Math.round(s.top), sfb: Math.round(r(q('#side .sbfix'))?.bottom || 0) /* 2.152.2 (#2622) */, ih: innerHeight, sdb: sd && Math.round(sd.bottom), sw: s && s.height,
+    return {sv: !!s && s.width > 0 && getComputedStyle(se).display !== 'none', sdt: sd && Math.round(sd.top), sb: s && Math.round(s.bottom), st: s && Math.round(s.top), sfb: Math.round(r(q('#side .sbmsrch') || q('#side .sbfix'))?.bottom || 0) /* 2.152.2 (#2622); 2.442.0 (#3739): on a phone the search's own box stays on top */, ih: innerHeight, sdb: sd && Math.round(sd.bottom), sw: s && s.height,
       ay: a && Math.round(a.top), ax: a && Math.round(a.right), wy: ws && Math.round(ws.top), ww: ws && Math.round(ws.width), sdw: sd && Math.round(sd.width), name: (q('#kbar .wsn') || q('#side .wsn'))?.textContent, over: document.documentElement.scrollWidth - innerWidth}; })()`;
   for (const [vw, vh, tag] of [[390, 844, 'phone'], [1280, 800, 'desktop']]) await firefox(async o => {
     const {cmd, ev, ctx, shot} = o;

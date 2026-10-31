@@ -53,7 +53,7 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_paperless.py']);
   check(!d.querySelector('.dc-smd #pl-url') && /Connect in the settings/.test(d.querySelector('.dc-smd [data-pl="goset"]')?.textContent || ''), '2.87.9 (#1936): the documents settings jump to the settings');
   d.querySelector('.dc-smd [data-pl="goset"]')?.click();
   await until(() => d.querySelector('.smodal .pl-slot #pl-url'));
-  check(!d.querySelector('.dc-smd') && d.querySelector('.smodal [data-pane="integr"] .pl-slot'), '2.87.9 (#1936): Settings > Integrations has the section');
+  check(!d.querySelector('.modal.dc-smd') && d.querySelector('.smodal [data-pane="integr"] .pl-slot'), '2.87.9 (#1936): Settings > Integrations has the section');  // 2.365.2 B (#2789): the gear opens Settings > Documents
   const slot = () => d.querySelector('.smodal .pl-slot');
   check(/Paperless-ngx/.test(slot()?.textContent || '') && d.querySelector('#pl-url') && d.querySelector('#pl-tok'), 'settings: the section with address + token');
   d.querySelector('#pl-url').value = 'http://127.0.0.1:8098';

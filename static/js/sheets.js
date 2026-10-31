@@ -448,7 +448,7 @@ function shvOptimistic(sh, chg) {
 async function shvPut(chg, label) {
   const sh = SHV.sh; if (!sh || !sh.can_write) return null;
   // 2.263.0 (#2977): a slash date in a date column goes as YYYY-MM-DD in the order of the region (en-US 10/23/2026)
-  chg = chg.map(x => sh._col.get(x.col_id)?.kind === 'date' && /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test((x.raw || '').trim()) ? {...x, raw: sgDay(x.raw) || x.raw} : x);
+  chg = chg.map(x => sh._col.get(x.col_id)?.kind === 'date' && /^\d{1,2}([/-])\d{1,2}\1\d{2,4}$/.test((x.raw || '').trim()) ? {...x, raw: sgDay(x.raw) || x.raw} : x);
   chg = chg.filter(x => (x.raw ?? '') !== shvRaw(x.row_id, x.col_id));
   if (!chg.length) return null;
   const sid = sh.id, old = chg.map(x => ({row_id: x.row_id, col_id: x.col_id, raw: shvRaw(x.row_id, x.col_id)}));
@@ -892,7 +892,7 @@ document.addEventListener('click', async e => {
   else if (k === 'omenu') menu(a, SHV_HOOKS.overview.flatMap(f => { try { return f(S.route.shl ? null : (typeof wsCur === 'function' ? wsCur() : 'all'), S.route.shl || null) || []; } catch (er) { console.error(er); return []; } }));
   else if (k === 'cmenu') {
     const id = +a.dataset.id, x = Object.values(SHV.idx).flatMap(d => d.items || []).find(y => y.id === id); if (!x) return;
-    menu(a, [{label: tr('Open'), icon: 'sheet', fn: () => go('sheets/' + id)}, ...(x.shared_in && x.share_role !== 'write' ? [] : [{label: tr('Rename…'), icon: 'edit', fn: () => shvRename(id, x.title)}]),
+    menu(a, [{label: tr('Open'), icon: 'sheet', fn: () => go('sheets/' + id)}, ...fv2_menuRow('r:sheet:' + id) /* 2.441.0 (#3592) */, ...(x.shared_in && x.share_role !== 'write' ? [] : [{label: tr('Rename…'), icon: 'edit', fn: () => shvRename(id, x.title)}]),
       ...(x.shared_in ? [] : [...sh_smvItems(x),  // 2.96.0 B (#1941); 2.124.0 C (#2113): a shared table: no move / delete
       '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => shvDelete(id, x.title, S.route.shl || null)}])]);
   }

@@ -139,12 +139,20 @@ before: give the folders to user 1000 once (`sudo chown -R 1000:1000 data secret
 
 Every server works the same way: each person has a private space, and organisations are shared workspaces with their own
 admins. A new server has no organisation; the first-run setup creates one when you give it a name (you become its admin),
-and an instance admin creates further ones under *Settings > Administration > Organisations*. Nobody joins an organisation
-by themselves: an admin picks it when adding a person, a registration joins one only through its e-mail domains (and only
+and an instance admin creates further ones under *Settings > Administration > Organisations*. Since 2.422 a person creates a
+company of her own too (the workspace menu > *Add an organisation*, `POST /api/orgs {name}`): she becomes its admin, at most
+3 such companies per person; their e-mail domains are set only by an instance admin, and they do not count as the server's
+organisations for open registration. Nobody joins an organisation by themselves: an admin picks it when adding a person, a registration joins one only through its e-mail domains (and only
 with a confirmed address: without e-mail sending an admin adds the person after the approval), and an
 organisation admin adds and removes members. A server without any organisation lets everyone see everyone (one household);
 once there is one, people see the members of their organisations and the people they share something with; private projects
 reach anybody else by e-mail address.
+
+**Private accounts without an invitation (2.422).** A server with an organisation allows open registration ("Anyone with a
+confirmed e-mail address") only with the switch *Private accounts register without an invitation* (*Settings > Users >
+Registration on the login page*, `PATCH /api/admin/settings {signup_private}`, off by default, switching it on asks for the
+password). Such a registration is a private account: it never joins an organisation, not even by its e-mail domain; a
+company's admin invites the person. Switched off again, the mode falls back to off.
 
 **Activity per organisation (2.143).** Instance admins see under *Settings > Administration > Organisation* one table with, per
 organisation, the members, the date of the last sign-in, the storage used, and the numbers of projects and tasks, plus a row
@@ -268,6 +276,9 @@ the Caddyfile (or nginx configuration) instead.
 **Compression (2.65).** Kalmido compresses its JSON answers itself (gzip, from 1 KB on) when the client accepts it; with
 many tasks the start state shrinks to about a twentieth. A proxy that compresses too (Caddy `encode`, nginx `gzip`) sees the
 `Content-Encoding` header and leaves those answers alone, so it can stay on for the static files.
+Since 2.442 the Docker image also carries its scripts and styles packed ahead of time (gzip and brotli) and sends them by
+`Accept-Encoding`, so the first load is about a third of the size without any proxy setting. The nginx and Traefik examples
+in `examples/` compress the rest as well.
 
 **Two host names (internal and single sign-on).** Links in mails, push messages and calendar feeds use `PUBLIC_URL`,
 so set it to the name people should open. Logging out of Kalmido does not log you out of the sign-on portal. Point API
@@ -651,7 +662,14 @@ deleted rows and columns of a table, pipeline deals, invoice series, the placeho
 the emptied rows of deleted comments, absences, disposition bookings, scheduling polls (with the votes of their guests),
 appointment types and file requests (*since 2.223.3*; the files received stay in their folder). The file store's trash names the period. Projects, tasks and events have their own
 trash periods. Legal retention wins: a booked receipt or the logbook is locked until its period ends, never deleted early
-(such a node stays in the trash and is counted as `files_locked`).
+(such a node stays in the trash and is counted as `files_locked`). Deleting an organisation or an account never fails on
+such a file: the organisation is retired until the lock ends, a private file moves into the account's retired office.
+
+**Restoring a backup keeps deletions.** Organisations and entries deleted for good (projects, tasks, files, knowledge
+pages, events, tables, contacts, clients, e-mails, deals) are noted by table and number only, like deleted accounts. A
+restore deletes them again when the backup brings them back. What went in the last 7 days stays, in case the restore was
+meant to bring it back; the admin alert and the log give the numbers. The list follows the backups' period in the log
+clean-up. Retiring an organisation also ends its calendars' subscription links and the booking pages that work for it.
 
 Expired credentials (sessions, tokens, codes past their end) are no data of a person any more and go without the switch.
 
@@ -762,6 +780,8 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
   docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli rotate --org <id> --recovery-out /data/rk-<id>.txt
   ```
 
+  Around the key switch the server takes no writes on any process, up to about half a minute: writes get a 503 and wait
+  in the app's queue, reading and signing in go on (a run that dies frees the server after two minutes; 2.360.2).
   A new key is made, every encrypted value and file of the organisation is encrypted again with it, then the old key
   is removed and a new recovery key is written (to stdout, or with `--recovery-out` into a new file with mode 0600: move
   it offline and delete the file). On this server all earlier recovery keys, including the earlier format, stop
@@ -943,7 +963,8 @@ organisation.
   address; never the status link, a new server would send new links) and the members with their roles (name, user
   name, e-mail address). Since 2.362 also the organisation's channels of the team chat (the open ones and the ones the
   exporting admin is a member of, like in the app) with their members, the files and voice messages of the team chat
-  (`files/tchat/`), the closed months of the logbook, the tasks and events made from filed e-mails, section templates,
+  (`files/tchat/`), knowledge pages, tables, documents, absences, filed e-mails, the newsletter, video sign-offs, letters,
+  the closed months of the logbook, the tasks and events made from filed e-mails, section templates,
   contacts on tasks, the newsletter's suppression list and consent log (address hashes only) and the booking pages the
   office bills plus the exporting admin's own one with their kinds of appointment and bookings (in the archive; the
   import does not take them over, a booking page belongs to one person). An open channel stays open in the target
@@ -954,7 +975,7 @@ organisation.
   the app (2.190): only the mails (and their files) the exporting admin can open there, not other members' inboxes or
   mails of projects the admin is not part of. Projects of the organisation follow the same rule (2.223.3): only the ones
   the admin sees in the app (shared with at least one more person or open to the organisation, the admin's own and the
-  ones shared with them); a member exports a project shared with nobody with the own account export. Deleted items (the
+  ones shared with them); a member exports a project shared with nobody with the own account export (2.362.3: the other admins get a News with the number of projects, once a day; the list history names them). Deleted items (the
   trash, undone entries) are not in it, nor in the retention export; removed logbook drives stay (the change log).
   Since 2.362 the manifest also names what stays out on purpose: group conversations of the team chat (like direct
   messages they belong to their people), closed channels the admin is not a member of, notification channels,
@@ -994,7 +1015,7 @@ organisation.
   report). Not moved: public links and upload links (new ones are made where needed), open agent proposals, the learnt
   models and word indexes (rebuilt on the target), knowledge pages of a space locked in the browser (export them as
   Markdown from the unlocked space), scheduling polls and bookmarks (personal).
-- **A personal office** (2.139.1): its owner exports it the same way (*Office > Settings > Export the office*: the office and
+- **A personal office** (2.139.1): its owner exports it the same way (*Settings > Company & office > Data > Export the office*: the office and
   the owner's private clients, nothing else); the import of such a file into the private space goes into the personal
   office of the importing person.
 
@@ -1021,6 +1042,13 @@ and 20). Agents and API tokens cannot do this; it is a person's step in the app.
    hash in the file, otherwise nobody is invited; everybody else invites them later as usual. Assignments to people that
    are not taken over stay empty; comments of such people keep their name.
 
+**Importing twice (2.362.3):** the preview says when an export of the same account was imported already (the import's
+number, undo until when), also for a newer export of that account. Importing again needs a tick and takes over only what
+the chosen place does not have yet, row by row: a newer export adds its new tasks to the imported project. Rows deleted or
+in the trash since count as gone and come back; a project that went to another person or organisation is taken over anew;
+another target is a separate copy. An organisation export counts by its file. The import keeps this record with its last
+20 imports.
+
 **What moves:** your projects (sections, fields, tags, status updates, links, milestones, project files, project notes),
 their tasks with subtasks, dependencies, field values and your tags, comments, attachments, your encrypted task notes
 (2.362), time entries, habits, filters, templates,
@@ -1042,8 +1070,13 @@ organisation data that is not yours (use the organisation export for a whole org
 **2.148.1 (Art. 15):** the file also holds the list of your private files (name, type, size, dates; not their content),
 your private knowledge pages, your chats with agents, what you wrote in direct messages, your absences and timesheets
 (`private_files`, `wiki_pages`, `agent_chats`, `direct_messages`, `absences`, `timesheets`; the import does not take them
-over yet). `not_included` in the manifest names what is still missing (content of private files, other people's chat
-messages, booking pages, polls and forms, holiday allowances, the organisation's office).
+over yet). `not_included` in the manifest names what is still missing (older versions of private files, other people's chat
+messages, the organisation's office).
+
+**2.360.2:** also the current content of your private files (`files/private_files/`), your booking page with its
+bookings (`appt_pages`, `appt_types`, `appt_bookings`, without network addresses), your private polls (`polls`,
+`poll_options`, `poll_votes`, without voters' e-mail addresses), the forms of your projects with their entries (`forms`,
+`form_entries`) and your holiday allowances (`leave_quota`). The import does not take them over: the preview names them.
 
 **The file** (`kalmido-account-<date>.zip`, readable without Kalmido):
 
@@ -1066,7 +1099,7 @@ Other people's addresses never leave the server in plain text: `email_hash` is t
 you may see on the new server. Your own address in `manifest.json` stays readable. Files of 2.73 test builds with a plain
 `email` field are still read.
 
-**A whole organisation** (2.73, stage 1): upload its organisation export (see above) the same way and enter the organisation's
+**A whole organisation**: upload its organisation export (see above) the same way and enter the organisation's
 recovery key of the old server. The archive is opened on the server (a wrong key is refused, ten attempts per upload),
 checked and shown as a preview; it goes into an organisation you administer or (2.96) into your private space. Into the
 private space nobody joins an organisation: ticked people only get the projects shared, the organisation's own address
@@ -1076,10 +1109,13 @@ new organisation's key), the organisation's calendars with events and its addres
 projects belong to you as the importing admin. Members are matched by e-mail address. Since 2.278 a ticked person
 with an account here does not join directly: they get an invitation to the organisation (with the role of the file,
 admin or member, which you confirm in the preview) and join only when they accept it. Until then their content stays
-with you as the importing admin (names as text) and no project is shared with them; a ticked person who is already a
-member gets their projects shared again. Not yet taken over (the preview names them with their counts): the
-office, the file store, team chat, knowledge pages, documents, newsletter, clients, absences and bookings, forms,
-playbooks, project notes and notepads, time entries, customer reports and browser-encrypted notes.
+with you as the importing admin (names as text) and no project is shared with them. Since 2.363 the projects ticked for
+that person are noted on the invitation and shared with their role when the person accepts (a project deleted or handed
+on meanwhile is left out); declining, withdrawing the invitation or undoing the import drops the note, and tasks keep
+their creator and assignee. A ticked person who is already a member gets their projects shared again. What moves with
+it is listed under [Organisation export](#organisation-export) (*Import*); the preview names everything with its counts.
+Memberships of people groups do not move, and mails and chat messages of people who are not ticked come over without
+their account (their name as text).
 
 2.278: a member without an address in the file (or not found by it) can be matched by the exact user name of an account
 you can see on this server (no search; an unknown and a hidden name give the same answer). Time entries billed on an
@@ -1118,6 +1154,9 @@ A short checklist for a new server:
   database errors without the values of the row. `KALMIDO_LOG_FULL_IP=1` keeps the addresses in full (for fail2ban,
   below). The shipped `docker-compose.yml` rotates every container log (`driver: local`, 3 files of 10 MB), so old lines
   are gone after a while; keep that (or set your own limit) when you change the logging driver.
+- **Two kinds of address limits.** Sign-in with a known name from a known address is only slowed down when an address has
+  many failures (2.282). Every other way in keeps the hard limit per address: the OIDC start, setup codes, invitations, the
+  password reset, the agent setup and API tokens have no "known name" to tell a person from a flood.
 - **fail2ban for failed logins.** Kalmido logs `login failed for user#<hash> from <address>` and has its own lockout.
   2.148.1: the log names a short hash of the typed name (never the name: it may be a password typed into the wrong field).
   fail2ban needs the full address: set `KALMIDO_LOG_FULL_IP=1` in `.env` (2.239: shortened by default). To block repeat
@@ -1766,8 +1805,13 @@ Notes:
 ## Moving to a new server
 
 1. **Before:** lower the DNS TTL of the name a day ahead; make a backup (*Back up now*).
-2. **Copy:** the data folder (attachments, backups) and the database (`pg_dump`, see above, or the database folder
-   with PostgreSQL stopped), the `.env` and above all **`KALMIDO_SECRET_KEY`** (or the file `secret/kalmido.key`).
+2. **Copy:** the data folder (attachments, office files, backups; the files keep owner uid 1000) and the database
+   (`pg_dump`, see above, or the database folder with PostgreSQL stopped), the `.env` and above all
+   **`KALMIDO_SECRET_KEY`** (or the file `secret/kalmido.key`).
+   Also what lives outside the data folder or only in the environment: the files behind `KALMIDO_AI_KEY_FILE` and
+   `KALMIDO_OPERATOR_TOKEN_FILE`, `KALMIDO_BACKUP_PASSPHRASE` when it is set that way, and any folder you moved with
+   `TASKS_ATTACHMENTS`, `TASKS_OFFICE_DIR`, `TASKS_TEXT_CACHE` or `KALMIDO_PAPERLESS_ZIP_DIR`.
+   `KALMIDO_FOLDERWATCH_DIR` comes with the image: nothing to copy.
    **Without the old server key everything encrypted is lost for good:** it wraps the organisation and account keys, and
    with them every sealed file and field - attachments, private files, organisation files, office documents (PDF / XML)
    and office fields, the wiki history - plus the stored secrets (repository tokens, sign-on client secret). Account keys
@@ -1780,7 +1824,18 @@ Notes:
    `curl --resolve tasks.example.com:443:<new address> https://tasks.example.com/api/health`.
 5. **Tell people what to redo,** because it is bound to the old server or name: passkeys (if the name changed), the
    installed app and push permissions (reinstall), calendar and contact accounts (CalDAV / CardDAV), shortcut URLs for
-   sharing, and calendar subscription (ICS) links.
+   sharing, and calendar subscription (ICS) links. With a new name also: the redirect address at your single sign-on
+   provider, incoming webhooks and Git webhooks, mail-in addresses at other services, the ntfy inbox address, and public,
+   form and portal links people have saved. With a new off-site target: its SFTP host fingerprint.
+
+<!-- backup-folders -->
+**What a backup archive holds:** `kalmido.dump`, `manifest.json`, `office/<organisation>/` and below `attachments/`:
+`<task>/` for task attachments; the folders `avatars/`, `listicons/`, `docthumbs/`, `listheads/` and `bookmarks/` with
+their files directly inside; the folders `files/`, `lists/`, `budget/`, `wiki/`, `tchat/` and `sheets/` with one folder per
+entry; and `chat/<agent>-<person>/`. Without the app: unpack `attachments/` to `./data/attachments` and `office/` to
+`./data/office`, restore the dump with `PGOPTIONS="-c app.role=system"` as in the backup section above. Restoring keeps
+the backup settings (`bk_` keys) of the running server; every other setting comes from the backup.
+<!-- /backup-folders -->
 
 ## Trash period of tasks
 

@@ -299,6 +299,9 @@ APP_ONLY = [
      "kinds through the table tools (a file cell read only: its name and id)",
      ("=GET /api/sheets/{}/people", "=POST /api/sheets/{}/files", "=GET /api/sheets/{}/files/{}", "=GET /api/sheets/{}/files/{}/{}",
       "=POST /api/sheets/{}/fixed", "=GET /api/sheets/{}/history", "=GET /api/sheets/{}/cells/{}/history")),
+    ("2.429.0 (#3580): the file store's collections \"From <area>\" are a view of the web app (files of knowledge pages, tables, "
+     "projects in one read-only list); agents read the same files through the areas' own tools (wiki, sheets, project files)",
+     ("=GET /api/files/collections/{}",)),
     ("2.98.0 B (#1954): the evaluation of a questionnaire (all submissions with the senders' names, addresses and answers, "
      "their CSV) stays with the people who manage the form in the app; an agent gets each submission as its task (task_added, "
      "the answers in the description) and sets the questions through the form's fields",
@@ -500,6 +503,8 @@ APP_ONLY = [
     # 2.73.0 B (#1473): moving an account between servers: export and import of a person's own data, people only (agents 403)
     ("2.73.0 B (#1473): the account export / import (moving to an own server and back): a person's own data, people only",
      ("* /api/account/export", "* /api/account/import")),
+    ("2.360.2 D (#2561): a person's own step in the settings: approval records of deleted videos hold customers' data (agents: 403)",
+     ("* /api/videos/signoffs/orphaned",)),
     ("2.146.0 D (#2468): the retention export before deleting an account / organisation: a person's own records or an "
      "organisation's admins, people only (an API token 403)", ("* /api/retention",)),
     ("2.42.0 (#828, #909): end-to-end encryption happens in a person's browser (keys, encrypted note / files, the switch of an encrypted DM); "
@@ -543,7 +548,7 @@ APP_ONLY = [
      "(the same visibility)", ("=GET /api/fields/task-refs",)),
     ("2.40.0 (#1344 / #1361): the own order of My tasks and the favourite star are personal app settings of a person; "
      "agents never set them; 2.46.1: the favourite suggestion asks the person", ("PUT /api/tasks/mine-order", "* /api/lists/{}/favorite",
-                                                                                   "POST /api/favorites/suggestion")),
+                                                                                   "POST /api/favorites/suggestion", "GET /api/favorites/targets")),
     ("2.41.0 (#1365 / #1205): \"Show in My tasks\" per list and the person's Waiting-on suggestions are personal app "
      "settings of a person; agents never set them (an agent writes the waiting text itself with PUT /tasks/{id}/waiting)",
      ("PUT /api/lists/{}/in-mine", "* /api/me/wait-suggestions")),

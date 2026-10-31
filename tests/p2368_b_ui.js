@@ -74,7 +74,10 @@ const sets = async () => (await call('GET', '/api/state')).settings;
   // ================= numeric dates in the chosen order
   const nums = {};
   for (const o of ['', 'dmy', 'mdy', 'ymd']) { ev(`S.settings.date_order = '${o}'`); nums[o] = [ev(`fmtDate('2026-10-03')`), ev(`fmtDateNum(new Date(2026, 9, 3), false)`), ev(`mdFirst()`)]; }
-  check(nums[''][0] === '03/10/2026', 'automatic (en-GB): 03/10/2026 ' + nums[''][0]);
+  // 2.450.0 (#3770): automatic = the browser's region, like the times and typed dates (this browser: en-US), no 03/10 = 3 Oct next to a typed 03/10 = 10 Mar
+  check(nums[''][0] === '10/03/2026' && nums[''][2] === true, 'automatic (en-US browser): 10/03/2026 ' + JSON.stringify(nums['']));
+  ev(`S.settings.date_order = ''; Object.defineProperty(navigator, 'language', {value: 'en-GB', configurable: true})`);
+  check(ev(`fmtDate('2026-10-03')`) === '03/10/2026' && ev(`mdFirst()`) === false, 'automatic (en-GB browser): 03/10/2026 ' + ev(`fmtDate('2026-10-03')`));
   check(nums.dmy[0] === '03.10.2026' && nums.dmy[1] === '03.10.' && nums.dmy[2] === false, 'dmy: 03.10.2026 / 03.10. ' + JSON.stringify(nums.dmy));
   check(nums.mdy[0] === '10/03/2026' && nums.mdy[1] === '10/03' && nums.mdy[2] === true, 'mdy: 10/03/2026, typed dates month first ' + JSON.stringify(nums.mdy));
   check(nums.ymd[0] === '2026-10-03' && nums.ymd[1] === '10-03', 'ymd: 2026-10-03 ' + JSON.stringify(nums.ymd));

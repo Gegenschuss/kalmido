@@ -887,6 +887,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         "parent_id": nul("integer", description="2.59.0 (#1827): the leading job of a part job (set by a chat answer with job_parent)")}}
     agent = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "status": {"type": "string", "enum": list(AGENT_STATUSES)},
                                               "status_text": {"type": "string"}, "status_task": nul("integer"),
+                                              "status_key": {"type": "string", "description": "2.450.0 (#3769): the key of a known status text, for the app to translate; \"\" = none"},
+                                              "status_key_at": {"type": "string", "description": "2.450.0 (#3769): the time in that text (ISO), \"\" = none"},
                                               "job_tasks": {"type": "array", "items": {"type": "integer"}}, "running": {"type": "integer"}, "waiting": {"type": "integer"},
                                               "enabled": {"type": "boolean"}}}
     msg = {"type": "object", "properties": {"id": {"type": "integer"}, "user_id": {"type": "integer"}, "from": {"type": "string", "enum": ["user", "agent"]},
@@ -935,7 +937,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         online=nul("boolean", description="false: no event poll for 5 minutes; null: unknown (webhook, never polled)"),
         last_poll_at=nul("string"), typing={"type": "number", "description": "Seconds left of its typing signal to you in the chat"},
         host={"type": "object", "description": "2.32.0 (#1079): what the host last reported (PUT /agent/status): model, permission_mode, "
-                                              "host_permission_mode, at"},
+                                              "host_permission_mode, permission_fixed, at"},
         quota=nul("object", description="2.33.0 (#1045): its plan usage as last reported (PUT /agent/quota; null = never): windows "
                   "[{key, label, percent, resets_at, reset_passed}], main (index), limit, at, stale (older than 24 h), level ok | warn | over, "
                   "percent (the main window), paused_until (the main window's reset when over the limit)"),
@@ -1000,6 +1002,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         "/agent": {"get": op("The agent itself: status, jobs, event cursor (agent tokens only)", AG, ok(ref("Agent")) | errs("403"))},
         "/agent/status": {"put": op("Report the agent's status", AG, ok(ref("Agent")) | errs("400", "403"), scope=W, body={
             "type": "object", "required": ["status"], "properties": {"status": {"type": "string", "enum": list(AGENT_STATUSES)}, "text": {"type": "string"},
+                                                                  "text_key": {"type": "string", "maxLength": 40, "description": "2.450.0 (#3769): the key of a known status text; text stays the fallback"},
+                                                                  "text_at": {"type": "string", "description": "2.450.0 (#3769): the time in that text (ISO)"},
                                                                   "task_id": nul("integer"),
                                                                   # 2.32.0 (#1079)
                                                                   "model": {"type": "string", "maxLength": 80, "description": "2.32.0: the model the host really runs, "
@@ -1007,7 +1011,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                                   "permission_mode": {"type": "string", "enum": ["", "ask", "auto"], "description":
                                                                                       "2.32.0: the permission mode the current run really uses"},
                                                                   "host_permission_mode": {"type": "string", "enum": ["", "ask", "auto"], "description":
-                                                                                           "2.32.0: the host's own default (shown as \"Host default (Auto)\")"}}})},
+                                                                                           "2.32.0: the host's own default (shown as \"Host default (Auto)\")"},
+                                                                  "permission_fixed": {"type": "boolean", "description":
+                                                                                       "2.437.0: the computer set the mode; the switch in the chat header is locked"}}})},
         # 2.33.0 (#1045): the usage ring
         "/agent/quota": {
             "put": op("2.33.0 (#1045): report your plan usage (e.g. the 5-hour and weekly windows of a Claude plan); people who chat with "

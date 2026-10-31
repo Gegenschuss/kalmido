@@ -26,7 +26,7 @@ function pp_html() {
   if (PPS.err) return `<div class="empty">${esc(PPS.err)}</div>`;
   if (!PPS.data) { setTimeout(() => { if (!PPS.data) pp_load(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const d = PPS.data, s = d.summary, items = d.items || [];
-  const top = `<div class="ofcbar"><span class="spacer"></span>${typeof leadBar === 'function' ? leadBar() : ''}<button class="btn sm pri" data-pp="new">${ic('plus', 's')}<span>${tr('New inquiry')}</span></button></div>
+  const top = `<div class="ofcbar">${lst_sortBtn('pipeline', LST_MANUAL)}<span class="spacer"></span>${typeof leadBar === 'function' ? leadBar() : ''}<button class="btn sm pri" data-pp="new">${ic('plus', 's')}<span>${tr('New inquiry')}</span></button></div>
     <div class="pptiles"><div class="pptile"><small class="muted">${tr('Open|pipeline')}</small><b>${ofcMoney(s.open)}</b><small class="muted">${esc(trn('{0} deal', '{0} deals', s.count_open))}</small></div>
     <div class="pptile"><small class="muted">${tr('Weighted')}</small><b>${ofcMoney(s.weighted)}</b><small class="muted">${tr('value × probability')}</small></div></div>
     <section class="pipfc" aria-label="${esc(tr('Expected to come in'))}"><h3 class="ofcgrp">${tr('Expected to come in')}</h3><ol class="ppfcl" role="list">${s.forecast.map(f => `<li class="${f.next ? 'next' : ''}"><small>${esc(pp_month(f.month))}${f.next ? ` <span class="rotag">${tr('next month')}</span>` : ''}</small><b>${ofcMoney(f.weighted)}</b></li>`).join('')}</ol>
@@ -37,6 +37,7 @@ function pp_html() {
     const lead = k === 'lead' && typeof leadCard === 'function';  // 2.94.0 A (#1930): leads by follow-up day, no sum
     let its = items.filter(x => x.stage === k);
     if (lead) its = leadSort(its);
+    its = lst_sorted(its, 'pipeline', x => ({date: lead ? x.follow_up : x.expected_date, client: lead ? x.company || x.contact : cdn_name(x.client_id, x.client_name) || x.contact, amount: lead ? null : x.value, name: x.title}), LST_MANUAL);  // 2.451.0 (#3834)
     const sum = its.reduce((a, x) => a + +x.value, 0);
     return `<section class="pipcol ${PPS.stage === k ? 'on' : ''}" data-pipcol="${k}" aria-label="${esc(tr(n))}"><header><b>${tr(n)}</b><span class="muted">${its.length}</span><span class="spacer"></span>${lead ? '' : `<span class="rksum muted" title="${esc(tr('Values net, in the office currency.'))}">${ofcMoney(sum)}</span>`}</header>
       <ul class="ppcards" role="list">${its.map(lead ? leadCard : pp_card).join('') || `<li class="muted ppnone">${lead ? tr('No leads yet. Note people who might become clients, with the next step and a follow-up day.') + oim_link('leads', true, true) : tr('Nothing here')}</li>`}</ul>${lead && its.length ? oim_link('leads', false, true) : ''}</section>`;  // 2.122.3 A (#2335): + the import link
@@ -47,7 +48,7 @@ function pp_html() {
 }
 function pp_card(x) {
   const who = cdn_name(x.client_id, x.client_name) || x.contact;  // 2.97.0 B (#1951)
-  const offer = x.offer_id ? `<span class="rotag ${x.offer_status === 'declined' ? 'ppdecl' : `st-${esc(x.offer_status)}`}">${esc(tr('Quotation {0}', x.offer_number || ''))}${x.offer_status === 'declined' ? ' · ' + tr('declined') : ''}</span>` : '';
+  const offer = x.offer_id ? `<span class="rotag ${x.offer_status === 'declined' ? 'ppdecl' : `st-${esc(x.offer_status)}`}">${esc(tr('Quotation {0}', x.offer_number || ''))}${x.offer_status === 'declined' ? ' · ' + tr('declined') : x.offer_status === 'superseded' ? ' · ' + tr('Superseded') : ''}</span>` : '';
   return `<li><div role="button" tabindex="0" class="ppcard${x.offer_status === 'declined' && x.stage !== 'lost' ? ' warn' : ''}" draggable="true" data-pp="open" data-id="${x.id}">
     <span class="pptitle">${esc(x.title)}</span>${who ? `<small class="muted">${esc(who)}</small>` : ''}
     <span class="ppmeta"><b class="rksum">${ofcMoney(x.value)}</b><span class="muted" title="${esc(tr('Probability'))}">${x.probability} %</span>${x.expected_date ? `<span class="muted" title="${esc(tr('Expected date'))}">${esc(fmtDateLoc(x.expected_date))}</span>` : ''}</span>

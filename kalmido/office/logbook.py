@@ -29,7 +29,7 @@ from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, iso, local_now, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
-from .calc import dec, dstr, money
+from .calc import calc_lang, dec, dstr, fmt_point, money
 from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_lock, office_settings_save
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 from .olock import olk_active, olk_until
@@ -869,7 +869,7 @@ def lb_csv():
     ofx_log(c, oid, "export", target="logbook", detail={"what": "logbook.csv", "year": y})
     c.commit()
     return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": f'attachment; filename="logbook-{y}.csv"', "Cache-Control": "no-store"})
+                    headers={"Content-Disposition": f'attachment; filename="{tr("logbook|file name")}-{y}.csv"', "Cache-Control": "no-store"})
 
 
 def lb_pdf_bytes(c, oid, y, vs, clients, drives, log, rep, lang):
@@ -880,7 +880,7 @@ def lb_pdf_bytes(c, oid, y, vs, clients, drives, log, rep, lang):
     ppr = pdf_paper_ns(s.get("paper"))  # 2.357.0 A (#3156): the office's paper size
     A4_H, A4_W, _Page = ppr.A4_H, ppr.A4_W, ppr._Page
     company = ofx_name1(ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name"))  # 2.99.0 D (#2188): one line
-    lg = "de" if lang == "de" else "en"
+    lg = calc_lang(lang)  # 2.449.0 (#3766): every app language (was de, else en)
     cur = hc_home(s)  # 2.189.0 B (#2475): the home currency
     x0, x1 = 40, A4_W - 40
     pages, st = [], {"pg": None, "y": 0}
@@ -895,7 +895,7 @@ def lb_pdf_bytes(c, oid, y, vs, clients, drives, log, rep, lang):
             page()
 
     def km(v):
-        return "" if v in (None, "") else (_de(v) if lg == "de" else str(v))
+        return "" if v in (None, "") else fmt_point(v, lg)
 
     page()
     pg = lambda: st["pg"]  # noqa: E731
@@ -986,4 +986,4 @@ def lb_pdf():
     ofx_log(c, oid, "export", target="logbook", detail={"what": "logbook.pdf", "year": y})
     c.commit()
     return Response(data, mimetype="application/pdf",
-                    headers={"Content-Disposition": f'attachment; filename="logbook-{y}.pdf"', "Cache-Control": "no-store"})
+                    headers={"Content-Disposition": f'attachment; filename="{tr("logbook|file name")}-{y}.pdf"', "Cache-Control": "no-store"})

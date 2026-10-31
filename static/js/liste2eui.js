@@ -50,7 +50,7 @@ async function le2u_unlock(lid) {
   try { ok = await le2eUnlock(lid); } catch (x) { if (x?.message) toast(x.message); return; }
   // 2.64.1 review 2 (M2): texts that do not open with the unwrapped key (a swapped list key) or no key at all: said, never silent
   const n = typeof le2eUnreadable === 'function' ? le2eUnreadable(lid) : 0;
-  if (n) toast(tr('{0} texts of this project cannot be opened with your key. Compare the safety numbers with the members.', n));
+  if (n) toast(trn('{0} text of this project cannot be opened with your key. Compare the safety numbers with the members.', '{0} texts of this project cannot be opened with your key. Compare the safety numbers with the members.', n));
   else if (!ok && !le2u_waiting(lid) && typeof e2eUnlocked === 'function' && e2eUnlocked()) toast(tr('The project key could not be opened. Compare the safety numbers with the members.'));
 }
 document.addEventListener('click', e => {
@@ -169,7 +169,7 @@ function le2u_rotHint(j, lid) {
   return `<div class="shint lhint keep le2urot" data-lid="${lid}">${ic('alert', 's')} <span>${esc(tr('A member has left this project. The key is being changed; until everything is encrypted again, former members can still decrypt older contents with their old key.'))}</span>`
     + (run ? `<span class="le2urotp">${le2u_pbar(r)}</span>` : '')
     // 2.64.2 review (M3): texts no key here opens stop the run -- said here, the owner / an admin can take them over as empty
-    + (!run && le2u_unread(lid) ? `<span class="e2ewarn" role="alert">${esc(tr('{0} texts of this project cannot be decrypted with the keys you hold.', le2u_unread(lid)))}</span>` : '')
+    + (!run && le2u_unread(lid) ? `<span class="e2ewarn" role="alert">${esc(trn('{0} text of this project cannot be decrypted with the keys you hold.', '{0} texts of this project cannot be decrypted with the keys you hold.', le2u_unread(lid)))}</span>` : '')
     + (btn ? `<span class="row">${btn}</span>` : '') + '</div>';
 }
 document.addEventListener('le2e:progress', e => {

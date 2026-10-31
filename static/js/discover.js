@@ -41,7 +41,7 @@ function dsc_html() {
   const chk = DSC.check;
   const checkHtml = !chk ? '' : `<div class="dsc-check" role="status">${chk.people.length ? chk.people.map(p => dsc_personRow(p, dsc_stateHtml(p))).join('')
     : `<div class="muted mhint">${chk.books ? tr('None of your contacts can be found yet.') : tr('You have no contacts with e-mail addresses yet.')}</div>`}
-    ${chk.skipped ? `<div class="shint">${tr('{0} addresses were not checked today (daily limit).', chk.skipped)}</div>` : ''}</div>`;
+    ${chk.skipped ? `<div class="shint">${trn('{0} address was not checked today (daily limit).', '{0} addresses were not checked today (daily limit).', chk.skipped)}</div>` : ''}</div>`;
   const st = !pr.on ? '' : pr.confirmed ? tr('Findable by {0}', pr.email) : pr.pending ? tr('Waiting for your confirmation: open the link in the mail to {0}.', pr.email)
     : tr('Your address changed or was not confirmed: switch off and on again to confirm it.');
   return `<div class="lhdr"><h3>${ic('users', 's')} ${tr('Find people')}</h3><span class="spacer"></span><button class="iconbtn" data-dsc="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>

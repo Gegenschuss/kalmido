@@ -17,6 +17,7 @@ EXEMPT = {
     'tcx_settings': 'the settings of ONE chat room (members, name), opened from the room',
     'ofcSaveSettings': 'saves the office settings form, draws nothing',
     'pl_openSettings': 'opens Settings > Integrations (the main settings dialog, searched anyway)',
+    'ltSigSettings': 'opens the letter signature dialog from Settings > Account (its button is searched there)',
 }
 NAME = r'[A-Za-z_$][\w$]*?(?:_settings|Settings|_settingsHtml|SettingsHtml|_sDraw)'
 DEF = re.compile(r'(?:function\s+(' + NAME + r')\s*\(|(?:const|let)\s+(' + NAME + r')\s*=\s*(?:async\s*)?\()')

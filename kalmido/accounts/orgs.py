@@ -15,6 +15,7 @@ from ..core.access import Denied, acx_drop, acx_lists_sql, plists, pvis
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.orgcrypt import oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from .navmenus import nav_clean_org, nav_org_off  # 2.418.0 (#3560)
 from .orgretain import Nn_, odl_former  # 2.186.0 A (#2599); 2.414.0 (#3502): Nn_ marks the plural pair below
 
 
@@ -84,7 +85,8 @@ def instance_mode(c=None):
 
 def main_org(c):
     with system_ctx(c):  # 2.37.0 (#1150): instance structure (the first organisation's id)
-        r = c.execute("SELECT id FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL ORDER BY id LIMIT 1").fetchone()  # 2.152.0 A
+        # 2.422.0 (#2937 review): a company a person created herself is never the server's organisation
+        r = c.execute("SELECT id FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL AND self_made=0 ORDER BY id LIMIT 1").fetchone()  # 2.152.0 A
     return r[0] if r else None
 
 
@@ -262,7 +264,7 @@ def _visible_people(c, uid):
             full = [o for o in user_orgs_full(c, uid) if o in orgs]
             q = ",".join("?" * len(orgs))
             ids = {r[0] for r in c.execute(f"SELECT user_id FROM org_members WHERE org_id IN ({q}) AND (role='admin' OR org_id IN ({','.join(str(int(o)) for o in full) or 'NULL'}))", orgs)}
-        elif not c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL LIMIT 1").fetchone():  # 2.152.0 A
+        elif not c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL AND self_made=0 LIMIT 1").fetchone():  # 2.152.0 A; 2.422.0 (#2937 review): like om_has_orgs
             return None  # 2.46.0 (#1592): an instance without any organisation (a household): everyone, as before
         return ids | _connections(c, uid) | {uid}
     if u[0]:
@@ -315,8 +317,9 @@ def workspaces_for(c, uid):
     # 2.53.0 B (#1474): + color (the organisation's colour, '' = the default tone of its id)
     # 2.409.0 (#3490): + areas_off (the areas its admins switched off for the members, accounts/wsareas.py)
     return [{"id": r["id"], "name": r["name"], **org_icon_fields(r), "color": r["color"] or "", "role": org_role(c, uid, r["id"]) or "member",
-             "areas_off": [x for x in (r["areas_off"] or "").split(",") if x]}
-            for r in c.execute(f"SELECT id, name, icon, color, areas_off FROM orgs WHERE id IN ({q}) ORDER BY id", oids)]
+             "areas_off": [x for x in (r["areas_off"] or "").split(",") if x],
+             "nav_off": nav_org_off(r)}  # 2.418.0 (#3560): menu points its admins switched off
+            for r in c.execute(f"SELECT id, name, icon, color, areas_off, nav_off FROM orgs WHERE id IN ({q}) ORDER BY id", oids)]
 
 
 def org_peers(c, uid):
@@ -825,6 +828,45 @@ def org_create():
         return jsonify(org_public(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone())), 201
 
 
+# 2.422.0 (#2937): a self-employed person creates a company of her own (work apart from her private
+# things) without the server's admin: mode workspaces, a person (no agent, no kid account), she becomes its admin. At most
+# ORG_SELF_MAX such companies per person. Marked self_made: only a server admin sets its e-mail domains (nobody joins it by
+# the domain of their address), and it does not count as the server's organisation for open registration (signup.py), its
+# main organisation (main_org) or the household rule "everyone sees everyone" (_visible_people). self_made holds the id of
+# the person who created it (0 = the server's admin), so leaving one never frees a place.
+ORG_SELF_MAX = 3
+
+
+def org_self_made_n(c, uid):
+    """The companies uid created herself (2.422.0, #2937; review: also the ones she left or handed over)."""
+    return c.execute("SELECT COUNT(*) FROM orgs WHERE self_made=? AND personal_of IS NULL AND retired_at IS NULL", (uid,)).fetchone()[0]
+
+
+@app.post("/api/orgs")
+def org_self_create():
+    """2.422.0 (#2937): {name, icon?} -- the signed-in person creates a company and becomes its admin (201, like
+    POST /api/admin/orgs). 403 for agents and kid accounts, 403 outside the mode workspaces, 409 for a taken name or when
+    she already has ORG_SELF_MAX companies of her own."""
+    if (g.user["kind"] or "user") == "agent" or g.user["kid"]:
+        raise Denied(403, tr("Only a person can create a company"))
+    c, b, uid = db(), body(), me()
+    with system_ctx(c):  # creating an organisation (instance structure) with the caller as its only member
+        if instance_mode(c) != "workspaces":
+            raise Denied(403, tr("Only an admin of this server can create an organisation"))
+        name = _clean_name(b.get("name"))
+        if c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?) AND personal_of IS NULL", (name,)).fetchone():
+            return err(tr("An organisation with this name exists"), 409)
+        if org_self_made_n(c, uid) >= ORG_SELF_MAX:
+            return err(tr("You already have {0} companies of your own", ORG_SELF_MAX), 409)
+        oid = insert_id(c, "INSERT INTO orgs(name,icon,domains,created_at,self_made) VALUES(?,?,?,?,?)",
+                        (name, _clean_icon(b.get("icon")), "", iso(now_utc()), uid))
+        org_member_add(c, oid, uid, "admin", keep_office=False)
+        bump(c)
+        c.commit()
+        print("organisation", oid, "created by its own admin", login_log_who(g.user), flush=True)
+        return jsonify(org_public(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone())), 201
+
+
 @app.patch("/api/admin/orgs/<int:oid>")
 def org_update(oid):
     """{name?, icon?, members?: [user ids] (replaces them), domains?} -- only on an instance that kept several organisations
@@ -883,6 +925,9 @@ def _org_patch(c, oid, b):
             c.execute("UPDATE orgs SET icon=? WHERE id=?", (v, oid))
             org_icon_drop_file(oid, old)  # an emoji replaces the own picture
     if "domains" in b:
+        # 2.422.0 (#2937): a company a person created herself takes e-mail domains only from an admin of the server
+        if not g.user["is_admin"] and (c.execute("SELECT self_made FROM orgs WHERE id=?", (oid,)).fetchone() or [0])[0]:
+            raise Denied(403, tr("Only an admin of this server sets the e-mail domains of this company"))
         c.execute("UPDATE orgs SET domains=? WHERE id=?", (_clean_domains(b["domains"]), oid))
 
 
@@ -1064,6 +1109,7 @@ def org_mine_dict(c, r, uid):
             "chn_content": bool(r["chn_content"]),  # 2.240.0 (#2867): personal channels get the content of the organisation's lists
             "member_agents": bool(r["member_agents"]),  # 2.361.4 (#2928): members may keep their own agents in it
             "areas_off": [x for x in (r["areas_off"] or "").split(",") if x],  # 2.409.0 (#3490): areas its admins switched off
+            "nav_off": nav_org_off(r),  # 2.418.0 (#3560): menu points its admins switched off for the members
             "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "guest",
                          "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
@@ -1122,6 +1168,8 @@ def org_mine_update(oid):
     if "areas_off" in b:  # 2.409.0 (#3490): the areas switched off for every member (admins only); nothing is deleted
         from .wsareas import wsa_clean_org
         c.execute("UPDATE orgs SET areas_off=? WHERE id=?", (wsa_clean_org(b["areas_off"]), oid))
+    if "nav_off" in b:  # 2.418.0 (#3560): menu points switched off for every member (admins only); only the menus change
+        c.execute("UPDATE orgs SET nav_off=? WHERE id=?", (nav_clean_org(b["nav_off"]), oid))
     _org_patch(c, oid, b)
     bump(c)
     c.commit()

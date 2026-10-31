@@ -32,6 +32,7 @@ KINDS = {
     # ---- covered by the matrix (the suites carry "tenant-matrix: <kind>")
     "aggregate": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: state, search, trash, tags, roadmap, day plan, occurrences"),
     "task": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: a task by id (read, change, complete, comment, subtasks, dependencies)"),
+    "favtarget": ("matrix", "p2441_favs_api_test.py, p2441_favs_ui.js: the favourites of a person resolved to objects of any area (2.441.0, #3592)"),
     "comment": ("matrix", "p2300_tenant_test.py: a comment by id (change, delete, react)"),
     "attachment": ("matrix", "p2300_tenant_test.py: a task's attachment / a list's file by id"),
     "chatfile": ("matrix", "p2300_tenant_test.py: a file of an agent chat by id"),
@@ -44,7 +45,8 @@ KINDS = {
     "agent": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: agents, their chat, events and jobs"),
     "people": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: the user list, user changes, invitations / sign-in links by id"),
     "org": ("matrix", "p2280_api_test.py: organisations, their members and admins; p2115_b_api_test.py: invitations by e-mail (2.115.0); "
-                   "p2146_d_api_test.py: the retention export of another organisation 404 (2.146.0)"),
+                   "p2146_d_api_test.py: the retention export of another organisation 404 (2.146.0); "
+                   "p2422_orgself_test.py: a company of one's own - its admin sets no e-mail domains (2.422.0)"),
     "calendar": ("matrix", "p2300_tenant_test.py: calendars by id, sharing (B2), workspace (B3); p294_b_api_test.py (the booking page: types / bookings of another person 404, the public pages); "
                  "p2111_b_api_test.py (invitation marks and subscription links of another person's calendar 404, a link ends with the sharing)"),
     "event": ("matrix", "p2300_tenant_test.py: events by id, ranges, invitations"),
@@ -514,9 +516,10 @@ ROUTES = {
     "DELETE /api/office/letterhead": "office", "POST /api/office/letterhead/restore": "office", "GET /api/office/letterhead/preview": "office",
     # 2.113.2 (#2253): terms and conditions as PDF per language (p2113c_a_api_test.py)
     "GET /api/office/terms": "office", "POST /api/office/terms/{}": "office", "GET /api/office/terms/{}/file": "office",
-    "DELETE /api/office/terms/{}": "office", "POST /api/office/terms/{}/restore": "office", "GET /api/office/docs/{}/terms": "office",
+    "DELETE /api/office/terms/{}": "office", "POST /api/office/terms/{}/restore": "office", "GET /api/office/docs/{}/terms": "office", "GET /api/office/docs/{}/recipients": "office",  # 2.433.0 (#3599)
     # ---- office (E, 2.36.2 #1021 / #1142): finalising a document, its history and the organisation's office log (3)
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
+    "GET /api/office/docs/{}/number-preview": "office",  # 2.431.0 B (#3605): the number of the finalise dialog
     "GET /api/office/docs/{}/log": "office", "GET /api/office/log": "office",
     # ---- office (F1, 2.38.0 #1021): invoices, credit notes, reminders, payments, sending, DATEV inbox (11)
     "POST /api/office/docs/{}/invoice": "office", "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/from-time": "office",
@@ -568,6 +571,7 @@ ROUTES = {
     "DAV /": "dav", "DAV /.well-known/caldav": "dav", "DAV /.well-known/caldav/": "dav", "DAV /.well-known/carddav": "dav",
     "DAV /.well-known/carddav/": "dav", "DAV /dav": "dav", "DAV /dav/": "dav", "DAV /dav/{}": "dav",
     "DAV /api/test/boom": "test",  # 2.359.0 (#3023): tests/p2359_a_api_test.py
+    "DAV /test/boom": "test",  # 2.447.0 (#3761): tests/p2447_a_lang_test.py
     # ---- event (19)
     "GET /api/calendars/events": "event", "GET /api/v1/events": "event", "POST /api/v1/events": "event",
     "GET /api/v1/events/{}": "event", "PATCH /api/v1/events/{}": "event", "DELETE /api/v1/events/{}": "event",
@@ -703,6 +707,7 @@ ROUTES = {
     "GET /api/admin/orgs": "org", "POST /api/admin/orgs/boundary/repair": "org",  # 2.46.0 (#1563)
      "POST /api/admin/orgs": "org", "PATCH /api/admin/orgs/{}": "org",
     "DELETE /api/admin/orgs/{}": "org", "PUT /api/admin/orgs/visibility": "org", "GET /api/orgs": "org",
+    "POST /api/orgs": "org",  # 2.422.0 (#2937): p2422_orgself_test.py
     "GET /api/admin/orgs/{}/delete-info": "org",  # 2.152.0 A (#2167): numbers for the delete dialog (instance admin)
     "GET /api/orgs/{}/leave-info": "org",  # 2.361.0 (#2922): the leave preview (the member / an admin of it)
     "POST /api/admin/orgs/{}/delete-notice": "org", "DELETE /api/admin/orgs/{}/delete-notice": "org",  # 2.361.0 (#2920): instance admin
@@ -731,6 +736,7 @@ ROUTES = {
     # 2.223.2 C (#2871): the step-up before the download (POST -> a one-time ticket, after the same checks as the GET)
     "POST /api/orgs/{}/export/file": "org", "POST /api/retention/org/{}/export.zip": "org", "POST /api/retention/me/export.zip": "own",
     # ---- own (119)
+    "GET /api/favorites/targets": "favtarget",  # 2.441.0 (#3592): stored keys can name anything, each target is checked
     "POST /api/favorites/suggestion": "own",  # 2.46.1 (#1361): a favourite suggestion from the person's own activity
     "PUT /api/tasks/mine-order": "own", "GET /api/me/wait-suggestions": "own", "DELETE /api/me/wait-suggestions": "own",  # 2.41.0 (#1205)
     "POST /api/onboarding": "own", "POST /api/sample": "own", "DELETE /api/sample": "own", "PATCH /api/settings": "own",
@@ -809,6 +815,7 @@ ROUTES = {
     "GET /s/q/{}/terms": "signoff",  # 2.113.2 (#2253): the terms frozen with the quotation of the link
     # 2.99.1 A (#1959): video sign-offs (videos/review.py; p2991_a_api_test.py)
     "GET /api/videos": "video", "POST /api/videos": "video", "GET /api/videos/{}": "video", "PATCH /api/videos/{}": "video",
+    "GET /api/videos/signoffs/orphaned": "own", "DELETE /api/videos/signoffs/orphaned/{}": "own",  # 2.360.2 D (#2561)
     "DELETE /api/videos/{}": "video", "POST /api/videos/{}/restore": "video", "POST /api/videos/{}/versions": "video",
     "DELETE /api/videos/{}/versions/{}": "video", "POST /api/videos/{}/comments": "video", "PATCH /api/videos/{}/comments/{}": "video",
     "DELETE /api/videos/{}/comments/{}": "video", "POST /api/videos/{}/comments/{}/restore": "video", "GET /api/videos/{}/export": "video",
@@ -1050,6 +1057,7 @@ ROUTES = {
     "GET /api/docs/{}/receipt": "receipt", "POST /api/docs/{}/extracted": "document",  # 2.121.0 A (#2092)
     "GET /api/docs/{}/einvoice": "document",  # 2.146.0 A (#2451): the readable view of an e-invoice
     "GET /api/files": "file", "GET /api/files/folders": "file",
+    "GET /api/files/collections/{}": "file",  # 2.429.0 (#3580): "From <area>", the boundary tested in p2429_a_ablage_view_test.py (another space 404, another person's files none)
     "GET /api/files/search": "file", "GET /api/v1/files/search": "file",  # 2.61.0 (#1820): names + recognised text, the boundary tested in p261_c_api_test.py
     "GET /api/files/nodes/{}": "file", "GET /api/files/nodes/{}/content": "file",
     "GET /api/files/nodes/{}/share-targets": "file", "GET /api/paperless": "paperless",
@@ -1225,6 +1233,16 @@ ROUTES = {
     # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py)
     "GET /api/office/bank/noreceipt": "office", "GET /api/office/bank/noreceipt/count": "office",
     "GET /api/office/bank/noreceipt/reminder": "office", "PUT /api/office/bank/noreceipt/reminder": "office",
+    # 2.444.0 (#3447): credit card statements (p2444_a_cards_test.py: another organisation 404, a person without an organisation the same)
+    "GET /api/office/cards": "office", "POST /api/office/cards": "office", "PATCH /api/office/cards/{}": "office", "DELETE /api/office/cards/{}": "office",
+    "POST /api/office/cards/{}/restore": "office", "GET /api/office/cards/{}/statements": "office", "POST /api/office/cards/{}/statements": "office",
+    "GET /api/office/cards/statements/{}": "office", "GET /api/office/cards/statements/{}/file": "office", "PATCH /api/office/cards/statements/{}": "office",
+    "DELETE /api/office/cards/statements/{}": "office", "POST /api/office/cards/statements/{}/restore": "office",
+    "POST /api/office/cards/statements/{}/confirm": "office", "POST /api/office/cards/statements/{}/reopen": "office",
+    "GET /api/office/cards/statements/{}/bank": "office", "POST /api/office/cards/statements/{}/lines": "office",
+    "PATCH /api/office/cards/lines/{}": "office", "DELETE /api/office/cards/lines/{}": "office", "GET /api/office/cards/lines/{}/candidates": "office",
+    "POST /api/office/cards/lines/{}/match": "office", "POST /api/office/cards/lines/{}/unmatch": "office", "POST /api/office/cards/lines/{}/upload": "office",
+    "GET /api/office/cards/reminder": "office", "PUT /api/office/cards/reminder": "office",
     # 2.425.0 B (#3451): recurring providers of the bank bookings (p2425_b_api_test.py: another organisation sees none, 404)
     "GET /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors/settings": "office",
 }

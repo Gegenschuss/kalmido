@@ -228,7 +228,7 @@ function sortTasks(arr, m = sortMode()) {
     custom: bySort,
     date: (a, b) => dueKey(a).localeCompare(dueKey(b)) || b.priority - a.priority || bySort(a, b),
     prio: (a, b) => b.priority - a.priority || bySort(a, b),
-    title: (a, b) => mdPlain(a.title).localeCompare(mdPlain(b.title), 'de'),  // 2.40.0 (#1409): by the text, not the marks
+    title: (a, b) => cmpText(mdPlain(a.title), mdPlain(b.title)),  // 2.40.0 (#1409): by the text, not the marks
     // 2.0.8 (#319): by creation, newest first / oldest first (ties: id, i.e. creation order)
     created: (a, b) => (b.created_at || '').localeCompare(a.created_at || '') || b.id - a.id,
     created_asc: (a, b) => (a.created_at || '').localeCompare(b.created_at || '') || a.id - b.id,
@@ -284,6 +284,7 @@ function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks
 }
 function titleFor(k) {
   if (SMART[k]) return tr(SMART[k].name);
+  if (k === 'favorites') return tr('Favourites');  // 2.441.0 (#3592)
   if (k === 'projects') return tr('Projects');  // 2.417.0 A (#3559)
   if (k.startsWith('l:')) return lname(listById(+k.slice(2))) || tr('Project');
   if (k.startsWith('tag:')) return '#' + k.slice(4);

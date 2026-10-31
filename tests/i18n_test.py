@@ -6,6 +6,7 @@ HTML tags as the key, no empty texts, a complete _meta (name, locale; the machin
 and 12 month names, date formats with known tokens only; the checker itself exits 0. Also: the server-side helpers that
 pick the plural form (French: 0 and 1 are singular) and format numbers / short dates per language.
 usage: i18n_test.py"""
+import glob
 import json
 import os
 import re
@@ -106,5 +107,75 @@ fi = ns["fmt_int"]
 check(fi(1234567, "en") == "1,234,567" and fi(1234567, "de") == "1.234.567" and fi(1234567, "fr") == "1\u202f234\u202f567"
       and fi(1234567, "nl") == "1.234.567", "thousands separators")
 check(all(ns["dec_comma"](x) for x in ("de", "fr", "es", "it", "nl")) and not ns["dec_comma"]("en"), "decimal comma (CSV ';') languages")
+
+# 2.446.0 (#3763): the completion lines (static/quips.json) have one block per language, all the same length; a language without
+# a block gets no line (never an English one); the new keys of this package are translated
+qd = json.load(open(os.path.join(ROOT, "static", "quips.json"), encoding="utf-8"))
+check(set(qd) == {"de", "en", "fr", "es", "it", "nl"} and len({len(v) for v in qd.values()}) == 1 and len(qd["de"]) == 50,
+      f"quips.json: 50 lines in each of de en fr es it nl ({ {k: len(v) for k, v in qd.items()} })")
+check(all(len(set(v)) == len(v) and all(x.strip() for x in v) for v in qd.values()), "quips.json: no empty or doubled line")
+check(not any(qd[a] == qd["en"] for a in ("fr", "es", "it", "nl")), "quips.json: the blocks are not copies of the English one")
+pal = open(os.path.join(ROOT, "static", "js", "palette.js"), encoding="utf-8").read()
+nq = pal[pal.index("function nextQuip()"):pal.index("QUIPS.last = LS.get")]
+check("d[I18N.code]" in nq and "d.en" not in nq, "nextQuip: no block for the language = no line (no English fallback)")
+for code in ("de", "fr", "es", "it", "nl"):
+    tk = json.load(open(os.path.join(I18N, code + ".json"), encoding="utf-8"))
+    for k in ("Answer to", "By list", "Lists and projects", "Kalmido text", "Auto-compact", "incl. producing ({0})"):
+        check(tk.get(k) not in (None, k), f"{code}: '{k}' is translated")
+
+# 2.447.0 (#3762): the app addresses everyone with "tu" in French, like "du" in German; "vous" only where the German text says "Sie"
+# (outsiders, customer mails, documents). A French text with vous / votre / vos whose German text has a du word and no Sie word fails.
+DE_DU = re.compile(r"\b(du|dir|dich|dein\w*)\b", re.I)
+DE_SIE = re.compile(r"\b(Sie|Ihr\w*|Ihnen)\b")
+FR_VOUS = re.compile(r"\b(vous|votre|vos)\b", re.I)
+join = lambda v: " ".join(v) if isinstance(v, list) else v  # noqa: E731 (plural forms)
+de_t = json.load(open(os.path.join(I18N, "de.json"), encoding="utf-8"))
+fr_t = json.load(open(os.path.join(I18N, "fr.json"), encoding="utf-8"))
+vous_du = [k for k, v in fr_t.items() if not k.startswith("_") and k in de_t
+           and FR_VOUS.search(re.sub(r"rendez-vous", "", join(v), flags=re.I))
+           and DE_DU.search(join(de_t[k])) and not DE_SIE.search(join(de_t[k]))]
+check(not vous_du, f"fr: no vous/votre/vos where de says du ({len(vous_du)}): {vous_du[:3]}")
+
+# 2.451.0 (#3771): every real count runs through trn (one / other), so one thing reads "1 rule", not "1 rules". The converted
+# counts: the code uses trn with both English forms, the old plural-only text is no tr() key any more, and every language holds
+# a singular and a plural (the two differ where the language marks the plural).
+COUNTS = [
+    ("static/js/liste2e.js", "{0} text of this project cannot be decrypted with the keys you hold."),
+    ("static/js/liste2eui.js", "{0} text of this project cannot be opened with your key. Compare the safety numbers with the members."),
+    ("static/js/wikie2e.js", "{0} page of this space cannot be opened with your key."),
+    ("static/js/wikie2e.js", "{0} text of this space cannot be decrypted. The space stays locked until it is taken over as empty."),
+    ("static/js/paperless.js", "{0} document in Paperless-ngx"),
+    ("static/js/paperless.js", "{0} rule is already here"),
+    ("static/js/paperless.js", "{0} rule taken over"),
+    ("static/js/wiki.js", "{0} page imported"),
+    ("static/js/wiki.js", "{0} name shortened"),
+    ("static/js/office_books.js", "{0} file already exists"),
+    ("static/js/office_leads.js", "{0} duplicate"),
+    ("static/js/newsletter.js", "{0} consent recorded"),
+    ("static/js/projtime.js", "{0} entry is already billed and stays."),
+    ("static/js/discover.js", "{0} address was not checked today (daily limit)."),
+    ("static/js/related.js", "{1} task computed, {2} waiting"),
+    ("static/js/office_docs.js", "{0} entry taken; skipped: {1} already billed, {2} not billable"),
+    ("kalmido/office/books.py", "{0} receipt lies in a folder you cannot open and is not in this export; the GoBD export holds it."),
+    ("kalmido/sheets/io.py", "{0} sheet imported"),
+    ("kalmido/sheets/io.py", "{0} formula taken over"),
+]
+SAME_OK = {"{0} already imported", "{0} duplicate"}  # the form does not change in some languages
+for rel, one in COUNTS:
+    src = open(os.path.join(ROOT, rel), encoding="utf-8").read()
+    check(("trn('%s'" % one) in src or ('trn("%s"' % one) in src, f"{rel}: trn with '{one[:50]}'")
+    for code in ("de", "fr", "es", "it", "nl"):
+        v = json.load(open(os.path.join(I18N, code + ".json"), encoding="utf-8")).get(one)
+        check(isinstance(v, list) and len(v) == 2 and all(x.strip() for x in v), f"{code}: singular + plural for '{one[:50]}'")
+        if code in ("de", "es", "fr") and isinstance(v, list) and one not in SAME_OK:
+            check(v[0] != v[1], f"{code}: singular differs from plural for '{one[:50]}'")
+        if isinstance(v, list):
+            check(all(x in v[0] for x in re.findall(r"\{\d+\}", one)), f"{code}: singular keeps the placeholders of '{one[:50]}'")
+OLD_TR = ["{0} rules taken over", "{0} rules not taken over", "{0} rules cannot be taken over", "{0} texts of this project cannot be decrypted with the keys you hold.",
+          "{0} pages imported", "{0} names shortened", "{0} rows with errors", "{0} consents recorded", "{0} tasks computed, {1} waiting"]
+allsrc = "".join(open(f, encoding="utf-8").read() for f in glob.glob(os.path.join(ROOT, "static", "js", "*.js")))
+for k in OLD_TR:
+    check(("tr('%s'" % k) not in allsrc, f"no plural-only tr() left for '{k[:50]}'")
+
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

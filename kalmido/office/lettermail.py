@@ -25,6 +25,7 @@ from ..personal.timetrack import BadInput
 from ..files.store import fs_purge_files, fs_subtree  # 2.184.0 C (#2582)
 from .letters import lt_ctx, lt_kick, lt_line, lt_multi, lt_mark_sent, lt_pdf, lt_public, lt_row
 from .doclang import DOC_LANGS  # 2.185.0 C (#2520)
+from .doctpl_samples import sample_langs, sample_text  # 2.449.0 (#3768)
 from .model import office_ctx  # 2.424.0 B (#3450)
 from ..docs.maillink import ml_token_new  # 2.424.0 B (#3450)
 
@@ -290,7 +291,7 @@ def ltm_link_replies(c, uid, org, msg, node_ids, letter=None):
 
 
 # ---------------------------------------------------------------- text blocks (#2030)
-LTB_STARTERS = {
+LTB_STARTERS = sample_langs({  # 2.449.0 (#3768): fr / es / it / nl from doctpl_samples_<lang>.py
     "cancel": {
         "de": ("Kündigung", "hiermit kündige ich den oben genannten Vertrag fristgerecht zum nächstmöglichen Zeitpunkt. "
                             "Bitte bestätigen Sie mir die Kündigung und das Datum, zu dem sie wirksam wird, schriftlich."),
@@ -316,7 +317,7 @@ LTB_STARTERS = {
         "en": ("Request for an extension", "I kindly ask you to extend the deadline of [date] to [date], as some documents are "
                                            "still missing. Thank you for your understanding."),
     },
-}
+}, "BLOCKS")
 
 
 def ltb_row(c, oid, bid):
@@ -359,12 +360,11 @@ def ltb_list():
 
 @app.get("/api/office/letter-blocks/starters")
 def ltb_starters_get():
-    """?lang=de|en (default: the office's document language) -> {starters: [{key, name, lang, body}], note}."""
+    """?lang= (default: the office's document language) -> {starters: [{key, name, lang, body}], note}."""
     from .doctpl import dt_lang
     c, uid, oid = lt_ctx()
     lg = dt_lang(c, oid, request.args.get("lang") or None)
-    sl = "de" if lg == "de" else "en"  # 2.185.0 C (#2520): the samples are de / en; other languages take the English one
-    return jsonify(starters=[{"key": k, "name": v[sl][0], "lang": lg, "body": v[sl][1]} for k, v in LTB_STARTERS.items()],
+    return jsonify(starters=[{"key": k, "name": sample_text(v, lg)[0], "lang": lg, "body": sample_text(v, lg)[1]} for k, v in LTB_STARTERS.items()],
                    note=tr(LTB_NOTE), lang=lg)
 
 
@@ -381,8 +381,8 @@ def ltb_post():
         if not st:
             raise BadInput(tr("Invalid value: {0}", "starter"))
         lg = dt_lang(c, oid, b.get("lang"))
-        sl = "de" if lg == "de" else "en"  # 2.185.0 C (#2520)
-        b = {"name": st[sl][0], "body": st[sl][1]}
+        nm, tx = sample_text(st, lg)  # 2.449.0 (#3768)
+        b = {"name": nm, "body": tx}
     row = ltb_clean(b)
     ts = iso(now_utc())
     row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)

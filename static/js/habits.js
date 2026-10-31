@@ -248,6 +248,7 @@ function viewPomo() {
   const opts = sortTasks(openTasks().filter(t => !t.parent_id)).map(t => `<option value="${t.id}" ${String(p ? p.task_id : pomoTask) === String(t.id) ? 'selected' : ''}>${esc(mdPlain(t.title))}</option>`).join('');
   const tt = p && p.task_id && S.tasks.get(p.task_id);
   return `<div class="pomo">
+    <div class="pomoset"><button type="button" class="btn sm" data-act="mod-settings" data-sec="focus">${ic('gear', 's')} ${tr('Settings…')}</button></div>
     <div class="seg">${[['focus', N_('Focus')], ['short', N_('Short break')], ['long', N_('Long break')], ['stopwatch', N_('Stopwatch')]].map(([k, n]) => `<button class="${kind === k ? 'on' : ''}" data-act="pomo-kind" data-k="${k}" ${p ? 'disabled' : ''}>${tr(n)}</button>`).join('')}</div>
     <div class="ring"><svg viewBox="0 0 100 100"><circle class="bgc" cx="50" cy="50" r="46"/><circle class="fgc" id="pring" cx="50" cy="50" r="46" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - rem / total)}"/></svg>
       <div class="t"><b id="ptime">${sw ? fmtT(el) : fmtMS(rem)}</b><span>${p ? (p.paused_at ? tr('paused') : tt ? esc(tt.title) : p.kind === 'focus' ? tr('Focus') : sw ? tr('stopwatch running') : tr('Break')) : sw ? tr('Stopwatch') : kind === 'focus' ? tr('ready') : tr('Break')}</span></div></div>

@@ -84,8 +84,8 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   const okb = [...cf.querySelectorAll('button')].find(b => /Remove computer/.test(b.textContent));
   click(w, okb);
   await until(() => !/studio-laptop/.test(md.querySelector('#ains-ms').textContent));
-  // (the token of "Create agent" stays; 2.58.0 (#1527): a token without computer data is listed as "API token", never used)
-  check(!/studio-laptop/.test(md.querySelector('#ains-ms').textContent) && /API token/.test(md.querySelector('#ains-ms').textContent) && /never used/.test(md.querySelector('#ains-ms').textContent), 'the computer is gone from the list');
+  // 2.442.0 (#1762): the token of "Create agent" went when the code was redeemed, so the list is empty now
+  check(!/studio-laptop/.test(md.querySelector('#ains-ms').textContent) && /No computer yet/.test(md.querySelector('#ains-ms').textContent) && !/API token/.test(md.querySelector('#ains-ms').textContent), 'the computer is gone from the list');
   check((await call('GET', '/api/v1/agent', null, null, {Authorization: 'Bearer ' + red.token})).status === 401, "its token stops working");
   w.close();
 

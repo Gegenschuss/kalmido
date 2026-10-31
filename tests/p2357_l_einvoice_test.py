@@ -87,7 +87,7 @@ bz = breakdown(xz)
 check(line_cats(xz) == ["Z", "Z"], f"#3217: the zero rated lines are Z (was E): {line_cats(xz)}")
 check(bz == [("Z", "0", "1200.00", None)], f"#3217: one breakdown Z 0 % without exemption reason (BR-Z-10): {bz}")
 check(ein.ein_check(xz) == [], f"#3217: own check clean: {ein.ein_check(xz)}")
-uz = ein.ein_ubl_build(mz, "peppol")
+uz = ein.ein_ubl_build(mz, "peppol", "9930:DE123456789", "0208:0123456749")  # 2.446.0 (#3783): Peppol ids, the own check now names EM
 check(b"<cbc:ID>Z</cbc:ID>" in uz and b"TaxExemptionReason" not in uz and b"<cbc:ID>E</cbc:ID>" not in uz and ein.ein_ubl_check(uz) == [],
       f"#3217: UBL Z without exemption reason: {ein.ein_ubl_check(uz)}")
 # a mixed invoice: Z for the zero rated line, E with the invoice's reason for the exempt one, S for the taxed one
@@ -100,7 +100,7 @@ check(line_cats(xm) == ["S", "Z", "E"], f"#3217: mixed: S, Z, E per line: {line_
 check(("Z", "0", "200.00", None) in bm and ("E", "0", "300.00", "Exempt education service") in bm and len(bm) == 3,
       f"#3217: mixed: Z without reason, E with the invoice's reason: {bm}")
 check(ein.ein_check(xm) == [], f"#3217: mixed: own check clean: {ein.ein_check(xm)}")
-um = ein.ein_ubl_build(mm, "peppol")
+um = ein.ein_ubl_build(mm, "peppol", "9930:DE123456789", "0208:0123456749")
 check(um.count(b"<cbc:TaxExemptionReason>") == 1 and ein.ein_ubl_check(um) == [], "#3217: mixed UBL: one exemption reason (the E subtotal)")
 bad = xz.replace(b"<ram:BasisAmount>", b"<ram:ExemptionReason>x</ram:ExemptionReason><ram:BasisAmount>", 1)
 check(any("BR-Z-10" in f for f in ein.ein_check(bad)), f"#3217: ein_check names a Z breakdown with an exemption reason: {ein.ein_check(bad)}")
@@ -121,7 +121,7 @@ check(b'schemeID="VA"' not in xo, "#3218: no VAT id of seller or buyer (BR-O-02)
 check(ein.ein_check(xo) == [], f"#3218: own check clean: {ein.ein_check(xo)}")
 xox = ein.ein_build(dict(mo, recipient=dict(CH, buyer_reference="04011000-1-03")), "xrechnung")
 check(ein.ein_check(xox) == [] and seller_id(xox) == "12/345/67890", f"#3218: XRechnung clean: {ein.ein_check(xox)}")
-uo = ein.ein_ubl_build(mo, "peppol")
+uo = ein.ein_ubl_build(mo, "peppol", "0208:0123456749", "0208:0123456749")
 check(b"<cac:PartyIdentification>" in uo and b"12/345/67890" in uo and b"DE123456789" not in uo and ein.ein_ubl_check(uo) == [],
       f"#3218: UBL O with PartyIdentification (BT-29): {ein.ein_ubl_check(uo)}")
 mr = copy.deepcopy(mo)

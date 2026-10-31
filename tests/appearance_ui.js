@@ -64,7 +64,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   const noMedia = css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media[^{]*\{/g, '').replace('calc(16px * var(--ui))', '').replaceAll('max(1rem,16px)', '');  // 2.38.0 (#1173): the 16 px floor of form fields on touch screens keeps iOS from zooming on focus // 2.52.1 (#1016): the same 16 px iOS floor for the inline title field of a new event
   const bad = [...noMedia.matchAll(/(?<![\w.#-])(\d*\.?\d+)px/g)].map(m => +m[1]).filter(v => v > 2 && v < 9999);
   check(bad.length === 0, 'app.css: only rem sizes (px > 2 left: ' + bad.slice(0, 5) + ')');
-  check(/html\{[^}]*font-size:calc\(16px \* var\(--ui\)\)/.test(css) && /:root\[data-fsize="xl"\]\{--ui:1\.25\}/.test(css) && /:root\[data-fsize="s"\]\{--ui:\.9\}/.test(css), 'root font size = 16px x --ui, sizes 90 / 112 / 125 %');
+  check(/html\{[^}]*font-size:calc\(100% \* var\(--ui\)\)/.test(css) /* 2.442.0 (#2810): the browser's default size, 16 px unless changed */ && /:root\[data-fsize="xl"\]\{--ui:1\.25\}/.test(css) && /:root\[data-fsize="s"\]\{--ui:\.9\}/.test(css), 'root font size = 100 % x --ui, sizes 90 / 112 / 125 %');
   check(/@media print\{:root\[data-fsize\]\{--ui:1\}\}/.test(css), 'print: always 100 %');
   check(/:root\[data-font="atkinson"\]\{--sans:"Atkinson Hyperlegible"/.test(css) && /:root\[data-font="system"\]\{--sans:system-ui/.test(css), 'font variables');
   check(/--mono:"Geist Mono"/.test(css) && !/data-font[^{]*\{[^}]*--mono/.test(css), 'mono details always Geist Mono');
@@ -94,7 +94,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   check(!md.querySelector('[data-pane="general"] #s-theme') && !md.querySelector('[data-pane="general"] #s-density'), 'theme + density moved out of General');
   const pane = () => md.querySelector('[data-pane="look"]');
   check(['#s-theme', '#s-density', '#s-fsize', '#s-font', '#s-accent'].every(s => pane().querySelector(s)), 'pane: theme, density, font size, font, accent');
-  check(pane().querySelector('.devtag'), 'pane tagged "This device"');
+  check(pane().querySelector('#s-tabbar-h') && !pane().querySelector('#s-tabbar-h .devtag'), 'tab bar heading without "This device" (2.418.0, #3560: per person now)');
   check(pane().querySelector('#s-fsize').type === 'range' && pane().querySelector('#s-fsize').min === '75' && pane().querySelector('#s-fsize').max === '150' && pane().querySelector('#s-fsize').step === '5' && pane().querySelectorAll('#s-font button').length === 3 && pane().querySelectorAll('#s-accent button').length === 8, 'font size: a slider 75-150 % in 5 % steps (2.13.0 #429, 2.13.2 #478: from 75); fonts 3, accents 7');
   const pv = pane().querySelector('.lookpv');
   check(pv && pv.hasAttribute('inert') && pv.querySelector('.trow .chk') && pv.querySelector('.trow .meta .dt') && pv.querySelector('.btn.pri') && pv.querySelector('.lpv-link'), 'live preview: sample rows, date, button, link (inert)');

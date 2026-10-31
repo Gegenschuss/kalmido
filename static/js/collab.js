@@ -236,6 +236,7 @@ function newsText(it, U) {
       lrename: tr('{0} renamed your project {1} to {2} (project admin)', who, q(d.old || ''), q(d.name || '')),  // 2.40.0 (#1431)
       owner: tr('{0} handed the project {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || '')),
       moveout: tr('{0} moved {1} out of the organisation {2}', who, q(d.name || ''), q(d.org || '')),  // 2.148.1 B (#2483)
+      export: trn('{1} exported {0} project of the organisation {2} with an account export', '{1} exported {0} projects of the organisation {2} with an account export', d.count || 1, who, q(d.org || '')),  // 2.362.3 (#3101)
       // 2.361.2 (#2923): a member asks back what they brought in; an admin releases / declines it
       outreq: tr('{0} asks to take {1} back into their private space (organisation {2})', who, q(d.name || ''), q(d.org || '')),
       outok: tr('{0} released {1}: you can move it into your private space now (within {2} days)', who, q(d.name || ''), d.days || 14),
@@ -278,6 +279,7 @@ function newsText(it, U) {
     case 'filereq': { const d = it.data || {}; return trn('{0} file arrived through {1}', '{0} files arrived through {1}', d.n || 1, q(d.title || '')) + (d.name ? ' · ' + q(d.name) : ''); }  // 2.122.0 A (#2097)
     case 'fetcherr': return tr('Receipt fetcher {0}: {1}', q(d.portal || ''), esc(d.error || ''));  // 2.425.0 C (#3453): docfetch.js
     case 'orgkey': return ocNewsText(d, it.actor_id ? who : q(tr('The server admin')), q);  // 2.138.0 C (#1972): orgcrypt.js
+    case 'apblimit': return tr('Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.', d.limit || '?');  // 2.360.2 L (#2561)
     case 'ptlimit': return d.org ? tr('The customer portal of {0} reached its limit of {1} sign-in mails per hour. Further customers get a link again later.', q(d.org), d.limit || '?')
       : tr('Your customer portal reached its limit of {0} sign-in mails per hour. Further customers get a link again later.', d.limit || '?');  // 2.138.4 C (#2380)
     case 'playbook_proposal': return pbNewsText(it, who, q);  // 2.39.0 (#1168)
@@ -620,7 +622,7 @@ function actText0(a, U) {
     case 'wont': return tr("{0} marked the task as won’t do", who);
     case 'reopen': return tr('{0} reopened the task', who);
     case 'skip': return tr('{0} skipped an occurrence, next one {1}', who, q(fmtDayAbs(d.next)));
-    case 'attach': return (d.n || 1) === 1 ? tr('{0} added the attachment {1}', who, q((d.names || [])[0] || '')) : trn('{1} added {0} attachment', '{1} added {0} attachments', d.n, who);
+    case 'attach': return (d.n || 1) === 1 ? tr('{0} added the attachment {1}', who, q(d.enc ? tr('Encrypted file') : (d.names || [])[0] || '')) : trn('{1} added {0} attachment', '{1} added {0} attachments', d.n, who);
     case 'attach_rm': return tr('{0} removed the attachment {1}', who, q(d.name || ''));
     case 'waiting': return d.until ? tr('{0} set the task to waiting on someone ({1}), follow up on {2}', who, q(d.note || '–'), q(dayLabel(d.until))) : tr('{0} set the task to waiting on someone ({1})', who, q(d.note || '–'));
     case 'waiting_rm': return tr('{0} ended the waiting on someone', who);
@@ -687,7 +689,7 @@ function personCard(anchor, id) {
   const p = listPeople(l).find(x => x.user_id === id), a = agentById(id);
   const name = p?.name || a?.name || anchor.dataset.mname || personNameAny(id) || anchor.textContent.replace(/^@/, ''), meId = S.me?.id;
   const role = p ? roleLabel(p.role) : '', U = S.tl.users || {};
-  const st = a ? `<span class="mcst st-${esc(!a.enabled ? 'paused' : agentOffline(a) ? 'offline' : a.status || 'idle')}">${esc(agentSt(a))}${a.status_text ? ' · ' + esc(a.status_text) : ''}</span>` : '';
+  const st = a ? `<span class="mcst st-${esc(!a.enabled ? 'paused' : agentOffline(a) ? 'offline' : a.status || 'idle')}">${esc(agentSt(a))}${a.status_text ? ' · ' + esc(agentStTx(a)) : ''}</span>` : '';
   const mine = l ? openTasks().filter(x => x.list_id === l.id && x.assignee_id === id && x.id !== t?.id).sort(bySort) : [];
   const acts = [];
   if (a && a.enabled && typeof chatOpen === 'function') acts.push(['chat', 'comment', tr('Open chat')]);

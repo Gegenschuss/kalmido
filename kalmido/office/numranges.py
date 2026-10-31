@@ -11,7 +11,7 @@ from ..core.i18n import tr
 from ..core.pg import write_lock
 from .invoices import INV_SKIP_REASON_MIN, inv_scheme
 from .ledger import ofx_log
-from .model import office_gate, office_number_format, office_org, office_role, office_scheme_period, office_settings
+from .model import num_kind, num_scheme, office_gate, office_number_format, office_org, office_role, office_scheme_period, office_settings
 
 ONUM_KINDS = ("offer", "invoice", "credit", "reminder", "delivery")  # delivery notes since 2.120.0 D (#2089)
 ONUM_REASON_KINDS = ("invoice", "credit")  # a jump in these series needs a reason (GoBD)
@@ -28,14 +28,17 @@ def onum_scheme(s, kind):
 
 
 def onum_range(c, oid, s, kind):
-    """The state of one series: scheme, counter period, last value, the next number (formatted with example values)."""
+    """The state of one series: scheme, counter period, last value, the next number (formatted with example values).
+    2.433.0 (#3597): invoice corrections on the invoices' counter (credit_shared) show that counter, shared = "invoice"
+    (the page greys the row: it is set with the invoices)."""
     scheme = onum_scheme(s, kind) or ""
-    period = office_scheme_period(scheme)
-    r = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (oid, kind, period)).fetchone()
+    ck = kind if kind == "offer" else num_kind(s, kind)
+    period = office_scheme_period(scheme if ck == kind else num_scheme(s, kind))
+    r = c.execute("SELECT last FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (oid, ck, period)).fetchone()
     last = int(r["last"]) if r else 0
     return {"kind": kind, "scheme": scheme, "period": period, "yearly": bool(period), "last": last, "next": last + 1, "min_next": last + 1,
-            "preview": office_number_format(scheme, last + 1, project=tr("Project"), client=tr("Client"), initials="AB"),
-            "reason_needed": kind in ONUM_REASON_KINDS}
+            "preview": office_number_format(scheme, last + 1, project=tr("Project"), client=tr("Client"), initials="AB", kuerzel="ABC"),
+            "reason_needed": kind in ONUM_REASON_KINDS, **({"shared": ck} if ck != kind else {})}
 
 
 def onum_reason(kind, skip, raw):
@@ -64,6 +67,8 @@ def onum_set(kind):
     oid = office_org(c, uid, admin=True)
     if kind not in onum_kinds(office_settings(c, oid)):
         return err(tr("Invalid value: {0}", "kind"))
+    if kind != "offer" and num_kind(office_settings(c, oid), kind) != kind:  # 2.433.0 (#3597): set with the invoices
+        return err(tr("Invoice corrections count with the invoice numbers; set the next number there"))
     b = body()
     b = b if isinstance(b, dict) else {}
     try:

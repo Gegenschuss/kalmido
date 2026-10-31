@@ -7,7 +7,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
 from ..core.pg import insert_id
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, now_utc, iso_ms
 from ..accounts.session import me
 from ..accounts.pictures import avatar_url
@@ -382,7 +382,9 @@ def prop_validate(kind, b, inp):
 
 # ---- the request (a person asks an agent)
 def prop_input(c, uid, kind, b):
-    """The job input for a request body b -> (input, title, task_id, list_id). Only what the person chose to send."""
+    """The job input for a request body b -> (input, title, task_id, list_id). Only what the person chose to send.
+    2.448.0 (#3765): the title in the language of the person who asked (a plan's timer asks for them without a request)."""
+    lg = lang(c, uid)
     if kind in ("inquiry", "setup"):  # 2.51.0 B (#1351 #1358)
         from ..agents.propkinds2 import pk2_input
         return pk2_input(c, uid, kind, b)
@@ -394,7 +396,7 @@ def prop_input(c, uid, kind, b):
         inp = {"text": _p_str(b.get("text"), "text", PROP_TEXT_MAX, True, line=False),
                "file_name": _p_str(b.get("file_name"), "file_name", 200) or None,
                "folder": clean_folder(b.get("folder")) or None}
-        return inp, tr(PROP_TITLES["project"]), None, None
+        return inp, tr(PROP_TITLES["project"], lg=lg), None, None
     if kind == "subtasks":
         _p_keys(b, "", ("agent_id", "kind", "task_id", "hint"))
         tid = _p_int(b.get("task_id"), "task_id")
@@ -411,7 +413,7 @@ def prop_input(c, uid, kind, b):
         inp = {"task": {"id": tid, "title": t["title"], "notes": (t["content"] or "")[:PROP_TEXT_MAX], "due": t["due"],
                         "subtasks": subs[:100]},
                "hint": _p_str(b.get("hint"), "hint", PROP_HINT_MAX, line=False) or None}
-        return inp, tr(PROP_TITLES["subtasks"], t["title"][:80]), tid, t["list_id"]
+        return inp, tr(PROP_TITLES["subtasks"], t["title"][:80], lg=lg), tid, t["list_id"]
     if kind == "triage":
         _p_keys(b, "", ("agent_id", "kind", "task_ids", "lists"))
         inbox = my_inbox(c, uid)
@@ -442,14 +444,14 @@ def prop_input(c, uid, kind, b):
         inp = {"items": [{"task_id": r["id"], "title": r["title"], "notes": (r["content"] or "")[:4000]} for r in rows],
                "lists": [{"id": d["id"], "name": d["name"], "folder": d["folder"] or None, "sections": secs.get(d["id"], [])}
                          for d in mine[:PROP_LISTS_MAX]]}
-        return inp, tr(PROP_TITLES["triage"]), None, inbox
+        return inp, tr(PROP_TITLES["triage"], lg=lg), None, inbox
     if kind == "dayplan":  # 2.10.0 (#440): the same input the built-in planner uses
         _p_keys(b, "", ("agent_id", "kind", "date", "mode"))
         day = dayplan_day(b.get("date"))
         inp = dayplan_input(c, uid, day, dayplan_mode(b.get("mode")))
         if not inp["tasks"]:
             raise BadInput(tr("There are no open tasks to plan"))
-        return inp, tr(PROP_TITLES["dayplan"], day.isoformat()), None, None
+        return inp, tr(PROP_TITLES["dayplan"], day.isoformat(), lg=lg), None, None
     from ..agents.meetprop import mtg_input  # 2.70.0 A (#1354): extract = notes and / or meeting photos (agents/meetprop.py)
     return mtg_input(c, uid, b)
 

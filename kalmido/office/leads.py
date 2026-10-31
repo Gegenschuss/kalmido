@@ -19,6 +19,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.orgcrypt import oc_enc_fields
 from ..core.errors import BadInput
 from ..api.common import v1_view
+from ..core.csvimport import amount_text
 from .calc import dec, dstr, money
 from .model import office_on, office_role, pb_cl_org, pb_cl_sql
 from .rights import ofr_rights
@@ -238,12 +239,11 @@ def _day_of(s):
 
 
 def _value_of(s):
-    from ..life.budget import _parse_amount
     s = (s or "").strip()
     if not s:
         return dec(0)
-    v = _parse_amount(s, "," if s.rfind(",") > s.rfind(".") else ".")
-    return v if v is not None and v >= 0 else None
+    v = amount_text(s)  # 2.363.0 (#3103): the shared reader ("1.500" = 1500, was 1,50)
+    return dec(v) if v is not None and v >= 0 else None
 
 
 def _source_of(s):

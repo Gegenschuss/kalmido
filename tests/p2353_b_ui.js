@@ -76,15 +76,14 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
     check(await until(() => d.querySelector('#s-scan .dsc-way')), 'Integrations: the section is drawn (folder watcher)');
     const txt = () => d.querySelector('#s-scan')?.textContent || '';
     check(/Folder watcher/.test(txt()) && ((d.querySelector('#s-scan .dsc-dl')?.children.length || 0) >= 1 || /Not available on this server/.test(txt())), 'Integrations: the download (or the honest hint) is there');
-    check(!!d.querySelector('#s-scan-h') && !d.querySelector('#s-scan [data-dcs]'), 'Integrations: heading, no mail buttons of the documents');
+    check(!!d.querySelector('#s-scan-h') && !d.querySelector('#s-scan [data-dcs]'), 'Integrations: heading, the buttons are its own (data-dsc)');
     check(!!d.querySelector('.aczlink [data-m="go-access"]'), 'Integrations: a link to API tokens and webhooks (Access)');
-    // the document settings: a pointer, no second copy
-    w.eval(`document.querySelectorAll('.modal').forEach(m => modalClose(m))`);
-    w.eval('dc_settings()');
-    await until(() => d.querySelector('.dc-smd .dsc-way'));
-    check(!d.querySelector('.dc-smd .dsc-dl') && !d.querySelector('.dc-smd .dsc-new') && !!d.querySelector('.dc-smd [data-dsc="tointegr"]'), 'document settings: only the pointer to Integrations');
-    click(w, d.querySelector('.dc-smd [data-dsc="tointegr"]'));
-    check(await until(() => !d.querySelector('.dc-smd') && d.querySelector('#s-scan .dsc-way')), 'the pointer opens Integrations at the section (one click)');
+    // the document settings: a pointer, no second copy (2.365.2 B, #2789: Settings > Documents)
+    click(w, d.querySelector('.snav [data-sec="docs"]'));
+    await until(() => d.querySelector('#s-dcs [data-dcs="go-integr"]'));
+    check(!d.querySelector('#s-dcs .dsc-dl') && !d.querySelector('#s-dcs .dsc-new') && !!d.querySelector('#s-dcs [data-dcs="go-integr"]'), 'document settings: only the pointer to Integrations');
+    click(w, d.querySelector('#s-dcs [data-dcs="go-integr"]'));
+    check(await until(() => !d.querySelector('[data-pane="integr"]')?.classList.contains('hidden') && d.querySelector('#s-scan .dsc-way')), 'the pointer opens Integrations at the section (one click)');
     w.close();
   }
 

@@ -152,11 +152,11 @@ function filterModal(id) {
       : `<div class="cfnumf"><select data-cfnum="${fd.id}"><option value="">–</option>${[['gt', '>'], ['lt', '<'], ['eq', '='], ['set', tr('has a value')], ['empty', tr('empty')]].map(([k, n]) => `<option value="${k}" ${cur.num?.op === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select><input data-cfnumv="${fd.id}" inputmode="decimal" value="${esc(cur.num?.v ?? '')}" style="max-width:6.875rem">${fd.options?.unit ? `<span class="muted">${esc(fd.options.unit)}</span>` : ''}</div>`;
     return `<div class="cfrow"><div class="cfn">${esc(lname(listById(fd.list_id)))} › <b>${esc(fd.name)}</b></div>${ctl}</div>`;
   };
-  const tags = [...new Set([...S.tasks.values()].flatMap(t => t.tags))].sort((a, b) => a.localeCompare(b, 'de'));
+  const tags = [...new Set([...S.tasks.values()].flatMap(t => t.tags))].sort(cmpText);
   // 2.390.0 B (#3355): assignee, column, sprint, milestone (only what occurs in the visible projects, or is chosen already)
   const liveL = id => { const l = listById(id); return l && !l.archived ? l : null; };
   const whoIds = [...new Set([...S.tasks.values()].filter(t => t.assignee_id && t.assignee_id !== S.me?.id && liveL(t.list_id)).map(t => t.assignee_id))];
-  const who = [['me', tr('Me')], ['none', tr('Nobody')], ...whoIds.map(id => [String(id), personNameAny(id) || '#' + id]).sort((a, b) => a[1].localeCompare(b[1], 'de'))];
+  const who = [['me', tr('Me')], ['none', tr('Nobody')], ...whoIds.map(id => [String(id), personNameAny(id) || '#' + id]).sort((a, b) => cmpText(a[1], b[1]))];
   const secs = S.sections.filter(s => liveL(s.list_id) && (!r.lists.length || r.lists.includes(s.list_id))).map(s => [String(s.id), `${lname(liveL(s.list_id))} › ${s.name}`]);
   const mss = [...S.tasks.values()].filter(t => t.ms && !t.deleted_at && liveL(t.list_id)).map(t => [String(t.id), t.title]);
   const sprOn = S.lists.some(l => !l.archived && spr_on(l)) || r.sprints.length;

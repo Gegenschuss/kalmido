@@ -25,7 +25,7 @@ from .sheet import dk_pack, dk_packs_on
 from .undo import oun_post, oun_pre
 from .otrash import otb_put  # 2.272.0 E2 (#3038)
 from .homecur import HC_CODES, hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
-from .model import (NAME_MAX, TEXT_MAX, UNITS, pb_cl_sql, office_gate, office_need_feature, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
+from .model import (NAME_MAX, PT_MAX, TEXT_MAX, UNITS, client_short_code, pb_cl_sql, office_gate, office_need_feature, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts, office_trial_number, trial_flag)
 from .pdf import pdf_paper  # 2.357.0 A (#3156)
 from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
@@ -38,9 +38,10 @@ from .invoices import inv_credit_pack, inv_refund_open  # 2.354.0 D (#2837, #283
 from .invoices import inv_number_year, inv_pay_add  # 2.355.0 A (#2839, #2847)
 
 DOC_KINDS = ("offer",) + INV_KINDS + ("delivery",)  # 2.120.0 D (#2089): delivery notes / proofs of service (office/delivery.py); 2.38.0 (#1021, F1): invoices, credit notes, reminders live in office/invoices.py
-STATUSES = ("draft", "sent", "accepted", "declined")
+STATUSES = ("draft", "sent", "accepted", "declined", "superseded")  # 2.437.0 B (#3621): superseded = replaced by a newer quotation (replaces_id)
+OFD_REPLACEABLE = ("sent", "accepted")  # 2.437.0 B (#3621): the states a quotation can be superseded from
 ITEM_KINDS = ("service", "text", "heading")
-STATUS_TXT = {"draft": N_("Draft"), "sent": N_("Sent|document"), "accepted": N_("Accepted|document"), "declined": N_("Declined"), **STATE_TXT}
+STATUS_TXT = {"draft": N_("Draft"), "sent": N_("Sent|document"), "accepted": N_("Accepted|document"), "declined": N_("Declined"), "superseded": N_("Superseded"), **STATE_TXT}
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MAX_ITEMS = 300
 MAX_FIELDS = 20
@@ -84,6 +85,11 @@ def _text(v, name, mx=TEXT_MAX):
     if not isinstance(v, str):
         raise BadInput(tr("Invalid value: {0}", name))
     return CTRL_RE.sub("", v).strip()[:mx]  # 2.39.0 (#1209 audit M2): control characters break the e-invoice XML / PDF/A
+
+
+def pt_text(v, name="project_title"):
+    """2.431.0 (#3594 review): the multi-line subject - CRLF / CR become LF on every way in (form, agents), then _text."""
+    return _text(v.replace("\r\n", "\n").replace("\r", "\n") if isinstance(v, str) else v, name, PT_MAX)
 
 
 def _num(v, name, lo=None, hi=None):
@@ -516,7 +522,7 @@ def doc_brief(r, pm=None, lg=None):
          "inv_type": r["inv_type"] if "inv_type" in r.keys() else "",  # 2.120.0 A (#2087)
          "trial": bool(r["trial"]) if "trial" in r.keys() else False}  # 2.144.10 A (#2576)
     if r["kind"] == "offer" and "cashflow" in r.keys():  # 2.88.0 (#1915)
-        d.update(version_of=r["version_of"], cashflow=r["cashflow"] or "auto")
+        d.update(version_of=r["version_of"], cashflow=r["cashflow"] or "auto", replaces_id=r["replaces_id"] if "replaces_id" in r.keys() else None)  # 2.437.0 B (#3621): replaces_id
     if r["kind"] in ("invoice", "credit"):
         d.update(inv_money_fields(r, pm))
         d["open_text"] = fmt_money(d["open"], r["lang"], r["currency"])
@@ -683,9 +689,9 @@ def clean_doc(c, oid, b, cur, admin):
             f["recipient"] = json.dumps(rec, ensure_ascii=False)
     elif "recipient" in b and b.get("recipient") is not None:
         f["recipient"] = json.dumps(_recipient_clean(b["recipient"]), ensure_ascii=False)
-    for k, mx in (("project_title", NAME_MAX), ("project_ref", 80), ("intro", TEXT_MAX), ("closing", TEXT_MAX), ("order_ref", 80)):
+    for k, mx in (("project_title", PT_MAX), ("project_ref", 80), ("intro", TEXT_MAX), ("closing", TEXT_MAX), ("order_ref", 80)):
         if k in b:
-            f[k] = _text(b.get(k), k, mx)
+            f[k] = pt_text(b.get(k), k) if k == "project_title" else _text(b.get(k), k, mx)  # 2.431.0 B (#3594)
     for k in ("date", "valid_until", "service_from", "service_to", "due_date"):  # 2.36.2: period of service; 2.38.0: due date
         if k in b:
             f[k] = _date(b.get(k), k)
@@ -940,24 +946,40 @@ def _assign_number(c, oid, did, s=None, manual=None, reason=""):
         if r["kind"] != "offer":  # 2.38.0: only above the series' last value (no back-dating), the counter follows
             inv_manual_number(c, oid, r, s, num, reason)
     else:
-        rec = _j(r["recipient"], {})
-        d = date.fromisoformat(r["date"]) if r["date"] else local_now().date()
-        # 2.118.0 A (#2265): a quotation's duplicate keeps the first one's running number with the next {version};
-        # quotations count per organisation, client or project (onc_next)
-        ver, num = onc_version(c, oid, r, inv_scheme(s, r["kind"]), lambda x: {"project": x["project_title"], "client": _j(x["recipient"], {}).get("name") or "",
-                                                                             "initials": _initials(c, x["created_by"])})
-        for _ in range(0 if num else 50):  # a scheme without {seq} uniqueness (e.g. only {date}): keep counting until free
-            num, _seq = onc_next(c, oid, s, r, inv_scheme(s, r["kind"]), d, project=r["project_title"], client=rec.get("name") or "",
-                                 initials=_initials(c, r["created_by"]), version=ver)
-            if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() \
-                    and not fi_number_taken(c, oid, num):  # 2.39.1 (#1182): nor a number of the legacy archive
-                break
+        num = doc_next_number(c, oid, r, s)
     if c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() or fi_number_taken(c, oid, num):
         raise BadInput(tr("The number {0} is already used", num))
     c.execute("UPDATE office_docs SET number=?, updated_at=? WHERE id=? AND org_id=?", (num, iso_ms(now_utc()), did, oid))
     from .docref import ofd_renamed
     ofd_renamed(c, did)  # 2.199.0 B (#2742)
     return num
+
+
+def doc_next_number(c, oid, r, s, peek=False):
+    """The number of the scheme that document row r (no number yet, not a trial) gets from settings s; the counter moves.
+    2.431.0 B (#3605): peek = the same choice (scheme, counter, project / client / initials / date / version) only looked
+    at, for the finalise dialog (odoc_number_preview) -- a later change of the choice lands in both."""
+    from .legacyimport import fi_number_taken
+    rec = _j(r["recipient"], {})
+    d = date.fromisoformat(r["date"]) if r["date"] else local_now().date()
+    # 2.118.0 A (#2265): a quotation's duplicate keeps the first one's running number with the next {version};
+    # quotations count per organisation, client or project (onc_next)
+    ver, num = onc_version(c, oid, r, inv_scheme(s, r["kind"]), lambda x: {"project": x["project_title"], "client": _j(x["recipient"], {}).get("name") or "",
+                                                                         "initials": _initials(c, x["created_by"]), "kuerzel": _client_code(c, x)})
+    for i in range(0 if num else 50):  # a scheme without {seq} uniqueness (e.g. only {date}): keep counting until free
+        num, _seq = onc_next(c, oid, s, r, inv_scheme(s, r["kind"]), d, peek=peek, ahead=i if peek else 0, project=r["project_title"],
+                             client=rec.get("name") or "", initials=_initials(c, r["created_by"]), version=ver, kuerzel=_client_code(c, r))
+        if not c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, r["id"])).fetchone() \
+                and not fi_number_taken(c, oid, num):  # 2.39.1 (#1182): nor a number of the legacy archive
+            break
+    return num
+
+
+def _client_code(c, r):
+    """2.433.0 (#3604): the text of {kuerzel} for document row r: its client's short code, else the first three letters of the
+    client's (or, without a client, the recipient's) name."""
+    cl = c.execute("SELECT name, short_code FROM clients WHERE id=?", (r["client_id"],)).fetchone() if r["client_id"] else None
+    return client_short_code(cl["short_code"] if cl else "", (cl["name"] if cl else "") or _j(r["recipient"], {}).get("name") or "")
 
 
 def _initials(c, uid):
@@ -1440,9 +1462,22 @@ def odoc_number(did):
     return jsonify(id=did, number=num)
 
 
+@app.get("/api/office/docs/<int:did>/number-preview")
+def odoc_number_preview(did):
+    """2.431.0 B (#3605): {number, given} -- the number finalising the document gives it (the finalise dialog): its own
+    number when it has one (given true), else the next one of its scheme, the counter only looked at. Who may finalise
+    may look (the same office context)."""
+    c, uid, oid = _ctx()
+    r = doc_row(c, oid, did)
+    if r["number"]:
+        return jsonify(number=r["number"], given=True)
+    num = office_trial_number(c, oid, did, peek=True) if r["trial"] else doc_next_number(c, oid, r, office_settings(c, oid), peek=True)
+    return jsonify(number=num, given=False)
+
+
 @app.post("/api/office/docs/<int:did>/status")
 def odoc_status(did):
-    """{status: draft|sent|accepted|declined}; sent sets sent_at (once). Also for finalised quotations."""
+    """{status: draft|sent|accepted|declined|superseded}; sent sets sent_at (once). Also for finalised quotations."""
     c, uid, oid = _ctx()
     write_lock(c, f"office_doc_{int(did)}")  # 2.355.0 A (#2839): the status is checked against the state after a parallel finalise / unlock
     r = doc_row(c, oid, did)
@@ -1459,6 +1494,8 @@ def odoc_set_status(c, oid, did, st, uid, r=None):
     and the customer's approval (office/signoff.py, uid None). Denied 403 / 409 when not allowed; the caller commits."""
     r = r or doc_row(c, oid, did)
     if r["kind"] == "offer" and st == "draft" and r["status"] != "draft":  # 2.39.0 (#1209 audit N1): sent = locked, a copy for changes
+        raise Denied(409, tr("This status change is not allowed ({0} to {1})", r["status"], st))
+    if r["kind"] == "offer" and st == "superseded" and r["status"] not in OFD_REPLACEABLE + ("superseded",):  # 2.437.0 B (#3621)
         raise Denied(409, tr("This status change is not allowed ({0} to {1})", r["status"], st))
     ts = iso(now_utc())
     if r["kind"] != "offer" and "paid" in (st, r["status"]) and st != r["status"] and not _ofr_may(c, uid, oid, "edit", "pay"):
@@ -1477,7 +1514,7 @@ def odoc_set_status(c, oid, did, st, uid, r=None):
                 ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": "paid"}})
                 return
     c.execute("UPDATE office_docs SET status=?, updated_at=?, sent_at=COALESCE(sent_at, ?) WHERE id=? AND org_id=?",
-              (st, ts, ts if st in ("sent", "accepted", "declined") else None, did, oid))
+              (st, ts, ts if st in ("sent", "accepted", "declined", "superseded") else None, did, oid))
     if r["kind"] != "offer":
         c.execute("UPDATE office_docs SET paid_at=CASE WHEN status='paid' THEN COALESCE(paid_at, ?) ELSE NULL END WHERE id=? AND org_id=?", (ts, did, oid))
     if st != r["status"]:
@@ -1489,9 +1526,28 @@ def odoc_set_status(c, oid, did, st, uid, r=None):
             ek_purchases_write(c, oid, did)  # 2.47.0 (#1649): accepted = its purchase is written, left = removed
             from .pipeline import pl2_offer_status  # 2.50.0 (#1196): a linked deal of the pipeline follows (one place for both callers)
             pl2_offer_status(c, oid, did, st)
-            if st == "accepted":
+            if st == "accepted" and r["status"] != "superseded":  # 2.437.0 B (#3621): taken back from superseded = no new acceptance
                 from .agentdocs import ofa_offer_accepted
                 ofa_offer_accepted(c, oid, did)  # 2.51.0 A (#1348): the event offer_accepted to the area's office agents
+            if st == "accepted" and r["replaces_id"]:  # 2.437.0 B (#3621): the replaced quotation goes out of every sum; a supplement has no reference
+                write_lock(c, f"office_doc_{int(r['replaces_id'])}")
+                old = doc_row(c, oid, r["replaces_id"])
+                if old["status"] in OFD_REPLACEABLE:
+                    odoc_set_status(c, oid, old["id"], "superseded", uid, old)
+
+
+def odoc_replace_undo(c, oid, r, uid):
+    """2.437.0 B (#3621): quotation draft r goes (deleted, not sent): the quotation it superseded at once gets its status from before
+    back, unless another quotation replaces it too. The status comes from the office log (plain JSON: no protected key)."""
+    if r["kind"] != "offer" or r["status"] != "draft" or not r["replaces_id"]:
+        return
+    old = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (r["replaces_id"], oid)).fetchone()
+    if not old or old["status"] != "superseded" or c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND replaces_id=? AND id<>? LIMIT 1",
+                                                             (oid, old["id"], r["id"])).fetchone():
+        return
+    log = c.execute("SELECT detail FROM office_doc_log WHERE org_id=? AND doc_id=? AND action='status' ORDER BY id DESC LIMIT 1", (oid, old["id"])).fetchone()
+    before = _j(log["detail"] if log else None, {}).get("before") or {}
+    odoc_set_status(c, oid, old["id"], before.get("status") if before.get("status") in OFD_REPLACEABLE else "sent", uid, old)
 
 
 # 2.36.2: columns a copy never takes over (identity, state, the frozen snapshot of a finalised original)
@@ -1500,6 +1556,7 @@ DUP_SKIP = {"id", "number", "status", "created_at", "updated_at", "sent_at", "cr
             "due_date", "paid_at", "pdf_sha256", "xml_sha256", "datev_sent_at",  # 2.38.0: the invoice's own marks
             "cancels_id", "ref_doc_ids", "source_doc_id",  # 2.38.0 review: a copy is a fresh document, bound to nothing
             "terms",  # 2.113.2 (#2253): a copy takes the terms when it is finalised itself
+            "replaces_id",  # 2.437.0 B (#3621): set below, only when asked for
             "version_of", "cashflow",  # 2.88.0 (#1915): set below (a quotation's copy = its next version, cash flow auto)
             "series_id", "series_period", "abs_refs",  # 2.120.0 A (#2087): abs_refs  # 2.91.0 A (#1923): a copy is no invoice of the series (office/recurring.py sets them itself)
             "reminder_fee_state", "agent_id", "list_id", "dup_times_from",  # 2.355.0 A (#2839): inv_type -- a copy of a final invoice is a plain one
@@ -1510,15 +1567,21 @@ DUP_ITEM_SKIP = {"id", "tax_pct", "net", "tax_amount"}
 @app.post("/api/office/docs/<int:did>/duplicate")
 def odoc_duplicate(did):
     """A copy as a new draft of today with the next number (positions, rights and texts copied); also of a finalised
-    document (= a new version)."""
+    document (= a new version). 2.437.0 B (#3621): {replaces: true} on a sent / accepted quotation = the copy replaces it (replaces_id)
+    and the original is superseded at once; without it (a supplement) both stay as they are."""
     c, uid, oid = _ctx()
     admin = office_role(c, uid, oid) == "admin"
+    b = body()
+    replaces = isinstance(b, dict) and b.get("replaces") is True
+    if replaces:
+        write_lock(c, f"office_doc_{int(did)}")
     r = doc_row(c, oid, did)
+    replaces = replaces and r["kind"] == "offer" and r["status"] in OFD_REPLACEABLE
     if r["kind"] == "delivery":  # 2.434.0 B (#3608): a copy is a new delivery note
         office_need_feature(c, oid, "docs.delivery")
     if r["kind"] == "credit":  # 2.354.0 D (#2838): a copy would be a credit note bound to no invoice
         raise Denied(409, tr("A credit note needs a finalised invoice"))
-    ref, hit = ofi_ref_doc(c, oid, uid, body())  # 2.269.0 D (#3046): sent again = the copy made the first time
+    ref, hit = ofi_ref_doc(c, oid, uid, b)  # 2.269.0 D (#3046): sent again = the copy made the first time
     if hit:
         return jsonify(doc_public(c, oid, doc_row(c, oid, hit), admin))
     s = office_settings(c, oid)
@@ -1530,6 +1593,8 @@ def odoc_duplicate(did):
     if r["kind"] == "offer":  # 2.88.0 (#1915): the chain of versions points at its first quotation (a copy of a copy too)
         row["version_of"] = r["version_of"] or r["id"]
         row["list_id"] = r["list_id"]  # 2.168.0 A (#2665): a new version stays in the project (an invoice's copy does not)
+        if replaces:
+            row["replaces_id"] = r["id"]
     if r["kind"] == "invoice" and r["client_id"] and r["service_from"] and r["service_to"]:
         row["dup_times_from"] = r["number"] or f"#{did}"  # 2.154.0 D (#2567): its hours are billed on the original; the copy binds none
     nid = insert_id(c, f"INSERT INTO office_docs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
@@ -1550,6 +1615,8 @@ def odoc_duplicate(did):
     recalc(c, oid, nid)
     n = doc_row(c, oid, nid)
     ofx_log(c, oid, "duplicate", doc_id=nid, detail={"from_id": did, "from_number": r["number"], "number": n["number"]})
+    if replaces:
+        odoc_set_status(c, oid, did, "superseded", uid, r)
     bump(c)
     c.commit()
     return jsonify(doc_public(c, oid, n, admin)), 201
@@ -1625,6 +1692,7 @@ def odoc_delete(did):
     if not _ofr_may(c, uid, oid, "manage"):  # 2.187.0 B (#2476): office groups: deleting = manage the area
         raise Denied(403, tr("Only an admin of this workspace can do this"))
     if r["trial"]:  # 2.144.10 A (#2576): a trial document goes at any time
+        odoc_replace_undo(c, oid, r, uid)  # 2.437.0 B (#3621)
         paths = trial_drop_doc(c, oid, r)
         bump(c)
         c.commit()
@@ -1651,6 +1719,7 @@ def odoc_delete(did):
                 sub=r["kind"], extra_nulls=[("time_entries", "billed_doc_id", did, te)] if te else ())
     from .timebill import tbill_free
     tbill_free(c, did)  # 2.144.6 A (#2053): the time entries of the deleted document are open again
+    odoc_replace_undo(c, oid, r, uid)  # 2.437.0 B (#3621)
     odoc_unlink_refs(c, oid, [did])
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
     from .docref import ofd_deleted

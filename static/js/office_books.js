@@ -67,13 +67,14 @@ function bkTabHtml() {
   for (let y = yNow + 1; y >= yNow - 6; y--) years.push([y, String(y)]);
   const head = `<div class="ofcbar bk-bar"><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('bk-year', BK.year, years)}</label><span class="spacer"></span>
     ${ofcFeat('books.datev') ? `<a class="btn sm ghost" href="#office/books/archive" data-bk-archive>${ic('archive', 's')}<span>${tr('Booking archive')}</span></a>` : ''}
-    <a class="btn sm ghost" href="#office/books/procdoc" data-bk-procdoc>${ic('file', 's')}<span>${tr('Procedure documentation')}</span></a></div>
+    ${OFC.info?.procdoc !== false ? `<a class="btn sm ghost" href="#office/books/procdoc" data-bk-procdoc>${ic('file', 's')}<span>${tr('Procedure documentation')}</span></a>` : ''}</div>
     ${bkPhotoHtml()}`;
-  const txd = typeof txdSectionHtml === 'function' && ofcFeat('books.tax_dates') ? txdSectionHtml() : '';  // part C: the tax dates; 2.147.0 (#2460): only while on
+  // 2.365.2 D (#2789): tax reserve, VAT basis and tax dates are set in Settings > Company & office > Bank & taxes (ost_taxHtml)
+  const set = ofcSetLink('tax', ofcFeat('books.tax_dates') ? tr('Tax reserve, VAT basis and tax dates') : tr('Tax reserve and VAT basis'));
   const dob = typeof dimp_obHtml === 'function' && ofcFeat('books.datev') ? dimp_obHtml(BK.year) : '';  // 2.148.0 D (#2458): opening balances of the DATEV import
   const plk = typeof plSectionHtml === 'function' && ofcFeat('books.gobd') ? plSectionHtml() : '';  // 2.148.0 A (#2471): lock periods + auditor export
   // 2.298.0 A2 (#3186): the tax note once at the end of the page, no longer under every part (R7)
-  return head + bkReceiptsHtml() + bkEuerHtml() + (BK.ustva?.off ? '' : bkUstvaHtml()) + bkExportHtml() + bkSettingsHtml() + txd + dob + plk + bkNote();
+  return head + bkReceiptsHtml() + bkEuerHtml() + (BK.ustva?.off ? '' : bkUstvaHtml()) + bkExportHtml() + set + dob + plk + bkNote();
 }
 // the upload of receipts (camera / files); 2.276.0 A (#3039): also on top of Office > Receipts (office_receipts.js rcp_tabHtml)
 const bkPhotoHtml = () => `<div class="bk-photo"><label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf,.xml,application/xml,text/xml" capture="environment" multiple hidden></label>
@@ -85,7 +86,7 @@ function bkExportHtml() {
   const y = BK.year, q = `from=${y}-01-01&to=${y}-12-31`;
   return `<section class="bk-sec" aria-labelledby="bk-exh"><div class="ofcbar"><h3 class="ofcgrp" id="bk-exh">${tr('Export for the tax advisor {0}', y)}</h3><div class="shint">${tr('All invoices, credit notes, payments, receipts and travel expenses of the year in one list; the ZIP also holds the invoice PDFs and the receipt files.')}</div><span class="spacer"></span>
     <a class="btn sm ghost" href="/api/office/books/export?${q}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/books/export?${q}&zip=1" download>${ic('download', 's')}<span>ZIP</span></a></div>
-    ${BK.info.incomplete ? `<p class="shint bk-exgap"><a href="#office/receipts">${tr('{0} receipts without date or amount are not in the export - complete them', BK.info.incomplete)}</a></p>` : ''}</section>`;  // 2.356.0 (#3097)
+    ${BK.info.incomplete ? `<p class="shint bk-exgap"><a href="#office/receipts">${trn('{0} receipt without date or amount is not in the export - complete it', '{0} receipts without date or amount are not in the export - complete them', BK.info.incomplete)}</a></p>` : ''}</section>`;  // 2.356.0 (#3097)
 }
 
 function bkRcRow(r) {
@@ -171,7 +172,7 @@ function bkItemRow(it) {
 }
 function bkSettingsHtml() {
   const s = OFC.info?.settings || {};
-  return `<section class="bk-sec" aria-labelledby="bk-sh"><h3 class="ofcgrp" id="bk-sh">${tr('Settings')}</h3>
+  return `<section class="bk-sec" aria-labelledby="bk-sh"><h3 class="ofcgrp" id="bk-sh">${tr('Tax reserve and VAT basis')}</h3>${''/* 2.365.2 D (#2789): in Settings > Company & office > Bank & taxes */}
     ${ofcRowF('bk-reserve', tr('Tax reserve'), `<input id="bk-reserve" type="number" min="0" max="60" step="1" inputmode="numeric" class="numin bk-pct" value="${+s.tax_reserve_pct || 0}"><span class="muted">%</span>`, tr('Share of the net money received that is put aside in the cash flow (0 = off).'))}
     <div class="row"><label id="bk-basisl">${tr('VAT')}</label><div class="seg" role="group" aria-labelledby="bk-basisl">${[['ist', tr('Cash basis (on payment)')], ['soll', tr('Accrual basis (on invoicing)')]].map(([k, n]) => `<button type="button" data-bk="basis" data-v="${k}" class="${(s.vat_basis || 'ist') === k ? 'on' : ''}" aria-pressed="${(s.vat_basis || 'ist') === k}">${esc(n)}</button>`).join('')}</div></div></section>`;
 }
@@ -227,7 +228,7 @@ async function bkMerge(files) {  // the photos -> one PDF (abscan.js: smaller on
 function bkDups(dups) {
   if (!dups.length) return;
   if (dups.length === 1) { toast(tr('This file already exists: {0}', dups[0].name), () => bkSheet(dups[0].id, false), 8000, tr('Open')); return; }
-  toast(tr('{0} files already exist', dups.length), () => {
+  toast(trn('{0} file already exists', '{0} files already exist', dups.length), () => {
     const md = modal(`<h3>${tr('Already there')}</h3><ul class="ofclist" role="list">${dups.map(d => `<li><button type="button" class="ofcrow" data-bk="rc" data-id="${+d.id}"><span class="ofcn"><b>${esc(d.name)}</b></span>${ic('chev', 's')}</button></li>`).join('')}</ul>
       <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
     md.classList.add('ofcdlg'); fgModal(md);
@@ -319,6 +320,7 @@ function bkAcctLine(md) {
   const x = bkAcct(cat);
   el.innerHTML = x ? `<span>${esc(tr('Account {0} ({1})', x.account, a.chart))}${x.own ? '' : ' · ' + esc(tr('default account'))}</span> <button type="button" class="btn sm ghost" data-m="acct">${tr('Change account')}</button>`
     : `<span>${esc(tr('New category: account after saving'))}</span>`;
+  if (x) el.insertAdjacentHTML('beforeend', ` <button type="button" class="linkbtn" data-setgo="biz-datev">${esc(tr('All accounts: Settings › Company & office › Data (DATEV)'))}</button>`);  // 2.365.2 D (#2789): the upkeep of all accounts
 }
 function bkAcctEdit(md) {
   const el = $('.bk-acct', md), cat = ($('#bk-cat', md)?.value || '').trim(), x = bkAcct(cat);
@@ -415,17 +417,18 @@ async function bkPoll(id, md, touched, n) {  // the recognition runs in the back
 
 // ---- events (delegated)
 document.addEventListener('change', e => {
-  if (S.route?.mod !== 'office' || !['books', 'receipts'].includes(ofcTab())) return;  // 2.276.0 A (#3039): the upload sits on Receipts too
   const t = e.target;
+  if (t.id === 'bk-reserve' && t.closest('.ostax')) { bkReserve(t); return; }  // 2.365.2 D (#2789): Settings > Company & office > Bank & taxes
+  if (S.route?.mod !== 'office' || !['books', 'receipts'].includes(ofcTab())) return;  // 2.276.0 A (#3039): the upload sits on Receipts too
   if (t.id === 'bk-file' || t.id === 'bk-files') { const fs = [...(t.files || [])]; t.value = ''; if (fs.length) bkFiles(fs); return; }  // 2.146.0 B (#2453)
   if (ofcTab() !== 'books') return;
   if (t.id === 'bk-year') { BK.year = +t.value; BK.info = null; BK.euer = null; ofcDraw(); return; }
   if (t.id === 'bk-period') { BK.period = t.value; bkLoadUstva(); return; }
   if (t.id === 'bk-pyear') { BK.pyear = +t.value; bkLoadUstva(); return; }
-  if (t.id === 'bk-reserve') { const n = Math.round(+t.value); if (!Number.isFinite(n) || n < 0 || n > 60) { toast(tr('Invalid value: {0}', tr('Tax reserve'))); t.value = +OFC.info?.settings?.tax_reserve_pct || 0; return; } bkSetUndo('tax_reserve_pct', n); }
 });
+function bkReserve(t) { const n = Math.round(+t.value); if (!Number.isFinite(n) || n < 0 || n > 60) { toast(tr('Invalid value: {0}', tr('Tax reserve'))); t.value = +OFC.info?.settings?.tax_reserve_pct || 0; return; } bkSetUndo('tax_reserve_pct', n); }
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-bk]'); if (!b || S.route?.mod !== 'office') return;
+  const b = e.target.closest('[data-bk]'); if (!b || (S.route?.mod !== 'office' && !b.closest('.ostax'))) return;  // 2.365.2 D (#2789): + Settings > Company & office
   const k = b.dataset.bk;
   if (k === 'rc') { bkSheet(+b.dataset.id, false); return; }
   if (k === 'einv') { bkEinvTake(+b.dataset.id, b); return; }

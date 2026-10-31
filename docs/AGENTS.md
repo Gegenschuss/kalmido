@@ -186,7 +186,7 @@ the threat model is [AGENT-SECURITY.md](AGENT-SECURITY.md).
 
 The quickest way to run a **project agent** on a Mac, a Windows PC or a Linux computer: *Settings > Agents >* (agent) *>
 Set up on a computer* (the download button in the agent's row; admins: in the agent's dialog). Pick Mac / Windows / Linux
-and the project folder; Kalmido shows **one command** to copy, with a **one-time setup code** instead of the API token:
+and the project folder; Kalmido shows **one command** to copy, with a **one-time setup code** instead of the API token (redeeming it revokes the token made with the agent if it was never used, 2.442):
 
 ```sh
 curl -fsSL https://tasks.example.com/agent-setup.sh | KALMIDO_SETUP_CODE=ks_... bash -s -- --url https://tasks.example.com --dir ~/projects/site
@@ -1336,7 +1336,8 @@ review section (default: the section named *Review*) and *Done only after approv
 PUT /api/v1/agent/status   {"status": "idle" | "working" | "waiting" | "error", "text": "short, max 200 chars",
                             "task_id": 51,
                             "model": "Opus 5.5", "permission_mode": "auto", "host_permission_mode": "auto",   (2.32.0, optional)
-                            "host": "studio-mac"}   (2.44.0, optional: the computer, kept on the token in use)
+                            "host": "studio-mac",   (2.44.0, optional: the computer, kept on the token in use)
+                            "text_key": "status_plan_limit", "text_at": "2026-11-02T08:00:00Z"}   (2.450.0, optional, see below)
 GET /api/v1/agent          -> {id, username, display_name, enabled, note, status, status_text, status_at, status_task,
                                job_tasks, jobs: {running, waiting}, webhook: {configured, enabled}, events_cursor,
                                online, last_poll_at, runtime (2.4.1), owner_id, org_id (2.28.0),
@@ -1359,7 +1360,8 @@ spinning ring while an agent works and an accent dot while it waits. `idle` clea
 
 **What the host really runs with (2.32.0).** With each status the host may report `model` (the model it really runs, as
 people know it, e.g. "Opus 5.5"; max. 80 characters), `permission_mode` (`ask` | `auto`: what the current run uses) and
-`host_permission_mode` (its own default when the person chose "Host default"). Kalmido keeps the last values with the
+`host_permission_mode` (its own default when the person chose "Host default"), and 2.437.0 `permission_fixed` (true: the
+computer set the mode, Kalmido's switch does not reach it). Kalmido keeps the last values with the
 agent (`host` in the agent objects people get) and shows them in the chat (2.350.0: in the chat header's "…" menu as
 "Permissions: …" and "Model: …"; the header itself keeps the name and one state): the permission entry says
 "Host default (Auto)" instead of only "Host default", the model entry stands next to it, and a model set in the runtime settings
@@ -1853,6 +1855,7 @@ expect files there.
 |---|---|---|
 | The top: what is shared with you + your own folder | `GET /api/v1/files` | `list_files` |
 | A folder's children (`?parent_id=`) / one node with its children or versions | `GET /api/v1/files?parent_id=<id>`, `GET /api/v1/files/{id}` | `list_files` with `folder_id` |
+| 2.443.0: by tag (every node has `tags: [{id, name}]`; `tag=1,7;3` = ids, `;` separates tags, `tag_mode=all` = every one, `not_tag=`; with `parent_id` its children, without: all you see at any depth, at most 500) | `GET /api/v1/files?tag=<ids>` | `list_files` with `tag` |
 | A file's bytes (`?version=` an older one) | `GET /api/v1/files/{id}/content` | `read_file` with `as: "base64"` |
 | A file as text (UTF-8, PDF text layer, 2.92.0: Word / Excel) | `GET /api/v1/files/{id}/text` | `read_file` |
 | Files by name or text (2.61.0: also the text recognised in scans / photos; `hit: name \| text \| doc`, 2.353.0: doc = sender, type or a tag of a document) | `GET /api/v1/files/search?q=` | `search_files` |
@@ -2021,7 +2024,7 @@ a folder above it) is shared with it, and every access is written into the file'
 | What | Endpoint | MCP |
 |---|---|---|
 | Documents shared with you (`q` = words of the text, `review=1` = waiting in *To review*; 2.122.0: `q` takes `tag:Name`, `sender:Name`, `type:Name`, `date:2025-01..2025-03`, `"exact phrase"`, `-word`; filters `tag` / `not_tag` / `tag_mode`, `sender`, `type`, `folder`, `added_from` / `added_to`, `no_tag`, `no_sender`, `ftype`) | `GET /api/v1/documents` | `list_documents` |
-| One document with its fields, open suggestions and the recognised text | `GET /api/v1/documents/{id}` | `get_document` |
+| One document with its fields, open suggestions, the recognised text and (2.440.0) `einvoice`, the fixed fields of an incoming e-invoice | `GET /api/v1/documents/{id}` | `get_document` |
 | A new document (2.122.0: `content_base64` + `name`, or multipart `file`; optional `title`, `parent_id`, `sender`, `type`, `tags`, `date`, `due`, `amount`, `currency`; without `parent_id` an agent writes into its own result folder) | `POST /api/v1/documents` | `create_document` |
 | Set fields (role *edit*): `date`, `due`, `amount`, `currency`, `sender`, `type`, `tags` (names), `custom_fields` (2.153.0: `{name or id: value}`, only fields the workspace has) | `PATCH /api/v1/documents/{id}` | `update_document` |
 | The file itself | `GET /api/v1/files/{id}/content` | -- |
@@ -2073,7 +2076,7 @@ only**: a person reserves the number, finalises, sends, deletes and books. Three
 - the scope `office` of the agent's token (Settings > Agents > Permissions: *Office drafts*);
 - the agent's switch **May draft office documents** (in its settings dialog; set by an admin of its office area, in a
   personal office by the person);
-- the area's privacy switch **Agents may read office data** (Office > Settings > Agents): client and price data go to the
+- the area's privacy switch **Agents may read office data** (Settings > Company & office > Access): client and price data go to the
   agent's AI model.
 
 The agent works in the office area of its workspace (`agents.org_id`); a personal agent without one works in its owner's
@@ -2084,7 +2087,7 @@ for something lately (a chat message, an @mention, an assignment, a job, *Let an
 last 48 hours): else `403` ("this person has not asked the agent") -- act for the person who asked you, never pick another one.
 
 **Office access of an agent: the office rights groups (2.187.0).** The office gives each person and agent its areas
-through groups (Office > Settings > Rights: levels none / own / view / edit / manage per area). An agent without a group
+through groups (Settings > Company & office > Rights in the office: levels none / own / view / edit / manage per area). An agent without a group
 has no office access; an agent that had the switch *May draft office documents* on before keeps that previous access
 until someone puts it into a group, then only its groups count (the switch no longer matters). 2.223.2: in an organisation
 that previous access is the quotes' scope (services, text blocks, framework contracts, clients, documents); payment
@@ -2101,7 +2104,7 @@ it: an agent never gets more than that person. An agent never manages office rig
 | The area, the person, the rules; 2.147: `country_pack` and `features` (the office functions as switched on, e.g. `books.datev: false`); 2.189: `home_currency` (price list and books; `currency` = the currency of new documents) | `GET /api/v1/office` | `get_office` |
 | Services, text blocks, framework contracts, clients (`q`) -- never purchase prices | `GET /api/v1/office/{services\|texts\|contracts\|clients}` | `list_office_data` |
 | Documents (`kind` offer / invoice / credit / reminder, `client_id`, `status`, `open=1`, 2.144.10: `trial=1\|0`) | `GET /api/v1/office/docs` | `list_office_documents` |
-| One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends; 2.356: an invoice's `source_offer` = the quotation it was made from, a quotation's `offer_invoices` = its invoices with `state`) | `GET /api/v1/office/docs/{id}` | `get_office_document` |
+| One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends; 2.356: an invoice's `source_offer` = the quotation it was made from, a quotation's `offer_invoices` = its invoices with `state`; 2.437: status `superseded` = replaced by a newer quotation, it counts nowhere and cannot be accepted any more; `replaces` / `replaced_by` name the quotations) | `GET /api/v1/office/docs/{id}` | `get_office_document` |
 | The PDF preview of a draft (marked as a draft) | `GET /api/v1/office/docs/{id}/pdf` | -- (binary; the chat card links it) |
 | A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`; 2.144.10: `trial` = a trial quotation) | `POST /api/v1/office/offers` | `create_offer_draft` |
 | Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent; 2.269: `expect_updated_at`, positions with their `id`; 2.270: `items[].id` of each kept position keeps its purchase price, price, unit and flags, `expect_updated_at` answers 409 + `current` when a person changed the draft since) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
@@ -2420,6 +2423,9 @@ agent accordingly.
 personal agent, and an admin for a team agent, switch it there (`PUT /api/agents/{id}/permission-mode {"mode": "auto"}`)
 or in the runtime section; the owner of a personal agent also through `PATCH /api/my/agents/{id} {"runtime": {…}}`. The
 host reads it before every run (Claude Code: `--permission-mode` with `default` for *ask*, `auto` for *auto*).
+2.437.0: this holds unless the computer fixed the mode: `--permission-mode` in the agent's command, or
+`KALMIDO_PERMISSION_MODE`, win over the switch; the same goes for a command that is not Claude Code. The host then reports
+`permission_fixed: true`, and the switch shows "Set on its computer" and is locked.
 
 2.312.0: *Permission questions go to* is offered in the runtime section of a team agent (the people come from
 `GET /api/agents/{id}/perm-users` -> `{team, current, people: [{id, name}]}`, for instance admins and the owner of a personal
@@ -2507,14 +2513,24 @@ no, `KALMIDO_PERM_RELAY=0`: off), and each person's chat goes on in one conversa
 runs, a pause, a new day, a model change or *Reset now*, with a summary as context; `KALMIDO_SESSION_RESUME=0`: off); 429
 is tried again after 5 / 15 / 30 / 60 s, a run has a time limit (`KALMIDO_RUN_TIMEOUT`, default 3600 s) and two tries,
 events wait in a queue on disk and a lock stops a second runner on the same state folder. A server without steps, host info, plan usage or approval cards (before 2.32 / 2.33 / 2.35) is
-detected by its answer (404 / 400) and the feature is switched off once. Keys in the env file: `KALMIDO_EVENTS=1` (same
+detected by its answer (404 / 400) and the feature is switched off once. 2.450.0: everything the runner says itself (permission question, failed run, reminders, notices, the hint on an answer without
+a card) comes from one table by the agent's language (`lang` of `GET /api/v1/agent`: de, en, fr, es, it, nl, otherwise English),
+yes and no count in these languages, and so does the check for an answer that asks without a card. `KALMIDO_PERM_TEXT` and the
+other text variables override a text in every language. Its status texts also go out as `text_key` (`status_chat`,
+`status_event`, `status_no_command`, `status_run_failed`, `status_outside_hours`, `status_plan_limit`) with `text_at` (ISO, the
+time in the text): `GET` carries them as `status_key` / `status_key_at` and the app shows the text in the language of whoever
+looks. `text` is still required for anything to show and stays what an older app or an unknown key shows; a server before
+2.450.0 answers 400 and gets the status again without the key.
+Keys in the env file: `KALMIDO_EVENTS=1` (same
 as `--events`), `KALMIDO_PROMPT_FILE`, `KALMIDO_STATE_DIR` (event cursor, default `~/.cache/kalmido-agent`),
 `KALMIDO_PERMISSION_MODE`, `KALMIDO_PERM_RELAY`, `KALMIDO_PERM_TIMEOUT`, `KALMIDO_PERM_USER` (2.126.0: with the owner and
 `KALMIDO_OWNER_IDS` the only ones who answer permission questions; anyone else chatting gets the step denied; 2.312.0: a
 person chosen in the agent's runtime settings comes first), `KALMIDO_APPROVAL_REMIND`,
 `KALMIDO_APPROVAL_TTL`, `KALMIDO_SESSION_RESUME`, `KALMIDO_SESSION_MAX_TOKENS`, `KALMIDO_SESSION_MAX_RUNS`,
 `KALMIDO_SESSION_IDLE_MIN`, `KALMIDO_RUN_TIMEOUT` (2.44.0), `KALMIDO_USAGE_LIMIT`, `KALMIDO_USAGE_FILE`, `KALMIDO_USAGE_MAX_AGE_H` (default 6: older
-values count as unknown), `KALMIDO_PYTHON`. The list of these capabilities is
+values count as unknown), `KALMIDO_PYTHON` (2.443.0: both launchers and both setup scripts use it for every Python call).
+2.443.0: both launchers stop alike: TERM / INT end the command and all it started (KILL after 30 s; Windows `taskkill /T`,
+`/F` after 30 s), a command that cannot start or an error in one round never ends the launcher. The list of these capabilities is
 [`mcp/launcher_capabilities.json`](../mcp/launcher_capabilities.json); `tests/launcher_parity_test.py` fails when one of the
 two launchers lacks one.
 

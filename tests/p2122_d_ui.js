@@ -24,7 +24,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   const yPrev = new Date().getFullYear() - 1;
 
   const w = await boot({hash: 'office/books/ustva'}); const d = w.document;
-  check(await until(() => d.querySelector('#bk-ustva .seg') && d.querySelector('#txd-ustva'), 80), 'the bookkeeping tab with the VAT figures and the tax dates');
+  // 2.365.2 D (#2789): the tax dates are set in Settings > Company & office > Bank & taxes; the bookkeeping tab links there
+  check(await until(() => d.querySelector('#bk-ustva .seg') && d.querySelector('#view [data-setgo="biz-tax"]'), 80) && !d.querySelector('#view #txd-ustva'), 'the bookkeeping tab with the VAT figures and the link to the tax dates');
   const seg = () => [...d.querySelectorAll('#bk-ustva [data-bk="mode"]')];
   check(seg().map(b => b.dataset.v).join() === 'month,quarter,year' && /Whole year/.test(seg()[2]?.textContent || ''), 'the period: month / quarter / whole year');
   check(w.eval('BK.mode') === 'quarter' && !!d.querySelector('#bk-period'), 'no tax dates: quarters by default, the quarter field');
@@ -38,6 +39,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   check(await until(() => w.eval(`BK.mode === 'quarter' && /^q[1-4]$/.test(BK.period)`) && !!d.querySelector('#bk-period'), 40), 'back to quarters');
 
   // the tax dates: yearly
+  d.querySelector('#view [data-setgo="biz-tax"]').click();
+  check(await until(() => d.querySelector('.smodal #s-biz #txd-ustva'), 80), 'the link opens Settings > Company & office with the tax dates');
   check(d.querySelectorAll('#txd-ustva option').length === 4 && !!d.querySelector('#txd-ustva option[value="year"]')
     && /Yearly \(annual return only\)/.test(d.querySelector('#txd-ustva option[value="year"]').textContent), 'the tax dates offer "Yearly (annual return only)"');
   const sel = d.querySelector('#txd-ustva'); sel.value = 'year';

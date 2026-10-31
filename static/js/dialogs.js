@@ -453,7 +453,7 @@ function listMenuItems(id, anchor) {
   // 2.25.0 (UX-52): list or project is the switch "Project features" in "Edit list…" (no "As a list / As a project" here)
   void k;
   if (collab() && l.shared) items.push({label: tr('Notifications: {0}', bellLabel(l.bell)), icon: BELL_ICON[l.bell || 'default'], rare: 1, fn: () => bellMenu(at(), id)});
-  { const fv = favMenuItem(l); if (fv) items.push(fv); }  // 2.40.0 (#1361): the personal star
+  { const fv = favMenuItem(l), o = items.findIndex(x => x && x.label === tr('Open')), c = items.findIndex(x => x?.rcls === 'mcols'); if (fv) items.splice(o >= 0 ? o + 1 : c >= 0 ? c + 2 : 0, 0, fv); }  // 2.40.0 (#1361): the personal star; 2.441.0 (#3592): second, right after Open
   if (progressFor(l) && !l.is_inbox) items.push(progHidden(id) ? {label: tr('Show progress'), icon: 'eye', rare: 1, fn: () => setProgHidden(id, false)} : {label: tr('Hide progress'), icon: 'x', rare: 1, fn: () => setProgHidden(id, true)});
   // U12: archive (with undo) instead of delete; deleting for good only from the archive
   // 2.25.0 (UX-13): delete from every list menu; 2.39.1 (#1188): also list admins, organisation admins (listadmin.js)
@@ -1091,7 +1091,19 @@ function listModal(id, folder = '', o = {}) {
   if (id) {
     md.addEventListener('input', e => { if (['l-name', 'l-folder', 'l-rate', 'l-dayh'].includes(e.target.id)) later(e.target); if (e.target.id === 'l-name') fl_nameLive(id, formBody().name); });  // 2.46.2 (#1659)
     md.addEventListener('focusout', e => { if (['l-name', 'l-folder', 'l-rate', 'l-dayh'].includes(e.target.id)) { const empty = e.target.id === 'l-name' && !e.target.value.trim().replace(EMO_RE, ''); autosave().then(() => { if (empty) lsync(true); }); } });
-    onRemove(md, () => { if (pend.size) autosave(); else fl_nameEnd(id); });
+    // 2.422.0 A (#3468): the page goes away within the 0.9 s of typing: the fields waiting go out with keepalive (core.js
+    // keepSend; a list has no queue, so closing / reloading asks while one waits or a save runs). A folder is not sent then
+    // (a new one / one with other defaults asks first in autosave); the question keeps it. 2.440.0 (#3654): + after a failed save (the text is only in the form)
+    const leave = () => {
+      if (!pend.size) return;
+      const ks = [...pend.keys()].map(e => ({'l-name': 'name', 'l-rate': 'rate', 'l-dayh': 'day_hours'})[e]).filter(Boolean);
+      const cur = listById(id); if (!cur || !ks.length) return;  // the timers stay: a page kept for "back" saves the rest then
+      const body = formBody(), diff = {}, prev = {};
+      for (const k of ks) if (k in body && lv(k, lbase[k]) !== lv(k, body[k]) && lv(k, cur[k]) !== lv(k, body[k])) { diff[k] = body[k]; prev[k] = lbase[k] ?? null; }
+      if (Object.keys(diff).length && keepSend('PATCH', '/api/lists/' + id, {...diff, _prev: prev})) for (const k in diff) lbase[k] = diff[k];
+    };
+    const fgOff = typeof fgPending === 'function' ? fgPending(leave, () => pend.size > 0 || lbusy > 0 || lfail) : () => {};
+    onRemove(md, () => { fgOff(); if (pend.size) autosave(); else fl_nameEnd(id); });
     // 2.359.2 B (#3049): Esc / the backdrop like "Close" when something is not saved yet (else at once, as before)
     md._close = async () => { if (pend.size || lfail || lbusy) { await autosave(); if (lfail && !await lDiscard()) return; } md.remove(); };
   }

@@ -6,6 +6,7 @@ const UMZ = {timer: 0, up: null};
 const umzHtml = hint => `<h4 id="s-umz-h">${tr('Move and export everything')}</h4>
   ${hint(tr('One file with everything that is yours: projects, tasks, comments, files, calendars, contacts, habits and settings. Use it to move to your own Kalmido server (or back) or as your own copy of your data.'))}
   <div id="s-umz-exp" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div>
+  <div id="s-umz-sig"></div>
   <div class="row"><label for="s-umz-file">${tr('Take over from a Kalmido export')}</label>${fileBtn('s-umz-file', '.zip,application/zip')}${''/* lazy-ok: 2.149.0 F (#2519): settings.js draws this section */}</div>
   <div id="s-umz-imp" aria-live="polite"></div>
   <details class="umzhow"><summary>${tr('Move to your own server')}</summary><ol class="umzsteps">
@@ -19,6 +20,12 @@ function umzExpHtml(j) {
   if (j.state === 'done') return `<div class="row umzdone"><span class="n">${esc(j.file)} <span class="muted">(${esc(fmtSize(j.bytes || 0))}) · ${esc(tr('available until {0}', fmtWhen(j.expires_at)))}</span></span></div>
     <div class="row"><a class="btn sm pri" href="/api/account/export/file" download data-sudl>${ic('download', 's')} ${tr('Download')}</a><button type="button" class="btn sm" data-umz="exp-del">${ic('trash', 's')} ${tr('Delete now')}</button>${start(tr('Create again'))}</div>`;
   return (j.state === 'failed' ? `<div class="shint keep">${ic('alert', 's')} ${esc(j.error || '')}</div>` : '') + `<div class="row">${start(tr('Export everything'))}</div>`;
+}
+// 2.360.2 D (#2561): approval records of deleted video reviews: shown here only when there are some
+async function umzSigLoad(md) {
+  const box = $('#s-umz-sig', md); if (!box) return;
+  const rows = (await api('GET', '/api/videos/signoffs/orphaned').catch(() => ({}))).signoffs || [];
+  box.innerHTML = rows.length ? `<h4>${tr('Approvals of deleted videos')}</h4><ul class="sglist" role="list">${rows.map(x => `<li class="sgrow"><div class="sghead"><b>${esc(x.title || '?')}</b><small class="muted"> · ${esc(fmtWhen(x.signed_at || x.created_at))}${x.signer_name ? ' · ' + esc(x.signer_name) : ''}</small></div>${x.kept_until ? `<small class="muted">${esc(tr('This record is kept until {0} by law', fmtDate(x.kept_until)))}</small>` : `<button type="button" class="btn sm danger" data-umz="sigdel" data-id="${+x.id}">${tr('Delete')}</button>`}</li>`).join('')}</ul>` : '';
 }
 async function umzExpLoad(md) {
   const box = $('#s-umz-exp', md); if (!box) return;
@@ -36,6 +43,9 @@ const umzCounts = o => Object.entries(o || {}).filter(([k, n]) => n && umzCount(
 // file as a suggestion the admin confirms
 const UMZ_ORG_TICK = N_('Invite to the organisation (projects are shared with members only)');
 const umzRoleSel = (x, i, hide) => `<select class="umzrole" data-umzr="${i}" aria-label="${esc(tr('Role of {0}', x.name || ''))}"${hide ? ' hidden' : ''}>${['member', 'admin'].map(r => `<option value="${r}"${x.role === r ? ' selected' : ''}>${r === 'admin' ? tr('Admin') : tr('Member')}</option>`).join('')}</select>`;
+// 2.362.3 (#3098): when it came in, and until when that can be undone
+const umzAgainText = e => e ? [tr('This export, or an older one of the same account, was imported on {0} (import {1}).', esc(fmtWhen(e.at)), '#' + (+e.id)),
+  e.undo_until ? tr('You can undo that until {0}.', esc(fmtWhen(e.undo_until))) : ''].filter(Boolean).join(' ') : tr('This export was imported already.');
 function umzPreviewHtml(j) {
   const p = j.preview, org = p.kind === 'org', src = p.source.url ? esc(p.source.url) : tr('unknown');
   const people = p.people.length ? `<div class="muted mhint">${tr('People of your projects')}</div>` + p.people.map((x, i) => `<div class="mrow umzp">
@@ -45,7 +55,7 @@ function umzPreviewHtml(j) {
       + (p.can_invite && !x.key.startsWith('id') ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="invite"> ${tr('Invite by e-mail')}</label>${x.need_address === false ? '' : `<input type="email" class="umzem" data-umze="${i}" autocomplete="off" placeholder="${esc(tr('Their e-mail address'))}" aria-label="${esc(tr('E-mail address of {0}', x.name || ''))}"><span class="muted umzmis" data-umzm="${i}" hidden>${tr('This is not the address in the file: nobody is invited.')}</span>`}` : x.by_login ? '' : `<span class="muted">${tr('Skipped')}</span>`)}</div>`).join('')
     + hintK(tr('Nothing is shared without a tick: an address on another server can belong to somebody else here.')) : '';
   const lists = p.lists.length ? `<div class="umzlists">${p.lists.slice(0, 12).map(l => `<div class="mrow"><span class="n">${esc(l.inbox ? tr('Basket') : l.name)}${l.folder ? ` <span class="muted">${esc(l.folder)}</span>` : ''}</span><span class="muted">${trn('{0} task', '{0} tasks', l.tasks)}</span></div>`).join('')}${p.lists.length > 12 ? `<div class="muted mhint">${esc(trn('and {0} more', 'and {0} more', p.lists.length - 12))}</div>` : ''}</div>` : '';
-  const notes = [p.again ? `<div class="shint warn" role="alert">${ic('alert', 's')} ${tr('You have imported this export already. Importing it again creates everything a second time.')}</div>` : '',
+  const notes = [p.again ? `<div class="shint warn" role="alert">${ic('alert', 's')} ${umzAgainText(p.earlier)}</div><label class="umzck"><input type="checkbox" data-umzagain> ${tr('Import again: what is already in the chosen place is skipped')}</label>` : '',  // 2.362.3 (#3098)
     p.server_links.length ? hintK(tr('Set up the connection to {0} again (Settings > Account > Servers): access keys never move along.', p.server_links.map(esc).join(', '))) : '',
     p.encrypted.attachments || p.encrypted.locked_notes ? hintK(p.encrypted.keys === 'take' ? tr('Your encryption keys come along: locked notes and your encrypted files open with your passphrase from before.')
       : p.encrypted.keys === 'keep' ? tr('You already have your own encryption keys here: locked notes and encrypted files from the export arrive unreadable.')
@@ -128,6 +138,7 @@ async function umzUpload(md, file) {
 function umzInit(md) {
   if (!$('#s-umz-exp', md)) return;
   umzExpLoad(md);
+  umzSigLoad(md);
   api('GET', '/api/account/import').then(j => { if (j.current && j.current.state !== 'upload') umzImpDraw(md, j.current); }).catch(() => {});
   $('#s-umz-file', md)?.addEventListener('change', e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) umzUpload(md, f).catch(() => umzImpDraw(md, null)); });
   md.addEventListener('change', async e => {  // review M1: a typed address that is not the one in the file -> hint at once
@@ -144,6 +155,7 @@ function umzInit(md) {
     const b = e.target.closest('[data-umz]'); if (!b) return;
     const a = b.dataset.umz;
     try {
+      if (a === 'sigdel') { await api('DELETE', `/api/videos/signoffs/orphaned/${+b.dataset.id}`); toast(tr('Deleted')); return umzSigLoad(md); }
       if (a === 'exp') { b.disabled = true; await api('POST', '/api/account/export'); return umzExpLoad(md); }
       if (a === 'exp-del') {
         if (!await askConfirm(tr('Delete the export now?'), tr('The file is removed from the server. You can create a new one at any time.'), {ok: tr('Delete'), danger: true})) return;
@@ -170,13 +182,14 @@ function umzInit(md) {
           people[k] = {...people[k], [x.dataset.k]: true, ...(em ? {email: em} : {}), ...(login ? {login} : {})};
           const rs = $(`[data-umzr="${i}"]`, md); if (rs && x.dataset.k === 'share') people[k].role = rs.value;  // 2.278.0 A (#3095)
         }
+        if (UMZ.cur.preview?.again && !$('[data-umzagain]', md)?.checked) { toast(tr('Tick “Import again” first: this export was imported already.')); return; }  // 2.362.3 (#3098)
         let t = $('#s-umz-tgt', md)?.value || 'private';
         // 2.87.9 (#1940): where the account's data goes, in words; from an organisation also into the private space
         const to = await importTargetConfirm({what: tr('the data of the account'), ws: t === 'private' ? 'private' : 'org:' + t, privOk: true});
         if (!to) return;
         if (to === 'private') t = 'private';
         b.disabled = true;
-        return umzImpDraw(md, await api('POST', `/api/account/import/${UMZ.cur.id}/run`, {target: t === 'private' ? 'private' : +t, people, ...(UMZ.cur.preview?.again ? {again: true} : {})}));  // 2.269.0 D (#3046): the warning was shown
+        return umzImpDraw(md, await api('POST', `/api/account/import/${UMZ.cur.id}/run`, {target: t === 'private' ? 'private' : +t, people, ...(UMZ.cur.preview?.again ? {again: true} : {})}));  // 2.269.0 D (#3046), 2.362.3 (#3098): ticked above
       }
       if (a === 'undo') {
         // 2.272.0 C (#3027): trash instead of delete, what changed since stays -- the texts say exactly that

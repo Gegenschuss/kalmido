@@ -130,7 +130,7 @@ document.addEventListener('click', e => {
 function asst_paneHtml(hint) {
   if (!asst_avail()) return '';
   const a = S.assistant, on = new Set(a.list_ids || []);
-  const ls = S.lists.filter(asst_canList).sort((x, y) => String(x.name).localeCompare(String(y.name)));
+  const ls = S.lists.filter(asst_canList).sort((x, y) => cmpText(x.name, y.name));
   return `<h4 id="s-asst-h">${tr('Assistant')}</h4>
     ${hint(tr('Summarizes, drafts replies, suggests tags and dates, sorts the basket and plans your day. Everything only as a proposal: the assistant changes nothing by itself.'))}
     <div class="row"><label>${tr('Assistant')}</label><label class="chkl"><input type="checkbox" id="s-asst-on" ${a.on ? 'checked' : ''}> ${tr('Use the assistant')}</label></div>

@@ -87,7 +87,8 @@ r = A.put(B + O + "/settings", json={"company": {"name": "Studio Nordlicht GmbH"
                                      "payment_days": 14, "reminder_fee": 5, "reminder_deadline_days": 10, "datev_email": "belege@kanzlei.example"})
 check(r.ok, "settings with company fields and invoice defaults " + r.text[:200])
 st = A.get(B + O + "/settings").json()["settings"]
-check(st.get("invoice_scheme") == "RE-{yyyy}-{seq:03}" and st.get("credit_scheme") == "GS-{yyyy}-{seq:03}" and st.get("reminder_scheme") == "MA-{yyyy}-{seq:03}",
+# 2.431.0 (#3595): credit notes are called Rechnungskorrektur, default scheme RK- (was Gutschrift / GS-)
+check(st.get("invoice_scheme") == "RE-{yyyy}-{seq:03}" and st.get("credit_scheme") == "RK-{yyyy}-{seq:03}" and st.get("reminder_scheme") == "MA-{yyyy}-{seq:03}",
       f"number schemes per kind from the pack: {st.get('invoice_scheme')} {st.get('credit_scheme')} {st.get('reminder_scheme')}")
 check(st.get("datev_email") == "belege@kanzlei.example" and st.get("payment_days") == 14 and st.get("einvoice_format") == "zugferd", "invoice settings stored")
 check(A.put(B + O + "/settings", json={"datev_email": "nope"}).status_code == 400, "settings: DATEV address validated")
@@ -284,14 +285,15 @@ check(len(CR["items"]) == 6 and CR["totals"]["gross"] == "40963.25" and CR["reci
 r = A.put(B + f"{D}/{CR['id']}/items", json={"items": [{"title": "Webhosting (3 Monate)", "qty": 1, "rate": 105}]})
 check(r.ok and r.json()["totals"]["gross"] == "124.95", "partial credit note " + r.text[:100])
 r = A.post(B + f"{D}/{CR['id']}/finalize")
-check(r.ok and r.json()["number"] == "GS-2026-001" and r.json()["status"] == "issued", "credit note finalised with its own series " + r.text[:120])
+# 2.431.0 (#3595): credit notes are called Rechnungskorrektur, default scheme RK- (was Gutschrift / GS-)
+check(r.ok and r.json()["number"] == "RK-2026-001" and r.json()["status"] == "issued", "credit note finalised with its own series " + r.text[:120])
 inv = A.get(B + f"{D}/{IID}").json()
-check(inv["status"] == "issued" and inv["credits"] == "124.95" and inv["open"] == "30838.30" and inv["credits_of"][0]["number"] == "GS-2026-001",
+check(inv["status"] == "issued" and inv["credits"] == "124.95" and inv["open"] == "30838.30" and inv["credits_of"][0]["number"] == "RK-2026-001",
       f"partial credit note lowers the open amount: {inv['open']} credits {inv['credits']}")
 rd = A.get(B + f"{D}/{CR['id']}/render").json()
 meta = dict((k, v) for k, v in rd["meta"])
 # 2.296.0 B (#3175): the credit note prints as "Rechnungskorrektur" (was "Gutschrift")
-check(rd["title"] == "Rechnungskorrektur" and meta.get("Rechnungskorrektur Nr.") == "GS-2026-001" and meta.get("zu Rechnung Nr.", "").startswith("RE-2026-005") and rd["cancels"]["number"] == "RE-2026-005",
+check(rd["title"] == "Rechnungskorrektur" and meta.get("Rechnungskorrektur Nr.") == "RK-2026-001" and meta.get("zu Rechnung Nr.", "").startswith("RE-2026-005") and rd["cancels"]["number"] == "RE-2026-005",
       f"credit note print model: {rd['title']} {meta}")
 # a full credit note cancels the invoice (INV2 is paid -> make a fresh one)
 r = A.post(B + D, json={"kind": "invoice", "client_id": CL, "service_from": "2026-05-01", "items": [{"title": "Beratung", "qty": 1, "rate": 500}]})
@@ -300,7 +302,7 @@ A.post(B + f"{D}/{INV3}/finalize")
 r = A.post(B + f"{D}/{INV3}/credit")
 CR2 = r.json()["id"]
 r = A.post(B + f"{D}/{CR2}/finalize")
-check(r.ok and r.json()["number"] == "GS-2026-002", "second credit note numbered 002")
+check(r.ok and r.json()["number"] == "RK-2026-002", "second credit note numbered 002")
 inv3 = A.get(B + f"{D}/{INV3}").json()
 check(inv3["status"] == "cancelled" and inv3["state"] == "cancelled" and inv3["open"] == "0.00" and inv3["status_text"] == "Cancelled", f"full credit note cancels the invoice: {inv3['status']} open {inv3['open']}")
 check(A.post(B + f"{D}/{INV3}/credit").status_code == 409, "no credit note on a cancelled invoice")

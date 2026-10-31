@@ -19,12 +19,13 @@ import zipfile
 import zlib
 from collections import Counter
 from datetime import date, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from xml.etree import ElementTree as ET
 
 from flask import jsonify
 
 from ..core.config import app
+from ..core.csvimport import amount_text
 from ..core.db import body, bump, iso, now_utc
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_enc_fields
@@ -122,6 +123,7 @@ def vmi_xlsx(raw):
         wb = _xml(z, "xl/workbook.xml", budget)
         wrels = _rels(z, "xl/workbook.xml", budget)
         sheets = [sh for sh in wb.iter() if _local(sh.tag) == "sheet"]
+        d1904 = any(_local(x.tag) == "workbookPr" and (x.get("date1904") or "").lower() in ("1", "true") for x in wb.iter())  # 2.363.0 (#3103): Mac Excel
         if len(sheets) > VMI_SHEETS_MAX:
             raise BadInput(tr("Too many sheets (at most {0})", VMI_SHEETS_MAX))
         out = []
@@ -131,7 +133,7 @@ def vmi_xlsx(raw):
             if not path or path not in names:
                 continue
             out.append({"name": (sh.get("name") or "").strip(), "grid": _sheet(z, path, strings, budget),
-                        "comments": vmi_comments(z, path, names, budget)})
+                        "comments": vmi_comments(z, path, names, budget), "d1904": d1904})
         return out
     # 2.95.0 (review): an encrypted / exotically packed zip (RuntimeError, NotImplementedError, OSError, LZMAError) -> 400 too
     except (ET.ParseError, KeyError, ValueError, zipfile.BadZipFile, zlib.error, EOFError, RuntimeError, NotImplementedError, OSError,
@@ -144,8 +146,9 @@ def vmi_norm(s):
     return re.sub(r"[^0-9a-zäöüß]", "", str(s or "").lower())
 
 
-def vmi_date(v):
-    """An Excel date number ('45714', also with a time fraction), DD.MM.YYYY / DD.MM.YY or YYYY-MM-DD -> 'YYYY-MM-DD' or None."""
+def vmi_date(v, d1904=False):
+    """An Excel date number ('45714', also with a time fraction; d1904: of a workbook with the 1904 date system), DD.MM.YYYY /
+    DD.MM.YY or YYYY-MM-DD -> 'YYYY-MM-DD' or None."""
     s = str(v or "").strip()
     if not s:
         return None
@@ -153,7 +156,7 @@ def vmi_date(v):
         if re.fullmatch(r"\d{4,6}(\.\d+)?", s):
             f = float(s)
             if 1 <= f < 2958466:
-                return (date(1899, 12, 30) + timedelta(days=int(f))).isoformat()
+                return ((date(1904, 1, 1) if d1904 else date(1899, 12, 30)) + timedelta(days=int(f))).isoformat()
             return None
         m = re.fullmatch(r"(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})", s)
         if m:
@@ -189,15 +192,9 @@ def vmi_time(v):
 
 
 def vmi_num(v):
-    """The per diem cell -> Decimal or None ('372', '372.5', '372,50 €')."""
-    s = re.sub(r"[\s  €]|EUR", "", str(v or ""))
-    if not s:
-        return None
-    if "," in s:
-        s = s.replace(".", "").replace(",", ".")
-    try:
-        d = Decimal(s)
-    except InvalidOperation:
+    """The per diem cell -> Decimal or None ('372', '372.5', '372,50 €', '1.234,50')."""
+    d = amount_text(v)  # 2.363.0 (#3103): the shared reader ("1.234" = 1234, was 1,234)
+    if d is None:
         return None
     return d if d.is_finite() and abs(d) < 10 ** 7 else None
 
@@ -338,7 +335,7 @@ def vmi_trip_key(pk, df, dt, dest):
 
 def vmi_sheet(sh, known, seen):
     """One sheet -> {sheet, person, rows, sum_excel, sum_calc, counts} or None (no header row: not a trip list)."""
-    grid, com = sh["grid"], sh["comments"]
+    grid, com, d1904 = sh["grid"], sh["comments"], sh.get("d1904")
     cols, hi = None, 0
     for i, row in enumerate(grid[:20]):
         m = {}
@@ -384,7 +381,7 @@ def vmi_sheet(sh, known, seen):
                "note": _clean("\n\n".join(notes), 2000), "country": "", "place": "", "vma_days": [],
                "excel": dstr(money(excel)) if excel is not None else None, "amount": None, "lines": [],
                "status": "error", "reasons": [], "sel": False}
-        df, dt = vmi_date(df_s), vmi_date(cell(r, "date_to")) if cell(r, "date_to") else None
+        df, dt = vmi_date(df_s, d1904), vmi_date(cell(r, "date_to"), d1904) if cell(r, "date_to") else None
         if df and not dt and not cell(r, "date_to"):
             dt = df
         if not df or not dt:

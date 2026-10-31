@@ -30,7 +30,12 @@ V1_FIELDS = ("date", "due", "amount", "currency", "sender", "type", "tags", "tex
 def _v1_doc(c, m, node, full=False, role=None):
     d = doc_json(c, m, node, full=full, role=role)
     d.pop("thumb", None)
-    d.pop("duplicate_of", None)  # 2.146.0 B (#2452): the duplicate warning is for the people of the app (agents: not in API v1)
+    dup = d.pop("duplicate_of", None)  # 2.146.0 B (#2452): the duplicate warning is for the people of the app (agents: not in API v1)
+    if "einvoice" in d:  # 2.440.0 (#2243): the fixed fields of an e-invoice; of a duplicate only the hint
+        from ..office.einvoice_in import ei_api
+        d["einvoice"] = ei_api(S.meta_json(c, m, "extracted", {})["_einv"], duplicate=bool(dup))
+    if "e-invoice" in d.get("auto", {}).values():  # the stored mark; API v1 says einvoice
+        d["auto"] = {k: "einvoice" if v == "e-invoice" else v for k, v in d["auto"].items()}
     d.pop("split", None)  # 2.154.0 A (#1111): the stack mark is for the people of the app (agents never split)
     d["url"] = f"/api/v1/documents/{m['node_id']}"
     d["content_url"] = f"/api/v1/files/{m['node_id']}/content"
@@ -191,12 +196,12 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "id": {"type": "integer", "description": "The file's id in the file store (/files/{id})"}, "name": {"type": "string"},
         "mime": {"type": "string"}, "size": {"type": "integer"}, "org_id": {"type": ["integer", "null"]},
         "state": {"type": "string", "enum": list(S.STATES), "description": "Recognition: wait, run, done, failed (error says why)"},
-        "error": {"type": "string"}, "method": {"type": "string", "description": "pdf (text layer), ocr, text, import"},
+        "error": {"type": "string"}, "method": {"type": "string", "description": "pdf (text layer), ocr, text, import, e-invoice"},
         "date": {"type": ["string", "null"], "format": "date"}, "due": {"type": ["string", "null"], "format": "date"},
         "taken_at": {"type": ["string", "null"], "description": "Capture time of a photo (from its EXIF, read before the metadata was removed)"},
         "amount": {"type": ["string", "null"], "description": "Decimal text, e.g. 119.00"}, "currency": {"type": ["string", "null"]},
         "sender": label, "type": label, "tags": {"type": "array", "items": {"type": "object"}}, "folder": label,
-        "auto": {"type": "object", "description": "Feature -> how it was set automatically: rule, learn, agent, import, code, photo"},
+        "auto": {"type": "object", "description": "Feature -> how it was set automatically: rule, learn, agent, import, code, photo, einvoice (2.440.0)"},
         "suggest": {"type": "object", "description": "Feature -> a suggestion waiting for review"}, "review": {"type": "boolean"},
         "text": {"type": "string", "description": "The recognised text (single document only)"}, "url": {"type": "string"},
         "content_url": {"type": "string"}, "asn": {"type": ["integer", "null"], "description": "Archive serial number (unique per workspace)"},
@@ -204,6 +209,10 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "extracted": {"type": ["object", "null"], "description": "Single document only: what the recognition read off an invoice / receipt, "
                       "a suggestion a person takes over (supplier, vat_id, tax_no, invoice_no, vat_pct 19|7|0, vat_rates [{pct, net, vat}], "
                       "net, vat, gross, currency; new = fields a take-over would change, hidden = dismissed)"},
+        # 2.440.0 (#2243)
+        "einvoice": {"type": "object", "description": "Single document only, only an incoming e-invoice (XRechnung, ZUGFeRD): its fixed "
+                     "EN 16931 fields: format, kind, source, number, date, due, currency, supplier, vat_id, tax_no, net, vat, gross, payable, "
+                     "vat_rates [{pct, net, vat}], credit_note (boolean), duplicate (boolean: may repeat an older document you can see)"},
         # 2.299.0 D (#3193)
         "checks": {"type": ["object", "null"], "description": "Single document only: hints of the fixed check of a receipt (required "
                    "details of an invoice, net + VAT = gross, VAT rate, VAT ID format): items [{code, level hint|warn, text}], "

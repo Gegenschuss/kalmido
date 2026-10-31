@@ -197,21 +197,8 @@ async function bm_detail(id) {
   setTimeout(() => $(ro ? '[data-m="close"]' : '#bmd-title', md)?.focus(), 30);
 }
 
-// ---- the bookmarklet (a link that opens /share?bm=1 with the page in a small window; the normal sign-in, no token)
-const bm_bookmarklet = () => `javascript:(()=>{window.open(${JSON.stringify(location.origin + '/share')}+'?bm=1&title='+encodeURIComponent(document.title)+'&url='+encodeURIComponent(location.href),'kalmido_bm','popup,width=560,height=680')})()`;
-function bm_bookmarkletHelp() {
-  const md = modal(`<div class="lhdr"><h3>${ic('bookmark', 's')} ${tr('Bookmark button for the browser')}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
-    <div class="row caprow"><a class="btn pri capbm" href="${esc(bm_bookmarklet())}" data-m="hint" draggable="true">${ic('bookmark', 's')} ${tr('Save to Kalmido')}</a></div>
-    <div class="shint">${tr('Drag the button to your bookmarks bar. On any page, click it: a small window shows the page, Save keeps it as a bookmark and opens it for tags and a note. It runs no code of ours on that page and uses your normal sign-in.')}</div>
-    <div class="shint keep">${tr('On the phone: share a link from any app to Kalmido and choose “Save as bookmark”.')}</div>
-    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
-  md.classList.add('capmodal');
-  md.addEventListener('click', e => {
-    const b = e.target.closest('[data-m]'); if (!b) return;
-    if (b.dataset.m === 'hint') { e.preventDefault(); toast(tr('Drag the button to your bookmarks bar')); return; }
-    if (b.dataset.m === 'close') md.remove();
-  });
-}
+// ---- the bookmarklet: 2.365.2 B (#2789): in Settings > Integrations next to sharing from the phone (integrations.js bmls_html)
+function bm_bookmarkletHelp() { settingsModal('bookmarklet'); }
 
 // ---- from the share sheet / the bookmarklet (main.js): save, then open the bookmark for tags and a note
 async function bm_shareSave(url, title) {
@@ -265,7 +252,7 @@ document.addEventListener('click', async e => {
   a.closest('details')?.removeAttribute('open');
   if (k === 'cards' || k === 'list') { LS.set('bmView', k); bm_draw(); return; }
   if (k === 'bmlet') { bm_bookmarkletHelp(); return; }
-  if (k === 'kk') { if (typeof kkModal === 'function') kkModal(); else { await loadModule('life'); kkModal(); } return; }
+  if (k === 'kk') { settingsModal('karakeep'); return; }  // 2.365.2 B (#2789)
   if (k === 'open') { bm_detail(id); return; }
   a.disabled = true;
   try {

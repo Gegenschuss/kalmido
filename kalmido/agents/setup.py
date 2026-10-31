@@ -187,7 +187,7 @@ def ains_admin_machine_del(aid, tid):
 def ains_redeem():
     """{code, host?, folder?, os?} -> {token, url, agent, operator_id, starter_base, starter_sha256, version}. No login: the one-time
     code is the credential. 2.380 G (#3390): starter_sha256 = {file: sha256}, the setup refuses a downloaded file that differs."""
-    from ..agents.admin import agent_token_new
+    from ..agents.admin import AGENT_TOKEN_CREATED, agent_token_new
     keys = [("setup:ip:" + rate_ip(), AINS_RATE)]
     if _rate_blocked(keys):
         return err(tr("Too many failed attempts, please wait a few minutes"), 429)
@@ -209,6 +209,8 @@ def ains_redeem():
         if not c.execute("UPDATE agent_setup_codes SET used_at=? WHERE id=? AND used_at IS NULL", (iso(now_utc()), r["id"])).rowcount:
             _rate_fail(keys)
             return err(tr("This setup code is invalid, used or expired. Create a new one in Kalmido."), 400)
+        # 2.442.0 (#1762): the token made along with the agent was never used: this setup replaces it, no nameless computer stays
+        c.execute("DELETE FROM api_tokens WHERE user_id=? AND name=? AND last_used_at IS NULL", (r["agent_id"], AGENT_TOKEN_CREATED))
         tok = agent_token_new(c, r["agent_id"])
         tid = c.execute("SELECT id FROM api_tokens WHERE token_hash=?", (_token_hash(tok),)).fetchone()[0]
         folder = ains_text(b.get("folder"), AINS_FOLDER_MAX, "folder") or r["folder"]

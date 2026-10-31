@@ -14,7 +14,8 @@ H = {"X-Requested-With": "kalmido"}
 PASSWORD = "password123"
 # the default modules plus the ones a purpose / an admin switches on (family, Home & life, office, clients, the hub)
 FEATURES = ("cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields,comments,events,contacts,files,docs,"
-            "family,contracts,home,care,health,review,travel,reading,clients,office,dispo,workload,forms,wiki,budget,feeds")
+            "family,contracts,home,care,health,review,travel,reading,clients,office,dispo,workload,forms,wiki,budget,feeds,"
+            "sheets")  # 2.421.0 A (#2936): tables, too (the sweep of p287b met their 409)
 
 
 def login(base, user, pw=PASSWORD):

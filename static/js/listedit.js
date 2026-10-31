@@ -206,14 +206,15 @@ function commentTyping() {
   fetch(`/api/tasks/${t.id}/typing`, {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}).catch(() => {});
 }
 function typingHtml(ags, id) {
-  if (!ags.length) return `<div class="atyping hidden" id="${id}" role="status" aria-live="polite"></div>`;
+  // 2.437.0 A (#3737): the agent chat keeps its row (fixed height, rule on top) while nobody writes - the message list never changes height
+  if (!ags.length) return `<div class="atyping${id === 'chat-typing' ? ' atyrow' : ' hidden'}" id="${id}" role="status" aria-live="polite"></div>`;
   // 2.13.2 (#478 F6): "is writing …" (dots) only for a real typing signal (or the chat's answer on its way); an agent that
   // only reports "working" on the task "is working on it"
   const wr = a => (id === 'chat-typing' && !a.busy) || (a.typing || 0) - agentAge() > 0, any = ags.some(wr);
   // 2.161.2 (#2610): the agent chat shows the small bot at work instead of the dots / the dot (same width); the task panel
   // (people too) keeps the dots. The text in the status line stays for screen readers.
   const fig = id === 'chat-typing';
-  return `<div class="atyping" id="${id}" role="status" aria-live="polite">${fig ? botFig('arbeitet', 'bchat') : any ? '<span class="atdots" aria-hidden="true"><i></i><i></i><i></i></span>' : hdot('working')}<span class="ttx">${ags.map(a => (fig ? '' : licBot()) /* 2.290.0 B (#3160): the chat shows the figure already */ + esc(wr(a) ? tr('{0} is writing …', a.name) : tr('{0} is working on it', a.name)) + (a.status_text ? ` <span class="muted">· ${esc(a.status_text)}</span>` : '')).join('<br>')}</span></div>`;
+  return `<div class="atyping${fig ? ' atyrow' : ''}" id="${id}" role="status" aria-live="polite">${fig ? botFig('arbeitet', 'bchat') : any ? '<span class="atdots" aria-hidden="true"><i></i><i></i><i></i></span>' : hdot('working')}<span class="ttx">${ags.map(a => (fig ? '' : licBot()) /* 2.290.0 B (#3160): the chat shows the figure already */ + esc(wr(a) ? tr('{0} is writing …', a.name) : tr('{0} is working on it', a.name)) + (a.status_text ? ` <span class="muted">· ${esc(a.status_text)}</span>` : '')).join('<br>')}</span></div>`;
 }
 const agentBusyState = () => { const ags = (S.agents || []).filter(a => a.enabled && !agentOffline(a)); return ags.some(a => a.status === 'working') ? 'working' : ags.some(a => a.status === 'waiting' || a.waiting) ? 'waiting' : ''; };
 const agentStatusLines = () => (S.agents || []).filter(a => a.enabled && a.status !== 'idle').map(agentHstLine);  // 2.13.0 (#453 P10): no stale status text while not connected

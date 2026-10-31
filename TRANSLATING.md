@@ -50,6 +50,8 @@ drop in a file and it shows up under *Settings > Language*.
 
 Keys that start with `_` are settings, everything else is a translation.
 
+The app addresses people informally in every language (German "du", French "tu"); the formal form is used only for outsiders, customer mails and documents, as in German.
+
 | Key | Meaning |
 |---|---|
 | `_meta.name` | Name of the language in the language itself, shown in the language selector (`Deutsch`, `Français`) |

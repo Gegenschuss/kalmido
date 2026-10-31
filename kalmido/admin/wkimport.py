@@ -32,7 +32,7 @@ from ..core.config import app, ATT_DIR
 from ..core.db import body, connect, db, err, iso, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
-from ..core.i18n import lang
+from ..core.i18n import N_, lang, tr_stored
 from ..core.pg import system_ctx
 from ..core.serializers import unlink_files
 from ..accounts.session import me
@@ -42,7 +42,7 @@ from ..wiki.wikiatt import WKA_FILE_MAX, tr
 from ..wiki.wikie2e import wke_guard
 from .orgexport import EXPORT_DIR
 from .acctexport import UMZ_BLOCK, UmzReader, UmzWriter, umz_key, umz_person, umz_space_ok, umz_user_conn, umz_write_state
-from .acctimport import UMZ_CHUNK, _env_mb, _slot, umz_disk_size
+from .acctimport import UMZ_CHUNK, UMZ_SETTLE_S, _env_mb, _slot, umz_disk_size
 from .hosting import quota_guard
 
 WKI_DIR = os.path.join(EXPORT_DIR, "wiki-import")
@@ -51,6 +51,7 @@ WKI_MAX_FILES = _env_mb("KALMIDO_WIKI_IMPORT_MAX_FILES", 10000)
 WKI_KEEP_H = 24  # an upload / result nobody looks at any more is removed after this
 WKI_TICK_S = 0.5  # the progress is written at most this often
 _WKI = {}  # user id -> running import thread
+_WKI_LAST = {}  # 2.363.0 (#3280): user id -> the last worker until it really ended (_WKI forgets it before its slot is free)
 _WKI_LOCK = threading.Lock()
 _PIECE_LOCK = threading.Lock()  # one piece at a time: two requests at the same offset must not both append
 
@@ -113,6 +114,8 @@ def _view(uid, iid, st):
     for k in ("progress", "result", "error"):
         if st.get(k) is not None and k not in out:
             out[k] = st[k]
+    if "error" in out:
+        out["error"] = tr_stored(out["error"])
     return out
 
 
@@ -215,12 +218,12 @@ def wki_run(uid, iid):
         c.rollback()
         unlink_files(saved)
         msg = str(e) if isinstance(e, BadInput) else getattr(e, "msg", None)
-        _set(uid, iid, state="failed", error=msg if isinstance(msg, str) and msg else tr("The import failed."))
+        _set(uid, iid, state="failed", error=msg if isinstance(msg, str) and msg else [N_("The import failed.")])
     except Exception as e:  # noqa: BLE001
         c.rollback()
         unlink_files(saved)
         print(f"wiki import of user {uid} failed: {type(e).__name__}", flush=True)
-        _set(uid, iid, state="failed", error=tr("The import failed."))
+        _set(uid, iid, state="failed", error=[N_("The import failed.")])  # 2.448.0 (#3765): key, translated for who asks
     finally:
         c.close()
         for fn in ("upload.bin", "saved.json"):  # the ZIP is not kept after the run; the stored files are in rows or gone
@@ -228,11 +231,22 @@ def wki_run(uid, iid):
                 os.remove(os.path.join(_dir(uid, iid), fn))
             except OSError:
                 pass
+        if os.environ.get("KALMIDO_TEST") == "1" and os.environ.get("KALMIDO_TEST_UMZ_END_DELAY"):  # tests only (#3280)
+            time.sleep(float(os.environ["KALMIDO_TEST_UMZ_END_DELAY"]))
         with _WKI_LOCK:
             _WKI.pop(int(uid), None)
 
 
+def _settle(uid):
+    """2.363.0 (#3280): the worker publishes "done" and then still tidies up and frees its slot: the person's next step
+    right after it waits for that end instead of answering "already running" (as acctimport._thread, #3261)."""
+    t = _WKI_LAST.get(int(uid))
+    if t and t is not threading.current_thread():
+        t.join(UMZ_SETTLE_S)
+
+
 def _thread(uid, iid):
+    _settle(uid)
     with _WKI_LOCK:
         if _busy(uid):
             raise Denied(409, tr("An import is already running"))
@@ -245,8 +259,11 @@ def _thread(uid, iid):
                 wki_run(uid, iid)
             finally:
                 lc.close()
+                with _WKI_LOCK:
+                    if _WKI_LAST.get(int(uid)) is threading.current_thread():
+                        _WKI_LAST.pop(int(uid), None)
         t = threading.Thread(target=run, daemon=True)
-        _WKI[int(uid)] = t
+        _WKI[int(uid)] = _WKI_LAST[int(uid)] = t
         _set(uid, iid, state="running", progress={"done": 0, "total": 0})  # review L6: under the lock, with the thread known
         t.start()
 
@@ -270,6 +287,7 @@ def wki_new():
     quota_guard(c, uid, size)  # the files in it count against the storage (checked again per file in the run)
     if not umz_space_ok(WKI_DIR, size * 2):
         return err(tr("There is not enough space on the server for the import. Please ask the server admin."), 507)
+    _settle(uid)
     if _busy(uid):
         return err(tr("An import is already running"), 409)
     if os.path.isdir(_base(uid)):  # one upload per person: an older one (or an old result) goes

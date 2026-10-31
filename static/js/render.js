@@ -82,7 +82,9 @@ const leadEmoji = n => (String(n ?? '').match(/^((?:\p{Extended_Pictographic}|\p
 // 2.24.0 (UX-36): the default bar is what one hand needs every day: Inbox, Today, Search and the lists (the drawer); modules
 // come in only when someone pins them (Settings > Appearance > Tab bar, or "Customize tab bar" under "More")
 const tabDefault = () => ['s:inbox', 's:today', 'search', 'lists'];
-const tabIds = () => mg_tabIds(LS.get('tabbar', null)) || tabDefault();  // 2.44.0 (#1187): old module tabs -> their area
+// 2.418.0 (#3560): the order of the person (setting nav_menus "tabbar", the same on every phone); before the first change
+// there the device's own (LS tabbar)
+const tabIds = () => { const o = nav_pref('tabbar').order; return mg_tabIds(o.length ? o.filter(x => x !== 'none') : LS.get('tabbar', null)) || tabDefault(); };  // 2.44.0 (#1187): old module tabs -> their area
 function tabItem(id) {
   const [kind, ...rest] = id.split(':'), v = rest.join(':');
   if (kind === 'a') return mg_tabItem(id);  // 2.44.0 (#1187)
@@ -110,6 +112,7 @@ function tabItem(id) {
   if (id === 'office') return officeOn() ? {id, go: 'office', icon: ic('receipt', 'l'), label: tr('Office & finance'), mod: 'office'} : null;  // 2.36.2 (#1146): in "More" like the other modules
   if (id === 'wiki') return feat('wiki') ? {id, go: 'wiki', icon: ic('book', 'l'), label: tr('Knowledge pages'), mod: 'wiki'} : null;  // 2.49.0 (#1199)
   if (id === 'sheets') return feat('sheets') ? {id, go: 'sheets', icon: ic('sheet', 'l'), label: tr('Tables'), mod: 'sheets'} : null;  // 2.89.0 (#1916)
+  if (id === 'favs') return {id, go: 'favorites', icon: ic('star', 'l'), label: tr('Favourites'), key: 'favorites'};  // 2.441.0 (#3592)
   if (id === 'home') return {id, go: 'home', icon: ic('start', 'l'),  /* 2.364.0 B (#3031) */ label: tr('Start|home'), mod: 'home'};  // 2.17.0 (#475)
   if (id === 'search') return {id, act: 'palette', icon: ic('search', 'l'), label: tr('Search'), key: 'search'};  // 2.31.0 (#1057): opens the search at once (with the keyboard)
   if (id === 'lists') return {id, go: sbb_target('tasks'), icon: ic('list', 'l'), label: tr('Projects'), mod: 'tasks', area: 'tasks'};  // 2.417.0 A (#3559): the page kept in Projects, like the other areas (was: the drawer)
@@ -248,7 +251,7 @@ function teamPeople() {
   if (!collab()) return [];
   const seen = new Map();
   for (const l of S.lists) for (const p of listPeople(l)) if (p.user_id && (!S.me || p.user_id !== S.me.id) && !agentById(p.user_id) && !seen.has(p.user_id)) seen.set(p.user_id, p.name || personNameAny(p.user_id));
-  return [...seen.entries()].map(([id, name]) => ({id, name})).sort((a, b) => a.name.localeCompare(b.name));
+  return [...seen.entries()].map(([id, name]) => ({id, name})).sort((a, b) => cmpText(a.name, b.name));
 }
 // 2.36.0 (#1117): the sidebar's list icons (line | emoji | dot) and its progress bars, per person on every device
 const sbiMode = () => ['line', 'emoji', 'dot'].includes(S.settings?.side_icons) ? S.settings.side_icons : 'line';
@@ -400,13 +403,13 @@ function renderSide0() {
   sbb_treeReg('lf', LF_TREE_H);
   lh += sbb_treeHtml(folderNames().filter(x => !fParent(x) && fShown(x)).map(fnode));
   const archived = S.lists.filter(l => l.archived && inWs(l));
-  const tags = Object.keys(c.tags).sort((a, b) => a.localeCompare(b, 'de'));
+  const tags = Object.keys(c.tags).sort(cmpText);
   // Focus: the smart lists
   // 2.25.0 (UX-03 / UX-49): Plan (the smart lists) as [key, html]: each entry can be hidden in Settings > Appearance > Sidebar;
   // (UX-47) the team chat and News moved to the group "Conversations" with the people and agents
   const hid = x => sideHidden(x);
   const plan = sidePlan(row, c, onTasks, k);
-  const planP = sbm ? plan.filter(([x]) => x !== 'today' && x !== 'inbox') : plan;  // 2.196.0 A (#2737): the phone's drawer has Today + Inbox fixed on top
+  const planP = plan;  // 2.450.0 (#3817): the phone's drawer lists Today + Inbox in Plan like the computer (was #2737: fixed on top)
   const planHiddenRows = planP.filter(([x, h]) => h && hid('e:' + x) && !(onTasks && k === x));
   const planHidden = planHiddenRows.length;
   // 2.250.0 C (#2995): "+ N more views" unfolds in place: the hidden views with a tick (= show in the sidebar), then a small link to the settings
@@ -477,16 +480,16 @@ function renderSide0() {
   // account in the head bar over everything (sbb_barHtml); the panel of another area than Tasks shows that area's entries
   // (sbb_panelHtml) instead of the groups
   // 2.152.2 (#2622, decision of 21.10.): in sidebar B Plan (Inbox, Today …) stays fixed on top with the search, only the middle scrolls
-  const planFix = sbb && tasksP && !hid('g:focus') ? SB.focus || '' : '';
+  const planFix = (sbb || sbm) && tasksP && !hid('g:focus') ? SB.focus || '' : '';
   const pan = tasksP ? '' : sbb_panelHtml(sbbArea);  // 2.152.3 A (#2619): first, the panel's head looks whether its groups fold
-  // 2.196.0 A (#2737): the phone's drawer: search, Today, Inbox (unless hidden in Settings) and the row of the areas fixed on top
-  const sbmTop = sbm ? `<div class="sbmtop">${scmd}${['today', 'inbox'].map(x => plan.find(p => p[0] === x)).filter(([x, h]) => h && !hid('g:focus') && (!hid('e:' + x) || (onTasks && k === x))).map(([, h]) => h).join('')}</div>${sbm_rowHtml(hid)}` : '';
+  // 2.450.0 (#3817): the phone's drawer: the search, the row of the areas (2.442.0 #3739: they scroll along, the search alone stays), then Plan (only in the area Projects, like planFix of sidebar B); #2737 had Today + Inbox fixed on top
+  const sbmTop = sbm ? `<div class="sbmtop"><div class="sbmsrch">${scmd}</div></div>${sbm_rowHtml(hid)}` : '';
   const sset = `<button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>`;
   const sbmX = sbm ? $('#side .sbmr')?.scrollLeft : null;
   $('#side').innerHTML = `
-    <div class="sbfix${sbb ? ' sbfix-flow' : ''}">${'' /* 2.331.0 A (#3303): in sidebar B the head scrolls along */}${'' /* 2.57.0 (#1798): the fixed head (workspace, favourites) stays while the rest scrolls */}
+    <div class="sbfix${sbb ? ' sbfix-flow' : sbm ? ' sbfix-flow sbfix-m' : ''}">${'' /* 2.331.0 A (#3303): in sidebar B the head scrolls along; 2.442.0 (#3739): in the phone's drawer too, only the search stays on top */}${'' /* 2.57.0 (#1798): the fixed head (workspace, favourites) stays while the rest scrolls */}
     <div class="sbhead">${'' /* 2.138.2 C (#2392): the 4 px stripe of #2389 is #side's top border (app.css); fold + fold-all show on hover / focus, the dot only offline or while syncing. 2.161.2 A (#2607): the brand (logo + word mark) is the workspace switch, the small mark at the bottom (2.145.0 A #2437) is gone. 2.152.3 A (#2619): on a computer the brand, the switch and the dot moved into the head bar (#kbar); the panel's head is the area's name, fold all and hide the panel (sbb_headHtml) */}${sbb ? sbb_headHtml(sbbArea, pan) : `${wsBarHtml()}${netDotHtml()}<span class="spacer"></span><span class="sbtools">${tasksP ? kbFoldAllBtn() + fv2_svToolBtn() /* 2.156.0 D (#2186) */ : ''}${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</span>`}</div>
-    ${tasksP && !sbm ? favSideHtml(lists, listRow, head) : ''}${planFix}${sbmTop}</div>
+    ${tasksP && !sbm ? favSideHtml(lists, listRow, head) : ''}${sbm ? sbmTop + planFix : planFix + sbmTop}</div>
     ${tasksP && sbm ? favSideHtml(lists, listRow, head) : ''}${tasksP ? sideGroupOrder().filter(g => (!hid('g:' + g) || g === 'lists') && !(planFix && g === 'focus')).map(g => (SB[g] || '') + (g === 'lists' ? msvvSide() : '')).join('') : pan}
     ${sbb ? '' : `${sbm ? '' : `<div class="sgroup sfoot">
       ${sset}
@@ -586,7 +589,7 @@ function renderTop0() {
   const kl = m === 'tasks' && k.startsWith('l:') ? listById(+k.slice(2)) : null;
   S.bandOn = bandAgents().length > 0;  // 2.8.0 (#434): the band shows the agents' dots, the header pill keeps only the robot
   const bar = sbb_on();  // 2.152.3 A (#2619): on a computer search, workspace and bell sit in the head bar over everything (sbb_bar)
-  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${listIconHtml(kl, {cls: 'h', full: false})}<span class="ht">${esc(title)}</span>${kl?.e2e && typeof le2u_headMark === 'function' ? le2u_headMark(kl) : ''}${wsBadge(kl)}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${favTopBtn(kl)}${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${bar ? '' : pal}${tnew}${bar || (kl && wsBadge(kl)) ? '' : wsChip()}${stChip()}${agentChip()}${bar ? '' : bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
+  setHtml($('#top'), `<button class="iconbtn menu" data-act="side" aria-label="${tr('Menu')}">${ic('menu')}</button><h1 title="${esc(title)}">${listIconHtml(kl, {cls: 'h', full: false})}<span class="ht">${esc(title)}</span>${kl?.e2e && typeof le2u_headMark === 'function' ? le2u_headMark(kl) : ''}${wsBadge(kl)}${nOpen ? `<span class="hn" aria-label="${esc(trn('{0} open task', '{0} open tasks', nOpen))}">${nOpen}</span>` : ''}${ms}</h1>${kl ? favTopBtn(kl) : fv2_topBtn() /* 2.441.0 (#3592): a star in every header */}${cf}${off}${timerPill()}${pm}${acts}${isMobile() ? '' : histBtns()}${bar ? '' : pal}${tnew}${bar || (kl && wsBadge(kl)) ? '' : wsChip()}${stChip()}${agentChip()}${bar ? '' : bellBtn()}`);  // 2.7.2 (#417): the agents' robot + dots directly before the bell  // 2.7.0 (#405): touch tablets / an unfolded Fold have the room for ← →
   fitTop();
   sbb_bar();  // 2.152.3 A (#2619): the bell's number
   netDotDraw();  // 2.31.0 (#378): the dot at the own picture follows every change of the connection
@@ -681,7 +684,7 @@ function topFolded() {
 // UX1 (U01, owner decision 4): the header's "…" menu. Phones: "Undo: …" / "Redo: …" first (no ← → there), then the rarer
 // view actions (select, sort), then the list's own menu or the filter
 function topMoreItems() {  // 2.99.0 B (#2183): + the knowledge pages' "Space" section
-  const out = topMoreItems0();
+  const fv = fv2_topItems(), o0 = topMoreItems0(), out = fv.length ? [...fv, '-', ...o0] : o0;  // 2.441.0 (#3592): a phone: the star of a page (a list: its own menu has it)
   if (S.route.mod !== 'wiki' || S.me?.kid || typeof w299_areaItems !== 'function') return out;
   return [...out, ...(out.length ? ['-'] : []), ...w299_areaItems()];
 }
@@ -828,6 +831,13 @@ function fl_viewSoon(raw, mod) {
   const wait = Math.max(0, (FL.vlast || 0) + 400 - Date.now());
   FL.vt = setTimeout(run, Math.max(16, wait));  // a timer, not a frame: a page that goes away takes it along
 }
+// 2.431.0 C (#3598): clients and contacts scroll in their two columns (the list, the card): a redraw keeps the list's scroll on
+// the same page and the card's on the same entry; the card of another entry starts at its top (a morph kept the old offset)
+function ct_scrollKeep(el) {
+  const sc = () => { const v = el.querySelector('.ctview'), c = v?.querySelector('.ctcard'); return v && [v.classList.contains('msclients'), v.querySelector('.ctlistw'), c, c?.dataset.ck]; };
+  const a = sc(), ls = a?.[1]?.scrollTop, cs = a?.[2]?.scrollTop;
+  return () => { const b = sc(); if (!a || !b || a[0] !== b[0]) return; if (b[1]) b[1].scrollTop = ls || 0; if (b[2]) b[2].scrollTop = a[3] === b[3] ? cs || 0 : 0; };
+}
 function setHtml(el, html) {
   const fg = typeof fgKeep === 'function' ? fgKeep(el) : null;  // 2.40.0 (#1371): unsaved form input survives the redraw
   if (morphRoot !== el) el.innerHTML = html;
@@ -938,7 +948,7 @@ function renderView0() {
   // 2.12.2 (#451): the open phone chat is never rebuilt (that took the focus, closed the keyboard and jumped to the top):
   // it is patched in place
   if (m === 'agents' && S.route.agent && chatFull() && S.chat.aid === +S.route.agent && $('#view .chview')?.dataset.aid === String(S.chat.aid) && $('#chat-in')) { chatPatch(); agentLive(); renderMultiBar(); return; }
-  const scroll = el.scrollTop;
+  const scroll = el.scrollTop, ctk = ct_scrollKeep(el);  // 2.431.0 C (#3598)
   const wbs = $('#wbody')?.scrollTop, tls = $('#tlscroll')?.scrollLeft, tlt = $('#tlscroll')?.scrollTop, wasRm = !!$('.tl.rm');
   const qi = $('#qinput'), qf = !!qi && document.activeElement === qi, qv = qi ? qi.value : '';  // the composer survives a re-render
   const tin = $('#view .ttlin'), tinF = !!tin && document.activeElement === tin;  // 2.0.2: inline title edit + section input too
@@ -982,6 +992,7 @@ function renderView0() {
   else if (S.route.key === 'search') setHtml(el, viewSearch());
   else if (S.route.key === 'done' || S.route.key === 'trash') setHtml(el, viewHistory());
   else if (S.route.key === 'archived') setHtml(el, viewArchived());
+  else if (S.route.key === 'favorites') setHtml(el, viewFavPage());  // 2.441.0 (#3592)
   else if (S.route.key === 'projects') setHtml(el, viewProjStart());  // 2.417.0 A (#3559)
   else if (isRoadmap()) setHtml(el, viewRoadmap());
   else if (isOverview()) setHtml(el, viewProjOv());  // 2.7.1 (#410)
@@ -991,8 +1002,8 @@ function renderView0() {
   else if (isTimeline()) setHtml(el, vsegHtml(routeList()) + viewTimeline(routeList().id));  // 2.13.0 (#453 A7)
   else if (moActive() && moBoard()) setHtml(el, mb_view());  // 2.156.0 C (#2072): My tasks as a board (mineboard.js)
   else setHtml(el, viewList());
-  el.scrollTop = scroll;
-  if (m === 'agents' && $('#view .chview')) { chatFit(); chatPatch(); } else { document.body.classList.remove('kb-open'); if (S.chat && !$('#chat-msgs')) S.chat.seenAt = 0; }  /* the chat left (chs cont) */  // 2.12.2 (#451): a chat opens at its newest message; 2.380 F (#3381): a new box at its place / first new message (chs_restore), an old one stays
+  el.scrollTop = scroll; ctk();
+  if (m === 'agents' && $('#view .chview')) { chatFit(); chatPatch(); } else { if (m === 'team') chatFit(); /* 2.446.0 (#3334) */ else document.body.classList.remove('kb-open'); if (S.chat && !$('#chat-msgs')) S.chat.seenAt = 0; }  /* the chat left (chs cont) */  // 2.12.2 (#451): a chat opens at its newest message; 2.380 F (#3381): a new box at its place / first new message (chs_restore), an old one stays
   if (S.ie) inlineEditMount(tinF);
   const sa2 = $('#view .secadd-in'); if (sa2 && S.secAdd) { sa2.value = S.secAdd.v || ''; if (saiF) sa2.focus(); }
   const q2 = $('#qinput'); if (q2 && qi && q2 !== qi) { q2.value = qv; if (qf) { q2.focus(); updateChips(q2); } }
@@ -1541,6 +1552,17 @@ function lcHead(l, lc) {  // the column titles above the rows (wide layouts)
     const tip = on ? (cur === p[0] ? tr('Sorted by {0}. Click again to reverse the direction', n) : tr('Sorted by {0}. Click again to go back to the project sort', n)) : tr('Sort by {0}', n);
     return `<span class="lc ${lcCls(k)} ${lcOvf(i)}${on ? ' sorted' : ''}" data-k="${esc(k)}" role="columnheader"${on ? ` aria-sort="${dir}"` : ''} title="${esc(n)}"><button type="button" class="lcs" data-colsort="${esc(k)}" title="${esc(tip)}" aria-label="${esc(n)}"><span class="lcn" aria-hidden="true">${k === 'who' || k === 'prio' ? ic(COL_ICON[k], 's') : `<span>${esc(colShort(l, k))}</span>`}</span>${on ? `<span class="lcsa" aria-hidden="true">${ic('chev', dir === 'ascending' ? 's cup' : 's')}</span>` : ''}</button>${isTouch() ? '' : `<button type="button" class="lcmb" data-colmenu="${esc(k)}" tabindex="-1" aria-haspopup="menu" title="${esc(tr('Column menu: {0}', n))}" aria-label="${esc(tr('Column menu: {0}', n))}">${ic('chev', 's')}</button>`}${isTouch() ? '' : `<i class="lcg" data-lcg="${esc(k)}" title="${esc(tr('Drag the column width · double-click = standard width'))}" role="separator" aria-orientation="vertical" tabindex="0" aria-label="${esc(tr('Width of the column {0}', n))}" ${lcwGet(l.id)[k] ? `aria-valuenow="${lcwGet(l.id)[k]}" aria-valuetext="${esc(tr('{0} rem', String(lcwGet(l.id)[k])))}"` : `aria-valuenow="7" aria-valuetext="${esc(tr('Standard width'))}"`} aria-valuemin="${LCW_MIN}" aria-valuemax="${LCW_MAX}"></i>`}</span>`; }).join('')}</div></div>`;
 }
+// 2.427.0 B (#3551): phones / narrow containers (where .lchead is hidden): the shown fields as a swipeable strip of names
+// above the rows (the sorted one with its arrow), a tap opens the column menu (lcMenu) at the name; "Fields" at the end
+// opens "Shown fields" (colModal). No widths here; list view only, not in an archived list or the overview
+function lcBar(l, lc) {
+  const ks = lc.filter(k => k !== 'id');
+  if (!ks.length || l.archived || isOverview()) return '';
+  const cur = sortMode();
+  return `<div class="lcbar" data-lid="${l.id}" role="toolbar" aria-label="${esc(tr('Shown fields'))}"><div class="lcbs">${ks.map(k => { const n = colName(l, k), on = colSorts(k).includes(cur), dir = on ? sortDir(cur) : '';
+    return `<button type="button" class="lcbn${on ? ' sorted' : ''}" data-k="${esc(k)}" aria-haspopup="menu" title="${esc(tr('Column menu: {0}', n))}"><span>${esc(n)}</span>${on ? `<span class="lcsa" aria-hidden="true">${ic('chev', dir === 'ascending' ? 's cup' : 's')}</span>` : ''}</button>`; }).join('')}</div><button type="button" class="lcbf" data-act="cols" data-id="${l.id}" aria-haspopup="dialog" title="${esc(tr('Shown fields…'))}">${ic('columns', 's')}<span>${esc(tr('Fields'))}</span></button></div>`;
+}
+document.addEventListener('click', e => { const b = e.target.closest?.('.lcbar .lcbn[data-k]'); if (!b) return; e.preventDefault(); lcMenu(b); });
 // 2.31.0 (#354): first click = the column's natural order, second = reversed, third = the list's sort again
 document.addEventListener('click', e => {
   const b = e.target.closest?.('.lchead [data-colsort]'); if (!b) return;
@@ -1562,7 +1584,7 @@ document.addEventListener('contextmenu', e => {
 // 2.39.1 (#1327): the same menu from the small arrow in the column title (hover / focus)
 document.addEventListener('click', e => { const b = e.target.closest?.('.lchead [data-colmenu]'); if (!b) return; e.preventDefault(); e.stopPropagation(); lcMenu(b.closest('.lc')); }, true);
 function lcMenu(c) {
-  const l = listById(+c.closest('.lchead').dataset.lid); if (!l) return;
+  const l = listById(+c.closest('.lchead,.lcbar').dataset.lid); if (!l) return;  // 2.427.0 B (#3551): + the phone strip
   const k = c.dataset.k, p = colSorts(k), cur = sortMode(), lc = listCols(l) || [];
   const dirName = m => sortDir(m) === 'ascending' ? tr('Sort ascending') : tr('Sort descending');
   const pick = m => { LS.del('sortback.' + S.route.key); sortSet(m); };
@@ -1792,7 +1814,7 @@ function viewListBody() {
   h += sgFilterNote(rl);  // 2.43.0 (#1331): a column filter of the list says so (sheetgrid.js)
   if (rl && sortOwn()) h += `<div class="onehint sortown">${ic('sort', 's')}<span>${esc(tr('You see your own sort of this shared project.'))}</span><button type="button" class="btn sm" data-act="sort-shared">${tr('Back to the shared sort')}</button></div>`;  // 2.27.0 (#988)
   if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks block each other in a circle; they are ordered by date.'))}</div>`;
-  if (lc && total0(groups)) h += lcHead(rl, lc);
+  if (lc && total0(groups)) h += lcHead(rl, lc) + lcBar(rl, lc);  // 2.427.0 B (#3551): + the strip for narrow layouts
   if (cols) h += `<div class="fcolhead"><span class="spacer"></span>${cols.map(f => `<span class="fcell t-${esc(f.type)}" title="${esc(f.name)}">${esc(f.name)}</span>`).join('')}</div>`;
   const total = groups.reduce((n, g) => n + g.tasks.length, 0);
   const flowDeps = flow && depsOn() && (() => {
@@ -1857,7 +1879,7 @@ function viewListBody() {
 // shared list): Open, Restore (owner, undoable) and Delete permanently (owner; 2.39.1 #1188: also list admins and organisation admins)
 function viewArchived() {
   const ls = S.lists.filter(l => l.archived && inWs(l)).sort((a, b) =>  // 2.380.2 (#3407): the shown workspace
-    (b.archived_at || '').localeCompare(a.archived_at || '') || lname(a).localeCompare(lname(b)));
+    (b.archived_at || '').localeCompare(a.archived_at || '') || cmpText(lname(a), lname(b)));
   if (!ls.length) return `<div class="empty">${ic('archive')}${tr('No archived projects.')}<br><span class="muted">${tr('Archive a project from its “…” menu; it disappears from the sidebar and its tasks from Today and the calendar.')}</span></div>`;
   return `<div class="archv">${ls.map(l => {
     const p = l.progress || {done: 0, total: 0}, own = isOwner(l), em = leadEmoji(l.name), name = em ? l.name.slice(em.length).trim() : listName(l.name);

@@ -2,11 +2,31 @@
 
 Shipped in the code only (never written into the database ahead): "Use sample" makes an own, freely editable template of
 one in the current office area (organisation or private). Each sample: kind (a key of doctpl.DT_KINDS), whether documents
-from it can be signed, whether it is a legal text (the picker says to have it checked) and the text in German and English
-(the other app languages get the English one, see doctpl.dt_lang). Only the variables of doctpl.DT_VARS; what no variable
+from it can be signed, whether it is a legal text (the picker says to have it checked) and the text in German and English;
+2.449.0 (#3768): fr / es / it / nl live in doctpl_samples_<lang>.py and join by sample_langs. Only the variables of doctpl.DT_VARS; what no variable
 knows (an invoice number, a date of notice) stays as [placeholder] in square brackets for the user to fill in. The PDF
 already prints the letterhead and the client's address field, so the letters start with their subject line. Neutral
 texts without names, firms or addresses; no legal advice."""
+from . import doctpl_samples_es, doctpl_samples_fr, doctpl_samples_it, doctpl_samples_nl
+
+# 2.449.0 (#3768): the translated samples; the ones here tell the picker "machine translated, check before use" (their text says so too)
+SAMPLE_LANGS = {"fr": doctpl_samples_fr, "es": doctpl_samples_es, "it": doctpl_samples_it, "nl": doctpl_samples_nl}
+SAMPLE_MT = ("nda", "privacy_dpa", "privacy_info", "privacy_consent")
+
+
+def sample_langs(starters, part="SAMPLES"):
+    """2.449.0 (#3768): adds the translated (name, text) of each language to a table of samples (in place) and returns it."""
+    for lg, mod in SAMPLE_LANGS.items():
+        for k, tx in getattr(mod, part).items():
+            if k in starters:
+                starters[k][lg] = tx
+    return starters
+
+
+def sample_text(v, lg):
+    """2.449.0 (#3768): (name, text) of a sample in lg; a language without its own text takes the English one."""
+    return v.get(lg) or v["en"]
+
 
 DMA_SAMPLES = {
     "letter": {"kind": "other", "sign": 0, "legal": 0,
@@ -168,11 +188,11 @@ Date: {{today}}
 ## Confirmation
 The client confirms receipt of the services listed above in the condition described.""")},
     "credit": {"kind": "other", "sign": 0, "legal": 0,
-               "de": ("Gutschrift-Anschreiben", """# Ihre Gutschrift [Gutschriftnummer]
+               "de": ("Rechnungskorrektur-Anschreiben", """# Ihre Rechnungskorrektur [Rechnungskorrekturnummer]
 
 Sehr geehrte Damen und Herren,
 
-anbei erhalten Sie unsere Gutschrift [Gutschriftnummer] vom {{today}} über [Betrag] zur Rechnung [Rechnungsnummer] im Projekt {{project.title}}.
+anbei erhalten Sie unsere Rechnungskorrektur [Rechnungskorrekturnummer] vom {{today}} über [Betrag] zur Rechnung [Rechnungsnummer] im Projekt {{project.title}}.
 
 Den Betrag [überweisen wir bis zum Datum auf Ihr Konto / verrechnen wir mit der nächsten Rechnung].
 
@@ -376,3 +396,4 @@ More information is given in our privacy information.
 
 Date: {{today}}""")},
 }
+sample_langs(DMA_SAMPLES)

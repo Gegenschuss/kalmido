@@ -55,7 +55,8 @@ button to the organisation's office.
 **Moving into a new organisation** (Settings > Data, section "Transfer into an organisation", button "Transfer into a new organisation…"; one way, after a confirmation): the personal
 office becomes a new organisation with its owner as admin - documents, numbers (no duplicates: it is the same area),
 settings, master data, files and the private clients go with it; "Private" is a new, empty personal office afterwards.
-Only where organisations can be created (an instance admin, not in the mode `shared`). Moving into an existing
+Only where organisations can be created (not in the mode `shared`); since 2.422 the owner herself too: it becomes a
+company of her own (at most 3, its e-mail domains only by an instance admin). Moving into an existing
 organisation is not offered yet. `POST /api/office/move` `{name, confirm: true}` -> `{org_id, name, clients}`.
 
 **Moving office data into another workspace** (2.97.0, both ways between the personal office and an organisation's office,
@@ -157,12 +158,22 @@ office tab without one appears at the end of its group (`OFC_TABS` field 5, else
 **Quotes & invoices** for everybody; the Pipeline becomes the start only once the office has an inquiry or a lead. The
 group **Money** stays folded until the office holds its first invoice or receipt (a fold or unfold by hand is kept per
 device). Cash flow, Figures, Travel expenses, Entertainment receipts and Subscriptions & tools appear once there is
-something in them; until then **Show more** at the end of Money lists them (and keeps them shown on this device), a
-direct link or a point opened once keeps working. The signal is `used` in `GET /api/office/settings` (existence checks
+something in them; until then they wait under **Hidden** of the menu's editor (2.418.0, #3560; before that behind
+**Show more**), a direct link keeps working and the open point always shows. The signal is `used` in `GET /api/office/settings` (existence checks
 only: invoice, receipt, inquiry, meal, travel, sub, fixed). The new point **Receipts** (`#office/receipts`, for everybody
 with the bookkeeping) holds the upload (*Photograph receipt*, *Upload files*), the receipts list and links to
 entertainment receipts and travel expenses; the upload on Bookkeeping stays. The uploaded file is stored in the file
 store folder "Documents" of the office and listed under Office > Receipts.
+
+*Since 2.418.0 (#3560):* every person arranges the office menu (and the menus of Home, Reading, Time, Review and the
+file store, and the phone's tab bar) with one editor: on a computer **Customize** at the end of the area's panel (or a
+right-click on a point: *Hide from menu*), on a phone the pen on top of the menu, and all of them at once under
+**Settings > Navigation**. Each row has a Minus (hide) and a grip (drag; on the grip the arrow keys move it), hidden
+points stay under **Hidden** with a Plus. Hiding only takes a point out of the menu: its data, function and rights stay
+and the search still finds it. The arrangement is the person's and the same on phone and computer (user setting
+`nav_menus`). In an organisation its admins switch menu points off for every member (Settings > Workspaces >
+*Menu points in this organisation*, `orgs.nav_off`); those are not in any member's menu there, not even under Hidden.
+Without an organisation the person is the own admin and arranges everything.
 
 *Since 2.380.0 (#3409, #3418):* quotations and invoices are two points of **Sell**. **Quotations** (`#office/offers`)
 has the tabs Quotations and Archive (archived quotations only); **Invoices** (`#office/invoices`) has Invoices, Credit
@@ -234,8 +245,8 @@ The country pack decides which office functions exist at all; the office admin s
 | Subscriptions & tools | `money.subs` | yes | yes |
 
 *Since 2.380:* the five points of Money are offered by every country pack. Switched off, the point leaves the sidebar and
-the office start page, and its routes answer `404`; its entries stay. The sidebar has no "Show more" any more: every
-point a person may open is shown.
+the office start page, and its routes answer `404`; its entries stay. The sidebar has no "Show more" any more: what a
+person may open is in the menu or under **Hidden** of the menu's editor (2.418.0, #3560).
 
 - **Off only hides.** Nothing is deleted: the DATEV address and booking settings, tax date settings and stored XML files
   stay; switching on again brings everything back. The server checks too: the routes of a function that is off answer
@@ -741,8 +752,8 @@ Since 2.141 a workspace can bring its **own mailbox** and Kalmido can **send** f
 
 *Since 2.95.*
 
-Office -> Money -> Travel expenses -> **Take over from Excel** (shown while the trip list is empty and in the
-evaluation) reads a per diem spreadsheet you kept so far (.xlsx, up to 2 MB, at most 30 sheets with 500 rows each).
+Office -> Settings -> **Import legacy data** -> **Trips from a per diem spreadsheet** -> **Take over from Excel** (2.365.2:
+on the legacy data page; the trip list and the evaluation link there) reads a per diem spreadsheet you kept so far (.xlsx, up to 2 MB, at most 30 sheets with 500 rows each).
 Nothing is stored before you confirm.
 
 - **One sheet = one person.** The name comes from the title above the header ("... Arbeitsliste <name> - <year>") or the
@@ -804,7 +815,8 @@ Two tabs for the admins of the office area (a personal office: its owner; member
   *Create quotation* makes a draft with the office's own quotation code (client and name taken over), binds it to the
   deal and moves an inquiry to *Quotation sent*. When the quotation's status becomes *accepted* - by hand or by the
   client's sign-off - the server moves its deal to *Order* (`pl2_offer_status`). A declined quotation leaves the deal
-  where it is: the card is marked and the admin sets *Lost* or makes a new quotation. *Create project* (a won deal)
+  where it is: the card is marked and the admin sets *Lost* or makes a new quotation. When a quotation that replaces
+  another one is accepted, the deal of the old one moves to it (2.437). *Create project* (a won deal)
   makes a project (type "Agency") named like the deal, in the office's workspace (a personal office: private),
   with the deal's client. Every change is one undo step; a deleted deal can be restored.
 - **Figures** - one view the server computes (`GET /api/office/kpi?year=`): revenue = payments received on invoices,
@@ -869,11 +881,20 @@ service (else its start, else their date); a sent one is marked **open quotation
 share apart). "Duplicate" on a quotation makes the copy its next **version** (`version_of` = the first quotation of the
 chain; a copy given to another client is a quotation of its own). Per chain one version counts:
 
-- **Automatic** (default): the newest sent or accepted version; drafts and declined versions never count.
+- **Automatic** (default): the newest sent or accepted version; drafts, declined and superseded versions never count.
 - **Yes**: when a version of the chain says yes, exactly the yes versions count (several are possible).
 - **No**: this version never counts.
 - Once a finalised invoice exists for any version of the chain, the whole chain is left out (the invoice is in the plan
   itself); a draft invoice does not take it out yet. Before 2.88 only the invoiced part was taken off.
+
+**Superseded** (2.437): "Duplicate" on a sent or accepted quotation asks *Mark the old quotation as superseded?* (ticked by
+default). Yes: the old quotation gets the status *Superseded* at once and the copy carries `replaces_id`; both show the link
+to each other (*Replaced by* / *Replaces*). A copy that replaces a quotation still sent or accepted (set back by hand)
+supersedes it again the moment it is accepted, by hand or by the client. Unticked = a supplement with only the new items: no
+reference, both quotations may be accepted. A superseded quotation counts nowhere (cash flow, purchases, invoice picker) like
+a declined one, its approval link is void, the client portal keeps showing it as superseded; there is no rejection rate it
+could fall into. Deleting the draft of the copy gives the old quotation its status back. By hand the status can be set from
+sent or accepted, and back. Freelancers without an organisation have the same in their personal office.
 
 The choice **In the cash flow** sits in the quotation (also when it is sent or finalised: it is planning, not printed and
 not part of the approval) with a line which version counts; everyone who may edit the area's quotations may change it, one
@@ -900,12 +921,12 @@ reason, VAT per row, net and gross) and the office it goes into; "Take over N ro
 removes them again. The agent never sees the office; an agent of an organisation imports only into that organisation.
 Freelancers without an organisation import into their personal office.
 
-**Monthly check** (optional): a tick creates the task "Cash flow: check the actual state" for one admin of the area, due
+**Monthly check** (optional; 2.365.2: set in **Settings > Company & office > Bank & taxes**, the cash flow links there): a tick creates the task "Cash flow: check the actual state" for one admin of the area, due
 on the 1st of every month in that person's basket, with only a link to the cash flow (never an amount). Another person
 ends the old task and creates a new one; switching it off ends the task (done, without a next date; not deleted). If the
 person later loses access to the cash flow, the tab says so; nobody else is picked automatically.
 
-**Account balance** (2.123): a rough orientation also when not everything is in Kalmido. In the office settings, section
+**Account balance** (2.123): a rough orientation also when not everything is in Kalmido. In **Settings > Company & office > Bank & taxes** (2.365.2; before: the office settings), section
 **Cash flow**, the admin enters a **starting balance** (may be negative) and its **reference date** (saved on change, one undo
 step; empty = no balance). The cash flow then shows per month the **account balance at the end of the month** (computed):
 the starting balance plus all money in minus all money out from the reference date on - actual and planned, so also in
@@ -950,7 +971,8 @@ rate (19 / 7 / 0 % or unknown). The **income/expense statement** of a year count
 section lists the figures (fields 81, 86, 21, 45, 66, 83; 2.355: also 41 goods to EU businesses, 43 exports, 48 other
 tax-free sales, 60 reverse charge at home) for a month, a quarter or the whole year to type into ELSTER, on cash
 or accrual basis (on accrual basis a cash discount taken lowers the base in the month of its payment; a reversed payment
-counts on the day of the payment it takes back); with the yearly tax dates setting the whole previous year is preselected (2.122); small businesses get no return. A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
+counts on the day of the payment it takes back); with the yearly tax dates setting the whole previous year is preselected (2.122); small businesses get no return. Tax reserve, cash or accrual basis and the tax dates are set in **Settings > Company & office > Bank & taxes** (2.365.2; the
+bookkeeping links there). A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
 as "Tax reserve" and "Freely available". No tax advice; figures without guarantee. Kalmido sends nothing to the tax office.
 
 **Billing receipts on to a client (2.121):** under the receipts of the month, **Bill receipts on to a client …** (or **Bill on to a
@@ -1206,6 +1228,7 @@ personal office). First add a **vehicle**: name, plate, kind (**private car used
 - **Year report** per vehicle: km total / business / private / home - workplace, the business share and the **mileage
   allowance** (business km of private cars x the rate per km, default 0.30, changeable in the report). Export as CSV
   (semicolon, decimal comma) or PDF, both with the change log of the year.
+- The rate is set in **Settings > Company & office > Bank & taxes** (2.365.2; the year report names it and links there).
 - The **rate per business km is kept per year**: changing it for one year never changes the allowance of earlier years.
   Every new or changed vehicle and every rate change is written to the office log and listed in the change log of the
   CSV / PDF of the year. Taking a drive over into the travel expenses is logged too (only the destination goes into the
@@ -1233,14 +1256,47 @@ moving the personal office into an organisation turns "every vehicle" into each 
 correction = `POST /api/office/drives` with `corrects_id` and `correct_note`; each drive answers `locked` auto | month,
 `corrects_id`, `corrected_by`).
 
+## Credit cards
+
+*Since 2.444.*
+
+Only the total of a credit card statement leaves the business account; the positions need their receipts. **Credit cards** in
+the menu group Money (the people of the bookkeeping; a holder with an account sees only their own cards; in a personal office
+its owner):
+
+- **Card**: holder (a person of the area, or a free name), provider (Mastercard for now), last four digits, the business account.
+  Several cards per holder and provider.
+- **Statement**: one PDF per card and month. Kalmido reads the positions itself, without a model or an outside service: day,
+  merchant, the euro amount, the original amount and currency, the foreign fee as a position of its own. Please check them and
+  press **Confirm positions**; until then they count for nothing. If they do not add up to the printed total you are told. A total
+  that cannot be found is typed in; a PDF that cannot be read (a scan) gets its positions typed in by hand. Layouts differ between
+  issuers: the reader follows the common German Mastercard layout.
+- **Receipts**: an open position shows the receipt found when its amount fits (also the original amount), **Choose receipt...**
+  searches all documents you see, also unsorted ones. A receipt is matched only when you press it; it becomes a receipt paid on
+  the position's day. Or **Upload receipt**: filed and matched at once.
+- Fees and interest need no receipt: the statement is the proof. **Private** marks a position; the statement shows what the holder
+  pays back.
+- **Match bank booking** (or the bank's own list): the sum is checked, the booking then counts as having its receipt and leaves
+  **Without receipt**.
+- **Reminder** (**Settings**, section Data, off by default): weekly or monthly one task for the holder while positions are open, done
+  by itself. Cards with a free name go to the person you choose.
+- **Exports**: the neutral bookkeeping export lists the positions (type *Credit card*; a position with its receipt only points at
+  it, the receipt's row carries the amount), its ZIP has the statements and receipts under `cards/`. DATEV: the card is an account of
+  its own (default SKR03 1730 / SKR04 3610, private 1800 / 2100, set in the DATEV settings): a receipt paid by card is booked against
+  it, fees and private positions too, the bank booking of the total takes it back to zero. Positions still without a receipt are not
+  exported; the check names them.
+
+Rights: office area **Credit cards**; the level *own* means the cards the person holds. Locked months stay as they are, by the
+position's day.
+
 ## Cash book
 
 *Since 2.121.*
 
 The menu group **Money** has the point **Cash book** (admins of the office area; without an organisation your personal
 office) for cash income and expenses. Every office has a **default cash box** (made on the first look, opening balance 0
-from that day); more boxes can be added under **Cash boxes** (name, opening balance, the day of the opening balance; saved
-on change). Boxes are archived, never deleted; the default box stays.
+from that day); more boxes can be added under **Cash boxes** in **Settings > Company & office > Bank & taxes** (2.365.2; the cash
+book's bar links there; name, opening balance, the day of the opening balance; saved on change). Boxes are archived, never deleted; the default box stays.
 
 - **Quick entry** on top (phone first): income or expense, amount, text, date (today), VAT rate 19 / 7 / 0 %, category
   (the receipt categories as suggestion, free text allowed). Every entry gets the **next number of its box, without
@@ -1456,6 +1512,17 @@ allowed) and `org_offices` (`[{id, name}]` while it is empty and the person has 
 `DELETE /api/office/docs/<id>/payments/<pid>`, `POST /api/office/docs/<id>/send`, `POST /api/office/docs/<id>/datev` and
 `GET /api/office/mail-status` (see "Invoices and credit notes" below); 2.40.0 adds `POST /api/office/docs/<id>/fee`
 (see "Payments and reminders"). Agents never reach `/api/office/*` (their routes are `/api/v1/office`, see "Agents").
+
+## Lists on the phone and their sort
+
+*Since 2.451.*
+
+- **Phones**: the rows of quotations, invoices, the archive, trips and entertainment receipts show no symbols; the row
+  uses the full width. A tap opens as before, a long press opens the row menu. In the archive the PDF view has *Correct*
+  on a phone, an open document has its *More* menu.
+- **Sort**: quotations, invoices, credit notes, reminders, delivery notes, the archive and the pipeline have one choice of
+  *Date*, *Client*, *Amount* and *Name*, on computer and phone alike, remembered per list on the device. Choosing the
+  same entry again reverses the direction. The pipeline starts in its own order (*Standard*).
 
 ## Quotations and the calculator
 
@@ -1685,7 +1752,7 @@ count as plural).
   page's direct positions, then per printed part a heading and its positions with quantity x part quantity, its producing /
   raw data / discount as positions; a part not printed stays one line), `title` (the title page; a part becomes a
   position with its amount, one per tax rate) or `summary` (one position per tax rate with a title, default
-  "Filmherstellung" / "Film production"). Net and gross equal the quotation's in every form, to the cent: with a
+  without one the neutral "Leistungen" / "Services" in the document's language). Net and gross equal the quotation's in every form, to the cent: with a
   fractional part quantity (1.5 shooting days) and mixed tax rates the part line is exactly rate x quantity, and the
   rest cent of the rounded positions goes on the last position of that rate, which then shows as one amount with its
   quantity x rate in the description (2.58.0). The preset is an office

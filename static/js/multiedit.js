@@ -181,7 +181,7 @@ function meTagsHtml(ts) {
   const all = new Map();
   for (const t of ts) for (const g of [...(t.ltags || []), ...t.tags]) { const k = g.toLowerCase(); if (!all.has(k)) all.set(k, g); }
   const lock = ts.filter(t => !canEdit(t)).length, chg = ME.chg.has('tags');
-  const chips = [...all.values()].sort((a, b) => a.localeCompare(b)).map(g => {
+  const chips = [...all.values()].sort(cmpText).map(g => {
     const n = ts.filter(t => meHas(t, g)).length, full = n === ts.length;
     return `<button type="button" class="metag ${full ? 'on' : 'half'}" data-act="me-tag" data-tag="${esc(g)}" aria-pressed="${full ? 'true' : 'mixed'}" ${lock ? 'disabled' : ''} title="${esc(full ? tr('All have {0} · click: remove from all', '#' + g) : tr('{0} of {1} have {2} · click: add to all', n, ts.length, '#' + g))}"><i aria-hidden="true"></i>#${esc(g)}</button>`;
   }).join('');

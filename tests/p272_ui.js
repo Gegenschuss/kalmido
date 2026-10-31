@@ -156,19 +156,19 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   d.querySelector('#chat-in').value = 'Ready for review?';
   w.eval('chatSend()'); await sleep(400);
   let mine = [...d.querySelectorAll('#chat-msgs .cmsg.me')].pop();
-  check(mine && /Sent/.test(mine.querySelector('.cdlv')?.textContent || '') && !mine.querySelector('.cdlv.on'), 'my message: Sent');
+  check(mine && /Sent/.test(mine.querySelector('.cdlv')?.getAttribute('aria-label') || '')  /* 2.437.0 (#3318): ticks, the word as aria-label */ && !mine.querySelector('.cdlv.on'), 'my message: Sent');
   check(d.activeElement?.id === 'chat-in', 'the box keeps its focus after sending (desktop)');
   await tcall('GET', `/agent/events?since=${cur}`, TOK);  // the agent fetches it
   await w.eval('chatLoad()'); await sleep(200);
   mine = [...d.querySelectorAll('#chat-msgs .cmsg.me')].pop();
-  check(mine.querySelector('.cdlv.on') && /Delivered/.test(mine.textContent), 'Delivered once the agent fetched it');
-  check(!d.querySelector('#chat-typing').classList.contains('hidden'), 'typing dots by themselves while the agent is online');
+  check(mine.querySelector('.cdlv.on') && /Delivered/.test(mine.querySelector('.cdlv')?.getAttribute('aria-label') || '') && !/Delivered/.test(mine.querySelector('.cdlv')?.textContent || ''), 'Delivered once the agent fetched it');
+  check(d.querySelector('#chat-typing').childElementCount > 0, 'typing dots by themselves while the agent is online');
   d.querySelector('#chat-in').value = 'draft text'; d.querySelector('#chat-in').focus();
   await w.eval('chatLoad()'); await sleep(100);
   check(d.activeElement?.id === 'chat-in' && d.querySelector('#chat-in').value === 'draft text', 'a refresh keeps the box, its text and its focus');
   const ans = await tcall('POST', '/agent/chats/1', TOK, {body: 'Yes. Shall I merge?'});
   await w.eval('chatLoad()'); await sleep(200);
-  check(d.querySelector('#chat-typing').classList.contains('hidden'), 'answered: no more dots');
+  check(d.querySelector('#chat-typing').childElementCount === 0, 'answered: no more dots');
   const am = d.querySelector(`#chat-msgs .cmsg.ag[data-mid="a:${ans.id}"]`);
   const up = am && am.querySelector('.rx.add[data-e="up"]');
   check(up && am.querySelectorAll('.rx.add').length === 3, 'quick 👍 👎 ❤️ on the agent\'s message');

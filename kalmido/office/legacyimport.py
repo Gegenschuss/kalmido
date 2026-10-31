@@ -18,6 +18,7 @@ Every confirmed import is a run (office_import_runs); its records carry the run 
 builds on yet (a client with a list, document, contract or archived document stays; so does a service used in a
 document) and says what stayed. Only the organisation's admins (the stricter of "master data" and "clients"); agent
 tokens and kids are stopped by office_gate."""
+import codecs
 import hashlib
 import hmac
 import io
@@ -36,7 +37,7 @@ from flask import jsonify, request
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
-from ..core.db import body, bump, db, iso, now_utc, parse_iso
+from ..core.db import body, bump, db, iso, local_now, now_utc, parse_iso
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .model import (MD, pb_cl_org, pb_cl_sql, office_create, office_gate, office_in_use, office_number_format, office_org, office_role, office_rows, office_scheme_period,
@@ -65,6 +66,8 @@ FI_REASONS = {
     "country": N_("Country not recognised"),
     "co": N_("c/o line moved to the contact"),
     "long_name": N_("Name shortened"),
+    "bad_email": N_("E-mail address not readable, left out"),  # 2.363.0 (#3103)
+    "bad_vat": N_("VAT ID too long, left out"),  # 2.363.0 (#3103)
     "one_line": N_("Only one line"),
     "foreign": N_("Address abroad: please check the fields"),
     "person_swap": N_("First line taken as the contact person: please check"),
@@ -144,6 +147,7 @@ def fi_xlsx_read(raw):
                     strings.append("".join(t.text or "" for t in si.iter() if _local(t.tag) == "t" and not _in_rph(si, t)))
         wb = _xml(z, "xl/workbook.xml", budget)
         wrels = _rels(z, "xl/workbook.xml", budget)
+        zeros = _fmt_zeros(z, names, budget)
         out = {}
         parts = 0
         for sh in wb.iter():
@@ -156,7 +160,7 @@ def fi_xlsx_read(raw):
             path = wrels.get(rid)
             if not path or path not in names:
                 continue
-            grid = _sheet(z, path, strings, budget)
+            grid = _sheet(z, path, strings, budget, zeros)
             out.setdefault((sh.get("name") or "").strip().lower(), grid)
             for t in _rels(z, path, budget).values():  # the sheet's tables (Excel "Format as table"; Power Query output)
                 if t in names and "/tables/" in t:
@@ -186,7 +190,27 @@ def _in_rph(si, t):
     return False
 
 
-def _sheet(z, path, strings, budget):
+def _fmt_zeros(z, names, budget):
+    """2.363.0 (#3103): {cell style index: digits} of the styles that show a number with leading zeros (format "00000"):
+    a postcode or customer number stored as a number keeps them, as Excel shows it."""
+    if "xl/styles.xml" not in names:
+        return {}
+    try:
+        st = _xml(z, "xl/styles.xml", budget)
+    except (ET.ParseError, BadInput):
+        return {}  # only a nicety: a broken style part does not stop the import
+    fmts = {x.get("numFmtId"): x.get("formatCode") or "" for x in st.iter() if _local(x.tag) == "numFmt"}
+    out = {}
+    for sec in st:
+        if _local(sec.tag) == "cellXfs":
+            for i, xf in enumerate(x for x in sec if _local(x.tag) == "xf"):
+                m = re.fullmatch(r"(?:\[\$-[0-9A-Fa-f]+\])?(0{2,})", fmts.get(xf.get("numFmtId"), ""))
+                if m:
+                    out[str(i)] = len(m.group(1))
+    return out
+
+
+def _sheet(z, path, strings, budget, zeros=None):
     rows = {}
     for row in _xml(z, path, budget).iter():
         if _local(row.tag) != "row":
@@ -219,6 +243,8 @@ def _sheet(z, path, strings, budget):
                 v = ""
             elif t in (None, "n") and re.fullmatch(r"-?\d+\.0+", v):
                 v = v.split(".")[0]
+            if zeros and t in (None, "n") and v.isdigit() and cel.get("s") in zeros:
+                v = v.zfill(zeros[cel.get("s")])
             cells[ci] = v
         rows[r] = cells
     if not rows:
@@ -634,6 +660,11 @@ FI_ADDR_COLS = {
     "city": ("ort", "stadt", "city", "town", "wohnort", "ortschaft", "gemeinde"),
     "country": ("land", "country", "staat", "countrycode", "ländercode", "laendercode"),
     "address": ("addresses", "address", "adresse", "adressen", "anschrift"),
+    # 2.363.0 (#3103): the other client fields such exports have (also beside the one-cell address)
+    "email": ("email", "mail", "emailadresse", "mailadresse"),
+    "phone": ("telefon", "telefonnummer", "tel", "phone", "phonenumber", "telephone", "mobil", "mobile", "handy"),
+    "customer_no": ("kundennummer", "kundennr", "kdnr", "knr", "debitor", "debitornummer", "customerno", "customernumber"),
+    "vat_id": ("ustidnr", "ustid", "ustidnummer", "umsatzsteuerid", "vatid", "vatnumber", "vatno"),
 }
 FI_MAP_KEYS = tuple(FI_ADDR_COLS)
 FI_CSV_NAMES = ("services", "leistungen", "equipment", "geräte", "technik", "freelancer", "staff", "crew")  # a CSV named so is that table
@@ -708,15 +739,27 @@ def fi_book(raw, name=""):
         return fi_xls_read(raw)
     if (name or "").lower().endswith((".xlsx", ".xlsm")):
         raise BadInput(tr("This is not a spreadsheet file (.xlsx)"))
-    if b"\x00" in raw[:4096] or raw.startswith(FI_NOT_CSV) or (name or "").lower().endswith((".pdf", ".zip", ".png", ".jpg", ".jpeg", ".heic")):
+    utf16 = raw[:2] in (codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)  # 2.363.0 (#3103): Excel's "Unicode text"
+    if utf16:
+        pass
+    elif b"\x00" in raw[:4096] or raw.startswith(FI_NOT_CSV) or (name or "").lower().endswith((".pdf", ".zip", ".png", ".jpg", ".jpeg", ".heic")):
         raise BadInput(tr("This is not a spreadsheet file (.xlsx or CSV)"))
     try:
-        text = raw.decode("utf-8-sig")
+        text = raw.decode("utf-16", "replace") if utf16 else raw.decode("utf-8-sig")
     except UnicodeDecodeError:
         text = raw.decode("cp1252", "replace")
     _d, head, body_ = csv_table(text, max_rows=FI_ROWS_MAX)
     stem = re.sub(r"\.[^.]*$", "", (name or "").replace("\\", "/").rsplit("/", 1)[-1]).strip().lower()
     return {stem if stem in FI_CSV_NAMES else "contacts": [head] + body_[:FI_ROWS_MAX]}
+
+
+def fi_head_at(book, *names):
+    """2.363.0 (#3103): the index of the header row of that table (title rows above it count for the row numbers)."""
+    for n in names:
+        for i, row in enumerate((book.get(n) or [])[:10]):
+            if any(str(x).strip() for x in row):
+                return i
+    return 0
 
 
 def fi_head_orig(book, *names):
@@ -805,6 +848,27 @@ def fi_columns_client(row, m):
     return out
 
 
+def fi_client_extras(a, row, m):
+    """2.363.0 (#3103): e-mail, phone, customer number, VAT ID of the client's row into a; what the import would refuse
+    stays out with a flag (one bad cell must not stop the whole file)."""
+    get = lambda k: _clean_line(str(row[m[k]])) if k in m and m[k] < len(row) else ""  # noqa: E731
+    mail = get("email")
+    if mail and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", mail):
+        mail = ""
+        a["flags"].append("bad_email")
+    vat = get("vat_id").replace(" ", "").upper()
+    if len(vat) > 20:
+        vat = ""
+        a["flags"].append("bad_vat")
+    a.update(email=mail[:200], phone=get("phone")[:60], customer_no=get("customer_no")[:40], vat_id=vat)
+
+
+def fi_unused_cols(orig, rows, used):
+    """2.363.0 (#3103): the headers of the columns with content that nothing takes over (the preview names them)."""
+    return [orig[j] or tr("Column {0}", j + 1) for j in range(len(orig))
+            if j not in used and any(j < len(r) and str(r[j]).strip() for r in rows)][:30]
+
+
 def fi_preview(c, oid, raw, name="", amap=None):
     book = fi_book(raw, name)  # 2.146.0 E (#2456): also CSV
     out = {"sheets": sorted(book), "clients": [], "roles": [], "crew": [], "services": [], "equipment": [], "other": {}}
@@ -820,6 +884,13 @@ def fi_preview(c, oid, raw, name="", amap=None):
         if isinstance(amap.get("address"), int) and not cols:
             ci = amap["address"]
         out["columns"] = {"head": orig[:60], "map": amap, "mode": "columns" if cols else "one"}
+        at = fi_head_at(book, "contacts", "kontakte", "kunden", "adressen")
+        used = set(amap.values()) | ({ci} if not cols and ci is not None else set())
+        if cols and "name" not in amap:  # the first free column is the name (fi_columns_client)
+            used.add(next((j for j in range(len(orig)) if j not in used), -1))
+        out["columns"]["unused"] = fi_unused_cols(orig, rows, used)
+        if at + 1 + len(rows) > FI_ROWS_MAX:
+            out["columns"]["cut"] = FI_ROWS_MAX
         known = _org_clients(c, oid)
         kn = [(fi_norm(k["name"]), k["zip"] or "", k) for k in known]
         seen = []
@@ -835,7 +906,8 @@ def fi_preview(c, oid, raw, name="", amap=None):
                 if not txt:
                     continue
                 a = fi_split_address(txt)
-            a["row"] = i + 2
+            fi_client_extras(a, row, amap)
+            a["row"] = i + at + 2  # 2.363.0 (#3103): the row of the file, also below title rows
             n = fi_norm(a["name"])
             a["dup"] = None
             for nn, zz, k in kn:
@@ -968,7 +1040,7 @@ def _run_row(c, oid, rid):
     return r
 
 
-MERGE_FIELDS = ("contact", "street", "zip", "city", "country", "address")
+MERGE_FIELDS = ("contact", "street", "zip", "city", "country", "address", "email", "phone", "customer_no", "vat_id")
 
 
 def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=None, pre=None):
@@ -1004,7 +1076,7 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=N
         if isinstance(x.get("row"), int):
             made[x["row"]] = tid
         return
-    f = {k: x.get(k) for k in ("name", "contact", "street", "zip", "city", "country", "address") if x.get(k) is not None}
+    f = {k: x.get(k) for k in ("name", "contact", "street", "zip", "city", "country", "address", "email", "phone", "customer_no", "vat_id") if x.get(k) is not None}
     if act == "merge":
         try:
             mid = int(x.get("merge_id"))
@@ -1504,18 +1576,40 @@ def _unlink_files(oid, files):
 
 # ---------------------------------------------------------------- archive: file names, storage, numbers
 DATE_PATTERNS = ((r"(\d{4})-(\d{1,2})-(\d{1,2})", "ymd"), (r"(\d{1,2})\.(\d{1,2})\.(\d{4})", "dmy"), (r"(\d{1,2})\.(\d{1,2})\.(\d{2})", "dmy2"),
-                 (r"(\d{1,2})-(\d{1,2})-(\d{4})", "dmy"), (r"(\d{1,2})-(\d{1,2})-(\d{2})", "dmy2"), (r"(20\d{2})(\d{2})(\d{2})", "ymd"),
-                 (r"(\d{2})(\d{2})(\d{2})", "ymd2"))
+                 (r"(\d{1,2})-(\d{1,2})-(\d{4})", "dmy"), (r"(\d{1,2})-(\d{1,2})-(\d{2})", "dmy2"), (r"(20\d{2})(\d{2})(\d{2})", "ymd"))
+
+
+def fi_six_digits(s):
+    """2.363.0 (#3103): the readings of six digits as a date, German first: [DDMMYY, YYMMDD], without impossible and future days."""
+    if not re.fullmatch(r"\d{6}", s):
+        return []
+    a, b_, c_ = int(s[:2]), int(s[2:4]), int(s[4:])
+    out = []
+    for y, mo, d in ((2000 + c_, b_, a), (2000 + a, b_, c_)):
+        try:
+            x = date(y, mo, d)
+        except ValueError:
+            continue
+        if x <= local_now().date() and x.isoformat() not in out:
+            out.append(x.isoformat())
+    return out
+
+
+def fi_date_open(s):
+    """2.363.0 (#3103): True when a date in a file name can be read two ways: it is proposed, not "sure"."""
+    return len(fi_six_digits((s or "").strip())) > 1
 
 
 def fi_parse_date(s):
     s = (s or "").strip()
+    if re.fullmatch(r"\d{6}", s):
+        return next(iter(fi_six_digits(s)), "")
     for pat, kind in DATE_PATTERNS:
         m = re.fullmatch(pat, s)
         if not m:
             continue
         a, b_, c_ = (int(x) for x in m.groups())
-        y, mo, d = {"ymd": (a, b_, c_), "dmy": (c_, b_, a), "dmy2": (2000 + c_, b_, a), "ymd2": (2000 + a, b_, c_)}[kind]
+        y, mo, d = {"ymd": (a, b_, c_), "dmy": (c_, b_, a), "dmy2": (2000 + c_, b_, a)}[kind]
         try:
             return date(y, mo, d).isoformat()
         except ValueError:
@@ -1537,13 +1631,13 @@ def fi_parse_filename(name, clients=()):
             out["project_no"] = m.group("proj")
         else:
             out["project"] = m.group("proj")
-        out["sure"] = bool(out["date"])
+        out["sure"] = bool(out["date"]) and not fi_date_open(m.group("date"))
     else:
         m = re.fullmatch(r"(?P<proj>[^_]+)_(?P<client>[^_]+)_(?P<title>.*?)_{2,}(?P<date>[^_]+)_(?:R|RE|Rechnung)", stem, re.I)
         if m:
             out.update(kind="invoice", project_no=m.group("proj"), client_name=m.group("client"), project=m.group("title").replace("_", " ").strip(),
                        date=fi_parse_date(m.group("date")))
-            out["sure"] = bool(out["date"])
+            out["sure"] = bool(out["date"]) and not fi_date_open(m.group("date"))
         else:  # a free form: the first number is the project, a date anywhere, R / KV mark the kind
             if toks and toks[0].isdigit():
                 out["project_no"] = toks[0]

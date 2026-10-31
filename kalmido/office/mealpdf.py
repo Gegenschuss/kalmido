@@ -11,12 +11,13 @@ from .pdf import (C_INK, C_INK2, C_RULE, C_RULE2, MM, PDF_CW, PDF_L, PDF_LOGO_MA
 from .model import office_settings  # 2.357.0 A (#3156)
 from .letters import lt_sig_pic  # 2.332.0 C (#3301): the approver's signature picture
 from .pdf import PAPER, pdf_paper, pdf_paper_bind
+from .calc import calc_lang, fmt_point
 
 BW_KIND = {"food": "Food", "drinks": "Drinks"}
 
 
 def bw_lg():
-    return "de" if lang() == "de" else "en"
+    return calc_lang(lang())  # 2.449.0 (#3766): every app language (was de, else en)
 
 
 def bw_when(ts, lg):
@@ -32,7 +33,7 @@ def bw_when(ts, lg):
 
 
 def bw_rate_txt(r):
-    return f"{str(r).replace('.', ',')} %" if bw_lg() == "de" else f"{r} %"
+    return f"{fmt_point(r, bw_lg())} %"
 
 
 def bw_kind_line(ln):

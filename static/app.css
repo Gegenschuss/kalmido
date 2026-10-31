@@ -1,7 +1,7 @@
 /* Kalmido 1.1 "compact & technical": Geist for the interface, Geist Mono for everything that is data
    (dates, times, counters, tags, durations, shortcut keys, ids). One accent (mint by default), cool greys,
    hairline separators instead of cards. Spacing scale 2 4 6 8 12 16 24 32, type scale 11 12 13 14 16 20 (px at 100 %).
-   1.2 Appearance (per device, settings > Appearance): every size is in rem and 1rem = 16px x --ui, so the font size
+   1.2 Appearance (per device, settings > Appearance): every size is in rem and 1rem = the browser's default size (16px) x --ui, so the font size
    setting (90 / 100 / 112 / 125 %) scales text, rows, icons, spacing and dialogs together. Only hairlines,
    bars and outlines (<= 2px) and the breakpoints (viewport px) stay fixed. */
 /* 2.27.0 (#966): the hidden attribute always hides (a rule like .row{display:flex} kept "hidden" rows visible) */
@@ -57,7 +57,7 @@
 /* density per device: compact (desktop default) / comfortable (phones, touch) */
 :root[data-density="comfortable"]{--row-py:.625rem;--row-fs:.9375rem;--srow-h:2.25rem;--meta-fs:.78125rem;--row-h:2.75rem}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html{scrollbar-color:var(--bg4) transparent;scrollbar-width:thin;font-size:calc(16px * var(--ui))}
+html{scrollbar-color:var(--bg4) transparent;scrollbar-width:thin;font-size:calc(100% * var(--ui))}  /* 2.442.0 (#2810): the browser's own default size counts, --ui stays a factor on it */
 body{font:var(--fs-b)/var(--lh) var(--sans)}
 html,body{margin:0;background:var(--bg);color:var(--text);height:100%;overscroll-behavior:none;font-feature-settings:"ss01" off;-webkit-font-smoothing:antialiased}
 /* 2.39.1 (#1189): the document itself never scrolls (Fold unfolded: a swipe past the end of the sidebar moved the whole app for a
@@ -507,6 +507,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 /* ---------- pomodoro ---------- */
 .pomo{display:flex;flex-direction:column;align-items:center;padding-top:.625rem}
 .pomo .seg{margin-bottom:1.125rem}
+.pomoset{align-self:flex-end;margin-bottom:.5rem}
 .ring{position:relative;width:min(17.5rem,72vw);aspect-ratio:1}
 .ring svg{width:100%;height:100%;transform:rotate(-90deg)}
 .ring circle{fill:none;stroke-width:3}
@@ -945,6 +946,7 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 .authscreen form{display:flex;flex-direction:column;gap:.625rem}
 .authscreen form .btn{margin-top:.25rem;padding:.625rem .875rem}
 .authscreen .aerr{color:var(--danger);font-size:var(--fs-m);min-height:1em}
+.authscreen .invby{margin:0 0 .5rem;font-weight:500}  /* 2.365.0 (#2802): who invites, into which organisation */
 /* website link (module "links") */
 .meta a.lnk{display:inline-flex;align-items:center;gap:.1875rem;color:var(--muted);text-decoration:none;max-width:10.625rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .meta a.lnk:hover{color:var(--accent)}
@@ -1006,6 +1008,8 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 .featgrid label span{display:flex;flex-direction:column}
 .featgrid label small{font-size:var(--fs-s);line-height:var(--lh)}
 @media (hover:none){ .cacts{opacity:1} }
+/* 2.421.0 (#3471): narrow phones - the comment buttons wrap into an own right-aligned row under name and time */
+@media (max-width:400px){.chead{flex-wrap:wrap;min-width:0}.cacts{flex-basis:100%;justify-content:flex-end}}
 
 /* ---------- News ("Neuigkeiten") ---------- */
 .iconbtn.bell,#tabs button,.rbtn{position:relative}
@@ -1377,7 +1381,23 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 /* v1.0: first-run setup, step 2 */
 .authscreen .setupcard{width:min(38rem,100%);max-height:calc(100dvh - 2rem);overflow:auto}
 .authscreen .setupcard h3{margin:.875rem 0 .375rem;font-size:var(--fs-h)}
-.authscreen #su-lang{align-self:flex-start}
+/* 2.365.0 (#2802): the language is a small menu in the card's top right corner (was a row of six buttons on top) */
+.authscreen .setupcard{position:relative}
+.sulang{position:absolute;top:1rem;right:1rem;z-index:3}
+.sulang>summary{display:inline-flex;align-items:center;gap:.375rem;min-height:2.75rem;padding:0 .625rem;border:1px solid var(--line);border-radius:var(--radius);cursor:pointer;list-style:none;font-size:var(--fs-s);color:var(--text2);background:var(--bg2)}
+.sulang>summary::-webkit-details-marker{display:none}
+.sulang .sulangs{position:absolute;right:0;top:calc(100% + .25rem);display:flex;flex-direction:column;min-width:10rem;padding:.25rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);box-shadow:var(--shadow,0 .5rem 1.5rem rgba(0,0,0,.15))}
+.sulang .sulangs button{text-align:left;padding:.5rem .75rem;min-height:2.75rem;border-radius:var(--radius);color:var(--text)}
+.sulang .sulangs button.on{color:var(--accent);font-weight:600}
+.sulang .sulangs button:hover{background:var(--bg3)}
+/* 2.365.0 (#2802) phone: one scroll bar (the page, not the card in it), the card starts at the top (it was cut off when centred),
+   the start tiles in one column below 400 px (titles were cut) */
+@media (max-width:560px){
+  .modal.modal.authscreen.authscreen:has(.setupcard){place-items:start center;align-items:start;align-content:start;overflow-y:auto;overscroll-behavior:contain}  /* doubled classes: above :root[data-theme] .modal.authscreen (0,4,0) */
+  .modal.authscreen .setupcard{max-height:none;overflow:visible}
+  .modal.authscreen .setupcard .sufoot{bottom:0}
+}
+@media (max-width:399px){ .sustarts.ptcards{grid-template-columns:1fr} }
 .suse-main,.suse-list{display:flex;flex-direction:column;gap:.375rem;margin:0 0 .625rem}
 .suse{display:flex;gap:.625rem;align-items:flex-start;padding:.5rem .625rem;border-radius:var(--radius);cursor:pointer}
 .suse-main .suse{background:var(--bg3)}
@@ -1560,6 +1580,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .cevh .cevdot{width:.625rem;height:.625rem;transform:translateY(-1px)}
 .cevm{display:flex;align-items:flex-start;gap:.5rem;font-size:var(--fs-s);color:var(--text2);overflow-wrap:anywhere}
 .cevm svg{flex:0 0 auto;color:var(--muted);margin-top:1px}
+.cevm .cvxthide{flex:none;margin-left:auto}  /* 2.443.0 (#3740) */
 .cevdesc{font-size:var(--fs-s);color:var(--text2);white-space:pre-wrap;overflow-wrap:anywhere;max-height:12rem;overflow-y:auto;border-top:1px solid var(--line);padding-top:.4375rem}
 .cevdesc a{color:var(--accent)}
 .cevact{display:flex;justify-content:flex-end;padding-top:.125rem}
@@ -1756,6 +1777,7 @@ body.tdrag .sdrop{display:flex}
 .modal.cdlg h3{margin-bottom:.5rem;line-height:var(--lh-tight)}
 .cdlg-b{color:var(--text2);font-size:var(--fs-b);line-height:var(--lh)}
 .cdlg-b p{margin:0 0 .5rem}
+.cdlg-b .ofdfinno{color:var(--text);font-size:1.05em}.ofdfinno b{font-variant-numeric:tabular-nums;overflow-wrap:anywhere} /* 2.431.0 B (#3605): the number in the finalise dialog */
 .cdlg-l{margin:.25rem 0 .75rem;padding-left:1.25rem}
 .cdlg-l li{margin:.125rem 0}
 .modal.cdlg #cdlg-in{width:100%;margin-top:.5rem}
@@ -2250,6 +2272,7 @@ button.tvr-task:hover{color:var(--accent)}
    the agent chat), a long name stays on one line */
 .tcrt b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:899px){ body.in-team:has(.tcview.inroom) #top{display:none} }
+@media (max-width:767px){ .tcrhead .msbtn{display:none} }  /* 2.446.0 (#3334): in the ⋯ menu, the hidden button anchors the search bar */
 .cmsg .runtask{display:inline-flex;align-items:center;gap:.25rem;padding:.125rem .25rem;color:var(--muted);font-size:var(--fs-m);max-width:100%}
 .chnote{padding:0 .75rem .75rem;margin:0}
 /* 2.12.2 (#451): "Load older messages" above the newest 30, "New message ↓" over the bottom edge of the list while scrolled up */
@@ -2258,7 +2281,7 @@ button.tvr-task:hover{color:var(--accent)}
 .chnew{position:relative;z-index:2;align-self:center;display:inline-flex;align-items:center;gap:.375rem;min-height:2.75rem;margin:-3.25rem 0 .5rem;padding:0 1rem;border:1px solid var(--line2);border-radius:99rem;background:var(--bg2);color:var(--accent);font:inherit;font-size:var(--fs-s);font-weight:600;box-shadow:var(--shadow);cursor:pointer}
 .chnew.hidden{display:none}
 /* 2.12.2 (#453 N4): phone chat with the keyboard up: all the room for the messages (height set by chatFit()) */
-body.kb-open #tabs,body.kb-open #fab,body.kb-open .chview .chnote{display:none}
+body.kb-open #tabs,body.kb-open #fab,body.kb-open .chview .chnote,body.kb-open .cwsw{display:none}
 @media (max-width:767px){.achip .act{max-width:34vw}.agview{padding:.5rem .75rem 7rem}.chview{height:calc(100dvh - 7.5rem)}}
 .rx.rxplus{padding:0 .375rem}.rx.rxplus .i{width:.75rem;height:.75rem}
 .rxpick{padding:.5rem;display:flex;flex-direction:column;gap:.5rem;max-width:17rem}
@@ -2332,6 +2355,9 @@ body.fab-on #view .chcomp,body.fab-on #detail .dbot .dcomp:not(.dctop){padding-r
 }
 @keyframes tdot{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-2px)}}
 #achat .atyping,.chview .atyping{padding:.25rem .875rem .5rem}
+/* 2.437.0 A (#3737): the typing row of the agent chat is always there: fixed height, a rule above, the text on one line */
+.atyping.atyrow,#achat .atyping.atyrow,.chview .atyping.atyrow{box-sizing:border-box;flex:none;height:2.25rem;padding-top:.25rem;padding-bottom:.25rem;border-top:1px solid var(--line);overflow:hidden}
+.atyping.atyrow .ttx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* global: spinning ring on the agent chip / agents button while an agent works, an accent dot while it waits */
 .achip{position:relative}
 .achip.aspin::before,#rail .aspin::before,#tabs .aspin .tico::before{content:'';position:absolute;border-radius:50%;border:2px solid color-mix(in srgb,var(--accent) 22%,transparent);border-top-color:var(--accent);pointer-events:none}
@@ -2387,6 +2413,23 @@ body.fab-on #view .chcomp,body.fab-on #detail .dbot .dcomp:not(.dctop){padding-r
 /* 2.32.0 (#1074): with the focus in the sticky comment box the padding above made each typed letter scroll the panel
    (Chrome reveals the caret 9rem above the bottom edge, the sticky box moves along, the next letter scrolls again) */
 #detail:has(.dbot :focus){scroll-padding-bottom:0}
+/* 2.365.0 (#2824) phone: the task's bottom bar above the comment field (detail.js thumb): date + Today / Tomorrow, project,
+   Complete on the right edge (thumb reach); it steps aside while a comment is typed (the keyboard needs the room) */
+.dthumb{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;padding:.375rem .75rem;border-top:1px solid var(--line);background:var(--bg2);container:dthumb / inline-size}
+.dthumb .dchip{flex:1 1 0;min-width:0;min-height:2.75rem;overflow:hidden;justify-content:flex-start;border:1px solid var(--line)}
+.dthumb .dchip .dct{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dthumb .dq{flex:none;min-width:2.75rem;min-height:2.75rem;justify-content:center;border:1px solid var(--line);color:var(--muted)}
+.dthumb .dq.on{border-color:var(--accent);color:var(--accent)}
+.dthumb .dql{display:none}
+.dthumb .dtbr{display:none}
+.dthumb .dtproj{display:inline-flex;align-items:center;gap:.375rem;flex:1 1 0;min-width:2.75rem;min-height:2.75rem;padding:0 .625rem;border:1px solid var(--line);border-radius:var(--radius);color:var(--text2);font-size:var(--fs-s)}
+.dthumb .dtpn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dthumb .dtdone{flex:none;min-height:2.75rem;gap:.375rem;padding:0 1rem}
+.dthumb .dtdone.on{color:var(--accent);border-color:var(--accent)}
+/* a narrow phone: two rows - the date with its quick buttons, then the project and Complete (the date is never cut short) */
+@container dthumb (max-width:35.99rem){ .dthumb .dtbr{display:block;flex:0 0 100%;height:0} }
+@container dthumb (min-width:36rem){ .dthumb .dtproj{flex:0 1 auto;max-width:14rem} .dthumb .dq[data-d="0"] .dql{display:inline;font-size:var(--fs-s);white-space:nowrap} .dthumb .dq[data-d="0"]{padding:0 .625rem} }
+#detail .dbot:has(.dcomp :focus) .dthumb{display:none}
 .meta .crd{opacity:.75}
 /* 2.0.8 (#321) Settings > AI colleague: lists at a glance */
 .aitbl{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden}
@@ -3828,6 +3871,19 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
   @container lrows (max-width:52rem){ .lc.o5{display:none} }
   @container lrows (max-width:44rem){ .lc.o3{display:none} }
 }
+/* 2.427.0 B (#3551): the field strip above the rows wherever .lchead is hidden (phones < 600 px, narrow list containers on wider
+   screens; tablets 600-767 px keep the column titles): names swipe sideways, 44 px targets, "Fields" stays at the right end */
+.lcbar{display:none;align-items:center;margin-bottom:2px;border-bottom:1px solid var(--line);font:500 var(--fs-xs)/var(--lh-tight) var(--mono);color:var(--muted)}
+@media (max-width:599px){ .lcbar{display:flex} }
+@media (min-width:768px){ @container lrows (max-width:48rem){ .lcbar{display:flex} } }
+.lcbar .lcbs{display:flex;flex:1;min-width:0;gap:.125rem;padding-left:.25rem;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain}
+.lcbar .lcbs::-webkit-scrollbar{display:none}
+.lcbar button{display:inline-flex;align-items:center;gap:.25rem;flex:none;min-height:2.75rem;min-width:2.75rem;justify-content:center;padding:0 .5rem;border:0;border-radius:var(--r-s);background:none;color:inherit;font:inherit;white-space:nowrap;cursor:pointer}
+.lcbar .lcbn.sorted{color:var(--text)}
+.lcbar .lcsa{display:inline-flex;color:var(--accent)}.lcbar .lcsa .cup{transform:rotate(180deg)}
+.lcbar .lcbf{border-left:1px solid var(--line);border-radius:0;color:var(--text2);font-family:var(--sans)}
+@media (hover:hover){ .lcbar button:hover{color:var(--text)} }
+.lcbar button:focus{outline:none}.lcbar button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 /* 2.14.0 (#484): quick add: paper clip + "Add and open" next to Send */
 .qadd .qbtn{flex:none;padding:.375rem;border-radius:.4375rem;color:var(--muted)}
 .qadd .qbtn:hover{color:var(--accent);background:var(--bg4)}
@@ -4043,6 +4099,7 @@ body.lcmoving{cursor:grabbing!important;user-select:none!important}  /* 2.331.0 
 .tcroom{display:flex;flex-direction:column;min-width:0;min-height:0}
 .tcroom.tcnone{align-items:center;justify-content:center}
 .tcrhead{display:flex;align-items:center;gap:.625rem;padding:.5rem .75rem;border-bottom:1px solid var(--line);min-height:3.25rem}
+@media (max-width:767px){ .tcrhead{padding-block:.25rem} }  /* 2.446.0 (#3334): 44 px buttons in at most 56 px, like the agent chat */
 .tcrt{display:flex;flex-direction:column;min-width:0}
 .tcrt .muted{font-size:var(--fs-s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tcmsgs{flex:1;min-height:0}
@@ -4098,6 +4155,7 @@ button.trdline:hover,button.trdline:focus-visible{background:var(--bg3);color:va
 @media (max-width:767px){
   body.in-team #view{overflow:hidden;padding-bottom:calc(var(--tabs-h) + var(--safe-b));display:flex;flex-direction:column;overscroll-behavior:none}
   body.in-team.kb-open #view{padding-bottom:0}
+  body.in-team.kb-open .tcview{min-height:0}  /* 2.446.0 (#3334): the 20rem ran on behind the box in landscape */
   .tcview{grid-template-columns:minmax(0,1fr);flex:1;height:auto;border:0;border-radius:0;margin:0 -.75rem}
   .tcview.inroom .tclist{display:none}
   .tcview:not(.inroom) .tcroom{display:none}
@@ -4620,6 +4678,17 @@ button.lkchip:hover{border-color:var(--accent)}
 .ctav img{width:100%;height:100%;object-fit:cover;border-radius:50%}
 .ctcard{overflow:auto;min-height:0;padding:.25rem .25rem 2rem;display:flex;flex-direction:column;gap:.75rem}
 .ctcard.ctnone{align-items:center;justify-content:center;gap:.5rem}
+/* 2.431.0 C (#3598): two columns (clients, contacts): the page itself stands still - the search bar stays on top, the list on the
+   left and the card on the right scroll each for themselves (the office wrap and #view used to grow with the list, so the whole
+   page scrolled); phones (one column) unchanged */
+@media (min-width:768px){
+  #view:has(.ctview > .ctcols){display:flex;flex-direction:column;overflow:hidden;padding-bottom:1rem}
+  #view:has(.ctview > .ctcols) > .ofwrap{flex:1;min-height:0;width:100%;display:flex;flex-direction:column}
+  #view:has(.ctview > .ctcols) .ofbody{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
+  #view:has(.ctview > .ctcols) .ofbody > :not(.ctview),#view:has(.ctview > .ctcols) > :not(.ofwrap,.ctview){flex-shrink:0}
+  .ctview:has(> .ctcols){flex:1;height:auto}
+  .ctview > .ctcols{grid-template-rows:minmax(0,1fr)}
+}
 .cthead{display:flex;align-items:center;gap:.75rem}
 .cthn{min-width:0;flex:1}
 .cthn h3{margin:0;font-size:var(--fs-l);overflow-wrap:break-word;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}  /* 2.217.0 A (#2794): two lines, break inside a word only as last resort */
@@ -5086,6 +5155,11 @@ button.lkchip:hover{border-color:var(--accent)}
 /* UX-42 review: wide task panels show Today / Tomorrow with their words too */
 @media (pointer:fine){ @container dtop (min-width:27rem){ .dtop .dq{padding:0 .5rem;width:auto} .dtop .dq .dql{display:inline;font-size:var(--fs-s);white-space:nowrap} } }
 @media not (pointer:coarse){ @container dtop (max-width:25.99rem){ .dtop .dpw{display:none} .dtop .iconbtn[data-act="prio"]{width:auto;padding:0 .375rem} } }  /* narrow panels with a mouse (chat beside it): the flag alone, its word is the tooltip; 2.53.0: "not coarse" so a pointer-less narrow window (no hover) gets it too */
+/* 2.431.0 A (#3593): fitDtop() (detail.js) sets dtl1..dtl5 while the header does not fit: the words go one step at a time, the icons stay */
+.dtop.dtl1 .dq[data-d="-1"] .dql,.dtop.dtl2 .dq[data-d="1"] .dql,.dtop.dtl3 .dq[data-d="0"] .dql,.dtop.dtl4 .tlkb .dpw,.dtop.dtl4 .dtime .dpw,.dtop.dtl4 .dpin,.dtop.dtl4 .asstb .dpw,.dtop.dtl5 .iconbtn[data-act="prio"] .dpw{display:none}
+.dtop.dtl1 .dq[data-d="-1"],.dtop.dtl2 .dq[data-d="1"],.dtop.dtl3 .dq[data-d="0"]{padding:.375rem}
+.dtop.dtl4 .tlkb,.dtop.dtl4 .dtime,.dtop.dtl4 .iconbtn[data-act="pin"],.dtop.dtl5 .iconbtn[data-act="prio"]{padding:.375rem}
+@media (pointer:coarse){ .dtop.dtl1 .dq[data-d="-1"],.dtop.dtl2 .dq[data-d="1"],.dtop.dtl3 .dq[data-d="0"],.dtop.dtl4 .tlkb,.dtop.dtl4 .dtime,.dtop.dtl4 .iconbtn[data-act="pin"],.dtop.dtl5 .iconbtn[data-act="prio"]{padding:0} }
 /* 2.26.0 (#932 #936 #937) */
 /* #932: the sidebar takes its width from --sideW (the grip on its right edge, see placeGrips) */
 #app:not(.side-rail) #side{min-width:0}
@@ -5683,7 +5757,7 @@ body.lydragging,body.lydragging *{cursor:grabbing!important;-webkit-user-select:
 /* 2.40.0 (#1382): building blocks of a number scheme (buttons, insert at the caret) and its preview */
 /* 2.36.1 C: Office & finance (#1021) -- quotations: the list, the editor (head, positions, automatic lines, totals, rights) */
 .ofdbar select{min-height:2.25rem}
-.rotag.st-sent{color:var(--accent)} .rotag.st-accepted{color:var(--ok,#2a8a4a)} .rotag.st-declined{color:var(--muted);text-decoration:line-through}
+.rotag.st-sent{color:var(--accent)} .rotag.st-accepted{color:var(--ok,#2a8a4a)} .rotag.st-declined,.rotag.st-superseded{color:var(--muted);text-decoration:line-through}
 .ofdsec{border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);padding:.5rem .75rem}
 .ofdsec>summary{cursor:pointer;display:flex;align-items:center;gap:.5rem;min-height:2.5rem;list-style:none}
 .ofdsec>summary::-webkit-details-marker{display:none}
@@ -6354,6 +6428,14 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
   .trow.hascols.iedit .ttl{flex:1 1 0;min-width:0}
   .trow.hascols.iedit .meta{flex:0 1 auto}
 }
+/* 2.437.0 A (#3626): in a narrow list (task panel open) the row is the phone row, title above the columns: the field fills the
+   width right of the circle (the row-mode centring above left it floating mid-row) */
+@media (min-width:600px){
+  @container lrows (max-width:48rem){
+    .trow.hascols.iedit .tmain{align-items:stretch}
+    .trow.hascols.iedit .ttl{flex:none;width:100%}
+  }
+}
 
 /* 2.46.1 E (#1637) Office: three tab levels, calmer and flush left -- area tabs as pills, the module's tabs underlined,
    the document kinds as small segment switches; search field and filter share one height; no heading above the tabs */
@@ -6459,6 +6541,11 @@ html.mini-chat .tcview{grid-template-columns:minmax(0,1fr);border:0;border-radiu
 html.mini-chat body.in-team #view{display:flex;flex-direction:column;overflow:hidden}
 html.mini-chat body.in-team .tcwrap{flex:1;min-height:0;display:flex;flex-direction:column}
 html.mini-chat body.in-team .tcview{flex:1;height:auto}
+/* 2.365.0 (#3319) the window is the chat: header, history and composer use its whole width at any size (no 44rem column);
+   only a single bubble stays readable (at most 75 % of the width, about 900 px of text), own ones right, the agent's left */
+html.mini-chat .chview,html.mini-chat body.in-chat .chview{max-width:none;margin:0}
+html.mini-chat body.in-chat #view,html.mini-chat body.in-team #view{padding-left:.75rem;padding-right:.75rem}
+@media (min-width:40rem){ html.mini-chat .cmsg{max-width:min(75%,56rem)} }  /* a narrow window keeps the usual 88 % */
 /* 2.46.2 C (#1712) never red text on the accent fill: pri + danger reads like danger solid */
 .btn.pri.danger{background:var(--danger);border-color:var(--danger);color:var(--danger-ink)}
 /* 2.46.2 C (#1651) hidden username field before the account password so managers pair the right login */
@@ -6718,6 +6805,10 @@ button.lnph:hover{border-color:var(--accent)}
 .abempty{padding:2rem 1rem}
 .abemptyhint{display:block;max-width:32rem;margin:.5rem auto 0;font-size:var(--fs-m)}
 .abhint{font-size:var(--fs-b);margin-top:.75rem}
+/* 2.429.0 (#3580): a collection "From <area>": its files grouped by their object (page, project, folder) */
+.abcollg{margin-top:1rem}
+.abcollh{margin:0 0 .25rem;font-size:var(--fs-b);font-weight:600;color:var(--muted)}
+.abcollnote{margin-top:0}
 /* 2.353.0 A (#2758): the bar of a locked folder (one accent, quiet) */
 .fslbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem .75rem;margin:.25rem 0 .5rem;border:1px solid var(--line);border-radius:.5rem;font-size:var(--fs-b);color:var(--muted)}
 .fslbar>span{flex:1 1 14rem}
@@ -7113,6 +7204,8 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .cmsg.agc.jobm .cbub{background:color-mix(in srgb,var(--jcol) var(--agent-tint),var(--bg3))}
 .cmsg.agc.jobm.jpart .cbub{background:color-mix(in srgb,color-mix(in srgb,var(--jcol) 70%,var(--bg)) var(--agent-tint),var(--bg3))}
 .cmsg.agc.apv .cbub{background:transparent}
+/* 2.438.0 A (#3322): a thin edge in the agent's colour (25 %) on its tinted bubbles; no colour chosen = no edge */
+:root:not([data-chat-agent]) .cmsg.agc:not(.jobm):not(.apv) .cbub:not(.del):not(.tcedit){box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--agcol,transparent) 25%,transparent)}
 /* 2.233.0 C (#3196): chat bubble colour of people / agents (settings > Appearance > Chat); icons.js applyLook sets data-chat-human /
    data-chat-agent + the palette's two tones; no attribute = "Default" = the rules above. Text stays var(--text) on a light tint (contrast). */
 :root{--chat-h:var(--chat-h-d,var(--accent));--chat-a:var(--chat-a-d,var(--accent))}
@@ -7309,6 +7402,38 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 #side .fv2-tile.fv2-before{box-shadow:-.1875rem 0 0 var(--accent)}
 #side .fv2-tile.fv2-after{box-shadow:.1875rem 0 0 var(--accent)}
 @media (prefers-reduced-motion:no-preference){ #side .fv2-tile{transition:opacity .15s ease,transform .15s ease} #side .fv2-tile:active{transform:scale(.96)} }
+/* 2.441.0 (#3592): the favourites as a row of symbols: on a computer only the free room of the head bar between the workspace
+   switch and the search (grows from nothing, takes no room: the bar's gap on its right is given back), on a phone a row to swipe */
+.fv2bar{display:flex;align-items:center;gap:.25rem;min-width:0}
+#kbar .fv2bar{flex:1 1 0;width:0;height:100%;overflow:hidden;margin-right:-.5rem;padding:0 .5rem 0 .25rem}
+#favrow{flex:none;padding:0 .5rem .375rem;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+#favrow::-webkit-scrollbar{display:none}
+#favrow.hidden{display:none}
+.fv2bar [hidden]{display:none}
+.fv2bar .fv2-tile{position:relative;display:flex;align-items:center;justify-content:center;flex:none;width:1.875rem;height:1.875rem;padding:0;border:0;border-radius:.5rem;background:none;color:var(--fvc,var(--text2));cursor:pointer}
+.fv2bar .fv2-tile:hover{background:var(--bg3);color:var(--fvc,var(--text))}
+.fv2bar .fv2-tile.on{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--fvc,var(--text))}
+.fv2bar .fv2-tile:focus-visible,.fv2-more:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.fv2bar .fv2-tile>.i,.fv2bar .fv2-tile .sic .i{width:1.125rem;height:1.125rem}
+.fv2bar .fv2-tile .sic{display:flex}
+.fv2bar .fv2-tile .lic{margin:0}
+.fv2bar .fv2-tile .fv2-av{width:1.375rem;height:1.375rem;font-size:var(--fs-xs)}
+.fv2bar .fv2-tile .fv2-st{position:absolute;right:.125rem;bottom:.125rem;display:flex}
+.fv2bar .fv2-tile .fv2-st .hdot{width:.4375rem;height:.4375rem}
+.fv2bar .fv2-wsd{position:absolute;top:.125rem;right:.125rem;display:flex}
+.fv2bar .fv2-wsd .wsp-dot{width:.375rem;height:.375rem}
+.fv2bar .fv2-sep{flex:none;width:.5625rem;height:1.125rem;background:linear-gradient(var(--line2),var(--line2)) center/1px 100% no-repeat;cursor:grab}
+.fv2bar .fv2-more{flex:none;height:1.875rem;padding:0 .375rem;border:0;border-radius:.5rem;background:none;color:var(--text2);font-size:var(--fs-xs);font-weight:500;cursor:pointer}
+.fv2bar .fv2-more:hover,.fv2bar .fv2-more.on{background:var(--bg3);color:var(--text)}
+.fv2bar.fv2-drop{box-shadow:inset 0 0 0 1px var(--accent);border-radius:.5rem}
+.fv2bar .dragging{opacity:.4}
+.fv2bar .fv2-before{box-shadow:-.125rem 0 0 var(--accent)}
+.fv2bar .fv2-after{box-shadow:.125rem 0 0 var(--accent)}
+.fv2-page{flex-direction:column;align-items:stretch;gap:.125rem;padding:.5rem}
+.fv2-page .fv2-tile{width:auto;height:auto;min-height:2.75rem;justify-content:flex-start;gap:.75rem;padding:.25rem .75rem;text-align:left}
+.fv2-page .fv2-pn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.fv2-page .fv2-pp{margin-left:auto;flex:none;color:var(--muted);font-size:var(--fs-s)}
+@media (pointer:coarse){ #favrow .fv2-tile{width:2.75rem;height:2.75rem} }
 
 /* 2.56.0 C (#1797) share symbols in two fixed columns at the right edge (agent | person) on every sidebar row: a missing
    symbol keeps its empty column, the count / dots / marks stay left of them, nesting only moves the name */
@@ -8385,7 +8510,6 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 :root.rail-nolabel{--srW:3.25rem}
 :root.rail-nolabel .srb .srbn{display:none}
 :root.rail-nolabel .srb{padding:.5rem .125rem}
-:root.rail-nolabel #side .sbmr .srb{width:2.75rem}
 .srb svg.i{width:var(--ic-l);height:var(--ic-l)}
 .srb:hover{background:var(--bg3);color:var(--text)}
 .srb.on{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);font-weight:600;--dot:currentColor}
@@ -8541,18 +8665,28 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #app:not(.side-rail) #srail .srb.srpanel{display:none}
 #pop .menu-list:has(.kbwsi){max-width:17rem}
 #pop .kbwsi .ml{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#srail .srb.on{color:color-mix(in srgb,var(--accent) 78%,var(--text))}  /* the open tile's word keeps 4.5:1 on its tint (light and dark) */
+#srail .srb.on,#side .sbmr .srb.on{color:color-mix(in srgb,var(--accent) 78%,var(--text))}  /* the open tile's word keeps 4.5:1 on its tint (light and dark), in the phone's drawer too */
 /* 2.196.0 A (#2737): the phone's drawer like sidebar B (only drawn on phones): search, Today, Inbox and the row of the areas
-   fixed on top (.sbfix), the row scrolls sideways and never wraps; Settings + the account fixed at the bottom (.sbmdock) */
+   on top (.sbfix, scrolls along since 2.442.0 #3739, only the search stays), Settings + the account fixed at the bottom (.sbmdock) */
 #side .sbmtop{margin-top:.5rem}
 #side .sbmtop .scmd{margin-bottom:.25rem}
+/* 2.442.0 (#3739): only the search stays on top. Sticky stays inside its parent, so the two boxes around it step aside (the
+   drawer's scrolling box is its parent). Its background reaches the top of the screen over the safe area and ends at the head
+   above it while at rest (the head paints over it), the rows slide under it */
+#side .sbfix-m,#side .sbfix-m .sbmtop{display:contents}
+#side .sbfix-m .sbhead{position:relative;z-index:4;margin-top:var(--sbpt)}  /* the gap .sbfix itself has elsewhere */
+#side .sbmsrch{position:sticky;top:0;z-index:3;margin:calc(-1 * var(--safe-t,0px)) -.75rem 0;padding:calc(.5rem + var(--safe-t,0px)) .75rem 0;background:var(--sbbg,var(--bg2))}
+#side .sbfix-m .sbmr{margin-bottom:.375rem}
 #side .sbmr{display:flex;gap:.125rem;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scroll-padding-inline:.75rem;scrollbar-width:none;margin:.375rem -.75rem 0;padding:.25rem .75rem 0;border-top:1px solid var(--line)}
 #side .sbmr::-webkit-scrollbar{display:none}
 #side .sbmr .srb{flex:none;width:3.875rem;min-height:2.75rem;scroll-snap-align:start}
 /* 2.364.0 B (#3040): the area icons as a grid of rows (all in sight, two rows for the usual 6-10 areas) instead of one row to swipe */
-#side .sbmr{display:grid;grid-template-columns:repeat(auto-fill,minmax(3.25rem,1fr));overflow:visible;scroll-snap-type:none}
-#side .sbmr .srb{width:auto;min-width:0}
-:root.rail-nolabel #side .sbmr{grid-template-columns:repeat(auto-fill,minmax(2.75rem,1fr))}
+/* 2.442.0 (#3739): at most two rows at any number of areas (--sbmc from sbm_rowHtml), smaller tiles; a long name may take a third line, never cut */
+#side .sbmr{display:grid;grid-template-columns:repeat(var(--sbmc,5),minmax(0,1fr));overflow:visible;scroll-snap-type:none;padding-inline:.25rem;gap:0}
+#side .sbmr .srb{width:auto;min-width:0;padding:.25rem .0625rem .1875rem;gap:.125rem;font-size:var(--fs-xxs)}
+#side .sbmr .srb svg.i{width:var(--ic,1rem);height:var(--ic,1rem)}
+#side .sbmr .srb .srbn{-webkit-line-clamp:3;line-clamp:3}
+#side .sbmr .srb .srbd{right:.25rem;top:.125rem}
 #side .sbmdock .sset{flex:1;min-width:0;margin:0}
 /* 2.290.0 C (#3163): an unfolded Fold 8 landscape / small tablets (900-1199 px). With a task open the panel folds into the
    drawer (detail.js layNow). Where the panel shows, the names come before the symbols: the share symbols and the progress
@@ -8604,3 +8738,20 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 .cfst svg{flex:none}
 .cfst-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:899px){.cfst .cfst-l{display:none}}
+.navpen{display:flex;justify-content:flex-end;padding:0 .25rem}  /* 2.418.0 (#3560): the pen on top of a phone's area menu */
+/* 2.442.0 (#2810): a low window (zoom 200 %, a phone on its side): more room for the content. Lying windows only: an upright
+   phone gets this low with the keyboard open (interactive-widget=resizes-content) and nothing may jump while typing. The
+   view switch folds to icons plus the active name, the head and the tab bar get thinner, the task's comment box stays in
+   the flow until it is used (while it has the focus it stays docked above the keyboard). The list's end keeps the plus
+   button's room through #view's padding (#2815) */
+@media (max-height:500px) and (min-aspect-ratio:1/1){
+  #detail .dbot:not(:focus-within):not(.vvpin){position:static}
+  .vsegm{margin:0 0 .25rem;padding:.125rem}
+  .vsegm button{min-height:2rem;padding:0 .5rem}
+  .vsegm button:not(.on)>span{display:none}
+  #top{min-height:2.5rem;padding-top:calc(.25rem + var(--safe-t));padding-bottom:.125rem}
+}
+@media (max-width:767px) and (max-height:500px) and (min-aspect-ratio:1/1){
+  :root{--tabs-h:2.75rem}
+  #tabs button>span:not(.dot):not(.temoji):not(.tsw):not(.tico){position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%)}
+}

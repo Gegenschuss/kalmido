@@ -426,7 +426,7 @@ function remDur(m) {  // "3 weeks", "90 minutes"
   return a % 10080 === 0 ? trn('{0} week', '{0} weeks', a / 10080) : a % 1440 === 0 ? trn('{0} day', '{0} days', a / 1440) : a % 60 === 0 ? trn('{0} hour', '{0} hours', a / 60) : trn('{0} minute', '{0} minutes', a);
 }
 const fmtRem = m => !+m ? tr('On time') : +m < 0 ? tr('{0} after', remDur(m)) : tr('{0} before', remDur(m));
-const fmtNum = (n, d = 1) => (+n).toLocaleString(LOCALE(), {maximumFractionDigits: d});
+const fmtNum = (n, d = 1, min = 0) => (+n).toLocaleString(LOCALE(), {minimumFractionDigits: min, maximumFractionDigits: d});  // 2.450.0 (#3770): min = fixed decimals (fmtNum(0, 2, 2) = "0,00" / "0.00")
 const remChip = v => { const o = REM_OPTS.find(x => x[0] === String(v)); return o ? tr(o[1]) : +v < 0 ? fmtRem(v) : remDur(v); };
 const remLabel = m => { const o = REM_OPTS.find(x => x[0] === String(m)); return o ? tr(o[1]) : fmtRem(m); };
 // ---- 2.7.0 (#412): a due date can be a deadline: the rows and the task panel count down ("12 days left") and highlight

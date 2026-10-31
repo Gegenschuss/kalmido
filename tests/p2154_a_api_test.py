@@ -252,6 +252,11 @@ check(Ca.post(B + f"/api/docs/{CD}/task/link", json={"task_id": FT}).status_code
 check(Fr.post(B + f"/api/docs/{CD}/task/link", json={"task_id": FT}).status_code == 404, "freelancer: another organisation's document 404")
 r = Fr.delete(B + f"/api/docs/{OID}/task")
 check(r.ok and not doc(Fr, OID).get("task_id") and Fr.get(B + f"/api/tasks/{FT}/docs").json()["docs"] == [], "unlink: gone on both sides")
+# 2.449.0 (#3800): the task for the due date (POST /api/docs/<id>/task) as the person without an organisation, and not on another's document
+r = Fr.post(B + f"/api/docs/{OID}/task")
+check(r.status_code == 201 and r.json().get("task_id") and (doc(Fr, OID).get("task") or {}).get("id") == r.json()["task_id"], f"freelancer: task for her document ({r.status_code} {r.text[:120]})")
+check(Fr.post(B + f"/api/docs/{CD}/task").status_code == 404, "freelancer: no task for another organisation's document (404)")
+Fr.delete(B + f"/api/docs/{OID}/task")
 # the organisation: its own tasks and private ones, a private document never with an organisation's task
 AL = A.post(B + "/api/lists", json={"name": "Alpha Aufgaben", "org_id": ORG}).json()["id"]
 AT = A.post(B + "/api/tasks", json={"title": "Alpha Rechnung", "list_id": AL}).json()["id"]

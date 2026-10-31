@@ -12,6 +12,7 @@ from flask import g, jsonify, request
 from ..core.config import app, ATT_DIR
 from ..core.db import body, bump, db, err, iso, now_utc, insert_id
 from ..core.i18n import tr
+from ..core.numtext import server_num
 from ..core.access import Denied, acx_of
 from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
@@ -380,14 +381,31 @@ def _feature_value(c, ws, node, f, v, uid):
             return ""
         if isinstance(v, int) and not isinstance(v, bool):
             # 2.48.0 review: only a folder the person sees (a member of an organisation: shared folders)
-            return str(v) if S.folder_ok(c, node, v) and fs_role(c, v, uid) else None
-        root = S.docs_root(c, node)
-        # 2.199.0 B (#2742): "Kunde A / 2026" = a subfolder; G (review): each step checked (sees it / edits where a folder is
-        # made: a folder shared to edit takes new subfolders, the documents folder itself only with edit there)
-        fid = S.folder_by_name(c, node, uid, str(v), create=bool(root), path=True, check=True)
-        fid = fid if fid and fs_role(c, fid, uid) else None
-        return str(fid) if fid else None
+            fid = v if S.folder_ok(c, node, v) else None
+        else:
+            root = S.docs_root(c, node)
+            # 2.199.0 B (#2742): "Kunde A / 2026" = a subfolder; G (review): each step checked (sees it / edits where a folder
+            # is made: a folder shared to edit takes new subfolders, the documents folder itself only with edit there)
+            fid = S.folder_by_name(c, node, uid, str(v), create=bool(root), path=True, check=True)
+        fr = fs_role(c, fid, uid) if fid else None
+        if not fr:
+            return None
+        # 2.422.0 (#3557): filed only into a folder the person may edit, like a rule and a learned choice (store.py); a
+        # folder shared to read only is refused (False), an old suggestion for one too when it is accepted
+        return str(fid) if fr in ("owner", "edit") else False
     return None
+
+
+def doc_amount(raw):
+    """An amount as sent or typed -> its plain text ("1234.56", "" = none), None when it is no amount: 2.450.0 (#3770):
+    "1.234,56" / "1,234.56" keep their value (core/numtext.py), more than two decimals are no amount, nothing is cut."""
+    v = str(raw or "").strip()[:20]
+    if not v or re.fullmatch(r"-?\d{1,12}(\.\d{1,2})?", v):
+        return v
+    x = server_num(v)
+    if x is None or abs(x) >= 1e12 or abs(round(x, 2) - x) > 1e-9:
+        return None
+    return f"{x:.2f}"
 
 
 def doc_update(c, nid, d, uid, by=None):
@@ -405,8 +423,8 @@ def doc_update(c, nid, d, uid, by=None):
                 return err(tr("Invalid value: {0}", k))
             sets[col] = v or None
     if "amount" in d:
-        v = str(d["amount"] or "").strip().replace(",", ".")[:20]
-        if v and not re.fullmatch(r"-?\d{1,12}(\.\d{1,2})?", v):
+        v = doc_amount(d["amount"])
+        if v is None:
             return err(tr("Invalid value: {0}", "amount"))
         sets["amount"] = S.doc_seal(c, ws, "doc_meta.amount", v)
     if "asn" in d and by is None:
@@ -434,7 +452,7 @@ def doc_update(c, nid, d, uid, by=None):
             c.execute("UPDATE fs_nodes SET name=?, updated_at=? WHERE id=?",
                       (_free_name(c, node["parent_id"], node["owner_id"], node["org_id"], safe_fs_name(name), skip=nid), _now(), nid))
     if any(k in sets for k in ("doc_date", "amount", "currency")):  # 2.148.0 A (#2471): a receipt of a locked month stays as it is
-        new_amt = str(d.get("amount") or "").strip().replace(",", ".")[:20] if "amount" in d else None
+        new_amt = doc_amount(d["amount"]) if "amount" in d else None
         if (("doc_date" in sets and (sets["doc_date"] or None) != (m["doc_date"] or None))
                 or ("currency" in sets and sets["currency"] != (m["currency"] or ""))
                 or (new_amt is not None and new_amt != (S.doc_open(c, ws, "doc_meta.amount", m["amount"]) or ""))):
@@ -500,6 +518,8 @@ def doc_update(c, nid, d, uid, by=None):
     vals = {}
     for f in changed:
         v = _feature_value(c, ws, node, f, d[f], uid)
+        if v is False:
+            return err(tr("You may only file documents into a folder you may edit"), 403)
         if v is None and f == "folder":
             return err(tr("Invalid value: {0}", f))
         vals[f] = v

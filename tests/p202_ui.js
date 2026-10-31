@@ -246,10 +246,13 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   await call('alice', 'PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   w.eval(`openDetail(${T1})`); await idle(w);
-  check(/Kommentare/.test(d.querySelector('#d-tl .cmhead').textContent) && d.querySelector('[data-act="md-more"]').textContent === 'Mehr anzeigen', 'German: comments bar, Mehr anzeigen');
+  // 2.365.0: under load the panel can be drawn after idle() - wait for both elements before reading them
+  await until(() => d.querySelector('#d-tl .cmhead') && d.querySelector('[data-act="md-more"]'));
+  check(/Kommentare/.test(d.querySelector('#d-tl .cmhead')?.textContent) && d.querySelector('[data-act="md-more"]')?.textContent === 'Mehr anzeigen', 'German: comments bar, Mehr anzeigen');
   await v1('PUT', '/agent/status', {status: 'working', task_id: T1});
   w.eval('load().then(render)'); await idle(w);
-  check(/Claude arbeitet daran/.test(d.querySelector('#d-typing').textContent), 'German: Claude arbeitet daran');
+  await until(() => /Claude arbeitet daran/.test(d.querySelector('#d-typing')?.textContent || ''));
+  check(/Claude arbeitet daran/.test(d.querySelector('#d-typing')?.textContent), 'German: Claude arbeitet daran');
   w.eval('closeDetail(); openPalette()'); await sleep(200);
   check(d.querySelector('.palette .pgroup').textContent === 'Zuletzt angesehen', 'German: Zuletzt angesehen');
   w.close();

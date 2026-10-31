@@ -42,8 +42,9 @@ from flask import g, jsonify, Response
 from ..core.config import app, APP_VERSION, ATT_DIR, PUBLIC_URL, SECRET_KEY
 from ..core.db import connect, db, err, iso, now_utc
 from ..core.pg import system_ctx
-from ..core.i18n import tr
+from ..core.i18n import N_, lang, tr
 from ..core.access import Denied, acx_lists_sql, acx_of
+from ..accounts.orgout import oo_exported  # 2.362.3 (#3101)
 from ..accounts.pictures import avatar_path
 from ..accounts.session import me
 from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _jdef, _safe_part, _under
@@ -63,20 +64,20 @@ UMZ_SUFFIX = ".zip"
 UMZ_SPACE_SPARE = 64 * 1024 * 1024  # free disk space kept on top of the expected size
 UMZ_NOT_INCLUDED = (
     # 2.239.0 A (#2882): sessions and push devices are in the file without their secrets
-    "passwords, session tokens, API tokens (only their names), two-factor data, push addresses and keys, webhook secrets and addresses",
-    "server-side settings (such as the ntfy topic an admin set)",
-    "access data of connections (calendar and address book subscriptions, Karakeep, newsletter, Git, server accounts)",
+    N_("passwords, session tokens, API tokens (only their names), two-factor data, push addresses and keys, webhook secrets and addresses"),
+    N_("server-side settings (such as the ntfy topic an admin set)"),
+    N_("access data of connections (calendar and address book subscriptions, Karakeep, newsletter, Git, server accounts)"),
     # 2.239.0 A (#2882): what you wrote elsewhere is in the file, the rest of those lists is not
-    "lists of other people (only a reference, your own comments and messages there and the tasks you created or are assigned to)",
-    "organisation data that is not yours (use the organisation export for a whole organisation)",
-    "the receipt files of household budgets (their entries are included)",  # 2.72.0 (#1333)
+    N_("lists of other people (only a reference, your own comments and messages there and the tasks you created or are assigned to)"),
+    N_("organisation data that is not yours (use the organisation export for a whole organisation)"),
+    N_("the receipt files of household budgets (their entries are included)"),  # 2.72.0 (#1333)
     # 2.148.1 C (#2494): what is not in the file either (the manifest names it honestly)
-    "the content of your private files (only their list: name, type, size, dates), files of knowledge pages and tables",
-    "messages and comments of other people in direct messages, channels and lists (only what you wrote yourself)",  # 2.239.0 A (#2882)
+    N_("older versions of your private files (the current one is in the file), files of knowledge pages and tables"),  # 2.360.2 D (#2561)
+    N_("messages and comments of other people in direct messages, channels and lists (only what you wrote yourself)"),  # 2.239.0 A (#2882)
     # 2.239.0 A (#2882): tasks of lists you no longer see; what you wrote inside an organisation you left stays with it
-    "tasks of lists you can no longer see, and your comments and messages inside an organisation you left",
-    "booking pages and their bookings, polls and forms with their answers, holiday allowances",
-    "the organisation's office (documents, receipts, cash book) and organisation knowledge pages: the organisation export",
+    N_("tasks of lists you can no longer see, and your comments and messages inside an organisation you left"),
+    N_("the network addresses of people who booked with you and the e-mail addresses of people who voted in your polls"),  # 2.360.2 D (#2561)
+    N_("the organisation's office (documents, receipts, cash book) and organisation knowledge pages: the organisation export"),
 )
 
 # 2.278.0 C (#3091): what the manifest says about browser-encrypted content (only what the import really does)
@@ -291,8 +292,10 @@ def umz_people(c, uid, salt=None):
 
 def umz_extra_queries(uid):
     own = "(SELECT id FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL))"  # 2.102.0 review F3: an organisation's list in its trash is the organisation's
+    private = "(SELECT id FROM lists WHERE owner_id=? AND org_id IS NULL)"  # 2.360.2 (#2561): answers sent to an organisation stay there
     shared = "(SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.owner_id!=?)"
     sheets = "org_id IS NULL AND owner_id=?"
+    polls = "org_id IS NULL AND user_id=? AND deleted_at IS NULL"
     return {
         "list_tags": (f"SELECT * FROM list_tags WHERE list_id IN {own}", (uid,)),
         "task_list_tags": (f"SELECT * FROM task_list_tags WHERE task_id IN (SELECT id FROM tasks WHERE list_id IN {own})", (uid,)),
@@ -337,6 +340,20 @@ def umz_extra_queries(uid):
         # 2.278.0 C (#3091): my own key bundle (wrapped in the browser with my passphrase / recovery code, the server never
         # had it in plain): the import takes it over, so my locked notes and encrypted files open again. Never another person's
         "e2e_keys": ("SELECT * FROM e2e_keys WHERE user_id=?", (uid,)),
+        # 2.360.2 D (#2561): Art. 15 -- my booking page with what people booked with me, my private polls, the forms of my
+        # projects with their entries (the form's owner holds them), my holiday allowances; never a token or network address
+        "appt_pages": ("SELECT user_id, slug, enabled, title, intro, hours, tz, created_at, updated_at FROM appt_pages WHERE user_id=?", (uid,)),
+        "appt_types": ("SELECT * FROM appt_types WHERE user_id=? AND deleted_at IS NULL ORDER BY id", (uid,)),
+        "appt_bookings": ("""SELECT id, type_id, start, "end", name, email, phone, message, lang, status, cancel_reason, cancelled_by,
+                             created_at, confirmed_at, cancelled_at FROM appt_bookings WHERE user_id=? ORDER BY id""", (uid,)),
+        "polls": (f"SELECT id, title, description, duration, location, tz, link_on, show_votes, expires_at, closed_at, chosen_id, created_at, updated_at FROM sched_polls WHERE {polls} ORDER BY id", (uid,)),
+        "poll_options": (f"SELECT * FROM sched_poll_options WHERE poll_id IN (SELECT id FROM sched_polls WHERE {polls}) ORDER BY id", (uid,)),
+        "poll_votes": (f"SELECT id, poll_id, name, answers, created_at, updated_at FROM sched_poll_votes WHERE poll_id IN (SELECT id FROM sched_polls WHERE {polls}) ORDER BY id", (uid,)),
+        "forms": (f"""SELECT id, list_id, title, intro, access, section_id, ask_email, enabled, count, last_at, questions, created_at
+                      FROM forms WHERE list_id IN {private} ORDER BY id""", (uid,)),
+        "form_entries": (f"""SELECT e.task_id, e.form_id, e.sender, e.email, e.answers, e.created_at FROM form_entries e JOIN forms f ON f.id=e.form_id
+                             WHERE f.list_id IN {private} ORDER BY e.created_at""", (uid,)),
+        "leave_quota": ("SELECT org_id, year, days, carry, updated_at FROM hub_leave_quota WHERE user_id=? ORDER BY year, org_id", (uid,)),
     }
 
 
@@ -468,6 +485,19 @@ def umz_build(c, uid, stream, export_id):
                 files[(table, r["id"])] = name
                 if table == "attachments" and "enc" in r.keys() and r["enc"]:
                     client_enc["attachments"].append(name)
+        # 2.360.2 D (#2561): the current version of my private files (locked in the browser = stays ciphertext, as attachments)
+        for r in c.execute("""SELECT n.id, n.name, v.no, v.path FROM fs_nodes n JOIN fs_versions v ON v.node_id=n.id AND v.no=n.cur_version
+                              WHERE n.owner_id=? AND n.org_id IS NULL AND n.kind='file' AND n.deleted_at IS NULL""", (uid,)).fetchall():
+            full = _under(ATT_DIR, r["path"])
+            if not full:
+                continue
+            sig = inf.get(("fs", int(r["id"]), int(r["no"])))
+            if sig is not None:
+                locked.append({"area": "private_files", "id": r["id"], "name": r["name"] or "", "signature": sig})
+                continue
+            name = umz_att_name("private_files", r["id"], r["name"])
+            _put(zf, out, name, oc_read_file(c, full))
+            files[("private_files", r["id"])] = name
         avatar = ""  # 2.239.0 A (#2882): my own profile picture
         a = c.execute("SELECT avatar FROM users WHERE id=?", (uid,)).fetchone()
         if a and (a[0] or "").startswith("u:"):
@@ -507,7 +537,7 @@ def umz_build(c, uid, stream, export_id):
             "people_salt": salt,  # 2.239.0 A (#2882): email_hash = HMAC-SHA256 with this key (umz_email_hash)
             "tables": out.tables, "files": out.files,
             "client_encrypted": {**client_enc, "keys": bool(out.tables.get("e2e_keys")), "note": UMZ_ENC_NOTE},  # 2.278.0 C (#3091)
-            "export_id": export_id, "not_included": list(UMZ_NOT_INCLUDED),
+            "export_id": export_id, "not_included": [tr(x, lg=lang(c, uid)) for x in UMZ_NOT_INCLUDED],  # 2.449.0 (#3768): in the person's language
             "locked_files": locked,  # 2.209.0 D (#1856)
         }
         mb = json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode()
@@ -549,13 +579,22 @@ def _running(uid):
 
 def umz_log_org_lists(c, uid):
     """2.148.1 C (#2492): an export that carries lists of an organisation (lists I own there) is noted in the organisation's
-    list history (org_list_log "export"), the admins see it. The caller commits."""
+    list history (org_list_log "export"), the admins see it. 2.360.2 D (#2561): one row per person, list and day, however
+    often they fetched it. 2.362.3 (#3101): a new row also tells the other admins (a re-import of the file into a private
+    space is no second way out unseen; the lists stay in the file, they are the owner's). The caller commits."""
     with system_ctx(c):  # the organisation's history (also of one I left while I still own a list there)
         rows = c.execute("SELECT id, name, org_id FROM lists WHERE owner_id=? AND org_id IS NOT NULL AND deleted_at IS NULL", (uid,)).fetchall()
         at = iso(now_utc())
+        fresh = {}
         for r in rows:
-            c.execute("INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at) VALUES(?,?,?,'export',?,?,NULL,?)",
-                      (r["org_id"], r["id"], r["name"], uid, uid, at))
+            n = c.execute("""INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at)
+                         SELECT CAST(? AS BIGINT),CAST(? AS BIGINT),CAST(? AS TEXT),'export',CAST(? AS BIGINT),CAST(? AS BIGINT),NULL,CAST(? AS TEXT) WHERE NOT EXISTS (SELECT 1 FROM org_list_log WHERE org_id=? AND list_id=?
+                         AND by_id=? AND action='export' AND substr(created_at, 1, 10)=?)""",
+                      (r["org_id"], r["id"], r["name"], uid, uid, at, r["org_id"], r["id"], uid, at[:10])).rowcount
+            if n:
+                fresh[r["org_id"]] = fresh.get(r["org_id"], 0) + 1
+        for oid, n in fresh.items():
+            oo_exported(c, oid, uid, n)
     return len(rows)
 
 
@@ -677,6 +716,8 @@ def umz_start():
     for t in ("attachments", "list_files"):
         sql, args = q[t]
         need += c.execute(f"SELECT COALESCE(SUM(size),0) FROM ({sql}) x", args).fetchone()[0] or 0
+    need += c.execute("SELECT COALESCE(SUM(size),0) FROM fs_nodes WHERE owner_id=? AND org_id IS NULL AND kind='file' AND deleted_at IS NULL",  # 2.360.2 D (#2561)
+                      (uid,)).fetchone()[0] or 0
     if not umz_space_ok(UMZ_DIR, need * 1.1):
         return err(tr("There is not enough space on the server for the export. Please ask the server admin."), 507)
     with _UMZ_LOCK:

@@ -11,8 +11,9 @@ from flask import g, jsonify, redirect, request, Response
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..core.config import app, APP_NAME, PUB_PREFIX, PUBLIC_URL, TZ
-from ..core.i18n import lang, LANGS, N_, short_day, tr, trn
+from ..core.i18n import browser_lang, lang, N_, short_day, tr, trn
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, iso_ms
+from ..core.instance import legal_links, privacy_email
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list, reading_ids, reading_sql, task_visible
@@ -77,11 +78,7 @@ def pub_find(c, token):
 
 
 def pub_lang(c, link):
-    for part in (request.headers.get("Accept-Language") or "").split(","):
-        code = part.split(";")[0].strip().lower()[:2]
-        if code in LANGS:
-            return code
-    return lang(c, link["l_owner"])
+    return browser_lang() or lang(c, link["l_owner"])
 
 
 def pub_cookie(link):
@@ -104,13 +101,25 @@ def pub_headers(resp):
     return resp
 
 
+def pub_legal(lg):
+    """2.360.2 D (#2561): the operator's privacy statement, contact and imprint on every public page ('' = none set)."""
+    e, c = html.escape, db()
+    urls = legal_links(c)
+    mail = privacy_email(c)
+    a = [f'<a href="{e(u)}" rel="noopener noreferrer">{e(tr(t, lg=lg))}</a>' for u, t in ((urls["privacy_url"], "Privacy"), (urls["imprint_url"], "Imprint")) if u]
+    if mail:
+        a.insert(1 if urls["privacy_url"] else 0, f'<a href="mailto:{e(mail)}">{e(mail)}</a>')
+    return " · ".join(a)
+
+
 def pub_html(title, main, lg, code=200, foot=True):
     e = html.escape
+    bits = [x for x in (e(tr("Shared with {0}", APP_NAME, lg=lg)) if foot else "", pub_legal(lg)) if x]
     doc = (f'<!doctype html><html lang="{e(lg)}"><head><meta charset="utf-8">'
            '<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow">'
            f'<meta name="referrer" content="no-referrer"><title>{e(title)}</title><link rel="stylesheet" href="/static/public.css">'
            f'<link rel="icon" href="/static/favicon.svg" type="image/svg+xml"></head><body><main>{main}</main>'
-           + (f'<footer>{e(tr("Shared with {0}", APP_NAME, lg=lg))}</footer>' if foot else '') + '</body></html>')
+           + (f'<footer>{" · ".join(bits)}</footer>' if bits else '') + '</body></html>')
     return pub_headers(Response(doc, status=code, mimetype="text/html"))
 
 

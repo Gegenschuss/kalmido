@@ -164,9 +164,9 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
 6. Optional, **Office & finance** (2.51.0): an agent that drafts quotations, invoices and reminders and suggests payments
    needs three switches, all off by default: the permission *Office drafts* (scope `office`), its own switch *May draft
    office documents* in its dialog (an admin of its office area; in a personal office the person) and *Agents may read
-   office data* in Office > Settings (client and price data then go to its model). It only ever makes drafts; people
+   office data* in Settings > Company & office (client and price data then go to its model). It only ever makes drafts; people
    finalise, send and book ([AGENTS.md](AGENTS.md#office-drafts-only)).
-   Since 2.187.0 the office access of an agent comes from the **office rights groups** (Office > Settings > Rights), the
+   Since 2.187.0 the office access of an agent comes from the **office rights groups** (Settings > Company & office > Rights in the office), the
    same groups as for people: an agent without a group has no office access (a new agent starts without one; an agent
    that had its switch *May draft office documents* on keeps that previous access until it is put into a group). It
    never gets more than the person it acts for, and never *Manage office rights*.
@@ -628,7 +628,8 @@ chat messages of one person that arrive together: one run). It does what a hoste
   Windows `taskkill /T`). A failed run is tried once more only when it had not called a tool yet; then the chat gets a
   short note with the reason (secrets masked). Events that arrive during a run wait in a queue in the state folder (a
   restart answers them; a crash in the middle of a run can answer one once more), and a lock there (`runner.lock`) keeps a second runner from starting on the same
-  folder (it exits with code 3; a stale lock never blocks).
+  folder (it exits with code 3; a stale lock never blocks). 2.443.0: stopping the launcher (TERM / INT) also ends a run in
+  progress with everything it started; its event runs again at the next start.
 - **Suggestions** (2.40.0): a final block ` ```suggest ` becomes answer buttons under the answer (servers without
   buttons: a numbered line). 2.46.6: the prompt asks for exactly one suggestion per answer, at most 80 characters, never
   one an earlier, still visible message already offers; the launcher still takes up to three lines, and a longer label is
@@ -697,6 +698,10 @@ event). `./bin/events.sh` (step 8) is then not needed. A dry run first:
 sudo -iu kalmido-agent
 ~/kalmido/mcp/agent_launcher.sh -e ~/.config/kalmido/agent.env --events --once -- claude --mcp-config ~/agent/.mcp.json
 ```
+
+The launcher exits with 2 on a wrong start (no env file, `KALMIDO_URL` or `KALMIDO_TOKEN` missing; before 2.443.0 the `.sh`
+exited with 127) and with 1 when Kalmido cannot be reached at the start; `agent_launcher.sh --help` and `agent_launcher.ps1
+--help` list the same settings. In the env file a ` # comment` behind a value is ignored by both launchers.
 
 Without `--events` the launcher starts the command as it is (the loop with `events.sh` below); that keeps working, but
 without steps, model, plan usage and approval cards unless the agent reports them itself with the MCP tools.

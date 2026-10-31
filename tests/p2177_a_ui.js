@@ -63,7 +63,7 @@ sys.stdout.buffer.write(b.getvalue())`]);
   // the window: upload line, then the unpacking with its count; "In the background" closes it
   w.eval(`wki_sheet(); wki_draw({state: 'upload', received: 3 * 1048576, size: 12 * 1048576})`);
   const box = () => d.querySelector('.modal .wki-box');
-  check(box() && /Uploading: 3,0 MB of 12,0 MB/.test(box().textContent) && box().querySelector('progress')?.getAttribute('max') === String(12 * 1048576), 'the upload line and bar ' + box()?.textContent);
+  check(box() && /Uploading: 3 MB of 12 MB/.test(box().textContent) && box().querySelector('progress')?.getAttribute('max') === String(12 * 1048576), 'the upload line and bar ' + box()?.textContent);
   w.eval(`wki_draw({state: 'running', progress: {done: 230, total: 600}})`);
   check(/Unpacking: 230 of 600 files/.test(box()?.textContent || '') && box().querySelector('progress')?.getAttribute('value') === '230', 'the unpacking line and bar ' + box()?.textContent);
   d.querySelector('.modal [data-wki="bg"]').click();

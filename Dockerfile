@@ -19,6 +19,13 @@ RUN set -e; go vet ./...; go test ./...; v="$(cat /VERSION)"; \
     cp "$(go env GOROOT)/LICENSE" /out/LICENSE-Go.txt; \
     chmod 0644 /out/*; chmod 0755 /out/kalmido-folder-watcher-linux-*; /build/pack sums /out
 
+# 2.442.0 (#2808): JS / CSS packed ahead of time (gzip, brotli) on the build machine, the app sends them by Accept-Encoding
+FROM --platform=${BUILDPLATFORM:-linux/amd64} python:3.12-slim AS staticpack
+RUN pip install --no-cache-dir brotli==1.2.1
+COPY static /src/static
+COPY kalmido/core/strip.py tools/pack_static.py /src/tools/
+RUN python /src/tools/pack_static.py /src/static /out
+
 FROM python:3.12-slim
 # 2.37.0: pg_dump/pg_restore for the in-app backup (Debian 13 ships PostgreSQL 17)
 # 2.143.0 B (#2152): + openssh-client (sftp) for the off-site backup target
@@ -32,6 +39,7 @@ WORKDIR /app
 COPY app.py VERSION mcp/starter_sha256.tx[t] /app/
 COPY kalmido /app/kalmido
 COPY static /app/static
+COPY --from=staticpack /out/ /app/static_packed/
 # 2.207.0 B (#2763): the folder watcher downloads (KALMIDO_FOLDERWATCH_DIR overrides the folder)
 COPY --from=folderwatch /out/ /app/folderwatch/
 # 2.182.0 (#2715): run as uid/gid 1000 also without the Compose "user:" line (own manifests, k8s, docker run); the

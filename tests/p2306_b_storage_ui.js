@@ -35,7 +35,7 @@ const call = async (method, url, body, ck) => { const r = await fetch(B + url.re
   check(w.document.querySelector('.authscreen .aulegal a[data-legal="imprint_url"]')?.getAttribute('href') === 'https://example.com/imprint', 'login page: imprint link');
   w.close();
 
-  // ================= a change waits to be sent: the 401 keeps everything
+  // ================= a change waits to be sent: the 401 keeps it (2.360.2, #3226: the offline start state goes, by decision)
   w = await boot({});
   check(await until(() => 'tasks.cache' in w.__store), 'second start: state stored');
   const lid = w.eval('S.lists[0].id');
@@ -46,7 +46,7 @@ const call = async (method, url, body, ck) => { const r = await fetch(B + url.re
   w.__offline = false;
   w.eval(`api('GET', '/api/state').catch(() => {})`);
   check(await until(() => w.document.querySelector('.authscreen')), 'the login page comes up again');
-  check('tasks.cache' in w.__store, 'a change still waiting: the cached state stays');
+  check(!('tasks.cache' in w.__store), 'a change still waiting: the cached state goes with the session (2.360.2, #3226)');
   check(w.eval('OUT.q.length') > 0 && w.eval(`OUT.q.some(x => x.body?.title === 'Written offline')`), 'a change still waiting: it is kept');
   w.close();
 
