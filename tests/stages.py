@@ -43,7 +43,7 @@ from shards import FRESH_RE, RUN_RE  # noqa: E402  (the same group count as tool
 FILE_RE = re.compile(r"\s([A-Za-z0-9_./-]+\.(?:py|js))\b")
 # the CI basics, the stage rules themselves and the release (VERSION): always the full run
 FULL_EXACT = {
-    "VERSION", "Dockerfile", ".dockerignore", "app.py", ".github/workflows/ci.yml",
+    "VERSION", "Dockerfile", ".dockerignore", "tools/requirements.lock", "tools/requirements.static.lock", "tests/.node-version", "app.py", ".github/workflows/ci.yml",
     "tests/run_all.sh", "tests/start.sh", "tests/requirements.txt", "tests/package.json", "tests/package-lock.json",
     "tests/stages.py", "tests/suites.py", "tools/shards.py",
     # test helpers (nearly) every suite uses

@@ -586,6 +586,19 @@ function intB_draw(md) {
 }
 // ---- Karakeep: connect, the project, fetch (one connection per person; was life.js kkModal)
 const kks_html = () => feat('reading') ? `<h4 id="s-kk-h">${tr('Karakeep')}</h4><div id="s-kk" class="kks"><div class="muted mhint">${tr('Loading…')}</div></div>` : '';
+// 2.453.0 (#3781): the fetch runs in the background: an error of it (a wrong key) appears here once it is through
+async function kksFetch(box) {
+  const was = box._cur?.synced_at;
+  await rawFetch('POST', '/api/life/karakeep/sync', {});
+  toast(tr('Bookmarks are being fetched in the background'));
+  const look = async n => {
+    if (!box.isConnected || n > 30) return;
+    let cur; try { cur = await api('GET', '/api/life/karakeep'); } catch { return; }
+    if (cur.synced_at === was) { setTimeout(() => look(n + 1), 2000); return; }
+    if (cur.error) kks_draw(box.parentElement);
+  };
+  setTimeout(() => look(0), 1000);
+}
 async function kks_draw(md) {
   const box = $('#s-kk', md); if (!box) return;
   let cur; try { cur = await api('GET', '/api/life/karakeep'); } catch { box.innerHTML = ''; return; }
@@ -597,7 +610,7 @@ async function kks_draw(md) {
     <div class="row"><label for="kk-tok">${tr('API key')}</label><input id="kk-tok" type="password" autocomplete="new-password" placeholder="${esc(cur.token_set ? tr('saved – enter a new one to replace it') : tr('Karakeep > Settings > API keys'))}"></div>
     ${rl.length > 1 ? `<div class="row"><label for="kk-list">${tr('Project')}</label><select id="kk-list">${rl.map(l => `<option value="${l.id}" ${l.id === cur.list_id ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
     <div class="row"><label>${tr('When ticked')}</label><label class="chkl"><input type="checkbox" id="kk-arch" ${cur.connected && !cur.archive ? '' : 'checked'}> ${tr('archive the bookmark in Karakeep')}</label></div>
-    ${cur.error ? `<p class="aerr">${esc(cur.error)}</p>` : ''}
+    ${cur.error ? `<p class="aerr">${esc(cur.error_text || cur.error)}</p>` : ''}
     <div class="aerr" role="alert" data-kks="err"></div>
     <div class="row">${cur.connected ? `<button type="button" class="btn sm" data-kks="sync">${ic('sync', 's')} ${tr('Fetch now')}</button><button type="button" class="btn sm danger" data-kks="del">${tr('Disconnect')}</button>` : ''}<span class="spacer"></span><button type="button" class="btn sm pri" data-kks="save">${cur.connected ? tr('Save') : tr('Connect')}</button></div>`;
   if (box._on) return;
@@ -605,15 +618,14 @@ async function kks_draw(md) {
   box.addEventListener('click', async e => {
     const b = e.target.closest('button[data-kks]'); if (!b) return;
     const c = box._cur || {}, a = b.dataset.kks, err = $('[data-kks="err"]', box), v = id => $(id, box)?.value?.trim() ?? '';
-    const fetched = j => toast(trn('{0} bookmark fetched', '{0} bookmarks fetched', j.added));
     if (a === 'del' && !await askConfirm(tr('Disconnect Karakeep?'), tr('The API key is removed; the tasks stay.'), {ok: tr('Disconnect'), danger: true})) return;
     const body = {url: v('#kk-url'), archive: !!$('#kk-arch', box)?.checked, ...(v('#kk-tok') ? {token: v('#kk-tok')} : {}), ...(v('#kk-list') ? {list_id: +v('#kk-list')} : {})};
     if (a === 'save' && !body.url) { $('#kk-url', box).focus(); err.textContent = tr('Please enter the address'); return; }
     if (a === 'save' && !c.token_set && !body.token) { $('#kk-tok', box).focus(); err.textContent = tr('Please enter the API key'); return; }
     b.disabled = true; err.textContent = '';
     try {
-      if (a === 'save') { await rawFetch('PUT', '/api/life/karakeep', body); fetched(await rawFetch('POST', '/api/life/karakeep/sync', {})); }
-      if (a === 'sync') fetched(await rawFetch('POST', '/api/life/karakeep/sync', {}));
+      if (a === 'save') await rawFetch('PUT', '/api/life/karakeep', body);
+      if (a === 'save' || a === 'sync') await kksFetch(box);  // 2.453.0 (#3781): in the background, no count
       if (a === 'del') await rawFetch('DELETE', '/api/life/karakeep');
       await load();
       if (typeof lifeReload === 'function') lifeReload();

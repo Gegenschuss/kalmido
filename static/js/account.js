@@ -145,9 +145,10 @@ const NOTIF_ROWS = [
   ['errreport', N_('New error reports'), N_('a new error from a project’s error-report webhook became a ticket (repeats stay quiet)')]];  // 2.18.0
 // 2.425.0 (#3453 review): the receipt fetcher's row lives here (docfetch.js comes lazily with the documents: the row was missing until then)
 NOTIF_ROWS.push(['fetcher', N_('Receipt fetcher'), N_('a portal of your receipt fetcher reports an error, for example a sign-in that ran out'), 'office']);
+NOTIF_ROWS.push(['limits', N_('Mail limits of public pages'), N_('your customer portal or booking page used up its sign-in or confirmation mails')]);  // 2.453.0 (#3781): News only
 const NM_GROUP = {comment: 'comment', reply: 'comment', follow: 'comment', mention: 'mention', assign: 'assign', complete: 'complete', status: 'status', share: 'share', unblock: 'unblock'};
 const NM_PRIMARY = ['comment', 'mention', 'assign', 'complete', 'status', 'share', 'unblock'];
-const NM_NEWS_NEW = {newtask: 0, approval: 0, followup: 1, usage: 1, proposal: 1, errreport: 1, signoff: 1};  // 2.266.0 (#2965): signoff
+const NM_NEWS_NEW = {newtask: 0, approval: 0, followup: 1, usage: 1, proposal: 1, errreport: 1, signoff: 1, limits: 1};  // 2.266.0 (#2965): signoff
 const NM_PUSH = {comment: 1, reply: 1, follow: 1, mention: 1, assign: 1, newtask: 0, complete: 1, status: 0, share: 0, unblock: 1, approval: 1, followup: 1, reminder: 1, usage: 1, proposal: 1, nag: 1, chat: 1, errreport: 1, signoff: 1};
 const NM_SOCIAL = ['comment', 'reply', 'follow', 'mention', 'assign', 'newtask', 'complete', 'status', 'share', 'unblock', 'approval', 'proposal', 'chat', 'errreport'];
 const nmStored = s => { try { const o = JSON.parse(s.notify || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
@@ -156,7 +157,7 @@ function notifMatrix(s) {
   for (const [r] of NOTIF_ROWS) {
     const x = o[r] && typeof o[r] === 'object' ? o[r] : {};
     const news = r === 'reminder' || r === 'nag' || r === 'chat' ? null : NM_PRIMARY.includes(r) ? nk.has(NM_GROUP[r]) : 'news' in x ? !!x.news : r in NM_GROUP ? nk.has(NM_GROUP[r]) : !!NM_NEWS_NEW[r];
-    out[r] = {news, push: 'push' in x ? !!x.push : !!NM_PUSH[r]};
+    out[r] = {news, push: r === 'limits' ? null : 'push' in x ? !!x.push : !!NM_PUSH[r]};
   }
   return out;
 }

@@ -53,7 +53,11 @@ def onboarding_tasks(feats, touch, mac):
 
 
 def _org_member(c, uid):
-    """2.364.0 A (#3037): uid belongs to an organisation as a member (invited, placed in a team), not as its admin."""
+    """2.364.0 A (#3037): uid belongs to an organisation as a member (invited, placed in a team), not as its admin.
+    2.453.0 (#3780): or is about to: a new account joins by accepting its invitation after the first start."""
+    from ..accounts.orginvite import ojn_waiting
+    if ojn_waiting(c, uid, plain=True):
+        return True
     with system_ctx(c):  # memberships are structure (as accounts/orgs.py user_orgs / org_role)
         return bool(c.execute("SELECT 1 FROM org_members m JOIN orgs o ON o.id=m.org_id WHERE m.user_id=? AND o.retired_at IS NULL "
                               "AND COALESCE(m.role, 'member')<>'admin' LIMIT 1", (uid,)).fetchone())

@@ -1126,3 +1126,9 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .rcl-pick{cursor:pointer;gap:.75rem}
 .rcl-pick input{flex:none;width:1.25rem;height:1.25rem;margin:0}
 .bk-chkrow{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;min-height:2.75rem;margin:.25rem 0}
+/* 2.452.0 (#3836): the other office lists on phones like #3834: no symbols in the row, a long press opens its menu. The buttons stay for screen readers */
+@media (max-width:767px){
+  .agr-doc,.agr-fold,.rin-acts,.brlrow>.swl,.brlrow>.btn,.dma-f[data-fid] .dma-acts,.dimpsup .ib,.rkplist .iconbtn,.dsbsec .ctlinks li>.iconbtn{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}
+  .agr-li .ofcrow>svg:last-child{display:none}
+  .agr-li .ofcrow,.rin-it,.brlrow,.dma-open,.dsbsec .ctlinks li{-webkit-touch-callout:none}
+}

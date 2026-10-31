@@ -1364,7 +1364,6 @@ POST /api/office/drives/{}/trip
 POST /api/office/gen-docs/tree/folders
 POST /api/office/import
 POST /api/office/legacy/archive/address
-POST /api/office/legacy/archive/parse
 POST /api/office/legacy/counter
 POST /api/office/legacy/runs/{}/tidy
 POST /api/office/legacy/split

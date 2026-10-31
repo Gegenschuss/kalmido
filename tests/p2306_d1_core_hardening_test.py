@@ -341,6 +341,10 @@ check(r.ok and kt.dbx("SELECT user_id, role FROM org_members WHERE org_id=? ORDE
 r = A.put(B + f"/api/orgs/{ORG}/members", json={"email": "hugo@example.com"})
 check(r.ok and kt.dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (ORG, uid["hugo"])) and not kt.dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (ORG, uid["hugo"])),
       "hosted: the instance admin only invites an existing account " + r.text[:160])
+r = A.post(B + f"/api/orgs/{ORG}/invites", json={"email": "newhosted@example.com"})  # 2.453.0 (#3780): a new address the same way
+check(r.ok and kt.dbx("SELECT 1 FROM org_joins j JOIN users u ON u.id=j.user_id WHERE j.org_id=? AND u.email='newhosted@example.com'", (ORG,))
+      and not kt.dbx("SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND u.email='newhosted@example.com'", (ORG,)),
+      "hosted: the instance admin only invites a new address, too " + r.text[:160])
 check(login(B, "hugo").post(B + f"/api/orgs/{ORG}/join").ok and kt.dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (ORG, uid["hugo"])),
       "hosted: the person accepts and is a member")
 r = A.patch(B + f"/api/users/{FID}", json={"orgs": [GO]})

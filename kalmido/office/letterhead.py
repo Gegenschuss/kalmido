@@ -37,6 +37,7 @@ from ..core.db import body, db, err
 from ..core.access import Denied
 from ..core.orgcrypt import OrgCryptError, oc_read_file, oc_write_file
 from .model import office_gate, office_org, office_settings, office_settings_lock, office_settings_save
+from ..files.scan import sc_size_mark
 from .bpread import BpCopier, BpDoc, BpError, BpPdfaError, bp_check, bp_pdfa_issues
 from .pdf import A4_H, A4_W, PAPER_SIZES, pdf_paper  # 2.357.0 A (#3156): + the paper sizes
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -102,7 +103,7 @@ def bp_public(lh, c=None, oid=None):
             "on": bool(lh["file"]), "file": lh["file"], "name": lh.get("name") or "", "bytes": int(lh.get("bytes") or 0),
             "pages": int(lh.get("pages") or 0) if lh["file"] else 0, "m1": lh["m1"], "m2": lh["m2"],
             "hide_head": 1 if lh.get("hide_head") else 0, "hide_footer": 1 if lh.get("hide_footer") else 0,
-            "prev": lh.get("prev") or ""}
+            "prev": lh.get("prev") or "", "up": sc_size_mark(int(lh.get("bytes") or 0)) if lh["file"] else None}  # 2.453.0 (#3781)
 
 
 def bp_margins_clean(v, name):

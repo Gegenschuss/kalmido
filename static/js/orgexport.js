@@ -9,7 +9,9 @@ function oxBoxHtml(o) {
     <div class="oxst" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div></div>`;
 }
 function oxStateHtml(j) {
-  if (!j.enabled) return `<div class="shint keep">${ic('alert', 's')} ${esc(tr('The organisation export needs the server key KALMIDO_SECRET_KEY (the archive is encrypted with the organisation’s key), see SELF-HOSTING.md.'))}</div>`;
+  return (j.enabled ? '' : `<div class="shint keep warn">${ic('alert', 's')} ${esc(tr('This server has no server key (KALMIDO_SECRET_KEY): the export is a ZIP file without encryption. Anyone who gets the file can read everything in it, so keep it safe.'))}</div>`) + oxActsHtml(j);  // 2.362.2 (#3099)
+}
+function oxActsHtml(j) {
   const start = lbl => `<button type="button" class="btn sm" data-ox="start">${ic('download', 's')} ${lbl}</button>`;
   // 2.278.0 A (#3093): another admin's archive (filtered by their rights): only the hint, a new one only when they left
   if (j.foreign) return `<div class="shint keep">${ic('lock', 's')} ${esc(j.hint || '')}</div>` + (j.may_replace && j.state === 'done' ? `<div class="row">${start(tr('Create export'))}</div>` : '');
@@ -47,7 +49,7 @@ function ox_pbBoxHtml(oid) {
   if (oid == null) return '';  // 0 = the own personal office (2.138.0 #1972)
   setTimeout(() => { const r = document.querySelector('.oxpb'); if (r) { oxDraw(r); ocDraw(r); } }, 0);
   return `<section class="oxpb" data-fg-skip aria-labelledby="oxpb-h"><h3 id="oxpb-h">${tr('Export the office')}</h3>
-    <p class="muted">${tr('An encrypted archive with this office and your private clients, to take them to another Kalmido server: there under Settings > Data into an organisation or into your own office. It opens with the recovery key.')}</p>
+    <p class="muted">${tr('An encrypted archive with this office, your private clients and the receipts and filed documents of the office, to take them to another Kalmido server: there under Settings > Data into an organisation or into your own office. It opens with the recovery key.')}</p>
     <div class="oxbox" data-oxorg="${+oid}"><div class="oxst" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div></div>${ocBoxHtml({id: +oid}, {title: ''})}</section>`;
 }
 // ---- 2.146.0 D (#2468): the retention export (kalmido/admin/retexport.py): a readable ZIP of the records the law asks to

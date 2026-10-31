@@ -31,7 +31,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.ofmAll', 'true'); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); /* 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js) */ sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     await signIn(ev, 'alice');
-    await nav(B + '#office/settings');
+    await nav(B + '#office/offers');  // 2.360.3: not #office/settings: its cash box section (cb_setHtml) loads the cash book itself, with a warm cache before the failure below is in place
     check(await ready(ev, `!!document.querySelector('#side [data-ofm="cashbook"]')`, 80), 'the office with the menu entry "Cash book"');  // 2.152.2 (#2617): the office points sit in the panel #side
     // the server answers 500 for the cash book (a short failure)
     await ev(`(() => { const f0 = window.fetch; window.__cbFail = true; window.fetch = (u, o) => (window.__cbFail && String(u).includes('/api/office/cashbooks')) ? Promise.resolve(new Response(JSON.stringify({error: 'Server error'}), {status: 500, headers: {'Content-Type': 'application/json'}})) : f0(u, o); return 1; })()`);

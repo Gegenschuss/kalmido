@@ -187,6 +187,8 @@ function rk_settingsHtml() {
     ${!ls ? `<p class="muted">${tr('Loading…')}</p>` : `<ul class="rkplist" role="list">${ls.map(p => `<li><input value="${esc(p.name)}" maxlength="120" data-rkp="name" data-id="${p.id}" aria-label="${esc(tr('Purpose'))}"><button type="button" class="iconbtn" data-rkp="del" data-id="${p.id}" aria-label="${esc(tr('Remove {0}', p.name))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>
     <div class="lacts"><input id="rkp-new" maxlength="120" enterkeyhint="done" autocomplete="off" placeholder="${esc(tr('Add another purpose…'))}" aria-label="${esc(tr('New purpose'))}"><button type="button" class="btn sm" data-rkp="add">${ic('plus', 's')}<span>${tr('Add')}</span></button></div>`}</section>`;
 }
+// 2.452.0 (#3836): on a phone the row has no symbols (office.css), a long press opens the Remove (also the places and people of office_meals.js)
+ms_rowMenu('.rkplist li', r => menu(r, [{label: tr('Remove'), icon: 'trash', cls: 'danger', fn: () => $('[data-rkp="del"],[data-bwc="del"]', r).click()}]));
 async function rk_purposeAct(a, el) {
   const sec = el.closest('.rkpset');
   try {

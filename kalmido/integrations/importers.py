@@ -225,6 +225,7 @@ IMPORT_JSON_DEPTH = 40                    # nesting of a JSON file (Trello: ~6)
 IMPORT_UNDO_HOURS = 24
 IMPORT_RATE = _imp_env("KALMIDO_IMPORT_RATE", 30)  # imports + previews per user and 10 minutes
 IMPORT_KEEP = 20                          # import records (undo) kept per user
+IMPORT_KEEP_ALWAYS = "Kalmido"            # 2.452.0 (#3810): an account import stays until undone, it is the memory of what is here already
 IMPORT_SOURCES = {"todoist": "Todoist", "trello": "Trello", "asana": "Asana", "mstodo": "Microsoft To Do", "ics": "ICS",
                   # 2.142.0 B (#2147): file imports only (no API / OAuth connection, nothing fetched from the files)
                   "notion": "Notion", "gtasks": "Google Tasks", "clickup": "ClickUp", "jira": "Jira", "csv": "CSV", "markdown": "Markdown"}
@@ -2224,8 +2225,7 @@ def imp_run(c, uid, plan, opts, dry):
         if created["tasks"] or created["lists"] or created["sections"]:
             iid = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
                             (uid, src, opts.get("_fname", "")[:200], json.dumps(created), json.dumps(stats), ts))
-            c.execute("""DELETE FROM imports WHERE user_id=? AND id NOT IN
-                         (SELECT id FROM imports WHERE user_id=? ORDER BY id DESC LIMIT ?)""", (uid, uid, IMPORT_KEEP))
+            imports_trim(c, uid)
             rep["import_id"] = iid
             rep["undo_until"] = iso(now_utc() + timedelta(hours=IMPORT_UNDO_HOURS))
         bump(c)
@@ -2430,6 +2430,12 @@ def imp_undo_trash(c, ids, back, iid):
 @app.post("/api/imports/<int:iid>/undo")
 def import_undo(iid):
     return jsonify(imp_undo(db(), me(), iid))
+
+
+def imports_trim(c, uid):
+    """Keep the newest IMPORT_KEEP records of a user, and every account import that is not undone (umz_again reads those)."""
+    c.execute("""DELETE FROM imports WHERE user_id=? AND NOT (source=? AND undone_at IS NULL) AND id NOT IN
+                 (SELECT id FROM imports WHERE user_id=? ORDER BY id DESC LIMIT ?)""", (uid, IMPORT_KEEP_ALWAYS, uid, IMPORT_KEEP))
 
 
 def _imp_report(raw):

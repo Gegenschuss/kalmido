@@ -93,11 +93,11 @@ def _oi_put(ctx, old, new, seal=True, mime="", keep=False, strict=False):
 
 def _oi_logo_ok(ctx, name):
     """2.137.0 review L4: a content-addressed logo copy only under the name of its own content (never a file that a
-    later logo of the target would be taken for)."""
+    later logo of the target would be taken for). 2.453.0 (#3781): the frozen letterhead (lhs-<sha16>.pdf) likewise."""
     import hashlib
     from .acctimport import _file_bytes
     raw = _file_bytes(ctx.zf, ctx.files, _oi_name(name))
-    return raw is not None and hashlib.sha256(raw).hexdigest()[:16] == name[5:21]
+    return raw is not None and hashlib.sha256(raw).hexdigest()[:16] == name.split("-", 1)[1][:16]
 
 
 def _oi_number_taken(c, space, number):
@@ -231,8 +231,8 @@ def _a_doc(c, run, src, nid, ctx):
         if isinstance(snd.get("logo"), str) and re.fullmatch(r"logo-[0-9a-f]{16}\.png", snd["logo"]) and _oi_logo_ok(ctx, snd["logo"]):
             _oi_put(ctx, snd["logo"], snd["logo"], seal=False, mime="image/png", keep=True)
         lh = snd.get("letterhead")
-        if isinstance(lh, dict) and isinstance(lh.get("file"), str) and re.fullmatch(r"lhs-[0-9a-f]{16}\.pdf", lh["file"]):
-            _oi_put(ctx, lh["file"], lh["file"], mime="application/pdf", keep=True)
+        if isinstance(lh, dict) and isinstance(lh.get("file"), str) and re.fullmatch(r"lhs-[0-9a-f]{16}\.pdf", lh["file"]) and _oi_logo_ok(ctx, lh["file"]):
+            _oi_put(ctx, lh["file"], lh["file"], mime="application/pdf", keep=True, strict=True)  # 2.453.0 (#3781): strict like the letterhead of the settings
 
 
 def _p_part(c, run, src, d, ctx):

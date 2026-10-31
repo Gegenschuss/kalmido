@@ -433,9 +433,9 @@ const weekOf = s => fmtPref('week_start') ? weekStartOf(s) : mondayOf(s);
 const fmtDateLoc = s => !/^\d{4}-\d\d-\d\d$/.test(s || '') ? '' : fmtDay(pd(s).getFullYear() !== new Date().getFullYear() ? 'year' : 'short', pd(s));
 const wdOrder = () => { const f = weekStart(); return [0, 1, 2, 3, 4, 5, 6].map(i => (i + f) % 7); };
 const weekStartOf = s => { const d = pd(s), k = (d.getDay() - weekStart() + 7) % 7; d.setDate(d.getDate() - k); return ds(d); };
-// a time typed by hand: "9", "930", "09:30", "9.30", "9:30 pm", "21 uhr" -> "HH:MM" or null
+// a time typed by hand: "9", "930", "09:30", "9.30", "9:30 pm", "21 uhr", "21 uur" -> "HH:MM" or null
 function parseHM(v) {
-  let s = String(v || '').trim().toLowerCase().replace(/\s*(uhr|h)$/, '');
+  let s = String(v || '').trim().toLowerCase().replace(/\s*(uhr|uur|h)$/, '');
   if (!s) return '';
   const pm = /p\.?m\.?$/.test(s), am = /a\.?m\.?$/.test(s);
   s = s.replace(/\s*[ap]\.?m\.?$/, '');

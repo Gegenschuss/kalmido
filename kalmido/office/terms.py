@@ -294,7 +294,10 @@ def agb_mail_files(c, oid, r, b, files):
 
 
 def agb_public(meta):
-    return {k: meta.get(k) for k in ("date", "sha256", "name", "bytes", "uploaded_at")} if meta else None
+    if not meta:
+        return None
+    from ..files.scan import sc_size_mark
+    return {**{k: meta.get(k) for k in ("date", "sha256", "name", "bytes", "uploaded_at")}, "up": sc_size_mark(int(meta.get("bytes") or 0))}  # 2.453.0 (#3781)
 
 
 def agb_clean_name(v):

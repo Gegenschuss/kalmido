@@ -115,6 +115,14 @@ async function fsr_fileMenu(anchor, kind, id, name) {
   if (!items.length) { toast(tr('No folder yet: create one in the files first')); return; }
   menu(anchor, items, null, null, tr('Move to folder…'));
 }
+// 2.452.0 (#3836): on a phone the row has no symbols (office.css), a long press opens what they did; a pending upload keeps its X
+ms_rowMenu('.dma-f[data-fid] .dma-open', r => {
+  const li = r.closest('.dma-f'), f = (DMA.items || []).find(x => x.id === +li.dataset.fid), by = k => $(`[data-dma="${k}"]`, li); if (!f) return;
+  menu(r, [{label: tr('Open'), icon: 'eye', fn: () => r.click()},
+    by('file') ? {label: tr('Move to folder…'), icon: 'folder', fn: () => fsr_fileMenu(r, 'contract_file', f.id, f.name)} : null,
+    by('replace') ? {label: tr('Replace'), icon: 'upload', fn: () => by('replace').click()} : null,
+    by('rm') ? '-' : null, by('rm') ? {label: tr('Remove'), icon: 'trash', cls: 'danger', fn: () => by('rm').click()} : null]);
+});
 document.addEventListener('click', e => {
   const b = /** @type {any} */ (e.target).closest?.('[data-dma="file"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();

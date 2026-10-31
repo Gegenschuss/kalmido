@@ -285,10 +285,24 @@ check([x["name"] for x in tv] == ["Summer in Italy", "Weekend"] and tv[0]["state
 # ================================================================== Karakeep (read later)
 check(A.get(B + "/api/life/karakeep").json() == {"connected": False}, "Karakeep: not connected")
 check(A.post(B + "/api/life/karakeep/sync").status_code == 400, "sync without a connection: 400")
+
+
+def kk_api():
+    """The API's sync: it stays synchronous with its counts."""
+    return requests.post(V + "/life/karakeep/sync", headers=pv)
+
+
+def kk_web():
+    """2.453.0 (#3781): the button's route queues the fetch and answers at once; waits for the job to end."""
+    r = A.post(B + "/api/life/karakeep/sync")
+    check(r.ok and r.json() == {"started": True}, "the web route starts the fetch, without a count " + r.text[:200])
+    check(until(lambda: not dbx("SELECT 1 FROM bg_jobs WHERE kind='life:karakeep' AND state IN ('wait','run')")), "the fetch ends in the background")
+
+
 r = A.put(B + "/api/life/karakeep", json={"url": "http://10.1.2.3:8097", "token": "kk-secret"})
 check(r.ok and r.json()["token_set"] and "token" not in r.json(), "connected (the key is write-only)")
-r = A.post(B + "/api/life/karakeep/sync")
-check(r.status_code == 400 and A.get(B + "/api/life/karakeep").json()["error"], "an internal address not allowed by the admin: refused, the error stored " + r.text[:200])
+kk_web()
+check(A.get(B + "/api/life/karakeep").json()["error"], "an internal address not allowed by the admin: refused, the error stored")
 json.dump([{"id": "bm_1", "title": "A long read", "content": {"type": "link", "url": "https://example.org/long"}},
            {"id": "bm_2", "title": None, "content": {"type": "link", "url": "https://example.org/b", "title": "From the page"}},
            {"id": "bm_3", "title": "A note", "content": {"type": "text", "text": "remember this"}},
@@ -298,7 +312,7 @@ json.dump([{"id": "bm_1", "title": "A long read", "content": {"type": "link", "u
 # 2.190.0 D (#2496): another server needs the key again (the stored one never goes to a new host)
 check(A.put(B + "/api/life/karakeep", json={"url": "http://127.0.0.1:8097/api/v1"}).status_code == 400, "a new host without the key: 400")
 A.put(B + "/api/life/karakeep", json={"url": "http://127.0.0.1:8097/api/v1", "token": "kk-secret"})
-r = A.post(B + "/api/life/karakeep/sync")
+r = kk_api()
 check(r.ok and r.json()["added"] == 4, "sync: 4 bookmarks over two pages (not the archived one) " + r.text[:200])
 RL = r.json()["list_id"]
 rt = {t["title"]: t for t in A.get(B + "/api/state").json()["tasks"] if t["list_id"] == RL}
@@ -308,25 +322,29 @@ check(sorted(bms) == ["https://example.org/b", "https://example.org/l", "https:/
       and bms["https://example.org/b"]["title"] == "From the page" and all(b["src"] == "karakeep" and b["space"] == "private" for b in bms.values())
       and list(rt) == ["A note"] and rt["A note"]["url"] is None and rt["A note"]["fam"] == {"kind": "bookmark", "src": "karakeep", "bid": "bm_3"},
       "links as bookmarks (titles), a note without a link as a task " + str(list(bms)) + str(list(rt)))
-check(A.post(B + "/api/life/karakeep/sync").json()["added"] == 0, "a second sync adds nothing")
+check(kk_api().json()["added"] == 0, "a second sync adds nothing")
 A.delete(B + f"/api/tasks/{rt['A note']['id']}")
 A.delete(B + f"/api/bookmarks/{bms['https://example.org/b']['id']}")
-check(A.post(B + "/api/life/karakeep/sync").json()["added"] == 0, "a deleted bookmark task / bookmark does not come back")
+check(kk_api().json()["added"] == 0, "a deleted bookmark task / bookmark does not come back")
 A.patch(B + f"/api/bookmarks/{bms['https://example.org/long']['id']}", json={"state": "archived"})
-r = A.post(B + "/api/life/karakeep/sync").json()
+r = kk_api().json()
 check(r["archived"] == 1 and next(m for m in json.load(open(os.path.join(DATA, "kk.json"))) if m["id"] == "bm_1")["archived"], "archived bookmark = archived in Karakeep")
-check(A.post(B + "/api/life/karakeep/sync").json()["archived"] == 0, "… once")
+check(kk_api().json()["archived"] == 0, "… once")
 log = [json.loads(x) for x in open(os.path.join(DATA, "kk.log"))]
 check(all(x["auth"] for x in log) and any("cursor=2" in x["p"] for x in log), "every request with the key, the second page followed")
 check(len(A.get(B + "/api/life/karakeep/lists").json()["lists"]) == 1, "the Karakeep lists (a bad id dropped)")
+json.dump(json.load(open(os.path.join(DATA, "kk.json"))) + [{"id": "bm_bg", "title": "Fetched behind", "content": {"type": "link", "url": "https://example.org/bg"}}],
+          open(os.path.join(DATA, "kk.json"), "w"))
+kk_web()
+check("https://example.org/bg" in [b["url"] for b in A.get(B + "/api/bookmarks").json()["items"]], "the background fetch brings the new bookmark (with the person's data)")
 A.put(B + "/api/life/karakeep", json={"source": "lst_1"})
 json.dump(json.load(open(os.path.join(DATA, "kk.json"))) + [{"id": "bm_6", "title": "Not in the list", "content": {"type": "link", "url": "https://e.org/6"}}],
           open(os.path.join(DATA, "kk.json"), "w"))
-check(A.post(B + "/api/life/karakeep/sync").json()["added"] == 0, "a source list: only its bookmarks")
+check(kk_api().json()["added"] == 0, "a source list: only its bookmarks")
 A.put(B + "/api/life/karakeep", json={"token": "wrong"})
-r = A.post(B + "/api/life/karakeep/sync")
-check(r.status_code == 400 and "refused the API key" in r.json()["error"], "a wrong key: a clear error")
+kk_web()
 st = A.get(B + "/api/life/karakeep").json()
+check("refused the API key" in st["error_text"], "a wrong key: a clear error " + st["error_text"])
 check(st["error"] == "auth" and "token" not in json.dumps(st).replace("token_set", ""), "the error is stored, the key never shown")
 raw = dbx("SELECT token FROM kk_conns WHERE user_id=1")[0][0]
 check(raw.startswith("v1.") and "wrong" not in raw, "the key is sealed at rest")

@@ -233,8 +233,9 @@ def fsm_plan(c, uid, b, to, dry, office=False):
         # 2.148.1 B (#2483): receipts the cash book or the equipment list points to stay in their workspace
         plan["block"], plan["code"] = tr(FSM_RECEIPT_STAYS), 409
     if big and not plan["block"] and not office:
-        from ..receipts.suggest import olk_fs_locked
-        for i in big:  # 2.186.0 B (#2600): a booked receipt stays in the books of its workspace for the legal period
+        from ..receipts.suggest import olk_fs_locked, olk_fs_maybe
+        maybe = olk_fs_maybe(c, big)  # 2.360.3 (#2733): one query instead of five per node, a folder can hold thousands of files
+        for i in (x for x in big if x in maybe):  # 2.186.0 B (#2600): a booked receipt stays in the books of its workspace for the legal period
             until = olk_fs_locked(c, i)
             if until:
                 plan["block"], plan["code"] = tr(FSM_BOOKED_STAYS, short_day(date.fromisoformat(until), year=True)), 409

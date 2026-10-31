@@ -28,6 +28,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import testclock  # noqa: E402
+import dbx as dbxm  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
 
 SRC = os.environ.get("KALMIDO_SRC") or os.path.join(N, "..")
@@ -363,6 +364,37 @@ def report_checks(s, uid, tag):
     s.patch(B + "/api/settings", json={"lang": "en"})
 
 
+def offer_title_checks(s, client, tag):
+    """2.453.0 (#3816): a finalised quotation keeps its heading: frozen at finalising, switching the industry pack off (or
+    on) never changes it; one finalised before keeps the word of its country pack."""
+    def offer(pt):
+        did = s.post(B + D, json={"kind": "offer", "client_id": client, "lang": "de", "project_title": pt,
+                                  "items": [{"kind": "service", "title": "Kamera", "qty": 1, "unit": "day", "rate": 500}]}).json()["id"]
+        r = s.post(B + f"{D}/{did}/finalize")
+        check(r.ok, f"{tag}: {pt} finalised " + r.text[:200])
+        return did
+    check(s.put(B + O + "/settings", json={"industry_packs": ["film"]}).ok, f"{tag}: film pack on")
+    film = offer(f"Film {tag}")
+    draft = s.post(B + D, json={"kind": "offer", "client_id": client, "lang": "de", "project_title": f"Draft {tag}"}).json()["id"]
+    check(render(s, film)["title"] == "Kostenvoranschlag", f"{tag}: the pack's heading on the finalised quotation")
+    check(s.put(B + O + "/settings", json={"industry_packs": []}).ok, f"{tag}: film pack off")
+    check(render(s, film)["title"] == "Kostenvoranschlag", f"{tag}: pack off: the finalised quotation keeps its heading")
+    check(render(s, draft)["title"] == "Angebot", f"{tag}: pack off: a draft follows the settings")
+    plain = offer(f"Plain {tag}")
+    check(s.put(B + O + "/settings", json={"industry_packs": ["film"]}).ok, f"{tag}: film pack on again")
+    check(render(s, plain)["title"] == "Angebot", f"{tag}: pack on later: a finalised quotation keeps its word")
+    check(render(s, draft)["title"] == "Kostenvoranschlag", f"{tag}: pack on: a draft follows the settings")
+    # finalised before 2.453.0: no heading in the snapshot, the country pack's word even with the pack on
+    c = dbxm.connect(os.path.join(sys.argv[1], "tasks.db"))
+    t = json.loads(c.execute("SELECT tax_snapshot FROM office_docs WHERE id=?", (film,)).fetchone()[0])
+    check(t.pop("offer_title", "") == "Kostenvoranschlag", f"{tag}: the heading lies in the snapshot")
+    c.execute("UPDATE office_docs SET tax_snapshot=? WHERE id=?", (json.dumps(t, ensure_ascii=False), film))
+    c.commit()
+    c.close()
+    check(render(s, film)["title"] == "Angebot", f"{tag}: an older finalised quotation keeps the country pack's word")
+    s.put(B + O + "/settings", json={"industry_packs": []})
+
+
 def new_office_checks(s, tag):
     """#3766: a new office without a country pack takes the person's language (it was the base pack's English)."""
     check(s.patch(B + "/api/settings", json={"lang": "fr"}).ok, f"{tag}: French")
@@ -379,6 +411,7 @@ A.put(B + O + "/settings", json={"lang": "fr"})
 privacy_checks(A, CL, "org")
 A.put(B + O + "/settings", json={"lang": "de"})
 position_checks(A, "org")
+offer_title_checks(A, CL, "org")
 report_checks(A, ALICE, "org")
 ORG2 = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": ALICE}).json()["id"]
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG2}"})
@@ -393,6 +426,7 @@ F.put(B + O + "/settings", json={"lang": "fr"})
 privacy_checks(F, CLF, "freelancer")
 F.put(B + O + "/settings", json={"lang": "de"})
 position_checks(F, "freelancer")
+offer_title_checks(F, CLF, "freelancer")
 report_checks(F, FID, "freelancer")
 _, F2 = freelancer(B, A, name="gaston")
 new_office_checks(F2, "freelancer")

@@ -18,7 +18,7 @@ function bp_settingsHtml(s, dis) {
   const st = BPL.st, adm = !dis;
   if (!st) return `<section class="bpset" id="bpset" data-fg-skip aria-labelledby="bp-h"><h3 id="bp-h">${tr('Letterhead')}</h3><p class="muted">${tr('Loading…')}</p></section>`;
   const pages = st.pages === 1 ? tr('one page for all pages') : tr('page 1 for the first page, page 2 for the following pages');
-  const file = st.on ? `<span>${ic('file', 's')} ${esc(st.name || tr('Letterhead'))} <span class="muted">· ${esc(pages)}</span></span>` : `<span class="muted">${tr('No letterhead yet')}</span>`;
+  const file = st.on ? `<span>${ic('file', 's')} ${esc(st.name || tr('Letterhead'))} <span class="muted">· ${esc(pages)}</span>${upMarkHtml(st.up)}</span>` : `<span class="muted">${tr('No letterhead yet')}</span>`;
   const up = adm ? `<input type="file" id="bp-file" accept="application/pdf,.pdf" hidden><button type="button" class="btn sm" data-bp-act="pick" ${BPL.busy ? 'disabled' : ''}>${ic('upload', 's')} ${st.on ? tr('Replace') : tr('Upload PDF')}</button>` : '';
   return `<section class="bpset" id="bpset" data-fg-skip aria-labelledby="bp-h"><h3 id="bp-h">${tr('Letterhead')}</h3><div class="shint">${tr('A PDF behind every quotation, invoice, credit note and reminder: its page 1 behind the first page, its page 2 behind the following pages (a one-page PDF behind all).')}</div>
     <p class="muted ofchint">${tr('PDF, A4 portrait, up to 10 MB')}</p>

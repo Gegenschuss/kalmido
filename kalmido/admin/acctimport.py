@@ -125,7 +125,7 @@ UMZ_READ = frozenset((
 ))
 UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is empty; a name used twice adds up
     (N_("Tables"), ("sheets", "sheet_columns", "sheet_rows", "sheet_cells", "sheet_files", "sheet_hist")),
-    (N_("Knowledge pages"), ("wiki_pages",)), (N_("E-mails"), ("hub_mails",)),
+    (N_("Knowledge pages"), ("wiki_pages", "wiki_files")), (N_("E-mails"), ("hub_mails",)),
     (N_("Video sign-offs"), ("video_reviews", "video_versions", "video_comments")), (N_("Bookmarks"), ("bookmarks",)),
     (N_("Household budget"), ("budgets",)), (N_("Focus sessions"), ("pomos",)), (N_("Notepads"), ("list_notepads",)),
     (N_("Playbooks"), ("playbooks", "playbook_proposals")), (N_("Staying in touch"), ("contact_care",)),
@@ -628,6 +628,9 @@ def umz_preview(c, uid, man, data, can_invite):
         skipped.append({"what": what, "count": n})
     if not org_kind:  # 2.273.0 A (#3030): every part of the file the import does not read (was a fixed list)
         skipped += umz_left(data)
+    office = man.get("personal_office") if isinstance(man.get("personal_office"), dict) else {}  # 2.362.2 (#3099)
+    if not org_kind and isinstance(office.get("rows"), int) and office["rows"]:
+        skipped.append({"what": tr(N_("Office")), "count": office["rows"]})
     return {
         "format": man.get("format"), "v": man.get("v"), "kalmido_version": _txt(man.get("kalmido_version"), 40),
         "created_at": _txt(man.get("created_at"), 40), "source": {"url": _txt(src.get("url"), 300), "hosted": bool(src.get("hosted"))},
@@ -641,7 +644,7 @@ def umz_preview(c, uid, man, data, can_invite):
         "encrypted": {"attachments": len(ce.get("attachments") or []) if isinstance(ce.get("attachments"), list) else 0,
                       "locked_notes": ce.get("locked_notes") if isinstance(ce.get("locked_notes"), int) else 0,
                       **umz_enc_preview(c, uid, data, org_kind)},  # 2.278.0 C (#3091)
-        "not_taken": skipped, "taken_areas": oi_counts(data) if org_kind else [], "again": bool(earlier), "earlier": earlier, "export_id": eid, "src": skey, "kind": "org" if org_kind else "account",
+        "not_taken": skipped, "taken_areas": oi_counts(data) if org_kind else [], "again": bool(earlier), "earlier": earlier, "office_copy": bool(not org_kind and office), "export_id": eid, "src": skey, "kind": "org" if org_kind else "account",
         "targets": umz_targets(c, uid),  # 2.96.0 D (#1941): an organisation export may go into the private space too
     }
 
@@ -1514,11 +1517,10 @@ def umz_run(uid, iid, opts):
             report = {**run.stats, "export_id": eid, "src": src, "target": run.org, "tasks": run.stats.get("tasks", 0), "not_taken": left}
             iid_db = None
             if any(run.created[k] for k in run.created):  # recorded with the rows (2.137.0, #2344: + "oi"): whatever happens next, undo works
-                from ..integrations.importers import IMPORT_KEEP
+                from ..integrations.importers import imports_trim
                 iid_db = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
                                    (uid, UMZ_SOURCE, _txt(st.get("name"), 200), json.dumps({**run.created, "src": run.src}), json.dumps(report), iso(now_utc())))
-                c.execute("""DELETE FROM imports WHERE user_id=? AND id NOT IN
-                             (SELECT id FROM imports WHERE user_id=? ORDER BY id DESC LIMIT ?)""", (uid, uid, IMPORT_KEEP))
+                imports_trim(c, uid)
             c.commit()
             run.written = []  # committed: the files belong to their rows now
             shared = []

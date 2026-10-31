@@ -22,7 +22,7 @@ import time
 from datetime import date, timedelta
 
 from ..core.config import app, PUBLIC_URL, APP_NAME
-from ..core.db import db, iso, now_utc, body, bump, err, iso_ms, parse_iso
+from ..core.db import db, iso, now_utc, body, bump, err, iso_ms, parse_iso, usettings
 from ..core.i18n import browser_lang, N_, lang, short_day, tr
 from ..core.pg import insert_id, system_ctx
 from ..accounts.session import _token_hash
@@ -419,6 +419,7 @@ def pt_limit_note(c, org_id, owner_id):
     """2.138.4 C (#2380): the space's budget of sign-in mails (ptls) is used up: a News item for its admins (an organisation)
     or its owner (the private space), at most once per window and process; no push, no mail. Caller commits."""
     import json
+    from ..collab.news import notif_ok
     if hit_limit(f"ptlsn:{org_id or ''}:{owner_id or ''}", 1, PT_LOGIN_WIN):
         return 0
     with system_ctx(c):  # who administers the space (structure); the notice names no customer
@@ -428,6 +429,7 @@ def pt_limit_note(c, org_id, owner_id):
             on = (c.execute("SELECT name FROM orgs WHERE id=?", (int(org_id),)).fetchone() or [""])[0]
         else:
             ids, on = [int(owner_id)] if owner_id else [], ""
+        ids = [uid for uid in ids if notif_ok(c, uid, usettings(c, uid), "limits", "news")]  # 2.453.0 (#3781): can be switched off
         for uid in ids:
             c.execute("INSERT INTO notifications(user_id,kind,task_id,list_id,actor_id,comment_id,data,created_at) VALUES(?,?,?,?,?,?,?,?)",
                       (uid, "ptlimit", None, None, None, None, json.dumps({"org_id": org_id, "org": on, "limit": PT_LOGIN_SPACE,

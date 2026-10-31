@@ -139,7 +139,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Image key (build inputs + week)
         id: key
-        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
       - name: Image in the cache?
         id: cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -171,7 +171,7 @@ jobs:
           python-version: "3.12"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version-file: tests/.node-version  # 2.360.3 (#2916): the same Node as the test runner, Node 20 has no support any more
       - name: Python syntax
         run: python -m py_compile app.py $(find kalmido -name '*.py') tools/*.py tests/*.py mcp/*.py
       - name: JavaScript syntax
@@ -220,15 +220,26 @@ jobs:
           python tests/agent_docs_coverage_test.py
       - name: Skipped flaky suites (tests/skip.txt well formed, no date passed) (#1315)
         run: python tests/skip_test.py
+      # 2.360.3 (#2915): base images by digest, installs with hashes, CI tools with a version, pdf.js against OSV (no lock file sees it)
+      - name: Pinned dependencies stay pinned
+        run: python tools/pins.py --osv
       - name: Install scanners
-        run: pip install bandit pip-audit
+        run: pip install bandit==1.9.4 pip-audit==2.10.1
       - name: bandit (fails on high severity only)
         run: bandit -q --severity-level high -r app.py kalmido tools
-      - name: pip-audit (pinned dependencies of the image)
+      # 2.360.3 (#2915): the lock files are the complete lists (sub-packages and tzdata too), nothing read from the Dockerfile any more
+      - name: pip-audit (image and embedding service)
         run: |
-          grep -oE '[A-Za-z0-9_.-]+(\[[a-z,]+\])?==[0-9][0-9A-Za-z.]*' Dockerfile > /tmp/requirements.txt  # 2.37.1: with extras (psycopg[binary])
-          cat /tmp/requirements.txt
-          pip-audit --strict -r /tmp/requirements.txt
+          pip-audit --strict --disable-pip --require-hashes -r tools/requirements.lock
+          pip-audit --strict --disable-pip --require-hashes -r tools/requirements.static.lock
+          pip-audit --strict --disable-pip --require-hashes -r embed/requirements.lock
+      # 2.360.3 (#2915): nothing of tests/ ships, so a finding there is reported without stopping the build
+      - name: pip-audit of the test tools (informational)
+        continue-on-error: true
+        run: pip-audit --strict -r tests/requirements.txt
+      - name: npm audit of the test tools (informational)
+        continue-on-error: true
+        run: npm audit --omit=optional --prefix tests
 
   einvoice:
     # 2.38.0 (#1021 P5): the e-invoice files Kalmido writes pass the real validators -- veraPDF (PDF/A-3b) and the KoSIT
@@ -283,7 +294,7 @@ jobs:
           python-version: "3.12"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version-file: tests/.node-version  # 2.360.3 (#2916): the same Node as the test runner, Node 20 has no support any more
           cache: npm
           cache-dependency-path: tests/package-lock.json
       - name: Test dependencies
@@ -317,7 +328,7 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
-      - run: pip install semgrep
+      - run: pip install semgrep==1.183.0
       - run: semgrep scan --config p/python --config p/flask --config p/javascript --metrics=off --exclude tests --exclude static/vendor app.py kalmido static tools
 
   tests:
@@ -340,7 +351,7 @@ jobs:
           python-version: "3.12"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version-file: tests/.node-version  # 2.360.3 (#2916): the same Node as the test runner, Node 20 has no support any more
           cache: npm
           cache-dependency-path: tests/package-lock.json
       - name: Test dependencies
@@ -350,7 +361,7 @@ jobs:
       # 2.180.0 A (#2692): the image of the job "image" (same key) when it is in the cache, else built here
       - name: Image key
         id: imgkey
-        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
       - name: Image cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         continue-on-error: true
@@ -423,7 +434,7 @@ jobs:
       # 2.180.0 A (#2692): the image of the job "image" (same key) when it is in the cache, else built here
       - name: Image key
         id: imgkey
-        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
       - name: Image cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         continue-on-error: true
@@ -450,5 +461,5 @@ jobs:
           curl -sf http://127.0.0.1:3040/api/health || { docker logs kalmido-zap 2>&1 | tail -40; exit 1; }
       - name: ZAP baseline scan (unauthenticated)
         run: |
-          docker run --rm --network host ghcr.io/zaproxy/zaproxy:stable \
+          docker run --rm --network host ghcr.io/zaproxy/zaproxy:2.17.0 \
             zap-baseline.py -t http://127.0.0.1:3040/ -I

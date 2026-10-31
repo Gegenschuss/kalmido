@@ -318,6 +318,13 @@ def _offer_title(s, L, lang):
     return L.get("offer", tr("Quotation|pack", lg=doc_lg(lang)))  # 2.185.0 C (#2520)
 
 
+def _offer_title_frozen(pack, L, lang):
+    """2.453.0 (#3816): the heading of a finalised quotation: the one frozen with it (ledger.ofx_finalize), never today's
+    industry packs; a document finalised before that keeps the word of its country pack snapshot."""
+    t = pack.get("offer_title")
+    return t if isinstance(t, str) and t else L.get("offer", tr("Quotation|pack", lg=doc_lg(lang)))
+
+
 def prd_new_doc(c, oid, s):
     """The calculation fields of a new quotation from the industry packs switched on: "share by amount" when a pack offers
     it (rate / factor from the office settings share_rate / share_factor, else the pack's; on when producing_on is set),
@@ -1187,7 +1194,7 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         "pack_version": (r["pack_version"] or "") if locked else str(pack.get("version") or ""),
         "service_from": r["service_from"] or "", "service_to": r["service_to"] or "", "currency": cur, "fx_rate": t.get("fx_rate"), "fx_note": t.get("fx_note") or "", "vat_mode": t["vat_mode"],
         "raw_mode": t["raw_mode"], "status": r["status"], "number": r["number"], "date": r["date"], "date_text": _fd(r["date"]),
-        "valid_until": r["valid_until"], "valid_until_text": valid_text, "title": _offer_title(s, L, lang),
+        "valid_until": r["valid_until"], "valid_until_text": valid_text, "title": _offer_title_frozen(pack, L, lang) if locked else _offer_title(s, L, lang),  # 2.453.0 (#3816)
         "project_title": r["project_title"], "project_ref": r["project_ref"],
         "company": {"name": co.get("name") or "", "name_lines": co.get("name_lines") or [], "lines": co.get("lines") or [], "contact_lines": co.get("contact_lines") or [],
                     "register_lines": co.get("register_lines") or [], "bank_lines": co.get("bank_lines") or [],

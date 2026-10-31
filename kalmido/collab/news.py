@@ -160,6 +160,7 @@ NOTIF_ROWS += ("leave",)  # 2.125.0 A (#2117): vacation requests (admins) and th
 NOTIF_ROWS += ("timesheet",)  # 2.125.0 B (#2119): timesheets: a member's closed month (admins), the decision on mine (News + push on by default)
 NOTIF_ROWS += ("signoff",)  # 2.266.0 (#2965): a customer decided through a link (sign-off, video review; News + push on by default, was "approval")
 NOTIF_ROWS += ("fetcher",)  # 2.425.0 C (#3453): a portal of my receipt fetcher has a new error (News + push on by default)
+NOTIF_ROWS += ("limits",)  # 2.453.0 (#3781): my customer portal / booking page used up its mails (News only, on by default)
 NOTIF_NEWS_GROUP = {"comment": "comment", "reply": "comment", "follow": "comment", "mention": "mention", "assign": "assign",
                     "complete": "complete", "status": "status", "share": "share", "unblock": "unblock"}
 NOTIF_NEWS_PRIMARY = ("comment", "mention", "assign", "complete", "status", "share", "unblock")  # News = news_kinds
@@ -170,6 +171,7 @@ NOTIF_NEWS_NEW["leave"] = 1  # 2.125.0 A (#2117)
 NOTIF_NEWS_NEW["timesheet"] = 1  # 2.125.0 B (#2119)
 NOTIF_NEWS_NEW["signoff"] = 1  # 2.266.0 (#2965)
 NOTIF_NEWS_NEW["fetcher"] = 1  # 2.425.0 C (#3453)
+NOTIF_NEWS_NEW["limits"] = 1  # 2.453.0 (#3781)
 NOTIF_PUSH_DEFAULT = {"comment": 1, "reply": 1, "follow": 1, "mention": 1, "assign": 1, "newtask": 0, "complete": 1,
                       "status": 0, "share": 0, "unblock": 1, "approval": 1, "followup": 1, "reminder": 1, "usage": 1,
                       "proposal": 1, "nag": 1, "chat": 1, "errreport": 1}
@@ -179,7 +181,9 @@ NOTIF_PUSH_DEFAULT["leave"] = 1  # 2.125.0 A (#2117)
 NOTIF_PUSH_DEFAULT["timesheet"] = 1  # 2.125.0 B (#2119)
 NOTIF_PUSH_DEFAULT["signoff"] = 1  # 2.266.0 (#2965)
 NOTIF_PUSH_DEFAULT["fetcher"] = 1  # 2.425.0 C (#3453)
+NOTIF_PUSH_DEFAULT["limits"] = 0  # 2.453.0 (#3781)
 NOTIF_NO_NEWS = ("reminder", "nag", "chat")
+NOTIF_NO_PUSH = ("limits",)  # 2.453.0 (#3781): News only (the notes promise no push, no mail)
 NOTIF_UNMUTED = ("mention", "assign")        # still come through a muted list
 NOTIF_NO_BELL = ("reminder", "followup", "usage", "proposal")  # never changed by a list bell
 BELL_MODES = ("all", "default", "mute", "custom")
@@ -199,6 +203,7 @@ KIND_ROW["leavereq"] = KIND_ROW["leavedecide"] = "leave"  # 2.125.0 A (#2117): i
 KIND_ROW["tsheet"] = "timesheet"  # 2.125.0 B (#2119)
 KIND_ROW["signoff"] = "signoff"  # 2.266.0 (#2965)
 KIND_ROW["fetcherr"] = "fetcher"  # 2.425.0 C (#3453)
+KIND_ROW["ptlimit"] = KIND_ROW["apblimit"] = "limits"  # 2.453.0 (#3781): one row for both
 KIND_ROW["wiki_shared"] = "share"  # 2.126.2 B (#2355): switched with the sharing row (News on, no push by default)
 
 
@@ -211,7 +216,7 @@ def notif_stored(s):
 
 
 def notif_matrix(s):
-    """{event: {"news": bool|None, "push": bool}} of a user's settings (None = the event has no News)."""
+    """{event: {"news": bool|None, "push": bool|None}} of a user's settings (None = the event has no News / no push)."""
     s = s or USER_DEFAULTS
     nk = set((s.get("news_kinds") if s.get("news_kinds") is not None else USER_DEFAULTS["news_kinds"]).split(","))
     o = notif_stored(s)
@@ -226,7 +231,7 @@ def notif_matrix(s):
             news = bool(x["news"])
         else:
             news = NOTIF_NEWS_GROUP[r] in nk if r in NOTIF_NEWS_GROUP else bool(NOTIF_NEWS_NEW[r])
-        out[r] = {"news": news, "push": bool(x["push"]) if "push" in x else bool(NOTIF_PUSH_DEFAULT[r])}
+        out[r] = {"news": news, "push": None if r in NOTIF_NO_PUSH else bool(x["push"]) if "push" in x else bool(NOTIF_PUSH_DEFAULT[r])}
     return out
 
 
@@ -244,7 +249,7 @@ def notif_update(s, v):
     nk = [x for x in (s.get("news_kinds") or "").split(",") if x]
     for r, x in v.items():
         if r not in NOTIF_ROWS or not isinstance(x, dict) or not x or any(k not in ("news", "push") for k in x) or \
-                any(y not in (0, 1, True, False) for y in x.values()) or (r in NOTIF_NO_NEWS and "news" in x):
+                any(y not in (0, 1, True, False) for y in x.values()) or (r in NOTIF_NO_NEWS and "news" in x) or (r in NOTIF_NO_PUSH and "push" in x):
             raise bad
         cur = o.setdefault(r, {})
         if "push" in x:
@@ -301,7 +306,7 @@ def notif_ok(c, uid, s, row, ch, lid=None, own=False):
     own (2.266.0, #2962): the due reminder / nag / follow-up is uid's own (uid = the task's reminder recipient, e.g. its
     assignee) - the owner's template does not limit it (it is meant for the noise of others, not one's own due dates)."""
     m = notif_matrix(s)[row]
-    if ch == "news" and m["news"] is None:
+    if m[ch] is None:  # 2.453.0 (#3781): was news only; a row without pushes (NOTIF_NO_PUSH) too
         return False
     if ch == "push" and lid and not (own and row in ("reminder", "nag", "followup")):  # 2.33.0 (#927): the list owner's template is a ceiling for pushes (the News stay complete)
         from ..notify.caps import cap_ok

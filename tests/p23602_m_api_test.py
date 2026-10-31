@@ -5,10 +5,13 @@ Invented names only.
  - a table shared by address: a row with or without an account, the same answer, list, count and limit; the address sealed;
    a person outside the table's organisation gets nothing; the account made later takes the row at sign-in
  - a person picked by name beside an address row, leaving the organisation, removing an address row
+ - 2.453.0 (#3781): a deleted account leaves the address row open
+ - 2.453.0 (#3780): a new address joins by accepting like an existing account: the member list is the same in both cases
  - open invitations: new account and existing account in one form (ref instead of ids); resend, withdraw, another
    organisation's ref; expired ones; with invitations switched off they stay visible and can be ended
 usage: p23602_m_api_test.py <datadir>"""
 # freelancer-matrix: sheets
+import hashlib
 import sys
 
 import kt
@@ -131,6 +134,18 @@ check(r.ok, "dora leaves " + r.text[:200])
 check(rows(Bo, S6) == n and dbx("SELECT user_id FROM sheet_shares WHERE sheet_id=?", (S6,))[0][0] is None, "the row stays, open again")
 check(Do.get(B + f"/api/sheets/{S6}").status_code == 404, "... without access")
 
+# 2.453.0 (#3781): a deleted account: the address row stays open, nothing tells the address had an account
+gone = A.post(B + "/api/users", json={"orgs": [], "username": "gone", "display_name": "Gone Name", "password": "password123",
+                                      "email": "gone@example.com", "features": "sheets,collab,comments"}).json()["id"]
+S7 = new(Bo, "Deleted", space="private")
+post(Bo, S7, email="gone@example.com", role="write")
+n = rows(Bo, S7)
+check(dbx("SELECT user_id FROM sheet_shares WHERE sheet_id=?", (S7,))[0][0] == gone, "the address row is bound to the account")
+r = A.delete(B + f"/api/users/{gone}")
+check(r.ok, "the account is deleted " + r.text[:200])
+check(rows(Bo, S7) == n, f"the address row reads as before {rows(Bo, S7)}")
+check([x[0] for x in dbx("SELECT user_id FROM sheet_shares WHERE sheet_id=?", (S7,))] == [None], "... open again, without an account behind it")
+
 # removing an address row: the address is gone, Undo = the address again
 x = [v for v in rows(Bo, S1) if v["email"] == "carol@example.com"][0]
 check(Bo.delete(B + f"/api/sheets/{S1}/shares/{x['id']}").ok, "stop sharing by address")
@@ -182,6 +197,91 @@ check(Bo.delete(B + f"/api/orgs/{ORG}/invites/{e['ref']}").status_code == 404, "
 
 r = Bo.delete(B + f"/api/orgs/{ORG}/invites/{n['ref']}")
 check(r.ok and not dbx("SELECT 1 FROM users WHERE lower(email)='newby@example.com'"), "a new account's invitation: withdrawn by its reference, the account goes")
+
+# ---- 2.453.0 (#3780): the member list tells nothing: a new address and an existing account both join by accepting
+def roster():
+    return sorted(x[0] for x in dbx("SELECT user_id FROM org_members WHERE org_id=?", (ORG,)))
+
+
+def members_seen():
+    return next(o for o in Bo.get(B + "/api/orgs").json()["orgs"] if o["id"] == ORG)["members"]
+
+
+def in_org(mail):
+    return dbx("SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND lower(u.email)=?", (ORG, mail))
+
+
+def link_of(mail):  # the link goes by mail only: a known token instead (only the hash is stored)
+    tok = hashlib.sha256(mail.encode()).hexdigest()[:40]
+    dbx("UPDATE user_invites SET token_hash=? WHERE user_id=(SELECT id FROM users WHERE lower(email)=?)", (hashlib.sha256(tok.encode()).hexdigest(), mail))
+    return tok
+
+
+before, seen = roster(), members_seen()
+ra = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "fresh@example.com", "role": "readonly"})
+check(ra.ok and roster() == before and members_seen() == seen, "a new address: no row in the member list " + ra.text[:200])
+rb = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "erin@example.com", "role": "readonly"})
+check(rb.ok and roster() == before and members_seen() == seen, "an existing account: no row either")
+check(set(ra.json()) == set(rb.json()), "the same answer")
+iv = {x["email"]: x for x in inv()["invites"]}
+f, e = iv.get("fresh@example.com"), iv.get("erin@example.com")
+check(len(inv()["invites"]) == 2 and {k: v for k, v in f.items() if k not in ("ref", "email", "name", "created_at")} == {k: v for k, v in e.items() if k not in ("ref", "email", "name", "created_at")},
+      f"one row each, the same values {iv}")
+dbx("UPDATE org_joins SET created_at='2020-01-01T00:00:00+00:00' WHERE org_id=?", (ORG,))
+dbx("UPDATE user_invites SET expires_at='2020-01-15T00:00:00+00:00' WHERE user_id=(SELECT id FROM users WHERE email='fresh@example.com')")
+st = {x["email"]: x["state"] for x in inv()["invites"]}
+check(st == {"fresh@example.com": "expired", "erin@example.com": "expired"}, f"both run out alike {st}")
+r = Bo.post(B + f"/api/orgs/{ORG}/invites/{next(x['ref'] for x in inv()['invites'] if x['email'] == 'fresh@example.com')}/resend")
+iv = {x["email"]: x for x in inv()["invites"]}
+check(r.ok and iv["fresh@example.com"]["state"] == "invited", "Resend renews the invitation with the link " + r.text[:200])
+re_u = r.json()["invitation"]
+r = Bo.post(B + f"/api/orgs/{ORG}/invites/{iv['erin@example.com']['ref']}/resend")
+check(set(re_u) == set(r.json()["invitation"]) == {"sent", "email"}, f"review: resend answers the same for both kinds {re_u} {r.text[:200]}")
+dbx("UPDATE org_joins SET created_at='2020-01-01T00:00:00+00:00' WHERE org_id=? AND user_id=(SELECT id FROM users WHERE email='erin@example.com')", (ORG,))
+tok = link_of("fresh@example.com")
+Fr = sess()
+chk = Fr.post(B + "/api/auth/invite/check", json={"token": tok}).json()
+check(chk.get("org_name") == "Alpha", f"the invitation page names the organisation {chk}")
+dbx("UPDATE org_joins SET created_at='2020-01-01T00:00:00+00:00' WHERE org_id=? AND user_id=(SELECT id FROM users WHERE email='fresh@example.com')", (ORG,))
+r = Fr.post(B + "/api/auth/invite/accept", json={"token": tok, "password": "password123"})
+check(r.ok, "the password is set " + r.text[:200])
+Fr.post(B + "/api/me/purpose", json={"purpose": "me", "only": True})
+check("collab" in Fr.get(B + "/api/state").json()["settings"]["features"].split(","), "the first start keeps collaboration for the organisation ahead")
+check(Fr.post(B + f"/api/orgs/{ORG}/join").ok and in_org("fresh@example.com"), "the link used on the last day: the time to accept starts again, accepted = a member")
+check(dbx("SELECT role FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND u.email='fresh@example.com'", (ORG,)) == [("readonly",)], "in the invited role")
+check(Er.post(B + f"/api/orgs/{ORG}/join").status_code == 404, "a used link says nothing for somebody else's expired invitation")
+Bo.delete(B + f"/api/orgs/{ORG}/invites/{inv()['invites'][0]['ref']}")
+# review: a reset names no organisation the person never joined; an older link does not bring an expired invitation back
+Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "stale@example.com"})
+St = sess()
+check(St.post(B + "/api/auth/invite/accept", json={"token": link_of("stale@example.com"), "password": "password123"}).ok, "the stale person sets a password")
+dbx("UPDATE user_invites SET kind='reset', used_at=NULL, expires_at='2099-01-01T00:00:00+00:00' WHERE user_id=(SELECT id FROM users WHERE email='stale@example.com')")
+chk = sess().post(B + "/api/auth/invite/check", json={"token": link_of("stale@example.com")}).json()
+check(chk.get("kind") == "reset" and not chk.get("org_name"), f"review: a reset link names no organisation {chk}")
+dbx("UPDATE user_invites SET kind='invite', used_at=?, created_at='2020-01-02T00:00:00+00:00' WHERE user_id=(SELECT id FROM users WHERE email='stale@example.com')", (kt.now().isoformat(),))
+dbx("UPDATE org_joins SET created_at='2020-03-01T00:00:00+00:00' WHERE org_id=? AND user_id=(SELECT id FROM users WHERE email='stale@example.com')", (ORG,))
+check(St.post(B + f"/api/orgs/{ORG}/join").status_code == 404, "review: a link older than the invitation keeps it expired")
+Bo.delete(B + f"/api/orgs/{ORG}/invites/{next(x['ref'] for x in inv()['invites'] if x['email'] == 'stale@example.com')}")
+# declined: nothing is left that the boundary check would count once the person is in another organisation
+Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "other@example.com"})
+tok = link_of("other@example.com")
+Ot = sess()
+check(Ot.post(B + "/api/auth/invite/accept", json={"token": tok, "password": "password123"}).ok, "another new person sets a password")
+check(Ot.delete(B + f"/api/orgs/{ORG}/join").ok and not dbx("SELECT 1 FROM org_invites i JOIN users u ON u.id=i.user_id WHERE u.email='other@example.com'"), "declined: the invitation is gone")
+check(dbx("SELECT 1 FROM users WHERE email='other@example.com'"), "the person keeps the own account")
+check(not in_org("other@example.com"), "and joined nothing")
+# an instance admin still adds directly, the row of such an account is the old one
+r = A.post(B + f"/api/orgs/{ORG}/invites", json={"email": "direct@example.com", "role": "member"})
+check(r.ok and in_org("direct@example.com") and not dbx("SELECT 1 FROM org_joins WHERE org_id=?", (ORG,)), "the instance admin: a member at once " + r.text[:200])
+r = Bo.delete(B + f"/api/orgs/{ORG}/invites/{next(x['ref'] for x in inv()['invites'] if x['email'] == 'direct@example.com')}")
+check(r.ok and not dbx("SELECT 1 FROM users WHERE email='direct@example.com'"), "withdrawn as ever")
+# withdrawing a new account with invitations switched off: the account goes with the invitation
+Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "offnew@example.com", "role": "admin"})
+A.patch(B + "/api/admin/settings", json={"org_invites": False})
+iv = inv()["invites"]
+check([x["email"] for x in iv] == ["offnew@example.com"], f"off: a new account's open invitation stays visible {iv}")
+check(Bo.delete(B + f"/api/orgs/{ORG}/invites/{iv[0]['ref']}").ok and not dbx("SELECT 1 FROM users WHERE email='offnew@example.com'"), "off: withdrawn, the account goes")
+A.patch(B + "/api/admin/settings", json={"org_invites": True})
 
 # expired: listed as expired, withdrawing works
 Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "erin@example.com"})

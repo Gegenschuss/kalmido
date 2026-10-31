@@ -9,7 +9,7 @@
  - the tool tools/kalmido_export_decrypt.py opens it with the recovery key (stdin and --key-file), checks the manifest;
    a wrong key, a shortened file and a flipped byte fail; several 1 MiB blocks
  - the office log notes the export; after 24 hours the archive is gone (state + the watchdog's clean-up after a restart)
- - without KALMIDO_SECRET_KEY the export is refused (409, enabled false)
+ - without KALMIDO_SECRET_KEY the export is a plain ZIP (enabled false, no 409; 2.362.2 #3099)
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY and the mode workspaces.
 tenant-matrix: org
 usage: p2420_c_api_test.py <datadir>"""
@@ -279,7 +279,7 @@ for _ in range(60):
     time.sleep(0.5)
 check(gone, "after 24 hours: the file is removed by the clean-up")
 
-# ---------------------------------------------------------------- without the server key: refused
+# ---------------------------------------------------------------- without the server key: a plain ZIP (2.362.2 #3099, details in p2362_2_export)
 start(with_key=False)
 s0 = requests.Session()
 s0.headers.update(H)
@@ -290,7 +290,7 @@ assert r.status_code == 201, r.text
 G = r.json()["id"]
 check(A.get(B + f"/api/orgs/{G}/export").json().get("enabled") is False, "without the server key: enabled false")
 r = A.post(B + f"/api/orgs/{G}/export")
-check(r.status_code == 409 and "KALMIDO_SECRET_KEY" in r.text and "SELF-HOSTING" in r.text, "without the server key: refused with a hint " + r.text[:200])
+check(r.status_code != 409 and r.json().get("state") == "running", "without the server key: the export starts (a plain ZIP, #3099) " + r.text[:200])
 
 shutil.rmtree(TMP, ignore_errors=True)
 print(f"p2420_c_api: {OKS[0]} ok, {len(FAILS)} failed")

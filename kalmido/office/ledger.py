@@ -413,6 +413,9 @@ def ofx_finalize(c, oid, uid, did):
              "texts": {k: {lang: v.get(lang) or ""} for k, v in (pack.get("texts") or {}).items() if isinstance(v, dict) and isinstance(v.get(lang) or "", str)}}
     from .catalog import pkc_origin  # 2.76.0 (#1023): which pack file exactly (built in or installed from a catalogue)
     tsnap["pack_sha256"], tsnap["pack_source"] = pkc_origin("country", tsnap["pack"])
+    if r["kind"] == "offer":  # 2.453.0 (#3816): the heading in the document's language, frozen (an industry pack may name its own)
+        from .docs import _offer_title
+        tsnap["offer_title"] = _offer_title(s, (pack.get("labels") or {}).get(lang) or {}, lang)
     from .terms import agb_freeze
     agb_freeze(c, oid, r)  # 2.113.2 (#2253): the terms of the document's language, before the stored PDF is written
     ts = iso(now_utc())

@@ -7,13 +7,17 @@ waits UMZ_KEEP_H hours and the watchdog removes it after that. The download is t
 
 ZIP layout (format "kalmido-account", v 1; admin/acctimport.py reads it):
     manifest.json      {format, v, kalmido_version, created_at, source: {url, hosted}, user: {id, name, email},
-                        tables: {name: rows}, files: [{path, size, sha256}], client_encrypted: {...}, export_id, not_included}
+                        tables: {name: rows}, files: [{path, size, sha256}], client_encrypted: {...}, export_id, not_included,
+                        personal_office: {rows, files} (2.362.2 #3099, only with one)}
     data/<table>.json  one JSON array per table: the tables of GET /api/export.json (accounts/settings.py
                         umz_export_queries) plus list tags, the lists shared with me (a reference only) with my own comments
                         there, what I wrote or got elsewhere (umz_mine_queries: comments, channel messages, tasks of other
                         lists, reactions, News, devices), the people of my lists (for the mapping on import; other people's
                         e-mail addresses only as email_hash, see umz_email_hash) and the server accounts (no token)
-    files/...          attachments of the tasks and project files of the lists (decrypted: oc_read_file), my profile picture
+    files/...          attachments of the tasks and project files of the lists (decrypted: oc_read_file), my profile picture;
+                        2.362.2 (#3099): the files of my knowledge pages and tables
+    personal-office/   2.362.2 (#3099): my personal office, readable, the same parts as its own export (orgexport.ox_pb_parts);
+                        the import names it as staying behind, its own export takes it to another server
     checksum.sha256    "sha256  path" lines (sha256sum -c): manifest.json and every file of the manifest
 
 Never in the file: passwords, session tokens, token hashes, two-factor data, push addresses and keys (only device, browser and
@@ -47,9 +51,9 @@ from ..core.access import Denied, acx_lists_sql, acx_of
 from ..accounts.orgout import oo_exported  # 2.362.3 (#3101)
 from ..accounts.pictures import avatar_path
 from ..accounts.session import me
-from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _jdef, _safe_part, _under
+from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _Man, _jdef, _safe_part, _under, ox_pb_parts
 from .offsite import stepup_download  # 2.360.0 A (#2496): the step-up before the download
-from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import OrgCryptError, oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
 from ..life.model import jr_open  # 2.306.0 A (#2885)
 
@@ -62,6 +66,7 @@ UMZ_FORMAT = "kalmido-account"
 UMZ_V = 1
 UMZ_SUFFIX = ".zip"
 UMZ_SPACE_SPARE = 64 * 1024 * 1024  # free disk space kept on top of the expected size
+UMZ_OFFICE_DIR = "personal-office/"  # 2.362.2 (#3099)
 UMZ_NOT_INCLUDED = (
     # 2.239.0 A (#2882): sessions and push devices are in the file without their secrets
     N_("passwords, session tokens, API tokens (only their names), two-factor data, push addresses and keys, webhook secrets and addresses"),
@@ -72,12 +77,13 @@ UMZ_NOT_INCLUDED = (
     N_("organisation data that is not yours (use the organisation export for a whole organisation)"),
     N_("the receipt files of household budgets (their entries are included)"),  # 2.72.0 (#1333)
     # 2.148.1 C (#2494): what is not in the file either (the manifest names it honestly)
-    N_("older versions of your private files (the current one is in the file), files of knowledge pages and tables"),  # 2.360.2 D (#2561)
+    N_("older versions of your private files (the current one is in the file)"),  # 2.360.2 D (#2561); 2.362.2 (#3099): + the files of knowledge pages and tables
     N_("messages and comments of other people in direct messages, channels and lists (only what you wrote yourself)"),  # 2.239.0 A (#2882)
     # 2.239.0 A (#2882): tasks of lists you no longer see; what you wrote inside an organisation you left stays with it
     N_("tasks of lists you can no longer see, and your comments and messages inside an organisation you left"),
     N_("the network addresses of people who booked with you and the e-mail addresses of people who voted in your polls"),  # 2.360.2 D (#2561)
-    N_("the organisation's office (documents, receipts, cash book) and organisation knowledge pages: the organisation export"),
+    # 2.362.2 (#3099): the personal office is in the file; this line is about organisations only
+    N_("the office (documents, receipts, cash book) and knowledge pages of an organisation: the organisation export"),
 )
 
 # 2.278.0 C (#3091): what the manifest says about browser-encrypted content (only what the import really does)
@@ -329,6 +335,8 @@ def umz_extra_queries(uid):
                           "AND org_id IS NULL AND deleted_at IS NULL ORDER BY id", (uid,)),
         "wiki_pages": ("SELECT id, org_id, owner_id, path, body, attrs, created_at, updated_at FROM wiki_pages WHERE owner_id=? "
                        "AND org_id IS NULL AND deleted_at IS NULL ORDER BY id", (uid,)),
+        "wiki_files": ("SELECT id, page_id, name, mime, size, created_at FROM wiki_files WHERE owner_id=? AND org_id IS NULL "  # 2.362.2 (#3099)
+                       "AND deleted_at IS NULL ORDER BY id", (uid,)),
         "agent_chats": ("SELECT id, agent_id, sender, body, task_id, created_at FROM agent_chat WHERE user_id=? ORDER BY id", (uid,)),
         "agent_chat_prefs": ("SELECT agent_id, prefs, updated_at FROM agent_chat_prefs WHERE user_id=? ORDER BY agent_id", (uid,)),  # 2.233.0 A (#2848)
         "direct_messages": ("SELECT m.id, m.room_id, m.body, m.enc, m.created_at, m.edited_at FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id "
@@ -455,6 +463,48 @@ def umz_att_name(kind, rid, name):
     return f"files/{kind}/{int(rid)}-{_safe_part(name)}"
 
 
+def umz_read(c, full, area, rid, name, locked):
+    """2.362.2 (#3099, review): the bytes of one file; one that does not open (a lost key, a damaged file) is named in
+    locked_files and never stops the export. -> bytes or None."""
+    try:
+        return oc_read_file(c, full)
+    except (OSError, OrgCryptError) as e:
+        print(f"account export: {area} file not readable: {type(e).__name__}", flush=True)
+        locked.append({"area": area, "id": rid, "name": name or "", "signature": "", "unreadable": True})
+        return None
+
+
+def umz_put_page_files(c, zf, out, uid, files, inf, locked):
+    """2.362.2 (#3099): the files of my private knowledge pages and tables (the rows name them under "file")."""
+    for kind, table, sql in (("wiki", "wiki_files", "SELECT id, name, path FROM wiki_files WHERE owner_id=? AND org_id IS NULL AND deleted_at IS NULL ORDER BY id"),
+                             ("sheet", "sheet_files", """SELECT id, name, path FROM sheet_files WHERE deleted_at IS NULL AND sheet_id IN
+                                                         (SELECT id FROM sheets WHERE org_id IS NULL AND owner_id=?) ORDER BY id""")):
+        for r in c.execute(sql, (uid,)).fetchall():
+            full = _under(ATT_DIR, r["path"])
+            sig = inf.get((kind, int(r["id"]), 0))
+            if sig is not None:
+                locked.append({"area": table, "id": r["id"], "name": r["name"] or "", "signature": sig})
+            elif full:
+                data = umz_read(c, full, table, r["id"], r["name"], locked)
+                if data is not None:
+                    files[(table, r["id"])] = umz_att_name(table, r["id"], r["name"])
+                    _put(zf, out, files[(table, r["id"])], data)
+
+
+def umz_office(c, zf, out, uid, have, locked):
+    """2.362.2 (#3099): my personal office into the file (the art. 20 copy no longer needs a second, hidden export) ->
+    {rows, files} or None. Every query of orgexport names the office, so the system context reads nothing else."""
+    with system_ctx(c):
+        r = c.execute("SELECT id FROM orgs WHERE personal_of=?", (uid,)).fetchone()
+        if not r:
+            return None
+        man = _Man()
+        ox_pb_parts(c, zf, man, r[0], uid, have, UMZ_OFFICE_DIR)
+    out.files += [{"path": p, "size": f["bytes"], "sha256": f["sha256"]} for p, f in man.files.items()]
+    locked += man.locked
+    return {"rows": sum(man.counts.values()), "files": sum(1 for p in man.files if p.startswith(UMZ_OFFICE_DIR + "files/"))}
+
+
 def umz_build(c, uid, stream, export_id):
     """Writes the ZIP of person uid into stream; returns the manifest."""
     from ..accounts.settings import umz_export_queries
@@ -495,8 +545,11 @@ def umz_build(c, uid, stream, export_id):
             if sig is not None:
                 locked.append({"area": "private_files", "id": r["id"], "name": r["name"] or "", "signature": sig})
                 continue
+            data = umz_read(c, full, "private_files", r["id"], r["name"], locked)  # 2.362.2 (#3099, review)
+            if data is None:
+                continue
             name = umz_att_name("private_files", r["id"], r["name"])
-            _put(zf, out, name, oc_read_file(c, full))
+            _put(zf, out, name, data)
             files[("private_files", r["id"])] = name
         avatar = ""  # 2.239.0 A (#2882): my own profile picture
         a = c.execute("SELECT avatar FROM users WHERE id=?", (uid,)).fetchone()
@@ -505,6 +558,7 @@ def umz_build(c, uid, stream, export_id):
             if full:
                 avatar = "files/avatar.jpg"
                 _put(zf, out, avatar, oc_read_file(c, full))
+        umz_put_page_files(c, zf, out, uid, files, inf, locked)  # 2.362.2 (#3099)
         for table, (sql, args) in q.items():
             def rows(table=table, sql=sql, args=args):
                 for r in c.execute(sql, args):
@@ -529,6 +583,7 @@ def umz_build(c, uid, stream, export_id):
         from ..life.budget import bud_export  # 2.72.0 (#1333): my budgets, decrypted like Settings > Export
         _put_rows(zf, out, "budgets", bud_export(c, uid))
         client_enc["locked_notes"] = out.tables.get("task_note_locks", 0)
+        office = umz_office(c, zf, out, uid, have, locked)  # 2.362.2 (#3099)
         manifest = {
             "format": UMZ_FORMAT, "v": UMZ_V, "kalmido_version": APP_VERSION, "created_at": iso(now_utc()),
             "source": {"url": PUBLIC_URL, "hosted": bool(hosted())},
@@ -539,6 +594,7 @@ def umz_build(c, uid, stream, export_id):
             "client_encrypted": {**client_enc, "keys": bool(out.tables.get("e2e_keys")), "note": UMZ_ENC_NOTE},  # 2.278.0 C (#3091)
             "export_id": export_id, "not_included": [tr(x, lg=lang(c, uid)) for x in UMZ_NOT_INCLUDED],  # 2.449.0 (#3768): in the person's language
             "locked_files": locked,  # 2.209.0 D (#1856)
+            **({"personal_office": office} if office else {}),
         }
         mb = json.dumps(manifest, ensure_ascii=False, indent=1, default=_jdef).encode()
         zi = zipfile.ZipInfo("manifest.json", date_time=time.localtime()[:6])
@@ -718,6 +774,8 @@ def umz_start():
         need += c.execute(f"SELECT COALESCE(SUM(size),0) FROM ({sql}) x", args).fetchone()[0] or 0
     need += c.execute("SELECT COALESCE(SUM(size),0) FROM fs_nodes WHERE owner_id=? AND org_id IS NULL AND kind='file' AND deleted_at IS NULL",  # 2.360.2 D (#2561)
                       (uid,)).fetchone()[0] or 0
+    need += c.execute("SELECT COALESCE(SUM(size),0) FROM wiki_files WHERE owner_id=? AND org_id IS NULL", (uid,)).fetchone()[0] or 0  # 2.362.2 (#3099)
+    need += c.execute("SELECT COALESCE(SUM(size),0) FROM sheet_files WHERE owner_id=? AND org_id IS NULL", (uid,)).fetchone()[0] or 0
     if not umz_space_ok(UMZ_DIR, need * 1.1):
         return err(tr("There is not enough space on the server for the export. Please ask the server admin."), 507)
     with _UMZ_LOCK:

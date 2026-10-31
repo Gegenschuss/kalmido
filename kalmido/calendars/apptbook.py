@@ -888,7 +888,10 @@ def apb_limit_note(c, uid, day):
     if not c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET day=excluded.day
                         WHERE mail_counts.day<>excluded.day RETURNING k""", (f"apbn:{uid}", day)).fetchone():
         return
+    from ..collab.news import notif_ok
     with system_ctx(c):  # the owner's own notice; the public page has no person signed in, the notice names no customer
+        if not notif_ok(c, uid, usettings(c, uid), "limits", "news"):  # 2.453.0 (#3781): can be switched off
+            return
         c.execute("INSERT INTO notifications(user_id,kind,task_id,list_id,actor_id,comment_id,data,created_at) VALUES(?,?,?,?,?,?,?,?)",
                   (uid, "apblimit", None, None, None, None, json.dumps({"limit": APB_MAIL_DAY}), iso(now_utc())))
 
