@@ -5,6 +5,133 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.457.0] - 2026-10-31
+
+Package 2.380.2 (Teil 2/6: Sammelpaket Büro, Einsatzplan, Listen und Kleinkram).
+### Changed
+- Settings moved from the bottom of the left bar into the Kalmido menu (the brand button at the top left: Settings, with "Update available" when there is one; the brand button shows a small dot then). Phones, small windows and child accounts keep their way (#3400).
+- The view "Workload & absences" is called "Einsatzplan" in German (sidebar, page title, settings, palette); the link #workload stays (#3407).
+- Office: "Preview (PDF)" of a draft opens the PDF right away (marked DRAFT); only downloading a draft still asks whether to finalise it (#3410).
+- Office PDFs: more space (about 18 mm, never less than 8 mm) between the last position and the totals - the totals move to the next page with the last position rather than sit closer; more room between the price and VAT columns (#3415). Stored PDFs of finalised documents stay as they are.
+### Fixed
+- Quick add: what the text says (!!!, !!, !, tomorrow, ~project) wins over a priority, date or project picked before with the buttons below the field, and the buttons show what will be saved; a button picked after typing still wins for that task (#3403).
+- Private no longer shows company projects in the roadmap, project status (with its "at risk" counter), the start page's "Active projects" and the archive; every view under Projects shows the lists of the chosen workspace ("All" shows everything). In a company the Einsatzplan shows that company's people (no organisation picker), in Private it is not offered (#3407).
+- Project page: the description (edit field and read view) fills its widget when the widget is made taller, and the field grows while typing instead of scrolling inside (#3399).
+
+Package 2.359.2 (Teil 2/4: Bündel Datenverlust beim Tippen/Offline + Sicherung (2.271 + 2.223.4)).
+### Fixed
+- Typed input is no longer lost when saving fails: quick entry, board, matrix, tag and shopping fields keep the text (and pasted images) until the task is saved and no longer send twice on a fast second Enter; the list dialog, the bell's custom selection, job messages and renaming in Files close only once saved ("Discard changes?" otherwise); settings, custom fields and the document editor keep a value whose save failed instead of jumping back (#3049)
+- Backups: restoring a backup on a server without an off-site target no longer brings the target and access data of the backup's server along - a production backup restored on a test server could upload there and thin out production's copies (#2892)
+- Backups: the server's own industry packs (`packs/industry/` in the data folder) are now part of every backup and come back with a restore; a pack the restore replaces is kept in `packs/industry.pre-restore-…` (#2895)
+- Windows: `update.ps1` backs up the PostgreSQL database into `data\backups\` before an update again, like `update.sh` (since 2.37 it made no copy); both update scripts keep the version of before in `.kalmido-version.prev` and name the way back at the end (#2897)
+### Changed
+- Self-hosting docs: what a backup holds and what it leaves out (server key, text cache, exports waiting for download, `.env`) (#2895)
+
+### Fixed
+- main: p241_ui knows the git author fields of the agent runtime (2.396 #3386)
+- main: p2440_d_ui follows 2.417 (#3559): the open area leads to its start page, the kept page stays for later
+
+Package 2.397 (Ansicht je Arbeitsbereich merken).
+### Changed
+- Switching the workspace (Private / an organisation) brings back exactly the view you left there: the open page (project, folder, document, office tab), the open task (only if it belongs to that workspace), the scroll position, the open sidebar groups and folders, and the area and filter choices of that workspace. Kept per device, it survives a reload and an app restart; phone and computer alike. "All workspaces" keeps no view of its own: switching to it keeps the page and adds the other workspaces' data, and nothing done there changes Private or the organisation. A first visit stays on the same page when the workspace has it, else the start. A link, notification or search into the other workspace wins and becomes that workspace's view (#3404).
+
+Package 2.358 (Bündel Wackel-Suiten vor Ablauf der Skip-Liste 08.11. + Test-Helfer (2.308-Reste, 2.302, 2.211, 2.319)).
+### Fixed
+- Settings > Notifications: undoing a switch no longer says "changed elsewhere, not undone" when the page reloaded between the change and the undo (#3302).
+- Office > Documents: switching the document kind while the list is still loading shows the list of the kind chosen last, not the old one (#3302).
+- Admin > Backups: the backup list no longer fails (error 500) while a running backup deletes old files by retention (#3279).
+### Changed
+- Tests: seven flaky suites fixed and taken off tests/skip.txt - backup, p2120_d_ui, sections_dnd_ui, p210_ui, p2141_a_ui, p2400_d_ui, p299_e_ui (#3279, #3249, #3282, #3302).
+- Tests: tests/ff.js counts the page's open requests and offers until() / idle() like tests/boot.js; ten Firefox / jsdom suites wait for the state instead of fixed sleeps (p260_ui 4:38 -> 1:54 min, p2160_a11y 6:47 -> 4:33 min) (#2782).
+- Tests: the local until() copies of 402 JS suites use the shared helper of tests/boot.js (at least 15 s instead of about 6 s by default) (#3286).
+- Tests: 14 of the last 15 Python suites with their own helpers use tests/kt.py (new sess options, a first-failure hook); pg_layer keeps its own (#2783).
+- Tests: p270_api holds over the night of the switch to winter time; run_all.sh KALMIDO_TEST_NOW_FORCE runs every group at a probe time (#2784).
+- Tests: run_all.sh with ONLY naming an unknown suite exits with an error instead of "ALL SUITES PASSED" (#3281).
+- Tests: tests/skip.txt and tests/selfstart.txt merge with tools/lines_merge.py - a line one side deleted stays deleted (git's union merge brought deleted lines back) (#3394).
+
+Package 2.362 (Teil 1/4: Bündel Export 1: Konto-/Org-Export vollständig (2.279 + Export-Funde)).
+### Added
+- Organisation export and import: the organisation's team chat channels (the open ones and the ones you are a member of) with their members, and the files and voice messages of the team chat; group conversations stay with their people and are named as not included (#3092)
+- Organisation export and import: the closed months of the logbook (also in the retention export), tasks and events made from filed e-mails, section templates, contacts on tasks and the newsletter's suppression list and consent log; booking pages are in the archive (not imported) (#3096)
+- Account export, `export.json` and the account import carry the project notes of your projects and your encrypted task notes; the move preview counts the project notes (#3090)
+### Changed
+- The organisation export's manifest names everything that stays out on purpose (notification channels, invitations, pictures, CalDAV data, groups, closed channels); a guard test keeps every table with an organisation or project column accounted for (#3096)
+### Fixed
+- Organisation import: a billed receipt whose invoice did not come along stays billed ("billed, the invoice did not come along" under Office > Bookkeeping) instead of open again, so it is never billed twice (#3131)
+- Encrypted task notes (and locked notes from an organisation import) open again after a move although their ids changed (#3090)
+- Deleting an account or an organisation no longer fails now and then with a server error while a document of it is still being read in the background (#3090)
+
+Package 2.380.2 (Teil 2/6: Sammelpaket Büro, Einsatzplan, Listen und Kleinkram).
+### Changed
+- Settings moved from the bottom of the left bar into the Kalmido menu (the brand button at the top left: Settings, with "Update available" when there is one; the brand button shows a small dot then). Phones, small windows and child accounts keep their way (#3400).
+- The view "Workload & absences" is called "Einsatzplan" in German (sidebar, page title, settings, palette); the link #workload stays (#3407).
+- Office: "Preview (PDF)" of a draft opens the PDF right away (marked DRAFT); only downloading a draft still asks whether to finalise it (#3410).
+- Office PDFs: more space (about 18 mm, never less than 8 mm) between the last position and the totals - the totals move to the next page with the last position rather than sit closer; more room between the price and VAT columns (#3415). Stored PDFs of finalised documents stay as they are.
+### Fixed
+- Quick add: what the text says (!!!, !!, !, tomorrow, ~project) wins over a priority, date or project picked before with the buttons below the field, and the buttons show what will be saved; a button picked after typing still wins for that task (#3403).
+- Private no longer shows company projects in the roadmap, project status (with its "at risk" counter), the start page's "Active projects" and the archive; every view under Projects shows the lists of the chosen workspace ("All" shows everything). In a company the Einsatzplan shows that company's people (no organisation picker), in Private it is not offered (#3407).
+- Project page: the description (edit field and read view) fills its widget when the widget is made taller, and the field grows while typing instead of scrolling inside (#3399).
+
+Package 2.410 (Bündel: Auswahlfeld als Stufen-Fortschrittsleiste anzeigen, Board: Verweilzeit je Karte mit Ampel, Teil 1/6: Sammelpaket Büro, Einsatzplan, ).
+### Added
+- Fields: a choice field can be marked "Ordered (stages)" in its field settings. Lists, board cards and the task panel then show the value as a small stage bar (filled = done, ring = current, grey = open) instead of the text; options can be special states in red or orange (e.g. "Parked", "Needs you"), shown in their colour on the stage they hold up. The task panel shows a wide bar with every stage's name and since when the current one is set; on a phone the rows show only the dots (#3514).
+- Board: every card shows how long it has been in its column ("12 min", "3 h", "2 d") in quiet grey. Column menu > "Time limits…" sets a yellow and a red limit per column (hours or days); above them the card's time turns yellow or red. A new or changed custom field value also remembers since when it is set (#3515).
+### Fixed
+- Projects: the "Budget h" sum counts each branch once. A task whose subtasks carry budgets counts their sum, not its own value as well, so the project header and the sum row under the column agree (before 140 h vs. 57 h). In the column, such a task shows its subtasks' sum in grey with "own value …" when its stored value differs (#3437).
+- View menu: "Show completed at the bottom" has its own icon (a tick with an arrow down) instead of the shopping cart, and list admins of a shared project see and set it too; the help texts name shopping lists only as one example (#3440).
+
+Package 2.381 (Test-Tempo: Container-Start sparen, Testuhr im Browser).
+
+### Changed
+- Tests/CI (#2712): the selfstart guard (tests/selfstart_test.py) follows a suite's start function (`def start()`, `function restart()`, `const fresh = () => …`, also `await fresh()`) and the NOSTART guard variants (plain lines before start.sh, a comment, a NOSTART variable set once); unsure cases stay out. tests/selfstart.txt regenerated: 945 instead of 603 suites start their own container, 886 of 1179 groups save the second container start. One snippet per pattern (and the ones that must stay out) in the guard's self test.
+- Tests/CI (#2853): `tests/stages.py --touched` (the Mac runner's `run --auto`, the train's check before it takes a package) always takes the static guards and the CI's script suites along: parity, pg_dialect, rls_static, tenant_coverage, freelancer_coverage, p2125_d_demo, launcher_parity, agent_docs_coverage, mcp, usage_hook; p2661_b_ui (WS_VIEWS) when a server or client file changed. New suite p2381_a_guards checks the list against tests/suites.py and ci.yml.
+- Tests (#2713): the test clock reaches Firefox too: with `now …` (KALMIDO_TEST_NOW) tests/ff.js adds a preload script that gives every page boot.js' shifted Date before the app's scripts (only "now" moves). New suite p2381_b_ffclock_ui (at `now wed 10:00`); the time-of-day sensitive groups p2102_a_ui, p2230_api, p2310_a_ui and p2450_d_ui run at the fixed test time.
+- Tests (#3543): p2283_ui waits up to 15 s for the task added in the quick add sheet (3 s were too short on a loaded runner).
+
+Package 2.380 (Sammelpaket Büro, Listen und Kleinkram - Rest).
+### Added
+- Task panel: every section (subtasks, files, tags, fields, time, comments ...) folds by its heading; the choice holds for all tasks on all devices, a folded heading shows a short summary ("2 open", "3 files", time red when over budget), "Fold / Unfold all sections" sits in the "..." menu (#3435).
+- Task panel: drag subtasks to reorder them (long press on a phone); the list shows the same order (#3436).
+- Chat: "Close the keyboard after sending" as a switch in the chat menu (agent chat: More; team chat: new More button on phones); with a hardware keyboard the cursor stays in the box (#3449).
+- Office > Settings > Functions: cash flow, figures, travel expenses, entertainment receipts and subscriptions can each be switched off; off = gone from the sidebar, nothing is deleted (#3411).
+- Events: switch "Guest list visible to guests" under the guests - on, the invitation names all external guests; off (default) only the recipient. Also via API, MCP and CalDAV (#3392).
+- Shared knowledge pages: "Show embedded pictures" in the share dialog (off by default) - guests and public links then see the file store pictures embedded in the page; other files stay hidden (#2356).
+- Moving an organisation takes its scheduling polls (options and votes, with a new link) and bookmarks (with pictures) along (#2398).
+- Inbound webhooks accept the token in the header `X-Kalmido-Hook-Token`, so it stays out of proxy logs; the old address with the token keeps working (#2289).
+- Agent setup checks every downloaded starter file against the checksum the server sends and stops on a mismatch (#3390).
+- Allowed internal hosts are set per service (calendars, address books, webhooks, mail, Git, newsletter, ntfy, Peppol, feeds, sign-on and more) under Settings > Administration > Advanced; the former single list was copied into every service (#3389).
+### Changed
+- Office sidebar: no "Show more" any more, every allowed point is shown (#3411).
+- Agent chat: coming back keeps your place; new answers start under a "New messages" line with the jump button instead of jumping to the bottom (#3381).
+- Personal webhooks no longer deliver events of organisation projects: new ones never, existing ones for 30 more days, then a news item; the webhook list shows which organisation is affected and lets its admins set it up as an organisation webhook (#3391).
+- Lists: the menu entry is "Attached tables"; the page says "Attached to <list>" with a link "All tables" and explains that tables stand on their own (#3465).
+- Agency projects no longer get a "Client" text field (the client belongs to the project). One way: empty "Client" fields of existing agency projects are removed at the first start; fields with a value stay (#3438).
+### Fixed
+- Invoice PDFs: the rights page names the document's own number ("Rechnung Nr." instead of "Angebot Nr.") (#3417).
+- List view: the column header row stays at the top while you scroll (#3416).
+- Dark design: the "Today is clear" line sits above the undo message instead of under it, its title may use two lines (#3331).
+- Offline: a change saved offline days ago no longer shows as a false conflict; a note no longer conflicts after coming back to the app; a refused offline picture can be downloaded from the conflicts dialog (#3387).
+
+Package 2.419 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- One type and spacing scale across the app: every text size now comes from the same eight steps (10, 11, 12, 13, 14, 16, 18, 20 px; larger display figures stay as they are), line heights are two values (body text and tight rows / headings), margins and gaps sit on the spacing scale, and hand-sized icons use the three icon sizes. Texts and icons move by at most about a pixel; on phones the page title is 18 px and the tab bar labels 11 px. A test keeps new styles on the scale (#3495).
+
+Package 2.420 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpaket Büro, Einsatzplan, Listen und Kleinkram).
+### Added
+- Office > Receipts: every receipt can be ticked as **Checked**, like the check mark in DATEV, with who ticked it and when. Tick it in the receipt sheet, or for several at once under Office > Receipts > All receipts ("Select", then "Mark as checked" / "Remove check", with undo). The list marks checked receipts and filters Checked / Not checked. The receipts CSV, the GoBD export and the DATEV booking batch carry the check (DATEV as additional information). Receipts of a locked month cannot be ticked or unticked; agents only read the check. Works in the personal office too (#3448).
+### Changed
+- All Kalmido e-mails share one look: invitations, password links, findability, appointment bookings, portal, event invitations, security, notification and daily mails come in the same card with the petrol button (no more violet buttons). Plain-text versions, subjects and links are unchanged (#3499).
+- Badges and counters use two sizes everywhere (small label, round chip) across office, agents, bookmarks and calendar; empty lists show a centred text in one size, a more compact one in side panels and popups (#3498).
+
+### Fixed
+- main: the fold chevron of the task panel has a 44 px hit area on touch again.
+
+### Fixed
+- main: the security suite reads past the start log of init_db (#3729), and p2437_l_start leaves tests/selfstart.txt because its start goes through kt.fresh, which the guard cannot follow.
+
+### Fixed
+- CI of 2.451.0: tag buttons in the task panel are 24 px targets, the fold button of a task section is a real 44 px target on touch, the long text field of a project no longer keeps an inner scroll bar, the checksums of the agent starter files are current again; tests follow the current app.
+
 ## [2.436.1] - 2026-10-31
 
 ### Fixed
@@ -9472,7 +9599,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.436.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.457.0...HEAD
+[2.457.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.457.0
 [2.436.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.436.1
 [2.436.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.436.0
 [2.430.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.430.1
