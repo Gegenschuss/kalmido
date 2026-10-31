@@ -311,7 +311,7 @@ def admin_agent_update(aid):
             pr = (pr or "").strip()[:200]
             cur = agent_row(c, aid)
             if pr:
-                c.execute("UPDATE agents SET status='paused', status_text=?, status_at=?, status_task=NULL WHERE user_id=?", (pr, iso(now_utc()), aid))
+                c.execute("UPDATE agents SET status='paused', status_text=?, status_key='', status_key_at='', status_at=?, status_task=NULL WHERE user_id=?", (pr, iso(now_utc()), aid))
             elif cur["status"] == "paused":
                 c.execute("UPDATE agents SET status='idle', status_text='', status_at=? WHERE user_id=?", (iso(now_utc()), aid))
         if "proposals" in b:  # 2.3.0: who may ask it for proposals
@@ -778,7 +778,7 @@ def my_agent_update(aid):
         pr = (pr or "").strip()[:200]
         cur = agent_row(c, aid)
         if pr:
-            c.execute("UPDATE agents SET status='paused', status_text=?, status_at=?, status_task=NULL WHERE user_id=?", (pr, iso(now_utc()), aid))
+            c.execute("UPDATE agents SET status='paused', status_text=?, status_key='', status_key_at='', status_at=?, status_task=NULL WHERE user_id=?", (pr, iso(now_utc()), aid))
         elif cur["status"] == "paused":
             c.execute("UPDATE agents SET status='idle', status_text='', status_at=? WHERE user_id=?", (iso(now_utc()), aid))
     if "enabled" in b:

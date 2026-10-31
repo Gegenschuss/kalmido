@@ -1336,7 +1336,8 @@ review section (default: the section named *Review*) and *Done only after approv
 PUT /api/v1/agent/status   {"status": "idle" | "working" | "waiting" | "error", "text": "short, max 200 chars",
                             "task_id": 51,
                             "model": "Opus 5.5", "permission_mode": "auto", "host_permission_mode": "auto",   (2.32.0, optional)
-                            "host": "studio-mac"}   (2.44.0, optional: the computer, kept on the token in use)
+                            "host": "studio-mac",   (2.44.0, optional: the computer, kept on the token in use)
+                            "text_key": "status_plan_limit", "text_at": "2026-11-02T08:00:00Z"}   (2.450.0, optional, see below)
 GET /api/v1/agent          -> {id, username, display_name, enabled, note, status, status_text, status_at, status_task,
                                job_tasks, jobs: {running, waiting}, webhook: {configured, enabled}, events_cursor,
                                online, last_poll_at, runtime (2.4.1), owner_id, org_id (2.28.0),
@@ -2512,7 +2513,15 @@ no, `KALMIDO_PERM_RELAY=0`: off), and each person's chat goes on in one conversa
 runs, a pause, a new day, a model change or *Reset now*, with a summary as context; `KALMIDO_SESSION_RESUME=0`: off); 429
 is tried again after 5 / 15 / 30 / 60 s, a run has a time limit (`KALMIDO_RUN_TIMEOUT`, default 3600 s) and two tries,
 events wait in a queue on disk and a lock stops a second runner on the same state folder. A server without steps, host info, plan usage or approval cards (before 2.32 / 2.33 / 2.35) is
-detected by its answer (404 / 400) and the feature is switched off once. Keys in the env file: `KALMIDO_EVENTS=1` (same
+detected by its answer (404 / 400) and the feature is switched off once. 2.450.0: everything the runner says itself (permission question, failed run, reminders, notices, the hint on an answer without
+a card) comes from one table by the agent's language (`lang` of `GET /api/v1/agent`: de, en, fr, es, it, nl, otherwise English),
+yes and no count in these languages, and so does the check for an answer that asks without a card. `KALMIDO_PERM_TEXT` and the
+other text variables override a text in every language. Its status texts also go out as `text_key` (`status_chat`,
+`status_event`, `status_no_command`, `status_run_failed`, `status_outside_hours`, `status_plan_limit`) with `text_at` (ISO, the
+time in the text): `GET` carries them as `status_key` / `status_key_at` and the app shows the text in the language of whoever
+looks. `text` is still required for anything to show and stays what an older app or an unknown key shows; a server before
+2.450.0 answers 400 and gets the status again without the key.
+Keys in the env file: `KALMIDO_EVENTS=1` (same
 as `--events`), `KALMIDO_PROMPT_FILE`, `KALMIDO_STATE_DIR` (event cursor, default `~/.cache/kalmido-agent`),
 `KALMIDO_PERMISSION_MODE`, `KALMIDO_PERM_RELAY`, `KALMIDO_PERM_TIMEOUT`, `KALMIDO_PERM_USER` (2.126.0: with the owner and
 `KALMIDO_OWNER_IDS` the only ones who answer permission questions; anyone else chatting gets the step denied; 2.312.0: a

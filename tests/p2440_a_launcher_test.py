@@ -151,7 +151,7 @@ ex = r2.prompt_extra(7, None)
 check(any("expired without an answer" in l and "Deploy 1.3" in l for l in ex), f"the next prompt says so: {ex}")
 check(not any("expired" in l for l in r2.prompt_extra(7, None)), "the note comes once")
 ev = {"event": "chat_choice", "data": {"message_id": int(mid), "approval": "approved", "user": {"id": 7}}}
-check(r2.groups([ev]) == [] and r2.api.posts[-1]["body"] == ar.APPROVAL_EXPIRED_PRESS, "a press on an expired card: an answer, no run")
+check(r2.groups([ev]) == [] and r2.api.posts[-1]["body"] == ar.say("approval_expired"), "a press on an expired card: an answer, no run")
 r2.approvals["77"] = {"uid": 7, "title": "Tag", "at": time.time()}
 e1 = {"event": "chat_choice", "data": {"message_id": 77, "approval": "approved", "user": {"id": 7}}}
 e2 = {"event": "chat_choice", "data": {"message_id": 77, "approval": "approved", "user": {"id": 7}, "via": "reaction"}}
@@ -230,7 +230,7 @@ r.perm_expire()
 check("950" in r.state.data["perm_expired"] and (7, "950", "expired") in r.api.withdrawn, "the question is closed as expired")
 n = len(r.api.posts)
 check(r.intercept([{"event": "chat_choice", "data": {"message_id": 950, "permission": True, "approval": "approved"}}]) == []
-      and r.api.posts[n:] and r.api.posts[-1]["body"] == ar.PERM_LATE, "a late answer: 'too late', no run")
+      and r.api.posts[n:] and r.api.posts[-1]["body"] == ar.say("perm_late"), "a late answer: 'too late', no run")
 ar.PERM_TIMEOUT_S = 540
 lock.release()
 cl = go(r, chat(9, "status"))

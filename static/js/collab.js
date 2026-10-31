@@ -688,7 +688,7 @@ function personCard(anchor, id) {
   const p = listPeople(l).find(x => x.user_id === id), a = agentById(id);
   const name = p?.name || a?.name || anchor.dataset.mname || personNameAny(id) || anchor.textContent.replace(/^@/, ''), meId = S.me?.id;
   const role = p ? roleLabel(p.role) : '', U = S.tl.users || {};
-  const st = a ? `<span class="mcst st-${esc(!a.enabled ? 'paused' : agentOffline(a) ? 'offline' : a.status || 'idle')}">${esc(agentSt(a))}${a.status_text ? ' · ' + esc(a.status_text) : ''}</span>` : '';
+  const st = a ? `<span class="mcst st-${esc(!a.enabled ? 'paused' : agentOffline(a) ? 'offline' : a.status || 'idle')}">${esc(agentSt(a))}${a.status_text ? ' · ' + esc(agentStTx(a)) : ''}</span>` : '';
   const mine = l ? openTasks().filter(x => x.list_id === l.id && x.assignee_id === id && x.id !== t?.id).sort(bySort) : [];
   const acts = [];
   if (a && a.enabled && typeof chatOpen === 'function') acts.push(['chat', 'comment', tr('Open chat')]);

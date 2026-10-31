@@ -15291,5 +15291,13 @@
   "This backup was encrypted with an earlier passphrase. Enter that passphrase to check, restore or download it.": "Questo backup è stato cifrato con una passphrase precedente. Inserisci quella passphrase per verificarlo, ripristinarlo o scaricarlo.",
   "Answer to": "Risposta a",
   "By list": "Per lista",
-  "Lists and projects": "Liste e progetti"
+  "Lists and projects": "Liste e progetti",
+  "Answering in the chat": "Risponde nella chat",
+  "Working on an event": "Lavora a un evento",
+  "The agent command cannot be started": "Il comando dell'agente non si avvia",
+  "The last run failed": "L'ultima esecuzione non è riuscita",
+  "Outside working hours": "Fuori dall'orario di lavoro",
+  "Outside working hours, back {0}": "Fuori dall'orario di lavoro, di ritorno {0}",
+  "Plan limit reached": "Limite del piano raggiunto",
+  "Plan limit reached, back at {0}": "Limite del piano raggiunto, di ritorno alle {0}"
 }

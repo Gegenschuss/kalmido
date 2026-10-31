@@ -887,6 +887,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         "parent_id": nul("integer", description="2.59.0 (#1827): the leading job of a part job (set by a chat answer with job_parent)")}}
     agent = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "status": {"type": "string", "enum": list(AGENT_STATUSES)},
                                               "status_text": {"type": "string"}, "status_task": nul("integer"),
+                                              "status_key": {"type": "string", "description": "2.450.0 (#3769): the key of a known status text, for the app to translate; \"\" = none"},
+                                              "status_key_at": {"type": "string", "description": "2.450.0 (#3769): the time in that text (ISO), \"\" = none"},
                                               "job_tasks": {"type": "array", "items": {"type": "integer"}}, "running": {"type": "integer"}, "waiting": {"type": "integer"},
                                               "enabled": {"type": "boolean"}}}
     msg = {"type": "object", "properties": {"id": {"type": "integer"}, "user_id": {"type": "integer"}, "from": {"type": "string", "enum": ["user", "agent"]},
@@ -1000,6 +1002,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         "/agent": {"get": op("The agent itself: status, jobs, event cursor (agent tokens only)", AG, ok(ref("Agent")) | errs("403"))},
         "/agent/status": {"put": op("Report the agent's status", AG, ok(ref("Agent")) | errs("400", "403"), scope=W, body={
             "type": "object", "required": ["status"], "properties": {"status": {"type": "string", "enum": list(AGENT_STATUSES)}, "text": {"type": "string"},
+                                                                  "text_key": {"type": "string", "maxLength": 40, "description": "2.450.0 (#3769): the key of a known status text; text stays the fallback"},
+                                                                  "text_at": {"type": "string", "description": "2.450.0 (#3769): the time in that text (ISO)"},
                                                                   "task_id": nul("integer"),
                                                                   # 2.32.0 (#1079)
                                                                   "model": {"type": "string", "maxLength": 80, "description": "2.32.0: the model the host really runs, "

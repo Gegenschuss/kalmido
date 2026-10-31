@@ -1098,6 +1098,7 @@ def agent_public(c, a, uid=None):
             "org_id": a["org_id"] if "org_id" in a.keys() else None, "owner_id": a["owner_id"] if "owner_id" in a.keys() else None,
             "avatar": avatar_url(c.execute("SELECT * FROM users WHERE id=?", (a["user_id"],)).fetchone()),
             "enabled": agent_active(a), "status": a["status"] or "idle", "status_text": a["status_text"] or "", "status_at": a["status_at"],
+            "status_key": (a["status_key"] or "") if a["status_text"] else "", "status_key_at": (a["status_key_at"] or "") if a["status_text"] else "",  # 2.450.0 (#3769)
             # 2.26.0 (#949): paused with a reason (the agent itself, its owner or an admin)
             "paused": a["status"] == "paused", "pause_reason": (a["status_text"] or "") if a["status"] == "paused" else "",
             # 2.0.2: the task it says it works on (only when the viewer may see it) + the tasks of its running jobs

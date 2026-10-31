@@ -15291,5 +15291,13 @@
   "This backup was encrypted with an earlier passphrase. Enter that passphrase to check, restore or download it.": "Deze back-up is versleuteld met een eerdere wachtzin. Voer die wachtzin in om hem te controleren, terug te zetten of te downloaden.",
   "Answer to": "Antwoord op",
   "By list": "Per lijst",
-  "Lists and projects": "Lijsten en projecten"
+  "Lists and projects": "Lijsten en projecten",
+  "Answering in the chat": "Antwoordt in de chat",
+  "Working on an event": "Werkt aan een gebeurtenis",
+  "The agent command cannot be started": "De agentopdracht kan niet worden gestart",
+  "The last run failed": "De laatste run is mislukt",
+  "Outside working hours": "Buiten werktijd",
+  "Outside working hours, back {0}": "Buiten werktijd, terug {0}",
+  "Plan limit reached": "Limiet van het abonnement bereikt",
+  "Plan limit reached, back at {0}": "Limiet van het abonnement bereikt, terug om {0}"
 }

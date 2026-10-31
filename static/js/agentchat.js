@@ -620,9 +620,9 @@ function chatStHtml(a) {
     : tr('working on {0}', `<button class="linkbtn chtask" data-act="open-id" data-id="${a.status_task}" title="${esc(taskById(a.status_task)?.title || '')}">#${a.status_task}</button>`);
   const cls = !a.enabled ? 'paused' : off ? 'offline' : a.limit_reached ? 'limit' : esc(a.status || 'idle');
   // 2.13.0 (#453 P11): the typing dots only once, in the line under the messages (#chat-typing); the header keeps the state
-  const pz = a.status === 'paused' && a.enabled, tail = a.status_text && a.enabled && !off && !(a.status === 'working' && a.status_task) ? (a.status === 'working' ? ': ' : ' · ') + a.status_text : '';
+  const pz = a.status === 'paused' && a.enabled, tail = a.status_text && a.enabled && !off && !(a.status === 'working' && a.status_task) ? (a.status === 'working' ? ': ' : ' · ') + agentStTx(a) : '';
   // 2.411.0 (#3529): one line that ends in "…" before the header buttons; the full text in the hint
-  const full = pz ? tr('does not answer right now: {0}', a.pause_reason || a.status_text || '') : tail ? agentSt(a) + tail : '';
+  const full = pz ? tr('does not answer right now: {0}', agentStTx(a) || a.pause_reason || '') : tail ? agentSt(a) + tail : '';
   return `<span class="chst st-${cls}${typing ? ' typing' : ''}" id="chat-st" role="status" aria-live="polite"><i class="adot st-${cls === 'limit' ? 'error' : cls}" aria-hidden="true"></i><span class="chstx"${full ? ` title="${esc(full)}"` : ''}>${pz ? esc(full) : st + esc(tail)}</span></span>`;  // 2.26.0 (#949); 2.30.0 (#1039): a task's status text shows in that task
 }
 // 2.29.0 (#1029): the permission mode badge (Auto / Ask) -- the owner (a team agent: an admin) switches it here; the agent's host
@@ -1484,7 +1484,7 @@ function agCardHtml(a, adm) {
   const u = (S.aiu.data?.agents || []).find(x => x.id === a.id), m = S.aiu.data?.cost && S.aiu.m === 'cost' ? 'cost' : 'tokens';
   const off = !a.enabled, st = off ? 'paused' : agentOffline(a) ? 'offline' : a.limit_reached || a.usage?.reached ? 'error' : a.status || 'idle';
   const facts = [off ? tr('paused') : agentSt(a), adm ? trn('{0} project', '{0} projects', (a.lists || []).length) : a.running || a.waiting ? [a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · ') : '', (pmk => pmk ? tr('Permissions: {0}', tr(AG_PMODES[pmk] || AG_PMODES[''])) : '')(a.permission_mode || a.runtime?.permission_mode)].filter(Boolean);  // 2.365.2 C (#2789): the mode, short (changed in Edit > Approvals)
-  const more = [a.status_text, adm && a.webhook ? tr('webhook') : adm ? tr('polling only') : '', a.last_event_at ? tr('last event {0}', relTime(a.last_event_at)) : '', a.note].filter(Boolean).join(' · ');
+  const more = [agentStTx(a), adm && a.webhook ? tr('webhook') : adm ? tr('polling only') : '', a.last_event_at ? tr('last event {0}', relTime(a.last_event_at)) : '', a.note].filter(Boolean).join(' · ');
   const wh = adm && a.webhook && (!a.webhook.enabled || (a.webhook.last && !a.webhook.last.ok)) ? `<small class="agwarn">${tr('webhook')} ${whState(a.webhook)}</small>` : '';
   const lim = a.usage?.reached || u?.limit_reached ? `<small class="agwarn aiulr">${ic('chart', 's')} ${a.usage ? aiuLimLine(a.usage) : esc(tr('limit reached'))}</small>` : '';
   const use = u && u.totals.d30.calls ? `<span class="agu" title="${esc(tr('Usage') + ': ' + tr('Today') + ' / ' + tr('7 days'))}"><small class="muted">${tr('Today')}</small> ${esc(aiuVal(u.totals.today, m))}<small class="muted">· ${tr('7 days')}</small> ${esc(aiuVal(u.totals.d7, m))}</span>` : '';

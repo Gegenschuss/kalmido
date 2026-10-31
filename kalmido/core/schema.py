@@ -2940,6 +2940,9 @@ MIGRATIONS = [
     ("lists", "icon", "ALTER TABLE lists ADD COLUMN icon TEXT"),
     # 2.0.2: the task an agent says it works on (PUT /api/v1/agent/status {task_id}) -> "Claude is writing ..." there
     ("agents", "status_task", "ALTER TABLE agents ADD COLUMN status_task BIGINT"),
+    # 2.450.0 (#3769): the key of a known status text (the app translates it) and the time in it; status_text stays the fallback
+    ("agents", "status_key", "ALTER TABLE agents ADD COLUMN status_key TEXT NOT NULL DEFAULT ''"),
+    ("agents", "status_key_at", "ALTER TABLE agents ADD COLUMN status_key_at TEXT NOT NULL DEFAULT ''"),
     # 2.0.5: rate limit of the "dismiss" pushes (close notifications handled on another device) per device
     ("push_subs", "dismiss_at", "ALTER TABLE push_subs ADD COLUMN dismiss_at DOUBLE PRECISION NOT NULL DEFAULT 0"),
     ("push_subs", "dismiss_day", "ALTER TABLE push_subs ADD COLUMN dismiss_day TEXT NOT NULL DEFAULT ''"),
