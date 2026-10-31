@@ -217,7 +217,9 @@ function bg_catsModal() {
     <div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`, async () => {}, '#bg-cnew');
   const redraw = async () => { await bg_load(); const w = $('.bgcwrap', md); if (w) w.innerHTML = listHtml(); };
   const patch = async (id, body, before, label) => {
-    await api('PATCH', `/api/budget/cats/${id}`, body);
+    const cur = cats().find(x => x.id === id);
+    try { const j = await rawFetch('PATCH', `/api/budget/cats/${id}`, cur?.updated_at ? {...body, expect_updated_at: cur.updated_at} : body); if (cur) cur.updated_at = j.updated_at; }  // 2.370.2 (#3088)
+    catch (x) { if (x.status === 409 && x.data?.category) { toast(tr('Changed in the meantime')); await redraw(); } throw x; }
     histAdd({label, undo: async () => { await api('PATCH', `/api/budget/cats/${id}`, before); bg_after(); }, redo: async () => { await api('PATCH', `/api/budget/cats/${id}`, body); bg_after(); }});
   };
   // 2.456.0 (#3837): a category to another place, by the arrows and by dragging: the changed places, ONE undo step

@@ -15,7 +15,6 @@ import hmac
 import html
 import json
 import secrets
-import threading
 from datetime import date, datetime, timedelta
 
 from flask import g, jsonify, redirect, request
@@ -30,7 +29,7 @@ from .model import office_role, pb_owner
 from .rights import NO_RIGHT, ofr_admin_or, ofr_allows
 from ..accounts.orgroles import OFFICE_READ
 from ..accounts.orgs import user_orgs
-from ..accounts.session import _accept_lang, me, _rate_blocked, _rate_fail, _token_hash, rate_ip
+from ..accounts.session import _accept_lang, gated_thread, me, _rate_blocked, _rate_fail, _token_hash, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..api.common import hit_budget, hit_limit
 from ..notify.alerts import aa_count
@@ -861,5 +860,5 @@ def sig_decide(token):
     if r["kind"] == "offer" and st == "accepted":
         qac_file(c, r)
     if push:
-        threading.Thread(target=push, daemon=True).start()
+        gated_thread(push)  # 2.370.2 (#2779)
     return redirect(SIG_PREFIX + token, 303)

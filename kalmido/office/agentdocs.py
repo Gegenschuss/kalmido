@@ -37,7 +37,7 @@ from .calc import dec, dstr, fmt_money, money
 from .model import office_on, office_role, office_rows, office_seed_texts, office_settings, pb_cl_sql, pb_owner, pb_personal, sr_public
 from .packs import office_features
 from .rights import LV, NO_RIGHT, office_can, ofr_admin_or, ofr_groups_of, ofr_rights
-from .invoices import ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
+from .invoices import ofi_ref, ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
 from .offerlink import OilExists, oil_agent_filter, oil_need_no_invoice  # 2.356.0 C (#3003)
 
 OFA_ITEM_KEYS = ("kind", "service_id", "text", "detail", "qty", "unit", "price", "discount")
@@ -595,9 +595,11 @@ def _notify(c, aid, uid, did, oid, what):
     return r["id"]
 
 
-def _draft_answer(c, aid, uid, oid, did, notify, what, code=201):
+def _draft_answer(c, aid, uid, oid, did, notify, what, code=201, kept=None):
     from .docs import doc_row
     out = {"doc": _doc_v1(c, oid, doc_row(c, oid, did))}
+    if kept is not None:  # 2.370.2 (#3088): positions the save left out that stay (billed receipts or time)
+        out["kept_ids"] = kept
     if notify:
         out["chat_message_id"] = _notify(c, aid, uid, did, oid, what)
     _log_doc(c, did)
@@ -687,18 +689,19 @@ def v1_office_offer_patch(did):
         c.execute(f"UPDATE office_docs SET {','.join(k + '=?' for k in f)} WHERE id=? AND org_id=?", [*f.values(), did, oid])
         if diff["after"]:
             ofx_log(c, oid, "update", doc_id=did, detail=diff)
+    kept = None
     if "items" in b:
         r = doc_row(c, oid, did)
         items, flags = ofa_items(c, oid, r, b["items"])
         old = doc_items(c, did, oid)
         ofa_match_ids(items, old)
         before = ofx_items_brief(old)
-        _put_items(c, oid, r, items, False, flags, keep=False if exp else "agent")  # 2.269.0 A (#3012): billed receipts' positions stay
+        kept = _put_items(c, oid, r, items, False, flags, keep=False if exp else "agent")  # 2.269.0 A (#3012): billed receipts' positions stay
         after = ofx_items_brief(doc_items(c, did, oid))
         if before != after:
             ofx_log(c, oid, "items", doc_id=did, detail={"before": before, "after": after})
     recalc(c, oid, did)
-    return _draft_answer(c, aid, uid, oid, did, notify, N_("Quotation draft"), 200)
+    return _draft_answer(c, aid, uid, oid, did, notify, N_("Quotation draft"), 200, kept)
 
 
 @app.post("/api/v1/office/offers/<int:did>/invoice")
@@ -790,11 +793,12 @@ def _pp_open_amount(c, oid, r):
 @app.post("/api/v1/office/payment-suggestions")
 @v1_view
 def v1_office_pp_post():
-    """{invoice_id, amount, date, reference?, confidence?: high|medium|low, note?} -> 201 the suggestion (open). An admin of
-    the area accepts it in the office (then it is booked as a payment) or rejects it."""
+    """{invoice_id, amount, date, reference?, confidence?: high|medium|low, note?, client_ref?} -> 201 the suggestion (open). An
+    admin of the area accepts it in the office (then it is booked as a payment) or rejects it. 2.370.2 (#3088): sent again
+    with the same client_ref = 200 the suggestion made the first time, whatever became of it."""
     from .docs import _date, doc_row
     from .ledger import ofx_locked
-    b = _json(("invoice_id", "amount", "date", "reference", "confidence", "note"))
+    b = _json(("invoice_id", "amount", "date", "reference", "confidence", "note", "client_ref"))
     c = db()
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="payment")
     did = _iid(b.get("invoice_id"), "invoice_id")
@@ -802,6 +806,12 @@ def v1_office_pp_post():
         raise BadInput(tr("Invalid value: {0}", "invoice_id"))
     write_lock(c, f"office_pay_{did}")  # 2.149.0 A (#2521): check and write in one go, like a person's payment (invoices.inv_pay_add)
     r = ofa_need_in_lists(c, aid, doc_row(c, oid, did))
+    cref = ofi_ref(b)  # 2.370.2 (#3088): before the checks (the invoice may be paid by now)
+    if cref:
+        write_lock(c, f"office-pp-ref-{aid}")
+        hit = c.execute("SELECT * FROM office_pay_props WHERE org_id=? AND agent_id=? AND client_ref=?", (oid, aid, cref)).fetchone()
+        if hit:
+            return jsonify({**_pp_public(c, hit), "exceeds_open": False}), 200
     if r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid", "draft"):
         raise Denied(409, tr("Payments go on finalised, open invoices only"))
     if r["trial"]:  # 2.144.10 B (#2576): no payment suggestions for trial invoices
@@ -823,8 +833,8 @@ def v1_office_pp_post():
     note = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", b.get("note") or "").strip()[:500] if isinstance(b.get("note"), str) else ""
     if c.execute("SELECT COUNT(*) FROM office_pay_props WHERE org_id=? AND state='open'", (oid,)).fetchone()[0] >= 200:
         raise Denied(409, tr("Too many open payment suggestions: let a person decide on them first"))
-    pid = insert_id(c, "INSERT INTO office_pay_props(org_id, doc_id, agent_id, requested_by, date, amount, reference, confidence, note, state, created_at) "
-                       "VALUES(?,?,?,?,?,?,?,?,?,'open',?)", (oid, did, aid, uid, d, float(money(amt)), ref, conf, note, iso(now_utc())))
+    pid = insert_id(c, "INSERT INTO office_pay_props(org_id, doc_id, agent_id, requested_by, date, amount, reference, confidence, note, state, created_at, client_ref) "
+                       "VALUES(?,?,?,?,?,?,?,?,?,'open',?,?)", (oid, did, aid, uid, d, float(money(amt)), ref, conf, note, iso(now_utc()), cref))
     _log_doc(c, did)
     bump(c)
     c.commit()
@@ -1030,6 +1040,7 @@ def ofa_spec(paths, schemas, op, ok, errs, ref, pid, q):
                    body={"type": "object", "required": ["invoice_id", "amount"], "properties": {
                        "invoice_id": {"type": "integer"}, "amount": {"type": "string", "description": "Decimal text, e.g. 1190.00"},
                        "date": {"type": "string", "format": "date"}, "reference": {"type": "string", "description": "The payment's reference text"},
-                       "confidence": {"type": "string", "enum": list(OFA_CONF)}, "note": {"type": "string"}, "requested_by": {"type": "integer"}}},
+                       "confidence": {"type": "string", "enum": list(OFA_CONF)}, "note": {"type": "string"}, "requested_by": {"type": "integer"},
+                       "client_ref": {"type": "string", "maxLength": 64, "description": "2.370.2: your own id of this request; sent again = 200 the suggestion made the first time"}}},
                    scope="office", desc="Kalmido has no bank access: you read the payment from what a person gave you. An admin accepts "
                                         "(then it is booked) or rejects it; you never book.")}

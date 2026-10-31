@@ -543,6 +543,11 @@ docker compose up -d kalmido
   names the folders) and you delete it by hand once you have checked it. A restore needs one server process
   (`KALMIDO_ROLE=all`, `KALMIDO_REPLICAS=1`): with separate web and worker processes it is refused, stop the others and
   start a single one for the restore.
+  2.370.2: *Backups* and an admin alert at the start name such folders, also the ones a hard stop in the middle of a
+  restore left behind; the next successful restore removes them unless they hold files the archive does not cover. The
+  attachments and office folders must not be mounts of their own (a restore swaps them by renaming, which cannot cross a
+  mount): such a restore is refused before anything changes, mount the data folder as a whole. While a restore runs,
+  the background queue and the pushes after a request wait; the off-site upload does not.
   2.359.2: also the own industry packs of the server (`packs/industry/` in the data folder, counted as `pack_files` in
   the manifest); a restore writes them back, keeps packs added since and moves a pack it replaces with other content to
   `packs/industry.pre-restore-…`. Not in a backup: the server key (`secret/`, see below), the backup folder itself, the

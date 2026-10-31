@@ -15455,5 +15455,7 @@
   "Mark as not delivered": "Markeren als niet bezorgd",
   "Mark as not delivered?": "Markeren als niet bezorgd?",
   "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Doe dit alleen nadat je bij de ontvanger of je provider hebt gecontroleerd dat de factuur niet is aangekomen. Daarna kun je hem opnieuw versturen.",
-  "Field values not taken over": "Veldwaarden niet overgenomen"
+  "Field values not taken over": "Veldwaarden niet overgenomen",
+  "The attachments or office folder is a mount of its own, so a restore cannot swap it. Nothing was changed. Mount the data folder as a whole, see SELF-HOSTING.md.": "De map met bijlagen of kantoorbestanden is een eigen mount, daardoor kan een herstel deze niet wisselen. Er is niets gewijzigd. Koppel de gegevensmap als geheel, zie SELF-HOSTING.md.",
+  "Folders from a restore are lying next to the data folder ({0}). After a hard stop the database and the files may not match: check them, a successful restore removes them.": "Naast de gegevensmap staan mappen van een herstel ({0}). Na een harde stop kloppen de database en de bestanden mogelijk niet: controleer ze, een geslaagd herstel ruimt ze op."
 }

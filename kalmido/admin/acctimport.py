@@ -107,7 +107,7 @@ UMZ_DROP = {
     "lists": {"is_inbox", "family", "agent_tidy", "agent_listen", "agent_members", "agent_peers", "agent_followup", "tidy_agent",
               "org_visibility", "org_edit", "git_folder_off", "icon"},
     "tasks": {"rotation", "approval", "fam", "tt_id", "nag_at", "wait_fired"},
-    "comments": {"mentions", "suggestion", "choices", "choice", "ext_name"},
+    "comments": {"mentions", "suggestion", "choices", "choice", "ext_name", "client_ref"},  # 2.370.2 (#3088): client_ref like the notes'
     "attachments": {"path", "enc_by"},
     "list_files": {"path"},
     "events": {"href"},

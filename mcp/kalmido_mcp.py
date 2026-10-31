@@ -283,7 +283,7 @@ def t_add_comment(api, a):
         b["suggestion"] = a["suggestion"]
     if a.get("reply_to"):  # 2.33.0 (#1076): answer one comment of the same task
         b["reply_to"] = int(a["reply_to"])
-    b.update(_pick(a, ("choices", "multi")))  # 2.41.0 (#1383): answer buttons under the comment
+    b.update(_pick(a, ("choices", "multi", "client_ref")))  # 2.41.0 (#1383): answer buttons under the comment; 2.370.2 (#3088)
     if a.get("portal"):  # 2.63.0 (#1513): a public answer the customer of a customer report sees
         b["portal"] = True
     return api.call("POST", f"/tasks/{int(a['task_id'])}/comments", body=b)
@@ -658,6 +658,7 @@ TOOLS = [
     ("add_comment", "Comment on a task (Markdown; mention people as <@user_id>). Optional structured tidy suggestion. reply_to (2.33.0): "
                     "the id of a comment of the same task you answer (its author is notified; the app shows a quote above yours).",
      _obj({"task_id": S_ID, "body": {"type": "string", "minLength": 1}, "suggestion": SUGGESTION, "reply_to": S_ID,
+           "client_ref": {"type": "string", "maxLength": 64, "description": "2.370.2: your own id of this comment; called again with it (after a timeout) = the comment made the first time"},
            "choices": {"type": "array", "maxItems": 8, "description": "2.41.0: answer buttons under the comment (suggestions for the person's "
                        "answer; a press is sent as the person's comment and reaches you as a comment event with answer). Only the newest "
                        "question of a task stays live", "items": {"type": "object", "properties": {
@@ -2032,7 +2033,7 @@ TOOLS += [
 _RB = {"requested_by": {"type": "integer", "minimum": 1, "description": "The person this is for (default: your owner; a team agent must name one who asked it, 2.223.2)"}}
 # 2.269.0 D (#3046): the agent's own id of a request that makes a draft; sent again with it = the draft made the first time (200)
 _CREF = {"client_ref": {"type": "string", "maxLength": 64, "description": "Optional: your own id of this request (e.g. a UUID); sent again with "
-                                                                          "the same value = the draft made the first time (200), never a second one"}}
+                                                                          "the same value = what was made the first time (200), never a second one"}}
 _OITEM = {"type": "object", "additionalProperties": False, "properties": {
     "kind": {"type": "string", "enum": ["service", "text", "heading"]}, "service_id": {"type": "integer", "description": "A service of the catalogue (title, unit, price taken over)"},
     "text": {"type": "string", "description": "Title (required without service_id)"}, "detail": {"type": "string"}, "qty": {"type": "number"},
@@ -2096,8 +2097,8 @@ TOOLS += [
                         "amount, date, reference, confidence high / medium / low, note = why this invoice. An admin books or rejects it; you never "
                         "book. Kalmido has no bank access. 2.149.0: above the invoice's open amount -> 409.",
      _obj({"invoice_id": S_ID, "amount": {"type": "string", "description": "Decimal text, e.g. 1190.00"}, "date": D, "reference": {"type": "string"},
-           "confidence": {"type": "string", "enum": ["high", "medium", "low"]}, "note": {"type": "string"}, **_RB}, ["invoice_id", "amount"]),
-     lambda api, a: api.call("POST", "/office/payment-suggestions", body=_pick(a, ("invoice_id", "amount", "date", "reference", "confidence", "note", "requested_by")))),
+           "confidence": {"type": "string", "enum": ["high", "medium", "low"]}, "note": {"type": "string"}, **_RB, **_CREF}, ["invoice_id", "amount"]),
+     lambda api, a: api.call("POST", "/office/payment-suggestions", body=_pick(a, ("invoice_id", "amount", "date", "reference", "confidence", "note", "requested_by", "client_ref")))),
     ("list_payment_suggestions", "2.51.0: your payment suggestions and what became of them (state open, accepted, rejected or all).",
      _obj({"state": {"type": "string", "enum": ["open", "accepted", "rejected", "all"]}, **_RB}),
      lambda api, a: api.call("GET", "/office/payment-suggestions", _pick(a, ("state", "requested_by")))),

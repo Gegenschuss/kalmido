@@ -301,6 +301,7 @@ VARS = (
     _v("KALMIDO_TEST_NOW_AT", "", "Test containers only: the real Unix second KALMIDO_TEST_NOW belongs to (app and worker share one shifted clock).", "test"),
     _v("KALMIDO_TEST_MODE", "0", "Test containers only: allows the test switches of the organisation key tool (1); left alone in a server's .env it is ignored.", "test"),
     _v("KALMIDO_TEST_FSREF", "0", "Test containers only (with KALMIDO_TEST=1): registers the test kind 'probe' of the folder references (2.199.0, files/fsref.py).", "test"),
+    _v("KALMIDO_TEST_BK_OWN_MOUNT", "", "Test containers only (with KALMIDO_TEST=1): a restore treats the attachments folder as a mount of its own (2.370.2, #2779).", "test"),
     _v("KALMIDO_TEST_BK_ZIP_DELAY", "", "Test containers only (with KALMIDO_TEST=1): seconds the backup waits after its ZIP (2.281.0, #3118).", "test"),
     _v("KALMIDO_TEST_UMZ_END_DELAY", "", "Test containers only (with KALMIDO_TEST=1): seconds an account or wiki import's worker waits before it ends (2.308.0, #3261; 2.363.0, #3280).", "test"),
     _v("KALMIDO_TEST_BK_IDLE_TX_MS", "", "Test containers only (with KALMIDO_TEST=1): idle-in-transaction limit of the backup's connection (2.281.0, #3118).", "test"),

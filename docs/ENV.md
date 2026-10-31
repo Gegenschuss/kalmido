@@ -328,6 +328,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_SHEET_RANGE_BUDGET` | `15000000` | Tests: range cells one evaluation of a table may read (2.148.1). |
 | `KALMIDO_TEST` | `0` | Switch: marks a test container (set by tests/start.sh); only then KALMIDO_TEST_NOW and KALMIDO_TEST_RATE_WINDOW_S work. Never on a real server. |
 | `KALMIDO_TEST_BK_IDLE_TX_MS` | `(empty)` | Test containers only (with KALMIDO_TEST=1): idle-in-transaction limit of the backup's connection (2.281.0, #3118). |
+| `KALMIDO_TEST_BK_OWN_MOUNT` | `(empty)` | Test containers only (with KALMIDO_TEST=1): a restore treats the attachments folder as a mount of its own (2.370.2, #2779). |
 | `KALMIDO_TEST_BK_ZIP_DELAY` | `(empty)` | Test containers only (with KALMIDO_TEST=1): seconds the backup waits after its ZIP (2.281.0, #3118). |
 | `KALMIDO_TEST_DUN_TICKS` | `10` | Test containers only (with KALMIDO_TEST=1): watchdog intervals between two runs of the payment reminder suggestions (2.192.0). |
 | `KALMIDO_TEST_FSREF` | `0` | Test containers only (with KALMIDO_TEST=1): registers the test kind 'probe' of the folder references (2.199.0, files/fsref.py). |

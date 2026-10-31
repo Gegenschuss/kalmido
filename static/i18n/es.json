@@ -15455,5 +15455,7 @@
   "Mark as not delivered": "Marcar como no entregado",
   "Mark as not delivered?": "¿Marcar como no entregado?",
   "Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.": "Hazlo solo después de comprobar con el destinatario o tu proveedor que la factura no llegó. Después podrás enviarla de nuevo.",
-  "Field values not taken over": "Valores de campo no transferidos"
+  "Field values not taken over": "Valores de campo no transferidos",
+  "The attachments or office folder is a mount of its own, so a restore cannot swap it. Nothing was changed. Mount the data folder as a whole, see SELF-HOSTING.md.": "La carpeta de adjuntos u oficina es un punto de montaje propio, por lo que una restauración no puede intercambiarla. No se ha cambiado nada. Monta la carpeta de datos completa, consulta SELF-HOSTING.md.",
+  "Folders from a restore are lying next to the data folder ({0}). After a hard stop the database and the files may not match: check them, a successful restore removes them.": "Junto a la carpeta de datos hay carpetas de una restauración ({0}). Tras una parada brusca, la base de datos y los archivos pueden no coincidir: revísalos, una restauración correcta los elimina."
 }

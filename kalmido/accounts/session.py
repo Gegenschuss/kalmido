@@ -184,20 +184,33 @@ class _Gate:
         self.cond = threading.Condition()
         self.active = 0
         self.maint = False
+        self.held = threading.local()  # 2.370.2 (#2779): how often this thread is inside (going in again never waits for itself)
 
     def enter(self, block):
         with self.cond:
-            if self.maint:
+            if self.maint and getattr(self.held, "n", 0) <= 0:
                 if not block:
                     return False
                 self.cond.wait_for(lambda: not self.maint)
             self.active += 1
+            self.held.n = getattr(self.held, "n", 0) + 1
             return True
 
     def leave(self):
         with self.cond:
             self.active -= 1
+            self.held.n = max(0, getattr(self.held, "n", 0) - 1)
             self.cond.notify_all()
+
+    @contextlib.contextmanager
+    def work(self):
+        """2.370.2 (#2779): work outside a request (a queue row, the pushes after a request): waits while a restore runs, and
+        a restore waits for it (bk_restore: GATE.begin). Unlike bg() it never waits for a loop's turn or a key rotation."""
+        self.enter(True)
+        try:
+            yield
+        finally:
+            self.leave()
 
     @contextlib.contextmanager
     def bg(self):
@@ -230,6 +243,14 @@ class _Gate:
 
 
 GATE = _Gate()
+
+
+def gated_thread(fn):
+    """2.370.2 (#2779): the pushes after a request in a thread of their own, through the maintenance gate."""
+    def run():
+        with GATE.work():
+            fn()
+    threading.Thread(target=run, daemon=True).start()
 
 
 def _accept_lang(default="en"):

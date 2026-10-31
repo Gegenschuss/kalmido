@@ -6,7 +6,7 @@ devices and figures only.
  - depreciation: the suggested useful life by category, linear by the month (the years add up to the price), low-value
    assets (<= 800 net) in full in the purchase year, an own useful life; book value; the current value = book value unless
    an own value is set; new value = purchase price unless set
- - the insurance list: sums, CSV (semicolon, decimal comma, no formula injection), PDF, filtered by policy (#1925)
+ - the insurance list: sums, CSV (comma and decimal point in English, #2984; no formula injection), PDF, filtered by policy (#1925)
  - "take from receipt": a document of the office's document space proposes date, gross / net and vendor; a document of
    another organisation or a private one is 404 (and refused as the receipt of a device)
  - rights: a member never gets prices / values (list, row, export) and gets 403 on the value routes; another organisation
@@ -229,12 +229,12 @@ A.patch(B + f"{E}/{OLD}", json={"archived": 1})
 check(OLD not in [x["id"] for x in A.get(B + E + "/value").json()["rows"]], "an archived device leaves the insurance list")
 r = A.get(B + E + "/value.csv")
 check(r.ok and r.headers["Content-Type"].startswith("text/csv") and "attachment" in r.headers.get("Content-Disposition", ""), "CSV download")
-rows_ = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=";"))
+rows_ = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=","))
 check(rows_[0][:3] == ["Device", "Category", "Serial number"], f"CSV header {rows_[0]}")
 cam_row = next((x for x in rows_ if x and x[0] == "Kamera Alpha"), None)
-check(cam_row is not None and cam_row[2] == "SN-0815" and cam_row[5] == "2600,00" and cam_row[6] == "999,00", f"CSV row with decimal comma {cam_row}")
+check(cam_row is not None and cam_row[2] == "SN-0815" and cam_row[5] == "2600.00" and cam_row[6] == "999.00", f"CSV row with decimal point {cam_row}")
 check(any(x and x[0] == "'=SUM(1;2)" for x in rows_), "CSV: a formula is defused")
-check(rows_[-2][0] == "Total" and rows_[-2][5] == f"{exp_new:.2f}".replace(".", ","), f"CSV total {rows_[-2]}")
+check(rows_[-2][0] == "Total" and rows_[-2][5] == f"{exp_new:.2f}", f"CSV total {rows_[-2]}")
 r = A.get(B + E + "/value.pdf")
 check(r.ok and r.content[:5] == b"%PDF-" and r.headers["Content-Type"] == "application/pdf", "PDF download")
 check(A.get(B + E + "/value?agreement_id=x").status_code == 400, "an invalid filter is 400")
