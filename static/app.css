@@ -8665,7 +8665,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #app:not(.side-rail) #srail .srb.srpanel{display:none}
 #pop .menu-list:has(.kbwsi){max-width:17rem}
 #pop .kbwsi .ml{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#srail .srb.on{color:color-mix(in srgb,var(--accent) 78%,var(--text))}  /* the open tile's word keeps 4.5:1 on its tint (light and dark) */
+#srail .srb.on,#side .sbmr .srb.on{color:color-mix(in srgb,var(--accent) 78%,var(--text))}  /* the open tile's word keeps 4.5:1 on its tint (light and dark), in the phone's drawer too */
 /* 2.196.0 A (#2737): the phone's drawer like sidebar B (only drawn on phones): search, Today, Inbox and the row of the areas
    on top (.sbfix, scrolls along since 2.442.0 #3739, only the search stays), Settings + the account fixed at the bottom (.sbmdock) */
 #side .sbmtop{margin-top:.5rem}
