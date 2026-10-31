@@ -298,7 +298,7 @@ body:is(.prbg-soft,.prbg-strong) .trow:is(.pr5,.pr3,.pr1):not(.sel):not(.msel):n
 .subadd input{flex:1;background:transparent;border:0;padding:.1875rem 0}
 .tagedit{display:flex;flex-wrap:wrap;gap:.375rem;align-items:center}
 .tagpill{display:inline-flex;align-items:center;gap:.25rem;padding:1px .25rem 1px .4375rem;border-radius:var(--r-s);border:1px solid var(--line2);color:var(--text2);font:var(--fs-s) var(--mono)}
-.tagpill button{color:inherit;opacity:.7;display:inline-flex}
+.tagpill button{color:inherit;opacity:.7;display:inline-flex;align-items:center;justify-content:center;min-width:1.5rem;min-height:1.5rem;margin:-.25rem 0}
 .tagedit input{background:transparent;border:0;padding:.25rem 2px;width:7.5rem;font-family:var(--mono);font-size:var(--fs-s)}
 .dfoot{display:flex;align-items:center;gap:.25rem;padding:.5rem .75rem;border-top:1px solid var(--line);color:var(--muted);font:var(--fs-xs) var(--mono);position:sticky;bottom:0;background:var(--bg2)}
 .fields{display:grid;grid-template-columns:auto 1fr;gap:.5rem .875rem;align-items:center;font-size:var(--fs-m)}
@@ -4951,7 +4951,7 @@ button.lkchip:hover{border-color:var(--accent)}
 /* 2.380 F (#3435): a section of the task panel folds by its heading (detail.js dfWrap); folded = the heading and its short line */
 .dfold>h5{display:flex;align-items:center;gap:.25rem;cursor:pointer}
 .dfold>h5 .dfbtn{width:1.5rem;height:1.5rem;min-width:0;margin-left:-.375rem;flex:none}
-@media (pointer:coarse){ .dfold>h5 .dfbtn{position:relative} .dfold>h5 .dfbtn::before{content:"";position:absolute;inset:calc(50% - 1.375rem)} }  /* #3506 main red, p260_ui: the small chevron keeps its look, a 44 px hit area on touch */
+@media (pointer:coarse){ .dfold>h5 .dfbtn{width:2.75rem;height:2.75rem;margin:0 -.625rem 0 -1rem;justify-content:center} }  /* #3506 main red, p260_ui + p2210_ui: the chevron and the heading stay where they are, the button itself is 44 px on touch */
 .dfold>h5 .dfbtn .fcar{width:.75rem;height:.75rem;transition:transform .15s}
 .dfold.dfolded>h5 .dfbtn .fcar{transform:rotate(-90deg)}
 .dfold.dfolded>:not(h5){display:none}
@@ -7207,7 +7207,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .nwl-imp-sum { margin: .375rem 0; }
 .nwl-imp-err { list-style: none; margin: .25rem 0; padding: 0; max-height: 10rem; overflow: auto; font-size: var(--fs-b); }
 .nwl-imp-err li { padding: .125rem 0; }
-.nwl-tag{font-size:var(--fs-xs);min-height:1.125rem;box-sizing:border-box;padding:0 .45rem;border-radius:var(--r-s);border:1px solid var(--accent);color:var(--accent)}
+.nwl-tag{font-size:var(--fs-xs);min-height:1.125rem;box-sizing:border-box;padding:0 .4375rem;border-radius:var(--r-s);border:1px solid var(--accent);color:var(--accent)}
 .nwl-segs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .375rem; }
 .nwl-segs li { display: flex; align-items: center; gap: .375rem; padding: .5rem .625rem; border: 1px solid var(--line); border-radius: .625rem; min-height: 2.75rem; }
 .nwl-sn { flex: 1; min-width: 0; }

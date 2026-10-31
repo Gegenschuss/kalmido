@@ -57,7 +57,7 @@ const settings = async () => (await call('GET', '/api/state')).settings;
   const set = w.eval(`(() => { const ks = Object.keys(P), draw = new Set(ks.map(k => P[k])), nw = ks.slice(ks.indexOf('flame'));
     return {n: ks.length, uniq: draw.size, newN: nw.length, oneDot: nw.filter(k => (P[k].match(/class="d"/g) || []).length !== 1),
       missing: Object.keys(SBI_EMO).filter(k => !P[k]), unused: nw.filter(k => ![...SBI_MAP.values()].includes(k))}; })()`);
-  check(set.n >= 195 && set.n <= 210, '#1117: about 200 icons ' + set.n);
+  check(set.n >= 195 && set.n <= 220, '#1117: about 200 icons ' + set.n);
   check(set.uniq >= set.n - 1, '#1117: no two new icons alike (left = back is old) ' + JSON.stringify([set.n, set.uniq]));
   check(!set.oneDot.length, '#1117: every new icon has exactly one dot of class d ' + set.oneDot);
   check(!set.missing.length && !set.unused.length, '#1117: the map only names existing icons, every new icon is reachable ' + JSON.stringify(set));

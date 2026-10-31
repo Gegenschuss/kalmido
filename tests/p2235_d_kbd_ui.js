@@ -30,6 +30,7 @@ const TOUCH = {'(hover: none)': true}, DESK = {'(hover:hover) and (pointer:fine)
     const w = await boot({user: 'alice', hash: opts.mobile ? 'agents/' + A1 : 'today', ...opts}), d = w.document;
     await until(() => w.eval('S.booted && (S.agents || []).length >= 1'));
     if (!opts.mobile) w.eval(`chatOpen(${A1})`);
+    if (opts.mobile) w.eval('kbReal = () => true');  // 2.380 E (#3449): jsdom has no visual viewport, here the on-screen keyboard is open
     await until(() => d.querySelector('#chat-in'));
     const ta = d.querySelector('#chat-in'); ta.focus(); ta.value = text;
     const n = w.eval('S.chat.msgs.length');

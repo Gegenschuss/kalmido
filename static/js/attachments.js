@@ -445,7 +445,7 @@ function mdCells(l) {
 function autosize(el) {
   if (!el) return;
   const sc = el.closest?.('.dbot') ? el.closest('#detail') : null, top = sc ? sc.scrollTop : 0;
-  el.style.height = 'auto'; if (el.scrollHeight) el.style.height = el.scrollHeight + 'px';
+  el.style.height = 'auto'; if (el.scrollHeight) el.style.height = el.scrollHeight + (el.offsetHeight - el.clientHeight) + 'px';  // the border counts: without it a long text keeps an inner scroll bar
   if (sc && sc.scrollTop !== top) sc.scrollTop = top;
 }
 // base: the value before the edit when the caller already changed the local copy (markdown checkbox)

@@ -287,6 +287,8 @@ const BASE = 'cal,comments,collab,time,progress,agents';
     if (vw === 390) {
       await ev(`(() => { location.hash = '#l/${P}'; return 1; })()`); await ready(ev, '#view .trow');
       await ev(`(() => { openDetail(${AP}); return 1; })()`); await ready(ev, '#detail .apbar');
+      // the fixed bottom bar covers whatever the scroll position leaves below it: the field is measured free of it
+      await ev(`(() => { document.querySelector('#d-sub')?.scrollIntoView({block: 'center'}); return 1; })()`); await sleep(200);
       await axe(ev, `${tag} approval bar`);
       await shot(`p2230-${vw}-${th}-approval.png`);
       await ev(`fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}).then(() => 1)`);
