@@ -51,7 +51,7 @@ const LONG = 'Großprojekt 1000';  // shorter since 2.408 (#3518): the count 2/3
       r.dispatchEvent(new MouseEvent('mouseover', {bubbles: true}));
       return {name: n.textContent, shk: !!r.querySelector('.shk svg'), cut: n.scrollWidth > n.clientWidth + 1, nw: Math.round(n.clientWidth), sw: n.scrollWidth, row: Math.round(rr.width),
         cRight: c && c.textContent ? Math.round(rr.right - R(c).right) : null, gap: Math.round(rr.right - Math.max(R(n).right, ...ends)), tip: r.title || n.title || ''}; }); })()`;
-  const RAIL = `[...document.querySelectorAll('#srail .srb .srbn')].filter(x => x.offsetParent).map(x => ({t: x.textContent, cut: x.scrollWidth > x.clientWidth + 1 || x.scrollHeight > x.clientHeight + 1, h: Math.round(x.getBoundingClientRect().height)}))`;
+  const RAIL = `[...document.querySelectorAll('#srail .srb .srbn')].filter(x => x.offsetParent).map(x => ({t: x.textContent, cut: !x.classList.contains('srcut') /* 2.458.0 (#3880): a word too wide ends in an ellipsis, it is never split */ && (x.scrollWidth > x.clientWidth + 1 || x.scrollHeight > x.clientHeight + 1), h: Math.round(x.getBoundingClientRect().height)}))`;
 
   await firefox(async o => {
     const {cmd, ev, ctx, nav, shot} = o;

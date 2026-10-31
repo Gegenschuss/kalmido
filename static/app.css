@@ -8521,6 +8521,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #srail .srfoot{margin-top:auto;padding-top:.5rem;align-items:stretch}
 .srb{position:relative;display:flex;flex-direction:column;align-items:center;gap:.1875rem;width:100%;padding:.4375rem .125rem .375rem;border-radius:var(--radius);color:var(--muted);font-size:var(--fs-xs);line-height:1.15;text-align:center}
 .srb .srbn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:normal;overflow-wrap:normal;hyphens:none;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}  /* 2.223.0 B (#2822): long names wrap to a second line */  /* 2.354.0 C (#3013): no hyphenation (it cut words with a hyphen sign) */
+#srail .srb{padding-inline:0}  /* 2.458.0 (#3880): the bar's width for the word */
 .srb .srbn.srcut{display:block;white-space:nowrap}  /* 2.458.0 (#3880): names break between words only; a word too long even in 9 px type ends in "…" (areas.js sbb_fit) */
 /* 2.319.0 B (#3288): Settings > Appearance "Show labels in the app bar" off: icons only, a narrower bar (detail.js srW), the name as title */
 :root.rail-nolabel{--srW:3.25rem}

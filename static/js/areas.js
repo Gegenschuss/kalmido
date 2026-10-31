@@ -480,7 +480,7 @@ function sbb_fit() {
   }
 }
 window.addEventListener('resize', () => requestAnimationFrame(sbb_fit));
-document.fonts?.ready.then(sbb_fit);
+document.fonts?.addEventListener('loadingdone', sbb_fit);
 // ---- 2.196.0 A (#2737): the phone's drawer like sidebar B. On top (fixed) search, Today, Inbox and ONE row of the area icons
 // (the bar's icons, order and rights; it scrolls sideways, never wraps), below the chosen area's panel, at the bottom Settings
 // and the account. An icon opens the page its area kept and the drawer stays open; the first change in an open drawer adds
