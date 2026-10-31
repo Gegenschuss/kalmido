@@ -264,17 +264,24 @@ function oim_sumHtml(items) {
 function oimArchiveListHtml(q) {
   if (!OIM.list) { setTimeout(oimLoadList, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const inv = oim_secKind() === 'invoice', paid = inv ? OIM.paid || '' : '';
-  const items = oim_secItems().filter(r => (!q || [r.number, r.client, r.client_name, r.project].some(v => (v || '').toLowerCase().includes(q))) && (!OIM.cl || String(r.client_id) === OIM.cl)
-    && (!paid || (paid === 'paid') === !!r.paid));
+  const items = lst_sorted(oim_secItems().filter(r => (!q || [r.number, r.client, r.client_name, r.project].some(v => (v || '').toLowerCase().includes(q))) && (!OIM.cl || String(r.client_id) === OIM.cl)
+    && (!paid || (paid === 'paid') === !!r.paid)), ofd_listKey('archive'), r => ({date: r.date, client: r.client || r.client_name, amount: r.amount, name: r.project || r.number || r.file_name}));  // 2.451.0 (#3834)
   const sum = oim_sumHtml(items);
   const imp = ofcAdmin() ? `<a class="btn sm" href="#office/import/archive">${ic('upload', 's')} ${tr('Import legacy data')}</a>` : '';
   const pf = inv && oim_secItems().length ? `<div class="seg oimpaid" role="group" aria-label="${esc(tr('Status'))}">${OIM_PAID.map(([v, n]) => `<button type="button" data-oim-paid="${v}" aria-pressed="${v === paid}" class="${v === paid ? 'on' : ''}">${tr(n)}</button>`).join('')}</div>` : '';
   const sum0 = r81b_clFilter(pf) + sum;  // 2.81.0 (#1834): the client filter above the list
   if (!items.length) return (OIM.cl || paid ? sum0 : '') + `<div class="empty nempty eact">${ic('archive')}<span>${q || OIM.cl || paid ? tr('Nothing matches.') : tr('No archived documents. Old invoices and quotations are added under Settings > Import legacy data.')}</span>${q ? '' : imp}</div>`;
   // 2.40.0 (#1366): the row shows the PDF in the browser, the button next to it downloads it
-  return sum0 + `<ul class="ofclist ofdlist oimarch" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener"${typeof pv_attr === 'function' ? pv_attr({url: `/api/office/legacy/archive/${r.id}/pdf`, name: (r.number || tr('Document')) + '.pdf', dlUrl: `/api/office/legacy/archive/${r.id}/pdf?download=1`}) : ''}>
+  return sum0 + `<ul class="ofclist ofdlist oimarch" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" data-arch="${r.id}" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener"${typeof pv_attr === 'function' ? pv_attr({url: `/api/office/legacy/archive/${r.id}/pdf`, name: (r.number || tr('Document')) + '.pdf', dlUrl: `/api/office/legacy/archive/${r.id}/pdf?download=1`, arch: isMobile() && !r.copy ? r.id : undefined /* 2.451.0 (#3834): the phone's way to Correct without a long press */}) : ''}>
     <span class="ofcn"><b>${esc(r.number || r.copy?.number || r.file_name)}${r.client || r.client_name ? ` · ${esc(r.client || r.client_name)}` : ''}</b><small class="muted">${esc([r.kind === 'offer' ? tr('Quotation') : tr('Invoice'), r.project, r.date ? fmtDateLoc(r.date) : ''].filter(Boolean).join(' · '))}</small></span>
     <span class="ofdsum"><b>${r.amount != null ? esc(ofcMoney(r.amount)) : ''}</b><small class="rotag">${ic('archive', 's')}${r.copy ? esc(oim_copyLabel(r.copy)) : tr('Archive|documents') + (r.kind === 'invoice' ? ' · ' + (r.paid ? tr('Paid') : tr('open')) : '')}</small></span>${ic('file', 's')}</a><a class="ib oimdl" href="/api/office/legacy/archive/${r.id}/pdf?download=1" download aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('download', 's')}</a>${r.copy ? '' : `<button type="button" class="ib oimdl" data-oim="arch-edit" data-id="${r.id}" aria-label="${esc(tr('Correct archived document'))}" title="${esc(tr('Correct archived document'))}">${ic('edit', 's')}</button>`}</li>`).join('')}</ul>` + `<div class="lacts">${imp}</div>`;
+}
+
+// 2.451.0 (#3834): the row menu (long press, right click): what the phone hides from the row
+function oim_rowMenu(id, row) {
+  const r = oim_secItems().find(x => String(x.id) === String(id)); if (!r) return;
+  menu(row, [{label: tr('Preview (PDF)'), icon: 'eye', fn: () => row.click()}, {label: tr('Download PDF'), icon: 'download', fn: () => row.closest('li').querySelector('a.oimdl').click()},
+    r.copy ? null : {label: tr('Correct archived document'), icon: 'edit', fn: () => r81b_archEdit(r.id)}].filter(Boolean));
 }
 
 // 2.97.0 C (#2049): a read-only copy taken along by a move between offices (office/officemove.py): view and PDF only

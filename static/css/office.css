@@ -12,6 +12,14 @@
 .ofdli>.ofdrow{flex:1;min-width:0}
 .ofdrmore{flex:none;width:2.75rem;min-height:2.75rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2);color:var(--muted);display:inline-flex;align-items:center;justify-content:center}
 .ofdrmore:hover,.ofdrmore:focus-visible{border-color:var(--accent);color:var(--text)}
+/* 2.451.0 (#3834): phones: no symbols in the row, it gets the full width; a long press opens the row menu. The buttons stay for screen readers (like .sr) */
+@media (max-width:767px){
+  li>.ofdrmore,.oimarch .oimdl{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}
+  .oimarch .ofcrow>svg:last-child,.oimarch .rotag svg{display:none}
+  .oimarch a.ofdrow{-webkit-touch-callout:none}
+  .lst-sortb span{display:none}
+  .lst-sortb{min-height:2.75rem}
+}
 .rklist>li{display:flex;align-items:stretch;gap:.25rem}.rklist>li>.ofcrow{flex:1;min-width:0}  /* 2.117.0 A (#2287): the arrow = the row menu */
 .rkbar .rkperson{max-width:12rem;text-overflow:ellipsis}  /* 2.117.0 A (#2291) */
 .rkplist{list-style:none;margin:0 0 .5rem;padding:0;display:flex;flex-direction:column;gap:.25rem}  /* 2.117.0 A (#2292): own purposes */

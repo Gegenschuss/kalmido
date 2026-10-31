@@ -270,6 +270,11 @@ const ofcChk = (id, label, on) => `<div class="row"><label class="chkl" style="m
 // 2.40.0 (#1381): the choice shows the text in the field's language (lg); a block without English text says so
 const ofcTextOpts = (kind, lg) => ofcRows('texts').filter(t => t.kind === kind && !t.archived).map(t => [t.id, (t.key ? t.key + ': ' : '') + (lg === 'en' ? (t.text_en ? t.text_en.slice(0, 70) : tr('(no English text)') + ' ' + (t.text_de || '').slice(0, 50)) : (t.text_de || t.text_en).slice(0, 70))]);
 function ofcModal(kind, r) {
+  // 2.451.0 (#3809): the service dialog waits for the roles: built before them its choice read "none" and Save wiped the role
+  if (kind === 'services' && !OFC.data.roles) {
+    if (!OFC.modalWait) { OFC.modalWait = true; (async () => { for (let i = 0; i < 60 && !OFC.data.roles; i++) { if (!OFC.loading.roles) ofcLoad('roles'); await sleep(150); } OFC.modalWait = false; if (!OFC.data.roles) OFC.data.roles = {error: tr('unknown')}; ofcModal(kind, r); })(); }
+    return;
+  }
   const adm = ofcAdmin(['roles', 'crew', 'sets'].includes(kind) ? 'equipment' : undefined), rate = v => v != null ? fmtNum(v, 2) : '';  // 2.187.1 A (#2735): roles / crew / sets = equipment area
   const titles = {services: [N_('New service'), N_('Edit service')], equipment: [N_('New device'), N_('Edit device')], sets: [N_('New set'), N_('Edit set')],
     texts: [N_('New text block'), N_('Edit text block')], contracts: [N_('New contract'), N_('Edit contract')],
@@ -360,7 +365,7 @@ function ofcModal(kind, r) {
       }
       const v = id => $(id, md)?.value ?? '';
       const body = {};
-      if (kind === 'services') Object.assign(body, {name_de: v('#of-name_de'), name_en: v('#of-name_en'), category: v('#of-category'), unit: v('#of-unit'), daily_rate: ofcNum(v('#of-daily_rate')), hourly_rate: ofcNum(v('#of-hourly_rate')), tax: v('#of-tax'), raw_fee: $('#of-raw_fee', md).checked ? 1 : 0, producing: $('#of-producing', md).checked ? 1 : 0, intext: v('#of-intext'), role: v('#of-role'), role_id: +v('#of-role_id') || null, sort: ofcNum(v('#of-sort')) ?? 0});
+      if (kind === 'services') Object.assign(body, {name_de: v('#of-name_de'), name_en: v('#of-name_en'), category: v('#of-category'), unit: v('#of-unit'), daily_rate: ofcNum(v('#of-daily_rate')), hourly_rate: ofcNum(v('#of-hourly_rate')), tax: v('#of-tax'), raw_fee: $('#of-raw_fee', md).checked ? 1 : 0, producing: $('#of-producing', md).checked ? 1 : 0, intext: v('#of-intext'), role: v('#of-role'), ...(Array.isArray(OFC.data.roles) ? {role_id: +v('#of-role_id') || null} : {}) /* 2.451.0 (#3809): roles not readable: the choice is empty, the stored role stays */, sort: ofcNum(v('#of-sort')) ?? 0});
       else if (kind === 'roles') Object.assign(body, {name_de: v('#of-name_de'), name_en: v('#of-name_en'), cost_day: ofcNum(v('#of-cost_day')), cost_hour: ofcNum(v('#of-cost_hour')), sort: ofcNum(v('#of-sort')) ?? 0});  // 2.47.0 (#1649)
       else if (kind === 'crew') Object.assign(body, {name_de: v('#of-name_de'), name_en: v('#of-name_en'), rate_day: ofcNum(v('#of-rate_day')), intext: v('#of-intext'), markup_pct: ofcNum(v('#of-markup_pct')), sort: ofcNum(v('#of-sort')) ?? 0});
       else if (kind === 'equipment') Object.assign(body, {name: v('#of-name'), name_en: v('#of-name_en'), category: v('#of-category'), daily_rate: ofcNum(v('#of-daily_rate')), ...astBody(md)});

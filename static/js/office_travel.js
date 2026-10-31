@@ -132,6 +132,9 @@ async function rk_dup(t) {  // a new trip with the same data, without the receip
     toast(tr('Copy created'), async () => { await api('DELETE', `/api/office/trips/${j.id}`); RK.open = null; rk_reload(); });
   } catch (x) { toast(x.message || tr('unknown')); }
 }
+// 2.451.0 (#3834): on a phone the arrow is hidden (office.css), a long press opens the menu like on the quotations
+const rk_lp = ms_longPress('.rklist .ofcrow[data-rk="open"]', () => false, r => rk_rowMenu(r.dataset.id, r));
+window.addEventListener('click', e => { if (ms_lpRecent(rk_lp) && e.target.closest?.('.rklist .ofcrow[data-rk="open"]')) { e.preventDefault(); e.stopPropagation(); } }, true);
 document.addEventListener('contextmenu', e => {  // right click on a trip row: the same menu
   const r = e.target.closest?.('.rklist .ofcrow[data-rk="open"]'); if (!r) return;
   e.preventDefault(); rk_rowMenu(r.dataset.id, r);

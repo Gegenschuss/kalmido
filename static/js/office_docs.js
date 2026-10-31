@@ -152,7 +152,7 @@ function ofdOffersTab(el) {
   if (id) el.querySelectorAll('textarea[data-grow-min]').forEach(t => ofcGrow(t, +t.dataset.grow || 3));  // 2.431.0 (#3594 review): a long subject wrapped by the field's width fits at once
   // 2.308.0 (#3251): the listeners sit on the tab body, not on a box inside it (the body and the box in it were both wired depending on timing: one click opened two dialogs)
   const host = el.closest('.ofcbody') || el;
-  if (!host._ofd) { host._ofd = true; host.addEventListener('contextmenu', ofdCtx); if (typeof ms_longPress === 'function') OFD.lp = ms_longPress('#view .ofdrow', () => false, r => ofdRowMenu(r.dataset.id, r)); host.addEventListener('click', ofdClick); host.addEventListener('change', ofdChange); host.addEventListener('input', ofdInput); host.addEventListener('keydown', ofdKey); }
+  if (!host._ofd) { host._ofd = true; host.addEventListener('contextmenu', ofdCtx); if (!OFD.lp && typeof ms_longPress === 'function') OFD.lp = ms_longPress('#view .ofdrow', () => false, r => ofdRowMenu(r.dataset.id, r)); host.addEventListener('click', ofdClick); host.addEventListener('change', ofdChange); host.addEventListener('input', ofdInput); host.addEventListener('keydown', ofdKey); }
 }
 
 // 2.356.0 C (#3004): the kind tab is part of the address (#office/offers/invoice): a new address (link, Back) chooses the tab,
@@ -166,11 +166,41 @@ function ofd_kindHash() {
   if (hk !== OFD.kind && (hk || OFD.kind !== ks[0])) history.replaceState(history.state, '', `#office/${p[1]}/${OFD.kind}`);
   OFD.hashSeen = location.hash;
 }
+// ---- 2.451.0 (#3834): the sort of an office list: same choice on computer and phone, remembered per list on the device.
+// sorts: [[key, label]]; a list with a manual order (the pipeline) has the key '' first = no sort
+const LST_SORTS = [['date', N_('Date')], ['client', N_('Client')], ['amount', N_('Amount')], ['name', N_('Name')]];
+const LST_MANUAL = [['', N_('Standard')], ...LST_SORTS];
+const lst_dir0 = k => (k === 'name' || k === 'client' ? 'asc' : 'desc');
+function lst_sort(list, sorts = LST_SORTS) {
+  const s = LS.get('lst.sort.' + list, null) || {}, k = sorts.some(x => x[0] === s.k) ? s.k : sorts[0][0];
+  return {k, d: s.d === 'asc' || s.d === 'desc' ? s.d : lst_dir0(k)};
+}
+function lst_sortMenu(anchor, list, sorts, draw) {
+  const s = lst_sort(list, sorts), set = (k, d) => { LS.set('lst.sort.' + list, {k, d}); draw(); };
+  menu(anchor, [...sorts.map(([k, n]) => ({label: tr(n), on: s.k === k, title: k && s.k === k ? tr('Click again to reverse the direction') : '', fn: () => set(k, s.k === k ? (s.d === 'asc' ? 'desc' : 'asc') : lst_dir0(k))})),
+    ...(s.k ? ['-', {label: tr('ascending|sort'), on: s.d === 'asc', fn: () => set(s.k, 'asc')}, {label: tr('descending|sort'), on: s.d === 'desc', fn: () => set(s.k, 'desc')}] : [])]);
+}
+function lst_sortBtn(list, sorts = LST_SORTS) {
+  const s = lst_sort(list, sorts), name = tr(sorts.find(x => x[0] === s.k)[1]), lbl = tr('Sorting') + ': ' + name + (s.k ? ', ' + (s.d === 'asc' ? tr('ascending|sort') : tr('descending|sort')) : '');
+  return `<button type="button" class="btn sm lst-sortb" data-lsort="${esc(list)}" aria-haspopup="menu" title="${esc(lbl)}" aria-label="${esc(lbl)}">${ic('sort', 's')} <span>${esc(name)}</span>${s.k ? (s.d === 'asc' ? ' ↑' : ' ↓') : ''}</button>`;
+}
+// get(row) -> {date, client, amount, name}; rows without the value stay last in both directions
+function lst_sorted(rows, list, get, sorts = LST_SORTS) {
+  const {k, d} = lst_sort(list, sorts), f = d === 'asc' ? 1 : -1; if (!k) return rows;
+  const val = r => { const v = get(r)[k]; return v == null || v === '' ? null : k === 'amount' ? +v : v; };
+  return rows.map(r => [r, val(r)]).sort(([, a], [, b]) => a === null || b === null ? (a === null) - (b === null) : f * (k === 'amount' ? a - b : k === 'date' ? (a < b ? -1 : a > b ? 1 : 0) : String(a).localeCompare(String(b), uiLang(), {numeric: true, sensitivity: 'base'}))).map(x => x[0]);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-lsort]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const l = b.dataset.lsort; lst_sortMenu(b, l, l === 'pipeline' ? LST_MANUAL : LST_SORTS, ofcDraw);
+});
+const ofd_listKey = k => (k === 'archive' ? 'archive.' + oim_secKind() : 'docs.' + k);
 // ---- the list
 function ofdListHtml() {
   const rows = OFD.list, k = OFD.kind, inv = k === 'invoice' || k === 'credit';
   const q = OFD.q.trim().toLowerCase();
-  if (k === 'archive') return `<div class="seg ofdkinds" role="tablist" aria-label="${esc(tr('Document kind'))}">${ofd_kinds().map(([v, n]) => `<button type="button" role="tab" data-ofd="kind" data-kind="${v}" aria-selected="${v === k}" class="${v === k ? 'on' : ''}">${tr(n)}</button>`).join('')}</div><div class="ofcbar ofdbar"><div class="ctsearch">${ic('search', 's')}<input id="ofd-q" type="search" value="${esc(OFD.q)}" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search documents'))}" autocomplete="off" enterkeyhint="search"></div></div>` + (typeof oimArchiveListHtml === 'function' ? oimArchiveListHtml(q) : '');
+  if (k === 'archive') return `<div class="seg ofdkinds" role="tablist" aria-label="${esc(tr('Document kind'))}">${ofd_kinds().map(([v, n]) => `<button type="button" role="tab" data-ofd="kind" data-kind="${v}" aria-selected="${v === k}" class="${v === k ? 'on' : ''}">${tr(n)}</button>`).join('')}</div><div class="ofcbar ofdbar"><div class="ctsearch">${ic('search', 's')}<input id="ofd-q" type="search" value="${esc(OFD.q)}" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search documents'))}" autocomplete="off" enterkeyhint="search"></div>${lst_sortBtn(ofd_listKey(k))}</div>` + (typeof oimArchiveListHtml === 'function' ? oimArchiveListHtml(q) : '');
   const sts = k === 'offer' ? OFD_STATUS : (k === 'invoice' ? ['open', 'draft', 'issued', 'sent', 'partial', 'overdue', 'paid', 'cancelled'] : OFD_INV_STATUS[k]).map(v => [v, OFD_STATE[v]]);  // 2.356.0 D (#3007): + the open items
   const newBtn = k === 'offer' ? `<button class="btn sm pri" data-ofd="new">${ic('plus', 's')}<span>${tr('New quotation')}</span></button>`  // 2.417.0 C (#3445): one button again (the test mode decides)
     : k === 'invoice' ? `${typeof dx_btn === 'function' && ofcFeat('books.datev') ? dx_btn() : ''}<button class="btn sm" data-ofd="remind">${ic('clock', 's')}<span>${tr('Create reminder')}</span></button><button class="btn sm pri" data-ofd="new-inv" aria-haspopup="menu">${ic('plus', 's')}<span>${tr('New invoice')}</span></button>`
@@ -180,11 +210,11 @@ function ofdListHtml() {
   // 2.46.1 (#1637): an empty offer list shows its one big button below the text, not a second one up here
   const noTop = k === 'offer' && rows && !rows.length && !q && !OFD.status && !OFD.trial;
   const bar = kinds + `<div class="ofcbar ofdbar"><div class="ctsearch">${ic('search', 's')}<input id="ofd-q" type="search" value="${esc(OFD.q)}" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search documents'))}" autocomplete="off" enterkeyhint="search"></div>
-    <select id="ofd-status" aria-label="${esc(tr('Status'))}"><option value="">${tr('All|status')}</option>${sts.map(([v, n]) => `<option value="${v}" ${OFD.status === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>${ofd_fltHtml()}${tri_filterHtml()}<span class="spacer"></span>${ofcAdmin('offers') ? `<button type="button" class="btn sm" data-ofd="trash" title="${esc(tr('Trash'))}" aria-label="${esc(tr('Trash'))}">${ic('trash', 's')}</button>` : ''}${noTop ? '' : newBtn}</div>${tri_barHtml()}`;
+    <select id="ofd-status" aria-label="${esc(tr('Status'))}"><option value="">${tr('All|status')}</option>${sts.map(([v, n]) => `<option value="${v}" ${OFD.status === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>${ofd_fltHtml()}${tri_filterHtml()}${lst_sortBtn(ofd_listKey(k))}<span class="spacer"></span>${ofcAdmin('offers') ? `<button type="button" class="btn sm" data-ofd="trash" title="${esc(tr('Trash'))}" aria-label="${esc(tr('Trash'))}">${ic('trash', 's')}</button>` : ''}${noTop ? '' : newBtn}</div>${tri_barHtml()}`;
   if (!rows) return bar + `<p class="muted lempty">${tr('Loading…')}</p>`;
   if (OFD.err && !rows.length) return bar + `<div class="empty">${esc(OFD.err)}</div>`;
   const hit = r => !q || [r.number, r.recipient_name, r.project_title, r.project_ref].some(v => (v || '').toLowerCase().includes(q));
-  const list = rows.filter(hit);
+  const list = lst_sorted(rows.filter(hit), ofd_listKey(k), r => ({date: r.date, client: r.recipient_name, amount: inv ? r.gross : k === 'delivery' ? null : r.net, name: r.project_title || r.number}));  // 2.451.0 (#3834)
   const emptyTxt = {offer: N_('No quotations yet.'),  // 2.298.0 A1 (#3186): the button sits right below
     invoice: N_('No invoices yet. Make one from a quotation, from time entries or start empty.'),
     credit: N_('No credit notes yet. A credit note is made from a finalised invoice.'), reminder: N_('No reminders yet. Pick open invoices in the invoice list.'),
@@ -734,9 +764,11 @@ function ofdMoreItems(d, inList) {
 }
 // 2.87.9 (#1920): right click / long press on a row opens the same menu as the dots button
 function ofdRowMenu(id, anchor) {
+  if (anchor?.dataset.arch) { oim_rowMenu(anchor.dataset.arch, anchor); return; }  // 2.451.0 (#3834): an archive row
   const r = (OFD.list || []).find(x => String(x.id) === String(id)); if (!r) return;
   menu(anchor, ofdMoreItems({...r, can_delete: OFD.role === 'admin' && (r.can_delete ?? (!r.locked && r.status !== 'sent' && !(['invoice', 'credit'].includes(r.kind) && r.number)))}, true));  // 2.114.2 A (#2263): the server marks the finalised quotations that may go; 2.126.0 A (#1966): a numbered invoice / credit note draft stays; 2.417.0 C (#2604): the server's false counts (an open quotation past draft)
 }
+window.addEventListener('click', e => { if (OFD.lp && ms_lpRecent(OFD.lp) && e.target.closest?.('.oimarch a.ofdrow')) { e.preventDefault(); e.stopPropagation(); } }, true);  // 2.451.0 (#3834): the press ends on a link: no preview under the menu
 function ofdCtx(e) { const b = e.target.closest('.ofdrow'); if (!b) return; e.preventDefault(); ofdRowMenu(b.dataset.id, b); }
 async function ofdClick(e) {
   if (typeof tpf_ctx === 'function') tpf_ctx(e.target);  // 2.113.0 (#2248): the open part the click happens in (also for the agent marks' own listener)
