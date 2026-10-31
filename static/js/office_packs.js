@@ -225,7 +225,7 @@ function ocf_settingsHtml(dis) {
 // each person shows / hides and folds the others for themselves at the card; the details always show)
 function ccb_settingsHtml(dis) {
   const off = OFC.info.settings?.client_blocks_off || [];
-  return `<h3>${tr('Client card')}</h3><p class="muted ofchint">${esc(tr('The blocks switched on here show at every client of the office. Each person can still hide or fold them for themselves.'))}</p>
+  return `<h3 id="ccb-h">${tr('Client card')}</h3><p class="muted ofchint">${esc(tr('The blocks switched on here show at every client of the office. Each person can still hide or fold them for themselves.'))}</p>
     <div class="ocf-list">${LY_CL_BLOCKS.filter(b => b[0] !== 'details').map(([k, n, i]) => `<div class="row ocf-row"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="ccb-${k}" data-ccb="${k}" ${off.includes(k) ? '' : 'checked'} ${dis}><span class="swt" aria-hidden="true"></span></span><span>${ic(i, 's')} ${esc(tr(n))}</span></label></div>`).join('')}</div>`;
 }
 const ccb_off = (k, off) => { if (typeof CLV !== 'undefined') CLV.data = null; const l = (OFC.info.settings?.client_blocks_off || []).filter(x => x !== k); return off ? [...l, k] : l; };

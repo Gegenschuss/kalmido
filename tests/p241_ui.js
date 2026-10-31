@@ -97,8 +97,10 @@ async function firefox(fn) {
   let a = await adm(ag.id);
   const srt = o => JSON.stringify(Object.keys(o || {}).sort().map(k => [k, o[k]]));
   // 2.312.0 (#3266): runtime has perm_user (null = as set up on its computer); 2.233.0 (#3189): + the interim-summary values (defaults)
+  // 2.396.0 A (#3386): + the git author of AI commits (defaults: no own name / mail, no co-author line; git_author = the one used)
   check(srt(a.runtime) === srt({model: 'sonnet', autocompact: true, autocompact_pct: 70, nightly_reset: '04:00', permission_mode: '', perm_user: null, reset_seq: 0,
-    rotate_size: 'medium', rotate_runs: 60, rotate_idle_min: 45, rotate_mb: 0.8, rotate_tokens: 150000, rotate_idle_mb: 0.4}), 'saved: ' + JSON.stringify(a.runtime));
+    rotate_size: 'medium', rotate_runs: 60, rotate_idle_min: 45, rotate_mb: 0.8, rotate_tokens: 150000, rotate_idle_mb: 0.4,
+    git_author: 'Kalmido <noreply@kalmido.com>', git_author_name: '', git_author_email: '', git_coauthor: false}), 'saved: ' + JSON.stringify(a.runtime));
   check((await v1(ag.token, 'GET', '/agent')).runtime?.model === 'sonnet', 'the agent reads it');
   // reopen: values shown, Reset now
   w.eval(`agModal(${JSON.stringify(a)}, null)`);
