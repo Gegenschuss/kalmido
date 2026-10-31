@@ -228,6 +228,18 @@ check("Diese Bereiche bleiben" in w and "Wissensseiten (1)" in w, f"#3808: the w
 imp = Fr.get(B + "/api/imports").json()["imports"][0]["counts"]
 check({"what": "Wissensseiten", "count": 1} in imp.get("not_taken", []), f"#3808: the import's record in German too {imp}")
 
+# ================================================================ wiki import: a check of the background run (2.454.0, #3808)
+speak(Fr, "de")
+r = Fr.post(B + "/api/wiki/import/upload", json={"size": len(JUNK), "name": "x.zip", "space": "private", "replace": False})
+check(r.ok, "a wiki upload " + r.text[:200])
+WID = r.json()["id"]
+Fr.put(B + f"/api/wiki/import/upload/{WID}?offset=0", data=JUNK, headers={"Content-Type": "application/octet-stream"})
+st = until(lambda: (lambda j: j if j.get("state") == "failed" else None)(Fr.get(B + f"/api/wiki/import/upload/{WID}").json()), 30) or {}
+check(st.get("error") == "Das ist keine ZIP-Datei", f"#3808: German while German {st}")
+speak(Fr, "fr")
+st = Fr.get(B + f"/api/wiki/import/upload/{WID}").json()
+check(st.get("error") == "Ce n'est pas un fichier ZIP", f"#3808: the same state read in French {st}")
+
 # ================================================================ history: the key, the reader's app translates it
 tid = Fr.post(B + "/api/tasks", json={"title": "Sealed"}).json()["id"]
 r = Fr.put(B + "/api/e2e/keys", json={"pub": {"kty": "EC", "crv": "P-256", "x": b64u(32), "y": b64u(32)},
