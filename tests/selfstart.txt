@@ -210,6 +210,7 @@ p2470_d_cost_api
 p2470_d_cost_ui
 p2470_a_import_api
 p2470_a_roles_ui
+p2451_a_office_rows_ui
 p2470_b_parts_api
 p2470_b_parts_ui
 p2470_f_review_api
