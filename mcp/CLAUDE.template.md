@@ -114,7 +114,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - **Do not overwrite people (2.270.0).** People edit the same tasks while you work. With `update_task` always send
   `expect_updated_at` = the task's `updated_at` from your last `get_task`; a `409` means someone changed it since: read
   it again (the answer's `current`), decide anew, never just resend. `create_task` gets a `client_ref` of your own, so a
-  retry after a timeout does not make a second task; `update_note` and `update_offer_draft` take `expect_updated_at` too,
+  retry after a timeout does not make a second task (2.370.2: `add_comment` and `suggest_payment` too); `update_note` and `update_offer_draft` take `expect_updated_at` too,
   and positions you keep in `update_offer_draft` go with their `id`.
 - **Dates move the chain (2.67.0).** Postponing a task's due date in a project with progress and status with *Move dependent tasks along* on
   also moves every task waiting on it by the same days (the whole chain; the answer's `chain` / `chain_note` names them,
