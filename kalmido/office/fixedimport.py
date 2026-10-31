@@ -251,12 +251,13 @@ def fci_clean_rows(items):
     return rows
 
 
-def fci_write(c, uid, oid, items, detail=None, kept=None):
+def fci_write(c, uid, oid, items, detail=None, kept=None, run=False):
     """2.68.0 (#1839): the writing part of the import (the spreadsheet and the agent's import proposal): every row checked
     again (fci_clean_rows), all or nothing, MAX_FIXED counted under the area's lock, one office log line. No commit.
     Returns the new ids. 2.269.0 D (#3046): a row the area already has (fci_key, as in the preview) is skipped unless it
     carries dup_ok (the person ticked a row the preview marked "Already there"): sent twice (two tabs, a retry) = once.
-    kept (a list): gets the items actually written, in the order of the returned ids (the import proposal keeps them)."""
+    kept (a list): gets the items actually written, in the order of the returned ids (the import proposal keeps them).
+    2.363.2 (#3104): run = an entry in the import runs (the import proposal has its own undo on the job)."""
     from .ledger import ofx_log
     rows = fci_clean_rows(items)
     write_lock(c, f"office_fixed_{int(oid)}")
@@ -275,6 +276,9 @@ def fci_write(c, uid, oid, items, detail=None, kept=None):
         row = oc_enc_fields(c, oid, "office_fixed_costs", row)
         ids.append(insert_id(c, f"INSERT INTO office_fixed_costs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())))
     ofx_log(c, oid, "import", target="fixed_costs", detail={"count": len(ids), **(detail or {})})
+    if run:
+        from .legacyimport import fx_run
+        fx_run(c, oid, uid, "fixed_costs", ids)
     return ids
 
 
@@ -289,10 +293,20 @@ def fci_import_post():
         raise BadInput(tr("Invalid data"))
     if len(items) > FCI_ROWS_MAX * 4:
         raise BadInput(tr("Too many rows (at most {0})", FCI_ROWS_MAX * 4))
-    ids = fci_write(c, uid, oid, items)  # 2.68.0 (#1839): shared with the agent's import proposal (agents/importprop.py)
+    ids = fci_write(c, uid, oid, items, run=True)  # 2.68.0 (#1839): shared with the agent's import proposal (agents/importprop.py)
     bump(c)
     c.commit()
     return jsonify(created=len(ids), ids=ids, skipped=len(items) - len(ids)), 201  # 2.269.0 D (#3046): + skipped (already there)
+
+
+def fci_remove(c, oid, ids):
+    """2.272.0 C (#3027): deletes the fixed costs `ids` of the area unchanged since they were made (updated_at = created_at, no
+    reminder sent). -> how many went. No commit."""
+    if not ids:
+        return 0
+    q = ",".join("?" * len(ids))
+    return c.execute(f"""DELETE FROM office_fixed_costs f WHERE org_id=? AND id IN ({q}) AND updated_at=created_at
+                         AND NOT EXISTS (SELECT 1 FROM office_sub_reminders r WHERE r.fixed_id=f.id)""", [oid] + ids).rowcount
 
 
 @app.post("/api/office/fixed-costs/delete")
@@ -308,8 +322,9 @@ def fci_delete_many():
     ids = sorted(set(ids))
     q = ",".join("?" * len(ids))
     have = c.execute(f"SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=? AND id IN ({q})", [oid] + ids).fetchone()[0] if ids else 0
-    n = c.execute(f"""DELETE FROM office_fixed_costs f WHERE org_id=? AND id IN ({q}) AND updated_at=created_at
-                      AND NOT EXISTS (SELECT 1 FROM office_sub_reminders r WHERE r.fixed_id=f.id)""", [oid] + ids).rowcount if ids else 0
+    n = fci_remove(c, oid, ids)
+    from .legacyimport import fx_settle
+    fx_settle(c, oid, uid, "fixed_costs")  # 2.363.2 (#3104)
     bump(c)
     c.commit()
     return jsonify(ok=True, deleted=n, kept=have - n)

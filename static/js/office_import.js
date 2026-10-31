@@ -33,7 +33,7 @@ function oimHtml() {
   if (OIM.runs === null && !OIM.loading) { OIM.loading = true; setTimeout(async () => { await oimLoad(); OIM.loading = false; }, 0); }
   setTimeout(oim_jump, 0);  // 2.122.3 A (#2335)
   const back = `<div class="ofcbar"><a class="btn sm" href="#office/settings">${ic('back', 's')} ${tr('Settings')}</a></div>`;
-  return `<div class="oim">${back}<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('You see everything before it is saved; every import can be undone.')}</p>
+  return `<div class="oim">${back}<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('You see everything before it is saved. Undo an import under Import runs; some imports only within 24 hours.')}</p>
     <section class="oimsec" id="oim-master"><h4>${ic('list', 's')} ${tr('Master data from a spreadsheet')}</h4><div class="shint">${tr('Contacts: the address in one cell or in the columns street, postcode, city.')}</div>
     <p class="muted">${tr('Excel or CSV with the sheets Contacts, Services, Equipment.')}</p>
     <div class="lacts"><input type="file" id="oim-xlsx" accept=".xlsx,.csv,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden><button type="button" class="btn sm pri" data-oim="pick-xlsx" ${OIM.busy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose file')}</button>${OIM.busy ? `<span class="muted">${tr('Reading…')}</span>` : ''}</div>
@@ -238,9 +238,9 @@ function oimRunsHtml() {
   const r = OIM.runs;
   if (r === null) return `<p class="muted">${tr('Loading…')}</p>`;
   if (!r.length) return `<p class="muted">${tr('No imports yet.')}</p>`;
-  const kn = {data: N_('Master data'), archive: N_('Archive|documents'), datev: N_('DATEV data')};  // 2.148.0 D (#2458)
+  const kn = {data: N_('Master data'), archive: N_('Archive|documents'), datev: N_('DATEV data'), fixed_costs: N_('Fixed costs'), trips: N_('Trips'), leads: N_('Leads')};  // 2.148.0 D (#2458)
   return `<ul class="ofclist" role="list">${r.map(x => `<li class="oimrun"><span class="ofcn"><b>${esc(tr(kn[x.kind] || x.kind))} · ${esc(trn('{0} entry', '{0} entries', x.total || 0))}</b><small class="muted">${esc([typeof ofdWhen === 'function' ? ofdWhen(x.created_at) : x.created_at, x.user_name].filter(Boolean).join(' · '))}</small></span>
-    ${x.undone_at ? `<span class="rotag">${tr('undone')}</span>` : `<button type="button" class="btn sm" data-oim="undo" data-id="${x.id}">${ic('undo', 's')} ${tr('Undo')}</button>`}${bk_runAreas(x)}${imr_tidyBtn(x)}</li>`).join('')}</ul>`;
+    ${x.undone_at ? `<span class="rotag">${tr('undone')}</span>` : `<button type="button" class="btn sm" data-oim="undo" data-id="${x.id}" data-run="${esc(x.kind)}">${ic('undo', 's')} ${tr('Undo')}</button>`}${bk_runAreas(x)}${imr_tidyBtn(x)}</li>`).join('')}</ul>`;
 }
 
 // ---- the archive in the documents tab (office_docs.js asks for it when the kind "Archive" is chosen)
@@ -383,13 +383,15 @@ document.addEventListener('click', async e => {
   } else if (a === 'area-skip') bk_skipAll(b.dataset.area);
   else if (a === 'undo') {
     const kind = b.dataset.kind;  // 2.46.1 (#1557): one area only; 2.138.0 E (#2241): the texts say that used services / devices are archived
-    if (!await askConfirm(kind ? tr(BK_UNDO[kind]) + '?' : tr('Undo this import?'), kind ? tr('Only the entries of this area are removed; services and devices in use are archived. The rest of the import stays.') : tr('Everything it added is removed. A client in use stays; a service or device in use is archived (documents keep showing it). Clients that were merged lose the fields the import filled in.') + (!kind || kind === 'clients' ? ' ' + tr('Its new clients go to the trash of the clients (only within 24 hours of the import).') : ''), {ok: tr('Undo'), danger: true})) return;  // 2.272.0 D (#3027)
+    const fx = ['fixed_costs', 'trips', 'leads'].includes(b.dataset.run);  // 2.363.2 (#3104)
+    if (!await askConfirm(fx ? tr('Undo this import?') : kind ? tr(BK_UNDO[kind]) + '?' : tr('Undo this import?'), fx ? tr('Everything it added is removed, within 24 hours of the import. Entries changed since stay; leads go to the trash.') : kind ? tr('Only the entries of this area are removed; services and devices in use are archived. The rest of the import stays.') : tr('Everything it added is removed. A client in use stays; a service or device in use is archived (documents keep showing it). Clients that were merged lose the fields the import filled in.') + (!kind || kind === 'clients' ? ' ' + tr('Its new clients go to the trash of the clients (only within 24 hours of the import).') : ''), {ok: tr('Undo'), danger: true})) return;  // 2.272.0 D (#3027)
     try {
       const j = await api('POST', `/api/office/legacy/runs/${b.dataset.id}/undo`, kind ? {kinds: [kind]} : undefined);
-      const k = j.kept || {}, kept = (k.clients || 0) + (k.services || 0) + (k.equipment || 0) + (k.roles || 0) + (k.crew || 0);
+      const k = j.kept || {}, kept = (k.clients || 0) + (k.services || 0) + (k.equipment || 0) + (k.roles || 0) + (k.crew || 0) + (k.entries || 0);
       OIM.arcd = (j.archived || []).length ? j.archived : null;  // 2.138.0 E (#2241): the used entries the undo archived
       toast(tr('Import undone') + (kept ? ' · ' + trn('{0} entry stays because it is in use', '{0} entries stay because they are in use', kept) : '')
         + (OIM.arcd ? ' · ' + trn('{0} entry in use archived', '{0} entries in use archived', OIM.arcd.length) : ''));
+      if (fx) { if (typeof rk_cfReload === 'function') rk_cfReload(); if (typeof rk_reload === 'function') rk_reload(); if (typeof pp_reload === 'function') pp_reload(); }
       OIM.list = null; ofcReload('services'); ofcReload('equipment'); ofcReload('roles'); ofcReload('crew'); await oimLoad();
     } catch (x) { toast(x.message || ''); }
   }

@@ -1033,6 +1033,58 @@ def _run_new(c, oid, uid, kind):
     return insert_id(c, "INSERT INTO office_import_runs(org_id, kind, created_by, created_at) VALUES(?,?,?,?)", (oid, kind, uid, iso(now_utc())))
 
 
+# 2.363.2 (#3104): the imports of fixed costs, trips and leads are runs too: {kind: (table, what still counts as there)}.
+FX_RUNS = {"fixed_costs": ("office_fixed_costs", ""), "trips": ("office_trips", ""), "leads": ("office_deals", " AND t.deleted_at IS NULL")}
+FX_UNDO_LATE = N_("This import is older than 24 hours and can no longer be undone.")
+
+
+def fx_run(c, oid, uid, kind, ids):
+    """A run for the new rows `ids` of kind (no rows: no run). Their rows carry the run id, like the master data. No commit."""
+    if not ids:
+        return None
+    rid = _run_new(c, oid, uid, kind)
+    c.execute("UPDATE office_import_runs SET counts=? WHERE id=? AND org_id=?", (json.dumps({kind: len(ids)}), rid, oid))
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        c.execute(f"UPDATE {FX_RUNS[kind][0]} SET import_run_id=? WHERE org_id=? AND id IN ({','.join('?' * len(part))})", [rid, oid] + part)
+    return rid
+
+
+def fx_settle(c, oid, uid, kind):
+    """The runs of kind with nothing left (the toast's undo, every row deleted by hand) count as undone. No commit."""
+    table, alive = FX_RUNS[kind]
+    c.execute(f"""UPDATE office_import_runs r SET undone_at=?, undone_by=? WHERE org_id=? AND kind=? AND undone_at IS NULL
+                  AND NOT EXISTS (SELECT 1 FROM {table} t WHERE t.org_id=r.org_id AND t.import_run_id=r.id{alive})""",
+              (iso(now_utc()), uid, oid, kind))
+
+
+def fx_undo(c, oid, uid, r):
+    """Undoes a run of FX_RUNS within OLK_UNDO_HOURS, by the rules of the toast's undo (what changed since stays).
+    -> as fi_undo."""
+    if r["undone_at"]:
+        raise Denied(409, tr("This import has already been undone"))
+    try:
+        at = parse_iso(r["created_at"])
+    except (TypeError, ValueError):
+        at = None
+    if at is None or now_utc() - at > timedelta(hours=OLK_UNDO_HOURS):
+        raise Denied(409, tr(FX_UNDO_LATE))
+    kind = r["kind"]
+    table, alive = FX_RUNS[kind]
+    ids = [x[0] for x in c.execute(f"SELECT t.id FROM {table} t WHERE t.org_id=? AND t.import_run_id=?{alive} ORDER BY t.id", (oid, r["id"]))]
+    if kind == "fixed_costs":
+        from .fixedimport import fci_remove
+        n = fci_remove(c, oid, ids)
+    elif kind == "trips":
+        from .vmaimport import vmi_remove
+        n = vmi_remove(c, oid, ids)["deleted"]
+    else:
+        from .leads import lead_bin
+        n = lead_bin(c, oid, ids)
+    c.execute("UPDATE office_import_runs SET undone_at=?, undone_by=? WHERE id=? AND org_id=?", (iso(now_utc()), uid, r["id"], oid))
+    return {kind: n}, {"entries": len(ids) - n}, [], []
+
+
 def _run_row(c, oid, rid):
     r = c.execute("SELECT * FROM office_import_runs WHERE id=? AND org_id=?", (rid, oid)).fetchone()
     if not r:
@@ -1362,6 +1414,8 @@ def fi_undo(c, oid, uid, rid, kinds=None):
     if r["kind"] == "datev_archive":  # 2.414.0 (#3502): a run of the booking archive (office/bookarch.py)
         from .bookarch import ba_undo
         return ba_undo(c, oid, uid, r)
+    if r["kind"] in FX_RUNS:
+        return fx_undo(c, oid, uid, r)
     if r["undone_at"]:
         raise Denied(409, tr("This import has already been undone"))
     detail = bk_detail(r)

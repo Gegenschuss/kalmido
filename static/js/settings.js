@@ -1175,7 +1175,7 @@ function impHelp(src) {
     asana: tr('<b>Asana:</b> open the project > arrow next to its name > Export / Print > CSV. Sections, subtasks, tags, start and due dates and completion are taken over, other fields go into the notes. An assignee is assigned when they are a member of the target project (same e-mail or name), otherwise their name goes into the notes.'),
     mstodo: tr('<b>Microsoft To Do</b> has no export of its own. Recommended: classic Outlook for Windows > File > Open & Export > Import/Export > Export to a file > Comma Separated Values > your Tasks folder (Outlook for Mac: File > Export > Tasks). CSV files of export tools (columns such as Title, List, Status, Importance, Due) and ICS files work too. English and German Outlook columns are recognized, also in Windows-1252.'),
     ics: tr('<b>ICS files with tasks (VTODO):</b> Nextcloud Tasks (calendar > … > Export), Thunderbird (right-click the calendar > Export), Apple Reminders via an export app or a CalDAV server, Tasks.org via its CalDAV account. Each calendar becomes a project; subtasks, repetitions, reminders, categories (tags), priorities and completion are taken over.'),
-    ticktick: tr('<b>TickTick:</b> Settings > Account > Generate backup (CSV). Imported directly, without a preview.'),
+    ticktick: tr('<b>TickTick:</b> Settings > Account > Generate backup (CSV). Lists, sections, subtasks, tags, dates and reminders are taken over.'),
     // 2.142.0 B (#2147)
     notion: tr('<b>Notion:</b> Settings > Workspace > Export all workspace content (or … on a page > Export) > Markdown & CSV, include subpages. Choose the ZIP as it is (parts inside it are read too). Every database becomes a project (name, status, date, tags and priority are recognized, other properties go into the notes), pages with checkboxes become projects with tasks. People stay names in the notes.'),
     gtasks: tr('<b>Google Tasks:</b> takeout.google.com > deselect all > select Tasks > create the export, then choose the ZIP (or the Tasks.json inside it). Lists, subtasks, due dates, notes and completion are taken over.'),
@@ -1238,7 +1238,7 @@ function impInit(md) {
     const box = $('#s-imp-hist', md); if (!box) return;
     let j; try { j = await api('GET', '/api/imports'); } catch { return; }
     const rows = j.imports.filter(x => x.can_undo).slice(0, 5);
-    box.innerHTML = rows.length ? `<div class="muted mhint">${tr('Recent imports')}</div>` + rows.map(x => `<div class="mrow"><span class="n">${esc(x.source_name)}${x.file_name ? ' · ' + esc(x.file_name) : ''}</span><span class="muted">${trn('{0} task', '{0} tasks', x.counts.tasks || 0)}</span><button class="btn sm" data-imp="undo" data-id="${+x.id}">${tr('Undo')}</button></div>`).join('') : '';
+    box.innerHTML = rows.length ? `<div class="muted mhint">${tr('Recent imports')}</div>` + rows.map(x => `<div class="mrow"><span class="n">${esc(x.source_name)}${x.file_name ? ' · ' + esc(x.file_name) : ''}</span><span class="muted">${x.source === 'newsletter' ? trn('{0} contact', '{0} contacts', x.counts.contacts || 0) : trn('{0} task', '{0} tasks', x.counts.tasks || 0)}</span><button class="btn sm" data-imp="undo" data-id="${+x.id}" data-src="${esc(x.source)}">${tr('Undo')}</button></div>`).join('') : '';
   }
   hist();
   $('#s-imp-src', md).addEventListener('change', e => {
@@ -1247,14 +1247,6 @@ function impInit(md) {
   });
   inp.addEventListener('change', async e => {
     const f = e.target.files[0]; if (!f) return;
-    if (I.src === 'ticktick') {
-      // 2.87.9 (#1940): TickTick's lists always become private lists of the person
-      if (!await importTargetConfirm({what: tr('the tasks'), ws: 'private'})) { inp.value = ''; const fn = $('#s-import-name', md); if (fn) fn.textContent = tr('No file chosen'); return; }
-      const fd = new FormData(); fd.append('file', f);
-      const j = await api('POST', '/api/import/ticktick', fd);
-      toast(tr('Import: {0} tasks, {1} new projects', j.tasks, j.lists) + (j.skipped ? tr(', {0} already there', j.skipped) : ''));
-      inp.value = ''; await load(); render(); return;
-    }
     // 2.87.9 (#1940): new lists go into the workspace shown in the sidebar
     // 2.144.5 B (#2002): "All" = the private space (the dialog offers the first organisation instead)
     const cur = wsCur();
@@ -1266,7 +1258,13 @@ function impInit(md) {
     if (k === 'target' && e.target.value !== 'new') delete I.opts.list_name;
     if (k !== 'list_name') preview();
   });
-  const undo = async id => {
+  const undo = async (id, src) => {
+    if (src === 'newsletter') {  // 2.363.2 (#3104)
+      if (!await askConfirm(tr('Undo this import?'), tr('The contacts go back to their earlier newsletter status, unless their consent changed since.'), {ok: tr('Undo'), danger: true})) return;
+      const j = await api('POST', `/api/imports/${id}/undo`);
+      toast(trn('Import undone: {0} contact reset', 'Import undone: {0} contacts reset', j.contacts || 0));
+      hist(); return;
+    }
     // 2.272.0 C (#3027): the undo moves into the trash and keeps what changed since -- the texts say exactly that
     if (!await askConfirm(tr('Undo this import?'), tr('The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.'), {ok: tr('Undo'), danger: true})) return;
     const j = await api('POST', `/api/imports/${id}/undo`);
@@ -1279,7 +1277,7 @@ function impInit(md) {
     const b = e.target.closest('[data-imp]'); if (!b || !md.contains(b)) return;
     const a = b.dataset.imp;
     if (a === 'cancel') { out.innerHTML = ''; I.file = null; inp.value = ''; return; }
-    if (a === 'undo') { await undo(+b.dataset.id); return; }
+    if (a === 'undo') { await undo(+b.dataset.id, b.dataset.src); return; }
     if (a === 'go') {
       // 2.87.9 (#1940): where the tasks go, in words; new lists from an organisation can go into the private space instead
       const tl = I.opts.target && I.opts.target !== 'new' ? listById(+I.opts.target) : null, n = I.last?.created?.tasks;

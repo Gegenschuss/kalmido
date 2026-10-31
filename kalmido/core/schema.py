@@ -3201,6 +3201,10 @@ MIGRATIONS = [
     ("clients", "import_run_id", "ALTER TABLE clients ADD COLUMN import_run_id BIGINT"),
     ("office_services", "import_run_id", "ALTER TABLE office_services ADD COLUMN import_run_id BIGINT"),
     ("office_equipment", "import_run_id", "ALTER TABLE office_equipment ADD COLUMN import_run_id BIGINT"),
+    # 2.363.2 (#3104): fixed costs, trips and leads of an import run too
+    ("office_fixed_costs", "import_run_id", "ALTER TABLE office_fixed_costs ADD COLUMN import_run_id BIGINT"),
+    ("office_trips", "import_run_id", "ALTER TABLE office_trips ADD COLUMN import_run_id BIGINT"),
+    ("office_deals", "import_run_id", "ALTER TABLE office_deals ADD COLUMN import_run_id BIGINT"),
     # 2.40.0 (#1380): the contact person a document is addressed to (office_client_contacts.id, no reference: a deleted one
     # falls back to the default; a finalised document keeps its snapshot)
     ("office_docs", "contact_id", "ALTER TABLE office_docs ADD COLUMN contact_id BIGINT"),  # no FK: 0 = no contact person; a deleted one falls back to the default

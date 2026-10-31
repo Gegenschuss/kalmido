@@ -13,7 +13,8 @@ from datetime import date, datetime, timezone
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.db import body, db, err, iso, local_now
+from ..core.db import body, db, err, iso, local_now, now_utc
+from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..accounts.session import me
@@ -372,6 +373,27 @@ def _imp_rows(text):
     return rows, cols
 
 
+def nwl_import_undo(c, uid, r):
+    """2.363.2 (#3104): the contacts of a consent import go back to their earlier status (the log keeps both steps), except
+    the ones whose consent changed since or that the person can no longer edit (kept). -> the answer of the undo."""
+    from ..contacts.model import need_contact
+    back, kept = 0, 0
+    for cid, was, at in json.loads(r["created"] or "{}").get("contacts") or []:
+        row = c.execute("SELECT nl_status, nl_at FROM contacts WHERE id=?", (cid,)).fetchone()
+        try:
+            need_contact(c, cid, write=True)
+        except Denied:
+            row = None
+        if not row or row["nl_status"] != "yes" or row["nl_at"] != at:
+            kept += 1
+            continue
+        N.nwl_set_status(c, cid, was, tr("Import undone"))
+        back += 1
+    c.execute("UPDATE imports SET undone_at=? WHERE id=?", (iso(now_utc()), r["id"]))
+    c.commit()
+    return {"contacts": back, "kept_contacts": kept}
+
+
 @app.post("/api/newsletter/consent/import")
 def nwl_consent_import():
     """{ws, csv: text, filename?, apply?} -- the consent import: columns E-mail, Date (YYYY-MM-DD or DD.MM.YYYY), Source (optional),
@@ -430,10 +452,14 @@ def nwl_consent_import():
                 kept += 1
                 continue
             will += 1
-            todo.append((r["id"], src, at))
+            todo.append((r["id"], src, at, r["nl_status"] or ""))
+    iid = None
     if apply_:
-        for cid, src, at in todo:
-            N.nwl_set_status(c, cid, "yes", src, at)
+        done = [[cid, was, at] for cid, src, at, was in todo if N.nwl_set_status(c, cid, "yes", src, at) == "yes"]
+        if done:  # 2.363.2 (#3104): an entry of the recent imports, undone by nwl_import_undo
+            ts = iso(now_utc())
+            iid = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
+                            (_uid, "newsletter", fname[:200], json.dumps({"contacts": done}), json.dumps({"contacts": len(done)}), ts))
         c.commit()
-    return jsonify({"rows": len(rows), "valid": valid, "errors": errors[:NWL_IMP_SHOW], "errors_count": len(errors), "will_change": will,
+    return jsonify({"import_id": iid, "rows": len(rows), "valid": valid, "errors": errors[:NWL_IMP_SHOW], "errors_count": len(errors), "will_change": will,
                     "kept": kept, "unmatched": unmatched, "applied": len(todo) if apply_ else 0})

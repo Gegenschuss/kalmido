@@ -12,7 +12,7 @@ from datetime import date
 from flask import g, jsonify
 
 from ..core.config import app
-from ..core.db import body, bump, db, iso, local_now, now_utc
+from ..core.db import body, bump, db, iso, local_now, now_utc, write_lock
 from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..core.pg import insert_id, system_ctx
@@ -76,6 +76,11 @@ def lead_insert(c, oid, by, row):
 def lead_title(b):
     """A lead's name when none was given: the company, else the person, else the e-mail."""
     return (b.get("title") or b.get("company") or b.get("contact") or b.get("email") or "").strip()
+
+
+def lead_key(x):
+    """2.363.2 (#3104): the key of a lead without an e-mail: title, contact, company and phone (case and spaces do not count)."""
+    return tuple(" ".join(str(x.get(k) or "").casefold().split()) for k in ("title", "contact", "company", "phone"))
 
 
 def lead_emails(c, oid):
@@ -255,7 +260,8 @@ def _source_of(s):
 
 def lead_parse(c, oid, text):
     """CSV text -> (columns {field: header}, rows): every row {n, title, contact, company, email, phone, source,
-    next_step, follow_up, note, value, error, dup}. Duplicates: the e-mail of a deal of the area or of an earlier row."""
+    next_step, follow_up, note, value, error, dup}. Duplicates: the e-mail of a deal of the area or of an earlier row;
+    2.363.2 (#3104): a row without an e-mail by lead_key (it came in new on every run)."""
     from ..life.budget import bud_csv_table
     if not isinstance(text, str) or not text.strip():
         raise BadInput(tr("The file is empty"))
@@ -269,7 +275,9 @@ def lead_parse(c, oid, text):
         raise BadInput(tr("No column for the name, the company or the e-mail found"))
     if len(rows) > LEAD_IMPORT_MAX:
         raise BadInput(tr("At most {0} rows per import", LEAD_IMPORT_MAX))
-    have = lead_emails(c, oid)
+    deals = pl2_list(c, oid)
+    have = {(d.get("email") or "").strip().lower() for d in deals} - {""}
+    keys = {lead_key(d) for d in deals}
     out = []
     for n, r in enumerate(rows, 1):
         cell = {f: (r[i] if i < len(r) else "").strip() for f, i in cols.items()}
@@ -295,6 +303,10 @@ def lead_parse(c, oid, text):
         if not x["error"] and em:
             x["dup"] = em in have
             have.add(em)
+        elif not x["error"]:
+            x["dup"] = lead_key(x) in keys
+        if not x["error"]:
+            keys.add(lead_key(x))
         out.append(x)
     return {f: header[i] for f, i in cols.items()}, out
 
@@ -308,6 +320,8 @@ def lead_import():
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
+    if b.get("commit"):
+        write_lock(c, f"office_leads_import_{int(oid)}")  # 2.363.2 (#3104): check and write in one go (two tabs)
     cols, rows = lead_parse(c, oid, b.get("text"))
     ok = [x for x in rows if not x["error"] and not x["dup"]]
     counts = dict(count=len(ok), dup_count=sum(1 for x in rows if x["dup"]), skipped=sum(1 for x in rows if x["error"]))
@@ -325,9 +339,19 @@ def lead_import():
                         | {"stage": "lead"})
         row["sort"] = base - len(ok) + i
         ids.append(lead_insert(c, oid, uid, row))
+    from .legacyimport import fx_run
+    fx_run(c, oid, uid, "leads", ids)  # 2.363.2 (#3104)
     bump(c)
     c.commit()
     return jsonify(ids=ids, **counts), 201
+
+
+def lead_bin(c, oid, ids):
+    """These leads of the area (still leads) into the bin. -> how many. No commit."""
+    ts, n = iso(now_utc()), 0
+    for i in ids:
+        n += c.execute("UPDATE office_deals SET deleted_at=? WHERE id=? AND org_id=? AND stage='lead' AND deleted_at IS NULL", (ts, i, oid)).rowcount
+    return n
 
 
 @app.post("/api/office/leads/import/undo")
@@ -338,9 +362,9 @@ def lead_import_undo():
     ids = b.get("ids") if isinstance(b, dict) else None
     if not isinstance(ids, list) or not ids or len(ids) > LEAD_IMPORT_MAX or any(not isinstance(i, int) or isinstance(i, bool) for i in ids):
         raise BadInput(tr("Invalid value: {0}", "ids"))
-    ts, n = iso(now_utc()), 0
-    for i in ids:
-        n += c.execute("UPDATE office_deals SET deleted_at=? WHERE id=? AND org_id=? AND stage='lead' AND deleted_at IS NULL", (ts, i, oid)).rowcount
+    n = lead_bin(c, oid, ids)
+    from .legacyimport import fx_settle
+    fx_settle(c, oid, uid, "leads")  # 2.363.2 (#3104)
     bump(c)
     c.commit()
     return jsonify(count=n)
