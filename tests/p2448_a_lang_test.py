@@ -7,6 +7,11 @@ key + values. The first admin speaks German here, so a text that silently falls 
  - planned proposal: the title in the language of the person the plan works for
  - import: the stored state keeps key + values, the status answers in the language of who asks
  - history: an encrypted file is stored as the key, the reader's app translates it
+ 2.454.0 (#3808), the rest of it:
+ - invoice series: a failed check of finalising or sending (the missing fields too) follows each admin
+ - account import: the areas that stay behind (preview, warning) follow who reads the state
+ - wiki import: a check text of the background run follows who reads the state
+ - proposal: the title in a task's history is kept as a key, the asker's words stay in title
  The cases without the series run for a person without an organisation (tests/freelancer_fixture.py)."""
 # kalmido-suite: fresh
 import base64
@@ -129,6 +134,17 @@ in_ct("import app\nfrom kalmido.core.db import connect\nfrom kalmido.office impo
 t = dict(dbx("SELECT created_by, content FROM tasks WHERE title LIKE '%Rente%'"))
 check("Der Kunde hat keine E-Mail-Adresse" in t.get(ALICE, ""), f"the German admin reads German {t}")
 check("Le client n’a pas d’adresse e-mail" in t.get(BOB, ""), f"the French admin reads French, whoever came first {t}")
+
+# 2.454.0 (#3808): the same for a check that fails inside finalising (tax number and IBAN are missing here)
+dbx("UPDATE clients SET email_invoice='billing@example.com' WHERE id=?", (CL,))
+r = A.post(B + O + "/series", json={"template_id": TPL, "every": "monthly", "start": date.today().isoformat(), "auto_send": True, "title": "Zweite"})
+check(r.status_code == 201, "a second series " + r.text[:200])
+dbx("UPDATE office_inv_series SET created_by=? WHERE id=?", (FID, r.json()["id"]))
+in_ct("import app\nfrom kalmido.core.db import connect\nfrom kalmido.office import recurring as x\nx._RIN_LAST['at'] = -1e12\n"
+      "c = connect()\nx.rin_tick(c)\nc.close()")
+t = dict(dbx("SELECT created_by, content FROM tasks WHERE title LIKE '%Zweite%'"))
+check("Vor dem Festschreiben fehlt" in t.get(ALICE, "") and "Steuernummer oder USt-IdNr." in t.get(ALICE, ""), f"#3808: the German admin reads the check in German {t}")
+check("Manque avant la clôture" in t.get(BOB, "") and "numéro fiscal" in t.get(BOB, ""), f"#3808: the French admin in French, the field names too {t}")
 
 # ================================================================ agent card: the person reads it
 Fr.get(B + O + "/settings")
