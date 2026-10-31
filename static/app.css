@@ -384,7 +384,7 @@ body>.modal{position:fixed;inset:0;max-height:none;max-width:none;margin:0}  /* 
 code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);font-family:var(--mono);font-size:var(--fs-s);word-break:break-all}
 
 /* ---------- toast ---------- */
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.5rem + var(--tabs-h) + var(--safe-b));z-index:80;background:var(--bg3);border-radius:var(--radius);padding:.5rem .625rem .5rem .875rem;display:flex;gap:.75rem;align-items:center;box-shadow:var(--shadow);font-size:var(--fs-m);max-width:calc(100vw - 2rem)}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.5rem + var(--tabs-h) + var(--safe-b));z-index:80;background:var(--bg3);border-radius:var(--radius);padding:.5rem .625rem .5rem .875rem;display:flex;gap:.75rem;align-items:center;box-shadow:var(--shadow);font-size:var(--fs-m);width:max-content;max-width:calc(100vw - 2rem)}
 #toast button{color:var(--accent);font-weight:600}
 /* 2.41.0 (#1437): the vCard import's progress / result: stays until it is closed */
 
@@ -6571,7 +6571,7 @@ html.mini-chat body.in-chat #view,html.mini-chat body.in-team #view{padding-left
 /* 2.46.4 C (#1755) the message with a button is one line: the text is cut with an ellipsis, the button stays whole */
 #toast.one>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 2.218.0 B (#2801): up to two lines instead of one cut-off line */
-#toast.one>span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;white-space:normal;overflow-wrap:anywhere}
+#toast.one>span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;white-space:normal;overflow-wrap:break-word}
 #toast.one button,#toast.one kbd{flex:none}
 /* 2.46.6 B (#1708 #1709): an agent's lists on its card, the workspace in the row of a personal agent, the setup offer */
 .agcard .aglists{flex-basis:100%;min-width:0;border-top:1px solid var(--line2);padding-top:.375rem}
