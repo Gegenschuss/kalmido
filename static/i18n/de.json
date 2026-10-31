@@ -12253,7 +12253,6 @@
   "You joined {0}": "Du bist {0} beigetreten",
   "Invitation declined": "Einladung abgelehnt",
   "Invitation sent. With an account, the person accepts it in their News.": "Einladung gesendet. Mit Konto nimmt die Person sie in ihren Neuigkeiten an.",
-  "Without an account, a new one is created in this organisation and the person gets an e-mail to choose a password. With an account, the person gets an invitation to accept.": "Ohne Konto wird in dieser Organisation ein neues angelegt und die Person bekommt eine E-Mail, um ein Passwort zu wählen. Mit Konto bekommt die Person eine Einladung zum Annehmen.",
   "The invitation e-mail could not be sent. Try Resend later or ask the server's admin.": "Die Einladungs-E-Mail konnte nicht gesendet werden. Versuch es später mit Erneut senden oder frag den Admin des Servers.",
   "This invitation was sent again too often today (at most {0}). Try again tomorrow.": "Diese Einladung wurde heute zu oft erneut gesendet (höchstens {0}). Versuch es morgen wieder.",
   "This person cannot be added to this conversation": "Diese Person kann nicht zu dieser Unterhaltung hinzugefügt werden",
@@ -15346,5 +15345,7 @@
   "Hold a row to see what you can do with it.": "Halte eine Zeile gedrückt, um zu sehen, was du damit tun kannst.",
   "Mail limits of public pages": "Mail-Grenzen öffentlicher Seiten",
   "your customer portal or booking page used up its sign-in or confirmation mails": "dein Kundenportal oder deine Buchungsseite hat seine Anmelde- oder Bestätigungsmails aufgebraucht",
-  "Bookmarks are being fetched in the background": "Lesezeichen werden im Hintergrund abgerufen"
+  "Bookmarks are being fetched in the background": "Lesezeichen werden im Hintergrund abgerufen",
+  "Invitation sent. The person accepts it in their News.": "Einladung gesendet. Die Person nimmt sie in ihren Neuigkeiten an.",
+  "Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.": "Ohne Konto wird ein neues angelegt und die Person bekommt eine E-Mail, um ein Passwort zu wählen. In beiden Fällen tritt die Person bei, indem sie die Einladung annimmt."
 }

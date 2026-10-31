@@ -168,10 +168,13 @@ dialog's history (old and new value) and the owner and the members get a News en
 
 **Inviting by e-mail (2.115).** An organisation's admin can invite somebody who has no account yet: *Settings >
 Organisation > Invite by e-mail* (address and role). Kalmido creates an account without a password (the user name is made
-from the address), makes it a member of that organisation in the chosen role and mails the invitation link (the link is
-shown, too, to pass on without mail). An address that already has an account is added as with *Add by e-mail address*.
-Open invitations are listed below with *Resend* (a new link, the old one stops working) and *Withdraw* (deletes the account,
-only while it never signed in and belongs to this organisation alone). Limits: 20 new invitations per inviting person and
+from the address) and mails the invitation link, valid for two weeks; the link goes to an organisation admin only by mail,
+an instance admin also gets it on the screen when no mail went. An address that already has an account is added as with
+*Add by e-mail address*. Since 2.453 a person with a new account joins like one with an existing account: by accepting the
+invitation in their News (after choosing a password), in the chosen role, so the member list does not tell the two apart.
+An instance admin still adds directly (on a hosted instance the operator invites, too). Open invitations are listed below
+with *Resend* (a new link and two more weeks, the old link stops working) and *Withdraw* (deletes the account, only while it
+never signed in and belongs to this organisation alone). Limits: 20 new invitations per inviting person and
 day, plus the daily mail budget. Instance admins switch it off under *Settings > Users > Registration on the login page*
 (*Organisation admins may invite new people by e-mail*, on by default); adding existing accounts stays possible.
 

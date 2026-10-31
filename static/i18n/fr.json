@@ -12277,7 +12277,6 @@
   "You joined {0}": "Tu as rejoint {0}",
   "Invitation declined": "Invitation refusée",
   "Invitation sent. With an account, the person accepts it in their News.": "Invitation envoyée. Avec un compte, la personne l’accepte dans ses Actualités.",
-  "Without an account, a new one is created in this organisation and the person gets an e-mail to choose a password. With an account, the person gets an invitation to accept.": "Sans compte, un nouveau est créé dans cette organisation et la personne reçoit un e-mail pour choisir un mot de passe. Avec un compte, la personne reçoit une invitation à accepter.",
   "The invitation e-mail could not be sent. Try Resend later or ask the server's admin.": "L’e-mail d’invitation n’a pas pu être envoyé. Réessaie plus tard avec Renvoyer ou demande à l’admin du serveur.",
   "This invitation was sent again too often today (at most {0}). Try again tomorrow.": "Cette invitation a été renvoyée trop souvent aujourd’hui (au plus {0}). Réessaie demain.",
   "This person cannot be added to this conversation": "Cette personne ne peut pas être ajoutée à cette conversation",
@@ -15346,5 +15345,7 @@
   "Hold a row to see what you can do with it.": "Maintiens une ligne appuyée pour voir ce que tu peux en faire.",
   "Mail limits of public pages": "Limites d’e-mails des pages publiques",
   "your customer portal or booking page used up its sign-in or confirmation mails": "ton portail client ou ta page de réservation a épuisé ses e-mails de connexion ou de confirmation",
-  "Bookmarks are being fetched in the background": "Les favoris sont récupérés en arrière-plan"
+  "Bookmarks are being fetched in the background": "Les favoris sont récupérés en arrière-plan",
+  "Invitation sent. The person accepts it in their News.": "Invitation envoyée. La personne l’accepte dans ses Actualités.",
+  "Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.": "Sans compte, un nouveau est créé et la personne reçoit un e-mail pour choisir un mot de passe. Dans les deux cas, la personne rejoint en acceptant l’invitation."
 }

@@ -11,6 +11,7 @@
    list comes on request (again: true, Settings > Help); an organisation admin and a person without organisation keep it
 freelancer-matrix: onboarding (elena has no organisation and gets the list and "For me")
 usage: p2364_a_onboard_test.py <datadir>"""
+import hashlib
 import sys
 
 import kt
@@ -75,6 +76,30 @@ check(r.ok and (not row or row[0][0] == "done"), "#3032: a kid account gets no q
 check(st(Bo)["settings"].get("purpose_ask") == "me", "#3032: an account the admin made without organisation: preselected For me")
 To.patch(B + "/api/settings", json={"purpose_ask": "done"})
 check(st(To)["settings"].get("purpose_ask") == "team", "#3032: purpose_ask is server-only (the client cannot answer it by PATCH)")
+
+# 2.453.0 (#3780): an address invited by an organisation admin is no member at the first start: it counts as one
+r = A.post(B + "/api/users", json={"username": "olive", "display_name": "Olive", "password": kt.PASSWORD, "email": "olive@example.com", "orgs": [OID]})
+check(r.ok and A.put(B + f"/api/orgs/{OID}/members", json={"user_id": r.json()["id"], "role": "admin"}).ok, "olive: an admin of Acme " + r.text[:200])
+Ol = sess("olive")
+
+
+def first_start(mail, role):
+    """A new address invited as role, the link used (a known token: the link goes by mail only) -> the person's session."""
+    check(Ol.post(B + f"/api/orgs/{OID}/invites", json={"email": mail, "role": role}).ok, "invited: " + mail)
+    tok = hashlib.sha256(mail.encode()).hexdigest()[:40]
+    kt.dbx("UPDATE user_invites SET token_hash=? WHERE user_id=(SELECT id FROM users WHERE email=?)", (hashlib.sha256(tok.encode()).hexdigest(), mail))
+    s = sess()
+    check(s.post(B + "/api/auth/invite/accept", json={"token": tok, "password": kt.PASSWORD}).ok, "the link sets the password: " + mail)
+    return s
+
+
+Sa = first_start("sam@example.com", "member")
+j = onboard(Sa)
+check(j.get("created") is False and st(Sa)["settings"].get("sample_ask") == "0", "#3780: invited, not accepted yet: no Getting started list, like an invited member " + str(j))
+check("collab" in st(Sa)["settings"]["features"].split(",") and Sa.post(B + "/api/me/purpose", json={"purpose": "me", "only": True}).ok
+      and "collab" in st(Sa)["settings"]["features"].split(","), "#3780: For me keeps collaboration for the organisation ahead")
+check(Sa.post(B + f"/api/orgs/{OID}/join").ok, "#3780: and the person joins")
+check(onboard(first_start("una@example.com", "admin")).get("created") is True, "#3780: invited as an admin: the first start of an admin")
 
 # P4: elena without organisation: the question with "For me"; the answer switches exactly calendar, events, contacts
 EID, El = freelancer(B, A, "elena")

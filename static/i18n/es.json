@@ -12277,7 +12277,6 @@
   "You joined {0}": "Te has unido a {0}",
   "Invitation declined": "Invitación rechazada",
   "Invitation sent. With an account, the person accepts it in their News.": "Invitación enviada. Si tiene cuenta, la persona la acepta en sus Novedades.",
-  "Without an account, a new one is created in this organisation and the person gets an e-mail to choose a password. With an account, the person gets an invitation to accept.": "Sin cuenta, se crea una nueva en esta organización y la persona recibe un correo para elegir una contraseña. Con cuenta, la persona recibe una invitación para aceptar.",
   "The invitation e-mail could not be sent. Try Resend later or ask the server's admin.": "No se pudo enviar el correo de invitación. Prueba Reenviar más tarde o pregunta al administrador del servidor.",
   "This invitation was sent again too often today (at most {0}). Try again tomorrow.": "Esta invitación se ha reenviado demasiadas veces hoy (como máximo {0}). Inténtalo mañana.",
   "This person cannot be added to this conversation": "Esta persona no se puede añadir a esta conversación",
@@ -15346,5 +15345,7 @@
   "Hold a row to see what you can do with it.": "Mantén pulsada una fila para ver qué puedes hacer con ella.",
   "Mail limits of public pages": "Límites de correo de las páginas públicas",
   "your customer portal or booking page used up its sign-in or confirmation mails": "tu portal de clientes o tu página de reservas ha agotado sus correos de acceso o de confirmación",
-  "Bookmarks are being fetched in the background": "Los marcadores se están obteniendo en segundo plano"
+  "Bookmarks are being fetched in the background": "Los marcadores se están obteniendo en segundo plano",
+  "Invitation sent. The person accepts it in their News.": "Invitación enviada. La persona la acepta en sus Novedades.",
+  "Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.": "Sin cuenta, se crea una nueva y la persona recibe un correo para elegir una contraseña. En ambos casos, la persona se une al aceptar la invitación."
 }

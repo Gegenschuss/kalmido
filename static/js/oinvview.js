@@ -1,7 +1,7 @@
 // @ts-check
 /* Kalmido web client: Settings > Organisation > Invite by e-mail (2.115.0 B, #2062).
    An organisation's admin invites an address (role member / admin): a new account gets the invitation mail (or the link to
-   copy), an address with an account is added as before. The open invitations of the organisation with "Resend" and
+   copy), an address with an account is added as before; 2.453.0 (#3780): the person joins by accepting in both cases. The open invitations of the organisation with "Resend" and
    "Withdraw", one form for every row (2.360.2 M, #2561: an opaque ref). Inviting and withdrawing are one undo step each. */
 // 2.143.0 A (#2151): every organisation role (server: accounts/orgroles.py); hints = GET /api/orgs roles [{key, label, hint}]
 const oinvRoleSel = (id, cur = 'member', hints = [], attrs = '') => `<select ${id ? `id="${id}" ` : ''}class="orgrolesel" ${attrs || `aria-label="${esc(tr('Role'))}"`}>${['member', 'admin', 'readonly', 'accounting', 'guest'].map(k =>
@@ -34,7 +34,7 @@ async function oinvSend(oid, email, role) {
   const r = await api('POST', `/api/orgs/${oid}/invites`, {email, role});
   if (r.invited && r.invitation) inviteResult(r.invitation, email);
   else if (r.notice) toast(r.notice);  // 2.148.1 A (#2486): the mail did not go (an organisation admin never gets the link)
-  else toast(S.me?.is_admin ? tr('If this address has an account, the person is now a member.') : tr('Invitation sent. With an account, the person accepts it in their News.'));  // 2.148.1 A (#2480)
+  else toast(S.me?.is_admin ? tr('If this address has an account, the person is now a member.') : tr('Invitation sent. The person accepts it in their News.'));  // 2.148.1 A (#2480), 2.453.0 (#3780)
   return r;
 }
 // 2.364.0 C (#3041): ONE invitation dialog for the three ways before (field + Add, "Invite by e-mail", Administration > New
@@ -52,7 +52,7 @@ function oinvDialog(oid, hints = [], on = true) {
     <div class="row"><label for="oinv-role">${tr('Role')}</label>${oinvRoleSel('oinv-role', 'member', hints)}</div>
     <div class="shint oinvrolehint">${esc((hints.find(x => x.key === 'member') || {}).hint || '')}</div>
     <div class="shint oinvmh">${!on ? tr('With an account, the person is added; without one, nothing happens (invitations are switched off on this server).') : S.me?.is_admin ? tr('Without an account, a new one is created in this organisation and the person gets an e-mail to choose a password. With an account, the person is added.')
-      : tr('Without an account, a new one is created in this organisation and the person gets an e-mail to choose a password. With an account, the person gets an invitation to accept.')}</div>
+      : tr('Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.')}</div>
     <div class="shint oinvlk" hidden>${tr('A new account in this organisation. You get a link to pass on (it works once and for 7 days); with it the person chooses a password. The e-mail is optional.')}</div>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" type="submit">${tr('Invite')}</button></div></form>`);
   md.addEventListener('click', e => { if (/** @type {any} */ (e.target).closest('[data-m="close"]')) md.remove(); });

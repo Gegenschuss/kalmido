@@ -12277,7 +12277,6 @@
   "You joined {0}": "Je bent lid van {0}",
   "Invitation declined": "Uitnodiging afgewezen",
   "Invitation sent. With an account, the person accepts it in their News.": "Uitnodiging verstuurd. Met een account accepteert de persoon haar in het Nieuws.",
-  "Without an account, a new one is created in this organisation and the person gets an e-mail to choose a password. With an account, the person gets an invitation to accept.": "Zonder account wordt er een nieuw aangemaakt in deze organisatie en krijgt de persoon een e-mail om een wachtwoord te kiezen. Met een account krijgt de persoon een uitnodiging om te accepteren.",
   "The invitation e-mail could not be sent. Try Resend later or ask the server's admin.": "De uitnodigingsmail kon niet worden verstuurd. Probeer later Opnieuw sturen of vraag de beheerder van de server.",
   "This invitation was sent again too often today (at most {0}). Try again tomorrow.": "Deze uitnodiging is vandaag te vaak opnieuw verstuurd (hoogstens {0}). Probeer het morgen opnieuw.",
   "This person cannot be added to this conversation": "Deze persoon kan niet aan dit gesprek worden toegevoegd",
@@ -15346,5 +15345,7 @@
   "Hold a row to see what you can do with it.": "Houd een regel ingedrukt om te zien wat je ermee kunt doen.",
   "Mail limits of public pages": "Mailgrenzen van openbare pagina’s",
   "your customer portal or booking page used up its sign-in or confirmation mails": "je klantenportaal of boekingspagina heeft zijn aanmeld- of bevestigingsmails opgebruikt",
-  "Bookmarks are being fetched in the background": "Bladwijzers worden op de achtergrond opgehaald"
+  "Bookmarks are being fetched in the background": "Bladwijzers worden op de achtergrond opgehaald",
+  "Invitation sent. The person accepts it in their News.": "Uitnodiging verstuurd. De persoon accepteert haar in het Nieuws.",
+  "Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.": "Zonder account wordt een nieuw aangemaakt en krijgt de persoon een e-mail om een wachtwoord te kiezen. In beide gevallen sluit de persoon zich aan door de uitnodiging te accepteren."
 }
