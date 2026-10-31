@@ -486,18 +486,20 @@ function wkoDrop() {
   return new Promise(ok => { try { const r = indexedDB.deleteDatabase('kalmido-wiki'); r.onsuccess = r.onerror = r.onblocked = () => ok(); } catch { ok(); } });
 }
 function outDrop() { LS.del('outbox'); if (OBX.on) return obxClear(); for (const o of OUT.q) o.done = true; OUT.q = []; return Promise.resolve(); }
+function startDrop() { LS.del('cache'); S.lpCache = null; }
 const wkoOld = m => !m || !(Date.now() - Date.parse(m.at) < WKO_MAX_AGE);
 function sessGuard(me) {
   if (!me) return;
   const m = LS.get('wko', null);
-  if (wkoOld(m) || m.g !== (me.sgen || '')) { wkoDrop(); LS.set('wko', {g: me.sgen || '', at: new Date().toISOString()}); }
+  if (wkoOld(m) || m.g !== (me.sgen || '')) { wkoDrop(); startDrop(); LS.set('wko', {g: me.sgen || '', at: new Date().toISOString()}); }
   const ids = (me.workspaces || []).map(w => w.id), was = LS.get('orgIds', null);
   if (Array.isArray(was) && was.some(id => !ids.includes(id))) outDrop();  // removed from an organisation
   LS.set('orgIds', ids);
 }
 // the session is gone (401 / account disabled at /api/state): the knowledge pages' copy goes before the sign-in page.
 // 2.306.0 B (#2889): the outbox stays (authGone keeps what waits; it goes out after the next login of the same account)
-function sessGone() { return Promise.race([wkoDrop(), new Promise(ok => setTimeout(ok, 3000))]); }
+// 2.360.2 (#3226): the offline start state (LS "cache", S.lpCache: all tasks of the last load) goes the same way; load() writes it anew
+function sessGone() { startDrop(); return Promise.race([wkoDrop(), new Promise(ok => setTimeout(ok, 3000))]); }
 function obxSyncReg() { if (OBX.on && navigator.serviceWorker?.ready) navigator.serviceWorker.ready.then(r => r.sync?.register('kalmido-outbox')).catch(() => {}); }
 if (globalThis.navigator?.serviceWorker) navigator.serviceWorker.addEventListener('message', e => { if (e.data?.type === 'outbox-flush' && OUT.q.length) flush(); });
 // 2.21.0 (#673): before the first render there is no top bar to update (renderTop on an empty state threw, so a start while
@@ -536,8 +538,9 @@ async function rawFetch0(method, url, body, key) {
   // same as offline (cached data, changes wait), the hint says "server not reachable"; never a reload loop on a proxy page
   // 2.24.0 (#907): 503 (the proxy's maintenance page) or a notice of the kind "maintenance": "server in maintenance"
   // 2.359.0 A (#3023): an HTML page with a server error (500, a database restart) the same way (the change waits, no reload)
+  // 2.360.2 L (#2561): the write lock of a key rotation too (JSON for API clients, the header X-Kalmido-Maint marks it)
   const ctype = r.headers.get('content-type') || '';
-  if (([502, 503, 504].includes(r.status) || (r.status >= 500 && ctype.includes('text/html'))) && !ctype.includes('application/json')) { const ch = !OUT.down; OUT.down = true; OUT.maint = r.status === 503 || S.announce?.level === 'maintenance'; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('down'); }
+  if (([502, 503, 504].includes(r.status) || (r.status >= 500 && ctype.includes('text/html'))) && (!ctype.includes('application/json') || r.headers.get('X-Kalmido-Maint'))) { const ch = !OUT.down; OUT.down = true; OUT.maint = r.status === 503 || S.announce?.level === 'maintenance'; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('down'); }
   if (OUT.down) { OUT.down = false; if (S.booted && !OUT.online) renderTop(); }
   setOnline(true);
   // 2.359.0 A (#3023): an HTML 404 / 405 / 4xx (an address without a route, e.g. a temporary id; a proxy's page) is an error

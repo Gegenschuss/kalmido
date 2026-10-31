@@ -49,6 +49,14 @@ def login_log_name(name, c=None):
     return "user#" + hmac.new(_AUTH_KEY["log"], str(name or "").strip().lower().encode(), hashlib.sha256).hexdigest()[:8]
 
 
+def addr_key(c, purpose, s):
+    """2.360.2 M (#2561): a keyed hash of an address (lookups in a sealed column; guessed addresses cannot be tried offline)."""
+    if "addr" not in _AUTH_KEY:
+        _AUTH_KEY["addr"] = HKDF(algorithm=hashes.SHA256(), length=32, salt=b"kalmido-auth",
+                                 info=b"address keys v1").derive(bytes.fromhex(gsetting(c, "auth_secret")))
+    return hmac.new(_AUTH_KEY["addr"], f"{purpose}:{str(s or '').strip().lower()}".encode(), hashlib.sha256).hexdigest()
+
+
 def login_log_ip(ip):
     """2.239.0 B (#2888): the address for a log line; shortened unless KALMIDO_LOG_FULL_IP=1. Nothing -> "-", text that is
     no address -> "?" (never logged as it came)."""

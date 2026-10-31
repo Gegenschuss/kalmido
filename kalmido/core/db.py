@@ -1128,6 +1128,15 @@ def init_db(guard=True, load=None):
             from ..accounts.orgretain import upg_fk_once
             upg_fk_once(c)
             gset(c, "migr_upg2103", "1")
+        if gsetting(c, "migr_upg2360") != "1":  # 2.360.2 D (#2561): an organisation's timesheets outlive the account
+            from ..accounts.orgretain import upg_fk_once
+            upg_fk_once(c)
+            gset(c, "migr_upg2360", "1")
+        if gsetting(c, "migr_siglog2360") != "1":  # 2.360.2 D (#2561): one way -- old approval log entries lose e-mail, address, device
+            from ..office.signoff import sig_log_trim
+            n, left = sig_log_trim(c)
+            gset(c, "migr_siglog2360", "1")
+            print(f"office log: {n} approval entries shortened, {left} sealed one(s) without a key left as they are", flush=True)
         if gsetting(c, "migr_drt2239") != "1":  # 2.239.0 D (#2874): closed logbook months outlive their vehicle
             from ..admin.dataretention import drt_fk_once
             drt_fk_once(c)

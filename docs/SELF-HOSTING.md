@@ -777,6 +777,8 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
   docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli rotate --org <id> --recovery-out /data/rk-<id>.txt
   ```
 
+  Around the key switch the server takes no writes on any process, up to about half a minute: writes get a 503 and wait
+  in the app's queue, reading and signing in go on (a run that dies frees the server after two minutes; 2.360.2).
   A new key is made, every encrypted value and file of the organisation is encrypted again with it, then the old key
   is removed and a new recovery key is written (to stdout, or with `--recovery-out` into a new file with mode 0600: move
   it offline and delete the file). On this server all earlier recovery keys, including the earlier format, stop
@@ -1057,8 +1059,13 @@ organisation data that is not yours (use the organisation export for a whole org
 **2.148.1 (Art. 15):** the file also holds the list of your private files (name, type, size, dates; not their content),
 your private knowledge pages, your chats with agents, what you wrote in direct messages, your absences and timesheets
 (`private_files`, `wiki_pages`, `agent_chats`, `direct_messages`, `absences`, `timesheets`; the import does not take them
-over yet). `not_included` in the manifest names what is still missing (content of private files, other people's chat
-messages, booking pages, polls and forms, holiday allowances, the organisation's office).
+over yet). `not_included` in the manifest names what is still missing (older versions of private files, other people's chat
+messages, the organisation's office).
+
+**2.360.2:** also the current content of your private files (`files/private_files/`), your booking page with its
+bookings (`appt_pages`, `appt_types`, `appt_bookings`, without network addresses), your private polls (`polls`,
+`poll_options`, `poll_votes`, without voters' e-mail addresses), the forms of your projects with their entries (`forms`,
+`form_entries`) and your holiday allowances (`leave_quota`). The import does not take them over: the preview names them.
 
 **The file** (`kalmido-account-<date>.zip`, readable without Kalmido):
 

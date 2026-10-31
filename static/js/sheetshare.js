@@ -2,8 +2,8 @@
 // 2.124.0 C (#2113): one table shared with single people or agents (read | write), loaded with the tables (lazyload.js).
 // The sheet's "…" menu gets "Share…" for who may change the table through its workspace (can_share from the server); the
 // dialog is built like the file store's Share dialog (ablage.js ab_share): the shares with a role each and a cross, "Share
-// with …" (people of the workspace, its agents), by e-mail address (the answer never tells whether the address has an
-// account). Every add / stop / role change is one Undo step. The overview shows "Shared" on a table with shares and puts
+// with …" (people of the workspace, its agents), by e-mail address (2.360.2 M, #2561: such a row always reads "Invited", with
+// or without an account behind the address). Every add / stop / role change is one Undo step. The overview shows "Shared" on a table with shares and puts
 // the tables shared with me into their own group (sheets.js shvOverview).
 const shs$ = (s, r) => /** @type {any} */ ((r || document).querySelector(s));
 const shsUrl = (sid, shid) => `/api/sheets/${sid}/shares${shid ? '/' + shid : ''}`;
@@ -32,11 +32,11 @@ async function shsOpen(sh) {
   let shares = d.shares || [];
   const draw = () => {
     const box = shs$('#shs-list', md); if (!box) return;
-    box.innerHTML = shares.map(s => `<div class="mrow" data-sid="${s.id}">${av(s.user_id, s.name)}<span class="n">${esc(s.name)}${s.agent ? agentBadge() : ''}</span>${roleSel(`data-shsr="${s.id}"`, s.role)}<button class="iconbtn" data-shsx="${s.id}" title="${esc(tr('Stop sharing'))}" aria-label="${esc(tr('Stop sharing with {0}', s.name))}">${ic('x', 's')}</button></div>`).join('')
+    box.innerHTML = shares.map(s => `<div class="mrow" data-sid="${s.id}">${s.email ? `<span class="avatar">${ic('mail', 's')}</span>` : av(s.user_id, s.name)}<span class="n">${esc(s.name)}${s.agent ? agentBadge() : ''}${s.state === 'invited' ? `<small class="muted">${tr('Invited')}</small>` : ''}</span>${roleSel(`data-shsr="${s.id}"`, s.role)}<button class="iconbtn" data-shsx="${s.id}" title="${esc(tr('Stop sharing'))}" aria-label="${esc(tr('Stop sharing with {0}', s.name))}">${ic('x', 's')}</button></div>`).join('')
       || `<div class="muted mhint">${tr('Not shared yet')}</div>`;
   };
   draw();
-  const add = async b => { const r = await api('POST', shsUrl(sid), b); shares = r.shares || shares; draw(); shsAfter(sid); return r; };  // 2.148.1 A (#2490): by address no list
+  const add = async b => { const r = await api('POST', shsUrl(sid), b); shares = r.shares || shares; draw(); shsAfter(sid); return r; };
   const idOf = uid => (shares.find(q => q.user_id === uid) || {}).id;
   md.addEventListener('click', async e => {
     const t = /** @type {any} */ (e.target);
@@ -57,7 +57,7 @@ async function shsOpen(sh) {
       if (!email || !inp.checkValidity()) { inp.focus(); return; }
       try { await add({email, role}); } catch { return; }
       inp.value = '';
-      toast(tr('If the address belongs to a person who can get the table, it is shared with them now.'));
+      toast(tr('Invited. With an account at this address, the person sees the table once they may get it.'));
       return;
     }
     const x = t.closest('[data-shsx]');
@@ -66,7 +66,7 @@ async function shsOpen(sh) {
       let r; try { r = await api('DELETE', shsUrl(sid, s.id)); } catch { return; }
       shares = r.shares; draw(); shsAfter(sid);
       offerUndo(tr('No longer shared with {0}', s.name), histAdd({label: tr('Stop sharing “{0}”', title),
-        undo: async () => { await shsReq('POST', shsUrl(sid), {user_id: s.user_id, role: s.role}); shsAfter(sid); return {}; },
+        undo: async () => { const n = await shsReq('POST', shsUrl(sid), s.email ? {email: s.email, role: s.role} : {user_id: s.user_id, role: s.role}); if (n?.shares) s.id = (n.shares.find(q => s.email ? q.email === s.email : q.user_id === s.user_id) || s).id; shsAfter(sid); return {}; },
         redo: async () => { await shsReq('DELETE', shsUrl(sid, s.id)); shsAfter(sid); return {}; }}));
     }
   });

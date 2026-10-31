@@ -925,8 +925,9 @@ VDR_PRUNE = {"at": 0.0}
 
 
 def vdr_trash_prune(c):
-    """2.99.1 review M3: reviews and comments in the trash longer than VDR_TRASH_DAYS go for good (versions, comments and
-    approval links of a review with it, FK cascade). The watchdog calls it, at most hourly (system context: every workspace)."""
+    """2.99.1 review M3: reviews and comments in the trash longer than VDR_TRASH_DAYS go for good (versions and comments of a
+    review with it, FK cascade; its approval records stay with video_id NULL, 2.148.1 C #2493: admins / the creator see and
+    delete them, office/signoff.sig_gone_list). The watchdog calls it, at most hourly (system context: every workspace)."""
     import time
     if time.time() - VDR_PRUNE["at"] < 3600:
         return

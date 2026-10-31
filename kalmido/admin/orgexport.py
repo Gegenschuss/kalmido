@@ -73,6 +73,7 @@ OX_SECRET_COLS = frozenset((
     "auth", "code_hash", "webauthn_handle", "oidc_subject", "proxy_login", "endpoint",
     "etags", "api_key", "access_token", "refresh_token",
     "hint",  # 2.55.0 (#1455): the last characters of a newsletter connection's access data (nl_conns)
+    "email_seal", "email_key",  # 2.360.2 M (#2561): sealed with this server's key (sheet_shares)
     "confirm_hash", "cancel_hash"))  # 2.362.0 (#3096): the links of a booking (appt_bookings)
 
 _OX = {}  # org id -> the running thread
@@ -364,7 +365,7 @@ OX_AREAS = (
     ("sheets/rows.json", "sheet_rows", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
     ("sheets/cells.json", "sheet_cells", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),
     ("sheets/links.json", "sheet_links", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),  # 2.89.0 (#1916, D): carried over by button
-    ("sheets/shares.json", "sheet_shares", "org_id=?"),  # 2.124.0 C (#2113): single tables shared with people / agents
+    ("sheets/shares.json", "sheet_shares", "org_id=? AND email_key=''"),  # 2.124.0 C (#2113): single tables shared with people / agents; 2.360.2 M (#2561): not by address (a sealed address, the account behind it stays unnamed)
     ("sheets/files.json", "sheet_files", "org_id=?"),  # 2.124.0 B (#2110): files of file cells (the rows; names, sizes)
     ("sheets/history.json", "sheet_hist", "sheet_id IN (SELECT id FROM sheets WHERE org_id=?)"),  # 2.124.0 B (#2112): cell history
     ("videos/reviews.json", "video_reviews", "org_id=?"),  # 2.99.1 A (#1959): video sign-offs (links only), versions, comments

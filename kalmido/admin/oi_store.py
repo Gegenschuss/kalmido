@@ -433,7 +433,7 @@ def _sheet_link(c, run, src, d, ctx):
 
 
 def _sheet_share(c, run, src, d, ctx):
-    return d if _not_agent(c, d["user_id"]) else None
+    return d if d["user_id"] is not None and _not_agent(c, d["user_id"]) else None  # 2.360.2 M (#2561): an open address row never
 
 
 # ---- video sign-offs -------------------------------------------------------------------------------------------------------

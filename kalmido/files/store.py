@@ -375,10 +375,8 @@ def _mail_hidden(c, uid):
     """2.148.1 D (#2488): the clause that leaves out nodes filed with a hub mail uid may not read ('' when there are none)."""
     if not c.execute("SELECT 1 FROM fs_nodes WHERE hub_mail_id IS NOT NULL LIMIT 1").fetchone():
         return ""
-    from ..hub.hubmail import hbm_node_mail_ids
-    ok = sorted(hbm_node_mail_ids(c, uid))
-    keep = f" AND hub_mail_id NOT IN ({','.join(str(int(x)) for x in ok)})" if ok else ""
-    return f" AND id NOT IN (SELECT id FROM fs_nodes WHERE hub_mail_id IS NOT NULL{keep})"
+    from ..hub.hubmail import hbm_node_sql
+    return f" AND id NOT IN (SELECT id FROM fs_nodes WHERE hub_mail_id IS NOT NULL AND hub_mail_id NOT IN ({hbm_node_sql(c, uid)}))"
 
 
 def fs_visible_ids(c, uid=None):
