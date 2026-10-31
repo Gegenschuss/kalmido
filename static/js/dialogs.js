@@ -453,7 +453,7 @@ function listMenuItems(id, anchor) {
   // 2.25.0 (UX-52): list or project is the switch "Project features" in "Edit list…" (no "As a list / As a project" here)
   void k;
   if (collab() && l.shared) items.push({label: tr('Notifications: {0}', bellLabel(l.bell)), icon: BELL_ICON[l.bell || 'default'], rare: 1, fn: () => bellMenu(at(), id)});
-  { const fv = favMenuItem(l); if (fv) items.push(fv); }  // 2.40.0 (#1361): the personal star
+  { const fv = favMenuItem(l), o = items.findIndex(x => x && x.label === tr('Open')), c = items.findIndex(x => x?.rcls === 'mcols'); if (fv) items.splice(o >= 0 ? o + 1 : c >= 0 ? c + 2 : 0, 0, fv); }  // 2.40.0 (#1361): the personal star; 2.441.0 (#3592): second, right after Open
   if (progressFor(l) && !l.is_inbox) items.push(progHidden(id) ? {label: tr('Show progress'), icon: 'eye', rare: 1, fn: () => setProgHidden(id, false)} : {label: tr('Hide progress'), icon: 'x', rare: 1, fn: () => setProgHidden(id, true)});
   // U12: archive (with undo) instead of delete; deleting for good only from the archive
   // 2.25.0 (UX-13): delete from every list menu; 2.39.1 (#1188): also list admins, organisation admins (listadmin.js)

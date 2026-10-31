@@ -548,7 +548,7 @@ APP_ONLY = [
      "(the same visibility)", ("=GET /api/fields/task-refs",)),
     ("2.40.0 (#1344 / #1361): the own order of My tasks and the favourite star are personal app settings of a person; "
      "agents never set them; 2.46.1: the favourite suggestion asks the person", ("PUT /api/tasks/mine-order", "* /api/lists/{}/favorite",
-                                                                                   "POST /api/favorites/suggestion")),
+                                                                                   "POST /api/favorites/suggestion", "GET /api/favorites/targets")),
     ("2.41.0 (#1365 / #1205): \"Show in My tasks\" per list and the person's Waiting-on suggestions are personal app "
      "settings of a person; agents never set them (an agent writes the waiting text itself with PUT /tasks/{id}/waiting)",
      ("PUT /api/lists/{}/in-mine", "* /api/me/wait-suggestions")),

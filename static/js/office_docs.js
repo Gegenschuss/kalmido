@@ -731,7 +731,7 @@ function ofdMoreItems(d, inList) {
         try { const j = await api('DELETE', `/api/office/docs/${d.id}`); gone();  // 2.272.0 E2 (#3038): a draft goes to the office trash, the toast undoes it
           if (j?.trash_id) toast(tr('“{0}” moved to the trash', d.number || ofdKindName(d.kind, true)), () => otb_restore(j.trash_id)); else toast(tr('Deleted')); } catch (x) { toast(x.message || tr('unknown')); }
       }} : null];
-  return inList ? [{label: tr('Open'), icon: 'edit', fn: () => go(ofd_href(d.id, d.kind))}, ...items] : items;
+  return inList ? [{label: tr('Open'), icon: 'edit', fn: () => go(ofd_href(d.id, d.kind))}, ...fv2_menuRow('r:office_doc:' + d.id) /* 2.441.0 (#3592) */, ...items] : items;
 }
 // 2.87.9 (#1920): right click / long press on a row opens the same menu as the dots button
 function ofdRowMenu(id, anchor) {

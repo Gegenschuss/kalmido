@@ -7,7 +7,7 @@
 'use strict';
 
 const FAV_VIEWS = ['today', 'tomorrow', 'week', 'doable', 'assigned'];
-const VW_FAV_HELP = N_('Star what you really work with: projects (the star next to the project title), but also folders, Plan views like Today, views and areas like the calendar, filters, tags, people and agents: right-click or long-press the row in the sidebar > Add to favourites. Your favourites stand as small tiles on top of the sidebar, which stays in place while the rest scrolls; drag a tile to move it, or right-click / long-press it > Move left / Move right. Your order is the same on all your devices. Other members do not see your stars; only your own agents see which of their projects are your favourites. The filter button there (Only favourites) folds every other project under “More projects”. Today, Tomorrow, Next 7 days, Now doable and My tasks can show only the tasks of your favourite projects: … > Only favourites.');  // Settings > Help
+const VW_FAV_HELP = N_('Star what you really work with: anything with an address of its own, like a project, a quotation or invoice, a document, a folder, a knowledge page, a table, a contact, an area, a filter or a saved view: the star next to the title, Add to favourites in the menu of a row (right-click or long-press), or drag it into the row. Your favourites stand as a row of symbols in the head bar, one row for all workspaces, a dot shows the workspace; what does not fit is under +N. On a phone the row sits under the header and can be swiped, or pin the tab Favourites instead. Drag a symbol to move it, or right-click / long-press it > Move left / Move right, add a divider or give it a colour or symbol of its own. Your order is the same on all your devices. Other members do not see your stars; only your own agents see which of their projects are your favourites. The filter button there (Only favourites) folds every other project under “More projects”. Today, Tomorrow, Next 7 days, Now doable and My tasks can show only the tasks of your favourite projects: … > Only favourites.');  // Settings > Help
 const favIds = () => (S.settings?.fav_lists || '').split(',').filter(Boolean).map(Number);
 const favIs = id => favIds().includes(+id);
 const favAny = () => favIds().some(id => { const l = listById(id); return l && !l.archived && !l.is_inbox; });
@@ -66,7 +66,9 @@ const favViewNote = () => favViewOn() && favAny() ? `<div class="favnote muted">
 
 // 2.46.1 (#1361): Settings > Appearance > Favourites: quieter pushes from lists without a star (default off) and the one-time
 // suggestion of a busy list (default on)
-const lc_favSetHtml = (chk, hint) => `<h4 id="s-fav-h">${tr('Favourites')}</h4>
+// 2.441.0 (#3592): + what shows nothing now, with a way to clear it
+const lc_favGoneHtml = () => { const n = fv2_goneKeys().length; return n ? `<div class="row" id="s-fav-gone"><span>${esc(trn('{0} favourite no longer available', '{0} favourites no longer available', n))}</span><button type="button" class="btn sm" data-fav-gone>${esc(tr('Remove'))}</button></div>` : ''; };
+const lc_favSetHtml = (chk, hint) => `<h4 id="s-fav-h">${tr('Favourites')}</h4>${lc_favGoneHtml()}
       <div class="row">${chk('s-favq', S.settings?.fav_quiet === '1', tr('Quieter pushes from projects without a star'))}</div>
       ${hint(tr('While you have favourites, projects without a star send pushes only for @mentions, replies to you, assignments, reminders and approvals. The News stay complete; a project bell set to All wins.'))}
       <div class="row">${chk('s-favs', S.settings?.fav_suggest !== '0', tr('Suggest favourites'))}</div>
@@ -82,9 +84,10 @@ async function lc_favSuggest() {
 }
 
 document.addEventListener('click', e => {
-  const t = e.target.closest?.('[data-fav],[data-fav-only],[data-fav-more],[data-fav-view-off]'); if (!t) return;
+  const t = e.target.closest?.('[data-fav],[data-fav-only],[data-fav-more],[data-fav-view-off],[data-fav-gone]'); if (!t) return;
   e.preventDefault(); e.stopPropagation();
-  if (t.hasAttribute('data-fav')) favSet(+t.dataset.fav, !favIs(+t.dataset.fav));
+  if (t.hasAttribute('data-fav-gone')) { const g = fv2_goneKeys(); $('#s-fav-gone')?.remove(); fv2_change(fv2_keys().filter(k => !g.includes(k)), tr('Removed from favourites')); }
+  else if (t.hasAttribute('data-fav')) favSet(+t.dataset.fav, !favIs(+t.dataset.fav));
   else if (t.hasAttribute('data-fav-only')) favSetting('fav_only', favOnly() ? '0' : '1');
   else if (t.hasAttribute('data-fav-more')) { S.favMore = !S.favMore; renderSide(); }
   else favSetting('fav_views', (S.settings.fav_views || '').split(',').filter(x => x && x !== S.route.key).join(','));

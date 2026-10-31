@@ -244,6 +244,7 @@ function sv_tileMenu(b) {
   const act = sv_cur()?.id === id;
   menu(b, [{label: v.name, dis: true, cls: 'mhead'}, '-',
     act ? {label: tr('Back to “Everything”'), icon: 'all', fn: () => sv_activate('', false)} : {label: tr('Open'), icon: 'right', fn: () => sv_activate(id)},
+    ...fv2_menuRow('sv:' + id),  // 2.441.0 (#3592)
     ...(act ? [{label: tr('Update view “{0}”', v.name), icon: 'check', dis: !sv_changed(), fn: sv_update}] : []),
     {label: tr('Edit view “{0}”…', v.name), icon: 'edit', fn: () => sv_edit(id)},
     '-', {label: tr('Delete'), icon: 'trash', fn: () => sv_delete(id)}]);
