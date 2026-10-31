@@ -334,4 +334,4 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_TEST_NOW_AT` | `(empty)` | Test containers only: the real Unix second KALMIDO_TEST_NOW belongs to (app and worker share one shifted clock). |
 | `KALMIDO_TEST_ROT_ABORT` | `(empty)` | Tests: stop the key rotation right after the switch (1). |
 | `KALMIDO_TEST_TIMING_ALL` | `(empty)` | Tests: Server-Timing for every account, not only instance admins (1). |
-| `KALMIDO_TEST_UMZ_END_DELAY` | `(empty)` | Test containers only (with KALMIDO_TEST=1): seconds an account import's worker waits before it ends (2.308.0, #3261). |
+| `KALMIDO_TEST_UMZ_END_DELAY` | `(empty)` | Test containers only (with KALMIDO_TEST=1): seconds an account or wiki import's worker waits before it ends (2.308.0, #3261; 2.363.0, #3280). |

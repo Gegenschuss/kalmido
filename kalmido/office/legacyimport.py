@@ -37,7 +37,7 @@ from flask import jsonify, request
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
-from ..core.db import body, bump, db, iso, now_utc, parse_iso
+from ..core.db import body, bump, db, iso, local_now, now_utc, parse_iso
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .model import (MD, pb_cl_org, pb_cl_sql, office_create, office_gate, office_in_use, office_number_format, office_org, office_role, office_rows, office_scheme_period,
@@ -1590,7 +1590,7 @@ def fi_six_digits(s):
             x = date(y, mo, d)
         except ValueError:
             continue
-        if x <= date.today() and x.isoformat() not in out:
+        if x <= local_now().date() and x.isoformat() not in out:
             out.append(x.isoformat())
     return out
 

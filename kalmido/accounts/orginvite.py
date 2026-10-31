@@ -95,7 +95,6 @@ def oinv_list(c, oid):
                         "name": r["email"] or r["display_name"] or r["username"], "role": r["role"], "created_at": r["created_at"],
                         "state": invite_state(c, r["user_id"]) or "expired"})
     # 2.148.1 H (#2480): the open invitations of existing accounts are listed, too (same form, no account id)
-    from ..core.pg import system_ctx
     since = iso(now_utc() - timedelta(days=OJN_DAYS))
     with system_ctx(c):  # the invited person is no member yet; the caller checked the organisation admin
         joins = c.execute("""SELECT j.id, j.role, j.created_at, u.email FROM org_joins j JOIN users u ON u.id=j.user_id WHERE j.org_id=?
@@ -260,7 +259,6 @@ def ojn_invite(c, oid, uid, role, by=None):
     """An organisation admin (checked by the caller) invites the existing account uid: one open invitation per organisation
     and person (a repeat updates the role); the person gets a News item (at most one a day), no push. The caller commits.
     2.278.0 A (#3095): by = the inviting admin outside a request (the org import's thread)."""
-    from ..core.pg import system_ctx
     now = now_utc()
     by = by or me()
     old = c.execute("SELECT created_at FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
@@ -279,7 +277,6 @@ def ojn_invite(c, oid, uid, role, by=None):
 def ojn_later(c, oid, uid, by, pairs):
     """2.363.0 (#3132): the org import's projects [(list id, role)] of an invited person, noted on the open invitation (a repeat
     invitation keeps them, a second import adds to them; a declined or withdrawn invitation takes them along)."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the row of a person who is no member yet
         r = c.execute("SELECT pending_lists FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
         if r and pairs:
@@ -290,7 +287,6 @@ def ojn_later(c, oid, uid, by, pairs):
 
 def ojn_drop_later(c, oid, uid, by):
     """2.363.0 (#3132): the undo of an import: an invitation another admin took over meanwhile stays, the notes of "by" go."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the row of a person who is no member yet
         r = c.execute("SELECT pending_lists FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
         if r and r["pending_lists"]:
@@ -312,7 +308,6 @@ def ojn_share_later(c, oid, uid, r):
 
 def ojn_open(c, oid, uid):
     """The open invitation row of uid into organisation oid (None: none, expired or already a member)."""
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the invited person is not a member yet: row-level security would hide the organisation's row
         # 2.223.2 A (#2859): never into a retired organisation (an invitation left from before the retirement)
         r = c.execute("SELECT j.* FROM org_joins j JOIN orgs o ON o.id=j.org_id WHERE j.org_id=? AND j.user_id=? AND j.created_at>? "
@@ -324,7 +319,6 @@ def ojn_open(c, oid, uid):
 
 def ojn_mine(c, uid):
     """My open invitations: [{org_id, name, role, by, created_at}] (GET /api/orgs)."""
-    from ..core.pg import system_ctx
     from ..collab.comments import user_names
     with system_ctx(c):  # my own invitations: I am not a member of these organisations yet
         rows = c.execute("""SELECT j.org_id, j.role, j.created_by, j.created_at, o.name FROM org_joins j JOIN orgs o ON o.id=j.org_id
@@ -339,7 +333,6 @@ def ojn_mine(c, uid):
 def org_join_accept(oid):
     """The invited person accepts the open invitation into organisation oid: member in the invited role (404 without one)."""
     from ..agents.core import is_agent
-    from ..core.pg import system_ctx
     from ..accounts.orgs import org_member_add
     c, uid = db(), me()
     if is_agent(g.user):
@@ -361,7 +354,6 @@ def org_join_accept(oid):
 @app.delete("/api/orgs/<int:oid>/join")
 def org_join_decline(oid):
     """The invited person declines the open invitation into organisation oid (404 without one)."""
-    from ..core.pg import system_ctx
     c, uid = db(), me()
     if not ojn_open(c, oid, uid):
         raise Denied(404)
