@@ -110,6 +110,10 @@ t = G.get(B + "/api/office/fixed-costs/import/template")
 check(t.ok and b"Montant (net)" in zipfile.ZipFile(io.BytesIO(t.content)).read("xl/worksheets/sheet1.xml"), "the template's header in French")
 r = G.post(B + "/api/office/fixed-costs/import/preview", files={"file": ("t.xlsx", t.content)})
 check(r.ok and len(r.json().get("rows") or []) == 2, f"the French template reads back {r.status_code} {r.text[:200]}")
+for lg in ("es", "it", "nl", "fr"):  # the Dutch "Bedrag (netto)" was no known column (review of 2.449.0); French stays for what follows
+    G.patch(B + "/api/settings", json={"lang": lg})
+    r = G.post(B + "/api/office/fixed-costs/import/preview", files={"file": ("t.xlsx", G.get(B + "/api/office/fixed-costs/import/template").content)})
+    check(r.ok and len(r.json().get("rows") or []) == 2, f"the template reads back in {lg} {r.status_code} {r.text[:200]}")
 r = G.post(B + "/api/account/export")
 check(r.status_code == 202, "export starts " + r.text[:200])
 for _ in range(480):  # polls the export's state until it is no longer running

@@ -42,7 +42,7 @@ FCI_HEAD = {  # normalised header (letters / digits only) -> field
     "fälligmonat": "month", "faelligmonat": "month", "monat": "month", "duemonth": "month", "month": "month",
     # 2.449.0 (#3768): the headers of the template in fr / es / it / nl
     "nom": "label", "nombre": "label", "nome": "label", "naam": "label", "montantnet": "amount", "montant": "amount", "importeneto": "amount",
-    "importe": "amount", "importonetto": "amount", "importo": "amount", "bedrag": "amount", "moisdéchéance": "month", "mois": "month",
+    "importe": "amount", "importonetto": "amount", "importo": "amount", "bedrag": "amount", "bedragnetto": "amount", "moisdéchéance": "month", "mois": "month",
     "mesdevencimiento": "month", "mes": "month", "mesediscadenza": "month", "mese": "month", "vervalmaand": "month", "maand": "month",
     "kategorie": "category", "category": "category", "gruppe": "category",
     "ust": "vat_rate", "ustsatz": "vat_rate", "mwst": "vat_rate", "mwstsatz": "vat_rate", "vat": "vat_rate", "vatrate": "vat_rate",
