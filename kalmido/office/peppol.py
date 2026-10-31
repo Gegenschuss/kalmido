@@ -42,6 +42,7 @@ from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .model import office_feature, office_gate, office_org, office_role, pb_cl_sql
 from .rights import ofr_admin_or
+from .ledger import ofx_log  # 2.370.0 (#2778)
 
 PEP_ICD = frozenset((
     "0002 0007 0009 0037 0060 0088 0096 0097 0106 0130 0135 0142 0147 0151 0154 0158 0170 0183 0184 0188 0190 0191 0192 0193 "
@@ -523,7 +524,6 @@ def pep_refresh(c, oid, did):
                      (st["status"], st.get("message") or "", ts, ts if st["status"] != x["status"] else x["updated_at"], x["id"])).fetchone():
         return True
     if st["status"] != x["status"]:
-        from .ledger import ofx_log
         ofx_log(c, oid, "peppol_status", doc_id=did, detail={"status": st["status"], **({"message": st["message"]} if st.get("message") else {})})
     return True
 
@@ -532,7 +532,6 @@ def pep_undelivered(c, oid, uid, did):
     """2.370.0 (#2778): a person found out that a send of a provider without rejection reports did not arrive: the newest
     send becomes an error, so "send again" is free (a new send with its own idempotency key); once only, in one statement
     against a status fetch at the same moment. 409 when no such send is on its way."""
-    from .ledger import ofx_log
     who = c.execute("SELECT display_name, username FROM users WHERE id=?", (uid,)).fetchone()
     msg = tr("Marked as not delivered by {0}", who["display_name"] or who["username"])
     q = ",".join("?" * len(PEP_NO_REJECT))
@@ -547,7 +546,6 @@ def pep_undelivered(c, oid, uid, did):
 def pep_send(c, oid, uid, r, again=False):
     """Sends finalised document row r over the provider (see the module text). 409 with the reason when something is
     missing or the document went already; the provider's failure is recorded (status error) and answered as 502."""
-    from .ledger import ofx_log
     conf = pep_conf(c, oid)
     miss = pep_missing(c, oid, r, conf)
     if miss:
