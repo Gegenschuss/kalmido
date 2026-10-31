@@ -261,7 +261,8 @@ function newsText(it, U) {
     case 'leavereq': return tr('{0} asks for vacation ({1})', who, d.start ? esc(fmtDayAbs(d.start) + (d.end && d.end !== d.start ? ' – ' + fmtDayAbs(d.end) : '')) : '');  // 2.125.0 A (#2117)
     case 'leavedecide': return (d.state === 'approved' ? tr('{0} approved your vacation ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : '') : tr('{0} rejected your vacation ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : ''));
     case 'errreport': return d.title ? tr('New error reported: {0}', q(d.title)) : tr('A new error was reported');  // 2.18.0
-    case 'approval': return tr('{0} is waiting for your approval', who);
+    case 'approval': return d.title ? tr('{0} is waiting for your approval: {1}', who, q(d.title)) : tr('{0} is waiting for your approval', who);  // 2.367.2 (#2968): a list-wide one has no task title
+    case 'aprequest': return tr('Approval needed: {0} (from {1})', q(it.task_title || ''), who) + (d.note ? ': ' + q(d.note) : '');  // 2.367.2 (#2968)
     case 'signoff': return d.state === 'accepted' ? (d.sk === 'document' ? tr('{0} signed {1}', q(d.name || ''), q(d.title || '')) : tr('{0} approved {1}', q(d.name || ''), q(d.title || '')))
       : d.sk === 'video' ? tr('{0} asks for changes to {1}', q(d.name || ''), q(d.title || '')) : tr('{0} rejected {1}', q(d.name || ''), q(d.title || ''));  // 2.266.0 (#2965): a customer through a link
     case 'review': return rvw_newsText(it, d, who, q);  // 2.60.0 C (#1512)

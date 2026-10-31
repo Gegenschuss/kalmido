@@ -52,6 +52,7 @@ NEWS_KINDS += ("signoff",)  # 2.266.0 (#2965): a customer approved / declined th
 NEWS_KINDS += ("orgdelnotice", "orggone")  # 2.361.0 (#2920): my organisation is deleted on a day / was deleted (always, no push; accounts/orgleave.py)
 NEWS_KINDS += ("whorgcut",)  # 2.380 G (#3391): my personal webhook no longer delivers an organisation's lists (always, no push; integrations/webhooks.py)
 NEWS_KINDS += ("fetcherr",)  # 2.425.0 C (#3453): a portal of my receipt fetcher reports a new error (row "fetcher", docs/fetcher.py)
+NEWS_KINDS += ("aprequest",)  # 2.367.2 (#2968): someone asks ME for an approval (row "assign", team/approvals.py)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
@@ -72,13 +73,16 @@ NEWS_FOR_ME += ("orgjoin",)  # 2.148.1 A (#2480)
 NEWS_FOR_ME += ("signoff",)  # 2.266.0 (#2965)
 NEWS_FOR_ME += ("orgdelnotice", "orggone")  # 2.361.0 (#2920)
 NEWS_FOR_ME += ("whorgcut",)  # 2.380 G (#3391)
+NEWS_FOR_ME += ("aprequest",)  # 2.367.2 (#2968)
 
 
 def news_to_me(kind, actor_id, data, agents, s=None):
     # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
     if kind in ("upscan", "filereq", "orgkey", "ptlimit", "apblimit", "fetcherr"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
         return True
-    if kind == "approval":  # 2.147.1 C (#2405): an agent waits for MY approval (my own row): "For you", counted by the bell
+    if kind in ("approval", "aprequest"):  # 2.147.1 C (#2405): an agent waits for MY approval (my own row): "For you", counted by the bell
+        return True
+    if kind == "review" and (data or {}).get("pr"):  # 2.367.2 (#2968): a linked pull request approved my task (no actor)
         return True
     if not actor_id:
         return False
@@ -145,6 +149,7 @@ def news_wanted(s, kind):
 # default to its "comment"), everything else in the setting "notify" (json {event: {news?: 0|1, push?: 0|1}}). Defaults
 # = the behaviour up to 2.0.8: pushes for comments, mentions, assignments, completions, unblocked tasks, approvals and
 # reminders; no pushes for status and sharing; newtask off; reply on (as comment); followup on.
+# 2.367.2 (#2968): the News of "approval" are on by default (an agent waits for the person).
 # The bell of a list (table list_bell, per user): all = every event of that list (also every comment and new task) as
 # News and push; default = the matrix; mute = nothing from that list except mentions of me and assignments to me (these
 # follow the matrix). Reminders and follow-ups are my own and never muted by a bell.
@@ -164,7 +169,7 @@ NOTIF_ROWS += ("limits",)  # 2.453.0 (#3781): my customer portal / booking page 
 NOTIF_NEWS_GROUP = {"comment": "comment", "reply": "comment", "follow": "comment", "mention": "mention", "assign": "assign",
                     "complete": "complete", "status": "status", "share": "share", "unblock": "unblock"}
 NOTIF_NEWS_PRIMARY = ("comment", "mention", "assign", "complete", "status", "share", "unblock")  # News = news_kinds
-NOTIF_NEWS_NEW = {"newtask": 0, "approval": 0, "followup": 1, "usage": 1, "proposal": 1, "errreport": 1}
+NOTIF_NEWS_NEW = {"newtask": 0, "approval": 1, "followup": 1, "usage": 1, "proposal": 1, "errreport": 1}
 NOTIF_NEWS_NEW["review"] = 1  # 2.60.0 C (#1512)
 NOTIF_NEWS_NEW["filereq"] = 1  # 2.122.0 A (#2097)
 NOTIF_NEWS_NEW["leave"] = 1  # 2.125.0 A (#2117)
@@ -198,6 +203,7 @@ KIND_ROW = {"mention": "mention", "comment": "comment", "assign": "assign", "una
             "proposal": "proposal", "take": "assign", "errreport": "errreport", "apdecide": "assign", "signup": "usage",
             "orglist": "share", "playbook_proposal": "proposal", "connreq": "share", "connok": "share", "lytpl": "share"}  # 2.35.0 (#1101): an organisation admin archived / restored / deleted / handed over a list
 KIND_ROW["review"] = "review"  # 2.60.0 C (#1512)
+KIND_ROW["aprequest"] = "assign"  # 2.367.2 (#2968): like the assignment it replaces
 KIND_ROW["filereq"] = "filereq"  # 2.122.0 A (#2097)
 KIND_ROW["leavereq"] = KIND_ROW["leavedecide"] = "leave"  # 2.125.0 A (#2117): its own row (switchable)
 KIND_ROW["tsheet"] = "timesheet"  # 2.125.0 B (#2119)
@@ -555,6 +561,9 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             pass  # 2.380 G (#3391): whorgcut = webhook + organisation names in data, no task, no list
         elif kind == "fetcherr":  # 2.425.0 C (#3453): my receipt fetcher's portal error (no task, no list)
             pass
+        elif kind == "approval" and r["task_id"] is None:  # 2.367.2 (#2968): an agent asks about a whole list (or about none)
+            if r["list_id"] and not sees(r["list_id"]):
+                continue
         elif kind == "unassign" and r["task_id"] is None:  # 2.38.0 (#1155): out of sight: only the list (while I see it)
             if not sees(r["list_id"]):
                 continue

@@ -148,7 +148,7 @@ for x in (A, Bo, Ge):
 st = Bo.get(B + "/api/state").json()
 m = st["notify"]
 check(all(m[k]["news"] and m[k]["push"] for k in ("comment", "reply", "follow", "mention", "assign", "unblock")), f"defaults on: {m}")
-check(m["newtask"] == {"news": False, "push": False} and m["approval"] == {"news": False, "push": True}, "new events off (approval push as before)")
+check(m["newtask"] == {"news": False, "push": False} and m["approval"] == {"news": True, "push": True}, "new events off, 2.367.2 (#2968): approval News on (approval push as before)")
 check(m["complete"] == {"news": False, "push": True} and m["status"] == {"news": True, "push": False} and m["share"] == {"news": True, "push": False},
       "complete / status / share as before")
 check(m["reminder"] == {"news": None, "push": True} and m["followup"] == {"news": True, "push": True}, "reminder push only; follow-up on")

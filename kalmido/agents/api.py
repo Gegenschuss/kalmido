@@ -382,7 +382,7 @@ def job_notify(c, j, old_state):
     if not s or not job_visible(c, j, uid):
         return
     lid = None
-    if j["task_id"]:  # 2.1.0 (#317): "agent waits for me" as News (off by default) + the push per the settings
+    if j["task_id"]:  # 2.1.0 (#317): "agent waits for me" as News (2.367.2, #2968: on by default) + the push per the settings
         lr = c.execute("SELECT list_id FROM tasks WHERE id=?", (j["task_id"],)).fetchone()
         lid = lr[0] if lr else None
         news_add(c, uid, "approval", task_id=j["task_id"], data={"title": (j["title"] or "")[:200], "job": j["id"]}, actor=j["agent_id"], s=s)

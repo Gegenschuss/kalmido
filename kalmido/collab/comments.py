@@ -472,8 +472,9 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
     out = []
     ag = agent_ids(c)
     # 2.62.0 (#1854): approval cards / questions with buttons / suggestions of an agent always arrive (they wait for the person)
-    asks = author in ag and bool(c.execute("SELECT choices IS NOT NULL OR suggestion IS NOT NULL FROM comments WHERE id=?",
-                                           (cid,)).fetchone()[0])
+    ask = c.execute("SELECT choices, suggestion FROM comments WHERE id=?", (cid,)).fetchone()
+    asks = author in ag and (ask["choices"] is not None or ask["suggestion"] is not None)
+    card = cmt_card_title(ask["choices"]) if asks else None  # 2.367.2 (#2968): an approval card names what it is about
     for uid in sorted(ids):
         s = collab_user(c, uid, t["list_id"]) if uid not in ag else None  # 2.0.0: agents get events (agent_comment_events)
         if not s or not task_visible(c, t["id"], uid, full=True):  # 1.10.0: participants only about their tasks
@@ -511,24 +512,43 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
                 out.append((uid, tr("Urgent: {0}", t["title"], lg=lg), tr("{0} commented: {1}", names.get(author, "?"), snippet or
                             trn("{0} file", "{0} files", nfiles, lg=lg), lg=lg), f"{PUBLIC_URL}/#t/{t['id']}", TBL_PRIO, comment_push_extra(t, lg)))
             continue
-        if not notif_ok(c, uid, s, row, "push", t["list_id"]) or not push_reachable(c, uid, s) or \
-                not burst_gate(c, uid, t["id"], mentioned=mentioned):
+        if not notif_ok(c, uid, s, row, "push", t["list_id"]) or not push_reachable(c, uid, s):
             continue
-        if not mentioned and not agent_push_ok(c, uid, s, author) and \
-                not (s.get("agent_comments") == "replies" and uid == prev):  # 2.28.0 (#987): an agent's comments push only when wanted
+        # 2.28.0 (#987): an agent's comments push only when wanted; 2.367.2 (#2968): that goes first (it used to leave a "1 more
+        # comment" for the summary); an agent's question / approval card goes past agent_push and the burst gate, like a mention
+        if not asks and not mentioned and not agent_push_ok(c, uid, s, author) and \
+                not (s.get("agent_comments") == "replies" and uid == prev):
             continue  # 2.62.0 (#1854): with "only replies to me" a reply right after my comment pushes like one with reply_to
+        if not asks and not burst_gate(c, uid, t["id"], mentioned=mentioned):
+            continue
         lg = lang_of(s)
         what = snippet or trn("{0} file", "{0} files", nfiles, lg=lg)
         who = names.get(author, "?")
         if lk:
             msg = tr("{0} mentioned you in {1}", who, lname, lg=lg) if uid in notify_mentions else \
                 tr("{0} replied to your message in {1}", who, lname, lg=lg) if uid == replied else tr("{0} commented in {1}", who, lname, lg=lg)
-            out.append((uid, le2e_neutral(lg), msg, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), comment_push_extra(t, lg)))
+            out.append((uid, le2e_neutral(lg), msg, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s),
+                        {**comment_push_extra(t, lg), **({"ws": "limit"} if asks else {})}))
             continue
         msg = tr("{0} mentioned you: {1}", who, what, lg=lg) if uid in notify_mentions else \
             tr("{0} replied to your message: {1}", who, what, lg=lg) if uid == replied else tr("{0} commented: {1}", who, what, lg=lg)
+        if card is not None:  # 2.367.2 (#2968): the card's own words; a question waits for the person like the chat's approval (mark "limit")
+            out.append((uid, tr("Approval needed: {0}", card or t["title"], lg=lg), tr("{0} asks in {1}", who, t["title"], lg=lg),
+                        f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), {**comment_push_extra(t, lg), "ws": "limit"}))
+            continue
+        if asks:
+            out.append((uid, t["title"], tr("{0} asks: {1}", who, what, lg=lg), f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s),
+                        {**comment_push_extra(t, lg), "ws": "limit"}))
+            continue
         out.append((uid, t["title"], msg, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), comment_push_extra(t, lg)))
     return out
+
+
+def cmt_card_title(choices):
+    """2.367.2 (#2968): the title of an approval card in a comment's choices ("" = a card without one), None = no card."""
+    ch = (json.loads(choices) if isinstance(choices, str) else choices) if choices else None
+    ap = ch.get("approval") if isinstance(ch, dict) else None
+    return (ap.get("title") or "") if isinstance(ap, dict) else None
 
 
 def comment_push_extra(t, lg):
@@ -546,8 +566,9 @@ def push_day(due, due_time, lg):
     return day + (" " + due_time if due_time else "")
 
 
-def task_event(c, tid, kind, prev_assignee=None):
-    """assign / unassign / complete pushes; queued in g.pushes and sent once the request succeeded."""
+def task_event(c, tid, kind, prev_assignee=None, skip=None):
+    """assign / unassign / complete pushes; queued in g.pushes and sent once the request succeeded.
+    2.367.2 (#2968): skip = a person who hears of this through an event of its own."""
     from ..collab.news import agent_push_ok, bell_all_users, KIND_ROW, news_add, notif_ok
     from ..notify.push import push_prio, push_reachable
     from ..agents.core import agent_assign_event, agent_ids
@@ -571,6 +592,7 @@ def task_event(c, tid, kind, prev_assignee=None):
         rcpt |= tbl_urgent_users(c, tid)  # 2.53.0 C (#1424): "Urgent" on the task (the push itself: tbl_note of the history line)
     rcpt.discard(None)
     rcpt.discard(actor)
+    rcpt.discard(skip)
     rcpt -= agent_ids(c)  # 2.0.0: agents get events (agent_assign_event), no pushes / News
     name = user_names(c, [actor]).get(actor, "?")
     for uid in sorted(rcpt):
