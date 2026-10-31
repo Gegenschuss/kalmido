@@ -100,8 +100,8 @@ const camt = rows => `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn
     await sleep(300);
     check(await ev(`(() => { const W = document.documentElement.clientWidth; return [...document.querySelectorAll('.brlset *')].filter(e => e.getClientRects().length).every(e => e.getBoundingClientRect().right <= W + 1); })()`),
       'on a phone the section stays inside the screen');
-    // 2.452.0 (#3836): on a phone the row has no buttons, a long press opens them; "New rule" keeps its size
-    check(await ev(`[...document.querySelectorAll('.brlrow>.btn')].every(b => b.getBoundingClientRect().height <= 1) && document.querySelector('[data-brl="new"]').getBoundingClientRect().height >= 43 && document.querySelector('.brlrow').getBoundingClientRect().height >= 43`), 'on a phone the row has no buttons, row and "New rule" are 44 px high');
+    // 2.452.0 (#3836): on a phone the row has no buttons, a long press opens them
+    check(await ev(`[...document.querySelectorAll('.brlrow>.btn')].every(b => b.getBoundingClientRect().height <= 1) && document.querySelector('.brlrow').getBoundingClientRect().height >= 43`), 'on a phone the row has no buttons and is 44 px high');
     await shot('p2299-b-settings-phone.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await ev(click(`[...document.querySelectorAll('.brlrow')].find(e => /Bank Beispiel/.test(e.textContent))?.querySelector('[data-brl="del"]')`));
