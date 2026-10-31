@@ -56,6 +56,7 @@ from .offsite import stepup_download  # 2.360.0 A (#2496): the step-up before th
 from ..core.orgcrypt import OrgCryptError, oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
 from ..life.model import jr_open  # 2.306.0 A (#2885)
+from ..accounts.login import unseal  # 2.455.0 (#3469)
 
 UMZ_DIR = os.path.join(EXPORT_DIR, "account")
 UMZ_KEEP_H = 24
@@ -458,7 +459,6 @@ def _umz_plain(c, table, d, uid=None):
         except OrgCryptError:
             return {k: v for k, v in d.items() if k not in ("text", "mood", "mood_enc", "from_addr", "from_name", "to_addrs", "subject", "body")}
     if table == "portal_tickets":  # 2.455.0 (#3469): sealed with the server key, like the organisation export
-        from ..accounts.login import unseal
         try:
             d["email"] = unseal(c, "portal-email", d["email"]) if d.get("email") else ""
         except Exception:  # noqa: BLE001  (sealed under an older server key: leave the address out, not the export)

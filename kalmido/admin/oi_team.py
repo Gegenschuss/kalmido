@@ -22,6 +22,8 @@ from ..accounts.login import seal  # 2.380 H (#2398)
 from ..accounts.session import _token_hash  # 2.380 H (#2398)
 from .orgexport import _safe_part  # 2.380 H (#2398)
 from .acctimport import umz_legacy_aad  # 2.362.0 (#3090)
+from ..life.rss import _norm, RSS_MAX_FEEDS  # 2.455.0 (#3469)
+from ..lists.rules import RUL_ACTIONS, RUL_DAYS_MAX, RUL_LIST_MAX, RUL_NAME_MAX, RUL_PRIO, RUL_TEXT_MAX, RUL_TRIGGERS  # 2.455.0 (#3469)
 
 # the person columns of the rows of one person (the row is left out when the person does not map)
 _W_PEOPLE = N_("Entries of people who were not chosen were not taken over: {0}")
@@ -325,7 +327,6 @@ def rule_ids(c, run, who, types, src, d):
     and action point at columns, tags, fields, people and lists of the list; what did not come along pauses the rule (the settings
     name why, like the app does when a column / person goes) with a word in the report, never an old id: it would name a row of
     this server. What the app itself would refuse (rules.py) leaves the rule out. -> d or None."""
-    from ..lists.rules import RUL_ACTIONS, RUL_DAYS_MAX, RUL_LIST_MAX, RUL_NAME_MAX, RUL_PRIO, RUL_TEXT_MAX, RUL_TRIGGERS
     name, lid = _txt(src.get("name"), RUL_NAME_MAX).strip() or tr("Rules"), d["list_id"]
     n = c.execute("SELECT COUNT(*) FROM list_rules WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchone()[0]
     trig, act = src.get("trig"), src.get("act")
@@ -428,7 +429,6 @@ def _sprints(c, run, uid, data, who):
 def _feed(c, run, src, d, ctx):
     """2.455.0 (#3469): a feed of the file comes in like a new one: its address checked as in the app (the fetch has its own guard),
     the limit of a space, none twice; the articles are fetched again."""
-    from ..life.rss import _norm, RSS_MAX_FEEDS
     url = _norm(src.get("url"))
     if not url:
         run.warning(N_("A feed without its address was not taken over: {0}"), _txt(src.get("title"), 80))
