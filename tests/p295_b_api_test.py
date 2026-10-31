@@ -13,10 +13,12 @@ cell comments = note + the split by country.
    without an organisation (freelancer-matrix: office) imports into the own personal office, nobody else sees it
 usage: p295_b_api_test.py <datadir>      (P295B_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import base64
+import io
 import os
 import subprocess
 import sys
 import time
+import zipfile
 
 import dbx as dbxm
 import requests
@@ -157,6 +159,26 @@ check(len(Do.get(B + T + "?year=2025").json()["trips"]) == 5 and Er.get(B + T + 
 check(Er.post(B + T + "/delete", json={"ids": DIDS}).json()["deleted"] == 0 and len(Do.get(B + T + "?year=2025").json()["trips"]) == 5,
       "#1932: another person deletes nothing of a personal office")
 check(Do.post(B + T + "/delete", json={"ids": DIDS}).json()["deleted"] == 5, "#1932: the owner's undo")
+
+# 2.363.0 (#3103): a Mac Excel workbook (1904 date system): the same serial is 1462 days later
+
+
+def mac1904(raw):
+    src = zipfile.ZipFile(io.BytesIO(raw))
+    z = io.BytesIO()
+    with zipfile.ZipFile(z, "w", zipfile.ZIP_DEFLATED) as f:
+        for n in src.namelist():
+            d = src.read(n)
+            f.writestr(n, d.replace(b"<sheets>", b'<workbookPr date1904="1"/><sheets>') if n == "xl/workbook.xml" else d)
+    return z.getvalue()
+
+
+_grid = [("Mac", [["Vom", "Ort"], [45714 - 1462, "Hamburg"]], {})]
+P9 = up(A, mac1904(xlsx(_grid))).json()
+_d = [r.get("date_from") for sh in P9.get("sheets", []) for r in sh["rows"]]
+P8 = up(A, xlsx([(_grid[0][0], [_grid[0][1][0], [45714, "Hamburg"]], {})])).json()
+_d8 = [r.get("date_from") for sh in P8.get("sheets", []) for r in sh["rows"]]
+check(_d and _d == _d8, f"#3103: a 1904 workbook gives the same day as the 1900 one {_d} {_d8}")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
