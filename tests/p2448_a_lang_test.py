@@ -240,6 +240,11 @@ speak(Fr, "fr")
 st = Fr.get(B + f"/api/wiki/import/upload/{WID}").json()
 check(st.get("error") == "Ce n'est pas un fichier ZIP", f"#3808: the same state read in French {st}")
 
+# the archive budget (zip bombs) must stop the background run in any language: there str(e) is in the first admin's language, so
+# only the key may be compared. The budget of that run is 4 GB, too much to reach here: a guard on the code (2.454.0, #3808)
+src = open(os.path.join(N, "..", "kalmido", "wiki", "wikiatt.py"), encoding="utf-8").read()
+check('str(e) == tr("The archive is too large")' not in src and src.count('getattr(e, "stored", None) == (WKA_TOO_LARGE,)') == 2, "#3808: the wiki import compares the key of the archive budget")
+
 # ================================================================ history: the key, the reader's app translates it
 tid = Fr.post(B + "/api/tasks", json={"title": "Sealed"}).json()["id"]
 r = Fr.put(B + "/api/e2e/keys", json={"pub": {"kty": "EC", "crv": "P-256", "x": b64u(32), "y": b64u(32)},
