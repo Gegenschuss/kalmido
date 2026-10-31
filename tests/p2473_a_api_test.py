@@ -216,8 +216,6 @@ check(A.get(B + f"{D}/{r.json()['id']}").json()["vat_mode"] == "novat", "section
 A.put(B + O + "/settings", json={"small_business": 0})
 
 # ================================================================== the move into a new organisation (one way)
-ws(Bo, "private")
-check(Bo.post(B + O + "/move", json={"name": "Bobs Firma", "confirm": True}).status_code == 403, "move: only where organisations can be created (instance admin)")
 ws(A, "private")
 INV_NO = A.get(B + f"{D}/{INV}").json()["number"]
 check(A.post(B + O + "/move", json={"name": "Nordlicht"}).status_code == 400, "move: needs the confirmation")
@@ -245,6 +243,7 @@ A, Bo = sess("alice"), sess("bob")
 ra, rb = A.get(B + O + "/settings"), Bo.get(B + O + "/settings")
 check(ra.ok and rb.ok and ra.json()["personal"] == 1 and rb.json()["personal"] == 1 and ra.json()["org_id"] != rb.json()["org_id"], "shared: everyone has their own office")
 check(rb.json()["org_id"] == PB and Bo.get(B + f"{D}/{OFF}").status_code == 404, "shared: bob's office stays his, nothing of others")
+check(Bo.post(B + O + "/move", json={"name": "Bobs Firma", "confirm": True}).status_code == 403, "move: only where organisations can be created (not in the mode shared; 2.422.0 #2937: else the owner too)")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

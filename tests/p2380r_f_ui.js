@@ -81,10 +81,12 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,docs,agents,fields,dep
     check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && !!document.querySelector('#side [data-g="office:money"]')`, 80), '#3411: the office with its sidebar');
     if (await ev(`document.querySelector('#side [data-g="office:money"]').getAttribute('aria-expanded') === 'false'`)) await click(ev, '#side [data-act="sbb-group"][data-g="office:money"]');
     const side = `[...document.querySelectorAll('#side [data-ofmg="money"] [data-ofm]')].map(b => b.dataset.ofm).join()`;
-    check(await ready(ev, `!!document.querySelector('#side [data-ofmg="money"] [data-ofm="kpi"]')`, 20), '#3411: Money open');
-    const pts = await ev(side);
-    check(['cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => pts.split(',').includes(k)) && await ev(`!document.querySelector('[data-act="ofm-more"]')`),
-      '#3411: every point of Money at once, no "Show more", although nothing is used yet ' + pts);
+    check(await ready(ev, `!!document.querySelector('#side [data-ofmg="money"] [data-ofm="bank"]')`, 20), '#3411: Money open');
+    const pts = await ev(`[${side}, ofm_hidden().map(i => i.key)].join()`);  // #3560 on the live train: not used yet = under "Hidden"; 2.448.0 (#3784, in main) nothing starts hidden
+    // 2.448.0 (#3784): back to #3411: every point shows although nothing is used yet, no "Show more"
+    const may = `ofm_avail().map(i => i.key)`;
+    check(['cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => pts.split(',').includes(k)) && (await ev(`['cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => ${may}.includes(k))`)) && await ev(`!document.querySelector('[data-act="ofm-more"]')`),
+      '#3784: every point of Money shows, no "Show more", although nothing is used yet ' + pts);
     await shot('p2380rf-money.png');
     // the switches under Settings > Functions
     await nav(B + '#office/settings');
@@ -96,7 +98,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,docs,agents,fields,dep
     await click(ev, '#ofc-set [data-feat="money.kpi"]');
     const off = async () => { for (let i = 0; i < 40; i++) { const j = await call(CF, 'GET', '/api/office/settings'); if ((j.settings?.features_off || []).includes('money.kpi')) return j; await sleep(250); } return null; };
     check(!!(await off()), '#3411: the switch saves itself');
-    check(await ready(ev, `!document.querySelector('#side [data-ofm="kpi"]') && !!document.querySelector('#side [data-ofm="cashflow"]')`, 40), '#3411: Figures off = no menu point, the others stay ' + await ev(side));
+    check(await ready(ev, `!${may}.includes('kpi') && ${may}.includes('cashflow')`, 40), '#3411: Figures off = no menu point, the others stay ' + await ev(may));
     await nav(B + '#office/kpi');
     check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && !!document.querySelector('.office[data-ofctab]') && document.querySelector('.office').dataset.ofctab !== 'kpi'`, 80),
       '#3411: a link to the figures opens another page ' + await ev(`document.querySelector('.office')?.dataset.ofctab`));
@@ -106,7 +108,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,docs,agents,fields,dep
     await ready(ev, `!!document.querySelector('#ofc-set [data-feat="money.kpi"]')`, 20);
     check(await ev(`document.querySelector('#ofc-set [data-feat="money.kpi"]').checked === false`), '#3411: the switch shows off');
     await click(ev, '#ofc-set [data-feat="money.kpi"]');
-    check(await ready(ev, `!!document.querySelector('#side [data-ofm="kpi"]')`, 40), '#3411: on again = the point is back');
+    check(await ready(ev, `${may}.includes('kpi')`, 40), '#3411: on again = the point is back');
 
     // ================= #3381 the chat keeps its place (phone page and computer panel)
     for (const [phone, vw, vh] of [[true, 390, 844], [false, 1280, 800]]) {
