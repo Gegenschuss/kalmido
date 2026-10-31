@@ -1687,7 +1687,7 @@ document.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
   const id = +b.dataset.id, t = taskById(id); if (!t) return;
   if (b.dataset.act === 'tin-due') { const d = addDays(today(), +b.dataset.d); patchUndoable(id, {due: d}, tr('Due: {0}', dayLabel(d))); return; }
-  tch_listPicker(b, {filter: l => !l.is_inbox && canAddTo(l.id), pick: l => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))});  // 2.38.0 (#1177)
+  mv_picker(b, [id], {filter: l => !l.is_inbox && canAddTo(l.id), pick: l => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))});  // 2.38.0 (#1177); 2.455.0 (#3848)
 });
 function qaddBox(extraCls = '') {
   return `<div class="qadd inline ${extraCls}"><div class="box">${ic('plus')}<input id="qinput" type="text" name="kalmido-quick-add" aria-label="${esc(tr('Add task…'))}" placeholder="${tr('Add task…')}" title="${esc(tr(QEX))}" autocomplete="off" data-form-type="other" data-lpignore="true" aria-autocomplete="none" enterkeyhint="done">${tplBtn()}${qExtraBtns('qinput')}</div><div class="chips" id="qchips"></div></div>`;

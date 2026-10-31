@@ -171,7 +171,7 @@ async function kbSortDo(a, anchor) {
   if (a === 'end') { KB.md?.remove(); return; }
   if (a === 'skip') { kbNext(false); return; }
   if (a === 'list') {
-    tch_listPicker(anchor || $('[data-kbs="list"]', KB.md), {filter: l => !l.is_inbox && canAddTo(l.id), pick: async l => { await patchUndoable(t.id, {list_id: l.id}, tr('Moved to {0}', lname(l))); kbNext(); }});
+    mv_picker(anchor || $('[data-kbs="list"]', KB.md), [t.id], {filter: l => !l.is_inbox && canAddTo(l.id), pick: async l => { await patchUndoable(t.id, {list_id: l.id}, tr('Moved to {0}', lname(l))); kbNext(); }});
     return;
   }
   if (a === 'me') { await patchUndoable(t.id, {assignee_id: S.me.id}, tr('Assigned to me')); kbNext(); return; }

@@ -45,6 +45,7 @@ async function moDrop(t, row, after) {
   if (moView() === 'lists' && target.list_id !== t.list_id) {  // grouped: into another group = into that list
     if (!canEditList(target.list_id)) { roToast(); return true; }
     if (tlkHits(t, {list_id: target.list_id})) { tlkToast(t); render(); return true; }  // a locked task keeps its list
+    if (!await mv_ask([t.id], listById(target.list_id))) return true;  // 2.455.0 (#3848)
     S.mineOrder = Object.fromEntries(ids.map((id, i) => [id, i]));
     try { await patchUndoable(t.id, {list_id: target.list_id, section_id: null}, tr('Moved to {0}', lname(listById(target.list_id)))); } catch { return true; }
   }

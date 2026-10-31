@@ -5888,6 +5888,7 @@ svg.i.lbot .d{fill:var(--bot)}
 #pop:not(.sheet) .tch-sh{display:none}
 /* 2.38.0 (#1177): the list picker: folders are headings, their lists indented (a subfolder one step deeper) */
 .menu-list .tch-fd .mgh{font-size:var(--fs-s)}
+.menu-list .tch-ws .mgh{font-size:var(--fs-b);font-weight:700;color:var(--text);padding-top:.625rem}  /* 2.455.0 (#3848): a workspace, clearly above a folder */
 .menu-list .tch-fd button{padding-left:1.5rem}
 .menu-list .tch-fd2 .mgh{padding-left:1.5rem}
 .menu-list .tch-fd2 button{padding-left:2.5rem}
