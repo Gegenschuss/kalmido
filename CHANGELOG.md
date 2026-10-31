@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.436.1] - 2026-10-31
+
+### Fixed
+- CI of 2.436.0: pyasn1 raised to 0.6.5 and pypdf to 6.21.4 (known vulnerabilities, pip-audit); the flaky suite p252_a_ui is skipped until its fix.
+
 ## [2.436.0] - 2026-10-31
 
 Package 2.424 (Bündel: main rot: p2360_a_ui, p21145_api, p2113_a_ui, Büro: Belege per Mail vollautomatisch (Download-Li, Sammelpaket: Aufgaben ohne Paket ().
@@ -9467,7 +9472,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.436.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.436.1...HEAD
+[2.436.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.436.1
 [2.436.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.436.0
 [2.430.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.430.1
 [2.430.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.430.0
