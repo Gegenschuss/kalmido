@@ -15,7 +15,7 @@ from ..core.config import (
     API_PREFIX, app, AUTH_HEADER, AUTH_PROXY_PORT, AUTH_TRUSTED, COOKIE, CSRF_HEADER, CSRF_VALUE, ICAL_PREFIX,
     OPEN_PATHS, PROXY_IGNORE, PUB_PREFIX, SESSION_DAYS, TRUSTED_PROXIES, TRUSTED_PROXY_COUNT, TRUSTED_PROXY_HEADERS,
 )
-from ..core.i18n import LANGS, tr
+from ..core.i18n import browser_lang, tr
 from ..core.db import db, err, iso, now_utc
 from ..core.ratedb import rate_clear, rate_counts  # 2.306.0 D1 (#2875): failures counted for every process
 from ..core.ratedb import rate_known_add, rate_known_at  # 2.312.0 C (#3265): known addresses for every process
@@ -210,11 +210,7 @@ GATE = _Gate()
 def _accept_lang(default="en"):
     """UI language from the browser (no database access: used while a restore runs). Accept-Language in its order,
     region dropped (fr-CA -> fr); 2.11.0: every language file counts (de, fr, es, it, nl)."""
-    for part in (request.headers.get("Accept-Language") or "").split(","):
-        code = part.split(";")[0].strip().lower()[:2]
-        if code in LANGS:
-            return code
-    return default
+    return browser_lang() or default
 
 
 @app.before_request

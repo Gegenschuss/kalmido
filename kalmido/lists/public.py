@@ -11,7 +11,7 @@ from flask import g, jsonify, redirect, request, Response
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..core.config import app, APP_NAME, PUB_PREFIX, PUBLIC_URL, TZ
-from ..core.i18n import lang, LANGS, N_, short_day, tr, trn
+from ..core.i18n import browser_lang, lang, N_, short_day, tr, trn
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, iso_ms
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
@@ -77,11 +77,7 @@ def pub_find(c, token):
 
 
 def pub_lang(c, link):
-    for part in (request.headers.get("Accept-Language") or "").split(","):
-        code = part.split(";")[0].strip().lower()[:2]
-        if code in LANGS:
-            return code
-    return lang(c, link["l_owner"])
+    return browser_lang() or lang(c, link["l_owner"])
 
 
 def pub_cookie(link):

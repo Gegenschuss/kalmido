@@ -29,8 +29,11 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from xml.etree import ElementTree as ET
 
 try:
-    from ..core.i18n import N_, tr
+    from ..core.i18n import lang, N_, tr
 except ImportError:  # loaded as a single file (tests, no package)
+    def lang():
+        return "en"
+
     def tr(key, *a, lg=None):
         return key.format(*a) if a else key
 
@@ -656,7 +659,7 @@ def ei_html(inv, title=""):
     vat = "".join(f"<tr><td>{e(tr('VAT'))} {e(r.get('pct'))} %</td><td class=\"n\">{e(_fmt_money(r.get('net'), cur))}</td>"
                   f"<td class=\"n\">{e(_fmt_money(r.get('vat'), cur))}</td></tr>" for r in inv.get("vat_rates") or [])
     fmt = "XRechnung / EN 16931 (UBL)" if inv.get("format") == "ubl" else "XRechnung / ZUGFeRD / Factur-X (CII)"
-    return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    return f"""<!doctype html><html lang="{e(lang())}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{e(title or tr(KIND_LABEL.get(inv.get('kind'), 'Invoice')))}</title><style>
 body{{font:0.95rem/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:#1d1b22;max-width:52rem;margin:1.5rem auto;padding:0 1rem}}
 h1{{font-size:1.4rem;margin:0 0 .25rem}}h2{{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:#6b6475;margin:0 0 .3rem}}

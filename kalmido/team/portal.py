@@ -23,7 +23,7 @@ from datetime import date, timedelta
 
 from ..core.config import app, PUBLIC_URL, APP_NAME
 from ..core.db import db, iso, now_utc, body, bump, err, iso_ms, parse_iso
-from ..core.i18n import N_, lang, LANGS, short_day, tr
+from ..core.i18n import browser_lang, N_, lang, short_day, tr
 from ..core.pg import insert_id, system_ctx
 from ..accounts.session import _token_hash
 from ..accounts.login import auth_key, seal, unseal
@@ -162,12 +162,7 @@ def pt_open(c, token):
 
 
 def pt_lang(c, p):
-    from flask import request
-    for part in (request.headers.get("Accept-Language") or "").split(","):
-        code = part.split(";")[0].strip().lower()[:2]
-        if code in LANGS:
-            return code
-    return lang(c, p["l_owner"] if "l_owner" in p.keys() else p["owner_id"])
+    return browser_lang() or lang(c, p["l_owner"] if "l_owner" in p.keys() else p["owner_id"])
 
 
 def pt_state(c, p):

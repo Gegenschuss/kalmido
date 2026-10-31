@@ -3,7 +3,7 @@ import glob
 import json
 import os
 import re
-from flask import g, has_request_context
+from flask import g, has_request_context, request
 
 from ..core.config import APP_DIR
 from ..core.schema import USER_DEFAULTS
@@ -40,12 +40,25 @@ def languages():
                    for k, v in LANGS.items()), key=lambda x: x["name"].casefold())  # 2.11.0: beta = machine-translated
 
 
+def browser_lang():
+    """2.447.0 (#3761): the first language of the request's Accept-Language the app has (region dropped: fr-CA -> fr), else
+    None: the caller names its own fallback (the owner of a public page). No database access (used while a restore runs)."""
+    if has_request_context():
+        for part in (request.headers.get("Accept-Language") or "").split(","):
+            code = part.split(";")[0].strip().lower()[:2]
+            if code in LANGS:
+                return code
+    return None
+
+
 def lang(c=None, uid=None):
-    """UI language of a user (request: the logged-in user; no user: the first admin). Works in
-    requests and in the watchdog threads."""
+    """UI language of a user. In a request: the logged-in user, 2.447.0 (#3761): without one the browser's language, else
+    English, never silently the first admin's. In the watchdog threads (no request): the given user, else the first admin."""
     from ..core.db import connect, db, default_uid
     try:
-        if uid is None and has_request_context() and getattr(g, "user", None):
+        if uid is None and has_request_context():
+            if not getattr(g, "user", None):
+                return browser_lang() or "en"
             uid = g.user["id"]
         own = c is None and not has_request_context()
         c = c or (db() if has_request_context() else connect())

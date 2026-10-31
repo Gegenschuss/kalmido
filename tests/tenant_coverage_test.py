@@ -570,6 +570,7 @@ ROUTES = {
     "DAV /": "dav", "DAV /.well-known/caldav": "dav", "DAV /.well-known/caldav/": "dav", "DAV /.well-known/carddav": "dav",
     "DAV /.well-known/carddav/": "dav", "DAV /dav": "dav", "DAV /dav/": "dav", "DAV /dav/{}": "dav",
     "DAV /api/test/boom": "test",  # 2.359.0 (#3023): tests/p2359_a_api_test.py
+    "DAV /test/boom": "test",  # 2.447.0 (#3761): tests/p2447_a_lang_test.py
     # ---- event (19)
     "GET /api/calendars/events": "event", "GET /api/v1/events": "event", "POST /api/v1/events": "event",
     "GET /api/v1/events/{}": "event", "PATCH /api/v1/events/{}": "event", "DELETE /api/v1/events/{}": "event",

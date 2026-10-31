@@ -27,7 +27,7 @@ from ..core.pg import insert_id
 from ..core.i18n import lang, languages, N_, tr, LANGS
 from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, local_now, now_utc, uset, write_lock
 from ..accounts.session import (
-    _accept_lang, _DUMMY_HASH, _peer_trusted, _rate_fail, _rate_keys, _rate_reset, _token_hash,
+    _DUMMY_HASH, _peer_trusted, _rate_fail, _rate_keys, _rate_reset, _token_hash,
     client_ip, FAIL_WINDOW, login_wait, proxy_login_value, rate_ip, set_cookie, start_session, user_public,
 )
 
@@ -81,8 +81,8 @@ def auth_info():
     from ..accounts.oidc import oidc_cfg, OIDC_ERRORS
     c = db()
     setup = not c.execute("SELECT 1 FROM users").fetchone()
-    # 2.11.0 (#439): before login the browser's language wins (first setup: else English; login: else the admin's)
-    return jsonify(setup=setup, lang=lang() if g.user else _accept_lang("en" if setup else lang()),
+    # 2.11.0 (#439): before login the browser's language wins; 2.447.0 (#3761): else English, the same rule as every text (lang())
+    return jsonify(setup=setup, lang=lang(),
                    languages=languages(), user=user_public(g.user) if g.user else None,
                    auth_error=g.auth_error, login=g.proxy_login or proxy_login_value(),
                    oidc={"label": oidc_cfg(c)["label"]} if oidc_cfg(c)["on"] else None, passkey_login=gsetting(c, "passkey_login") != "0",
@@ -153,7 +153,7 @@ def auth_login():
     ok = bool(u and u["password_hash"] and not u["disabled"] and pw_ok and not is_agent(u))
     if not ok and u and pw_ok and u["password_hash"] and u["disabled"] and u["signup"] == "pending":
         # 2.23.0 (#711): the right password of a registration that waits for an admin (says nothing to anyone else)
-        return err(tr("Your account waits for an admin to approve it.", lg=_accept_lang(lang())), 403)
+        return err(tr("Your account waits for an admin to approve it."), 403)
     if not ok:
         # admin alerts: only real usernames are named (a typo in the name field could be a password)
         for k in _rate_fail(keys):
@@ -168,7 +168,7 @@ def auth_login():
                        N_("Login rate limit reached for an unknown user name (logins refused for {0} min)."), [FAIL_WINDOW // 60])
         aa_count("security", "logins", client_ip(), user=username if u else "?")
         print("login failed for", login_log_name(username, c), "from", login_log_ip(client_ip()), flush=True)  # 2.148.1 C (#2494)
-        return err(tr("Wrong username or password", lg=_accept_lang(lang())), 401)  # 2.13.0 (#453 P7): the page's language
+        return err(tr("Wrong username or password"), 401)  # 2.13.0 (#453 P7): the page's language
     remember = bool(b.get("remember", True))
     methods = twofa_methods(c, u)
     if methods:  # second step: a code, a passkey or a recovery code (POST /api/auth/2fa...)

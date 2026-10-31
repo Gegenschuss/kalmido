@@ -30,7 +30,7 @@ from flask import g, has_request_context, jsonify, make_response, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
 from ..core.pg import insert_id, system_ctx
-from ..core.i18n import LANGS, N_, lang, short_day, tr
+from ..core.i18n import browser_lang, LANGS, N_, lang, short_day, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
@@ -672,11 +672,7 @@ def tpo_find(c, token):
 
 
 def tpo_lang(c, r):
-    for part in (request.headers.get("Accept-Language") or "").split(","):
-        code = part.split(";")[0].strip().lower()[:2]
-        if code in LANGS:
-            return code
-    return lang(c, r["user_id"])
+    return browser_lang() or lang(c, r["user_id"])
 
 
 # the page's only script (served by GET /s/v/time.js; the public pages allow no inline script): the proposed times in the
