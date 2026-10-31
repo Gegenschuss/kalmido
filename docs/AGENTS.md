@@ -1359,7 +1359,8 @@ spinning ring while an agent works and an accent dot while it waits. `idle` clea
 
 **What the host really runs with (2.32.0).** With each status the host may report `model` (the model it really runs, as
 people know it, e.g. "Opus 5.5"; max. 80 characters), `permission_mode` (`ask` | `auto`: what the current run uses) and
-`host_permission_mode` (its own default when the person chose "Host default"). Kalmido keeps the last values with the
+`host_permission_mode` (its own default when the person chose "Host default"), and 2.437.0 `permission_fixed` (true: the
+computer set the mode, Kalmido's switch does not reach it). Kalmido keeps the last values with the
 agent (`host` in the agent objects people get) and shows them in the chat (2.350.0: in the chat header's "…" menu as
 "Permissions: …" and "Model: …"; the header itself keeps the name and one state): the permission entry says
 "Host default (Auto)" instead of only "Host default", the model entry stands next to it, and a model set in the runtime settings
@@ -2022,7 +2023,7 @@ a folder above it) is shared with it, and every access is written into the file'
 | What | Endpoint | MCP |
 |---|---|---|
 | Documents shared with you (`q` = words of the text, `review=1` = waiting in *To review*; 2.122.0: `q` takes `tag:Name`, `sender:Name`, `type:Name`, `date:2025-01..2025-03`, `"exact phrase"`, `-word`; filters `tag` / `not_tag` / `tag_mode`, `sender`, `type`, `folder`, `added_from` / `added_to`, `no_tag`, `no_sender`, `ftype`) | `GET /api/v1/documents` | `list_documents` |
-| One document with its fields, open suggestions and the recognised text | `GET /api/v1/documents/{id}` | `get_document` |
+| One document with its fields, open suggestions, the recognised text and (2.440.0) `einvoice`, the fixed fields of an incoming e-invoice | `GET /api/v1/documents/{id}` | `get_document` |
 | A new document (2.122.0: `content_base64` + `name`, or multipart `file`; optional `title`, `parent_id`, `sender`, `type`, `tags`, `date`, `due`, `amount`, `currency`; without `parent_id` an agent writes into its own result folder) | `POST /api/v1/documents` | `create_document` |
 | Set fields (role *edit*): `date`, `due`, `amount`, `currency`, `sender`, `type`, `tags` (names), `custom_fields` (2.153.0: `{name or id: value}`, only fields the workspace has) | `PATCH /api/v1/documents/{id}` | `update_document` |
 | The file itself | `GET /api/v1/files/{id}/content` | -- |
@@ -2102,7 +2103,7 @@ it: an agent never gets more than that person. An agent never manages office rig
 | The area, the person, the rules; 2.147: `country_pack` and `features` (the office functions as switched on, e.g. `books.datev: false`); 2.189: `home_currency` (price list and books; `currency` = the currency of new documents) | `GET /api/v1/office` | `get_office` |
 | Services, text blocks, framework contracts, clients (`q`) -- never purchase prices | `GET /api/v1/office/{services\|texts\|contracts\|clients}` | `list_office_data` |
 | Documents (`kind` offer / invoice / credit / reminder, `client_id`, `status`, `open=1`, 2.144.10: `trial=1\|0`) | `GET /api/v1/office/docs` | `list_office_documents` |
-| One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends; 2.356: an invoice's `source_offer` = the quotation it was made from, a quotation's `offer_invoices` = its invoices with `state`) | `GET /api/v1/office/docs/{id}` | `get_office_document` |
+| One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends; 2.356: an invoice's `source_offer` = the quotation it was made from, a quotation's `offer_invoices` = its invoices with `state`; 2.437: status `superseded` = replaced by a newer quotation, it counts nowhere and cannot be accepted any more; `replaces` / `replaced_by` name the quotations) | `GET /api/v1/office/docs/{id}` | `get_office_document` |
 | The PDF preview of a draft (marked as a draft) | `GET /api/v1/office/docs/{id}/pdf` | -- (binary; the chat card links it) |
 | A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`; 2.144.10: `trial` = a trial quotation) | `POST /api/v1/office/offers` | `create_offer_draft` |
 | Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent; 2.269: `expect_updated_at`, positions with their `id`; 2.270: `items[].id` of each kept position keeps its purchase price, price, unit and flags, `expect_updated_at` answers 409 + `current` when a person changed the draft since) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
@@ -2421,6 +2422,9 @@ agent accordingly.
 personal agent, and an admin for a team agent, switch it there (`PUT /api/agents/{id}/permission-mode {"mode": "auto"}`)
 or in the runtime section; the owner of a personal agent also through `PATCH /api/my/agents/{id} {"runtime": {…}}`. The
 host reads it before every run (Claude Code: `--permission-mode` with `default` for *ask*, `auto` for *auto*).
+2.437.0: this holds unless the computer fixed the mode: `--permission-mode` in the agent's command, or
+`KALMIDO_PERMISSION_MODE`, win over the switch; the same goes for a command that is not Claude Code. The host then reports
+`permission_fixed: true`, and the switch shows "Set on its computer" and is locked.
 
 2.312.0: *Permission questions go to* is offered in the runtime section of a team agent (the people come from
 `GET /api/agents/{id}/perm-users` -> `{team, current, people: [{id, name}]}`, for instance admins and the owner of a personal

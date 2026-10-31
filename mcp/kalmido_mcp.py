@@ -2055,13 +2055,15 @@ TOOLS += [
      lambda api, a: api.call("GET", f"/office/{a['kind']}", _pick(a, ("q", "requested_by")))),
     ("list_office_documents", "2.51.0: quotations (kind offer, default), invoices, credit notes or reminders of the office, newest first; client_id = "
                               "earlier quotations of a client (their positions as a model); open = only open invoices (issued, sent, partial, overdue). "
-                              "2.144.10: every document carries trial (a trial document: TEST number, never real business); trial = true / false filters.",
+                              "2.144.10: every document carries trial (a trial document: TEST number, never real business); trial = true / false filters. "
+                              "2.437.0: a quotation's status is draft, sent, accepted, declined or superseded.",
      _obj({"kind": {"type": "string", "enum": ["offer", "invoice", "credit", "reminder"]}, "client_id": S_ID, "status": {"type": "string"}, "open": {"type": "boolean"},
            "trial": {"type": "boolean", "description": "true = only trial documents, false = only real ones"}, **_RB}),
      lambda api, a: api.call("GET", "/office/docs", {**_pick(a, ("kind", "client_id", "status", "requested_by")), **({"open": "1"} if a.get("open") else {}),
                                                       **({"trial": "1" if a["trial"] else "0"} if a.get("trial") is not None else {})})),
     ("get_office_document", "2.51.0: one document of the office with its positions, sums and state. 2.356.0: an invoice names its quotation "
-                            "(source_offer), a quotation lists the invoices made from it (offer_invoices).",
+                            "(source_offer), a quotation lists the invoices made from it (offer_invoices). "
+                            "2.437.0: replaces / replaced_by name the quotation it replaces and those that replace it (status superseded: counts nowhere).",
      _obj({"doc_id": S_ID, **_RB}, ["doc_id"]), lambda api, a: api.call("GET", f"/office/docs/{int(a['doc_id'])}", _pick(a, ("requested_by",)))),
     ("create_offer_draft", "2.51.0: a quotation DRAFT (no number, never sent): client, title, positions (service_id + qty takes title, unit and price "
                            "from the catalogue or the client's framework contract; free positions, other prices and discounts are allowed but marked "

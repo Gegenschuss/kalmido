@@ -319,6 +319,7 @@ def auth_link():
         c.rollback()
         return jsonify(ok=False, switch=True, name=u["display_name"] or u["username"], current=g.user["display_name"] or g.user["username"])
     c.execute("UPDATE user_invites SET used_at=? WHERE user_id=?", (iso(now_utc()), u["id"]))
+    c.execute("UPDATE users SET email_proved=lower(coalesce(email,'')) WHERE id=?", (u["id"],))  # 2.360.2 (#2561): the link came to this address
     c.commit()
     if u["is_admin"] or (u["kind"] or "user") == "agent":
         # 2.86.0 (N4): checked again on use: the account may have become an admin after the link was made (the link is used up)

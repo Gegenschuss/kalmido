@@ -1,0 +1,7 @@
+# 2.360.2 (#2912): keeps the commit hashes of the pinned actions current (with the version comment behind them)
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

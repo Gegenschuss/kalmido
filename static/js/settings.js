@@ -585,8 +585,9 @@ function hostHtml(hint) {
     <div class="row"><label for="s-qpool">${tr('Shared by')}</label><select id="s-qpool"><option value="user">${tr('each person on their own')}</option><option value="org" ${a.storage_pool === 'org' ? 'selected' : ''}>${tr('the organisation (amount × members)')}</option></select></div>
     <div class="row"><label for="s-support">${tr('Support address')}</label><input id="s-support" type="email" value="${esc(a.support_email || '')}" placeholder="${esc(a.support_email_env || 'support@example.com')}" autocomplete="off"></div>
     <h4 id="s-legal-h">${tr('Privacy and imprint')}</h4>
-    ${hint(tr('Links on the login page and under Help, e.g. to your privacy statement. Empty = no link (or the value from the server configuration).'))}
+    ${hint(tr('Links on the login page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).'))}
     <div class="row"><label for="s-privacy">${tr('Privacy statement')}</label><input id="s-privacy" type="url" value="${esc(a.privacy_url || '')}" placeholder="${esc(a.privacy_url_env || 'https://example.com/privacy')}" autocomplete="off"></div>
+    <div class="row"><label for="s-privmail">${tr('Privacy contact')}</label><input id="s-privmail" type="email" value="${esc(a.privacy_email || '')}" placeholder="${esc(a.privacy_email_env || 'privacy@example.com')}" autocomplete="off"></div>
     <div class="row"><label for="s-imprint">${tr('Imprint')}</label><input id="s-imprint" type="url" value="${esc(a.imprint_url || '')}" placeholder="${esc(a.imprint_url_env || 'https://example.com/imprint')}" autocomplete="off"></div>
     <h4 id="s-maillim-h">${tr('E-mails per day')}</h4>
     ${hint(tr('Per person and day (at most 5 a day to one address). Over the limit the link is shown to copy.'))}
@@ -620,6 +621,7 @@ function hostWire(md) {
     if (id === 's-quota') { const v = e.target.value.trim(); if (v !== '' && !/^\d+$/.test(v)) { toast(tr('Invalid value: {0}', tr('Storage per person'))); return; } hostSave(md, {storage_quota_mb: v === '' ? null : +v}, tr('Saved')); return; }
     if (id === 's-qpool') { hostSave(md, {storage_pool: e.target.value}, tr('Saved')); return; }
     if (id === 's-support') { hostSave(md, {support_email: e.target.value.trim()}, tr('Saved')); return; }
+    if (id === 's-privmail') { hostSave(md, {privacy_email: e.target.value.trim()}, tr('Saved')); return; }  // 2.360.2 D (#2561)
     if (id === 's-privacy' || id === 's-imprint') { hostSave(md, {[id === 's-privacy' ? 'privacy_url' : 'imprint_url']: e.target.value.trim()}, tr('Saved')); return; }  // 2.306.0 B (#2887)
     if (id === 's-maillim') { const v = +e.target.value; if (!(v >= 1 && v <= 1000)) { toast(tr('Invalid value: {0}', tr('E-mails per day'))); e.target.value = S.about?.mail_day_limit || 30; return; } hostSave(md, {mail_day_limit: v}, tr('Saved')); }
   });
@@ -1620,7 +1622,7 @@ function ss_hits(md, q, shown, SYN) {
 // per window: src = the functions that draw it (tests/p2353_e_setsearch_guard_test.py: every area settings window has an
 // entry here), on = its module is on and the person may open it, open = its area + the window, root = the window once drawn,
 // secs = its sections [label, words people type (German + English), the element (else the heading with that label), office pane, gate]
-const ss_ofm = k => { const i = typeof OFM_ITEMS !== 'undefined' && OFM_ITEMS.find(x => x.key === k); return !!i && i.on() && ofm_ok(i); };
+const ss_ofm = k => { const i = typeof OFM_ITEMS !== 'undefined' && OFM_ITEMS.find(x => x.key === k); return !!i && i.on() && ofm_ok(i) && !ofm_menuOff(k); };  // 2.440.0 (#3609)
 const ss_ofcFeat = k => typeof ofcFeat !== 'function' || ofcFeat(k);  // office.js loads with the area
 const SS_AREA = [
   // 2.365.2 B (#2789): Settings > Documents (docs.js dcs_paneHtml, drawn by dc_sDraw); the lists and fields open from there in the module
@@ -1630,10 +1632,10 @@ const SS_AREA = [
       [N_('Rules'), ['regel', 'rule'], '#s-dcs-rules-h'], [N_('Senders, types and tags'), ['absender', 'sender', 'dokumenttyp', 'schlagwort', 'tags', 'feld', 'felder', 'field', 'fields'], '#s-dcs-lists-h'],
       [N_('Inboxes'), ['eingang', 'eingänge', 'inbox', 'mail', 'e-mail', 'scanner', 'wächter', 'watcher'], '#s-dcs-in-h']]},
   {src: ['ofcSettingsHtml', 'agbSettingsHtml', 'bp_settingsHtml', 'dun_settingsHtml', 'tpSettingsHtml', 'pep_settingsHtml', 'dx_settingsHtml', 'dv_settingsHtml', 'brl_settingsHtml', 'bnr_settingsHtml',
-    'rcm_settingsHtml', 'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['büro', 'office', 'firma', 'company'],
+    'rcm_settingsHtml', 'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml', 'ocm_settingsHtml', 'ccn_settingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['büro', 'office', 'firma', 'company'],
     on: () => modOn('office') && ss_ofm('settings'), open: () => settingsModal('biz'), root: '#s-biz #ofc-set',  // 2.365.2 (#2789): Settings > Company & office
     secs: [[N_('Company'), ['firma', 'adresse', 'address', 'logo', 'bank', 'iban', 'bankverbindung', 'bank details', 'konto', 'steuernummer', 'ust-idnr', 'vat id', 'register'], '', 'company'], [N_('Terms and conditions (PDF)'), ['agb', 'terms'], '#agb-box', 'company'], [N_('Letterhead'), ['briefpapier', 'briefkopf', 'letterhead'], '#bp-h', 'company'],
-      [N_('Master data file'), ['stammdaten', 'master data'], '', 'data'],
+      [N_('Master data file'), ['stammdaten', 'master data'], '', 'data'], [N_('Card positions without a receipt'), ['karte', 'kartenposten', 'card', 'beleg', 'receipt', 'erinnerung', 'reminder'], '#ccn-h', 'data'],
       [N_('Bank & taxes'), ['steuer', 'steuerrücklage', 'tax reserve', 'ust', 'vat', 'ist', 'soll', 'steuertermine', 'tax dates', 'kasse', 'kassen', 'cash box', 'anfangsbestand', 'kilometer', 'km', 'pauschale', 'mileage', 'bank'], '#s-biz-tax', 'tax'],
       [N_('Documents & numbers'), ['nummer', 'nummern', 'nummernkreis', 'number', 'numbering', 'angebot', 'quotation', 'währung', 'currency'], '', 'docs'], [N_('Invoices'), ['rechnung', 'invoice', 'zahlungsziel', 'payment terms', 'skonto'], '', 'docs'],
       [N_('Suggest payment reminders for overdue invoices'), ['mahnung', 'mahnungen', 'mahnwesen', 'zahlungserinnerung', 'reminder', 'dunning', 'girocode'], '#os-dun-on', 'docs'],
@@ -1645,11 +1647,14 @@ const SS_AREA = [
       [N_('Receipts by e-mail'), ['weiterleitung', 'forwarding', 'gmail', 'e-mail', 'mail'], '#rcm-h', 'data'],  // 2.424.0 B (#3450)
       [N_('Country pack'), ['land', 'country', 'paket', 'pack'], '', 'packs'], [N_('Travel expenses'), ['reise', 'reisekosten', 'travel'], '#rkp-h', 'packs'],
       [N_('Entertainment receipts'), ['bewirtung', 'entertainment', 'meals'], '#bwc-h', 'packs'], [N_('Cash flow'), ['liquidität', 'cashflow', 'cash flow', 'startsaldo', 'starting balance'], '#cfs-h', 'tax'],
-      [N_('Functions'), ['funktion', 'function', 'module'], '', 'functions'], [N_('Agents'), ['agent', 'agenten', 'ki', 'ai'], '', 'access'],
+      [N_('Functions'), ['funktion', 'function', 'module'], '', 'functions'], [N_('Menu points'), ['menüpunkt', 'menu point', 'menü', 'ausblenden', 'abschalten'], '', 'functions'], [N_('Agents'), ['agent', 'agenten', 'ki', 'ai'], '', 'access'],
       [N_('E-mail'), ['imap', 'smtp', 'postfach', 'mailbox', 'absender', 'sender', 'mailserver'], '#s-bizmail-h', '']]},  // 2.365.2 (#2789): the workspace's mailbox
   {src: ['bkSettingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['buchhaltung', 'bookkeeping', 'euer', 'ustva'],  // 2.365.2 D (#2789): in Bank & taxes
     on: () => modOn('office') && ss_ofm('books'), open: () => settingsModal('biz-tax'), root: '#s-biz #bk-sh', secs: [[N_('Tax reserve and VAT basis'), ['einstellungen', 'settings', 'buchhaltung', 'bookkeeping', 'steuerrücklage', 'tax reserve'], '#bk-sh']]}];
 // the hits of the area windows: a section beats its window, a word must start like the query, a label may hold it anywhere
+// the client card and the test mode sit in the office settings window: same area, gate and opener (#2789)
+SS_AREA.push({...SS_AREA.find(w => w.src.includes('ofcSettingsHtml')), src: ['ccb_settingsHtml', 'tri_settingsHtml'],
+  secs: [[N_('Client card'), ['kundenkarte', 'client card', 'block', 'bausteine'], '#ccb-h', 'functions'], [N_('Test mode'), ['testmodus', 'test mode', 'muster', 'probe', 'trial'], '#tri-h', 'docs']]});
 function ss_areaHits(q, max = 6) {
   const out = [], lo = s => String(s || '').toLowerCase();
   const wOk = ws => ws.some(w => w === q || (q.length >= 3 && w.startsWith(q)));

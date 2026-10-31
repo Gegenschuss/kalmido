@@ -4,8 +4,12 @@ A share (sheet_shares, one row per table and account) ADDS rights, it never take
 shs_may first). Who may manage the shares: who may write the table through its space or its list (a share recipient never
 re-shares; private tables: the owner is their own admin). Targets: people the person may see (accounts/orgs.py
 visible_people; an organisation's table only its members) and the agents of the table's workspace (an organisation's agents;
-a private table: private agents without an owner or the person's own) -- the same pool as file store shares. By e-mail
-address: the answer never says whether the address has an account (like sharing a list); no mail goes out.
+a private table: private agents without an owner or the person's own) -- the same pool as file store shares.
+
+2.360.2 M (#2561): by e-mail address every share is a row with the sealed address (email_seal) and its keyed hash (email_key),
+account or not: GET, the count and the limit treat all alike and the row always reads "invited" (address, never a name), so
+nothing tells whether the address has an account; no mail goes out. An account that may hold the share is bound to the row
+at once (user_id), otherwise user_id stays NULL until the account of that address signs in (shs_redeem).
 
 The read layer checks every share again (shs_may): a person must still be a member of the table's organisation, an agent
 must belong to the table's workspace, never a health / budget list's table, its list limit applies; a revoked share
@@ -15,16 +19,18 @@ the table between workspaces end the shares (org_leave, sheets/shmove.py); a del
 """
 from flask import g, has_request_context, jsonify
 
-from ..core.config import app
+from ..core.config import app, EMAIL_RE
 from ..core.access import Denied, acx_org_ok, collab_all, need_feat
 from ..core.db import body, bump, db, err, iso_ms, now_utc
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, system_ctx
+from ..accounts.login import addr_key, seal, unseal
 from ..accounts.session import me
 
 SHS_ROLES = ("read", "write")
 SHS_MAX = 200
 SHS_ONLY_OWN = N_("Only people who may change this table through its workspace can do this")
+SHS_SEAL = "sheet-share"  # purpose of email_seal / email_key
 
 
 def _cache(uid):
@@ -162,11 +168,57 @@ def shs_targets(c, r, uid):
 
 def shs_list(c, sid):
     from ..collab.comments import user_names
-    rows = c.execute("SELECT s.*, u.kind FROM sheet_shares s JOIN users u ON u.id=s.user_id WHERE s.sheet_id=? AND s.revoked_at IS NULL "
+    rows = c.execute("SELECT s.*, u.kind FROM sheet_shares s LEFT JOIN users u ON u.id=s.user_id WHERE s.sheet_id=? AND s.revoked_at IS NULL "
                      "ORDER BY s.id", (sid,)).fetchall()
-    names = user_names(c, {x["user_id"] for x in rows})
-    return [{"id": x["id"], "user_id": x["user_id"], "name": names.get(x["user_id"], ""), "role": x["role"],
-             "agent": (x["kind"] or "") == "agent", "created_at": x["created_at"]} for x in rows]
+    names = user_names(c, {x["user_id"] for x in rows if x["user_id"] and not x["email_key"]})
+    out = []
+    for x in rows:
+        if x["email_key"]:  # 2.360.2 M (#2561): one form with or without an account behind the address
+            em = _addr(c, x)
+            out.append({"id": x["id"], "user_id": None, "name": em, "email": em, "role": x["role"], "agent": False,
+                        "state": "invited", "created_at": x["created_at"]})
+        else:
+            out.append({"id": x["id"], "user_id": x["user_id"], "name": names.get(x["user_id"], ""), "role": x["role"],
+                        "agent": (x["kind"] or "") == "agent", "state": "active", "created_at": x["created_at"]})
+    return out
+
+
+def _addr(c, x):
+    try:
+        return unseal(c, SHS_SEAL, x["email_seal"])
+    except Exception:  # noqa: BLE001  (sealed under an older server key: the row stays, it can still be removed)
+        return ""
+
+
+def _bind(c, r, shid, tid, by):
+    """2.360.2 M (#2561): the account tid takes the address row shid of sheet r when it may hold a share. A live share of
+    its own (picked by name) stays alone: the address row just stays open. True when bound."""
+    if tid in (by, r["owner_id"]) or not collab_all() or not shs_fits(c, tid, r):
+        return False
+    other = c.execute("SELECT id, revoked_at FROM sheet_shares WHERE sheet_id=? AND user_id=? AND id!=?", (r["id"], tid, shid)).fetchone()
+    if other and other["revoked_at"] is None:
+        return False
+    if other:
+        c.execute("DELETE FROM sheet_shares WHERE id=?", (other["id"],))
+    c.execute("UPDATE sheet_shares SET user_id=? WHERE id=?", (tid, shid))
+    return True
+
+
+def shs_redeem(c, u):
+    """2.360.2 M (#2561): at sign-in the open address rows of the account's e-mail address become its shares. u = a users row.
+    A row that does not fit yet (an organisation's table, not a member) stays open for a later sign-in. Returns how many."""
+    em = (u["email"] or "").strip().lower()
+    if not em or em != u["email_proved"] or (u["kind"] or "user") == "agent":  # review: a typed-in address takes nobody's tables
+        return 0
+    n = 0
+    with system_ctx(c):  # tables of organisations the person may not be in yet; the checks are in _bind
+        for x in c.execute("SELECT id, sheet_id, created_by FROM sheet_shares WHERE email_key=? AND user_id IS NULL AND revoked_at IS NULL",
+                           (addr_key(c, SHS_SEAL, em),)).fetchall():
+            r = c.execute("SELECT * FROM sheets WHERE id=?", (x["sheet_id"],)).fetchone()
+            n += bool(r and _bind(c, r, x["id"], u["id"], x["created_by"]))
+    if n:
+        shs_drop_cache()
+    return n
 
 
 def shs_end(c, sid, user_ids=None):
@@ -185,6 +237,8 @@ def shs_end(c, sid, user_ids=None):
 def shs_leave(c, oid, uids):
     """org_leave's hook: the shares of organisation oid's tables held by the leaver (and their agents) end."""
     if uids:
+        # 2.360.2 M (#2561): an address row stays listed as it was (open again): a row that goes would name the leaver's address
+        c.execute(f"UPDATE sheet_shares SET user_id=NULL WHERE org_id=? AND email_key!='' AND user_id IN ({','.join('?' * len(uids))})", [oid, *uids])
         c.execute(f"UPDATE sheet_shares SET revoked_at=? WHERE org_id=? AND revoked_at IS NULL AND user_id IN ({','.join('?' * len(uids))})",
                   [iso_ms(now_utc()), oid, *uids])
         shs_drop_cache()
@@ -220,7 +274,7 @@ def sheets_shares_get(sid):
 @app.post("/api/sheets/<int:sid>/shares")
 def sheets_shares_add(sid):
     """{user_id | email, role: read | write}: share the table (the same account again = its role changes; a revoked share
-    comes back). By e-mail address the status is the same whether the address has an account or not."""
+    comes back). By e-mail address the row is the same whether the address has an account or not (2.360.2 M, #2561)."""
     need_feat("sheets")
     c = db()
     r, uid = _manage(c, sid)
@@ -231,20 +285,18 @@ def sheets_shares_add(sid):
     tid = b.get("user_id")
     if b.get("email") and not tid:
         em = str(b["email"]).strip().lower()[:200]
-        x = c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'", (em,)).fetchone()
-        # by address also someone outside one's contacts (a client), as list invitations do; the dialog then names them
-        if not x or x[0] in (uid, r["owner_id"]) or not shs_fits(c, x[0], r) or not collab_all():
-            return jsonify(by_email=True), 201  # nothing happens, nothing is revealed (2.148.1 A, #2490: the same answer as a share)
-        tid = x[0]
-        by_email = True
-    else:
-        by_email = False
-        if isinstance(tid, bool) or not isinstance(tid, int):
-            return err(tr("Expected {0}", "user_id | email"))
-        t = shs_targets(c, r, uid)
-        if not any(p["id"] == tid for p in t["people"] + t["agents"]):
-            return err(tr("Only people and agents of the same workspace can get a share"), 409)
-    old = c.execute("SELECT id, revoked_at FROM sheet_shares WHERE sheet_id=? AND user_id=?", (sid, tid)).fetchone()
+        if not EMAIL_RE.fullmatch(em):
+            return err(tr("Please enter a valid e-mail address"))
+        return _by_email(c, r, uid, em, role)
+    if isinstance(tid, bool) or not isinstance(tid, int):
+        return err(tr("Expected {0}", "user_id | email"))
+    t = shs_targets(c, r, uid)
+    if not any(p["id"] == tid for p in t["people"] + t["agents"]):
+        return err(tr("Only people and agents of the same workspace can get a share"), 409)
+    old = c.execute("SELECT id, revoked_at, email_key FROM sheet_shares WHERE sheet_id=? AND user_id=?", (sid, tid)).fetchone()
+    if old and old["email_key"]:  # 2.360.2 M (#2561): the address row stays as it is, the person gets a row of their own
+        c.execute("UPDATE sheet_shares SET user_id=NULL WHERE id=?", (old["id"],))
+        old = None
     ts = iso_ms(now_utc())
     if old:
         c.execute("UPDATE sheet_shares SET role=?, revoked_at=NULL, org_id=?, created_by=?, created_at=CASE WHEN revoked_at IS NULL "
@@ -256,11 +308,28 @@ def sheets_shares_add(sid):
         shid = insert_id(c, "INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at) VALUES(?,?,?,?,?,?)",
                          (sid, r["org_id"], tid, role, uid, ts))
     shs_drop_cache()
-    if by_email:  # 2.148.1 A (#2490): by address no share list (it would name the account behind the address)
-        bump(c)
-        c.commit()
-        return jsonify(by_email=True), 201
     return _answer(c, sid, 201, id=shid)
+
+
+def _by_email(c, r, uid, em, role):
+    """2.360.2 M (#2561): one row per table and address, the limit counts it like any share; by address also someone
+    outside one's contacts (a client), as list invitations do. The answer and the list are the same for every address."""
+    sid, key, ts = r["id"], addr_key(c, SHS_SEAL, em), iso_ms(now_utc())
+    old = c.execute("SELECT id, user_id FROM sheet_shares WHERE sheet_id=? AND email_key=?", (sid, key)).fetchone()
+    if old:
+        c.execute("UPDATE sheet_shares SET role=?, revoked_at=NULL, org_id=?, created_by=?, created_at=CASE WHEN revoked_at IS NULL "
+                  "THEN created_at ELSE ? END WHERE id=?", (role, r["org_id"], uid, ts, old["id"]))
+        shid = old["id"]
+    else:
+        if c.execute("SELECT COUNT(*) FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (sid,)).fetchone()[0] >= SHS_MAX:
+            return err(tr("Too many shares"), 409)
+        shid = insert_id(c, "INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at,email_seal,email_key) "
+                            "VALUES(?,?,NULL,?,?,?,?,?)", (sid, r["org_id"], role, uid, ts, seal(c, SHS_SEAL, em), key))
+    x = c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'", (em,)).fetchone()
+    if x and not (old and old["user_id"]):
+        _bind(c, r, shid, x[0], uid)
+    shs_drop_cache()
+    return _answer(c, sid, 201, by_email=True)
 
 
 def _need_share(c, sid, shid):
@@ -291,7 +360,10 @@ def sheets_shares_delete(sid, shid):
     need_feat("sheets")
     c = db()
     _manage(c, sid)
-    _need_share(c, sid, shid)
-    c.execute("UPDATE sheet_shares SET revoked_at=? WHERE id=?", (iso_ms(now_utc()), shid))
+    x = _need_share(c, sid, shid)
+    if x["email_key"]:  # 2.360.2 M (#2561): the address is not kept (Undo = POST the address again)
+        c.execute("DELETE FROM sheet_shares WHERE id=?", (shid,))
+    else:
+        c.execute("UPDATE sheet_shares SET revoked_at=? WHERE id=?", (iso_ms(now_utc()), shid))
     shs_drop_cache()
     return _answer(c, sid)

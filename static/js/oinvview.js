@@ -1,8 +1,8 @@
 // @ts-check
 /* Kalmido web client: Settings > Organisation > Invite by e-mail (2.115.0 B, #2062).
    An organisation's admin invites an address (role member / admin): a new account gets the invitation mail (or the link to
-   copy), an address with an account is added as before. The open invitations of the organisation (accounts it invited that
-   never signed in) with "Resend" and "Withdraw" (deletes that account). Inviting and withdrawing are one undo step each. */
+   copy), an address with an account is added as before. The open invitations of the organisation with "Resend" and
+   "Withdraw", one form for every row (2.360.2 M, #2561: an opaque ref). Inviting and withdrawing are one undo step each. */
 // 2.143.0 A (#2151): every organisation role (server: accounts/orgroles.py); hints = GET /api/orgs roles [{key, label, hint}]
 const oinvRoleSel = (id, cur = 'member', hints = [], attrs = '') => `<select ${id ? `id="${id}" ` : ''}class="orgrolesel" ${attrs || `aria-label="${esc(tr('Role'))}"`}>${['member', 'admin', 'readonly', 'accounting', 'guest'].map(k =>
   `<option value="${k}" ${k === (cur || 'member') ? 'selected' : ''} title="${esc((hints.find(x => x.key === k) || {}).hint || '')}">${esc(oinvRoleSel.label(k))}</option>`).join('')}</select>`;
@@ -16,20 +16,19 @@ async function oinvDraw(box) {
     if (!o || o.role !== 'admin' || !(box._j || {}).manage) continue;
     let j; try { j = await api('GET', `/api/orgs/${oid}/invites`); } catch { continue; }
     det.dataset.oinvon = j.enabled ? '1' : '';  // 2.364.0 C (#3041): off = the dialog adds by address (PUT members) as before
-    if (!j.enabled) continue;
     $('.oinvbox', det)?.remove();
+    if (!j.enabled && !j.invites.length) continue;  // 2.360.2 M (#2561): what is open stays visible with invitations off
     const add = $('.wsadd', det);
-    // 2.148.1 H (#2480): invitations of existing accounts are listed without an account id (no Resend / Withdraw)
     // 2.364.0 C (#3041): the one "Invite" button is in the organisation's member list (wsPaneDraw); here the open invitations
     const html = `<div class="oinvbox">
-      ${j.invites.length ? `<div class="shint">${tr('Open invitations')}</div><div class="members">${j.invites.map(v => `<div class="mrow oinvrow" data-oinvu="${v.user_id || ''}"><span class="avatar">${ic('mail', 's')}</span>
+      ${j.invites.length ? `<div class="shint">${tr('Open invitations')}</div><div class="members">${j.invites.map(v => `<div class="mrow oinvrow" data-oinvu="${esc(v.ref)}"><span class="avatar">${ic('mail', 's')}</span>
         <span class="n"><b>${esc(v.email || v.name)}</b><small class="muted">${esc([oinvRoleSel.label(v.role), v.state === 'invited' ? tr('Invited') : tr('Invitation expired'), fmtWhen(v.created_at)].join(' · '))}</small></span>
-        ${v.user_id ? `<button type="button" class="btn sm" data-oinv="resend">${tr('Resend')}</button><button type="button" class="btn sm" data-oinv="withdraw">${tr('Withdraw')}</button>` : ''}</div>`).join('')}</div>` : ''}</div>`;
+        ${j.enabled ? `<button type="button" class="btn sm" data-oinv="resend">${tr('Resend')}</button>` : ''}<button type="button" class="btn sm" data-oinv="withdraw">${tr('Withdraw')}</button></div>`).join('')}</div>` : ''}</div>`;
     if (add) add.insertAdjacentHTML('afterend', html); else det.insertAdjacentHTML('beforeend', html);
   }
 }
-// 2.148.1 A (#2480): an organisation admin's answer carries no account id: the new invitation is found in the open ones
-const oinvUid = (r, email) => r.user_id || ((r.invites || []).find(v => (v.email || '').toLowerCase() === String(email || '').toLowerCase()) || {}).user_id;
+// 2.148.1 A (#2480): an organisation admin's answer carries no account id: the new invitation is found in the open ones (its ref)
+const oinvUid = (r, email) => r.user_id || ((r.invites || []).find(v => (v.email || '').toLowerCase() === String(email || '').toLowerCase()) || {}).ref;
 const oinvRedraw = () => { const md = $('#s-ws')?.closest('.modal') || document; if (typeof wsPaneDraw === 'function') wsPaneDraw(md); };
 async function oinvSend(oid, email, role) {
   const r = await api('POST', `/api/orgs/${oid}/invites`, {email, role});
@@ -111,7 +110,7 @@ document.addEventListener('click', async e => {
   if (b.dataset.oinv === 'new') {  // 2.143.0 A (#2151): with the role explanations of GET /api/orgs (wsPaneDraw keeps it)
     const o = (($('#s-ws')?._j || {}).orgs || []).find(x => x.id === oid); oinvDialog(oid, o?.roles || [], b.closest('[data-oinvon]')?.dataset.oinvon !== ''); return;  // 2.364.0 C (#3041): + invitations on
   }
-  const row = b.closest('[data-oinvu]'), uid = +row?.dataset.oinvu; if (!uid) return;
+  const row = b.closest('[data-oinvu]'), uid = row?.dataset.oinvu; if (!uid) return;
   const who = $('b', row)?.textContent || '';
   b.disabled = true;
   try {
@@ -119,9 +118,10 @@ document.addEventListener('click', async e => {
       const r = await api('POST', `/api/orgs/${oid}/invites/${uid}/resend`);
       inviteResult(r.invitation, who);
     } else {
-      if (!await askConfirm(tr('Withdraw the invitation for {0}?', who), tr('The link stops working and the account, never used, is deleted.'), {ok: tr('Withdraw'), danger: true})) return;
+      if (!await askConfirm(tr('Withdraw the invitation for {0}?', who), tr('The invitation stops working.'), {ok: tr('Withdraw'), danger: true})) return;
       const r = await api('DELETE', `/api/orgs/${oid}/invites/${uid}`);
       let nu = uid;
+      if (b.closest('[data-oinvon]')?.dataset.oinvon === '') { toast(tr('Invitation withdrawn')); await load(); render(); oinvRedraw(); return; }  // 2.360.2 M (#2561): invitations off: no way to invite again
       histToast(tr('Invitation withdrawn'), histAdd({label: tr('Invitation withdrawn'), sett: true,  // undo: the same address invited again
         undo: async () => { nu = oinvUid(await api('POST', `/api/orgs/${oid}/invites`, {email: r.email, role: r.role}), r.email); oinvRedraw(); },
         redo: async () => { await api('DELETE', `/api/orgs/${oid}/invites/${nu}`); oinvRedraw(); }}));

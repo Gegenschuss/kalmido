@@ -477,6 +477,15 @@ def ei_details(inv):
             "gross": inv.get("gross") or inv.get("payable"), "currency": inv.get("currency")}
 
 
+def ei_api(inv, duplicate=False):
+    """2.440.0 (#2243): the fixed EN 16931 fields of an incoming e-invoice for GET /api/v1/documents/{id}; duplicate = the
+    document may repeat an older one the reader sees too (no name, no id)."""
+    det = ei_details(inv)
+    return {**{k: inv.get(k) for k in ("format", "kind", "source", "number", "date", "due", "currency", "net", "vat", "gross", "payable")},
+            "supplier": det["supplier"], "vat_id": det["vat_id"], "tax_no": det["tax_no"], "vat_rates": det["vat_rates"],
+            "credit_note": inv.get("kind") == "credit_note", "duplicate": duplicate}
+
+
 def ei_compact(inv):
     """What the document keeps of the invoice for its readable view (doc_meta.extracted, sealed): the dict, JSON-safe."""
     keep = ("format", "kind", "number", "date", "due", "currency", "seller", "buyer", "iban", "bic", "payment_ref", "terms",

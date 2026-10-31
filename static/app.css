@@ -2354,6 +2354,9 @@ body.fab-on #view .chcomp,body.fab-on #detail .dbot .dcomp:not(.dctop){padding-r
 }
 @keyframes tdot{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-2px)}}
 #achat .atyping,.chview .atyping{padding:.25rem .875rem .5rem}
+/* 2.437.0 A (#3737): the typing row of the agent chat is always there: fixed height, a rule above, the text on one line */
+.atyping.atyrow,#achat .atyping.atyrow,.chview .atyping.atyrow{box-sizing:border-box;flex:none;height:2.25rem;padding-top:.25rem;padding-bottom:.25rem;border-top:1px solid var(--line);overflow:hidden}
+.atyping.atyrow .ttx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* global: spinning ring on the agent chip / agents button while an agent works, an accent dot while it waits */
 .achip{position:relative}
 .achip.aspin::before,#rail .aspin::before,#tabs .aspin .tico::before{content:'';position:absolute;border-radius:50%;border:2px solid color-mix(in srgb,var(--accent) 22%,transparent);border-top-color:var(--accent);pointer-events:none}
@@ -5751,7 +5754,7 @@ body.lydragging,body.lydragging *{cursor:grabbing!important;-webkit-user-select:
 /* 2.40.0 (#1382): building blocks of a number scheme (buttons, insert at the caret) and its preview */
 /* 2.36.1 C: Office & finance (#1021) -- quotations: the list, the editor (head, positions, automatic lines, totals, rights) */
 .ofdbar select{min-height:2.25rem}
-.rotag.st-sent{color:var(--accent)} .rotag.st-accepted{color:var(--ok,#2a8a4a)} .rotag.st-declined{color:var(--muted);text-decoration:line-through}
+.rotag.st-sent{color:var(--accent)} .rotag.st-accepted{color:var(--ok,#2a8a4a)} .rotag.st-declined,.rotag.st-superseded{color:var(--muted);text-decoration:line-through}
 .ofdsec{border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);padding:.5rem .75rem}
 .ofdsec>summary{cursor:pointer;display:flex;align-items:center;gap:.5rem;min-height:2.5rem;list-style:none}
 .ofdsec>summary::-webkit-details-marker{display:none}
@@ -6421,6 +6424,14 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 @media (min-width:768px){
   .trow.hascols.iedit .ttl{flex:1 1 0;min-width:0}
   .trow.hascols.iedit .meta{flex:0 1 auto}
+}
+/* 2.437.0 A (#3626): in a narrow list (task panel open) the row is the phone row, title above the columns: the field fills the
+   width right of the circle (the row-mode centring above left it floating mid-row) */
+@media (min-width:600px){
+  @container lrows (max-width:48rem){
+    .trow.hascols.iedit .tmain{align-items:stretch}
+    .trow.hascols.iedit .ttl{flex:none;width:100%}
+  }
 }
 
 /* 2.46.1 E (#1637) Office: three tab levels, calmer and flush left -- area tabs as pills, the module's tabs underlined,

@@ -178,6 +178,10 @@ def host_info_in(b):
             if v not in ("", *HOST_MODES):
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = v
+    if "permission_fixed" in b:  # 2.437.0 (#2931): the computer set the mode, the switch in the chat header does not reach it
+        if not isinstance(b["permission_fixed"], bool):
+            raise BadInput(tr("Invalid value: {0}", "permission_fixed"))
+        out["permission_fixed"] = b["permission_fixed"]
     return out
 
 
@@ -187,7 +191,8 @@ def host_info(a):
     except (ValueError, TypeError):
         d = {}
     return {"model": d.get("model") or "", "permission_mode": d.get("permission_mode") or "",
-            "host_permission_mode": d.get("host_permission_mode") or "", "at": d.get("at")}
+            "host_permission_mode": d.get("host_permission_mode") or "", "permission_fixed": bool(d.get("permission_fixed")),
+            "at": d.get("at")}
 
 
 def host_info_set(c, a, new):
@@ -197,7 +202,7 @@ def host_info_set(c, a, new):
     cur = host_info(a)
     nxt = {**cur, **new, "at": iso(now_utc())}
     c.execute("UPDATE agents SET host_info=? WHERE user_id=?", (json.dumps(nxt, ensure_ascii=False), a["user_id"]))
-    return any(cur.get(k) != nxt.get(k) for k in ("model", "permission_mode", "host_permission_mode"))
+    return any(cur.get(k) != nxt.get(k) for k in ("model", "permission_mode", "host_permission_mode", "permission_fixed"))
 
 
 # ---- the person's side (session; never an agent, never anyone but the person the steps are for)

@@ -662,7 +662,14 @@ deleted rows and columns of a table, pipeline deals, invoice series, the placeho
 the emptied rows of deleted comments, absences, disposition bookings, scheduling polls (with the votes of their guests),
 appointment types and file requests (*since 2.223.3*; the files received stay in their folder). The file store's trash names the period. Projects, tasks and events have their own
 trash periods. Legal retention wins: a booked receipt or the logbook is locked until its period ends, never deleted early
-(such a node stays in the trash and is counted as `files_locked`).
+(such a node stays in the trash and is counted as `files_locked`). Deleting an organisation or an account never fails on
+such a file: the organisation is retired until the lock ends, a private file moves into the account's retired office.
+
+**Restoring a backup keeps deletions.** Organisations and entries deleted for good (projects, tasks, files, knowledge
+pages, events, tables, contacts, clients, e-mails, deals) are noted by table and number only, like deleted accounts. A
+restore deletes them again when the backup brings them back. What went in the last 7 days stays, in case the restore was
+meant to bring it back; the admin alert and the log give the numbers. The list follows the backups' period in the log
+clean-up. Retiring an organisation also ends its calendars' subscription links and the booking pages that work for it.
 
 Expired credentials (sessions, tokens, codes past their end) are no data of a person any more and go without the switch.
 
@@ -773,6 +780,8 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
   docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli rotate --org <id> --recovery-out /data/rk-<id>.txt
   ```
 
+  Around the key switch the server takes no writes on any process, up to about half a minute: writes get a 503 and wait
+  in the app's queue, reading and signing in go on (a run that dies frees the server after two minutes; 2.360.2).
   A new key is made, every encrypted value and file of the organisation is encrypted again with it, then the old key
   is removed and a new recovery key is written (to stdout, or with `--recovery-out` into a new file with mode 0600: move
   it offline and delete the file). On this server all earlier recovery keys, including the earlier format, stop
@@ -1053,8 +1062,13 @@ organisation data that is not yours (use the organisation export for a whole org
 **2.148.1 (Art. 15):** the file also holds the list of your private files (name, type, size, dates; not their content),
 your private knowledge pages, your chats with agents, what you wrote in direct messages, your absences and timesheets
 (`private_files`, `wiki_pages`, `agent_chats`, `direct_messages`, `absences`, `timesheets`; the import does not take them
-over yet). `not_included` in the manifest names what is still missing (content of private files, other people's chat
-messages, booking pages, polls and forms, holiday allowances, the organisation's office).
+over yet). `not_included` in the manifest names what is still missing (older versions of private files, other people's chat
+messages, the organisation's office).
+
+**2.360.2:** also the current content of your private files (`files/private_files/`), your booking page with its
+bookings (`appt_pages`, `appt_types`, `appt_bookings`, without network addresses), your private polls (`polls`,
+`poll_options`, `poll_votes`, without voters' e-mail addresses), the forms of your projects with their entries (`forms`,
+`form_entries`) and your holiday allowances (`leave_quota`). The import does not take them over: the preview names them.
 
 **The file** (`kalmido-account-<date>.zip`, readable without Kalmido):
 
@@ -1129,6 +1143,9 @@ A short checklist for a new server:
   database errors without the values of the row. `KALMIDO_LOG_FULL_IP=1` keeps the addresses in full (for fail2ban,
   below). The shipped `docker-compose.yml` rotates every container log (`driver: local`, 3 files of 10 MB), so old lines
   are gone after a while; keep that (or set your own limit) when you change the logging driver.
+- **Two kinds of address limits.** Sign-in with a known name from a known address is only slowed down when an address has
+  many failures (2.282). Every other way in keeps the hard limit per address: the OIDC start, setup codes, invitations, the
+  password reset, the agent setup and API tokens have no "known name" to tell a person from a flood.
 - **fail2ban for failed logins.** Kalmido logs `login failed for user#<hash> from <address>` and has its own lockout.
   2.148.1: the log names a short hash of the typed name (never the name: it may be a password typed into the wrong field).
   fail2ban needs the full address: set `KALMIDO_LOG_FULL_IP=1` in `.env` (2.239: shortened by default). To block repeat

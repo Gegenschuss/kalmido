@@ -805,6 +805,8 @@ async function ua8_delete(u) {
   let j; try { j = await api('GET', `/api/users/${u.id}/delete-info`); } catch { return false; }
   const name = u.display_name || u.name || '';
   if (!j.can_delete) return ua8_orgRemove(u, name, j);
+  // 2.360.4 (#3243): nobody may take over: said now, before the steps of the dialog (the server refuses it as well)
+  if (j.purge?.no_heir) { await askConfirm(tr('Delete user “{0}”?', name), j.purge.no_heir, {ok: tr('OK'), after: md => { $('[data-cd="no"]', md).hidden = true; }}); return false; }
   // 2.146.0 D (#2468): records to keep (the personal office): the retention step first (the server checks it too)
   let rx = '';
   // 2.186.0 A (#2599): records that are retired (self-hosting) need no export step: no waiver is noted
@@ -957,6 +959,7 @@ function ua8PurgeHtml(p) {
   if (p.agents) rows.push([false, trn('{0} own agent is deleted with its access keys.', '{0} own agents are deleted with their access keys.', p.agents)]);
   if (p.calendars) rows.push([false, trn('{0} calendar of an organisation goes to an admin of the organisation.', '{0} calendars of an organisation go to an admin of the organisation.', p.calendars)]);
   if (p.time_kept) rows.push([false, trn('{0} time entry in projects of an organisation stays, without the name.', '{0} time entries in projects of an organisation stay, without the name.', p.time_kept)]);
+  if (p.sheets_kept) rows.push([false, trn('{0} monthly timesheet of an organisation stays, without the name.', '{0} monthly timesheets of an organisation stay, without the name.', p.sheets_kept)]);  // 2.360.2 D (#2561)
   if (p.dms) rows.push([false, trn('{0} direct conversation stays for the other person.', '{0} direct conversations stay for the other people.', p.dms)]);
   rows.push([false, tr('Messages and comments of this person stay with their text, without the name.')]);  // 2.306.0 C (#2889)
   return rows.map(([w, t]) => `<div class="shint keep ua8purge${w ? ' warn' : ''}">${w ? ic('alert', 's') + ' ' : ''}${esc(t)}</div>`).join('');

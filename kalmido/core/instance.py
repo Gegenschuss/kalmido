@@ -21,6 +21,7 @@ from ..core.access import _COLLAB_ALL, _TIME_ALL, collab_all, time_all
 
 # 2.306.0 B (#2887): privacy statement / imprint of the operator (env or Administration > Server)
 LEGAL_ENV = {"privacy_url": os.environ.get("KALMIDO_PRIVACY_URL", "").strip(), "imprint_url": os.environ.get("KALMIDO_IMPRINT_URL", "").strip()}
+PRIVACY_EMAIL_ENV = os.environ.get("KALMIDO_PRIVACY_EMAIL", "").strip()  # 2.360.2 D (#2561)
 LEGAL_URL_RE = re.compile(r"https?://[^\s\"'<>\\]+")
 
 
@@ -36,6 +37,11 @@ def legal_links(c):
         u = gsetting(c, k) or env
         out[k] = u if legal_url_ok(u) else ""
     return out
+
+
+def privacy_email(c):
+    """2.360.2 D (#2561): the operator's privacy contact (Administration > Server / KALMIDO_PRIVACY_EMAIL), '' = none."""
+    return gsetting(c, "privacy_email") or PRIVACY_EMAIL_ENV
 
 
 # ---------------------------------------------------------------- version, update check, instance settings

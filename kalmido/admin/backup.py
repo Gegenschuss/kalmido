@@ -20,12 +20,13 @@ from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from flask import Response, g, jsonify, request, send_file
 
 from ..core.config import app, APP_VERSION, ATT_DIR, DATABASE_URL, DB, OFFICE_DIR, SESSION_DAYS, TZ
-from ..core.schema import SCHEMA_TRIGGERS, SCHEMA_VERSION
+from ..core.schema import PURGED_TABLES, SCHEMA_TRIGGERS, SCHEMA_VERSION
 from ..core import pg as _pg
 from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, gset, gsetting, init_db, iso, local_now, now_utc, parse_iso
 from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database errors in the log
 from ..core.db import appver_newer_minor
+from ..core.serializers import unlink_files
 from ..core.env import env_bool
 from ..core.retention import ret_on as bk_ret_on  # 2.186.0 C (#2602)
 from ..accounts.session import _rate_fail, _rate_keys, GATE, login_wait, set_cookie, start_session
@@ -1475,6 +1476,85 @@ def bkr_creds_after(c, creds):
 BKR_RECENT_DAYS = 7
 
 
+# ---- 2.360.4 (#3243): organisations and entries deleted for good after the backup was written stay deleted: by the list
+# of what went (purged_rows, filled by a database trigger, core/schema.py PURGED_TRIGGER; read before, written back after).
+# The account rule applies: what went in the last BKR_RECENT_DAYS days stays (the restore may be meant to bring it back,
+# the admin learns the number); only the same row counts (same made-at time: ids are given out again after a restore).
+def bkr_purged_read(c):
+    """The list now [(table, id, at)]; caller is in system_ctx."""
+    try:
+        with c.savepoint():
+            return [tuple(r) for r in c.execute("SELECT tbl, ref_id, made, at FROM purged_rows")]
+    except _pg.Error:  # a database from before 2.360.4 (no table yet)
+        return []
+
+
+def bkr_purged_note(c, rows):
+    c.executemany("INSERT INTO purged_rows(tbl, ref_id, made, at) VALUES(?,?,?,?) ON CONFLICT (tbl, ref_id) "
+                  "DO UPDATE SET made=excluded.made, at=excluded.at", rows)
+
+
+def bkr_purged_drop(c, tbl, rid):
+    """Row rid of tbl goes again; -> the files for unlink_files. Stored files of tasks and projects go along; the other
+    tables keep theirs in rows that cascade and in the storage sweep."""
+    if tbl == "orgs":
+        from ..accounts.orgretain import odl_dismantle
+        return odl_dismantle(c, rid)
+    if tbl == "fs_nodes":
+        from ..files.store import fs_purge, fs_purge_files
+        ids, paths = fs_purge(c, rid)
+        return [lambda: fs_purge_files(ids, paths)]
+    if tbl == "lists":  # as the owner's delete: the tasks go to the trash of the inbox, what became of them has its own rows
+        from ..lists.lists import list_purge
+        inbox = c.execute("SELECT i.id FROM lists i JOIN lists l ON l.owner_id=i.owner_id WHERE l.id=? AND i.is_inbox=1", (rid,)).fetchone()
+        return list_purge(c, rid, inbox[0] if inbox else None)[1]
+    files = []
+    if tbl == "tasks":
+        files = [r[0] for r in c.execute("""WITH RECURSIVE t(id) AS (SELECT id FROM tasks WHERE id=?
+                                            UNION SELECT k.id FROM tasks k JOIN t ON k.parent_id=t.id)
+                                            SELECT a.path FROM attachments a JOIN t ON t.id=a.task_id""", (rid,))]
+    c.execute(f"DELETE FROM {tbl} WHERE id=?", (rid,))
+    return files
+
+
+def bkr_purged_after(c, rows):
+    """After the accounts (own commits): the list back, then what the backup brought back goes one row at a time.
+    -> (deleted again, kept as deleted recently, could not be deleted)."""
+    gone, recent, stuck, files = 0, 0, 0, []
+    cut = iso(now_utc() - timedelta(days=BKR_RECENT_DAYS))
+    with _pg.system_ctx(c):  # entries of every organisation; numbers only
+        bkr_purged_note(c, rows)
+        c.commit()
+        for tbl in PURGED_TABLES:  # the big ones first: what goes with them needs no step of its own
+            todo = {r[1]: r for r in rows if r[0] == tbl}
+            ids = sorted(todo)
+            here = []
+            for i in range(0, len(ids), 1000):
+                part = ids[i:i + 1000]
+                here += [r[0] for r in c.execute(f"SELECT id, created_at FROM {tbl} WHERE id IN ({','.join('?' * len(part))})", part).fetchall()
+                         if r[1] == todo[r[0]][2]]
+            for rid in here:
+                at = todo[rid][3]
+                if at >= cut:
+                    recent += 1
+                    continue
+                if not c.execute(f"SELECT 1 FROM {tbl} WHERE id=?", (rid,)).fetchone():  # went with one before it
+                    continue
+                try:
+                    with c.savepoint():
+                        files += bkr_purged_drop(c, tbl, rid)
+                    c.commit()
+                    gone += 1
+                except Exception as e:  # noqa: BLE001 -- one row must not stop the others (a legal lock, a key that is gone)
+                    c.rollback()
+                    print("restore: deleting an entry again failed:", tbl, type(e).__name__, flush=True)
+                    stuck += 1
+        bkr_purged_note(c, rows)  # the deletions just now noted their own time: the first one counts
+        c.commit()
+    unlink_files(files)
+    return gone, recent, stuck
+
+
 def bkr_after_restore(c, rows):
     """After a restore: the journal written back as it was before, then every account the backup brought back that the
     journal names (same id, same user name or e-mail, created no later than it was deleted) goes again (user_purge). One that owns
@@ -1483,7 +1563,6 @@ def bkr_after_restore(c, rows):
     #2602: counted apart). The caller commits nothing: this function does."""
     from ..accounts.users import user_purge
     from ..core.pg import system_ctx
-    from ..core.serializers import unlink_files
     with system_ctx(c):  # the journal and the accounts of every organisation; nothing is shown to a person
         c.execute("DELETE FROM deleted_accounts")
         for r in rows:
@@ -1565,6 +1644,7 @@ def bk_restore(path, pw, admin, via):
             with _pg.system_ctx(cur):
                 jobs = cur.execute("SELECT count(*) FROM bg_jobs WHERE state IN ('wait','run')").fetchone()[0]
                 creds = bkr_creds_read(cur)  # 2.360.0 A (#2496)
+                purged = bkr_purged_read(cur)  # 2.360.4 (#3243)
         finally:
             cur.close()
         if not GATE.begin(own=1, timeout=60):
@@ -1641,7 +1721,7 @@ def bk_restore(path, pw, admin, via):
                 shutil.rmtree(old, ignore_errors=True)
         bk_restore_packs(pack_new)  # 2.359.2 (#2895)
         print(f"restore: {os.path.basename(path)} restored by an admin (safety backup {safety})", flush=True)  # 2.239.0 B (#2888): no name in the log
-        man["_again"] = bkr_restore_journal(journal)  # 2.152.0 B (#2172)
+        man["_again"] = bkr_restore_journal(journal, purged)  # 2.152.0 B (#2172)
         # 2.273.0 A (#3051 p. 12, 13): what a restore cannot bring back, in the result and the log
         man["_notes"] = ([(N_("{0} waiting background jobs were not restored (a backup never holds them): start what is still needed again."), jobs)]
                          if jobs else []) + [(BK_OFFLINE_NOTE,)]
@@ -1694,12 +1774,14 @@ def bk_restore_packs(src):
     return n
 
 
-def bkr_restore_journal(journal):
-    """bkr_after_restore with its own connection, its numbers in the log and as an admin alert; never fails the restore."""
+def bkr_restore_journal(journal, purged=()):
+    """bkr_after_restore with its own connection, its numbers in the log and as an admin alert; never fails the restore.
+    2.360.4 (#3243): then what purged names (bkr_purged_after), with numbers of its own."""
     try:
         c = connect()
         try:
             gone, off, recent = bkr_after_restore(c, journal)
+            pgone, precent, pstuck = bkr_purged_after(c, purged)
         finally:
             c.close()
     except Exception as e:  # noqa: BLE001 -- the restore itself is done; the admin learns it from the alert
@@ -1712,7 +1794,14 @@ def bkr_restore_journal(journal):
         aa_now("security", f"restore-journal:{int(time.time())}",
                N_("After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled; {2} deleted in the last {3} days were disabled, in case the restore was meant to bring them back (delete them in the user administration otherwise)."),
                [str(gone), str(off), str(recent), str(BKR_RECENT_DAYS)])
-    return {"deleted": gone, "disabled": off + recent, "owners": off, "recent": recent}
+    if pgone or precent or pstuck:
+        print(f"restore: entries deleted earlier: {pgone} deleted again, {precent} kept (deleted in the last {BKR_RECENT_DAYS} days), "
+              f"{pstuck} could not be deleted", flush=True)
+        aa_now("security", f"restore-purged:{int(time.time())}",
+               N_("After the restore, {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log)."),
+               [str(pgone), str(precent), str(BKR_RECENT_DAYS), str(pstuck)])
+    return {"deleted": gone, "disabled": off + recent, "owners": off, "recent": recent,
+            "entries": pgone, "entries_recent": precent, "entries_failed": pstuck}
 
 
 # ---- API (admins; CSRF header on every change)

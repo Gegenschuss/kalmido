@@ -148,6 +148,13 @@ const lsj = (br, k) => { const v = br.shared.store['tasks.' + k]; return v == nu
   check(await until(async () => (await call('GET', `/api/tasks/${T1}`)).title === 'Sent after a new sign-in'), 'a new sign-in of the same account: the waiting change is sent');
   w.close();
 
+  // 2.360.2 (#3226): another sign-in mark drops the offline start state as well (load() writes the new one after it)
+  const CK4 = await login('frida');
+  w = await win(br, 'frida', {ck: CK4});
+  await until(() => w.eval(`!!S.lpCache && !!LS.get('cache', null)`));
+  check(w.eval(`(sessGuard({sgen: 'another', workspaces: S.me.workspaces}), !S.lpCache && LS.get('cache', null) === null)`), '2.360.2 (#3226): a new sign-in mark: the offline start state is gone');
+  w.close();
+
   // ================= the session gone (401): the copy goes, nothing is sent (the outbox stays: 2.306.0 B, #2889)
   const CK3 = await login('frida');
   w = await win(br, 'frida', {ck: CK3});
@@ -156,8 +163,10 @@ const lsj = (br, k) => { const v = br.shared.store['tasks.' + k]; return v == nu
   await fetch(B + 'api/auth/logout', {method: 'POST', headers: {...H, Cookie: CK3}});
   br.shared.store['tasks.outbox'] = JSON.stringify([{method: 'PATCH', url: `/api/tasks/${T1}`, body: {title: 'Never sent'}, uid: st0.me.id, k: 'k2238b'}]);
   check(br.db.size > 0, 'setup: a copy before the session ends');
+  check(!!br.shared.store['tasks.cache'], 'setup: the offline start state before the session ends');  // 2.360.2 (#3226)
   w = await win(br, 'frida', {ck: CK3});
   check(await until(() => br.db.size === 0), `401 at /api/state: the copy is gone (${br.db.size} records)`);
+  check(await until(() => !br.shared.store['tasks.cache']), '2.360.2 (#3226): 401 at /api/state: the offline start state is gone too');
   check(await until(() => w.eval('OUT.q.length') === 1), '401 at /api/state: the waiting change stays in the outbox (2.306.0 B)');
   await sleep(300);
   check((await call('GET', `/api/tasks/${T1}`)).title === 'Sent after a new sign-in', '401: nothing waiting was sent');

@@ -374,8 +374,10 @@ def who_obj(c, kind, oid, event):
                                                        "start": r["start"], "end": r["end"], "status": r["status"],
                                                        "deleted": bool(r["deleted_at"])}, "calendar": {"id": r["cal_id"], "name": r["cal_name"]}}
     if kind == "file":
-        r = c.execute("SELECT id, kind, name, mime, size, parent_id, owner_id, org_id, created_at FROM fs_nodes WHERE id=?", (oid,)).fetchone()
+        r = c.execute("SELECT id, kind, name, mime, size, parent_id, owner_id, org_id, created_at, hub_mail_id FROM fs_nodes WHERE id=?", (oid,)).fetchone()
         if not r or r["kind"] != "file":
+            return None
+        if r["org_id"] and r["hub_mail_id"]:  # 2.360.2 L (#2561): a filed mail's name is its subject; only who may read the mail sees it (#2488)
             return None
         return r["org_id"], r["owner_id"], {"file": {"id": r["id"], "name": r["name"], "mime": r["mime"] or "", "size": r["size"] or 0,
                                                      "folder_id": r["parent_id"], "created_at": r["created_at"]}}

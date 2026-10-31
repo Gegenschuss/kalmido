@@ -25,15 +25,17 @@ from ..core.i18n import N_, tr
 from ..core.db import body, db, err, iso, local_now, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_anon_bind, Denied, FULL_ROLES, list_role, need_list
-from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
+from ..core.orgcrypt import OrgCryptError, oc_dec, oc_dec_fields, oc_enc, oc_enc_fields, oc_is_enc, oc_log_detail
 from .model import office_role, pb_owner
 from .rights import NO_RIGHT, ofr_admin_or, ofr_allows
 from ..accounts.orgroles import OFFICE_READ
-from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, rate_ip
+from ..accounts.orgs import user_orgs
+from ..accounts.session import _accept_lang, me, _rate_blocked, _rate_fail, _token_hash, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..api.common import hit_budget, hit_limit
 from ..notify.alerts import aa_count
 from ..core.errors import BadInput
+from ..core.retention import RET_LEGAL_YEARS
 from ..tasks.validation import valid_date
 from ..lists.public import PUB_ACTOR, PUB_TOKEN_RE, pub_gone, pub_html, pub_limited, public_links_on
 
@@ -134,12 +136,45 @@ def sig_fk_migrate(c):
               "REFERENCES video_reviews(id) ON DELETE SET NULL")
 
 
+SIG_LOG_DROP = ("email", "ip", "user_agent")  # 2.148.1 C (#2493): they stay in office_signoffs (encrypted), the log never holds them again
+
+
+def sig_log_trim(c):
+    """2.360.2 D (#2561, decided 28.10.2026, one way, once at the start): old log entries of a customer's decision lose the
+    signer's e-mail, address and device; everything else in the detail stays (GoBD). A sealed entry is opened and sealed
+    again; one that cannot be opened (no key) stays as it is and is counted. Returns (trimmed, left)."""
+    n = left = 0
+    with system_ctx(c):
+        q = ",".join("?" * len(LOG_TEXT))
+        rows = c.execute(f"SELECT id, org_id, detail FROM office_doc_log WHERE action IN ({q})", tuple(LOG_TEXT.values())).fetchall()
+        for r in rows:
+            sealed = oc_is_enc(r["detail"])
+            try:
+                d = json.loads(oc_dec(c, r["org_id"], "office_doc_log.detail", r["detail"]) or "{}")
+            except OrgCryptError:
+                left += 1
+                continue
+            except ValueError:
+                continue
+            if not isinstance(d, dict) or not any(k in d for k in SIG_LOG_DROP):
+                continue
+            t = json.dumps({k: v for k, v in d.items() if k not in SIG_LOG_DROP}, ensure_ascii=False)
+            c.execute("UPDATE office_doc_log SET detail=? WHERE id=?",
+                      (oc_enc(c, r["org_id"], "office_doc_log.detail", t) if sealed else oc_log_detail(c, r["org_id"], t), r["id"]))
+            n += 1
+    return n, left
+
+
 def sig_crypt_org(c, r):
     """2.50.0 (#1200 review): the organisation whose key protects the signer's data of approval r: its own, or for a
     private list's sign-off the personal office of the list's owner (None without one: stored plain like other private data)."""
     if not r["org_id"] and r["kind"] == "video" and r["video_id"]:  # 2.99.1 A (#1959): a private review: its owner's personal office
         with system_ctx(c):  # as below
             x = c.execute("SELECT o.id FROM video_reviews v JOIN orgs o ON o.personal_of=v.owner_id WHERE v.id=?", (r["video_id"],)).fetchone()
+        return x[0] if x else None
+    if not r["org_id"] and r["kind"] == "video" and r["created_by"]:  # 2.360.2 D (#2561): the review is gone: its creator's office
+        with system_ctx(c):
+            x = c.execute("SELECT id FROM orgs WHERE personal_of=?", (r["created_by"],)).fetchone()
         return x[0] if x else None
     if r["org_id"] or not r["list_id"]:
         return r["org_id"]
@@ -326,6 +361,68 @@ def sig_offer_revoke(sid):
                 detail={"signoff": sid, **({"gen_doc": r["gen_doc_id"]} if r["gen_doc_id"] else {})})
         c.commit()
     return jsonify(sig_public(c, c.execute("SELECT * FROM office_signoffs WHERE id=?", (sid,)).fetchone(), office_role(c, uid, oid) == "admin"))
+
+
+# 2.360.2 D (#2561): approval records of video reviews deleted for good (video_id NULL, 2.148.1 C #2493): an organisation's
+# for its office admins, a private one for its creator (settings > Move and export everything); before, nobody reached them
+SIG_GONE_MAX = 200
+
+
+def sig_gone_kept(c, r):
+    """The last day of the legal period of a decided record of an organisation or a personal office (as orgretain ODL "signoffs");
+    None: free to delete."""
+    office = r["org_id"] or c.execute("SELECT 1 FROM orgs WHERE personal_of=?", (r["created_by"],)).fetchone()
+    if not office or not (r["signed_at"] or r["state"] == "accepted"):
+        return None
+    return f"{int((r['signed_at'] or r['created_at'])[:4]) + RET_LEGAL_YEARS['letter']}-12-31"
+
+
+def sig_gone_out(c, r):
+    try:
+        d = sig_dec(c, r)
+    except OrgCryptError:  # a private record sealed with an owner other than its creator
+        d = dict(r)
+    d = {k: None if oc_is_enc(d[k]) else d[k] for k in ("signer_name", "signer_email", "signed_at")} | {k: d[k] for k in ("id", "org_id", "title", "state", "created_at")}
+    return {**d, "kept_until": sig_gone_kept(c, r)}
+
+
+def sig_gone_rows(c, uid):
+    orgs = [o for o in user_orgs(c, uid) if office_role(c, uid, o) == "admin"]
+    inorg = f"org_id IN ({','.join('?' * len(orgs))}) OR " if orgs else ""
+    return c.execute(f"""SELECT * FROM office_signoffs WHERE kind='video' AND video_id IS NULL AND ({inorg}(org_id IS NULL AND created_by=?))
+                         ORDER BY id DESC LIMIT {SIG_GONE_MAX}""", (*orgs, uid)).fetchall()
+
+
+def sig_no_agent():
+    from ..agents.core import is_agent
+    if is_agent(getattr(g, "user", None)):  # the customers' data, as vdr_dict(signoffs=False)
+        raise Denied(403, tr("Not available for agent accounts"))
+
+
+@app.get("/api/videos/signoffs/orphaned")
+def sig_gone_list():
+    sig_no_agent()
+    c, uid = db(), me()
+    return jsonify(signoffs=[sig_gone_out(c, r) for r in sig_gone_rows(c, uid)])
+
+
+@app.delete("/api/videos/signoffs/orphaned/<int:sid>")
+def sig_gone_delete(sid):
+    """An organisation's decided record only after its legal period (409 until then)."""
+    from .ledger import ofx_log
+    sig_no_agent()
+    c, uid = db(), me()
+    r = next((x for x in sig_gone_rows(c, uid) if x["id"] == sid), None)
+    if not r:
+        raise Denied(404)
+    kept = sig_gone_kept(c, r)
+    if kept and kept >= iso(now_utc())[:10]:
+        raise Denied(409, tr("This record is kept until {0} by law", kept))
+    c.execute("DELETE FROM office_signoffs WHERE id=?", (sid,))
+    if r["org_id"]:
+        ofx_log(c, r["org_id"], "signoff_delete", target="video", detail={"signoff": sid})
+    c.commit()
+    return jsonify(ok=True)
 
 
 # acceptance of a list (the owner of the list; from the list dialog > Public link)

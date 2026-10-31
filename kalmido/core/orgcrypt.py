@@ -189,6 +189,9 @@ def oc_error(e):
 _LOCK = threading.Lock()
 _CACHE = {}  # (org id, wrapped) -> org key; a deleted / rewrapped row is never found again (the wrapped text is the key)
 _ROT = {}  # 2.138.0 C (#1972): org id -> the earlier org key while orgcrypt_cli rotate runs (reading falls back to it)
+# 2.360.2 L (#2561): the write lock of a rotation is a row in settings (the CLI is a process of its own): unix time it ends
+# at, renewed while the run lives, so a dead run frees the server by itself. The request gate (accounts/session.py) caches it.
+ROT_LOCK_KEY, ROT_LOCK_S, ROT_LOCK_TTL = "rot_write_lock", 120, 2.0
 
 
 def _b64u(b):

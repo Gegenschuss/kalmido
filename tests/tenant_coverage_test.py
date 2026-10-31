@@ -812,6 +812,7 @@ ROUTES = {
     "GET /s/q/{}/terms": "signoff",  # 2.113.2 (#2253): the terms frozen with the quotation of the link
     # 2.99.1 A (#1959): video sign-offs (videos/review.py; p2991_a_api_test.py)
     "GET /api/videos": "video", "POST /api/videos": "video", "GET /api/videos/{}": "video", "PATCH /api/videos/{}": "video",
+    "GET /api/videos/signoffs/orphaned": "own", "DELETE /api/videos/signoffs/orphaned/{}": "own",  # 2.360.2 D (#2561)
     "DELETE /api/videos/{}": "video", "POST /api/videos/{}/restore": "video", "POST /api/videos/{}/versions": "video",
     "DELETE /api/videos/{}/versions/{}": "video", "POST /api/videos/{}/comments": "video", "PATCH /api/videos/{}/comments/{}": "video",
     "DELETE /api/videos/{}/comments/{}": "video", "POST /api/videos/{}/comments/{}/restore": "video", "GET /api/videos/{}/export": "video",

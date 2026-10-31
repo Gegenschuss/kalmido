@@ -59,7 +59,8 @@ check(st is None, "a branch 'hotfixes' is no hotfix branch (%s)" % st)
 rel = read(".github", "workflows", "release.yml")
 check("${{ steps.v.outputs.latest == 'true' && 'ghcr.io/gegenschuss/kalmido:latest' || '' }}" in rel,
       "image tag :latest only for the newest version")
-check('--latest="${{ steps.v.outputs.latest }}"' in rel, "gh release create marks latest only for the newest version")
+# 2.360.2 (#2912): the GitHub release is the job publish now
+check('--latest="${{ needs.release.outputs.latest }}"' in rel, "gh release create marks latest only for the newest version")
 check("ghcr.io/gegenschuss/kalmido:${{ steps.v.outputs.version }}" in rel, "the version image tag stays")
 step = re.search(r"- name: Version from tag\n(?:.*\n)*?        run: \|\n((?:          .*\n|\n)+)", rel)
 script = "\n".join(line[10:] for line in step.group(1).splitlines()) if step else ""

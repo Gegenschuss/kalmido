@@ -838,6 +838,7 @@ ROUTES = {
     "POST /api/time/entries": "time", "POST /api/time/start": "time", "POST /api/time/stop": "time",
     "POST /api/v1/habits": "time", "POST /api/v1/habits/{}/checkin": "time", "POST /api/v1/time/entries": "time",
     "POST /api/v1/time/timer": "time",
+    "GET /api/videos/signoffs/orphaned": "own", "DELETE /api/videos/signoffs/orphaned/{}": "own",  # 2.360.2 D (#2561)
     "GET /api/time/sheets": "time", "POST /api/time/sheets": "time", "POST /api/time/sheets/decide": "time",  # 2.125.0 B (#2119)
     # ---- token (3)
     "POST /api/hooks/deploy/{}/{}": "token", "POST /api/hooks/git/{}": "token", "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/issues/{}": "token",
@@ -1193,7 +1194,6 @@ PATCH /api/list-tags/{}
 PATCH /api/lists/{}/error-hook
 PATCH /api/lists/{}/links/{}
 PATCH /api/lists/{}/milestones/{}
-PATCH /api/me
 PATCH /api/me/tokens/{}
 PATCH /api/me/webhooks/{}
 PATCH /api/newsletter/segments/{}

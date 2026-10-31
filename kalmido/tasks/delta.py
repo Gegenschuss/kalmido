@@ -19,8 +19,8 @@ from datetime import timedelta
 
 from flask import jsonify, request
 
-from ..core.config import app
-from ..core.db import db, gset, gsetting, iso, now_utc, usettings
+from ..core.config import app, APP_VERSION
+from ..core.db import appver_parse, db, gset, gsetting, iso, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import plists, time_all, token_lists, tvis, vis_sql, wr_sql  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
@@ -142,10 +142,19 @@ def dl_setup(c):
             args = ", ".join(f"'{x}'" for x in cols)
             c.execute(f"CREATE OR REPLACE TRIGGER kalmido_dl_{t} AFTER INSERT OR UPDATE OR DELETE ON {t} "
                       f"FOR EACH ROW EXECUTE FUNCTION kalmido_dl_touch({args})")
-    sig = hashlib.sha256(json.dumps([DL_FN, DL_TABLES, DL_SCOPE], sort_keys=True).encode()).hexdigest()[:16]
-    if gsetting(c, "dl_sig") != sig:
+    dl_floor_check(c, hashlib.sha256(json.dumps([DL_FN, DL_TABLES, DL_SCOPE], sort_keys=True).encode()).hexdigest()[:16])
+
+
+def dl_floor_check(c, sig):
+    """Deltas from before now answer full when the triggers' signature changed.
+    2.360.4 (#3248): a step back (this image is older than the newest that ran here, core/db.py appver_stamp): what
+    the versions in between recorded is not known and the signature is not kept, so the next upgrade answers full as well."""
+    r = c.execute("SELECT value FROM kalmido_meta WHERE key='app_version'").fetchone()
+    have, mine = appver_parse(r[0]) if r else None, appver_parse(APP_VERSION)
+    back = bool(have and mine and have > mine)
+    if gsetting(c, "dl_sig") != ("" if back else sig):  # once per step back, not at every start of the older image
         gset(c, "dl_floor", gsetting(c, "version") or "0")
-        gset(c, "dl_sig", sig)
+        gset(c, "dl_sig", "" if back else sig)
 
 
 def dl_stamp(c, v):

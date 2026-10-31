@@ -98,6 +98,13 @@ def shb_only_books(c, rows):
     return [r for r in rows if not r["book_id"]]
 
 
+def shb_cell_stats(c, bid):
+    """2.360.2 L (#2561): (stored cells, bytes of their inputs) over all sheets of table bid."""
+    r = c.execute("SELECT COUNT(*), COALESCE(SUM(octet_length(raw)), 0) FROM sheet_cells WHERE sheet_id IN "
+                  "(SELECT id FROM sheets WHERE id=? OR book_id=?)", (bid, bid)).fetchone()
+    return r[0], int(r[1])
+
+
 def shb_counts(c, rows, out):
     """sh_brief's hook: + sheets = the number of live sheets of each table."""
     ids = [int(r["id"]) for r in rows]
@@ -358,12 +365,14 @@ def _copy(c, src, tid, uid, ts):
     kinds = {r["id"]: r["kind"] for r in c.execute("SELECT id, kind FROM sheet_columns WHERE sheet_id=?", (src["id"],)).fetchall()}
     cells = [x for x in c.execute("SELECT * FROM sheet_cells WHERE sheet_id=?", (src["id"],)).fetchall()
              if x["row_id"] in rmap and x["col_id"] in cmap]
-    from .core import SH_BOOK_CELLS_MAX  # 2.148.1 G (#2485): a copied sheet counts against the table's cell cap, too
+    from .core import SH_BOOK_CELLS_MAX, SH_BOOK_MB_MAX  # 2.148.1 G (#2485): a copied sheet counts against the table's caps, too
     bid = c.execute("SELECT COALESCE(book_id, id) FROM sheets WHERE id=?", (tid,)).fetchone()[0]
-    have = c.execute("SELECT COUNT(*) FROM sheet_cells WHERE sheet_id IN (SELECT id FROM sheets WHERE id=? OR book_id=?)",
-                     (bid, bid)).fetchone()[0]
+    have, have_b = shb_cell_stats(c, bid)
     if have + len(cells) > SH_BOOK_CELLS_MAX:
         raise BadInput(tr("The table is full (at most {0} cells)", SH_BOOK_CELLS_MAX))
+    size = sum(len((x["raw"] or "").encode("utf-8", "replace")) for x in cells if kinds.get(x["col_id"]) != "file")
+    if have_b + size > SH_BOOK_MB_MAX * 1048576:  # 2.360.2 L (#2561)
+        raise BadInput(tr("The table is full (at most {0} MB)", SH_BOOK_MB_MAX))
     for x in cells:
         raw = "" if kinds.get(x["col_id"]) == "file" else (x["raw"] or "")  # a cell file belongs to its sheet
         xmap[x["id"]] = insert_id(c, "INSERT INTO sheet_cells(sheet_id,row_id,col_id,raw,name,frozen,frozen_value,updated_by,updated_at) "

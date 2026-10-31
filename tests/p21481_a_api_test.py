@@ -225,7 +225,8 @@ sh = Bo.post(B + "/api/sheets", json={"title": "Rates", "space": f"org:{ORG}"})
 SID = sh.json().get("id") if sh.ok else None
 r1 = Bo.post(B + f"/api/sheets/{SID}/shares", json={"email": "dave@example.com", "role": "read"})
 r2 = Bo.post(B + f"/api/sheets/{SID}/shares", json={"email": "ghost@example.com", "role": "read"})
-check(r1.status_code == r2.status_code == 201 and r1.json() == r2.json() == {"by_email": True}, "a table shared by address: the same answer, no list " + r1.text[:200])
+# 2.360.2 (#2561): one row per address, an account or not
+check(r1.status_code == r2.status_code == 201 and set(r1.json()) == set(r2.json()) and {x["state"] for x in r2.json()["shares"]} == {"invited"}, "a table shared by address: the same answer, the same rows " + r1.text[:200])
 check(Bo.get(B + "/api/me/storage").json().get("support") == "", "no support address set: none (not an admin's)")
 check(Fr.get(B + "/api/me/storage").json().get("support") == "", "freelancer: the same")
 
@@ -235,7 +236,7 @@ r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "erin@example.com"})
 inv = {x["email"]: x for x in Bo.get(B + f"/api/orgs/{ORG}/invites").json().get("invites", [])}
 check(r.ok and "erin@example.com" in inv and inv["erin@example.com"]["user_id"] is None and inv["erin@example.com"]["state"] == "invited",
       "open invitations list an existing account, too " + str(inv.get("erin@example.com")))
-check("nolink@example.com" in inv and set(inv["erin@example.com"]) - {"join_id"} <= set(inv["nolink@example.com"]), "... in the same form")
+check("nolink@example.com" in inv and set(inv["erin@example.com"]) == set(inv["nolink@example.com"]), "... in the same form")
 # #2480 an invitation the existing path refuses: a clean error, no server error
 r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "bob@example.com", "role": "member"})
 check(400 <= r.status_code < 500, "an invitation that cannot be done answers with an error, not a server error " + str(r.status_code) + r.text[:200])

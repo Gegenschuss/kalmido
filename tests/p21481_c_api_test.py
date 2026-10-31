@@ -304,7 +304,8 @@ after = open(p, 'rb').read()[:len(oc.MAGIC)] == oc.MAGIC
 print(before, after, res)
 """
 rc, out, err_ = py(code)
-check(rc == 0 and out.split()[:2] == ["True", "True"], f"#2487: the organisation's own file stays sealed before the deletion {out[-200:]} {err_[-400:]}")
+# 2.360.2 (#2561): the start log (#3729) prints on stdout, too: the answer is the last line
+check(rc == 0 and out.strip().splitlines()[-1].split()[:2] == ["True", "True"], f"#2487: the organisation's own file stays sealed before the deletion {out[-200:]} {err_[-400:]}")
 r = A.delete(B + f"/api/admin/orgs/{ORG3}", params={"confirm": "1"})  # bundle C: 2.152.0 (#2164) asks to confirm an organisation with content
 check(r.ok and not one("SELECT 1 FROM orgs WHERE id=?", (ORG3,)), f"#2487: the organisation is deleted {r.status_code} {r.text[:200]}")
 
@@ -378,15 +379,17 @@ check(dbx("SELECT 1 FROM org_list_log WHERE org_id=? AND list_id=? AND action='e
       "#2492: the export of an organisation's list is in its list history")
 # 2.148.1 H (#2492, review): the ZIP exports of the same lists are noted, too
 for kind in ("todoist", "markdown"):
-    n0 = dbx("SELECT COUNT(*) FROM org_list_log WHERE org_id=? AND list_id=? AND action='export'", (ORG, LO))[0][0]
+    # 2.360.2 (#2561): one row per person, list and day: the earlier rows of today go first
+    dbx("DELETE FROM org_list_log WHERE org_id=? AND list_id=? AND action='export'", (ORG, LO))
     r = A.get(B + f"/api/export/{kind}.zip")
-    check(r.ok and dbx("SELECT COUNT(*) FROM org_list_log WHERE org_id=? AND list_id=? AND action='export'", (ORG, LO))[0][0] == n0 + 1,
+    check(r.ok and dbx("SELECT COUNT(*) FROM org_list_log WHERE org_id=? AND list_id=? AND action='export'", (ORG, LO))[0][0] == 1,
           f"#2492: the {kind} ZIP export of an organisation's list is in its list history")
 # parallel imports: the one slot of this server is taken -> 429
 code = "import time, app\nfrom kalmido.core.config import DATABASE_URL\nfrom kalmido.core.pg import connect_direct\nc = connect_direct(DATABASE_URL)\n" \
        "c.execute('SELECT pg_advisory_lock(21481, 0)').fetchone(); c.commit(); print('held', flush=True); time.sleep(25)\n"
 holder = subprocess.Popen(["docker", "exec", "-i", CT, "python", "-c", code], stdout=subprocess.PIPE, text=True)
-holder.stdout.readline()
+while holder.stdout.readline().strip() != "held":  # 2.360.2 (#2561): past the start log (#3729)
+    pass
 iid2, r429 = upload(Bo, crafted)
 check(r429 is not None and r429.status_code == 429, f"#2492: a further import while the slots are taken: 429 {r429.status_code if r429 is not None else 'none'}")
 holder.wait(timeout=60)

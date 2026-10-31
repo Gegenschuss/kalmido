@@ -19,15 +19,21 @@
 
 ## What's new
 
+**2.436.0** (2026-10-31):
+- **Office**: receipts by e-mail - forward invoice mails to your office address, Kalmido fetches linked invoice PDFs by itself; the client card's blocks fold and can be switched off per office.
+- **Documents**: the list can be sorted (date, arrival, sender, amount, due date, title).
+- **Settings**: "View as member" (Settings > Account) shows Kalmido as a member of your organisation sees it; the rights stay, the way back is in the account menu.
+- **Projects**: properties per project type (software, agency, personal), switchable in the project options under Properties.
+- **Agents**: git author for AI commits is a setting (agent settings, per project overridable).
+- **Backups and restore**: larger files are kept once in `data/backups/.store` for all backups (2.432); copy the backup folder WITH `.store`; *Download* always gives one complete file; a copy elsewhere is made complete with `python3 -I kalmido/admin/bkstore.py assemble` (see SELF-HOSTING.md).
+
 **2.430.0** (2026-10-30):
-- **Workspaces**: each workspace remembers its own view; create your own company from the workspace menu, with optional private registration without an invitation.
-- **Projects**: properties per project type (software, agency, personal), "Project type" in folder settings.
-- **Agents**: a live "working on it" mark on tasks (dot, name, time, last line) through the API / MCP; git author for AI commits is a setting.
+- **Projects**: ticket keys APP-123 (project dialog), linked from commits, branches and pull requests; saved filters by assignee, column, sprint, milestone and text; the agent API filters and sorts tasks by every field; "Project type" in folder settings.
+- **Agents**: a live "working on it" mark on tasks (dot, name, time, last line) through the API / MCP.
 - **Knowledge**: tags (#word) with a list in the panel, live query blocks, `![[Page]]` embeds, daily notes and template placeholders.
-- **Office**: receipts by e-mail, missing invoices of recurring providers with a link to their portal, a receipt fetcher for portal invoices, a booking archive for past DATEV years, final invoices after the BMF letter of 15.10.2026, the client card's blocks fold, "Checked" ticks on receipts.
-- **Documents**: the open document stands in a pane beside the list, the list can be sorted.
-- **Settings**: new areas "Company & office" and "Documents"; "View as member" under Settings > Account.
-- **Backups**: larger files are kept once in `data/backups/.store` for all backups; copy the backup folder WITH `.store`.
+- **Office**: missing invoices of recurring providers with a link to their portal, a receipt fetcher for portal invoices, a booking archive for past DATEV years, final invoices after the BMF letter of 15.10.2026.
+- **Documents**: the open document stands in a pane beside the list, arrow keys go through the list.
+- **Moving**: office data moves between workspaces now also with deals, letter drafts and equipment sets.
 
 **2.409.0** (2026-10-30):
 - **Projects**: one kind of project; project folders live in the file store tree with shares that apply at runtime.
