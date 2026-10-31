@@ -15292,7 +15292,6 @@
   "group conversations of the team chat (like direct messages they belong to their people, not to the organisation)": "conversaciones de grupo del chat de equipo (como los mensajes directos, pertenecen a sus participantes, no a la organización)",
   "channels of the organisation that are not open and that the exporting admin is not a member of": "canales de la organización que no son abiertos y de los que el administrador que exporta no es miembro",
   "notification channels (their targets are secrets), invitations and join requests, the organisation's and the lists' pictures (icons, cover pictures), synchronisation data of calendar and task apps (CalDAV), groups of people and their shares": "canales de notificación (sus destinos son secretos), invitaciones y solicitudes de unión, imágenes de la organización y de las listas (iconos, imágenes de portada), datos de sincronización de aplicaciones de calendario y tareas (CalDAV), grupos de personas y lo que comparten",
-  "feeds of the organisation (not yet in this export)": "fuentes de la organización (aún no en esta exportación)",
   "booking pages of other members that the office does not bill (only their owner reads the bookings), archived channels": "páginas de reserva de otros miembros que la oficina no factura (solo su propietario lee las reservas), canales archivados",
   "filed e-mails (and their files) the exporting admin cannot open in the app: other members' inboxes, projects without them": "correos archivados (y sus archivos) que el administrador que exporta no puede abrir en la aplicación: buzones de otros miembros, proyectos sin él",
   "everything of the private space but the office, its clients and the documents the office stands on (receipts, filed letters, contract and equipment documents, cash book receipts); files below a browser-locked folder stay out": "todo el espacio privado salvo la oficina, sus clientes y los documentos en los que se basa la oficina (justificantes, cartas archivadas, documentos de contratos y equipos, justificantes del libro de caja); los archivos bajo una carpeta bloqueada en el navegador quedan fuera",
@@ -15352,5 +15351,11 @@
   "your customer portal or booking page used up its sign-in or confirmation mails": "tu portal de clientes o tu página de reservas ha agotado sus correos de acceso o de confirmación",
   "Bookmarks are being fetched in the background": "Los marcadores se están obteniendo en segundo plano",
   "Invitation sent. The person accepts it in their News.": "Invitación enviada. La persona la acepta en sus Novedades.",
-  "Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.": "Sin cuenta, se crea una nueva y la persona recibe un correo para elegir una contraseña. En ambos casos, la persona se une al aceptar la invitación."
+  "Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.": "Sin cuenta, se crea una nueva y la persona recibe un correo para elegir una contraseña. En ambos casos, la persona se une al aceptar la invitación.",
+  "A rule was paused because something it refers to did not come along: {0}": "Una regla se pausó porque falta algo a lo que se refiere: {0}",
+  "A rule was left out because this version cannot read it or the project has too many: {0}": "Se omitió una regla porque esta versión no puede leerla o el proyecto tiene demasiadas: {0}",
+  "A feed without its address was not taken over: {0}": "No se transfirió una fuente sin su dirección: {0}",
+  "A feed was not taken over, the limit is reached: {0}": "No se transfirió una fuente, se alcanzó el límite: {0}",
+  "the articles of feeds (fetched again on the target) and feed addresses that carry an access key": "los artículos de las fuentes (se vuelven a obtener en el destino) y las direcciones de fuentes con clave de acceso",
+  "your agents and their keys and tokens (set them up again on the target)": "tus agentes y sus claves y tokens (configúralos de nuevo en el destino)"
 }

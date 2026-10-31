@@ -15292,7 +15292,6 @@
   "group conversations of the team chat (like direct messages they belong to their people, not to the organisation)": "groepsgesprekken van de teamchat (net als directe berichten horen ze bij hun deelnemers, niet bij de organisatie)",
   "channels of the organisation that are not open and that the exporting admin is not a member of": "kanalen van de organisatie die niet open zijn en waarvan de exporterende beheerder geen lid is",
   "notification channels (their targets are secrets), invitations and join requests, the organisation's and the lists' pictures (icons, cover pictures), synchronisation data of calendar and task apps (CalDAV), groups of people and their shares": "meldingskanalen (hun doelen zijn geheimen), uitnodigingen en lidmaatschapsverzoeken, de afbeeldingen van de organisatie en de lijsten (pictogrammen, omslagafbeeldingen), synchronisatiegegevens van agenda- en taak-apps (CalDAV), groepen mensen en wat met hen is gedeeld",
-  "feeds of the organisation (not yet in this export)": "feeds van de organisatie (nog niet in deze export)",
   "booking pages of other members that the office does not bill (only their owner reads the bookings), archived channels": "boekingspagina's van andere leden die het kantoor niet factureert (alleen de eigenaar leest de boekingen), gearchiveerde kanalen",
   "filed e-mails (and their files) the exporting admin cannot open in the app: other members' inboxes, projects without them": "opgeslagen e-mails (en hun bestanden) die de exporterende beheerder in de app niet kan openen: postvakken van andere leden, projecten zonder deze persoon",
   "everything of the private space but the office, its clients and the documents the office stands on (receipts, filed letters, contract and equipment documents, cash book receipts); files below a browser-locked folder stay out": "de hele privéruimte behalve het kantoor, zijn klanten en de documenten waarop het kantoor steunt (bonnen, gearchiveerde brieven, contract- en apparatuurdocumenten, kasboekbonnen); bestanden onder een in de browser vergrendelde map blijven erbuiten",
@@ -15352,5 +15351,11 @@
   "your customer portal or booking page used up its sign-in or confirmation mails": "je klantenportaal of boekingspagina heeft zijn aanmeld- of bevestigingsmails opgebruikt",
   "Bookmarks are being fetched in the background": "Bladwijzers worden op de achtergrond opgehaald",
   "Invitation sent. The person accepts it in their News.": "Uitnodiging verstuurd. De persoon accepteert haar in het Nieuws.",
-  "Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.": "Zonder account wordt een nieuw aangemaakt en krijgt de persoon een e-mail om een wachtwoord te kiezen. In beide gevallen sluit de persoon zich aan door de uitnodiging te accepteren."
+  "Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.": "Zonder account wordt een nieuw aangemaakt en krijgt de persoon een e-mail om een wachtwoord te kiezen. In beide gevallen sluit de persoon zich aan door de uitnodiging te accepteren.",
+  "A rule was paused because something it refers to did not come along: {0}": "Een regel is gepauzeerd omdat iets waarnaar hij verwijst niet is meegekomen: {0}",
+  "A rule was left out because this version cannot read it or the project has too many: {0}": "Een regel is weggelaten omdat deze versie hem niet kan lezen of het project er te veel heeft: {0}",
+  "A feed without its address was not taken over: {0}": "Een feed zonder adres is niet overgenomen: {0}",
+  "A feed was not taken over, the limit is reached: {0}": "Een feed is niet overgenomen, de limiet is bereikt: {0}",
+  "the articles of feeds (fetched again on the target) and feed addresses that carry an access key": "de artikelen van feeds (worden op het doel opnieuw opgehaald) en feedadressen met een toegangssleutel",
+  "your agents and their keys and tokens (set them up again on the target)": "je agents en hun sleutels en tokens (stel ze op het doel opnieuw in)"
 }

@@ -15292,7 +15292,6 @@
   "group conversations of the team chat (like direct messages they belong to their people, not to the organisation)": "conversations de groupe du chat d'équipe (comme les messages directs, elles appartiennent à leurs participants, pas à l'organisation)",
   "channels of the organisation that are not open and that the exporting admin is not a member of": "canaux de l'organisation qui ne sont pas ouverts et dont l'administrateur qui exporte n'est pas membre",
   "notification channels (their targets are secrets), invitations and join requests, the organisation's and the lists' pictures (icons, cover pictures), synchronisation data of calendar and task apps (CalDAV), groups of people and their shares": "canaux de notification (leurs cibles sont secrètes), invitations et demandes d'adhésion, images de l'organisation et des listes (icônes, images de couverture), données de synchronisation des applis d'agenda et de tâches (CalDAV), groupes de personnes et leurs partages",
-  "feeds of the organisation (not yet in this export)": "flux de l'organisation (pas encore dans cet export)",
   "booking pages of other members that the office does not bill (only their owner reads the bookings), archived channels": "pages de réservation d'autres membres que le bureau ne facture pas (seul leur propriétaire lit les réservations), canaux archivés",
   "filed e-mails (and their files) the exporting admin cannot open in the app: other members' inboxes, projects without them": "e-mails classés (et leurs fichiers) que l'administrateur qui exporte ne peut pas ouvrir dans l'appli : boîtes d'autres membres, projets sans lui",
   "everything of the private space but the office, its clients and the documents the office stands on (receipts, filed letters, contract and equipment documents, cash book receipts); files below a browser-locked folder stay out": "tout l'espace privé sauf le bureau, ses clients et les documents sur lesquels le bureau s'appuie (justificatifs, lettres classées, documents de contrats et d'équipements, justificatifs du livre de caisse) ; les fichiers sous un dossier verrouillé dans le navigateur restent en dehors",
@@ -15352,5 +15351,11 @@
   "your customer portal or booking page used up its sign-in or confirmation mails": "ton portail client ou ta page de réservation a épuisé ses e-mails de connexion ou de confirmation",
   "Bookmarks are being fetched in the background": "Les favoris sont récupérés en arrière-plan",
   "Invitation sent. The person accepts it in their News.": "Invitation envoyée. La personne l’accepte dans ses Actualités.",
-  "Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.": "Sans compte, un nouveau est créé et la personne reçoit un e-mail pour choisir un mot de passe. Dans les deux cas, la personne rejoint en acceptant l’invitation."
+  "Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.": "Sans compte, un nouveau est créé et la personne reçoit un e-mail pour choisir un mot de passe. Dans les deux cas, la personne rejoint en acceptant l’invitation.",
+  "A rule was paused because something it refers to did not come along: {0}": "Une règle a été mise en pause car un élément auquel elle se réfère n'a pas suivi : {0}",
+  "A rule was left out because this version cannot read it or the project has too many: {0}": "Une règle a été ignorée car cette version ne peut pas la lire ou le projet en a trop : {0}",
+  "A feed without its address was not taken over: {0}": "Un flux sans adresse n'a pas été repris : {0}",
+  "A feed was not taken over, the limit is reached: {0}": "Un flux n'a pas été repris, la limite est atteinte : {0}",
+  "the articles of feeds (fetched again on the target) and feed addresses that carry an access key": "les articles des flux (récupérés à nouveau sur la destination) et les adresses de flux contenant une clé d'accès",
+  "your agents and their keys and tokens (set them up again on the target)": "tes agents et leurs clés et jetons (à reconfigurer sur la destination)"
 }

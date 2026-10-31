@@ -15292,7 +15292,6 @@
   "group conversations of the team chat (like direct messages they belong to their people, not to the organisation)": "conversazioni di gruppo della chat del team (come i messaggi diretti appartengono ai partecipanti, non all'organizzazione)",
   "channels of the organisation that are not open and that the exporting admin is not a member of": "canali dell'organizzazione che non sono aperti e di cui l'amministratore che esporta non è membro",
   "notification channels (their targets are secrets), invitations and join requests, the organisation's and the lists' pictures (icons, cover pictures), synchronisation data of calendar and task apps (CalDAV), groups of people and their shares": "canali di notifica (le loro destinazioni sono segrete), inviti e richieste di adesione, immagini dell'organizzazione e delle liste (icone, immagini di copertina), dati di sincronizzazione di app di calendario e attività (CalDAV), gruppi di persone e le loro condivisioni",
-  "feeds of the organisation (not yet in this export)": "feed dell'organizzazione (non ancora in questa esportazione)",
   "booking pages of other members that the office does not bill (only their owner reads the bookings), archived channels": "pagine di prenotazione di altri membri che l'ufficio non fattura (solo il proprietario legge le prenotazioni), canali archiviati",
   "filed e-mails (and their files) the exporting admin cannot open in the app: other members' inboxes, projects without them": "e-mail archiviate (e i loro file) che l'amministratore che esporta non può aprire nell'app: caselle di altri membri, progetti senza di lui",
   "everything of the private space but the office, its clients and the documents the office stands on (receipts, filed letters, contract and equipment documents, cash book receipts); files below a browser-locked folder stay out": "tutto lo spazio privato tranne l'ufficio, i suoi clienti e i documenti su cui si basa l'ufficio (giustificativi, lettere archiviate, documenti di contratti e attrezzature, giustificativi del libro cassa); i file sotto una cartella bloccata nel browser restano fuori",
@@ -15352,5 +15351,11 @@
   "your customer portal or booking page used up its sign-in or confirmation mails": "il tuo portale clienti o la tua pagina di prenotazione ha esaurito le e-mail di accesso o di conferma",
   "Bookmarks are being fetched in the background": "I segnalibri vengono recuperati in background",
   "Invitation sent. The person accepts it in their News.": "Invito inviato. La persona lo accetta nelle sue Novità.",
-  "Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.": "Senza account, ne viene creato uno nuovo e la persona riceve un’e-mail per scegliere una password. In entrambi i casi la persona entra accettando l’invito."
+  "Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.": "Senza account, ne viene creato uno nuovo e la persona riceve un’e-mail per scegliere una password. In entrambi i casi la persona entra accettando l’invito.",
+  "A rule was paused because something it refers to did not come along: {0}": "Una regola è stata messa in pausa perché manca qualcosa a cui si riferisce: {0}",
+  "A rule was left out because this version cannot read it or the project has too many: {0}": "Una regola è stata tralasciata perché questa versione non può leggerla o il progetto ne ha troppe: {0}",
+  "A feed without its address was not taken over: {0}": "Un feed senza indirizzo non è stato trasferito: {0}",
+  "A feed was not taken over, the limit is reached: {0}": "Un feed non è stato trasferito, il limite è stato raggiunto: {0}",
+  "the articles of feeds (fetched again on the target) and feed addresses that carry an access key": "gli articoli dei feed (recuperati di nuovo sulla destinazione) e gli indirizzi dei feed con chiave di accesso",
+  "your agents and their keys and tokens (set them up again on the target)": "i tuoi agenti e le loro chiavi e token (da configurare di nuovo sulla destinazione)"
 }

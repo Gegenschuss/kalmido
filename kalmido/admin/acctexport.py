@@ -56,6 +56,7 @@ from .offsite import stepup_download  # 2.360.0 A (#2496): the step-up before th
 from ..core.orgcrypt import OrgCryptError, oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
 from ..life.model import jr_open  # 2.306.0 A (#2885)
+from ..accounts.login import unseal  # 2.455.0 (#3469)
 
 UMZ_DIR = os.path.join(EXPORT_DIR, "account")
 UMZ_KEEP_H = 24
@@ -84,7 +85,39 @@ UMZ_NOT_INCLUDED = (
     N_("the network addresses of people who booked with you and the e-mail addresses of people who voted in your polls"),  # 2.360.2 D (#2561)
     # 2.362.2 (#3099): the personal office is in the file; this line is about organisations only
     N_("the office (documents, receipts, cash book) and knowledge pages of an organisation: the organisation export"),
+    # 2.455.0 (#3469): agents never move: their keys and tokens stay, an agent is set up anew on the target
+    N_("your agents and their keys and tokens (set them up again on the target)"),
 )
+
+# 2.455.0 (#3469): every table with a person column (user_id) that is NOT in the queries of the account export, with the reason (the
+# static guard tests/export_coverage_test.py fails on a new such table until it is exported or here -- so nothing goes missing silently)
+_U_SECRET = "credentials, keys and link secrets"
+_U_VIEW = "what a person has seen or hidden, the order of their rows"
+_U_SERVER = "state of this server (queues, limits, sign-in records, import records)"
+_U_AGENT = "agents and their logs (agents are set up anew, UMZ_NOT_INCLUDED)"
+_U_DERIVED = "derived or working data, rebuilt on the target"
+_U_SHARE = "who shares what with whom (a share is made anew on the target)"
+_U_ORG = "data of an organisation or an office: the organisation export"
+_U_LATER = "not part of the decision of #3469, not in the account export yet"
+UMZ_LEFT_USERS = {
+    "abs_cal_feeds": _U_SECRET, "app_passwords": _U_SECRET, "contact_srcs": _U_SECRET, "disc_profiles": _U_SECRET, "disc_tokens": _U_SECRET,
+    "doc_fetchers": _U_SECRET, "doc_mail": _U_SECRET, "ev_cal_feeds": _U_SECRET, "fs_lock_keys": _U_SECRET, "hub_tokens": _U_SECRET,
+    "list_key_pending": _U_SECRET, "list_keys": _U_SECRET, "mail_tokens": _U_SECRET, "notify_channels": _U_SECRET, "ntfy_inboxes": _U_SECRET,
+    "org_invites": _U_SECRET, "pl_conn_users": _U_SECRET, "pl_tokens": _U_SECRET, "recovery_codes": _U_SECRET, "user_invites": _U_SECRET,
+    "user_keys": _U_SECRET, "webauthn_creds": _U_SECRET, "wiki_key_pending": _U_SECRET, "wiki_keys": _U_SECRET, "wiki_shares": _U_SECRET,
+    "list_bell": _U_VIEW, "list_folder_skip": _U_VIEW, "list_mine_hide": _U_VIEW, "rss_reads": _U_VIEW, "task_seen": _U_VIEW, "tchat_reads": _U_VIEW,
+    "tchat_thread_reads": _U_VIEW, "user_task_order": _U_VIEW, "wait_hidden": _U_VIEW,
+    "admin_login_ips": _U_SERVER, "agent_push_held": _U_SERVER, "bg_jobs": _U_SERVER, "conn_blocks": _U_SERVER, "deleted_accounts": _U_SERVER,
+    "disc_quota": _U_SERVER, "ev_invite_day": _U_SERVER, "ev_reminded": _U_SERVER, "idem_keys": _U_SERVER, "imports": _U_SERVER, "login_ips": _U_SERVER,
+    "notify_mail_queue": _U_SERVER, "sample_items": _U_SERVER, "task_push": _U_SERVER,
+    "agent_jobs": _U_AGENT, "agents": _U_AGENT,
+    "dav_sync": _U_DERIVED, "dav_sync2": _U_DERIVED, "dl_changes": _U_DERIVED, "list_activity": _U_DERIVED, "rss_items": _U_DERIVED, "sheet_lastvals": _U_DERIVED,
+    "book_members": _U_SHARE, "ev_cal_members": _U_SHARE, "folder_people": _U_SHARE, "fs_shares": _U_SHARE, "group_members": _U_SHARE, "sheet_shares": _U_SHARE,
+    "office_archive_log": _U_ORG, "office_doc_log": _U_ORG, "office_drives": _U_ORG, "office_letter_profiles": _U_ORG, "office_meal_log": _U_ORG,
+    "office_rgroup_members": _U_ORG, "office_sub_reminders": _U_ORG, "office_undo": _U_ORG, "org_joins": _U_ORG, "org_members": _U_ORG, "tchat_files": _U_ORG,
+    "budget_files": "the receipt files of household budgets (UMZ_NOT_INCLUDED)",
+    "chat_saves": _U_LATER, "ctr_notices": _U_LATER, "fs_log": _U_LATER, "section_templates": _U_LATER,
+}
 
 # 2.278.0 C (#3091): what the manifest says about browser-encrypted content (only what the import really does)
 UMZ_ENC_NOTE = ("Encrypted in the browser: stored here as ciphertext. Your key bundle (e2e_keys, wrapped with your passphrase and "
@@ -362,6 +395,18 @@ def umz_extra_queries(uid):
         "form_entries": (f"""SELECT e.task_id, e.form_id, e.sender, e.email, e.answers, e.created_at FROM form_entries e JOIN forms f ON f.id=e.form_id
                              WHERE f.list_id IN {private} ORDER BY e.created_at""", (uid,)),
         "leave_quota": ("SELECT org_id, year, days, carry, updated_at FROM hub_leave_quota WHERE user_id=? ORDER BY year, org_id", (uid,)),
+        # 2.455.0 (#3469): the sprints, further placements and rules of my lists; a placement only between my own lists, and a
+        # move rule into a list that is not mine without its target (other people's lists are no part of my data). The customer
+        # reports of my private lists like the forms (a report sent to an organisation stays there), never their status links
+        "sprints": (f"SELECT id, list_id, num, name, start, end_day, goal, state, review, closed_at, created_at FROM sprints WHERE list_id IN {own} ORDER BY id", (uid,)),
+        "task_links": (f"""SELECT l.task_id, l.list_id, l.section_id, l.sort, l.created_at FROM task_links l JOIN tasks t ON t.id=l.task_id
+                           WHERE t.list_id IN {own} AND l.list_id IN {own}""", (uid, uid)),
+        "list_rules": (f"""SELECT id, list_id, name, trig, trig_val, act, active, paused_reason, created_at, updated_at,
+                           CASE WHEN target_list_id IN {own} THEN target_list_id END AS target_list_id,
+                           CASE WHEN target_list_id IS NULL OR target_list_id IN {own} THEN act_val ELSE '{{}}' END AS act_val
+                           FROM list_rules WHERE list_id IN {own} AND deleted_at IS NULL ORDER BY id""", (uid, uid, uid)),
+        "portal_tickets": (f"""SELECT id, task_id, list_id, name, email, notify, mailed_status, lang, claimed, created_at, last_seen_at, last_mail_at
+                               FROM portal_tickets WHERE list_id IN {private} ORDER BY id""", (uid,)),
     }
 
 
@@ -413,6 +458,12 @@ def _umz_plain(c, table, d, uid=None):
             return oc_dec_fields(c, -int(uid), "hub_mails", d)
         except OrgCryptError:
             return {k: v for k, v in d.items() if k not in ("text", "mood", "mood_enc", "from_addr", "from_name", "to_addrs", "subject", "body")}
+    if table == "portal_tickets":  # 2.455.0 (#3469): sealed with the server key, like the organisation export
+        try:
+            d["email"] = unseal(c, "portal-email", d["email"]) if d.get("email") else ""
+        except Exception:  # noqa: BLE001  (sealed under an older server key: leave the address out, not the export)
+            d["email"] = ""
+        return d
     if table == "wiki_pages":
         from ..wiki.wkhist import wsb_body_or
         d["body"] = wsb_body_or(c, d)

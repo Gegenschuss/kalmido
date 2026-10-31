@@ -15292,7 +15292,6 @@
   "group conversations of the team chat (like direct messages they belong to their people, not to the organisation)": "Gruppengespräche des Team-Chats (wie Direktnachrichten gehören sie ihren Personen, nicht der Organisation)",
   "channels of the organisation that are not open and that the exporting admin is not a member of": "Kanäle der Organisation, die nicht offen sind und in denen der exportierende Admin nicht Mitglied ist",
   "notification channels (their targets are secrets), invitations and join requests, the organisation's and the lists' pictures (icons, cover pictures), synchronisation data of calendar and task apps (CalDAV), groups of people and their shares": "Benachrichtigungskanäle (ihre Ziele sind Geheimnisse), Einladungen und Beitrittsanfragen, die Bilder der Organisation und der Listen (Symbole, Titelbilder), Synchronisationsdaten von Kalender- und Aufgaben-Apps (CalDAV), Personengruppen und ihre Freigaben",
-  "feeds of the organisation (not yet in this export)": "Feeds der Organisation (noch nicht in diesem Export)",
   "booking pages of other members that the office does not bill (only their owner reads the bookings), archived channels": "Buchungsseiten anderer Mitglieder, die das Büro nicht abrechnet (nur ihr Inhaber liest die Buchungen), archivierte Kanäle",
   "filed e-mails (and their files) the exporting admin cannot open in the app: other members' inboxes, projects without them": "abgelegte E-Mails (und ihre Dateien), die der exportierende Admin in der App nicht öffnen kann: Postfächer anderer Mitglieder, Projekte ohne ihn",
   "everything of the private space but the office, its clients and the documents the office stands on (receipts, filed letters, contract and equipment documents, cash book receipts); files below a browser-locked folder stay out": "alles aus dem privaten Bereich außer dem Büro, seinen Kunden und den Dokumenten, auf denen das Büro aufbaut (Belege, abgelegte Briefe, Vertrags- und Geräteunterlagen, Kassenbuchbelege); Dateien unter einem im Browser gesperrten Ordner bleiben draußen",
@@ -15352,5 +15351,11 @@
   "your customer portal or booking page used up its sign-in or confirmation mails": "dein Kundenportal oder deine Buchungsseite hat seine Anmelde- oder Bestätigungsmails aufgebraucht",
   "Bookmarks are being fetched in the background": "Lesezeichen werden im Hintergrund abgerufen",
   "Invitation sent. The person accepts it in their News.": "Einladung gesendet. Die Person nimmt sie in ihren Neuigkeiten an.",
-  "Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.": "Ohne Konto wird ein neues angelegt und die Person bekommt eine E-Mail, um ein Passwort zu wählen. In beiden Fällen tritt die Person bei, indem sie die Einladung annimmt."
+  "Without an account, a new one is created and the person gets an e-mail to choose a password. Either way the person joins by accepting the invitation.": "Ohne Konto wird ein neues angelegt und die Person bekommt eine E-Mail, um ein Passwort zu wählen. In beiden Fällen tritt die Person bei, indem sie die Einladung annimmt.",
+  "A rule was paused because something it refers to did not come along: {0}": "Eine Regel wurde pausiert, weil etwas fehlt, worauf sie sich bezieht: {0}",
+  "A rule was left out because this version cannot read it or the project has too many: {0}": "Eine Regel wurde ausgelassen, weil diese Version sie nicht lesen kann oder das Projekt zu viele hat: {0}",
+  "A feed without its address was not taken over: {0}": "Eine Nachrichtenquelle ohne Adresse wurde nicht übernommen: {0}",
+  "A feed was not taken over, the limit is reached: {0}": "Eine Nachrichtenquelle wurde nicht übernommen, die Grenze ist erreicht: {0}",
+  "the articles of feeds (fetched again on the target) and feed addresses that carry an access key": "die Artikel der Nachrichtenquellen (werden am Ziel neu geholt) und Adressen von Nachrichtenquellen mit Zugangsschlüssel",
+  "your agents and their keys and tokens (set them up again on the target)": "deine Agenten und ihre Schlüssel und Tokens (am Ziel neu einrichten)"
 }
