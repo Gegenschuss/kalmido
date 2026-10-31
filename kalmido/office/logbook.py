@@ -25,8 +25,8 @@ from flask import jsonify, request, Response
 from ..core.config import app
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
-from ..core.i18n import N_, lang, tr
-from ..core.db import body, bump, db, iso, local_now, now_utc
+from ..core.i18n import N_, csv_dialect, lang, tr
+from ..core.db import body, bump, db, iso, local_now, local_stamp, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import calc_lang, dec, dstr, fmt_point, money
@@ -424,7 +424,7 @@ def lb_drive_public(c, oid, r, names=None, warns=None, trips=None, closed=None, 
         tid = None
     # 2.93.0 B (#1928 review): the trip keeps its km when the drive changes later -> a hint, never changed on its own
     tkm = _km_str((trips or {}).get(tid)) if tid and isinstance(trips, dict) else None
-    hint = tr("The trip in the travel expenses still has {0} km.", tkm if lang() == "en" else _de(tkm)) if tkm is not None and tkm != out["km"] else ""
+    hint = tr("The trip in the travel expenses still has {0} km.", _dec(tkm)) if tkm is not None and tkm != out["km"] else ""
     out.update(id=d["id"], trip_id=tid, trip_km=tkm, trip_hint=hint, driver=(names or {}).get(d.get("user_id")) or "", deleted=bool(d.get("deleted_at")),
                warn=(warns or {}).get(d["id"]), created_at=d["created_at"], updated_at=d["updated_at"])
     # 2.152.0 C (#2169): closed (auto | month), the correction it is (corrects_id + reason) / the one that corrected it
@@ -771,7 +771,7 @@ def _veh_val(k, v):
     if k == "archived":
         return tr("Archived") if v else tr("Restored")
     if k == "odo_start":
-        return _de(v)
+        return _dec(v)
     return "" if v is None else str(v)
 
 
@@ -794,7 +794,7 @@ def lb_office_log(c, oid, year, vids, vs):
         elif r["target"] == "km_rate":
             if str(det.get("year")) != str(year):
                 continue
-            text = f"{tr('Mileage allowance per business km')} {year}: {_de(b.get('km_rate'))} -> {_de(a.get('km_rate'))}"
+            text = f"{tr('Mileage allowance per business km')} {year}: {_dec(b.get('km_rate'))} -> {_dec(a.get('km_rate'))}"
         else:
             if det.get("vehicle_id") not in vids:
                 continue
@@ -806,8 +806,8 @@ def lb_office_log(c, oid, year, vids, vs):
     return out
 
 
-def _de(v):
-    return "" if v is None else str(v).replace(".", ",")
+def _dec(v):
+    return csv_dialect()[1](v)  # 2.368.2 (#2984): the decimal sign of the language (was a comma for every language)
 
 
 def _prev_text(prev, vs, clients):
@@ -824,7 +824,7 @@ def _prev_text(prev, vs, clients):
         elif k == "kind":
             v = _kind_label(v)
         elif k in ("km", "odo_start", "odo_end"):
-            v = _de(v)
+            v = _dec(v)
         out.append(f"{labels.get(k, k)}: {'' if v is None else v}")
     return ", ".join(out)
 
@@ -836,13 +836,14 @@ LB_ACTIONS = {"create": N_("Created"), "change": N_("Changed"), "delete": N_("De
 
 @app.get("/api/office/logbook.csv")
 def lb_csv():
-    """?year=&vehicle_id= -> the drives of the year with odometer and sums, then the change log (semicolon, decimal comma)."""
+    """?year=&vehicle_id= -> the drives of the year with odometer and sums, then the change log (separator and decimal sign of the language, times local: 2.368.2 #2984)."""
     from .books import bk_csv_cell
     from .ledger import ofx_log
     c, uid, oid = _ctx()
     y, vid, vs, clients, drives, log, rep = _export_data(c, oid, uid)
     buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";", lineterminator="\r\n")
+    sep, num = csv_dialect()
+    w = csv.writer(buf, delimiter=sep, lineterminator="\r\n")
     cell = bk_csv_cell
     w.writerow([tr("Date"), tr("Vehicle"), tr("Plate"), tr("Driver"), tr("Start"), tr("Destination"), tr("Purpose"), tr("Client"), tr("Project"),
                 tr("Kind"), tr("Odometer start"), tr("Odometer end"), "km",
@@ -852,18 +853,18 @@ def lb_csv():
     for d in drives:
         v = vs.get(d["vehicle_id"]) or {}
         w.writerow([d["day"], cell(v.get("name")), cell(v.get("plate")), cell(d["driver"]), cell(d["start_place"]), cell(d["dest"]), cell(d["purpose"]),
-                    cell(clients.get(d["client_id"], "")), cell(d["project"]), cell(_kind_label(d["kind"])), _de(d["odo_start"]), _de(d["odo_end"]), _de(d["km"]),
+                    cell(clients.get(d["client_id"], "")), cell(d["project"]), cell(_kind_label(d["kind"])), num(d["odo_start"]), num(d["odo_end"]), num(d["km"]),
                     d["id"], d.get("corrects_id") or "", d.get("corrected_by") or "", cell(d.get("correct_note") or ""), 1 if d.get("locked") else 0])
     w.writerow([])
     w.writerow([cell(tr("Vehicle")), tr("km total"), tr("Business"), tr("Private|drive"), tr("Home - workplace"), tr("Business share"), tr("Mileage allowance")])
     for v in rep["vehicles"]:
-        w.writerow([cell(v["name"]), _de(v["km_total"]), _de(v["km_business"]), _de(v["km_private"]), _de(v["km_commute"]), f"{v['business_pct']} %", _de(v["allowance"])])
+        w.writerow([cell(v["name"]), num(v["km_total"]), num(v["km_business"]), num(v["km_private"]), num(v["km_commute"]), f"{num(v['business_pct'])} %", num(v["allowance"])])
     w.writerow([])
     w.writerow([cell(tr("Change log"))])
     w.writerow([tr("Time"), tr("Date"), tr("Action"), tr("By"), tr("Values before"), "ID"])  # 2.152.0 C (#2169): + the drive's number
     days = {d["id"]: d["day"] for d in drives}
     for r in log:
-        w.writerow([r["at"], days.get(r["drive_id"], ""), cell(tr(LB_ACTIONS.get(r["action"], r["action"]))), cell(r["by"]), cell(r.get("text") or _prev_text(r["prev"], vs, clients)),
+        w.writerow([local_stamp(r["at"]), days.get(r["drive_id"], ""), cell(tr(LB_ACTIONS.get(r["action"], r["action"]))), cell(r["by"]), cell(r.get("text") or _prev_text(r["prev"], vs, clients)),
                     r["drive_id"] or ""])
     w.writerow([cell(tr(LB_NOTE))])
     ofx_log(c, oid, "export", target="logbook", detail={"what": "logbook.csv", "year": y})
@@ -964,7 +965,7 @@ def lb_pdf_bytes(c, oid, y, vs, clients, drives, log, rep, lang):
     days = {d["id"]: d["day"] for d in drives}
     for r in log:
         need(26)
-        pg().text(x0, st["y"], f"{r['at'][:16].replace('T', ' ')} · {tr(LB_ACTIONS.get(r['action'], r['action']))} · {r['by']}"
+        pg().text(x0, st["y"], f"{local_stamp(r['at'])[:16]} · {tr(LB_ACTIONS.get(r['action'], r['action']))} · {r['by']}"
                   + (f" · {tr('Drive of {0}', days[r['drive_id']])}" if r["drive_id"] in days else ""), 8, bold=True)
         st["y"] += 11
         t = r.get("text") or _prev_text(r["prev"], vs, clients)

@@ -20,7 +20,7 @@ from flask import Response, jsonify, request
 
 from ..core.config import app
 from ..core.db import db, local_now
-from ..core.i18n import N_, lang, tr, trn
+from ..core.i18n import N_, csv_dialect, lang, tr, trn
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import calc_lang, dec, dstr, money
@@ -335,24 +335,21 @@ def bnk_csv_cell(s):
     return csv_cell(s)
 
 
-def _de(v):
-    return "" if v in (None, "") else str(v).replace(".", ",")
-
-
 @app.get("/api/office/equipment/value.csv")
 def ast_value_csv():
-    """Office admin: the insurance list as CSV (semicolon, decimal comma, like the other office CSVs)."""
+    """Office admin: the insurance list as CSV (separator and decimal sign of the language, like the other office CSVs)."""
     c, uid, oid = _ctx()
     d = ast_value(c, oid, _aid_arg())
     buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";")
+    sep, num = csv_dialect()  # 2.368.2 (#2984)
+    w = csv.writer(buf, delimiter=sep)
     w.writerow([tr("Device"), tr("Category"), tr("Serial number"), tr("Purchase date"), tr("Purchase price (net)"), tr("New value"),
                 tr("Current value"), tr("Depreciation {0}", d["year"]), tr("Insured by")])
     for r in d["rows"]:
-        w.writerow([bnk_csv_cell(r["name"]), bnk_csv_cell(r["category"]), bnk_csv_cell(r["serial_no"]), r["purchase_date"], _de(r["purchase_net"]),
-                    _de(r["new_value"]), _de(r["current_value"]), _de(r["afa_year"]), bnk_csv_cell(r["agreement_name"])])
+        w.writerow([bnk_csv_cell(r["name"]), bnk_csv_cell(r["category"]), bnk_csv_cell(r["serial_no"]), r["purchase_date"], num(r["purchase_net"]),
+                    num(r["new_value"]), num(r["current_value"]), num(r["afa_year"]), bnk_csv_cell(r["agreement_name"])])
     s = d["sums"]
-    w.writerow([tr("Total"), "", "", "", _de(s["purchase_net"]), _de(s["new_value"]), _de(s["current_value"]), _de(s["afa_year"]), ""])
+    w.writerow([tr("Total"), "", "", "", num(s["purchase_net"]), num(s["new_value"]), num(s["current_value"]), num(s["afa_year"]), ""])
     w.writerow([bnk_csv_cell(d["disclaimer"])])
     return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
                     headers={"Content-Disposition": 'attachment; filename="equipment-value.csv"', "Cache-Control": "no-store"})  # 2.306.0 D2 (#2875)

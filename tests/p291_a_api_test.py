@@ -285,7 +285,8 @@ TW2 = invoice(A, CL, title="Lange her")
 SW2 = A.post(B + S, json={"template_id": TW2["id"], "every": "monthly", "start": first_of(TODAY, -6).isoformat(), "title": "Lange her"}).json()
 got = until(lambda: dbx("SELECT id, series_period FROM office_docs WHERE series_id=?", (SW2["id"],)), 60)
 check(len(got) == 1 and got[0][1] == first_of(TODAY, 0).isoformat(), f"watchdog: more than 3 missed periods: only the newest {got}")
-tk = dbx("SELECT content FROM tasks WHERE assignee_id=? AND url LIKE ?", (ALICE, f"%#office/offers/{got[0][0]}")) if got else []
+# 2.368.2 (#2986): the series of one day share one task since #2972 (link to the invoices, one block per series): found by its text
+tk = dbx("SELECT content FROM tasks WHERE assignee_id=? AND content LIKE ?", (ALICE, "%Missed periods%")) if got else []
 check(bool(tk) and "Missed periods" in tk[0][0], f"watchdog: the task names the missed periods {tk}")
 nx = items_of(A)[SW2["id"]]["next_date"]
 check(nx == first_of(TODAY, 1).isoformat(), f"watchdog: next date after the newest {nx}")
@@ -295,7 +296,7 @@ check(A.delete(B + f"{D}/{TW3['id']}").ok, "the template draft deleted")
 dbx("UPDATE office_inv_series SET next_date=? WHERE id=?", (TODAY.isoformat(), SW3["id"]))
 off = until(lambda: dbx("SELECT active FROM office_inv_series WHERE id=? AND active=0", (SW3["id"],)), 60)
 check(bool(off) and not dbx("SELECT 1 FROM office_docs WHERE series_id=?", (SW3["id"],)), "watchdog: a deleted template pauses the series, no invoice")
-check(bool(dbx("SELECT 1 FROM tasks WHERE assignee_id=? AND title LIKE ?", (ALICE, "%Vorlage weg%paused%"))), "watchdog: a task says it is paused")
+check(bool(dbx("SELECT 1 FROM tasks WHERE assignee_id=? AND title || ' ' || content LIKE ?", (ALICE, "%Vorlage weg%paused%"))), "watchdog: a task says it is paused")
 check(not dbx("SELECT 1 FROM office_docs WHERE series_id=? AND series_period>?", (S1["id"], "2027-02-28")), "watchdog: series with future periods make nothing")
 check(dbx("SELECT COUNT(*) FROM office_docs WHERE series_id IS NOT NULL GROUP BY series_id, series_period HAVING COUNT(*) > 1") == [], "never two invoices for one period")
 if DUP:

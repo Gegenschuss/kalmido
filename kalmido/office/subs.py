@@ -20,7 +20,7 @@ from flask import Response, jsonify
 
 from ..core.config import PUBLIC_URL, app, WATCHDOG_INTERVAL
 from ..core.db import iso, local_now, now_utc
-from ..core.i18n import N_, lang, tr
+from ..core.i18n import N_, lang, short_day, tr
 from ..core.pg import insert_id
 from ..personal.timetrack import _csv_cell
 from ..core.errors import BadInput
@@ -303,9 +303,7 @@ def abo_task_new(c, person, label, due, text):
 
 
 def _fmt_day(day, lg):
-    d = date.fromisoformat(day)
-    return d.isoformat() if lg == "en" else f"{d.day:02d}-{d.month:02d}-{d.year}" if lg == "nl" else \
-        f"{d.day:02d}.{d.month:02d}.{d.year}" if lg == "de" else f"{d.day:02d}/{d.month:02d}/{d.year}"
+    return short_day(date.fromisoformat(day), lg, True)  # 2.368.2 (#2986): like the app's other reminders
 
 
 def abo_tick(c, now=None, force=False):

@@ -35,9 +35,9 @@ from flask import Response, jsonify, request
 
 from ..core.access import Denied
 from ..core.config import MAX_FILE_MB, OFFICE_DIR, app
-from ..core.db import body, bump, iso, local_now, now_utc
+from ..core.db import body, bump, iso, local_now, local_stamp, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, csv_dialect, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_read_file, oc_write_file
 from ..core.pg import insert_id, write_lock, system_ctx
 from ..core.errors import BadInput
@@ -907,8 +907,8 @@ def bw_report_get():
     if fmt == "csv":
         co = bw_company(c, oid)
         buf = io.StringIO()
-        w = csv.writer(buf, delimiter=";")
-        num = lambda v: str(v).replace(".", ",")  # noqa: E731
+        sep, num = csv_dialect()  # 2.368.2 (#2984): separator and decimal sign of the language, times local
+        w = csv.writer(buf, delimiter=sep)
         w.writerow([tr("Date"), tr("Place"), tr("Address"), tr("Occasion"), tr("Host"), tr("Guests"), tr("Food") + f" ({cur})", tr("Drinks") + f" ({cur})",
                     tr("Tip") + f" ({cur})", tr("Gross") + f" ({cur})", tr("Input VAT") + f" ({cur})", tr("Net") + f" ({cur})",
                     tr("Deductible 70 %") + f" ({cur})", tr("Not deductible 30 %") + f" ({cur})", tr("Approved by"), tr("Approved at")])
@@ -917,7 +917,7 @@ def bw_report_get():
             w.writerow([m["date"], _csv_safe(m["place_name"]), _csv_safe(m["place_address"].replace("\n", ", ")), _csv_safe(m["occasion"]),
                         _csv_safe(bw_pname(m["host"] or {"name": ""}, co)), _csv_safe(", ".join(bw_pname(p, co) for p in m["guests"])),
                         num(k["food"]), num(k["drinks"]), num(k["tip"]), num(k["gross"]), num(k["vat"]), num(k["net"]), num(k["deductible"]),
-                        num(k["not_deductible"]), _csv_safe(m["approved_name"]), (m["approved_at"] or "")[:16].replace("T", " ")])
+                        num(k["not_deductible"]), _csv_safe(m["approved_name"]), local_stamp(m["approved_at"])[:16]])
         t = rep["total"]
         w.writerow([tr("Total"), rep["count"], "", "", "", "", num(t["food"]), num(t["drinks"]), num(t["tip"]), num(t["gross"]), num(t["vat"]), num(t["net"]),
                     num(t["deductible"]), num(t["not_deductible"]), "", ""])

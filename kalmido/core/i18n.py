@@ -154,6 +154,13 @@ def dec_comma(lg=None):
     return lg_base(lg) in COMMA_LANGS
 
 
+def csv_dialect(lg=None):
+    """2.368.2 (#2984): (separator, number text) of a CSV export in language lg: ";" and a decimal comma where the spreadsheets of
+    the language expect them, else "," and the point. num(None) and num("") = ""."""
+    comma = dec_comma(lg)
+    return (";" if comma else ","), lambda v: "" if v in (None, "") else str(v).replace(".", ",") if comma else str(v)
+
+
 def fmt_int(n, lg=None):
     """12345 -> 12,345 (en) / 12.345 (de, es, it, nl) / 12 345 (fr, narrow no-break space)."""
     s = f"{int(n or 0):,}"

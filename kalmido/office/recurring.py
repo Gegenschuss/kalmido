@@ -22,7 +22,7 @@ from flask import g, jsonify, request
 from ..core.config import PUBLIC_URL, app, WATCHDOG_INTERVAL
 from ..core.db import IntegrityError, body, bump, db, iso, local_now, now_utc, uset, usettings
 from ..core.access import Denied, my_inbox
-from ..core.i18n import LANGS, N_, lang, tr, tr_stored, trn
+from ..core.i18n import LANGS, N_, lang, short_day, tr, tr_stored, trn
 from .doclang import doc_lg  # 2.185.0 C (#2520)
 from .pdfweb import epdf_sweep  # 2.355.0 A (#2847)
 from ..core.pg import insert_id, system_ctx, write_lock
@@ -116,7 +116,7 @@ def rin_fill(text, period, nxt, lg, pack):
     from .docs import _fmt_date
     p = date.fromisoformat(period)
     last = (date.fromisoformat(nxt) - timedelta(days=1)).isoformat()
-    vals = {"period": f"{_fmt_date(period, pack)} - {_fmt_date(last, pack)}",
+    vals = {"period": f"{_fmt_date(period, pack, lg)} - {_fmt_date(last, pack, lg)}",  # 2.368.2 (#2986): the document's language first
             "month": f"{(RIN_MONTHS.get(lg) or _rin_months(lg))[p.month - 1]} {p.year}",
             "quarter": f"Q{(p.month - 1) // 3 + 1} {p.year}", "year": str(p.year)}
     return RIN_PH_RE.sub(lambda m: vals[m.group(1)], text)
@@ -423,9 +423,10 @@ def rin_bare(text):
     return re.sub(r"\s{2,}", " ", RIN_PH_RE.sub("", text or "")).strip(" -·,")
 
 
-def _period_txt(period, nxt):
+def _period_txt(period, nxt, lg):
+    """2.368.2 (#2986): the period in the language of the person who reads it (was German for everyone)."""
     try:
-        return f"{date.fromisoformat(period).strftime('%d.%m.%Y')} - {(date.fromisoformat(nxt) - timedelta(days=1)).strftime('%d.%m.%Y')}"
+        return f"{short_day(date.fromisoformat(period), lg, True)} - {short_day(date.fromisoformat(nxt) - timedelta(days=1), lg, True)}"
     except ValueError:
         return period
 
@@ -444,19 +445,19 @@ def rin_step(c, oid, uid, s, period, people, missed=()):
         return None, False, False, "", None
     sent, why, datev, m = (rin_send(c, oid, uid, did) if s["auto_send"] else (False, "", False, None))
     name = _name(c, oid, s)
-    pt = _period_txt(period, nxt)
-    gone = (lambda lg: "\n" + tr("Missed periods without an invoice: {0}", ", ".join(missed), lg=lg)) if missed else (lambda lg: "")
+    pt = lambda lg: _period_txt(period, nxt, lg)  # noqa: E731
+    gone = (lambda lg: "\n" + tr("Missed periods without an invoice: {0}", ", ".join(_period_txt(p, n, lg) for p, n in missed), lg=lg)) if missed else (lambda lg: "")
     if s["auto_send"] and not sent:
-        _tell(c, people, RIN_TASK_FAIL, name, lambda lg: tr("Period {0}. The invoice stays a draft: {1}", pt, tr_stored(why, lg), lg=lg) + gone(lg), did)
+        _tell(c, people, RIN_TASK_FAIL, name, lambda lg: tr("Period {0}. The invoice stays a draft: {1}", pt(lg), tr_stored(why, lg), lg=lg) + gone(lg), did)
     elif not sent:
-        _tell(c, people, RIN_TASK_DRAFT, name, lambda lg: tr("Period {0}. Open the draft, check it and send it like any invoice.", pt, lg=lg) + gone(lg), did)
+        _tell(c, people, RIN_TASK_DRAFT, name, lambda lg: tr("Period {0}. Open the draft, check it and send it like any invoice.", pt(lg), lg=lg) + gone(lg), did)
 
     def post():  # 2.269.0 D (#3046): the mail after the number's commit, then its task
         ok, why2 = rin_mail(c, oid, uid, m)
         if not ok:
-            _tell(c, people, RIN_TASK_FAIL, name, lambda lg: tr("Period {0}. The invoice is finalised, the mail did not go out: {1}", pt, tr_stored(why2, lg), lg=lg) + gone(lg), did)
+            _tell(c, people, RIN_TASK_FAIL, name, lambda lg: tr("Period {0}. The invoice is finalised, the mail did not go out: {1}", pt(lg), tr_stored(why2, lg), lg=lg) + gone(lg), did)
         elif missed:
-            _tell(c, people, RIN_TASK_DRAFT, name, lambda lg: tr("Period {0} was sent.", pt, lg=lg) + gone(lg), did)
+            _tell(c, people, RIN_TASK_DRAFT, name, lambda lg: tr("Period {0} was sent.", pt(lg), lg=lg) + gone(lg), did)
         bump(c)
         c.commit()
         return ok, why2
@@ -541,7 +542,7 @@ def _rin_as(c, oid, sid, today, actor, people):
         period = s["next_date"]
         if len(due) > RIN_MAX_MISSED:
             period, missed = due[-1], due[:-1]
-        did, sent, datev, _why, post = rin_step(c, oid, actor, s, period, people, [_period_txt(p, rin_after(s["start"], s["every"], p)) for p in missed[-12:]])
+        did, sent, datev, _why, post = rin_step(c, oid, actor, s, period, people, [(p, rin_after(s["start"], s["every"], p)) for p in missed[-12:]])
         bump(c)
         c.commit()
         if post:  # 2.269.0 D (#3046): number committed, now the mail

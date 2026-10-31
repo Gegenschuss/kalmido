@@ -10,7 +10,7 @@ from ..core.config import TZ, PUBLIC_URL
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core import orgcrypt as oc  # 2.306.0 A (#2885)
 from ..core.conflict import Conflict  # 2.269.0 C (#3017)
-from ..core.i18n import lang, N_, tr
+from ..core.i18n import csv_dialect, lang, N_, tr
 from ..core.db import iso, iso_ms, local_now, now_utc, usettings
 from ..core.access import Denied, health_hidden, my_max_sort, need_list, org_trips_hidden, tvis, vis_sql, wr_sql, FEAT_OFF
 from ..core.serializers import load_tasks, csv_cell
@@ -837,7 +837,7 @@ def journal_export(c, uid, b, fmt):
     rows = _journal_find(c, uid, f, "day")  # 2.306.0 A (#2885)
     if fmt == "csv":
         buf = io.StringIO()
-        w = csv.writer(buf)
+        w = csv.writer(buf, delimiter=csv_dialect(lang(c, uid))[0])  # 2.368.2 (#2984)
         w.writerow([tr("Date"), tr("Mood"), tr("Text")])
         for r in rows:
             w.writerow([r["day"], r["mood"] or "", csv_cell(r["text"])])

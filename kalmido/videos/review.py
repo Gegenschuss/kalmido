@@ -30,7 +30,7 @@ from ..core.access import Denied, FULL_ROLES, WRITE_ROLES, acx_org_ok, list_role
 from ..office.signoff import sig_people  # 2.266.0 (#2965)
 from ..core.db import body, db, err, iso, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, csv_dialect, tr
 from ..core.pg import insert_id, write_lock
 from ..accounts.session import me, rate_ip
 from ..accounts.login import auth_key
@@ -588,7 +588,7 @@ def vdr_export(vid):
             lines.append(("    > " if ans else f"[{'x' if done else ' '}] {v} {tc or '--:--'} ") + f"{name}: {' '.join(text.split())}")
         return jsonify(text="\n".join(lines))
     buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";")
+    w = csv.writer(buf, delimiter=csv_dialect()[0])  # 2.368.2 (#2984)
     w.writerow([tr("Version"), tr("Timecode"), tr("Name"), tr("Comment"), tr("Done"), tr("Answer")])
     for v, tc, name, text, done, ans in rows:
         w.writerow([v, tc, vdr_csv_cell(name), vdr_csv_cell(text), tr("Yes") if done else "", tr("Yes") if ans else ""])

@@ -540,7 +540,7 @@ def lt_pdf(c, oid, d):
     info_x = P.PDF_INFO_X  # 2.390.0 A (#3350): 125 mm from the sheet edge, as in pdf.py
     info_w = max(40 * P.MM, PL + PCW - P.PDF_INFO_X)  # (a letterhead with wide margins keeps a usable width)
     page.text(info_x, y + 2, tr("Date", lg=lang), 8.6, False, P.C_INK2)
-    page.text(info_x, y + 2, _fmt_date(d.get("letter_date") or local_now().date().isoformat(), _pack(c, oid)), 8.6, True, P.C_INK, align="r", width=info_w)
+    page.text(info_x, y + 2, _fmt_date(d.get("letter_date") or local_now().date().isoformat(), _pack(c, oid), lang), 8.6, True, P.C_INK, align="r", width=info_w)
     if d.get("tracking_no") and d.get("channel") == "registered":
         page.text(info_x, y + 16, tr("Registered mail", lg=lang), 8.6, False, P.C_INK2)
         page.text(info_x, y + 16, d["tracking_no"][:30], 8, False, P.C_INK, align="r", width=info_w)

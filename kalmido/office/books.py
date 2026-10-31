@@ -26,7 +26,7 @@ from flask import Response, g, has_request_context, jsonify, request
 from ..core.config import app
 from ..core.db import db, local_now
 from ..core.access import Denied
-from ..core.i18n import N_, tr, trn, lang
+from ..core.i18n import N_, csv_dialect, tr, trn, lang
 from ..core.errors import BadInput
 from .abschlag import abs_skonto_rows  # 2.355.0 C (#2840)
 from .calc import calc_lang, dec, dstr, money
@@ -549,25 +549,22 @@ def bk_csv_cell(v):
     return csv_cell(v)
 
 
-def _de(v):
-    return str(v).replace(".", ",")
-
-
 @app.get("/api/office/books/euer.csv")
 def bk_euer_csv():
-    """?year=YYYY -> the EUeR as CSV (semicolon, decimal comma: German spreadsheets): group;net;VAT;gross."""
+    """?year=YYYY -> the EUeR as CSV (separator and decimal sign of the language, 2.368.2 #2984): group, net, VAT, gross."""
     from .ledger import ofx_log
     c, uid, oid = _ctx()
     d = bk_euer(c, oid, _year(request.args.get("year")))
     buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";", lineterminator="\r\n")
+    sep, num = csv_dialect()
+    w = csv.writer(buf, delimiter=sep, lineterminator="\r\n")
     w.writerow([tr("Group"), tr("Net"), tr("VAT"), tr("Gross")])
     for title, rows, tot in ((tr("Income"), d["income"], d["income_total"]), (tr("Expenses"), d["expenses"], d["expense_total"])):
         w.writerow([bk_csv_cell(title), "", "", ""])
         for r in rows:
-            w.writerow([bk_csv_cell(r["label"]), _de(r["net"]), _de(r["vat"]), _de(r["gross"])])
-        w.writerow([bk_csv_cell(tr("Total")), _de(tot["net"]), _de(tot["vat"]), _de(tot["gross"])])
-    w.writerow([bk_csv_cell(tr("Profit")), _de(d["profit"]), "", ""])
+            w.writerow([bk_csv_cell(r["label"]), num(r["net"]), num(r["vat"]), num(r["gross"])])
+        w.writerow([bk_csv_cell(tr("Total")), num(tot["net"]), num(tot["vat"]), num(tot["gross"])])
+    w.writerow([bk_csv_cell(tr("Profit")), num(d["profit"]), "", ""])
     w.writerow([bk_csv_cell(tr(BK_NOTE)), "", "", ""])
     ofx_log(c, oid, "export", target="books", detail={"what": "euer.csv", "year": d["year"]})
     c.commit()

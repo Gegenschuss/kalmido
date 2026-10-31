@@ -183,12 +183,9 @@ def agb_gen_terms(c, oid, d):
 
 
 def agb_fmt_date(v, lang):
-    """2026-10-19 -> 19.10.2026 (de) / 2026-10-19 (en)."""
-    try:
-        d = datetime.date.fromisoformat(str(v or ""))
-    except ValueError:
-        return str(v or "")
-    return d.strftime("%d.%m.%Y") if agb_lang(lang) == "de" else d.isoformat()
+    """2026-10-19 -> 19.10.2026 (de) / 19 October 2026 (en): 2.368.2 (#2986) the date of the other documents (was ISO)."""
+    from .pdf import pdf_date
+    return pdf_date(v, str(lang or "de").split("-")[0])
 
 
 def agb_print_line(c, oid, r, fmt_date=None):

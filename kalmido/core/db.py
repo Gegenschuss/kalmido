@@ -112,6 +112,17 @@ def local_day(ts):
         return None
 
 
+def local_stamp(ts):
+    """2.368.2 (#2984): a stored UTC timestamp as local time "2026-10-09 14:05:33" (exports and logs); an unreadable one stays as it is."""
+    if not ts:
+        return ""
+    try:
+        d = parse_iso(ts)
+        return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).astimezone(TZ).strftime("%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError, OverflowError):
+        return str(ts)
+
+
 def db():
     """The request's connection (from the pool; context "system" until authenticate() sets the person, see set_ctx)."""
     if "db" not in g:

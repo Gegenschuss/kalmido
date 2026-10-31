@@ -14,7 +14,7 @@ from flask import Response, g as fl_g, jsonify, request
 
 from ..core.config import app
 from ..core.db import local_now
-from ..core.i18n import lang, tr, trn
+from ..core.i18n import csv_dialect, lang, tr, trn
 from ..core.errors import BadInput
 from .calc import calc_lang, dstr, fmt_point, money
 from .ledger import ofx_log
@@ -207,18 +207,19 @@ def vmr_row_note(r):
 
 @app.get("/api/office/trips/vma.csv")
 def vmr_csv():
-    """The report as CSV (semicolon, decimal comma, one row per person and trip, a total per person and overall)."""
+    """The report as CSV (separator and decimal sign of the language, one row per person and trip, a total per person and overall)."""
     c, uid, oid, year, person, lg = vmr_args()
     rep = vmr_report(c, oid, year, person, lg)
     buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";")
+    sep, num = csv_dialect(lg)  # 2.368.2 (#2984)
+    w = csv.writer(buf, delimiter=sep)
     w.writerow([tr("Person")] + vmr_head()[:6] + [tr("Per diem") + f" ({VMR_CUR})", tr("Breakdown")])
     for g in rep["people"]:
         for r in g["trips"]:
             w.writerow([_csv_safe(g["label"]), r["date_from"], r["date_to"], r["t_start"], r["t_end"], _csv_safe(r["dest"]), _csv_safe(r["purpose"]),
-                        r["amount"].replace(".", ",") if r["amount"] is not None else "", _csv_safe(" | ".join(vmr_row_note(r).split("\n")))])
-        w.writerow([_csv_safe(g["label"]), "", "", "", "", "", tr("Total"), g["total"].replace(".", ","), ""])
-    w.writerow([tr("Total"), "", "", "", "", "", "", rep["total"].replace(".", ","), "; ".join(rep["source"])])
+                        num(r["amount"]), _csv_safe(" | ".join(vmr_row_note(r).split("\n")))])
+        w.writerow([_csv_safe(g["label"]), "", "", "", "", "", tr("Total"), num(g["total"]), ""])
+    w.writerow([tr("Total"), "", "", "", "", "", "", num(rep["total"]), "; ".join(rep["source"])])
     ofx_log(c, oid, "export", target="travel", detail={"what": "vma.csv", "year": year})
     c.commit()
     return vmr_send("﻿" + buf.getvalue(), "text/csv; charset=utf-8", vmr_fname(year, person, "csv"))

@@ -290,7 +290,7 @@ def dt_values(c, oid, lang, client_id=None, list_id=None, doc_id=None):
     v = {k: "" for k in DT_VAR_KEYS}
     v["company.name"] = co.get("name") or ""
     v["company.address"] = ", ".join(str(x) for x in co.get("lines") or [] if str(x).strip())
-    v["today"] = _fmt_date(local_now().date().isoformat(), pack)
+    v["today"] = _fmt_date(local_now().date().isoformat(), pack, lang)  # 2.368.2 (#2986): the document's language first
     v["payment.days"] = str(int(office_settings(c, oid).get("payment_days") or 14))  # 2.296.0 C (#3165): was a fixed 14 in the samples
     if client_id:
         cl = dt_client(c, oid, client_id)
@@ -306,7 +306,7 @@ def dt_values(c, oid, lang, client_id=None, list_id=None, doc_id=None):
             t = m.get("totals") or {}
             tot = t.get("gross") if t.get("gross") is not None else t.get("net")
             v["offer.number"] = r["number"] or ""
-            v["offer.date"] = _fmt_date(r["date"], pack) if r["date"] else ""
+            v["offer.date"] = _fmt_date(r["date"], pack, lang) if r["date"] else ""
             v["offer.total"] = fmt_money(tot, lang, r["currency"] or "EUR") if tot is not None else ""
             v["offer.gross"] = v["offer.total"]  # 2.296.0 C (#3165)
             v["offer.net"] = fmt_money(t["net"], lang, r["currency"] or "EUR") if t.get("net") is not None else ""
@@ -547,7 +547,7 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     when = (d.get("final_at") or d.get("updated_at") or iso(now_utc()))[:10]
     from .docs import _fmt_date
     page.text(info_x, y + 2, tr("Date", lg=lang), 8.6, False, P.C_INK2)
-    page.text(info_x, y + 2, _fmt_date(when, _pack(c, oid)), 8.6, True, P.C_INK, align="r", width=info_w)
+    page.text(info_x, y + 2, _fmt_date(when, _pack(c, oid), lang), 8.6, True, P.C_INK, align="r", width=info_w)
     y = max(PAT + P.PDF_ADDR_H, yy + 4)  # 2.217.0 B (#2800): a longer address pushes the body down
 
     def room(h):

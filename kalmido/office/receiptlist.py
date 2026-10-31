@@ -33,7 +33,7 @@ from ..files.store import fs_chain, fs_deleted, fs_role
 from ..personal.timetrack import BadInput
 from .homecur import hc_code
 from .ledger import ofx_log
-from .books import BK_VAT, DAY_RE, _ctx, _de, _home, _split, bk_csv_cell, bk_to_home, bk_ws
+from .books import BK_VAT, DAY_RE, _ctx, _home, _split, bk_csv_cell, bk_to_home, bk_ws
 from .calc import dec, dstr, money
 from .model import office_need_feature, office_settings
 from .periodlock import pl_receipt_need_open
