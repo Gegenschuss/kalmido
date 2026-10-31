@@ -1632,10 +1632,10 @@ const SS_AREA = [
       [N_('Rules'), ['regel', 'rule'], '#s-dcs-rules-h'], [N_('Senders, types and tags'), ['absender', 'sender', 'dokumenttyp', 'schlagwort', 'tags', 'feld', 'felder', 'field', 'fields'], '#s-dcs-lists-h'],
       [N_('Inboxes'), ['eingang', 'eingänge', 'inbox', 'mail', 'e-mail', 'scanner', 'wächter', 'watcher'], '#s-dcs-in-h']]},
   {src: ['ofcSettingsHtml', 'agbSettingsHtml', 'bp_settingsHtml', 'dun_settingsHtml', 'tpSettingsHtml', 'pep_settingsHtml', 'dx_settingsHtml', 'dv_settingsHtml', 'brl_settingsHtml', 'bnr_settingsHtml',
-    'rcm_settingsHtml', 'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['büro', 'office', 'firma', 'company'],
+    'rcm_settingsHtml', 'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml', 'ocm_settingsHtml', 'ccn_settingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['büro', 'office', 'firma', 'company'],
     on: () => modOn('office') && ss_ofm('settings'), open: () => settingsModal('biz'), root: '#s-biz #ofc-set',  // 2.365.2 (#2789): Settings > Company & office
     secs: [[N_('Company'), ['firma', 'adresse', 'address', 'logo', 'bank', 'iban', 'bankverbindung', 'bank details', 'konto', 'steuernummer', 'ust-idnr', 'vat id', 'register'], '', 'company'], [N_('Terms and conditions (PDF)'), ['agb', 'terms'], '#agb-box', 'company'], [N_('Letterhead'), ['briefpapier', 'briefkopf', 'letterhead'], '#bp-h', 'company'],
-      [N_('Master data file'), ['stammdaten', 'master data'], '', 'data'],
+      [N_('Master data file'), ['stammdaten', 'master data'], '', 'data'], [N_('Card positions without a receipt'), ['karte', 'kartenposten', 'card', 'beleg', 'receipt', 'erinnerung', 'reminder'], '#ccn-h', 'data'],
       [N_('Bank & taxes'), ['steuer', 'steuerrücklage', 'tax reserve', 'ust', 'vat', 'ist', 'soll', 'steuertermine', 'tax dates', 'kasse', 'kassen', 'cash box', 'anfangsbestand', 'kilometer', 'km', 'pauschale', 'mileage', 'bank'], '#s-biz-tax', 'tax'],
       [N_('Documents & numbers'), ['nummer', 'nummern', 'nummernkreis', 'number', 'numbering', 'angebot', 'quotation', 'währung', 'currency'], '', 'docs'], [N_('Invoices'), ['rechnung', 'invoice', 'zahlungsziel', 'payment terms', 'skonto'], '', 'docs'],
       [N_('Suggest payment reminders for overdue invoices'), ['mahnung', 'mahnungen', 'mahnwesen', 'zahlungserinnerung', 'reminder', 'dunning', 'girocode'], '#os-dun-on', 'docs'],
@@ -1652,6 +1652,9 @@ const SS_AREA = [
   {src: ['bkSettingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['buchhaltung', 'bookkeeping', 'euer', 'ustva'],  // 2.365.2 D (#2789): in Bank & taxes
     on: () => modOn('office') && ss_ofm('books'), open: () => settingsModal('biz-tax'), root: '#s-biz #bk-sh', secs: [[N_('Tax reserve and VAT basis'), ['einstellungen', 'settings', 'buchhaltung', 'bookkeeping', 'steuerrücklage', 'tax reserve'], '#bk-sh']]}];
 // the hits of the area windows: a section beats its window, a word must start like the query, a label may hold it anywhere
+// the client card and the test mode sit in the office settings window: same area, gate and opener (#2789)
+SS_AREA.push({...SS_AREA.find(w => w.src.includes('ofcSettingsHtml')), src: ['ccb_settingsHtml', 'tri_settingsHtml'],
+  secs: [[N_('Client card'), ['kundenkarte', 'client card', 'block', 'bausteine'], '#ccb-h', 'functions'], [N_('Test mode'), ['testmodus', 'test mode', 'muster', 'probe', 'trial'], '#tri-h', 'docs']]});
 function ss_areaHits(q, max = 6) {
   const out = [], lo = s => String(s || '').toLowerCase();
   const wOk = ws => ws.some(w => w === q || (q.length >= 3 && w.startsWith(q)));

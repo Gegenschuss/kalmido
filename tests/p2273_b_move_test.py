@@ -263,7 +263,10 @@ check(RP, f"setup: a private page of bob {r.text[:120]}")
 import subprocess  # noqa: E402
 
 hold = subprocess.Popen(["docker", "exec", "-i", kt.CT, "python", "-c", HOLD, str(RP), "Race/Renamed"], stdout=subprocess.PIPE, text=True)
-check((hold.stdout.readline() or "").startswith("locked"), "setup: the page row is locked by another transaction")
+hold_line = hold.stdout.readline() or ""
+while hold_line.startswith("migrations:"):  # #2561: the test switch KALMIDO_TEST_TIMING_ALL prints the start's timing on import
+    hold_line = hold.stdout.readline() or ""
+check(hold_line.startswith("locked"), f"setup: the page row is locked by another transaction {hold_line!r}")
 res = []
 th = threading.Thread(target=lambda: res.append(Bo.post(B + "/api/wiki/move-space", json={"space": "private", "folder": "Race", "to": f"org:{ORG}"})))
 th.start()
