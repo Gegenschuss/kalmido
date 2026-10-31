@@ -1063,11 +1063,13 @@ def bud_ikey(lid, day, amount, kind, iban):
     return hmac.new(_dup_key(), msg, hashlib.sha256).hexdigest()[:40]
 
 
-def bud_rkeys(lid, amount, kind, ref, e2e):
-    """2.146.0 C (#2469): the keyed reference keys of a row (core/csvimport.csv_ref_parts), space separated."""
+def bud_rkeys(lid, day, amount, kind, ref, e2e, parts=cx.csv_ref_parts):
+    """2.146.0 C (#2469): the keyed reference keys of a row (core/csvimport.csv_ref_parts), space separated.
+    2.378.0 (#3347): with the booking day in the EndToEndId key, like the office's import (#2843); parts=cx.csv_ref_legacy
+    gives the keys stored before, which count only for a booking of the same day."""
     a = Decimal(str(amount)) if amount is not None else None
-    parts = cx.csv_ref_parts({"amount": None if a is None else (a if kind == "in" else -a), "svc_ref": ref, "e2e": e2e})
-    return " ".join(hmac.new(_dup_key(), f"r|{int(lid)}|{p}".encode(), hashlib.sha256).hexdigest()[:40] for p in parts)
+    ps = parts({"amount": None if a is None else (a if kind == "in" else -a), "svc_ref": ref, "e2e": e2e, "day": day})
+    return " ".join(hmac.new(_dup_key(), f"r|{int(lid)}|{p}".encode(), hashlib.sha256).hexdigest()[:40] for p in ps)
 
 
 class _Dups:
@@ -1075,33 +1077,36 @@ class _Dups:
     one of its references is in the list or in an EARLIER file of this import (a pending entry booked later with another
     day or text is found so), else by day + amount + counterpart IBAN, else by the old key with the text (dkey; entries of
     earlier versions only have that one, so it stays checked). Rows of one file are distinct: two equal rows need two
-    existing ones; across files the larger number counts, never the sum (like the office's import, 2.144.1)."""
+    existing ones; across files the larger number counts, never the sum (like the office's import, 2.144.1).
+    2.378.0 (#3347): refs = {key: {day}}; an old EndToEndId key without a day counts only for a booking of that day."""
 
     def __init__(self, c, lid):
         self.c, self.lid = c, lid
         self.dk, self.sids = _dkey_counts(c, lid)
         self.sid = bud_sid(c, lid)
         self.sids |= {self.sid}
-        self.ik, self.refs = {}, set()
-        for r in c.execute("SELECT ikey, rkeys FROM budget_entries WHERE list_id=?", (lid,)):
+        self.ik, self.refs = {}, {}
+        for r in c.execute("SELECT ikey, rkeys, day FROM budget_entries WHERE list_id=?", (lid,)):
             if r[0]:
                 self.ik[r[0]] = self.ik.get(r[0], 0) + 1
             if r[1]:
-                self.refs.update(r[1].split())
+                for k in r[1].split():
+                    self.refs.setdefault(k, set()).add(r[2])
         self.fi = None
         self._start()
 
     def _start(self):
-        self.l_dk, self.l_ik, self.s_dk, self.s_ik, self.s_refs = dict(self.dk), dict(self.ik), {}, {}, set()
+        self.l_dk, self.l_ik, self.s_dk, self.s_ik, self.s_refs = dict(self.dk), dict(self.ik), {}, {}, {}
 
     def _end(self):
         for mine, have in ((self.s_dk, self.dk), (self.s_ik, self.ik)):
             for k, n in mine.items():
                 have[k] = max(have.get(k, 0), n)
-        self.refs |= self.s_refs
+        for k, days in self.s_refs.items():
+            self.refs.setdefault(k, set()).update(days)
 
     def check(self, x, fi=0):
-        """x: day, amount, kind, title, iban?, rkeys (str) -> True when it is there already; the row counts as seen."""
+        """x: day, amount, kind, title, iban?, rkeys (str), rold (str, the keys without a day) -> True when it is there already; the row counts as seen."""
         if fi != self.fi:
             if self.fi is not None:
                 self._end()
@@ -1109,8 +1114,10 @@ class _Dups:
             self._start()
         rk, ik = (x.get("rkeys") or "").split(), x.get("ikey") or ""
         dks = [bud_dkey(self.c, self.lid, s, x["day"], x["amount"], x["kind"], x["title"]) for s in self.sids]
-        dup = any(k in self.refs for k in rk) or bool(ik and cx.csv_dup_take(self.l_ik, ik)) or any(cx.csv_dup_take(self.l_dk, k) for k in dks)
-        self.s_refs.update(rk)
+        dup = any(k in self.refs for k in rk) or any(x["day"] in self.refs.get(k, ()) for k in (x.get("rold") or "").split()) \
+            or bool(ik and cx.csv_dup_take(self.l_ik, ik)) or any(cx.csv_dup_take(self.l_dk, k) for k in dks)
+        for k in rk:
+            self.s_refs.setdefault(k, set()).add(x["day"])
         cur = bud_dkey(self.c, self.lid, self.sid, x["day"], x["amount"], x["kind"], x["title"])
         self.s_dk[cur] = self.s_dk.get(cur, 0) + 1
         if ik:
@@ -1196,7 +1203,8 @@ def bud_import_parse(c, uid, lid, b, fs=None):
         x["cat_id"] = by_cp.get(_norm(x["counterpart"])) if x["counterpart"] else None
         if x["cat_id"] is None:
             x["cat_id"] = by_title.get(_norm(x["title"]))
-        x["dup"] = dups.check({**x, "rkeys": bud_rkeys(lid, x["amount"], x["kind"], x["ref"], x["e2e"]),
+        x["dup"] = dups.check({**x, "rkeys": bud_rkeys(lid, x["day"], x["amount"], x["kind"], x["ref"], x["e2e"]),
+                               "rold": bud_rkeys(lid, x["day"], x["amount"], x["kind"], x["ref"], x["e2e"], cx.csv_ref_legacy),
                                "ikey": bud_ikey(lid, x["day"], x["amount"], x["kind"], x["iban"])}, x["fi"])
         if not x["dup"]:
             for rr in open_for(x["day"][:7]):
@@ -1268,7 +1276,9 @@ def bud_import_commit(c, uid, lid, b):
         iban = x.get("iban")
         iban = iban.replace(" ", "").upper() if isinstance(iban, str) else ""
         fi = x.get("fi")
-        imp = {"rkeys": bud_rkeys(lid, v["amount"], v["kind"], _ref_txt(x.get("ref")), _ref_txt(x.get("e2e"))),
+        ref, e2e = _ref_txt(x.get("ref")), _ref_txt(x.get("e2e"))
+        imp = {"rkeys": bud_rkeys(lid, v["day"], v["amount"], v["kind"], ref, e2e),
+               "rold": bud_rkeys(lid, v["day"], v["amount"], v["kind"], ref, e2e, cx.csv_ref_legacy),
                "ikey": bud_ikey(lid, v["day"], v["amount"], v["kind"], iban if IBAN_RE.match(iban) else None),
                "fi": fi if isinstance(fi, int) and not isinstance(fi, bool) and 0 <= fi < 10000 else 0}
         rr = _rec_of(c, lid, x.get("recurring_id"))
