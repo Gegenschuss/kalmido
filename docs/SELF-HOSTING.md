@@ -963,7 +963,8 @@ organisation.
   address; never the status link, a new server would send new links) and the members with their roles (name, user
   name, e-mail address). Since 2.362 also the organisation's channels of the team chat (the open ones and the ones the
   exporting admin is a member of, like in the app) with their members, the files and voice messages of the team chat
-  (`files/tchat/`), the closed months of the logbook, the tasks and events made from filed e-mails, section templates,
+  (`files/tchat/`), knowledge pages, tables, documents, absences, filed e-mails, the newsletter, video sign-offs, letters,
+  the closed months of the logbook, the tasks and events made from filed e-mails, section templates,
   contacts on tasks, the newsletter's suppression list and consent log (address hashes only) and the booking pages the
   office bills plus the exporting admin's own one with their kinds of appointment and bookings (in the archive; the
   import does not take them over, a booking page belongs to one person). An open channel stays open in the target
@@ -1098,7 +1099,7 @@ Other people's addresses never leave the server in plain text: `email_hash` is t
 you may see on the new server. Your own address in `manifest.json` stays readable. Files of 2.73 test builds with a plain
 `email` field are still read.
 
-**A whole organisation** (2.73, stage 1): upload its organisation export (see above) the same way and enter the organisation's
+**A whole organisation**: upload its organisation export (see above) the same way and enter the organisation's
 recovery key of the old server. The archive is opened on the server (a wrong key is refused, ten attempts per upload),
 checked and shown as a preview; it goes into an organisation you administer or (2.96) into your private space. Into the
 private space nobody joins an organisation: ticked people only get the projects shared, the organisation's own address
@@ -1108,10 +1109,13 @@ new organisation's key), the organisation's calendars with events and its addres
 projects belong to you as the importing admin. Members are matched by e-mail address. Since 2.278 a ticked person
 with an account here does not join directly: they get an invitation to the organisation (with the role of the file,
 admin or member, which you confirm in the preview) and join only when they accept it. Until then their content stays
-with you as the importing admin (names as text) and no project is shared with them; a ticked person who is already a
-member gets their projects shared again. Not yet taken over (the preview names them with their counts): the
-office, the file store, team chat, knowledge pages, documents, newsletter, clients, absences and bookings, forms,
-playbooks, project notes and notepads, time entries, customer reports and browser-encrypted notes.
+with you as the importing admin (names as text) and no project is shared with them. Since 2.363 the projects ticked for
+that person are noted on the invitation and shared with their role when the person accepts (a project deleted or handed
+on meanwhile is left out); declining, withdrawing the invitation or undoing the import drops the note, and tasks keep
+their creator and assignee. A ticked person who is already a member gets their projects shared again. What moves with
+it is listed under [Organisation export](#organisation-export) (*Import*); the preview names everything with its counts.
+Memberships of people groups do not move, and mails and chat messages of people who are not ticked come over without
+their account (their name as text).
 
 2.278: a member without an address in the file (or not found by it) can be matched by the exact user name of an account
 you can see on this server (no search; an unknown and a hidden name give the same answer). Time entries billed on an
@@ -1801,8 +1805,13 @@ Notes:
 ## Moving to a new server
 
 1. **Before:** lower the DNS TTL of the name a day ahead; make a backup (*Back up now*).
-2. **Copy:** the data folder (attachments, backups) and the database (`pg_dump`, see above, or the database folder
-   with PostgreSQL stopped), the `.env` and above all **`KALMIDO_SECRET_KEY`** (or the file `secret/kalmido.key`).
+2. **Copy:** the data folder (attachments, office files, backups; the files keep owner uid 1000) and the database
+   (`pg_dump`, see above, or the database folder with PostgreSQL stopped), the `.env` and above all
+   **`KALMIDO_SECRET_KEY`** (or the file `secret/kalmido.key`).
+   Also what lives outside the data folder or only in the environment: the files behind `KALMIDO_AI_KEY_FILE` and
+   `KALMIDO_OPERATOR_TOKEN_FILE`, `KALMIDO_BACKUP_PASSPHRASE` when it is set that way, and any folder you moved with
+   `TASKS_ATTACHMENTS`, `TASKS_OFFICE_DIR`, `TASKS_TEXT_CACHE` or `KALMIDO_PAPERLESS_ZIP_DIR`.
+   `KALMIDO_FOLDERWATCH_DIR` comes with the image: nothing to copy.
    **Without the old server key everything encrypted is lost for good:** it wraps the organisation and account keys, and
    with them every sealed file and field - attachments, private files, organisation files, office documents (PDF / XML)
    and office fields, the wiki history - plus the stored secrets (repository tokens, sign-on client secret). Account keys
@@ -1815,7 +1824,18 @@ Notes:
    `curl --resolve tasks.example.com:443:<new address> https://tasks.example.com/api/health`.
 5. **Tell people what to redo,** because it is bound to the old server or name: passkeys (if the name changed), the
    installed app and push permissions (reinstall), calendar and contact accounts (CalDAV / CardDAV), shortcut URLs for
-   sharing, and calendar subscription (ICS) links.
+   sharing, and calendar subscription (ICS) links. With a new name also: the redirect address at your single sign-on
+   provider, incoming webhooks and Git webhooks, mail-in addresses at other services, the ntfy inbox address, and public,
+   form and portal links people have saved. With a new off-site target: its SFTP host fingerprint.
+
+<!-- backup-folders -->
+**What a backup archive holds:** `kalmido.dump`, `manifest.json`, `office/<organisation>/` and below `attachments/`:
+`<task>/` for task attachments; the folders `avatars/`, `listicons/`, `docthumbs/`, `listheads/` and `bookmarks/` with
+their files directly inside; the folders `files/`, `lists/`, `budget/`, `wiki/`, `tchat/` and `sheets/` with one folder per
+entry; and `chat/<agent>-<person>/`. Without the app: unpack `attachments/` to `./data/attachments` and `office/` to
+`./data/office`, restore the dump with `PGOPTIONS="-c app.role=system"` as in the backup section above. Restoring keeps
+the backup settings (`bk_` keys) of the running server; every other setting comes from the backup.
+<!-- /backup-folders -->
 
 ## Trash period of tasks
 
