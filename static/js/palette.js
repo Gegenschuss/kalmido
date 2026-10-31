@@ -132,7 +132,7 @@ window.addEventListener('keydown', e => {
     const b = k === 'x' || k === ' ' ? $('#mbar [data-act="mb-done"]') : $(`#detail.multi [data-act="me-f"][data-f="${k === 'm' ? 'list' : 'date'}"]:not([disabled])`);
     if (b) { e.preventDefault(); b.click(); }
     else if (k === 'd') { e.preventDefault(); multiDateMenu($('#mbar .mcount') || document.body); }
-    else if (k === 'm') { e.preventDefault(); menu($('#mbar .mcount') || document.body, S.lists.filter(l => !l.archived && canEditList(l.id)).map(l => ({label: lname(l), lic: l, fn: () => batch('patch', {list_id: l.id, section_id: null})}))); }
+    else if (k === 'm') { e.preventDefault(); mv_batch($('#mbar .mcount') || document.body); }  // 2.455.0 (#3848)
     return;
   }
   if (e.shiftKey && (k === 'X' || k === 'J' || k === 'K' || k === 'ArrowDown' || k === 'ArrowUp')) {  // select / extend
@@ -417,9 +417,13 @@ function palItems() {
   if (PAL.mode === 'ref') return rf_palItems(q);  // 2.53.0 (#1449): pick a reference for the comment / description (refs.js)
   if (PAL.mode === 'move') {
     const t = curTask(); if (!t) return [];
-    return (canEditList(t.list_id) ? S.lists : []).filter(l => !l.archived && canEditList(l.id) && l.id !== t.list_id).map(l => ({id: 'mv:' + l.id, kind: 'list', label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, sw: cssColor(lp_col(l)),
-      fn: () => patchUndoable(t.id, {list_id: l.id, section_id: null}, tr('Moved to {0}', lname(l)))}))
+    // 2.455.0 (#3848): like the picker: the task's workspace (All: every project, its workspace beside it), the others through the entry
+    const ws = mv_scope([t.id]), o = {filter: l => canEditList(l.id) && l.id !== t.list_id, pick: l => patchUndoable(t.id, {list_id: l.id, section_id: null}, tr('Moved to {0}', lname(l)))};
+    const it = (canEditList(t.list_id) ? S.lists : []).filter(l => !l.archived && o.filter(l) && (!ws || inWs(l, ws))).map(l => ({id: 'mv:' + l.id, kind: 'list', label: lname(l), ...(ws === 'all' && !l.is_inbox ? {sub: wsName(wsOf(l))} : {}), icon: l.is_inbox ? 'inbox' : 'list', lic: l, sw: cssColor(lp_col(l)),
+      fn: async () => { if (await mv_ask([t.id], l)) o.pick(l); }}))
       .map(x => ({...x, score: fuzzy(q, x.label)})).filter(x => x.score > 0).map(x => ({...x, score: x.score + lc_favBoost(x)})).sort((a, b) => b.score - a.score);
+    const more = canEditList(t.list_id) && mv_wsItem($(`#view .trow[data-id="${t.id}"]`) || $('#top h1'), [t.id], o);
+    return more ? [...it, {...more, id: 'mv:ws', kind: 'action', score: 1}] : it;
   }
   const all = palAll();
   if (!q) {  // recently viewed tasks / lists, recent commands, then the actions for the current task, the rest of the actions + views

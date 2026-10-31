@@ -17,6 +17,40 @@
 // Resolves the result of run, or null when cancelled. Without an organisation there is no other workspace: callers show the
 // action only when smv_can() (a person without an organisation never sees it; their private space is the only one).
 const smv_can = from => wsOn() && wsOptions().filter(w => w !== 'all' && w !== wsOf({org_id: from})).length > 0;
+// 2.455.0 (#3848): moving tasks (one, or a selection) to a project. A task's workspace is its project's; in the Basket, which every
+// workspace shows, the one shown now. "Move to project" lists only that workspace (o.ws of tch_listPicker); "All workspaces"
+// (a Basket task there, or a selection from several workspaces) lists every project under its workspace. Going to a project
+// of another workspace takes its own entry (workspace first, then the project there) and always a question; Undo stays.
+// Without organisations null: one space, nothing changes. The Basket as a target is no change of workspace.
+const mv_home = l => l?.is_inbox ? wsCur() : wsOf(l);
+const mv_scope = ids => { if (!wsOn()) return null; const s = new Set(ids.map(i => mv_home(listById(taskById(i)?.list_id)))); return s.size === 1 ? [...s][0] : 'all'; };
+// the workspaces in the switch's order; a list shared from an organisation the person is not in comes last
+const mv_wss = ls => [...new Set([...wsOptions().filter(w => w !== 'all'), ...ls.map(wsOf)])];
+// a Basket task under "All workspaces" counts as private: there it lives
+const mv_cross = (ids, l) => wsOn() && !!l && !l.is_inbox && ids.some(i => (h => (h === 'all' ? 'private' : h) !== wsOf(l))(mv_home(listById(taskById(i)?.list_id))));
+async function mv_ask(ids, l) {
+  if (!mv_cross(ids, l)) return true;
+  const to = wsName(wsOf(l)), t = ids.length === 1 ? taskById(ids[0]) : null;
+  return askConfirm(tr('Move to another workspace'), t ? tr('Move {0} to {1}, project {2}?', qn(toastClip(t.title, 60)), to, lname(l))
+    : trn('Move {0} task to {1}, project {2}?', 'Move {0} tasks to {1}, project {2}?', ids.length, to, lname(l)), {ok: tr('Move')});
+}
+// the entry "Move to another workspace…", null when there is none. o: as mv_picker
+function mv_wsItem(anchor, ids, o) {
+  const from = mv_scope(ids); if (!from || from === 'all') return null;
+  const ls = S.lists.filter(l => !l.is_inbox && !l.archived && o.filter(l)), tos = mv_wss(ls).filter(w => w !== from);
+  if (!tos.length) return null;
+  const pick = async l => { if (await mv_ask(ids, l)) return o.pick(l); };
+  return {label: tr('Move to another workspace…'), icon: 'brief', fn: () => menu(anchor, tos.map(w => ({label: wsName(w), icon: w === 'private' ? 'home' : 'brief',
+    ...(ls.some(l => wsOf(l) === w) ? {fn: () => tch_listPicker(anchor, {ws: w, filter: l => !l.is_inbox && o.filter(l), pick, title: wsName(w)})} : {dis: true, title: tr('No projects')})})),
+  null, null, tr('Move to another workspace'))};
+}
+// o: filter(list) = where these tasks may go, pick(list) = the move (after the question, if one is due)
+function mv_picker(anchor, ids, o) {
+  const more = mv_wsItem(anchor, ids, o);
+  return tch_listPicker(anchor, {filter: o.filter, ws: mv_scope(ids), pre: more ? [more, '-'] : [], pick: async l => { if (await mv_ask(ids, l)) return o.pick(l); }});
+}
+// the selection's Move (the bar, the key m)
+const mv_batch = a => mv_picker(a, [...S.multi], {filter: l => canEditList(l.id), pick: l => batch('patch', {list_id: l.id, section_id: null})});
 // 2.147.1 B (#2230): move id lists in batches of SMV_CHUNK so the dialog can show the progress. Posts b with b[key] (ids | items)
 // split up, returns the merged answer ({moved, org_was, to, count, shares}). A later batch that fails keeps what moved so far:
 // the answer then has failed = the error text (api() already toasted it) and the caller offers the undo for the moved part.

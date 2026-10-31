@@ -97,6 +97,8 @@ def stmt_uploads(b, limits=None):
     fs = StmtFiles(limits)
     lim = fs.lim
     if request.files:
+        if "files" not in request.files:     # 2.363.2 (#3106): another field name (file) is no empty file
+            raise _bad(tr("Missing field: {0}", "files"))
         ups = [f for f in request.files.getlist("files") if f]
         if not ups:
             raise _bad(tr("The file is empty"))

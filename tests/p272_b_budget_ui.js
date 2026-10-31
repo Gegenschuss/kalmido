@@ -114,6 +114,17 @@ const DE = d => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
   check(FUN && +FUN.limit === 100 && FUN.kind === 'out', '#1333: the category with its limit ' + JSON.stringify(FUN));
   await until(() => dlg()?.querySelector(`.bgcr[data-cid="${FUN?.id}"]`));
   check(dlg()?.querySelector(`.bgcr[data-cid="${FUN?.id}"] [data-cmv]`), '#1333: categories can be moved with arrows');
+  // 2.456.0 (#3837): and by the grip (jsdom has no layout: above = the top, below = the end), the arrows use the same saving
+  { const ptr = (el, type, y) => el.dispatchEvent(new w.MouseEvent(type, {bubbles: true, cancelable: true, clientY: y, button: 0}));
+    const pull = (y) => { const g = dlg().querySelector(`.bgcr[data-cid="${FUN.id}"] [data-rowd="bgc"]`); ptr(g, 'pointerdown', 10); ptr(g, 'pointermove', y); ptr(g, 'pointerup', y); click(w, d.body); };  // the browser's click after a drag, swallowed
+    const first = () => dlg()?.querySelector('.bgcr')?.dataset.cid === String(FUN.id), last = () => [...dlg().querySelectorAll('.bgcr')].pop()?.dataset.cid === String(FUN.id);
+    const back = last();
+    pull(-40);
+    check(await until(first), 'the grip drags a category to the top');
+    const down = dlg().querySelector(`.bgcr[data-cid="${FUN.id}"] [data-cmv="1"]`); click(w, down);
+    check(await until(() => !first()), 'the arrow moves it one down');
+    pull(4000);
+    check(await until(last), 'the grip drags it to the end ' + back); }
   click(w, dlg().querySelector('[data-m="close"]')); await until(() => !dlg());
   await call('POST', `/api/budget/${LID}/entries`, {day: DAY, amount: 60, kind: 'out', title: 'Cinema', cat_id: FUN.id});
   w.eval(`bg_after()`);

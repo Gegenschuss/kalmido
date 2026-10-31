@@ -6,15 +6,18 @@
 - Deleting: odl_delete_info (orgs.py) adds per member what they own in it (olv_members); the instance admin may tell the
   members first (POST /api/admin/orgs/<oid>/delete-notice: a News item with the day, the deletion waits until then), and
   every member gets a News item when it is gone (olv_gone_news, kinds orgdelnotice / orggone, no push).
+- 2.363.3 (#3133): coming back within OLV_BACK_H hours: org_leave keeps the tasks the person's assignments and "coming along"
+  ended in (space_moves kind 'orgleave', obj_id = the person, ids only), org_member_add puts back what still exists there and
+  what the person may see again (olv_rejoin). Project memberships do not come back: those are the admins' to give.
 Numbers only: no names of files, pages or tables leave the organisation's boundary.
 """
 import json
 from datetime import timedelta
 
-from flask import jsonify, request
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
-from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
+from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, parse_iso
 from ..core.i18n import trn, tr
 from ..core.pg import system_ctx
 from ..core.access import Denied
@@ -46,6 +49,7 @@ OLV_STAYS = (
     ("drives", Nn_("{0} drive", "{0} drives"), "SELECT COUNT(*) FROM office_drives WHERE org_id=? AND user_id=? AND deleted_at IS NULL"),
 )
 OLV_NOTICE_DAYS = 14  # the default period between telling the members and the deletion
+OLV_BACK_H = 24  # how long joining again restores assignments and "coming along" (the undo window of the moves)
 
 
 def _names(c, ids):
@@ -111,6 +115,62 @@ def olv_leave_info(oid):
         heir = (c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' AND id!=? ORDER BY id LIMIT 1",
                           (uid,)).fetchone() or [None])[0]
     return jsonify(olv_info(c, oid, uid, heir))
+
+
+def olv_snap(c, oid, uid):
+    """2.363.3 (#3133): before uid leaves oid: the tasks of the organisation uid is assigned to / comes along to."""
+    with system_ctx(c):  # the person's own rows in lists of the organisation, also when an admin removes them
+        return {"assign": {r[0] for r in c.execute("SELECT id FROM tasks WHERE assignee_id=? AND list_id IN (SELECT id FROM lists WHERE org_id=?)", (uid, oid))},
+                "people": {r[0] for r in c.execute("SELECT task_id FROM task_people WHERE user_id=? AND task_id IN "
+                                                   "(SELECT id FROM tasks WHERE list_id IN (SELECT id FROM lists WHERE org_id=?))", (uid, oid))}}
+
+
+def olv_memo(c, oid, uid, snap):
+    """2.363.3 (#3133): after uid left oid: what ended of snap (olv_snap) as one space_moves row, nothing when nothing ended."""
+    with system_ctx(c):
+        assign = sorted(t for t in snap["assign"] if not c.execute("SELECT 1 FROM tasks WHERE id=? AND assignee_id=?", (t, uid)).fetchone())
+        people = sorted(t for t in snap["people"] if not c.execute("SELECT 1 FROM task_people WHERE task_id=? AND user_id=?", (t, uid)).fetchone())
+        if assign or people:
+            c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('orgleave',?,?,NULL,?,?,?)",
+                      (uid, oid, me() if has_request_context() and getattr(g, "user", None) else None, iso(now_utc()),
+                       json.dumps({"assign": assign, "people": people}, separators=(",", ":"))))
+
+
+def olv_rejoin(c, oid, uid):
+    """2.363.3 (#3133): uid just joined oid (org_member_add): within OLV_BACK_H hours of leaving, the assignments and "coming
+    along" that ended come back, for tasks that still exist in the organisation and that uid may see now (an assignment only
+    where uid may be assigned: check_assignee's rule; a task somebody else took over stays theirs). -> how many came back."""
+    from ..core.access import list_people, ov_role, task_visible
+    n = 0
+    with system_ctx(c):  # the person may not be the one making the request (an admin adds them); only their own rows change
+        m = c.execute("SELECT id, at, detail FROM space_moves WHERE kind='orgleave' AND obj_id=? AND from_org=? ORDER BY id DESC LIMIT 1",
+                      (uid, oid)).fetchone()
+        if not m:
+            return 0
+        try:
+            d = json.loads(m["detail"])
+            young = parse_iso(m["at"]) > now_utc() - timedelta(hours=OLV_BACK_H)
+        except (TypeError, ValueError):
+            return 0
+        if not young or d.get("restored"):
+            return 0
+
+        def live(tid):
+            t = c.execute("""SELECT t.list_id, t.assignee_id, t.assignee_group_id FROM tasks t JOIN lists l ON l.id=t.list_id
+                             WHERE t.id=? AND t.deleted_at IS NULL AND l.deleted_at IS NULL AND l.org_id=?""", (tid, oid)).fetchone()
+            return t if t and task_visible(c, tid, uid) else None
+        for tid in d.get("assign") or []:
+            t = live(tid)
+            if t and not t["assignee_id"] and not t["assignee_group_id"] \
+                    and (uid in list_people(c, t["list_id"]) or ov_role(c, t["list_id"], uid) == "edit"):
+                c.execute("UPDATE tasks SET assignee_id=? WHERE id=?", (uid, tid))
+                n += 1
+        for tid in d.get("people") or []:
+            if live(tid):
+                n += c.execute("INSERT INTO task_people(task_id,user_id) VALUES(?,?) ON CONFLICT DO NOTHING", (tid, uid)).rowcount
+        d["restored"] = iso(now_utc())
+        c.execute("UPDATE space_moves SET detail=? WHERE id=?", (json.dumps(d, separators=(",", ":")), m["id"]))
+    return n
 
 
 def olv_people(c, oid):

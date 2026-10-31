@@ -171,7 +171,7 @@ document.addEventListener('click', async e => {
   if (a === 'imp-go') {
     if (!await importTargetConfirm({what: tr('the data of the file'), ws: NWL.ws, place: tr('Newsletter')})) return;  // 2.356.0 B (#2934): the target in words (#1940)
     b.disabled = true;
-    try { const r = await nwl_impCall(true); NWL.imp = null; nwl_load(); toast(trn('{0} consent recorded', '{0} consents recorded', r.applied)); } catch { b.disabled = false; }
+    try { const r = await nwl_impCall(true); NWL.imp = null; nwl_load(); toast(trn('{0} consent recorded', '{0} consents recorded', r.applied), r.import_id ? async () => { await api('POST', `/api/imports/${r.import_id}/undo`); nwl_load(); } : undefined); } catch { b.disabled = false; }
     return;
   }
   if (a === 'close') { b.closest('.nwl-md')?.remove(); return; }

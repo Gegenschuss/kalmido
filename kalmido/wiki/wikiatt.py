@@ -30,7 +30,7 @@ from ..core.db import bump, db, err, insert_id, iso_ms, now_utc
 from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..accounts.session import me
 from ..core.access import Denied
-from ..core.orgcrypt import OrgCryptError, oc_read_file, oc_send_file, oc_user_space, oc_write_file
+from ..core.orgcrypt import OrgCryptError, oc_copy_file, oc_read_file, oc_send_file, oc_user_space, oc_write_file
 from ..core.serializers import unlink_files
 from ..core.errors import BadInput, BadKey
 from ..tasks.attachments import file_ext, safe_name, send_stored
@@ -334,22 +334,25 @@ def wka_org_files(c, oid):
     return [r[0] for r in c.execute("SELECT path FROM wiki_files WHERE org_id=?", (oid,))]
 
 
-def wka_move_files(c, page_ids, to, uid):
+def wka_move_files(c, page_ids, to, uid, new_paths, old_paths):
     """2.99.0 (#2182 x 2.96.0 #1941): pages moved between the private space and an organisation take their files along (also
-    the ones in the trash): row org / owner as the page, the stored file sealed again with the target's key. The caller
-    commits; a file read with its own header key, so a failed commit leaves every file readable."""
+    the ones in the trash): row org / owner as the page, the stored file sealed with the target's key. The caller commits.
+    2.363.3 (#3133): into a new stored file as files/fsmove.py does: new_paths (removed on an error) and old_paths (removed
+    after the commit; both for unlink_files) go to the caller, so a failed commit leaves the old file as it was."""
     ids = [int(x) for x in page_ids]
     if not ids:
         return 0
     rows = c.execute(f"SELECT id, path FROM wiki_files WHERE page_id IN ({','.join('?' * len(ids))})", ids).fetchall()
     space = int(to) if to else oc_user_space(uid)
     for r in rows:
-        full = os.path.join(ATT_DIR, r["path"])
+        rel = os.path.join(os.path.dirname(r["path"]), f"{uuid.uuid4().hex[:12]}-{os.path.basename(r['path']).partition('-')[2]}")
         try:
-            data = oc_read_file(c, full)
+            oc_copy_file(c, os.path.join(ATT_DIR, r["path"]), os.path.join(ATT_DIR, rel), space)  # review 2 L1: plain bytes that look sealed get an outer layer
         except (OSError, OrgCryptError):
             continue  # a missing / unreadable file stays as it is (the storage check reports it)
-        oc_write_file(c, space, full, data, fresh=True)  # review 2 L1: plain bytes that look sealed get an outer layer
+        new_paths.append(rel)
+        c.execute("UPDATE wiki_files SET path=? WHERE id=?", (rel, r["id"]))
+        old_paths.append(r["path"])
     if rows:
         q = ",".join("?" * len(rows))
         fids = [r["id"] for r in rows]

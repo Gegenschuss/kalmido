@@ -3,7 +3,7 @@
 """2.362.2 (#3099 #3105): a person without an organisation gets everything in one export. Invented names only (example.com).
  With the server key:
   #3099 the account export carries the personal office (readable, personal-office/ with the same parts as its own export, the
-        receipt files too), the import preview names it as staying behind; the files of the knowledge pages are in the file
+        receipt files too), the import preview names it as staying behind; the files of the knowledge pages and (#3134) of templates are in the file
   #3099 the office archive (organisation 0) carries the receipts, the filed documents the office points at and their folders;
         never a file in the trash, never another person's node an office row names; a second person imports it privately:
         the cash entry and the equipment point at their files again, the file downloads
@@ -180,6 +180,13 @@ with zipfile.ZipFile(zb, "w") as z:
 r = F.post(B + "/api/wiki/import", params={"space": "private"}, files={"file": ("export.zip", zb.getvalue(), "application/zip")})
 check(r.ok, f"knowledge import {r.status_code} {r.text[:200]}")
 
+# #3134: a template with its own copy of a task's file
+TL = F.post(B + "/api/lists", json={"name": "Vorlagen Projekt"}).json()["id"]
+TT = F.post(B + "/api/tasks", json={"list_id": TL, "title": "Mit Datei"}).json()["id"]
+check(F.post(B + f"/api/tasks/{TT}/attachments", files={"file": ("plan.txt", b"der Vorlagen Plan\n", "text/plain")}).ok, "setup: the file of the task")
+r = F.post(B + "/api/templates", json={"list_id": TL, "name": "Vorlage mit Datei"})
+check(r.ok and r.json()["skipped_files"] == [], f"setup: the template {r.status_code} {r.text[:200]}")
+
 # ---------------------------------------------------------------- #3099: the account export
 raw = acct_export(F)
 z = zipfile.ZipFile(io.BytesIO(raw))
@@ -199,11 +206,14 @@ iid = upload(F, raw, "konto.zip")
 j = wait(F, iid)
 check(j.get("state") == "preview", f"#3099 the import reads the file {j.get('state')} {j.get('error')}")
 pv = j.get("preview") or {}
+check(any(x["what"] == "Files of templates" for x in pv.get("not_taken", [])), f"#3134 the preview names the files of templates {pv.get('not_taken')}")
 check(pv.get("office_copy") is True and any(x["what"] == "Office" for x in pv.get("not_taken", [])), f"#3099 the preview names the office {pv.get('not_taken')}")
 F.delete(B + f"/api/account/import/{iid}")
 
 wf = json.loads(z.read("data/wiki_files.json"))
 check(wf and any(n.startswith("files/wiki_files/") for n in names) and wf[0].get("file"), f"#3099 the file of the knowledge page {wf}")
+tf = json.loads(z.read("data/template_files.json"))
+check(len(tf) == 1 and tf[0]["name"] == "plan.txt" and "path" not in tf[0] and z.read(tf[0]["file"]) == b"der Vorlagen Plan\n", f"#3134 the file of the template, readable {tf}")
 check(not any(n.startswith(f"files/private_files/{GONE}-") for n in names), "a file in the trash stays out")
 check(any("knowledge" not in x and "older versions" in x for x in man["not_included"]), "#3099 the manifest no longer leaves the page files out")
 
@@ -246,8 +256,8 @@ with open(full, "r+b") as f:
 raw = acct_export(F)
 z = zipfile.ZipFile(io.BytesIO(raw))
 man = json.loads(z.read("manifest.json"))
-bad = [x for x in man["locked_files"] if x.get("name") == "kaputt.pdf"]
-check(len(bad) >= 2 and not any("kaputt" in n for n in z.namelist()), f"#3099 the broken file is named, the export runs {man['locked_files']}")
+bad = [x for x in man["locked_files"] if x.get("name") == "kaputt.pdf"] + [x for x in man["missing"] if x["file"].endswith("kaputt.pdf")]  # 2.363.2 (#3106): the private copy is under "missing"
+check(len(bad) >= 2 and not any("kaputt" in n for n in z.namelist()), f"#3099 the broken file is named, the export runs {man['locked_files']} {man['missing']}")
 check(any(n.startswith(P + f"files/store/{R1}-") for n in z.namelist()), "#3099 the other files are there")
 with open(full, "wb") as f:  # whole again (a row delete here can meet the server's own background work)
     f.write(whole)

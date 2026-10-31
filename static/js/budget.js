@@ -201,13 +201,13 @@ async function bg_book(rid) {
     redo: async () => { cur = await api('POST', `/api/budget/recurring/${rid}/book`, {month: cur.day.slice(0, 7), day: cur.day}); bg_after(); }}));
   bg_after();
 }
-// categories: name, kind, monthly limit, order (arrows); every change at once, each ONE undo step
+// categories: name, kind, monthly limit, order (arrows, 2.456.0 #3837: and the grip); every change at once, each ONE undo step
 function bg_catsModal() {
   const lid = BG.lid;
-  const rowHtml = (c, i, n) => `<li class="bgcr" data-cid="${c.id}"><input class="bgcn" data-f="name" value="${esc(c.name)}" maxlength="60" aria-label="${esc(tr('Name'))}">
+  const rowHtml = (c, i, n) => `<li class="bgcr" data-cid="${c.id}">${rowd_grip('bgc')}<input class="bgcn" data-f="name" value="${esc(c.name)}" maxlength="60" aria-label="${esc(tr('Name'))}">
     <select data-f="kind" aria-label="${esc(tr('Kind'))}"><option value="out" ${c.kind === 'out' ? 'selected' : ''}>${tr('Expense')}</option><option value="in" ${c.kind === 'in' ? 'selected' : ''}>${tr('Income')}</option></select>
     <input class="numin" data-f="limit" inputmode="decimal" value="${esc(bg_numStr(c.limit))}" placeholder="${esc(tr('no limit'))}" aria-label="${esc(tr('Limit per month'))}">
-    <span class="bgca"><button type="button" class="iconbtn" data-cmv="-1" ${i === 0 ? 'disabled' : ''} aria-label="${esc(tr('Move up'))}" title="${esc(tr('Move up'))}">${ic('up', 's')}</button><button type="button" class="iconbtn" data-cmv="1" ${i === n - 1 ? 'disabled' : ''} aria-label="${esc(tr('Move down'))}" title="${esc(tr('Move down'))}">${ic('down', 's')}</button><button type="button" class="iconbtn danger" data-cdel aria-label="${esc(tr('Delete {0}', c.name))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></li>`;
+    <span class="bgca">${rowd_arrows(`<button type="button" class="iconbtn" data-cmv="-1" ${i === 0 ? 'disabled' : ''} aria-label="${esc(tr('Move up'))}" title="${esc(tr('Move up'))}">${ic('up', 's')}</button><button type="button" class="iconbtn" data-cmv="1" ${i === n - 1 ? 'disabled' : ''} aria-label="${esc(tr('Move down'))}" title="${esc(tr('Move down'))}">${ic('down', 's')}</button>`)}<button type="button" class="iconbtn danger" data-cdel aria-label="${esc(tr('Delete {0}', c.name))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></li>`;
   const cats = () => [...(BG.data?.cats || [])].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0) || a.id - b.id);
   const listHtml = () => { const cs = cats(); return cs.length ? `<ul class="bgcrs">${cs.map((c, i) => rowHtml(c, i, cs.length)).join('')}</ul>` : `<p class="muted">${tr('No categories yet.')}</p>`; };
   const md = bg_modal(`<h3>${ic('tag', 's')} ${tr('Categories')}</h3>
@@ -220,6 +220,13 @@ function bg_catsModal() {
     await api('PATCH', `/api/budget/cats/${id}`, body);
     histAdd({label, undo: async () => { await api('PATCH', `/api/budget/cats/${id}`, before); bg_after(); }, redo: async () => { await api('PATCH', `/api/budget/cats/${id}`, body); bg_after(); }});
   };
+  // 2.456.0 (#3837): a category to another place, by the arrows and by dragging: the changed places, ONE undo step
+  const moveTo = async (c, to) => {
+    const cs = cats(); cs.splice(to, 0, cs.splice(cs.indexOf(c), 1)[0]);
+    try { await histGroup(async () => { for (const [n, x] of cs.entries()) if (x.sort !== n) await patch(x.id, {sort: n}, {sort: x.sort ?? null}, tr('Order of the categories')); }, tr('Order of the categories')); } catch (er) { lifeErr(md, er); }
+    await redraw();
+  };
+  rowd_attach(md, {kind: 'bgc', row: '.bgcr', move: (from, to, li) => { const c = cats().find(x => x.id === +li.dataset.cid); return c && moveTo(c, to); }});
   md.addEventListener('change', async ev => {
     const li = ev.target.closest('.bgcr'), f = ev.target.dataset.f; if (!li || !f) return;
     const c = cats().find(x => x.id === +li.dataset.cid); if (!c) return;
@@ -235,9 +242,7 @@ function bg_catsModal() {
     const mv = ev.target.closest('[data-cmv]'), del = ev.target.closest('[data-cdel]'), add = ev.target.closest('[data-cadd]');
     if (mv && c) {
       const cs = cats(), i = cs.indexOf(c), j = i + +mv.dataset.cmv; if (j < 0 || j >= cs.length) return;
-      const o = cs[j], sc = c.sort ?? i, so = o.sort ?? j, a = sc === so ? i : sc, b = sc === so ? j : so;
-      try { await histGroup(async () => { await patch(c.id, {sort: b}, {sort: c.sort ?? null}, tr('Order of the categories')); await patch(o.id, {sort: a}, {sort: o.sort ?? null}, tr('Order of the categories')); }, tr('Order of the categories')); } catch (er) { lifeErr(md, er); }
-      await redraw(); $(`.bgcr[data-cid="${c.id}"] [data-cmv="${mv.dataset.cmv}"]`, md)?.focus();
+      await moveTo(c, j); $(`.bgcr[data-cid="${c.id}"] [data-cmv="${mv.dataset.cmv}"]`, md)?.focus();
     } else if (del && c) {
       if (!await askConfirm(tr('Delete the category “{0}”?', c.name), tr('Its entries stay, without a category.'), {ok: tr('Delete'), danger: true})) return;
       let gone;
@@ -443,6 +448,7 @@ function bg_csvModal() {
     const shown = rows.slice(0, BG_SHOW), pend = rows.filter(r => r.pending && !r.error), many = (p.files || 1) > 1;
     area.innerHTML = `<p class="muted">${esc([trn('{0} row read', '{0} rows read', rows.length - pend.length), st.skipped ? trn('{0} row skipped', '{0} rows skipped', st.skipped) : '', many ? trn('{0} file', '{0} files', p.files) : ''].filter(Boolean).join(' · '))}</p>
       ${p.camt052 ? `<p class="shint lhint keep bnk052">${ic('info', 's')} ${tr('These are day reports (CAMT.052). Pending transactions are shown but not imported; a booking that appears in several reports counts once. For the bookkeeping, better export the account statement (CAMT.053).')}</p>` : ''}${filesInfo(p)}
+      ${rows.some(r => r.cut && !r.error) ? `<p class="shint lhint keep bgcut">${ic('info', 's')} ${esc(trn('{0} purpose is longer than {1} characters and is cut off on import.', '{0} purposes are longer than {1} characters and are cut off on import.', rows.filter(r => r.cut && !r.error).length, 200))}</p>` /* 2.363.3 (#3134) */ : ''}
       <ul class="bgprev">${shown.map((r, i) => r.pending && !r.error ? '' : `<li class="bgpr ${r.error ? 'err' : r.dup ? 'dup' : ''}"><label class="bgprc"><input type="checkbox" data-csr="${i}" ${r.error || r.dup ? '' : 'checked'} ${r.error ? 'disabled' : ''} aria-label="${esc(r.title || tr('Row {0}', r.n))}"></label>
         <span class="bgel"><b>${esc(r.title || '–')}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.counterpart, many ? r.file : ''].filter(Boolean).join(' · '))}</small>
         ${r.error ? `<small class="bgwarn">${ic('alert', 's')} ${esc(r.error)}</small>` : r.dup ? `<small class="bgwarn">${esc(tr('Already in the budget'))}</small>` : ''}

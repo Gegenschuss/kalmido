@@ -97,9 +97,9 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
       return r;
     };
     const shot = async name => { const dir = shots && process.env[shots]; if (!dir) return; const r = await cmd('browsingContext.captureScreenshot', {context: ctx}); fs.writeFileSync(path.join(dir, name), Buffer.from(r.data, 'base64')); };
-    // a drag with the mouse (desktop) or one finger (touch) from (x0, y0) by (dx, dy)
-    const drag = (x0, y0, dx, dy, kind = 'mouse') => cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'p1', parameters: {pointerType: kind},
-      actions: [{type: 'pointerMove', x: Math.round(x0), y: Math.round(y0)}, {type: 'pointerDown', button: 0}, {type: 'pointerMove', x: Math.round(x0 + dx / 2), y: Math.round(y0 + dy / 2), duration: 120},
+    // a drag with the mouse (desktop) or one finger (touch) from (x0, y0) by (dx, dy); hold = ms of a long press first
+    const drag = (x0, y0, dx, dy, kind = 'mouse', hold = 0) => cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'p1', parameters: {pointerType: kind},
+      actions: [{type: 'pointerMove', x: Math.round(x0), y: Math.round(y0)}, {type: 'pointerDown', button: 0}, ...(hold ? [{type: 'pause', duration: hold}] : []), {type: 'pointerMove', x: Math.round(x0 + dx / 2), y: Math.round(y0 + dy / 2), duration: 120},
         {type: 'pointerMove', x: Math.round(x0 + dx), y: Math.round(y0 + dy), duration: 120}, {type: 'pointerUp', button: 0}]}]}).then(() => cmd('input.releaseActions', {context: ctx}));
     // 2.358.0 C (#2782): wait for a state instead of a fixed sleep (like boot.js): until(expr | fn) polls a page expression (string,
     // a throw counts as false) or a function until it is truthy (-> that value) or timeout ms are over (-> the last value)

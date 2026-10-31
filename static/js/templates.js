@@ -9,8 +9,18 @@ const tplOf = kind => (S.templates || []).filter(x => x.kind === kind);
 async function saveTemplate(src, def) {
   const name = await askPrompt(tr('Template name'), def || '', {ok: tr('Save as template')});
   if (name === null) return;
-  try { await api('POST', '/api/templates', {...src, name: name.trim()}); } catch { return; }
-  await load(); render(); toast(tr('Saved as template'));
+  let j; try { j = await api('POST', '/api/templates', {...src, name: name.trim()}); } catch { return; }
+  await load(); render(); toast(tr('Saved as template')); tpl_skipped(j);
+}
+// 2.363.3 (#3134): files that could not be copied (storage full, infected, encrypted in the browser) are named, never lost silently
+function tpl_skipped(j) { if (j?.skipped_files?.length) toast(tr('Not copied: {0}', j.skipped_files.slice(0, 5).join(', ')), null, 9000); }
+// 2.363.3 (#3134): a copy of the task on the server (subtasks, assignees, files, ...); offline or not saved yet: the fields the device has
+async function taskDuplicate(t, plain) {
+  if (t.id < 0 || !navigator.onLine) return plain();
+  let j; try { j = await api('POST', `/api/tasks/${t.id}/duplicate`); } catch { return; }
+  putTask(j.task); await load(); render();
+  const lab = tr('Created {0}', qn(String(j.task.title).slice(0, 40)));
+  offerUndo(lab, histCreate(lab, j.task)); tpl_skipped(j);
 }
 async function useTemplate(tp) {
   if (tp.kind === 'list') {
@@ -18,11 +28,11 @@ async function useTemplate(tp) {
     if (tp.data?.rel) { tplUseModal(tp); return; }  // 2.4.0 (#328): a project template asks for the start (and an optional end)
     const name = await askPrompt(tr('Name of the new project'), tp.name, {ok: tr('Create')}); if (name === null) return;
     let j; try { j = await api('POST', `/api/templates/${tp.id}/apply`, {name: name.trim()}); } catch { return; }
-    await load(); go('l/' + j.list_id); toast(tr('Project created from template')); return;
+    await load(); go('l/' + j.list_id); toast(tr('Project created from template')); tpl_skipped(j); return;
   }
   const lid0 = quickDefaults().list_id, lid = listById(lid0)?.e2e ? null : lid0;  // 2.64.1 (#1817): a template never lands in a locked list (the basket instead)
   let j; try { j = await api('POST', `/api/templates/${tp.id}/apply`, {list_id: lid && canEditList(lid) ? lid : null}); } catch { return; }
-  putTask(j.task); await load(); render();
+  putTask(j.task); await load(); render(); tpl_skipped(j);
   const id = j.task.id;
   requestAnimationFrame(() => { const r = $(`#view .trow[data-id="${id}"]`); if (r) { r.classList.add('flash'); r.scrollIntoView({block: 'nearest'}); } });
   offerUndo(tr('Created from template: {0}', tp.name), histCreate(tr('Created from template: {0}', tp.name), {...j.task, created_at: j.task.created_at}));
@@ -48,7 +58,7 @@ function tplUseModal(tp) {
     const end = $('#tu-end', md)?.value || '';
     if (end && end < $('#tu-start', md).value) { toast(tr('The end date is before the start date')); return; }
     let j; try { j = await api('POST', `/api/templates/${tp.id}/apply`, {name, folder: fNorm($('#tu-folder', md).value), start: $('#tu-start', md).value || today(), ...(end ? {end} : {})}); } catch { return; }
-    md.remove(); await load(); go('l/' + j.list_id); toast(tr('Project created from template'));
+    md.remove(); await load(); go('l/' + j.list_id); toast(tr('Project created from template')); tpl_skipped(j);
   });
   if (!isTouch()) setTimeout(() => $('#tu-name', md).focus(), 50);  // 2.13.0: no keyboard popping up on touch
 }
@@ -60,14 +70,14 @@ function listDuplicate(id) {
   const md = modal(`<h3>${tr('Duplicate “{0}”', esc(lname(l)))}</h3>
     <div class="row"><label for="ld-name">${tr('Name')}</label><input id="ld-name" value="${esc(tr('{0} (copy)', lname(l)))}" maxlength="200"></div>
     <div class="row"><label class="chkl"><input type="checkbox" id="ld-done"> ${tr('Copy completed tasks too')}</label></div>
-    <div class="shint keep">${tr('Sections, tasks with subtasks and dates, fields, notepads and the page arrangement come along. Members, shares and assignees do not: the copy is yours alone.')}</div>
+    <div class="shint keep">${tr('Everything except comments and times comes along, files too. Members and shares do not: assignees stay only where they may see the copy.')}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Duplicate')}</button></div>`);
   md.classList.add('ldmodal');
   const go_ = async () => {
     const name = $('#ld-name', md).value.trim(); if (!name) { need($('#ld-name', md)); return; }
     const b = $('[data-m="ok"]', md); if (b.disabled) return; b.disabled = true;
     let j; try { j = await api('POST', `/api/lists/${id}/duplicate`, {name, done: $('#ld-done', md).checked}); } catch { b.disabled = false; return; }
-    md.remove(); await load(); go('l/' + j.list_id); toast(tr('Project duplicated'));
+    md.remove(); await load(); go('l/' + j.list_id); toast(tr('Project duplicated')); tpl_skipped(j);
   };
   md.addEventListener('click', e => {
     const b = e.target.closest('[data-m]'); if (!b) return;

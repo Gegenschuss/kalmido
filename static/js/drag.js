@@ -3,7 +3,8 @@
    threshold before a drag starts, the long press on touch, a ghost that slides by transform, auto-scroll at the edge of the
    scroller, Esc cancels, the click after a drag is swallowed. The callers keep what is theirs (where something may go, what
    a drop does): onStart / onMove / onDrop / onCancel / onTap. Sections (secdrag.js) and bottom sheets (sheetdrag.js) use it;
-   caldrag, roadmap, timeline, dnd / dragmulti and mindmap are next (docs/ARCHITECTURE.md "Dragging").
+   caldrag, roadmap, timeline, dnd / dragmulti and mindmap are next (docs/ARCHITECTURE.md "Dragging"). rowd_attach below:
+   the order of the rows of a list (2.456.0, #3837).
    Touch uses touch events, not pointer events: the browser cancels a pointer as soon as it starts to pan the page, a touch
    whose touchmove is prevented stays ours. Mouse and pen use pointer events with pointer capture.
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
@@ -31,7 +32,7 @@
  *   (2.193.0 B, #2219; same edge / step, together with scroll)
  * @property {number|(() => number)} [scrollXInset]  px at the scroller's left that are not content (a sticky name column):
  *   the left edge zone starts right of them
- * @property {{el: HTMLElement, cls?: string}} [ghost]  a copy of el follows the pointer (fixed, by transform)
+ * @property {{el: HTMLElement|((d: any) => HTMLElement), cls?: string}} [ghost]  a copy of el follows the pointer (fixed, by transform)
  * @property {(d: any, x: number, y: number) => void} [onStart]
  * @property {(d: any, x: number, y: number, dx: number, dy: number) => void} [onMove]
  * @property {(d: any, x: number, y: number) => void} [onDrop]
@@ -330,3 +331,56 @@ function pz_attach(root, o) {
 }
 /** @returns {boolean} a zoom of pz_attach runs (other gestures wait) */
 const pz_busy = () => !!pz_cur;
+
+// ---- 2.456.0 (#3837): the order of rows, the same everywhere: hold the grip, then drag (a finger), or drag the grip (mouse,
+// pen). The grip is the row's position symbol because the rows are full of input fields. The up / down arrows stay on a
+// computer for the keyboard; on a touch screen (no hover) rowd_arrows leaves them out.
+const ROWD_HOLD = 380;
+const rowd_touch = () => { try { return matchMedia('(hover: none)').matches; } catch { return false; } };
+const rowd_arrows = html => rowd_touch() ? '' : html;
+const rowd_attr = kind => `data-rowd="${kind}" title="${esc(tr('Drag to reorder'))}"`;
+const rowd_grip = kind => `<span class="rowgrip" ${rowd_attr(kind)}>${ic('grip', 's')}</span>`;
+/**
+ * The rows matching o.row with a grip [data-rowd=o.kind] inside root can be dragged within their parent. o.move(from, to,
+ * row, list) saves: the same code as the arrows; from / to are places among the rows.
+ * @param {HTMLElement|Document} root @param {{kind: string, row: string, move: (from: number, to: number, row: HTMLElement, list: HTMLElement) => any}} o
+ */
+function rowd_attach(root, o) {
+  const grip = `[data-rowd="${o.kind}"]`;
+  const rows = l => [...l.children].filter(x => x.matches(o.row));
+  // a save of the field left by the drag may draw the list anew: the same list by the grip's place
+  const listOf = d => d.list.isConnected ? d.list : $$(grip)[d.n]?.closest(o.row)?.parentElement || null;
+  const spot = (d, y) => {
+    const l = listOf(d); if (!l) return null;
+    const rs = rows(l), i = rs.findIndex(r => { const b = r.getBoundingClientRect(); return y < b.top + b.height / 2; }), at = i < 0 ? rs.length : i;
+    return {l, rs, at, to: at > d.from ? at - 1 : at};
+  };
+  const clear = () => $$('.rowd-before, .rowd-after').forEach(x => x.classList.remove('rowd-before', 'rowd-after'));
+  const stop = d => { clear(); d.row.classList.remove('rowd-on'); };
+  const lift = d => {
+    if (d.on) return;
+    d.on = true; d.sc = tdScroller(d.row); d.row.classList.add('rowd-on');
+    const f = document.activeElement; if (f instanceof HTMLElement && f.matches('input, textarea, select')) f.blur();  // its change first
+    if (navigator.vibrate) navigator.vibrate(12);
+  };
+  let cur = null;
+  drg_attach(root, {
+    hold: ROWD_HOLD, holdMove: 8, onTarget: true, raf: true, ghost: {el: d => d.row, cls: 'ghost-drag rowd-ghost'},
+    scroll: () => cur?.sc, scrollBox: sc => tdBox(sc, cur), edge: TD_EDGE, step: TD_MAX,
+    start: t => {
+      const g = /** @type {any} */ (t).closest?.(grip), row = g?.closest(o.row);
+      if (!row?.parentElement || g.closest('fieldset[disabled]')) return null;
+      return cur = {row, list: row.parentElement, n: $$(grip).indexOf(g), from: rows(row.parentElement).indexOf(row), on: false};
+    },
+    onHold: lift, onStart: lift,
+    onMove: (d, x, y) => {
+      clear();
+      const s = spot(d, y); if (!s || s.to === d.from) return;
+      if (s.at < s.rs.length) s.rs[s.at].classList.add('rowd-before'); else s.rs[s.rs.length - 1].classList.add('rowd-after');
+    },
+    onDrop: (d, x, y) => { const s = spot(d, y); stop(d); if (s && s.to !== d.from) o.move(d.from, s.to, d.row, s.l); },
+    onTap: stop, onCancel: stop,
+  });
+  // the long press is the app's: no menu of the browser over the grip (a mouse keeps it)
+  root.addEventListener('contextmenu', e => { if (/** @type {any} */ (e.target).closest?.(grip) && (/** @type {any} */ (e).pointerType ? /** @type {any} */ (e).pointerType === 'touch' : isTouch())) e.preventDefault(); });
+}

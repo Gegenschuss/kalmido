@@ -32,6 +32,7 @@ from ..core.orgcrypt import oc_enc_fields
 from ..core.pg import insert_id, write_lock
 from ..core.errors import BadInput
 from .calc import dstr, money
+from .legacyimport import fx_run, fx_settle  # 2.363.2 (#3104)
 from .vma import VMA_HOME, VMA_NAMES, vma_dates, vma_places, vma_rate, vma_table_year, vma_trip
 
 VMI_FILE_MAX = 2 * 1024 * 1024
@@ -512,7 +513,8 @@ def vmi_import_post():
         try:
             rows.append(rk_trip_clean(c, oid, uid, {k: t.get(k) for k in VMI_FIELDS}))
         except BadInput as x:
-            raise BadInput(tr("Row {0}: {1}", i + 1, str(x.args[0] if x.args else x))) from None
+            # 2.363.2 (#3106): the row of the sheet (the preview's row), not the position among the ticked trips
+            raise BadInput(tr("Row {0}: {1}", t["row"] if isinstance(t.get("row"), int) else i + 1, str(x.args[0] if x.args else x))) from None
     from .periodlock import period_need_open
     period_need_open(c, oid, *[d for r in rows for d in (r.get("date_from"), r.get("date_to"))])  # 2.148.0 A (#2471)
     write_lock(c, f"office_trips_import_{int(oid)}")  # 2.269.0 D (#3046): check and write in one go (two tabs)
@@ -528,26 +530,20 @@ def vmi_import_post():
         row = oc_enc_fields(c, oid, "office_trips", row)
         ids.append(insert_id(c, f"INSERT INTO office_trips({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())))
     ofx_log(c, oid, "import", target="trips", detail={"count": len(ids)})
+    fx_run(c, oid, uid, "trips", ids)  # 2.363.2 (#3104)
     bump(c)
     c.commit()
     return jsonify(created=len(ids), ids=ids, skipped=len(trips) - len(ids)), 201
 
 
-@app.post("/api/office/trips/delete")
-def vmi_delete_many():
-    """Office admin. {ids: [...]} -> deletes these trips of the office (the undo of an import: one step) with their
-    receipts; a trip with a receipt billed on to a client or locked (olk_trip_item_reason) stays (skipped). Answers the deleted trips as they were.
-    2.272.0 C (#3027): only trips unchanged since they were made (updated_at = created_at, no receipts, no drive or trip project
-    pointing at them) go; the others stay (kept) -- an undo takes back the import, never what was added since."""
-    from .travel import _ctx, rk_trips
-    c, uid, oid = _ctx()
-    b = body()
-    ids = b.get("ids") if isinstance(b, dict) else None
-    if not isinstance(ids, list) or len(ids) > VMI_IMPORT_MAX or not all(isinstance(x, int) and not isinstance(x, bool) for x in ids):
-        raise BadInput(tr("Invalid data"))
-    ids = sorted(set(ids))
+def vmi_remove(c, oid, ids):
+    """Deletes these trips of the office with their receipts; a trip with a receipt billed on to a client or locked
+    (olk_trip_item_reason) stays (skipped). 2.272.0 C (#3027): only trips unchanged since they were made (updated_at =
+    created_at, no receipts, no drive or trip project pointing at them) go; the others stay (kept) -- an undo takes back the
+    import, never what was added since. -> {deleted, trips (as they were), skipped, kept}. No commit."""
+    from .travel import rk_trips
     if not ids:
-        return jsonify(ok=True, deleted=0, trips=[], skipped=[])
+        return {"deleted": 0, "trips": [], "skipped": [], "kept": []}
     q = ",".join("?" * len(ids))
     mine = {r[0] for r in c.execute(f"SELECT id FROM office_trips WHERE org_id=? AND id IN ({q})", [oid] + ids)}
     billed = {r[0] for r in c.execute(f"SELECT DISTINCT trip_id FROM office_trip_items WHERE org_id=? AND billed_doc_id IS NOT NULL "
@@ -568,6 +564,20 @@ def vmi_delete_many():
     if gone:
         c.execute(f"DELETE FROM office_trip_items WHERE org_id=? AND trip_id IN ({','.join('?' * len(gone))})", [oid] + gone)
         c.execute(f"DELETE FROM office_trips WHERE org_id=? AND id IN ({','.join('?' * len(gone))})", [oid] + gone)
+    return {"deleted": len(gone), "trips": old, "skipped": sorted(mine & billed), "kept": sorted(kept)}
+
+
+@app.post("/api/office/trips/delete")
+def vmi_delete_many():
+    """Office admin. {ids: [...]} -> vmi_remove (the undo of an import: one step)."""
+    from .travel import _ctx
+    c, uid, oid = _ctx()
+    b = body()
+    ids = b.get("ids") if isinstance(b, dict) else None
+    if not isinstance(ids, list) or len(ids) > VMI_IMPORT_MAX or not all(isinstance(x, int) and not isinstance(x, bool) for x in ids):
+        raise BadInput(tr("Invalid data"))
+    out = vmi_remove(c, oid, sorted(set(ids)))
+    fx_settle(c, oid, uid, "trips")  # 2.363.2 (#3104)
     bump(c)
     c.commit()
-    return jsonify(ok=True, deleted=len(gone), trips=old, skipped=sorted(mine & billed), kept=sorted(kept))
+    return jsonify(ok=True, **out)

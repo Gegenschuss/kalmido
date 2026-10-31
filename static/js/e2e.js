@@ -437,8 +437,7 @@ async function e2eFileDecrypt(buf, tid, legacy) {
 async function e2eUpload(tid, files) {
   files = noEmpty(files); if (!files.length) return;
   if (!(tid > 0)) { toast(tr('Task is still syncing, try again in a moment')); return; }
-  const max = 50 * 1024 * 1024, big = files.find(f => f.size > max);
-  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
+  const lim = upLimit(files, true); if (lim) { toast(lim); return; }  // 2.363.3 (#3134): one request per file
   if (!await e2eEnsure()) return;
   toast(tr('Encrypting…'));
   let t;
@@ -446,7 +445,7 @@ async function e2eUpload(tid, files) {
     const fd = new FormData();
     fd.append('file', new Blob([await e2eFileEncrypt(f, tid)], {type: 'application/octet-stream'}), 'encrypted.kenc');
     try { t = await rawFetch('POST', `/api/tasks/${tid}/enc-attachments`, fd); }
-    catch (x) { if (!x.shown) toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); return; }
+    catch (x) { if (t) { putTask(t); render(); if (S.sel === tid) renderDetail(); } if (!x.shown) toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); return; }  // 2.363.3 (#3134): the files before a Cancel stay and show
   }
   putTask(t); render(); if (S.sel === tid) renderDetail();
   toast(files.length === 1 ? tr('Encrypted and attached') : tr('{0} files encrypted and attached', files.length));

@@ -118,7 +118,8 @@ BK_SHARED_MIN = max(1, _env_int("KALMIDO_BACKUP_SHARED_MIN", 64 * 1024))
 # files), listheads (list header pictures), bookmarks (bookmark pictures)
 # 2.152.0 B (#2172, review C-H3) found the same gaps (listheads, sheets, tchat, bookmarks): one list for both
 BK_FLAT = ("avatars", "listicons", "docthumbs", "listheads", "bookmarks")
-BK_PER_ID = ("files", "lists", "budget", "wiki", "tchat", "sheets")
+# 2.363.3 (#3134): + tplfiles (the files of templates)
+BK_PER_ID = ("files", "lists", "budget", "wiki", "tchat", "sheets", "tplfiles")
 BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|" + "|".join(BK_FLAT) + "|(?:" + "|".join(BK_PER_ID) + r")/\d{1,12}|chat/\d{1,12}-\d{1,12})"
                           r"/([^/\\\x00-\x1f]{1,255})")
 # 2.359.2 (#2895): the own industry packs of the instance (office/sheet.py IND_DATA_DIR, /data/packs/industry): flat files

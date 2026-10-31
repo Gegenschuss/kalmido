@@ -958,7 +958,10 @@ def _camt_rows(text, mt940=False):
     for r in rows:
         x = {"day": r["day"], "amount": None, "kind": "out", "title": "", "counterpart": (r["counterpart"] or "")[:BUD_CP_MAX], "error": r["error"],
              "pending": r["pending"], "iban": r["iban"], "ref": r["svc_ref"], "e2e": r["e2e"]}
-        x["title"] = re.sub(r"\s+", " ", r["purpose"] or r["counterpart"] or "").strip()[:BUD_TITLE_MAX]
+        full = re.sub(r"\s+", " ", r["purpose"] or r["counterpart"] or "").strip()
+        x["title"] = full[:BUD_TITLE_MAX]
+        if len(full) > BUD_TITLE_MAX:
+            x["cut"] = True  # 2.363.3 (#3134): the import dialog says so
         a = r["amount"]
         if a is not None:
             x["amount"], x["kind"] = _f(abs(a)), "in" if a > 0 else "out"

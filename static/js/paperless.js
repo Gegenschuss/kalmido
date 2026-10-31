@@ -286,7 +286,7 @@ async function plh_upload(f) {
     let n = z.next;
     while (n * z.chunk < f.size) {
       if (PL.up.abort || PL.ws !== ws) { PL.up = null; await api('DELETE', `/api/paperless/zip?ws=${encodeURIComponent(ws)}`).then(j => { PL.d = j; }).catch(() => null); pl_draw(); return; }
-      const fd = new FormData(); fd.append('ws', ws); fd.append('n', String(n)); fd.append('part', f.slice(n * z.chunk, Math.min(f.size, (n + 1) * z.chunk)), 'part');
+      const fd = new FormData(); fd.append('ws', ws); fd.append('n', String(n)); fd.append('part', f.slice(n * z.chunk, Math.min(f.size, (n + 1) * z.chunk)), 'part'); /** @type {any} */ (fd).upQuiet = true;  // 2.363.3 (#3134): one piece, the dialog draws the whole upload
       if ((n + 1) * z.chunk >= f.size) { PL.up.check = true; pl_draw(); }  // the server checks the export after the last part
       let j = null;
       for (let t = 0; t < 3 && !j; t++) { try { j = await rawFetch('POST', '/api/paperless/zip/part', fd); } catch (x) { if (t === 2 || (x?.status && x.status < 500)) throw x; await new Promise(res => setTimeout(res, 1500)); } }

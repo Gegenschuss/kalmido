@@ -106,7 +106,8 @@ function overdueAct(a) {
 }
 // 2.32.0 (#1055): the lists the selection can move to (the bar's Move, the key m without the multi panel)
 function multiMoveMenu(a) {
-  tch_listPicker(a, {filter: l => canEditList(l.id), pick: l => { const ids = [...S.multi]; S.multi.clear(); S.multiMode = false; dgToList(ids, l.id); }});  // 2.38.0 (#1177); 2.43.0 (#1003): subtasks leave their parent (one batch, one undo)
+  const ids = [...S.multi];
+  mv_picker(a, ids, {filter: l => canEditList(l.id), pick: l => { S.multi.clear(); S.multiMode = false; dgToList(ids, l.id); }});  // 2.38.0 (#1177); 2.43.0 (#1003): subtasks leave their parent (one batch, one undo)
 }
 // 2.32.0 (#1055): the phone bar's More: what does not fit into the four buttons
 function multiMoreMenu(a) {
@@ -239,8 +240,7 @@ async function filesToTasks(l, files) {
   files = noEmpty(files);
   if (!files.length) return;
   if (!OUT.online) { toast(tr('Offline: only works again with a connection')); return; }
-  const max = 50 * 1024 * 1024, big = files.find(f => f.size > max);
-  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
+  const lim = upLimit(files, true); if (lim) { toast(lim); return; }  // 2.363.3 (#3134): one request per file
   toast(files.length === 1 ? tr('Uploading…') : tr('Uploading {0} files…', files.length));
   let n = 0;
   await histGroup(async () => {
@@ -843,7 +843,7 @@ async function folderPropsModal(f, opt = {}) {
     er.hidden = !bad.length;
     saved(undo ? () => put(k, prev, false) : null);
     if (v === null && nL) toast(tr('Not set: the projects keep the value they have.'));
-    else if (r.changed) toast(trn('{0} project changed', '{0} projects changed', r.changed));  // 2.46.1 (#1422): the counter
+    else if (r.changed) toast(tmm_msg(trn('{0} project changed', '{0} projects changed', r.changed), r));  // 2.46.1 (#1422): the counter; 2.363.3 (#3133): what the workspace change ended
     await load(); render();
   };
   md.addEventListener('change', e => {

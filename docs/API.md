@@ -306,7 +306,7 @@ had been made in the app. Webhooks fire too.
 | `GET /lists/{id}/kpis` | read | 2.43.0 (#1328): the key figures of a list (tiles of its project page): `{data: [{id, title, agg: sum\|count\|avg\|ratio, value, unit, n}]}` over the tasks you may see; `value` null = nothing to compute. Health lists: `404` for agents. Set up by people (web: `PATCH /api/lists/{id}` `{kpis: [{title, agg, field?, field2?, state: all\|open\|done, cond_field?, cond_value?}]}`, owner / list admins; the sum row of a list: `{col_sums: {"f:<id>": sum\|avg\|count\|min\|max}}`) |
 | `GET /templates` · `POST …` | read · structure | 2.15.0: your templates; create from `{task_id}`, `{list_id, relative?}` or `{kind, data}`, `name?` |
 | `PATCH /templates/{id}` · `DELETE …` · `POST …/apply` | structure · delete · structure | 2.15.0: rename / replace data; delete; use it (task template: `{list_id?, section_id?}`; list template: `{name?, folder?, start?, end?}`) |
-| `POST /lists/{id}/duplicate` | structure | 2.78.0: a copy of the list as a new list of yours `{name?, done?, folder?}` -> `{list_id}`: sections, tasks with their dates (done = also the completed ones), subtasks, fields, dependencies, milestones, Playbook, notepads, page arrangement; no members, shares or assignees; not for participants; 2.126.0: only who may edit the list (view only = 403) |
+| `POST /lists/{id}/duplicate` | structure | 2.78.0: a copy of the list as a new list of yours `{name?, done?, folder?}` -> `{list_id}`: sections, tasks with their dates (done = also the completed ones), subtasks, fields, dependencies, milestones, Playbook, notepads, page arrangement; 2.363.3: `{list_id, skipped_files}`, everything except comments and times comes along (assignees, files as copies, the tags of others, person / task fields, sprints, WIP limits, list tags, key links, places in further lists); no members or shares, so people stay only where they may be assigned in the copy; not for participants; 2.126.0: only who may edit the list (view only = 403) |
 | `POST /tasks/{id}/attachments` | attachments:write | 2.15.0: upload files (multipart, field `file`, repeatable; the server's size limit, no empty files) |
 | `POST /tasks/{id}/attachments/text` | attachments:write | 2.30.0: a text file from JSON `{name, content}` (Markdown, plain text, HTML / CSS / JS, JSON / CSV, code; UTF-8, at most 1 MB). An ending that is not a text type (`.sh`, `.ps1`, `.bat`, `.exe` …) gets `.txt` appended; a name the task already has becomes a new version next to it (`report (v2).md`, the old file stays). Answer `201` `{id, task_id, name, mime, size, created_at, version, replaces, url}` |
 | `DELETE /attachments/{id}` | attachments:write | 2.15.0: remove a file of a task (or of your comment) |
@@ -660,10 +660,10 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/
 
 The importers of *Settings > Data > Import* are available to scripts. `source` is one of `todoist`, `trello`,
 `asana`, `mstodo` (Outlook / Microsoft To Do CSV or ICS), `ics` and (2.142.0) `notion` (the export ZIP "Markdown & CSV",
-ZIPs inside it too, or one database CSV / page), `gtasks` (Google Takeout ZIP or its `Tasks.json`), `clickup` (CSV),
+ZIPs inside it too, or one database CSV / page), `gtasks` (Google Takeout ZIP or its `Tasks.json`), `ticktick` (its backup CSV), `clickup` (CSV),
 `jira` (CSV, repeated columns such as `Labels` kept), `csv` (any CSV: columns detected by name in English and German,
 unknown columns go into the notes) and `markdown` (checklists: headings = projects / sections, `- [ ]` / `- [x]` tasks,
-indentation = subtasks). These six never match people of the file to accounts: their names go into the notes. The body
+indentation = subtasks). These seven never match people of the file to accounts: their names go into the notes. The body
 is `multipart/form-data` with the file in `file` and these optional fields:
 
 | Field | Values | |

@@ -6,7 +6,7 @@
 // AAD "kalmido-lfile:v1:<list>:<gen>", over u32 header length | header JSON {name, type, size} | the file bytes.
 // The attachment row keeps the name as a list cipher (field "file_name"), so the list shows names without loading files.
 const LE2F = {aid: new Map(), tried: new Set(), busy: false};
-const LE2F_HEAD = 9, LE2F_MAX = 50 * 1024 * 1024;
+const LE2F_HEAD = 9;
 const le2fAad = (lid, g) => `kalmido-lfile:v1:${lid}:${g}`;
 const le2fBusy = () => le2eErr(tr('This project is being encrypted. Try again in a moment.'), 'list_e2e_busy');
 
@@ -45,8 +45,7 @@ const le2fBlob = u => new Blob([u], {type: 'application/octet-stream'});
 async function le2eFileParts(lid, files) {
   if (!le2eOn(lid)) return null;
   if (le2eMode(lid) !== 'on') throw le2fBusy();
-  const big = files.find(f => f.size > LE2F_MAX);
-  if (big) throw le2eErr(tr('{0} is larger than 50 MB', big.name), 'size');
+  const lim = upLimit(files); if (lim) throw le2eErr(lim, 'size');  // 2.363.3 (#3134)
   const out = [];
   for (const [i, f] of files.entries()) {
     const name = f.name || `${tr('Image')}-${Date.now()}-${i}.${(f.type.split('/')[1] || 'png').replace('jpeg', 'jpg')}`;

@@ -13,7 +13,9 @@ const moActive = () => S.route.mod === 'tasks' && S.route.key === 'assigned';
 const moOwn = () => moActive() && moView() === 'own';
 // what counts as mine: assigned to me or one of my groups; without collaboration every task of my lists (#1344: always shown)
 const moPred = () => collab() ? mineAssigned : mineTask;
-const moFromState = j => { mtFromState(j); return OUT.q.some(e => e.url === '/api/tasks/mine-order') ? (S.mineOrder || {}) : (j.mine_order || {}); };
+// 2.363.3 (#3133): S.mineBase = the order the server confirmed, sent as _prev: an order that waited offline does not overwrite one set elsewhere
+const moIds = o => Object.entries(o).sort((a, b) => a[1] - b[1]).map(x => +x[0]);
+const moFromState = j => { mtFromState(j); if (OUT.q.some(e => e.url === '/api/tasks/mine-order')) return S.mineOrder || {}; S.mineBase = moIds(j.mine_order || {}); return j.mine_order || {}; };
 const moPos = t => { const p = S.mineOrder?.[t.id]; return p == null ? null : +p; };
 function moCmp(a, b) {
   const x = moPos(a), y = moPos(b);
@@ -31,7 +33,12 @@ function moAll() {
 async function moSave(ids) {
   S.mineOrder = Object.fromEntries(ids.map((id, i) => [id, i]));
   render();
-  try { await api('PUT', '/api/tasks/mine-order', {ids: ids.filter(id => id > 0)}); } catch { /* api() showed it; offline it waits in the outbox */ }
+  const send = ids.filter(id => id > 0), seen = S.mineBase;
+  S.mineBase = send;  // the next drag builds on this one
+  try {
+    const r = await api('PUT', '/api/tasks/mine-order', {ids: send, ...(seen ? {_prev: {ids: seen}} : {})});
+    if (r?.order_kept) { toast(tr(MO_KEPT)); await load(); render(); }
+  } catch { if (S.mineBase === send) S.mineBase = seen; /* api() showed it; the server never confirmed this order; offline it waits in the outbox */ }
 }
 // dnd.js dropTask0: a drop onto a row of "My tasks" -> true when handled here (never a change of tasks.sort)
 async function moDrop(t, row, after) {
@@ -45,6 +52,7 @@ async function moDrop(t, row, after) {
   if (moView() === 'lists' && target.list_id !== t.list_id) {  // grouped: into another group = into that list
     if (!canEditList(target.list_id)) { roToast(); return true; }
     if (tlkHits(t, {list_id: target.list_id})) { tlkToast(t); render(); return true; }  // a locked task keeps its list
+    if (!await mv_ask([t.id], listById(target.list_id))) return true;  // 2.455.0 (#3848)
     S.mineOrder = Object.fromEntries(ids.map((id, i) => [id, i]));
     try { await patchUndoable(t.id, {list_id: target.list_id, section_id: null}, tr('Moved to {0}', lname(listById(target.list_id)))); } catch { return true; }
   }

@@ -113,6 +113,7 @@ def _user_bytes(c, uids):
     k = sum(c.execute(f"SELECT COALESCE(SUM(size),0) FROM {t} WHERE created_by IN ({q})", uids).fetchone()[0]
             for t in ("office_meal_files", "office_contract_files"))
     t_ = c.execute(f"SELECT COALESCE(SUM(size),0) FROM tchat_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.113.1 (#2059): team chat files
+    t_ += c.execute(f"SELECT COALESCE(SUM(size),0) FROM template_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.363.3 (#3134)
     return int(a + b + d + e + g + h + k + t_)
 
 

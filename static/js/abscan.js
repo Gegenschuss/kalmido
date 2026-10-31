@@ -39,10 +39,10 @@ function abm_scanOpen(o = {}) {
   onRemove(md, free);
   const draw = () => {
     const box = $('#abs-pages', md); if (!box) return;
-    box.innerHTML = pages.length ? pages.map((p, i) => `<div class="abscpg" role="listitem" data-pg="${i}"><span class="abscimg">${p.url ? `<img src="${p.url}" alt="${esc(tr('Page {0}', i + 1))}" style="transform:rotate(${p.rot}deg)">` : ic('picture')}</span>
+    box.innerHTML = pages.length ? pages.map((p, i) => `<div class="abscpg" role="listitem" data-pg="${i}">${rowd_grip('pg')}<span class="abscimg">${p.url ? `<img src="${p.url}" alt="${esc(tr('Page {0}', i + 1))}" style="transform:rotate(${p.rot}deg)">` : ic('picture')}</span>
       <span class="abscno">${esc(tr('Page {0}', i + 1))}</span><span class="abscacts">
-      <button type="button" class="iconbtn" data-abp="up" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move page {0} up', i + 1))}" title="${esc(tr('Move up'))}">${ic('up', 's')}</button>
-      <button type="button" class="iconbtn" data-abp="down" ${i < pages.length - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move page {0} down', i + 1))}" title="${esc(tr('Move down'))}">${ic('down', 's')}</button>
+      ${rowd_arrows(`<button type="button" class="iconbtn" data-abp="up" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move page {0} up', i + 1))}" title="${esc(tr('Move up'))}">${ic('up', 's')}</button>
+      <button type="button" class="iconbtn" data-abp="down" ${i < pages.length - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move page {0} down', i + 1))}" title="${esc(tr('Move down'))}">${ic('down', 's')}</button>`)}
       <button type="button" class="iconbtn" data-abp="rot" aria-label="${esc(tr('Turn page {0}', i + 1))}" title="${esc(tr('Turn by 90 degrees'))}">${ic('redo', 's')}</button>
       <button type="button" class="iconbtn" data-abp="del" aria-label="${esc(tr('Remove page {0}', i + 1))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button></span></div>`).join('')
       : `<div class="muted abscempty">${tr('Photograph the first page. Each further photo becomes the next page of the PDF.')}</div>`;
@@ -50,6 +50,7 @@ function abm_scanOpen(o = {}) {
     const sh = $('.abscshot span', md); if (sh) sh.textContent = pages.length ? tr('Next page') : tr('Take a page');
   };
   draw();
+  rowd_attach(md, {kind: 'pg', row: '.abscpg', move: (from, to) => { pages.splice(to, 0, pages.splice(from, 1)[0]); draw(); }});  // 2.456.0 (#3837)
   md.addEventListener('change', async e => {
     if (/** @type {any} */ (e.target).id !== 'abs-file') return;
     const fs = [...(/** @type {any} */ (e.target).files || [])].filter(f => /^image\//.test(f.type) || !f.type); /** @type {any} */ (e.target).value = '';

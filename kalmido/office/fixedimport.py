@@ -2,15 +2,15 @@
 actual state".
 
 Import, two steps (office_gate + office_org with the admin of the office area, like every route of the cash flow):
-  1. POST /api/office/fixed-costs/import/preview (multipart 'file', .xlsx up to 2 MB, at most 500 rows): every row of the
-     first sheet below its header row -> new / dup / error with a reason. Nothing is stored.
+  1. POST /api/office/fixed-costs/import/preview (multipart 'file', .xlsx / .xls / CSV up to 2 MB, at most 500 rows): every row
+     of the first sheet with a header row below it -> new / dup / error with a reason. Nothing is stored.
   2. POST /api/office/fixed-costs/import {items: [...]}: the rows the person kept (VAT rates changed there); every row is
      checked again with rk_fixed_clean (nothing from the client unchecked), MAX_FIXED counted, one transaction.
 Format: a header row with "Name", "Betrag (netto)" (also "Betrag", "netto"), "fällig Monat" (also "Monat", 2.449.0 (#3768): the same in fr / es / it / nl); optional
 "Kategorie", "USt", "Wiederholung". A row with a name but no amount is a group row: the category of the rows below it.
 Month 0 = monthly from 2026-01-01, 1..12 = yearly in that month (2026-MM-01); quarterly (by the name or the column
 "Wiederholung") with a month X = four yearly rows X, X+3, X+6, X+9; a contradiction name / month: the month wins.
-The spreadsheet is read by legacyimport.fi_xlsx_read (zip budget, entity guard, only the cells' text; formulas are never
+The spreadsheet is read by legacyimport.fi_book (zip budget, entity guard, only the cells' text; formulas are never
 evaluated, their stored value is the text)."""
 import io
 import math
@@ -30,6 +30,7 @@ from ..core.pg import insert_id
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .cashflow import MAX_FIXED, _ctx, fci_gross, rk_fixed, rk_fixed_clean
+from .legacyimport import _upload, fi_book, fx_run, fx_settle
 from .model import office_settings, office_settings_lock, office_settings_save
 from ..core.access import my_inbox  # 2.149.0 G (#2517): pulled up from functions
 
@@ -118,14 +119,8 @@ def _vat(v):
     return r if abs(f - r) < 0.01 and r in (0, 7, 19) else "bad"
 
 
-def fci_preview(c, oid, raw):
-    """{rows: [{row, label, amount, gross, repeat, start, month, category, vat_rate, status new|dup|error, reason, sel,
-    part}], counts: {new, dup, error}, header: [...]}."""
-    from .legacyimport import fi_xlsx_read
-    sheets = fi_xlsx_read(raw)
-    grid = next(iter(sheets.values()), None) if sheets else None
-    if not grid:
-        raise BadInput(tr("The spreadsheet is empty"))
+def fci_head(grid):
+    """(column map, index of the header row) of a sheet's rows, (None, 0) without a header row."""
     cols, hi = None, 0
     heads = []
     for i, row in enumerate(grid[:20]):
@@ -146,6 +141,22 @@ def fci_preview(c, oid, raw):
                 if j is not None:
                     cols, hi = {**m, "label": j}, i
                     break
+    return cols, hi
+
+
+def fci_preview(c, oid, raw, name=""):
+    """{rows: [{row, label, amount, gross, repeat, start, month, category, vat_rate, status new|dup|error, reason, sel,
+    part}], counts: {new, dup, error}, header: [...]}.
+    2.363.2 (#3106): also .xls / CSV (fi_book); the first sheet with a header row counts, not simply the first sheet."""
+    grids = [g for g in fi_book(raw, name).values() if g]
+    if not grids:
+        raise BadInput(tr("The spreadsheet is empty"))
+    grid, cols, hi = grids[0], None, 0
+    for g in grids:
+        cols, hi = fci_head(g)
+        if cols is not None:
+            grid = g
+            break
     if cols is None:
         raise BadInput(tr("No header row with the columns Name and Amount (net) found"))
     body_rows = [(hi + 2 + k, r) for k, r in enumerate(grid[hi + 1:])]
@@ -225,11 +236,10 @@ def fci_preview(c, oid, raw):
 
 @app.post("/api/office/fixed-costs/import/preview")
 def fci_preview_post():
-    """Office admin. multipart 'file' (.xlsx) -> fci_preview. Nothing is stored."""
-    from .legacyimport import _upload
+    """Office admin. multipart 'file' (.xlsx, .xls, CSV) -> fci_preview. Nothing is stored."""
     c, uid, oid = _ctx()
-    _f, raw = _upload("file", FCI_FILE_MAX)
-    return jsonify(fci_preview(c, oid, raw))
+    f, raw = _upload("file", FCI_FILE_MAX)
+    return jsonify(fci_preview(c, oid, raw, f.filename or ""))
 
 
 def fci_seen(c, oid):
@@ -247,16 +257,19 @@ def fci_clean_rows(items):
         try:
             rows.append(rk_fixed_clean({k: it.get(k) for k in ("label", "amount", "repeat", "start", "until", "category", "vat_rate", "sub", "notice_days")}))  # 2.91.0 B (#1924): + sub, notice_days
         except BadInput as x:
-            raise BadInput(tr("Row {0}: {1}", i + 1, str(x.args[0] if x.args else x))) from None
+            # 2.363.2 (#3106): the row of the sheet when the preview sent it
+            no = it["row"] if isinstance(it.get("row"), int) and not isinstance(it.get("row"), bool) else i + 1
+            raise BadInput(tr("Row {0}: {1}", no, str(x.args[0] if x.args else x))) from None
     return rows
 
 
-def fci_write(c, uid, oid, items, detail=None, kept=None):
+def fci_write(c, uid, oid, items, detail=None, kept=None, run=False):
     """2.68.0 (#1839): the writing part of the import (the spreadsheet and the agent's import proposal): every row checked
     again (fci_clean_rows), all or nothing, MAX_FIXED counted under the area's lock, one office log line. No commit.
     Returns the new ids. 2.269.0 D (#3046): a row the area already has (fci_key, as in the preview) is skipped unless it
     carries dup_ok (the person ticked a row the preview marked "Already there"): sent twice (two tabs, a retry) = once.
-    kept (a list): gets the items actually written, in the order of the returned ids (the import proposal keeps them)."""
+    kept (a list): gets the items actually written, in the order of the returned ids (the import proposal keeps them).
+    2.363.2 (#3104): run = an entry in the import runs (the import proposal has its own undo on the job)."""
     from .ledger import ofx_log
     rows = fci_clean_rows(items)
     write_lock(c, f"office_fixed_{int(oid)}")
@@ -275,6 +288,8 @@ def fci_write(c, uid, oid, items, detail=None, kept=None):
         row = oc_enc_fields(c, oid, "office_fixed_costs", row)
         ids.append(insert_id(c, f"INSERT INTO office_fixed_costs({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())))
     ofx_log(c, oid, "import", target="fixed_costs", detail={"count": len(ids), **(detail or {})})
+    if run:
+        fx_run(c, oid, uid, "fixed_costs", ids)
     return ids
 
 
@@ -289,10 +304,20 @@ def fci_import_post():
         raise BadInput(tr("Invalid data"))
     if len(items) > FCI_ROWS_MAX * 4:
         raise BadInput(tr("Too many rows (at most {0})", FCI_ROWS_MAX * 4))
-    ids = fci_write(c, uid, oid, items)  # 2.68.0 (#1839): shared with the agent's import proposal (agents/importprop.py)
+    ids = fci_write(c, uid, oid, items, run=True)  # 2.68.0 (#1839): shared with the agent's import proposal (agents/importprop.py)
     bump(c)
     c.commit()
     return jsonify(created=len(ids), ids=ids, skipped=len(items) - len(ids)), 201  # 2.269.0 D (#3046): + skipped (already there)
+
+
+def fci_remove(c, oid, ids):
+    """2.272.0 C (#3027): deletes the fixed costs `ids` of the area unchanged since they were made (updated_at = created_at, no
+    reminder sent). -> how many went. No commit."""
+    if not ids:
+        return 0
+    q = ",".join("?" * len(ids))
+    return c.execute(f"""DELETE FROM office_fixed_costs f WHERE org_id=? AND id IN ({q}) AND updated_at=created_at
+                         AND NOT EXISTS (SELECT 1 FROM office_sub_reminders r WHERE r.fixed_id=f.id)""", [oid] + ids).rowcount
 
 
 @app.post("/api/office/fixed-costs/delete")
@@ -308,8 +333,8 @@ def fci_delete_many():
     ids = sorted(set(ids))
     q = ",".join("?" * len(ids))
     have = c.execute(f"SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=? AND id IN ({q})", [oid] + ids).fetchone()[0] if ids else 0
-    n = c.execute(f"""DELETE FROM office_fixed_costs f WHERE org_id=? AND id IN ({q}) AND updated_at=created_at
-                      AND NOT EXISTS (SELECT 1 FROM office_sub_reminders r WHERE r.fixed_id=f.id)""", [oid] + ids).rowcount if ids else 0
+    n = fci_remove(c, oid, ids)
+    fx_settle(c, oid, uid, "fixed_costs")  # 2.363.2 (#3104)
     bump(c)
     c.commit()
     return jsonify(ok=True, deleted=n, kept=have - n)

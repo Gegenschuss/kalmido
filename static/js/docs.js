@@ -423,7 +423,13 @@ async function dc_mdClick(e) {
     if (hand && !await askConfirm(tr('Recognise again?'), tr('Values set by hand stay: {0}', hand), {ok: tr('Recognise again')})) return;
     const r = await api('POST', `/api/docs/${d.id}/redo`).catch(() => null);
     DC.doc = r || d; dc_mdDraw(md); dc_load();
-    if (r?.kept?.length) toast(tr('Not replaced, set by hand: {0}', r.kept.map(f => names[f]).filter(Boolean).join(', ')));
+    if (!r) return;
+    const redraw = x => { if (DC.doc?.id === d.id) { DC.doc = x; if (md.isConnected) dc_mdDraw(md); } dc_load(); return {}; };
+    // 2.363.3 (#3134): the run can be taken back (server: the values from before, kept 24 h)
+    histToast(r.kept?.length ? tr('Not replaced, set by hand: {0}', r.kept.map(f => names[f]).filter(Boolean).join(', ')) : tr('Recognising again'),
+      histAdd({label: tr('Recognising again'),
+        undo: async () => redraw(await api('POST', `/api/docs/${d.id}/redo/undo`)),
+        redo: async () => redraw(await api('POST', `/api/docs/${d.id}/redo`))}));
     return;
   }
   if (a === 'take' || a.startsWith('take:') || a === 'takeall') {

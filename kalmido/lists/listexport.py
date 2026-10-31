@@ -4,8 +4,10 @@ An app route (session cookie) like the time sheet's CSV; agents have /api/v1/tas
 (static/js/listprint.js). Same rules as reading the list: who cannot see it gets 404, participants get only their own tasks
 (tvis, the tasks they may change: no context parents), a list with the lock (end-to-end encrypted) has only ciphertext here (409; the client does not offer it).
 2.145.0 C (#2431): more columns, appended after the old ones (importers / sheets of users keep working): start, deadline,
-duration, tracked time, created / completed by, milestone, sprint and the checklist as one cell. Comments, attachments and the
-project description stay out (the printable view has the project head, #2432)."""
+duration, tracked time, created / completed by, milestone, sprint and the checklist as one cell. The texts of comments, the files
+and the project description stay out (the printable view has the project head, #2432).
+2.363.3 (#3134): + repeat, reminders, dependencies (the titles of the blockers the person may see) and the number of comments and
+attachments, empty at none: the CSV import keeps what it does not know as lines in the notes, a 0 would only add noise there."""
 import csv
 import io
 import json
@@ -74,7 +76,7 @@ def lex_extra(c, uid, lid, rows, ids):
     task view's total (time_totals: finished entries the user may see); subs: subtasks per parent the user may change (tvis)."""
     from ..collab.comments import h6r_shared_people, user_names
     from ..personal.timetrack import evis, th_sql
-    out = {"names": {}, "ms": {}, "sprints": {}, "secs": {}, "subs": {}}
+    out = {"names": {}, "ms": {}, "sprints": {}, "secs": {}, "subs": {}, "deps": {}, "ncom": {}, "natt": {}}
     if not ids:
         return out
     q = ",".join(str(int(i)) for i in ids)
@@ -96,6 +98,13 @@ def lex_extra(c, uid, lid, rows, ids):
     for r in c.execute(f"""SELECT parent_id, title, status FROM tasks t WHERE parent_id IN ({q}) AND deleted_at IS NULL
                              AND {tvis(c, uid, 't.', write=True)} ORDER BY sort, id"""):
         out["subs"].setdefault(r["parent_id"], []).append(r)
+    # 2.363.3 (#3134): the blockers the user may see (they can sit in another list), the numbers of comments and files of the task
+    for r in c.execute(f"""SELECT d.task_id, t.title FROM task_deps d JOIN tasks t ON t.id=d.blocker_id WHERE d.task_id IN ({q})
+                             AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()} AND {tvis(c, uid, 't.')} ORDER BY t.sort, t.id""", (uid, uid)):
+        out["deps"].setdefault(r["task_id"], []).append(r["title"])
+    out["ncom"] = {r[0]: r[1] for r in c.execute(f"SELECT task_id, COUNT(*) FROM comments WHERE task_id IN ({q}) AND deleted_at IS NULL GROUP BY task_id")}
+    out["natt"] = {r[0]: r[1] for r in c.execute(f"""SELECT task_id, COUNT(*) FROM attachments WHERE task_id IN ({q}) AND comment_id IS NULL
+                                                     AND deleted_at IS NULL GROUP BY task_id""")}
     return out
 
 
@@ -138,7 +147,8 @@ def lex_csv(lid):
     w.writerow([tr("Title"), tr("Status"), tr("Due"), tr("Priority"), tr("Tags"), tr("Assignee"), tr("Section"), tr("Parent task"),
                 tr("Description"), tr("Completed"), tr("Created")] + [_csv_cell(f["name"]) for f in fields]
               + [tr("Start date"), tr("Deadline"), tr("Duration (h)"), tr("Tracked time (h)"), tr("Created by"), tr("Completed by"),
-                 tr("Milestone"), tr("Sprint"), tr("Checklist")])
+                 tr("Milestone"), tr("Sprint"), tr("Checklist"),
+                 tr("Repeat"), tr("Reminders"), tr("Dependencies"), tr("Comments"), tr("Attachments")])  # 2.363.3 (#3134)
     for r in rows:
         due = (r["due"] or "") + (" " + r["due_time"] if r["due"] and r["due_time"] else "")
         st = tr("Completed") if r["status"] == 2 else tr("Won’t do") if r["status"] == -1 else tr("Open|report")  # 2.145.0 C (#2431): the state, not the verb (de "Offen")
@@ -151,7 +161,9 @@ def lex_csv(lid):
                       hrs(x["secs"].get(r["id"], 0)), _csv_cell(x["names"].get(r["created_by"], "")),
                       _csv_cell(x["names"].get(r["completed_by"], "") if r["status"] == 2 else ""),
                       _csv_cell(x["ms"].get(r["milestone_id"], "")), _csv_cell(x["sprints"].get(r["sprint_id"], "")),
-                      _csv_cell(lex_checklist(r["content"], x["subs"].get(r["id"], [])))])
+                      _csv_cell(lex_checklist(r["content"], x["subs"].get(r["id"], []))),
+                      _csv_cell(r["repeat"] or ""), _csv_cell(r["reminders"] or ""), _csv_cell(", ".join(x["deps"].get(r["id"], []))),
+                      x["ncom"].get(r["id"]) or "", x["natt"].get(r["id"]) or ""])
     name = re.sub(r"[^A-Za-z0-9._-]", "_", f"{lex_name(c, lid)}-{local_now().date().isoformat()}") + ".csv"
     return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})

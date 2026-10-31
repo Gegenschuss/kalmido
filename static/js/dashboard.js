@@ -205,12 +205,12 @@ function lyHtml(v, parts, o = {}) {
 }
 function lyEditor(v, o = {}) {
   const d = LY[v], pr = lyPref(v, {std: S.ly.std}), {order, hidden, size, fixed} = pr, bs = lyBlocks(v), A = lyAct(v), n = order.length;
-  const desk = !isMobile();
+  const desk = !isMobile(), nat = desk && !rowd_touch();  // 2.456.0 (#3837): nat = the browser's row drag, else the grip (rowd_attach)
   const rows = order.map((k, i) => { const [_, nm, icon] = bs.find(b => b[0] === k), sz = size(k);
-    return `<li data-k="${k}" ${desk ? 'draggable="true"' : ''} tabindex="-1">${desk ? `<span class="lyg" aria-hidden="true">${ic('grip', 's')}</span>` : ''}${ic(icon, 's')}<span class="dcl">${esc(tr(nm))}</span>
+    return `<li data-k="${k}" ${nat ? 'draggable="true"' : ''} tabindex="-1">${nat ? `<span class="lyg" aria-hidden="true">${ic('grip', 's')}</span>` : rowd_grip('ly')}${ic(icon, 's')}<span class="dcl">${esc(tr(nm))}</span>
       ${d.nosize || !desk ? '' : `<button type="button" class="btn sm lysz" data-act="ly-size" data-lyv="${v}" data-k="${k}" aria-pressed="${sz === 'full'}" title="${esc(tr('Width'))}" aria-label="${esc(tr('Width') + ': ' + tr(nm) + ', ' + (sz === 'full' ? tr('full width') : tr('half width')))}">${sz === 'full' ? tr('Full') : tr('Half')}</button>`}
-      <button type="button" class="iconbtn" data-act="${A}-mv" data-lyv="${v}" data-k="${k}" data-d="-1" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + tr(nm))}">${ic('up', 's')}</button>
-      <button type="button" class="iconbtn" data-act="${A}-mv" data-lyv="${v}" data-k="${k}" data-d="1" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + tr(nm))}">${ic('down', 's')}</button>
+      ${rowd_arrows(`<button type="button" class="iconbtn" data-act="${A}-mv" data-lyv="${v}" data-k="${k}" data-d="-1" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + tr(nm))}">${ic('up', 's')}</button>
+      <button type="button" class="iconbtn" data-act="${A}-mv" data-lyv="${v}" data-k="${k}" data-d="1" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + tr(nm))}">${ic('down', 's')}</button>`)}
       <label class="swc"><input type="checkbox" data-dshow="${k}" data-lyv="${v}" ${hidden.has(k) ? '' : 'checked'} ${fixed.has(k) ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show {0}', tr(nm)))}</span></label></li>`; }).join('');
   const scope = o.canStd ? `<div class="seg lyscope" role="group" aria-label="${esc(tr('Arrangement for'))}"><button type="button" class="${S.ly.std ? '' : 'on'}" aria-pressed="${!S.ly.std}" data-act="ly-scope" data-lyv="${v}" data-k="mine">${tr('Only for me')}</button><button type="button" class="${S.ly.std ? 'on' : ''}" aria-pressed="${S.ly.std}" data-act="ly-scope" data-lyv="${v}" data-k="std">${tr('Standard for everyone')}</button></div>` : '';
   const ph = `<label class="chkl lyph"><input type="checkbox" data-lyphone="${v}" ${pr.mobile ? 'checked' : ''}> ${tr('Different on the phone')}</label>${pr.mobile ? `<div class="seg" role="group" aria-label="${esc(tr('Arrangement for'))}"><button type="button" class="${S.ly.phone ? '' : 'on'}" aria-pressed="${!S.ly.phone}" data-act="ly-dev" data-lyv="${v}" data-k="0">${tr('Computer')}</button><button type="button" class="${S.ly.phone ? 'on' : ''}" aria-pressed="${S.ly.phone}" data-act="ly-dev" data-lyv="${v}" data-k="1">${tr('Phone|device')}</button></div>` : ''}`;
@@ -218,7 +218,7 @@ function lyEditor(v, o = {}) {
   // 2.35.0 (#1097): the blocks right in the view (drag them by the handle, on a phone hold a block; hide, width at the
   // block; hidden ones at the bottom), the list with the arrows stays below for the keyboard and screen readers
   const list = `<details class="lylist" ${LS.get('lyList', true) ? 'open' : ''}><summary>${ic('chev', 's fcar')}<span>${tr('Order as a list')}</span></summary>
-    <ol class="dcust" aria-label="${esc(v === 'home' ? tr('Cards') : tr('Blocks'))}" aria-describedby="lyhint-${v}">${rows}</ol><p class="muted lyhint" id="lyhint-${v}"${desk ? ` title="${esc(tr('Alt + arrow keys move the focused row.'))}"` : ''}>${desk ? tr('Drag a row or use the arrows.') : tr('Use the arrows to change the order.')}</p></details>`;
+    <ol class="dcust" aria-label="${esc(v === 'home' ? tr('Cards') : tr('Blocks'))}" aria-describedby="lyhint-${v}">${rows}</ol><p class="muted lyhint" id="lyhint-${v}"${nat ? ` title="${esc(tr('Alt + arrow keys move the focused row.'))}"` : ''}>${nat ? tr('Drag a row or use the arrows.') : tr('Hold the handle, then drag it.')}</p></details>`;
   return `<div class="lyed" data-lyed="${v}"><div class="dashhead"><h2>${esc(d.title())}</h2><span class="spacer"></span><button type="button" class="btn sm pri" data-act="${A}-done" data-lyv="${v}">${tr('Done')}</button></div>
     <div class="lyopts">${scope}${ph}</div>${typeof lyv_edBar === 'function' ? lyv_edBar(v) : ''}
     ${lydragCanvas(v, pr, o.parts || {})}
@@ -291,6 +291,11 @@ document.addEventListener('drop', e => {
   const v = li.closest('.lyed').dataset.lyed, k = lyDrag, to = li.dataset.k; lyDrag = null;
   if (k !== to) lydragDo(v, st => { const i = st.order.indexOf(k), j = st.order.indexOf(to); st.order.splice(i, 1); st.order.splice(j, 0, k); }, tr('Moved'));  // 2.35.0: undoable
 });
+// 2.456.0 (#3837): a phone: hold the grip, then drag
+rowd_attach(document, {kind: 'ly', row: 'li', move: (from, to, li, ol) => {
+  const k = li.dataset.k;
+  lydragDo(ol.closest('.lyed').dataset.lyed, st => { st.order.splice(st.order.indexOf(k), 1); st.order.splice(to, 0, k); }, tr('Moved'));
+}});
 
 // Today and Time tracking (2.32.0): the first views on the builder; the blocks a view does not show right now simply stay out
 LY.today = {key: 'view_today', empty: '', title: () => tr('Customize Today'), blocks: () => [['brief', N_('Briefing'), 'sunrise', 'full'], ['wait', N_('Waiting for you'), 'hourglass', 'full'], ['review', N_('Daily review'), 'journal', 'full'],

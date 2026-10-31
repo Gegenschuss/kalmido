@@ -135,15 +135,21 @@ def csv_delim(lines):
 def csv_table(text, max_rows=CSV_ROWS):
     """CSV text -> (delimiter, header, rows): the header is the first row with the most common column count (bank
     exports start with a few lines about the account)."""
+    return csv_table_numbered(text, max_rows)[:3]
+
+
+def csv_table_numbered(text, max_rows=CSV_ROWS):
+    """csv_table + the spreadsheet row of each body row (2.363.2, #3106: blank rows and lines above the header count there)."""
     text = csv_decode(text)
     lines = text.split("\n")
     d = csv_delim(lines)
     try:
-        rows = [r for r in csv.reader(io.StringIO(text), delimiter=d) if any(x.strip() for x in r)]
+        numbered = [(n, r) for n, r in enumerate(csv.reader(io.StringIO(text), delimiter=d), 1) if any(x.strip() for x in r)]
     except csv.Error:
         raise _bad(tr("The file cannot be read as CSV")) from None
-    if not rows:
+    if not numbered:
         raise _bad(tr("The file is empty"))
+    nums, rows = zip(*numbered)
     if len(rows) > max_rows + 50:
         raise _bad(tr("At most {0} rows per import", max_rows))
     lens = [len(r) for r in rows]
@@ -151,7 +157,7 @@ def csv_table(text, max_rows=CSV_ROWS):
     hi = next(i for i, r in enumerate(rows) if len(r) == common)
     header = [x.strip()[:80] for x in rows[hi]]
     body = [[x.strip() for x in r] for r in rows[hi + 1:]]
-    return d, header, body
+    return d, header, body, list(nums[hi + 1:])
 
 
 def amount_text(s, dec=None):
@@ -349,7 +355,10 @@ def csv_row(r, m, title_max=CSV_TEXT_MAX, cp_max=CSV_TEXT_MAX, amount_max=CSV_AM
         elif a_out:  # the debit column: written with or without a minus, always out
             amt = -abs(a_out)
     title = (col("title") or col("counterpart")).strip()
-    out["title"] = re.sub(r"\s+", " ", title)[:title_max]
+    full = re.sub(r"\s+", " ", title)
+    out["title"] = full[:title_max]
+    if len(full) > title_max:
+        out["cut"] = True  # 2.363.3 (#3134): the import dialog says so
     if out["day"] is None:
         out["error"] = tr("The date cannot be read")
     elif m.get("sign") is not None and m.get("amount") is not None and amt is None and csv_sign(col("sign")) is None:

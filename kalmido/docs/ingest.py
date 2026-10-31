@@ -168,6 +168,7 @@ def docs_run_once():
             _Q["scan"] = time.monotonic()
             with system_ctx(c):  # docs queue: server-side recognition of every workspace's documents, nothing handed to a person
                 inbox_scan(c)
+                S.redo_purge(c)  # 2.363.3 (#3134)
             c.commit()
         stale = iso(now_utc() - timedelta(minutes=RUN_STALE))
         with system_ctx(c):  # docs queue: server-side recognition of every workspace's documents, nothing handed to a person

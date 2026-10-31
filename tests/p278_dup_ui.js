@@ -66,7 +66,7 @@ const FEAT = 'comments,collab,progress';
     check(await openMenuEntry(), 'the list menu has "Duplicate list…"');
     check(await until(`!!document.querySelector('.modal.ldmodal #ld-name')`), 'dialog');
     const dlg = await ev(`(() => { const m = document.querySelector('.modal.ldmodal'); return {h: m.querySelector('h3').textContent, v: m.querySelector('#ld-name').value, done: m.querySelector('#ld-done').checked, hint: m.querySelector('.shint').textContent}; })()`);
-    check(dlg.h === 'Duplicate “Harbour site”' && dlg.v === 'Harbour site (copy)' && dlg.done === false && /Members, shares and assignees do not/.test(dlg.hint), 'dialog: title, name, box off, hint ' + JSON.stringify(dlg));
+    check(dlg.h === 'Duplicate “Harbour site”' && dlg.v === 'Harbour site (copy)' && dlg.done === false && /Members and shares do not/.test(dlg.hint), 'dialog: title, name, box off, hint ' + JSON.stringify(dlg));
     await sleep(600); await shot('p278-dialog-desktop.png');
     const C1 = await dup(false);
     check(JSON.stringify(await titles(C1)) === JSON.stringify(['Survey the quay']), 'default copy: open tasks only');

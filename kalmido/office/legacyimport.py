@@ -610,6 +610,7 @@ def sr_role_rows(c, oid, book, kind):
     t = sr_table(book, *spec["tables"])
     if t is None:
         return None
+    at = fi_head_at(book, *spec["tables"])
     head, rows = t
     head = [eq_head(h) for h in head]
     ix = {f: _col(head, *n) for f, n in spec["cols"].items()}
@@ -622,7 +623,7 @@ def sr_role_rows(c, oid, book, kind):
         nm = get("name_de")
         if not nm or SEP_RE.match(nm):
             continue
-        e = {"row": i + 2, "name_de": nm[:200]}
+        e = {"row": i + at + 2, "name_de": nm[:200]}  # 2.363.2 (#3106): the row in Excel, also below title rows
         for f in spec["cols"]:
             if f in SR_NUMS:
                 e[f] = _num(get(f))
@@ -929,6 +930,7 @@ def fi_preview(c, oid, raw, name="", amap=None):
     if t:
         head, rows = t
         have = sr_have(c, oid, "services", "name_de")
+        at = fi_head_at(book, "services", "leistungen")
         ix = {k: _col(head, *v) for k, v in {"de": ("servicede", "service", "leistung"), "en": ("serviceen",), "day": ("dailyrate", "tagessatz"),
                                               "hour": ("hourlyrate", "stundensatz"), "raw": ("rawfee",), "prod": ("producingfee", "producing"),
                                               "order": ("order", "sort"), "cat": ("category", "kategorie"), "role": ("freelancer", "role"),
@@ -947,7 +949,7 @@ def fi_preview(c, oid, raw, name="", amap=None):
             if not de:
                 continue
             day, hour = _num(cell(row, "day")), _num(cell(row, "hour"))
-            s = {"row": i + 2, "name_de": de[:200], "name_en": cell(row, "en")[:200], "category": (cell(row, "cat") or cat)[:80],
+            s = {"row": i + at + 2, "name_de": de[:200], "name_en": cell(row, "en")[:200], "category": (cell(row, "cat") or cat)[:80],
                  "daily_rate": day, "hourly_rate": hour, "unit": "hour" if hour is not None and day is None else "day",
                  "raw_fee": _flag01(cell(row, "raw")), "producing": _flag01(cell(row, "prod")),
                  "role": cell(row, "role")[:80], "intext": sr_intext(cell(row, "ie"))}  # 2.47.0 (#1649): also shooting
@@ -976,6 +978,7 @@ def fi_preview(c, oid, raw, name="", amap=None):
     if t:
         head, rows = t
         have = sr_have(c, oid, "equipment", "name", "name_en")  # 2.47.0 (#1648): name -> row (to fill)
+        at = fi_head_at(book, "equipment", "geräte", "technik")
         # 2.45.1 (#1556): "Device DE" / "Device EN" (spaces, underscores, hyphens and case do not matter); DE before the plain names
         head = [eq_head(h) for h in head]
         ni = _col(head, "devicede", "gerätde", "geraetde", "namede", "device", "name", "gerät", "geraet")
@@ -1004,7 +1007,7 @@ def fi_preview(c, oid, raw, name="", amap=None):
                     by_id[rid_]["action"] = "fill" if by_id[rid_]["fill"] else "skip"
                 names.add(nm.lower())
                 continue
-            e = {"row": i + 2, "name": nm[:200], "name_en": en[:200], "category": (cell(row, cti) or cat)[:80],
+            e = {"row": i + at + 2, "name": nm[:200], "name_en": en[:200], "category": (cell(row, cti) or cat)[:80],
                  "daily_rate": _num(sr_cell(row[di])) if di is not None and di < len(row) else None}
             e["dup"] = any(v in have or v in names for v in {nm.lower(), en.lower()} - {""})  # 2.45.1 (#1556): either name
             cur = have.get(nm.lower()) or have.get(en.lower())
@@ -1033,6 +1036,58 @@ def _run_new(c, oid, uid, kind):
     return insert_id(c, "INSERT INTO office_import_runs(org_id, kind, created_by, created_at) VALUES(?,?,?,?)", (oid, kind, uid, iso(now_utc())))
 
 
+# 2.363.2 (#3104): the imports of fixed costs, trips and leads are runs too: {kind: (table, what still counts as there)}.
+FX_RUNS = {"fixed_costs": ("office_fixed_costs", ""), "trips": ("office_trips", ""), "leads": ("office_deals", " AND t.deleted_at IS NULL")}
+FX_UNDO_LATE = N_("This import is older than 24 hours and can no longer be undone.")
+
+
+def fx_run(c, oid, uid, kind, ids):
+    """A run for the new rows `ids` of kind (no rows: no run). Their rows carry the run id, like the master data. No commit."""
+    if not ids:
+        return None
+    rid = _run_new(c, oid, uid, kind)
+    c.execute("UPDATE office_import_runs SET counts=? WHERE id=? AND org_id=?", (json.dumps({kind: len(ids)}), rid, oid))
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        c.execute(f"UPDATE {FX_RUNS[kind][0]} SET import_run_id=? WHERE org_id=? AND id IN ({','.join('?' * len(part))})", [rid, oid] + part)
+    return rid
+
+
+def fx_settle(c, oid, uid, kind):
+    """The runs of kind with nothing left (the toast's undo, every row deleted by hand) count as undone. No commit."""
+    table, alive = FX_RUNS[kind]
+    c.execute(f"""UPDATE office_import_runs r SET undone_at=?, undone_by=? WHERE org_id=? AND kind=? AND undone_at IS NULL
+                  AND NOT EXISTS (SELECT 1 FROM {table} t WHERE t.org_id=r.org_id AND t.import_run_id=r.id{alive})""",
+              (iso(now_utc()), uid, oid, kind))
+
+
+def fx_undo(c, oid, uid, r):
+    """Undoes a run of FX_RUNS within OLK_UNDO_HOURS, by the rules of the toast's undo (what changed since stays).
+    -> as fi_undo."""
+    if r["undone_at"]:
+        raise Denied(409, tr("This import has already been undone"))
+    try:
+        at = parse_iso(r["created_at"])
+    except (TypeError, ValueError):
+        at = None
+    if at is None or now_utc() - at > timedelta(hours=OLK_UNDO_HOURS):
+        raise Denied(409, tr(FX_UNDO_LATE))
+    kind = r["kind"]
+    table, alive = FX_RUNS[kind]
+    ids = [x[0] for x in c.execute(f"SELECT t.id FROM {table} t WHERE t.org_id=? AND t.import_run_id=?{alive} ORDER BY t.id", (oid, r["id"]))]
+    if kind == "fixed_costs":
+        from .fixedimport import fci_remove
+        n = fci_remove(c, oid, ids)
+    elif kind == "trips":
+        from .vmaimport import vmi_remove
+        n = vmi_remove(c, oid, ids)["deleted"]
+    else:
+        from .leads import lead_bin
+        n = lead_bin(c, oid, ids)
+    c.execute("UPDATE office_import_runs SET undone_at=?, undone_by=? WHERE id=? AND org_id=?", (iso(now_utc()), uid, r["id"], oid))
+    return {kind: n}, {"entries": len(ids) - n}, [], []
+
+
 def _run_row(c, oid, rid):
     r = c.execute("SELECT * FROM office_import_runs WHERE id=? AND org_id=?", (rid, oid)).fetchone()
     if not r:
@@ -1057,13 +1112,13 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=N
             try:
                 tid = int(x.get("merge_id"))
             except (TypeError, ValueError):
-                raise BadInput(tr("Invalid value: {0}", "merge_id")) from None
+                raise BadInput(tr("The chosen client no longer exists")) from None
         else:
             tid = made.get(x.get("contact_row"))
             if not tid:
                 raise BadInput(tr("The client of row {0} is not imported", x.get("contact_row") if isinstance(x.get("contact_row"), int) else "?"))
         if not c.execute(f"SELECT 1 FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (tid,)).fetchone():
-            raise BadInput(tr("Invalid value: {0}", "merge_id"))
+            raise BadInput(tr("The chosen client no longer exists"))
         name = str(x.get("contact") or "").strip()
         if not name:
             raise BadInput(tr("Name missing"))
@@ -1081,10 +1136,10 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=N
         try:
             mid = int(x.get("merge_id"))
         except (TypeError, ValueError):
-            raise BadInput(tr("Invalid value: {0}", "merge_id")) from None
+            raise BadInput(tr("The chosen client no longer exists")) from None
         cur = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (mid,)).fetchone()
         if not cur:
-            raise BadInput(tr("Invalid value: {0}", "merge_id"))
+            raise BadInput(tr("The chosen client no longer exists"))
         f.pop("name", None)
         f = clean_client(c, uid, f)
         fill = {k: v for k, v in f.items() if k in MERGE_FIELDS and v and not (cur[k] or "").strip()}
@@ -1099,7 +1154,7 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=N
         counts["merged"] += 1
         return
     if act != "new":
-        raise BadInput(tr("Invalid value: {0}", "action"))
+        raise BadInput(tr("Unknown choice for this row"))
     # 2.269.0 D (#3046): sent again (two tabs, a retry) = a client that is there by now is skipped like in the preview;
     # dup_ok = the person chose "new" for a row the preview found (pre = the clients before this run)
     if pre and x.get("dup_ok") not in (1, True, "1"):
@@ -1214,7 +1269,7 @@ def sr_import_rows(c, oid, rid, kind, rows, cols, counts, filled, resolve=None):
             names = [str(x.get(n) or "").strip().lower() for n in SR_NAMES[kind]]
             cur = next((have[n] for n in names if n and n in have), None)
             if not cur:
-                raise BadInput(tr("Row {0}: {1}", x.get("row") if isinstance(x.get("row"), int) else "?", tr("Invalid value: {0}", "action")))
+                raise BadInput(tr("Row {0}: {1}", x.get("row") if isinstance(x.get("row"), int) else "?", tr("Unknown choice for this row")))
             f = sr_fill(kind, cur, vals)
             if not f:
                 counts["skipped"] += 1
@@ -1228,7 +1283,7 @@ def sr_import_rows(c, oid, rid, kind, rows, cols, counts, filled, resolve=None):
             counts[kind + "_filled"] = counts.get(kind + "_filled", 0) + 1
             continue
         if act != "new":
-            raise BadInput(tr("Invalid value: {0}", "action"))
+            raise BadInput(tr("Row {0}: {1}", x.get("row") if isinstance(x.get("row"), int) else "?", tr("Unknown choice for this row")))
         # 2.269.0 D (#3046): sent again = a row of that name there by now is skipped (the preview's dup = "new" on purpose)
         nm = str(x.get(SR_NAMES[kind][0]) or "").strip().lower()
         if nm and not x.get("dup") and nm in have:
@@ -1362,6 +1417,8 @@ def fi_undo(c, oid, uid, rid, kinds=None):
     if r["kind"] == "datev_archive":  # 2.414.0 (#3502): a run of the booking archive (office/bookarch.py)
         from .bookarch import ba_undo
         return ba_undo(c, oid, uid, r)
+    if r["kind"] in FX_RUNS:
+        return fx_undo(c, oid, uid, r)
     if r["undone_at"]:
         raise Denied(409, tr("This import has already been undone"))
     detail = bk_detail(r)

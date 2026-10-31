@@ -732,24 +732,33 @@ async function waitClear(id) {
 // menus): date · priority · assignee · list / section · waiting · pin · time · template · structure · delete. The short
 // menus (swipe, selection) keep the same order and end with "All…".
 const PRIO_ROW = id => { const t = taskById(id); return {row: [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', on: t?.priority === p, title: tr('Priority') + ': ' + tr(n), fn: () => patchTask(id, {priority: p})}))}; };
-const moveListItem = (anchor, id) => ({label: tr('Move to project…'), icon: 'list', keys: 'm', fn: () => { const t = taskById(id); if (tlkStop(t)) return; tch_listPicker(anchor, {filter: l => l.id !== t?.list_id && canAddTo(l.id), pick: l => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))}); }});
+// 2.455.0 (#3848): the task's own workspace; the other ones through moveWsItem, the entry beside it (spacemove.js)
+const mv_taskO = id => ({filter: l => l.id !== taskById(id)?.list_id && canAddTo(l.id), pick: l => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))});
+const moveListItem = (anchor, id) => ({label: tr('Move to project…'), icon: 'list', keys: 'm', fn: () => { if (!tlkStop(taskById(id))) mv_picker(anchor, [id], mv_taskO(id)); }});
+const moveWsItem = (anchor, id) => { const m = mv_wsItem(anchor, [id], mv_taskO(id)); return m && {...m, fn: () => { if (!tlkStop(taskById(id))) m.fn(); }}; };
 // 2.38.0 (#1177): ONE list picker for "Move to list…" (task menu, a note, the Inbox's move button): the Inbox first, then the
 // lists in the sidebar's order; a folder is only a heading with its lists indented below it (a subfolder one step deeper).
 // opts: filter(list) = which lists, pick(list) = what a choice does, title = the sheet's title (default "Move to list")
 // 2.435.0 (#3606): pre = menu items on top (e.g. "No project"), first = {head, lists, rest} a group on top (e.g. the client's
 // projects) with the other lists below the heading rest, on = the current list's id (a check), search = a search field
 // from this many entries
+// 2.455.0 (#3848): ws = only this workspace's projects (and the Basket), 'all' = every project under its workspace's heading
 function tch_listPicker(anchor, o = {}) {
-  const top = o.first?.lists || [], ok = l => !!l && !l.archived && (!o.filter || o.filter(l)), ib = inbox();
+  const top = o.first?.lists || [], ok = l => !!l && !l.archived && (!o.ws || inWs(l, o.ws)) && (!o.filter || o.filter(l)), ib = inbox();
   const it = l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, cls: 'tch-l', on: !!o.on && l.id === o.on, fn: () => o.pick(l)});
   const ls = sideOrder().filter(l => ok(l) && !top.includes(l)), rows = [...(o.pre || [])];
   if (top.length) rows.push({head: o.first.head, keep: true}, ...sideOrder().filter(l => top.includes(l) && ok(l)).map(it), {head: o.first.rest || tr('Other projects'), keep: true});
-  rows.push(...(ok(ib) && !top.includes(ib) ? [it(ib)] : []), ...ls.filter(l => !l.folder).map(it));
-  for (const f of folderNames()) {
-    const fl = ls.filter(l => l.folder === f), sub = !!fParent(f);
-    if (!fl.length && (sub || !ls.some(l => fUnder(l.folder, f)))) continue;  // a folder without lists here is left out
-    rows.push({head: sub ? fName(f) : f, cls: 'tch-fd' + (sub ? ' tch-fd2' : ''), keep: !sub}, ...fl.map(it));
-  }
+  rows.push(...(ok(ib) && !top.includes(ib) ? [it(ib)] : []));
+  const part = pl => {
+    rows.push(...pl.filter(l => !l.folder).map(it));
+    for (const f of folderNames()) {
+      const fl = pl.filter(l => l.folder === f), sub = !!fParent(f);
+      if (!fl.length && (sub || !pl.some(l => fUnder(l.folder, f)))) continue;  // a folder without lists here is left out
+      rows.push({head: sub ? fName(f) : f, cls: 'tch-fd' + (sub ? ' tch-fd2' : ''), keep: !sub}, ...fl.map(it));
+    }
+  };
+  if (o.ws === 'all' && wsOn()) for (const w of mv_wss(ls)) { const pl = ls.filter(l => wsOf(l) === w); if (pl.length) { rows.push({head: wsName(w), cls: 'tch-ws', keep: true}); part(pl); } }
+  else part(ls);
   const p = menu(anchor, rows, null, null, o.title || tr('Move to project'));
   if (o.search && rows.filter(r => !r.head).length >= o.search) tch_menuSearch(p);
   return p;
@@ -798,7 +807,7 @@ function taskMenu(anchor, id, o = {}) {
     ...(collab() && l?.shared && t.id > 0 && !t.context && canAssign(t) && pz_show(t, 'who', t.assignee_id || t.assignee_group_id) ? [{label: tr('Assign…'), icon: 'user', fn: () => assignMenu(anchor, id)}] : []),
     {head: tr('Organize')},
     // where it lives
-    ...(open ? [moveListItem(anchor, id)] : []),
+    ...(open ? [moveListItem(anchor, id), moveWsItem(anchor, id)] : []),
     ...(open ? ml_menuItems(anchor, t) : []),  // 2.71.0 B (#1459): show also in another list / remove from it
     ...(open && !t.parent_id && (S.sections.some(x => x.list_id === t.list_id) || canEditList(t.list_id)) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, id)}] : []),
     ...(open ? spr_menuItems(t, anchor) : []),  // 2.60.0 (#343): Sprint… (lists with sprints on)
@@ -825,7 +834,7 @@ function taskMenu(anchor, id, o = {}) {
     {head: tr('Structure')},
     // template
     {label: tr('Save as template'), icon: 'copy', fn: () => saveTemplate({task_id: id}, t.title), ...(listById(t.list_id)?.e2e ? {dis: true, title: tr('Not available in encrypted projects')} : {})},  // 2.64.1 (#1817)
-    {label: tr('Duplicate'), icon: 'sub', fn: async () => { const sn = await snipLoad(t).catch(() => []); let note = t.content; if (tkNoteMissing(t)) { try { note = await tkNoteLoad(t.id); } catch { toast(tr('Only available online.')); return; } } return createTask({title: t.title, content: note, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {}), ...(sn.length ? {snippets: sn.map(({id, by, updated_at, ...x}) => x)} : {})}); }, ...(typeof le2eLocked === 'function' && le2eLocked(t) ? {dis: true, title: tr('Unlock first: this project is encrypted in the browser.')} : {})},  // 2.35.0 (#1095): the snippets come along (loaded first); 2.64.1 (#1817): not while its texts are locked; 2.280.0 A (#3108): a long note too
+    {label: tr('Duplicate'), icon: 'sub', fn: () => taskDuplicate(t, async () => { const sn = await snipLoad(t).catch(() => []); let note = t.content; if (tkNoteMissing(t)) { try { note = await tkNoteLoad(t.id); } catch { toast(tr('Only available online.')); return; } } return createTask({title: t.title, content: note, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {}), ...(sn.length ? {snippets: sn.map(({id, by, updated_at, ...x}) => x)} : {})}); }), ...(typeof le2eLocked === 'function' && le2eLocked(t) ? {dis: true, title: tr('Unlock first: this project is encrypted in the browser.')} : {})},  // 2.35.0 (#1095): the snippets come along (loaded first); 2.64.1 (#1817): not while its texts are locked; 2.280.0 A (#3108): a long note too
     ...(t.id > 0 && !t.context && !t.url ? [{label: tr('Add link'), icon: 'link', fn: () => linkAdd(id)}] : []),  // 2.41.0 (#1475)
     ...(t.id > 0 && !t.context && canEdit(t) && !snipShown(t) && pz_on(t.list_id, 'repo') ? [{label: tr('Add code snippet'), icon: 'code', fn: () => snipOpen(id, 'new')}] : []),  // 2.35.0 (#1095)
     // structure + more

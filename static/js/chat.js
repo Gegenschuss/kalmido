@@ -175,6 +175,7 @@ function tcMentions(text) {
 async function tcSend() {
   const ta = $('#tc-in'), rid = S.tc.rid; if (!ta || !rid) return;
   const text = ta.value.trim(), files = tcx_filesOk(S.tc.room) ? S.tc.files[rid] || [] : []; if (!text && !files.length) return;  // 2.113.1 (#2059): + files
+  const lim = upLimit(files); if (lim) { toast(lim); return; }  // 2.363.3 (#3134): the text stays in the box
   chatSentOnce();
   const hadF = document.activeElement === ta, ck = 't:' + rid; if (csdBusy(ck)) return;  // 2.62.0 (#1530): one send at a time
   const p = csdAdd(ck, text, S.tc.msgs), sb = () => $('[data-act="tc-send"]');  // shown as "Sending…", the box empties at once
@@ -535,8 +536,8 @@ function tcx_chipsSync() { const b = $('#tc-files'); if (b) b.innerHTML = tcx_ch
 function tcx_addFiles(files, rid = S.tc.rid) {
   if (!rid || !tcx_filesOk(S.tc.room)) { if (files?.length) toast(S.tc.room?.archived ? tr('This channel is archived') : tr('Files cannot be sent in an end-to-end encrypted conversation')); return; }
   files = noEmpty(files); if (!files.length) return;
-  const big = files.find(f => f.size > 50 * 1024 * 1024);
-  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); files = files.filter(f => f !== big); }
+  const lim = upLimit(files, true);  // 2.363.3 (#3134)
+  if (lim) { toast(lim); files = files.filter(upFits); }
   const arr = S.tc.files[rid] ||= [];
   arr.push(...files.slice(0, Math.max(0, 10 - arr.length)));
   if (arr.length >= 10 && files.length) toast(tr('At most {0} files per message', 10));

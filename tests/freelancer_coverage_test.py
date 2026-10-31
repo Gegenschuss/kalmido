@@ -256,7 +256,7 @@ ROUTES = {
     # 2.112.1 A (#2058): several nodes into the trash / back, the ZIP download, the phone scan (p21121_a_api_test.py)
     "POST /api/files/trash": "files", "POST /api/files/restore": "files", "GET /api/files/zip": "files", "POST /api/files/scan": "files",
     "POST /api/docs": "files", "POST /api/docs/labels/{}": "files", "POST /api/docs/mail": "files",
-    "POST /api/docs/rules": "files", "POST /api/docs/{}/accept": "files", "POST /api/docs/{}/redo": "files",
+    "POST /api/docs/rules": "files", "POST /api/docs/{}/accept": "files", "POST /api/docs/{}/redo": "files", "POST /api/docs/{}/redo/undo": "files",
     "POST /api/docs/{}/review": "files", "POST /api/docs/{}/task": "files", "POST /api/files/folders": "files",
     "POST /api/files/links": "files", "POST /api/files/nodes/{}/restore": "files", "POST /api/files/nodes/{}/shares": "files",
     "POST /api/files/nodes/{}/order": "files", "POST /api/files/refs": "files", "GET /api/files/refs/{}/{}": "files",  # 2.199.0 A (#2742): p2199_a_fsref_test.py
@@ -719,7 +719,7 @@ ROUTES = {
     "POST /api/comments/{}/choice": "tasks", "POST /api/comments/{}/decide": "tasks",
     "POST /api/comments/{}/reactions": "tasks", "POST /api/deps": "tasks", "POST /api/envs/{}/deploy": "tasks",
     "POST /api/envs/{}/restore": "tasks", "POST /api/favorites/suggestion": "tasks", "GET /api/favorites/targets": "tasks", "POST /api/ical": "tasks",
-    "POST /api/import/ticktick": "tasks", "POST /api/import/{}": "tasks", "POST /api/imports/{}/undo": "tasks",
+    "POST /api/import/{}": "tasks", "POST /api/imports/{}/undo": "tasks",
     "POST /api/list-checks/{}/run": "tasks", "POST /api/news/dismiss": "tasks", "POST /api/news/read": "tasks",
     "POST /api/pdf-text": "tasks", "POST /api/pomo/start": "tasks", "POST /api/pomo/{}/{}": "tasks",
     "POST /api/repos/{}/refresh": "tasks", "POST /api/sample": "tasks", "POST /api/sprints/{}/close": "tasks",
@@ -729,7 +729,7 @@ ROUTES = {
     "POST /api/tasks/{}/attachments": "tasks", "POST /api/tasks/{}/bell/undo": "tasks",
     "POST /api/tasks/{}/chain/pull": "tasks", "POST /api/tasks/{}/comments": "tasks", "POST /api/tasks/{}/complete": "tasks",
     "POST /api/tasks/{}/contacts": "tasks", "POST /api/tasks/{}/editing": "tasks",
-    "POST /api/tasks/{}/enc-attachments": "tasks", "POST /api/tasks/{}/git-undo": "tasks", "POST /api/tasks/{}/links": "tasks",
+    "POST /api/tasks/{}/duplicate": "tasks", "POST /api/tasks/{}/enc-attachments": "tasks", "POST /api/tasks/{}/git-undo": "tasks", "POST /api/tasks/{}/links": "tasks",
     "POST /api/tasks/{}/list-attachments": "tasks", "POST /api/tasks/{}/reopen": "tasks",
     "POST /api/tasks/{}/restore": "tasks", "POST /api/tasks/{}/review": "tasks", "POST /api/tasks/{}/seen": "tasks",
     "POST /api/tasks/{}/skip": "tasks", "POST /api/tasks/{}/take": "tasks", "POST /api/tasks/{}/to-shopping": "tasks",
@@ -1146,7 +1146,6 @@ DELETE /api/tasks/{}/enc-note
 DELETE /api/tasks/{}/links/{}
 DELETE /api/tasks/{}/note-lock
 DELETE /api/tasks/{}/waiting
-DELETE /api/templates/{}
 DELETE /api/v1/address-books/{}
 DELETE /api/v1/address-books/{}/members/{}
 DELETE /api/v1/attachments/{}
@@ -1209,7 +1208,6 @@ PATCH /api/office/meals/choices/{}
 PATCH /api/office/trips/purposes/{}
 PATCH /api/office/trips/{}/items/{}
 PATCH /api/office/vehicles/{}
-PATCH /api/sections/{}
 PATCH /api/servers/self
 PATCH /api/servers/{}
 PATCH /api/servers/{}/tasks/{}
@@ -1217,7 +1215,6 @@ PATCH /api/supporter/nudge
 PATCH /api/tasks/{}/links/{}
 PATCH /api/tasks/{}/ticket
 PATCH /api/team/dispo/bookings/{}
-PATCH /api/templates/{}
 PATCH /api/v1/address-books/{}
 PATCH /api/v1/clients/{}
 PATCH /api/v1/comments/{}
@@ -1295,7 +1292,6 @@ POST /api/habits/{}/log
 POST /api/hubmail/mailbox/check
 POST /api/hubmail/mails/{}/assign
 POST /api/ical
-POST /api/imports/{}/undo
 POST /api/layouts/offers
 POST /api/layouts/offers/{}/accept
 POST /api/layouts/offers/{}/decline
@@ -1320,7 +1316,6 @@ POST /api/lists/{}/folder-reset
 POST /api/lists/{}/header
 POST /api/lists/{}/icon
 POST /api/lists/{}/join
-POST /api/lists/{}/links
 POST /api/lists/{}/milestones
 POST /api/lists/{}/notepads
 POST /api/lists/{}/playbook/proposals/{}/apply

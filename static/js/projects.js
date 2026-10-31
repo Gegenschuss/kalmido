@@ -238,6 +238,18 @@ function povFlHtml(lid, k, rows, names) {
   return `${many ? `<input type="search" class="povfq" data-k="${k}" placeholder="${esc(tr('Search files'))}" aria-label="${esc(tr('Search files'))}" autocomplete="off">` : ''}<div class="povfl${many && all ? ' all' : ''}" data-k="${k}">${items.join('')}</div>`
     + (many ? `<button type="button" class="linkbtn povmore" data-pov="fl-more" data-k="${k}" aria-expanded="${all}">${all ? tr('Show less') : tr('Show all {0}', rows.length)}</button>` : '');
 }
+// 2.456.0 (#3837): a key link to another place, by the arrow and by dragging; attached once, at the first draw (this script
+// loads before drag.js)
+async function povLinkMove(l, j, i, to) {
+  const ids = j.links.map(x => x.id); ids.splice(to, 0, ids.splice(i, 1)[0]);
+  try { await povApi('PUT', `/api/lists/${l.id}/links/order`, {ids}); } catch { /* shown */ }
+}
+let povRowdOn = false;
+function povRowd() {
+  if (povRowdOn) return;
+  povRowdOn = true;
+  rowd_attach(document, {kind: 'lnk', row: '.povl', move: (from, to) => { const l = routeList(), j = l && S.povD[l.id]?.j; return j && povLinkMove(l, j, from, to); }});
+}
 function viewProjOv() {
   const l = routeList(), d = S.povD[l.id];
   if (!d || (!d.busy && d.v !== S.v)) setTimeout(() => povLoad(l.id), 0);
@@ -275,8 +287,9 @@ function viewProjOv() {
   P.files = x => povSec('files', tr('Project files'), `${povFlHtml(l.id, 'files', filesA, j.files.map(f => f.name))}
       ${tfN ? `<details class="povtf" ${LS.get('povTf', tfN <= POV_FL_N) /* 2.331.0 A (#3307): from 9 entries closed until opened by hand */ ? 'open' : ''}><summary>${tr('Attachments from tasks')} <span class="muted">${j.task_files.length}</span></summary>${povFlHtml(l.id, 'tf', tf, j.task_files.map(f => f.name))}</details>` : ''}${(j.files_trash || []).length ? povTrashHtml(j, can) : ''}`, fAdd + x, emp(fEmpty && !(j.files_trash || []).length, tr('No files yet: contracts, briefings, plans.')));
   // side: key links, members, time
-  const links = j.links.map((x, i) => `<div class="povl">${flkLink(x.url, 'povla', `${ic(povLinkIcon(x.url), 's')}<span class="pln">${esc(x.title)}</span><span class="muted plh">${esc(povHost(x.url))}</span>`)}
-      ${can ? `<span class="povlb">${i ? `<button class="iconbtn" data-pov="link-up" data-id="${x.id}" title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up'))}">${ic('chev', 's up')}</button>` : ''}<button class="iconbtn" data-pov="link-edit" data-id="${x.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button></span>` : ''}</div>`).join('');
+  if (can) povRowd();
+  const links = j.links.map((x, i) => `<div class="povl">${can ? rowd_grip('lnk') : ''}${flkLink(x.url, 'povla', `${ic(povLinkIcon(x.url), 's')}<span class="pln">${esc(x.title)}</span><span class="muted plh">${esc(povHost(x.url))}</span>`)}
+      ${can ? `<span class="povlb">${i ? rowd_arrows(`<button class="iconbtn" data-pov="link-up" data-id="${x.id}" title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up'))}">${ic('chev', 's up')}</button>`) : ''}<button class="iconbtn" data-pov="link-edit" data-id="${x.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button></span>` : ''}</div>`).join('');
   P.links = x => povSec('links', tr('Key links'), links, (can ? `<button class="btn sm" data-pov="link-add">${ic('plus', 's')}<span>${tr('Add link')}</span></button>` : '') + x, emp(!links, tr('No links yet: repository, designs, documents.')));
   if (collab() && j.members.length) {
     P.people = x => povSec('people', tr('Members'), `<div class="povp">${j.members.map(p => `<div class="povpm">${avBtn(p.user_id, p.name)}<span class="ppn">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}</span><span class="muted">${esc(roleLabel(p.role))}</span></div>`).join('')}</div>`,
@@ -360,8 +373,7 @@ function povMsModal(l, m) {
 async function povUpload(l, files) {
   files = noEmpty(files);
   if (!files.length) return;
-  const max = 50 * 1024 * 1024, big = files.find(f => f.size > max);
-  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
+  const lim = upLimit(files); if (lim) { toast(lim); return; }  // 2.363.3 (#3134)
   const fd = new FormData();
   files.forEach(f => fd.append('file', f, f.name));
   toast(files.length === 1 ? tr('Uploading…') : tr('Uploading {0} files…', files.length));
@@ -397,7 +409,7 @@ document.addEventListener('click', async e => {
       delete S.drafts['pov:' + l.id]; delete S.drafts[ka]; renderView(); toast(tr('Saved')); break; }
     case 'link-add': povLinkModal(l, null); break;
     case 'link-edit': povLinkModal(l, j.links.find(x => x.id === id)); break;
-    case 'link-up': { const ids = j.links.map(x => x.id), i = ids.indexOf(id); if (i > 0) { [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; try { await povApi('PUT', `/api/lists/${l.id}/links/order`, {ids}); } catch { /* shown */ } } break; }
+    case 'link-up': { const i = j.links.findIndex(x => x.id === id); if (i > 0) await povLinkMove(l, j, i, i - 1); break; }
     case 'ms-add': povMsModal(l, null); break;
     case 'ms-edit': povMsModal(l, j.milestones.find(x => x.id === id)); break;
     case 'ms-open': openDetail(id); break;  // 2.18.0 (#430): milestones are tasks (progress, burndown, release notes there)

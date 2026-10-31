@@ -342,6 +342,7 @@ registering the ones of its area.
 | `countries.js` | 2.40.0: the country picker (names from the browser, ISO 3166 alpha-2 codes) of the client card, company data and import preview. |
 | `collab.js` | News and comments + activity (module "collab"). |
 | `attachments.js` | Attachments and the share target. |
+| `upbar.js` | 2.363.3 (#3134): upload progress with Cancel. `rawFetch0` sends every form with at least 1 MB of files through `upSend` (XHR), so all file dialogs share one bar; Cancel ends only while the body is on its way. `upLimit` in `attachments.js` holds the server's limit for all file dialogs. |
 | `pdfview.js` | 2.48.0 (#1367): the PDF preview `pdfView({url, name, size, dlUrl})` (lightbox: pages drawn on demand, turn pages, zoom, swipe, a clear message offline or for a damaged file) for attachments, project files, office documents and archive PDFs; links carry `data-pview`. Uses the bundled pdf.js (`static/vendor/pdfjs/`, loaded on first use, `isEvalSupported: false`, no scripting). |
 | `undo.js` | Undo / redo history. |
 | `popovers.js` | Popovers (date, priority, list, tags, reminders, repeat ...). |
@@ -494,6 +495,13 @@ a second finger or a cancel event, and swallows the click after a drag. The call
 2.193.0 A (#2219): the calendar (`caldrag.js`: the 15-minute grid in `onMove`, `scroll` = the hours, touch after a 0.4 s
 hold) and the mind map (`mindmap.js`: rehanging a branch, the drop target in map coordinates; moving the map and pinch stay
 its own pointer handling) use it.
+
+2.456.0 (#3837): the order of the rows of a list is the same gesture everywhere: `rowd_attach(root, {kind, row, move})` in
+`drag.js` on `drg_attach`. The grip (`data-rowd="kind"`, `rowd_grip` / `rowd_attr`; a position's symbol where the row is full
+of fields) drags with a mouse at once, with a finger after a 0.38 s hold; a line shows where the row lands, `move(from, to,
+row, list)` saves with the same code as the arrows. `rowd_arrows` keeps the arrows on a computer for the keyboard and leaves
+them out on a touch screen (no hover). Used by quotation positions and parts, form questions, budget categories, the
+arrangements, sidebar views, key links, scanned pages and the phone list of "Arrange blocks".
 
 2.193.0 C (#2219): task rows and chips (`dnd.js`, list / board / matrix / calendar, the selection's grip) drag by finger
 on `drg_attach`: the long press is `hold` (0.38 s, 8 px; 0 on the grip), `onHold` lifts the row at once (ghost, "Move to

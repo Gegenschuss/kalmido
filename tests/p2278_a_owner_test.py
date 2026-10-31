@@ -9,6 +9,7 @@ Invented names only.
    unknown role = member); their rows stay with dave, no project is shared with them; bob accepts and is admin.
  - 2.363.0 (#3132): the ticked projects are noted on the invitation (a resend keeps them), accepting shares them, owner and
    creator stay with dave; a project in the trash is skipped; declining drops the note.
+ - 2.456.0 (#3821): the former owner of a project is no row of list_members and gets it shared all the same.
  - P4: a person without organisation imports the same archive into the private space: nobody is invited, the ticked
    person gets the projects shared as before.
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY.
@@ -200,6 +201,8 @@ check(NL and one("SELECT created_by FROM tasks WHERE list_id=? AND title='Aufgab
 check(NL and not one("SELECT 1 FROM list_members WHERE list_id=? AND user_id IN (?,?,?)", (NL, ALICE, BOB, CAROL)), "no project shared with the invited")
 check(Bo.post(B + f"/api/orgs/{GAMMA}/join").ok, "bob accepts the invitation")
 check(one("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (GAMMA, BOB)) == "admin", "bob: member of Gamma as admin")
+check(one("SELECT role FROM list_members WHERE list_id=? AND user_id=?", (NL, BOB)) == "edit" and one("SELECT owner_id FROM lists WHERE id=?", (NL,)) == DAVE,
+      "#3821: bob, the project's owner in the file, gets it shared like the members; the owner stays dave")
 # 2.363.0 (#3132): the ticked projects are noted on the invitation and shared on accepting
 PEND = one("SELECT pending_lists FROM org_joins WHERE org_id=? AND user_id=?", (GAMMA, ALICE)) or ""
 check(json.loads(PEND or "[]") == [[NL, "edit", DAVE]], f"#3132: the ticked project is noted with its role and the importing admin {PEND}")

@@ -122,6 +122,7 @@ UMZ_READ = frozenset((
     "event_attendees", "journal", "mailbox", "settings", "people", "server_links",
     "e2e_keys",  # 2.278.0: the browser keys
     "notes", "task_enc_notes",  # 2.362.0 (#3090): project notes, my encrypted task notes
+    "sprints", "task_links", "list_rules", "portal_tickets",  # 2.455.0 (#3469)
 ))
 UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is empty; a name used twice adds up
     (N_("Tables"), ("sheets", "sheet_columns", "sheet_rows", "sheet_cells", "sheet_files", "sheet_hist")),
@@ -147,6 +148,7 @@ UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is
     (N_("Tasks in other projects"), ("other_tasks",)), (N_("Tasks I take part in"), ("task_people",)), (N_("Reactions"), ("reactions",)),
     (N_("Stars"), ("kid_stars",)), (N_("Received notifications"), ("notifications",)), (N_("Sign-ins"), ("sessions",)),
     (N_("Push devices"), ("push_devices",)), (N_("Agent chat settings"), ("agent_chat_prefs",)),
+    (N_("Files of templates"), ("template_files",)),  # #3134
 )
 
 _UMI = {}  # user id -> running check / import thread
@@ -448,6 +450,9 @@ def umz_org_open(zf, names, man, mraw, full):
     lists = {}
     for m in data.pop("list_members", []):
         lists.setdefault(_oid(m.get("user_id")), {})[str(_oid(m.get("list_id")))] = m.get("role")
+    for r in data.get("lists", []):  # 2.456.0 (#3821): the owner is no row of list_members; the project is shared like with a member
+        if _oid(r.get("owner_id")):
+            lists.setdefault(_oid(r.get("owner_id")), {}).setdefault(str(_oid(r.get("id"))), "edit")
     data["people"] = [{"user_id": _oid(m.get("id")), "name": _txt(m.get("display_name"), 100) or _txt(m.get("username"), 100),
                        "email": "" if m.get("kind") == "agent" else _txt(m.get("email"), 200), "lists": lists.get(_oid(m.get("id")), {}),
                        **({"agent": True} if m.get("kind") == "agent" else {})} for m in data.pop("members", [])]
@@ -760,6 +765,7 @@ UMZ_CHECK = {
     ("habits", "goal"): lambda v: isinstance(v, int) and 1 <= v <= 1000, ("habits", "per_week"): lambda v: isinstance(v, int) and 0 <= v <= 7,
     ("habit_logs", "day"): valid_date, ("events", "start"): _iso_ts, ("events", "end"): _iso_ts,
     ("time_entries", "start"): _iso_ts, ("time_entries", "end"): _iso_ts,
+    ("sprints", "start"): valid_date, ("sprints", "end_day"): valid_date,  # 2.455.0 (#3469): the app reads them as days
 }
 UMZ_CHECK[("tasks", "remind_at")] = valid_plan_start  # 2.111.0 C (#2057): local "YYYY-MM-DDTHH:MM", not a UTC time stamp
 
@@ -862,6 +868,8 @@ UMZ_SRC = {
     "time_entries": ("time_entries", "user_id", None), "habits": ("habits", "user_id", None), "filters": ("filters", "user_id", None),
     "templates": ("templates", "user_id", None), "books": ("books", "owner_id", None), "ev_cals": ("ev_cals", "owner_id", None),
     "contacts": ("contacts", "book_id", "books"), "events": ("events", "cal_id", "ev_cals"), "event_attendees": ("event_attendees", "event_id", "events"),
+    "sprints": ("sprints", "list_id", "lists"), "list_rules": ("list_rules", "list_id", "lists"),  # 2.455.0 (#3469)
+    "portal_tickets": ("portal_tickets", "list_id", "lists"),
 }
 
 
@@ -931,6 +939,8 @@ def umz_have(c, run, uid, rows, mine=False):
             run.task_list.update({n: x["up"] for n, x in here.items()})
         elif kind == "list_fields":
             run.field_list.update({n: x["up"] for n, x in here.items()})
+        elif kind == "sprints":  # 2.455.0 (#3469)
+            run.sprint_list.update({n: x["up"] for n, x in here.items()})
 
 
 class _Run:
@@ -944,6 +954,7 @@ class _Run:
         self.warn = {}
         self.done, self.total, self.tick = 0, max(1, total), 0
         self.task_list, self.field_list, self.list_org = {}, {}, {}
+        self.sprint_list = {}  # 2.455.0 (#3469): new sprint id -> its list
         self.written = []  # full paths of files written (removed again when the run fails)
         self.stopped = None
         self.kind = "account"  # or "org": an organisation export (part 4)
@@ -988,6 +999,63 @@ def _file_bytes(zf, files, path):
         return None
     zi, sha = files[path]
     return _read_entry(zf, zi, MAX_FILE_MB * 1024 * 1024 * 4, sha)
+
+
+def umz_part(run, lid, table, key):
+    """2.455.0 (#3469): a row on a list of an earlier import: the undo of this run takes it away (on a list of this run it stays
+    with its list, which goes into the trash and can come back)."""
+    if lid not in run.created["lists"]:
+        run.created.setdefault("parts", []).append([table, key])
+
+
+def umz_list_parts(c, run, uid, inbox, data, who):
+    """2.455.0 (#3469): after the tasks: the close-outs of the sprints, the further placements of tasks, the rules and the customer
+    reports of my lists. Every id through the maps of this run; what points at something that did not come along goes, nothing
+    here keeps an id of the old server."""
+    from .oi_team import rule_fields, rule_ids, sprint_finish, ticket_seal
+    ts = iso(now_utc())
+    sprint_finish(c, run, [r for r in data.get("sprints", []) if _oid(r.get("id")) not in run.have.get("sprints", {})])
+    for r in data.get("task_links", []):
+        run.step()
+        tid, lid = run.m("tasks", r.get("task_id")), run.m("lists", r.get("list_id"))
+        if not tid or not lid or lid == inbox or lid == run.task_list.get(tid):
+            continue
+        both = c.execute("SELECT org_id, life FROM lists WHERE id IN (?,?)", (lid, run.task_list.get(tid))).fetchall()  # the app's rule (ml_add)
+        if len(both) < 2 or both[0][0] != both[1][0] or any(x[1] in ("health", "budget") for x in both):
+            continue
+        sid = run.m("sections", r.get("section_id"))
+        if sid and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (sid, lid)).fetchone():
+            sid = None
+        d = umz_row(c, "task_links", r, {"task_id": tid, "list_id": lid, "section_id": sid, "org_id": run.list_org.get(lid), "added_by": uid}, ts)
+        if d and umz_insert(c, "task_links", d, rid=False):
+            umz_part(run, lid, "task_links", [tid, lid])
+            run.count("task_links")
+    types = rule_fields(data)
+    for r in data.get("list_rules", []):
+        run.step()
+        lid = run.m("lists", r.get("list_id"))
+        if not lid or lid == inbox or r.get("deleted_at") or run.there("list_rules", r.get("id")):
+            continue
+        d = umz_row(c, "list_rules", r, {"list_id": lid, "org_id": run.list_org.get(lid), "created_by": uid, "name": "", "trig": "", "act": "",
+                                          "updated_at": ts}, ts)
+        d = rule_ids(c, run, who, types, r, d) if d else None
+        nid = umz_insert(c, "list_rules", d) if d else None
+        if nid:
+            run.put("list_rules", r.get("id"), nid)
+            umz_part(run, lid, "list_rules", nid)
+            run.count("list_rules")
+    for r in data.get("portal_tickets", []):
+        run.step()
+        tid, lid = run.m("tasks", r.get("task_id")), run.m("lists", r.get("list_id"))
+        if not tid or not lid or lid == inbox or run.task_list.get(tid) != lid or run.there("portal_tickets", r.get("id")):
+            continue
+        d = umz_row(c, "portal_tickets", r, {"task_id": tid, "list_id": lid, "token": "", "token_hash": ""}, ts)
+        d = ticket_seal(c, run, uid, r, d) if d else None
+        nid = umz_insert(c, "portal_tickets", d) if d else None
+        if nid:
+            run.put("portal_tickets", r.get("id"), nid)
+            umz_part(run, lid, "portal_tickets", nid)
+            run.count("portal_tickets")
 
 
 def umz_write(c, run, uid, man, zf, files, data, people):
@@ -1046,7 +1114,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
     # what hangs on a list
     for table, kind, fixed in (("sections", "sections", {}), ("list_fields", "list_fields", {}), ("list_tags", "list_tags", {}),
                                ("list_status", "list_status", {"user_id": uid}), ("list_links", "list_links", {"created_by": uid}),
-                               ("list_milestones", "list_milestones", {"created_by": uid})):
+                               ("list_milestones", "list_milestones", {"created_by": uid}), ("sprints", "sprints", {"created_by": uid, "review": None, "state": "planned"})):  # 2.455.0 (#3469): both from sprint_finish, a stop before it keeps no old id
         for r in data.get(table, []):
             run.step()
             lid = run.m("lists", r.get("list_id"))
@@ -1058,6 +1126,9 @@ def umz_write(c, run, uid, man, zf, files, data, people):
                 run.put(kind, r.get("id"), nid)
                 if kind == "list_fields":
                     run.field_list[nid] = lid
+                elif kind == "sprints":  # 2.455.0 (#3469)
+                    run.sprint_list[nid] = lid
+                    umz_part(run, lid, "sprints", nid)
             if nid and table == "sections":
                 run.created["sections"].append(nid)
             if nid:
@@ -1079,7 +1150,10 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         aid = who(t.get("assignee_id"))
         if t.get("assignee_id") and not aid:
             run.warning(N_("Assignment not taken over (the person is not on this server or was not chosen)"))
+        spr = run.m("sprints", t.get("sprint_id"))  # 2.455.0 (#3469): of the same list, else the backlog
+        spr = spr if run.sprint_list.get(spr) == lid else None
         d = umz_row(c, "tasks", t, {
+            **({} if spr or man.get("kind") == "org" else {"sprint_at": None}), "sprint_id": spr,  # an organisation export: oi_write
             "list_id": lid, "section_id": sid, "title": _txt(t.get("title"), TITLE_MAX) or "…",
             "content": _txt(t.get("content"), CONTENT_MAX), "status": status, "milestone_id": run.m("list_milestones", t.get("milestone_id")),
             "created_by": uid, "completed_by": uid if status else None, "assignee_id": aid, "assigned_by": uid if aid else None,
@@ -1151,6 +1225,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         if nid:
             run.put("notes", r.get("id"), nid)
             run.count("notes")
+    umz_list_parts(c, run, uid, inbox, data, who)  # 2.455.0 (#3469)
     keys = [r for r in data.get("e2e_keys", []) if _oid(r.get("user_id")) == me_old] if run.kind != "org" else []
     if keys:  # 2.278.0 C (#3091): my key bundle -- taken while I have none here, never replacing my own keys
         k = e2e_import_keys(c, uid, keys[0], me_old)
@@ -1517,10 +1592,10 @@ def umz_run(uid, iid, opts):
             report = {**run.stats, "export_id": eid, "src": src, "target": run.org, "tasks": run.stats.get("tasks", 0), "not_taken": left}
             iid_db = None
             if any(run.created[k] for k in run.created):  # recorded with the rows (2.137.0, #2344: + "oi"): whatever happens next, undo works
-                from ..integrations.importers import imports_trim
+                from ..integrations.importers import imp_prune
                 iid_db = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
                                    (uid, UMZ_SOURCE, _txt(st.get("name"), 200), json.dumps({**run.created, "src": run.src}), json.dumps(report), iso(now_utc())))
-                imports_trim(c, uid)
+                imp_prune(c, uid)
             c.commit()
             run.written = []  # committed: the files belong to their rows now
             shared = []
@@ -1791,6 +1866,17 @@ def _thread_go(uid, fn, *args):
         t.start()
 
 
+def umz_undo_parts(c, cr):
+    """2.455.0 (#3469): the rows umz_part recorded."""
+    for table, key in reversed(cr.get("parts") or []):
+        if table == "task_links":
+            c.execute("DELETE FROM task_links WHERE task_id=? AND list_id=?", (int(key[0]), int(key[1])))
+        elif table in ("sprints", "list_rules", "portal_tickets"):
+            if table == "sprints":  # tasks.sprint_id has no foreign key
+                c.execute("UPDATE tasks SET sprint_id=NULL, sprint_at=NULL WHERE sprint_id=?", (int(key),))
+            c.execute(f"DELETE FROM {table} WHERE id=?", (int(key),))
+
+
 def umz_undo(c, uid, r):
     """Undo of an account import (called by importers.imp_undo after its own checks): everything the run created.
     2.272.0 C (#3027): tasks and lists go into the trash (restorable) instead of being deleted, and only what nobody touched
@@ -1800,6 +1886,7 @@ def umz_undo(c, uid, r):
     cr = json.loads(r["created"] or "{}")
     from .orgimport import oi_undo, oi_undo_files
     n_oi = oi_undo(c, cr)  # 2.137.0 (#2344): the areas first (they point at the lists and tasks)
+    umz_undo_parts(c, cr)  # 2.455.0 (#3469)
     own_lists = [int(x) for x in cr.get("lists") or []]
     since = parse_iso(r["created_at"])
     mine = []
