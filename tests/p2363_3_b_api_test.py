@@ -243,7 +243,7 @@ check(not rows[1].get("cut"), "a short one is not")
 
 # ================================================================ Recognise again -> Undo
 def doc(s, ws, name):
-    r = s.post(B + "/api/docs", data={"ws": ws}, files=[("files", (name, b"Rechnung 12.03.2031\nGesamt 123,45 EUR\n", "text/plain"))])
+    r = s.post(B + "/api/docs", data={"ws": ws}, files=[("files", (name, f"Rechnung 12.03.2031\nGesamt 123,45 EUR\n{name}\n".encode(), "text/plain"))])
     assert r.ok, r.text
     nid = r.json()["ids"][0]
     until(lambda: s.get(B + f"/api/docs/{nid}").json()["state"] == "done", 90)
