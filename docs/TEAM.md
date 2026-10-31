@@ -916,8 +916,12 @@ Notifications can also go to a chat service, as a short text with the link to th
   admin who switches it on again owns it.
 - **The address is a secret:** stored encrypted, never shown again (only the service, the name and the last characters).
   Editing leaves it unchanged unless you type a new one.
-- **Delivery:** in the background, one try per message with a short time limit. After 5 failed sends in a row the channel
-  turns itself off and the settings say why; switching it on again starts the count anew. Quiet hours hold back your own
+- **Your own changes:** *Changes in my own projects* leaves out what you did yourself; tick *Including my own changes* to get
+  those too. An inbound webhook and a rule count as news, even though they act in your name. An organisation's channel is a
+  team feed and always reports everybody.
+- **Delivery:** in the background with a short time limit; a failed message gets one more try after a minute. After 5 failed
+  messages in a row the channel turns itself off: the settings say why, and you (for an organisation's channel: its admins)
+  get a News item and a push (event *Integrations* in the notification settings). Switching it on again starts the count anew. Quiet hours hold back your own
   channel messages (urgent ones excepted).
 - **Addresses:** `https://` only. Addresses in your own network and plain `http://` only for hosts an admin allowed
   (*Settings > Administration > Advanced* or `KALMIDO_WEBHOOK_ALLOW_HOSTS`), the same guard as for webhooks.

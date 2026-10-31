@@ -101,6 +101,8 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_CHANNELS` | `1` | Switch: notification channels (Slack, Matrix, Telegram, Signal). |
 | `KALMIDO_CHANNEL_FAILS` | `5` | Failed deliveries in a row after which a channel is switched off. |
 | `KALMIDO_CHANNEL_TICK` | `5` | Seconds between two deliveries rounds of the channels. |
+| `KALMIDO_CHANNEL_RETRY` | `60` | Seconds until a failed channel message gets its one more try. |
+| `KALMIDO_INTEG_FAILS` | `5` | Failed polls in a row of a mailbox, git connection or ntfy inbox after which its people get a notice. |
 | `KALMIDO_DISMISS_DAY` | `30` | Removals per person and day. |
 | `KALMIDO_DISMISS_GAP` | `60` | Seconds between two such removals per person. |
 | `KALMIDO_DISMISS_WAIT` | `30` | Seconds before a read notification is removed from the other devices. |
