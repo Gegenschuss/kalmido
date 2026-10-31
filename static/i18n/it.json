@@ -15263,5 +15263,17 @@
   "Polls": "Sondaggi",
   "Holiday allowance": "Saldo ferie",
   "Privacy contact": "Contatto privacy",
-  "Links on the login page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).": "Link nella pagina di accesso, in Aiuto e nelle pagine pubbliche (moduli, portale, approvazioni, prenotazioni), ad es. alla tua informativa sulla privacy. Vuoto = nessun link (o il valore della configurazione del server)."
+  "Links on the login page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).": "Link nella pagina di accesso, in Aiuto e nelle pagine pubbliche (moduli, portale, approvazioni, prenotazioni), ad es. alla tua informativa sulla privacy. Vuoto = nessun link (o il valore della configurazione del server).",
+  "Menu points": "Voci di menu",
+  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Una voce disattivata qui scompare per tutti in questo ufficio. Non viene eliminato nulla: riattivandola torna tutto.",
+  "Comments in other projects": "Commenti in altri progetti",
+  "Channel messages": "Messaggi dei canali",
+  "Tasks in other projects": "Attività in altri progetti",
+  "Tasks I take part in": "Attività a cui partecipo",
+  "Received notifications": "Notifiche ricevute",
+  "Sign-ins": "Accessi",
+  "Push devices": "Dispositivi push",
+  "Agent chat settings": "Impostazioni delle chat degli agenti",
+  "Deleting account #{0}: {1} files kept by law stay with an instance administrator as keeper until their period ends.": "Eliminazione dell’account #{0}: {1} file conservati per legge restano affidati a un amministratore dell’istanza fino alla scadenza.",
+  "After the restore, {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log).": "Dopo il ripristino {0} organizzazioni e voci eliminate in precedenza sono state eliminate di nuovo; {1} degli ultimi {2} giorni restano, nel caso il ripristino dovesse recuperarle; {3} non si sono potute eliminare di nuovo (vedi il log del server)."
 }

@@ -79,7 +79,8 @@ for fmt in ("zugferd", "xrechnung"):
     check(ein.ein_check(x.encode()) == [], f"{fmt}: ein_check clean {ein.ein_check(x.encode())}")
     with open(os.path.join(OUT, f"invoice-p2408-final-{fmt}.xml"), "wb") as fh:
         fh.write(x.encode())
-u = ein.ein_ubl_build(M, "peppol").decode("utf-8")
+# Peppol ids like tests/p2154_b_ubl_test.py and the real send (pep_ubl): the e-mail fallback (EM) is not in the Peppol EAS list, KoSIT rejects it
+u = ein.ein_ubl_build(M, "peppol", "9930:DE123456789", "0208:0123456749").decode("utf-8")
 check('<cbc:PrepaidAmount currencyID="EUR">6318.28</cbc:PrepaidAmount>' in u and '<cbc:PayableAmount currencyID="EUR">5341.72</cbc:PayableAmount>' in u
       and '<cbc:TaxInclusiveAmount currencyID="EUR">11660.00</cbc:TaxInclusiveAmount>' in u and "RE-2026-0107" in u, "UBL: the same sums and the note")
 check(ein.ein_ubl_check(u.encode()) == [], f"UBL: ein_ubl_check clean {ein.ein_ubl_check(u.encode())}")

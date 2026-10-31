@@ -125,6 +125,7 @@ def lgc_tick(c, force=False):
             try:
                 with c.savepoint():
                     counts["deleted_accounts"] = lgc_count_del(c, "deleted_accounts", "at", "", cut, kill)
+                    counts["purged_rows"] = lgc_count_del(c, "purged_rows", "at", "", cut, kill)  # 2.360.4 (#3243)
             except Exception as e:  # noqa: BLE001
                 print("retention: logs deleted_accounts", type(e).__name__, flush=True)
         ret_report(c, "logs", counts, kill)

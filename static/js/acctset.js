@@ -805,6 +805,8 @@ async function ua8_delete(u) {
   let j; try { j = await api('GET', `/api/users/${u.id}/delete-info`); } catch { return false; }
   const name = u.display_name || u.name || '';
   if (!j.can_delete) return ua8_orgRemove(u, name, j);
+  // 2.360.4 (#3243): nobody may take over: said now, before the steps of the dialog (the server refuses it as well)
+  if (j.purge?.no_heir) { await askConfirm(tr('Delete user “{0}”?', name), j.purge.no_heir, {ok: tr('OK'), after: md => { $('[data-cd="no"]', md).hidden = true; }}); return false; }
   // 2.146.0 D (#2468): records to keep (the personal office): the retention step first (the server checks it too)
   let rx = '';
   // 2.186.0 A (#2599): records that are retired (self-hosting) need no export step: no waiver is noted

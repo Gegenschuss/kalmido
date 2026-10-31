@@ -143,6 +143,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.147.0 (#2460): office functions the admin switched off (keys of packs.PACK_FEATURES that may be
                      # switched); empty = everything the country pack offers is on, so offices from before stay as they were
                      "features_off": [],
+                     "menu_off": [],  # 2.440.0 (#3609): points of the office menu the office switched off (OFFICE_MENU_OFF)
                      # 2.189.0 (#2475): the home currency (ISO 4217; office/homecur.py: fixed by the pack, chosen only in an
                      # editable one, resolved on every read) and the office rates of foreign currencies {code: per one home unit}
                      "home_currency": "", "fx_rates": {},
@@ -154,6 +155,9 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 # 2.435.0 A (#3600): the blocks of the client card an office admin may switch off (static/js/dashboard.js LY_CL_BLOCKS;
 # the details always show)
+# 2.440.0 (#3609): the points of the office menu that can be switched off for the whole office; off = only hidden (data and
+# routes stay). The other points of Money have a function of their own (features_off, packs.PACK_FEATURES money.*)
+OFFICE_MENU_OFF = ("pipeline", "gendocs", "letters", "time", "contracts", "cashbook", "bank", "cards", "equipment", "agreements")
 CLIENT_BLOCKS = ("persons", "invoices", "month", "lists", "note", "tickets", "gendocs", "letters", "privacy")
 
 
@@ -558,6 +562,10 @@ def office_settings_clean(c, oid, b, cur):
             if not isinstance(v, list) or any(x not in CLIENT_BLOCKS for x in v):
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = [x for x in CLIENT_BLOCKS if x in v]
+        elif k == "menu_off":  # 2.440.0 (#3609): only known points; switching off hides, never deletes
+            if not isinstance(v, list) or any(x not in OFFICE_MENU_OFF for x in v):
+                raise BadInput(tr("Invalid value: {0}", k))
+            out[k] = [x for x in OFFICE_MENU_OFF if x in v]
         elif k == "features_off":  # 2.147.0 (#2460): only switchable functions; switching off hides, never deletes
             from .packs import PACK_FEATURES
             if not isinstance(v, list) or any(not isinstance(x, str) or not PACK_FEATURES.get(x, {}).get("switch") for x in v):

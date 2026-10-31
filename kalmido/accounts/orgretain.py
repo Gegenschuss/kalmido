@@ -139,6 +139,21 @@ def _until(kind, years):
     return end if end and end >= date.today().isoformat() else None
 
 
+# 2.186.0 review M1: the file-store nodes a lock can sit on; olk_fs_locked (receipts/suggest.py) decides which are kept
+# (paid / VAT, cash book, equipment, billed, doc_meta.kept_until, #2600; 2.360.4, #3243: open receipts and e-invoices too)
+UPG_DOCS = ("(EXISTS(SELECT 1 FROM rc_receipts r WHERE r.node_id=n.id) "
+            "OR EXISTS(SELECT 1 FROM doc_meta m WHERE m.node_id=n.id AND (m.kept_until IS NOT NULL OR m.extracted<>'')) "
+            "OR EXISTS(SELECT 1 FROM office_cash_entries e WHERE e.node_id=n.id) "
+            "OR EXISTS(SELECT 1 FROM office_equipment a WHERE a.receipt_node_id=n.id))")
+
+
+def odl_file_locks(c, where, arg):
+    """[(node id, last day)] of the file-store nodes matching where that deleting for good would refuse now."""
+    from ..receipts.suggest import olk_fs_locked
+    rows = [(x[0], olk_fs_locked(c, x[0], arrival=True)) for x in c.execute(f"SELECT n.id FROM fs_nodes n WHERE {where}", (arg,)).fetchall()]
+    return [x for x in rows if x[1]]
+
+
 def odl_retention(c, oid):
     """{"counts": {what: n}, "until": "YYYY-12-31" | None}: the office data of organisation (or personal office) oid that
     the law keeps, and the latest end of its periods (None = nothing to keep)."""
@@ -158,6 +173,13 @@ def odl_retention(c, oid):
         if end:
             counts["einvoices"] = len(years)
             ends.append(end)
+        # 2.360.4 (#3243): a file locked on its own (a booking taken back, doc_meta.kept_until) keeps the organisation as well:
+        # fs_nodes cascades with it, so a lock met only in the purge could not stay; it is retired instead of failing with a 409.
+        # Only these: the rest of what olk_fs_locked asks ODL_LEGAL has counted above
+        locked = odl_file_locks(c, "n.org_id=? AND EXISTS(SELECT 1 FROM doc_meta m WHERE m.node_id=n.id AND m.kept_until IS NOT NULL)", int(oid))
+        if locked:
+            counts.setdefault("receipts", len(locked))
+            ends.append(max(x[1] for x in locked))
     ends = [e for e in ends if e]
     return {"counts": counts, "until": max(ends) if ends else None}
 
@@ -261,10 +283,19 @@ def odl_former(c, uid):
     return [{"id": r["id"], "name": r["name"], "retain_until": r["retain_until"] or ""} for r in rows if int(uid) in odl_ids(r["retired_admins"])]
 
 
+def odl_public_off(c, oid):
+    """2.360.4 (#3243): before organisation oid's calendars become private (odl_retire): their subscription links go and the
+    booking pages that work for it (its office, or one of these calendars) switch off. The task and absence feeds follow the
+    membership by themselves; a new link for the calendar, now private, is the owner's own step."""
+    c.execute("DELETE FROM ev_cal_feeds WHERE cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)", (oid,))
+    c.execute("UPDATE appt_pages SET enabled=0 WHERE office_org_id=? OR cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)", (oid, oid))
+
+
 def odl_retire(c, oid, until, gone=None):
     """Retires organisation oid until `until`: members (people and agents) out, its calendars / address books stay with
-    their owners (private, as on a deletion), its agents leave it, the e-mail domains no longer let anybody in, invoice
-    series, mailboxes and the newsletter sync stop; the data, the file store and the key stay. The caller commits."""
+    their owners (private, as on a deletion) without public ways in, its agents leave it, the e-mail domains no longer let
+    anybody in, invoice series, mailboxes and the newsletter sync stop; the data, the file store and the key stay. The
+    caller commits."""
     oid = int(oid)
     with system_ctx(c):  # the instance admin (or an account deletion) retires an organisation they need not be in
         # 2.186.0 A (#2599): who was its admin keeps its export (people only; never the deleted person of a personal office)
@@ -272,6 +303,7 @@ def odl_retire(c, oid, until, gone=None):
                                             "AND m.role='admin' AND COALESCE(u.kind, 'user')!='agent' AND m.user_id!=? ORDER BY m.user_id",
                                             (oid, int(gone or 0))).fetchall()]
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
+        odl_public_off(c, oid)  # 2.360.4 (#3243)
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))
         c.execute("DELETE FROM org_members WHERE org_id=?", (oid,))
@@ -376,22 +408,13 @@ def odl_retired_prune(c, force=False):
 
 
 # ---------------------------------------------------------------- #2164: the account deletion (users.user_purge)
-# 2.186.0 review M1: the candidates of the private file store; olk_fs_locked (receipts/suggest.py) decides which are kept
-# (paid / VAT, cash book, equipment, billed, doc_meta.kept_until, #2600), so a lock never blocks the deletion
-UPG_BOOKED = ("SELECT n.id FROM fs_nodes n WHERE n.owner_id=? AND n.org_id IS NULL AND (EXISTS(SELECT 1 FROM rc_receipts r WHERE r.node_id=n.id) "
-              "OR EXISTS(SELECT 1 FROM doc_meta m WHERE m.node_id=n.id AND m.kept_until IS NOT NULL) "
-              "OR EXISTS(SELECT 1 FROM office_cash_entries e WHERE e.node_id=n.id) "
-              "OR EXISTS(SELECT 1 FROM office_equipment a WHERE a.receipt_node_id=n.id))")
-
-
 def upg_personal_state(c, uid):
     """(personal office id | None, odl_retention of it incl. the booked receipts of the private file store, their node ids)."""
     with system_ctx(c):  # the deleted person's own office and private receipts (counts / ids, nothing handed out)
         r = c.execute("SELECT id FROM orgs WHERE personal_of=?", (int(uid),)).fetchone()
         from ..admin.hosting import hosted  # 2.152.0 (#2164, review A3): the hosted instance keeps nothing for others (rx_gate first)
-        from ..receipts.suggest import olk_fs_locked
-        rows = [] if hosted() else [(x[0], olk_fs_locked(c, x[0])) for x in c.execute(UPG_BOOKED, (int(uid),)).fetchall()]
-    rows = [x for x in rows if x[1]]  # review A8: only while their period runs
+        # review A8: only while their period runs; 2.360.4 (#3243): all the purge would refuse, so no lock stops the deletion
+        rows = [] if hosted() else odl_file_locks(c, f"n.owner_id=? AND n.org_id IS NULL AND {UPG_DOCS}", int(uid))
     poid = r[0] if r else None
     ret = odl_retention(c, poid)
     end = max((x[1] for x in rows), default=None)
@@ -587,6 +610,7 @@ def upg_info(c, uid):
         info["dms"] = c.execute("SELECT COUNT(*) FROM tchat_rooms WHERE kind='dm' AND (a=? OR b=?) AND a IS NOT NULL AND b IS NOT NULL "
                                 "AND a!=b AND last_at IS NOT NULL", (int(uid), int(uid))).fetchone()[0]
     content = odl_content(c, poid) if poid else {}
+    info["no_heir"] = tr(UPG_NO_HEIR) if upg_heirless(c, uid) else ""  # 2.360.4 (#3243): said in the dialog, not by the 409 afterwards
     info.update(office="keep" if ret["until"] else ("delete" if content else None), office_counts=content,
                 kept=ret["counts"], kept_until=ret["until"])
     return info

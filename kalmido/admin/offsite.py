@@ -738,7 +738,7 @@ def stepup_need(c, b, proxy_ok=False):
 
 def stepup_download(c, proxy_ok=False):
     """2.223.2 C (#2871): a download behind the step-up (the caller checked the right first): POST with the step-up ->
-    {ticket}; GET ?t=<ticket> (once, PEND_TTL, this person + this address) -> None = send the file; else the response."""
+    {ticket}; GET ?t=<ticket> (once, PEND_TTL, this person + this path; the IP address is not compared) -> None = send the file; else the response."""
     if request.method == "POST":
         e = stepup_need(c, body(), proxy_ok)
         if e is not None:

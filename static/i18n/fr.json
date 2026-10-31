@@ -15263,5 +15263,17 @@
   "Polls": "Sondages",
   "Holiday allowance": "Solde de congés",
   "Privacy contact": "Contact confidentialité",
-  "Links on the login page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).": "Liens sur la page de connexion, dans l'aide et sur les pages publiques (formulaires, portail, validations, réservations), p. ex. vers votre politique de confidentialité. Vide = pas de lien (ou la valeur de la configuration du serveur)."
+  "Links on the login page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).": "Liens sur la page de connexion, dans l'aide et sur les pages publiques (formulaires, portail, validations, réservations), p. ex. vers votre politique de confidentialité. Vide = pas de lien (ou la valeur de la configuration du serveur).",
+  "Menu points": "Points de menu",
+  "A point switched off here disappears for everybody in this office. Nothing is deleted: switching it on again brings everything back.": "Un point désactivé ici disparaît pour tout le monde dans ce bureau. Rien n'est supprimé : le réactiver ramène tout.",
+  "Comments in other projects": "Commentaires dans d’autres projets",
+  "Channel messages": "Messages de canaux",
+  "Tasks in other projects": "Tâches dans d’autres projets",
+  "Tasks I take part in": "Tâches auxquelles je participe",
+  "Received notifications": "Notifications reçues",
+  "Sign-ins": "Connexions",
+  "Push devices": "Appareils push",
+  "Agent chat settings": "Réglages des discussions d’agents",
+  "Deleting account #{0}: {1} files kept by law stay with an instance administrator as keeper until their period ends.": "Suppression du compte #{0} : {1} fichiers conservés par la loi restent confiés à un administrateur de l’instance jusqu’à la fin du délai.",
+  "After the restore, {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log).": "Après la restauration, {0} organisations et entrées supprimées auparavant ont été supprimées à nouveau ; {1} des {2} derniers jours restent, au cas où la restauration devait les ramener ; {3} n’ont pas pu être supprimées à nouveau (voir le journal du serveur)."
 }

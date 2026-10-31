@@ -623,6 +623,14 @@ def apb_live(c, uid):
     return apb_mail_on() and public_links_on(c) and "events" in (usettings(c, uid).get("features") or "").split(",")
 
 
+def apb_retired(c, p):
+    """2.360.4 (#3243): page p works for a retired organisation's office: closed too when it was switched on again."""
+    if not p["office_org_id"]:
+        return False
+    with system_ctx(c):  # instance structure, as acx_anon_bind
+        return bool(c.execute("SELECT 1 FROM orgs WHERE id=? AND retired_at IS NOT NULL", (p["office_org_id"],)).fetchone())
+
+
 def apb_open(c, slug):
     """(page, None) or (None, the 404 / rate-limit answer): the same answer for unknown and switched-off pages."""
     from ..lists.public import pub_gone, pub_limited
@@ -632,7 +640,7 @@ def apb_open(c, slug):
         return None, pub_limited(apb_lang_hdr())
     bad = [("pubbad:" + ip, APB_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
     p = c.execute("SELECT * FROM appt_pages WHERE slug=? AND enabled=1", (slug,)).fetchone() if SLUG_RE.fullmatch(slug or "") else None
-    if not p or not apb_live(c, p["user_id"]):
+    if not p or not apb_live(c, p["user_id"]) or apb_retired(c, p):
         if _rate_blocked(bad):
             return None, pub_limited(apb_lang_hdr())
         _rate_fail(bad)
