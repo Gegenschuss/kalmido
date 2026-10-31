@@ -43,10 +43,9 @@ FAILS_MAX = 2  # KALMIDO_CHANNEL_FAILS below
 def dbx(sql, args=()):
     c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
-        r = c.execute(sql, args)
-        rows = r.fetchall() if r.description else []
+        r = c.execute(sql, args).fetchall()
         c.commit()
-        return rows
+        return r
     finally:
         c.close()
 
