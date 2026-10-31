@@ -742,7 +742,7 @@ _ADD_LINE = re.compile(r"^[ \t]*ALTER[ \t]+TABLE[ \t]+(\w+)[ \t]+ADD[ \t]+COLUMN
 
 def col_present(c, stmt):
     """2.369.0 B (#2731): is stmt an ALTER TABLE .. ADD COLUMN IF NOT EXISTS whose column exists (the same no-op)?"""
-    m = _ADD_LINE.search(stmt)
+    m = _ADD_LINE.search(stmt) if stmt.upper().count("ADD COLUMN") == 1 else None  # review: several columns = run it
     return bool(m and c.execute("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() "
                                 "AND table_name=? AND column_name=?", m.groups()).fetchone())
 
