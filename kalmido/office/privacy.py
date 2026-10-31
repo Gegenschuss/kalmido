@@ -35,7 +35,7 @@ from ..personal.timetrack import BadInput
 from .doctpl import (DT_NOTE, _ctx, _iid, dt_client, dt_doc, dt_fill, dt_file, dt_hash, dt_kick, dt_lang, dt_pdf, dt_signed_sync,
                      dt_tpl, dt_values)
 from .doclang import doc_lg
-from .doctpl_samples import DMA_SAMPLES
+from .doctpl_samples import DMA_SAMPLES, sample_text
 from .model import pb_owner
 
 # kind -> (label, sample key in DMA_SAMPLES, needs a signature)
@@ -236,7 +236,7 @@ def dsb_post():
         title, text = t["name"], t["body"]
     else:
         lang = dt_lang(c, oid, b.get("lang") or None)
-        title, text = DMA_SAMPLES[skey]["de" if lang == "de" else "en"]  # 2.449.0 (#3766): English sample for nl / fr / es / it, like doctpl (was a 500)
+        title, text = sample_text(DMA_SAMPLES[skey], lang)  # 2.449.0 (#3766, #3768): every language of the samples, English for the rest (was a 500)
     ts = iso(now_utc())
     row = {"org_id": oid, "template_id": tid, "kind": "other",
            "title": title[:300], "body": text, "client_id": cl["id"], "lang": lang, "sign": int(sign), "status": "draft",
