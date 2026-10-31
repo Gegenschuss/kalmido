@@ -33,7 +33,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
 
   // ================= the services tab: the two masters below the services
   let w = await boot({hash: 'office/services'}); let d = w.document;
-  await until(() => d.querySelectorAll('.office .srhead').length === 2 && d.querySelector('[data-ofc="open"][data-kind="crew"]'), 60);
+  // 2.449.0 (#3807): roles and crew load on their own, the crew row alone said nothing about the roles (night run 31.10.2026)
+  await until(() => d.querySelectorAll('.office .srhead').length === 2 && d.querySelector('[data-ofc="open"][data-kind="crew"]') && d.querySelector('[data-ofc="open"][data-kind="roles"]'), 60);
   const heads = [...d.querySelectorAll('.office .srhead')].map(h => h.textContent);
   check(heads.length === 2 && /Freelancer roles/.test(heads[0]) && /Crew/.test(heads[1]), 'services tab: sections Freelancer roles and Crew ' + JSON.stringify(heads));
   const role = d.querySelector('[data-ofc="open"][data-kind="roles"]');
