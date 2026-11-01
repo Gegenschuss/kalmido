@@ -45,7 +45,7 @@ const behindI = (d, el) => !!el && el.classList.contains('iisrc') && !!d.querySe
     // cash flow: the legend behind (i), titles on the heads and arrows
     const leg = await until(() => d.querySelector('#view .rkcfleg'), 80);
     check(behindI(d, leg) && /Actual = paid or already past/.test(leg.textContent), tag + 'cash flow: the legend sits behind (i)');
-    check(!d.querySelector('.rkcfms ~ p.ofchint'), tag + 'cash flow: no legend paragraph under the months');
+    check(!d.querySelector('.rkcfms ~ p.ofchint:not(.ofcsetl)'), tag + 'cash flow: no legend paragraph under the months');
     check(d.querySelector('.rkcftab th[title="Paid or already past"]') && d.querySelector('.rkcftab th[title="Expected"]'), tag + 'cash flow: the column heads explain themselves');
     check(d.querySelector('[data-rkf="prev"]')?.title === 'Earlier' && d.querySelector('[data-rkf="next"]')?.title === 'Later', tag + 'cash flow: the arrows have a title');
 

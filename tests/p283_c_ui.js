@@ -52,7 +52,7 @@ const FEAT = 'collab,comments,progress';
   // ---- the list: strip, ring, dialog, undo
   let w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
   let hd = d.querySelector('#main > #o3c-head');
-  check(hd && hd.classList.contains('o3c-h-dots') && hd.getAttribute('aria-hidden') === 'true' && hd.nextElementSibling?.id === 'view' && hd.previousElementSibling?.id === 'top', 'list: the dots strip between header and view, decorative');
+  check(hd && hd.classList.contains('o3c-h-dots') && hd.getAttribute('aria-hidden') === 'true' && hd.nextElementSibling?.id === 'view' && !!(d.querySelector('#top').compareDocumentPosition(hd) & 4), 'list: the dots strip between header and view, decorative');  // 2.413 (#3592): #favrow sits between #top and the strip
   const ring = d.querySelector(`#side [data-list="${L}"] .o3c-ring`);
   check(ring && /--p:\s*50/.test(ring.getAttribute('style')) && /1 of 2 done/.test(ring.getAttribute('aria-label')), 'sidebar: progress ring 1 of 2 (50 %) ' + JSON.stringify({ring: ring?.outerHTML, prog: w.eval(`JSON.stringify(listById(${L}).progress)`)}));
   check(!d.querySelector(`#side [data-list="${E}"] .o3c-ring`), 'an empty list has no ring');

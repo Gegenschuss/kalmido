@@ -63,7 +63,7 @@ OLD_PDF = {  # office/pdf.py PDF_LABELS up to 2.167
 for k, (de, en) in OLD_PDF.items():
     check(pdf.tr(pdf.PDF_LABELS[k], lg="de") == de and pdf.tr(pdf.PDF_LABELS[k], lg="en") == en, f"pdf label {k}: de / en as before")
 # 2.357.0 C (#3182): + accept_text (the order sentence above the signature lines of a quotation)
-NEW_PDF = {"accept_text"}
+NEW_PDF = {"accept_text", "ov_title", "ov_part", "ov_page", "ov_hint"}  # 2.449.0 (#3766): + the overview of #3622 (this check was red since then)
 check(set(pdf.PDF_LABELS) == set(OLD_PDF) | NEW_PDF, "pdf: no label lost")
 check(pdf.tr(pdf.PDF_LABELS["title"], lg="fr") == "Devis" and pdf.tr(pdf.PDF_LABELS["vat"], lg="nl") == "Btw", "pdf: fr / nl words")
 

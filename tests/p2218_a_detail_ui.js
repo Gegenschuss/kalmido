@@ -17,7 +17,7 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), http: r.status}; };
 const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-const dq = d => [...d.querySelectorAll('#detail .dtop [data-act="due-q"]')].map(b => b.dataset.d).join();
+const dq = d => [...d.querySelectorAll('#detail :is(.dtop, .dthumb) [data-act="due-q"]')].map(b => b.dataset.d).join();
 const menuItems = (w, d, id) => { w.eval(`taskMenu(document.querySelector('#detail [data-act="task-menu"]'), ${id})`); return [...d.querySelectorAll('#pop [role="menuitem"]')]; };
 const item = (its, re) => its.find(b => re.test(b.querySelector('.ml')?.textContent || ''));
 
@@ -70,7 +70,7 @@ const item = (its, re) => its.find(b => re.test(b.querySelector('.ml')?.textCont
   check(dq(d) === '0,1,-1', 'due tomorrow: Today and Tomorrow (a further day, #2768): ' + dq(d));  // 2.354.0 C (#3326): + "-1 day"
   w.eval(`openDetail(${T9})`); await sleep(400);
   check(dq(d) === '0,1,-1', 'due in 9 days: Today and Tomorrow: ' + dq(d));
-  d.querySelector('#detail .dtop [data-act="due-q"][data-d="1"]').click();
+  d.querySelector('#detail .dthumb [data-act="due-q"][data-d="1"]').click();  // 2.365.0 (#2824): the phone's bottom bar
   check(await until(() => dq(d) === '0,1,-1'), 'a tap on Tomorrow (one more day, #2768): both stay');  // 2.218.0: merged with #2768, Tomorrow is never left out
   w.close();
 
