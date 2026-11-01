@@ -19,6 +19,9 @@
 
 ## What's new
 
+**2.475.0** (2026-11-01):
+- **Favourites**: favourites of everything - one row of symbols in the head bar for all workspaces, from a project to a single invoice.
+
 **2.468.0** (2026-11-01):
 - **Menus**: arrange every area menu yourself - hide, bring back, drag; the same on phone and computer.
 - **Settings**: new areas "Company & office" (the office settings, also for your private office) and "Documents"; Karakeep, newsletter service, bookmark button, CardDAV birthdays and booking page are set up in Settings > Integrations.
