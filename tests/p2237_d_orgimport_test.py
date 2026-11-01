@@ -11,7 +11,7 @@ Invented names only.
  - undo by the admin of another target (the finalised invoice of the file was finalised there before): works, nothing left
  - a person without organisation (freelancer) imports it privately: unchanged (no rows of others)
  - 2.459.0 (#3849): the organisation's symbol, a list icon and a header picture come back from files/pictures (new tokens, sealed,
-   served): a target with a symbol keeps it, into the private space the list pictures only, the undo removes them (a picture
+   served): a target with a symbol keeps it, into the private workspace the list pictures only, the undo removes them (a picture
    changed since stays), a doctored archive (foreign ids, odd names, no picture, tokens in lists.json) sets nothing of its own
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY (P2237D_NOSTART=1 = the server already runs like that).
 usage: p2237_d_orgimport_test.py <datadir>"""
@@ -309,7 +309,7 @@ check(not dbx("SELECT 1 FROM org_members WHERE user_id=?", (FID,)), "freelancer:
 pf = pics(FL)
 check(str(pf["icon"]).startswith("u:") and got(Fr, f"/api/list-icon/{FL}/{pf['icon'][2:]}.png", PNGM)
       and got(Fr, f"/api/list-header/{FL}/{pf['header_file']}.jpg", JPGM), f"#3849 freelancer: the list keeps its pictures {dict(pf)}")
-check(any("private space: Symbol" in str(x.get("text")) for x in (j.get("result") or {}).get("warnings", [])),
+check(any("private workspace: Symbol" in str(x.get("text")) for x in (j.get("result") or {}).get("warnings", [])),
       f"#3849 freelancer: the result names the symbol that stayed behind {(j.get('result') or {}).get('warnings')}")
 r = Fr.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
 check(r.ok and r.json().get("trash") and not dbx("SELECT 1 FROM lists WHERE id=? AND deleted_at IS NULL", (FL,)),
