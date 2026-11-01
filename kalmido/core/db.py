@@ -321,6 +321,8 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
         # admin's id (preselected: the purpose they picked for themselves) or 0 ("For me"); None = no question
         if ask_purpose is not None:
             vals["purpose_ask"] = (usettings(c, ask_purpose).get("purpose") if ask_purpose else "") or "me"
+    if not ONBOARDING_ENV:  # 2.466.0 (#3314): the switch turns the areas' introductions off too (they are on by default)
+        vals["tours_more"] = "0"
     # 2.250.0 C (#2995): no lean sidebar for added accounts any more (2.25.0 UX-26 hid Tomorrow / Next 7 days / Now doable):
     # a new account starts like the self-set-up one. Existing accounts keep their choice.
     if not vals["ntfy_topic"]:
@@ -1289,6 +1291,22 @@ def init_db(guard=True, load=None):
             gset(c, "migr_agcl2380", "1")
             if ids:
                 print("agency projects:", len(ids), "empty field(s) \"Client\" removed", flush=True)
+        if gsetting(c, "migr_tours2466") != "1":  # 2.466.0 (#3314): an area an existing account has content in counts as
+            # opened: its introduction shows only for areas never used. Nothing is lost: a later start skips this, an older
+            # version ignores the setting
+            seen = {}
+            for area, sql in (("cal", "SELECT DISTINCT created_by FROM events"), ("office", "SELECT DISTINCT created_by FROM clients"),
+                              ("time", "SELECT DISTINCT user_id FROM time_entries"), ("review", "SELECT DISTINCT user_id FROM journal"),
+                              ("wiki", "SELECT DISTINCT owner_id FROM wiki_pages"), ("sheets", "SELECT DISTINCT owner_id FROM sheets"),
+                              ("habits", "SELECT DISTINCT user_id FROM habits")):
+                for r in c.execute(sql).fetchall():
+                    if r[0] is not None:
+                        seen.setdefault(r[0], []).append(area)
+            for uid, areas in seen.items():
+                c.execute("INSERT INTO user_settings(user_id,key,value) SELECT id,'tours_seen',? FROM users WHERE id=? "
+                          "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value WHERE user_settings.value=''",  # the start fills in defaults first
+                          (",".join(areas), uid))
+            gset(c, "migr_tours2466", "1")
         from .fkeys import fk_ensure
         fk_ensure(c)  # 2.152.0 C (#2174): the missing foreign keys (orphans cleaned first), every start, idempotent
         clk("fk_ensure")

@@ -78,6 +78,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-wthours': ['capacity_h', N_('Hours per week'), 'text'],  // 2.125.0 A (#2118): the working week (leave.js)
   's-review': ['review_time', N_('Daily review at'), 'time'],
   's-brief': ['brief_time', N_('Morning briefing at'), 'time'],  // 2.34.0 (#264)
+  's-tmore': ['tours_more', N_('Show more introductions'), 'chk'],  // 2.466.0 (#3314)
   's-lemo': ['list_emoji', N_('Suggest icons for new projects'), 'chk'],  // 2.32.0 (#1077)
   's-sdn': ['show_done_new', N_('Hide completed tasks in new projects'), 'chk'],  // 2.49.0 (#1535)
   's-prbg': ['prio_bg', N_('Priority as background'), 'sel'],  // 2.40.0 (#1416)
@@ -791,6 +792,8 @@ function settingsModal(focus) {
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
       <div class="row"><button class="btn sm" data-m="practice-add">${ic('plus', 's')} ${tr('Create the practice project')}</button>${S.sample ? '' : `<button class="btn sm" data-m="sample-add">${ic('plus', 's')} ${tr('Create sample project')}</button>`}</div>
+      ${S.me?.kid ? '' : `<div class="row">${chk('s-tmore', s.tours_more !== '0', tr('Show more introductions'))}</div>
+      <div class="row">${Object.keys(TOUR_MODS).filter(id => sbb_def(id)?.[3]()).map(id => `<button class="btn sm" data-m="tour-mod" data-v="${id}">${esc(tr(sbb_def(id)[2]))}</button>`).join('')}</div>`}<!-- 2.466.0 (#3314): one area's introduction again -->
       ${isMobile() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, projects, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}
       <h4>${tr('Quick add')}</h4>
       <div class="shelp">${tr('today, tomorrow, day after tomorrow, friday, next monday, in 3 days, 12.10., 3pm, at 15:00<br>daily, weekdays, weekly, every monday, every 2 weeks, monthly, yearly<br>!high / !medium / !low (or !!!, !!, !) · #tag · ~project, “in project Work” or “… in Work” at the end<br>German works too: morgen 15 uhr, jeden montag, !hoch<br>Keyboard: n = new task, / = search, Esc = close')}</div>
@@ -1120,6 +1123,7 @@ function settingsModal(focus) {
       const e = setLocal(tr('Appearance'), snap, put, null); if (e) offerUndo(tr('Appearance reset to the defaults'), e); return;
     }
     if (b.dataset.m === 'tour') { md.remove(); tourStart(); return; }
+    if (b.dataset.m === 'tour-mod') { md.remove(); tourModRestart(b.dataset.v); return; }  // 2.466.0 (#3314)
     if (b.dataset.m === 'keys') { md.remove(); shortcutsModal(); return; }
     if (b.dataset.m === 'hints-reset') { LS.del('hintsSeen'); toast(tr('Done')); render(); return; }
     if (b.dataset.m === 'ag-guide') { aiSubShow(md, 'setup', true); return; }  // 2.4.2 (#392); 2.7.2 (#420): the Set up tab

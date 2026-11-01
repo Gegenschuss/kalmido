@@ -4571,6 +4571,8 @@ USER_DEFAULTS = {
     # ('' = the one of my area, hub/absence.py ABS_STATES)
     "cal_holidays": "1", "cal_abs": "1", "cal_abs_team": "0", "holiday_state": "",
     "tour": "done",             # welcome tour: pending (new users) | done; existing users never see it
+    "tours_seen": "",           # 2.466.0 (#3314): the areas whose short introduction ran (comma list, palette.js TOUR_MODS)
+    "tours_more": "1",          # 2.466.0 (#3314): 0 = no more introductions (tick on their last card, Settings > Help)
     "onboard": "done",          # "Getting started" list: pending (new users, created on first start) | done
     "sample_ask": "1",          # 1.8.0: the welcome tour offers the sample project (0 = decided in the setup / created once)
     "purpose_ask": "done",      # 2.364.0 A (#3032): "What do you use Kalmido for?" on the first start of an account an admin made

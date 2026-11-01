@@ -578,22 +578,64 @@ function tourSteps() {
   // steps only name modules that are on (a "Simple list" setup has no habits / focus)
   // 2.364.0 A (#3016): the bar's step names what the bar really holds (was "Tab bar" with "calendar, habits, focus")
   const tabs = $$('#tabs > button').map(b => (b.querySelector('span:last-child')?.textContent || b.getAttribute('aria-label') || '').trim()).filter(Boolean);
+  // 2.466.0 (#3314): the rail is today's way between the areas; folders and sharing work alike in all of them
+  const rail = !m && $('#srail');
+  if (rail) s.push({id: 'rail', sel: '#srail', t: N_('Your areas'), d: N_('Calendar, Office, Files and more sit in this bar. Folders and sharing work the same in every area.'), r: rect('#srail')});
   if (m) s.push({id: 'tabs', sel: '#tabs', t: N_('The bar at the bottom'), d: tabs.length ? N_('{0}. Pin projects: Settings > Appearance.') : N_('Your projects and views. Pin projects: Settings > Appearance.'), args: tabs.length ? [tabs.join(' · ')] : [], r: rect('#tabs')});
   else if (!touch) s.push({id: 'keys', sel: '#kbar .kbsrch, #top .kbtn', t: N_('Keyboard first'), d: N_('{0} opens search and commands for everything, {1} lists all shortcuts. j and k move through tasks, x completes.'), args: [kbText('Mod+K'), '?'], r: rect('#kbar .kbsrch, #top .kbtn')});  // 2.152.3 A (#2619)
-  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: N_('Modules, language and appearance.'),  // 2.352.0 B (#2752): no switch to point at
-    r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
   // 2.365.0 (#2802): one step for what the start switched on: the office (Office & finance), else the team (Team, Software)
   const ofc = officeOn() && vis('#tabs [data-go^="office"], #srail [data-sbb="office"], #side [data-go^="office"]');
   if (ofc) s.push({id: 'office', sel: '#tabs [data-go^="office"], #srail [data-sbb="office"], #side [data-go^="office"]', t: N_('Office|area'), d: N_('Here you create clients and quotations.'), r: () => ofc.getBoundingClientRect()});
   else if (collab() && !S.me?.kid) s.push({id: 'team', t: N_('Work as a team'), d: N_('Share a project from its “…” menu: the people you add see only what you share, and you assign tasks to them with @name.')});
-  if (collab()) s.push({id: 'news', sel: '#kbar .bell, #top .bell', t: N_('News'), d: N_('Mentions, assignments and comments on your tasks arrive here.'), r: rect('#kbar .bell, #top .bell')});  // 2.152.3 A (#2619): a computer: the head bar
-  return s.slice(0, 7);  // 2.365.0 (#2802): 7 with the step of the chosen start
+  if (collab()) s.push({id: 'news', sel: '#kbar .bell, #top .bell', t: N_('News'), d: N_('Mentions, assignments and comments from all your workspaces arrive here.'), r: rect('#kbar .bell, #top .bell')});  // 2.152.3 A (#2619): a computer: the head bar; 2.466.0 (#3314): all workspaces
+  const agEl = () => vis('#srail [data-sbb="agents"], #tabs [data-go="agents"]');  // 2.466.0 (#3314)
+  if ((S.agents || []).length) s.push({id: 'agents', sel: '#srail [data-sbb="agents"], #tabs [data-go="agents"]', t: N_('Agents'), d: N_('Your connected agents work in the projects you share and answer in the chat.'), r: rect(agEl)});
+  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: N_('Modules, language and appearance.'),  // 2.352.0 B (#2752): no switch to point at
+    r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
+  return s.slice(0, 8);  // 2.365.0 (#2802): with the step of the chosen start; 2.466.0 (#3314): 8 with the areas' bar
+}
+// 2.466.0 (#3314): the short introduction of an area: once, the first time the area opens (tours_seen, per account), never
+// for a child, a second window or after "Show more introductions" is unticked; the welcome tour goes first. Restart: Settings > Help.
+// A step without a target (or with its target not on the screen) shows its card in the middle.
+const TOUR_TABS = '[data-mgtabs]', tourParts = id => () => mg_parts(mg_area(id)).length > 1;
+const TOUR_MODS = {
+  cal: [{id: 'cal1', t: N_('Your calendar'), d: N_('Tasks with a date and your appointments, side by side.')}, {id: 'cal2', sel: '.calbar', t: N_('Your view'), d: N_('Switch between day, week and month here and move through time.')}, {id: 'cal3', t: N_('New appointment'), d: N_('Pick a free time to add an appointment.')}],
+  office: [{id: 'office1', t: N_('Your office'), d: N_('Clients, quotations, invoices and receipts in one place.')}, {id: 'office2', sel: TOUR_TABS, t: N_('Get around'), d: N_('This bar takes you to each part of the office.')}, {id: 'office3', t: N_('Start with a client'), d: N_('Create a client first: quotations and invoices then fill in the address for you.')}],
+  time: [{id: 'time1', t: N_('Track your time'), d: N_('Start the timer on a task or enter the hours afterwards.')}, {id: 'time2', t: N_('See the totals'), d: N_('Your times add up per day and per project.')}],
+  review: [{id: 'review1', t: N_('Look back'), d: N_('Write a few lines about your day and see how the week went.')}, {id: 'review2', sel: TOUR_TABS, on: tourParts('review'), t: N_('Statistics'), d: N_('Completed tasks and trends have their own tab.')}],
+  life: [{id: 'life1', t: N_('Home and life'), d: N_('Household and everyday things, apart from your work.')}, {id: 'life2', sel: TOUR_TABS, on: tourParts('life'), t: N_('More at home'), d: N_('Family and budget have their own tabs when they are on.')}],
+  reading: [{id: 'reading1', t: N_('Read later'), d: N_('Save articles and links, and read them when you have time.')}, {id: 'reading2', sel: TOUR_TABS, on: tourParts('reading'), t: N_('Feeds and bookmarks'), d: N_('Feeds and bookmarks have their own tabs.')}],
+  ablage: [{id: 'ablage1', t: N_('Your files'), d: N_('Files and documents in folders, in one place.')}, {id: 'ablage2', t: N_('Share a folder'), d: N_('Share a folder from its menu: the people you add see only that folder.')}],
+  wiki: [{id: 'wiki1', t: N_('Your knowledge'), d: N_('Notes and instructions as pages that link to each other.')}, {id: 'wiki2', t: N_('Find it again'), d: N_('Search finds your pages from anywhere in Kalmido.')}],
+  sheets: [{id: 'sheets1', t: N_('Your tables'), d: N_('Build your own tables for lists, prices or plans.')}, {id: 'sheets2', t: N_('Share a table'), d: N_('Share a table from its menu, just like a project.')}],
+  habits: [{id: 'habits1', t: N_('Your habits'), d: N_('Set what you want to do regularly and tick it off.')}, {id: 'habits2', t: N_('Keep going'), d: N_('Your streak shows how well a habit is going.')}],
+  agents: [{id: 'agents1', t: N_('Your agents'), d: N_('Agents are helpers you connect yourself. They see only what you share with them.')}, {id: 'agents2', t: N_('Work with them'), d: N_('Give them tasks in your projects or write to them in the chat.')}],
+};
+const tourModSteps = id => (TOUR_MODS[id] || []).filter(st => !st.on || st.on()).map(st => ({...st, r: st.sel ? () => { const e = $$(st.sel).find(x => x.offsetWidth || x.offsetHeight); return e ? e.getBoundingClientRect() : null; } : null}));
+const toursSeen = () => (S.settings.tours_seen || '').split(',').filter(Boolean);
+const tourModBlocked = () => TOUR.on || !S.me || S.me.kid || S.settings.tour === 'pending' || S.settings.tours_more === '0' || MW_ON || S.capturePage || S.sel || S.route?.task || !!$('.modal');
+function tourModAuto() {
+  if (tourModBlocked()) return;
+  const id = sbb_area();
+  if (!TOUR_MODS[id] || toursSeen().includes(id)) return;
+  setTimeout(() => {  // the view of the area first: the steps point at it
+    if (tourModBlocked() || sbb_area() !== id || toursSeen().includes(id)) return;
+    S.settings.tours_seen = [...toursSeen(), id].join(',');
+    api('PATCH', '/api/settings', {tours_seen: S.settings.tours_seen}).catch(() => { /* offline: once more on the next start */ });
+    tourStart(id);
+  }, 500);
+}
+// Settings > Help: one area's introduction again: there first, the tour when it is open
+function tourModRestart(id) {
+  go(sbb_target(id));
+  const t0 = Date.now(), wait = () => { if (sbb_area() === id) setTimeout(() => tourStart(id), 300); else if (Date.now() - t0 < 3000) setTimeout(wait, 100); };
+  wait();
 }
 // 2.223.0 A (#2821): the steps point at the area Projects (the panel's smart lists, the quick add, a task row). The automatic
 // start (tour still pending) runs at most once per session and only in Projects: a link with a target (#cal, #office,
 // #client/…, a task) opens that target and the tour waits until one comes back to Projects. Leaving Projects while it runs
 // pauses it (ring and card hidden, keys free); it goes on at the same step on the way back. A child's tour is not bound.
-const tourHome = () => !!S.me?.kid || S.route?.mod === 'tasks';
+const tourHome = () => TOUR.mod ? sbb_area() === TOUR.mod : !!S.me?.kid || S.route?.mod === 'tasks';
 function tourAuto() {
   if (TOUR.on || S.settings.tour !== 'pending') { TOUR.wait = false; return; }
   let seen = ''; try { seen = sessionStorage.getItem('kalmido-tour-' + S.me?.id) || ''; } catch { /* private mode */ }
@@ -610,15 +652,17 @@ function tourPause(on) {
 window.addEventListener('hashchange', () => setTimeout(() => {
   if (TOUR.wait) tourAuto();
   else if (TOUR.on && TOUR.paused === tourHome()) tourPause(!TOUR.paused);
+  else tourModAuto();
 }, 0));
-function tourStart() {
-  TOUR.wait = false; TOUR.paused = false;
+function tourStart(mod) {
+  TOUR.wait = false; TOUR.paused = false; TOUR.mod = mod || '';
   closePalette(); $$('.modal:not(.authscreen)').forEach(x => x.remove()); closePop(); if (S.sel) closeDetail();
   const inList = S.route.mod === 'tasks' && !NOLIST_KEYS.includes(S.route.key) && !isKanban() && !isTimeline();
-  if (!S.me?.kid && (!inList || !$('#view .trow'))) go('today');  // the tour points at a task (a fresh account's Inbox is empty); 2.49.0 (#1533): a child stays in My day
-  TOUR.on = true; TOUR.steps = tourSteps(); TOUR.i = 0;
+  if (!mod && !S.me?.kid && (!inList || !$('#view .trow'))) go('today');  // the tour points at a task (a fresh account's Inbox is empty); 2.49.0 (#1533): a child stays in My day
+  TOUR.on = true; TOUR.steps = mod ? tourModSteps(mod) : tourSteps(); TOUR.i = 0;
+  TOUR.more = S.settings.tours_more !== '0'; TOUR.moreShown = false;  // 2.466.0 (#3314)
   // 1.8.0: first start of an account: "Create a sample project" on the first card (preticked for project setups)
-  TOUR.sample = S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0' && !S.me?.kid && !tourHasProjects() && !tourOrg(); TOUR.sampleOn = false;  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
+  TOUR.sample = !mod && S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0' && !S.me?.kid && !tourHasProjects() && !tourOrg(); TOUR.sampleOn = false;  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
   let el = $('.tour');
   if (!el) { el = document.createElement('div'); el.className = 'tour'; el.innerHTML = '<div class="tring"></div><div class="tcard" role="dialog" aria-live="polite"></div>'; document.body.appendChild(el); }
   el.addEventListener('click', e => {
@@ -626,11 +670,11 @@ function tourStart() {
     const a = b.dataset.tour;
     if (a === 'next') tourGo(TOUR.i + 1); else if (a === 'back') tourGo(TOUR.i - 1); else tourEnd(true);
   });
-  el.addEventListener('change', e => { if (e.target.id === 't-sample') TOUR.sampleOn = e.target.checked; if (e.target.id === 't-ptype') TOUR.ptype = e.target.value; });
+  el.addEventListener('change', e => { if (e.target.id === 't-sample') TOUR.sampleOn = e.target.checked; if (e.target.id === 't-ptype') TOUR.ptype = e.target.value; if (e.target.id === 't-more') TOUR.more = e.target.checked; });
   el.addEventListener('click', e => { const b = e.target.closest('[data-tpurpose]'); if (!b) return; TOUR.purpose = TOUR.purpose === b.dataset.tpurpose ? '' : b.dataset.tpurpose; tourGo(TOUR.i); $(`.tour [data-tpurpose="${b.dataset.tpurpose}"]`)?.focus(); });  // 2.19.0 (#653)
   TOUR.ptype = ''; TOUR.purpose = '';
   // 2.165.0 (#2612): the very first start of the account greets once: the figure waves on the first card (tourGo)
-  TOUR.hi = S.settings.tour === 'pending' && !LS.get('botHi', false); TOUR.hiShown = false;
+  TOUR.hi = !mod && S.settings.tour === 'pending' && !LS.get('botHi', false); TOUR.hiShown = false;
   setTimeout(() => tourGo(0), 60);
 }
 // 2.165.0 (#2612): the figure of the first card. On the very first start (once per account and device: the tour is still
@@ -663,9 +707,10 @@ function tourGo(i) {
   const card = $('.tcard', el), ring = $('.tring', el);
   el.dataset.step = st.id; el.dataset.sel = st.sel || '';
   card.innerHTML = `<div class="tstep"><span>${TOUR.i + 1}/${n}</span><span class="tdots">${TOUR.steps.map((_, j) => `<i class="${j === TOUR.i ? 'on' : j < TOUR.i ? 'past' : ''}"></i>`).join('')}</span></div>
-    <h3>${TOUR.i === 0 ? tourHiFig() : ''}${esc(tr(st.t, ...(st.targs || [])))}</h3><p>${esc(tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
+    <h3>${TOUR.i === 0 && !TOUR.mod ? tourHiFig() : ''}${esc(tr(st.t, ...(st.targs || [])))}</h3><p>${esc(tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
     ${last && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.')}</small></span></label>` : ''}
-    ${last && (S.agents || []).length ? pk2_setupHtml() : ''}
+    ${last && !TOUR.mod && (S.agents || []).length ? pk2_setupHtml() : ''}
+    ${last && !S.me?.kid ? `<label class="tsample"><input type="checkbox" id="t-more" ${TOUR.more ? 'checked' : ''}><span><b>${tr('Show more introductions')}</b></span></label>` : ''}
     <div class="tfoot"><button class="btn sm tskip" data-tour="skip">${tr('Skip tour')}</button><span class="spacer"></span>${TOUR.i ? `<button class="btn sm" data-tour="back">${tr('Back')}</button>` : ''}<button class="btn sm pri" data-tour="next">${last ? tr('Done') : tr('Next')}</button></div>`;
   const r = st.r && st.r();
   let pl = tourPlace(r, innerWidth, innerHeight);
@@ -678,6 +723,7 @@ function tourGo(i) {
     if (cr.height && pl.ring && (cr.bottom > innerHeight - 12 || cr.top < 12)) { card.style.bottom = 'auto'; card.style.top = Math.max(12, Math.min(innerHeight - cr.height - 12, cr.top)) + 'px'; }
   }
   if (last && TOUR.sample) TOUR.sampleShown = true;  // 2.25.0 (UX-24)
+  if (last) TOUR.moreShown = true;
   $('[data-tour="next"]', card)?.focus();
 }
 async function tourSample() {  // 2.25.0 (UX-24): once, when the tour ends and its last card offered the sample project
@@ -695,8 +741,10 @@ async function tourSample() {  // 2.25.0 (UX-24): once, when the tour ends and i
 }
 async function tourEnd(skipped) {
   tourSample();
-  TOUR.on = false; TOUR.paused = false; $('.tour')?.remove();
+  const mod = TOUR.mod; TOUR.on = false; TOUR.paused = false; TOUR.mod = ''; $('.tour')?.remove();
+  if (TOUR.moreShown && !S.me?.kid && TOUR.more !== (S.settings.tours_more !== '0')) { S.settings.tours_more = TOUR.more ? '1' : '0'; api('PATCH', '/api/settings', {tours_more: S.settings.tours_more}).catch(() => { /* offline: stays as it was */ }); }  // 2.466.0 (#3314)
   if (S.settings.tour === 'pending') { S.settings.tour = 'done'; try { await api('PATCH', '/api/settings', {tour: 'done'}); } catch { /* offline: shows again next start */ } }
+  if (mod) return;
   if (!skipped && !S.me?.kid) toast(tr('Tour finished. Restart it any time under Settings > Help.'));  // 2.49.0 (#1533): a child has no Help
 }
 window.addEventListener('resize', () => { if (TOUR.on) tourGo(TOUR.i); });
