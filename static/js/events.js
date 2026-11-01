@@ -559,7 +559,7 @@ document.addEventListener('click', async e => {
     case 'side-fold': sideFold(!LS.get('sideFold', false)); break;  // 2.13.0 (#453 A15)
     case 'side-timeline': closeSide(); S.rmScrollReset = true; if (S.route.mod === 'tasks' && S.route.key === 'all') rmSet({v: 'timeline'}, 'all'); else Promise.resolve(rmSet({v: 'timeline'}, 'none')).then(() => go('all')); break;  // 2.65.0 (#1823): rmSet may load the timeline first
     case 'team-agent': { closeSide(); const ag = agentById(a.dataset.aid); if (ag && ag.enabled) chatOpen(ag.id); else go('agents'); break; }
-    case 'lists-reorder': S.listReorder = !S.listReorder; renderSide(); break;
+    case 'lists-reorder': listReorderSet(!S.listReorder); break;
     case 'side-more': sb_moreOpen = !sb_moreOpen; renderSide(); break;  // 2.250.0 C (#2995): unfolds in place (was: the settings)
     case 'side-customize': closeSide(); settingsModal('sidebar'); break;  // 2.25.0 (UX-03 / UX-26)
     case 'sb-people': closeSide(); sbp_dialog(); break;  // 2.99.0 E (#2187): "All people …" (sbnav.js)

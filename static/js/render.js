@@ -338,15 +338,24 @@ const sidePlan = (row, c, onTasks, k) => [['inbox', kbInboxRowTip(row('inbox', i
 function viewProjStart() {
   const c = counts(), lists = sideLists(), hid = x => sideHidden(x), cnt = n => rsy_sideCnt() && n || '';
   const row = (key, icon, name, n) => `<button type="button" class="psrow" data-go="${esc(keyToHash(key))}">${icon}<span class="n">${esc(name)}</span><span class="c">${cnt(n)}</span></button>`;
-  const lrow = l => { const em = !l.icon && leadEmoji(l.name); return row('l:' + l.id, `<span class="sic" aria-hidden="true">${listIconHtml(l, {emoji: true})}</span>`, em ? listName(l.name).slice(em.length).trim() : listName(l.name), c.lists[l.id]); };
+  // 2.482.0 (#3951): the sidebar's sort mode (S.listReorder, one order): a grip on the left drags at once, rows do not open
+  const ro = !!S.listReorder;
+  const lrow = l => { const em = !l.icon && leadEmoji(l.name), ic0 = `<span class="sic" aria-hidden="true">${listIconHtml(l, {emoji: true})}</span>`, nm = em ? listName(l.name).slice(em.length).trim() : listName(l.name);
+    return ro ? `<div class="psrow reorder" data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}><span class="sgrip" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span>${ic0}<span class="n">${esc(nm)}</span><button type="button" class="iconbtn" data-lsort="${l.id}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', nm))}">${ic('dots', 's')}</button></div>`
+      : row('l:' + l.id, ic0, nm, c.lists[l.id]); };
   const grp = (cls, head, body) => body ? `<section class="psg ${cls}"><h2 class="pshead">${head}</h2><div class="psrows">${body}</div></section>` : '';
   const plan = hid('g:focus') ? '' : sidePlan(row, c, false, '').filter(([x, h]) => h && !hid('e:' + x)).map(([, h]) => h).join('');
   const fil = hid('g:filters') ? '' : S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join('');
   const walk = f => [f, ...folderSubs(f).filter(x => sideFolderShown(lists, x)).flatMap(walk)];
   const folders = folderNames().filter(x => !fParent(x) && sideFolderShown(lists, x)).flatMap(walk);
   const loose = lists.filter(l => !l.folder).map(lrow).join('');
-  const fhead = f => `<button type="button" class="psfold" data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}">${ic('folder', 's')}<span>${esc(fDisp(f))}</span></button>`;
-  const proj = lists.length || folders.length ? grp('ps-lists', esc(tr('Projects')), loose) + folders.map(f => grp('ps-folder', fhead(f), lists.filter(l => l.folder === f).map(lrow).join('') || `<div class="muted psempty">${esc(tr('empty'))}</div>`)).join('')
+  const fhead = f => ro ? `<span class="psfold" data-folder="${esc(f)}">${ic('folder', 's')}<span>${esc(fDisp(f))}</span></span>`
+    : `<button type="button" class="psfold" data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}">${ic('folder', 's')}<span>${esc(fDisp(f))}</span></button>`;
+  const phead = `<span class="psroot">${esc(tr('Projects'))}</span>${lists.length && !ro ? `<button type="button" class="iconbtn pssort" data-act="lists-reorder" title="${esc(tr('Sort projects'))}" aria-label="${esc(tr('Sort projects'))}">${ic('sort', 's')}</button>` : ''}`;
+  const pempty = f => ro ? `<div class="muted psempty fempty" data-folder="${esc(f)}">${esc(tr('empty: drag a project here'))}</div>` : `<div class="muted psempty">${esc(tr('empty'))}</div>`;
+  const rbar = ro ? `<div class="sreobar psreobar" role="group" aria-label="${esc(tr('Sort projects'))}"><span class="sreot"><b>${tr('Sort projects')}</b><small>${esc(tr('Drag by the handle on the left, or use “…”'))}</small></span><button type="button" class="btn sm pri" data-act="lists-reorder">${tr('Done')}</button></div>` : '';
+  const lgrp = grp('ps-lists', phead, loose || (ro ? `<div class="muted psempty fempty" data-folder="">${esc(tr('empty: drag a project here'))}</div>` : '')) || `<section class="psg ps-lists"><h2 class="pshead">${phead}</h2></section>`;  // the head (with "Sort") even when every project sits in a folder
+  const proj = lists.length || folders.length ? rbar + lgrp + folders.map(f => grp('ps-folder', fhead(f), lists.filter(l => l.folder === f).map(lrow).join('') || pempty(f))).join('')
     : `<div class="empty">${ic('list')}${esc(tr('No projects yet'))}<br><button type="button" class="btn pri" data-act="list-new">${ic('plus', 's')}<span>${esc(tr('New project'))}</span></button></div>`;
   const parts = {focus: grp('ps-plan', esc(tr('Plan|nav')), plan), lists: proj, filters: grp('ps-filters', esc(tr('Filters')), fil)};
   return `<div class="pstart">${sideGroupOrder().filter(g => g in parts).map(g => parts[g]).join('')}</div>`;  // the sidebar's order of the groups

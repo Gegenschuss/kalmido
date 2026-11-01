@@ -517,6 +517,9 @@ async function lf_share(f) {
       $('[data-m="lf-more"]', box).addEventListener('click', () => { const md = box.closest('.modal'); if (md) modalSub(md, () => folderShareModal(f, {back: true})); else folderShareModal(f); }); }});
 }
 // 2.22.0 (#740) / 2.41.0 (#1420): sharing a whole folder -> folderShareModal (sharedlg.js)
+// 2.482.0 (#3951): the sort mode of the projects is one for the sidebar and the Projects page (#projects): both redraw
+function listReorderSet(on) { S.listReorder = !!on; renderSide(); if (S.route.key === 'projects') render(); }
+const ps_redraw = () => { if (S.route.key === 'projects') render(); };
 // the sidebar order (+ folder moves) in one request, as one history step (label: what it was)
 const listOrderNow = () => S.lists.filter(l => !l.is_inbox).sort((a, b) => (a.sort || 0) - (b.sort || 0) || a.id - b.id).map(l => l.id);
 async function saveListOrder(order, folder, label) {
@@ -527,7 +530,7 @@ async function saveListOrder(order, folder, label) {
   order.concat(rest).forEach((l, i) => { l.sort = i; });
   if (folder) for (const [id, f] of Object.entries(folder)) listById(+id).folder = f;
   S.lists.sort((a, b) => b.is_inbox - a.is_inbox || a.sort - b.sort || a.id - b.id);
-  renderSide();
+  renderSide(); ps_redraw();  // 2.482.0 (#3951)
   const ids = order.concat(rest).map(l => l.id);
   await api('POST', '/api/lists/reorder', {ids, folder, ...(adopt.length ? {folder_adopt: adopt} : {})});
   const same = before.join() === ids.join() && (!folder || Object.keys(folder).every(k => f0[k] === folder[k]));
@@ -563,11 +566,12 @@ function moveList(id, dir) {
 // the "Projects" header). 2.352.0 E (#2748): a folder is a node of the sidebar tree (areas.js sbb_treeReg 'lf'): it is
 // dragged, sorted and given its menu there
 let listDrag = null;
+const SD_MARKS = '#side .dropbefore, #side .dropafter, #side .drop, .pstart .dropbefore, .pstart .dropafter, .pstart .drop';  // 2.482.0 (#3951)
 document.addEventListener('dragstart', e => {
-  const r = e.target.closest && e.target.closest('#side .srow[data-list][draggable="true"]');
+  const r = e.target.closest && e.target.closest('#side .srow[data-list][draggable="true"], .pstart .psrow.reorder[data-list][draggable="true"]');
   if (r) { listDrag = +r.dataset.list; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'list:' + listDrag); }
 });
-const sideDropTarget = (el, y = null) => !el?.closest ? null : el.closest('#side .srow[data-list], #side .fhead[data-folder], #side .fempty, #side .shead.lroot') || sb_sideEnd(el, y);
+const sideDropTarget = (el, y = null) => !el?.closest ? null : el.closest('#side .srow[data-list], #side .fhead[data-folder], #side .fempty, #side .shead.lroot, .pstart .psrow.reorder[data-list], .pstart .psfold[data-folder], .pstart .fempty') || sb_sideEnd(el, y);  // 2.482.0 (#3951): + the Projects page in sort mode
 // 2.46.1 (#1612 #1635): the targets in their order (list rows, sections, board columns) and the pointer (clientY, or clientX
 // for columns): the target under it or, in a gap or up to `slack` px past the last one, the nearest; after = the pointer is
 // past its middle (so the last one can be passed: dropped at the very end). null = outside.
@@ -579,7 +583,7 @@ function sb_dropNear(els, pos, axis = 'y', slack = 24) {
   return {el: vis[i], after: pos > (R[i][lo] + R[i][hi]) / 2};
 }
 // 2.46.1 (#1612): a list dragged off any row (below the last list of a folder or of the loose lists, in a gap) = the nearest list row
-const sb_sideEnd = (el, y) => el.closest('#side') && sb_dropNear($$('#side .sg-lists .srow[data-list]'), y)?.el || null;
+const sb_sideEnd = (el, y) => el.closest('#side') && sb_dropNear($$('#side .sg-lists .srow[data-list]'), y)?.el || el.closest('.pstart') && S.listReorder && sb_dropNear($$('.pstart .psrow.reorder[data-list]'), y)?.el || null;
 // 2.46.1 (#1612): a list dropped on its own folder's header (or on "Lists" while it has no folder) goes to the end there
 function sb_listToEnd(id, f) {
   const l = listById(id), order = sideOrder(), was = order.map(x => x.id).join();
@@ -589,11 +593,11 @@ function sb_listToEnd(id, f) {
   if (order.map(x => x.id).join() !== was) saveListOrder(order, undefined, tr('Moved project {0}', qn(lname(l))));
 }
 // 2.27.0 (#991): the lower half of a list row = after it (so a list can go to the very end of a folder)
-const sideAfter = (t, y) => !!t && t.classList.contains('srow') && y != null && (() => { const r = t.getBoundingClientRect(); return r.height > 0 && y > r.top + r.height / 2; })();
+const sideAfter = (t, y) => !!t && (t.classList.contains('srow') || t.classList.contains('psrow')) && y != null && (() => { const r = t.getBoundingClientRect(); return r.height > 0 && y > r.top + r.height / 2; })();
 const sideMark = (t, drag, y) => {  // the same highlights for mouse and touch; false = not a valid target
-  $$('#side .dropbefore, #side .dropafter, #side .drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
+  $$(SD_MARKS).forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   if (!t || (drag.list && t.dataset.list && +t.dataset.list === drag.list)) return false;
-  t.classList.add(t.classList.contains('srow') ? (sideAfter(t, y) ? 'dropafter' : 'dropbefore') : 'drop');
+  t.classList.add(t.classList.contains('srow') || t.classList.contains('psrow') ? (sideAfter(t, y) ? 'dropafter' : 'dropbefore') : 'drop');
   return true;
 };
 document.addEventListener('dragover', e => {
@@ -604,7 +608,7 @@ document.addEventListener('drop', e => {
   if (!listDrag) return;
   e.preventDefault(); e.stopImmediatePropagation();
   const drag = {list: listDrag}; listDrag = null;
-  $$('#side .dropbefore, #side .dropafter, #side .drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
+  $$(SD_MARKS).forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   const t = sideDropTarget(e.target, e.clientY);
   sideDrop(drag, t, sideAfter(t, e.clientY));
 }, true);
@@ -617,7 +621,7 @@ async function sideDrop(drag, t, after = false) {
   if (l.mirrored) { toast(mirroredMsg(l)); return; }  // 2.27.0 (#988)
   const f0 = l.folder || '';
   const undoFolder = (f, e) => { if (f !== f0 && e && !e._said) offerUndo(folderNowShared(id, f) || (f ? tr('Moved to folder {0}', fDisp(f)) : tr('Removed from folder')), e); };  // 2.41.0 (#1428)
-  if (t.classList.contains('fhead') || t.classList.contains('fempty')) { const f = (t.closest('[data-folder]') || t).dataset.folder; if (f === f0) { sb_listToEnd(id, f); return; } undoFolder(f, await setListFolder(id, f)); return; }
+  if (t.classList.contains('fhead') || t.classList.contains('fempty') || t.classList.contains('psfold')) { const f = (t.closest('[data-folder]') || t).dataset.folder; if (f === f0) { sb_listToEnd(id, f); return; } undoFolder(f, await setListFolder(id, f)); return; }
   if (t.classList.contains('lroot')) { if (!f0) { sb_listToEnd(id, ''); return; } undoFolder('', await setListFolder(id, '')); return; }
   const order = sideOrder(), moving = order.find(x => x.id === id), target = listById(+t.dataset.list);
   if (!moving || !target || moving === target) return;
@@ -648,7 +652,8 @@ document.addEventListener('contextmenu', e => {
 });
 let sd = null, sdHeld = false;
 document.addEventListener('touchstart', e => {
-  const r = e.target.closest?.('#side .srow[data-list]');
+  // 2.482.0 (#3951): + the rows of the Projects page in sort mode (only by the grip: its long press is the row's menu)
+  const r = e.target.closest?.('#side .srow[data-list]') || (S.listReorder ? e.target.closest?.('.pstart .psrow.reorder[data-list]') : null);
   // 2.25.0 (UX-02): in sort mode the grip drags at once; elsewhere in sort mode a touch scrolls
   const grip = S.listReorder && e.target.closest('.sgrip');
   if ((S.listReorder && !grip) || !r || e.target.closest('.iconbtn') || listById(+r.dataset.list)?.archived) { sd = null; return; }
@@ -659,6 +664,8 @@ document.addEventListener('touchstart', e => {
   if (!sd.el._sdL) { sd.el._sdL = 1; sd.el.addEventListener('touchmove', sdMove, {passive: false}); sd.el.addEventListener('touchend', sdEnd); sd.el.addEventListener('touchcancel', sdEnd); }
   if (grip) sdStart(); else sd.timer = setTimeout(sdStart, 380);
 }, {passive: true});
+// the element that scrolls a row of the Projects page (the view, or the document)
+function ps_scroller(el) { for (let p = el?.parentElement; p && p !== document.body; p = p.parentElement) { const o = getComputedStyle(p).overflowY; if ((o === 'auto' || o === 'scroll') && p.scrollHeight > p.clientHeight) return p; } return document.scrollingElement || document.documentElement; }
 function sdStart() {
   if (!sd) return;
   sd.active = true;
@@ -686,7 +693,7 @@ const sdFrame = rafThrottle((x, y) => {
   sd.ghost.style.transform = `translateY(${y - sd.y}px)`;
   const t = sideDropTarget(document.elementFromPoint(x, y), y);
   sideMark(t, sd, y);
-  const side = $('#side'), r = side.getBoundingClientRect();
+  const side = sd.el.closest('#side') || ps_scroller(sd.el), r = side.getBoundingClientRect();  // 2.482.0 (#3951): the page scrolls on the Projects page
   if (r.height && side.scrollBy) { if (y < r.top + 48) side.scrollBy(0, -12); else if (y > r.bottom - 48) side.scrollBy(0, 12); }
   // hovering a closed folder for a moment opens it
   const fh = t && sd.list && t.classList.contains('fhead') && t.classList.contains('closed') ? t.dataset.folder : null;
@@ -703,7 +710,7 @@ function sdEnd(e) {
   sdHeld = true; setTimeout(() => { sdHeld = false; }, 500);
   st.ghost.remove(); st.el.classList.remove('dragging');
   const t = st.moved ? sideDropTarget(document.elementFromPoint(st.lx, st.ly), st.ly) : null;
-  $$('#side .dropbefore, #side .dropafter, #side .drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
+  $$(SD_MARKS).forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
   if (!st.moved && st.reorder) return;  // a tap on the grip
   if (!st.moved) { const el = $(`#side .srow[data-list="${st.list}"]`); if (el) listMenu(el, st.list); return; }
   if (t && e?.type === 'touchend') sideDrop({list: st.list}, t, sideAfter(t, st.ly));
