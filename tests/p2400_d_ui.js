@@ -7,6 +7,7 @@
 // - #1368 8 + 9: reminder list: settled reminder below the open ones with "Settled" and the open fee; editor of the
 //   finalised reminder: fee open with "Waive fee" / "Fee paid"; waiving updates it
 // - #1381: switching the document language swaps the texts and shows the note box (texts changed by hand / no English)
+// - #3940 (2.482.0): a closed language note stays closed when a late language save answers; a new switch shows it again
 // - #1381: settings > default texts: the English choice shows the English text
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -129,16 +130,37 @@ const TEST_IBAN = 'DE02120300000000202051';
   const off = await call('POST', '/api/office/docs', {project_title: 'Imagefilm', items: [{service_id: SV, qty: 1}]});
   w = await boot({hash: 'office/offers/' + off.id}); d = w.document;
   await until(() => d.querySelector('#ofd-lang'), 200);
+  // 2.482.0 (#3940): the first answer's lang_notes are kept; a later language save can be held back and answers with them
+  let lnSeen = null, lnHold = false, lnRel = null, lnDone = false; const rf0 = w.rawFetch;
+  w.rawFetch = async (m, u, b, k) => {
+    const j = await rf0(m, u, b, k);
+    if (j && j.lang_notes && !lnSeen) { lnSeen = j.lang_notes; return j; }
+    if (lnHold && m === 'PATCH' && b && typeof b === 'object' && 'lang' in b) { await new Promise(r => { lnRel = r; }); setTimeout(() => { lnDone = true; }); return {...j, lang_notes: lnSeen}; }
+    return j;
+  };
   const ls = d.querySelector('#ofd-lang'); ls.value = 'en'; ls.dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(() => d.querySelector('.ofdlnote'), 200);
   check(/Dear Sir or Madam/.test(d.querySelector('#ofd-intro')?.value || ''), '#1381: the intro is English after the switch');
   check(/Farbkorrektur/.test(d.querySelector('.ofdlnote')?.textContent || '') && /no English name/.test(d.querySelector('.ofdlnote')?.textContent || ''), '#1381: note box names the position without an English name: ' + (d.querySelector('.ofdlnote')?.textContent || '').slice(0, 160));
   // #3927 (Mac red 20261101-210647): closed before the language save had answered, its answer (lang_notes) opened the box again
   await idle(w);
+  // 2.482.0 (#3940): a second language save is on its way while the box is closed; its late answer must not reopen it
+  lnHold = true; d.querySelector('#ofd-lang').dispatchEvent(new w.Event('change', {bubbles: true}));
+  await until(() => lnRel, 200);
   d.querySelector('[data-ofd="ln-x"]')?.click();
   // #3927: since 2.460.0 (#3767) the box of missing own texts (.ofdlnote too, without a close button) may follow it: the language box is the one with ln-x
   await until(() => !d.querySelector('.ofdlnote [data-ofd="ln-x"]'), 200);
   check(!d.querySelector('.ofdlnote [data-ofd="ln-x"]'), '#1381: the note box closes');
+  check(!!lnSeen, '#3940: the language answer carried lang_notes');
+  lnHold = false; lnRel && lnRel();
+  await until(() => lnDone, 200); await idle(w);
+  check(!!lnRel && !d.querySelector('.ofdlnote [data-ofd="ln-x"]'), '#3940: the late answer of the language save does not open the closed note again');
+  // a new language switch shows it again
+  const ls2 = d.querySelector('#ofd-lang'); ls2.value = 'de'; ls2.dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);
+  const ls3 = d.querySelector('#ofd-lang'); ls3.value = 'en'; ls3.dispatchEvent(new w.Event('change', {bubbles: true}));
+  await until(() => d.querySelector('.ofdlnote [data-ofd="ln-x"]'), 200);
+  check(!!d.querySelector('.ofdlnote [data-ofd="ln-x"]'), '#3940: a new language switch shows the note again');
+  w.rawFetch = rf0;
   w.close();
 
   // ================= #1381: settings - the English choice shows the English text
