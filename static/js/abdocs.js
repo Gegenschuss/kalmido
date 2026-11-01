@@ -10,7 +10,9 @@
 
 const abd_on = () => feat('docs') && !S.me?.kid;
 const abd_cardKeys = () => { try { const a = JSON.parse(S.settings?.ab_cards || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } };
-const abd_cardsOn = key => abd_on() && abd_cardKeys().includes(key);
+// asked for by ablage.js with typeof before this file may be loaded: function declarations (window properties), never const -
+// a view drawn before the load kept seeing a const as missing (main red #3506: a new start showed the list, not the cards)
+function abd_cardsOn(key) { return abd_on() && abd_cardKeys().includes(key); }
 const abd_locked = n => !!n?.locked;  // part A (#2758): a locked folder and everything in it (a missing field = not locked)
 
 // ---- list / cards per folder (all devices of the person: the setting ab_cards, changed by single entries)
@@ -34,10 +36,10 @@ function abd_card(n) {
   const meta = abd_locked(n) ? '' : [n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(n.updated_at)].filter(Boolean).join(' · ');
   return `<li class="dc-card abcf"><button type="button" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''} aria-label="${esc(n.name)}"><span class="dc-th">${img || `<span class="dc-ph">${ab_icon(n)}</span>`}</span><span class="dc-ct"><b class="dc-nm">${esc(n.name)}</b>${meta ? `<span class="dc-mt">${esc(meta)}</span>` : ''}</span></button>${menuBtn}</li>`;
 }
-const abd_cardsHtml = d => {
+function abd_cardsHtml(d) {
   if (!AB.dq && !AB.loading) { AB.key = ''; setTimeout(ab_load, 0); }  // loaded as a list before this file was there: again with the documents' fields
   return abd_cardsHtml2(d);
-};
+}
 const abd_cardsHtml2 = d => `<ul class="dc-grid abcards" aria-label="${esc(tr('Files'))}">${d.items.map(abd_card).join('')}</ul>`;
 
 // ---- recognition: the line above a folder's list, the menu items, the switch
