@@ -305,7 +305,7 @@ USE = {"GET /api/files/nodes/{}/requests": {"node": "folder"}, "GET /api/office/
 FROM_TO = {"from": "2030-03-01", "to": "2030-03-31"}
 QUERY = {
     "GET /api/calendars/events": FROM_TO, "GET /api/events": FROM_TO, "GET /api/occurrences": FROM_TO, "GET /api/v1/events": FROM_TO,
-    "GET /api/events/freebusy": {"day": D, "users": "{me}"}, "GET /api/clients/usage": {"ids": "{client}"},
+    "GET /api/events/freebusy": {"day": D, "users": "{me}"}, "GET /api/v1/events/freebusy": {"day": D, "users": "{me}"}, "GET /api/clients/usage": {"ids": "{client}"},
     "GET /api/files/search": {"q": "plan"}, "GET /api/v1/files/search": {"q": "plan"}, "GET /api/files/tagged": {"tag": "1"},
     "GET /api/files/zip": {"ids": "{node}"}, "GET /api/folders/agents": {"folder": "Work"},
     "GET /api/folders/notify-template": {"folder": "Work"}, "GET /api/folders/people/diff": {"folder": "Work", "role": "edit", "user_id": "{agent}"},

@@ -114,6 +114,8 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "tax_reserve_pct": 0, "vat_basis": "ist",
                      # 2.90.0 C (#1922): tax dates as tasks (set only by its own route, office/taxdates.py)
                      "tax_dates": {},
+                     # 2.467.0 (#3456): VAT paid to / refunded by the tax office per year (set only by its own route, office/taxforms.py)
+                     "tax_form_vat": {},
                      # 2.299.0 C (#3192): the reminder of the bank bookings without a receipt (set only by its own route, office/banknorc.py)
                      "bank_norc": {},
                      # 2.425.0 B (#3451): the recurring providers of the bank bookings (set only by its own route, office/bankvend.py): days

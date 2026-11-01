@@ -196,6 +196,8 @@ p2462_c_ui
 p2462_d_api
 p2462_d_ui
 p2462_a_ui
+p2467_c_api
+p2467_c_ui
 p246d_a_ui
 p246d_b_ui
 p246d_c_ui

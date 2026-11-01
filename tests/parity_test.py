@@ -33,6 +33,7 @@ API = {f"{m.upper()} {norm(p)[len('/api/v1'):]}" for m, p in routes if p.startsw
 
 # ---- 1. the web client's routes -> the REST API
 APP_TO_API = {
+    "GET /api/events/freebusy": ["GET /events/freebusy"],  # 2.467.0 (#2586)
     "PUT /api/tasks/{}/irreversible": ["PATCH /tasks/{}"], "DELETE /api/tasks/{}/irreversible": ["PATCH /tasks/{}"],  # 2.392.0 C (#3370)
     "GET /api/tasks/{}/decisions": ["GET /tasks/{}/decisions"], "POST /api/tasks/{}/decisions": ["POST /tasks/{}/decisions"],
     "GET /api/state": ["GET /lists", "GET /tasks", "GET /habits", "GET /filters", "GET /me"],
@@ -697,9 +698,8 @@ APP_ONLY = [
     # bundle C (2.152.0 D #2175, 2.155.0 B #2076 #2077): routes of packages built in parallel, judged after the merge
     ("2.152.0 D (#2175): a person deletes messages of their own agent chat (retention); agents never delete chat messages",
      ("=DELETE /api/agents/{}/chat", "=DELETE /api/agents/{}/chat/{}")),
-    ("2.155.0 B (#2076, #2077): the availability bar of the event editor and the absences feed are a person's views of the "
-     "team calendar; agents read events and absences through their own tools",
-     ("=GET /api/events/freebusy", "=GET /api/team/absences/feed")),
+    ("2.155.0 B (#2076): the absences feed is a person's view of the team calendar; agents read absences through their own tool",
+     ("=GET /api/team/absences/feed",)),
     # 2.168.0 A (#2665): a project page's office documents, only for people with office rights in its area
     ("2.168.0 (#2665): a project page's quotations and invoices are a person's office view (agents and people without office "
      "rights get office false); agents read office documents only through /api/v1/office/docs",

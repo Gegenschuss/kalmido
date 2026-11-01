@@ -930,10 +930,13 @@ def _org_patch(c, oid, b):
             c.execute("UPDATE orgs SET icon=? WHERE id=?", (v, oid))
             org_icon_drop_file(oid, old)  # an emoji replaces the own picture
     if "domains" in b:
-        # 2.422.0 (#2937): a company a person created herself takes e-mail domains only from an admin of the server
-        if not g.user["is_admin"] and (c.execute("SELECT self_made FROM orgs WHERE id=?", (oid,)).fetchone() or [0])[0]:
-            raise Denied(403, tr("Only an admin of this server sets the e-mail domains of this company"))
-        c.execute("UPDATE orgs SET domains=? WHERE id=?", (_clean_domains(b["domains"]), oid))
+        # 2.422.0 (#2937), 2.467.0 (#3898): only an admin of the server sets e-mail domains, for every organisation: they decide
+        # whose registrations land here. What an organisation has stays; its own value sent back unchanged is no change.
+        v = _clean_domains(b["domains"])
+        if g.user["is_admin"]:
+            c.execute("UPDATE orgs SET domains=? WHERE id=?", (v, oid))
+        elif v != _clean_domains((c.execute("SELECT domains FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0] or ""):
+            raise Denied(403, tr("Only an admin of this server sets the e-mail domains of an organisation"))
 
 
 @app.delete("/api/admin/orgs/<int:oid>")
@@ -1146,8 +1149,8 @@ def orgs_mine():
 
 @app.patch("/api/orgs/<int:oid>")
 def org_mine_update(oid):
-    """2.28.0 (#935): {name?, icon?, domains?} -- an organisation admin renames it / sets its e-mail domains (modes multi /
-    workspaces; in the mode organisation the name comes from the configuration or the instance admin).
+    """2.28.0 (#935): {name?, icon?, domains?} -- an organisation admin renames it (modes multi / workspaces; in the mode
+    organisation the name comes from the configuration or the instance admin). 2.467.0 (#3898): domains only by a server admin.
     2.53.0 B (#1474): {color?} -- its colour for every member ('' = the default tone); only here (an admin of this
     organisation), not in the instance admin's routes. 2.61.0 B (#1819): {photo_meta_strip?: bool} likewise."""
     c, b = db(), body()

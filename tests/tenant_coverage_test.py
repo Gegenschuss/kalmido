@@ -46,7 +46,7 @@ KINDS = {
     "people": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: the user list, user changes, invitations / sign-in links by id"),
     "org": ("matrix", "p2280_api_test.py: organisations, their members and admins; p2115_b_api_test.py: invitations by e-mail (2.115.0); "
                    "p2146_d_api_test.py: the retention export of another organisation 404 (2.146.0); "
-                   "p2422_orgself_test.py: a company of one's own - its admin sets no e-mail domains (2.422.0)"),
+                   "p2422_orgself_test.py: a company of one's own - its admin sets no e-mail domains (2.422.0), an organisation admin neither (2.467.0)"),
     "calendar": ("matrix", "p2300_tenant_test.py: calendars by id, sharing (B2), workspace (B3); p294_b_api_test.py (the booking page: types / bookings of another person 404, the public pages); "
                  "p2111_b_api_test.py (invitation marks and subscription links of another person's calendar 404, a link ends with the sharing)"),
     "event": ("matrix", "p2300_tenant_test.py: events by id, ranges, invitations"),
@@ -362,6 +362,7 @@ ROUTES = {
     "DELETE /api/evcals/{}/members/{}": "calendar", "GET /api/evcals/{}/export.ics": "calendar",
     "GET /api/evinvite": "calendar", "GET /api/evcals/{}/feed": "calendar", "POST /api/evcals/{}/feed": "calendar",  # 2.111.0 B (#2056)
     "GET /api/events/freebusy": "calendar",  # 2.155.0 B (#2077): spans only, colleagues of the same organisation
+    "GET /api/v1/events/freebusy": "calendar",  # 2.467.0 (#2586): the same; an agent only about the people shared with it
     # ---- chatfile (4)
     "GET /api/chat-files/{}": "chatfile", "DELETE /api/chat-files/{}": "chatfile",
     "POST /api/chat-save": "chatsave",  # 2.37.0 (#1159)
@@ -504,6 +505,9 @@ ROUTES = {
     "POST /api/office/datev/suppliers/{}/restore": "office", "GET /api/office/datev/opening": "office",
     # 2.90.0 A (#1921): bookkeeping light, office admins (p290_a_api_test.py)
     "GET /api/office/books": "office", "GET /api/office/books/euer": "office", "GET /api/office/books/ustva": "office",
+    "GET /api/office/books/taxform/euer": "office", "GET /api/office/books/taxform/euer.csv": "office", "GET /api/office/books/taxform/euer.pdf": "office",  # 2.467.0 (#3456): p2467_c_api_test.py
+    "GET /api/office/books/taxform/ust": "office", "GET /api/office/books/taxform/ust.csv": "office", "GET /api/office/books/taxform/ust.pdf": "office",
+    "PUT /api/office/books/taxform/vat": "office",
     "GET /api/office/books/euer.csv": "office", "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/export": "office",  # 2.147.0 (#2461): neutral export, admin only (p2147_a_api_test.py)
     "GET /api/office/books/receipts": "office", "GET /api/office/books/receipts.csv": "office", "GET /api/office/books/receipts.zip": "office",  # 2.153.0 (#2055)
     "POST /api/office/books/receipts/checked": "office",  # 2.420.0 C (#3448): p24200_c_api_test.py

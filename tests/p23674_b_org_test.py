@@ -152,7 +152,7 @@ sess("alice", ip="198.51.100.21")
 check(until(lambda: [x for x in alerts() if "Admin alice signed in" in (x.get("message") or "")], 70), "an instance admin stays the admin alert")
 
 # ================================================================== a registration by domain
-assert Bo.patch(B + f"/api/orgs/{ORG}", json={"domains": "nordwind.example"}).ok or A.patch(B + f"/api/orgs/{ORG}", json={"domains": "nordwind.example"}).ok
+assert A.patch(B + f"/api/admin/orgs/{ORG}", json={"domains": "nordwind.example"}).ok  # 2.467.0 (#3898): only a server admin
 A.patch(B + "/api/admin/settings", json={"password": "password123", "signup_mode": "approval"})
 R = requests.Session()
 R.headers.update(H)
@@ -213,10 +213,12 @@ check(out == f"[{ALICE}] []", f"skip leaves the admin out {out}")
 sec = Bo.post(B + "/api/me/2fa/totp", json={"password": "password123"}).json()["secret"]
 check(Bo.post(B + "/api/me/2fa/totp/confirm", json={"code": totp(sec)}).ok, "setup: bob turns two-factor on")
 check(until(lambda: [x for x in alerts() if "1 person turned on two-factor authentication: bob" in (x.get("message") or "")], 70), "it reaches the list as a summed alert")
+dbx("UPDATE admin_alerts SET sent_at='2000-01-01T00:00:00+00:00' WHERE sent_at IS NOT NULL")  # the hourly cap: a capped row counts for no cooldown
 for _ in range(2):  # the same reset twice within the cooldown
     dbx("UPDATE users SET totp_secret='x' WHERE id=?", (EVE,))
     check(A.patch(B + f"/api/users/{EVE}", json={"reset_2fa": True}).ok, "setup: a reset")
-r = until(lambda: [x for x in alerts() if "reset the two-factor" in (x.get("message") or "")], 70)
+resets = lambda: [x for x in alerts() if "reset the two-factor" in (x.get("message") or "")]  # noqa: E731
+r = until(lambda: (y if len(y := resets()) > 1 or (y and y[0].get("repeats")) else None), 70) or resets()  # the second reset lands a round later under load
 check(len(r) == 1 and r[0].get("repeats") == 1, f"one row, the cooldown holds (with a time in the key: two) {r}")
 
 # ================================================================== the notice

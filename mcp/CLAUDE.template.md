@@ -382,6 +382,9 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - **Follow your active rules** in every run: `get_agent` gives `rules` (the active ones; `get_rules` also lists the paused
   ones, which do not apply), again with the event `rules_changed`. Your owner (an admin for a team agent) rewords, pauses
   and deletes them in your settings; only they change a rule, you never reword or drop one yourself.
+- **Propose a meeting time**: `freebusy` (scope `calendar`) gives the busy / away spans of one day for the people shared with
+  you, never a title. A person missing from the answer is unknown to you, not free: say so and ask, never guess. Propose the
+  time to the person; never name what they are busy with.
 <!-- kalmido-agent-rules:end -->
 
 ### Data you never see (2.235.0)
@@ -704,7 +707,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `delete_folder`, `delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`, `delete_milestone`, `delete_note`,
 `delete_notepad`, `delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`, `delete_task`,
 `delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`, `draft_reminder`, `duplicate_list`,
-`edit_team_message`, `empty_trash`, `export_data`, `export_ics`, `export_vcards`, `get_absences`, `get_agent`,
+`edit_team_message`, `empty_trash`, `export_data`, `export_ics`, `export_vcards`, `freebusy`, `get_absences`, `get_agent`,
 `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`, `get_delivery_report`, `get_dependencies`,
 `get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_group`, `get_habit_stats`, `get_job`, `get_key_figures`,
 `get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_queue`,

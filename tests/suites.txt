@@ -701,6 +701,8 @@ fresh; run p2462_d_api "$PY" p2462_d_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2462_d_ui node p2462_d_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.2 part A: #1718 no flicker (the view is morphed on a redraw of the same route)
 fresh; run p2462_a_ui node p2462_a_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2467_c_api "$PY" p2467_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run p2467_c_ui node p2467_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.4 part A: #1732 the contacts of a deleted address book leave the list at once (dialog, filter, live update)
 fresh; run p246d_a_ui node p246d_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.46.4 part B: #1751 the list switch "Tap does not open details" (a tap ticks off; on for shopping / packing lists)

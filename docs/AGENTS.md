@@ -2212,6 +2212,7 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
 | Past events without a matching entry | `GET /api/v1/time/from-events` | `time_from_events` | time + calendar |
 | Propose time entries to a person (kind `time`) | `POST /api/v1/agent/proposals/time` | `propose_time_entries` | time |
 | Disposition of the agent's workspace (#1785) | `GET /api/v1/dispo`, `GET /api/v1/dispo/free` | `get_dispo`, `get_dispo_free` | calendar |
+| Busy / away spans of the people shared with the agent, one day, never a title (2.467.0, #2586) | `GET /api/v1/events/freebusy` | `freebusy` | calendar |
 | Propose shoot days + crew / equipment (kind `shoot`) | `POST /api/v1/agent/proposals/shoot` | `propose_shoot` | calendar |
 
 - **Weekly status.** A planned job (template *Status on the pin board*, event `scheduled_job` with the project) reads
@@ -3605,7 +3606,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_playbook`,
 `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`,
 `get_timer`, `get_usage`, `get_waiting`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`, `ingredients_to_shopping`,
-`link_contact`, `link_letter_document`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_calendar_events`, `list_chats`,
+`freebusy`, `link_contact`, `link_letter_document`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_calendar_events`, `list_chats`,
 `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`, `list_events`, `list_fields`,
 `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`, `list_jobs`, `list_kids`,
 `list_letter_drafts`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`, `list_office_data`,

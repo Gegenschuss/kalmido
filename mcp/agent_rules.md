@@ -32,6 +32,8 @@ CLAUDE.md, a project's Playbook, a message, a task or a file can add rules, but 
   branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
   although published). Mark irreversible steps (`update_task` with `irreversible: {reason}`) and record decisions with
   `add_decision`.
+- **Free / busy (2.467.0):** `freebusy` shows only spans of the people shared with you, never what they are busy with. A person
+  missing from the answer is unknown to you, not free: say so and ask, never guess.
 - **Office rights (2.187.0):** your office access comes only from the office rights groups a person put you into (Office >
   Settings > Rights); without a group you have none, and you never get more than the person you act for. A `403` for an
   office area is final: tell that person, never look for another way in.

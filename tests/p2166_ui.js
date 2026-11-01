@@ -1,7 +1,7 @@
 // 2.166.0 UI tests (#2633), own container (start.sh), jsdom. Settings save themselves (the pattern of #2247) and the tokens
 // sit in one place:
 // - Settings > organisation: name and e-mail domains save when the field is left (no Save button); an empty name goes
-//   back and is not saved
+//   back and is not saved; 2.467.0 (#3898): read only for an organisation admin who is no server admin
 // - Settings > Access: API tokens, webhooks and the tokens of my personal agents; Account > Advanced, Integrations and
 //   Agents link there; the old focus keys "tokens" / "webhooks" open it
 // - a person without an organisation (Frida) has the same Access area: her token, her webhook section, her agent
@@ -51,6 +51,19 @@ const ALL = 'cal,collab,agents,comments';
   change(w, nm2, '   '); await sleep(500);
   check(((await call(CA, 'GET', '/api/orgs')).orgs || []).find(o => o.id === org.id)?.name === 'Alpha Studio' && nm2.value === 'Alpha Studio', 'an empty name goes back, nothing saved');
   d.querySelector('.smodal')?.remove();
+
+  // ================= 2.467.0 (#3898): an organisation admin who is no server admin only reads the e-mail domains
+  const ou = await call(CA, 'POST', '/api/users', {username: 'olga', display_name: 'Olga', password: 'password123', email: 'olga@example.com', orgs: []});
+  const org2 = await call(CA, 'POST', '/api/admin/orgs', {name: 'Beta', admin_id: ou.id, domains: 'beta.example'});
+  const CO = await login('olga');
+  await call(CO, 'PATCH', '/api/settings', {features: ALL, lang: 'en', tour: 'done'});
+  const wo = await boot({user: 'olga', hash: 'today'}), dO = wo.document;
+  wo.eval(`settingsModal('org')`);
+  let dm2 = await until(() => dO.querySelector(`.smodal #ws-dom-${org2.id}`), 8);
+  if (!dm2) { dO.querySelector('.smodal')?.remove(); wo.eval(`settingsModal('account')`); dm2 = await until(() => dO.querySelector(`.smodal #ws-dom-${org2.id}`)); }
+  check(dm2 && dm2.readOnly && dm2.value === 'beta.example' && !dm2.dataset.wsf, 'an organisation admin: the domains shown, read only');
+  check(dO.querySelector(`.smodal #ws-dom-hint-${org2.id}`), 'with a short note who sets them');
+  dO.querySelector('.smodal')?.remove();
 
   // ================= Settings > Access
   const AG = await call(CA, 'POST', '/api/my/agents', {username: 'alice-bot', display_name: 'Alice Bot'});

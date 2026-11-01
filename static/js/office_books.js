@@ -60,6 +60,7 @@ function bkTabHtml() {
   if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
   if (bkSub() === 'receipts' && typeof rclHtml === 'function') return rclHtml();  // 2.110.0 B (#2055): all receipts (office_receipts.js)
   if (bkSub() === 'archive' && typeof bkaHtml === 'function') return bkaHtml();  // 2.414.0 A (#3502): the booking archive (office_bookarch.js)
+  if (bkSub() === 'taxforms') return tfHtml();  // 2.467.0 (#3456): Anlage EUeR and annual VAT return
   if (BK.err) return `<div class="empty">${esc(BK.err)}</div>`;
   if (!BK.info || !BK.euer || !BK.ustva) { if (!BK.loadingT) BK.loadingT = setTimeout(() => { BK.loadingT = 0; bkLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   if (bkSub() === 'ustva' && !BK.jumped) { BK.jumped = true; setTimeout(() => $('#bk-ustva')?.scrollIntoView({block: 'start'}), 0); }
@@ -67,6 +68,7 @@ function bkTabHtml() {
   for (let y = yNow + 1; y >= yNow - 6; y--) years.push([y, String(y)]);
   const head = `<div class="ofcbar bk-bar"><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('bk-year', BK.year, years)}</label><span class="spacer"></span>
     ${ofcFeat('books.datev') ? `<a class="btn sm ghost" href="#office/books/archive" data-bk-archive>${ic('archive', 's')}<span>${tr('Booking archive')}</span></a>` : ''}
+    ${ofcFeat('books.vat_return') ? `<a class="btn sm ghost" href="#office/books/taxforms/euer" data-bk-taxforms>${ic('file', 's')}<span>${tr('Tax forms')}</span></a>` : ''}
     ${OFC.info?.procdoc !== false ? `<a class="btn sm ghost" href="#office/books/procdoc" data-bk-procdoc>${ic('file', 's')}<span>${tr('Procedure documentation')}</span></a>` : ''}</div>
     ${bkPhotoHtml()}`;
   // 2.365.2 D (#2789): tax reserve, VAT basis and tax dates are set in Settings > Company & office > Bank & taxes (ost_taxHtml)
@@ -175,6 +177,53 @@ function bkSettingsHtml() {
   return `<section class="bk-sec" aria-labelledby="bk-sh"><h3 class="ofcgrp" id="bk-sh">${tr('Tax reserve and VAT basis')}</h3>${''/* 2.365.2 D (#2789): in Settings > Company & office > Bank & taxes */}
     ${ofcRowF('bk-reserve', tr('Tax reserve'), `<input id="bk-reserve" type="number" min="0" max="60" step="1" inputmode="numeric" class="numin bk-pct" value="${+s.tax_reserve_pct || 0}"><span class="muted">%</span>`, tr('Share of the net money received that is put aside in the cash flow (0 = off).'))}
     <div class="row"><label id="bk-basisl">${tr('VAT')}</label><div class="seg" role="group" aria-labelledby="bk-basisl">${[['ist', tr('Cash basis (on payment)')], ['soll', tr('Accrual basis (on invoicing)')]].map(([k, n]) => `<button type="button" data-bk="basis" data-v="${k}" class="${(s.vat_basis || 'ist') === k ? 'on' : ''}" aria-pressed="${(s.vat_basis || 'ist') === k}">${esc(n)}</button>`).join('')}</div></div></section>`;
+}
+
+// ---- 2.467.0 (#3456): the Anlage EUeR and the annual VAT return line by line (#office/books/taxforms/euer|ust); server: office/taxforms.py
+const TF = {oid: null, kind: null, year: null, d: null, err: null, seq: 0, t: 0};
+const tfYears = () => { const y = new Date().getFullYear(), out = []; for (let i = y; i >= y - 6; i--) out.push([i, String(i)]); return out; };
+async function tfLoad() {
+  const seq = ++TF.seq;
+  try { const d = await api('GET', `/api/office/books/taxform/${TF.kind}?year=${TF.year}`); if (seq === TF.seq) Object.assign(TF, {d, err: null}); }
+  catch (x) { if (seq === TF.seq) TF.err = x.message || tr('unknown'); }
+  ofcDraw();
+}
+const tfRow = r => `<tr${r.sum ? ' class="bk-tot"' : ''}><td class="num" data-l="${esc(tr('Line'))}">${r.line}</td><td class="num" data-l="${esc(tr('Field'))}">${esc(r.kz)}</td><th scope="row">${esc(r.label)}${(r.from || []).length ? ` <small class="muted">${esc(r.from.join(', '))}</small>` : ''}</th>
+  <td class="num" data-l="${esc(tr('Base'))}">${r.base != null ? esc(fmtNum(+r.base, 0)) + ' ' + ofcSym(TF.d.currency) : ''}</td><td class="num" data-l="${esc(tr('Amount'))}">${r.tax != null ? ofcMoney(r.tax) : r.amount != null ? ofcMoney(r.amount) : ''}</td></tr>`;
+function tfVatHtml(d) {
+  if (d.small_business) return '';
+  return `<div class="tf-vat"><h4 class="bk-h">${tr('VAT and the tax office in {0}', d.year)}</h4>
+    ${ofcRowF('tf-paid', tr('VAT paid to the tax office'), `<input id="tf-paid" inputmode="decimal" class="numin" value="${esc(fmtNum(+d.vat_paid, 2))}">`, tr('Advance payments and final payments that left the account in this year.'))}
+    ${ofcRowF('tf-refund', tr('VAT refunded by the tax office'), `<input id="tf-refund" inputmode="decimal" class="numin" value="${esc(fmtNum(+d.vat_refund, 2))}">`)}</div>`;
+}
+function tfHtml() {
+  if (!ofcFeat('books.vat_return')) return `<div class="empty">${tr('The VAT return figures are switched off for this office.')}</div>`;
+  const kind = location.hash.split('/')[3] === 'ust' ? 'ust' : 'euer';
+  if (TF.oid !== OFC.info?.org_id || TF.kind !== kind) Object.assign(TF, {oid: OFC.info?.org_id, kind, d: null, err: null, year: TF.year || new Date().getFullYear() - 1});
+  const back = `<a class="btn sm ghost" href="#office/books">${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a>`;
+  const tabs = `<div class="seg" role="group" aria-label="${esc(tr('Tax forms'))}">${[['euer', tr('Anlage EÜR')], ['ust', tr('Annual VAT return')]].map(([k, n]) => `<a class="btn sm${kind === k ? ' on' : ''}" href="#office/books/taxforms/${k}"${kind === k ? ' aria-current="page"' : ''}>${esc(n)}</a>`).join('')}</div>`;
+  const bar = `<div class="ofcbar bk-bar">${back}${tabs}<span class="spacer"></span><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('tf-year', TF.year, tfYears())}</label></div>`;
+  if (TF.err) return bar + `<div class="empty">${esc(TF.err)}</div>`;
+  if (!TF.d) { if (!TF.t) TF.t = setTimeout(() => { TF.t = 0; tfLoad(); }, 0); return bar + `<p class="muted lempty">${tr('Loading…')}</p>`; }
+  const d = TF.d, notes = d.notes.map(n => `<p class="muted bk-note">${esc(n)}</p>`).join('');
+  if (!d.rows.length) return bar + `<p class="bk-warn">${esc(d.notes[0])}</p>` + d.notes.slice(1).map(n => `<p class="muted bk-note">${esc(n)}</p>`).join('');
+  const dl = kind === 'euer' ? 'euer' : 'ust';
+  const head = `<div class="ofcbar"><h3 class="ofcgrp">${esc(kind === 'euer' ? tr('Anlage EÜR {0}', d.year) : tr('Annual VAT return {0}', d.year))}</h3><span class="spacer"></span>
+    <a class="btn sm ghost" href="/api/office/books/taxform/${dl}.csv?year=${d.year}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/books/taxform/${dl}.pdf?year=${d.year}" download>${ic('download', 's')}<span>PDF</span></a></div>`;
+  const table = `<table class="bk-tab"><thead><tr><th class="num">${tr('Line')}</th><th class="num">${tr('Field')}</th><th>${tr('Description')}</th><th class="num">${tr('Base')}</th><th class="num">${tr('Amount')}</th></tr></thead><tbody>${d.rows.map(tfRow).join('')}</tbody></table>`;
+  const foot = kind === 'euer'
+    ? `<div class="bk-profit"><span>${tr('Line sum income minus line sum expenses')}</span><b class="${+d.profit < 0 ? 'neg' : ''}">${ofcMoney(d.profit)}</b></div>
+       <p class="muted ofchint">${esc(tr('Profit of the income/expense statement (without VAT): {0} · difference through VAT: {1}', ofcMoney(d.profit_books), ofcMoney(d.vat_balance)))}</p>${tfVatHtml(d)}`
+    : `<p class="muted ofchint">${esc(tr('Field {0}', '133'))}: ${d.basis_code === '1' ? tr('VAT on invoicing (by invoice date)') : tr('VAT on payment received')}</p>`;
+  const warn = d.missing_vat ? `<p class="bk-warn">${esc(trn('{0} receipt without VAT rate counts without input tax.', '{0} receipts without VAT rate count without input tax.', d.missing_vat))}</p>` : '';
+  return bar + `<section class="bk-sec">${head}${table}${foot}${warn}${notes}</section>`;
+}
+async function tfVatSave() {
+  const num = id => { const v = ($('#' + id)?.value || '').trim(); return v ? ofcNum(v) : 0; };
+  const paid = num('tf-paid'), refund = num('tf-refund');
+  if (paid == null || refund == null) { toast(tr('Invalid data')); return; }
+  try { TF.d = await api('PUT', '/api/office/books/taxform/vat', {year: TF.year, paid: paid.toFixed(2), refund: refund.toFixed(2)}); } catch (x) { toast(x.message || tr('unknown')); }
+  ofcDraw();
 }
 
 // ---- settings: one undo step each
@@ -425,6 +474,8 @@ document.addEventListener('change', e => {
   if (t.id === 'bk-year') { BK.year = +t.value; BK.info = null; BK.euer = null; ofcDraw(); return; }
   if (t.id === 'bk-period') { BK.period = t.value; bkLoadUstva(); return; }
   if (t.id === 'bk-pyear') { BK.pyear = +t.value; bkLoadUstva(); return; }
+  if (t.id === 'tf-year') { TF.year = +t.value; TF.d = null; ofcDraw(); return; }  // 2.467.0 (#3456)
+  if (t.id === 'tf-paid' || t.id === 'tf-refund') { tfVatSave(); return; }
 });
 function bkReserve(t) { const n = Math.round(+t.value); if (!Number.isFinite(n) || n < 0 || n > 60) { toast(tr('Invalid value: {0}', tr('Tax reserve'))); t.value = +OFC.info?.settings?.tax_reserve_pct || 0; return; } bkSetUndo('tax_reserve_pct', n); }
 document.addEventListener('click', e => {

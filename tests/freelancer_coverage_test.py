@@ -652,6 +652,7 @@ ROUTES = {
     "GET /api/evcals": "pim",
     "GET /api/evinvite": "pim", "GET /api/evcals/{}/feed": "pim", "POST /api/evcals/{}/feed": "pim",  # 2.111.0 B (#2056)
     "GET /api/events/freebusy": "pim",  # 2.155.0 B (#2077): only the own bar without an organisation
+    "GET /api/v1/events/freebusy": "pim",  # 2.467.0 (#2586): the same; a freelancer's agent only about its owner
     "GET /api/evcals/{}/export.ics": "pim", "GET /api/events": "pim", "GET /api/events/{}": "pim",
     "GET /api/v1/address-books": "pim", "GET /api/v1/address-books/{}/export": "pim", "GET /api/v1/contacts": "pim",
     "GET /api/v1/contacts/{}": "pim", "GET /api/v1/event-calendars": "pim", "GET /api/v1/event-calendars/{}/export": "pim",
@@ -917,6 +918,9 @@ ROUTES = {
     "GET /api/office/bank/tx/{}/candidates": "office", "GET /api/office/books": "office",
     "GET /api/office/books/euer": "office", "GET /api/office/books/euer.csv": "office", "GET /api/office/books/export": "office",  # 2.147.0 (#2461)
     "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/ustva": "office",
+    "GET /api/office/books/taxform/euer": "office", "GET /api/office/books/taxform/euer.csv": "office", "GET /api/office/books/taxform/euer.pdf": "office",  # 2.467.0 (#3456)
+    "GET /api/office/books/taxform/ust": "office", "GET /api/office/books/taxform/ust.csv": "office", "GET /api/office/books/taxform/ust.pdf": "office",
+    "PUT /api/office/books/taxform/vat": "office",
     "GET /api/office/books/receipts": "office", "GET /api/office/books/receipts.csv": "office", "GET /api/office/books/receipts.zip": "office",  # 2.153.0 (#2055)
     "POST /api/office/books/receipts/checked": "office",  # 2.420.0 C (#3448): p24200_c_api_test.py
     "POST /api/office/receipts/submit": "office", "GET /api/office/receipts/mine": "office", "GET /api/office/receipts/submitted": "office",  # 2.356.0 D (#3129)
@@ -1540,7 +1544,6 @@ PUT /api/office/cashflow/actual
 PUT /api/office/cashflow/check
 PUT /api/office/cashflow/start
 PUT /api/office/logbook/settings
-PUT /api/office/tax-dates
 PUT /api/paperless
 PUT /api/supporter/{}
 PUT /api/tasks/{}/bell

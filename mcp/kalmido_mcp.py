@@ -1099,6 +1099,12 @@ TOOLS += [
     ("list_calendar_events", "2.21.0: the events in a date range (repeating ones expanded, at most 400 days): own + shared calendars and invitations.",
      _obj({"from": {"type": "string"}, "to": {"type": "string"}, "calendar_id": S_ID}, ["from", "to"]),
      lambda api, a: api.call("GET", "/events", {"from": a["from"], "to": a["to"], "calendar_id": a.get("calendar_id")})),
+    ("freebusy", "2.467.0 (#2586): busy / away time spans of one day per person, for proposing a meeting time: never a title, a place or a "
+                 "calendar. Only people shared with you (your owner; others by their own setting, full members of your workspace); "
+                 "anyone else is left out of the answer: a person missing from it is unknown to you, not free.",
+     _obj({"day": {"type": "string"}, "users": {"type": "array", "items": {"type": "integer"}, "minItems": 1, "maxItems": 20},
+           "tz": {"type": "string"}, "skip": S_ID}, ["day", "users"]),
+     lambda api, a: api.call("GET", "/events/freebusy", {"day": a["day"], "users": ",".join(str(int(x)) for x in a["users"]), "tz": a.get("tz"), "skip": a.get("skip")})),
     ("get_event", "2.21.0: one event with its rule, changed / left-out dates and attendees.", _obj({"event_id": S_ID}, ["event_id"]),
      lambda api, a: api.call("GET", f"/events/{int(a['event_id'])}")),
     ("create_event", "2.21.0: create an event (all day or with times; repeat, reminders, attendees: people of this server, contacts, addresses).",
@@ -2373,7 +2379,7 @@ TOOL_SCOPES = {
     "time": ("start_timer", "stop_timer", "add_time_entry", "update_time_entry", "delete_time_entry"),
     "export": ("export_data",),
     "calendar": ("list_event_calendars", "create_event_calendar", "update_event_calendar", "delete_event_calendar", "share_event_calendar",
-                 "unshare_event_calendar", "import_ics", "export_ics", "list_calendar_events", "get_event", "create_event", "update_event", "delete_event",
+                 "unshare_event_calendar", "import_ics", "export_ics", "list_calendar_events", "freebusy", "get_event", "create_event", "update_event", "delete_event",
                  "restore_event", "reply_to_event", "add_preparation_task", "get_task_events"),
     "contacts": ("list_address_books", "create_address_book", "update_address_book", "delete_address_book", "share_address_book",
                  "unshare_address_book", "import_vcards", "export_vcards", "search_contacts", "get_contact", "create_contact", "update_contact",

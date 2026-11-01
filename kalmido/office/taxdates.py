@@ -125,6 +125,7 @@ def txd_task_new(c, kind, cfg, person):
     content = f"{tr(TXD_TEXT[kind], lg=lg)}\n\n[{tr(TXD_HELP, lg=lg)}]({url})\n\n_{tr(TXD_NOTE, lg=lg)} {tr(TXD_WEEKEND, lg=lg)}_"
     title = tr(TXD_TITLES[kind], lg=lg)
     if txy_year(kind, cfg):  # 2.122.0 D (#2315)
+        url = base + "/#office/books/taxforms/ust"  # 2.467.0 (#3456): the annual return line by line
         title = tr(TXY_TITLE, lg=lg)
         content = f"{tr(TXY_TEXT, lg=lg)}\n\n{tr(TXY_HINT, lg=lg)}\n\n[{tr(TXD_HELP, lg=lg)}]({url})\n\n_{tr(TXD_NOTE, lg=lg)} {tr(TXD_WEEKEND, lg=lg)}_"
     lid = my_inbox(c, person)
