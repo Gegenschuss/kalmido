@@ -1074,8 +1074,8 @@ def bud_rkeys(lid, day, amount, kind, ref, e2e, parts=cx.csv_ref_parts):
 
 class _Dups:
     """2.146.0 C (#2455 #2469): the duplicate check of one import (preview and commit alike). A row is there already when
-    one of its references is in the list or in an EARLIER file of this import (a pending entry booked later with another
-    day or text is found so), else by day + amount + counterpart IBAN, else by the old key with the text (dkey; entries of
+    one of its references is in the list or in an EARLIER file of this import (the bank's reference finds a booking with
+    another day or text), else by day + amount + counterpart IBAN, else by the old key with the text (dkey; entries of
     earlier versions only have that one, so it stays checked). Rows of one file are distinct: two equal rows need two
     existing ones; across files the larger number counts, never the sum (like the office's import, 2.144.1).
     2.378.0 (#3347): refs = {key: {day}}; an old EndToEndId key without a day counts only for a booking of that day."""
