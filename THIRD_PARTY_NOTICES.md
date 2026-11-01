@@ -62,6 +62,7 @@ Kalmido itself and only loaded when a page has a formula or a diagram; the brows
 - segno (BSD-3-Clause), QR codes
 - pyasn1 and pyasn1-modules (BSD-2-Clause), pyOpenSSL (Apache-2.0), dependencies of webauthn
 - typing-extensions (PSF-2.0)
+- brotli (MIT), packs JS and CSS ahead of time while the image is built, not part of the image itself
 - Dependencies installed along with the above: Jinja2, MarkupSafe, itsdangerous, blinker, cffi, pycparser, six (BSD-3-Clause / MIT)
 
 The version of every package is pinned in the `Dockerfile`; each package carries its license file in the image.
