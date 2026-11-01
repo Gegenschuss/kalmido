@@ -34,7 +34,8 @@ const startRule = d => {
     const w = await boot({user}), d = w.document;
     const hit = await until(() => startRule(d));
     check(hit, `${user}: the start rule is in the page's stylesheets at start`);
-    check(hit && /\/static\/app\.css/.test(hit.sheet.href || (hit.sheet.ownerNode && hit.sheet.ownerNode.getAttribute('href')) || ''), `${user}: it arrives inside app.css (${hit && (hit.sheet.href || hit.sheet.ownerNode && hit.sheet.ownerNode.getAttribute('href'))})`);
+    const appLink = d.querySelector('link[rel="stylesheet"][href*="/static/app.css"]');
+    check(hit && appLink && appLink.sheet === hit.sheet, `${user}: it arrives inside app.css (the sheet of its <link>)`);
     check(hit && hit.index > hit.count / 2, `${user}: behind the rules of app.css (${hit && hit.index} of ${hit && hit.count})`);
     check(![...d.querySelectorAll('link[rel="stylesheet"]')].some(l => /start-/.test(l.href)), `${user}: no own <link> for a start style file`);
     w.close();
