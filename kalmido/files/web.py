@@ -16,6 +16,7 @@ from ..accounts.session import me
 from ..core.access import Denied, acx_of, collab_all
 from ..core.orgcrypt import oc_send_file
 from .upsafe import h6d_one_file_request, h6d_read
+from .scan import sc_guard  # 2.477.0 (#3936): pulled up from functions
 from .store import (fs_chain, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_purge, fs_purge_files, fs_put, fs_read,
                     fs_height, fs_mail_rows, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place, ROLE_RANK)
@@ -390,7 +391,6 @@ def _send(c, n, version=None, dl=False):
         if not v:
             raise Denied(404)
         path, name, mime, size = v["path"], n["name"], v["mime"] or n["mime"], v["size"]
-        from .scan import sc_guard
         sc_guard(c, "fs", n["id"], v["no"])  # 2.61.0 (#1818): a version found infected later is locked
     full = os.path.join(ATT_DIR, path)
     if not os.path.isfile(full):
@@ -441,7 +441,6 @@ def files_thumb(nid):
     v = fs_version_row(c, nid)
     if not v or (v["size"] or 0) > FS_THUMB_MAX:
         raise Denied(404)
-    from .scan import sc_guard
     sc_guard(c, "fs", nid, v["no"])
     from ..docs.ocr import thumb_bytes
     jpg = thumb_bytes(fs_read(c, nid, v["no"]), "image")
