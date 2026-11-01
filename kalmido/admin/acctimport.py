@@ -40,7 +40,7 @@ from ..accounts.orgs import visible_people as umz_visible  # 2.278.0 B (#3094)
 from ..core.serializers import unlink_files  # 2.464.0 (#3865)
 from ..files.upsafe import up_after_store, up_check, UploadRefused  # 2.464.0 (#3865): pulled up from functions
 from ..lists.projects import LIST_FILES_SUB
-from ..lists.tplextra import tx_keys
+from ..lists.tplextra import tx_import, tx_keys
 from ..tasks.attachments import safe_name
 from .hosting import QuotaExceeded, quota_guard
 from ..core.db import body, bump, connect, db, err, iso, now_utc, parse_iso, usettings, uset, create_user, DataError, IntegrityError
@@ -1546,6 +1546,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
                 if extra["data"] is None:
                     run.warning(N_("A template could not be taken over: {0}"), _txt(r.get("name"), 80))
                     continue
+                extra["extra"] = tx_import(r.get("extra"), who, tx_keys(json.loads(extra["data"])))  # 2.463.0 (#3860): never the file's text
             d = umz_row(c, table, r, {**fixed, **extra, "updated_at": ts, "changed_at": ts}, ts)
             nid = umz_insert(c, table, d) if d else None
             if not nid:
