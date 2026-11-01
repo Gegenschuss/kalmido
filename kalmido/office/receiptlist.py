@@ -26,7 +26,7 @@ from flask import Response, jsonify, request
 
 from ..core.access import Denied, list_role
 from ..core.config import app
-from ..core.db import body, local_now, now_iso
+from ..core.db import body, local_day, local_now, now_iso
 from ..core.i18n import tr
 from ..core.orgcrypt import OrgCryptError
 from ..files.store import fs_chain, fs_deleted, fs_role
@@ -259,7 +259,7 @@ def rcl_csv_text(c, oid, rows):
                 tr("Category"), tr("Project"), tr("Net"), tr("VAT rate"), tr("VAT"), tr("Gross"), tr("Currency"), tr("Original amount"),
                 tr("Original currency"), tr("File name in the ZIP"), tr("Kalmido ID")])
     for x in rows:
-        w.writerow([day(x["doc_date"]), day(x["paid_at"]), day((x.get("checked_at") or "")[:10]), bk_csv_cell(x.get("checked_by") or ""),  # 2.420.0 C (#3448)
+        w.writerow([day(x["doc_date"]), day(x["paid_at"]), day(str(local_day(x.get("checked_at")) or "")), bk_csv_cell(x.get("checked_by") or ""),  # 2.420.0 C (#3448)
                     bk_csv_cell(x["supplier"]), bk_csv_cell(x["vat_id"]), bk_csv_cell(x["number"]),
                     tr("yes") if x["einvoice"] else tr("no"), bk_csv_cell(x["title"]), bk_csv_cell(x["category"]), bk_csv_cell(x["project"] or ""),
                     num(dstr(x["net"])), x["vat_pct"] if x["vat_pct"] is not None else "", num(dstr(x["vat"])), num(dstr(x["amount"])),
