@@ -939,7 +939,6 @@ def member_rejoin(c, oid, uid, rows):
     participant, no participant in a project with the lock, no bridge between agents. A project with the lock gets uid on its
     waiting list (the members trigger): the key comes from somebody who holds it. Roles through groups and folders follow from
     grp_sync. -> how many."""
-    from ..agents.safety import bridge_blocks
     from ..collab.liste2e import le2a_member_problem
     from ..family.family import is_kid
     from ..lists.groups import grp_sync
@@ -947,7 +946,7 @@ def member_rejoin(c, oid, uid, rows):
     for lid, role in rows:
         role = "participant" if kid and role else role
         if not c.execute("SELECT 1 FROM lists WHERE id=? AND org_id=? AND owner_id!=? AND deleted_at IS NULL", (lid, oid, uid)).fetchone() \
-                or (role and (le2a_member_problem(c, lid, uid, role) or bridge_blocks(c, lid, uid))):
+                or (role and (le2a_member_problem(c, lid, uid, role) or _agent_bridge_blocks(c, lid, uid))):
             continue
         back.append(lid)
         if role and c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?) ON CONFLICT DO NOTHING",
