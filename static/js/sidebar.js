@@ -693,7 +693,7 @@ const sdFrame = rafThrottle((x, y) => {
   sd.ghost.style.transform = `translateY(${y - sd.y}px)`;
   const t = sideDropTarget(document.elementFromPoint(x, y), y);
   sideMark(t, sd, y);
-  const side = sd.el.closest('#side') || ps_scroller(sd.el), r = side.getBoundingClientRect();  // 2.482.0 (#3951): the page scrolls on the Projects page
+  const side = sd.el.closest('.pstart') ? ps_scroller(sd.el) : $('#side'), r = side.getBoundingClientRect();  // 2.482.0 (#3951): the page scrolls on the Projects page
   if (r.height && side.scrollBy) { if (y < r.top + 48) side.scrollBy(0, -12); else if (y > r.bottom - 48) side.scrollBy(0, 12); }
   // hovering a closed folder for a moment opens it
   const fh = t && sd.list && t.classList.contains('fhead') && t.classList.contains('closed') ? t.dataset.folder : null;
