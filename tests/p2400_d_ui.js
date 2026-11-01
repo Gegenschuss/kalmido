@@ -10,7 +10,7 @@
 // - #1381: settings > default texts: the English choice shows the English text
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -24,7 +24,7 @@ const FEAT = 'cal,comments,collab,office,clients';
 const TEST_IBAN = 'DE02120300000000202051';
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
@@ -133,9 +133,12 @@ const TEST_IBAN = 'DE02120300000000202051';
   await until(() => d.querySelector('.ofdlnote'), 200);
   check(/Dear Sir or Madam/.test(d.querySelector('#ofd-intro')?.value || ''), '#1381: the intro is English after the switch');
   check(/Farbkorrektur/.test(d.querySelector('.ofdlnote')?.textContent || '') && /no English name/.test(d.querySelector('.ofdlnote')?.textContent || ''), '#1381: note box names the position without an English name: ' + (d.querySelector('.ofdlnote')?.textContent || '').slice(0, 160));
+  // #3927 (Mac red 20261101-210647): closed before the language save had answered, its answer (lang_notes) opened the box again
+  await idle(w);
   d.querySelector('[data-ofd="ln-x"]')?.click();
-  await until(() => !d.querySelector('.ofdlnote'), 200);
-  check(!d.querySelector('.ofdlnote'), '#1381: the note box closes');
+  // #3927: since 2.460.0 (#3767) the box of missing own texts (.ofdlnote too, without a close button) may follow it: the language box is the one with ln-x
+  await until(() => !d.querySelector('.ofdlnote [data-ofd="ln-x"]'), 200);
+  check(!d.querySelector('.ofdlnote [data-ofd="ln-x"]'), '#1381: the note box closes');
   w.close();
 
   // ================= #1381: settings - the English choice shows the English text
