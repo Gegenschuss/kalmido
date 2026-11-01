@@ -15521,7 +15521,6 @@
   "For advanced users: set it up by hand": "Voor gevorderden: met de hand instellen",
   "Indent": "Inspringen",
   "{0} dated task hidden": ["{0} taak met datum verborgen", "{0} taken met datum verborgen"],
-  "{0} registered with the address of your organisation and waits for approval": "{0} heeft zich geregistreerd met het adres van je organisatie en wacht op goedkeuring",
   "agents and their logs (agents are connected anew)": "agenten en hun logboeken (agenten worden opnieuw gekoppeld)",
   "credentials, keys and link secrets": "inloggegevens, sleutels en linkgeheimen",
   "data of an organisation or an office: the organisation export, a person's own office the retention export": "gegevens van een organisatie of kantoor: daarvoor is de organisatie-export, voor iemands eigen kantoor de bewaar-export",
@@ -15551,5 +15550,6 @@
   "the lock of a space (client_encrypted names it)": "de vergrendeling van een ruimte (client_encrypted noemt die)",
   "the trash": "de prullenbak",
   "undo steps of one day": "ongedaan-stappen van één dag",
-  "{0} file of a template": ["{0} sjabloonbestand", "{0} sjabloonbestanden"]
+  "{0} file of a template": ["{0} sjabloonbestand", "{0} sjabloonbestanden"],
+  "{0} registered with the address of your organisation and waits for approval": "{0} heeft zich geregistreerd met het adres van je organisatie en wacht op goedkeuring"
 }

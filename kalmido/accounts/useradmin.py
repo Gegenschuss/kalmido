@@ -125,34 +125,10 @@ def ua8_admin_orgs(c):
     return [o for o in user_orgs(c, me()) if org_role(c, me(), o) == "admin"]
 
 
-def ua8_may_approve(c, u, uid):
-    """2.464.0 (#3882): who decides a waiting registration: an instance admin (users.om_admin_all) or an admin of an organisation the
-    person belongs to (the person joined by the confirmed address of its domain). Raises Denied (404 = an account the caller must
-    not know). -> True for an instance admin."""
-    from ..agents.core import is_agent
-    from ..accounts.users import om_admin_all
-    if g.user["is_admin"]:
-        if not u or not om_admin_all(c, uid):
-            raise Denied(404)
-        return True
-    if is_agent(g.user):
-        raise Denied(403)
-    mine = ua8_admin_orgs(c)
-    if not mine:
-        raise Denied(403)
-    from ..accounts.orgs import user_orgs
-    theirs = user_orgs(c, uid) if u else []
-    if not set(theirs) & set(mine):
-        raise Denied(404)
-    if len(theirs) != 1 or u["is_admin"] or is_agent(u):  # as ua8_may_delete: only an account of this one organisation
-        raise Denied(403)
-    return False
-
-
-def ua8_may_delete(c, u, uid):
-    """Who deletes account uid: 'instance' (an instance admin, as before: users.om_admin_all) or the id of the organisation
-    whose admin deletes it -- only an account that belongs to that one organisation alone and is no instance admin (the
-    others: only "Remove from the organisation"). Raises Denied (404 = an account the caller must not know)."""
+def ua8_decider(c, u, uid, *other):
+    """Whose decision about account uid: 'instance' (an instance admin, as before: users.om_admin_all) or the organisation whose admin
+    decides -- only an account that belongs to that one organisation alone and is no instance admin. *other = the text of the 403 for
+    any other account. Raises Denied (404 = an account the caller must not know)."""
     from ..agents.core import is_agent
     from ..accounts.users import om_admin_all
     if g.user["is_admin"]:
@@ -170,11 +146,25 @@ def ua8_may_delete(c, u, uid):
     if not shared:
         raise Denied(404, tr("unknown person"))
     if len(theirs) != 1 or u["is_admin"] or is_agent(u):
-        raise Denied(403, tr("Only a server admin can delete this account (it belongs to another organisation too or is a server admin). You can remove it from your organisation."))
-    areas = ua8_private_areas(c, uid)  # review N1: deleting the account would delete its private space too
-    if areas:  # 2.148.1 B (#2479): 409 with the areas by name
-        raise Denied(409, tr(UA8_PRIVATE_AREAS, ", ".join(areas)))
+        raise Denied(403, *other)
     return shared[0]
+
+
+def ua8_may_approve(c, u, uid):
+    """2.464.0 (#3882): who decides a waiting registration: an instance admin or an admin of the person's one organisation (the person
+    joined by the confirmed address of its domain). -> True for an instance admin."""
+    return ua8_decider(c, u, uid) == "instance"
+
+
+def ua8_may_delete(c, u, uid):
+    """Who deletes account uid: 'instance' or the id of the organisation whose admin deletes it (ua8_decider; the others: only
+    "Remove from the organisation")."""
+    who = ua8_decider(c, u, uid, tr("Only a server admin can delete this account (it belongs to another organisation too or is a server admin). You can remove it from your organisation."))
+    if who != "instance":
+        areas = ua8_private_areas(c, uid)  # review N1: deleting the account would delete its private space too
+        if areas:  # 2.148.1 B (#2479): 409 with the areas by name
+            raise Denied(409, tr(UA8_PRIVATE_AREAS, ", ".join(areas)))
+    return who
 
 
 def ua8_owned(c, uid):

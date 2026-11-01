@@ -15521,7 +15521,6 @@
   "For advanced users: set it up by hand": "Pour les utilisateurs avancés : l'installer à la main",
   "Indent": "Indenter",
   "{0} dated task hidden": ["{0} tâche datée masquée", "{0} tâches datées masquées"],
-  "{0} registered with the address of your organisation and waits for approval": "{0} s’est inscrit·e avec l’adresse de ton organisation et attend l’approbation",
   "agents and their logs (agents are connected anew)": "les agents et leurs journaux (les agents sont reconnectés)",
   "credentials, keys and link secrets": "identifiants, clés et secrets de liens",
   "data of an organisation or an office: the organisation export, a person's own office the retention export": "données d’une organisation ou d’un bureau : elles sont dans l’export de l’organisation, le bureau personnel dans l’export de conservation",
@@ -15551,5 +15550,6 @@
   "the lock of a space (client_encrypted names it)": "le verrou d’un espace (client_encrypted le nomme)",
   "the trash": "la corbeille",
   "undo steps of one day": "étapes d’annulation d’une journée",
-  "{0} file of a template": ["{0} fichier de modèle", "{0} fichiers de modèles"]
+  "{0} file of a template": ["{0} fichier de modèle", "{0} fichiers de modèles"],
+  "{0} registered with the address of your organisation and waits for approval": "{0} s’est inscrit·e avec l’adresse de ton organisation et attend l’approbation"
 }
