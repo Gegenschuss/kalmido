@@ -22,7 +22,7 @@ from ..core.orgcrypt import oc_task_org  # 2.149.0 G (#2517): pulled up from fun
 from ..core.tokenhash import tkh_hash, tkh_match  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.db import GLOBAL_DEFAULTS, lv_versions_fmt, lv_versions_q  # 2.149.0 G (#2517): pulled up from functions
-from ..core.strip import strip_asset  # 2.191.0 B (#1824)
+from ..core.strip import strip_asset, start_css_files, with_start_css  # 2.191.0 B (#1824), 2.476.0 (#3487)
 
 
 # ---------------------------------------------------------------- pages
@@ -101,18 +101,33 @@ def st_asset(rel):
     except (OSError, ValueError):
         return None
     key = (st.st_mtime_ns, st.st_size)
+    rel = os.path.relpath(path, root).replace(os.sep, "/")
+    # 2.476.0 (#3487): app.css goes out with the start style files behind it (core/strip.py with_start_css): a new, changed
+    # or removed file is a new version of app.css
+    starts = start_css_files(root) if rel == "app.css" else []
+    mtime = st.st_mtime
+    for sp in starts:
+        try:
+            s2 = os.stat(sp)
+        except OSError:
+            continue
+        key += (sp, s2.st_mtime_ns, s2.st_size)
+        mtime = max(mtime, s2.st_mtime)
     hit = _SHASH.get(path)
     if hit and hit[0] == key:
         return hit[1]
-    rel = os.path.relpath(path, root).replace(os.sep, "/")
     h, served = hashlib.sha256(), None
     try:
         if rel.endswith((".js", ".css")) and not rel.startswith("vendor/"):
             with open(path, "rb") as f:
                 data = f.read()
+            if starts:
+                data = with_start_css(root, data, starts)
             served = strip_asset(rel, data)
             if served is None:
                 app.logger.warning("static %s goes out with its comments (strip unsure)", rel)
+                if starts:
+                    served = data  # never the file alone: the start styles belong to it
             h.update(data if served is None else served)
         else:
             with open(path, "rb") as f:
@@ -121,7 +136,7 @@ def st_asset(rel):
     except OSError:
         return None
     with _SHASH_LOCK:
-        _SHASH[path] = (key, (served, h.hexdigest()[:12], st.st_mtime))
+        _SHASH[path] = (key, (served, h.hexdigest()[:12], mtime))
     return _SHASH[path][1]
 
 

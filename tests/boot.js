@@ -86,7 +86,9 @@ exports.allCss = async () => {
 };
 exports.allCssSync = () => {
   const fs = require('fs'), st = require('path').join(__dirname, '..', 'static'), rd = f => fs.readFileSync(require('path').join(st, f), 'utf8');
-  return [rd('app.css'), ...cssList(rd('sw.js')).map(f => rd('css/' + f))].join('\n');
+  // 2.476.0 (#3487): + the start style files (static/css/start-*.css, sorted), which the server sends behind app.css
+  const starts = fs.readdirSync(require('path').join(st, 'css')).filter(f => /^start-.*\.css$/.test(f)).sort();
+  return [rd('app.css'), ...starts.map(f => rd('css/' + f)), ...cssList(rd('sw.js')).map(f => rd('css/' + f))].join('\n');
 };
 // 2.20.0 (#646): the web client is static/js/*.js (the order of the script tags in index.html); this is all of it as one text
 exports.clientSource = async () => {

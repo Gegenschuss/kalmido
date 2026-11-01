@@ -409,9 +409,10 @@ registering the ones of its area.
 ### Adding a client file
 
 1. Create `static/js/<name>.js` with `// @ts-check` as its first line (2.102.0), the header comment and `'use strict';`.
-2. Add its `<script>` tag to `static/index.html` (before `main.js`, after the files whose functions it calls while it
-   loads), add it to `SHELL` in `static/sw.js` in the same order and bump `CACHE` there.
-3. `python3 tools/check_layout.py` compares the three lists; `node --check` runs on every file in CI.
+2. Prefer loading it on demand (`LD_MODS` in `static/js/lazyload.js`, see "Modules loaded on demand"). A file needed at
+   start gets its `<script>` tag in `static/index.html` in the part below the mark before `main.js`, sorted by name (2.476,
+   see "Styles and start scripts" below); `python3 tools/sw_lists.py` rewrites `SHELL` in `static/sw.js` from it.
+3. `python3 tools/check_layout.py` compares the lists; `node --check` runs on every file in CI.
 
 ### Caching of static files and request timing
 
@@ -482,6 +483,27 @@ hand used to conflict in almost every merge; they are handled now so two package
   written only by the release cut (packages describe their change in `changelog.d/<id>.md`).
 
 The merge drivers are registered once per clone with `tools/git_setup.sh` (`.gitattributes` names them; CI never merges).
+
+### Styles and start scripts (2.476, #3487)
+
+Two more files every package used to append to - `static/app.css` (new rules at its end) and `static/index.html` (a new
+`<script>` right before `main.js`) - collided most often after that. They take nothing new at their end any more:
+
+- **`static/app.css` does not grow.** Rules of a module loaded on demand go into its own `static/css/<module>.css`
+  (`LD_CSS` in `static/js/lazyload.js`). Rules needed at start go into a file of their own,
+  `static/css/start-<topic>.css`, one per package or topic. The server sends them behind `app.css` under the same URL
+  `/static/app.css`, sorted by name (`with_start_css` in `kalmido/core/strip.py`: one content hash, one ETag, the service
+  worker precaches it as before); a start file comes after `app.css` in the cascade and before the module stylesheets.
+  `tools/perf_budget.py`, `tools/pack_static.py` and `tools/build_demo.py` count / pack / build the whole, and
+  `tests/boot.js` `allCssSync()` reads it in the same order. `tools/check_appcss.py` (inside `tools/check_layout.py`)
+  fails when `app.css` has more lines than its fixed limit (changing or deleting rules stays allowed; the limit is only
+  ever lowered) and checks every start file's braces and comments on its own.
+- **Start scripts go below the mark.** The scripts above the comment `new start scripts go below this line` in
+  `static/index.html` keep their order (defer runs them in it, some rely on it); their number only goes down. A new start
+  script - better: a module loaded on demand - goes into the part between the mark and `main.js`, one tag per line,
+  sorted by name, so two packages land on different lines. It runs after every script above and before `main.js`; it may
+  only declare functions and must not call into a script that sorts after it while it loads. `tools/check_layout.py`
+  checks the order and the limit.
 
 ### Dragging
 
@@ -602,7 +624,7 @@ desktop switch of the chat, the pop-up button, reaction rows, `patchKids`, the t
 - `LD_NOP`: stand-ins that do nothing before the module is loaded (they only update what the module drew, e.g. `chatPatch`).
 - Styles: `LD_CSS` names each module's stylesheets in `static/css/<name>.css`; `loadModule` loads them next to the
   scripts and resolves only once both apply (no unstyled flash); `loadCss(name)` loads one alone. `LAZY_CSS` in
-  `static/sw.js` precaches them (offline); `tools/check_layout.py` checks `LAZY_CSS` = `LD_CSS` = `static/css/*.css`. A
+  `static/sw.js` precaches them (offline); `tools/check_layout.py` checks `LAZY_CSS` = `LD_CSS` = `static/css/*.css` (without `start-*.css`). A
   module stylesheet comes after `app.css` in the cascade: only rules whose every selector names a class / id that only the
   module's scripts use move there, and none that a later rule of `app.css` for the same class would override. Suites that
   read rules use `allCss()` / `allCssSync()` of `tests/boot.js` (app.css + the module stylesheets).

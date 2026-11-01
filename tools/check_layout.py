@@ -47,7 +47,9 @@ if sorted(tags + lazy) != files:
 lazy_css = re.findall(r"'/static/css/([\w-]+\.css)'", (re.search(r"LAZY_CSS = \[(.*?)\];", sw, re.S) or [None, ""])[1])
 _lc = re.search(r"const LD_CSS = \{(.*?)\};", read("static", "js", "lazyload.js"), re.S)
 ld_css = [f + ".css" for f in re.findall(r"'([\w-]+)'", re.sub(r"^\s*\w+:", "", _lc.group(1), flags=re.M))] if _lc else []
-css_files = sorted(os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "static", "css", "*.css")))
+# 2.476.0 (#3487): static/css/start-*.css are no module stylesheets: the server sends them behind app.css (tools/check_appcss.py)
+css_files = sorted(os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "static", "css", "*.css"))
+                   if not os.path.basename(p).startswith("start-"))
 if lazy_css != ld_css:
     ERR.append(f"sw.js LAZY_CSS differs from LD_CSS in static/js/lazyload.js (same files, same order): {lazy_css} vs {ld_css}")
 if sorted(lazy_css) != css_files or len(set(lazy_css)) != len(lazy_css):
@@ -56,6 +58,25 @@ if len(set(tags)) != len(tags):
     ERR.append("index.html loads a module twice")
 if tags and tags[-1] != "main.js":
     ERR.append("index.html: main.js (the start-up) must be the last script")
+# 2.476.0 (#3487): new start scripts no longer pile up right before main.js (the most frequent conflict in index.html after
+# app.css): they go into the part below the mark, sorted by name, so two packages land on different lines. The scripts above
+# the mark keep their order (defer runs them in it; some depend on it) and their number only goes down.
+LAYOUT_TOP_MAX = 136  # 01.11.2026: the start scripts above the mark when the rule came in; lower it when one moves or goes
+_ih = read("static", "index.html")
+_mk = re.search(r"<!-- [^\n]*new start scripts go below this line[^\n]*-->\n", _ih)
+if not _mk:
+    ERR.append("index.html: the mark of the sorted start scripts (before main.js) is missing")
+else:
+    _top = re.findall(r'<script src="/static/js/([\w-]+\.js)"', _ih[:_mk.start()])
+    _low = _ih[_mk.end():_ih.find('<script src="/static/js/main.js"')]
+    _new = re.findall(r'<script src="/static/js/([\w-]+\.js)" defer></script>\n', _low)
+    if "".join(f'<script src="/static/js/{n}" defer></script>\n' for n in _new) != _low:
+        ERR.append("index.html: between the mark and main.js only start scripts, one per line (<script src=\"/static/js/x.js\" defer></script>)")
+    if _new != sorted(_new):
+        ERR.append(f"index.html: the start scripts below the mark are sorted by name: {_new} -> {sorted(_new)}")
+    if len(_top) > LAYOUT_TOP_MAX:
+        ERR.append(f"index.html: {len(_top)} start scripts above the mark (limit {LAYOUT_TOP_MAX}): a new start script goes below "
+                   "the mark, sorted by name -- better still, load it on demand (LD_MODS in static/js/lazyload.js)")
 # 2.312.0 (#3285): render() (render.js) draws only once main.js declared bootDone(); renamed or moved = a blank app
 if not re.search(r"^function bootDone\(", read("static", "js", "main.js"), re.M):
     ERR.append("static/js/main.js: function bootDone() must stay declared there (render.js waits for it)")
@@ -220,20 +241,12 @@ for f in sorted(glob.glob(os.path.join(ROOT, "static", "js", "*.js"))):
 
 # 2.48.0: the stylesheet's braces balance -- a lost "}" after a merge nests every later rule into the block before it
 # (the end of an @media print block made the rules of three parts apply only when printing)
-_css, _depth, _open = re.sub(r"/\*.*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group()), read("static", "app.css"), flags=re.S), 0, 0
-for _no, _line in enumerate(_css.split("\n"), 1):
-    for ch in _line:
-        _depth += (ch == "{") - (ch == "}")
-        if _depth < 0:
-            ERR.append(f"app.css line {_no}: a closing brace too many")
-            _depth = 0
-    if _depth == 0:
-        _open = _no
-if _depth:
-    ERR.append(f"app.css: {_depth} block(s) not closed -- the first after line {_open}")
+# 2.476.0 (#3487): the same per start style file, and app.css does not grow (tools/check_appcss.py)
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+import check_appcss  # noqa: E402
+ERR += check_appcss.braces("app.css", read("static", "app.css")) + check_appcss.errors(ROOT)
 
 # 2.192.0 C (#2514): new Python suites import check/sess/until from tests/kt.py (tools/check_kt.py, list tools/kt_legacy.txt)
-sys.path.insert(0, os.path.join(ROOT, "tools"))
 import check_kt  # noqa: E402
 _kt_err, _kt_warn = check_kt.errors()
 ERR += [e.removeprefix("ERROR: ") for e in _kt_err]

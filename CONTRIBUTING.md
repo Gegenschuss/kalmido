@@ -98,6 +98,9 @@ and issues are the way.
   forbids them).
 - Migrations are additive and run on start (see `MIGRATIONS` in `kalmido/core/schema.py`, `init_db` in `kalmido/core/db.py`); never break an
   existing database.
+- New styles never go at the end of `static/app.css` (it does not grow): a module's rules into `static/css/<module>.css`,
+  rules needed at start into `static/css/start-<topic>.css`; a new start script below the sorted mark in
+  `static/index.html` (docs/ARCHITECTURE.md, "Styles and start scripts").
 - Comments explain *why*; the user-facing behaviour belongs in the README.
 
 ## AI-assisted development
