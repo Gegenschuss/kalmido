@@ -280,7 +280,7 @@ def logbook(s, who):
     if DAY(1)[:4] == DAY(10)[:4]:
         check(rep and rep[0]["km_business"] == "75.0", f"{who}: the sums count the correction, not the corrected drive {rep}")
     r = s.get(B + LB + f".csv?year={DAY(10)[:4]}&vehicle_id={vid}")
-    rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=";"))
+    rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=","))  # 2.462.0 (#2984): English CSV = commas
     head = rows[0]
     by = {x[13]: x for x in rows[1:] if len(x) > 17 and x[13].isdigit()}
     check(head[13:18] == ["ID", "Corrects", "Corrected by", "Reason", "Closed"] and by.get(str(old), [""] * 18)[15] == str(fix)

@@ -211,7 +211,8 @@ if genc == "gzip":
     r = requests.get(B + "/api/state", headers={"Accept-Encoding": "gzip", **H}, stream=True)
     check(r.headers.get("Content-Encoding") is None, f"an error answer (not logged in, {r.status_code}) stays plain or tiny")
     r = A.get(B + "/static/app.css", headers={"Accept-Encoding": "gzip"}, stream=True)
-    check(r.headers.get("Content-Encoding") is None, "static files are not compressed by the app (the proxy may)")
+    # 2.442.0 (#2808): the image sends the copy packed ahead of time, the app does not pack static files while answering
+    check(r.headers.get("Content-Encoding") is None or r.headers.get("ETag", "").strip('"').endswith("-" + r.headers["Content-Encoding"]), "static files: plain or the copy packed ahead of time")
     r.close()
     r = get_state(A, "identity")
     check(r.headers.get("Content-Encoding") is None, "Accept-Encoding: identity -> plain")

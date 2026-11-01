@@ -1130,7 +1130,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .rcl-pick input{flex:none;width:1.25rem;height:1.25rem;margin:0}
 .bk-chkrow{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;min-height:2.75rem;margin:.25rem 0}
 .ofm-send .row{justify-content:space-between;gap:.5rem}
-.ofm-sig{margin:0;font:inherit;font-size:.875rem;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted)}
+.ofm-sig{margin:0;font:inherit;font-size:var(--fs-b);white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted)}
 .ofm-box{padding:.5rem .75rem;border-left:2px solid var(--line)}
 .ofm-prev{margin:.5rem 0;padding:.5rem .75rem;border-left:2px solid var(--line)}
 .ofm-prev img{display:block;height:3rem;width:auto;max-width:100%;margin-bottom:.375rem}

@@ -169,7 +169,7 @@ for who, s in (("no cookie", anon), ("freelancer", Fr), ("admin", A)):
         et = r.headers.get("ETag")
         r3 = s.get(B + u, headers={"If-None-Match": et or '"x"'})
         check(et and r3.status_code == 304 and not r3.content, f"#1824: {u} ETag {et!r} + If-None-Match = 304 ({r3.status_code})")
-        r4 = s.head(B + u)
+        r4 = s.head(B + u, headers={"Accept-Encoding": "identity"})  # 2.442.0 (#2808): else the image answers with its packed copy
         check(r4.ok and int(r4.headers.get("Content-Length", -1)) == len(body), f"#1824: HEAD {u} ({r4.status_code} {r4.headers.get('Content-Length')})")
 core = anon.get(B + "/static/js/core.js").text
 check("function domReady(" in core and "'use strict';" in core, "#1824/#2505: the code itself is kept (core.js with domReady)")

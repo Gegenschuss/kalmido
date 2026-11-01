@@ -8831,4 +8831,4 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 .owbar .owt{flex:1 1 12rem;min-width:0;display:flex;flex-direction:column;gap:.125rem;overflow-wrap:anywhere}
 .owbar .owb{display:flex;flex-wrap:wrap;gap:.375rem}
 .owdec{margin:0 0 .75rem}.owdec ul{list-style:none;margin:0 0 .25rem;padding:0}
-.owd{padding:.25rem 0;overflow-wrap:anywhere}.owd.old .owdt{text-decoration:line-through;color:var(--muted)}.owdm{font-size:.8125rem}
+.owd{padding:.25rem 0;overflow-wrap:anywhere}.owd.old .owdt{text-decoration:line-through;color:var(--muted)}.owdm{font-size:var(--fs-m)}

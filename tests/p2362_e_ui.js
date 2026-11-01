@@ -65,11 +65,10 @@ const fire = (w, el, type) => el.dispatchEvent(new w.Event(type, {bubbles: true}
     && d.querySelector('.ofdhead .ofddl')?.dataset.dl === '1', '#1146: the PDF button has a label and an aria-label');
   check(!!d.querySelector('[data-ofd="finalize"]') && !!d.querySelector('#ofd-service_from') && !!d.querySelector('#ofd-service_to') && !d.querySelector('input[type="date"]'), 'editor: Finalise, period of service (date pickers, no native date input)');
   check(!d.querySelector('fieldset.ofdfs').disabled && !d.querySelector('.ofdlocked'), 'editor: open before finalising');
+  // 2.431.0 (#3605): the dialog comes after the number preview; the bridge of tests/boot.js answers it through w.confirm
+  const asked = []; w.confirm = t => { asked.push(t); return true; };
   d.querySelector('[data-ofd="finalize"]').click();
-  await until(() => d.querySelector('[data-cd="yes"]'), 40);
-  check(/Finalise this document/.test(d.querySelector('.modal')?.textContent || ''), 'Finalise asks first');
-  const yes = d.querySelector('[data-cd="yes"]'); const fm = yes.closest('form');
-  if (fm) fm.dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true})); else yes.click();
+  check(await until(() => asked.length, 40) && /Finalise this document/.test(asked[0]), 'Finalise asks first: ' + asked[0]);
   const srv = await until(async () => { const j = await call('GET', `/api/office/docs/${doc.id}`); return j.locked && j; }, 60);
   check(srv && srv.locked && srv.can_edit === false, 'the server has the document finalised');
   await until(() => d.querySelector('.ofdlocked'), 60);
