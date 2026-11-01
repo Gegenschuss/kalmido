@@ -221,17 +221,20 @@ const acz_linkHtml = on => { const row = `<div class="row aczlink"><span class="
 async function acz_draw(md) {
   tokDraw(md); whDraw(md);
   const box = $('#s-acz-ags', md); if (!box) return;
-  let j; try { j = await api('GET', '/api/my/agents'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  // 2.366.0 (#2999): admins see the team agents here too (their tokens used to be only in the agent's "Set up" dialog)
+  let j, t; try { [j, t] = await Promise.all([api('GET', '/api/my/agents'), S.me?.is_admin ? api('GET', '/api/admin/agents') : null]); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  j = {agents: [...(j.agents || []), ...(t?.agents || []).filter(a => !a.owner).map(a => ({...a, acz_team: true}))]};
   box._j = j;
-  box.innerHTML = (j.agents || []).length ? j.agents.map(a => `<div class="mrow ${a.enabled ? '' : 'off'}" data-aczag="${a.id}">${av(a.id, a.name)}<span class="n"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span><small class="muted">${esc(scopeSummary(a.effective_scopes || a.scopes))}</small></span>
+  box.innerHTML = j.agents.length ? j.agents.map(a => `<div class="mrow ${a.enabled ? '' : 'off'}" data-aczag="${a.id}">${av(a.id, a.name)}<span class="n"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span>${a.acz_team ? ` <span class="agown agteam">${ic('users', 's')}${esc(tr('Team'))}</span>` : ''}<small class="muted">${esc(scopeSummary(a.effective_scopes || a.scopes))}</small></span>
       <button type="button" class="iconbtn" data-acz="setup" title="${esc(tr('Set up on a computer'))}" aria-label="${esc(tr('Set up {0} on a computer', a.name))}">${ic('download', 's')}</button><button type="button" class="iconbtn" data-acz="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button></div>`).join('')
-    : `<div class="muted mhint">${tr('No personal agents yet.')}</div>`;
+    : `<div class="muted mhint">${S.me?.is_admin ? tr('No agents yet.') : tr('No personal agents yet.')}</div>`;
 }
 document.addEventListener('click', e => {
   const b = e.target.closest?.('#s-acz-ags [data-acz]'); if (!b) return;
   const a = (($('#s-acz-ags')._j || {}).agents || []).find(x => x.id === +b.closest('[data-aczag]').dataset.aczag); if (!a) return;
-  if (b.dataset.acz === 'token') agTokenModal(a, `/api/my/agents/${a.id}/token`);
-  else ains_setupModal(a, `/api/my/agents/${a.id}`);  // lazy-ok: the settings dialog (LD_NEED settings -> agentchat bundle with agentsetup.js)
+  const base = a.acz_team ? `/api/admin/agents/${a.id}` : `/api/my/agents/${a.id}`;  // 2.366.0 (#2999)
+  if (b.dataset.acz === 'token') agTokenModal(a, `${base}/token`);
+  else ains_setupModal(a, base);  // lazy-ok: the settings dialog (LD_NEED settings -> agentchat bundle with agentsetup.js)
 });
 function whState(w) {
   if (!w.enabled) return `<span class="calerr" role="alert">${w.disabled_reason === 'failures' ? tr('turned off after failed deliveries') : tr('off')}</span>`;

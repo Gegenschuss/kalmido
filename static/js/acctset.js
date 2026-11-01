@@ -393,7 +393,8 @@ function accountWire(md) {
 function userModal(u, done) {
   const md = modal(`<h3>${u ? tr('Edit person') : tr('New person')}</h3>
     <div class="row"><label for="u-name">${tr('Display name')}</label><input id="u-name" value="${esc(u?.display_name || '')}" maxlength="60" placeholder="${esc(tr('e.g. Alice Example'))}"></div>
-    <div class="row"><label for="u-user">${tr('Username')}</label><input id="u-user" class="unin" value="${esc(u?.username || '')}" ${u ? 'disabled' : ''} autocapitalize="off" placeholder="${tr('a-z, 0-9, . - _')}"><span class="muted">${tr('for the sign-in and @mentions')}</span></div>
+    <div class="row"><label for="u-user">${tr('Username')}</label><input id="u-user" class="unin" value="${esc(u?.username || '')}" ${u ? 'disabled' : ''} autocapitalize="off"></div>
+    <div class="shint keep">${tr('for the sign-in and @mentions')} · ${tr('a-z, 0-9, . - _')}</div>${''/* 2.366.0 (#3001): under the field, the field keeps the row's width (the placeholder was cut) */}
     <div class="shint keep" id="u-userhint" hidden></div>
     <div class="row"><label for="u-pw">${tr('Password')}</label><input type="password" id="u-pw" autocomplete="new-password" placeholder="${u ? (u.has_password ? tr('unchanged') : tr('none (single sign-on only)')) : tr('optional, min. 8 characters')}"></div>
     <div class="row"><label for="u-email">${tr('E-mail')}</label><input id="u-email" type="email" value="${esc(u?.email || '')}" autocapitalize="off" placeholder="${tr('optional')}"></div>

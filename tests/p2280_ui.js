@@ -204,11 +204,20 @@ const V = B + 'api/v1';
   check(agmd.querySelector('#ag-ws') && agmd.querySelector('#ag-ws').value === '', '#935: a personal agent starts private');
   const order = [...agmd.querySelectorAll('input')].map(x => x.id);
   check(order.indexOf('ag-name') < order.indexOf('ag-user'), '#926: the display name comes first ' + order.slice(0, 3));
+  // 2.366.0 (#3001): "for the sign-in and @mentions" under the username field, not next to it (the field was 42 px on a phone)
+  check(!agmd.querySelector('#ag-user').parentElement.querySelector('.muted') && /for the sign-in and @mentions/.test(agmd.querySelector('#ag-user').closest('.row').nextElementSibling?.textContent || ''), '#3001: the username hint under the field');
   agmd.querySelector('#ag-name').value = 'Team Dev AI'; agmd.querySelector('#ag-name').dispatchEvent(new w.Event('input', {bubbles: true}));
   check(agmd.querySelector('#ag-user').value === 'team-dev-ai', '#926: the username is suggested from the display name ' + agmd.querySelector('#ag-user').value);
   agmd.querySelector('#ag-user').value = 'Bad Name'; agmd.querySelector('#ag-user').dispatchEvent(new w.Event('input', {bubbles: true}));
   check(!agmd.querySelector('#ag-userhint').hidden && /did you mean bad-name/.test(agmd.querySelector('#ag-userhint').textContent), '#926: a wrong username gets the suggestion ' + agmd.querySelector('#ag-userhint').textContent);
   agmd.remove();
+  // 2.366.0 (#2997): "Team agent" in the chooser opens the dialog on "Team agent", not on my own person (both were selected)
+  click(w, addBtn); await until(() => d.querySelector('#pop [role="menuitem"]'));
+  click(w, d.querySelectorAll('#pop [role="menuitem"]')[0]); await until(() => d.querySelector('#ag-owner'));
+  const tmd = d.querySelector('#ag-owner').closest('.modal');
+  await until(() => tmd.querySelectorAll('#ag-owner option').length >= 2);
+  check(/New team agent/.test(tmd.querySelector('h3').textContent) && tmd.querySelector('#ag-owner').value === '' && /A team agent for projects/.test(tmd.querySelector('#ag-ownhint').textContent), '#2997: a new team agent starts on "Team agent" ' + tmd.querySelector('#ag-owner').value);
+  tmd.remove();
   // Account > Workspaces; 2.39.1 (#1188): Settings > Organisation (Account links there)
   w.eval(`settingsModal('org')`); await until(() => d.querySelector('#s-ws .wsorg'));
   const wsb = d.querySelector('#s-ws');

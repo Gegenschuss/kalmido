@@ -1103,6 +1103,7 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 .oidcform .row input{flex:1;min-width:0}
 details.sdet{margin:.25rem 0 .625rem}
 details.sdet summary{cursor:pointer;color:var(--accent);font-size:var(--fs-m);margin-bottom:.375rem}
+@media (pointer:coarse){ details.sdet>summary{line-height:2.75rem} }  /* 2.366.0 (#3001): a folded help is a touch target too (p260 44 px rule) */
 
 /* ---------- statistics ---------- */
 .stats{max-width:51.25rem;padding-bottom:1.875rem}
@@ -3824,6 +3825,7 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 .empty.hempty{display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:2.5rem 1rem}
 .empty.hempty b{color:var(--text);font-weight:600}
 .empty.hempty span{font-size:var(--fs-s);max-width:24rem}
+.agfirst{margin:.5rem 0 .75rem;padding-left:1.25rem;text-align:left;font-size:var(--fs-s);color:var(--text)}  /* 2.366.0 (#2998): the three steps to the first agent */
 .authscreen .alogo.hwelc{flex-direction:column;align-items:center;gap:.25rem}
 .authscreen .bot.hwel{width:4.5rem;height:4.5rem}
 .tcard h3 .bot.htour{width:3.5rem;height:3.5rem;margin:0 0 .5rem}
@@ -6176,6 +6178,13 @@ html.mini-task #app,html.mini-task #app.detail-open{grid-template-columns:minmax
 /* 2.354.0 C (#3009): the head of "Overdue" carries "All to today" / "Another day…": its right edge keeps clear of the block's "…"
    (the button's width + its offset), so the two never overlap at any width */
 [data-ly="today"] > .lyb.lym[data-lyk="tasks"] .ghead:has(.odact){padding-right:3.25rem}
+/* 2.366.0 (#3001): Agents like Today: the blocks' "…" without the grey square, the jobs head (Open | All) keeps clear of it;
+   the one-line hint below has none (Arrange blocks… moves or hides it) */
+[data-ly=agents]>.lyb>.lymore{background:none}
+[data-ly=agents]>.lyb.lym[data-lyk=jobs]>.lymore{top:0}
+[data-ly=agents]>.lyb.lym[data-lyk=jobs] .agjh{padding-right:2.5rem}
+@media (pointer:coarse){[data-ly=agents]>.lyb.lym[data-lyk=jobs] .agjh{padding-right:3.25rem}}
+[data-ly=agents]>.lyb[data-lyk=hint]>.lymore{display:none}
 @media (pointer:coarse){ [data-ly="today"] > .lyb.lym[data-lyk="tasks"] .ghead:has(.odact){padding-right:4rem} }
 .lyb.lym .povh,.lyb.lym > .dcard > h3,.lyb.lym > .dcard > h2{padding-right:2rem}
 .lyb.lym .agjh{padding-right:2.25rem}  /* the … button must not cover the Open / All switch of the agents view (axe target-size) */

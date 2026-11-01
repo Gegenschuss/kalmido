@@ -567,6 +567,7 @@ function renderTop0() {
   if (m === 'tasks' && k === 'done' && (S.extra || []).length) acts += `<button class="btn sm" data-act="done-clean" title="${esc(tr('Move completed tasks to the trash'))}">${ic('trash', 's')}<span class="bl">${tr('Delete completed…')}</span></button>`;
   // 2.24.0 (#906): "Tasks of …" of another person: write to them
   if (m === 'tasks' && k.startsWith('who:') && S.me && +k.slice(4) !== S.me.id && !agentById(+k.slice(4))) acts += `<button class="btn sm tf" data-act="dm" data-uid="${+k.slice(4)}" data-ico="comment" title="${esc(tr('Message'))}">${ic('comment', 's')}<span class="bl">${tr('Message')}</span></button>`;
+  if (m === 'agents' && !S.route.agent && S.me && !S.me.kid && aiPaneOn()) acts += `<button class="btn sm tf4" data-act="ag-setup" data-ico="plus" title="${esc(tr('Add agent…'))}">${ic('plus', 's')}<span class="bl">${tr('Add agent…')}</span></button>`;  // 2.366.0 (#2998)
   if (m === 'tasks' && S.multiMode) acts += `<button class="iconbtn on" data-act="multi" title="${tr('End selection')}" aria-label="${tr('End selection')}">${ic('select')}</button>`;
   // everything rarer sits in "…" (phones: undo / redo there too); the title keeps its room
   acts += `<button class="iconbtn tmore" data-act="top-more" aria-haspopup="menu" title="${tr('More actions')}" aria-label="${tr('More actions')}">${ic('dots')}${isMobile() && HIST.undo.length && histPending(HIST.undo[HIST.undo.length - 1]) ? '<span class="pdot"></span>' : ''}</button>`;
@@ -726,8 +727,7 @@ function topMoreItems0() {
   sec.push(...li);
   if (m === 'tasks' && k.startsWith('tag:')) { if (sec.length) sec.push('-'); sec.push(tagDeleteItem(k.slice(4))); }
   const rest = [...out, ...(out.length && sec.length ? ['-'] : []), ...sec];
-  // 2.6.0 (K01): "…" is there on every view; where a view has nothing of its own it offers search (+ the shortcuts)
-  if (!rest.length && !fold.some(x => x.icon === 'search')) rest.push({label: tr('Search and commands'), icon: 'search', keys: 'Mod+K', fn: () => openPalette()}, ...(isTouch() ? [] : [{label: tr('Keyboard shortcuts'), icon: 'help', keys: '?', fn: shortcutsModal}]));
+  // 2.366.0 (#3002): no stand-in search entry any more - the search sits right next to it, a view without own actions has no "…" (fitTop hides it)
   // 2.13.0 (#453 A7): an entry that is already there (a folded header button, e.g. "Share…") comes only once
   const seen = new Set(fold.map(x => x.label)), rest2 = rest.filter(x => x === '-' || x.row || x.head || !seen.has(x.label));
   if (heads) {  // undo / redo on top, then View: the folded header buttons and the view entries, then List

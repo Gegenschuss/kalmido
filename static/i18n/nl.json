@@ -15514,5 +15514,12 @@
   "E-mails leave from {0} through your mailbox.": "Mails gaan uit vanaf {0} via je mailbox.",
   "The organisation keeps its symbol: the one in the file was not taken over.": "De organisatie behoudt haar symbool: dat uit het bestand is niet overgenomen.",
   "Promo film": "Promotiefilm",
-  "Example Ltd": "Voorbeeld BV"
+  "Example Ltd": "Voorbeeld BV",
+  "Share a project with it": "Een project met hem delen",
+  "Set it up on your computer": "Op je computer instellen",
+  "Agents: {0} not connected": ["Agenten: {0} niet verbonden", "Agenten: {0} niet verbonden"],
+  "Set up by hand": "Handmatig ingesteld",
+  "The folder the agent works in, e.g. {0}": "De map waarin de agent werkt, bijv. {0}",
+  "The quick way: create the agent, then “Set up on a computer” at it gives you one command to paste.": "De snelle weg: maak de agent aan, dan geeft „Op een computer instellen” je één opdracht om te plakken.",
+  "For advanced users: set it up by hand": "Voor gevorderden: met de hand instellen"
 }

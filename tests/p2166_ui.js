@@ -56,6 +56,7 @@ const ALL = 'cal,collab,agents,comments';
   const AG = await call(CA, 'POST', '/api/my/agents', {username: 'alice-bot', display_name: 'Alice Bot'});
   check(AG.http < 300 && AG.id, 'setup: a personal agent ' + AG.http);
   await call(CA, 'POST', '/api/me/tokens', {name: 'Home script', scopes: ['read']});
+  const TAG0 = await call(CA, 'POST', '/api/admin/agents', {scopes: ['read', 'comments'], username: 'team-bot', display_name: 'Team Bot'});  // 2.366.0 (#2999)
   w.eval(`settingsModal('tokens')`); await sleep(500);
   let md = d.querySelector('.smodal');
   check(md.querySelector('.snav [data-sec="access"]')?.classList.contains('on'), 'the focus "tokens" opens Settings > Access');
@@ -63,6 +64,11 @@ const ALL = 'cal,collab,agents,comments';
   check(pane && pane.querySelector('#s-api-h') && pane.querySelector('#s-wh-h') && pane.querySelector('#s-acz-ag-h'), 'Access: API tokens, webhooks, agents');
   check(await until(() => /Home script/.test(pane.querySelector('#s-toks')?.textContent || '')), 'Access: my API token is listed');
   check(await until(() => /No webhooks yet/.test(pane.querySelector('#s-whs')?.textContent || '')), 'Access: the webhooks load');
+  // 2.366.0 (#2999): created before the dialog opened -- an admin sees the team agent under Access too, its token button on the admin path
+  const TAG = TAG0;
+  const tRow = await until(() => pane.querySelector(`#s-acz-ags [data-aczag="${TAG.id}"]`));
+  check(tRow && /Team Bot/.test(tRow.textContent) && tRow.querySelector('.agteam') && tRow.querySelector('[data-acz="token"]'), '#2999: Access lists the team agent (marked Team) with its token');
+  if (tRow) { click(w, tRow.querySelector('[data-acz="token"]')); await sleep(300); const ttm = [...d.querySelectorAll('.modal')].pop(); check(ttm && /New API token for Team Bot/.test(ttm.textContent), '#2999: the team agent token dialog opens from Access'); click(w, ttm && ttm.querySelector('[data-m="close"]')); await sleep(200); }
   const agRow = await until(() => pane.querySelector(`#s-acz-ags [data-aczag="${AG.id}"]`));
   check(agRow && /Alice Bot/.test(agRow.textContent) && agRow.querySelector('[data-acz="token"]') && agRow.querySelector('[data-acz="setup"]'), 'Access: my agent with "New API token" and "Set up on a computer"');
   click(w, agRow && agRow.querySelector('[data-acz="token"]')); await sleep(300);

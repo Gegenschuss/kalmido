@@ -356,10 +356,7 @@ function pg_officeItems(add) {
 }
 // 2.250.0 B (#2993 #2996): create actions, only where the button in the UI would be there
 function pg_actions(add) {
-  if (S.me && aiPaneOn()) add('a:ag-new', 'action', tr('Add agent…'), 'bot', () => {
-    settingsModal('agents');
-    pg_waitEl(S.me.is_admin ? '[data-ag="new"]' : '[data-aigo="setup"]', b => b.click());
-  }, {sub: tr('Settings: {0}', tr('Agents'))});
+  if (S.me && aiPaneOn()) add('a:ag-new', 'action', tr('Add agent…'), 'bot', agCreateGo, {sub: tr('Settings: {0}', tr('Agents'))});  // 2.366.0 (#2998): the same way as the Agents area
   if (!S.me?.kid && clientsOn()) add('a:cl-new', 'action', tr('Add client'), 'brief', () => clientModal(null), {sub: tr('Clients')});
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
     add('v:o-openitems', 'view', tr('Open items'), 'receipt', () => loadModule('office').then(() => kp_openItems('open')), {sub: tr('Office|area'), kw: tr('OP open items unpaid invoices overdue'), prio: 2});  // 2.356.0 D (#3007): only where the invoices are

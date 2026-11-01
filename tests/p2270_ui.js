@@ -196,6 +196,14 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   w.eval(`settingsModal('agents')`); await until(() => d.querySelector('#s-myags .agnone, #s-myags .mhint'));
   check(/No agent is available to you yet/.test(d.querySelector('#s-myags')?.textContent || '') && d.querySelector('#s-myags [data-aigo="setup"]'), '#955: why it is empty + connect your own');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
+  // 2.366.0 (#2998): the Agents area has "Add agent…" (header + empty state with the three steps); it opens "Set up" at once,
+  // not the Agents tab with the same button again (the focus "agents" used to win over "Set up")
+  w.eval(`go('agents')`); await until(() => d.querySelector('#view .agview .hempty [data-act="ag-setup"]'));
+  const agE = d.querySelector('#view .agview .hempty');
+  check(agE && agE.querySelectorAll('.agfirst li').length === 3 && /Add agent/.test(agE.querySelector('[data-act="ag-setup"]').textContent) && d.querySelector('#top [data-act="ag-setup"]'), '#2998: "Add agent…" in the header and the empty state with three steps');
+  click(w, agE.querySelector('[data-act="ag-setup"]')); await until(() => d.querySelector('.modal #aisp-setup'));
+  check(d.querySelector('.modal #aisp-setup') && !d.querySelector('.modal #aisp-setup').hidden && d.querySelector('.modal #aisp-agents').hidden, '#2998: "Add agent…" opens Settings > Agents > Set up directly');
+  [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   w.close();
 
   // ================= #964 Settings > Agents > Lists

@@ -413,7 +413,8 @@ function dashCard(k) {
     // 2.45.0 (#1504): every running job with "since HH:MM"; an agent only as a line while it needs a look (error, waits, paused)
     const rows = ags.flatMap(a => [...(['error', 'waiting', 'paused'].includes(agentHst(a)) ? [`<li><a href="#agents/${a.id}">${hdot(agentHst(a))}<span class="dwt">${esc(agentHstLine(a))}</span></a></li>`] : []),
       ...jobs(a).map(j => `<li class="djob"><a href="#agents/${a.id}">${hdot('working')}<span class="dwt">${esc(j.title)}</span>${j.created_at ? `<span class="hpt">${esc(hpSince(j.created_at))}</span>` : ''}</a></li>`)]);
-    return !ags.length ? '' : rows.length ? card(`<ul class="dwl">${rows.join('')}</ul>`) : slim(tr('Agents: all quiet'));
+    const nc = ags.filter(agentOffline).length;  // 2.366.0 (#3000): "all quiet" only when none is cut off (the same "not connected" as at the agent)
+    return !ags.length ? '' : rows.length ? card(`<ul class="dwl">${rows.join('')}</ul>`) : slim(nc ? trn('Agents: {0} not connected', 'Agents: {0} not connected', nc) : tr('Agents: all quiet'));
   }
   if (k === 'stats') {
     const done7 = [...S.tasks.values()].filter(t => t.status === 2 && t.completed_at && t.completed_at.slice(0, 10) >= addDays(t0, -6)).length;

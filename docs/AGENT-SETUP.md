@@ -138,7 +138,8 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
 
 ### 1. Create the agent in Kalmido
 
-1. *Settings > Agents > Status > Add agent* (admins): a username (e.g. `claude`), a display name and optionally a
+1. *Settings > Agents > Status > Add agent* (admins; 2.366.0: also *Add agent…* in the header of the Agents area and in its
+   empty state, which opens the same chooser): a username (e.g. `claude`), a display name and optionally a
    note (who runs it and where). **Permissions** (2.15.0): it starts with *Read*, *Tasks*, *Comments* and the file store (*Read files* and *Add files*, `files:read` / `files:write`); tick only what
    it needs on top (structure, delete, task attachments, time, export, calendar, contacts, office, tables, knowledge pages). *Office drafts* is a right you give on purpose (see [AGENTS.md](AGENTS.md#permissions)); `account`, `admin-read`, `private` and `docs:upload` are never available to an agent. An agent that may only read cannot answer in the chat or send
    proposals (2.190.0): keep *Comments* or *Tasks* on for that. With *structure* it can set up a project with custom fields as

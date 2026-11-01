@@ -448,7 +448,7 @@ document.addEventListener('click', async e => {
     case 'jc-back': jc_enter(S.chat.aid, null); break;
     case 'prop-open': propOpen(+a.dataset.jid); break;  // 2.3.0
     case 'aiu-more': settingsModal('usage'); break;
-    case 'ag-setup': LS.set('aiSub', 'setup'); settingsModal('agents'); break;  // 2.22.0 (#739); 2.27.0 (#955): at "Set up"
+    case 'ag-setup': agCreateGo(); break;  // 2.22.0 (#739); 2.366.0 (#2998): straight to creating one (the focus "agents" used to win over "Set up")
     case 'jobs-more': jobsMore(a); break;  // 2.40.0 (#1432)
     case 'hist-more': histMore(a); break;
     case 'news-more': newsMore(a); break;

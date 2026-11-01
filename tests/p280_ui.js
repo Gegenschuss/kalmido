@@ -104,7 +104,11 @@ const CONTRAST = `(() => {
   const band = await until(() => d.querySelector('#view .agband .agb-w'));
   check(band, 'agent band with the waiting job');
   const cells = [...d.querySelectorAll('#view .agband .agb-a')];
-  check(cells.length === 3 && cells.some(c => c.classList.contains('hs-working') && c.textContent.includes('#' + T.dots)) && cells.some(c => c.classList.contains('hs-offline')), 'band: 3 agents, working one with its ticket, offline one');
+  // 2.366.0 (#3000, intended change): Archivar never got in touch: no row in the band (before: a third, offline cell)
+  check(cells.length === 2 && cells.some(c => c.classList.contains('hs-working') && c.textContent.includes('#' + T.dots)) && !cells.some(c => c.dataset.aid === String(ARC.id)), '#3000 band: 2 agents, working one with its ticket, the never connected one left out ' + cells.length);
+  // 2.366.0 (#3000): the start page says "not connected" instead of "all quiet" when an agent never got in touch
+  const dashNc = w.eval(`(() => { const keep = S.agents; S.agents = keep.filter(a => a.id === ${ARC.id}); try { return dashCard('agents'); } finally { S.agents = keep; } })()`);
+  check(/Agents: 1 not connected/.test(dashNc) && !/all quiet/.test(dashNc), '#3000: the start page counts the agent that is not connected ' + dashNc.replace(/<[^>]+>/g, ''));
   check(!d.querySelector('#top .hdot') && d.querySelector('#top .achip .abot'), 'no duplicate agent dots in the header while the band shows (the robot stays)');
   check(d.querySelector(`.trow[data-id="${T.dots}"] .chk.work`), 'row of the task an agent works on: working glyph');
   const ap = d.querySelector('#view .agband [data-act="job-do"][data-a="approve"]');

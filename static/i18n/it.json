@@ -15514,5 +15514,12 @@
   "E-mails leave from {0} through your mailbox.": "Le e-mail partono da {0} tramite la tua casella.",
   "The organisation keeps its symbol: the one in the file was not taken over.": "L’organizzazione mantiene il suo simbolo: quello del file non è stato importato.",
   "Promo film": "Video promozionale",
-  "Example Ltd": "Esempio S.r.l."
+  "Example Ltd": "Esempio S.r.l.",
+  "Share a project with it": "Condividere un progetto con lui",
+  "Set it up on your computer": "Configurarlo sul tuo computer",
+  "Agents: {0} not connected": ["Agenti: {0} non connesso", "Agenti: {0} non connessi"],
+  "Set up by hand": "Configurato a mano",
+  "The folder the agent works in, e.g. {0}": "La cartella in cui lavora l'agente, ad es. {0}",
+  "The quick way: create the agent, then “Set up on a computer” at it gives you one command to paste.": "La via rapida: crea l'agente, poi «Configura su un computer» ti dà un comando da incollare.",
+  "For advanced users: set it up by hand": "Per utenti esperti: configurarlo a mano"
 }

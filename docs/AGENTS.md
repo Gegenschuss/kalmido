@@ -242,6 +242,9 @@ delete; deleting works without it, but the program then stays on the computer. T
 key is already revoked (agent deleted): Kalmido answers 401, the script only says so and still stops the autostart and
 deletes the files. `--dry-run` / `-DryRun` only shows what would happen; `--no-autostart` / `-NoAutostart` installs without
 the autostart. A *New API token* in the agent's settings still replaces every token of the agent, also the computers'.
+2.366.0 (#2999): a computer without a host name is listed after its system and the day it was set up ("macOS · 27 Oct");
+a token made by hand shows as *Set up by hand*. *Settings > Access* lists the team agents for admins too (token and
+*Set up on a computer*), not only the personal agents.
 Behind a login proxy, let `/agent-setup.sh`, `/agent-setup.ps1` and `/api/agent-setup/` through like `/api/v1/`.
 
 | | Team agent (admin) | Personal agent (user) |

@@ -21,6 +21,8 @@ const agentAge = () => (Date.now() - (S.agentsAt || Date.now())) / 1000;
 // 2.6.0 (K08): "not connected" (grey) instead of a green "ready" for an agent that never got in touch (no event poll, no API
 // call) or has not for 5 minutes; a webhook agent is told about events, so only its explicit "offline" counts
 const agentOffline = a => !!a && (a.online === false || (!a.webhook && (a.contact_age === null || a.contact_age === undefined || a.contact_age + agentAge() > 300)));
+// 2.366.0 (#3000): never got in touch at all (set up, but not yet connected on a computer)
+const agentNever = a => !!a && !a.webhook && (a.contact_age === null || a.contact_age === undefined);
 // 2.26.0 (#949): paused with a reason ("does not answer right now: …"); (#933) "connected, but no service running": its
 // token is used (an interactive session) but nothing has collected its events for 10 minutes
 const AGENT_TXT = {status_chat: N_('Answering in the chat'), status_event: N_('Working on an event'), status_no_command: N_('The agent command cannot be started'), status_run_failed: N_('The last run failed'),
@@ -109,7 +111,8 @@ function agentChip() {
 const BAND_KEYS = ['inbox', 'today', 'tomorrow', 'week', 'all', 'assigned', 'doable'];
 function bandAgents() {
   if (isMobile() || S.route.mod !== 'tasks' || !feat('agents')) return [];
-  const sh = shownAgents(); if (!sh.length) return [];
+  // 2.366.0 (#3000): an agent that never connected takes no row over the tasks (its grey dot in the header says it) until it asks something
+  const sh = shownAgents().filter(a => !agentNever(a) || a.waiting || a.chat_unread || a.approvals_open); if (!sh.length) return [];
   const k = S.route.key;
   if (k.startsWith('l:')) { const l = listById(+k.slice(2)), ids = new Set(listAgents(l).map(a => a.id)); return sh.filter(a => ids.has(a.id)); }
   if (k.startsWith('folder:')) { const ids = new Set(folderLists(k.slice(7)).flatMap(listAgents).map(a => a.id)); return sh.filter(a => ids.has(a.id)); }
@@ -508,6 +511,12 @@ function jobHtml(j) {
     ${j.action && !(j.action === 'approve' && j.state === 'waiting') ? `<div class="muted jact">${j.action === 'approve' ? thumbIc(true) + ' ' : j.action === 'reject' ? thumbIc(false) + ' ' : ''}${esc({approve: tr('Approved by {0}', j.action_by_name), reject: tr('Rejected by {0}', j.action_by_name), stop: tr('Stopped by {0}', j.action_by_name)}[j.action] || '')}</div>` : ''}
     ${acts ? `<div class="jobb">${acts}</div>` : ''}</div>`;
 }
+// 2.366.0 (#2998): ONE way to create an agent (the Agents area's button, its empty state, the palette): admins get the
+// chooser team / personal, everybody else the "Set up" tab with their personal agents (it says when an admin has to allow them)
+function agCreateGo() {
+  if (S.me?.is_admin) { settingsModal('agents'); pg_waitEl('[data-ag="new"]', b => b.click()); } else settingsModal('agentsetup');
+}
+const agSteps = () => `<ol class="agfirst">${[N_('Create the agent'), N_('Share a project with it'), N_('Set it up on your computer')].map(x => `<li>${tr(x)}</li>`).join('')}</ol>`;
 function viewAgents() {
   if (S.jobs.items === null) { S.jobs.items = []; S.jobs.older = []; S.jobs.next = S.jobs.more = null; loadJobs(); aiuLoad().then(() => { if (S.route.mod === 'agents') renderView(); }); }  // 2.1.1: the usage card
   if (S.route.agent && chatFull()) return chatViewHtml(S.route.agent);
@@ -529,7 +538,7 @@ function viewAgents() {
     return `<div class="agview">${S.ly.view === 'agents' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('agents')}</div>`}${lyHtml('agents', P)}</div>`;
   }
   return `<div class="agview">
-    ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty hempty">${botFig('ruhig')}<b>${tr('No agent is available to you yet.')}</b><span>${tr('The owner of a project can let its members use the project’s agent (Share › Agents). You can also connect an agent of your own.')}</span><button type="button" class="btn" data-act="ag-setup">${ic('bot', 's')} ${tr('Connect your own agent…')}</button></div>`}
+    ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty hempty">${botFig('ruhig')}<b>${tr('No agent is available to you yet.')}</b><span>${tr('The owner of a project can let its members use the project’s agent (Share › Agents). You can also connect an agent of your own.')}</span>${agSteps()}<button type="button" class="btn pri" data-act="ag-setup">${ic('plus', 's')} ${tr('Add agent…')}</button></div>`}
     ${ags.length ? aiuCardHtml() : ''}
     <div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
     ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}

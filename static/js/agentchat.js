@@ -1563,7 +1563,8 @@ function agModal(a, done, o = {}) {
     ${wsOn() ? `<div class="row"><label for="ag-ws">${tr('Workspace')}</label>${wsSelectHtml('ag-ws', a ? a.org_id : (wsCur().startsWith('org:') ? +wsCur().slice(4) : (personal ? null : S.me?.workspaces?.[0]?.id)))}</div><div class="shint">${tr('An agent works in one workspace and joins only its projects; a private agent never sees an organisation’s projects.')}</div>` : ''}
     <div class="row"><label for="ag-name">${tr('Display name')}</label><input id="ag-name" value="${esc(a?.name || '')}" maxlength="60" placeholder="Claude"></div>
     ${a ? '' : `${avRow}<details class="agadv" id="ag-adv"><summary>${tr('Advanced')}</summary>`}${''/* 2.364.0 D (#3035): a new agent: name, kind, workspace, picture; the rest folded, sent as before */}
-    <div class="row"><label for="ag-user">${tr('Username')}</label><input id="ag-user" class="unin" value="${esc(a?.username || '')}" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="32" placeholder="claude"><span class="muted">${tr('for the sign-in and @mentions')}</span></div>
+    <div class="row"><label for="ag-user">${tr('Username')}</label><input id="ag-user" class="unin" value="${esc(a?.username || '')}" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="32" placeholder="claude"></div>
+    <div class="shint keep">${tr('for the sign-in and @mentions')}</div>${''/* 2.366.0 (#3001): under the field, on a phone the field was 42 px wide */}
     <div class="shint keep" id="ag-userhint" hidden></div>
     ${a ? `<div class="shint keep">${tr('a-z, 0-9, . - _ · its API tokens keep working after a rename; @mentions use the new name')}</div>` : ''}
     ${a ? avRow : ''}

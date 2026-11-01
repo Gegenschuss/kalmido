@@ -381,12 +381,14 @@ function agSetupPaneHtml(hint) {
   return `<h4 id="s-agg-h">${tr('Who is the agent for?')}</h4>
     ${seg('guide', g, [['own', N_('For me'), 'user'], ['team', N_('For the team'), 'users']])}
     <p class="agwhy muted" id="s-agwhy">${agWhyHtml(g, adm)}</p>
-    ${seg('os', os, [['linux', 'Linux'], ['mac', 'macOS'], ['win', 'Windows']])}
-    <div class="agguidebox" id="s-agguide" role="tabpanel">${agSetupHtml(g, os)}</div>
-    <div class="row aibtns"><button class="btn sm" data-m="ag-guide-cc" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('bot', 's')} ${tr('Let Claude Code set it up (Linux)')}</button></div>
+    <div class="shint keep agone">${ic('download', 's')} <span>${tr('The quick way: create the agent, then “Set up on a computer” at it gives you one command to paste.')}</span></div>
     <h4 id="s-myown-h">${tr('Your personal agents')}</h4>
     ${hint(tr('Only you can chat with it; it runs on your own computer.'))}
-    <div class="members aglist" id="s-myown" aria-labelledby="s-myown-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+    <div class="members aglist" id="s-myown" aria-labelledby="s-myown-h"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <details class="sdet aghand"><summary>${tr('For advanced users: set it up by hand')}</summary>
+    ${seg('os', os, [['linux', 'Linux'], ['mac', 'macOS'], ['win', 'Windows']])}
+    <div class="agguidebox" id="s-agguide" role="tabpanel">${agSetupHtml(g, os)}</div>
+    <div class="row aibtns"><button class="btn sm" data-m="ag-guide-cc" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('bot', 's')} ${tr('Let Claude Code set it up (Linux)')}</button></div></details>`;  // 2.366.0 (#3001): the one-command way first, the steps by hand folded
 }
 // 2.29.0 (#1024): one sentence per choice, so the difference is clear before the steps
 function agWhyHtml(g, adm) {
@@ -780,7 +782,7 @@ function settingsModal(focus) {
       ${hint(tr('Private to you. Save from a task’s menu (…) or the project dialog; use via the template button or Projects > +.'))}
       <div class="members" id="s-tpls"><div class="muted mhint">${tr('Loading…')}</div></div>
       ${sampleHtml(hint)}`,
-    ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage'}[focus]) : '',  // 2.7.0 (#405 S2)
+    ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage', agentsetup: 'setup'}[focus]) : '',  // 2.7.0 (#405 S2)
     assistant: asst_paneHtml(hint),  // 2.75.0 (#1411): only with a configured assistant
     users: S.me?.is_admin ? admSubsHtml('users', {  // 2.24.0 (#826): Administration in sub-tabs like Agents; 2.364.0 C (#3041): "Server"
       signin: `<div id="s-signin">${signinHtml(hint)}</div>`,
@@ -818,7 +820,7 @@ function settingsModal(focus) {
   pane.data += biz_dataHtml(); pane.integr += biz_integrHtml();  // 2.365.2 D (#2789): the office's data and its Peppol access (both live in Company & office)
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', odata: 'org', dayplan: 'general'}[focus] || (INTB_FOCUS[focus] ? 'integr' : focus);  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
+  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', agentsetup: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', odata: 'org', dayplan: 'general'}[focus] || (INTB_FOCUS[focus] ? 'integr' : focus);  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
   if (/^biz-/.test(focus || '')) { S.bizJump = focus.slice(4); cur = 'biz'; }  // 2.365.2 D (#2789): a part of Company & office (office.js biz_jump scrolls there)
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
@@ -1022,7 +1024,7 @@ function settingsModal(focus) {
   md._show = show;  // 2.364.0 C (#3041): a sub-tab of the other area opens that area (admSubShow)
   if (cur === 'users' || cur === 'org') { ad_secDraw(md); Promise.resolve(admSubShow(md, ad_admFocus(focus), false, cur)).then(() => { if (focus === 'activity') $('#s-adlog-h', md)?.scrollIntoView({block: 'start'}); }); }  // 2.42.0 (#828): + ocAdminDraw  // 2.46.6 (#1710): + the shown sub-tab's data; 'activity' = its log, once the rules above it are drawn
   aiTblWire(md);
-  if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', agentsafe: 'safe'}[focus]);  // 2.5.1 (#393)
+  if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', agentsafe: 'safe', agentsetup: 'setup'}[focus]);  // 2.5.1 (#393)
   md.addEventListener('click', e => { const b = e.target.closest('[data-aisub]'); if (b) aiSubShow(md, b.dataset.aisub, true); const g = e.target.closest('[data-aigo]'); if (g) aiSubShow(md, g.dataset.aigo, true); });
   md.addEventListener('click', e => { const b = e.target.closest('[data-admsub]'); if (b) admSubShow(md, b.dataset.admsub, true); });  // 2.24.0 (#826)
   md.addEventListener('click', e => {  // 2.46.6 (#1710): "Open in Administration" next to an admin switch
