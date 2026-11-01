@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.468.2] - 2026-11-01
+
+### Fixed
+- main: the settings and the demo fall back to the same bell default as the server ("completed by others" on, #2980); tests p190_ui, p210_ui and p283_c_ui follow that default, the four new notification rows and the favourites row (#3506)
+
 ## [2.468.1] - 2026-11-01
 
 - CI flaky tests p2130_ui, p2190_fixes_ui, p220_ui moved to tests/skip.txt
@@ -9734,7 +9739,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.468.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.468.2...HEAD
+[2.468.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.468.2
 [2.468.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.468.1
 [2.468.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.468.0
 [2.457.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.457.0
