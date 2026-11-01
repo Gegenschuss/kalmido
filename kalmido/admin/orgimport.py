@@ -377,7 +377,7 @@ def oi_pictures(c, run, uid, zf, files, data):
         tok = secrets.token_urlsafe(12)
         if m[1] is None:
             if not run.org:
-                run.warning(N_("Not taken over into the private space: {0}"), tr(N_("Symbol")))
+                run.warning(N_("Not taken over into the private workspace: {0}"), tr(N_("Symbol")))
                 continue
             png = _oi_pic(c, run, uid, zf, files, path, AVATAR_MAX_MB, list_icon_process)
             if png is None:
