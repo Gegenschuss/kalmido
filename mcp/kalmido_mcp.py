@@ -373,6 +373,16 @@ def _b64_files(a):
     return files
 
 
+def t_import_vcards(api, a):
+    """2.465.0 (#2477): the text of a .vcf file, or files = [{name, base64}] -> multipart (several .vcf files or a ZIP)."""
+    path = f"/address-books/{int(a['book_id'])}/import"
+    if a.get("files"):
+        return api.call("POST", path, multipart=({}, _b64_files(a)))
+    if not isinstance(a.get("vcf"), str):
+        raise ApiError(400, "vcf or files is required")
+    return api.call("POST", path, body={"vcf": a["vcf"]})
+
+
 def t_post_team_message(api, a):
     """2.138.1 (#2059): a team chat message; files = [{name, base64, mime?}] -> multipart (the body may then be empty)."""
     path = f"/team/rooms/{int(a['room_id'])}/messages"
@@ -1094,9 +1104,10 @@ TOOLS += [
     ("unshare_address_book", "2.21.0: stop sharing an address book (owner) or leave one.", _obj({"book_id": S_ID, "user_id": S_ID}, ["book_id", "user_id"]),
      lambda api, a: api.call("DELETE", f"/address-books/{int(a['book_id'])}/members/{int(a['user_id'])}")),
     ("import_vcards", "2.21.0: import the text of a .vcf file into an address book (the same UID is updated). 2.273.0: only the "
-     "fields the card carries change; a contact changed here after the card's REV stays and is counted in kept_newer.",
-     _obj({"book_id": S_ID, "vcf": {"type": "string"}}, ["book_id", "vcf"]),
-     lambda api, a: api.call("POST", f"/address-books/{int(a['book_id'])}/import", body={"vcf": a["vcf"]})),
+     "fields the card carries change; a contact changed here after the card's REV stays and is counted in kept_newer. "
+     "2.465.0: instead of vcf, files = [{name, base64}]: several .vcf files or a ZIP of them (the answer adds files).",
+     _obj({"book_id": S_ID, "vcf": {"type": "string"}, "files": {"type": "array", "items": {"type": "object"}}}, ["book_id"]),
+     t_import_vcards),
     ("export_vcards", "2.21.0: an address book as vCard text.", _obj({"book_id": S_ID}, ["book_id"]),
      lambda api, a: api.call("GET", f"/address-books/{int(a['book_id'])}/export")),
     ("search_contacts", "2.21.0: search contacts by name, company, e-mail, phone, address or group (q), optionally in one address book / group. "
