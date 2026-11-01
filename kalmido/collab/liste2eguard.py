@@ -309,6 +309,7 @@ def le2b_scrub(c, lid):
     n["webhook_queue"] = _drop_payloads(c, "webhook_queue", lid, tids)
     n["agent_events"] = _drop_payloads(c, "agent_events", lid, tids)
     n["tidy_pending"] = c.execute(f"DELETE FROM tidy_pending WHERE task_id IN ({tq})", (lid,)).rowcount
+    c.execute("DELETE FROM agent_burst_held WHERE list_id=?", (lid,))  # 2.465.0 (#3892)
     # agent proposals about the list (cleanup, tidy, time ...): what they proposed / changed held titles; an open one is closed
     n["agent_jobs"] = c.execute(f"""UPDATE agent_jobs SET input='{{}}', proposal='{{}}', applied='{{}}',
                                     prop_state=CASE WHEN prop_state IN ('', 'applied', 'discarded') THEN prop_state ELSE 'discarded' END
