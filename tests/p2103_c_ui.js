@@ -5,6 +5,7 @@
 // - "Correct" opens a new entry prefilled with the old values and a reason field; saved, the list marks both drives
 // - on a phone nothing sticks out to the side (list and dialog)
 const path = require('path');
+const TC = require('./testclock');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
@@ -26,7 +27,7 @@ const FEAT = 'cal,comments,collab,office,clients';
   const me = (await call(CA, 'GET', '/api/state')).me;
   const org = await call(CA, 'POST', '/api/admin/orgs', {name: 'Alpha', admin_id: me.id});
   await call(CA, 'PATCH', '/api/settings', {workspace: `org:${org.id}`});
-  const today = new Date().toISOString().slice(0, 10);
+  const today = TC.today();  // the Berlin day: the first hours of a month are still the month before in UTC
   // 2.186.0 (#2601): only past months can be closed: the drive lies on the 10th of the previous month
   const pm = new Date(Date.UTC(+today.slice(0, 4), +today.slice(5, 7) - 2, 10)).toISOString().slice(0, 10);
   const veh = await call(CA, 'POST', '/api/office/vehicles', {name: 'Kombi', kind: 'private', odo_start: '1000'});

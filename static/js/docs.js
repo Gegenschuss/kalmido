@@ -293,7 +293,7 @@ function dc_mdDraw(md) {
       ${field('date', tr('Date'), dateIn('dc-date', d.date || '', {label: tr('Date'), ro: !!ro, attrs: 'data-dcp="date"'}))}${typeof pmeta_takenHtml === 'function' ? pmeta_takenHtml(d) : ''}
       ${opt('due', tr('Due'), dateIn('dc-due', d.due || '', {label: tr('Due'), ro: !!ro, attrs: 'data-dcp="due"'}), noDue)}
       ${field('asn', tr('Archive number'), `<span class="dc-amt"><input type="number" min="1" id="dc-asn" data-dcp="asn" value="${esc(d.asn || '')}" ${ro}>${w && !d.asn ? `<button type="button" class="btn sm" data-dc="asnnext">${tr('Next free number')}</button>` : ''}</span>`)}
-      ${opt('amount', tr('Amount'), `<span class="dc-amt"><input id="dc-amount" data-dcp="amount" inputmode="decimal" value="${esc(d.amount ? numField(d.amount) : '')}" ${ro}><input id="dc-currency" data-dcp="currency" value="${esc(d.currency || '')}" maxlength="3" aria-label="${esc(tr('Currency'))}" placeholder="EUR" ${ro}></span>`, noAmt)}
+      ${opt('amount', tr('Amount'), `<span class="dc-amt"><input id="dc-amount" data-dcp="amount" inputmode="decimal" value="${esc(d.amount ? numField(d.amount, 6, 2) : '')}" ${ro}><input id="dc-currency" data-dcp="currency" value="${esc(d.currency || '')}" maxlength="3" aria-label="${esc(tr('Currency'))}" placeholder="EUR" ${ro}></span>`, noAmt)}
       ${!ro && (noDue || noAmt) ? `<div class="row dc-f dc-optbtn"><button type="button" class="linkbtn" data-dc="showopt">${tr('Add')}: ${tr('Due')} / ${tr('Amount')}</button></div>` : ''}
       ${(d.custom_fields || []).map(f => dc_cfRow(d, f, ro)).join('')}
     </div>

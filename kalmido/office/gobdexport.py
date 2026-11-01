@@ -21,7 +21,7 @@ from flask import Response, request
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import db, local_now
+from ..core.db import db, local_day, local_now
 from ..core.orgcrypt import oc_dec_fields
 from ..collab.comments import user_names
 from ..personal.timetrack import BadInput
@@ -147,7 +147,7 @@ def gx_tables(c, oid, frm, to, gaps=None):
     rcs = bk_receipts(c, oid, frm, to, uid=0, by="doc", gaps=gaps)
     who = user_names(c, [r["checked_by"] for r in rcs])  # 2.420.0 C (#3448): + the person's tick "checked" (day, name)
     for r in rcs:
-        t.add(r["node_id"], r["doc_date"] or r["date"], r["paid_at"] or "", (r["checked_at"] or "")[:10], who.get(r["checked_by"], ""),
+        t.add(r["node_id"], r["doc_date"] or r["date"], r["paid_at"] or "", str(local_day(r["checked_at"]) or ""), who.get(r["checked_by"], ""),
               r["amount"], r["vat_pct"] or "", r["net"], r["vat"], r["category"], r["title"])
     out.append(t)
 

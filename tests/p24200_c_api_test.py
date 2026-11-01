@@ -20,7 +20,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
-from datetime import date
+from datetime import datetime
 
 import requests
 
@@ -34,12 +34,14 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
 from kt import check, done, sess  # noqa: E402  shared helpers (tests/kt.py)
+import testclock  # noqa: E402
 FEAT = "cal,comments,collab,office,clients,docs,files"
 O = "/api/office"
 RL = O + "/books/receipts"
 CK = RL + "/checked"
-TODAY = date.today().isoformat()
-Y = date.today().year
+local_day = lambda ts: datetime.fromisoformat(ts).astimezone(testclock.TZ).date().isoformat() if ts else ""  # noqa: E731  stored in UTC
+TODAY = testclock.today().isoformat()  # the Berlin day, like the exports
+Y = testclock.today().year
 LY = Y - 1
 
 
@@ -148,10 +150,10 @@ check(ids(j) == sorted([R0, R1, R2, R3, R9]) and all(x["checked_at"] is None and
 r = tick(A, [R1])
 check(r.ok and r.json()["changed"] == [R1], "tick one receipt " + r.text[:300])
 row = (r.json().get("rows") or [{}])[0]
-check(row.get("node_id") == R1 and row.get("checked_by") == "Alice Admin" and str(row.get("checked_at") or "")[:10] == TODAY,
+check(row.get("node_id") == R1 and row.get("checked_by") == "Alice Admin" and local_day(row.get("checked_at")) == TODAY,
       f"who + when in the answer {row}")
 at, by = state(R1)
-check(by == ALICE and str(at or "")[:10] == TODAY, f"who + when stored {(at, by)}")
+check(by == ALICE and local_day(at) == TODAY, f"who + when stored {(at, by)}")
 r = tick(A, [R1])
 check(r.ok and r.json()["changed"] == [] and state(R1) == (at, by), "ticking again changes nothing (keeps the first who + when)")
 sh = A.get(B + f"/api/docs/{R1}/receipt").json()["receipt"]
@@ -261,7 +263,7 @@ check(r.ok, "freelancer shares her receipt with her agent " + r.text[:200])
 FA = tok(fa["token"])
 r = FA.get(V + f"/documents/{F1}")
 rc = r.json().get("receipt_checked") if r.ok else None
-check(r.ok and isinstance(rc, dict) and rc.get("by") == "Frida" and str(rc.get("at") or "")[:10] == TODAY, f"her agent reads the tick {r.status_code} {rc}")
+check(r.ok and isinstance(rc, dict) and rc.get("by") == "Frida" and local_day(rc.get("at")) == TODAY, f"her agent reads the tick {r.status_code} {rc}")
 r = FA.post(B + CK, json={"node_ids": [F1], "checked": False})
 check(r.status_code == 403 and state(F1)[0] is not None, f"her agent cannot untick (403, {r.status_code})")
 
