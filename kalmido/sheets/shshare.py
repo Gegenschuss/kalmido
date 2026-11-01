@@ -264,9 +264,11 @@ def shs_leave(c, oid, uids):
     if uids:
         # 2.360.2 M (#2561): an address row stays listed as it was (open again): a row that goes would name the leaver's address
         c.execute(f"UPDATE sheet_shares SET user_id=NULL WHERE org_id=? AND email_key!='' AND user_id IN ({','.join('?' * len(uids))})", [oid, *uids])
-        c.execute(f"UPDATE sheet_shares SET revoked_at=? WHERE org_id=? AND revoked_at IS NULL AND user_id IN ({','.join('?' * len(uids))})",
-                  [iso_ms(now_utc()), oid, *uids])
+        ended = c.execute(f"UPDATE sheet_shares SET revoked_at=? WHERE org_id=? AND revoked_at IS NULL AND user_id IN ({','.join('?' * len(uids))}) "
+                          "RETURNING sheet_id, user_id", [iso_ms(now_utc()), oid, *uids]).fetchall()
         shs_drop_cache()
+        for x in ended:
+            _tell_unshared(c, x[0], [x[1]])
 
 
 def shs_forget(c, uid):
