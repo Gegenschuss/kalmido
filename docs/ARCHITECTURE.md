@@ -274,7 +274,7 @@ The most used helpers:
 1. Create the file in the folder of its area with a one-line docstring (what it holds).
 2. Add it to `ORDER` in `kalmido/__init__.py` **after** every module it imports at the top; names of later modules are
    imported inside functions (see above). The folder `__init__.py` files stay empty.
-3. Database changes are additive migrations (`MIGRATIONS` in `core/schema.py`, run by `init_db` in `core/db.py`).
+3. Database changes are additive migrations (one file per task in `core/migrations.d/`, run by `init_db` in `core/db.py`).
 4. `python3 tools/check_layout.py` checks that `ORDER` and the files agree (CI runs it).
 5. Layers (2.102.0): every package sits in one of five layers, lowest first -- `core`, `accounts`, `domain` (tasks,
    lists, calendars, office, ...), `integrations` (api, admin, mail, webhooks, importers, ...) and `agents` (`LAYERS` in
@@ -650,6 +650,12 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
   in the table `kalmido_migrations` (applied / present / again, with the time). The one-shot data migrations keep their
   settings flag (`migr_*`, read by older versions after a rollback) and are recorded there as `flag:migr_*`.
   `SCHEMA_VERSION` only gates restores of newer backups.
+- **Migration fragments (2.475).** New tables, columns and indexes no longer go into `core/schema.py`: each task adds one
+  file `core/migrations.d/<task id>.py` with up to three plain values: `SCHEMA` (idempotent `CREATE TABLE` / `CREATE INDEX`
+  text, runs right after the schema), `MIGRATIONS` (steps as above, same ids) and `AFTER` (a list of idempotent statements,
+  run on every start after the indexes). Files load in name order (`frag_load` in `core/db.py`), so two packages never touch
+  the same lines. What `core/schema.py` holds stays there. `tools/check_migrations.py` (CI) refuses a new step, table or
+  index in `core/schema.py` (list: `tools/migrations_frozen.json`, it never grows) and a fragment with anything but data.
 - **Process roles (2.102).** `KALMIDO_ROLE=all` (default) runs web and background loops in one process; `web` runs no
   loop; `worker` (`python app.py worker`) runs only the loops. Every loop thread (by its name, `admin/worker.py`
   `WRK_LOOPS`) takes a session-level `pg_try_advisory_lock` of its own before its rounds -- the check sits in

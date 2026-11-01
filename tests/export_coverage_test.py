@@ -28,7 +28,10 @@ SKIP = ("orgs", "lists")  # the organisation and the lists themselves (organisat
 TYPES = "BIGINT|TEXT|INTEGER|DOUBLE|NUMERIC|BOOLEAN|JSONB|BYTEA|REAL|SMALLINT|DATE|TIMESTAMP"
 
 # 2.455.0 (#3469): without the comments: a column behind a comment line was not seen (issue_reports.list_id)
-schema = re.sub(r"--[^\n]*", "", open(os.path.join(ROOT, "kalmido", "core", "schema.py"), encoding="utf-8").read())
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+from check_migrations import schema_src  # noqa: E402
+
+schema = re.sub(r"--[^\n]*", "", schema_src(ROOT))  # 2.475.0 (#3478): + migrations.d
 tables = {}
 for m in re.finditer(r"CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\);", schema, re.S):
     body = re.sub(r"--[^\n]*", "", m.group(2))  # 2.362.4 (#3107): a comment must not hide the column after it

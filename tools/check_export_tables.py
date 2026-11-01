@@ -16,6 +16,8 @@ import os
 import re
 import sys
 
+from check_migrations import schema_src
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TYPES = "BIGINT|TEXT|INTEGER|DOUBLE|NUMERIC|BOOLEAN|JSONB|BYTEA|REAL|SMALLINT|DATE|TIMESTAMP"
 PEOPLE = ("user_id", "owner_id", "created_by", "org_id", "list_id", "task_id")
@@ -32,7 +34,7 @@ def read(root, *p):
 
 
 def schema_tables(root):
-    src = read(root, "kalmido", "core", "schema.py")
+    src = schema_src(root)  # 2.475.0 (#3478): + migrations.d
     tables = {}
     for m in re.finditer(r"CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\);", src, re.S):
         body = re.sub(r"--[^\n]*", "", m.group(2))  # a comment at a line's end must not hide the column on the next line

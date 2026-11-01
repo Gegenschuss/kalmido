@@ -16,6 +16,8 @@ import os
 import re
 import sys
 
+from check_migrations import schema_src as all_schema
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ERR = []
 
@@ -194,7 +196,7 @@ TENANT_EXEMPT = {
     "abs_cal_feeds": _OWN + " (2.155.0 B #2076: the person's subscription link of their own absences + holidays; never data of others)",
     "idem_keys": _OWN + " (2.270.0 C #3022: the person's idempotency keys and the stored answer of their own write request; read only for the same person, method and path)",
 }
-schema_src = re.sub(r"--[^\n]*", "", read("kalmido", "core", "schema.py"))
+schema_src = re.sub(r"--[^\n]*", "", all_schema(ROOT))  # 2.475.0 (#3478): + migrations.d
 tables = {m.group(1): m.group(2) for m in re.finditer(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\((.*?)\);", schema_src, re.S)}
 for m in re.finditer(r'ALTER TABLE (\w+) ADD COLUMN (\w+) ([^"]*)"', schema_src):
     tables[m.group(1)] = tables.get(m.group(1), "") + f", {m.group(2)} {m.group(3)}"

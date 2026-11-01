@@ -712,11 +712,35 @@ def appver_stamp(c):
               (APP_VERSION,))
 
 
+# 2.475.0 (#3478): a package's new tables, columns and indexes come as one file kalmido/core/migrations.d/<task id>.py instead of
+# one more line at the end of schema.py (the same spot for every package: conflicts). Plain data, three optional names: SCHEMA
+# (idempotent CREATE TABLE / INDEX, run right after schema.py's), MIGRATIONS (steps as in schema.py), AFTER (a list of idempotent
+# statements, run on every start after INDEXES). Sorted by file name; here and not in schema.py, so that the loader collides with nothing.
+MIG_D = os.path.join(os.path.dirname(os.path.abspath(__file__)), "migrations.d")
+
+
+def frag_load(d=MIG_D):
+    """2.475.0 (#3478): (SCHEMA text, MIGRATIONS list, AFTER list) of all fragments in d. tools/check_migrations.py holds them to data."""
+    schema, steps, after = [], [], []
+    for n in sorted(os.listdir(d)) if os.path.isdir(d) else ():
+        if n.endswith(".py"):
+            ns, path = {}, os.path.join(d, n)
+            with open(path, encoding="utf-8") as f:
+                exec(compile(f.read(), path, "exec"), ns)  # nosec: a file of this package
+            schema.append(ns.get("SCHEMA", ""))
+            steps += ns.get("MIGRATIONS", [])
+            after += ns.get("AFTER", [])
+    return "\n".join(schema), steps, after
+
+
+FRAG_SCHEMA, FRAG_MIGRATIONS, FRAG_AFTER = frag_load()
+
+
 def mig_ids():
     """2.102.0 D (#1996): (id, table, column, ddl) per MIGRATIONS step; id = "table.column", the n-th step of the same column
-    "table.column#n" -- stable wherever a release inserts its steps."""
+    "table.column#n" -- stable wherever a release inserts its steps. 2.475.0 (#3478): the fragments' steps behind schema.py's."""
     seen, out = {}, []
-    for table, col, ddl in MIGRATIONS:
+    for table, col, ddl in MIGRATIONS + FRAG_MIGRATIONS:
         k = f"{table}.{col}"
         seen[k] = seen.get(k, 0) + 1
         out.append((k if seen[k] == 1 else f"{k}#{seen[k]}", table, col, ddl))
@@ -908,7 +932,7 @@ def init_db(guard=True, load=None):
         write_lock(c, "kalmido-init")
         for ext in ("unaccent", "pg_trgm"):  # message search (collab/msgsearch.py); both ship with the postgres image
             c.execute(f"CREATE EXTENSION IF NOT EXISTS {ext}")
-        c.executescript(trigger_skip_present(c, ix_skip_present(SCHEMA, ix_have(c))))  # 2.183.0 B (#2666): only the missing indexes; 2.369.0 B (#2731): and triggers
+        c.executescript(trigger_skip_present(c, ix_skip_present(SCHEMA + FRAG_SCHEMA, ix_have(c))))  # 2.183.0 B (#2666): only the missing indexes; 2.369.0 B (#2731): and triggers; 2.475.0 (#3478): + the fragments
         clk("schema")
         flags0 = mig_flags_sync(c)  # 2.102.0 D (#1996): the one-shots done before this start (recorded if not yet)
         mig_apply(c)  # 2.102.0 D (#1996): only the MIGRATIONS steps not yet recorded in kalmido_migrations
@@ -946,7 +970,7 @@ def init_db(guard=True, load=None):
         c.executescript(trigger_skip_present(c, SEC_AT_TRIGGER.replace("{off}", str(round(_TEST_OFFSET.total_seconds()) if _TEST_OFFSET is not None else 0))))
         clk("sec_at_trigger")
         have_ix = ix_have(c)  # 2.183.0 B (#2666): only the missing indexes
-        for stmt in INDEXES.strip().split(";"):
+        for stmt in INDEXES.strip().split(";") + FRAG_AFTER:  # 2.475.0 (#3478): + the fragments' AFTER
             m = _IX_LINE.search(stmt + ";")
             if stmt.strip() and not (m and m.group(1).lower() in have_ix) and not col_present(c, stmt):
                 c.execute(stmt)

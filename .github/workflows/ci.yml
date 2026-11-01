@@ -206,6 +206,8 @@ jobs:
         run: python tools/env_check.py
       - name: Links and anchors between the Markdown pages (2.277, #3055)
         run: python tools/check_links.py -v
+      - name: New tables, columns and indexes in migrations.d, not schema.py (2.475.0, #3478)
+        run: python tools/check_migrations.py -v
       - name: Every table with people's data is exported or named (2.362.4, #3107)
         run: python tools/check_export_tables.py
       - name: Translations complete
