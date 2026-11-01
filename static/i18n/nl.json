@@ -15460,7 +15460,6 @@
   "Only admins of this workspace can decide on holiday requests": "Alleen beheerders van deze werkruimte kunnen beslissen over verlofaanvragen",
   "Back to your private workspace (you brought them in): {0}": "Terug naar je privéruimte (door jou ingebracht): {0}",
   "Back to the person’s private workspace (brought in by them): {0}": "Terug naar de privéruimte van de persoon (door hen ingebracht): {0}",
-  "{0} project you had brought in is back in your private workspace.": ["{0} project dat je had ingebracht is terug in je privéruimte.", "{0} projecten die je had ingebracht zijn terug in je privéruimte."],
   "{0} holiday account": ["{0} verlofsaldo", "{0} verlofsaldi"],
   "A helper program on your computer fetches invoices from portals like Amazon and uploads them as PDFs into these documents; they are recognised like any upload. You sign in to the portals only in the helper: Kalmido never stores passwords, cookies or sign-ins.": "Een hulpprogramma op je computer haalt facturen op uit portalen zoals Amazon en uploadt ze als pdf naar deze documenten; ze worden herkend zoals elke upload. Je meldt je alleen in het hulpprogramma aan bij de portalen: Kalmido slaat nooit wachtwoorden, cookies of aanmeldgegevens op.",
   "Absences and holiday": "Afwezigheid en vakantie",
@@ -15723,5 +15722,10 @@
   "Agents are helpers you connect yourself. They see only what you share with them.": "Agenten zijn helpers die je zelf koppelt. Ze zien alleen wat je met ze deelt.",
   "Work with them": "Met ze werken",
   "Give them tasks in your projects or write to them in the chat.": "Geef ze taken in je projecten of schrijf ze in de chat.",
-  "Show more introductions": "Meer introducties tonen"
+  "Show more introductions": "Meer introducties tonen",
+  "Back to your private workspace too: {0}": "Gaat ook terug naar je privéwerkruimte: {0}",
+  "Back to the person’s private workspace too: {0}": "Gaat ook terug naar de privéwerkruimte van deze persoon: {0}",
+  "{0} item you had brought in is back in your private workspace.": ["{0} item dat je had ingebracht is terug in je privéwerkruimte.", "{0} items die je had ingebracht zijn terug in je privéwerkruimte."],
+  "{0} item you brought in cannot go back by itself and stays. Ask an admin to release it before you leave.": ["{0} ingebracht item kan niet vanzelf terug en blijft. Vraag een admin het vrij te geven voordat je vertrekt.", "{0} ingebrachte items kunnen niet vanzelf terug en blijven. Vraag een admin ze vrij te geven voordat je vertrekt."],
+  "{0} item the person brought in cannot go back by itself and stays.": ["{0} door deze persoon ingebracht item kan niet vanzelf terug en blijft.", "{0} door deze persoon ingebrachte items kunnen niet vanzelf terug en blijven."]
 }

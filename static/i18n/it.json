@@ -15460,7 +15460,6 @@
   "Only admins of this workspace can decide on holiday requests": "Solo gli amministratori di questo spazio di lavoro possono decidere sulle richieste di ferie",
   "Back to your private workspace (you brought them in): {0}": "Torna nel tuo spazio privato (portato da te): {0}",
   "Back to the person’s private workspace (brought in by them): {0}": "Torna nello spazio privato della persona (portato da lei): {0}",
-  "{0} project you had brought in is back in your private workspace.": ["{0} progetto che avevi portato è tornato nel tuo spazio privato.", "{0} progetti che avevi portato sono tornati nel tuo spazio privato."],
   "{0} holiday account": ["{0} conto ferie", "{0} conti ferie"],
   "A helper program on your computer fetches invoices from portals like Amazon and uploads them as PDFs into these documents; they are recognised like any upload. You sign in to the portals only in the helper: Kalmido never stores passwords, cookies or sign-ins.": "Un programma di supporto sul tuo computer raccoglie le fatture da portali come Amazon e le carica come PDF in questi documenti; vengono riconosciute come ogni caricamento. Accedi ai portali solo nel programma: Kalmido non salva mai password, cookie o credenziali.",
   "Absences and holiday": "Assenze e ferie",
@@ -15723,5 +15722,10 @@
   "Agents are helpers you connect yourself. They see only what you share with them.": "Gli agenti sono assistenti che colleghi tu stesso. Vedono solo ciò che condividi con loro.",
   "Work with them": "Lavora con loro",
   "Give them tasks in your projects or write to them in the chat.": "Affida loro attività nei tuoi progetti o scrivi loro nella chat.",
-  "Show more introductions": "Mostra altre introduzioni"
+  "Show more introductions": "Mostra altre introduzioni",
+  "Back to your private workspace too: {0}": "Torna anche nel tuo spazio privato: {0}",
+  "Back to the person’s private workspace too: {0}": "Torna anche nello spazio privato della persona: {0}",
+  "{0} item you had brought in is back in your private workspace.": ["{0} elemento che avevi portato è tornato nel tuo spazio privato.", "{0} elementi che avevi portato sono tornati nel tuo spazio privato."],
+  "{0} item you brought in cannot go back by itself and stays. Ask an admin to release it before you leave.": ["{0} elemento portato non può tornare da solo e resta. Chiedi a un admin di liberarlo prima di uscire.", "{0} elementi portati non possono tornare da soli e restano. Chiedi a un admin di liberarli prima di uscire."],
+  "{0} item the person brought in cannot go back by itself and stays.": ["{0} elemento portato dalla persona non può tornare da solo e resta.", "{0} elementi portati dalla persona non possono tornare da soli e restano."]
 }

@@ -78,9 +78,9 @@ def fsm_parent(v):
         raise Denied(400, tr("Invalid value: {0}", "parent")) from None
 
 
-def fsm_walk(c, root):
+def fsm_walk(c, root, only=None):
     """(moved rows, staying rows) below root (root itself first in moved): links, agent folders and what is in the trash
-    stay (with what lies below them)."""
+    stay (with what lies below them). 2.365.1 (#3395): only = the ids that may go, anything else stays too."""
     moved, stay, front = [root], [], [root["id"]]
     for _ in range(DEPTH_MAX + 1):
         if not front:
@@ -88,7 +88,7 @@ def fsm_walk(c, root):
         q = ",".join("?" * len(front))
         nxt = []
         for r in c.execute(f"SELECT * FROM fs_nodes WHERE parent_id IN ({q}) ORDER BY id", front).fetchall():
-            if r["deleted_at"] or r["kind"] in ("link", "ref") or r["agent_id"]:  # 2.199.0 A (#2742): a filed object stays in its workspace
+            if r["deleted_at"] or r["kind"] in ("link", "ref") or r["agent_id"] or (only is not None and r["id"] not in only):  # 2.199.0 A (#2742): a filed object stays in its workspace
                 stay.append(r)
             else:
                 moved.append(r)
@@ -186,7 +186,7 @@ def fsm_plan(c, uid, b, to, dry, office=False):
         roots.append((n, base if parent is _KEEP else fsm_parent(parent), name))
     smv_same(src, to)
     admin = bool(src) and is_org_admin(c, uid, src)
-    plan = {"roots": [], "moved": [], "stay": [], "src": src, "block": None, "code": 409}
+    plan = {"roots": [], "moved": [], "stay": [], "src": src, "block": None, "code": 409, "office": office}
     files = folders = size = shares = opened = 0
     for n, parent, name in roots:
         moved, stay = fsm_walk(c, c.execute("SELECT * FROM fs_nodes WHERE id=?", (n["id"],)).fetchone())
@@ -544,7 +544,9 @@ def fsm_apply(c, uid, plan, to, new_paths, old_paths):
     src, ts = plan["src"], _now()
     out = []
     from ..accounts.orgout import org_out  # 2.148.1 B (#2483): logged, the organisation's other admins told
-    org_out(c, src, to, "file", ", ".join(n["name"] for n, _, _, _ in plan["roots"]), obj=[n["id"] for n, _, _, _ in plan["roots"]])
+    if not plan.get("home"):  # 2.365.1 (#3395): the leaving logs it per area (accounts/orgback.py)
+        org_out(c, src, to, "file", ", ".join(n["name"] for n, _, _, _ in plan["roots"]), obj=[n["id"] for n, _, _, _ in plan["roots"]])
+    brought = uid if to and not src and not plan.get("office") else None  # 2.365.1 (#3395): goes back when uid leaves (a personal office's receipts stay, officemove)
     ids = [r["id"] for r, _ in plan["moved"]]
     for i in range(0, len(ids), 500):  # the recognition queues skip locked rows: none starts until the commit
         part = ids[i:i + 500]
@@ -563,12 +565,12 @@ def fsm_apply(c, uid, plan, to, new_paths, old_paths):
     for n, pid, owner, name in plan["roots"]:
         out.append({"id": n["id"], "parent_was": n["parent_id"], "org_was": src, "name_was": n["name"]})
         names[n["id"]] = _free_name(c, pid, owner, to, name or n["name"], skip=n["id"])
-        c.execute("UPDATE fs_nodes SET parent_id=?, name=?, org_id=?, owner_id=?, org_access='', updated_at=? WHERE id=?",
-                  (pid, names[n["id"]], to, owner, ts, n["id"]))
+        c.execute("UPDATE fs_nodes SET parent_id=?, name=?, org_id=?, owner_id=?, org_access='', updated_at=?, brought_by=? WHERE id=?",
+                  (pid, names[n["id"]], to, owner, ts, brought, n["id"]))
     for r, owner in plan["moved"]:
         nm = names.get(r["id"], r["name"])
         if r["id"] not in names:
-            c.execute("UPDATE fs_nodes SET org_id=?, owner_id=?, org_access='', updated_at=? WHERE id=?", (to, owner, ts, r["id"]))
+            c.execute("UPDATE fs_nodes SET org_id=?, owner_id=?, org_access='', updated_at=?, brought_by=? WHERE id=?", (to, owner, ts, brought, r["id"]))
         dt_move(c, r["id"], f"o{to}" if to else f"u{owner}")  # 2.122.0 B (#2099): tags of files / folders go along by name
         if r["kind"] == "file":
             fsm_doc(c, r["id"], to, owner, uid, nm, new_paths, old_paths)
@@ -587,6 +589,57 @@ def fsm_apply(c, uid, plan, to, new_paths, old_paths):
     xl_space_moved(c, ids)  # 2.112.1 B (#2058): external links end with the move into another workspace
     restored = fsm_memo_apply(c, back, to, uid)
     return out, restored
+
+
+def fsm_home_fits(c, r, booked):
+    """2.365.1 (#3395): may node r (brought in) go back by itself? Not a link, an agent folder, a closed area's folder, a locked
+    folder or a receipt in the books (fsm_plan's rules: nobody is there to be told, it stays and the preview says so).
+    booked = fsm_home_booked of the nodes."""
+    if r["kind"] in ("link", "ref") or r["agent_id"]:
+        return False
+    try:
+        fs_area_root_need_free(c, r["id"])
+        fs_area_need_stay(c, r["id"])
+        fsl_space_guard(c, [r["id"]])
+        if r["kind"] == "file":
+            from ..office.periodlock import pl_receipt_need_open
+            pl_receipt_need_open(c, r["id"])
+    except Denied:
+        return False
+    return r["id"] not in booked
+
+
+def fsm_home_booked(c, ids):
+    """The nodes of ids the cash book, the equipment list or the books hold (one query each, as fsm_plan: a folder can hold thousands)."""
+    if not ids:
+        return set()
+    from ..receipts.suggest import olk_fs_locked, olk_fs_maybe
+    q = ",".join("?" * len(ids))
+    out = {x[0] for x in c.execute(f"SELECT node_id FROM office_cash_entries WHERE node_id IN ({q}) UNION ALL "
+                                   f"SELECT receipt_node_id FROM office_equipment WHERE receipt_node_id IN ({q})", ids + ids)}
+    return out | {i for i in olk_fs_maybe(c, ids) if olk_fs_locked(c, i)}
+
+
+def fsm_home_plans(c, oid, uid):
+    """2.365.1 (#3395): what uid brought into organisation oid and goes back with them: (plans for fsm_apply, one per top item,
+    at most SMV_MAX nodes; how many nodes stay). What others put into a brought folder stays (at the top of the organisation)."""
+    rows = c.execute("SELECT * FROM fs_nodes WHERE org_id=? AND brought_by=? AND deleted_at IS NULL ORDER BY id", (oid, uid)).fetchall()
+    booked = fsm_home_booked(c, [r["id"] for r in rows if r["kind"] == "file"])
+    fit = {r["id"] for r in rows if fsm_home_fits(c, r, booked)}
+    plans, n = [], 0
+    for r in rows:
+        if r["id"] not in fit or r["parent_id"] in fit:
+            continue
+        moved, stay = fsm_walk(c, r, fit)
+        if n + len(moved) > SMV_MAX:
+            continue
+        n += len(moved)
+        ids = [x["id"] for x in moved]
+        ends = [s["id"] for s in c.execute(f"SELECT * FROM fs_shares WHERE node_id IN ({','.join('?' * len(ids))})", ids).fetchall()
+                if fsm_share_ends(c, s, None, uid)]
+        plans.append({"home": True, "src": oid, "roots": [(r, None, uid, None)], "moved": [(x, uid) for x in moved], "stay": stay, "ends": ends,
+                      "root_of": {x["id"]: r["id"] for x in moved + stay}})
+    return plans, len(rows) - n
 
 
 @app.post("/api/files/move-space")

@@ -122,7 +122,9 @@ def sheets_move_space(sid):
         if k and (k["org_id"] or None) == (to or None) and k["e2e"] is None and list_role(c, back["list_id"], uid) in WRITE_ROLES:
             list_id = back["list_id"]
     org_out(c, r["org_id"], to, "sheet", r["title"], obj=sid)  # 2.148.1 B (#2483): logged, the organisation's other admins told
-    c.execute("UPDATE sheets SET org_id=?, owner_id=?, list_id=? WHERE id=?", (to, None if to else uid, list_id, sid))
+    # 2.365.1 (#3395): brought_by = who brought it in from the private space (goes back when they leave, accounts/orgback.py)
+    c.execute("UPDATE sheets SET org_id=?, owner_id=?, list_id=?, brought_by=? WHERE id=?",
+              (to, None if to else uid, list_id, uid if to and not r["org_id"] else None, sid))
     ended = [x[0] for x in c.execute("SELECT id FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (sid,))]  # 2.273.0 B (#3042)
     if shares:  # 2.124.0 C (#2113): every share ends (the people / agents belong to the old workspace; share again there)
         from .shshare import shs_end
@@ -168,6 +170,31 @@ def sheets_move_space(sid):
     d = sh_dict(c, sh_reload(c, sid))
     return jsonify(smv_answer(notes, None, ok=True, move_id=mid, from_space=sh_space_key(r["org_id"]), space=sh_space_key(to),
                               sheet=d, revived=len(revived), shares_back=sback))
+
+
+def shm_home(c, r, uid, new_paths, old_paths):
+    """2.365.1 (#3395): table r (its first sheet) goes back into uid's private space with their leaving (accounts/orgback.py):
+    what sheets_move_space does, without the dialog. A project that went back too keeps it attached. The caller commits."""
+    from .shbook import shb_member_ids, shb_move
+    from .shfolder import shf_after_move
+    from .shkinds import shk_move_files
+    from .shshare import shs_end
+    sid, tabs, ts = r["id"], shb_member_ids(c, r["id"]), iso_ms(now_utc())
+    l = c.execute("SELECT org_id FROM lists WHERE id=?", (r["list_id"],)).fetchone() if r["list_id"] else None
+    keep = bool(l) and not l["org_id"]
+    links = [x for t in tabs for x in shm_links_out(c, t, None)]
+    ended = [x[0] for x in c.execute("SELECT id FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (sid,))]
+    c.execute("UPDATE sheets SET org_id=NULL, owner_id=?, list_id=?, brought_by=NULL WHERE id=?", (uid, r["list_id"] if keep else None, sid))
+    if ended:
+        shs_end(c, sid)
+    shf_after_move(c, sid)
+    shk_move_files(c, sid, None, uid, new_paths, old_paths)
+    shb_move(c, sid, None, uid, new_paths, old_paths)
+    if links:
+        c.execute(f"UPDATE sheet_links SET undone_at=? WHERE id IN ({','.join('?' * len(links))})", [ts, *links])
+    c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('sheet',?,?,NULL,?,?,?)",
+              (sid, r["org_id"], uid, ts, json.dumps({"list_id": None if keep else r["list_id"], "links": links, "at": ts, "shares": ended})))
+    sh_touch(c, sid, uid)
 
 
 def shm_last(c, sid):

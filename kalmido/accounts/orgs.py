@@ -1358,7 +1358,8 @@ def org_leave(c, oid, uid, heir, back=None):
     """uid leaves organisation oid: their lists of that workspace go to heir (an organisation admin), uid leaves every list
     of the organisation (members and the agents it owns there stay with the lists), their personal agents of that workspace
     become private. 2.361.0 (#2922): a list uid brought in from the private space (lists.brought_by) goes back there instead
-    (its id appended to back). The caller commits. Returns the number of lists transferred."""
+    (its id appended to back), 2.365.1 (#3395) and so does what else they brought in (accounts/orgback.py, [kind, id] appended).
+    The caller commits. Returns the number of lists transferred."""
     from ..lists.ownership import owner_transfer
     from .orgleave import olv_memo, olv_snap
     snap = olv_snap(c, oid, uid)  # 2.363.3 (#3133): what the end of the membership takes away, for coming back within a day
@@ -1388,6 +1389,8 @@ def org_leave(c, oid, uid, heir, back=None):
     if priv:  # 2.352.0 F (#2748, review N3): the lists now private leave the organisation's tree, its folders' roles end
         from ..lists.groups import grp_sync
         grp_sync(c, priv)
+    from .orgback import olb_home
+    olb_home(c, oid, uid, back)  # 2.365.1 (#3395): after the lists: what hangs at a project that went back stays attached
     # 2.83.0 (#1725): tasks assigned without joining (a list everyone in the organisation may edit)
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=? AND list_id IN (SELECT id FROM lists WHERE org_id=? AND owner_id!=?)", (uid, oid, uid))
     # 2.363.3 (#3133): coming along without a membership too (brought back by joining again in a list open to the organisation)

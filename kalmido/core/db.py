@@ -1251,6 +1251,11 @@ def init_db(guard=True, load=None):
         clk("cdn_backfill")
         if n:
             print("clients: address fields filled from the free address for", n, "client(s)", flush=True)
+        if gsetting(c, "migr_brought2365") != "1":  # 2.365.1 (#3395): who brought what in, from the history of the moves
+            from ..accounts.orgback import olb_backfill
+            n = olb_backfill(c)
+            gset(c, "migr_brought2365", "1")
+            print("organisations: noted who brought in", n, "item(s)", flush=True)
         if gsetting(c, "migr_upg2103") != "1":  # 2.152.0 A (#2164): time entries / direct messages outlive an account
             from ..accounts.orgretain import upg_fk_once
             upg_fk_once(c)

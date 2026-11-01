@@ -645,7 +645,7 @@ def tpo_move_space(pid):
         return jsonify(smv_answer(notes, deny.text() if deny else None, count=1, **((deny and deny.data) or {})))
     org_out(c, r["org_id"], to, "poll", r["title"], obj=pid)  # 2.361.2 B (#2923): logged, admins told, release used
     ts = iso_ms(now_utc())
-    sets = {"org_id": to, "updated_at": ts, **{k: None for k in drop}}
+    sets = {"org_id": to, "updated_at": ts, "brought_by": uid if to and not r["org_id"] else None, **{k: None for k in drop}}  # 2.365.1 (#3395): accounts/orgback.py
     c.execute(f"UPDATE sched_polls SET {','.join(k + '=?' for k in sets)} WHERE id=?", [*sets.values(), pid])
     mid = insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('poll',?,?,?,?,?,?)",
                     (pid, r["org_id"], to, uid, ts, json.dumps({k: r[k] for k in drop})))
@@ -653,6 +653,19 @@ def tpo_move_space(pid):
     c.commit()
     return jsonify(smv_answer(notes, None, ok=True, move_id=mid, from_space=tpo_space_key(r["org_id"]), space=tpo_space_key(to),
                               poll=tpo_dict(c, tpo_need(c, pid), uid)))
+
+
+def tpo_home(c, r, uid):
+    """2.365.1 (#3395): poll r goes back into uid's private space with their leaving (accounts/orgback.py): its task / project
+    only when that went back too, its client of the organisation stays there. The caller commits."""
+    q = {"task_id": "SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=? AND l.org_id IS NULL AND l.owner_id=?",
+         "list_id": "SELECT 1 FROM lists WHERE id=? AND org_id IS NULL AND owner_id=?"}
+    drop = [k for k in ("task_id", "client_id", "list_id") if r[k] and not (k in q and c.execute(q[k], (r[k], uid)).fetchone())]
+    ts = iso_ms(now_utc())
+    sets = {"org_id": None, "updated_at": ts, "brought_by": None, **{k: None for k in drop}}
+    c.execute(f"UPDATE sched_polls SET {','.join(k + '=?' for k in sets)} WHERE id=?", [*sets.values(), r["id"]])
+    c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('poll',?,?,NULL,?,?,?)",
+              (r["id"], r["org_id"], uid, ts, json.dumps({k: r[k] for k in drop})))
 
 
 # ---------------------------------------------------------------- the public page /s/v/<token>

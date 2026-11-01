@@ -193,8 +193,8 @@ def wiki_move_space():
     try:
         with c.savepoint():
             for r, n in moves + tmoves:
-                c.execute("UPDATE wiki_pages SET org_id=?, owner_id=?, path=?, updated_by=?, updated_at=? WHERE id=?",
-                          (to, None if to else uid, n, uid, ts, r["id"]))
+                c.execute("UPDATE wiki_pages SET org_id=?, owner_id=?, path=?, updated_by=?, updated_at=?, brought_by=? WHERE id=?",
+                          (to, None if to else uid, n, uid, ts, uid if to and not src else None, r["id"]))  # 2.365.1 (#3395): accounts/orgback.py
     except IntegrityError:
         c.rollback()  # 2.361.2 (#2923, review): nothing of the move stays, also not the used release
         return jsonify(error=tr("A page with this name already exists"), taken=[]), 409
@@ -229,6 +229,55 @@ def wiki_move_space():
     return jsonify(smv_answer(notes, None, ok=True, space=wiki_space_key(to), from_space=wiki_space_key(src), relinked=relinked,
                               moved=[{"id": r["id"], "from": r["path"], "to": n} for r, n in moves]))
 
+
+
+def wkm_home_rows(c, oid, uid):
+    """2.365.1 (#3395): (the pages uid brought into organisation oid that go back with them, how many stay): nothing with a lock
+    on either side (the server cannot encrypt them again; that way back is the request, the browser re-encrypts)."""
+    from .wikie2e import wke_mode
+    from .wkhist import wsb_body_or
+    rows = c.execute("SELECT * FROM wiki_pages WHERE org_id=? AND brought_by=? AND deleted_at IS NULL ORDER BY id", (oid, uid)).fetchall()
+    if rows and (wke_mode(c, oid, uid)[0] or wke_mode(c, None, uid)[0]):
+        return [], len(rows)
+    go = [r for r in rows if wsb_body_or(c, r, None) is not None][:SMV_MAX]  # a text that cannot be opened stays
+    return go, len(rows) - len(go)
+
+
+def wkm_free(path, taken):
+    """path, or "path (2)" ... when taken (lower-case paths; the name found is added)."""
+    n, i = path, 1
+    while n.lower() in taken:
+        i += 1
+        n = f"{path} ({i})"
+    taken.add(n.lower())
+    return n
+
+
+def wkm_home(c, oid, uid, rows, new_paths, old_paths):
+    """2.365.1 (#3395): pages rows (wkm_home_rows) go back into uid's private space: what wiki_move_space does, without the
+    dialog; a name taken there gets " (2)" and the links between these pages follow. The caller commits."""
+    from .wikiatt import wka_move_files
+    from .wkfolder import wkf_drop, wkf_sync
+    from .wkhist import wkh_body, wkh_move, wkh_seal
+    from .wkshare import wsh_end_moved
+    w, a = wiki_space_sql(None, uid)
+    taken = {x[0].lower() for x in c.execute(f"SELECT path FROM wiki_pages WHERE deleted_at IS NULL AND {w}", a)}
+    plain = {r["id"]: wkh_body(c, r) for r in rows}
+    moves = [(r, wkm_free(r["path"], taken)) for r in rows]
+    ren, ids, ts = {r["path"].lower(): n for r, n in moves if r["path"] != n}, [r["id"] for r in rows], iso_ms(now_utc())
+    for r, n in moves:
+        c.execute("UPDATE wiki_pages SET org_id=NULL, owner_id=?, path=?, updated_by=?, updated_at=?, brought_by=NULL WHERE id=?", (uid, n, uid, ts, r["id"]))
+    wka_move_files(c, ids, None, uid, new_paths, old_paths)
+    wsh_end_moved(c, oid, None, [r["path"] for r in rows])
+    wkh_move(c, rows, None, uid)
+    for r, n in moves:
+        nb = wkm_relink(plain[r["id"]], ren)
+        c.execute("UPDATE wiki_pages SET body=? WHERE id=?", (wkh_seal(c, None, uid, nb), r["id"]))
+        wiki_set_links(c, r["id"], nb)
+        c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('wiki',?,?,NULL,?,?,?)",
+                  (r["id"], oid, uid, ts, json.dumps({"from": r["path"], "to": n}, ensure_ascii=False)))
+    wkf_drop(c, ids)
+    wkf_sync(c, uid, None)
 
 
 # ---------------------------------------------------------------- 2.97.0 D (#2050): moves with a space with the lock
@@ -380,8 +429,9 @@ def wkr_move(c, uid, src, to, b, dry):
             for r in rows:
                 p, t = got[r["id"]]
                 attrs = "{}" if tst["mode"] else json.dumps(wiki_frontmatter(t), ensure_ascii=False)
-                c.execute("UPDATE wiki_pages SET org_id=?, owner_id=?, path=?, body=?, attrs=?, updated_by=?, updated_at=? WHERE id=?",
-                          (to, None if to else uid, p, t if tst["mode"] else wkh_seal(c, to, None if to else uid, t), attrs, uid, ts, r["id"]))
+                c.execute("UPDATE wiki_pages SET org_id=?, owner_id=?, path=?, body=?, attrs=?, updated_by=?, updated_at=?, brought_by=? WHERE id=?",
+                          (to, None if to else uid, p, t if tst["mode"] else wkh_seal(c, to, None if to else uid, t), attrs, uid, ts,
+                           uid if to and not src else None, r["id"]))  # 2.365.1 (#3395)
     except IntegrityError:
         c.rollback()
         return jsonify(error=tr("A page with this name already exists"), taken=[]), 409

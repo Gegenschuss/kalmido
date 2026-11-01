@@ -15460,7 +15460,6 @@
   "Only admins of this workspace can decide on holiday requests": "Nur Admins dieses Bereichs können über Urlaubsanträge entscheiden",
   "Back to your private workspace (you brought them in): {0}": "Zurück in deinen privaten Bereich (von dir eingebracht): {0}",
   "Back to the person’s private workspace (brought in by them): {0}": "Zurück in den privaten Bereich der Person (von ihr eingebracht): {0}",
-  "{0} project you had brought in is back in your private workspace.": ["{0} Projekt, das du eingebracht hattest, ist zurück in deinem privaten Bereich.", "{0} Projekte, die du eingebracht hattest, sind zurück in deinem privaten Bereich."],
   "{0} holiday account": ["{0} Urlaubskonto", "{0} Urlaubskonten"],
   "A helper program on your computer fetches invoices from portals like Amazon and uploads them as PDFs into these documents; they are recognised like any upload. You sign in to the portals only in the helper: Kalmido never stores passwords, cookies or sign-ins.": "Ein Hilfsprogramm auf deinem Computer holt Rechnungen aus Portalen wie Amazon und lädt sie als PDF in diese Dokumente; sie werden wie jeder Upload erkannt. Bei den Portalen meldest du dich nur im Hilfsprogramm an: Kalmido speichert nie Passwörter, Cookies oder Logins.",
   "Absences and holiday": "Abwesenheiten und Urlaub",
@@ -15723,5 +15722,10 @@
   "Agents are helpers you connect yourself. They see only what you share with them.": "Agenten sind Helfer, die du selbst verbindest. Sie sehen nur, was du mit ihnen teilst.",
   "Work with them": "Mit ihnen arbeiten",
   "Give them tasks in your projects or write to them in the chat.": "Gib ihnen Aufgaben in deinen Projekten oder schreib ihnen im Chat.",
-  "Show more introductions": "Weitere Einführungen zeigen"
+  "Show more introductions": "Weitere Einführungen zeigen",
+  "Back to your private workspace too: {0}": "Geht auch zurück in deinen privaten Bereich: {0}",
+  "Back to the person’s private workspace too: {0}": "Geht auch zurück in den privaten Bereich der Person: {0}",
+  "{0} item you had brought in is back in your private workspace.": ["{0} Eintrag, den du eingebracht hattest, ist zurück in deinem privaten Bereich.", "{0} Einträge, die du eingebracht hattest, sind zurück in deinem privaten Bereich."],
+  "{0} item you brought in cannot go back by itself and stays. Ask an admin to release it before you leave.": ["{0} eingebrachter Eintrag kann nicht von selbst zurück und bleibt. Bitte vor dem Austritt einen Admin um Freigabe.", "{0} eingebrachte Einträge können nicht von selbst zurück und bleiben. Bitte vor dem Austritt einen Admin um Freigabe."],
+  "{0} item the person brought in cannot go back by itself and stays.": ["{0} eingebrachter Eintrag der Person kann nicht von selbst zurück und bleibt.", "{0} eingebrachte Einträge der Person können nicht von selbst zurück und bleiben."]
 }

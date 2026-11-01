@@ -4006,6 +4006,14 @@ MIGRATIONS = [
     # 2.361.0 (#2922): who moved a project from their private space into its organisation (accounts/orgs.py list_org_set);
     # it goes back to that person's private space when they leave (org_leave). Older versions ignore it (the way back)
     ("lists", "brought_by", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS brought_by BIGINT"),
+    # 2.365.1 (#3395): the same for tables, files / folders, knowledge pages, video reviews, polls and bookmarks (their
+    # move-space routes; back with org_leave, accounts/orgback.py). Older versions ignore it (the way back)
+    ("sheets", "brought_by", "ALTER TABLE sheets ADD COLUMN IF NOT EXISTS brought_by BIGINT"),
+    ("fs_nodes", "brought_by", "ALTER TABLE fs_nodes ADD COLUMN IF NOT EXISTS brought_by BIGINT"),
+    ("wiki_pages", "brought_by", "ALTER TABLE wiki_pages ADD COLUMN IF NOT EXISTS brought_by BIGINT"),
+    ("video_reviews", "brought_by", "ALTER TABLE video_reviews ADD COLUMN IF NOT EXISTS brought_by BIGINT"),
+    ("sched_polls", "brought_by", "ALTER TABLE sched_polls ADD COLUMN IF NOT EXISTS brought_by BIGINT"),
+    ("bookmarks", "brought_by", "ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS brought_by BIGINT"),
     # 2.361.0 (#2920): the day the members of an organisation were told it is deleted (accounts/orgleave.py; the deletion
     # waits until then). Older versions ignore it (they delete at once, as before)
     ("orgs", "delete_notice", "ALTER TABLE orgs ADD COLUMN IF NOT EXISTS delete_notice TEXT"),

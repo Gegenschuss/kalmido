@@ -304,6 +304,8 @@ function wsPaneWire(md) {
 function olvLeaveHtml(j, self) {
   const rows = [], th = j.to_heir || {};
   if ((j.back || []).length) rows.push([false, (self ? tr('Back to your private workspace (you brought them in): {0}', j.back.join(', ')) : tr('Back to the person’s private workspace (brought in by them): {0}', j.back.join(', ')))]);
+  if (j.back_text) rows.push([false, (self ? tr('Back to your private workspace too: {0}', j.back_text) : tr('Back to the person’s private workspace too: {0}', j.back_text))]);  // 2.365.1 (#3395)
+  if (j.kept) rows.push([true, (self ? trn('{0} item you brought in cannot go back by itself and stays. Ask an admin to release it before you leave.', '{0} items you brought in cannot go back by themselves and stay. Ask an admin to release them before you leave.', j.kept) : trn('{0} item the person brought in cannot go back by itself and stays.', '{0} items the person brought in cannot go back by themselves and stay.', j.kept))]);
   const given = [th.lists ? trn('{0} project', '{0} projects', th.lists) : '', th.calendars ? trn('{0} calendar', '{0} calendars', th.calendars) : '', th.books ? trn('{0} address book', '{0} address books', th.books) : ''].filter(Boolean).join(', ');
   if (given) rows.push([false, tr('Goes to {0}: {1}', j.heir || tr('an admin'), given)]);
   if (j.stays_text) rows.push([true, (self ? tr('Stays in the organisation, you no longer see it: {0}', j.stays_text) : tr('Stays in the organisation, the person no longer sees it: {0}', j.stays_text))]);

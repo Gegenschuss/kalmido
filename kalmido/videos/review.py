@@ -899,8 +899,8 @@ def vdr_move_space(vid):
     if not any(new.values()):  # 2.99.1 review L2: the old place no longer fits -> a project in the target, no review at nothing
         return jsonify(smv_answer(notes, tr("Choose a project in the target workspace"), count=1))
     org_out(c, r["org_id"], to, "video", r["title"], obj=vid)  # 2.361.2 B (#2923): logged, admins told, release used
-    c.execute("UPDATE video_reviews SET org_id=?, owner_id=?, task_id=?, list_id=?, client_id=?, updated_at=? WHERE id=?",
-              (to, None if to else uid, new["task_id"], new["list_id"], new["client_id"], ts, vid))
+    c.execute("UPDATE video_reviews SET org_id=?, owner_id=?, task_id=?, list_id=?, client_id=?, updated_at=?, brought_by=? WHERE id=?",
+              (to, None if to else uid, new["task_id"], new["list_id"], new["client_id"], ts, uid if to and not r["org_id"] else None, vid))  # 2.365.1 (#3395): accounts/orgback.py
     c.execute("UPDATE video_versions SET org_id=? WHERE review_id=?", (to, vid))
     c.execute("UPDATE video_comments SET org_id=? WHERE review_id=?", (to, vid))
     if live:
@@ -918,6 +918,36 @@ def vdr_move_space(vid):
     c.commit()
     return jsonify(smv_answer(notes, None, ok=True, move_id=mid, from_space=vdr_space_key(r["org_id"]), space=vdr_space_key(to),
                               review=vdr_dict(c, vdr_reload(c, vid), uid, full=True), revived=revived))
+
+
+def vdr_home(c, r, uid):
+    """2.365.1 (#3395): review r goes back into uid's private space with their leaving (accounts/orgback.py): what
+    vdr_move_space does without the dialog. Its place: its task / project when that went back too, else the person's inbox
+    (a review always has a place; False without one: it stays). The caller commits."""
+    import json
+    write_lock(c, f"video_review_{int(r['id'])}")  # as the route: a customer decision does not land in the old workspace mid-move
+    place = "task_id" if r["task_id"] else "list_id" if r["list_id"] else "client_id" if r["client_id"] else None
+    new = {"task_id": None, "list_id": None, "client_id": None}
+    q = "SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=? AND l.org_id IS NULL AND l.owner_id=?" if place == "task_id" else \
+        "SELECT 1 FROM lists WHERE id=? AND org_id IS NULL AND owner_id=?" if place == "list_id" else None
+    if q and c.execute(q, (r[place], uid)).fetchone():
+        new[place] = r[place]
+    else:
+        new["list_id"] = (c.execute("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1 AND org_id IS NULL ORDER BY id LIMIT 1", (uid,)).fetchone() or [None])[0]
+        if not new["list_id"]:
+            return False
+    vid, ts = r["id"], iso(now_utc())
+    sigs = c.execute("SELECT id, state, revoked_at FROM office_signoffs WHERE video_id=?", (vid,)).fetchall()
+    live = [s["id"] for s in sigs if s["state"] == "open" and not s["revoked_at"]]
+    c.execute("UPDATE video_reviews SET org_id=NULL, owner_id=?, task_id=?, list_id=?, client_id=?, updated_at=?, brought_by=NULL WHERE id=?",
+              (uid, new["task_id"], new["list_id"], new["client_id"], ts, vid))
+    c.execute("UPDATE video_versions SET org_id=NULL WHERE review_id=?", (vid,))
+    c.execute("UPDATE video_comments SET org_id=NULL WHERE review_id=?", (vid,))
+    if live:
+        c.execute(f"UPDATE office_signoffs SET revoked_at=? WHERE id IN ({','.join('?' * len(live))})", [ts, *live])
+    c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('video',?,?,NULL,?,?,?)",
+              (vid, r["org_id"], uid, ts, json.dumps({"place": place, "place_id": r[place] if place else None, "sigs": [s["id"] for s in sigs]})))
+    return True
 
 
 VDR_TRASH_DAYS = 30
