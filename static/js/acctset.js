@@ -78,7 +78,7 @@ const NEWS_KINDS = [['mention', N_('Mentions of me')], ['assign', N_('Tasks assi
 // one checkbox -> the two stored values {notify, news_kinds}
 function notifPatch(s, row, ch, on) {
   const o = nmStored(s);
-  let nk = String(s.news_kinds ?? 'mention,assign,comment,unblock,share,status').split(',').filter(Boolean);
+  let nk = String(s.news_kinds ?? 'mention,assign,comment,complete,unblock,share,status').split(',').filter(Boolean);
   if (ch === 'news' && NM_PRIMARY.includes(row)) nk = on ? [...new Set([...nk, NM_GROUP[row]])] : nk.filter(k => k !== NM_GROUP[row]);
   else { o[row] = {...(o[row] || {}), [ch]: on ? 1 : 0}; }
   const sorted = Object.keys(o).sort().reduce((a, k) => { a[k] = Object.keys(o[k]).sort().reduce((b, j) => { b[j] = o[k][j]; return b; }, {}); return a; }, {});

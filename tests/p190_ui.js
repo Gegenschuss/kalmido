@@ -155,7 +155,7 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   await sleep(600);
   let items = [...d.querySelectorAll('#view .nitem')];
   check(items.length >= 3 && items.every(i => i.querySelector('[data-act="news-dismiss"]')), 'every item has a remove button (desktop)');
-  check(!items.some(i => i.classList.contains('k-complete')), 'default: completions by others do not show');
+  check(items.some(i => i.classList.contains('k-complete')), 'default: completions by others show');  // 2.367.5 (#2980): like its push
   check(d.querySelector('#view .nitem.unread') && /Unread/.test(d.querySelector('#view .nitem.unread').getAttribute('aria-label')), 'unread items marked (bold style + label)');
   const n0 = items.length, u0 = w.eval('S.news.unread');
   items[0].querySelector('[data-act="news-dismiss"]').click(); await sleep(800);
@@ -169,9 +169,9 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   d.querySelector('[data-act="news-settings"]').click(); await idle(w);
   // 2.1.0 (#317): the News column of the notification matrix replaced the News checkboxes
   const nk = [...d.querySelectorAll('#sp-notify [data-nm][data-ch="news"]')];
-  check(nk.length >= 9 && !d.querySelector('#sp-notify [data-nm="complete"][data-ch="news"]').checked && d.querySelector('#sp-notify [data-nm="mention"][data-ch="news"]').checked && !d.querySelector('#sp-notify').classList.contains('hidden'), 'News column in Settings > Notifications (complete off by default)');
-  const c = d.querySelector('#sp-notify [data-nm="complete"][data-ch="news"]'); c.checked = true; c.dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);
-  check((await call('bob', 'GET', '/api/state')).settings.news_kinds.split(',').includes('complete'), 'turning "completed" on is saved');
+  check(nk.length >= 9 && d.querySelector('#sp-notify [data-nm="complete"][data-ch="news"]').checked && d.querySelector('#sp-notify [data-nm="mention"][data-ch="news"]').checked && !d.querySelector('#sp-notify').classList.contains('hidden'), 'News column in Settings > Notifications (complete on by default)');
+  const c = d.querySelector('#sp-notify [data-nm="complete"][data-ch="news"]'); c.checked = false; c.dispatchEvent(new w.Event('change', {bubbles: true})); await idle(w);
+  check(!(await call('bob', 'GET', '/api/state')).settings.news_kinds.split(',').includes('complete'), 'turning "completed" off is saved');
   w.close();
   // touch: swipe to remove
   w = await boot({user: 'bob', hash: 'news', mobile: true, setup: x => { x.ontouchstart = null; x.navigator.maxTouchPoints = 5; }}); d = w.document; await sleep(600);
