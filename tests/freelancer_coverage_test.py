@@ -30,7 +30,8 @@ SUITE = "p287b_a_freelancer_api_test.py"
 KINDS = {
     # ---- checked as a freelancer (the suites carry "freelancer-matrix: <area>")
     "tasks": ("matrix", SUITE + ": tasks, comments, subtasks, attachments, tags, notes, search, trash, day plan, roadmap, export "
-                        "and import in the private workspace; every GET of the area as the freelancer (no 403 / 5xx)"),
+                        "and import in the private workspace; every GET of the area as the freelancer (no 403 / 5xx); "
+                        "p2477_quicknote_api_test.py: her private list Notes of the quick note, sharing refused, an empty note gone for good (2.477.0)"),
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET"),
     "office": ("matrix", SUITE + ", p2199_b_office_test.py (2.199.0: a quotation of the personal office in a private folder, the folder routes, her agent), p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py, p2113c_a_api_test.py, p2110_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
@@ -690,6 +691,7 @@ ROUTES = {
     "DELETE /api/deps/{}/{}": "tasks", "DELETE /api/envs/{}": "tasks", "DELETE /api/envs/{}/deploys/{}": "tasks",
     "DELETE /api/list-checks/{}": "tasks", "DELETE /api/notepads/{}": "tasks", "DELETE /api/notes/{}": "tasks",
     "POST /api/notes/{}/restore": "tasks", "POST /api/v1/notes/{}/restore": "tasks",  # 2.272.0 E1 (#3038)
+    "POST /api/notes/quick-list": "tasks",  # 2.477.0 (#3881): the private list Notes (p2477_quicknote_api_test.py, freelancer-matrix: tasks)
     "DELETE /api/repos/{}": "tasks", "DELETE /api/sample": "tasks", "DELETE /api/sprints/{}": "tasks",
     "DELETE /api/tasks/{}": "tasks", "DELETE /api/tasks/{}/contacts/{}": "tasks", "DELETE /api/tasks/{}/enc-note": "tasks",
     "DELETE /api/tasks/{}/links/{}": "tasks", "DELETE /api/tasks/{}/note-lock": "tasks",
@@ -1140,7 +1142,6 @@ DELETE /api/my/agents/{}/machines/{}
 DELETE /api/newsletter
 DELETE /api/newsletter/segments/{}
 DELETE /api/notepads/{}
-DELETE /api/notes/{}
 DELETE /api/office/cashflow/adjust/{}
 DELETE /api/office/cashflow/start
 DELETE /api/office/docs/{}/parts/{}

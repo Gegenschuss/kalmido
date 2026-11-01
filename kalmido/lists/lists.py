@@ -16,6 +16,7 @@ from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
 from ..tasks.ticketkey import tk_set  # 2.390.0 (#3353)
 from ..core.access import list_other_agent, ONE_AGENT_MSG  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import qn_is, qn_private  # 2.477.0 (#3881)
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 
 
@@ -368,6 +369,14 @@ def list_create():
     return jsonify(dict(c.execute("SELECT * FROM lists WHERE id=?", (cur_id,)).fetchone()))
 
 
+def qn_shares(b):
+    """2.477.0 (#3881): True when a PATCH of a list would bring other people or agents to it: a workspace, a folder (its
+    people and defaults), an agent switch, family / Home & life. The list dialog sends unchanged off values along: they pass."""
+    return bool(b.get("org_id") not in (None, "", 0, "0", "private") or (b.get("folder") or "") != "" or b.get("agent_members")
+                or b.get("agent_peers") or b.get("listen_agent_ids") or b.get("agent_tidy") not in (None, "", "off")
+                or b.get("tidy_agent_id") is not None or b.get("family") or b.get("life") or b.get("org_visibility"))
+
+
 @app.patch("/api/lists/<int:lid>")
 def list_update(lid):
     from ..lists.groups import grp_touch
@@ -382,6 +391,8 @@ def list_update(lid):
     b = {k: v for k, v in b.items() if k != "agent_peers"}  # 2.40.0 (#1373): fixed off, still accepted from old clients, ignored
     c = db()
     role = need_list(c, lid, write=False)
+    if qn_is(c, lid) and qn_shares(b):  # 2.477.0 (#3881): the list "Notes" stays private (no workspace, folder, agents, family)
+        qn_private(c, lid)
     b, conflicts = lp_prev_conflicts(c, lid, role, b)  # 2.270.0 A (#3019): before anything is written (was: only LIST_FIELDS, late)
     given = set(b)  # 2.29.0 (#1030): what this request sets on its own (kept when the list moves into a folder)
     tb_col_on = None  # 2.39.1 (#1293): modules the field columns switched on (None = no field columns sent)
@@ -647,7 +658,8 @@ def list_reorder():
     moved = []
     for lid, folder in fmap.items():
         folder = clean_folder(folder)
-        if c.execute("UPDATE lists SET folder=? WHERE id=? AND owner_id=? AND folder!=?", (folder, int(lid), uid, folder)).rowcount:
+        # 2.477.0 (#3881): the list "Notes" stays out of folders (a folder brings its people and defaults)
+        if c.execute("UPDATE lists SET folder=? WHERE id=? AND owner_id=? AND folder!=? AND quicknote=0", (folder, int(lid), uid, folder)).rowcount:
             moved.append(int(lid))
         c.execute("UPDATE list_members SET folder=? WHERE list_id=? AND user_id=? AND folder!=?", (folder, int(lid), uid, folder))
     if fmap:
@@ -801,6 +813,7 @@ def member_set(lid):
     need_list(c, lid, write=False, manage=True)
     if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("The basket cannot be shared"))
+    qn_private(c, lid)  # 2.477.0 (#3881): the list "Notes" stays private
     role = b.get("role", "edit")
     if role not in ROLES:
         return err(tr("Role must be admin, edit, participant or view"))
@@ -1162,7 +1175,7 @@ def agent_share_add(c, lid, aid, actor):
     from ..accounts.orgs import ws_member_problem
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone() or \
             c.execute("SELECT 1 FROM lists WHERE id=? AND (life IN ('health', 'budget') OR (life='travel' AND org_id IS NOT NULL))", (lid,)).fetchone() or \
-            reading_ids(c, [lid]) or \
+            reading_ids(c, [lid]) or qn_is(c, lid) or \
             list_other_agent(c, lid, aid) or ws_member_problem(c, lid, aid):  # 2.22.0 (#663) health; 2.26.0: one agent per list; 2.28.0: workspace; 2.172.1 A (#2689): read later
         return False
     from ..agents.safety import bridge_blocks
@@ -1237,6 +1250,8 @@ def list_agent_set(lid):
     if new is not None and (isinstance(new, bool) or not isinstance(new, int) or new not in agent_ids(c)):
         return err(tr("Invalid value: {0}", "agent_id"))
     from ..collab.liste2eguard import le2b_agent_problem
+    if new is not None:
+        qn_private(c, lid)  # 2.477.0 (#3881): no agent in the list "Notes"
     if new is not None and le2b_agent_problem(c, lid, new):  # 2.64.1 B (#1817): no agent in a list with the lock
         return err(le2b_agent_problem(c, lid, new), 409)
     lr = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
@@ -1276,7 +1291,7 @@ def agent_share_all(aid):
     skip = set(d["skip"].get(str(aid), []))
     from ..agents.safety import bridge_blocks
     n, other, bridged = 0, [], []
-    for (lid, name) in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND COALESCE(archived,0)=0 ORDER BY id",
+    for (lid, name) in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND quicknote=0 AND COALESCE(archived,0)=0 ORDER BY id",  # 2.477.0 (#3881): not the list Notes
                                  (me(),)).fetchall():
         if lid in skip:
             continue

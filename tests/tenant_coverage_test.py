@@ -680,6 +680,7 @@ ROUTES = {
     "PATCH /api/notes/{}": "list", "DELETE /api/notes/{}": "list", "GET /api/v1/lists/{}/notes": "list",
     "POST /api/v1/lists/{}/notes": "list", "GET /api/v1/notes/{}": "list", "PATCH /api/v1/notes/{}": "list",
     "DELETE /api/v1/notes/{}": "list", "POST /api/notes/{}/restore": "list", "POST /api/v1/notes/{}/restore": "list",  # 2.272.0 E1 (#3038)
+    "POST /api/notes/quick-list": "own",  # 2.477.0 (#3881): the person's own private list Notes
     "POST /api/lists/{}/tags": "list", "PATCH /api/list-tags/{}": "list",
     "DELETE /api/list-tags/{}": "list", "POST /api/lists/{}/tags/promote": "list", "GET /api/lists/{}/error-hook": "list",
     "PATCH /api/lists/{}/error-hook": "list", "GET /api/v1/lists/{}/error-hook": "list",

@@ -590,7 +590,7 @@ async function listDeleteForGood(id) {
 // ---- 2.6.0 (K12): the Share dialog, out of the long list dialog: people + roles and inviting, the agents of the list (share /
 // stop sharing, the tidy agent), the public link, transferring the ownership. From the list's "…" menu, the header's Share
 // button and the list dialog (Sharing > Share…). Admins without collaboration only see the ownership part.
-const shareOk = l => !!l && !l.is_inbox && (collab() || !!S.me?.is_admin);
+const shareOk = l => !!l && !l.is_inbox && !l.quicknote && (collab() || !!S.me?.is_admin);  // 2.477.0 (#3881): the list Notes stays private
 function shareSummary(l) {
   const ppl = listPeople(l).filter(p => !(S.me && p.user_id === S.me.id) && !agentById(p.user_id) && !p.agent), ags = listAgents(l);
   if (!collab()) return tr('Owner: {0}', l.owner_name || S.me?.display_name || '');

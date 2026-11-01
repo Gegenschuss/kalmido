@@ -2750,7 +2750,8 @@ SCHEMA_VERSION = 2  # package B only added tables + a column: older versions can
 # 2.102.0 D (#1996): stays the restore gate only (bump it for a change an older version cannot read); which step ran when is in
 # the table kalmido_migrations.
 # triggers / views a restored database may contain (anything else is refused: it would run inside this app)
-SCHEMA_TRIGGERS = {"time_task_list", "time_task_title", "list_e2e_members", "time_title_e2e", "wiki_e2e_members"} | {  # 2.64.1 (#1817): + list_e2e_members, time_title_e2e; 2.64.3: + wiki_e2e_members
+SCHEMA_TRIGGERS = {"time_task_list", "time_task_title", "list_e2e_members", "time_title_e2e", "wiki_e2e_members",
+                   "quicknote_members", "quicknote_groups"} | {  # 2.477.0 (#3881): + quicknote_members, quicknote_groups  # 2.64.1 (#1817): + list_e2e_members, time_title_e2e; 2.64.3: + wiki_e2e_members
       # 2.33.0 (#1080): FTS5 triggers of SQLite backups 2.33-2.36 (Postgres 2.37: no triggers, see msgsearch.py)
     f"msg_fts_{t}_{w}" for t in ("comments", "tchat_msgs", "agent_chat") for w in ("ai", "au", "ad")}
 # time_entries.task_title follows a rename only for entries of users who still see the task (a former
@@ -2826,6 +2827,19 @@ BEGIN
 END $fn$;
 CREATE OR REPLACE TRIGGER list_e2e_members BEFORE INSERT OR UPDATE OF role, user_id OR DELETE ON list_members FOR EACH ROW
   EXECUTE FUNCTION kalmido_list_e2e_members()"""
+# 2.477.0 (#3881): the private list "Notes" of the quick note (lists.quicknote = 1) never gets a member or a group share,
+# whatever path tries (sharing a folder or "share all lists" with an agent, an agent's proposal, an import): such a row is
+# left out without an error, so those paths go on for the other lists. The routes refuse before with a clear text
+# (core/access.py qn_private). Function re-created, trigger checked on every start (init_db).
+QUICKNOTE_TRIGGER = """CREATE OR REPLACE FUNCTION kalmido_quicknote_private() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+  IF NEW.list_id IS NOT NULL AND EXISTS (SELECT 1 FROM lists WHERE id=NEW.list_id AND quicknote=1) THEN RETURN NULL; END IF;
+  RETURN NEW;
+END $fn$;
+CREATE OR REPLACE TRIGGER quicknote_members BEFORE INSERT OR UPDATE OF list_id ON list_members FOR EACH ROW
+  EXECUTE FUNCTION kalmido_quicknote_private();
+CREATE OR REPLACE TRIGGER quicknote_groups BEFORE INSERT OR UPDATE OF list_id ON group_shares FOR EACH ROW
+  EXECUTE FUNCTION kalmido_quicknote_private()"""
 # 2.64.3 (#1817): members of an organisation whose knowledge space has the lock (wiki_spaces.e2e not NULL). Every way an
 # organisation membership changes (invite, join, exit, removal, account deletion, cascades) passes here:
 # - a new member (a person, not an agent: agents never read a locked space) without a key of the current generation lands
@@ -4133,6 +4147,10 @@ MIGRATIONS = [
     # booked once whatever the provider sends. Older versions ignore it
     ("office_payments", "online_ref", "ALTER TABLE office_payments ADD COLUMN IF NOT EXISTS online_ref TEXT"),
     ("office_payments", "online_ref", "CREATE UNIQUE INDEX IF NOT EXISTS office_payments_online_ref ON office_payments(org_id, online_ref) WHERE online_ref IS NOT NULL"),
+    # 2.477.0 (#3881): lists.quicknote = 1: the private list "Notes" of the quick note (one per person, made by POST
+    # /api/notes/quick-list). It stays private for good: no members, groups, agents, public link, workspace or owner change
+    # (core/access.py qn_private + the trigger QUICKNOTE_TRIGGER); renaming / deleting never clears it. Older versions ignore it
+    ("lists", "quicknote", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS quicknote BIGINT NOT NULL DEFAULT 0"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

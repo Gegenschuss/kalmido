@@ -782,6 +782,25 @@ def dlg_gone(c, lid, uid):
     c.execute("DELETE FROM task_watchers WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
 
 
+# 2.477.0 (#3881): the private list "Notes" of the quick note (lists.quicknote = 1) is never shared: every way a list gets
+# other people or agents (members, groups, public link, workspace, owner, agent switches) asks here first and refuses with
+# one text; the trigger QUICKNOTE_TRIGGER (core/schema.py) leaves out member rows of every other path. The mark is set only by
+# POST /api/notes/quick-list (collab/notes.py); renaming or deleting the list never clears it.
+QN_PRIVATE_MSG = N_("The list Notes stays private: it cannot be shared, not with people and not with agents.")
+
+
+def qn_is(c, lid):
+    """2.477.0 (#3881): True for the private list "Notes" of the quick note."""
+    r = c.execute("SELECT quicknote FROM lists WHERE id=?", (lid,)).fetchone() if lid else None
+    return bool(r and r[0])
+
+
+def qn_private(c, lid):
+    """2.477.0 (#3881): Denied 409 (code quicknote_private) for the private list "Notes"."""
+    if qn_is(c, lid):
+        raise Denied(409, tr(QN_PRIVATE_MSG), {"code": "quicknote_private"})
+
+
 def list_people(c, lid):
     """Owner + member ids of a list."""
     r = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()

@@ -251,6 +251,9 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.477.0 (#3881): the private list Notes of the app's quick note is made by the app's grip for the person; agents never "
+     "see it and cannot be given it (a token makes notes in any list with POST /lists/{}/notes)",
+     ("=POST /api/notes/quick-list",)),
     ("2.392.0 C (#3370): the yes to a one-way step is a person's, per task, in the app: never an agent or a token",
      ("=POST /api/tasks/{}/irreversible-yes",)),
     ("2.272.0 E1 (#3038): an address book in the trash is restored or deleted for good by a person -- an agent's delete of a whole "

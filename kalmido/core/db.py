@@ -22,7 +22,7 @@ from ..core.pg import (  # noqa: F401  (re-exported: the app imports the databas
     connect_pooled, insert_id, like_escape, table_columns, table_exists, wait_ready, write_lock,
 )
 from ..core.schema import (
-    GLOBAL_DEFAULTS, INDEXES, LIST_E2E_TRIGGER, PURGED_TRIGGER, REVOKED_TRIGGER, TICKET_NO_TRIGGER, WIKI_E2E_TRIGGER, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
+    GLOBAL_DEFAULTS, INDEXES, LIST_E2E_TRIGGER, PURGED_TRIGGER, QUICKNOTE_TRIGGER, REVOKED_TRIGGER, TICKET_NO_TRIGGER, WIKI_E2E_TRIGGER, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
     SEC_AT_TRIGGER,  # 2.410.0 B (#3515)
 )
 from ..core.i18n import LANGS, tr
@@ -927,6 +927,7 @@ def init_db(guard=True, load=None):
         c.execute("DROP INDEX IF EXISTS tasks_tt")  # tt_id is unique per user now (tasks_tt_user)
         c.executescript(trigger_skip_present(c, TIME_TITLE_TRIGGER))
         c.executescript(trigger_skip_present(c, LIST_E2E_TRIGGER))  # 2.64.1 (#1817): members of lists with the lock
+        c.executescript(trigger_skip_present(c, QUICKNOTE_TRIGGER))  # 2.477.0 (#3881): the private list "Notes" stays without members
         c.executescript(trigger_skip_present(c, WIKI_E2E_TRIGGER))  # 2.64.3 (#1817): members of organisations whose knowledge space has the lock
         c.executescript(trigger_skip_present(c, REVOKED_TRIGGER))  # 2.360.0 R (#2496): what was revoked stays revoked after a restore
         c.executescript(trigger_skip_present(c, PURGED_TRIGGER))  # 2.360.4 (#3243): what was deleted for good stays deleted after a restore

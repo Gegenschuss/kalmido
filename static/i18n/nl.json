@@ -6974,7 +6974,6 @@
   "{0} agent working": ["{0} agent aan het werk", "{0} agenten aan het werk"],
   "contains the open view": "bevat de geopende weergave",
   "Message {0}": "Bericht aan {0}",
-  "New note in…": "Nieuwe notitie in…",
   "Setup code": "Installatiecode",
   "The server prints it into its log at start: {0}": "De server schrijft hem bij het starten in zijn log: {0}",
   "Wrong setup code. It is in the server log (docker compose logs kalmido).": "Verkeerde installatiecode. Hij staat in het serverlog (docker compose logs kalmido).",
@@ -15803,5 +15802,14 @@
   "{0} removed {1} from the watchers": "{0} heeft {1} verwijderd uit de volgers",
   "{0} started watching the task": "{0} volgt nu de taak",
   "{0} stopped watching the task": "{0} volgt de taak niet meer",
-  "This device fits {0} tabs, the rest goes under “More”.": "Op dit apparaat passen {0} tabbladen, de rest staat onder „Meer”."
+  "This device fits {0} tabs, the rest goes under “More”.": "Op dit apparaat passen {0} tabbladen, de rest staat onder „Meer”.",
+  "The list Notes stays private: it cannot be shared, not with people and not with agents.": "De lijst Notities blijft privé: hij kan niet gedeeld worden, niet met personen en niet met agents.",
+  "Others will see this note: {0}": "Anderen zien deze notitie dan: {0}",
+  "everyone in {0}": "iedereen in {0}",
+  "The note is not empty": "De notitie is niet leeg",
+  "The list Notes is made with the first quick note: that needs a connection once.": "De lijst Notities ontstaat met de eerste snelle notitie: daarvoor is één keer een verbinding nodig.",
+  "Lands in your private list Notes": "Komt in je privélijst Notities",
+  "Move the note to {0}?": "Notitie naar {0} verplaatsen?",
+  "After the move these people see this note:": "Na het verplaatsen zien deze personen de notitie:",
+  "The list Notes itself stays private.": "De lijst Notities zelf blijft privé."
 }

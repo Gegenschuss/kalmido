@@ -811,7 +811,7 @@ function closeSide() {
   sideRet = null;
   $('#side').classList.remove('open'); if (!$('.qadd.sheet') && $('#pop').classList.contains('hidden')) $('#scrim').classList.add('hidden'); }
 $('#scrim').addEventListener('click', () => { closeSide(); closePop(); });
-$('#fab').addEventListener('click', () => openQuickSheet());
+$('#fab').addEventListener('click', () => { if (typeof QN_FAB === 'object' && ms_lpRecent(QN_FAB)) return; openQuickSheet(); });  // 2.477.0 (#3881): the click ending a hold opens no task
 
 document.addEventListener('input', e => {
   const t = e.target;
@@ -923,6 +923,8 @@ document.addEventListener('keydown', async e => {
   if (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === 'n') { e.preventDefault(); const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); }
   if (e.key === 'q' && !$('.modal')) { e.preventDefault(); quickCapture(); }
+  // 2.477.0 (#3881): m = a quick note, where m means nothing else (palette.js: the focused task / the selection moves; the timeline's bar)
+  if (e.key === 'm' && !e.defaultPrevented && !$('.modal') && !t.closest?.('.rm-sum')) { e.preventDefault(); qn_new(); }
   if (e.key === 'a' && !$('.modal') && !chatFull() && feat('agents') && chatFabAgent()) { e.preventDefault(); chatPop(); }  // 2.29.0 (#363)
   if (e.key === '/') { e.preventDefault(); go('search'); }
 });

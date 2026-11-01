@@ -1373,6 +1373,7 @@ function parseHash() {
   if (a === 'msg' && (b === 'a' || b === 't')) { const p = h.split('/'); return {mod: 'tasks', key: S.route.key || LS.get('lastKey', START_KEY), msg: {art: b, place: +p[2], id: +p[3]}}; }  // 2.37.0 (#1159): link back to a saved message
   if (a === 'notes' && +b) return {mod: 'notes', key: 'notes', lid: +b};  // 2.17.0 (#442)
   if (a === 'notes' && !b) return {mod: 'notes', key: 'notes', lid: null};  // 2.45.0 (#1516): the notes of all lists (notesall.js)
+  if (a === 'note' && +b === QN_DRAFT) { const d = S.nt.draft; return d ? {mod: 'notes', key: 'notes', lid: d.list_id, nid: QN_DRAFT} : {mod: 'notes', key: 'notes', lid: qn_list()?.id || null}; }  // 2.477.0 (#3881): the quick note being written
   if (a === 'note' && +b) { const n = (S.notes || []).find(x => x.id === +b); return n ? {mod: 'notes', key: 'notes', lid: n.list_id, nid: n.id} : {mod: 'tasks', key: LS.get('lastKey', START_KEY), noteMissing: true}; }
   if (a === 'reply' && b) return {mod: 'tasks', key: S.route.key || START_KEY, task: +b, reply: true};  // 2.0.8 (#331): push button "Reply"
   if (a === 'snooze' && b) return {mod: 'tasks', key: LS.get('lastKey', START_KEY), snooze: +b};
@@ -1435,7 +1436,7 @@ async function route() {
   sbb_seen(r);  // 2.152.2 (#2622): the area keeps this page (sidebar B, areas.js)
   wsv_seen(r);  // 2.397.0 (#3404): and its workspace (workspace.js)
   if (r.mod === 'team') teamRoute(r.rid || null); else if (S.tc.rid) teamRoute(null);  // 2.17.0
-  if (r.mod === 'notes') noteRoute(r.lid, r.nid || null); else if (S.nt.id) { noteFlush(); S.nt.id = null; }
+  if (r.mod === 'notes') noteRoute(r.lid, r.nid || null); else if (S.nt.id) { if (!qn_leave()) noteFlush(); S.nt.id = null; }  // 2.477.0 (#3881): qn_leave
   if (r.noteMissing) setTimeout(() => toast(tr('This note does not exist or you cannot see it.')), 0);  // 2.10.0: review = #today/review
   if (r.mod === 'agents') S.jobs.items = null;
   S.jobFocus = r.job || null;  // 2.36.2 (#1141): #job/<id>

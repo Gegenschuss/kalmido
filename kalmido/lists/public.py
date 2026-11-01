@@ -16,7 +16,7 @@ from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_n
 from ..core.instance import legal_links, privacy_email
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
-from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list, reading_ids, reading_sql, task_visible
+from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list, qn_private, reading_ids, reading_sql, task_visible
 from ..core.pg import insert_id, system_ctx
 from ..tasks.validation import log_act, valid_date
 from ..tasks.watchers import wat_users  # 2.473.0 (#3357)
@@ -536,6 +536,7 @@ def need_pub_owner(c, lid):
     need_list(c, lid, owner=True)
     if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         raise BadInput(tr("The basket cannot be shared"))
+    qn_private(c, lid)  # 2.477.0 (#3881): no public link for the list "Notes"
 
 
 def pub_new_token(c, lid):

@@ -11,7 +11,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc
 from ..core.db import usettings, uset  # 2.356.0 B (#2932)
 from ..accounts.session import me
-from ..core.access import Denied, acx_drop, acx_lists_sql, dlg_gone, plists, pvis, token_lists
+from ..core.access import Denied, acx_drop, acx_lists_sql, dlg_gone, plists, pvis, qn_private, token_lists
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.orgcrypt import oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -501,6 +501,8 @@ def list_org_set(c, lid, v):
     oid = clean_org_id(c, v, me())
     if lr["is_inbox"] and oid:
         raise Denied(409, tr("The basket is always private"))
+    if oid:
+        qn_private(c, lid)  # 2.477.0 (#3881)
     if oid and (lr["family"] or (lr["life"] and lr["life"] != "travel")):  # 2.173.0 A (#2680): a trip may belong to an organisation
         raise Denied(409, tr(WS_MSG_PRIVATE_ONLY))
     if (oid or None) == (list_org(c, lid) or None):

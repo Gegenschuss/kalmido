@@ -6974,7 +6974,6 @@
   "{0} agent working": ["{0} agente trabajando", "{0} agentes trabajando"],
   "contains the open view": "contiene la vista abierta",
   "Message {0}": "Mensaje a {0}",
-  "New note in…": "Nueva nota en…",
   "Setup code": "Código de configuración",
   "The server prints it into its log at start: {0}": "El servidor lo escribe en su registro al arrancar: {0}",
   "Wrong setup code. It is in the server log (docker compose logs kalmido).": "Código de configuración incorrecto. Está en el registro del servidor (docker compose logs kalmido).",
@@ -15803,5 +15802,14 @@
   "{0} removed {1} from the watchers": "{0} quitó a {1} de los observadores",
   "{0} started watching the task": "{0} empezó a observar la tarea",
   "{0} stopped watching the task": "{0} dejó de observar la tarea",
-  "This device fits {0} tabs, the rest goes under “More”.": "En este dispositivo caben {0} pestañas; el resto va en «Más»."
+  "This device fits {0} tabs, the rest goes under “More”.": "En este dispositivo caben {0} pestañas; el resto va en «Más».",
+  "The list Notes stays private: it cannot be shared, not with people and not with agents.": "La lista Notas sigue siendo privada: no se puede compartir, ni con personas ni con agentes.",
+  "Others will see this note: {0}": "Otros verán esta nota: {0}",
+  "everyone in {0}": "todos en {0}",
+  "The note is not empty": "La nota no está vacía",
+  "The list Notes is made with the first quick note: that needs a connection once.": "La lista Notas se crea con la primera nota rápida: para eso hace falta conexión una vez.",
+  "Lands in your private list Notes": "Va a tu lista privada Notas",
+  "Move the note to {0}?": "¿Mover la nota a {0}?",
+  "After the move these people see this note:": "Tras moverla, estas personas verán la nota:",
+  "The list Notes itself stays private.": "La lista Notas sigue siendo privada."
 }

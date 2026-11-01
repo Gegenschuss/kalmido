@@ -16,7 +16,7 @@ another workspace) of its tasks go along; a report's client of another workspace
 from flask import jsonify
 
 from ..core.config import app
-from ..core.access import Denied, need_list
+from ..core.access import Denied, need_list, qn_is, QN_PRIVATE_MSG
 from ..core.db import body, db
 from ..core.i18n import tr, trn
 from ..accounts.session import me
@@ -97,6 +97,8 @@ def list_move_space(lid):
     from ..accounts.orgout import oo_denied, org_out_ok
     if lr["is_inbox"] and to:
         return jsonify(smv_answer([], tr("The basket is always private"), count=1))
+    if to and qn_is(c, lid):  # 2.477.0 (#3881)
+        return jsonify(smv_answer([], tr(QN_PRIVATE_MSG), count=1))
     if to and lr["life"] and lr["life"] != "travel":
         return jsonify(smv_answer([], tr(WS_MSG_PRIVATE_ONLY), count=1))
     if not org_out_ok(c, lr["org_id"], to, "list", lid):  # 2.148.1 B (#2483): out of an organisation only by its admin

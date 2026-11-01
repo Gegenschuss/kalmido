@@ -16,6 +16,7 @@ from ..core.db import bump, db, err, gsetting, iso, now_utc, usettings
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import Denied, need_list, need_task, need_time, ROLES, task_visible, token_lists, tvis, vis_sql, wr_sql, list_role
+from ..core.access import qn_private  # 2.477.0 (#3881)
 from ..core.serializers import load_tasks
 from ..core.state import visible_lists
 from ..lists.lists import list_delete, member_remove, member_set
@@ -1052,6 +1053,7 @@ def v1_member_set(lid, user_id):
     uid = as_int(user_id, "user_id", 1)
     c = db()
     need_list(c, lid, write=False, manage=True)
+    qn_private(c, lid)  # 2.477.0 (#3881): the list "Notes" stays private
     role = str(b.get("role") or "edit")
     if role not in ROLES:
         raise BadInput(tr("Role must be admin, edit, participant or view"))

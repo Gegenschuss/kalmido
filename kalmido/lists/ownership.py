@@ -7,7 +7,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from ..core.access import collab_all, Denied, list_role, my_max_sort, need_collab
+from ..core.access import collab_all, Denied, list_role, my_max_sort, need_collab, qn_private
 from ..lists.groups import grp_sync
 
 
@@ -181,6 +181,7 @@ def list_owner_set(lid):
         need_collab()
     if lr["is_inbox"]:
         return err(tr("The basket cannot be transferred"), 409)
+    qn_private(c, lid)  # 2.477.0 (#3881): the list "Notes" stays with its person
     try:
         new = int(b.get("user_id") or 0)
     except (TypeError, ValueError):

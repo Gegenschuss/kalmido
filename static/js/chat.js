@@ -715,7 +715,7 @@ S.nt = {lid: null, id: null, notes: null, mayWrite: false, q: '', edit: false, s
 const notesOf = lid => (S.notes || []).filter(n => n.list_id === lid);
 const notesOn = l => !!l && !l.is_inbox && !(l.role === 'participant');
 async function loadNotes(lid) {
-  try { const j = await rawFetch('GET', `/api/lists/${lid}/notes`); if (S.nt.lid !== lid) return; S.nt.notes = j.notes; S.nt.mayWrite = j.may_write; S.nt.err = null; ntKeep(lid, j); }
+  try { const j = await rawFetch('GET', `/api/lists/${lid}/notes`); if (S.nt.lid !== lid) return; S.nt.notes = j.notes; S.nt.mayWrite = j.may_write; S.nt.err = null; ntKeep(lid, j); qn_heal(lid); }  // 2.477.0 (#3881): qn_heal
   catch (e) {
     const c = e instanceof Offline && ntKept(lid);  // 2.143.0 C (#2153): offline: the notes as last seen (and written on)
     if (c) { if (S.nt.lid === lid) { S.nt.notes = c.notes; S.nt.mayWrite = c.may_write; S.nt.err = null; for (const o of OUT.q) if (/^\/api\/(notes\/-?\d+|lists\/\d+\/notes)$/.test(o.url)) ntLocal(o); } return; }
@@ -759,6 +759,7 @@ function ntSent(e, j) {
   if (!j || !j.id) return;
   if (e.tmp) {
     for (const a of [S.nt.notes, S.notes]) { const x = (a || []).find(n => n.id === e.tmp); if (x) x.id = j.id; }
+    if (QN_MADE.has(e.tmp)) QN_MADE.add(j.id);  // 2.477.0 (#3881)
     if (S.nt.id === e.tmp) { S.nt.id = j.id; if (S.route.mod === 'notes') history.replaceState(null, '', '#note/' + j.id); }
     return;
   }
@@ -820,6 +821,7 @@ function trefOpen(e) {
 }
 document.addEventListener('click', trefOpen, true);
 function noteRoute(lid, id) {
+  if (S.nt.id && S.nt.id !== id && !qn_leave()) noteFlush();  // 2.477.0 (#3881): a quick note left empty goes for good
   if (!lid) { noteFlush(); S.nt = {...S.nt, lid: null, id: null, notes: null}; return; }  // 2.45.0 (#1516): the overview of all notes
   if (S.nt.lid !== lid) { S.nt = {...S.nt, lid, notes: null, err: null, trash: null}; loadNotes(lid).then(() => { if (S.route.mod === 'notes') renderView(); }); }
   if (S.nt.id !== id) { noteFlush(); S.nt.id = id; S.nt.edit = !!id && S.nt.newId === id; S.nt.newId = null; }
@@ -828,14 +830,15 @@ function viewNotes() {
   if (!S.nt.lid) return sb_notesView();  // 2.45.0 (#1516)
   const l = listById(S.nt.lid);
   if (!l) return botEmpty('ruhig', tr('This project does not exist (any more).'));
-  const ns = S.nt.notes;
+  const dr = S.nt.id === QN_DRAFT ? noteCur() : null, qn = qn_isList(l.id);  // 2.477.0 (#3881): the quick note being written (open at once)
+  const ns = S.nt.notes || (dr ? [] : null);
   if (!ns) return `<div class="muted mhint">${S.nt.err ? esc(S.nt.err) : tr('Loading…')}</div>`;
-  const q = S.nt.q.trim().toLowerCase();
+  const q = qn ? '' : S.nt.q.trim().toLowerCase();  // 2.477.0 (#3881): the list "Notes" is a plain list, newest first, no search
   const vis = q ? ns.filter(n => (n.title + ' ' + n.body + ' ' + n.tags.join(' ')).toLowerCase().includes(q)) : ns;
-  const cur = S.nt.id && ns.find(n => n.id === S.nt.id);
+  const cur = dr || (S.nt.id && ns.find(n => n.id === S.nt.id));
   const list = `<div class="ntlist ${cur ? 'hasnote' : ''}">
-    <div class="ntbar"><div class="ssearch">${ic('search', 's')}<input id="nt-q" type="search" value="${esc(S.nt.q)}" placeholder="${esc(tr('Search notes'))}" aria-label="${esc(tr('Search notes'))}" autocomplete="off"></div>
-      ${S.nt.mayWrite ? `<button type="button" class="iconbtn ${S.nt.trash ? 'on' : ''}" data-act="nt-trash" title="${esc(tr('Trash'))}" aria-label="${esc(tr('Trash'))}">${ic('trash')}</button><button type="button" class="btn sm pri" data-act="nt-new">${ic('plus', 's')}${tr('New note')}</button>` : ''}</div>
+    <div class="ntbar">${qn ? '<span class="spacer"></span>' : `<div class="ssearch">${ic('search', 's')}<input id="nt-q" type="search" value="${esc(S.nt.q)}" placeholder="${esc(tr('Search notes'))}" aria-label="${esc(tr('Search notes'))}" autocomplete="off"></div>`}
+      ${S.nt.mayWrite || dr ? `<button type="button" class="iconbtn ${S.nt.trash ? 'on' : ''}" data-act="nt-trash" title="${esc(tr('Trash'))}" aria-label="${esc(tr('Trash'))}">${ic('trash')}</button><button type="button" class="btn sm pri" data-act="nt-new">${ic('plus', 's')}${tr('New note')}</button>` : ''}</div>
     <div id="nt-res">${S.nt.trash ? ntTrashHtml() : ntCardsHtml(vis, q, cur)}</div>
   </div>`;
   return `<div class="ntwrap"><div class="ntview ${cur ? 'open' : ''}">${list}${cur ? `<article class="ntedit" aria-label="${esc(cur.title)}">${noteEditHtml(cur)}</article>` : ''}</div></div>`;
@@ -844,11 +847,12 @@ function viewNotes() {
 function ntCardsHtml(vis, q, cur) {
   return `${vis.length ? `<ul class="ntcards" aria-label="${esc(tr('Notes'))}">${vis.map(n => `<li><a href="#note/${n.id}" class="ntcard ${cur && cur.id === n.id ? 'on' : ''}" ${cur && cur.id === n.id ? 'aria-current="true"' : ''}>
         <span class="ntt">${n.pinned ? `<span class="ntpin" title="${esc(tr('Pinned'))}">${ic('pin', 's')}</span>` : ''}${esc(n.title)}</span>
-        <span class="ntx">${esc(n.body.replace(/^#{1,6}\s+/gm, '').replace(/[*_`>\[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 140))}</span>
+        <span class="ntx">${esc((qn_isList(n.list_id) ? n.body.replace(/^\s*[^\n]*\n?/, '') : n.body).replace(/^#{1,6}\s+/gm, '').replace(/[*_`>\[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 140))}</span>
         <span class="ntm">${n.tags.map(t => `<span class="tag">#${esc(t)}</span>`).join('')}<time title="${esc(fmtWhen(n.updated_at))}">${esc(relTime(n.updated_at))}</time>${n.updated_by_name ? `<span class="muted">· ${esc(n.updated_by_name)}</span>` : ''}</span></a></li>`).join('')}</ul>`
       : q ? `<div class="empty">${tr('No notes match.')}</div>` : symEmpty('note', tr('No notes yet.'), S.nt.mayWrite ? tr('Meeting notes, briefings, decisions: write them next to the tasks.') : '')}`;
 }
 function noteEditHtml(n) {
+  if (qn_plain(n)) return qn_editHtml(n);  // 2.477.0 (#3881): one text field, the first line is the title
   const ro = !S.nt.mayWrite, edit = S.nt.edit && !ro;
   return `<div class="nthead">${isMobile() ? `<button type="button" class="iconbtn" data-act="nt-close" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}
     <input id="nt-title" class="nttitle" value="${esc(n.title)}" aria-label="${esc(tr('Title'))}" maxlength="300" ${ro ? 'readonly' : ''}>
@@ -861,11 +865,15 @@ function noteEditHtml(n) {
       : `<div class="md ntmd" id="nt-md">${n.body.trim() ? mdTaskRefs(renderMd(n.body, false, {lid: S.nt.lid})) : `<p class="muted">${ro ? tr('Empty note.') : tr('Empty note. Switch to Edit to write.')}</p>`}</div>`}
     <div class="ntfoot muted"><span id="nt-saved" role="status" aria-live="polite"></span>${edit ? `<span class="shint">${esc(tr('Markdown: # heading, - list, **bold**, #123 links a task'))}</span>` : '' /* 2.298.0 C (#3187) */}<span class="spacer"></span><span>${esc(tr('Changed {0}', fmtWhen(n.updated_at)))}${n.updated_by_name ? ' · ' + esc(n.updated_by_name) : ''}</span></div>`;
 }
-const noteCur = () => S.nt.notes && S.nt.notes.find(n => n.id === S.nt.id);
+const noteCur = () => S.nt.id === QN_DRAFT ? (S.nt.draft?.list_id === S.nt.lid ? S.nt.draft : null) : S.nt.notes && S.nt.notes.find(n => n.id === S.nt.id);  // 2.477.0 (#3881): + the draft
 function noteQueue() { S.nt.dirty = true; clearTimeout(S.nt.saveT); S.nt.saveT = setTimeout(noteFlush, 1200); }
 function notePatch(n) {
   const t = $('#nt-title'), b = $('#nt-body'), g = $('#nt-tags');
   const patch = {expect_updated_at: n.updated_at};
+  if (qn_plain(n)) {  // 2.477.0 (#3881): the text alone, its first line the title
+    if (b && b.value !== n.body) { patch.body = b.value; const tt = qn_titleOf(b.value); if (tt && tt !== n.title) patch.title = tt; }
+    return patch;
+  }
   if (t && t.value.trim() && t.value.trim() !== n.title) patch.title = t.value.trim();
   if (b && b.value !== n.body) patch.body = b.value;
   if (g) { const tg = g.value.split(',').map(x => x.trim().replace(/^#/, '')).filter(Boolean); if (tg.join() !== n.tags.join()) patch.tags = tg; }
@@ -893,6 +901,7 @@ window.addEventListener('pageshow', e => {
 async function noteFlush() {
   clearTimeout(S.nt.saveT);
   const n = noteCur(); if (!n || !S.nt.dirty) return;
+  if (n.id === QN_DRAFT) { qn_create(); return; }  // 2.477.0 (#3881): its first character makes it
   S.nt.dirty = false;
   const patch = notePatch(n);
   if (Object.keys(patch).length === 1) return;
@@ -915,6 +924,7 @@ async function noteConflict(mine, theirs, patch) {
 }
 async function noteNew() {
   const lid = S.nt.lid;
+  if (qn_isList(lid)) { qn_new(lid); return; }  // 2.477.0 (#3881): the list "Notes" makes quick notes
   const url = `/api/lists/${lid}/notes`, b = {title: tr('New note'), client_ref: outKey()};  // 2.143.0 C (#2153): offline into the outbox (ntLocal draws it)
   let r; try { r = await rawFetch('POST', url, b); } catch (e) { if (!(e instanceof Offline) || ntLocked(lid)) { toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.message); return; } r = null; }
   if (!r) { r = enqueue('POST', url, b); S.nt.newId = r.id; go('note/' + r.id); setTimeout(() => { const t = $('#nt-title'); if (t) { t.focus(); t.select(); } }, 120); return; }
@@ -927,7 +937,13 @@ function noteMenu(anchor) {
   const others = S.lists.filter(l => !l.archived && l.id !== n.list_id && canEditList(l.id) && notesOn(l));
   menu(anchor, [{label: tr('Copy link'), icon: 'link', fn: () => { navigator.clipboard?.writeText(`${location.origin}${location.pathname}#note/${n.id}`).then(() => toast(tr('Link copied'))); }},
     ...(others.length ? [{label: tr('Move to project…'), icon: 'folder', fn: () => tch_listPicker(anchor, {filter: l => others.includes(l), pick: async l => {  // 2.38.0 (#1177)
-      try { const r = await rawFetch('PATCH', `/api/notes/${n.id}`, {list_id: l.id}); Object.assign(n, r); } catch (e) { toast(e.message); return; }
+      let r; try { r = await rawFetch('PATCH', `/api/notes/${n.id}`, {list_id: l.id}); } catch (e) {
+        // 2.477.0 (#3881): out of the private list "Notes" to other people only after the warning that names them
+        if (!(e.status === 409 && e.data?.code === 'quicknote_share')) { toast(e.message); return; }
+        if (!await qn_shareAsk(e.data.people || [], l)) return;
+        try { r = await rawFetch('PATCH', `/api/notes/${n.id}`, {list_id: l.id, share_ok: true}); } catch (e2) { toast(e2.message); return; }
+      }
+      Object.assign(n, r);
       await load(); toast(tr('Moved to {0}', lname(l))); go('note/' + n.id); }})}] : []),
     '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: async () => {
       let r; try { r = await rawFetch('DELETE', `/api/notes/${n.id}`); } catch (e) { toast(e.message); return; }
@@ -947,6 +963,7 @@ document.addEventListener('input', e => {
     clearTimeout(S.nt.qT); S.nt.qT = setTimeout(() => { if (document && q) announce(trn('{0} note', '{0} notes', vis.length)); }, 600);
     return;
   }
+  if (e.target.id === 'nt-body' && S.nt.id === QN_DRAFT && S.nt.draft) S.nt.draft.text = e.target.value;  // 2.477.0 (#3881): a redraw keeps it
   if (['nt-title', 'nt-body', 'nt-tags'].includes(e.target.id)) { if (e.target.id === 'nt-body') autosize(e.target); noteQueue(); }
 });
 document.addEventListener('focusout', e => { if (['nt-title', 'nt-body', 'nt-tags'].includes(e.target.id)) noteFlush(); });

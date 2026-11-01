@@ -7,7 +7,7 @@ from ..core.pg import insert_id, st_ids, system_ctx
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
-from ..core.access import Denied, dlg_gone, my_max_sort, need_collab, need_list, ROLES, task_visible
+from ..core.access import Denied, dlg_gone, my_max_sort, need_collab, need_list, qn_private, ROLES, task_visible
 from ..lists.lists import clean_folder, folder_under
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
@@ -418,6 +418,7 @@ def list_group_set(lid, gid):
     need_group(c, gid)
     if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("The basket cannot be shared"))
+    qn_private(c, lid)  # 2.477.0 (#3881)
     role = grp_role(body())
     from ..collab.liste2e import le2e_mode
     if role == "participant" and le2e_mode(c, lid):  # 2.64.1 (#1817)
