@@ -6,7 +6,7 @@
 // Firefox 390 x 844 touch: the Services tab with rows >= 44 px tall, the service dialog, the settings tab (screenshots)
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2361_b_ui', check, shots: 'P2361B_SHOTS'});
@@ -19,7 +19,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
 const FEAT = 'cal,comments,collab,clients';
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
@@ -33,7 +33,7 @@ const FEAT = 'cal,comments,collab,clients';
 
   // ================= jsdom: off by default
   let w = await boot({hash: 'office'}); let d = w.document;
-  await sleep(800);
+  await idle(w);  // loaded and drawn: what is not there now is not there
   check(!d.querySelector('#side [data-go^="office"]') && !d.querySelector('.office'), 'off: no sidebar entry, no view');
   check(w.eval('officeOn()') === false, 'off: officeOn() false');
   // Settings > Modules: the group with the switch
@@ -102,7 +102,7 @@ const FEAT = 'cal,comments,collab,clients';
   }
   check(/Edit service/.test(md?.querySelector('h3')?.textContent || '') && md.querySelector('#of-name_de').value === 'Kamera', 'tapping a row opens the edit dialog ' + (md?.querySelector('h3')?.textContent || 'no dialog') + ' ' + (md?.querySelector('#of-name_de')?.value || ''));
   check(!!md.querySelector('[data-m="del"]') && !!md.querySelector('#of-archived'), 'admin: delete + archive in the dialog');
-  md.querySelector('[data-m="close"]').click(); await sleep(200);
+  md.querySelector('[data-m="close"]').click(); await until(() => !d.querySelector('.ofcdlg'));
   // settings tab
   w.eval(`go('office/settings')`); await until(() => d.querySelector('.office .ofcset'), 60);
   check(/next: KVA-\d{4}-001/.test(d.querySelector('#os-preview')?.textContent || ''), 'settings: the number preview ' + d.querySelector('#os-preview')?.textContent);
@@ -137,21 +137,24 @@ const FEAT = 'cal,comments,collab,clients';
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.ofmAll', 'true'); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); /* 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js) */ localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
-  const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('.office .ofcbody')`).catch(() => false)); i++) await sleep(300); await sleep(800); };
+  const ready = async (o, expr) => { await o.until(`!!document.querySelector('.office .ofcbody')`); await o.until(expr); await o.idle({quiet: 300}); };  // the office drawn, the wanted part there, its requests done
   await firefox(async o => {
     const {cmd, ev, ctx, shot} = o;
     check(await ffLogin(o) === 200, '390: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
-    await o.nav(B + '#office/services'); await ready(ev); await sleep(1200);
+    await o.nav(B + '#office/services'); await ready(o, `!!document.querySelector('.office .ofcrow') && !!document.querySelector('#view .ofpb .ofpt2')`);
     const g = await ev(`(() => { const r = document.querySelector('.office .ofcrow'); if (!r) return null; const b = r.getBoundingClientRect(); const t = document.querySelector('#view .ofpb .ofpt2').getBoundingClientRect();  /* 2.87.9 (#1917): the group's points on a phone; 2.98.0 (#2180): its tab row */ return {h: Math.round(b.height), w: Math.round(b.width), th: Math.round(t.height), over: document.documentElement.scrollWidth > window.innerWidth + 1}; })()`);
     check(g && g.h >= 44 && g.w >= 300 && g.th >= 24 && !g.over, '390: rows >= 44 px, tabs >= 24 px, no horizontal overflow ' + JSON.stringify(g));
     await shot('p2361b-390-services.png');
-    await ev(`(() => { document.querySelector('.office [data-ofc="new"][data-kind="services"]').click(); return 1; })()`); await sleep(800);
+    await ev(`(() => { document.querySelector('.office [data-ofc="new"][data-kind="services"]').click(); return 1; })()`); await o.until(`!!document.querySelector('.ofcdlg .card [data-m="save"]')`); await o.idle();
     const dg = await ev(`(() => { const m = document.querySelector('.ofcdlg .card'); if (!m) return null; const b = m.getBoundingClientRect(); const s = m.querySelector('[data-m="save"]').getBoundingClientRect(); return {w: Math.round(b.width), sh: Math.round(s.height), fits: b.right <= window.innerWidth + 1}; })()`);
     check(dg && dg.fits && dg.sh >= 24, '390: the dialog fits, save button >= 24 px ' + JSON.stringify(dg));
     await shot('p2361b-390-service-dialog.png');
-    await ev(`(() => { document.querySelector('.ofcdlg [data-m="close"]').click(); return 1; })()`); await sleep(400);
-    await o.nav(B + '#office/settings'); await ready(ev); await sleep(1000);
+    await ev(`(() => { document.querySelector('.ofcdlg [data-m="close"]').click(); return 1; })()`);
+    // the dialog's own history entry (backclose.js) goes with a history.back() a moment later: wait for it, or it lands after the next nav
+    await o.until(`!document.querySelector('.ofcdlg') && !history.state?.f8d && (typeof f8d_bk === 'undefined' || (!f8d_bk.pushed && !f8d_bk.skip && !f8d_bk.queued))`);
+    await o.nav(B + '#office/settings'); await ready(o, `!!document.querySelector('.office .ofcset') && /KVA-/.test(document.querySelector('#os-preview')?.textContent || '')`);
+
     const st = await ev(`(() => { const f = document.querySelector('.office .ofcset'); return f ? {over: document.documentElement.scrollWidth > window.innerWidth + 1, pv: document.querySelector('#os-preview')?.textContent || ''} : null; })()`);
     check(st && !st.over && /KVA-/.test(st.pv), '390: settings fit, preview shows ' + JSON.stringify(st));
     await shot('p2361b-390-settings.png');
