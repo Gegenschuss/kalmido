@@ -228,7 +228,7 @@ out = in_app("import base64\nfrom kalmido.files.photometa import _pm_gif, _pm_ti
              f"t = base64.b64decode('{base64.b64encode(tf).decode()}')\n"
              "print('pm', pm_kind(g), base64.b64encode(_pm_gif(g, True)[0] or b'').decode(), base64.b64encode(_pm_heif(h, True)[0] or b'').decode(), "
              "base64.b64encode(_pm_tiff(t, True)[0] or b'').decode(), _pm_gif(g, False)[0])")
-parts = out.split("pm ", 1)[1].split() if "pm " in out else []
+parts = out.split("pm ", 1)[1].split("\n", 1)[0].split() if "pm " in out else []  # 2.475.0: its line only, the start log follows on stderr
 check(len(parts) == 5 and parts[0] == "gif" and base64.b64decode(parts[1]) == want, "#1856: a GIF loses comment and XMP, keeps loop and image " + out[-300:])
 hout = base64.b64decode(parts[2]) if len(parts) == 5 else b""
 check(len(hout) == len(hf) and b"SerienNr" not in hout and hout[pic_at:pic_at + 10] == b"BILDDATEN0" and hout[:exif_at] == hf[:exif_at],
@@ -247,7 +247,7 @@ assert len(dng) == 88
 out = in_app("import base64\nfrom kalmido.files.photometa import _pm_gif, _pm_tiff\n"
              f"a = base64.b64decode('{base64.b64encode(g2).decode()}')\nr = base64.b64decode('{base64.b64encode(dng).decode()}')\n"
              "print('pm2', base64.b64encode(_pm_gif(a, True)[0] or b'').decode() or '-', b'SN123456' in (_pm_tiff(r, True)[0] or r))")
-p2 = out.split("pm2 ", 1)[1].split() if "pm2 " in out else []
+p2 = out.split("pm2 ", 1)[1].split("\n", 1)[0].split() if "pm2 " in out else []
 check(len(p2) == 2 and base64.b64decode(p2[0]) == g2[:13] + g2[20:], "#1856: a GIF without a global colour table loses its comment " + out[-300:])
 check(len(p2) == 2 and p2[1] == "True", "#1856: a camera RAW (DNG version tag) keeps its EXIF directory")
 
