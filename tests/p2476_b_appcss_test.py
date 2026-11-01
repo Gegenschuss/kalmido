@@ -10,6 +10,7 @@ usage: python3 tests/p2476_b_appcss_test.py"""
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -48,7 +49,11 @@ with tempfile.TemporaryDirectory() as tmp:
     put(app, orig.replace("{", "{ ", 1))  # a changed line: same count
     rc, out = run("check_appcss.py", "--root", root)
     check(rc == 0, "a changed line of app.css stays allowed: " + out)
-    put(app, orig + ".p2476-new { color: red; }\n")
+    # 2.476.0 (#3487): the limit has a small margin over the count when the rule landed: grow app.css one line past it
+    import re as _re
+    cap = int(_re.search(r"^APPCSS_MAX_LINES = (\d+)", open(os.path.join(ROOT, "tools", "check_appcss.py"), encoding="utf-8").read(), _re.M).group(1))
+    have = orig.count("\n") + (0 if orig.endswith("\n") else 1)
+    put(app, orig + "".join(f".p2476-new{i} {{ color: red; }}\n" for i in range(max(1, cap - have + 1))))
     rc, out = run("check_appcss.py", "--root", root)
     check(rc == 1 and "grew" in out and "start-<topic>.css" in out and "static/css/<module>.css" in out,
           "app.css one line longer: exit 1, the message says where new rules go: " + out)
@@ -113,7 +118,10 @@ with tempfile.TemporaryDirectory() as tmp:
     rc, out = lay()
     check("sorted by name" not in out and "above the mark" not in out, "sorted below the mark: no order error " + out[-400:])
     first = '<script src="/static/js/reloadguard.js" defer></script>\n'
-    put(idx, h.replace(first, first + tag("aa-p2476")))
+    # 2.476.0 (#3487): as many new scripts above the mark as it takes to pass the limit (it has a small margin)
+    top_max = int(re.search(r"^LAYOUT_TOP_MAX = (\d+)", open(os.path.join(ROOT, "tools", "check_layout.py"), encoding="utf-8").read(), re.M).group(1))
+    top_now = len(re.findall(r"<script src=\"/static/js/[\w-]+\.js\"", h.split("new start scripts go below this line")[0]))
+    put(idx, h.replace(first, first + "".join(tag(f"aa-p2476-{i}") for i in range(max(1, top_max - top_now + 1)))))
     rc, out = lay()
     check(rc == 1 and "above the mark (limit" in out, "a new start script above the mark: error " + out[-400:])
     put(idx, h.replace("new start scripts go below this line", "x"))
