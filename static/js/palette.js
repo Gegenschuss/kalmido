@@ -645,7 +645,7 @@ function tourStart(mod) {
   closePalette(); $$('.modal:not(.authscreen)').forEach(x => x.remove()); closePop(); if (S.sel) closeDetail();
   const inList = S.route.mod === 'tasks' && !NOLIST_KEYS.includes(S.route.key) && !isKanban() && !isTimeline();
   if (!mod && !S.me?.kid && (!inList || !$('#view .trow'))) go('today');  // the tour points at a task (a fresh account's Inbox is empty); 2.49.0 (#1533): a child stays in My day
-  TOUR.on = true; TOUR.steps = mod ? tourModSteps(mod) : tourSteps(); TOUR.i = 0;
+  TOUR.on = true; TOUR.steps = mod ? tourModSteps(mod) : tourSteps(); TOUR.i = 0;  // lazy-ok: both callers with mod load tourmods first
   TOUR.more = S.settings.tours_more !== '0'; TOUR.moreShown = false;  // 2.466.0 (#3314)
   // 1.8.0: first start of an account: "Create a sample project" on the first card (preticked for project setups)
   TOUR.sample = !mod && S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0' && !S.me?.kid && !tourHasProjects() && !tourOrg(); TOUR.sampleOn = false;  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
