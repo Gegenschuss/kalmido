@@ -763,7 +763,7 @@ _TG_LINE = re.compile(r"^[ \t]*CREATE[ \t]+OR[ \t]+REPLACE[ \t]+TRIGGER[ \t]+(\w
 
 
 def tg_norm(sql, schema="public"):
-    """A trigger statement in one form, so that the wanted text and pg_get_triggerdef(oid, true) compare: words in lower case
+    """A trigger statement in one form, so that the wanted text and the pretty pg_get_triggerdef compare: words in lower case
     and spaces evened out (string literals, the trigger's arguments, stay as they are), the events and the columns of UPDATE OF
     sorted, the schema off the table and the function, EXECUTE PROCEDURE = FUNCTION. WHEN stays as written apart from that
     (only the pretty form drops its redundant brackets). None when it cannot be read."""
@@ -782,8 +782,8 @@ def tg_norm(sql, schema="public"):
 
 def tg_same(c, name, table, sql):
     """Is trigger name of table in place as sql says, and switched on (a replace would switch it on again)?"""
-    r = c.execute("SELECT pg_get_triggerdef(t.oid, true), t.tgenabled='O', current_schema() FROM pg_trigger t "
-                  "JOIN pg_class k ON k.oid=t.tgrelid WHERE t.tgname=? AND k.relname=? "
+    r = c.execute("SELECT pg_get_triggerdef(t.oid, true), t.tgenabled='O', current_schema() FROM pg_trigger t "  # pg-ok: pg_catalog oid
+                  "JOIN pg_class k ON k.oid=t.tgrelid WHERE t.tgname=? AND k.relname=? "  # pg-ok: pg_catalog oid
                   "AND k.relnamespace=current_schema()::regnamespace AND NOT t.tgisinternal", (name, table)).fetchone()
     if not r or not r[1]:
         return False

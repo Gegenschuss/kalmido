@@ -111,8 +111,8 @@ got = {g["label"]: (g["key"], g["amount"]) for g in rep["rows"]}
 check(got == {"Messe": ("Messe", "100.00"), "Acquisition / research": ("acquisition", "50.00"), "Kongress": ("Kongress", "30.00")},
       f"the evaluation by purpose {got}")
 r = A.get(B + T + "/report?by=purpose&from=2025-01-01&to=2025-12-31&format=csv")
-rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=";")) if r.ok else []
-check(rows and rows[0][0] == "Purpose" and rows[-1][2] == "180,00", f"the CSV by purpose {rows[:1]} {rows[-1:]}")
+rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=",")) if r.ok else []  # #2984: comma and point in English
+check(rows and rows[0][0] == "Purpose" and rows[-1][2] == "180.00", f"the CSV by purpose {rows[:1]} {rows[-1:]}")
 rep = A.get(B + T + "/report?by=project&from=2025-01-01&to=2025-12-31").json()
 got = {g["label"]: g["amount"] for g in rep["rows"]}
 check(got == {"No project": "100.00", "Acquisition / research": "50.00", "Film eins": "30.00"}, f"by project: an own purpose is no acquisition {got}")

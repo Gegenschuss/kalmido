@@ -159,6 +159,9 @@ KINDS = {
     "pure": ("n/a", "a pure transformation of the request body (an outline file into a tree): no stored data is read or written"),
     "token": ("n/a", "an inbound hook addressed by the unguessable secret of one list (sealed, looked up by its hash): nothing to "
                      "guess by id"),
+    "mailoff": ("n/a", "the one-click off link of a notification mail (2.367.5 #2975): addressed by a signature over one person and "
+                       "what to turn off, it changes only that person's own mail settings and shows no data; a wrong link is the same "
+                       "404 (p23675_notify_test.py)"),
     # 2.49.0 (#1106): finding people by e-mail (accounts/discover.py) -- its own kind (a second "people" key here silently
     # replaced the matrix kind of the user list above)
     "discover": ("n/a", "finding people by e-mail and connection requests: person to person, outside every workspace; the "
@@ -803,6 +806,7 @@ ROUTES = {
     "GET /api/v1/announcement": "public", "GET /api/v1/openapi.json": "public", "GET /api/about": "public", "POST /api/client-errors": "clienterr",
     "GET /": "public", "GET /capture": "public", "GET /share": "public", "POST /share": "public", "POST /drop": "public",
     "POST /drop/drop": "public", "GET /robots.txt": "public", "GET /manifest.json": "public", "GET /sw.js": "public",
+    "GET /mail/off/{}": "mailoff", "POST /mail/off/{}": "mailoff",  # 2.367.5 (#2975): no sign-in, the link's signature names the person
     "GET /sw-manifest.json": "public",  # 2.149.0 B (#2506): the service worker's file hashes (no user data)
     "GET /static/i18n/{}.core.json": "public", "GET /static/i18n/{}.mod-{}.json": "public",  # 2.191.0 A (#2518): the split language files (no user data)
     "GET /api/health": "public", "GET /api/version": "public", "POST /api/qr": "public",
