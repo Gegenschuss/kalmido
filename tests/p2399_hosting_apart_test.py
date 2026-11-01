@@ -255,6 +255,9 @@ r = A.post(B + "/api/admin/backups/upload", data=b"PK\x03\x04not-a-real-archive"
 check(r.status_code == 403 and "no archive is uploaded" in r.text, "#3944 F6: hosted: uploading an archive is refused " + r.text[:160])
 r = A.post(B + "/api/admin/backups/restore", json={"upload": "upload-" + "ab" * 12, "confirm": "RESTORE"})
 check(r.status_code == 403 and "no archive is uploaded" in r.text, "#3944 F6: hosted: no restore from an uploaded archive " + r.text[:160])
+# 2.480.0 review (#3944, F6): checking an uploaded archive is refused too
+r = A.post(B + "/api/admin/backups/upload-" + "ab" * 12 + "/verify", json={})
+check(r.status_code == 403 and "no archive is uploaded" in r.text, "#3944 F6: hosted: no check of an uploaded archive " + r.text[:160])
 
 # ---- F8: an account the operator made itself (family, no organisation) stays its own until it signs in
 r = A.post(B + "/api/users", json={"username": "famkid", "display_name": "Fam", "password": "password123"})

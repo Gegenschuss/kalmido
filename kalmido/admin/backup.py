@@ -2224,6 +2224,8 @@ def backups_verify(name):
     """Full check without changing anything: decrypt, member list, every checksum, database integrity."""
     need_backups()
     c = db()
+    if name.startswith("upload-"):
+        bk_no_upload_hosted()  # 2.480.0 review (#3944, F6): hosted -> no uploaded archive at all
     p = bk_path(name) if not name.startswith("upload-") else bk_upload_path(name)
     pw = str(body().get("passphrase") or "") or bk_passphrase(c)
     work = tempfile.mkdtemp(prefix=".verify-", dir=BK_DIR)

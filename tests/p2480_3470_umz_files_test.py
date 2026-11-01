@@ -16,6 +16,7 @@ import base64
 import io
 import json
 import os
+import subprocess
 import sys
 import zipfile
 
@@ -163,5 +164,24 @@ iid, j = upload(Hn, EX2)
 err = json.dumps(j.get("error"), ensure_ascii=False)
 check(j.get("state") == "invalid" and "too small for the files" in err, f"#3470 refused before the run, with the sizes {j.get('state')} {err[:300]}")
 check(not kt.dbx("SELECT 1 FROM fs_nodes WHERE owner_id=?", (HID,)), "#3470 nothing was written")
+
+# 2.480.0 review (#3470): a file encrypted in the browser has no bytes in the export: its versions are no rows and the file
+# no node (else a node whose current version points at nothing, one warning per version)
+LOCKED = r"""
+import json
+from kalmido.admin.acctimport import umz_private_oi
+data = {"private_files": [{"id": 1, "kind": "folder", "name": "Ordner"}, {"id": 2, "kind": "file", "name": "a.txt", "parent_id": 1},
+                          {"id": 3, "kind": "file", "name": "zu.bin", "parent_id": 1}],
+        "private_versions": [{"id": 10, "node_id": 2, "no": 1, "file": "files/private_files/2-a.txt"},
+                             {"id": 11, "node_id": 3, "no": 1}, {"id": 12, "node_id": 3, "no": 2}]}
+oi = umz_private_oi(data, {"files/private_files/2-a.txt": (None, 0)})
+print(json.dumps({k: [r.get("id") for r in v] for k, v in oi.items()}))
+"""
+r = subprocess.run(["docker", "exec", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test"), "python3", "-c", LOCKED],
+                   capture_output=True, text=True, timeout=120)
+got = json.loads((r.stdout or "{}").strip().splitlines()[-1] if r.stdout.strip() else "{}")
+ids = sorted(i for v in got.values() for i in v)
+check(r.returncode == 0 and 3 not in ids and 11 not in ids and 12 not in ids and 2 in ids and 10 in ids and 1 in ids,
+      f"#3470 review: a locked file (no bytes) is left out, versions and node {got} {r.stderr[-300:]}")
 
 sys.exit(kt.done("p2480_3470_umz_files"))

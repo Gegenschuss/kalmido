@@ -312,6 +312,9 @@ def authenticate():
         u = c.execute("SELECT * FROM users WHERE lower(proxy_login)=lower(?)", (val,)).fetchone()
         if u and not u["disabled"] and not is_agent(u):
             g.user, g.auth_via = u, "proxy"
+            if u["op_made_by"]:  # 2.480.0 review (#3944, F8): a proxy sign-in is the first sign-in too (no start_session here)
+                c.execute("UPDATE users SET op_made_by=NULL WHERE id=?", (u["id"],))
+                c.commit()
             if u["email"] and time.monotonic() > _PROXY_SHS.get(u["id"], 0):  # 2.360.2 M (#2561): no sign-in step with a proxy
                 _PROXY_SHS[u["id"]] = time.monotonic() + 3600
                 _shs_signin(c, u)

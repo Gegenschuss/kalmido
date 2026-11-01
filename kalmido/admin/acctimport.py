@@ -1674,6 +1674,7 @@ def umz_private_oi(data, files):
         vers = [{"id": r.get("id"), "node_id": r.get("id"), "no": _oid(r.get("cur_version")) or 1, "size": r.get("size"),
                  "mime": r.get("mime"), "created_at": r.get("updated_at"), "file": r.get("file")}
                 for r in nodes if r.get("kind") == "file" and r.get("file")]
+    kept = []
     for v in vers:
         try:
             path = f"files/store/{int(v['node_id'])}-v{int(v['no'])}-{_safe_part(names.get(_oid(v['node_id'])))}"
@@ -1681,6 +1682,13 @@ def umz_private_oi(data, files):
             continue
         if path not in files and v.get("file") in files:
             files[path] = files[v["file"]]
+        if path in files:
+            kept.append(v)
+    # 2.480.0 review (#3470): a version without bytes (a file encrypted in the browser: its bytes are not exported) is no
+    # row, and a file without any version is no node (it would point at nothing)
+    vers = kept
+    has = {_oid(v.get("node_id")) for v in vers}
+    nodes = [r for r in nodes if r.get("kind") != "file" or _oid(r.get("id")) in has]
     sheets = {_oid(r.get("id")) for r in data.get("sheets") or []}
     for part, kind in (("wiki_files", "wiki"), ("sheet_files", "sheets")):
         for r in data.get(part) or []:
