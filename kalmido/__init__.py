@@ -293,6 +293,7 @@ ORDER = (
     "team.clientmerge",  # 2.66.0 B (#1835): merging duplicate clients (reversible)
     "office.clientlink",  # 2.59.0 A (#1735): the address book search of the client dialog
     "team.workload",
+    "hub.holidays",  # 2.461 (#3773): public holidays per country (data files), used by hub.absence
     "hub.absence",  # 2.50.0 A (#1195): absences + German public holidays
     "hub.leave",  # 2.125.0 A (#2118, #2117): working days per person, vacation account + requests
     "hub.abscal",  # 2.155.0 B (#2076): holidays + absences in the calendar views, their subscription link
