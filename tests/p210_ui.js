@@ -41,7 +41,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
     w.eval(`settingsModal('notify')`); await sleep(700);
     const mx = d.querySelector('#sp-notify .nmx');
     const rows = [...(mx?.querySelectorAll('.nmr') || [])];
-    check(mx && rows.length === 21 &&  /* 2.266.0 (#2965): + signoff; 2.18.0: + errreport; 2.60.0 (#1512): + review; 2.122.0 (#2097): + filereq; 2.125.0 (#2117 #2119): + leave, timesheet */  /Event.*News.*Push/.test(mx.querySelector('.nmh').textContent), `${lab}: matrix with every event (${rows.length}: ${rows.map(r => r.querySelector('[data-nm]')?.dataset.nm || '-').join(',')})`);
+    check(mx && rows.length === 25 &&  /* 2.367.2 (#2969): + calsub; 2.367.3 (#2971): + integration; 2.367.4 (#2974): + notice; 2.453.0 (#3781): + limits; 2.266.0 (#2965): + signoff; 2.18.0: + errreport; 2.60.0 (#1512): + review; 2.122.0 (#2097): + filereq; 2.125.0 (#2117 #2119): + leave, timesheet */  /Event.*News.*Push/.test(mx.querySelector('.nmh').textContent), `${lab}: matrix with every event (${rows.length}: ${rows.map(r => r.querySelector('[data-nm]')?.dataset.nm || '-').join(',')})`);
     const rem = rows.find(r => /Reminders/.test(r.textContent));
     check(rem && !rem.querySelector('[data-ch="news"]') && rem.querySelector('.nmna') && rem.querySelector('[data-nm="reminder"][data-ch="push"]').checked, `${lab}: reminders push only`);
     check(d.querySelector('[data-nm="reply"][data-ch="push"]').checked && d.querySelector('[data-nm="newtask"][data-ch="push"]').checked === mobile  // the desktop run switched it on
@@ -51,9 +51,9 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
       const cb = d.querySelector('[data-nm="newtask"][data-ch="push"]'); cb.checked = true; change(w, cb); await sleep(700);
       let st = await call('GET', '/api/state', null, CKB);
       check(st.notify.newtask.push === true && JSON.parse(st.settings.notify).newtask.push === 1, 'toggle: saved (notify)');
-      const cm = d.querySelector('[data-nm="complete"][data-ch="news"]'); cm.checked = true; change(w, cm); await sleep(700);
+      const cm = d.querySelector('[data-nm="complete"][data-ch="news"]'); check(cm.checked, 'complete: News on by default (2.367.5, #2980)'); cm.checked = false; change(w, cm); await sleep(700);  // on by default, so the change here is switching it off
       st = await call('GET', '/api/state', null, CKB);
-      check(st.notify.complete.news === true && st.settings.news_kinds.split(',').includes('complete'), 'toggle a News of an old event: news_kinds');
+      check(st.notify.complete.news === false && !st.settings.news_kinds.split(',').includes('complete'), 'toggle a News of an old event: news_kinds');
       // 2.9.0: on a slow CI runner the second save could still be settling in the undo history when Undo was clicked
       // (Undo then took back the first change): wait until the saved note names the second change
       // 2.12.2: wait for the note to hold the newest undo entry, then click at once (the note drops its Undo after 6 s; the
@@ -68,9 +68,9 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
       for (let i = 0; i < 50 && !top(); i++) await sleep(100);
       check(top(), 'the note holds the newest undo step');
       click(w, d.querySelector('.smodal .ssaved [data-m="s-undo"]')); await sleep(900);
-      for (let i = 0; i < 40 && (await call('GET', '/api/state', null, CKB)).notify.complete.news !== false; i++) await sleep(300);  // 2.7.2: slow CI runner
+      for (let i = 0; i < 40 && (await call('GET', '/api/state', null, CKB)).notify.complete.news !== true; i++) await sleep(300);  // 2.7.2: slow CI runner
       st = await call('GET', '/api/state', null, CKB);
-      check(st.notify.complete.news === false && st.notify.newtask.push === true, `undo takes back the last change (complete.news ${st.notify.complete.news}, newtask.push ${st.notify.newtask.push}, undo ${w.eval('HIST.undo.length')}, redo ${w.eval('HIST.redo.length')}, local ${w.eval('S.settings.news_kinds')}, toast ${d.querySelector('#toast')?.textContent || ''})`);  // 2.358.0 B (#3302): #toast, redo, local value
+      check(st.notify.complete.news === true && st.notify.newtask.push === true, `undo takes back the last change (complete.news ${st.notify.complete.news}, newtask.push ${st.notify.newtask.push}, undo ${w.eval('HIST.undo.length')}, redo ${w.eval('HIST.redo.length')}, local ${w.eval('S.settings.news_kinds')}, toast ${d.querySelector('#toast')?.textContent || ''})`);  // 2.358.0 B (#3302): #toast, redo, local value
     }
     w.close();
   }

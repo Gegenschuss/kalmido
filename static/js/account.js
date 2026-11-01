@@ -157,7 +157,7 @@ const NM_PUSH = {comment: 1, reply: 1, follow: 1, mention: 1, assign: 1, newtask
 const NM_SOCIAL = ['comment', 'reply', 'follow', 'mention', 'assign', 'newtask', 'complete', 'status', 'share', 'unblock', 'approval', 'proposal', 'chat', 'errreport'];
 const nmStored = s => { try { const o = JSON.parse(s.notify || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
 function notifMatrix(s) {
-  const nk = new Set(String(s.news_kinds ?? 'mention,assign,comment,unblock,share,status').split(',')), o = nmStored(s), out = {};
+  const nk = new Set(String(s.news_kinds ?? 'mention,assign,comment,complete,unblock,share,status').split(',')), o = nmStored(s), out = {};
   for (const [r] of NOTIF_ROWS) {
     const x = o[r] && typeof o[r] === 'object' ? o[r] : {};
     const news = r === 'reminder' || r === 'nag' || r === 'chat' || r === 'notice' ? null : NM_PRIMARY.includes(r) ? nk.has(NM_GROUP[r]) : 'news' in x ? !!x.news : r in NM_GROUP ? nk.has(NM_GROUP[r]) : !!NM_NEWS_NEW[r];
