@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from flask import g, jsonify, request, Response
 
 from ..core.config import API_PREFIX, app, MAX_FILE_MB, PUBLIC_URL, TZ
-from ..core.pg import insert_id
+from ..core.pg import insert_id, system_ctx
 from ..core.i18n import dec_comma, fmt_int, lang, tr
 from ..core.db import bump, connect, db, inbox_default, iso, iso_ms, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import GATE, me
@@ -40,6 +40,7 @@ from ..agents.workstyle import ws_get
 from ..agents.workqueue import wq_spec
 from ..agents.agentrules import ar_spec  # 2.235.0 C (#2903)
 from ..agents.proposals import PROP_KINDS, PROP_MAX_BYTES, PROP_MAX_ITEMS, PROP_STATES, PROP_SUMMARY_MAX
+from ..accounts.orgs import _operator_apart, op_foreign_account  # 2.399.0 (#2687)
 
 
 # ---------------------------------------------------------------- 2.1.1 (#326): model usage of agents + limits
@@ -556,9 +557,13 @@ def audit_cleanup(c, force=False):
     return n
 
 
-def audit_query(c, a, aid=None, csv_out=False):
-    """Rows of the log for the filters in a (agent_id, status, day, cursor / before, limit). aid fixes the agent."""
+def audit_query(c, a, aid=None, csv_out=False, only=None):
+    """Rows of the log for the filters in a (agent_id, status, day, cursor / before, limit). aid fixes the agent. 2.399.0 (#2687):
+    only = the agent ids the viewer may read (None = every one)."""
     where, args = [], []
+    if only is not None:
+        where.append(f"agent_id IN ({','.join('?' * len(only)) or 'NULL'})")
+        args += sorted(only)
     if aid is None and a.get("agent_id"):
         aid = as_int(a.get("agent_id"), "agent_id", 1)
     if aid is not None:
@@ -630,17 +635,29 @@ def admin_agents_audit(aid=None):
         need_agent_admin(c, aid)
     else:
         need_admin()
-    return _audit_answer(aid)
+    return _audit_answer(aid, only=op_own_agents(c))
 
 
-def _audit_answer(aid, own=False):
+def op_own_agents(c):
+    """2.399.0 (#2687): hosted -> the ids of the agents the operator itself runs (not a client's: accounts.orgs.op_foreign_account);
+    self-hosted None (every agent, as before)."""
+    if not _operator_apart():
+        return None
+    with system_ctx(c):
+        ids = [r[0] for r in c.execute("SELECT user_id FROM agents")]
+    return {x for x in ids if not op_foreign_account(c, x)}
+
+
+def _audit_answer(aid, own=False, only=None):
     """own: the owner's view of one personal agent -- only that agent's name (review 2.361.4: never the server's agent list)."""
     c = db()
     csv_out = request.args.get("format") == "csv"
-    rows, more = audit_query(c, request.args, aid, csv_out)
+    rows, more = audit_query(c, request.args, aid, csv_out, only=only)
     names = audit_names(c)
     if own:
         names = {aid: names.get(aid, f"#{aid}")}
+    if only is not None:  # 2.399.0 (#2687): hosted: no names of a client's agents
+        names = {k: v for k, v in names.items() if k in only}
     if csv_out:
         return audit_csv(rows, names, aid or request.args.get("agent_id"))
     data = [audit_dict(r, names) for r in rows]
@@ -667,6 +684,9 @@ def _audit_answer(aid, own=False):
         if sel is not None:
             w += " AND agent_id=?"
             wa.append(sel)
+        if only is not None:  # 2.399.0 (#2687)
+            w += f" AND agent_id IN ({','.join('?' * len(only)) or 'NULL'})"
+            wa += sorted(only)
         r = c.execute(f"""SELECT COUNT(*) n, COUNT(*) FILTER (WHERE status IN ({','.join(map(str, AUDIT_DENIED))})) den,
                                  COUNT(*) FILTER (WHERE method=? AND route=?) poll FROM agent_audit WHERE {w}""", (*AUDIT_POLL, *wa)).fetchone()
         out["today"] = {"requests": r["n"], "denied": r["den"], "polls": r["poll"]}

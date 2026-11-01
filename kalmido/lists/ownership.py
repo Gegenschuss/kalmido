@@ -38,6 +38,15 @@ def owner_candidates(c, lid, owner):
     return out
 
 
+def op_takeover_apart(c, lr):
+    """2.399.0 (#2687): hosted, the operator takes over no project of a client: a private one (a disabled person's own things) or
+    one of an organisation it does not administer (its own agents' private projects stay). Self-hosted: False (as before)."""
+    from ..accounts.orgs import _operator_apart, op_foreign_account, op_foreign_org
+    if not _operator_apart():
+        return False
+    return op_foreign_org(c, lr["org_id"]) if lr["org_id"] else op_foreign_account(c, lr["owner_id"])
+
+
 def owner_rights(c, lid):
     """(list row, 'owner' | 'takeover') for the current user, or Denied: 404 when they may neither see nor take it over."""
     from ..agents.core import is_agent
@@ -48,7 +57,7 @@ def owner_rights(c, lid):
         raise Denied(403, tr("Agents cannot transfer projects"))
     if lr["owner_id"] == me():
         return lr, "owner"
-    if g.user["is_admin"] and owner_orphaned(c, lr["owner_id"]):
+    if g.user["is_admin"] and owner_orphaned(c, lr["owner_id"]) and not op_takeover_apart(c, lr):
         return lr, "takeover"
     if list_role(c, lid):
         raise Denied(403, tr("Only the owner can transfer this project"))
@@ -207,11 +216,12 @@ def admin_lists_orphaned():
     from ..accounts.users import need_admin
     need_admin()
     c = db()
-    rows = c.execute("""SELECT l.id, l.name, l.archived, l.owner_id, u.username, u.display_name, u.kind, u.disabled,
+    rows = c.execute("""SELECT l.id, l.name, l.archived, l.owner_id, l.org_id, u.username, u.display_name, u.kind, u.disabled,
                                (SELECT COUNT(*) FROM list_members m WHERE m.list_id=l.id) AS members,
                                (SELECT COUNT(*) FROM tasks t WHERE t.list_id=l.id AND t.deleted_at IS NULL) AS tasks
                         FROM lists l JOIN users u ON u.id=l.owner_id
                         WHERE l.is_inbox=0 AND l.deleted_at IS NULL AND (u.kind='agent' OR u.disabled=1) ORDER BY l.id""").fetchall()
+    rows = [r for r in rows if not op_takeover_apart(c, r)]  # 2.399.0 (#2687): hosted: only projects of the operator's own organisations
     return jsonify(lists=[{"id": r["id"], "name": r["name"], "archived": bool(r["archived"]), "owner_id": r["owner_id"],
                            "owner_name": r["display_name"] or r["username"], "reason": "agent" if r["kind"] == "agent" else "disabled",
                            "members": r["members"], "tasks": r["tasks"]} for r in rows],

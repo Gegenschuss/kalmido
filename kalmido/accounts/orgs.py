@@ -722,6 +722,37 @@ def _operator_apart():
     return hosted()
 
 
+# 2.399.0 (#2687): on a hosted instance the operator (an instance admin) runs the server, not its customers' organisations: every
+# instance-admin way into an organisation it does not administer itself (members, roles, creating one for somebody else) and into
+# an account of a customer (password, sign-in link, e-mail, organisations, its agents) answers 403. Locking, deleting and quotas stay.
+OP_APART_MSG = N_("On a hosted instance the operator does not reach into the organisations and accounts of its clients")
+
+
+def op_apart_deny():
+    raise Denied(403, tr(OP_APART_MSG))
+
+
+def op_foreign_org(c, oid):
+    """2.399.0 (#2687): hosted and the current person is no admin of organisation oid (a self-hosted server: False)."""
+    return bool(_operator_apart()) and org_role(c, me(), oid) != "admin"
+
+
+def op_foreign_account(c, uid):
+    """2.399.0 (#2687): hosted and account uid belongs to a customer: not the current person, no account of an organisation the
+    current person administers. An agent follows its owner (a personal one: only one's own) or its organisation; a server agent
+    without both belongs to the operator."""
+    if not _operator_apart() or uid == me():
+        return False
+    with system_ctx(c):  # membership structure, no content
+        a = c.execute("SELECT owner_id, org_id FROM agents WHERE user_id=?", (uid,)).fetchone()
+        if a:
+            if a["owner_id"]:
+                return a["owner_id"] != me()
+            return bool(a["org_id"]) and op_foreign_org(c, a["org_id"])
+        return not c.execute("SELECT 1 FROM org_members a JOIN org_members b ON b.org_id=a.org_id "
+                             "WHERE a.user_id=? AND a.role='admin' AND b.user_id=? LIMIT 1", (me(), uid)).fetchone()
+
+
 def org_own_admin(c, oid, but=0):
     """2.306.0 Fix-1 (#2875 review): an active admin of organisation oid who is a person (not `but`), or None."""
     r = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' "
@@ -768,6 +799,15 @@ def _members_gone(c, oid, gone):
             org_leave(c, oid, u, heir)
 
 
+def op_org_public(c, r):
+    """2.399.0 (#2687): an organisation for the instance admin's list -- hosted, one it does not administer comes without its
+    people and domains (name, symbol, the number of people) and marked apart (no edit button)."""
+    d = org_public(c, r)
+    if op_foreign_org(c, r["id"]):
+        d.update(members=[], admins=[], domains="", apart=True)
+    return d
+
+
 @app.get("/api/admin/orgs")
 def orgs_get():
     """2.23.0 (#799): + mode (organisation | shared | multi | workspaces) and whether names / members can be changed here
@@ -779,7 +819,7 @@ def orgs_get():
         rows = [] if m == "shared" else c.execute("SELECT * FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id").fetchall()  # 2.47.3 (#1360): never the personal offices
         from ..accounts.tenancy import boundary_summary
         # 2.152.0 A (#2167): + retired_at / retain_until / retired_personal (a retired one: kept by law, export only)
-        return jsonify(orgs=[{**org_public(c, r), "retired_at": r["retired_at"], "retain_until": r["retain_until"] or "",
+        return jsonify(orgs=[{**op_org_public(c, r), "retired_at": r["retired_at"], "retain_until": r["retain_until"] or "",
                               "retired_personal": bool(r["retired_personal"])} for r in rows],
                        visibility=vis_mode(c), mode=m, editable=m == "workspaces",
                        creatable=m == "workspaces", name_env=bool(ORG_NAME_ENV),
@@ -826,6 +866,9 @@ def org_create():
         if not isinstance(adm, int) or isinstance(adm, bool) or not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND disabled=0", (adm,)).fetchone():
             c.rollback()
             return err(tr("Invalid value: {0}", "admin_id"))
+        if adm != me() and _operator_apart():  # 2.399.0 (#2687): hosted: a customer creates its organisation itself (POST /api/orgs)
+            c.rollback()
+            op_apart_deny()
         org_member_add(c, oid, adm, "admin", keep_office=adm != me())
         bump(c)
         c.commit()
@@ -879,6 +922,8 @@ def org_update(oid):
     admins_add / admins_remove (or members / admins with _prev: {members, admins}) change only those people."""
     _need_admin()
     c, b = db(), body()
+    if op_foreign_org(c, oid):  # 2.399.0 (#2687): hosted: name, members and roles of a customer's organisation are its admins' own
+        op_apart_deny()
     with system_ctx(c):  # 2.37.0 (#1150): instance admin manages the organisations themselves (also ones he is not in)
         if instance_mode(c) != "workspaces":
             _no_change()

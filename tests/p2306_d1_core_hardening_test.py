@@ -7,9 +7,9 @@ with KEEP=1 as a hosted instance). Invented accounts only (example.com). One cas
    per-minute load limits stay per process; the stored keys are hashes
  - an organisation's trip is not reachable by its id with a personal API token (a private one is, also for a person
    without an organisation)
- - hosted: the last admin leaving makes the operator no admin (409), the instance admin's dialog can still swap the admin
-   in one step; self-hosted the operator takes over as before
- - hosted: the instance admin invites an existing account into an organisation (it joins by accepting); self-hosted directly
+ - hosted: the last admin leaving makes the operator no admin (409); self-hosted the operator takes over as before.
+   2.399.0 (#2687): the instance admin's dialog no longer reaches into a client's organisation at all (403)
+ - hosted: the instance admin invites an existing account into its own organisation (it joins by accepting); self-hosted directly
  - the sign-on's admin domains change only with the account password (a draft's apply too); non-admins 403 as before
  - review (Fix-1): while an admin rule is set, the provider, client, groups claim and auto-create change only with the
    password too; hosted, the last admin stays at the user dialog, admins_remove and the old admins set; invited + admin
@@ -322,25 +322,28 @@ check(r.ok and not kt.dbx("SELECT 1 FROM org_members WHERE org_id=? AND role='ad
       "self-hosted: the instance admin may still demote every admin (as before) " + r.text[:120])
 
 # ================================================================ hosted (KEEP=1)
+# 2.399.0 (#2687): the operator stays out of its clients' organisations altogether -- a client creates its organisation itself
+# (POST /api/orgs) and the instance admin's member / role routes into it answer 403 (was: 409 / an invitation; every way in:
+# p2399_hosting_apart_test.py). In the operator's own organisation the rules of 2.306.0 stay (invitations, an admin of its own).
 kt.fresh(env={"KALMIDO_SECRET_KEY": KEY, "KALMIDO_HOSTED": "1"}, keep=True)
 A = sess("alice")
-r = A.post(B + "/api/admin/orgs", json={"name": "Gamma", "admin_id": uid["gus"]})
-GO = r.json().get("id") or r.json().get("org", {}).get("id")
-check(r.status_code in (200, 201) and GO, "hosted: an organisation of a customer " + r.text[:160])
 G = sess("gus")
+r = G.post(B + "/api/orgs", json={"name": "Gamma"})
+GO = r.json().get("id")
+check(r.status_code == 201 and GO, "hosted: a client creates its organisation itself (2.399.0 #2687) " + r.text[:160])
 r = G.delete(B + f"/api/orgs/{GO}/members/{uid['gus']}")
 check(r.status_code == 409 and not kt.dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=1", (GO,)),
       "hosted: the last admin cannot leave, the operator does not become its admin " + r.text[:160])
 dbw("INSERT INTO org_members(org_id, user_id, role) VALUES(?,?,'member')", (GO, uid["mia"]))
 r = A.patch(B + f"/api/admin/orgs/{GO}", json={"members_remove": [uid["gus"]]})
-check(r.status_code == 409 and kt.dbx("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (GO, uid["gus"])) == [("admin",)],
-      "hosted: the instance admin's dialog cannot take the last admin out either (nothing changed) " + r.text[:160])
+check(r.status_code == 403 and kt.dbx("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (GO, uid["gus"])) == [("admin",)],
+      "hosted: the instance admin's dialog does not take a client's admin out (2.399.0 #2687: 403, nothing changed) " + r.text[:160])
 r = A.patch(B + f"/api/admin/orgs/{GO}", json={"members_remove": [uid["gus"]], "admins_add": [uid["mia"]]})
-check(r.ok and kt.dbx("SELECT user_id, role FROM org_members WHERE org_id=? ORDER BY user_id", (GO,)) == [(uid["mia"], "admin")],
-      "hosted: swapping the admin in one step works, the operator stays out " + r.text[:160])
+check(r.status_code == 403 and kt.dbx("SELECT user_id, role FROM org_members WHERE org_id=? ORDER BY user_id", (GO,)) == sorted([(uid["gus"], "admin"), (uid["mia"], "member")]),
+      "hosted: nor swaps a client's admin (2.399.0 #2687: its own admins do) " + r.text[:160])
 r = A.put(B + f"/api/orgs/{ORG}/members", json={"email": "hugo@example.com"})
 check(r.ok and kt.dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (ORG, uid["hugo"])) and not kt.dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (ORG, uid["hugo"])),
-      "hosted: the instance admin only invites an existing account " + r.text[:160])
+      "hosted: the instance admin only invites an existing account into its own organisation " + r.text[:160])
 r = A.post(B + f"/api/orgs/{ORG}/invites", json={"email": "newhosted@example.com"})  # 2.453.0 (#3780): a new address the same way
 check(r.ok and kt.dbx("SELECT 1 FROM org_joins j JOIN users u ON u.id=j.user_id WHERE j.org_id=? AND u.email='newhosted@example.com'", (ORG,))
       and not kt.dbx("SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND u.email='newhosted@example.com'", (ORG,)),
@@ -348,37 +351,33 @@ check(r.ok and kt.dbx("SELECT 1 FROM org_joins j JOIN users u ON u.id=j.user_id 
 check(login(B, "hugo").post(B + f"/api/orgs/{ORG}/join").ok and kt.dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (ORG, uid["hugo"])),
       "hosted: the person accepts and is a member")
 r = A.patch(B + f"/api/users/{FID}", json={"orgs": [GO]})
-check(r.ok and not kt.dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (GO, FID))
-      and kt.dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (GO, FID)),
-      "hosted: the user dialog invites the freelancer instead of adding them " + r.text[:160])
-check(Fr.get(B + "/api/state").json()["me"].get("workspaces") == [], "freelancer: still without an organisation until accepted")
+check(r.status_code == 403 and not kt.dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (GO, FID))
+      and not kt.dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (GO, FID)),
+      "hosted: the user dialog does not put the freelancer into a client's organisation (2.399.0 #2687: 403, no invitation) " + r.text[:160])
+check(Fr.get(B + "/api/state").json()["me"].get("workspaces") == [], "freelancer: still without an organisation")
 
-# ---- 2.306.0 Fix-1 (#2875 review): hosted, the organisation keeps an admin of its own at every place the operator edits
+
+# ---- 2.306.0 Fix-1 (#2875 review): hosted, an organisation keeps an admin of its own (2.399.0: shown in the operator's own one)
 def role(o, u):
     return kt.dbx("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (o, u))
 
 
 r = A.patch(B + f"/api/users/{uid['mia']}", json={"orgs": []})
-check(r.status_code == 409 and role(GO, uid["mia"]) == [("admin",)] and not role(GO, 1),
-      "hosted: the user dialog cannot take the last admin out, the operator does not take over " + r.text[:120])
-r = A.patch(B + f"/api/admin/orgs/{GO}", json={"admins_remove": [uid["mia"]]})
-check(r.status_code == 409 and role(GO, uid["mia"]) == [("admin",)], "hosted: the last admin is not demoted " + r.text[:120])
-r = A.patch(B + f"/api/admin/orgs/{GO}", json={"admins": []})
-check(r.status_code == 409 and role(GO, uid["mia"]) == [("admin",)], "hosted: the old admins set cannot empty it either " + r.text[:120])
-dbw("INSERT INTO org_members(org_id, user_id, role) VALUES(?,?,'member')", (GO, uid["ivy"]))
-r = A.patch(B + f"/api/admin/orgs/{GO}", json={"admins_add": [uid["ivy"]], "admins_remove": [uid["mia"]]})
-check(r.ok and role(GO, uid["ivy"]) == [("admin",)] and role(GO, uid["mia"]) == [("member",)], "hosted: swapping the admin role works " + r.text[:120])
-r = A.patch(B + f"/api/users/{uid['mia']}", json={"orgs": [DO]})  # Delta (no admin since the self-hosted part) stays as it is
-check(r.ok and not role(GO, uid["mia"]) and not role(GO, 1), "hosted: a member is taken out by the user dialog, the operator stays out " + r.text[:120])
-r = A.patch(B + f"/api/admin/orgs/{GO}", json={"members_add": [uid["bob"]], "admins_add": [uid["bob"]]})
-check(r.ok and kt.dbx("SELECT role FROM org_joins WHERE org_id=? AND user_id=?", (GO, uid["bob"])) == [("admin",)],
+check(r.status_code == 403 and role(GO, uid["mia"]) == [("member",)] and not role(GO, 1),
+      "hosted: the user dialog does not take a client out of its organisation (2.399.0 #2687: 403) " + r.text[:120])
+r = A.patch(B + f"/api/admin/orgs/{ORG}", json={"admins_remove": [1]})
+check(r.status_code == 409 and role(ORG, 1) == [("admin",)], "hosted: the last admin of the own organisation is not demoted " + r.text[:120])
+r = A.patch(B + f"/api/admin/orgs/{ORG}", json={"admins": []})
+check(r.status_code == 409 and role(ORG, 1) == [("admin",)], "hosted: the old admins set cannot empty it either " + r.text[:120])
+r = A.patch(B + f"/api/admin/orgs/{ORG}", json={"members_add": [uid["mia"]], "admins_add": [uid["mia"]]})
+check(r.ok and kt.dbx("SELECT role FROM org_joins WHERE org_id=? AND user_id=?", (ORG, uid["mia"])) == [("admin",)],
       "hosted: invited + admin in one step: the invitation carries the admin role " + r.text[:120])
-check(login(B, "bob").post(B + f"/api/orgs/{GO}/join").ok and role(GO, uid["bob"]) == [("admin",)], "hosted: accepted, the person is an admin")
+check(login(B, "mia").post(B + f"/api/orgs/{ORG}/join").ok and role(ORG, uid["mia"]) == [("admin",)], "hosted: accepted, the person is an admin")
 r = A.patch(B + f"/api/admin/orgs/{GO}", json={"members_add": [1]})
-check(r.status_code == 409 and not kt.dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=1", (GO,)) and not role(GO, 1),
-      "hosted: the operator does not invite itself into a customer's organisation " + r.text[:120])
+check(r.status_code == 403 and not kt.dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=1", (GO,)) and not role(GO, 1),
+      "hosted: the operator does not invite itself into a client's organisation (2.399.0 #2687: 403) " + r.text[:120])
 r = A.patch(B + "/api/users/1", json={"orgs": [ORG, GO]})
-check(r.status_code == 409 and not kt.dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=1", (GO,)) and role(ORG, 1) == [("admin",)],
+check(r.status_code == 403 and not kt.dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=1", (GO,)) and role(ORG, 1) == [("admin",)],
       "hosted: not through the user dialog either (nothing changed) " + r.text[:120])
 check(Fr.patch(B + f"/api/admin/orgs/{GO}", json={"members_add": [FID]}).status_code == 403, "freelancer (no instance admin): 403 as before")
 

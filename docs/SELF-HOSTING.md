@@ -2039,6 +2039,27 @@ of the instance and **never sees content**: no names, e-mail addresses, titles, 
 |---|---|---|
 | `KALMIDO_OPERATOR_TOKEN_FILE` | empty | File with the operator token; empty = the operator interface is off (404) |
 
+### The instance admin on a hosted instance
+
+*Since 2.399.* On a server with `KALMIDO_HOSTED=1` the hoster's own accounts may still be instance admins (Settings >
+Administration), but they run the server, not the customers' organisations. Every instance-admin way into an organisation
+the admin does not administer itself answers 403:
+
+- **Organisations:** no new organisation with somebody else as its admin (customers create theirs themselves, *New
+  company*), no name, e-mail domains, members or roles of a customer's organisation; the list shows such an organisation
+  with its number of people only. Deleting one stays (with its legal periods and the export first).
+- **Accounts of customers** (members of an organisation the admin does not administer, and people without an
+  organisation): only *disabled*, the storage quota and the server admin flag change. No password, sign-in link,
+  password link, e-mail address, organisations, SSO sign-in, ntfy topic, 2FA reset or conversion to an agent; deleting
+  an account deletes its projects along or refuses, it never hands them to somebody.
+- **Agents of customers** (an organisation's agent, a customer's personal agent): only the kill switch (pause); no token,
+  setup code, move, deletion or activity log. New agents of the admin never land in a customer's organisation.
+- **Content:** no backup download in the app (it holds every customer's content: keep it on the server and offsite), the
+  storage check without titles and file names, no takeover of a disabled customer's projects.
+
+The customers' own admins invite, set roles and manage their organisation as before. A self-hosted server (the default)
+keeps the in-app server admin unchanged.
+
 ## Support Kalmido (supporter licence)
 
 Since 2.74. A supporter licence is voluntary and paid once. It **unlocks nothing**: every feature stays free (AGPL-3.0).

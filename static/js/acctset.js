@@ -205,7 +205,7 @@ const orgsHtml = () => S.instanceMode === 'shared' ? `<h4 id="a-orgs-h">${tr('Or
   <div class="members" id="a-orgs"><div class="muted mhint">${tr('Loading…')}</div></div><div class="row"><button class="btn sm" data-acc="org-new">${ic('plus', 's')} ${tr('New organisation')}</button></div>`;
 // 2.46.0 (#1561): "Add person": the organisation (none / each one; exactly one: preselected, as a member) and the role in it
 function omNewOrgRows() {
-  const os = S.orgs || [], one = os.length === 1 ? os[0].id : 0;
+  const os = (S.orgs || []).filter(o => !o.apart), one = os.length === 1 ? os[0].id : 0;  // 2.399.0 (#2687): hosted, a client's organisation is not offered
   return `<div class="row"><label for="u-org">${tr('Organisation')}</label><select id="u-org"><option value="0">${tr('None (private workspace only)')}</option>${os.map(o => `<option value="${o.id}" ${o.id === one ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select></div>
     <div class="row" id="u-orgrow" ${one ? '' : 'hidden'}><label for="u-orgrole">${tr('Role in the organisation')}</label><select id="u-orgrole"><option value="member">${tr('Member')}</option><option value="admin">${tr('Admin of the organisation')}</option></select></div>`;
 }
@@ -399,7 +399,7 @@ function userModal(u, done) {
     <div class="row"><label for="u-pw">${tr('Password')}</label><input type="password" id="u-pw" autocomplete="new-password" placeholder="${u ? (u.has_password ? tr('unchanged') : tr('none (single sign-on only)')) : tr('optional, min. 8 characters')}"></div>
     <div class="row"><label for="u-email">${tr('E-mail')}</label><input id="u-email" type="email" value="${esc(u?.email || '')}" autocapitalize="off" placeholder="${tr('optional')}"></div>
     ${!u && S.instanceMode === 'workspaces' && (S.orgs || []).length ? omNewOrgRows() : ''}
-    ${u && S.instanceMode === 'workspaces' && (S.orgs || []).length ? `<div class="row"><label>${tr('Organisations')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Organisations'))}">${S.orgs.map(o => { const on = u ? (u.orgs || []).includes(o.id) : o.members.includes(S.me.id); return `<button type="button" class="fperson ${on ? 'on' : ''}" data-uorg="${o.id}" aria-pressed="${on}"><span aria-hidden="true">${esc(o.icon || '🏢')}</span><span>${esc(o.name)}</span></button>`; }).join('')}</div></div>` : ''}
+    ${u && S.instanceMode === 'workspaces' && (S.orgs || []).length ? `<div class="row"><label>${tr('Organisations')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Organisations'))}">${S.orgs.map(o => { const on = u ? (u.orgs || []).includes(o.id) : o.members.includes(S.me.id); return `<button type="button" class="fperson ${on ? 'on' : ''}" data-uorg="${o.id}" aria-pressed="${on}" ${o.apart ? 'disabled' : ''}><span aria-hidden="true">${esc(o.icon || '🏢')}</span><span>${esc(o.name)}</span></button>`; }).join('')}</div></div>` : ''}
     ${u ? `<div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="u-avpick" data-cur="${esc(u.avatar || '')}">${avPickHtml(u.avatar || '', false, u.display_name || u.username)}</div></div>` : ''}
     <div class="row"><label>${tr('Rights')}</label><label class="chkl"><input type="checkbox" id="u-admin" ${u?.is_admin ? 'checked' : ''}> ${tr('Manage the server')}</label>${''/* 2.364.0 C (#3041): the server admin, not an organisation's */}${u ? `<label class="chkl"><input type="checkbox" id="u-dis" ${u.disabled ? 'checked' : ''}> ${tr('disabled')}</label>` : ''}</div>
     ${''/* 2.364.0 C (#3044): the special fields folded under "Advanced" (open when one of them is in use; same fields, same effect) */}<details class="sdet uadv" ${u && (u.proxy_login || u.kid || u.oidc_linked) ? 'open' : ''}><summary>${tr('Advanced')}</summary>
@@ -418,6 +418,10 @@ function userModal(u, done) {
     ${u?.oidc_linked ? `<div class="row"><label>OIDC</label><label class="chkl"><input type="checkbox" id="u-oidcun"> ${tr('Unlink (the next OIDC sign-in links again by user name or e-mail)')}</label></div>` : ''}
     <div class="muted" style="font-size:var(--fs-s);line-height:1.6">${tr('Every person has their own settings, filters and habits; projects are shared.')}</div>
     <div class="foot">${u && u.id !== S.me.id ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  if (u?.apart) {  // 2.399.0 (#2687): hosted, a customer's account: the operator locks it (or sets its quota), nothing else
+    $$('input, select, [data-uorg], [data-av], [data-m="invite"], [data-m="signin"]', md).forEach(x => { if (x.id !== 'u-admin' && x.id !== 'u-dis') x.disabled = true; });
+    $('h3', md).insertAdjacentHTML('afterend', `<div class="shint">${ic('info', 's')} ${esc(tr('Hosted: the account belongs to a client. You can lock or delete it; its sign-in, e-mail address and organisations stay with the client.'))}</div>`);
+  }
   // 2.19.0 (#653): a child account and its parents (people, never agents or other children)
   const par = new Set(u?.parents || []);
   const parDraw = async () => {
@@ -468,6 +472,7 @@ function userModal(u, done) {
         }
         if (u) {  // 2.270.0 A (#3019): only the fields changed here; organisations / parents with _prev (only the difference counts)
           body.disabled = $('#u-dis', md).checked;
+          if (u.apart) { delete body.kid; delete body.parents; delete body.orgs; }  // 2.399.0 (#2687): lock / admin only
           for (const k of ['display_name', 'proxy_login', 'email', 'ntfy_topic', 'is_admin', 'disabled']) if (k in body && (typeof body[k] === 'boolean' ? body[k] === !!u[k] : body[k] === (u[k] || ''))) delete body[k];
           const same = (x, y) => JSON.stringify([...x].sort()) === JSON.stringify([...y].sort());
           const prev = {};

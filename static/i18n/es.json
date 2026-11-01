@@ -15769,5 +15769,8 @@
   "Tax-free sales: please check the line and enter the section of the law on the form.": "Ventas exentas: comprueba la línea e indica el artículo de la ley en el formulario.",
   "Only an admin of this server sets the e-mail domains of an organisation": "Solo un administrador de este servidor define los dominios de correo de una organización",
   "Show dispatcher messages": "Mostrar mensajes del dispatcher",
-  "Dispatcher messages hidden": "Mensajes del dispatcher ocultos"
+  "Dispatcher messages hidden": "Mensajes del dispatcher ocultos",
+  "On a hosted instance the operator does not reach into the organisations and accounts of its clients": "En una instancia alojada, el operador no interviene en las organizaciones ni en las cuentas de sus clientes",
+  "On a hosted instance a backup is not downloaded in the app: it holds the content of every client (it stays on the server and its offsite copy)": "En una instancia alojada, una copia de seguridad no se descarga en la app: contiene el contenido de todos los clientes (se queda en el servidor y en su copia externa)",
+  "Hosted: the account belongs to a client. You can lock or delete it; its sign-in, e-mail address and organisations stay with the client.": "Alojado: la cuenta pertenece a un cliente. Puedes bloquearla o eliminarla; su inicio de sesión, su dirección de correo electrónico y sus organizaciones siguen siendo del cliente."
 }

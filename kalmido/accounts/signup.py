@@ -16,6 +16,7 @@ from ..api.common import hit_limit
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
+from .orgs import op_apart_deny, op_foreign_account  # 2.399.0 (#2687)
 
 
 # ---------------------------------------------------------------- 2.23.0 (#711): self-registration
@@ -287,6 +288,8 @@ def _may_link(c, uid):
         raise Denied(404)
     if not (g.user["is_admin"] or parent_of(c, me(), uid)):
         raise Denied(403)
+    if not parent_of(c, me(), uid) and op_foreign_account(c, uid):  # 2.399.0 (#2687): hosted: no sign-in as a client by the operator
+        op_apart_deny()
     if t["is_admin"]:
         raise Denied(409, tr("Admins sign in with their password"))
     if t["disabled"]:

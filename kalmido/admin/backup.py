@@ -2010,6 +2010,8 @@ def need_backups():
 def storage_check():
     need_admin()
     c, out, n = db(), [], 0
+    from .hosting import hosted
+    apart = hosted()
     for kind, sql in (("attachment", "SELECT a.id, a.task_id AS owner, a.name, a.size, a.path, t.title AS where_ FROM attachments a "
                                      "LEFT JOIN tasks t ON t.id=a.task_id"),
                       ("list_file", "SELECT f.id, f.list_id AS owner, f.name, f.size, f.path, l.name AS where_ FROM list_files f "
@@ -2035,7 +2037,8 @@ def storage_check():
             from ..core.orgcrypt import oc_plain_size
             disk = oc_plain_size(full) if r["path"] and os.path.isfile(full) else None  # 2.42.0 (#828): sealed = plain size
             if disk is None or (r["size"] and disk != r["size"]):
-                out.append({"kind": kind, "id": r["id"], "owner": r["owner"], "where": r["where_"] or "", "name": r["name"],
+                out.append({"kind": kind, "id": r["id"], "owner": r["owner"], "where": "" if apart else r["where_"] or "",
+                            "name": "" if apart else r["name"],  # 2.399.0 (#2687): hosted: numbers only, no titles / file names
                             "size": r["size"], "disk": disk, "problem": "missing" if disk is None else "empty" if not disk else "size"})
     return jsonify(checked=n, problems=out)
 
@@ -2107,6 +2110,9 @@ def backups_now():
 def backups_download(name):
     from .offsite import stepup_download
     need_backups()
+    from .hosting import hosted
+    if hosted():  # 2.399.0 (#2687): a backup holds every client's content: on a hosted instance it stays on the server / offsite
+        raise Denied(403, tr("On a hosted instance a backup is not downloaded in the app: it holds the content of every client (it stays on the server and its offsite copy)"))
     p = bk_path(name)
     enc = bool(bk_parse_name(name)["encrypted"])
     fmt3 = bk_meta(p, enc).get("format_version") == 3

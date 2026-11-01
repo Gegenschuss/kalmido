@@ -15769,5 +15769,8 @@
   "Tax-free sales: please check the line and enter the section of the law on the form.": "Steuerfreie Umsätze: Bitte die Zeile prüfen und den Paragrafen im Formular eintragen.",
   "Only an admin of this server sets the e-mail domains of an organisation": "Die E-Mail-Domains einer Organisation setzt nur ein Admin dieses Servers",
   "Show dispatcher messages": "Dispatcher-Meldungen zeigen",
-  "Dispatcher messages hidden": "Dispatcher-Meldungen ausgeblendet"
+  "Dispatcher messages hidden": "Dispatcher-Meldungen ausgeblendet",
+  "On a hosted instance the operator does not reach into the organisations and accounts of its clients": "Auf einer gehosteten Instanz greift der Betreiber nicht in die Organisationen und Konten seiner Kunden ein",
+  "On a hosted instance a backup is not downloaded in the app: it holds the content of every client (it stays on the server and its offsite copy)": "Auf einer gehosteten Instanz wird eine Sicherung nicht in der App heruntergeladen: Sie enthält die Inhalte aller Kunden (sie bleibt auf dem Server und in ihrer externen Kopie)",
+  "Hosted: the account belongs to a client. You can lock or delete it; its sign-in, e-mail address and organisations stay with the client.": "Gehostet: Das Konto gehört einem Kunden. Du kannst es sperren oder löschen; Anmeldung, E-Mail-Adresse und Organisationen bleiben beim Kunden."
 }

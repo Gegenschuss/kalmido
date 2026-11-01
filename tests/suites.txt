@@ -2246,3 +2246,5 @@ now wed 10:00; fresh; run p2367_quietbundle "$PY" p2367_quietbundle_test.py "$KA
 fresh; run p2363_3_c_ui node p2363_3_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.455.0 (#3847 #3852): the phone drawer stays on a workspace switch, names/file names get the first line at 320 px
 fresh; run p2455_a_phone_ui node p2455_a_phone_ui.js "$KALMIDO_TEST_DATA"
+# 2.399.0 (#2687): hosted, the operator stays out of its clients' organisations and accounts (the guard: every instance-admin way in -> 403, self-hosted unchanged); freelancer-matrix: own, orgadmin
+fresh; run p2399_hosting_apart "$PY" p2399_hosting_apart_test.py "$KALMIDO_TEST_DATA"

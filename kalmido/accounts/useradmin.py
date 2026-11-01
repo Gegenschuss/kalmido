@@ -13,6 +13,7 @@ from ..core.rls import org_tables
 from ..core.access import Denied, list_role, my_inbox
 from ..accounts.session import me, user_public
 from .orgretain import _until  # 2.186.0 A (#2566)
+from .orgs import op_apart_deny, op_foreign_account  # 2.399.0 (#2687)
 
 
 UA8_FILTERS = ("people", "active", "disabled", "admin", "invited", "pending", "agents", "all")
@@ -364,6 +365,8 @@ def ua8_lists_settle(c, u, by, rx_how=None):
     if by != "instance" and any(not lr["org_id"] for lr in lists):  # private stays private (ua8_may_delete refused already)
         raise Denied(409, tr(UA8_PRIVATE))  # 2.148.1 B (#2479): 409 like ua8_may_delete
     if mode == "transfer":
+        if by == "instance" and op_foreign_account(c, uid):  # 2.399.0 (#2687): hosted: a client's projects never go by the operator's hand
+            op_apart_deny()
         try:
             to = int(request.args.get("to") or 0)
         except ValueError:

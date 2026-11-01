@@ -15769,5 +15769,8 @@
   "Tax-free sales: please check the line and enter the section of the law on the form.": "Vrijgestelde omzet: controleer de regel en vul het wetsartikel op het formulier in.",
   "Only an admin of this server sets the e-mail domains of an organisation": "Alleen een beheerder van deze server stelt de e-maildomeinen van een organisatie in",
   "Show dispatcher messages": "Dispatcher-meldingen tonen",
-  "Dispatcher messages hidden": "Dispatcher-meldingen verborgen"
+  "Dispatcher messages hidden": "Dispatcher-meldingen verborgen",
+  "On a hosted instance the operator does not reach into the organisations and accounts of its clients": "Op een gehoste instantie grijpt de beheerder niet in in de organisaties en accounts van zijn klanten",
+  "On a hosted instance a backup is not downloaded in the app: it holds the content of every client (it stays on the server and its offsite copy)": "Op een gehoste instantie wordt een back-up niet in de app gedownload: hij bevat de inhoud van alle klanten (hij blijft op de server en in de externe kopie)",
+  "Hosted: the account belongs to a client. You can lock or delete it; its sign-in, e-mail address and organisations stay with the client.": "Gehost: het account hoort bij een klant. Je kunt het blokkeren of verwijderen; aanmelding, e-mailadres en organisaties blijven bij de klant."
 }

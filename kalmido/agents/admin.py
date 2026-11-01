@@ -26,6 +26,7 @@ from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..accounts.users import admin_sees, avatar_upload, need_admin, user_purge
 from ..accounts.orgs import may_see
+from ..accounts.orgs import _operator_apart, op_apart_deny, op_foreign_account, op_foreign_org  # 2.399.0 (#2687)
 from ..agents.workstyle import WS_NEW
 from ..agents.control import ctl_new  # 2.235.0 A (#2891): a new agent asks before every change
 from ..api.v1 import API_ON, need_api, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, token_public, WH_ON
@@ -66,11 +67,15 @@ def _agent_name(v):
     return re.sub(r"[\x00-\x1f\x7f]", " ", str(v or "")).strip()[:60]
 
 
-def need_agent_admin(c, aid):
+def need_agent_admin(c, aid, kill=False):
+    """An instance admin and agent aid (404 without it). 2.399.0 (#2687): hosted, an agent of a client (its organisation's, or a
+    client's personal one) only for the kill switch (kill=True: PATCH {enabled}); everything else 403."""
     need_admin()
     a = agent_row(c, aid)
     if not a:
         raise Denied(404)
+    if not kill and op_foreign_account(c, aid):
+        op_apart_deny()
     return a
 
 
@@ -182,6 +187,9 @@ def admin_agent_create():
     need_admin()
     need_api()
     b, c = body(), db()
+    if _operator_apart() and ((b.get("owner_id") and b.get("owner_id") != me())
+                              or (isinstance(b.get("org_id"), int) and op_foreign_org(c, b["org_id"]))):
+        op_apart_deny()  # 2.399.0 (#2687): hosted: no agent for a client or in a client's organisation by the operator (its token)
     with system_ctx(c):  # 2.37.0 (#1150): the instance admin creates an account (structure); a team agent may land in an organisation he is not in
         username = (b.get("username") or "").strip().lower()
         if not USERNAME_RE.fullmatch(username):
@@ -193,7 +201,7 @@ def admin_agent_create():
         c.execute("UPDATE agents SET note=?, provider=? WHERE user_id=?", (str(b.get("note") or "")[:AGENT_NOTE_MAX], str(b.get("provider") or "").strip()[:80], uid))
         try:  # 2.28.0 (#965 / #970 / #935): owner_id = a personal agent of that person (default: a team agent), org_id = its workspace
             agent_owner_set(c, uid, b.get("owner_id"), bool(b.get("owner_id")))
-            agent_org_set(c, uid, b["org_id"] if "org_id" in b else "auto")
+            agent_org_set(c, uid, b["org_id"] if "org_id" in b else "private" if _operator_apart() else "auto")  # 2.399.0 (#2687): hosted: never a client's
         except BadInput:
             c.rollback()
             raise
@@ -257,8 +265,8 @@ def admin_agent_update(aid):
     from ..api.scopes import agent_scopes_set
     c = db()
     with system_ctx(c):  # 2.37.0 (#1150): the instance admin manages agent accounts (any organisation; structure, no content)
-        a0 = need_agent_admin(c, aid)
         b = body()
+        a0 = need_agent_admin(c, aid, kill=isinstance(b, dict) and set(b) <= {"enabled"})  # 2.399.0 (#2687): hosted, a client's agent: pause only
         secret = None
         if "username" in b:
             username = str(b["username"] or "").strip().lower()
@@ -294,6 +302,10 @@ def admin_agent_update(aid):
         if "provider" in b:  # 2.24.0 (#896)
             c.execute("UPDATE agents SET provider=? WHERE user_id=?", (str(b["provider"] or "").strip()[:80], aid))
         if "owner_id" in b or "org_id" in b:  # 2.28.0 (#965 / #935): "Belongs to" (team | a person) and the workspace
+            if _operator_apart() and ((b.get("owner_id") and b.get("owner_id") != me())
+                                      or (isinstance(b.get("org_id"), int) and op_foreign_org(c, b["org_id"]))):
+                c.rollback()
+                op_apart_deny()  # 2.399.0 (#2687): hosted: the operator hands no agent to a client or into a client's organisation
             try:
                 if "owner_id" in b:
                     agent_owner_set(c, aid, b["owner_id"], True)

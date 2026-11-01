@@ -19,6 +19,7 @@ from ..core.access import Denied
 from ..core.mailframe import MAIL_ACC, MAIL_BG, MAIL_MUTED, Safe, mail_html
 from ..core.pg import system_ctx
 from ..integrations.mail import MAIL_OUT_ON, mail_send
+from .orgs import op_apart_deny, op_foreign_account  # 2.399.0 (#2687)
 
 
 # ---------------------------------------------------------------- 2.22.0 (#697): invitations
@@ -263,6 +264,8 @@ def user_invite(uid):
     c = db()
     if not admin_sees(c, uid):  # 2.28.0 (#935): mode workspaces: only people the admin sees
         raise Denied(404)
+    if op_foreign_account(c, uid):  # 2.399.0 (#2687): hosted: the link sets the password -- the client asks for it itself (pwreset)
+        op_apart_deny()
     b = body()
     out = invite_new(c, uid, g.user["id"], send=b.get("send", True) is not False)
     bump(c)
