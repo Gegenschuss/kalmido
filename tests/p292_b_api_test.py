@@ -18,10 +18,12 @@ import base64
 import csv
 import io
 import os
+import re
 import subprocess
 import sys
 import time
 from decimal import ROUND_HALF_UP, Decimal
+from pathlib import Path
 
 import dbx as dbxm
 import requests
@@ -229,7 +231,11 @@ A.patch(B + f"{E}/{OLD}", json={"archived": 1})
 check(OLD not in [x["id"] for x in A.get(B + E + "/value").json()["rows"]], "an archived device leaves the insurance list")
 r = A.get(B + E + "/value.csv")
 check(r.ok and r.headers["Content-Type"].startswith("text/csv") and "attachment" in r.headers.get("Content-Disposition", ""), "CSV download")
-rows_ = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=","))
+# 2.368.2 (#2984) sits in main, the live train does not have it yet (";" and decimal comma in every language): drop this then
+NOT_ON_TRAIN = "csv_dialect" not in (Path(__file__).resolve().parent.parent / "kalmido/office/assets.py").read_text(encoding="utf-8")
+rows_ = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=";" if NOT_ON_TRAIN else ","))
+if NOT_ON_TRAIN:
+    rows_ = [[x.replace(",", ".") if re.fullmatch(r"-?\d+,\d\d", x) else x for x in row] for row in rows_]
 check(rows_[0][:3] == ["Device", "Category", "Serial number"], f"CSV header {rows_[0]}")
 cam_row = next((x for x in rows_ if x and x[0] == "Kamera Alpha"), None)
 check(cam_row is not None and cam_row[2] == "SN-0815" and cam_row[5] == "2600.00" and cam_row[6] == "999.00", f"CSV row with decimal point {cam_row}")
