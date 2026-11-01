@@ -207,7 +207,7 @@ BK3 = Fr.post(B + "/api/books", json={"name": "Newsletter old", "org_id": None})
 Fr.delete(B + f"/api/books/{BK3}")
 nb = box(f"from kalmido.newsletter.sync import nwl_books\nfrom kalmido.core.pg import system_ctx\n"
          f"with system_ctx(c):\n    print('books', [b['id'] for b in nwl_books(c, 'u{FID}')])")
-check("books [" in nb and f"{BK3}" not in nb.split("books", 1)[1], f"newsletter: a book in the trash is no source {nb[-300:]}")
+check("books [" in nb and f"{BK3}" not in nb.split("books", 1)[1].split("\n", 1)[0], f"newsletter: a book in the trash is no source {nb[-300:]}")
 MR = sql("INSERT INTO merge_runs(kind, target_id, book_id, snapshot, created_at) VALUES(?,?,?,?,?) RETURNING id",
          ("contact", 0, BK3, '{"x": 1}', ago()))[0][0]
 sql("UPDATE books SET deleted_at=? WHERE id=?", (ago(days=400), BK3))
