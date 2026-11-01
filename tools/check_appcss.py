@@ -19,7 +19,7 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-APPCSS_MAX_LINES = 8834  # 01.11.2026, the line count of app.css when the rule came in; lower it when app.css shrinks
+APPCSS_MAX_LINES = 8836  # 01.11.2026, the line count of app.css in main when the rule came in (#3773 added 2 lines meanwhile); lower it when app.css shrinks
 WHERE = ("put new rules into static/css/<module>.css (loaded with the module, LD_CSS in static/js/lazyload.js) or, "
          "when they are needed at start, into a file of their own static/css/start-<topic>.css (docs/ARCHITECTURE.md, "
          "\"Styles and start scripts\")")
