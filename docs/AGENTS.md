@@ -717,6 +717,13 @@ sharing, `GET /api/agents`, its jobs) only through projects it is in, like every
 `POST /api/admin/agents`, or turn a team agent into one with `PATCH /api/admin/agents/{id} {"owner_id": <user id>}`
 (*Belongs to* in the app); `null` makes it a team agent again.
 
+**The private list "Notes" (2.477.0).** Each person's quick notes live in one private list "Notes" (made on the first
+quick note). It is never shared: adding members, a group, an agent, a public link, another owner, a workspace or a folder
+share answers `409` with `code: quicknote_private`, *Share all* skips it, so an agent never sees it. A single note moved out
+of it into a list other people see needs the person's confirmation: without it `PATCH /api/v1/notes/{id}` with a new
+`list_id` answers `409` `quicknote_share` (with the names of the people who would see it); the same call with
+`"share_ok": true` moves it. A note created with a text and no title takes its first line as the title.
+
 ## Workspaces
 
 *Since 2.28.0.*
