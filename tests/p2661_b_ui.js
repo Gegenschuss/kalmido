@@ -84,6 +84,8 @@ const WS_VIEWS = {
   'kalmido/hub/abscal.py': 'check:calteam',   // 2.155.0 B (#2076): the colleagues' absences in the calendar for the saved
                                               // workspace (abc_team_orgs); calendar.js reloads the range once the server knows it
   'static/js/sideviews.js': 'draw',           // #2186 (bundle C): the sidebar views' editor lists the lists of the shown workspace (inWs while drawing)
+  'static/js/popovers.js': 'helper',          // 2.455.0 (#3848): the project picker lists the workspace the caller names (o.ws, inWs), no view keeping data
+  'static/js/spacemove.js': 'helper',         // 2.455.0 (#3848): mv_home - a Basket task counts as the shown workspace while the move dialog opens, no view keeping data
   'kalmido/personal/timesheet.py': 'helper',  // 2.125.0 (#2119): tsl_org - which organisation a closed month goes to (no view)
   'kalmido/accounts/orgs.py': 'helper',       // 2.148.1 (#2480): ws_chosen_org - the default workspace of a new list (no view)
   'kalmido/office/search.py': 'helper',       // 2.250.0 A (#2992): bs_office_oid - the office area of the search hits, per request
@@ -110,7 +112,7 @@ function scan() {
   const found = scan();
   const missing = found.filter(f => !(f in WS_VIEWS));
   check(found.length > 10 && !missing.length, 'guard: views with a workspace link without an entry in WS_VIEWS (add them with a check): ' + missing.join(', '));
-  const NOT_ON_TRAIN = ['static/js/acctset.js'];  // 2.365.2 C (#2789) sits in main, the live train does not have it yet: drop this once it is live
+  const NOT_ON_TRAIN = ['static/js/acctset.js', 'static/js/popovers.js', 'static/js/spacemove.js'];  // 2.365.2 C (#2789) and 2.455.0 (#3848) sit in main, the live train does not have them yet: drop this once they are live
   const stale = Object.keys(WS_VIEWS).filter(f => !found.includes(f) && !NOT_ON_TRAIN.includes(f));
   check(!stale.length, 'guard: entries whose file has no workspace link any more (remove them): ' + stale.join(', '));
   const CHECKED = new Set();
