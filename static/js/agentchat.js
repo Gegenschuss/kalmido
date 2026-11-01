@@ -994,7 +994,7 @@ function tcFit(t) {
   const vv = window.visualViewport, kb = !!vv && editFocused() && t.contains(document.activeElement) && vv.height < (S.vvMax || innerHeight) - 120;
   const was = document.body.classList.contains('kb-open'), box = $('#tc-msgs');
   document.body.classList.toggle('kb-open', kb);
-  if (kb && !was && box && box.scrollHeight - box.scrollTop - box.clientHeight < 80 + (S.vvMax || innerHeight) - vv.height) box.scrollTop = box.scrollHeight;
+  if (kb && !was && box && box.scrollHeight - box.scrollTop - box.clientHeight < 80 + (S.vvMax || innerHeight) - vv.height) { box.scrollTop = box.scrollHeight; requestAnimationFrame(() => requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; })); }  // once more when the room has its new height
 }
 const chatFitIn = id => id === 'chat-in' || id === 'tc-in' || id === 'tth-in';
 window.addEventListener('resize', () => chatFit());
