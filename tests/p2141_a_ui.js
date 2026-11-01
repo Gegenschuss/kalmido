@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const {execFileSync} = require('child_process');
-const {boot, errs, sleep, B, login} = require('./boot');
+const {boot, errs, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
@@ -37,7 +37,7 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 20000, ste
 const FEAT = 'collab,comments,clients,contacts';
 
 (async () => {
-  await sleep(800);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
@@ -74,7 +74,7 @@ const FEAT = 'collab,comments,clients,contacts';
   check(md && md.querySelectorAll('.hmbcheck .hmbok').length === 2, 'Check connection: receiving and sending work');
   check(outbox().length === 0, 'the check sends nothing');
   if (md) click(w, md.querySelector('[data-m="close"]'));
-  await sleep(300);
+  await until(async () => !d.querySelector('.modal.hmbdlg'));
 
   // ---- the client's card: New e-mail with suggested recipients
   w.eval(`go('client/${ACME}')`);
