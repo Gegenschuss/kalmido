@@ -11,7 +11,7 @@
 // right next to the sidebar grip opens the list menu while the grip is invisible and the menu is on top.
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, B, login} = require('./boot');
 const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -28,7 +28,7 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
 const V = B + 'api/v1';
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B + 'api/health').catch(() => null))?.ok);
   let r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
@@ -86,14 +86,14 @@ const V = B + 'api/v1';
   check(names().includes('Website') && names().includes('Garden'), '#935: all lists in the sidebar ' + names());
   const todayN = () => d.querySelectorAll('#view .trow').length;
   check(todayN() === 2, '#935: Today shows both due tasks ' + todayN());
-  w.eval(`wsSet('private')`); await sleep(400);
+  w.eval(`wsSet('private')`); await until(() => !names().includes('Website') && names().includes('Family plans') && todayN() === 1);
   check(!names().includes('Website') && names().includes('Garden') && names().includes('Family plans'), '#935: Private: only the private lists ' + names());
   check(![...d.querySelectorAll('#side .fhead')].some(f => f.dataset.folder === 'Office'), '#935: a folder with nothing in this workspace is left out');
   check(todayN() === 1 && d.querySelector('#view .trow .ttl')?.textContent.includes('hedge'), '#935: Today shows the private task only');
   check(!d.querySelector('#top .wschip') && /Private/.test(d.querySelector('#kbar .kbsw .wsn')?.textContent || ''), '#935: the switch in the head bar names the workspace');  // 2.152.3 (#2619): the header chip and the panel's switch became the head bar's switch (.kbsw .wsn)
   await until(async () => (await call('GET', '/api/state')).settings.workspace === 'private');
   check((await call('GET', '/api/state')).settings.workspace === 'private', '#935: the setting follows (every device)');
-  w.eval(`wsSet('org:${ORG}')`); await sleep(400);
+  w.eval(`wsSet('org:${ORG}')`); await until(() => names().includes('Shop') && !names().includes('Garden') && todayN() === 1);
   check(names().includes('Website') && !names().includes('Garden') && names().includes('Shop'), '#935: the organisation: its lists ' + names());
   check(d.querySelectorAll('#view .trow').length === 1 && d.querySelector('#view .trow .ttl')?.textContent.includes('Deploy'), '#935: Today shows the organisation task only');
   const shown = w.eval('JSON.stringify(shownAgents().map(a => [a.name, a.org_id]))');
@@ -125,7 +125,7 @@ const V = B + 'api/v1';
   await until(() => md.querySelector('#sh-agents .mrow, #sh-agsel'));
   check(d.querySelector('.modal.shmodal .avatar.agent .abot-b'), '#985: the agent carries the robot badge');
   md.remove();
-  w.eval(`wsSet('all')`); await sleep(300);
+  w.eval(`wsSet('all')`); await until(async () => (await call('GET', '/api/state')).settings.workspace === 'all');
   w.close();
 
   // ================= #987 News: For you | Activity, the bell, the banner
@@ -142,16 +142,16 @@ const V = B + 'api/v1';
   // 2.138.2 (#2405): the 'Activity' section is now 'Also new'; a Read section comes below
   const secs0 = [...d.querySelectorAll('#view .nsec:not(.read)')].map(x => x.textContent.trim());
   check(secs0.length === 2 && /For you/.test(secs0[0]) && /Also new/.test(secs0[1]) && d.querySelector('#view .nsec.first').nextElementSibling.classList.contains('tome'), '#987: "All" = two sections, the items for me first ' + secs0.join('|'));
-  click(w, tabs.querySelector('[data-tab="me"]')); await sleep(200);
+  click(w, tabs.querySelector('[data-tab="me"]')); await until(() => d.querySelector('.ntabs [data-tab="me"].on') && [...d.querySelectorAll('#view .nitem')].every(x => x.classList.contains('tome')));
   let items = [...d.querySelectorAll('#view .nitem')];
   check(items.length === 2 && items.every(x => x.classList.contains('tome')) && items.some(x => /mentioned you/.test(x.textContent)) && items.some(x => /assigned a task to you/.test(x.textContent)), '#987: "For you" = the mention and the assignment ' + items.map(x => x.querySelector('.ntext')?.textContent).join('|'));
-  click(w, d.querySelector('.ntabs [data-tab="act"]')); await sleep(200);
+  click(w, d.querySelector('.ntabs [data-tab="act"]')); await until(() => d.querySelector('.ntabs [data-tab="act"].on') && ![...d.querySelectorAll('#view .nitem')].some(x => x.classList.contains('tome')));
   items = [...d.querySelectorAll('#view .nitem')];
   check(items.length >= 1 && items.every(x => !x.classList.contains('tome')) && items.some(x => /Claude/.test(x.textContent)), '#987: "Activity" = the agent\'s completion (2.66.1 #1943: no longer its comments) ' + items.length);
-  click(w, d.querySelector('.ntabs [data-tab="all"]')); await sleep(200);
+  click(w, d.querySelector('.ntabs [data-tab="all"]')); await until(() => d.querySelector('.ntabs [data-tab="all"].on') && d.querySelectorAll('#view .nsec:not(.read)').length === 2);
   check(d.querySelectorAll('#view .nitem').length >= 3 && d.querySelectorAll('#view .nsec:not(.read)').length === 2, '#987: "All" shows everything in two sections');
   // the bell's dropdown: sections
-  click(w, d.querySelector('.ntabs [data-tab="me"]')); await sleep(100);
+  click(w, d.querySelector('.ntabs [data-tab="me"]')); await until(() => d.querySelector('.ntabs [data-tab="me"].on'));
   click(w, d.querySelector('#kbar [data-act="bell-pop"]')); await until(() => d.querySelector('#pop .bpop .nitem'));  // 2.152.3 (#2619): the bell moved into the head bar
   const secs = [...d.querySelectorAll('#pop .nsec:not(.read)')].map(x => x.textContent.trim());
   check(secs.length === 2 && /For you/.test(secs[0]) && /Also new/.test(secs[1]), '#987: the dropdown: "For you" above "Activity" ' + secs.join('|'));
@@ -159,7 +159,7 @@ const V = B + 'api/v1';
   w.eval('closePop()');
   // reading one for me lowers the bell
   w.eval(`go('news')`); await until(() => d.querySelector('#view .nitem.tome'));
-  click(w, d.querySelector('#view .nitem.tome')); await sleep(400);
+  click(w, d.querySelector('#view .nitem.tome'));
   await until(async () => (await call('GET', '/api/news')).unread_me === 1);
   check((await call('GET', '/api/news')).unread_me === 1, '#987: one read -> one left for me');
   w.close();
@@ -231,14 +231,15 @@ const V = B + 'api/v1';
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); localStorage.setItem('tasks.newsBundle', 'false'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${user}', password: 'password123'})}).then(r => r.status)`);
   };
-  const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(800); };
+  const ready = async o => { await o.until(`!!document.querySelector('#top h1')`); await o.idle(); };
+  const wsAll = () => until(async () => (await call('GET', '/api/state')).settings.workspace === 'all');  // wsSet('all') saved before the next page load
   const q2 = await (await fetch(V + '/agent/chats/1', {method: 'POST', headers: AGH, body: JSON.stringify({body: 'Which checks shall I run?', choices: ['lint', 'tests', 'build'], multi: true})})).json();
   check(q2.choices?.multi === true, '#1005: a multi question for the screenshots');
   for (const th of ['light', 'dark']) await firefox(async o => {
     const {cmd, ev, ctx, shot} = o, tag = '1440 ' + th;
     check(await ffLogin(o, th) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
-    await o.nav(B + '#today'); await ready(ev);
+    await o.nav(B + '#today'); await ready(o);
     check(await ev(`!!document.querySelector('#kbar .kbsw')`), `${tag}: #935 the switch in the head bar`);  // 2.152.3 (#2619): the switch moved from the panel into the head bar
     await shot(`p2280-${th}-1440-today-all.png`);
     await ev(`(() => { wsSet('org:${ORG}'); return 1; })()`);
@@ -248,39 +249,44 @@ const V = B + 'api/v1';
     const geo = await ev(`(() => { const r = document.querySelector('#side .srow[data-list="${W1}"]').getBoundingClientRect(), g = document.querySelector('#pgrip-side'); const gr = g ? g.getBoundingClientRect() : null; return {x: Math.round(r.right - 14), y: Math.round(r.top + r.height / 2), grip: gr ? [Math.round(gr.left), Math.round(gr.right)] : null}; })()`);
     check(geo.grip && geo.x > geo.grip[0] - 40, `${tag}: #976 the sidebar grip sits at the row's edge ${JSON.stringify(geo)}`);
     await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: geo.x, y: geo.y}, {type: 'pointerDown', button: 2}, {type: 'pointerUp', button: 2}]}]});
-    await cmd('input.releaseActions', {context: ctx}); await sleep(400);
+    await cmd('input.releaseActions', {context: ctx}); await o.until(`/Archive/.test([...document.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent).join('|')) && document.body.classList.contains('pop-open') && getComputedStyle(document.querySelector('#pgrip-side')).visibility === 'hidden'`);
     const menuTxt = await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim()).join('|')`);
     // 2.152.2 (#2624): project instead of list
     check(/Archive/.test(menuTxt) && /Edit project/.test(menuTxt), `${tag}: #976 the right-click opened the list menu ` + menuTxt.slice(0, 80));
     check(await ev(`document.body.classList.contains('pop-open') && getComputedStyle(document.querySelector('#pgrip-side')).visibility === 'hidden'`), `${tag}: #976 the sidebar grip is invisible while the menu is open`);
     check(await ev(`(() => { const g = document.querySelector('#pgrip-side'), gr = g.getBoundingClientRect(), p = document.querySelector('#pop'), pr = p.getBoundingClientRect(); const x = Math.min(Math.max(gr.left + gr.width / 2, pr.left + 2), pr.right - 2); let hit = 0; for (const y of [pr.top + 10, pr.top + pr.height / 2, pr.bottom - 10]) { const e = document.elementFromPoint(x, y); if (e && (p.contains(e) || !g.contains(e))) hit++; } return hit === 3 && getComputedStyle(g, '::after').backgroundColor !== getComputedStyle(document.documentElement).getPropertyValue('--accent'); })()`), `${tag}: #976 nothing of the grip (line / tooltip) is hit over the menu`);
     await shot(`p2280-${th}-1440-sidebar-menu.png`);
-    await ev(`(() => { closePop(); return 1; })()`); await sleep(200);
+    await ev(`(() => { closePop(); return 1; })()`); await o.until(`!document.body.classList.contains('pop-open') && getComputedStyle(document.querySelector('#pgrip-side')).visibility === 'visible'`);
     check(await ev(`!document.body.classList.contains('pop-open') && getComputedStyle(document.querySelector('#pgrip-side')).visibility === 'visible'`), `${tag}: #976 the grip is back after the menu`);
     // a dialog: the grip steps aside too (the list dialog with the workspace field)
-    await ev(`(() => { listModal(${W1}); return 1; })()`); await sleep(500);
+    await ev(`(() => { listModal(${W1}); return 1; })()`); await o.until(`!!document.querySelector('.modal #l-ws') && document.body.classList.contains('modal-open')`); await o.idle();
     check(await ev(`document.body.classList.contains('modal-open') && getComputedStyle(document.querySelector('#pgrip-side')).visibility === 'hidden'`), `${tag}: #976 the grip steps aside under a dialog`);
     check(await ev(`!!document.querySelector('.modal #l-ws')`), `${tag}: #935 the Workspace field in the list dialog`);
     await shot(`p2280-${th}-1440-listdialog.png`);
-    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`); await sleep(300);
+    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`); await o.until(`!document.body.classList.contains('modal-open')`);
     check(await ev(`!document.body.classList.contains('modal-open')`), `${tag}: #976 back after the dialog`);
-    await ev(`(() => { wsSet('all'); return 1; })()`); await sleep(400);
-    await o.nav(B + '#news'); await ready(ev);
-    for (let i = 0; i < 20 && (await ev(`document.querySelectorAll('#view .nsec:not(.read)').length`)) < 2; i++) await sleep(300);
+    await ev(`(() => { wsSet('all'); return 1; })()`); await wsAll();
+    await o.nav(B + '#news'); await ready(o);
+    await o.until(`document.querySelectorAll('#view .nsec:not(.read)').length >= 2`);
     check(await ev(`!!document.querySelector('.ntabs [data-tab="all"].on') && document.querySelectorAll('#view .nsec:not(.read)').length === 2`), `${tag}: #987 News opens with the two sections`)
     await shot(`p2280-${th}-1440-news.png`);
-    await ev(`(() => { document.querySelector('#kbar [data-act="bell-pop"]').click(); return 1; })()`); await sleep(700);  // 2.152.3 (#2619): the bell moved into the head bar
+    await ev(`(() => { document.querySelector('#kbar [data-act="bell-pop"]').click(); return 1; })()`); await o.until(`!!document.querySelector('#pop .bpop .nitem')`); await o.idle();  // 2.152.3 (#2619): the bell moved into the head bar
     await shot(`p2280-${th}-1440-bell.png`);
     await ev(`(() => { closePop(); return 1; })()`);
-    await o.nav(B + '#agents/' + AG); await ready(ev);
+    // the menu is gone and its history entry too (backclose.js: a late history.back() of the closed menu took the next page back to #news)
+    await o.until(`document.querySelector('#pop')?.classList.contains('hidden') !== false && (typeof f8d_bk === 'undefined' || (!f8d_bk.pushed && !f8d_bk.skip && !f8d_bk.queued))`);
+    await o.nav(B + '#agents/' + AG); await ready(o);
+    await o.until(`location.hash === '#agents/${AG}' && !!document.querySelector('#chat-msgs')`);
+
     // #3506: wait for the chat's messages instead of a fixed 900 ms (under the load of the full run the chat came later)
-    await until(() => ev(`document.querySelectorAll('#chat-msgs .cchoices').length >= 2`).catch(() => false), 60);
-    check(await ev(`document.querySelectorAll('#chat-msgs .cchoices').length >= 2`), `${tag}: #1005 the buttons in the chat`);
+    await o.until(`document.querySelectorAll('#chat-msgs .cchoices').length >= 2`, {timeout: 20000});
+    check(await ev(`document.querySelectorAll('#chat-msgs .cchoices').length >= 2`), `${tag}: #1005 the buttons in the chat ` + await ev(`JSON.stringify({route: location.hash, box: !!document.querySelector('#chat-msgs'), msgs: document.querySelectorAll('#chat-msgs .cmsg').length, ch: document.querySelectorAll('#chat-msgs .cchoices').length, aid: S.chat?.aid, n: S.chat?.msgs?.length})`).catch(e => e.message));
+
     await shot(`p2280-${th}-1440-chat-choices.png`);
-    await ev(`(() => { settingsModal('agents'); return 1; })()`); await sleep(1200);
+    await ev(`(() => { settingsModal('agents'); return 1; })()`); await o.until(`!!document.querySelector('#s-ags .agsrow')`); await o.idle();
     await shot(`p2280-${th}-1440-settings-agents.png`);
-    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); settingsModal('org'); return 1; })()`); await sleep(1200);
-    await ev(`(() => { document.querySelector('#s-ws')?.scrollIntoView(); return 1; })()`); await sleep(300);
+    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); settingsModal('org'); return 1; })()`); await o.until(`!!document.querySelector('#s-ws .wsorg')`); await o.idle();
+    await ev(`(() => { document.querySelector('#s-ws')?.scrollIntoView(); return 1; })()`);
     await shot(`p2280-${th}-1440-settings-workspaces.png`);
     await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
   });
@@ -288,22 +294,23 @@ const V = B + 'api/v1';
     const {cmd, ev, ctx, shot} = o, tag = '390';
     check(await ffLogin(o, 'light') === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
-    await o.nav(B + '#today'); await ready(ev);
-    await ev(`(() => { document.querySelector('#top [data-act="side"]').click(); return 1; })()`); await sleep(600);
+    await o.nav(B + '#today'); await ready(o);
+    await ev(`(() => { document.querySelector('#top [data-act="side"]').click(); return 1; })()`); await o.until(`(() => { const b = document.querySelector('#side .wsbar'); return !!b && b.getBoundingClientRect().width > 30; })()`);
     // 2.87.9 (#1933): the switch is a round icon button beside the search
     check(await ev(`(() => { const b = document.querySelector('#side .wsbar'); return !!b && b.getBoundingClientRect().width > 30 && b.parentElement.classList.contains('sbhead'); })()`), `${tag}: #935 the switch in the drawer, the head of the sidebar (2.138.2 #2392)`);  // 2.138.2 (#2392): the switch is the sidebar's heading
     await shot('p2280-light-390-drawer.png');
-    await ev(`(() => { wsSet('private'); return 1; })()`); await sleep(700);
+    await ev(`(() => { wsSet('private'); return 1; })()`); await o.until(`!!document.querySelector('#top .wschip')`);
     check(await ev(`!!document.querySelector('#top .wschip')`), `${tag}: #935 the chip on the phone`);
     await shot('p2280-light-390-today-private.png');
-    await ev(`(() => { wsSet('all'); return 1; })()`); await sleep(300);
-    await o.nav(B + '#news'); await ready(ev); await sleep(600);
+    await ev(`(() => { wsSet('all'); return 1; })()`); await wsAll();
+    await o.nav(B + '#news'); await ready(o); await o.until(`!!document.querySelector('.ntabs')`);
     check(await ev(`(() => { const t = document.querySelector('.ntabs'); return !!t && t.getBoundingClientRect().width <= 390 && document.documentElement.scrollWidth <= 390; })()`), `${tag}: #987 the tabs fit the phone`);
     await shot('p2280-light-390-news.png');
-    await o.nav(B + '#agents/' + AG); await ready(ev); await sleep(900);
+    await o.nav(B + '#agents/' + AG); await ready(o); await o.until(`!!document.querySelector('#chat-msgs .cchb')`);
     check(await ev(`(() => { const b = document.querySelector('#chat-msgs .cchb'); return !!b && b.getBoundingClientRect().height >= 40; })()`), `${tag}: #1005 the buttons are at least 40 px high on touch`);
     await shot('p2280-light-390-chat-choices.png');
-    await o.nav(B + '#home'); await ready(ev); await sleep(800);
+    await o.nav(B + '#home'); await ready(o); await o.until(`!!document.querySelector('.dash')`); await o.idle();
+
     await shot('p2280-light-390-home.png');
   }, true);
 
