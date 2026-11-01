@@ -19,7 +19,7 @@ LAYERS = (
     ("integrations", ("integrations", "api", "admin", "paperless", "newsletter")),
     ("agents", ("agents", "assistant", "startup")),
 )
-LAYER_OF = {"admin.migrate": "core", "api.common": "core"}  # the move from SQLite runs inside init_db; 2.149.0 G (#2517): the v1 helpers are infrastructure
+LAYER_OF = {"admin.migrate": "core", "api.common": "core", "accounts.orgback": "domain"}  # the move from SQLite runs inside init_db; 2.149.0 G (#2517): the v1 helpers are infrastructure; 2.365.1 (#3395): orgback calls every area
 
 ORDER = (
     "core.env",  # 2.149.0 D (#2511): the registry of the environment variables (no imports from the app)

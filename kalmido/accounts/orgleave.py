@@ -53,6 +53,7 @@ OLV_STAYS = (
     ("drives", Nn_("{0} drive", "{0} drives"), "SELECT COUNT(*) FROM office_drives WHERE org_id=? AND user_id=? AND deleted_at IS NULL"),
 )
 OLV_FOLDERS = Nn_("{0} folder", "{0} folders")  # 2.365.1 (#3395): back_text
+OLV_AREAS = {}  # 2.365.1 (#3395): preview, home of accounts/orgback.py (a higher layer: it calls every area and enters itself here)
 OLV_BACK = ("files", "folders", "wiki_pages", "tables", "bookmarks", "polls", "videos")
 OLV_NOTICE_DAYS = 14  # the default period between telling the members and the deletion
 OLV_BACK_H = 24  # how long joining again restores assignments and "coming along" (the undo window of the moves)
@@ -101,8 +102,7 @@ def olv_info(c, oid, uid, heir):
         assigned = c.execute("SELECT COUNT(*) FROM tasks WHERE assignee_id=? AND deleted_at IS NULL AND list_id IN "
                              "(SELECT id FROM lists WHERE org_id=? AND owner_id!=?)", (uid, oid, uid)).fetchone()[0]
         hname = _names(c, [heir]).get(heir, "") if heir and heir != uid else ""
-    from .orgback import olb_preview
-    counts, gone, kept = olb_preview(c, oid, uid)
+    counts, gone, kept = OLV_AREAS["preview"](c, oid, uid)
     stays = olv_stays(c, oid, uid, gone=gone)
     return {"back": back, "back_counts": counts, "back_text": olb_text(counts), "kept": kept,
             "to_heir": {"lists": given if hname else 0, "calendars": cals if hname else 0, "books": books if hname else 0},

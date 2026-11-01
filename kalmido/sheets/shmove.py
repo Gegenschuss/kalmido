@@ -23,6 +23,8 @@ from ..accounts.session import me
 from ..accounts.orgs import is_org_admin
 from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_target
 from .core import sh_dict, sh_need, sh_reload, sh_space_key, sh_touch
+from .shfolder import shf_after_move
+from .shkinds import shk_move_files
 from ..core.pg import insert_id  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files
 
@@ -138,9 +140,7 @@ def sheets_move_space(sid):
                 c.execute("UPDATE sheet_shares SET revoked_at=NULL WHERE id=?", (x["id"],))
                 sback += 1
         shs_drop_cache()
-    from .shfolder import shf_after_move
     shf_after_move(c, sid)  # 2.199.0 C (#2742): its folder belongs to the old workspace
-    from .shkinds import shk_move_files
     new_paths, old_paths = [], []  # 2.363.3 (#3133): sealed into new stored files, the old ones go after the commit
     try:
         shk_move_files(c, sid, to, uid, new_paths, old_paths)  # 2.124.0 B (#2110): the files of file cells go along, sealed with the target's key
@@ -176,8 +176,6 @@ def shm_home(c, r, uid, new_paths, old_paths):
     """2.365.1 (#3395): table r (its first sheet) goes back into uid's private space with their leaving (accounts/orgback.py):
     what sheets_move_space does, without the dialog. A project that went back too keeps it attached. The caller commits."""
     from .shbook import shb_member_ids, shb_move
-    from .shfolder import shf_after_move
-    from .shkinds import shk_move_files
     from .shshare import shs_end
     sid, tabs, ts = r["id"], shb_member_ids(c, r["id"]), iso_ms(now_utc())
     l = c.execute("SELECT org_id FROM lists WHERE id=?", (r["list_id"],)).fetchone() if r["list_id"] else None

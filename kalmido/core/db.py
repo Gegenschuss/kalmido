@@ -1252,8 +1252,7 @@ def init_db(guard=True, load=None):
         if n:
             print("clients: address fields filled from the free address for", n, "client(s)", flush=True)
         if gsetting(c, "migr_brought2365") != "1":  # 2.365.1 (#3395): who brought what in, from the history of the moves
-            from ..accounts.orgback import olb_backfill
-            n = olb_backfill(c)
+            n = brought_backfill(c)
             gset(c, "migr_brought2365", "1")
             print("organisations: noted who brought in", n, "item(s)", flush=True)
         if gsetting(c, "migr_upg2103") != "1":  # 2.152.0 A (#2164): time entries / direct messages outlive an account
@@ -1472,6 +1471,19 @@ def repair_data(c):
 # 2.380 G (#3389): the purposes of the allowed internal hosts (one admin list each, calendars/subscriptions.py cal_allow)
 ALLOW_PURPOSES = ("calendar", "carddav", "webhooks", "mail", "git", "newsletter", "ntfy", "peppol", "feeds", "oidc",
                   "paperless", "karakeep", "servers")
+
+
+def brought_backfill(c):
+    """2.365.1 (#3395): once at the start: the mark brought_by (accounts/orgback.py) of what came in before it existed, from the
+    last move of each thing (space_moves): private -> today's organisation = by_id brought it in. Files have no reliable rows."""
+    n = 0
+    with pg_system_ctx(c):
+        for table, kind in (("sheets", "sheet"), ("wiki_pages", "wiki"), ("video_reviews", "video"), ("sched_polls", "poll"), ("bookmarks", "bookmark")):
+            n += c.execute(f"""UPDATE {table} t SET brought_by=m.by_id FROM
+                               (SELECT DISTINCT ON (obj_id) obj_id, from_org, to_org, by_id FROM space_moves WHERE kind=? ORDER BY obj_id, id DESC) m
+                               WHERE m.obj_id=t.id AND m.from_org IS NULL AND m.to_org=t.org_id AND m.by_id IS NOT NULL AND t.brought_by IS NULL""",
+                           (kind,)).rowcount
+    return n
 
 
 def gsetting(c, key):

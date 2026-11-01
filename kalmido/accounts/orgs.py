@@ -1361,7 +1361,7 @@ def org_leave(c, oid, uid, heir, back=None):
     (its id appended to back), 2.365.1 (#3395) and so does what else they brought in (accounts/orgback.py, [kind, id] appended).
     The caller commits. Returns the number of lists transferred."""
     from ..lists.ownership import owner_transfer
-    from .orgleave import olv_memo, olv_snap
+    from .orgleave import OLV_AREAS, olv_memo, olv_snap
     snap = olv_snap(c, oid, uid)  # 2.363.3 (#3133): what the end of the membership takes away, for coming back within a day
     n, priv = 0, []
     for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND org_id=? AND is_inbox=0", (uid, oid)).fetchall():
@@ -1389,8 +1389,7 @@ def org_leave(c, oid, uid, heir, back=None):
     if priv:  # 2.352.0 F (#2748, review N3): the lists now private leave the organisation's tree, its folders' roles end
         from ..lists.groups import grp_sync
         grp_sync(c, priv)
-    from .orgback import olb_home
-    olb_home(c, oid, uid, back)  # 2.365.1 (#3395): after the lists: what hangs at a project that went back stays attached
+    OLV_AREAS["home"](c, oid, uid, back)  # 2.365.1 (#3395): after the lists: what hangs at a project that went back stays attached
     # 2.83.0 (#1725): tasks assigned without joining (a list everyone in the organisation may edit)
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=? AND list_id IN (SELECT id FROM lists WHERE org_id=? AND owner_id!=?)", (uid, oid, uid))
     # 2.363.3 (#3133): coming along without a membership too (brought back by joining again in a list open to the organisation)
