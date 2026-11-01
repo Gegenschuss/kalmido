@@ -8,6 +8,7 @@
  - tools/check_layout.py: the start scripts below the mark in index.html are sorted; a new one above the mark = error
 usage: python3 tests/p2476_b_appcss_test.py"""
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -79,11 +80,11 @@ with tempfile.TemporaryDirectory() as tmp:
 
     # perf_budget: the start style files count into the start CSS
     rc, out = run("perf_budget.py", "--root", root, "--json")
-    import json
-    before = json.loads(out)["measured"]["start_css_bytes"] if out.strip().startswith("{") else 0
+    first = lambda o: json.JSONDecoder().raw_decode(o.strip())[0]  # noqa: E731  (over the budget: the messages follow)
+    before = first(out)["measured"]["start_css_bytes"]
     put(os.path.join(css, "start-zz-p2476.css"), ".zz { color: red; }\n" * 40000)
     rc, out = run("perf_budget.py", "--root", root, "--json")
-    after = json.loads(out)["measured"]["start_css_bytes"]
+    after = first(out)["measured"]["start_css_bytes"]
     check(after - before > 700000, f"perf_budget counts the start style files ({before} -> {after})")
     rc, out = run("perf_budget.py", "--root", root)
     check(rc == 1 and "Budget exceeded: start_css_bytes" in out, "a big start style file goes over the start CSS budget: " + out)
