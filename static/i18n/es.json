@@ -8586,7 +8586,6 @@
   "{0} document added": ["{0} documento añadido", "{0} documentos añadidos"],
   "{0} document is being recognised…": ["Se está reconociendo {0} documento…", "Se están reconociendo {0} documentos…"],
   "{0}: no space left in your storage": "{0}: no queda espacio en tu almacenamiento",
-  "{0} of {1} shown, narrow the search": "Se muestran {0} de {1}, acota la búsqueda",
   "Accept all": "Aceptar todo",
   "Add documents": "Añadir documentos",
   "Add rule": "Añadir regla",
@@ -15811,5 +15810,7 @@
   "Lands in your private list Notes": "Va a tu lista privada Notas",
   "Move the note to {0}?": "¿Mover la nota a {0}?",
   "After the move these people see this note:": "Tras moverla, estas personas verán la nota:",
-  "The list Notes itself stays private.": "La lista Notas sigue siendo privada."
+  "The list Notes itself stays private.": "La lista Notas sigue siendo privada.",
+  "Previous document": "Documento anterior",
+  "Next document": "Documento siguiente"
 }

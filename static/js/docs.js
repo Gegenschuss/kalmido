@@ -5,7 +5,8 @@
 'use strict';
 
 const DC = {docs: null, total: 0, review: 0, waiting: 0, facets: null, err: null, loading: false, seq: 0, q: '',
-  f: dc_f0(), more: false, poll: null, doc: null, set: null, drag: 0};
+  f: dc_f0(), more: false, poll: null, doc: null, set: null, drag: 0,
+  page: 200};  // 2.476.0 (#3935): the documents of one load (the server's PAGE_MAX), the next ones follow at the list's end
 const DC_FEATS = [['sender', N_('Sender')], ['type', N_('Document type')], ['tags', N_('Tags')], ['folder', N_('Folder')]];
 const DC_LEVELS = [['learn', N_('Learns from your documents')], ['rules', N_('Rules only')], ['agent', N_('Left to an agent')], ['off', N_('Off')]];
 const DC_KINDS = [['any', N_('contains one of the words')], ['all', N_('contains all words')], ['exact', N_('contains the exact phrase')],
@@ -54,7 +55,7 @@ function dc_sortHtml() {  // phones: the sort at the top of the filter sheet
 
 // ---- loading
 function dc_params() {
-  const p = new URLSearchParams({ws: dc_ws(), limit: '200'});
+  const p = new URLSearchParams({ws: dc_ws(), limit: String(DC.page)});
   if (DC.q.trim()) p.set('q', DC.q.trim());
   for (const k of ['tag', 'from', 'to']) if (DC.f[k]) p.set(k, DC.f[k]);
   dc_fParams(p);  // 2.122.0 B (#2294): several values, more filters
@@ -67,15 +68,45 @@ async function dc_load() {
   const seq = ++DC.seq, ws = dc_ws();  // 2.66.1 (#1945): the workspace of this load, held from its start
   DC.loading = true; DC.ws = ws;
   try {
-    const j = await api('GET', '/api/docs?' + dc_params());
+    const p = dc_params(), key = dc_key(p);
+    const j = await api('GET', '/api/docs?' + p);
     if (seq !== DC.seq || ws !== dc_ws()) return;  // 2.66.1 (#1945): an answer for a workspace no longer shown is dropped
     const rv0 = DC.review;
-    Object.assign(DC, {docs: j.docs, total: j.total, review: j.review, waiting: j.waiting, facets: j.facets || DC.facets, err: null});
+    // 2.476.0 (#3935): the same list loaded again (the poll, a change) keeps the pages loaded after the first one
+    let docs = j.docs;
+    if (DC.docs && DC.key === key && DC.docs.length > docs.length && docs.length >= DC.page) { const have = new Set(docs.map(x => x.id)); docs = docs.concat(DC.docs.slice(docs.length).filter(x => !have.has(x.id))); }
+    Object.assign(DC, {docs, total: j.total, review: j.review, waiting: j.waiting, facets: j.facets || DC.facets, err: null, key});
     if (rv0 !== DC.review && typeof sbb_sync === 'function') setTimeout(() => sbb_sync('ablage'), 0);  // 2.353.0 D (#2759): the counter of the saved filter To review
   } catch (x) { if (seq !== DC.seq || ws !== dc_ws()) return; DC.err = x.message || tr('unknown'); }
   DC.loading = false; DC.at = Date.now(); DC.atWs = ws;  // 2.62.0 (#1844)
   dc_draw();
   dc_pollSet();
+}
+// 2.476.0 (#3935): the next page of the list (scrolled to its end, the button there, swiped past the last loaded document);
+// one at a time, an answer for a list loaded anew in between is dropped. Resolves true when documents were added.
+const dc_key = p => { const q = new URLSearchParams(p); q.delete('limit'); q.delete('offset'); return q.toString(); };
+function dc_more() {
+  if (DC.moreP) return DC.moreP;
+  const ds = DC.docs; if (!ds || DC.loading || ds.length >= DC.total) return Promise.resolve(false);
+  const seq = DC.seq, ws = dc_ws(), p = dc_params();
+  p.set('offset', String(ds.length)); p.set('facets', '0');
+  DC.moreP = (async () => {
+    try {
+      const j = await api('GET', '/api/docs?' + p);
+      if (seq !== DC.seq || ws !== dc_ws() || DC.docs !== ds) return false;
+      const have = new Set(ds.map(x => x.id)), add = j.docs.filter(x => !have.has(x.id));
+      DC.docs = ds.concat(add); DC.total = j.total;
+      dc_draw();
+      return add.length > 0;
+    } catch { return false; } finally { DC.moreP = null; }
+  })();
+  return DC.moreP;
+}
+function dc_moreWatch() {  // the list's end coming near loads the next page (no observer: the button there)
+  DC.io?.disconnect(); DC.io = null;
+  const s = $('.dc-view .dc-moreld'); if (!s || typeof IntersectionObserver !== 'function') return;
+  DC.io = new IntersectionObserver(es => { if (es.some(x => x.isIntersecting)) dc_more(); }, {root: $('#view'), rootMargin: '0px 0px 600px 0px'});  // #view scrolls (like render.js rowMoreIO)
+  DC.io.observe(s);
 }
 // 2.87.9 (#1934): a hit of the search (palette.js palSubItems): the documents filtered by one sender / type / tag
 function dc_filterGo(k, v) {
@@ -101,6 +132,7 @@ function dc_draw() {
   const el = $('#view'); if (!el) return;
   keepFocus(el, () => setHtml(el, typeof mg_wrap === 'function' ? mg_wrap('docs', viewDocs()) : viewDocs()));
   dc_fSheetDraw();  // 2.122.0 B (#2294): the filter sheet (phones) follows the list
+  dc_moreWatch(); dc_navSync();  // 2.476.0 (#3935)
 }
 
 // ---- the view
@@ -130,7 +162,7 @@ function viewDocs() {
   if (DC.err) body = `<div class="empty">${ic('alert')}<span>${esc(DC.err)}</span></div>`;
   else if (!DC.docs) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
   else if (!DC.docs.length) body = `<div class="empty nempty dc-empty">${ic('file')}<span>${DC.q || active || DC.f.review ? tr('No documents found') : tr('Drop PDFs or photos of letters here, or add them with the button. Kalmido reads the text, finds date and amount and sorts them.')}</span></div>`;
-  else body = `<ul class="dc-grid${DC.selOn ? ' dc-selon' : ''}" aria-label="${esc(tr('Documents'))}">${DC.docs.map(dc_card).join('')}</ul>${DC.total > DC.docs.length ? `<p class="muted">${esc(tr('{0} of {1} shown, narrow the search', DC.docs.length, DC.total))}</p>` : ''}${dc_smvBar()}`;
+  else body = `<ul class="dc-grid${DC.selOn ? ' dc-selon' : ''}" aria-label="${esc(tr('Documents'))}">${DC.docs.map(dc_card).join('')}</ul>${DC.total > DC.docs.length ? `<p class="muted dc-moreld"><button type="button" class="linkbtn" data-dc="loadmore">${esc(tr('Load more ({0} of {1})', DC.docs.length, DC.total))}</button></p>` /* 2.476.0 (#3935) */ : ''}${dc_smvBar()}`;
   // 2.430.0 (#3582): an open document stands in a pane right of the list (computer; a window narrowed to phone width shows it
   // as the whole page instead of closing it); filled by dc_mdDraw, a redraw of the list keeps its content (data-fl-fill)
   const pane = DC.paneId ? `<aside class="dc-md dc-pane" data-k="dcpane" data-fl-fill aria-labelledby="dc-h"></aside>` : '';
@@ -181,7 +213,7 @@ async function dc_shareFiles(files) {  // the share sheet: "File as document"
 async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from the file store's cards (its route stays)
   // 2.430.0 (#3582): in the documents view of a computer the document opens in the pane beside the list; phones
   // and the file store keep the sheet (phones: as a whole page). DC.opening = the document being fetched (a later one wins)
-  const pane = !o.keep && !isMobile() && S.route.mod === 'docs' && !$('.dc-md:not(.dc-pane)');
+  const pane = o.pane ?? (!o.keep && !isMobile() && S.route.mod === 'docs' && !$('.dc-md:not(.dc-pane)'));  // 2.476.0 (#3935): o.pane = stay in the pane
   DC.opening = id;
   let d;
   try { d = await api('GET', `/api/docs/${id}`); } catch { if (DC.opening === id) DC.opening = null; if (dc_hashId() === id) history.replaceState(null, '', DC.paneId ? `#docs/${DC.paneId}` : '#docs'); return; }
@@ -205,7 +237,7 @@ async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from
     md.addEventListener('click', dc_mdClick);
     md.addEventListener('change', dc_mdChange);
     if (dc_hashId() !== id && !o.keep) history.replaceState(null, '', `#docs/${id}`);
-  }
+  } else if (S.route.mod === 'docs' && dc_hashId() && dc_hashId() !== id) history.replaceState(null, '', `#docs/${id}`);  // 2.476.0 (#3935): leafed on
   dc_mdDraw(md);
 }
 // 2.430.0 (#3582): the pane. Its remove() closes it (the sheet's callers -- Close, Delete, a split, a workspace switch -- call
@@ -225,12 +257,8 @@ function dc_paneClose(p) {
   setTimeout(() => { dc_draw(); const c = back && $(`.dc-view [data-dco="${was}"]`); if (c) c.focus({preventScroll: true}); }, 0);  // the focus back on its card
 }
 // the next / previous document of the list in the pane (arrow keys); the card comes into view and keeps the focus
-function dc_paneStep(dir) {
-  const ds = DC.docs || [], i = ds.findIndex(x => x.id === (DC.opening ?? DC.paneId)), n = ds[i + dir];
-  if (i < 0 || !n) return;
-  const f = document.activeElement?.closest?.('.dc-view [data-dco]');
-  dc_open(n.id).then(() => { const c = $(`.dc-view [data-dco="${n.id}"]`); if (!c) return; c.scrollIntoView?.({block: 'nearest'}); if (f) c.focus({preventScroll: true}); });
-}
+// 2.476.0 (#3935): the same for the phone's whole page, the swipe on the preview and the arrow buttons (dc_step)
+const dc_paneStep = dir => dc_step(dir);
 document.addEventListener('keydown', e => {
   if (!DC.paneId || S.route.mod !== 'docs' || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || $('.modal') || $('.lightbox') || $('#pop:not(.hidden)')) return;
   if (e.target.closest?.('input, textarea, select, [contenteditable="true"], [contenteditable=""]')) return;
@@ -238,6 +266,153 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'Escape' && !DC.selOn) { e.preventDefault(); dc_paneClose($('.dc-pane')); }
 });
 document.addEventListener('click', e => { if (e.target.closest?.('.dc-pane')) dc_mdClick(e); });
+// ---- 2.476.0 (#3935): leafing through the open document -- always in the list as shown (filtered, sorted: DC.docs, like
+// the arrow keys). "3 of 48" and two arrow buttons above the preview; a swipe sideways on the preview (not on the fields
+// below) turns to the next / previous one, which glides in; past the last loaded one the next page loads, at the real end
+// the page springs back. A preview enlarged with two fingers moves with one finger instead; normal size again = swipes.
+const DCW = {sw: null, pz: null, end: 0};
+const dc_navIdx = d => (S.route.mod === 'docs' && DC.docs && d ? DC.docs.findIndex(x => x.id === d.id) : -1);
+function dc_navHtml(d) {
+  const i = dc_navIdx(d); if (i < 0) return '';
+  const n = Math.max(DC.total || 0, DC.docs.length);
+  return `<div class="dc-nav" data-sig="${i}/${n}" role="group" aria-label="${esc(tr('{0} of {1}', i + 1, n))}"><button type="button" class="iconbtn dc-navb" data-dc="step:-1" aria-label="${esc(tr('Previous document'))}" title="${esc(tr('Previous document'))}"${i > 0 ? '' : ' disabled'}>${ic('left', 's')}</button><span class="dc-navn" aria-hidden="true">${esc(tr('{0} of {1}', i + 1, n))}</span><button type="button" class="iconbtn dc-navb" data-dc="step:1" aria-label="${esc(tr('Next document'))}" title="${esc(tr('Next document'))}"${i < n - 1 ? '' : ' disabled'}>${ic('right', 's')}</button></div>`;
+}
+function dc_navSync() {  // the list changed (loaded again, the next page): the counter of the open document follows
+  for (const md of $$('.dc-md')) {
+    const top = $('.dc-top', md), d = DC.doc;
+    if (!top || !d || $('.dc-body', md)?.dataset.id !== String(d.id)) continue;
+    const old = $('.dc-nav', top), h = dc_navHtml(d), sig = (h.match(/data-sig="([^"]*)"/) || [])[1];
+    if (old?.dataset.sig === sig || (!old && !h)) continue;
+    const f = old && old.contains(document.activeElement) ? document.activeElement.dataset.dc : null;
+    if (old) old.remove();
+    if (h) top.insertAdjacentHTML('afterbegin', h);
+    if (f) $(`.dc-nav [data-dc="${f}"]`, top)?.focus({preventScroll: true});
+  }
+}
+// opens another document of the list where the open one stands (the pane keeps its card in view and the focus on it)
+function dc_goTo(id, dir) {
+  DC.slide = dir;
+  const pane = !!DC.paneId && !$('.dc-md:not(.dc-pane)');
+  const f = pane && document.activeElement?.closest?.('.dc-view [data-dco]');
+  return dc_open(id, pane ? {pane: true} : {}).then(() => {
+    if (!pane) return;
+    const c = $(`.dc-view [data-dco="${id}"]`); if (!c) return;
+    c.scrollIntoView?.({block: 'nearest'}); if (f) c.focus({preventScroll: true});
+  });
+}
+async function dc_step(dir) {  // true = turned; the real end springs back
+  const cur = DC.opening ?? DC.doc?.id;
+  let i = (DC.docs || []).findIndex(x => x.id === cur);
+  if (i < 0 || S.route.mod !== 'docs') return false;
+  if (dir > 0 && i + 1 >= DC.docs.length && DC.docs.length < DC.total) { await dc_more(); i = (DC.docs || []).findIndex(x => x.id === cur); }
+  const n = i < 0 ? null : DC.docs[i + dir];
+  if (!n) { dc_bounce(dir); return false; }
+  await dc_goTo(n.id, dir);
+  return true;
+}
+const dc_mdOpen = () => $('.dc-md:not(.dc-pane)') || $('.dc-pane');
+function dc_anim(el, cls, ms) {
+  if (!el) return;
+  el.classList.remove('dc-in-n', 'dc-in-p', 'dc-bnc-n', 'dc-bnc-p');
+  void el.offsetWidth;  // the class again starts the animation anew
+  el.classList.add(cls);
+  clearTimeout(el._dcAn); el._dcAn = setTimeout(() => el.classList.remove(cls), ms);
+}
+function dc_slideIn(md) { const dir = DC.slide; DC.slide = 0; dc_anim($('.dc-body', md), dir > 0 ? 'dc-in-n' : 'dc-in-p', 400); }
+function dc_bounce(dir) { const b = $('.dc-body', dc_mdOpen()); if (b) { b.style.transform = ''; dc_anim(b, dir > 0 ? 'dc-bnc-n' : 'dc-bnc-p', 450); } }
+
+// the zoom of the preview: k = the size (1 = normal), x / y = the shift of the picture inside its box
+function dc_zoomSet(box, k, x, y) {
+  const el = box?.firstElementChild;
+  if (!box) return;
+  if (!el || k <= 1.02) { k = 1; x = 0; y = 0; }
+  else {
+    const w = el.offsetWidth, h = el.offsetHeight, bw = box.clientWidth, bh = box.clientHeight, l = el.offsetLeft, t = el.offsetTop;
+    // the enlarged picture keeps covering what it covered: no empty edge drawn into the box
+    x = Math.min(-l, Math.max(bw - l - w * k, x)); if (w * k < bw) x = (bw - w * k) / 2 - l;
+    y = Math.min(-t, Math.max(bh - t - h * k, y)); if (h * k < bh) y = -t;
+  }
+  box._z = {k, x, y};
+  box.classList.toggle('dc-zoomed', k > 1);
+  if (el) { el.style.transformOrigin = '0 0'; el.style.transform = k > 1 ? `translate(${Math.round(x)}px, ${Math.round(y)}px) scale(${k.toFixed(3)})` : ''; }
+}
+const dc_pvBox = t => t?.closest?.('.dc-md .dc-prev');
+document.addEventListener('touchstart', e => {
+  if (!e.touches) return;  // a plain Event("touchstart") (tests, synthetic taps) has no touch list
+  const box = dc_pvBox(e.target);
+  if (!box) { DCW.sw = null; return; }
+  const z = box._z || {k: 1, x: 0, y: 0};
+  if (e.touches.length >= 2) {  // two fingers: enlarge / shrink the preview around their middle
+    const [p, q] = e.touches, r = box.getBoundingClientRect(), el = box.firstElementChild;
+    DCW.sw = null;
+    DCW.pz = {box, l: el?.offsetLeft || 0, t: el?.offsetTop || 0, d0: Math.max(1, Math.hypot(p.clientX - q.clientX, p.clientY - q.clientY)), k0: z.k, x0: z.x, y0: z.y,
+      mx: (p.clientX + q.clientX) / 2 - r.left, my: (p.clientY + q.clientY) / 2 - r.top};
+    return;
+  }
+  const t = e.touches[0];
+  if (DCW.pz) return;
+  // the phone's own Back gesture at the screen's edges; a page enlarged by the browser moves as the browser does
+  if (t.clientX < 16 || t.clientX > innerWidth - 16 || (window.visualViewport?.scale || 1) > 1.05) { DCW.sw = null; return; }
+  DCW.sw = {box, x0: t.clientX, y0: t.clientY, lx: t.clientX, lt: Date.now(), v: 0, dx: 0, lock: null, pan: z.k > 1, z};
+}, {passive: true});
+document.addEventListener('touchmove', e => {
+  const p = DCW.pz;
+  if (p) {
+    if (e.touches.length < 2) return;
+    if (e.cancelable) e.preventDefault();
+    const [a, b] = e.touches, r = p.box.getBoundingClientRect();
+    const k = Math.min(5, Math.max(1, p.k0 * Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) / p.d0));
+    const mx = (a.clientX + b.clientX) / 2 - r.left, my = (a.clientY + b.clientY) / 2 - r.top;
+    // the point of the picture under the fingers' middle stays under it
+    dc_zoomSet(p.box, k, mx - p.l - (p.mx - p.l - p.x0) * k / p.k0, my - p.t - (p.my - p.t - p.y0) * k / p.k0);
+    return;
+  }
+  const s = DCW.sw; if (!s || e.touches.length !== 1) return;
+  const t = e.touches[0], dx = t.clientX - s.x0, dy = t.clientY - s.y0;
+  if (s.pan) {  // enlarged: one finger moves the picture
+    if (e.cancelable) e.preventDefault();
+    s.moved = s.moved || Math.hypot(dx, dy) > 8;
+    dc_zoomSet(s.box, s.z.k, s.z.x + dx, s.z.y + dy);
+    return;
+  }
+  if (!s.lock) {
+    if (Math.hypot(dx, dy) < 10) return;
+    s.lock = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
+    const md = s.box.closest('.dc-md');
+    if (s.lock === 'y' || dc_navIdx(DC.doc) < 0 || $('.dc-body', md)?.dataset.id !== String(DC.doc?.id)) { DCW.sw = null; return; }  // up / down: the page scrolls
+    s.body = $('.dc-body', md);
+    const i = dc_navIdx(DC.doc);
+    s.edge = {'1': !DC.docs[i + 1] && DC.docs.length >= DC.total, '-1': i <= 0};
+  }
+  if (e.cancelable) e.preventDefault();
+  s.v = (t.clientX - s.lx) / Math.max(1, Date.now() - s.lt); s.lx = t.clientX; s.lt = Date.now();
+  s.dx = dx;
+  const end = s.edge[dx < 0 ? '1' : '-1'];  // nothing there: the page follows only a little
+  s.body.style.transition = 'none';
+  s.body.style.transform = `translateX(${Math.round(end ? dx * .3 : dx)}px)`;
+}, {passive: false});
+function dc_touchEnd(e) {
+  if (DCW.pz) {
+    if (e.touches?.length >= 2) return;
+    const b = DCW.pz.box; DCW.pz = null; DCW.end = Date.now();
+    if ((b._z?.k || 1) <= 1.05) dc_zoomSet(b, 1, 0, 0);
+    if (e.touches?.length === 1) DCW.sw = null;  // the finger left on the picture does not swipe
+    return;
+  }
+  const s = DCW.sw; DCW.sw = null;
+  if (!s) return;
+  if (s.pan) { if (s.moved) DCW.end = Date.now(); return; }
+  if (!s.body) return;
+  DCW.end = Date.now();
+  const w = s.box.clientWidth || innerWidth;
+  // far enough (a fifth of the width) or a quick flick: the next / previous document, else back into place
+  const go = e.type !== 'touchcancel' && (Math.abs(s.dx) > Math.min(90, w * .2) || (Math.abs(s.dx) > 30 && Math.abs(s.v) > .35 && Math.sign(s.v) === Math.sign(s.dx)));
+  s.body.style.transition = ''; s.body.style.transform = '';
+  if (go) dc_step(s.dx < 0 ? 1 : -1);
+}
+document.addEventListener('touchend', dc_touchEnd, {passive: true});
+document.addEventListener('touchcancel', dc_touchEnd, {passive: true});
+
 document.addEventListener('change', e => { if (e.target.closest?.('.dc-pane')) dc_mdChange(e); });
 function dc_auto(d, f) {
   const by = d.auto?.[f];
@@ -269,7 +444,7 @@ function dc_mdDraw(md) {
   if (!body) { body = document.createElement('div'); body.className = 'dc-body'; md.appendChild(body); }
   if (body.dataset.id !== String(d.id)) { body.textContent = ''; body.dataset.id = String(d.id); }
   fl_set(body, `<div class="lhdr"><button class="iconbtn dc-back" data-dc="close" aria-label="${esc(tr('Back'))}">${ic('back')}</button><h3 id="dc-h">${esc(d.name)}</h3><span class="spacer"></span><button class="iconbtn dc-x" data-dc="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
-    <div class="dc-top">
+    <div class="dc-top">${dc_navHtml(d)}
       <button type="button" class="dc-prev" data-dc="view" data-fl-fill aria-label="${esc(tr('Show {0}', d.name))}"></button>
       <div class="dc-acts">
         <button type="button" class="btn sm" data-dc="view">${ic('eye', 's')} ${tr('Show')}</button>
@@ -299,6 +474,7 @@ function dc_mdDraw(md) {
     </div>
     <details class="dc-text"><summary>${tr('Recognised text')}</summary>${d.text ? `<pre>${esc(d.text)}</pre>` : `<p class="muted">${tr('No text recognised.')}</p>`}</details>`);
   dc_pvDraw(md, d);
+  if (DC.slide) dc_slideIn(md);  // 2.476.0 (#3935): the next document glides in from the side it was swiped to
 }
 // 2.430.0 (#3582): the preview at the top: the small picture at once, then an image as itself or a PDF's first page drawn sharp
 // to the width (pdf.js of the module pdf, nothing in the file runs); fails = the small picture stays. Once per document and file size.
@@ -306,11 +482,11 @@ async function dc_pvDraw(md, d) {
   const box = $('.dc-prev', md); if (!box) return;
   const key = `${d.id}:${d.size}`;  // a field saved does not draw it again
   if (box._pv === key && box.firstChild) return;
-  box._pv = key;
+  box._pv = key; dc_zoomSet(box, 1, 0, 0);  // 2.476.0 (#3935): another document starts at its normal size
   box.innerHTML = d.thumb ? `<img src="/api/docs/${d.id}/thumb?v=${esc(d.updated_at || '')}" alt="">` : `<span class="dc-ph">${ic(dc_isPdf(d) ? 'file' : 'picture')}</span>`;
   const live = () => box.isConnected && box._pv === key;
   if (/^image\//.test(d.mime || '') && d.thumb) {
-    const im = new Image(); im.alt = ''; im.onload = () => { if (live()) box.replaceChildren(im); }; im.src = dc_fileUrl(d);
+    const im = new Image(); im.alt = ''; im.onload = () => { if (live()) { box.replaceChildren(im); dc_zoomSet(box, 1, 0, 0); } }; im.src = dc_fileUrl(d);
     return;
   }
   if (!dc_isPdf(d) || d.size > 20e6 || typeof loadModule !== 'function') return;
@@ -327,7 +503,7 @@ async function dc_pvDraw(md, d) {
       cv.width = Math.floor(vp.width * dpr); cv.height = Math.floor(vp.height * dpr);
       cv.setAttribute('aria-hidden', 'true');
       await page.render({canvas: cv, canvasContext: cv.getContext('2d'), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null}).promise;
-      if (live()) box.replaceChildren(cv);
+      if (live()) { box.replaceChildren(cv); dc_zoomSet(box, 1, 0, 0); }  // 2.476.0 (#3935): the sharp page starts at normal size
     } finally { doc.destroy(); }
   } catch { /* the small picture stays */ }
 }
@@ -406,7 +582,9 @@ async function dc_mdClick(e) {
     return;
   }
   if (a === 'space') { if (await dc_smvMove(new Map([[d.id, d.org_id || null]]), `“${d.name}”`)) md.remove(); return; }  // 2.96.0 A (#1941)
+  if (a.startsWith('step:')) { dc_step(+a.slice(5)); return; }  // 2.476.0 (#3935): the arrow buttons above the preview
   if (a === 'view') {
+    if (Date.now() - (DCW.end || 0) < 700) return;  // 2.476.0 (#3935): the end of a swipe / zoom on the preview is no tap
     if (d.einvoice?.source === 'xml') { window.open(`/api/docs/${d.id}/einvoice`, '_blank', 'noopener'); return; }  // 2.146.0 A (#2451)
     if (dc_isPdf(d) && typeof pdfView === 'function') pdfView({url: dc_fileUrl(d), name: d.name, size: d.size, dlUrl: dc_fileUrl(d, true)});
     else if (/^image\//.test(d.mime) && typeof attLightbox === 'function') window.open(dc_fileUrl(d), '_blank', 'noopener');
@@ -443,12 +621,14 @@ async function dc_mdClick(e) {
     return;
   }
   if (a === 'checked') {
+    const ds = DC.docs || [], ci = ds.findIndex(x => x.id === d.id), nx = ci < 0 ? null : ds[ci + 1] || ds[ci - 1], nxDir = nx && ds[ci + 1] ? 1 : -1;
     const x = await api('POST', `/api/docs/${d.id}/review`, {done: true}).catch(() => null); if (!x) return;
     DC.doc = {...d, ...x, text: d.text}; dc_mdDraw(md); dc_load();
     histToast(tr('Marked as checked'), histAdd({label: tr('Marked as checked'),
       undo: async () => { await api('POST', `/api/docs/${d.id}/review`, {done: false}); dc_load(); return {}; },
       redo: async () => { await api('POST', `/api/docs/${d.id}/review`, {done: true}); dc_load(); return {}; }}));
-    if (DC.f.review) md.remove();
+    // 2.476.0 (#3935): in "To review" the next document follows at once (the one before at the end, none left = back to the list)
+    if (DC.f.review) { if (nx && S.route.mod === 'docs') dc_goTo(nx.id, nxDir); else md.remove(); }
     return;
   }
   if (a === 'task') {
@@ -684,6 +864,7 @@ document.addEventListener('click', e => {
   else if (a === 'sort') dc_sortMenu(b);  // 2.428.0 (#3579)
   else if (a === 'more') { if (isMobile()) dc_fSheet(); else { DC.more = !DC.more; dc_draw(); } }  // 2.122.0 B (#2294): phones: a sheet
   else if (a === 'clear') { DC.f = {...dc_f0(), review: DC.f.review}; DC.q = ''; dc_load(); }
+  else if (a === 'loadmore') dc_more();  // 2.476.0 (#3935)
   else if (a === 'under-off') { DC.under = null; dc_load(); if (typeof sbb_sync === 'function') sbb_sync('ablage'); }
 });
 document.addEventListener('change', e => {

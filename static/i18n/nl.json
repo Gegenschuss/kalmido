@@ -8586,7 +8586,6 @@
   "{0} document added": ["{0} document toegevoegd", "{0} documenten toegevoegd"],
   "{0} document is being recognised…": ["{0} document wordt herkend…", "{0} documenten worden herkend…"],
   "{0}: no space left in your storage": "{0}: geen ruimte meer in je opslag",
-  "{0} of {1} shown, narrow the search": "{0} van {1} getoond, verfijn de zoekopdracht",
   "Accept all": "Alles overnemen",
   "Add documents": "Documenten toevoegen",
   "Add rule": "Regel toevoegen",
@@ -15811,5 +15810,7 @@
   "Lands in your private list Notes": "Komt in je privélijst Notities",
   "Move the note to {0}?": "Notitie naar {0} verplaatsen?",
   "After the move these people see this note:": "Na het verplaatsen zien deze personen de notitie:",
-  "The list Notes itself stays private.": "De lijst Notities zelf blijft privé."
+  "The list Notes itself stays private.": "De lijst Notities zelf blijft privé.",
+  "Previous document": "Vorig document",
+  "Next document": "Volgend document"
 }
