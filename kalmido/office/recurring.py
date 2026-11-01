@@ -305,11 +305,11 @@ def rin_send(c, oid, uid, did):
     reason = a stored text (tr_stored): the timer has no reader, each person gets it in their own language.
     2.269.0 D (#3046): only finalised and checked here (number, the day's counters); the mail goes out after the caller's
     commit (rin_mail), so a failed commit never leaves a mailed invoice whose number is given again."""
-    from ..integrations.mail import MAIL_OUT_ON
     from .docs import doc_row
     from .invoices import inv_send
     from .ledger import ofx_finalize
-    if not MAIL_OUT_ON:
+    from .mailsig import ofm_sender
+    if not ofm_sender(c, oid, uid, {})["via"]:  # 2.439.0 (#3617): also through the mailbox of the series' person
         return False, [N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)")], False, None
     cid = doc_row(c, oid, did)["client_id"]
     to = rin_client_mail(c, oid, cid)
@@ -319,7 +319,7 @@ def rin_send(c, oid, uid, did):
     try:
         with c.savepoint():
             r = ofx_finalize(c, oid, uid, did)
-            _files, datev, m = inv_send(c, oid, uid, r, {"to": to, "cc": cc}, later=True)
+            _files, datev, m = inv_send(c, oid, uid, r, {"to": to, "cc": cc}, later=True, auto=True)
     except (BadInput, Denied) as e:
         epdf_sweep(c)  # 2.355.0 A (#2847): the files of the finalising just rolled back
         return False, err_stored(e) or [N_("unknown")], False, None  # 2.454.0 (#3808): key + values, every person's own language

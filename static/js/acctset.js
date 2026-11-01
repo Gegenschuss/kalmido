@@ -125,7 +125,7 @@ function accountHtml() {
     <div class="shint">${tr('Kalmido looks like it does for a member: settings and administration of your organisations and of the server are hidden; your private area, your own agents and the daily office work stay. Only the display changes, your rights stay the same. The way back is at the bottom of the settings and in the account menu.')}</div>` : ''}${''/* 2.436.0 (#3620) */}
     ${tfaHtml()}
     ${typeof officeOn === 'function' && officeOn() ? `<h4 id="s-sig-h">${tr('Signature for letters')}</h4>
-    <div class="row"><button type="button" class="btn sm" data-act="lt-sigset">${ic('edit', 's')} ${tr('Edit signature…')}</button></div>
+    <div class="row"><button type="button" class="btn sm" data-act="lt-sigset">${ic('edit', 's')} ${tr('Edit signature…')}</button> <button type="button" class="btn sm" data-act="ofm-sigset">${ic('edit', 's')} ${tr('E-mail signature…')}</button></div>
     <div class="shint">${tr('Greeting, name and picture under your letters (the same dialog as in the Office, Letters).')}</div>` : ''}${''/* 2.365.2 C (#2789) */}
     ${typeof sesHtml === 'function' ? sesHtml() : ''}${''/* 2.115.0 B (#2062): active sessions */}
     ${e2eHtml()}${''/* 2.42.0 (#828, #909) */}
@@ -967,6 +967,13 @@ function ua8PurgeHtml(p) {
   return rows.map(([w, t]) => `<div class="shint keep ua8purge${w ? ' warn' : ''}">${w ? ic('alert', 's') + ' ' : ''}${esc(t)}</div>`).join('');
 }
 
+// 2.439.0 (#3617): the e-mail signature of the Office, also for members (the Office's settings are read-only for them)
+async function ofmSigSettings() {
+  try {
+    if (typeof ofmSigModal !== 'function') await loadModule('office');
+    await ofmSigModal();
+  } catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); }
+}
 // 2.365.2 C (#2789): the letter signature dialog of the Office, opened from Settings > Account (the Office module loads first)
 async function ltSigSettings() {
   try {

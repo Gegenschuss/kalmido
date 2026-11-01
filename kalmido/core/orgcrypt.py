@@ -98,7 +98,7 @@ FIELDS = {
     "office_bookarch": ("doc1", "doc2", "text", "raw"), "office_bookarch_accts": ("label",),  # 2.414.0 (#3502): the booking archive
     "office_bookarch_docs": ("file_name",), "office_bookarch_files": ("file_name",),  # 2.414.0 review F8: names may carry a client's
     "office_letters": ("rcpt_name", "rcpt_address", "rcpt_email", "subject", "body", "ref_line"),  # 2.153.0 (#2028): letters
-    "office_letter_blocks": ("body",), "office_letter_profiles": ("image",),  # 2.153.0 (#2030, #2028): text blocks, signature picture
+    "office_letter_blocks": ("body",), "office_letter_profiles": ("image", "mail_sig", "mail_from_name", "mail_reply_to"),  # 2.153.0 (#2030, #2028): text blocks, signature picture; 2.439.0 (#3617): the mail signature, sender name, answer address
     "office_deals": ("value", "contact", "note", "lost_reason",
                      "next_step", "email", "phone", "company"),  # 2.50.0 (#1196): the sales pipeline; 2.94.0 A (#1930): leads
     "time_sheets": ("note",),  # 2.125.0 R (#2119): the note of a timesheet decision

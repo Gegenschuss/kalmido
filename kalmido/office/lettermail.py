@@ -169,9 +169,9 @@ def ltm_filename(d, lg):
 def ltm_info_get():
     """{mail_on, reply_address, company_email}: the client hides "Send by e-mail" without a mail server; reply_address =
     where answers arrive (linked automatically), '' = answers go to company_email and are assigned by hand."""
-    from ..integrations.mail import MAIL_OUT_ON
+    from .mailsig import ofm_sender
     c, uid, oid = lt_ctx()
-    return jsonify(mail_on=bool(MAIL_OUT_ON), reply_address=ltm_reply_address(c, oid, uid), company_email=ltm_company_mail(c, oid))
+    return jsonify(mail_on=bool(ofm_sender(c, oid, uid)["via"]), reply_address=ltm_reply_address(c, oid, uid), company_email=ltm_company_mail(c, oid))
 
 
 @app.get("/api/office/letters/<int:lid>/mail-draft")
@@ -199,14 +199,14 @@ def ltm_drop_filed(c, nid):
 def ltm_send_post(lid):
     """{to?, cc?, subject?, text?} mails draft lid with its PDF (to = the recipient's e-mail by default), keeps the Message-ID
     and marks it sent (channel email). 400 without a mail server / not a draft / no address; 409 when the server refuses."""
-    from ..integrations.mail import MAIL_OUT_ON
     from .invoices import _mail, h6c_send_budget
     from .ledger import ofx_log
+    from .mailsig import ofm_mail, ofm_reply, ofm_sender
     c, uid, oid = lt_ctx()
     b = body() or {}
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    if not MAIL_OUT_ON:
+    if not ofm_sender(c, oid, uid)["via"]:  # 2.439.0 (#3617): the person's mailbox also sends without the server's SMTP
         raise BadInput(tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
     write_lock(c, f"office_letter_{int(lid)}")  # like /sent: two presses never mail twice
     d = lt_row(c, oid, lid)
@@ -225,14 +225,15 @@ def ltm_send_post(lid):
     text = lt_multi(b.get("text"), "text", LTM_TEXT_MAX).strip() or ltm_default_text(c, oid, d, lg)
     h6c_send_budget(c, oid, uid, [to] + ([cc] if cc else []))  # the day's limits of the office mails (2.86.0 N27)
     pdf = lt_pdf(c, oid, {**d, "status": "sent"})  # the mailed PDF is the final letter (no draft mark)
-    u = g.user
-    rt = ltm_reply_address(c, oid, uid, d["id"]) or ltm_company_mail(c, oid) or None
+    mail = ofm_mail(c, oid, uid, text, b)  # 2.439.0 (#3617): the person's signature, sender name, way out
+    # 2.312.0 C (#3265): the letter's own address stays first (answers are linked to it); else as the person says, the company
+    rt = ltm_reply_address(c, oid, uid, d["id"]) or ofm_reply(c, oid, mail["profile"], b)
     # review 2.153.0: mark sent + file the PDF BEFORE the mail goes out (a full quota / filing error then sends nothing);
     # a refused mail raises and rolls all of it back, the Message-ID is written after the server took the mail
     d = lt_mark_sent(c, oid, d, channel="email", uid=uid)
     try:
-        sent = _mail(to, subject, text, attachments=[(ltm_filename(d, lg), pdf, "application/pdf")], cc=cc or None,
-                     from_name=(u["display_name"] if u is not None and "display_name" in u.keys() else None), reply_to=rt)
+        sent = _mail(to, subject, mail["text"], attachments=[(ltm_filename(d, lg), pdf, "application/pdf")], cc=cc or None,
+                     from_name=mail["name"], reply_to=rt, **mail["kw"])
     except BaseException:
         ltm_drop_filed(c, d.get("node_id"))  # 2.184.0 C (#2582): the refused mail takes the just filed PDF with it
         raise

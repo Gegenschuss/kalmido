@@ -79,6 +79,8 @@ _SEG = sorted(((s, a[0]) for a in OFFICE_AREAS for s in a[3]), key=lambda x: -le
 
 # routes every person with any office access reads (the office's settings carry the person's rights, the menu needs them)
 ANY_READ = frozenset({"/api/office/settings", "/api/office/number-preview", "/api/office/mail-status"})
+# 2.439.0 (#3617): a person's own settings, read and written with any office access (not an area of the office)
+ANY_OWN = frozenset({"/api/office/mail-profile"})
 # routes whose writes need "manage" of their area ("the area's settings"); everything else writes with "edit"
 MANAGE_ROUTES = frozenset({
     "/api/office/settings", "/api/office/logbook/settings", "/api/office/trips/purposes", "/api/office/trips/vma-rates",
@@ -408,6 +410,8 @@ def ofr_check(c, uid, oid, area=None, admin=False):
         return False
     if request.path.startswith("/api/office/rights"):
         return True  # the rights page checks on its own (ofr_manager)
+    if request.url_rule is not None and request.url_rule.rule in ANY_OWN and any(v != "none" for v in r["levels"].values()):
+        return True  # 2.439.0 (#3617): no area of the office, only the person's own row
     area = area or ofr_area_of(request.path)
     if area is None:
         raise Denied(403, tr(NO_AREA))

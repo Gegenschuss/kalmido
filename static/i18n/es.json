@@ -15497,5 +15497,19 @@
   "{0} text of this workspace cannot be decrypted with the keys you hold.": ["{0} texto de este espacio no se puede descifrar con tus claves.", "{0} textos de este espacio no se pueden descifrar con tus claves."],
   "E-mail limits of public pages": "Límites de correo de las páginas públicas",
   "your client portal or booking page used up its sign-in or confirmation e-mails": "tu portal de clientes o tu página de reservas ha agotado sus correos de acceso o de confirmación",
-  "Booking cancelled by the client: {0}": "Reserva cancelada por el cliente: {0}"
+  "Booking cancelled by the client: {0}": "Reserva cancelada por el cliente: {0}",
+  "No signature": "Sin firma",
+  "Answers to": "Respuestas a",
+  "Attach signature": "Adjuntar firma",
+  "Mailbox of the workspace": "Buzón del espacio de trabajo",
+  "My own mailbox": "Mi propio buzón",
+  "E-mail signature": "Firma de correo",
+  "E-mail signature…": "Firma de correo…",
+  "Goes under your quotations, invoices, reminders and letters by e-mail. The signature picture of letters stays apart.": "Aparece bajo tus presupuestos, facturas, recordatorios y cartas por correo. La imagen de firma de las cartas es aparte.",
+  "Signature|e-mail": "Firma",
+  "Fill from name and company data": "Rellenar con el nombre y los datos de la empresa",
+  "Show logo": "Mostrar logotipo",
+  "Send through": "Enviar por",
+  "E-mails leave from the server's address so they do not land in spam; answers go to the answer address. An own sender address needs a mailbox with SMTP (E-mail filing).": "Los correos salen de la dirección del servidor para no acabar en spam; las respuestas van a la dirección de respuesta. Una dirección de remitente propia necesita un buzón con SMTP (archivo de correos).",
+  "E-mails leave from {0} through your mailbox.": "Los correos salen de {0} a través de tu buzón."
 }

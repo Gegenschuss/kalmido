@@ -1129,6 +1129,11 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .rcl-pick{cursor:pointer;gap:.75rem}
 .rcl-pick input{flex:none;width:1.25rem;height:1.25rem;margin:0}
 .bk-chkrow{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;min-height:2.75rem;margin:.25rem 0}
+.ofm-send .row{justify-content:space-between;gap:.5rem}
+.ofm-sig{margin:0;font:inherit;font-size:.875rem;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted)}
+.ofm-box{padding:.5rem .75rem;border-left:2px solid var(--line)}
+.ofm-prev{margin:.5rem 0;padding:.5rem .75rem;border-left:2px solid var(--line)}
+.ofm-prev img{display:block;height:3rem;width:auto;max-width:100%;margin-bottom:.375rem}
 /* 2.452.0 (#3836): the other office lists on phones like #3834: no symbols in the row, a long press opens its menu. The buttons stay for screen readers */
 @media (max-width:767px){
   .agr-doc,.agr-fold,.rin-acts,.brlrow>.swl,.brlrow>.btn,.dma-f[data-fid] .dma-acts,.dimpsup .ib,.rkplist .iconbtn,.dsbsec .ctlinks li>.iconbtn{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}

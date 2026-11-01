@@ -124,9 +124,63 @@ async function ltmStarters(after) {
   });
 }
 
+// ---- 2.439.0 (#3617): the person's own part of the office's mails. The editor (signature, logo, sender name, answer address,
+// way out) and what both send dialogs show: the signature to leave off for this mail, the answer address, one sentence on the sender
+const ofmProfile = async () => { try { return await api('GET', '/api/office/mail-profile'); } catch { return null; } };
+const ofmSigBox = t => t ? `<pre class="ofm-sig">${esc(t)}</pre>` : `<p class="muted ofchint">${tr('No signature')}</p>`;
+/** the rows of a send dialog; rt: show the answer address (a letter with its own address has none to choose) */
+function ofmSendHtml(p, rt, dis) {
+  if (!p) return '';
+  const d = dis ? 'disabled' : '';
+  return `${rt ? ofcRowF('ofm-reply', tr('Answers to'), `<input id="ofm-reply" type="email" inputmode="email" autocomplete="off" maxlength="254" value="${esc(p.reply_to || p.default_reply_to || '')}" ${d}>`) : ''}
+    <div class="ofm-send"><div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofm-on" ${p.signature ? 'checked' : 'disabled'} ${d}> ${tr('Attach signature')}</label><button type="button" class="linkbtn" data-ofm="edit">${tr('Edit')}</button></div>
+    <div class="ofm-box">${ofmSigBox(p.signature)}</div></div>
+    <p class="muted ofchint">${esc(p.note || '')}</p>`;
+}
+function ofmSendBody(md) {
+  const on = $('#ofm-on', md), rt = $('#ofm-reply', md);
+  return {...(on ? {signature: on.checked} : {}), ...(rt ? {reply_to: rt.value.trim()} : {})};
+}
+async function ofmSigModal(done) {
+  const p = await ofmProfile(); if (!p) { toast(tr('Only available online.')); return; }
+  const ways = {server: tr('Server address'), workspace: tr('Mailbox of the workspace'), private: tr('My own mailbox')};
+  /** @type {any} */
+  const md = modal(`<h3>${tr('E-mail signature')}</h3>
+    <p class="muted ofchint">${esc(tr('Goes under your quotations, invoices, reminders and letters by e-mail. The signature picture of letters stays apart.'))}</p>
+    <label for="ofm-text" class="dtp-lab">${tr('Signature|e-mail')}</label><textarea id="ofm-text" class="dtp-ta" rows="6" maxlength="1000">${esc(p.signature)}</textarea>
+    <div class="row"><button type="button" class="linkbtn" data-m="prefill">${tr('Fill from name and company data')}</button></div>
+    ${p.has_logo ? ofcChk('ofm-logo', tr('Show logo'), p.logo) : ''}
+    <div class="ofm-prev" aria-label="${esc(tr('Preview'))}"><img id="ofm-prevlogo" src="${esc(p.logo_data || '')}" alt="" height="48"><pre class="ofm-sig" id="ofm-prevtext"></pre></div>
+    ${ofcRowF('ofm-name', tr('Sender name'), `<input id="ofm-name" maxlength="120" autocomplete="off" value="${esc(p.from_name)}" placeholder="${esc(p.default_from_name)}">`)}
+    ${ofcRowF('ofm-rt', tr('Answers to'), `<input id="ofm-rt" type="email" inputmode="email" autocomplete="off" maxlength="254" value="${esc(p.reply_to)}" placeholder="${esc(p.default_reply_to)}">`)}
+    ${p.ways.length > 1 ? ofcRowF('ofm-via', tr('Send through'), ofcSel('ofm-via', p.via, p.ways.map(w => [w.key, w.address ? `${ways[w.key]} (${w.address})` : ways[w.key]]))) : ''}
+    <p class="muted ofchint">${esc(p.note)}</p>
+    <div class="aerr" role="alert"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  md.classList.add('ofcdlg', 'ofm-dlg');
+  const close = fgModal(md), ta = $('#ofm-text', md);
+  let reset = false;
+  const paint = () => { $('#ofm-prevtext', md).textContent = ta.value; const l = $('#ofm-prevlogo', md); l.hidden = !(p.has_logo && $('#ofm-logo', md)?.checked); };
+  paint();
+  md.addEventListener('input', e => { if (/** @type {any} */ (e.target).id === 'ofm-text') reset = false; paint(); });
+  md.addEventListener('change', paint);
+  md.addEventListener('click', async e => {
+    const b = /** @type {any} */ (e.target).closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { close(); return; }
+    if (b.dataset.m === 'prefill') { ta.value = p.default_signature; reset = true; paint(); return; }
+    b.disabled = true;
+    try {
+      const j = await api('PUT', '/api/office/mail-profile', {signature: reset ? null : ta.value, from_name: $('#ofm-name', md).value, reply_to: $('#ofm-rt', md).value.trim(),
+        ...($('#ofm-logo', md) ? {logo: $('#ofm-logo', md).checked} : {}), ...($('#ofm-via', md) ? {via: $('#ofm-via', md).value} : {})});
+      md.remove(); toast(tr('Saved')); done?.(j);
+    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+  });
+}
+
 // ---- send by e-mail: to, cc, subject, the covering text; where answers arrive
 async function ltmMailModal(id) {
   let j, info;
+  const prof = await ofmProfile();
   try { [j, info] = await Promise.all([api('GET', `/api/office/letters/${id}/mail-draft`), ltmInfo()]); } catch (x) { toast(x.message || ''); return; }
   const hint = j.reply_address ? tr('Answers go to {0} and are linked to this letter automatically.', j.reply_address)
     : tr('There is no document address for this office: answers go to the company e-mail and are assigned to the letter by hand.');
@@ -137,6 +191,7 @@ async function ltmMailModal(id) {
     ${ofcRowF('ltm-subj', tr('Subject'), ofcIn('ltm-subj', j.subject, {max: 200}))}
     <label for="ltm-text" class="dtp-lab">${tr('Message')}</label><textarea id="ltm-text" class="dtp-ta" rows="7" maxlength="5000">${esc(j.text)}</textarea>
     <p class="muted ofchint">${ic('clip', 's')} ${esc(j.filename)}</p>
+    ${ofmSendHtml(prof, !j.reply_address)}
     <p class="muted ofchint">${esc(hint)}</p>
     <div class="aerr" role="alert"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="send">${ic('send', 's')} ${tr('Send')}</button></div>`);
@@ -149,18 +204,25 @@ async function ltmMailModal(id) {
     b.disabled = true;
     try {
       await api('POST', `/api/office/letters/${id}/send-mail`, {to: $('#ltm-to', md).value.trim(), cc: $('#ltm-cc', md).value.trim(),
-        subject: $('#ltm-subj', md).value, text: $('#ltm-text', md).value});
+        subject: $('#ltm-subj', md).value, text: $('#ltm-text', md).value, ...ofmSendBody(md)});
       md.remove(); toast(tr('Sent')); ltmReload();
     } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
 }
 
 document.addEventListener('click', e => {
+  const o = /** @type {any} */ (e.target).closest?.('[data-ofm]');
+  if (o) {  // 2.439.0 (#3617): from a send dialog: back in it with the new signature
+    const send = o.closest('.ofm-send');
+    ofmSigModal(j => { if (!send?.isConnected) return; $('.ofm-box', send).innerHTML = ofmSigBox(j.signature); const on = $('#ofm-on', send); on.disabled = !j.signature; on.checked = !!j.signature; });
+    return;
+  }
   const b = /** @type {any} */ (e.target).closest?.('[data-ltm]'); if (!b) return;
   e.preventDefault();
   if (b.dataset.ltm === 'blocks') ltmBlocksModal(true);
   else if (b.dataset.ltm === 'manage') ltmBlocksModal(false);
   else if (b.dataset.ltm === 'mail') ltmMailModal(+b.dataset.id);
+  else if (b.dataset.ltm === 'sig') ofmSigModal();
 });
 
 // a draft: the text block button above the text, "Send by e-mail" with the letter's buttons; no letter open: manage

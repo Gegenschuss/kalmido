@@ -369,6 +369,7 @@ ORDER = (
     "office.letters",  # 2.153.0 (#2028): letters (correspondence): recipient, text, signature, DIN 5008 PDF, status, filing
     "office.letterlinks",  # 2.153.0 (#2028): letter <-> document links, history, deadline -> task, follow-up, reference line
     "office.lettermail",  # 2.153.0 (#2029, #2030): letters by e-mail with the answer linked, text blocks
+    "office.mailsig",  # 2.439.0 (#3617): the person's signature, sender name, answer address of the office mails
     "office.letteragent",  # 2.153.0 (#2031): agents draft letters (API v1, MCP, event at a document)
     "videos.review",  # 2.99.1 A (#1959): video sign-off with comments at a timecode (links only), customer link = signoff kind video
     "office.logbook",  # 2.93.0 B (#1928): the logbook (vehicles, drives, change log, year report, mileage allowance)

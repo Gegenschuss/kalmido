@@ -15497,5 +15497,19 @@
   "{0} text of this workspace cannot be decrypted with the keys you hold.": ["{0} Text dieses Arbeitsbereichs lässt sich mit deinen Schlüsseln nicht entschlüsseln.", "{0} Texte dieses Arbeitsbereichs lassen sich mit deinen Schlüsseln nicht entschlüsseln."],
   "E-mail limits of public pages": "Mail-Grenzen öffentlicher Seiten",
   "your client portal or booking page used up its sign-in or confirmation e-mails": "dein Kundenportal oder deine Buchungsseite hat seine Anmelde- oder Bestätigungsmails aufgebraucht",
-  "Booking cancelled by the client: {0}": "Buchung vom Kunden abgesagt: {0}"
+  "Booking cancelled by the client: {0}": "Buchung vom Kunden abgesagt: {0}",
+  "No signature": "Keine Signatur",
+  "Answers to": "Antwort an",
+  "Attach signature": "Signatur anhängen",
+  "Mailbox of the workspace": "Postfach des Arbeitsbereichs",
+  "My own mailbox": "Mein eigenes Postfach",
+  "E-mail signature": "E-Mail-Signatur",
+  "E-mail signature…": "E-Mail-Signatur…",
+  "Goes under your quotations, invoices, reminders and letters by e-mail. The signature picture of letters stays apart.": "Steht unter deinen Angeboten, Rechnungen, Mahnungen und Briefen per E-Mail. Das Unterschrift-Bild der Briefe bleibt davon getrennt.",
+  "Signature|e-mail": "Signatur",
+  "Fill from name and company data": "Aus Name und Firmendaten füllen",
+  "Show logo": "Logo zeigen",
+  "Send through": "Senden über",
+  "E-mails leave from the server's address so they do not land in spam; answers go to the answer address. An own sender address needs a mailbox with SMTP (E-mail filing).": "Mails gehen von der Adresse des Servers raus, damit sie nicht im Spam landen; Antworten kommen an die Antwort-Adresse. Eine eigene Absenderadresse braucht ein Postfach mit SMTP (E-Mail-Ablage).",
+  "E-mails leave from {0} through your mailbox.": "Mails gehen von {0} über dein Postfach raus."
 }

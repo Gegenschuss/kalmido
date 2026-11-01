@@ -1113,7 +1113,7 @@ def _mail(to, subject, text, **kw):
     from ..integrations.mail import mail_send
     try:
         return mail_send(to, subject, text, **kw)  # 2.153.0 (#2029): the message sent (a letter keeps its Message-ID)
-    except (smtplib.SMTPException, OSError) as e:
+    except (Exception if kw.get("smtp") else (smtplib.SMTPException, OSError)) as e:  # 2.439.0 (#3617): a mailbox's own server fails in more ways (check of its address)
         app.logger.warning("office mail failed: %s", type(e).__name__)  # 2.39.0 (#1209 audit N6): no addresses in the log
         raise Denied(409, tr("E-mail server refused the message"))
 
@@ -1135,16 +1135,17 @@ def inv_datev_ready(c, oid, r, s):
 INV_CC_MAX = 5  # 2.433.0 (#3599): copy addresses of one mail (= contacts_cl.FK_CC_MAX)
 
 
-def inv_send(c, oid, uid, r, b, later=False):
+def inv_send(c, oid, uid, r, b, later=False, auto=False):
     """Mails the finalised document r to b["to"] (cc, subject, text optional) with its PDF (+ XML) and records it (status
     sent, log). Returns (files, datev): datev = the DATEV copy is due (b["datev"] true, or the setting datev_auto while
     the document has not gone to DATEV yet); the caller commits the customer mail first and sends that copy afterwards
     (2.38.0 review: a DATEV failure never undoes or repeats the customer mail). Its prerequisites are checked before
     anything goes out. 409 without SMTP. 2.269.0 D (#3046): later = only the checks and the day's counters, returns (files,
     datev, mail): the caller commits, then inv_send_mail(c, oid, uid, mail) mails and marks it sent (nothing goes out
-    before the commit; a refused mail marks nothing)."""
+    before the commit; a refused mail marks nothing). 2.439.0 (#3617): auto = no person pressed send (a series): mailsig.ofm_mail."""
     from ..integrations.mail import MAIL_OUT_ON
-    if not MAIL_OUT_ON:
+    from .mailsig import ofm_mail, ofm_own_text, ofm_reply, ofm_sender
+    if not ofm_sender(c, oid, uid, {} if auto else None)["via"]:  # 2.439.0 (#3617): the person's mailbox also sends without the server's SMTP
         raise DeniedKey(409, N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
     if not ofx_locked(r):
         raise DeniedKey(409, N_("Finalise the document first"))
@@ -1163,7 +1164,7 @@ def inv_send(c, oid, uid, r, b, later=False):
     if explicit:  # 2.147.0 (#2460): DATEV switched off -> no copy, also not the automatic one
         office_need_feature(c, oid, "books.datev", s)
     # 2.144.10 B (#2576): no automatic DATEV copy of a trial document (an explicit one is refused by inv_datev_ready)
-    datev = r["kind"] in ("invoice", "credit") and (explicit or (b.get("datev") is None and s.get("datev_auto") and not _col(r, "datev_sent_at")
+    datev = r["kind"] in ("invoice", "credit") and (explicit or (b.get("datev") is None and MAIL_OUT_ON and s.get("datev_auto") and not _col(r, "datev_sent_at")
                                                                  and not _col(r, "trial")
                                                                  and office_feature(c, oid, "books.datev", s)))
     if datev:
@@ -1174,10 +1175,12 @@ def inv_send(c, oid, uid, r, b, later=False):
     subject = inv_clean_subject(b.get("subject")) or f"{title} {r['number']}"
     text = (b.get("text") or "").strip() if isinstance(b.get("text"), str) else ""
     own = bool(text) and text[:5000] != _mail_text(r, lang, s).strip()
+    text = text[:5000] or _mail_text(r, lang, s)
+    mail = ofm_mail(c, oid, uid, text, b, auto=auto)  # 2.439.0 (#3617): the person's signature, sender name, way out
+    own = own or ofm_own_text(c, oid, uid, mail)
     if own:
         inv_own_text_quota(c, oid, uid)
     budget = h6c_send_budget(c, oid, uid, [to] + ccs)  # 2.86.0 (N27); 2.433.0 (#3599): every copy address counts
-    text = text[:5000] or _mail_text(r, lang, s)
     files = inv_files(c, oid, r["id"])
     sheet = []
     if r["kind"] == "invoice" and b.get("timesheet") in (1, True, "1", "true"):  # 2.120.0 D (#2089): the timesheet as a second attachment
@@ -1185,12 +1188,9 @@ def inv_send(c, oid, uid, r, b, later=False):
         sheet = [ls_sheet_file(c, oid, uid, r)]
     from .terms import agb_mail_files
     mail_files, terms = agb_mail_files(c, oid, r, b, files + sheet)  # 2.113.2 (#2253): the terms PDF on request (quotations: by default; never to DATEV)
-    u = g.user
-    from .ledger import ofx_company
-    rt = ofx_company(c, oid).get("email") or ""  # 2.39.0 (#1209 audit N4): the client's answer goes to the company, not the server
-    rt = rt if re.fullmatch(r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+", rt) else None
-    m = {"did": r["id"], "to": to, "subject": subject, "text": text, "files": mail_files, "cc": cc or None, "reply_to": rt,
-         "from_name": (u["display_name"] if u is not None and "display_name" in u.keys() else None),
+    # 2.39.0 (#1209 audit N4): the client's answer goes to the company, not the server; 2.439.0 (#3617): or where the person says
+    m = {"did": r["id"], "to": to, "subject": subject, "text": mail["text"], "files": mail_files, "cc": cc or None,
+         "reply_to": ofm_reply(c, oid, mail["profile"], b), "from_name": mail["name"], "kw": mail["kw"],
          "detail": {"to": to, "cc": cc, "files": [f[0] for f in mail_files], **({"own_text": 1} if own else {}),
                     **({"terms": terms} if terms else {})},  # 2.113.2 (#2253)
          "base": _inv_base(r)}  # 2.269.0 review: the state the checks saw
@@ -1227,7 +1227,7 @@ def inv_send_mail(c, oid, uid, m, r=None):
               "WHERE id=? AND org_id=?", (ts, ts, r["id"], oid))
     ofx_log(c, oid, "send", doc_id=r["id"], detail=m["detail"])
     try:
-        _mail(m["to"], m["subject"], m["text"], attachments=m["files"], cc=m["cc"], from_name=m["from_name"], reply_to=m["reply_to"])
+        _mail(m["to"], m["subject"], m["text"], attachments=m["files"], cc=m["cc"], from_name=m["from_name"], reply_to=m["reply_to"], **m["kw"])
     except Exception:
         if m.get("budget"):
             c.rollback()  # the marks above go, the day's count of the log with them
@@ -1689,11 +1689,13 @@ def inv_datev_post(did):
 def inv_mail_status():
     """{smtp: bool, datev_email: str} so the send dialog can say when mail is not set up."""
     from ..integrations.mail import MAIL_OUT_ON
+    from .mailsig import ofm_sender
     c, uid, oid = _ctx()
     s = office_settings(c, oid)
+    smtp = bool(ofm_sender(c, oid, uid)["via"])  # 2.439.0 (#3617): also through the person's mailbox (the DATEV copy only through the server)
     if not office_feature(c, oid, "books.datev", s):  # 2.147.0 (#2460): the send dialog shows no DATEV choice
-        return jsonify(smtp=bool(MAIL_OUT_ON), datev_email="", datev_auto=0, datev_on=False)
-    return jsonify(smtp=bool(MAIL_OUT_ON), datev_email=s.get("datev_email") or "", datev_auto=int(s.get("datev_auto") or 0), datev_on=True)
+        return jsonify(smtp=smtp, datev_email="", datev_auto=0, datev_on=False)
+    return jsonify(smtp=smtp, datev_email=(s.get("datev_email") or "") if MAIL_OUT_ON else "", datev_auto=int(s.get("datev_auto") or 0), datev_on=True)
 
 
 # ---------------------------------------------------------------- 2.40.0 (#1368 points 8 + 9): reminder fee as an open item, settled reminders

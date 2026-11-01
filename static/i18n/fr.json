@@ -15497,5 +15497,19 @@
   "{0} text of this workspace cannot be decrypted with the keys you hold.": ["{0} texte de cet espace ne peut pas être déchiffré avec tes clés.", "{0} textes de cet espace ne peuvent pas être déchiffrés avec tes clés."],
   "E-mail limits of public pages": "Limites d’e-mails des pages publiques",
   "your client portal or booking page used up its sign-in or confirmation e-mails": "ton portail client ou ta page de réservation a épuisé ses e-mails de connexion ou de confirmation",
-  "Booking cancelled by the client: {0}": "Réservation annulée par le client : {0}"
+  "Booking cancelled by the client: {0}": "Réservation annulée par le client : {0}",
+  "No signature": "Pas de signature",
+  "Answers to": "Réponses à",
+  "Attach signature": "Joindre la signature",
+  "Mailbox of the workspace": "Boîte mail de l'espace de travail",
+  "My own mailbox": "Ma propre boîte mail",
+  "E-mail signature": "Signature e-mail",
+  "E-mail signature…": "Signature e-mail…",
+  "Goes under your quotations, invoices, reminders and letters by e-mail. The signature picture of letters stays apart.": "Figure sous tes devis, factures, relances et lettres envoyés par e-mail. L'image de signature des lettres reste à part.",
+  "Signature|e-mail": "Signature",
+  "Fill from name and company data": "Remplir avec le nom et les données de l'entreprise",
+  "Show logo": "Afficher le logo",
+  "Send through": "Envoyer via",
+  "E-mails leave from the server's address so they do not land in spam; answers go to the answer address. An own sender address needs a mailbox with SMTP (E-mail filing).": "Les e-mails partent de l'adresse du serveur pour ne pas finir en spam ; les réponses vont à l'adresse de réponse. Une adresse d'expéditeur propre nécessite une boîte mail avec SMTP (classement des e-mails).",
+  "E-mails leave from {0} through your mailbox.": "Les e-mails partent de {0} via ta boîte mail."
 }

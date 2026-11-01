@@ -4012,6 +4012,14 @@ MIGRATIONS = [
     ("sheet_shares", "email_seal", "ALTER TABLE sheet_shares ADD COLUMN IF NOT EXISTS email_seal TEXT NOT NULL DEFAULT ''"),
     ("sheet_shares", "email_key", "ALTER TABLE sheet_shares ADD COLUMN IF NOT EXISTS email_key TEXT NOT NULL DEFAULT ''"),
     ("sheet_shares", "email_key", "ALTER TABLE sheet_shares ALTER COLUMN user_id DROP NOT NULL"),
+    # 2.439.0 (#3617): what a person adds to the office's mails (office/mailsig.py): signature (0 = still the prefilled one),
+    # logo under it, sender name, answer address, way out. Older versions ignore them
+    ("office_letter_profiles", "mail_sig", "ALTER TABLE office_letter_profiles ADD COLUMN IF NOT EXISTS mail_sig TEXT NOT NULL DEFAULT ''"),
+    ("office_letter_profiles", "mail_sig_set", "ALTER TABLE office_letter_profiles ADD COLUMN IF NOT EXISTS mail_sig_set BIGINT NOT NULL DEFAULT 0"),
+    ("office_letter_profiles", "mail_sig_logo", "ALTER TABLE office_letter_profiles ADD COLUMN IF NOT EXISTS mail_sig_logo BIGINT NOT NULL DEFAULT 1"),
+    ("office_letter_profiles", "mail_from_name", "ALTER TABLE office_letter_profiles ADD COLUMN IF NOT EXISTS mail_from_name TEXT NOT NULL DEFAULT ''"),
+    ("office_letter_profiles", "mail_reply_to", "ALTER TABLE office_letter_profiles ADD COLUMN IF NOT EXISTS mail_reply_to TEXT NOT NULL DEFAULT ''"),
+    ("office_letter_profiles", "mail_via", "ALTER TABLE office_letter_profiles ADD COLUMN IF NOT EXISTS mail_via TEXT NOT NULL DEFAULT ''"),
     # 2.448.0 (#3765): the language a voter saw when voting, for the mail about the chosen time ('' = not known: the mail
     # follows the poll's owner). Older versions ignore it
     ("sched_poll_votes", "lang", "ALTER TABLE sched_poll_votes ADD COLUMN IF NOT EXISTS lang TEXT NOT NULL DEFAULT ''"),

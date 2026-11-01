@@ -15497,5 +15497,19 @@
   "{0} text of this workspace cannot be decrypted with the keys you hold.": ["{0} testo di questo spazio non si può decifrare con le tue chiavi.", "{0} testi di questo spazio non si possono decifrare con le tue chiavi."],
   "E-mail limits of public pages": "Limiti di e-mail delle pagine pubbliche",
   "your client portal or booking page used up its sign-in or confirmation e-mails": "il tuo portale clienti o la tua pagina di prenotazione ha esaurito le e-mail di accesso o di conferma",
-  "Booking cancelled by the client: {0}": "Prenotazione annullata dal cliente: {0}"
+  "Booking cancelled by the client: {0}": "Prenotazione annullata dal cliente: {0}",
+  "No signature": "Nessuna firma",
+  "Answers to": "Risposte a",
+  "Attach signature": "Allega firma",
+  "Mailbox of the workspace": "Casella dello spazio di lavoro",
+  "My own mailbox": "La mia casella",
+  "E-mail signature": "Firma e-mail",
+  "E-mail signature…": "Firma e-mail…",
+  "Goes under your quotations, invoices, reminders and letters by e-mail. The signature picture of letters stays apart.": "Compare sotto preventivi, fatture, solleciti e lettere via e-mail. L'immagine della firma delle lettere resta separata.",
+  "Signature|e-mail": "Firma",
+  "Fill from name and company data": "Compila da nome e dati aziendali",
+  "Show logo": "Mostra logo",
+  "Send through": "Invia tramite",
+  "E-mails leave from the server's address so they do not land in spam; answers go to the answer address. An own sender address needs a mailbox with SMTP (E-mail filing).": "Le e-mail partono dall'indirizzo del server per non finire nello spam; le risposte arrivano all'indirizzo di risposta. Un indirizzo mittente proprio richiede una casella con SMTP (archivio e-mail).",
+  "E-mails leave from {0} through your mailbox.": "Le e-mail partono da {0} tramite la tua casella."
 }

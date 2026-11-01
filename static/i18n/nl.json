@@ -15497,5 +15497,19 @@
   "{0} text of this workspace cannot be decrypted with the keys you hold.": ["{0} tekst van deze ruimte kan niet met je sleutels worden ontsleuteld.", "{0} teksten van deze ruimte kunnen niet met je sleutels worden ontsleuteld."],
   "E-mail limits of public pages": "Mailgrenzen van openbare pagina’s",
   "your client portal or booking page used up its sign-in or confirmation e-mails": "je klantenportaal of boekingspagina heeft zijn aanmeld- of bevestigingsmails opgebruikt",
-  "Booking cancelled by the client: {0}": "Boeking afgezegd door de klant: {0}"
+  "Booking cancelled by the client: {0}": "Boeking afgezegd door de klant: {0}",
+  "No signature": "Geen handtekening",
+  "Answers to": "Antwoorden naar",
+  "Attach signature": "Handtekening toevoegen",
+  "Mailbox of the workspace": "Mailbox van de werkruimte",
+  "My own mailbox": "Mijn eigen mailbox",
+  "E-mail signature": "E-mailhandtekening",
+  "E-mail signature…": "E-mailhandtekening…",
+  "Goes under your quotations, invoices, reminders and letters by e-mail. The signature picture of letters stays apart.": "Staat onder je offertes, facturen, aanmaningen en brieven per e-mail. De handtekeningafbeelding van brieven blijft apart.",
+  "Signature|e-mail": "Handtekening",
+  "Fill from name and company data": "Invullen met naam en bedrijfsgegevens",
+  "Show logo": "Logo tonen",
+  "Send through": "Verzenden via",
+  "E-mails leave from the server's address so they do not land in spam; answers go to the answer address. An own sender address needs a mailbox with SMTP (E-mail filing).": "Mails gaan uit vanaf het serveradres zodat ze niet in de spam belanden; antwoorden gaan naar het antwoordadres. Een eigen afzenderadres vereist een mailbox met SMTP (e-mailarchief).",
+  "E-mails leave from {0} through your mailbox.": "Mails gaan uit vanaf {0} via je mailbox."
 }

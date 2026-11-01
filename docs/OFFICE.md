@@ -2315,6 +2315,21 @@ document texts are encrypted at rest in organisations with encryption.
   `POST .../send` takes `timesheet: true` to attach it as a second file (the invoice's own PDF / ZUGFeRD file is unchanged;
   the DATEV copy never gets it). The document answer has `timesheet_ok`.
 
+## E-mail signature, sender and answer address
+
+*Since 2.439.0 (#3617):* every person sets their own part of the office's mails (quotations, invoices, credit notes, reminders,
+delivery notes, letters by e-mail): *Settings > Company & office > Documents & numbers > E-mail signature*, *Settings > Account*
+or *Edit* in a send dialog (`GET` / `PUT /api/office/mail-profile`, with any office access, only the person's own row).
+
+- **Signature**: plain text, at most 1000 characters and 12 lines, prefilled from the name and the company data until saved. It goes
+  under the text behind `-- `; the mail is then text + HTML with the company logo as an embedded picture (*Show logo*), never a link
+  to an outside picture. The send dialog can leave it off for one mail (`signature: false`). The signature picture of letters stays apart.
+- **Sender name** free. **Answers to** (Reply-To): this mail's, else the person's, else the company e-mail. A letter's own reply address stays first.
+- **Sender address**: through the server always the server's (SPF / DMARC). With a mailbox with SMTP (e-mail filing) the mail leaves
+  through it with its address: the workspace's, in an organisation also the person's private one when chosen (*Send through*).
+- A member's own signature counts for the day's limit of own texts. A series sends without a person: the workspace's mailbox or
+  the server, the prefilled signature, the company e-mail as Reply-To, never a person's private mailbox.
+
 ## Correspondence: letters
 
 *Since 2.153.0.*
