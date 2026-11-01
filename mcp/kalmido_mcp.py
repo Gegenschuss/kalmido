@@ -378,9 +378,7 @@ def t_import_vcards(api, a):
     path = f"/address-books/{int(a['book_id'])}/import"
     if a.get("files"):
         return api.call("POST", path, multipart=({}, _b64_files(a)))
-    if not isinstance(a.get("vcf"), str):
-        raise ApiError(400, "vcf or files is required")
-    return api.call("POST", path, body={"vcf": a["vcf"]})
+    return api.call("POST", path, body={"vcf": a.get("vcf")})
 
 
 def t_post_team_message(api, a):
