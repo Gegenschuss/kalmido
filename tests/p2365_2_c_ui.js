@@ -113,9 +113,9 @@ const change = (w, el, v) => { if (typeof v === 'boolean') el.checked = v; else 
   check(!!ps, '#2789: General > Working week has the own state of the public holidays (person without an organisation)');
   const pc = d.querySelector('.smodal #s-holst-cc');  // 2.461.0 (#3773): first the country
   if (pc) change(w, pc, 'DE');
-  check(await until(() => !ps.hidden), '#3773: the regions of Germany show for a person without an organisation');
-  if (ps) change(w, ps, 'BY');
-  check(await until(async () => (await call('GET', '/api/state', null, CC)).settings.holiday_state === 'BY'), '#2789: the own state saved');
+  check(await until(async () => (await call('GET', '/api/state', null, CC)).settings.holiday_state === 'DE'), '#3773: Germany saved first');
+  // saving may draw the section anew: always the field that is there now
+  check(await until(async () => { const r = d.querySelector('.smodal #s-holst'); if (r && !r.hidden) change(w, r, 'BY'); return (await call('GET', '/api/state', null, CC)).settings.holiday_state === 'BY'; }), '#2789: the own state saved');
   check((await call('GET', '/api/team/absences/feed', null, CC)).state === 'BY', '#2789: it applies to the person without an organisation');
   w.close();
 

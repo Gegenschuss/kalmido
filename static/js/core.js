@@ -1505,7 +1505,7 @@ function hol_selects(id, cs, v, blank, attrs = '') {
 document.addEventListener('change', e => {  // the country changed: its regions, starting on the nationwide holidays
   const t = /** @type {any} */ (e.target), box = t.closest?.('.holsel');
   if (!box || t !== box.firstElementChild) return;
-  const rg = /** @type {any} */ (box.lastElementChild), c = HOL_CS.find(x => x.code === t.value);
+  const rg = /** @type {any} */ (t.nextElementSibling), c = HOL_CS.find(x => x.code === t.value);
   rg.innerHTML = hol_regions(c, '', t.options[0].textContent);
   rg.hidden = !c || !Object.keys(c.regions).length;
   rg.value = t.value;
