@@ -2183,7 +2183,6 @@ class Runner:
             return None
         if self.refresh_due:  # runtime_changed: the switch may have changed
             self.refresh_agent()
-            self.refresh_due = True  # the next run reads the runtime too
         if agent_dispatch.mode_of(self.agent) == "off":
             return None
         if getattr(self, "dispatcher", None) is None:
