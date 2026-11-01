@@ -109,6 +109,7 @@ UMZ_LEFT_USERS = {
     "user_keys": _U_SECRET, "webauthn_creds": _U_SECRET, "wiki_key_pending": _U_SECRET, "wiki_keys": _U_SECRET, "wiki_shares": _U_SECRET,
     "list_bell": _U_VIEW, "list_folder_skip": _U_VIEW, "list_mine_hide": _U_VIEW, "rss_reads": _U_VIEW, "task_seen": _U_VIEW, "tchat_reads": _U_VIEW,
     "tchat_thread_reads": _U_VIEW, "user_task_order": _U_VIEW, "wait_hidden": _U_VIEW,
+    "push_gate": _U_SERVER, "quiet_push_held": _U_SERVER,  # 2.463.0: the two tables of #2966
     "admin_login_ips": _U_SERVER, "agent_push_held": _U_SERVER, "bg_jobs": _U_SERVER, "conn_blocks": _U_SERVER, "deleted_accounts": _U_SERVER,
     "disc_quota": _U_SERVER, "ev_invite_day": _U_SERVER, "ev_reminded": _U_SERVER, "idem_keys": _U_SERVER, "imports": _U_SERVER, "login_ips": _U_SERVER,
     "notify_mail_queue": _U_SERVER, "sample_items": _U_SERVER, "task_push": _U_SERVER,
