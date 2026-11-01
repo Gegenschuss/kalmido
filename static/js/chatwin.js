@@ -28,8 +28,9 @@ document.addEventListener('click', e => {
 }, true);
 // middle click: a conversation in the team chat, an agent's Chat button, a link to a chat (Home, News, the agents' cards)
 const dw_target = e => {
-  const r = e.target.closest?.('#view .tcrow[data-rid], [data-act="chat-open"][data-aid], a[href^="#agents/"], a[href^="#team/"]'); if (!r) return null;
+  const r = e.target.closest?.('#view .tcrow[data-rid], #side .sbconv[data-go^="team/"], [data-act="chat-open"][data-aid], a[href^="#agents/"], a[href^="#team/"]'); if (!r) return null;
   if (r.dataset.rid) return ['team', +r.dataset.rid];
+  if (/^team\/\d+$/.test(r.dataset.go || '')) return ['team', +r.dataset.go.split('/')[1]];  // 2.479.0 (#2814): a row of the area Chat's panel
   if (r.dataset.aid) return ['agents', +r.dataset.aid];
   const h = r.getAttribute('href'); if (!/^#(agents|team)\/\d+(?:$|\?)/.test(h || '')) return null;  // not a sub page of the chat
   const k = dw_chatOf(h); return k ? k.split('/') : null;
