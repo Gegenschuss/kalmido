@@ -148,6 +148,8 @@ TENANT_EXEMPT = {
     "agent_chat": "a person's chat with an agent (agent_id + user_id; the agent's workspace decides what it sees)",
     "agent_chat_prefs": "2.233.0 A (#2848): a person's own settings for one agent chat (agent_id + user_id, like agent_chat)",
     "agent_push_held": "2.236.0 B (#2905): a count of pushes an agent held back for one person in its quiet window (no content; like agent_chat)",
+    "quiet_push_held": "2.367 (#2966): a count of a person's pushes held back in their own quiet hours (no content; only that person)",
+    "push_gate": "2.367 (#2967): counts of a person's bundled pushes (no content; only that person, the summary checks access again)",
     "agent_rules": _AGENT + " (2.235.0 C #2903: its standing rules; the source is checked against what the agent sees)",
     "chat_reactions": "per agent chat message",
     "agent_steps": "2.32.0 (#1081): an agent's steps for ONE person (its chat answer / its job for that person); only that person reads them",

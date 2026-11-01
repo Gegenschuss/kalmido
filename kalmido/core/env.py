@@ -124,6 +124,8 @@ VARS = (
     _v("KALMIDO_ADMIN_TOPIC", "", "ntfy topic for the admin alerts (empty = the admins' own topics).", "notify"),
     _v("KALMIDO_ADMIN_ALERT_WINDOW", "3600", "Seconds over which repeated alerts are summed up.", "notify"),
     _v("TASKS_PUSH_GAP", "60", "Least seconds between two comment notifications of one task.", "notify"),
+    _v("KALMIDO_QUIET_PUSH", "1", "`0` = quiet hours hold only repeated reminders and notification channels, as before 2.367.", "notify"),
+    _v("KALMIDO_PUSH_BUNDLE", "1", "`0` = no summary pushes per person and chat room (one push per event).", "notify"),
     _v("TASKS_NEWS_DAYS", "90", "Days the News entries are kept.", "notify"),
     _v("TASKS_NEWS_MAX", "500", "News entries kept per person at most.", "notify"),
 

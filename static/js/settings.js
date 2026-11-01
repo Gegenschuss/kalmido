@@ -733,8 +733,9 @@ function settingsModal(focus) {
       <div id="s-digmail-w"></div>
       <div class="row"><label for="s-brief">${tr('Morning briefing at')}</label>${timeIn('s-brief', s.brief_time || '', {label: tr('Morning briefing at'), empty: tr('off')})}</div>
       ${hint(tr('One push with the numbers of your briefing (the first block of Today).'))}
-      <h4 id="s-quiet-h">${tr('Repeated reminders')}</h4>
+      <h4 id="s-quiet-h">${tr('Quiet hours (all pushes)')}</h4>
       <div class="row"><label for="s-qfrom">${tr('Quiet from')}</label>${timeIn('s-qfrom', s.quiet_from ?? '22:00', {label: tr('Quiet from'), empty: tr('none')})}<label for="s-qto" class="qtol">${tr('until|time')}</label>${timeIn('s-qto', s.quiet_to ?? '07:00', {label: tr('Quiet until'), empty: tr('none')})}</div>
+      ${hint(tr('No pushes during these hours, on your clock (the time zone of your time tracking settings). The bell keeps everything; one summary when they end. Urgent tasks, focus timers and times you set yourself (digest, briefing) still come.'))}
       ${hint(tr('A task or a project can repeat its reminder until done (date dialog or project dialog). Nothing repeats during the quiet hours.'))}`,
     integr: integrCardsHtml() + calsHtml(chk, hint) + (typeof famDavHtml === 'function' ? famDavHtml() : '') + `<h4 id="s-ical-h">${tr('Calendar subscription')}</h4>
       ${hint(tr('Read-only. Calendar apps fetch changes every few hours.'))}

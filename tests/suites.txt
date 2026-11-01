@@ -2238,6 +2238,8 @@ fresh; run p23602_a_api "$PY" p23602_a_api_test.py "$KALMIDO_TEST_DATA"
 # 2.442.0: agent token at setup (#1762), packed static files (#2808) (UI: p2442_c_ui.js)
 fresh; run p2442_a_token "$PY" p2442_a_token_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2442_b_static_pack "$PY" p2442_b_static_pack_test.py "$KALMIDO_TEST_DATA"
+# 2.367 (#2966 #2967): quiet hours for all pushes, the person's time zone, bundled pushes
+now wed 10:00; fresh; run p2367_quietbundle "$PY" p2367_quietbundle_test.py "$KALMIDO_TEST_DATA"
 # 2.363.3 C (#3134): upload progress with Cancel, the server's limit in all file dialogs
 fresh; run p2363_3_c_ui node p2363_3_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.455.0 (#3847 #3852): the phone drawer stays on a workspace switch, names/file names get the first line at 320 px

@@ -6,7 +6,8 @@ import time
 from datetime import date
 from flask import g, has_request_context, jsonify, request
 
-from ..core.config import app, PUBLIC_URL
+from ..core.config import app, APP_NAME, PUBLIC_URL
+from ..core.env import env_bool
 from ..core.pg import insert_id, write_lock
 from ..core.i18n import LANGS, short_day, tr, trn
 from ..core.db import body, bump, db, err, inbox_default, iso, iso_ms, local_now, now_utc, usettings
@@ -441,8 +442,74 @@ def collab_user(c, uid, lid=None):
     return s if collab_on(s) else None
 
 
-def burst_gate(c, uid, tid, mentioned=False, event=False):
-    """True = push now (time remembered); False = counted for the watchdog's summary."""
+# 2.367 (#2967): the gate above is per task, so 10 tasks assigned at once were 10 pushes. push_gate counts per person and
+# scope: a<actor> = from the third push of one actor inside the gap only counted (PERSON_PUSH_FREE; an @mention always
+# comes), r<room> = one chat push per room and gap. The watchdog then sends one summary with the count (never a text).
+PUSH_BUNDLE_ON = env_bool("KALMIDO_PUSH_BUNDLE", True)  # the test containers switch it off (start.sh), the suites count single pushes
+PERSON_PUSH_FREE = 2
+
+
+def push_gate(c, uid, scope, free, kind="", ref=0, actor=0):
+    """True = push now; False = counted for the summary. The caller commits."""
+    if not PUSH_BUNDLE_ON:
+        return True
+    now = time.time()
+    r = c.execute("SELECT * FROM push_gate WHERE user_id=? AND scope=?", (uid, scope)).fetchone()
+    if r and (r["held"] or now - r["started_at"] < TASK_PUSH_GAP):  # (held: the watchdog has not sent the summary yet)
+        hold = r["n"] >= free
+        c.execute("UPDATE push_gate SET n=n+1, held=held+?, kind=?, ref=?, actor=? WHERE user_id=? AND scope=?",
+                  (1 if hold else 0, kind if r["kind"] == kind else "", ref if r["ref"] == ref else 0,
+                   actor if r["actor"] == actor else 0, uid, scope))
+        return not hold
+    c.execute("""INSERT INTO push_gate(user_id,scope,started_at,n,held,kind,ref,actor) VALUES(?,?,?,1,0,?,?,?)
+                 ON CONFLICT(user_id,scope) DO UPDATE SET started_at=excluded.started_at, n=1, held=0, kind=excluded.kind,
+                 ref=excluded.ref, actor=excluded.actor""", (uid, scope, now, kind, ref, actor))
+    return True
+
+
+def push_gate_due(c, prefix):
+    """The gates of one scope type whose window is over and that hold something."""
+    return c.execute("SELECT * FROM push_gate WHERE held>0 AND started_at<=? AND substr(scope,1,1)=?",
+                     (time.time() - TASK_PUSH_GAP, prefix)).fetchall()
+
+
+def push_gate_reset(c, p):
+    """The summary of gate row p goes out now: a new window starts with it (so the room's "one per gap" holds), before sending: never twice."""
+    c.execute("UPDATE push_gate SET started_at=?, n=?, held=0, kind='', ref=0, actor=0 WHERE user_id=? AND scope=?",
+              (time.time(), PERSON_PUSH_FREE, p["user_id"], p["scope"]))
+    c.commit()
+
+
+def push_gate_tick(c, users, S, LG):
+    """Watchdog: one summary per person and actor ("Anna assigned you 10 tasks", opens the list when it was one list)."""
+    from ..notify.push import _wd_fail
+    for p in push_gate_due(c, "a"):
+        try:
+            _push_gate_one(c, p, users, S, LG)
+        except Exception as e:  # noqa: BLE001
+            _wd_fail(c, "bundled push", (p["user_id"], p["scope"]), e)
+    c.execute("DELETE FROM push_gate WHERE held=0 AND started_at<?", (time.time() - 86400,))
+    c.commit()
+
+
+def _push_gate_one(c, p, users, S, LG):
+    from ..notify.push import notify, push_prio
+    push_gate_reset(c, p)
+    uid = p["user_id"]
+    if uid not in users:
+        return
+    lg, click = LG[uid], f"{PUBLIC_URL}/#today"
+    if p["ref"] and list_role(c, p["ref"], uid):  # the person can still open that list
+        click = f"{PUBLIC_URL}/#l/{p['ref']}"
+    who = user_names(c, [p["actor"]]).get(p["actor"]) if p["actor"] else None
+    msg = trn("assigned you {0} task", "assigned you {0} tasks", p["n"], lg=lg) if p["kind"] == "assign" else \
+        trn("{0} notification", "{0} notifications", p["n"], lg=lg)
+    notify(uid, who or APP_NAME, msg, push_prio(S[uid]), click, s=S[uid], tag=f"gate-{p['actor']}", kind="assign" if p["kind"] == "assign" else "other")
+
+
+def burst_gate(c, uid, tid, mentioned=False, event=False, kind=""):
+    """True = push now (time remembered); False = counted for the watchdog's summary.
+    2.367 (#2967): kind = what the second gate's summary says (push_gate); an @mention passes it."""
     if any(f(c, uid) for f in PUSH_BURST_SKIP):  # 2.236.0 (#2909 #2905): an agent's work style drops / holds it
         return False
     now = time.time()
@@ -451,6 +518,11 @@ def burst_gate(c, uid, tid, mentioned=False, event=False):
         c.execute("""UPDATE task_push SET pending=pending+?, events=events+?, mentioned=GREATEST(mentioned,?)
                      WHERE user_id=? AND task_id=?""", (0 if event else 1, 1 if event else 0, 1 if mentioned else 0, uid, tid))
         return False
+    if not mentioned:
+        actor = g.get("user") if has_request_context() else None
+        tl = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
+        if not push_gate(c, uid, f"a{actor['id'] if actor else 0}", PERSON_PUSH_FREE, kind, tl[0] if tl else 0, actor["id"] if actor else 0):
+            return False
     # 2.421.0 (#3512): the counters of the last window stay - the watchdog sends them (also "you were mentioned") one gap later
     c.execute("INSERT INTO task_push(user_id,task_id,sent_at) VALUES(?,?,?) ON CONFLICT(user_id,task_id) "
               "DO UPDATE SET sent_at=excluded.sent_at", (uid, tid, now))
@@ -632,7 +704,7 @@ def task_event(c, tid, kind, prev_assignee=None, skip=None):
             from ..notify.channels import evm_note
             evm_note(c, uid, "assign", tid, actor, s)
         if not notif_ok(c, uid, s, KIND_ROW[kind], "push", t["list_id"]) or not push_reachable(c, uid, s) or \
-                not burst_gate(c, uid, tid, event=True):
+                not burst_gate(c, uid, tid, event=True, kind=kind):
             continue
         if kind == "complete" and not agent_push_ok(c, uid, s, actor):  # 2.28.0 (#987)
             continue

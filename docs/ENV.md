@@ -109,6 +109,8 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_EVENT_MAIL_GAP` | `600` | Least seconds between two summary mails to one person. |
 | `KALMIDO_INTEG_FAILS` | `5` | Failed polls in a row of a mailbox, git connection or ntfy inbox after which its people get a notice. |
 | `KALMIDO_NOTIF_TEMPLATE` | `read` | Notification template of a share without one: read, work or all. |
+| `KALMIDO_PUSH_BUNDLE` | `1` | `0` = no summary pushes per person and chat room (one push per event). |
+| `KALMIDO_QUIET_PUSH` | `1` | `0` = quiet hours hold only repeated reminders and notification channels, as before 2.367. |
 | `KALMIDO_TELEGRAM_API` | `https://api.telegram.org` | Address of the Telegram bot API. |
 | `KALMIDO_VAPID_SUBJECT` | `(empty)` | Contact of the push keys (empty = PUBLIC_URL if https, else mailto:admin@example.com). |
 | `KALMIDO_WEBPUSH` | `1` | Switch: browser push notifications. |

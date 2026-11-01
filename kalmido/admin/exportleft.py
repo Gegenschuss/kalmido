@@ -60,7 +60,7 @@ UMZ_LEFT_TABLES = {
     "user_keys": _SECRET, "webauthn_creds": _SECRET, "wiki_key_pending": _SECRET, "wiki_keys": _SECRET, "wiki_shares": _SECRET,
     "admin_login_ips": _SERVER, "agent_push_held": _SERVER, "bg_jobs": _SERVER, "conn_blocks": _SERVER, "deleted_accounts": _SERVER, "disc_quota":
     _SERVER, "ev_invite_day": _SERVER, "ev_reminded": _SERVER, "idem_keys": _SERVER, "imports": _SERVER, "login_ips": _SERVER, "notify_mail_queue":
-    _SERVER, "org_keys": _SERVER, "org_out_requests": _SERVER, "sample_items": _SERVER, "task_push": _SERVER, "tidy_pending": _SERVER, "upload_scan":
+    _SERVER, "org_keys": _SERVER, "org_out_requests": _SERVER, "push_gate": _SERVER, "quiet_push_held": _SERVER, "sample_items": _SERVER, "task_push": _SERVER, "tidy_pending": _SERVER, "upload_scan":
     _SERVER,
     "book_members": _SHARE, "ev_cal_members": _SHARE, "folder_people": _SHARE, "fs_shares": _SHARE, "group_members": _SHARE, "group_shares": _SHARE,
     "groups": _SHARE, "sheet_shares": _SHARE, "tchat_members": _SHARE,

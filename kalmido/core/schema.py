@@ -4257,6 +4257,18 @@ CREATE TABLE IF NOT EXISTS agent_push_held (
   agent_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   n BIGINT NOT NULL DEFAULT 0, first_at TEXT NOT NULL, last_at TEXT NOT NULL, PRIMARY KEY (agent_id, user_id));
 CREATE INDEX IF NOT EXISTS agent_push_held_user ON agent_push_held(user_id);
+-- 2.367 (#2966): pushes held back in a person's quiet hours (a count, no content), one summary when they end
+-- (notify/push.py quiet_hold, quiet_held_tick). New table only: older versions ignore it
+CREATE TABLE IF NOT EXISTS quiet_push_held (
+  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  n BIGINT NOT NULL DEFAULT 0, first_at TEXT NOT NULL, last_at TEXT NOT NULL);
+-- 2.367 (#2967): the bundling of pushes per person: scope a<actor> = what one person triggers, r<room> = a chat room. Counts
+-- only (collab/comments.py push_gate). kind / ref / actor = what the summary says. New table only: older versions ignore it
+CREATE TABLE IF NOT EXISTS push_gate (
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, scope TEXT NOT NULL,
+  started_at DOUBLE PRECISION NOT NULL DEFAULT 0, n BIGINT NOT NULL DEFAULT 0, held BIGINT NOT NULL DEFAULT 0,
+  kind TEXT NOT NULL DEFAULT '', ref BIGINT NOT NULL DEFAULT 0, actor BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, scope));
 -- 2.235.0 C (#2903): the standing rules of an agent ("from now on always ..."): the text, active | paused, the source (a chat
 -- message / a comment the agent saw, or manual) with a short excerpt (agents/agentrules.py). New table only: older versions ignore it
 CREATE TABLE IF NOT EXISTS agent_rules (

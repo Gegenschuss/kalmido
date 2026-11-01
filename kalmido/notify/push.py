@@ -26,7 +26,7 @@ from ..accounts.session import GATE
 from ..core.access import list_role, task_visible, vis_sql
 from ..tasks.validation import NAG_HOUR_CAP, NAG_MINUTES, valid_hm
 from ..tasks.tasks import _wd_followups
-from ..collab.comments import collab_on, task_push_tick
+from ..collab.comments import collab_on, push_gate_tick, task_push_tick
 from ..collab.news import news_cleanup, news_unread_me, notif_ok
 from ..personal.habits import habit_times, pomo_close, pomo_elapsed, pomo_planned_end
 from ..personal.timetrack import _num, time_watchdog
@@ -456,14 +456,55 @@ def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=N
     return p
 
 
+# 2.367 (#2966): the quiet hours hold every push (they only held nags and the channels). Not held: priority 5 (a task's
+# "Urgent"), and what the person set to their own time or started themselves: the push test, digest, briefing, daily
+# review (a time inside the quiet hours is their choice; a later delivery would report the wrong day) and focus timers
+# (quiet=False). A held push is only counted, the bell keeps its entry; one summary when the quiet hours end.
+QUIET_ON = env_bool("KALMIDO_QUIET_PUSH", True)  # the test containers switch it off (start.sh): the suites also run at night
+QUIET_FREE_TAGS = ("test", "digest", "briefing", "review")
+
+
+def quiet_hold(uid, prio, tag, s):
+    """True = uid is in their quiet hours: this push is counted instead of sent."""
+    if not QUIET_ON or str(prio) == "5" or tag in QUIET_FREE_TAGS or not in_quiet(s, local_now()):
+        return False
+    try:
+        c = connect()
+        try:
+            with system_ctx(c):  # the recipient's own row (a push thread has no request context)
+                ts = iso(now_utc())
+                c.execute("""INSERT INTO quiet_push_held(user_id,n,first_at,last_at) VALUES(?,1,?,?)
+                             ON CONFLICT(user_id) DO UPDATE SET n=quiet_push_held.n+1, last_at=excluded.last_at""", (uid, ts, ts))
+            c.commit()
+        finally:
+            c.close()
+    except Exception as e:  # noqa: BLE001  (the count never breaks the caller; the push stays held)
+        print("quiet hours: counting failed:", type(e).__name__, e, flush=True)
+    return True
+
+
+def quiet_held_tick(c, users, S, LG, now):
+    """Watchdog: once a person's quiet hours have ended, ONE push "N notifications during the quiet hours"; the count goes."""
+    for h in c.execute("SELECT * FROM quiet_push_held ORDER BY user_id").fetchall():
+        uid = h["user_id"]
+        if uid in users and in_quiet(S[uid], now):
+            continue
+        c.execute("DELETE FROM quiet_push_held WHERE user_id=? AND last_at<=?", (uid, h["last_at"]))  # newer counts wait for the next tick
+        c.commit()  # before sending: never twice
+        if uid in users and h["n"]:
+            notify(uid, APP_NAME, trn("{0} notification during the quiet hours", "{0} notifications during the quiet hours", h["n"], lg=LG[uid]),
+                   push_prio(S[uid]), f"{PUBLIC_URL}/#today", s=S[uid], tag="quiet", kind="other", quiet=False)
+
+
 def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None, task=None, due=None, ttl=86400, kind=None,
-           scope=None, chn_msg=None):
+           scope=None, chn_msg=None, quiet=True):
     """One push to one user over the channel of their settings (push_channel):
     ntfy = the ntfy topic; webpush = every subscribed device, and the ntfy topic instead while no device is
     subscribed or none accepted it; both = both. Returns True when at least one channel accepted it.
     2.142.0 A (#2145): kind (reminder | assign | comment | digest | other) also goes to the person's notification channels
     that want it (Slack, Matrix, Telegram, Signal; notify/channels.py); without kind it is guessed from tag / origin.
-    2.240.0 B2 (#2867): scope / chn_msg = what the push belongs to / the channels' text (chn_scope, chn_push); web push and ntfy unchanged."""
+    2.240.0 B2 (#2867): scope / chn_msg = what the push belongs to / the channels' text (chn_scope, chn_push); web push and ntfy unchanged.
+    2.367 (#2966): quiet=False = not held in the person's quiet hours (quiet_hold)."""
     from ..notify.alerts import aa_count
     if s is None:
         c = connect()
@@ -472,6 +513,8 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
                 s = usettings(c, uid)
         finally:
             c.close()
+    if quiet and quiet_hold(uid, prio, tag, s):
+        return False
     from ..collab.liste2eguard import le2b_net
     lg = s.get("lang") if s.get("lang") in LANGS else "en"
     title, msg = le2b_net(title, lg), le2b_net(msg, lg)  # 2.64.2 D (#1817): the neutral word in the recipient's language
@@ -625,6 +668,7 @@ def _watchdog_tick(c):
     for uid in users:
         LG[uid] = S[uid].get("lang") if S[uid].get("lang") in LANGS else "en"
     _wd_section(c, "collab pushes", task_push_tick, users, S, LG)
+    _wd_section(c, "bundled pushes", push_gate_tick, users, S, LG)  # 2.367 (#2967): one summary per person who triggered many
     _wd_section(c, "dismiss pushes", push_dismiss_tick)
     _wd_section(c, "news cleanup", news_cleanup)
     _wd_section(c, "office log prune", fx2_office_log_prune)  # 2.38.0 (#1155)
@@ -674,6 +718,7 @@ def _watchdog_tick(c):
     _wd_section(c, "portal mails", pt_mail_tick)  # 2.63.0 B (#1513): answers / "done" to the reporters of customer reports
     _wd_section(c, "time", time_watchdog, users, S, LG)
     now = local_now()
+    _wd_section(c, "quiet hours summary", quiet_held_tick, users, S, LG, now)  # 2.367 (#2966)
     _wd_section(c, "reminders", _wd_reminders, users, S, LG, now)
     from ..tasks.remindat import rat_tick
     _wd_section(c, "fixed reminders", rat_tick, users, S, LG, now)  # 2.111.0 C (#2057): "remind me Tue 9:00"
@@ -748,7 +793,8 @@ def _wd_reminders(c, users, S, LG, now):
                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL
                           AND t.reminders!='' AND l.archived=0""").fetchall()  # 1.5.1: none for archived lists
     early, margin = wd_early_allday(S), WD_EARLY_MARGIN + tz_gap(S, now)  # 2.368.3 (#2985): + the distance to the people's clocks
-    memo = {}  # 2.281.0 B (#3117): list roles / push settings per person, once per tick (a wave of 100 reminders)
+    # 2.281.0 B (#3117): list roles / push settings per person, once per tick (a wave of 100 reminders)
+    memo = {"bundle": {}}  # 2.367 (#2967): + the all-day reminders of this tick per person
     for t in rows:
         if not wd_rem_maybe(t, early, now, margin):
             continue  # 2.191.0 C (#2516): nothing of this task can be due yet -- _wd_reminder would only read
@@ -756,6 +802,24 @@ def _wd_reminders(c, users, S, LG, now):
             _wd_reminder(c, t, users, S, LG, now, memo)
         except Exception as e:  # noqa: BLE001
             _wd_fail(c, "reminder of task", t["id"], e)
+    for who, items in memo["bundle"].items():
+        try:
+            _wd_rem_flush(who, items, S.get(who, USER_DEFAULTS), LG.get(who, "en"), now)
+        except Exception as e:  # noqa: BLE001
+            _wd_fail(c, "reminders of user", who, e)
+
+
+def _wd_rem_flush(who, items, s, lg, now):
+    """2.367 (#2967): all-day reminders fire together at the person's all-day time: one alone stays its usual push (buttons),
+    more become one message like the digest. A reminder with a time of day stays a push of its own."""
+    if len(items) == 1:
+        return notify(*items[0][1], **items[0][2])
+    today = user_now(s, now).date().isoformat()
+    head = trn("{0} task today", "{0} tasks today", len(items), lg=lg) if all(t["due"] == today for t, _a, _k in items) else \
+        trn("{0} reminder", "{0} reminders", len(items), lg=lg)
+    lines = [f"- {t['title']}" for t, _a, _k in items[:15]]
+    return notify(who, tr("Reminders", lg=lg), head + "\n" + "\n".join(lines), push_prio(s, 4 if any(t["priority"] == 5 for t, _a, _k in items) else None),
+                  f"{PUBLIC_URL}/#today", s=s, tag="reminders", kind="reminder", scope="private", chn_msg=head)  # like the digest: the channels get the number
 
 
 # 2.191.0 C (#2516): the reminder / nag sections looked up the recipient of EVERY open task with reminders (task_visible:
@@ -828,11 +892,15 @@ def _wd_reminder(c, t, users, S, LG, now, memo=None):
             day = tr("today", lg=lgw) if t["due"] == user_now(sw, now).date().isoformat() else \
                 short_day(date.fromisoformat(t["due"]), lgw)
             lname = tr("Basket", lg=lgw) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
-            notify(who, t["title"], tr("Due {0} {1} · {2}", day, when, lname, lg=lgw),
-                   push_prio(sw, 4 if t["priority"] == 5 else None), f"{PUBLIC_URL}/#t/{t['id']}", s=sw,
-                   actions=[(tr("Snooze", lg=lgw), f"{PUBLIC_URL}/#snooze/{t['id']}"),
-                            (tr("Done|action", lg=lgw), f"{PUBLIC_URL}/#done/{t['id']}")],
-                   task=t["id"], due=t["due"] if t["repeat"] else None)
+            push = ((who, t["title"], tr("Due {0} {1} · {2}", day, when, lname, lg=lgw),
+                     push_prio(sw, 4 if t["priority"] == 5 else None), f"{PUBLIC_URL}/#t/{t['id']}"),
+                    {"s": sw, "actions": [(tr("Snooze", lg=lgw), f"{PUBLIC_URL}/#snooze/{t['id']}"),
+                                          (tr("Done|action", lg=lgw), f"{PUBLIC_URL}/#done/{t['id']}")],
+                     "task": t["id"], "due": t["due"] if t["repeat"] else None})
+            if t["due_time"] or "bundle" not in memo:
+                notify(*push[0], **push[1])
+            else:
+                memo["bundle"].setdefault(who, []).append((t, *push))  # 2.367 (#2967): sent after the loop (_wd_rem_flush)
         if not rcpt or not _wd_notif_ok(c, rcpt, s, None, memo):
             continue
         if nag_minutes(t["nag"], t["list_nag"]):  # 2.7.0 (#413): this reminder counts as a nag (the next one an interval later)
@@ -876,7 +944,7 @@ def nag_last(raw, key):
 
 
 def in_quiet(s, now):
-    """True during the person's quiet hours (local HH:MM range, may span midnight)."""
+    """True during the person's quiet hours (HH:MM range on their clock, may span midnight; 2.367 (#2966): their time zone)."""
     a, b = s.get("quiet_from") or "", s.get("quiet_to") or ""
     if not (valid_hm(a) and valid_hm(b)) or a == b:
         return False
@@ -967,9 +1035,9 @@ def _wd_pomo(c, p, users, S, LG):
         s, lg = S[p["user_id"]], LG[p["user_id"]]
         if p["kind"] == "focus":
             notify(p["user_id"], tr("Focus done", lg=lg), tr("{0} min{1}. Time for a break.", p["minutes"], " · " + p["title"] if p["title"] else "", lg=lg),
-                   push_prio(s), f"{PUBLIC_URL}/#pomo", s=s, scope=f"t:{p['task_id']}" if p["task_id"] else "private")  # 2.240.0 B2 (#2867)
+                   push_prio(s), f"{PUBLIC_URL}/#pomo", s=s, scope=f"t:{p['task_id']}" if p["task_id"] else "private", quiet=False)  # 2.240.0 B2 (#2867)
         else:
-            notify(p["user_id"], tr("Break is over", lg=lg), tr("Back to it.", lg=lg), push_prio(s), f"{PUBLIC_URL}/#pomo", s=s, scope="private")
+            notify(p["user_id"], tr("Break is over", lg=lg), tr("Back to it.", lg=lg), push_prio(s), f"{PUBLIC_URL}/#pomo", s=s, scope="private", quiet=False)
 
 
 def _wd_habits(c, users, S, LG, now):
