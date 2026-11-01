@@ -5,6 +5,137 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.468.0] - 2026-11-01
+
+Package 2.422 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpaket Büro, Einsatzplan, Listen und Kleinkram, Sammelpaket: A).
+### Added
+- A person creates a company of her own: the workspace menu (top left) > Add an organisation asks for its name, she becomes its admin and lands in it - work apart from private things, at most 3 per person; its e-mail domains are set only by an admin of the server (#2937).
+- Settings > Users > Registration on the login page: on a server with an organisation the new switch "Private accounts register without an invitation" (off by default, asks for the password) allows "Anyone with a confirmed e-mail address"; such an account stays private and never joins an organisation by its address (#2937).
+### Changed
+- Office settings > Data > "Transfer into a new organisation…" is offered to the owner of a personal office herself, not only to the server's admin (#2937).
+### Fixed
+- Closing or reloading the page right after typing in a project's settings (name, hourly rate, hours per day) no longer loses the change: it is sent as the page goes, and the browser asks first while it is still being saved (#3468).
+- A custom field typed into but not left (e.g. Budget in a task) is saved when the page is closed or reloaded (#3468).
+- Documents: filing a document into a folder (Edit > Folder, or accepting an old suggestion) needs the edit right on that folder; a folder shared to read only answers with a message instead (#3557).
+### Security
+- Companies people create themselves never take e-mail domains from their admin, never become the server's main organisation and do not end the "everyone sees everyone" rule of a household server (#2937, review).
+
+Package 2.365 (Teil 1/6: Bündel UX: Team-Chat-Bereich, Handy-Daumen, Zeiterfassung-Start, Menüs, Tempo/A11y (2.225 + 2.226 + 2.219 + 2.253 + 2.214 + 2.221)).
+### Changed
+- Phone task detail: a bar at the bottom, right above the comment field, holds the date with Today / Tomorrow, the project (tap: open or move) and Complete on the right edge - all in thumb reach; the header keeps Back, Priority and "…". The bar steps aside while a comment is typed. A computer keeps the header as before (#2824).
+- Messages ("Saved", Undo) sit above the phone's task bar and follow the keyboard when it opens or closes (#2824).
+- First start on the phone: the language is a small menu in the top right corner of the setup (it is preselected from the browser), the setup card scrolls with the page (one scroll bar, no longer cut off at the top), the start tiles use one column below 400 px; the app opens directly on Today; the tour says where the Basket is on a phone ("down in the bar"), calls the tab bar "the bar at the bottom", fixes the German "mit dem Gantt-Zeitstrahl" and has one step for the chosen start (Office: clients and quotations; Team: sharing and @name) (#2802).
+- The invitation page names who invites and into which organisation: "Alice invites you to Alpha." (#2802).
+- My tasks: the group of unassigned tasks without a date from your own projects is called "Unassigned in your projects" and starts folded (it is not counted); the view switch says "Kanban" like in a project (#3010).
+### Fixed
+- A chat opened in its own window (agents, team, direct) fills the whole window at any size - header, history and composer use the full width; only a single bubble stays at most 75 % / about 900 px wide (#3319).
+
+Package 2.427 (Bündel: Ordner-Wächter: Prüfen/Speichern antwortet forbidd, Dokumente einrichten: Scan-Hinweise allgemein stat, Sammelpaket: Aufgaben ohne P).
+### Added
+- Phones: lists with shown fields get a slim field strip above the rows - tap a field name to sort, filter or hide it, the sorted field carries its arrow, many fields swipe sideways; "Fields" at the right end opens the shown fields directly (#3551).
+### Changed
+- Settings > Documents, scan setup: the folder and e-mail hints for the scanner no longer name a device - set up a profile in your scan software that saves PDFs into the folder, or send by e-mail; the folder watcher's hint likewise (#3577).
+### Fixed
+- Folder watcher: "Check" and "Save" on its local page answered "forbidden" in Chromium browsers, so a folder could never be chosen; the page now sends a same-origin referrer policy and accepts "Origin: null" only together with Sec-Fetch-Site same-origin (the secret stays required) (#3576).
+
+Package 2.365.2 (Teil 2/6: Bündel UX: Team-Chat-Bereich, Handy-Daumen, Zeiterfassung-Start, Menüs, Tempo/A11y (2.225 + 2.226 + 2.219 + 2.253 + 2.214 + 2.221)).
+### Changed
+- Settings that were tucked away inside modules moved into the main Settings (#2789):
+  - New area Settings > Company & office: the office settings of the current workspace (also your private office) with every part one below the other (Company, Bank & taxes, Documents & numbers, Packs, Functions, Data, Access), "Applies to" with the workspace switch, the workspace's own mailbox (IMAP / SMTP) and a link to the office rights. The office menu's "Settings" opens it.
+  - Bank & taxes in Company & office: tax reserve, cash or accrual VAT, tax dates, mileage allowance per year, the cash flow's starting balance and monthly check, the cash boxes; Bookkeeping, Cash flow, Cash book and the logbook link there.
+  - New area Settings > Documents: sorting automatically, archive numbers and rules; the gear in Documents opens it. The inboxes (file store folder, folder watcher, scan inboxes, mail address) are one block "Documents: inboxes" in Settings > Integrations. Senders, types, tags and custom fields stay in Documents (new list button in the documents bar).
+  - Settings > Integrations also holds Karakeep, the newsletter service, the bookmark button, the address books for birthdays (CardDAV), the booking page and "E-invoice (Peppol)"; the modules keep a link, the phone guides in Calendar and Contacts open Integrations > CalDAV.
+  - Settings > Data has an "Office" part (export, import and transfer, legacy data); the trips import is on the legacy data page.
+  - Settings > Organisation: vacation approval and the organisation's public-holiday state; your own state is under General > Working week.
+  - Time tracking and the Focus timer have a "Settings…" button; Settings > Agents has "Always show steps"; the agent list shows each agent's approval mode; Settings > Account has "Signature for letters" (with the office on).
+  - The settings search knows the new places (Nummernkreis, Bankverbindung, Mahnung, DATEV, IMAP, Newsletter, Karakeep, CardDAV, Peppol).
+
+Package 2.418 (Bündel: Bereichsmenüs anpassen: Minus/Plus/Ziehen, Büro zu).
+### Added
+- Area menus you arrange yourself: Office (every point on its own), Home, Reading, Time, Review and File store. On a computer "Customize" is the last row of the area's panel, on a phone a pen sits on top of the menu (office start page, the drawer). The editor shows each point with a Minus (hide) and a grip (drag; the arrow keys move it), "Hidden" below with a Plus to bring a point back, then "Done". On a computer a right-click on a point offers "Hide from menu" (#3560).
+- Settings > Navigation: the same editor for every area's menu and for the phone's tab bar at once (#3560).
+- Organisations: under Settings > Workspaces the admins switch menu points off for all members ("Menu points in this organisation"); such a point is in no member's menu there, not even under Hidden (#3560).
+### Changed
+- Hiding only takes a point out of the menu: its data, function and rights stay, the search and links still open it, and the point open right now always shows (#3560).
+- The office's automatic "Show more" at the end of Money is gone: cash flow, figures, travel expenses, entertainment receipts and subscriptions that are not used yet start under "Hidden" of the editor; a choice made with "Show more" on a device is taken over (#3560).
+- The arrangement is yours and the same on phone and computer, the phone's tab bar too (it was kept per device; the old order stays until you change it); parts hidden in the old sidebar settings count as hidden until you show them again (#3560).
+
+### Fixed
+- main: tag buttons in the task panel are 24 px targets again now that the tags stand above "More details"; the fold button of a task section is a real 44 px target on touch; two styles back on the type and spacing scales; tests follow the new order.
+
+Package 2.429 (Bündel: Ablage zeigt nur echte Ablage-Ordner; Wissen, Tabe).
+### Changed
+- File store: shows only its own folders. The root folders of Knowledge, Tables, the office's areas (Quotations, Invoices, Documents, Correspondence, Receipts), Projects and the address book no longer appear at the top of My files / an organisation, in "Shared with me", in the file store's search or in its "Move to…" list. Nothing is moved or deleted: the areas keep their folders in their own panels, and a folder still opens by its link or from the area's share dialog (#3580).
+### Added
+- File store: read-only collections "From Knowledge", "From Tables", "From Projects" (and "From Office" / "From Address book" when files lie there) after the folders of My files and of each organisation, also in the folder panel on the left. They list the files attached to knowledge pages, table file cells and projects, grouped by page / table / project (the group title opens it), plus files an older version left in an area's folders; open and download only, deleting stays on the page, table or project. Knowledge pages themselves are found through the global search (#3580).
+
+Package 2.433 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Office settings > Documents & numbers: new switch "Invoice corrections count in the invoice series" (off for new offices). On, a correction takes the next number of the invoice counter and keeps its own scheme (suggested: the invoice scheme with _RK instead of _R), so 423_R, 424_RK, 425_R count on without a gap; the corrections' row under "Next running number" is greyed. Switched off again, the corrections' own counter continues above the numbers already given. The change is in the office log (#3597)
+- Clients: new field "Short code" (2-6 capitals / digits, e.g. TNP) next to the display name; the number scheme knows the building block {kuerzel} ({seq}_{kuerzel}_{isodate}_R = 673_TNP_2026-10-29_R). Without a short code the first three letters of the client's name (Müller -> MUE) (#3604)
+- Clients: a contact person can be marked "Gets invoices" (#3599)
+### Changed
+- Sending an invoice, correction or reminder starts with To = the client's e-mail for invoices and Copy to = the contact persons marked "Gets invoices" (none marked: the default contact person); a quotation goes to the default contact person with the e-mail for invoices in copy. Several copy addresses (comma separated) are possible; an address only once. Invoice series that send themselves copy the same contact persons (#3599)
+- Client dialog: "E-mail for invoices" sits next to E-mail and Phone and is shown when adding a client (#3599)
+- Settings > Rights > Groups: a template shows its levels as plain text (no select that looks changeable) with the note "Template - copy it to adjust" and the Copy button next to it; locked special rights are greyed (#3607)
+
+Package 2.438.0 (Bundle: invoice overview, agent colour in chats, red and flaky tests).
+
+### Added
+- Quotations and invoices of two pages or more, also progress and final invoices, start with an overview on page 1: the net total of each part, then the document totals. Behind each part name a small "PAGE n" shows where it starts; tap it in the PDF to jump there. Quotations with printed parts show the page behind each part on the title page (#3622).
+
+### Changed
+- The colour chosen for an agent now also tints its answer bubbles per agent in team chats and adds a thin edge in that colour; changing the colour in the agent's profile repaints open chats at once (#3322).
+
+### Fixed
+- Tests: p2169_a_ui waited for the tidying of the offline copy without making sure it had started (#3625); p21445_a_ui let a background load overwrite the hint (#3643). Both are out of tests/skip.txt.
+
+CI fix of 2.430.0 (job 1920).
+### Fixed
+- CI of 2.430.0: a ```mindmap block in a knowledge page is drawn again (its placeholder had lost its marks in #3150 / #3153, the page showed "MM0"); the MCP tools set_working and end_working ask for tasks:write like their routes (#3513); the booking archive tables carry the "no FK" note for run_id (#3502); p2138_c_api leaves the fixed marker tv:1 out of the key comparison; p21522_c_ui, p2233_a_chatsugg_ui, p2220_b_side_ui follow the usage switch (#3493) and the count 2/3 (#3518); p2218_c_newclient_ui follows the invoice e-mail in the short form (#3599); p21522_c_ui also leaves out the keyboard switch (#3449); p2147_a_ui follows the area Bank & taxes (#2789); p2661_b_ui tolerates the acctset.js entry until #2789 is live.
+
+Package 2.444.0 (Credit card statements in the office).
+
+### Added
+- Office > Money > Credit cards (#3447): cards with holder (person or free name), Mastercard, last four digits and business account; upload the monthly statement as a PDF, Kalmido reads the positions without a model or an outside service, a person confirms them. Every open position gets its receipt: suggestion by amount, search over all documents, upload; matched only by a press. Fees need no receipt, private positions add up to what the holder pays back. The bank booking of the total is matched with a sum check and leaves "Without receipt". Holders with an account see only their own cards. Reminder task per holder (Settings, off by default). Neutral export with the statements and receipts, DATEV with the card as an account of its own. Also in the personal office.
+
+### Changed
+- Rights: new office area "Credit cards" (level "own" = the cards the person holds).
+
+Package 2.421 (Bündel: CI-Nachtlauf rot: 24.10.2026, Jobs schreiben Commits mit privatem Autor, Bündel Wackel-Suiten vor Ablauf der Skip-Liste 08.).
+### Fixed
+- Phone (up to 400 px): the action buttons of a comment in the task detail (Reply, Copy, Save as task, Edit, Delete) wrap into their own right-aligned row under name and time instead of reaching over the edge (#3471).
+- Pushes: a mention made during the short quiet time after a push is no longer lost when the next push for the same task goes out before the summary; the summary ("you were mentioned") follows one quiet time later (#3512).
+- Tests: two night-run wobblers wait for the real state (saved link, uploaded attachment) instead of checking once (#3087); p2351_a_officetree_ui and time_ui run again in CI (#3398).
+### Changed
+- Tests: the guard for people without an organisation is strict now - every 4xx in its sweep fails unless listed with a reason, unreachable routes are capped, every new write route needs a suite that calls it, and a second person on a hosted server without any admin switch creates lists, tracks time, writes an invoice and connects an own agent (#2936).
+
+### Fixed
+- main: the office menu tests count the new point Credit cards (#3447) in Money.
+
+### Fixed
+- main: freelancer_coverage green again, the import undo route is proven by a real call and left the list of unproven write routes (#3506).
+- main: p2661_b_ui green again, the workspace guard knows the two files of the project picker from #3848 (#3506).
+
+### Fixed
+- main: 14 suites of the train's check green again: the tests follow the app (phone task bar #2824, field strip #3551, the owner's office move #2937, cash flow settings link #2789), a race in p272_ui, guards know what sits in main only (#3506).
+
+### Fixed
+
+- main: an approved plain waiting job no longer leaves its approval item unread in the bell.
+
+### Fixed
+- main: on the train branch the suites p3_ui, p292_b_api, p2117_a_ui and p2119_a_ui ran ahead of the app (#3134, #2984 and #3834 are in main only), they now check what the code at hand does; p2355_b_bank locks a month early in a month too.
+
+### Fixed
+- CI of 2.461.0: p2355_b_bank failed on the first days of a month (the month it locks held a receipt day of the suite); it now locks a month before every day it still books, as on main.
+
+### Fixed
+- CI of 2.461.0: p2355_b_bank failed on the first days of a month; the line that locks a month before every day the suite still books now reaches the train's branch too.
+
+### Fixed
+- CI of 2.468.0: perf budget file the same in both repositories.
+
 ## [2.457.0] - 2026-10-31
 
 Package 2.380.2 (Teil 2/6: Sammelpaket Büro, Einsatzplan, Listen und Kleinkram).
@@ -9599,7 +9730,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.457.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.468.0...HEAD
+[2.468.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.468.0
 [2.457.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.457.0
 [2.436.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.436.1
 [2.436.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.436.0
