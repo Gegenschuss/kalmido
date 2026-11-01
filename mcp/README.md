@@ -129,6 +129,13 @@ buttons; a typed number picks one. Long answers go in numbered parts with code b
 What a launcher has to do is listed in [`launcher_capabilities.json`](launcher_capabilities.json); a test fails when the
 `.sh` or the `.ps1` lacks one.
 
+**Working a list off (2.481.0):** with *Work the list off* switched on in the agent's runtime settings (or
+`KALMIDO_DISPATCH=dry|on`), the event runner loads [`agent_dispatch.py`](agent_dispatch.py) and works the lists named in
+`KALMIDO-DISPATCH.json` (project folder) off mechanically: it closes tasks whose commit (`#ID` in the subject) is in
+`close_ref`, starts ONE job per free place for the next bundle, guards the jobs and posts one day report. A dry run changes
+nothing. `python3 agent_dispatch.py --dry-run` runs one round by hand. Details:
+[docs/AGENTS.md](../docs/AGENTS.md#working-a-list-off-24810).
+
 ## Claude Code usage hook
 
 [`claude_usage_hook.py`](claude_usage_hook.py) (2.1.1) reports a Claude Code session's token usage to Kalmido after every turn,

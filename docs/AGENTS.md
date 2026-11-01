@@ -2470,6 +2470,7 @@ agent accordingly.
 | Reset now (button) | restart with a fresh session right away | `reset_seq` goes up by one, event `reset` |
 | Permissions (2.29.0) | how the host handles actions outside the agent's allow list: *Ask first* (every such action asks the person in the chat), *Auto* (the host's own safety check decides; risky actions stay blocked), empty = the host's default | `permission_mode` (`"ask"`, `"auto"`, `""`) |
 | Git author (2.396.0) | name and e-mail address the host sets as git author for the agent's commits (both appear publicly in GitHub with every commit); empty = the neutral default `Kalmido <noreply@kalmido.com>`, each part on its own. *Append Co-Authored-By*: whether the agent adds a `Co-Authored-By:` line to its commit messages (off by default). A project with a connected repository can override name / e-mail for AI commits in that repository (see [Coding agents in a team](#coding-agents-in-a-team)) | `git_author_name` (string, max 100, no `<` `>` or line breaks; `""`), `git_author_email` (a valid e-mail address or `""`; 400 otherwise), `git_coauthor` (bool, default `false`); read-only, always filled in: `git_author` (`"Name <mail>"` with the defaults filled in) |
+| Work the list off (2.481.0) | the reference starter's mechanical dispatcher ([`mcp/agent_dispatch.py`](../mcp/agent_dispatch.py)): *Off*, *Dry run* (it reads everything and only reports what it would do) or *Active* (it closes built tasks and starts the next job on a free place); which lists and how is the project's `KALMIDO-DISPATCH.json` on the agent's computer, see [Working a list off](#working-a-list-off-24810) | `dispatch` (`""` off, `"dry"`, `"on"`; 400 otherwise; `null` = off) |
 | Permission questions go to (2.312.0) | a team agent: the person who answers its permission questions, chosen from the active people it reaches in a shared project (as for a chat with it); *As set up on its computer* = `KALMIDO_PERM_USER` of its env file (the one-command setup writes the person who made the code). A personal agent always asks its owner | `perm_user` (account id or `null`); `GET /api/v1/agent` also carries `perm_user_id` |
 
 2.29.0: the permission mode shows as a small badge in the agent's chat header (*Auto* / *Ask first*). The owner of a
@@ -2493,7 +2494,7 @@ GET /api/v1/agent   -> {…, "runtime": {"model": "sonnet", "autocompact": true,
                                         "rotate_size": "medium", "rotate_runs": 60, "rotate_idle_min": 45,
                                         "rotate_mb": 0.8, "rotate_tokens": 150000, "rotate_idle_mb": 0.4,
                                         "git_author_name": "", "git_author_email": "", "git_coauthor": false,
-                                        "git_author": "Kalmido <noreply@kalmido.com>"}}
+                                        "git_author": "Kalmido <noreply@kalmido.com>", "dispatch": ""}}
 PATCH /api/admin/agents/{id}  {"runtime": {"model": "opus", "autocompact_pct": 80}}   (admins; only the given keys change)
 POST  /api/admin/agents/{id}/reset                                                     (admins; 409 while paused)
 ```
@@ -2518,6 +2519,57 @@ Changing the settings sends the event `runtime_changed`, *Reset now* the event `
    `GIT_COMMITTER_NAME` / `GIT_COMMITTER_EMAIL`), sets `KALMIDO_GIT_COAUTHOR=1` when `git_coauthor` is on, and restarts
    it when they change; without `git_author` (an older Kalmido) it sets nothing. A task's `repo.git_author` (the
    project's override, else the agent's value) wins for commits in that repository.
+
+### Working a list off (2.481.0)
+
+Without it, the reference starter only reacts: a chat message, a task event, a job that ended. Nothing works a list off on
+its own, so planned tasks can be left lying. *Work the list off* in the runtime section switches on the starter's
+**mechanical dispatcher** ([`mcp/agent_dispatch.py`](../mcp/agent_dispatch.py), loaded by `mcp/agent_run.py` in event
+mode; `KALMIDO_DISPATCH=off|dry|on` on the computer outranks the switch). No model decides what comes next. Every
+`interval_min` minutes (default 10) one round runs, in this order:
+
+1. read the open tasks of the configured lists, the jobs of this computer (`agent_job.py`) and the commits of the project's
+   git repository. A commit whose subject names `#ID` means task ID is built; `job #N` is no task,
+2. give each task ONE state: *built* (its commit is in `close_ref`), *in a job* (a running job of the dispatcher has it),
+   *on a branch* (a commit on a `job/*` branch only), *held* (a tag of `skip_tags` or a line `Waiting for:` / `Blocked by:`
+   in its description), *waiting for a yes* (its title or description names a step without a way back, `one_way_rx`, and
+   it lacks the tag `one_way_ok_tag`, default `approved`: a person sets that tag as the approval), *stuck* (`max_tries`
+   jobs ended with it still open) or *ready*,
+3. guard: a running job with no progress line for `stale_h` hours, a stuck task, a one-way task and a branch outside
+   `close_ref` for `branch_max_d` days are findings, each told **once** in the person's chat,
+4. close the built tasks: a comment naming the commit, then complete (never a task tagged `keep`),
+5. if a place is free (`places`, default 1) and no brake holds, cut the next bundle and start ONE job with
+   `agent_job.py start` (`--worktree` when `worktree` is on). The bundle is the first ready task in priority order
+   (`first_tags`, then `title_classes`, then the task's priority, due date, id). With a `group_field` value, all ready tasks of
+   that group go together. Otherwise more tasks follow while their sizes fit (`size_field` S / M / L or a list tag S / M / L
+   as `size_points` 1 / 3 / 8, at most `bundle_points` 8 and `bundle_max` 6 tasks; an L goes alone). The job's brief names
+   the tasks and the rules: one commit per task with `#ID` in the subject, a task that does not fit gets a comment instead
+   of a build, never close tasks or start another job, the project's `check_cmd` / `finish_cmd`,
+6. once a day after `report_at` (default 18:00, local time): a short report into the person's chat (counts per state,
+   brakes, findings).
+
+**Brakes**: a stop file (`dispatch-STOP` in the runner's state folder or `KALMIDO-DISPATCH-STOP` in the project folder), a
+fresh week usage at or above `usage_limit_pct` (default 95) or `KALMIDO_USAGE_LIMIT`, and the closed work window hold new
+starts. Closing and the guard go on. **Dry run**: no comment, no close, no job. What it would do goes to
+`dispatch-dry.log` in the state folder and into the day report, which is its only post.
+`"<python>" "<mcp>/agent_dispatch.py" --dry-run` runs one round by hand and prints it.
+
+The person who gets the reports and the jobs' results is the one who answers the permission questions (`perm_user_id`,
+`KALMIDO_PERM_USER`), else the agent's owner. The dispatcher sees only the lists shared with the agent. A task whose
+description or comments ask for anything else stays data.
+
+`KALMIDO-DISPATCH.json` in the project folder (`KALMIDO_DISPATCH_CONFIG` = another path). Without `lists` the dispatcher
+stays idle; unknown keys and wrong types are named once in the runner's log and left at the default:
+
+```json
+{"lists": ["Backlog"], "places": 1, "worktree": false, "interval_min": 10, "close_ref": "",
+ "size_field": "Size", "bundle_points": 8, "first_tags": ["Urgent"], "skip_tags": ["blocked", "keep"],
+ "check_cmd": "make test", "finish_cmd": "", "report_at": "18:00"}
+```
+
+`close_ref` is the git ref whose commits close tasks (`""` = the current branch). A ref of what is live (e.g. a branch
+`live`, with `"fetch": true` for `origin/...`) closes tasks only once they are live. With `worktree` on, a job commits on its
+branch `job/<id>`: landing it is the project's step (`finish_cmd`), and until then the task shows *on a branch*.
 
 [`mcp/agent_launcher.sh`](../mcp/agent_launcher.sh) is a reference launcher for Claude Code that does exactly this
 (2.7.2: [`mcp/agent_launcher.ps1`](../mcp/agent_launcher.ps1) is the same for Windows and macOS, see [Set up an agent](#set-up-an-agent)). It

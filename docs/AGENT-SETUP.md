@@ -660,6 +660,11 @@ chat messages of one person that arrive together: one run). It does what a hoste
   project folder (the working folder of the launcher) or a folder named in `KALMIDO_AUTO_IMAGE_DIRS` are attached, other
   files the agent wants to show go into `$KALMIDO_OUTBOX`). The prompt tells the agent about the folder. Needs
   a server with chat files (2.13.1+); older servers get nothing.
+- **Working a list off** (2.481.0, [`mcp/agent_dispatch.py`](../mcp/agent_dispatch.py)): *Settings > Agents > (agent) >
+  Runtime > Work the list off* (*Off* / *Dry run* / *Active*) lets the starter work the lists of `KALMIDO-DISPATCH.json` in
+  the project folder off on its own. It closes built tasks (a commit with `#ID` in `close_ref`), starts the next job when a
+  place is free, tells you once about stuck tasks and silent jobs, and sends a day report. Start with *Dry run*: it only
+  reports what it would do. Details and every key: [AGENTS.md](AGENTS.md#working-a-list-off-24810).
 - **Long work as a job** (2.44.0, [`mcp/agent_job.py`](../mcp/agent_job.py)): work that takes more than about ten minutes (a release
   build, an audit, a full test run) the agent starts with `"<python>" "<mcp>/agent_job.py" start --title "..." [--worktree] -` (the brief on
   stdin; 2.223.8: the prompt names the Python that runs the starter and quotes both paths, so Windows without
