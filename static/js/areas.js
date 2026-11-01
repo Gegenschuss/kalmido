@@ -234,7 +234,7 @@ function ofm_detail(mod) {
   let p = null;
   if (mod === 'clients' && S.route.client && S.route.client !== 'mailhub' && typeof CLV !== 'undefined' && CLV.id === S.route.client && CLV.data?.name) p = [tr('Clients'), CLV.data.name];
   else if (mod === 'contacts' && typeof CT !== 'undefined' && CT.sel && CT.card) p = [tr('Address book'), CT.card.fn || CT.card.org || '?'];
-  else if (mod === 'office' && S.route.id && typeof OFD !== 'undefined' && OFD.doc?.id === S.route.id) p = [tr(OFD.doc.kind === 'offer' ? 'Quotations' : 'Invoices'), `${typeof ofdKindName === 'function' ? ofdKindName(OFD.doc.kind, true) + ' ' : ''}${OFD.doc.number || tr('Draft')}`];  // 2.356.0 C (#3004): the open document, never the one before
+  else if (mod === 'office' && S.route.id && typeof ofd_openDoc === 'function' && ofd_openDoc()?.id === S.route.id) p = [tr(ofd_openDoc().kind === 'offer' ? 'Quotations' : 'Invoices'), `${ofdKindName(ofd_openDoc().kind, true)} ${ofd_openDoc().number || tr('Draft')}`];  // 2.356.0 C (#3004): the open document, never the one before
   else if (mod === 'office' && S.route.tab === 'travel' && typeof RK !== 'undefined' && RK.open && typeof rk_trip === 'function' && rk_trip(RK.open)) p = [tr('Travel expenses'), rk_trip(RK.open).dest || tr('Trip')];
   return p ? `<nav class="ofmcrumb" aria-label="${esc(tr('Path'))}">${p.map(x => `<span>${esc(x)}</span>`).join('<span aria-hidden="true">›</span>')}</nav>` : '';
 }
