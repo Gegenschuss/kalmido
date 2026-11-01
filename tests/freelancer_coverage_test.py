@@ -1184,7 +1184,6 @@ DELETE /api/v1/me/app-passwords/{}
 DELETE /api/v1/notepads/{}
 DELETE /api/v1/notes/{}
 DELETE /api/v1/sections/{}
-DELETE /api/v1/tasks/{}
 DELETE /api/v1/tasks/{}/contacts/{}
 DELETE /api/v1/tasks/{}/dependencies/{}
 DELETE /api/v1/tasks/{}/links/{}
@@ -1540,7 +1539,6 @@ PUT /api/newsletter/consent
 PUT /api/office/cashflow/actual
 PUT /api/office/cashflow/check
 PUT /api/office/cashflow/start
-PUT /api/office/letterhead
 PUT /api/office/logbook/settings
 PUT /api/office/tax-dates
 PUT /api/paperless

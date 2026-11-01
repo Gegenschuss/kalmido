@@ -460,6 +460,8 @@ APP_ONLY = [
     ("2.60.0 (#1514): environments (Staging, Live) are created, renamed and removed by people in the app, their deploy-webhook token is "
      "shown once to people; agents read them (list_environments) and record deployments (set_deployment)",
      ("* /api/lists/{}/envs", "* /api/envs/", "POST /api/hooks/deploy/")),
+    # 2.469.0 (#3459): called by the payment provider, its token names the office area
+    ("2.469.0 (#3459): the webhook of the online payment provider: signed by the provider, not called by a client", ("POST /api/hooks/pay/",)),
     # 2.144.0 D (#797): the hosting operator's interface: its own token from a file, called by the hoster's console, never
     # by a person or an agent (no account of the instance; numbers only)
     ("2.144.0 (#797): the hosting operator's interface (own token, the hoster's console; not a user or agent API)",

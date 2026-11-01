@@ -133,7 +133,7 @@ def _comment_cards(s):
 
 def _gates(s):
     c, uid, out, memo = s.c, s.uid, [], {}
-    rows = _comment_rows(s, "k.suggestion LIKE ?", ('%"state": "open"%',))
+    rows = _comment_rows(s, "k.suggestion ILIKE ?", ('%"state": "open"%',))
     names = user_names(c, [r["user_id"] for r in rows if r["user_id"]])
     for r in rows:
         sug = json.loads(r["suggestion"])

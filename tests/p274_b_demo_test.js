@@ -101,7 +101,7 @@ const srv = http.createServer((req, res) => {
   check(t.lines[0].total === 2000 && t.lines[1].total === 59.97 && /Alle Preise zuzüglich/.test(t.vat_note), 'quotation lines + VAT note');
   w.eval(`ofdLoadDoc(${oid}, true)`); await sleep(500);
   const ed = d.querySelector('#view')?.textContent || '';
-  check(/2\.444,17 €/.test(ed) && /KVA-/.test(ed), 'editor shows the gross total 2.444,17 €');
+  check(/2\.444,17\s€/.test(ed) && /KVA-/.test(ed), 'editor shows the gross total 2.444,17 €');
   // discount 10 % on the quotation: one negative line, the tax on the reduced bases (server rule)
   const od = await J(w, `api('PATCH', '/api/office/docs/${oid}', {discount_pct: 10})`);
   check(od.totals.discount === 206 && od.totals.net === 1853.97 && od.totals.gross === 2199.75, 'discount 10 %: ' + JSON.stringify([od.totals.discount, od.totals.net, od.totals.gross]));
@@ -206,7 +206,7 @@ const srv = http.createServer((req, res) => {
       await sleep(1500);
       const tag = `Firefox ${vw}px`;
       const e = JSON.parse(await ev(`JSON.stringify({over: document.documentElement.scrollWidth - innerWidth, txt: (document.querySelector('#view') || {}).textContent || '', csp: KDEMO.csp})`));
-      check(e.over <= 0 && /2\.444,17 €/.test(e.txt), `${tag}: invoice editor fits (${e.over}), total shown`);
+      check(e.over <= 0 && /2\.444,17\s€/.test(e.txt), `${tag}: invoice editor fits (${e.over}), total shown`);
       await shot(`p274b-editor-${vw}.png`);
       await ev(`(() => { KDEMO.printView(${id}); return 1; })()`); await sleep(500);
       const p = JSON.parse(await ev(`(() => { const pg = document.querySelector('.kp-page'), sc = document.querySelector('#kd-print .kd-pscroll'), bar = document.querySelector('#kd-print .kd-pbar');
