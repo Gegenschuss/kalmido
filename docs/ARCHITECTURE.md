@@ -399,6 +399,7 @@ registering the ones of its area.
 | `mindmap.js` | 2.49.0 (#1201): the list view "Mind map" (SVG, keys like Mindjet, drag to rehang, pan / pinch, outline, export Markdown / SVG / PNG, outline import) and the ```mindmap block of knowledge pages. |
 | `notesall.js` | 2.45.0 (#1516): `#notes` = the notes of all lists and projects (pinned first, a filter by list, a search in title and text, a new note in a picked list). |
 | `navmenu.js` | 2.418.0 (#3560): the editor of the areas' menus and the tab bar (Minus / Plus / grip, Hidden, Done), in place of a panel / the office's start page and under Settings > Navigation; the org admins' menu points (`nav_orgDraw`). Loaded on demand (module `navmenu`); the model (`nav_pref`, `nav_hid`, `nav_sort`) is in `areas.js`, the setting `nav_menus` and `orgs.nav_off` in `kalmido/accounts/navmenus.py`. |
+| `tourmods.js` | 2.466.0 (#3314): the steps of the areas' short introductions (when they start: `palette.js`). |
 | `lazyload.js` | 2.53.0 (#1410): modules loaded on demand (`loadModule`, the stand-ins of their functions, `officeOn`), see below. |
 | `setcore.js` | 2.53.0 (#1410): the parts of the settings needed from the start: Web Push on this device, the app badge, the service worker's messages, the settings sections and modules, the project links. |
 | `ctlinks.js` | 2.53.0 (#1410): the contacts in the task panel ("People and dates", linking a contact). |

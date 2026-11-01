@@ -597,38 +597,24 @@ function tourSteps() {
 // 2.466.0 (#3314): the short introduction of an area: once, the first time the area opens (tours_seen, per account), never
 // for a child, a second window or after "Show more introductions" is unticked; the welcome tour goes first. Restart: Settings > Help.
 // A step without a target (or with its target not on the screen) shows its card in the middle.
-const TOUR_TABS = '[data-mgtabs]', tourParts = id => () => mg_parts(mg_area(id)).length > 1;
-const TOUR_MODS = {
-  cal: [{id: 'cal1', t: N_('Your calendar'), d: N_('Tasks with a date and your appointments, side by side.')}, {id: 'cal2', sel: '.calbar', t: N_('Your view'), d: N_('Switch between day, week and month here and move through time.')}, {id: 'cal3', t: N_('New appointment'), d: N_('Pick a free time to add an appointment.')}],
-  office: [{id: 'office1', t: N_('Your office'), d: N_('Clients, quotations, invoices and receipts in one place.')}, {id: 'office2', sel: TOUR_TABS, t: N_('Get around'), d: N_('This bar takes you to each part of the office.')}, {id: 'office3', t: N_('Start with a client'), d: N_('Create a client first: quotations and invoices then fill in the address for you.')}],
-  time: [{id: 'time1', t: N_('Track your time'), d: N_('Start the timer on a task or enter the hours afterwards.')}, {id: 'time2', t: N_('See the totals'), d: N_('Your times add up per day and per project.')}],
-  review: [{id: 'review1', t: N_('Look back'), d: N_('Write a few lines about your day and see how the week went.')}, {id: 'review2', sel: TOUR_TABS, on: tourParts('review'), t: N_('Statistics'), d: N_('Completed tasks and trends have their own tab.')}],
-  life: [{id: 'life1', t: N_('Home and life'), d: N_('Household and everyday things, apart from your work.')}, {id: 'life2', sel: TOUR_TABS, on: tourParts('life'), t: N_('More at home'), d: N_('Family and budget have their own tabs when they are on.')}],
-  reading: [{id: 'reading1', t: N_('Read later'), d: N_('Save articles and links, and read them when you have time.')}, {id: 'reading2', sel: TOUR_TABS, on: tourParts('reading'), t: N_('Feeds and bookmarks'), d: N_('Feeds and bookmarks have their own tabs.')}],
-  ablage: [{id: 'ablage1', t: N_('Your files'), d: N_('Files and documents in folders, in one place.')}, {id: 'ablage2', t: N_('Share a folder'), d: N_('Share a folder from its menu: the people you add see only that folder.')}],
-  wiki: [{id: 'wiki1', t: N_('Your knowledge'), d: N_('Notes and instructions as pages that link to each other.')}, {id: 'wiki2', t: N_('Find it again'), d: N_('Search finds your pages from anywhere in Kalmido.')}],
-  sheets: [{id: 'sheets1', t: N_('Your tables'), d: N_('Build your own tables for lists, prices or plans.')}, {id: 'sheets2', t: N_('Share a table'), d: N_('Share a table from its menu, just like a project.')}],
-  habits: [{id: 'habits1', t: N_('Your habits'), d: N_('Set what you want to do regularly and tick it off.')}, {id: 'habits2', t: N_('Keep going'), d: N_('Your streak shows how well a habit is going.')}],
-  agents: [{id: 'agents1', t: N_('Your agents'), d: N_('Agents are helpers you connect yourself. They see only what you share with them.')}, {id: 'agents2', t: N_('Work with them'), d: N_('Give them tasks in your projects or write to them in the chat.')}],
-};
-const tourModSteps = id => (TOUR_MODS[id] || []).filter(st => !st.on || st.on()).map(st => ({...st, r: st.sel ? () => { const e = $$(st.sel).find(x => x.offsetWidth || x.offsetHeight); return e ? e.getBoundingClientRect() : null; } : null}));
+const TOUR_AREAS = ['cal', 'office', 'time', 'review', 'life', 'reading', 'ablage', 'wiki', 'sheets', 'habits', 'agents'];  // the steps: tourmods.js, loaded on the first use
 const toursSeen = () => (S.settings.tours_seen || '').split(',').filter(Boolean);
 const tourModBlocked = () => TOUR.on || !S.me || S.me.kid || S.settings.tour === 'pending' || S.settings.tours_more === '0' || MW_ON || S.capturePage || S.sel || S.route?.task || !!$('.modal');
 function tourModAuto() {
   if (tourModBlocked()) return;
   const id = sbb_area();
-  if (!TOUR_MODS[id] || toursSeen().includes(id)) return;
+  if (!TOUR_AREAS.includes(id) || toursSeen().includes(id)) return;
   setTimeout(() => {  // the view of the area first: the steps point at it
     if (tourModBlocked() || sbb_area() !== id || toursSeen().includes(id)) return;
     S.settings.tours_seen = [...toursSeen(), id].join(',');
     api('PATCH', '/api/settings', {tours_seen: S.settings.tours_seen}).catch(() => { /* offline: once more on the next start */ });
-    tourStart(id);
+    loadModule('tourmods').then(() => { if (sbb_area() === id && !tourModBlocked()) tourStart(id); }, () => {});
   }, 500);
 }
 // Settings > Help: one area's introduction again: there first, the tour when it is open
 function tourModRestart(id) {
   go(sbb_target(id));
-  const t0 = Date.now(), wait = () => { if (sbb_area() === id) setTimeout(() => tourStart(id), 300); else if (Date.now() - t0 < 3000) setTimeout(wait, 100); };
+  const t0 = Date.now(), wait = () => { if (sbb_area() === id) loadModule('tourmods').then(() => setTimeout(() => tourStart(id), 300), () => {}); else if (Date.now() - t0 < 3000) setTimeout(wait, 100); };
   wait();
 }
 // 2.223.0 A (#2821): the steps point at the area Projects (the panel's smart lists, the quick add, a task row). The automatic

@@ -63,10 +63,10 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinv
   '/static/js/sheetsio.js', '/static/js/sheetsize.js', '/static/js/sheetshare.js', '/static/js/sheetchart.js', '/static/js/sheetkinds.js',
   '/static/js/sheetbook.js', '/static/js/fslock.js', '/static/js/tagsel.js', '/static/js/filereq.js', '/static/js/fsshare.js',
   '/static/js/videorev.js', '/static/js/abscan.js', '/static/js/pubvideo.js', '/static/js/hookin.js', '/static/js/polls.js', '/static/js/formq.js',
-  '/static/js/navmenu.js', '/static/js/office_undo.js', '/static/js/voice.js', '/static/js/hubmailbox.js', '/static/js/listprint.js',
-  '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js', '/static/js/dpmodal.js', '/static/js/gitrepo.js',
-  '/static/js/timesheet.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js', '/static/js/hubmail.js', '/static/js/msvview.js',
-  '/static/js/sprints2.js', '/static/js/sideviews.js', '/static/js/notetrash.js', '/static/js/trashui.js'];
+  '/static/js/navmenu.js', '/static/js/tourmods.js', '/static/js/office_undo.js', '/static/js/voice.js', '/static/js/hubmailbox.js',
+  '/static/js/listprint.js', '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js', '/static/js/dpmodal.js',
+  '/static/js/gitrepo.js', '/static/js/timesheet.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js', '/static/js/hubmail.js',
+  '/static/js/msvview.js', '/static/js/sprints2.js', '/static/js/sideviews.js', '/static/js/notetrash.js', '/static/js/trashui.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
 // 2.65.0 (#1824): the stylesheets of the modules loaded on demand (static/css/, LD_CSS in lazyload.js, same order)

@@ -60,6 +60,7 @@ const LD_MODS = {
   polls: ['polls'],  // 2.102.0 C (#2208): scheduling polls (#1953), on the first "Find a date"
   formq: ['formq'],  // 2.102.0 C (#2208): questionnaires (#1954), with the forms dialog of a list
   navmenu: ['navmenu'],  // 2.418.0 (#3560): the editor of the areas' menus (Customize / the pen, Settings > Navigation)
+  tourmods: ['tourmods'],  // 2.466.0 (#3314): the steps of the areas' introductions
   ofundo: ['office_undo'],  // 2.111.0 A (#2233): undo of the office editors, clients and tables (office, sheets and the client dialog load it)
   voice: ['voice'],  // 2.139.0 B (#2128): voice messages of the team chat (the composer's microphone, the audio player)
   hubmailbox: ['hubmailbox'],
