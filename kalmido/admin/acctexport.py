@@ -57,6 +57,7 @@ from .offsite import stepup_download  # 2.360.0 A (#2496): the step-up before th
 from ..core.orgcrypt import OrgCryptError, oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
 from ..life.model import jr_open  # 2.306.0 A (#2885)
+from ..lists.tplextra import tx_export  # 2.463.0 (#3860)
 from ..accounts.login import unseal  # 2.455.0 (#3469)
 
 UMZ_DIR = os.path.join(EXPORT_DIR, "account")
@@ -584,7 +585,6 @@ def umz_build(c, uid, stream, export_id):
     """Writes the ZIP of person uid into stream; returns the manifest."""
     from ..accounts.settings import umz_export_queries
     from ..admin.hosting import hosted
-    from ..lists.tplextra import tx_export
     out = _Out()
     have = {r[0] for r in c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema()")}
     u = c.execute("SELECT id, username, display_name, email FROM users WHERE id=?", (uid,)).fetchone()

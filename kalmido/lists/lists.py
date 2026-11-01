@@ -10,7 +10,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
-from ..core.access import collab_all, Denied, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES
+from ..core.access import acx_drop, collab_all, Denied, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES
 from ..core.state import visible_lists
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
@@ -931,6 +931,32 @@ def _folder_member_add(c, lid, uid, role, actor):
         from ..admin.hosting import agent_joined_notice
         agent_joined_notice(c, lid, uid, actor)  # 2.24.0 (#896)
     return True
+
+
+def member_rejoin(c, oid, uid, rows):
+    """2.463.0 (#3859): uid joined organisation oid again: the memberships of rows [[list id, own role | None], ...] come back
+    (accounts/orgleave.py olv_rejoin), under the rules of a share: a project still in oid, never where uid owns it, a child as a
+    participant, no participant in a project with the lock, no bridge between agents. A project with the lock gets uid on its
+    waiting list (the members trigger): the key comes from somebody who holds it. Roles through groups and folders follow from
+    grp_sync. -> how many."""
+    from ..agents.safety import bridge_blocks
+    from ..collab.liste2e import le2a_member_problem
+    from ..family.family import is_kid
+    from ..lists.groups import grp_sync
+    kid, back = is_kid(c, uid), []
+    for lid, role in rows:
+        role = "participant" if kid and role else role
+        if not c.execute("SELECT 1 FROM lists WHERE id=? AND org_id=? AND owner_id!=? AND deleted_at IS NULL", (lid, oid, uid)).fetchone() \
+                or (role and (le2a_member_problem(c, lid, uid, role) or bridge_blocks(c, lid, uid))):
+            continue
+        back.append(lid)
+        if role and c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?) ON CONFLICT DO NOTHING",
+                              (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc()))).rowcount:
+            member_folder_adopt(c, lid, uid)
+    if back:
+        grp_sync(c, back)
+        acx_drop()
+    return len(back)
 
 
 def _in_folder(path, f):

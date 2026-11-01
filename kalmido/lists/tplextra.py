@@ -164,7 +164,6 @@ def _tx_rows(v):
 
 def _tx_list_in(p):
     """The list's part of an imported x, rebuilt field by field (tx_apply takes it as it stands)."""
-    from ..core.errors import BadInput
     from .lists import LIST_COLOR_RE
     from .projects import ov_link_clean
     txt = lambda v, n: v.strip()[:n] if isinstance(v, str) else ""  # noqa: E731

@@ -17,6 +17,7 @@ from datetime import timedelta
 
 from flask import g, has_request_context, jsonify, request
 
+from ..core.access import list_people, ov_role, task_visible
 from ..core.config import app
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, parse_iso
 from ..core.i18n import trn, tr
@@ -142,39 +143,12 @@ def olv_memo(c, oid, uid, snap):
                        json.dumps({"assign": assign, "people": people, "lists": lists}, separators=(",", ":"))))
 
 
-def _olv_lists(c, oid, uid, rows):
-    """2.463.0 (#3859): the project memberships of the memo rows [[list id, own role | None], ...] come back, before the
-    assignments (those ask whether uid is in the project), under the rules of a share: a project still in oid, never where uid
-    owns it, a child as a participant, no participant in a project with the lock, no bridge between agents. A project with the lock gets uid on its waiting
-    list (the members trigger): the key comes from somebody who holds it. Roles through groups and folders follow from grp_sync."""
-    from ..agents.safety import bridge_blocks
-    from ..collab.liste2e import le2a_member_problem
-    from ..core.access import acx_drop
-    from ..family.family import is_kid
-    from ..lists.groups import grp_sync
-    from ..lists.lists import member_folder_adopt, my_max_sort
-    kid, back = is_kid(c, uid), []
-    for lid, role in rows:
-        role = "participant" if kid and role else role
-        if not c.execute("SELECT 1 FROM lists WHERE id=? AND org_id=? AND owner_id!=? AND deleted_at IS NULL", (lid, oid, uid)).fetchone() \
-                or (role and (le2a_member_problem(c, lid, uid, role) or bridge_blocks(c, lid, uid))):
-            continue
-        back.append(lid)
-        if role and c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?) ON CONFLICT DO NOTHING",
-                             (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc()))).rowcount:
-            member_folder_adopt(c, lid, uid)
-    if back:
-        grp_sync(c, back)
-        acx_drop()
-    return len(back)
-
-
 def olv_rejoin(c, oid, uid):
     """2.363.3 (#3133): uid just joined oid (org_member_add): within OLV_BACK_H hours of leaving, the assignments and "coming
     along" that ended come back, for tasks that still exist in the organisation and that uid may see now (an assignment only
     where uid may be assigned: check_assignee's rule; a task somebody else took over stays theirs). 2.463.0 (#3859): the
-    project memberships first (_olv_lists). -> how many came back."""
-    from ..core.access import list_people, ov_role, task_visible
+    project memberships first (member_rejoin). -> how many came back."""
+    from ..lists.lists import member_rejoin
     n = 0
     with system_ctx(c):  # the person may not be the one making the request (an admin adds them); only their own rows change
         m = c.execute("SELECT id, at, detail FROM space_moves WHERE kind='orgleave' AND obj_id=? AND from_org=? ORDER BY id DESC LIMIT 1",
@@ -193,7 +167,7 @@ def olv_rejoin(c, oid, uid):
             t = c.execute("""SELECT t.list_id, t.assignee_id, t.assignee_group_id FROM tasks t JOIN lists l ON l.id=t.list_id
                              WHERE t.id=? AND t.deleted_at IS NULL AND l.deleted_at IS NULL AND l.org_id=?""", (tid, oid)).fetchone()
             return t if t and task_visible(c, tid, uid) else None
-        n += _olv_lists(c, oid, uid, d.get("lists") or [])
+        n += member_rejoin(c, oid, uid, d.get("lists") or [])
         for tid in d.get("assign") or []:
             t = live(tid)
             if t and not t["assignee_id"] and not t["assignee_group_id"] \
