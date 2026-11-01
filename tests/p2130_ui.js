@@ -28,7 +28,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
 const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static', 'i18n', l + '.json'), 'utf8'));
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   const SW = await (await fetch(B + 'sw.js')).text();
   check(/const CACHE = 'tasks-shell-v(?:8[3-9]|9[0-9]|[1-9][0-9]{2})'/.test(SW), 'service worker cache v83');
 
@@ -75,7 +75,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   const rp1 = await call('POST', `/api/agents/${AG}/chat/${q1.id}/reactions`, {emoji: 'up'});
   check(rp1.status === 200 && rp1.approval === null, 'A2: 👍 on a status message is a plain reaction, no approval');
   const q3 = await tcall('POST', `/agent/chats/${ME}`, TOK, {body: 'May I merge the branch?'});
-  await w.eval('chatLoad()'); await sleep(300);
+  await w.eval('chatLoad()'); await until(() => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${q3.id}"] .rxrow [data-e="up"]`));
   const r3 = () => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${q3.id}"]`);
   // 2.30.0 (#1041, intended change): no "👍 = approval" hint any more; 👍 / 👎 stay one tap away on the newest question
   check(!r3()?.querySelector('.rxhint') && r3()?.querySelector('.rxrow [data-e="up"]:not(.rxq)') && r3()?.querySelector('.rxrow [data-e="down"]:not(.rxq)'), 'A2: the newest question keeps 👍 / 👎 at hand, without the hint');
@@ -157,7 +157,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   // 2.218.0 (#2799): the number is in the task's "…" menu ("Copy link · #id", 2.445.0: under "More…"), no longer in the panel's path
   check(!d.querySelector('#detail .dcid') && w.eval(`(taskMenu(document.querySelector('#detail [data-act="task-menu"]'), ${T[0]}), document.querySelector('#pop .mtmore')?.click(), [...document.querySelectorAll('#pop [role="menuitem"]')].some(b => b.textContent.includes('Copy link · #${T[0]}')))`), 'task number in the "…" menu: #' + T[0]);
   w.eval('closePop()');
-  w.eval('closeDetail()'); w.eval(`listModal(${P})`); await sleep(300);
+  w.eval('closeDetail()'); w.eval(`listModal(${P})`); await until(() => d.querySelector('.lmodal')); await idle(w);
   check(d.activeElement?.id !== 'l-name', 'phone: the list dialog does not focus its name field (no keyboard)');
   w.eval(`document.querySelectorAll('.modal').forEach(m => m.remove())`);
   w.close();
@@ -170,15 +170,15 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   w.eval('closePalette()');
   const shown = () => d.querySelectorAll('#view .trow .tgut').length;
   check(!shown(), 'numbers off by default (no tickets)');
-  await w.eval(`colSave(${P}, ['id', 'due'], true)`); await sleep(300);
+  await w.eval(`colSave(${P}, ['id', 'due'], true)`); await until(() => shown() > 0);
   check(shown() > 0, '2.14.0: the column "Task number" shows them in any list');
-  await w.eval(`colSave(${P}, null, true)`); await sleep(200);
+  await w.eval(`colSave(${P}, null, true)`); await until(() => !shown()); await idle(w);
   w.close();
   await call('PATCH', `/api/lists/${P}`, {view: 'list'});
 
   // ================= A13: offline in words; A14 multi bar; P8 quick add toast; P1 / P17; A8
   w = await boot({user: 'alice', mobile: true, hash: 'today'}); d = w.document;
-  w.__offline = true; w.eval(`toggleTask(${T[4]})`); await sleep(400); w.eval('setOnline(false); staleDraw()');
+  w.__offline = true; w.eval(`toggleTask(${T[4]})`); await until(() => w.eval('OUT.q.length') > 0); w.eval('setOnline(false); staleDraw()');
   check(/Offline · 1 change waiting/.test(d.querySelector('#stale')?.textContent || ''), 'A13: "Offline · 1 change waiting": ' + (d.querySelector('#stale')?.textContent || '-'));
   w.__offline = false; w.eval('setOnline(true)'); await until(() => !w.eval('OUT.q.length'), 40); w.eval('S.syncOk = Date.now(); staleDraw()');
   check(!d.querySelector('#stale'), 'A13: back online: the chip goes');
@@ -197,9 +197,9 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   // 2.320.0 (#3289): + "Show also in project…"
   check(mm.join('|') === 'Edit|Subtasks of…|Show also in project…|Select all|Tidy up…|Delete', 'A14 (2.26.0) / #1055: from two tasks More offers "Edit" (the panel as a sheet): ' + mm.join('|'));
   closeAll(w); w.eval('S.multi.clear(); S.multiMode = false; render()');
-  w.eval(`openQuickSheet('Call Bob tomorrow 10:00')`); await sleep(100);
+  w.eval(`openQuickSheet('Call Bob tomorrow 10:00')`); await until(() => d.body.classList.contains('qsheet-open'));
   check(d.body.classList.contains('qsheet-open'), 'P8: the + button hides behind the add sheet');
-  await w.eval(`submitQuick(document.querySelector('#qsheet'))`); await sleep(900);  // 2.192.0 B (#2513): the toast follows a timer, not a request
+  await w.eval(`submitQuick(document.querySelector('#qsheet'))`); await until(() => /Basket · Tomorrow 10:00/.test(d.querySelector('#toast')?.textContent || ''));  // 2.192.0 B (#2513): the toast follows a timer, not a request
   check(/Basket · Tomorrow 10:00/.test(d.querySelector('#toast')?.textContent || '') && /Open/.test(d.querySelector('#toast button')?.textContent || ''), 'P8: where the task went: ' + d.querySelector('#toast')?.textContent);
   closeAll(w); w.close();
 
@@ -209,7 +209,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   w.eval(`setListView(routeList(), 'overview')`); await until(() => d.querySelector('#view .pov'));
   const sst = [...d.querySelectorAll('#view button')].filter(b => /Set status/.test(b.textContent));
   check(sst.length <= 1 && !d.querySelector('#view .lhead .stpill'), 'P1: "Set status" once in the overview ' + sst.map(b => b.className + '@' + (b.closest('[id], section')?.id || b.parentElement.className)).join(', '));
-  w.eval(`setListView(routeList(), 'list')`); await sleep(300);
+  w.eval(`setListView(routeList(), 'list')`); await until(() => !d.querySelector('#view .pov')); await idle(w);
   // A8: Plan my day: planned + still free, the ones that do not fit get actions
   for (let i = 0; i < 5; i++) await call('POST', '/api/tasks', {title: 'Long ' + i, list_id: P, due: day(0), duration: 240});
   await w.eval('load().then(render)');
@@ -238,8 +238,8 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   check(/(incorrect|Nom d’utilisateur|mot de passe)/i.test((await bad.json()).error || ''), 'P7: a failed login answers in the page\'s language (fr)');
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
-  w.eval(`datePop(document.querySelector('#view .trow'), ${T[0]})`); await sleep(300);
-  if (!d.querySelector('#p-dur')) { d.querySelector('#p-time').value = '10:00'; d.querySelector('#p-time').dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(300); }
+  w.eval(`datePop(document.querySelector('#view .trow'), ${T[0]})`); await until(() => d.querySelector('#p-dur') || d.querySelector('#p-time'));
+  if (!d.querySelector('#p-dur')) { d.querySelector('#p-time').value = '10:00'; d.querySelector('#p-time').dispatchEvent(new w.Event('change', {bubbles: true})); await until(() => d.querySelector('#p-dur')); }
   const durs = [...(d.querySelector('#p-dur')?.options || [])].map(o => o.textContent);
   check(durs.includes('Dauer 1,5 h') && d.querySelector('#p-dur').getAttribute('aria-label') === 'Dauer', 'P4 / P5: "Dauer 1,5 h", the select has a name');
   check(d.querySelector('#p-rep')?.getAttribute('aria-label') && /Erinnerung/.test(d.querySelector('#pop .prow .plab')?.textContent || ''), 'P5: repeat select named, the reminders have a label');
@@ -260,15 +260,15 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   check(d.querySelectorAll('.smodal .ib[data-ii]').length >= 15 && inl().every(h => h.matches('.keep, .cnote, .warn, .wpstate, .updline, .aanone, .aimodoff, [role], [aria-live]') || h.querySelector('a, button, code, input, select') || !h.textContent.trim()), `helper texts: settings: ${d.querySelectorAll('.smodal .ib[data-ii]').length} behind (i), inline only the kept ones (${inl().length})`);
   const ib = d.querySelector('[data-pane="general"] .ib[data-ii]');
   check(ib && d.getElementById(ib.dataset.ii)?.textContent.length > 10 && ib.getAttribute('aria-describedby') === ib.dataset.ii, 'helper texts: (i) is described by its text');
-  click(w, ib); await sleep(100);
+  click(w, ib); await until(() => !d.querySelector('#iitip').classList.contains('hidden'));
   check(!d.querySelector('#iitip').classList.contains('hidden') && d.querySelector('#iitip').textContent === d.getElementById(ib.dataset.ii).textContent.trim() && ib.getAttribute('aria-expanded') === 'true', 'helper texts: a tap shows it');
-  click(w, d.querySelector('.smodal h3')); await sleep(50);
+  click(w, d.querySelector('.smodal h3')); await until(() => d.querySelector('#iitip').classList.contains('hidden'));
   check(d.querySelector('#iitip').classList.contains('hidden'), 'helper texts: a tap elsewhere hides it');
   // P20: search the settings
   const ss = d.querySelector('#s-search'); ss.value = 'working hours'; ss.dispatchEvent(new w.Event('input', {bubbles: true}));
   const hit = d.querySelector('#s-sres [data-hit]');
   check(hit && /Working hours/i.test(hit.textContent), 'P20: settings search finds "Working hours"');
-  w.eval(`document.querySelector('.snav [data-sec="look"]').click()`); click(w, d.querySelector('#s-sres [data-hit]')); await sleep(100);
+  w.eval(`document.querySelector('.snav [data-sec="look"]').click()`); click(w, d.querySelector('#s-sres [data-hit]')); await until(() => !d.querySelector('.spane[data-pane="general"]').classList.contains('hidden'));
   check(!d.querySelector('.spane[data-pane="general"]').classList.contains('hidden'), 'P20: a hit opens its tab');
   closeAll(w);
   w.eval(`listModal(${P})`); await idle(w);
@@ -276,9 +276,9 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   closeAll(w); w.close();
   // A15: the sidebar can be folded away below 1100 px
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`sideFold(true)`); await sleep(100);
+  w.eval(`sideFold(true)`); await until(() => d.querySelector('#app').classList.contains('side-rail'));
   check(d.querySelector('#app').classList.contains('side-rail') && w.eval(`LS.get('sideFold')`) === true, 'A15: folded sidebar (drawer) on a ~1000 px window, remembered');
-  w.eval(`sideFold(false)`); await sleep(100);
+  w.eval(`sideFold(false)`); await until(() => !d.querySelector('#app').classList.contains('side-rail'));
   check(!d.querySelector('#app').classList.contains('side-rail'), 'A15: back');
   check(!errs.length, 'jsdom: no JS errors ' + errs.join(' | '));
   w.close();
@@ -304,7 +304,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     const ta = () => d.querySelector('#d-content');
     const typeIt = v => { const t = ta(); t.focus(); t.value = v; t.dispatchEvent(new w.Event('input', {bubbles: true})); };
     const srv = async () => (await call('GET', '/api/state')).tasks.find(t => t.id === TT).content || '';
-    typeIt('Hello'); await sleep(1200);  // on purpose: a window in which NO save may happen
+    typeIt('Hello'); await sleep(1200);  // wanted: a window in which NO save may happen
     check(await srv() === '', 'notes: no save every keystroke pause (the 600 ms autosave is gone)');
     w.__offline = true; await w.eval('flushSaves()');
     typeIt('Hello world'); await w.eval('flushSaves()'); typeIt('Hello world, offline'); await w.eval('flushSaves()');
@@ -335,13 +335,13 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   };
   // 2.358.0 C (#2782): settle = the page's requests done (ff.js idle) + two frames drawn, instead of fixed sleeps after an action
   const settle = async (ev, idle) => { await idle({quiet: 300}); await ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))`).catch(() => 0); };
-  const ready = async (ev, idle, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await settle(ev, idle); };
+  const ready = async (ev, idle, n = 30) => { await require('./boot').until(() => ev(`!!document.querySelector('#top h1')`).catch(() => false), {timeout: n * 300, step: 150}); await settle(ev, idle); };
   const CTR = `(fg, bg) => { const p = s => s.match(/[\\d.]+/g).slice(0, 3).map(Number).map(v => /^color\\(/.test(s) ? v * 255 : v).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); const L = c => { const [r, g, b] = p(c); return .2126 * r + .7152 * g + .0722 * b; }; const a = L(fg), b = L(bg); return (Math.max(a, b) + .05) / (Math.min(a, b) + .05); }`;
   const bgOf = `el => { for (let n = el; n; n = n.parentElement) { const c = getComputedStyle(n).backgroundColor; if (c && !/rgba\\(0, 0, 0, 0\\)|transparent/.test(c)) return c; } return 'rgb(255,255,255)'; }`;
 
   // ---- phone 390 x 844, touch, light, German
   await call('PATCH', '/api/settings', {lang: 'de'});
-  await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
+  await firefox(async ({cmd, ev, nav, ctx, shot, idle, until: fu}) => {
     check(await ffLogin({ev, nav}, 'light') === 200, '390: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     const tap = (x, y, hold = 60) => cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 't1', parameters: {pointerType: 'touch'}, actions: [{type: 'pointerMove', x: Math.round(x), y: Math.round(y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: hold}, {type: 'pointerUp', button: 0}]}]}).then(() => cmd('input.releaseActions', {context: ctx}));
@@ -361,8 +361,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     // 2.13.2: on a phone closeDetail() goes history.back() (the task's history entry); that navigation lands after the next
     // nav() and took the page back to the previous document (the flaky A7 / "listModal is not defined"): wait for it first
     await ev(`(() => { closeDetail(); return 1; })()`);
-    for (let i = 0; i < 30 && await ev(`!!(history.state && history.state.detail)`).catch(() => true); i++) await sleep(100);
-    await sleep(300);
+    await fu(`!(history.state && history.state.detail)`, {timeout: 3000}); await settle(ev, idle);
     // A7: the view switch; A11 habits; P13 contrast
     await nav(B + '?p=2#l/' + P); await ready(ev, idle);
     const vs = await ev(`(() => { const s = document.querySelector('#view .vsegm'); if (!s) return null; const r = s.getBoundingClientRect(); return {n: s.querySelectorAll('button').length, h: Math.min(...[...s.querySelectorAll('button')].map(b => b.getBoundingClientRect().height)), right: r.right, vw: innerWidth, txt: s.textContent}; })()`);
@@ -386,12 +385,12 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     // 2.308.0 (#3250): measure once the sheet and the toast stopped moving (same rects twice in a row) instead of after a fixed time
     const TSQ = `(() => { const t = document.querySelector('#toast').getBoundingClientRect(), s = document.querySelector('#pop.sheet').getBoundingClientRect(); return {tb: Math.round(t.bottom), st: Math.round(s.top), tt: Math.round(t.top), overlap: !(t.bottom <= s.top + 1 || t.top >= s.bottom)}; })()`;
     let ts = await ev(TSQ).catch(() => null);
-    for (let i = 0; i < 30; i++) { await sleep(150); const n = await ev(TSQ).catch(() => null); const same = ts && n && n.tb === ts.tb && n.st === ts.st && n.tt === ts.tt; ts = n; if (same) break; }
+    await fu(async () => { const n = await ev(TSQ).catch(() => null); const same = ts && n && n.tb === ts.tb && n.st === ts.st && n.tt === ts.tt; ts = n; return same; }, {timeout: 4500, step: 150});
     check(!ts.overlap, '390 A12: the toast does not cover the sheet ' + JSON.stringify(ts));
     await ev(`(() => { closePop(); return 1; })()`);
     // A14: long press on a row = select
     const rw = await ev(`(() => { const r = document.querySelector('#view .trow .tmain').getBoundingClientRect(); return {x: r.left + 30, y: r.top + r.height / 2}; })()`);
-    await tap(rw.x, rw.y, 700); await sleep(400);
+    await tap(rw.x, rw.y, 700); await fu(`S.multiMode && S.multi.size > 0 && !document.querySelector('#mbar').classList.contains('hidden')`); await settle(ev, idle);
     // 2.32.0 (#1055): the long press selects the row at once (2.25.0 UX-11 opened the task's menu first); the phone's bar:
     // Verschieben, Datum, Erledigt, Mehr (Löschen is under Mehr)
     const sel = await ev(`(() => { const b = document.querySelector('#mbar'), r = b.getBoundingClientRect(); return {mode: S.multiMode, n: S.multi.size, menu: !!document.querySelector('#pop:not(.hidden) [role="menuitem"]'), vis: !b.classList.contains('hidden'), in: r.left >= 0 && r.right <= innerWidth + .5, lab: [...b.querySelectorAll('.mbb:not([hidden]) .mbl')].map(x => x.textContent).join('|')}; })()`);
@@ -401,11 +400,12 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     // the keyboard: the chat with a keyboard-sized viewport keeps the newest message in view (#453 N4 still holds)
     await nav(B + '?p=5#agents/' + AG); await settle(ev, idle);
     await ev(`(() => { document.querySelector('#chat-in').focus(); return 1; })()`);
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 464}}); await sleep(700);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 464}}); await fu(`(() => { const b = document.querySelector('#chat-msgs'); return document.body.classList.contains('kb-open') && b.clientHeight >= 260 && b.scrollHeight - b.scrollTop - b.clientHeight <= 2; })()`);
     const kb = await ev(`(() => { const b = document.querySelector('#chat-msgs'); return {kb: document.body.classList.contains('kb-open'), h: Math.round(b.clientHeight), gap: Math.round(b.scrollHeight - b.scrollTop - b.clientHeight)}; })()`);
     check(kb.kb && kb.h >= 260 && kb.gap <= 2, '390 keyboard: the chat without the page header has more room ' + JSON.stringify(kb));
     await shot('p2130-chat-keyboard-390.png');
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}}); await sleep(300);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}}); await fu(`innerHeight > 800`); await settle(ev, idle);
+
     // settings with the search and the (i)
     await nav(B + '?p=6#today'); await ready(ev, idle);
     await ev(`(() => { settingsModal('general'); return 1; })()`); await settle(ev, idle);
@@ -430,24 +430,24 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
 
   // ---- iPhone behaviour (simulated: iOS keeps innerHeight and only shrinks window.visualViewport): the add sheet and
   // the date sheet sit above the "keyboard", the chat never overflows sideways (390 and 428 wide)
-  for (const vw of [390, 428]) await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
+  for (const vw of [390, 428]) await firefox(async ({cmd, ev, nav, ctx, shot, idle, until: fu}) => {
     check(await ffLogin({ev, nav}, 'dark') === 200, `${vw} iOS: login`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: 926}});
     await nav(B + `?ios=${vw}#l/` + P); await ready(ev, idle);
     const FAKE = `(h, top) => { const t = new EventTarget(); Object.assign(t, {height: h, width: innerWidth, offsetTop: top, offsetLeft: 0, pageTop: top, scale: 1}); Object.defineProperty(window, 'visualViewport', {configurable: true, value: t}); vvSync(); }`;
-    await ev(`(() => { openQuickSheet(''); return 1; })()`); await sleep(300);
-    await ev(`(${FAKE})(560, 0)`); await sleep(200);
+    await ev(`(() => { openQuickSheet(''); return 1; })()`); await fu(`!!document.querySelector('#qsheet')`);
+    await ev(`(${FAKE})(560, 0)`); await fu(`document.querySelector('#qsheet').getBoundingClientRect().bottom <= visualViewport.height + visualViewport.offsetTop`);
     const q = await ev(`(() => { const r = document.querySelector('#qsheet').getBoundingClientRect(); return {bottom: Math.round(r.bottom), lim: visualViewport.height + visualViewport.offsetTop, vvb: getComputedStyle(document.documentElement).getPropertyValue('--vvb')}; })()`);
     check(q.bottom <= q.lim, `${vw} iOS: the add sheet's field sits above the keyboard ` + JSON.stringify(q));
     await shot(`p2130-ios-quickadd-${vw}.png`);
     await ev(`(() => { closePop(); return 1; })()`);
-    await ev(`(() => { snoozeSheet(${T[1]}); return 1; })()`); await sleep(300);
+    await ev(`(() => { snoozeSheet(${T[1]}); return 1; })()`); await fu(`(() => { const p = document.querySelector('#pop.sheet'); return !!p && p.getBoundingClientRect().bottom <= visualViewport.height + visualViewport.offsetTop + 1; })()`);
     const sh = await ev(`(() => { const r = document.querySelector('#pop.sheet').getBoundingClientRect(); return {bottom: Math.round(r.bottom), lim: visualViewport.height + visualViewport.offsetTop}; })()`);
     check(sh.bottom <= sh.lim + 1, `${vw} iOS: a bottom sheet sits above the keyboard ` + JSON.stringify(sh));
     await ev(`(() => { closePop(); return 1; })()`);
     await nav(B + `?ios2=${vw}#agents/` + AG); await settle(ev, idle);
     await ev(`(() => { document.querySelector('#chat-in').focus(); return 1; })()`);
-    await ev(`(${FAKE})(560, 0)`); await sleep(300);
+    await ev(`(${FAKE})(560, 0)`); await fu(`(() => { const c = document.querySelector('#chat-in').getBoundingClientRect(); return c.bottom <= visualViewport.height + 1 && visualViewport.height - c.bottom < 90; })()`);
     const ch = await ev(`(() => { const c = document.querySelector('#chat-in').getBoundingClientRect(), s = document.querySelector('[data-act="chat-send"]').getBoundingClientRect(); return {sw: document.scrollingElement.scrollWidth, iw: innerWidth, send: Math.round(s.right), inBottom: Math.round(c.bottom), lim: visualViewport.height, gap: Math.round(visualViewport.height - c.bottom), meta: document.querySelector('meta[name=viewport]').content}; })()`);
     check(ch.sw <= ch.iw && ch.send <= ch.iw && ch.inBottom <= ch.lim + 1 && ch.gap < 90, `${vw} iOS: chat: no sideways overflow, Send on screen, the box right above the keyboard ` + JSON.stringify(ch));
     await shot(`p2130-ios-chat-${vw}.png`);
@@ -499,7 +499,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   // the main area sits beside the panel (never under it); the draft, the focus and the newest message stay
   await call('PATCH', '/api/settings', {lang: 'de'});
   await call('PATCH', `/api/lists/${P}`, {view: 'list'});
-  await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
+  await firefox(async ({cmd, ev, nav, ctx, shot, idle, until: fu}) => {
     check(await ffLogin({ev, nav}, 'dark') === 200, 'Fold chat: login');
     const vp = (w, h) => cmd('browsingContext.setViewport', {context: ctx, viewport: {width: w, height: h}});
     const LAY = `(() => { const v = document.querySelector('#view'), m = document.querySelector('#main').getBoundingClientRect(), a = document.querySelector('#achat:not(.hidden)'), ar = a && a.getBoundingClientRect(), sd = document.querySelector('#side'), sr = sd.getBoundingClientRect(), side = getComputedStyle(sd).display !== 'none' && sr.width > 0 && sr.right > 0 && !document.querySelector('#app').classList.contains('side-rail');
@@ -510,7 +510,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     for (const [w, h] of [[904, 680], [904, 904]]) for (const fold of [false, true]) {
       await vp(w, h);
       await nav(B + `?fold=${w}${h}${fold}#l/` + P); await ready(ev, idle);
-      await ev(`(() => { LS.set('sideFold', ${fold}); fitLayout(); render(); return 1; })()`); await sleep(300);
+      await ev(`(() => { LS.set('sideFold', ${fold}); fitLayout(); render(); return 1; })()`); await settle(ev, idle);
       let L = await ev(LAY);
       check(!L.fab && L.ttl > 200, `${w}x${h} ${fold ? 'folded' : 'sidebar'}: the list: no + button next to the add bar, titles get room ` + JSON.stringify(L));
       await ev(`(() => { chatOpen(${AG}); return 1; })()`); await settle(ev, idle);
@@ -528,11 +528,11 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     let L = await ev(LAY);
     check(L.panel > 0 && L.mainR <= L.panel + 1 && L.ttl > 200, '1200x904: the panel, the main area beside it (not under it) ' + JSON.stringify(L));
     await shot('p2130-rotate-1200-panel.png');
-    await vp(904, 1200); await sleep(900);
+    await vp(904, 1200); await fu(`(() => { const L = ${LAY}; return L.full && L.panel === -1 && L.gap <= 2; })()`);
     L = await ev(LAY);
     check(L.full && L.panel === -1 && L.draft === 'Entwurf beim Drehen' && L.focus === 'chat-in' && L.gap <= 2, 'rotated to 904x1200: a full page, draft + focus + newest message kept ' + JSON.stringify(L));
     await shot('p2130-rotate-904-full.png');
-    await vp(1200, 904); await sleep(900);
+    await vp(1200, 904); await fu(`(() => { const L = ${LAY}; return L.panel > 0 && !L.full; })()`);
     L = await ev(LAY);
     check(L.panel > 0 && !L.full && L.mainR <= L.panel + 1 && L.draft === 'Entwurf beim Drehen', 'rotated back to 1200x904: the panel again, the draft kept ' + JSON.stringify(L));
   }, true);
@@ -541,12 +541,15 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   // ---- desktop 1440 x 900, mouse, light then dark, English
   await call('PATCH', '/api/settings', {lang: 'en'});
   await call('PATCH', `/api/lists/${P}`, {view: 'list'});
-  for (const theme of ['light', 'dark']) await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
+  for (const theme of ['light', 'dark']) await firefox(async ({cmd, ev, nav, ctx, shot, idle, until: fu}) => {
     check(await ffLogin({ev, nav}, theme) === 200, `1440 ${theme}: login`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
     await nav(B + '?d=1#today'); await ready(ev, idle);
     const key = k => cmd('input.performActions', {context: ctx, actions: [{type: 'key', id: 'k', actions: [{type: 'keyDown', value: k}, {type: 'keyUp', value: k}]}]});
     const TAB = '', DOWN = '';
+    // a key press, then wait until the focus moved (instead of a fixed 150 ms)
+    const SIG = `(() => { const a = document.activeElement; return a ? a.tagName + '#' + a.id + '.' + a.className + ':' + (a.textContent || '').trim().slice(0, 40) : ''; })()`;
+    const press = async k => { const s0 = await ev(SIG); await key(k); await fu(async () => (await ev(SIG)) !== s0, {timeout: 3000}); };
     // headless Firefox never focuses its window, so :focus / :focus-visible never match there: the ring is checked in the
     // style sheet (a 2px outline for every :focus-visible, no rule takes it away from buttons) and on the element's rule
     const RING = `(() => { const rs = [...document.styleSheets].flatMap(sh => { try { return [...sh.cssRules]; } catch { return []; } }).flatMap(r => r.cssRules && !r.selectorText ? [...r.cssRules] : [r]).filter(r => r.selectorText);
@@ -557,29 +560,30 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     check(ring0, `1440 ${theme} A9: a 2 px focus ring for every :focus-visible, none taken away from buttons / the sidebar`);
     const foc = () => ev(`(() => { const a = document.activeElement; return {id: a.id, side: !!a.closest('#side'), rail: !!a.closest('#srail'), bar: !!a.closest('#kbar'), view: !!a.closest('#main'), txt: (a.textContent || '').trim().slice(0, 20), ring: ${ring0}}; })()`);
     await ev(`(() => { document.activeElement?.blur(); window.focus(); return 1; })()`);
-    await key(TAB); await sleep(150);
+    await press(TAB);
     const f1 = await foc();
     const sk = await ev(`[...document.styleSheets].flatMap(sh => { try { return [...sh.cssRules]; } catch { return []; } }).some(r => r.selectorText === '.skip:focus' && r.style.transform === 'none')`);
     check(f1.id === 'skip' && sk && f1.ring, `1440 ${theme} A9: the first Tab: the skip link "Skip to content", visible, with a ring ` + JSON.stringify(f1));
     // 2.152.2 (#2622): sidebar B: the bar of the areas is one stop, then the panel (#side) is one stop
     // 2.152.3 (#2619): first the head bar over everything: the workspace switch, the search, the bell, the account
-    await key(TAB); await sleep(150);
+    await press(TAB);
     let f2r = await foc();
     check(f2r.bar && /Kalmido/.test(f2r.txt) && f2r.ring, `1440 ${theme} A9: the second Tab: the workspace switch in the head bar ` + JSON.stringify(f2r));
-    for (let i = 0; i < 6 && f2r.bar; i++) { await key(TAB); await sleep(150); f2r = await foc(); }
+    for (let i = 0; i < 6 && f2r.bar; i++) { await press(TAB); f2r = await foc(); }
     check(f2r.rail && f2r.ring, `1440 ${theme} A9: then the bar of the areas (one stop) ` + JSON.stringify(f2r));
-    await key(TAB); await sleep(150);
+    await press(TAB);
     const f2 = await foc();
     check(f2.side && f2.ring, `1440 ${theme} A9: then the sidebar panel (one stop) with a focus ring ` + JSON.stringify(f2));
-    await key(DOWN); await sleep(150);
+    await press(DOWN);
     const f3 = await foc();
     check(f3.side && f3.txt !== f2.txt, `1440 ${theme} A9: ↓ walks the sidebar ` + JSON.stringify(f3));
-    await key(TAB); await sleep(150);
+    await press(TAB);
     const f4 = await foc();
     check(!f4.side && !f4.rail, `1440 ${theme} A9: the next Tab leaves the sidebar ` + JSON.stringify(f4));
     await shot(`p2130-focus-1440-${theme}.png`);
     // the skip link jumps to the content
-    await ev(`(() => { document.querySelector('#skip').click(); return 1; })()`); await key(TAB); await sleep(150);
+    await ev(`(() => { document.querySelector('#skip').click(); return 1; })()`); await press(TAB);
+
     const f5 = await foc();
     check(f5.view && !f5.side, `1440 ${theme} A9: after the skip link Tab lands in the content ` + JSON.stringify(f5));
     // A2: hover shows the quick reactions; helper text tooltip on hover
