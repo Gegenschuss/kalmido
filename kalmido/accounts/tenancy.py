@@ -10,7 +10,7 @@ import os
 
 from ..core.i18n import N_
 from ..core.db import gset, gsetting, iso, local_now, now_utc
-from ..accounts.orgs import PRIVATE_FOLDER_RE, has_workspaces
+from ..accounts.orgs import PRIVATE_FOLDER_RE, _operator_apart, has_workspaces, op_foreign_account, op_foreign_org
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import dlg_gone  # 2.473.0 (#3357)
 
@@ -350,7 +350,6 @@ RP_ORG = {"list_person": "SELECT org_id FROM lists WHERE id=?", "group": "SELECT
 def rp_foreign(c, kind, oid_, uid):
     """2.480.0 (#3944, F5): hosted -> is the row (kind, object id, person) of a client (an organisation the operator does not
     administer, or a client's private object)? The operator's button then only counts it. Self-hosted: never."""
-    from .orgs import _operator_apart, op_foreign_account, op_foreign_org
     if not _operator_apart():
         return False
     sql = RP_ORG.get(kind)

@@ -58,7 +58,7 @@ from ..lists.formula import fx_display  # 2.362.4 (#3100)
 from ..lists.templates import tpl_clean  # 2.362.4 (#3100)
 from ..tasks.validation import (DATE_MAX_Y, DATE_MIN_Y, DURATION_MAX, PRIORITIES, REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm,
                                 rr_problem, valid_date, valid_hm, valid_plan_start)
-from .orgexport import EXPORT_DIR, OX_SECRET_COLS
+from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _safe_part
 from .acctexport import (UMZ_BLOCK, UMZ_FORMAT, UMZ_HEAD, UMZ_V, UmzReader, UmzWriter, umz_key, umz_person, umz_space_ok,
                          umz_user_conn, umz_write_state)
 from ..core.orgcrypt import oc_user_space, oc_write_file, rck_parse  # 2.149.0 G (#2517): pulled up from functions
@@ -417,7 +417,6 @@ UMZ_ORG_SKIP = (  # archive prefix -> what the preview names as not taken over
 def umz_org_open(zf, names, man, mraw, full):
     """-> (manifest, files, data) of an opened organisation export, in the shape of an account export (2.137.0, #2344: the
     entries of admin/orgimport.py under data["oi"][entry])."""
-    from .orgexport import _safe_part
     from .orgimport import oi_covers
     fl = man.get("files")
     if man.get("format_version") != 1 or not isinstance(fl, dict) or not isinstance(man.get("org"), dict):
@@ -1665,7 +1664,6 @@ def umz_private_oi(data, files):
     get the names the areas read (files/store/<node>-v<no>-<name>, files/wiki/..., files/sheets/...) as a second name of the
     file's entry; an export before #3470 has no versions: the current one comes from the node's "file". Files of a filed mail
     follow the mail (it stays on the old server), rows of a table in the trash stay with it."""
-    from .orgexport import _safe_part
     oi = {}
     nodes = [r for r in data.get("private_files") or [] if not r.get("hub_mail_id")]
     names = {_oid(r.get("id")): r.get("name") for r in nodes}

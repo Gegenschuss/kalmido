@@ -47,6 +47,7 @@ from ..notify.push import _b64u, _b64u_dec, _VAPID
 from ..notify.alerts import _clamp_int, _env_int, aa_count, aa_disk, aa_now, aa_oserr, aa_switch
 from ..calendars.subscriptions import _CAL_KEY
 from . import bkstore as bks  # 2.432.0 (#3584): the shared file store
+from .hosting import hosted  # 2.480.0 (#3944, F6)
 
 
 # ---------------------------------------------------------------- backups + restore (admins)
@@ -2244,7 +2245,6 @@ def backups_verify(name):
 def bk_no_upload_hosted():
     """2.480.0 (#3944, F6): hosted -> an archive from outside is neither taken nor restored: a self-made archive would replace
     every client's password hash and content. Restoring goes only from the server's own backups (and its offsite copy)."""
-    from .hosting import hosted
     if hosted():
         raise Denied(403, tr("On a hosted instance no archive is uploaded: restoring goes only from the server's own backups"))
 
