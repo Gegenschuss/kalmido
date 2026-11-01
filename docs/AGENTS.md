@@ -771,7 +771,7 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 |---|---|---|
 | `mention` | someone mentions the agent in a comment, or writes `@agentname` in a task title or notes | `task`, `list`, `comment` (or `null`), `where`: `comment` or `task` |
 | `comment` | a new comment on a task the agent follows (assigned to it, created by it, or it commented before); 2.13.1: in a project where the agent **reads every comment**, every comment a person writes there; 2.41.0 (#1383): a person pressed a button under one of the agent's comments ([Answer buttons and approval cards in comments](#answer-buttons-and-approval-cards-in-comments)); 2.63.0 (#1513): the customer of a [customer report](#customer-reports) wrote on its status page | `task`, `list`, `comment`; 2.41.0: `answer` `{comment_id, choice_ids, labels, via, user, approval?, approval_request?}`; 2.63.0: `comment.portal` (the customer sees it), a customer's comment has `author_id` null and `comment.ext_name` |
-| `assigned` / `unassigned` | a task is assigned to the agent or taken away from it | `task`, `list`; 2.236.0: `assigned` also `queue` `{position, active, max_parallel}` and `priority_rule` ([The queue](#the-queue)) |
+| `assigned` / `unassigned` | a task is assigned to the agent or taken away from it (2.473.0: also delegated to it, then with `delegated: true`: `task.delegate_agent_id` is the agent, the person stays `assignee_id`) | `task`, `list`; 2.236.0: `assigned` also `queue` `{position, active, max_parallel}` and `priority_rule` ([The queue](#the-queue)) |
 | `chat` | a person writes in their chat with the agent | `message` `{id, body, task_id, created_at, attachments}`, `user` `{id, name}`; fetching it marks the message *delivered* (2.7.2); 2.13.1: `attachments` `[{id, name, mime, size, url}]` (images / files, `body` may then be empty); 2.153.0 (#1962): `message.job_id` + `job` (the job) when it was typed in that job's own chat |
 | `reaction` | someone reacts to one of the agent's comments; 2.7.2: or to one of its chat messages | comments: `task`, `list`, `comment` `{id, text}`, `reaction` `{emoji, user}`, `approval`: `approved`, `rejected` or `null`; chat: `chat_message` `{id, text, from, created_at}`, `reaction`, `approval`, `user`; 2.30.0: `stale: true` when a 👍 / 👎 hit a permission question that is already answered or expired (act on `approval`, never on the emoji) ([Chat reactions](#chat-reactions-and-delivery)) |
 | `job` | someone presses Approve, Reject or Stop on one of the agent's jobs; 2.3.0: a proposal was applied (`approve`) or discarded (`reject`); 2.56.0: someone wrote to a running job from its card (`message`) | `job`, `action`: `approve`, `reject`, `stop` or `message` (2.56.0, with `text`; the job itself does not change), `user`; for proposals also `proposal` `{state: applied \| discarded, created, changed, list_id}` |
@@ -2373,7 +2373,7 @@ rule proposals per agent and day.
 2.138.0 (#2060): new triggers `created` (a task is created in the project), `assigned` (`user_id`: only that person, null =
 anybody; fires only when the person is new on the task; 2.144.6 (#2400): not when an approval request or "changes" of an
 approval hands the task over) and `field` (`field_id` of the project's custom fields; `value` = only
-when set to that option id / `"1"` checked / `"0"` unchecked, null = any change; formula fields never trigger). New actions
+when set to that option id / `"1"` checked / `"0"` unchecked / 2.473.0 `"*"` has a value, null = any change; formula fields never trigger). New actions
 `priority` (`priority` none / low / medium / high), `tag` (`tag_id`: adds a tag of this project; personal tags never) and `field`
 (`field_id` + `value`, checked like a normal field value, null clears it). A deleted field or project tag pauses the rule
 (`paused_reason` `field` / `tag`). The loop protection stays: a value set by a rule never triggers a `field` rule.
@@ -3135,7 +3135,9 @@ Admins create groups of people (Settings > Organisation > People > Groups; optio
 the OIDC provider). A project or a folder can be shared with a group; every member then is a member of the project with the
 group's role, which is the higher of their own role and the group's. Agents are never group members; share projects with an
 agent directly. A task can be assigned to a group (`assignee_group_id`); members see it in *Assigned to me* until one of
-them takes it (`POST /api/v1/tasks/{id}/take`). Events of such tasks carry `assignee_group_id`. Read the groups with
+them takes it (`POST /api/v1/tasks/{id}/take`). 2.473.0: `delegate_agent_id` hands the work to an agent of the project while the
+person stays the assignee: only an agent open to the person, it counts in the agent's queue (`GET /api/v1/agent/queue`, `list_tasks`
+with `delegate=me`). `watch_task` / `unwatch_task` / `list_watchers`: a watching agent gets the task's `comment` events. Events of such tasks carry `assignee_group_id`. Read the groups with
 `GET /api/v1/groups` (MCP `list_groups`) and the groups of a project with `GET /api/v1/lists/{id}/groups`
 (MCP `list_list_groups`).
 
@@ -3584,6 +3586,7 @@ with the scope it needs). The tools:
   `recipes`, `ingredients_to_shopping` scales to `servings`, adds amounts to open items of the same name and has a
   `preview`
 - waiting on someone: `set_waiting`, `clear_waiting`, `list_waiting`, `list_stale_tasks` (2.34.0: tasks lying idle)
+- watching a task (2.473.0): `watch_task`, `unwatch_task`, `list_watchers`
 - agent channel (agent tokens only): `get_agent`, `set_status`, `list_events`, `wait_for_events`, `list_jobs`,
   `create_job`, `get_job`, `update_job`, `set_working` / `end_working` (2.407.0), `submit_proposal`, `propose_to_person` (2.51.0), `list_chats`, `send_chat`, `request_chat_approval` (2.35.0),
   `chat_typing`, `react_to_chat`, `pin_chat_message` (2.62.0), `report_usage`, `get_usage`, `tidy_task`, `request_merge_approval`

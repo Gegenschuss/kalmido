@@ -209,7 +209,7 @@ function newsText(it, U) {
     case 'assign': return d.group ? tr('{0} assigned a task to your group {1}', who, q(d.group)) : tr('{0} assigned a task to you', who);
     case 'take': return tr('{0} took a task of your group {1}', who, q(d.group || ''));  // 2.10.0 (#441)
     case 'unassign': return !it.task_id && it.list_id ? tr('{0} removed you as assignee of a task in {1}', who, q(newsListName(it))) : tr('{0} removed you as assignee', who);  // 2.38.0 (#1155): out of sight
-    case 'complete': return tr('{0} completed a task', who);
+    case 'complete': return d.st === 'reopen' ? tr('{0} reopened a task', who) : d.st === 'wont' ? tr('{0} closed a task as won’t do', who) : tr('{0} completed a task', who);  // 2.473.0 (#3357): st = what a watcher hears of
     case 'share': return d.org ? (d.role === 'admin' ? tr('{0} added you to the organisation {1} as an admin', who, q(d.name || '')) : tr('{0} added you to the organisation {1}', who, q(d.name || '')))  // 2.28.0 (#935)
       : d.role === 'view' ? tr('{0} shared the project {1} with you (view only)', who, q(newsListName(it)))
       : d.role === 'participant' ? tr('{0} added you to {1} as a participant (you see the tasks assigned to you)', who, q(newsListName(it)))
@@ -620,6 +620,10 @@ function actText0(a, U) {
     case 'dep_shift': return tr('{0} moved a task that blocks this one, so it moved along to {1}', who, due());
     case 'priority': return tr('{0} changed the priority to {1}', who, q(tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High')][+d.p] || N_('None'))));
     case 'assign': return d.to ? tr('{0} assigned the task to {1}', who, q(uname(d.to, U))) : tr('{0} removed the assignee', who);
+    case 'delegate': return d.to ? tr('{0} delegated the task to {1}', who, q(uname(d.to, U))) : tr('{0} removed the delegation', who);  // 2.473.0 (#3357)
+    case 'watch':
+      if (d.to) return d.on ? tr('{0} added {1} to the watchers', who, q(uname(d.to, U))) : tr('{0} removed {1} from the watchers', who, q(uname(d.to, U)));
+      return d.on ? tr('{0} started watching the task', who) : tr('{0} stopped watching the task', who);
     case 'assign_group': return d.group ? tr('{0} assigned the task to the group {1}', who, q(d.group)) : tr('{0} removed the group', who);  // 2.10.0 (#441)
     case 'take': return tr('{0} took the task (group {1})', who, q(d.group || ''));
     case 'list': return tr('{0} moved the task to the project {1}', who, q(d.inbox && inboxDef(d.name) ? tr('Basket') : listName(d.name)));

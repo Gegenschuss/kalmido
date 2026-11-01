@@ -28,6 +28,7 @@ from ..core.pg import insert_id, system_ctx
 from ..accounts.session import _token_hash
 from ..accounts.login import auth_key, seal, unseal
 from ..accounts.bgjobs import bgj_add, bgj_fn
+from ..tasks.watchers import wat_users  # 2.473.0 (#3357)
 from ..core.access import acx_anon_bind, need_task, task_visible  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import hit_budget, hit_limit  # 2.149.0 G (#2517): pulled up from functions
 from ..core.mailframe import Safe, mail_html
@@ -339,7 +340,7 @@ def pt_team_news(c, t, cid, text, name):
     from ..notify.push import push_prio, push_reachable
     from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO
     from ..agents.core import agent_ids
-    rcpt = ({t["l_owner"], t["created_by"], t["assignee_id"]} | tbl_urgent_users(c, t["id"])) - {None} - agent_ids(c)
+    rcpt = ({t["l_owner"], t["created_by"], t["assignee_id"]} | tbl_urgent_users(c, t["id"]) | wat_users(c, t["id"])) - {None} - agent_ids(c)
     for uid in sorted(rcpt):
         s = collab_user(c, uid, t["list_id"])
         if not s or not task_visible(c, t["id"], uid, full=True):

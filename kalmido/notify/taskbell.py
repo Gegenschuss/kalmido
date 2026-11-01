@@ -29,13 +29,14 @@ from ..core.errors import BadInput
 TBL_LEVELS = ("list", "mute", "urgent")
 TBL_PRIO = "5"  # ntfy 5 = urgent (Web Push: urgency high)
 TBL_MAX_USERS = 500
-TBL_SKIP = ("created", "bell")  # history lines that never push (a new task has no bells; bell changes push on their own)
+TBL_SKIP = ("created", "bell", "watch")  # history lines that never push (a new task has no bells; bell changes push on their own)
 TBL_DONE_KINDS = ("complete", "wont")  # the completion itself still reaches someone urgent "until completed"
 # the push text of a change (activity kind -> what happened); anything else: "changed the task"
 TBL_KIND_TXT = {
     "title": N_("{0} renamed the task"), "content": N_("{0} edited the description"),
     "due": N_("{0} changed the date"), "snooze": N_("{0} changed the date"), "dep_shift": N_("{0} changed the date"),
     "priority": N_("{0} changed the priority"), "assign": N_("{0} changed the assignee"),
+    "delegate": N_("{0} changed who the task is delegated to"),
     "list": N_("{0} moved the task to another project"), "section": N_("{0} moved the task to another section"),
     "complete": N_("{0} completed the task"), "reopen": N_("{0} reopened the task"), "wont": N_("{0} closed the task as won’t do"),
     "delete": N_("{0} deleted the task"), "restore": N_("{0} restored the task"),

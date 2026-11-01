@@ -5276,7 +5276,7 @@ body.msel #view .qdock{visibility:hidden}
 .lkseg label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:1px}
 .lkseg label:has(input:disabled){cursor:default;opacity:.7}
 @media (pointer:coarse){ .lkseg label{min-height:2.75rem} }
-.ptsecs .muted{font-size:var(--fs-s)}
+.ptsecs .muted,.ptbug .muted{font-size:var(--fs-s)}
 /* 2.27.0 (#964): one agent per list: "Agent reads every comment" is a switch like the access switches above it */
 .lsn1 .lsnag.agacc{display:flex;width:100%}
 .lsn1 .lsnag .swc input{position:absolute;inset:-.75rem -.375rem;width:auto;height:auto}
@@ -5288,10 +5288,10 @@ body.msel #view .qdock{visibility:hidden}
 /* 2.27.0 (#964): Settings > Agents > Lists grouped by folder (a group row folds and sets one agent for the whole folder) */
 .lkseg{max-width:100%;min-width:0}
 .lkseg label{min-width:0;white-space:nowrap}
-.ptsecs{flex-direction:column;align-items:flex-start;row-gap:.125rem;margin-top:.75rem}
-.modal .row.ptsecs label.chkl{font-size:var(--fs-m)}
-.ptsecs #l-ptsecsl{padding-left:1.625rem}
-.ptsecs .muted{min-width:0;overflow-wrap:anywhere}
+.ptsecs,.ptbug{flex-direction:column;align-items:flex-start;row-gap:.125rem;margin-top:.75rem}
+.modal .row.ptsecs label.chkl,.modal .row.ptbug label.chkl{font-size:var(--fs-m)}
+.ptsecs #l-ptsecsl,.ptbug .muted{padding-left:1.625rem}
+.ptsecs .muted,.ptbug .muted{min-width:0;overflow-wrap:anywhere}
 @media (max-width:767px){ .lkrow{flex-wrap:wrap} .lkseg{flex:1 1 100%} .lkseg label{flex:1;justify-content:center} }
 .modal .row .lkseg label{min-width:0;color:var(--muted);font-size:var(--fs-m)}
 .modal .row .lkseg label.on{color:var(--text)}
@@ -8834,3 +8834,8 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 .owbar .owb{display:flex;flex-wrap:wrap;gap:.375rem}
 .owdec{margin:0 0 .75rem}.owdec ul{list-style:none;margin:0 0 .25rem;padding:0}
 .owd{padding:.25rem 0;overflow-wrap:anywhere}.owd.old .owdt{text-decoration:line-through;color:var(--muted)}.owdm{font-size:var(--fs-m)}
+/* 2.473.0 (#3357): delegated to an agent, watchers (taskbell.js) */
+.dlgrow{align-items:center}
+.dlgrow .dlg-w.on{color:var(--accent);border-color:var(--accent)}
+.dlgrow .dlg-l{font-size:var(--fs-s)}
+@media (pointer:coarse){ .dlgrow .dlg-w,.dlgrow .dlg-l{min-height:2.75rem} }

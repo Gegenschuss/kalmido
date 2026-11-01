@@ -1277,10 +1277,17 @@ def init_db(guard=True, load=None):
             gset(c, "migr_kind2352", "1")  # once: a status cleared later (= not tracked) stays cleared
             if n:
                 print("list types:", n, "projects without a status became 'on track'", flush=True)
-        if gsetting(c, "migr_allow2380") != "1":  # 2.380 G (#3389): the one list of internal hosts -> a copy per purpose
-            old = gsetting(c, "cal_allow_hosts")
+        # 2.380 G (#3389): the one list of internal hosts -> a copy per purpose. 2.473.0 (#3569): allow_hosts_copied_from = the
+        # old list as last copied; it differs after a fallback to an older version changed the old list -> copy again, a host
+        # removed there must not stay allowed. A server without the mark only gets it: nothing says the old list changed (so the
+        # mark is no entry of GLOBAL_DEFAULTS, those are stored before this runs).
+        old = gsetting(c, "cal_allow_hosts")
+        was = c.execute("SELECT value FROM settings WHERE key='allow_hosts_copied_from'").fetchone()
+        if gsetting(c, "migr_allow2380") != "1" or (was and was[0] != old):
             gset(c, "allow_hosts_by_purpose", json.dumps({p: old for p in ALLOW_PURPOSES}, sort_keys=True))
             gset(c, "migr_allow2380", "1")
+        if not was or was[0] != old:
+            gset(c, "allow_hosts_copied_from", old)
         if gsetting(c, "migr_agcl2380") != "1":  # 2.380 F (#3438): one way -- the agency projects' "Client" text fields go
             # when no task has a value in them (the client is the project's, lists.client_id); a field with a value stays
             names = sorted({tr("Client", lg=x).strip().lower() for x in LANGS} | {"client"})

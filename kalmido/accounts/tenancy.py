@@ -12,6 +12,7 @@ from ..core.i18n import N_
 from ..core.db import gset, gsetting, iso, local_now, now_utc
 from ..accounts.orgs import PRIVATE_FOLDER_RE, has_workspaces
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import dlg_gone  # 2.473.0 (#3357)
 
 # when the check runs: once a day at this local hour or later; KALMIDO_TENANT_CHECK=always = at every watchdog tick (tests)
 TENANT_CHECK_HOUR = int(os.environ.get("KALMIDO_TENANT_CHECK_HOUR", "3") or 3)
@@ -177,6 +178,10 @@ CHECKS = {
                        "THEN b.owner_org_id IS DISTINCT FROM cl.org_id OR b.org_id IS DISTINCT FROM cl.org_id "
                        "ELSE b.owner_org_id IS NOT NULL OR b.org_id IS NOT NULL OR (b.owner_id IS DISTINCT FROM cl.created_by "
                        "AND NOT EXISTS (SELECT 1 FROM book_members bm WHERE bm.book_id=b.id AND bm.user_id=cl.created_by)) END"),
+    # 2.473.0 (#3357): someone who watches a task of an organisation without being a member of it (boundary_repair removes the row)
+    "task_watcher_person": ("SELECT w.task_id, w.user_id FROM task_watchers w JOIN tasks t ON t.id=w.task_id JOIN lists l ON l.id=t.list_id "
+                            "JOIN users u ON u.id=w.user_id WHERE l.org_id IS NOT NULL AND u.kind!='agent' AND NOT EXISTS (SELECT 1 FROM org_members m "
+                            "WHERE m.org_id=l.org_id AND m.user_id=w.user_id)"),
     # 2.60.0 C (#1512): the reviewer of an organisation's task who is neither its list's owner nor a member of the list
     "task_reviewer": ("SELECT t.id, t.reviewer_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.reviewer_id IS NOT NULL "
                       "AND l.org_id IS NOT NULL AND t.reviewer_id<>l.owner_id AND NOT EXISTS (SELECT 1 FROM list_members m "
@@ -322,6 +327,7 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
           "file_person": ("fs_shares", "node_id"),  # 2.48.0 (#1207)
           "doc_mail_person": ("doc_mail", "org_id"),  # 2.48.0 (#1111)
           "task_bell_person": ("task_bell", "task_id"),  # 2.53.0 C (#1424)
+          "task_watcher_person": ("task_watchers", "task_id"),  # 2.473.0 (#3357)
           "assistant_person": ("assistant_access", "list_id"),  # 2.75.0 A (#1411)
           "hub_token_person": ("hub_tokens", "org_id"),  # 2.84.0 A (#1198)
           "sheet_share_person": ("sheet_shares", "sheet_id"),  # 2.124.0 C (#2113)
@@ -354,6 +360,7 @@ def boundary_repair(c):
             c.execute(f"DELETE FROM {table} WHERE {col}=? AND user_id=?", (oid_, uid))
             if table == "list_members":
                 c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (oid_, uid))
+                dlg_gone(c, oid_, uid)  # 2.473.0 (#3357): delegated tasks and watching of this list end
                 c.execute("DELETE FROM task_people WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, oid_))
             done.append([oid_, uid])
         if done:

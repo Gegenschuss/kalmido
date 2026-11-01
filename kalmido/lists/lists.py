@@ -10,7 +10,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
-from ..core.access import acx_drop, collab_all, Denied, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES
+from ..core.access import acx_drop, collab_all, Denied, dlg_gone, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES
 from ..core.state import visible_lists
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
@@ -315,18 +315,25 @@ def list_create():
         fpt = folder_ptype(db(), me(), folder)  # (ptype "" in the request = chosen: no type; a chosen type goes first)
         if fpt:
             b = {**b, "ptype": fpt, "sections": True}
+    if "bug_inbox" in b and not isinstance(b["bug_inbox"], bool):  # 2.473.0 (#3378)
+        return err(tr("Invalid value: {0}", "bug_inbox"))
     if b.get("ptype"):  # 2.4.0 (#243): a project of a built-in type (sections, fields, view, ticket types, modules)
         c = db()
         if "sections" in b and not isinstance(b["sections"], bool):
             return err(tr("Invalid value: {0}", "sections"))
+        bug = b.get("bug_inbox") is True and b["ptype"] == "software"
+        if bug:  # its rule would be an agent's (agents only propose rules): refused before anything is made
+            from ..lists.rules import _need_person
+            _need_person()
         from ..accounts.orgs import clean_org_id, ws_default_org
         oid = clean_org_id(c, b["org_id"], me()) if "org_id" in b else ws_default_org(c, me(), folder)  # 2.28.0 (#935)
-        lid, on = ptype_create(c, me(), b["ptype"], name, folder, color, sections=b.get("sections") is True, org_id=oid)  # 2.27.0 (#972)
+        made = {}
+        lid, on = ptype_create(c, me(), b["ptype"], name, folder, color, sections=b.get("sections") is True, org_id=oid, bug_inbox=bug, made=made)  # 2.27.0 (#972)
         if "time_tracking" in b:  # 2.41.0 (#1471)
             c.execute("UPDATE lists SET time_tracking=? WHERE id=?", (clean_list_value("time_tracking", b["time_tracking"]), lid))
         bump(c)
         c.commit()
-        return jsonify({**dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()), "modules_on": on})
+        return jsonify({**dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()), "modules_on": on, **made})
     view = clean_list_value("view", b.get("view") or "list")
     kind = clean_list_value("kind", b["kind"]) if b.get("kind") else "list"
     fam = clean_list_value("family", b.get("family"))  # 2.19.0 (#653)
@@ -716,7 +723,8 @@ def list_purge(c, lid, inbox):
         tfiles = hard_delete(c, [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))], lists={lid})
     if inbox:  # 2.272.0 F (#3038, review E2-M4): without an inbox (a retired organisation) nothing to carry over
         lp_carry(c, lid, inbox)  # 2.272.0 E2 (#3038): fields, tags and section names go along
-    c.execute("UPDATE tasks SET deleted_at=COALESCE(deleted_at,?), list_id=?, section_id=NULL, assignee_id=NULL WHERE list_id=?",
+    c.execute("DELETE FROM task_watchers WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)", (lid,))  # 2.473.0 (#3357)
+    c.execute("UPDATE tasks SET deleted_at=COALESCE(deleted_at,?), list_id=?, section_id=NULL, assignee_id=NULL, delegate_agent_id=NULL WHERE list_id=?",
               (ts, inbox, lid))
     icon = c.execute("SELECT icon FROM lists WHERE id=?", (lid,)).fetchone()[0]
     lfiles = [r[0] for r in c.execute("SELECT path FROM list_files WHERE list_id=?", (lid,))] + tfiles  # 2.7.1 (#410)
@@ -1364,6 +1372,7 @@ def member_remove(lid, uid):
         return jsonify(ok=True, via_group=True)
     c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
+    dlg_gone(c, lid, uid)  # 2.473.0 (#3357): delegated tasks and watching of this list end
     # 2.53.0 (#1424, review): a removed member's task bells of this list go (no old "Urgent" coming back on re-invite)
     c.execute("DELETE FROM task_bell WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
     # 2.82.0 (#1464): their own "My tasks" places of this list's tasks go too (the state filters them anyway)

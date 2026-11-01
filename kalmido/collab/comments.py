@@ -425,7 +425,7 @@ def comment_delete(cid):
 
 # ---- collaboration pushes (module "collab" of the recipient must be on; never to the person who acted;
 # only users who still see the task; each via their own ntfy topic, in their own language; click opens it)
-#  - comment: assignee, creator, everyone who commented before + mentioned people (even non-participants)
+#  - comment: assignee, creator, watchers, everyone who commented before + mentioned people (even non-participants)
 #  - assign / unassign: the new assignee / the previous one when someone else (re)assigns the task
 #  - complete: creator + whoever assigned it, when someone else completes a task in a shared list
 # Burst rule, shared by all of them (per recipient and task): the first push goes out right away; anything
@@ -555,6 +555,8 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
     ids |= bell_all_users(c, t["list_id"], "comment")  # 2.1.0 (#317): the bell "All" of a list: every comment (2.6.1: or "custom")
     from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO
     ids |= tbl_urgent_users(c, t["id"])  # 2.53.0 C (#1424): "Urgent" on the task: every comment
+    from ..tasks.watchers import wat_users
+    ids |= wat_users(c, t["id"])  # 2.473.0 (#3357): watchers like someone who commented (row "follow"); rights checked per person below
     if only is not None:
         ids = set(only)
     prev = c.execute("SELECT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id<? ORDER BY id DESC LIMIT 1",

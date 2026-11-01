@@ -1282,6 +1282,8 @@ def task_wake(tid):
         aid = as_int(b["agent_id"], "agent_id", 1)
         if aid not in cands:
             raise Denied(404)
+    elif t["delegate_agent_id"] in cands:  # 2.473.0 (#3357): the agent the task is delegated to
+        aid = t["delegate_agent_id"]
     elif t["assignee_id"] in cands:
         aid = t["assignee_id"]
     elif len(cands) == 1:

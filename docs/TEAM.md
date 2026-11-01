@@ -672,7 +672,9 @@ workspace).
 
 - *A task is created* (also by an agent, the API or an import step), *A task is assigned* (to a chosen person or to anyone;
   only when the person is new on the task) and *A custom field changes* (any change, or for selection and checkbox fields
-  only a chosen value: an option, checked, unchecked). Formula fields are calculated and never start a rule.
+  only a chosen value: an option, checked, unchecked; every field but a checkbox also *Filled*: it has a value, clearing it
+  starts nothing). Formula fields are calculated and never start a rule. A rule that moves a task to another project keeps the
+  values of text, number, amount, rating, date and checkbox fields where the target has a field of the same name and type.
 - *Set the priority* (none, low, medium, high), *Add a project tag* (only tags of this project: the rule belongs to everyone in
   the project, personal tags stay personal) and *Set a custom field* (a fixed value, checked like a value you type; empty
   clears the field).

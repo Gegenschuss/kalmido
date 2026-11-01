@@ -11,7 +11,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc
 from ..core.db import usettings, uset  # 2.356.0 B (#2932)
 from ..accounts.session import me
-from ..core.access import Denied, acx_drop, acx_lists_sql, plists, pvis
+from ..core.access import Denied, acx_drop, acx_lists_sql, dlg_gone, plists, pvis, token_lists
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.orgcrypt import oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -227,6 +227,20 @@ def visible_people(c, uid):
     as "system" (ids only), so the rule is the same whoever asks -- row-level security does not narrow it."""
     with system_ctx(c):
         return _visible_people(c, uid)
+
+
+def token_people(c, uid):
+    """2.473.0 (#3907): None = no limit; a token limited to some projects (a person's or an agent's): the set of the people
+    of those projects, oneself and an agent's owner -- the people of the account's other projects stay out. Ids only."""
+    lids = token_lists()
+    if lids is None:
+        return None
+    q = ",".join("?" * len(lids)) or "NULL"
+    with system_ctx(c):
+        keep = {uid, *(r[0] for r in c.execute("SELECT owner_id FROM agents WHERE user_id=?", (uid,)))}
+        keep |= {r[0] for r in c.execute(f"SELECT owner_id FROM lists WHERE id IN ({q})", [*lids])}
+        keep |= {r[0] for r in c.execute(f"SELECT user_id FROM list_members WHERE list_id IN ({q})", [*lids])}
+    return keep
 
 
 def _agent_visible_people(c, uid):
@@ -1390,6 +1404,7 @@ def ol_private(c, lid, uid):
                             "AND a.owner_id IS DISTINCT FROM ? AND a.org_id IS NOT NULL", (lid, uid)).fetchall():
         c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, aid))
         c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, aid))
+        dlg_gone(c, lid, aid)  # 2.473.0 (#3357): delegated tasks and watching of this list end
     from ..admin.orgcrypt_cli import oc_settle_kick
     oc_settle_kick([lid])  # 2.64.0 (#1864): its files get the owner's account key
 
@@ -1434,11 +1449,14 @@ def org_leave(c, oid, uid, heir, back=None):
     for (lid,) in c.execute("SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.org_id=?", (uid, oid)).fetchall():
         c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
         c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
+        dlg_gone(c, lid, uid)  # 2.473.0 (#3357): delegated tasks and watching of this list end
         c.execute("DELETE FROM task_people WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
     if priv:  # 2.352.0 F (#2748, review N3): the lists now private leave the organisation's tree, its folders' roles end
         from ..lists.groups import grp_sync
         grp_sync(c, priv)
     OLV_AREAS["home"](c, oid, uid, back)  # 2.365.1 (#3395): after the lists: what hangs at a project that went back stays attached
+    # 2.473.0 (#3357): watching without a membership ends the same way (a list open to the organisation)
+    c.execute("DELETE FROM task_watchers WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id IN (SELECT id FROM lists WHERE org_id=? AND owner_id!=?))", (uid, oid, uid))
     # 2.83.0 (#1725): tasks assigned without joining (a list everyone in the organisation may edit)
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=? AND list_id IN (SELECT id FROM lists WHERE org_id=? AND owner_id!=?)", (uid, oid, uid))
     # 2.363.3 (#3133): coming along without a membership too (brought back by joining again in a list open to the organisation)
@@ -1525,12 +1543,11 @@ def org_member_remove(oid, uid):
     oname = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]  # 2.37.0 (#1150): before leaving it (then invisible)
     back = []
     n = org_leave(c, oid, uid, heir, back=back)  # 2.361.0 (#2922): what the person brought in goes back to their private space
+    from ..collab.news import news_add
     if operator:
-        from ..collab.news import news_add
         news_add(c, operator, "share", list_id=None, data={"org": True, "name": oname, "role": "admin", "handover": n}, actor=uid)
         print("organisation", oid, "last admin", uid, "left: operator", operator, "took it over,", n, "lists", flush=True)
     if uid != me():
-        from ..collab.news import news_add
         from ..collab.comments import user_names
         # 2.148.1 A (#2480): the person learns that their lists of the organisation stayed with it (and with whom)
         news_add(c, uid, "unshare", list_id=None, data={"org": True, "name": oname, **({"lists": n, "to": user_names(c, [heir]).get(heir, "")} if n else {}),

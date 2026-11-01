@@ -62,8 +62,8 @@ def tx_collect(c, uid, lid, order, base, x, dup=False, fidx=None, ftypes=None):
 
     def nd(tid):
         return nodes.setdefault(keys[tid], {})
-    for r in c.execute(f"SELECT id, assignee_id, assignee_group_id, reviewer_id, sprint_id FROM tasks WHERE id IN ({q})"):
-        for k, col in (("a", "assignee_id"), ("g", "assignee_group_id"), ("r", "reviewer_id")):
+    for r in c.execute(f"SELECT id, assignee_id, assignee_group_id, reviewer_id, delegate_agent_id, sprint_id FROM tasks WHERE id IN ({q})"):
+        for k, col in (("a", "assignee_id"), ("g", "assignee_group_id"), ("r", "reviewer_id"), ("dl", "delegate_agent_id")):
             if r[col]:
                 nd(r["id"])[k] = r[col]
         if r["sprint_id"] in smap:
@@ -317,6 +317,7 @@ def tx_apply(c, uid, lid, x, made, st, start=None, scale=1.0, fmap=None):
     st["skipped"] += x.get("skipped", [])
     smap = _list_part(c, uid, lid, x["list"], start, scale) if x.get("list") else {}
     ltags = {r["name"].lower(): r["id"] for r in c.execute("SELECT id, name FROM list_tags WHERE list_id=?", (lid,))}
+    from ..tasks.watchers import check_delegate
     seen, who = {}, {}
 
     def sees(u):
@@ -338,6 +339,8 @@ def tx_apply(c, uid, lid, x, made, st, start=None, scale=1.0, fmap=None):
             c.execute("UPDATE tasks SET assignee_group_id=? WHERE id=?", (n["g"], tid))
         if n.get("r") and may(n["r"]):
             c.execute("UPDATE tasks SET reviewer_id=? WHERE id=?", (n["r"], tid))
+        if n.get("dl") and _ok(check_delegate, c, lid, n["dl"]):  # 2.473.0 (#3357): the agent, when it fits this list (watchers stay with the original)
+            c.execute("UPDATE tasks SET delegate_agent_id=? WHERE id=?", (n["dl"], tid))
         if n.get("sp") in smap:
             c.execute("UPDATE tasks SET sprint_id=?, sprint_at=? WHERE id=?", (smap[n["sp"]], iso(now_utc()), tid))
         for u, tags in (n.get("xt") or {}).items():

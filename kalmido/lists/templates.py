@@ -773,8 +773,9 @@ PTYPES = {
     "agency": {"view": "list", "tickets": 0, "dep_shift": 0, "modules": ("time", "fields"),
                "sections": (N_("Request"), N_("Concept"), N_("Production"), N_("Approval"), N_("Billing")),
                "fields": ((N_("Budget h"), "number"),)},  # 2.380 F (#3438): no "Client" text field, the client is the project's (lists.client_id)
-    "software": {"view": "list", "tickets": 1, "dep_shift": 1, "modules": ("kanban", "deps"),
-                 "sections": (N_("Backlog"), N_("Next|section"), N_("In progress"), N_("Review"), N_("Done|section")), "fields": ()},
+    "software": {"view": "list", "tickets": 1, "dep_shift": 1, "modules": ("kanban", "deps", "fields"),  # 2.473.0 (#3378): + fields, Size and Release
+                 "sections": (N_("Backlog"), N_("Next|section"), N_("In progress"), N_("Review"), N_("Done|section")),
+                 "fields": ((N_("Size|field"), "select"), (N_("Release|field"), "text"))},
     "private": {"view": "list", "tickets": 0, "dep_shift": 0, "modules": (),
                 "sections": (N_("Ideas"), N_("Planning"), N_("To do|section")), "fields": ()},
 }
@@ -820,19 +821,45 @@ PTYPE_WIP = {"software": {"In progress": 3, "Review": 3}}
 
 
 PTYPE_NAMES = {"agency": N_("Agency"), "software": N_("Software / AI dev"), "private": N_("Personal|project type")}
+# 2.473.0 (#3378): field name -> its options (the choices of a selection field) / the fields of a type that are not pinned
+PTYPE_FIELD_OPTS = {"Size|field": {"options": [{"id": x.lower(), "name": x, "color": ""} for x in ("S", "M", "L")]}}
+PTYPE_FIELD_UNPINNED = ("Release|field",)
+BUG_INBOX_FIELD = "Release|field"
 
 
 def ptype_template(k, lg, sections=False):
     p = PTYPES[k]
     return {"kind": "project", "view": p["view"], "sections": [tr(x, lg=lg) for x in p["sections"]] if sections else [],
-            "fields": [{"name": tr(n, lg=lg), "type": t, "options": {}, "pinned": 1} for n, t in p["fields"]],
+            "fields": [{"name": tr(n, lg=lg), "type": t, "options": PTYPE_FIELD_OPTS.get(n, {}), "pinned": 0 if n in PTYPE_FIELD_UNPINNED else 1}
+                       for n, t in p["fields"]],
             "tasks": [], "deps": [], "rel": True, "span": 0, "tickets": p["tickets"], "ticket_tpl": {}, "dep_shift": p["dep_shift"]}
 
 
-def ptype_create(c, uid, k, name, folder="", color="", start=None, sections=False, org_id="auto"):
+def ptype_bug_inbox(c, uid, build, name, folder, color, org_id, start):
+    """2.473.0 (#3378): the second list of a software project: "<name> – Bugs" next to the build list, with the field Release and
+    a rule (it runs as uid, checked again each time, lists/rules.py): as soon as Release is filled, the task moves to the build
+    list, into its first section when it has sections. The caller commits, both lists land together. Returns the new list id."""
+    from .rules import RUL_FILLED, rul_clean, rul_insert
+    from ..agents.safety import token_list_add
+    lg = lang(c, uid)
+    d = ptype_template("software", lg)
+    d["fields"] = [f for f in d["fields"] if f["name"] == tr(BUG_INBOX_FIELD, lg=lg)]
+    lid = tpl_apply_list(c, uid, d, tr("{0} – Bugs", name, lg=lg)[:200], folder, start, color=color, org_id=org_id)
+    c.execute("UPDATE lists SET ptype='software' WHERE id=?", (lid,))
+    token_list_add(c, build)  # a token limited to selected lists keeps both, and the rule's checks below see them
+    token_list_add(c, lid)
+    sec = c.execute("SELECT id FROM sections WHERE list_id=? ORDER BY sort, id LIMIT 1", (build,)).fetchone()
+    fid = c.execute("SELECT id FROM list_fields WHERE list_id=?", (lid,)).fetchone()[0]
+    rul_insert(c, lid, rul_clean(c, lid, {"name": tr("Bugs with a release go to {0}", name, lg=lg), "trigger": {"kind": "field", "field_id": fid, "value": RUL_FILLED},
+                                          "action": {"kind": "move", "list_id": build, "section_id": sec[0] if sec else None}}), uid)
+    return lid
+
+
+def ptype_create(c, uid, k, name, folder="", color="", start=None, sections=False, org_id="auto", bug_inbox=False, made=None):
     """A new project list of type k for uid; returns (list id, [modules switched on]). 2.27.0 (#972): the type's standard
     sections only when asked for (sections=True: the box "With the default sections" / API sections: true); without them
-    the project starts empty (modules, ticket types, fields and the view still come with the type)."""
+    the project starts empty (modules, ticket types, fields and the view still come with the type). 2.473.0 (#3378): bug_inbox
+    (type software, no effect on another type): + the list "<name> – Bugs", its id in made["bug_list_id"]."""
     if k not in PTYPES:
         raise BadInput(tr("Invalid value: {0}", tr("Project type")))
     lid = tpl_apply_list(c, uid, ptype_template(k, lang(c, uid), sections), name, folder, start or local_now().date(), color=color, org_id=org_id)
@@ -845,6 +872,10 @@ def ptype_create(c, uid, k, name, folder="", color="", start=None, sections=Fals
     on = [m for m in PTYPES[k]["modules"] if m not in fs]
     if on:
         uset(c, uid, "features", ",".join(fs + on))
+    if bug_inbox and k == "software":
+        bug = ptype_bug_inbox(c, uid, lid, name, folder, color, org_id, start or local_now().date())
+        if made is not None:
+            made["bug_list_id"] = bug
     return lid, on
 
 
@@ -859,7 +890,8 @@ def ptype_missing(c, lid, k, lg):
     def lacks(x, have):
         return tr(x, lg=lg).strip().casefold() not in have and x.split("|")[0].strip().casefold() not in have
     return {"sections": [tr(x, lg=lg) for x in PTYPES[k]["sections"] if lacks(x, have_s)],
-            "fields": [{"name": tr(n, lg=lg), "type": t} for n, t in PTYPES[k]["fields"] if lacks(n, have_f)]}
+            "fields": [{"name": tr(n, lg=lg), "type": t, **({"options": PTYPE_FIELD_OPTS[n]} if n in PTYPE_FIELD_OPTS else {})}
+                       for n, t in PTYPES[k]["fields"] if lacks(n, have_f)]}
 
 
 def list_ptype_set(c, lid, role, k, skip=()):

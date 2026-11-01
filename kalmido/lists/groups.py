@@ -7,7 +7,7 @@ from ..core.pg import insert_id, st_ids, system_ctx
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
-from ..core.access import Denied, my_max_sort, need_collab, need_list, ROLES, task_visible
+from ..core.access import Denied, dlg_gone, my_max_sort, need_collab, need_list, ROLES, task_visible
 from ..lists.lists import clean_folder, folder_under
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
@@ -178,6 +178,7 @@ def grp_sync(c, lids, actor=None):
             elif eff is None:
                 c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
                 c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
+                dlg_gone(c, lid, uid)  # 2.473.0 (#3357): delegated tasks and watching of this list end
                 # 2.352.0 F (#2748, review N7): like removing a member by hand (lists.py member_remove)
                 c.execute("DELETE FROM task_bell WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
                 c.execute("DELETE FROM user_task_order WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))

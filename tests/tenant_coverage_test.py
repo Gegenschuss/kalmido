@@ -879,6 +879,8 @@ ROUTES = {
     "POST /api/team/rooms/{}/e2e": "team", "GET /api/tasks/{}/enc-note": "task", "PUT /api/tasks/{}/enc-note": "task",
     "DELETE /api/tasks/{}/enc-note": "task", "POST /api/tasks/{}/enc-attachments": "attachment",
     # 2.48.0 (#1642): the locked note of a task (need_task; only the person who locked it)
+    "GET /api/tasks/{}/watchers": "task", "POST /api/tasks/{}/watchers": "task", "DELETE /api/tasks/{}/watchers/{}": "task",  # 2.473.0 (#3357): need_task, others only owner / admins (pr2473_a_api)
+    "GET /api/v1/tasks/{}/watchers": "task", "POST /api/v1/tasks/{}/watchers": "task", "DELETE /api/v1/tasks/{}/watchers/{}": "task",
     "GET /api/tasks/{}/bell": "task", "PUT /api/tasks/{}/bell": "task", "POST /api/tasks/{}/bell/undo": "task",  # 2.53.0 C (#1424): need_task + people of the list (p253_c_api_test.py)
     # 2.64.1 A (#1817): the lock per list -- need_list + people only (p264a_a_api_test.py: outside the list 404, agents / tokens 403)
     "GET /api/lists/{}/e2e": "list", "POST /api/lists/{}/e2e/start": "list", "GET /api/lists/{}/e2e/todo": "list",

@@ -263,7 +263,7 @@ def user_update(uid):
     from ..notify.push import NTFY_TOPIC_RE
     from ..notify.alerts import aa_now
     from ..agents.core import agent_row, is_agent
-    from ..agents.admin import make_agent
+    from ..agents.admin import agent_org_set, make_agent
     from ..family.family import kid_parents, kid_set
     need_admin()
     b = body()
@@ -315,7 +315,7 @@ def user_update(uid):
             was = user_orgs(c, uid)
             make_agent(c, uid)
             if was:  # 2.37.0 (#1150): the converted account keeps working in its organisation (row-level security: a private
-                from ..agents.admin import agent_org_set  # agent never reads an organisation's lists, not even its own)
+                # agent never reads an organisation's lists, not even its own)
                 from ..core.errors import BadInput as _BadInput
                 try:
                     with c.savepoint():
@@ -520,6 +520,8 @@ def _user_purge(c, uid):
     c.execute("DELETE FROM filters WHERE user_id=?", (uid,))
     c.execute("DELETE FROM task_tags WHERE user_id=?", (uid,))
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=?", (uid,))
+    c.execute("UPDATE tasks SET delegate_agent_id=NULL WHERE delegate_agent_id=?", (uid,))  # 2.473.0 (#3357)
+    c.execute("DELETE FROM task_watchers WHERE user_id=?", (uid,))
     c.execute("UPDATE tasks SET created_by=NULL WHERE created_by=?", (uid,))
     c.execute("DELETE FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields WHERE type='person')", (str(uid),))
     user_forget_conns(c, uid)  # personal connection rows, stored tokens, grants; list bells

@@ -466,7 +466,7 @@ _ACT_KIND_IDS = {"field": {"id": "list_fields"}, "subtask": {"id": "tasks"}, "mi
                  "dep_rm": {"id": "tasks"}, "blocks_add": {"id": "tasks"}, "blocks_rm": {"id": "tasks"}, "unblocked": {"id": "tasks"}}
 _ACT_PEOPLE = ("user_id", "assignee_id", "agent_id", "agent", "approver", "reviewer", "by")  # by: tidy (comments.py names it)
 _ACT_DROP = ("hook",)  # the inbound webhook of the old server (log_act "via": "webhook")
-_ACT_KIND_PEOPLE = {"assign": ("to", "from"), "owner": ("from", "to")}
+_ACT_KIND_PEOPLE = {"assign": ("to", "from"), "owner": ("from", "to"), "delegate": ("to", "from"), "watch": ("to",)}
 
 
 def _act_data(run, who, kind, v):
@@ -598,6 +598,8 @@ SPECS = [
     # tasks
     OiT("tasks/people.json", "task_people", refs={"task_id": "tasks"}, need=("task_id",), people={"user_id": "member"}, space=(), rid=False,
         label=N_("People")),
+    OiT("tasks/watchers.json", "task_watchers", refs={"task_id": "tasks"}, need=("task_id",), people={"user_id": "member"}, space=(), rid=False,
+        label=N_("People")),  # 2.473.0 (#3357)
     OiT("tasks/links.json", "task_links", refs={"task_id": "tasks", "list_id": "lists", "section_id": "sections"},
         need=("task_id", "list_id"), people={"added_by": "null"}, rid=False, label=N_("Tasks")),
     OiT("tasks/decisions.json", "task_decisions", refs={"task_id": "tasks"}, need=("task_id",), people={"by_id": "null"},

@@ -258,6 +258,9 @@ def task_core(r, tags, fields):
             # 2.390.0 B (#3355): the sprint (null = backlog), the reviewer and the review state (pending | approved | changes)
             "sprint_id": r["sprint_id"] if "sprint_id" in r.keys() else None,
             "reviewer_id": r["reviewer_id"] if "reviewer_id" in r.keys() else None,
+            # 2.473.0 (#3357): the agent the task is delegated to (the assignee stays), who watches it
+            "delegate_agent_id": r["delegate_agent_id"] if "delegate_agent_id" in r.keys() else None,
+            "watchers": list(r["watchers"]) if "watchers" in r.keys() else [],
             "review": (r["review"] or None) if "review" in r.keys() else None,
             # 2.35.0 (#1095): the code snippets: one task (GET / change / webhook row) all of them, lists only snippets_n
             **_snips(r)}
@@ -309,6 +312,8 @@ def task_for(c, row, uid):
         from ..lists.formula import fx_fill
         fields = fx_fill(c, {row["id"]: fields}, {row["id"]: row["list_id"]}).get(row["id"], fields)
     out = {**task_core(row, tags, fields), "list_tags": ltag_names(c, row["id"]), "key": tk_key(c, row)}  # 2.390.0 (#3353): key
+    from ..tasks.watchers import wat_users
+    out["watchers"] = sorted(wat_users(c, row["id"]))  # 2.473.0 (#3357): webhook payloads and agent events too
     if c.execute("SELECT 1 FROM task_enc_notes WHERE task_id=? LIMIT 1", (row["id"],)).fetchone():
         out["encrypted_note"] = True  # 2.42.0 (#828): agents learn only that there is an encrypted note
     if c.execute("SELECT 1 FROM task_note_locks WHERE task_id=?", (row["id"],)).fetchone():
@@ -327,6 +332,7 @@ V1_TASK_IN += ("remind_at",)  # 2.111.0 C (#2057): a reminder at a fixed local t
 # 2.390.0 B (#3355): an open sprint of the task's list (null = backlog) and the reviewer (null = none; set through the
 # review step's checks after the task itself, see v1_reviewer_set)
 V1_TASK_IN += ("sprint_id", "reviewer_id")
+V1_TASK_IN += ("delegate_agent_id",)  # 2.473.0 (#3357): an agent of the task's list (null = none)
 
 
 def v1_task_in(b, allowed=V1_TASK_IN):
@@ -685,7 +691,7 @@ def v1_list_create():
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "checklist", "done_at_bottom", "kind", "tickets", "project_type", "nag", "day_hours",
                                                "family", "sections", "org_id", "time_tracking"))  # 2.28.0 (#935): org_id; 2.41.0 (#1471)
-    unknown = [k for k in unknown if k != "points_on"]  # 2.60.0 (#1511): story points on (set right after, like time_tracking)
+    unknown = [k for k in unknown if k not in ("points_on", "bug_inbox")]  # 2.60.0 (#1511): story points on (set right after, like time_tracking); 2.473.0 (#3378)
     if unknown:
         raise UnknownFields(unknown)
     later = {k: b.pop(k) for k in ("nag", "day_hours", "time_tracking") if k in b}  # 2.7.0: set right after the list exists
@@ -721,7 +727,7 @@ def v1_list_create():
     if later:
         v1_call(list_update, j["id"], body=later)
     d = next(x for x in visible_lists(db(), me()) if x["id"] == j["id"])
-    return jsonify(v1_list(d)), 201
+    return jsonify({**v1_list(d), **({"bug_list_id": j["bug_list_id"]} if j.get("bug_list_id") else {})}), 201
 
 
 @app.patch("/api/v1/lists/<int:lid>")
@@ -938,6 +944,7 @@ V1_COMPACT = ("id", "title", "list_id", "section_id", "parent_id", "status", "du
 
 # ---- 2.390.0 B (#3355): the further filters and the sort of GET /api/v1/tasks
 V1_TASKS_MORE = ("priority", "priority_min", "section_id", "sprint_id", "created_by", "reviewer", "review", "q", "sort", "key")  # 2.390.0 (#3353): key
+V1_TASKS_MORE += ("delegate", "watcher")  # 2.473.0 (#3357)
 V1_FIELD_ARG = re.compile(r"field_(\d{1,9})")
 # sort name -> (SQL expression ascending, ... descending): no due date last in both directions, the id breaks ties
 V1_SORTS = {"priority": ("priority", "priority"), "due": ("COALESCE(due, '9999-99-99')", "COALESCE(due, '')"),
@@ -1001,6 +1008,14 @@ def v1_tasks_more(c, uid, a, where, args):
     if a.get("reviewer"):
         w, x = _v1_who(a, "reviewer", uid)
         where.append("reviewer_id " + w)
+        args += x
+    if a.get("delegate"):  # 2.473.0 (#3357): me | none | an agent id
+        w, x = _v1_who(a, "delegate", uid)
+        where.append("delegate_agent_id " + w)
+        args += x
+    if a.get("watcher"):  # 2.473.0 (#3357): me | an id
+        w, x = _v1_who(a, "watcher", uid, none=False)
+        where.append("id IN (SELECT task_id FROM task_watchers WHERE user_id " + w + ")")
         args += x
     if a.get("review"):
         if a["review"] not in ("pending", "approved", "changes", "none"):

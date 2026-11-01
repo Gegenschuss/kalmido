@@ -19,6 +19,7 @@ from ..core.access import acx_task_ok, Denied, list_people, list_role, MANAGE_RO
 from ..core.state import visible_sections
 from ..tasks.oneway import dec_list
 from ..tasks.validation import valid_hm
+from ..tasks.watchers import wat_users  # 2.473.0 (#3357)
 from ..collab.comments import comment_plain, user_names
 from ..core.errors import BadInput
 from ..notify.alerts import _env_int
@@ -327,14 +328,14 @@ def _lv_comment_choices(k):
 
 
 def agent_comment_events(c, t, cid, mentions, new_mentions, created=True):
-    """Comment on task t: 'mention' to newly mentioned agents, 'comment' to agents that follow the task (assignee, creator,
-    earlier commenters). Only agents that see the task with its comments."""
+    """Comment on task t: 'mention' to newly mentioned agents, 'comment' to agents that follow the task (assignee, delegated
+    agent, creator, watchers, earlier commenters). Only agents that see the task with its comments."""
     ag = agent_ids(c)
     if not ag:
         return
     k = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
-    follow = {t["assignee_id"], t["created_by"]} | {r[0] for r in c.execute(
-        "SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id!=?", (t["id"], cid))}
+    follow = {t["assignee_id"], t["created_by"], t["delegate_agent_id"]} | wat_users(c, t["id"]) | {r[0] for r in c.execute(
+        "SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id!=?", (t["id"], cid))}  # 2.473.0 (#3357): + delegated, watchers
     # 2.13.1 (#471): agents set to read every comment of a person in this list ("Agent reads every comment")
     listen = set(listen_agents_of(c, t["list_id"])) if created and k["user_id"] not in ag else set()
     for aid in sorted(ag):
@@ -376,19 +377,20 @@ def agent_task_mentions(c, tid, old_text=""):
             agent_emit(c, aid, "mention", agent_task_data(c, tid, aid, comment=None, where="task"))
 
 
-def agent_assign_event(c, tid, kind, uid):
+def agent_assign_event(c, tid, kind, uid, delegated=False):
+    """2.473.0 (#3357): delegated = the task is delegated to the agent (tasks.delegate_agent_id), the person stays assignee."""
     if not uid or uid not in agent_ids(c):
         return
     if task_visible(c, tid, uid, full=True):
-        extra = {}
+        extra = {"delegated": True} if delegated else {}
         if kind == "assigned":  # 2.236.0 C (#2906 #2907): its place in the queue + the priority rule for choosing the next task
             from .workqueue import wq_event_extra
-            extra = wq_event_extra(c, uid, tid)
+            extra.update(wq_event_extra(c, uid, tid))
         agent_emit(c, uid, kind, agent_task_data(c, tid, uid, **extra))
     elif kind == "unassigned":  # 2.36.2 (#1142): out of sight -> only the ids (the agent can drop the task), no content
         r = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
         if r:
-            agent_emit(c, uid, kind, {"task": {"id": tid, "list_id": r[0]}, "list": {"id": r[0]}, "visible": False})
+            agent_emit(c, uid, kind, {"task": {"id": tid, "list_id": r[0]}, "list": {"id": r[0]}, "visible": False, **({"delegated": True} if delegated else {})})
 
 
 # 2.30.0 (#1034): an agent of a list either LISTENS IN (it gets every task created in or moved into the list -- task_added /

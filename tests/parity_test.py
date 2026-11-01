@@ -51,6 +51,8 @@ APP_TO_API = {
     "POST /api/tasks/{}/skip": ["POST /tasks/{}/skip"],
     "POST /api/tasks/{}/partial": ["POST /tasks/{}/partial"],  # 2.392.0 B (#3364)
     "POST /api/tasks/{}/take": ["POST /tasks/{}/take"],
+    "GET /api/tasks/{}/watchers": ["GET /tasks/{}/watchers"], "POST /api/tasks/{}/watchers": ["POST /tasks/{}/watchers"],  # 2.473.0 (#3357)
+    "DELETE /api/tasks/{}/watchers/{}": ["DELETE /tasks/{}/watchers/{}"],
     "PUT /api/tasks/{}/waiting": ["PUT /tasks/{}/waiting"],
     "DELETE /api/tasks/{}/waiting": ["DELETE /tasks/{}/waiting"],
     "POST /api/tasks/{}/attachments": ["POST /tasks/{}/attachments"],

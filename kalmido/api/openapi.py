@@ -42,6 +42,8 @@ def groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
                   scope="write", desc="Every member of the group gets access; members who join later too. A person's role is the "
                                       "higher of their own and the one via groups."),
         "delete": op("Stop sharing a project with a group", G, ok({"type": "object"}) | errs("403", "404"), [pid(desc="Project id"), gp], scope="write")}
+    from ..tasks.watchers import wat_spec
+    wat_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.473.0 (#3357)
     paths["/tasks/{id}/take"] = {"post": op("Take a task assigned to one of your groups", "Tasks", ok(ref("Task")) | errs("403", "404", "409"),
                                             [pid()], scope="write", desc="The task becomes yours (assignee_id) and is no longer assigned to the group.")}
 
@@ -184,10 +186,15 @@ def openapi_spec():
                                     "project; null = none). Writable, with the checks of POST /tasks/{id}/review action reviewer")
     task_props["review"] = nul("string", enum=["pending", "approved", "changes", None], description="2.390.0: the review state "
                                "(null = none; read only, changed with POST /tasks/{id}/review)")
+    task_props["delegate_agent_id"] = nul("integer", description="2.473.0: the agent the task is delegated to, next to the assignee (the "
+                                          "person stays responsible; null = none). Writable: an agent with access to the project that is open "
+                                          "to you; the task counts in its queue, it gets the event assigned with delegated true")
+    task_props["watchers"] = {"type": "array", "items": {"type": "integer"}, "description": "2.473.0: who watches the task (read only here; "
+                              "POST /tasks/{id}/watchers, DELETE /tasks/{id}/watchers/{user_id}). They get its comments and status changes"}
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}
-    for k in ("list_id", "section_id", "parent_id", "assignee_id", "assignee_group_id"):
+    for k in ("list_id", "section_id", "parent_id", "assignee_id", "assignee_group_id", "delegate_agent_id"):
         task_in[k] = nul("integer")
     task_in["content"] = {"type": "string", "description": "Alias of notes (the web API's name, 2.2.1); not together with a different notes"}
     schemas = {
@@ -303,7 +310,8 @@ def openapi_spec():
                         "Home & life (health projects are private: never visible to agents, tokens need the scope private); null = none"),
             "trip": {"type": ["object", "null"], "description": "2.22.0: a trip project's {from, to, where?}", "properties": {
                 "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "where": {"type": "string"}}},
-            "client_id": nul("integer", description="2.23.0: the client the project belongs to (GET /clients); null = none")}},
+            "client_id": nul("integer", description="2.23.0: the client the project belongs to (GET /clients); null = none"),
+            "bug_list_id": {"type": "integer", "description": "2.473.0: only in the answer of POST /lists with bug_inbox: the id of the bug inbox list"}}},
         "ListDetail": {"allOf": [ref("List"), {"type": "object", "properties": {"sections": {"type": "array", "items": ref("Section")},
             "fields": {"type": "array", "description": "2.14.0: the project's custom fields (ids for the columns f:<id>)",
                        "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "type": {"type": "string"}}}},
@@ -322,6 +330,9 @@ def openapi_spec():
                              "its standard sections; null / \"\" = no type"},
             "sections": {"type": "boolean", "default": False, "description": "2.27.0: with project_type: create the type's standard sections "
                          "(e.g. Backlog … Done); without it the project starts without sections"},
+            "bug_inbox": {"type": "boolean", "default": False, "description": "2.473.0: with project_type software (no effect on another type): also creates "
+                          "the list \"<name> – Bugs\" next to it, with the field Release and a rule: as soon as Release is filled, the task moves to the project "
+                          "(with sections: its first section), the value goes along. The rule runs as you; the answer carries bug_list_id. An agent gets 403 (agents only propose rules)"},
             "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the project is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
                           "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing, recipes (2.140.0: a task per recipe); null = an ordinary project"),
@@ -566,6 +577,8 @@ def openapi_spec():
                      q("tag", "One of your tags or a project tag (without #)"), q("list_tag", "A project tag (without #)"),
                      q("assignee", "me, none or a user id"),
                      q("assignee_group", "2.10.0: mine (assigned to one of your groups) or a group id"),
+                     q("delegate", "2.473.0: me, none or an agent id (the task is delegated to it)"),
+                     q("watcher", "2.473.0: me or a user id (who watches the task)"),
                      q("updated_since", "Changed since (ISO date-time)", {"type": "string", "format": "date-time"}),
                      q("parent_id", "Subtasks of this task", {"type": "integer"}), q("top_level", "true = no subtasks", {"type": "boolean"}),
                      q("fields", "compact = only id, title, list_id, section_id, parent_id, status, due, due_time, priority, tags, "

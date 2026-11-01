@@ -19,6 +19,7 @@ from ..accounts.login import auth_key, seal, unseal
 from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list, reading_ids, reading_sql, task_visible
 from ..core.pg import insert_id, system_ctx
 from ..tasks.validation import log_act, valid_date
+from ..tasks.watchers import wat_users  # 2.473.0 (#3357)
 from ..tasks.lifecycle import complete_stale, do_complete, trash_task
 from ..collab.comments import task_event
 from ..core.errors import BadInput
@@ -341,7 +342,7 @@ def cv_fb_post(token):
                     (tid, None, text, "", iso_ms(now_utc()), name))
     t = c.execute("SELECT t.*, l.owner_id AS l_owner FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
     from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO
-    rcpt = ({t["l_owner"], t["created_by"], t["assignee_id"]} | tbl_urgent_users(c, tid)) - {None} - agent_ids(c)  # 2.53.0 C (#1424): + "Urgent"
+    rcpt = ({t["l_owner"], t["created_by"], t["assignee_id"]} | tbl_urgent_users(c, tid) | wat_users(c, tid)) - {None} - agent_ids(c)  # 2.53.0 C (#1424): + "Urgent"
     for uid in sorted(rcpt):  # News + push like a comment on my task, the notification switch "comment"
         s = collab_user(c, uid, t["list_id"])
         if not s or not task_visible(c, tid, uid, full=True):

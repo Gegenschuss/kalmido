@@ -166,7 +166,8 @@ def cal_allow_text(entries):
 # longer one list for all: the admin setting allow_hosts_by_purpose = JSON {purpose: "host, host:port"}; a one-shot at the
 # start (core/db.py, flag migr_allow2380) copies the old list cal_allow_hosts into every purpose, so nothing that worked stops.
 # KALMIDO_CALENDAR_ALLOW_HOSTS (the server configuration) still counts for every purpose. cal_allow_hosts stays as it was
-# (an older version reads it).
+# (an older version reads it). 2.473.0 (#3569): changed there after a fallback, the start copies it into every purpose again
+# (allow_hosts_copied_from).
 
 
 def allow_by_purpose(c):

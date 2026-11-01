@@ -77,6 +77,7 @@ CTL_ROUTES = (
     (CTL_WRITE, r"^/agents/\{\}/chat/", "meta"),
     (("POST",), r"^/tasks$", "routine"),
     (("POST",), r"^/tasks/\{\}/(subtasks|comments|complete|reopen|skip)$", "routine"),
+    (("POST", "DELETE"), r"^/tasks/\{\}/watchers(/\{\})?$", "routine"),  # 2.473.0 (#3357): small and reversible, the task itself stays as it is
     (("PATCH",), r"^/tasks/\{\}$", "plan"),
     (("POST",), r"^/tasks/batch$", "batch"),
     (("POST",), r"^/videos/\{\}/comments$", "routine"),

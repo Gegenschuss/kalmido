@@ -211,6 +211,7 @@ def admin_settings():
             return e
         if v != gsetting(c, "cal_allow_hosts"):
             gset(c, "cal_allow_hosts", v)
+            gset(c, "allow_hosts_copied_from", v)  # 2.473.0 (#3569): changed here, already in every purpose: no copy at the next start
             new_by = {p: v for p in ALLOW_PURPOSES}  # 2.380 G (#3389): the old field (an older client) = one list for every purpose
     if "allow_hosts_by_purpose" in b:  # 2.380 G (#3389): {purpose: hosts} -- only the purposes named change
         v = b["allow_hosts_by_purpose"]

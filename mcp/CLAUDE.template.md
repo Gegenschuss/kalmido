@@ -641,6 +641,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `comment`: a new comment on a task you work on or listen to
 - `assigned`: a task was assigned to you
 - `unassigned`: a task is no longer assigned to you
+- both also for a task delegated to you (`delegated: true`): you do the work, the person stays the assignee, the task is in your queue
 - `chat`: a person wrote to you in your chat
 - `reaction`: a reaction (thumbs up / down = approval) on your comment or chat message
 - `job`: a job of yours changed (approved, rejected, stopped); 2.56.0: `action` `message` = the person wrote to that running job (`text`): pass it on to the job if you can, else answer it in their chat as a message about the job
@@ -721,7 +722,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_notepads`, `list_notes`, `list_office_data`, `list_office_documents`, `list_office_leads`, `list_packing_templates`,
 `list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_rules`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`,
-`list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_video_reviews`, `list_waiting`, `leave_team_channel`, `mark_news_read`, `mark_team_chat_read`,
+`list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_video_reviews`, `list_waiting`, `list_watchers`, `leave_team_channel`, `mark_news_read`, `mark_team_chat_read`,
 `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`, `propose_contract_notice`, `propose_import`, `propose_layout`, `propose_playbook`,
 `propose_rule`, `propose_sheet_tasks`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,
@@ -735,10 +736,10 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `partial_task`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,
 `time_from_events`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`, `unshare_list`,
-`unshare_list_from_group`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
+`unshare_list_from_group`, `unwatch_task`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
 `update_document`, `update_event`, `update_event_calendar`, `update_field`, `update_filter`, `update_form`,
 `update_habit`, `update_job`, `update_letter_draft`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_notepad`,
 `update_offer_draft`, `update_office_lead`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
-`upload_attachment`, `upload_project_file`, `wait_for_events`, `wiki_create`, `wiki_list`, `wiki_read`, `wiki_write`,
+`upload_attachment`, `upload_project_file`, `wait_for_events`, `watch_task`, `wiki_create`, `wiki_list`, `wiki_read`, `wiki_write`,
 `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`, `write_journal`, `write_status_pad`
 <!-- kalmido-tool-index:end -->

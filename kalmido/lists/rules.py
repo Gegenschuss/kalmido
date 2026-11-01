@@ -53,6 +53,8 @@ RUL_PAUSE = {  # paused_reason -> the text the settings show
     "tag": N_("the project tag no longer exists"),  # 2.138.0 D (#2060)
 }
 _NEW = {"new": True}  # rul_fire: the task was just created
+RUL_FILLED = "*"  # 2.473.0 (#3378): trigger value of a field rule: the field has a value (clearing it does not trigger)
+RUL_CARRY = ("text", "number", "currency", "rating", "date", "checkbox")  # 2.473.0 (#3378): values that mean the same in another list
 
 
 # ---------------------------------------------------------------- 2.64a (lock per list)
@@ -197,7 +199,7 @@ def _field_row(c, lid, fid):
 def rul_trig_clean(c, lid, t):
     """trig_val of the triggers assigned ({user_id?}: "" = anybody, else that person of the list) and field ({field_id,
     value?}: "<id>" = any change; "<id>=<option id>" = set to that option of a selection field; checkbox "<id>=1" = checked,
-    "<id>=" = unchecked). Formula fields are computed, they never trigger."""
+    "<id>=" = unchecked); 2.473.0 (#3378): "<id>=*" = has a value now. Formula fields are computed, they never trigger."""
     if t["kind"] == "assigned":
         if t.get("user_id") in (None, "", 0):
             return ""
@@ -216,6 +218,8 @@ def rul_trig_clean(c, lid, t):
         if v in (True, 1, "1", "true") or v in (False, 0, "0", "false"):  # 2.138.0 D (#2060, review): anything else is no checkbox value
             return f"{fid}={'1' if v in (True, 1, '1', 'true') else ''}"
         raise BadInput(tr("Invalid value: {0}", "trigger.value"))
+    if v == RUL_FILLED:
+        return f"{fid}={RUL_FILLED}"
     if f["type"] == "select" and str(v) in {o["id"] for o in json.loads(f["options"] or "{}").get("options", [])}:
         return f"{fid}={v}"
     raise BadInput(tr("Invalid value: {0}", "trigger.value"))
@@ -300,6 +304,8 @@ def rul_new_events(c, t, before, new):
         for fid in set(old) | set(cur):
             if old.get(fid) != cur.get(fid):
                 ev |= {("field", str(fid)), ("field", f"{fid}={cur.get(fid) or ''}")}
+                if cur.get(fid):  # 2.473.0 (#3378)
+                    ev.add(("field", f"{fid}={RUL_FILLED}"))
     return ev
 
 
@@ -347,7 +353,7 @@ def rul_dict(c, r):
         f = _field_row(c, r["list_id"], int(fid))
         trig["field_id"], trig["value"] = int(fid), (("1" if v else "0") if f and f["type"] == "checkbox" else v) if eq else None
         names["field"] = f["name"] if f else None
-        names["value"] = rul_val_name(c, f, v) if eq else None
+        names["value"] = rul_val_name(c, f, v) if eq and v != RUL_FILLED else None
     act = {"kind": r["act"], **a}
     if r["act"] == "assign":
         names["user"] = user_names(c, [a.get("user_id")]).get(a.get("user_id"))
@@ -651,7 +657,8 @@ def rul_exec(c, r, tid):
                         elif r["act"] == "due":
                             b = {"due": None if a.get("days") is None else (local_now().date() + timedelta(days=a["days"])).isoformat()}
                         elif r["act"] == "move":
-                            b = {"list_id": a.get("list_id") or r["list_id"], **({"section_id": a["section_id"]} if a.get("section_id") else {})}
+                            dst = a.get("list_id") or r["list_id"]
+                            b = {"list_id": dst, **({"section_id": a["section_id"]} if a.get("section_id") else {}), **rul_carry(c, tid, r["list_id"], dst)}
                         else:  # 2.138.0 D (#2060, review): an action this version does not know does nothing (never a move)
                             return False
                         e = apply_update(c, tid, b)
@@ -668,6 +675,18 @@ def rul_exec(c, r, tid):
         rul_pause(c, r, pause)
         return False
     return True
+
+
+def rul_carry(c, tid, src, dst):
+    """2.473.0 (#3378): a move into another list keeps the task's values in the target's fields of the same name and type
+    (field values belong to the list's fields: a bug's Release would be gone in the build list). {"fields": ...} for apply_update."""
+    if dst == src:
+        return {}
+    to = {(r["name"].strip().casefold(), r["type"]): r["id"] for r in c.execute("SELECT id, name, type FROM list_fields WHERE list_id=?", (dst,))}
+    rows = c.execute("""SELECT f.name, f.type, v.value FROM task_field_values v JOIN list_fields f ON f.id=v.field_id
+                        WHERE v.task_id=? AND f.list_id=?""", (tid, src)).fetchall()
+    out = {str(to[k]): r["value"] for r in rows if r["type"] in RUL_CARRY and (k := (r["name"].strip().casefold(), r["type"])) in to}
+    return {"fields": out} if out else {}
 
 
 def rul_comment(c, r, tid, text):
@@ -879,12 +898,14 @@ def rul_spec(paths, schemas, op, ok, errs, ref, pid):
                     "reopen (opened again), ltag (gets the list tag tag_id), due (its due day is today), created (a task is created "
                     "in the list), assigned (a person is newly assigned, not by an approval; user_id = only that person, null = anybody), field (a value "
                     "of the list's custom field field_id changes; value = only when set to that option id of a selection field / "
-                    "\"1\" checked, \"0\" unchecked of a checkbox field, null = any change; formula fields never trigger)",
+                    "\"1\" checked, \"0\" unchecked of a checkbox field, \"*\" = whenever it has a value (2.473.0; not on a checkbox field), "
+                    "null = any change; formula fields never trigger)",
                     "properties": {"kind": {"type": "string", "enum": list(RUL_TRIGGERS)}, "section_id": {"type": "integer"},
                                    "tag_id": {"type": "integer"}, "user_id": {"type": ["integer", "null"]},
                                    "field_id": {"type": "integer"}, "value": {"type": ["string", "null"]}}},
         "action": {"type": "object", "description": "kind: assign (user_id, a person of the list), due (days from today 0.."
-                   f"{RUL_DAYS_MAX}, null = clear), comment (text, at most {RUL_TEXT_MAX} characters), move (list_id and / or section_id), "
+                   f"{RUL_DAYS_MAX}, null = clear), comment (text, at most {RUL_TEXT_MAX} characters), move (list_id and / or section_id; 2.473.0: "
+                   "values of text, number, currency, rating, date and checkbox fields go along into the target's field of the same name and type), "
                    "priority (priority none | low | medium | high), tag (adds the list tag tag_id), field (sets the list's custom "
                    "field field_id to value, checked like a normal field value; null = clear it)",
                    "properties": {"kind": {"type": "string", "enum": list(RUL_ACTIONS)}, "user_id": {"type": "integer"},

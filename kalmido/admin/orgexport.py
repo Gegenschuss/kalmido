@@ -246,6 +246,7 @@ OX_AREAS = (
     ("tasks/field_values.json", "task_field_values", f"task_id IN ({TSQ})"),
     ("tasks/tags.json", "task_list_tags", f"task_id IN ({TSQ})"),
     ("tasks/people.json", "task_people", f"task_id IN ({TSQ})"),
+    ("tasks/watchers.json", "task_watchers", f"task_id IN ({TSQ})"),  # 2.473.0 (#3357)
     ("tasks/links.json", "task_links", f"task_id IN ({TSQ})"),  # 2.137.0 C (#2344): a task placed in a further list
     ("tasks/decisions.json", "task_decisions", f"task_id IN ({TSQ})"),  # 2.392.0 C (#3370)
     ("tasks/history.json", "activity", f"task_id IN ({TSQ})"),

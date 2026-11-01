@@ -1756,6 +1756,12 @@ CREATE TABLE IF NOT EXISTS task_bell (
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, prev TEXT, act TEXT, act_by BIGINT,
   PRIMARY KEY (task_id, user_id));
 CREATE INDEX IF NOT EXISTS ix2281_task_bell_user_id ON task_bell(user_id);
+-- 2.473.0 (#3357): who watches a task (tasks/watchers.py): comments and status changes reach them like someone who commented.
+-- The delegated agent is tasks.delegate_agent_id. New table only: older versions ignore it
+CREATE TABLE IF NOT EXISTS task_watchers (
+  task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL, PRIMARY KEY (task_id, user_id));
+CREATE INDEX IF NOT EXISTS ix2281_task_watchers_user_id ON task_watchers(user_id);
 -- 2.55.0 (#1069): saved arrangements of a view per person ("Focus", "Overview"; accounts/layoutsets.py). view_key = a key of
 -- accounts/layouts.py WG_STD_KEYS or "list:<id>" (a project page). layout = the same json as the person's own value
 -- (clean_layout). source = '' (made by the person) | 'template' (#1068, taken over from someone) | 'agent' (#1066, an
@@ -4099,6 +4105,8 @@ MIGRATIONS = [
     ("office_texts", "trans", "ALTER TABLE office_texts ADD COLUMN IF NOT EXISTS trans TEXT NOT NULL DEFAULT '{}'"),
     ("office_roles", "trans", "ALTER TABLE office_roles ADD COLUMN IF NOT EXISTS trans TEXT NOT NULL DEFAULT '{}'"),
     ("office_contracts", "trans", "ALTER TABLE office_contracts ADD COLUMN IF NOT EXISTS trans TEXT NOT NULL DEFAULT '{}'"),
+    # 2.473.0 (#3357): "delegated to": one agent next to the assignee (tasks/watchers.py; NULL = none). Older versions ignore it
+    ("tasks", "delegate_agent_id", "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS delegate_agent_id BIGINT REFERENCES users(id) ON DELETE SET NULL"),
     ("clients", "doc_lang", "ALTER TABLE clients ADD COLUMN IF NOT EXISTS doc_lang TEXT NOT NULL DEFAULT ''"),
     # 2.367.3 (#2971): failed polls in a row of a mailbox (reaches INTEG_FAILS: its people are told once). Older versions ignore it
     ("hub_mailboxes", "fails", "ALTER TABLE hub_mailboxes ADD COLUMN IF NOT EXISTS fails BIGINT NOT NULL DEFAULT 0"),
@@ -4384,6 +4392,7 @@ CREATE TABLE IF NOT EXISTS agent_burst_held (
   how TEXT NOT NULL, from_list BIGINT, source TEXT NOT NULL DEFAULT '', held_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS agent_burst_held_group ON agent_burst_held(actor_id, list_id);
 CREATE INDEX IF NOT EXISTS agent_burst_held_list ON agent_burst_held(list_id);
+CREATE INDEX IF NOT EXISTS ix2281_tasks_delegate_agent_id ON tasks(delegate_agent_id) WHERE delegate_agent_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS agent_burst_held_task ON agent_burst_held(task_id);
 -- 2.235.0 C (#2903): the standing rules of an agent ("from now on always ..."): the text, active | paused, the source (a chat
 -- message / a comment the agent saw, or manual) with a short excerpt (agents/agentrules.py). New table only: older versions ignore it

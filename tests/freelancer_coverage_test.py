@@ -710,6 +710,8 @@ ROUTES = {
     "GET /api/notes/{}": "tasks", "GET /api/occurrences": "tasks", "GET /api/pomo/stats": "tasks", "GET /api/roadmap": "tasks",
     "GET /api/search": "tasks", "GET /api/search/messages": "tasks", "GET /api/sprints/{}": "tasks", "GET /api/stale": "tasks", "GET /api/state": "tasks",
     "GET /api/state/delta": "tasks", "GET /api/stats": "tasks", "GET /api/tags/count": "tasks", "GET /api/tasks": "tasks",
+    "GET /api/tasks/{}/watchers": "tasks", "POST /api/tasks/{}/watchers": "tasks", "DELETE /api/tasks/{}/watchers/{}": "tasks",  # 2.473.0 (#3357)
+    "GET /api/v1/tasks/{}/watchers": "tasks", "POST /api/v1/tasks/{}/watchers": "tasks", "DELETE /api/v1/tasks/{}/watchers/{}": "tasks",
     "GET /api/tasks/{}": "tasks", "GET /api/tasks/{}/bell": "tasks", "GET /api/tasks/{}/deps": "tasks",
     "GET /api/tasks/{}/enc-note": "tasks", "GET /api/tasks/{}/events": "tasks", "GET /api/tasks/{}/milestone": "tasks",
     "GET /api/tasks/{}/note-lock": "tasks", "GET /api/tasks/{}/related": "tasks", "GET /api/tasks/{}/timeline": "tasks",
@@ -1345,7 +1347,6 @@ POST /api/me/webhooks/{}/secret
 POST /api/me/webhooks/{}/test
 POST /api/my/agents/{}/setup-code
 POST /api/news/dismiss
-POST /api/news/read
 POST /api/newsletter/consent/import
 POST /api/newsletter/segments
 POST /api/newsletter/sync

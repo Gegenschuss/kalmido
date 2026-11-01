@@ -209,6 +209,11 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
     elif "assignee_group_id" not in f and cur["assignee_group_id"] and lid != cur["list_id"] \
             and cur["assignee_group_id"] not in {x[0] for x in grp_shares_of_list(c, lid)}:
         f["assignee_group_id"] = None
+    if "delegate_agent_id" in f and (_norm(f["delegate_agent_id"]) != _norm(cur["delegate_agent_id"]) or lid != cur["list_id"]):
+        from ..tasks.watchers import check_delegate  # 2.473.0 (#3357): against the list the task ends up in
+        e = check_delegate(c, lid, f["delegate_agent_id"])
+        if e:
+            return e
     if "assignee_id" in f and _norm(f["assignee_id"]) != _norm(cur["assignee_id"]):
         f["assigned_by"] = me() if f["assignee_id"] else None
         if f["assignee_id"]:  # 2.40.0 (#1344): newly assigned = on top of the person's own order of "My tasks"
@@ -249,6 +254,9 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         log_changes(c, tid, cur, b.get("_act"))
         new_a, new_g = c.execute("SELECT assignee_id, assignee_group_id FROM tasks WHERE id=?", (tid,)).fetchone()
         assignment_events(c, tid, cur["assignee_id"], new_a)
+        if "delegate_agent_id" in f:  # 2.473.0 (#3357; a move that ends the delegation: wat_moved)
+            from ..tasks.watchers import dlg_events
+            dlg_events(c, tid, cur["delegate_agent_id"], f["delegate_agent_id"])
         if new_g != cur["assignee_group_id"]:
             log_act(c, tid, "assign_group", {"group": grp_name(c, new_g), "from": grp_name(c, cur["assignee_group_id"])})
             if new_g:

@@ -160,6 +160,8 @@ TASK_FIELDS = {
     "assignee_id": {"type": ["integer", "null"]}, "tags": {**STRS, "description": "the agent's personal tags"},
     "assignee_group_id": {"type": ["integer", "null"], "description": "2.10.0: assign to a group (whoever has time takes it); "
                           "the project must be shared with the group; clears assignee_id and the other way round"},
+    "delegate_agent_id": {"type": ["integer", "null"], "description": "2.473.0: delegate to an agent of the project, next to the assignee "
+                          "(the person stays responsible; null = none); the task counts in that agent's queue"},
     "duration": {"type": ["integer", "null"], "minimum": 1, "description": "minutes (the calendar block of a timed task)"},
     "list_tags": {**STRS, "description": "shared project tags (seen by every project member)"},
     "parent_id": S_ID,
@@ -221,7 +223,7 @@ COMPACT_AUTO = 25  # 2.0.8: without `compact`, a page with more tasks than this 
 def t_list_tasks(api, a):
     """2.0.8: compact=true -> the API's fields=compact; false -> full tasks; not given -> full for small results,
     compact (client side, with "compact": true in the result) once a page has more than COMPACT_AUTO tasks."""
-    q = _pick(a, ("list_id", "status", "tag", "list_tag", "assignee", "assignee_group", "limit", "cursor", "type"))
+    q = _pick(a, ("list_id", "status", "tag", "list_tag", "assignee", "assignee_group", "delegate", "watcher", "limit", "cursor", "type"))
     if "waiting" in a:  # 2.1.0 (#335)
         q["waiting"] = "true" if a["waiting"] else "false"
     if "pinned" in a:  # 2.16.0 (#648)
@@ -544,6 +546,8 @@ TOOLS = [
            "pinned": {"type": "boolean", "description": "2.16.0: true = only pinned tasks (the 'Pinned' view), false = only the others"},
            "type": {"type": "string", "enum": ["bug", "feature", "task", "none"], "description": "only tickets of this type"},
            "assignee_group": {"type": "string", "description": "2.10.0: mine (assigned to one of your groups) or a group id"},
+           "delegate": {"type": "string", "description": "2.473.0: me, none or an agent id (the task is delegated to it)"},
+           "watcher": {"type": "string", "description": "2.473.0: me or a user id (who watches the task)"},
            "milestone": {"type": "boolean", "description": "2.18.0: true = only milestones, false = only the other tasks"},
            "milestone_id": {**S_ID, "description": "2.18.0: only the tasks of this milestone"},
            # 2.390.0 B (#3355)
@@ -1381,8 +1385,10 @@ TOOLS += [
                     "true (2.41.0) = time tracking on (any type, default off). "
                     "project_type agency | software | private = a project of that built-in type (fields, ticket types); "
                     "sections true (2.27.0) = also the type's standard sections (default: none). "
-                    "2.411.0: project_type left out in a folder = the folder's project type with its standard sections; \"\" = no type.",
-     _obj({**LIST_PROPS, "project_type": {"type": "string", "enum": ["agency", "software", "private", ""]}, "sections": {"type": "boolean"}}, ["name"]),
+                    "2.411.0: project_type left out in a folder = the folder's project type with its standard sections; \"\" = no type. "
+                    "bug_inbox true (2.473.0, project_type software, not for agents: they only propose rules, 403) = also the project "
+                    "\"<name> – Bugs\" with the field Release and a rule: a filled Release moves the task into this project; the answer carries bug_list_id.",
+     _obj({**LIST_PROPS, "project_type": {"type": "string", "enum": ["agency", "software", "private", ""]}, "sections": {"type": "boolean"}, "bug_inbox": {"type": "boolean"}}, ["name"]),
      lambda api, a: api.call("POST", "/lists", body=a)),
     ("update_list", "Change a project: name, color, folder (moving your own project into another folder waits for approval), view, kind "
                     "(stored only, no longer evaluated since 2.352.0), archived (true = archive), done_at_bottom, nag, day_hours, time_tracking (2.41.0, owner), project_type (2.18.0, owner / project admins: "
@@ -1485,6 +1491,14 @@ TOOLS += [
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/skip")),
     ("take_task", "Take a task assigned to one of your groups: it becomes yours.", _obj({"task_id": S_ID}, ["task_id"]),
      lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/take")),
+    ("list_watchers", "2.473.0: who watches a task.", _obj({"task_id": S_ID}, ["task_id"]),
+     lambda api, a: api.call("GET", f"/tasks/{_id(a, 'task_id')}/watchers")),
+    ("watch_task", "2.473.0: watch a task: its comments reach you as events. Without user_id yourself; somebody else: only project "
+     "owners / admins.", _obj({"task_id": S_ID, "user_id": S_ID}, ["task_id"]),
+     lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/watchers", body=_pick(a, ("user_id",)))),
+    ("unwatch_task", "2.473.0: stop watching a task (user_id = your own id from get_agent; somebody else: only project owners / admins).",
+     _obj({"task_id": S_ID, "user_id": S_ID}, ["task_id", "user_id"]),
+     lambda api, a: api.call("DELETE", f"/tasks/{_id(a, 'task_id')}/watchers/{_id(a, 'user_id')}")),
     ("list_subtasks", "The subtasks of a task.", _obj({"task_id": S_ID}, ["task_id"]),
      lambda api, a: api.call("GET", f"/tasks/{_id(a, 'task_id')}/subtasks")),
     ("add_subtask", "Add a subtask (same fields as create_task, without list_id / parent_id).",
@@ -2318,7 +2332,7 @@ TOOLS += [
 _RULE_TRIG = {"type": "object", "description": "{kind: section (a task comes into column section_id) | done | reopen | ltag (gets the project "
                                                "tag tag_id) | due (its due day is today) | created (2.138.0: a task is created in the project) | "
                                                "assigned (2.138.0: user_id = only that person, null = anybody) | field (2.138.0: custom field "
-                                               "field_id changes; value = option id / \"1\" checked / \"0\" unchecked, null = any change), "
+                                               "field_id changes; value = option id / \"1\" checked / \"0\" unchecked / \"*\" has a value (2.473.0), null = any change), "
                                                "section_id?, tag_id?, user_id?, field_id?, value?}"}
 _RULE_ACT = {"type": "object", "description": "{kind: assign (user_id, a person of the project) | due (days from today 0..365, null = clear) | "
                                               "comment (text, at most 2000 characters) | move (list_id and / or section_id) | priority "
@@ -2365,7 +2379,7 @@ TOOL_SCOPES = {
               "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules", "propose_playbook"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_decision", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "link_task_to_list", "unlink_task_from_list", "batch_tasks",
-                    "reopen_task", "partial_task", "skip_occurrence", "take_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
+                    "reopen_task", "partial_task", "skip_occurrence", "take_task", "watch_task", "unwatch_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
                     "update_habit", "check_in_habit", "shift_list_dates", "request_approval", "restore_note"),  # 2.272.0 E1 (#3038): restore_note
     "comments": ("comment_typing", "request_comment_approval", "withdraw_comment_choices", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "pin_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "request_integration_approval", "request_deploy_approval", "update_comment", "delete_comment", "mark_news_read",
                  "delete_chat_attachment"),

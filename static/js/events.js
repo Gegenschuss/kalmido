@@ -486,6 +486,9 @@ document.addEventListener('click', async e => {
     case 'toggle': e.stopPropagation(); toggleTask(id); break;
     case 'flow-why': e.stopPropagation(); e.preventDefault(); toast(tr(FLOW_WHY), null, 6000); break;
     case 'assign': e.stopPropagation(); assignMenu(a, id); break;
+    case 'delegate': e.stopPropagation(); dlg_menu(a, id); break;  // 2.473.0 (#3357)
+    case 'watch': e.stopPropagation(); wat_toggle(id); break;
+    case 'watchers': e.stopPropagation(); wat_menu(a, id); break;
     case 'take': e.stopPropagation(); takeTask(id || S.sel); break;  // 2.10.0 (#441)
     case 'dayplan': dayplanModal(a.dataset.mode || 'day', a.dataset.day || today()); break;  // 2.10.0 (#440)
     case 'unplan': patchUndoable(+a.dataset.id, {plan_start: null}, tr('Unplanned {0}', qn(String(taskById(+a.dataset.id)?.title || '').slice(0, 40)))); break;  // 2.11.0: the day plan's slot only

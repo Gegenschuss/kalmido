@@ -35,6 +35,8 @@ def task_dict(r, tags, full_snips=False):
             d.pop(k, None)
     if d.get("reviewer_id") is None:
         d.pop("reviewer_id", None)
+    if d.get("delegate_agent_id") is None:  # 2.473.0 (#3357): only when set
+        d.pop("delegate_agent_id", None)
     if not d.get("approval"):  # 2.23.0 (#463): only on tasks that wait for / had an approval
         d.pop("approval", None)
         d.pop("approver_id", None)
@@ -92,6 +94,15 @@ def wk_for(c, ids):
         out[r["task_id"]] = {"agent_id": r["agent_id"], "agent": r["display_name"] or r["username"], "name": r["name"] or None,
                              "text": line[:WK_TEXT_MAX - 1] + "…" if len(line) > WK_TEXT_MAX else line, "at": r["updated_at"],
                              "ttl": WK_TTL}
+    return out
+
+
+def wat_of(c, ids):
+    """2.473.0 (#3357): {task id: [user ids]} of the tasks ids that have watchers."""
+    out = {}
+    if ids:
+        for r in c.execute("SELECT task_id, user_id FROM task_watchers WHERE task_id = ANY(CAST(? AS BIGINT[])) ORDER BY user_id", (st_ids(ids),)):
+            out.setdefault(r[0], []).append(r[1])
     return out
 
 
@@ -204,6 +215,7 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
     from ..collab.notelock import ln_locked_ids
     lockn = ln_locked_ids(c, ids)  # 2.48.0 (#1642): tasks whose note is locked with a password (never its content)
     ppl = people_of(c, ids)  # 2.19.0 (#653): who comes along
+    wat = wat_of(c, ids - ctx)  # 2.473.0 (#3357): who watches it (not on a read-only context task)
     wk = wk_for(c, ids - ctx) if uid else {}  # 2.407.0 A (#3513): an agent works on it now
     out = []
     for r in rows:
@@ -236,6 +248,8 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
         d["blocking"] = bing.get(r["id"], 0)
         if r["id"] in ppl:
             d["people"] = ppl[r["id"]]
+        if r["id"] in wat:
+            d["watchers"] = wat[r["id"]]
         if r["id"] in aiu and r["id"] not in ctx:
             d["ai_usage"] = aiu[r["id"]]
         if r["id"] in wk:

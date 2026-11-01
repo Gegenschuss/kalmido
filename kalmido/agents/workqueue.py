@@ -1,4 +1,4 @@
-"""2.236.0 C (#2906 #2907): the queue of an agent - the open tasks assigned to it that it may see, in the order it set
+"""2.236.0 C (#2906 #2907): the queue of an agent - the open tasks assigned or delegated to it that it may see, in the order it set
 last (agents.queue_order, a JSON list of task ids), the rest by priority (high first), due date, creation. The first
 max_parallel (work style, 0 = no limit) are "active", the others "waiting" with their position 1..n. The priority rule of
 the work style goes along wherever the agent chooses its next task (GET /api/v1/agent/queue, the event "assigned").
@@ -50,12 +50,13 @@ def wq_order_of(a):
 
 
 def _wq_rows(c, aid):
-    """The open tasks assigned to aid that aid may see (the same filters as GET /api/v1/tasks?assignee=me), default order."""
+    """The open tasks assigned to aid that aid may see (the same filters as GET /api/v1/tasks?assignee=me), default order.
+    2.473.0 (#3357): + the tasks delegated to it (delegate=me)."""
     with _wq_as(c, aid):
         return c.execute(f"""SELECT t.id, t.title, t.list_id, t.priority, t.due FROM tasks t
                              WHERE t.list_id IN {vis_sql()} AND t.deleted_at IS NULL AND {tvis(c, aid, 't.')}
-                             AND t.status=0 AND t.assignee_id=?
-                             ORDER BY t.priority DESC, t.due IS NULL, t.due, t.id""", (aid, aid, aid)).fetchall()
+                             AND t.status=0 AND (t.assignee_id=? OR t.delegate_agent_id=?)
+                             ORDER BY t.priority DESC, t.due IS NULL, t.due, t.id""", (aid, aid, aid, aid)).fetchall()
 
 
 def wq_build(c, a, ws=None):

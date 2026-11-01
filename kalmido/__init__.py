@@ -139,6 +139,7 @@ ORDER = (
     "api.v1",
     "notify.caps",  # 2.33.0 (#927)
     "notify.taskbell",  # 2.53.0 C (#1424): the bell of one task per person
+    "tasks.watchers",  # 2.473.0 (#3357): delegated to an agent, watchers of a task
     "notify.channels",  # 2.142.0 A (#2145, #2146): Slack / Matrix / Telegram / Signal, e-mails for single events
     "tasks.dayplan",
     "tasks.briefing",  # 2.34.0 (#264)

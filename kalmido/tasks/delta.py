@@ -36,7 +36,7 @@ DL_TABLES = {
     "tasks": ("id",), "task_tags": ("task_id",), "task_list_tags": ("task_id",), "attachments": ("task_id",),
     "comments": ("task_id",), "task_seen": ("task_id",), "task_field_values": ("task_id",),
     "task_deps": ("task_id", "blocker_id"), "agent_usage": ("task_id",), "git_links": ("task_id",), "git_closes": ("task_id",),
-    "task_people": ("task_id",), "events": ("task_id",), "contact_tasks": ("task_id",), "time_entries": ("task_id",),
+    "task_people": ("task_id",), "task_watchers": ("task_id",), "events": ("task_id",), "contact_tasks": ("task_id",), "time_entries": ("task_id",),
     "task_enc_notes": ("task_id",),  # 2.42.0 (#828): the encrypted note marker of a task
     "task_note_locks": ("task_id",),  # 2.48.0 (#1642): the locked note marker of a task
     "task_links": ("task_id",),  # 2.71.0 B (#1459): the further lists a task is shown in (its "also")
