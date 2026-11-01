@@ -4373,7 +4373,7 @@ USER_DEFAULTS = {
     "purpose_ask": "done",      # 2.364.0 A (#3032): "What do you use Kalmido for?" on the first start of an account an admin made
                                 # (user admin, organisation invitation, import): the preselected purpose = pending | done
     # 1.9.0: which events create a News item (groups, see NEWS_GROUPS). Default: everything but "completed by others"
-    "news_kinds": "mention,assign,comment,unblock,share,status",
+    "news_kinds": "mention,assign,comment,complete,unblock,share,status",  # 2.367.5 (#2980): complete, like its push
     # 2.1.0 (#317): the rest of the notification matrix, json {event: {news?, push?}} (see NOTIF_ROWS; '' = defaults)
     "notify": "",
     # 2.28.0 (#935): the workspace the app shows: all | private | org:<id> (the sidebar's switch; followed on every device)
