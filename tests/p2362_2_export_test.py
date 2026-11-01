@@ -275,7 +275,9 @@ gfull = os.path.join(DATA, "attachments", tfiles()[0]["path"])
 check(os.path.exists(gfull), "#3865 the file is there again")
 ok(G.post(B + f"/api/imports/{j['result']['import_id']}/undo", json={}), "#3865 undo")
 check(not tfiles() and not os.path.exists(gfull), "#3865 the undo with the template leaves no file behind")
-check(any("knowledge" not in x and "older versions" in x for x in man["not_included"]), "#3099 the manifest no longer leaves the page files out")
+# 2.480.0 (#3470): every version of the private files is in the file now; only the histories stay out
+check(not any("older versions" in x for x in man["not_included"]) and any("history of your knowledge pages" in x for x in man["not_included"]),
+      f"#3099 #3470 the manifest leaves neither the page files nor older file versions out {man['not_included']}")
 
 # Mandantengrenze: an account export with the office option never carries another person's rows
 check(not any(f"{FOREIGN}-" in n for n in names), "#3099 another person's node stays out, also when an office row names it")

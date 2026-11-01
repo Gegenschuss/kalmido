@@ -80,7 +80,8 @@ UMZ_NOT_INCLUDED = (
     N_("organisation data that is not yours (use the organisation export for a whole organisation)"),
     N_("the receipt files of household budgets (their entries are included)"),  # 2.72.0 (#1333)
     # 2.148.1 C (#2494): what is not in the file either (the manifest names it honestly)
-    N_("older versions of your private files (the current one is in the file)"),  # 2.360.2 D (#2561); 2.362.2 (#3099): + the files of knowledge pages and tables
+    # #3470: every version of the private files is in the file now; what still stays is the history of the knowledge pages
+    N_("the history of your knowledge pages and the access history of your private files (the current state is in the file)"),
     N_("messages and comments of other people in direct messages, channels and lists (only what you wrote yourself)"),  # 2.239.0 A (#2882)
     # 2.239.0 A (#2882): tasks of lists you no longer see; what you wrote inside an organisation you left stays with it
     N_("tasks of lists you can no longer see, and your comments and messages inside an organisation you left"),
@@ -357,7 +358,7 @@ def umz_extra_queries(uid):
         "sheet_rows": (f"SELECT * FROM sheet_rows WHERE sheet_id IN (SELECT id FROM sheets WHERE {sheets})", (uid,)),
         "sheet_cells": (f"SELECT * FROM sheet_cells WHERE sheet_id IN (SELECT id FROM sheets WHERE {sheets})", (uid,)),
         # 2.124.0 B (#2110): the file rows of my private tables' file cells
-        "sheet_files": (f"SELECT id, sheet_id, name, mime, size, created_at, deleted_at FROM sheet_files WHERE sheet_id IN (SELECT id FROM sheets WHERE {sheets})", (uid,)),
+        "sheet_files": (f"SELECT id, sheet_id, name, mime, size, created_by, created_at, deleted_at FROM sheet_files WHERE sheet_id IN (SELECT id FROM sheets WHERE {sheets})", (uid,)),
         # 2.124.0 B (#2112): the cell history of my private tables
         "sheet_hist": (f"SELECT * FROM sheet_hist WHERE sheet_id IN (SELECT id FROM sheets WHERE {sheets})", (uid,)),
         # 2.99.1 A (#1959): my private video sign-offs (organisation ones are in the organisation export)
@@ -367,11 +368,18 @@ def umz_extra_queries(uid):
                            "AND deleted_at IS NULL", (uid,)),
         # 2.148.1 C (#2494): Art. 15 -- the list of my private files (not their content), my private knowledge pages, my chats
         # with agents, what I wrote in direct messages, my absences and timesheets (protected fields decrypted, UMZ_DECRYPT)
-        "private_files": ("SELECT id, parent_id, kind, name, mime, size, created_at, updated_at FROM fs_nodes WHERE owner_id=? "
-                          "AND org_id IS NULL AND deleted_at IS NULL ORDER BY id", (uid,)),
+        # #3470: + what the import needs to rebuild the tree (current version, references, order, a filed mail's mark)
+        "private_files": ("SELECT id, parent_id, kind, name, mime, size, cur_version, ref_kind, ref_id, sort_no, hub_mail_id, e2e_gen, "
+                          "created_at, updated_at FROM fs_nodes WHERE owner_id=? AND org_id IS NULL AND deleted_at IS NULL ORDER BY id", (uid,)),
+        # #3470: every version of my private files (the bytes: the current one under the node's "file", older ones under
+        # files/store/<node>-v<no>-<name> like the organisation export) and the roots of my areas (knowledge, tables) in that tree
+        "private_versions": ("""SELECT v.id, v.node_id, v.no, v.size, v.mime, v.sha256, v.created_by, v.created_at FROM fs_versions v JOIN fs_nodes n ON n.id=v.node_id
+                                WHERE n.owner_id=? AND n.org_id IS NULL AND n.kind='file' AND n.deleted_at IS NULL ORDER BY v.node_id, v.no""", (uid,)),
+        "private_area_roots": ("SELECT area, node_id, updated_at FROM fs_area_roots WHERE owner_id=? AND org_id IS NULL AND node_id IS NOT NULL "
+                               "ORDER BY area", (uid,)),
         "wiki_pages": ("SELECT id, org_id, owner_id, path, body, attrs, created_at, updated_at FROM wiki_pages WHERE owner_id=? "
                        "AND org_id IS NULL AND deleted_at IS NULL ORDER BY id", (uid,)),
-        "wiki_files": ("SELECT id, page_id, name, mime, size, created_at FROM wiki_files WHERE owner_id=? AND org_id IS NULL "  # 2.362.2 (#3099)
+        "wiki_files": ("SELECT id, page_id, name, mime, size, created_by, created_at FROM wiki_files WHERE owner_id=? AND org_id IS NULL "  # 2.362.2 (#3099)
                        "AND deleted_at IS NULL ORDER BY id", (uid,)),
         "template_files": ("SELECT id, template_id, node_key, name, mime, size, scan, created_at FROM template_files WHERE user_id=? ORDER BY id", (uid,)),  # #3134
         "agent_chats": ("SELECT id, agent_id, sender, body, task_id, created_at FROM agent_chat WHERE user_id=? ORDER BY id", (uid,)),
@@ -611,17 +619,23 @@ def umz_build(c, uid, stream, export_id):
                 files[(table, r["id"])] = name
                 if table == "attachments" and "enc" in r.keys() and r["enc"]:
                     client_enc["attachments"].append(name)
-        # 2.360.2 D (#2561): the current version of my private files (locked in the browser = stays ciphertext, as attachments)
-        for r in c.execute("""SELECT n.id, n.name, v.no, v.path FROM fs_nodes n JOIN fs_versions v ON v.node_id=n.id AND v.no=n.cur_version
-                              WHERE n.owner_id=? AND n.org_id IS NULL AND n.kind='file' AND n.deleted_at IS NULL""", (uid,)).fetchall():
+        # 2.360.2 D (#2561): my private files (locked in the browser = stays ciphertext, as attachments); #3470: every version,
+        # the current one under the node's path (older imports and the filed mails find it there), older ones like orgexport
+        for r in c.execute("""SELECT n.id, n.name, v.id AS vid, v.no, v.path, v.no=n.cur_version AS cur FROM fs_nodes n
+                              JOIN fs_versions v ON v.node_id=n.id WHERE n.owner_id=? AND n.org_id IS NULL AND n.kind='file'
+                              AND n.deleted_at IS NULL ORDER BY n.id, v.no""", (uid,)).fetchall():
             full = _under(ATT_DIR, r["path"])
             sig = inf.get(("fs", int(r["id"]), int(r["no"])))
             if sig is not None:
-                locked.append({"area": "private_files", "id": r["id"], "name": r["name"] or "", "signature": sig})
+                locked.append({"area": "private_files", "id": r["id"], "name": r["name"] or "", "signature": sig,
+                               **({} if r["cur"] else {"version": int(r["no"])})})
                 continue
-            name = umz_att_name("private_files", r["id"], r["name"])
+            name = umz_att_name("private_files", r["id"], r["name"]) if r["cur"] else \
+                f"files/store/{int(r['id'])}-v{int(r['no'])}-{_safe_part(r['name'])}"
             if _put_file(c, zf, out, name, full):
-                files[("private_files", r["id"])] = name
+                files[("private_versions", r["vid"])] = name
+                if r["cur"]:
+                    files[("private_files", r["id"])] = name
         avatar = ""  # 2.239.0 A (#2882): my own profile picture
         a = c.execute("SELECT avatar FROM users WHERE id=?", (uid,)).fetchone()
         if a and (a[0] or "").startswith("u:"):
@@ -835,6 +849,12 @@ def umz_get():
     return jsonify(keep_hours=UMZ_KEEP_H, **umz_status(me()))
 
 
+def umz_private_bytes(c, uid):
+    """#3470: the bytes of every version of my private files (the export takes them all along, the import writes them all)."""
+    return c.execute("""SELECT COALESCE(SUM(v.size),0) FROM fs_versions v JOIN fs_nodes n ON n.id=v.node_id WHERE n.owner_id=?
+                        AND n.org_id IS NULL AND n.kind='file' AND n.deleted_at IS NULL""", (uid,)).fetchone()[0] or 0
+
+
 @app.post("/api/account/export")
 def umz_start():
     """Starts my account export in the background (one at a time; 409 while one runs, 507 without the disk space)."""
@@ -847,8 +867,7 @@ def umz_start():
     for t in ("attachments", "list_files"):
         sql, args = q[t]
         need += c.execute(f"SELECT COALESCE(SUM(size),0) FROM ({sql}) x", args).fetchone()[0] or 0
-    need += c.execute("SELECT COALESCE(SUM(size),0) FROM fs_nodes WHERE owner_id=? AND org_id IS NULL AND kind='file' AND deleted_at IS NULL",  # 2.360.2 D (#2561)
-                      (uid,)).fetchone()[0] or 0
+    need += umz_private_bytes(c, uid)  # 2.360.2 D (#2561); #3470: every version
     need += c.execute("SELECT COALESCE(SUM(size),0) FROM wiki_files WHERE owner_id=? AND org_id IS NULL", (uid,)).fetchone()[0] or 0  # 2.362.2 (#3099)
     need += c.execute("SELECT COALESCE(SUM(size),0) FROM sheet_files WHERE owner_id=? AND org_id IS NULL", (uid,)).fetchone()[0] or 0
     need += c.execute("SELECT COALESCE(SUM(size),0) FROM template_files WHERE user_id=?", (uid,)).fetchone()[0] or 0  # #3134

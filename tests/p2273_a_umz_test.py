@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """2.273.0 part A (#3030): the account import says what stays on the old server. Invented names only (example.com).
  - a real account export of a person without an organisation (a table, a knowledge page, a bookmark, the appearance,
-   the working days, a task with a code snippet) -> the preview's not_taken names tables, knowledge pages and bookmarks with
-   their numbers; every exported part with rows is either read by the import or named (nothing stays behind unseen)
+   the working days, a task with a code snippet) -> the preview's not_taken names bookmarks with
+   their numbers (2.480.0, #3470: tables and knowledge pages come along now, the preview no longer names them); every exported part with rows is either read by the import or named (nothing stays behind unseen)
  - the run: the result carries the same list as a warning, the import's record keeps it (report.not_taken); the appearance
    (theme) and the working days come over now, the code snippet too (with the importer as author)
  - a crafted file: an unknown new part keeps its technical name, a task in the trash is named, settings that do not move
@@ -158,8 +158,8 @@ check(j.get("state") == "preview", f"preview {j.get('state')} {j.get('error')}")
 pv = j.get("preview") or {}
 nt = named(pv)
 # the regression of #3030: before 2.273.0 the preview named none of these (a fixed list of connections only)
-check(nt.get("Tables") == 1, f"#3030: the preview names the table with its number {nt}")
-check(nt.get("Knowledge pages") == 1, f"#3030: ... the knowledge page {nt}")
+# 2.480.0 (#3470): tables and knowledge pages come along now -- the preview no longer names them as staying behind
+check("Tables" not in nt and "Knowledge pages" not in nt, f"#3470: the table and the knowledge page are not named as staying {nt}")
 check(nt.get("Bookmarks") == 1, f"#3030: ... the bookmark {nt}")
 check(nt.get("Other settings", 0) >= 1, f"#3030: ... the settings that do not move (counted) {nt}")
 check(not any(w in nt for w in ("tasks", "lists", "Tasks in the trash")), f"#3030: nothing that comes over is named {nt}")
@@ -169,10 +169,13 @@ j = run(Gi, iid)
 check(j.get("state") == "done", f"the import is done {j.get('state')} {j.get('error')}")
 res = j.get("result") or {}
 w = " | ".join(x.get("text", "") for x in res.get("warnings") or [])
-check("stay on the old server" in w and "Tables (1)" in w and "Knowledge pages (1)" in w, f"#3030: the result names them too: {w[:300]}")
+check("stay on the old server" in w and "Bookmarks (1)" in w and "Tables (1)" not in w, f"#3030: the result names them too: {w[:300]}")  # 2.480.0 (#3470): tables come along
 rep = kt.dbx("SELECT report FROM imports WHERE user_id=? ORDER BY id DESC LIMIT 1", (GID,))
 rep = json.loads(rep[0][0]) if rep else {}
-check({"what": "Tables", "count": 1} in (rep.get("not_taken") or []), f"#3030: the import's record keeps the list {rep.get('not_taken')}")
+check({"what": "Bookmarks", "count": 1} in (rep.get("not_taken") or []), f"#3030: the import's record keeps the list {rep.get('not_taken')}")  # 2.480.0 (#3470)
+check(kt.dbx("SELECT COUNT(*) FROM sheets WHERE owner_id=? AND org_id IS NULL AND title='Umzug Tabelle'", (GID,))[0][0] == 1
+      and kt.dbx("SELECT COUNT(*) FROM wiki_pages WHERE owner_id=? AND org_id IS NULL AND path ILIKE '%umzug%' AND deleted_at IS NULL", (GID,))[0][0] == 1,
+      "2.480.0 (#3470): the table and the knowledge page arrive in the private space")
 st = Gi.get(B + "/api/state").json()["settings"]
 check(json.loads(st.get("look") or "{}").get("theme") == "dark" and st.get("workdays") == "0,1,2,3",
       f"#3030: the appearance (theme) and the working days come over {st.get('look')!r} {st.get('workdays')!r}")

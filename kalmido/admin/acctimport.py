@@ -137,16 +137,25 @@ UMZ_READ = frozenset((
     "sprints", "task_links", "list_rules", "portal_tickets",  # 2.455.0 (#3469)
     "task_decisions",  # 2.392.0 C (#3370)
     "template_files",  # 2.464.0 (#3865)
+    "private_files", "private_versions", "private_area_roots", "wiki_pages", "wiki_files",  # #3470: umz_private (UMZ_PRIVATE)
+    "sheets", "sheet_columns", "sheet_rows", "sheet_cells", "sheet_files", "sheet_hist",
 ))
+# #3470: the private file store, knowledge pages and tables of an account export go through the organisation import's areas
+# (admin/oi_store.py) into my private space: account part -> archive entry of the organisation export
+UMZ_PRIVATE = (
+    ("private_files", "store/nodes.json"), ("private_area_roots", "store/area_roots.json"), ("private_versions", "store/versions.json"),
+    ("wiki_pages", "wiki/pages.json"), ("wiki_files", "wiki/files.json"),
+    ("sheets", "sheets/sheets.json"), ("sheet_columns", "sheets/columns.json"), ("sheet_rows", "sheets/rows.json"),
+    ("sheet_cells", "sheets/cells.json"), ("sheet_files", "sheets/files.json"), ("sheet_hist", "sheets/history.json"),
+)
 UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is empty; a name used twice adds up
-    (N_("Tables"), ("sheets", "sheet_columns", "sheet_rows", "sheet_cells", "sheet_files", "sheet_hist")),
-    (N_("Knowledge pages"), ("wiki_pages", "wiki_files")), (N_("E-mails"), ("hub_mails",)),
+    (N_("E-mails"), ("hub_mails",)),  # #3470: tables, knowledge pages and my files come along (UMZ_PRIVATE)
     (N_("Video sign-offs"), ("video_reviews", "video_versions", "video_comments")), (N_("Bookmarks"), ("bookmarks",)),
     (N_("Household budget"), ("budgets",)), (N_("Focus sessions"), ("pomos",)), (N_("Notepads"), ("list_notepads",)),
     (N_("Playbooks"), ("playbooks", "playbook_proposals")), (N_("Staying in touch"), ("contact_care",)),
     (N_("Saved arrangements"), ("view_layouts", "list_layouts", "view_layout_offers")), (N_("Task bells"), ("task_bell", "task_watchers")),
     (N_("History"), ("activity",)), (N_("Direct messages"), ("direct_messages",)), (N_("Agent chats"), ("agent_chats",)),
-    (N_("My files"), ("private_files",)), (N_("Absences"), ("absences",)), (N_("Timesheets"), ("timesheets",)),
+    (N_("Absences"), ("absences",)), (N_("Timesheets"), ("timesheets",)),
     (N_("Shared with me"), ("shared_lists", "shared_comments")), (N_("Notifications"), ("list_notif", "folder_notif")),
     (N_("Environments"), ("list_envs", "env_deploys")), (N_("Devices"), ("device_links",)),
     (N_("Assistant"), ("assistant_access", "assistant_log")),
@@ -1644,9 +1653,69 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         from .orgimport import oi_write
         oi_write(c, run, uid, man, zf, files, data, who)
         run.created["oi_done"] = True  # 2.362.3 (#3098, review): a run stopped inside (quota) took only a part of the areas
+    if man.get("kind") != "org":  # #3470: my private file store, knowledge pages and tables
+        umz_private(c, run, uid, man, zf, files, data, who)
     if man.get("kind") == "org":  # 2.459.0 (#3849): also on a second run: the lists it creates anew
         from .orgimport import oi_pictures
         oi_pictures(c, run, uid, zf, files, data)
+
+
+def umz_private_oi(data, files):
+    """#3470: the private areas of an account export as the archive entries of admin/oi_store.py -> {entry: rows}. The bytes
+    get the names the areas read (files/store/<node>-v<no>-<name>, files/wiki/..., files/sheets/...) as a second name of the
+    file's entry; an export before #3470 has no versions: the current one comes from the node's "file". Files of a filed mail
+    follow the mail (it stays on the old server), rows of a table in the trash stay with it."""
+    from .orgexport import _safe_part
+    oi = {}
+    nodes = [r for r in data.get("private_files") or [] if not r.get("hub_mail_id")]
+    names = {_oid(r.get("id")): r.get("name") for r in nodes}
+    vers = [v for v in data.get("private_versions") or [] if _oid(v.get("node_id")) in names]
+    if not data.get("private_versions"):  # an older export: the current version of each file
+        vers = [{"id": r.get("id"), "node_id": r.get("id"), "no": _oid(r.get("cur_version")) or 1, "size": r.get("size"),
+                 "mime": r.get("mime"), "created_at": r.get("updated_at"), "file": r.get("file")}
+                for r in nodes if r.get("kind") == "file" and r.get("file")]
+    for v in vers:
+        try:
+            path = f"files/store/{int(v['node_id'])}-v{int(v['no'])}-{_safe_part(names.get(_oid(v['node_id'])))}"
+        except (TypeError, ValueError, KeyError):
+            continue
+        if path not in files and v.get("file") in files:
+            files[path] = files[v["file"]]
+    sheets = {_oid(r.get("id")) for r in data.get("sheets") or []}
+    for part, kind in (("wiki_files", "wiki"), ("sheet_files", "sheets")):
+        for r in data.get(part) or []:
+            path = f"files/{kind}/{_oid(r.get('id')) or 0}-{_safe_part(r.get('name'))}"
+            if path not in files and r.get("file") in files:
+                files[path] = files[r["file"]]
+    for part, entry in UMZ_PRIVATE:
+        rows = nodes if part == "private_files" else vers if part == "private_versions" else data.get(part) or []
+        if part.startswith("sheet_"):
+            rows = [r for r in rows if _oid(r.get("sheet_id")) in sheets and not r.get("deleted_at")]
+        if part in ("private_versions", "wiki_files", "sheet_files"):  # the account export names no server path: the area's prep sets it
+            rows = [{**r, "path": ""} for r in rows]
+        if rows:
+            oi[entry] = rows
+    return oi
+
+
+def umz_private(c, run, uid, man, zf, files, data, who):
+    """#3470: my private file store (every version), knowledge pages and tables, restored in my private space -- also when the
+    rest goes into an organisation (they are mine alone, like the Home & life projects). Sealed, counted on my storage and
+    checked by the virus scanner per file like an upload (orgimport.oi_file); undone with the import (run.created["oi"])."""
+    oi = umz_private_oi(data, files)
+    if not oi:
+        return
+    if run.oi_done:  # 2.362.3 (#3098): an earlier import of this file brought them already
+        run.warning(N_("Your files, knowledge pages and tables are here already from an earlier import: they were skipped."))
+        return
+    from .orgimport import oi_write
+    org = run.org
+    run.org = None
+    try:
+        oi_write(c, run, uid, man, zf, files, {"oi": oi, "people": data.get("people") or []}, who)
+    finally:
+        run.org = org
+    run.created["oi_done"] = True
 
 
 def umz_share(c, run, uid, data, picks, can_invite, salt=None):
@@ -1876,6 +1945,21 @@ def umz_run(uid, iid, opts):
             _UMI.pop(int(uid), None)
 
 
+def umz_room(c, uid, files):
+    """#3470: the files of the export (their unpacked sizes: what the import writes) must fit my storage and the server's disk,
+    else UmzBad with what they need and what is free (the upload only counted its packed size)."""
+    from .hosting import fmt_bytes, quota_info
+    need = sum(zi.file_size for p, (zi, _s) in files.items() if p.startswith("files/"))
+    if not need:
+        return
+    info = quota_info(c, uid)
+    if info and info["limit"] and info["used"] + need > info["limit"]:
+        raise UmzBad(N_("Your storage is too small for the files of this export: they need {0}, {1} are free. Free up space or ask for more storage, then upload the file again."),
+                     fmt_bytes(need), fmt_bytes(max(0, info["limit"] - info["used"])))
+    if not umz_space_ok(ATT_DIR, need):
+        raise UmzBad(N_("There is not enough space on the server for the import. Please ask the server admin."))
+
+
 def umz_check(uid, iid, can_invite):
     """The thread after the last piece: check the file, build the preview."""
     c = connect()
@@ -1892,6 +1976,7 @@ def umz_check(uid, iid, can_invite):
             return
         zf, man, files, data = umz_open(os.path.join(_dir(uid, iid), "upload.bin"), key, st["size"])
         zf.close()
+        umz_room(c, uid, files)  # #3470: before the preview, never halfway through the run
         pv = umz_preview(c, uid, man, data, can_invite)
         c.rollback()
         _set(uid, iid, state="preview", preview=pv, export_id=pv["export_id"], src=pv["src"])

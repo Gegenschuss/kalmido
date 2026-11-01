@@ -14766,7 +14766,6 @@
   "lists of other people (only a reference, your own comments and messages there and the tasks you created or are assigned to)": "liste di altre persone (solo un riferimento, i tuoi commenti e messaggi e le attività che hai creato o che ti sono assegnate)",
   "organisation data that is not yours (use the organisation export for a whole organisation)": "dati dell'organizzazione che non sono tuoi (usa l'esportazione dell'organizzazione per un'intera organizzazione)",
   "the receipt files of household budgets (their entries are included)": "i file dei giustificativi dei budget familiari (le loro voci sono incluse)",
-  "older versions of your private files (the current one is in the file)": "versioni precedenti dei tuoi file privati (quella attuale è nel file)",
   "messages and comments of other people in direct messages, channels and lists (only what you wrote yourself)": "messaggi e commenti di altre persone in messaggi diretti, canali e liste (solo ciò che hai scritto tu)",
   "tasks of lists you can no longer see, and your comments and messages inside an organisation you left": "attività di liste che non vedi più, e i tuoi commenti e messaggi in un'organizzazione che hai lasciato",
   "the network addresses of people who booked with you and the e-mail addresses of people who voted in your polls": "gli indirizzi di rete di chi ha prenotato da te e gli indirizzi e-mail di chi ha votato nei tuoi sondaggi",
@@ -15829,5 +15828,8 @@
   "Declining depreciation at {0} %, linear from the year it gives more": "Ammortamento decrescente al {0} %, lineare dall'anno in cui rende di più",
   "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "L'ammortamento decrescente è possibile solo per acquisti dal 1° luglio 2025 al 31 dicembre 2027.",
   "On a hosted instance no archive is uploaded: restoring goes only from the server's own backups": "Su un'istanza ospitata non si carica alcun archivio: il ripristino avviene solo dai backup del server stesso",
-  "{0} finding in a client’s organisation stays: only its admins clean it up": ["{0} risultato nell'organizzazione di un cliente resta: solo i suoi admin lo sistemano", "{0} risultati in organizzazioni di clienti restano: solo i loro admin li sistemano"]
+  "{0} finding in a client’s organisation stays: only its admins clean it up": ["{0} risultato nell'organizzazione di un cliente resta: solo i suoi admin lo sistemano", "{0} risultati in organizzazioni di clienti restano: solo i loro admin li sistemano"],
+  "the history of your knowledge pages and the access history of your private files (the current state is in the file)": "la cronologia delle tue pagine di conoscenza e la cronologia degli accessi ai tuoi file privati (lo stato attuale è nel file)",
+  "Your files, knowledge pages and tables are here already from an earlier import: they were skipped.": "I tuoi file, le pagine di conoscenza e le tabelle sono già qui da un'importazione precedente: sono stati saltati.",
+  "Your storage is too small for the files of this export: they need {0}, {1} are free. Free up space or ask for more storage, then upload the file again.": "Il tuo spazio non basta per i file di questa esportazione: servono {0}, ne sono liberi {1}. Libera spazio o chiedi più spazio, poi carica di nuovo il file."
 }

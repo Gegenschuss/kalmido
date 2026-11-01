@@ -541,6 +541,12 @@ qz = mkzip({"lists": [{"id": 1, "name": "Kontingent Test", "created_at": ts}],
            man={"source": {"url": "https://kontingent.example.com", "hosted": True}})  # 2.362.3 (#3098): an own source, its ids are new
 iid = upload(Da, qz)
 j = wait(Da, iid)
+# 2.480.0 (#3470): the check adds up the unpacked files before the preview: 1.8 MB do not fit 1 MB -> refused with what they need
+check(j.get("state") == "invalid" and "too small for the files" in json.dumps(j.get("error")), f"#3470: refused before the run {j.get('state')} {j.get('error')}")
+A.patch(B + f"/api/users/{DAVE}", json={"storage_quota_mb": None})
+iid = upload(Da, qz)
+j = wait(Da, iid)
+A.patch(B + f"/api/users/{DAVE}", json={"storage_quota_mb": 1})  # 2.480.0 (#3470): full only after the preview: the run stops
 j = run(Da, iid, people={"bob@example.com": {"share": True}}) if j.get("state") == "preview" else j
 check(j.get("state") == "stopped" and j["result"].get("stopped") and j["result"].get("import_id"), f"quota in the run: stopped {j.get('state')}")
 na = dbx("SELECT COUNT(*) AS n FROM attachments a JOIN tasks t ON t.id=a.task_id JOIN lists l ON l.id=t.list_id WHERE l.owner_id=? AND l.name='Kontingent Test'",

@@ -14766,7 +14766,6 @@
   "lists of other people (only a reference, your own comments and messages there and the tasks you created or are assigned to)": "Listen anderer Personen (nur ein Verweis, deine eigenen Kommentare und Nachrichten dort und die Aufgaben, die du angelegt hast oder die dir zugewiesen sind)",
   "organisation data that is not yours (use the organisation export for a whole organisation)": "Organisationsdaten, die nicht deine sind (für eine ganze Organisation den Organisations-Export nutzen)",
   "the receipt files of household budgets (their entries are included)": "die Belegdateien von Haushaltsbudgets (ihre Einträge sind enthalten)",
-  "older versions of your private files (the current one is in the file)": "ältere Versionen deiner privaten Dateien (die aktuelle ist in der Datei)",
   "messages and comments of other people in direct messages, channels and lists (only what you wrote yourself)": "Nachrichten und Kommentare anderer Personen in Direktnachrichten, Kanälen und Listen (nur was du selbst geschrieben hast)",
   "tasks of lists you can no longer see, and your comments and messages inside an organisation you left": "Aufgaben aus Listen, die du nicht mehr siehst, und deine Kommentare und Nachrichten in einer Organisation, die du verlassen hast",
   "the network addresses of people who booked with you and the e-mail addresses of people who voted in your polls": "die Netzwerkadressen von Personen, die bei dir gebucht haben, und die E-Mail-Adressen von Personen, die an deinen Umfragen teilgenommen haben",
@@ -15829,5 +15828,8 @@
   "Declining depreciation at {0} %, linear from the year it gives more": "Degressive Abschreibung mit {0} %, linear ab dem Jahr, in dem das mehr ergibt",
   "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "Degressive Abschreibung ist nur für Käufe vom 1. Juli 2025 bis 31. Dezember 2027 möglich.",
   "On a hosted instance no archive is uploaded: restoring goes only from the server's own backups": "Auf einer gehosteten Instanz wird kein Archiv hochgeladen: Zurückgesichert wird nur aus den eigenen Sicherungen des Servers",
-  "{0} finding in a client’s organisation stays: only its admins clean it up": ["{0} Fund in der Organisation eines Kunden bleibt: Nur ihre Admins bereinigen ihn", "{0} Funde in Organisationen von Kunden bleiben: Nur deren Admins bereinigen sie"]
+  "{0} finding in a client’s organisation stays: only its admins clean it up": ["{0} Fund in der Organisation eines Kunden bleibt: Nur ihre Admins bereinigen ihn", "{0} Funde in Organisationen von Kunden bleiben: Nur deren Admins bereinigen sie"],
+  "the history of your knowledge pages and the access history of your private files (the current state is in the file)": "der Verlauf deiner Wissensseiten und der Zugriffsverlauf deiner privaten Dateien (der aktuelle Stand ist in der Datei)",
+  "Your files, knowledge pages and tables are here already from an earlier import: they were skipped.": "Deine Dateien, Wissensseiten und Tabellen sind schon von einem früheren Import da und wurden übersprungen.",
+  "Your storage is too small for the files of this export: they need {0}, {1} are free. Free up space or ask for more storage, then upload the file again.": "Dein Speicher reicht für die Dateien dieses Exports nicht: Sie brauchen {0}, frei sind {1}. Schaffe Platz oder frag nach mehr Speicher und lade die Datei dann erneut hoch."
 }

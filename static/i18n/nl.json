@@ -14766,7 +14766,6 @@
   "lists of other people (only a reference, your own comments and messages there and the tasks you created or are assigned to)": "lijsten van anderen (alleen een verwijzing, je eigen reacties en berichten daar en de taken die je hebt gemaakt of die aan jou zijn toegewezen)",
   "organisation data that is not yours (use the organisation export for a whole organisation)": "organisatiegegevens die niet van jou zijn (gebruik de organisatie-export voor een hele organisatie)",
   "the receipt files of household budgets (their entries are included)": "de bonbestanden van huishoudbudgetten (hun regels zijn inbegrepen)",
-  "older versions of your private files (the current one is in the file)": "oudere versies van je privébestanden (de huidige staat in het bestand)",
   "messages and comments of other people in direct messages, channels and lists (only what you wrote yourself)": "berichten en reacties van anderen in directe berichten, kanalen en lijsten (alleen wat je zelf hebt geschreven)",
   "tasks of lists you can no longer see, and your comments and messages inside an organisation you left": "taken uit lijsten die je niet meer ziet, en je reacties en berichten in een organisatie die je hebt verlaten",
   "the network addresses of people who booked with you and the e-mail addresses of people who voted in your polls": "de netwerkadressen van mensen die bij jou hebben geboekt en de e-mailadressen van mensen die in je polls hebben gestemd",
@@ -15829,5 +15828,8 @@
   "Declining depreciation at {0} %, linear from the year it gives more": "Degressieve afschrijving van {0} %, lineair vanaf het jaar waarin dat meer oplevert",
   "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "Degressieve afschrijving is alleen mogelijk voor aankopen van 1 juli 2025 tot en met 31 december 2027.",
   "On a hosted instance no archive is uploaded: restoring goes only from the server's own backups": "Op een gehoste instantie wordt geen archief geüpload: terugzetten gaat alleen vanuit de eigen back-ups van de server",
-  "{0} finding in a client’s organisation stays: only its admins clean it up": ["{0} bevinding in de organisatie van een klant blijft: alleen haar admins ruimen die op", "{0} bevindingen in organisaties van klanten blijven: alleen hun admins ruimen die op"]
+  "{0} finding in a client’s organisation stays: only its admins clean it up": ["{0} bevinding in de organisatie van een klant blijft: alleen haar admins ruimen die op", "{0} bevindingen in organisaties van klanten blijven: alleen hun admins ruimen die op"],
+  "the history of your knowledge pages and the access history of your private files (the current state is in the file)": "de geschiedenis van je kennispagina's en de toegangsgeschiedenis van je privébestanden (de huidige stand staat in het bestand)",
+  "Your files, knowledge pages and tables are here already from an earlier import: they were skipped.": "Je bestanden, kennispagina's en tabellen zijn er al van een eerdere import: ze zijn overgeslagen.",
+  "Your storage is too small for the files of this export: they need {0}, {1} are free. Free up space or ask for more storage, then upload the file again.": "Je opslag is te klein voor de bestanden van deze export: ze hebben {0} nodig, {1} is vrij. Maak ruimte vrij of vraag om meer opslag en upload het bestand daarna opnieuw."
 }
