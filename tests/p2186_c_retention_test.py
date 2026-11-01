@@ -175,7 +175,10 @@ out = box("from kalmido.admin.dataretention import lgc_tick\nprint('rows', lgc_t
 left = sql("SELECT id, kind FROM activity WHERE task_id=? AND created_at<?", (TP["id"], ago(400)))
 check(left == [(first, "content")], f"portal: the oldest edit row of the ticket stays, the others go {left} " + out[-200:])
 check(not sql("SELECT 1 FROM activity WHERE task_id=? AND created_at<?", (TO, ago(400))), "logs: an old edit row of a task without a ticket goes")
-check(box(orig) == before, "portal: the answer of the check is the same after the clean-up")
+# only the answer line: the process also logs its start time (migrations: start total ... ms), different on every run
+answer = lambda s: [ln for ln in s.splitlines() if ln.startswith("orig ")]  # noqa: E731
+after = box(orig)
+check(answer(after) == answer(before), f"portal: the answer of the check is the same after the clean-up {answer(before)} / {answer(after)}")
 
 print(f"p2186_c_retention: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

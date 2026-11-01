@@ -131,7 +131,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await sleep(500);
     check(await ready(ev, `document.querySelectorAll('.rklist [data-rk="rowmore"]').length === 4`), 'the list on a phone');
-    check(await ev(`[...document.querySelectorAll('.rklist [data-rk="rowmore"]')].every(b => { const r = b.getBoundingClientRect(); return r.width >= 43 && r.height >= 43; })`), '#2287: the arrow is a 44 px target on a phone');
+    check(await ev(`[...document.querySelectorAll('.rklist [data-rk="rowmore"]')].every(b => { const r = b.getBoundingClientRect(); return r.width <= 1 && r.height <= 1; })`), '#3834: on a phone the arrow leaves the row, for screen readers it stays');
     check(await ev(noSide), 'nothing sticks out to the side on a phone');
     await shot('p2117-a-phone.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});

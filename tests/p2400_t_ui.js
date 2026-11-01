@@ -160,8 +160,8 @@ const FEAT = 'comments,collab,fields,habits';
     check(c7.btn, '#1191: 700 px: the columns button');
     await shot('p2400t-cols-700.png');
     await vp(500, 900); await sleep(300); await ev(`(() => { render(); return 1; })()`); await sleep(400);
-    const c5 = await ev(`(() => { const vis = e => !!e && getComputedStyle(e).display !== 'none'; return {head: vis(document.querySelector('#view .lchead')), btn: !!document.querySelector('[data-act="cols"]')}; })()`);
-    check(!c5.head && !c5.btn, '#1191: 500 px: the phone layout (no column titles, no button) ' + JSON.stringify(c5));
+    const c5 = await ev(`(() => { const vis = e => !!e && getComputedStyle(e).display !== 'none'; return {head: vis(document.querySelector('#view .lchead')), btn: !!document.querySelector('.iconbtn[data-act="cols"]')}; })()`);
+    check(!c5.head && !c5.btn, '#1191: 500 px: the phone layout (no column titles, no toolbar button; 2.42x #3551: the field strip has its own) ' + JSON.stringify(c5));
 
     // ================= #1415 empty state with a button
     await vp(1440, 900); await ev(`(() => { go('habits'); return 1; })()`);

@@ -19,15 +19,34 @@
 
 ## What's new
 
+**2.460.0** (2026-10-31):
+- **Menus**: arrange every area menu yourself - hide, bring back, drag; the same on phone and computer.
+- **Settings**: new areas "Company & office" (the office settings, also for your private office) and "Documents"; Karakeep, newsletter service, bookmark button, CardDAV birthdays and booking page are set up in Settings > Integrations.
+- **Office**: client short code `{kuerzel}` in number schemes; invoice corrections optionally count in the invoice series; credit card statements - PDF positions read locally, a receipt per position, bank total matched, DATEV account of its own.
+- **File store**: only the file store's own folders; files of knowledge pages, tables and projects as read-only collections "From <area>".
+- **Self-employed**: create your own company from the workspace menu (work apart from private); optional private registration without an invitation per server.
+
+**2.457.0** (2026-10-31):
+- **Workspaces**: each workspace remembers its own view (page, open task, scroll position, sidebar) on every device.
+- **Fields and board**: choice fields as a stage bar ("Ordered (stages)") and the board's time per card with yellow / red limits per column.
+- **Moving**: the account export now includes project notes and encrypted task notes; the organisation export includes the team chat channels with their files.
+- **Self-hosting**: on Windows `update.ps1` also makes a `pg_dump` into `data/backups/` before the update.
+
+**2.436.0** (2026-10-31):
+- **Office**: receipts by e-mail - forward invoice mails to your office address, Kalmido fetches linked invoice PDFs by itself; the client card's blocks fold and can be switched off per office.
+- **Documents**: the list can be sorted (date, arrival, sender, amount, due date, title).
+- **Settings**: "View as member" (Settings > Account) shows Kalmido as a member of your organisation sees it; the rights stay, the way back is in the account menu.
+- **Projects**: properties per project type (software, agency, personal), switchable in the project options under Properties.
+- **Agents**: git author for AI commits is a setting (agent settings, per project overridable).
+- **Backups and restore**: larger files are kept once in `data/backups/.store` for all backups (2.432); copy the backup folder WITH `.store`; *Download* always gives one complete file; a copy elsewhere is made complete with `python3 -I kalmido/admin/bkstore.py assemble` (see SELF-HOSTING.md).
+
 **2.430.0** (2026-10-30):
-- **Workspaces**: each workspace remembers its own view; create your own company from the workspace menu, with optional private registration without an invitation.
-- **Projects**: properties per project type (software, agency, personal), "Project type" in folder settings.
-- **Agents**: a live "working on it" mark on tasks (dot, name, time, last line) through the API / MCP; git author for AI commits is a setting.
+- **Projects**: ticket keys APP-123 (project dialog), linked from commits, branches and pull requests; saved filters by assignee, column, sprint, milestone and text; the agent API filters and sorts tasks by every field; "Project type" in folder settings.
+- **Agents**: a live "working on it" mark on tasks (dot, name, time, last line) through the API / MCP.
 - **Knowledge**: tags (#word) with a list in the panel, live query blocks, `![[Page]]` embeds, daily notes and template placeholders.
-- **Office**: receipts by e-mail, missing invoices of recurring providers with a link to their portal, a receipt fetcher for portal invoices, a booking archive for past DATEV years, final invoices after the BMF letter of 15.10.2026, the client card's blocks fold, "Checked" ticks on receipts.
-- **Documents**: the open document stands in a pane beside the list, the list can be sorted.
-- **Settings**: new areas "Company & office" and "Documents"; "View as member" under Settings > Account.
-- **Backups**: larger files are kept once in `data/backups/.store` for all backups; copy the backup folder WITH `.store`.
+- **Office**: missing invoices of recurring providers with a link to their portal, a receipt fetcher for portal invoices, a booking archive for past DATEV years, final invoices after the BMF letter of 15.10.2026.
+- **Documents**: the open document stands in a pane beside the list, arrow keys go through the list.
+- **Moving**: office data moves between workspaces now also with deals, letter drafts and equipment sets.
 
 **2.409.0** (2026-10-30):
 - **Projects**: one kind of project; project folders live in the file store tree with shares that apply at runtime.
@@ -272,7 +291,7 @@ How to update depends on how you installed:
 
 | Installed with | Update |
 |---|---|
-| the installer | `~/kalmido/update.sh` (Windows: `update.ps1`): backs up the database to `data/backups/` (from 2.37 a `pg_dump`; Windows: in-app backups), adds a database password to `.env` if missing, then fetches the latest release and restarts |
+| the installer | `~/kalmido/update.sh` (Windows: `update.ps1`): backs up the database to `data/backups/` (from 2.37 a `pg_dump`; Windows: `update.ps1` also makes a `pg_dump` into `data/backups/`), adds a database password to `.env` if missing, then fetches the latest release and restarts |
 | prebuilt image (`KALMIDO_IMAGE`) | set the new version in `KALMIDO_IMAGE` (or use `:latest`), then `docker compose pull && docker compose up -d` (2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`) |
 | git + local build | `git fetch --tags && git checkout "$(git tag --sort=-v:refname \| head -n 1)" && docker compose up -d --build` (2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`, and Docker Compose 2.20+; the installer adds it) |
 
@@ -329,7 +348,7 @@ setup); an existing server keeps its setting. *Back up now* makes one at any tim
 **Restore** a listed backup or an uploaded file (larger files: copy them into the backup folder, they show up in the
 project). You type `RESTORE` to confirm. Kalmido then:
 
-1. checks the archive completely: only the expected members (`manifest.json`, `kalmido.dump`, `attachments/<task>/<file>`, 2.46.0: `attachments/avatars|listicons/<file>` - a 2.45 server refuses such an archive; 2.79.0: `attachments/chat|budget|docthumbs/...` - a 2.78 server refuses such an archive;
+1. checks the archive completely: only the expected members (listed in docs/SELF-HOSTING.md, *Moving to a new server*),
    no paths outside, no links, no folders), size and member limits (`KALMIDO_BACKUP_MAX_MB`), compression ratio (zip
    bombs), free disk space, every SHA-256 while extracting, the dump's table of contents and statements (only tables,
    data, sequences, indexes, constraints and plain defaults are taken; functions, triggers and access rules are always
@@ -341,10 +360,10 @@ project). You type `RESTORE` to confirm. Kalmido then:
    if anything fails, the previous database and attachments are put back. Backups from before 2.37 (`tasks.db`) are
    moved over into PostgreSQL the same way as on the first start of 2.37;
 5. ends every session except yours (you get a fresh one; with single sign-on nothing changes). The backup settings
-   themselves stay as they are.
+   (`bk_` keys) stay as they are.
 
-Restoring the safety backup undoes a restore. Without the app: see *Backup* in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)
-(`pg_restore` of `kalmido.dump`, attachments unzipped into `./data`).
+Restoring the safety backup undoes a restore. Without the app: see *Moving to a new server* in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)
+(`pg_restore` of `kalmido.dump`, attachments unzipped into `./data`, `office/` into `./data/office`, `PGOPTIONS="-c app.role=system"`).
 
 </details>
 
