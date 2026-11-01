@@ -195,7 +195,8 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   check(fa() && /Fold all/.test(fa().title), '#1185: "Fold all" in the head of the sidebar');
   click(w, fa()); await sleep(600);
   check(!w.eval('kbSideAnyOpen()') && w.eval('foldClosed("Private")') && d.querySelector('#side .sg-lists .sgh.closed') && /Unfold all/.test(fa().title), '#1185: everything folded, the button says "Unfold all"');
-  const fc = (await call('GET', '/api/state')).settings.folders_closed;
+  // 2.445.0 (#3008): the setting is saved with a delay: wait for it, not for a fixed time (red under load)
+  let fc = ''; await until(async () => { fc = (await call('GET', '/api/state')).settings.folders_closed; return /Private/.test(fc || ''); });
   check(/Private/.test(fc || ''), '#1185: the folded folders are stored like a single fold ' + fc);
   click(w, fa()); await sleep(600);
   check(!w.eval('foldClosed("Private")') && d.querySelector('#side .sg-views > .smod') && d.querySelector('#side .sg-lists .sgh:not(.closed)') && /Fold all/.test(fa().title), '#1185: everything unfolded again');  // 2.152.2 (#2622): Views instead of the gone group Areas

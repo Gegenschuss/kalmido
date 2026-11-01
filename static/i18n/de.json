@@ -664,7 +664,6 @@
   "Skip this occurrence": "Diesen Termin überspringen",
   "Skipped, next occurrence: {0}": "Übersprungen, nächster Termin: {0}",
   "Will be sent as soon as the server is reachable": "Wird übertragen, sobald der Server erreichbar ist",
-  "Indent (under “{0}”)": "Einrücken (unter „{0}“)",
   "Outdent": "Ausrücken",
   "Reopen": "Wieder öffnen",
   "Duplicate": "Duplizieren",
@@ -15521,5 +15520,7 @@
   "Set up by hand": "Von Hand eingerichtet",
   "The folder the agent works in, e.g. {0}": "Der Ordner, in dem der Agent arbeitet, z. B. {0}",
   "The quick way: create the agent, then “Set up on a computer” at it gives you one command to paste.": "Der schnelle Weg: Agent anlegen, dann gibt dir „Auf einem Rechner einrichten“ am Agenten einen Befehl zum Einfügen.",
-  "For advanced users: set it up by hand": "Für Fortgeschrittene: von Hand einrichten"
+  "For advanced users: set it up by hand": "Für Fortgeschrittene: von Hand einrichten",
+  "Indent": "Einrücken",
+  "{0} dated task hidden": ["{0} datierte Aufgabe ausgeblendet", "{0} datierte Aufgaben ausgeblendet"]
 }

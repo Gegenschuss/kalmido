@@ -132,6 +132,12 @@ asleep as soon as nobody types there. Only the service of step 7 (Linux; step 9 
 task (Windows) keeps it awake. *Settings > Agents* says **"connected, but no service running"** when the agent's token
 is used but nothing has collected its events for 10 minutes: that is the sign that this service is missing.
 
+**Where to look on Windows (2.445.0, #3748):** the scheduled task writes the launcher's own lines to `agent.log` in the agent's folder
+(`%LOCALAPPDATA%\Kalmido\agents\<folder>-<hash>\`). The event runner (`agent_run.py`) runs as a child process whose error output
+never reaches that file, so it keeps its own `agent_run.log` next to it (runs, answers, failures). After 1 MiB the file
+moves to `agent_run.log.1` (one old generation), so it neither grows without end nor loses the last runs at a restart.
+`KALMIDO_RUN_LOG=0` in the env file switches it off. macOS / Linux: unchanged, everything stays in the one log.
+
 ## Path B: do it yourself
 
 Run the commands as a user with sudo unless a step says *as the agent user* (`sudo -iu kalmido-agent`).

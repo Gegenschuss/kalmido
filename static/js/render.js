@@ -529,8 +529,9 @@ $('#skip')?.addEventListener('click', skipToContent);
 function renderTop() { return keepFocus($('#top'), renderTop0); }
 function renderTop0() {
   const m = S.route.mod, k = S.route.key;
-  const MT = {cal: N_('Calendar'), matrix: N_('Eisenhower matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload & absences'), wiki: N_('Knowledge pages'), tags: N_('Tags'), sheets: N_('Tables')};  // 2.49.0 (#1199): + wiki
+  const MT = {cal: N_('Calendar'), matrix: N_('Matrix'), habits: N_('Habits'), pomo: N_('Focus timer'), news: N_('News'), stats: N_('Statistics'), time: N_('Time tracking'), overview: N_('Project status'), agents: N_('Agents'), team: N_('Team chat'), home: N_('Start|home'), family: N_('Family'), contacts: N_('Contacts'), life: N_('Home & life'), review: N_('Review & journal'), clients: N_('Clients'), workload: N_('Workload & absences'), wiki: N_('Knowledge pages'), tags: N_('Tags'), sheets: N_('Tables')};  // 2.49.0 (#1199): + wiki
   let title = m === 'tasks' ? titleFor(k) : m === 'notes' ? (S.nt.lid ? tr('Notes') + ' · ' + (lname(listById(S.nt.lid)) || '') : tr('Notes')) : m === 'family' && S.me?.kid ? tr('My day') : MT[m] ? tr(MT[m]) : '';
+  if (m === 'tasks' && isRoadmap()) title = tr('Timeline');  // 2.445.0 (#3011): the heading = the name in the menu
   if (m === 'matrix' && mxTitle()) title = `${tr('Matrix')} · ${mxTitle()}`;
   if (!title && m === 'budget') title = tr('Budget');  // 2.72.0 (#1333)
   if (!title && m === 'feeds') title = tr('Feeds');  // 2.85.0 B (#1162)
@@ -703,9 +704,10 @@ function topMoreItems0() {
   if (m === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview())
     sec.push({label: S.multiMode ? tr('End selection') : tr('Select multiple'), icon: 'select', on: S.multiMode, fn: () => { S.multiMode = !S.multiMode; if (!S.multiMode) S.multi.clear(); render(); }},
       {label: tr('Sort…'), icon: 'sort', fn: () => sortMenu($('#top [data-act="top-more"]') || $('#top h1'))});
-  { const cl = m === 'tasks' ? routeList() : null; if (cl && !cl.archived && listView(cl) === 'list' && !isOverview()) sec.push(colItem(cl.id)); }  // 2.14.0 (#425)
-  if (doneToggleView()) sec.push(doneItem(), ...lmDoneResetItems());  // 2.39.1 (#1214): "like the default"
-  { const rl = m === 'tasks' ? routeList() : null; if (rl && canManage(rl) && !rl.is_inbox && listView(rl) === 'list' && !isOverview()) sec.push(dabItem(rl)); }  // 2.7.2 (#414); 2.410.0 (#3440): list admins too
+  // 2.445.0 (#3008): what the header shows is not repeated here (a folded header button comes back through fold)
+  const inTop = a => !!$(`#top [data-act="${a}"]`);
+  { const cl = m === 'tasks' ? routeList() : null; if (cl && !cl.archived && listView(cl) === 'list' && !isOverview() && !inTop('cols')) sec.push(colItem(cl.id)); }  // 2.14.0 (#425)
+  sec.push(...(m === 'tasks' ? doneItems(routeList()) : []));  // 2.39.1 (#1214), 2.445.0 (#3008): one switch
   sec.push(...collapseItems());
   sec.push(...kbGroupResetItems());  // 2.39.1 (#1221)
   sec.push(...favViewItems());  // 2.40.0 (#1361)
@@ -720,7 +722,7 @@ function topMoreItems0() {
   // 2.35.0 (#1105): no "Refresh" in the list menu any more - the app checks every 4 s and the offline hint calls refreshNow()
   // 2.31.0 (#1056): in a list two groups with a small heading each: View (incl. the folded header buttons) and List; then
   // archive / delete, set apart (listMenuSort)
-  const li = l ? listMenuItems(l.id, () => $('#top [data-act="top-more"]') || $('#top h1')).filter(x => !(x.cls === 'mcols' && sec.some(y => y.cls === 'mcols'))) : [];
+  const li = l ? listMenuItems(l.id, () => $('#top [data-act="top-more"]') || $('#top h1')).filter(x => !(x.cls === 'mcols' && (inTop('cols') || sec.some(y => y.cls === 'mcols'))) && !(x.cls === 'mshare' && inTop('share-list'))) : [];
   const heads = li.length > 0 && (sec.length > 0 || fold.length > 0);
   if (heads) { fold.unshift({head: tr('View')}); sec.push({head: tr('Project')}); }
   else if (l && sec.length && sec[sec.length - 1] !== '-') sec.push('-');

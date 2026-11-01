@@ -410,7 +410,7 @@ function listMenuItems(id, anchor) {
   const l = listById(id); if (!l) return [];
   const own = isOwner(l), k = l.kind || 'list', at = () => typeof anchor === 'function' ? anchor() : anchor;
   // 2.25.0 (UX-12): only what works here: the inbox has no "Edit list…" and no list / project switch
-  const items = [...(l.is_inbox ? [] : [{label: tr('Edit project…'), icon: 'edit', fn: () => listModal(id)}]), ...(shareOk(l) && !l.archived ? [{label: tr(collab() ? N_('Share…') : N_('Ownership…')), icon: 'users', fn: () => shareModal(id)}] : [])];
+  const items = [...(l.is_inbox ? [] : [{label: tr('Edit project…'), icon: 'edit', fn: () => listModal(id)}]), ...(shareOk(l) && !l.archived ? [{label: tr(collab() ? N_('Share…') : N_('Ownership…')), icon: 'users', cls: 'mshare', fn: () => shareModal(id)}] : [])];
   // 2.27.0 (#974): "Agent: <name>…" right under "Share…": opens the share dialog at its Agents part (one place for the setting)
   // 2.36.2 (#1135): from the sidebar (right-click / long press): the colour in one tap (the 9 fixed colours + none)
   if (own && !l.is_inbox && !l.archived && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.unshift(lp_menuRow(lp_col(l), c => licColor(id, c)), '-');  // 2.53.0 (#1426): the 12 tones (listcolor.js)

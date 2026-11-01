@@ -77,10 +77,12 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const dn = d.querySelector('#view .group.ckdone');
   check(/Milk/.test(dn.textContent) && dn.querySelector('.ckback'), 'done item at the bottom, one tap puts it back');
   check(!d.querySelector('#view .trow.ck') && d.querySelector('#view .group.ckdone .trow .dt'), 'rows are full tasks (the date stays)');
+  // 2.445.0 (#3008): the option is the third button of the completed row (title = the old label)
+  const dabBtn = items => items.find(x => x && x.rcls === 'mdone3')?.row.find(b => b.title === 'Show completed at the bottom');
   const more = w.eval('topMoreItems()').map(x => x.label);
-  check(more.includes('Show completed at the bottom'), '"…" offers the option: ' + more.slice(0, 8));
+  check(!!dabBtn(w.eval('topMoreItems()')), '"…" offers the option: ' + more.slice(0, 8));
   w.eval(`sortMenu(document.querySelector('#top h1'))`); await sleep(100);
-  check([...d.querySelectorAll('#pop .dabitem')].length === 1, 'the sort menu offers it too');
+  check([...d.querySelectorAll('#pop .mdone3 button[title="Show completed at the bottom"]')].length === 1, 'the sort menu offers it too');
   w.eval('closePop()');
   w.eval(`setDab(${SH}, false)`);
   await until(() => !d.querySelector('#view .group.ckdone'));
@@ -89,7 +91,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w.close();
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'l/' + SH}); d = w.document;
-  check(w.eval('topMoreItems()').some(x => x.label === 'Erledigte unten anzeigen'), 'de: Erledigte unten zeigen');
+  check(w.eval('topMoreItems()').some(x => x.rcls === 'mdone3' && x.row.some(b => b.title === 'Erledigte unten anzeigen' && b.label === 'Unten')), 'de: Erledigte unten zeigen');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 

@@ -144,7 +144,7 @@ async function firefox(fn) {
 
   // ================= #387 the Code section
   w = await boot({user: 'alice', hash: 't/' + TB}); d = w.document; await sleep(400);
-  const menuLabels = async () => { w.eval(`taskMenu(document.querySelector('#top h1'), ${TB})`); await sleep(150); const l = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent); w.eval('closePop()'); return l; };
+  const menuLabels = async () => { w.eval(`taskMenu(document.querySelector('#top h1'), ${TB})`); await sleep(150); d.querySelector('#pop .mtmore')?.click(); await sleep(100); const l = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent); w.eval('closePop()'); return l; };  // 2.445.0 (#3008): the rare entries are under "More…"
   check(!d.querySelector('#d-code') && !(await menuLabels()).some(x => /Link code/.test(x)), 'no repository: no Code section, no "Link code…"');
   w.eval(`listById(${L}).repos = [{id: 1, full_name: 'acme/app', provider: 'github'}]; taskById(${TB}).assignee_id = ${BOB}; renderDetail()`);
   check(!d.querySelector('#d-code'), 'repository + plain task: no Code section');
@@ -152,6 +152,7 @@ async function firefox(fn) {
   check(ml.some(x => /Link code/.test(x)), 'repository + plain task: "Link code…" in the task menu: ' + ml.join('|'));
   let copied = null; Object.defineProperty(w.navigator, 'clipboard', {configurable: true, value: {writeText: async x => { copied = x; }}});
   w.eval(`taskMenu(document.querySelector('#top h1'), ${TB})`); await sleep(150);
+  click(w, d.querySelector('#pop .mtmore')); await sleep(100);
   click(w, [...d.querySelectorAll('#pop .menu-list button')].find(b => /Link code/.test(b.textContent))); await sleep(200);
   check(new RegExp(`^kalmido-${TB}$`).test(copied || ''), 'Link code…: copies the branch name kalmido-<id> (2.5.1, #396) ' + copied);
   for (const [set, lab] of [[`taskById(${TB}).ttype = 'bug'`, 'bug'], [`taskById(${TB}).ttype = 'feature'`, 'feature'], [`taskById(${TB}).assignee_id = ${ag.id}`, 'agent assignee'], [`taskById(${TB}).code = {prs: [{n: 3, state: 'open', title: 'x', url: 'https://example.com/p/3'}], commits: []}`, 'linked pull request']]) {

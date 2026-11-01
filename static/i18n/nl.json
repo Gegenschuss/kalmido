@@ -666,7 +666,6 @@
   "Skip this occurrence": "Deze keer overslaan",
   "Skipped, next occurrence: {0}": "Overgeslagen, volgende keer: {0}",
   "Will be sent as soon as the server is reachable": "Wordt verstuurd zodra de server bereikbaar is",
-  "Indent (under “{0}”)": "Inspringen (onder “{0}”)",
   "Outdent": "Uitspringen",
   "Reopen": "Heropenen",
   "Won’t do (discard)": "Niet uitvoeren (verwerpen)",
@@ -15521,5 +15520,7 @@
   "Set up by hand": "Handmatig ingesteld",
   "The folder the agent works in, e.g. {0}": "De map waarin de agent werkt, bijv. {0}",
   "The quick way: create the agent, then “Set up on a computer” at it gives you one command to paste.": "De snelle weg: maak de agent aan, dan geeft „Op een computer instellen” je één opdracht om te plakken.",
-  "For advanced users: set it up by hand": "Voor gevorderden: met de hand instellen"
+  "For advanced users: set it up by hand": "Voor gevorderden: met de hand instellen",
+  "Indent": "Inspringen",
+  "{0} dated task hidden": ["{0} taak met datum verborgen", "{0} taken met datum verborgen"]
 }

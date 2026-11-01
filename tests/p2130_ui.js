@@ -154,8 +154,8 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   // task numbers: in the panel (copyable), "#id" in the command palette, "Show task numbers" for any list; no keyboard
   // popping up when a dialog opens on a phone
   w.eval(`openDetail(${T[0]})`); await idle(w);
-  // 2.218.0 (#2799): the number is in the task's "…" menu ("Copy link · #id"), no longer in the panel's path
-  check(!d.querySelector('#detail .dcid') && w.eval(`(taskMenu(document.querySelector('#detail [data-act="task-menu"]'), ${T[0]}), [...document.querySelectorAll('#pop [role="menuitem"]')].some(b => b.textContent.includes('Copy link · #${T[0]}')))`), 'task number in the "…" menu: #' + T[0]);
+  // 2.218.0 (#2799): the number is in the task's "…" menu ("Copy link · #id", 2.445.0: under "More…"), no longer in the panel's path
+  check(!d.querySelector('#detail .dcid') && w.eval(`(taskMenu(document.querySelector('#detail [data-act="task-menu"]'), ${T[0]}), document.querySelector('#pop .mtmore')?.click(), [...document.querySelectorAll('#pop [role="menuitem"]')].some(b => b.textContent.includes('Copy link · #${T[0]}')))`), 'task number in the "…" menu: #' + T[0]);
   w.eval('closePop()');
   w.eval('closeDetail()'); w.eval(`listModal(${P})`); await sleep(300);
   check(d.activeElement?.id !== 'l-name', 'phone: the list dialog does not focus its name field (no keyboard)');

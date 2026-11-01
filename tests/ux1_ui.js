@@ -137,7 +137,10 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   const m0 = (await st()).tasks.find(t => t.id === milk);
   check(m0.tags.includes('dairy') && m0.url === 'https://example.org/milk' && m0.content === 'the good one', 'the data stays (tags, link, note)');
   click(w, det.querySelector('[data-act="task-menu"]')); await sleep(80);
-  const ckm = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent);
+  // 2.445.0 (#3008): Duplicate lives under "More…": both levels are read
+  let ckm = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent);
+  d.querySelector('#pop .mtmore')?.click(); await sleep(80);
+  ckm = ckm.concat([...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent));
   // 2.31.0 (#1056): in the panel the menu leaves out date and priority (the panel's header has both)
   // 2.152.2 (#2624): project instead of list
   check(ckm.some(x => /Duplicate/i.test(x)) && ckm.some(x => /Move to project/i.test(x)) && !ckm.some(x => /New date/i.test(x)), 'the full task menu (2.7.2; 2.31.0: without date / priority in the panel): ' + ckm);

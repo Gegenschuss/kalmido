@@ -666,7 +666,6 @@
   "Skip this occurrence": "Sauter cette occurrence",
   "Skipped, next occurrence: {0}": "Sautée, prochaine occurrence : {0}",
   "Will be sent as soon as the server is reachable": "Sera envoyé dès que le serveur sera joignable",
-  "Indent (under “{0}”)": "Indenter (sous « {0} »)",
   "Outdent": "Désindenter",
   "Reopen": "Rouvrir",
   "Won’t do (discard)": "Abandonner (écarter)",
@@ -15521,5 +15520,7 @@
   "Set up by hand": "Installé à la main",
   "The folder the agent works in, e.g. {0}": "Le dossier dans lequel l'agent travaille, p. ex. {0}",
   "The quick way: create the agent, then “Set up on a computer” at it gives you one command to paste.": "La voie rapide : crée l'agent, puis « Installer sur un ordinateur » te donne une commande à coller.",
-  "For advanced users: set it up by hand": "Pour les utilisateurs avancés : l'installer à la main"
+  "For advanced users: set it up by hand": "Pour les utilisateurs avancés : l'installer à la main",
+  "Indent": "Indenter",
+  "{0} dated task hidden": ["{0} tâche datée masquée", "{0} tâches datées masquées"]
 }

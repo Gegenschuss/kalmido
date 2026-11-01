@@ -308,7 +308,8 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
     await shot(`p2140-${tag}-list.png`);
     if (phone) {  // "Columns…" high up in "…" (the view group, after Sort…)
       const pos = await ev(`topMoreItems().filter(x => x !== '-').findIndex(x => x.label === 'Shown fields…')`);
-      check(pos >= 0 && pos <= 6, `${tag}: "Columns…" is among the first entries of "…" (position ${pos + 1})`);
+      const inTop = await ev(`!!document.querySelector('#top [data-act="cols"]')`);  // 2.445.0 (#3008): not doubled when the header has the button
+      check((pos >= 0 && pos <= 6) || (pos < 0 && inTop), `${tag}: "Columns…" is among the first entries of "…" (position ${pos + 1})`);
     }
     await ev(`(() => { colModal(${P}); return 1; })()`); await sleep(400);
     const dl = await ev(DLG);

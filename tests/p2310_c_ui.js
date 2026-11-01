@@ -98,9 +98,13 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
   w.eval('closePop()');
 
   // ================= jsdom: the task menu (#1056): from the row: everything; from the panel: no date / priority
-  const tmenu = async anchorJs => { w.eval(`taskMenu(${anchorJs}, ${T1})`); await until(() => d.querySelector('#pop [role="menuitem"]')); const x = {items: [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => (b.querySelector('.ml')?.firstChild?.textContent || b.textContent).trim()), heads: [...d.querySelectorAll('#pop .mgh')].map(h => h.textContent)}; w.eval('closePop()'); return x; };
+  const tmenu = async anchorJs => { w.eval(`taskMenu(${anchorJs}, ${T1})`); await until(() => d.querySelector('#pop [role="menuitem"]')); const x = {items: [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => (b.querySelector('.ml')?.firstChild?.textContent || b.textContent).trim()), heads: [...d.querySelectorAll('#pop .mgh')].map(h => h.textContent)};
+    // 2.445.0 (#3008): the rare entries are one level deeper, "all" = both levels
+    x.all = x.items; if (d.querySelector('#pop .mtmore')) { d.querySelector('#pop .mtmore').click(); x.all = x.items.concat([...d.querySelectorAll('#pop [role="menuitem"]')].map(b => (b.querySelector('.ml')?.firstChild?.textContent || b.textContent).trim())); }
+    w.eval('closePop()'); return x; };
   const row = await tmenu(`document.querySelector('#view .trow[data-id="${T1}"] .ttl') || document.querySelector('#top h1')`);
-  check(row.heads.join('|') === 'Plan|Organise|Time|Structure', '#1056 task menu headings ' + row.heads.join('|'));
+  check(row.heads.join('|') === 'Plan|Time|Organise', '#1056 task menu headings '  // 2.445.0 (#3008): Time before Organise, no Structure any more
+    + row.heads.join('|'));
   check(row.items.includes('New date…') && row.items.includes('High') && row.items.includes('Today'), '#1056 task menu from the row: date + priority');
   check(row.items.slice(-2).join('|') === "Won’t do (discard)|Delete", "#1056 won't do + delete last " + row.items.slice(-3).join('|'));
   w.eval(`openDetail(${T1})`);
@@ -108,9 +112,10 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
   const pan = await tmenu(`document.querySelector('#detail .dtop [data-act="task-menu"]')`);
   check(!pan.items.includes('New date…') && !pan.items.includes('High') && !pan.items.includes('Today'), '#1056 task menu in the panel: no date / priority ' + pan.items.join('|'));
   check(d.querySelector('#detail .dtop [data-act="date"]') && d.querySelector('#detail .dtop [data-act="prio"]'), '#1056 ... the panel header has both');
-  const lost = row.items.filter(x => !pan.items.includes(x) && !['New date…', 'Today', 'Tomorrow', 'High', 'Medium', 'Low', 'None', 'Move up', 'Move down'].includes(x));
+  // 2.445.0 (#3008): Pin, Start time tracking (header buttons) and Assign… (the chip in .dmeta) are not repeated either
+  const lost = row.all.filter(x => !pan.all.includes(x) && !['New date…', 'Today', 'Tomorrow', 'High', 'Medium', 'Low', 'None', 'Move up', 'Move down', 'Pin', 'Start time tracking', 'Assign…'].includes(x));
   check(!lost.length, '#1056 the panel menu lost nothing else ' + lost.join('|'));
-  check(pan.items.includes('Skip this occurrence') && pan.items.includes('Assign…'), '#1056 panel: skip + assign stay under Plan');
+  check(pan.items.includes('Skip this occurrence') && pan.items.includes('Assign…') === !d.querySelector('#detail .dmeta [data-act="assign"]'), '#1056 panel: skip stays under Plan, Assign… only without the chip');
   // "More" in the tab bar: Views / Conversations, "Customise tab bar" last
   w.eval(`tabsMore(document.querySelector('#top h1'))`);
   await until(() => d.querySelector('#pop [role="menuitem"]'));

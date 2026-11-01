@@ -200,8 +200,8 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   const pos = re => ml.findIndex(x => re.test(x));
   check(pos(/^\[Today\/Tomorrow\]/) === 0 && pos(/New date/) === 1, 'UX-09 / UX-10: the date first, "New date…" ' + ml.slice(0, 3).join(' | '));
   // 2.152.2 (#2624): project instead of list
-  check(pos(/\[High\/Medium\/Low\/None\]/) > 1 && pos(/\[High/) < pos(/Assign/) && pos(/Assign/) < pos(/Move to project/) && pos(/Move to project/) < pos(/Waiting on someone/) && pos(/Waiting/) < pos(/^Pin/) && pos(/^Pin/) < pos(/Save as template/) && pos(/Save as template/) < pos(/^Delete/),
-    'UX-09: date · priority · assignee · list · waiting · pin · template · delete ' + ml.join(' | '));
+  check(pos(/\[High\/Medium\/Low\/None\]/) > 1 && pos(/\[High/) < pos(/Assign/) && pos(/Assign/) < pos(/Move to project/) && pos(/Move to project/) < pos(/Waiting on someone/) && pos(/Waiting/) < pos(/^Pin/) && pos(/^Pin/) < pos(/^More…/) && pos(/^More…/) < pos(/^Delete/),  // 2.445.0 (#3008): the template entry is under "More…"
+    'UX-09: date · priority · assignee · list · waiting · pin · More… · delete ' + ml.join(' | '));
   w.eval('closePop()');
   w.eval(`snoozeSheet(${T1}, document.querySelector('#top h1'), ['-', moveListItem(document.querySelector('#top h1'), ${T1}), {label: tr('All…'), icon: 'dots', fn() {}}], true)`); await sleep(150);
   const sw = [...d.querySelectorAll('#pop .menu-list button')];

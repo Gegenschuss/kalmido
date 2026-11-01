@@ -212,7 +212,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,docs,agents,fields,dep
     await ev(`(() => { openDetail(${PT2}); return 1; })()`);
     check(await ready(ev, `${sec}?.classList.contains('dfolded') && /1 open/.test(${sec}.querySelector('.dfsum')?.textContent || '')`, 40), '#3435: another task after reloading: folded too ("1 open")');
     await click(ev, '#detail .dtop [data-act="task-menu"]');
-    const item = `[...document.querySelectorAll('button, [role="menuitem"]')].find(b => /Unfold all sections/.test(b.textContent))`;
+    const item = `(document.querySelector('#pop .mtmore')?.click(), [...document.querySelectorAll('button, [role="menuitem"]')].find(b => /Unfold all sections/.test(b.textContent)))`;  // 2.445.0 (#3008): under "More…"
     check(await ready(ev, `!!${item}`, 20), '#3435: "Unfold all sections" in the task\'s menu');
     await ev(`(() => { ${item}?.click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('#detail .dfolded')`, 20) && (await srvFold(v => v === '')) !== null, '#3435: everything open again, saved');

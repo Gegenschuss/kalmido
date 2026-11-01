@@ -74,7 +74,7 @@ function menu(anchor, items, back, fsel, title) {
     if ((it === '-' || it.head) && grp) { html += '</div>'; grp = false; }
     if (it === '-') html += '<hr role="separator">';
     else if (it.head) { html += `<div class="mgrp${it.cls ? ' ' + it.cls : ''}" role="group" aria-label="${esc(it.head)}"><div class="mgh" aria-hidden="true">${esc(it.head)}</div>`; grp = true; }
-    else html += it.row ? `<div class="mquick${it.rcls ? ' ' + it.rcls : ''}" role="group"${it.rlab ? ` aria-label="${esc(it.rlab)}"` : ''}>${it.row.map((x, j) => btn(x, i, j)).join('')}</div>` : btn(it, i);
+    else html += it.row ? `${it.rhd ? `<div class="mgh" aria-hidden="true">${esc(it.rhd)}</div>` : ''}<div class="mquick${it.rcls ? ' ' + it.rcls : ''}" role="group"${it.rlab ? ` aria-label="${esc(it.rlab)}"` : ''}>${it.row.map((x, j) => btn(x, i, j)).join('')}</div>` : btn(it, i);
   });
   if (grp) html += '</div>';
   // 2.220.0 B (#2811): every menu has a name: the sheet's title, else the title / the button that opened it
@@ -729,7 +729,7 @@ async function waitClear(id) {
   toast(tr('No longer waiting'), async () => { putTask(await api('PUT', `/api/tasks/${id}/waiting`, before)); render(); if (S.sel === id) renderDetail(); });
 }
 // 2.24.0 (UX-09): ONE task menu in a fixed order (right-click, "…" in the row / the task panel, "All…" of the short
-// menus): date · priority · assignee · list / section · waiting · pin · time · template · structure · delete. The short
+// menus): date · priority · assignee · time · list / section · waiting · pin · More… · delete. The short
 // menus (swipe, selection) keep the same order and end with "All…".
 const PRIO_ROW = id => { const t = taskById(id); return {row: [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', on: t?.priority === p, title: tr('Priority') + ': ' + tr(n), fn: () => patchTask(id, {priority: p})}))}; };
 // 2.455.0 (#3848): the task's own workspace; the other ones through moveWsItem, the entry beside it (spacemove.js)
@@ -785,9 +785,39 @@ function taskMenu(anchor, id, o = {}) {
   if (!canEdit(t)) { roToast(); return; }
   const sib = siblings(t), i = sib.findIndex(x => x.id === t.id);
   const l = listById(t.list_id), open = t.status === 0;
-  // 2.31.0 (#1056): groups with small headings (Plan, Organize, Time, Structure); won't do + delete last, set apart. In the task
+  // 2.31.0 (#1056): groups with small headings (Plan, Time, Organize); won't do + delete last, set apart. In the task
   // panel date and priority are not repeated: the panel's header has both (the date chip, Today / Tomorrow, the flag)
   const inPanel = !!anchor?.closest?.('#detail .dtop') && !!$('#detail :is(.dtop, .dthumb) [data-act="date"]') && !!$('#detail .dtop [data-act="prio"]');  // 2.365.0 (#2824): the phone's date sits in the bottom bar
+  // 2.445.0 (#3008): the everyday entries first (date, priority, assignee, time, where it lives, pin), the rest in one second
+  // level "More…" (one alone stays inline, like listMenuSort), nothing the task panel's header already shows; delete last
+  const inHead = sel => { const b = inPanel ? $('#detail .dtop ' + sel) : null; return !!b && getComputedStyle(b).display !== 'none'; };
+  const rare = menuTidy([
+    ...(open ? spr_menuItems(t, anchor) : []),  // 2.60.0 (#343): Sprint… (lists with sprints on)
+    ...(open && t.id > 0 && S.route.mod === 'tasks' && $(`#view .trow[data-id="${id}"]`) ? [{row: [{label: tr('Move up'), icon: 'up', title: kt(tr('Move up'), 'Alt+ArrowUp'), fn: () => taskNudge(id, -1)}, {label: tr('Move down'), icon: 'down', title: kt(tr('Move down'), 'Alt+ArrowDown'), fn: () => taskNudge(id, 1)}]}] : []),
+    ...(open && t.id > 0 && dFor(t) ? [{label: tr('Waiting on a task…'), icon: 'lock', fn: () => dgDepPick(id)}] : []),  // 2.43.0 (#1330): the phone's way to a dependency
+    ...(open && t.id > 0 && collab() && l?.shared && t.approval !== 'pending' ? [{label: tr('Ask for approval…'), icon: 'eye', fn: () => approvalRequest(id)}] : []),
+    '-',
+    ...(t.id > 0 ? [{label: tlkIs(t) ? tr('Locked') : tr('Lock'), icon: 'lock', on: tlkIs(t), fn: () => tlkSet(id, !t.locked).catch(() => {})}] : []),  // 2.364.0 D (#3036): always here (the panel's bar shows only a set lock)
+    ...(typeof ln_canLock === 'function' && ln_canLock(t, tlkIs(t)) ? [{label: tr('Lock note'), icon: 'lock', title: tr('Encrypt the note with your own password'), fn: () => ln_lock(id)}] : []),  // 2.364.0 D (#3036)
+    ...(typeof mw_ok === 'function' && mw_ok() && t.id > 0 ? [{label: tr('Open in its own window'), icon: 'panel', fn: () => mw_taskOpen(id)}] : []),  // 2.43.0 (#1500)
+    ...(typeof tbl_menuItems === 'function' ? tbl_menuItems(t, anchor) : []),  // 2.53.0 C (#1424): the bell of this task
+    '-',
+    {label: tr('Save as template'), icon: 'copy', fn: () => saveTemplate({task_id: id}, t.title), ...(listById(t.list_id)?.e2e ? {dis: true, title: tr('Not available in encrypted projects')} : {})},  // 2.64.1 (#1817)
+    {label: tr('Duplicate'), icon: 'sub', fn: () => taskDuplicate(t, async () => { const sn = await snipLoad(t).catch(() => []); let note = t.content; if (tkNoteMissing(t)) { try { note = await tkNoteLoad(t.id); } catch { toast(tr('Only available online.')); return; } } return createTask({title: t.title, content: note, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {}), ...(sn.length ? {snippets: sn.map(({id, by, updated_at, ...x}) => x)} : {})}); }), ...(typeof le2eLocked === 'function' && le2eLocked(t) ? {dis: true, title: tr('Unlock first: this project is encrypted in the browser.')} : {})},  // 2.35.0 (#1095): the snippets come along (loaded first); 2.64.1 (#1817): not while its texts are locked; 2.280.0 A (#3108): a long note too
+    ...(t.id > 0 && !t.context && !t.url ? [{label: tr('Add link'), icon: 'link', fn: () => linkAdd(id)}] : []),  // 2.41.0 (#1475)
+    ...(t.id > 0 && !t.context && canEdit(t) && !snipShown(t) && pz_on(t.list_id, 'repo') ? [{label: tr('Add code snippet'), icon: 'code', fn: () => snipOpen(id, 'new')}] : []),  // 2.35.0 (#1095)
+    '-',
+    ...(isMs(t) || (!t.parent_id && !children(t.id).length && t.id > 0) ? [{label: isMs(t) ? tr('Make it a normal task') : tr('Make it a milestone'), icon: 'flag', fn: () => msToggle(id)}] : []),  // 2.18.0 (#430)
+    ...(i > 0 && depthOf(sib[i - 1]) < maxDepth() - 1 && !isMs(t) && !isMs(sib[i - 1]) ? [{label: tr('Indent'), icon: 'indent', fn: () => patchTask(id, {parent_id: sib[i - 1].id})}] : []),
+    ...(t.parent_id ? [{label: tr('Outdent'), icon: 'outdent', fn: () => patchTask(id, {parent_id: S.tasks.get(t.parent_id)?.parent_id || null})}] : []),
+    ...(t.parent_id && S.tasks.get(t.parent_id)?.parent_id ? [{label: tr('Make it a main task'), icon: 'arrow', fn: () => patchTask(id, {parent_id: null})}] : []),
+    ...(propBreakOk(t) ? [{label: propWith(N_('Break down with {0}…'), N_('Break down with an agent…')), icon: 'bot', fn: () => propRequest('subtasks', {tid: id})}] : []),  // 2.3.0 (#261)
+    ...(t.id > 0 && !t.context && listRepos(t.list_id).length && !codeShown(t) && pz_on(t.list_id, 'repo') ? [{label: tr('Link code…'), icon: 'git', title: tr('Copies a branch name for this task; commits and pull requests that name #{0} are linked too', t.id), fn: () => gitCopyBranch(t)}] : []),  // 2.4.2 (#387)
+    ...msvvMoveItem(t),  // 2.73.0 C (#661): "Move to another server…"
+    '-',
+    ...(t.id > 0 ? [{label: tr('Copy link') + ' · ' + (tkOf(t) ? tkOf(t) + ' · ' : '') + '#' + id, icon: 'link', title: tr('Copy the link to this task'), fn: () => copyTaskLink(id)}] : []),  // 2.390.0 (#3353): + the key  // 2.218.0 A (#2799): the task number lives here
+    ...(inPanel && typeof df_menuItem === 'function' ? df_menuItem() : []),  // 2.380 F (#3435): fold / unfold all sections
+  ]);
   menu(anchor, [
     // 2.25.0 (UX-11): opened by a long press: the title on top, then "Select" (more tasks follow with a tap)
     ...(o.select ? [{label: t.title.length > 60 ? t.title.slice(0, 59) + '…' : t.title, cls: 'mhead', dis: true, fn: () => {}}, {label: tr('Select'), icon: 'select', fn: () => { S.multiMode = true; S.multi.add(id); S.multiLast = id; render(); }}, '-'] : []),
@@ -804,49 +834,23 @@ function taskMenu(anchor, id, o = {}) {
     }}] : []),
     // priority, assignee
     ...(inPanel ? [] : [PRIO_ROW(id)]),
-    ...(collab() && l?.shared && t.id > 0 && !t.context && canAssign(t) && pz_show(t, 'who', t.assignee_id || t.assignee_group_id) ? [{label: tr('Assign…'), icon: 'user', fn: () => assignMenu(anchor, id)}] : []),
+    ...(!(inPanel && $('#detail .dmeta [data-act="assign"]')) && collab() && l?.shared && t.id > 0 && !t.context && canAssign(t) && pz_show(t, 'who', t.assignee_id || t.assignee_group_id) ? [{label: tr('Assign…'), icon: 'user', fn: () => assignMenu(anchor, id)}] : []),
+    {head: tr('Time|menu')},
+    // time
+    ...(tFor(t) ? [...(inHead('[data-act="timer-toggle"]') ? [] : [S.timer && S.timer.task_id === id ? {label: tr('Stop timer'), icon: 'stop', fn: timerStop} : {label: tr('Start time tracking'), icon: 'clock', fn: () => timerStart({task_id: id})}]),
+      {label: tr('Add time…'), icon: 'plus', fn: () => entryModal(null, {task_id: id})}] : []),
+    ...(feat('pomo') ? [{label: tr('Start focus session'), icon: 'timer', fn: () => { pomoStart(id); go('pomo'); }}] : []),
     {head: tr('Organise')},
     // where it lives
     ...(open ? [moveListItem(anchor, id), moveWsItem(anchor, id)] : []),
     ...(open ? ml_menuItems(anchor, t) : []),  // 2.71.0 B (#1459): show also in another list / remove from it
     ...(open && !t.parent_id && (S.sections.some(x => x.list_id === t.list_id) || canEditList(t.list_id)) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, id)}] : []),
-    ...(open ? spr_menuItems(t, anchor) : []),  // 2.60.0 (#343): Sprint… (lists with sprints on)
-    // 2.16.0 (#473, WCAG 2.5.7): what dragging does, as menu items (also Alt+↑ / ↓)
-    ...(open && t.id > 0 && S.route.mod === 'tasks' && $(`#view .trow[data-id="${id}"]`) ? [{row: [{label: tr('Move up'), icon: 'up', title: kt(tr('Move up'), 'Alt+ArrowUp'), fn: () => taskNudge(id, -1)}, {label: tr('Move down'), icon: 'down', title: kt(tr('Move down'), 'Alt+ArrowDown'), fn: () => taskNudge(id, 1)}]}] : []),
     // waiting
-    ...(open && t.id > 0 && dFor(t) ? [{label: tr('Waiting on a task…'), icon: 'lock', fn: () => dgDepPick(id)}] : []),  // 2.43.0 (#1330): the phone's way to a dependency
     ...(open ? [t.waiting_at ? {label: tr('No longer waiting'), icon: 'hourglass', fn: () => waitClear(id)}
       : hasPeers() ? {label: tr('Waiting on someone…'), icon: 'hourglass', fn: () => waitDialog(id)} : null].filter(Boolean) : []),  // 2.364.0 D (#3036): alone: no "Waiting on someone…" 
-    // 2.23.0 (#463): an approval (a person of the shared list decides)
-    ...(open && t.id > 0 && collab() && l?.shared && t.approval !== 'pending' ? [{label: tr('Ask for approval…'), icon: 'eye', fn: () => approvalRequest(id)}] : []),
-    // pin
-    // 2.218.0 A (#2799): with its state (a check when on); in a narrow task panel Pin and Lock are only here
-    {label: t.pinned ? tr('Pinned') : tr('Pin'), icon: 'pin', on: !!t.pinned, fn: () => patchTask(id, {pinned: t.pinned ? 0 : 1})},
-    ...(t.id > 0 ? [{label: tlkIs(t) ? tr('Locked') : tr('Lock'), icon: 'lock', on: tlkIs(t), fn: () => tlkSet(id, !t.locked).catch(() => {})}] : []),  // 2.364.0 D (#3036): always here (the panel's bar shows only a set lock)
-    ...(typeof ln_canLock === 'function' && ln_canLock(t, tlkIs(t)) ? [{label: tr('Lock note'), icon: 'lock', title: tr('Encrypt the note with your own password'), fn: () => ln_lock(id)}] : []),  // 2.364.0 D (#3036)
-    ...(typeof mw_ok === 'function' && mw_ok() && t.id > 0 ? [{label: tr('Open in its own window'), icon: 'panel', fn: () => mw_taskOpen(id)}] : []),  // 2.43.0 (#1500)
-    ...(typeof tbl_menuItems === 'function' ? tbl_menuItems(t, anchor) : []),  // 2.53.0 C (#1424): the bell of this task
-    {head: tr('Time|menu')},
-    // time
-    ...(feat('pomo') ? [{label: tr('Start focus session'), icon: 'timer', fn: () => { pomoStart(id); go('pomo'); }}] : []),
-    ...(tFor(t) ? [S.timer && S.timer.task_id === id ? {label: tr('Stop timer'), icon: 'stop', fn: timerStop} : {label: tr('Start time tracking'), icon: 'clock', fn: () => timerStart({task_id: id})},
-      {label: tr('Add time…'), icon: 'plus', fn: () => entryModal(null, {task_id: id})}] : []),
-    {head: tr('Structure')},
-    // template
-    {label: tr('Save as template'), icon: 'copy', fn: () => saveTemplate({task_id: id}, t.title), ...(listById(t.list_id)?.e2e ? {dis: true, title: tr('Not available in encrypted projects')} : {})},  // 2.64.1 (#1817)
-    {label: tr('Duplicate'), icon: 'sub', fn: () => taskDuplicate(t, async () => { const sn = await snipLoad(t).catch(() => []); let note = t.content; if (tkNoteMissing(t)) { try { note = await tkNoteLoad(t.id); } catch { toast(tr('Only available online.')); return; } } return createTask({title: t.title, content: note, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {}), ...(sn.length ? {snippets: sn.map(({id, by, updated_at, ...x}) => x)} : {})}); }), ...(typeof le2eLocked === 'function' && le2eLocked(t) ? {dis: true, title: tr('Unlock first: this project is encrypted in the browser.')} : {})},  // 2.35.0 (#1095): the snippets come along (loaded first); 2.64.1 (#1817): not while its texts are locked; 2.280.0 A (#3108): a long note too
-    ...(t.id > 0 && !t.context && !t.url ? [{label: tr('Add link'), icon: 'link', fn: () => linkAdd(id)}] : []),  // 2.41.0 (#1475)
-    ...(t.id > 0 && !t.context && canEdit(t) && !snipShown(t) && pz_on(t.list_id, 'repo') ? [{label: tr('Add code snippet'), icon: 'code', fn: () => snipOpen(id, 'new')}] : []),  // 2.35.0 (#1095)
-    // structure + more
-    ...(isMs(t) || (!t.parent_id && !children(t.id).length && t.id > 0) ? [{label: isMs(t) ? tr('Make it a normal task') : tr('Make it a milestone'), icon: 'flag', fn: () => msToggle(id)}] : []),  // 2.18.0 (#430)
-    ...(i > 0 && depthOf(sib[i - 1]) < maxDepth() - 1 && !isMs(t) && !isMs(sib[i - 1]) ? [{label: tr('Indent (under “{0}”)', sib[i - 1].title.slice(0, 24)), icon: 'indent', fn: () => patchTask(id, {parent_id: sib[i - 1].id})}] : []),
-    ...(t.parent_id ? [{label: tr('Outdent'), icon: 'outdent', fn: () => patchTask(id, {parent_id: S.tasks.get(t.parent_id)?.parent_id || null})}] : []),
-    ...(t.parent_id && S.tasks.get(t.parent_id)?.parent_id ? [{label: tr('Make it a main task'), icon: 'arrow', fn: () => patchTask(id, {parent_id: null})}] : []),
-    ...(propBreakOk(t) ? [{label: propWith(N_('Break down with {0}…'), N_('Break down with an agent…')), icon: 'bot', fn: () => propRequest('subtasks', {tid: id})}] : []),  // 2.3.0 (#261)
-    ...(t.id > 0 && !t.context && listRepos(t.list_id).length && !codeShown(t) && pz_on(t.list_id, 'repo') ? [{label: tr('Link code…'), icon: 'git', title: tr('Copies a branch name for this task; commits and pull requests that name #{0} are linked too', t.id), fn: () => gitCopyBranch(t)}] : []),  // 2.4.2 (#387)
-    ...msvvMoveItem(t),  // 2.73.0 C (#661): "Move to another server…"
-    ...(t.id > 0 ? [{label: tr('Copy link') + ' · ' + (tkOf(t) ? tkOf(t) + ' · ' : '') + '#' + id, icon: 'link', title: tr('Copy the link to this task'), fn: () => copyTaskLink(id)}] : []),  // 2.390.0 (#3353): + the key  // 2.218.0 A (#2799): the task number lives here
-    ...(inPanel && typeof df_menuItem === 'function' ? df_menuItem() : []),  // 2.380 F (#3435): fold / unfold all sections
+    // 2.218.0 A (#2799): with its state (a check when on); 2.445.0 (#3008): only where the panel's header does not show it
+    ...(inHead('[data-act="pin"]') ? [] : [{label: t.pinned ? tr('Pinned') : tr('Pin'), icon: 'pin', on: !!t.pinned, fn: () => patchTask(id, {pinned: t.pinned ? 0 : 1})}]),
+    ...(rare.length > 1 ? [{label: tr('More…'), icon: 'sliders', cls: 'mtmore', more: rare}] : rare),
     '-',
     {label: t.status === -1 ? tr('Reopen') : tr("Won’t do (discard)"), icon: 'ban', fn: () => t.status === -1 ? toggleTask(id) : wontDo(id)},
     ...(canDelete(t) ? [{label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}] : []),
@@ -909,12 +913,25 @@ function sortMenu(anchor) {
     ...[['prio', N_('Priority, then manual')], ['custom', N_('Manual only')], ['date', N_('Date')], ['title', N_('Title')], ['creator', N_('Creator|sort')], ...(depsOn() ? [['flow', N_('Flow|sort')]] : [])].map(([m, n]) => ({label: tr(n), on: cur === m, fn: () => set(m)})),
     {label: !crOn ? tr('Created|sort') : cur === 'created' ? tr('Created: newest first') : tr('Created: oldest first'), on: crOn, cls: 'sortcr', title: crOn ? tr('Click again to reverse the direction') : '', fn: () => set(cur === 'created' ? 'created_asc' : 'created')},
     ...(cfs.length ? ['-', ...cfs.map(f => ({label: tr('Field: {0}', f.name), icon: FT_ICON[f.type], on: cur === 'cf:' + f.id, fn: () => set('cf:' + f.id)}))] : []),
-    ...(doneToggleView() ? ['-', doneItem(), ...lmDoneResetItems()] : []),  // 2.39.1 (#1214)
-    ...(l && canManage(l) && listView(l) === 'list' && !isOverview() ? ['-', dabItem(l), ...(dsxFixedOff(l) || l.is_inbox ? [] : [dsxItem(l)])] : []),
+    '-', ...doneItems(l),  // 2.39.1 (#1214)
+    ...(doneMan(l) && !dsxFixedOff(l) && !l.is_inbox ? [dsxItem(l)] : []),
     ...(l && !isOverview() ? lgfItems(l) : [])]);  // 2.144.0 C (#2414): group by a custom field
 }
-// 2.7.2 (#414): the list option "Show completed at the bottom" (owner; for everyone in the list, one undo step)
-const dabItem = l => ({label: tr('Show completed at the bottom'), icon: 'donedown', on: !!l.checklist, cls: 'dabitem', fn: () => setDab(l.id, !l.checklist)});  // 2.410.0 (#3440): donedown, not the cart (every project uses it)
+// 2.445.0 (#3008): ONE switch for what happens to the completed tasks of a list: hidden / shown (the view's own choice, per
+// person) / at the bottom (2.7.2 #414, the list option for everyone, one undo step). A choice equal to the default ends the
+// view's own entry, so "like the default" needs no entry here. Who may not set the list option and other views keep doneItem.
+const doneMan = l => !!l && canManage(l) && listView(l) === 'list' && !isOverview();
+function doneItems(l) {
+  if (!doneMan(l)) return doneToggleView() ? [doneItem(), ...lmDoneResetItems()] : [];
+  const m = l.checklist ? 'bottom' : showDone() ? 'show' : 'hide', it = (k, n, title) => ({label: tr(n), title: tr(title), on: m === k, fn: () => doneSet(l, k)});
+  return [{row: [it('hide', N_('Hide'), N_('Hide completed')), it('show', N_('Show'), N_('Show completed')), it('bottom', N_('Bottom'), N_('Show completed at the bottom'))], rhd: tr('Completed tasks'), rlab: tr('Completed tasks'), rcls: 'mdone3'}];
+}
+async function doneSet(l, m) {
+  const key = S.route.key, on = m === 'show';
+  if (!!l.checklist !== (m === 'bottom')) await setDab(l.id, m === 'bottom');
+  if (m === 'bottom' || showDone(key) === on) return;
+  if (lmDoneOwn(key) && lmDoneDefault(key) === on) await lmDoneReset(key); else await setShowDone(on, key);
+}
 // 2.36.2 (#1136): "Keep completed in their section" (owner / list admins; for everyone in the list)
 const dsxItem = l => ({label: tr('Keep completed in their section'), icon: 'done', on: dsxOn(l), cls: 'dsxitem', fn: () => dsxSet(l.id, !dsxOn(l))});
 // 2.396.0 (#3385): the hint "Use as a shopping list?" (render.js): list kind shopping + ticked at the bottom, one undo step

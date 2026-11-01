@@ -93,11 +93,13 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
   check(await order() === 'Charlie,Alpha,Bravo', 'Alpha is now above Bravo: ' + await order());
   check(await until(() => /Moved up/.test(d.getElementById('srlive')?.textContent || '')), 'and that is announced');
   w.eval(`taskMenu(document.querySelector('#view .trow[data-id="${N[2]}"] .ttl'), ${N[2]})`); await sleep(100);
+  const mi1 = [...d.querySelectorAll('#pop [role="menuitem"]')];
+  check(d.activeElement === mi1.find(b => !b.disabled), 'the menu gets the focus (first item)');
+  key(w, d.activeElement, 'ArrowDown'); await sleep(30);
+  check(d.activeElement === mi1.filter(b => !b.disabled)[1], '↓ moves in the menu');
+  d.querySelector('#pop .mtmore')?.click(); await sleep(100);  // 2.445.0 (#3008): Move up / down are under "More…"
   const mi = [...d.querySelectorAll('#pop [role="menuitem"]')];
   check(mi.some(b => b.textContent.trim() === 'Move down') && mi.some(b => b.textContent.trim() === 'Move up'), 'the task menu has Move up / Move down');
-  check(d.activeElement === mi.find(b => !b.disabled), 'the menu gets the focus (first item)');
-  key(w, d.activeElement, 'ArrowDown'); await sleep(30);
-  check(d.activeElement === mi.filter(b => !b.disabled)[1], '↓ moves in the menu');
   click(w, mi.find(b => b.textContent.trim() === 'Move down'));
   check(await until(async () => (await order()) === 'Alpha,Charlie,Bravo'), 'the menu moves Charlie down: ' + await order());
   // a menu given back the focus with Esc

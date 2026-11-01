@@ -236,6 +236,7 @@ function Start-Agent($s) {
   elseif ($exe -match '\.(cmd|bat)$') { $rest = @('/d', '/c', $exe) + $rest; $exe = $env:ComSpec }
   # 2.443.0 (#2940): on Unix an own session as in the .sh (same pid, so "kill -- -PID" ends all of it); Windows: taskkill /T
   if (-not $OnWindows) {
+    if (-not $found) { throw "command not found: $exe" }  # 2.445.0 (#3748): else setsid starts fine and only then fails, unlogged
     $ss = Get-Command setsid -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($ss) { $rest = @($exe) + $rest; $exe = $ss.Source }
     else {

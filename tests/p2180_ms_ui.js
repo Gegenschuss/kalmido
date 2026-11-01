@@ -124,6 +124,7 @@ const task = async id => (await state()).tasks.find(t => t.id === id);
   check(await until(() => w.eval('S.sel') === T3), 'a task of the milestone opens from the list');
   // the "…" menu
   w.eval(`taskMenu(document.body, ${T4})`); await sleep(200);
+  d.querySelector('#pop .mtmore')?.click(); await sleep(100);  // 2.445.0 (#3008): under "More…"
   check([...d.querySelectorAll('#pop button, #pop [role=menuitem]')].some(b => /Make it a milestone/.test(b.textContent)), 'task menu: "Make it a milestone"');
   w.eval('closePop(); closeDetail()');
   // activity line

@@ -666,7 +666,6 @@
   "Skip this occurrence": "Omitir esta repetición",
   "Skipped, next occurrence: {0}": "Omitida, próxima repetición: {0}",
   "Will be sent as soon as the server is reachable": "Se enviará en cuanto el servidor esté disponible",
-  "Indent (under “{0}”)": "Aplicar sangría (bajo «{0}»)",
   "Outdent": "Quitar sangría",
   "Reopen": "Reabrir",
   "Won’t do (discard)": "Descartar (no hacer)",
@@ -15521,5 +15520,7 @@
   "Set up by hand": "Configurado a mano",
   "The folder the agent works in, e.g. {0}": "La carpeta en la que trabaja el agente, p. ej. {0}",
   "The quick way: create the agent, then “Set up on a computer” at it gives you one command to paste.": "La vía rápida: crea el agente y «Configurar en un ordenador» te da un comando para pegar.",
-  "For advanced users: set it up by hand": "Para usuarios avanzados: configurarlo a mano"
+  "For advanced users: set it up by hand": "Para usuarios avanzados: configurarlo a mano",
+  "Indent": "Aumentar sangría",
+  "{0} dated task hidden": ["{0} tarea con fecha oculta", "{0} tareas con fecha ocultas"]
 }

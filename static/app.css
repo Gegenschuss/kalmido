@@ -321,6 +321,8 @@ body:is(.prbg-soft,.prbg-strong) .trow:is(.pr5,.pr3,.pr1):not(.sel):not(.msel):n
 /* 1.5.1: one line of equal buttons (task menu: Today / Tomorrow) */
 .menu-list .mquick{display:grid;grid-template-columns:1fr 1fr;gap:.25rem}
 .menu-list .mquick button{justify-content:center;border:1px solid var(--line);padding:.4375rem .5rem}
+.menu-list .mquick.mdone3{grid-template-columns:repeat(3,1fr)}
+.menu-list .mquick.mdone3 .mchk{display:none}
 .dtop .dq{color:var(--faint)}
 .dtop .dq:hover,.dtop .dq.on{color:var(--accent)}
 .quick{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-bottom:.5rem}
@@ -575,12 +577,11 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
   .modal .card{border-radius:.875rem .875rem 0 0;padding-bottom:calc(1.25rem + var(--safe-b));max-height:min(90dvh,calc(var(--vvh,100dvh) - 1rem))}
   .modal .row label{min-width:100%}
   .kanban{margin:0 -.75rem;padding:0 .75rem 1.25rem;scroll-padding:.75rem}
-  .kcol{flex-basis:84vw;max-height:calc(100dvh - 12.5rem)}
+  .kcol{max-height:calc(100dvh - 12.5rem)}
   .cal .cell{min-height:3.25rem;padding:.1875rem 1px;align-items:center}
   .cal .ev,.cal .more{display:none}
   .cal .dots{display:flex}
   .cal .wd{padding:.375rem 2px;text-align:center;font-size:var(--fs-xxs)}
-  .matrix{grid-template-columns:1fr}
   .quad{min-height:0}
   .quad .qlist{max-height:none}
   .hweek{grid-template-columns:minmax(0,1fr) repeat(7,1.875rem) 2.75rem;gap:2px;padding:.625rem 2px}
@@ -3629,7 +3630,9 @@ svg.kword{display:block;height:.82em;width:auto;aspect-ratio:371.8/81;color:#EEE
 .quad{min-width:0}
 .quad h3{flex-wrap:wrap}
 .quad .trow .ttl{overflow-wrap:anywhere}
-@media (max-width:767px){ .matrix{grid-template-columns:minmax(0,1fr)} }
+/* 2.445.0 (#3011): a tablet keeps the 2x2 matrix and the 18 rem Kanban columns; the 84vw columns only on a phone */
+@media (max-width:699px){ .matrix{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:599px){ .kcol{flex-basis:84vw} }
 /* 2.15.1 (#633): a phone folds a quadrant by its heading (the count stays visible) */
 .quad .qfold{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;margin:-.5rem 0 -.25rem;padding:0;background:none;border:0;color:inherit;font:inherit;text-align:start;cursor:pointer}
 .quad .qfold .qcar{margin-inline-start:auto;color:var(--muted);transition:transform .12s}

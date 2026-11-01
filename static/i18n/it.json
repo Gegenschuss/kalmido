@@ -666,7 +666,6 @@
   "Skip this occurrence": "Salta questa occorrenza",
   "Skipped, next occurrence: {0}": "Saltata, prossima occorrenza: {0}",
   "Will be sent as soon as the server is reachable": "Verrà inviato appena il server è raggiungibile",
-  "Indent (under “{0}”)": "Rientra (sotto “{0}”)",
   "Outdent": "Riduci rientro",
   "Reopen": "Riapri",
   "Won’t do (discard)": "Non farò (scarta)",
@@ -15521,5 +15520,7 @@
   "Set up by hand": "Configurato a mano",
   "The folder the agent works in, e.g. {0}": "La cartella in cui lavora l'agente, ad es. {0}",
   "The quick way: create the agent, then “Set up on a computer” at it gives you one command to paste.": "La via rapida: crea l'agente, poi «Configura su un computer» ti dà un comando da incollare.",
-  "For advanced users: set it up by hand": "Per utenti esperti: configurarlo a mano"
+  "For advanced users: set it up by hand": "Per utenti esperti: configurarlo a mano",
+  "Indent": "Aumenta rientro",
+  "{0} dated task hidden": ["{0} attività con data nascosta", "{0} attività con data nascoste"]
 }

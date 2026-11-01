@@ -2,7 +2,7 @@
 // - #3437 a budget counts once per branch in the column sum too: the sum row over the top-level rows counts the subtasks'
 //   budgets of a task that has some (86, not 57 = top level only, not 140 = everything); a parent's budget cell shows the sum
 //   of its subtasks (grey) with its own different value as a hint; a task without valued subtasks shows its own value
-// - #3440 "Show completed at the bottom" in the view menu: the icon donedown (not the cart), also for a list admin
+// - #3440 "Show completed at the bottom" in the view menu: the icon donedown (not the cart), also for a list admin  (2.445.0: now the Bottom button of the completed row)
 // kalmido-suite: fresh
 const {boot, errs, B, login, until} = require('./boot');
 const F = []; let ok = 0;
@@ -48,8 +48,10 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
   }
 
   // ================= #3440 the icon, for the owner and a list admin
-  const items = w.eval(`JSON.stringify(topMoreItems().filter(x => x && x.label === 'Show completed at the bottom').map(x => x.icon))`);
-  check(items === '["donedown"]', '#3440: the owner sees the entry with the icon donedown: ' + items);
+  // 2.445.0 (#3008): the entry is the "Bottom" button of the completed row (no icon of its own any more)
+  const bottomOf = win => win.eval(`JSON.stringify(topMoreItems().filter(x => x && x.rcls === 'mdone3').flatMap(x => x.row.filter(b => b.title === 'Show completed at the bottom').map(b => b.label)))`);
+  const items = bottomOf(w);
+  check(items === '["Bottom"]', '#3440: the owner sees the Bottom button: ' + items);
   check(w.eval(`!!P.donedown && /<svg/.test(ic('donedown')) && ic('donedown') !== ic('cart')`), '#3440: the icon exists');
   w.close();
   const L = (await call(CK, 'POST', '/api/lists', {name: 'Team project'})).id;
@@ -58,8 +60,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
   check(r.status === 200, 'setup: bob is a list admin ' + r.status);
   const wb = await boot({user: 'bob', hash: 'l/' + L});
   check(await until(() => wb.eval(`!!listById(${L}) && routeList()?.id === ${L}`)), 'setup: bob is in the shared project');
-  const bi = wb.eval(`JSON.stringify(topMoreItems().filter(x => x && x.label === 'Show completed at the bottom').map(x => x.icon))`);
-  check(bi === '["donedown"]', '#3440: a list admin sees the entry too: ' + bi);
+  const bi = bottomOf(wb);
+  check(bi === '["Bottom"]', '#3440: a list admin sees the button too: ' + bi);
   wb.close();
 
   check(errs.length === 0, 'no script errors: ' + errs.join(' | '));

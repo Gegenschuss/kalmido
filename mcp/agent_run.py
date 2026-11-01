@@ -49,6 +49,8 @@ usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [AR
   KALMIDO_PERMISSION_MODE       the permission mode of a Claude Code COMMAND without --permission-mode; set, the mode counts as
                                 fixed by this computer: the switch in the chat header (runtime permission_mode) is not applied
   KALMIDO_APPROVAL_CHECK        0 = no approval check of chat answers (default 1)
+  KALMIDO_RUN_LOG               the runner's own log file (default on Windows: agent_run.log next to agent_run.py; "0" = none;
+                                one old generation .1 after 1 MiB) -- stderr of Start-Process never reaches agent.log there
   --once-event FILE             handle the events of FILE (one JSON object per line) and exit (for tests)
 Never prints the token or message contents; the log has event types, ids and lengths only.
 """
@@ -126,9 +128,48 @@ SECRET_RES = [
 APPROVAL_RE = re.compile(r"(?:\A|\n)[ \t]*\n*```(?:approval|freigabe)(?![\w-])[^\n]*\n(.*?)\n?```\s*$", re.S)
 
 
+# 2.445.0 (#3748): on Windows the launcher starts this runner with Start-Process, whose stderr never reaches the agent.log
+# of the scheduled task (*>> locks that file). So the runner keeps its own agent_run.log next to the starter files (or the
+# file named by KALMIDO_RUN_LOG; "0" = none). Like nothing else rotates agent.log, the size is capped here: one old
+# generation (agent_run.log.1), checked once at start and then every RUN_LOG_CHECK lines.
+RUN_LOG_MAX = 1024 * 1024
+RUN_LOG_CHECK = 200
+_run_log = {"path": None, "n": 0, "ready": False}
+
+
+def run_log_path():
+    p = os.environ.get("KALMIDO_RUN_LOG")
+    if p is not None:
+        return None if p in ("", "0") else p
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent_run.log") if os.name == "nt" else None
+
+
+def _run_log_rotate(path):
+    try:
+        if os.path.getsize(path) > RUN_LOG_MAX:
+            os.replace(path, path + ".1")
+    except OSError:
+        pass
+
+
 def log(msg):
-    sys.stderr.write(time.strftime("%Y-%m-%d %H:%M:%S") + " agent_run: " + msg + "\n")
+    line = time.strftime("%Y-%m-%d %H:%M:%S") + " agent_run: " + msg + "\n"
+    sys.stderr.write(line)
     sys.stderr.flush()
+    try:
+        if not _run_log["ready"]:
+            _run_log["ready"] = True
+            _run_log["path"] = run_log_path()
+            if _run_log["path"]:
+                _run_log_rotate(_run_log["path"])
+        if _run_log["path"]:
+            _run_log["n"] += 1
+            if _run_log["n"] % RUN_LOG_CHECK == 0:
+                _run_log_rotate(_run_log["path"])
+            with open(_run_log["path"], "a", encoding="utf-8") as f:
+                f.write(line)
+    except Exception:
+        pass  # a log that cannot be written never stops a run
 
 
 def redact(text):
