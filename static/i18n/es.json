@@ -15831,5 +15831,6 @@
   "{0} finding in a client’s organisation stays: only its admins clean it up": ["{0} hallazgo en la organización de un cliente se queda: solo sus admins lo limpian", "{0} hallazgos en organizaciones de clientes se quedan: solo sus admins los limpian"],
   "the history of your knowledge pages and the access history of your private files (the current state is in the file)": "el historial de tus páginas de conocimiento y el historial de acceso de tus archivos privados (el estado actual está en el archivo)",
   "Your files, knowledge pages and tables are here already from an earlier import: they were skipped.": "Tus archivos, páginas de conocimiento y tablas ya están aquí de una importación anterior: se han omitido.",
-  "Your storage is too small for the files of this export: they need {0}, {1} are free. Free up space or ask for more storage, then upload the file again.": "Tu almacenamiento no basta para los archivos de esta exportación: necesitan {0}, quedan {1} libres. Libera espacio o pide más almacenamiento y vuelve a subir el archivo."
+  "Your storage is too small for the files of this export: they need {0}, {1} are free. Free up space or ask for more storage, then upload the file again.": "Tu almacenamiento no basta para los archivos de esta exportación: necesitan {0}, quedan {1} libres. Libera espacio o pide más almacenamiento y vuelve a subir el archivo.",
+  "All conversations": "Todas las conversaciones"
 }

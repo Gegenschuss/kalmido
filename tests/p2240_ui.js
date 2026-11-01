@@ -174,7 +174,8 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   check(dm && dm.classList.contains('pri') && d.querySelector('#pop .mcacts').firstElementChild === dm, '#906: the person card: "Message" first and big');
   click(w, dm); await until(() => w.eval('S.route.mod') === 'team' && w.eval('S.tc.rid'));
   check(w.eval('S.route.mod') === 'team' && w.eval('S.tc.rid') > 0, '#906: it opens the conversation with Bob');
-  check(d.querySelector('#view [data-act="tc-new"]')?.textContent.includes('New message'), '#906: "New message" in the team chat');
+  // 2.479.0 (#2814, intended change): with a conversation open on a computer "New message" is the "+" in the head of the area Chat's panel
+  check(d.querySelector('#side [data-act="tc-new"]')?.getAttribute('aria-label') === 'New message', '#906: "New message" in the team chat');
   w.eval(`S.team = {...S.team, enabled: false}`);  // the team chat switched off
   w.__dialogs = 'manual';
   w.eval(`dmOpen(${BOB}, 'Bob')`); await sleep(300);

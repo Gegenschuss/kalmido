@@ -150,7 +150,7 @@ const tabAreaItems = () => { const cur = sbb_area(); return SBB_RAIL.map(r => r[
 function tabOverflow() {
   const items = tabItems(), mx = tabMax(), shown = items.length > mx ? items.slice(0, mx - 1) : items;  // 2.477.0 (#3938)
   const rest = items.slice(shown.length), pinned = k => items.some(t => t.id === k);
-  const areas = tabAreaItems(), conv = ['team', 'news'].filter(k => !pinned(k)).map(tabItem).filter(t => t && !o3a_hidT(t));
+  const areas = tabAreaItems(), conv = ['team', 'news'].filter(k => !pinned(k) && !areas.some(t => t.id === k) /* 2.479.0 (#2814): the team chat is an area */).map(tabItem).filter(t => t && !o3a_hidT(t));
   const end = ['search', 'settings'].filter(k => !pinned(k)).map(tabItem).filter(Boolean);
   // search + settings are also in the side menu: they alone do not justify a "Mehr" tab
   return {shown, rest, more: rest.length || areas.some(t => !pinned(t.id)) ? [...rest, ...areas, ...conv, ...end] : []};
@@ -435,7 +435,7 @@ function renderSide0() {
   const focus = planP.filter(([x, h]) => h && (!hid('e:' + x) || (onTasks && k === x))).map(([, h]) => h).join('')
     + (planHidden ? `<button class="srow smore" data-act="side-more" aria-expanded="${smOpen ? 'true' : 'false'}">${ic('plus')}<span class="n">${esc(trn('{0} more view', '{0} more views', planHidden))}</span></button>`
       + (smOpen ? `<div class="smorebox">${planHiddenRows.map(([x, h]) => `<div class="smrow"><input type="checkbox" data-side-show="${esc(x)}" aria-label="${esc(tr('Show {0}', smName(x)))}" title="${esc(tr('Show {0}', smName(x)))}">${h}</div>`).join('')}<button type="button" class="smcust" data-act="side-customize" title="${esc(tr('Settings > Appearance > Sidebar'))}">${esc(tr('Customise…'))}</button></div>` : '') : '');
-  const convo = [sb_msgRows(),  // 2.45.0 (#1509): "Messages" (always while the team chat is on) + the last conversations (sbnav.js)
+  const convo = [sb_msgRows(),  // 2.45.0 (#1509): "Messages" (always while the team chat is on) + the last conversations (sbnav.js); 2.479.0 (#2814): not with the area bar (sb_msgShown)
     collab() && (hasSharing() || S.news?.unread) ? `<button class="srow ${S.route.mod === 'news' ? 'on' : ''}" data-go="news" title="${esc(tr('Assignments, @mentions, comments and follow-ups for you'))}">${ic('bell')}<span class="n">${tr('News')}</span><span class="c ${bellCount() ? 'nunread' : ''}">${bellCount() || ''}</span></button>` : ''].join('');  // 2.28.0 (#987): the number = "For you"
   // Views: every switched-on module (the rail's old job)
   const aw = (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread + (x.approvals_open || 0), 0);  // 2.35.0 (#1103): open approvals

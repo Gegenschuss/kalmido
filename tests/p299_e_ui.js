@@ -59,7 +59,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   // ================= the sidebar without pins
   let w = await boot({user: 'alice', hash: 'inbox'}), d = w.document;
   const team = () => d.querySelector('#side .sg-team');
-  check(await until(() => d.querySelectorAll('#side .sbconv').length === 2), '2 conversations in the sidebar');
+  // 2.479.0 (#2814): the conversations moved into the area "Chat" (its own icon in the bar): none in Projects any more
+  check(await until(() => d.querySelector('#srail .srb[data-sbb="team"]') && team()) && !d.querySelector('#side .sbconv'), 'the conversations are the area Chat, not in Projects');
   check(!team().querySelector('.sbpw') && !team().querySelector('[data-go^="who/"]'), 'no person rows without pinning (8 people shared)');
   const allRow = team().querySelector('.sbpall[data-act="sb-people"]');
   check(allRow && /All people/.test(allRow.textContent) && team().lastElementChild === allRow, '"All people …" as the last row');
@@ -87,7 +88,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   // Person 1 has a conversation: pinned, but not twice
   await until(() => pinBtn(P[0])); click(w, pinBtn(P[0]));
   check(await pinsAre([P[2], P[0]].join(',')), 'Person 1 pinned');
-  check(!team().querySelector(`[data-go="who/${P[0]}"]`) && team().querySelectorAll('.sbconv').length === 2, 'Person 1 stands there only as the conversation');
+  // 2.479.0 (#2814): the conversations are no longer in Projects, so a pinned person with a conversation stands there as the person
+  check(await until(() => team().querySelector(`.sbpw [data-go="who/${P[0]}"]`)) && !team().querySelector('.sbconv'), 'Person 1 stands there as the person (the conversation is in Chat)');
   // up to 5, the 6th is refused with a note
   // 2.206.0 B (#2513): each pin also arrived in the page (pressed) before the next click: the page sends its own list of pins
   // (CI of 2.168.3: "the 6th pin is refused" red - the 6th click came before the page knew the 5th); the note is waited for
@@ -123,8 +125,9 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check(un, 'the person\'s menu offers "Unpin from the sidebar"');
   if (un) click(w, un);
   check(await until(() => !d.querySelector(`#side .sg-team [data-go="who/${P[2]}"]`)), '… and unpins');
-  // the conversation's menu offers the pin too
-  const conv = d.querySelector('#side .sbconv');
+  // the conversation's menu offers the pin too (2.479.0 #2814: in the area Chat's panel)
+  w.eval(`go('team')`);
+  const conv = await until(() => d.querySelector('#side .tcpanel .sbconv[data-go^="team/"]'));
   conv.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
   check(await until(() => [...d.querySelectorAll('#pop [role="menuitem"]')].some(b => /(Pin to|Unpin from) the sidebar/.test(b.textContent))), 'a direct conversation\'s menu has the pin entry');
   w.eval('typeof closePop === "function" && closePop()');

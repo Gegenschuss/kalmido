@@ -65,13 +65,36 @@ function mdBrief(t) {
 const editingTeam = () => document.activeElement?.id === 'tc-in' || document.activeElement?.id === 'tth-in' || document.activeElement?.id === 'ms-q' || document.activeElement?.classList?.contains('tc-edit');  // 2.139.0 A (#2127): + the thread's box
 const roomName = r => r ? (r.kind === 'dm' ? (r.name || '?') : lname(listById(r.list_id)) || r.name || '?') : '';
 const roomIcon = r => r.kind === 'dm' ? av(r.user_id, r.name, 'avatar') : tcx_isX(r) ? tcx_icon(r) : `<span class="tcico">${licon(listById(r.list_id), 'licon') || ic('users', 's')}</span>`;
+// 2.479.0 (#2814): the conversations shown (view and the area's panel): only those with messages, plus the open one and
+// channels / groups (2.27.0 #986, 2.113.1 #2059), in the shown workspace (2.28.0 #935)
+const tc_rooms = rid => (S.tc.rooms || []).filter(r => (r.last || r.id === rid || tcx_isX(r)) && (r.kind === 'dm' || r.id === rid || (tcx_isX(r) ? tcx_vis(r) : inWs(listById(r.list_id)))));
+// 2.479.0 (#2814): on a computer the team chat is the area "Chat": its conversations are the panel, the page only the open one
+// (the second column "Conversations" is gone; with none open the list is the page); phones and the mini windows keep the old layout
+const tc_listOff = () => typeof sbb_on === 'function' && sbb_on();
+const tc_newBtnHtml = () => teamOn() ? `<button type="button" class="iconbtn" data-act="tc-new" aria-haspopup="${S.tc.people.length ? 'menu' : 'dialog'}" title="${esc(tr('New message'))}" aria-label="${esc(tr('New message'))}">${ic('plus', 's')}</button>` : '';
+function tc_panelHtml() {
+  if (!teamOn()) return '';
+  if (S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.tc.rooms !== null) renderSide(); }); }
+  const rid = S.route.mod === 'team' ? (S.cw?.lt ? S.cw.home?.rid : S.tc.rid) : null, rooms = tc_rooms(rid);
+  const n = S.team?.unread || 0, lab = tr('All conversations');
+  const head = `<button type="button" class="srow smod sbbi ${S.route.mod === 'team' && !rid ? 'on' : ''}" data-go="team"${S.route.mod === 'team' && !rid ? ' aria-current="page"' : ''}>${ic('comment')}<span class="n">${esc(lab)}</span><span class="c ${n ? 'nunread' : ''}">${n ? `${n}<span class="sr"> ${esc(tr('unread'))}</span>` : ''}</span></button>`;
+  const row = r => {
+    const u = r.unread > 0 && (!r.muted || r.mention), nm = roomName(r), on = r.id === rid;
+    const ico = r.kind === 'dm' ? av(r.user_id, r.name, 'avatar sbav') : `<span class="sic" aria-hidden="true">${tcx_isX(r) ? ic(r.kind === 'channel' ? 'hash' : 'users', 's') : listIconHtml(listById(r.list_id)) || ic('users', 's')}</span>`;
+    return `<button type="button" class="srow sbconv sbbi ${u ? 'sbun' : ''} ${on ? 'on' : ''}" data-go="team/${r.id}"${on ? ' aria-current="page"' : ''} title="${esc(r.kind === 'dm' ? tr('Direct message with {0}', nm) : nm)}">${ico}<span class="n">${esc(nm)}</span>${r.muted ? `<span class="tcmute" title="${esc(tr('Muted'))}">${ic('belloff', 's')}</span>` : ''}<span class="c ${u ? 'nunread' : ''}">${r.unread ? `${r.mention ? '@' : ''}${r.unread}<span class="sr"> ${esc(tr('unread'))}</span>` : ''}</span></button>`;
+  };
+  const body = S.tc.rooms === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : rooms.length ? tcx_listHtml(rooms, row) : `<div class="muted mhint">${tr('No conversations yet')}</div>`;
+  return `<div class="sgroup sbbp tcpanel">${head}${body}</div>`;
+}
 function viewTeam() {
   if (typeof cw_tcHome === 'function' && S.cw.lt) return cw_tcHome(viewTeam);  // 2.47.1 (#1720): a conversation live in the chat panel (chatwins.js)
   if (!teamOn()) return `<div class="empty">${tr('The team chat needs collaboration (Settings > Modules).')}</div>`;
   if (S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'team') renderView(); }); }
   // 2.27.0 (#986): only conversations that have messages (newest first); an empty one shows once it is opened / written in
-  const rid = S.tc.rid, rooms = (S.tc.rooms || []).filter(r => (r.last || r.id === rid || tcx_isX(r)) && (r.kind === 'dm' || r.id === rid || (tcx_isX(r) ? tcx_vis(r) : inWs(listById(r.list_id)))));  // 2.28.0 (#935); 2.113.1 (#2059): channels / groups also without messages
-  const list = `<nav class="tclist" aria-label="${esc(tr('Conversations'))}">
+  // 2.479.0 (#2814): off = a computer's area "Chat": the list is the area's start page (no conversation open, full width) and the
+  // panel; an open conversation takes the page alone (no second column)
+  const rid = S.tc.rid, rooms = tc_rooms(rid), off = tc_listOff();
+  const list = off && rid ? '' : `<nav class="tclist" aria-label="${esc(tr('Conversations'))}">
     <div class="tchead"><b>${tr('Conversations')}</b><span class="spacer"></span><button type="button" class="btn sm pri" data-act="tc-new" aria-haspopup="${S.tc.people.length ? 'menu' : 'dialog'}">${ic('plus', 's')}${tr('New message')}</button></div>
     ${S.tc.rooms === null ? `<div class="muted mhint">${tr('Loading…')}</div>` : rooms.length ? tcx_listHtml(rooms, r => `<button type="button" class="tcrow ${r.id === rid ? 'on' : ''} ${r.unread ? 'unread' : ''}" data-act="tc-open" data-rid="${r.id}" ${r.id === rid ? 'aria-current="true"' : ''}>
       ${roomIcon(r)}<span class="tcmain"><span class="tcn">${esc(roomName(r))}${r.kind !== 'dm' ? `<span class="tck">${ic('users', 's')}${r.members}</span>` : ''}</span>
@@ -80,7 +103,7 @@ function viewTeam() {
     : `<div class="empty tcempty">${botFig('ruhig')}<b>${tr('No conversations yet')}</b><span>${S.tc.people.length || (S.tc.rooms || []).length ? tr('Write to someone you work with, or share a project: every shared project gets its own chat.') : tr('Share a project with someone: every shared project gets its own chat.')}</span>${S.tc.people.length || (S.tc.rooms || []).length ? `<button type="button" class="btn sm pri" data-act="tc-new">${ic('plus', 's')}${tr('Start a conversation')}</button>` : ''}</div>`}
   </nav>`;
   const thp = rid && S.tc.th && tth_wide();  // 2.139.0 A (#2127): the open thread right of the conversation
-  return `<div class="tcwrap"><div class="tcview ${rid ? 'inroom' : ''}${thp ? ' inthread' : ''}">${list}${rid ? `<section class="tcroom" aria-label="${esc(roomName(S.tc.room ? {...S.tc.room, name: (rooms.find(x => x.id === rid) || {}).name} : rooms.find(x => x.id === rid)))}">${tcRoomHtml()}</section>` : (isMobile() ? '' : `<section class="tcroom tcnone"><div class="empty">${ic('comment')}<span>${tr('Pick a conversation.')}</span></div></section>`)}${thp ? `<aside class="tthpane" aria-label="${esc(tr('Thread'))}">${tth_html()}</aside>` : ''}</div></div>`;
+  return `<div class="tcwrap"><div class="tcview ${rid ? 'inroom' : ''}${thp ? ' inthread' : ''}${off ? (rid ? ' nolist' : ' listpage') : ''}">${list}${rid ? `<section class="tcroom" aria-label="${esc(roomName(S.tc.room ? {...S.tc.room, name: (rooms.find(x => x.id === rid) || {}).name} : rooms.find(x => x.id === rid)))}">${tcRoomHtml()}</section>` : (isMobile() || off ? '' : `<section class="tcroom tcnone"><div class="empty">${ic('comment')}<span>${tr('Pick a conversation.')}</span></div></section>`)}${thp ? `<aside class="tthpane" aria-label="${esc(tr('Thread'))}">${tth_html()}</aside>` : ''}</div></div>`;
 }
 // 2.83.0 (#1774): "Open in split window" in the head of a team room (a phone has no long press / right click); not inside the panel itself
 function o3b_splitBtn(room, rid) {

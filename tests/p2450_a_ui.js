@@ -5,6 +5,7 @@
 //   Settings stays alone at the bottom
 // - #1509: "Messages" with the unread count on top of "Conversations", the last conversations (at most 5, unread first and
 //   bold), a bubble at every person opens the direct message, g n opens the messenger (in the shortcut help)
+//   2.479.0 (#2814): with the area bar (computer, phone drawer) they are the area "Chat" and its panel, not in Projects
 // - #1532: a new folder belongs to the shown workspace (Private / an organisation), so it shows there at once
 // - #1516: "Notes" in Views with the number of notes; #notes = the notes of all lists: pinned first, the list's name, a filter
 //   by list, a search in title and text, "New note" in a picked list; rights as before (participants / view-only)
@@ -94,23 +95,29 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
 
   // ================= #1509 the messenger in the sidebar
   await call('PATCH', '/api/settings', {side_people: String(BOB)});  // 2.99.0 (#2187): people only while pinned
+  // 2.479.0 (#2814, intended change): the team chat is the area "Chat" (an icon of the bar with the unread count); its
+  // conversations are the area's panel, no longer on top of Conversations in Projects
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
-  const msg = await until(() => d.querySelector('#side .sg-team .sbmsg[data-go="team"]'));
-  check(msg && /Team chat/.test(msg.textContent) /* 2.364.0 (#3040): one name, was "Messages" */ && msg.querySelector('.c.nunread')?.textContent.startsWith('2'), '#1509: "Team chat" with 2 unread ' + msg?.textContent);
-  check(d.querySelector('#side .sg-team').firstElementChild.nextElementSibling === msg, '#1509: on top of Conversations');
-  const conv = await until(() => d.querySelectorAll('#side .sbconv').length === 2 && [...d.querySelectorAll('#side .sbconv')]);
+  const rb = await until(() => d.querySelector('#srail .srb[data-sbb="team"]'));
+  check(rb && /Chat/.test(rb.textContent) && /^2/.test(rb.querySelector('.srbd.nunread')?.textContent || ''), '#2814: the area Chat in the bar with 2 unread ' + rb?.textContent);
+  check(!d.querySelector('#side .sbmsg') && !d.querySelector('#side .sbconv'), '#2814: no team chat rows in Projects any more');
+  click(w, rb);
+  check(await until(() => w.eval(`S.route.mod === 'team'`) && d.querySelector('#side .tcpanel')), '#2814: the icon opens the team chat with its panel');
+  const msg = d.querySelector('#side .tcpanel [data-go="team"]');
+  check(msg && /All conversations/.test(msg.textContent) && msg.querySelector('.c.nunread')?.textContent.startsWith('2') && msg.classList.contains('on'), '#2814: "All conversations" with 2 unread, lit ' + msg?.textContent);
+  check(d.querySelector('#side [data-act="tc-new"]')?.getAttribute('aria-label') === 'New message', '#2814: "+" New message in the head of the panel');
+  check(d.querySelector('#view .tcview.listpage .tclist') && !d.querySelector('#view .tcroom'), '#2814: with no conversation open the list is the page, alone');
+  const conv = await until(() => d.querySelectorAll('#side .tcpanel .sbconv').length === 2 && [...d.querySelectorAll('#side .tcpanel .sbconv')]);
   check(conv && conv.every(b => b.classList.contains('sbun')) && conv.some(b => b.dataset.go === `team/${DM}`) && conv.some(b => b.dataset.go === `team/${CH}`), '#1509: the 2 conversations, unread (bold)');
-  // 2.99.0 (#2187): Bob stands there as a conversation, so not a second time as a person (pinned or not); the person row with
-  // its bubble is checked in p299_e_ui.js
-  check(![...d.querySelectorAll('#side .sbpw')].some(x => /Bob/.test(x.textContent)), '#2187: Bob only once (as the conversation)');
   click(w, d.querySelector(`#side .sbconv[data-go="team/${DM}"]`));
   check(await until(() => w.eval(`S.route.mod === 'team' && S.tc.rid === ${DM}`)), '#1509: the conversation row opens the direct message');
   await until(() => !d.querySelector(`#side .sbconv[data-go="team/${DM}"]`)?.classList.contains('sbun'));
   check(d.querySelector(`#side .sbconv[data-go="team/${DM}"]`)?.classList.contains('on') && !d.querySelector(`#side .sbconv[data-go="team/${DM}"]`).classList.contains('sbun'), '#1509: the open conversation lit, read');
+  check(await until(() => d.querySelector('#view .tcview.nolist .tcroom')) && !d.querySelector('#view .tclist'), '#2814: the open conversation takes the page, no second column "Conversations"');
   // live: a new message raises the count (the version poll calls teamChanged)
   await call('POST', `/api/team/rooms/${CH}/messages`, {body: 'And the photos'}, CB);
   w.eval(`go('inbox')`); await sleep(200); await w.eval('teamChanged()');
-  check(await until(() => /^2/.test(d.querySelector('#side .sbmsg .c')?.textContent || '')), '#1509: the unread count follows live ' + d.querySelector('#side .sbmsg .c')?.textContent);
+  check(await until(() => /^2/.test(d.querySelector('#srail .srb[data-sbb="team"] .srbd')?.textContent || '')), '#1509: the unread count follows live ' + d.querySelector('#srail .srb[data-sbb="team"]')?.textContent);
   // g n
   key(w, 'g'); key(w, 'n');
   check(await until(() => w.eval(`S.route.mod === 'team'`)), '#1509: g n opens the messenger');
@@ -123,9 +130,12 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
     const r = (await call('GET', '/api/team', null, CB)).rooms.find(x => x.list_id === L)?.id;
     await call('POST', `/api/team/rooms/${r}/messages`, {body: 'Hi ' + i}, CB);
   }
-  w = await boot({user: 'alice', hash: 'inbox', mobile: true}); d = w.document;
-  const cs = await until(() => d.querySelectorAll('#side .sbconv').length && [...d.querySelectorAll('#side .sbconv')]);
-  check(cs && cs.length === 5 && cs.every(b => b.classList.contains('sbun')), '#1509: at most 5 conversations (phone drawer) ' + cs?.length);
+  // 2.479.0 (#2814, intended change): the phone's drawer shows the area Chat like the computer: all conversations in its
+  // panel (the 5 last ones in Projects are gone with the bar's areas; they stay only without it)
+  w = await boot({user: 'alice', hash: 'team', mobile: true}); d = w.document;
+  const cs = await until(() => d.querySelectorAll('#side .tcpanel .sbconv').length >= 8 && [...d.querySelectorAll('#side .tcpanel .sbconv')]);
+  check(cs && cs.every(b => b.classList.contains('sbun')) && d.querySelector('#side .sbmr .srb[data-sbb="team"]'), '#2814: the phone drawer: the area Chat with all 8+ conversations ' + d.querySelectorAll('#side .tcpanel .sbconv').length);
+  check(w.eval(`sb_msgRows()`) === '', '#2814: no conversations in Projects on the phone either');
   w.close();
 
   // ================= #1516 the notes of all lists

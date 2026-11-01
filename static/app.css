@@ -4159,6 +4159,14 @@ body.lcmoving{cursor:grabbing!important;user-select:none!important}  /* 2.331.0 
 .tcxmem{max-height:14rem;overflow:auto;margin-bottom:.625rem}
 /* 2.139.0 A (#2127): threads: the pane right of the conversation (desktop), the line under a first message, the thread view */
 .tcview.inthread{grid-template-columns:minmax(13rem,17rem) minmax(0,1fr) minmax(18rem,24rem)}
+/* 2.479.0 (#2814): the area "Chat" on a computer: its conversations are the panel, the page only the open one (and its thread) */
+.tcview.nolist{grid-template-columns:minmax(0,1fr)}
+.tcview.nolist.inthread{grid-template-columns:minmax(0,1fr) minmax(18rem,24rem)}
+.tcview.nolist .tcback{display:none}
+.tcview.listpage{grid-template-columns:minmax(0,1fr)}
+.tcview.listpage .tclist{border-right:0}
+#side .tcpanel .tcsec{padding:.625rem .5rem .125rem;font-size:var(--fs-xs)}
+#side .tcpanel .tcmute{display:inline-flex;color:var(--muted);flex:none}
 .tthpane{display:flex;flex-direction:column;min-width:0;min-height:0;border-left:1px solid var(--line);background:var(--bg)}
 .tthview{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0}
 .tthmsgs{flex:1;min-height:0}

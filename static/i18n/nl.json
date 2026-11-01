@@ -15831,5 +15831,6 @@
   "{0} finding in a client’s organisation stays: only its admins clean it up": ["{0} bevinding in de organisatie van een klant blijft: alleen haar admins ruimen die op", "{0} bevindingen in organisaties van klanten blijven: alleen hun admins ruimen die op"],
   "the history of your knowledge pages and the access history of your private files (the current state is in the file)": "de geschiedenis van je kennispagina's en de toegangsgeschiedenis van je privébestanden (de huidige stand staat in het bestand)",
   "Your files, knowledge pages and tables are here already from an earlier import: they were skipped.": "Je bestanden, kennispagina's en tabellen zijn er al van een eerdere import: ze zijn overgeslagen.",
-  "Your storage is too small for the files of this export: they need {0}, {1} are free. Free up space or ask for more storage, then upload the file again.": "Je opslag is te klein voor de bestanden van deze export: ze hebben {0} nodig, {1} is vrij. Maak ruimte vrij of vraag om meer opslag en upload het bestand daarna opnieuw."
+  "Your storage is too small for the files of this export: they need {0}, {1} are free. Free up space or ask for more storage, then upload the file again.": "Je opslag is te klein voor de bestanden van deze export: ze hebben {0} nodig, {1} is vrij. Maak ruimte vrij of vraag om meer opslag en upload het bestand daarna opnieuw.",
+  "All conversations": "Alle gesprekken"
 }
