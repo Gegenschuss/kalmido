@@ -75,6 +75,16 @@ DEFAULTS = {
 ID_RE = re.compile(r"(?<![Jj]ob )(?<![\w/])#(\d{1,9})\b")
 
 
+LOGGED = set()
+
+
+def log_once(msg):
+    """A configuration warning once per run of the runner, not every tick."""
+    if msg not in LOGGED:
+        LOGGED.add(msg)
+        log(msg)
+
+
 def log(msg):
     print(f"[{time.strftime('%H:%M:%S')}] dispatch: {msg}", file=sys.stderr, flush=True)
 
@@ -101,17 +111,21 @@ def load_config(project_dir):
     cfg = dict(DEFAULTS)
     if not os.path.isfile(path):
         return cfg, "no " + CONFIG_FILE
-    raw = load_json(path, None)
+    try:
+        with open(path, encoding="utf-8") as f:
+            raw = json.load(f)
+    except (OSError, ValueError):
+        raw = None
     if not isinstance(raw, dict):
         return cfg, CONFIG_FILE + " is no JSON object"
     unknown = sorted(k for k in raw if k not in DEFAULTS)
     if unknown:
-        log("unknown keys in the configuration left out: " + ", ".join(unknown))
+        log_once("unknown keys in the configuration left out: " + ", ".join(unknown))
     for k, v in raw.items():
         if k in DEFAULTS and (type(v) is type(DEFAULTS[k]) or (isinstance(DEFAULTS[k], float) and isinstance(v, int))):
             cfg[k] = v
         elif k in DEFAULTS:
-            log(f"configuration key {k}: wrong type, default kept")
+            log_once(f"configuration key {k}: wrong type, default kept")
     return cfg, "" if cfg["lists"] else "no lists in " + CONFIG_FILE
 
 

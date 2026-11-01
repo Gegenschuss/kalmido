@@ -188,7 +188,7 @@ check(len(tells) == 1 and "#107" in tells[0] and "approved" in tells[0], f"the o
 JOBS["501"] = {"id": 501, "state": "running", "created": time.time()}
 res = d.tick(force=True)
 check(res["states"][104] == "building" and len(STARTS) == 1, "a running job holds the place and its task is building")
-check(not [t for _, t in h.api.chats[1:] if t.startswith("Dispatcher:")], "a finding is told only once")
+check(len([t for _, t in h.api.chats if t.startswith("Dispatcher:")]) == 1, "a finding is told only once")
 JOBS["501"]["state"] = "done"
 res = d.tick(force=True)
 check(d.reg["tries"].get("104") == 1 and len(STARTS) == 2 and STARTS[1][0] == [104], f"an ended job counts one try, 104 again: {d.reg['tries']}")
