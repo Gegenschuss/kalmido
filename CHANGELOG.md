@@ -5,6 +5,14 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.468.3] - 2026-11-01
+
+### Fixed
+- main: p210_api follows complete in the bell default (#2980), the test still expected News off.
+
+### Fixed
+- CI of 2.468.2: the server's bell default now has "completed by others" on, like the settings and the tests of the train; p190_api and p210_api follow it, p210_ui no longer pins the number of notification rows (#2980)
+
 ## [2.468.2] - 2026-11-01
 
 ### Fixed
@@ -9739,7 +9747,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.468.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.468.3...HEAD
+[2.468.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.468.3
 [2.468.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.468.2
 [2.468.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.468.1
 [2.468.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.468.0
