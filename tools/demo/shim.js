@@ -1295,10 +1295,10 @@
   on('PUT', '/api/workload/capacity/(\\d+)', (q, b) => { DB.settings.capacity_h = b.hours == null || b.hours === '' ? '' : String(num(b.hours)); return {id: 1, capacity_h: num(DB.settings.capacity_h) || 40}; });
   // absences (kalmido/hub/absence.py): own ones, holidays of a chosen German state (the nationwide days + Easter based)
   const STATES = {BW: 'Baden-Württemberg', BY: 'Bayern', BE: 'Berlin', BB: 'Brandenburg', HB: 'Bremen', HH: 'Hamburg', HE: 'Hessen', MV: 'Mecklenburg-Vorpommern', NI: 'Niedersachsen',
+    NW: 'Nordrhein-Westfalen', RP: 'Rheinland-Pfalz', SL: 'Saarland', SN: 'Sachsen', ST: 'Sachsen-Anhalt', SH: 'Schleswig-Holstein', TH: 'Thüringen'};
   // 2.461 (#3773): the picker: first the country, then its regions
   const COUNTRIES = [{code: 'DE', name: 'Deutschland', regions: Object.fromEntries(Object.entries(STATES).filter(([k]) => k !== 'AT'))}, {code: 'AT', name: 'Österreich', regions: {}}];
   STATES.DE = 'Deutschland';
-    NW: 'Nordrhein-Westfalen', RP: 'Rheinland-Pfalz', SL: 'Saarland', SN: 'Sachsen', ST: 'Sachsen-Anhalt', SH: 'Schleswig-Holstein', TH: 'Thüringen'};
   const easter = y => { const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30,
     i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451), mo = Math.floor((h + l - 7 * m + 114) / 31), da = ((h + l - 7 * m + 114) % 31) + 1; return `${y}-${pad(mo)}-${pad(da)}`; };
   const holidays = (from, to) => { if (!MD().state) return []; const out = [];
