@@ -155,6 +155,8 @@ function ofdDraw() {
   const el = $('.office .ofcbody .pboffers') || $('.office .ofcbody'); if (el) ofdOffersTab(el);  // 2.47.3 (#1360): below the hint of an empty personal office
   ofd_crumbSync();
 }
+// a function, not typeof OFD in areas.js: the module comes later, and a typeof on a const of a later script can stay "undefined" in jsdom (p2380_b_buero_ui)
+function ofd_openDoc() { return OFD.doc; }
 // 2.356.0 C (#3004): the path line is drawn with the page (before the document has loaded) -> it follows the open document here
 function ofd_crumbSync() {
   if (typeof ofm_detail !== 'function') return;
