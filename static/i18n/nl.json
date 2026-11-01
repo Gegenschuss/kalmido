@@ -15819,5 +15819,8 @@
   "Required by the EU AI Act wherever people read its texts. Switch off only for a bot without AI.": "Vereist door de AI-verordening van de EU overal waar mensen zijn teksten lezen. Alleen uitzetten voor een bot zonder AI.",
   "Created with AI support": "Gemaakt met AI-ondersteuning",
   "Created by an AI agent. Texts for the public must be labelled as such, unless a person has checked them and takes responsibility.": "Gemaakt door een AI-agent. Teksten voor het publiek moeten dat vermelden, tenzij een mens ze heeft gecontroleerd en ervoor verantwoordelijk is.",
-  "Insert label": "Vermelding invoegen"
+  "Insert label": "Vermelding invoegen",
+  "Work the list off": "Lijst afwerken",
+  "Dry run": "Proefrun",
+  "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "De agent werkt de op zijn computer genoemde lijsten na elkaar af: is er een plek vrij, dan start hij de volgende job, en gebouwde taken sluit hij af. Proefrun = hij meldt alleen wat hij zou doen."
 }

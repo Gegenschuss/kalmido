@@ -705,7 +705,9 @@ def tidy_tick(c):
 RUNTIME_DEFAULTS = {"model": "", "autocompact": True, "autocompact_pct": None, "nightly_reset": "", "permission_mode": "",
                     "rotate_size": "medium", "rotate_runs": 60, "rotate_idle_min": 45,
                     "perm_user": None,  # 2.312.0 D (#3266): who answers a team agent's permission questions (None = as set up)
-                    "git_author_name": "", "git_author_email": "", "git_coauthor": False}  # 2.396.0 A (#3386)
+                    "git_author_name": "", "git_author_email": "", "git_coauthor": False,  # 2.396.0 A (#3386)
+                    "dispatch": ""}  # 2.481.0 (#3662): the starter's mechanical dispatcher: "" off, "dry" dry run, "on"
+DISPATCH_MODES = ("", "dry", "on")
 # 2.396.0 A (#3386): the git author the agent's host sets for its commits (public in GitHub). '' = the neutral default;
 # git_coauthor: whether the AI appends a Co-Authored-By line. A project with a repo may override name / mail (git_author_of).
 GIT_AUTHOR_DEFAULT = ("Kalmido", "noreply@kalmido.com")
@@ -819,6 +821,11 @@ def runtime_clean(cur, b):
         if not isinstance(b["git_coauthor"], bool):
             raise BadInput(tr("Invalid value: {0}", "git_coauthor"))
         out["git_coauthor"] = b["git_coauthor"]
+    if "dispatch" in b:  # 2.481.0 (#3662)
+        v = b["dispatch"] if b["dispatch"] is not None else ""
+        if v not in DISPATCH_MODES:
+            raise BadInput(tr("Invalid value: {0}", "dispatch"))
+        out["dispatch"] = v
     return out
 
 

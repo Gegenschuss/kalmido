@@ -15819,5 +15819,8 @@
   "Required by the EU AI Act wherever people read its texts. Switch off only for a bot without AI.": "Vorgabe der KI-Verordnung der EU, überall wo Menschen seine Texte lesen. Nur für einen Bot ohne KI ausschalten.",
   "Created with AI support": "Erstellt mit KI-Unterstützung",
   "Created by an AI agent. Texts for the public must be labelled as such, unless a person has checked them and takes responsibility.": "Von einem KI-Agenten erstellt. Bei Texten für die Öffentlichkeit musst du das kennzeichnen, außer ein Mensch hat ihn geprüft und verantwortet ihn.",
-  "Insert label": "Kennzeichnung einfügen"
+  "Insert label": "Kennzeichnung einfügen",
+  "Work the list off": "Liste abarbeiten",
+  "Dry run": "Trockenlauf",
+  "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "Der Agent arbeitet die auf seinem Computer genannten Listen nacheinander ab: Ist ein Platz frei, startet er den nächsten Job, und gebaute Aufgaben hakt er ab. Trockenlauf = er meldet nur, was er tun würde."
 }

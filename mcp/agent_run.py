@@ -738,6 +738,24 @@ TEXTS = {
     "status_outside_hours_at": {"en": "Outside working hours, back {0}", "de": "Außerhalb der Arbeitszeit, zurück {0}",
                                 "fr": "En dehors des heures de travail, de retour {0}", "es": "Fuera del horario de trabajo, vuelve {0}",
                                 "it": "Fuori dall'orario di lavoro, di ritorno {0}", "nl": "Buiten werktijd, terug {0}"},
+    # 2.481.0 (#3662): what the dispatcher (agent_dispatch.py) says in the person's chat and on a closed task
+    "dispatch_closed": {"en": "Built in commit {0} ({1}) - closed by the dispatcher.", "de": "Gebaut in Commit {0} ({1}) - vom Dispatcher abgehakt.", "fr": "Réalisé dans le commit {0} ({1}) - clôturé par le répartiteur.", "es": "Hecho en el commit {0} ({1}) - cerrado por el despachador.", "it": "Fatto nel commit {0} ({1}) - chiuso dal dispatcher.", "nl": "Gebouwd in commit {0} ({1}) - afgesloten door de dispatcher."},
+    "dispatch_on_branch": {"en": "{0} is built on branch {1} but not landed yet", "de": "{0} ist auf Zweig {1} gebaut, aber noch nicht übernommen", "fr": "{0} est réalisé sur la branche {1} mais pas encore intégré", "es": "{0} está hecho en la rama {1} pero aún no integrado", "it": "{0} è fatto sul ramo {1} ma non ancora integrato", "nl": "{0} is gebouwd op branch {1} maar nog niet samengevoegd"},
+    "dispatch_needs_yes": {"en": "{0} has a step without a way back: it starts once a person gives it the tag \"{1}\"", "de": "{0} hat einen Schritt ohne Rückweg: er startet, sobald eine Person die Markierung \"{1}\" setzt", "fr": "{0} contient une étape sans retour : elle démarre dès qu'une personne ajoute l'étiquette « {1} »", "es": "{0} tiene un paso sin vuelta atrás: empieza cuando una persona le pone la etiqueta \"{1}\"", "it": "{0} ha un passo senza ritorno: parte quando una persona aggiunge l'etichetta \"{1}\"", "nl": "{0} heeft een stap zonder weg terug: hij start zodra iemand het label \"{1}\" zet"},
+    "dispatch_stuck": {"en": "{0} stayed open after {1} jobs: it needs you", "de": "{0} blieb nach {1} Jobs offen: braucht dich", "fr": "{0} est resté ouvert après {1} tâches : il a besoin de toi", "es": "{0} sigue abierto tras {1} trabajos: te necesita", "it": "{0} è rimasto aperto dopo {1} job: serve il tuo aiuto", "nl": "{0} bleef open na {1} jobs: heeft jou nodig"},
+    "dispatch_stale": {"en": "Job {0} has reported nothing for {1} h", "de": "Job {0} meldet seit {1} h nichts", "fr": "La tâche {0} ne signale rien depuis {1} h", "es": "El trabajo {0} no informa nada desde hace {1} h", "it": "Il job {0} non segnala nulla da {1} h", "nl": "Job {0} meldt al {1} u niets"},
+    "dispatch_findings": {"en": "Dispatcher:", "de": "Dispatcher:", "fr": "Répartiteur :", "es": "Despachador:", "it": "Dispatcher:", "nl": "Dispatcher:"},
+    "dispatch_report": {"en": "Dispatcher, day report {0}:", "de": "Dispatcher, Tagesbericht {0}:", "fr": "Répartiteur, rapport du jour {0} :", "es": "Despachador, informe del día {0}:", "it": "Dispatcher, rapporto del giorno {0}:", "nl": "Dispatcher, dagrapport {0}:"},
+    "dispatch_report_dry": {"en": "Dispatcher (dry run, nothing changed), day report {0}:", "de": "Dispatcher (Trockenlauf, nichts geändert), Tagesbericht {0}:", "fr": "Répartiteur (essai à blanc, rien modifié), rapport du jour {0} :", "es": "Despachador (simulación, nada cambiado), informe del día {0}:", "it": "Dispatcher (prova a secco, nulla cambiato), rapporto del giorno {0}:", "nl": "Dispatcher (proefrun, niets gewijzigd), dagrapport {0}:"},
+    "dispatch_nothing": {"en": "no open tasks", "de": "keine offenen Aufgaben", "fr": "aucune tâche ouverte", "es": "ninguna tarea abierta", "it": "nessuna attività aperta", "nl": "geen open taken"},
+    "dispatch_brakes": {"en": "Held: {0}", "de": "Angehalten: {0}", "fr": "En pause : {0}", "es": "En pausa: {0}", "it": "In pausa: {0}", "nl": "Gepauzeerd: {0}"},
+    "dispatch_state_done": {"en": "built", "de": "gebaut", "fr": "réalisées", "es": "hechas", "it": "fatte", "nl": "gebouwd"},
+    "dispatch_state_building": {"en": "in a job", "de": "im Job", "fr": "en cours", "es": "en curso", "it": "in corso", "nl": "in een job"},
+    "dispatch_state_on_branch": {"en": "on a branch", "de": "auf einem Zweig", "fr": "sur une branche", "es": "en una rama", "it": "su un ramo", "nl": "op een branch"},
+    "dispatch_state_held": {"en": "held", "de": "zurückgehalten", "fr": "retenues", "es": "retenidas", "it": "trattenute", "nl": "aangehouden"},
+    "dispatch_state_needs_yes": {"en": "waiting for a yes", "de": "warten auf ein Ja", "fr": "attendent un oui", "es": "esperan un sí", "it": "attendono un sì", "nl": "wachten op een ja"},
+    "dispatch_state_stuck": {"en": "need you", "de": "brauchen dich", "fr": "ont besoin de toi", "es": "te necesitan", "it": "serve il tuo aiuto", "nl": "hebben jou nodig"},
+    "dispatch_state_ready": {"en": "ready", "de": "bereit", "fr": "prêtes", "es": "listas", "it": "pronte", "nl": "klaar"},
     "status_plan_limit": {"en": "Plan limit reached", "de": "Tarifgrenze erreicht", "fr": "Limite de l'abonnement atteinte",
                           "es": "Límite del plan alcanzado", "it": "Limite del piano raggiunto", "nl": "Limiet van het abonnement bereikt"},
     "status_plan_limit_at": {"en": "Plan limit reached, back at {0}", "de": "Tarifgrenze erreicht, zurück um {0}",
@@ -2152,6 +2170,26 @@ class Runner:
             self.queue_add(evs)
         return len(evs)
 
+    # kalmido-capability: dispatcher (2.481.0, #3662)
+    def dispatch_watch(self):
+        """2.481.0 (#3662): the mechanical dispatcher (agent_dispatch.py) -- switched on in Kalmido (runtime.dispatch dry | on)
+        or with KALMIDO_DISPATCH, it works the lists of KALMIDO-DISPATCH.json off: one tick every interval_min, closes built
+        tasks, starts the next job on a free place, guards the jobs, one day report. Off: nothing happens, no API call."""
+        if self.dry:
+            return None
+        try:
+            import agent_dispatch
+        except ImportError:
+            return None
+        if self.refresh_due:  # runtime_changed: the switch may have changed
+            self.refresh_agent()
+            self.refresh_due = True  # the next run reads the runtime too
+        if agent_dispatch.mode_of(self.agent) == "off":
+            return None
+        if getattr(self, "dispatcher", None) is None:
+            self.dispatcher = agent_dispatch.Dispatcher(self)
+        return self.dispatcher.tick()
+
     # kalmido-capability: approval_closed (2.44.0, #1441)
     def close_decided(self, uid, lines):
         """Lines of an ```approval-done block -> close (withdraw) exactly those open cards of this chat; never as a yes (only
@@ -2616,6 +2654,10 @@ class Runner:
                     self.job_watch()  # 2.46.6 (#1445): also right at the start (last_hk = 0): jobs lost by a restart
                 except Exception as e:
                     log(f"jobs: {type(e).__name__}")
+                try:
+                    self.dispatch_watch()  # 2.481.0 (#3662): the list worked off, when switched on (it keeps its own pace)
+                except Exception as e:
+                    log(f"dispatcher: {type(e).__name__}")
             ex = getattr(self, "extras", None)  # part B: a bundle of task events that is due runs without a new event
             due = bool(ex and ex.due())
             if not self.state.data["queue"] and not due:

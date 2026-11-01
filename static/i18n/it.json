@@ -15819,5 +15819,8 @@
   "Required by the EU AI Act wherever people read its texts. Switch off only for a bot without AI.": "Richiesto dal regolamento UE sull’IA ovunque le persone leggano i suoi testi. Disattiva solo per un bot senza IA.",
   "Created with AI support": "Creato con il supporto dell’IA",
   "Created by an AI agent. Texts for the public must be labelled as such, unless a person has checked them and takes responsibility.": "Creato da un agente IA. I testi per il pubblico devono indicarlo, a meno che una persona li abbia verificati e se ne assuma la responsabilità.",
-  "Insert label": "Inserisci indicazione"
+  "Insert label": "Inserisci indicazione",
+  "Work the list off": "Smaltire la lista",
+  "Dry run": "Prova a secco",
+  "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "L'agente lavora una dopo l'altra le liste indicate sul suo computer: quando un posto è libero avvia il job successivo e chiude le attività una volta fatte. Prova a secco = segnala solo cosa farebbe."
 }
