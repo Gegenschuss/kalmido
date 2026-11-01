@@ -38,6 +38,11 @@ from ..core.config import app, ATT_DIR, MAX_FILE_MB, PUBLIC_URL
 from ..core.config import USERNAME_RE  # 2.278.0 B (#3094)
 from ..accounts.orgs import visible_people as umz_visible  # 2.278.0 B (#3094)
 from ..core.serializers import unlink_files  # 2.464.0 (#3865)
+from ..files.upsafe import up_after_store, up_check, UploadRefused  # 2.464.0 (#3865): pulled up from functions
+from ..lists.projects import LIST_FILES_SUB
+from ..lists.tplextra import tx_keys
+from ..tasks.attachments import safe_name
+from .hosting import QuotaExceeded, quota_guard
 from ..core.db import body, bump, connect, db, err, iso, now_utc, parse_iso, usettings, uset, create_user, DataError, IntegrityError
 from ..core.pg import insert_id, system_ctx
 from ..core.errors import BadInput  # 2.273.0 A (#3030)
@@ -1146,10 +1151,6 @@ def umz_formulas(c, run, data):
 
 def umz_files(c, run, uid, me_old, zf, files, data):
     """Attachments and project files of a run."""
-    from ..admin.hosting import QuotaExceeded, quota_guard
-    from ..files.upsafe import up_after_store, up_check, UploadRefused
-    from ..lists.projects import LIST_FILES_SUB
-    from ..tasks.attachments import safe_name
     ts = iso(now_utc())
     # files: attachments + project files, sealed like an upload (orgcrypt) and counted against the quota
     for table, kind in (("attachments", "tasks"), ("list_files", "lists")):
@@ -1222,10 +1223,6 @@ def umz_files(c, run, uid, me_old, zf, files, data):
 def umz_template_files(c, run, uid, zf, files, data):
     """2.464.0 (#3865): the file copies of my templates, checked like an attachment, sealed for my account (lists/tplextra.py) and
     counted against the quota. The node key comes along as it is: templates.data keeps its keys (tx_keys)."""
-    from ..admin.hosting import QuotaExceeded, quota_guard
-    from ..files.upsafe import up_check, UploadRefused
-    from ..lists.tplextra import tx_keys
-    from ..tasks.attachments import safe_name
     ts = iso(now_utc())
     keys = {}  # template -> its node keys
     for r in data.get("template_files", []):

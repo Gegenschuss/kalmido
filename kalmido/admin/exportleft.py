@@ -3,6 +3,8 @@ reads this file without the app (the CI lint step), and a table with people's da
 manifests name these lines in not_included (left_lines), so "not in the file" comes from one list. The organisation export keeps its
 list in admin/orgexport.py OX_LEFT."""
 
+from ..core.i18n import tr
+
 _SECRET = "credentials, keys and link secrets"
 _SERVER = "state of this server (queues, limits, sign-in records, import records)"
 _DERIVED = "derived or working data, rebuilt on the target"
@@ -87,7 +89,6 @@ RX_LEFT_TABLES = {
 def left_lines(left, lg="en"):
     """{table: reason} -> the lines of a manifest's not_included: one per reason, with its tables. 2.464.0 (#3841): the reason in the
     language lg, the table names stay technical. The reasons are keys without N_ (core/i18nkeys.py reason_keys reads them)."""
-    from ..core.i18n import tr
     why = {}
     for t, r in sorted(left.items()):
         why.setdefault(r.replace(" (not_included)", ""), []).append(t)
