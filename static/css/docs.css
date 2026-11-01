@@ -43,7 +43,7 @@
 /* 2.476.0 (#3935): leafing through the open document: "3 of 48" with two arrows above the preview; the preview takes a
    sideways swipe (up / down scrolls the page), enlarged it moves with the finger; the next document glides in, the end springs back */
 .dc-nav{display:flex;align-items:center;justify-content:center;gap:.25rem;margin-bottom:-.25rem}
-.dc-navn{min-width:5.5rem;text-align:center;font-size:.8125rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.dc-navn{min-width:5.5rem;text-align:center;font-size:var(--fs-m);color:var(--muted);font-variant-numeric:tabular-nums}
 .dc-navb[disabled]{opacity:.35;pointer-events:none}
 .dc-prev{position:relative;touch-action:pan-y}
 .dc-prev.dc-zoomed{touch-action:none;cursor:grab}
