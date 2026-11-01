@@ -28,6 +28,7 @@ import stat
 from decimal import Decimal, ROUND_HALF_UP
 
 from .calc import calc_code, calc_lang, dec, money, fmt_money, fmt_qty
+from .doclang import doc_trans
 
 IND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "packs", "industry")
 DK_BLOCKS = ("staff", "share", "km", "meals", "hotel", "set", "free")
@@ -303,12 +304,17 @@ def _row_by_uid(rows):
     return {r.get("uid"): r for r in rows or [] if isinstance(r, dict) and r.get("uid")}
 
 
+def _tr_names(r):
+    """2.460.0 (#3767): {lang: name} of the master row (kept with a sheet row, like its name and name_en)."""
+    return {lg: x["name"] for lg, x in doc_trans(r).items() if isinstance(x, dict) and x.get("name")}
+
+
 def _role(c, oid, rid):
     try:
         rid = int(rid)
     except (TypeError, ValueError):
         return None
-    r = c.execute("SELECT id, name_de, name_en, rate_day, intext, markup_pct FROM office_roles WHERE id=? AND org_id=? AND kind='crew'",
+    r = c.execute("SELECT id, name_de, name_en, trans, rate_day, intext, markup_pct FROM office_roles WHERE id=? AND org_id=? AND kind='crew'",
                   (rid, oid)).fetchone()
     return dict(r) if r else None
 
@@ -318,7 +324,7 @@ def _service(c, oid, sid):
         sid = int(sid)
     except (TypeError, ValueError):
         return None
-    r = c.execute("SELECT id, name_de, name_en, daily_rate FROM office_services WHERE id=? AND org_id=? AND intext='shooting'",
+    r = c.execute("SELECT id, name_de, name_en, trans, daily_rate FROM office_services WHERE id=? AND org_id=? AND intext='shooting'",
                   (sid, oid)).fetchone()
     return dict(r) if r else None
 
@@ -350,10 +356,10 @@ def _equipment(c, oid, eid):
         eid = int(eid)
     except (TypeError, ValueError):
         return None
-    e = c.execute("SELECT id, name, name_en, daily_rate FROM office_equipment WHERE id=? AND org_id=?", (eid, oid)).fetchone()
+    e = c.execute("SELECT id, name, name_en, trans, daily_rate FROM office_equipment WHERE id=? AND org_id=?", (eid, oid)).fetchone()
     if not e:
         return None
-    return {"equipment_id": e["id"], "name": e["name"], "name_en": e["name_en"] or "", "qty": 1, "rate": _n(e["daily_rate"], 0)}
+    return {"equipment_id": e["id"], "name": e["name"], "name_en": e["name_en"] or "", "name_tr": _tr_names(e), "qty": 1, "rate": _n(e["daily_rate"], 0)}
 
 
 def dk_sheet_new(pack):
@@ -391,7 +397,7 @@ def dk_sheet_clean(c, oid, sheet_in, cur_sheet, admin):
         else:
             role = _role(c, oid, r.get("role_id"))
             if role:
-                row = {"uid": _uid(None), "role_id": role["id"], "name": role["name_de"], "name_en": role["name_en"] or "",
+                row = {"uid": _uid(None), "role_id": role["id"], "name": role["name_de"], "name_en": role["name_en"] or "", "name_tr": _tr_names(role),
                        "rate": _n(role["rate_day"], 0), "intext": _ie(role["intext"], "extern"),
                        "markup_pct": _n(role["markup_pct"], 0, hi=Decimal(1000))}
             elif admin and _txt(r.get("name")):  # a row without a role (admin only: it sets a price)
@@ -430,7 +436,7 @@ def dk_sheet_clean(c, oid, sheet_in, cur_sheet, admin):
         else:
             sv = _service(c, oid, r.get("service_id")) if r.get("service_id") else None
             if sv:
-                row = {"uid": _uid(None), "service_id": sv["id"], "name": sv["name_de"], "name_en": sv["name_en"] or "",
+                row = {"uid": _uid(None), "service_id": sv["id"], "name": sv["name_de"], "name_en": sv["name_en"] or "", "name_tr": _tr_names(sv),
                        "rate": _n(sv["daily_rate"], 0), "intext": "extern", "markup_pct": 0}
             else:
                 row = {"uid": _uid(None), "service_id": None, "name": "", "name_en": "", "rate": 0, "intext": "extern", "markup_pct": 0}
@@ -569,6 +575,8 @@ def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1, home="EUR")
     def name(r):
         if plg == "de":
             return r.get("name") or ""
+        if (r.get("name_tr") or {}).get(lg):  # 2.460.0 (#3767)
+            return r["name_tr"][lg]
         s = r.get("name_en") or r.get("name") or ""
         return roles.get(s.strip().lower()) or roles.get(str(r.get("name") or "").strip().lower()) or s
 

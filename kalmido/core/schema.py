@@ -4026,6 +4026,15 @@ MIGRATIONS = [
     # 2.454.0 (#3808): a proposal's title as JSON [key, *values] for the task's history: every reader gets it in their own
     # language, title stays the asker's. NULL = no key (an agent's own title). Older versions ignore it
     ("agent_jobs", "title_key", "ALTER TABLE agent_jobs ADD COLUMN IF NOT EXISTS title_key TEXT"),
+    # 2.460.0 (#3767): the own texts of an office in the languages beside German and English, JSON {lang: {field: text}} (fields:
+    # office/model.py MD, the de / en columns stay as they are); clients.doc_lang = the language of the client's documents and
+    # portal mails ('' = none). Older versions ignore them
+    ("office_services", "trans", "ALTER TABLE office_services ADD COLUMN IF NOT EXISTS trans TEXT NOT NULL DEFAULT '{}'"),
+    ("office_equipment", "trans", "ALTER TABLE office_equipment ADD COLUMN IF NOT EXISTS trans TEXT NOT NULL DEFAULT '{}'"),
+    ("office_texts", "trans", "ALTER TABLE office_texts ADD COLUMN IF NOT EXISTS trans TEXT NOT NULL DEFAULT '{}'"),
+    ("office_roles", "trans", "ALTER TABLE office_roles ADD COLUMN IF NOT EXISTS trans TEXT NOT NULL DEFAULT '{}'"),
+    ("office_contracts", "trans", "ALTER TABLE office_contracts ADD COLUMN IF NOT EXISTS trans TEXT NOT NULL DEFAULT '{}'"),
+    ("clients", "doc_lang", "ALTER TABLE clients ADD COLUMN IF NOT EXISTS doc_lang TEXT NOT NULL DEFAULT ''"),
     # 2.367.3 (#2971): failed polls in a row of a mailbox (reaches INTEG_FAILS: its people are told once). Older versions ignore it
     ("hub_mailboxes", "fails", "ALTER TABLE hub_mailboxes ADD COLUMN IF NOT EXISTS fails BIGINT NOT NULL DEFAULT 0"),
 ]

@@ -501,7 +501,8 @@ def _put_rows(c, oid, did, rows):
 def inv_default_texts(c, oid, s, kind, lang, level=1):
     """intro / closing of an invoice, credit note or reminder: the organisation's text (settings), else the pack's.
     2.40.0 (#1368): credit notes have their own closing (credit_closing), reminders an intro / closing per level 1-3.
-    2.185.0 C (#2520): nl / fr / es / it: the pack's texts translated, the organisation's own (de / en) text in English."""
+    2.185.0 C (#2520): nl / fr / es / it: the pack's texts translated, the organisation's own (de / en) text in English.
+    2.460.0 (#3767): the organisation's own text in that language comes first."""
     lang = doc_lg(lang)
     plg = "de" if lang == "de" else "en"
     pack = doc_pack(office_pack_for(s) or {}, lang)
@@ -514,13 +515,13 @@ def inv_default_texts(c, oid, s, kind, lang, level=1):
     if sal and intro:
         intro = sal + "\n" + intro
     if kind == "reminder":
-        closing = s.get("reminder_text_" + plg) or (texts.get("reminder_closing" + sfx) or texts.get("reminder_closing") or {}).get(lang) or ""
+        closing = s.get("reminder_text_" + lang) or s.get("reminder_text_" + plg) or (texts.get("reminder_closing" + sfx) or texts.get("reminder_closing") or {}).get(lang) or ""
     elif kind == "credit":
         closing = (texts.get("credit_closing") or {}).get(lang) or ""
     elif kind == "delivery":  # 2.296.0 D (#3167): a receipt line, not "please transfer"
-        closing = s.get("delivery_closing_" + plg) or (texts.get("delivery_closing") or {}).get(lang) or ""
+        closing = s.get("delivery_closing_" + lang) or s.get("delivery_closing_" + plg) or (texts.get("delivery_closing") or {}).get(lang) or ""
     else:
-        closing = s.get("invoice_closing_" + plg) or (texts.get("invoice_closing") or {}).get(lang) or ""
+        closing = s.get("invoice_closing_" + lang) or s.get("invoice_closing_" + plg) or (texts.get("invoice_closing") or {}).get(lang) or ""
     return intro, closing
 
 

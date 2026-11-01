@@ -1147,3 +1147,5 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
   .bwln{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 2.75rem;grid-template-areas:"k k k" "r g x"}
   .bwfoot .btn{flex:1 1 100%;max-width:100%;white-space:normal;justify-content:center}
 }
+/* 2.460.0 (#3767): the language tabs over the own texts of a form; a filled language in bold */
+.ofclts{margin:.25rem 0 .5rem}.ofclts .seg{flex-wrap:wrap;margin-bottom:.5rem}.ofclts .seg button.ltfill{font-weight:600}

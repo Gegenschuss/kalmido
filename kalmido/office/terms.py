@@ -54,15 +54,15 @@ from .model import office_gate, office_org, office_role, office_settings, office
 from .doclang import doc_lg
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
-AGB_LANGS = ("de", "en")
+AGB_LANGS = ("de", "en", "nl", "fr", "es", "it")  # 2.460.0 (#3767): every document language (was de / en)
 AGB_MAX_MB = 10
 AGB_MAIL_MAX_MB = 20  # all attachments of one document mail together
-AGB_FILE_RE = re.compile(r"terms-(de|en)-[0-9a-f]{16}\.pdf")
+AGB_FILE_RE = re.compile(r"terms-(de|en|nl|fr|es|it)-[0-9a-f]{16}\.pdf")
 AGB_NAME_MAX = 120
 AGB_GEN_KINDS = ("contract", "confirmation")  # documents from templates that carry the terms (framework contract, order confirmation)
 # printed in the document's language (like the other print words of office/pdf.py)
 AGB_LINE = N_("Our terms and conditions (as of {0}) apply, see attachment.|terms")  # 2.185.0 C (#2520): was a de / en table
-AGB_ATTACH = {"de": "AGB-Stand-{0}.pdf", "en": "Terms-{0}.pdf"}
+AGB_ATTACH = {"de": "AGB-Stand-{0}.pdf", "en": "Terms-{0}.pdf", "nl": "Voorwaarden-{0}.pdf", "fr": "CGV-{0}.pdf", "es": "Condiciones-{0}.pdf", "it": "Condizioni-{0}.pdf"}
 # 2.434.0 (#3619): the quotation PDF + the terms pages behind it, joined by pypdf in a limited child process (like
 # docs/split.py): stdin = 8 bytes length + the quotation + the terms, stdout = the joined PDF
 AGB_JOIN_WORKER = r"""
@@ -103,7 +103,8 @@ def agb_path(oid, name):
 
 
 def agb_lang(lang):
-    return "en" if str(lang or "").lower().startswith("en") else "de"
+    s = str(lang or "").lower()
+    return "en" if s.startswith("en") else s if s in AGB_LANGS else "de"
 
 
 def agb_all(c, oid):
@@ -120,7 +121,7 @@ def agb_cands(lang):
     """2.185.0 C (#2520): the terms languages a document in lang may use, in order: de / en its own; any other app language
     the English ones, else the German ones."""
     s = str(lang or "").lower()
-    return AGB_LANGS[::-1] if not s.startswith("en") and s != "de" and s in LANGS else (agb_lang(lang),)
+    return (s, "en", "de") if not s.startswith("en") and s != "de" and s in LANGS else (agb_lang(lang),)  # 2.460.0 (#3767): its own first
 
 
 def agb_pick(c, oid, lang):

@@ -309,9 +309,17 @@ mode: not checked yet) keeps its line in the list without the file (2.306.0).
   record purchase, depreciation and insurance values (see [Equipment value](#equipment-value-depreciation-and-insurance-list)).
 - **Contracts & insurance** (2.92.0, admins) - business contracts and insurances with notice deadlines, see
   [Contracts and insurance](#contracts-and-insurance).
-- **Text blocks** - reusable texts in German and English, grouped by kind: the rights catalogue (`rights_time`,
+- **Text blocks** - reusable texts per language, grouped by kind: the rights catalogue (`rights_time`,
   `rights_territory`, `rights_media`), introduction, closing, note, free block between positions, raw data note.
   The first call of the module copies the country pack's catalogue into the organisation's text blocks.
+- **Own texts per language** (2.460) - services, equipment, roles, text blocks, framework contracts and the invoice, delivery
+  note and reminder closings have one tab per language in their form. German and English stay in their columns, the others in
+  `trans` (`{"fr": {"name": "..."}}`, fields `name`, `text`, `rights_note`, `closing`); closings as settings such as
+  `invoice_closing_fr`. A language without its text prints the English one (a built-in standard text translated), else the
+  German one, and the document says so (`lang_notes`, `lang_gaps`). The terms PDF can be uploaded per language too.
+- **Language of a client** (2.460) - `doc_lang` in the client's billing details: new documents take it, choosing the client on
+  a draft swaps its language and standard texts, a language sent along wins; credit notes and reminders keep their invoice's.
+  Portal sign-in mails use it, and event invitations to the address of one of the inviting person's clients.
 - **Framework contracts** - one per agency or client: date, raw data included, default rights (three catalogue entries),
   rights note, closing text, special rates per service. A document can pick a contract and deviate from it.
   The signed contract and its addenda can be attached as PDF files in the contract's dialog ("Contract (PDF)": upload,

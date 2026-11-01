@@ -77,7 +77,9 @@ function ofu_sync(inp, d) {
   const q = parseNum(inp.value) ?? NaN;
   for (const o of sel.options) o.textContent = ofu_label(o.value, isNaN(q) ? 0 : q, d);
 }
-const ofdSvcName = (s, d) => (ofdLang(d) === 'en' ? s.name_en || s.name_de : s.name_de || s.name_en) || '';
+// 2.460.0 (#3767): the document's own language (ofdLang: the pack's de / en)
+const ofdTl = d => { const l = String((d || OFD.doc)?.lang || 'de'); return l.startsWith('en') ? 'en' : l; };
+const ofdSvcName = (s, d) => ofcOwn(s, 'name', ofdTl(d));
 
 // ---- loading
 // 2.358.0 B (#3302): a switch of kind / filter while a list loads is no longer dropped: the answer of the old one is thrown
@@ -290,9 +292,8 @@ function ofdEditorHtml() {
   const d = OFD.doc && OFD.doc.id === S.route.id ? OFD.doc : null;
   const back = `<button type="button" class="btn sm ofdback" data-ofd="back">${ic('left', 's')}<span>${ofdKindName(OFD.kind)}</span></button>`;
   if (!d) return `<div class="ofdhead">${back}</div>` + (OFD.err ? `<div class="empty">${ic('receipt')}<span>${esc(OFD.err)}</span></div>` : `<p class="muted lempty">${tr('Loading…')}</p>`);
-  const adm = ofcAdmin(), lg = ofdLang(d), t = d.totals || {};
-  const texts = kind => ofcRows('texts').filter(x => x.kind === kind && !x.archived);
-  const txtOpt = kind => texts(kind).map(x => [x.id, (x.key ? x.key + ': ' : '') + (lg === 'en' && !x.text_en && x.text_de ? tr('(no English text)') + ' ' : '') + ((lg === 'en' ? x.text_en || x.text_de : x.text_de || x.text_en) || '').slice(0, 70)]);  // 2.40.0 (#1381): no silent German
+  const adm = ofcAdmin(), t = d.totals || {};
+  const txtOpt = kind => ofcTextOpts(kind, ofdTl(d));  // 2.40.0 (#1381): no silent German
   const contracts = ofcRows('contracts').filter(x => !x.archived || x.id === d.contract_id).map(x => [x.id, x.name]);
   const clients = typeof clientsOn === 'function' && clientsOn() ? (S.clients || []).filter(c => (!c.archived && (c.org_id || null) === pb_clOrg()) || c.id === d.client_id).map(c => [c.id, cdn_label(c)]) : [];
   const lk = !!d.locked, inv = ofdIsInv(d), kind = d.kind, ro = !d.can_edit;
@@ -375,7 +376,9 @@ function ofdEditorHtml() {
   const logSec = adm ? ofdSec('log', tr('History'), ofdLogHtml(d)) : '';
   const ln = OFD.langNotes && OFD.langNotes.id === d.id && !lk ? OFD.langNotes.notes : [];  // 2.40.0 (#1381): what the language switch left as it was
   const langNote = ln.length ? `<div class="ofdlnote" role="status">${ic('info', 's')}<span>${tr('Language changed. Default texts were translated; these stayed as they were:')}<br>${ln.map(esc).join('<br>')}</span><button type="button" class="ib" data-ofd="ln-x" aria-label="${esc(tr('Close'))}">${ic('x', 's')}</button></div>` : '';
-  return `${head}${banner}${kind === 'invoice' && typeof rinBox === 'function' ? rinBox(d) : '' /* 2.91.0 A (#1923) */}${typeof oa_docBanner === 'function' ? oa_docBanner(d) : ''}${ofd_cfBar(d) /* 2.269.0 A (#3012) */}${langNote}${typeof sg_box === 'function' ? sg_box(d) : ''}${typeof pep_box === 'function' ? pep_box(d) : '' /* 2.154.0 B (#1960) */}${vf ? '' : ofr_linkHtml(d) + oil_linkHtml(d) /* 2.437.0 B (#3621): ofr_linkHtml; 2.356.0 C (#3003); 2.351 vf: no links into the master data */}<div class="ofdeditor${kind === 'delivery' ? ' ofdls' : ''}" data-fg="ofd:${d.id}" data-fg-live><fieldset class="ofdfs" ${ro ? 'disabled' : ''}>${headSec}</fieldset>${!vf && typeof dpj_rowHtml === 'function' ? dpj_rowHtml(d) : '' /* 2.168.0 A (#2665): outside the locked fieldset; 2.356.0 C (#3005): below the head (client first) */}<fieldset class="ofdfs" ${ro ? 'disabled' : ''}>${`<section class="ofdsec open"><h3>${kind === 'reminder' ? tr('Reminded invoices') : tr('Positions')}</h3>${items}${auto}${totals}</section>${!vf && typeof tpPartsHtml === 'function' ? tpPartsHtml(d, adm) : ''}` /* 2.113.0 (#2248): parts open in place in "Parts" */}${kind === 'reminder' || kind === 'delivery' ? '' : kind === 'offer' || oil_hasRights(d) ? rightsSec : ro ? '' : `<button type="button" class="btn sm oil_rtadd" data-ofd="rights-add">${ic('plus', 's')}<span>${tr('Transfer of rights')}</span></button>` /* 2.356.0 C (#3005): an invoice shows it once it has rights */}${textsSec}${kind === 'reminder' ? '' : fieldsSec}</fieldset>${kind === 'offer' && typeof cf8_box === 'function' ? cf8_box(d) : '' /* 2.88.0 (#1915) */}${ofdFeeHtml(d, adm)}${paySec}${logSec}</div>`;  // 2.50.0 (#1200): sg_box = the approval link of a sent quotation
+  const gaps = !ln.length && !lk ? d.lang_gaps || [] : [];  // 2.460.0 (#3767)
+  const gapNote = gaps.length ? `<div class="ofdlnote" role="status">${ic('info', 's')}<span>${tr('Some of your own texts are missing in this language:')}<br>${gaps.map(esc).join('<br>')}</span></div>` : '';
+  return `${head}${banner}${kind === 'invoice' && typeof rinBox === 'function' ? rinBox(d) : '' /* 2.91.0 A (#1923) */}${typeof oa_docBanner === 'function' ? oa_docBanner(d) : ''}${ofd_cfBar(d) /* 2.269.0 A (#3012) */}${langNote}${gapNote}${typeof sg_box === 'function' ? sg_box(d) : ''}${typeof pep_box === 'function' ? pep_box(d) : '' /* 2.154.0 B (#1960) */}${vf ? '' : ofr_linkHtml(d) + oil_linkHtml(d) /* 2.437.0 B (#3621): ofr_linkHtml; 2.356.0 C (#3003); 2.351 vf: no links into the master data */}<div class="ofdeditor${kind === 'delivery' ? ' ofdls' : ''}" data-fg="ofd:${d.id}" data-fg-live><fieldset class="ofdfs" ${ro ? 'disabled' : ''}>${headSec}</fieldset>${!vf && typeof dpj_rowHtml === 'function' ? dpj_rowHtml(d) : '' /* 2.168.0 A (#2665): outside the locked fieldset; 2.356.0 C (#3005): below the head (client first) */}<fieldset class="ofdfs" ${ro ? 'disabled' : ''}>${`<section class="ofdsec open"><h3>${kind === 'reminder' ? tr('Reminded invoices') : tr('Positions')}</h3>${items}${auto}${totals}</section>${!vf && typeof tpPartsHtml === 'function' ? tpPartsHtml(d, adm) : ''}` /* 2.113.0 (#2248): parts open in place in "Parts" */}${kind === 'reminder' || kind === 'delivery' ? '' : kind === 'offer' || oil_hasRights(d) ? rightsSec : ro ? '' : `<button type="button" class="btn sm oil_rtadd" data-ofd="rights-add">${ic('plus', 's')}<span>${tr('Transfer of rights')}</span></button>` /* 2.356.0 C (#3005): an invoice shows it once it has rights */}${textsSec}${kind === 'reminder' ? '' : fieldsSec}</fieldset>${kind === 'offer' && typeof cf8_box === 'function' ? cf8_box(d) : '' /* 2.88.0 (#1915) */}${ofdFeeHtml(d, adm)}${paySec}${logSec}</div>`;  // 2.50.0 (#1200): sg_box = the approval link of a sent quotation
 }
 // 2.38.0 (#1021, F1): the invoices a reminder lists (read-only rows), the payments of an invoice
 function ofdRefsHtml(d, t) {
@@ -750,11 +753,11 @@ async function ofdChange0(e) {
   if (f.startsWith('r-')) {
     const k = f.slice(2);
     if (['time', 'territory', 'media'].includes(k)) {  // a catalogue choice takes the catalogue's text
-      const tx = $('#ofd-r-' + k + '-t'); if (tx && t.value) tx.value = ofcText(+t.value, ofdLang(d));
+      const tx = $('#ofd-r-' + k + '-t'); if (tx && t.value) tx.value = ofcText(+t.value, ofdTl(d));
     }
     await ofdPatch({rights: ofdRightsBody()}); return;
   }
-  if (f === 'intro_pick' || f === 'closing_pick') { if (!t.value) return; const k = f.replace('_pick', ''); const ta = $('#ofd-' + k); const v = ofcText(+t.value, ofdLang(d)); if (ta) ta.value = v; await ofdPatch({[k]: v}); return; }
+  if (f === 'intro_pick' || f === 'closing_pick') { if (!t.value) return; const k = f.replace('_pick', ''); const ta = $('#ofd-' + k); const v = ofcText(+t.value, ofdTl(d)); if (ta) ta.value = v; await ofdPatch({[k]: v}); return; }
   if (f === 'recipient_name' || f === 'recipient_lines') { await ofdPatch({recipient: {name: $('#ofd-recipient_name')?.value ?? d.recipient?.name, lines: ($('#ofd-recipient_lines')?.value ?? (d.recipient?.lines || []).join('\n')).split('\n')}}); return; }
   if (f === 'client_id') { await ofdPatch({client_id: t.value ? +t.value : null, recipient_from_client: !!t.value}); return; }
   if (f === 'contract_id') { await ofdPatch({contract_id: t.value ? +t.value : null}); return; }
@@ -868,7 +871,7 @@ async function ofdClick(e) {
     const blocks = ofcRows('texts').filter(x => x.kind === 'block' && !x.archived);
     const add = async text => { d.items.push({kind: 'text', title: '', detail: text, qty: 1, unit: 'day', rate: 0, tax: 'standard', raw_fee: 0, producing: 0, intext: 'intern', cost: 0, discountable: 1}); if (text) await ofdPutItems(); else ofdDraw(); if (!text) $(`${sc}.ofdits [data-i="${d.items.length - 1}"][data-k="detail"]`)?.focus(); };
     if (!blocks.length) { await add(''); return; }
-    menu(b, [{label: tr('Free text'), icon: 'edit', fn: () => add('')}, '-', ...blocks.map(x => ({label: x.key || (x.text_de || x.text_en).slice(0, 50), fn: () => add(ofcText(x.id, ofdLang(d)))}))]);
+    menu(b, [{label: tr('Free text'), icon: 'edit', fn: () => add('')}, '-', ...blocks.map(x => ({label: x.key || (x.text_de || x.text_en).slice(0, 50), fn: () => add(ofcText(x.id, ofdTl(d)))}))]);
     return;
   }
   if (a === 'it-del') { d.items.splice(+b.dataset.i, 1); await ofdPutItems(); return; }

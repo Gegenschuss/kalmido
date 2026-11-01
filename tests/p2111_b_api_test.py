@@ -295,5 +295,17 @@ check(Ca.get(B + f"/api/evcals/{FCAL}/feed").status_code == 404, "nobody else re
 check(Fr.post(B + f"/api/evcals/{FCAL}/feed", json={"action": "off"}).json()["url"] is None and pub.get(B + feed_path(UF)).status_code == 404,
       "freelancer: off")
 
+# 2.460.0 (#3767): an invitation to the address of an own client goes out in the client's language
+A.patch(B + "/api/settings", json={"features": "cal,events,clients"})
+CAL = A.post(B + "/api/evcals", json={"name": "Termine Kunden", "org_id": None}).json()["id"]
+r = A.post(B + "/api/clients", json={"name": "Lumière SARL", "email": "Ext.Fr@example.com", "doc_lang": "fr", "org_id": None})
+check(r.status_code == 201, "a client with a language " + r.text[:200])
+r = A.post(B + "/api/events", json={"cal_id": CAL, "title": "Rendez-vous", "start": f"{D}T14:00", "end": f"{D}T15:00", "tz": "Europe/Berlin",
+                                    "send_invites": True, "attendees": [{"email": "ext.fr@example.com", "name": "Ext Fr"}]})
+check(r.status_code == 201, "an event for the client " + r.text[:200])
+m = wait_mail("ext.fr@example.com", 1)
+subj = parts(m[0])[0] if m else ""
+check(subj.startswith("Invitation : Rendez-vous"), "the invitation in French: " + subj)
+
 print(f"p2111_b_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

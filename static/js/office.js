@@ -136,7 +136,10 @@ document.addEventListener('click', e => {
 const ofcReload = kind => { if (kind) delete OFC.data[kind]; else OFC.data = {}; if (S.route.mod === 'office') ofcDraw(); };
 const ofcRows = kind => Array.isArray(OFC.data[kind]) ? OFC.data[kind] : [];
 const ofcRow = (kind, id) => ofcRows(kind).find(r => r.id === id);
-const ofcText = (id, lg) => { const t = ofcRow('texts', id); return t ? (lg === 'en' ? t.text_en || t.text_de : t.text_de || t.text_en) : ''; };
+// 2.460.0 (#3767): an own text in language lg: de / en in their columns, the others in r.trans[lg][base]; missing = English, then German
+const ofcOwn = (r, base, lg, de = base + '_de', en = base + '_en') => (lg === 'de' ? r[de] || r[en] : (lg !== 'en' && r.trans?.[lg]?.[base]) || r[en] || r[de]) || '';
+const ofcOwnGap = (r, base, lg, de = base + '_de', en = base + '_en') => lg === 'de' ? false : !(lg === 'en' ? r[en] : r.trans?.[lg]?.[base]) && !!(r[en] || r[de]);
+const ofcText = (id, lg) => { const t = ofcRow('texts', id); return t ? ofcOwn(t, 'text', lg) : ''; };
 
 // ---- the view
 function viewOffice() {
@@ -268,7 +271,28 @@ const ofcRowF = (id, label, field, hint, o) => `<div class="row"><label for="${i
 const imr_cur = () => `<span class="muted imrcur">${esc(ofcCur())}</span>`;  // 2.138.0 E (#2237)
 const ofcChk = (id, label, on) => `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${esc(label)}</label></div>`;
 // 2.40.0 (#1381): the choice shows the text in the field's language (lg); a block without English text says so
-const ofcTextOpts = (kind, lg) => ofcRows('texts').filter(t => t.kind === kind && !t.archived).map(t => [t.id, (t.key ? t.key + ': ' : '') + (lg === 'en' ? (t.text_en ? t.text_en.slice(0, 70) : tr('(no English text)') + ' ' + (t.text_de || '').slice(0, 50)) : (t.text_de || t.text_en).slice(0, 70))]);
+const ofcTextOpts = (kind, lg = 'de') => ofcRows('texts').filter(t => t.kind === kind && !t.archived).map(t => { const gap = ofcOwnGap(t, 'text', lg); return [t.id, (t.key ? t.key + ': ' : '') + (gap ? (lg === 'en' ? tr('(no English text)') : tr('(no text in this language)')) + ' ' : '') + ofcOwn(t, 'text', lg).slice(0, gap ? 50 : 70)]; });
+// 2.460.0 (#3767): one tab per language over the own texts of a form. fields: [{base, label, id: lg => input id, val: lg => value, rows, max, ph}]
+const ofcLangList = () => { const L = (S.languages || []).map(x => [x.code, x.name]); return L.length ? L : [['de', 'Deutsch'], ['en', 'English']]; };
+function ofcLangTabs(fields, o = {}) {
+  const ls = ofcLangList(), dis = o.dis || '';
+  const inp = (x, lg) => { const id = x.id(lg), ph = x.ph ? ` placeholder="${esc(x.ph)}"` : '', tr_ = ['de', 'en'].includes(lg) ? '' : ` data-tr="${esc(x.base)}" data-lg="${lg}"`;
+    return ofcRowF(id, x.label, x.rows ? `<textarea id="${id}" rows="${x.rows}" maxlength="${x.max || 8000}"${ph}${tr_} ${dis}>${esc(x.val(lg) || '')}</textarea>` : `<input id="${id}" value="${esc(x.val(lg) || '')}" maxlength="${x.max || 200}"${ph}${tr_} ${dis}>`); };
+  return `<div class="ofclts"><div class="seg" role="tablist" aria-label="${esc(tr('Language'))}">${ls.map(([lg, n], i) => `<button type="button" role="tab" data-lt="${lg}" aria-selected="${i ? 'false' : 'true'}" class="${i ? '' : 'on'}${fields.some(x => x.val(lg)) ? ' ltfill' : ''}">${esc(n)}</button>`).join('')}</div>
+    ${ls.map(([lg], i) => `<div data-ltp="${lg}" role="tabpanel"${i ? ' hidden' : ''}>${fields.map(x => inp(x, lg)).join('')}</div>`).join('')}</div>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-lt]'), box = b?.closest('.ofclts');
+  if (!box) return;
+  for (const x of $$('[data-lt]', box)) { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-selected', on ? 'true' : 'false'); }
+  for (const p of $$('[data-ltp]', box)) p.hidden = p.dataset.ltp !== b.dataset.lt;
+});
+const ofcTrField = (r, base, de, en, o) => ({base, id: lg => lg === 'de' ? 'of-' + de : lg === 'en' ? 'of-' + en : `of-tr-${base}-${lg}`, val: lg => lg === 'de' ? r?.[de] : lg === 'en' ? r?.[en] : r?.trans?.[lg]?.[base], ...o});
+const ofcTransBody = md => { const t = {}; for (const el of $$('[data-tr]', md)) (t[el.dataset.lg] ||= {})[el.dataset.tr] = el.value; return t; };
+// 2.460.0 (#3767): the office's own closing texts, one tab per language
+const OST_CLOSE = [['inv', 'invoice_closing', N_('Invoice closing')], ['dl', 'delivery_closing', N_('Delivery note closing')], ['rm', 'reminder_text', N_('Payment reminder closing')]];
+const ost_closeId = (k, lg) => `os-${k}-${k === 'rm' ? 'text' : 'close'}-${lg}`;
+const ofcClosingTabs = (s, dis) => ofcLangTabs(OST_CLOSE.filter(([k]) => k !== 'dl' || ofcFeat('docs.delivery')).map(([k, key, n]) => ({base: key, label: tr(n), id: lg => ost_closeId(k, lg), val: lg => s[`${key}_${lg}`], rows: 2, max: 3000, ph: tr('empty = the default text')})), {dis});
 function ofcModal(kind, r) {
   // 2.451.0 (#3809): the service dialog waits for the roles: built before them its choice read "none" and Save wiped the role
   if (kind === 'services' && !OFC.data.roles) {
@@ -282,7 +306,7 @@ function ofcModal(kind, r) {
   let f = '';
   if (kind === 'services') {
     const cats = [...new Set(ofcRows('services').map(x => x.category).filter(Boolean))];
-    f = ofcRowF('of-name_de', tr('Name (German)'), ofcIn('of-name_de', r?.name_de)) + ofcRowF('of-name_en', tr('Name (English)'), ofcIn('of-name_en', r?.name_en))
+    f = ofcLangTabs([ofcTrField(r, 'name', 'name_de', 'name_en', {label: tr('Name')})])
       + ofcRowF('of-category', tr('Category'), ofcIn('of-category', r?.category, {max: 80, list: 'of-cats', ph: tr('e.g. Video, Audio, Office')})) + `<datalist id="of-cats">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`
       + ofcRowF('of-unit', tr('Unit'), ofcSel('of-unit', r?.unit || 'day', OFC_UNITS.map(([v, n]) => [v, tr(n)])))
       // 2.138.0 E (#2237): the currency beside the field, not below it
@@ -295,11 +319,11 @@ function ofcModal(kind, r) {
       + ofcRowF('of-role_id', tr('Freelancer role'), ofcSel('of-role_id', r?.role_id, ofcRows('roles').filter(x => !x.archived || x.id === r?.role_id).map(x => [x.id, x.name_de]), tr('none')))
       + (r?.role ? ofcRowF('of-role', tr('Role'), ofcIn('of-role', r.role, {max: 80})) : `<input type="hidden" id="of-role" value="">`) + ofcRowF('of-sort', tr('Order'), ofcIn('of-sort', r?.sort ?? '', {num: true}));
   } else if (kind === 'roles') {  // 2.47.0 (#1649): purchase prices only for admins (members do not get them)
-    f = ofcRowF('of-name_de', tr('Name (German)'), ofcIn('of-name_de', r?.name_de)) + ofcRowF('of-name_en', tr('Name (English)'), ofcIn('of-name_en', r?.name_en))
+    f = ofcLangTabs([ofcTrField(r, 'name', 'name_de', 'name_en', {label: tr('Name')})])
       + (adm ? ofcRowF('of-cost_day', tr('Purchase per day'), ofcIn('of-cost_day', rate(r?.cost_day), {num: true}), ofcCur(), {keep: 1}) + ofcRowF('of-cost_hour', tr('Purchase per hour'), ofcIn('of-cost_hour', rate(r?.cost_hour), {num: true}), ofcCur(), {keep: 1}) : '')
       + ofcRowF('of-sort', tr('Order'), ofcIn('of-sort', r?.sort ?? '', {num: true}));
   } else if (kind === 'crew') {
-    f = ofcRowF('of-name_de', tr('Name (German)'), ofcIn('of-name_de', r?.name_de)) + ofcRowF('of-name_en', tr('Name (English)'), ofcIn('of-name_en', r?.name_en))
+    f = ofcLangTabs([ofcTrField(r, 'name', 'name_de', 'name_en', {label: tr('Name')})])
       + ofcRowF('of-rate_day', tr('Daily rate'), ofcIn('of-rate_day', rate(r?.rate_day), {num: true}), ofcCur(), {keep: 1})
       + ofcRowF('of-intext', tr('Internal / external'), ofcSel('of-intext', r?.intext || 'extern', [['extern', tr('external')], ['intern', tr('internal')]]))
       + (adm ? ofcRowF('of-markup_pct', tr('Markup'), ofcIn('of-markup_pct', r?.markup_pct != null ? fmtNum(r.markup_pct, 1) : '', {num: true, ph: tr('optional')}), '%') : '')
@@ -307,7 +331,7 @@ function ofcModal(kind, r) {
   } else if (kind === 'equipment') {
     const cats = [...new Set(ofcRows('equipment').map(x => x.category).filter(Boolean))];
     // 2.45.1 (#1556): German + English name, like a service
-    f = ofcRowF('of-name', tr('Name (German)'), ofcIn('of-name', r?.name)) + ofcRowF('of-name_en', tr('Name (English)'), ofcIn('of-name_en', r?.name_en)) + ofcRowF('of-category', tr('Category'), ofcIn('of-category', r?.category, {max: 80, list: 'of-cats'})) + `<datalist id="of-cats">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`
+    f = ofcLangTabs([ofcTrField(r, 'name', 'name', 'name_en', {label: tr('Name')})]) + ofcRowF('of-category', tr('Category'), ofcIn('of-category', r?.category, {max: 80, list: 'of-cats'})) + `<datalist id="of-cats">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`
       + ofcRowF('of-daily_rate', tr('Daily rate'), ofcIn('of-daily_rate', rate(r?.daily_rate), {num: true}), ofcCur(), {keep: 1}) + astFields(r);  // 2.92.0 B (#1931)
   } else if (kind === 'sets') {
     const eq = ofcRows('equipment').filter(x => !x.archived).map(x => [x.id, x.name]);
@@ -316,8 +340,7 @@ function ofcModal(kind, r) {
       + `<div class="row"><label>${tr('Devices')}</label></div><div id="of-items" class="ofcitems">${items.map(it => ofcSetItemHtml(eq, it)).join('')}</div>${adm ? `<button type="button" class="btn sm" data-m="add-item">${ic('plus', 's')} ${tr('Add device')}</button>` : ''}`;
   } else if (kind === 'texts') {
     f = ofcRowF('of-kind', tr('Kind'), ofcSel('of-kind', r?.kind || 'block', OFC_TEXT_KINDS.map(([v, n]) => [v, tr(n)]))) + ofcRowF('of-key', tr('Short name'), ofcIn('of-key', r?.key, {max: 80, ph: tr('optional')}))
-      + `<div class="row"><label for="of-text_de">${tr('Text (German)')}</label><textarea id="of-text_de" rows="4" maxlength="8000">${esc(r?.text_de || '')}</textarea></div>`
-      + `<div class="row"><label for="of-text_en">${tr('Text (English)')}</label><textarea id="of-text_en" rows="4" maxlength="8000">${esc(r?.text_en || '')}</textarea></div>` + ofcRowF('of-sort', tr('Order'), ofcIn('of-sort', r?.sort ?? '', {num: true}));
+      + ofcLangTabs([ofcTrField(r, 'text', 'text_de', 'text_en', {label: tr('Text'), rows: 4})]) + ofcRowF('of-sort', tr('Order'), ofcIn('of-sort', r?.sort ?? '', {num: true}));
   } else if (kind === 'contracts') {
     const cl = (typeof clientsOn === 'function' && clientsOn()) ? (S.clients || []).filter(c => !c.archived).map(c => [c.id, cdn_label(c)]) : [];
     const svc = ofcRows('services').filter(x => !x.archived);
@@ -330,10 +353,7 @@ function ofcModal(kind, r) {
       + ofcRowF('of-rights_time_id', tr('Rights: duration'), ofcSel('of-rights_time_id', r?.rights_time_id, ofcTextOpts('rights_time'), tr('none')))
       + ofcRowF('of-rights_territory_id', tr('Rights: territory'), ofcSel('of-rights_territory_id', r?.rights_territory_id, ofcTextOpts('rights_territory'), tr('none')))
       + ofcRowF('of-rights_media_id', tr('Rights: media'), ofcSel('of-rights_media_id', r?.rights_media_id, ofcTextOpts('rights_media'), tr('none')))
-      + `<div class="row"><label for="of-rights_note_de">${tr('Rights note (German)')}</label><textarea id="of-rights_note_de" rows="2" maxlength="8000">${esc(r?.rights_note_de || '')}</textarea></div>`
-      + `<div class="row"><label for="of-rights_note_en">${tr('Rights note (English)')}</label><textarea id="of-rights_note_en" rows="2" maxlength="8000">${esc(r?.rights_note_en || '')}</textarea></div>`
-      + `<div class="row"><label for="of-closing_de">${tr('Closing (German)')}</label><textarea id="of-closing_de" rows="2" maxlength="8000">${esc(r?.closing_de || '')}</textarea></div>`
-      + `<div class="row"><label for="of-closing_en">${tr('Closing (English)')}</label><textarea id="of-closing_en" rows="2" maxlength="8000">${esc(r?.closing_en || '')}</textarea></div>`
+      + ofcLangTabs([ofcTrField(r, 'rights_note', 'rights_note_de', 'rights_note_en', {label: tr('Rights note'), rows: 2}), ofcTrField(r, 'closing', 'closing_de', 'closing_en', {label: tr('Closing'), rows: 2})])
       + `<details class="ofcrates"><summary>${tr('Special rates')} <span class="muted">(${Object.keys(rates).length})</span></summary><div class="ofcrl">${svc.map(s => `<div class="row"><label for="of-rate-${s.id}">${esc(s.name_de)}</label><input id="of-rate-${s.id}" data-rate="${s.id}" inputmode="decimal" class="numin" value="${rates[s.id] != null ? esc(fmtNum(rates[s.id], 2)) : ''}" placeholder="${esc(s.daily_rate != null ? fmtNum(s.daily_rate, 2) : '–')}"></div>`).join('') || `<p class="muted">${tr('Add services first.')}</p>`}</div></details>`
       + `<div class="row"><label for="of-note">${tr('Note')}</label><textarea id="of-note" rows="2" maxlength="8000">${esc(r?.note || '')}</textarea></div>`;
   }
@@ -377,6 +397,7 @@ function ofcModal(kind, r) {
           rights_media_id: +v('#of-rights_media_id') || null, rights_note_de: v('#of-rights_note_de'), rights_note_en: v('#of-rights_note_en'), closing_de: v('#of-closing_de'), closing_en: v('#of-closing_en'), rates, note: v('#of-note')});
         if ($('#of-client_id', md)) body.client_id = +v('#of-client_id') || null;
       }
+      if (['services', 'roles', 'crew', 'equipment', 'texts', 'contracts'].includes(kind)) body.trans = ofcTransBody(md);  // 2.460.0 (#3767)
       if ($('#of-archived', md)) body.archived = $('#of-archived', md).checked ? 1 : 0;
       if (r?.updated_at) body.expect_updated_at = r.updated_at;  // 2.269.0 C (#3017): saved elsewhere meanwhile -> 409, never overwritten
       const sv = await (r?.updated_at ? rawFetch : api)(r ? 'PATCH' : 'POST', r ? `/api/office/${kind}/${r.id}` : `/api/office/${kind}`, body);
@@ -469,12 +490,7 @@ function ofcSettingsHtml() {
     ${typeof ccn_settingsHtml === 'function' ? ccn_settingsHtml(dis) : '' /* 2.444.0 (#3447): the reminder of the card positions without a receipt */}
     ${typeof rcm_settingsHtml === 'function' ? rcm_settingsHtml() : '' /* 2.424.0 B (#3450): receipts by e-mail */}
     </fieldset>${ost_p('docs', dis)}
-    ${ofcRowF('os-inv-close-de', tr('Invoice closing (German)'), `<textarea id="os-inv-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the default text'))}" ${dis}>${esc(s.invoice_closing_de || '')}</textarea>`)}
-    ${ofcRowF('os-inv-close-en', tr('Invoice closing (English)'), `<textarea id="os-inv-close-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the default text'))}" ${dis}>${esc(s.invoice_closing_en || '')}</textarea>`)}
-    ${ofcFeat('docs.delivery') ? ofcRowF('os-dl-close-de', tr('Delivery note closing (German)'), `<textarea id="os-dl-close-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the default text'))}" ${dis}>${esc(s.delivery_closing_de || '')}</textarea>`) : ''}
-    ${ofcFeat('docs.delivery') ? ofcRowF('os-dl-close-en', tr('Delivery note closing (English)'), `<textarea id="os-dl-close-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the default text'))}" ${dis}>${esc(s.delivery_closing_en || '')}</textarea>`) : ''}
-    ${ofcRowF('os-rm-text-de', tr('Payment reminder closing (German)'), `<textarea id="os-rm-text-de" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the default text'))}" ${dis}>${esc(s.reminder_text_de || '')}</textarea>`)}
-    ${ofcRowF('os-rm-text-en', tr('Payment reminder closing (English)'), `<textarea id="os-rm-text-en" rows="2" maxlength="3000" placeholder="${esc(tr('empty = the default text'))}" ${dis}>${esc(s.reminder_text_en || '')}</textarea>`)}
+    ${ofcClosingTabs(s, dis)}
     <h3>${tr('Calculation rules')}</h3>
     <p class="shint">${tr('Default for new quotations, can be changed in each quotation')}</p>
     ${psh ? `${ofcChk('os-prod-on', tr('{0} by amount', pshl), s.producing_on)}
@@ -740,7 +756,7 @@ function ofcSettingsBody(form) {
     raw_factor: ofcNum(v('#os-rf'), true),  // 2.113.1 (#2251): producing only through an industry pack's option (below)
     ...($('#os-sf', form) ? {share_factor: ofcNum(v('#os-sf'), true), share_rate: ofcNum(v('#os-sr')), producing_service_id: +v('#os-ps') || null, producing_on: $('#os-prod-on', form)?.checked ? 1 : 0} : {}),
     raw_on: $('#os-raw-on', form)?.checked ? 1 : 0,
-    ...($('#os-ls-scheme', form) ? {delivery_scheme: v('#os-ls-scheme'), delivery_closing_de: v('#os-dl-close-de'), delivery_closing_en: v('#os-dl-close-en')} : {}),  // 2.434.0 B (#3608): hidden while delivery notes are off
+    ...($('#os-ls-scheme', form) ? {delivery_scheme: v('#os-ls-scheme'), ...ost_closeBody('dl', v)} : {}),  // 2.434.0 B (#3608): hidden while delivery notes are off
     ...($('#os-accept-on', form) ? {accept_on: $('#os-accept-on', form).checked ? 1 : 0} : {}),  // 2.114.4 B (#2270)
     ...($('#os-sign-offers', form) ? {sign_offers: $('#os-sign-offers', form).checked ? 1 : 0} : {}),  // 2.357.0 C (#3158)
     ...($('#os-portal-docs', form) ? {portal_docs: $('#os-portal-docs', form).checked ? 1 : 0} : {}),  // 2.120.0 B (#2088)
@@ -757,7 +773,7 @@ function ofcSettingsBody(form) {
     ...($('#os-datev', form) ? {datev_email: v('#os-datev').trim(), datev_auto: $('#os-datev-auto', form)?.checked ? 1 : 0} : {}),
     ...($('#os-tax-std', form) ? {tax_rates: Object.fromEntries([['standard', ofcNum(v('#os-tax-std'))], ['reduced', ofcNum(v('#os-tax-red'))]].filter(x => x[1] != null))} : {}),
     ...($('#os-ret', form) ? {retention_years: ofcNum(v('#os-ret'))} : {}),
-    invoice_closing_de: v('#os-inv-close-de'), invoice_closing_en: v('#os-inv-close-en'), reminder_text_de: v('#os-rm-text-de'), reminder_text_en: v('#os-rm-text-en')};
+    ...ost_closeBody('inv', v), ...ost_closeBody('rm', v)};
   if (typeof tpSettingsBody === 'function') Object.assign(body, tpSettingsBody(form));  // 2.47.0 (#1215)
   if (typeof dun_settingsBody === 'function') Object.assign(body, dun_settingsBody(form));  // 2.147.1 B (#2054)
   if (typeof dx_settingsBody === 'function' && $('.dxset', form)) Object.assign(body, dx_settingsBody(form));  // 2.47.3 (#1460); 2.147.0 (#2460): only while DATEV is on
@@ -833,11 +849,12 @@ function biz_jump(box) {
 }
 // every field saves itself: the part of the PUT body that belongs to it (null = no setting: the country's text field, search, ...);
 // a group the server keeps together goes as one (the DATEV booking export)
+const ost_closeBody = (k, v) => { const key = OST_CLOSE.find(x => x[0] === k)[1], o = {}; for (const [lg] of ofcLangList()) { const id = '#' + ost_closeId(k, lg); if ($(id)) o[`${key}_${lg}`] = v(id); } return o; };
 const OST_FLAT = {'os-color': 'color', 'os-lang': 'lang', 'os-currency': 'currency', 'os-home': 'home_currency', 'os-scheme': 'offer_scheme', 'os-numat': 'offer_number_at',
   'os-valid': 'offer_valid_days', 'os-small': 'small_business', 'os-inv-scheme': 'invoice_scheme', 'os-cr-scheme': 'credit_scheme', 'os-cr-shared': 'credit_shared', 'os-rm-scheme': 'reminder_scheme',
   'os-paydays': 'payment_days', 'os-rmfee': 'reminder_fee', 'os-rmdays': 'reminder_deadline_days', 'os-einv': 'einvoice_format', 'os-datev': 'datev_email',
-  'os-datev-auto': 'datev_auto', 'os-inv-close-de': 'invoice_closing_de', 'os-inv-close-en': 'invoice_closing_en', 'os-dl-close-de': 'delivery_closing_de', 'os-dl-close-en': 'delivery_closing_en', 'os-rm-text-de': 'reminder_text_de',
-  'os-rm-text-en': 'reminder_text_en', 'os-prod-on': 'producing_on', 'os-pq': 'prod_quotient', 'os-ps': 'producing_service_id', 'os-pr': 'producing_rate',
+  'os-datev-auto': 'datev_auto', ...Object.fromEntries(OST_CLOSE.flatMap(([k, key]) => ['de', 'en', 'nl', 'fr', 'es', 'it'].map(lg => [ost_closeId(k, lg), `${key}_${lg}`]))),
+  'os-prod-on': 'producing_on', 'os-pq': 'prod_quotient', 'os-ps': 'producing_service_id', 'os-pr': 'producing_rate',
   'os-counter': 'offer_counter',  // 2.118.0 A (#2265)
   'os-paper': 'paper',  // 2.357.0 A (#3156)
   'os-logo-size': 'logo_size', 'os-logo-pos': 'logo_pos',  // 2.406.0 (#3501)

@@ -21,7 +21,7 @@ from ..core.errors import BadInput, BadKey, DeniedKey
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
 from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES, TAX_KEYS, dec, fmt_money, fmt_rate, inv_calc, office_calc
 from .packs import office_pack_for
-from .doclang import DOC_LANGS, doc_lg, doc_pack, doc_word  # 2.185.0 C (#2520)
+from .doclang import DOC_LANGS, doc_client_lang, doc_lg, doc_own, doc_pack, fd_lang_gaps  # 2.185.0 C (#2520); 2.460.0 (#3767)
 from .sheet import dk_pack, dk_packs_on
 from .undo import oun_post, oun_pre
 from .otrash import otb_put  # 2.272.0 E2 (#3038)
@@ -171,10 +171,10 @@ def _iid(v):
 def _text_of(c, oid, tid, lang):
     if not tid:
         return None
-    r = c.execute("SELECT text_de, text_en FROM office_texts WHERE id=? AND org_id=?", (_iid(tid), oid)).fetchone()
+    r = c.execute("SELECT text_de, text_en, trans FROM office_texts WHERE id=? AND org_id=?", (_iid(tid), oid)).fetchone()
     if not r:
         return None
-    return (doc_word(r["text_en"], lang) if doc_lg(lang) != "de" else r["text_de"]) or r["text_de"] or r["text_en"] or ""  # 2.185.0 C: nl / fr / es / it English (doc_word)
+    return doc_own(r, lang, "text")[0] or r["text_de"] or r["text_en"] or ""  # 2.460.0 (#3767): its own language, else English (doc_own)
 
 
 def _contract(c, oid, cid):
@@ -487,6 +487,8 @@ def doc_public(c, oid, r, admin, items=True):
     for k in ("sender", "recipient_snapshot", "tax_snapshot"):
         d.pop(k, None)  # the frozen copies stay on the server (the print model shows them)
     d["locked"] = locked
+    if items and not locked:  # 2.460.0 (#3767): own texts missing in the document's language
+        d["lang_gaps"] = fd_lang_gaps(c, oid, r, d.get("items") or [])
     d["locked_by_name"] = ""
     if locked and r["locked_by"]:
         u = c.execute("SELECT display_name, username FROM users WHERE id=?", (r["locked_by"],)).fetchone()
@@ -611,7 +613,7 @@ def _rights_from_contract(c, oid, ct, lang):
     for dim, col in (("time", "rights_time_id"), ("territory", "rights_territory_id"), ("media", "rights_media_id")):
         tid = ct.get(col)
         out[dim] = {"id": tid, "text": _text_of(c, oid, tid, lang) or ""} if tid else {"id": None, "text": ""}
-    out["note"] = (ct.get("rights_note_en") if doc_lg(lang) != "de" else ct.get("rights_note_de")) or ct.get("rights_note_de") or ""
+    out["note"] = doc_own(ct, lang, "rights_note")[0] or ""
     return out
 
 
@@ -624,7 +626,7 @@ def _default_text(c, oid, s, kind, lang):
     if t is None:
         rows = _texts(c, oid, kind)
         if rows:
-            t = (doc_word(rows[0]["text_en"], lang) if plg == "en" else rows[0]["text_de"]) or rows[0]["text_de"]
+            t = doc_own(rows[0], lang, "text")[0] or rows[0]["text_de"]
     if t is None:
         pack = doc_pack(office_pack_for(s) or {}, lang)
         pt = (pack.get("texts") or {}).get(kind) or {}
@@ -643,8 +645,8 @@ def _apply_contract(c, oid, f, ct, lang, cur_rights):
     rights = dict(cur_rights or {})
     rights.update(_rights_from_contract(c, oid, ct, lang))
     f["rights"] = json.dumps(rights, ensure_ascii=False)
-    closing = (ct.get("closing_en") if doc_lg(lang) != "de" else ct.get("closing_de")) or ""
-    if closing:
+    closing, miss = doc_own(ct, lang, "closing")
+    if closing and miss != "de":
         f["closing"] = closing
 
 
@@ -664,6 +666,11 @@ def clean_doc(c, oid, b, cur, admin):
     lang = cur["lang"]
     if "lang" in b:
         f["lang"] = lang = _choice(b.get("lang"), "lang", DOC_LANGS)  # 2.185.0 C (#2520): every app language
+    elif b.get("client_id") and _iid(b["client_id"]) != _cur_val(cur, "client_id") and cur["kind"] not in ("credit", "reminder"):
+        # 2.460.0 (#3767): a newly chosen client brings its language (credit notes and reminders keep their invoice's)
+        lg_ = doc_client_lang(c, oid, b["client_id"])
+        if lg_ and lg_ != lang:
+            f["lang"] = lang = lg_
     if "currency" in b:  # 2.189.0 (#2475): every currency of homecur.HC_CODES (was EUR / USD)
         f["currency"] = _choice(str(b.get("currency") or "").upper(), "currency", HC_CODES)
     if "fx_rate" in b:
@@ -821,7 +828,7 @@ def clean_items(c, oid, r, items, admin, part=None):
                 row["service_id"] = sv["id"]
                 unit = it.get("unit") or sv["unit"] or "day"
                 if not row["title"]:
-                    row["title"] = (sv["name_en"] if doc_lg(lang) != "de" else sv["name_de"]) or sv["name_de"]
+                    row["title"] = doc_own(sv, lang, "name")[0] or sv["name_de"]
                 rate = it.get("rate")
                 if rate in (None, ""):
                     if ct and str(sv["id"]) in (ct.get("rates") or {}):
@@ -865,7 +872,8 @@ def doc_create(c, oid, uid, b, admin, number=True):
     reserved at once. 2.51.0 A (#1348): number=False (an agent's draft) reserves none (a person does, or finalising)."""
     s = office_settings(c, oid)
     kind = _choice(b.get("kind") or "offer", "kind", DOC_KINDS)
-    lang = _choice(b.get("lang") or s.get("lang") or "de", "lang", DOC_LANGS)  # 2.185.0 C (#2520)
+    # 2.185.0 C (#2520); 2.460.0 (#3767): the client's language comes before the office's
+    lang = _choice(b.get("lang") or doc_client_lang(c, oid, b.get("client_id")) or s.get("lang") or "de", "lang", DOC_LANGS)
     today = local_now().date()
     if kind == "credit":  # 2.354.0 D (#2838): a credit note only from a finalised invoice (POST /docs/<id>/credit)
         raise Denied(409, tr("A credit note needs a finalised invoice"))
@@ -896,7 +904,7 @@ def doc_create(c, oid, uid, b, admin, number=True):
             rights[dim] = {"id": rd[key], "text": _text_of(c, oid, rd[key], lang) or ""}
     notes = _texts(c, oid, "note")
     if notes:
-        rights["note"] = (doc_word(notes[0]["text_en"], lang) if doc_lg(lang) != "de" else notes[0]["text_de"]) or notes[0]["text_de"]
+        rights["note"] = doc_own(notes[0], lang, "text")[0] or notes[0]["text_de"]
     ts = iso(now_utc())
     row = {"org_id": oid, "kind": kind, "number": "", "status": "draft", "lang": lang, "currency": (s.get("currency") or "EUR").upper(),
            "fx_rate": s.get("fx_usd") or 1.09, "vat_mode": "novat" if s.get("small_business") else "vat", "client_id": None, "recipient": json.dumps({"name": "", "lines": []}),

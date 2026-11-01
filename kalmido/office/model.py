@@ -69,6 +69,7 @@ TEXT_MAX = 8000
 # not chosen: outside an office with the film pack it counts as empty (office_settings)
 PARTS_TITLE_FILM = {"de": "Filmherstellung", "en": "Film production"}
 
+TRANS_LANGS = tuple(k for k in LANGS if k not in ("de", "en"))  # 2.460.0 (#3767): the languages of the column trans
 # ---- settings (office_settings.data), defaults filled from the country pack
 SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact_lines": [], "register_lines": [], "bank_lines": []},
                      "logo": "", "color": "", "lang": "de", "currency": "EUR", "fx_usd": 1.09, "offer_scheme": "",
@@ -156,6 +157,9 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "tax_rates": {}, "retention_years": None,
                      # 2.368.0 (#2979): 1 once the admin chose the document language; until then a pack switch takes it along
                      "lang_set": 0}
+# 2.460.0 (#3767): the own closing texts in the languages beside de / en
+CLOSING_BASES = ("invoice_closing", "delivery_closing", "reminder_text")
+SETTINGS_DEFAULTS.update({f"{k}_{lg}": "" for k in CLOSING_BASES for lg in TRANS_LANGS})
 SETTINGS_KEYS = tuple(SETTINGS_DEFAULTS)
 # 2.435.0 A (#3600): the blocks of the client card an office admin may switch off (static/js/dashboard.js LY_CL_BLOCKS;
 # the details always show)
@@ -558,7 +562,7 @@ def office_settings_clean(c, oid, b, cur):
             out[k] = int(_num(v, k, 0, 90))
         elif k in ("datev_auto", "producing_on", "raw_on", "small_business", "agents_read", "accept_on", "portal_docs", "sign_offers", "credit_shared"):  # 2.433.0 (#3597): credit_shared  # 2.120.0 B (#2088): portal_docs  # 2.114.4 B (#2270): accept_on  # 2.51.0 A (#1348): agents_read  # 2.40.0 (#1379): the two calculation switches
             out[k] = 1 if v in (1, True, "1", "true") else 0
-        elif k in ("invoice_closing_de", "invoice_closing_en", "delivery_closing_de", "delivery_closing_en", "reminder_text_de", "reminder_text_en"):
+        elif k.rsplit("_", 1)[0] in CLOSING_BASES:  # 2.460.0 (#3767): every language
             out[k] = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", v or "").strip()[:TEXT_MAX] if isinstance(v, str) else ""
         elif k == "parts_invoice_mode":  # 2.47.0 (#1215)
             if v not in ("full", "title", "summary"):
@@ -1033,14 +1037,14 @@ MD = {
                           "unit": ("choice", False, UNITS), "daily_rate": ("num0", False, None), "hourly_rate": ("num0", False, None),
                           "raw_fee": ("int01", False, None), "producing": ("int01", False, None), "intext": ("choice", False, INTEXT),
                           "role": ("str", False, 80), "tax": ("choice", False, TAXES), "archived": ("int01", False, None),
-                          "role_id": ("role", False, "freelancer")}},  # 2.47.0 (#1649): the freelancer role (purchase price)
+                          "role_id": ("role", False, "freelancer"), "trans": ("trans", False, (("name",), NAME_MAX))}},  # 2.47.0 (#1649): the freelancer role (purchase price)
     # 2.92.0 B (#1931): purchase, receipt, useful life, new / current value and the policy (assets.py); admins only, the
     # money columns and the serial number encrypted at rest ("crypt": the orgcrypt FIELDS of the table)
     "equipment": {"table": "office_equipment", "order": "lower(category), lower(name), id", "label": "name", "crypt": "office_equipment",
                   "admin_cols": ("purchase_date", "purchase_net", "serial_no", "vendor", "receipt_node_id", "life_months", "new_value",
                                  "current_value", "agreement_id"),
                   "cols": {"name": ("str", True, NAME_MAX), "name_en": ("str", False, NAME_MAX), "category": ("str", False, 80),  # 2.45.1 (#1556): name_en
-                           "daily_rate": ("num0", False, None), "archived": ("int01", False, None),
+                           "daily_rate": ("num0", False, None), "archived": ("int01", False, None), "trans": ("trans", False, (("name",), NAME_MAX)),
                            "purchase_date": ("date", False, None), "purchase_net": ("money", False, None), "serial_no": ("str", False, 120),
                            "vendor": ("str", False, 120), "receipt_node_id": ("receipt", False, None), "life_months": ("months", False, None),
                            "new_value": ("money", False, None), "current_value": ("money", False, None), "agreement_id": ("agreement", False, None)}},
@@ -1049,24 +1053,27 @@ MD = {
                       "archived": ("int01", False, None)}},
     "texts": {"table": "office_texts", "order": "kind, sort, id", "label": "key",
               "cols": {"kind": ("choice", True, TEXT_KINDS), "key": ("str", False, 80), "text_de": ("str", False, TEXT_MAX),
-                       "text_en": ("str", False, TEXT_MAX), "sort": ("num", False, None), "archived": ("int01", False, None)}},
+                       "text_en": ("str", False, TEXT_MAX), "sort": ("num", False, None), "archived": ("int01", False, None),
+                       "trans": ("trans", False, (("text",), TEXT_MAX))}},
     "contracts": {"table": "office_contracts", "order": "lower(name), id", "label": "name",
                   "cols": {"name": ("str", True, NAME_MAX), "client_id": ("fk", False, "clients"), "date": ("date", False, None),
                            "raw_included": ("int01", False, None), "rights_time_id": ("fk", False, "office_texts"),
                            "rights_territory_id": ("fk", False, "office_texts"), "rights_media_id": ("fk", False, "office_texts"),
                            "rights_note_de": ("str", False, TEXT_MAX), "rights_note_en": ("str", False, TEXT_MAX),
                            "closing_de": ("str", False, TEXT_MAX), "closing_en": ("str", False, TEXT_MAX), "rates": ("rates", False, None),
-                           "note": ("str", False, TEXT_MAX), "archived": ("int01", False, None)}},
+                           "note": ("str", False, TEXT_MAX), "archived": ("int01", False, None),
+                           "trans": ("trans", False, (("rights_note", "closing"), TEXT_MAX))}},
     # 2.47.0 (#1649): the two masters of office_roles (one table, kind fixed per master). cost_day / cost_hour = the
     # purchase price, kept in the encrypted JSON column costs; admin_cols never reach members (sr_public)
     "roles": {"table": "office_roles", "kind": "freelancer", "order": "sort, lower(name_de), id", "label": "name_de",
               "admin_cols": ("cost_day", "cost_hour"),
               "cols": {"name_de": ("str", True, NAME_MAX), "name_en": ("str", False, NAME_MAX), "cost_day": ("cost", False, None),
-                       "cost_hour": ("cost", False, None), "sort": ("num", False, None), "archived": ("int01", False, None)}},
+                       "cost_hour": ("cost", False, None), "sort": ("num", False, None), "archived": ("int01", False, None),
+                       "trans": ("trans", False, (("name",), NAME_MAX))}},
     "crew": {"table": "office_roles", "kind": "crew", "order": "sort, lower(name_de), id", "label": "name_de", "admin_cols": ("markup_pct",),
              "cols": {"name_de": ("str", True, NAME_MAX), "name_en": ("str", False, NAME_MAX), "rate_day": ("num0", False, None),
                       "intext": ("choice", False, CREW_INTEXT), "markup_pct": ("num0", False, None), "sort": ("num", False, None),
-                      "archived": ("int01", False, None)}},
+                      "archived": ("int01", False, None), "trans": ("trans", False, (("name",), NAME_MAX))}},
 }
 MD_KINDS = tuple(MD)
 SR_COSTS = {"cost_day": "day", "cost_hour": "hour"}  # 2.47.0 (#1649): field -> key in office_roles.costs
@@ -1096,7 +1103,7 @@ def _row_dict(kind, r, c=None, oid=None):
     if kind == "roles":  # the crew's columns are not part of a freelancer role
         for k in ("rate_day", "intext", "markup_pct"):
             d.pop(k, None)
-    for k in ("items", "rates"):
+    for k in ("items", "rates", "trans"):  # 2.460.0 (#3767): trans
         if k in d:
             try:
                 d[k] = json.loads(d[k]) if d[k] else ([] if k == "items" else {})
@@ -1106,6 +1113,10 @@ def _row_dict(kind, r, c=None, oid=None):
         if k in d:
             d[k] = int(d[k] or 0)
     return d
+
+
+# 2.460.0 (#3767): a search hit in a translation (the values only: never the field names or language codes of the JSON)
+TRANS_Q = "EXISTS (SELECT 1 FROM jsonb_each(CAST(trans AS jsonb)) tl, jsonb_each_text(tl.value) tv WHERE tv.value ILIKE ? ESCAPE '\\')"
 
 
 def office_rows(c, oid, kind, archived=True, q=""):
@@ -1120,17 +1131,17 @@ def office_rows(c, oid, kind, archived=True, q=""):
     if q:
         like = f"%{like_escape(q.strip())}%"
         if kind == "services":
-            sql += " AND (name_de ILIKE ? ESCAPE '\\' OR name_en ILIKE ? ESCAPE '\\' OR category ILIKE ? ESCAPE '\\')"
-            args += [like, like, like]
+            sql += f" AND (name_de ILIKE ? ESCAPE '\\' OR name_en ILIKE ? ESCAPE '\\' OR category ILIKE ? ESCAPE '\\' OR {TRANS_Q})"
+            args += [like, like, like, like]
         elif kind == "equipment":  # 2.45.1 (#1556): also the English name
-            sql += " AND (name ILIKE ? ESCAPE '\\' OR name_en ILIKE ? ESCAPE '\\')"
-            args += [like, like]
-        elif kind in ("roles", "crew"):  # 2.47.0 (#1649)
-            sql += " AND (name_de ILIKE ? ESCAPE '\\' OR name_en ILIKE ? ESCAPE '\\')"
-            args += [like, like]
-        elif kind == "texts":
-            sql += " AND (key ILIKE ? ESCAPE '\\' OR text_de ILIKE ? ESCAPE '\\' OR text_en ILIKE ? ESCAPE '\\')"
+            sql += f" AND (name ILIKE ? ESCAPE '\\' OR name_en ILIKE ? ESCAPE '\\' OR {TRANS_Q})"
             args += [like, like, like]
+        elif kind in ("roles", "crew"):  # 2.47.0 (#1649)
+            sql += f" AND (name_de ILIKE ? ESCAPE '\\' OR name_en ILIKE ? ESCAPE '\\' OR {TRANS_Q})"
+            args += [like, like, like]
+        elif kind == "texts":
+            sql += f" AND (key ILIKE ? ESCAPE '\\' OR text_de ILIKE ? ESCAPE '\\' OR text_en ILIKE ? ESCAPE '\\' OR {TRANS_Q})"
+            args += [like, like, like, like]
         else:
             sql += f" AND {m['label']} ILIKE ? ESCAPE '\\'"
             args.append(like)
@@ -1247,6 +1258,24 @@ def _clean_col(c, oid, kind, k, v):
                 raise BadInput(tr("Invalid value: {0}", k))
             out.append({"equipment_id": eid, "qty": _num(it.get("qty", 1), k, 0, 1e6)})
         return json.dumps(out)
+    if typ == "trans":  # 2.460.0 (#3767): {lang: {field: text}}; empty ones and unknown languages fall away
+        if v in (None, ""):
+            return "{}"
+        if isinstance(v, str):  # the raw column in an export of an older version
+            try:
+                v = json.loads(v)
+            except ValueError:
+                raise BadInput(tr("Invalid value: {0}", k))
+        if not isinstance(v, dict):
+            raise BadInput(tr("Invalid value: {0}", k))
+        out = {}
+        for lg, row in v.items():
+            if not isinstance(row, dict):
+                raise BadInput(tr("Invalid value: {0}", k))
+            t = {f: row[f].strip()[:spec[1]] for f in spec[0] if isinstance(row.get(f), str) and row[f].strip()}
+            if lg in TRANS_LANGS and t:
+                out[lg] = t
+        return json.dumps(out, ensure_ascii=False)
     if typ == "rates":  # {service_id: rate}
         if v in (None, ""):
             return "{}"

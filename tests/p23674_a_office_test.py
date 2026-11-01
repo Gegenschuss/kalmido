@@ -171,6 +171,14 @@ check(r.ok, f"setup: the portal link {r.status_code} {r.text[:200]}")
 m = until(lambda: mails("client-fr@example.com"), 20)
 sub = str(email.message_from_string(m[0]["raw"], policy=email.policy.default)["subject"]) if m else ""
 check("documents" in sub.lower() and "Your" not in sub and "Dokumente" not in sub, f"French for a client with French documents, the office speaks German: {sub}")
+# 2.460.0 (#3767): a language set on the client wins over its newest document
+CN = client(A, "Client Nl", email="client-nl@example.com")
+assert A.patch(B + f"/api/clients/{CN}", json={"doc_lang": "nl"}).ok
+invoice(A, CN, lang="fr")
+assert A.post(B + f"{O}/clients/{CN}/portal-link", json={}).ok
+m = until(lambda: mails("client-nl@example.com"), 20)
+sub = str(email.message_from_string(m[0]["raw"], policy=email.policy.default)["subject"]) if m else ""
+check(sub and "Vos" not in sub and "Your" not in sub and "Dokumente" not in sub, f"Dutch for a client set to Dutch with a French document: {sub}")
 
 # ================================================================== a person without an organisation
 FID, Fr = freelancer(B, A)

@@ -9,7 +9,7 @@ const DK_HEAD = [['shoot_days', N_('Shooting days')], ['travel_days', N_('Travel
   ['sat_days', N_('Saturdays')], ['sat_pct', N_('Saturday surcharge %')], ['sun_days', N_('Sundays / holidays')], ['sun_pct', N_('Sunday surcharge %')]];
 const dkNum = (k, v, label, extra) => `<label class="dkf"><span>${esc(label)}</span><input data-dk="${k}" inputmode="decimal" class="numin" value="${esc(ofdNumIn(v))}" ${extra || ''}></label>`;
 const dkLine = (calc, uid) => (calc?.lines || []).find(l => l.uid === uid);
-const dkName = (r, d) => (ofdLang(d) === 'en' ? r.name_en || r.name : r.name) || '';
+const dkName = (r, d) => { const lg = ofdTl(d); return (lg === 'de' ? r.name : r.name_tr?.[lg] || r.name_en || r.name) || ''; };  // 2.460.0 (#3767): name_tr
 
 function dkSheetHtml(part, doc, adm) {
   if (!part) return '';
