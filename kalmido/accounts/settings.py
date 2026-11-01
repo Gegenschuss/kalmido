@@ -811,7 +811,7 @@ def umz_export_queries(uid):
         "task_enc_notes": ("SELECT * FROM task_enc_notes WHERE user_id=?", (uid,)),
         "notes": (f"SELECT * FROM notes WHERE list_id IN {own} AND deleted_at IS NULL", (uid,)),
         "settings": ("SELECT key, value FROM user_settings WHERE user_id=? AND key NOT ILIKE 'sup_key%'", (uid,)),  # 2.74.0 (#338): never the licence key
-        "templates": ("SELECT id, kind, name, data, created_at, updated_at FROM templates WHERE user_id=?", (uid,)),
+        "templates": ("SELECT id, kind, name, data, extra, created_at, updated_at FROM templates WHERE user_id=?", (uid,)),  # 2.463.0 (#3860): extra through tx_export
         "time_entries": ("SELECT * FROM time_entries WHERE user_id=? ORDER BY start", (uid,)),
         "list_fields": (f"SELECT * FROM list_fields WHERE list_id IN {own}", (uid,)),
         "task_field_values": (f"SELECT * FROM task_field_values WHERE task_id IN {task_ids}", (uid,)),

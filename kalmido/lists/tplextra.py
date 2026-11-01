@@ -2,8 +2,9 @@
 
 Duplicating and templates take everything except comments and times. What names people, lists or stored files stays on the
 server: x = {"nodes": {node key: {a, g, r, xt, lt, pf, tf, sp, ln, files}}, "list": {wip, ltags, sprints, sprint_cfg, points_on,
-links}}, in a template the column templates.extra (never sent to a client, not in the export; a template edit keeps it, node by
-node key). The rules on use, whatever the template or the original said:
+links}}, in a template the column templates.extra (never sent to a client; a template edit keeps it, node by node key; 2.463.0,
+#3860: in the account export without the numbers of other people, lists and tasks, tx_export / tx_import). The rules on use,
+whatever the template or the original said:
  - a person (assignee, reviewer, person field) only when they may be assigned in the target list (check_assignee / field_value),
    tags of other people only when they see the target list: a copy gives nobody a right they did not have
  - a place in a further list only within the rules of multilist.ml_check (same workspace, write on the target)
@@ -12,6 +13,7 @@ node key). The rules on use, whatever the template or the original said:
    found infected, one encrypted in the browser and what does not fit the person's storage are skipped and named in skipped_files."""
 import json
 import os
+import re
 import uuid
 
 from ..core.config import ATT_DIR
@@ -21,6 +23,7 @@ from ..core.access import Denied, list_role
 from ..core.errors import BadInput
 
 TX_MAX_FILES, TX_MAX_BYTES = 500, 1024 ** 3  # per request: the copy runs inside it
+TX_MAX_ROWS = 500  # 2.463.0 (#3860): per part of an imported extra
 
 
 def tx_state():
@@ -124,9 +127,100 @@ def tx_of_template(c, r):
         x = json.loads(r["extra"] or "{}")
     except ValueError:
         x = {}
+    for n in (x.get("nodes") or {}).values():  # 2.463.0 (#3860): files only from template_files: tx_store never leaves any in the column
+        n.pop("files", None)
     for f in c.execute("SELECT node_key, name, mime, size, path, scan FROM template_files WHERE template_id=? ORDER BY id", (r["id"],)):
         x.setdefault("nodes", {}).setdefault(f["node_key"], {}).setdefault("files", []).append(dict(f))
     return x
+
+
+def tx_export(raw, uid):
+    """2.463.0 (#3860): templates.extra of person uid for the account export: what names other people, lists or tasks of this
+    server means nothing elsewhere and stays behind; uid's own assignments stay (the import makes them the importer's)."""
+    try:
+        x = json.loads(raw or "{}")
+    except ValueError:
+        return {}
+    out = {"list": x["list"]} if x.get("list") else {}
+    nodes = {}
+    for k, n in (x.get("nodes") or {}).items():
+        d = {f: n[f] for f in ("lt", "sp") if f in n}
+        d.update({f: uid for f in ("a", "r") if n.get(f) == uid})
+        pf = {i: v for i, v in (n.get("pf") or {}).items() if str(v) == str(uid)}
+        tf = {i: {"k": v["k"]} for i, v in (n.get("tf") or {}).items() if "k" in v}
+        d.update({f: v for f, v in (("pf", pf), ("tf", tf)) if v})
+        if d:
+            nodes[k] = d
+    return {**out, "nodes": nodes} if nodes else out
+
+
+def _tx_int(v, lo, hi):
+    return min(hi, max(lo, v)) if isinstance(v, int) and not isinstance(v, bool) else None
+
+
+def _tx_rows(v):
+    return [r for r in v if isinstance(r, dict)][:TX_MAX_ROWS] if isinstance(v, list) else []
+
+
+def _tx_list_in(p):
+    """The list's part of an imported x, rebuilt field by field (tx_apply takes it as it stands)."""
+    from ..core.errors import BadInput
+    from .lists import LIST_COLOR_RE
+    from .projects import ov_link_clean
+    txt = lambda v, n: v.strip()[:n] if isinstance(v, str) else ""  # noqa: E731
+    wip = p.get("wip") if isinstance(p.get("wip"), dict) else {}
+    out = {"wip": {txt(k, 200): _tx_int(v, 1, 9999) for k, v in list(wip.items())[:TX_MAX_ROWS] if txt(k, 200) and _tx_int(v, 1, 9999)},
+           "points_on": 1 if p.get("points_on") else 0, "sprints": [], "ltags": [], "links": []}
+    try:
+        out["sprint_cfg"] = json.dumps(c) if isinstance(c := json.loads(p.get("sprint_cfg") or "{}"), dict) and c else ""
+    except (TypeError, ValueError):
+        out["sprint_cfg"] = ""
+    for s in _tx_rows(p.get("sprints")):
+        a, e = _tx_int(s.get("s"), -3650, 3650), _tx_int(s.get("e"), -3650, 3650)
+        if txt(s.get("name"), 200) and a is not None and e is not None:
+            out["sprints"].append({"name": txt(s["name"], 200), "goal": txt(s.get("goal"), 2000), "state": "planned", "s": a, "e": e})
+    for t in _tx_rows(p.get("ltags")):
+        col = t.get("color") if isinstance(t.get("color"), str) and LIST_COLOR_RE.fullmatch(t["color"]) else ""
+        if txt(t.get("name"), 100):
+            out["ltags"].append({"name": txt(t["name"], 100), "color": col, "sort": _tx_int(t.get("sort"), 0, 99999) or 0})
+    for t in _tx_rows(p.get("links")):
+        try:
+            title, url = ov_link_clean({"title": txt(t.get("title"), 300), "url": txt(t.get("url"), 2000)})
+        except BadInput:
+            continue
+        out["links"].append({"title": title, "url": url})
+    return out
+
+
+def tx_import(v, who, keys):
+    """2.463.0 (#3860): the extra of a template from an account export as text for templates.extra. The file is not trusted:
+    only the parts tx_export writes, rebuilt with the right types, node keys of the template (keys), people through who (old id
+    -> id here or None); files, other people's tags, lists and tasks of the old server never get in."""
+    try:
+        x = json.loads(v) if isinstance(v, str) else v
+    except ValueError:
+        return "{}"
+    x = x if isinstance(x, dict) else {}
+    out = {"list": _tx_list_in(x["list"])} if isinstance(x.get("list"), dict) else {}
+    nodes, sprints = {}, len((out.get("list") or {}).get("sprints") or [])
+    for k, n in (x.get("nodes") if isinstance(x.get("nodes"), dict) else {}).items():
+        if k not in keys or not isinstance(n, dict):
+            continue
+        d = {f: u for f in ("a", "r") if (u := who(n.get(f)))}
+        if isinstance(n.get("lt"), list):
+            d["lt"] = [t[:100] for t in n["lt"][:TX_MAX_ROWS] if isinstance(t, str) and t]
+        if _tx_int(n.get("sp"), 0, sprints - 1) is not None and n["sp"] in range(sprints):
+            d["sp"] = n["sp"]
+        pf = n.get("pf") if isinstance(n.get("pf"), dict) else {}
+        pf = {i: str(u) for i, v_ in list(pf.items())[:TX_MAX_ROWS] if re.fullmatch(r"\d{1,4}", str(i)) and (u := who(v_))}
+        tf = n.get("tf") if isinstance(n.get("tf"), dict) else {}
+        tf = {i: {"k": t["k"]} for i, t in list(tf.items())[:TX_MAX_ROWS] if re.fullmatch(r"\d{1,4}", str(i)) and isinstance(t, dict) and isinstance(t.get("k"), str) and t["k"] in keys}
+        d.update({f: y for f, y in (("pf", pf), ("tf", tf)) if y})
+        if d:
+            nodes[k] = d
+    if nodes:
+        out["nodes"] = nodes
+    return json.dumps(out, ensure_ascii=False, separators=(",", ":"))
 
 
 def tx_keys(data):

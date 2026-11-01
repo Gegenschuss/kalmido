@@ -223,6 +223,12 @@ def ofa_need_in_lists(c, aid, r):
     return r
 
 
+def ofa_restricted(c, aid):
+    """2.463.0 (#3889): agent aid sees only some lists (ofa_doc_in_lists can leave rows out)."""
+    a = c.execute("SELECT list_ids FROM agents WHERE user_id=?", (aid,)).fetchone() if aid else None
+    return bool(a and str(a[0] or "").strip())
+
+
 def ofa_doc_in_lists(c, aid, r):
     """2.190.0 D (#2496): document row r lies within agent aid's list restriction (no restriction / no project = yes)."""
     lid = r["list_id"] if "list_id" in r.keys() else None
@@ -515,9 +521,9 @@ def v1_office_master(kind):
 @app.get("/api/v1/office/docs")
 @v1_view
 def v1_office_docs():
-    from .docs import DOC_KINDS, doc_brief
+    from .docs import DOC_KINDS, ODOC_PAGE_MAX, doc_brief
     from .invoices import inv_paid_map
-    a = _args(("kind", "client_id", "open", "status", "trial"))
+    a = _args(("kind", "client_id", "open", "status", "trial", "before", "limit"))
     c = db()
     aid, oid, uid = _v1ctx(c, a.get("requested_by"), target="docs")
     kind = a.get("kind") or "offer"
@@ -536,18 +542,36 @@ def v1_office_docs():
             raise BadInput(tr("Invalid value: {0}", "trial"))
         sql += " AND trial=?"
         args.append(int(a["trial"]))
+    # 2.463.0 (#3889): a page by (date, id) as /api/office/docs (#3200); what is filtered here is decided before the page is cut
+    # (an old open invoice was missing behind the 500 newest documents, the same fault as #3115)
+    n = str(a.get("limit") or "")
+    n = max(1, min(int(n), ODOC_PAGE_MAX)) if re.fullmatch(r"\d{1,6}", n) else ODOC_PAGE_MAX
+    if a.get("before"):
+        cur = re.fullmatch(r"([^\x00]{0,40}),(\d{1,18})", str(a["before"]))
+        if not cur:
+            raise BadInput(tr("Invalid value: {0}", "before"))
+        sql += " AND (date, id) < (?, ?)"
+        args += [cur[1], int(cur[2])]
+    only_open = a.get("open") == "1"
+    if only_open:  # every kind keeps its meaning (a sent quotation, a credit note): the states below decide, this only narrows
+        sql += " AND status NOT IN ('draft', 'paid', 'cancelled')"
+    narrowed = only_open or ofa_restricted(c, aid)
     pm = inv_paid_map(c, oid) if kind in ("invoice", "credit") else {}
-    rows = []
-    for r in c.execute(sql + " ORDER BY date DESC, id DESC LIMIT 500", args).fetchall():
+    rows, last, next_cursor = [], None, None
+    for r in c.execute(sql + " ORDER BY date DESC, id DESC" + ("" if narrowed else f" LIMIT {n + 1}"), args).fetchall():
         if not ofa_doc_in_lists(c, aid, r):
             continue
         b = doc_brief(r, pm)
         b["agent_id"] = r["agent_id"]
-        if a.get("open") == "1" and b.get("state") not in ("issued", "sent", "partial", "overdue"):
+        if only_open and b.get("state") not in ("issued", "sent", "partial", "overdue"):
             continue
+        if len(rows) == n:
+            next_cursor = f"{last['date']},{last['id']}"
+            break
         rows.append(b)
+        last = r
     c.commit()
-    return jsonify(data=rows)
+    return jsonify(data=rows, next_cursor=next_cursor)
 
 
 @app.get("/api/v1/office/docs/<int:did>")
@@ -1012,7 +1036,9 @@ def ofa_spec(paths, schemas, op, ok, errs, ref, pid, q):
     paths["/office/docs"] = {"get": op("Quotations, invoices or reminders of the office, newest first (2.51.0)", T, ok(o) | errs("400", "403", "404"),
                                        [q("kind", "offer (default), invoice, credit, reminder", {"type": "string"}), q("client_id", "Only this client", {"type": "integer"}),
                                         q("status", "Stored status", {"type": "string"}), q("open", "1 = only open invoices (issued, sent, partial, overdue)", {"type": "string"}),
-                                        q("trial", "2.144.10: 1 = only trial documents, 0 = only real ones (each document carries trial)", {"type": "string"}), rb],
+                                        q("trial", "2.144.10: 1 = only trial documents, 0 = only real ones (each document carries trial)", {"type": "string"}),
+                                        q("before", "2.463.0: next_cursor of the page before: the next, older page", {"type": "string"}),
+                                        q("limit", "2.463.0: documents per page, at most 500", {"type": "integer"}), rb],
                                        scope="office")}
     paths["/office/docs/{id}"] = {"get": op("One document with its positions (2.51.0)", T, ok(o) | errs("400", "403", "404"), [pid("id", "Document id"), rb], scope="office")}
     paths["/office/docs/{id}/pdf"] = {"get": {**op("The PDF preview of a draft (2.51.0)", T, errs("400", "403", "404", "409"), [pid("id", "Document id"), rb], scope="office"),

@@ -352,9 +352,12 @@ const FAM = 'cal,habits,comments,collab,family';
     await tap(it.x, it.y);
     check(await until(async () => !!(await call('GET', `/api/tasks/${it.id}`)).completed_at, 40), `${tag}: a tap ticks the item`);
     await call('POST', `/api/tasks/${it.id}/reopen`);
-    await ev(`(() => { document.querySelector('.shopmode')?.remove(); return 1; })()`);
+    // 2.463.0 (#3887): closed by its button, and the link only after shopping mode's history entry is gone: closing goes one
+    // step back, a raw remove and a link at once lost the link to that step (a test effect: nothing in the app does both)
+    await ev(`(() => { document.querySelector('.shopmode [data-act="shop-close"]').click(); return 1; })()`);
+    check(await until(() => ev(`!document.querySelector('.shopmode') && !S.shop && !history.state?.shop`), 80), `${tag}: shopping mode closes, its history entry gone`);
     // the task panel's family section
-    await ev(`openDetail(${BD.id}); 1`);
+    await o.nav(B + '#t/' + BD.id);
     // #3506: the panel really open (the section can sit in a panel still hidden: the checks below then measured nothing),
     // the year field clear of the sticky bottom bar (it scrolls, 96 x 13 px of it showed above the bar)
     check(await until(() => ev(`(() => { const e = document.querySelector('#detail.open:not(.hidden) .famsec #d-fyear'); if (!e) return false; e.scrollIntoView({block: 'center'}); return e.getBoundingClientRect().height > 0; })()`), 80), `${tag}: the task panel opens`);

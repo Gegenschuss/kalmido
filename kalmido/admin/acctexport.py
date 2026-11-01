@@ -584,6 +584,7 @@ def umz_build(c, uid, stream, export_id):
     """Writes the ZIP of person uid into stream; returns the manifest."""
     from ..accounts.settings import umz_export_queries
     from ..admin.hosting import hosted
+    from ..lists.tplextra import tx_export
     out = _Out()
     have = {r[0] for r in c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema()")}
     u = c.execute("SELECT id, username, display_name, email FROM users WHERE id=?", (uid,)).fetchone()
@@ -637,6 +638,8 @@ def umz_build(c, uid, stream, export_id):
                         d["owner_email_hash"] = umz_email_hash(d.pop("owner_email", ""), salt)
                     if table == "hub_mails":
                         _mail_files(d, files)
+                    if table == "templates":  # 2.463.0 (#3860)
+                        d["extra"] = tx_export(d.get("extra"), uid)
                     if (table, d.get("id")) in files:
                         d["file"] = files[(table, d["id"])]
                     yield _umz_plain(c, table, d, uid)  # 2.148.1 C (#2494); 2.306.0 A (#2885): + uid

@@ -87,6 +87,13 @@ for lid in (OPEN, SHUT):  # the membership ends with leaving; the open list stil
 T1, T2, T3, T4 = new_task(A, OPEN, "Mine again"), new_task(A, OPEN, "Taken over"), new_task(A, SHUT, "Closed list"), new_task(A, OPEN, "Deleted since")
 for t in (T1, T2, T3, T4):
     check(A.patch(B + f"/api/tasks/{t}", json={"assignee_id": BID, "people": [BID]}).ok, f"setup: bob on task {t}")
+# 2.463.0 (#3859): closed projects: a role comes back, one bob was taken out of before does not, his own stays with the heir
+VIEWL, GONE, TRASHED = new_list(A, "Read only", ORG), new_list(A, "Taken out", ORG), new_list(A, "Trashed since", ORG)
+assert A.put(B + f"/api/lists/{VIEWL}/members", json={"email": "bob@example.com", "role": "view"}).ok
+for lid in (GONE, TRASHED):
+    assert A.put(B + f"/api/lists/{lid}/members", json={"email": "bob@example.com", "role": "edit"}).ok
+assert A.delete(B + f"/api/lists/{GONE}/members/{BID}").ok
+BOBS = new_list(Bo, "Bob's own", ORG)
 
 
 def leave_and_back():
@@ -98,12 +105,26 @@ def leave_and_back():
 leave_and_back()
 check(A.patch(B + f"/api/tasks/{T2}", json={"assignee_id": AID}).ok, "setup: alice takes one over")
 check(A.delete(B + f"/api/tasks/{T4}").ok, "setup: one is deleted")
+sql("UPDATE lists SET deleted_at='2026-01-01T00:00:00Z' WHERE id=?", TRASHED)  # a project in the trash
 check(A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com"}).ok and org_join(B, "bob", ORG), "bob joins again")
 check(one("SELECT assignee_id FROM tasks WHERE id=?", T1) == BID, "#3133: the assignment is back")
 check(one("SELECT COUNT(*) FROM task_people WHERE task_id=? AND user_id=?", T1, BID) == 1, "#3133: coming along is back")
 check(one("SELECT assignee_id FROM tasks WHERE id=?", T2) == AID, "#3133: a task somebody else took over stays theirs")
-check(one("SELECT assignee_id FROM tasks WHERE id=?", T3) is None, "#3133: a task of a closed list (not visible) stays unassigned")
-check(one("SELECT COUNT(*) FROM task_people WHERE task_id=? AND user_id=?", T3, BID) == 0, "#3133: nor does coming along return there")
+# 2.463.0 (#3859): the membership of a closed project returns first, so its assignment and coming along do too (until 2.462 they stayed away)
+check(one("SELECT assignee_id FROM tasks WHERE id=?", T3) == BID, "#3859: the assignment in a closed project is back")
+check(one("SELECT COUNT(*) FROM task_people WHERE task_id=? AND user_id=?", T3, BID) == 1, "#3859: coming along is back there too")
+
+
+def role_of(lid):
+    return one("SELECT role FROM list_members WHERE list_id=? AND user_id=?", lid, BID)
+
+
+check(role_of(SHUT) == "edit" and role_of(OPEN) == "edit", "#3859: the memberships are back with their role")
+check(role_of(VIEWL) == "view" and one("SELECT own_role FROM list_members WHERE list_id=? AND user_id=?", VIEWL, BID) == "view", "#3859: a read-only role stays read-only")
+check(role_of(GONE) is None, "#3859: a project bob was taken out of before leaving stays closed to him")
+check(role_of(TRASHED) is None, "#3859: a project in the trash gets nobody back")
+check(role_of(BOBS) is None and one("SELECT owner_id FROM lists WHERE id=?", BOBS) != BID, "#3859: his own project stays with the heir")
+check(task(Bo, T3).get("id") == T3, "#3859: bob reads the closed project's task again")
 check(one("SELECT assignee_id FROM tasks WHERE id=?", T4) is None, "#3133: a deleted task gets nothing back")
 check(one("SELECT detail FROM space_moves WHERE kind='orgleave' ORDER BY id DESC LIMIT 1").find("restored") > 0, "#3133: the memo counts as used")
 # older than 24 hours: nothing
@@ -111,6 +132,17 @@ leave_and_back()
 sql("UPDATE space_moves SET at='2020-01-01T00:00:00Z' WHERE kind='orgleave'")
 check(A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com"}).ok and org_join(B, "bob", ORG), "bob joins a third time")
 check(one("SELECT assignee_id FROM tasks WHERE id=?", T1) is None, "#3133: after 24 hours nothing comes back")
+check(role_of(SHUT) is None, "#3859: after 24 hours no membership comes back")
+assert A.put(B + f"/api/lists/{SHUT}/members", json={"email": "bob@example.com", "role": "edit"}).ok
+sql("UPDATE lists SET e2e='on', e2e_gen=1 WHERE id=?", SHUT)
+PART = new_list(A, "Locked, participant", ORG)
+assert A.put(B + f"/api/lists/{PART}/members", json={"email": "bob@example.com", "role": "participant"}).ok
+sql("UPDATE lists SET e2e='on', e2e_gen=1 WHERE id=?", PART)
+leave_and_back()
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com"}).ok and org_join(B, "bob", ORG), "bob joins a fourth time")
+check(role_of(SHUT) == "edit", "#3859: a project with the lock: the membership is back")
+check(one("SELECT COUNT(*) FROM list_keys WHERE list_id=? AND user_id=?", SHUT, BID) == 0, "#3859: no key comes with it")
+check(role_of(PART) is None, "#3859: a project with the lock has no participants")
 
 # ================================================================== 2. a folder of several lists
 assert A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": CID, "role": "admin"}).ok

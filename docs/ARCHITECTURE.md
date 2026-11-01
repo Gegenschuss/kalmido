@@ -770,6 +770,11 @@ Who may see what is decided in one module, `kalmido/core/access.py`:
   (`acx_task_ok()`), whatever triggered them.
 - **Repair.** The nightly boundary check (`accounts/tenancy.py`) removes memberships in an organisation's list, calendar or
   address book of people outside it and reports counts and ids as a security alert; other findings are counted as before.
+- **Coming back (2.363.3, 2.463.0).** `org_leave` notes what the end of a membership took away (`space_moves` kind `orgleave`,
+  ids and roles only, gone after two days); `org_member_add` within 24 hours puts back the memberships of other people's projects
+  with their role, then the assignments and coming along (`olv_rejoin`, `accounts/orgleave.py`). A project in the trash or no
+  longer in the organisation stays away, the person's own projects stay with the heir, a project with the lock takes them onto
+  its waiting list (no key comes along).
 - **Invitations (2.87.0).** Leaving an organisation also ends the invitations to the events of its calendars (the person's
   and their agents'). An invitation counts only while the person may see the calendar's workspace (`ev_att_ok()`: event
   view, range, reply, CalDAV invitations, reminders); an organisation's event invites only its people, and a calendar moves

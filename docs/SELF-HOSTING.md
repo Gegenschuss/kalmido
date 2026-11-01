@@ -1075,7 +1075,8 @@ another target is a separate copy. An organisation export counts by its file. Th
 
 **What moves:** your projects (sections, fields, tags, status updates, links, milestones, project files, project notes),
 their tasks with subtasks, dependencies, field values and your tags, comments, attachments, your encrypted task notes
-(2.362), time entries, habits, filters, templates,
+(2.362), time entries, habits, filters, templates (2.463: with their files and what they keep on the server: sprints, key
+links, project tags and your own assignments; other people, and lists and tasks of the old server, stay behind),
 your own calendars with events, your own address books with contacts, the journal and a few plain settings (language,
 work hours, display options, the folder order). Browser-encrypted content (locked notes, your encrypted files) stays
 encrypted; your key bundle (wrapped in the browser with your passphrase and recovery code) comes along. The import keeps

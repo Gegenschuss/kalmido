@@ -8,7 +8,8 @@
   every member gets a News item when it is gone (olv_gone_news, kinds orgdelnotice / orggone, no push).
 - 2.363.3 (#3133): coming back within OLV_BACK_H hours: org_leave keeps the tasks the person's assignments and "coming along"
   ended in (space_moves kind 'orgleave', obj_id = the person, ids only), org_member_add puts back what still exists there and
-  what the person may see again (olv_rejoin). Project memberships do not come back: those are the admins' to give.
+  what the person may see again (olv_rejoin). 2.463.0 (#3859): the memberships of projects (with the role) too, so a closed
+  project is back with its assignments; a project with the lock waits for a key the usual way, their own projects stay with the heir.
 Numbers only: no names of files, pages or tables leave the organisation's boundary.
 """
 import json
@@ -118,11 +119,15 @@ def olv_leave_info(oid):
 
 
 def olv_snap(c, oid, uid):
-    """2.363.3 (#3133): before uid leaves oid: the tasks of the organisation uid is assigned to / comes along to."""
+    """2.363.3 (#3133): before uid leaves oid: the tasks of the organisation uid is assigned to / comes along to. 2.463.0 (#3859):
+    + the projects of others uid is a member of {list id: uid's own role, None = only through a group or folder}."""
     with system_ctx(c):  # the person's own rows in lists of the organisation, also when an admin removes them
         return {"assign": {r[0] for r in c.execute("SELECT id FROM tasks WHERE assignee_id=? AND list_id IN (SELECT id FROM lists WHERE org_id=?)", (uid, oid))},
                 "people": {r[0] for r in c.execute("SELECT task_id FROM task_people WHERE user_id=? AND task_id IN "
-                                                   "(SELECT id FROM tasks WHERE list_id IN (SELECT id FROM lists WHERE org_id=?))", (uid, oid))}}
+                                                   "(SELECT id FROM tasks WHERE list_id IN (SELECT id FROM lists WHERE org_id=?))", (uid, oid))},
+                "lists": {r["list_id"]: r["own_role"] if r["own_role"] is not None else (r["role"] if r["grole"] is None and r["frole"] is None else None)
+                          for r in c.execute("""SELECT m.list_id, m.role, m.own_role, m.grole, m.frole FROM list_members m JOIN lists l ON l.id=m.list_id
+                                                WHERE m.user_id=? AND l.org_id=? AND l.owner_id!=?""", (uid, oid, uid))}}
 
 
 def olv_memo(c, oid, uid, snap):
@@ -130,16 +135,45 @@ def olv_memo(c, oid, uid, snap):
     with system_ctx(c):
         assign = sorted(t for t in snap["assign"] if not c.execute("SELECT 1 FROM tasks WHERE id=? AND assignee_id=?", (t, uid)).fetchone())
         people = sorted(t for t in snap["people"] if not c.execute("SELECT 1 FROM task_people WHERE task_id=? AND user_id=?", (t, uid)).fetchone())
-        if assign or people:
+        lists = sorted([k, v] for k, v in snap["lists"].items() if not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (k, uid)).fetchone())
+        if assign or people or lists:
             c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('orgleave',?,?,NULL,?,?,?)",
                       (uid, oid, me() if has_request_context() and getattr(g, "user", None) else None, iso(now_utc()),
-                       json.dumps({"assign": assign, "people": people}, separators=(",", ":"))))
+                       json.dumps({"assign": assign, "people": people, "lists": lists}, separators=(",", ":"))))
+
+
+def _olv_lists(c, oid, uid, rows):
+    """2.463.0 (#3859): the project memberships of the memo rows [[list id, own role | None], ...] come back, before the
+    assignments (those ask whether uid is in the project), under the rules of a share: a project still in oid, never where uid
+    owns it, a child as a participant, no participant in a project with the lock, no bridge between agents. A project with the lock gets uid on its waiting
+    list (the members trigger): the key comes from somebody who holds it. Roles through groups and folders follow from grp_sync."""
+    from ..agents.safety import bridge_blocks
+    from ..collab.liste2e import le2a_member_problem
+    from ..core.access import acx_drop
+    from ..family.family import is_kid
+    from ..lists.groups import grp_sync
+    from ..lists.lists import member_folder_adopt, my_max_sort
+    kid, back = is_kid(c, uid), []
+    for lid, role in rows:
+        role = "participant" if kid and role else role
+        if not c.execute("SELECT 1 FROM lists WHERE id=? AND org_id=? AND owner_id!=? AND deleted_at IS NULL", (lid, oid, uid)).fetchone() \
+                or (role and (le2a_member_problem(c, lid, uid, role) or bridge_blocks(c, lid, uid))):
+            continue
+        back.append(lid)
+        if role and c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?) ON CONFLICT DO NOTHING",
+                             (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc()))).rowcount:
+            member_folder_adopt(c, lid, uid)
+    if back:
+        grp_sync(c, back)
+        acx_drop()
+    return len(back)
 
 
 def olv_rejoin(c, oid, uid):
     """2.363.3 (#3133): uid just joined oid (org_member_add): within OLV_BACK_H hours of leaving, the assignments and "coming
     along" that ended come back, for tasks that still exist in the organisation and that uid may see now (an assignment only
-    where uid may be assigned: check_assignee's rule; a task somebody else took over stays theirs). -> how many came back."""
+    where uid may be assigned: check_assignee's rule; a task somebody else took over stays theirs). 2.463.0 (#3859): the
+    project memberships first (_olv_lists). -> how many came back."""
     from ..core.access import list_people, ov_role, task_visible
     n = 0
     with system_ctx(c):  # the person may not be the one making the request (an admin adds them); only their own rows change
@@ -159,6 +193,7 @@ def olv_rejoin(c, oid, uid):
             t = c.execute("""SELECT t.list_id, t.assignee_id, t.assignee_group_id FROM tasks t JOIN lists l ON l.id=t.list_id
                              WHERE t.id=? AND t.deleted_at IS NULL AND l.deleted_at IS NULL AND l.org_id=?""", (tid, oid)).fetchone()
             return t if t and task_visible(c, tid, uid) else None
+        n += _olv_lists(c, oid, uid, d.get("lists") or [])
         for tid in d.get("assign") or []:
             t = live(tid)
             if t and not t["assignee_id"] and not t["assignee_group_id"] \
