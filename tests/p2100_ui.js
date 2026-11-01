@@ -12,7 +12,7 @@
 // group settings and the share dialog without horizontal overflow, 44 px touch targets.
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2100_ui', check, shots: 'P2100_SHOTS'});
@@ -22,6 +22,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
+const funtil = (ev, expr) => require('./boot').until(() => ev(expr).catch(() => false), {timeout: 15000, step: 200});  // Firefox side: wait until the page expression is truthy
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const change = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
 const last = d => [...d.querySelectorAll('.modal')].pop();
@@ -30,7 +31,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const b = e.getBoundingClientRect(); return [e.className || e.tagName, (e.textContent || '').trim().slice(0, 16), Math.round(b.width), Math.round(b.height)]; }).filter(x => x[2] < 43.5 || x[3] < 43.5))()`;
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   const SW = await (await fetch(B + 'sw.js')).text();
   check(/const CACHE = 'tasks-shell-v(?:79|8[0-9]|9[0-9]|[1-9][0-9]{2})'/.test(SW), 'service worker cache v79');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
@@ -51,7 +52,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
 
   // ================= Settings > Administration > Groups
   let w = await boot({user: 'alice'}), d = w.document;
-  w.settingsModal('groups'); await sleep(400);
+  w.settingsModal('groups'); await until(() => /Bob/.test(d.querySelector('[data-pane="org"] #a-groups')?.textContent || ''));
   const us = d.querySelector('[data-pane="org"]');  // 2.364.0 C (#3041): Organisation > People
   check(us && !us.classList.contains('hidden') && us.querySelector('#s-groups-h'), 'focus "groups" opens Organisation at Groups');
   check(/Office/.test(us.querySelector('#a-groups')?.textContent || '') && /Bob/.test(us.querySelector('#a-groups').textContent), 'the group with its members');
@@ -68,10 +69,10 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   click(w, md.querySelector('[data-m="ok"]'));
   check(await until(() => /Field/.test(us.querySelector('#a-groups')?.textContent || '') && /Carol/.test(us.querySelector('#a-groups').textContent)), 'created: Field with Carol');
   const G2 = (await call('GET', '/api/groups')).groups.find(g => g.name === 'Field').id;
-  click(w, d.querySelector('.smodal [data-m="close"]')); await sleep(200);
+  click(w, d.querySelector('.smodal [data-m="close"]')); await until(() => !d.querySelector('.smodal'));
 
   // ================= share dialog: Groups
-  w.shareModal(L); await sleep(500);
+  w.shareModal(L); await until(() => /via a group/.test(d.querySelector('#l-members')?.textContent || '') && d.querySelector(`#sh-groups [data-grole="${G1}"]`));
   md = last(d);
   const sg = md.querySelector('#sh-groups');
   check(sg && /Office/.test(sg.textContent) && sg.querySelector(`[data-grole="${G1}"]`)?.value === 'edit', 'share dialog: Office with its role');
@@ -83,7 +84,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(await until(async () => ((await call('GET', `/api/lists/${L}/groups`)).groups || []).find(x => x.group_id === G2)?.role === 'view'), 'change the group role');
   click(w, await until(() => last(d).querySelector(`[data-grm="${G2}"]`)));
   check(await until(async () => ((await call('GET', `/api/lists/${L}/groups`)).groups || []).length === 1), 'remove the group (confirmed)');
-  click(w, last(d).querySelector('[data-m="close"]')); await sleep(200);
+  click(w, last(d).querySelector('[data-m="close"]')); await until(() => !d.querySelector('.modal'));
   // folder menu
   // 2.41.0 (#1420): the groups are a part of the folder's one Share dialog (no own "Share with a group…" dialog)
   w.eval('folderShareModal("Team", {focus: "grp"})'); await until(() => last(d).querySelector('#fg-add'));
@@ -93,51 +94,51 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   click(w, md.querySelector('[data-m="fg-add"]'));
   check(await until(async () => ((await call('GET', '/api/folders/groups?folder=Team')).groups || []).length === 1), 'folder shared with Office');
   click(w, last(d).querySelector('[data-m="close"]'));
-  await sleep(500);
+  await until(() => w.eval(`JSON.stringify(listById(${FL}).groups)`).includes('"via":"Team"'));
   check(w.eval(`JSON.stringify(listById(${FL}).groups)`).includes('"via":"Team"'), 'the folder list knows its group (via Team)');
 
   // ================= assign to a group
-  w.go(`l/${L}`); await sleep(600);
+  w.go(`l/${L}`); await until(() => d.querySelector(`.trow[data-id="${T1}"]`));
   let row = d.querySelector(`.trow[data-id="${T1}"]`);
-  w.eval(`assignMenu(document.querySelector('.trow[data-id="${T1}"]'), ${T1})`); await sleep(200);
+  w.eval(`assignMenu(document.querySelector('.trow[data-id="${T1}"]'), ${T1})`); await until(() => [...d.querySelectorAll('[role="menuitem"]')].find(b => /Office · Group/.test(b.textContent)));
   const mi = [...d.querySelectorAll('[role="menuitem"]')].find(b => /Office · Group/.test(b.textContent));
   check(mi, 'the row menu offers the list\'s group');
   if (mi) click(w, mi);
   check(await until(async () => (await call('GET', `/api/tasks/${T1}`)).assignee_group_id === G1), 'assigned to Office');
-  await sleep(500);
+  await until(() => d.querySelector(`.trow[data-id="${T1}"] .gchip`));
   row = d.querySelector(`.trow[data-id="${T1}"]`);
   check(row && row.querySelector('.gchip') && /Office/.test(row.querySelector('.gchip').textContent), 'the row shows the group chip');
-  w.openDetail(T1); await sleep(400);
+  w.openDetail(T1); await until(() => /Office/.test(d.querySelector('#detail .dmeta .dwho')?.textContent || ''));
   // 2.31.0 (#1054): the panel's assignee is the chip under the title (no select): it names the group, its menu has it checked
   const wch = d.querySelector('#detail .dmeta .dwho');
   check(wch && /Office/.test(wch.textContent), 'panel chip: the group is shown');
-  if (wch) click(w, wch); await sleep(200);
+  if (wch) click(w, wch); await until(() => d.querySelector('#pop [role="menuitem"].on'));
   check([...d.querySelectorAll('#pop [role="menuitem"].on')].some(b => /Office/.test(b.textContent)), 'panel chip menu: the group is checked');
   w.eval('closePop()');
   w.close();
 
   // ================= bob: Assigned to me, sidebar group, Take it
   w = await boot({user: 'bob', hash: 'assigned'}); d = w.document;
-  await sleep(300);
+  await until(() => d.querySelector(`.trow[data-id="${T1}"] .gchip.me`));
   check(d.querySelector(`.trow[data-id="${T1}"] .gchip.me`), 'bob: the group task is in "Assigned to me" (my group chip)');
   check(d.querySelector(`#side .sgrp[data-go="grp/${G1}"]`), 'sidebar Team: the group row');
-  w.go(`grp/${G1}`); await sleep(500);
+  w.go(`grp/${G1}`); await until(() => d.querySelector(`.trow[data-id="${T1}"]`) && /Group Office/.test(d.querySelector('#top h1')?.textContent || ''));
   check(d.querySelector(`.trow[data-id="${T1}"]`) && /Group Office/.test(d.querySelector('#top h1')?.textContent || ''), 'the group view lists its task');
-  w.openDetail(T1); await sleep(400);
+  w.openDetail(T1); await until(() => d.querySelector('.dtake'));
   click(w, d.querySelector('.dtake'));
   check(await until(async () => (await call('GET', `/api/tasks/${T1}`)).assignee_id === BOB), '"Take it": the task is bob\'s');
-  await sleep(300);
+  await idle(w);  // the page has the answer of the take (the undo step exists)
   w.eval("histStep('undo')");
   check(await until(async () => { const t = await call('GET', `/api/tasks/${T1}`); return t.assignee_group_id === G1 && !t.assignee_id; }), 'undo: back to the group');
   w.close();
 
   // ================= #440 Settings > General > Day planning
   w = await boot({user: 'alice'}); d = w.document;
-  w.settingsModal('dayplan'); await sleep(400);
+  w.settingsModal('dayplan'); await until(() => d.querySelector('[data-pane="general"] #s-plan-h'));
   const gp = d.querySelector('[data-pane="general"]');
   check(gp && gp.querySelector('#s-plan-h') && gp.querySelector('#s-wfrom') && gp.querySelector('#s-wto') && gp.querySelector('#s-review'), 'General: Day planning (hours + review time)');
   check(!gp.querySelector('#s-plan-h').parentElement.querySelector('input[type="date"]'), 'no native date inputs');
-  click(w, d.querySelector('.smodal [data-m="close"]')); await sleep(200);
+  click(w, d.querySelector('.smodal [data-m="close"]')); await until(() => !d.querySelector('.smodal'));
   w.close();
 
   // tasks + one calendar event for TOMORROW (a full working day)
@@ -150,7 +151,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w = await boot({user: 'alice'}); d = w.document;
   // 2.24.0 (UX-35): the planners are in Today's "…" menu
   check(w.eval(`topMoreItems().slice(0, 2).map(x => x.label).join('|')`) === 'Plan my day|Fill free time', 'Today: "Plan my day" + "Fill free time" in "…"');
-  w.dayplanModal('day', TM); await sleep(700);
+  w.dayplanModal('day', TM); await until(() => d.querySelector('.dpm .dprow.nofit'));
   md = d.querySelector('.dpm');
   const rows = [...md.querySelectorAll('.dprow')];
   check(rows.some(r => r.classList.contains('fixed') && /Standup/.test(r.textContent)), 'timeline: the timed task stays fixed');
@@ -172,7 +173,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check((await call('GET', `/api/tasks/${A2}`)).plan_start === null, 'the left-out task is unchanged');
   const huge = await call('GET', `/api/tasks/${A3}`);
   check(huge.due === TM && huge.plan_start === null, `the huge task is not moved (${huge.due})`);
-  await sleep(300);
+  await idle(w);  // the page has the answer of Apply (the undo step exists)
   w.eval("histStep('undo')");
   check(await until(async () => (await call('GET', `/api/tasks/${A1}`)).plan_start === null), 'one undo takes the whole plan back');
   w.close();
@@ -182,13 +183,13 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w = await boot({user: 'alice'}); d = w.document;
   const prow = await until(() => [...d.querySelectorAll('.trow')].find(r => /Later report/.test(r.textContent)));
   check(prow && prow.querySelector('.pchip') && /23:30|11:30\s?PM/i.test(prow.querySelector('.pchip').textContent), 'Today: the planned task with its slot chip (locale time)');
-  w.openDetail(LATER); await sleep(400);
+  w.openDetail(LATER); await until(() => d.querySelector('#detail .dplan [data-act="unplan"]'));
   const dpl = d.querySelector('#detail .dplan');
   check(dpl && /Planned: (23:30|11:30\s?PM)/i.test(dpl.textContent) && dpl.querySelector('[data-act="unplan"]'), 'panel: "Planned: 23:30" + Unplan');
   click(w, dpl.querySelector('[data-act="unplan"]'));
   check(await until(async () => (await call('GET', `/api/tasks/${LATER}`)).plan_start === null), 'Unplan clears the slot only');
   check((await call('GET', `/api/tasks/${LATER}`)).due === ds(new Date(Date.now() + 5 * 86400000)), 'Unplan keeps the due date');
-  await sleep(300); w.eval("histStep('undo')");
+  await idle(w); w.eval("histStep('undo')");  // the page has the answer of Unplan
   check(await until(async () => (await call('GET', `/api/tasks/${LATER}`)).plan_start === ds(new Date()) + 'T23:30'), 'undo brings the slot back');
   await call('DELETE', `/api/tasks/${LATER}`);
   w.close();
@@ -197,7 +198,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const ag = await call('POST', '/api/admin/agents', {scopes: ['write'], username: 'planner', display_name: 'Planner'});
   await call('PATCH', `/api/admin/agents/${ag.id}`, {proposals: 'all'});
   w = await boot({user: 'alice'}); d = w.document;
-  w.dayplanModal('day', TM); await sleep(700);
+  w.dayplanModal('day', TM); await until(() => d.querySelector('.dpm [data-dp="agent"]'));
   md = d.querySelector('.dpm');
   check(md.querySelector('[data-dp="agent"]'), 'an agent online: "Let an agent plan"');
   click(w, md.querySelector('[data-dp="agent"]'));
@@ -207,7 +208,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const r = await fetch(B + `api/v1/agent/jobs/${job.id}/proposal`, {method: 'POST', headers: at, body: JSON.stringify({kind: 'dayplan', summary: 'Deep work first',
     items: [{task_id: A2, start: '09:00', note: 'quick'}, {task_id: A1, start: '10:00'}], defer: [{task_id: A3, to: null}]})});
   check(r.status === 201, `agent proposal accepted (${r.status})`);
-  w.propOpen(job.id); await sleep(700);
+  w.propOpen(job.id); await until(() => d.querySelector('.ppm .dprow.nofit'));
   md = d.querySelector('.ppm');
   check(md && md.querySelectorAll('.dprow.plan').length === 2 && md.querySelector('.dprow.fixed') && md.querySelector('.dprow.nofit'), 'the proposal shows as the same timeline');
   check(/Deep work first/.test(md.textContent) && /Does not fit today/.test(md.textContent) && !md.querySelector('.dprow.nofit .ppc'), 'summary + "Does not fit today" (old defer answer, only listed)');
@@ -224,7 +225,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(card && /Daily review/.test(card.textContent) && /Done thing/.test(card.textContent), 'review card: done today');
   check(card && card.querySelector('[data-act="dayplan"][data-day]'), 'review card: "Plan tomorrow"');
   click(w, card.querySelector('[data-act="review-hide"]'));
-  w.go('today'); await sleep(400);
+  w.go('today'); await until(() => !d.querySelector('.rvcard'), {timeout: 6000});
   check(!d.querySelector('.rvcard') || /review/.test(w.location.hash), 'hidden for today');
   w.close();
 
@@ -232,7 +233,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice'}); d = w.document;
   check(w.eval(`topMoreItems().slice(0, 2).map(x => x.label).join('|')`) === 'Tag planen|Freie Zeit füllen', 'German: Tag planen / Freie Zeit füllen');
-  w.settingsModal('groups'); await sleep(400);
+  w.settingsModal('groups'); await until(() => /Gruppen/.test(d.querySelector('#s-groups-h')?.textContent || ''));
   check(/Gruppen/.test(d.querySelector('#s-groups-h')?.textContent || ''), 'German: Gruppen');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
@@ -253,12 +254,11 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
             await nav(B + 'static/icon.svg');
             try { await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`); break; } catch (e) {
               if (k >= 2 || !/SecurityError|insecure/.test(e.message)) throw e;
-              console.log(`p2100_ui: the theme could not be stored yet (${e.message}), once more`); await sleep(500);
+              console.log(`p2100_ui: the theme could not be stored yet (${e.message}), once more`); await sleep(500);  // pause between two tries of a navigate that committed late (no state to wait for)
             }
           }
           await nav(B + '?v=' + (++nr) + '#today/review');
-          for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300);
-          await sleep(1200);
+          await funtil(ev, `!!(document.querySelector('#top h1') && document.querySelector('.rvcard'))`);
           const lay = await ev(`(() => { const c = document.querySelector('.rvcard');
             return {card: !!(c && c.offsetWidth), doc: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1}; })()`);
           check(lay.card && lay.doc, `${vw}px ${theme}: Today with the review card, no horizontal overflow ${JSON.stringify(lay)}`);
@@ -267,7 +267,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
             check(!small.length, `${vw}px ${theme}: Today buttons >= 44 px ${JSON.stringify(small)}`);
           }
           if (vw === 390 || vw === 1280) await shot(`p2100-today-${vw}-${theme}.png`);
-          await ev(`(() => { dayplanModal('day', '${TM}'); return 1; })()`); await sleep(1200);
+          await ev(`(() => { dayplanModal('day', '${TM}'); return 1; })()`); await funtil(ev, `!!document.querySelector('.dpm .dprow.plan')`);
           const pl = await ev(`(() => { const m = document.querySelector('.dpm .card'); const r = document.querySelector('.dpm .dprow.plan');
             return {sw: m.scrollWidth, cw: m.clientWidth, row: !!(r && r.offsetWidth), doc: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1}; })()`);
           check(pl.row && pl.sw <= pl.cw + 1 && pl.doc, `${vw}px ${theme}: planner without horizontal overflow ${JSON.stringify(pl)}`);
@@ -276,7 +276,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
             check(!small.length, `${vw}px ${theme}: planner targets >= 44 px ${JSON.stringify(small)}`);
           }
           if (vw === 390 || vw === 1280) await shot(`p2100-plan-${vw}-${theme}.png`);
-          await ev(`(() => { document.querySelector('.dpm')?.remove(); settingsModal('groups'); return 1; })()`); await sleep(900);
+          await ev(`(() => { document.querySelector('.dpm')?.remove(); settingsModal('groups'); return 1; })()`); await funtil(ev, `!!document.querySelector('#a-groups')?.offsetWidth`);
           const gs = await ev(`(() => { const m = document.querySelector('.smodal .spanes'); const s = document.querySelector('#a-groups');
             return {sw: m.scrollWidth, cw: m.clientWidth, g: !!(s && s.offsetWidth)}; })()`);
           check(gs.g && gs.sw <= gs.cw + 1, `${vw}px ${theme}: Groups settings without horizontal overflow ${JSON.stringify(gs)}`);
@@ -285,7 +285,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
             check(!small.length, `${vw}px ${theme}: group buttons >= 44 px ${JSON.stringify(small)}`);
           }
           if (vw === 390 || vw === 1280) await shot(`p2100-groups-${vw}-${theme}.png`);
-          await ev(`(() => { document.querySelector('.smodal')?.remove(); shareModal(${L}); return 1; })()`); await sleep(900);
+          await ev(`(() => { document.querySelector('.smodal')?.remove(); shareModal(${L}); return 1; })()`); await funtil(ev, `!!document.querySelector('#sh-groups')?.offsetWidth`);
           const sh = await ev(`(() => { const m = [...document.querySelectorAll('.modal .card')].pop(); const g = document.querySelector('#sh-groups');
             return {sw: m.scrollWidth, cw: m.clientWidth, g: !!(g && g.offsetWidth)}; })()`);
           check(sh.g && sh.sw <= sh.cw + 1, `${vw}px ${theme}: share dialog with groups without overflow ${JSON.stringify(sh)}`);
