@@ -24,7 +24,7 @@ from ..core.config import app
 from ..core.i18n import N_, tr
 from ..core.errors import BadInput
 from .calc import dec, money
-from ..core.db import db  # 2.149.0 G (#2517): pulled up from functions
+from ..core.db import db, local_day  # 2.149.0 G (#2517): pulled up from functions
 
 # keyword (casefolded, part of the category) -> (SKR03, SKR04); the first match wins
 DV_CAT_DEFAULTS = (
@@ -189,9 +189,9 @@ def _eur(amount, s):
 def _line(amount, konto, gegen, bu, day, beleg, text, node=None, checked=None):
     from .datev import dx_beleg, _amt, _ddmm
     # 2.420.0 C (#3448): a receipt a person ticked as checked carries it as additional information (Art "Geprueft", Inhalt =
-    # DD.MM.YYYY of the tick): the booking batch has no field of its own for it
-    extra = ({"Zusatzinformation - Art 1": "Geprueft", "Zusatzinformation - Inhalt 1": f"{checked[8:10]}.{checked[5:7]}.{checked[:4]}"}
-             if checked and len(checked) >= 10 else {})
+    # DD.MM.YYYY of the tick): the booking batch has no field of its own for it. The tick is stored in UTC, its day is the local one
+    tick = local_day(checked)
+    extra = {"Zusatzinformation - Art 1": "Geprueft", "Zusatzinformation - Inhalt 1": tick.strftime("%d.%m.%Y")} if tick else {}
     return {**extra, "Umsatz (ohne Soll/Haben-Kz)": _amt(amount), "Soll/Haben-Kennzeichen": "S" if amount > 0 else "H", "WKZ Umsatz": "EUR",
             "Konto": konto, "Gegenkonto (ohne BU-Schlüssel)": gegen, "BU-Schlüssel": bu, "Belegdatum": _ddmm(day),
             "Belegfeld 1": dx_beleg(beleg), "Buchungstext": (text or "").strip()[:60], "Festschreibung": "0",
