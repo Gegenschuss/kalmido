@@ -36,7 +36,9 @@ function astFields(r) {
   if (!ofcAdmin()) return '';
   const plan = r?.afa_plan || [];
   const life = r?.life_suggest ? tr('Suggestion: {0} months', r.life_suggest) : tr('Suggested from the category');
-  const tbl = plan.length ? `<table class="ast-plan"><caption>${r.method === 'gwg' ? tr('Low-value asset: written off in the purchase year') : tr('Linear depreciation over {0} months', r.life_eff)}</caption>
+  const cap = r.method === 'gwg' ? tr('Low-value asset: written off in the purchase year') : r.method === 'declining'  // 2.480.0 C (#3528)
+    ? tr('Declining depreciation at {0} %, linear from the year it gives more', fmtNum(+r.declining_pct, 2).replace(/[.,]00$/, '')) : tr('Linear depreciation over {0} months', r.life_eff);
+  const tbl = plan.length ? `<table class="ast-plan"><caption>${cap}</caption>
     <thead><tr><th scope="col">${tr('Year')}</th><th scope="col">${tr('Depreciation')}</th><th scope="col">${tr('Book value')}</th></tr></thead>
     <tbody>${plan.map(p => `<tr class="${p.year === r.year ? 'cur' : ''}"><td>${p.year}</td><td>${ofcMoney(p.afa)}</td><td>${ofcMoney(p.book)}</td></tr>`).join('')}</tbody></table>` : '';
   return `<details class="ast-sec" ${r?.purchase_net || r?.purchase_date ? 'open' : ''}><summary>${tr('Purchase and value')}</summary>
@@ -50,15 +52,24 @@ function astFields(r) {
     ${ofcRowF('of-vendor', tr('Vendor'), ofcIn('of-vendor', r?.vendor, {max: 120}))}
     ${ofcRowF('of-serial_no', tr('Serial number'), ofcIn('of-serial_no', r?.serial_no, {max: 120}))}
     ${ofcRowF('of-life_months', tr('Useful life (months)'), ofcIn('of-life_months', r?.life_months ?? '', {num: true, ph: r?.life_suggest ? String(r.life_suggest) : ''}), life)}
+    <div class="ast-meth" id="ast-meth" ${astDeclOk(r?.purchase_date, r?.purchase_net) ? '' : 'hidden'}>${ofcRowF('of-afa_method', tr('Depreciation'),
+      ofcSel('of-afa_method', r?.afa_method === 'declining' ? 'declining' : 'auto', [['auto', tr('linear')], ['declining', tr('declining, up to 30 %')]]),
+      tr('For purchases from July 2025 to December 2027. No tax advice.'))}</div>
     ${tbl}
     ${ofcRowF('of-new_value', tr('New value'), ofcIn('of-new_value', astM(r?.new_value), {num: true, ph: astM(r?.purchase_net)}), tr('Default: the purchase price'))}
     ${ofcRowF('of-current_value', tr('Current value'), ofcIn('of-current_value', astM(r?.current_value), {num: true, ph: astM(r?.book_value)}), tr('Current value = book value, unless you enter an own value.'))}
     ${ofcRowF('of-agreement_id', tr('Insured by'), ofcSel('of-agreement_id', r?.agreement_id, r?.agreement_id ? [[r.agreement_id, r.agreement_name || `#${r.agreement_id}`]] : [], tr('none')))}
     ${astNote()}</details>${r?.id ? `<div class="astlink dlbox" id="ast-link" data-eq="${r.id}"></div>` : ''}`;  // 2.140.0 B (#2136): the private device link
 }
+// 2.480.0 C (#3528): declining depreciation is a choice for a purchase from 01.07.2025 to 31.12.2027 above the low-value limit
+// (the server checks the window as well)
+const astDeclOk = (d, net) => !!d && d >= '2025-07-01' && d <= '2027-12-31' && !(net !== '' && net != null && +net <= 800);
 // fills the policy choice, wires the receipt picker
 function astBind(md, r) {
   if (!ofcAdmin() || !$('#of-agreement_id', md)) return;
+  const meth = () => { const b = $('#ast-meth', md); if (b) b.hidden = !astDeclOk($('#of-purchase_date', md)?.value, ofcNum($('#of-purchase_net', md)?.value ?? '')); };
+  for (const id of ['#of-purchase_date', '#of-purchase_net']) $(id, md)?.addEventListener('change', meth);  // 2.480.0 C (#3528)
+  $('#of-purchase_net', md)?.addEventListener('input', meth);
   api('GET', `${AST_URL}/policies`).then(j => {
     const sel = $('#of-agreement_id', md); if (!sel) return;
     const cur = String(r?.agreement_id ?? '');
@@ -111,6 +122,7 @@ function astTake(md, s) {
   const dt = $('#of-purchase_date', md); if (dt && s.date) { dt.value = s.date; dpSync(dt); }
   set('#of-purchase_net', s.net != null ? fmtNum(+s.net, 2) : null);
   set('#of-vendor', s.vendor);
+  $('#of-purchase_net', md)?.dispatchEvent(new Event('change'));  // 2.480.0 C (#3528): the depreciation choice follows
   $('#ast-hint', md).textContent = s.hint || (s.vat_pct != null ? tr('Net price from {0} gross with {1} % VAT.', fmtNum(+s.gross, 2), s.vat_pct) : '');
 }
 // the fields to save (only when the part is in the dialog)
@@ -119,7 +131,8 @@ function astBody(md) {
   const v = id => $(id, md)?.value ?? '';
   return {purchase_date: v('#of-purchase_date'), purchase_net: ofcNum(v('#of-purchase_net')), receipt_node_id: +v('#of-receipt_node_id') || null,
     vendor: v('#of-vendor'), serial_no: v('#of-serial_no'), life_months: ofcNum(v('#of-life_months')), new_value: ofcNum(v('#of-new_value')),
-    current_value: ofcNum(v('#of-current_value')), agreement_id: +v('#of-agreement_id') || null};
+    current_value: ofcNum(v('#of-current_value')), agreement_id: +v('#of-agreement_id') || null,
+    afa_method: $('#ast-meth', md)?.hidden === false && v('#of-afa_method') === 'declining' ? 'declining' : 'auto'};  // 2.480.0 C (#3528)
 }
 // one undo step for a saved device: the fields before back (members never edit)
 function astUndo(r, body) {

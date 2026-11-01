@@ -15822,5 +15822,10 @@
   "Insert label": "Insertar indicación",
   "Work the list off": "Trabajar la lista",
   "Dry run": "Simulación",
-  "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "El agente trabaja una tras otra las listas indicadas en su ordenador: cuando hay un hueco libre inicia el siguiente trabajo y cierra las tareas una vez hechas. Simulación = solo informa de lo que haría."
+  "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "El agente trabaja una tras otra las listas indicadas en su ordenador: cuando hay un hueco libre inicia el siguiente trabajo y cierra las tareas una vez hechas. Simulación = solo informa de lo que haría.",
+  "linear": "lineal",
+  "declining, up to 30 %": "degresiva, hasta el 30 %",
+  "For purchases from July 2025 to December 2027. No tax advice.": "Para compras de julio de 2025 a diciembre de 2027. Sin asesoramiento fiscal.",
+  "Declining depreciation at {0} %, linear from the year it gives more": "Amortización degresiva al {0} %, lineal desde el año en que resulta mayor",
+  "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "La amortización degresiva solo es posible para compras del 1 de julio de 2025 al 31 de diciembre de 2027."
 }

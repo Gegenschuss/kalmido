@@ -15822,5 +15822,10 @@
   "Insert label": "Inserisci indicazione",
   "Work the list off": "Smaltire la lista",
   "Dry run": "Prova a secco",
-  "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "L'agente lavora una dopo l'altra le liste indicate sul suo computer: quando un posto è libero avvia il job successivo e chiude le attività una volta fatte. Prova a secco = segnala solo cosa farebbe."
+  "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "L'agente lavora una dopo l'altra le liste indicate sul suo computer: quando un posto è libero avvia il job successivo e chiude le attività una volta fatte. Prova a secco = segnala solo cosa farebbe.",
+  "linear": "lineare",
+  "declining, up to 30 %": "decrescente, fino al 30 %",
+  "For purchases from July 2025 to December 2027. No tax advice.": "Per acquisti da luglio 2025 a dicembre 2027. Nessuna consulenza fiscale.",
+  "Declining depreciation at {0} %, linear from the year it gives more": "Ammortamento decrescente al {0} %, lineare dall'anno in cui rende di più",
+  "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "L'ammortamento decrescente è possibile solo per acquisti dal 1° luglio 2025 al 31 dicembre 2027."
 }

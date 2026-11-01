@@ -4154,6 +4154,9 @@ MIGRATIONS = [
     # /api/notes/quick-list). It stays private for good: no members, groups, agents, public link, workspace or owner change
     # (core/access.py qn_private + the trigger QUICKNOTE_TRIGGER); renaming / deleting never clears it. Older versions ignore it
     ("lists", "quicknote", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS quicknote BIGINT NOT NULL DEFAULT 0"),
+    # 2.480.0 C (#3528): the depreciation chosen per device: auto (= linear, as before) | linear | declining (only for a
+    # purchase from 01.07.2025 to 31.12.2027, office/assets.py). Older versions ignore it
+    ("office_equipment", "afa_method", "ALTER TABLE office_equipment ADD COLUMN IF NOT EXISTS afa_method TEXT NOT NULL DEFAULT 'auto'"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

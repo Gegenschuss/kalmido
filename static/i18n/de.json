@@ -15822,5 +15822,10 @@
   "Insert label": "Kennzeichnung einfügen",
   "Work the list off": "Liste abarbeiten",
   "Dry run": "Trockenlauf",
-  "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "Der Agent arbeitet die auf seinem Computer genannten Listen nacheinander ab: Ist ein Platz frei, startet er den nächsten Job, und gebaute Aufgaben hakt er ab. Trockenlauf = er meldet nur, was er tun würde."
+  "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "Der Agent arbeitet die auf seinem Computer genannten Listen nacheinander ab: Ist ein Platz frei, startet er den nächsten Job, und gebaute Aufgaben hakt er ab. Trockenlauf = er meldet nur, was er tun würde.",
+  "linear": "linear",
+  "declining, up to 30 %": "degressiv, bis 30 %",
+  "For purchases from July 2025 to December 2027. No tax advice.": "Für Käufe von Juli 2025 bis Dezember 2027. Keine Steuerberatung.",
+  "Declining depreciation at {0} %, linear from the year it gives more": "Degressive Abschreibung mit {0} %, linear ab dem Jahr, in dem das mehr ergibt",
+  "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "Degressive Abschreibung ist nur für Käufe vom 1. Juli 2025 bis 31. Dezember 2027 möglich."
 }

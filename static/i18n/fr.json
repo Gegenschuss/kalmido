@@ -15822,5 +15822,10 @@
   "Insert label": "Insérer la mention",
   "Work the list off": "Traiter la liste",
   "Dry run": "Essai à blanc",
-  "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "L'agent traite l'une après l'autre les listes indiquées sur son ordinateur : dès qu'une place est libre, il lance la tâche suivante et clôt les tâches une fois réalisées. Essai à blanc = il indique seulement ce qu'il ferait."
+  "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "L'agent traite l'une après l'autre les listes indiquées sur son ordinateur : dès qu'une place est libre, il lance la tâche suivante et clôt les tâches une fois réalisées. Essai à blanc = il indique seulement ce qu'il ferait.",
+  "linear": "linéaire",
+  "declining, up to 30 %": "dégressif, jusqu'à 30 %",
+  "For purchases from July 2025 to December 2027. No tax advice.": "Pour les achats de juillet 2025 à décembre 2027. Pas de conseil fiscal.",
+  "Declining depreciation at {0} %, linear from the year it gives more": "Amortissement dégressif à {0} %, linéaire à partir de l'année où il donne plus",
+  "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "L'amortissement dégressif n'est possible que pour un achat du 1er juillet 2025 au 31 décembre 2027."
 }

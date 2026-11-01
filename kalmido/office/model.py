@@ -1044,12 +1044,13 @@ MD = {
     # money columns and the serial number encrypted at rest ("crypt": the orgcrypt FIELDS of the table)
     "equipment": {"table": "office_equipment", "order": "lower(category), lower(name), id", "label": "name", "crypt": "office_equipment",
                   "admin_cols": ("purchase_date", "purchase_net", "serial_no", "vendor", "receipt_node_id", "life_months", "new_value",
-                                 "current_value", "agreement_id"),
+                                 "current_value", "agreement_id", "afa_method"),
                   "cols": {"name": ("str", True, NAME_MAX), "name_en": ("str", False, NAME_MAX), "category": ("str", False, 80),  # 2.45.1 (#1556): name_en
                            "daily_rate": ("num0", False, None), "archived": ("int01", False, None), "trans": ("trans", False, (("name",), NAME_MAX)),
                            "purchase_date": ("date", False, None), "purchase_net": ("money", False, None), "serial_no": ("str", False, 120),
                            "vendor": ("str", False, 120), "receipt_node_id": ("receipt", False, None), "life_months": ("months", False, None),
-                           "new_value": ("money", False, None), "current_value": ("money", False, None), "agreement_id": ("agreement", False, None)}},
+                           "new_value": ("money", False, None), "current_value": ("money", False, None), "agreement_id": ("agreement", False, None),
+                           "afa_method": ("choice", False, ("auto", "linear", "declining"))}},  # 2.480.0 C (#3528): the depreciation per device
     "sets": {"table": "office_sets", "order": "lower(name), id", "label": "name",
              "cols": {"name": ("str", True, NAME_MAX), "discount_pct": ("num", False, None), "items": ("items", False, None),
                       "archived": ("int01", False, None)}},
@@ -1181,7 +1182,7 @@ def _clean_col(c, oid, kind, k, v):
         return 1 if v in (1, True, "1", "true", "on") else 0
     if typ == "choice":
         if v in (None, "") and not req:
-            return spec[0] if k in ("unit", "tax") else ("extern" if k == "intext" else "")
+            return spec[0] if k in ("unit", "tax", "afa_method") else ("extern" if k == "intext" else "")
         if v not in spec:
             raise BadInput(tr("Invalid value: {0}", k))
         return v
@@ -1306,6 +1307,9 @@ def office_create(c, oid, kind, b):
         if k in b or req:
             cols.append(k)
             vals.append(_clean_col(c, oid, kind, k, b.get(k)))
+    if kind == "equipment" and "afa_method" in b:  # 2.480.0 C (#3528): declining only for a purchase in the window
+        from .assets import ast_method_check
+        ast_method_check(vals[cols.index("afa_method")], b.get("purchase_date"))
     if m.get("kind"):  # 2.47.0 (#1649)
         _sr_costs(c, oid, cols, vals, {})
         cols.append("kind"), vals.append(m["kind"])
@@ -1336,6 +1340,10 @@ def office_update(c, oid, kind, rid, b):
             continue  # 2.92.0 B (#1931): an unchanged link stays even when its policy is archived by now
         sets.append(k)
         vals.append(_clean_col(c, oid, kind, k, v))
+    if kind == "equipment" and ("afa_method" in sets or "purchase_date" in sets):  # 2.480.0 C (#3528): also a new purchase day
+        from .assets import ast_method_check  # must not leave a declining device outside the window
+        g = lambda f: vals[sets.index(f)] if f in sets else r.get(f)  # noqa: E731
+        ast_method_check(g("afa_method"), g("purchase_date"))
     if m.get("kind"):  # 2.47.0 (#1649)
         _sr_costs(c, oid, sets, vals, {f: r.get(f) for f in SR_COSTS})
     _md_crypt(c, oid, kind, sets, vals)
