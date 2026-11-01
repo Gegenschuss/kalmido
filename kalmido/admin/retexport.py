@@ -616,7 +616,7 @@ def rx_stream(sub, uid, by, title, lg):
             idx = _index(z, sub, title, by, when)
             man = {"format": "kalmido-retention-export", "format_version": 1, "kalmido_version": APP_VERSION, "subject": sub["key"],
                    "created_at": when, "created_by": by, "files": dict(z.files), "missing": z.missing, "locked_files": z.locked,
-                   "not_included": left_lines(RX_LEFT_TABLES)}  # 2.362.4 (#3107)
+                   "not_included": left_lines(RX_LEFT_TABLES, lg)}  # 2.362.4 (#3107), 2.464.0 (#3841)
             yield z.put("00-index.txt", idx)
             yield z.put("manifest.json", json.dumps(man, ensure_ascii=False, indent=1))
             z.zf.close()

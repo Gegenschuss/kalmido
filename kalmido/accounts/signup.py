@@ -124,9 +124,9 @@ def _cleanup(c):
 
 
 def _notify_admins(c, uid):
-    """News + push to every admin: a registration waits for approval. 2.367.4 (#2974): only an instance admin can approve, so
-    they keep it; a person who joined an organisation by the address's domain tells its admins too (data.org_id: they know
-    who it is, the text says who approves). The push follows the row "usage", like the News."""
+    """News + push to every admin: a registration waits for approval. 2.367.4 (#2974): a person who joined an organisation by the
+    address's domain tells its admins too (data.org_id); 2.464.0 (#3882): they approve as well (Settings > Organisation, the
+    person's row). The push follows the row "usage", like the News."""
     from ..collab.news import news_add, notif_ok
     from ..core.access import org_admin_people
     from ..core.pg import system_ctx
@@ -141,7 +141,7 @@ def _notify_admins(c, uid):
     for aid in ops + list(org):
         s = usettings(c, aid)
         news_add(c, aid, "signup", data={**data, **({"org_id": org[aid]} if aid in org else {})}, actor=uid, s=s)
-        if notif_ok(c, aid, s, "usage", "push") and push_reachable(c, aid, s) and aid not in org:
+        if notif_ok(c, aid, s, "usage", "push") and push_reachable(c, aid, s):
             lg = lang_of(s)
             g.pushes.append((aid, tr("Registration waits for approval: {0}", u["display_name"] or u["username"], lg=lg),
                              tr("Settings > Organisation > People", lg=lg), f"{PUBLIC_URL}/#settings/users", push_prio(s)))
@@ -220,13 +220,13 @@ def auth_signup():
 
 @app.post("/api/users/<int:uid>/approve")
 def user_approve(uid):
-    """Admins: a registration that waits for approval becomes an active account (declining = deleting it)."""
-    from ..accounts.users import om_admin_all as admin_sees, need_admin, user_admin_dict  # 2.46.0 (#1592)
-    need_admin()
+    """Admins: a registration that waits for approval becomes an active account (declining = deleting it). 2.464.0 (#3882): or an
+    admin of the person's organisation (useradmin.ua8_may_approve); their answer has no account details."""
+    from ..accounts.useradmin import ua8_may_approve
+    from ..accounts.users import user_admin_dict  # 2.46.0 (#1592)
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    if not u or not admin_sees(c, uid):  # 2.28.0 (#935)
-        raise Denied(404)
+    inst = ua8_may_approve(c, u, uid)  # 2.28.0 (#935)
     if u["signup"] != "pending":
         return err(tr("This account does not wait for an approval"), 409)
     c.execute("UPDATE users SET signup='', disabled=0 WHERE id=?", (uid,))
@@ -234,7 +234,7 @@ def user_approve(uid):
     c.commit()
     from .secmail import sec_mail
     sec_mail(c, uid, "approved")  # 2.266.0 (#2963): the person learns it without trying
-    return jsonify(user_admin_dict(c, c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()))
+    return jsonify(user_admin_dict(c, c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone())) if inst else jsonify(ok=True)
 
 
 def signup_settings(c, b):

@@ -4,6 +4,7 @@
  With the server key:
   #3099 the account export carries the personal office (readable, personal-office/ with the same parts as its own export, the
         receipt files too), the import preview names it as staying behind; the files of the knowledge pages and (#3134) of templates are in the file
+  #3865 the import takes the files of templates back: sealed, on the new template, counted against the storage, once, with the undo
   #3099 the office archive (organisation 0) carries the receipts, the filed documents the office points at and their folders;
         never a file in the trash, never another person's node an office row names; a second person imports it privately:
         the cash entry and the equipment point at their files again, the file downloads
@@ -206,7 +207,8 @@ iid = upload(F, raw, "konto.zip")
 j = wait(F, iid)
 check(j.get("state") == "preview", f"#3099 the import reads the file {j.get('state')} {j.get('error')}")
 pv = j.get("preview") or {}
-check(any(x["what"] == "Files of templates" for x in pv.get("not_taken", [])), f"#3134 the preview names the files of templates {pv.get('not_taken')}")
+# 2.464.0 (#3865): the import reads them now (before: named as staying behind, #3134)
+check(not any("templates" in x["what"] for x in pv.get("not_taken", [])), f"#3865 the files of templates come along {pv.get('not_taken')}")
 check(pv.get("office_copy") is True and any(x["what"] == "Office" for x in pv.get("not_taken", [])), f"#3099 the preview names the office {pv.get('not_taken')}")
 F.delete(B + f"/api/account/import/{iid}")
 
@@ -215,6 +217,64 @@ check(wf and any(n.startswith("files/wiki_files/") for n in names) and wf[0].get
 tf = json.loads(z.read("data/template_files.json"))
 check(len(tf) == 1 and tf[0]["name"] == "plan.txt" and "path" not in tf[0] and z.read(tf[0]["file"]) == b"der Vorlagen Plan\n", f"#3134 the file of the template, readable {tf}")
 check(not any(n.startswith(f"files/private_files/{GONE}-") for n in names), "a file in the trash stays out")
+
+# ---------------------------------------------------------------- 2.464.0 (#3865): the files of templates come back with the import
+
+
+dbx_w = dbxm.connect(DATA)
+
+
+def imp(s, quota=None):
+    iid = upload(s, raw, "konto.zip")
+    check(wait(s, iid).get("state") == "preview", "#3865 the preview")
+    dbx_w.execute("UPDATE users SET storage_quota_mb=? WHERE id=?", (quota, GID))  # after the upload: it counts against the storage too
+    ok(s.post(B + f"/api/account/import/{iid}/run", json={"again": True, "target": "private", "people": {}}), "#3865 the import starts")
+    return wait(s, iid)
+
+
+def tfiles():
+    return dbx("SELECT id, template_id, node_key, name, size, path, scan FROM template_files WHERE user_id=? ORDER BY id", (GID,))
+
+
+L0 = G.post(B + "/api/lists", json={"name": "Voll"}).json()["id"]
+T0 = G.post(B + "/api/tasks", json={"list_id": L0, "title": "Gross"}).json()["id"]
+for i in range(3):
+    ok(G.post(B + f"/api/tasks/{T0}/attachments", files={"file": (f"gross{i}.bin", os.urandom(400000), "application/octet-stream")}), "#3865 setup: the storage fills")
+j = imp(G, 1)
+check(j.get("state") == "stopped" and not tfiles(), f"#3865 a full storage keeps the file of the template out {j.get('state')} {tfiles()}")
+check(one("SELECT COUNT(*) FROM templates WHERE user_id=?", (GID,)) == 1, "#3865 the template itself came")
+check(any("storage is full" in w["text"] for w in j["result"]["warnings"]), f"#3865 and it is named {j['result']['warnings']}")
+ok(G.post(B + f"/api/imports/{j['result']['import_id']}/undo", json={}), "#3865 setup: undo of the full run")
+dbx_w.execute("UPDATE users SET storage_quota_mb=NULL WHERE id=?", (GID,))
+
+j = imp(G)
+check(j.get("state") == "done" and (j["result"]["created"] or {}).get("template_files") == 1, f"#3865 the import takes the file {j.get('state')} {j.get('result')}")
+tr0 = tfiles()
+gtpl = one("SELECT id FROM templates WHERE user_id=?", (GID,))
+check(len(tr0) == 1 and tr0[0]["name"] == "plan.txt" and tr0[0]["template_id"] == gtpl and tr0[0]["path"].startswith(f"tplfiles/{gtpl}/"), f"#3865 the row on the new template {tr0}")
+gfull = os.path.join(DATA, "attachments", tr0[0]["path"])
+with open(gfull, "rb") as fh:
+    check(b"der Vorlagen Plan" not in fh.read(), "#3865 sealed on disk")
+r = ok(G.post(B + f"/api/templates/{gtpl}/apply", json={"name": "Aus Import"}), "#3865 the template is used")
+fid = dbx("SELECT a.id FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE t.list_id=? AND a.name='plan.txt'", (r["list_id"],))
+check(fid and G.get(B + f"/api/attachments/{fid[0][0]}").content == b"der Vorlagen Plan\n", f"#3865 the task from the template has the file {fid}")
+j = imp(G)
+check(len(tfiles()) == 1, f"#3865 a second import of the same file adds no copy {tfiles()}")
+# a template of an earlier import without its file (imported before #3865): the file joins it, its undo takes only the file
+dbx_w.execute("DELETE FROM template_files WHERE user_id=?", (GID,))
+j = imp(G)
+tr1 = tfiles()
+check(len(tr1) == 1 and tr1[0]["template_id"] == gtpl, f"#3865 the file comes to the earlier template {tr1}")
+ok(G.post(B + f"/api/imports/{j['result']['import_id']}/undo", json={}), "#3865 undo of that run")
+check(not tfiles() and one("SELECT COUNT(*) FROM templates WHERE id=?", (gtpl,)) == 1 and not os.path.exists(os.path.join(DATA, "attachments", tr1[0]["path"])), "#3865 its undo takes the file, the template stays")
+for x in reversed(dbx("SELECT id FROM imports WHERE user_id=? AND undone_at IS NULL ORDER BY id", (GID,))):
+    G.post(B + f"/api/imports/{x['id']}/undo", json={})
+check(one("SELECT COUNT(*) FROM templates WHERE user_id=?", (GID,)) == 0, "#3865 undoing the first run takes the template")
+j = imp(G)
+gfull = os.path.join(DATA, "attachments", tfiles()[0]["path"])
+check(os.path.exists(gfull), "#3865 the file is there again")
+ok(G.post(B + f"/api/imports/{j['result']['import_id']}/undo", json={}), "#3865 undo")
+check(not tfiles() and not os.path.exists(gfull), "#3865 the undo with the template leaves no file behind")
 check(any("knowledge" not in x and "older versions" in x for x in man["not_included"]), "#3099 the manifest no longer leaves the page files out")
 
 # Mandantengrenze: an account export with the office option never carries another person's rows

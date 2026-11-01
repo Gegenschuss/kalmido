@@ -270,7 +270,7 @@ function newsText(it, U) {
     case 'wiki_shared': return d.folder ? tr('{0} shared the pages of the folder {1} with you', who, q(String(d.path || '').split('/').pop())) : tr('{0} shared the page {1} with you', who, q(String(d.path || '').split('/').pop()));  // 2.126.2 B (#2355)
     case 'apdecide': return {approved: tr('{0} approved {1}', who, q(it.task_title || '')), changes: tr('{0} asks for changes to {1}', who, q(it.task_title || '')),
       rejected: tr('{0} rejected {1}', who, q(it.task_title || ''))}[d.state] || tr('{0} decided on your approval request', who);  // 2.23.0 (#463)
-    case 'signup': return d.org_id ? tr('{0} registered with the address of your organisation and waits for the server admin’s approval', q(d.name || d.username || '')) : tr('{0} registered and waits for your approval', q(d.name || d.username || ''));  // 2.23.0 (#711); 2.367.4 (#2974): only an instance admin approves
+    case 'signup': return d.org_id ? tr('{0} registered with the address of your organisation and waits for approval', q(d.name || d.username || '')) : tr('{0} registered and waits for your approval', q(d.name || d.username || ''));  // 2.23.0 (#711); 2.464.0 (#3882): an organisation's admin approves too
     case 'orglogin': return tr('Admin {0} signed in from a new address: {1}', q(d.name || ''), esc(d.ip || ''));  // 2.367.4 (#2974)
     case 'orgjoinres': return d.yes ? tr('{0} accepted your invitation to {1}', who, q(d.name || '')) : tr('{0} declined your invitation to {1}', who, q(d.name || ''));
     case 'orgrole': return tr('{0} changed your role in {1}: {2}', who, q(d.name || ''), esc(({admin: tr('Admin'), readonly: tr('Read-only'), accounting: tr('Accounting'), guest: tr('Guest')})[d.role] || tr('Member')));
@@ -491,7 +491,7 @@ async function newsOpen(i, opts) {
   if (it.kind === 'upscan' && it.data?.where === 'chat') { if (feat('agents') && agentsOn()) go('agents'); return; }
   if (it.kind === 'signoff' || it.kind === 'docpaid' || it.kind === 'docoverdue') { const k = String(it.data?.click || ''); if (k.startsWith('#') && k.length > 1) go(k.slice(1)); return; }  // 2.266.0 (#2965): the quotation / document / video
   if (it.kind === 'whorgcut') { settingsModal('webhooks'); return; }  // 2.380 G (#3391): Settings > Access, the webhooks
-  if (it.kind === 'signup' && it.data?.org_id) return;  // 2.367.4 (#2974): the server's admin decides
+  if (it.kind === 'signup' && it.data?.org_id) { settingsModal('org'); return; }  // 2.464.0 (#3882): the person's row in the organisation
   if (it.kind === 'orglogin' || it.kind === 'orgjoinres' || it.kind === 'orgrole') return;
   if (it.kind === 'signup') { settingsModal('users'); return; }  // 2.23.0 (#711): approve it under Users  // 2.15.0 (#479): an agent's request
   if (!it.task_id) { if (it.list_id && listById(it.list_id)) go('l/' + it.list_id); return; }

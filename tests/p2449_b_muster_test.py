@@ -123,4 +123,5 @@ for _ in range(480):  # polls the export's state until it is no longer running
 r = su_get(G, B + "/api/account/export/file")
 man = json.loads(zipfile.ZipFile(io.BytesIO(r.content)).read("manifest.json"))
 check(any("mots de passe" in x for x in man["not_included"]) and not any(x.startswith("passwords") for x in man["not_included"]), "the manifest in French")
+check(any(x.startswith("pas encore dans l’export du compte: ") and "chat_saves" in x for x in man["not_included"]), f"#3841: the reasons of the tables left out in French, the names stay: {man['not_included'][-1]}")
 sys.exit(done("p2449_b_muster"))

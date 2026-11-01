@@ -8,7 +8,10 @@
  5. a table exported AND named as left out
  6. a new office table outside the retention export
  7. an area of the organisation export the import neither maps nor names
+ 8. 2.464.0 (#3841): every reason is a translated key
 usage: python3 tests/export_tables_lint_test.py"""
+import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -69,6 +72,16 @@ check(rc == 1 and "zz_part" in out, f"a part the import does not know is a findi
 rc, out = with_edit(("admin", "orgexport.py"), '    ("bookmarks.json", "bookmarks", "org_id=?"),\n',
                     '    ("bookmarks.json", "bookmarks", "org_id=?"),\n    ("zz/area.json", "notes", "org_id=?"),\n')
 check(rc == 1 and "zz/area.json" in out, f"an area the import does not know is a finding: {out[-300:]}")
+
+# 2.464.0 (#3841): the reasons are keys of the language files, also the ones of the organisation export and without the mark in the manifest
+spec = importlib.util.spec_from_file_location("i18nkeys", os.path.join(ROOT, "kalmido", "core", "i18nkeys.py"))
+ik = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ik)
+keys = ik.reason_keys(ROOT)
+check({"not yet in the account export", "credentials", "the trash", "not yet in the export"} <= set(keys) and not any("not_included" in k for k in keys), f"the reasons are read: {sorted(keys)[:5]}")
+with open(os.path.join(ROOT, "static", "i18n", "de.json"), encoding="utf-8") as f:
+    de = json.load(f)
+check(not [k for k in keys if k not in de], f"every reason is translated: {[k for k in keys if k not in de][:5]}")
 
 print(f"export_tables_lint: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

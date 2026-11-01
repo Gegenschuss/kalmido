@@ -125,6 +125,30 @@ def ua8_admin_orgs(c):
     return [o for o in user_orgs(c, me()) if org_role(c, me(), o) == "admin"]
 
 
+def ua8_may_approve(c, u, uid):
+    """2.464.0 (#3882): who decides a waiting registration: an instance admin (users.om_admin_all) or an admin of an organisation the
+    person belongs to (the person joined by the confirmed address of its domain). Raises Denied (404 = an account the caller must
+    not know). -> True for an instance admin."""
+    from ..agents.core import is_agent
+    from ..accounts.users import om_admin_all
+    if g.user["is_admin"]:
+        if not u or not om_admin_all(c, uid):
+            raise Denied(404)
+        return True
+    if is_agent(g.user):
+        raise Denied(403)
+    mine = ua8_admin_orgs(c)
+    if not mine:
+        raise Denied(403)
+    from ..accounts.orgs import user_orgs
+    theirs = user_orgs(c, uid) if u else []
+    if not set(theirs) & set(mine):
+        raise Denied(404)
+    if len(theirs) != 1 or u["is_admin"] or is_agent(u):  # as ua8_may_delete: only an account of this one organisation
+        raise Denied(403)
+    return False
+
+
 def ua8_may_delete(c, u, uid):
     """Who deletes account uid: 'instance' (an instance admin, as before: users.om_admin_all) or the id of the organisation
     whose admin deletes it -- only an account that belongs to that one organisation alone and is no instance admin (the

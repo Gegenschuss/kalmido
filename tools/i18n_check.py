@@ -93,6 +93,8 @@ def extract():
             elif prev and kind == "p" and prev[1] != other:
                 errors.append(f"{where}: plural key {key!r} has two different 'other' forms (see {prev[2]})")
             keys.setdefault(key, (kind, other, where))
+    for key, where in KEYS.reason_keys(ROOT).items():  # 2.464.0 (#3841)
+        keys.setdefault(key, ("s", None, where))
     return keys, dynamic, errors
 
 

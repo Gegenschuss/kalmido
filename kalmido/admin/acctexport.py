@@ -662,7 +662,7 @@ def umz_build(c, uid, stream, export_id):
             "people_salt": salt,  # 2.239.0 A (#2882): email_hash = HMAC-SHA256 with this key (umz_email_hash)
             "tables": out.tables, "files": out.files,
             "client_encrypted": {**client_enc, "keys": bool(out.tables.get("e2e_keys")), "note": UMZ_ENC_NOTE},  # 2.278.0 C (#3091)
-            "export_id": export_id, "not_included": [*(tr(x, lg=lang(c, uid)) for x in UMZ_NOT_INCLUDED), *left_lines(UMZ_LEFT_TABLES)],  # 2.449.0 (#3768): in the person's language, 2.362.4 (#3107)
+            "export_id": export_id, "not_included": [*(tr(x, lg=lang(c, uid)) for x in UMZ_NOT_INCLUDED), *left_lines(UMZ_LEFT_TABLES, lang(c, uid))],  # 2.449.0 (#3768): in the person's language, 2.362.4 (#3107), 2.464.0 (#3841)
             "locked_files": locked,  # 2.209.0 D (#1856)
             **({"personal_office": office} if office else {}),
             "missing": out.missing,  # 2.363.2 (#3106): files that are gone or cannot be decrypted [{file, reason}]

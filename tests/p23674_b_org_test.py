@@ -165,12 +165,29 @@ check(requests.post(B + "/api/auth/invite/accept", headers=H, json={"token": tok
 NID = dbx("SELECT id FROM users WHERE username='nina'")[0][0]
 check(dbx("SELECT org_id FROM org_members WHERE user_id=?", (NID,)) == [(ORG,)], "setup: in the organisation by its domain")
 n = news(A, "signup")
-check(len(n) == 1 and "org_id" not in n[0]["data"], f"the instance admin keeps it, only they approve {n}")
+check(len(n) == 1 and "org_id" not in n[0]["data"], f"the instance admin keeps it {n}")
 n = news(Bo, "signup")
 check(len(n) == 1 and n[0]["data"]["org_id"] == ORG and n[0]["data"]["user_id"] == NID, f"the organisation's admin hears of it {n}")
 check(not news(Da, "signup"), "not a plain member")
-check(Bo.post(B + f"/api/users/{NID}/approve").status_code == 403, "approving stays the instance admin's")
-check(A.post(B + f"/api/users/{NID}/approve").ok and not news(Bo, "signup"), "decided: the item is gone")
+# 2.464.0 (#3882): the organisation's admin decides it too (before: 403, the instance admin only)
+def waiting(s):
+    o = [x for x in s.get(B + "/api/orgs").json()["orgs"] if x["id"] == ORG]
+    return [m["id"] for m in o[0]["members"] if m.get("pending")] if o else []
+
+
+check(waiting(Bo) == [NID], f"the organisation's admin sees who waits {waiting(Bo)}")
+check(not waiting(Da), "a plain member does not")
+check(Da.post(B + f"/api/users/{NID}/approve").status_code == 403, "a plain member cannot approve")
+assert A.post(B + "/api/admin/orgs", json={"name": "Fremd GmbH", "admin_id": user("xena")}).ok
+Xo = sess("xena")
+check(Xo.post(B + f"/api/users/{NID}/approve").status_code == 404, "the admin of another organisation gets a 404")
+check(Xo.delete(B + f"/api/users/{NID}").status_code == 404, "and cannot decline it")
+r = Bo.post(B + f"/api/users/{NID}/approve")
+check(r.ok and r.json() == {"ok": True}, f"the organisation's admin approves, the answer has no account details {r.status_code} {r.text[:200]}")
+check(dbx("SELECT signup, disabled FROM users WHERE id=?", (NID,)) == [("", 0)], "the account is active")
+check(not news(Bo, "signup") and not news(A, "signup"), "decided: the item is gone")
+check(Bo.post(B + f"/api/users/{NID}/approve").status_code == 409, "once")
+check(until(lambda: mails("nina@nordwind.example")[1:], 20), "the person hears of it")
 
 # ================================================================== security alerts
 out = in_ct("""import app
@@ -227,4 +244,12 @@ assert Fr.patch(B + f"/api/my/agents/{FA}", json={"limits": {"period": "day", "m
 n0 = len(news(A, "usage"))
 report()
 check(until(lambda: news(Fr, "usage"), 10) and len(news(A, "usage")) == n0, "a personal agent: its owner, not the operator")
-done("p23674_b_org")
+# 2.464.0 (#3882): at the end: a deleted account is one more security alert
+r = R.post(B + "/api/auth/signup", json={"name": "Olga", "email": "olga@nordwind.example", "password": "olga-secret-12"})
+check(r.ok, f"setup: a second registration {r.text[:200]}")
+ml = until(lambda: mails("olga@nordwind.example"), 20)
+htm = [p for p in _em.message_from_string(ml[0]["raw"]).walk() if p.get_content_type() == "text/html"][0].get_payload(decode=True).decode()
+check(requests.post(B + "/api/auth/invite/accept", headers=H, json={"token": re.search(r"#invite/([A-Za-z0-9_-]{20,100})", htm)[1], "password": "olga-secret-12"}).ok, "setup: confirmed")
+OID = dbx("SELECT id FROM users WHERE username='olga'")[0][0]
+check(Bo.delete(B + f"/api/users/{OID}").ok and not dbx("SELECT 1 FROM users WHERE id=?", (OID,)), "declining: the organisation's admin deletes the waiting account")
+sys.exit(done("p23674_b_org"))

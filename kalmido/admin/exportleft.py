@@ -84,9 +84,11 @@ RX_LEFT_TABLES = {
 }
 
 
-def left_lines(left):
-    """{table: reason} -> the lines of a manifest's not_included: one per reason, with its tables."""
+def left_lines(left, lg="en"):
+    """{table: reason} -> the lines of a manifest's not_included: one per reason, with its tables. 2.464.0 (#3841): the reason in the
+    language lg, the table names stay technical. The reasons are keys without N_ (core/i18nkeys.py reason_keys reads them)."""
+    from ..core.i18n import tr
     why = {}
     for t, r in sorted(left.items()):
         why.setdefault(r.replace(" (not_included)", ""), []).append(t)
-    return [f"{r}: {', '.join(ts)}" for r, ts in why.items()]
+    return [f"{tr(r, lg=lg)}: {', '.join(ts)}" for r, ts in why.items()]

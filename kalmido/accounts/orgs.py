@@ -1100,13 +1100,14 @@ def org_need_person(c, oid):
 
 def org_mine_dict(c, r, uid):
     from ..collab.comments import user_names
-    mem = c.execute("SELECT m.user_id, m.role, u.kind, u.disabled FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? ORDER BY lower(u.display_name), u.id", (r["id"],)).fetchall()
+    mem = c.execute("SELECT m.user_id, m.role, u.kind, u.disabled, u.signup FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? ORDER BY lower(u.display_name), u.id", (r["id"],)).fetchall()
     from .orgroles import org_sees_all, org_writes, roles_public
     full = org_sees_all(c, uid, r["id"])
     if not full:  # 2.143.0 A (#2151): a guest / accounting sees only the people they share something with (and the admins)
         near = _connections(c, uid) | {uid}
         mem = [m for m in mem if m["user_id"] in near or m["role"] == "admin"]
     names = user_names(c, [m["user_id"] for m in mem])
+    admin = org_role(c, uid, r["id"]) == "admin"  # 2.464.0 (#3882): they see a waiting registration and decide it
     return {"id": r["id"], "name": r["name"], **org_icon_fields(r), "color": r["color"] or "", "domains": r["domains"],  # 2.87.9 (#1913)
             "photo_meta_strip": bool(r["photo_meta_strip"]),  # 2.61.0 B (#1819)
             "ext_links": bool(r["ext_links"]),  # 2.112.1 B (#2058): external share links of the file store allowed
@@ -1117,7 +1118,8 @@ def org_mine_dict(c, r, uid):
             "nav_off": nav_org_off(r),  # 2.418.0 (#3560): menu points its admins switched off for the members
             "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "guest",
-                         "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
+                         "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"]),
+                         **({"pending": True} if admin and m["signup"] == "pending" else {})} for m in mem],  # 2.464.0 (#3882)
             "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=? AND deleted_at IS NULL", (r["id"],)).fetchone()[0] if full else 0,
             "limited": not full or not org_writes(c, uid, r["id"]),  # 2.143.0 A (#2151): guest / read-only / accounting
             "roles": roles_public(c)}  # 2.143.0 A (#2151): the roles an admin hands out, with their explanation

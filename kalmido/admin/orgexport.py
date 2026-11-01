@@ -445,12 +445,12 @@ _PERSONAL = "a person's own data (their account export)"
 _DERIVED = "derived or working data, rebuilt on the target"
 _SERVER = "state of this server (keys, jobs, scanner, queues)"
 _AGENT = "agents and their logs (never in the organisation export)"
-_LATER2 = "not yet in the export (2.390 / 2.352 tables, follow-up task #3642)"
+_LATER2 = "not yet in the export"  # follow-up task #3642: the 2.390 / 2.352 tables
 OX_LEFT = {
     # organisation column
     "agents": _AGENT, "bg_jobs": _SERVER, "doc_mail": _SECRET, "doc_models": _DERIVED, "file_text": _DERIVED,
     "doc_fetchers": "a person's receipt fetcher and its token (set up again on the target)", "doc_fetch_portals": _DERIVED,
-    "fs_ext_links": _SECRET, "fs_locks": "folder locks and their keys (client_encrypted, 2.353.0 #2758)", "fs_upload_requests": _SECRET, "hub_tokens": _SECRET, "life_trip_costs": _PERSONAL,
+    "fs_ext_links": _SECRET, "fs_locks": "folder locks and their keys (client_encrypted)", "fs_upload_requests": _SECRET, "hub_tokens": _SECRET, "life_trip_costs": _PERSONAL,
     "merge_runs": _PERSONAL, "notify_channels": _SECRET, "office_peppol": _SECRET, "office_trash": "the trash (not_included)",
     "office_undo": "undo steps of one day", "org_invites": "invitations (not_included)", "org_joins": "join requests (not_included)",
     "org_keys": _SERVER, "org_members": "members.json (with the role)", "org_out_requests": "requests of one person, short-lived",
@@ -582,10 +582,13 @@ def _safe_part(s, n=80):
     return s or "file"
 
 
+def ox_lang(c, by):
+    return lang(c, by["id"]) if by else "en"
+
+
 def ox_not_included(c, by, texts):
     """2.449.0 (#3768): what the export leaves out, in the language of the person who runs it (without one: English)."""
-    lg = lang(c, by["id"]) if by else "en"
-    return [tr(x, lg=lg) for x in texts]
+    return [tr(x, lg=ox_lang(c, by)) for x in texts]
 
 
 def ox_file_name(org_name, oid, when, suffix=OX_SUFFIX):
@@ -829,7 +832,7 @@ def ox_build(c, oid, out, by=None):
             "counts": man.counts, "files": man.files,
             "client_encrypted": {**man.client_enc, "note": "Encrypted in the browser by their author: stored here as ciphertext, only the author can open them."},
             "decrypted": ox_decrypted_note("organisation"),
-            "not_included": [*ox_not_included(c, by, OX_NOT_INCLUDED), *left_lines(OX_LEFT)],  # 2.449.0 (#3768), 2.362.4 (#3107)
+            "not_included": [*ox_not_included(c, by, OX_NOT_INCLUDED), *left_lines(OX_LEFT, ox_lang(c, by))],  # 2.449.0 (#3768), 2.362.4 (#3107), 2.464.0 (#3841)
             "locked_files": man.locked,  # 2.209.0 D (#1856)
             "missing": man.missing,  # 2.363.2 (#3106)
         }

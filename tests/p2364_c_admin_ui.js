@@ -6,6 +6,7 @@
 //   the chosen role, the link to copy. An organisation admin who is no server admin gets no link choice.
 // - The recovery key / export of an organisation once (Organisation > Data), not again under People or the server switch.
 // - One role word: the project role "view" reads "Read-only" (German "Nur lesen"), the server admin box "Manage the server".
+// - #3882: an organisation admin approves a waiting registration in the person's row.
 // - A member sees no sub-tabs and no invitation; a person without an organisation keeps their own settings (P4).
 // - #3044: Settings > Access is listed only with an own API token / webhook, else it waits under Integrations > "For advanced
 //   users"; "New person" folds SSO sign-in, ntfy topic, child account and the OIDC note under "Advanced"; everyday German words.
@@ -125,11 +126,18 @@ const subs = (md, sec) => [...md.querySelectorAll(`[data-pane="${sec}"] [data-ad
   await call('PATCH', '/api/settings', {lang: 'en'});
 
   // ================= the organisation's admin (no server admin)
+  // 2.464.0 (#3882): a registration by the organisation's domain waits: its admin decides it in the person's row
+  uid.pia = (await call('POST', '/api/users', {username: 'pia', display_name: 'Pia', password: 'password123', email: 'pia@example.com', orgs: [{id: ORG, role: 'member'}]})).id;
+  execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE users SET signup='pending', disabled=1 WHERE id=?", JSON.stringify([uid.pia])]);
   w = await boot({user: 'olga'}); d = w.document;
   w.eval(`settingsModal('org')`);
   md = await until(() => d.querySelector('.smodal'));
   check(secOn(md) === 'org' && subs(md, 'org') === 'users,odata', 'organisation admin: People and Data, no Agents: ' + subs(md, 'org'));
   check(!md.querySelector('.snav [data-sec="users"]') && !md.querySelector('#a-users'), 'organisation admin: no Server, no server users');
+  const pb = await until(() => d.querySelector(`#s-ws [data-wsok="${uid.pia}"]`));
+  check(pb && /Pia/.test(pb.closest('.mrow').textContent) && /waits for approval/.test(pb.closest('.mrow').textContent), 'organisation admin: Approve in the row of the person who waits');
+  click(w, pb);
+  check(await until(() => /Approved/.test(d.querySelector('#toast')?.textContent || '') && !d.querySelector(`#s-ws [data-wsok="${uid.pia}"]`)), 'organisation admin: approved, the button is gone');
   click(w, await until(() => d.querySelector(`.wsorg[data-oid="${ORG}"] [data-oinv="new"]`)));
   dlg = await until(() => d.querySelector('#oinv-mail')?.closest('.modal'));
   check(dlg && !dlg.querySelector('[data-oinvhow]'), 'organisation admin: invitation by e-mail only (the link stays with the server admins)');

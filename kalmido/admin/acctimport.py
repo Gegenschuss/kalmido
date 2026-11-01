@@ -37,6 +37,7 @@ from flask import g, jsonify, request
 from ..core.config import app, ATT_DIR, MAX_FILE_MB, PUBLIC_URL
 from ..core.config import USERNAME_RE  # 2.278.0 B (#3094)
 from ..accounts.orgs import visible_people as umz_visible  # 2.278.0 B (#3094)
+from ..core.serializers import unlink_files  # 2.464.0 (#3865)
 from ..core.db import body, bump, connect, db, err, iso, now_utc, parse_iso, usettings, uset, create_user, DataError, IntegrityError
 from ..core.pg import insert_id, system_ctx
 from ..core.errors import BadInput  # 2.273.0 A (#3030)
@@ -128,6 +129,7 @@ UMZ_READ = frozenset((
     "e2e_keys",  # 2.278.0: the browser keys
     "notes", "task_enc_notes",  # 2.362.0 (#3090): project notes, my encrypted task notes
     "sprints", "task_links", "list_rules", "portal_tickets",  # 2.455.0 (#3469)
+    "template_files",  # 2.464.0 (#3865)
 ))
 UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is empty; a name used twice adds up
     (N_("Tables"), ("sheets", "sheet_columns", "sheet_rows", "sheet_cells", "sheet_files", "sheet_hist")),
@@ -153,7 +155,6 @@ UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is
     (N_("Tasks in other projects"), ("other_tasks",)), (N_("Tasks I take part in"), ("task_people",)), (N_("Reactions"), ("reactions",)),
     (N_("Stars"), ("kid_stars",)), (N_("Received notifications"), ("notifications",)), (N_("Sign-ins"), ("sessions",)),
     (N_("Push devices"), ("push_devices",)), (N_("Agent chat settings"), ("agent_chat_prefs",)),
-    (N_("Files of templates"), ("template_files",)),  # #3134
 )
 
 _UMI = {}  # user id -> running check / import thread
@@ -872,6 +873,7 @@ UMZ_SRC = {
     "contacts": ("contacts", "book_id", "books"), "events": ("events", "cal_id", "ev_cals"), "event_attendees": ("event_attendees", "event_id", "events"),
     "sprints": ("sprints", "list_id", "lists"), "list_rules": ("list_rules", "list_id", "lists"),  # 2.455.0 (#3469)
     "portal_tickets": ("portal_tickets", "list_id", "lists"),
+    "template_files": ("template_files", "template_id", "templates"),  # 2.464.0 (#3865)
 }
 
 
@@ -1009,7 +1011,7 @@ class _Run:
         self.maps = {}
         self.have, self.src, self.oi_done = {}, {}, False  # 2.362.3 (#3098): umz_have; old -> new of this run, for the next one
         self.created = {"lists": [], "sections": [], "tasks": [], "habits": [], "filters": [], "templates": [], "ev_cals": [],
-                        "books": [], "time_entries": [], "journal": [], "settings": {}, "files": []}
+                        "books": [], "time_entries": [], "journal": [], "settings": {}, "files": [], "template_files": []}
         self.stats = {}
         self.warn = {}
         self.done, self.total, self.tick = 0, max(1, total), 0
@@ -1214,6 +1216,79 @@ def umz_files(c, run, uid, me_old, zf, files, data):
             if kind == "tasks":
                 run.created["files"].append(rel)
             run.count(table)
+    umz_template_files(c, run, uid, zf, files, data)
+
+
+def umz_template_files(c, run, uid, zf, files, data):
+    """2.464.0 (#3865): the file copies of my templates, checked like an attachment, sealed for my account (lists/tplextra.py) and
+    counted against the quota. The node key comes along as it is: templates.data keeps its keys (tx_keys)."""
+    from ..admin.hosting import QuotaExceeded, quota_guard
+    from ..files.upsafe import up_check, UploadRefused
+    from ..lists.tplextra import tx_keys
+    from ..tasks.attachments import safe_name
+    ts = iso(now_utc())
+    keys = {}  # template -> its node keys
+    for r in data.get("template_files", []):
+        run.step()
+        tpl, node = run.m("templates", r.get("template_id")), _txt(r.get("node_key"), 80)
+        if not tpl or not node or run.there("template_files", r.get("id")):
+            continue
+        if tpl not in keys:
+            keys[tpl] = tx_keys(json.loads(c.execute("SELECT data FROM templates WHERE id=?", (tpl,)).fetchone()[0] or "{}"))
+        if node not in keys[tpl]:  # review: a task the template does not have: the file would never be used, only count
+            run.warning(N_("A file could not be taken over: {0}"), _txt(r.get("name"), 80))
+            continue
+        if run.stopped:
+            run.warning(UMZ_NO_SPACE)
+            continue
+        raw = _file_bytes(zf, files, r.get("file"))
+        if raw is None:
+            run.warning(N_("A file is missing in the export: {0}"), _txt(r.get("name"), 80))
+            continue
+        if not raw or len(raw) > MAX_FILE_MB * 1024 * 1024:
+            run.warning(N_("A file is empty or too large and was skipped: {0}"), _txt(r.get("name"), 80))
+            continue
+        try:
+            quota_guard(c, uid, len(raw))
+        except QuotaExceeded:
+            run.stopped = "quota"
+            run.warning(UMZ_NO_SPACE)
+            continue
+        name = safe_name(_txt(r.get("name"), 150))
+        try:
+            raw, mime, info = up_check(c, name, raw, _txt(r.get("mime"), 120) or "application/octet-stream", uid, None, "att")
+        except UploadRefused:
+            run.warning(N_("A file could not be taken over: {0}"), name)
+            continue
+        rel = os.path.join("tplfiles", str(tpl), f"{uuid.uuid4().hex[:12]}-{name}")
+        full = os.path.join(ATT_DIR, rel)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        run.written.append(full)
+        oc_write_file(c, oc_user_space(uid), full, raw, fresh=True)
+        d = umz_row(c, "template_files", r, {"template_id": tpl, "user_id": uid, "node_key": node, "name": name, "mime": mime[:120], "size": len(raw),
+                                             "path": rel, "scan": info.get("scan") or "clean", "created_at": _txt(r.get("created_at"), 40) or ts}, ts)
+        nid = umz_insert(c, "template_files", d) if d else None
+        if not nid:
+            run.written.remove(full)  # review: no row, no file (the commit keeps what is in the list)
+            os.remove(full)
+            run.warning(N_("A file could not be taken over: {0}"), name)
+            continue
+        run.put("template_files", r.get("id"), nid)
+        run.created["template_files"].append(nid)
+        run.count("template_files")
+
+
+def umz_undo_templates(c, uid, cr):
+    """2.464.0 (#3865): the files that go with the undo: of the run's templates (the rows go with the template) and the ones it put
+    on a template of an earlier run. Before the templates go -> the paths to unlink after the commit."""
+    tpl, ids = [int(x) for x in cr.get("templates") or []], [int(x) for x in cr.get("template_files") or []]
+    paths = []
+    for i in range(0, max(len(tpl), len(ids)), 500):
+        t, f = tpl[i:i + 500] or [0], ids[i:i + 500] or [0]
+        q = f"WHERE user_id=? AND (template_id IN ({','.join('?' * len(t))}) OR id IN ({','.join('?' * len(f))}))"
+        paths += [x[0] for x in c.execute(f"SELECT path FROM template_files {q}", [uid, *t, *f]).fetchall()]
+        c.execute(f"DELETE FROM template_files {q}", [uid, *t, *f])
+    return paths
 
 
 def umz_write(c, run, uid, man, zf, files, data, people):
@@ -2017,6 +2092,7 @@ def umz_undo(c, uid, r):
     from .orgimport import oi_undo, oi_undo_files
     n_oi = oi_undo(c, cr)  # 2.137.0 (#2344): the areas first (they point at the lists and tasks)
     umz_undo_parts(c, cr)  # 2.455.0 (#3469)
+    tpl_paths = umz_undo_templates(c, uid, cr)  # 2.464.0 (#3865)
     own_lists = [int(x) for x in cr.get("lists") or []]
     since = parse_iso(r["created_at"])
     mine = []
@@ -2073,6 +2149,7 @@ def umz_undo(c, uid, r):
     bump(c)
     c.commit()
     oi_undo_files(cr)  # 2.272.0 C (#3027): the files of the tasks stay with them in the trash (the trash run deletes them)
+    unlink_files(tpl_paths)  # 2.464.0 (#3865)
     print("account import undo", r["id"], "user", uid, "tasks", len(back), "kept", len(kept), "area rows", n_oi, flush=True)
     return {"tasks": len(back), "lists": n_lists, "sections": 0, "kept_lists": kept_lists, "kept_tasks": len(kept),
             "kept_cals": kept_cals, "kept_books": kept_books, "trash": True}
