@@ -11,7 +11,7 @@ from flask import g, has_request_context
 from ..core.config import app, EMAIL_RE
 from ..core.pg import insert_id
 from ..core.i18n import tr
-from ..core.db import inbox_default, iso, now_utc, parse_iso
+from ..core.db import inbox_default, iso, iso_ms, now_utc, parse_iso
 from ..accounts.session import me
 from ..accounts.pictures import avatar_url
 from ..core.dlock import dl_list_locked
@@ -498,7 +498,7 @@ def tidy_agent_of(c, lid, cands=None):
     return cands[0] if cands else None
 
 
-_BURST, _BURST_HELD, _BURST_LOCK = {}, {}, threading.Lock()
+_BURST, _BURST_LOCK = {}, threading.Lock()
 
 
 def _burst_actor():
@@ -522,32 +522,33 @@ def burst_hit(kind, lid):
         return len(ts) > AGENT_BURST
 
 
-def _burst_hold(lid, tid, how, from_lid, source):
+def _burst_hold(c, lid, tid, how, from_lid, source):
+    """2.465.0 (#3892): one row per task in the table, the caller commits it with the task: with KALMIDO_ROLE=web the watchdog
+    (burst_tick) is another process, a burst held in this process's memory never reached it."""
     a = _burst_actor()
-    with _BURST_LOCK:
-        h = _BURST_HELD.setdefault((a["id"], lid), {"actor": a, "ids": [], "how": set(), "from": set(), "source": set()})
-        if len(h["ids"]) < AGENT_BURST_IDS:
-            h["ids"].append(tid)
-        h["n"] = h.get("n", 0) + 1
-        h["how"].add(how)
-        if from_lid:
-            h["from"].add(from_lid)
-        if source:
-            h["source"].add(source)
-        h["last"] = time.monotonic()
+    c.execute("INSERT INTO agent_burst_held(actor_id,list_id,task_id,how,from_list,source,held_at) VALUES(?,?,?,?,?,?,?)",
+              (a["id"], lid, tid, how, from_lid, source or "", iso_ms(now_utc())))
 
 
 def burst_tick(c):
-    """Watchdog: one 'tasks_added' per agent of the list for every burst that has been quiet for AGENT_BURST_QUIET_S."""
-    now = time.monotonic()
-    with _BURST_LOCK:
-        ready = [(k, _BURST_HELD.pop(k)) for k, h in list(_BURST_HELD.items()) if now - h["last"] >= AGENT_BURST_QUIET_S]
+    """Watchdog: one 'tasks_added' per agent of the list for every burst that has been quiet for AGENT_BURST_QUIET_S.
+    2.465.0 (#3892): DELETE ... RETURNING takes a burst once; a failure before the commit leaves it held for the next tick."""
+    cut = iso_ms(now_utc() - timedelta(seconds=AGENT_BURST_QUIET_S))
+    ready = c.execute("SELECT actor_id, list_id FROM agent_burst_held GROUP BY actor_id, list_id HAVING MAX(held_at)<=?", (cut,)).fetchall()
     sent = 0
-    for (_, lid), h in ready:
-        if not c.execute("SELECT 1 FROM lists WHERE id=?", (lid,)).fetchone():
-            continue
-        ids = [r[0] for r in c.execute(f"SELECT id FROM tasks WHERE list_id=? AND deleted_at IS NULL AND id IN ({','.join('?' * len(h['ids']))})",
-                                       (lid, *h["ids"]))] if h["ids"] else []
+    for actor_id, lid in ready:
+        held = c.execute("DELETE FROM agent_burst_held WHERE actor_id=? AND list_id=? RETURNING id, task_id, how, from_list, source",
+                         (actor_id, lid)).fetchall()
+        held.sort(key=lambda r: r["id"])
+        tids = list(dict.fromkeys(r["task_id"] for r in held))
+        how = {r["how"] for r in held}
+        sources = sorted({r["source"] for r in held if r["source"]})
+        froms = sorted({r["from_list"] for r in held if r["from_list"]})
+        kept = tids[:AGENT_BURST_IDS]
+        ids = [r[0] for r in c.execute(f"SELECT id FROM tasks WHERE list_id=? AND deleted_at IS NULL AND id IN ({','.join('?' * len(kept))})",
+                                       (lid, *kept))] if kept else []
+        u = c.execute("SELECT id, display_name, username, kind FROM users WHERE id=?", (actor_id,)).fetchone()
+        actor = {"id": u["id"], "name": u["display_name"] or u["username"], "kind": "agent" if u["kind"] == "agent" else "person"}
         listen = set(listen_agents_of(c, lid))  # 2.30.0 (#1034): only agents that listen in
         for aid in list_agents(c, lid):
             if aid not in listen:
@@ -556,14 +557,14 @@ def burst_tick(c):
             if not mine:
                 continue
             data = {"list": lst_brief(c, lid), "list_id": lid, "task_ids": mine, "count": len(mine),
-                    "how": "moved" if h["how"] == {"moved"} else ("created" if h["how"] == {"created"} else "mixed"),
-                    "truncated": h.get("n", 0) > len(h["ids"])}
-            if h["source"]:
-                data["source"] = sorted(h["source"])[0]
-            moved_from = [{"id": f, "name": lst_brief(c, f)["name"]} for f in sorted(h["from"]) if list_role(c, f, aid)]
+                    "how": "moved" if how == {"moved"} else ("created" if how == {"created"} else "mixed"),
+                    "truncated": len(tids) > len(kept)}
+            if sources:
+                data["source"] = sources[0]
+            moved_from = [{"id": f, "name": lst_brief(c, f)["name"]} for f in froms if list_role(c, f, aid)]
             if moved_from:
                 data["moved_from"] = moved_from
-            if agent_emit(c, aid, "tasks_added", data, actor=h["actor"]):
+            if agent_emit(c, aid, "tasks_added", data, actor=actor):
                 sent += 1
     c.commit()
     return sent
@@ -589,7 +590,7 @@ def agent_added_events(c, tid, from_lid=None, source=None, info=None):
     if not listen:
         return
     if burst_hit("added", t["list_id"]):  # 2.29.0 (#1031): a bulk move / script -> one 'tasks_added' later (burst_tick)
-        _burst_hold(t["list_id"], tid, "moved" if from_lid else "created", from_lid, source)
+        _burst_hold(c, t["list_id"], tid, "moved" if from_lid else "created", from_lid, source)
         return
     for aid in list_agents(c, t["list_id"]):
         if aid not in listen or not task_visible(c, tid, aid, full=True):

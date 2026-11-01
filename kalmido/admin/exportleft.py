@@ -22,7 +22,7 @@ UMZ_BUILD_TABLES = ('budget_cats', 'budget_entries', 'budget_recurring', 'fs_ver
 
 # every table with a person, organisation, list or task column that is not in the account export
 UMZ_LEFT_TABLES = {
-    "agent_audit": _AGENT, "agent_decisions": _AGENT, "agent_jobs": _AGENT, "agent_list_access": _AGENT, "agent_rules": _AGENT, "agent_usage": _AGENT,
+    "agent_audit": _AGENT, "agent_burst_held": _SERVER, "agent_decisions": _AGENT, "agent_jobs": _AGENT, "agent_list_access": _AGENT, "agent_rules": _AGENT, "agent_usage": _AGENT,
     "agents": _AGENT, "folder_agents": _AGENT,
     "budget_meta": _DERIVED, "contact_occ": _DERIVED, "dav_meta": _DERIVED, "dav_sync": _DERIVED, "dav_sync2": _DERIVED, "dl_changes": _DERIVED,
     "doc_models": _DERIVED, "file_text": _DERIVED, "git_closes": _DERIVED, "git_links": _DERIVED, "list_activity": _DERIVED, "list_ticket_seq": _DERIVED,

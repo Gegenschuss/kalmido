@@ -459,7 +459,7 @@ OX_LEFT = {
     "task_vectors": _DERIVED, "upload_scan": _SERVER, "webhooks": _SECRET, "wiki_shares": _SECRET,
     "wiki_spaces": "the lock of a space (client_encrypted names it)",
     # list column
-    "agent_audit": _AGENT, "agent_decisions": _AGENT, "agent_jobs": _AGENT, "agent_list_access": _AGENT, "agent_schedules": _AGENT, "agent_usage": _AGENT,
+    "agent_audit": _AGENT, "agent_burst_held": _SERVER, "agent_decisions": _AGENT, "agent_jobs": _AGENT, "agent_list_access": _AGENT, "agent_schedules": _AGENT, "agent_usage": _AGENT,
     "assistant_access": _PERSONAL, "assistant_log": _PERSONAL, "budget_cats": _PERSONAL, "budget_entries": _PERSONAL,
     "budget_files": _PERSONAL, "budget_meta": _PERSONAL, "budget_recurring": _PERSONAL, "contact_srcs": _SECRET, "ctr_notices": _PERSONAL, "dav_sync": _DERIVED,
     "dl_changes": _DERIVED, "env_deploys": _SECRET, "git_conns": _SECRET, "group_shares": "groups of people (not_included)",
