@@ -655,6 +655,7 @@ const ofdSave = (method, url, body, src) => ofd_inChain(() => ofd_save1(method, 
 // a save outside ofdSave (the calculation sheet) in the same row; ofd_ver = its version field
 const ofd_inChain = fn => { const p = (OFD.chain || Promise.resolve()).then(fn, fn); OFD.chain = p.catch(() => { /* the caller reports it */ }); return p; };
 const ofd_ver = () => OFD.doc?.updated_at ? {expect_updated_at: OFD.doc.updated_at} : {};
+const ofd_lnShut = j => !!OFD.langNotesShut && OFD.langNotesShut.id === j.id && OFD.langNotesShut.key === JSON.stringify(j.lang_notes);  // 2.482.0 (#3940)
 async function ofd_save1(method, url, body, src) {
   OFD.saving++; ofdSaveHint();
   const ver = ofd_verUrl(url) && body && typeof body === 'object' && !Array.isArray(body) ? OFD.doc.updated_at : null;
@@ -662,10 +663,11 @@ async function ofd_save1(method, url, body, src) {
     if (src && Array.isArray(body.items)) body.items.forEach((x, i) => { if (!x.id && src[i]?.id) x.id = src[i].id; });
     body = {...body, expect_updated_at: ver};
   }
+  if (body && typeof body === 'object' && ('lang' in body || 'reminder_level' in body)) OFD.langNotesShut = null;  // 2.482.0 (#3940): only a new language switch shows a closed note again
   try {
     const j = await rawFetch(method, url, body);
     if (src && j) { const its = (j.part ? j.part.items : j.items) || []; src.forEach((x, i) => { if (!x.id && its[i]?.id) x.id = its[i].id; }); }
-    if (OFD.doc && j && j.id === OFD.doc.id) OFD.doc = ofd_keepVia(j.items ? j : {...OFD.doc, ...j}); /* the status answer has no positions */ OFD.err = ''; if (j && j.lang_notes) OFD.langNotes = {id: j.id, notes: j.lang_notes};
+    if (OFD.doc && j && j.id === OFD.doc.id) OFD.doc = ofd_keepVia(j.items ? j : {...OFD.doc, ...j}); /* the status answer has no positions */ OFD.err = ''; if (j && j.lang_notes && !ofd_lnShut(j)) OFD.langNotes = {id: j.id, notes: j.lang_notes};  // 2.482.0 (#3940): a late answer does not reopen a closed note
     if (!ver && method !== 'GET' && OFD.doc && j && !j.updated_at && url.startsWith(`/api/office/docs/${OFD.doc.id}/`)) {  // a status / number / payment answer without the version: the current state
       try { const f = await rawFetch('GET', `/api/office/docs/${OFD.doc.id}`); if (OFD.doc && f && f.id === OFD.doc.id) OFD.doc = f; } catch { /* the next save reports it */ }
     }
@@ -849,7 +851,7 @@ async function ofdClick(e) {
     return;
   }
   if (a === 'send') { ofdSendDialog(d); return; }
-  if (a === 'ln-x') { OFD.langNotes = null; ofdDraw(); return; }
+  if (a === 'ln-x') { const n = OFD.langNotes; OFD.langNotesShut = n ? {id: n.id, key: JSON.stringify(n.notes)} : null; OFD.langNotes = null; ofdDraw(); return; }  // 2.482.0 (#3940): remembered as closed
   if (a === 'rights-add') { OFD.rightsFor = d.id; OFD.open.rights = true; ofdDraw(); return; }  // 2.356.0 C (#3005)
   if (a === 'cf-reload') { ofd_cfReload(); return; }  // 2.269.0 A (#3012)
   if (a === 'fee') { const j = await ofdSave('POST', `/api/office/docs/${d.id}/fee`, {state: b.dataset.st || ''}); if (j) savedTick('.ofdfeeinfo > span'); return; }  // 2.298.0 A1 (#3186): the quiet tick
