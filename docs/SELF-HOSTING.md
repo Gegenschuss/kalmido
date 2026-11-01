@@ -2052,6 +2052,8 @@ the admin does not administer itself answers 403:
   organisation): only *disabled*, the storage quota and the server admin flag change. No password, sign-in link,
   password link, e-mail address, organisations, SSO sign-in, ntfy topic, 2FA reset or conversion to an agent; deleting
   an account deletes its projects along or refuses, it never hands them to somebody.
+- **Single sign-on:** the provider is set by the instance admin, so a sign-on links an existing account for the first time
+  only from that account's own session (Settings > Account), never by a matching e-mail address or user name alone.
 - **Agents of customers** (an organisation's agent, a customer's personal agent): only the kill switch (pause); no token,
   setup code, move, deletion or activity log. New agents of the admin never land in a customer's organisation.
 - **Content:** no backup download in the app (it holds every customer's content: keep it on the server and offsite), the
