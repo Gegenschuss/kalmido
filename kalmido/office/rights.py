@@ -44,7 +44,7 @@ SPECIAL_KEYS = tuple(k for k, _ in SPECIALS)
 OFFICE_AREAS = (
     ("pipeline", N_("Pipeline"), "sell", ("deals", "leads"), False, "admin"),
     ("offers", N_("Quotations & invoices"), "sell", ("docs", "series", "signoffs", "number-preview", "trial", "mail-status",
-                                                  "peppol", "undo", "catalog", "clients", "trash"), False, "member"),  # trash: 2.304 (#3038, the route asks for manage)
+                                                  "peppol", "payonline", "undo", "catalog", "clients", "trash"), False, "member"),  # trash: 2.304 (#3038, the route asks for manage)
     ("time", N_("Times to bill"), "sell", ("time-open",), True, "member"),
     ("gendocs", N_("Documents"), "sell", ("gen-docs", "doc-templates", "privacy-sheets"), False, "admin"),
     ("letters", N_("Correspondence"), "sell", ("letters", "letter-blocks"), False, "admin"),
@@ -87,7 +87,8 @@ MANAGE_ROUTES = frozenset({
     "/api/office/equipment/policies", "/api/office/cashflow/start", "/api/office/letters/profile",
     # 2.187.0 B (#2476): the set-up of the areas (purposes, vehicles, cash books, e-invoice transmission, tax dates, process doc)
     "/api/office/trips/purposes/<int:pid>", "/api/office/letters/profile/image", "/api/office/vehicles",
-    "/api/office/vehicles/<int:vid>", "/api/office/cashbooks", "/api/office/cashbooks/<int:bid>", "/api/office/peppol",
+    "/api/office/vehicles/<int:vid>", "/api/office/cashbooks", "/api/office/cashbooks/<int:bid>", "/api/office/peppol", "/api/office/payonline", "/api/office/payonline/check", "/api/office/payonline/rotate",
+    "/api/office/payonline/events/<int:eid>/retry", "/api/office/payonline/events/<int:eid>/done",
     "/api/office/peppol/check", "/api/office/tax-dates", "/api/office/procdoc",
     "/api/office/cards/reminder",  # 2.444.0 (#3447)
 })
@@ -105,6 +106,7 @@ SPECIAL_ROUTES = {
     # pay: payments of invoices, reminder fees, payment proposals, the bank matching that books
     "POST /api/office/docs/<int:did>/payments": "pay", "DELETE /api/office/docs/<int:did>/payments/<int:pid>": "pay",
     "POST /api/office/docs/<int:did>/fee": "pay", "POST /api/office/pay-props/<int:pid>": "pay",
+    "PUT /api/office/docs/<int:did>/pay-online": "pay",  # 2.469.0 (#3459): the invoice's online payment switch
     "POST /api/office/bank/tx/<int:tid>/match": "pay", "POST /api/office/bank/tx/<int:tid>/unmatch": "pay",
     # lock: periods, the cash book's daily closing, the logbook's month
     "POST /api/office/periods/lock": "lock", "POST /api/office/cashbooks/<int:bid>/closing": "lock",

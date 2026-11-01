@@ -89,6 +89,7 @@ FIELDS = {
     "office_bank_vendors": ("match", "name", "portal"),  # 2.425.0 B (#3451): recurring providers of the bank bookings
     "office_cc_cards": ("holder_name", "last4", "account"), "office_cc_statements": ("total",),  # 2.444.0 (#3447): credit card statements
     "office_cc_lines": ("merchant", "amount", "orig_amount"),
+    "office_payonline": ("secret_key", "webhook_secret", "hook_token"), "office_pay_links": ("token",),  # 2.469.0 (#3459): the provider key, the webhook secret, the public tokens
     "office_doc_templates": ("body",), "office_gen_docs": ("body",),  # 2.93.0 A (#1927): document templates, documents
     "office_vehicles": ("plate",), "office_drives": ("start_place", "dest", "purpose", "correct_note"),  # 2.93.0 B (#1928): the logbook; 2.152.0 C (#2169): + reason
     "office_drive_log": ("prev",),  # 2.93.0 B (#1928): the change log of the logbook
@@ -139,6 +140,7 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_bank_balances": N_("Bank statements"),  # 2.124.0 D (#2342)
                  "office_bank_rules": N_("Bank statements"),  # 2.299.0 B (#3191)
                  "office_bank_vendors": N_("Bank statements"),  # 2.425.0 B (#3451)
+                 "office_payonline": N_("Stored access tokens (online payment)"), "office_pay_links": N_("Stored access tokens (online payment)"),  # 2.469.0 (#3459)
                  "office_cc_cards": N_("Credit cards"), "office_cc_statements": N_("Credit cards"), "office_cc_lines": N_("Credit cards"),  # 2.444.0 (#3447)
                  "office_doc_templates": N_("Document templates and documents"), "office_gen_docs": N_("Document templates and documents"),  # 2.93.0 A (#1927)
                  "office_vehicles": N_("Logbook"), "office_drives": N_("Logbook"), "office_drive_log": N_("Logbook"),  # 2.93.0 B (#1928)

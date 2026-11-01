@@ -163,7 +163,7 @@ _FLASK_LOG_EXC = app.log_exception
 # 2.360.0 A (#2496): the secret part of a path in the log: hook tokens (2.126.0 B #1979 I8, 2.138.4 #2381, 2.148.1 E) and the
 # tokens of the public pages (shared lists / folders / quotations / videos / wiki, forms, action links, status pages,
 # calendar feeds, portal sign-in links, document ZIPs)
-_LOG_PATH_RE = re.compile(r"^(/api/hooks/(?:issues|deploy)/[0-9]+/|/api/hooks/in/|/s/[bfqvw]/|/s/|/f/|/u/|/p/|/ical/(?:abs/|ev/)?"
+_LOG_PATH_RE = re.compile(r"^(/api/hooks/(?:issues|deploy)/[0-9]+/|/api/hooks/in/|/api/hooks/pay/|/s/pay/|/s/[bfqvw]/|/s/|/f/|/u/|/p/|/ical/(?:abs/|ev/)?"
                           r"|/portal/login/|/api/docs/zip/)[^/]+")
 
 

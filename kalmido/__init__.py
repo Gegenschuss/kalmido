@@ -322,6 +322,7 @@ ORDER = (
     "office.olock",  # 2.152.0 C (#2168 #2169): legal retention locks (booked receipts, logbook)
     "office.invoices",  # 2.38.0 (#1021, F1): invoices, credit notes, reminders, payments, sending, DATEV inbox
     "office.peppol",  # 2.154.0 B (#1960): e-invoices over Peppol (own provider account): ids, connection, UBL, send + status
+    "office.payonline",  # 2.469.0 (#3459): online payment of invoices (own provider account): connection, pay link, webhook
     "office.delivery",  # 2.120.0 D (#2089): delivery notes / proofs of service, the timesheet of an invoice
     "office.abschlag",  # 2.120.0 A (#2087): progress / final invoices, cash discount (Skonto)
     "office.offerlink",  # 2.356.0 C (#3003): quotation <-> invoices made from it (links, asking before a second invoice)
@@ -480,6 +481,7 @@ ORDER = (
     "agents.meetprop",  # 2.70.0 A (#1354): a meeting becomes tasks (extract with photos, the chat's cards)
     "agents.dupprop",  # 2.70.0 B (#1357): duplicate contacts as a proposal (no routes)
     "agents.contractprop",  # 2.70.0 C (#1359): contract_notice + the proposal kind notice (no routes of its own)
+    "agents.ccsread",  # 2.469.0 (#3749): an agent reads a credit card statement (card_statement_read, no routes of its own)
     "agents.rcread",  # 2.299.0 E (#3194): an agent reads a receipt (receipt_read of agents.asstprop, no routes of its own)
     "agents.asstprop",  # 2.126.1 A (#2123 #2124): office texts, document summaries, client reports by an agent (no routes of its own)
     "agents.ideaprop",  # 2.156.0 A (#1201): "Add ideas" in the mind map -- an agent proposes sub-branches

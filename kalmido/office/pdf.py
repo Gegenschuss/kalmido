@@ -1722,15 +1722,19 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
     # the due text stays there (full width), the bank line and the GiroCode form a block of their own at the end, above the footer
     pay = m.get("payment") if isinstance(m.get("payment"), dict) else None
     pay_end = []  # (height, draw) of the bank line + GiroCode, placed after the closing (see below)
-    if pay and (pay.get("text") or pay.get("iban")):
+    if pay and (pay.get("text") or pay.get("iban") or pay.get("pay_url")):
         iban = str(pay.get("iban") or "").replace(" ", "")
         bank = " · ".join(x for x in (str(pay.get("bank_name") or ""), ("IBAN " + " ".join(iban[i:i + 4] for i in range(0, len(iban), 4))) if iban else "",
                                      ("BIC " + str(pay["bic"])) if pay.get("bic") else "") if x)
         gcq = str(pay.get("girocode") or "")  # 2.147.1 B (#2054): the GiroCode right of the bank line (office/girocode.py)
-        if gcq:  # imported only then: this module also runs on its own (no package; tests/office_einvoice_test.py)
-            from .girocode import GCQ_SIZE, gcq_block_h, gcq_draw
+        pol = str(pay.get("pay_url") or "")  # 2.469.0 (#3459): the pay link, frozen with the document (office/payonline.py): its code left of the GiroCode
+        if gcq or pol:  # imported only then: this module also runs on its own (no package; tests/office_einvoice_test.py)
+            from .girocode import GCQ_SIZE, POL_LABELS, gcq_block_h, gcq_draw
         pt_lines = pdf_wrap(str(pay.get("text") or ""), body, PDF_CW) if pay.get("text") else []
-        pb_lines = pdf_wrap(bank, FS_SMALL, PDF_CW - GCQ_SIZE - 14 if gcq else PDF_CW) if bank else []
+        pb_w = PDF_CW - (GCQ_SIZE + 14) * ((1 if gcq else 0) + (1 if pol else 0)) if gcq or pol else PDF_CW
+        pb_lines = pdf_wrap(bank, FS_SMALL, pb_w) if bank else []
+        if pol:
+            pb_lines += pdf_wrap(f'{tr(POL_LABELS[0], lg=lang)}: {pol}', FS_SMALL, pb_w)
         pb_lh = pdf_fs(FS_SMALL) * 1.42
         if pt_lines:
             pay_h = 6 + len(pt_lines) * lh
@@ -1749,11 +1753,14 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
             def draw_bank(p, y, pb_lines=pb_lines):
                 if gcq:
                     gcq_draw(p, PDF_L + PDF_CW - GCQ_SIZE, y + 10, gcq, lang, C_INK, C_INK2)
+                if pol:
+                    gcq_draw(p, PDF_L + PDF_CW - GCQ_SIZE * (2 if gcq else 1) - (14 if gcq else 0), y + 10, pol, lang, C_INK, C_INK2,
+                             labels=(tr(POL_LABELS[0], lg=lang), tr(POL_LABELS[1], lg=lang)))
                 yy = y + 10
                 for t_ in pb_lines:
                     p.text(PDF_L, yy, t_, FS_SMALL, False, C_INK2)
                     yy += pb_lh
-            pay_end.append((10 + max(len(pb_lines) * pb_lh + 2, gcq_block_h() if gcq else 0), draw_bank))
+            pay_end.append((10 + max(len(pb_lines) * pb_lh + 2, gcq_block_h() if gcq or pol else 0), draw_bank))
 
     # -- rights block (not torn); 2.114.1 C (#2258): printed as an appendix on its own last page, see below
     bfc_rights, bfc_seen = [], []

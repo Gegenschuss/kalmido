@@ -134,7 +134,7 @@ def dun_paid_news(c, oid, r, uid):
     number, client, click = r["number"] or "", _dun_client(r), f"#office/invoices/{int(r['id'])}"
     for p in people:
         s = usettings(c, p)
-        news_add(c, p, "docpaid", actor=uid, row="office", data={"org_id": oid, "number": number, "client": client, "click": click})
+        news_add(c, p, "docpaid", actor=uid or 0, row="office", data={"org_id": oid, "number": number, "client": client, "click": click})  # 2.469.0 (#3459): 0 = no person (the provider's webhook)
         if g.get("pushes") is not None and notif_ok(c, p, s, "office", "push") and push_reachable(c, p, s):
             g.pushes.append((p, tr("Payment received: {0}", ", ".join(x for x in (number, client) if x), lg=lang(c, p)), "",
                              f"{PUBLIC_URL.rstrip('/')}/{click}", push_prio(s)))

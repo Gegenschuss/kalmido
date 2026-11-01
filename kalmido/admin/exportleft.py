@@ -47,6 +47,7 @@ UMZ_LEFT_TABLES = {
     "office_gen_docs": _ORG, "office_import_runs": _ORG, "office_inv_series": _ORG, "office_letter_blocks": _ORG, "office_letter_links": _ORG,
     "office_letter_profiles": _ORG, "office_letters": _ORG, "office_meal_choices": _ORG, "office_meal_files": _ORG, "office_meal_log": _ORG,
     "office_meals": _ORG, "office_numbers": _ORG, "office_opening_balances": _ORG, "office_pack_installs": _ORG, "office_pay_props": _ORG,
+    "office_payonline": _ORG, "office_pay_links": _ORG, "office_pay_sessions": _ORG, "office_pay_events": _ORG, "office_pay_payouts": _ORG,
     "office_payments": _ORG, "office_peppol": _ORG, "office_peppol_sends": _ORG, "office_period_locks": _ORG, "office_privacy_sheets": _ORG,
     "office_procdocs": _ORG, "office_purchases": _ORG, "office_rgroup_members": _ORG, "office_rgroups": _ORG, "office_rights_log": _ORG, "office_roles":
     _ORG, "office_services": _ORG, "office_sets": _ORG, "office_settings": _ORG, "office_signoffs": _ORG, "office_sub_reminders": _ORG,
@@ -80,7 +81,8 @@ RX_LEFT_TABLES = {
     "office_rgroup_members": _RX_MASTER, "office_rgroups": _RX_MASTER, "office_roles":
     _RX_MASTER, "office_services": _RX_MASTER, "office_sets": _RX_MASTER, "office_settings": _RX_MASTER, "office_sub_reminders": _RX_MASTER,
     "office_texts": _RX_MASTER, "office_trip_purposes": _RX_MASTER,
-    "office_peppol": _RX_SECRET,
+    "office_peppol": _RX_SECRET, "office_payonline": _RX_SECRET, "office_pay_links": _RX_SECRET,
+    "office_pay_sessions": _RX_WORK, "office_pay_events": _RX_WORK, "office_pay_payouts": _RX_WORK,
     "office_cf_actual": _RX_WORK, "office_cf_adjust": _RX_WORK, "office_cf_start": _RX_WORK, "office_trash": _RX_WORK, "office_undo":
     _RX_WORK,
 }

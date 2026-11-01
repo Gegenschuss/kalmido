@@ -513,6 +513,9 @@ def doc_public(c, oid, r, admin, items=True):
         d["cf_chain"] = cf8_chain(c, oid, r)  # 2.88.0 (#1915): which version of the chain counts in the cash flow
     from .peppol import pep_doc_extra
     pep_doc_extra(c, oid, d)  # 2.154.0 B (#1960): the newest Peppol send of an invoice / credit note
+    if items:
+        from .payonline import pol_doc_extra
+        pol_doc_extra(c, oid, d, admin)  # 2.469.0 (#3459): the invoice's online payment switch, link (admins)
     return d
 
 

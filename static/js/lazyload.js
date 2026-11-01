@@ -17,6 +17,7 @@ const LD_MODS = {
     'office_cards',  // 2.444.0 (#3447): credit card statements
     'office_recurring', 'office_subs', 'office_dunning',  // 2.91.0 (#1923, #1924); 2.147.1 B (#2054): office_dunning
     'office_peppol',  // 2.154.0 B (#1960): e-invoices over Peppol
+    'office_payonline',  // 2.469.0 (#3459): online payment of invoices
     'office_bankrules',  // 2.299.0 B (#3191): bank rules
     'office_docproject',  // 2.168.0 A (#2665): documents bound to a project
     'office_agreements', 'office_assets',  // 2.92.0 (#1925, #1931)

@@ -2131,7 +2131,7 @@ it: an agent never gets more than that person. An agent never manages office rig
 | The area, the person, the rules; 2.147: `country_pack` and `features` (the office functions as switched on, e.g. `books.datev: false`); 2.189: `home_currency` (price list and books; `currency` = the currency of new documents) | `GET /api/v1/office` | `get_office` |
 | Services, text blocks, framework contracts, clients (`q`) -- never purchase prices | `GET /api/v1/office/{services\|texts\|contracts\|clients}` | `list_office_data` |
 | Documents (`kind` offer / invoice / credit / reminder, `client_id`, `status`, `open=1`, 2.144.10: `trial=1\|0`, 2.463: `before` = the `next_cursor` of the last page, `limit` up to 500) | `GET /api/v1/office/docs` | `list_office_documents` |
-| One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends; 2.356: an invoice's `source_offer` = the quotation it was made from, a quotation's `offer_invoices` = its invoices with `state`; 2.437: status `superseded` = replaced by a newer quotation, it counts nowhere and cannot be accepted any more; `replaces` / `replaced_by` name the quotations) | `GET /api/v1/office/docs/{id}` | `get_office_document` |
+| One document with its positions (2.154: `peppol` = the status of its send over the Peppol network, read only -- a person sends; 2.356: an invoice's `source_offer` = the quotation it was made from, a quotation's `offer_invoices` = its invoices with `state`; 2.437: status `superseded` = replaced by a newer quotation, it counts nowhere and cannot be accepted any more; `replaces` / `replaced_by` name the quotations; 2.469: an invoice's `pay_online` = `{ready, on}`: online payment set up and the invoice's switch, read only -- the pay link is for people; a payment that came in online is an ordinary payment and raises `invoice.paid` once the invoice is covered) | `GET /api/v1/office/docs/{id}` | `get_office_document` |
 | The PDF preview of a draft (marked as a draft) | `GET /api/v1/office/docs/{id}/pdf` | -- (binary; the chat card links it) |
 | A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`; 2.144.10: `trial` = a trial quotation) | `POST /api/v1/office/offers` | `create_offer_draft` |
 | Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent; 2.269: `expect_updated_at`, positions with their `id`; 2.270: `items[].id` of each kept position keeps its purchase price, price, unit and flags, `expect_updated_at` answers 409 + `current` when a person changed the draft since) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
@@ -2899,6 +2899,9 @@ explanation, Markdown, at most 2,000 characters) and `kind` (must match the job)
 {"supplier": "Example Office Supplies Ltd", "vat_id": "DE123456789", "invoice_no": "RE-2026-17", "date": "2026-10-05",
  "net": "100.00", "vat": "19.00", "gross": "119.00", "vat_pct": "19", "currency": "EUR",
  "positions": [{"text": "Paper A4", "qty": 10, "net": "100.00", "vat_pct": "19"}], "category": "Office supplies"}
+// card_statement_read (2.469.0): only printed positions, + charged, - money back; orig_amount and orig_currency together
+{"total": "129.90", "lines": [{"day": "2026-10-05", "merchant": "Example Hotel", "amount": "129.90", "orig_amount": "140.00",
+ "orig_currency": "USD", "kind": "purchase"}]}
 // ideas (2.156.0): sub-branches for input.path; children only when input.levels is 2; at most 50 entries in all
 {"items": [{"title": "Venue", "children": [{"title": "Book the hall"}, {"title": "Catering"}]}, {"title": "Invitations"}]}
 ```
@@ -2935,6 +2938,19 @@ Nothing is sent to a client, nothing changes before *Take over* (one undo step, 
   instead of the fixed one (copy / share as before); undo goes back to the fixed text.
 - Word the text from the input only: invent nothing, no placeholders for unknown facts, in the document's language.
   Unknown fields: 400; the office switches off (or the project no longer shared) when you submit: 403.
+
+**Reading a credit card statement (2.469.0, kind `card_statement_read`).** The fallback when no reader of Kalmido knows a
+statement's layout. On a draft statement without positions "Read with an agent" asks one of the person's agents; who can be
+asked is the same as for `receipt_read` (the right *Receipts* to edit, the switches, the PDF shared with the agent), and the
+person must work on the statement (the bookkeeping, or the holder of the card). `GET /api/proposals/agents?kind=card_statement_read&statement_id=`.
+- The input is `doc_summary`'s for the PDF + `mime`, `size`, `content_url`, and `statement` {id, month, day, total, currency}.
+- The answer: `total?` and `lines` (at most `limits.card_lines_max`, merchant at most `limits.card_merchant_max` characters):
+  values only, amounts and days strict, a foreign amount only with its currency; anything else 400. The agent's text is shown as
+  plain text, never as HTML.
+- Take over adds the positions to the draft as the person (the total only if the statement has none; 409 once it has positions,
+  is confirmed or the month is locked; one undo step, skipped after a change by hand). They count only when the person
+  confirms the statement with its sum check. Nothing is stored in the statement before that; a person without an organisation
+  does the same with the own agent in the personal office.
 
 **Reading a receipt (2.299.0, kind `receipt_read`).** Kalmido brings no model of its own and sends nothing out: on a
 document / receipt the person may change (document sheet, the bookkeeping's receipt sheet) "Read with an agent" asks one

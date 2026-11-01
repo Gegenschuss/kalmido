@@ -118,6 +118,11 @@ RX_LEFT = {
     "office_sub_reminders": _RX_SETUP, "office_trip_purposes": _RX_SETUP, "office_pack_installs": _RX_SETUP, "office_rgroups": _RX_SETUP,
     "office_rgroup_members": _RX_SETUP, "office_meal_choices": _RX_SETUP, "office_pay_props": "agents' suggestions, not the booked payments",
     "office_peppol": "the Peppol connection and its key (a secret; the sends are in the export)",
+    "office_payonline": "the online payment connection and its keys (a secret; the payments are in the export)",
+    "office_pay_links": "the public pay links (secrets; the payments are in the export)",
+    "office_pay_sessions": "the online provider's working data (the payments are in the export)",
+    "office_pay_events": "the online provider's working data (the payments are in the export)",
+    "office_pay_payouts": "the online provider's working data (the payments are in the export)",
     "office_trash": "the trash (deleted items are not in the export)", "office_undo": "undo steps of one day",
 }
 

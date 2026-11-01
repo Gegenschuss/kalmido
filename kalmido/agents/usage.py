@@ -1141,7 +1141,10 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                  f"report: {{text}} (Markdown). "
                                  # 2.299.0 E (#3194): the values read off a receipt (the agent opens the file itself), only what is on it
                                  f"receipt_read (2.299.0): {{supplier?, vat_id?, tax_no?, invoice_no?, date?, net?, vat?, gross?, vat_pct?, vat_rates?[{{pct, net, vat}}], "
-                                 f"currency?, positions?[{{text, qty?, net?, vat_pct?}}] (at most 100), category?, account?, bank_tx? (an id of input.bank)}}. "
+                                 f"currency?, positions?[{{text, qty?, net?, vat_pct?}}] (at most 100), category?, account?, bank_tx? (an id of input.bank)}}; "
+                                 # 2.469.0 (#3749): the positions read off a credit card statement (the agent opens the PDF itself)
+                                 f"card_statement_read (2.469.0): {{total?, lines[{{day, booked?, merchant, amount (+ charged, - money back), orig_amount?, orig_currency?, "
+                                 f"kind? (purchase | fee | credit)}}]}}. "
                                  f"At most {PROP_MAX_ITEMS} entries, {PROP_MAX_BYTES // 1024} KB."})},
         "/agent/chats": {"get": op("Chat messages after a cursor", AG, ok(ref("ChatPage")) | errs("400", "403"),
                                    [q("since", "Message id", {"type": "integer"}), q("user_id", "One person", {"type": "integer"}), q("limit", "At most 500", {"type": "integer"})])},

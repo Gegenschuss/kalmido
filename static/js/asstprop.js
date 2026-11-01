@@ -12,10 +12,13 @@
    2.299.0 E (#3194): receipt_read -- "Read with an agent" on a document / receipt (the line of the recognised values,
    receipts.js rx_html): the agent's values show as "Read by the agent (name)" with Take over / Discard (the proposal's apply /
    discard, one undo step), the checks and a suggested bank booking (matched by the person). Server: kalmido/agents/rcread.py.
+   2.469.0 (#3749): card_statement_read -- "Read with an agent" on a credit card statement without positions (office_cards.js):
+   the agent's positions show on the proposal sheet, Take over adds them to the draft, the person still confirms the statement.
+   Server: kalmido/agents/ccsread.py.
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-const AST_KINDS = ['office_text', 'doc_summary', 'report', 'receipt_read'];  // 2.299.0 E (#3194): + receipt_read
+const AST_KINDS = ['office_text', 'doc_summary', 'report', 'receipt_read', 'card_statement_read'];  // 2.299.0 E (#3194): + receipt_read; 2.469.0 (#3749)
 const AST = {/** @type {Record<string, any[]>} */ agents: {}, /** @type {Record<string, boolean>} */ busy: {}};
 /** @param {any} v */
 const ast_is = v => AST_KINDS.includes(v?.kind);
@@ -102,13 +105,14 @@ function ast_ask(kind, q, src) {
   const ags = AST.agents[kind + '?' + q] || []; if (!ags.length) return;
   const id = +(q.split('=')[1] || 0), rptMd = kind === 'report' ? src.closest('.modal') : null, rs = rptMd?._rptSt;
   const title = {office_text: tr('Draft text with an agent'), doc_summary: tr('Summarise with an agent'), report: tr('Word the report with an agent'),
-    receipt_read: tr('Read with an agent')}[kind];
+    receipt_read: tr('Read with an agent'), card_statement_read: tr('Read with an agent')}[kind];
   const agSel = ags.length > 1 ? `<div class="row"><label for="ast-agent">${tr('Agent')}</label><select id="ast-agent">${ags.map(a => `<option value="${a.id}" ${a.limit_reached ? 'disabled' : ''}>${esc(a.name)}${a.limit_reached ? ' · ' + esc(tr('usage limit reached')) : ''}</option>`).join('')}</select></div>`
     : `<p class="muted">${esc(tr('{0} writes a draft. You get a notification when it is ready.', ags[0].name))}</p>`;
   const field = kind === 'office_text' ? `<div class="row"><label for="ast-field">${tr('Text')}</label><select id="ast-field"><option value="intro">${tr('Introduction')}</option><option value="closing">${tr('Closing')}</option></select></div>` : '';
   const hint = {office_text: tr('The agent gets the document without purchase prices, the client and the current text. Nothing is sent.'),
     doc_summary: tr('The agent gets what it may read of this document anyway. Nothing is changed before you take it over.'),
     receipt_read: tr('The agent reads the file it may see anyway, where it runs. Kalmido sends nothing out. Nothing is changed before you take the values over.'),
+    card_statement_read: tr('The agent reads the statement it may see anyway, where it runs. Kalmido sends nothing out. Nothing is changed before you take the positions over, and they count once you confirm them.'),
     report: tr('The agent gets the status report of this period (without comments, notes and names; your tracked hours only as a total). Nothing goes to the client.')}[kind];
   const md = modal(`<h3>${ic('bot', 's')} ${esc(title)}</h3>${agSel}${field}
     <div class="row"><label for="ast-wish">${tr('Your wish')}</label></div><textarea id="ast-wish" rows="2" maxlength="500" placeholder="${esc(tr('optional, e.g. friendly and short'))}"></textarea>
@@ -121,6 +125,7 @@ function ast_ask(kind, q, src) {
     /** @type {any} */
     const body = {kind, agent_id: +(/** @type {any} */ (ast$('#ast-agent', md))?.value || ags[0].id), wish: /** @type {any} */ (ast$('#ast-wish', md)).value.trim() || null};
     if (kind === 'report') { body.list_id = id; if (rs?.ast) { body.from = rs.ast.from; body.to = rs.ast.to; } body.lang = S.settings?.lang || 'en'; }
+    else if (kind === 'card_statement_read') body.statement_id = id;
     else body.doc_id = id;
     if (kind === 'office_text') body.field = /** @type {any} */ (ast$('#ast-field', md)).value;
     x.disabled = true;
@@ -135,6 +140,7 @@ function ast_ask(kind, q, src) {
 /** @param {any} v */
 function ast_draw(v) {
   if (v.kind === 'receipt_read') return rcr_draw(v);  // 2.299.0 E (#3194)
+  if (v.kind === 'card_statement_read') return ccs_draw(v);  // 2.469.0 (#3749)
   const p = v.proposal || {}, t = v.target || {}, kind = v.kind;
   const what = kind === 'office_text' ? (v.input?.field === 'closing' ? tr('Closing') : tr('Introduction')) + (t.number ? ' · ' + t.number : '')
     : kind === 'doc_summary' ? tr('Summary') + (t.name ? ' · ' + t.name : '') : tr('Status report');
@@ -164,12 +170,13 @@ document.addEventListener('click', async e => {
 });
 /** @param {any} v */
 const ast_toast = v => v.kind === 'report' ? tr('Report text taken over') : v.kind === 'doc_summary' ? tr('Summary saved')
-  : v.kind === 'receipt_read' ? tr('Values taken over') : tr('Text taken over into the draft');
+  : v.kind === 'receipt_read' ? tr('Values taken over') : v.kind === 'card_statement_read' ? tr('Positions taken over') : tr('Text taken over into the draft');
 /** @param {any} v @param {boolean} [applied] */
 function ast_after(v, applied) {  // the open view follows apply / undo / redo
   const id = v.target?.doc_id;
   if (v.kind === 'office_text' && id && typeof ofdLoadDoc === 'function' && typeof OFD === 'object' && OFD.doc?.id === id) ofdLoadDoc(id, true);
   if (v.kind === 'receipt_read' && id) rcr_refresh(id);  // 2.299.0 E (#3194)
+  if (v.kind === 'card_statement_read' && typeof CC === 'object' && CC.sid === v.target?.statement_id && typeof ccSheet === 'function') ccSheet();  // 2.469.0 (#3749)
   if (v.kind === 'doc_summary' && id && typeof DC === 'object' && DC.doc?.id === id && typeof dc_load === 'function') {
     rawFetch('GET', `/api/docs/${id}`).then(d => { if (DC.doc?.id === id) { DC.doc = d; dc_mdDraw(ast$('.dc-md')); } }).catch(() => {});
   }
@@ -185,6 +192,34 @@ function ast_hist(v, e) {
   e.undo = async () => { const x = await u(); ast_after(v); return x; };
   e.redo = async () => { const x = await r(); ast_after(v); return x; };
 }
+
+// ---- 2.469.0 (#3749): an agent reads a credit card statement (kind card_statement_read); everything it sent escaped
+/** @param {any} v */
+function ccs_draw(v) {
+  const p = v.proposal || {}, t = v.target || {}, gone = t.gone || t.editable === false, cur = t.currency || '', ls = p.lines || [];
+  const rows = ls.map((/** @type {any} */ x) => `<tr><td>${esc(fmtDateLoc(x.day))}</td><td>${esc(x.merchant)}</td><td>${esc(rcr_money(x.amount, cur))}</td><td>${x.orig_amount ? esc(rcr_money(x.orig_amount, x.orig_currency)) : ''}</td></tr>`).join('');
+  const main = `<div class="ast-head"><span class="muted">${esc(tr('Proposal by {0}', v.agent.name))}</span> · <b>${esc(tr('Read card statement'))}${t.month ? ' · ' + esc(t.month) : ''}</b></div>
+    <p>${esc(trn('{0} position', '{0} positions', ls.length))} · ${esc(tr('Sum of the positions'))}: ${esc(rcr_money(t.sum, cur))}${t.total ? ` · ${esc(tr('Total of the statement'))}: ${esc(rcr_money(t.total, cur))}` : ''}</p>
+    ${t.total && !t.fits ? `<div class="shint cnote">${esc(tr('The positions do not add up to the total of the statement'))}</div>` : ''}
+    <table class="rcr-tab"><tbody>${rows}</tbody></table>
+    ${gone ? `<div class="shint">${esc(tr('This is no longer available to you.'))}</div>` : ''}
+    <div class="shint keep">${esc(tr('Taking it over adds the positions to the statement. You then check them and confirm the statement. One step, undo takes it back.'))}</div>`;
+  const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Discard'))}">${thumbIc(false)} ${esc(tr('Discard'))}</button><span class="spacer"></span>
+    <button class="btn" data-pp="close">${tr('Close')}</button>
+    <button class="btn pri" data-pp="apply" ${gone ? 'disabled' : ''}>${ic('check', 's')} ${esc(tr('Take over'))}</button>`;
+  return {main, foot};
+}
+// office_cards.js: the line on a statement without positions -- the agent is reading / its proposal / the button
+/** @param {any} s @param {any} a */
+function ccs_html(s, a) {
+  if (!a) return `<div class="ast-row">${ast_btnHtml('card_statement_read', 'statement_id=' + s.id, tr('Read with an agent'))}</div>`;
+  if (a.state !== 'ready') return `<p class="muted" role="status">${esc(tr('{0} is reading the statement …', a.agent?.name || ''))}</p>`;
+  return `<div class="ast-row"><button type="button" class="btn sm pri" data-ccs-open="${+a.job}">${ic('bot', 's')}<span>${esc(tr('Check the positions read by {0}', a.agent?.name || ''))}</span></button></div>`;
+}
+document.addEventListener('click', e => {
+  const b = /** @type {any} */ (e.target)?.closest?.('[data-ccs-open]');
+  if (b && typeof propOpen === 'function') propOpen(+b.dataset.ccsOpen);
+});
 
 // ---- 2.299.0 E (#3194): an agent reads a receipt (kind receipt_read)
 const RCR_FIELDS = /** @type {Record<string, string>} */ ({amount: 'Amount', vat_pct: 'VAT rate', sender: 'Sender', date: 'Date', category: 'Category'});

@@ -1832,6 +1832,13 @@ name, editable, new (the fields Take over changes: amount, vat_pct, sender, date
 409), `.../undo` / `.../redo` put the values back (skipped when one was changed since). `GET /api/docs/{id}` (people only,
 never API v1) carries `agent_read` {job, state: requested | ready, agent, values?, new?, checks?, bank?} or null.
 
+*Since 2.469.0:* `kind: "card_statement_read"` -- an agent reads a credit card statement.
+`GET /api/proposals/agents?kind=card_statement_read&statement_id=`, `POST /api/proposals {agent_id, kind, statement_id, wish?}`
+(a draft without positions, the right *Receipts*). The agent answers `{total?, lines}` (AGENTS.md *Reading a credit card
+statement*); `GET /api/proposals/{id}` adds `target` {statement_id, month, currency, editable, sum, total, fits};
+`POST /api/proposals/{id}/apply {select: ["0"]}` adds the positions to the draft, `.../undo` / `.../redo` take them back / again.
+`GET /api/office/cards/statements/{id}` carries `agent_read` {job, state: requested | ready, agent, lines} or null.
+
 ## Ideas for the mind map
 
 *Since 2.156.0.*

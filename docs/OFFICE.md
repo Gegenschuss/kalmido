@@ -2682,6 +2682,51 @@ reminders). A draft invoice, credit note or reminder is rendered on request with
 attaches the stored files (PDF, and the XML for invoices / credit notes). A finalised quotation is not stored; its PDF is
 rendered from the snapshot on every request.
 
+## Online payment of invoices
+
+*Since 2.469.*
+
+Customers pay an invoice by link -- in the invoice mail, on the PDF (address and QR code) and in the customer portal -- and the
+payment lands on the invoice by itself. It runs through **your own account** at the provider: the money goes directly to you, the
+provider bills its fees to you, Kalmido takes no money and charges nothing. The GiroCode stays. No subscriptions or direct debit
+series; the first provider is Stripe Checkout, the methods (card, SEPA direct debit, PayPal, Apple / Google Pay) are the ones
+switched on in your Stripe account.
+
+**Set up** (Office -> Settings -> Invoices -> *Online payment of invoices*; admins of the office area, without an organisation
+you yourself):
+
+1. Choose the provider and enter the secret API key of your account (a restricted key with write access to Checkout Sessions and
+   read access to balance transactions is enough; a test key works for a trial with Stripe's test cards).
+2. Copy the *webhook address* and create a webhook endpoint at the provider with the events `checkout.session.completed`,
+   `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`,
+   `charge.refunded`, `charge.dispute.funds_withdrawn`, `charge.dispute.funds_reinstated` and `payout.paid`.
+3. Enter the endpoint's *webhook secret* and switch on *Offer online payment on invoices*.
+
+Keys are sealed with the key of the office area and never shown again; *New webhook address* replaces the address (the old one
+stops at once). Public links must be on for the server.
+
+**On the invoice.** The switch *Offer online payment* sits at each invoice: off, its link says "not available" and no payment can
+start, also from a PDF already sent. A draft, a credit note, a trial document and a cancelled invoice never have a link. A finalised
+PDF does not change: the link goes in when finalising, like the GiroCode decision. An invoice finalised before the set-up has no
+link on its PDF; mail and portal offer it anyway. Reminders carry no link of their own.
+
+**The pay page** shows the company, the invoice number and the open amount, computed at the moment of paying; a customer can pay a
+part. Paying goes to the provider's page and back.
+
+**Booking.** The provider's message books the payment exactly like one recorded by hand (method *Online payment*): part paid, paid,
+period locks and books follow. A payment arrives once whatever the provider repeats. A direct debit counts when it has settled.
+A refund or a lost dispute reverses the payment and books what is left as a new payment, both visible in the payment list. A
+refund is dated like every reversal, on the day of the payment.
+What cannot be booked (paid by bank meanwhile, invoice cancelled, month locked, another amount reported) is never lost: it stays
+under *Payments waiting for you* in the settings and at the invoice, the admins get one notice (*Integration problems* in the
+notification settings), and *Try again* or *Done* close it; money paid twice goes back by a refund at the provider, which also ends
+the wait.
+
+**Bank.** The provider's payout to your account is one collective amount. The bank list suggests *Collective payout* instead of an
+invoice (same amount as a reported payout, or the provider's name in the booking); matching it books no payment, so nothing counts
+twice. With the payout known, its fees are read at the provider and filed as one receipt, paid that day: the expense in the books.
+Set its VAT rate there if your provider's fees carry VAT (Stripe bills from abroad, usually reverse charge).
+
 ## E-invoices over the Peppol network
 
 *Since 2.154.*

@@ -963,6 +963,8 @@ def build_prompt(evs, chat_uid, extra=None):
                 out += ideas_hint(x)
             if (x.get("kind") or j.get("kind")) == "receipt_read":  # kalmido-capability: receipt_read (2.299.0, #3194)
                 out += receipt_hint(x)
+            if (x.get("kind") or j.get("kind")) == "card_statement_read":  # kalmido-capability: card_statement_read (2.469.0, #3749)
+                out += card_statement_hint(x)
         elif kind == "message_edited":  # kalmido-capability: message_edited (2.39.0, #1179)
             out += edit_hint(x)
         elif kind == "chat_choice":
@@ -1016,6 +1018,17 @@ def receipt_hint(x):
             "(\"12.34\"), vat_pct? (19 | 7 | 0 ...), vat_rates? [{pct, net, vat}], currency? (EUR), positions? [{text, qty?, net?, "
             "vat_pct?}] (at most 100), category? (one of input.categories when one fits), account?} with submit_proposal;" + bank +
             " unknown fields are refused. The person checks the values and takes them over; you never change the receipt."]
+
+
+def card_statement_hint(x):
+    """2.469.0 (#3749): a person asks the agent to read a credit card statement no reader of Kalmido could read. The agent reads
+    the PDF itself where it runs; Kalmido calls no model and sends nothing out."""
+    return ["Read a credit card statement (kind card_statement_read): open the PDF itself (read_file with file_id = "
+            "input.document.id and as \"base64\", or the text of input.document) and read only what is printed -- nothing invented, "
+            "no balance, carried amount or payment of the last statement as a position. Answer {total? (\"12.34\"), lines: [{day "
+            "(YYYY-MM-DD), booked?, merchant, amount (\"12.34\", + charged, - money back), orig_amount?, orig_currency? (both or "
+            "neither), kind? (purchase | fee | credit)}]} with submit_proposal; unknown fields are refused. The person checks the "
+            "positions, takes them over and confirms the statement; you never change it."]
 
 
 def ideas_hint(x):

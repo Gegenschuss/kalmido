@@ -58,7 +58,7 @@ BATCH = 200
 # budget (sid, bud_settle) and the knowledge pages (wkh_settle) have their own passes; tables with one row per organisation
 # use org_id as their id column
 FIELD_SETTLED = ("budget_", "wiki_")
-FIELD_ORG_ROWS = ("office_company", "office_settings", "office_cf_start")
+FIELD_ORG_ROWS = ("office_company", "office_settings", "office_cf_start", "office_payonline")
 FIELD_JOBS = [(t, "org_id" if t in FIELD_ORG_ROWS else "id", col, "log" if (t, col) == ("office_doc_log", "detail") else "text")
               for t, cols in oc.FIELDS.items() if not t.startswith(FIELD_SETTLED) for col in cols] + [
     (t, "org_id" if t in FIELD_ORG_ROWS else "id", col, "json") for (t, col) in oc.JSON_KEYS]

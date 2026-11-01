@@ -120,6 +120,7 @@ def kp_items(c, oid, rows, lg):
     from .calc import fmt_money
     from .docs import _j
     from .invoices import inv_money_fields, inv_paid_map, inv_state
+    from .payonline import pol_active_url
     pm = inv_paid_map(c, oid, [r["id"] for r in rows if r["kind"] in ("invoice", "credit")])
     out, signs = [], 0
     for r in rows:
@@ -139,8 +140,9 @@ def kp_items(c, oid, rows, lg):
         if r["kind"] == "offer" and st == "sent" and signs < KP_SIGN_MAX:
             signs += 1
             url = kp_sign_url(c, oid, r)
+        pay = pol_active_url(c, oid, r) if r["kind"] == "invoice" and st in ("sent", "issued", "partial", "overdue") else None  # 2.469.0 (#3459)
         out.append({"id": r["id"], "kind": r["kind"], "title": f'{tr(KP_KIND_TXT[r["kind"]], lg=lg)} {r["number"] or ""}'.strip(),
-                    "sub": " · ".join(x for x in sub if x), "state": st, "state_text": tr(KP_STATE_TXT.get(st, "Open|payment state"), lg=lg), "sign_url": url})
+                    "sub": " · ".join(x for x in sub if x), "state": st, "state_text": tr(KP_STATE_TXT.get(st, "Open|payment state"), lg=lg), "sign_url": url, "pay_url": pay})
     return out
 
 
@@ -151,11 +153,13 @@ def kp_portal_html(c, who, lg):
         return None
     e = html.escape
     items = kp_items(c, oid, kp_docs(c, oid, cids), lg)
+    c.commit()  # 2.469.0 (#3459): a pay link made on the way
     li = []
     for x in items:
         cls = {"paid": "done", "accepted": "done", "partial": "progress", "overdue": "late"}.get(x["state"], "open")
         li.append(f'<li><a href="/portal/docs/{x["id"]}/pdf"><b>{e(x["title"])}</b><span class="sub">{e(x["sub"])}</span></a>'
                   + (f'<a class="kpgo" href="{e(x["sign_url"])}">{e(tr("Review and approve", lg=lg))}</a>' if x["sign_url"] else "")
+                  + (f'<a class="kpgo" href="{e(x["pay_url"])}">{e(tr("Pay now", lg=lg))}</a>' if x["pay_url"] else "")  # 2.469.0 (#3459)
                   + f'<span class="ptst ptst-{cls}">{e(x["state_text"])}</span></li>')
     return (f'<h2>{e(tr("Documents", lg=lg))}</h2>'
             + (f'<ul class="ptall kpdocs">{"".join(li)}</ul>' if li else f'<p class="empty">{e(tr("No documents for this address.", lg=lg))}</p>'))

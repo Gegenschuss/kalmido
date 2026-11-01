@@ -431,6 +431,14 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   `positions` [{text, qty?, net?, vat_pct?}] (at most 100), `category` (one of `input.categories` when one fits), `account`;
   `bank_tx` only an id of `input.bank` that clearly fits. Unknown fields are refused. Never guess a value; the person
   checks the values and takes them over, you change nothing yourself.
+### Reading a credit card statement (2.469.0, job_request kind card_statement_read)
+- A person asks you to read a credit card statement that no reader of Kalmido could read. Open the PDF itself as for a
+  receipt (`read_file` of `input.document.id`, `as: "base64"`); `input.statement` has the month, the total if known and the
+  currency. A local model on this computer is fine.
+- Answer with ONE `submit_proposal`: `total` when printed and `lines` [{`day` (YYYY-MM-DD), `booked`?, `merchant`, `amount`
+  ("12.34", + charged, - money back), `orig_amount`?, `orig_currency`? (both or neither), `kind`? (purchase | fee | credit)}].
+  Only printed positions: no balances, carried amounts or the payment of the last statement. Unknown fields are refused. The
+  person checks the positions, takes them over and confirms the statement; you change nothing yourself.
 ### Ideas for a branch of the mind map (2.156.0, job_request kind ideas)
 - A person asks you for ideas on one branch of a project's mind map ("Add ideas"). The input is all you get: `input.list`
   (the project's name), `input.path` (the titles from the top of the map down to the branch; empty = the project itself),

@@ -310,7 +310,7 @@ ROUTES = {
     "GET /portal/login/{}": "link", "GET /s/q/{}": "link", "GET /s/q/{}/pdf": "link", "GET /s/q/{}/terms": "link", "POST /s/q/{}/comments": "link", "GET /s/{}": "link",
     "GET /s/{}/file/{}": "link", "GET /s/{}/logo": "link", "POST /f/{}": "link", "POST /p/{}/comment": "link",
     "POST /p/{}/login": "link", "POST /p/{}/notify": "link", "POST /p/{}/stop": "link", "POST /portal/login/{}": "link",
-    "POST /portal/logout": "link", "POST /s/q/{}": "link", "POST /s/{}/feedback": "link", "POST /s/{}/tick": "link",
+    "POST /portal/logout": "link", "GET /s/pay/{}": "link", "POST /s/pay/{}/go": "link", "POST /s/q/{}": "link", "POST /s/{}/feedback": "link", "POST /s/{}/tick": "link",
     "POST /s/{}/unlock": "link",
     # ---- lists (254)
     "DELETE /api/fields/{}": "lists", "DELETE /api/filters/{}": "lists", "DELETE /api/folders/agents": "lists",
@@ -489,6 +489,9 @@ ROUTES = {
     "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/{}/datev": "office",
     # 2.154.0 B (#1960): e-invoices over Peppol (p2154_b_peppol_test.py: the freelancer sets up and sends in the personal office)
     "GET /api/office/peppol": "office", "PUT /api/office/peppol": "office", "POST /api/office/peppol/check": "office",
+    "GET /api/office/payonline": "office", "PUT /api/office/payonline": "office", "POST /api/office/payonline/check": "office",  # 2.469.0 (#3459)
+    "POST /api/office/payonline/rotate": "office", "POST /api/office/payonline/events/{}/retry": "office", "POST /api/office/payonline/events/{}/done": "office",
+    "PUT /api/office/docs/{}/pay-online": "office",
     "GET /api/office/docs/{}/ubl": "office", "GET /api/office/docs/{}/peppol": "office", "POST /api/office/docs/{}/peppol": "office",
     "POST /api/office/docs/{}/peppol/lookup": "office",
     "POST /api/office/docs/{}/peppol/undelivered": "office",  # 2.370.0 (#2778)
@@ -853,6 +856,7 @@ ROUTES = {
     "POST /api/hooks/deploy/{}/{}": "token", "POST /api/hooks/git/{}": "token", "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/issues/{}": "token",
     # 2.115.0 A (#2061): inbound webhooks of a list (p2115_a_api_test.py calls them as a person without an organisation);
     # the hook URL itself is a secret token; the webhooks of an organisation are managed by its admins
+    "POST /api/hooks/pay/{}": "token",  # 2.469.0 (#3459)
     "POST /api/hooks/in/{}": "token", "POST /api/hooks/in": "token", "GET /api/lists/{}/hooks-in": "lists",  # 2.380 G (#2289): header variant
     "POST /api/lists/{}/hooks-in": "lists",
     "PATCH /api/hooks-in/{}": "lists", "DELETE /api/hooks-in/{}": "lists", "POST /api/hooks-in/{}/rotate": "lists",

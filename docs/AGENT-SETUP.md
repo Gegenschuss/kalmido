@@ -349,6 +349,9 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
   and answer only the values on it (supplier, VAT id, invoice number, date, net / VAT / gross, positions, a category of
   input.categories). Kalmido calls no model: you may read it with a local model on your computer (for example through
   Ollama). The person checks and takes the values over.
+- Read a credit card statement (job_request kind card_statement_read, 2.469.0): the fallback when no reader of Kalmido
+  knows the layout. Open the PDF itself and answer only its printed positions and total. The person takes them over and
+  confirms the statement.
 - Ideas for a branch of the mind map (job_request kind ideas, 2.156.0): the input is only the branch's path, the project's
   name, the levels still free and the person's hint; answer {items: [{title, children?}]} with short titles in input.lang.
 - The event contract_notice (2.70.0): a contract's last day to cancel is near. Send ONE sentence with

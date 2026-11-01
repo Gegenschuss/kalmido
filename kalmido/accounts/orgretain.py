@@ -105,6 +105,7 @@ ODL_MORE_SKIP = frozenset((
     "org_members", "org_list_log", "org_keys", "org_invites", "org_joins", "office_settings", "office_company", "office_numbers",
     "office_import_runs", "office_undo", "office_rights_log", "office_period_locks", "office_pack_installs", "office_rgroups",
     "office_rgroup_members", "office_inv_series", "office_datev_guids", "office_peppol", "office_pay_props", "bg_jobs",
+    "office_payonline", "office_pay_links", "office_pay_sessions", "office_pay_events", "office_pay_payouts",  # 2.469.0 (#3459)
     "notify_channels", "reading_orgs", "task_vectors", "upload_scan", "file_text", "merge_runs", "task_bell", "task_links",
     "hub_leave_quota", "fs_area_roots", "fs_upload_requests", "fs_ext_links", "wiki_spaces", "doc_cfg", "doc_models",
     "doc_types", "doc_tags", "doc_rules", "doc_fields", "doc_senders", "pl_sources", "pl_rules", "nl_conns", "nl_segments",

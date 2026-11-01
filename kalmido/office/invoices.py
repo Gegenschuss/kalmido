@@ -40,6 +40,7 @@ INV_KINDS = ("invoice", "credit", "reminder")
 INV_STATUSES = {"invoice": ("draft", "issued", "sent", "paid", "cancelled"), "credit": ("draft", "issued", "sent", "paid"),
                 "reminder": ("draft", "issued", "sent"), "delivery": ("draft", "issued", "sent")}  # 2.120.0 D (#2089): + delivery
 PAY_METHODS = ("transfer", "cash", "card", "other")
+PAY_ONLINE = "online"  # 2.469.0 (#3459): only the provider's webhook books it (office/payonline.py)
 REMINDER_LEVELS = (1, 2, 3)
 STATE_TXT = {"issued": N_("Finalised"), "paid": N_("Paid"), "partial": N_("Partly paid"), "overdue": N_("Overdue"), "cancelled": N_("Cancelled")}
 # 2.149.0 A (#2520): the documents' own words (when the pack has no label) through tr() in the document's language
@@ -1067,6 +1068,8 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     m["payment"] = {"iban": sfd["iban"], "bic": sfd["bic"], "bank_name": sfd["bank_name"], "text": ptext} if kind not in ("credit", "delivery") else None
     from .girocode import gcq_model
     gcq_model(r, m, None if ofx_locked(r) else office_settings(c, oid), snd)  # 2.147.1 B (#2054): the GiroCode (EPC QR text)
+    if kind == "invoice" and ofx_locked(r) and snd.get("payonline") and isinstance(m.get("payment"), dict):
+        m["payment"]["pay_url"] = snd["payonline"]  # 2.469.0 (#3459): frozen like the GiroCode decision (ledger.ofx_finalize, office/payonline.py)
     m["valid_note"] = ""
     m["valid_until"] = ""
     m["valid_until_text"] = ""
@@ -1177,6 +1180,8 @@ def inv_send(c, oid, uid, r, b, later=False, auto=False):
     text = (b.get("text") or "").strip() if isinstance(b.get("text"), str) else ""
     own = bool(text) and text[:5000] != _mail_text(r, lang, s).strip()
     text = text[:5000] or _mail_text(r, lang, s)
+    from .payonline import pol_mail_text
+    text = pol_mail_text(c, oid, r, text, lang)  # 2.469.0 (#3459): the pay link of an open invoice
     mail = ofm_mail(c, oid, uid, text, b, auto=auto)  # 2.439.0 (#3617): the person's signature, sender name, way out
     own = own or ofm_own_text(c, oid, uid, mail)
     if own:
@@ -1465,6 +1470,7 @@ def inv_reminder_post():
 def _payment_public(c, r, reversed_ids=()):
     d = dict(r)
     d.pop("client_ref", None)  # 2.269.0 D (#3046): only the server matches it
+    d.pop("online_ref", None)  # 2.469.0 (#3459): the provider's reference, the same
     d["amount"] = dstr(d.get("amount") or 0)
     d["reversed"] = r["id"] in reversed_ids  # 2.152.0 C (#2168): a reversal line points to its payment (reverses_id)
     u = c.execute("SELECT display_name, username FROM users WHERE id=?", (r["created_by"],)).fetchone() if r["created_by"] else None
@@ -1509,11 +1515,12 @@ def inv_payment_post(did):
     return _answer(c, oid, uid, did, 201)
 
 
-def inv_pay_add(c, oid, uid, did, b, ref=None):
+def inv_pay_add(c, oid, uid, did, b, ref=None, online_ref=None):
     """2.90.0 B (#1921): records payment b {date, amount, method?, note?} on invoice did of area oid (the caller checked the
     admin role) and refreshes its state; returns the payment's id. Also used by the bank reconciliation (office/bank.py).
     2.269.0 D (#3046): ref = the device's client_ref: a payment this person already booked with it -> None (nothing booked;
-    on another invoice 409), before the state checks (a retry after the full payment is no error)."""
+    on another invoice 409), before the state checks (a retry after the full payment is no error).
+    2.469.0 (#3459): online_ref = the provider's unique payment reference (office/payonline.py), only with method online."""
     from .docs import _date, doc_row
     write_lock(c, f"office_pay_{did}")  # 2.38.0 review: check and write of one invoice's payments in one go
     if ref:
@@ -1526,7 +1533,7 @@ def inv_pay_add(c, oid, uid, did, b, ref=None):
     r = doc_row(c, oid, did)
     refund = r["kind"] == "credit" and ofx_locked(r) and r["status"] not in ("cancelled", "paid")  # 2.354.0 D (#2837): the refund
     if not refund and (r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid")):
-        raise Denied(409, tr("Payments go on finalised, open invoices only"))
+        raise DeniedKey(409, N_("Payments go on finalised, open invoices only"))  # 2.469.0 (#3459): payonline._why reads the key
     amt = dec(b.get("amount"), "NaN") if b.get("amount") not in (None, "") else Decimal("NaN")
     if amt.is_nan() or amt <= 0 or amt > Decimal("100000000"):
         raise BadInput(tr("Invalid value: {0}", "amount"))
@@ -1541,13 +1548,13 @@ def inv_pay_add(c, oid, uid, did, b, ref=None):
         if money(amt) > inv_refund_open(c, oid, r):  # 2.354.0 D (#2837): only what the customer paid beyond the invoice
             raise Denied(409, tr("The refund exceeds what is to be paid back"))
     elif money(amt) > dec(inv_money_fields(r, inv_paid_map(c, oid, [did]))["open"]):
-        raise Denied(409, tr("The payment exceeds the open amount"))
+        raise DeniedKey(409, N_("The payment exceeds the open amount"))  # 2.469.0 (#3459)
     method = b.get("method") or "transfer"
-    if method not in PAY_METHODS:
+    if method not in PAY_METHODS and not (method == PAY_ONLINE and online_ref):
         raise BadInput(tr("Invalid value: {0}", "method"))
     note = (b.get("note") or "").strip()[:500] if isinstance(b.get("note"), str) else ""
-    pid = insert_id(c, "INSERT INTO office_payments(org_id, doc_id, date, amount, method, note, created_by, created_at, client_ref) VALUES(?,?,?,?,?,?,?,?,?)",
-                    (oid, did, d, float(money(amt)), method, note, uid, iso(now_utc()), ref))
+    pid = insert_id(c, "INSERT INTO office_payments(org_id, doc_id, date, amount, method, note, created_by, created_at, client_ref, online_ref) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (oid, did, d, float(money(amt)), method, note, uid, iso(now_utc()), ref, online_ref))
     inv_refresh_paid(c, oid, did)
     ofx_log(c, oid, "payment", doc_id=did, detail={"id": pid, "date": d, "amount": dstr(amt), "method": method})
     if not refund:

@@ -7,7 +7,7 @@ fonts, pictures and vector graphics come along unchanged; a PDF that cannot be r
 rotated pages) is refused at the upload with one plain sentence, never later in a document.
 
 Stored sealed like the documents (orgcrypt) below <data dir>/office/<org id>/letterhead-<sha16>.pdf; the setting
-office_settings.data["letterhead"] = {file, sha256, name, bytes, pages, sizes, prev, m1, m2, hide_head, hide_footer}:
+office_settings.data["letterhead"] = {file, sha256, name, bytes, pages, fmt, prev, m1, m2, hide_head, hide_footer}:
 m1 / m2 = the margins of page 1 / the following pages [top, right, bottom, left] in mm (page 1: top = where the address
 field begins), hide_head = no logo / company name / fold marks of our own, hide_footer = no footer columns of our own
 (number and page stay, under the body). prev = the file before the last upload / removal, kept for one undo step;
@@ -53,6 +53,7 @@ BP_MIN_WIDTH_MM = 100  # the text column never gets narrower
 # 2.296.0 C (#3177): what of a letterhead breaks PDF/A (bpread.bp_pdfa_issues), named for the user
 BP_PDFA_LABELS = {"font": N_("a font is not embedded"), "cmyk": N_("CMYK colours (RGB is needed)"), "lzw": N_("LZW compression")}
 _PDFA_SEEN = {}  # (org, sha256) -> the issues of a letterhead stored before 2.296.0 (read once per process)
+_FMT_SEEN = {}  # (org, sha256) -> the paper format of a letterhead stored before 2.469.0 (read once per process)
 
 
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
@@ -90,6 +91,40 @@ def bp_pdfa_of(c, oid, lh):
     return _PDFA_SEEN[key]
 
 
+def bp_fmt(sizes):
+    """2.469.0 (#3352): the paper format ("a4" | "letter") all the pages of a letterhead have, "" when unknown (a page of neither
+    format, or pages of both). Same tolerance as the upload (aspect ratio 0.03), against the closest of PAPER_SIZES."""
+    found = set()
+    for w, h in sizes:
+        if not w or not h:
+            return ""
+        d, k = min((abs(w / h - pw / ph), k) for k, (pw, ph) in PAPER_SIZES.items())
+        if d > 0.03:
+            return ""
+        found.add(k)
+    return found.pop() if len(found) == 1 else ""
+
+
+def bp_fmt_of(c, oid, lh):
+    """2.469.0 (#3352): the paper format of the current letterhead (stored since 2.469.0; an older one is read once)."""
+    if not lh["file"]:
+        return ""
+    if lh.get("fmt") in PAPER_SIZES:
+        return lh["fmt"]
+    key = (oid, lh.get("sha256") or lh["file"])
+    if key not in _FMT_SEEN:
+        try:
+            data = bp_read(c, oid, lh["file"])
+            _FMT_SEEN[key] = bp_fmt(bp_check(data)[1]) if data else ""
+        except (BpError, ValueError, IndexError, KeyError, TypeError, RecursionError, MemoryError) as e:
+            log.info("letterhead format check: %s", e)
+            _FMT_SEEN[key] = ""
+        except (OSError, OrgCryptError) as e:  # file gone / key unreadable: no hint, never a 500 (not cached)
+            log.info("letterhead format check: %s", e)
+            return ""
+    return _FMT_SEEN[key]
+
+
 def bp_pdfa_text(issues):
     return ", ".join(tr(BP_PDFA_LABELS[k]) for k in issues if k in BP_PDFA_LABELS)
 
@@ -98,8 +133,11 @@ def bp_public(lh, c=None, oid=None):
     """The state for the client: no server paths, no previous file name beyond the undo marker.
     2.296.0 C (#3177): with c / oid also pdfa_hint (a letterhead uploaded before the PDF/A check that would break it)."""
     issues = bp_pdfa_of(c, oid, lh) if c is not None else []
+    fmt = bp_fmt_of(c, oid, lh) if c is not None else ""  # 2.469.0 (#3352)
+    paper = pdf_paper(office_settings(c, oid).get("paper")) if c is not None else ""
     return {"pdfa_issues": issues, "pdfa_hint": tr("This letterhead makes your documents invalid PDF/A (needed for e-invoices): {0}. Export it as PDF/A and upload it again.",
                                                    bp_pdfa_text(issues)) if issues else "",
+            "paper": fmt, "paper_mismatch": bool(fmt and paper and fmt != paper),  # 2.469.0 (#3352): the letterhead's format, no hint when unknown
             "on": bool(lh["file"]), "file": lh["file"], "name": lh.get("name") or "", "bytes": int(lh.get("bytes") or 0),
             "pages": int(lh.get("pages") or 0) if lh["file"] else 0, "m1": lh["m1"], "m2": lh["m2"],
             "hide_head": 1 if lh.get("hide_head") else 0, "hide_footer": 1 if lh.get("hide_footer") else 0,
@@ -129,7 +167,7 @@ def bp_margins_clean(v, name):
 def _save(c, oid, lh):
     office_settings_lock(c, oid)  # 2.269.0 B (#3014)
     s = office_settings(c, oid)
-    s["letterhead"] = {k: lh.get(k) for k in ("file", "sha256", "name", "bytes", "pages", "prev", "m1", "m2", "hide_head", "hide_footer",
+    s["letterhead"] = {k: lh.get(k) for k in ("file", "sha256", "name", "bytes", "pages", "fmt", "prev", "m1", "m2", "hide_head", "hide_footer",
                                               "pdfa")}  # 2.296.0 C (#3177)
     office_settings_save(c, oid, s)
 
@@ -296,7 +334,7 @@ def bp_upload():
     lh = bp_state(office_settings(c, oid))
     prev = lh["file"] if lh["file"] != name else lh.get("prev") or ""
     fname = re.sub(r"[\x00-\x1f\x7f/\\]", "", os.path.basename(f.filename or ""))[:120]
-    lh.update(file=name, sha256=sha, name=fname, bytes=len(raw), pages=pages, prev=prev, pdfa=[])
+    lh.update(file=name, sha256=sha, name=fname, bytes=len(raw), pages=pages, prev=prev, pdfa=[], fmt=bp_fmt(sizes))  # 2.469.0 (#3352)
     _save(c, oid, lh)
     bp_purge(oid, {name, prev})
     ofx_log(c, oid, "upload", target="letterhead", detail={"bytes": len(raw), "pages": pages, "sha256": sha})
@@ -341,7 +379,7 @@ def bp_delete():
     lh = bp_state(office_settings(c, oid))
     if lh["file"]:
         lh["prev"], lh["file"] = lh["file"], ""
-        lh.update(sha256="", bytes=0, pages=0)
+        lh.update(sha256="", bytes=0, pages=0, fmt="")
         _save(c, oid, lh)
         bp_purge(oid, {lh["prev"]})
         ofx_log(c, oid, "delete", target="letterhead")
@@ -363,16 +401,16 @@ def bp_restore():
         return jsonify(letterhead=bp_public(lh, c, oid))
     if not want:  # the undo of an upload onto no letterhead: none again, the uploaded file stays as prev
         lh["prev"], lh["file"] = lh["file"], ""
-        lh.update(sha256="", bytes=0, pages=0)
+        lh.update(sha256="", bytes=0, pages=0, fmt="")
     else:
         if want != lh.get("prev") or not BP_FILE_RE.fullmatch(want):
             raise Denied(404)
         data = bp_read(c, oid, want)
         if not data:
             raise Denied(404)
-        pages, _sizes = bp_check(data)
+        pages, sizes = bp_check(data)
         lh["prev"], lh["file"] = lh["file"], want
-        lh.update(sha256=hashlib.sha256(data).hexdigest(), bytes=len(data), pages=pages, pdfa=None)  # 2.296.0 C (#3177): read again (bp_pdfa_of)
+        lh.update(sha256=hashlib.sha256(data).hexdigest(), bytes=len(data), pages=pages, pdfa=None, fmt=bp_fmt(sizes))  # 2.469.0 (#3352)  # 2.296.0 C (#3177): read again (bp_pdfa_of)
     _save(c, oid, lh)
     ofx_log(c, oid, "update", target="letterhead", detail={"restored": want})
     c.commit()

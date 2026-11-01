@@ -8,7 +8,15 @@ async function bp_load() {
   try { const j = await api('GET', '/api/office/letterhead'); BPL.st = j.letterhead; } catch { BPL.st = BPL.st || {on: false}; }
   bp_draw();
 }
-function bp_draw() { const el = $('#bpset'); if (el) el.outerHTML = bp_settingsHtml(OFC.info?.settings || {}, ofcAdmin() ? '' : 'disabled'); }
+// 2.469.0 (#3352): "The letterhead is A4 ..." when its page format is not the chosen paper size (no blocking, no converting); '' when fine or unknown
+function bp_paperHint(paper) {
+  const f = BPL.st?.on ? BPL.st.paper : '', p = paper === 'letter' ? 'letter' : 'a4';
+  return !f || f === p ? '' : f === 'a4' ? tr('The letterhead is A4 - please upload a US-Letter version') : tr('The letterhead is US-Letter - please upload an A4 version');
+}
+function bp_draw() {
+  const el = $('#bpset'); if (el) el.outerHTML = bp_settingsHtml(OFC.info?.settings || {}, ofcAdmin() ? '' : 'disabled');
+  bp_paperShow($('#os-paper')?.value || OFC.info?.settings?.paper);  // 2.469.0 (#3352): the hint under the paper field follows
+}
 
 function bp_marginsHtml(key, label, vals, dis) {
   return `<fieldset class="bpm" style="border:0;padding:0;margin:0 0 .75rem" ${dis}><legend style="padding:0;margin-bottom:.25rem">${esc(label)}</legend><div style="display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center">${BPL_SIDES.map(([s, n], i) => `<span style="display:inline-flex;gap:.4rem;align-items:center"><label class="muted" for="bp-${key}-${s}">${esc(tr(n))}</label><input id="bp-${key}-${s}" class="numin" style="width:4.5rem" inputmode="decimal" data-bp="${key}" data-i="${i}" value="${esc(fmtNum(vals?.[i] ?? 0, 1))}" aria-label="${esc(label + ': ' + tr(n) + ' (mm)')}" ${dis}></span>`).join('')}<span class="muted">mm</span></div></fieldset>`;
@@ -23,6 +31,7 @@ function bp_settingsHtml(s, dis) {
   return `<section class="bpset" id="bpset" data-fg-skip aria-labelledby="bp-h"><h3 id="bp-h">${tr('Letterhead')}</h3><div class="shint">${tr('A PDF behind every quotation, invoice, credit note and payment reminder: its page 1 behind the first page, its page 2 behind the following pages (a one-page PDF behind all).')}</div>
     <p class="muted ofchint">${tr('PDF, A4 portrait, up to 10 MB')}</p>
     <div class="row"><span class="lacts">${file}</span></div>
+    ${bp_paperHint(s.paper) ? `<p class="dtp-warn" id="bp-paper-hint" role="status">${esc(bp_paperHint(s.paper))}</p>` : '<p class="dtp-warn" id="bp-paper-hint" role="status" hidden></p>'}
     ${st.on && st.pdfa_hint ? `<p class="dtp-warn" role="status">${esc(st.pdfa_hint)}</p>` : ''}
     <div class="lacts" style="margin-bottom:.5rem">${up}<button type="button" class="btn sm" data-bp-act="preview">${ic('eye', 's')} ${tr('Preview')}</button>${adm && st.on ? `<button type="button" class="btn sm" data-bp-act="del">${ic('trash', 's')} ${tr('Remove')}</button>` : ''}</div>
     ${st.on ? `<fieldset class="bpf" style="border:0;padding:0;margin:0" ${dis}>${ofcChk('bp-hide-head', tr('Leave out our own head (logo, company name, fold marks)'), st.hide_head)}
@@ -80,3 +89,9 @@ document.addEventListener('keydown', e => {  // Enter in a margin field saves it
   const x = e.target; if (e.key !== 'Enter' || e.isComposing || !x.dataset?.bp || !x.closest?.('#bpset')) return;
   e.preventDefault(); e.stopPropagation(); x.blur();
 }, true);
+// 2.469.0 (#3352): switching the paper size shows the hint at once, under the field and in the letterhead section (before it is saved)
+function bp_paperShow(paper) {
+  const t = bp_paperHint(paper), a = $('#os-paper-hint'), b = $('#bp-paper-hint');
+  for (const el of [a, b]) if (el) { el.textContent = t; el.hidden = !t; }
+}
+document.addEventListener('change', e => { if (e.target.id === 'os-paper' && e.target.closest?.('#ofc-set')) bp_paperShow(e.target.value); });

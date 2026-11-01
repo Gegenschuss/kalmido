@@ -535,6 +535,9 @@ ROUTES = {
     "GET /api/office/mail-status": "office", "GET /api/office/docs/{}/xml": "office",  # F2: the e-invoice XML of a finalised document
     # 2.154.0 B (#1960): e-invoices over Peppol (p2154_b_peppol_test.py: another organisation 404, a member cannot set up)
     "GET /api/office/peppol": "office", "PUT /api/office/peppol": "office", "POST /api/office/peppol/check": "office",
+    "GET /api/office/payonline": "office", "PUT /api/office/payonline": "office", "POST /api/office/payonline/check": "office",  # 2.469.0 (#3459)
+    "POST /api/office/payonline/rotate": "office", "POST /api/office/payonline/events/{}/retry": "office", "POST /api/office/payonline/events/{}/done": "office",
+    "PUT /api/office/docs/{}/pay-online": "office",
     "GET /api/office/docs/{}/ubl": "office", "GET /api/office/docs/{}/peppol": "office", "POST /api/office/docs/{}/peppol": "office",
     "POST /api/office/docs/{}/peppol/lookup": "office",
     "POST /api/office/docs/{}/peppol/undelivered": "office",  # 2.370.0 (#2778)
@@ -818,7 +821,7 @@ ROUTES = {
     "GET /api/lists/{}/public-link": "publiclink", "PUT /api/lists/{}/public-link": "publiclink",
     "POST /api/lists/{}/public-link/regenerate": "publiclink", "DELETE /api/lists/{}/public-link": "publiclink",
     # 2.50.0 (#329, #1200)
-    "GET /s/{}/file/{}": "signoff", "GET /s/{}/logo": "signoff", "POST /s/{}/feedback": "signoff", "GET /s/q/{}": "signoff", "GET /s/q/{}/pdf": "signoff", "POST /s/q/{}": "signoff",
+    "GET /s/{}/file/{}": "signoff", "GET /s/{}/logo": "signoff", "POST /s/{}/feedback": "signoff", "GET /s/pay/{}": "signoff", "POST /s/pay/{}/go": "signoff", "GET /s/q/{}": "signoff", "GET /s/q/{}/pdf": "signoff", "POST /s/q/{}": "signoff",
     "POST /s/q/{}/comments": "signoff",  # 2.99.1 A (#1959): a customer's comment on a video sign-off
     "GET /s/q/{}/terms": "signoff",  # 2.113.2 (#2253): the terms frozen with the quotation of the link
     # 2.99.1 A (#1959): video sign-offs (videos/review.py; p2991_a_api_test.py)
@@ -922,6 +925,7 @@ ROUTES = {
     "DELETE /api/me/channels/{}": "channel", "POST /api/me/channels/{}/test": "channel",
     "GET /api/orgs/{}/channels": "channel", "POST /api/orgs/{}/channels": "channel", "PATCH /api/orgs/{}/channels/{}": "channel",
     "DELETE /api/orgs/{}/channels/{}": "channel", "POST /api/orgs/{}/channels/{}/test": "channel",
+    "POST /api/hooks/pay/{}": "token",  # 2.469.0 (#3459)
     "POST /api/hooks/in/{}": "token", "POST /api/hooks/in": "token", "GET /api/lists/{}/hooks-in": "list",  # 2.380 G (#2289): header variant
     "POST /api/lists/{}/hooks-in": "list",
     "PATCH /api/hooks-in/{}": "list", "DELETE /api/hooks-in/{}": "list", "POST /api/hooks-in/{}/rotate": "list",

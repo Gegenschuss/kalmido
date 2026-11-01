@@ -449,6 +449,7 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-color', tr('Brand colour'), `<span class="lacts"><input id="os-color" value="${esc(s.color || '')}" maxlength="7" placeholder="#2f5d8a" class="numin" ${dis}><i class="ofcsw" style="background:${cssColor(s.color) || 'var(--accent)'}"></i></span>`)}${ofcII('color', tr('empty = the app’s accent colour'))}
     <p class="muted" id="os-color-note"${ofcColorLight(s.color) ? '' : ' hidden'}>${esc(tr('Text in a light brand colour is printed in a darker variant of it.'))}</p>
     ${ofcRowF('os-paper', tr('Paper size'), ofcSel('os-paper', s.paper === 'letter' ? 'letter' : 'a4', [['a4', tr('A4 (DIN 5008)')], ['letter', tr('US-Letter (8.5 × 11 in)')]]))}${/* 2.357.0 A (#3156) */ ''}
+    <p class="dtp-warn" id="os-paper-hint" role="status" ${typeof bp_paperHint === 'function' && bp_paperHint(s.paper) ? '' : 'hidden'}>${typeof bp_paperHint === 'function' ? esc(bp_paperHint(s.paper)) : ''}</p>${/* 2.469.0 (#3352) */ ''}
     ${typeof bp_settingsHtml === 'function' ? bp_settingsHtml(s, dis) : ''}
     </fieldset>${ost_p('tax', dis)}${ost_taxHtml()}${/* 2.365.2 D (#2789) */ ''}
     </fieldset>${ost_p('docs', dis)}
@@ -480,6 +481,7 @@ function ofcSettingsHtml() {
     ${typeof tpSettingsHtml === 'function' ? tpSettingsHtml(s, dis) : ''}
     ${ofcFeat('docs.einvoice') ? ofcEinvRow(s) : ''}
     ${ofcFeat('docs.einvoice') && typeof pep_settingsHtml === 'function' ? pep_settingsHtml() : '' /* 2.154.0 B (#1960) */}
+    ${typeof pol_settingsHtml === 'function' ? pol_settingsHtml() : '' /* 2.469.0 (#3459) */}
     </fieldset>${ost_p('data', dis)}
     ${ofcFeat('books.datev') ? `${ofcRowF('os-datev', tr('DATEV inbox'), `<input id="os-datev" type="email" value="${esc(s.datev_email || '')}" maxlength="200" placeholder="${esc(tr('e-mail address of the document inbox'))}" ${dis}>`)}${ofcII('datev')}
     ${ofcChk('os-datev-auto', tr('Send every invoice to the DATEV inbox when it is sent'), s.datev_auto)}${ofcII('datev_auto')}` : ''}

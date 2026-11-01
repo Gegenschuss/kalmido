@@ -250,6 +250,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_IMPORT_MAX_TASKS` | `20000` | Tasks per import at most. |
 | `KALMIDO_IMPORT_RATE` | `30` | Imports and previews per person in 10 minutes. |
 | `KALMIDO_NTFYIN_TICK` | `20` | Seconds between two rounds of the personal share inboxes. |
+| `KALMIDO_PAYONLINE_GO_RATE` | `10` | Checkouts one address may start per minute on the public pay page (2.469.0). |
 | `KALMIDO_PEPPOL_ALLOW_HOSTS` | `(empty)` | Internal hosts the own Peppol endpoint of any office area may reach (the calendar allow list counts only when an instance admin sets the endpoint, 2.306.0). |
 | `KALMIDO_PUBLIC_LINKS` | `1` | Switch: public read-only links of lists. |
 | `KALMIDO_WEBHOOKS` | `1` | Switch: outgoing webhooks. |
@@ -324,6 +325,8 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `KALMIDO_PAYONLINE_ALLOW_HOSTS` | `(empty)` | Tests: internal hosts the online payment connection may reach (2.469.0). |
+| `KALMIDO_PAYONLINE_STRIPE_URL` | `(empty)` | Tests: the address of a stand-in for the Stripe API (empty = the real one, 2.469.0). |
 | `KALMIDO_PEPPOL_STORECOVE_URL` | `(empty)` | Tests: the address of a stand-in for the Storecove Peppol API (empty = the real one, 2.154.0). |
 | `KALMIDO_SHEET_CELLS_MAX` | `1000000` | Tests: stored cells over all sheets of one table (2.148.1). |
 | `KALMIDO_SHEET_MB_MAX` | `200` | Tests: size in MB of the inputs over all sheets of one table (2.360.2). |

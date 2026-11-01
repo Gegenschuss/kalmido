@@ -296,11 +296,12 @@ def authenticate():
         return api_authenticate()  # bearer token only (package B)
     if request.path.startswith(("/dav/", "/.well-known/")) or request.path == "/dav":
         return None  # 2.9.0 (#435): CalDAV: HTTP Basic with an app password (dav_login), never a cookie or the proxy header
-    if (request.path.startswith(("/api/hooks/git/", "/api/hooks/issues/", "/api/hooks/deploy/", "/api/hooks/in/"))
+    if (request.path.startswith(("/api/hooks/git/", "/api/hooks/issues/", "/api/hooks/deploy/", "/api/hooks/in/", "/api/hooks/pay/"))
             or request.path == "/api/hooks/in") and request.method == "POST":  # 2.380 G (#2289): token in the header
         return None  # 2.2.0: inbound Git webhook: no user, no proxy header, the HMAC signature is the credential
         # (2.18.0: also the error-report webhook: the secret token in its URL is the credential; 2.60.0: and the deploy hook)
         # (2.115.0 A (#2061): and the inbound webhook of a list)
+        # (2.469.0, #3459: and the payment provider's webhook of an office)
     if request.path in OPERATOR_PATHS:  # 2.144.0 D2 (#797): exact paths, a later route under /api/operator/ is not let through
         return None  # 2.144.0 D (#797): the hosting operator's interface: its own token (admin/operator.py), never a person
     if request.path.startswith(PUB_PREFIX):

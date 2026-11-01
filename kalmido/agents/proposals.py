@@ -63,7 +63,8 @@ PROP_KINDS += ("import",)  # 2.68.0 (#1839): the agent proposes old data for the
 PROP_KINDS += ("merge",)  # 2.70.0 B (#1357): duplicate contacts merged (agents/dupprop.py), on request
 PROP_KINDS += ("notice",)  # 2.70.0 C (#1359): a contract's notice deadline as a note (agents/contractprop.py), never on request
 PROP_KINDS += ("rule",)  # 2.71.0 A (#1457): the agent proposes a rule of a list (lists/rules.py), never on request
-PROP_KINDS += ("office_text", "doc_summary", "report", "receipt_read")  # 2.299.0 E (#3194): + receipt_read; 2.126.1 A (#2123 #2124): office texts, a receipt summary, the client report (agents/asstprop.py), on request
+PROP_AST = ("office_text", "doc_summary", "report", "receipt_read", "card_statement_read")  # 2.469.0 (#3749): + card_statement_read (agents/ccsread.py); 2.299.0 E (#3194): + receipt_read; 2.126.1 A (#2123 #2124): office texts, a receipt summary, the client report (agents/asstprop.py), on request
+PROP_KINDS += PROP_AST
 PROP_KINDS += ("sheet_tasks",)  # 2.126.1 B (#2125): table rows -> tasks, proposed by the agent itself (agents/sheetprop.py)
 PROP_KINDS += ("ideas",)  # 2.156.0 A (#1201): sub-branches for a branch of the mind map, on request (agents/ideaprop.py)
 PROP_MAX_ITEMS = 200                    # entries one proposal may create / change (tasks + subtasks)
@@ -371,7 +372,7 @@ def prop_validate(kind, b, inp):
     elif kind == "rule":  # 2.71.0 A (#1457)
         from ..lists.rules import rul_prop_validate
         out.update(rul_prop_validate(b, inp))
-    elif kind in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124): texts worded by the agent (agents/asstprop.py)
+    elif kind in PROP_AST:  # 2.126.1 A (#2123 #2124): texts worded by the agent (agents/asstprop.py)
         from ..agents.asstprop import ast_validate
         out.update(ast_validate(kind, b, inp))
     elif kind == "ideas":  # 2.156.0 A (#1201)
@@ -459,7 +460,7 @@ def prop_input(c, uid, kind, b):
 @app.get("/api/proposals/agents")
 def proposal_agents_get():
     c = db()
-    if request.args.get("kind") in ("office_text", "doc_summary", "report", "receipt_read") and not is_agent(g.user):  # 2.126.1 A (#2123 #2124): ?kind=&doc_id= | &list_id=
+    if request.args.get("kind") in PROP_AST and not is_agent(g.user):  # 2.126.1 A (#2123 #2124): ?kind=&doc_id= | &list_id=
         from ..agents.asstprop import ast_agents_get
         return ast_agents_get(c, me(), request.args)
     if request.args.get("kind") == "ideas" and not is_agent(g.user):  # 2.156.0 A (#1201): ?kind=ideas&list_id=
@@ -490,7 +491,7 @@ def proposal_request():
         return err(tr("Invalid value: {0}", "kind"))
     if kind == "notice":  # 2.70.0 C (#1359): the agent proposes it after contract_notice, never on request
         return err(tr("Invalid value: {0}", "kind"))
-    if kind in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124): own agents (office switches / the list's), own input (agents/asstprop.py)
+    if kind in PROP_AST:  # 2.126.1 A (#2123 #2124): own agents (office switches / the list's), own input (agents/asstprop.py)
         from ..agents.asstprop import ast_request
         return ast_request(c, uid, b)
     if kind == "ideas":  # 2.156.0 A (#1201): the agents of the list, only the branch's path (agents/ideaprop.py)
@@ -565,7 +566,7 @@ def prop_view(c, j):
     if j["kind"] == "rule":  # 2.71.0 A (#1457): the rule in names for the card
         from ..lists.rules import rul_prop_extra
         out.update(rul_prop_extra(c, j))
-    if j["kind"] in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124): the target as it is now
+    if j["kind"] in PROP_AST:  # 2.126.1 A (#2123 #2124): the target as it is now
         from ..agents.asstprop import ast_view_extra
         out.update(ast_view_extra(c, j))
     if j["kind"] == "ideas":  # 2.156.0 A (#1201): the mind map of this list shows them
@@ -696,7 +697,7 @@ def prop_run(c, j, sel, ed, extra):
         from ..lists.rules import rul_prop_run
         return rul_prop_run(c, j, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": extra, "tasks": [], "sections": [],
                                    "changes": {}, "list": None, "undone": False})
-    if kind in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124): the (edited) text into its field as the person
+    if kind in PROP_AST:  # 2.126.1 A (#2123 #2124): the (edited) text into its field as the person
         from ..agents.asstprop import ast_run
         return ast_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": {}, "tasks": [], "sections": [],
                                               "changes": {}, "list": None, "undone": False})
@@ -921,7 +922,7 @@ def proposal_apply(jid):
         counts.update(ctr_result(rec))
     if j["kind"] == "rule":  # 2.71.0 A (#1457)
         counts.update(rule_id=rec.get("rule_id"))
-    if j["kind"] in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124)
+    if j["kind"] in PROP_AST:  # 2.126.1 A (#2123 #2124)
         from ..agents.asstprop import ast_result
         counts.update(ast_result(rec))
     prop_notify_agent(c, j, "approve", "applied", {**counts, "list_id": rec["list"] if j["kind"] in ("project", "cleanup") else None})
@@ -990,7 +991,7 @@ def proposal_undo(jid):
     elif j["kind"] == "rule":  # 2.71.0 A (#1457): the accepted rule goes to the trash
         from ..lists.rules import rul_prop_undo
         n, skipped = rul_prop_undo(c, j, rec)
-    elif j["kind"] in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124): the text before comes back (unless changed since)
+    elif j["kind"] in PROP_AST:  # 2.126.1 A (#2123 #2124): the text before comes back (unless changed since)
         from ..agents.asstprop import ast_undo
         n, skipped = ast_undo(c, j, rec)
     elif j["kind"] in ("triage", "dayplan"):
@@ -1104,7 +1105,7 @@ def proposal_redo(jid):
         from ..lists.rules import rul_prop_undo
         n, skipped = rul_prop_undo(c, j, rec, back=False)
         rec.update(undone=False)
-    elif j["kind"] in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124)
+    elif j["kind"] in PROP_AST:  # 2.126.1 A (#2123 #2124)
         from ..agents.asstprop import ast_undo
         n, skipped = ast_undo(c, j, rec, back=False)
     elif j["kind"] in ("triage", "dayplan"):
@@ -1200,7 +1201,7 @@ def v1_agent_job_proposal(jid):
     if j["kind"] == "rule":  # 2.71.0 A (#1457)
         from ..api.scopes import need_scope
         need_scope("structure")
-    if j["kind"] in ("office_text", "doc_summary", "report", "receipt_read"):  # 2.126.1 A (#2123 #2124): the office switches still on / the list still shared
+    if j["kind"] in PROP_AST:  # 2.126.1 A (#2123 #2124): the office switches still on / the list still shared
         from ..agents.asstprop import ast_need_agent
         ast_need_agent(c, j, aid)
     if j["kind"] == "ideas":  # 2.156.0 A (#1201): the list still shared, nothing taken over yet

@@ -25,6 +25,7 @@ INTEG_TEXT = {
     "git": N_("Git connection {0} cannot fetch, failing since {1}."),
     "ntfy": N_("ntfy inbox {0} cannot fetch, failing since {1}."),
     "backup": N_("Backup failed: {0}"),
+    "payonline": N_("An online payment on invoice {0} could not be booked: {1}"),  # 2.469.0 (#3459)
 }
 
 
