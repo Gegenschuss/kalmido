@@ -353,6 +353,16 @@ function fl_nameEnd(id) {
   clearTimeout(fl_liveRaf); renderSide(); renderTop();
 }
 const lp_fieldName = f => tr({name: N_('Name'), color: N_('Colour'), folder: N_('Folder'), view: N_('View'), kind: N_('Type'), checklist: N_('Show completed at the bottom'), dep_shift: N_('Move dependent tasks along'), rate: N_('Hourly rate'), archived: N_('Archived')}[f] || f);
+// 2.474.0 (#3917): the writes of one list go out one after the other: a second quick choice on a slow connection could overtake
+// the first on the server, and the older value stayed while the screen showed the newer one
+const LP_TAIL = new Map();
+function lpSend(id, body) {
+  const p = (LP_TAIL.get(id) || Promise.resolve()).catch(() => {}).then(() => api('PATCH', '/api/lists/' + id, body));
+  LP_TAIL.set(id, p);
+  const end = () => { if (LP_TAIL.get(id) === p) LP_TAIL.delete(id); };
+  p.then(end, end);
+  return p;
+}
 async function listPatch(id, body, label, o = {}) {
   const l = listById(id); if (!l) return false;
   const ws0 = l.org_id || null;  // 2.53.0 (#1474)
@@ -373,7 +383,7 @@ async function listPatch(id, body, label, o = {}) {
       const back = optSet(() => listById(id), vals)();
       if (!e && Object.keys(before).length) { e = histAdd({label: label || tr('Settings of {0}', qn(lname(l))), undo: go(before, after), redo: go(after, before), post: o.post}); o.step?.(e); }
       return back;
-    }, () => api('PATCH', '/api/lists/' + id, body));
+    }, () => lpSend(id, body));
   } catch {
     if (e) { HIST.undo = HIST.undo.filter(x => x !== e); renderHist(); }
     run(); return false;

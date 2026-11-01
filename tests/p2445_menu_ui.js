@@ -77,6 +77,17 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
   check(d.querySelectorAll('#pop .mdone3').length === 1 && !labels().includes('Show completed at the bottom'), 'sort menu: the same switch ' + labels().join('|'));
   w.eval('closePop()');
 
+  // 2.474.0 (#3917): two quick writes of one list: the second waits for the first, so the newer value stays on the server
+  // (the "plain entry" check below went red when the older "Bottom" overtook and stayed on)
+  w.eval(`window.__lp = {n: 0, go: null}; { const f = window.fetch; window.fetch = (u, o) => { if (o?.method === 'PATCH' && /\\/api\\/lists\\/${P}$/.test(String(u))) { const k = ++window.__lp.n; if (k === 1) return new Promise(r => { window.__lp.go = () => r(f(u, o)); }); } return f(u, o); }; }`);
+  w.eval(`window.__lpa = listPatch(${P}, {checklist: true}); window.__lpb = listPatch(${P}, {checklist: false}); Promise.all([window.__lpa, window.__lpb]).then(() => { window.__lp.done = true; });`);
+  check(await until(() => w.eval('!!window.__lp.go')), 'order: the first write is under way');
+  check(w.eval('!listById(' + P + ').checklist && window.__lp.n === 1'), 'order: the second write waits for the first ' + w.eval('window.__lp.n'));
+  w.eval('window.__lp.go()');
+  check(await until(() => w.eval('!!window.__lp.done && window.__lp.n === 2')), 'order: both writes went out');
+  const ol = (await call(CK, 'GET', '/api/state')).lists?.find(x => x.id === P);
+  check(ol && !ol.checklist, 'order: the newer value stays on the server ' + ol?.checklist);
+
   // ================= not doubled to the header
   if (w.eval(`!!document.querySelector('#top [data-act="share-list"]') && topLevel() < 3`)) check(!/Share…/.test(flat()), 'project menu: Share… only in the header ' + flat());
   w.close();
