@@ -4157,6 +4157,9 @@ MIGRATIONS = [
     # 2.480.0 C (#3528): the depreciation chosen per device: auto (= linear, as before) | linear | declining (only for a
     # purchase from 01.07.2025 to 31.12.2027, office/assets.py). Older versions ignore it
     ("office_equipment", "afa_method", "ALTER TABLE office_equipment ADD COLUMN IF NOT EXISTS afa_method TEXT NOT NULL DEFAULT 'auto'"),
+    # 2.480.0 (#3944, F8): hosted: the operator who made this account (user admin), until its first sign-in (start_session
+    # clears it); such an account is still the operator's (accounts/orgs.py op_foreign_account). Older versions ignore it
+    ("users", "op_made_by", "ALTER TABLE users ADD COLUMN IF NOT EXISTS op_made_by BIGINT"),
 ]
 # 2.34.0 review (M4): activity_created / activity_user / comments_user / comments_created serve the briefing ("new since")
 # and the time gaps (what a person worked on); new indexes only, 2.33 runs on with them.

@@ -2239,10 +2239,19 @@ def backups_verify(name):
                    missing_files=man.get("missing_files") or 0, missing_paths=man.get("missing_paths") or [])  # 2.273.0 A (#3050)
 
 
+def bk_no_upload_hosted():
+    """2.480.0 (#3944, F6): hosted -> an archive from outside is neither taken nor restored: a self-made archive would replace
+    every client's password hash and content. Restoring goes only from the server's own backups (and its offsite copy)."""
+    from .hosting import hosted
+    if hosted():
+        raise Denied(403, tr("On a hosted instance no archive is uploaded: restoring goes only from the server's own backups"))
+
+
 @app.post("/api/admin/backups/upload")
 def backups_upload():
     """An archive to restore from (raw request body). Kept for an hour in .uploads/; returns its id + summary."""
     need_backups()
+    bk_no_upload_hosted()
     request.max_content_length = BK_MAX_BYTES
     os.makedirs(os.path.join(BK_DIR, ".uploads"), mode=0o700, exist_ok=True)
     bk_uploads_gc()
@@ -2294,6 +2303,8 @@ def backups_restore():
     """{name | upload, confirm: "RESTORE", passphrase?}"""
     need_backups()
     c, b = db(), body()
+    if b.get("upload"):
+        bk_no_upload_hosted()  # 2.480.0 (#3944, F6)
     if b.get("confirm") != BK_CONFIRM:
         return err(BK_ERR_TEXT("confirm", BK_CONFIRM))
     from .offsite import stepup_need

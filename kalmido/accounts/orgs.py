@@ -755,7 +755,7 @@ def op_foreign_org(c, oid):
 
 def op_foreign_account(c, uid):
     """2.399.0 (#2687): hosted and account uid belongs to a customer: not the current person, no account of an organisation the
-    current person administers. An agent follows its owner (a personal one: only one's own) or its organisation; a server agent
+    current person administers, 2.480.0 (#3944, F8): no account the current person made that never signed in (users.op_made_by). An agent follows its owner (a personal one: only one's own) or its organisation; a server agent
     without both belongs to the operator."""
     if not _operator_apart() or uid == me():
         return False
@@ -765,6 +765,8 @@ def op_foreign_account(c, uid):
             if a["owner_id"]:
                 return a["owner_id"] != me()
             return bool(a["org_id"]) and op_foreign_org(c, a["org_id"])
+        if c.execute("SELECT 1 FROM users WHERE id=? AND op_made_by=?", (uid, me())).fetchone():
+            return False  # 2.480.0 (#3944, F8): an account the operator made itself that never signed in (family, a kid)
         return not c.execute("SELECT 1 FROM org_members a JOIN org_members b ON b.org_id=a.org_id JOIN orgs o ON o.id=a.org_id "
                              "WHERE a.user_id=? AND a.role='admin' AND b.user_id=? AND o.retired_at IS NULL LIMIT 1",
                              (me(), uid)).fetchone()  # review F7: a retired organisation grants nothing
@@ -848,17 +850,19 @@ def oa_boundary_repair():
     """2.46.0 (#1563): the button "Clean up" of the boundary check: takes out the memberships of people (not agents) in an
     organisation's lists / calendars / address books that are not members of the organisation (tenancy.boundary_repair)."""
     _need_admin()
-    from ..accounts.tenancy import boundary_repair, boundary_summary
+    from ..accounts.tenancy import boundary_repair, boundary_summary, rp_foreign
     c = db()
-    with system_ctx(c):
-        done = boundary_repair(c)
+    with system_ctx(c):  # 2.480.0 (#3944, F5): hosted: only the operator's own organisations, a client's rows are only counted
+        done = boundary_repair(c, keep=(lambda k, a, b: rp_foreign(c, k, a, b)) if _operator_apart() else None)
+        kept = done.pop("_kept", {})
         if done:
             bump(c)
     c.commit()
     n = sum(len(v) for v in done.values())
     if n:
         print(f"boundary check (#1563): {n} memberships across the workspace boundary removed by an admin", flush=True)
-    return jsonify(removed=n, kinds={k: len(v) for k, v in done.items()}, boundary=boundary_summary(c, g.user["id"]))  # 2.122.4 A (#1724)
+    return jsonify(removed=n, kinds={k: len(v) for k, v in done.items()}, kept=sum(kept.values()),
+                   boundary=boundary_summary(c, g.user["id"]))  # 2.122.4 A (#1724)
 
 
 def _no_change():

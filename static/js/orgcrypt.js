@@ -150,7 +150,9 @@ document.addEventListener('click', async e => {
   const md = b.closest('.modal') || document;
   if (!await askConfirm(tr('Clean up the boundary?'), tr('Takes people out of the projects, calendars and address books of an organisation they do not belong to. Agents stay as they are. This cannot be undone here.'), {ok: tr('Clean up'), danger: true})) return;
   let j; try { j = await api('POST', '/api/admin/orgs/boundary/repair', {}); } catch { return; /* api() said it */ }
-  toast(j.removed ? trn('{0} membership removed', '{0} memberships removed', j.removed) : tr('Nothing to clean up'));
+  toast([j.removed ? trn('{0} membership removed', '{0} memberships removed', j.removed) : (j.kept ? '' : tr('Nothing to clean up')),
+    // 2.480.0 (#3944, F5): hosted: rows of a client's organisation are only counted
+    j.kept ? trn('{0} finding in a client’s organisation stays: only its admins clean it up', '{0} findings in clients’ organisations stay: only their admins clean them up', j.kept) : ''].filter(Boolean).join(' · '));
   if (typeof orgsDraw === 'function') orgsDraw(md);
 });
 // ---- 2.223.2 C (#2871): the same step-up before other sensitive steps (orgcrypt.py stepup_need): the off-site target of

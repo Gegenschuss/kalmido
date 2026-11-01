@@ -335,28 +335,67 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Organisation > People")
 
 
-def boundary_repair(c):
+# 2.480.0 (#3944, F5): the organisation of a repaired row by kind -> SQL on the object id (None: the object id IS the
+# organisation's id); a row without one is private: it belongs to the person in its second column (client_contact, hub_mail_ref)
+RP_ORG = {"list_person": "SELECT org_id FROM lists WHERE id=?", "group": "SELECT org_id FROM lists WHERE id=?",
+          "assistant_person": "SELECT org_id FROM lists WHERE id=?", "cal_person": "SELECT org_id FROM ev_cals WHERE id=?",
+          "book_person": "SELECT org_id FROM books WHERE id=?", "file_person": "SELECT org_id FROM fs_nodes WHERE id=?",
+          "att_person": "SELECT k.org_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?",
+          "task_bell_person": "SELECT l.org_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?",
+          "sheet_share_person": "SELECT org_id FROM sheets WHERE id=?", "tchat_person": "SELECT org_id FROM tchat_rooms WHERE id=?",
+          "doc_mail_person": None, "hub_token_person": None,
+          "client_contact": "SELECT org_id FROM clients WHERE id=?", "hub_mail_ref": "SELECT org_id FROM hub_mails WHERE id=?"}
+
+
+def rp_foreign(c, kind, oid_, uid):
+    """2.480.0 (#3944, F5): hosted -> is the row (kind, object id, person) of a client (an organisation the operator does not
+    administer, or a client's private object)? The operator's button then only counts it. Self-hosted: never."""
+    from .orgs import _operator_apart, op_foreign_account, op_foreign_org
+    if not _operator_apart():
+        return False
+    sql = RP_ORG.get(kind)
+    if sql is None and kind in RP_ORG:
+        org = oid_
+    else:
+        r = c.execute(sql, (oid_,)).fetchone() if sql else None
+        org = r[0] if r else None
+    return op_foreign_org(c, org) if org else op_foreign_account(c, uid)
+
+
+def boundary_repair(c, keep=None):
     """Takes out every membership in an organisation's list / calendar / address book of a person who is not a member of
     that organisation. {kind: [[object id, user id], ...]} of what was removed; the
-    caller commits."""
-    out = {}
-    ckl = c.execute(CHECKS["client_contact"] + " ORDER BY 1, 2").fetchall()  # 2.59.0 A (#1735): also without workspaces (freelancers)
+    caller commits. 2.480.0 (#3944, F5): keep(kind, object id, user id) -> True leaves that row as it is (counted only);
+    the rows kept are in out["_kept"] ({kind: n})."""
+    out, kept = {}, {}
+    def skip(k, a, b):
+        if keep and keep(k, a, b):
+            kept[k] = kept.get(k, 0) + 1
+            return True
+        return False
+    ckl = [r for r in c.execute(CHECKS["client_contact"] + " ORDER BY 1, 2").fetchall()  # 2.59.0 A (#1735): also without workspaces (freelancers)
+           if not skip("client_contact", r[0], r[1])]
     for cid, _ in ckl:
         c.execute("UPDATE office_client_contacts k SET contact_id=NULL FROM contacts ct, books b, clients cl WHERE k.client_id=? "
                   "AND cl.id=k.client_id AND ct.id=k.contact_id AND b.id=ct.book_id AND " + CHECKS["client_contact"].split(" WHERE ", 1)[1], (cid,))
     if ckl:
         out["client_contact"] = [[r[0], r[1]] for r in ckl]
-    hbm = c.execute(CHECKS["hub_mail_ref"] + " ORDER BY 1, 2").fetchall()  # 2.84.0 A (#1198): also without workspaces (private <-> org)
+    hbm = [r for r in c.execute(CHECKS["hub_mail_ref"] + " ORDER BY 1, 2").fetchall()  # 2.84.0 A (#1198): also without workspaces (private <-> org)
+           if not skip("hub_mail_ref", r[0], r[1])]
     for mid, _ in hbm:
         c.execute("UPDATE hub_mails SET client_id=NULL, list_id=NULL WHERE id=?", (mid,))
     if hbm:
         out["hub_mail_ref"] = [[r[0], r[1]] for r in hbm]
     if not has_workspaces(c):
+        if kept:
+            out["_kept"] = kept
         return out
     for k, (table, col) in REPAIR.items():
         rows = c.execute(CHECKS[k] + " ORDER BY 1, 2").fetchall()
         done = []
         for oid_, uid in rows:
+            if skip(k, oid_, uid):
+                continue
             c.execute(f"DELETE FROM {table} WHERE {col}=? AND user_id=?", (oid_, uid))
             if table == "list_members":
                 c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (oid_, uid))
@@ -365,6 +404,8 @@ def boundary_repair(c):
             done.append([oid_, uid])
         if done:
             out[k] = done
+    if kept:
+        out["_kept"] = kept
     return out
 
 

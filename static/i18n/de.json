@@ -15827,5 +15827,7 @@
   "declining, up to 30 %": "degressiv, bis 30 %",
   "For purchases from July 2025 to December 2027. No tax advice.": "Für Käufe von Juli 2025 bis Dezember 2027. Keine Steuerberatung.",
   "Declining depreciation at {0} %, linear from the year it gives more": "Degressive Abschreibung mit {0} %, linear ab dem Jahr, in dem das mehr ergibt",
-  "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "Degressive Abschreibung ist nur für Käufe vom 1. Juli 2025 bis 31. Dezember 2027 möglich."
+  "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "Degressive Abschreibung ist nur für Käufe vom 1. Juli 2025 bis 31. Dezember 2027 möglich.",
+  "On a hosted instance no archive is uploaded: restoring goes only from the server's own backups": "Auf einer gehosteten Instanz wird kein Archiv hochgeladen: Zurückgesichert wird nur aus den eigenen Sicherungen des Servers",
+  "{0} finding in a client’s organisation stays: only its admins clean it up": ["{0} Fund in der Organisation eines Kunden bleibt: Nur ihre Admins bereinigen ihn", "{0} Funde in Organisationen von Kunden bleiben: Nur deren Admins bereinigen sie"]
 }

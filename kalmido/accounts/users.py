@@ -211,12 +211,14 @@ def user_create():
     orgs = om_orgs_arg(c, b)  # 2.46.0 (#1561): checked before the account exists
     if isinstance(orgs, str):
         return err(orgs)
-    from ..accounts.orgs import op_apart_deny, op_foreign_org
+    from ..accounts.orgs import _operator_apart, op_apart_deny, op_foreign_org
     if any(op_foreign_org(c, o) for o, _role in orgs):  # 2.399.0 (#2687): hosted: nobody new in a customer's organisation by the operator
         op_apart_deny()
     uid = create_user(c, username, (b.get("display_name") or "").strip()[:60] or username, pw or None, proxy,
                       bool(b.get("is_admin")), ntfy_topic=topic or None, onboard=True,
                       ask_purpose=None if b.get("kid") is True else me() if orgs else 0)  # 2.364.0 A (#3032)
+    if _operator_apart():  # 2.480.0 (#3944, F8): hosted: the operator's own account until it signs in (orgs.op_foreign_account)
+        c.execute("UPDATE users SET op_made_by=? WHERE id=?", (me(), uid))
     email = str(b.get("email") or "").strip()[:200]
     if email and not EMAIL_RE.fullmatch(email):
         c.rollback()

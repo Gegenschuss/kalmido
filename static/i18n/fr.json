@@ -15827,5 +15827,7 @@
   "declining, up to 30 %": "dégressif, jusqu'à 30 %",
   "For purchases from July 2025 to December 2027. No tax advice.": "Pour les achats de juillet 2025 à décembre 2027. Pas de conseil fiscal.",
   "Declining depreciation at {0} %, linear from the year it gives more": "Amortissement dégressif à {0} %, linéaire à partir de l'année où il donne plus",
-  "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "L'amortissement dégressif n'est possible que pour un achat du 1er juillet 2025 au 31 décembre 2027."
+  "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "L'amortissement dégressif n'est possible que pour un achat du 1er juillet 2025 au 31 décembre 2027.",
+  "On a hosted instance no archive is uploaded: restoring goes only from the server's own backups": "Sur une instance hébergée, aucune archive n'est téléversée : la restauration se fait uniquement depuis les sauvegardes du serveur",
+  "{0} finding in a client’s organisation stays: only its admins clean it up": ["{0} constat dans l'organisation d'un client reste : seuls ses admins le corrigent", "{0} constats dans des organisations de clients restent : seuls leurs admins les corrigent"]
 }

@@ -230,4 +230,47 @@ check(A.patch(B + f"/api/admin/orgs/{FO}", json={"members_add": [1]}).status_cod
 check(Fr.patch(B + f"/api/admin/orgs/{CO}", json={"name": "x"}).status_code == 403, "freelancer (no instance admin): 403 as before")
 check(Fr.post(B + "/api/lists", json={"name": "Portfolio", "org_id": None}).ok, "freelancer: her private workspace works as before")
 
+# ================================================================ 2.480.0 (#3944): the small findings of the rights review
+# ---- F4: the delete dialog of a client's account: numbers only, nobody to hand its projects to
+r = A.get(B + f"/api/users/{uid['pia']}/delete-info")
+j = r.json() if r.ok else {}
+check(r.ok and j.get("candidates") == [] and "office" not in j.get("purge", {}) and "office_counts" not in j.get("purge", {})
+      and all(x.get("members") == [] for x in j.get("lists", [])), f"#3944 F4: delete-info of a client's account without people / office details {r.text[:200]}")
+ops = kt.dbx("SELECT id FROM users WHERE username='opsmate'")[0][0]
+r = A.get(B + f"/api/users/{ops}/delete-info")
+check(r.ok and "office" in r.json().get("purge", {}), "#3944 F4: an account of the operator's own organisation keeps the full details " + r.text[:160])
+
+# ---- F5: the boundary clean-up takes out a stray membership in the own organisation, a client's only counts
+AL = A.post(B + "/api/lists", json={"name": "Ops plans", "org_id": ALPHA}).json()["id"]
+for lid, who in ((CL, uid["pia"]), (AL, FID)):
+    dbw("INSERT INTO list_members(list_id,user_id,role,added_at) VALUES(?,?,'edit','2030-01-01T00:00:00Z') ON CONFLICT DO NOTHING", (lid, who))
+r = A.post(B + "/api/admin/orgs/boundary/repair", json={})
+check(r.ok and r.json().get("kept", 0) >= 1 and kt.dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (CL, uid["pia"]))
+      and not kt.dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (AL, FID)),
+      "#3944 F5: hosted: the clean-up repairs the own organisation, a client's finding stays (counted) " + r.text[:160])
+dbw("DELETE FROM list_members WHERE list_id=? AND user_id=?", (CL, uid["pia"]))
+
+# ---- F6: no archive from outside on a hosted instance (it would replace every client's password hash)
+r = A.post(B + "/api/admin/backups/upload", data=b"PK\x03\x04not-a-real-archive", headers={"Content-Type": "application/octet-stream"})
+check(r.status_code == 403 and "no archive is uploaded" in r.text, "#3944 F6: hosted: uploading an archive is refused " + r.text[:160])
+r = A.post(B + "/api/admin/backups/restore", json={"upload": "upload-" + "ab" * 12, "confirm": "RESTORE"})
+check(r.status_code == 403 and "no archive is uploaded" in r.text, "#3944 F6: hosted: no restore from an uploaded archive " + r.text[:160])
+
+# ---- F8: an account the operator made itself (family, no organisation) stays its own until it signs in
+r = A.post(B + "/api/users", json={"username": "famkid", "display_name": "Fam", "password": "password123"})
+assert r.ok, r.text
+FAM = r.json()["id"]
+r = A.post(B + "/api/users", json={"username": "famnew", "display_name": "Fam new", "invite": True, "send": False})
+assert r.ok, r.text
+r2 = A.post(B + f"/api/users/{r.json()['id']}/invite", json={"send": False})
+check(r2.ok and r2.json().get("link"), "#3944 F8: hosted: a new invitation link for an account the operator made, never signed in " + r2.text[:120])
+r = A.post(B + f"/api/users/{FAM}/signin-link")
+check(r.ok and r.json().get("link"), "#3944 F8: hosted: a sign-in link for an own account that never signed in " + r.text[:120])
+users = {u["id"]: u for u in A.get(B + "/api/users?all=1").json()["users"]}
+check(not users[FAM].get("apart"), "#3944 F8: ... not marked as a client's account")
+assert login(B, "famkid").get(B + "/api/state").ok
+r = A.post(B + f"/api/users/{FAM}/signin-link")
+check(r.status_code in (403, 404) and "link" not in r.text and kt.dbx("SELECT op_made_by FROM users WHERE id=?", (FAM,)) == [(None,)],
+      "#3944 F8: once signed in it is the client's own: no sign-in link any more " + r.text[:120])
+
 sys.exit(kt.done("p2399_hosting_apart"))

@@ -553,6 +553,7 @@ def start_session(c, uid, remember, via="password"):
     c.execute("INSERT INTO sessions(token_hash,user_id,created_at,expires_at,via,last_seen_at,user_agent) VALUES(?,?,?,?,?,?,?)",
               (_token_hash(tok), uid, iso(now_utc()), iso(now_utc() + timedelta(days=days)), via, iso(now_utc()),
                ses_ua() if has_request_context() else ""))
+    c.execute("UPDATE users SET op_made_by=NULL WHERE id=? AND op_made_by IS NOT NULL", (uid,))  # 2.480.0 (#3944, F8): signed in = the client's own
     from ..admin.clientip import login_seen
     login_seen(c, uid)  # 2.33.0 (#834): many accounts from one private address = the proxy hides the client addresses
     _shs_signin(c, c.execute("SELECT id, email, email_proved, kind FROM users WHERE id=?", (uid,)).fetchone())

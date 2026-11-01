@@ -321,10 +321,15 @@ def ua8_delete_info(uid):
     ret["needed_along"] = rx_user_info(c, uid, along=True)["needed"]  # ... also when the lists (with receipts) go along
     from .orgretain import upg_info
     purge = upg_info(c, uid)  # 2.152.0 A (#2164): personal office (deleted / kept by law until), agents, calendars, time, DMs
-    if by != "instance":  # an organisation admin: nothing about the person's private office (privat bleibt privat)
+    foreign = by == "instance" and op_foreign_account(c, uid)  # 2.480.0 (#3944, F4): hosted: a client's account
+    if by != "instance" or foreign:  # an organisation admin: nothing about the person's private office (privat bleibt privat)
         purge = {k: v for k, v in purge.items() if k in ("calendars", "time_kept", "sheets_kept", "agents", "dms", "no_heir")}
+    info = ua8_list_info(c, lists, by)
+    if foreign:  # 2.480.0 (#3944, F4): the operator sees numbers only -- no names of the people the lists are shared with
+        info = [dict(x, members=[]) for x in info]
     return jsonify(**base, can_delete=True, by="instance" if by == "instance" else "org", org_id=None if by == "instance" else by,
-                   username=u["username"], lists=ua8_list_info(c, lists, by), candidates=ua8_candidates(c, lists, uid) if lists else [],
+                   username=u["username"], lists=info,
+                   candidates=ua8_candidates(c, lists, uid) if lists and not foreign else [],  # 2.480.0 (#3944, F4): hosted: none for a client
                    retention=ret,
                    purge=purge)
 
