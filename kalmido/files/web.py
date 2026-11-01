@@ -423,6 +423,36 @@ def files_content(nid):
     return _send(c, n, request.args.get("v", type=int))
 
 
+FS_THUMB_MAX = 40 << 20  # 2.477.0 (#3936): a bigger picture gets no small preview (the card shows its icon)
+
+
+@app.get("/api/files/nodes/<int:nid>/thumb")
+def files_thumb(nid):
+    """2.477.0 (#3936): a small JPEG of a picture file for the cards of the file store (instead of the original; ?v= the
+    version: cached by the browser). Made on request, never stored (a private file's preview would lie unsealed on disk).
+    404: no picture, a locked folder (ciphertext), too big or unreadable -- the card then shows the icon."""
+    c = db()
+    n = need_node(c, nid)
+    if n["kind"] != "file" or not str(n["mime"] or "").startswith("image/"):
+        raise Denied(404)
+    from .fslock import fl_is_locked
+    if fl_is_locked(c, nid):
+        raise Denied(404)
+    v = fs_version_row(c, nid)
+    if not v or (v["size"] or 0) > FS_THUMB_MAX:
+        raise Denied(404)
+    from .scan import sc_guard
+    sc_guard(c, "fs", nid, v["no"])
+    from ..docs.ocr import thumb_bytes
+    jpg = thumb_bytes(fs_read(c, nid, v["no"]), "image")
+    if not jpg:
+        raise Denied(404)
+    r = Response(jpg, mimetype="image/jpeg")
+    r.headers["Cache-Control"] = "private, max-age=86400" if request.args.get("v") else "private, no-cache"
+    r.headers["X-Content-Type-Options"] = "nosniff"
+    return r
+
+
 @app.post("/api/files/nodes/<int:nid>/versions")
 def files_version_upload(nid):
     """multipart file: a new version of the file (keeps its name)."""

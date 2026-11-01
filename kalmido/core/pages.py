@@ -59,7 +59,10 @@ def headers(resp):
     # 2.29.0 (#1026): never indexed unless the operator allows it; public list links, forms and feeds never
     if not SEARCH_INDEX or request.path.startswith((PUB_PREFIX, ICAL_PREFIX, "/f/", "/api/", "/dav")):
         resp.headers["X-Robots-Tag"] = "noindex, nofollow"
-    if request.path.startswith("/api/") and not request.path.startswith(("/api/attachments/", "/api/chat-files/", "/api/avatar/", "/api/group-avatar/", "/api/list-icon/", "/api/list-files/", "/api/list-header/")):
+    if request.path.startswith("/api/") and not request.path.startswith(("/api/attachments/", "/api/chat-files/", "/api/avatar/", "/api/group-avatar/", "/api/list-icon/", "/api/list-files/", "/api/list-header/")) \
+            and not (request.path.endswith("/thumb") and request.args.get("v")
+                     and resp.headers.get("Cache-Control", "").startswith("private, max-age")):
+        # 2.477.0 (#3936): the small previews of the cards (files / documents ?v=<version>) stay in the browser's cache
         resp.headers["Cache-Control"] = "no-store"
     # 2.149.0 B (#2505): a static file asked for with ?v=<its content hash> never changes: the browser keeps it a year without
     # asking again. Any other ?v= (the version of the code, an old hash after an update) and no ?v= stay as before.

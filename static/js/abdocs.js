@@ -20,7 +20,7 @@ async function abd_setCards(key, on) {
   const ks = abd_cardKeys().filter(k => k !== key);
   if (on) ks.push(key);
   if (S.settings) S.settings.ab_cards = JSON.stringify(ks);
-  AB.key = ''; ab_load();
+  ab_draw();  // 2.477.0 (#3936): the loaded entries drawn again at once (no new load; the cards fetch the documents' fields themselves when needed)
   try { await api('PATCH', '/api/settings', {set_delta: {ab_cards: on ? {add: [key]} : {remove: [key]}}}); } catch { /* shown; the local choice holds until the next load */ }
 }
 function abd_toolsHtml(d, key) {
@@ -32,12 +32,15 @@ function abd_toolsHtml(d, key) {
 function abd_card(n) {
   const menuBtn = `<span class="abcmenu"><button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots', 's')}</button></span>`;  // in a span: .dc-card>button is the tile
   if (n.doc?.id && !abd_locked(n) && typeof dc_card === 'function') return dc_card(n.doc).replace(/<\/li>$/, menuBtn + '</li>');
-  const img = n.kind === 'file' && !abd_locked(n) && ab_isImg(n) && !upLocked(n) ? `<img src="${esc(ab_url(n))}" alt="" loading="lazy">` : '';
+  const img = n.kind === 'file' && !abd_locked(n) && ab_isImg(n) && !upLocked(n) ? `<img src="${esc(abd_thumbUrl(n))}" alt="" loading="lazy">` : '';
   const meta = abd_locked(n) ? '' : [n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(n.updated_at)].filter(Boolean).join(' · ');
   return `<li class="dc-card abcf"><button type="button" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''} aria-label="${esc(n.name)}"><span class="dc-th">${img || `<span class="dc-ph">${ab_icon(n)}</span>`}</span><span class="dc-ct"><b class="dc-nm">${esc(n.name)}</b>${meta ? `<span class="dc-mt">${esc(meta)}</span>` : ''}</span></button>${menuBtn}</li>`;
 }
+// 2.477.0 (#3936): a picture card shows the server's small preview, never the original (the version keeps the browser's copy fresh)
+const abd_thumbUrl = n => `/api/files/nodes/${n.id}/thumb?v=${encodeURIComponent(n.version || 1)}`;
 function abd_cardsHtml(d) {
-  if (!AB.dq && !AB.loading) { AB.key = ''; setTimeout(ab_load, 0); }  // loaded as a list before this file was there: again with the documents' fields
+  // loaded as a list: the cards draw at once, only documents among the entries need their fields (fetched behind, the cards stay)
+  if (!AB.dq && !AB.loading && d.items.some(n => n.doc && !n.doc.id)) { AB.key = ''; setTimeout(ab_load, 0); }  // 2.477.0 (#3936)
   return abd_cardsHtml2(d);
 }
 const abd_cardsHtml2 = d => `<ul class="dc-grid abcards" aria-label="${esc(tr('Files'))}">${d.items.map(abd_card).join('')}</ul>`;
@@ -105,3 +108,9 @@ document.addEventListener('click', e => {
   const r = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-abdr]'));
   if (r) { const n = AB.data?.node; if (n && n.id === +r.dataset.abdr) abd_recogMenu(n, r); }
 });
+// 2.477.0 (#3936): a picture card whose small preview cannot be made (too big, unreadable) shows the picture icon, no broken image
+document.addEventListener('error', e => {
+  const img = /** @type {HTMLElement} */ (e.target);
+  if (img?.tagName !== 'IMG' || !img.closest?.('.abcf .dc-th')) return;
+  img.outerHTML = `<span class="dc-ph">${ic('picture')}</span>`;
+}, true);

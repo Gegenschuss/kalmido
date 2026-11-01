@@ -1081,6 +1081,7 @@ ROUTES = {
     "GET /api/files/collections/{}": "file",  # 2.429.0 (#3580): "From <area>", the boundary tested in p2429_a_ablage_view_test.py (another space 404, another person's files none)
     "GET /api/files/search": "file", "GET /api/v1/files/search": "file",  # 2.61.0 (#1820): names + recognised text, the boundary tested in p261_c_api_test.py
     "GET /api/files/nodes/{}": "file", "GET /api/files/nodes/{}/content": "file",
+    "GET /api/files/nodes/{}/thumb": "file",  # 2.477.0 (#3936): p2477_ablagethumb_test.py: another person 404
     "GET /api/files/nodes/{}/share-targets": "file", "GET /api/paperless": "paperless",
     "GET /api/paperless/preview": "paperless", "GET /api/v1/files": "file", "GET /api/v1/files/{}": "file",
     "GET /api/v1/files/{}/content": "file", "GET /api/v1/files/{}/text": "file", "GET /api/v1/receipt-suggestions": "receipt",

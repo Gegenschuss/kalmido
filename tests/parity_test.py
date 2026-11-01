@@ -352,6 +352,8 @@ APP_ONLY = [
      "people on purpose -- agents never make, list or revoke them",
      ("=POST /api/files/trash", "=POST /api/files/restore", "=GET /api/files/zip", "=POST /api/files/scan",
       "=GET /api/files/nodes/{}/ext-links", "=POST /api/files/nodes/{}/ext-links", "* /api/files/ext-links/")),
+    ("2.477.0 (#3936): the small preview of a picture is the cards' image in the browser; agents read the file itself (/files/{}/content)",
+     ("=GET /api/files/nodes/{}/thumb",)),
     ("2.48.0 (#1111): documents -- a person's own steps (upload by hand / share sheet, review and accept, recognise again, the "
      "preview image, a task for the due date, the workspace's levels / rules / labels / mail address); agents read and set fields "
      "with /documents and add files with /files; 2.122.0 (#2098): create_document; (#2100) the CSV of chosen documents is a person's download", ("=POST /api/docs", "=POST /api/docs/export.csv", "=POST /api/docs/{}/accept", "=POST /api/docs/{}/review",

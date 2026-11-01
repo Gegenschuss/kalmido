@@ -242,6 +242,7 @@ ROUTES = {
     "GET /api/docs/{}/receipt": "files", "GET /api/docs/{}/thumb": "files", "GET /api/files": "files",
     "GET /api/files/collections/{}": "files",  # 2.429.0 (#3580)
     "GET /api/files/folders": "files", "GET /api/files/nodes/{}": "files", "GET /api/files/nodes/{}/content": "files",
+    "GET /api/files/nodes/{}/thumb": "files",  # 2.477.0 (#3936): p2477_ablagethumb_test.py without an organisation
     "GET /api/files/nodes/{}/share-targets": "files", "GET /api/files/search": "files", "GET /api/v1/documents": "files",
     "GET /api/v1/documents/{}": "files", "GET /api/v1/files": "files", "GET /api/v1/files/search": "files",
     "GET /api/v1/files/{}": "files", "GET /api/v1/files/{}/content": "files", "GET /api/v1/files/{}/text": "files",
