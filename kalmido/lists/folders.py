@@ -108,8 +108,8 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
     from ..accounts.orgs import clean_org_id, list_org, list_space_follow, ws_member_problem
     from ..collab.reactions import list_tidy_update
     from ..lists.lists import list_agent_set
-    lr = c.execute("SELECT id, owner_id, folder, is_inbox, family, life, archived FROM lists WHERE id=?", (lid,)).fetchone()
-    if not lr or lr["is_inbox"] or lr["owner_id"] != uid:
+    lr = c.execute("SELECT id, owner_id, folder, is_inbox, family, life, archived, quicknote FROM lists WHERE id=?", (lid,)).fetchone()
+    if not lr or lr["is_inbox"] or lr["quicknote"] or lr["owner_id"] != uid:  # 2.477.0 (#3881, review F1): + the list Notes
         return [], 0
     eff, _ = folder_effective(c, lr["owner_id"], lr["folder"] or "")
     own = set() if force else set(list_own(c, lid))
@@ -234,7 +234,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
 
 def folder_lists(c, owner, folder):
     from ..lists.lists import folder_under
-    return [r for r in c.execute("SELECT id, name, folder FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 ORDER BY sort, id", (owner,))
+    return [r for r in c.execute("SELECT id, name, folder FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND quicknote=0 ORDER BY sort, id", (owner,))
             if folder_under(r["folder"] or "", folder)]
 
 

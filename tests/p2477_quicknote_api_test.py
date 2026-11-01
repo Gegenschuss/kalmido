@@ -133,4 +133,22 @@ Bo = sess("bob")
 assert Bo.patch(B + f"/api/notes/{N1}", json={"body": ""}).ok
 check(Bo.delete(B + f"/api/notes/{N1}?empty=1").status_code == 409 and A.get(B + f"/api/notes/{N1}").ok, "an empty note of somebody else is never purged that way")
 
+# ================= review F1: the tree of the lists -- the list Notes dragged into a folder there stays out of it
+N4 = A.post(B + f"/api/lists/{Q}/notes", json={"body": "Stays private"}).json()["id"]
+TL = A.post(B + "/api/lists", json={"name": "Garden plan", "folder": "Garden", "org_id": None}).json()["id"]
+sps = A.get(B + "/api/lists/tree").json()["spaces"]
+qx = next((x for sp in sps for x in sp["lists"] if x["list_id"] == Q), None)
+gf = next((f["id"] for sp in sps if sp["org_id"] is None for f in sp["folders"] if f["path"] == "Garden" and f["mine"]), None)
+if qx and gf:
+    A.post(B + "/api/lists/tree/move", json={"node_id": qx["node_id"], "parent_id": gf})
+    check((lst(A, Q).get("folder") or "") == "", f"tree: the list Notes moved to a folder keeps no folder {lst(A, Q).get('folder')}")
+    A.put(B + "/api/folders/public-links", json={"folder": "Garden", "on": True})
+    pl = A.get(B + "/api/folders/public-links", params={"folder": "Garden"}).json().get("lists", [])
+    check(all(x["id"] != Q for x in pl) and any(x["id"] == TL for x in pl), f"tree: links for all lists of the folder leave the list Notes out {pl}")
+else:
+    check(qx is None, f"tree: the list Notes has no node to drag {qx} {gf}")
+# review F2: a note with text outside the list Notes is never purged by ?empty=1 (only quick notes)
+NE = A.post(B + f"/api/lists/{MINE}/notes", json={"title": "Plan", "body": ""}).json()["id"]
+check(A.delete(B + f"/api/notes/{NE}?empty=1").status_code == 409 and A.get(B + f"/api/notes/{NE}").ok, "a titled empty note in another list: not purged")
+
 sys.exit(kt.done("p2477_quicknote"))

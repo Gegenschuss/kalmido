@@ -48,7 +48,7 @@ import threading
 from flask import has_app_context, jsonify
 
 from ..core.config import app
-from ..core.access import Denied, acx_of, reading_ids, reading_sql
+from ..core.access import Denied, acx_of, qn_is, reading_ids, reading_sql  # 2.477.0 (#3881): + qn_is
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc, uset, usettings
 from ..core.i18n import N_, lang, tr
 from ..core.pg import system_ctx
@@ -520,6 +520,8 @@ def _paths_follow(c, lids):
                 continue
             p = lf_node_path(c, n, chain)
             if p is None or p == (lr["folder"] or ""):
+                continue
+            if qn_is(c, lid):  # 2.477.0 (#3881, review F1): the private list Notes never lands in a folder (folder shares, links)
                 continue
             c.execute("UPDATE lists SET folder=? WHERE id=?", (p, lid))
             c.execute("UPDATE list_members SET folder=? WHERE list_id=? AND folder=?", (p, lid, lr["folder"] or ""))

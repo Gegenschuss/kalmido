@@ -262,7 +262,8 @@ def note_delete(nid):
     c = db()
     r = need_note(c, nid, write=True)
     if request.args.get("empty") == "1":
-        if (r["body"] or "").strip() or r["created_by"] != me():
+        # 2.477.0 (review F2): only a quick note (its list Notes) without text and tags is purged; anything else goes to the trash
+        if (r["body"] or "").strip() or r["created_by"] != me() or not qn_is(c, r["list_id"]) or (r["tags"] or "") not in ("", "[]"):
             return jsonify(error=tr("The note is not empty"), code="note_not_empty"), 409
         c.execute("DELETE FROM notes WHERE id=?", (nid,))
         bump(c)
