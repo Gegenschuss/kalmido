@@ -34,7 +34,7 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   // 2.142.1 (#2150): "Share inbox (ntfy)" is the heading of the ntfy share inbox per person (the topic, not the basket)
   // 2.207.0 A (#2763): a "scan inbox" (Documents > Settings, upload-only key) is not the basket either (de: Scan-Eingang)
   // 2.457.0 (#2971): "ntfy inbox {0} cannot fetch" is the same ntfy share inbox in the notice to the person who can repair it
-  const allowed = k => /DATEV|document inbox|scan inbox|^Inboxes$|^Documents: inboxes$|other members' inboxes|two inboxes|^Create inbox$|ntfy share inbox|ntfy inbox \{0\}|Share inbox \(ntfy\)|topic inbox|Incoming invoices|^Coming up$|Dokumente\/Eingang|^Inbox\|folder$/.test(k);  // 2.368.0 (#2987): the documents' inbox folder  // it: "In arrivo" = coming up
+  const allowed = k => /DATEV|document inbox|scan inbox|^Inboxes$|^Documents: inboxes$|other members' inboxes|two inboxes|^Create inbox$|ntfy share inbox|ntfy inbox \{0\}|Share inbox \(ntfy\)|topic inbox|Incoming invoices|^Coming up$|Dokumente\/Eingang|^Inbox\|folder$|^With a bug inbox$/.test(k);  // 2.368.0 (#2987): the documents' inbox folder  // 2.473.0 (#3378): the bug inbox of a Software project (a second project), not the basket  // it: "In arrivo" = coming up
   for (const lg of Object.keys(NEW)) {
     const dict = JSON.parse(fs.readFileSync(path.join(I18N, lg + '.json'), 'utf8'));
     check(dict.Basket === NEW[lg], `#1219 ${lg}: Basket = ${NEW[lg]} (${dict.Basket})`);
