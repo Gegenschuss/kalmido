@@ -749,8 +749,9 @@ def op_foreign_account(c, uid):
             if a["owner_id"]:
                 return a["owner_id"] != me()
             return bool(a["org_id"]) and op_foreign_org(c, a["org_id"])
-        return not c.execute("SELECT 1 FROM org_members a JOIN org_members b ON b.org_id=a.org_id "
-                             "WHERE a.user_id=? AND a.role='admin' AND b.user_id=? LIMIT 1", (me(), uid)).fetchone()
+        return not c.execute("SELECT 1 FROM org_members a JOIN org_members b ON b.org_id=a.org_id JOIN orgs o ON o.id=a.org_id "
+                             "WHERE a.user_id=? AND a.role='admin' AND b.user_id=? AND o.retired_at IS NULL LIMIT 1",
+                             (me(), uid)).fetchone()  # review F7: a retired organisation grants nothing
 
 
 def org_own_admin(c, oid, but=0):

@@ -7,11 +7,13 @@ organisation and its own agents stay with the operator; the clients' own admins 
 without an organisation keeps everything (creates her own company on the hosted instance).
 freelancer-matrix: own, orgadmin
 usage: p2399_hosting_apart_test.py <datadir>"""
+import json
 import os
+import subprocess
 import sys
 
 import kt
-from kt import B, check, sess
+from kt import B, CT, check, sess
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from freelancer_fixture import freelancer, login, org_join  # noqa: E402
@@ -28,6 +30,28 @@ def dbw(q, a=()):
     finally:
         c.close()
 
+
+def py(code):
+    """Runs code in a second process of the container (role web, no loops); the last output line = JSON."""
+    r = subprocess.run(["docker", "exec", "-w", "/app", "-e", "TASKS_WATCHDOG=0", "-e", "KALMIDO_ROLE=web", CT, "python", "-c",
+                        "import app\n" + code], capture_output=True, text=True)
+    try:
+        return json.loads(r.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        print((r.stdout + r.stderr)[-2000:], flush=True)
+        return {}
+
+
+LINK = """
+import json
+from kalmido.accounts.oidc import oidc_link_ok
+from kalmido.core.db import connect
+from kalmido.core.pg import system_ctx
+c = connect()
+with system_ctx(c):
+    u = c.execute("SELECT * FROM users WHERE id=?", (%d,)).fetchone()
+    print(json.dumps({"email": oidc_link_ok(c, u, "email", u["email"], None), "own": oidc_link_ok(c, u, "email", u["email"], u["id"])}))
+"""
 
 kt.fresh(env={"KALMIDO_SECRET_KEY": KEY})
 A = kt.sess(None)
@@ -83,6 +107,8 @@ r = A.post(B + f"/api/lists/{QL}/owner", json={"user_id": 1})
 check(r.ok and kt.dbx("SELECT owner_id FROM lists WHERE id=?", (QL,)) == [(1,)], "self-hosted: the admin takes over a disabled person's project (as before) " + r.text[:120])
 org = {o["id"]: o for o in A.get(B + "/api/admin/orgs").json()["orgs"]}
 check(org[CO]["members"] and not org[CO].get("apart"), "self-hosted: the organisation list shows the members (as before)")
+q = py(LINK % uid["cara"])
+check(q.get("email") is True, f"self-hosted: a sign-on links an account by its verified e-mail (as before) {q}")
 
 # ================================================================ hosted (KEEP=1)
 kt.fresh(env={"KALMIDO_SECRET_KEY": KEY, "KALMIDO_HOSTED": "1"}, keep=True)
@@ -162,6 +188,14 @@ r = A.patch(B + f"/api/admin/agents/{ABOT}", json={"display_name": "Ops bot"})
 check(r.ok, "hosted: the operator's own agent stays editable " + r.text[:100])
 check(A.patch(B + f"/api/admin/agents/{ABOT}", json={"org_id": CO}).status_code == 403
       and kt.dbx("SELECT org_id FROM agents WHERE user_id=?", (ABOT,)) != [(CO,)], "hosted: the own agent does not move into a client's organisation")
+r = A.patch(B + f"/api/admin/agents/{ABOT}", json={"org_id": "auto"})  # review F2: "auto" never resolves to a client's organisation
+check(kt.dbx("SELECT org_id FROM agents WHERE user_id=?", (ABOT,)) != [(CO,)] and not kt.dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (CO, ABOT)),
+      "hosted: org_id auto does not put the own agent into a client's organisation " + r.text[:100])
+r = A.post(B + "/api/admin/agents", json={"username": "autobot", "org_id": "auto"})
+check(not kt.dbx("SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE u.username='autobot' AND m.org_id=?", (CO,)),
+      "hosted: a new agent with org_id auto does not land in a client's organisation " + r.text[:100])
+q = py(LINK % uid["cara"])  # review F1: the operator sets the sign-on provider; a first link only from the account's own session
+check(q.get("email") is False and q.get("own") is True, f"hosted: a sign-on links a client's account only from its own session {q}")
 names = {a["id"] for a in A.get(B + "/api/admin/agents/audit").json()["agents"]}
 check(ABOT in names and CBOT not in names, f"hosted: the activity log lists the operator's agents only {names}")
 

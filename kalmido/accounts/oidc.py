@@ -23,6 +23,7 @@ from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gset
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip, set_cookie, start_session
 from ..accounts.login import _reauth, _user, pend_ip_cap
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.env import env_bool  # 2.399.0 (#2687): the hosting switch (KALMIDO_HOSTED)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 
@@ -334,6 +335,8 @@ def oidc_link_ok(c, u, how, email, sess_uid):
     sign-on (no password, no e-mail). Linked accounts stay as they are."""
     if sess_uid is not None and sess_uid == u["id"]:
         return True
+    if env_bool("KALMIDO_HOSTED", False):  # admin.hosting.hosted() (a higher layer); 2.399.0 (#2687, review F1): the operator sets the provider -- a first link only from the account's own session
+        return False
     from .login import twofa_methods
     if u["kind"] != "user" or u["kid"] or u["is_admin"] or twofa_methods(c, u):
         return False

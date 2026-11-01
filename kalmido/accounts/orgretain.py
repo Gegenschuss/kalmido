@@ -24,6 +24,7 @@ from ..core.db import iso, now_utc
 from ..core.i18n import N_, tr, trn
 from ..core.merges import mg_fk_refs
 from ..core.pg import system_ctx
+from ..core.env import env_bool  # 2.399.0 (#2687): the hosting switch (KALMIDO_HOSTED)
 from ..core.retention import RET_LEGAL_YEARS, ret_on, ret_report
 
 # (count key, legal kind, SQL of the years per row: org_id = ?) -- the year a period starts from (its end + N years)
@@ -263,7 +264,9 @@ def odl_admin_export(c, oid, retention=False):
     ids, alive = odl_ids(r["retired_admins"]), None
     if ids:  # 2.186.0 review M3: none of them left (deleted / disabled, or no person was its admin) = the instance admins
         with system_ctx(c):  # instance structure
-            q = f"SELECT 1 FROM users WHERE id IN ({','.join('?' * len(ids))}) AND disabled=0 LIMIT 1"
+            # 2.399.0 (#2687, review F3): hosted, a locked former admin still counts (the operator may lock accounts, so locking
+            # them all must not hand it the client's records); only deleted ones are gone
+            q = f"SELECT 1 FROM users WHERE id IN ({','.join('?' * len(ids))}){'' if env_bool('KALMIDO_HOSTED', False) else ' AND disabled=0'} LIMIT 1"
             alive = c.execute(q, sorted(ids)).fetchone()
     if r["retired_admins"] is None or not ids or not alive:
         return bool(retention and g.user["is_admin"])

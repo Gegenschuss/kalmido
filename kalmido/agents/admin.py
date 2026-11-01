@@ -3,7 +3,7 @@ import json
 import re
 import secrets
 from datetime import timedelta
-from flask import g, jsonify
+from flask import g, has_request_context, jsonify
 
 from ..core.config import app, TZ, USERNAME_RE
 from ..core.pg import insert_id, system_ctx
@@ -550,7 +550,9 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
         oids = user_orgs_full(c, a["owner_id"], write=True) if a["owner_id"] else []  # 2.143.0 A (#2151)
         if a["owner_id"]:  # 2.361.4 (#2928): the first organisation that lets it have an agent, else its private area
             oids = [o for o in oids if agent_ws_allowed(c, a["owner_id"], o)]
-        v = oids[0] if oids else (None if a["owner_id"] else main_org(c))
+        v = oids[0] if oids else (None if a["owner_id"] or _operator_apart() else main_org(c))  # 2.399.0 (#2687, review F2): hosted: private
+    if not a["owner_id"] and isinstance(v, int) and not isinstance(v, bool) and has_request_context() and op_foreign_org(c, v):
+        op_apart_deny()  # 2.399.0 (#2687, review F2): hosted: a team agent of the operator never joins a client's organisation
     if v in (None, "", 0, "0", "private"):
         if a["org_id"]:  # 2.361.4 (#2935): out of an organisation only when none of its projects / calendars / books holds it
             _agent_ws_check(c, aid, None)
