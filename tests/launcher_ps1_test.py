@@ -161,11 +161,12 @@ os.close(slave); os.close(master)
 check(os.path.exists(agentlog) and "KALMIDO_TOKEN missing" in open(agentlog).read(), "the log line is in the file of *>>")
 
 # the table for Windows PowerShell 5.1: every Windows id is a real one, Europe/Berlin is in it
+# 2.445.0 (#3748): a Linux without the legacy tz names cannot load every id; its Windows id table still knows them
 src = open(PS1, encoding="utf-8").read()
 table = src[src.index("$WinZones = @{"):src.index("function Now-In")]
 ids = re.findall(r"^  '([^']+)' = '", table, re.M)
 check(len(ids) > 30 and "Europe/Berlin" in table, f"the zone table: {len(ids)}")
-script = "foreach ($i in @(" + ",".join(f"'{i}'" for i in ids) + ")) { try { [void][TimeZoneInfo]::FindSystemTimeZoneById($i) } catch { Write-Output \"BAD $i\" } }"
+script = "foreach ($i in @(" + ",".join(f"'{i}'" for i in ids) + ")) { try { [void][TimeZoneInfo]::FindSystemTimeZoneById($i) } catch { $x = $null; if (-not [TimeZoneInfo]::TryConvertWindowsIdToIanaId($i, [ref]$x)) { Write-Output \"BAD $i\" } } }"
 r = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-Command", script], capture_output=True, text=True, timeout=60)
 check(r.returncode == 0 and "BAD" not in r.stdout, f"every Windows zone id exists: {r.stdout[-300:]} {r.stderr[-200:]}")
 

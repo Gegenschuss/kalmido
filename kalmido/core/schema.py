@@ -2188,6 +2188,7 @@ CREATE TABLE IF NOT EXISTS deleted_accounts (
 CREATE TABLE IF NOT EXISTS revoked_creds (hash TEXT PRIMARY KEY, at TEXT NOT NULL);
 -- 2.360.4 (#3243): organisations and entries deleted for good, by table, id and made-at time only (trigger PURGED_TRIGGER);
 -- a restore deletes them again when the backup brings them back. New table only: older versions never read it
+-- no FK: ref_id = a row of the table named in tbl.
 CREATE TABLE IF NOT EXISTS purged_rows (tbl TEXT NOT NULL, ref_id BIGINT NOT NULL, made TEXT NOT NULL DEFAULT '', at TEXT NOT NULL, PRIMARY KEY (tbl, ref_id));
 CREATE INDEX IF NOT EXISTS purged_rows_at ON purged_rows(at);
 -- 2.97.0 A (#1950): bookmarks (new tables below this line)
