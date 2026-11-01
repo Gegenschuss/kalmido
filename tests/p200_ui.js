@@ -114,6 +114,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   check(d.querySelector('#top h1')?.textContent.startsWith('Agents'), 'Agents view title');
   const card = d.querySelector('.agcard');
   check(card && /Claude/.test(card.textContent) && /working · Cutting/.test(card.textContent) && card.querySelector('.adot.st-working'), 'agent card with status');
+  for (let i = 0; i < 60 && !d.querySelector('.job.st-waiting'); i++) await sleep(150);  // 2.482.0: the job list loads after the view (a slow run drew it later)
   const job = d.querySelector('.job.st-waiting');
   check(job && /Rough cut/.test(job.textContent) && /Cut trailer/.test(job.textContent) && job.querySelector('[data-a="approve"]'), 'waiting job with task + Approve');
   job.querySelector('[data-a="approve"]').click(); await sleep(1500);
