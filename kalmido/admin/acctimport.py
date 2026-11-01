@@ -42,7 +42,7 @@ from ..files.upsafe import up_after_store, up_check, UploadRefused  # 2.464.0 (#
 from ..lists.projects import LIST_FILES_SUB
 from ..lists.tplextra import tx_import, tx_keys
 from ..tasks.attachments import safe_name
-from .hosting import QuotaExceeded, quota_guard
+from .hosting import QuotaExceeded, fmt_bytes, quota_guard, quota_info
 from ..core.db import body, bump, connect, db, err, iso, now_utc, parse_iso, usettings, uset, create_user, DataError, IntegrityError
 from ..core.pg import insert_id, system_ctx
 from ..core.errors import BadInput  # 2.273.0 A (#3030)
@@ -1956,7 +1956,6 @@ def umz_run(uid, iid, opts):
 def umz_room(c, uid, files):
     """#3470: the files of the export (their unpacked sizes: what the import writes) must fit my storage and the server's disk,
     else UmzBad with what they need and what is free (the upload only counted its packed size)."""
-    from .hosting import fmt_bytes, quota_info
     need = sum(zi.file_size for p, (zi, _s) in files.items() if p.startswith("files/"))
     if not need:
         return

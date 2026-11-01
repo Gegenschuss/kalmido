@@ -35,7 +35,7 @@ UMZ_LEFT_TABLES = {
     "list_rule_runs": _LATER, "section_templates": _LATER, "sheet_links": _LATER, "shop_memory": _LATER,
     "wiki_spaces": _LATER, "wiki_versions": _LATER,
     "clients": _ORG, "doc_cfg": _ORG, "doc_fetch_portals": _ORG, "doc_field_values": _ORG, "doc_fields": _ORG, "doc_meta": _ORG, "doc_rules": _ORG,
-    "doc_senders": _ORG, "doc_tags": _ORG, "doc_types": _ORG, "fs_area_roots": _ORG, "hub_bookings": _ORG, "hub_mail_links": _ORG, "nl_consent_log": _ORG,
+    "doc_senders": _ORG, "doc_tags": _ORG, "doc_types": _ORG, "hub_bookings": _ORG, "hub_mail_links": _ORG, "nl_consent_log": _ORG,
     "nl_members": _ORG, "nl_suppress": _ORG, "office_agreements": _ORG, "office_archive": _ORG, "office_archive_log": _ORG, "office_bank_balances": _ORG,
     "office_bank_imports": _ORG, "office_bank_rule_nos": _ORG, "office_bank_rules": _ORG, "office_bank_tx": _ORG, "office_bank_vendors": _ORG,
     "office_bookarch": _ORG, "office_bookarch_accts": _ORG, "office_bookarch_docs": _ORG, "office_bookarch_files": _ORG, "office_cash_closings": _ORG,
