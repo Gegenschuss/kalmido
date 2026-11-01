@@ -2,7 +2,7 @@
 // Agents view with jobs Approve / Reject / Stop, chat side panel + phone view, Settings > Administration > Agents, turning a
 // user into an agent), reactions ❤️ 👍 👎 on comments (names, approval), tidy suggestions (card, Apply, 👍), shared list tags
 // (colored chips, personal tags with the person icon, tag editor, promote, list dialog: tags + "Agent may tidy up entries"),
-// German texts.
+// German texts. 2.482.0 (#3530): "AI agent" badge, ai false = plain "Agent".
 const {boot, errs, sleep, B, login} = require('./boot');
 const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
@@ -47,7 +47,14 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   w.eval(`openDetail(${T1})`); await idle(w);
   for (let i = 0; i < 30 && !d.querySelector(`.cm[data-cid="${k1}"]`); i++) await sleep(200);  // 2.28.0: the comments load after the panel
   const cm = d.querySelector(`.cm[data-cid="${k1}"]`);
-  check(cm?.querySelector('.abadge') && /Agent/.test(cm.querySelector('.abadge').textContent), 'agent badge on its comment');
+  check(cm?.querySelector('.abadge') && /^AI agent$/.test(cm.querySelector('.abadge').textContent.trim()), 'agent badge on its comment');  // 2.482.0 (#3530): "AI agent" (EU AI Act Art. 50)
+  // 2.482.0 (#3530): a bot without AI (ai false) shows the plain "Agent"; a wrong type is refused; back to AI
+  check((await call('alice', 'PATCH', `/api/admin/agents/${CL}`, {ai: 'no'})).status === 400, '#3530: ai must be true / false');
+  check((await call('alice', 'PATCH', `/api/admin/agents/${CL}`, {ai: false})).status === 200, '#3530: the agent marked as a bot without AI');
+  await w.eval('load()'); await idle(w);
+  check(w.eval(`agentById(${CL}).ai`) === false && />Agent<\/span>$/.test(w.eval(`agentBadge(${CL})`)), '#3530: a bot without AI: plain "Agent" ' + w.eval(`agentBadge(${CL})`));
+  await call('alice', 'PATCH', `/api/admin/agents/${CL}`, {ai: true}); await w.eval('load()'); await idle(w);
+  check(w.eval(`agentById(${CL}).ai`) === true && /AI agent/.test(w.eval(`agentBadge(${CL})`)), '#3530: back to "AI agent"');
   check(cm && cm.querySelectorAll('.rx.add').length === 3, 'three reaction buttons (❤️ 👍 👎)');
   cm.querySelector('[data-act="c-react"][data-e="up"]').click(); await sleep(900);
   const cm2 = d.querySelector(`.cm[data-cid="${k1}"]`);

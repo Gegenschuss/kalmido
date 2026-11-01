@@ -8850,3 +8850,7 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 .dlgrow .dlg-w.on{color:var(--accent);border-color:var(--accent)}
 .dlgrow .dlg-l{font-size:var(--fs-s)}
 @media (pointer:coarse){ .dlgrow .dlg-w,.dlgrow .dlg-l{min-height:2.75rem} }
+/* 2.482.0 (#3530): the quiet AI note before a text goes out */
+.aiph{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.5rem 0;padding:.5rem .625rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);color:var(--muted);font-size:var(--fs-s)}
+.aiph .aipht{flex:1 1 14rem;min-width:0}
+.abadge.abai{white-space:nowrap}

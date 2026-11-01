@@ -2635,7 +2635,6 @@
   "{0} tidied up the task (the original text is at the top of the notes)": "{0} a mis de l'ordre dans la tâche (le texte original figure en haut des notes)",
   "{0} turns long entries into a short title; the original text stays in the notes.": "{0} transforme les longues entrées en titre court ; le texte d'origine reste dans les notes.",
   "Agent": "Agent",
-  "Agent: an AI assistant or bot that works through the API": "Agent : un assistant IA ou un bot qui travaille via l'API",
   "Agent (API only, never admin)": "Agent (API uniquement, jamais admin)",
   "Agent may tidy up entries": "L'agent peut mettre de l'ordre dans les entrées",
   "Agent not found": "Agent introuvable",
@@ -15812,5 +15811,13 @@
   "After the move these people see this note:": "Après le déplacement, ces personnes verront la note :",
   "The list Notes itself stays private.": "La liste Notes elle-même reste privée.",
   "Previous document": "Document précédent",
-  "Next document": "Document suivant"
+  "Next document": "Document suivant",
+  "AI agent": "Agent IA",
+  "AI agent: an AI assistant that works through the API. Its texts are written by AI.": "Agent IA : un assistant IA qui travaille via l’API. Ses textes sont rédigés par une IA.",
+  "Agent: a bot without AI that works through the API": "Agent : un bot sans IA qui travaille via l’API",
+  "AI assistant: shown as \"AI agent\"": "Assistant IA : affiché comme « Agent IA »",
+  "Required by the EU AI Act wherever people read its texts. Switch off only for a bot without AI.": "Exigé par le règlement européen sur l’IA partout où des personnes lisent ses textes. À désactiver uniquement pour un bot sans IA.",
+  "Created with AI support": "Créé avec l’aide de l’IA",
+  "Created by an AI agent. Texts for the public must be labelled as such, unless a person has checked them and takes responsibility.": "Créé par un agent IA. Les textes destinés au public doivent l’indiquer, sauf si une personne les a vérifiés et en assume la responsabilité.",
+  "Insert label": "Insérer la mention"
 }

@@ -35,7 +35,15 @@ function wkfs_share(nodeId, t) {
     hint: t.space !== 'private' ? tr('Every member of the organisation reads these pages already: a share adds guests, the accounting and agents, or the right to edit.') : '',
     extra: (/** @type {any} */ box) => wsh_fill(box, t.folder ? {space: t.space, folder: t.path} : {page_id: t.page_id}, t.space, !!t.folder, true)});
 }
-function wsh_sharePage(p) { wkfs_share(p.node_id, {space: p.space, path: p.path, page_id: p.id}); }
+// 2.482.0 (#3530): the page an agent created or changed last: the AI note above the public link
+let WSH_AI = null;
+function wsh_sharePage(p) { WSH_AI = typeof isAgentUser === 'function' && (isAgentUser(p.updated_by) || isAgentUser(p.created_by)) && agentIsAi(isAgentUser(p.updated_by) ? p.updated_by : p.created_by) ? p.id : null; wkfs_share(p.node_id, {space: p.space, path: p.path, page_id: p.id}); }
+if (typeof AIPH_INS !== 'undefined') AIPH_INS.wiki = async id => {
+  const pg = await calReq('GET', `/api/wiki/pages/${+id}`);
+  if ((pg.body || '').includes(aiphLine())) return true;
+  await calReq('PATCH', `/api/wiki/pages/${+id}`, {body: (pg.body || '').replace(/\s+$/, '') + '\n\n*' + aiphLine() + '*', expect_updated_at: pg.updated_at});
+  toast(tr('Saved')); if (typeof wk_after === 'function') wk_after(pg.space); return true;
+};
 async function wsh_shareFolder(p) {
   if (wsh_lockedSp(p.space)) { wsh_lockHint(); return; }
   let fid = p.folder_id || null;
@@ -90,7 +98,8 @@ function wsh_fill(md, tgt, sp, folder, legacy) {
         <div class="row"><button type="button" class="btn sm${links.some(s => s.direct && !s.ended) ? '' : ' pri'}" data-wsh="link">${ic('link', 's')} ${tr(links.some(s => s.direct && !s.ended) ? N_('Another public link') : N_('Create public link'))}</button></div>`;
     // 2.380 H (#2356): new shares show the pictures of the file store embedded in the page only with this switch (default off)
     const imgRow = `<div class="row"><label for="wsh-img">${tr('Show embedded pictures')}</label><label class="swc"><input type="checkbox" id="wsh-img"><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show embedded pictures'))}</span></label></div><div class="shint">${esc(tr('Only pictures from the file store that are embedded in the page and that you may see. Other files stay hidden.'))}</div>`;
-    box.innerHTML = (people ? `<h4 id="wsh-ppl-h">${tr(legacy ? 'Read only by e-mail address' : 'People')}</h4>${people}` : '') + `<h4>${tr('Public link')}</h4><div id="wsh-pub">${pub}</div>` + imgRow;
+    const aiph = tgt.page_id && WSH_AI === tgt.page_id && j.enabled && typeof aiphHtml === 'function' ? aiphHtml('wiki', tgt.page_id) : '';  // 2.482.0 (#3530)
+    box.innerHTML = (people ? `<h4 id="wsh-ppl-h">${tr(legacy ? 'Read only by e-mail address' : 'People')}</h4>${people}` : '') + `<h4>${tr('Public link')}</h4>${aiph}<div id="wsh-pub">${pub}</div>` + imgRow;
   };
   const load = async () => {
     try { j = await calReq('GET', '/api/wiki/shares?' + q); } catch (x) { const b = wsh$('.wsh-body', md); if (b) b.innerHTML = `<div class="muted mhint">${esc(x.status === 404 ? tr('No links yet: a public link can be made once the folder holds a page.') : x.message)}</div>`; return; }

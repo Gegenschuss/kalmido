@@ -200,13 +200,15 @@ def pt_plain(text):
 def pt_answers(c, task_id):
     """The comments the customer sees: public answers + their own, oldest first, with the shown author name."""
     out = []
-    rows = c.execute("""SELECT k.id, k.user_id, k.body, k.created_at, k.ext_name, u.display_name, u.kind FROM comments k
-                        LEFT JOIN users u ON u.id=k.user_id WHERE k.task_id=? AND k.portal=1 AND k.deleted_at IS NULL ORDER BY k.id""",
+    rows = c.execute("""SELECT k.id, k.user_id, k.body, k.created_at, k.ext_name, u.display_name, u.kind, ag.ai FROM comments k
+                        LEFT JOIN users u ON u.id=k.user_id LEFT JOIN agents ag ON ag.user_id=k.user_id WHERE k.task_id=? AND k.portal=1 AND k.deleted_at IS NULL ORDER BY k.id""",
                      (task_id,)).fetchall()
     for r in rows:
         mine = r["user_id"] is None
         who = (r["ext_name"] or "") if mine else ("" if (r["kind"] or "user") == "agent" else (r["display_name"] or "").strip())
-        out.append({"id": r["id"], "customer": mine, "who": who, "body": pt_plain(r["body"]), "at": r["created_at"]})
+        # 2.482.0 (#3530, EU AI Act Art. 50): an answer of an AI agent is marked as such (the name stays "Team")
+        ai = not mine and (r["kind"] or "user") == "agent" and (r["ai"] is None or int(r["ai"]) != 0)
+        out.append({"id": r["id"], "customer": mine, "who": who, "body": pt_plain(r["body"]), "at": r["created_at"], "is_ai": ai})
     return out
 
 
@@ -246,7 +248,8 @@ def pt_render(c, p, token, lg, note=""):
         out += f'<section class="ptd"><h2>{e(t(N_("Your report")))}</h2>{_pt_paras(orig)}</section>'
     items = "".join(
         f'<li class="{"me" if a["customer"] else "tm"}"><div class="ptw"><b>{e(a["who"] or (t(N_("You|public")) if a["customer"] else t(N_("Team"))))}</b>'
-        f'<span>{e(pt_day(a["at"], lg))}</span></div>{_pt_paras(a["body"])}</li>' for a in ans)
+        + (f'<span class="ptai">{e(t(N_("AI agent")))}</span>' if a.get("is_ai") else '')  # 2.482.0 (#3530)
+        + f'<span>{e(pt_day(a["at"], lg))}</span></div>{_pt_paras(a["body"])}</li>' for a in ans)
     out += (f'<section class="ptc"><h2>{e(t(N_("Answers")))}</h2>'
             + (f'<ol class="ptlist">{items}</ol>' if items else f'<p class="empty">{e(t(N_("No answer yet. You will see it here.")))}</p>') + '</section>')
     out += (f'<section class="fb" id="answer"><h2>{e(t(N_("Your answer|public")))}</h2><form method="post" action="/p/{e(token)}/comment" class="fform">'  # 2.165.3 (#2650): the customer side says Sie
@@ -783,7 +786,7 @@ def pt_mail_tick(c):
             url, stop = pt_mail_url(c, p, tok), pt_status_url(tok) + "/stop"  # 2.360.0 A (#2496): the mail's link confirms
             head = tr("Your report “{0}” is done.", p["title"], lg=lg) if done else \
                 tr("There is a new answer to your report “{0}”.", p["title"], lg=lg)
-            body_ = [(a["who"] or tr("Team", lg=lg)) + ":\n" + a["body"][:2000] for a in new[-3:]]
+            body_ = [(a["who"] or tr("Team", lg=lg)) + (" (" + tr("AI agent", lg=lg) + ")" if a.get("is_ai") else "") + ":\n" + a["body"][:2000] for a in new[-3:]]  # 2.482.0 (#3530)
             foot = tr("You get this e-mail because you sent the report. No more e-mails about it: {0}", stop, lg=lg)
             ttl = " ".join(p["title"].split())  # review: no line breaks in the subject
             subj = (tr("Done: {0}", ttl, lg=lg) if done else tr("New answer: {0}", ttl, lg=lg))[:200]

@@ -2625,7 +2625,6 @@
   "{0} tidied up the task (the original text is at the top of the notes)": "{0} hat die Aufgabe aufgeräumt (der Originaltext steht oben in der Beschreibung)",
   "{0} turns long entries into a short title; the original text stays in the notes.": "{0} macht aus langen Einträgen einen kurzen Titel; der Originaltext bleibt in der Beschreibung.",
   "Agent": "Agent",
-  "Agent: an AI assistant or bot that works through the API": "Agent: eine KI oder ein Bot, der über die API arbeitet",
   "Agent (API only, never admin)": "Agent (nur API, nie Admin)",
   "Agent may tidy up entries": "Agent darf Einträge aufräumen",
   "Agent not found": "Agent nicht gefunden",
@@ -15812,5 +15811,13 @@
   "After the move these people see this note:": "Nach dem Verschieben sehen diese Personen die Notiz:",
   "The list Notes itself stays private.": "Die Liste Notizen selbst bleibt privat.",
   "Previous document": "Voriges Dokument",
-  "Next document": "Nächstes Dokument"
+  "Next document": "Nächstes Dokument",
+  "AI agent": "KI-Agent",
+  "AI agent: an AI assistant that works through the API. Its texts are written by AI.": "KI-Agent: ein KI-Assistent, der über die API arbeitet. Seine Texte schreibt eine KI.",
+  "Agent: a bot without AI that works through the API": "Agent: ein Bot ohne KI, der über die API arbeitet",
+  "AI assistant: shown as \"AI agent\"": "KI-Assistent: wird als „KI-Agent“ gekennzeichnet",
+  "Required by the EU AI Act wherever people read its texts. Switch off only for a bot without AI.": "Vorgabe der KI-Verordnung der EU, überall wo Menschen seine Texte lesen. Nur für einen Bot ohne KI ausschalten.",
+  "Created with AI support": "Erstellt mit KI-Unterstützung",
+  "Created by an AI agent. Texts for the public must be labelled as such, unless a person has checked them and takes responsibility.": "Von einem KI-Agenten erstellt. Bei Texten für die Öffentlichkeit musst du das kennzeichnen, außer ein Mensch hat ihn geprüft und verantwortet ihn.",
+  "Insert label": "Kennzeichnung einfügen"
 }

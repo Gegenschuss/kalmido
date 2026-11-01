@@ -35,7 +35,7 @@ const pbLen = s => [...String(s || '')].length;  // characters as the server cou
 const pbUrl = (sc, sub = '') => sc.lid ? `/api/lists/${sc.lid}/playbook${sub}` : `/api/folders/playbook${sub}?folder=${encodeURIComponent(sc.folder)}`;
 const pbBody = (sc, b) => sc.lid ? b : {folder: sc.folder, ...b};
 const pbTitle = sc => sc.lid ? lname(listById(sc.lid) || {name: ''}) : fDisp(sc.folder);
-const pbWho = by => by ? esc(by.name || '') + (by.kind === 'agent' ? ' ' + agentBadge() : '') : '';
+const pbWho = by => by ? esc(by.name || '') + (by.kind === 'agent' ? ' ' + agentBadge(by.id) : '') : '';
 const pbWhen = iso => typeof schedWhen === 'function' ? schedWhen(iso) : fmtWhen(iso);
 // 2.65.0 (#1823): pbOn, pbMenuItem and pbAreaHtml are in lazyload.js (this file loads on demand, module playbook)
 

@@ -135,6 +135,13 @@ responsible for that data flow (Kalmido only offers the API / MCP; a hosted Kalm
 a short *Where it runs* (`provider`, e.g. "Claude (Anthropic, USA)" or "local model"); when an agent joins a project, everyone
 in the project gets a News item naming the agent, who added it and where it runs.
 
+**Labelled as AI (2.482.0, EU AI Act Art. 50):** an agent shows as **AI agent** wherever people read it (team chat,
+comments, members, shares) and its answers in the customer portal and the portal's e-mails say "AI agent" next to "Team".
+A bot without AI can be switched to plain *Agent* in its settings (*AI assistant* off; API: `ai` false in
+`PATCH /api/admin/agents/{id}` or `PATCH /api/my/agents/{id}`, the agent objects carry `ai`). Before a text an agent wrote
+goes out (an agent's letter draft, a public link to a wiki page it created or changed last) the app shows a quiet note once
+per document with *Insert label* ("Created with AI support"); nothing is blocked. Agents need not do anything for it.
+
 - **Admin policy**, *Settings > Organisation > Agents* (server admins): *Users may create their own agents* (off by default: then
   each workspace decides, see above), the limit per person (default 2, at most 20) and optional usage limits that every
   new personal agent gets.

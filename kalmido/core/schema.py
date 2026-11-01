@@ -3957,6 +3957,9 @@ MIGRATIONS = [
     # 2.235.0 A (#2891 #2900 #2901): the control level of an agent, its own one-way steps, the deadline of its approvals (JSON,
     # agents/control.py; '' = made before 2.235.0: no level chosen, works as before). Older versions ignore it
     ("agents", "control", "ALTER TABLE agents ADD COLUMN IF NOT EXISTS control TEXT NOT NULL DEFAULT ''"),
+    # 2.482.0 (#3530): an AI agent (1, default: shown as "AI agent", EU AI Act Art. 50) or a bot without AI (0: "Agent").
+    # Older versions ignore it
+    ("agents", "ai", "ALTER TABLE agents ADD COLUMN IF NOT EXISTS ai BIGINT NOT NULL DEFAULT 1"),
     # 2.239.0 D (#2874): the name of the project a booked receipt was assigned to when that project was deleted for good
     # (receipts/suggest.py olk_keep_project; list_id is emptied by its foreign key). Older versions ignore it
     ("rc_receipts", "list_name", "ALTER TABLE rc_receipts ADD COLUMN IF NOT EXISTS list_name TEXT"),

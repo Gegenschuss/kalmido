@@ -2635,7 +2635,6 @@
   "{0} tidied up the task (the original text is at the top of the notes)": "{0} heeft de taak opgeschoond (de oorspronkelijke tekst staat bovenaan in de notities)",
   "{0} turns long entries into a short title; the original text stays in the notes.": "{0} maakt van lange invoer een korte titel; de oorspronkelijke tekst blijft in de notities.",
   "Agent": "Agent",
-  "Agent: an AI assistant or bot that works through the API": "Agent: een AI-assistent of bot die via de API werkt",
   "Agent (API only, never admin)": "Agent (alleen API, nooit beheerder)",
   "Agent may tidy up entries": "Agent mag items opschonen",
   "Agent not found": "Agent niet gevonden",
@@ -15812,5 +15811,13 @@
   "After the move these people see this note:": "Na het verplaatsen zien deze personen de notitie:",
   "The list Notes itself stays private.": "De lijst Notities zelf blijft privé.",
   "Previous document": "Vorig document",
-  "Next document": "Volgend document"
+  "Next document": "Volgend document",
+  "AI agent": "AI-agent",
+  "AI agent: an AI assistant that works through the API. Its texts are written by AI.": "AI-agent: een AI-assistent die via de API werkt. Zijn teksten zijn door AI geschreven.",
+  "Agent: a bot without AI that works through the API": "Agent: een bot zonder AI die via de API werkt",
+  "AI assistant: shown as \"AI agent\"": "AI-assistent: getoond als ‘AI-agent’",
+  "Required by the EU AI Act wherever people read its texts. Switch off only for a bot without AI.": "Vereist door de AI-verordening van de EU overal waar mensen zijn teksten lezen. Alleen uitzetten voor een bot zonder AI.",
+  "Created with AI support": "Gemaakt met AI-ondersteuning",
+  "Created by an AI agent. Texts for the public must be labelled as such, unless a person has checked them and takes responsibility.": "Gemaakt door een AI-agent. Teksten voor het publiek moeten dat vermelden, tenzij een mens ze heeft gecontroleerd en ervoor verantwoordelijk is.",
+  "Insert label": "Vermelding invoegen"
 }

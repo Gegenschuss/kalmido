@@ -31,7 +31,26 @@ const AGENT_TXT = {status_chat: N_('Answering in the chat'), status_event: N_('W
 const agentStTx = a => { if (!a.status_text) return ''; const at = a.status_key_at ? new Date(a.status_key_at) : null, tim = at && !isNaN(at) ? AGENT_TXT[a.status_key + '_at'] : ''; return tim ? tr(tim, fmtStamp(at)) : AGENT_TXT[a.status_key] ? tr(AGENT_TXT[a.status_key]) : a.status_text; };
 const agentSt = a => !a.enabled ? tr('paused') : a.status === 'paused' ? tr('paused: {0}', agentStTx(a) || a.pause_reason || '') : agentOffline(a) ? tr('not connected') : a.limit_reached ? tr('limit reached') : a.no_service && (a.status || 'idle') === 'idle' ? tr('connected, but no service running') : tr(AGENT_ST[a.status] || AGENT_ST.idle);  // 2.1.1 (#326)
 const agentDot = id => { const a = agentById(id); return a ? `<i class="adot st-${!a.enabled || a.status === 'paused' ? 'paused' : agentOffline(a) ? 'offline' : esc(a.status)}" title="${esc(agentHstLine(a))}"></i>` : ''; };
-const agentBadge = () => `<span class="abadge" title="${esc(tr('Agent: an AI assistant or bot that works through the API'))}">${ic('bot', 's')}${tr('Agent')}</span>`;
+// 2.482.0 (#3530, EU AI Act Art. 50): "AI agent" unless the agent is marked as a bot without AI (ai: false); an agent the
+// viewer does not know counts as AI (the safe side)
+const agentIsAi = id => agentById(id)?.ai !== false;
+const agentBadge = id => agentIsAi(id) ? `<span class="abadge abai" title="${esc(tr('AI agent: an AI assistant that works through the API. Its texts are written by AI.'))}">${ic('bot', 's')}${tr('AI agent')}</span>`
+  : `<span class="abadge" title="${esc(tr('Agent: a bot without AI that works through the API'))}">${ic('bot', 's')}${tr('Agent')}</span>`;
+// 2.482.0 (#3530, EU AI Act Art. 50 (4)): a quiet note once per document where a text an agent wrote goes out (a letter
+// being sent, a wiki page getting a public link). "Insert label" adds one line; closing or inserting = not shown again for
+// that document (this device). No obligation, nothing is blocked. AIPH_INS[kind](id) inserts the line for its kind.
+const AIPH_INS = {};
+const aiphKey = (kind, id) => `aiph.${kind}.${id}`;
+const aiphLine = () => tr('Created with AI support');
+const aiphHtml = (kind, id) => LS.get(aiphKey(kind, id), false) ? '' : `<div class="aiph" role="note" data-aiph="${esc(kind)}" data-aiph-id="${esc(String(id))}">${ic('info', 's')}<span class="aipht">${esc(tr('Created by an AI agent. Texts for the public must be labelled as such, unless a person has checked them and takes responsibility.'))}</span><button type="button" class="btn sm" data-aiph-ins>${esc(tr('Insert label'))}</button><button type="button" class="ib" data-aiph-x aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x', 's')}</button></div>`;
+document.addEventListener('click', async e => {
+  const b = /** @type {any} */ (e.target)?.closest?.('[data-aiph-ins], [data-aiph-x]'); if (!b) return;
+  const box = b.closest('[data-aiph]'); if (!box) return;
+  e.preventDefault(); e.stopPropagation();
+  const kind = box.dataset.aiph, id = box.dataset.aiphId;
+  if (b.hasAttribute('data-aiph-ins')) { const fn = AIPH_INS[kind]; b.disabled = true; try { if (fn && await fn(id) === false) { b.disabled = false; return; } } catch (x) { b.disabled = false; toast(x.message || tr('unknown')); return; } }
+  LS.set(aiphKey(kind, id), true); box.remove();
+});
 // agents of a list that can pick up this task (participant agents only their own tasks)
 function taskAgents(t) {
   const l = t && listById(t.list_id); if (!l || !collab()) return [];

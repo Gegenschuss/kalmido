@@ -301,6 +301,11 @@ def admin_agent_update(aid):
             c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b["note"] or "")[:AGENT_NOTE_MAX], aid))
         if "provider" in b:  # 2.24.0 (#896)
             c.execute("UPDATE agents SET provider=? WHERE user_id=?", (str(b["provider"] or "").strip()[:80], aid))
+        if "ai" in b:  # 2.482.0 (#3530): AI agent (true) or a bot without AI (false)
+            if not isinstance(b["ai"], bool):
+                c.rollback()
+                return err(tr("Invalid value: {0}", "ai"))
+            c.execute("UPDATE agents SET ai=? WHERE user_id=?", (1 if b["ai"] else 0, aid))
         if "owner_id" in b or "org_id" in b:  # 2.28.0 (#965 / #935): "Belongs to" (team | a person) and the workspace
             if _operator_apart() and ((b.get("owner_id") and b.get("owner_id") != me())
                                       or (isinstance(b.get("org_id"), int) and op_foreign_org(c, b["org_id"]))):
@@ -739,7 +744,7 @@ def my_agent_update(aid):
     a = need_own_agent(c, aid)
     b = body()
     unknown = sorted(k for k in b if k not in ("display_name", "note", "enabled", "scopes", "allowed_ips", "provider", "pause_reason", "org_id",
-                                               "runtime", "list_ids", "bridge_ok", "limits"))
+                                               "runtime", "list_ids", "bridge_ok", "limits", "ai"))
     if unknown:
         return err(tr("Invalid value: {0}", ", ".join(unknown)))
     if "org_id" in b:  # 2.28.0 (#935): the owner moves the agent into another workspace (its lists must fit: none of another one)
@@ -784,6 +789,11 @@ def my_agent_update(aid):
         c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b["note"] or "")[:AGENT_NOTE_MAX], aid))
     if "provider" in b:  # 2.24.0 (#896)
         c.execute("UPDATE agents SET provider=? WHERE user_id=?", (str(b["provider"] or "").strip()[:80], aid))
+    if "ai" in b:  # 2.482.0 (#3530): AI agent (true) or a bot without AI (false)
+        if not isinstance(b["ai"], bool):
+            c.rollback()
+            return err(tr("Invalid value: {0}", "ai"))
+        c.execute("UPDATE agents SET ai=? WHERE user_id=?", (1 if b["ai"] else 0, aid))
     if "pause_reason" in b:  # 2.26.0 (#949): pause with a reason (text) / resume (null or ""): status paused <-> idle
         pr = b["pause_reason"]
         if pr is not None and not isinstance(pr, str):

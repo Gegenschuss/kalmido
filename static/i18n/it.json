@@ -2635,7 +2635,6 @@
   "{0} tidied up the task (the original text is at the top of the notes)": "{0} ha riordinato l'attività (il testo originale è in cima alle note)",
   "{0} turns long entries into a short title; the original text stays in the notes.": "{0} trasforma le voci lunghe in un titolo breve; il testo originale resta nelle note.",
   "Agent": "Agente",
-  "Agent: an AI assistant or bot that works through the API": "Agente: un assistente IA o un bot che lavora tramite l'API",
   "Agent (API only, never admin)": "Agente (solo API, mai admin)",
   "Agent may tidy up entries": "L'agente può riordinare le voci",
   "Agent not found": "Agente non trovato",
@@ -15812,5 +15811,13 @@
   "After the move these people see this note:": "Dopo lo spostamento queste persone vedono la nota:",
   "The list Notes itself stays private.": "La lista Note resta comunque privata.",
   "Previous document": "Documento precedente",
-  "Next document": "Documento successivo"
+  "Next document": "Documento successivo",
+  "AI agent": "Agente IA",
+  "AI agent: an AI assistant that works through the API. Its texts are written by AI.": "Agente IA: un assistente IA che lavora tramite l’API. I suoi testi sono scritti da un’IA.",
+  "Agent: a bot without AI that works through the API": "Agente: un bot senza IA che lavora tramite l’API",
+  "AI assistant: shown as \"AI agent\"": "Assistente IA: mostrato come «Agente IA»",
+  "Required by the EU AI Act wherever people read its texts. Switch off only for a bot without AI.": "Richiesto dal regolamento UE sull’IA ovunque le persone leggano i suoi testi. Disattiva solo per un bot senza IA.",
+  "Created with AI support": "Creato con il supporto dell’IA",
+  "Created by an AI agent. Texts for the public must be labelled as such, unless a person has checked them and takes responsibility.": "Creato da un agente IA. I testi per il pubblico devono indicarlo, a meno che una persona li abbia verificati e se ne assuma la responsabilità.",
+  "Insert label": "Inserisci indicazione"
 }

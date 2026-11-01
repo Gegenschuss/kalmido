@@ -1571,6 +1571,7 @@ function agModal(a, done, o = {}) {
     ${a ? `<div class="row"><label id="ag-col-h">${tr('Colour')}</label><div class="pfcol" role="group" aria-labelledby="ag-col-h">${ac_pickHtml(a.color || (S.colors || {})[a.id] || '', a.id)}</div></div>` : ''}${''/* 2.47.1 (#1721): saved at once */}
     <div class="row"><label for="ag-note">${tr('Note')}</label><input id="ag-note" value="${esc(a?.note || '')}" maxlength="2000" placeholder="${tr('What it is for (only admins see this)')}"></div>
     <div class="row"><label for="ag-prov">${tr('Where it runs')}</label><input id="ag-prov" value="${esc(a?.provider || '')}" maxlength="80" placeholder="${esc(tr('e.g. Claude (Anthropic, USA)'))}"></div>
+    ${a ? `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ag-ai" ${a.ai !== false ? 'checked' : ''}> ${tr('AI assistant: shown as "AI agent"')}</label></div><div class="shint keep">${tr('Required by the EU AI Act wherever people read its texts. Switch off only for a bot without AI.')}</div>` : ''}
     <div class="row"><label for="ag-prop">${tr('Proposals for')}</label><select id="ag-prop">${[['shared', N_('People who share a project with it')], ['all', N_('Everyone')], ['off', N_('Nobody')]].map(([k, n]) => `<option value="${k}" ${(a?.proposals || 'shared') === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint">${tr('Who may ask it for a proposal (project from a briefing, break down a task, sort the basket, tasks from notes). It only gets what the person sends; instance admins count as sharing a project.')}</div>
     ${scopesHtml(S.agOffer || [], a ? a.scopes : (S.agDefScopes || ['read', 'tasks:write', 'comments', 'files:read', 'files:write']))}
@@ -1638,7 +1639,7 @@ function agModal(a, done, o = {}) {
       }
       const rt = agRtBody(md); if (!rt) { if ($('#ag-adv', md)) $('#ag-adv', md).open = true; return; }
       const body = {display_name: $('#ag-name', md).value.trim(), note: $('#ag-note', md).value.trim(), provider: $('#ag-prov', md)?.value.trim() || '', proposals: $('#ag-prop', md).value, webhook_url: $('#ag-url', md).value.trim(), ...aiuLimBody(md), runtime: rt,
-        ...(S.agOffer ? {scopes: scopesVal(md)} : {}), allowed_ips: $('#ag-ips', md).value.trim(), ...(a ? {list_ids: listCapVal(md, 'ag-lcap')} : {})};  // 2.15.0 (#479); 2.30.0 (#919): list_ids
+        ...(S.agOffer ? {scopes: scopesVal(md)} : {}), allowed_ips: $('#ag-ips', md).value.trim(), ...(a ? {list_ids: listCapVal(md, 'ag-lcap')} : {}), ...($('#ag-ai', md) ? {ai: $('#ag-ai', md).checked} : {})};  // 2.482.0 (#3530): ai  // 2.15.0 (#479); 2.30.0 (#919): list_ids
       const ow = $('#ag-owner', md); if (ow && (!a || String(a.owner?.id || '') !== ow.value)) body.owner_id = ow.value ? +ow.value : null;  // 2.28.0 (#965)
       const wsel = $('#ag-ws', md); if (wsel && (!a || String(a.org_id || '') !== wsel.value)) body.org_id = wsel.value ? +wsel.value : null;  // 2.28.0 (#935)
       const un = $('#ag-user', md).value.trim().toLowerCase();

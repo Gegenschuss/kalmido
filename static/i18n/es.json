@@ -2635,7 +2635,6 @@
   "{0} tidied up the task (the original text is at the top of the notes)": "{0} ha ordenado la tarea (el texto original está al principio de las notas)",
   "{0} turns long entries into a short title; the original text stays in the notes.": "{0} convierte entradas largas en un título corto; el texto original queda en las notas.",
   "Agent": "Agente",
-  "Agent: an AI assistant or bot that works through the API": "Agente: un asistente de IA o bot que trabaja a través de la API",
   "Agent (API only, never admin)": "Agente (solo API, nunca administrador)",
   "Agent may tidy up entries": "El agente puede ordenar las entradas",
   "Agent not found": "Agente no encontrado",
@@ -15812,5 +15811,13 @@
   "After the move these people see this note:": "Tras moverla, estas personas verán la nota:",
   "The list Notes itself stays private.": "La lista Notas sigue siendo privada.",
   "Previous document": "Documento anterior",
-  "Next document": "Documento siguiente"
+  "Next document": "Documento siguiente",
+  "AI agent": "Agente de IA",
+  "AI agent: an AI assistant that works through the API. Its texts are written by AI.": "Agente de IA: un asistente de IA que trabaja a través de la API. Sus textos los escribe una IA.",
+  "Agent: a bot without AI that works through the API": "Agente: un bot sin IA que trabaja a través de la API",
+  "AI assistant: shown as \"AI agent\"": "Asistente de IA: se muestra como «Agente de IA»",
+  "Required by the EU AI Act wherever people read its texts. Switch off only for a bot without AI.": "Lo exige el Reglamento de IA de la UE allí donde las personas leen sus textos. Desactívalo solo para un bot sin IA.",
+  "Created with AI support": "Creado con ayuda de IA",
+  "Created by an AI agent. Texts for the public must be labelled as such, unless a person has checked them and takes responsibility.": "Creado por un agente de IA. Los textos para el público deben indicarlo, salvo que una persona los haya revisado y asuma la responsabilidad.",
+  "Insert label": "Insertar indicación"
 }

@@ -1091,6 +1091,11 @@ def job_may_act(c, j, uid, action):
     return is_approver(c, t, uid) or (action == "stop" and task_visible(c, t["id"], uid, write=True))
 
 
+def agent_is_ai(a):
+    """2.482.0 (#3530): an agent counts as AI unless it is marked as a bot without AI (agents.ai = 0)."""
+    return not (a is not None and "ai" in a.keys() and a["ai"] is not None and int(a["ai"]) == 0)
+
+
 def agent_public(c, a, uid=None):
     """An agent as the people who share lists with it see it: status + their visible running / waiting jobs + unread chat."""
     from ..agents.usage import usage_block, usage_cost_public
@@ -1102,6 +1107,7 @@ def agent_public(c, a, uid=None):
                        (a["user_id"], uid)).fetchone()[0] if uid else 0
     return {"id": a["user_id"], "username": a["username"], "name": a["display_name"] or a["username"],
             "display_name": a["display_name"] or a["username"],
+            "ai": agent_is_ai(a),  # 2.482.0 (#3530): labelled "AI agent" (EU AI Act Art. 50); 0 = a bot without AI
             # 2.28.0 (#935 / #965): the workspace it works in (null = private) and whose personal agent it is (null = team)
             "org_id": a["org_id"] if "org_id" in a.keys() else None, "owner_id": a["owner_id"] if "owner_id" in a.keys() else None,
             "avatar": avatar_url(c.execute("SELECT * FROM users WHERE id=?", (a["user_id"],)).fetchone()),
