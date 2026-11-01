@@ -670,7 +670,7 @@ function settingsModal(focus) {
       <h4>${tr('Tips')}</h4><div class="row"><label>${tr('Hints')}</label><button class="btn sm" data-m="hints-reset">${ic('undo', 's')} ${tr('Show tips again')}</button></div>
       ${hint(tr('Brings back the one-time hints on this device (touch screens show helper texts once).'))}
       <h4 id="s-tabbar-h">${tr('Tab bar')}</h4>
-      ${hint(tr('A phone fits {0} tabs, the rest goes under “More”.', TAB_MAX))}
+      ${hint(tr('This device fits {0} tabs, the rest goes under “More”.', tabMax()))}
       <div class="navlist" id="s-tabbar"></div>
       <div class="row" style="margin-top:.5rem"><button type="button" class="btn sm tabaddb" id="s-tabadd" data-m="tab-add" style="flex:1" aria-haspopup="dialog">${tr('+ Add tab …')}</button><button class="btn sm" data-m="tab-reset">${tr('Default')}</button></div>
       <h4 id="s-prbg-h">${tr('Task rows')}</h4>
@@ -1052,7 +1052,7 @@ function settingsModal(focus) {
   });
   const tabDraw = () => {
     const ids = tabIds(), box = $('#s-tabbar', md); if (!box) return;
-    box.innerHTML = ids.map(tabItem).map((t, i) => t ? `<div class="navrow" data-tab="${esc(t.id)}">${t.icon}<span>${esc(t.label)}</span>${i === TAB_MAX - 1 && ids.length > TAB_MAX ? `<span class="muted" style="font-size:var(--fs-xs)">${tr('from here on “More”')}</span>` : ''}<button class="iconbtn" data-tmove="-1" title="${tr('move forward')}" aria-label="${esc(tr('move forward') + ': ' + t.label)}">${ic('chev', 's up')}</button><button class="iconbtn" data-tmove="1" title="${tr('move back')}" aria-label="${esc(tr('move back') + ': ' + t.label)}">${ic('chev', 's')}</button><button class="iconbtn" data-tdel title="${tr('remove')}" aria-label="${esc(tr('remove') + ': ' + t.label)}">${ic('x', 's')}</button></div>` : '').join('') || `<div class="muted" style="font-size:var(--fs-m)">${tr('Empty: only “More”')}</div>`;
+    box.innerHTML = ids.map(tabItem).map((t, i) => t ? `<div class="navrow" data-tab="${esc(t.id)}">${t.icon}<span>${esc(t.label)}</span>${i === tabMax() - 1 && ids.length > tabMax() ? `<span class="muted" style="font-size:var(--fs-xs)">${tr('from here on “More”')}</span>` : ''}<button class="iconbtn" data-tmove="-1" title="${tr('move forward')}" aria-label="${esc(tr('move forward') + ': ' + t.label)}">${ic('chev', 's up')}</button><button class="iconbtn" data-tmove="1" title="${tr('move back')}" aria-label="${esc(tr('move back') + ': ' + t.label)}">${ic('chev', 's')}</button><button class="iconbtn" data-tdel title="${tr('remove')}" aria-label="${esc(tr('remove') + ': ' + t.label)}">${ic('x', 's')}</button></div>` : '').join('') || `<div class="muted" style="font-size:var(--fs-m)">${tr('Empty: only “More”')}</div>`;
   };
   md._tabDraw = tabDraw;
   // 2.25.0 (UX-03): the sidebar: groups up / down, an eye per group, check boxes for the entries of Plan and Views

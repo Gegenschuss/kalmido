@@ -77,6 +77,11 @@ function modHash(m) { return m === 'tasks' ? keyToHash(LS.get('lastKey', START_K
 // ---- tab bar / rail per device (LS 'tabbar'): pinned modules, smart lists, lists, filters, tags,
 // search, settings. null = default = the modules in the server-wide order (settings "Module").
 const TAB_MAX = 5;  // phone: more than this -> first TAB_MAX-1 + "Mehr"
+// 2.477.0 (#3938): the number of tabs follows the width: below 600 CSS px TAB_MAX, from 600 px 7, from 900 px 9 (the last one
+// is "More" when something is left); turning the device draws the bar again
+const TAB_MQ = typeof matchMedia === 'function' ? [matchMedia('(min-width: 900px)'), matchMedia('(min-width: 600px)')] : [];
+const tabMax = () => TAB_MQ[0]?.matches ? 9 : TAB_MQ[1]?.matches ? 7 : TAB_MAX;
+TAB_MQ.forEach(q => q.addEventListener?.('change', () => { if ($('#tabs')) renderTabs(); }));
 const SMART_TABS = ['inbox', 'today', 'tomorrow', 'week', 'doable', 'pinned', 'waiting', 'mine_wait', 'stale', 'assigned', 'byme', 'all', 'done', 'trash'];
 const leadEmoji = n => (String(n ?? '').match(/^((?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\uFE0F|\u200D)+)/u) || [])[1];
 // 2.24.0 (UX-36): the default bar is what one hand needs every day: Inbox, Today, Search and the lists (the drawer); modules
@@ -142,7 +147,7 @@ function tabBtn(t, on, cls = '') {
 // pinned, Search and Settings last. Overflowing pinned tabs stay on top. rest = those, for the groups of tabsMore
 const tabAreaItems = () => { const cur = sbb_area(); return SBB_RAIL.map(r => r[0]).filter(id => sbb_btnHtml(id, cur, sideHidden, 0)).map(id => { const d = sbb_def(id), a = !!mg_area(id); return {id: a ? 'a:' + id : id, go: sbb_target(id), icon: ic(d[1], 'l'), ico: d[1], label: tr(d[2]), mod: id, ...(a ? {area: id} : {})}; }); };
 function tabOverflow() {
-  const items = tabItems(), shown = items.length > TAB_MAX ? items.slice(0, TAB_MAX - 1) : items;
+  const items = tabItems(), mx = tabMax(), shown = items.length > mx ? items.slice(0, mx - 1) : items;  // 2.477.0 (#3938)
   const rest = items.slice(shown.length), pinned = k => items.some(t => t.id === k);
   const areas = tabAreaItems(), conv = ['team', 'news'].filter(k => !pinned(k)).map(tabItem).filter(t => t && !o3a_hidT(t));
   const end = ['search', 'settings'].filter(k => !pinned(k)).map(tabItem).filter(Boolean);

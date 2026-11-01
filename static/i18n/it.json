@@ -1030,7 +1030,6 @@
   "Appearance": "Aspetto",
   "Reminders": "Promemoria",
   "Tab bar": "Barra delle schede",
-  "A phone fits {0} tabs, the rest goes under “More”.": "Sul telefono stanno {0} schede, il resto va in «Altro».",
   "Single files also via the ntfy app:": "Singoli file anche tramite l'app ntfy:",
   "Gestures (phone)": "Gesti (telefono)",
   "Statistics": "Statistiche",
@@ -15803,5 +15802,6 @@
   "{0} added {1} to the watchers": "{0} ha aggiunto {1} agli osservatori",
   "{0} removed {1} from the watchers": "{0} ha rimosso {1} dagli osservatori",
   "{0} started watching the task": "{0} ora osserva l’attività",
-  "{0} stopped watching the task": "{0} non osserva più l’attività"
+  "{0} stopped watching the task": "{0} non osserva più l’attività",
+  "This device fits {0} tabs, the rest goes under “More”.": "Su questo dispositivo stanno {0} schede, il resto va in «Altro»."
 }

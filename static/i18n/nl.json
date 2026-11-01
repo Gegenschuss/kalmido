@@ -1030,7 +1030,6 @@
   "Appearance": "Weergave",
   "Reminders": "Herinneringen",
   "Tab bar": "Tabbalk",
-  "A phone fits {0} tabs, the rest goes under “More”.": "Op de telefoon passen {0} tabbladen, de rest staat onder „Meer”.",
   "Single files also via the ntfy app:": "Losse bestanden ook via de ntfy-app:",
   "Gestures (phone)": "Gebaren (telefoon)",
   "Statistics": "Statistieken",
@@ -15803,5 +15802,6 @@
   "{0} added {1} to the watchers": "{0} heeft {1} toegevoegd aan de volgers",
   "{0} removed {1} from the watchers": "{0} heeft {1} verwijderd uit de volgers",
   "{0} started watching the task": "{0} volgt nu de taak",
-  "{0} stopped watching the task": "{0} volgt de taak niet meer"
+  "{0} stopped watching the task": "{0} volgt de taak niet meer",
+  "This device fits {0} tabs, the rest goes under “More”.": "Op dit apparaat passen {0} tabbladen, de rest staat onder „Meer”."
 }

@@ -1030,7 +1030,6 @@
   "Appearance": "Apariencia",
   "Reminders": "Recordatorios",
   "Tab bar": "Barra de pestañas",
-  "A phone fits {0} tabs, the rest goes under “More”.": "En el móvil caben {0} pestañas; el resto va en «Más».",
   "Single files also via the ntfy app:": "Archivos sueltos también mediante la app ntfy:",
   "Gestures (phone)": "Gestos (móvil)",
   "Statistics": "Estadísticas",
@@ -15803,5 +15802,6 @@
   "{0} added {1} to the watchers": "{0} añadió a {1} como observador",
   "{0} removed {1} from the watchers": "{0} quitó a {1} de los observadores",
   "{0} started watching the task": "{0} empezó a observar la tarea",
-  "{0} stopped watching the task": "{0} dejó de observar la tarea"
+  "{0} stopped watching the task": "{0} dejó de observar la tarea",
+  "This device fits {0} tabs, the rest goes under “More”.": "En este dispositivo caben {0} pestañas; el resto va en «Más»."
 }
