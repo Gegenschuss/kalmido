@@ -186,6 +186,7 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None, edits=False):
             "job_id": r["job_id"] if "job_id" in r.keys() else None,  # 2.32.0 (#1081): the job whose result this is
             "job_parent": r["job_parent"] if "job_parent" in r.keys() else None,  # 2.47.3 (#1764): the leading job of that part job
             "job_msg": r["job_msg"] if "job_msg" in r.keys() else None,  # 2.96.0 C (#2015): say | question | result | error (null = unknown)
+            "source": r["source"] if "source" in r.keys() else None,  # 2.388.0 (#3341): e.g. dispatcher, the app can hide it (null = the agent itself)
             # 2.37.0 (#1159): the agent offers "Save as task" under this message (the person saves, never the agent)
             "offer_save": bool(r["offer_save"]) if "offer_save" in r.keys() and r["sender"] == "agent" else False,
             **chat_reply(r),  # 2.33.0 (#1076): reply_to + reply (the quote of the answered message)
@@ -675,6 +676,23 @@ def chat_post(c, aid, uid, sender, b, files, allowed_keys=("body", "task_id")):
 # push, never unread, no buttons, no live steps taken along, no event to anyone; it does not make older buttons expire and
 # is no answer to an edited message. At most one file (the summary): a tap on the line opens it.
 NOTICE_MAX = 200
+
+
+def chat_source(v):
+    """2.388.0 (#3341): the checked field source of POST /api/v1/agent/chats/{uid}: a short name, None without."""
+    if v in (None, ""):
+        return None
+    if not isinstance(v, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,23}", v):
+        raise BadInput(tr("Invalid value: {0}", "source"))
+    return v
+
+
+def chat_set_source(c, r, src):
+    """Writes the source on the new row r -> the row (caller commits)."""
+    if not src:
+        return r
+    c.execute("UPDATE agent_chat SET source=? WHERE id=?", (src, r["id"]))
+    return c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone()
 
 
 def cx_notice_post(c, aid, uid, b, files):

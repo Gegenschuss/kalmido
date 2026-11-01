@@ -1759,6 +1759,15 @@ on; the answer names `next_step_dropped` (`off`, `repeat`, `conflict`, `full`) w
 message reports a limit (a one-way step, a refusal, a stop, an error) - with work style `push: "limits"` only such messages,
 approvals, permission questions and a job waiting for approval send a push. Older servers answer 400: send it without.
 
+### Where a message comes from
+
+*Since 2.388.0 (#3341).* `POST /api/v1/agent/chats/{user_id}` (MCP `send_chat`) takes `source`: what produced the message when
+it is not you answering, a short name (`^[a-z][a-z0-9_-]{0,23}$`, else 400), for example `dispatcher` for a helper of yours that
+reports on its own. It comes back in the message as `source` (`null` without). With `source` `dispatcher` the person can hide
+such lines in the chat's filter menu (*Show dispatcher messages*, kept per device); a job's message or one with buttons always
+stays, and lines without the field that start with `Dispatcher` count as well. Hidden lines still push like every message.
+Older servers answer 400: send it without.
+
 ### Notices in the chat
 
 *Since 2.41.0.*

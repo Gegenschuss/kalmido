@@ -337,11 +337,11 @@ def t_send_chat(api, a):
             except ValueError:
                 raise ApiError(400, f"files: {f['name']} is not valid base64") from None
             files.append((f["name"], f.get("mime") or "application/octet-stream", data))
-        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "job_msg", "reply_to", "offer_save", "kind", "next_step", "limit")), files))  # approval: see request_chat_approval; 2.236.0 (#2909 #2911): next_step / limit
+        return api.call("POST", f"/agent/chats/{int(a['user_id'])}", multipart=(_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "job_msg", "reply_to", "offer_save", "kind", "next_step", "limit", "source")), files))  # approval: see request_chat_approval; 2.236.0 (#2909 #2911): next_step / limit
     if not a.get("body"):
         raise ApiError(400, "body (or files) is required")
     return api.call("POST", f"/agent/chats/{int(a['user_id'])}", body=_pick(a, ("body", "task_id", "choices", "multi", "permission", "expires_in", "job_id", "job_parent", "job_msg", "reply_to", "offer_save", "kind",
-                                                                              "next_step", "limit")))  # 2.236.0 (#2909 #2911)
+                                                                              "next_step", "limit", "source")))  # 2.236.0 (#2909 #2911); 2.388.0 (#3341): source
 
 
 def t_request_chat_approval(api, a):
@@ -915,6 +915,9 @@ TOOLS = [
                        "description": "2.96.0: with job_id: what this job message is -- say (an interim message), question, result (the job's end "
                                       "result) or error; the app groups a job's messages into one card and shows result / error under it. "
                                       "Without it the app reads the text (a leading ✅ = result, ⚠️ ⏰ ⏹ = error). Older servers answer 400 -- then send it without"},
+           "source": {"type": "string", "description": "2.388.0: what produced this message when it is not you answering (a short name in lower case, e.g. "
+                                                       "dispatcher: a helper of yours); the person can hide the source dispatcher in the chat's filter menu. "
+                                                       "Older servers answer 400 -- then send it without"},
            "permission": {"type": "boolean"}, "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800},
            "choices": {"type": "array", "maxItems": 8, "items": {"type": "object", "properties": {
                "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},

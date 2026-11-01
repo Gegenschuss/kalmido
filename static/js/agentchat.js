@@ -181,7 +181,7 @@ function chs_save(box, force) {
 let chs_st = 0;
 const chs_saveSoon = box => { clearTimeout(chs_st); chs_st = setTimeout(() => chs_save(box.isConnected ? box : null), 80); };
 // the first agent message after the one seen (null: nothing new, or the chat was never opened here)
-const chs_after = id => S.chat.msgs.find(m => m.id > id && m.from === 'agent' && m.kind !== 'notice') || null;
+const chs_after = id => S.chat.msgs.find(m => m.id > id && m.from === 'agent' && m.kind !== 'notice' && !jcd_hidden(m)) || null;  // 2.388.0 (#3341): a hidden line is no new one
 function chs_first() { const sv = chs_get(S.chat.aid); return sv ? chs_after(sv.id) : null; }
 // scrolls the line "New messages" (or its message) to the top; false = not drawn (e.g. inside a job's card)
 function chs_toLine(box) {
@@ -767,7 +767,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act="chat-head-menu"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();
   // 2.152.2 C (#2627): filter, long messages and steps live in this menu (the header shows only search + menu)
-  const filt = !S.chat.job && S.jcd.n;
+  const filt = !S.chat.job && (S.jcd.n || jcd_srcSeen());  // 2.388.0 (#3341)
   menu(b, [...chatStopItem(agentById(S.chat.aid)), ...chatHeadInfo(b), ...filt ? [{label: tr('Filter: {0}', jcd_filterName()), icon: 'filter', more: jcd_choices()}] : [],
     {label: tr('Fold long messages'), icon: 'collapse', on: jcf_on(), fn: () => jcf_toggle()},
     {label: tr('Always show steps'), icon: 'list', on: stepsAlwaysOn(), fn: () => stepsAlways()},
@@ -959,7 +959,7 @@ function chatPatch(o = {}) {
   else if (late && chs_toLine(box)) { /* the first new one, loaded right after opening */ }
   else if (o.keep) box.scrollTop = top + box.scrollHeight - h;
   else if (near || o.bottom) { box.scrollTop = box.scrollHeight; chatNewPill(false); S.chat.pin = true; chs_save(box); }
-  else { if (box.scrollTop !== top) box.scrollTop = top; if (last && nl > last && ms.some(m => m.id > last && m.from === 'agent' && m.kind !== 'notice')) chatNewPill(true); }
+  else { if (box.scrollTop !== top) box.scrollTop = top; if (last && nl > last && ms.some(m => m.id > last && m.from === 'agent' && m.kind !== 'notice' && !jcd_hidden(m))) chatNewPill(true); }
   const on = !!a?.enabled && !jc_ended(), ci = $('#chat-in'),  /* 2.56.0 (#1793): an ended job's history: box off */ sb = ci?.closest('.chcomp')?.querySelector('[data-act="chat-send"]') || $('[data-act="chat-send"]');  // paused / resumed: the same box; 2.47.1 (#1720): the live window's button
   if (ci && ci.disabled === on) ci.disabled = !on;
   if (sb && sb.disabled === on && !S.chat.sending) sb.disabled = !on;

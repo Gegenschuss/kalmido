@@ -3277,6 +3277,8 @@ MIGRATIONS = [
     ("agent_chat", "kind", "ALTER TABLE agent_chat ADD COLUMN kind TEXT"),
     # 2.96.0 C (#2015): the kind of a job message: say | question | result | error (NULL = unknown, the app derives it)
     ("agent_chat", "job_msg", "ALTER TABLE agent_chat ADD COLUMN job_msg TEXT"),
+    # 2.388.0 (#3341): where an agent's message comes from (e.g. dispatcher, NULL = the agent itself); older versions ignore it
+    ("agent_chat", "source", "ALTER TABLE agent_chat ADD COLUMN source TEXT"),
     # 2.41.0 (#1471): time tracking is a switch of each list (any type, default off; was: every project list). Lists that
     # already hold time entries get it on once (core/db.py init_db, migr_time241); 2.40.2 ignores the column
     ("lists", "time_tracking", "ALTER TABLE lists ADD COLUMN time_tracking BIGINT NOT NULL DEFAULT 0"),

@@ -1184,6 +1184,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                  "offer_save": {"type": "boolean", "description": "2.37.0 (#1159): the button \"Save as task\" under the message (the person saves it, never the agent)"},
                                                  "kind": {"type": "string", "enum": ["message", "notice"], "description": "2.41.0 (#1206): notice = one grey line (body up to 200 characters, no buttons, at most one file)"},
                                                  "job_msg": {"type": "string", "enum": ["say", "question", "result", "error"], "description": "2.306.0 F (#2942): with job_id, the kind of this job message (2.96.0 C, #2015)"},
+                                                 "source": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,23}$", "description": "2.388.0 (#3341): what produced this "
+                                                            "message, when it is not you answering (e.g. dispatcher: a helper of yours); comes back as source, "
+                                                            "the person can hide the source dispatcher in the chat's filter menu"},
                                                  "limit": {"type": "boolean", "description": "2.236.0 B (#2909): this message reports a limit (a one-way "
                                                            "step, a refusal, a stop, an error): with the work style push \"limits\" only such messages, "
                                                            "approval requests and permission questions push"},
@@ -1210,6 +1213,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                  "job_id": {"type": "integer"}, "job_parent": {"type": "integer"},  # 2.59.0 (#1827)
                                                  "approval": {"type": "string", "description": "2.35.0 (#1103): the approval object as a JSON string"},
                                                  "limit": {"type": "string", "description": "2.236.0 B (#2909): true / false"}, "next_step": {"type": "string", "maxLength": 80},
+                                                 "source": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,23}$"},  # 2.388.0 (#3341)
                                                  "file": {"type": "array", "items": {"type": "string", "format": "binary"}}}}}}}}},
         "/agent/usage": {  # 2.1.1 (#326)
             "post": op("Report model usage (numbers and ids only; allowed also over the hard limit)", AG,

@@ -15767,5 +15767,7 @@
   "Advance payments: the sum of the advance returns as Kalmido computes them, without a special advance payment. Please compare with what you filed.": "Vorauszahlungen: die Summe der Voranmeldungen, wie Kalmido sie rechnet, ohne Sondervorauszahlung. Bitte mit dem Abgegebenen vergleichen.",
   "Advance payments are 0 because no rhythm is set under tax dates. Please enter what you filed.": "Die Vorauszahlungen sind 0, weil unter Steuertermine kein Rhythmus eingestellt ist. Bitte das Abgegebene eintragen.",
   "Tax-free sales: please check the line and enter the section of the law on the form.": "Steuerfreie Umsätze: Bitte die Zeile prüfen und den Paragrafen im Formular eintragen.",
-  "Only an admin of this server sets the e-mail domains of an organisation": "Die E-Mail-Domains einer Organisation setzt nur ein Admin dieses Servers"
+  "Only an admin of this server sets the e-mail domains of an organisation": "Die E-Mail-Domains einer Organisation setzt nur ein Admin dieses Servers",
+  "Show dispatcher messages": "Dispatcher-Meldungen zeigen",
+  "Dispatcher messages hidden": "Dispatcher-Meldungen ausgeblendet"
 }

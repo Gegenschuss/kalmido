@@ -15767,5 +15767,7 @@
   "Advance payments: the sum of the advance returns as Kalmido computes them, without a special advance payment. Please compare with what you filed.": "Voorschotten: de som van de voorlopige aangiften zoals Kalmido ze berekent, zonder speciaal voorschot. Vergelijk met wat je hebt ingediend.",
   "Advance payments are 0 because no rhythm is set under tax dates. Please enter what you filed.": "De voorschotten zijn 0 omdat er bij belastingdata geen ritme is ingesteld. Vul in wat je hebt ingediend.",
   "Tax-free sales: please check the line and enter the section of the law on the form.": "Vrijgestelde omzet: controleer de regel en vul het wetsartikel op het formulier in.",
-  "Only an admin of this server sets the e-mail domains of an organisation": "Alleen een beheerder van deze server stelt de e-maildomeinen van een organisatie in"
+  "Only an admin of this server sets the e-mail domains of an organisation": "Alleen een beheerder van deze server stelt de e-maildomeinen van een organisatie in",
+  "Show dispatcher messages": "Dispatcher-meldingen tonen",
+  "Dispatcher messages hidden": "Dispatcher-meldingen verborgen"
 }
