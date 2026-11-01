@@ -8792,7 +8792,8 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
   .timev .tvseg{max-width:100%;min-width:0;flex:1 1 100%}
   .timev .tvseg button{flex:1 1 auto;justify-content:center}
   .tvr-acts .btn{flex:1 1 100%;white-space:normal;text-align:center}
-  .calbar>*{min-width:0;max-width:100%}
+  .calbar>*{max-width:100%}
+  .calbar>:not(.btn){min-width:0}  /* buttons keep the 44 px width of a touch screen (p260_ui) */
   .calbar .seg{flex:1 1 100%;overflow-x:auto;scrollbar-width:none}
   .calbar .seg button{flex:1 0 auto;white-space:nowrap}
   .ntbar{flex-wrap:wrap}
