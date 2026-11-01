@@ -55,7 +55,7 @@ D = O + "/docs"
 TODAY = testclock.today()
 TD = TODAY.isoformat()
 DAY = [(TODAY - timedelta(days=n)).isoformat() for n in range(0, 40)]
-M0 = (TODAY.replace(day=1) - timedelta(days=1)).replace(day=1)  # the finished month before
+M0 = ((TODAY - timedelta(days=7)).replace(day=1) - timedelta(days=1)).replace(day=1)  # a finished month before every day the suite still books after the lock (DAY[6]), also early in a month
 M = M0.isoformat()[:7]
 COMPANY = {"street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE", "vat_id": "DE123456789",
            "iban": "DE02120300000000202051", "bic": "BYLADEM1001", "bank_name": "Beispielbank"}

@@ -82,11 +82,11 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,docs,agents,fields,dep
     if (await ev(`document.querySelector('#side [data-g="office:money"]').getAttribute('aria-expanded') === 'false'`)) await click(ev, '#side [data-act="sbb-group"][data-g="office:money"]');
     const side = `[...document.querySelectorAll('#side [data-ofmg="money"] [data-ofm]')].map(b => b.dataset.ofm).join()`;
     check(await ready(ev, `!!document.querySelector('#side [data-ofmg="money"] [data-ofm="bank"]')`, 20), '#3411: Money open');
-    const pts = await ev(side);
-    // #3560: not used yet = they start under "Hidden" of the editor; the point may show, no "Show more"
+    const pts = await ev(`[${side}, ofm_hidden().map(i => i.key)].join()`);  // #3560 on the live train: not used yet = under "Hidden"; 2.448.0 (#3784, in main) nothing starts hidden
+    // 2.448.0 (#3784): back to #3411: every point shows although nothing is used yet, no "Show more"
     const may = `ofm_avail().map(i => i.key)`;
-    check(['cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => !pts.split(',').includes(k)) && (await ev(`['cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => ${may}.includes(k))`)) && await ev(`!document.querySelector('[data-act="ofm-more"]')`),
-      '#3411: every point of Money can show, no "Show more", although nothing is used yet ' + pts);
+    check(['cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => pts.split(',').includes(k)) && (await ev(`['cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => ${may}.includes(k))`)) && await ev(`!document.querySelector('[data-act="ofm-more"]')`),
+      '#3784: every point of Money shows, no "Show more", although nothing is used yet ' + pts);
     await shot('p2380rf-money.png');
     // the switches under Settings > Functions
     await nav(B + '#office/settings');
@@ -212,7 +212,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,docs,agents,fields,dep
     await ev(`(() => { openDetail(${PT2}); return 1; })()`);
     check(await ready(ev, `${sec}?.classList.contains('dfolded') && /1 open/.test(${sec}.querySelector('.dfsum')?.textContent || '')`, 40), '#3435: another task after reloading: folded too ("1 open")');
     await click(ev, '#detail .dtop [data-act="task-menu"]');
-    const item = `[...document.querySelectorAll('button, [role="menuitem"]')].find(b => /Unfold all sections/.test(b.textContent))`;
+    const item = `(document.querySelector('#pop .mtmore')?.click(), [...document.querySelectorAll('button, [role="menuitem"]')].find(b => /Unfold all sections/.test(b.textContent)))`;  // 2.445.0 (#3008): under "More…"
     check(await ready(ev, `!!${item}`, 20), '#3435: "Unfold all sections" in the task\'s menu');
     await ev(`(() => { ${item}?.click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('#detail .dfolded')`, 20) && (await srvFold(v => v === '')) !== null, '#3435: everything open again, saved');

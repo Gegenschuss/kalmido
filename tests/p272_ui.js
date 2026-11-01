@@ -84,6 +84,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w.eval('closePop()');
   w.eval(`setDab(${SH}, false)`);
   await until(() => !d.querySelector('#view .group.ckdone'));
+  await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === SH).checklist === 0);  // the view goes first, the server answers later
   check(!d.querySelector('#view .group.ckdone') && (await call('GET', '/api/state')).lists.find(l => l.id === SH).checklist === 0, 'switched off from the menu');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'de'});

@@ -230,6 +230,8 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   st = await call('GET', '/api/state');
   const dup = st.tasks.filter(t => t.title === 'Build').find(t => t.id !== t2);
   check(dup && dup.fields[FS.id] === OPT.Doing && dup.fields[FB.id] === '1234.5', 'duplicate keeps the field values');
+  const NOT_ON_TRAIN = !require('fs').existsSync(require('path').join(__dirname, '..', 'kalmido/lists/tplextra.py'));  // #3134 sits in main, the live train does not have it yet: drop this then
+  check(NOT_ON_TRAIN || (await call('GET', `/api/tasks/${dup.id}/deps`)).blocked_by.some(x => x.id === t1), 'duplicate keeps what it waits on (#3134)');
   const tp = await call('POST', '/api/templates', {list_id: WORK});
   w.eval(`templateModal(${JSON.stringify(tp)})`); await sleep(100);
   check(/Custom fields.*Budget.*Stage/.test(lastModal(d).textContent), 'list template dialog shows the fields');
@@ -245,10 +247,10 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   const cards = [...d.querySelectorAll('.ovcard')];
   check(cards.length === 2 && /Work/.test(cards[0].querySelector('.ovname').textContent) && cards[0].classList.contains('risk'), 'overview: 2 lists, Work (at risk) first');
   const wc = cards[0].textContent;
-  check(/Overdue\s*1/.test(wc) && /Design/.test(wc) && /Blocked\s*1/.test(wc) && /Blocked by: “Design”/.test(wc) && /Without assignee/.test(wc), 'Work card: overdue, waiting, without assignee');
+  check(/Overdue\s*1/.test(wc) && /Design/.test(wc) && new RegExp(`Blocked\\s*${NOT_ON_TRAIN ? 1 : 2}`).test(wc) && /Blocked by: “Design”/.test(wc) && /Without assignee/.test(wc), 'Work card: overdue, waiting (Build and its duplicate, #3134), without assignee');
   check(/Nobody/.test(wc), 'overdue grouped by assignee (Nobody)');
   const tiles = [...d.querySelectorAll('.ovw .sttiles b')].map(b => b.textContent);
-  check(tiles[0] === '1' && tiles[1] === '1' && tiles[2] === '1', 'tiles: 1 overdue, 1 waiting, 1 at risk: ' + tiles);
+  check(tiles[0] === '1' && tiles[1] === (NOT_ON_TRAIN ? '1' : '2') && tiles[2] === '1', 'tiles: 1 overdue, 2 waiting, 1 at risk: ' + tiles);
   d.querySelector('[data-act="ov-only"][data-k="1"]').click(); await sleep(100);
   check(d.querySelectorAll('.ovcard').length === 1, 'needs attention: only Work');
   d.querySelector('[data-act="ov-only"][data-k=""]').click();
