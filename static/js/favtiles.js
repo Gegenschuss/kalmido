@@ -17,7 +17,7 @@
 
 // [icon, name] of the Plan views and the rows of "More"
 const FV2_VIEWS = {inbox: ['inbox', N_('Basket')], assigned: ['user', N_('My tasks')], today: ['sun', N_('Today')], tomorrow: ['sunrise', N_('Tomorrow')],
-  week: ['week', N_('Next 7 days')], doable: ['zap', N_('Now doable')], pinned: ['pin', N_('Pinned|view')], waiting: ['hourglass', N_('Waiting on someone')],
+  week: ['week', N_('Next 7 days')], doable: ['zap', N_('Now doable')], pinned: ['pin', N_('Pinned|view')], waiting: ['hourglass', N_('Waiting on someone')], mine_wait: ['flag', N_('Waiting for me')],
   stale: ['clock', N_('Lying idle')], byme: ['send', N_('Assigned by me')], all: ['all', N_('All')], done: ['done', N_('Completed')], trash: ['trash', N_('Trash')],
   archived: ['archive', N_('Archived')]};
 // [icon, name] of the views and modules (an area of areas.js wins for its id: its row stands for all its parts)

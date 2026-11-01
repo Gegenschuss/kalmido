@@ -801,6 +801,7 @@ def umz_export_queries(uid):
         "filters": ("SELECT * FROM filters WHERE user_id=?", (uid,)),
         "attachments": (f"SELECT * FROM attachments WHERE task_id IN {task_ids}", (uid,)),
         "comments": (f"SELECT * FROM comments WHERE task_id IN {task_ids} AND deleted_at IS NULL", (uid,)),
+        "task_decisions": (f"SELECT * FROM task_decisions WHERE task_id IN {task_ids} ORDER BY id", (uid,)),  # 2.392.0 C (#3370)
         # 2.71.0 (#1459, review N5): "also in list X" lines without the id of a list the person may not see
         "activity": (f"SELECT id, task_id, user_id, kind, CASE WHEN kind IN ('ml_add', 'ml_rm') THEN '{{}}'::jsonb ELSE data END AS data, "
                      f"created_at FROM activity WHERE task_id IN {task_ids}", (uid,)),
@@ -914,10 +915,10 @@ def export_json():
 # that); their "l:<id>" here only holds the place. A key the person cannot see (any more) is kept but never shown.
 FV2_MAX = 200
 FV2_VIEWS = ("inbox", "assigned", "today", "tomorrow", "week", "doable", "pinned", "waiting", "stale", "byme", "all", "done",
-             "trash", "archived")
+             "trash", "archived", "mine_wait")
 # 2.441.0 (#3592): anything with an address of its own: r:<reference kind>:<id> (lists/favorites.py FV2_REF_KINDS), file: (a file
 # or folder of the file store), doc: (a document), sv: (a saved view of the sidebar), sep: (a divider between the favourites)
-FV2_KEY_RE = re.compile(r"(?:[lafpg]:\d{1,11}|m:[a-z]{2,16}|v:[a-z]{2,12}|(?:file|doc|sep):\d{1,11}|sv:[a-z0-9]{1,16}"
+FV2_KEY_RE = re.compile(r"(?:[lafpg]:\d{1,11}|m:[a-z]{2,16}|v:[a-z_]{2,12}|(?:file|doc|sep):\d{1,11}|sv:[a-z0-9]{1,16}"
                         r"|r:(?:office_doc|office_letter|office_gendoc|office_receipt|wiki|sheet|contact|address_book):\d{1,11})")
 FV2_META_MAX = 200
 FV2_META_RE = re.compile(r"(?:#[0-9a-fA-F]{6})?")

@@ -1143,6 +1143,7 @@ async function load(auto) {
   if (S.chat.aid && collab()) chatLoad();
   if (S.route.mod === 'agents' && S.jobs.items !== null) loadJobs();
   if (typeof staleLoad === 'function') staleLoad(S.route.key === 'stale');  // 2.34.0 (#266): at most every 5 minutes, at once in its view
+  mwLoad(S.route.key === 'mine_wait');  // 2.392.0 D (#3369): at most once a minute, at once in its view
 }
 // 2.40.0 (#1432): Completed / Trash show 100 tasks first, "Load more" adds 100; a change reloads as many as are shown
 const HIST_PAGE = 100;
@@ -1350,6 +1351,7 @@ const SMART = {
   doable: {name: N_('Now doable'), icon: 'zap'},  // 1.7.0
   waiting: {name: N_('Waiting on someone'), icon: 'hourglass'},  // 2.1.0 (#335)
   stale: {name: N_('Lying idle'), icon: 'clock'},  // 2.34.0 (#266)
+  mine_wait: {name: N_('Waiting for me'), icon: 'flag'},  // 2.392.0 D (#3369): minewait.js
   pinned: {name: N_('Pinned|view'), icon: 'pin'},  // 2.16.0 (#648): every pinned task of every list
   assigned: {name: N_('My tasks'), icon: 'user'},
   byme: {name: N_('Assigned by me'), icon: 'send'},  // 2.36.2 (#1138)

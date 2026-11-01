@@ -16,6 +16,7 @@ from ..integrations.importers import IMPORT_MAX_MB, IMPORT_MAX_TASKS, IMPORT_SOU
 from ..api.v1 import _SPEC, API_PAGE_DEFAULT, API_PAGE_MAX, API_SCOPES, API_VERSION, PRIO_VALUES, STATUS_NAMES, V1_TASK_IN
 from ..api.common import V1_CODES
 from ..tasks.dayplan import dayplan_spec
+from ..tasks.oneway import dec_spec
 
 
 def groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
@@ -165,6 +166,9 @@ def openapi_spec():
                    "notes, completing and subtasks stay free). Tasks created with an agent token start locked (send "
                    "locked: false to create an open one); the API itself is not bound by the lock and can set or clear it"}}
     # 2.60.0 (#1511): story points
+    task_props["irreversible"] = {"type": ["object", "null"], "description": "2.392.0: a one-way step: PATCH {reason} marks the task (a "
+                                  "new reason takes a yes back), null takes the mark off (people only). Read: reason, yes_by, yes_at. Where the "
+                                  "project has irreversible_needs_yes on, integrate / deploy requests stay open until a person said yes"}
     task_props["points"] = nul("integer", enum=[1, 2, 3, 5, 8, 13, None], description="2.60.0: story points (Fibonacci); "
                                "null = none. Always stored; the app shows them where the project has story points on (points_on)")
     # 2.111.0 C (#2057): a reminder at a fixed local time, with or without a due date
@@ -188,9 +192,16 @@ def openapi_spec():
     task_in["content"] = {"type": "string", "description": "Alias of notes (the web API's name, 2.2.1); not together with a different notes"}
     schemas = {
         "Error": {"type": "object", "required": ["error"], "properties": {"error": {"type": "object", "required": ["code", "message"], "properties": {
-            "code": {"type": "string", "enum": sorted(set(V1_CODES.values()) | {"unknown_field"})}, "message": {"type": "string"},
+            "code": {"type": "string", "enum": sorted(set(V1_CODES.values()) | {"unknown_field", "slots_full", "wip_full"})}, "message": {"type": "string"},
             "fields": {"type": "array", "items": {"type": "string"},
-                       "description": "code unknown_field (2.2.1): the body fields this endpoint does not know (nothing was changed)"}}}}},
+                       "description": "code unknown_field (2.2.1): the body fields this endpoint does not know (nothing was changed)"},
+            # 2.392.0 A (#3367): POST /agent/jobs refused by a hard limit (409)
+            "running": {"type": "integer", "description": "code slots_full: your running jobs"},
+            "max": {"type": "integer", "description": "code slots_full: your max_parallel (the places)"},
+            "section_id": {"type": "integer", "description": "code wip_full: the column that is over its limit"},
+            "section": {"type": "string", "description": "code wip_full: its name"},
+            "count": {"type": "integer", "description": "code wip_full: open tasks in it"},
+            "limit": {"type": "integer", "description": "code wip_full: its wip_limit"}}}}},
         "Task": {"type": "object", "properties": {**task_props, "blocked": {"type": "boolean", "description": "Blocked by an open task (dependencies, shown as Blocked by)"},
                                                   "comment_count": {"type": "integer"},
                                                   "context": {"type": "boolean", "description": "Participant view: the parent of one of your "
@@ -738,6 +749,7 @@ def openapi_spec():
              q("day", "Local day YYYY-MM-DD", date_s), limit, cursor], scope="admin-read")},
     }
     agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page)
+    dec_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.392.0 C (#3370)
     git_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)
     overview_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)
     groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)  # 2.10.0 (#441)
@@ -788,6 +800,8 @@ def openapi_spec():
     briefing_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#264)
     from ..lists.report import report_spec
     report_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#265)
+    from ..integrations.delivery import delivery_spec
+    delivery_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.392.0 D (#3369)
     from ..tasks.stale import stale_spec
     stale_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#266)
     from ..personal.timegaps import timegaps_spec

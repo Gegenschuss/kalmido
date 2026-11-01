@@ -497,16 +497,20 @@ def chat_approval_clean(v, expires_in=None):
     return json.dumps(d, ensure_ascii=False)
 
 
+CHAT_CARD_SQL = """sender='agent' AND choice IS NULL AND choices IS NOT NULL AND choices->>'withdrawn_at' IS NULL
+                   AND (choices->>'approval' IS NOT NULL OR COALESCE(choices->>'permission', '0') NOT IN ('0', 'false'))"""
+
+
 def chat_approvals_open(c, aid, uid):
     """2.35.0 (#1103): the open approval requests + permission questions of agent aid to person uid (newest last)."""
-    out = []
-    for r in c.execute("""SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND sender='agent' AND choice IS NULL
-                          AND choices IS NOT NULL AND choices->>'withdrawn_at' IS NULL
-                          AND (choices->>'approval' IS NOT NULL OR COALESCE(choices->>'permission', '0') NOT IN ('0', 'false'))
-                          ORDER BY id""", (aid, uid)):
-        if choice_state(r, _jload(r["choices"]), None) == "open":
-            out.append(r)
-    return out
+    return [r for r in c.execute(f"SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND {CHAT_CARD_SQL} ORDER BY id", (aid, uid))
+            if choice_state(r, _jload(r["choices"]), None) == "open"]
+
+
+def chat_approvals_of(c, uid, aid, scan):
+    """2.392.0 D (#3369): the same over all agents of person uid (aid: only that one), newest first, of the newest scan cards."""
+    q = f"SELECT * FROM agent_chat WHERE user_id=? {'AND agent_id=?' if aid else ''} AND {CHAT_CARD_SQL} ORDER BY id DESC LIMIT ?"
+    return [r for r in c.execute(q, (uid, aid, scan) if aid else (uid, scan)) if choice_state(r, _jload(r["choices"]), None) == "open"]
 
 
 def _approval_of(ids):

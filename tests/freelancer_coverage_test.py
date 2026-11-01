@@ -344,6 +344,7 @@ ROUTES = {
     "GET /api/lists/{}/playbook/versions/{}": "lists", "GET /api/lists/{}/public-link": "lists",
     "GET /api/lists/{}/repos": "lists", "GET /api/lists/{}/build-status": "lists", "GET /api/v1/lists/{}/build-status": "lists",
     "PUT /api/lists/{}/repos/version-field": "lists",  # 2.151.0 A (#2558)
+    "PUT /api/lists/{}/repos/close-release": "lists", "POST /api/tasks/{}/partial": "tasks", "POST /api/v1/tasks/{}/partial": "tasks",  # 2.392.0 B (#3364)
     "GET /api/lists/{}/rules": "lists", "GET /api/lists/{}/signoffs": "lists",
     "GET /api/lists/{}/sprints": "lists", "GET /api/lists/{}/status": "lists", "GET /api/lists/{}/status-report": "lists",
     "GET /api/lists/{}/time/delete-all": "lists", "GET /api/lists/{}/velocity": "lists", "GET /api/templates": "lists",
@@ -358,6 +359,7 @@ ROUTES = {
     "GET /api/v1/lists/{}/overview": "lists", "GET /api/v1/lists/{}/playbook": "lists", "GET /api/v1/lists/{}/repos": "lists",
     "GET /api/v1/lists/{}/rules": "lists", "GET /api/v1/lists/{}/sections": "lists", "GET /api/v1/lists/{}/sprints": "lists",
     "GET /api/v1/lists/{}/status-report": "lists", "GET /api/v1/lists/{}/tags": "lists",
+    "GET /api/v1/lists/{}/delivery-report": "lists",  # 2.392.0 D (#3369)
     "GET /api/v1/lists/{}/velocity": "lists", "GET /api/v1/lists/{}/weekly-status": "lists", "GET /api/v1/templates": "lists",
     "PATCH /api/fields/{}": "lists", "PATCH /api/filters/{}": "lists", "PATCH /api/forms/{}": "lists",
     "PATCH /api/layouts/saved/{}": "lists", "PATCH /api/list-tags/{}": "lists", "PATCH /api/lists/{}": "lists",
@@ -392,6 +394,8 @@ ROUTES = {
     "POST /api/lists/{}/time/restore": "lists", "POST /api/rules/{}/restore": "lists", "POST /api/sections": "lists",
     "POST /api/templates": "lists", "POST /api/templates/{}/apply": "lists", "POST /api/v1/filters": "lists",
     "POST /api/v1/folders/delete": "lists", "POST /api/v1/folders/rename": "lists", "POST /api/v1/layouts/proposals": "lists",
+    "PUT /api/tasks/{}/irreversible": "tasks", "DELETE /api/tasks/{}/irreversible": "tasks", "POST /api/tasks/{}/irreversible-yes": "tasks",  # 2.392.0 C (#3370)
+    "GET /api/tasks/{}/decisions": "tasks", "POST /api/tasks/{}/decisions": "tasks", "GET /api/v1/tasks/{}/decisions": "tasks", "POST /api/v1/tasks/{}/decisions": "tasks",
     "POST /api/v1/lists": "lists", "POST /api/v1/lists/{}/deployments": "lists", "POST /api/v1/lists/{}/duplicate": "lists",
     "POST /api/v1/lists/{}/fields": "lists", "POST /api/v1/lists/{}/files": "lists", "POST /api/v1/lists/{}/forms": "lists",
     "POST /api/v1/lists/{}/join": "lists", "POST /api/v1/lists/{}/links": "lists", "POST /api/v1/lists/{}/milestones": "lists",
@@ -695,6 +699,7 @@ ROUTES = {
     "DELETE /api/v1/notes/{}": "tasks", "DELETE /api/v1/tasks/{}": "tasks", "DELETE /api/v1/tasks/{}/contacts/{}": "tasks",
     "DELETE /api/v1/tasks/{}/dependencies/{}": "tasks", "DELETE /api/v1/tasks/{}/links/{}": "tasks",
     "DELETE /api/v1/tasks/{}/waiting": "tasks", "DELETE /api/v1/trash": "tasks", "GET /api/attachments/{}": "tasks",
+    "GET /api/inbox": "tasks", "GET /api/v1/me/waiting": "tasks",  # 2.392.0 D (#3369)
     "GET /api/briefing": "tasks", "GET /api/chat-files/{}": "tasks", "GET /api/comments/{}/choice": "tasks",
     "GET /api/dayplan": "tasks", "GET /api/dayplan/review": "tasks", "GET /api/deps": "tasks", "GET /api/export.json": "tasks", "GET /api/export/todoist.zip": "tasks", "GET /api/export/markdown.zip": "tasks", 
     "GET /api/ical": "tasks", "GET /api/imports": "tasks", "GET /api/news": "tasks", "GET /api/notes": "tasks",
@@ -1098,7 +1103,6 @@ DELETE /api/disc/requests/{}
 DELETE /api/docs/mail
 DELETE /api/e2e/keys
 DELETE /api/envs/{}
-DELETE /api/envs/{}/deploys/{}
 DELETE /api/family/contacts/{}
 DELETE /api/family/kids/{}/pin
 DELETE /api/family/rewards/{}
@@ -1192,7 +1196,6 @@ PATCH /api/calendars/{}
 PATCH /api/calendars/{}/events
 PATCH /api/comments/{}
 PATCH /api/docs/labels/{}/{}
-PATCH /api/envs/{}
 PATCH /api/evcals/{}
 PATCH /api/family/rewards/{}
 PATCH /api/filters/{}
@@ -1260,11 +1263,9 @@ POST /api/clients/merge
 POST /api/clients/merges/{}/undo
 POST /api/comments/{}/apply
 POST /api/comments/{}/choice
-POST /api/comments/{}/decide
 POST /api/comments/{}/reactions
 POST /api/contacts/merge
 POST /api/contacts/merges/{}/undo
-POST /api/deps
 POST /api/disc/blocks/{}
 POST /api/disc/check
 POST /api/disc/confirm
@@ -1273,7 +1274,6 @@ POST /api/disc/find
 POST /api/disc/requests
 POST /api/disc/requests/{}/{}
 POST /api/docs/{}/accept
-POST /api/envs/{}/deploy
 POST /api/envs/{}/restore
 POST /api/events/{}/prep-task
 POST /api/events/{}/rsvp
@@ -1307,14 +1307,10 @@ POST /api/life/upkeep
 POST /api/list-checks/{}/run
 POST /api/lists/reorder
 POST /api/lists/{}/checks
-POST /api/lists/{}/e2e/bulk
 POST /api/lists/{}/e2e/files/{}
-POST /api/lists/{}/e2e/finish
 POST /api/lists/{}/e2e/keys
 POST /api/lists/{}/e2e/rotate
-POST /api/lists/{}/e2e/start
 POST /api/lists/{}/e2e/stop
-POST /api/lists/{}/envs
 POST /api/lists/{}/folder-reset
 POST /api/lists/{}/header
 POST /api/lists/{}/icon
@@ -1415,7 +1411,6 @@ POST /api/tasks/{}/chain/pull
 POST /api/tasks/{}/contacts
 POST /api/tasks/{}/editing
 POST /api/tasks/{}/enc-attachments
-POST /api/tasks/{}/git-undo
 POST /api/tasks/{}/list-attachments
 POST /api/tasks/{}/seen
 POST /api/tasks/{}/take

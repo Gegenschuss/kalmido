@@ -652,6 +652,9 @@ function actText0(a, U) {
     case 'apstate': return {pending: tr('{0} asked {1} for approval', who, q(uname(d.approver, U))), approved: tr('{0} approved the task', who), changes: tr('{0} asked for changes', who),
       rejected: tr('{0} rejected the task', who), cancelled: tr('{0} withdrew the approval request', who)}[d.state] + (d.note ? ': ' + q(d.note) : '');  // 2.23.0 (#463)
     case 'review': return rvw_actText(d, who, q, U);  // 2.60.0 C (#1512)
+    case 'irreversible': return d.on === 0 ? tr('{0} took the one-way mark off', who) : d.reason ? tr('{0} marked this as a one-way step: {1}', who, q(d.reason)) : tr('{0} marked this as a one-way step', who);  // 2.392.0 C (#3370)
+    case 'irreversible_yes': return tr('{0} gave the yes to this one-way step', who);
+    case 'decision': return tr('{0} recorded a decision', who);
     case 'approval': return d.ok ? tr('{0} approved the comment of {1}', who, q(uname(d.agent, U))) : tr('{0} rejected the comment of {1}', who, q(uname(d.agent, U)));
     case 'agent_job': {
       const jt = q(d.title_key ? tr(...d.title_key) : d.title || '');  // 2.454.0 (#3808): a proposal's title in the reader's language
@@ -824,6 +827,7 @@ function drawTimeline() {
   const box = $('#d-tl-items'), seen = !box?.lastElementChild || cf_visible(box.lastElementChild);
   if (box) { patchKids(box, timelineItems()); cf_comments(box, seen); }  // 2.46.2 (#1660)  // 2.12.2 (#451): only changed / new comments
   if (typeof ptl_draw === 'function') ptl_draw();  // 2.63.0 B (#1513): the customer report's box + the switch
+  ow_draw();  // 2.392.0 C (#3370): the decisions and the yes arrive with the comments
   const hb = $('#d-hist-items'); if (hb) hb.innerHTML = histItems();
   cfst_since();  // 2.410.0 A (#3514): "since …" under a stage bar
   const n = $('#d-tl-count'); if (n) n.textContent = S.tl.comments?.length || '';
@@ -888,7 +892,7 @@ async function sendComment() {
   const cr = CMT_REF[tid]?.text === raw ? CMT_REF[tid] : (CMT_REF[tid] = {text: raw, ref: Date.now().toString(36) + Math.random().toString(36).slice(2, 10)});
   if (payload instanceof FormData) payload.append('client_ref', cr.ref); else payload.client_ref = cr.ref;
   const btn = $('[data-act="c-send"]'); if (btn) btn.disabled = true;
-  try { await capi('POST', `/api/tasks/${tid}/comments`, payload); }
+  try { const r = await capi('POST', `/api/tasks/${tid}/comments`, payload); if (r?.partial) { toast(r.partial.reason || tr('Saved')); if (r.partial.applied) { await load(); render(); } } }  // 2.392.0 B (#3364): "partly: rest in Y"
   catch { if (pub) { PTL.on[tid] = true; ptl_draw(); } return; }
   finally { if (btn) btn.disabled = false; }
   delete CMT_REF[tid];

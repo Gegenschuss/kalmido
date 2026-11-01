@@ -33,6 +33,8 @@ API = {f"{m.upper()} {norm(p)[len('/api/v1'):]}" for m, p in routes if p.startsw
 
 # ---- 1. the web client's routes -> the REST API
 APP_TO_API = {
+    "PUT /api/tasks/{}/irreversible": ["PATCH /tasks/{}"], "DELETE /api/tasks/{}/irreversible": ["PATCH /tasks/{}"],  # 2.392.0 C (#3370)
+    "GET /api/tasks/{}/decisions": ["GET /tasks/{}/decisions"], "POST /api/tasks/{}/decisions": ["POST /tasks/{}/decisions"],
     "GET /api/state": ["GET /lists", "GET /tasks", "GET /habits", "GET /filters", "GET /me"],
     "GET /api/me/storage": ["GET /me/storage"],  # 2.24.0 (#910)
     "GET /api/tasks": ["GET /tasks", "GET /search", "GET /trash"],
@@ -46,6 +48,7 @@ APP_TO_API = {
     "POST /api/tasks/{}/reopen": ["POST /tasks/{}/reopen"],
     "POST /api/tasks/{}/restore": ["POST /tasks/{}/restore"],
     "POST /api/tasks/{}/skip": ["POST /tasks/{}/skip"],
+    "POST /api/tasks/{}/partial": ["POST /tasks/{}/partial"],  # 2.392.0 B (#3364)
     "POST /api/tasks/{}/take": ["POST /tasks/{}/take"],
     "PUT /api/tasks/{}/waiting": ["PUT /tasks/{}/waiting"],
     "DELETE /api/tasks/{}/waiting": ["DELETE /tasks/{}/waiting"],
@@ -142,6 +145,7 @@ APP_TO_API = {
     "GET /api/dayplan": ["GET /dayplan"],
     "GET /api/dayplan/review": ["GET /dayplan/review"],
     "GET /api/briefing": ["GET /briefing"],  # 2.34.0 (#264)
+    "GET /api/inbox": ["GET /me/waiting"],  # 2.392.0 D (#3369)
     "GET /api/lists/{}/status-report": ["GET /lists/{}/status-report"],  # 2.34.0 (#265)
     "GET /api/export.json": ["GET /export"],
     "POST /api/import/{}": ["POST /import/{}"],
@@ -244,6 +248,8 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.392.0 C (#3370): the yes to a one-way step is a person's, per task, in the app: never an agent or a token",
+     ("=POST /api/tasks/{}/irreversible-yes",)),
     ("2.272.0 E1 (#3038): an address book in the trash is restored or deleted for good by a person -- an agent's delete of a whole "
      "address book waits for a person's approval already, so the way back stays with people too",
      ("=POST /api/books/{}/restore", "=POST /api/books/{}/purge")),
@@ -442,6 +448,7 @@ APP_ONLY = [
     ("repositories: their secrets are entered by people; the API reads them (GET /lists/{id}/repos)", (
         "POST /api/lists/{}/repos", "* /api/repos/", "POST /api/hooks/git/", "POST /api/tasks/{}/git-undo",
         "* /api/folders/repos", "PUT /api/lists/{}/folder-repo",
+        "PUT /api/lists/{}/repos/close-release",  # 2.392.0 B (#3364)
         "PUT /api/lists/{}/repos/version-field")),  # 2.151.0 A (#2558): which field holds the version, set with the repository  # 2.33.0 (#934): folder repositories, read through /lists/{id}/repos
     ("2.18.0: the error-report webhook of a list: its secret URL is shown once to people (owner / list admins); the inbound hook "
      "is called by the error service, not by a client", ("* /api/lists/{}/error-hook", "POST /api/hooks/issues/")),
@@ -796,6 +803,7 @@ for name, _, schema, fn in mcp.TOOLS:
             check(False, f"tool {name} {extra}: {e.message}")
 reached = {c for s in CALLS.values() for c in s}
 API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
+    "GET /tasks/{}/decisions": "2.392.0 C (#3370): get_task carries them",
     "GET /office/docs/{}/pdf": "2.51.0 (#1348): the PDF preview of a draft is binary; the chat card (notify) links it for the person",
     "GET /office/letters/{}": "2.153.0 (#2031): list_letter_drafts returns the agent's letters with every field; one letter by id is for scripts",
     "GET /openapi.json": "the API description itself",

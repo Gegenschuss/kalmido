@@ -60,7 +60,7 @@ function aw_html(ws, st) {
     </div>
     <h4 id="aw-h-par">${tr('Tasks at once')}</h4>
     <div class="row"><label for="aw-max_parallel">${tr('At most')}</label><span class="agpct"><input id="aw-max_parallel" data-aw="max_parallel" type="number" min="0" max="20" step="1" inputmode="numeric" value="${esc(ws.max_parallel)}"><span class="muted" id="aw-nolimit">${ws.max_parallel ? '' : esc(tr('no limit'))}</span></span></div>
-    <div class="shint">${tr('0 = no limit. The rest waits in the queue.')}</div>
+    <div class="shint">${tr('0 = no limit. With a number, the agent cannot start more running jobs than that; the rest waits in the queue.')}</div>
     <div id="aw-queue"></div>
     <h4 id="aw-h-prio">${tr('Priority rule')}</h4>
     <textarea id="aw-priority_rule" data-aw="priority_rule" rows="3" maxlength="500" placeholder="${esc(tr('e.g. bugs first, then office, then new things'))}" aria-labelledby="aw-h-prio">${esc(ws.priority_rule)}</textarea>

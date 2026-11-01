@@ -49,7 +49,9 @@ function repoWire(md, lid, folder) {
     const autoLbl = v.setting === 'auto' && v.field ? tr('Automatic ({0})', v.field.name) : tr('Automatic');
     const ctl = j.may ? `<select id="rp-ver" aria-label="${esc(tr('Version field'))}"><option value="auto"${cur === 'auto' ? ' selected' : ''}>${esc(autoLbl)}</option><option value="off"${cur === 'off' ? ' selected' : ''}>${esc(tr('Off'))}</option>${v.fields.map(f => `<option value="${f.id}"${cur === String(f.id) ? ' selected' : ''}>${esc(f.name)}</option>`).join('')}</select>`
       : `<span class="muted">${esc(v.field ? v.field.name : tr('Off'))}</span>`;
-    return `<div class="row rpver"><label for="rp-ver">${tr('Version field')}</label>${ctl}</div><div class="shint lhint">${esc(tr('A task whose version is already released but which is still open gets a hint. Automatic: a text field named Package, Version or Release.'))}</div>`;
+    return `<div class="row rpver"><label for="rp-ver">${tr('Version field')}</label>${ctl}</div><div class="shint lhint">${esc(tr('A task whose version is already released but which is still open gets a hint. Automatic: a text field named Package, Version or Release.'))}</div>`
+      // 2.392.0 B (#3364): off until someone switches it on
+      + `<div class="row rpclose"><label class="chkl"><input type="checkbox" id="rp-close" ${j.close_release ? 'checked' : ''} ${j.may ? '' : 'disabled'}> ${tr('Complete tasks when their package or code is released')}</label></div><div class="shint lhint">${esc(tr('Each task once per version; the history offers Undo. Nothing is written to the repository.'))}</div>`;
   };
   // 2.33.0 (#934): the repositories this list takes from its folder
   const repoNames = rs => rs.map(r => r.full_name).join(', ');
@@ -175,6 +177,10 @@ function repoWire(md, lid, folder) {
       const v = e.target.value;
       try { j.version_field = await api('PUT', `/api/lists/${lid}/repos/version-field`, {field: /^\d+$/.test(v) ? +v : v}); toast(tr('Saved')); } catch { /* shown */ }
       draw(); $('#rp-ver', box)?.focus(); await load(); render();
+    }
+    if (e.target.id === 'rp-close') {  // 2.392.0 B (#3364)
+      try { j.close_release = (await api('PUT', `/api/lists/${lid}/repos/close-release`, {on: e.target.checked})).on; toast(tr('Saved')); } catch { /* shown */ }
+      draw(); $('#rp-close', box)?.focus();
     }
   });
   box.addEventListener('input', e => {  // 2.18.0: a cloud address picks its provider

@@ -79,6 +79,7 @@ ORDER = (
     "lists.listtrash",  # 2.102.0 A (#1988)
     "tasks.validation",
     "tasks.tasks",
+    "tasks.oneway",  # 2.392.0 C (#3370): the one-way mark and the decisions of a task
     "tasks.roadmap",
     "tasks.lifecycle",
     "tasks.tasktrash",  # 2.116.0 A (#2063): the trash period of tasks
@@ -170,6 +171,9 @@ ORDER = (
     "tasks.multilist",  # 2.71.0 B (#1459): a task in several lists without a copy (after api.v1)
     "tasks.movememo",  # 2.273.0 B (#3042): what a task move ends, restored by a move back (no routes)
     "agents.gates",  # 2.26.0 (#949)
+    "agents.taskdec",  # 2.392.0 C (#3370): the yes to a one-way task
+    "agents.waiting",  # 2.392.0 D (#3369): what waits for a person
+    "integrations.delivery",  # 2.392.0 D (#3369): the delivery report of a list
     "agents.safety",  # 2.30.0 (#919)
     "agents.usage",
     "lists.custview",  # 2.50.0 C (#329): customer view of public links (no routes; used by lists.public)

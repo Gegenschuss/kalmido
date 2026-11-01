@@ -82,6 +82,21 @@ def _task_row(r, extra=None):
     return d
 
 
+def brief_blocked(c, uid, ql, vis):
+    """Tasks of the lists ql: mine and waiting on someone outside, or on an open task (dependencies count between project lists)."""
+    cols = "t.id, t.title, t.list_id, t.due, t.due_time, t.priority, t.assignee_id, l.name AS list_name, l.is_inbox"
+    mine = "((l.owner_id=? AND (t.assignee_id IS NULL OR t.assignee_id=?)) OR t.assignee_id=?)"
+    base = f"""FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.status=0 AND t.deleted_at IS NULL AND t.list_id IN ({ql})
+               AND t.id NOT IN (SELECT item_id FROM sample_items WHERE kind='task') AND {vis}"""
+    rows = c.execute(f"""SELECT {cols}, t.waiting_at, t.wait_note, t.wait_until,
+                           (SELECT COUNT(*) FROM task_deps d JOIN tasks b ON b.id=d.blocker_id WHERE d.task_id=t.id AND b.status=0
+                              AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE is_inbox=0) AND {tvis(c, uid, 'b.')}) AS open_blockers
+                         {base} AND {mine} AND (t.waiting_at IS NOT NULL OR EXISTS (SELECT 1 FROM task_deps d JOIN tasks b ON b.id=d.blocker_id
+                              WHERE d.task_id=t.id AND b.status=0 AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE is_inbox=0) AND {tvis(c, uid, 'b.')}))
+                         ORDER BY t.due IS NULL, t.due, t.id""", (uid, uid, uid)).fetchall()
+    return [r for r in rows if r["waiting_at"] or r["open_blockers"]]
+
+
 def briefing_data(c, uid, *, agent_id=None, since=None):
     """The briefing of person uid (see the module text). agent_id: only lists shared with that agent. since: a UTC datetime
     overriding the start of "changed". Works with and without a request (the watchdog's push, scheduled jobs)."""
@@ -111,14 +126,7 @@ def briefing_data(c, uid, *, agent_id=None, since=None):
     out["counts"]["today"] = sum(1 for r in rows if r["due"][:10] == today)
     out["counts"]["overdue"] = sum(1 for r in rows if r["due"][:10] < today)
     out["today"] = [_task_row(r, {"overdue": r["due"][:10] < today}) for r in rows[:BRIEF_LIST_MAX]]
-    # blocked: mine and waiting on someone outside, or on an open task (dependencies count between project lists)
-    rows = c.execute(f"""SELECT {cols}, t.waiting_at, t.wait_note, t.wait_until,
-                           (SELECT COUNT(*) FROM task_deps d JOIN tasks b ON b.id=d.blocker_id WHERE d.task_id=t.id AND b.status=0
-                              AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE is_inbox=0) AND {tvis(c, uid, 'b.')}) AS open_blockers
-                         {base} AND {mine} AND (t.waiting_at IS NOT NULL OR EXISTS (SELECT 1 FROM task_deps d JOIN tasks b ON b.id=d.blocker_id
-                              WHERE d.task_id=t.id AND b.status=0 AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE is_inbox=0) AND {tvis(c, uid, 'b.')}))
-                         ORDER BY t.due IS NULL, t.due, t.id""", (uid, uid, uid)).fetchall()
-    rows = [r for r in rows if r["waiting_at"] or r["open_blockers"]]
+    rows = brief_blocked(c, uid, ql, vis)
     out["counts"]["blocked"] = len(rows)
     out["blocked"] = [_task_row(r, {"reason": "waiting" if r["waiting_at"] else "blocked", "wait_note": (r["wait_note"] or "") if r["waiting_at"] else "",
                                     "wait_until": r["wait_until"] if r["waiting_at"] else None, "open_blockers": r["open_blockers"]})

@@ -600,6 +600,8 @@ SPECS = [
         label=N_("People")),
     OiT("tasks/links.json", "task_links", refs={"task_id": "tasks", "list_id": "lists", "section_id": "sections"},
         need=("task_id", "list_id"), people={"added_by": "null"}, rid=False, label=N_("Tasks")),
+    OiT("tasks/decisions.json", "task_decisions", refs={"task_id": "tasks"}, need=("task_id",), people={"by_id": "null"},
+        late={"superseded_by": "task_decisions"}, space=(), label=N_("History")),  # 2.392.0 C (#3370)
     OiT("tasks/history.json", "activity", refs={"task_id": "tasks"}, need=("task_id",), people={"user_id": "null"}, space=(),
         label=N_("History"), prep=_activity),
     OiT("tasks/encrypted_notes.json", "task_enc_notes", refs={"task_id": "tasks"}, need=("task_id",), space=(), rid=False, enc=False,

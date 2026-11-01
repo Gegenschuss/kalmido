@@ -69,12 +69,21 @@ const FEAT = 'cal,kanban,collab,comments,progress,deps';
       const mi = await ev(`[...document.querySelectorAll('.menu-list [role="menuitem"]')].map(b => b.textContent.trim()).filter(t => /WIP/.test(t))`);
       check(mi.length === 1 && /3/.test(mi[0]), `${tag}: #1510: the column menu offers the limit ` + JSON.stringify(mi));
       await ev(`(() => { [...document.querySelectorAll('.menu-list [role="menuitem"]')].find(b => /WIP/.test(b.textContent)).click(); return 1; })()`); await sleep(500);
-      await ev(`(() => { const i = document.querySelector('#cdlg-in'); i.value = '5'; i.closest('form').requestSubmit(); return 1; })()`); await sleep(900);
+      // 2.392.0 (#3367): the dialog has the number #wip-n (and the switch #wip-hard) now
+      await ev(`(() => { const i = document.querySelector('#wip-n'); i.value = '5'; i.closest('form').requestSubmit(); return 1; })()`); await sleep(900);
       const h5 = await ev(HEAD(INP));
       check(h5 && h5.wip === '4/5' && !h5.over, `${tag}: #1510: set to 5 in the dialog ` + JSON.stringify(h5));
       check((await call('GET', '/api/state')).sections.find(s => s.id === INP).wip_limit === 5, `${tag}: #1510: saved`);
       await ev(`(() => { histStep('undo'); return 1; })()`); await sleep(1200);
       check((await call('GET', '/api/state')).sections.find(s => s.id === INP).wip_limit === 3, `${tag}: #1510: one undo puts 3 back`);
+      // 2.392.0 (#3367): the same dialog has the switch "No new jobs while over the limit"; saved with the limit, one undo step
+      await ev(`(() => { document.querySelector('.kcol[data-kcol="${INP}"] [data-act="section-menu"]').click(); return 1; })()`); await sleep(400);
+      await ev(`(() => { [...document.querySelectorAll('.menu-list [role="menuitem"]')].find(b => /WIP/.test(b.textContent)).click(); return 1; })()`); await sleep(500);
+      await ev(`(() => { const c = document.querySelector('#wip-hard'); c.checked = true; c.closest('form').requestSubmit(); return 1; })()`); await sleep(900);
+      const sh = (await call('GET', '/api/state')).sections.find(s => s.id === INP);
+      check(sh.wip_hard === 1 && sh.wip_limit === 3, `${tag}: #3367: the switch is saved with the limit ` + JSON.stringify([sh.wip_hard, sh.wip_limit]));
+      await ev(`(() => { histStep('undo'); return 1; })()`); await sleep(1200);
+      check((await call('GET', '/api/state')).sections.find(s => s.id === INP).wip_hard === 0, `${tag}: #3367: one undo switches it off again`);
       // the task panel: Story points
       await ev(`(() => { openDetail(${T[3]}); return 1; })()`); await sleep(900);
       const opts = await ev(`[...(document.querySelector('#d-spt')?.options || [])].map(o => o.value).join(',')`);

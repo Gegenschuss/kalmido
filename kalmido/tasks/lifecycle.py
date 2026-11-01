@@ -19,6 +19,7 @@ from ..tasks.validation import (
     check_parent, check_url, clean_task, DATE_MAX_Y, descendants, log_act, log_changes, rr_feasible, rr_norm, rr_rule, rmd_split,
     ticket_template, valid_hm, valid_plan_start,
 )
+from ..tasks.oneway import irr_guard
 from ..tasks.tasks import (
     check_assignee, check_move, hard_delete, move_subtree, ms_cleanup, ms_target, my_tags, one_task,
     participant_assignee, set_tags,
@@ -149,6 +150,7 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
             del f["list_id"]
         elif f["list_id"] != cur["list_id"]:
             need_list(c, f["list_id"])  # moving out needs write on the source (caller), in on the target
+            irr_guard(c, tid)  # 2.392.0 (#3370)
             check_move(c, cur["list_id"], f["list_id"])
     lid = f.get("list_id", cur["list_id"])
     le2_post = le2a_task_write(c, tid, cur, f, b, lid)  # 2.64.1 (#1817): the texts of a list with the lock (ciphertexts only, moves via the app)
@@ -397,6 +399,7 @@ def do_complete(c, tid, status=2, undo=None):
     from ..family.family import _jparse, FAM_OCC, rot_next, stars_earn, stars_revoke
     from ..notify.channels import chn_note
     write_lock(c, f"task-{tid}")  # 2.126.0 D (#1987): one completion of a task at a time (the row below is then current)
+    irr_guard(c, tid)  # 2.392.0 (#3370)
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if status == 2 and t["status"] != 2:  # 2.60.0 C (#1512): "done only after approval" -- every way of completing ends here
         from ..tasks.review import rvw_gate
@@ -717,6 +720,7 @@ def task_delete(tid):
 
 def trash_task(c, tid):
     """Moves a task (and its subtasks) to the trash with a history line (web client, REST API)."""
+    irr_guard(c, tid)  # 2.392.0 (#3370)
     do_delete(c, tid)
     log_act(c, tid, "delete")
 

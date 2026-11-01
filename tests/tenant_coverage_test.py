@@ -232,6 +232,7 @@ ROUTES = {
     "POST /api/v1/agent/jobs": "agent", "PATCH /api/v1/agent/jobs/{}": "agent", "GET /api/agents": "agent",
     "GET /api/agents/jobs": "agent", "POST /api/agents/jobs/{}/action": "agent",
     "POST /api/agents/{}/chat/{}/choice": "agent", "PUT /api/agents/{}/permission-mode": "agent",
+    "GET /mail/off/{}": "own", "POST /mail/off/{}": "own",  # #2975: a person's own notification mail, by its token
     "GET /api/agents/{}/perm-users": "agent",  # 2.312.0 D (#3266): p2312_d_perm_user_test.py
     "GET /api/agents/{}/chat-prefs": "agent", "PUT /api/agents/{}/chat-prefs": "agent", "POST /api/agents/{}/chat/{}/dismiss": "agent",  # 2.233.0 A (#2848)
     "GET /api/agents/{}/chat": "agent", "POST /api/agents/{}/chat": "agent",
@@ -677,6 +678,7 @@ ROUTES = {
     "PATCH /api/lists/{}/error-hook": "list", "GET /api/v1/lists/{}/error-hook": "list",
     "PATCH /api/v1/lists/{}/error-hook": "list", "GET /api/v1/lists/{}/repos": "list", "GET /api/lists/{}/repos": "list",
     "GET /api/lists/{}/build-status": "list", "GET /api/v1/lists/{}/build-status": "list", "PUT /api/lists/{}/repos/version-field": "list",  # 2.151.0 A (#2558)
+    "PUT /api/lists/{}/repos/close-release": "list", "POST /api/tasks/{}/partial": "task", "POST /api/v1/tasks/{}/partial": "task",  # 2.392.0 B (#3364)
    
     "POST /api/lists/{}/repos": "list", "PATCH /api/repos/{}": "list", "DELETE /api/repos/{}": "list",
     "POST /api/repos/{}/refresh": "list", "POST /api/lists/{}/fields": "list", "PATCH /api/fields/{}": "list",
@@ -928,6 +930,8 @@ ROUTES = {
     # the status report of a list (p2340_a_api_test.py has the cross-tenant cases)
     "GET /api/briefing": "aggregate", "POST /api/briefing/read": "own", "GET /api/v1/briefing": "aggregate",
     "GET /api/lists/{}/status-report": "list", "GET /api/v1/lists/{}/status-report": "list",
+    # 2.392.0 D (#3369): p2392_d_api_test.py has the stranger and the shared-only cases
+    "GET /api/inbox": "aggregate", "GET /api/v1/me/waiting": "aggregate", "GET /api/v1/lists/{}/delivery-report": "list",
     # ---- 2.34.0 (#266 #269 #272 #368): stale tasks, time gaps, planned agent jobs, a file's text (p2300_tenant_test.py has the
     # cross-tenant cases: the other organisation's people and agent get 404 / nothing of the first one); the briefing field's
     # PDF reader reads only the uploaded file of the signed-in person and stores nothing (own)
@@ -1116,6 +1120,8 @@ ROUTES = {
     "GET /api/lists/{}/velocity": "list", "GET /api/v1/lists/{}/velocity": "list",
     # 2.60.0 C (#1512): the review step (need_task / need_list of the task's list; p260_c_api_test.py: a stranger 404, a viewer 403)
     "POST /api/tasks/{}/review": "task", "POST /api/v1/tasks/{}/review": "task",
+    "PUT /api/tasks/{}/irreversible": "task", "DELETE /api/tasks/{}/irreversible": "task", "POST /api/tasks/{}/irreversible-yes": "task",  # 2.392.0 C (#3370)
+    "GET /api/tasks/{}/decisions": "task", "POST /api/tasks/{}/decisions": "task", "GET /api/v1/tasks/{}/decisions": "task", "POST /api/v1/tasks/{}/decisions": "task",
     "PUT /api/lists/{}/review": "list", "PUT /api/v1/lists/{}/review": "list",
     # 2.61.0 (#1818): the virus scanner's state + counts for the server admin (no file, no content; p261_a_api_test.py: 403 for others)
     "GET /api/admin/upload-scan": "admin",

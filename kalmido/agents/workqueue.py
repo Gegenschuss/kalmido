@@ -3,7 +3,8 @@ last (agents.queue_order, a JSON list of task ids), the rest by priority (high f
 max_parallel (work style, 0 = no limit) are "active", the others "waiting" with their position 1..n. The priority rule of
 the work style goes along wherever the agent chooses its next task (GET /api/v1/agent/queue, the event "assigned").
 
-Kalmido does not start or stop the agent's work: the agent reads the queue and keeps to it; the person sees the same queue
+Kalmido does not start or stop the agent's work: the agent reads the queue and keeps to it. 2.392.0 A (#3367): with
+max_parallel > 0 the limit is hard for new running jobs (POST /api/v1/agent/jobs: 409 slots_full, agents/api.py); the person sees the same queue
 in the agent's settings (GET /api/agents/<aid>/queue, owner of a personal agent / an instance admin for a team agent)."""
 import contextlib
 import json

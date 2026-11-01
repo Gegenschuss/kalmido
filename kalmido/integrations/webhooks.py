@@ -246,13 +246,14 @@ def wh_host(url):
     return urllib.parse.urlsplit(url or "").hostname or ""
 
 
-def wh_enqueue(c, n):
+def wh_enqueue(c, n, by=None):
+    """by = (actor, via) of a change without a request (2.392.0 B, #3364: the git poll), else the current request's."""
     hooks = c.execute("""SELECT w.* FROM webhooks w JOIN users u ON u.id=w.user_id
                          WHERE w.enabled=1 AND u.disabled=0 AND w.agent=0 ORDER BY w.id""").fetchall()
     hooks = who_admin_ok(c, hooks)  # 2.115.0 A (#2061): an organisation's webhook only while its creator is an admin there
     if not hooks:
         return
-    actor, via = wh_actor(c), act_via() or "web"
+    actor, via = by or (wh_actor(c), act_via() or "web")
     lists, settings, orgs = {}, {}, {}
 
     def lst(lid):

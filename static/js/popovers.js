@@ -799,6 +799,7 @@ function taskMenu(anchor, id, o = {}) {
     '-',
     ...(t.id > 0 ? [{label: tlkIs(t) ? tr('Locked') : tr('Lock'), icon: 'lock', on: tlkIs(t), fn: () => tlkSet(id, !t.locked).catch(() => {})}] : []),  // 2.364.0 D (#3036): always here (the panel's bar shows only a set lock)
     ...(typeof ln_canLock === 'function' && ln_canLock(t, tlkIs(t)) ? [{label: tr('Lock note'), icon: 'lock', title: tr('Encrypt the note with your own password'), fn: () => ln_lock(id)}] : []),  // 2.364.0 D (#3036)
+    ...ow_menuItems(t),  // 2.392.0 C (#3370)
     ...(typeof mw_ok === 'function' && mw_ok() && t.id > 0 ? [{label: tr('Open in its own window'), icon: 'panel', fn: () => mw_taskOpen(id)}] : []),  // 2.43.0 (#1500)
     ...(typeof tbl_menuItems === 'function' ? tbl_menuItems(t, anchor) : []),  // 2.53.0 C (#1424): the bell of this task
     '-',
@@ -806,6 +807,7 @@ function taskMenu(anchor, id, o = {}) {
     {label: tr('Duplicate'), icon: 'sub', fn: () => taskDuplicate(t, async () => { const sn = await snipLoad(t).catch(() => []); let note = t.content; if (tkNoteMissing(t)) { try { note = await tkNoteLoad(t.id); } catch { toast(tr('Only available online.')); return; } } return createTask({title: t.title, content: note, list_id: t.list_id, section_id: t.section_id, priority: t.priority, due: t.due, due_time: t.due_time, reminders: t.reminders, repeat: t.repeat, repeat_from: t.repeat_from, tags: t.tags, parent_id: t.parent_id, url: t.url || null, ...(t.ms ? {ms: 1} : {}), ...(t.milestone_id ? {milestone_id: t.milestone_id} : {}), ...(t.fields && Object.keys(t.fields).length ? {fields: t.fields} : {}), ...(sn.length ? {snippets: sn.map(({id, by, updated_at, ...x}) => x)} : {})}); }), ...(typeof le2eLocked === 'function' && le2eLocked(t) ? {dis: true, title: tr('Unlock first: this project is encrypted in the browser.')} : {})},  // 2.35.0 (#1095): the snippets come along (loaded first); 2.64.1 (#1817): not while its texts are locked; 2.280.0 A (#3108): a long note too
     ...(t.id > 0 && !t.context && !t.url ? [{label: tr('Add link'), icon: 'link', fn: () => linkAdd(id)}] : []),  // 2.41.0 (#1475)
     ...(t.id > 0 && !t.context && canEdit(t) && !snipShown(t) && pz_on(t.list_id, 'repo') ? [{label: tr('Add code snippet'), icon: 'code', fn: () => snipOpen(id, 'new')}] : []),  // 2.35.0 (#1095)
+    ...(t.id > 0 && t.status === 0 && !t.context && canEdit(t) && !listById(t.list_id)?.e2e && gitVerField(t.list_id) ? [{label: tr('Partly, rest in …'), icon: 'git', fn: () => gitPartial(id)}] : []),  // 2.392.0 B (#3364)
     '-',
     ...(isMs(t) || (!t.parent_id && !children(t.id).length && t.id > 0) ? [{label: isMs(t) ? tr('Make it a normal task') : tr('Make it a milestone'), icon: 'flag', fn: () => msToggle(id)}] : []),  // 2.18.0 (#430)
     ...(i > 0 && depthOf(sib[i - 1]) < maxDepth() - 1 && !isMs(t) && !isMs(sib[i - 1]) ? [{label: tr('Indent'), icon: 'indent', fn: () => patchTask(id, {parent_id: sib[i - 1].id})}] : []),

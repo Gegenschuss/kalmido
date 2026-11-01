@@ -48,13 +48,14 @@ def _bounds(frm, to):
     return local_bounds(frm, to)
 
 
-def project_status(c, lid, uid, *, frm=None, to=None, with_time=True):
+def project_status(c, lid, uid, *, frm=None, to=None, with_time=True, bounds=None, cap=REPORT_LIST_MAX):
     """The status data of list lid as uid sees it (the caller checked need_list(c, lid, write=False)). frm / to: dates.
-    with_time=False: no time block (time: None), see time_allowed."""
+    with_time=False: no time block (time: None), see time_allowed. 2.392.0 D (#3369): bounds = (lo, hi) UTC instead of whole days
+    (the delivery report), cap = rows per section."""
     today = local_now().date()
     to = to or today
     frm = frm or (to - timedelta(days=6))
-    lo, hi = _bounds(frm, to)
+    lo, hi = bounds or _bounds(frm, to)
     lst = c.execute("SELECT id, name, is_inbox, kind, status, time_tracking FROM lists WHERE id=?", (lid,)).fetchone()
     vis = tvis(c, uid, "t.")  # 2.223.7 D (#2941): open_blockers counts only blockers uid sees too
     base = f"FROM tasks t WHERE t.list_id=? AND t.deleted_at IS NULL AND {vis}"
@@ -91,12 +92,12 @@ def project_status(c, lid, uid, *, frm=None, to=None, with_time=True):
            "counts": {"done": len(done), "done_subtasks": sum(1 for r in done_all if r["parent_id"] and not r["ms"]),
                       "in_progress": len(progress), "blocked": len(blocked), "overdue": len(overdue), "upcoming": len(upcoming),
                       "open": sum(1 for r in opened if not r["ms"])},
-           "done": [row(r, completed_at=r["completed_at"]) for r in done[:REPORT_LIST_MAX]],
-           "in_progress": [row(r) for r in progress[:REPORT_LIST_MAX]],
+           "done": [row(r, completed_at=r["completed_at"]) for r in done[:cap]],
+           "in_progress": [row(r) for r in progress[:cap]],
            "blocked": [row(r, reason="waiting" if r["waiting_at"] else "blocked", wait_note=(r["wait_note"] or "") if r["waiting_at"] else "",
-                           wait_until=r["wait_until"] if r["waiting_at"] else None) for r in blocked[:REPORT_LIST_MAX]],
-           "overdue": [row(r) for r in overdue[:REPORT_LIST_MAX]],
-           "upcoming": [row(r, due_time=r["due_time"]) for r in upcoming[:REPORT_LIST_MAX]],
+                           wait_until=r["wait_until"] if r["waiting_at"] else None) for r in blocked[:cap]],
+           "overdue": [row(r) for r in overdue[:cap]],
+           "upcoming": [row(r, due_time=r["due_time"]) for r in upcoming[:cap]],
            "milestones": [row(r, done=True, completed_at=r["completed_at"]) for r in reached]
                          + [row(r, done=False) for r in ms_next],
            "time": _time_of(c, lid, uid, frm, to) if with_time and lst["time_tracking"] and time_all() else None}  # 2.41.0 (#1471): the list's switch

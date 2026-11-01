@@ -30,6 +30,7 @@ from ..lists.fields import fmt_num
 from ..lists.ownership import list_owner_set
 from ..tasks.validation import as_int, NAG_VALUES, PRIORITIES, TICKET_TYPES, valid_date
 from ..tasks.tasks import clear_waiting, set_waiting, task_create, task_update
+from ..tasks.oneway import dec_list, irr_apply, irr_view  # 2.392.0 C (#3370)
 from ..tasks.ticketkey import tk_ids_ordered, tk_key, tk_parse  # 2.390.0 (#3353)
 from ..tasks.roadmap import list_shift, roadmap_build
 from ..tasks.lifecycle import task_complete, task_reopen, trash_task
@@ -252,6 +253,7 @@ def task_core(r, tags, fields):
             # 2.36.0 (#1118): locked in the app (tasks created with an agent token start locked; the API is not bound by it)
             "locked": bool(r["locked"]) if "locked" in r.keys() else False,
             "points": r["points"] if "points" in r.keys() else None,  # 2.60.0 (#1511): story points (null = none)
+            "irreversible": irr_view(r) if "irreversible" in r.keys() else None,  # 2.392.0 C (#3370): {reason, yes_by, yes_at}, null = no one-way step
             "remind_at": r["remind_at"] if "remind_at" in r.keys() else None,  # 2.111.0 C (#2057): fixed-time reminder
             # 2.390.0 B (#3355): the sprint (null = backlog), the reviewer and the review state (pending | approved | changes)
             "sprint_id": r["sprint_id"] if "sprint_id" in r.keys() else None,
@@ -282,6 +284,7 @@ def v1_task(d):
     out = task_core(d, d["tags"], d.get("fields") or {})
     out["list_tags"] = d.get("ltags") or []
     out["key"] = tk_key(db(), d)  # 2.390.0 (#3353): "APP-12" (null = the project has no key)
+    out["partial_until"] = d.get("partial_until")  # 2.392.0 B (#3364): done in part: only this version completes it
     out.update(blocked=bool(d.get("blocked")), comment_count=d.get("comment_count", 0), context=bool(d.get("context")),
                attachments=[{**{k: a[k] for k in ("id", "name", "mime", "size")}, **({"encrypted": True} if a.get("enc") else {})}
                             for a in d.get("attachments") or []])
@@ -395,6 +398,7 @@ def v1_one(c, tid):
     out = v1_task(rows[0])
     if not rows[0].get("context"):  # 2.2.0 (#271 / #339): linked pull requests / commits + the list's repository
         out["code"] = rows[0].get("code") or {"prs": [], "commits": []}
+        out["decisions"] = dec_list(c, tid)  # 2.392.0 C (#3370): as the comments, not for a context parent
         if out["code"].get("build"):  # 2.151.0 A2 (#2558 review): branch names marked untrusted also without repo below
             from ..integrations.gitbuild import gb_untrusted
             out["code"] = {**out["code"], "build": gb_untrusted(out["code"]["build"])}
@@ -429,6 +433,7 @@ def v1_list(d):
             "ticket_key": d.get("ticket_key") or None,  # 2.390.0 (#3353): the project's key APP (its tasks: APP-1, APP-2, ...)
             "time_tracking": bool(d.get("time_tracking")),  # 2.41.0 (#1471): time tracking on for this list
             "points_on": bool(d.get("points_on")),  # 2.60.0 (#1511): story points shown in the app
+            "irreversible_needs_yes": bool(d.get("irreversible_needs_yes")),  # 2.392.0 C (#3370): the gates wait for a person's yes to one-way tasks
             "header_style": d.get("header_style") or "",  # 2.83.0 (#1427): the list's header strip in the app (read only)
             "nag": d.get("nag") or "", "day_hours": d.get("day_hours"),  # 2.7.0 (#413, #407)
             "columns": d.get("columns"),  # 2.14.0 (#425): the list's columns (null = default)
@@ -1236,16 +1241,22 @@ def v1_task_update(tid):
     if stale:
         return stale
     prev = v1_prev_in(raw.pop("_prev")) if "_prev" in raw else None
+    irr = "irreversible" in raw  # 2.392.0 C (#3370): {reason} or null, its own rules (tasks/oneway.py)
+    irv = raw.pop("irreversible", None)
     b = v1_task_in(raw)
     rv = "reviewer_id" in b
     rid = b.pop("reviewer_id", None)
-    if not b and not rv:
+    if not b and not rv and not irr:
         raise BadInput(tr("Nothing to change"))
+    if irr:
+        irr_apply(c, tid, irv)
+        bump(c)
     if rv:  # 2.390.0 B (#3355): checked first (against the list the task ends up in); set before the fields unless it moves
         v1_reviewer_check(c, b.get("list_id") or c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()[0], rid, tid)
         if not b.get("list_id"):
             v1_reviewer_set(c, tid, rid)
     if not b:
+        c.commit()  # 2.392.0 C (#3370): only the mark
         return jsonify(v1_one(c, tid))
     if b.get("list_id"):
         from ..agents.safety import move_gate
@@ -1505,7 +1516,8 @@ def v1_comment_create(tid):
             need_approval(c, N_("Answer the client of the task “{0}”"), (t["title"][:80],), list_id=t["list_id"], task_id=tid)
     j = v1_call(comment_create, tid, body={"body": b["body"], **{k: b[k] for k in ("suggestion", "reply_to", "choices", "multi", "approval",
                                                                                     "expires_in", "portal", "client_ref") if k in b}})
-    return jsonify(v1_comment(c, {**j, "task_id": tid}, user_names(c, [me()]))), 200 if again else 201
+    # 2.392.0 B (#3364): partial = what the comment command "partly: rest in Y" did (or why not)
+    return jsonify({**v1_comment(c, {**j, "task_id": tid}, user_names(c, [me()])), **({"partial": j["partial"]} if j.get("partial") else {})}), 200 if again else 201
 
 
 def v1_entry(e):

@@ -17,6 +17,7 @@ from ..accounts.pictures import avatar_url
 from ..core.dlock import dl_list_locked
 from ..core.access import acx_task_ok, Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, org_trip_sql, reading_sql, task_visible, vis_sql, WRITE_ROLES
 from ..core.state import visible_sections
+from ..tasks.oneway import dec_list
 from ..tasks.validation import valid_hm
 from ..collab.comments import comment_plain, user_names
 from ..core.errors import BadInput
@@ -70,7 +71,9 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "missed",  # 2.29.0 (#1031): events older than AGENT_EVENTS_STALE_H, folded into one summary at the next poll
                 "stale_tasks",  # 2.34.0 (#266): once a day, the stale tasks of lists with "Agent follows up" on (bundled)
                 "scheduled_job",  # 2.34.0 (#272): a planned job of a person is due (agents/schedules.py); answer in their chat
+                "decision_added",  # 2.392.0 C (#3370): a decision was recorded on a task the agent sees with its comments
                 "deployed",  # 2.60.0 (#1514): a version / milestone arrived in an environment (Staging, Live) of a list shared with the agent
+                "task.completed",  # 2.392.0 B (#3364): the git poll completed a task because its package or code is released (via "release")
                 "playbook_proposal",  # 2.39.0 (#1168): people applied / discarded the agent's proposed change of a list's Playbook
                 "message_edited",  # 2.39.0 (#1179): a person changed a chat message / comment / team message the agent already had
                 "file_shared",  # 2.48.0 (#1207): a folder / file of the file store was shared with the agent (node, role)
@@ -186,7 +189,7 @@ def wh_queue_raw(c, w, env):
               (w["id"], env["id"], env["event"], json.dumps({**env, "webhook_id": w["id"]}, ensure_ascii=False), time.time(), iso(now_utc())))
 
 
-def agent_emit(c, aid, event, data, actor="auto"):
+def agent_emit(c, aid, event, data, actor="auto", via=None):
     """Records an event for agent aid (the polling queue) and queues its webhook delivery; the caller commits. Nothing for a
     paused / disabled agent or for the agent's own actions. Returns the event's seq or None."""
     a = agent_row(c, aid)
@@ -226,7 +229,7 @@ def agent_emit(c, aid, event, data, actor="auto"):
         if pb:
             data = {**data, "playbook": pb_for_agent(c, pb, aid)}  # 2.126.0 B (#1978): with its authors
     ev, ts = str(uuid.uuid4()), iso(now_utc())
-    via = (act_via() or "web") if has_request_context() else "web"
+    via = via or ((act_via() or "web") if has_request_context() else "web")  # 2.392.0 B (#3364): via "release"
     seq = insert_id(c, "INSERT INTO agent_events(agent_id,uuid,event,payload,created_at) VALUES(?,?,?,'{}',?)", (aid, ev, event, ts))
     env = {"id": ev, "seq": seq, "event": event, "created_at": ts, "agent_id": aid, "actor": actor, "via": via, "data": data}
     c.execute("UPDATE agent_events SET payload=? WHERE id=?", (json.dumps(env, ensure_ascii=False), seq))
@@ -297,6 +300,7 @@ def agent_task_data(c, tid, aid, full=None, **extra):
     if full:
         task["comments"] = agent_event_comments(c, tid)
         task["comments_total"] = c.execute("SELECT COUNT(*) FROM comments WHERE task_id=? AND deleted_at IS NULL", (tid,)).fetchone()[0]
+        task["decisions"] = dec_list(c, tid, current=True)  # 2.392.0 C (#3370): those in force
         lst["sections"] = list_sections(c, aid, row["list_id"])
         rp = git_repo_for_task(c, row, aid)  # 2.2.0 (#339): the repository to work in, a branch name, the linked code (2.396.0 A #3386: its git author)
         if rp:

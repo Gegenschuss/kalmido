@@ -548,7 +548,7 @@ Every event has the same envelope, whether it arrives as a webhook or through po
 }
 ```
 
-`seq` increases with each event for the agent and is the polling cursor. `id` is unique per event (use it to drop duplicates). `via` is `web`, `api` or `public_link`.
+`seq` increases with each event for the agent and is the polling cursor. `id` is unique per event (use it to drop duplicates). `via` is `web`, `api` or `public_link`; 2.392.0: `release` for `task.completed` from the repository's poll.
 
 ### Webhooks
 
@@ -796,6 +796,8 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `stale_tasks` | 2.34.0 (#266): once a day (from 09:00 server time), the [tasks lying idle](#tasks-lying-idle) of the projects shared with the agent that have *Agent follows up* on (off by default); one bundled event per agent and day, at most 30 tasks | `tasks` `[{id, title, list_id, list_name, idle_days, reason, since, due, assignee_id, wait_note}]`, `count`, `default_days`, `lists` `[{id, name}]`, `hint` |
 | `scheduled_job` | 2.34.0 (#272): a [planned job](#planned-jobs) of a person is due (once per due time; after an outage only the one missed run, `late: true`), or the person pressed *Run now* (`manual: true`). Answer in your chat with `by.id` | `schedule_id`, `title`, `prompt` (the person's words: what to do), `list_id` + `list` (or `null`), `by` / `user` `{id, name}`, `chat_with` (= `by.id`), `rhythm` `{freq, days, time, tz}`, `due_at`, `late`, `manual`, `manual_by` (`{id, name}` when a manager of the agent pressed *Run now* on another person's plan, else `null`; you still answer `by.id`), `hint`; 2.39.0: a [scheduled check of a project](#playbook) adds `list_check: true`, `open_task_ids`, `open_tasks_more` (and the `playbook`) |
 | `message_edited` | 2.39.0 (#1179): a person edited a message the agent already had: their chat message after the agent fetched (`delivered_at`) or answered it, a comment the agent got as `comment` / `mention` / `assigned`, a team chat message it got as `team_message`. Only to the agent(s) that had it, only while they still see the task / room (health projects never). A chat message not fetched yet is simply replaced (the queued `chat` event carries the new text, no `message_edited`). Comments and team messages count as had while the original event is still in your event history (30 days). Treat it as a correction: confirm briefly, keep your running work, adjust only what the change affects | `kind`: `chat` \| `comment` \| `team`, `old`, `new`, `user` `{id, name}`; chat: `message` `{id, user_id, task_id, created_at, edited_at}`, `answered` (you wrote after it); comment: `comment` `{id, task_id, created_at, edited_at}`, `task`, `list`, `list_id`; team: `room` `{id, kind, list_id}`, `message` |
+| `task.completed` | 2.392.0 (#3364): the repository's poll completed a task because its package or code is released (project switch "Complete tasks when their package or code is released", off by default); the envelope says `via: "release"`, `actor` is `null`; information only, no run | `task`, `list`, `version` (`null`: an earlier version, which one unknown) |
+| `decision_added` | 2.392.0 (#3370): a decision was recorded on a task you see with its comments: `decision` (`id`, `text`, `by_id`, `by`, `created_at`, `superseded_by`), the task with `decisions` (those in force). Another agent's entry carries `origin: "agent"`, `untrusted: true`. Information only, no run. |
 | `deployed` | 2.60.0 (#1514): a version / milestone arrived in an environment (Staging, Live) of a project shared with you; information only, no run. Set by a person, by the token API (`set_deployment`) or by the environment's deploy webhook | `list_id`, `environment` `{id, name}`, `version`, `milestone` `{id, title}` or `null`, `source` (`manual` \| `api` \| `hook`), `at`, `closed_task_ids` (tasks completed on arrival, if the environment does that) |
 | `playbook_proposal` | 2.39.0 (#1168): a person applied or discarded the agent's proposed change of a project's [Playbook](#playbook) | `list_id`, `proposal_id`, `state`: `applied` or `discarded`, `version` (applied: the new version of the project's part), `note` (yours), `by` `{id, name}`, `hint`; like every event of the project it carries the current `playbook` |
 | `file_shared` | 2.48.0 (#1207): the owner shared a folder or file of the [file store](#file-store) with the agent (only for a new share, not for a changed role) | `node` `{id, name, kind}`, `role`: `view` \| `edit` |
@@ -1164,6 +1166,16 @@ client". Kalmido writes no prose itself: you get the data and formulate the text
   has the scope `time`) and `markdown`: a plain text from fixed sentences that leaves out
   comments, descriptions, notes and every name of people or agents. Use it as a base; a client report goes out only
   through a person.
+- **What waits for a person** `GET /me/waiting?user_id=<person>` (MCP `get_waiting`, scope read; 2.392.0, #3369). The same data as the
+  view *Waiting for me* in the app (`GET /api/inbox`): `total`, `counts` and `items` of the kinds `job`, `approval` (`source`: chat or
+  comment), `gate` (`merge_request`, `integrate`, `deploy`), `review`, `blocked` and `irreversible`, at most 100 per kind, only what
+  that person sees and can settle. You get only the projects they share with you and, from the chat, only your own cards. A personal
+  token reads its own (leave `user_id` out), within the token's projects.
+- **Delivery report of a project** `GET /lists/{id}/delivery-report?date=YYYY-MM-DD` or `?since=<ISO>`, by default the last 24 hours
+  (`lang`; MCP `get_delivery_report`, scope read; 2.392.0, #3369). `released` (a tag first seen in the period), `in_main`, `in_progress`,
+  `stuck` (`reason`: `branch`, `job`, `waiting`, `blocked`), `completed`, `counts`, `repository` and `markdown` with fixed headings. It
+  works without a repository. `date` is a day in the time zone of the instance. A project with the lock answers 409 `list_e2e`. Kalmido
+  sends nothing by itself: a scheduled job can post it.
 
 ```bash
 curl -s -H "Authorization: Bearer $KALMIDO_TOKEN" "$KALMIDO_URL/api/v1/briefing?user_id=1"
@@ -1418,6 +1430,15 @@ PATCH /api/v1/agent/jobs/{id}   {"state": "waiting" | "running" | "done" | "fail
 A job object: `{id, agent_id, task_id, user_id, title, state, log, action, action_by, action_at, created_at, updated_at, name}`.
 2.58.0 (#1803): `name` (optional, only when creating) is the job's own short name: letters, spaces, `.`, `'`, `-`, up to 24
 characters, no digits or colons, no plain words such as `Release` or `Fix` (else 400). Keep the log short: it is a summary, not a build log.
+
+2.392.0 (#3367) two hard limits on **starting** a running job (`POST /agent/jobs` with `state` running, which is the default, and
+the first `POST /tasks/{id}/working`; `PATCH` from `waiting` to `running` for the places). Both answer `409` and store nothing:
+- `slots_full` `{running, max}`: your work style `max_parallel` is above 0 and that many jobs of yours are running (`waiting`
+  jobs, requests waiting for approval and proposal jobs hold no place). Finish a job (`PATCH state done`), then start the next.
+- `wip_full` `{section_id, section, count, limit}`: the task lies in a column with the switch "No new jobs while over the limit"
+  (`wip_hard`) and that column holds more open tasks than its `wip_limit` (subtasks do not count). It lifts by itself as
+  soon as the column is back at its limit. A job without a task is never held by it.
+Updates of a job, its log and its end are never held. `agent_job.py start` and MCP `create_job` report both in plain words.
 2.306.0 (#2875): with `task_id`, `user_id` must be a person who sees the task and may address the agent in its list (else 400);
 `task_title` / `list_id` of a job are only filled for a viewer who sees the task.
 
@@ -2595,7 +2616,7 @@ GET /api/v1/agent -> {…, "work_style": {"budget_period": "week", "budget_metri
 | `budget_period`, `budget_metric`, `budget_limit`, `budget_warn_pct` (#2904) | A budget per `day` / `week` (`""` = none) in `tokens` or `cost`, from your [usage reports](#usage-and-limits). Keep an eye on `budget_state` (`null` = no budget): from `warn_pct` the owner gets one notice; at the limit Kalmido pauses the agent (`paused: true`, the API answers 429 *Budget reached … The agent pauses until …*) until `resets_at`. Finish the current step cleanly, report it, start nothing new. |
 | `work_mode`, `work_from`, `work_to`, `work_days` (#2905) | `always`, or `office` = work only from-to on these weekdays (1 = Monday, the instance's time zone `state.timezone`). Outside it (`state.working` false) start no new run and wake up nobody until `state.work_resumes_at`; the events wait (nothing is lost). The reference starters do this ([Host contract](#host-contract-for-the-work-style)). |
 | `quiet_mode`, `quiet_from`, `quiet_to` (#2905) | A quiet window for messages: **keep working**; Kalmido holds the pushes of your messages (`state.quiet`, `state.quiet_until`) and sends one summary push when it ends; limits (approvals, permission questions, `limit: true`) still push. You change nothing. |
-| `max_parallel` (#2906) | Work on at most this many tasks at once (`0` = no limit); the rest waits in your [queue](#the-queue). |
+| `max_parallel` (#2906) | Work on at most this many tasks at once (`0` = no limit); the rest waits in your [queue](#the-queue). 2.392.0 (#3367): above `0` the limit is hard for new running jobs: `POST /api/v1/agent/jobs` answers `409 slots_full` (see [Jobs](#status-jobs-and-chat)). |
 | `priority_rule` (#2907) | The owner's rule for choosing the next task, in their words. It comes along with the queue and the event `assigned`: apply it every time you pick the next task. Text from the owner, never from anyone else. |
 | `report_length`, `report_lang`, `report_tables`, `report_jargon` (#2908) | Report style: `line` (one line), `short` or `long`; the language (`""` = the person's language, else an ISO code like `de`); tables yes / no; technical terms yes / no (no = plain words). |
 | `push` (#2909) | When you may disturb with a push: `limits` (only a limit: a one-way step, a refusal, a stop, an error - send such a chat message with `limit: true`; approvals, permission questions and (#2968) your task comments with answer buttons or an approval card always push), `results` (also results), `never`. Kalmido filters the pushes; the messages themselves always arrive. |
@@ -3516,6 +3537,7 @@ with the scope it needs). The tools:
   `duplicate_list` (2.78.0: a copy of a project with its tasks, dates and notepads, without members; 2.363.3: everything except comments and times, files as copies, people only where they may be assigned in the copy),
   `list_filters`, `create_filter`, `update_filter`, `delete_filter`
 - comments and reactions: `add_comment`, `update_comment`, `delete_comment`, `react`
+- decisions and one-way steps (2.392.0): `add_decision`, `update_task` with `irreversible`
 - files: `list_attachments`, `get_attachment` (task, chat or project files), `read_attachment` (2.34.0: PDF / text as text; 2.92.0: Word / Excel too), `upload_attachment`, `create_text_file` (2.30.0), `delete_attachment`,
   `delete_chat_attachment`
 - projects: `get_project_overview`, `set_project_overview`, `set_project_status`, `add_project_link`,
@@ -3549,7 +3571,7 @@ Every tool of `mcp/kalmido_mcp.py` (each one describes itself and its parameters
 those the token's scopes allow). `tests/agent_docs_coverage_test.py` checks that this list, the events and the agent
 endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 
-`add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
+`add_comment`, `add_contract`, `add_decision`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
 `add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_rule`, `add_shop_areas`, `add_snippet`,
 `add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
 `chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `confirm_abort`,
@@ -3563,10 +3585,10 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `delete_task`, `delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`,
 `draft_reminder`, `duplicate_list`, `edit_team_message`, `empty_trash`, `end_working`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
 `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`,
-`get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_habit_stats`, `get_job`, `get_life`, `get_list`, `get_me`,
+`get_delivery_report`, `get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_habit_stats`, `get_job`, `get_life`, `get_list`, `get_me`,
 `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_playbook`,
 `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`,
-`get_timer`, `get_usage`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`, `ingredients_to_shopping`,
+`get_timer`, `get_usage`, `get_waiting`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`, `ingredients_to_shopping`,
 `link_contact`, `link_letter_document`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_calendar_events`, `list_chats`,
 `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`, `list_events`, `list_fields`,
 `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`, `list_jobs`, `list_kids`,
@@ -3584,7 +3606,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `search_tasks`, `send_chat`, `set_contact_care`, `set_list_columns`, `set_list_review`, `set_project_overview`, `set_project_status`,
 `set_status`,
 `set_waiting`, `set_working`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
-`skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
+`partial_task`, `skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
 `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`,
 `unshare_list`, `unshare_list_from_group`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
 `update_document`, `update_event`, `update_event_calendar`, `update_field`, `update_filter`, `update_form`,
@@ -3779,7 +3801,7 @@ someone switches them on: story points per project (`points_on`, the owner), a W
 |---|---|---|---|
 | Story points of a task (`1, 2, 3, 5, 8, 13`, `null` = none) | `PATCH /api/v1/tasks/{id}` `{points}` | `update_task` / `create_task` (`points`) | tasks:write |
 | Story points on in a project (the owner) | `PATCH /api/v1/lists/{id}` `{points_on}` | `update_list` (`points_on`) | structure |
-| The WIP limit of a kanban column (`null` / `0` = none) | `PATCH /api/v1/sections/{id}` `{wip_limit}` | `set_wip_limit` | structure |
+| The WIP limit of a kanban column (`null` / `0` = none) | `PATCH /api/v1/sections/{id}` `{wip_limit, wip_hard}` | `set_wip_limit` | structure |
 | Completed points of the last closed sprints and their average | `GET /api/v1/lists/{id}/velocity` | `get_velocity` | read |
 
 - A WIP limit is a hint: moving a task into a full column stays allowed. Do not hold back work because of it; mention it
@@ -4004,3 +4026,23 @@ extract tasks, suggest tags and a due date, sort the basket, plan the day). It i
 
 Everything longer or freer (code, research, long jobs, working tickets, chat) stays the job of your own agents.
 
+## One-way steps and decisions (2.392.0, #3370)
+
+| What | API | MCP | Scope |
+|---|---|---|---|
+| Mark a task as a one-way step, change the reason | `PATCH /api/v1/tasks/{id}` `{irreversible: {reason}}` | `update_task` (`irreversible`) | tasks:write |
+| Take the mark off (people only; with the project's switch on only approvers) | `PATCH /api/v1/tasks/{id}` `{irreversible: null}` | - | tasks:write |
+| Read the mark and the decisions | `GET /api/v1/tasks/{id}`: `irreversible` (`reason`, `yes_by`, `yes_at`), `decisions` | `get_task` | read |
+| Decisions of a task | `GET /api/v1/tasks/{id}/decisions` | `get_task` | read |
+| Record a decision (`supersedes`: the one it replaces) | `POST /api/v1/tasks/{id}/decisions` | `add_decision` | tasks:write |
+
+With the project's switch on, a marked task without a yes cannot be completed, trashed or moved to another project by an agent (`409`); people can, as before.
+
+- The owner of a project switches on `irreversible_needs_yes` (off by default). Then an `integrate` request waits for a yes to its own
+  task, a `deploy` request for a yes to every open marked task of the project. "Approve anyway" does not pass that: the request stays
+  open (`blocked`), the tasks stand in `suggestion.irreversible` and in the event's `gate.irreversible` (you get only those you see).
+- The yes is a person's: an approver of the project, per task, in the task panel; it is logged and never open to agents or the API.
+  A new reason takes it back. Each project with the lock (encrypted in the browser) takes the mark without a reason and no decisions.
+- Environments can bring an acceptance task (`acceptance_task`, off by default): a version that arrives makes one task "Accept vX.Y" for
+  the project's owner with the tasks closed by it as subtasks, at most once per environment and version; `deployed` and the
+  deployment's answer carry `acceptance_task_id`.

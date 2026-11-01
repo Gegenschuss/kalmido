@@ -1065,7 +1065,10 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                      q("limit", "At most 500", {"type": "integer"}),
                                      q("wait", f"0-{AGENT_WAIT_MAX} s: wait for the next event when there is none", {"type": "integer"})])},
         "/agent/jobs": {"get": op("The agent's jobs", AG, ok(ref("JobPage")) | errs("403"), [q("state", "all, open or a state")]),
-                        "post": op("Report a new job", AG, ok(ref("Job"), "Created", "201") | errs("400", "403", "404"), scope=W, body={
+                        "post": op("Report a new job", AG, ok(ref("Job"), "Created", "201") | errs("400", "403", "404", "409"), scope=W,
+                                   desc="2.392.0 (#3367): 409 slots_full {running, max} when your work style max_parallel (> 0) is reached by running jobs "
+                                        "(waiting jobs hold no place); 409 wip_full {section_id, section, count, limit} when the task's column is over its "
+                                        "WIP limit and has the hard switch (wip_hard). Nothing is stored; finish a job or wait.", body={
                             "type": "object", "required": ["title"], "properties": {"title": {"type": "string"}, "task_id": {"type": "integer"},
                                                                                     "state": {"type": "string", "enum": list(JOB_STATES)}, "log": {"type": "string"},
                                                                                     "user_id": {"type": "integer"},
@@ -1086,7 +1089,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                        "mark fades on its own. Needs write access to the task's list. It is your running job of the task (GET /agent/jobs); "
                        "prose only, no secrets (the server folds the text into one line and replaces recognisable secrets).", AG,
                        ok(wkr, "Updated") | ok(wkr, "Started", "201")
-                       | errs("400", "403", "404"), [pid()], scope=W, body={
+                       | errs("400", "403", "404", "409"), [pid()], scope=W, body={
                            "type": "object", "additionalProperties": False, "properties": {
                                "text": {"type": "string", "description": "The progress line (one line, cut to 500 characters; shown up to 200)"},
                                "title": {"type": "string", "description": "Title of the job when it starts (default: the task's title)"},

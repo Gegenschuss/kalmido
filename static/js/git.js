@@ -99,6 +99,19 @@ async function gitRefresh(lid) {
   toast(tr('Checking the repository …'));
   setTimeout(async () => { await load(); render(); }, 4000);
 }
+// 2.392.0 B (#3364): the field that holds the version of list lid (gb_ver_field on the server)
+const GIT_VER_NAMES = ['paket', 'package', 'version', 'release', 'ziel-version', 'target version'];
+function gitVerField(lid) {
+  const s = listById(lid)?.git_ver_field, fs = fieldsAll(lid).filter(f => f.type === 'text' || f.type === 'select');
+  if (s === 0) return null;
+  return (s != null ? fs.find(f => f.id === s) : fs.find(f => f.type === 'text' && GIT_VER_NAMES.includes(f.name.trim().toLowerCase()))) || null;
+}
+async function gitPartial(tid) {
+  const v = await askPrompt(tr('Partly done: which version brings the rest?'), '', {body: tr('The task stays open until that version is released. A new task “Rest: …” gets that version.'), ok: tr('Save')});
+  if (!v?.trim()) return;
+  try { await api('POST', `/api/tasks/${tid}/partial`, {version: v.trim()}); } catch { return; }
+  toast(tr('Saved')); await load(); render(); if (S.sel === tid) loadTimeline(tid);
+}
 async function gitUndo(tid) {
   try { await api('POST', `/api/tasks/${tid}/git-undo`); } catch { return; }
   toast(tr('Reopened')); await load(); render(); if (S.sel === tid) loadTimeline(tid);
@@ -110,6 +123,7 @@ function gitActText(a, d, q) {
   const t = taskById(S.tl.id), undo = t && t.status !== 0 && canEdit(t) && a.id === Math.max(...(S.tl.activity || []).filter(x => x.kind === 'git_done').map(x => x.id))
     ? ` <button class="linkbtn" data-act="git-undo" data-id="${t.id}">${tr('Undo')}</button>` : '';
   return (d.kind === 'pr' ? tr('Completed by the pull request {0} in {1}', q(d.title || ''), repo)
+    : d.kind === 'release' ? (d.title ? tr('Released in {0}: {1}', q(d.title), repo) : tr('Released in an earlier version: {0}', repo))  // 2.392.0 B (#3364)
     : d.kind === 'tag' ? tr('Milestone reached: tag {0} in {1}', q(d.ref || ''), repo)  // 2.18.0 (#408)
       : tr('Completed by the commit {0} in {1}', q(d.title || ''), repo)) + undo;
 }
@@ -128,6 +142,7 @@ function mrHtml(c, s, ro) {
 function gateHtml(c, s, ro) {
   const st = s.state === 'approved' ? tr('approved') : s.state === 'rejected' ? tr('rejected') : '';
   const may = s.state === 'open' && !ro && (c.may_decide ?? S.tl.approver), dep = s.kind === 'deploy', left = (s.checklist || []).length;
+  const irr = s.state === 'open' ? s.irreversible || [] : [];  // 2.392.0 C (#3370): no "Approve anyway" passes these, only a yes on the task
   const li = x => `<li><button type="button" class="linkbtn" data-act="open-id" data-id="${x.id}">#${x.id}</button> ${esc(x.title || '')}</li>`;
   return `<div class="sug mr gate ${esc(s.state || 'open')}"><div class="sugh">${ic(dep ? 'send' : 'pr', 's')}<b>${dep ? tr('Ready to deploy') : tr('Ready to integrate')}</b>${st ? `<span class="muted">· ${s.state === 'approved' ? thumbIc(true) : thumbIc(false)} ${st}</span>` : ''}</div>
     ${dep ? '' : `<div class="gref"><code>${esc(s.source || '')}</code> → <code>${esc(s.target || 'main')}</code></div>`}
@@ -135,12 +150,13 @@ function gateHtml(c, s, ro) {
     ${s.evidence ? `<details class="gev"><summary>${tr('Evidence')}</summary><pre>${esc(s.evidence)}</pre></details>` : ''}
     ${dep && (s.integrations || []).length ? `<div class="gint"><span class="muted">${tr('Integrations')}:</span> ${s.integrations.map(x => `<code>${esc(x.source || '')}</code>`).join(', ')}</div>` : ''}
     ${dep ? `<div class="gchk"><b>${left ? trn('{0} open deploy task', '{0} open deploy tasks', left) : tr('Checklist complete')}</b>${left ? `<ul>${s.checklist.map(li).join('')}</ul>` : ''}${(s.skipped || []).length ? `<div class="muted">${tr('Approved although open')}: ${s.skipped.map(x => '#' + x.id).join(', ')}</div>` : ''}</div>` : ''}
-    ${may ? `<div class="sugb">${dep && left ? `<button class="btn sm" data-act="gate-skip" data-cid="${c.id}">${thumbIc(true)} ${tr('Approve anyway')}</button>` : `<button class="btn sm pri" data-act="gate-ok" data-cid="${c.id}">${thumbIc(true)} ${tr('Approve')}</button>`}<button class="btn sm" data-act="mr-no" data-cid="${c.id}">${thumbIc(false)} ${tr('Reject')}</button><span class="muted">${dep ? tr('The agent deploys only after your approval') : tr('The agent integrates only after your approval')}</span></div>` : ''}</div>`;
+    ${irr.length ? `<div class="gchk"><b>${esc(trn('{0} one-way step without a yes', '{0} one-way steps without a yes', irr.length))}</b><ul>${irr.map(x => `<li><button type="button" class="linkbtn" data-act="open-id" data-id="${x.id}">#${x.id}</button> ${esc(x.title || '')}${x.reason ? ` <span class="muted">${esc(x.reason)}</span>` : ''}</li>`).join('')}</ul></div>` : ''}
+    ${may ? `<div class="sugb">${irr.length ? '' : dep && left ? `<button class="btn sm" data-act="gate-skip" data-cid="${c.id}">${thumbIc(true)} ${tr('Approve anyway')}</button>` : `<button class="btn sm pri" data-act="gate-ok" data-cid="${c.id}">${thumbIc(true)} ${tr('Approve')}</button>`}<button class="btn sm" data-act="mr-no" data-cid="${c.id}">${thumbIc(false)} ${tr('Reject')}</button><span class="muted">${dep ? tr('The agent deploys only after your approval') : tr('The agent integrates only after your approval')}</span></div>` : ''}</div>`;
 }
 async function gateDecide(cid, skip) {
   let j; try { j = await api('POST', `/api/comments/${cid}/decide`, {decision: 'approve', skip_checklist: !!skip}); } catch { return; }
   const c = tlComment(cid); if (c) { c.suggestion = j.suggestion; drawTimeline(); }
-  toast(j.state === 'blocked' ? tr('Open deploy tasks first, or approve anyway') : tr('Approved'));
+  toast(j.state === 'blocked' ? (j.suggestion?.irreversible || []).length ? tr('These one-way steps need a yes first') : tr('Open deploy tasks first, or approve anyway') : tr('Approved'));
 }
 // list dialog > Repository
 function repoBoxHtml(l) {

@@ -16,6 +16,7 @@ from ..core.access import collab_all, Denied, list_people, list_role, MANAGE_ROL
 from ..core.serializers import unlink_files
 from ..tasks.tasks import WEB_COMMENT
 from ..tasks.attachments import save_attachments
+from ..tasks.oneway import dec_list, gate_irreversible
 from .replies import reply_check, with_replies
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
 
@@ -185,6 +186,8 @@ def timeline(tid):
         if sk in ("merge_request", "integrate", "deploy") and x["user_id"] in ag:  # 2.190.0 C (#2561): who may decide this request
             trow = trow or c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
             x["may_decide"] = is_approver(c, trow, me(), agent=x["user_id"], assignee=sk == "merge_request")
+            if sk != "merge_request" and x["suggestion"].get("state") == "open":  # 2.392.0 C (#3370): what blocks NOW, for this reader
+                x["suggestion"]["irreversible"] = gate_irreversible(c, trow, sk, me())
     ppl = task_people(c, t["list_id"], tid) if collab_all() else []  # 2.86.0 (N20)
     for p in ppl:
         if p["id"] in ag:
@@ -194,7 +197,9 @@ def timeline(tid):
                    agents=sorted(i for i in ids | {p["id"] for p in ppl} if i in ag),
                    can_write=task_visible(c, tid, me(), write=True),
                    approver=is_approver(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), me()),  # 2.2.0 (#339)
-                   ticket=pt_ticket_info(c, tid, me()))  # 2.63.0 B (#1513): a customer's report (box in the task panel)
+                   ticket=pt_ticket_info(c, tid, me()),  # 2.63.0 B (#1513): a customer's report (box in the task panel)
+                   decisions=dec_list(c, tid),  # 2.392.0 C (#3370): the section at the top of the task panel
+                   may_yes=is_approver(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), me(), assignee=False))  # who gives the yes to a one-way task
 
 
 @app.post("/api/tasks/<int:tid>/seen")
@@ -254,7 +259,7 @@ def comment_create(tid):
     from ..integrations.webhooks import wh_note
     from ..agents.core import agent_comment_events, is_agent, tidy_agent_of
     from ..collab.reactions import clean_suggestion, with_reactions
-    from ..integrations.git import git_merge_link, git_merge_request
+    from ..integrations.git import GIT_COMMENT_CMD, git_merge_link, git_merge_request
     c = db()
     if not is_agent(g.user):
         need_feat("comments")
@@ -354,7 +359,9 @@ def comment_create(tid):
     bump(c)
     c.commit()
     send_pushes(pushes)
-    return comment_answer(c, tid, c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone())
+    hint = GIT_COMMENT_CMD[0](c, t, text) if not portal else None  # 2.392.0 B (#3364): "partly: rest in Y" in the first line
+    r = comment_answer(c, tid, c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone())
+    return jsonify({**r.get_json(), "partial": hint}) if hint else r
 
 
 @app.patch("/api/comments/<int:cid>")

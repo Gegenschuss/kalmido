@@ -148,7 +148,7 @@ function sv_entries() {
   const lists = S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l));
   const it = (key, name, depth = 0) => ({key, name, depth});
   const per = {
-    focus: () => ['inbox', 'assigned', 'today', 'tomorrow', 'week', 'doable', 'pinned', 'waiting', 'stale', 'byme'].filter(k => FV2_VIEWS[k] && (k !== 'byme' || collab()) && !hid('e:' + k)).map(k => it('v:' + k, tr(FV2_VIEWS[k][1]))),
+    focus: () => ['inbox', 'assigned', 'today', 'tomorrow', 'week', 'doable', 'pinned', 'waiting', 'mine_wait', 'stale', 'byme'].filter(k => FV2_VIEWS[k] && (k !== 'byme' || collab()) && !hid('e:' + k)).map(k => it('v:' + k, tr(FV2_VIEWS[k][1]))),
     lists: () => {
       const a = lists.filter(l => !l.folder).map(l => it('l:' + l.id, lname(l)));
       const fold = (f, d) => {

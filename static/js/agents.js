@@ -148,11 +148,12 @@ const waitJobBtns = j => j.kind ? `<button class="btn sm pri" data-act="prop-ope
 function waitCard() {
   // 2.13.2 (#478 F14): like the agent pill and the chat, the card follows "agents share lists with me", not the Agents
   // module (that is the tab + the band): what waits for my approval never disappears with a switch
-  if (S.route.key !== 'today' || !agentsOn()) return '';
-  const js = waitJobs(); if (!js.length) return '';
+  if (S.route.key !== 'today') return '';
+  const js = agentsOn() ? waitJobs() : [], n = mwToDo();  // 2.392.0 D (#3369): the rest stands in the view "Waiting for me", not here
+  if (!js.length) return n ? `<section class="waitcard"><a class="linkbtn" href="#mine_wait">${esc(trn('{0} thing waits for you', '{0} things wait for you', n))}</a></section>` : '';
   return `<section class="waitcard" aria-labelledby="wc-h"><h3 id="wc-h">${hdot('waiting')} ${esc(trn('{0} job waits for you', '{0} jobs wait for you', js.length))}</h3>
     ${js.slice(0, 5).map(j => `<div class="wcrow"><div class="wci"><b>${esc(j.title)}</b><span class="muted">${esc(j.agent_name)}${j.task_id ? ` · #${j.task_id} ${esc(j.task_title || '')}` : ''}</span></div><div class="wcb">${waitJobBtns(j)}</div></div>`).join('')}
-    ${js.length > 5 ? `<a class="linkbtn" href="#agents">${esc(trn('and {0} more', 'and {0} more', js.length - 5))}</a>` : ''}</section>`;
+    ${n > 5 || js.length > 5 ? `<a class="linkbtn" href="#mine_wait">${esc(tr('Everything that waits for you'))}</a>` : ''}</section>`;
 }
 function agBandHtml() {
   const ags = bandAgents(); if (!ags.length) return '';

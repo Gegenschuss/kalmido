@@ -4,7 +4,9 @@ A deployment is set by hand (the milestone's "Put on ..."), by the token API (se
 POST /api/hooks/deploy/<environment id>/<token> {"version": "2.60.0"}. The token is shown once and stored only as its SHA-256
 (like the error-report hook); the version finds the milestone by its title (exact, or with / without a leading "v", or as a
 word of the title). A version without a milestone is stored too. Optional per environment: "close tasks on arrival" completes
-the open tasks of the milestone that reaches it (each one can be reopened as usual). Agents with list access hear `deployed`."""
+the open tasks of the milestone that reaches it (each one can be reopened as usual). Agents with list access hear `deployed`.
+2.392.0 C (#3370): optional per environment: "acceptance task": a version that arrives brings a task "vX.Y" to accept, for the
+list's owner, with the tasks closed by it as subtasks, at most once per environment and version."""
 import hashlib
 import hmac
 import re
@@ -12,13 +14,16 @@ import secrets
 from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
-from ..core.pg import insert_id, system_ctx
-from ..core.i18n import N_, tr
+from ..core.pg import insert_id, st_ids, system_ctx
+from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
 from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list
 from ..tasks.validation import log_act
 from ..tasks.lifecycle import do_complete
+from ..tasks.oneway import DEPLOY_TAG
+from ..tasks.tasks import task_inherit
+from ..collab.comments import assignment_events
 from ..core.errors import UnknownFields, web_fields
 from ..agents.core import agent_emit, is_agent, list_agents
 from ..api.common import v1_args, v1_call, v1_json, v1_view
@@ -30,6 +35,7 @@ ENV_VERSION_MAX = 100
 ENV_SUGGEST = (N_("Staging"), N_("Live"))  # offered for a software project, never created unasked
 ENV_SOURCES = ("manual", "api", "hook")
 ENV_RATE_S = 2         # s between two webhook calls per environment (a deploy script, not a flood)
+ENV_ACCEPT_MAX = 100   # subtasks of an acceptance task
 _ENV_LAST = {}
 
 
@@ -81,7 +87,7 @@ def env_current(c, eids):
 
 def env_dict(r, cur, manage=False):
     d = {"id": r["id"], "list_id": r["list_id"], "name": r["name"], "sort": r["sort"], "auto_close": bool(r["auto_close"]),
-         "current": cur}
+         "acceptance_task": bool(r["acceptance_task"]), "current": cur}
     if manage:
         d["hook"] = bool(r["token_hash"])
     return d
@@ -145,9 +151,11 @@ def env_deploy(c, e, version="", milestone_id=None, source="manual", uid=None):
     closed = []
     if ms and e["auto_close"]:
         closed = env_close_tasks(c, ms["id"], e["name"], uid)
+    acc = env_acceptance(c, e, version, closed, uid) if e["acceptance_task"] else None
     bump(c)
     out = {"id": did, "env_id": e["id"], "env": e["name"], "version": version, "at": ts, "source": source,
-           "milestone_id": ms["id"] if ms else None, "milestone": ms["title"] if ms else None, "closed": closed}
+           "milestone_id": ms["id"] if ms else None, "milestone": ms["title"] if ms else None, "closed": closed,
+           "acceptance_task_id": acc}
     env_event(c, lid, out)
     return out
 
@@ -172,11 +180,53 @@ def env_close_tasks(c, mid, env_name, uid):
     return done
 
 
+def env_acceptance(c, e, version, closed, uid):
+    """2.392.0 C (#3370): the task to accept a version that arrived, assigned to the list's owner, the closed tasks as its
+    subtasks. Its id; None when this environment had one for the version already, or in a list with the lock (the server
+    writes no plain text there)."""
+    from ..collab.liste2eguard import le2b_list_locked
+    lid = e["list_id"]
+    if le2b_list_locked(c, lid):
+        return None
+    c.execute("SELECT id FROM list_envs WHERE id=? FOR UPDATE", (e["id"],))  # two deployments of one version at once: one task
+    key = f"{e['id']}:{env_norm(version)}"
+    if c.execute("SELECT 1 FROM tasks WHERE list_id=? AND acceptance_of=?", (lid, key)).fetchone():
+        return None
+    owner = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
+    lg = lang(c, owner)
+    sec = c.execute("SELECT id FROM sections WHERE list_id=? ORDER BY sort, id LIMIT 1", (lid,)).fetchone()
+    sec = sec[0] if sec else None
+    srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
+    now = iso(now_utc())
+    name = "v" + version if re.match(r"^\d", version) else version
+    more = len(closed) - ENV_ACCEPT_MAX
+    tid = insert_id(c, """INSERT INTO tasks(list_id,section_id,title,content,sort,created_at,updated_at,created_by,assignee_id,acceptance_of)
+                       VALUES(?,?,?,?,?,?,?,NULL,?,?)""",
+                    (lid, sec, tr("Accept {0}", name, lg=lg)[:300], tr("{0} more tasks closed with this version", more, lg=lg) if more > 0 else "",
+                     srt, now, now, owner, key))
+    titles = {r["id"]: r["title"] for r in c.execute("SELECT id, title FROM tasks WHERE id = ANY(CAST(? AS BIGINT[]))", (st_ids(closed),))}
+    for i, cid in enumerate(closed[:ENV_ACCEPT_MAX]):
+        sub = insert_id(c, """INSERT INTO tasks(list_id,section_id,parent_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?,NULL)""",
+                        (lid, sec, tid, titles.get(cid, ""), i, now, now))
+        task_inherit(c, sub, cid)  # 2.392.0 (#3370 review): a title stays behind the data lock of its task; the tag deploy would refill the checklist
+        c.execute("""DELETE FROM task_list_tags WHERE task_id=? AND tag_id IN (SELECT id FROM list_tags WHERE list_id=? AND lower(name)=lower(?))""",
+                  (sub, lid, DEPLOY_TAG))
+    prev = g.get("user")
+    if not prev:
+        g.user = {"id": None, "display_name": "", "username": "", "kind": "person"}  # a hook: nobody's task
+    try:
+        log_act(c, tid, "created", {"env": e["name"]}, uid=uid)
+        assignment_events(c, tid, None, owner)
+    finally:
+        g.user = prev
+    return tid
+
+
 def env_event(c, lid, dep):
     """Agents with access to the list hear `deployed` (agent_emit keeps list limits, health lists and paused agents out)."""
     data = {"list_id": lid, "environment": {"id": dep["env_id"], "name": dep["env"]}, "version": dep["version"],
             "milestone": {"id": dep["milestone_id"], "title": dep["milestone"]} if dep["milestone_id"] else None,
-            "source": dep["source"], "at": dep["at"], "closed_task_ids": dep["closed"]}
+            "source": dep["source"], "at": dep["at"], "closed_task_ids": dep["closed"], "acceptance_task_id": dep["acceptance_task_id"]}
     for aid in list_agents(c, lid):
         agent_emit(c, aid, "deployed", data)
 
@@ -195,7 +245,7 @@ def env_get(lid):
 def env_add(lid):
     c = db()
     need_overview(c, lid, write=True)
-    b = web_fields(body(), {"name", "auto_close"}, "POST /api/lists/{lid}/envs")
+    b = web_fields(body(), {"name", "auto_close", "acceptance_task"}, "POST /api/lists/{lid}/envs")
     name = env_clean_name(b.get("name"))
     rows = c.execute("SELECT name FROM list_envs WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchall()
     if len(rows) >= ENV_MAX:
@@ -203,8 +253,8 @@ def env_add(lid):
     if name.lower() in {r["name"].lower() for r in rows}:
         return err(tr("This name is taken"), 409)
     sort = c.execute("SELECT COALESCE(MAX(sort), 0) + 1 FROM list_envs WHERE list_id=?", (lid,)).fetchone()[0]
-    eid = insert_id(c, "INSERT INTO list_envs(list_id,name,sort,auto_close,created_at) VALUES(?,?,?,?,?)",
-                    (lid, name, sort, 1 if b.get("auto_close") else 0, iso(now_utc())))
+    eid = insert_id(c, "INSERT INTO list_envs(list_id,name,sort,auto_close,acceptance_task,created_at) VALUES(?,?,?,?,?,?)",
+                    (lid, name, sort, 1 if b.get("auto_close") else 0, 1 if b.get("acceptance_task") else 0, iso(now_utc())))
     bump(c)
     c.commit()
     return jsonify(env_dict(c.execute("SELECT * FROM list_envs WHERE id=?", (eid,)).fetchone(), None, True)), 201
@@ -212,9 +262,9 @@ def env_add(lid):
 
 @app.patch("/api/envs/<int:eid>")
 def env_update(eid):
-    """{name?, auto_close?, hook?: on | rotate | off}. The webhook token is shown once (owner / list admins, never an agent)."""
+    """{name?, auto_close?, acceptance_task?, hook?: on | rotate | off}. The webhook token is shown once (owner / list admins, never an agent)."""
     c = db()
-    b = web_fields(body(), {"name", "auto_close", "hook"}, "PATCH /api/envs/{id}")
+    b = web_fields(body(), {"name", "auto_close", "acceptance_task", "hook"}, "PATCH /api/envs/{id}")
     e = env_row(c, eid, write=True, manage="hook" in b)
     out = {}
     if "name" in b:
@@ -224,6 +274,8 @@ def env_update(eid):
         c.execute("UPDATE list_envs SET name=? WHERE id=?", (name, eid))
     if "auto_close" in b:
         c.execute("UPDATE list_envs SET auto_close=? WHERE id=?", (1 if b["auto_close"] else 0, eid))
+    if "acceptance_task" in b:
+        c.execute("UPDATE list_envs SET acceptance_task=? WHERE id=?", (1 if b["acceptance_task"] else 0, eid))
     if "hook" in b:
         if b["hook"] not in ("on", "rotate", "off"):
             return err(tr("Invalid value: {0}", "hook"))
@@ -365,13 +417,15 @@ def env_spec(paths, schemas, op, ok, errs, ref, pid):
     schemas["Environment"] = {"type": "object", "properties": {
         "id": {"type": "integer"}, "list_id": {"type": "integer"}, "name": {"type": "string"}, "sort": {"type": "integer"},
         "auto_close": {"type": "boolean", "description": "a milestone that reaches the environment completes its open tasks"},
+        "acceptance_task": {"type": "boolean", "description": "a version that arrives brings a task to accept it, for the project's owner"},
         "current": {"oneOf": [cur, {"type": "null"}], "description": "the latest deployment"}}}
     schemas["EnvironmentPage"] = {"type": "object", "required": ["data", "next_cursor"], "properties": {
         "data": {"type": "array", "items": ref("Environment")}, "next_cursor": {"type": ["string", "null"]}}}
     schemas["Deployment"] = {"type": "object", "properties": {
         "id": {"type": "integer"}, "env_id": {"type": "integer"}, "env": {"type": "string"}, "version": {"type": "string"},
         "at": {"type": "string"}, "source": {"type": "string"}, "milestone_id": {"type": ["integer", "null"]},
-        "milestone": {"type": ["string", "null"]}, "closed": {"type": "array", "items": {"type": "integer"}}}}
+        "milestone": {"type": ["string", "null"]}, "closed": {"type": "array", "items": {"type": "integer"}},
+        "acceptance_task_id": {"type": ["integer", "null"], "description": "the acceptance task made by this deployment"}}}
     paths.update({
         "/lists/{id}/environments": {"get": op("Environments of a project list (Staging, Live, ...) with the latest deployment of each",
                                                "Lists", ok(ref("EnvironmentPage")) | errs("404", "409"), [lp])},

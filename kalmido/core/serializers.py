@@ -21,12 +21,13 @@ def task_dict(r, tags, full_snips=False):
     d.pop("reminded", None)
     d.pop("nag_at", None)
     d.pop("client_ref", None)  # 2.126.0 D (#1990): only the server matches it
+    d.pop("acceptance_of", None)  # 2.392.0 C (#3370): only the server matches it
     # 2.18.0 (#430): ms only on milestones, milestone_id only when set (keeps every other task's dict as it was)
     if not d.get("ms"):
         d.pop("ms", None)
     if d.get("milestone_id") is None:
         d.pop("milestone_id", None)
-    for k in ("sprint_id", "sprint_at", "points", "section_at"):  # 2.60.0 (#343 / #1511): only when set; 2.410.0 B (#3515): + section_at
+    for k in ("sprint_id", "sprint_at", "points", "section_at", "partial_until"):  # 2.60.0 (#343 / #1511): only when set; 2.410.0 B (#3515): + section_at; 2.392.0 B (#3364): + partial_until
         if d.get(k) is None:
             d.pop(k, None)
     if not d.get("review"):  # 2.60.0 C (#1512): review fields only when a review state is set; the reviewer when one is set
@@ -240,7 +241,7 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
         if r["id"] in wk:
             d["working"] = wk[r["id"]]
         if r["id"] in ctx:
-            d.update(content="", url=None, attachments=[], comment_count=0, unread=0, fields={},
+            d.update(content="", url=None, attachments=[], comment_count=0, unread=0, fields={}, irreversible_reason="",
                      blockers=[], blocked=0, blocking=0, context=True)
             d.pop("approvals_open", None)
             d.pop("snippets", None)  # 2.35.0 (#1095)

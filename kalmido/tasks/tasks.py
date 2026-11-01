@@ -201,6 +201,13 @@ WEB_COMMENT = frozenset({"body", "suggestion", "reply_to", "choices", "multi", "
 WEB_COMMENT |= {"portal"}  # 2.63.0 B (#1513): an answer the customer sees
 
 
+def task_inherit(c, tid, src):
+    """Tags of everyone, list tags and the people of task src: what decides who sees a task (participants, an agent's data lock)."""
+    c.execute("INSERT INTO task_tags(task_id,user_id,tag) SELECT ?, user_id, tag FROM task_tags WHERE task_id=? ON CONFLICT DO NOTHING", (tid, src))
+    c.execute("INSERT INTO task_list_tags(task_id,tag_id) SELECT ?, tag_id FROM task_list_tags WHERE task_id=? ON CONFLICT DO NOTHING", (tid, src))
+    c.execute("INSERT INTO task_people(task_id,user_id) SELECT ?, user_id FROM task_people WHERE task_id=? ON CONFLICT DO NOTHING", (tid, src))
+
+
 @app.post("/api/tasks")
 def task_create():
     from ..tasks.lifecycle import repeat_problem
@@ -317,6 +324,8 @@ def task_create():
         if e:
             c.rollback()
             return err(e)
+    if g.get("task_like"):  # 2.392.0 B (#3364): the rest of a task: seen by the same people and agents, before any event goes out
+        task_inherit(c, cur_id, g.pop("task_like"))
     log_act(c, cur_id, "created")
     agent_task_mentions(c, cur_id)
     agent_tidy_events(c, cur_id)

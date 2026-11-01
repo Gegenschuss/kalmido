@@ -114,7 +114,8 @@ UMZ_DROP = {
     "lists": {"is_inbox", "family", "agent_tidy", "agent_listen", "agent_members", "agent_peers", "agent_followup", "tidy_agent",
               "org_visibility", "org_edit", "git_folder_off", "icon",
               "header_file"},  # 2.459.0 (#3849): a token of the old server (orgimport.oi_pictures makes a new one with the picture)
-    "tasks": {"rotation", "approval", "fam", "tt_id", "nag_at", "wait_fired"},
+    "tasks": {"rotation", "approval", "fam", "tt_id", "nag_at", "wait_fired",
+              "irreversible_yes_at", "acceptance_of"},  # 2.392.0 C (#3370): a yes is given here, an environment id means nothing here
     "comments": {"mentions", "suggestion", "choices", "choice", "ext_name", "client_ref"},  # 2.370.2 (#3088): client_ref like the notes'
     "attachments": {"path", "enc_by"},
     "list_files": {"path"},
@@ -134,6 +135,7 @@ UMZ_READ = frozenset((
     "e2e_keys",  # 2.278.0: the browser keys
     "notes", "task_enc_notes",  # 2.362.0 (#3090): project notes, my encrypted task notes
     "sprints", "task_links", "list_rules", "portal_tickets",  # 2.455.0 (#3469)
+    "task_decisions",  # 2.392.0 C (#3370)
     "template_files",  # 2.464.0 (#3865)
 ))
 UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is empty; a name used twice adds up
@@ -385,7 +387,7 @@ UMZ_ORG_MAP = {
     "lists/tags.json": "list_tags", "lists/status.json": "list_status", "lists/links.json": "list_links",
     "lists/milestones.json": "list_milestones", "lists/files.json": "list_files", "tasks.json": "tasks",
     "tasks/dependencies.json": "task_deps", "tasks/field_values.json": "task_field_values", "tasks/tags.json": "task_list_tags",
-    "comments.json": "comments", "attachments.json": "attachments", "calendars.json": "event_calendars", "events.json": "events",
+    "tasks/decisions.json": "task_decisions", "comments.json": "comments", "attachments.json": "attachments", "calendars.json": "event_calendars", "events.json": "events",
     "events/attendees.json": "event_attendees", "books.json": "address_books", "books/contacts.json": "contacts",
     "members.json": "members",
 }
@@ -1491,6 +1493,21 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         if nid:
             run.put("comments", r.get("id"), nid)
             run.count("comments")
+    # 2.392.0 C (#3370): the decisions of the tasks that came along, oldest first; what replaced what through the new ids
+    for r in sorted(data.get("task_decisions", []), key=lambda x: _oid(x.get("id")) or 0):
+        run.step()
+        tid = run.m("tasks", r.get("task_id"))
+        if not tid or run.there("task_decisions", r.get("id")):
+            continue
+        d = umz_row(c, "task_decisions", r, {"task_id": tid, "by_id": uid if _oid(r.get("by_id")) == me_old else None, "superseded_by": None}, ts)
+        nid = umz_insert(c, "task_decisions", d) if d else None
+        if nid:
+            run.put("task_decisions", r.get("id"), nid)
+            run.count("task_decisions")
+    for r in data.get("task_decisions", []):
+        old, new = run.m("task_decisions", r.get("id")), run.m("task_decisions", r.get("superseded_by"))
+        if old and new:
+            c.execute("UPDATE task_decisions SET superseded_by=? WHERE id=?", (new, old))
     # personal parts
     for r in data.get("time_entries", []):
         run.step()

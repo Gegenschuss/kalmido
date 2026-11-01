@@ -3414,9 +3414,10 @@ body.in-chat #top{display:none}
 .wcrow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.375rem 0;border-top:1px solid var(--line)}
 .wcrow:first-of-type{border-top:0}
 .wci{display:flex;flex-direction:column;min-width:0;flex:1 1 12rem}
+.mwv{display:flex;flex-direction:column;gap:.75rem}.mwg h3 .muted{font-weight:400;font-size:var(--fs-s)}.mwa{display:flex;flex:1 1 12rem;min-width:0;color:inherit;text-decoration:none;text-align:left;width:100%;background:none;border-left:0;border-right:0;border-bottom:0;font:inherit;cursor:pointer}
 .wci b{overflow-wrap:anywhere}.wci .muted{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wcb{display:flex;gap:.375rem;flex-wrap:wrap}
-@media (pointer:coarse){ .wcb .btn,.waitcard .linkbtn{min-height:2.75rem} }
+@media (pointer:coarse){ .wcb .btn,.waitcard .linkbtn,.mwa{min-height:2.75rem} }
 .menu-list .mwait .ml{white-space:normal}
 /* helper texts behind (i): the button next to its heading / label, the shared tooltip */
 .shint.iisrc{display:none}
@@ -8825,3 +8826,9 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
   .povs.povs-empty .povh{flex-wrap:wrap}
   .povs-empty .povemh{flex:1 1 100%;min-width:0}
 }
+/* 2.392.0 C (#3370): the one-way mark and the decisions of a task */
+.owbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-start;border:1px solid var(--line2);border-radius:.75rem;padding:.625rem .75rem;margin:0 0 .75rem;background:var(--bg2)}
+.owbar .owt{flex:1 1 12rem;min-width:0;display:flex;flex-direction:column;gap:.125rem;overflow-wrap:anywhere}
+.owbar .owb{display:flex;flex-wrap:wrap;gap:.375rem}
+.owdec{margin:0 0 .75rem}.owdec ul{list-style:none;margin:0 0 .25rem;padding:0}
+.owd{padding:.25rem 0;overflow-wrap:anywhere}.owd.old .owdt{text-decoration:line-through;color:var(--muted)}.owdm{font-size:.8125rem}
