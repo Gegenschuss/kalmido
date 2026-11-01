@@ -214,7 +214,7 @@ function lst_sortMenu(anchor, list, sorts, draw) {
 }
 function lst_sortBtn(list, sorts = LST_SORTS) {
   const s = lst_sort(list, sorts), name = tr(sorts.find(x => x[0] === s.k)[1]), lbl = tr('Sorting') + ': ' + name + (s.k ? ', ' + (s.d === 'asc' ? tr('ascending|sort') : tr('descending|sort')) : '');
-  return `<button type="button" class="btn sm lst-sortb" data-lsort="${esc(list)}" aria-haspopup="menu" title="${esc(lbl)}" aria-label="${esc(lbl)}">${ic('sort', 's')} <span>${esc(name)}</span>${s.k ? (s.d === 'asc' ? ' ↑' : ' ↓') : ''}</button>`;
+  return `<button type="button" class="btn sm lst-sortb" data-lstsort="${esc(list)}" aria-haspopup="menu" title="${esc(lbl)}" aria-label="${esc(lbl)}">${ic('sort', 's')} <span>${esc(name)}</span>${s.k ? (s.d === 'asc' ? ' ↑' : ' ↓') : ''}</button>`;
 }
 // get(row) -> {date, client, amount, name}; rows without the value stay last in both directions
 function lst_sorted(rows, list, get, sorts = LST_SORTS) {
@@ -223,9 +223,9 @@ function lst_sorted(rows, list, get, sorts = LST_SORTS) {
   return rows.map(r => [r, val(r)]).sort(([, a], [, b]) => a === null || b === null ? (a === null) - (b === null) : f * (k === 'amount' ? a - b : k === 'date' ? (a < b ? -1 : a > b ? 1 : 0) : String(a).localeCompare(String(b), uiLang(), {numeric: true, sensitivity: 'base'}))).map(x => x[0]);
 }
 document.addEventListener('click', e => {
-  const b = e.target.closest?.('[data-lsort]'); if (!b) return;
+  const b = e.target.closest?.('[data-lstsort]'); if (!b) return;  // not data-lsort: that is the "…" of a list in the sidebar sort mode
   e.preventDefault(); e.stopPropagation();
-  const l = b.dataset.lsort; lst_sortMenu(b, l, l === 'pipeline' ? LST_MANUAL : LST_SORTS, () => { ofcDraw(); if (l.startsWith('docs.') && OFD.next) ofdLoadList(true); });  // 2.369.0 A (#3200): another sorting asks the server
+  const l = b.dataset.lstsort; lst_sortMenu(b, l, l === 'pipeline' ? LST_MANUAL : LST_SORTS, () => { ofcDraw(); if (l.startsWith('docs.') && OFD.next) ofdLoadList(true); });  // 2.369.0 A (#3200): another sorting asks the server
 });
 const ofd_listKey = k => (k === 'archive' ? 'archive.' + oim_secKind() : 'docs.' + k);
 // ---- the list
