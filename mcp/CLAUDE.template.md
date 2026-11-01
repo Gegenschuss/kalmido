@@ -654,6 +654,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 - `playbook_proposal`: people applied or discarded your proposed change of a project's Playbook
 - `message_edited`: a person changed a chat message, comment or team message you already had (a correction)
 - `file_shared`: a folder or file of the file store was shared with you (`node`, `role` view | edit)
+- `sheet_shared` / `sheet_unshared`: a table was shared with you (`sheet`, `role` read | write) / that share ended (`sheet` id only)
 - `document_added`: a new document was recognised in a folder / file shared with you (`document`); a receipt? see *assign a receipt* below
 - `offer_accepted`: a quotation of your office area was accepted (`doc_id`, `client_id`, `list_id`, sums); only with your office switch on
   (or office groups with offers); `list_id` is null when the project is not shared with you
