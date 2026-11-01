@@ -98,7 +98,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   click(w, [...d.querySelectorAll('#pop .menu-list button')].find(b => /Approve/.test(b.textContent)));
   check(await until(async () => (await tcall('GET', `/agent/jobs/${J}`, TOK)).action === 'approve'), 'A6: Approve from the menu reaches the job');
   await w.eval('load().then(render)'); await idle(w);
-  check(!d.querySelector('#view .waitcard'), 'A6: the Today card goes once nothing waits');
+  check(await until(() => !d.querySelector('#view .waitcard')), 'A6: the Today card goes once nothing waits: ' + (d.querySelector('#view .waitcard')?.textContent || '-'));
   check(!(await call('GET', '/api/news')).items.some(x => x.kind === 'approval' && !x.read), 'A6: the approved job leaves no unread News (#2968)');
   // A10: #agents/<id> opens the chat on a desktop
   w.close(); w = await boot({user: 'alice', hash: 'agents/' + AG}); d = w.document;
