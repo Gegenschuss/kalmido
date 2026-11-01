@@ -159,7 +159,7 @@ const CHIP = `(() => { const a = [...document.querySelectorAll('#detail .attsec 
   click(w, d.querySelector('#d-tl [data-act="tl-menu"]')); await sleep(80);
   click(w, d.querySelector('#pop .mtlold')); await sleep(900);
   check((await sett()).comment_order === 'old', '#1054: back to "Oldest first"');
-  check(!d.querySelector('#detail #d-assignee') && d.querySelectorAll('#detail .dwho').length === 1, '#1054: phone: the assignee once');
+  check(!d.querySelector('#detail #d-assignee') && d.querySelectorAll('#detail .dwho:not(.dlg-c)').length === 1, '#1054: phone: the assignee once');  // 2.473.0 (#3357): the "Delegate" chip (.dwho.dlg-c) is not the assignee
   check(d.querySelector('#detail .dfoot .dfc') && /Created by Alice/.test(d.querySelector('#detail .dfoot .dfc').textContent), 'the footer "Created by …"');
   w.close();
   // a private task without comments on the phone: only the box (no area, no jump)
