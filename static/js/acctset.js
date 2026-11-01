@@ -305,7 +305,7 @@ async function wsr_draw(md, oid) {
   box.innerHTML = `${orgs.length > 1 ? `<div class="row"><label for="s-wsr-org">${tr('Organisation')}</label><select id="s-wsr-org">${orgs.map(w => `<option value="${w.id}" ${w.id === oid ? 'selected' : ''}>${esc(w.name)}</option>`).join('')}</select></div>` : ''}
     ${lv.personal ? '' : `<div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-wsr-appr" data-org="${oid}" ${lv.approval ? 'checked' : ''} ${dis}><span class="swt" aria-hidden="true"></span></span><span>${tr('Holiday of members needs an approval')}</span></label></div>
     <div class="shint">${tr('On: holiday a member enters is a request until an admin approves it. Sick leave and days off need no approval. Admins entering holiday for someone approve it at once.')}</div>`}
-    <div class="row"><label for="s-wsr-state">${tr('Public holidays')}</label><select id="s-wsr-state" data-org="${oid}" ${dis}><option value="">${tr('None')}</option>${Object.entries(ab.states).map(([k, v]) => `<option value="${esc(k)}" ${k === ab.state ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></div>
+    <div class="row"><label for="s-wsr-state-cc">${tr('Public holidays')}</label>${hol_selects('s-wsr-state', ab.countries, ab.state, tr('None'), `data-org="${oid}" data-was="${esc(ab.state)}" ${dis}`)}</div>
     ${lv.admin ? '' : `<div class="shint">${tr('Only admins of this workspace can change this')}</div>`}`;
 }
 function wsr_wire(md) {
@@ -318,8 +318,8 @@ function wsr_wire(md) {
       const to = t.checked, put = v => async () => { await api('PUT', '/api/team/leave/approval', {org, on: v}); };
       try { await put(to)(); histAdd({label: tr('Changed setting: {0}', tr('Holiday of members needs an approval')), sett: true, undo: put(!to), redo: put(to), post: () => wsr_draw(md, org)}); savedTick(t); } catch { t.checked = !to; /* api() said it */ }
     } else {
-      const from = t.dataset.was ?? [...t.options].find(o => o.defaultSelected)?.value ?? '', to = t.value, put = v => async () => { await api('PUT', '/api/team/absences/holidays', {state: v, org}); };
-      try { await put(to)(); t.dataset.was = to; histAdd({label: tr('Changed setting: {0}', tr('Public holidays')), sett: true, undo: put(from), redo: put(to), post: () => wsr_draw(md, org)}); savedTick(t); } catch { t.value = from; /* api() said it */ }
+      const from = t.dataset.was ?? '', to = t.value, put = v => async () => { await api('PUT', '/api/team/absences/holidays', {state: v, org}); };
+      try { await put(to)(); t.dataset.was = to; histAdd({label: tr('Changed setting: {0}', tr('Public holidays')), sett: true, undo: put(from), redo: put(to), post: () => wsr_draw(md, org)}); savedTick(t); } catch { wsr_draw(md, org); /* api() said it */ }
     }
   });
 }

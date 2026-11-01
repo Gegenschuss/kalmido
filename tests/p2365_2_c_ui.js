@@ -80,6 +80,15 @@ const change = (w, el, v) => { if (typeof v === 'boolean') el.checked = v; else 
   const ap = await until(() => d.querySelector('.smodal #s-wsr-appr'), 80);
   const hs = await until(() => d.querySelector('.smodal #s-wsr-state'), 80);
   check(!!ap && !!hs && !ap.disabled && !hs.disabled, '#2789: the admin sees both fields, editable');
+  // 2.461.0 (#3773): first the country, then the region; a country without regions shows no second field
+  const hc = d.querySelector('.smodal #s-wsr-state-cc');
+  check(!!hc && !!hs && hs.hidden, '#3773: without a choice only the country shows');
+  if (hc) change(w, hc, 'FR');
+  check(await until(async () => (await call('GET', `/api/team/absences?org=${ORG}`)).state === 'FR'), '#3773: a country without regions is saved at once');
+  check(hs.hidden, '#3773: France has no region field');
+  if (hc) change(w, hc, 'DE');
+  check(await until(async () => (await call('GET', `/api/team/absences?org=${ORG}`)).state === 'DE'), '#3773: Germany starts on the nationwide holidays');
+  check(!hs.hidden && [...hs.options].some(o => o.value === 'BY'), '#3773: Germany offers its states');
   if (hs) change(w, hs, 'BY');
   check(await until(async () => (await call('GET', `/api/team/absences?org=${ORG}`)).state === 'BY'), '#2789: the state of the organisation saved');
   if (ap) change(w, ap, true);
@@ -102,6 +111,9 @@ const change = (w, el, v) => { if (typeof v === 'boolean') el.checked = v; else 
   w.eval(`settingsModal('general')`);
   const ps = await until(() => d.querySelector('.smodal #s-holst'), 80);
   check(!!ps, '#2789: General > Working week has the own state of the public holidays (person without an organisation)');
+  const pc = d.querySelector('.smodal #s-holst-cc');  // 2.461.0 (#3773): first the country
+  if (pc) change(w, pc, 'DE');
+  check(await until(() => !ps.hidden), '#3773: the regions of Germany show for a person without an organisation');
   if (ps) change(w, ps, 'BY');
   check(await until(async () => (await call('GET', '/api/state', null, CC)).settings.holiday_state === 'BY'), '#2789: the own state saved');
   check((await call('GET', '/api/team/absences/feed', null, CC)).state === 'BY', '#2789: it applies to the person without an organisation');

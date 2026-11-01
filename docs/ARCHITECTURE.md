@@ -244,6 +244,7 @@ The most used helpers:
 | `team/clients.py` | Clients (module "clients"): clients of an organisation above the lists, hours, budget, estimate vs. actual. |
 | `team/workload.py` | Workload (module "workload"): planned hours per person and week against their capacity. |
 | `hub/absence.py` | 2.50.0 (#1195): absences per person and area (the team sees "away", the kind only the person and the admins; kind + note encrypted at rest), German public holidays per state, the effect on workload, day plan and assigning, `GET /api/v1/absences`. See docs/TEAM.md. |
+| `hub/holidays.py` | 2.461 (#3773): public holidays per country from the data files `office/packs/holidays/<code>.json`, regions, Easter formula. |
 | `hub/leave.py` | 2.125.0 (#2118, #2117): working days per person (setting `workdays`, read by workload, time gaps and the vacation account), the vacation account per person / area / year (`hub_leave_quota`), vacation requests (`hub_absences.status`, the organisation's switch `orgs.hub_leave_approval`) and their decision with News / push. See docs/TEAM.md. |
 | `hub/dispo.py` | 2.50.0 (#1194): resources and disposition (module "dispo"): bookings of members, contacts, equipment and sets (option / firm), double bookings and absences as warnings, "who is free", my bookings. See docs/TEAM.md. |
 | `team/approvals.py` | Approvals as a step of a task: request, approve / changes / reject, withdraw. |

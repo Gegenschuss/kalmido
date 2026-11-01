@@ -1,0 +1,17 @@
+{
+ "code": "NL",
+ "name": "Netherlands",
+ "version": 1,
+ "holidays": [
+  {"date": "01-01", "name": "New Year's Day"},
+  {"date": "04-27", "name": "King's Day", "since": 2014, "sunday_shift": -1},
+  {"date": "05-05", "name": "Liberation Day|Netherlands", "every": 5},
+  {"date": "12-25", "name": "Christmas Day"},
+  {"date": "12-26", "name": "Boxing Day"},
+  {"easter": 0, "name": "Easter Sunday"},
+  {"easter": 1, "name": "Easter Monday"},
+  {"easter": 39, "name": "Ascension Day"},
+  {"easter": 49, "name": "Whit Sunday"},
+  {"easter": 50, "name": "Whit Monday"}
+ ]
+}

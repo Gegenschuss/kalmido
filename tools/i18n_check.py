@@ -95,6 +95,8 @@ def extract():
             keys.setdefault(key, (kind, other, where))
     for key, where in KEYS.reason_keys(ROOT).items():  # 2.464.0 (#3841)
         keys.setdefault(key, ("s", None, where))
+    for key in sorted(KEYS.data_keys(ROOT)):  # 2.461 (#3773): the holiday files
+        keys.setdefault(key, ("s", None, "kalmido/office/packs/holidays/"))
     return keys, dynamic, errors
 
 

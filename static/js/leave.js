@@ -28,8 +28,7 @@ async function wt_holDraw(md) {
   const box = $('#s-holst-box', md); if (!box) return;
   let j; try { j = await api('GET', '/api/team/absences/feed'); } catch { return; }
   if (!md.isConnected) return;
-  box.innerHTML = `<div class="row"><label for="s-holst">${tr('Public holidays of')}</label><select id="s-holst"><option value="">${esc(j.area ? tr('As my organisation ({0})', j.states[j.area] || j.area) : tr('None'))}</option>
-    ${Object.entries(j.states).map(([k, v]) => `<option value="${esc(k)}" ${k === j.own ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></div>
+  box.innerHTML = `<div class="row"><label for="s-holst-cc">${tr('Public holidays of')}</label>${hol_selects('s-holst', j.countries, j.own, j.area ? tr('As my organisation ({0})', j.states[j.area] || j.area) : tr('None'))}</div>
     <div class="shint">${tr('Shows in your calendar and lowers your workload on these days.')}</div>`;
 }
 document.addEventListener('change', async ev => {

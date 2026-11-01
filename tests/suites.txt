@@ -2227,6 +2227,7 @@ fresh; run p2354_c_ui node p2354_c_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2380_l_ui node p2380_l_ui.js "$KALMIDO_TEST_DATA"
 # 2.365.2 C (#2789): module settings moved to Settings (time/focus link, agent steps, letter signature, organisation rules, own holiday state); freelancer-matrix: none
 fresh; run p2365_2_c_ui node p2365_2_c_ui.js "$KALMIDO_TEST_DATA"
+fresh; run p2461_holidays python3 p2461_holidays_test.py "$KALMIDO_TEST_DATA"
 # 2.435.0 A (#3600): the client card blocks fold (open / folded with the number, kept per person), the office switches blocks off; freelancer-matrix: office
 fresh; run p2435_a_ui node p2435_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.437.0 (#3729): init_db names its steps and milliseconds in the start log

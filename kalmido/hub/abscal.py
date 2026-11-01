@@ -25,7 +25,7 @@ from ..core.access import Denied
 from ..core.orgcrypt import oc_dec_fields
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip
 from ..personal.timetrack import BadInput
-from .absence import ABS_STATES, _gate, abs_holidays, abs_holidays_shown, abs_org, abs_people, abs_state, abs_states_shown
+from .absence import ABS_STATES, _gate, abs_holidays, abs_holidays_shown, abs_org, abs_countries_shown, abs_people, abs_state, abs_states_shown
 
 ABC_KIND = {"vacation": "Holiday", "sick": "Sick leave", "off": "Day off", "other": "Other absence"}
 ABC_MAX = 2000  # absences in one answer / feed
@@ -197,7 +197,7 @@ def abc_feed_info():
     own choice (holiday_state, '' = my area's), the state that applies now and my area's."""
     c, uid = _gate()
     s = usettings(c, uid)
-    return jsonify(url=abc_url(abc_feed_row(c, uid)), states=abs_states_shown(), own=s.get("holiday_state") or "", state=abc_state(c, uid, s),
+    return jsonify(url=abc_url(abc_feed_row(c, uid)), states=abs_states_shown(), countries=abs_countries_shown(), own=s.get("holiday_state") or "", state=abc_state(c, uid, s),
                    area=abc_state(c, uid, {}))
 
 

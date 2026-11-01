@@ -1486,3 +1486,28 @@ const keyToHash = k => k.startsWith('lists:') ? 'lists/' + k.slice(6) : k.starts
 // 1.5.2: folder view (key "folder:<name>"): the open tasks of every active list in that sidebar folder, grouped by list
 const folderLists = f => sideOrder().filter(l => fUnder(l.folder, f) && !l.archived && !l.is_inbox);  // 2.4.0: subfolders too
 window.addEventListener('hashchange', route);
+
+// 2.461 (#3773): the holiday picker of Settings and the Absences tab: first the country, then its region. What is stored is one
+// code (the select `id`): a region, or the country itself ("only the nationwide ones"); `blank` names "no choice"; `attrs` go on
+// the select `id`, which fires the usual change. cs: the answer's countries.
+let HOL_CS = [];
+function hol_country(cs, v) { return cs.find(c => c.code === v || v in c.regions); }
+function hol_regions(c, v, blank) {
+  if (!c) return `<option value="">${esc(blank)}</option>`;
+  return `<option value="${esc(c.code)}">${tr('Nationwide holidays only')}</option>` + Object.entries(c.regions).map(([k, n]) => `<option value="${esc(k)}" ${k === v ? 'selected' : ''}>${esc(n)}</option>`).join('');
+}
+function hol_selects(id, cs, v, blank, attrs = '') {
+  HOL_CS = cs;
+  const c = hol_country(cs, v), off = /\bdisabled\b/.test(attrs) ? 'disabled' : '';
+  return `<span class="holsel"><select id="${id}-cc" aria-label="${esc(tr('Country'))}" ${off}><option value="">${esc(blank)}</option>${cs.map(x => `<option value="${esc(x.code)}" ${x === c ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
+    <select id="${id}" aria-label="${esc(tr('Region'))}" ${attrs} ${c && Object.keys(c.regions).length ? '' : 'hidden'}>${hol_regions(c, v, blank)}</select></span>`;
+}
+document.addEventListener('change', e => {  // the country changed: its regions, starting on the nationwide holidays
+  const t = /** @type {any} */ (e.target), box = t.closest?.('.holsel');
+  if (!box || t !== box.firstElementChild) return;
+  const rg = /** @type {any} */ (box.lastElementChild), c = HOL_CS.find(x => x.code === t.value);
+  rg.innerHTML = hol_regions(c, '', t.options[0].textContent);
+  rg.hidden = !c || !Object.keys(c.regions).length;
+  rg.value = t.value;
+  rg.dispatchEvent(new Event('change', {bubbles: true}));
+});

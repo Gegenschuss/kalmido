@@ -8,7 +8,7 @@ the app adds the rest:
   count as "away" for the team, the workload, the day plan, the booking page and agents);
 - the team sees "absent" and the period; the kind (above all sick leave) and the note only the person and the admins of
   the organisation. Agents never see the kind (health data), at most "absent" (GET /api/v1/absences);
-- German public holidays per state, computed here (Easter formula, no library, no service): one state per organisation
+- public holidays per country and region, computed offline (hub/holidays.py, 2.461 #3773): one choice per organisation
   (its admins), people without an organisation set their own (their personal area);
 - workload (capacity 0 on absent workdays), the day plan (a hint instead of a proposal) and assigning (a warning, never a
   block) read abs_days() / abs_check().
@@ -20,7 +20,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, system_ctx
-from ..core.i18n import lang, N_, tr
+from ..core.i18n import lang, tr
 from ..core.db import body, bump, db, iso, local_now, now_utc, usettings
 from ..core.access import Denied
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
@@ -28,6 +28,7 @@ from ..accounts.session import me, user_public
 from ..accounts.orgs import visible_people
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_view
+from .holidays import HOL_CODES, HOL_PACKS, hol_year
 
 ABS_KINDS = ("vacation", "sick", "off", "other")
 ABS_HALF = ("", "am", "pm")
@@ -36,68 +37,10 @@ ABS_SPAN_MAX = 366  # days of one absence
 ABS_RANGE_MAX = 370  # days of one view
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
-# ---------------------------------------------------------------- German public holidays
-# 2.368.4 (#2989): states and holidays as translation keys, shown in the reader's language (abs_states_shown, abs_holidays_shown)
-ABS_STATES = {"BW": N_("Baden-Württemberg"), "BY": N_("Bavaria"), "BE": N_("Berlin"), "BB": N_("Brandenburg"), "HB": N_("Bremen"),
-              "HH": N_("Hamburg"), "HE": N_("Hesse"), "MV": N_("Mecklenburg-Vorpommern"), "NI": N_("Lower Saxony"),
-              "NW": N_("North Rhine-Westphalia"), "RP": N_("Rhineland-Palatinate"), "SL": N_("Saarland"), "SN": N_("Saxony"),
-              "ST": N_("Saxony-Anhalt"), "SH": N_("Schleswig-Holstein"), "TH": N_("Thuringia"),
-              "AT": N_("Austria")}  # 2.155.0 B (#2076): Austria (nationwide holidays only)
-# regional ones only where they hold in the whole state
-_FIXED = ((1, 1, N_("New Year's Day"), None), (1, 6, N_("Epiphany"), "BW BY ST"), (3, 8, N_("International Women's Day"), "BE MV"),
-          (5, 1, N_("Labour Day"), None), (8, 15, N_("Assumption Day"), "SL"), (9, 20, N_("World Children's Day"), "TH"),
-          (10, 3, N_("German Unity Day"), None), (10, 31, N_("Reformation Day"), "BB HB HH MV NI SN ST SH TH"),
-          (11, 1, N_("All Saints' Day"), "BW BY NW RP SL"), (12, 25, N_("Christmas Day"), None), (12, 26, N_("Boxing Day"), None))
-_EASTER = ((-2, N_("Good Friday"), None), (0, N_("Easter Sunday"), "BB"), (1, N_("Easter Monday"), None), (39, N_("Ascension Day"), None),
-           (49, N_("Whit Sunday"), "BB"), (50, N_("Whit Monday"), None), (60, N_("Corpus Christi"), "BW BY HE NW RP SL"))
-# 2.155.0 B (#2076): Austria's nationwide public holidays (Good Friday is none since 2019)
-_AT_FIXED = ((1, 1, N_("New Year's Day")), (1, 6, N_("Epiphany")), (5, 1, N_("State Holiday")), (8, 15, N_("Assumption Day")),
-             (10, 26, N_("Austrian National Day")), (11, 1, N_("All Saints' Day")), (12, 8, N_("Immaculate Conception")),
-             (12, 25, N_("Christmas Day|Austria")), (12, 26, N_("St Stephen's Day")))
-_AT_EASTER = ((1, N_("Easter Monday")), (39, N_("Ascension Day")), (50, N_("Whit Monday")), (60, N_("Corpus Christi")))
-
-
-def abs_easter(y):
-    """Easter Sunday of year y (Gregorian; the anonymous algorithm)."""
-    a, b, c = y % 19, y // 100, y % 100
-    d, e = b // 4, b % 4
-    f = (b + 8) // 25
-    g_ = (b - f + 1) // 3
-    h = (19 * a + b - d - g_ + 15) % 30
-    i, k = c // 4, c % 4
-    l_ = (32 + 2 * e + 2 * i - h - k) % 7
-    m = (a + 11 * h + 22 * l_) // 451
-    month = (h + l_ - 7 * m + 114) // 31
-    return date(y, month, (h + l_ - 7 * m + 114) % 31 + 1)
-
-
-def abs_holidays_year(y, state):
-    """{ISO day: name key} of the public holidays of year y in state (one of ABS_STATES; '' = none)."""
-    if state not in ABS_STATES:
-        return {}
-    if state == "AT":  # 2.155.0 B (#2076)
-        e = abs_easter(y)
-        out = {date(y, mo, d).isoformat(): name for mo, d, name in _AT_FIXED}
-        out.update({(e + timedelta(days=off)).isoformat(): name for off, name in _AT_EASTER})
-        return out
-    out = {}
-    for mo, d, name, only in _FIXED:
-        if only is None or state in only.split():
-            if (mo, d) == (3, 8) and (y < 2019 or (state == "MV" and y < 2023)):
-                continue
-            if (mo, d) == (9, 20) and y < 2019:
-                continue
-            if (mo, d) == (10, 31) and state in ("HB", "HH", "NI", "SH") and y < 2018:
-                continue
-            out[date(y, mo, d).isoformat()] = name
-    e = abs_easter(y)
-    for off, name, only in _EASTER:
-        if only is None or state in only.split():
-            out[(e + timedelta(days=off)).isoformat()] = name
-    if state == "SN":  # Buss- und Bettag: the Wednesday before 23 November
-        d = date(y, 11, 22)
-        out[(d - timedelta(days=(d.weekday() - 2) % 7)).isoformat()] = N_("Day of Repentance and Prayer")
-    return out
+# ---------------------------------------------------------------- public holidays
+# 2.461 (#3773): one file per country, hub/holidays.py; a stored "state" is a region or a country. ABS_STATES: all of them
+ABS_STATES = {code: (HOL_PACKS[cc]["regions"][r] if r else HOL_PACKS[cc]["name"]) for code, (cc, r) in HOL_CODES.items()}
+abs_holidays_year = hol_year
 
 
 def abs_holidays(state, first, last):
@@ -118,6 +61,13 @@ def abs_states_shown(lg=None):
     """2.368.4 (#2989): the states to choose from, in the reader's language."""
     lg = lg or lang()
     return {k: tr(v, lg=lg) for k, v in ABS_STATES.items()}
+
+
+def abs_countries_shown(lg=None):
+    """2.461 (#3773): the picker: first the country, then its regions (only countries that have any), in the reader's language."""
+    lg = lg or lang()
+    return [{"code": cc, "name": tr(p["name"], lg=lg), "regions": {k: tr(v, lg=lg) for k, v in (p.get("regions") or {}).items()}}
+            for cc, p in HOL_PACKS.items()]
 
 
 def abs_state(c, oid):
@@ -340,7 +290,7 @@ def abs_list():
     with_org = [{"id": r[0], "name": r[1]} for r in c.execute(
         "SELECT id, name FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id") if r[0] in mine]
     # 2.96.0 D (#1941): the personal area (when there is one) is offered next to the organisations
-    return jsonify(org_id=oid, orgs=with_org, personal=pb_personal(c, uid, create=False), admin=adm, state=st, states=abs_states_shown(), today=today.isoformat(),
+    return jsonify(org_id=oid, orgs=with_org, personal=pb_personal(c, uid, create=False), admin=adm, state=st, states=abs_states_shown(), countries=abs_countries_shown(), today=today.isoformat(),
                    start=first.isoformat(), end=last.isoformat(),
                    people=[{**user_public(p), "own": p["id"] == uid} for p in people],
                    items=[{**abs_public(r, adm or r["user_id"] == uid, c), "can_edit": adm or r["user_id"] == uid}

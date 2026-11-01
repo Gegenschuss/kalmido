@@ -7021,6 +7021,8 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .ab2hol li{padding:.25rem 0;font-size:var(--fs-s)}
 .ab2foot{margin-top:1rem}
 .ab2st{display:inline-flex;align-items:center;gap:.5rem}
+.holsel{display:inline-flex;flex-wrap:wrap;gap:.5rem}  /* 2.461 (#3773): country, then region */
+.holsel select[hidden]{display:none}
 .ab2md .ab2kinds{flex-wrap:wrap}
 .ab2md .ab2kinds button{min-height:2.25rem}
 .ab2md .ab2dates{display:flex;gap:.75rem}

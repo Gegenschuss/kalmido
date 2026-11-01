@@ -17,8 +17,10 @@ Kalmido's team views live in **Workload** (sidebar, module "Workload"). Since 2.
 - **Who sees what:** the team sees *that* somebody is away and when. The kind (above all sick leave) and the note
   only the person and the organisation's admins see. Kind and note are stored encrypted when the server's
   encryption at rest is on.
-- **Public holidays:** an organisation's admins pick a German state at the bottom of the tab; Kalmido computes the
-  statutory holidays itself (no external service). People without an organisation set their own.
+- **Public holidays:** an organisation's admins pick first the country, then the region where it has any (Settings >
+  Organisation); Germany by state, or only the nationwide holidays; Austria, Switzerland, France, Spain, Italy and the
+  Netherlands with their nationwide holidays. Kalmido computes them itself (no external service), one data file per country
+  under `kalmido/office/packs/holidays/`, the names follow your language. People without an organisation set their own.
 - **Effect:** in the workload a week's capacity shrinks by the absent workdays and holidays (a week away = no
   capacity). *Plan my day* shows a hint instead of a proposal on a day away. Assigning a task to somebody who is
   away on its day shows a warning - the assignment still happens.
@@ -46,7 +48,7 @@ Kalmido's team views live in **Workload** (sidebar, module "Workload"). Since 2.
 - **Vacation account:** per person and year an entitlement in days (half days allowed) and an optional carry-over from
   the year before. The admins of an organisation set it for its members in **Absences > Vacation accounts**; people
   without an organisation set their own there. The tab shows *entitlement*, *taken* (approved vacation working days of
-  the year; half days count 0.5, public holidays of the state and days you do not work do not count), *requested* (open
+  the year; half days count 0.5, public holidays of the chosen region and days you do not work do not count), *requested* (open
   requests) and *left*. No entitlement = no account, nothing changes.
 - **Vacation requests:** off by default. An organisation's admins switch on **Vacation of members needs an approval** in
   **Absences > Vacation accounts**. Then vacation a member enters for themselves is a request: the person and the admins

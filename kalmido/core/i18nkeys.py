@@ -46,6 +46,16 @@ def reason_keys(root):
     return out
 
 
+def data_keys(root):
+    """2.461 (#3773): the keys held in data files, not in code: the names of the holiday files (kalmido/office/packs/holidays/)."""
+    keys = set()
+    for p in glob.glob(os.path.join(root, "kalmido", "office", "packs", "holidays", "*.json")):
+        with open(p, encoding="utf-8") as f:
+            d = json.load(f)
+        keys |= {d["name"], *(d.get("regions") or {}).values(), *(h["name"] for h in d["holidays"])}
+    return keys
+
+
 def skip_ws(src, i):
     return _WS.match(src, i).end()
 

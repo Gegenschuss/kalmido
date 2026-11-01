@@ -36,7 +36,7 @@ function abc_group() {
       ${fbo.map(([k, v]) => `<option value="${k}" ${k === fbv ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
       <span class="muted mhint">${esc(tr('Colleagues only see busy or free, never titles.'))}</span></div>` : '';
   return `<div class="cvxgrp">${tr('Holidays and absences')}</div>
-    ${row('hol', S.settings.cal_holidays !== '0', tr('Public holidays'), cur ? st[cur] || cur : tr('no state chosen'))}
+    ${row('hol', S.settings.cal_holidays !== '0', tr('Public holidays'), cur ? st[cur] || cur : tr('no country chosen'))}
     ${row('abs', S.settings.cal_abs !== '0', tr('My absences'), '')}
     ${team ? row('team', S.settings.cal_abs_team === '1', tr('Team absences'), tr('only “away”')) : ''}
     ${sel}${fb}<div class="row abcfeed"><button type="button" class="btn sm" data-abc="feed">${ic('link', 's')} ${tr('Subscription link…')}</button></div>`;
