@@ -87,7 +87,7 @@ check('doc_lg(lang) in ("fr", "es")' not in dl, "#3349 the fr / es-only switch i
 check(abs(pdf.PDF_INFO_X - 125 * MM) < 0.01, f"#3350 PDF_INFO_X = 125 mm {pdf.PDF_INFO_X / MM}")
 for fn in ("doctpl.py", "letters.py"):
     check("PDF_INFO_X" in src("kalmido", "office", fn) and "PDF_ADDR_W + 8" not in src("kalmido", "office", fn), f"#3350 {fn} uses the shared constant")
-LONG = "Bestellung 2026-10-4711 der Einkauf Nord, Kostenstelle 4711"
+LONG = "Bestellung 2026-10-4711 der Einkauf Nord, Kostenstelle 4711, Projekt Herbst"  # 2.413.0 (#3500): at 8 pt the shorter one fits in two lines beside its label on letter paper
 for paper, right in (("a4", 20 * MM), ("letter", 72.0)):
     m = model(paper=paper, meta=[["Invoice No.", "INV-2026-357"], ["Date", "10/26/2026"], ["Your reference", LONG]])
     m["kind"] = "delivery"  # 2.434.0 (#3603): an invoice prints 2 pt smaller in look A now; the info block is the same on a delivery note
@@ -103,6 +103,6 @@ for paper, right in (("a4", 20 * MM), ("letter", 72.0)):
     lp = [t for t in page["texts"] if t["bold"] and t["s"] and t["s"].split(" ")[0] in LONG and t["y"] < 100 * MM
           and t["s"] not in ("INV-2026-357", "10/26/2026")]
     lab_p = [t for t in page["texts"] if t["s"] == "Your reference"]
-    check(lab_p and len(lp) == 2 and min(t["y"] for t in lp) > lab_p[0]["y"], f"#3350 {paper}: a long value wraps under its label")
+    check(lab_p and len(lp) == 2 and min(t["y"] for t in lp) > lab_p[0]["y"], f"#3350 {paper}: a long value wraps under its label {lab_p[:1]} {[(t['s'], round(t['x']), round(t['y'])) for t in lp]}")
     check(not pdfcheck.problems(data, right=right), f"#3350 {paper}: layout clean {pdfcheck.problems(data, right=right)[:3]}")
 sys.exit(done("p2390_0_a_office"))

@@ -142,7 +142,7 @@ title_right = max(t["x"] + t["w"] for t in p["texts"] if t["size"] == FS(9.6) an
 check(q is not None and q["x"] >= title_right + 2, f"#3170: {QW!r} stays in the quantity column (x {q and round(q['x'], 1)}, the service text ends at {title_right:.1f})")
 rate = next((t for t in p["texts"] if t["s"] == "100,00 €"), None)
 check(q is not None and rate is not None and q["x"] + q["w"] <= rate["x"] - 2, "#3170: the quantity ends left of the price")
-q3 = next((t for t in p["texts"] if t["s"] == "3" and t["size"] == FS(8.8)), None)
+q3 = next((t for t in p["texts"] if t["s"] == "3" and t["size"] == FS(pdf.FS_BODY) and t["x"] >= title_right), None)  # 2.413.0 (#3500): quantities print in FS_BODY
 u3 = next((t for t in p["texts"] if t["s"].startswith("Pauschalen")), None)
 check(q3 is not None and u3 is not None and u3["y"] > q3["y"] + 5 and u3["x"] >= title_right, "#3170: a quantity wider than the widest column: the unit on its own line")
 
