@@ -10,7 +10,7 @@
 // Screenshots into $P2330B_SHOTS.
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {sleep, B, login} = require('./boot');
+const {B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2330_b_ui', check, shots: 'P2330B_SHOTS'});
@@ -22,7 +22,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,family,team';
 
 (async () => {
-  await sleep(600);
+  await require('./boot').until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
@@ -52,21 +52,21 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
-  const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(800); };
   const until = (ev, expr, n) => require('./boot').until(() => ev(expr).catch(() => false), {timeout: n ? n * 250 : 15000, step: 250});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
+  const ready = async (ev, idle) => { await until(ev, `!!document.querySelector('#top h1')`); await idle({quiet: 300}); };  // the page is drawn and its requests are done
   const type = (ev, sel, v) => ev(`(() => { const i = document.querySelector('${sel}'); i.focus(); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
   await firefox(async o => {
-    const {cmd, ev, ctx, shot, nav} = o;
+    const {cmd, ev, ctx, shot, nav, idle} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     check(await ffLogin(o) === 200, 'login');
-    await nav(B + '#team/' + RW); await ready(ev);
+    await nav(B + '#team/' + RW); await ready(ev, idle);
     await until(ev, `!!document.querySelector('#tc-msgs .cmsg')`);
 
     // ================= team chat: the magnifier, the bar, hits, arrows
     const b0 = await ev(`(() => { const b = document.querySelector('.tcrhead [data-act="tc-more"]'); if (!b) return null; const r = b.getBoundingClientRect(); return {w: r.width, h: r.height, bar: !!document.querySelector('.mqbar'), in: r.right <= innerWidth}; })()`);
     check(b0 && b0.w >= 24 && b0.h >= 24 && !b0.bar && b0.in, '#1080: the ⋯ menu in the team chat header, no search bar before ' + JSON.stringify(b0));
     await ev(`(() => { document.querySelector('.tcrhead [data-act="tc-more"]').click(); return 1; })()`); await until(ev, `!!document.querySelector('#pop:not(.hidden) [role=menuitem]')`);
-    await ev(`(() => { [...document.querySelectorAll('#pop:not(.hidden) [role=menuitem]')].find(x => /^Search in this chat$/.test(x.textContent.trim())).click(); return 1; })()`); await sleep(300);
+    await ev(`(() => { [...document.querySelectorAll('#pop:not(.hidden) [role=menuitem]')].find(x => /^Search in this chat$/.test(x.textContent.trim())).click(); return 1; })()`); await until(ev, `!!document.querySelector('.mqbar') && document.activeElement?.id === 'ms-q'`);
     const b1 = await ev(`(() => { const bar = document.querySelector('.mqbar'); return {bar: !!bar, h: Math.round(bar?.getBoundingClientRect().height || 0), under: bar?.previousElementSibling?.classList.contains('tcrhead'), foc: document.activeElement?.id, over: document.documentElement.scrollWidth <= 390}; })()`);
     check(b1.bar && b1.h >= 44 && b1.h <= 64 && b1.under && b1.foc === 'ms-q' && b1.over, '#1080: the bar opens under the header, the field has the focus ' + JSON.stringify(b1));
     await type(ev, '#ms-q', 'spülmaschine');
@@ -80,11 +80,11 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     const h2 = await ev(`(() => { const el = document.querySelector('[data-mid="t:${M1}"]'), r = el?.getBoundingClientRect(), box = document.querySelector('#tc-msgs').getBoundingClientRect();
       return {cnt: document.querySelector('.mqbar .mscount').textContent, vis: !!r && r.top < box.bottom && r.bottom > box.top, mark: el?.querySelector('mark.mshl')?.textContent, older: document.querySelector('.mqbar [data-act="ms-older"]').disabled, newer: document.querySelector('.mqbar [data-act="ms-newer"]').disabled}; })()`);
     check(old && h2.cnt === '2 of 2' && h2.vis && h2.mark === 'Spülmaschine' && h2.older && !h2.newer, '#1080: the arrow goes to the older hit, older pages loaded, in view ' + JSON.stringify(h2));
-    await ev(`(() => { document.querySelector('#ms-q').dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 1; })()`); await sleep(300);
+    await ev(`(() => { document.querySelector('#ms-q').dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 1; })()`); await until(ev, `!document.querySelector('.mqbar') && !document.querySelector('mark.mshl')`);
     check(await ev(`!document.querySelector('.mqbar') && !document.querySelector('mark.mshl')`), '#1080: Escape closes the bar, the marks go');
 
     // ================= agent chat
-    await nav(B + '#agents/' + CL); await ready(ev);
+    await nav(B + '#agents/' + CL); await ready(ev, idle);
     await until(ev, `!!document.querySelector('#chat-msgs .cmsg')`);
     // 2.350.0 (#3317): the search is an entry of the agent chat header's ⋯ menu ("Search in this chat")
     await ev(`(() => { document.querySelector('.chath [data-act="chat-head-menu"]').click(); return 1; })()`);
@@ -95,11 +95,11 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     await type(ev, '#ms-q', 'invoice');
     const ac = await until(ev, `document.querySelector('.mqbar .mscount')?.textContent === '1 of 2' && !!document.querySelector('#chat-msgs mark.mshl')`);
     check(ac && await ev(`document.querySelector('#chat-msgs mark.mshl').textContent === 'invoice'`), '#1080: search in the agent chat, the newest hit marked');
-    await ev(`(() => { document.querySelector('.mqbar [data-act="ms-close"]').click(); return 1; })()`); await sleep(200);
+    await ev(`(() => { document.querySelector('.mqbar [data-act="ms-close"]').click(); return 1; })()`); await until(ev, `!document.querySelector('.mqbar')`);
     check(await ev(`!document.querySelector('.mqbar')`), '#1080: X closes the bar');
 
     // ================= the search page: "Messages" with chips
-    await nav(B + '#search'); await ready(ev);
+    await nav(B + '#search'); await ready(ev, idle);
     await type(ev, '#searchq', 'Spülmaschine');
     const sp = await until(ev, `document.querySelectorAll('#smsgs .mhit').length >= 4`);
     const s1 = await ev(`(() => { const hs = [...document.querySelectorAll('#smsgs .mhit')]; return {n: hs.length, chips: [...document.querySelectorAll('#smsgs .mschips .chip')].map(c => c.textContent).join('|'),
@@ -115,10 +115,11 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     await ev(`(() => { document.querySelector('#smsgs .mhit').click(); return 1; })()`);
     const jumped = await until(ev, `!!document.querySelector('#detail [data-mid="c:${CM}"]')`);
     check(jumped && await ev(`S.sel === ${T}`), '#1080: a comment hit opens the task with the comment');
-    await ev(`(() => { closeDetail(); return 1; })()`); await sleep(400);
+    await ev(`(() => { closeDetail(); return 1; })()`); await until(ev, `!S.sel && !(history.state && history.state.detail)`); await idle();
 
     // ================= the command field
-    await ev(`(() => { openPalette(); return 1; })()`); await sleep(300);
+    await ev(`(() => { openPalette(); return 1; })()`); await until(ev, `!!document.querySelector('.palette .pqin')`);
+
     await type(ev, '.palette .pqin', 'dishwasher');
     const pm = await until(ev, `[...document.querySelectorAll('.palette .pgroup')].some(g => g.textContent === 'Messages') && !!document.querySelector('.palette .pitem .pmsg mark')`);
     check(pm && await ev(`document.querySelector('.palette .pitem .pmsg mark').textContent === 'dishwasher'`), '#1080: the command field shows the group "Messages" with the hit marked');
