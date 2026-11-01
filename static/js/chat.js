@@ -74,7 +74,7 @@ const tc_listOff = () => typeof sbb_on === 'function' && sbb_on();
 const tc_newBtnHtml = () => teamOn() ? `<button type="button" class="iconbtn" data-act="tc-new" aria-haspopup="${S.tc.people.length ? 'menu' : 'dialog'}" title="${esc(tr('New message'))}" aria-label="${esc(tr('New message'))}">${ic('plus', 's')}</button>` : '';
 function tc_panelHtml() {
   if (!teamOn()) return '';
-  if (S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.tc.rooms !== null) renderSide(); }); }
+  if (S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.tc.rooms !== null) { renderSide(); if (S.route.mod === 'team') renderView(); } }); }  // the page may have waited on this load
   const rid = S.route.mod === 'team' ? (S.cw?.lt ? S.cw.home?.rid : S.tc.rid) : null, rooms = tc_rooms(rid);
   const n = S.team?.unread || 0, lab = tr('All conversations');
   const head = `<button type="button" class="srow smod sbbi ${S.route.mod === 'team' && !rid ? 'on' : ''}" data-go="team"${S.route.mod === 'team' && !rid ? ' aria-current="page"' : ''}>${ic('comment')}<span class="n">${esc(lab)}</span><span class="c ${n ? 'nunread' : ''}">${n ? `${n}<span class="sr"> ${esc(tr('unread'))}</span>` : ''}</span></button>`;

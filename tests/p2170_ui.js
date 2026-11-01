@@ -170,9 +170,10 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   w.close();
   // Bob: unread in the sidebar, the list menu
   w = await boot({user: 'bob', hash: 'today'}); d = w.document;
-  await until(() => d.querySelector('#side [data-go="team"]'));
-  const tr0 = d.querySelector('#side [data-go="team"]');
-  check(tr0 && /\d/.test(tr0.querySelector('.c')?.textContent || ''), '#419: the sidebar row with the unread count');
+  // 2.479.0 (#2814, intended change): the team chat is the area Chat: its icon in the bar carries the unread count
+  await until(() => d.querySelector('#srail [data-sbb="team"]'));
+  const tr0 = d.querySelector('#srail [data-sbb="team"]');
+  check(tr0 && /\d/.test(tr0.querySelector('.srbd')?.textContent || ''), '#419: the sidebar row with the unread count');
   w.eval(`go('l/${L}')`); await sleep(300);
   w.eval(`menu(document.querySelector('#top h1'), listMenuItems(${L}, document.querySelector('#top h1')))`); await sleep(80);
   const lm = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim());

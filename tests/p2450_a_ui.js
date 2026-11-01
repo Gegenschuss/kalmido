@@ -134,7 +134,7 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   // panel (the 5 last ones in Projects are gone with the bar's areas; they stay only without it)
   w = await boot({user: 'alice', hash: 'team', mobile: true}); d = w.document;
   const cs = await until(() => d.querySelectorAll('#side .tcpanel .sbconv').length >= 8 && [...d.querySelectorAll('#side .tcpanel .sbconv')]);
-  check(cs && cs.every(b => b.classList.contains('sbun')) && d.querySelector('#side .sbmr .srb[data-sbb="team"]'), '#2814: the phone drawer: the area Chat with all 8+ conversations ' + d.querySelectorAll('#side .tcpanel .sbconv').length);
+  check(cs && cs.filter(b => b.classList.contains('sbun')).length >= 7 /* the direct message was read above */ && d.querySelector('#side .sbmr .srb[data-sbb="team"]'), '#2814: the phone drawer: the area Chat with all 8+ conversations ' + d.querySelectorAll('#side .tcpanel .sbconv').length);
   check(w.eval(`sb_msgRows()`) === '', '#2814: no conversations in Projects on the phone either');
   w.close();
 
