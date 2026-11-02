@@ -339,7 +339,10 @@ holidays hatched, the event's time marked. The server sends only the spans (`GET
 places or calendars; events shown as free, all-day and cancelled events do not count. People of other organisations get no
 bar; without an organisation you see your own. Since 2.240 a colleague sees only your calendars, invitations and absences of
 the organisations you share; Calendar > Calendars > *Show my free / busy times* widens that to all your calendars (private
-ones, other organisations, subscriptions) or turns it off. The answers are limited per person (120 a minute). A CalDAV `free-busy-query` REPORT is still answered with 403.
+ones, other organisations, subscriptions) or turns it off. Since 2.360.5 the organisation view counts only the
+organisation calendars you own (a team calendar shared with you is not your time; its events count once you accepted the
+invitation) and shows no public holidays (they would tell your state) - you see your holidays in your own bar, colleagues
+only with "all my calendars". The answers are limited per person (120 a minute). A CalDAV `free-busy-query` REPORT is still answered with 403.
 
 ## For admins
 
