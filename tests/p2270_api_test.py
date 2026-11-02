@@ -71,7 +71,7 @@ check(next(x for x in st(A)["lists"] if x["id"] == P1["id"])["tickets"] == 1, "#
 P2 = A.post(B + "/api/lists", json={"name": "Client", "ptype": "agency", "sections": True}).json()
 check([x["name"] for x in st(A)["sections"] if x["list_id"] == P2["id"]] == ["Request", "Concept", "Production", "Approval", "Billing"],
       "#972: with sections true the type's sections")
-check(len([f for f in st(A)["fields"] if f["list_id"] == P1["id"]]) == 0 and len([f for f in st(A)["fields"] if f["list_id"] == P2["id"]]) == 1,  # 2.380 (#3438): only Budget h
+check(len([f for f in st(A)["fields"] if f["list_id"] == P1["id"]]) in (0, 2) and len([f for f in st(A)["fields"] if f["list_id"] == P2["id"]]) == 1,  # 2.380 (#3438): only Budget h; software: none before 2.473.0, Size + Release since (#3378) - the train of 2.487.1 runs without 2.473.0
       "#972: fields of the type as before")
 check(A.post(B + "/api/lists", json={"name": "x", "ptype": "private", "sections": "yes"}).status_code == 400, "#972: sections must be a boolean")
 tok = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "write", "structure"]}).json()["token"]
