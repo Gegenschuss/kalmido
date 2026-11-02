@@ -318,8 +318,7 @@ function palAll() {
     if (k === 'account' && !S.me) continue;
     if (k === 'users' && !S.me?.is_admin) continue;
     if (k === 'org' && !(S.me && lmOrgPaneOn())) continue;  // 2.39.1 (#1188)
-    if (k === 'ai' && !aiPaneOn()) continue;  // 2.7.0 (#405 S2/S8: was a dead branch for a "time" tab)
-    if (k === 'assistant' && !asst_avail()) continue;  // 2.75.0 (#1411)
+    if (k === 'ai' && !aiOn()) continue;  // 2.7.0 (#405 S2/S8: was a dead branch for a "time" tab); 2.489.0 (#2664): + the built-in assistant
     if ((k === 'biz' && !officeOn()) || (k === 'docs' && !feat('docs'))) continue;  // 2.365.2 (#2789)
     add('s:' + k, 'setting', tr('Settings: {0}', tr(n)), icon, () => settingsModal(k), {keys: k === 'general' ? 'g s' : ''});
   }

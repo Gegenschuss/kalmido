@@ -62,7 +62,9 @@ const mg_wrap = (mod, html) => mg_areaOf(mod)?.[0] === 'office' && !isMobile() &
 // the group's points. The old routes stay (#office/offers, #clients, #contacts …); the path on detail pages is text only.
 // 2.98.0 C (#2180): three groups (On the road is gone: travel expenses -> Money, framework contracts -> Sell); services and
 // text blocks are no menu points any more but Settings > Company & office > Texts & templates (2.470.0, #3596), their routes stay
-const OFM_GROUPS = [['sell', 'tag', N_('Sell|office')], ['money', 'wallet', N_('Money|office')], ['admin', 'sliders', N_('Administration|office')]];
+// 2.489.0 (#2664, decision #2647): the address book is no part of Sell any more but an entry of its own (group 'book', [3] = 1:
+// no heading, never folded), below the groups and right above its folders
+const OFM_GROUPS = [['sell', 'tag', N_('Sell|office')], ['money', 'wallet', N_('Money|office')], ['admin', 'sliders', N_('Administration|office')], ['book', 'users', N_('Address book'), 1]];
 const ofm_ofc = () => officeOn();
 const ofm_sub = () => typeof OFC !== 'undefined' && !!OFC.info?.submit;  // 2.356.0 D (#3129)
 const ofm_cc = () => typeof OFC !== 'undefined' && !!OFC.info?.cards;  // 2.444.0 (#3447): the person holds a card here
@@ -71,7 +73,7 @@ const OFM_ITEMS = [
   {key: 'offers', go: 'office/offers', icon: 'file', name: N_('Quotations'), group: 'sell', on: ofm_ofc},  // 2.380.0 B (#3409): quotations and invoices are two points
   {key: 'invoices', go: 'office/invoices', icon: 'receipt', name: N_('Invoices'), group: 'sell', on: ofm_ofc, lvk: 'offers'},  // the rights of the quotations' area
   {key: 'clients', go: 'clients', icon: 'brief', name: N_('Clients'), group: 'sell', on: () => clientsOn()},
-  {key: 'contacts', go: 'contacts', icon: 'users', name: N_('Address book'), group: 'sell', on: () => feat('contacts')},
+  {key: 'contacts', go: 'contacts', icon: 'users', name: N_('Address book'), group: 'book', on: () => feat('contacts')},  // 2.489.0 (#2664): own entry
   {key: 'cashflow', go: 'office/cashflow', need: 'money.cashflow', icon: 'trend', name: N_('Cash flow'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'kpi', go: 'office/kpi', need: 'money.kpi', icon: 'chart', name: N_('Figures'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'travel', go: 'office/travel', need: 'money.travel', icon: 'plane', name: N_('Travel expenses'), group: 'money', on: ofm_ofc, adm: 1},
@@ -82,7 +84,7 @@ const OFM_ITEMS = [
   {key: 'settings', go: 'office/settings', icon: 'gear', name: N_('Settings'), group: 'admin', on: ofm_ofc},
   // 2.152.2 (#2632): the parts of the office's own scripts too (their OFC_TABS entries only bring the tab's content), so the
   // menu / panel shows the same points on #clients, #contacts, #office and #time, before the office is loaded as after
-  {key: 'gendocs', go: 'office/gendocs', icon: 'file', name: N_('Documents'), group: 'sell', on: ofm_ofc, adm: 1},
+  {key: 'gendocs', go: 'office/gendocs', icon: 'file', name: N_('Letters & contracts'), group: 'sell', on: ofm_ofc, adm: 1},  // 2.489.0 (#2664, decision #2646): Schreiben & Verträge, as the office's own tab
   {key: 'letters', go: 'office/letters', icon: 'mail', name: N_('Correspondence'), group: 'sell', on: ofm_ofc, adm: 1},
   {key: 'bank', go: 'office/bank', icon: 'bank', name: N_('Bank'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'cards', go: 'office/cards', icon: 'card', name: N_('Credit cards'), group: 'money', on: ofm_ofc, get adm() { return ofm_cc() ? 0 : 1; }},  // 2.444.0 (#3447): also for the holder of a card
@@ -288,7 +290,7 @@ function ofm_startHtml() {
   // 2.276.0 A (#3039): Money folds like in the panel (same state, sbb_folded); 2.418.0 (#3560): no "More" any more, the
   // menu's editor (pen on top, navmenu.js) hides and brings back points
   if (NAV.edit === 'office') return `<div class="ofmstart">${nav_editSlot('office')}</div>`;
-  const head = g => g[0] !== 'money' ? `<h3>${esc(tr(g[2]))}</h3>` : `<h3><button type="button" class="oflgt" data-act="ofm-group" aria-expanded="${!sbb_folded('office:money')}">${ic('chev', 's fcar')}<span>${esc(tr(g[2]))}</span></button></h3>`;
+  const head = g => g[3] ? '' : g[0] !== 'money' ? `<h3>${esc(tr(g[2]))}</h3>` : `<h3><button type="button" class="oflgt" data-act="ofm-group" aria-expanded="${!sbb_folded('office:money')}">${ic('chev', 's fcar')}<span>${esc(tr(g[2]))}</span></button></h3>`;
   const fold = g => g[0] === 'money' && sbb_folded('office:money');
   const norc = typeof bnr_startHtml === 'function' && ofm_adm() && !ofm_menuOff('bank') ? bnr_startHtml() : '';  // 2.299.0 C (#3192): "12 bookings without a receipt"
   return `<div class="ofmstart">${nav_penHtml('office')}${fig}${norc}<div class="ofl">${OFM_GROUPS.map(g => { const gi = its.filter(i => i.group === g[0]); return gi.length ? `<section class="oflg${fold(g) ? ' closed' : ''}" data-ofmg="${g[0]}">${head(g)}${fold(g) ? '' : `<div class="oflc">${gi.map(row).join('')}</div>`}</section>` : ''; }).join('')}</div></div>`;
@@ -668,8 +670,8 @@ const sbb_head = (g, label, n, on) => `<div class="shead sgh sbbg ${sbb_folded(g
 function sbb_officeHtml() {
   const its = ofm_items(), here = sbb_area() === 'office', cur = here ? ofm_cur(S.route.mod) : '';
   return OFM_GROUPS.map(g => {
-    const gi = its.filter(i => i.group === g[0]), k = 'office:' + g[0], on = gi.some(i => i.key === cur); if (!gi.length) return '';
-    return `<div class="sgroup sbbp" data-ofmg="${g[0]}">${sbb_head(k, tr(g[2]), gi.length, on && sbb_folded(k))}${sbb_folded(k) ? '' : gi.map(i => (typeof oft_rowHtml === 'function' && oft_rowHtml(i, i.key === cur)) || sbb_row(i.go, i.icon, tr(i.name), i.key === cur, `data-ofm="${i.key}" data-navk="office:${i.key}"`)).join('')}</div>`;
+    const gi = its.filter(i => i.group === g[0]), k = 'office:' + g[0], on = gi.some(i => i.key === cur), solo = !!g[3]; if (!gi.length) return '';
+    return `<div class="sgroup sbbp" data-ofmg="${g[0]}">${solo ? '' : sbb_head(k, tr(g[2]), gi.length, on && sbb_folded(k))}${!solo && sbb_folded(k) ? '' : gi.map(i => (typeof oft_rowHtml === 'function' && oft_rowHtml(i, i.key === cur)) || sbb_row(i.go, i.icon, tr(i.name), i.key === cur, `data-ofm="${i.key}" data-navk="office:${i.key}"`)).join('')}</div>`;
   }).join('')  // 2.351.0 A (#3312): a document area opens as a tree (office_tree.js: its folders, 20 newest, More…); no group "Folders"
     + (typeof ctf_panelHtml === 'function' ? ctf_panelHtml() : '');  // 2.351.0 B (#2749): the address book's folders (ctfold.js, on its page)
 }

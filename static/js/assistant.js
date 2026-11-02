@@ -126,7 +126,7 @@ document.addEventListener('click', e => {
   else if (k === 'triage') { const ids = asst_inboxIds(); if (!ids.length) toast(tr('The basket is empty')); else asst_go({kind: 'triage', task_ids: ids}, b); }
 });
 
-// ---- Settings > Assistant
+// ---- Settings > Agents > Built-in assistant (2.489.0, #2664: was its own section)
 function asst_paneHtml(hint) {
   if (!asst_avail()) return '';
   const a = S.assistant, on = new Set(a.list_ids || []);
@@ -172,11 +172,11 @@ async function asst_admDraw(md) {
 }
 function asst_paneDraw(md) {  // the shown section loads its data (Assistant: the log, Administration: the instance block)
   const p = $('.spane:not(.hidden)', md)?.dataset.pane;
-  if (p === 'assistant') asst_logDraw(md);
+  if (p === 'ai' && !$('[data-aisp]', md)) asst_logDraw(md);  // 2.489.0 (#2664): the assistant alone in Agents (with tabs: aiSubShow)
   if (p === 'users') asst_admDraw(md);
 }
 function asst_setWire(md) {
-  md.addEventListener('click', e => { if (e.target.closest('[data-asstlog="more"]')) asst_logDraw(md, true); if (e.target.closest('[data-asstgo]')) $('.snav [data-sec="assistant"]', md)?.click(); });
+  md.addEventListener('click', e => { if (e.target.closest('[data-asstlog="more"]')) asst_logDraw(md, true); if (e.target.closest('[data-asstgo]')) { $('.snav [data-sec="ai"]', md)?.click(); if ($('[data-aisp]', md)) aiSubShow(md, 'assistant', true); } });  // 2.489.0 (#2664)
   md.addEventListener('change', async e => {
     const el = e.target; if (!el.dataset?.asstl) return;
     const from = [...(S.assistant?.list_ids || [])], to = $$('[data-asstl]:checked', md).map(x => +x.dataset.asstl);

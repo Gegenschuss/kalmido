@@ -128,10 +128,12 @@ function swMessage(e) {
   if (d.type === 'refresh') load().then(render).catch(() => {});
 }
 const SET_SECS = [['account', 'user', N_('Account')], ['org', 'building', N_('Organisation')], ['biz', 'receipt', N_('Company & office')], ['general', 'sliders', N_('General')], ['look', 'palette', N_('Appearance')], ['nav', 'menu', N_('Navigation')], ['modules', 'grid', N_('Modules')],  // 2.418.0 (#3560): nav
-  ['notify', 'bell', N_('Notifications')], ['integr', 'link', N_('Integrations')], ['docs', 'file', N_('Documents|settings')], ['access', 'key', N_('Access|settings')], ['ai', 'bot', N_('Agents')], ['assistant', 'sparkle', N_('Assistant|settings')], ['data', 'download', N_('Data')], ['users', 'grid', N_('Server|settings')], ['help', 'help', N_('Help')]];
+  ['notify', 'bell', N_('Notifications')], ['integr', 'link', N_('Integrations')], ['docs', 'file', N_('Documents|settings')], ['access', 'key', N_('Access|settings')], ['ai', 'bot', N_('Agents')], ['data', 'download', N_('Data')], ['users', 'grid', N_('Server|settings')], ['help', 'help', N_('Help')]];
+// 2.489.0 (#2664, decision #2654): the built-in assistant is a sub-tab of Agents (AI_SUBS), no section of its own
 const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('Calendar and people'), ['events']], [N_('For you'), ['habits', 'comments']],
   [N_('Projects and team'), ['collab', 'progress', 'deps', 'fields', 'agents', 'workload', 'dispo', 'forms', 'wiki', 'sheets']], [N_('Areas|nav'), ['a:office', 'a:ablage', 'a:time', 'a:review', 'a:life', 'a:reading']]];  // 2.48.0 (#1207): + the file store; 2.172.0 B (#2679): + Reading
 const aiPaneOn = () => !!S.me && (feat('agents') || (!!S.me.is_admin && (S.agents || []).length > 0));
+const aiOn = () => aiPaneOn() || (typeof asst_avail === 'function' && asst_avail());  // 2.489.0 (#2664): the section Agents is there (agents or the built-in assistant)
 const ABOUT_LINKS = [['https://kalmido.com', N_('Website'), 'link'], ['https://github.com/Gegenschuss/kalmido', N_('Source code on GitHub'), 'file'], ['https://github.com/Gegenschuss/kalmido/issues', N_('Report a problem'), 'alert']];
 const openExt = u => { const w = window.open(u, '_blank', 'noopener,noreferrer'); if (w) w.opener = null; };
 // 2.143.0 C (#2153): a quiet hint to install the app. Android / desktop: the browser's own install question

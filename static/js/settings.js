@@ -51,7 +51,6 @@ async function wpDraw(md) {
 // 2.25.0 (UX-17): what each area holds, shown in the overview a phone opens with
 const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('People, invitations, agents, data and backups'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'), nav: N_('The menus of the areas and the tab bar'),
   modules: N_('What Kalmido shows'), notify: N_('Push, News and quiet hours'), integr: N_('Calendar on the phone, sharing, e-mail'), access: N_('API tokens, webhooks and agent tokens'), ai: N_('Agents and what they do'),
-  assistant: N_('The built-in assistant and the projects it may read'),  // 2.75.0 (#1411)
   biz: N_('Company, documents and numbers, invoices, taxes'), docs: N_('Sorting automatically, archive numbers, rules'),  // 2.365.2 (#2789)
   data: N_('Import, export, templates, backups'), users: N_('Sign-in, server, log'), help: N_('How things work, about Kalmido')};
 // ---- UX1 (U03, owner decision 2): settings save themselves. Every control applies at once, "Saved · Undo" shows in the
@@ -343,8 +342,10 @@ function ad_allSwHtml() {
 // 2.53.0 (#1410): aiPaneOn lives in setcore.js (the command palette asks it)
 // 2.29.0 (#1024): ONE "Set up" (first question: for me / for the team); the server-wide switches are "Administration" (admins)
 // 2.46.6 (#1710): Log and the server-wide rules moved to Settings > Administration > Agents (ADM_SUBS); old jumps land there
-const AI_SUBS = [['agents', 'bot', N_('Status|agents')], ['lists', 'list', N_('Projects')], ['usage', 'chart', N_('Usage')], ['setup', 'help', N_('Set up|agents')], ['safe', 'lock', N_('Use safely')]];  // 2.30.0 (#920): Use safely  // 2.7.2 (#420): Set up
-const aiSubs = () => AI_SUBS.filter(([k]) => k === 'usage' ? !!S.me?.is_admin || (S.agents || []).length > 0 : true);
+// 2.489.0 (#2664, decision #2654): + the built-in assistant (was the section Assistant), only with a configured assistant;
+// with the agents off (aiPaneOn) the section Agents shows the assistant alone, without tabs
+const AI_SUBS = [['agents', 'bot', N_('Status|agents')], ['lists', 'list', N_('Projects')], ['usage', 'chart', N_('Usage')], ['setup', 'help', N_('Set up|agents')], ['safe', 'lock', N_('Use safely')], ['assistant', 'sparkle', N_('Assistant|settings')]];  // 2.30.0 (#920): Use safely  // 2.7.2 (#420): Set up
+const aiSubs = () => AI_SUBS.filter(([k]) => k === 'usage' ? !!S.me?.is_admin || (S.agents || []).length > 0 : k === 'assistant' ? asst_avail() : true);
 function aiSubCur(want) { const ks = aiSubs().map(x => x[0]), k = want || LS.get('aiSub', 'agents'); return ks.includes(k) ? k : 'agents'; }
 function aiHtml(hint, want) {
   const adm = !!S.me?.is_admin, ags = S.agents || [], cur = aiSubCur(want);
@@ -371,7 +372,8 @@ function aiHtml(hint, want) {
     ${subs.some(x => x[0] === 'usage') ? pane('usage', `${hint(adm ? tr('What the agents report about their model usage: tokens and, if they send it, the cost. You see every agent; limits are set per agent (Edit).') : tr('What the agents in your projects report about their model usage, counted in the projects you see.'))}
     <div class="aiu" id="s-aiu"></div>`) : ''}
     ${pane('setup', agSetupPaneHtml(hint))}
-    ${pane('safe', agSafeHtml())}`;
+    ${pane('safe', agSafeHtml())}
+    ${subs.some(x => x[0] === 'assistant') ? pane('assistant', asst_paneHtml(hint)) : ''}`;
 }
 // ---- 2.7.2 (#420) Settings > Agents > Set up: my personal agents (when an admin allows them), the admins' switch for
 // that, and the two guides (a team agent on a server / a personal agent on your own computer), each for Linux, macOS and
@@ -521,6 +523,7 @@ function aiSubShow(md, want, save) {
   if (k === 'usage') return aiuDraw(md);
   if (k === 'log') return audDraw(md);
   if (k === 'setup' || k === 'admin') return agSetupDraw(md);  // 2.29.0 (#1024): the admin switches are filled there too
+  if (k === 'assistant') return asst_logDraw(md);  // 2.489.0 (#2664)
 }
 // ---- 2.24.0 (#826): Settings > Administration in five sub-tabs (the pattern of Agents): People, Sign-in, Organisation,
 // Server, Log & errors. The last one is remembered per device; the settings search opens the sub-tab of its hit.
@@ -784,8 +787,7 @@ function settingsModal(focus) {
       ${hint(tr('Private to you. Save from a task’s menu (…) or the project dialog; use via the template button or Projects > +.'))}
       <div class="members" id="s-tpls"><div class="muted mhint">${tr('Loading…')}</div></div>
       ${sampleHtml(hint)}`,
-    ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage', agentsetup: 'setup'}[focus]) : '',  // 2.7.0 (#405 S2)
-    assistant: asst_paneHtml(hint),  // 2.75.0 (#1411): only with a configured assistant
+    ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage', agentsetup: 'setup', assistant: 'assistant'}[focus]) : asst_paneHtml(hint),  // 2.7.0 (#405 S2); 2.489.0 (#2664): the assistant alone while the agents are off
     users: S.me?.is_admin ? admSubsHtml('users', {  // 2.24.0 (#826): Administration in sub-tabs like Agents; 2.364.0 C (#3041): "Server"
       signin: `<div id="s-signin">${signinHtml(hint)}</div>`,
       server: instanceHtml(chk, hint) + ad_updHtml(hint) + hostHtml(hint) + (typeof rt9_adminHtml === 'function' ? rt9_adminHtml(hint) : '') + asst_admHtml(),  // 2.75.0 (#1411): + asst_admHtml; 2.59.0 B (#1375): + related tasks  // 2.46.6 (#1710): + the update check result (was Help)
@@ -824,7 +826,7 @@ function settingsModal(focus) {
   pane.data += biz_dataHtml(); pane.integr += biz_integrHtml();  // 2.365.2 D (#2789): the office's data and its Peppol access (both live in Company & office)
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', agentsetup: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', odata: 'org', dayplan: 'general'}[focus] || (INTB_FOCUS[focus] ? 'integr' : focus);  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
+  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', agentsetup: 'ai', assistant: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', odata: 'org', dayplan: 'general'}[focus] || (INTB_FOCUS[focus] ? 'integr' : focus);  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
   if (/^biz-/.test(focus || '')) { S.bizJump = focus.slice(4); cur = 'biz'; }  // 2.365.2 D (#2789): a part of Company & office (office.js biz_jump scrolls there)
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
@@ -879,7 +881,7 @@ function settingsModal(focus) {
     if (k === 'users' || k === 'org') ad_secDraw(md);  // 2.364.0 C (#3041)
     if (k === 'ai') aiSubShow(md);  // 2.5.1 (#393): only the shown sub-tab loads
     if (k === 'users' || k === 'org') admSubShow(md, null, false, k);
-    if (k === 'assistant' || k === 'users') asst_paneDraw(md);  // 2.75.0 (#1411)
+    if (k === 'ai' || k === 'users') asst_paneDraw(md);  // 2.75.0 (#1411); 2.489.0 (#2664): the assistant lives in Agents
     if (k === 'account') { tfaDraw(md); apwDraw(md); e2eDraw(md); if (typeof msvDraw === 'function') msvDraw(md); if (typeof sesDraw === 'function') sesDraw(md); if (typeof sgvDraw === 'function') sgvDraw(md); }  // 2.73.0 A (#661): + Servers; 2.115.0 B (#2062): + sessions
     $(`.snav [data-sec="${k}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'});
   };
@@ -1029,7 +1031,7 @@ function settingsModal(focus) {
   md._show = show;  // 2.364.0 C (#3041): a sub-tab of the other area opens that area (admSubShow)
   if (cur === 'users' || cur === 'org') { ad_secDraw(md); Promise.resolve(admSubShow(md, ad_admFocus(focus), false, cur)).then(() => { if (focus === 'activity') $('#s-adlog-h', md)?.scrollIntoView({block: 'start'}); }); }  // 2.42.0 (#828): + ocAdminDraw  // 2.46.6 (#1710): + the shown sub-tab's data; 'activity' = its log, once the rules above it are drawn
   aiTblWire(md);
-  if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', agentsafe: 'safe', agentsetup: 'setup'}[focus]);  // 2.5.1 (#393)
+  if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', agentsafe: 'safe', agentsetup: 'setup', assistant: 'assistant'}[focus]);  // 2.5.1 (#393)
   md.addEventListener('click', e => { const b = e.target.closest('[data-aisub]'); if (b) aiSubShow(md, b.dataset.aisub, true); const g = e.target.closest('[data-aigo]'); if (g) aiSubShow(md, g.dataset.aigo, true); });
   md.addEventListener('click', e => { const b = e.target.closest('[data-admsub]'); if (b) admSubShow(md, b.dataset.admsub, true); });  // 2.24.0 (#826)
   md.addEventListener('click', e => {  // 2.46.6 (#1710): "Open in Administration" next to an admin switch
