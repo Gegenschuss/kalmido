@@ -232,9 +232,10 @@ _OI_AREA = {"office_payments": N_("Payments"), "office_pay_props": N_("Payments"
 
 
 def oi_area(spec):
-    """2.278.0 B (#3094): the translated area of a spec for a warning (by table, else its label or archive folder)."""
+    """2.278.0 B (#3094): the area of a spec for a warning (by table, else its label or archive folder); #3808: kept as the key
+    (a tuple), the warning reads it in the language of who looks."""
     k = _OI_AREA.get(spec.table) or spec.label or next((t for pre, t in UMZ_ORG_SKIP if spec.path.startswith(pre)), None)
-    return tr(k) if k else spec.path
+    return (k,) if k else spec.path
 
 
 def oi_write(c, run, uid, man, zf, files, data, who):
@@ -250,7 +251,7 @@ def oi_write(c, run, uid, man, zf, files, data, who):
             continue
         take, space = oi_space(c, run, spec)
         if not take:
-            run.warning(N_("Not taken over into the private workspace: {0}"), tr(spec.label) if spec.label else spec.path)
+            run.warning(N_("Not taken over into the private workspace: {0}"), (spec.label,) if spec.label else spec.path)
             continue
         cols, _fks = umz_cols(c, spec.table)
         if not cols:
@@ -299,7 +300,7 @@ def oi_write(c, run, uid, man, zf, files, data, who):
                 continue
             if d is None:
                 if spec.label:
-                    run.warning(N_("A row could not be taken over: {0}"), tr(spec.label))
+                    run.warning(N_("A row could not be taken over: {0}"), (spec.label,))  # #3808: the key, read in the reader's language
                 continue
             enc_space = space or (oc_user_space(uid) if spec.enc == "user" else None)
             if spec.enc and enc_space:
@@ -307,7 +308,7 @@ def oi_write(c, run, uid, man, zf, files, data, who):
             nid = umz_insert(c, spec.table, d, rid=spec.rid)
             if not nid:
                 if spec.label:
-                    run.warning(N_("A row could not be taken over: {0}"), tr(spec.label))
+                    run.warning(N_("A row could not be taken over: {0}"), (spec.label,))  # #3808: the key, read in the reader's language
                 continue
             if spec.rid:
                 run.put(spec.kind, src.get("id"), nid)
@@ -346,7 +347,7 @@ OI_PIC_RE = re.compile(r"files/pictures/(?:organisation\.png|list-([1-9][0-9]{0,
 def _oi_pic(c, run, uid, zf, files, path, max_mb, process):
     """The re-encoded picture of an archive entry (only what the app's own upload would keep: its size limit, its image types,
     no metadata), or None with a warning."""
-    what = tr(N_("Pictures"))
+    what = (N_("Pictures"),)  # #3808: the key, read in the reader's language
     if not 0 < files[path][0].file_size <= min(max_mb, MAX_FILE_MB) * 1024 * 1024:
         run.warning(N_("A file is empty or too large and was skipped: {0}"), what)
         return None
@@ -372,12 +373,12 @@ def oi_pictures(c, run, uid, zf, files, data):
         run.step()
         m = OI_PIC_RE.fullmatch(path)
         if not m:
-            run.warning(N_("A file could not be taken over: {0}"), tr(N_("Pictures")))
+            run.warning(N_("A file could not be taken over: {0}"), (N_("Pictures"),))
             continue
         tok = secrets.token_urlsafe(12)
         if m[1] is None:
             if not run.org:
-                run.warning(N_("Not taken over into the private workspace: {0}"), tr(N_("Symbol")))
+                run.warning(N_("Not taken over into the private workspace: {0}"), (N_("Symbol"),))
                 continue
             png = _oi_pic(c, run, uid, zf, files, path, AVATAR_MAX_MB, list_icon_process)
             if png is None:

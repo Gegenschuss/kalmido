@@ -24,7 +24,6 @@ import secrets
 
 from ..core.i18n import N_
 from .orgimport import OiT, _txt  # 2.362.0 (#3131): + _txt
-from .acctimport import tr  # 2.184.0 A (#2579)
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.config import ATT_DIR  # 2.149.0 G (#2517): pulled up from functions
 from ..files.fsroots import fs_area_root, fs_area_ws  # 2.353.0 C (#2829)
@@ -331,11 +330,11 @@ def _wiki_locked(c, ctx):
 def _video_version(c, run, src, d, ctx):
     """2.137.0 review M1: the link is checked like a pasted one (videos/review.py vdr_parse); provider and embed id come from it."""
     from ..videos.review import vdr_parse
-    from .acctimport import tr, umz_cols
+    from .acctimport import umz_cols
     try:
         v = vdr_parse(src.get("url"))
     except BadInput:
-        run.warning(N_("A row could not be taken over: {0}"), tr(N_("Video sign-offs")))
+        run.warning(N_("A row could not be taken over: {0}"), (N_("Video sign-offs"),))
         return False
     for k in ("url", "provider", "embed_id"):
         if k in d or k in umz_cols(c, "video_versions")[0]:
