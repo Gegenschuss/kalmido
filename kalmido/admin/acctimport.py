@@ -46,7 +46,7 @@ from .hosting import QuotaExceeded, fmt_bytes, quota_guard, quota_info
 from ..core.db import body, bump, connect, db, err, iso, now_utc, parse_iso, usettings, uset, create_user, DataError, IntegrityError
 from ..core.pg import insert_id, system_ctx
 from ..core.errors import BadInput  # 2.273.0 A (#3030)
-from ..accounts.settings import clean_look_pref  # 2.273.0 A (#3030)
+from ..accounts.settings import clean_look_pref, clean_setting  # 2.273.0 A (#3030); 2.363.4 (#3127): clean_setting
 from ..tasks.snippets import snip_clean  # 2.273.0 A (#3030)
 from ..core.i18n import lang, LANGS, N_, stored_join, tr as _tr_base, tr_stored
 from ..core.access import Denied, ROLES, list_role, my_inbox, my_max_sort, WRITE_ROLES
@@ -109,6 +109,17 @@ UMZ_SETTINGS = ("lang", "allday_time", "default_reminder", "work_start", "work_e
                 "show_done_default", "group_order", "comment_order", "time_rounding", "time_currency", "capacity_h",
                 "list_emoji", "side_icons", "prio_bg", "celebrate", "progress_subtasks", "hide_progress", "folders",
                 "look", "workdays")  # 2.273.0 A (#3030): the appearance (theme) and the working days move along too
+# 2.363.4 (#3127): the other settings that move along -- an allow list of preferences without ids of the old server, checked like a
+# value set by hand (accounts/settings.py clean_setting); never sign-in, security, push, mail delivery or connections
+UMZ_SETTINGS_MORE = ("detail_split", "detail_cm_fold", "detail_fold", "agent_steps_live", "agent_steps_always", "agent_quota_show",
+                     "chat_read_receipts", "chat_kbd_agent", "chat_kbd_team", "today_inbox", "pomo_focus", "pomo_short", "pomo_long",
+                     "pomo_long_every", "time_autostop_h", "time_focus", "time_target", "time_split_midnight", "tz", "hide_blocked_today",
+                     "fav_only", "fav_suggest", "mine_view", "mine_board", "mine_board_by", "date_confirm", "start_page", "person_colors",
+                     "list_color_dot", "side_progress", "row_icons", "row_icons_custom", "side_count", "side_dots", "side_share",
+                     "cal_today", "cal_tasks", "cal_holidays", "cal_abs", "cal_abs_team", "holiday_state", "tours_more", "features",
+                     "nav_order", "mods_all", "folders_closed", "folder_colors", "photo_meta_strip", "week_start", "time_format",
+                     "date_order", "mail_trim_fwd", "mail_trim_eml")
+UMZ_SETTINGS_ALL = frozenset(UMZ_SETTINGS + UMZ_SETTINGS_MORE)
 # columns never taken from a file, in addition to ids, *_id / *_by columns, foreign keys and OX_SECRET_COLS
 UMZ_DROP = {
     "lists": {"is_inbox", "family", "agent_tidy", "agent_listen", "agent_members", "agent_peers", "agent_followup", "tidy_agent",
@@ -139,6 +150,10 @@ UMZ_READ = frozenset((
     "template_files",  # 2.464.0 (#3865)
     "private_files", "private_versions", "private_area_roots", "wiki_pages", "wiki_files",  # #3470: umz_private (UMZ_PRIVATE)
     "sheets", "sheet_columns", "sheet_rows", "sheet_cells", "sheet_files", "sheet_hist",
+    # 2.363.4 (#3127): filed mails, video sign-offs, notepads and project playbooks through the areas (umz_private), the rest
+    # of my own rows directly (admin/umz_more.py)
+    "hub_mails", "video_reviews", "video_versions", "video_comments", "list_notepads", "playbooks", "bookmarks", "pomos",
+    "contact_care", "view_layouts", "list_layouts", "task_bell", "task_watchers",
 ))
 # #3470: the private file store, knowledge pages and tables of an account export go through the organisation import's areas
 # (admin/oi_store.py) into my private space: account part -> archive entry of the organisation export
@@ -149,11 +164,10 @@ UMZ_PRIVATE = (
     ("sheet_cells", "sheets/cells.json"), ("sheet_files", "sheets/files.json"), ("sheet_hist", "sheets/history.json"),
 )
 UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is empty; a name used twice adds up
-    (N_("E-mails"), ("hub_mails",)),  # #3470: tables, knowledge pages and my files come along (UMZ_PRIVATE)
-    (N_("Video sign-offs"), ("video_reviews", "video_versions", "video_comments")), (N_("Bookmarks"), ("bookmarks",)),
-    (N_("Household budget"), ("budgets",)), (N_("Focus sessions"), ("pomos",)), (N_("Notepads"), ("list_notepads",)),
-    (N_("Playbooks"), ("playbooks", "playbook_proposals")), (N_("Staying in touch"), ("contact_care",)),
-    (N_("Saved arrangements"), ("view_layouts", "list_layouts", "view_layout_offers")), (N_("Task bells"), ("task_bell", "task_watchers")),
+    # #3470: tables, knowledge pages and my files come along (UMZ_PRIVATE); 2.363.4 (#3127): mails, video sign-offs, bookmarks,
+    # focus sessions, notepads, playbooks, staying in touch, saved arrangements and task bells too (what stays: umz_left counts it)
+    (N_("Household budget"), ("budgets",)), (N_("Playbooks"), ("playbook_proposals",)),
+    (N_("Saved arrangements"), ("view_layout_offers",)),
     (N_("History"), ("activity",)), (N_("Direct messages"), ("direct_messages",)), (N_("Agent chats"), ("agent_chats",)),
     (N_("Absences"), ("absences",)), (N_("Timesheets"), ("timesheets",)),
     (N_("Shared with me"), ("shared_lists", "shared_comments")), (N_("Notifications"), ("list_notif", "folder_notif")),
@@ -604,10 +618,14 @@ def umz_left(data):
     for t in sorted(set(n) - known):
         if n[t]:
             out[t] = n[t]
-    for what, k in ((N_("Other settings"), sum(1 for r in data.get("settings", []) if r.get("key") not in UMZ_SETTINGS)),
-                    (N_("Tasks in the trash"), sum(1 for t in data.get("tasks", []) if t.get("deleted_at")))):
+    mine = {_oid(L.get("id")) for L in data.get("lists", []) if isinstance(L, dict) and not L.get("e2e")}
+    for what, k in ((N_("Other settings"), sum(1 for r in data.get("settings", []) if r.get("key") not in UMZ_SETTINGS_ALL)),
+                    (N_("Tasks in the trash"), sum(1 for t in data.get("tasks", []) if t.get("deleted_at"))),
+                    # 2.363.4 (#3127): what hangs on a project that is not mine (or encrypted), and a folder's playbook
+                    (N_("Notepads"), sum(1 for r in data.get("list_notepads", []) if _oid(r.get("list_id")) not in mine)),
+                    (N_("Playbooks"), sum(1 for r in data.get("playbooks", []) if _oid(r.get("list_id")) not in mine))):
         if k:
-            out[what] = k
+            out[what] = out.get(what, 0) + k
     return [{"what": w, "count": k} for w, k in out.items()]
 
 
@@ -1625,9 +1643,16 @@ def umz_write(c, run, uid, man, zf, files, data, people):
     cur = usettings(c, uid)
     for r in data.get("settings", []):
         k, v = r.get("key"), r.get("value")
-        if k not in UMZ_SETTINGS or not isinstance(v, str) or len(v) > 20000:
+        if k not in UMZ_SETTINGS_ALL or not isinstance(v, str) or len(v) > 20000:
             continue
-        if k == "look":  # 2.273.0 A (#3030): JSON, checked like a value set by hand
+        if k in UMZ_SETTINGS_MORE:  # 2.363.4 (#3127): checked like a value set by hand
+            try:
+                v = clean_setting(k, v)
+            except BadInput:
+                continue
+            if v is None:
+                continue
+        elif k == "look":  # 2.273.0 A (#3030): JSON, checked like a value set by hand
             try:
                 v = clean_look_pref(v)
             except BadInput:
@@ -1659,13 +1684,39 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         oi_pictures(c, run, uid, zf, files, data)
 
 
-def umz_private_oi(data, files):
+# 2.363.4 (#3127): account parts that go through the areas of admin/orgimport.py (archive entry of the organisation export); a
+# notepad or playbook only on a project of the file (the others hang on projects of other people, umz_left names them)
+UMZ_PRIVATE_MORE = (("video_reviews", "videos/reviews.json"), ("video_versions", "videos/versions.json"),
+                    ("video_comments", "videos/comments.json"), ("list_notepads", "lists/notepads.json"), ("playbooks", "lists/playbooks.json"))
+
+
+def umz_mails_oi(data, nodes, me_old):
+    """2.363.4 (#3127): my filed mails as rows of hub/mails.json: the file names their .eml and attachments by their place in the
+    ZIP (acctexport._mail_files), the area wants the nodes of the file store -> (mail rows, ids of their nodes)."""
+    by_file = {r.get("file"): _oid(r.get("id")) for r in nodes if isinstance(r.get("file"), str) and _oid(r.get("id"))}
+    rows, used = [], set()
+    for r in data.get("hub_mails") or []:
+        if not isinstance(r, dict) or not _oid(r.get("id")):
+            continue
+        d = {k: v for k, v in r.items() if k not in ("eml_file", "attachment_files", "eml_id", "files", "folder_id")}
+        att = r.get("attachment_files") if isinstance(r.get("attachment_files"), list) else []
+        ids = [by_file[f] for f in att if isinstance(f, str) and by_file.get(f)]
+        d.update(owner_id=me_old, eml_id=by_file.get(r.get("eml_file")) if isinstance(r.get("eml_file"), str) else None, files=json.dumps(ids))
+        used.update(x for x in (d["eml_id"], *ids) if x)
+        rows.append(d)
+    return rows, used
+
+
+def umz_private_oi(data, files, me_old=None):
     """#3470: the private areas of an account export as the archive entries of admin/oi_store.py -> {entry: rows}. The bytes
     get the names the areas read (files/store/<node>-v<no>-<name>, files/wiki/..., files/sheets/...) as a second name of the
     file's entry; an export before #3470 has no versions: the current one comes from the node's "file". Files of a filed mail
     follow the mail (it stays on the old server), rows of a table in the trash stay with it."""
     oi = {}
-    nodes = [r for r in data.get("private_files") or [] if not r.get("hub_mail_id")]
+    every = [r for r in data.get("private_files") or [] if isinstance(r, dict)]
+    mails, of_mails = umz_mails_oi(data, every, me_old)  # 2.363.4 (#3127): a filed mail comes along with its files
+    took = {_oid(m.get("id")) for m in mails}
+    nodes = [r for r in every if not r.get("hub_mail_id") or (_oid(r.get("hub_mail_id")) in took and _oid(r.get("id")) in of_mails)]
     names = {_oid(r.get("id")): r.get("name") for r in nodes}
     vers = [v for v in data.get("private_versions") or [] if _oid(v.get("node_id")) in names]
     if not data.get("private_versions"):  # an older export: the current version of each file
@@ -1701,6 +1752,15 @@ def umz_private_oi(data, files):
             rows = [{**r, "path": ""} for r in rows]
         if rows:
             oi[entry] = rows
+    if mails:
+        oi["hub/mails.json"] = mails
+    mine = {_oid(L.get("id")) for L in data.get("lists") or [] if isinstance(L, dict) and not L.get("e2e")}
+    for part, entry in UMZ_PRIVATE_MORE:
+        rows = [r for r in data.get(part) or [] if isinstance(r, dict)]
+        if part in ("list_notepads", "playbooks"):
+            rows = [r for r in rows if _oid(r.get("list_id")) in mine]
+        if rows:
+            oi[entry] = rows
     return oi
 
 
@@ -1708,17 +1768,22 @@ def umz_private(c, run, uid, man, zf, files, data, who):
     """#3470: my private file store (every version), knowledge pages and tables, restored in my private space -- also when the
     rest goes into an organisation (they are mine alone, like the Home & life projects). Sealed, counted on my storage and
     checked by the virus scanner per file like an upload (orgimport.oi_file); undone with the import (run.created["oi"])."""
-    oi = umz_private_oi(data, files)
-    if not oi:
+    from .umz_more import umz_more_has, umz_more_write, umz_more_space
+    me_old = _oid((man.get("user") or {}).get("id"))
+    oi = umz_private_oi(data, files, me_old)
+    if not oi and not umz_more_has(data):
         return
     if run.oi_done:  # 2.362.3 (#3098): an earlier import of this file brought them already
         run.warning(N_("Your files, knowledge pages and tables are here already from an earlier import: they were skipped."))
         return
     from .orgimport import oi_write
+    umz_more_space(run, oi)  # 2.363.4 (#3127): a mail or sign-off in my private space never points into an organisation
     org = run.org
     run.org = None
     try:
-        oi_write(c, run, uid, man, zf, files, {"oi": oi, "people": data.get("people") or []}, who)
+        if oi:
+            oi_write(c, run, uid, man, zf, files, {"oi": oi, "people": data.get("people") or []}, who)
+        umz_more_write(c, run, uid, me_old, data)  # 2.363.4 (#3127): bookmarks, focus sessions, arrangements, bells ...
     finally:
         run.org = org
     run.created["oi_done"] = True
@@ -2197,6 +2262,8 @@ def umz_undo(c, uid, r):
     from .orgimport import oi_undo, oi_undo_files
     n_oi = oi_undo(c, cr)  # 2.137.0 (#2344): the areas first (they point at the lists and tasks)
     umz_undo_parts(c, cr)  # 2.455.0 (#3469)
+    from .umz_more import umz_more_undo
+    umz_more_undo(c, uid, cr)  # 2.363.4 (#3127): bookmarks, focus sessions, arrangements, bells
     tpl_paths = umz_undo_templates(c, uid, cr)  # 2.464.0 (#3865)
     own_lists = [int(x) for x in cr.get("lists") or []]
     since = parse_iso(r["created_at"])
@@ -2245,7 +2312,7 @@ def umz_undo(c, uid, r):
         c.execute("DELETE FROM hub_mailboxes WHERE id=? AND created_by=? AND secret='' AND error='password'", (int(mid), uid))
     cur = usettings(c, uid)
     for k, v in (cr.get("settings") or {}).items():
-        if k in UMZ_SETTINGS and isinstance(v, dict) and cur.get(k) == v.get("new"):
+        if k in UMZ_SETTINGS_ALL and isinstance(v, dict) and cur.get(k) == v.get("new"):  # 2.363.4 (#3127): + the allow list
             uset(c, uid, k, v.get("old") if v.get("old") is not None else "")
     for oid, who in cr.get("org_joins") or []:  # 2.360.2 M (#2561): an invitation not accepted yet goes with the import
         c.execute("DELETE FROM org_joins WHERE org_id=? AND user_id=? AND created_by=?", (int(oid), int(who), uid))

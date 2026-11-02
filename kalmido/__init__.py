@@ -427,6 +427,7 @@ ORDER = (
     "admin.oi_office",  # 2.137.0 (#2344): its office tables (no routes)
     "admin.oi_store",  # 2.137.0 (#2344): its file store, documents, knowledge pages, tables (no routes)
     "admin.oi_team",  # 2.137.0 (#2344): its chat, absences, forms and the rest (no routes)
+    "admin.umz_more",  # 2.363.4 (#3127): the account import's own rows (bookmarks, focus sessions, arrangements, bells; no routes)
     "admin.dataretention",  # 2.152.0 D (#2171 #2173): old logs, expired credentials, orphan files (no routes)
     "admin.orgcrypt_cli",  # 2.42.0 (#828): the organisation keys' start-up pass + command line (no routes)
     "docs.extract",  # 2.48.0 (#1111): date / due date / amount from a text (no routes, standard library only)

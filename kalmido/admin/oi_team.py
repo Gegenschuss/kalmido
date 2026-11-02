@@ -25,6 +25,8 @@ from .acctimport import umz_legacy_aad  # 2.362.0 (#3090)
 from ..life.rss import _norm, RSS_MAX_FEEDS  # 2.455.0 (#3469)
 from ..lists.rules import RUL_ACTIONS, RUL_DAYS_MAX, RUL_LIST_MAX, RUL_NAME_MAX, RUL_PRIO, RUL_TEXT_MAX, RUL_TRIGGERS  # 2.455.0 (#3469)
 from .acctimport import umz_mentions  # 2.362.4 (#3100)
+from ..core.orgcrypt import FIELDS  # 2.363.4 (#3127)
+from ..hub.hubmail import hbm_seal  # 2.363.4 (#3127)
 
 # the person columns of the rows of one person (the row is left out when the person does not map)
 _W_PEOPLE = N_("Entries of people who were not chosen were not taken over: {0}")
@@ -182,6 +184,9 @@ def _mail(c, run, src, d, ctx):
     except ValueError:
         files = []
     d["files"] = json.dumps([n for n in (run.m("fs_nodes", x) for x in files if isinstance(x, int)) if n])
+    if not run.org:  # 2.363.4 (#3127): a private mail sealed with the account key while private spaces are encrypted (hbm_seal)
+        vals, _sealed = hbm_seal(c, None, d["owner_id"], d["ws"], {k: d.get(k) or "" for k in FIELDS["hub_mails"]})
+        d.update(vals)
     return d
 
 
