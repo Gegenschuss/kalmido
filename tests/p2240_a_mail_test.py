@@ -6,7 +6,8 @@
    expunged (UID EXPUNGE when the server has UIDPLUS, else EXPUNGE); a mail whose import failed, that an importer refused
    (None / 0) or that was taken in only in part (MailKept: an attachment not stored) stays (only \\Seen); a mail another
    process claimed stays too; KALMIDO_IMAP_KEEP=1 = only \\Seen as before; workspace mailboxes (delete off) only \\Seen
- - error log lines: a refused recipient's address never lands in the log (only the error class)
+ - error log lines: a refused recipient's address never lands in the log (only the error class); 2.360.5 (#3245): the
+   channel / event mail lines of notify/channels.py print the error class only too
  - freelancer-matrix: mail (a person without organisation: a mail to her personal address through the IMAP stub becomes a
    task in her basket and is deleted from the mailbox)
 Runs the functions inside the test container (fake IMAP objects) plus one real round through tests/stub_mail.py.
@@ -156,7 +157,8 @@ from kalmido.notify import channels as C
 bad = []
 for mod in (M, X, C):
     for ln in inspect.getsource(mod).splitlines():
-        if re.search(r'print\\("(mail|mailbox):.*type\\(e\\)\\.__name__, e[,)]', ln):  # the mail / mailbox error lines
+        # 2.360.5 (#3245): the channel and event mail lines of notify/channels.py too
+        if re.search(r'print\\("(mail|mailbox|channels[ a-z]*|event mail):.*type\\(e\\)\\.__name__, e[,)]', ln):
             bad.append(ln.strip())
 print(json.dumps(bad))
 """

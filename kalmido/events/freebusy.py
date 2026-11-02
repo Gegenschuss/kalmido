@@ -10,7 +10,7 @@ busy = timed events marked busy (an event shown as free, TRANSP:TRANSPARENT / bu
 of the calendars the person sees and did not hide, events they accepted, timed events of their visible subscriptions
 (the same sources as the booking page, calendars/apptbook.py apb_busy). All-day events never block (a birthday, a
 reminder), as in the day plan. away = an approved absence (half days: the morning or the afternoon) or a public holiday
-of the person's state (hub/abscal.py). skip = the event being edited (it should not collide with itself).
+of the person's state (hub/abscal.py; 2.360.5, #3245: only for oneself and "all", never in the "org" view). skip = the event being edited (it should not collide with itself).
 The colleagues' calendars are read as "system" (core/pg.py system_ctx) because they lie outside one's own rights; only
 the merged spans leave this module.
 2.240.0 C (#2868): a colleague sees only the sources of the organisations both share (that organisation's calendars, invitations
@@ -37,15 +37,10 @@ EFB_USERS_MAX = 20
 EFB_RATE = 120  # 2.240.0 C (#2868): answers per person and minute (the editor asks once per change of day / people, cached 60 s)
 
 
-def efb_allowed(c, uid, ids):
-    """The ids of `ids` uid may ask about: uid, and the full members of the organisations uid is a full member of (no
-    agents, children or disabled accounts)."""
-    return list(efb_scopes(c, uid, ids))
-
-
 def efb_scopes(c, uid, ids):
     """2.240.0 C (#2868): {id: the organisations whose sources uid sees of that person (None = all of them)} for the ids of
-    `ids` uid may ask about (efb_allowed). None for oneself and for a person sharing "all"; a person sharing "off" is left out."""
+    `ids` uid may ask about: uid, and the full members of the organisations uid is a full member of (no agents, children or
+    disabled accounts). None for oneself and for a person sharing "all"; a person sharing "off" is left out."""
     from ..accounts.orgs import user_orgs
     with system_ctx(c):  # memberships of other people (structure, ids only)
         mine = set(user_orgs(c, uid)) & set(user_orgs_full(c, uid))
@@ -111,7 +106,10 @@ def efb_token_cut(c, uid, allowed):
 
 def efb_spans(c, uid, day, zone, skip=None, orgs=None):
     """[(start minute, end minute, kind)] of person uid on day (0..1440 in zone), merged per kind. Run as system.
-    orgs: only the sources of these organisations (2.240.0 C, #2868: a colleague's view); None = all of them."""
+    orgs: only the sources of these organisations (2.240.0 C, #2868: a colleague's view); None = all of them.
+    2.360.5 (#3245): in a colleague's view only the organisation calendars the person owns count (a team calendar shared
+    with them is not their time; its events count once they accepted an invitation), and public holidays only with
+    orgs None (oneself / "all"): they would tell the person's state."""
     from ..events.model import ev_att_ok, ev_expand, my_cal_ids
     from ..hub.absence import abs_holidays_year
     from ..hub.abscal import abc_state
@@ -128,7 +126,8 @@ def efb_spans(c, uid, day, zone, skip=None, orgs=None):
     cals = list(my_cal_ids(c, uid, hidden=False))
     if orgs is not None and cals:  # 2.240.0 C (#2868): only the calendars of the shared organisations
         q = ",".join("?" * len(cals))
-        cals = [r[0] for r in c.execute(f"SELECT id, org_id FROM ev_cals WHERE id IN ({q})", cals) if r[1] in orgs]
+        cals = [r[0] for r in c.execute(f"SELECT id, org_id, owner_id FROM ev_cals WHERE id IN ({q})", cals)
+                if r[1] in orgs and r[2] == uid]  # 2.360.5 (#3245): only the person's own
     rows = []
     if cals:
         q = ",".join("?" * len(cals))
@@ -159,7 +158,7 @@ def efb_spans(c, uid, day, zone, skip=None, orgs=None):
         if orgs is not None and r[1] not in orgs:  # 2.240.0 C (#2868): only the absences of the shared organisations
             continue
         away.append((720, 1440) if r[0] == "pm" else (0, 720) if r[0] == "am" else (0, 1440))
-    if abs_holidays_year(day.year, abc_state(c, uid)).get(day.isoformat()):
+    if orgs is None and abs_holidays_year(day.year, abc_state(c, uid)).get(day.isoformat()):  # 2.360.5 (#3245)
         away.append((0, 1440))
     return [(a, b, "away") for a, b in efb_merge(away)] + [(a, b, "busy") for a, b in efb_merge(busy)]
 

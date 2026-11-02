@@ -265,7 +265,7 @@ def chn_loop():
             while chn_tick() >= CH_BATCH:
                 pass
         except Exception as e:  # noqa: BLE001
-            print("channels error:", type(e).__name__, e, flush=True)
+            print("channels error:", type(e).__name__, flush=True)  # 2.360.5 (#3245): the name only, never the text
             aa_count("watchdog", f"channels|{type(e).__name__}", "tick")
 
 
@@ -387,7 +387,7 @@ def chn_push(uid, title, msg, prio, click, kind, s, task=None, scope=None, chn_m
             _CH_WAKE.set()
         return n > 0
     except Exception as e:  # noqa: BLE001  (a channel never breaks the push)
-        print("channels: queueing failed:", type(e).__name__, e, flush=True)
+        print("channels: queueing failed:", type(e).__name__, flush=True)  # 2.360.5 (#3245): the name only, never the text
         return False
 
 
@@ -434,7 +434,7 @@ def chn_flush(resp):
                 db().heal()
             except Exception:  # noqa: BLE001
                 pass
-            print("channels: list events failed:", type(e).__name__, e, flush=True)
+            print("channels: list events failed:", type(e).__name__, flush=True)  # 2.360.5 (#3245): the name only, never the text
     return resp
 
 
@@ -774,7 +774,7 @@ def evm_note(c, uid, kind, tid, actor, s, cid=None):
         c.execute("INSERT INTO notify_mail_queue(user_id,kind,task_id,comment_id,actor_id,created_at) VALUES(?,?,?,?,?,?)",
                   (uid, kind, tid, cid, actor, time.time()))
     except Exception as e:  # noqa: BLE001  (a mail note never fails the change itself)
-        print("event mail: note failed:", type(e).__name__, e, flush=True)
+        print("event mail: note failed:", type(e).__name__, flush=True)  # 2.360.5 (#3245): the name only, never the text
 
 
 def evm_tick(c, users, S, LG, now):
