@@ -12,6 +12,7 @@ from ..tasks.validation import (
     as_int, clean_task, log_act, log_changes, RR_OCC_PER_TASK, RR_OCC_SECONDS, RR_OCC_TOTAL, rr_rule,
 )
 from ..tasks.tasks import check_move, dep_shift, move_subtree, ms_cleanup, one_task
+from ..tasks.oneway import irr_guard
 from ..tasks.lifecycle import PD_OWN, _norm, apply_update, complete_stale, do_complete, do_delete, restore_task, signed, undo_status
 from ..tasks.attachments import need_attachment
 from ..lists.listtrash import otr_err_task
@@ -232,6 +233,9 @@ def task_batch():
                     if e == lock_msg:
                         skipped.append(tid)
                     continue
+                if cf and len(cf) >= sum(len(v) if k == "fields" and isinstance(v, dict) else 1 for k, v in data.items() if k != "prev"):  # 2.370.0 (#3126): nothing written: not counted
+                    back()
+                    continue
             elif action == "patch_each":  # undo / redo: every task to its own values
                 if str(tid) not in per or not isinstance(per[str(tid)], dict):
                     continue
@@ -309,6 +313,7 @@ def task_batch():
                                           LIMIT 1""", (tid, str(since), me())).fetchone():
                     conflict(tid, "changed")
                     continue
+                irr_guard(c, tid)  # 2.392.0 (#3370)
                 do_delete(c, tid)
                 log_act(c, tid, "delete")
             elif action == "restore":

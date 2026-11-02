@@ -9,7 +9,7 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-const MTG_IMG = 4, MTG_IMG_MB = 50;
+const MTG_IMG = 4;
 S.mtg = {};      // agent id -> its ready "extract" proposals for me (the chat's cards)
 S.mtgSel = {};   // proposal id -> Set of the ticked task keys
 const mtg_ok = aid => typeof propOn === 'function' && propOn() && (S.proposers || []).some(a => a.id === +aid);
@@ -60,8 +60,8 @@ function mtg_request(ctx = {}) {
     if (e.target.id !== 'mtg-file') return;
     let fs = noEmpty([...e.target.files || []]); e.target.value = '';
     if (fs.some(f => !/^image\//.test(f.type))) { err(tr('Only images')); fs = fs.filter(f => /^image\//.test(f.type)); } else err('');
-    const big = fs.find(f => f.size > MTG_IMG_MB * 1024 * 1024);
-    if (big) { err(tr('{0} is larger than 50 MB', big.name)); fs = fs.filter(f => f !== big); }
+    const lim = upLimit(fs, true);  // 2.363.3 (#3134)
+    if (lim) { err(lim); fs = fs.filter(upFits); }
     if (imgs.length + fs.length > MTG_IMG) err(tr('At most {0} images', MTG_IMG));
     imgs.push(...fs.slice(0, Math.max(0, MTG_IMG - imgs.length)));
     drawImgs();
@@ -72,6 +72,7 @@ function mtg_request(ctx = {}) {
     if (b.dataset.m === 'close') { md.remove(); return; }
     const q = {agent_id: aid(), kind: 'extract', list_id: lid(), text: $('#pp-text', md).value.trim()};
     if (!q.text && !imgs.length) { need($('#pp-text', md), tr('Paste the notes or add a photo')); return; }
+    const lim = upLimit(imgs); if (lim) { err(lim); return; }  // 2.363.3 (#3134)
     b.disabled = true; err('');
     let ids = [];
     try {

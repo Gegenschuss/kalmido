@@ -7,9 +7,9 @@ from .core.db import connect, init_db, mig_flags_sync
 from .core.pages import ntfy_inbox_loop
 from .core.instance import update_loop
 from .notify.push import watchdog
-from .notify.alerts import aa_now
+from .notify.alerts import aa_now, aa_secret_key
 from .calendars.subscriptions import cal_loop, CAL_ON
-from .admin.backup import backup_loop, BK_ON_ENV
+from .admin.backup import backup_loop, bk_leftovers_alert, bk_tools_note, BK_ON_ENV
 from .api.v1 import WH_ON
 from .integrations.webhooks import wh_loop
 from .notify.channels import chn_loop, CH_ON
@@ -40,6 +40,8 @@ from .admin.clientip import ip_startup_check
 ip_startup_check()  # 2.33.0 (#834): many accounts from one private address -> warn in the log
 from .office.pdfweb import rx_office_perms
 rx_office_perms()  # 2.39.1 (#1210 N8): office folders of older versions become 0700
+if not _OC_CLI and env_bool("TASKS_WATCHDOG", True):  # 2.370.2 (#2779): folders a hard stop of a restore left behind
+    bk_leftovers_alert()
 if not _OC_CLI and env_bool("TASKS_WATCHDOG", True) and WRK_ROLE != "web":  # 2.42.0 (#828): existing organisation data gets encrypted at
     # rest (a background pass, idempotent); not in helper processes (CLI, scripts run with TASKS_WATCHDOG=0)
     from .admin.orgcrypt_cli import oc_migrate_start
@@ -83,3 +85,9 @@ if not _OC_CLI and env_bool("TASKS_WATCHDOG", True) and WRK_ROLE != "web":  # 2.
         print("office: number scheme check:", type(e).__name__, flush=True)
     finally:
         _c.close()
+    aa_secret_key()  # 2.359.3 (#2510)
+    if BK_ON_ENV:
+        try:
+            bk_tools_note()  # 2.359.3 (#2945)
+        except Exception as e:  # noqa: BLE001 - a report, never a reason not to start
+            print("backup: tools check:", type(e).__name__, flush=True)

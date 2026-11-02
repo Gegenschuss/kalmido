@@ -47,20 +47,22 @@ from ..core.i18n import LANGS, N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, local_now, now_utc
 from ..core.retention import ret_on, ret_report  # 2.272.0 A (#3026)
 from ..core.access import Denied
+from ..core.errors import DeniedKey
 from ..core.orgcrypt import oc_read_file, oc_write_file
+from .pdf import pdf_date
 from .model import office_gate, office_org, office_role, office_settings, office_settings_lock, office_settings_save
 from .doclang import doc_lg
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
-AGB_LANGS = ("de", "en")
+AGB_LANGS = ("de", "en", "nl", "fr", "es", "it")  # 2.460.0 (#3767): every document language (was de / en)
 AGB_MAX_MB = 10
 AGB_MAIL_MAX_MB = 20  # all attachments of one document mail together
-AGB_FILE_RE = re.compile(r"terms-(de|en)-[0-9a-f]{16}\.pdf")
+AGB_FILE_RE = re.compile(r"terms-(de|en|nl|fr|es|it)-[0-9a-f]{16}\.pdf")
 AGB_NAME_MAX = 120
 AGB_GEN_KINDS = ("contract", "confirmation")  # documents from templates that carry the terms (framework contract, order confirmation)
 # printed in the document's language (like the other print words of office/pdf.py)
 AGB_LINE = N_("Our terms and conditions (as of {0}) apply, see attachment.|terms")  # 2.185.0 C (#2520): was a de / en table
-AGB_ATTACH = {"de": "AGB-Stand-{0}.pdf", "en": "Terms-{0}.pdf"}
+AGB_ATTACH = {"de": "AGB-Stand-{0}.pdf", "en": "Terms-{0}.pdf", "nl": "Voorwaarden-{0}.pdf", "fr": "CGV-{0}.pdf", "es": "Condiciones-{0}.pdf", "it": "Condizioni-{0}.pdf"}
 # 2.434.0 (#3619): the quotation PDF + the terms pages behind it, joined by pypdf in a limited child process (like
 # docs/split.py): stdin = 8 bytes length + the quotation + the terms, stdout = the joined PDF
 AGB_JOIN_WORKER = r"""
@@ -101,7 +103,8 @@ def agb_path(oid, name):
 
 
 def agb_lang(lang):
-    return "en" if str(lang or "").lower().startswith("en") else "de"
+    s = str(lang or "").lower()
+    return "en" if s.startswith("en") else s if s in AGB_LANGS else "de"
 
 
 def agb_all(c, oid):
@@ -118,7 +121,7 @@ def agb_cands(lang):
     """2.185.0 C (#2520): the terms languages a document in lang may use, in order: de / en its own; any other app language
     the English ones, else the German ones."""
     s = str(lang or "").lower()
-    return AGB_LANGS[::-1] if not s.startswith("en") and s != "de" and s in LANGS else (agb_lang(lang),)
+    return (s, "en", "de") if not s.startswith("en") and s != "de" and s in LANGS else (agb_lang(lang),)  # 2.460.0 (#3767): its own first
 
 
 def agb_pick(c, oid, lang):
@@ -182,12 +185,8 @@ def agb_gen_terms(c, oid, d):
 
 
 def agb_fmt_date(v, lang):
-    """2026-10-19 -> 19.10.2026 (de) / 2026-10-19 (en)."""
-    try:
-        d = datetime.date.fromisoformat(str(v or ""))
-    except ValueError:
-        return str(v or "")
-    return d.strftime("%d.%m.%Y") if agb_lang(lang) == "de" else d.isoformat()
+    """2026-10-19 -> 19.10.2026 (de) / 19 October 2026 (en): 2.368.2 (#2986) the date of the other documents (was ISO)."""
+    return pdf_date(v, str(lang or "de").split("-")[0])
 
 
 def agb_print_line(c, oid, r, fmt_date=None):
@@ -279,7 +278,7 @@ def agb_mail_files(c, oid, r, b, files):
                 break
         if joined:
             if sum(len(f[1]) for f in out) > AGB_MAIL_MAX_MB * 1024 * 1024:
-                raise Denied(413, tr("The attachments are too large for one mail (at most {0} MB)", AGB_MAIL_MAX_MB))
+                raise DeniedKey(413, N_("The attachments are too large for one e-mail (at most {0} MB)"), AGB_MAIL_MAX_MB)
             return out, agb_doc_terms(c, oid, r)
     want = b.get("terms")
     want = r["kind"] == "offer" if want is None else want in (1, True, "1", "true")
@@ -288,12 +287,15 @@ def agb_mail_files(c, oid, r, b, files):
     if not a:
         return files, None
     if sum(len(f[1]) for f in files) + len(a[1]) > AGB_MAIL_MAX_MB * 1024 * 1024:
-        raise Denied(413, tr("The attachments are too large for one mail (at most {0} MB)", AGB_MAIL_MAX_MB))
+        raise DeniedKey(413, N_("The attachments are too large for one e-mail (at most {0} MB)"), AGB_MAIL_MAX_MB)
     return list(files) + [a], t
 
 
 def agb_public(meta):
-    return {k: meta.get(k) for k in ("date", "sha256", "name", "bytes", "uploaded_at")} if meta else None
+    if not meta:
+        return None
+    from ..files.scan import sc_size_mark
+    return {**{k: meta.get(k) for k in ("date", "sha256", "name", "bytes", "uploaded_at")}, "up": sc_size_mark(int(meta.get("bytes") or 0))}  # 2.453.0 (#3781)
 
 
 def agb_clean_name(v):

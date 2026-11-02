@@ -33,7 +33,7 @@ const wait = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (awa
   await call('POST', '/api/tasks', {title: 'Kid two', list_id: P2, parent_id: RICH});
   await call('POST', `/api/tasks/${K1}/complete`, {});
   await call('POST', '/api/tasks', {title: 'Plain', list_id: P2});
-  // alice has no organisation here: every check below is also the freelancer case (private space, own admin)
+  // alice has no organisation here: every check below is also the freelancer case (private workspace, own admin)
 
   // ================= jsdom (a mouse, English)
   let w = await boot({user: 'alice', hash: 'overview'}), d = w.document;

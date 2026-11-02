@@ -6,7 +6,7 @@
    member without access to a file gets nothing about it (no name in the answer), a file / table of another space (the
    person's private one, another organisation) is never resolved, a file in the trash is gone
  - GET /api/wiki/refs?file= | sheet= = the pages one may read that reference it (404 without access to the file / table)
- - a move to the private space ends the references into the organisation's file store (rows rebuilt, text kept); the ZIP
+ - a move to the private workspace ends the references into the organisation's file store (rows rebuilt, text kept); the ZIP
    export keeps the references as text; a file deleted for good takes its backlink rows with it
  - #2108: a converted checkbox line "- [ ] … #<id>" links the task (to_task, "Mentioned in"); the parser runs in the
    browser (p2123_c_ui.js)
@@ -178,9 +178,9 @@ check(r.ok and links(PG)["task"] == [T["id"]], "#2108: the line links the task (
 r = A.get(B + "/api/wiki/mentions", params={"task": T["id"]})
 check(r.ok and [p["id"] for p in r.json()["pages"]] == [PG], "#2108: the task shows the page under 'Mentioned in'")
 
-# ---------------------------------------------------------------- a move to the private space ends the references
+# ---------------------------------------------------------------- a move to the private workspace ends the references
 r = A.post(B + "/api/wiki/move-space", json={"pages": [PG], "space": SP, "to": "private", "dest": ""})
-check(r.ok, "setup: the page into the private space " + r.text[:200])
+check(r.ok, "setup: the page into the private workspace " + r.text[:200])
 L = links(PG)
 check(L["file"] == [F_PRIV] and L["sheet"] == [], f"#2103: after the move no reference into the organisation's file store, the own private file now is one {L}")
 j = refs(A, PG, ALL_F, ALL_L).json()

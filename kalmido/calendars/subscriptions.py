@@ -68,11 +68,12 @@ CAL_TIMEOUT, CAL_DEADLINE = 20, 60  # s per socket operation / for a whole downl
 CAL_MAX_SUBS = 20            # per user
 CAL_INTERVALS = (15, 60)     # minutes
 CAL_ALERT_FAILS = 5          # failed syncs in a row -> admin alert ("integration")
+CAL_USER_FAILS = 3           # 2.367.2 (#2969): failed syncs in a row -> one News item for the person
 CAL_NET_LIMIT = _env_int("KALMIDO_CALENDAR_RATE", 30)  # adds / discoveries / manual refreshes per user within FAIL_WINDOW (15 min)
 CAL_COLORS = ("#6d8cff", "#2dd4bf", "#f5b041", "#f87171", "#c084fc", "#4ade80", "#f472b6", "#94a3b8", "#6ee7b7")
 CAL_TEXT = {"title": 300, "location": 300, "description": 4000}
 CAL_ERR = {"blocked": N_("This address is in a private network. An admin can allow the host under Settings > Server > Server > Advanced."),
-           "auth": N_("Access denied: wrong username or password, or the link needs a login"),
+           "auth": N_("Access denied: wrong username or password, or the link needs a sign-in"),
            "not_found": N_("Not found: check the link"),
            "http": N_("The server answered with an error ({0})"),
            "too_large": N_("The calendar is larger than {0} MB"),
@@ -165,7 +166,8 @@ def cal_allow_text(entries):
 # longer one list for all: the admin setting allow_hosts_by_purpose = JSON {purpose: "host, host:port"}; a one-shot at the
 # start (core/db.py, flag migr_allow2380) copies the old list cal_allow_hosts into every purpose, so nothing that worked stops.
 # KALMIDO_CALENDAR_ALLOW_HOSTS (the server configuration) still counts for every purpose. cal_allow_hosts stays as it was
-# (an older version reads it).
+# (an older version reads it). 2.473.0 (#3569): changed there after a fallback, the start copies it into every purpose again
+# (allow_hosts_copied_from).
 
 
 def allow_by_purpose(c):
@@ -901,6 +903,9 @@ def cal_sync(c, sid, force=False):
             upd.update(status="error", error=ce.stored(), fails=s["fails"] + 1)
             if not s["name"]:
                 upd["name"] = (urllib.parse.urlsplit(url).hostname if url else "") or tr("Calendar", lg=lg)
+            if upd["fails"] == CAL_USER_FAILS:  # 2.367.2 (#2969): once per streak, the name only (never the link)
+                from ..collab.news import news_add
+                news_add(c, s["user_id"], "calsub", actor=0, data={"sub_id": sid, "name": upd.get("name") or s["name"]})
             if upd["fails"] >= CAL_ALERT_FAILS:
                 aa_now("integration", f"calendar:{sid}:{ce.code}",
                        N_("Calendar subscription #{0} of user {1} failed {2} times in a row ({3})."),
@@ -1019,7 +1024,7 @@ def _cal_fields(b, old=None):
     if "color" in b:
         v = b["color"]
         if not isinstance(v, str) or not (v == "" or re.fullmatch(r"#[0-9a-fA-F]{6}", v)):
-            raise BadInput(tr("Invalid value: {0}", tr("Color")))
+            raise BadInput(tr("Invalid value: {0}", tr("Colour")))
         out["color"] = v.lower()
     if "visible" in b:
         if not isinstance(b["visible"], bool):

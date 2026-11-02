@@ -509,13 +509,14 @@ def shb_member_ids(c, sid):
     return [x["id"] for x in shb_rows(c, bid[0], deleted=True)] if bid else [sid]
 
 
-def shb_move(c, sid, to, uid):
-    """After the first sheet moved: the further sheets follow (space fields, the files of their file cells)."""
+def shb_move(c, sid, to, uid, new_paths, old_paths):
+    """After the first sheet moved: the further sheets follow (space fields, the files of their file cells; 2.363.3 (#3133):
+    new_paths / old_paths as in shk_move_files)."""
     from .shkinds import shk_move_files
     shb_sync(c, sid)
     for t in shb_member_ids(c, sid):
         if t != sid:
-            shk_move_files(c, t, to, uid)
+            shk_move_files(c, t, to, uid, new_paths, old_paths)
 
 
 # ---------------------------------------------------------------- files (sheets/io.py)

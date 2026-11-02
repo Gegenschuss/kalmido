@@ -3,14 +3,24 @@ import re
 import urllib.parse
 from flask import g, jsonify
 
+from ..accounts.session import me
 from ..core.config import app
-from ..core.db import body, bump, db, err, iso, now_utc
+from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
+from ..core.errors import BadInput, reject_unknown
 from ..core.i18n import tr
-from ..core.access import need_list, plists, pvis
-from ..core.pg import st_ids
-from ..api.v1 import v1_args, v1_view
-from .git import (CalError, git_api, git_commit_norm, GitMatch, git_conn_lists, git_conns_of_list, git_http, git_items,
-                  git_need_manage, git_take_commits, git_urls, git_version, GitRate, GIT_ITEMS, _gs)
+from ..core.access import Denied, list_role, need_list, need_task, plists, pvis, task_visible
+from ..core.pg import insert_id, st_ids
+from ..api.common import V1Error, v1_call, v1_json
+from ..api.v1 import _v1_live, v1_args, v1_one, v1_view
+from ..collab.liste2e import le2e_mode
+from ..lists.fields import set_field_values
+from ..tasks.review import rvw_gate
+from ..tasks.tasks import one_task, task_create
+from ..tasks.validation import log_act
+from .webhooks import wh_note
+from ..tasks.oneway import irr_needs_yes
+from .git import (CalError, GIT_COMMENT_CMD, git_api, git_close, git_commit_norm, GitMatch, git_conn_lists, git_conns_of_list, git_http, git_items,
+                  git_need_manage, git_release_events, git_tag_url, git_take_commits, git_urls, git_version, GitRate, GIT_ITEMS, _gs)
 
 
 # ---------------------------------------------------------------- 2.151.0 A (#2558): what was built for a task, and is it live
@@ -24,7 +34,8 @@ from .git import (CalError, git_api, git_commit_norm, GitMatch, git_conn_lists, 
 #  package = the list's version field ("Package", "Version", "Release", "Target version" ..., or the one picked in the
 #  repository dialog) and whether a tag with exactly that version exists (2.151 = 2.151.0; "2.46c" cannot be checked: never
 #  released). Deliberately no "lower than the newest version": packages are built in parallel and renumbered.
-#  stale = the task is still open although its package or its code is released.
+#  stale = the task is still open although its package or its code is released; 2.392.0 B (#3364): a task done in part
+#  (tasks.partial_until = Y) is stale only once Y is released.
 # The poll (git.py git_poll) finds it out with few requests: per NEW version tag one compare with the version before it
 # (the first tag that holds a commit wins), once for an existing connection the newest GB_FILL_TAGS tags; one compare newest
 # version tag...default branch when either moved (gb_released); one branch list (ETag) and a compare only for a branch whose
@@ -38,6 +49,9 @@ GB_LASTING = ("not_found", "auth")  # errors that do not go away by trying again
 GB_EARLIER = "~"           # git_commits.tag / git_prs.tag: in an earlier version, which one unknown (no tag name has a ~)
 GB_VER_NAMES = ("paket", "package", "version", "release", "ziel-version", "target version")
 GB_VER_RE = re.compile(r"[vV]?(\d{1,9}(?:\.\d{1,9}){0,3})")
+GB_CLOSE_MAX = 100         # 2.392.0 B (#3364): tasks one poll completes (the rest in the next one)
+GB_PARTIAL_RE = re.compile(r"(?:teilweise|partly)\s*:\s*rest\s+in\s+(\S+)", re.I)  # alone in a comment's first line
+GB_NOTE_MAX = 2000
 
 
 def gb_key(v):
@@ -312,16 +326,21 @@ def gb_ver_field(c, lid, setting=None, fields=None):
     return next((f for f in fields if f["type"] == "text" and (f["name"] or "").strip().casefold() in GB_VER_NAMES), None)
 
 
-def _gb_fval(f, v):
-    """A field value as text (a select stores the option id)."""
-    if f["type"] != "select":
-        return str(v or "").strip()
+def gb_options(f):
+    """The options of a select field."""
     import json
     try:
         opts = json.loads(f["options"] or "{}").get("options") or []
     except (ValueError, AttributeError):
         opts = []
-    return next((str(o.get("name") or "").strip() for o in opts if isinstance(o, dict) and str(o.get("id")) == str(v)), "")
+    return [o for o in opts if isinstance(o, dict)]
+
+
+def _gb_fval(f, v):
+    """A field value as text (a select stores the option id)."""
+    if f["type"] != "select":
+        return str(v or "").strip()
+    return next((str(o.get("name") or "").strip() for o in gb_options(f) if str(o.get("id")) == str(v)), "")
 
 
 def gb_ver_info(c, lid):
@@ -400,6 +419,8 @@ def git_build_for(c, rows):
         for x in c.execute("""SELECT task_id, field_id, value FROM task_field_values WHERE task_id = ANY(CAST(? AS BIGINT[]))
                               AND field_id = ANY(CAST(? AS BIGINT[]))""", (idl, st_ids(fids))):
             fv[(x["task_id"], x["field_id"])] = x["value"]
+    part = {x["id"]: gb_key(x["partial_until"]) for x in c.execute(  # 2.392.0 B (#3364)
+        "SELECT id, partial_until FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) AND partial_until IS NOT NULL", (idl,))}
     out = {}
     for t in rows:
         cs = lc[t["list_id"]]
@@ -447,7 +468,7 @@ def git_build_for(c, rows):
              "branches": [{"repo": f"{conn[x['conn_id']]['owner']}/{conn[x['conn_id']]['repo']}", "name": x["name"], "ahead": x["ahead"],
                            "url": gb_branch_url(conn[x["conn_id"]], x["name"])} for x in sorted(ahead, key=lambda y: y["name"])],
              "package": pkg, "stale": False}
-        b["stale"] = t["status"] == 0 and (bool(pkg and pkg["released"]) or state == "released")
+        b["stale"] = t["status"] == 0 and (part[t["id"]] in known if t["id"] in part else bool(pkg and pkg["released"]) or state == "released")
         out[t["id"]] = b
     return out
 
@@ -461,6 +482,212 @@ def gb_branch_url(r, name):
 def gb_untrusted(b):
     """For agents: branch names are written by anyone with access to the repository."""
     return {**b, "branches": [{**x, "origin": "git", "untrusted": True} for x in b["branches"]]}
+
+
+# ---- 2.392.0 B (#3364): completing tasks at a release, "partly, the rest in Y"
+# A list with the switch lists.git_close_release (off for every list): the poll completes its open tasks with stale = true through
+# git_close (kind "release", Undo), once per task and version (git_closes.versions), and tells webhooks and agents task.completed
+# with via "release". No request of its own: it reads what the poll stored, and only when that changed (git_conns.rel_sig). It never
+# writes to Git. A task may wait for more: gb_close_held.
+def gb_close_on(c, lid):
+    x = c.execute("SELECT git_close_release FROM lists WHERE id=?", (lid,)).fetchone()
+    return bool(x and x["git_close_release"])
+
+
+@app.put("/api/lists/<int:lid>/repos/close-release")
+def gb_close_set(lid):
+    """{on: bool} -- the list owner / a list admin (people), like the version field."""
+    c = db()
+    git_need_manage(c, lid)
+    v = body().get("on")
+    if not isinstance(v, bool):
+        return err(tr("Invalid value: {0}", "on"))
+    c.execute("UPDATE lists SET git_close_release=? WHERE id=?", (int(v), lid))
+    bump(c)
+    c.commit()
+    return jsonify(on=v)
+
+
+def gb_known(c, lid):
+    """{version key: tag name} of the repositories list lid uses."""
+    known = {}
+    for k in git_conns_of_list(c, lid):
+        for x in c.execute("SELECT name FROM git_tags WHERE conn_id=?", (k["id"],)):
+            if gb_key(x["name"]):
+                known[gb_key(x["name"])] = x["name"]
+    return known
+
+
+def gb_close_held(c, t):
+    """THE stop of the release pass: True = task t (a tasks row) stays open although it is stale: it waits for its rest, or
+    it is a one-way step whose list asks a person's yes and has none yet (2.392.0, #3370)."""
+    y = gb_key(t["partial_until"])
+    if y and y not in gb_known(c, t["list_id"]):
+        return True
+    return bool(t["irreversible"]) and not t["irreversible_yes_at"] and irr_needs_yes(c, t["list_id"])
+
+
+def gb_canon(v):
+    return ".".join(str(n) for n in gb_key(v))
+
+
+def gb_close_vers(t, b):
+    """{canonical version: text} a stale task (row t, build b) is released in: Y of a task done in part, else its package and the
+    highest tag of its code (GB_EARLIER with text '': an earlier version, which one unknown)."""
+    if gb_key(t["partial_until"]):
+        return {gb_canon(t["partial_until"]): git_version(t["partial_until"])}
+    out = {}
+    if b["package"] and b["package"]["released"]:
+        out[gb_canon(b["package"]["value"])] = b["package"]["value"]
+    if b["state"] == "released":
+        out.setdefault(gb_canon(b["version"]) if b["version"] else GB_EARLIER, b["version"] or "")
+    return out
+
+
+def gb_close_released(c, r):
+    """The pass of connection r in its poll. True = a task was completed. What it could not finish (a task waiting for its review
+    approval, more than GB_CLOSE_MAX) comes again in the next poll."""
+    lids = sorted(git_conn_lists(c, r))
+    on = [x["id"] for x in c.execute("SELECT id FROM lists WHERE id = ANY(CAST(? AS BIGINT[])) AND git_close_release=1 AND archived=0",
+                                     (st_ids(lids),))] if lids else []
+    if not on:
+        return False
+    x = c.execute("""SELECT (SELECT COUNT(*) FROM git_tags WHERE conn_id=?), (SELECT MAX(seen_at) FROM git_tags WHERE conn_id=?),
+                            (SELECT COUNT(*) FROM git_commits WHERE conn_id=? AND tag<>''), (SELECT COUNT(*) FROM git_prs WHERE conn_id=? AND tag<>''),
+                            (SELECT COUNT(*) FROM git_links WHERE conn_id=?), (SELECT rel_check FROM git_conns WHERE id=?),
+                            (SELECT rel_sig FROM git_conns WHERE id=?),
+                            (SELECT MAX(updated_at) FROM tasks WHERE list_id = ANY(CAST(? AS BIGINT[])) AND status=0 AND deleted_at IS NULL)""",
+                  (*[r["id"]] * 7, st_ids(on))).fetchone()
+    sig = f"{on} {x[0]} {x[1]} {x[2]} {x[3]} {x[4]} {x[5]} {x[7]}"
+    if sig == x[6]:
+        return False
+    rows = c.execute("""SELECT id, list_id, status, partial_until, irreversible, irreversible_yes_at FROM tasks
+                        WHERE list_id = ANY(CAST(? AS BIGINT[])) AND status=0
+                        AND deleted_at IS NULL ORDER BY id""", (st_ids(on),)).fetchall()
+    bs = git_build_for(c, rows)
+    tags = {gb_key(y["name"]): y["name"] for y in c.execute("SELECT name FROM git_tags WHERE conn_id=?", (r["id"],)) if gb_key(y["name"])}
+    done, again = [], False
+    for t in rows:
+        b = bs.get(t["id"])
+        if not b or not b["stale"] or gb_close_held(c, t):
+            continue
+        if len(done) >= GB_CLOSE_MAX:
+            again = True
+            break
+        vers = gb_close_vers(t, b)
+        top = max(vers, key=lambda v: gb_key(v) or ())
+        name = tags.get(gb_key(top))
+        if git_close(c, r, t["id"], "release", vers[top] or GB_EARLIER, vers[top], git_tag_url(r, name) if name else "", set(on), list(vers)):
+            done.append((t["id"], vers[top]))
+        again |= bool(rvw_gate(c, t["id"]))
+    if not again:
+        c.execute("UPDATE git_conns SET rel_sig=? WHERE id=?", (sig, r["id"]))
+    if done:
+        git_release_events(c, done)
+    return bool(done)
+
+
+def gb_partial(c, t, version, note=""):
+    """Task t was done in part, the rest comes in version: its version field and partial_until become that version, a new task
+    "Rest: <title>" with that version and t's place and visibility, t waits on it (task_deps), and a comment says so. Commits.
+    Returns {task id, rest id or None, version, partly_in, already}."""
+    tid, lid = t["id"], t["list_id"]
+    if t["status"] != 0 or t["deleted_at"]:
+        raise Denied(409, tr("Only an open task can be done in part"))
+    if le2e_mode(c, lid):
+        raise Denied(409, tr("Not available in encrypted projects"))
+    key = gb_key(version)
+    if not key:
+        raise BadInput(tr("Invalid value: {0}", "version"))
+    version = git_version(version)
+    f = gb_ver_field(c, lid)
+    if not f:
+        raise BadInput(tr("This project has no version field, so nothing was changed"))
+    if gb_key(t["partial_until"]) == key:  # sent again: the rest exists
+        return {"task": tid, "rest": None, "version": version, "partly_in": None, "already": True}
+    if key in gb_known(c, lid):
+        raise BadInput(tr("Version {0} is already released", version))
+    val = version
+    if f["type"] == "select":
+        val = next((o.get("id") for o in gb_options(f) if gb_key(o.get("name")) == key), None)
+        if val is None:
+            raise BadInput(tr("The version field has no option {0}", version))
+    x = c.execute("SELECT value FROM task_field_values WHERE task_id=? AND field_id=?", (tid, f["id"])).fetchone()
+    b = git_build_for(c, [t]).get(tid) or {}
+    was = b.get("version") or _gb_fval(f, x["value"] if x else None) or None
+    c.execute("UPDATE tasks SET partial_until=?, updated_at=? WHERE id=?", (version, iso(now_utc()), tid))
+    set_field_values(c, tid, lid, {f["id"]: val})
+    g.task_like = tid
+    keep = {k: t[k] for k in ("section_id", "parent_id", "priority", "ttype", "assignee_id", "assignee_group_id") if t[k]}
+    if list_role(c, lid) == "participant":  # their new task is theirs (task_create), the people stay
+        keep = {k: v for k, v in keep.items() if k not in ("assignee_id", "assignee_group_id")}
+    rest = v1_call(task_create, body={"title": f"Rest: {t['title']}", "list_id": lid, "content": note, "fields": {f["id"]: val}, **keep})["id"]
+    ts = iso_ms(now_utc())
+    c.execute("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)", (tid, rest, me(), ts))
+    log_act(c, tid, "dep_add", {"id": rest, "title": f"Rest: {t['title']}"[:200]})
+    text = tr("Partly in {0}, rest in {1}", was, version) if was else tr("Rest in {0}", version)
+    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at) VALUES(?,?,?,'',?)",
+                    (tid, me(), f"{text}: #{rest}" + (f"\n{note}" if note else ""), ts))
+    wh_note(c, tid, "comment", cid=cid)
+    bump(c)
+    c.commit()
+    return {"task": tid, "rest": rest, "version": version, "partly_in": was, "already": False}
+
+
+def gb_partial_cmd(c, t, text):
+    """A comment's first line "partly: rest in Y" / "teilweise: Rest in Y": None = no command, else what the API answers as
+    `partial`: {applied, reason?, version?, rest_id?}. Only with write access; a comment that did nothing stays a comment."""
+    m = GB_PARTIAL_RE.fullmatch((text or "").split("\n", 1)[0].strip())
+    if not m:
+        return None
+    if g.get("auth_via") == "token" and "tasks:write" not in (g.get("scopes") or ()):
+        return {"applied": False, "reason": tr("This needs the permission to change tasks")}
+    if not task_visible(c, t["id"], me(), write=True):
+        return {"applied": False, "reason": tr("This needs the permission to change tasks")}
+    try:
+        o = gb_partial(c, c.execute("SELECT * FROM tasks WHERE id=?", (t["id"],)).fetchone(), m.group(1))
+    except Denied as e:
+        c.rollback()
+        return {"applied": False, "reason": e.text()}
+    except BadInput as e:
+        c.rollback()
+        return {"applied": False, "reason": str(e)}
+    except V1Error as e:
+        c.rollback()
+        return {"applied": False, "reason": ((e.resp.get_json() or {}).get("error") or {}).get("message", "")}
+    return {"applied": True, "version": o["version"], "rest_id": o["rest"]}
+
+
+GIT_COMMENT_CMD.append(gb_partial_cmd)  # collab/comments.py sits below this module
+
+
+def gb_partial_in(b):
+    reject_unknown(b, ("version", "note"))
+    note = b.get("note") or ""
+    if not isinstance(b.get("version"), str) or not isinstance(note, str) or len(note) > GB_NOTE_MAX:
+        raise BadInput(tr("Invalid value: {0}", "version" if not isinstance(b.get("version"), str) else "note"))
+    return b["version"], note.strip()
+
+
+@app.post("/api/tasks/<int:tid>/partial")
+def gb_partial_web(tid):
+    """{version, note?}: see gb_partial."""
+    c = db()
+    need_task(c, tid)
+    v, note = gb_partial_in(body())
+    o = gb_partial(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), v, note)
+    return jsonify({**o, "task": one_task(c, tid), "rest": one_task(c, o["rest"]) if o["rest"] else None})
+
+
+@app.post("/api/v1/tasks/<int:tid>/partial")
+@v1_view
+def v1_gb_partial(tid):
+    v1_args(())
+    v, note = gb_partial_in(v1_json())
+    c = db()
+    _v1_live(c, tid)
+    o = gb_partial(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), v, note)
+    return jsonify({**o, "task": v1_one(c, tid), "rest": v1_one(c, o["rest"]) if o["rest"] else None})
 
 
 def gb_status(c, lid, agent=False):
@@ -478,13 +705,8 @@ def gb_status(c, lid, agent=False):
         b = bs.get(r["id"])
         if b and (b["stale"] or b["branches"] or b["state"] == "branch"):
             data.append({"id": r["id"], "title": r["title"], "build": gb_untrusted(b) if agent else b})
-    cs = git_conns_of_list(c, lid)
-    known = {}
-    for k in cs:
-        for x in c.execute("SELECT name FROM git_tags WHERE conn_id=?", (k["id"],)):
-            if gb_key(x["name"]):
-                known[gb_key(x["name"])] = x["name"]
-    return {"data": data, "list_id": lid, "repos": len(cs), "latest": git_version(known[max(known)]) if known else None,
+    known = gb_known(c, lid)
+    return {"data": data, "list_id": lid, "repos": len(git_conns_of_list(c, lid)), "latest": git_version(known[max(known)]) if known else None,
             "checked_at": iso(now_utc())}
 
 
@@ -524,6 +746,15 @@ def gb_spec(paths, schemas, op, ok, errs, ref, pid, nul):
     schemas["BuildStatus"] = {"type": "object", "properties": {"data": {"type": "array", "items": item}, "list_id": {"type": "integer"},
                                                                "repos": {"type": "integer"}, "latest": nul("string"),
                                                                "checked_at": {"type": "string"}}}
+    schemas["Task"]["properties"]["partial_until"] = nul("string", description="2.392.0 (#3364): done in part: only this version completes it")
+    paths["/tasks/{id}/partial"] = {"post": op(
+        "2.392.0 (#3364): the task was done in part, the rest comes in a later version: it stays open and only that version completes "
+        "it, its version field and a new task \"Rest: <title>\" get that version, the task waits on the rest. Body {version, note?}. "
+        "Sent again with the same version: already true, nothing new", "Tasks",
+        ok({"type": "object", "properties": {"task": ref("Task"), "rest": {"oneOf": [ref("Task"), {"type": "null"}]}, "version": {"type": "string"},
+                                             "partly_in": nul("string"), "already": {"type": "boolean"}}}) | errs("400", "403", "404", "409"),
+        [pid("id", "Task id")], scope="tasks:write",
+        body={"type": "object", "required": ["version"], "properties": {"version": {"type": "string"}, "note": {"type": "string", "maxLength": GB_NOTE_MAX}}})}
     paths["/lists/{id}/build-status"] = {"get": op(
         "2.151.0 (#2558): open tasks of a list whose build needs a look: stale (package or code released, task still open) or "
         "work on a branch that is not in the default branch. Call it before reporting work as done", "Lists",

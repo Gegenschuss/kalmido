@@ -1,0 +1,18 @@
+{
+ "code": "FR",
+ "name": "France",
+ "version": 1,
+ "holidays": [
+  {"date": "01-01", "name": "New Year's Day"},
+  {"date": "05-01", "name": "Labour Day"},
+  {"date": "05-08", "name": "Victory in Europe Day"},
+  {"date": "07-14", "name": "National Day|France"},
+  {"date": "08-15", "name": "Assumption Day"},
+  {"date": "11-01", "name": "All Saints' Day"},
+  {"date": "11-11", "name": "Armistice Day"},
+  {"date": "12-25", "name": "Christmas Day"},
+  {"easter": 1, "name": "Easter Monday"},
+  {"easter": 39, "name": "Ascension Day"},
+  {"easter": 50, "name": "Whit Monday"}
+ ]
+}

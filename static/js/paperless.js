@@ -55,8 +55,8 @@ function pl_jumpNow() {  // 2.87.9 (#1936): the jump from the search / the docum
 }
 // 2.87.9 (#1940): where a run files the documents, in words
 function pl_toText(r) {
-  if (r?.target === 'private') return r.mine ? tr('your private space') : tr('the private space of the person who started it');
-  return PL.ws === 'private' ? tr('your private space') : tr('the organisation {0}', wsName(PL.ws));
+  if (r?.target === 'private') return r.mine ? tr('your private workspace') : tr('the private workspace of the person who started it');
+  return PL.ws === 'private' ? tr('your private workspace') : tr('the organisation {0}', wsName(PL.ws));
 }
 // a running import: bar, count, target (#1940), Stop and the line that it runs on without the window (#1935)
 function pl_runHtml(r, stop) {
@@ -138,7 +138,7 @@ async function pl_preview(zip) {
       <input data-pln value="${esc(t.target)}" maxlength="120" aria-label="${esc(tr('Name in Kalmido'))}" ${t.to === 'skip' ? 'disabled' : ''}></li>`;
   const sec = (title, rows) => rows.length ? `<details class="pl-sec" ${rows.length <= 8 ? 'open' : ''}><summary>${title} <span class="muted">${rows.length}</span></summary><ul class="pl-maps">${rows.join('')}</ul></details>` : '';
   const left = Math.max(0, p.count - p.already);
-  $('.pl-pbody', md).innerHTML = `<p>${tr('{0} documents in Paperless-ngx', p.count)}${p.already ? ` · ${tr('{0} already imported', p.already)}` : ''}</p>
+  $('.pl-pbody', md).innerHTML = `<p>${trn('{0} document in Paperless-ngx', '{0} documents in Paperless-ngx', p.count)}${p.already ? ` · ${trn('{0} already imported', '{0} already imported', p.already)}` : ''}</p>
     <p class="muted">${tr('Each document comes with its file, text, date and notes. Documents that are already here are left out.')}</p>
     ${plh_size_html(p.size)}
     ${sec(tr('Tags'), p.tags.map(tagRow))}${sec(tr('Correspondents → senders'), p.senders.map(t => labRow('senders', t)))}${sec(tr('Document types'), p.types.map(t => labRow('types', t)))}${pll_preview_html(p)}
@@ -219,18 +219,18 @@ function pll_preview_html(p) {
   let h = `<div class="pll-rules">`;
   if (n) h += `<label class="chkl"><input type="checkbox" id="pll-rules" ${r.on === false ? '' : 'checked'}> ${tr('Take over the matching rules from Paperless-ngx ({0})', n)}</label>`;
   const notes = [];
-  if (r.dup) notes.push(tr('{0} rules are already here', r.dup));
+  if (r.dup) notes.push(trn('{0} rule is already here', '{0} rules are already here', r.dup));
   if (r.auto) notes.push(tr('{0} use “Auto” in Paperless-ngx: Kalmido learns them from the imported documents', r.auto));
   if (notes.length) h += `<p class="muted">${esc(notes.join(' · '))}</p>`;
-  if (bad.length) h += `<details class="pll-bad"><summary class="muted">${tr('{0} rules cannot be taken over', r.unsupported_n || bad.length)}</summary><ul>${bad.map(b => `<li>${esc(b.name)} <span class="muted">${esc(tr(WHY[b.why] || b.why))}</span></li>`).join('')}</ul></details>`;
+  if (bad.length) h += `<details class="pll-bad"><summary class="muted">${trn('{0} rule cannot be taken over', '{0} rules cannot be taken over', r.unsupported_n || bad.length)}</summary><ul>${bad.map(b => `<li>${esc(b.name)} <span class="muted">${esc(tr(WHY[b.why] || b.why))}</span></li>`).join('')}</ul></details>`;
   return h + '</div>';
 }
 function pll_line(l) {
   if (!l) return '';
   const parts = [];
   if (l.trained) parts.push(tr('learnt from {0} documents', l.trained));
-  if (l.rules_new) parts.push(tr('{0} rules taken over', l.rules_new));
-  if (l.unsupported_n) parts.push(tr('{0} rules not taken over', l.unsupported_n));
+  if (l.rules_new) parts.push(trn('{0} rule taken over', '{0} rules taken over', l.rules_new));
+  if (l.unsupported_n) parts.push(trn('{0} rule not taken over', '{0} rules not taken over', l.unsupported_n));
   return parts.length ? `<p class="muted pll-line">${esc(parts.join(' · '))}</p>` : '';
 }
 // ---- 2.69.0 A (#1846): an export ZIP of Paperless-ngx (document_exporter), for a server Kalmido cannot reach
@@ -286,7 +286,7 @@ async function plh_upload(f) {
     let n = z.next;
     while (n * z.chunk < f.size) {
       if (PL.up.abort || PL.ws !== ws) { PL.up = null; await api('DELETE', `/api/paperless/zip?ws=${encodeURIComponent(ws)}`).then(j => { PL.d = j; }).catch(() => null); pl_draw(); return; }
-      const fd = new FormData(); fd.append('ws', ws); fd.append('n', String(n)); fd.append('part', f.slice(n * z.chunk, Math.min(f.size, (n + 1) * z.chunk)), 'part');
+      const fd = new FormData(); fd.append('ws', ws); fd.append('n', String(n)); fd.append('part', f.slice(n * z.chunk, Math.min(f.size, (n + 1) * z.chunk)), 'part'); /** @type {any} */ (fd).upQuiet = true;  // 2.363.3 (#3134): one piece, the dialog draws the whole upload
       if ((n + 1) * z.chunk >= f.size) { PL.up.check = true; pl_draw(); }  // the server checks the export after the last part
       let j = null;
       for (let t = 0; t < 3 && !j; t++) { try { j = await rawFetch('POST', '/api/paperless/zip/part', fd); } catch (x) { if (t === 2 || (x?.status && x.status < 500)) throw x; await new Promise(res => setTimeout(res, 1500)); } }

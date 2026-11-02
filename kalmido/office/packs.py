@@ -302,7 +302,8 @@ def _rate_text(v, lg):
     except (TypeError, ValueError):
         return ""
     txt = f"{v:.2f}".rstrip("0").rstrip(".")
-    return txt.replace(".", ",") if lg == "de" else txt
+    from .calc import fmt_point
+    return fmt_point(txt, lg)  # 2.449.0 (#3766): every comma language (was de alone)
 
 
 def office_pack_public(d):

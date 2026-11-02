@@ -146,10 +146,13 @@ const LONG = 'Website relaunch 2026 for the client';
   await call('POST', `/api/team/rooms/${RID}/messages`, {body: 'Here is the fix:\n```js\nconst a = 1;\n```'}, CB);
   const pv = (await call('GET', '/api/team')).rooms.find(r => r.id === RID)?.last?.text;
   check(pv === 'Here is the fix: const a = 1;', 'review: the room preview has no Markdown fences (API): ' + JSON.stringify(pv));
-  await w.eval('loadTeam()'); w.eval('render()');
+  // 2.479.0 (#2814, intended change): on a computer the list with its previews is the page of the team chat without an open
+  // conversation (no second column beside the room): checked there
+  await w.eval('loadTeam()'); w.eval(`go('team')`); w.eval('render()');
   const pvEl = () => d.querySelector(`.tclist .tcrow[data-rid="${RID}"] .tclast`);
   check(await until(() => /Here is the fix: const a = 1;/.test(pvEl()?.textContent || '') && !/```/.test(pvEl().textContent)), 'review: ... and in the conversation list: ' + pvEl()?.textContent);
-  d.querySelector('#tc-in').value = '**Bold** and `code` in [a link](https://example.com)'; await w.eval('tcSend()'); w.eval('render()');
+  w.eval(`go('team/${RID}')`); await until(() => d.querySelector('#tc-in') && w.eval(`S.tc.rid === ${RID} && !!S.tc.room`));
+  d.querySelector('#tc-in').value = '**Bold** and `code` in [a link](https://example.com)'; await w.eval('tcSend()'); w.eval(`go('team')`); w.eval('render()');
   check(await until(() => /You: Bold and code in a link/.test(pvEl()?.textContent || '')), 'review: a message sent here: its local preview without markers too: ' + pvEl()?.textContent);
   w.close();
 
@@ -186,7 +189,7 @@ const LONG = 'Website relaunch 2026 for the client';
   // magnifier / drawer field of before, which stay for a tab bar without "Search"
   const ffLogin = async ({ev, nav}, theme = 'light') => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.tabbar', '["s:inbox","s:today","lists"]'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); localStorage.setItem('tasks.tabbar', '["s:inbox","s:today","lists"]'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(900); };

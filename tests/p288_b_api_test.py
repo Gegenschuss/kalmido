@@ -12,7 +12,7 @@
    300 accounts: a page of 50 under one second; without limit the whole list as before
  - POST /api/users/bulk: disable / enable / org_add per account through the single route (own account, invisible: failed)
  - review B2: candidates cut with the admin's visibility (M1), a locked list whose key nobody else holds (M2), lists with
-   receipts only handed over (M3), an organisation admin never deletes a private space along (N1), no foreign org name (N2)
+   receipts only handed over (M3), an organisation admin never deletes a private workspace along (N1), no foreign org name (N2)
 usage: p288_b_api_test.py <datadir>      (a fresh container; P288B_NOSTART=1 = the server already runs)"""
 import base64
 import os
@@ -241,13 +241,13 @@ check(deluser(Bo, "kim").status_code == 403, "a plain member -> 403")
 check(Bo.get(B + f"/api/users/{uid['kim']}/delete-info").status_code == 403, "a plain member: no delete-info")
 r = deluser(Er, "max")
 check(r.ok, "org admin: a member of Alpha alone without lists " + r.text[:200])
-# review N1: an organisation admin does not delete a private space along (here: a task in the basket)
+# review N1: an organisation admin does not delete a private workspace along (here: a task in the basket)
 r = A.post(B + "/api/users", json={"orgs": [ORG], "username": "nora", "display_name": "Nora Example", "password": "password123"})
 uid["nora"] = r.json()["id"]
 No = sess("nora")
 check(No.post(B + "/api/tasks", json={"title": "Call the dentist"}).ok, "setup: a task in Nora's basket")
 r = Er.get(B + f"/api/users/{uid['nora']}/delete-info")
-check(r.ok and not r.json()["can_delete"] and "private space" in r.json().get("reason", "") and r.json()["org_id"] == ORG,
+check(r.ok and not r.json()["can_delete"] and "private workspace" in r.json().get("reason", "") and r.json()["org_id"] == ORG,
       "N1: delete-info: no, only Remove from the organisation " + r.text[:300])
 check(deluser(Er, "nora").status_code == 409, "N1: org admin cannot delete an account with a basket task")  # 2.148.1 (#2479): 409 + areas
 check(No.get(B + "/api/me").ok, "N1: Nora's account is still there")

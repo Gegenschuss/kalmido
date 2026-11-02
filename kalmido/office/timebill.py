@@ -50,7 +50,7 @@ def tbill_need_open(c, r, b):
             return  # only the note (or unchanged values of a form that sends everything)
     d = tbill_doc(c, r["billed_doc_id"])
     if d is None:
-        c.execute("UPDATE time_entries SET billed_doc_id=NULL, billed_at=NULL WHERE id=?", (r["id"],))
+        c.execute("UPDATE time_entries SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL WHERE id=?", (r["id"],))
         return
     tbill_locked(c, d, b is None)
 
@@ -159,7 +159,7 @@ def tbill_free_stale(c, sql, args):
     if not ids:
         return
     with system_ctx(c):  # existence only, across the RLS of office_docs (the billing document may lie in another area)
-        c.execute(f"UPDATE time_entries SET billed_doc_id=NULL, billed_at=NULL WHERE id IN ({','.join('?' * len(ids))}) "
+        c.execute(f"UPDATE time_entries SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL WHERE id IN ({','.join('?' * len(ids))}) "
                   "AND NOT EXISTS (SELECT 1 FROM office_docs d WHERE d.id=time_entries.billed_doc_id)", ids)
 
 
@@ -192,9 +192,16 @@ def tbill_take(c, did, sql, args):
                     "skipped_unbillable": before["unbillable_entries"]}
 
 
+def tbill_items(c, did):
+    """2.370.2 (#3088): the entries of draft did know their position (one per list): it gone, they are open again (docs.py
+    ofd_free_receipts). Entries billed before stay as they are."""
+    c.execute("UPDATE time_entries SET billed_item_id=(SELECT MIN(x.id) FROM office_doc_items x WHERE x.doc_id=? AND x.list_id=time_entries.list_id) "
+              "WHERE billed_doc_id=?", (did, did))
+
+
 def tbill_free(c, did):
     """The draft did goes away: its entries are open again."""
-    c.execute("UPDATE time_entries SET billed_doc_id=NULL, billed_at=NULL, updated_at=? WHERE billed_doc_id=?", (iso(now_utc()), did))
+    c.execute("UPDATE time_entries SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL, updated_at=? WHERE billed_doc_id=?", (iso(now_utc()), did))
 
 
 def tbill_doc_time(c, did):

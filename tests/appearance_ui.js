@@ -167,7 +167,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   };
   const run = async (q, id) => { const it = await pal(q); const on = it?.dataset?.id || it?.id || ''; key(w, 'Enter', {}, d.querySelector('.palette .pqin')); await sleep(120); return on; };
   key(w, 'k', {ctrlKey: true}); await sleep(80);
-  check(!/Accent color|Font size/.test(d.querySelector('.palette .plist').textContent), 'palette: appearance items only when searching');
+  check(!/Accent colour|Font size/.test(d.querySelector('.palette .plist').textContent), 'palette: appearance items only when searching');
   key(w, 'Escape', {}, d.querySelector('.palette .pqin')); await sleep(40);
   await run('accent violet'); check(d.documentElement.dataset.accent === 'violet' && w.__store['tasks.accent'] === '"violet"', 'palette: "accent violet"');
   await run('font size larger'); check(w.eval('fsPct()') === 105, 'palette: font size larger (100 -> 105 %)');

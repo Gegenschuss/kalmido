@@ -4,7 +4,7 @@
 //         has no Modules / Integrations / Agents / Data / Administration / Help for a child
 //  #1533: a child's first start shows its own tour (3 cards, no sample project); finishing it saves tour=done; a grown-up's
 //         tour stays the same
-//  #1551: a parent sets the PIN in the Family view; the child then gets the PIN field for Settings and Log out (wrong PIN:
+//  #1551: a parent sets the PIN in the Family view; the child then gets the PIN field for Settings and Sign out (wrong PIN:
 //         a calm message, right PIN: Settings open); ticking off needs no PIN
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -96,7 +96,7 @@ const kidBoot = async log => {
   check(await until(() => !d.querySelector('.kdpin') && d.querySelector('.smodal')), 'the right PIN opens Settings');
   w.eval('$$(".modal").forEach(m => m.remove())');
   w.eval('S.kids[0].pin_open = null'); w.eval('logout()'); await sleep(200);
-  check(d.querySelector('.kdpin') && w.eval('S.me') && w.eval('S.me.kid'), 'Log out: the PIN field first');
+  check(d.querySelector('.kdpin') && w.eval('S.me') && w.eval('S.me.kid'), 'Sign out: the PIN field first');
   check(!log.some(x => / 403$/.test(x) && !/pin\/unlock/.test(x)), 'no other write refused ' + JSON.stringify(log));
   w.close();
 

@@ -16,6 +16,7 @@ from ..accounts.session import me
 from ..core.access import Denied, acx_of, collab_all
 from ..core.orgcrypt import oc_send_file
 from .upsafe import h6d_one_file_request, h6d_read
+from .scan import sc_guard  # 2.477.0 (#3936): pulled up from functions
 from .store import (fs_chain, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_purge, fs_purge_files, fs_put, fs_read,
                     fs_height, fs_mail_rows, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place, ROLE_RANK)
@@ -390,7 +391,6 @@ def _send(c, n, version=None, dl=False):
         if not v:
             raise Denied(404)
         path, name, mime, size = v["path"], n["name"], v["mime"] or n["mime"], v["size"]
-        from .scan import sc_guard
         sc_guard(c, "fs", n["id"], v["no"])  # 2.61.0 (#1818): a version found infected later is locked
     full = os.path.join(ATT_DIR, path)
     if not os.path.isfile(full):
@@ -421,6 +421,35 @@ def files_content(nid):
     fs_log_add(c, nid, "download", request.args.get("v") or "")
     c.commit()
     return _send(c, n, request.args.get("v", type=int))
+
+
+FS_THUMB_MAX = 40 << 20  # 2.477.0 (#3936): a bigger picture gets no small preview (the card shows its icon)
+
+
+@app.get("/api/files/nodes/<int:nid>/thumb")
+def files_thumb(nid):
+    """2.477.0 (#3936): a small JPEG of a picture file for the cards of the file store (instead of the original; ?v= the
+    version: cached by the browser). Made on request, never stored (a private file's preview would lie unsealed on disk).
+    404: no picture, a locked folder (ciphertext), too big or unreadable -- the card then shows the icon."""
+    c = db()
+    n = need_node(c, nid)
+    if n["kind"] != "file" or not str(n["mime"] or "").startswith("image/"):
+        raise Denied(404)
+    from .fslock import fl_is_locked
+    if fl_is_locked(c, nid):
+        raise Denied(404)
+    v = fs_version_row(c, nid)
+    if not v or (v["size"] or 0) > FS_THUMB_MAX:
+        raise Denied(404)
+    sc_guard(c, "fs", nid, v["no"])
+    from ..docs.ocr import thumb_bytes
+    jpg = thumb_bytes(fs_read(c, nid, v["no"]), "image")
+    if not jpg:
+        raise Denied(404)
+    r = Response(jpg, mimetype="image/jpeg")
+    r.headers["Cache-Control"] = "private, max-age=86400" if request.args.get("v") else "private, no-cache"
+    r.headers["X-Content-Type-Options"] = "nosniff"
+    return r
 
 
 @app.post("/api/files/nodes/<int:nid>/versions")
@@ -592,7 +621,7 @@ def _move(c, n, target, uid, fsl_ok=False):
             raise Denied(409, tr("Folders can be nested at most {0} levels deep", DEPTH_MAX))
         if (t["org_id"] or None) != (n["org_id"] or None) or t["owner_id"] != n["owner_id"]:
             # 2.48.0 (#1207): never into another workspace / someone else's tree (the key and the owner would change)
-            raise Denied(409, tr("Files can only be moved within the same space"))
+            raise Denied(409, tr("Files can only be moved within the same workspace"))
     elif n["owner_id"] != uid and not (n["org_id"] and n["role"] == "owner"):
         raise Denied(403)
     nm = _free_name(c, tid, n["owner_id"], n["org_id"], n["name"], skip=n["id"])

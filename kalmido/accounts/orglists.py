@@ -209,7 +209,7 @@ def oadm_owner(oid, lid):
         return err(tr("Invalid value: {0}", "user_id"))
     u = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (new,)).fetchone()
     if not u or oid not in user_orgs(c, new):
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     if (u["kind"] or "user") == "agent":
         return err(tr("An agent cannot own a project"))
     if new == lr["owner_id"]:

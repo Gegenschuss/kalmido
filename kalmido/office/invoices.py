@@ -19,10 +19,10 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, write_lock
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, stored_join, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, vis_sql
-from ..core.errors import BadInput
+from ..core.errors import BadInput, BadKey, DeniedKey
 from .calc import INV_VAT_NOTES, TAX_KEYS, dec, dstr, fmt_money, inv_calc, inv_open, money, pack_tax
 from .homecur import hc_code, hc_home, hc_office_rate, hc_rate_missing  # 2.189.0 (#2475); 2.355.0 C (#2844): hc_rate_missing
 from .packs import office_pack_for
@@ -40,6 +40,7 @@ INV_KINDS = ("invoice", "credit", "reminder")
 INV_STATUSES = {"invoice": ("draft", "issued", "sent", "paid", "cancelled"), "credit": ("draft", "issued", "sent", "paid"),
                 "reminder": ("draft", "issued", "sent"), "delivery": ("draft", "issued", "sent")}  # 2.120.0 D (#2089): + delivery
 PAY_METHODS = ("transfer", "cash", "card", "other")
+PAY_ONLINE = "online"  # 2.469.0 (#3459): only the provider's webhook books it (office/payonline.py)
 REMINDER_LEVELS = (1, 2, 3)
 STATE_TXT = {"issued": N_("Finalised"), "paid": N_("Paid"), "partial": N_("Partly paid"), "overdue": N_("Overdue"), "cancelled": N_("Cancelled")}
 # 2.149.0 A (#2520): the documents' own words (when the pack has no label) through tr() in the document's language
@@ -252,51 +253,51 @@ def inv_refund_open(c, oid, r):
 
 # ---------------------------------------------------------------- finalising (called by ledger.ofx_finalize)
 def inv_missing(c, oid, r, s, pack, items):
-    """The required fields of an invoice that are still missing (names in the signed-in person's language)."""
+    """The required fields of an invoice that are still missing (stored texts: 2.454.0, #3808, the reader's language, tr_stored)."""
     miss = []
     rec = _j(r["recipient"], {})
     cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (r["client_id"],)).fetchone() if r["client_id"] else None
     if not (rec.get("name") or "").strip():
-        miss.append(tr("recipient name"))
+        miss.append([N_("recipient name")])
     addr_ok = cl is not None and all((cl[k] if k in cl.keys() else "") for k in ("street", "zip", "city"))
     # 2.97.0 B (#1951): with a client only its fields count (its name + attn. line are no address)
     if not addr_ok and (cl is not None or len([x for x in (rec.get("lines") or []) if x.strip()]) < 2):
-        miss.append(tr("recipient address (street, postcode and city)"))
+        miss.append([N_("recipient address (street, postcode and city)")])
     if not r["date"]:
-        miss.append(tr("date"))
+        miss.append([N_("date")])
     if r["kind"] == "reminder":
         if not _j(_col(r, "ref_doc_ids") or "[]", []):
-            miss.append(tr("invoices to remind of"))
+            miss.append([N_("invoices to remind of")])
         return miss
     if r["kind"] == "delivery":  # 2.120.0 D (#2089): no tax, bank or period needed: recipient, date and one position
         if not any(it.get("kind") == "service" for it in items):
-            miss.append(tr("at least one position"))
+            miss.append([N_("at least one position")])
         return miss
     if not (_col(r, "service_from") or _col(r, "service_to")):
-        miss.append(tr("period of service"))
+        miss.append([N_("period of service")])
     if not any(it.get("kind") == "service" for it in items):
-        miss.append(tr("at least one position"))
+        miss.append([N_("at least one position")])
     co = ofx_company(c, oid)
     free = s.get("company") or {}
     if not (co.get("name") or free.get("name")):
-        miss.append(tr("company name"))
+        miss.append([N_("company name")])
     if not ((co.get("street") and co.get("zip") and co.get("city")) or free.get("lines")):
-        miss.append(tr("company address"))
+        miss.append([N_("company address")])
     if not (co.get("tax_number") or co.get("vat_id")):
-        miss.append(tr("tax number or VAT ID"))
+        miss.append([N_("tax number or VAT ID")])
     if not co.get("iban"):
-        miss.append(tr("IBAN"))
+        miss.append([N_("IBAN")])
     from .countries import fk_country_code  # 2.40.0 (#1372): an unknown country code stops here, never silently DE
     if co.get("country") and fk_country_code(co["country"]) is None:
-        miss.append(tr("valid country of the company (ISO code, now {0})", co["country"]))
+        miss.append([N_("valid country of the company (ISO code, now {0})"), co["country"]])
     elif not co.get("country") and (pack or {}).get("neutral"):  # 2.147.0 (#2461): the base pack assumes no country (the e-invoice needs one)
-        miss.append(tr("country of the company"))
+        miss.append([N_("country of the company")])
     if cl is not None and "country" in cl.keys() and cl["country"] and fk_country_code(cl["country"]) is None:
-        miss.append(tr("valid country of the client (ISO code, now {0})", cl["country"]))
+        miss.append([N_("valid country of the client (ISO code, now {0})"), cl["country"]])
     if r["kind"] == "invoice" and not (_col(r, "due_date") or _col(r, "payment_days")) and not s.get("payment_days"):
-        miss.append(tr("due date or payment days"))
+        miss.append([N_("due date or payment days")])
     if r["kind"] in ("invoice", "credit") and hc_rate_missing(r, hc_home(s)):  # 2.355.0 C (#2844): a foreign currency needs its rate (the tax in the home currency)
-        miss.append(tr("the exchange rate of {0} (document or office settings)", r["currency"]))
+        miss.append([N_("the exchange rate of {0} (document or office settings)"), r["currency"]])
     if r["kind"] == "invoice" and dec(_col(r, "skonto_pct") or 0) > 0 and int(_col(r, "skonto_days") or 0) > 0 and r["date"]:
         # 2.355.0 C (#2840): the cash discount period ends on the due day at the latest (else the PDF and BT-20 contradict the terms)
         due = _col(r, "due_date") or ""
@@ -306,38 +307,38 @@ def inv_missing(c, oid, r, s, pack, items):
         except ValueError:
             days = None
         if days is not None and int(_col(r, "skonto_days")) > days:
-            miss.append(tr("a cash discount period no longer than the payment terms ({0} days)", days))
+            miss.append([N_("a cash discount period no longer than the payment terms ({0} days)"), days])
     if r["vat_mode"] == "novat" and (_col(r, "vat_note") or "") not in INV_VAT_NOTES:
-        miss.append(tr("VAT note (reverse charge / not taxable / small business)"))
+        miss.append([N_("VAT note (reverse charge / not taxable / small business)")])
     if r["vat_mode"] == "novat" and _col(r, "vat_note") == "reverse":  # 2.296.0 B (#3168): both VAT ids (section 14a (1) UStG, BR-AE-02)
         # 2.296.0 F (#3168): a stale note of a taxed invoice counts no more; at home (section 13b) the tax number will do and
         # the client needs a VAT id only for the EU case or when the e-invoice is built (BR-AE-02 asks for BT-48)
         case = fk_reverse_case(cl["country"] if cl is not None and "country" in cl.keys() else "", co.get("country") or "DE")
         if not (co.get("vat_id") or (case != "eu" and co.get("tax_number"))):
-            miss.append(tr("your VAT ID (reverse charge)"))
+            miss.append([N_("your VAT ID (reverse charge)")])
         if (case == "eu" or (office_feature(c, oid, "docs.einvoice", s) and not _col(r, "trial"))) and not (
                 cl is not None and "vat_id" in cl.keys() and str(cl["vat_id"] or "").strip()):
-            miss.append(tr("the client's VAT ID (reverse charge)"))
+            miss.append([N_("the client's VAT ID (reverse charge)")])
     # 2.354.0 A (#2834): "abroad" without a register number is category G in the e-invoice, which needs the seller's VAT id (BR-G-02);
     # 2.357.0 (#3218): with the tax number it is O (einvoice._doc_cat), which needs no VAT id
     if r["vat_mode"] == "novat" and _col(r, "vat_note") == "abroad" and office_feature(c, oid, "docs.einvoice", s) and not _col(r, "trial") and not (
             co.get("vat_id") or str(co.get("register_no") or "").strip() or str(co.get("tax_number") or "").strip()):
-        miss.append(tr("your VAT ID or register number (not taxable domestically)"))
+        miss.append([N_("your VAT ID or register number (not taxable domestically)")])
     if r["vat_mode"] == "novat" and _col(r, "vat_note") in ("eu_goods", "export"):
         # 2.355.0 C (#2844): goods to a business in another EU state (section 6a UStG: both VAT ids, BR-IC-02) / to a third
         # country (section 6 UStG; BR-G-02 the seller's VAT id in the e-invoice); the delivery date = the period of service
         case = fk_reverse_case(cl["country"] if cl is not None and "country" in cl.keys() else "", co.get("country") or "DE")
         eu = _col(r, "vat_note") == "eu_goods"
         if case != ("eu" if eu else "other"):
-            miss.append(tr("a client in another EU country (intra-Community supply)") if eu else tr("a client outside the EU (export)"))
+            miss.append([N_("a client in another EU country (intra-Community supply)") if eu else N_("a client outside the EU (export)")])
         if not co.get("vat_id") and (eu or (office_feature(c, oid, "docs.einvoice", s) and not _col(r, "trial"))):
-            miss.append(tr("your VAT ID"))
+            miss.append([N_("your VAT ID")])
         if eu and not (cl is not None and "vat_id" in cl.keys() and str(cl["vat_id"] or "").strip()):
-            miss.append(tr("the client's VAT ID"))
+            miss.append([N_("the client's VAT ID")])
     # 2.296.0 B (#3169): a 0 % position of a taxed invoice needs the reason of its exemption (section 14 (4) no. 8 UStG, BT-120)
     if r["vat_mode"] != "novat" and not str(s.get("exempt_reason") or "").strip() and any(
             it.get("kind") in ("service", "discount") and it.get("tax") == "exempt" and pack_tax(pack, "exempt") == 0 for it in items):  # 2.357.0 (#3217): a 0 % standard / reduced rate is zero rated (Z), no reason
-        miss.append(tr("reason for the tax exemption of the 0 % positions (office settings, invoices)"))
+        miss.append([N_("reason for the tax exemption of the 0 % positions (office settings, invoices)")])
     return miss
 
 
@@ -347,7 +348,7 @@ def inv_before_finalize(c, oid, r, s, pack):
     items = doc_items(c, r["id"], oid)
     miss = inv_missing(c, oid, r, s, pack, items)
     if miss:
-        raise BadInput(tr("Missing before finalising: {0}", ", ".join(miss)))
+        raise BadKey(N_("Missing before finalising: {0}"), stored_join(miss))
     if r["kind"] in ("invoice", "credit"):
         inv_check_date(c, oid, r, s)
     from .abschlag import abs_before_finalize
@@ -356,7 +357,7 @@ def inv_before_finalize(c, oid, r, s, pack):
     # invoice (progress invoices above the work done leave a negative rest; a credit note needs a finalised invoice)
     if r["kind"] in ("invoice", "credit") and _col(r, "inv_type") != "final":
         if money(dec(doc_totals(c, oid, r).get("gross") or 0)) < 0:
-            raise BadInput(tr("A negative total can only be finalised as a credit note with positive amounts"))
+            raise BadKey(N_("A negative total can only be finalised as a credit note with positive amounts"))
     if r["kind"] == "invoice" and not _col(r, "due_date"):
         days = _col(r, "payment_days")
         if days is None:
@@ -372,10 +373,10 @@ def inv_check_date(c, oid, r, s):
     from .model import office_scheme_period
     d = r["date"]
     if d > local_now().date().isoformat():
-        raise BadInput(tr("The date must not lie in the future"))
+        raise BadKey(N_("The date must not lie in the future"))
     due = _col(r, "due_date")
     if due and due < d:
-        raise BadInput(tr("The due date must not lie before the date"))
+        raise BadKey(N_("The due date must not lie before the date"))
     scheme = inv_scheme(s, r["kind"])
     period = office_scheme_period(scheme, date.fromisoformat(d))
     # 2.144.10 B (#2576): trial documents have their own series; they neither count for real ones nor the other way round
@@ -383,7 +384,7 @@ def inv_check_date(c, oid, r, s):
                          "ORDER BY date DESC", (oid, r["kind"], r["id"], d, 1 if _col(r, "trial") else 0)):
         try:
             if office_scheme_period(scheme, date.fromisoformat(row["date"])) == period:
-                raise BadInput(tr("The date must not lie before the last finalised document of this series ({0})", row["date"]))
+                raise BadKey(N_("The date must not lie before the last finalised document of this series ({0})"), row["date"])
         except ValueError:
             continue
 
@@ -403,7 +404,7 @@ def inv_after_finalize(c, oid, uid, r):
                 (oid, inv_["id"], r["id"]))), Decimal(0))
             inv_credit_check(c, oid, r, inv_)  # 2.354.0 D (#2838): its currency and rate, and per VAT rate
             if credited + money(dec(tc.get("gross") or 0)) > money(dec(ti.get("gross") or 0)):  # 2.38.0 review: credits never exceed the invoice
-                raise Denied(409, tr("The credit notes would exceed the amount of the invoice"))
+                raise DeniedKey(409, N_("The credit notes would exceed the amount of the invoice"))
             if money(dec(tc.get("gross") or 0)) >= money(dec(ti.get("gross") or 0)) and inv_["status"] != "cancelled":
                 c.execute("UPDATE office_docs SET status='cancelled', updated_at=? WHERE id=? AND org_id=?", (ts, inv_["id"], oid))
                 ofx_log(c, oid, "status", doc_id=inv_["id"], detail={"before": {"status": inv_["status"]}, "after": {"status": "cancelled"}, "credit_id": r["id"]})
@@ -501,7 +502,8 @@ def _put_rows(c, oid, did, rows):
 def inv_default_texts(c, oid, s, kind, lang, level=1):
     """intro / closing of an invoice, credit note or reminder: the organisation's text (settings), else the pack's.
     2.40.0 (#1368): credit notes have their own closing (credit_closing), reminders an intro / closing per level 1-3.
-    2.185.0 C (#2520): nl / fr / es / it: the pack's texts translated, the organisation's own (de / en) text in English."""
+    2.185.0 C (#2520): nl / fr / es / it: the pack's texts translated, the organisation's own (de / en) text in English.
+    2.460.0 (#3767): the organisation's own text in that language comes first."""
     lang = doc_lg(lang)
     plg = "de" if lang == "de" else "en"
     pack = doc_pack(office_pack_for(s) or {}, lang)
@@ -514,13 +516,13 @@ def inv_default_texts(c, oid, s, kind, lang, level=1):
     if sal and intro:
         intro = sal + "\n" + intro
     if kind == "reminder":
-        closing = s.get("reminder_text_" + plg) or (texts.get("reminder_closing" + sfx) or texts.get("reminder_closing") or {}).get(lang) or ""
+        closing = s.get("reminder_text_" + lang) or s.get("reminder_text_" + plg) or (texts.get("reminder_closing" + sfx) or texts.get("reminder_closing") or {}).get(lang) or ""
     elif kind == "credit":
         closing = (texts.get("credit_closing") or {}).get(lang) or ""
     elif kind == "delivery":  # 2.296.0 D (#3167): a receipt line, not "please transfer"
-        closing = s.get("delivery_closing_" + plg) or (texts.get("delivery_closing") or {}).get(lang) or ""
+        closing = s.get("delivery_closing_" + lang) or s.get("delivery_closing_" + plg) or (texts.get("delivery_closing") or {}).get(lang) or ""
     else:
-        closing = s.get("invoice_closing_" + plg) or (texts.get("invoice_closing") or {}).get(lang) or ""
+        closing = s.get("invoice_closing_" + lang) or s.get("invoice_closing_" + plg) or (texts.get("invoice_closing") or {}).get(lang) or ""
     return intro, closing
 
 
@@ -626,7 +628,7 @@ def inv_credit_check(c, oid, r, inv_):
     if list(have) == [""]:  # an invoice without tax lines: the sum only
         got = {"": sum(got.values(), Decimal(0))}
     if any(money(v) > money(have.get(k, Decimal(0))) for k, v in got.items() if money(v) > 0):
-        raise Denied(409, tr("The credit notes would exceed the amount of the invoice"))
+        raise DeniedKey(409, N_("The credit notes would exceed the amount of the invoice"))
 
 
 def inv_credit_of(c, oid, uid, inv_):
@@ -664,7 +666,7 @@ def inv_from_time(c, oid, uid, b):
     if not d_from or not d_to or d_to < d_from:
         raise BadInput(tr("Invalid value: {0}", "from/to"))
     # 2.144.6 A (#2053): only billable, still open entries; they are bound to the draft (office/timebill.py)
-    from .timebill import tbill_take, tbill_where
+    from .timebill import tbill_items, tbill_take, tbill_where
     sql, args = tbill_where(c, oid, uid, cid, d_from, d_to, b.get("project_id"))
     s = office_settings(c, oid)
     row = inv_new_row(c, oid, s, "invoice", s.get("lang") or "de")
@@ -688,6 +690,7 @@ def inv_from_time(c, oid, uid, b):
                      "tax": "standard", "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1,
                      "list_id": gr["list_id"]})  # 2.144.5 C (#1523): "billed, stays" (personal/timewipe.py) by the list, not its name
     _put_rows(c, oid, did, rows)
+    tbill_items(c, did)  # 2.370.2 (#3088)
     return did, len(rows)
 
 
@@ -703,7 +706,7 @@ def inv_reminder_rows(c, oid, ids):
             raise BadInput(tr("Only open, finalised invoices can be reminded of ({0})", r["number"] or did))
         trial.add(bool(_col(r, "trial")))
         if len(trial) > 1:  # 2.144.10 B (#2576): one reminder never mixes trial and real invoices
-            raise BadInput(tr("A reminder cannot mix trial and real invoices"))
+            raise BadInput(tr("A payment reminder cannot mix trial and real invoices"))
         mf = inv_money_fields(r, pm)
         rows.append({"kind": "ref", "id": r["id"], "number": r["number"], "date": r["date"], "due_date": _col(r, "due_date") or "", "gross": _j(r["totals"], {}).get("gross"),
                      "open": mf["open"], "currency": r["currency"]})
@@ -817,7 +820,7 @@ def inv_check_reminder(c, oid, ids, rows):
         who = r["client_id"] if r["client_id"] else (_j(r["recipient"], {}).get("name") or "").strip().lower()
         keys.add((who, r["currency"]))
     if len(keys) > 1:
-        raise BadInput(tr("A reminder covers invoices of one client in one currency only"))
+        raise BadInput(tr("A payment reminder covers invoices of one client in one currency only"))
 
 
 def inv_check_reminder_due(rows, today=None):
@@ -826,7 +829,7 @@ def inv_check_reminder_due(rows, today=None):
     day0 = today or local_now().date().isoformat()
     early = [ln for ln in rows if ln.get("due_date") and ln["due_date"] >= day0]
     if early:
-        raise Denied(409, tr("Not yet overdue: {0}. A reminder can follow once the due date has passed.",
+        raise Denied(409, tr("Not yet overdue: {0}. A payment reminder can follow once the due date has passed.",
                              ", ".join(str(ln.get("number") or ln.get("id")) for ln in early[:10])))
 
 
@@ -967,7 +970,7 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
         meta.append([L.get("ref", tr("Ref./PO no.|document", lg=lang)), m["order_ref"]])
     # 2.357.0 B (#3181): no "Betreff" row in the head -- the project title is printed in bold below the title (was twice)
     if m["recipient"].get("customer_no"):
-        meta.append([L.get("customer_no", tr("Customer no.|document", lg=lang)), m["recipient"]["customer_no"]])
+        meta.append([L.get("customer_no", tr("Client no.|document", lg=lang)), m["recipient"]["customer_no"]])
     if kind in ("invoice", "credit") and m["recipient"].get("vat_id"):  # 2.296.0 B (#3168): section 14a (1) UStG
         meta.append([L.get("customer_vat_id", tr("Client VAT ID|document", lg=lang)), m["recipient"]["vat_id"]])
     if kind in ("invoice", "credit") and m["recipient"].get("buyer_reference"):  # 2.296.0 B (#3173): BT-10 visible as well
@@ -1065,6 +1068,8 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
     m["payment"] = {"iban": sfd["iban"], "bic": sfd["bic"], "bank_name": sfd["bank_name"], "text": ptext} if kind not in ("credit", "delivery") else None
     from .girocode import gcq_model
     gcq_model(r, m, None if ofx_locked(r) else office_settings(c, oid), snd)  # 2.147.1 B (#2054): the GiroCode (EPC QR text)
+    if kind == "invoice" and ofx_locked(r) and snd.get("payonline") and isinstance(m.get("payment"), dict):
+        m["payment"]["pay_url"] = snd["payonline"]  # 2.469.0 (#3459): frozen like the GiroCode decision (ledger.ofx_finalize, office/payonline.py)
     m["valid_note"] = ""
     m["valid_until"] = ""
     m["valid_until_text"] = ""
@@ -1112,9 +1117,9 @@ def _mail(to, subject, text, **kw):
     from ..integrations.mail import mail_send
     try:
         return mail_send(to, subject, text, **kw)  # 2.153.0 (#2029): the message sent (a letter keeps its Message-ID)
-    except (smtplib.SMTPException, OSError) as e:
+    except (Exception if kw.get("smtp") else (smtplib.SMTPException, OSError)) as e:  # 2.439.0 (#3617): a mailbox's own server fails in more ways (check of its address)
         app.logger.warning("office mail failed: %s", type(e).__name__)  # 2.39.0 (#1209 audit N6): no addresses in the log
-        raise Denied(409, tr("Mail server refused the message"))
+        raise Denied(409, tr("E-mail server refused the message"))
 
 
 def inv_datev_ready(c, oid, r, s):
@@ -1122,47 +1127,48 @@ def inv_datev_ready(c, oid, r, s):
     from ..integrations.mail import MAIL_OUT_ON
     office_need_feature(c, oid, "books.datev", s)  # 2.147.0 (#2459, #2460)
     if not MAIL_OUT_ON:
-        raise Denied(409, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
+        raise DeniedKey(409, N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
     if not s.get("datev_email"):
-        raise Denied(409, tr("No DATEV inbox address in the settings"))
+        raise DeniedKey(409, N_("No DATEV inbox address in the settings"))
     if not ofx_locked(r):
-        raise Denied(409, tr("Finalise the document first"))
+        raise DeniedKey(409, N_("Finalise the document first"))
     if _col(r, "trial"):  # 2.144.10 B (#2576)
-        raise Denied(409, tr("Trial documents do not go to the accounting"))
+        raise DeniedKey(409, N_("Trial documents do not go to the accounting"))
 
 
 INV_CC_MAX = 5  # 2.433.0 (#3599): copy addresses of one mail (= contacts_cl.FK_CC_MAX)
 
 
-def inv_send(c, oid, uid, r, b, later=False):
+def inv_send(c, oid, uid, r, b, later=False, auto=False):
     """Mails the finalised document r to b["to"] (cc, subject, text optional) with its PDF (+ XML) and records it (status
     sent, log). Returns (files, datev): datev = the DATEV copy is due (b["datev"] true, or the setting datev_auto while
     the document has not gone to DATEV yet); the caller commits the customer mail first and sends that copy afterwards
     (2.38.0 review: a DATEV failure never undoes or repeats the customer mail). Its prerequisites are checked before
     anything goes out. 409 without SMTP. 2.269.0 D (#3046): later = only the checks and the day's counters, returns (files,
     datev, mail): the caller commits, then inv_send_mail(c, oid, uid, mail) mails and marks it sent (nothing goes out
-    before the commit; a refused mail marks nothing)."""
+    before the commit; a refused mail marks nothing). 2.439.0 (#3617): auto = no person pressed send (a series): mailsig.ofm_mail."""
     from ..integrations.mail import MAIL_OUT_ON
-    if not MAIL_OUT_ON:
-        raise Denied(409, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
+    from .mailsig import ofm_mail, ofm_own_text, ofm_reply, ofm_sender
+    if not ofm_sender(c, oid, uid, {} if auto else None)["via"]:  # 2.439.0 (#3617): the person's mailbox also sends without the server's SMTP
+        raise DeniedKey(409, N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
     if not ofx_locked(r):
-        raise Denied(409, tr("Finalise the document first"))
+        raise DeniedKey(409, N_("Finalise the document first"))
     to = (b.get("to") or "").strip() if isinstance(b.get("to"), str) else ""
     cc = (b.get("cc") or "").strip() if isinstance(b.get("cc"), str) else ""
     mail_re = r"[^@\s,]+@[^@\s,]+\.[^@\s,]+"
     # 2.433.0 (#3599): several copy addresses, comma separated (the send dialog fills the contact persons in); each once
     ccs = list(dict.fromkeys(x.strip() for x in cc.replace(";", ",").split(",") if x.strip() and x.strip().lower() != to.lower()))
     if not re.fullmatch(mail_re, to):
-        raise BadInput(tr("Invalid value: {0}", "to"))
+        raise BadKey(N_("Invalid value: {0}"), "to")
     if len(ccs) > INV_CC_MAX or any(not re.fullmatch(mail_re, x) for x in ccs):
-        raise BadInput(tr("Invalid value: {0}", "cc"))
+        raise BadKey(N_("Invalid value: {0}"), "cc")
     cc = ", ".join(ccs)
     s = office_settings(c, oid)
     explicit = b.get("datev") in (1, True, "1", "true")
     if explicit:  # 2.147.0 (#2460): DATEV switched off -> no copy, also not the automatic one
         office_need_feature(c, oid, "books.datev", s)
     # 2.144.10 B (#2576): no automatic DATEV copy of a trial document (an explicit one is refused by inv_datev_ready)
-    datev = r["kind"] in ("invoice", "credit") and (explicit or (b.get("datev") is None and s.get("datev_auto") and not _col(r, "datev_sent_at")
+    datev = r["kind"] in ("invoice", "credit") and (explicit or (b.get("datev") is None and MAIL_OUT_ON and s.get("datev_auto") and not _col(r, "datev_sent_at")
                                                                  and not _col(r, "trial")
                                                                  and office_feature(c, oid, "books.datev", s)))
     if datev:
@@ -1173,10 +1179,14 @@ def inv_send(c, oid, uid, r, b, later=False):
     subject = inv_clean_subject(b.get("subject")) or f"{title} {r['number']}"
     text = (b.get("text") or "").strip() if isinstance(b.get("text"), str) else ""
     own = bool(text) and text[:5000] != _mail_text(r, lang, s).strip()
+    text = text[:5000] or _mail_text(r, lang, s)
+    from .payonline import pol_mail_text
+    text = pol_mail_text(c, oid, r, text, lang)  # 2.469.0 (#3459): the pay link of an open invoice
+    mail = ofm_mail(c, oid, uid, text, b, auto=auto)  # 2.439.0 (#3617): the person's signature, sender name, way out
+    own = own or ofm_own_text(c, oid, uid, mail)
     if own:
         inv_own_text_quota(c, oid, uid)
-    h6c_send_budget(c, oid, uid, [to] + ccs)  # 2.86.0 (N27); 2.433.0 (#3599): every copy address counts
-    text = text[:5000] or _mail_text(r, lang, s)
+    budget = h6c_send_budget(c, oid, uid, [to] + ccs)  # 2.86.0 (N27); 2.433.0 (#3599): every copy address counts
     files = inv_files(c, oid, r["id"])
     sheet = []
     if r["kind"] == "invoice" and b.get("timesheet") in (1, True, "1", "true"):  # 2.120.0 D (#2089): the timesheet as a second attachment
@@ -1184,16 +1194,14 @@ def inv_send(c, oid, uid, r, b, later=False):
         sheet = [ls_sheet_file(c, oid, uid, r)]
     from .terms import agb_mail_files
     mail_files, terms = agb_mail_files(c, oid, r, b, files + sheet)  # 2.113.2 (#2253): the terms PDF on request (quotations: by default; never to DATEV)
-    u = g.user
-    from .ledger import ofx_company
-    rt = ofx_company(c, oid).get("email") or ""  # 2.39.0 (#1209 audit N4): the client's answer goes to the company, not the server
-    rt = rt if re.fullmatch(r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+", rt) else None
-    m = {"did": r["id"], "to": to, "subject": subject, "text": text, "files": mail_files, "cc": cc or None, "reply_to": rt,
-         "from_name": (u["display_name"] if u is not None and "display_name" in u.keys() else None),
+    # 2.39.0 (#1209 audit N4): the client's answer goes to the company, not the server; 2.439.0 (#3617): or where the person says
+    m = {"did": r["id"], "to": to, "subject": subject, "text": mail["text"], "files": mail_files, "cc": cc or None,
+         "reply_to": ofm_reply(c, oid, mail["profile"], b), "from_name": mail["name"], "kw": mail["kw"],
          "detail": {"to": to, "cc": cc, "files": [f[0] for f in mail_files], **({"own_text": 1} if own else {}),
                     **({"terms": terms} if terms else {})},  # 2.113.2 (#2253)
          "base": _inv_base(r)}  # 2.269.0 review: the state the checks saw
     if later:
+        m["budget"] = budget  # 2.370.2 (#3088): committed before the mail, handed back when it is refused
         m["send"] = inv_send_mail  # 2.269.0 D (#3046): for the series (office/recurring.py), no import of its own
         return files, datev, m
     inv_send_mail(c, oid, uid, m, r)
@@ -1206,8 +1214,9 @@ def _inv_base(r):
 
 def inv_send_mail(c, oid, uid, m, r=None):
     """Mails m (inv_send) and marks its document sent (status, sent_at, webhook, log "send"); the caller commits. 409 when
-    the mail server refuses (nothing marked). 2.269.0 D (#3046): after inv_send(later=True) and its commit, the document
-    is read again under its lock (r None; only its plain columns kind / status are used)."""
+    the mail server refuses (nothing marked, the address counters back). 2.269.0 D (#3046): after inv_send(later=True) and its
+    commit, the document is read again under its lock (r None; only its plain columns kind / status are used).
+    2.370.2 (#3088): marked before the mail: whatever can fail in marking fails while nothing has gone out."""
     if r is None:  # 2.269.0 review: lock + read again BEFORE the mail (an unlock / delete in between mails nothing)
         write_lock(c, f"office_mail_{int(oid)}")  # same order as ledger.ofx_unlock
         write_lock(c, f"office_doc_{int(m['did'])}")
@@ -1216,16 +1225,23 @@ def inv_send_mail(c, oid, uid, m, r=None):
             raise Denied(404)
         if "base" in m and _inv_base(r) != m["base"]:
             raise Denied(409, tr("Changed in the meantime"))
-    _mail(m["to"], m["subject"], m["text"], attachments=m["files"], cc=m["cc"], from_name=m["from_name"], reply_to=m["reply_to"])
     if r["kind"] == "offer" and r["status"] == "draft":  # 2.113.2 (#2253): a mailed quotation is sent (purchase, pipeline as in the app)
         from .docs import odoc_set_status
         odoc_set_status(c, oid, r["id"], "sent", uid, r)
     ts = iso(now_utc())
     c.execute("UPDATE office_docs SET status=CASE WHEN status IN ('issued') THEN 'sent' ELSE status END, sent_at=COALESCE(sent_at, ?), updated_at=? "
               "WHERE id=? AND org_id=?", (ts, ts, r["id"], oid))
+    ofx_log(c, oid, "send", doc_id=r["id"], detail=m["detail"])
+    try:
+        _mail(m["to"], m["subject"], m["text"], attachments=m["files"], cc=m["cc"], from_name=m["from_name"], reply_to=m["reply_to"], **m["kw"])
+    except Exception:
+        if m.get("budget"):
+            c.rollback()  # the marks above go, the day's count of the log with them
+            h6c_refund(c, *m["budget"])
+            c.commit()
+        raise
     from ..integrations.webhooks import who_note
     who_note("invoice.sent", "invoice", r["id"])  # 2.115.0 A (#2061): mailed
-    ofx_log(c, oid, "send", doc_id=r["id"], detail=m["detail"])
 
 
 INV_OWN_TEXT_DAY = 50  # 2.39.1 (#1210 N7): mails with an own text per organisation and day before members get 429
@@ -1241,7 +1257,7 @@ def inv_own_text_quota(c, oid, uid):
     n = c.execute("SELECT COUNT(*) FROM office_doc_log WHERE org_id=? AND action='send' AND at>=? AND detail LIKE ?",  # pg-ok: own JSON, exact case
                   (oid, since, '%"own_text": 1%')).fetchone()[0]
     if n >= INV_OWN_TEXT_DAY:
-        raise Denied(429, tr("Your organisation sent {0} mails with an own text today; members can send more tomorrow or with the standard text", INV_OWN_TEXT_DAY))
+        raise Denied(429, tr("Your organisation sent {0} e-mails with an own text today; members can send more tomorrow or with the standard text", INV_OWN_TEXT_DAY))
 
 
 # 2.86.0 (N27): the day's budget of document mails (any text), generous so month-end billing never hits it
@@ -1264,23 +1280,31 @@ H6C_SEND_DAY_RCPT = h6r_env_int("KALMIDO_OFFICE_MAILS_DAY_ADDRESS", 20)     # pe
 def h6c_send_budget(c, oid, uid, rcpts):
     """2.86.0 (N27): 429 once the organisation / the person sent their day's document mails or one address got its share;
     counts the log's "send" entries since midnight UTC (user_id is plain, the detail may be encrypted) and per address a
-    mail_counts row (key o:<org>:<address>, cleared like the other mail limits). The DATEV copy never counts."""
+    mail_counts row (key o:<org>:<address>, cleared like the other mail limits). The DATEV copy never counts.
+    -> (keys, day) of the rows counted (h6c_refund)."""
     write_lock(c, f"office_mail_{int(oid)}")
     since = now_utc().strftime("%Y-%m-%dT00:00:00")
     n_org, n_me = c.execute("SELECT COUNT(*), COUNT(*) FILTER (WHERE user_id=?) FROM office_doc_log WHERE org_id=? AND action='send' AND at>=?",
                             (uid, oid, since)).fetchone()
     if n_org >= H6C_SEND_DAY_ORG or n_me >= H6C_SEND_DAY_PERSON:
-        raise Denied(429, tr("The day's limit of document mails is reached ({0}); please try again tomorrow",
-                             H6C_SEND_DAY_PERSON if n_me >= H6C_SEND_DAY_PERSON else H6C_SEND_DAY_ORG))
+        raise DeniedKey(429, N_("The day's limit of document e-mails is reached ({0}); please try again tomorrow"),
+                        H6C_SEND_DAY_PERSON if n_me >= H6C_SEND_DAY_PERSON else H6C_SEND_DAY_ORG)
     day = since[:10]
     keys = [f"o:{int(oid)}:{x.strip().lower()}"[:300] for x in rcpts if x]
     for k in keys:
         r = c.execute("SELECT n FROM mail_counts WHERE k=? AND day=?", (k, day)).fetchone()
         if r and r[0] >= H6C_SEND_DAY_RCPT:
-            raise Denied(429, tr("This address already got {0} mails from your organisation today; please try again tomorrow", H6C_SEND_DAY_RCPT))
+            raise DeniedKey(429, N_("This address already got {0} e-mails from your organisation today; please try again tomorrow"), H6C_SEND_DAY_RCPT)
     for k in keys:
         c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET
                      n=CASE WHEN mail_counts.day=excluded.day THEN mail_counts.n+1 ELSE 1 END, day=excluded.day""", (k, day))
+    return keys, day
+
+
+def h6c_refund(c, keys, day):
+    """2.370.2 (#3088): a refused mail never used up the day's share of its addresses."""
+    for k in keys:
+        c.execute("UPDATE mail_counts SET n=GREATEST(n-1, 0) WHERE k=? AND day=?", (k, day))
 
 
 def inv_datev(c, oid, r, s=None, files=None):
@@ -1446,6 +1470,7 @@ def inv_reminder_post():
 def _payment_public(c, r, reversed_ids=()):
     d = dict(r)
     d.pop("client_ref", None)  # 2.269.0 D (#3046): only the server matches it
+    d.pop("online_ref", None)  # 2.469.0 (#3459): the provider's reference, the same
     d["amount"] = dstr(d.get("amount") or 0)
     d["reversed"] = r["id"] in reversed_ids  # 2.152.0 C (#2168): a reversal line points to its payment (reverses_id)
     u = c.execute("SELECT display_name, username FROM users WHERE id=?", (r["created_by"],)).fetchone() if r["created_by"] else None
@@ -1490,11 +1515,12 @@ def inv_payment_post(did):
     return _answer(c, oid, uid, did, 201)
 
 
-def inv_pay_add(c, oid, uid, did, b, ref=None):
+def inv_pay_add(c, oid, uid, did, b, ref=None, online_ref=None):
     """2.90.0 B (#1921): records payment b {date, amount, method?, note?} on invoice did of area oid (the caller checked the
     admin role) and refreshes its state; returns the payment's id. Also used by the bank reconciliation (office/bank.py).
     2.269.0 D (#3046): ref = the device's client_ref: a payment this person already booked with it -> None (nothing booked;
-    on another invoice 409), before the state checks (a retry after the full payment is no error)."""
+    on another invoice 409), before the state checks (a retry after the full payment is no error).
+    2.469.0 (#3459): online_ref = the provider's unique payment reference (office/payonline.py), only with method online."""
     from .docs import _date, doc_row
     write_lock(c, f"office_pay_{did}")  # 2.38.0 review: check and write of one invoice's payments in one go
     if ref:
@@ -1507,13 +1533,13 @@ def inv_pay_add(c, oid, uid, did, b, ref=None):
     r = doc_row(c, oid, did)
     refund = r["kind"] == "credit" and ofx_locked(r) and r["status"] not in ("cancelled", "paid")  # 2.354.0 D (#2837): the refund
     if not refund and (r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid")):
-        raise Denied(409, tr("Payments go on finalised, open invoices only"))
+        raise DeniedKey(409, N_("Payments go on finalised, open invoices only"))  # 2.469.0 (#3459): payonline._why reads the key
     amt = dec(b.get("amount"), "NaN") if b.get("amount") not in (None, "") else Decimal("NaN")
     if amt.is_nan() or amt <= 0 or amt > Decimal("100000000"):
         raise BadInput(tr("Invalid value: {0}", "amount"))
     d = _date(b.get("date"), "date") or local_now().date().isoformat()
     if d > local_now().date().isoformat():
-        raise BadInput(tr("The date must not lie in the future"))
+        raise BadKey(N_("The date must not lie in the future"))
     from .periodlock import period_need_open
     period_need_open(c, oid, d)  # 2.148.0 A (#2471): also for the bank reconciliation and the agents' payment proposals
     if refund:
@@ -1522,15 +1548,18 @@ def inv_pay_add(c, oid, uid, did, b, ref=None):
         if money(amt) > inv_refund_open(c, oid, r):  # 2.354.0 D (#2837): only what the customer paid beyond the invoice
             raise Denied(409, tr("The refund exceeds what is to be paid back"))
     elif money(amt) > dec(inv_money_fields(r, inv_paid_map(c, oid, [did]))["open"]):
-        raise Denied(409, tr("The payment exceeds the open amount"))
+        raise DeniedKey(409, N_("The payment exceeds the open amount"))  # 2.469.0 (#3459)
     method = b.get("method") or "transfer"
-    if method not in PAY_METHODS:
+    if method not in PAY_METHODS and not (method == PAY_ONLINE and online_ref):
         raise BadInput(tr("Invalid value: {0}", "method"))
     note = (b.get("note") or "").strip()[:500] if isinstance(b.get("note"), str) else ""
-    pid = insert_id(c, "INSERT INTO office_payments(org_id, doc_id, date, amount, method, note, created_by, created_at, client_ref) VALUES(?,?,?,?,?,?,?,?,?)",
-                    (oid, did, d, float(money(amt)), method, note, uid, iso(now_utc()), ref))
+    pid = insert_id(c, "INSERT INTO office_payments(org_id, doc_id, date, amount, method, note, created_by, created_at, client_ref, online_ref) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (oid, did, d, float(money(amt)), method, note, uid, iso(now_utc()), ref, online_ref))
     inv_refresh_paid(c, oid, did)
     ofx_log(c, oid, "payment", doc_id=did, detail={"id": pid, "date": d, "amount": dstr(amt), "method": method})
+    if not refund:
+        from .dunning import dun_paid_news
+        dun_paid_news(c, oid, r, uid)  # 2.367.4 (#2972)
     return pid
 
 
@@ -1668,11 +1697,13 @@ def inv_datev_post(did):
 def inv_mail_status():
     """{smtp: bool, datev_email: str} so the send dialog can say when mail is not set up."""
     from ..integrations.mail import MAIL_OUT_ON
+    from .mailsig import ofm_sender
     c, uid, oid = _ctx()
     s = office_settings(c, oid)
+    smtp = bool(ofm_sender(c, oid, uid)["via"])  # 2.439.0 (#3617): also through the person's mailbox (the DATEV copy only through the server)
     if not office_feature(c, oid, "books.datev", s):  # 2.147.0 (#2460): the send dialog shows no DATEV choice
-        return jsonify(smtp=bool(MAIL_OUT_ON), datev_email="", datev_auto=0, datev_on=False)
-    return jsonify(smtp=bool(MAIL_OUT_ON), datev_email=s.get("datev_email") or "", datev_auto=int(s.get("datev_auto") or 0), datev_on=True)
+        return jsonify(smtp=smtp, datev_email="", datev_auto=0, datev_on=False)
+    return jsonify(smtp=smtp, datev_email=(s.get("datev_email") or "") if MAIL_OUT_ON else "", datev_auto=int(s.get("datev_auto") or 0), datev_on=True)
 
 
 # ---------------------------------------------------------------- 2.40.0 (#1368 points 8 + 9): reminder fee as an open item, settled reminders
@@ -1712,6 +1743,7 @@ def fd_reminder_extra(c, oid, rows):
         pm = inv_paid_map(c, oid, refs) if refs else {}
         st = {x["id"]: inv_state(x, pm) for x in c.execute(
             "SELECT * FROM office_docs WHERE org_id=? AND id IN (" + ",".join("?" * len(refs)) + ")", [oid] + refs)} if refs else {}
+        settled_txt = tr("Settled")  # 2.369.0 A (#3200): once per list (the language is a query)
         for d in rems:
             x = meta.get(d["id"])
             if x is None:
@@ -1725,7 +1757,7 @@ def fd_reminder_extra(c, oid, rows):
             d["fee_open_text"] = fmt_money(d["fee_open"], x["lang"], x["currency"])
             if d["settled"]:
                 d["state"] = "done"
-                d["status_text"] = tr("Settled")
+                d["status_text"] = settled_txt
     if invs:
         open_fees = {}
         for x in c.execute("SELECT id, number, ref_doc_ids, reminder_fee FROM office_docs WHERE org_id=? AND kind='reminder' AND locked_at IS NOT NULL "
@@ -1753,7 +1785,7 @@ def fd_fee_post(did):
         raise Denied(403, tr("Only an admin of this workspace can do this"))
     r = doc_row(c, oid, did)
     if r["kind"] != "reminder" or not ofx_locked(r) or money(dec(_col(r, "reminder_fee") or 0)) <= 0:
-        raise Denied(409, tr("Only the fee of a finalised reminder can be waived or marked as paid"))
+        raise Denied(409, tr("Only the fee of a finalised payment reminder can be waived or marked as paid"))
     b = body()
     st = b.get("state") if isinstance(b, dict) else None
     if st not in FEE_STATES:

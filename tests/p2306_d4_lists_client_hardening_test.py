@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """2.306.0 D4 (#2875): hardening of lists / collaboration / life (audit D) and the server side of three client findings.
-freelancer-matrix: lists, budget, reading, contacts (a person without an organisation keeps every function in the own private space)
+freelancer-matrix: lists, budget, reading, contacts (a person without an organisation keeps every function in the own private workspace)
  - section templates: the sections of an organisation's list go into a private / other template only through the organisation's admin
  - budget: an import run of somebody else is taken back only by the list's owner / admin (the own run by its author)
  - read later: without an own project an entry never lands in a project somebody shared (an own one is made)

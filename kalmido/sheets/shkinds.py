@@ -22,7 +22,7 @@ from ..core.config import ATT_DIR, MAX_FILE_MB, app
 from ..core.db import db, err, insert_id, iso_ms, now_utc, body
 from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.i18n import tr
-from ..core.orgcrypt import OrgCryptError, oc_read_file, oc_user_space, oc_write_file
+from ..core.orgcrypt import OrgCryptError, oc_copy_file, oc_user_space, oc_write_file
 from ..core.serializers import unlink_files
 from ..accounts.session import me
 from ..collab.comments import user_names
@@ -354,18 +354,23 @@ def shk_tick(c, force=False):
     unlink_files([r["path"] for r in rows])
 
 
-def shk_move_files(c, sid, to, uid):
+def shk_move_files(c, sid, to, uid, new_paths, old_paths):
     """A table moved between the private space and an organisation (sheets/shmove.py) takes its files along (also the ones
-    in the trash): row org / owner as the sheet, the stored file sealed again with the target's key. The caller commits."""
+    in the trash): row org / owner as the sheet, the stored file sealed with the target's key. The caller commits.
+    2.363.3 (#3133): into a new stored file as files/fsmove.py does: new_paths (removed on an error) and old_paths (removed
+    after the commit; both for unlink_files) go to the caller, so a failed commit leaves the old file as it was."""
     rows = c.execute("SELECT id, path FROM sheet_files WHERE sheet_id=?", (sid,)).fetchall()
     space = int(to) if to else oc_user_space(uid)
     for r in rows:
         full = os.path.join(ATT_DIR, r["path"])
+        rel = os.path.join(os.path.dirname(r["path"]), f"{uuid.uuid4().hex[:12]}-{os.path.basename(r['path']).partition('-')[2]}")
         try:
-            data = oc_read_file(c, full)
+            oc_copy_file(c, full, os.path.join(ATT_DIR, rel), space)
         except (OSError, OrgCryptError):
             continue  # a missing / unreadable file stays as it is (the storage check reports it)
-        oc_write_file(c, space, full, data, fresh=True)
+        new_paths.append(rel)
+        c.execute("UPDATE sheet_files SET path=? WHERE id=?", (rel, r["id"]))
+        old_paths.append(r["path"])
     if rows:
         fids = [r["id"] for r in rows]
         q = ",".join("?" * len(fids))

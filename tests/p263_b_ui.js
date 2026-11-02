@@ -1,7 +1,7 @@
 // 2.63.0 UI tests (part B), own container (start.sh). jsdom:
-// #1513 the task panel of a customer report: the box "Customer report" (name, address, Copy the status link, Mails to the
+// #1513 the task panel of a customer report: the box "Client report" (name, address, Copy the status link, Mails to the
 //       customer for people who may change the task; a viewer sees only the name), the composer's switch Internal / To the
-//       customer (off by default, back to internal after sending), the marks "to the customer" / "Customer" on the comments,
+//       customer (off by default, back to internal after sending), the marks "to the client" / "Client" on the comments,
 //       the mail switch is one undo step; a task without a ticket has neither box nor switch
 // Firefox 390 touch: the box and the switch fit the phone; the status page /p/<token> fits the phone (screenshots).
 const {execFileSync} = require('child_process');
@@ -47,23 +47,23 @@ const ticket = (tid, lid, name, mail) => execFileSync('docker', ['exec', CT, 'py
   let w = await boot({user: 'alice', hash: 't/' + T1}), d = w.document;
   await until(() => d.querySelector('#d-ptl .ptlbox'));
   const box = () => d.querySelector('#d-ptl .ptlbox');
-  check(box() && /Customer report/.test(box().textContent) && /Jane Example/.test(box().textContent), '#1513: the box "Customer report" with the name');
+  check(box() && /Client report/.test(box().textContent) && /Jane Example/.test(box().textContent), '#1513: the box "Client report" with the name');
   check(box()?.querySelector('a[href="mailto:jane@example.com"]') && box().querySelector('[data-ptl="copy"]'), '#1513: the address and "Copy the status link"');
   const nt = () => box()?.querySelector('[data-ptl="notify"]');
-  check(nt() && nt().checked, '#1513: "Mails to the customer" on');
+  check(nt() && nt().checked, '#1513: "E-mails to the client" on');
   const sw = () => d.querySelector('#c-ptl [data-ptl="switch"]');
   check(sw() && sw().getAttribute('aria-pressed') === 'false' && /Internal/.test(sw().textContent), '#1513: the switch starts on Internal');
   click(w, sw()); await sleep(50);
-  check(sw().getAttribute('aria-pressed') === 'true' && /To the customer/.test(sw().textContent), '#1513: the switch turns to "To the customer"');
+  check(sw().getAttribute('aria-pressed') === 'true' && /To the client/.test(sw().textContent), '#1513: the switch turns to "To the client"');
   d.querySelector('#c-input').value = 'We are on it.';
   await w.eval('sendComment()'); await sleep(300);
   let tl = await call('GET', `/api/tasks/${T1}/timeline`);
   const pub = tl.comments.find(c => c.body === 'We are on it.');
-  check(pub && pub.portal === true, '#1513: the comment went to the customer');
+  check(pub && pub.portal === true, '#1513: the comment went to the client');
   await until(() => sw()?.getAttribute('aria-pressed') === 'false');
   check(sw()?.getAttribute('aria-pressed') === 'false', '#1513: after sending the switch is back on Internal');
   await until(() => d.querySelector(`#d-tl-items .cm[data-cid="${pub?.id}"] .ptltag.pub`));
-  check(d.querySelector(`#d-tl-items .cm[data-cid="${pub?.id}"] .ptltag.pub`), '#1513: the public answer is marked "to the customer"');
+  check(d.querySelector(`#d-tl-items .cm[data-cid="${pub?.id}"] .ptltag.pub`), '#1513: the public answer is marked "to the client"');
   d.querySelector('#c-input').value = 'Internal note only.';
   await w.eval('sendComment()'); await sleep(300);
   tl = await call('GET', `/api/tasks/${T1}/timeline`);
@@ -75,8 +75,8 @@ const ticket = (tid, lid, name, mail) => execFileSync('docker', ['exec', CT, 'py
   const f = (pg.match(/name="f" value="([0-9a-f]{64})"/) || [])[1];
   await fetch(B + `p/${TK}/comment`, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({f, text: 'Thank you!'}).toString(), redirect: 'manual'});
   await w.eval(`loadTimeline(${T1})`);
-  await until(() => [...d.querySelectorAll('#d-tl-items .cm .chead')].some(x => /Jane Example \(customer/.test(x.textContent)));
-  check([...d.querySelectorAll('#d-tl-items .cm .chead')].some(x => /Jane Example \(customer/.test(x.textContent) && !x.querySelector('.ptltag')), '#1513: the customer\'s comment is marked as the customer\'s (its name)');
+  await until(() => [...d.querySelectorAll('#d-tl-items .cm .chead')].some(x => /Jane Example \(client/.test(x.textContent)));
+  check([...d.querySelectorAll('#d-tl-items .cm .chead')].some(x => /Jane Example \(client/.test(x.textContent) && !x.querySelector('.ptltag')), '#1513: the customer\'s comment is marked as the customer\'s (its name)');
   // the mail switch: one undo step
   const n0 = w.eval('HIST.undo.length');
   nt().checked = false; nt().dispatchEvent(new w.Event('change', {bubbles: true}));
@@ -96,7 +96,7 @@ const ticket = (tid, lid, name, mail) => execFileSync('docker', ['exec', CT, 'py
   await until(() => d.querySelector('#d-ptl .ptlbox'));
   check(d.querySelector('#d-ptl .ptlbox') && !/jane@example\.com/.test(d.querySelector('#d-ptl').textContent) && !d.querySelector('[data-ptl="copy"]'),
     '#1513: a viewer sees the report, not the address or the link');
-  check(!d.querySelector('[data-ptl="switch"]'), '#1513: a viewer has no "To the customer"');
+  check(!d.querySelector('[data-ptl="switch"]'), '#1513: a viewer has no "To the client"');
   w.close();
 
   // ================= Firefox, phone 390

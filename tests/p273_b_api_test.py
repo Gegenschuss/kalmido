@@ -378,7 +378,7 @@ check(A.post(B + f"/api/account/import/{iid}/key", json={"recovery_key": RK}).st
 j = wait(A, iid)
 pv = j.get("preview") or {}
 check(j.get("state") == "preview" and pv.get("kind") == "org", f"opened: preview {j.get('state')} {j.get('error')}")
-# 2.96.0 (#1941): an organisation export may go into the private space too (p296_d_api_test.py runs it)
+# 2.96.0 (#1941): an organisation export may go into the private workspace too (p296_d_api_test.py runs it)
 check("private" in [t["id"] for t in pv.get("targets", [])] and GAMMA in [t["id"] for t in pv.get("targets", [])], "targets: private + organisations")
 check(any(x["key"] == EH("bob@example.com") and x["found"] for x in pv.get("people", [])) and
       not any(x["key"] == EH("alice@example.com") for x in pv.get("people", [])) and not any("email" in x for x in pv.get("people", [])),
@@ -537,9 +537,16 @@ qz = mkzip({"lists": [{"id": 1, "name": "Kontingent Test", "created_at": ts}],
             "comments": [{"id": 1, "task_id": 1, "user_id": 55, "body": "Bob im Kontingent", "created_at": ts}],
             "people": [{"user_id": 55, "name": "Bob aus der Datei", "email": "bob@example.com", "lists": {"1": "edit"}}],
             "attachments": [{"id": i, "task_id": i, "name": f"q{i}.txt", "file": f"files/attachments/{i}-q{i}.txt", "created_at": ts} for i in (1, 2, 3)]},
-           files={f"files/attachments/{i}-q{i}.txt": big for i in (1, 2, 3)})
+           files={f"files/attachments/{i}-q{i}.txt": big for i in (1, 2, 3)},
+           man={"source": {"url": "https://kontingent.example.com", "hosted": True}})  # 2.362.3 (#3098): an own source, its ids are new
 iid = upload(Da, qz)
 j = wait(Da, iid)
+# 2.480.0 (#3470): the check adds up the unpacked files before the preview: 1.8 MB do not fit 1 MB -> refused with what they need
+check(j.get("state") == "invalid" and "too small for the files" in json.dumps(j.get("error")), f"#3470: refused before the run {j.get('state')} {j.get('error')}")
+A.patch(B + f"/api/users/{DAVE}", json={"storage_quota_mb": None})
+iid = upload(Da, qz)
+j = wait(Da, iid)
+A.patch(B + f"/api/users/{DAVE}", json={"storage_quota_mb": 1})  # 2.480.0 (#3470): full only after the preview: the run stops
 j = run(Da, iid, people={"bob@example.com": {"share": True}}) if j.get("state") == "preview" else j
 check(j.get("state") == "stopped" and j["result"].get("stopped") and j["result"].get("import_id"), f"quota in the run: stopped {j.get('state')}")
 na = dbx("SELECT COUNT(*) AS n FROM attachments a JOIN tasks t ON t.id=a.task_id JOIN lists l ON l.id=t.list_id WHERE l.owner_id=? AND l.name='Kontingent Test'",
@@ -547,8 +554,9 @@ na = dbx("SELECT COUNT(*) AS n FROM attachments a JOIN tasks t ON t.id=a.task_id
 check(na == 1, f"one file fitted ({na})")
 qa = dbx("SELECT t.assignee_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE l.owner_id=? AND l.name='Kontingent Test'", (DAVE,))
 qc = dbx("SELECT c.user_id, c.ext_name FROM comments c WHERE c.body='Bob im Kontingent'")
-check(qa and all(x["assignee_id"] is None for x in qa) and qc and qc[0]["user_id"] is None and qc[0]["ext_name"] == "Bob aus der Datei",
-      "stopped before the sharing: bob is neither assignee nor author in a list he cannot see")
+# 2.362.4 (#3100): a full storage stops only the files, the sharing still runs: bob joins and stays assignee
+check(qa and all(x["assignee_id"] == ids["bob"] for x in qa) and qc and qc[0]["user_id"] is None and qc[0]["ext_name"] == "Bob aus der Datei",
+      f"the sharing ran after the stop: bob is assignee, the comment keeps his name as text {qa}")
 check(Da.post(B + f"/api/imports/{j['result'].get('import_id')}/undo").ok and not dbx("SELECT 1 FROM lists WHERE owner_id=? AND name='Kontingent Test' AND deleted_at IS NULL", (DAVE,)),  # 2.272.0 (#3027): trash
       "undo after the stop")
 A.patch(B + f"/api/users/{DAVE}", json={"storage_quota_mb": None})

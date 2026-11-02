@@ -93,7 +93,7 @@ const behindI = (d, el) => !!el && el.classList.contains('iisrc') && !!d.querySe
     const ed = await until(() => [...d.querySelectorAll('.modal')].find(m => m.querySelector('#fm-portal')), 40);
     const pr = ed?.querySelector('.frm-hint');
     check(pr && !pr.classList.contains('shint') && pr.textContent.trim() === 'It shows only their report: title, status and the answers you send to them, never internal comments or your team.', tag + 'forms: the privacy promise stays visible word for word');
-    const how = [...(ed?.querySelectorAll('.shint') || [])].find(x => /^Without login, the sender sees a link/.test(x.textContent));
+    const how = [...(ed?.querySelectorAll('.shint') || [])].find(x => /^Without sign-in, the sender sees a link/.test(x.textContent));
     check(behindI(d, how), tag + 'forms: the how of the status link sits behind (i)');
     w.close();
   }

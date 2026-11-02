@@ -197,7 +197,7 @@ check(len(log) == 1 and log[0][1] == "client", f"#2088: the office log notes the
 # ---------------------------------------------------------------- the portal of client X in Alpha
 PX = sign_in("rechnung@xaver.example.com", n0)
 pg = PX.get(B + "/portal").text
-check("Customer portal" in pg and "Documents" in pg, "#2088: the portal shows the documents section")
+check("Client portal" in pg and "Documents" in pg, "#2088: the portal shows the documents section")
 check(OFFNUM and OFFNUM in pg and inv1["number"] in pg and inv2["number"] in pg, "#2088: the sent quotation and the sent invoices are listed")
 check(issued["number"] not in pg and invy["number"] not in pg, "#2088: neither an unsent invoice nor another client's")
 check(f"/portal/docs/{DRAFT}/" not in pg and f"/portal/docs/{ISSUED}/" not in pg and f"/portal/docs/{INVY}/" not in pg and f"/portal/docs/{INVZ}/" not in pg,
@@ -236,7 +236,7 @@ check(last.ok and A.post(B + O + f"/clients/{Y}/portal-link", json={}).status_co
 # ---------------------------------------------------------------- switched off = the portal as before
 check(A.put(B + O + "/settings", json={"portal_docs": 0}).ok, "#2088: switched off again")
 pg = PX.get(B + "/portal").text
-check("Your reports" in pg and "Customer portal" not in pg and f"/portal/docs/{INV1}/" not in pg, "#2088: off = the portal as before")
+check("Your reports" in pg and "Client portal" not in pg and f"/portal/docs/{INV1}/" not in pg, "#2088: off = the portal as before")
 check(PX.get(B + f"/portal/docs/{INV1}/pdf").status_code == 404, "#2088: off = the PDF 404")
 check(A.put(B + O + "/settings", json={"portal_docs": 1}).ok, "on again")
 A.patch(B + "/api/admin/settings", json={"public_links": False})
@@ -256,7 +256,7 @@ check(Fr.post(B + O + f"/clients/{FC}/portal-link", json={}).ok, "freelancer: se
 check(Fr.post(B + O + f"/clients/{X}/portal-link", json={}).status_code == 404 and A.post(B + O + f"/clients/{FC}/portal-link", json={}).status_code == 404,
       "freelancer: no link to an organisation's client, the organisation none to the private client (404)")
 row = dbq("SELECT org_id, owner_id FROM portal_logins ORDER BY id DESC LIMIT 1")
-check(row and row[0][0] is None and row[0][1] == FID, f"freelancer: the sign-in belongs to the private space {row}")
+check(row and row[0][0] is None and row[0][1] == FID, f"freelancer: the sign-in belongs to the private workspace {row}")
 PF = sign_in("quer@example.com", n2)
 pf = PF.get(B + "/portal").text
 check(finv["number"] in pf and f"/portal/docs/{FINV}/" in pf and f"/portal/docs/{INV1}/" not in pf, "freelancer: the private client's portal shows its invoice")

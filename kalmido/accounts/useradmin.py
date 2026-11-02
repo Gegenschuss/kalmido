@@ -13,12 +13,13 @@ from ..core.rls import org_tables
 from ..core.access import Denied, list_role, my_inbox
 from ..accounts.session import me, user_public
 from .orgretain import _until  # 2.186.0 A (#2566)
+from .orgs import op_apart_deny, op_foreign_account  # 2.399.0 (#2687)
 
 
 UA8_FILTERS = ("people", "active", "disabled", "admin", "invited", "pending", "agents", "all")
 UA8_MAX_PAGE = 200
 UA8_MAX_BULK = 200
-UA8_PRIVATE = N_("The account still has things in its private space (projects, basket, calendars, files ...): only a server admin can delete it. You can remove it from your organisation.")
+UA8_PRIVATE = N_("The account still has things in its private workspace (projects, basket, calendars, files ...): only a server admin can delete it. You can remove it from your organisation.")
 
 
 def ua8_where(q, flt):
@@ -68,7 +69,8 @@ def ua8_admin_dicts(c, rows):
                 f"SELECT user_id, COALESCE(SUM(size),0) FROM budget_files WHERE user_id IN ({q}) GROUP BY user_id",
                 f"SELECT created_by, COALESCE(SUM(size),0) FROM wiki_files WHERE created_by IN ({q}) GROUP BY created_by",  # 2.99.0 A (#2182)
                 f"SELECT created_by, COALESCE(SUM(size),0) FROM sheet_files WHERE created_by IN ({q}) GROUP BY created_by",  # 2.124.0 B (#2110)
-                f"SELECT user_id, COALESCE(SUM(size),0) FROM tchat_files WHERE user_id IN ({q}) GROUP BY user_id"):  # 2.113.1 (#2059)
+                f"SELECT user_id, COALESCE(SUM(size),0) FROM tchat_files WHERE user_id IN ({q}) GROUP BY user_id",  # 2.113.1 (#2059)
+                f"SELECT user_id, COALESCE(SUM(size),0) FROM template_files WHERE user_id IN ({q}) GROUP BY user_id"):  # 2.363.3 (#3134)
         for uid, n in c.execute(sql, ids):  # admin/hosting._user_bytes, per account
             used[uid] = used.get(uid, 0) + int(n or 0)
     out = []
@@ -124,15 +126,15 @@ def ua8_admin_orgs(c):
     return [o for o in user_orgs(c, me()) if org_role(c, me(), o) == "admin"]
 
 
-def ua8_may_delete(c, u, uid):
-    """Who deletes account uid: 'instance' (an instance admin, as before: users.om_admin_all) or the id of the organisation
-    whose admin deletes it -- only an account that belongs to that one organisation alone and is no instance admin (the
-    others: only "Remove from the organisation"). Raises Denied (404 = an account the caller must not know)."""
+def ua8_decider(c, u, uid, *other):
+    """Whose decision about account uid: 'instance' (an instance admin, as before: users.om_admin_all) or the organisation whose admin
+    decides -- only an account that belongs to that one organisation alone and is no instance admin. *other = the text of the 403 for
+    any other account. Raises Denied (404 = an account the caller must not know)."""
     from ..agents.core import is_agent
     from ..accounts.users import om_admin_all
     if g.user["is_admin"]:
         if not u or not om_admin_all(c, uid):
-            raise Denied(404, tr("unknown user"))
+            raise Denied(404, tr("unknown person"))
         return "instance"
     if is_agent(g.user):
         raise Denied(403)
@@ -143,13 +145,27 @@ def ua8_may_delete(c, u, uid):
     theirs = user_orgs(c, uid) if u else []
     shared = [o for o in theirs if o in mine]
     if not shared:
-        raise Denied(404, tr("unknown user"))
+        raise Denied(404, tr("unknown person"))
     if len(theirs) != 1 or u["is_admin"] or is_agent(u):
-        raise Denied(403, tr("Only a server admin can delete this account (it belongs to another organisation too or is a server admin). You can remove it from your organisation."))
-    areas = ua8_private_areas(c, uid)  # review N1: deleting the account would delete its private space too
-    if areas:  # 2.148.1 B (#2479): 409 with the areas by name
-        raise Denied(409, tr(UA8_PRIVATE_AREAS, ", ".join(areas)))
+        raise Denied(403, *other)
     return shared[0]
+
+
+def ua8_may_approve(c, u, uid):
+    """2.464.0 (#3882): who decides a waiting registration: an instance admin or an admin of the person's one organisation (the person
+    joined by the confirmed address of its domain). -> True for an instance admin."""
+    return ua8_decider(c, u, uid) == "instance"
+
+
+def ua8_may_delete(c, u, uid):
+    """Who deletes account uid: 'instance' or the id of the organisation whose admin deletes it (ua8_decider; the others: only
+    "Remove from the organisation")."""
+    who = ua8_decider(c, u, uid, tr("Only a server admin can delete this account (it belongs to another organisation too or is a server admin). You can remove it from your organisation."))
+    if who != "instance":
+        areas = ua8_private_areas(c, uid)  # review N1: deleting the account would delete its private space too
+        if areas:  # 2.148.1 B (#2479): 409 with the areas by name
+            raise Denied(409, tr(UA8_PRIVATE_AREAS, ", ".join(areas)))
+    return who
 
 
 def ua8_owned(c, uid):
@@ -248,14 +264,15 @@ UA8_AREAS = (
     (N_("direct messages"), "SELECT 1 FROM tchat_rooms r WHERE r.kind='dm' AND ? IN (r.a, r.b) "
         "AND EXISTS (SELECT 1 FROM tchat_msgs m WHERE m.room_id=r.id) LIMIT 1"),
 )
-UA8_PRIVATE_AREAS = N_("The account still has things in its private space ({0}): only a server admin can delete it. You can remove it from your organisation.")
+UA8_PRIVATE_AREAS = N_("The account still has things in its private workspace ({0}): only a server admin can delete it. You can remove it from your organisation.")
 
 
 # 2.239.0 C (#2866): office tables that hold the office's settings / structure (made by itself), not the person's records
 UA8_OFFICE_SKIP = frozenset((
     "office_settings", "office_company", "office_numbers", "office_inv_series", "office_rgroups", "office_rgroup_members",
     "office_rights_log", "office_pack_installs", "office_letter_profiles", "office_letter_blocks", "office_cashbooks",
-    "office_datev_guids", "office_peppol", "office_pay_props", "office_import_runs", "office_undo", "office_period_locks"))
+    "office_datev_guids", "office_peppol", "office_pay_props", "office_import_runs", "office_undo", "office_period_locks",
+    "office_payonline", "office_pay_links", "office_pay_sessions", "office_pay_events", "office_pay_payouts"))  # 2.469.0 (#3459)
 
 
 def ua8_office_sql(c):
@@ -304,10 +321,15 @@ def ua8_delete_info(uid):
     ret["needed_along"] = rx_user_info(c, uid, along=True)["needed"]  # ... also when the lists (with receipts) go along
     from .orgretain import upg_info
     purge = upg_info(c, uid)  # 2.152.0 A (#2164): personal office (deleted / kept by law until), agents, calendars, time, DMs
-    if by != "instance":  # an organisation admin: nothing about the person's private office (privat bleibt privat)
+    foreign = by == "instance" and op_foreign_account(c, uid)  # 2.480.0 (#3944, F4): hosted: a client's account
+    if by != "instance" or foreign:  # an organisation admin: nothing about the person's private office (privat bleibt privat)
         purge = {k: v for k, v in purge.items() if k in ("calendars", "time_kept", "sheets_kept", "agents", "dms", "no_heir")}
+    info = ua8_list_info(c, lists, by)
+    if foreign:  # 2.480.0 (#3944, F4): the operator sees numbers only -- no names of the people the lists are shared with
+        info = [dict(x, members=[]) for x in info]
     return jsonify(**base, can_delete=True, by="instance" if by == "instance" else "org", org_id=None if by == "instance" else by,
-                   username=u["username"], lists=ua8_list_info(c, lists, by), candidates=ua8_candidates(c, lists, uid) if lists else [],
+                   username=u["username"], lists=info,
+                   candidates=ua8_candidates(c, lists, uid) if lists and not foreign else [],  # 2.480.0 (#3944, F4): hosted: none for a client
                    retention=ret,
                    purge=purge)
 
@@ -348,6 +370,8 @@ def ua8_lists_settle(c, u, by, rx_how=None):
     if by != "instance" and any(not lr["org_id"] for lr in lists):  # private stays private (ua8_may_delete refused already)
         raise Denied(409, tr(UA8_PRIVATE))  # 2.148.1 B (#2479): 409 like ua8_may_delete
     if mode == "transfer":
+        if by == "instance" and op_foreign_account(c, uid):  # 2.399.0 (#2687): hosted: a client's projects never go by the operator's hand
+            op_apart_deny()
         try:
             to = int(request.args.get("to") or 0)
         except ValueError:
@@ -357,7 +381,7 @@ def ua8_lists_settle(c, u, by, rx_how=None):
         need_visible(c, to)  # a person the caller may not see: as unknown
         t = c.execute("SELECT * FROM users WHERE id=?", (to,)).fetchone()
         if not t:
-            return err(tr("unknown user"), 404), None
+            return err(tr("unknown person"), 404), None
         if to == uid or t["disabled"] or is_agent(t):
             return err(tr("The projects can only go to another active person (not an agent)")), None
         ok = {x["id"] for x in ua8_candidates(c, lists, uid)}

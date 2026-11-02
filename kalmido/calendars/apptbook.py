@@ -24,6 +24,7 @@ from flask import g, jsonify, redirect, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
 from ..core.i18n import browser_lang, LANGS, N_, short_day, tr
+from ..collab.comments import lang_of  # 2.367.5 (#2980)
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_token_bind, Denied, need_feat
@@ -598,7 +599,7 @@ def apb_clean(v, mx):
 
 def apb_lang(c, uid):
     """The customer's language: Accept-Language if the app has it, else the person's language."""
-    lg = browser_lang() or usettings(c, uid).get("lang") or "en"
+    lg = browser_lang() or lang_of(usettings(c, uid))
     return lg if lg in LANGS else "en"
 
 
@@ -888,7 +889,10 @@ def apb_limit_note(c, uid, day):
     if not c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET day=excluded.day
                         WHERE mail_counts.day<>excluded.day RETURNING k""", (f"apbn:{uid}", day)).fetchone():
         return
+    from ..collab.news import notif_ok
     with system_ctx(c):  # the owner's own notice; the public page has no person signed in, the notice names no customer
+        if not notif_ok(c, uid, usettings(c, uid), "limits", "news"):  # 2.453.0 (#3781): can be switched off
+            return
         c.execute("INSERT INTO notifications(user_id,kind,task_id,list_id,actor_id,comment_id,data,created_at) VALUES(?,?,?,?,?,?,?,?)",
                   (uid, "apblimit", None, None, None, None, json.dumps({"limit": APB_MAIL_DAY}), iso(now_utc())))
 
@@ -1023,7 +1027,7 @@ def apb_make(c, p, t, r):
     office area chosen) of a confirmed booking -> (event id, contact id | None, deal id | None)."""
     from ..events.model import default_cal, ev_store
     uid = r["user_id"]
-    olg = usettings(c, uid).get("lang") or "en"
+    olg = lang_of(usettings(c, uid))
     cid = p["cal_id"] if p["cal_id"] and apb_cal_ok(c, uid, p["cal_id"]) else default_cal(c, uid)
     zone = apb_zone(p)
     s, e = parse_iso(r["start"]).astimezone(zone), parse_iso(r["end"]).astimezone(zone)
@@ -1130,7 +1134,7 @@ def apb_mail_confirm(c, p, t, r, tok):
     when = apb_when(p, parse_iso(r["start"]), parse_iso(r["end"]), lg)
     lines = [tr("Hello {0},", r["name"], lg=lg), tr("please confirm your booking: {0}, {1}.", t["name"], when, lg=lg),
              tr("Without your confirmation the time is released after 30 minutes.", lg=lg)]
-    foot = tr("If you did not book this, you can ignore this mail.", lg=lg)
+    foot = tr("If you did not book this, you can ignore this e-mail.", lg=lg)
     rt, fn = apb_mail_meta(c, r["user_id"])
     subj = tr("Please confirm your booking", lg=lg)
     return (r["email"], subj, "\n\n".join(lines) + f"\n\n{url}\n\n{foot}",
@@ -1163,18 +1167,37 @@ def apb_mail_cancelled(c, r, reason):
             apb_mail_html(lines, url, tr("Book an appointment", lg=lg) if url else None, "", subj, fn, lg), rt, fn)
 
 
+def apb_line(c, r, lg):
+    """Customer · type · time of booking r in language lg (push, News, mail)."""
+    p = apb_page_row(c, r["user_id"])
+    t = c.execute("SELECT name FROM appt_types WHERE id=?", (r["type_id"],)).fetchone() if r["type_id"] else None
+    return f'{r["name"]} · {t[0] if t else ""} · {apb_when(p, parse_iso(r["start"]), parse_iso(r["end"]), lg)}'
+
+
+def apb_mail_line(c, bid, uid, lg):
+    """2.367.2 (#2969): the line of the bundled event mail about booking bid (still mine), else None; the state at sending time."""
+    r = c.execute("SELECT * FROM appt_bookings WHERE id=? AND user_id=?", (bid, uid)).fetchone()
+    if not r:
+        return None
+    what = tr("Booking cancelled by the client", lg=lg) if r["status"] == "cancelled" else tr("New booking", lg=lg)
+    return what, apb_line(c, r, lg), f"{PUBLIC_URL}/#calendar"
+
+
 def apb_push(c, r, what):
-    """Push to the person (the switch "assign" like an event invitation): a new confirmed booking / a cancel by the customer."""
-    from ..collab.news import notif_ok
+    """News, mail (2.367.2, #2969) + push to the person (the switch "assign" like an event invitation): a new confirmed booking /
+    a cancel by the customer. Without a push device a booking used to stay unnoticed."""
+    from ..collab.news import news_add, notif_ok
+    from ..notify.channels import evm_note
     from ..notify.push import push_prio
     uid = r["user_id"]
     s = usettings(c, uid)
+    lg = lang_of(s)
+    msg = apb_line(c, r, lg)
+    news_add(c, uid, "apbooking", actor=0, data={"what": what, "line": msg[:300], "event_id": r["event_id"]}, s=None)
     if not notif_ok(c, uid, s, "assign", "push"):
         return
-    lg = s.get("lang") or "en"
+    evm_note(c, uid, "apbook", None, None, s, r["id"])
     p = apb_page_row(c, uid)
-    t = c.execute("SELECT name FROM appt_types WHERE id=?", (r["type_id"],)).fetchone() if r["type_id"] else None
-    title = tr("New booking", lg=lg) if what == "new" else tr("Booking cancelled by the customer", lg=lg)
-    msg = f'{r["name"]} · {t[0] if t else ""} · {apb_when(p, parse_iso(r["start"]), parse_iso(r["end"]), lg)}'
+    title = tr("New booking", lg=lg) if what == "new" else tr("Booking cancelled by the client", lg=lg)
     click = f"{PUBLIC_URL}/#ev/{r['event_id']}" if r["event_id"] and what == "new" else f"{PUBLIC_URL}/#calendar"
     g.setdefault("pushes", []).append((uid, title, msg, click, push_prio(s), {"scope": f"o:{p['office_org_id'] if p else None}"}))  # 2.240.0 B2 (#2867)

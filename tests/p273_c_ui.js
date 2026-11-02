@@ -176,7 +176,7 @@ const MOCK = `(() => {
     await ev(`(() => { S.calMode = 'month'; LS.set('calMode', 'month'); return 1; })()`);
     // ---- Move an own task to another server: the menu entry, the plain question, the call
     await go(ev, 'inbox', `#view .trow[data-id="${OWN}"]`);
-    await ev(`(() => { taskMenu(document.querySelector('#view .trow[data-id="${OWN}"] .ttl'), ${OWN}); return 1; })()`); await sleep(400);
+    await ev(`(() => { taskMenu(document.querySelector('#view .trow[data-id="${OWN}"] .ttl'), ${OWN}); document.querySelector('#pop .mtmore')?.click(); return 1; })()`); await sleep(400);  // 2.445.0 (#3008): under "More…"
     check(await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].some(b => /Move to another server/.test(b.textContent))`), '#661: the task menu offers "Move to another server…"');
     await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Move to another server/.test(b.textContent))?.click(); return 1; })()`); await sleep(500);
     await ev(`(() => { const s = document.querySelector('#msvvmv-s'); s.value = '1'; s.dispatchEvent(new Event('change')); const l = document.querySelector('#msvvmv-l'); l.value = '11'; document.querySelector('.msvvmv button[type="submit"]').click(); return 1; })()`); await sleep(500);

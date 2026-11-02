@@ -163,7 +163,7 @@ def le2f_upload(tid):
         unlink_files(saved)
         return err(e)
     if cid is None:
-        log_act(c, tid, "attach", {"names": [tr("Encrypted file")] * min(len(files), 20), "n": len(files)})
+        log_act(c, tid, "attach", {"names": [N_("Encrypted file")] * min(len(files), 20), "n": len(files), "enc": 1})  # 2.448.0 (#3765): the key, the reader's app translates it
     bump(c)
     c.commit()
     return jsonify(one_task(c, tid))

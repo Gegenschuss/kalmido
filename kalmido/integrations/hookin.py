@@ -14,6 +14,7 @@ from ..accounts.session import client_ip, me
 from ..core.access import Denied, list_role, need_list, WRITE_ROLES
 from ..core.errors import BadInput, reject_unknown
 from ..notify.alerts import _env_int, aa_count
+from ..collab.integfail import integ_tell
 from ..api.v1 import PRIO_VALUES
 from ..api.common import hit_limit
 
@@ -287,9 +288,13 @@ def whi_task_body(c, lid, b):
     return out, ignored[:50]
 
 
-def whi_pause(c, hid, why):
+def whi_pause(c, r, why):
     with system_ctx(c):  # 2.115.0 A (#2061): system on purpose: pausing exactly the webhook whose token was just checked
-        c.execute("UPDATE hook_in SET paused_reason=? WHERE id=?", (why, hid))
+        c.execute("UPDATE hook_in SET paused_reason=? WHERE id=?", (why, r["id"]))
+        lo = c.execute("SELECT owner_id FROM lists WHERE id=?", (r["list_id"],)).fetchone()
+    # 2.367.3 (#2971): who set it up and the project's owner (the callers it fails for never see a reason): once, a paused one returns before this
+    integ_tell(c, [r["created_by"], lo["owner_id"] if lo else None], "hookin", r["name"] or f"#{r['id']}", WHI_PAUSE[why],
+               click=f"l/{r['list_id']}", list=r["list_id"])
     c.commit()
 
 
@@ -325,12 +330,12 @@ def whi_in(token):
     if r["paused_reason"]:
         return err(tr("This webhook is paused: {0}", tr(WHI_PAUSE.get(r["paused_reason"], WHI_PAUSE["creator"]))), 403)
     if not u or u["disabled"] or is_agent(u) or u["kid"]:
-        whi_pause(c, r["id"], "creator")
+        whi_pause(c, r, "creator")
         return err(tr("This webhook is paused: {0}", tr(WHI_PAUSE["creator"])), 403)
     g.user, g.auth_via, g.whi_hook = u, "hook_in", r["id"]  # from here on: exactly the owner's rights and organisations
     role = list_role(c, r["list_id"])
     if role not in WRITE_ROLES:
-        whi_pause(c, r["id"], "role" if role else "creator")
+        whi_pause(c, r, "role" if role else "creator")
         return err(tr("This webhook is paused: {0}", tr(WHI_PAUSE["role" if role else "creator"])), 403)
     why = whi_list_ok(c, r["list_id"])
     if why or r["archived"]:

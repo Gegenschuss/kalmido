@@ -21,7 +21,7 @@ from decimal import Decimal
 from flask import g, jsonify, request, Response
 
 from ..core.config import app
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, short_day, tr
 from ..core.db import db, local_now
 from ..core.errors import BadInput
 from ..core.orgcrypt import oc_dec_fields  # 2.355.0 E (#2841)
@@ -358,7 +358,7 @@ def dx_check(st, d_from, d_to):
         raise BadInput(tr(DX_NEED_IDS))
     a, b = dx_fiscal_year(date.fromisoformat(d_from), int(st["fy_start"]))
     if date.fromisoformat(d_to) > b:
-        raise BadInput(tr(DX_FY_SPAN, a.strftime("%d.%m.%Y"), b.strftime("%d.%m.%Y")))
+        raise BadInput(tr(DX_FY_SPAN, short_day(a, year=True), short_day(b, year=True)))  # 2.368.2 (#2986)
 
 
 def dx_extf(c, oid, d_from, d_to, by="", s=None, now=None, inside=True, hints_out=None, rows=None, fixed=False):

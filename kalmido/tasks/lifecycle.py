@@ -19,6 +19,7 @@ from ..tasks.validation import (
     check_parent, check_url, clean_task, DATE_MAX_Y, descendants, log_act, log_changes, rr_feasible, rr_norm, rr_rule, rmd_split,
     ticket_template, valid_hm, valid_plan_start,
 )
+from ..tasks.oneway import irr_guard
 from ..tasks.tasks import (
     check_assignee, check_move, hard_delete, move_subtree, ms_cleanup, ms_target, my_tags, one_task,
     participant_assignee, set_tags,
@@ -149,6 +150,7 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
             del f["list_id"]
         elif f["list_id"] != cur["list_id"]:
             need_list(c, f["list_id"])  # moving out needs write on the source (caller), in on the target
+            irr_guard(c, tid)  # 2.392.0 (#3370)
             check_move(c, cur["list_id"], f["list_id"])
     lid = f.get("list_id", cur["list_id"])
     le2_post = le2a_task_write(c, tid, cur, f, b, lid)  # 2.64.1 (#1817): the texts of a list with the lock (ciphertexts only, moves via the app)
@@ -207,6 +209,11 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
     elif "assignee_group_id" not in f and cur["assignee_group_id"] and lid != cur["list_id"] \
             and cur["assignee_group_id"] not in {x[0] for x in grp_shares_of_list(c, lid)}:
         f["assignee_group_id"] = None
+    if "delegate_agent_id" in f and (_norm(f["delegate_agent_id"]) != _norm(cur["delegate_agent_id"]) or lid != cur["list_id"]):
+        from ..tasks.watchers import check_delegate  # 2.473.0 (#3357): against the list the task ends up in
+        e = check_delegate(c, lid, f["delegate_agent_id"])
+        if e:
+            return e
     if "assignee_id" in f and _norm(f["assignee_id"]) != _norm(cur["assignee_id"]):
         f["assigned_by"] = me() if f["assignee_id"] else None
         if f["assignee_id"]:  # 2.40.0 (#1344): newly assigned = on top of the person's own order of "My tasks"
@@ -247,6 +254,9 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         log_changes(c, tid, cur, b.get("_act"))
         new_a, new_g = c.execute("SELECT assignee_id, assignee_group_id FROM tasks WHERE id=?", (tid,)).fetchone()
         assignment_events(c, tid, cur["assignee_id"], new_a)
+        if "delegate_agent_id" in f:  # 2.473.0 (#3357; a move that ends the delegation: wat_moved)
+            from ..tasks.watchers import dlg_events
+            dlg_events(c, tid, cur["delegate_agent_id"], f["delegate_agent_id"])
         if new_g != cur["assignee_group_id"]:
             log_act(c, tid, "assign_group", {"group": grp_name(c, new_g), "from": grp_name(c, cur["assignee_group_id"])})
             if new_g:
@@ -395,7 +405,9 @@ def do_complete(c, tid, status=2, undo=None):
     """undo (dict, filled in): what POST /api/tasks/<id>/undo needs to take this completion back."""
     from ..collab.comments import assignment_events
     from ..family.family import _jparse, FAM_OCC, rot_next, stars_earn, stars_revoke
+    from ..notify.channels import chn_note
     write_lock(c, f"task-{tid}")  # 2.126.0 D (#1987): one completion of a task at a time (the row below is then current)
+    irr_guard(c, tid)  # 2.392.0 (#3370)
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if status == 2 and t["status"] != 2:  # 2.60.0 C (#1512): "done only after approval" -- every way of completing ends here
         from ..tasks.review import rvw_gate
@@ -432,6 +444,7 @@ def do_complete(c, tid, status=2, undo=None):
             c.execute("INSERT INTO task_tags(task_id,user_id,tag) VALUES(?,?,?)", (cur_id, r["user_id"], r["tag"]))
         c.execute("INSERT INTO task_field_values(task_id,field_id,value) SELECT ?, field_id, value FROM task_field_values WHERE task_id=?",
                   (cur_id, tid))
+        chn_note(c, cur_id, "complete")  # 2.367.3 (#2973): the original is open again after this; its completed copy is what the channels report
         c.execute("INSERT INTO sample_items(user_id,kind,item_id) SELECT user_id, 'task', ? FROM sample_items "
                   "WHERE kind='task' AND item_id=? ON CONFLICT DO NOTHING", (cur_id, tid))
         start = t["start"]
@@ -715,6 +728,7 @@ def task_delete(tid):
 
 def trash_task(c, tid):
     """Moves a task (and its subtasks) to the trash with a history line (web client, REST API)."""
+    irr_guard(c, tid)  # 2.392.0 (#3370)
     do_delete(c, tid)
     log_act(c, tid, "delete")
 

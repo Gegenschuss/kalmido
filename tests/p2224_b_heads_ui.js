@@ -1,7 +1,7 @@
 // 2.224.0 part B UI tests (#2816), own container (start.sh), Firefox. Invented people only.
 // One heading per page: an office page's big heading (#top h1) is the page's name, no small .ofpt below it, "Office" stays
 // above the panel; the country card (.ocf-choose) only on the page the office opens with, elsewhere one slim line whose
-// button leads there; Tables: one heading, "New table" only in the head (not in the panel); Pipeline: one "New inquiry"
+// button leads there; Tables: one heading, "New table" only in the head (not in the panel); Pipeline: one "New enquiry"
 // button in the toolbar. Computer and phone width; the person without an organisation (own admin, P4) is the main person.
 // P2224B_NOSTART=1 = the server already runs.
 const path = require('path');
@@ -52,7 +52,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     check(await ev(`${h1} === 'Pipeline' && !document.querySelector('#view .ofpt')`), '#2816: the head names the page, no small heading ' + await ev(h1));
     check(await ev(`document.querySelector('#side h2.sbbpt')?.textContent === 'Office'`), '#2816: "Office" stays above the panel');
     check(await ready(ev, `!!document.querySelector('.ofcbar [data-pp="new"]')`, 60), '#2816: the pipeline loads');
-    check(await ev(`document.querySelectorAll('.ofcbar [data-pp="new"]').length === 1 && !document.querySelector('[data-pp="newlead"]') && !!document.querySelector('.ofcbar [data-pp="new"].pri')`), '#2816: one "New inquiry" button in the toolbar, the accent one');
+    check(await ev(`document.querySelectorAll('.ofcbar [data-pp="new"]').length === 1 && !document.querySelector('[data-pp="newlead"]') && !!document.querySelector('.ofcbar [data-pp="new"].pri')`), '#2816: one "New enquiry" button in the toolbar, the accent one');
     await shot('p2224-b-pipeline.png');
     // ---- another page: one slim line, the page's name in the head
     await nav(B + '#office/bank');

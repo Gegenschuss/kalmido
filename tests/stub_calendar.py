@@ -367,7 +367,7 @@ class H(BaseHTTPRequestHandler):
         if p == '/huge-nolen.ics':  # no Content-Length: the limit applies while reading
             return self._send(200, huge_ics(1_300_000), length=False)
         if p == '/login.html':
-            return self._send(200, '<html><body>Please log in</body></html>', 'text/html')
+            return self._send(200, '<html><body>Please sign in</body></html>', 'text/html')
         if p == '/garbage.ics':
             return self._send(200, 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART:notadate\r\n', 'text/calendar')
         if p == '/flaky.ics':

@@ -71,7 +71,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   w.eval(`S.settings.ws_colors = JSON.stringify({'org:${ORG}': 'teal'}); render()`);
   check(app().style.getPropertyValue('--wbd') === '#2dd4bf', '#2389: my own choice wins over the organisation\'s colour');
   w.eval(`S.settings.ws_colors = JSON.stringify({'org:${ORG}': 'none'}); render()`);
-  check(!app().classList.contains('wsb-on'), '#2389: "No color": a grey stripe');
+  check(!app().classList.contains('wsb-on'), '#2389: "No colour": a grey stripe');
   // #3506: the choice is saved on the server too and the check waits for the stripe - a state reload under load (core.js
   // takes S.settings from the server) wiped the local-only choice before the fixed 400 ms were over (Vorprüfung 2.409)
   await call('PATCH', '/api/settings', {ws_colors: JSON.stringify({private: 'blue'})});
@@ -120,7 +120,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   // ================= Firefox: 1280 / 1000 rail / 390, dark + light
   const login2 = async ({ev, nav}, theme) => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
   };
   const ready = async ev => { for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(250); await sleep(800); };

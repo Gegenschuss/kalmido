@@ -11,7 +11,7 @@ freelancer-matrix: admin
    (prev = the older one); a newer patch of the same minor starts and keeps its stamp
  - TASKS_WATCHDOG: true = on (the watchdog loop runs, was off before 2.149), 0 = off, unset = on
  - restore: an archive whose manifest names a newer minor is refused with code "newer" (upload check), an older one is not
-   refused for its version; a person without an organisation (own admin of the private space only) gets 403
+   refused for its version; a person without an organisation (own admin of the private workspace only) gets 403
  - server key: a new database without a key refuses to start unless KALMIDO_NO_SECRET_KEY=1; a key file created during a
    start next to a database that holds account keys stays (2.190.0 B, #2592: was removed) and the start is refused; the old key file starts it
  - data folder without write access: a clear FATAL with the uid instead of a traceback
@@ -146,6 +146,24 @@ res = in_app("from kalmido.core.db import appver_check as a\n"
              " a('2.151.0', '2.150.2', '2.150.0'), a('2.152.0', '2.151.0', '2.150.0'), a('3.0.0', None, '2.150.0'),"
              " a('2.149.0', None, '2.150.0'), a(None, None, '2.150.0'), a('2.151.0', None, '0.0.0')]))")
 check(res == json.dumps(["ok", "newer", "back", "back", "newer", "newer", "ok", "ok", "ok"]), f"appver_check: patch / newer / one step back / major: {res}")
+
+# 2.359.3 (#2896): the format limit of a database comes before everything else, the one step back does not pass it
+res = in_app("from kalmido.core.db import appver_check as a\n"
+             "print(json.dumps([a('2.150.3', None, '2.150.0', '2.149.0'), a('2.151.0', '2.150.0', '2.150.0', '2.151.0'),"
+             " a('2.150.3', None, '2.150.0', '2.150.1'), a('2.150.3', None, '2.150.0', '2.150.0'), a(None, None, '2.150.0', '3.0.0'),"
+             " a('2.151.0', None, '0.0.0', '3.0.0')]))")
+check(res == json.dumps(["ok", "format", "format", "ok", "format", "ok"]), f"appver_check: format limit {res}")
+fl = dict(dbx("SELECT key, value FROM kalmido_meta WHERE key IN ('back_floor','back_floor_how')"))
+check(fl.get("back_floor") == "2.149.0" and "UPGRADING" in fl.get("back_floor_how", ""), f"the database keeps the format limit {fl}")
+set_meta("back_floor", "99.0.0")
+set_meta("back_floor_how", "run the tool xyz")
+ok = start()
+lg = logs()
+check(not ok and "FATAL: this database has a format limit at Kalmido 99.0.0" in lg and "run the tool xyz" in lg, f"an image below the limit: refused with the stored step {lg[-300:]!r}")
+ok = start(extra=("-e KALMIDO_ALLOW_DOWNGRADE=1",))
+check(ok and "WARNING: this database has a format limit" in logs(), "KALMIDO_ALLOW_DOWNGRADE=1 passes the limit with a warning")
+check(dict(dbx("SELECT key, value FROM kalmido_meta WHERE key='back_floor'")).get("back_floor") == "99.0.0", "the limit is only ever raised")
+set_meta("back_floor", "2.149.0")
 
 # a database a newer minor ran on: refused
 set_meta("app_version", NEWER)

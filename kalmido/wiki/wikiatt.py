@@ -25,20 +25,21 @@ from urllib.parse import quote, unquote
 from flask import jsonify, request, send_file
 
 from ..core.config import app, ATT_DIR
-from ..core.i18n import tr as _tr_base
+from ..core.i18n import N_, tr as _tr_base
 from ..core.db import bump, db, err, insert_id, iso_ms, now_utc
 from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..accounts.session import me
 from ..core.access import Denied
-from ..core.orgcrypt import OrgCryptError, oc_read_file, oc_send_file, oc_user_space, oc_write_file
+from ..core.orgcrypt import OrgCryptError, oc_copy_file, oc_read_file, oc_send_file, oc_user_space, oc_write_file
 from ..core.serializers import unlink_files
-from ..core.errors import BadInput
+from ..core.errors import BadInput, BadKey
 from ..tasks.attachments import file_ext, safe_name, send_stored
 from .pages import (WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, wiki_clean_path, wiki_fit_paths, wiki_path_parts, wiki_frontmatter, wiki_insert, wiki_need,
                     wiki_set_links, wiki_space_sql)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 WKA_LANG = threading.local()  # 2.177.0 (#2685): the language of the person a background import (wkimport.py) works for
+WKA_TOO_LARGE = N_("The archive is too large")
 
 
 def tr(key, *a, lg=None):
@@ -245,7 +246,7 @@ def wka_upload(pid):
     uid = me()
     pg = wiki_need(c, pid, write=True)  # 2.200.0 A (#2747): edit on the page
     if wka_locked(c, pg):
-        raise Denied(403, tr("Files cannot be added to an encrypted space yet."))
+        raise Denied(403, tr("Files cannot be added to an encrypted workspace yet."))
     files = request.files.getlist("file")
     if not files:
         return err(tr("File missing"))
@@ -333,22 +334,25 @@ def wka_org_files(c, oid):
     return [r[0] for r in c.execute("SELECT path FROM wiki_files WHERE org_id=?", (oid,))]
 
 
-def wka_move_files(c, page_ids, to, uid):
+def wka_move_files(c, page_ids, to, uid, new_paths, old_paths):
     """2.99.0 (#2182 x 2.96.0 #1941): pages moved between the private space and an organisation take their files along (also
-    the ones in the trash): row org / owner as the page, the stored file sealed again with the target's key. The caller
-    commits; a file read with its own header key, so a failed commit leaves every file readable."""
+    the ones in the trash): row org / owner as the page, the stored file sealed with the target's key. The caller commits.
+    2.363.3 (#3133): into a new stored file as files/fsmove.py does: new_paths (removed on an error) and old_paths (removed
+    after the commit; both for unlink_files) go to the caller, so a failed commit leaves the old file as it was."""
     ids = [int(x) for x in page_ids]
     if not ids:
         return 0
     rows = c.execute(f"SELECT id, path FROM wiki_files WHERE page_id IN ({','.join('?' * len(ids))})", ids).fetchall()
     space = int(to) if to else oc_user_space(uid)
     for r in rows:
-        full = os.path.join(ATT_DIR, r["path"])
+        rel = os.path.join(os.path.dirname(r["path"]), f"{uuid.uuid4().hex[:12]}-{os.path.basename(r['path']).partition('-')[2]}")
         try:
-            data = oc_read_file(c, full)
+            oc_copy_file(c, os.path.join(ATT_DIR, r["path"]), os.path.join(ATT_DIR, rel), space)  # review 2 L1: plain bytes that look sealed get an outer layer
         except (OSError, OrgCryptError):
             continue  # a missing / unreadable file stays as it is (the storage check reports it)
-        oc_write_file(c, space, full, data, fresh=True)  # review 2 L1: plain bytes that look sealed get an outer layer
+        new_paths.append(rel)
+        c.execute("UPDATE wiki_files SET path=? WHERE id=?", (rel, r["id"]))
+        old_paths.append(r["path"])
     if rows:
         q = ",".join("?" * len(rows))
         fids = [r["id"] for r in rows]
@@ -408,7 +412,7 @@ def _wka_read(z, info, cap, budget):
         data = fh.read(min(cap, budget[0]) + 1)
     budget[0] -= len(data)
     if budget[0] < 0:
-        raise BadInput(tr("The archive is too large"))
+        raise BadKey(WKA_TOO_LARGE)
     return None if len(data) > cap else data
 
 
@@ -459,9 +463,9 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
     from ..admin.hosting import QuotaExceeded
     tick = tick or (lambda n=1: None)
     if len(infos) > max_files:
-        raise BadInput(tr("Too many files (at most {0})", max_files))
+        raise BadKey(N_("Too many files (at most {0})"), max_files)  # 2.454.0 (#3808): the background import keeps key + values
     if sum(i.file_size for i in infos) > total:
-        raise BadInput(tr("The archive is too large"))
+        raise BadKey(WKA_TOO_LARGE)
     w, a = wiki_space_sql(oid, uid)
     created, updated, skipped, ts = [], [], [], iso_ms(now_utc())
     budget, md_left = [total], [WKA_MD_TOTAL]
@@ -504,7 +508,7 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
                 if text.startswith("e2e1:"):  # 2.64.3 (#1817, review M1): no ciphertext-like text in an open space
                     raise BadInput(tr("Invalid value: {0}", "body"))
             except BadInput as e:
-                if str(e) == tr("The archive is too large"):
+                if getattr(e, "stored", None) == (WKA_TOO_LARGE,):
                     raise
                 skip(name, str(e))
                 continue
@@ -648,7 +652,7 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
                              (pid, fname.lower(), hashlib.sha256(data).hexdigest())).fetchone()
             fid = same["id"] if same else wka_store(c, pg, fname, mime, data, uid, saved)
         except BadInput as e:
-            if str(e) == tr("The archive is too large"):
+            if getattr(e, "stored", None) == (WKA_TOO_LARGE,):  # 2.454.0 (#3808): str(e) is in the first admin's language in the background run
                 raise
             skip(name, str(e))
             continue

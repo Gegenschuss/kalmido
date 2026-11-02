@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.55.0 API tests, part A (#1069, #1068): several saved arrangements per view, an arrangement as a template. Invented names only.
  - #1069 saved arrangements: create (with / without layout), list, rename (unique names), move, overwrite, delete (the row
-   comes back for undo), activate (the view's own value becomes the saved one), "Standard" (none active, own value back),
+   comes back for undo), activate (the view's own value becomes the saved one), "Default" (none active, own value back),
    changes while one is active follow into it, a reset to the standard ends "active"; LYV_MAX 409; unknown view 400;
    someone else's id 404; agents 403; a project page only for people who see it (404 / 403 like the page itself);
    the data export carries view_layouts
@@ -96,7 +96,7 @@ check(not any(x["active"] for x in saved(A)) and json.loads(next(x for x in save
 A.post(B + f"/api/layouts/saved/{O}/activate")
 r = A.patch(B + f"/api/layouts/saved/{O}", json={"layout": FOCUS})
 check(r.ok and json.loads(r.json()["value"]) == json.loads(FOCUS) and json.loads(own(A)) == json.loads(FOCUS), "#1069: overwriting the active one sets the view")
-# "Standard": none active, own value as sent ('' = the standard), undo sends the old one
+# "Default": none active, own value as sent ('' = the standard), undo sends the old one
 r = A.post(B + "/api/layouts/saved/standard", json={"key": "view_today"})
 check(r.ok and r.json()["value"] == "" and own(A) == "" and not any(x["active"] for x in saved(A)), "#1069: Standard " + r.text[:200])
 r = A.post(B + "/api/layouts/saved/standard", json={"key": "view_today", "value": WIDE})

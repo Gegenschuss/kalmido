@@ -1,7 +1,7 @@
 // 2.50.0 UI tests, part B (office: sales pipeline #1196, business figures #1197), own container (start.sh, mode workspaces),
 // Firefox (desktop + phone width). Invented companies, people and figures only.
 // - #1196: the admin has the tab "Pipeline": the sums on top (open, weighted, the months with the next one marked), four
-//   columns with the deals; a new inquiry through the dialog lands in "Inquiry"; dragging a card into another column changes
+//   columns with the deals; a new inquiry through the dialog lands in "Enquiry"; dragging a card into another column changes
 //   its stage (saved); a declined quotation shows on the card; on a phone one stage at a time with the switcher, nothing
 //   sticks out to the side, large tap targets
 // - #1197: the tab "Figures": tiles (revenue, open / overdue invoices, pipeline, cash flow), twelve months, the client with

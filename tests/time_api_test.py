@@ -322,7 +322,7 @@ check(r.headers["content-type"].startswith("text/csv") and "charset=utf-8" in r.
 check(r.content.startswith(b"\xef\xbb\xbf"), "CSV starts with a UTF-8 BOM")
 check('filename="timesheet-2026-09-14-2026-09-20.csv"' in r.headers.get("content-disposition", ""), "CSV file name " + r.headers.get("content-disposition", ""))
 rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig"))))
-check(rows[0] == ["Project", "Task", "User", "Start", "End", "Duration (h)", "Duration (h:mm)", "Rounded (h)", "Amount (€)", "Note"], f"CSV header {rows[0]}")
+check(rows[0] == ["Project", "Task", "Person", "Start", "End", "Duration (h)", "Duration (h:mm)", "Rounded (h)", "Amount (€)", "Note"], f"CSV header {rows[0]}")
 check(len(rows) == 1 + 7, f"CSV rows {len(rows)}")  # 2.125.0 (#2120): the entry over midnight = one row per day
 check(rows[1] == ["Client A", "Design", "Carol", "2026-09-14 09:00", "2026-09-14 09:07", "0.12", "0:07", "0.25", "25.00", ""], f"CSV row 1 {rows[1]}")
 note_row = [x for x in rows if x[3] == "2026-09-17 09:00"][0]

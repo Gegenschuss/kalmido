@@ -95,7 +95,8 @@ function histFields(label, pairs, o = {}) {
 // completion / won't do (status) of ids; res = the answer of the forward request (signed undo payloads)
 function histDone(label, ids, snaps, res, status = 2) {
   const toks = r => { const u = r?.undo; return !u ? {} : u.sig ? {[ids[0]]: u} : u; };
-  const expect = Object.fromEntries(ids.map(id => [id, snaps.find(s => s.id === id)?.due ?? null]));
+  // 2.370.0 (#3126): with the time for a several-times-a-day rule, as toggleDone
+  const expect = Object.fromEntries(ids.map(id => { const s = snaps.find(x => x.id === id); return [id, /TIMES=/.test(s?.repeat || '') ? {due: s.due ?? null, due_time: s.due_time ?? null} : s?.due ?? null]; }));
   return histAdd({label, snaps, ids, res,
     undo: e => { const t = toks(e.res); return Object.keys(t).length ? histBatch('undo', Object.keys(t), {items: t}) : {skipped: [], none: true}; },
     redo: async e => { const r = await histBatch('complete', ids, {status, expect}); e.res = r.res; return r; }});
@@ -296,7 +297,7 @@ function tmm_msg(msg, r) {
     x.subtasks && trn('{0} subtask stays in its project', '{0} subtasks stay in their projects', x.subtasks), x.assignee && tr('Assignee'), x.group && tr('Group'),
     x.milestone && tr('Milestone'), x.sprint && tr('Sprint'), x.ltags && trn('{0} project tag', '{0} project tags', x.ltags),
     x.client && tr('Client'), x.visibility && tr('Everyone in the organisation'), x.assignees && trn('{0} assignment of a reader', '{0} assignments of readers', x.assignees),
-    x.tclients && trn('{0} client of a customer report', '{0} clients of customer reports', x.tclients)].filter(Boolean);  // a list's workspace (dialogs.js); 2.401.0 (#2924): + tclients
+    x.tclients && trn('{0} client of a client report', '{0} clients of client reports', x.tclients)].filter(Boolean);  // a list's workspace (dialogs.js); 2.401.0 (#2924): + tclients
   return p.length ? `${msg || tr('Moved')} · ${tr('Not carried over: {0}. Undo brings it back.', p.join(', '))}` : msg;
 }
 // the few older callers: a toast with "Undo" for a step built above

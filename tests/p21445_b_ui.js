@@ -1,6 +1,6 @@
 // 2.144.5 part B UI tests (jsdom), own container (start.sh). Invented names only.
 // #2002 the target of an import:
-//   (a) the task import with the sidebar on "All" goes into the private space by default; the question offers "Rather into
+//   (a) the task import with the sidebar on "All" goes into the private workspace by default; the question offers "Rather into
 //       <organisation>" (the first one) instead, which files the new list there; Import keeps it private
 //   (b) the event import into an organisation's calendar offers "Rather into private" also without a private calendar: one is
 //       made then and the events land there
@@ -63,7 +63,7 @@ async function taskImport(w, file, answer) {
   let w = await boot({user: 'bob'}); w.__dialogs = 'manual';
   check(w.eval(`wsCur()`) === 'all', 'setup: the sidebar shows All');
   let seen = await taskImport(w, 'Umzug21445org', 'org');
-  check(/your private space/.test(seen.text) && !seen.priv, '#2002: with All the import names the private space first ' + seen.text);
+  check(/your private workspace/.test(seen.text) && !seen.priv, '#2002: with All the import names the private workspace first ' + seen.text);
   check(/Rather into Alpha/.test(seen.org), '#2002: it offers the organisation instead ' + JSON.stringify(seen.org));
   let l = await listOf(CB, 'Umzug21445org');
   check(l && l.org_id === org.id, '#2002: "Rather into Alpha" files the new list in the organisation ' + JSON.stringify(l && l.org_id));
@@ -108,7 +108,7 @@ async function taskImport(w, file, answer) {
   // ================= P4: a person without organisation
   w = await boot({user: 'erin'}); w.__dialogs = 'manual';
   seen = await taskImport(w, 'Umzug21445erin', 'yes');
-  check(/your private space/.test(seen.text) && !seen.org && !seen.priv && !/organisation/i.test(seen.text), 'P4: only the private space, no other workspace offered ' + seen.text);
+  check(/your private workspace/.test(seen.text) && !seen.org && !seen.priv && !/organisation/i.test(seen.text), 'P4: only the private workspace, no other workspace offered ' + seen.text);
   l = await listOf(CE, 'Umzug21445erin');
   check(l && !l.org_id, 'P4: the list is private');
   w.close();

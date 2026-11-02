@@ -5,6 +5,9 @@
    private calendar; a member of Beta the other way round
  - setting freebusy_share: org (default) / all (private + other organisations too) / off (left out, like a stranger); bad = 400
  - asking about oneself still sees every source; a freelancer (no organisation) gets her own bar as before
+ - 2.360.5 (#3245): holidays only for oneself / "all" (never in the org view, they tell the state); a team calendar shared
+   with him is not his time (an invitation he accepted is); an invitation to another organisation's event, a subscription
+   and a read-only member
  - the answer is counted per person: 429 after EFB_RATE answers a minute
 freelancer-matrix: pim
 usage: p2240_c_freebusy_test.py <datadir>"""
@@ -137,6 +140,50 @@ ev(Fr, cal(Fr, "Fiona", None), f"{DS}T09:00", f"{DS}T09:30")
 r = fb(Fr, DS, [FID, XAV, ANNA])
 check(r.ok and [p["user_id"] for p in r.json()["people"]] == [FID], "the freelancer: only herself " + r.text[:200])
 check(slots(Fr, DS, FID) == [("09:00", "09:30", "busy")], "the freelancer: her private calendar counts")
+
+# ---- 2.360.5 (#3245): holidays, a team calendar shared with him, invitations, a subscription, a read-only member
+from datetime import datetime, timezone  # noqa: E402
+from zoneinfo import ZoneInfo  # noqa: E402
+XMAS = f"{D.year + 1}-12-25"  # a holiday in every state, nothing else on it
+check(Xa.patch(B + "/api/settings", json={"holiday_state": "BE"}).ok, "xavier picks Berlin for his holidays")
+check(slots(Xa, XMAS, XAV) == AWAY, f"xavier himself: Christmas is a holiday ({slots(Xa, XMAS, XAV)})")
+got = slots(An, XMAS, XAV)
+check(got == [], f"org view: no holiday, it would tell his state ({got})")
+Xa.patch(B + "/api/settings", json={"freebusy_share": "all"})
+check(slots(An, XMAS, XAV) == AWAY, "all: the holiday shows")
+Xa.patch(B + "/api/settings", json={"freebusy_share": "org"})
+
+D4 = (D + timedelta(days=7)).isoformat()
+TEAM = cal(An, "Team", OA)
+dbx("INSERT INTO ev_cal_members(cal_id, user_id, role, hidden, added_at) VALUES(?,?,?,?,?)", (TEAM, XAV, "view", 0, "2026-10-01T00:00:00Z"), write=True)
+ev(An, TEAM, f"{D4}T14:00", f"{D4}T15:00")
+inv = ev(An, TEAM, f"{D4}T16:00", f"{D4}T17:00")
+binv = ev(Be, cal(Be, "Beta-Team", OB), f"{D4}T18:00", f"{D4}T19:00")
+for e_id in (inv, binv):
+    dbx("INSERT INTO event_attendees(event_id, user_id, partstat) VALUES(?,?,?)", (e_id, XAV, "accepted"), write=True)
+sub = dbx("INSERT INTO cal_subs(user_id, kind, name, url, status, created_at) VALUES(?,?,?,?,?,?) RETURNING id",
+          (XAV, "ics", "Extern", "x", "ok", "2026-10-01T00:00:00Z"), write=True)[0][0]
+z = ZoneInfo(TZ)
+s0_, e0_ = (datetime.fromisoformat(f"{D4}T{h}:00").replace(tzinfo=z).astimezone(timezone.utc) for h in ("20:00", "21:00"))
+dbx('INSERT INTO cal_events(sub_id, start, "end", d0, d1) VALUES(?,?,?,?,?)',
+    (sub, s0_.strftime("%Y-%m-%dT%H:%M:%SZ"), e0_.strftime("%Y-%m-%dT%H:%M:%SZ"), D4, D4), write=True)
+TEAMEV, INV, BINV, SUB = ("14:00", "15:00", "busy"), ("16:00", "17:00", "busy"), ("18:00", "19:00", "busy"), ("20:00", "21:00", "busy")
+got = slots(An, D4, XAV)
+check(got == [INV], f"org view: anna's team calendar is not his time, the invitation he accepted is; no subscription ({got})")
+got = slots(Be, D4, XAV)
+check(got == [BINV], f"berta: the invitation to the Beta event, not the Alpha team calendar ({got})")
+got = slots(Xa, D4, XAV)
+check(got == [TEAMEV, INV, BINV, SUB], f"xavier himself: every source incl. the subscription ({got})")
+Xa.patch(B + "/api/settings", json={"freebusy_share": "all"})
+got = slots(An, D4, XAV)
+check(SUB in got and BINV in got, f"all: the subscription and the Beta invitation show ({got})")
+Xa.patch(B + "/api/settings", json={"freebusy_share": "org"})
+check(An.put(B + f"/api/orgs/{OA}/members", json={"user_id": XAV, "role": "readonly"}).ok, "xavier becomes read-only in Alpha")
+got = slots(An, DS, XAV)
+check(got == [ALPHA], f"a read-only member: his own Alpha calendar still counts ({got})")
+r = fb(Xa, DS, [ANNA])
+check(r.ok and [p["user_id"] for p in r.json()["people"]] == [ANNA], "a read-only member may ask about a colleague " + r.text[:200])
+check(An.put(B + f"/api/orgs/{OA}/members", json={"user_id": XAV, "role": "member"}).ok, "xavier back to member")
 
 # ---- per-person limit (berta; the freelancer and anna are not affected)
 codes = [fb(Be, DS, [BERTA]).status_code for _ in range(EFB_RATE + 2)]

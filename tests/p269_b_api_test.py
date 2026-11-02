@@ -7,7 +7,7 @@ container (fake_paperless.py, 127.0.0.1:8098, allowed as an internal host). Inve
  - the preview counts them; the switch off = no rules (the learning still runs)
  - a second import makes no doubles, a deleted taken-over rule does not come back
  - the classifier learns the imported values once at the end of the run (models + the documents marked as trained)
- - the rules only go into the workspace of the import (an organisation's import never touches a private space)
+ - the rules only go into the workspace of the import (an organisation's import never touches a private workspace)
  - a case-sensitive rule only matches the pattern as written (an upload through the normal route)
 usage: p269_b_api_test.py <datadir>"""
 import json

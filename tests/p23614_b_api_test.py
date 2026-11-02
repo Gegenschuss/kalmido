@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # kalmido-suite:
-"""2.361.4 B (#2935) API tests, own container (kt.fresh): moving between the private space and an organisation loses
+"""2.361.4 B (#2935) API tests, own container (kt.fresh): moving between the private workspace and an organisation loses
 nothing silently.
  - absences: a new entry lands in the area the workspace switch shows ("Private" = the personal area, never quietly the
    first organisation; the switch on the organisation = that organisation); freelancer-matrix: absences (a person without
@@ -81,10 +81,10 @@ check(j.get("requests") == 2 and "1 file request goes along" in notes and "1 fil
 check(len(kt.dbx("SELECT 1 FROM fs_ext_links WHERE node_id=?", (FI,))) == 1, "#2935: the dry run changes nothing")
 
 r = A.post(B + "/api/files/move-space", json={"ids": [FO], "to": "private"})
-check(r.ok, f"the folder moved into alice's private space {r.status_code} {r.text[:160]}")
+check(r.ok, f"the folder moved into alice's private workspace {r.status_code} {r.text[:160]}")
 check(not kt.dbx("SELECT 1 FROM fs_ext_links WHERE node_id=?", (FI,)), "#2935: the external link ended with the move")
 rows = kt.dbx("SELECT org_id FROM fs_upload_requests WHERE node_id=?", (FO,))
-check(len(rows) == 2 and all(x[0] is None for x in rows), f"#2935: the file requests followed the folder into the private space {rows}")
+check(len(rows) == 2 and all(x[0] is None for x in rows), f"#2935: the file requests followed the folder into the private workspace {rows}")
 check(requests.get(B + "/u/" + TOK, timeout=30).status_code == 200, "#2935: alice's upload page still opens after the move")
 lst = A.get(B + f"/api/files/nodes/{FO}/requests")
 check(lst.ok and len(lst.json().get("requests") or []) == 2, f"#2935: the folder still lists its requests {lst.status_code} {lst.text[:160]}")

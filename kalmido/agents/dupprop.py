@@ -11,7 +11,7 @@ reads the contact routes (they stay refused for agents) and never applies anythi
 import json
 import re
 
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..core.db import db
 from ..core.access import Denied
 from ..accounts.session import me
@@ -82,7 +82,7 @@ def dup_input(c, uid, b):
     if len(rows) < 2:
         raise BadInput(tr("This address book has fewer than two contacts"))
     inp = {"book": {"id": bid, "name": book["name"]}, "contacts": [dup_brief(r) for r in rows], "limits": DUP_LIMITS}
-    return inp, tr(DUP_TITLE, (book["name"] or "")[:80]), None, None
+    return inp, tr(DUP_TITLE, (book["name"] or "")[:80], lg=lang(c, uid)), None, None
 
 
 def dup_validate(b, inp):

@@ -123,7 +123,7 @@ check(Ca.post(B + f"/api/sheets/{SID}/presence", json={"cell_id": None}).ok, "ca
 mine = ids(Ca)
 check(SID in mine and mine[SID]["shared_in"] is True and SECRET not in mine, "carol's index: the shared table, not bob's other one")
 check(set(ids(Ca, "shared")) == {SID}, "space=shared: exactly the shared table")
-check(SID not in ids(Ca, "private"), "carol's private space does not hold bob's table")
+check(SID not in ids(Ca, "private"), "carol's private workspace does not hold bob's table")
 check(Ca.get(B + f"/api/sheets/{SECRET}").status_code == 404, "bob's other private table: 404 for carol")
 vs = Ca.get(B + f"/api/sheets/{SID}/vars").json().get("vars", [])
 check(not any("salar" in (v.get("label") or "").lower() or "salar" in v.get("token", "") for v in vs), "the completion names no other table")

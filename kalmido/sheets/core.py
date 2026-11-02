@@ -27,10 +27,11 @@ from ..accounts.session import me
 from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..core.numtext import user_dec  # 2.263.0 (#2976)
-from .formula import (SH_FUNCS, SH_RAW_MAX, SH_TEXT_BUDGET, ShErr, ShEval, sh_col_index, sh_col_letter, sh_fmt, sh_freeze_dump, sh_freeze_load,
-                      sh_fn_key, sh_json_value, sh_name_ok, sh_parse, sh_parse_date, sh_parse_number, sh_plain_value, sh_slug, sh_today, sh_tokens, sh_vtype)
+from .formula import (SH_BOOLS, SH_FUNCS, SH_RAW_MAX, SH_TEXT_BUDGET, ShErr, ShEval, sh_col_index, sh_col_letter, sh_fmt, sh_freeze_dump, sh_freeze_load,
+                      sh_fn_key, sh_fn_name, sh_is_de, sh_json_value, sh_name_ok, sh_parse, sh_parse_date, sh_parse_number, sh_plain_value, sh_slug, sh_today, sh_tokens, sh_vtype)
 from .shfuncs import SHF_HELP
-from .vars import SH_VAR_WORD, sh_fields_of, sh_here_value, sh_slug_of, sh_id_of, sh_source, sh_var_value
+from .vars import (SH_HERE_WORDS, SH_VAR_TYPE, sh_field_key, sh_field_word, sh_fields_of, sh_here_value, sh_here_word, sh_slug_of, sh_id_of,
+                   sh_source, sh_var_value, sh_var_word)
 from .shkinds import SHK_KINDS, shk_plain, shk_raw  # 2.124.0 B (#2110): checkbox, person, link, file
 from .shbook import (shb_cell_stats, shb_counts, shb_deleted, shb_dict, shb_display, shb_internal, shb_only_books, shb_pairs, shb_rights_row,
                      shb_check, shb_touch)  # 2.124.0 E (#2116): several sheets in one table
@@ -391,7 +392,9 @@ def sh_to_internal(c, sheet_row, text, uid, book=None, keep=""):
             if not pos:
                 raise BadInput(tr("There is no cell {0}", f"{val[0]}{val[1]}"))
             rep = "{c:%d}" % book.ensure(pos[0], pos[1], uid)["id"]
-        elif kind == "ident" and val.lower() not in ("wahr", "true", "falsch", "false"):
+        elif kind == "ident" and val.lower() in SH_BOOLS:  # 2.368.3 (#2988): one stored form, shown in the viewer's language
+            rep = "TRUE" if SH_BOOLS[val.lower()] else "FALSE"
+        elif kind == "ident":
             rep = _ident_internal(c, sheet_row, book, names, val, uid)
         elif kind == "xref":  # 2.124.0 E (#2116): Blatt2!A1
             rep = shb_internal(c, sheet_row, book, val, uid)
@@ -414,8 +417,11 @@ def sh_to_internal(c, sheet_row, text, uid, book=None, keep=""):
                     raise BadInput(tr("Unknown field: {0}", field or "?"))
                 if val not in kept and sh_source(c, sheet_row, uid, typ, xid) in (None, "deleted"):
                     raise BadInput(tr("Unknown name: {0}", body[a:b]))
-        elif kind == "fn" and sh_fn_key(val) is None:  # 2.124.0 A (#2109): + shfuncs
-            raise BadInput(tr("Unknown function: {0}", val))
+        elif kind == "fn":  # 2.124.0 A (#2109): + shfuncs
+            key = sh_fn_key(val)
+            if key is None:
+                raise BadInput(tr("Unknown function: {0}", val))
+            rep = sh_fn_name(key)  # 2.368.3 (#2988)
         if rep is not None:
             out.append(body[last:a])
             out.append(rep)
@@ -438,22 +444,24 @@ def _ident_internal(c, sheet_row, book, names, val, uid):
     if low in book.slug_col:
         return "{col:%d}" % book.slug_col[low]
     parts = low.split(".")
-    if parts[0] in ("projekt", "liste", "kunde", "aufgabe"):  # 2.89.0 (#1916, D): + aufgabe.<id>.<field>
-        typ = {"projekt": "p", "liste": "l", "kunde": "k", "aufgabe": "t"}[parts[0]]
+    if parts[0] in SH_VAR_TYPE:  # 2.89.0 (#1916, D): + aufgabe.<id>.<field>; 2.368.3 (#2988): + the English words
+        typ = SH_VAR_TYPE[parts[0]]
         if len(parts) != 3:
             raise BadInput(tr("Unknown name: {0}", val))
-        if parts[2] not in sh_fields_of(typ):
+        field = sh_field_key(parts[2])
+        if field not in sh_fields_of(typ):
             raise BadInput(tr("Unknown field: {0}", parts[2]))
         sid = sh_id_of(c, sheet_row, uid, typ, parts[1])
         if not sid:
             raise BadInput(tr("Unknown name: {0}", val))
-        return "{%s:%d}.%s" % (typ, sid, parts[2])
-    if parts[0] == "hier":
-        if len(parts) != 2 or parts[1] not in sh_fields_of("l"):
+        return "{%s:%d}.%s" % (typ, sid, field)
+    if parts[0] in SH_HERE_WORDS:
+        field = sh_field_key(parts[-1])
+        if len(parts) != 2 or field not in sh_fields_of("l"):
             raise BadInput(tr("Unknown field: {0}", parts[-1]))
         if not sheet_row["list_id"]:
             raise BadInput(tr("This table is not attached to a project"))
-        return low
+        return f"hier.{field}"
     raise BadInput(tr("Unknown name: {0}", val))
 
 
@@ -484,7 +492,8 @@ def _node(tok, book, sheet_row):
 
 def sh_to_display(c, sheet_row, raw, book=None, uid=None):
     """A stored formula with the current names / addresses for viewer uid (default: the current principal). Ids the viewer
-    may not use (or that are gone) stay bare ids: never a name they may not see."""
+    may not use (or that are gone) stay bare ids: never a name they may not see. 2.368.3 (#2988): functions, TRUE / FALSE and the
+    words of Kalmido values in the viewer's language, whatever language they are stored in."""
     if not isinstance(raw, str) or not raw.startswith("="):
         return raw
     book = book or ShBook(c, sheet_row)
@@ -495,12 +504,26 @@ def sh_to_display(c, sheet_row, raw, book=None, uid=None):
     except ShErr:
         return raw
     names_of = {x["id"]: x["name"] for x in book.cells.values() if x.get("name") and book.live(x)}
+    lg = lang()
     out, last = [], 0
     for kind, val, a, b in toks:
+        rep = None
+        if kind == "fn":
+            key = sh_fn_key(val)
+            rep = sh_fn_name(key, lg) if key else None
+        elif kind == "ident":
+            low = val.lower()
+            if low in SH_BOOLS:
+                rep = ("WAHR" if SH_BOOLS[low] else "FALSCH") if sh_is_de(lg) else ("TRUE" if SH_BOOLS[low] else "FALSE")
+            elif low.startswith("hier."):
+                rep = f"{sh_here_word(lg)}.{sh_field_word(low[5:], lg)}"
         if kind != "idref":
+            if rep is not None:
+                out.append(body[last:a])
+                out.append(rep)
+                last = b
             continue
         typ, xid, field = val
-        rep = None
         if typ == "c":
             x = book.cells.get(xid)
             if book.live(x):
@@ -513,7 +536,7 @@ def sh_to_display(c, sheet_row, raw, book=None, uid=None):
         else:
             s = sh_slug_of(c, sheet_row, uid, typ, xid)
             if s:
-                rep = f"{SH_VAR_WORD[typ]}.{s}.{field}"
+                rep = f"{sh_var_word(typ, lg)}.{s}.{sh_field_word(field, lg)}"
         if rep is not None:
             out.append(body[last:a])
             out.append(rep)
@@ -1405,8 +1428,8 @@ def sh_vars(c, sheet_row, uid, q=""):
     q = (q or "").strip().lower()[:80]
     out = []
 
-    def add(token, label, kind, value_display="", help_=""):
-        if q and q not in token.lower() and q not in (label or "").lower():
+    def add(token, label, kind, value_display="", help_="", other=""):  # other: the same thing's name in the other language
+        if q and q not in token.lower() and q not in (label or "").lower() and q not in other.lower():
             return
         out.append({"token": token, "label": label, "kind": kind, "value_display": value_display, "help": help_})
 
@@ -1421,25 +1444,27 @@ def sh_vars(c, sheet_row, uid, q=""):
                 vd = sh_fmt(v, "number", lg)
             except ShErr:
                 continue
-            add(f"hier.{f}", tr(SH_FIELD_HELP[f]), "here", vd, tr(SH_FIELD_HELP[f]))
+            add(f"{sh_here_word(lg)}.{sh_field_word(f, lg)}", tr(SH_FIELD_HELP[f]), "here", vd, tr(SH_FIELD_HELP[f]),
+                f"{SH_HERE_WORDS[0]}.{f} {SH_HERE_WORDS[1]}.{sh_field_word(f, 'en')}")
     for typ, kind in (("p", "project"), ("l", "list"), ("k", "client")):
         for xid, slug, name in sh_sources(c, sheet_row, uid, typ):
             for f in sh_fields_of(typ):
-                tok = f"{SH_VAR_WORD[typ]}.{slug}.{f}"
-                if q and q not in tok and q not in (name or "").lower():
+                tok = f"{sh_var_word(typ, lg)}.{slug}.{sh_field_word(f, lg)}"
+                other = f"{sh_var_word(typ, 'de')}.{slug}.{f} {sh_var_word(typ, 'en')}.{slug}.{sh_field_word(f, 'en')}"
+                if q and q not in tok and q not in (name or "").lower() and q not in other:
                     continue
                 try:
                     v = sh_var_value(c, sheet_row, uid, typ, xid, f)
                     vd = sh_fmt(v, "currency" if f in ("satz", "budget_betrag") else "number", lg, sh_currency(c, sheet_row))
                 except ShErr:
                     vd = ""
-                add(tok, name, kind, vd, tr(SH_FIELD_HELP[f]))
+                add(tok, name, kind, vd, tr(SH_FIELD_HELP[f]), other)
                 if len(out) >= 300:
                     break
-    for fn in ("SUMME", "MITTELWERT", "MIN", "MAX", "ANZAHL", "WENN", "RUNDEN", "HEUTE", "TAGE"):
-        add(fn, fn, "function", "", tr(SH_FN_HELP[fn]))
-    for fn, help_ in SHF_HELP.items():  # 2.124.0 A (#2109)
-        add(fn, fn, "function", "", tr(help_))
+    # 2.124.0 A (#2109): + SHF_HELP; 2.368.3 (#2988): named in the person's language, found by either language's name
+    for fn, help_ in (*SH_FN_HELP.items(), *SHF_HELP.items()):
+        key = sh_fn_key(fn)
+        add(sh_fn_name(key, lg), sh_fn_name(key, lg), "function", "", tr(help_), f"{sh_fn_name(key, 'de')} {sh_fn_name(key, 'en')}")
     return out[:300]
 
 

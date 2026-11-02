@@ -264,7 +264,7 @@ const FAM = 'cal,habits,comments,collab,family';
   check(kt() && kt().getAttribute('role') === 'checkbox' && /Done: Tidy up your room/.test(kt().getAttribute('aria-label')), 'its task: a big named checkbox');
   check(![...d.querySelectorAll('.kidtasks li')].some(li => /Clean the bathroom|Water the plants/.test(li.textContent)), 'only its own tasks');
   w.eval(`openDetail(${KT.id}); openPalette()`); await sleep(100);
-  check(!w.eval('S.sel') && !d.querySelector('.palette:not(.hidden)') && w.eval(`topMoreItems().filter(x => x.label).map(x => x.label).join()`) === 'Account,Settings,Log out',
+  check(!w.eval('S.sel') && !d.querySelector('.palette:not(.hidden)') && w.eval(`topMoreItems().filter(x => x.label).map(x => x.label).join()`) === 'Account,Settings,Sign out',
     'a kid gets no task panel, no command palette; "…" has only its account');
   click(w, kt());
   check(await until(() => /\+2 stars!/.test(d.querySelector('#toast')?.textContent || '')), 'ticked: "+2 stars!"');
@@ -310,7 +310,7 @@ const FAM = 'cal,habits,comments,collab,family';
     // 2.161.3 CI: navigate(icon.svg) now and then answers while the app page is still shown; its late load then swallowed
     // the login fetch (no answer within 120 s) - wait until icon.svg is really the page (as p21144_d_ui)
     for (let i = 0; i < 40 && !(await ev(`location.pathname === '/static/icon.svg' && document.readyState === 'complete'`).catch(() => false)); i++) await sleep(250);
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${user}', password: 'password123'})}).then(r => r.status)`);
   };
   const ready = async (ev, sel = '#top h1', n = 40) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('${sel}')`).catch(() => false)); i++) await sleep(250); await sleep(700); };
@@ -352,9 +352,12 @@ const FAM = 'cal,habits,comments,collab,family';
     await tap(it.x, it.y);
     check(await until(async () => !!(await call('GET', `/api/tasks/${it.id}`)).completed_at, 40), `${tag}: a tap ticks the item`);
     await call('POST', `/api/tasks/${it.id}/reopen`);
-    await ev(`(() => { document.querySelector('.shopmode')?.remove(); return 1; })()`);
+    // 2.463.0 (#3887): closed by its button, and the link only after shopping mode's history entry is gone: closing goes one
+    // step back, a raw remove and a link at once lost the link to that step (a test effect: nothing in the app does both)
+    await ev(`(() => { document.querySelector('.shopmode [data-act="shop-close"]').click(); return 1; })()`);
+    check(await until(() => ev(`!document.querySelector('.shopmode') && !S.shop && !history.state?.shop`), 80), `${tag}: shopping mode closes, its history entry gone`);
     // the task panel's family section
-    await ev(`openDetail(${BD.id}); 1`);
+    await o.nav(B + '#t/' + BD.id);
     // #3506: the panel really open (the section can sit in a panel still hidden: the checks below then measured nothing),
     // the year field clear of the sticky bottom bar (it scrolls, 96 x 13 px of it showed above the bar)
     check(await until(() => ev(`(() => { const e = document.querySelector('#detail.open:not(.hidden) .famsec #d-fyear'); if (!e) return false; e.scrollIntoView({block: 'center'}); return e.getBoundingClientRect().height > 0; })()`), 80), `${tag}: the task panel opens`);

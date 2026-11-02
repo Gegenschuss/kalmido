@@ -309,9 +309,17 @@ mode: not checked yet) keeps its line in the list without the file (2.306.0).
   record purchase, depreciation and insurance values (see [Equipment value](#equipment-value-depreciation-and-insurance-list)).
 - **Contracts & insurance** (2.92.0, admins) - business contracts and insurances with notice deadlines, see
   [Contracts and insurance](#contracts-and-insurance).
-- **Text blocks** - reusable texts in German and English, grouped by kind: the rights catalogue (`rights_time`,
+- **Text blocks** - reusable texts per language, grouped by kind: the rights catalogue (`rights_time`,
   `rights_territory`, `rights_media`), introduction, closing, note, free block between positions, raw data note.
   The first call of the module copies the country pack's catalogue into the organisation's text blocks.
+- **Own texts per language** (2.460) - services, equipment, roles, text blocks, framework contracts and the invoice, delivery
+  note and reminder closings have one tab per language in their form. German and English stay in their columns, the others in
+  `trans` (`{"fr": {"name": "..."}}`, fields `name`, `text`, `rights_note`, `closing`); closings as settings such as
+  `invoice_closing_fr`. A language without its text prints the English one (a built-in standard text translated), else the
+  German one, and the document says so (`lang_notes`, `lang_gaps`). The terms PDF can be uploaded per language too.
+- **Language of a client** (2.460) - `doc_lang` in the client's billing details: new documents take it, choosing the client on
+  a draft swaps its language and standard texts, a language sent along wins; credit notes and reminders keep their invoice's.
+  Portal sign-in mails use it, and event invitations to the address of one of the inviting person's clients.
 - **Framework contracts** - one per agency or client: date, raw data included, default rights (three catalogue entries),
   rights note, closing text, special rates per service. A document can pick a contract and deviate from it.
   The signed contract and its addenda can be attached as PDF files in the contract's dialog ("Contract (PDF)": upload,
@@ -1513,6 +1521,17 @@ allowed) and `org_offices` (`[{id, name}]` while it is empty and the person has 
 `GET /api/office/mail-status` (see "Invoices and credit notes" below); 2.40.0 adds `POST /api/office/docs/<id>/fee`
 (see "Payments and reminders"). Agents never reach `/api/office/*` (their routes are `/api/v1/office`, see "Agents").
 
+## Lists on the phone and their sort
+
+*Since 2.451.*
+
+- **Phones**: the rows of quotations, invoices, the archive, trips and entertainment receipts show no symbols; the row
+  uses the full width. A tap opens as before, a long press opens the row menu. In the archive the PDF view has *Correct*
+  on a phone, an open document has its *More* menu.
+- **Sort**: quotations, invoices, credit notes, reminders, delivery notes, the archive and the pipeline have one choice of
+  *Date*, *Client*, *Amount* and *Name*, on computer and phone alike, remembered per list on the device. Choosing the
+  same entry again reverses the direction. The pipeline starts in its own order (*Standard*).
+
 ## Quotations and the calculator
 
 (Stage 1: quotations. See the editor's tab "Quotations".) The calculator is a pure function over the document, its
@@ -1523,7 +1542,7 @@ per position from the pack. Transfer of rights is printed as its own section (du
 document's language.
 
 Routes (members of the organisation; deleting needs its admin; costs and surplus only for the admin):
-`GET /api/office/docs?kind=offer&status=&q=`, `POST /api/office/docs` (a new draft from the settings; the number of the
+`GET /api/office/docs?kind=offer&status=&q=&limit=&before=` (2.369.0: a page of `limit` rows, 1-500, default 500; `next_cursor` in the answer, null on the last page, is the `before` of the next page; the list loads 100 and has *Load more*; `status=open&client_id=` = the open invoices of one client, from the whole list), `POST /api/office/docs` (a new draft from the settings; the number of the
 scheme is reserved at once), `GET/PATCH/DELETE /api/office/docs/<id>` (PATCH changes the head and returns the totals;
 choosing a framework contract presets raw data, rights and closing unless `apply_contract: false`),
 `PUT /api/office/docs/<id>/items` (the whole list of positions; a `service_id` fills title, rate, tax and flags),
@@ -1741,7 +1760,7 @@ count as plural).
   page's direct positions, then per printed part a heading and its positions with quantity x part quantity, its producing /
   raw data / discount as positions; a part not printed stays one line), `title` (the title page; a part becomes a
   position with its amount, one per tax rate) or `summary` (one position per tax rate with a title, default
-  "Filmherstellung" / "Film production"). Net and gross equal the quotation's in every form, to the cent: with a
+  without one the neutral "Leistungen" / "Services" in the document's language). Net and gross equal the quotation's in every form, to the cent: with a
   fractional part quantity (1.5 shooting days) and mixed tax rates the part line is exactly rate x quantity, and the
   rest cent of the rounded positions goes on the last position of that rate, which then shows as one amount with its
   quantity x rate in the description (2.58.0). The preset is an office
@@ -2304,6 +2323,21 @@ document texts are encrypted at rest in organisations with encryption.
   `POST .../send` takes `timesheet: true` to attach it as a second file (the invoice's own PDF / ZUGFeRD file is unchanged;
   the DATEV copy never gets it). The document answer has `timesheet_ok`.
 
+## E-mail signature, sender and answer address
+
+*Since 2.439.0 (#3617):* every person sets their own part of the office's mails (quotations, invoices, credit notes, reminders,
+delivery notes, letters by e-mail): *Settings > Company & office > Documents & numbers > E-mail signature*, *Settings > Account*
+or *Edit* in a send dialog (`GET` / `PUT /api/office/mail-profile`, with any office access, only the person's own row).
+
+- **Signature**: plain text, at most 1000 characters and 12 lines, prefilled from the name and the company data until saved. It goes
+  under the text behind `-- `; the mail is then text + HTML with the company logo as an embedded picture (*Show logo*), never a link
+  to an outside picture. The send dialog can leave it off for one mail (`signature: false`). The signature picture of letters stays apart.
+- **Sender name** free. **Answers to** (Reply-To): this mail's, else the person's, else the company e-mail. A letter's own reply address stays first.
+- **Sender address**: through the server always the server's (SPF / DMARC). With a mailbox with SMTP (e-mail filing) the mail leaves
+  through it with its address: the workspace's, in an organisation also the person's private one when chosen (*Send through*).
+- A member's own signature counts for the day's limit of own texts. A series sends without a person: the workspace's mailbox or
+  the server, the prefilled signature, the company e-mail as Reply-To, never a person's private mailbox.
+
 ## Correspondence: letters
 
 *Since 2.153.0.*
@@ -2524,9 +2558,13 @@ with
 - `receipts/`: the receipts of the documents space with their files (also those in the trash) and `receipts.csv`;
   `project-receipts/`: the receipt files of lists and projects;
 - `cashbook/`: every cash book as PDF and CSV over its whole time (entries, day closings, change log);
-- `bank/`, `expenses/`, `archive/`, `logs/` (the office log and the change logs, GoBD) as CSV; `office-files/`: every other
-  file of the office folder (archived PDFs, accepted quotations, entertainment bills ...);
+- `books/` (procedure documentation, number ranges, opening balances, locked periods, equipment), `contracts/` (contracts,
+  agreements), `bank/`, `expenses/`, `archive/`, `logs/` (the office log and the change logs, GoBD) as CSV; `office-files/`:
+  every other file of the office folder (archived PDFs, accepted quotations, entertainment bills ...). Settings and working
+  data (price lists, text blocks, cash flow, bank rules ...) stay out: a static test names each such table with its reason;
 - `00-index.txt` (contents, the retention note, files that could not be read) and `manifest.json` (SHA-256 of every file).
+  A file the virus scanner locked stays out and is listed with its reason under `locked_files` (2.370.0), apart from
+  `missing`; a receipt keeps its line in `receipts.csv`.
 
 Who downloads it: the person themself for their own records (*Office -> Settings -> Data*, also without an organisation)
 and the admins of an organisation for its office (*Settings -> Organisation*). Nobody else -- an instance admin neither
@@ -2644,6 +2682,51 @@ reminders). A draft invoice, credit note or reminder is rendered on request with
 attaches the stored files (PDF, and the XML for invoices / credit notes). A finalised quotation is not stored; its PDF is
 rendered from the snapshot on every request.
 
+## Online payment of invoices
+
+*Since 2.469.*
+
+Customers pay an invoice by link -- in the invoice mail, on the PDF (address and QR code) and in the customer portal -- and the
+payment lands on the invoice by itself. It runs through **your own account** at the provider: the money goes directly to you, the
+provider bills its fees to you, Kalmido takes no money and charges nothing. The GiroCode stays. No subscriptions or direct debit
+series; the first provider is Stripe Checkout, the methods (card, SEPA direct debit, PayPal, Apple / Google Pay) are the ones
+switched on in your Stripe account.
+
+**Set up** (Office -> Settings -> Invoices -> *Online payment of invoices*; admins of the office area, without an organisation
+you yourself):
+
+1. Choose the provider and enter the secret API key of your account (a restricted key with write access to Checkout Sessions and
+   read access to balance transactions is enough; a test key works for a trial with Stripe's test cards).
+2. Copy the *webhook address* and create a webhook endpoint at the provider with the events `checkout.session.completed`,
+   `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`,
+   `charge.refunded`, `charge.dispute.funds_withdrawn`, `charge.dispute.funds_reinstated` and `payout.paid`.
+3. Enter the endpoint's *webhook secret* and switch on *Offer online payment on invoices*.
+
+Keys are sealed with the key of the office area and never shown again; *New webhook address* replaces the address (the old one
+stops at once). Public links must be on for the server.
+
+**On the invoice.** The switch *Offer online payment* sits at each invoice: off, its link says "not available" and no payment can
+start, also from a PDF already sent. A draft, a credit note, a trial document and a cancelled invoice never have a link. A finalised
+PDF does not change: the link goes in when finalising, like the GiroCode decision. An invoice finalised before the set-up has no
+link on its PDF; mail and portal offer it anyway. Reminders carry no link of their own.
+
+**The pay page** shows the company, the invoice number and the open amount, computed at the moment of paying; a customer can pay a
+part. Paying goes to the provider's page and back.
+
+**Booking.** The provider's message books the payment exactly like one recorded by hand (method *Online payment*): part paid, paid,
+period locks and books follow. A payment arrives once whatever the provider repeats. A direct debit counts when it has settled.
+A refund or a lost dispute reverses the payment and books what is left as a new payment, both visible in the payment list. A
+refund is dated like every reversal, on the day of the payment.
+What cannot be booked (paid by bank meanwhile, invoice cancelled, month locked, another amount reported) is never lost: it stays
+under *Payments waiting for you* in the settings and at the invoice, the admins get one notice (*Integration problems* in the
+notification settings), and *Try again* or *Done* close it; money paid twice goes back by a refund at the provider, which also ends
+the wait.
+
+**Bank.** The provider's payout to your account is one collective amount. The bank list suggests *Collective payout* instead of an
+invoice (same amount as a reported payout, or the provider's name in the booking); matching it books no payment, so nothing counts
+twice. With the payout known, its fees are read at the provider and filed as one receipt, paid that day: the expense in the books.
+Set its VAT rate there if your provider's fees carry VAT (Stripe bills from abroad, usually reverse charge).
+
 ## E-invoices over the Peppol network
 
 *Since 2.154.*
@@ -2661,7 +2744,8 @@ with a sandbox key, and your own Peppol ID. **Check connection** asks the provid
   (`document_submissions`, the raw document parsed by the provider), asks before sending whether the recipient is
   reachable (`discovery/receives`) and reads the delivery evidence when you refresh the status. Storecove reports a
   rejection or a failed delivery only through a webhook, which Kalmido does not receive: such a send stays *Sent over
-  Peppol*, and the Peppol view says so - check the status with the recipient or in your Storecove account.
+  Peppol*, and the Peppol view says so - check the status with the recipient or in your Storecove account. Did it not
+  arrive, *Mark as not delivered* in that view frees *Send again* (2.370.0).
 - *Own endpoint (URL)*: any bridge to an access point (your own one, another provider's API behind a small adapter) that
   speaks this protocol, `https` (plain `http` only for a host the instance admin allowed like a calendar host); every call
   carries `Authorization: Bearer <API key>`:

@@ -34,6 +34,7 @@ async function pdfView(o) {
     <div class="pvzoom" hidden><button type="button" class="iconbtn" data-pv="out" title="${esc(tr('Zoom out'))}" aria-label="${esc(tr('Zoom out'))}">${PV_IC.minus}</button>
       <button type="button" class="pvpct" data-pv="fit" title="${esc(tr('Fit to width'))}"></button>
       <button type="button" class="iconbtn" data-pv="in" title="${esc(tr('Zoom in'))}" aria-label="${esc(tr('Zoom in'))}">${ic('plus')}</button></div>
+    ${o.arch ? `<button type="button" class="iconbtn" data-pv="arch" title="${esc(tr('Correct archived document'))}" aria-label="${esc(tr('Correct archived document'))}">${ic('edit')}</button>` : '' /* 2.451.0 (#3834) */}
     <a class="iconbtn" href="${esc(dl)}" download="${esc(o.name || '')}" title="${esc(tr('Download'))}" aria-label="${esc(tr('Download'))}">${ic('download')}</a>
     <a class="iconbtn" href="${esc(url)}" target="_blank" rel="noopener" title="${esc(tr('Open in new tab'))}" aria-label="${esc(tr('Open in new tab'))}">${PV_IC.ext}</a>
     <button type="button" class="iconbtn" data-pv="x" title="${esc(tr('Close'))}" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
@@ -102,6 +103,7 @@ async function pdfView(o) {
   m.addEventListener('click', e => {
     const b = e.target.closest('[data-pv]');
     if (e.target === m || b?.dataset.pv === 'x') { close(); return; }
+    if (b?.dataset.pv === 'arch') { close(); r81b_archEdit(o.arch); return; }
     if (!b || b.disabled) return;
     const a = b.dataset.pv;
     if (a === 'prev') go(cur - 1); else if (a === 'next') go(cur + 1);

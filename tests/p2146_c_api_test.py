@@ -10,11 +10,13 @@ tenant-matrix: office, budget
    with another day and text is found again by its reference; camt052 tells the dialog to recommend CAMT.053
  - #2455 shared reader: the S/H mark column (guessed next to the amount, by its name, the Volksbank layout with S/H),
    an unreadable mark = an error row, DD-MM-YYYY and YYYYMMDD
- - #2455 household (the person without organisation in its private space, and an organisation's member): several files and
+ - #2455 household (the person without organisation in its private workspace, and an organisation's member): several files and
    a ZIP in one multipart parse, pending rows apart and refused on commit, duplicates across files by reference, a CSV row
    with the counterpart IBAN found again in a CAMT file with another text (day + amount + IBAN), more than 3000 rows read
    and taken over in two parts under one run, 20001 rows refused; an import run listed and taken back (an entry changed
    after the import is named and kept, then deleted when asked); another person gets 404 on the list's runs
+ - 2.378.0 (#3347) household: a fixed EndToEndId with the same amount in two months = two entries (the second was dropped);
+   the same file again = duplicate; a key stored without the day only finds an entry of its own day, and is not rewritten
 usage: p2146_c_api_test.py <datadir>"""
 import base64
 import io
@@ -35,7 +37,7 @@ DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import CT, FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 FEAT = "cal,comments,collab,office,clients,home,budget,contracts"
 K = "/api/office/bank"
 IBAN1, IBAN2, IBAN3 = "DE02120300000000202051", "DE89370400440532013000", "DE75512108001245126199"
@@ -273,6 +275,57 @@ r = Bo.post(B + f"/api/budget/{LO}/import/commit", json={"rows": [{k: x[k] for k
 check(r.status_code == 201 and r.json()["created"] == 4, "organisation budget: the same 4 " + r.text[:100])
 check(all(str(x[0]).startswith("kenc1:") for x in sql("SELECT title FROM budget_entries WHERE list_id=?", (LO,))), "organisation budget: titles encrypted at rest")
 check(Ca.post(B + f"/api/budget/{LO}/import/parse", json={"text": YM}).status_code in (403, 404), "organisation budget: another person 404")
+
+# ================================================================ 2.378.0 (#3347) household: the EndToEndId key with the booking day
+# a fixed EndToEndId (contract number) with the same amount every month = a new booking each month, like the office (#2843)
+L3 = Fr.post(B + "/api/budget/lists", json={}).json()["list_id"]
+BK = ("day", "amount", "kind", "title", "counterpart", "iban", "ref", "e2e", "fi")
+
+
+def bparse(entries):
+    r = up(Fr, f"/api/budget/{L3}/import/parse", [("auszug.xml", c053(entries))])
+    assert r.ok, r.text
+    return r.json()["rows"]
+
+
+def bfix(day, text):
+    return ntry("49.00", "CRDT", day, e2e="VERTRAG-77", name="Kunde Abo", text=text)
+
+
+def bcommit(rows):
+    r = Fr.post(B + f"/api/budget/{L3}/import/commit", json={"rows": [{k: x[k] for k in BK} for x in rows]})
+    check(r.status_code == 201, "budget #3347: commit " + r.text[:200])
+    return r.json()
+
+
+jan, feb, mae = bfix("2026-01-15", "Abo Januar"), bfix("2026-02-15", "Abo Februar"), bfix("2026-03-15", "Abo Maerz")
+rows = bparse([jan])
+check(bcommit(rows)["created"] == 1, "budget #3347: January imported")
+rows = bparse([feb])
+check([x["dup"] for x in rows] == [False], f"budget #3347: the same EndToEndId and amount a month later is no duplicate {rows}")
+j = bcommit(rows)
+check(j["created"] == 1 and j["skipped_dup"] == 0, f"budget #3347: the February booking is created (was dropped) {j}")
+check([x["dup"] for x in bparse([feb])] == [True], "budget #3347: the same file again is a duplicate")
+check(bcommit(bparse([bfix("2026-02-15", "Abo Februar anders")]))["skipped_dup"] == 1, "budget #3347: the same day with another text stays a duplicate on commit")
+# two months in the files of one import: both new
+rows = up(Fr, f"/api/budget/{L3}/import/parse", [("a.xml", c053([bfix("2026-04-15", "Abo April")])), ("b.xml", c053([bfix("2026-05-15", "Abo Mai")]))]).json()["rows"]
+check([x["dup"] for x in rows] == [False, False], f"budget #3347: two months in two files of one import {rows}")
+# a key stored before 2.378 (without the day): only for a booking of its own day; stored keys are not rewritten
+out = subprocess.run(["docker", "exec", CT, "python", "-c", "import app\nfrom kalmido.life.budget import bud_rkeys\nfrom kalmido.core import csvimport as cx\n"
+                      f"print('KEY', bud_rkeys({L3}, '2026-01-15', 49, 'in', None, 'VERTRAG-77', cx.csv_ref_legacy))"], capture_output=True, text=True)
+old = next((x.split()[1] for x in out.stdout.splitlines() if x.startswith("KEY ")), None)
+check(old is not None, "budget #3347: the old key made in the app " + (out.stdout + out.stderr)[-300:])
+ids = [x[0] for x in sql("SELECT id FROM budget_entries WHERE list_id=? AND day='2026-01-15'", (L3,))]
+check(len(ids) == 1, f"budget #3347: the January entry {ids}")
+con = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+con.execute("UPDATE budget_entries SET rkeys=?, ikey='', dkey='' WHERE id=?", (old or "", ids[0]))  # only the old key may find it
+con.commit()
+con.close()
+check([x["dup"] for x in bparse([bfix("2026-01-15", "Abo Januar anders")])] == [True], "budget #3347: an old key finds the booking of its own day")
+check([x["dup"] for x in bparse([mae])] == [False], "budget #3347: an old key does not swallow the booking of another month")
+check(bcommit(bparse([mae]))["created"] == 1, "budget #3347: an old key lets March through on commit")
+check(bcommit(bparse([bfix("2026-01-15", "Abo Januar anders")]))["created"] == 0, "budget #3347: an old key stays a duplicate on commit on its own day")
+check(sql("SELECT rkeys FROM budget_entries WHERE id=?", (ids[0],))[0][0] == old, "budget #3347: a stored old key is not rewritten")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

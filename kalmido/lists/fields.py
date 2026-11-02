@@ -166,7 +166,7 @@ def field_value(c, f, v, lid):
         try:
             uid = int(v)
         except (TypeError, ValueError):
-            raise BadInput(tr("unknown user")) from None
+            raise BadInput(tr("unknown person")) from None
         if uid not in list_people(c, lid) or (not collab_all() and list_role(c, lid, uid) != "owner"):
             raise BadInput(tr("Only the owner or a member of the project can be assigned"))
         return str(uid)

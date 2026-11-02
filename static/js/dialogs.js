@@ -353,6 +353,16 @@ function fl_nameEnd(id) {
   clearTimeout(fl_liveRaf); renderSide(); renderTop();
 }
 const lp_fieldName = f => tr({name: N_('Name'), color: N_('Colour'), folder: N_('Folder'), view: N_('View'), kind: N_('Type'), checklist: N_('Show completed at the bottom'), dep_shift: N_('Move dependent tasks along'), rate: N_('Hourly rate'), archived: N_('Archived')}[f] || f);
+// 2.474.0 (#3917): the writes of one list go out one after the other: a second quick choice on a slow connection could overtake
+// the first on the server, and the older value stayed while the screen showed the newer one
+const LP_TAIL = new Map();
+function lpSend(id, body) {
+  const p = (LP_TAIL.get(id) || Promise.resolve()).catch(() => {}).then(() => api('PATCH', '/api/lists/' + id, body));
+  LP_TAIL.set(id, p);
+  const end = () => { if (LP_TAIL.get(id) === p) LP_TAIL.delete(id); };
+  p.then(end, end);
+  return p;
+}
 async function listPatch(id, body, label, o = {}) {
   const l = listById(id); if (!l) return false;
   const ws0 = l.org_id || null;  // 2.53.0 (#1474)
@@ -373,7 +383,7 @@ async function listPatch(id, body, label, o = {}) {
       const back = optSet(() => listById(id), vals)();
       if (!e && Object.keys(before).length) { e = histAdd({label: label || tr('Settings of {0}', qn(lname(l))), undo: go(before, after), redo: go(after, before), post: o.post}); o.step?.(e); }
       return back;
-    }, () => api('PATCH', '/api/lists/' + id, body));
+    }, () => lpSend(id, body));
   } catch {
     if (e) { HIST.undo = HIST.undo.filter(x => x !== e); renderHist(); }
     run(); return false;
@@ -410,7 +420,7 @@ function listMenuItems(id, anchor) {
   const l = listById(id); if (!l) return [];
   const own = isOwner(l), k = l.kind || 'list', at = () => typeof anchor === 'function' ? anchor() : anchor;
   // 2.25.0 (UX-12): only what works here: the inbox has no "Edit list…" and no list / project switch
-  const items = [...(l.is_inbox ? [] : [{label: tr('Edit project…'), icon: 'edit', fn: () => listModal(id)}]), ...(shareOk(l) && !l.archived ? [{label: tr(collab() ? N_('Share…') : N_('Ownership…')), icon: 'users', fn: () => shareModal(id)}] : [])];
+  const items = [...(l.is_inbox ? [] : [{label: tr('Edit project…'), icon: 'edit', fn: () => listModal(id)}]), ...(shareOk(l) && !l.archived ? [{label: tr(collab() ? N_('Share…') : N_('Ownership…')), icon: 'users', cls: 'mshare', fn: () => shareModal(id)}] : [])];
   // 2.27.0 (#974): "Agent: <name>…" right under "Share…": opens the share dialog at its Agents part (one place for the setting)
   // 2.36.2 (#1135): from the sidebar (right-click / long press): the colour in one tap (the 9 fixed colours + none)
   if (own && !l.is_inbox && !l.archived && typeof anchor !== 'function' && anchor?.closest?.('#side')) items.unshift(lp_menuRow(lp_col(l), c => licColor(id, c)), '-');  // 2.53.0 (#1426): the 12 tones (listcolor.js)
@@ -437,6 +447,7 @@ function listMenuItems(id, anchor) {
   if (feat('sheets') && !l.is_inbox && !l.archived && !l.e2e) items.push({label: tr('Attached tables'), icon: 'sheet', cls: 'msheets', fn: () => go('sheets/l/' + id)});  // 2.89.0 (#1916): the tables attached to it
   if (!l.archived && typeof mw_ok === 'function' && mw_ok()) items.push({label: tr('Open in its own window'), icon: 'panel', cls: 'mminiwin', fn: () => mw_open(id)});  // 2.39.1 (#1294): desktop, miniwin.js
   if (!l.is_inbox && !l.archived) items.push({label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(at(), id)});
+  if (!l.is_inbox && !l.archived && !S.listReorder && typeof listReorderSet === 'function') items.push({label: tr('Sort projects'), icon: 'sort', cls: 'mlsort', fn: () => listReorderSet(true)});  // 2.482.0 (#3951): the sort mode of sidebar + Projects page
   // 2.116.0 C (#2064): the list as a CSV file / a printable page (listprint.js); a list with the lock has only ciphertext on the server
   items.push({label: tr('Export as CSV'), icon: 'download', cls: 'mlexcsv', fn: () => lexCsv(id), ...(l.e2e ? {dis: true, title: tr('Not available in encrypted projects')} : {})},
     {label: tr('Print'), icon: 'file', cls: 'mlexprint', fn: () => lexPrint(id)});
@@ -580,7 +591,7 @@ async function listDeleteForGood(id) {
 // ---- 2.6.0 (K12): the Share dialog, out of the long list dialog: people + roles and inviting, the agents of the list (share /
 // stop sharing, the tidy agent), the public link, transferring the ownership. From the list's "…" menu, the header's Share
 // button and the list dialog (Sharing > Share…). Admins without collaboration only see the ownership part.
-const shareOk = l => !!l && !l.is_inbox && (collab() || !!S.me?.is_admin);
+const shareOk = l => !!l && !l.is_inbox && !l.quicknote && (collab() || !!S.me?.is_admin);  // 2.477.0 (#3881): the list Notes stays private
 function shareSummary(l) {
   const ppl = listPeople(l).filter(p => !(S.me && p.user_id === S.me.id) && !agentById(p.user_id) && !p.agent), ags = listAgents(l);
   if (!collab()) return tr('Owner: {0}', l.owner_name || S.me?.display_name || '');
@@ -611,7 +622,7 @@ function shareModal(id, opt = {}) {
   const shSecSet = (k, show, st) => { const sec = $('#sh-sec-' + k, md); if (!sec) return; sec.hidden = !show; const e = $('#sh-st-' + k, md); if (e) e.textContent = st || ''; };
   const roleSel = (attr, cur_, lab) => `<select ${attr} aria-label="${esc(lab || tr('Role'))}">${ROLES.map(([v, n, h]) => `<option value="${v}" title="${esc(tr(h))}" ${v === cur_ ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
   const isAg = p => !!(p.agent || agentById(p.user_id));
-  const row = (cur, p, mng) => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, p.name)}<span class="n">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}${isAg(p) ? agentBadge() : ''}${p.via_group ? ` <span class="muted">${tr('via a group')}</span>` : ''}${p.via_folder && cur.folder ? ` <span class="muted lfvia">${esc(tr('via the folder {0}', fDisp(cur.folder)))}</span>` : ''/* 2.352.0 E (#2748) */}</span>${mng && p.role !== 'owner' && !(S.me && p.user_id === S.me.id) && !p.via_group
+  const row = (cur, p, mng) => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, p.name)}<span class="n">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}${isAg(p) ? agentBadge(p.user_id) : ''}${p.via_group ? ` <span class="muted">${tr('via a group')}</span>` : ''}${p.via_folder && cur.folder ? ` <span class="muted lfvia">${esc(tr('via the folder {0}', fDisp(cur.folder)))}</span>` : ''/* 2.352.0 E (#2748) */}</span>${mng && p.role !== 'owner' && !(S.me && p.user_id === S.me.id) && !p.via_group
       ? `${roleSel(`data-mrole="${p.user_id}"`, p.role, tr('Role of {0}', p.name))}<button class="iconbtn" data-mrm="${p.user_id}" title="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove from project'))}" aria-label="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove {0} from this project', p.name))}">${ic('x', 's')}</button>`
       : `<span class="muted" title="${esc(roleHelp(p.role))}">${esc(roleLabel(p.role))}</span>`}</div>`;
   const draw = () => {
@@ -875,7 +886,7 @@ async function lmStatusSet(lid, sel) {  // the status at once, without a note (t
 // 2.361.2 (#2923): moving a project into an organisation: a member gets it back only through its admins (they ask for it)
 function lwsBack(org, from) {
   if (!org || +org === +(from || 0) || (S.me?.workspaces || []).find(w => w.id === +org)?.role === 'admin') return '';
-  return ' ' + tr('Back into your private space only after an admin of the organisation releases it (you ask for it).');
+  return ' ' + tr('Back into your private workspace only after an admin of the organisation releases it (you ask for it).');
 }
 // 2.364.0 D (#3033): "New project" in short: "For whom?" (the workspace) on top, then the name; the rest under "More options"
 // (closed; open when the dialog comes with a project type or a use). The fields stay in the form and are sent as before.
@@ -938,7 +949,7 @@ function listModal(id, folder = '', o = {}) {
     ${timeOn() && (own || l.rate) ? `<div class="row"><label for="l-rate">${tr('Hourly rate')}</label><input id="l-rate" inputmode="decimal" value="${l.rate != null ? esc(String(l.rate).replace('.', numDec())) : ''}" placeholder="${tr('optional')}" style="max-width:6.875rem" ${dis}><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('time reports')}</span></div>` : ''}
     ${timeOn() ? '</div>' : ''}`, fown)}
     ${lmSec('show', tr('Display and behaviour'), `
-    <div class="row"><label>${tr('Color')}</label><div class="colors" id="l-col" role="group" aria-label="${esc(tr('Color'))}">${lp_dlgBtns(id || l.color ? lp_col(l) : lp_folderColor(folder), adis) /* 2.53.0 (#1426): the 12 tones; a new list: its folder's */}</div></div>
+    <div class="row"><label>${tr('Colour')}</label><div class="colors" id="l-col" role="group" aria-label="${esc(tr('Colour'))}">${lp_dlgBtns(id || l.color ? lp_col(l) : lp_folderColor(folder), adis) /* 2.53.0 (#1426): the 12 tones; a new list: its folder's */}</div></div>
     ${''/* 2.396.0 (#3385): the row "Used for" is gone; a list keeps its stored family (shopping mode, aisles); a shopping list offers it in the list itself (render.js hint shop) */}
     ${id ? `<div class="row lmtrow"><label>${tr('My tasks')}</label><label class="chkl"><input type="checkbox" id="l-inmine" ${mtShown(id) ? 'checked' : ''}> ${tr('Show in My tasks')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
     ${id && progressOn() ? `<div class="row"><label>${tr('Progress')}</label><label class="chkl"><input type="checkbox" id="l-showprog" ${progHidden(id) ? '' : 'checked'}> ${tr('Show the progress bar')}</label><span class="muted">${tr('only for you')}</span></div>` : ''}
@@ -966,7 +977,8 @@ function listModal(id, folder = '', o = {}) {
     ${lmSec('sec', tr('Security|project'), `${id && typeof le2u_listRowHtml === 'function' ? le2u_listRowHtml(l) : ''}${''/* 2.64.1 (#1817): the lock of the list (liste2eui.js) */}`, fown)}
     ${l.is_inbox ? '' : lmSec('proj', tr('Project features'), `
     ${id ? '' : `<div class="lptype"><div class="ptlab">${tr('Start from')}</div><div class="ptcards" role="radiogroup" aria-label="${esc(tr('Start from'))}">${PTYPE_UI.map(([k, n, i, dsc]) => `<button type="button" class="ptcard ${k === (o.ptype || '') ? 'on' : ''}" role="radio" aria-checked="${k === (o.ptype || '')}" data-pt="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(dsc)}</small></button>`).join('')}${tplOf('list').map(tp => `<button type="button" class="ptcard" role="radio" aria-checked="false" data-pt="tpl:${tp.id}">${ic('copy', 's')}<b>${esc(tp.name)}</b><small class="muted" data-ptd="${tp.id}">${tr('Your template')}</small></button>`).join('')}</div>
-      <div class="row ptsecs" ${PTYPE_SECS[o.ptype || ''] ? '' : 'hidden'}><label class="chkl"><input type="checkbox" id="l-ptsecs"> ${tr('With the standard sections')}</label><span class="muted" id="l-ptsecsl">${esc(ptSecsLine(o.ptype || ''))}</span></div>
+      <div class="row ptsecs" ${PTYPE_SECS[o.ptype || ''] ? '' : 'hidden'}><label class="chkl"><input type="checkbox" id="l-ptsecs"> ${tr('With the default sections')}</label><span class="muted" id="l-ptsecsl">${esc(ptSecsLine(o.ptype || ''))}</span></div>
+      <div class="row ptbug" ${o.ptype === 'software' ? '' : 'hidden'}><label class="chkl"><input type="checkbox" id="l-ptbug"> ${tr('With a bug inbox')}</label><span class="muted">${tr('A second project; bugs with a release move here by themselves')}</span></div>${''/* 2.473.0 (#3378) */}
       <div class="ptdates" hidden><div class="row"><label>${tr('Project start')}</label>${dateIn('l-pstart', today(), {label: tr('Project start'), clear: false})}</div><div class="row"><label>${tr('End (optional)')}</label>${dateIn('l-pend', '', {label: tr('End (optional)'), empty: tr('none')})}<span class="muted">${tr('stretches or squeezes the dates')}</span></div></div></div>`}
     ${id ? ptypeRowHtml(l) : ''}
     ${own ? `<div class="row ltkrow" ${swArea(l) || l.tickets ? '' : 'hidden'}><label>${tr('Ticket types')}</label><label class="chkl"><input type="checkbox" id="l-tickets" ${l.tickets ? 'checked' : ''}> ${tr('Bug, feature, task')}</label>${id ? `<button class="btn sm" data-m="tt-tpl" type="button">${tr('Templates…')}</button>` : ''}</div>
@@ -974,6 +986,7 @@ function listModal(id, folder = '', o = {}) {
     ${tk_listRow(l)}${''/* 2.390.0 (#3353): ticket key (git.js) */}
     ${id ? spr_dlgRow(l) : ''}${''/* 2.60.0 (#343) */}
     ${spt_listRow(l, own)}${''/* 2.60.0 (#1511) */}
+    ${ow_listRow(l, own)}${''/* 2.392.0 C (#3370) */}
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
     <div class="shint lhint">${tr('Postponing a task moves the tasks it blocks by the same number of days. One undo takes the whole chain back.')}</div>` : ''}
     ${id && canManage(l) && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this project: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner and project admins can change them')}</div>` : ''}
@@ -1191,6 +1204,7 @@ function listModal(id, folder = '', o = {}) {
       const tp = b.dataset.pt.startsWith('tpl:');
       $('.ptdates', md).hidden = !tp;
       $('.ptsecs', md).hidden = !PTYPE_SECS[b.dataset.pt]; $('#l-ptsecsl', md).textContent = ptSecsLine(b.dataset.pt);  // 2.27.0 (#972)
+      $('.ptbug', md).hidden = b.dataset.pt !== 'software';  // 2.473.0 (#3378)
       const pt = PTYPE_UI.find(x => x[0] === b.dataset.pt);
       // 2.22.0 (#749): every new list opens as a list (the board is one tap away)
       if ($('#l-tickets', md)) { $('#l-tickets', md).checked = b.dataset.pt === 'software'; $('#l-tickets', md).closest('.row').hidden = !!b.dataset.pt; }
@@ -1251,7 +1265,7 @@ function listModal(id, folder = '', o = {}) {
         try { n = {id: (await api('POST', `/api/templates/${+pt.slice(4)}/apply`, {name: body.name, folder: body.folder, ...(body.color ? {color: body.color} : {}), start: $('#l-pstart', md).value || today(), ...($('#l-pend', md).value ? {end: $('#l-pend', md).value} : {})})).list_id}; } catch { return; }
       } else {
         // 2.411.0 (#3516): no type in a folder that has one = chosen so (ptype ""), the server would give it the folder's type
-        try { n = await api('POST', '/api/lists', pt ? {name: b0.name, folder: b0.folder, color: b0.color, ptype: pt, ...($('#l-ptsecs', md)?.checked ? {sections: true} : {}), ...('org_id' in b0 ? {org_id: b0.org_id} : {})} : own && folderPtype(b0.folder) ? {...b0, ptype: ''} : b0); } catch { return; }
+        try { n = await api('POST', '/api/lists', pt ? {name: b0.name, folder: b0.folder, color: b0.color, ptype: pt, ...($('#l-ptsecs', md)?.checked ? {sections: true} : {}), ...(pt === 'software' && $('#l-ptbug', md)?.checked ? {bug_inbox: true} : {}), ...('org_id' in b0 ? {org_id: b0.org_id} : {})} : own && folderPtype(b0.folder) ? {...b0, ptype: ''} : b0); } catch { return; }
       }
       // 2.359.2 B (#3049): the rate / reminder sent after the create: a failure says so, with the list's dialog one tap away
       const rnFail = (rate || nag) && await api('PATCH', '/api/lists/' + n.id, {...(rate ? {rate} : {}), ...(nag ? {nag} : {})}).then(() => false, () => true);
@@ -1297,6 +1311,7 @@ function lmFolderPtype(md, folder) {
   if (!card) return;
   $$('.ptcard', md).forEach(x => { x.classList.toggle('on', x === card); x.setAttribute('aria-checked', x === card); });
   $('.ptsecs', md).hidden = !PTYPE_SECS[t]; $('#l-ptsecsl', md).textContent = ptSecsLine(t);
+  $('.ptbug', md).hidden = t !== 'software';  // 2.473.0 (#3378)
   if ($('#l-ptsecs', md)) $('#l-ptsecs', md).checked = !!t;
   if ($('#l-tickets', md)) { $('#l-tickets', md).checked = t === 'software'; $('#l-tickets', md).closest('.row').hidden = !!t; }
 }
@@ -1324,15 +1339,15 @@ async function ownerModal(lid, name, j, done) {
   });
 }
 // Settings > Administration: the lists nobody can manage (owner = an agent or a disabled user), with "Take over"
-const orphHtml = () => `<h4 id="s-orph-h">${tr('Projects owned by agents or disabled users')}</h4>
-  <div class="shint">${tr('Nobody can manage who is in these projects: agents cannot share, disabled users cannot log in. Take a project over for yourself or hand it to another person.')}</div>
+const orphHtml = () => `<h4 id="s-orph-h">${tr('Projects owned by agents or disabled accounts')}</h4>
+  <div class="shint">${tr('Nobody can manage who is in these projects: agents cannot share, disabled users cannot sign in. Take a project over for yourself or hand it to another person.')}</div>
   <div class="members" id="s-orph"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 async function orphDraw(md) {
   const box = $('#s-orph', md); if (!box) return;
   let j; try { j = await calReq('GET', '/api/admin/lists/orphaned'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box._j = j;
   box.innerHTML = j.lists.length ? j.lists.map(l => `<div class="mrow" data-olid="${l.id}">${av(l.owner_id, l.owner_name)}<span class="n"><b>${esc(listName(l.name))}</b>
-      <small class="muted">${esc(l.reason === 'agent' ? tr('owned by the agent {0}', l.owner_name) : tr('owned by the disabled user {0}', l.owner_name))} · ${esc(trn('{0} member', '{0} members', l.members))} · ${esc(trn('{0} task', '{0} tasks', l.tasks))}${l.archived ? ' · ' + esc(tr('archived')) : ''}</small></span>
+      <small class="muted">${esc(l.reason === 'agent' ? tr('owned by the agent {0}', l.owner_name) : tr('owned by the disabled account {0}', l.owner_name))} · ${esc(trn('{0} member', '{0} members', l.members))} · ${esc(trn('{0} task', '{0} tasks', l.tasks))}${l.archived ? ' · ' + esc(tr('archived')) : ''}</small></span>
       <button class="btn sm" data-orph="${l.id}">${ic('user', 's')} ${tr('Take over')}</button></div>`).join('')
     : `<div class="muted mhint">${tr('None: every project is owned by an active person.')}</div>`;
 }
@@ -1384,7 +1399,7 @@ function lookHtml() {
       <div class="lpv-foot"><span class="btn sm pri">${ic('plus', 's')} ${tr('Add task')}</span><span class="lpv-link">${tr('Show completed')}</span><span class="lpv-prio flag-5">${ic('flag', 's')}${tr('high')}</span></div>
     </div>
     ${o3c_packHtml() /* 2.83.0 C (#1427): themes (listhead.js) */}
-    <h4>${tr('Color scheme')}</h4>
+    <h4>${tr('Colour scheme')}</h4>
     <div class="row">${seg('theme', THEMES)}</div>
     <h4>${tr('Density')}</h4>
     <div class="row">${seg('density', DENSITIES)}</div>
@@ -1399,7 +1414,7 @@ function lookHtml() {
     <h4>${tr('Font')}</h4>
     <div class="lkopts lkfont" id="s-font" role="group">${LOOK.font.map(([v, n]) => `<button ${on('font', v)}><span class="lkAa lkf-${v}">Aa</span><span class="lkn">${tr(n)}</span></button>`).join('')}</div>
     <div class="shint">${tr('Atkinson Hyperlegible is especially easy to read.')}</div>
-    <h4>${tr('Accent color')}</h4>
+    <h4>${tr('Accent colour')}</h4>
     <div class="lkopts lkacc" id="s-accent" role="group">${LOOK.accent.map(([v, n, d, l]) => `<button ${on('accent', v)} style="--sw-d:${d};--sw-l:${l}" title="${tr(n)}"><i class="lksw"></i><span class="lkn">${tr(n)}</span></button>`).join('')}</div>
     ${lkChatHtml() /* 2.233.0 C (#3196) */}
     ${o3c_lookHtml() /* 2.83.0 C (#1427): header pictures + progress rings */}
@@ -1430,7 +1445,7 @@ function lkChatHtml() {
   const on = (k, v) => `data-look="${k}" data-v="${v}" aria-pressed="${lookCur(k) === v}" class="${lookCur(k) === v ? 'on' : ''}"`;
   const pick = (k, id) => `<div class="lkopts lkacc" id="${id}" role="group" aria-label="${esc(tr(k === 'chatHuman' ? 'Messages from people' : 'Messages from agents'))}">${LOOK[k].map(([v, n, d, l]) => `<button ${on(k, v)} style="--sw-d:${d || 'var(--bg3)'};--sw-l:${l || 'var(--bg3)'}" title="${tr(n)}"><i class="lksw${d ? '' : ' lkswd'}"></i><span class="lkn">${tr(n)}</span></button>`).join('')}</div>`;
   return `<h4>${tr('Chat')}</h4>
-    <div class="shint">${tr('Own messages keep the accent color.')}</div>
+    <div class="shint">${tr('Own messages keep the accent colour.')}</div>
     <div class="lkcpv" inert aria-hidden="true"><div class="cmsg ag"><div class="cbub">${tr('Can you take a look at this?')}</div></div><div class="cmsg ag agc"><div class="cbub">${tr('Done, it is in the list.')}</div></div><div class="cmsg me"><div class="cbub">${tr('Thanks!')}</div></div></div>
     <h5 class="lkch">${tr('Messages from people')}</h5>${pick('chatHuman', 's-chatHuman')}
     <h5 class="lkch">${tr('Messages from agents')}</h5>${pick('chatAgent', 's-chatAgent')}`;

@@ -84,6 +84,7 @@ function env_editModal(l, e, j) {
   const md = modal(`<h3>${esc(tr('Environment'))}</h3>
     <div class="row"><label for="env-name">${tr('Name')}</label><input id="env-name" maxlength="40" value="${esc(e?.name || '')}" placeholder="${esc(tr('e.g. Staging'))}" autocomplete="off"></div>
     <div class="row"><label class="chkl"><input type="checkbox" id="env-close" ${e?.auto_close ? 'checked' : ''}> <span>${esc(tr('Complete the open tasks of a milestone when it arrives here'))}</span></label></div>
+    <div class="row"><label class="chkl"><input type="checkbox" id="env-acc" ${e?.acceptance_task ? 'checked' : ''}> <span>${esc(tr('Create a task to accept each new version'))}</span></label></div>
     ${e && j.manage ? `<div class="row envhook"><label>${esc(tr('Deploy webhook'))}</label><div><span class="muted">${esc(e.hook ? tr('On: your deploy script posts the version to a secret address.') : tr('Off'))}</span>
       <div class="envhb"><button type="button" class="btn sm" data-m="hook" data-how="${e.hook ? 'rotate' : 'on'}">${esc(e.hook ? tr('New address') : tr('Switch on'))}</button>${e.hook ? `<button type="button" class="btn sm" data-m="hook" data-how="off">${esc(tr('Switch off'))}</button>` : ''}</div>
       <div id="env-url"></div></div></div>` : ''}
@@ -105,15 +106,15 @@ function env_editModal(l, e, j) {
           redo: async () => { await api('DELETE', `/api/envs/${e.id}`); env_load(l.id, true); }});
         env_load(l.id, true); toast(tr('Environment removed')); return;
       }
-      const name = $('#env-name', md).value.trim(), ac = $('#env-close', md).checked;
+      const name = $('#env-name', md).value.trim(), ac = $('#env-close', md).checked, at = $('#env-acc', md).checked;
       if (!name) { toast(tr('Enter a name')); return; }
       if (e) {
-        const before = {name: e.name, auto_close: e.auto_close};
-        await api('PATCH', `/api/envs/${e.id}`, {name, auto_close: ac});
+        const before = {name: e.name, auto_close: e.auto_close, acceptance_task: e.acceptance_task};
+        await api('PATCH', `/api/envs/${e.id}`, {name, auto_close: ac, acceptance_task: at});
         const put = x => async () => { await api('PATCH', `/api/envs/${e.id}`, x); env_load(l.id, true); };
-        histAdd({label: tr('Environment changed'), undo: put(before), redo: put({name, auto_close: ac})});
+        histAdd({label: tr('Environment changed'), undo: put(before), redo: put({name, auto_close: ac, acceptance_task: at})});
       } else {
-        let r = await api('POST', `/api/lists/${l.id}/envs`, {name, auto_close: ac});
+        let r = await api('POST', `/api/lists/${l.id}/envs`, {name, auto_close: ac, acceptance_task: at});
         histAdd({label: tr('Environment added'), undo: async () => { await api('DELETE', `/api/envs/${r.id}`); env_load(l.id, true); },
           redo: async () => { await api('POST', `/api/envs/${r.id}/restore`); env_load(l.id, true); }});
       }

@@ -31,7 +31,7 @@ const sql = (q, a = []) => JSON.parse(execFileSync('python3', [__dirname + '/dbx
   check(!sql("SELECT id FROM office_signoffs WHERE kind='video'").length, 'gone from the server');
   // a deleted person's month: the review row without buttons (timesheet.js)
   const h = w.eval(`TSL.data = {month: 'other', review: [
-    {user_id: null, name: 'Deleted user', month: '2026-05', state: 'closed', seconds: 3600}, {user_id: ${me}, name: 'Alice', month: '2026-05', state: 'closed', seconds: 60}]}; tsl_card()`);
+    {user_id: null, name: 'Deleted person', month: '2026-05', state: 'closed', seconds: 3600}, {user_id: ${me}, name: 'Alice', month: '2026-05', state: 'closed', seconds: 60}]}; tsl_card()`);
   const box = w.document.createElement('div'); box.innerHTML = h;
   const rows = [...box.querySelectorAll('.tslrev .tslrow')];
   check(rows.length === 2 && !rows[0].querySelector('[data-tsl]') && rows[1].querySelector('[data-tsl="approve"]'), 'no decision on a deleted person\'s month, the other row keeps them');

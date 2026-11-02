@@ -174,8 +174,8 @@ check(len(sheets) == 4 and "Alice Admin" in wb and "Externe Person" in wb, f"the
 s1 = z.read("xl/worksheets/sheet1.xml").decode() if z else ""
 check("10.03.2025" in s1 and "<v>39.2</v>" in s1 and "<v>53.2</v>" in s1, "the sheet: dates as text, amounts as numbers, a total")
 r = A.get(B + T + "/vma.csv?year=2025")
-rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=";")) if r.ok else []
-check(rows and rows[0][0] == "Person" and rows[-1][7] == "275,40" and any(x[0] == "Bob Member" and x[6] == "Total" and x[7] == "81,20" for x in rows),
+rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=",")) if r.ok else []
+check(rows and rows[0][0] == "Person" and rows[-1][7] == "275.40" and any(x[0] == "Bob Member" and x[6] == "Total" and x[7] == "81.20" for x in rows),
       f"the CSV with totals per person and overall {rows[-2:]}")
 log = A.get(B + "/api/office/log?limit=10").json().get("log", [])
 check(any(x["action"] == "export" and x["target"] == "travel" for x in log), "the export is in the office log")

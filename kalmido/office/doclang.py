@@ -7,7 +7,7 @@ an English text keeps its German text with the note "no English text stored". Fi
 import json
 
 from ..core.i18n import LANGS, N_, tr
-from .model import office_settings
+from .model import office_settings, pb_cl_sql
 
 FIELD_TXT = {"intro": N_("Introduction"), "closing": N_("Closing text"), "time": N_("Duration of use"), "territory": N_("Territory"),
              "media": N_("Media"), "note": N_("Rights note")}
@@ -29,6 +29,55 @@ def doc_lg(lang):
 
 # 2.185.0 C (#2520): the languages a document can be written in (every app language; de / en as before)
 DOC_LANGS = tuple(sorted(LANGS, key=lambda k: (k not in ("de", "en"), k != "de", k)))
+
+
+def doc_trans(row):
+    """2.460.0 (#3767): the column trans of a master data row, {lang: {field: text}} (row without it: {})."""
+    v = _j(row["trans"], {}) if "trans" in row.keys() else {}
+    return v if isinstance(v, dict) else {}
+
+
+def doc_own(row, lang, field, de=None, en=None):
+    """2.460.0 (#3767): (text, missing) of an own text of master data row for a document in lang. field = the key in trans, de / en
+    its columns (default field_de / field_en). A language without its text: the English one (the standard text of a built-in
+    pack translated, doc_word), else the German one; missing = the language used instead ("en" / "de"), else False."""
+    d, e = row[de or field + "_de"] or "", row[en or field + "_en"] or ""
+    lg = doc_lg(lang)
+    if lg == "de":
+        return d, False
+    if lg != "en":
+        own = ((doc_trans(row).get(lg) or {}).get(field) or "")
+        if own.strip():
+            return own, False
+    if e.strip():
+        w = doc_word(e, lg)
+        return w, "en" if lg != "en" and w == e else False
+    return d, "de"
+
+
+def doc_gap(label, lang, miss):
+    """2.460.0 (#3767): the visible note of doc_own's missing for label."""
+    if doc_lg(lang) == "en":
+        return tr("{0}: no English text stored", label)
+    return tr("{0}: no text in this language, English used", label) if miss == "en" else tr("{0}: no text in this language, German used", label)
+
+
+def doc_gap_pos(name, lang, miss):
+    if doc_lg(lang) == "en":
+        return tr("Position \"{0}\": no English name stored", name)
+    return tr("Position \"{0}\": no name in this language, English used", name) if miss == "en" else tr("Position \"{0}\": no name in this language, German used", name)
+
+
+def doc_client_lang(c, oid, cid):
+    """2.460.0 (#3767): the language set on client cid of this office ('' = none)."""
+    try:
+        cid = int(cid or 0)
+    except (TypeError, ValueError):
+        return ""
+    if not cid:
+        return ""
+    r = c.execute(f"SELECT doc_lang FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (cid,)).fetchone()
+    return r["doc_lang"] if r and r["doc_lang"] in DOC_LANGS else ""
 
 
 def doc_txt(de, en, lang):
@@ -147,12 +196,10 @@ def _block(c, oid, tid, lang):
     from .docs import _iid
     if not tid:
         return None, False
-    r = c.execute("SELECT text_de, text_en FROM office_texts WHERE id=? AND org_id=?", (_iid(tid), oid)).fetchone()
+    r = c.execute("SELECT text_de, text_en, trans FROM office_texts WHERE id=? AND org_id=?", (_iid(tid), oid)).fetchone()
     if not r:
         return None, False
-    if _en(lang) and not (r["text_en"] or "").strip():
-        return r["text_de"] or "", True
-    return (doc_word(r["text_en"], lang) if _en(lang) else r["text_de"]) or r["text_de"] or "", False
+    return doc_own(r, lang, "text")  # 2.460.0 (#3767)
 
 
 def _offer_block_missing(c, oid, s, kind, lang):
@@ -165,8 +212,8 @@ def _offer_block_missing(c, oid, s, kind, lang):
         t, miss = _block(c, oid, tid, lang)
         if t is not None:
             return miss
-    r = c.execute("SELECT text_en FROM office_texts WHERE org_id=? AND archived=0 AND kind=? ORDER BY sort, id LIMIT 1", (oid, kind)).fetchone()
-    return bool(r) and not (r["text_en"] or "").strip()
+    r = c.execute("SELECT text_de, text_en, trans FROM office_texts WHERE org_id=? AND archived=0 AND kind=? ORDER BY sort, id LIMIT 1", (oid, kind)).fetchone()
+    return doc_own(r, lang, "text")[1] if r else False
 
 
 def _defaults(c, oid, s, cur, lang, level, ct):
@@ -182,13 +229,10 @@ def _defaults(c, oid, s, cur, lang, level, ct):
         cands = {base}
         closing, miss = base, _offer_block_missing(c, oid, s, "closing", lang)
         if ct:
-            ctc = (ct.get("closing_en") if _en(lang) else ct.get("closing_de")) or ""
+            ctc, cm = doc_own(ct, lang, "closing")
             if ctc:
                 cands.add(ctc)
-                closing, miss = ctc, False
-            elif _en(lang) and ct.get("closing_de"):
-                cands.add(ct["closing_de"])
-                closing, miss = ct["closing_de"], True
+                closing, miss = ctc, cm
         out["closing"] = (closing, cands, miss)
     else:
         intro, closing = inv_default_texts(c, oid, s, kind, lang, level)
@@ -209,7 +253,9 @@ def _defaults(c, oid, s, cur, lang, level, ct):
         if kind == "reminder":
             icands |= {inv_default_texts(c, oid, s, kind, lang, lv)[0] for lv in (1, 2, 3)}
         out["intro"] = (intro, icands, False)
-        out["closing"] = (closing, cands, False)
+        # 2.460.0 (#3767): the office's own closing without this language: its English one stands in
+        own = {"reminder": "reminder_text", "delivery": "delivery_closing", "invoice": "invoice_closing"}.get(kind)
+        out["closing"] = (closing, cands, "en" if own and doc_lg(lang) not in ("de", "en") and not s.get(f"{own}_{doc_lg(lang)}") and s.get(own + "_en") else False)
     if doc_lg(lang) != "de":  # 2.357.0 D (#3183): fr / es standard intros up to 2.356 began with a small letter; 2.390.0 A (#3349): en / it / nl up to 2.389
         i0, ic, im = out["intro"]
         out["intro"] = (i0, ic | {x[:1].lower() + x[1:] for x in ic if x}, im)
@@ -220,17 +266,16 @@ def _note_texts(c, oid, ct, lang):
     """The standard rights notes in lang (contract's, the first note block's) -> (first, candidates, missing)."""
     cands, first, miss = set(), None, False
     if ct:
-        t = (ct.get("rights_note_en") if _en(lang) else ct.get("rights_note_de")) or ct.get("rights_note_de") or ""
+        t, m = doc_own(ct, lang, "rights_note")
         if t:
             cands.add(t)
-            first = t
-            miss = _en(lang) and not ct.get("rights_note_en")
-    r = c.execute("SELECT text_de, text_en FROM office_texts WHERE org_id=? AND archived=0 AND kind='note' ORDER BY sort, id LIMIT 1", (oid,)).fetchone()
+            first, miss = t, m
+    r = c.execute("SELECT text_de, text_en, trans FROM office_texts WHERE org_id=? AND archived=0 AND kind='note' ORDER BY sort, id LIMIT 1", (oid,)).fetchone()
     if r:
-        t = (doc_word(r["text_en"], lang) if _en(lang) else r["text_de"]) or r["text_de"] or ""
+        t, m = doc_own(r, lang, "text")
         cands.add(t)
         if first is None:
-            first, miss = t, _en(lang) and not (r["text_en"] or "").strip()
+            first, miss = t, m
     return first, cands, miss
 
 
@@ -259,7 +304,7 @@ def fd_lang_swap(c, oid, cur, b, f):
         if _norm(now) in {_norm(x) for x in old_d[k][1]} or _norm(now) in {_norm(x) for x in new_d[k][1]}:
             f[k] = new_d[k][0]
             if new_d[k][2]:
-                notes.append(tr("{0}: no English text stored", tr(FIELD_TXT[k])))
+                notes.append(doc_gap(tr(FIELD_TXT[k]), new_lang, new_d[k][2]))
         else:
             notes.append(tr("{0} changed by hand, not translated", tr(FIELD_TXT[k])))
     if old_lang != new_lang:
@@ -279,7 +324,7 @@ def fd_lang_swap(c, oid, cur, b, f):
                     rights[dim] = x
                     changed = True
                     if miss:
-                        notes.append(tr("{0}: no English text stored", tr(FIELD_TXT[dim])))
+                        notes.append(doc_gap(tr(FIELD_TXT[dim]), new_lang, miss))
                 elif _norm(x.get("text")) != _norm(nt):
                     notes.append(tr("{0} changed by hand, not translated", tr(FIELD_TXT[dim])))
             if _norm(rights.get("note")):
@@ -289,7 +334,7 @@ def fd_lang_swap(c, oid, cur, b, f):
                     rights["note"] = nf
                     changed = True
                     if miss:
-                        notes.append(tr("{0}: no English text stored", tr(FIELD_TXT["note"])))
+                        notes.append(doc_gap(tr(FIELD_TXT["note"]), new_lang, miss))
                 elif _norm(rights["note"]) not in {_norm(x) for x in nc}:
                     notes.append(tr("{0} changed by hand, not translated", tr(FIELD_TXT["note"])))
         if changed:
@@ -301,21 +346,50 @@ def fd_lang_swap(c, oid, cur, b, f):
         for it in doc_items(c, cur["id"], oid) + tp_part_items_all(c, oid, cur["id"]):
             if not it.get("service_id") or it.get("kind") != "service":
                 continue
-            sv = c.execute("SELECT name_de, name_en FROM office_services WHERE id=? AND org_id=?", (it["service_id"], oid)).fetchone()
+            sv = c.execute("SELECT name_de, name_en, trans FROM office_services WHERE id=? AND org_id=?", (it["service_id"], oid)).fetchone()
             if not sv:
                 continue
-            on = (sv["name_en"] if _en(old_lang) else sv["name_de"]) or sv["name_de"]
-            nn = (sv["name_en"] if _en(new_lang) else sv["name_de"]) or sv["name_de"]
+            on = doc_own(sv, old_lang, "name")[0] or sv["name_de"]
+            nn, miss = doc_own(sv, new_lang, "name")
+            nn = nn or sv["name_de"]
             if _norm(it.get("title")) == _norm(on):
                 if nn != it.get("title"):
                     titles[it["id"]] = nn
-                if _en(new_lang) and not (sv["name_en"] or "").strip():
-                    notes.append(tr("Position \"{0}\": no English name stored", sv["name_de"]))
+                if miss:
+                    notes.append(doc_gap_pos(sv["name_de"], new_lang, miss))
             elif _norm(it.get("title")) != _norm(nn):
                 hand += 1
         if hand:
             notes.append(tr("Position titles changed by hand, not translated: {0}", hand))
     return notes, titles
+
+
+def fd_lang_gaps(c, oid, r, items):
+    """2.460.0 (#3767): the notes of a draft in a language some of its own texts lack (standard intro / closing, catalogue
+    positions): shown on the document, also when it was created in that language (no language change, no fd_lang_swap)."""
+    from .docs import _contract
+    lang = r["lang"]
+    if doc_lg(lang) == "de":
+        return []
+    s = office_settings(c, oid)
+    ct = _contract(c, oid, r["contract_id"]) if r["contract_id"] else None
+    level = int(r["reminder_level"] or 1) if "reminder_level" in r.keys() and r["reminder_level"] else 1
+    notes = []
+    for k, (_, cands, miss) in _defaults(c, oid, s, r, lang, level, ct).items():
+        if miss and _norm(r[k]) and _norm(r[k]) in {_norm(x) for x in cands}:
+            notes.append(doc_gap(tr(FIELD_TXT[k]), lang, miss))
+    seen = set()
+    for it in items:
+        sid = it.get("service_id")
+        if not sid or sid in seen or it.get("kind") != "service":
+            continue
+        seen.add(sid)
+        sv = c.execute("SELECT name_de, name_en, trans FROM office_services WHERE id=? AND org_id=?", (sid, oid)).fetchone()
+        if sv:
+            t, miss = doc_own(sv, lang, "name")
+            if miss and _norm(it.get("title")) == _norm(t):
+                notes.append(doc_gap_pos(sv["name_de"], lang, miss))
+    return notes
 
 
 def fd_put_titles(c, oid, did, titles):

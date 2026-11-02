@@ -66,6 +66,15 @@ const RM = '(prefers-reduced-motion: reduce)';
   check(busy.querySelector('svg.bot.b-arbeitet') && /working on it/.test(busy.querySelector('.ttx').textContent), '#2610: "working on it": the bot too');
   const task = P.parseFromString(w.typingHtml([{name: 'Bob', typing: Infinity}], 'd-typing'), 'text/html');
   check(task.querySelector('.atdots') && !task.querySelector('svg.bot'), '#2610: the task panel (people) keeps the dots');
+  // 2.413.0 (#3554): an agent writing / working in a task's comments: the same figure as in the chat, no dots / dot, no second small robot
+  const agSaved = w.eval('S.agents'); w.eval('S.agents = [{id: 990001, name: "Claude", enabled: true, status: "working"}]');
+  for (const ty of [Infinity, 0]) {
+    const ta = P.parseFromString(w.typingHtml([{id: 990001, name: 'Claude', typing: ty}], 'd-typing'), 'text/html');
+    check(ta.querySelector('#d-typing > svg.bot.b-arbeitet.bchat') && !ta.querySelector('.atdots') && !ta.querySelector('.hdot') && !ta.querySelector('.ttx svg.lbot'), '#3554: task comments, agent ' + (ty ? 'writing' : 'working') + ': the bot figure');
+  }
+  const mix = P.parseFromString(w.typingHtml([{id: 990001, name: 'Claude', typing: Infinity}, {id: 990002, name: 'Bob', typing: Infinity}], 'd-typing'), 'text/html');
+  check(mix.querySelectorAll('#d-typing svg.bot').length === 1 && /Bob is writing/.test(mix.querySelector('.ttx').textContent), '#3554: agent and person together: one figure, both names');
+  w.eval('S.agents = ' + JSON.stringify(agSaved || []));
   check(P.parseFromString(w.typingHtml([], 'chat-typing'), 'text/html').querySelector('#chat-typing.atyrow:empty') && !P.parseFromString(w.typingHtml([], 'chat-typing'), 'text/html').querySelector('svg.bot'), '#2610: nobody working: no figure');
 
   // ================= #2611: long jobs

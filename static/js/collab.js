@@ -18,7 +18,7 @@ function bellBtn() {
 const NEWS_CHIPS = [['mention', 'at', N_('Mentions'), ['mention']], ['comment', 'comment', N_('Comments'), ['comment']],
   ['assign', 'user', N_('Assignments'), ['assign', 'unassign', 'take']], ['newtask', 'plus', N_('New tasks'), ['newtask', 'errreport']],
   ['complete', 'check', N_('Completed'), ['complete', 'unblock']], ['status', 'pulse', N_('Status'), ['status']],
-  ['agents', 'bot', N_('Agents'), ['approval', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner', 'orgjoin', 'orgdelnotice', 'orggone', 'whorgcut']],
+  ['agents', 'bot', N_('Agents'), ['approval', 'proposal', 'usage']], ['share', 'users', N_('Sharing'), ['share', 'role', 'unshare', 'owner', 'orgjoin', 'orgjoinres', 'orgrole', 'orgdelnotice', 'orggone', 'whorgcut', 'integfail']],
   ['followup', 'hourglass', N_('Follow-ups'), ['followup']]];
 const newsKindOk = (it, k = S.nf.kind) => { const c = k && NEWS_CHIPS.find(x => x[0] === k); return !c || c[3].includes(it.kind); };
 function newsChipsHtml(items, attr) {
@@ -209,7 +209,7 @@ function newsText(it, U) {
     case 'assign': return d.group ? tr('{0} assigned a task to your group {1}', who, q(d.group)) : tr('{0} assigned a task to you', who);
     case 'take': return tr('{0} took a task of your group {1}', who, q(d.group || ''));  // 2.10.0 (#441)
     case 'unassign': return !it.task_id && it.list_id ? tr('{0} removed you as assignee of a task in {1}', who, q(newsListName(it))) : tr('{0} removed you as assignee', who);  // 2.38.0 (#1155): out of sight
-    case 'complete': return tr('{0} completed a task', who);
+    case 'complete': return d.st === 'reopen' ? tr('{0} reopened a task', who) : d.st === 'wont' ? tr('{0} closed a task as won’t do', who) : tr('{0} completed a task', who);  // 2.473.0 (#3357): st = what a watcher hears of
     case 'share': return d.org ? (d.role === 'admin' ? tr('{0} added you to the organisation {1} as an admin', who, q(d.name || '')) : tr('{0} added you to the organisation {1}', who, q(d.name || '')))  // 2.28.0 (#935)
       : d.role === 'view' ? tr('{0} shared the project {1} with you (view only)', who, q(newsListName(it)))
       : d.role === 'participant' ? tr('{0} added you to {1} as a participant (you see the tasks assigned to you)', who, q(newsListName(it)))
@@ -218,9 +218,9 @@ function newsText(it, U) {
     case 'role': return tr('{0} changed your role in {1} to {2}', who, q(newsListName(it)), q(roleLabel(d.role)));
     case 'unshare': return d.org ? tr('{0} removed you from the organisation {1}', who, q(d.name || ''))  // 2.28.0 (#935)
       + (d.lists ? ' ' + esc(trn('Your {0} project of the organisation stayed with it ({1}).', 'Your {0} projects of the organisation stayed with it ({1}).', d.lists, d.to || '')) : '')  // 2.148.1 A (#2480)
-      + (d.back ? ' ' + esc(trn('{0} project you had brought in is back in your private space.', '{0} projects you had brought in are back in your private space.', d.back)) : '')  // 2.361.0 (#2922)
+      + (d.back ? ' ' + esc(trn('{0} item you had brought in is back in your private workspace.', '{0} items you had brought in are back in your private workspace.', d.back)) : '')  // 2.361.0 (#2922)
       : tr('{0} removed you from the project {1}', who, q(newsListName(it)));
-    case 'owner': return (d.self ? tr('You took over the project {1} from {0}', who, q(newsListName(it))) : tr('{0} made you the owner of the project {1}', who, q(newsListName(it))))  // 2.1.2 (#349)
+    case 'owner': return (d.given != null ? tr('{0} handed your project {1} to {2}', who, q(newsListName(it)), d.given) : d.self ? tr('You took over the project {1} from {0}', who, q(newsListName(it))) : tr('{0} made you the owner of the project {1}', who, q(newsListName(it))))  // 2.1.2 (#349)
       + ((d.reset || []).includes('link') ? ' ' + esc(tr('Its public link was reset: share the new link again if needed.')) : '')  // 2.148.1 A (#2478)
       + ((d.reset || []).includes('hook') ? ' ' + esc(tr('Its deploy webhooks were switched off: switch them on again under environments if needed.')) : '');
     case 'orglist': return ({archive: tr('{0} archived the project {1} (admin of {2})', who, q(d.name || ''), q(d.org || '')),  // 2.35.0 (#1101)
@@ -236,9 +236,10 @@ function newsText(it, U) {
       lrename: tr('{0} renamed your project {1} to {2} (project admin)', who, q(d.old || ''), q(d.name || '')),  // 2.40.0 (#1431)
       owner: tr('{0} handed the project {1} to {2} (admin of {3})', who, q(d.name || ''), q(d.to || ''), q(d.org || '')),
       moveout: tr('{0} moved {1} out of the organisation {2}', who, q(d.name || ''), q(d.org || '')),  // 2.148.1 B (#2483)
+      export: trn('{1} exported {0} project of the organisation {2} with an account export', '{1} exported {0} projects of the organisation {2} with an account export', d.count || 1, who, q(d.org || '')),  // 2.362.3 (#3101)
       // 2.361.2 (#2923): a member asks back what they brought in; an admin releases / declines it
-      outreq: tr('{0} asks to take {1} back into their private space (organisation {2})', who, q(d.name || ''), q(d.org || '')),
-      outok: tr('{0} released {1}: you can move it into your private space now (within {2} days)', who, q(d.name || ''), d.days || 14),
+      outreq: tr('{0} asks to take {1} back into their private workspace (organisation {2})', who, q(d.name || ''), q(d.org || '')),
+      outok: tr('{0} released {1}: you can move it into your private workspace now (within {2} days)', who, q(d.name || ''), d.days || 14),
       outno: tr('{0} declined to give {1} back (organisation {2})', who, q(d.name || ''), q(d.org || '')),
       takeover: tr('{0} (server admin) handed your project {1} to {2}', who, q(d.name || ''), q(d.to || '')),  // 2.148.1 B (#2491)
       // 2.56.0 (#1795): an organisation admin renamed it / changed its icon or colour
@@ -257,10 +258,11 @@ function newsText(it, U) {
     case 'connok': return tr('{0} accepted your connection request', who);
     case 'lytpl': return tr('{0} sent you the arrangement {1}', who, q(d.name || ''));  // 2.55.0 (#1068)
     case 'dispo': return tr('{0} booked you: {1} ({2})', who, q(d.title || ''), d.start ? esc(fmtDayAbs(d.start.slice(0, 10))) : '');  // 2.50.0 (#1194)
-    case 'leavereq': return tr('{0} asks for vacation ({1})', who, d.start ? esc(fmtDayAbs(d.start) + (d.end && d.end !== d.start ? ' – ' + fmtDayAbs(d.end) : '')) : '');  // 2.125.0 A (#2117)
-    case 'leavedecide': return (d.state === 'approved' ? tr('{0} approved your vacation ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : '') : tr('{0} rejected your vacation ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : ''));
+    case 'leavereq': return tr('{0} asks for holiday ({1})', who, d.start ? esc(fmtDayAbs(d.start) + (d.end && d.end !== d.start ? ' – ' + fmtDayAbs(d.end) : '')) : '');  // 2.125.0 A (#2117)
+    case 'leavedecide': return (d.state === 'approved' ? tr('{0} approved your holiday ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : '') : tr('{0} rejected your holiday ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : ''));
     case 'errreport': return d.title ? tr('New error reported: {0}', q(d.title)) : tr('A new error was reported');  // 2.18.0
-    case 'approval': return tr('{0} is waiting for your approval', who);
+    case 'approval': return d.title ? tr('{0} is waiting for your approval: {1}', who, q(d.title)) : tr('{0} is waiting for your approval', who);  // 2.367.2 (#2968): a list-wide one has no task title
+    case 'aprequest': return tr('Approval needed: {0} (from {1})', q(it.task_title || ''), who) + (d.note ? ': ' + q(d.note) : '');  // 2.367.2 (#2968)
     case 'signoff': return d.state === 'accepted' ? (d.sk === 'document' ? tr('{0} signed {1}', q(d.name || ''), q(d.title || '')) : tr('{0} approved {1}', q(d.name || ''), q(d.title || '')))
       : d.sk === 'video' ? tr('{0} asks for changes to {1}', q(d.name || ''), q(d.title || '')) : tr('{0} rejected {1}', q(d.name || ''), q(d.title || ''));  // 2.266.0 (#2965): a customer through a link
     case 'review': return rvw_newsText(it, d, who, q);  // 2.60.0 C (#1512)
@@ -268,7 +270,10 @@ function newsText(it, U) {
     case 'wiki_shared': return d.folder ? tr('{0} shared the pages of the folder {1} with you', who, q(String(d.path || '').split('/').pop())) : tr('{0} shared the page {1} with you', who, q(String(d.path || '').split('/').pop()));  // 2.126.2 B (#2355)
     case 'apdecide': return {approved: tr('{0} approved {1}', who, q(it.task_title || '')), changes: tr('{0} asks for changes to {1}', who, q(it.task_title || '')),
       rejected: tr('{0} rejected {1}', who, q(it.task_title || ''))}[d.state] || tr('{0} decided on your approval request', who);  // 2.23.0 (#463)
-    case 'signup': return tr('{0} registered and waits for your approval', q(d.name || d.username || ''));  // 2.23.0 (#711)
+    case 'signup': return d.org_id ? tr('{0} registered with the address of your organisation and waits for approval', q(d.name || d.username || '')) : tr('{0} registered and waits for your approval', q(d.name || d.username || ''));  // 2.23.0 (#711); 2.464.0 (#3882): an organisation's admin approves too
+    case 'orglogin': return tr('Admin {0} signed in from a new address: {1}', q(d.name || ''), esc(d.ip || ''));  // 2.367.4 (#2974)
+    case 'orgjoinres': return d.yes ? tr('{0} accepted your invitation to {1}', who, q(d.name || '')) : tr('{0} declined your invitation to {1}', who, q(d.name || ''));
+    case 'orgrole': return tr('{0} changed your role in {1}: {2}', who, q(d.name || ''), esc(({admin: tr('Admin'), readonly: tr('Read-only'), accounting: tr('Accounting'), guest: tr('Guest')})[d.role] || tr('Member')));
     case 'agentjoin': return d.provider ? tr('{0} added the agent {1} to {2}. It runs at {3}. What it reads in the project goes there.', who, q(d.agent || ''), q(newsListName(it)), q(d.provider))
       : tr('{0} added the agent {1} to {2}. What it reads in the project goes to its AI provider.', who, q(d.agent || ''), q(newsListName(it)));  // 2.24.0 (#896)
     case 'followup': return d.note ? tr('Follow up today: waiting on {0}', q(d.note)) : tr('Follow up today: the task is waiting on someone');
@@ -276,13 +281,18 @@ function newsText(it, U) {
     case 'proposal': return tr('{0} has a proposal for you: {1}', d.assistant ? q(tr('Assistant')) : who, q(d.title || ''));  // 2.3.0; 2.75.0 (#1411): the built-in assistant has no person
     case 'upscan': return tr('The virus scanner found {0} in your file {1}. The file is locked.', esc(d.sig || '?'), q(d.name || ''));  // 2.61.0 (#1818)
     case 'filereq': { const d = it.data || {}; return trn('{0} file arrived through {1}', '{0} files arrived through {1}', d.n || 1, q(d.title || '')) + (d.name ? ' · ' + q(d.name) : ''); }  // 2.122.0 A (#2097)
+    case 'integfail': return esc(d.text || '');  // 2.367.3 (#2971): written in the person's language by the server (collab/integfail.py)
     case 'fetcherr': return tr('Receipt fetcher {0}: {1}', q(d.portal || ''), esc(d.error || ''));  // 2.425.0 C (#3453): docfetch.js
     case 'orgkey': return ocNewsText(d, it.actor_id ? who : q(tr('The server admin')), q);  // 2.138.0 C (#1972): orgcrypt.js
-    case 'apblimit': return tr('Your booking page reached its limit of {0} confirmation mails today. Further bookings work again tomorrow.', d.limit || '?');  // 2.360.2 L (#2561)
-    case 'ptlimit': return d.org ? tr('The customer portal of {0} reached its limit of {1} sign-in mails per hour. Further customers get a link again later.', q(d.org), d.limit || '?')
-      : tr('Your customer portal reached its limit of {0} sign-in mails per hour. Further customers get a link again later.', d.limit || '?');  // 2.138.4 C (#2380)
+    case 'apblimit': return tr('Your booking page reached its limit of {0} confirmation e-mails today. Further bookings work again tomorrow.', d.limit || '?');  // 2.360.2 L (#2561)
+    case 'ptlimit': return d.org ? tr('The client portal of {0} reached its limit of {1} sign-in e-mails per hour. Further clients get a link again later.', q(d.org), d.limit || '?')
+      : tr('Your client portal reached its limit of {0} sign-in e-mails per hour. Further clients get a link again later.', d.limit || '?');  // 2.138.4 C (#2380)
     case 'playbook_proposal': return pbNewsText(it, who, q);  // 2.39.0 (#1168)
-    case 'evinvite': case 'evshare': return evNewsText(it, who, q);  // 2.21.0 (#659)
+    case 'evinvite': case 'evshare': case 'evchange': return evNewsText(it, who, q);  // 2.21.0 (#659)
+    case 'apbooking': return (d.what === 'new' ? tr('New booking: {0}', q(d.line || '')) : tr('Booking cancelled by the client: {0}', q(d.line || '')));  // 2.367.2 (#2969)
+    case 'docpaid': return tr('Payment received: {0}', q([d.number, d.client].filter(Boolean).join(', ')));  // 2.367.4 (#2972)
+    case 'docoverdue': return d.n > 1 ? tr('{0} invoices are overdue', d.n) : tr('Invoice overdue: {0}', q([d.number, d.client].filter(Boolean).join(', ')));
+    case 'calsub': return tr('Your calendar subscription {0} keeps failing. Its events may be out of date.', q(d.name || ''));  // 2.367.2 (#2969)
     case 'abshare': return d.role === 'edit' ? tr('{0} shared the address book {1} with you', who, q(d.name || '')) : tr('{0} shared the address book {1} with you (view only)', who, q(d.name || ''));  // 2.21.0 (#658)
     case 'status': return d.status ? tr('{0} set {1} to {2}', who, q(newsListName(it)), `<span class="stpill st-${esc(d.status)} inl"><i></i>${esc(statusLabel(d.status))}</span>`) : tr('{0} cleared the status of {1}', who, q(newsListName(it)));
   }
@@ -292,12 +302,13 @@ const NEWS_ICON = {playbook_proposal: 'book', orglist: 'archive', mention: 'at',
 /** @type {any} */ (NEWS_ICON).wiki_shared = 'book';  // 2.126.2 B (#2355)
 /** @type {any} */ (NEWS_ICON).orgdelnotice = /** @type {any} */ (NEWS_ICON).orggone = 'alert';  // 2.361.0 (#2920)
 /** @type {any} */ (NEWS_ICON).whorgcut = 'alert';  // 2.380 G (#3391)
+/** @type {any} */ (NEWS_ICON).integfail = 'alert';  // 2.367.3 (#2971)
 // 2.361.0 (#2920 / #2922): what of a person is in an organisation (accounts/orgleave.py OLV_STAYS, the same words)
 const OLV_WORDS = {files: n => trn('{0} file', '{0} files', n), wiki_pages: n => trn('{0} knowledge page', '{0} knowledge pages', n),
   tables: n => trn('{0} table', '{0} tables', n), bookmarks: n => trn('{0} bookmark', '{0} bookmarks', n), polls: n => trn('{0} poll', '{0} polls', n),
   videos: n => trn('{0} video review', '{0} video reviews', n), drafts: n => trn('{0} office draft', '{0} office drafts', n),
   clients: n => trn('{0} client', '{0} clients', n), absences: n => trn('{0} absence', '{0} absences', n),
-  leave_quota: n => trn('{0} vacation account', '{0} vacation accounts', n), timesheets: n => trn('{0} timesheet', '{0} timesheets', n),
+  leave_quota: n => trn('{0} holiday account', '{0} holiday accounts', n), timesheets: n => trn('{0} timesheet', '{0} timesheets', n),
   time: n => trn('{0} time entry', '{0} time entries', n), drives: n => trn('{0} drive', '{0} drives', n)};
 const olvText = c => Object.keys(OLV_WORDS).filter(k => (c || {})[k]).map(k => OLV_WORDS[k](c[k])).join(', ');
 /** @type {any} */ (NEWS_ICON).signoff = 'check';  // 2.266.0 (#2965)
@@ -322,7 +333,7 @@ function viewNews() {
   // 2.13.0 (#453 P9): ONE filter row: "All" (clears both), "Mentions & assigned to me" (server filter) and the kinds
   const k0 = S.nf.kind, fchips = (items) => { const h = newsChipsHtml(items || [], 'data-nk').replace(/^<div class="nchips"[^>]*>/, '').replace(/<\/div>$/, '').replace(/<button type="button" class="nchip [^"]*" data-act="news-kind" data-nk="" aria-pressed="[^"]*">[^<]*<\/button>/, '');
     return `<div class="nchips nfrow" role="group" aria-label="${esc(tr('Show only'))}"><button type="button" class="nchip ${f || k0 ? '' : 'on'}" data-act="news-filter" data-f="" data-nk="" aria-pressed="${!f && !k0}">${tr('All')}</button><button type="button" class="nchip ${f ? 'on' : ''}" data-act="news-filter" data-f="me" data-fme aria-pressed="${!!f}">${ic('at', 's')}${tr('Mentions & assigned to me')}</button>${h}</div>`; };
-  const bar0 = `<div class="nbar"><button class="btn sm ntog ${S.nf.unread ? 'on' : ''}" data-act="news-unread" aria-pressed="${S.nf.unread}" title="${esc(tr('Hide news you have already read'))}">${ic('eye', 's')}${tr('Unread only')}</button><button class="btn sm ntog ${newsBundled() ? 'on' : ''}" data-act="news-bundle" aria-pressed="${newsBundled()}" title="${esc(tr('Group by task, what needs you first'))}">${ic('columns', 's')}${tr('Bundled')}</button><span class="spacer"></span>${S.news?.unread && (S.agents || []).some(x => x.enabled) ? `<button class="btn sm" data-act="news-sum" aria-haspopup="menu" title="${esc(tr('An agent summarizes your unread news in its chat'))}">${ic('bot', 's')}${tr('Summarize')}</button>` : ''}${S.news?.unread ? `<button class="btn sm" data-act="news-readall" title="${esc(tr('Mark all as read'))}">${ic('check', 's')}${tr('All read')}</button>` : ''}<button class="iconbtn" data-act="news-settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
+  const bar0 = `<div class="nbar"><button class="btn sm ntog ${S.nf.unread ? 'on' : ''}" data-act="news-unread" aria-pressed="${S.nf.unread}" title="${esc(tr('Hide news you have already read'))}">${ic('eye', 's')}${tr('Unread only')}</button><button class="btn sm ntog ${newsBundled() ? 'on' : ''}" data-act="news-bundle" aria-pressed="${newsBundled()}" title="${esc(tr('Group by task, what needs you first'))}">${ic('columns', 's')}${tr('Bundled')}</button><span class="spacer"></span>${S.news?.unread && (S.agents || []).some(x => x.enabled) ? `<button class="btn sm" data-act="news-sum" aria-haspopup="menu" title="${esc(tr('An agent summarises your unread news in its chat'))}">${ic('bot', 's')}${tr('Summarise')}</button>` : ''}${S.news?.unread ? `<button class="btn sm" data-act="news-readall" title="${esc(tr('Mark all as read'))}">${ic('check', 's')}${tr('All read')}</button>` : ''}<button class="iconbtn" data-act="news-settings" title="${esc(tr('What shows up here'))}" aria-label="${esc(tr('What shows up here'))}">${ic('gear', 's')}</button></div>`;
   const mine0 = S.nf.items && S.nf.f === f ? S.nf.items : null;
   // 2.28.0 (#987): "For you" (people: mentions, assignments, replies, direct messages) | "Activity" (changes, agents) | All
   const tab = newsTab(), nMe = (mine0 || []).filter(it => !it.read && newsForMe(it)).length + dmRows().reduce((a, r) => a + r.unread, 0), nAct = (mine0 || []).filter(it => !it.read && !newsForMe(it)).length;
@@ -451,6 +462,9 @@ async function newsOpen(i, opts) {
   if (it.kind === 'proposal') { propOpen(it.data?.job); return; }  // 2.3.0
   if (it.kind === 'playbook_proposal') { pbNewsOpen(it); return; }  // 2.39.0 (#1168)
   if (it.kind === 'evinvite' && it.data?.event_id) { evOpen(it.data.event_id); return; }  // 2.21.0 (#659 / #658)
+  if (it.kind === 'evchange') { if (['time', 'place', 'occ'].includes(it.data?.what)) evOpen(it.data.event_id); else go('cal'); return; }  // 2.367.2 (#2969)
+  if (it.kind === 'apbooking') { if (it.data?.what === 'new' && it.data.event_id) evOpen(it.data.event_id); else go('cal'); return; }
+  if (it.kind === 'calsub') { settingsModal('calendars'); return; }
   if (it.kind === 'evshare') { go('cal'); setTimeout(evCalsModal, 150); return; }
   if (it.kind === 'abshare') { go('contacts'); return; }
   if (it.kind === 'orgjoin') { ojn_open(it.data || {}); return; }  // 2.148.1 A (#2480): accept or decline
@@ -470,12 +484,15 @@ async function newsOpen(i, opts) {
   if (it.kind === 'approval' && !it.task_id && feat('agents') && agentsOn()) { go('agents'); return; }
   if (it.kind === 'upscan' && it.data?.where === 'fs') { go('ablage/' + it.data.ref); return; }  // 2.61.0 (#1818): the locked file
   if (it.kind === 'filereq' && it.data?.node) { go('ablage/' + it.data.node); return; }  // 2.122.0 A (#2097): the folder the files went into
+  if (it.kind === 'integfail') { const d = it.data || {}; if (d.list && listById(d.list)) go('l/' + d.list); else if (d.ws) loadModule('hubmailbox').then(hmb_load).then(() => hmb_dialog(d.ws)); else settingsModal(d.focus); return; }  // 2.367.3 (#2971): where to repair it
   if (it.kind === 'fetcherr') { settingsModal('fetcher'); return; }  // 2.425.0 C (#3453): the receipt fetcher's portals
   if (it.kind === 'tsheet') { tsl_open(it.data); return; }  // 2.125.0 B (#2119): the time page on that month
   if (it.kind === 'wiki_shared') { if (feat('wiki')) { S.wshFocus = true; go('wiki'); } else toast(tr('Turn on the knowledge pages in the settings to read it.')); return; }  // 2.126.2 B (#2355): "Shared with me"
   if (it.kind === 'upscan' && it.data?.where === 'chat') { if (feat('agents') && agentsOn()) go('agents'); return; }
-  if (it.kind === 'signoff') { const k = String(it.data?.click || ''); if (k.startsWith('#') && k.length > 1) go(k.slice(1)); return; }  // 2.266.0 (#2965): the quotation / document / video
+  if (it.kind === 'signoff' || it.kind === 'docpaid' || it.kind === 'docoverdue') { const k = String(it.data?.click || ''); if (k.startsWith('#') && k.length > 1) go(k.slice(1)); return; }  // 2.266.0 (#2965): the quotation / document / video
   if (it.kind === 'whorgcut') { settingsModal('webhooks'); return; }  // 2.380 G (#3391): Settings > Access, the webhooks
+  if (it.kind === 'signup' && it.data?.org_id) { settingsModal('org'); return; }  // 2.464.0 (#3882): the person's row in the organisation
+  if (it.kind === 'orglogin' || it.kind === 'orgjoinres' || it.kind === 'orgrole') return;
   if (it.kind === 'signup') { settingsModal('users'); return; }  // 2.23.0 (#711): approve it under Users  // 2.15.0 (#479): an agent's request
   if (!it.task_id) { if (it.list_id && listById(it.list_id)) go('l/' + it.list_id); return; }
   if (!taskById(it.task_id)) {  // e.g. completed long ago: not in the state
@@ -489,7 +506,7 @@ async function newsOpen(i, opts) {
 // ---- 2.122.0 (#2314): phones: a sideways swipe on the task opened from the news goes to the next (left) / previous (right)
 // UNREAD news in the order and with the filter (tab, kind, workspace) of the list; it is marked read like on opening. None left:
 // a short notice, the view stays. Same exceptions as the swipe on tasks (detail.js, #1071); the swipe on the list rows stays.
-const NSW_SKIP = /^(proposal|playbook_proposal|evinvite|evshare|abshare|connreq|connok|orgjoin|lytpl|dispo|usage|upscan|signup|leavereq|leavedecide|tsheet|wiki_shared|orgdelnotice|orggone|whorgcut)$/;  // 2.125.0 A (#2117) + B (#2119): + leave, timesheets
+const NSW_SKIP = /^(orglogin|orgjoinres|orgrole|proposal|playbook_proposal|evinvite|evchange|apbooking|calsub|docpaid|docoverdue|evshare|abshare|connreq|connok|orgjoin|lytpl|dispo|usage|upscan|signup|leavereq|leavedecide|tsheet|wiki_shared|orgdelnotice|orggone|whorgcut|integfail)$/;  // 2.125.0 A (#2117) + B (#2119): + leave, timesheets
 const nswOn = () => !!S.nswTask && S.sel === S.nswTask;
 function nswTarget(dir) {
   const its = S.nf.items || [], cur = its.findIndex(x => x.id === S.nswId);
@@ -568,7 +585,7 @@ async function cmtOrderToggle() {
   S.settings.comment_order = v; renderDetail(); if (f) $('#c-input')?.focus();
   try { await api('PATCH', '/api/settings', {comment_order: v}); } catch { /* api() showed it; the local choice stays until the next load */ }
 }
-const uname = (id, U) => (U || {})[id] || (id ? tr('Deleted user') : tr('Someone'));
+const uname = (id, U) => (U || {})[id] || (id ? tr('Deleted person') : tr('Someone'));
 function fmtWhen(iso) {
   const d = new Date(iso), hmTxt = fmtTimeAt(d);  // 2.368.0 B (#2982)
   if (ds(d) === today()) return hmTxt;
@@ -580,7 +597,7 @@ function actText(a, U) {  // "via API" after lines written through a personal ac
   return actText0(a, U) + (a.data?.via === 'api' ? ` <span class="via">${tr('via API')}</span>` : a.data?.via === 'caldav' ? ` <span class="via">${tr('via CalDAV')}</span>`
     : a.data?.via === 'webhook' ? ` <span class="via">${tr('via webhook')}</span>` : '');  // 2.115.0 A (#2061)
 }
-const viaName = (d, id, U) => d?.rule ? tr('Rule {0}', d.rule.name || '') : d?.via === 'public_link' && !id ? (d.ext_name ? tr('{0} (customer, via the link)', d.ext_name) : tr('Someone via the public link')) : uname(id, U);  // 2.50.0 (#329): + the customer's name
+const viaName = (d, id, U) => d?.rule ? tr('Rule {0}', d.rule.name || '') : d?.via === 'public_link' && !id ? (d.ext_name ? tr('{0} (client, via the link)', d.ext_name) : tr('Someone via the public link')) : uname(id, U);  // 2.50.0 (#329): + the customer's name
 function actText0(a, U) {
   const d = a.data || {}, who = `<b>${esc(viaName(d, a.user_id, U))}</b>`, q = x => `<b>${esc(x)}</b>`;
   const due = () => q((d.start && d.start < d.due ? fmtDayAbs(d.start) + ' – ' : '') + fmtDayAbs(d.due) + (d.time ? ', ' + d.time : ''));
@@ -603,6 +620,10 @@ function actText0(a, U) {
     case 'dep_shift': return tr('{0} moved a task that blocks this one, so it moved along to {1}', who, due());
     case 'priority': return tr('{0} changed the priority to {1}', who, q(tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High')][+d.p] || N_('None'))));
     case 'assign': return d.to ? tr('{0} assigned the task to {1}', who, q(uname(d.to, U))) : tr('{0} removed the assignee', who);
+    case 'delegate': return d.to ? tr('{0} delegated the task to {1}', who, q(uname(d.to, U))) : tr('{0} removed the delegation', who);  // 2.473.0 (#3357)
+    case 'watch':
+      if (d.to) return d.on ? tr('{0} added {1} to the watchers', who, q(uname(d.to, U))) : tr('{0} removed {1} from the watchers', who, q(uname(d.to, U)));
+      return d.on ? tr('{0} started watching the task', who) : tr('{0} stopped watching the task', who);
     case 'assign_group': return d.group ? tr('{0} assigned the task to the group {1}', who, q(d.group)) : tr('{0} removed the group', who);  // 2.10.0 (#441)
     case 'take': return tr('{0} took the task (group {1})', who, q(d.group || ''));
     case 'list': return tr('{0} moved the task to the project {1}', who, q(d.inbox && inboxDef(d.name) ? tr('Basket') : listName(d.name)));
@@ -621,7 +642,7 @@ function actText0(a, U) {
     case 'wont': return tr("{0} marked the task as won’t do", who);
     case 'reopen': return tr('{0} reopened the task', who);
     case 'skip': return tr('{0} skipped an occurrence, next one {1}', who, q(fmtDayAbs(d.next)));
-    case 'attach': return (d.n || 1) === 1 ? tr('{0} added the attachment {1}', who, q((d.names || [])[0] || '')) : trn('{1} added {0} attachment', '{1} added {0} attachments', d.n, who);
+    case 'attach': return (d.n || 1) === 1 ? tr('{0} added the attachment {1}', who, q(d.enc ? tr('Encrypted file') : (d.names || [])[0] || '')) : trn('{1} added {0} attachment', '{1} added {0} attachments', d.n, who);
     case 'attach_rm': return tr('{0} removed the attachment {1}', who, q(d.name || ''));
     case 'waiting': return d.until ? tr('{0} set the task to waiting on someone ({1}), follow up on {2}', who, q(d.note || '–'), q(dayLabel(d.until))) : tr('{0} set the task to waiting on someone ({1})', who, q(d.note || '–'));
     case 'waiting_rm': return tr('{0} ended the waiting on someone', who);
@@ -635,9 +656,15 @@ function actText0(a, U) {
     case 'apstate': return {pending: tr('{0} asked {1} for approval', who, q(uname(d.approver, U))), approved: tr('{0} approved the task', who), changes: tr('{0} asked for changes', who),
       rejected: tr('{0} rejected the task', who), cancelled: tr('{0} withdrew the approval request', who)}[d.state] + (d.note ? ': ' + q(d.note) : '');  // 2.23.0 (#463)
     case 'review': return rvw_actText(d, who, q, U);  // 2.60.0 C (#1512)
+    case 'irreversible': return d.on === 0 ? tr('{0} took the one-way mark off', who) : d.reason ? tr('{0} marked this as a one-way step: {1}', who, q(d.reason)) : tr('{0} marked this as a one-way step', who);  // 2.392.0 C (#3370)
+    case 'irreversible_yes': return tr('{0} gave the yes to this one-way step', who);
+    case 'decision': return tr('{0} recorded a decision', who);
     case 'approval': return d.ok ? tr('{0} approved the comment of {1}', who, q(uname(d.agent, U))) : tr('{0} rejected the comment of {1}', who, q(uname(d.agent, U)));
-    case 'agent_job': return d.action === 'approve' ? tr('{0} approved the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || ''))
-      : d.action === 'reject' ? tr('{0} rejected the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || '')) : tr('{0} stopped the job {2} of {1}', who, q(uname(d.agent, U)), q(d.title || ''));
+    case 'agent_job': {
+      const jt = q(d.title_key ? tr(...d.title_key) : d.title || '');  // 2.454.0 (#3808): a proposal's title in the reader's language
+      return d.action === 'approve' ? tr('{0} approved the job {2} of {1}', who, q(uname(d.agent, U)), jt)
+        : d.action === 'reject' ? tr('{0} rejected the job {2} of {1}', who, q(uname(d.agent, U)), jt) : tr('{0} stopped the job {2} of {1}', who, q(uname(d.agent, U)), jt);
+    }
     case 'tidy': return tr('{0} tidied up the task (the original text is at the top of the notes)', who);
     case 'ltags': return d.tags?.length ? tr('{0} set the project tags {1}', who, q(d.tags.map(g => '#' + g).join(' '))) : tr('{0} removed the project tags', who);
     case 'delete': return tr('{0} moved the task to the trash', who);
@@ -688,7 +715,7 @@ function personCard(anchor, id) {
   const p = listPeople(l).find(x => x.user_id === id), a = agentById(id);
   const name = p?.name || a?.name || anchor.dataset.mname || personNameAny(id) || anchor.textContent.replace(/^@/, ''), meId = S.me?.id;
   const role = p ? roleLabel(p.role) : '', U = S.tl.users || {};
-  const st = a ? `<span class="mcst st-${esc(!a.enabled ? 'paused' : agentOffline(a) ? 'offline' : a.status || 'idle')}">${esc(agentSt(a))}${a.status_text ? ' · ' + esc(a.status_text) : ''}</span>` : '';
+  const st = a ? `<span class="mcst st-${esc(!a.enabled ? 'paused' : agentOffline(a) ? 'offline' : a.status || 'idle')}">${esc(agentSt(a))}${a.status_text ? ' · ' + esc(agentStTx(a)) : ''}</span>` : '';
   const mine = l ? openTasks().filter(x => x.list_id === l.id && x.assignee_id === id && x.id !== t?.id).sort(bySort) : [];
   const acts = [];
   if (a && a.enabled && typeof chatOpen === 'function') acts.push(['chat', 'comment', tr('Open chat')]);
@@ -701,7 +728,7 @@ function personCard(anchor, id) {
   // 2.7.2 (#418): what an agent works on right now (only a task the viewer sees)
   const cur = a ? [a.status_task, ...(a.job_tasks || [])].filter(Boolean).filter((x, i, arr) => arr.indexOf(x) === i).slice(0, 3) : [];
   const curHtml = a ? `<div class="mcsec"><div class="mch">${esc(tr('Working on'))}</div>${cur.map(x => { const tk = taskById(x); return `<button type="button" class="mctask" data-mc="task" data-id="${x}">${ic('sub', 's')}<span>${esc(tk ? tk.title : tr('Task {0}', '#' + x))}</span></button>`; }).join('') || `<div class="muted mhint">${esc(tr('No task right now'))}</div>`}</div>` : '';
-  const pop = openPop(anchor, `<div class="mcard" role="dialog" aria-label="${esc(name)}"><div class="mchead">${av(id, name, 'avatar lg')}<div class="mcn"><b>${esc(name)}${id === meId ? ' ' + esc(tr('(me)')) : ''}</b>${a ? agentBadge() : ''}
+  const pop = openPop(anchor, `<div class="mcard" role="dialog" aria-label="${esc(name)}"><div class="mchead">${av(id, name, 'avatar lg')}<div class="mcn"><b>${esc(name)}${id === meId ? ' ' + esc(tr('(me)')) : ''}</b>${a ? agentBadge(id) : ''}
       <span class="muted">${esc(role || (U[id] ? '' : tr('Not a member of this project')))}</span>${st}</div></div>
     ${l && p ? `<div class="mcsec"><div class="mch">${esc(tr('Assigned in {0}', lname(l)))} <span class="c">${mine.length}</span></div>${mine.slice(0, 5).map(x => `<button type="button" class="mctask" data-mc="task" data-id="${x.id}">${ic('check', 's')}<span>${esc(x.title)}</span></button>`).join('') || `<div class="muted mhint">${esc(tr('No other open tasks'))}</div>`}${mine.length > 5 ? `<div class="muted mhint">${esc(trn('and {0} more', 'and {0} more', mine.length - 5))}</div>` : ''}</div>` : ''}
     ${curHtml}
@@ -752,7 +779,7 @@ function commentHtml(c, U, ro = false) {
     : `${ro ? '' : replyQuoteHtml(c, 'c')}${c.body ? `<div class="cbody">${commentBody(c.body, U, taskById(c.task_id || S.sel)?.list_id)}</div>` : ''}${files}${sugHtml(c, ro)}${ccCommentHtml(c, ro)}${reactHtml(c, ro)}`;
   // 2.5.1 (#395): the author's avatar opens the same card as an @mention (only in the comment list, not read-only copies)
   const cav = ro || c.ext_name ? av(c.user_id, cv_who(c, U)) : `<button type="button" class="cmav" data-mcard="${c.user_id}" data-mname="${esc(uname(c.user_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(c.user_id, U)))}">${av(c.user_id, uname(c.user_id, U))}</button>`;  // 2.50.0 (#329): a customer's comment: their name, no card
-  return `<div class="cm ${isNew ? 'new' : ''}${isAgentUser(c.user_id) ? ' agc' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}" data-mid="c:${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(cv_who(c, U))}</b>${isAgentUser(c.user_id) ? agentBadge() : ''}${c.portal && typeof ptl_mark === 'function' ? ptl_mark(c) : '' /* 2.63.0 B (#1513) */}${rul_cmtTag(c) /* 2.71.0 A (#1457) */}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${csv}${acts}</div>${main}</div></div>`;
+  return `<div class="cm ${isNew ? 'new' : ''}${isAgentUser(c.user_id) ? ' agc' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}" data-mid="c:${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(cv_who(c, U))}</b>${isAgentUser(c.user_id) ? agentBadge(c.user_id) : ''}${c.portal && typeof ptl_mark === 'function' ? ptl_mark(c) : '' /* 2.63.0 B (#1513) */}${rul_cmtTag(c) /* 2.71.0 A (#1457) */}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${csv}${acts}</div>${main}</div></div>`;
 }
 function timelineItems(ro = false) {
   const T = S.tl, soc = cmSocial(taskById(T.id));
@@ -804,6 +831,7 @@ function drawTimeline() {
   const box = $('#d-tl-items'), seen = !box?.lastElementChild || cf_visible(box.lastElementChild);
   if (box) { patchKids(box, timelineItems()); cf_comments(box, seen); }  // 2.46.2 (#1660)  // 2.12.2 (#451): only changed / new comments
   if (typeof ptl_draw === 'function') ptl_draw();  // 2.63.0 B (#1513): the customer report's box + the switch
+  ow_draw();  // 2.392.0 C (#3370): the decisions and the yes arrive with the comments
   const hb = $('#d-hist-items'); if (hb) hb.innerHTML = histItems();
   cfst_since();  // 2.410.0 A (#3514): "since …" under a stage bar
   const n = $('#d-tl-count'); if (n) n.textContent = S.tl.comments?.length || '';
@@ -841,6 +869,7 @@ async function loadTimeline(id) {
   if (pane && !cmtNew()) pane.scrollTop = pane.scrollHeight;
   else if (first && j.comments.some(c => c.id > (j.seen || 0) && c.user_id !== S.me?.id)) setTimeout(() => { if (S.sel === id) $('#d-tl')?.scrollIntoView?.({block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth'}); }, 60);
 }
+const CMT_REF = {};  // 2.370.2 (#3088): task id -> {text, ref} of a comment whose answer is still missing
 async function capi(method, url, body) {  // comments: never queued, clear message when offline
   try { return await rawFetch(method, url, body); }
   catch (e) {
@@ -854,8 +883,7 @@ async function sendComment() {
   if (tid < 0) { toast(tr('Task is still syncing, try again in a moment')); return; }
   const raw = ta.value.trim(), files = S.cfiles[tid] || [];
   if (!raw && !files.length) { ta.focus(); return; }
-  const big = files.find(f => f.size > 50 * 1024 * 1024);
-  if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
+  const lim = upLimit(files); if (lim) { toast(lim); return; }  // 2.363.3 (#3134)
   const text = encodeMentions(raw, S.tl.id === tid ? S.tl.people : []);
   const rto = replyTo('c:' + tid);  // 2.33.0 (#1076)
   const pub = typeof ptl_take === 'function' && ptl_take(tid);  // 2.63.0 B (#1513): "To the customer"
@@ -864,10 +892,14 @@ async function sendComment() {
   let lf = null;
   if (files.length && typeof le2eFileParts === 'function') { try { lf = await le2eFileParts(taskById(tid)?.list_id, files); } catch (x) { toast(x.message); return; } }
   if (files.length) { payload = new FormData(); payload.append('body', text); if (rto) payload.append('reply_to', rto); if (pub) payload.append('portal', '1'); if (lf) lf.forEach(p => { payload.append('file', p.blob, 'encrypted.kenc'); payload.append('le2e_name', p.name); }); else files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
+  // 2.370.2 (#3088): the same text sent again after a failed answer = the same comment
+  const cr = CMT_REF[tid]?.text === raw ? CMT_REF[tid] : (CMT_REF[tid] = {text: raw, ref: Date.now().toString(36) + Math.random().toString(36).slice(2, 10)});
+  if (payload instanceof FormData) payload.append('client_ref', cr.ref); else payload.client_ref = cr.ref;
   const btn = $('[data-act="c-send"]'); if (btn) btn.disabled = true;
-  try { await capi('POST', `/api/tasks/${tid}/comments`, payload); }
+  try { const r = await capi('POST', `/api/tasks/${tid}/comments`, payload); if (r?.partial) { toast(r.partial.reason || tr('Saved')); if (r.partial.applied) { await load(); render(); } } }  // 2.392.0 B (#3364): "partly: rest in Y"
   catch { if (pub) { PTL.on[tid] = true; ptl_draw(); } return; }
   finally { if (btn) btn.disabled = false; }
+  delete CMT_REF[tid];
   delete S.drafts[tid]; delete S.cfiles[tid]; replySent('c:' + tid);
   if (S.sel === tid) { const i = $('#c-input'); if (i) { i.value = ''; autosize(i); } const f = $('#c-files'); if (f) f.innerHTML = ''; }
   await loadTimeline(tid);

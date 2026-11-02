@@ -58,7 +58,7 @@ the complete, tested lists are elsewhere:
 |---|---|---|
 | Projects and tasks | `list_lists`, `list_tasks`, `search_tasks`, `get_task`, `list_subtasks`, `get_dependencies`, `get_project_overview` | `read` |
 | Change tasks | `create_task`, `update_task`, `complete_task`, `move_task`, `batch_tasks`, `set_waiting`, `check_in_habit` | `tasks:write` |
-| Comments and chat | `add_comment`, `react` (`remove: true` takes a reaction back), `send_chat`, `react_to_chat` (`emoji`, `remove`), `list_chats`, `request_chat_approval` | `comments`, `read` |
+| Comments and chat | `add_comment`, `add_decision` (2.392.0), `react` (`remove: true` takes a reaction back), `send_chat`, `react_to_chat` (`emoji`, `remove`), `list_chats`, `request_chat_approval` | `comments`, `read` |
 | Files of tasks and projects | `list_attachments`, `get_attachment` (`source`: `task`, `chat`, `team` or `project`), `read_attachment`, `upload_attachment` | `attachments:read`, `attachments:write` |
 | File store | the folders and files shared with the agent | `files:read`, `files:write` |
 | Structure | projects, sections, fields, project tags, templates, saved filters, folders | `structure` |
@@ -128,6 +128,13 @@ buttons; a typed number picks one. Long answers go in numbered parts with code b
 
 What a launcher has to do is listed in [`launcher_capabilities.json`](launcher_capabilities.json); a test fails when the
 `.sh` or the `.ps1` lacks one.
+
+**Working a list off (2.481.0):** with *Work the list off* switched on in the agent's runtime settings (or
+`KALMIDO_DISPATCH=dry|on`), the event runner loads [`agent_dispatch.py`](agent_dispatch.py) and works the lists named in
+`KALMIDO-DISPATCH.json` (project folder) off mechanically: it closes tasks whose commit (`#ID` in the subject) is in
+`close_ref`, starts ONE job per free place for the next bundle, guards the jobs and posts one day report. A dry run changes
+nothing. `python3 agent_dispatch.py --dry-run` runs one round by hand. Details:
+[docs/AGENTS.md](../docs/AGENTS.md#working-a-list-off-24810).
 
 ## Claude Code usage hook
 

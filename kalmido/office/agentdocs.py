@@ -37,7 +37,7 @@ from .calc import dec, dstr, fmt_money, money
 from .model import office_on, office_role, office_rows, office_seed_texts, office_settings, pb_cl_sql, pb_owner, pb_personal, sr_public
 from .packs import office_features
 from .rights import LV, NO_RIGHT, office_can, ofr_admin_or, ofr_groups_of, ofr_rights
-from .invoices import ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
+from .invoices import ofi_ref, ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
 from .offerlink import OilExists, oil_agent_filter, oil_need_no_invoice  # 2.356.0 C (#3003)
 
 OFA_ITEM_KEYS = ("kind", "service_id", "text", "detail", "qty", "unit", "price", "discount")
@@ -221,6 +221,12 @@ def ofa_need_in_lists(c, aid, r):
     if not ofa_doc_in_lists(c, aid, r):
         raise Denied(404)
     return r
+
+
+def ofa_restricted(c, aid):
+    """2.463.0 (#3889): agent aid sees only some lists (ofa_doc_in_lists can leave rows out)."""
+    a = c.execute("SELECT list_ids FROM agents WHERE user_id=?", (aid,)).fetchone() if aid else None
+    return bool(a and str(a[0] or "").strip())
 
 
 def ofa_doc_in_lists(c, aid, r):
@@ -458,7 +464,7 @@ def _doc_v1(c, oid, r, items=True):
     for it in d.get("items") or []:  # 2.144.5 C (#1523): the source list of a position is internal
         it.pop("list_id", None)
     oil_agent_filter(d, lambda x: ofa_doc_in_lists(c, g.user["id"], x))  # 2.356.0 C (#3003): linked documents only inside the agent's projects
-    d["app_url"] = f"#office/offers/{r['id']}"  # every kind opens in the tab "Quotes & invoices"
+    d["app_url"] = f"#office/offers/{r['id']}"  # every kind opens in the tab "Quotations & invoices"
     return d
 
 
@@ -515,9 +521,9 @@ def v1_office_master(kind):
 @app.get("/api/v1/office/docs")
 @v1_view
 def v1_office_docs():
-    from .docs import DOC_KINDS, doc_brief
+    from .docs import DOC_KINDS, ODOC_PAGE_MAX, doc_brief
     from .invoices import inv_paid_map
-    a = _args(("kind", "client_id", "open", "status", "trial"))
+    a = _args(("kind", "client_id", "open", "status", "trial", "before", "limit"))
     c = db()
     aid, oid, uid = _v1ctx(c, a.get("requested_by"), target="docs")
     kind = a.get("kind") or "offer"
@@ -536,18 +542,36 @@ def v1_office_docs():
             raise BadInput(tr("Invalid value: {0}", "trial"))
         sql += " AND trial=?"
         args.append(int(a["trial"]))
+    # 2.463.0 (#3889): a page by (date, id) as /api/office/docs (#3200); what is filtered here is decided before the page is cut
+    # (an old open invoice was missing behind the 500 newest documents, the same fault as #3115)
+    n = str(a.get("limit") or "")
+    n = max(1, min(int(n), ODOC_PAGE_MAX)) if re.fullmatch(r"\d{1,6}", n) else ODOC_PAGE_MAX
+    if a.get("before"):
+        cur = re.fullmatch(r"([^\x00]{0,40}),(\d{1,18})", str(a["before"]))
+        if not cur:
+            raise BadInput(tr("Invalid value: {0}", "before"))
+        sql += " AND (date, id) < (?, ?)"
+        args += [cur[1], int(cur[2])]
+    only_open = a.get("open") == "1"
+    if only_open:  # every kind keeps its meaning (a sent quotation, a credit note): the states below decide, this only narrows
+        sql += " AND status NOT IN ('draft', 'paid', 'cancelled')"
+    narrowed = only_open or ofa_restricted(c, aid)
     pm = inv_paid_map(c, oid) if kind in ("invoice", "credit") else {}
-    rows = []
-    for r in c.execute(sql + " ORDER BY date DESC, id DESC LIMIT 500", args).fetchall():
+    rows, last, next_cursor = [], None, None
+    for r in c.execute(sql + " ORDER BY date DESC, id DESC" + ("" if narrowed else f" LIMIT {n + 1}"), args).fetchall():
         if not ofa_doc_in_lists(c, aid, r):
             continue
         b = doc_brief(r, pm)
         b["agent_id"] = r["agent_id"]
-        if a.get("open") == "1" and b.get("state") not in ("issued", "sent", "partial", "overdue"):
+        if only_open and b.get("state") not in ("issued", "sent", "partial", "overdue"):
             continue
+        if len(rows) == n:
+            next_cursor = f"{last['date']},{last['id']}"
+            break
         rows.append(b)
+        last = r
     c.commit()
-    return jsonify(data=rows)
+    return jsonify(data=rows, next_cursor=next_cursor)
 
 
 @app.get("/api/v1/office/docs/<int:did>")
@@ -595,9 +619,11 @@ def _notify(c, aid, uid, did, oid, what):
     return r["id"]
 
 
-def _draft_answer(c, aid, uid, oid, did, notify, what, code=201):
+def _draft_answer(c, aid, uid, oid, did, notify, what, code=201, kept=None):
     from .docs import doc_row
     out = {"doc": _doc_v1(c, oid, doc_row(c, oid, did))}
+    if kept is not None:  # 2.370.2 (#3088): positions the save left out that stay (billed receipts or time)
+        out["kept_ids"] = kept
     if notify:
         out["chat_message_id"] = _notify(c, aid, uid, did, oid, what)
     _log_doc(c, did)
@@ -687,18 +713,19 @@ def v1_office_offer_patch(did):
         c.execute(f"UPDATE office_docs SET {','.join(k + '=?' for k in f)} WHERE id=? AND org_id=?", [*f.values(), did, oid])
         if diff["after"]:
             ofx_log(c, oid, "update", doc_id=did, detail=diff)
+    kept = None
     if "items" in b:
         r = doc_row(c, oid, did)
         items, flags = ofa_items(c, oid, r, b["items"])
         old = doc_items(c, did, oid)
         ofa_match_ids(items, old)
         before = ofx_items_brief(old)
-        _put_items(c, oid, r, items, False, flags, keep=False if exp else "agent")  # 2.269.0 A (#3012): billed receipts' positions stay
+        kept = _put_items(c, oid, r, items, False, flags, keep=False if exp else "agent")  # 2.269.0 A (#3012): billed receipts' positions stay
         after = ofx_items_brief(doc_items(c, did, oid))
         if before != after:
             ofx_log(c, oid, "items", doc_id=did, detail={"before": before, "after": after})
     recalc(c, oid, did)
-    return _draft_answer(c, aid, uid, oid, did, notify, N_("Quotation draft"), 200)
+    return _draft_answer(c, aid, uid, oid, did, notify, N_("Quotation draft"), 200, kept)
 
 
 @app.post("/api/v1/office/offers/<int:did>/invoice")
@@ -762,7 +789,7 @@ def v1_office_reminder_post():
     c.execute("UPDATE office_docs SET agent_id=? WHERE id=? AND org_id=?", (aid, nid, oid))
     ofi_ref_keep(c, nid, ref)
     recalc(c, oid, nid)
-    return _draft_answer(c, aid, uid, oid, nid, notify, N_("Reminder draft"))
+    return _draft_answer(c, aid, uid, oid, nid, notify, N_("Payment reminder draft"))
 
 
 # ---------------------------------------------------------------- #1350: payment suggestions
@@ -790,11 +817,12 @@ def _pp_open_amount(c, oid, r):
 @app.post("/api/v1/office/payment-suggestions")
 @v1_view
 def v1_office_pp_post():
-    """{invoice_id, amount, date, reference?, confidence?: high|medium|low, note?} -> 201 the suggestion (open). An admin of
-    the area accepts it in the office (then it is booked as a payment) or rejects it."""
+    """{invoice_id, amount, date, reference?, confidence?: high|medium|low, note?, client_ref?} -> 201 the suggestion (open). An
+    admin of the area accepts it in the office (then it is booked as a payment) or rejects it. 2.370.2 (#3088): sent again
+    with the same client_ref = 200 the suggestion made the first time, whatever became of it."""
     from .docs import _date, doc_row
     from .ledger import ofx_locked
-    b = _json(("invoice_id", "amount", "date", "reference", "confidence", "note"))
+    b = _json(("invoice_id", "amount", "date", "reference", "confidence", "note", "client_ref"))
     c = db()
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="payment")
     did = _iid(b.get("invoice_id"), "invoice_id")
@@ -802,6 +830,12 @@ def v1_office_pp_post():
         raise BadInput(tr("Invalid value: {0}", "invoice_id"))
     write_lock(c, f"office_pay_{did}")  # 2.149.0 A (#2521): check and write in one go, like a person's payment (invoices.inv_pay_add)
     r = ofa_need_in_lists(c, aid, doc_row(c, oid, did))
+    cref = ofi_ref(b)  # 2.370.2 (#3088): before the checks (the invoice may be paid by now)
+    if cref:
+        write_lock(c, f"office-pp-ref-{aid}")
+        hit = c.execute("SELECT * FROM office_pay_props WHERE org_id=? AND agent_id=? AND client_ref=?", (oid, aid, cref)).fetchone()
+        if hit:
+            return jsonify({**_pp_public(c, hit), "exceeds_open": False}), 200
     if r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid", "draft"):
         raise Denied(409, tr("Payments go on finalised, open invoices only"))
     if r["trial"]:  # 2.144.10 B (#2576): no payment suggestions for trial invoices
@@ -823,8 +857,8 @@ def v1_office_pp_post():
     note = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", b.get("note") or "").strip()[:500] if isinstance(b.get("note"), str) else ""
     if c.execute("SELECT COUNT(*) FROM office_pay_props WHERE org_id=? AND state='open'", (oid,)).fetchone()[0] >= 200:
         raise Denied(409, tr("Too many open payment suggestions: let a person decide on them first"))
-    pid = insert_id(c, "INSERT INTO office_pay_props(org_id, doc_id, agent_id, requested_by, date, amount, reference, confidence, note, state, created_at) "
-                       "VALUES(?,?,?,?,?,?,?,?,?,'open',?)", (oid, did, aid, uid, d, float(money(amt)), ref, conf, note, iso(now_utc())))
+    pid = insert_id(c, "INSERT INTO office_pay_props(org_id, doc_id, agent_id, requested_by, date, amount, reference, confidence, note, state, created_at, client_ref) "
+                       "VALUES(?,?,?,?,?,?,?,?,?,'open',?,?)", (oid, did, aid, uid, d, float(money(amt)), ref, conf, note, iso(now_utc()), cref))
     _log_doc(c, did)
     bump(c)
     c.commit()
@@ -1002,7 +1036,9 @@ def ofa_spec(paths, schemas, op, ok, errs, ref, pid, q):
     paths["/office/docs"] = {"get": op("Quotations, invoices or reminders of the office, newest first (2.51.0)", T, ok(o) | errs("400", "403", "404"),
                                        [q("kind", "offer (default), invoice, credit, reminder", {"type": "string"}), q("client_id", "Only this client", {"type": "integer"}),
                                         q("status", "Stored status", {"type": "string"}), q("open", "1 = only open invoices (issued, sent, partial, overdue)", {"type": "string"}),
-                                        q("trial", "2.144.10: 1 = only trial documents, 0 = only real ones (each document carries trial)", {"type": "string"}), rb],
+                                        q("trial", "2.144.10: 1 = only trial documents, 0 = only real ones (each document carries trial)", {"type": "string"}),
+                                        q("before", "2.463.0: next_cursor of the page before: the next, older page", {"type": "string"}),
+                                        q("limit", "2.463.0: documents per page, at most 500", {"type": "integer"}), rb],
                                        scope="office")}
     paths["/office/docs/{id}"] = {"get": op("One document with its positions (2.51.0)", T, ok(o) | errs("400", "403", "404"), [pid("id", "Document id"), rb], scope="office")}
     paths["/office/docs/{id}/pdf"] = {"get": {**op("The PDF preview of a draft (2.51.0)", T, errs("400", "403", "404", "409"), [pid("id", "Document id"), rb], scope="office"),
@@ -1030,6 +1066,7 @@ def ofa_spec(paths, schemas, op, ok, errs, ref, pid, q):
                    body={"type": "object", "required": ["invoice_id", "amount"], "properties": {
                        "invoice_id": {"type": "integer"}, "amount": {"type": "string", "description": "Decimal text, e.g. 1190.00"},
                        "date": {"type": "string", "format": "date"}, "reference": {"type": "string", "description": "The payment's reference text"},
-                       "confidence": {"type": "string", "enum": list(OFA_CONF)}, "note": {"type": "string"}, "requested_by": {"type": "integer"}}},
+                       "confidence": {"type": "string", "enum": list(OFA_CONF)}, "note": {"type": "string"}, "requested_by": {"type": "integer"},
+                       "client_ref": {"type": "string", "maxLength": 64, "description": "2.370.2: your own id of this request; sent again = 200 the suggestion made the first time"}}},
                    scope="office", desc="Kalmido has no bank access: you read the payment from what a person gave you. An admin accepts "
                                         "(then it is booked) or rejects it; you never book.")}

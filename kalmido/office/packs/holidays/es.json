@@ -1,0 +1,17 @@
+{
+ "code": "ES",
+ "name": "Spain",
+ "version": 1,
+ "holidays": [
+  {"date": "01-01", "name": "New Year's Day"},
+  {"date": "01-06", "name": "Epiphany"},
+  {"date": "05-01", "name": "Labour Day"},
+  {"date": "08-15", "name": "Assumption Day"},
+  {"date": "10-12", "name": "National Day|Spain"},
+  {"date": "11-01", "name": "All Saints' Day"},
+  {"date": "12-06", "name": "Constitution Day"},
+  {"date": "12-08", "name": "Immaculate Conception"},
+  {"date": "12-25", "name": "Christmas Day"},
+  {"easter": -2, "name": "Good Friday"}
+ ]
+}

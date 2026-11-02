@@ -152,7 +152,7 @@ function updateChips(input) {
   const chips = input.closest('.qadd').querySelector('.chips');
   if (!chips) return;
   const r = parseQuick(input.value, S.quick.ignore);
-  chips.innerHTML = r.chips.map(c => `<button class="qchip ${c.off ? 'off' : ''}" data-qtype="${esc(c.type)}" title="${c.off ? tr('recognize again') : tr("don't recognize")}">${esc(c.label)}</button>`).join('') + qMismatch(r) + (input.id === 'qsheet' && !S.quickPreset?.capture ? dsxWhoChip() : '');  // 2.36.2 (#1138)
+  chips.innerHTML = r.chips.map(c => `<button class="qchip ${c.off ? 'off' : ''}" data-qtype="${esc(c.type)}" title="${c.off ? tr('recognise again') : tr("don't recognise")}">${esc(c.label)}</button>`).join('') + qMismatch(r) + (input.id === 'qsheet' && !S.quickPreset?.capture ? dsxWhoChip() : '');  // 2.36.2 (#1138)
 }
 // U21: a date that is not on the repeat's own days ("tomorrow … every monday"): say what happens
 function qMismatch(r) {
@@ -448,7 +448,7 @@ document.addEventListener('click', async e => {
     case 'jc-back': jc_enter(S.chat.aid, null); break;
     case 'prop-open': propOpen(+a.dataset.jid); break;  // 2.3.0
     case 'aiu-more': settingsModal('usage'); break;
-    case 'ag-setup': LS.set('aiSub', 'setup'); settingsModal('agents'); break;  // 2.22.0 (#739); 2.27.0 (#955): at "Set up"
+    case 'ag-setup': agCreateGo(); break;  // 2.22.0 (#739); 2.366.0 (#2998): straight to creating one (the focus "agents" used to win over "Set up")
     case 'jobs-more': jobsMore(a); break;  // 2.40.0 (#1432)
     case 'hist-more': histMore(a); break;
     case 'news-more': newsMore(a); break;
@@ -486,6 +486,9 @@ document.addEventListener('click', async e => {
     case 'toggle': e.stopPropagation(); toggleTask(id); break;
     case 'flow-why': e.stopPropagation(); e.preventDefault(); toast(tr(FLOW_WHY), null, 6000); break;
     case 'assign': e.stopPropagation(); assignMenu(a, id); break;
+    case 'delegate': e.stopPropagation(); dlg_menu(a, id); break;  // 2.473.0 (#3357)
+    case 'watch': e.stopPropagation(); wat_toggle(id); break;
+    case 'watchers': e.stopPropagation(); wat_menu(a, id); break;
     case 'take': e.stopPropagation(); takeTask(id || S.sel); break;  // 2.10.0 (#441)
     case 'dayplan': dayplanModal(a.dataset.mode || 'day', a.dataset.day || today()); break;  // 2.10.0 (#440)
     case 'unplan': patchUndoable(+a.dataset.id, {plan_start: null}, tr('Unplanned {0}', qn(String(taskById(+a.dataset.id)?.title || '').slice(0, 40)))); break;  // 2.11.0: the day plan's slot only
@@ -515,7 +518,7 @@ document.addEventListener('click', async e => {
       {label: tr('Account'), icon: 'user', fn: () => { closeSide(); settingsModal('account'); }},
       {label: tr('Settings'), icon: 'gear', keys: 'g s', fn: () => { closeSide(); settingsModal(); }},
       ...(mvOn() ? [{label: tr('Show administration again'), icon: 'eye', fn: () => { closeSide(); loadModule('settings').then(() => mvSet(false), () => {}); }}] : []),  // 2.436.0 (#3620)
-      ...(S.me?.auth === 'session' ? ['-', {label: tr('Log out'), icon: 'logout', fn: logout}] : [])]); break; }
+      ...(S.me?.auth === 'session' ? ['-', {label: tr('Sign out'), icon: 'logout', fn: logout}] : [])]); break; }
     case 'tabs-more': tabsMore(a); break;
     case 'list-chat': listChat(+a.dataset.id); break;  // 2.17.0 (#419)
     case 'rows-more': rowsMore(); break;  // 2.17.0 (#649)
@@ -556,7 +559,7 @@ document.addEventListener('click', async e => {
     case 'side-fold': sideFold(!LS.get('sideFold', false)); break;  // 2.13.0 (#453 A15)
     case 'side-timeline': closeSide(); S.rmScrollReset = true; if (S.route.mod === 'tasks' && S.route.key === 'all') rmSet({v: 'timeline'}, 'all'); else Promise.resolve(rmSet({v: 'timeline'}, 'none')).then(() => go('all')); break;  // 2.65.0 (#1823): rmSet may load the timeline first
     case 'team-agent': { closeSide(); const ag = agentById(a.dataset.aid); if (ag && ag.enabled) chatOpen(ag.id); else go('agents'); break; }
-    case 'lists-reorder': S.listReorder = !S.listReorder; renderSide(); break;
+    case 'lists-reorder': listReorderSet(!S.listReorder); break;
     case 'side-more': sb_moreOpen = !sb_moreOpen; renderSide(); break;  // 2.250.0 C (#2995): unfolds in place (was: the settings)
     case 'side-customize': closeSide(); settingsModal('sidebar'); break;  // 2.25.0 (UX-03 / UX-26)
     case 'sb-people': closeSide(); sbp_dialog(); break;  // 2.99.0 E (#2187): "All people …" (sbnav.js)
@@ -743,7 +746,7 @@ document.addEventListener('click', async e => {
     case 'mb-today': batch('patch', {due: today()}); break;
     case 'mb-tomorrow': batch('patch', {due: addDays(today(), 1)}); break;
     case 'mb-prio': menu(a, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => batch('patch', {priority: p})}))); break;
-    case 'mb-list': tch_listPicker(a, {filter: l => canEditList(l.id), pick: l => batch('patch', {list_id: l.id, section_id: null})}); break;  // 2.38.0 (#1177)
+    case 'mb-list': mv_batch(a); break;  // 2.38.0 (#1177); 2.455.0 (#3848)
     case 'mb-ms': {  // 2.18.0 (#430): the selected tasks (one list) into one of its open milestones, or out
       const lid = msBulkList(); if (!lid) break;
       menu(a, [...msOfList(lid).filter(m => m.status === 0).map(m => ({label: m.title + (m.due ? ' · ' + fmtDateLoc(m.due) : ''), icon: 'flag', fn: () => batch('patch', {milestone_id: m.id}, false, undefined, tr('Milestone: {0}', m.title))})),
@@ -792,6 +795,7 @@ document.addEventListener('click', async e => {
     case 'tv-toggle': { const k = a.dataset.key; S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k); LS.set('collapsed', [...S.collapsed]); renderView(); break; }
     case 'tv-entries': S.tv.entries = !S.tv.entries; LS.set('timeEntries', S.tv.entries); lyOptSet('time', 'entries', 'open', S.tv.entries); renderView(); break;
     case 'tv-sheet': timesheet(); break;
+    case 'ofm-sigset': ofmSigSettings(); break;  // 2.439.0 (#3617)  // lazy-ok: the button sits in Settings > Account (acctset.js loads with it)
     case 'lt-sigset': ltSigSettings(); break;  // 2.365.2 C (#2789): from Settings > Account  // lazy-ok: the button sits in Settings > Account (acctset.js loads with it)
     case 'mod-settings': settingsModal(a.dataset.sec); break;  // 2.365.2 C (#2789): module -> its Settings area
     case 'tvg-add': entryModal(null, {task_id: id || null, date: a.dataset.d}); break;  // 2.34.0 (#269): a day without tracked time
@@ -807,7 +811,7 @@ function closeSide() {
   sideRet = null;
   $('#side').classList.remove('open'); if (!$('.qadd.sheet') && $('#pop').classList.contains('hidden')) $('#scrim').classList.add('hidden'); }
 $('#scrim').addEventListener('click', () => { closeSide(); closePop(); });
-$('#fab').addEventListener('click', () => openQuickSheet());
+$('#fab').addEventListener('click', () => { if (typeof QN_FAB === 'object' && ms_lpRecent(QN_FAB)) return; openQuickSheet(); });  // 2.477.0 (#3881): the click ending a hold opens no task
 
 document.addEventListener('input', e => {
   const t = e.target;
@@ -919,6 +923,8 @@ document.addEventListener('keydown', async e => {
   if (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === 'n') { e.preventDefault(); const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); }
   if (e.key === 'q' && !$('.modal')) { e.preventDefault(); quickCapture(); }
+  // 2.477.0 (#3881): m = a quick note, where m means nothing else (palette.js: the focused task / the selection moves; the timeline's bar)
+  if (e.key === 'm' && !e.defaultPrevented && !$('.modal') && !t.closest?.('.rm-sum')) { e.preventDefault(); qn_new(); }
   if (e.key === 'a' && !$('.modal') && !chatFull() && feat('agents') && chatFabAgent()) { e.preventDefault(); chatPop(); }  // 2.29.0 (#363)
   if (e.key === '/') { e.preventDefault(); go('search'); }
 });

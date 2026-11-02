@@ -78,7 +78,7 @@ for u, o in (("bob", "Alpha"), ("dave", "Alpha"), ("carl", "Beta")):
 Bo, Da, Ca = login(B, "bob"), login(B, "dave"), login(B, "carl")
 for s in (A, Bo, Da, Ca):
     assert s.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": FEATURES}).ok
-FID, Fr = freelancer(B, A)  # freelancer-matrix: lists, tasks (task-refs and the lean delta in the own private space)
+FID, Fr = freelancer(B, A)  # freelancer-matrix: lists, tasks (task-refs and the lean delta in the own private workspace)
 
 
 def task(s, title, lid, **kw):

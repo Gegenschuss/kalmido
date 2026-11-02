@@ -266,9 +266,9 @@ for _ in range(5):
     requests.get(B + "/ical/1.wrongtoken.ics")
 m = wait_for(lambda: [x for x in admin_msgs("t-alice") if "Security" in x["title"]], 4, t=12)
 msgs = [x["msg"] for x in m]
-check(any("Login rate limit reached for user bob" in x for x in msgs), f"rate limit trip for bob: {msgs}")
-lg = [x for x in msgs if "failed logins" in x]
-check(lg and lg[0].startswith("6 failed logins") and "bob ×5" in lg[0] and "?" in lg[0], f"failed logins summed up: {lg}")
+check(any("Sign-in rate limit reached for user bob" in x for x in msgs), f"rate limit trip for bob: {msgs}")
+lg = [x for x in msgs if "failed sign-ins" in x]
+check(lg and lg[0].startswith("6 failed sign-ins") and "bob ×5" in lg[0] and "?" in lg[0], f"failed logins summed up: {lg}")
 # 2.38.0 (#1155): addresses in alerts lose their last octet (IPv6: all but the first 48 bits)
 check(lg and re.search(r"\d+\.\d+\.\d+\.x\b", lg[0]) and not any(re.search(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", x) for x in msgs),
       f"IPs masked in the security alerts: {msgs}")
@@ -276,7 +276,7 @@ check(any(x.startswith("5 uploads (/drop) with an invalid token") for x in msgs)
 check(any(x.startswith("5 calendar feed requests with an invalid link") for x in msgs), f"calendar token burst: {msgs}")
 requests.post(B + "/api/auth/login", json={"username": "carol", "password": "wrong"}, headers=H)
 time.sleep(4.5)
-check(not [x for x in admin_msgs("t-alice") if "failed login " in x["msg"]], "a single failed login stays below the burst threshold")
+check(not [x for x in admin_msgs("t-alice") if "failed sign-in " in x["msg"]], "a single failed login stays below the burst threshold")
 # cooldown: the same /drop burst again within 6 h -> not sent, counted
 n0 = len(admin_msgs("t-alice"))
 for _ in range(5):

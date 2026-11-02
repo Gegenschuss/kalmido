@@ -30,6 +30,7 @@ from ..lists.fields import fmt_num
 from ..lists.ownership import list_owner_set
 from ..tasks.validation import as_int, NAG_VALUES, PRIORITIES, TICKET_TYPES, valid_date
 from ..tasks.tasks import clear_waiting, set_waiting, task_create, task_update
+from ..tasks.oneway import dec_list, irr_apply, irr_view  # 2.392.0 C (#3370)
 from ..tasks.ticketkey import tk_ids_ordered, tk_key, tk_parse  # 2.390.0 (#3353)
 from ..tasks.roadmap import list_shift, roadmap_build
 from ..tasks.lifecycle import task_complete, task_reopen, trash_task
@@ -252,10 +253,14 @@ def task_core(r, tags, fields):
             # 2.36.0 (#1118): locked in the app (tasks created with an agent token start locked; the API is not bound by it)
             "locked": bool(r["locked"]) if "locked" in r.keys() else False,
             "points": r["points"] if "points" in r.keys() else None,  # 2.60.0 (#1511): story points (null = none)
+            "irreversible": irr_view(r) if "irreversible" in r.keys() else None,  # 2.392.0 C (#3370): {reason, yes_by, yes_at}, null = no one-way step
             "remind_at": r["remind_at"] if "remind_at" in r.keys() else None,  # 2.111.0 C (#2057): fixed-time reminder
             # 2.390.0 B (#3355): the sprint (null = backlog), the reviewer and the review state (pending | approved | changes)
             "sprint_id": r["sprint_id"] if "sprint_id" in r.keys() else None,
             "reviewer_id": r["reviewer_id"] if "reviewer_id" in r.keys() else None,
+            # 2.473.0 (#3357): the agent the task is delegated to (the assignee stays), who watches it
+            "delegate_agent_id": r["delegate_agent_id"] if "delegate_agent_id" in r.keys() else None,
+            "watchers": list(r["watchers"]) if "watchers" in r.keys() else [],
             "review": (r["review"] or None) if "review" in r.keys() else None,
             # 2.35.0 (#1095): the code snippets: one task (GET / change / webhook row) all of them, lists only snippets_n
             **_snips(r)}
@@ -282,6 +287,7 @@ def v1_task(d):
     out = task_core(d, d["tags"], d.get("fields") or {})
     out["list_tags"] = d.get("ltags") or []
     out["key"] = tk_key(db(), d)  # 2.390.0 (#3353): "APP-12" (null = the project has no key)
+    out["partial_until"] = d.get("partial_until")  # 2.392.0 B (#3364): done in part: only this version completes it
     out.update(blocked=bool(d.get("blocked")), comment_count=d.get("comment_count", 0), context=bool(d.get("context")),
                attachments=[{**{k: a[k] for k in ("id", "name", "mime", "size")}, **({"encrypted": True} if a.get("enc") else {})}
                             for a in d.get("attachments") or []])
@@ -306,6 +312,8 @@ def task_for(c, row, uid):
         from ..lists.formula import fx_fill
         fields = fx_fill(c, {row["id"]: fields}, {row["id"]: row["list_id"]}).get(row["id"], fields)
     out = {**task_core(row, tags, fields), "list_tags": ltag_names(c, row["id"]), "key": tk_key(c, row)}  # 2.390.0 (#3353): key
+    from ..tasks.watchers import wat_users
+    out["watchers"] = sorted(wat_users(c, row["id"]))  # 2.473.0 (#3357): webhook payloads and agent events too
     if c.execute("SELECT 1 FROM task_enc_notes WHERE task_id=? LIMIT 1", (row["id"],)).fetchone():
         out["encrypted_note"] = True  # 2.42.0 (#828): agents learn only that there is an encrypted note
     if c.execute("SELECT 1 FROM task_note_locks WHERE task_id=?", (row["id"],)).fetchone():
@@ -324,6 +332,7 @@ V1_TASK_IN += ("remind_at",)  # 2.111.0 C (#2057): a reminder at a fixed local t
 # 2.390.0 B (#3355): an open sprint of the task's list (null = backlog) and the reviewer (null = none; set through the
 # review step's checks after the task itself, see v1_reviewer_set)
 V1_TASK_IN += ("sprint_id", "reviewer_id")
+V1_TASK_IN += ("delegate_agent_id",)  # 2.473.0 (#3357): an agent of the task's list (null = none)
 
 
 def v1_task_in(b, allowed=V1_TASK_IN):
@@ -395,6 +404,7 @@ def v1_one(c, tid):
     out = v1_task(rows[0])
     if not rows[0].get("context"):  # 2.2.0 (#271 / #339): linked pull requests / commits + the list's repository
         out["code"] = rows[0].get("code") or {"prs": [], "commits": []}
+        out["decisions"] = dec_list(c, tid)  # 2.392.0 C (#3370): as the comments, not for a context parent
         if out["code"].get("build"):  # 2.151.0 A2 (#2558 review): branch names marked untrusted also without repo below
             from ..integrations.gitbuild import gb_untrusted
             out["code"] = {**out["code"], "build": gb_untrusted(out["code"]["build"])}
@@ -429,6 +439,7 @@ def v1_list(d):
             "ticket_key": d.get("ticket_key") or None,  # 2.390.0 (#3353): the project's key APP (its tasks: APP-1, APP-2, ...)
             "time_tracking": bool(d.get("time_tracking")),  # 2.41.0 (#1471): time tracking on for this list
             "points_on": bool(d.get("points_on")),  # 2.60.0 (#1511): story points shown in the app
+            "irreversible_needs_yes": bool(d.get("irreversible_needs_yes")),  # 2.392.0 C (#3370): the gates wait for a person's yes to one-way tasks
             "header_style": d.get("header_style") or "",  # 2.83.0 (#1427): the list's header strip in the app (read only)
             "nag": d.get("nag") or "", "day_hours": d.get("day_hours"),  # 2.7.0 (#413, #407)
             "columns": d.get("columns"),  # 2.14.0 (#425): the list's columns (null = default)
@@ -680,7 +691,7 @@ def v1_list_create():
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("name", "color", "folder", "checklist", "done_at_bottom", "kind", "tickets", "project_type", "nag", "day_hours",
                                                "family", "sections", "org_id", "time_tracking"))  # 2.28.0 (#935): org_id; 2.41.0 (#1471)
-    unknown = [k for k in unknown if k != "points_on"]  # 2.60.0 (#1511): story points on (set right after, like time_tracking)
+    unknown = [k for k in unknown if k not in ("points_on", "bug_inbox")]  # 2.60.0 (#1511): story points on (set right after, like time_tracking); 2.473.0 (#3378)
     if unknown:
         raise UnknownFields(unknown)
     later = {k: b.pop(k) for k in ("nag", "day_hours", "time_tracking") if k in b}  # 2.7.0: set right after the list exists
@@ -716,7 +727,7 @@ def v1_list_create():
     if later:
         v1_call(list_update, j["id"], body=later)
     d = next(x for x in visible_lists(db(), me()) if x["id"] == j["id"])
-    return jsonify(v1_list(d)), 201
+    return jsonify({**v1_list(d), **({"bug_list_id": j["bug_list_id"]} if j.get("bug_list_id") else {})}), 201
 
 
 @app.patch("/api/v1/lists/<int:lid>")
@@ -933,6 +944,7 @@ V1_COMPACT = ("id", "title", "list_id", "section_id", "parent_id", "status", "du
 
 # ---- 2.390.0 B (#3355): the further filters and the sort of GET /api/v1/tasks
 V1_TASKS_MORE = ("priority", "priority_min", "section_id", "sprint_id", "created_by", "reviewer", "review", "q", "sort", "key")  # 2.390.0 (#3353): key
+V1_TASKS_MORE += ("delegate", "watcher")  # 2.473.0 (#3357)
 V1_FIELD_ARG = re.compile(r"field_(\d{1,9})")
 # sort name -> (SQL expression ascending, ... descending): no due date last in both directions, the id breaks ties
 V1_SORTS = {"priority": ("priority", "priority"), "due": ("COALESCE(due, '9999-99-99')", "COALESCE(due, '')"),
@@ -996,6 +1008,14 @@ def v1_tasks_more(c, uid, a, where, args):
     if a.get("reviewer"):
         w, x = _v1_who(a, "reviewer", uid)
         where.append("reviewer_id " + w)
+        args += x
+    if a.get("delegate"):  # 2.473.0 (#3357): me | none | an agent id
+        w, x = _v1_who(a, "delegate", uid)
+        where.append("delegate_agent_id " + w)
+        args += x
+    if a.get("watcher"):  # 2.473.0 (#3357): me | an id
+        w, x = _v1_who(a, "watcher", uid, none=False)
+        where.append("id IN (SELECT task_id FROM task_watchers WHERE user_id " + w + ")")
         args += x
     if a.get("review"):
         if a["review"] not in ("pending", "approved", "changes", "none"):
@@ -1236,16 +1256,22 @@ def v1_task_update(tid):
     if stale:
         return stale
     prev = v1_prev_in(raw.pop("_prev")) if "_prev" in raw else None
+    irr = "irreversible" in raw  # 2.392.0 C (#3370): {reason} or null, its own rules (tasks/oneway.py)
+    irv = raw.pop("irreversible", None)
     b = v1_task_in(raw)
     rv = "reviewer_id" in b
     rid = b.pop("reviewer_id", None)
-    if not b and not rv:
+    if not b and not rv and not irr:
         raise BadInput(tr("Nothing to change"))
+    if irr:
+        irr_apply(c, tid, irv)
+        bump(c)
     if rv:  # 2.390.0 B (#3355): checked first (against the list the task ends up in); set before the fields unless it moves
         v1_reviewer_check(c, b.get("list_id") or c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()[0], rid, tid)
         if not b.get("list_id"):
             v1_reviewer_set(c, tid, rid)
     if not b:
+        c.commit()  # 2.392.0 C (#3370): only the mark
         return jsonify(v1_one(c, tid))
     if b.get("list_id"):
         from ..agents.safety import move_gate
@@ -1487,21 +1513,26 @@ def v1_comment_create(tid):
     v1_args(())
     b = v1_json()
     # 2.2.1 (#359): 400 unknown_field; 2.33.0 (#1076): reply_to; 2.41.0 (#1383): choices / multi / approval / expires_in
-    reject_unknown(b, ("body", "suggestion", "reply_to", "choices", "multi", "approval", "expires_in", "portal"))  # 2.63.0 B (#1513): + portal
+    reject_unknown(b, ("body", "suggestion", "reply_to", "choices", "multi", "approval", "expires_in", "portal", "client_ref"))  # 2.63.0 B (#1513): + portal; 2.370.2 (#3088): + client_ref
     if not isinstance(b.get("body"), str):
         raise BadInput(tr("Expected {0}", '{"body": "..."}'))
+    ref = b.get("client_ref")
+    if ref is not None and (not isinstance(ref, str) or not ref.strip() or len(ref) > 64):  # 2.370.2 (#3088): as a new task's
+        raise BadInput(tr("Invalid value: {0}", "client_ref"))
     c = db()
     _v1_live(c, tid, write=False, full=True)  # view-only members may comment (as in the app)
-    if b.get("portal") not in (None, False, 0, "0", "false", "") and not any(b.get(k) for k in ("suggestion", "choices", "approval")):
+    again = ref and c.execute("SELECT 1 FROM comments WHERE task_id=? AND user_id=? AND client_ref=? AND deleted_at IS NULL", (tid, me(), ref.strip())).fetchone()
+    if not again and b.get("portal") not in (None, False, 0, "0", "false", "") and not any(b.get(k) for k in ("suggestion", "choices", "approval")):
         # 2.126.0 B (#1979 G5): an agent's answer to a customer waits for a person (need_approval: agents only)
         from ..api.scopes import need_approval
         from ..team.portal import pt_comment_flag
         if pt_comment_flag(c, tid, me(), b["portal"]):
             t = c.execute("SELECT title, list_id FROM tasks WHERE id=?", (tid,)).fetchone()
-            need_approval(c, N_("Answer the customer of the task “{0}”"), (t["title"][:80],), list_id=t["list_id"], task_id=tid)
+            need_approval(c, N_("Answer the client of the task “{0}”"), (t["title"][:80],), list_id=t["list_id"], task_id=tid)
     j = v1_call(comment_create, tid, body={"body": b["body"], **{k: b[k] for k in ("suggestion", "reply_to", "choices", "multi", "approval",
-                                                                                    "expires_in", "portal") if k in b}})
-    return jsonify(v1_comment(c, {**j, "task_id": tid}, user_names(c, [me()]))), 201
+                                                                                    "expires_in", "portal", "client_ref") if k in b}})
+    # 2.392.0 B (#3364): partial = what the comment command "partly: rest in Y" did (or why not)
+    return jsonify({**v1_comment(c, {**j, "task_id": tid}, user_names(c, [me()])), **({"partial": j["partial"]} if j.get("partial") else {})}), 200 if again else 201
 
 
 def v1_entry(e):

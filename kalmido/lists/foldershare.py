@@ -288,7 +288,7 @@ def sh_folder_owner():
     from ..accounts.orgs import may_see
     u = c.execute("SELECT * FROM users WHERE id=?", (new,)).fetchone()
     if not u or u["disabled"] or new == me() or not may_see(c, me(), new):
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     if is_agent(u):
         return err(tr("An agent cannot own a project"))
     moved, skipped = 0, []

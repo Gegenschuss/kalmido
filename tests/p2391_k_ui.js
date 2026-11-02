@@ -33,7 +33,8 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   // 2.48.0 (#1111): "Dokumente/Eingang" is the fixed name of a folder in the file store (data, the same in every language), not the basket
   // 2.142.1 (#2150): "Share inbox (ntfy)" is the heading of the ntfy share inbox per person (the topic, not the basket)
   // 2.207.0 A (#2763): a "scan inbox" (Documents > Settings, upload-only key) is not the basket either (de: Scan-Eingang)
-  const allowed = k => /DATEV|document inbox|scan inbox|^Inboxes$|^Documents: inboxes$|other members' inboxes|two inboxes|^Create inbox$|ntfy share inbox|Share inbox \(ntfy\)|topic inbox|Incoming invoices|^Coming up$|Dokumente\/Eingang|^Inbox\|folder$/.test(k);  // 2.368.0 (#2987): the documents' inbox folder  // it: "In arrivo" = coming up
+  // 2.457.0 (#2971): "ntfy inbox {0} cannot fetch" is the same ntfy share inbox in the notice to the person who can repair it
+  const allowed = k => /DATEV|document inbox|scan inbox|^Inboxes$|^Documents: inboxes$|other members' inboxes|two inboxes|^Create inbox$|ntfy share inbox|ntfy inbox \{0\}|Share inbox \(ntfy\)|topic inbox|Incoming invoices|^Coming up$|Dokumente\/Eingang|^Inbox\|folder$|^With a bug inbox$/.test(k);  // 2.368.0 (#2987): the documents' inbox folder  // 2.473.0 (#3378): the bug inbox of a Software project (a second project), not the basket  // it: "In arrivo" = coming up
   for (const lg of Object.keys(NEW)) {
     const dict = JSON.parse(fs.readFileSync(path.join(I18N, lg + '.json'), 'utf8'));
     check(dict.Basket === NEW[lg], `#1219 ${lg}: Basket = ${NEW[lg]} (${dict.Basket})`);
@@ -194,7 +195,8 @@ const FEAT = 'cal,matrix,habits,stats,comments,collab';
   check(fa() && /Fold all/.test(fa().title), '#1185: "Fold all" in the head of the sidebar');
   click(w, fa()); await sleep(600);
   check(!w.eval('kbSideAnyOpen()') && w.eval('foldClosed("Private")') && d.querySelector('#side .sg-lists .sgh.closed') && /Unfold all/.test(fa().title), '#1185: everything folded, the button says "Unfold all"');
-  const fc = (await call('GET', '/api/state')).settings.folders_closed;
+  // 2.445.0 (#3008): the setting is saved with a delay: wait for it, not for a fixed time (red under load)
+  let fc = ''; await until(async () => { fc = (await call('GET', '/api/state')).settings.folders_closed; return /Private/.test(fc || ''); });
   check(/Private/.test(fc || ''), '#1185: the folded folders are stored like a single fold ' + fc);
   click(w, fa()); await sleep(600);
   check(!w.eval('foldClosed("Private")') && d.querySelector('#side .sg-views > .smod') && d.querySelector('#side .sg-lists .sgh:not(.closed)') && /Fold all/.test(fa().title), '#1185: everything unfolded again');  // 2.152.2 (#2622): Views instead of the gone group Areas

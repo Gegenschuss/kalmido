@@ -24,6 +24,7 @@ from ..accounts.session import me
 from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same, smv_target
 from ..core.errors import BadInput
+from ..core.serializers import unlink_files
 from .pages import wiki_clean_path, wiki_need, wiki_set_links, wiki_space, wiki_space_key, wiki_space_sql
 
 WKM_FILE_RE = re.compile(r"/api/files/|/f/[A-Za-z0-9_-]{8,}|/s/[A-Za-z0-9_-]{8,}|\[\[\s*datei\s*:", re.I)  # 2.123.0 C (#2107): + [[datei:…]]
@@ -65,6 +66,20 @@ def wkm_rows(c, uid, src, b, lock=False):
         if not out:
             raise Denied(404)
     return out
+
+
+def wkm_trash(c, uid, src, to, folder, lock=False):
+    """2.363.3 (#3133): the pages in the trash below a folder that moves go along: ([(row, rest)], how many stay). Their rest
+    as in wkm_rows; they stay when the person may not take them out (a page of someone else without an admin or a release)
+    or beyond SMV_MAX. lock: the rows locked, in id order."""
+    if not folder:
+        return [], 0
+    w, a = wiki_space_sql(src, uid)
+    rows = c.execute(f"SELECT * FROM wiki_pages WHERE deleted_at IS NOT NULL AND {w} AND (lower(path)=? OR lower(path) ILIKE ? ESCAPE '\\') ORDER BY id"
+                     + (" FOR UPDATE" if lock else ""), [*a, folder.lower(), wkm_like(folder)]).fetchall()
+    cut = len(folder) - len(folder.split("/")[-1])
+    go = [(r, r["path"][cut:]) for r in rows if not src or org_out_ok(c, src, to, "wiki", r["id"])][:SMV_MAX]
+    return go, len(rows) - len(go)
 
 
 def wkm_relink(text, ren):
@@ -126,6 +141,9 @@ def wiki_move_space():
     dest = b.get("dest") or ""
     dest = wiki_clean_path(dest) if dest else ""
     moves = [(r, wiki_clean_path(dest + "/" + rest if dest else rest)) for r, rest in rows]
+    folder = wiki_clean_path(b["folder"]) if b.get("folder") not in (None, "") else None
+    trash_go, trash_stays = wkm_trash(c, uid, src, to, folder, lock=not dry)
+    tmoves = [(r, wiki_clean_path(dest + "/" + rest if dest else rest)) for r, rest in trash_go]  # names are free: the index holds live pages only
     tw, ta = wiki_space_sql(to, uid)
     seen, taken = set(), []
     for _, n in moves:
@@ -146,21 +164,21 @@ def wiki_move_space():
     from .wkhist import wkh_body, wkh_move, wkh_seal  # 2.123.0 A (#2105): the texts are sealed with the key of their space
     # 2.273.0 B (#3042): the texts written back are read under the row lock (an edit saved meanwhile is kept) -- since F1 the
     # rows come locked and read again from wkm_rows(lock=True)
-    plain = {r["id"]: wkh_body(c, r) for r, _ in moves}
+    plain = {r["id"]: wkh_body(c, r) for r, _ in moves + tmoves}
     files = sum(1 for r, _ in moves if WKM_FILE_RE.search(plain[r["id"]] or ""))
     notes = [trn("{0} page moves", "{0} pages move", len(moves)),
              trn("{0} link points to the other workspace (it stays as text)", "{0} links point to the other workspace (they stay as text)",
                  out_links + in_links) if out_links + in_links else "",
              trn("{0} page links files of the file store: the files stay in the old workspace",
                  "{0} pages link files of the file store: the files stay in the old workspace", files) if files else ""]
-    folder = wiki_clean_path(b["folder"]) if b.get("folder") not in (None, "") else None
     from .wkshare import wsh_end_moved
-    shares = wsh_end_moved(c, src, None if src else uid, [r["path"] for r, _ in moves], folder, dry=True)
-    trash = c.execute(f"SELECT COUNT(*) FROM wiki_pages WHERE deleted_at IS NOT NULL AND {sw} AND (lower(path)=? OR lower(path) ILIKE ? ESCAPE '\\')",
-                      [*sa, folder.lower(), wkm_like(folder)]).fetchone()[0] if folder else 0
-    vers = wkm_vers_dropped(c, ids, to)
+    shares = wsh_end_moved(c, src, None if src else uid, [r["path"] for r, _ in moves + tmoves], folder, dry=True)
+    trash = len(tmoves) + trash_stays
+    all_ids = ids + [r["id"] for r, _ in tmoves]
+    vers = wkm_vers_dropped(c, all_ids, to)
     notes += [wkm_share_note(shares),  # 2.273.0 B (#3042): what ends / stays behind is named before
-              trn("{0} page in the trash stays in the old workspace", "{0} pages in the trash stay in the old workspace", trash) if trash else "",
+              trn("{0} page in the trash goes along", "{0} pages in the trash go along", len(tmoves)) if tmoves else "",  # 2.363.3 (#3133)
+              trn("{0} page in the trash stays in the old workspace", "{0} pages in the trash stay in the old workspace", trash_stays) if trash_stays else "",
               wkm_vers_note(vers)]
     notes.append(oo_into_note(c, src, to))  # 2.361.2 B (#2923): the way back (empty unless a member moves it in)
     block = tr("A page with this name already exists") + ": " + ", ".join(taken[:5]) if taken else None
@@ -170,39 +188,96 @@ def wiki_move_space():
         return jsonify(smv_answer(notes, block, count=len(moves), taken=taken[:20], shares=shares, trash=trash, versions=vers))
     if taken:
         return jsonify(error=tr("A page with this name already exists"), taken=taken[:20]), 409
-    org_out(c, src, to, "wiki", ", ".join(r["path"] for r, _ in moves), obj=ids)  # 2.361.2 B (#2923): logged, admins told, release used
+    org_out(c, src, to, "wiki", ", ".join(r["path"] for r, _ in moves), obj=all_ids)  # 2.361.2 B (#2923): logged, admins told, release used
     ts = iso_ms(now_utc())
     try:
         with c.savepoint():
-            for r, n in moves:
-                c.execute("UPDATE wiki_pages SET org_id=?, owner_id=?, path=?, updated_by=?, updated_at=? WHERE id=?",
-                          (to, None if to else uid, n, uid, ts, r["id"]))
+            for r, n in moves + tmoves:
+                c.execute("UPDATE wiki_pages SET org_id=?, owner_id=?, path=?, updated_by=?, updated_at=?, brought_by=? WHERE id=?",
+                          (to, None if to else uid, n, uid, ts, uid if to and not src else None, r["id"]))  # 2.365.1 (#3395): accounts/orgback.py
     except IntegrityError:
         c.rollback()  # 2.361.2 (#2923, review): nothing of the move stays, also not the used release
         return jsonify(error=tr("A page with this name already exists"), taken=[]), 409
     from .wikiatt import wka_move_files
-    wka_move_files(c, ids, to, uid)  # 2.99.0 (#2182): the pages' files go along, sealed with the target's key
-    # 2.123.0 B (#2104): their shares end (a share never changes its space)
-    wsh_end_moved(c, src, None if src else uid, [r["path"] for r, _ in moves], folder)
-    relinked = 0
-    # 2.123.0 A (#2102, #2106): the history sealed for the target, the index anew; 2.360.0 D (#2496): not into an organisation
-    wkh_move(c, [r for r, _ in moves], to, uid, keep=to is None)
-    for r, n in moves:
-        nb = wkm_relink(plain[r["id"]], {k: v for k, v in ren.items() if k != v})
-        if nb != plain[r["id"]]:
-            relinked += 1
-        c.execute("UPDATE wiki_pages SET body=? WHERE id=?", (wkh_seal(c, to, None if to else uid, nb), r["id"]))  # 2.123.0 A (#2105)
-        wiki_set_links(c, r["id"], nb)
-        c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('wiki',?,?,?,?,?,?)",
-                  (r["id"], src, to, uid, ts, json.dumps({"from": r["path"], "to": n}, ensure_ascii=False)))
-    from .wkfolder import wkf_drop, wkf_sync
-    wkf_drop(c, ids)  # 2.200.0 A (#2747): their nodes leave the old space's tree, the target's tree files them anew
-    wkf_sync(c, uid, to)
-    bump(c)
-    c.commit()
+    new_paths, old_paths = [], []  # 2.363.3 (#3133): sealed into new stored files, the old ones go after the commit
+    try:
+        wka_move_files(c, all_ids, to, uid, new_paths, old_paths)  # 2.99.0 (#2182): the pages' files go along, sealed with the target's key
+        # 2.123.0 B (#2104): their shares end (a share never changes its space)
+        wsh_end_moved(c, src, None if src else uid, [r["path"] for r, _ in moves + tmoves], folder)
+        relinked = 0
+        # 2.123.0 A (#2102, #2106): the history sealed for the target, the index anew; 2.360.0 D (#2496): not into an organisation
+        wkh_move(c, [r for r, _ in moves + tmoves], to, uid, keep=to is None)
+        ren_all = {**ren, **{r["path"].lower(): n for r, n in tmoves}}
+        for r, n in moves + tmoves:
+            nb = wkm_relink(plain[r["id"]], {k: v for k, v in ren_all.items() if k != v})
+            if nb != plain[r["id"]]:
+                relinked += 1
+            c.execute("UPDATE wiki_pages SET body=? WHERE id=?", (wkh_seal(c, to, None if to else uid, nb), r["id"]))  # 2.123.0 A (#2105)
+            wiki_set_links(c, r["id"], nb)
+            c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('wiki',?,?,?,?,?,?)",
+                      (r["id"], src, to, uid, ts, json.dumps({"from": r["path"], "to": n}, ensure_ascii=False)))
+        from .wkfolder import wkf_drop, wkf_sync
+        wkf_drop(c, all_ids)  # 2.200.0 A (#2747): their nodes leave the old space's tree, the target's tree files them anew
+        wkf_sync(c, uid, to)
+        bump(c)
+        c.commit()
+    except BaseException:
+        c.rollback()
+        unlink_files(new_paths)
+        raise
+    unlink_files(old_paths)
     return jsonify(smv_answer(notes, None, ok=True, space=wiki_space_key(to), from_space=wiki_space_key(src), relinked=relinked,
                               moved=[{"id": r["id"], "from": r["path"], "to": n} for r, n in moves]))
 
+
+
+def wkm_home_rows(c, oid, uid):
+    """2.365.1 (#3395): (the pages uid brought into organisation oid that go back with them, how many stay): nothing with a lock
+    on either side (the server cannot encrypt them again; that way back is the request, the browser re-encrypts)."""
+    from .wikie2e import wke_mode
+    from .wkhist import wsb_body_or
+    rows = c.execute("SELECT * FROM wiki_pages WHERE org_id=? AND brought_by=? AND deleted_at IS NULL ORDER BY id", (oid, uid)).fetchall()
+    if rows and (wke_mode(c, oid, uid)[0] or wke_mode(c, None, uid)[0]):
+        return [], len(rows)
+    go = [r for r in rows if wsb_body_or(c, r, None) is not None][:SMV_MAX]  # a text that cannot be opened stays
+    return go, len(rows) - len(go)
+
+
+def wkm_free(path, taken):
+    """path, or "path (2)" ... when taken (lower-case paths; the name found is added)."""
+    n, i = path, 1
+    while n.lower() in taken:
+        i += 1
+        n = f"{path} ({i})"
+    taken.add(n.lower())
+    return n
+
+
+def wkm_home(c, oid, uid, rows, new_paths, old_paths):
+    """2.365.1 (#3395): pages rows (wkm_home_rows) go back into uid's private space: what wiki_move_space does, without the
+    dialog; a name taken there gets " (2)" and the links between these pages follow. The caller commits."""
+    from .wikiatt import wka_move_files
+    from .wkfolder import wkf_drop, wkf_sync
+    from .wkhist import wkh_body, wkh_move, wkh_seal
+    from .wkshare import wsh_end_moved
+    w, a = wiki_space_sql(None, uid)
+    taken = {x[0].lower() for x in c.execute(f"SELECT path FROM wiki_pages WHERE deleted_at IS NULL AND {w}", a)}
+    plain = {r["id"]: wkh_body(c, r) for r in rows}
+    moves = [(r, wkm_free(r["path"], taken)) for r in rows]
+    ren, ids, ts = {r["path"].lower(): n for r, n in moves if r["path"] != n}, [r["id"] for r in rows], iso_ms(now_utc())
+    for r, n in moves:
+        c.execute("UPDATE wiki_pages SET org_id=NULL, owner_id=?, path=?, updated_by=?, updated_at=?, brought_by=NULL WHERE id=?", (uid, n, uid, ts, r["id"]))
+    wka_move_files(c, ids, None, uid, new_paths, old_paths)
+    wsh_end_moved(c, oid, None, [r["path"] for r in rows])
+    wkh_move(c, rows, None, uid)
+    for r, n in moves:
+        nb = wkm_relink(plain[r["id"]], ren)
+        c.execute("UPDATE wiki_pages SET body=? WHERE id=?", (wkh_seal(c, None, uid, nb), r["id"]))
+        wiki_set_links(c, r["id"], nb)
+        c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('wiki',?,?,NULL,?,?,?)",
+                  (r["id"], oid, uid, ts, json.dumps({"from": r["path"], "to": n}, ensure_ascii=False)))
+    wkf_drop(c, ids)
+    wkf_sync(c, uid, None)
 
 
 # ---------------------------------------------------------------- 2.97.0 D (#2050): moves with a space with the lock
@@ -213,11 +288,11 @@ def wiki_move_space():
 # exactly the pages named, each with path and text; both generations as seen by the dry run (else 409, the browser tries
 # again). Names in a locked target are compared in the browser. No links are kept for a locked target, its history line
 # keeps no names. Only a person in the web app (agents, API tokens: 403).
-WKR_BUSY = N_("This space is being encrypted. Try again in a moment.")
-WKR_NOKEY = N_("You cannot unlock the target space: you have no key for it yet. An admin of the organisation can give it to you.")
-WKR_NOKEY_SRC = N_("You have no key for this space yet.")
+WKR_BUSY = N_("This workspace is being encrypted. Try again in a moment.")
+WKR_NOKEY = N_("You cannot unlock the target workspace: you have no key for it yet. An admin of the organisation can give it to you.")
+WKR_NOKEY_SRC = N_("You have no key for this workspace yet.")
 WKR_PLAIN = N_("The pages are no longer end-to-end encrypted in the target.")
-WKR_GEN = N_("The key of a space was changed meanwhile. Please try again.")
+WKR_GEN = N_("The key of a workspace was changed meanwhile. Please try again.")
 
 
 def wkr_state(c, oid, uid, lock=False):
@@ -303,8 +378,8 @@ def wkr_move(c, uid, src, to, b, dry):
     shares = wsh_end_moved(c, src, None if src else uid, [r["path"] for r in rows], dry=True)
     q = ",".join("?" * len(ids))
     vers = c.execute(f"SELECT COUNT(*) FROM wiki_versions WHERE page_id IN ({q})", ids).fetchone()[0] if tst["mode"] else 0
-    notes += [wkm_share_note(shares), trn("{0} earlier version is deleted: a space with the lock keeps no history",
-                                          "{0} earlier versions are deleted: a space with the lock keeps no history", vers) if vers else "",
+    notes += [wkm_share_note(shares), trn("{0} earlier version is deleted: a workspace with the lock keeps no history",
+                                          "{0} earlier versions are deleted: a workspace with the lock keeps no history", vers) if vers else "",
               oo_into_note(c, src, to)]  # 2.361.2 B (#2923)
     if not tst["mode"]:  # 2.360.0 D (#2496): an open organisation as the target keeps no history either (wkm_vers_note)
         vers = wkm_vers_dropped(c, ids, to)
@@ -315,7 +390,7 @@ def wkr_move(c, uid, src, to, b, dry):
         e2e_deny = {}
     from .wikiatt import wka_pages_have_files
     if not block and tst["mode"] and wka_pages_have_files(c, [r["id"] for r in rows]):  # 2.99.0 (#2182): no plain files
-        block = tr("The pages of this space have files. Files cannot be encrypted in the browser yet: delete them first.")
+        block = tr("The pages of this workspace have files. Files cannot be encrypted in the browser yet: delete them first.")
     if dry:  # 2.273.0 B (#3042): + updated_at per page (the move sends it back as expect_updated_at)
         return jsonify(smv_answer(notes, block, count=len(rows), e2e=e2e, taken=[], shares=shares,
                                   pages=[{"id": r["id"], "updated_at": r["updated_at"]} for r in rows], **e2e_deny))
@@ -354,8 +429,9 @@ def wkr_move(c, uid, src, to, b, dry):
             for r in rows:
                 p, t = got[r["id"]]
                 attrs = "{}" if tst["mode"] else json.dumps(wiki_frontmatter(t), ensure_ascii=False)
-                c.execute("UPDATE wiki_pages SET org_id=?, owner_id=?, path=?, body=?, attrs=?, updated_by=?, updated_at=? WHERE id=?",
-                          (to, None if to else uid, p, t if tst["mode"] else wkh_seal(c, to, None if to else uid, t), attrs, uid, ts, r["id"]))
+                c.execute("UPDATE wiki_pages SET org_id=?, owner_id=?, path=?, body=?, attrs=?, updated_by=?, updated_at=?, brought_by=? WHERE id=?",
+                          (to, None if to else uid, p, t if tst["mode"] else wkh_seal(c, to, None if to else uid, t), attrs, uid, ts,
+                           uid if to and not src else None, r["id"]))  # 2.365.1 (#3395)
     except IntegrityError:
         c.rollback()
         return jsonify(error=tr("A page with this name already exists"), taken=[]), 409
@@ -394,7 +470,7 @@ def wkr_place(c, oid, by_id, viewer):
         return None, tr("Organisation")
     if by_id == viewer:
         return "private", tr("Private")
-    return None, tr("private space")
+    return None, tr("private workspace")
 
 def wkm_last(c, pid):
     """The last move of page pid between workspaces (its history line), or None. The caller checked the page is visible."""

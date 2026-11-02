@@ -2,7 +2,7 @@
 """2.87.9 API tests, part B: the target of an import (#1940) and the progress of a Paperless-ngx import (#1938), against the
 fake Paperless-ngx inside the test container (fake_paperless.py, 127.0.0.1:8098). Invented names only, generated files.
  - #1940 Paperless (connection + export ZIP way share pl_run_target): an organisation's admin imports from the
-   organisation's connection into the organisation (as before) or with target "private" into their OWN private space
+   organisation's connection into the organisation (as before) or with target "private" into their OWN private workspace
    (the run says target private + mine); a member cannot start either; any other target is refused (400); a person
    without an organisation imports into their own space (target private = the same)
  - #1940 task import (ICS): space=private / org:<id> puts the new lists there, a foreign organisation is refused (400),
@@ -124,7 +124,7 @@ OWS = f"org:{ORG}"
 cols = {(r[0], r[1]) for r in dbx("SELECT table_name, column_name FROM information_schema.columns WHERE column_name='run_ws'")}
 check(cols == {("pl_sources", "run_ws"), ("pl_uploads", "run_ws")}, f"#1940: run_ws on pl_sources + pl_uploads ({sorted(cols)})")
 
-# ---- #1940 Paperless: from the organisation's connection into the own private space
+# ---- #1940 Paperless: from the organisation's connection into the own private workspace
 r = Bo.put(B + "/api/paperless", json={"ws": OWS, "url": PL, "token": "pl-secret"})
 check(r.ok, f"the organisation's admin connects ({r.status_code} {r.text[:200]})")
 for bad in ("org:999999", f"org:{ORG2}", "u1", "everyone", 5):
@@ -132,7 +132,7 @@ for bad in ("org:999999", f"org:{ORG2}", "u1", "everyone", 5):
     check(r.status_code == 400, f"#1940: target {bad!r} refused ({r.status_code} {r.text[:120]})")
 check(run_of(Bo, OWS).get("state") == "idle", "#1940: a refused start leaves the run idle")
 r = Ca.post(B + "/api/paperless/import", json={"ws": OWS, "target": "private"})
-check(r.status_code == 403, f"#1940: a member cannot start an import into their private space from the organisation's connection ({r.status_code})")
+check(r.status_code == 403, f"#1940: a member cannot start an import into their private workspace from the organisation's connection ({r.status_code})")
 r = Bo.post(B + "/api/paperless/import", json={"ws": OWS, "target": "private"})
 check(r.ok, f"#1940: the admin starts the import into private ({r.status_code} {r.text[:200]})")
 run = r.json()["conn"]["run"]
@@ -144,7 +144,7 @@ check(len(pd) == 3 and all(not d.get("org_id") for d in pd), f"#1940: they are i
 check(not docs(Bo, OWS), "#1940: nothing in the organisation's documents")
 check(not docs(Ca, OWS) and not docs(Ca, "private"), "#1940: carol (member) sees none of them")
 ws_rows = {r[0] for r in dbx("SELECT ws FROM pl_imported")}
-check(ws_rows == {f"u{ids['bob']}"}, f"#1940: remembered for bob's private space ({ws_rows})")
+check(ws_rows == {f"u{ids['bob']}"}, f"#1940: remembered for bob's private workspace ({ws_rows})")
 j = Ca.get(B + f"/api/paperless?ws={OWS}").json()
 check(j["conn"]["run"].get("target") == "private" and j["conn"]["run"].get("mine") is False, "#1940: another member sees 'private of the starter', not 'mine'")
 # the same connection into the organisation (as before): the documents come in there too (another space = not twice)
@@ -166,7 +166,7 @@ check(r.ok, f"P4: erin connects their own space ({r.status_code})")
 r = Er.post(B + "/api/paperless/import", json={"ws": "private", "target": "private"})
 check(r.ok and r.json()["conn"]["run"].get("target") == "ws", f"P4: target private = their own space ({r.status_code} {r.text[:200]})")
 run_idle(Er, "private")
-check(len(docs(Er, "private")) == 3, "P4: erin's documents are in their private space")
+check(len(docs(Er, "private")) == 3, "P4: erin's documents are in their private workspace")
 r = Er.post(B + "/api/paperless/import", json={"ws": "private", "target": OWS})
 check(r.status_code == 400, f"P4: a foreign organisation as target refused ({r.status_code})")
 check(Er.post(B + "/api/paperless/import", json={"ws": OWS, "target": "private"}).status_code == 404, "P4: not across workspaces (404)")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.330 API tests, part A (small fixes found while filling staging), own container (start.sh). Invented companies, people
 and figures only. tenant-matrix: life_org
- - #3295: Home & life in the private space shows only what lies in private projects. An office contract of the
+ - #3295: Home & life in the private workspace shows only what lies in private projects. An office contract of the
    organisation (Office > Contracts & insurances, its deadline task in an organisation project), a device and a
    read-later entry in an organisation project never show in the private view (nor in its monthly / yearly sums); the
    private contract, device and read-later entry do; the organisation's view stays travel + staying in touch only

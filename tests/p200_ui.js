@@ -2,7 +2,7 @@
 // Agents view with jobs Approve / Reject / Stop, chat side panel + phone view, Settings > Administration > Agents, turning a
 // user into an agent), reactions ❤️ 👍 👎 on comments (names, approval), tidy suggestions (card, Apply, 👍), shared list tags
 // (colored chips, personal tags with the person icon, tag editor, promote, list dialog: tags + "Agent may tidy up entries"),
-// German texts.
+// German texts. 2.482.0 (#3530): "AI agent" badge, ai false = plain "Agent".
 const {boot, errs, sleep, B, login} = require('./boot');
 const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
@@ -47,7 +47,16 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   w.eval(`openDetail(${T1})`); await idle(w);
   for (let i = 0; i < 30 && !d.querySelector(`.cm[data-cid="${k1}"]`); i++) await sleep(200);  // 2.28.0: the comments load after the panel
   const cm = d.querySelector(`.cm[data-cid="${k1}"]`);
-  check(cm?.querySelector('.abadge') && /Agent/.test(cm.querySelector('.abadge').textContent), 'agent badge on its comment');
+  check(cm?.querySelector('.abadge') && /^AI agent$/.test(cm.querySelector('.abadge').textContent.trim()), 'agent badge on its comment');  // 2.482.0 (#3530): "AI agent" (EU AI Act Art. 50)
+  // 2.482.0 (#3530): a bot without AI (ai false) shows the plain "Agent"; a wrong type is refused; back to AI. (No reload
+  // here: the detail panel stays as the next checks need it; the client's part uses the agent object as the state sends it)
+  check((await call('alice', 'PATCH', `/api/admin/agents/${CL}`, {ai: 'no'})).status === 400, '#3530: ai must be true / false');
+  check((await call('alice', 'PATCH', `/api/admin/agents/${CL}`, {ai: false})).ai === false, '#3530: the agent marked as a bot without AI');
+  check(w.eval(`agentById(${CL}).ai`) === true, '#3530: the state carries ai (default true)');
+  w.eval(`agentById(${CL}).ai = false`);
+  check(/>Agent<\/span>$/.test(w.eval(`agentBadge(${CL})`)), '#3530: a bot without AI: plain "Agent" ' + w.eval(`agentBadge(${CL})`));
+  w.eval(`agentById(${CL}).ai = true`);
+  check((await call('alice', 'PATCH', `/api/admin/agents/${CL}`, {ai: true})).ai === true && /AI agent/.test(w.eval(`agentBadge(${CL})`)), '#3530: back to "AI agent"');
   check(cm && cm.querySelectorAll('.rx.add').length === 3, 'three reaction buttons (❤️ 👍 👎)');
   cm.querySelector('[data-act="c-react"][data-e="up"]').click(); await sleep(900);
   const cm2 = d.querySelector(`.cm[data-cid="${k1}"]`);
@@ -105,6 +114,7 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   check(d.querySelector('#top h1')?.textContent.startsWith('Agents'), 'Agents view title');
   const card = d.querySelector('.agcard');
   check(card && /Claude/.test(card.textContent) && /working · Cutting/.test(card.textContent) && card.querySelector('.adot.st-working'), 'agent card with status');
+  for (let i = 0; i < 60 && !d.querySelector('.job.st-waiting'); i++) await sleep(150);  // 2.482.0: the job list loads after the view (a slow run drew it later)
   const job = d.querySelector('.job.st-waiting');
   check(job && /Rough cut/.test(job.textContent) && /Cut trailer/.test(job.textContent) && job.querySelector('[data-a="approve"]'), 'waiting job with task + Approve');
   job.querySelector('[data-a="approve"]').click(); await sleep(1500);

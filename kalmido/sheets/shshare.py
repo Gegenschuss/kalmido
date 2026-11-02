@@ -15,7 +15,8 @@ The read layer checks every share again (shs_may): a person must still be a memb
 must belong to the table's workspace, never a health / budget list's table, its list limit applies; a revoked share
 (revoked_at) counts nothing. A recipient only through a share may not delete / restore the table, attach it to a list, move
 it to another workspace, manage its shares or carry rows over (step 2): shs_need_own. Leaving an organisation and moving
-the table between workspaces end the shares (org_leave, sheets/shmove.py); a deleted account takes its rows along.
+the table between workspaces end the shares (org_leave, sheets/shmove.py); a deleted account takes the rows picked by name
+along, an address row stays open without access (shs_forget): a row that goes would tell the address had an account.
 """
 from flask import g, has_request_context, jsonify
 
@@ -221,6 +222,29 @@ def shs_redeem(c, u):
     return n
 
 
+def _tell_shared(c, aid, r, role):
+    """2.465.0 (#2361): the agent learns that table r was shared with it (like file_shared: only a new share). No list_id in the
+    event: a share does not make the agent a member of the list, its Playbook stays out; only the data lock is asked here."""
+    try:
+        from ..agents.core import agent_emit
+        from ..core.dlock import dl_list_locked
+        if not (r["list_id"] and dl_list_locked(c, aid, r["list_id"])):
+            agent_emit(c, aid, "sheet_shared", {"sheet": {"id": r["id"], "title": r["title"]}, "role": role})
+    except Exception as e:  # noqa: BLE001  an event must never block the share itself
+        print(f"WARNING sheet_shared event for agent {aid}: {e}", flush=True)
+
+
+def _tell_unshared(c, sid, uids):
+    """2.465.0 (#2361): the share of table sid ended: only its id, the agent may not read the table any more."""
+    from ..agents.core import agent_emit
+    for aid in uids:
+        try:
+            if aid and _agent_row(c, aid):
+                agent_emit(c, aid, "sheet_unshared", {"sheet": {"id": sid}})
+        except Exception as e:  # noqa: BLE001  an event must never block ending the share
+            print(f"WARNING sheet_unshared event for agent {aid}: {e}", flush=True)
+
+
 def shs_end(c, sid, user_ids=None):
     """Revoke the live shares of sheet sid (only those of user_ids when given). Returns how many ended."""
     q, args = "UPDATE sheet_shares SET revoked_at=? WHERE sheet_id=? AND revoked_at IS NULL", [iso_ms(now_utc()), sid]
@@ -229,9 +253,10 @@ def shs_end(c, sid, user_ids=None):
             return 0
         q += f" AND user_id IN ({','.join('?' * len(user_ids))})"
         args += list(user_ids)
-    n = c.execute(q, args).rowcount
+    n = c.execute(q + " RETURNING user_id", args).fetchall()
     shs_drop_cache()
-    return n
+    _tell_unshared(c, sid, [x[0] for x in n])
+    return len(n)
 
 
 def shs_leave(c, oid, uids):
@@ -239,9 +264,18 @@ def shs_leave(c, oid, uids):
     if uids:
         # 2.360.2 M (#2561): an address row stays listed as it was (open again): a row that goes would name the leaver's address
         c.execute(f"UPDATE sheet_shares SET user_id=NULL WHERE org_id=? AND email_key!='' AND user_id IN ({','.join('?' * len(uids))})", [oid, *uids])
-        c.execute(f"UPDATE sheet_shares SET revoked_at=? WHERE org_id=? AND revoked_at IS NULL AND user_id IN ({','.join('?' * len(uids))})",
-                  [iso_ms(now_utc()), oid, *uids])
+        ended = c.execute(f"UPDATE sheet_shares SET revoked_at=? WHERE org_id=? AND revoked_at IS NULL AND user_id IN ({','.join('?' * len(uids))}) "
+                          "RETURNING sheet_id, user_id", [iso_ms(now_utc()), oid, *uids]).fetchall()
         shs_drop_cache()
+        for x in ended:
+            _tell_unshared(c, x[0], [x[1]])
+
+
+def shs_forget(c, uid):
+    """2.453.0 (#3781): before an account is deleted its address rows open again (address kept, no access), like shs_leave;
+    the rows picked by name go with the account (foreign key)."""
+    c.execute("UPDATE sheet_shares SET user_id=NULL WHERE user_id=? AND email_key!=''", (uid,))
+    shs_drop_cache()
 
 
 def _manage(c, sid):
@@ -298,6 +332,7 @@ def sheets_shares_add(sid):
         c.execute("UPDATE sheet_shares SET user_id=NULL WHERE id=?", (old["id"],))
         old = None
     ts = iso_ms(now_utc())
+    is_new = not old or old["revoked_at"] is not None
     if old:
         c.execute("UPDATE sheet_shares SET role=?, revoked_at=NULL, org_id=?, created_by=?, created_at=CASE WHEN revoked_at IS NULL "
                   "THEN created_at ELSE ? END WHERE id=?", (role, r["org_id"], uid, ts, old["id"]))
@@ -308,6 +343,8 @@ def sheets_shares_add(sid):
         shid = insert_id(c, "INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at) VALUES(?,?,?,?,?,?)",
                          (sid, r["org_id"], tid, role, uid, ts))
     shs_drop_cache()
+    if is_new and any(a["id"] == tid for a in t["agents"]):
+        _tell_shared(c, tid, r, role)
     return _answer(c, sid, 201, id=shid)
 
 
@@ -365,5 +402,6 @@ def sheets_shares_delete(sid, shid):
         c.execute("DELETE FROM sheet_shares WHERE id=?", (shid,))
     else:
         c.execute("UPDATE sheet_shares SET revoked_at=? WHERE id=?", (iso_ms(now_utc()), shid))
+        _tell_unshared(c, sid, [x["user_id"]])
     shs_drop_cache()
     return _answer(c, sid)

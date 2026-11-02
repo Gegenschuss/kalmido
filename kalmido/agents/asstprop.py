@@ -22,6 +22,9 @@ Kinds:
 - receipt_read (2.299.0 E, #3194): the agent reads a receipt (agents/rcread.py): the office switches with the receipts
   right, the file shared with it; the input = doc_summary's + the file's address, the categories, maybe bank bookings. The
   agent answers the values it read; taking them over sets amount, VAT rate, sender, date, category (one undo step).
+- card_statement_read (2.469.0, #3749): the agent reads a credit card statement no reader could read (agents/ccsread.py): the
+  rights of receipt_read, a draft without positions; taking it over adds the positions to the draft (one undo step), they
+  count once the person confirms the statement.
 """
 import json
 import re
@@ -40,9 +43,11 @@ from ..agents.proposals import PROP_LIMITS, PROP_OPEN_MAX, PROP_TEXT_MAX, _p_key
 from ..collab.comments import user_names
 from ..office.rights import NO_RIGHT, ofr_allows
 from ..files.store import fs_role
+from .ccsread import CCS_LIMITS, ccs_ask, ccs_input, ccs_run, ccs_target, ccs_undo, ccs_validate  # 2.469.0 (#3749)
 from .rcread import RCR_LIMITS, rcr_doc_view, rcr_input, rcr_run, rcr_target, rcr_undo, rcr_validate  # 2.299.0 E (#3194)
 
-AST_KINDS = ("office_text", "doc_summary", "report", "receipt_read")  # 2.299.0 E (#3194): + receipt_read (agents/rcread.py)
+AST_KINDS = ("office_text", "doc_summary", "report", "receipt_read", "card_statement_read")  # 2.469.0 (#3749): + card_statement_read (agents/ccsread.py); 2.299.0 E (#3194): + receipt_read (agents/rcread.py)
+AST_READ = ("receipt_read", "card_statement_read")  # the kinds that need the receipts right and the file shared with the agent
 AST_DOC_KINDS = ("offer", "invoice", "reminder")   # documents with an introduction / closing the agent may word
 AST_FIELDS = ("intro", "closing")
 AST_WISH_MAX = 500                                 # the person's short wish ("friendly, short")
@@ -50,7 +55,7 @@ AST_DOC_TEXT_MAX = 20000                           # recognised text of a docume
 AST_SUMMARY_MAX = 4000                             # a document's summary
 AST_ITEM_KEYS = ("kind", "title", "detail", "qty", "unit", "rate", "tax")  # never cost / cost_enc / margins
 AST_TITLES = {"office_text": N_("Text draft: {0}"), "doc_summary": N_("Summary: {0}"), "report": N_("Client report: {0}"),
-              "receipt_read": N_("Read receipt: {0}")}  # 2.299.0 E (#3194)
+              "receipt_read": N_("Read receipt: {0}"), "card_statement_read": N_("Read card statement: {0}")}  # 2.299.0 E (#3194), 2.469.0 (#3749)
 AST_NO_AGENT = N_("This agent cannot make proposals for you")
 
 
@@ -155,6 +160,8 @@ def ast_agents_get(c, uid, a):
             ags = ast_office_agents(c, uid, r["org_id"]) if r["kind"] in AST_DOC_KINDS and editable else []
         elif kind in ("doc_summary", "receipt_read"):  # 2.299.0 E (#3194): receipt_read with the receipts right
             ags = ast_doc_agents(c, uid, _iid(a.get("doc_id"), "doc_id"), "receipts" if kind == "receipt_read" else "offers")[0]
+        elif kind == "card_statement_read":  # 2.469.0 (#3749): a draft without positions the person works on
+            ags = ast_doc_agents(c, uid, ccs_ask(c, uid, _iid(a.get("statement_id"), "statement_id"))[1]["node_id"], "receipts")[0]
         else:
             from ..core.access import need_list
             lid = _iid(a.get("list_id"), "list_id")
@@ -290,6 +297,14 @@ def ast_request(c, uid, b):
         if kind == "receipt_read":
             inp = rcr_input(c, uid, aid, oid, n, inp)
         title = tr(AST_TITLES[kind], n["name"][:80])
+    elif kind == "card_statement_read":  # 2.469.0 (#3749): doc_summary's input of the PDF + ccsread.ccs_input
+        _p_keys(b, "", (*common, "statement_id"))
+        oid, s = ccs_ask(c, uid, _iid(b.get("statement_id"), "statement_id"))
+        ags, n = ast_doc_agents(c, uid, s["node_id"], "receipts")
+        if not [a for a in ags if a["user_id"] == aid]:
+            return err(tr(AST_NO_AGENT), 404)
+        inp = ccs_input(oid, s, n, _doc_input(c, aid, n, wish))
+        title = tr(AST_TITLES[kind], s["month"])
     else:
         _p_keys(b, "", (*common, "list_id", "from", "to", "days", "lang"))
         from ..core.access import need_list
@@ -323,7 +338,7 @@ def ast_request(c, uid, b):
     return jsonify(job_dict(c, j)), 201
 
 
-AST_LIMITS = {"text_max": PROP_TEXT_MAX, "summary_text_max": AST_SUMMARY_MAX, **RCR_LIMITS}  # 2.299.0 E (#3194): + receipt_read
+AST_LIMITS = {"text_max": PROP_TEXT_MAX, "summary_text_max": AST_SUMMARY_MAX, **RCR_LIMITS, **CCS_LIMITS}  # 2.299.0 E (#3194): + receipt_read; 2.469.0 (#3749)
 
 
 # ---------------------------------------------------------------- the agent's answer
@@ -338,6 +353,8 @@ def ast_validate(kind, b, inp):
         return {"field": f, "text": _clean(b.get("text"), "text", TEXT_MAX, True)}
     if kind == "receipt_read":  # 2.299.0 E (#3194): the values read off the receipt
         return rcr_validate(b, inp)
+    if kind == "card_statement_read":  # 2.469.0 (#3749): the positions read off the statement
+        return ccs_validate(b, inp)
     _p_keys(b, "", ("kind", "summary", "text"))
     return {"text": _clean(b.get("text"), "text", AST_SUMMARY_MAX if kind == "doc_summary" else PROP_TEXT_MAX, True)}
 
@@ -353,8 +370,8 @@ def ast_need_agent(c, j, aid):
     need_scope("office")  # as every office route of an agent
     with system_ctx(c):  # the agent's switch, its area and the area's privacy switch (structure; an agent's token does not see the settings of a personal office)
         a = agent_row(c, aid)
-        ok = ofa_agent_ok(c, aid, ofa_area(c, a), "receipts" if j["kind"] == "receipt_read" else "offers")
-    if ok and j["kind"] == "receipt_read":  # 2.299.0 E (#3194): the file still shared with the agent
+        ok = ofa_agent_ok(c, aid, ofa_area(c, a), "receipts" if j["kind"] in AST_READ else "offers")
+    if ok and j["kind"] in AST_READ:  # 2.299.0 E (#3194): the file still shared with the agent
         ok = bool(fs_role(c, (json.loads(j["input"] or "{}").get("document") or {}).get("id") or 0, uid=aid))
     if not ok:
         from ..office.agentdocs import OFA_OFF
@@ -429,7 +446,7 @@ def ast_run(c, j, sel, ed, extra, rec):
     from ..office.ledger import ofx_need_editable
     from ..office.model import TEXT_MAX
     kind = j["kind"]
-    prop, text = _text_of(j, ed) if kind != "receipt_read" else (None, None)
+    prop, text = _text_of(j, ed) if kind not in AST_READ else (None, None)
     if kind == "office_text":
         text = _clean(text, "text", TEXT_MAX, True)
         oid, r = _office_target(c, j)
@@ -440,6 +457,8 @@ def ast_run(c, j, sel, ed, extra, rec):
     elif kind == "receipt_read":  # 2.299.0 E (#3194): the read values onto the receipt as the person (agents/rcread.py)
         n, _ = _receipt_target(c, j)  # 2.351.0 C (#3247): the receipts right again
         rec["receipt"] = rcr_run(c, j, n, g.user["id"], ed)
+    elif kind == "card_statement_read":  # 2.469.0 (#3749): the positions into the draft as the person (agents/ccsread.py)
+        rec["card"] = ccs_run(c, j, ed)
     elif kind == "doc_summary":
         text = _clean(text, "text", AST_SUMMARY_MAX, True)
         n, m = _doc_target(c, j)
@@ -475,6 +494,13 @@ def ast_undo(c, j, rec, back=True):
         if not rcr_undo(c, n_, g.user["id"], rec["receipt"], back):
             return 0, [j["title"][:40]]
         n = 1
+    elif kind == "card_statement_read":  # 2.469.0 (#3749)
+        try:
+            if not ccs_undo(c, j, rec["card"], back):
+                return 0, [j["title"][:40]]
+        except Denied:
+            return 0, [j["title"][:40]]
+        n = 1
     elif kind == "doc_summary":
         o = rec["document"]
         try:
@@ -494,7 +520,7 @@ def ast_undo(c, j, rec, back=True):
 
 
 def ast_result(rec):
-    return {"changed": 1 if (rec.get("office") or rec.get("document") or rec.get("text") or rec.get("receipt")) else 0, "created": 0}
+    return {"changed": 1 if (rec.get("office") or rec.get("document") or rec.get("text") or rec.get("receipt") or rec.get("card")) else 0, "created": 0}
 
 
 def ast_view_extra(c, j):
@@ -514,6 +540,8 @@ def ast_view_extra(c, j):
             out["target"] = rcr_target(c, j, n, m, g.user["id"])
             if not ofr_allows(c, g.user["id"], _doc_area(c, g.user["id"], n), "receipts", "edit"):
                 out["target"]["editable"] = False  # 2.351.0 C (#3247): Take over would be refused
+        elif j["kind"] == "card_statement_read":  # 2.469.0 (#3749)
+            out["target"] = ccs_target(c, j)
         else:
             rec = json.loads(j["applied"] or "null") or {}
             out["target"] = {"list_id": j["list_id"], "text": rec.get("text") or "", "editable": True}

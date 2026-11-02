@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """2.306.0 D3 (#2875): hardening of files / knowledge and agents / integrations (audit D).
-freelancer-matrix: files, wiki, agents (a person without an organisation keeps every function in the own private space)
+freelancer-matrix: files, wiki, agents (a person without an organisation keeps every function in the own private workspace)
  - tables: the table list names the folder a table lies in only to who sees that folder (a share of the table alone: none)
  - documents: the search narrows to a folder (?under=) only when the caller sees that folder (else: nothing)
  - knowledge: an organisation's whole trash is emptied only by its admins (a member: 403, may_empty false), the purge is in
-   the organisation's history; single pages and the private space as before
+   the organisation's history; single pages and the private workspace as before
  - exports: a locked office file of another version does not break the list of locked files
  - deleting a document for good removes its preview file only after the commit
  - agent jobs: user_id with a task must see the task and reach the agent there; a job's task title only with sight of the task

@@ -45,7 +45,7 @@ function ab2_view() {
   }).join('');
   const hl = (d.holidays || []).map(h => `<li class="muted">${esc(fmtDayAbs(h.date))} · ${esc(h.name)}</li>`).join('');
   const stLink = d.admin && d.org_id !== d.personal ? `<button type="button" class="linkbtn ab2st" data-act="mod-settings" data-sec="org">${tr('Public holidays: {0}', esc(d.states[d.state] || tr('None')))} · ${tr('Change in Settings > Organisation')}</button>` : '';  // 2.365.2 C (#2789): an organisation's state moved to Settings; the personal area keeps its picker
-  const stSel = stLink || (d.admin ? `<label class="ab2st"><span class="muted">${tr('Public holidays')}</span><select id="ab2-state" aria-label="${esc(tr('Public holidays'))}"><option value="">${tr('None')}</option>${Object.entries(d.states).map(([k, v]) => `<option value="${k}" ${k === d.state ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>`
+  const stSel = stLink || (d.admin ? `<span class="ab2st"><span class="muted">${tr('Public holidays')}</span>${hol_selects('ab2-state', d.countries, d.state, tr('None'))}</span>`
     : d.state ? `<span class="muted ab2st">${esc(tr('Public holidays: {0}', d.states[d.state] || d.state))}</span>` : '');
   // 2.96.0 D (#1941): the own personal area next to the organisations (the workspace switch on "Private" opens it)
   const areas = [...(d.personal ? [{id: d.personal, name: tr('Private|workspace')}] : []), ...d.orgs];
@@ -107,7 +107,7 @@ function ab2_sheet(it) {
         histAdd({label: tr('Absence entered'), undo: async () => { await api('DELETE', `/api/team/absences/${r.id}`); ab2_reload(); },
           redo: async () => { await api('POST', `/api/team/absences/${r.id}/restore`); ab2_reload(); }});
       }
-      md.remove(); ab2_reload(); toast(!it && AB2.req ? tr('Vacation requested') : tr('Saved'));
+      md.remove(); ab2_reload(); toast(!it && AB2.req ? tr('Holiday requested') : tr('Saved'));
     } catch { b.disabled = false; /* api() said it */ }
   });
 }

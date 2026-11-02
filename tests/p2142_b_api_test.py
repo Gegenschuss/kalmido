@@ -16,7 +16,7 @@ Every sample file is made here (invented names, @example.com addresses only), ne
    subtask, text below = notes, clear dates + #tags + priority symbols; a list without checkboxes = plain bullets
  - every source: preview writes nothing, import, undo; wrong / broken / binary / too large files, ZIP bomb, ZIPs nested
    too deeply; people never become assignees; workspace: org:<id> / private, someone else's organisation 400
- - a person without an organisation (freelancer-matrix: Import): imports into the own private space, undo
+ - a person without an organisation (freelancer-matrix: Import): imports into the own private workspace, undo
  - OpenAPI: the six sources in the enum, columns in ImportReport
 usage: p2142_b_api_test.py <datadir>      (P2142B_NOSTART=1 = the server already runs, KALMIDO_IMPORT_MAX_MB=2)"""
 import io
@@ -359,7 +359,7 @@ for src, name, data in (("markdown", "frei.md", b"- [ ] Frei 1\n  - [ ] Frei 1a\
     st, j = imp(Fr, src, name, data)
     nl = j.get("lists", [{}])[0].get("list_id") if st == 200 else None
     check(st == 200 and nl and one("SELECT org_id FROM lists WHERE id=?", (nl,)) is None and one("SELECT owner_id FROM lists WHERE id=?", (nl,)) == FID,
-          f"freelancer: {src} into the own private space {st} {str(j)[:200]}")
+          f"freelancer: {src} into the own private workspace {st} {str(j)[:200]}")
     if st == 200:
         r = Fr.post(B + f"/api/imports/{j['import_id']}/undo")
         check(r.ok and r.json()["tasks"] == j["created"]["tasks"], f"freelancer: undo {src}")

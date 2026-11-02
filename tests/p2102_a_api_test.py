@@ -5,7 +5,7 @@ tenant-matrix: list
 freelancer-matrix: lists
  - an organisation admin deletes an archived organisation list of another owner: the list goes into the ORGANISATION's list
    trash with everything (tasks stay in it, fields + values, sections, list chat); nothing lands in the owner's private inbox,
-   a single task comes back only with its list (409), never into the private space; a plain member neither sees nor restores
+   a single task comes back only with its list (409), never into the private workspace; a plain member neither sees nor restores
    nor purges it; the admin restores it into the organisation (archived) with fields, values and chat
  - the former owner who left the organisation no longer sees it in any trash (404 on restore); the admin still restores it
  - a person without an organisation (freelancer): a private list into the own trash, restore, delete for good from the
@@ -132,7 +132,7 @@ check(not {T1, T2} & {t["id"] for t in tb}, "bob's task trash does not show them
 check(LT not in {x["id"] for x in A.get(B + f"/api/orgs/{ORG}/lists").json()["lists"]}, "the org admin's overview leaves it out")
 check(requests.get(B + f"/api/v1/lists/{LT}", headers=AGH).status_code in (403, 404), "the agent API does not reach it")
 check(Bo.get(B + f"/api/lists/{LT}/notes").status_code in (403, 404), "a list route answers 404")
-# a single task never comes back on its own (and never into the private space)
+# a single task never comes back on its own (and never into the private workspace)
 r = Bo.post(B + f"/api/tasks/{T1}/restore")
 check(r.status_code in (403, 409) and sql("SELECT deleted_at IS NOT NULL, list_id FROM tasks WHERE id=?", (T1,))[0] == (1, LT),
       f"bob restores a single task: refused, still in the list ({r.status_code})")

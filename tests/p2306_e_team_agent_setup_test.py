@@ -93,7 +93,7 @@ check(r.ok and r.json().get("operator_id") is None, "personal agent, admin's cod
 
 # 2.306.0 review (#2927): a team agent of an organisation -- only a maker who reaches the agent answers (shared list or a
 # member of the organisation); an instance admin outside it gets no operator_id (the starter then says "nobody set")
-r = A.post(B + "/api/admin/orgs", json={"name": "Customer", "admin_id": r_bob})
+r = A.post(B + "/api/admin/orgs", json={"name": "Client", "admin_id": r_bob})
 check(r.ok, f"an organisation the admin is not in {r.text[:200]}")
 if r.ok:
     CUST = r.json()["id"]

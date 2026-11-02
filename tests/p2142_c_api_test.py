@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.142.0 API tests, part C: export into Todoist CSV / Markdown (#2148), the admin button "Fetch mails now" (#2149), the ntfy share
+"""2.142.0 API tests, part C: export into Todoist CSV / Markdown (#2148), the admin button "Fetch e-mails now" (#2149), the ntfy share
 inbox per person (#2150). Own container (start.sh) with a tiny ntfy server inside (stub_ntfyin.py); invented names only.
 #2148:
  - GET /api/export/todoist.zip: one CSV per list in the Todoist template (TYPE,CONTENT,...), sections as TYPE=section, subtasks by INDENT,

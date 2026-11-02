@@ -61,7 +61,7 @@ const MEASURE = `(() => {
         await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: w, height: h}});
         for (const route of ['#today', `#list/${L}`, '#cal', '#news', '#stats']) {
           await nav(B + route); await sleep(900);
-          await ev(`wsCur() !== 'org:${org.id}' ? wsSet('org:${org.id}') : 0`); await sleep(700);  // a reload may fall back to the private space
+          await ev(`wsCur() !== 'org:${org.id}' ? wsSet('org:${org.id}') : 0`); await sleep(700);  // a reload may fall back to the private workspace
           const res = JSON.parse(await ev(MEASURE));
           console.log(`${lang} ${w} ${route}: ${res.length ? res.join(' | ') : 'ok'}`);
           check(!res.length, `${lang} ${w}px ${route}: ${res.join(' | ')}`);

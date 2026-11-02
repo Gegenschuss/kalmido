@@ -23,7 +23,7 @@ from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import db, gset, gsetting
+from ..core.db import db, gset, gsetting, ix_ensure, trigger_ensure
 from ..core.pg import st_ids
 from ..core.access import access_note, tvis, vis_sql
 from ..core.serializers import load_tasks
@@ -70,8 +70,8 @@ def fts_index_init(c):
               "vec tsvector NOT NULL)")
     c.execute("CREATE TABLE IF NOT EXISTS cmt_fts (comment_id BIGINT PRIMARY KEY REFERENCES comments(id) ON DELETE CASCADE, "
               "vec tsvector NOT NULL)")
-    c.execute("CREATE INDEX IF NOT EXISTS ix2281_task_fts_vec ON task_fts USING gin (vec)")
-    c.execute("CREATE INDEX IF NOT EXISTS ix2281_cmt_fts_vec ON cmt_fts USING gin (vec)")
+    ix_ensure(c, "CREATE INDEX IF NOT EXISTS ix2281_task_fts_vec ON task_fts USING gin (vec)")
+    ix_ensure(c, "CREATE INDEX IF NOT EXISTS ix2281_cmt_fts_vec ON cmt_fts USING gin (vec)")
     for fn, tbl, key, cols in (("kalmido_fts_task", "tasks", "task_id", ("title", "content")),
                                ("kalmido_fts_cmt", "comments", "comment_id", ("body",))):
         vec = TASK_NEW_VEC if tbl == "tasks" else CMT_NEW_VEC
@@ -86,9 +86,9 @@ BEGIN
   RETURN NULL;
 END $fn$""")
         changed = " OR ".join(f"OLD.{x} IS DISTINCT FROM NEW.{x}" for x in cols)
-        c.execute(f"CREATE OR REPLACE TRIGGER {fn}_ins AFTER INSERT ON {tbl} FOR EACH ROW EXECUTE FUNCTION {fn}()")
-        c.execute(f"CREATE OR REPLACE TRIGGER {fn}_upd AFTER UPDATE OF {', '.join(cols)} ON {tbl} FOR EACH ROW "
-                  f"WHEN ({changed}) EXECUTE FUNCTION {fn}()")
+        trigger_ensure(c, f"{fn}_ins", tbl, f"CREATE OR REPLACE TRIGGER {fn}_ins AFTER INSERT ON {tbl} FOR EACH ROW EXECUTE FUNCTION {fn}()")
+        trigger_ensure(c, f"{fn}_upd", tbl, f"CREATE OR REPLACE TRIGGER {fn}_upd AFTER UPDATE OF {', '.join(cols)} ON {tbl} FOR EACH ROW "
+                       f"WHEN ({changed}) EXECUTE FUNCTION {fn}()")
     if new:
         c.execute("TRUNCATE task_fts, cmt_fts")
     c.execute(f"INSERT INTO task_fts(task_id, vec) SELECT id, {TASK_VEC} FROM tasks t "

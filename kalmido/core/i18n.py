@@ -93,6 +93,20 @@ def tr(key, *a, lg=None):
     return s.format(*a) if a else s
 
 
+def tr_stored(v, lg=None):
+    """2.448.0 (#3765): a text kept for later, translated for its reader: [key, *values] (see tr), or a str as it is (an old
+    row, a text the person or another system wrote). 2.454.0 (#3808): a value that is a list is such a text itself."""
+    if isinstance(v, (list, tuple)) and v:
+        return tr(v[0], *[tr_stored(x, lg) if isinstance(x, (list, tuple)) else x for x in v[1:]], lg=lg)
+    return v or ""
+
+
+def stored_join(items):
+    """2.454.0 (#3808): several stored texts as one stored text, "a, b, c" (the key is only the pattern, same in every language)."""
+    items = tuple(items)
+    return (", ".join("{%d}" % i for i in range(len(items))), *items)
+
+
 def plural_one(n, lg):
     """The "one" form for n? 1 everywhere; 2.11.0: French also uses it for 0 (like the browser's Intl.PluralRules)."""
     return n == 1 or (n == 0 and str(lg or "").split("-")[0] == "fr")
@@ -138,6 +152,13 @@ def lg_base(lg=None):
 
 def dec_comma(lg=None):
     return lg_base(lg) in COMMA_LANGS
+
+
+def csv_dialect(lg=None):
+    """2.368.2 (#2984): (separator, number text) of a CSV export in language lg: ";" and a decimal comma where the spreadsheets of
+    the language expect them, else "," and the point. num(None) and num("") = ""."""
+    comma = dec_comma(lg)
+    return (";" if comma else ","), lambda v: "" if v in (None, "") else str(v).replace(".", ",") if comma else str(v)
 
 
 def fmt_int(n, lg=None):

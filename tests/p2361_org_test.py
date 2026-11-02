@@ -2,7 +2,7 @@
 # kalmido-suite: fresh
 """2.361.0 (#2920 / #2922): leaving and deleting an organisation, seen from its members. Own container in mode workspaces.
  #2922 leaving / being removed:
- - a project the person brought in from the private space (PATCH org_id) goes back there, not to an admin; one made in the
+ - a project the person brought in from the private workspace (PATCH org_id) goes back there, not to an admin; one made in the
    organisation goes to the admin as before
  - GET /api/orgs/<oid>/leave-info names it (back), what goes to the admin, what stays (a table) and the end of assignments;
    only the person or an admin of the organisation (404 / 403 else, also for a person without an organisation)

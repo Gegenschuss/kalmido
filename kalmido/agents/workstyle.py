@@ -270,7 +270,7 @@ def ws_route_patch(aid):
 # Every push queued while an AGENT's own request runs (g.pushes, sent after the request: collab/comments.py
 # send_queued_pushes) passes ws_push_filter: push "results" = as before, "never" = none, "limits" = only the ones marked
 # {"ws": "limit"} in their extra (approval / permission questions, chat messages with limit: true, a job waiting for an
-# approval). {"ws": "system"} (usage / budget alerts to admins and owners) always passes. The person's own settings
+# approval, 2.367.2 #2968: a task comment with answer buttons or an approval card). {"ws": "system"} (usage / budget alerts to admins and owners) always passes. The person's own settings
 # (agent_push, the notification matrix) were applied before (the stricter one wins). Inside the agent's quiet window the
 # remaining pushes are only counted (agent_push_held); ws_held_tick sends each person ONE summary once it ends.
 WS_HELD_GONE_DAYS = 8  # a count older than this (the agent's window never ended, e.g. quiet all day) is sent anyway

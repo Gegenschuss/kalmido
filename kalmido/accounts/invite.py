@@ -19,6 +19,7 @@ from ..core.access import Denied
 from ..core.mailframe import MAIL_ACC, MAIL_BG, MAIL_MUTED, Safe, mail_html
 from ..core.pg import system_ctx
 from ..integrations.mail import MAIL_OUT_ON, mail_send
+from .orgs import op_apart_deny, op_foreign_account, op_support_only  # 2.399.0 (#2687), 2.485.0 (#3939)
 
 
 # ---------------------------------------------------------------- 2.22.0 (#697): invitations
@@ -43,10 +44,11 @@ def invite_state(c, uid):
     return "invited" if parse_iso(r["expires_at"]) > now_utc() else "expired"
 
 
-def invite_new(c, uid, by, send=True, kind=None):
+def invite_new(c, uid, by, send=True, kind=None, days=None):
     """A new link for uid (replaces an older one) -> {link, expires_at, sent, kind, error?}. send: by e-mail when SMTP is
     set up and the person has an address. kind: invite / reset (by the password), 2.23.0: signup (#711, a registration
-    to confirm), login (#444, a sign-in link without a password: never sent by mail, shown as a link + QR code)."""
+    to confirm), login (#444, a sign-in link without a password: never sent by mail, shown as a link + QR code).
+    2.453.0 (#3780): days = how long the link lives (default INVITE_DAYS)."""
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or (u["kind"] or "user") == "agent":
         raise Denied(404)
@@ -55,7 +57,10 @@ def invite_new(c, uid, by, send=True, kind=None):
     tok = secrets.token_urlsafe(32)
     kind = kind or ("reset" if u["password_hash"] else "invite")
     now = now_utc()
-    exp = iso(now + timedelta(days=INVITE_DAYS))
+    days = days or INVITE_DAYS
+    exp = iso(now + timedelta(days=days))
+    from .supportgrant import sga_link_exp
+    exp = sga_link_exp(c, exp)  # 2.485.0 (#3939): made through the client's support access: it ends with that access
     c.execute("""INSERT INTO user_invites(user_id,token_hash,kind,created_by,created_at,expires_at) VALUES(?,?,?,?,?,?)
                  ON CONFLICT(user_id) DO UPDATE SET token_hash=excluded.token_hash, kind=excluded.kind, created_by=excluded.created_by,
                  created_at=excluded.created_at, expires_at=excluded.expires_at, sent_at=NULL, used_at=NULL""",
@@ -71,7 +76,7 @@ def invite_new(c, uid, by, send=True, kind=None):
         try:
             with c.savepoint():  # 2.37.0 (#1150): a failure here must not abort the caller's transaction
                 inviter = c.execute("SELECT display_name, username FROM users WHERE id=?", (by,)).fetchone()
-                subject, text, body_html = invite_mail(c, u, link, kind, (inviter["display_name"] or inviter["username"]) if inviter else "")
+                subject, text, body_html = invite_mail(c, u, link, kind, (inviter["display_name"] or inviter["username"]) if inviter else "", days, by=by)
             try:
                 logo = {"logo": (open(os.path.join(APP_DIR, "static", "icon-192.png"), "rb").read(), "png")}
             except OSError:
@@ -89,7 +94,18 @@ def invite_new(c, uid, by, send=True, kind=None):
     return out
 
 
-def invite_mail(c, u, link, kind, inviter):
+def invite_org(c, u, kind, by):
+    """2.367.5 (#2980): the organisation a mail names. With several it is the one shared with whoever sent the mail, or none."""
+    from ..accounts.orgs import org_names
+    from ..accounts.orginvite import ojn_org_name  # 2.453.0 (#3780): a new account is no member before it accepts
+    names = org_names(c, u["id"])
+    if len(names) > 1:
+        names = [x for x in names if by and x in org_names(c, by)]
+        return names[0] if len(names) == 1 else ""
+    return (names or [ojn_org_name(c, u["id"]) if kind == "invite" else ""])[0]  # a reset or a registration names no organisation the person never joined
+
+
+def invite_mail(c, u, link, kind, inviter, days=INVITE_DAYS, by=None):
     """(subject, text, html) of the invitation / reset mail in the person's language (the design of the welcome mail)."""
     lg = lang(c, u["id"])
     t = lambda s, *a: tr(s, *a, lg=lg)  # noqa: E731
@@ -97,8 +113,7 @@ def invite_mail(c, u, link, kind, inviter):
     name = u["display_name"] or u["username"]
     host = PUBLIC_URL.split("://", 1)[-1].rstrip("/")
     acc, bg, muted = MAIL_ACC, MAIL_BG, MAIL_MUTED  # 2.300.0 (#3198): petrol (was violet); 2.420.0 B (#3499): from the mail frame
-    from ..accounts.orgs import org_names  # 2.22.0 (#752): "Example · Kalmido"
-    org = (org_names(c, u["id"]) or [""])[0]
+    org = invite_org(c, u, kind, by)  # 2.22.0 (#752): "Example · Kalmido"
     brand = f"{org} · {APP_NAME}" if org else APP_NAME
     if kind == "signup":  # 2.23.0 (#711): confirm the address of a registration
         subject = t(N_("Confirm your registration at {0}"), APP_NAME)
@@ -114,7 +129,7 @@ def invite_mail(c, u, link, kind, inviter):
         head = t(N_("Hello {0}, welcome to {1}!"), name, APP_NAME)
         intro = t(N_("{0} created an account for you. In {1} we plan tasks, projects and appointments together – in the browser and as an app on the phone."), inviter or t(N_("An admin")), APP_NAME)
         button = t(N_("Set up your account"))
-    valid = t(N_("The link works once and for {0} days."), INVITE_DAYS)
+    valid = t(N_("The link works once and for {0} days."), days)
     steps = [t(N_("Choose your own password on the page the button opens.")), t(N_("Best right away: turn on two-factor sign-in (an app code or a passkey).")),
              t(N_("On the phone: in the browser “Add to home screen” – then {0} runs like an app, with notifications."), APP_NAME)]
     box = Safe(f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{bg};border-radius:12px">
@@ -181,7 +196,8 @@ def invite_check():
                           "WHERE m.user_id=? AND o.personal_of IS NULL AND o.retired_at IS NULL "
                           "ORDER BY (i.org_id IS NULL), (b.user_id IS NULL), m.org_id LIMIT 1", (r["created_by"], u["id"])).fetchone()
         by_name = (by["display_name"] or by["username"]) if by else ""
-        org_name = o["name"] if o else ""
+        from ..accounts.orginvite import ojn_org_name  # 2.453.0 (#3780): a new account is no member before it accepts
+        org_name = o["name"] if o else (ojn_org_name(c, u["id"]) if r["kind"] == "invite" else "")
     return jsonify(username=u["username"], display_name=u["display_name"] or u["username"], kind=r["kind"],
                    lang=usettings(c, u["id"]).get("lang") or "en", min_password=MIN_PASSWORD, invited_by=by_name, org_name=org_name)
 
@@ -250,8 +266,13 @@ def user_invite(uid):
     c = db()
     if not admin_sees(c, uid):  # 2.28.0 (#935): mode workspaces: only people the admin sees
         raise Denied(404)
+    if op_foreign_account(c, uid):  # 2.399.0 (#2687): hosted: the link sets the password -- the client asks for it itself (pwreset)
+        op_apart_deny()
     b = body()
-    out = invite_new(c, uid, g.user["id"], send=b.get("send", True) is not False)
+    sup = op_support_only(c, uid=uid)  # 2.485.0 (#3939, review F1): through support access the link goes to the client's address only
+    out = invite_new(c, uid, g.user["id"], send=sup or b.get("send", True) is not False)
+    if sup:
+        out = {k: v for k, v in out.items() if k != "link"}
     bump(c)
     c.commit()
     return jsonify(out)

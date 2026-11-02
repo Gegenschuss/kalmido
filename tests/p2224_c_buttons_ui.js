@@ -1,7 +1,7 @@
 // 2.224.0 C (#2816, #2817): two button sizes on a computer, one switch style. Own container (start.sh), Firefox with a mouse.
 // A person WITHOUT an organisation with an own office (the freelancer case). Invented data only.
 // - the cash book: "Book" 28 px on a computer, the Income | Expense switch is a plain .seg with the same button height as the view switch, aria-pressed works
-// - the document-kind tabs (Quotes & invoices) are a plain .seg: same button height as the cash book's switch
+// - the document-kind tabs (Quotations & invoices) are a plain .seg: same button height as the cash book's switch
 // - the header's "New task" (a probe button with its CSS) is a normal button (32 px, no pill)
 // - on a phone width the quick entry keeps its large targets
 const path = require('path');

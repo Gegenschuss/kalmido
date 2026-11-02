@@ -8,7 +8,7 @@
 //   for the next sign-in of the same account)
 // - the outbox: kept at a new sign-in of the same account (then sent), dropped when an organisation of the account is gone
 // - the service worker answers (and keeps) only the app shell: /, /capture, /manifest.json, /static/ (allow list)
-// freelancer-matrix: wiki (the pages are in the private space of a person without an organisation)
+// freelancer-matrix: wiki (the pages are in the private workspace of a person without an organisation)
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');

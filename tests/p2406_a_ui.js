@@ -110,7 +110,7 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
 
     // ---- #3492: the office menu: a tree row vs a plain row
     await nav(B + '#office/offers'); await ready(ev);
-    check(await wait(ev, `!!document.querySelector('#side .sbbt[data-sbbid="a:offers"]')`), 'Firefox: the office menu shows Quotes & invoices as a tree row');
+    check(await wait(ev, `!!document.querySelector('#side .sbbt[data-sbbid="a:offers"]')`), 'Firefox: the office menu shows Quotations & invoices as a tree row');
     await ev(`(() => { const a = document.querySelector('#side [data-act="sbb-tree"][data-k="of:a:offers"]'); if (a && !a.dataset.open) a.click(); return 1; })()`);
     await wait(ev, `!!document.querySelector('#side .sbbt[data-sbbpar="a:offers"]')`);
     await sleep(300);

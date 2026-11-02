@@ -9,7 +9,15 @@
 const {JSDOM, VirtualConsole} = require('jsdom');
 const http = require('http'), fs = require('fs'), path = require('path'), {execFileSync} = require('child_process');
 const ROOT = path.join(__dirname, '..'), OUT = path.join(__dirname, '.demo-all');
+// #3927: wait for a state instead of a fixed sleep: until(fn) like tests/boot.js (not required here: boot.js hooks the process);
+// quiet(w) = the page is still for ms: no new shim call, the body unchanged (the demo has no network for idle() to count)
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const until = async (fn, {timeout = 15000, step = 50} = {}) => {
+  const end = performance.now() + timeout;
+  for (;;) { const x = await fn(); if (x || performance.now() >= end) return x; await new Promise(r => setTimeout(r, step)); }
+};
+const sig = w => { try { return (w.KDEMO ? w.KDEMO.calls.length + '|' + w.KDEMO.calls[w.KDEMO.calls.length - 1] : '-') + '|' + (w.document.body?.innerHTML.length || 0); } catch { return 'closed'; } };
+const quiet = async (w, ms = 400) => { let s0 = null, t0 = performance.now(); await until(() => { const s = sig(w); if (s !== s0) { s0 = s; t0 = performance.now(); } return performance.now() - t0 >= ms; }, {timeout: 8000}); };
 const PROBE = process.env.P2125D_PROBE === '1';  // prints every view's answers (inventory), checks nothing about them
 let ok = 0; const fails = [];
 const check = (c, what) => { if (c) ok++; else { fails.push(what); console.log('FAIL:', what); } };
@@ -32,7 +40,7 @@ const srv = http.createServer((req, res) => {
   const store = {}, errs = [], warns = [];
   // an exception in a timer of the page reaches node: counted as an error of the page (the next view still gets looked at)
   process.on('uncaughtException', e => errs.push('uncaught: ' + String(e && e.stack || e).slice(0, 400)));
-  const open = async (lang = 'de-DE', wait = 2500, width = 1280) => {
+  const open = async (lang = 'de-DE', ready = () => true, width = 1280) => {
     const vc = new VirtualConsole();
     vc.on('jsdomError', e => { if (!/navigation|Not implemented|Could not load (img|link)/.test(e.message)) errs.push(e.message); });
     vc.on('error', e => errs.push(String(e && e.stack || e)));
@@ -56,27 +64,29 @@ const srv = http.createServer((req, res) => {
         w.addEventListener('unhandledrejection', e => errs.push('unhandled: ' + String(e.reason && (e.reason.stack || e.reason))));
         w.addEventListener('error', e => errs.push('error: ' + String(e.error && e.error.stack || e.message)));
       }});
-    await sleep(wait);
-    return dom.window;
+    const w = dom.window;
+    await until(() => { try { return w.KDEMO && ready(w); } catch { return false; } });
+    await quiet(w);
+    return w;
   };
 
   // 1. first start: the intro of a new account (language, purpose, modules, "Start with"), the app behind it inert
-  let w = await open('de-DE'), d = w.document;
+  let w = await open('de-DE', w => w.document.querySelectorAll('.authscreen .setupcard [data-su-preset]').length >= 5), d = w.document;
   const card = d.querySelector('.authscreen .setupcard');
   check(!!card && /Wofür nutzt du Kalmido/.test(card.textContent) && card.querySelectorAll('[data-su-preset]').length >= 5 && card.querySelectorAll('[data-su-lang]').length === 6,
     'intro: purpose, presets and the six languages: ' + (card ? card.textContent.slice(0, 160) : d.body.textContent.slice(0, 200)));
   check(d.querySelector('#app')?.hasAttribute('inert') && !d.querySelector('.tour'), 'intro: the app waits behind it, no tour yet');
-  // every module: "Switch on all modules" + every box under "Customize…"
+  // every module: "Switch on all modules" + every box under "Customise…"
   const all = d.querySelector('#su-modsall');
   check(!!all, 'intro: switch "all modules"');
-  if (all) { all.checked = true; all.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(200); }
+  if (all) { all.checked = true; all.dispatchEvent(new w.Event('change', {bubbles: true})); }
   for (const c of d.querySelectorAll('.authscreen [data-use]')) if (!c.checked) { c.checked = true; c.dispatchEvent(new w.Event('change', {bubbles: true})); }
-  d.querySelector('.authscreen [data-su="go"]')?.click(); await sleep(800);
+  d.querySelector('.authscreen [data-su="go"]')?.click(); await until(() => w.KDEMO.db().settings.setup === 'done'); await quiet(w);
   check(w.KDEMO.db().settings.setup === 'done', 'intro: Start stores the choice: ' + (d.querySelector('#su-err')?.textContent || '') + ' ' + JSON.stringify(w.KDEMO.calls.slice(-8)) + ' go:' + !!d.querySelector('.authscreen [data-su="go"]'));
   w.close();
 
   // 2. after the intro: "Getting started" + the tour, every module on
-  w = await open('de-DE', 3000); d = w.document;
+  w = await open('de-DE', w => !w.document.querySelector('.authscreen') && w.document.querySelector('.tour .tcard') && /Erste Schritte/.test(w.document.querySelector('#side')?.textContent || '')); d = w.document;
   const feats = w.eval(`S.settings.features`).split(',');
   const allFeats = w.eval(`JSON.stringify(FEATS.map(x => x[0]))`);
   const offF = JSON.parse(allFeats).filter(f => !feats.includes(f) && f !== 'family' && f !== 'docs');  // documents: not part of the intro (as on a server)
@@ -84,12 +94,12 @@ const srv = http.createServer((req, res) => {
   check(!d.querySelector('.authscreen'), 'intro gone after the start');
   check(/Erste Schritte/.test(d.querySelector('#side')?.textContent || ''), 'onboarding list "Erste Schritte"');
   check(!!d.querySelector('.tour .tcard'), 'tour after the intro');
-  w.eval('tourEnd(true)'); await sleep(300);
-  if (offF.length) { await w.eval(`api('POST', '/api/me/purpose', {purpose: 'office', all_modules: true}).then(load).then(render)`); await sleep(300); }  // the views below still get looked at
+  w.eval('tourEnd(true)'); await until(() => !d.querySelector('.tour .tcard')); await quiet(w);
+  if (offF.length) { await w.eval(`api('POST', '/api/me/purpose', {purpose: 'office', all_modules: true}).then(load).then(render)`); await quiet(w); }  // the views below still get looked at
   // the documents (Settings > Modules, not in the intro)
-  if (!w.eval(`feat('docs')`)) { await w.eval(`api('PATCH', '/api/settings', {features: S.settings.features + ',docs'}).then(load).then(render)`); await sleep(300); }
+  if (!w.eval(`feat('docs')`)) { await w.eval(`api('PATCH', '/api/settings', {features: S.settings.features + ',docs'}).then(load).then(render)`); await quiet(w); }
   // the sample on request, so that the views have something to show
-  await w.eval(`api('POST', '/api/sample', {}).then(load).then(render)`); await sleep(500);
+  await w.eval(`api('POST', '/api/sample', {}).then(load).then(render)`); await quiet(w);
 
   // 3. every module's start view + every office page: no exception, no unknown call, no empty page
   const views = JSON.parse(w.eval(`JSON.stringify(['today', 'cal', 'matrix', 'habits', 'pomo', 'news', 'stats', 'time', 'overview', 'agents', 'team', 'notes', 'home', 'family',
@@ -98,7 +108,7 @@ const srv = http.createServer((req, res) => {
   check(!offV.length, 'module views switched on: missing ' + offV.join(', '));
   const visit = async (route, label) => {
     const m0 = w.KDEMO.miss.length, g0 = w.KDEMO.gated.length, e0 = errs.length, n0 = w.KDEMO.unknown.length;
-    w.eval(`go(${JSON.stringify(route)})`); await sleep(1600);
+    w.eval(`go(${JSON.stringify(route)})`); await quiet(w, 500); await sleep(1100);  // wanted: each view keeps its own window for late errors of its timers (a shorter one moves them into the next view)
     const txt = (d.querySelector('#view')?.textContent || '').replace(/\s+/g, ' ').trim();
     const r = {label, miss: w.KDEMO.miss.slice(m0), gated: w.KDEMO.gated.slice(g0), errs: errs.slice(e0).map(x => x.slice(0, 300)), unknown: w.KDEMO.unknown.slice(n0), txt: txt.slice(0, 140)};
     console.log('VIEW', JSON.stringify(r));
@@ -181,7 +191,7 @@ const srv = http.createServer((req, res) => {
 
   // 4. server-only features answer at the place (the notice), never silently
   const n0 = w.document.querySelectorAll('#kd-note').length;
-  await w.eval(`api('POST', '/api/me/webhooks', {url: 'https://example.com/x'}).catch(() => 0)`); await sleep(200);
+  await w.eval(`api('POST', '/api/me/webhooks', {url: 'https://example.com/x'}).catch(() => 0)`); await until(() => w.document.querySelector('#kd-note'));
   check(!!w.document.querySelector('#kd-note') && n0 === 0, 'a server-only write shows the "not available in the demo" notice');
   w.document.querySelector('#kd-note button')?.click();
   // an unknown call: a visible message + console.warn, no crash
@@ -203,10 +213,11 @@ const srv = http.createServer((req, res) => {
   await w.eval(`api('POST', '/api/tasks', {title: 'Probe p2125d', list_id: S.lists[0].id}).then(load)`);
   const nT = w.KDEMO.db().tasks.length;
   w.close();
-  w = await open('de-DE', 2500); d = w.document;
+  w = await open('de-DE', w => w.eval(`[...S.tasks.values()].some(t => t.title === 'Probe p2125d')`)); d = w.document;
   check(w.eval(`[...S.tasks.values()].some(t => t.title === 'Probe p2125d')`) && w.KDEMO.db().tasks.length === nT && !d.querySelector('.authscreen'), 'reload: data stays, no intro');
-  w.KDEMO.reset(); await sleep(300); w.close();
-  w = await open('de-DE', 2500); d = w.document;
+  w.KDEMO.reset(); await quiet(w); w.close();
+  w = await open('de-DE', w => w.document.querySelector('.authscreen .setupcard')); d = w.document;
+
   check(!w.KDEMO.db().tasks.length && !!d.querySelector('.authscreen .setupcard'), 'reset: empty, the intro again');
   w.close();
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """1.1 API tests: "Getting started" sample list + welcome tour for NEW accounts only (setup, user admin),
 language / device / module awareness, idempotency, existing accounts never, KALMIDO_ONBOARDING=0, and the
-new user settings (celebrate, tour). Starts its OWN test containers (start.sh, KALMIDO_ONBOARDING=1).
+new account settings (celebrate, tour). Starts its OWN test containers (start.sh, KALMIDO_ONBOARDING=1).
 usage: v11_api_test.py <datadir>"""
 import os
 import dbx

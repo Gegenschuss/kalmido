@@ -33,7 +33,7 @@ from ..files.store import fs_chain, fs_deleted, fs_role
 from ..personal.timetrack import BadInput
 from .homecur import hc_code
 from .ledger import ofx_log
-from .books import BK_VAT, DAY_RE, _ctx, _de, _home, _split, bk_csv_cell, bk_to_home, bk_ws
+from .books import BK_VAT, DAY_RE, _ctx, _home, _split, bk_csv_cell, bk_to_home, bk_ws
 from .calc import dec, dstr, money
 from .model import office_need_feature, office_settings
 from .periodlock import pl_receipt_need_open
@@ -251,7 +251,7 @@ def rcl_csv_text(c, oid, rows):
     format follows the country pack: decimal comma -> semicolon, DD.MM.YYYY; else comma, decimal point, ISO days."""
     from .packs import office_pack_for
     comma = ((office_pack_for(office_settings(c, oid)) or {}).get("formats") or {}).get("decimal") == ","
-    num = _de if comma else (lambda v: v)  # noqa: E731
+    num = (lambda v: str(v).replace(".", ",")) if comma else (lambda v: v)  # noqa: E731
     day = (lambda v: f"{v[8:10]}.{v[5:7]}.{v[:4]}" if v and DAY_RE.match(v) else "") if comma else (lambda v: v if v and DAY_RE.match(v) else "")  # noqa: E731
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";" if comma else ",", lineterminator="\r\n")

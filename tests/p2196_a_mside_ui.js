@@ -38,7 +38,7 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = async (o, u) => {
     await o.nav(B + 'static/icon.svg');
-    await o.ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.ofmAll', 'true'); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); /* 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js) */ sessionStorage.clear(); localStorage.setItem('tasks.theme', '"dark"'); return 1; })()`);
+    await o.ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.ofmAll', 'true'); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); /* 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js) */ sessionStorage.clear(); localStorage.setItem('tasks.theme', '"dark"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     return o.ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
   };
   const tap = sel => `(() => { const b = document.querySelector('${sel}'); if (b) b.click(); return !!b; })()`;
@@ -75,7 +75,10 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     check(s.row && s.ids.length >= 5 && s.ids.join() === s.rail.join() && s.ids[0] === 'home' && s.ids[1] === 'tasks' /* 2.364.0 (#3031): Start first */ && ['cal', 'office', 'wiki'].every(x => s.ids.includes(x)), `${tag}: the row of area icons in the order of the computer's bar ` + JSON.stringify(s));
     // 2.364.0 (#3040): a grid of rows (two or more), every icon in sight, nothing to swipe sideways (was one swiping row)
     check(s.rows >= 2 && !s.scrolls && s.inRow && s.minH >= 43, `${tag}: a grid of rows, all in sight, big enough to tap ` + JSON.stringify(s));
-    check(s.on === 'tasks' && s.search && s.today && s.inbox && s.rowFixed && s.todayTwice === 1, `${tag}: on top search, Today, Inbox and the row; Today only once ` + JSON.stringify(s));
+    check(s.on === 'tasks' && s.search && s.today && s.inbox && s.rowFixed && s.todayTwice === 1, `${tag}: on top search and the row, Plan (Today, Inbox) in Projects; Today only once ` + JSON.stringify(s));
+    // 2.450.0 (#3817): order search, areas, Plan; a hidden entry is missing like on a computer
+    check(await ev(`(() => { const q = x => document.querySelector(x), P = (a, b) => !!(a && b && (a.compareDocumentPosition(b) & 4)); return P(q('#side .sbmsrch'), q('#side .sbmr')) && P(q('#side .sbmr'), q('#side .sg-focus')) && P(q('#side .sg-focus'), q('#side .sg-lists')); })()`), `${tag}: order search, areas, Plan, projects`);
+    check(await ev(`(() => { S.settings.sidebar = JSON.stringify({hidden: ['e:inbox']}); renderSide(); const r = !document.querySelector('#side .sg-focus .srow[data-drop="inbox"]') && !!document.querySelector('#side .sg-focus .srow[data-go="today"]'); S.settings.sidebar = '{}'; renderSide(); return r; })()`), `${tag}: a hidden Inbox is missing, Today stays (the open view always shows)`);
     check(s.lists && !s.office && s.fshr && s.ws && s.inside, `${tag}: the Tasks panel: projects (shared folder with its share symbol), the workspace switch stays ` + JSON.stringify(s));
     check(s.set && s.acct && Math.abs(s.dockBottom) <= 2, `${tag}: at the bottom Settings and the account ` + JSON.stringify(s));
     await ev(`(() => { const s = document.querySelector('#side'); s.scrollTop = s.scrollHeight; return 1; })()`); await sleep(200);
@@ -87,7 +90,7 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     check(await ready(ev, `S.route.mod === 'office' && !!document.querySelector('#side [data-ofmg]')`, 40), `${tag}: the office opens with its panel`);
     await sleep(500);
     s = (await ev(SIDE)) || {};
-    check(s.open && s.on === 'office' && s.office && !s.lists && s.search && s.today, `${tag}: the drawer stays open, only the office panel, the top stays ` + JSON.stringify(s));
+    check(s.open && s.on === 'office' && s.office && !s.lists && s.search && !s.today && !s.inbox, `${tag}: the drawer stays open, only the office panel, no Today / Inbox ` + JSON.stringify(s));
     await shot(`p2196a-office-${w}.png`);
     // Back once = the drawer closes (no stacked steps)
     await ev(`(() => { history.back(); return 1; })()`);

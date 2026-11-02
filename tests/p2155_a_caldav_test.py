@@ -7,7 +7,7 @@
  - #2079: MKCALENDAR (and extended MKCOL) creates an own calendar like "new calendar" in the app: name, colour, description
    from the body, 201 + Location, it shows in PROPFIND of the home and in the app under the client's address, takes events;
    twice = 405; only tasks (VTODO) / reserved names = 403; deleting it over CalDAV stays refused; a person without an
-   organisation gets it in the private space (freelancer-matrix: pim)
+   organisation gets it in the private workspace (freelancer-matrix: pim)
 usage: p2155_a_caldav_test.py <datadir>      (a fresh container; P2155A_NOSTART=1 = the server already runs)"""
 import os
 import re
@@ -220,7 +220,7 @@ fr = Dav(Fr, "frida")
 r = fr.req("MKCALENDAR", "/dav/calendars/frida/F1/", MKCAL.format(name="Studio", comps='<C:comp name="VEVENT"/><C:comp name="VTODO"/>'))
 check(r.status_code == 201, f"P4: frida creates a calendar from her phone ({r.status_code} {r.text[:160]})")
 fc = {c["name"]: c for c in Fr.get(B + "/api/evcals").json()["items"]}.get("Studio") or {}
-check(fc.get("role") == "owner" and fc.get("org_id") is None, f"P4: ... in her private space {fc}")
+check(fc.get("role") == "owner" and fc.get("org_id") is None, f"P4: ... in her private workspace {fc}")
 lo, hi = sorted((ALICE, FID))
 dbx("INSERT INTO conn_links(a_id, b_id, created_at) VALUES(?, ?, '2026-10-21T10:00:00.000Z')", (lo, hi))
 HOME = A.post(B + "/api/evcals", json={"name": "Home", "org_id": None}).json()["id"]

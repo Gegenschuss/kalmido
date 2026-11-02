@@ -56,7 +56,7 @@ const FABCHK = `(async () => {
   check(((await call(CF, 'GET', '/api/state')).me?.workspaces || []).length === 0, 'frida is in no organisation');
   const me = (await call(CA, 'GET', '/api/state')).me;
   const BOB = (await call(CB, 'GET', '/api/state')).me.id;
-  // an agent alice and frida share a list with (in alice's private space, frida is admin there): the round button shows for both
+  // an agent alice and frida share a list with (in alice's private workspace, frida is admin there): the round button shows for both
   const AG = (await call(CA, 'POST', '/api/admin/agents', {scopes: ['write'], username: 'claude', display_name: 'Claude'})).id;
   const LS = (await call(CA, 'POST', '/api/lists', {name: 'Shared with Frida'})).id;
   await call(CA, 'PUT', `/api/lists/${LS}/members`, {user_id: AG, role: 'edit'});
@@ -97,7 +97,7 @@ const FABCHK = `(async () => {
       check(await signIn(ev, user) === 200, `${user}: login`);
       for (const [vw, vh, theme] of [[1280, 800, 'light'], [1440, 900, 'dark']]) {
         await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
-        await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+        await ev(`(() => { localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
         for (const [name, hash, rdy, ...rest] of PAGES) {
           const act = rest.find(x => x.includes('(')), who = rest.filter(x => x !== act);
           if (!who.includes(user)) continue;

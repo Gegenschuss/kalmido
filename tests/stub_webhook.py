@@ -1,12 +1,15 @@
 # fake webhook receiver for webhooks_test.py: runs INSIDE the test container (docker exec -d python /data/stub_webhook.py) on
 # 127.0.0.1:8097 and logs every request (path, headers, body) to /data/wh.log.
 #   /ok /anything -> 200   /fail -> 500   /redirect -> 302 to /ok   /slow -> answers after 12 s   /big -> 200 with 2 MB
-#   /code/<n> -> status n
+#   /code/<n> -> status n   /flap... -> 500 on the first call of the path, 200 afterwards (2.367.3, #2971)
 import json
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 LOG = open('/data/wh.log', 'a', buffering=1)
+
+
+SEEN = set()
 
 
 class H(BaseHTTPRequestHandler):
@@ -22,6 +25,9 @@ class H(BaseHTTPRequestHandler):
                               'headers': {k: v for k, v in self.headers.items()}}) + '\n')
         code, extra, out = 200, {}, b'{"ok": true}'
         if self.path.startswith('/fail'):
+            code = 500
+        elif self.path.startswith('/flap') and self.path not in SEEN:
+            SEEN.add(self.path)
             code = 500
         elif self.path.startswith('/redirect'):
             code, extra = 302, {'Location': '/ok-after-redirect'}

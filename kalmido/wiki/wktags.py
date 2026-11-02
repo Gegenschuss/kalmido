@@ -23,7 +23,10 @@ English keys: tag, folder, property, show (pages | tasks), sort (name | updated 
 table), columns. The page holding the block and the templates are never in its result. The reader sees only pages they
 may read (wkf_visible_sql: the space's pages, through a share only the shared ones).
 """
+import hashlib
 import re
+import threading
+from collections import OrderedDict
 
 from flask import jsonify, request
 
@@ -41,6 +44,7 @@ from .wksearch import wks_job_add, wks_key_state, wks_unindexed, wks_ws
 
 WKT_MAX = 50            # tags per page
 WKT_LIST_MAX = 300      # tags in the list of a space
+WKT_CACHE_MAX = 256     # 2.469.0 (#3546): (space, person) entries of the tag list in this process, the oldest used goes first
 WKQ_LIMIT, WKQ_LIMIT_MAX = 50, 200
 WKQ_OPEN_MAX = 500      # pages whose text a query with "zeige: aufgaben" opens
 WKT_ONE = re.compile(r"[^\W\d_][\w/-]{0,59}")
@@ -99,11 +103,13 @@ def _space_w(oid, uid):
     return ("p.org_id=?", [oid]) if oid else ("p.org_id IS NULL AND p.owner_id=?", [uid])
 
 
-def _late(c, oid, owner):
-    """{page id: row} of the space's pages whose index (words + tags) is not current: read now, indexed in the background."""
+def _late(c, oid, owner, uid):
+    """{page id: row} of the space's pages whose index (words + tags) is not current: read now, indexed in the background.
+    2.469.0 (#3546): only a person of the space starts that job, a reader through a share (wkf_base None) only reads."""
+    from .wkfolder import wkf_base
     w, a = _space_w(oid, owner)
     rows = {r["id"]: r for r in wks_unindexed(c, w, a, wks_key_state(c, oid, None if oid else owner))}
-    if rows:
+    if rows and wkf_base(c, uid, {"org_id": oid, "owner_id": owner}) is not None:
         wks_job_add(oid, None if oid else owner)
     return rows
 
@@ -113,13 +119,13 @@ def _text(c, r):
     return "" if le2e_is_cipher(t) else t
 
 
-def wkt_space_rows(c, oid, owner, uid, keys=None):
+def wkt_space_rows(c, oid, owner, uid, keys=None, late=None):
     """(rows, texts): the page rows (p.*) of a space (oid, or the private one of owner) that uid may read and that have every
     tag of keys (None: every page that has a tag at all), without the templates and pages of the lock; texts = {page id:
-    text} of the pages read now (not indexed yet)."""
+    text} of the pages read now (not indexed yet). late: _late when the caller has it."""
     from .wkfolder import wkf_visible_sql
     w, a = _space_w(oid, owner)
-    late = _late(c, oid, owner)
+    late = _late(c, oid, owner, uid) if late is None else late
     ws = wks_ws(oid, None if oid else owner)
     if keys:
         hs = [wkt_hash(c, ws, k) for k in keys]
@@ -144,6 +150,41 @@ def wkt_space_rows(c, oid, owner, uid, keys=None):
     return out, {i: t for i, t in late.items() if isinstance(t, str)}
 
 
+# ---- 2.469.0 (#3546): the tag list in the process's memory (module docstring)
+_wkt_cache = OrderedDict()  # (oid or None for the private space, uid) -> (stamp, [{tag, n}])
+_wkt_lock = threading.Lock()
+
+
+def _wkt_stamp(c, oid, owner, uid):
+    """What the list of uid in this space hangs on. Read before the pages: a change in between stores the newer list under
+    the older stamp, which is a miss next time, never an old list under a new stamp."""
+    from .wkfolder import wkf_visible_sql
+    w, a = _space_w(oid, owner)
+    live = "FILTER (WHERE p.deleted_at IS NULL)"
+    r = c.execute(f"SELECT COUNT(*) {live} AS n, max(p.updated_at) {live} AS u, max(p.deleted_at) AS d, "
+                  f"md5(string_agg(CAST(p.id AS text) || ':' || CAST(p.xmin AS text), ',' ORDER BY p.id) {live}) AS x "
+                  f"FROM wiki_pages p WHERE {w}", a).fetchone()
+    return (r["n"], r["u"], r["d"], r["x"], wks_key_state(c, oid, None if oid else owner),
+            hashlib.sha256(wkf_visible_sql(c, uid).encode()).hexdigest())
+
+
+def _wkt_get(key, stamp):
+    with _wkt_lock:
+        hit = _wkt_cache.get(key)
+        if hit is None or hit[0] != stamp:
+            return None
+        _wkt_cache.move_to_end(key)
+        return hit[1]
+
+
+def _wkt_put(key, stamp, tags):
+    with _wkt_lock:
+        _wkt_cache[key] = (stamp, tags)
+        _wkt_cache.move_to_end(key)
+        while len(_wkt_cache) > WKT_CACHE_MAX:
+            _wkt_cache.popitem(last=False)
+
+
 @app.get("/api/wiki/tags")
 def wkt_list():
     """?space=private|org:<id> -- {tags: [{tag, n}]} the tags of the space's pages (most used first); with &tag=<name> the
@@ -160,14 +201,23 @@ def wkt_list():
         rows, _ = wkt_space_rows(c, oid, uid, uid, [tag.lower()])
         rows.sort(key=lambda r: r["path"].lower())
         return jsonify(space=wiki_space_key(oid), tag=tag, pages=[{"id": r["id"], "path": r["path"], "updated_at": r["updated_at"]} for r in rows])
-    rows, texts = wkt_space_rows(c, oid, uid, uid)
+    key, stamp = (oid, uid), _wkt_stamp(c, oid, uid, uid)
+    late = _late(c, oid, uid, uid)
+    current = not late  # wkt_space_rows fills late
+    hit = _wkt_get(key, stamp) if current else None
+    if hit is not None:
+        return jsonify(space=wiki_space_key(oid), tags=hit)
+    rows, texts = wkt_space_rows(c, oid, uid, uid, late=late)
     n, shown = {}, {}
     for r in rows:  # the names: from the texts, in memory only
         for k, t in wkt_tags(texts[r["id"]] if r["id"] in texts else _text(c, r)):
             n[k] = n.get(k, 0) + 1
             shown.setdefault(k, t)
     tags = sorted(n, key=lambda k: (-n[k], k))[:WKT_LIST_MAX]
-    return jsonify(space=wiki_space_key(oid), tags=[{"tag": shown[k], "n": n[k]} for k in tags])
+    out = [{"tag": shown[k], "n": n[k]} for k in tags]
+    if current:
+        _wkt_put(key, stamp, out)
+    return jsonify(space=wiki_space_key(oid), tags=out)
 
 
 # ---- the ```abfrage block

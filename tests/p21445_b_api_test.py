@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.144.5 part B, own container (start.sh with KALMIDO_SECRET_KEY, mode workspaces). Invented names only.
  - #2410 the mailbox of a workspace (hub_mailboxes) moves with the exports: the organisation export carries servers, user
-   names and sender but never the passwords; imported into an empty organisation and into the private space (org ->
+   names and sender but never the passwords; imported into an empty organisation and into the private workspace (org ->
    private) it keeps server / user and asks for the passwords again (error "password", *_password_set false); the account
    export carries the private mailbox (no passwords), its import into an organisation (private -> org) keeps server / user,
    undo removes it again (2.144.5 A2, review R6/R7: imported switched off, undo keeps a changed one); a workspace that has a mailbox keeps its own (warning); the boundary check reports a mailbox whose
@@ -215,6 +215,7 @@ bp = box(f"u{ALICE}")
 check(bp and bp["org_id"] is None and bp["owner_id"] == ALICE and bp["imap_host"] == "imap.example.com" and bp["smtp_user"] == "team@example.com"
       and bp["secret"] == "", f"#2410: organisation -> private keeps server and user {bp}")
 # again into Gamma: it has its own mailbox now, it stays
+OX, RK = org_export(A, ORG)  # 2.362.3 (#3098): a newer export (the same file again skips its areas)
 iid = opened(A, OX, RK)
 j = run(A, iid, ORG3)
 check(box(f"o{ORG3}")["secret"] != "" and "already has a mailbox" in warnings(j), f"#2410: a workspace keeps its own mailbox: {warnings(j)}")

@@ -2,7 +2,7 @@
 // - documents (a computer): the panel shows the whole folder tree below the documents folder (ns 'dc', draggable, a menu);
 //   a subfolder picked = the list shows its documents (?under=), a removable line names the path; the document's folder
 //   field is a pick with the path ("Documents / Client Alpha / 2026") and offers a new subfolder of the current one
-// - the office (a computer): 2.351.0 (#3312) the area Quotes & invoices is a tree node (no group "Folders", no automatic
+// - the office (a computer): 2.351.0 (#3312) the area Quotations & invoices is a tree node (no group "Folders", no automatic
 //   groups); the year is a filter at the top of the list; the document's More menu files it into a folder (a reference node)
 // - a phone: the documents' folders in the drawer, held to drag (data-sbbdrag), a menu
 // freelancer-matrix: n/a (no new route here; alice's personal office without an organisation is the freelancer case, the
@@ -73,7 +73,7 @@ const openRow = async (w, d, txt) => { const r = rowOf(d, txt); const a = r?.que
   // filters at the top of the list
   const AR = await until(() => d.querySelector('#side .sbbt[data-sbbid="a:offers"]'));
   check(AR && AR.dataset.sbbns === 'oft' && AR.dataset.sbbmenu === '1' && !rowOf(d, 'By year') && !d.querySelector('#side [data-offolders]'),
-    'office: Quotes & invoices is a tree node; no automatic groups, no group "Folders"');
+    'office: Quotations & invoices is a tree node; no automatic groups, no group "Folders"');
   const yr = new Date().getFullYear().toString();
   const ysel = await until(() => d.querySelector('#ofd-flt-year'));
   check(ysel && [...ysel.options].some(o => o.value === yr), 'office: the year is a filter at the top of the list');

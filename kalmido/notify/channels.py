@@ -6,8 +6,9 @@ channels of the organisation (Settings > Workspaces) for what happens in its lis
 assigned, comment) -- never a private area, never a list shared only with some, never the words of a list with the lock.
 The address (webhook URL, bot token, numbers) is a secret: sealed with the server key, never sent back (kind, name and a masked
 end only). Messages are plain text for people, not JSON events (that is what the webhooks are for). They are queued and sent by
-a background loop (short timeout, the request never waits); a failed send is not retried, CH_FAIL_MAX failures in a row turn
-the channel off (the settings show why). Outbound only to public https addresses, the webhooks' allow-list of an admin
+a background loop (short timeout, the request never waits); a failed send is tried once more after CH_RETRY_S (2.367.3, #2971),
+CH_FAIL_MAX failed messages in a row turn the channel off (the settings show why, its owner or the organisation's admins get a
+News item and a push). Outbound only to public https addresses, the webhooks' allow-list of an admin
 (Settings > Administration > Advanced, KALMIDO_WEBHOOK_ALLOW_HOSTS) for self-hosted targets -- the same guard as the webhooks.
 A person's quiet hours hold back their channel messages (urgent ones excepted). KALMIDO_CHANNELS=0: off.
 
@@ -37,18 +38,20 @@ from ..accounts.orgs import org_role  # 2.240.0 B2 (#2867): pulled up from funct
 from ..core.access import Denied, org_trip_sql, ov_open, reading_sql, task_visible
 from ..core.errors import BadInput
 from ..core.mailframe import MAIL_ACC, MAIL_MUTED, Safe, mail_html
-from ..notify.alerts import _env_int
+from ..notify.alerts import _env_int, aa_count, aa_err, aa_fail, aa_ok
 from ..core.env import env_bool
 
 CH_ON = env_bool("KALMIDO_CHANNELS", True)
 CH_KINDS = ("slack", "matrix", "telegram", "signal")
-CH_EVENTS_ME = ("reminder", "assign", "comment", "digest", "other", "lists")  # a person's channel
+CH_KINDS_TXT = {"slack": "Slack", "matrix": "Matrix", "telegram": "Telegram", "signal": "Signal"}
+CH_EVENTS_ME = ("reminder", "assign", "comment", "digest", "other", "lists", "own")  # a person's channel; own (2.367.3, #2973): "lists" also with what they did themselves
 CH_EVENTS_ORG = ("newtask", "complete", "assign", "comment")                   # an organisation's channel
 CH_DEFAULT_ME = ("reminder", "assign", "comment")
 CH_DEFAULT_ORG = ("newtask", "complete", "assign", "comment")
 CH_MAX = 10              # per person and per organisation
 CH_FAIL_MAX = _env_int("KALMIDO_CHANNEL_FAILS", 5)  # failures in a row -> off
 CH_TICK = _env_int("KALMIDO_CHANNEL_TICK", 5)
+CH_RETRY_S = _env_int("KALMIDO_CHANNEL_RETRY", 60)  # 2.367.3 (#2971): a failed message gets one more try after this long
 CH_TIMEOUT = 8
 CH_QUEUE_MAX = 200       # waiting messages per channel (more are dropped)
 CH_BATCH = 30
@@ -68,6 +71,8 @@ _CH_TL = threading.local()  # .wd = True while the watchdog runs (its pushes are
 
 EVM_CHOICES = ("off", "nopush", "always")
 EVM_KINDS = {"assign": "mail_assign", "mention": "mail_mention"}
+EVM_KINDS.update(aprequest="mail_assign", apdecide="mail_assign")  # 2.367.2 (#2968): an approval follows the assignment mail's setting
+EVM_KINDS["apbook"] = "mail_assign"  # 2.367.2 (#2969): a booking too (comment_id = the booking, no task)
 EVM_DELAY = _env_int("KALMIDO_EVENT_MAIL_DELAY", 600)   # seconds after the first event
 EVM_GAP = _env_int("KALMIDO_EVENT_MAIL_GAP", 600)       # at least this long between two mails to one person
 EVM_DAY_MAX = 20
@@ -197,9 +202,9 @@ def chn_tick():
                              AND user_id IN (SELECT id FROM users WHERE disabled<>0)""", (iso(now_utc()),))  # 2.240.0 B2 (#2867): visible to its admins
                 c.execute("""DELETE FROM notify_channel_queue WHERE channel_id IN (SELECT n.id FROM notify_channels n JOIN users u ON u.id=n.user_id
                              WHERE n.enabled=0 OR u.disabled<>0)""")  # 2.240.0 B (#2867): nor what waits for a disabled account
-                rows = [dict(r) for r in c.execute("""SELECT q.id, q.channel_id, q.text, n.kind, n.target FROM notify_channel_queue q
-                                                      JOIN notify_channels n ON n.id=q.channel_id
-                                                      ORDER BY q.id LIMIT ?""", (CH_BATCH,))]
+                rows = [dict(r) for r in c.execute("""SELECT q.id, q.channel_id, q.text, q.created_at, q.retry_at, n.kind, n.target
+                                                      FROM notify_channel_queue q JOIN notify_channels n ON n.id=q.channel_id
+                                                      WHERE q.retry_at<=? ORDER BY q.id LIMIT ?""", (time.time(), CH_BATCH))]
                 for r in rows:
                     try:
                         r["t"] = json.loads(unseal(c, f"channel:{r['channel_id']}", r["target"]) or "{}")
@@ -217,6 +222,11 @@ def chn_tick():
             try:
                 with system_ctx(c):  # background loop: the results of every channel
                     for r, (ok, status, code) in res:
+                        if not ok and r["retry_at"]:
+                            continue  # 2.367.3 (#2971): its second try: gone now, and one message counts as one failure
+                        if not ok and code != "config":
+                            c.execute("INSERT INTO notify_channel_queue(channel_id,text,created_at,retry_at) VALUES(?,?,?,?)",
+                                      (r["channel_id"], r["text"], r["created_at"], time.time() + CH_RETRY_S))
                         chn_result(c, r["channel_id"], ok, status, code)
                 c.commit()
             finally:
@@ -231,15 +241,23 @@ def chn_result(c, cid, ok, status, code):
         return
     c.execute("UPDATE notify_channels SET fails=fails+1, last_error=?, last_at=? WHERE id=?",
               (code + (f" {int(status) // 100}xx" if status else ""), ts, cid))  # 2.306.0 (#2875 review N13): the class only
-    r = c.execute("SELECT fails FROM notify_channels WHERE id=?", (cid,)).fetchone()
+    r = c.execute("SELECT fails, user_id, org_id, name, kind FROM notify_channels WHERE id=?", (cid,)).fetchone()
     if r and r[0] >= CH_FAIL_MAX:
         c.execute("UPDATE notify_channels SET enabled=0, disabled_reason='failures', updated_at=? WHERE id=?", (ts, cid))
         c.execute("DELETE FROM notify_channel_queue WHERE channel_id=?", (cid,))
         print(f"notification channel {cid} turned off after {r[0]} failed sends ({code} {status or ''})", flush=True)
+        chn_off_tell(c, r, "channel")
+
+
+def chn_off_tell(c, ch, what):
+    """2.367.3 (#2971): a channel turned itself off: its owner / the organisation's admins hear it, not only the settings."""
+    from ..collab.integfail import integ_org_admins, integ_tell
+    uids = integ_org_admins(c, ch["org_id"]) if ch["org_id"] else [ch["user_id"]]
+    integ_tell(c, uids, what, ch["name"] or CH_KINDS_TXT.get(ch["kind"], ch["kind"]),
+               click="settings/users" if ch["org_id"] else "settings/newskinds", focus="users" if ch["org_id"] else "newskinds")
 
 
 def chn_loop():
-    from ..notify.alerts import aa_count
     while True:
         _CH_WAKE.wait(CH_TICK)
         _CH_WAKE.clear()
@@ -247,7 +265,7 @@ def chn_loop():
             while chn_tick() >= CH_BATCH:
                 pass
         except Exception as e:  # noqa: BLE001
-            print("channels error:", type(e).__name__, e, flush=True)
+            print("channels error:", type(e).__name__, flush=True)  # 2.360.5 (#3245): the name only, never the text
             aa_count("watchdog", f"channels|{type(e).__name__}", "tick")
 
 
@@ -369,7 +387,7 @@ def chn_push(uid, title, msg, prio, click, kind, s, task=None, scope=None, chn_m
             _CH_WAKE.set()
         return n > 0
     except Exception as e:  # noqa: BLE001  (a channel never breaks the push)
-        print("channels: queueing failed:", type(e).__name__, e, flush=True)
+        print("channels: queueing failed:", type(e).__name__, flush=True)  # 2.360.5 (#3245): the name only, never the text
         return False
 
 
@@ -416,17 +434,19 @@ def chn_flush(resp):
                 db().heal()
             except Exception:  # noqa: BLE001
                 pass
-            print("channels: list events failed:", type(e).__name__, e, flush=True)
+            print("channels: list events failed:", type(e).__name__, flush=True)  # 2.360.5 (#3245): the name only, never the text
     return resp
 
 
-def chn_list_events(c, n):
-    chans = c.execute("""SELECT n.id, n.user_id, n.org_id, n.events FROM notify_channels n JOIN users u ON u.id=n.user_id
+def chn_list_events(c, n, auto=False):
+    """auto (2.367.3, #2973): a rule run of the watchdog (it acts as the rule's creator, but nobody just did this)."""
+    chans = c.execute("""SELECT n.id, n.user_id, n.org_id, n.events, n.name, n.kind FROM notify_channels n JOIN users u ON u.id=n.user_id
                          WHERE n.enabled=1 AND u.disabled=0
                          AND (n.org_id IS NOT NULL OR n.events ILIKE '%lists%') ORDER BY n.id""").fetchall()  # 2.240.0 B (#2867): not of a disabled account
     if not chans:
         return
     actor = g.user["id"] if g.get("user") and g.get("auth_via") != "public" else None
+    self_id = None if auto or g.get("auth_via") == "hook_in" else actor  # 2.367.3 (#2973): an inbound webhook acts as its owner, but is news to them
     sent = 0
     for (tid, ev), e in n.items():
         t = c.execute("""SELECT t.id, t.title, t.status, t.deleted_at, t.assignee_id, t.list_id, l.name AS lname, l.is_inbox, l.owner_id,
@@ -451,9 +471,12 @@ def chn_list_events(c, n):
                     c.execute("UPDATE notify_channels SET enabled=0, disabled_reason='admin', updated_at=? WHERE id=?",
                               (iso(now_utc()), ch["id"]))
                     c.execute("DELETE FROM notify_channel_queue WHERE channel_id=?", (ch["id"],))
+                    chn_off_tell(c, ch, "channel_admin")  # 2.367.3 (#2971): the organisation's admins
                     continue
             elif t["org_id"] or t["owner_id"] != ch["user_id"]:
                 continue  # a person's channel: events of their own private lists only (2.142.0 P4: the private area's channel)
+            elif ch["user_id"] == self_id and "own" not in ch["events"].split(","):
+                continue  # 2.367.3 (#2973): they just did it themselves (an organisation's channel is a team feed: stays)
             text = chn_event_text(c, t, ev, e.get("cid"), actor, ch["user_id"])
             if text and chn_enqueue(c, ch["id"], text):
                 sent += 1
@@ -746,11 +769,12 @@ def evm_note(c, uid, kind, tid, actor, s, cid=None):
         if not u or u["kind"] == "agent" or u["disabled"] or not (u["email"] or "").strip():
             return
         if c.execute("SELECT COUNT(*) FROM notify_mail_queue WHERE user_id=?", (uid,)).fetchone()[0] >= 200:
+            aa_count("watchdog", "event mail queue full", uid)  # 2.367.5 (#2980): the admin hears of it
             return
         c.execute("INSERT INTO notify_mail_queue(user_id,kind,task_id,comment_id,actor_id,created_at) VALUES(?,?,?,?,?,?)",
                   (uid, kind, tid, cid, actor, time.time()))
     except Exception as e:  # noqa: BLE001  (a mail note never fails the change itself)
-        print("event mail: note failed:", type(e).__name__, e, flush=True)
+        print("event mail: note failed:", type(e).__name__, flush=True)  # 2.360.5 (#3245): the name only, never the text
 
 
 def evm_tick(c, users, S, LG, now):
@@ -771,12 +795,19 @@ def evm_tick(c, users, S, LG, now):
             _wd_fail(c, "event mail of user", uid, e)
 
 
+def evm_line(kind, who, title, lg):
+    if kind == "aprequest":  # 2.367.2 (#2968)
+        return tr("Approval needed: {0} (from {1})", title, who, lg=lg)
+    if kind == "apdecide":
+        return tr("{0} decided on your approval request: {1}", who, title, lg=lg)
+    return tr("{0} assigned you: {1}", who, title, lg=lg) if kind == "assign" else tr("{0} mentioned you: {1}", who, title, lg=lg)
+
+
 def evm_user(c, uid, s, lg, now):
     from ..admin.hosting import mail_budget
     from ..collab.comments import user_names
     from ..collab.liste2e import le2e_mode, le2e_neutral
-    from ..integrations.mail import MAIL_OUT_ON, mail_send
-    from ..notify.alerts import aa_err, aa_fail, aa_ok
+    from ..integrations.mail import MAIL_OUT_ON, mail_off_url, mail_send
     if time.time() - float(s.get("evmail_at") or 0) < EVM_GAP:
         return
     q = c.execute("SELECT * FROM notify_mail_queue WHERE user_id=? ORDER BY id", (uid,)).fetchall()
@@ -795,7 +826,14 @@ def evm_user(c, uid, s, lg, now):
     names = user_names(c, list({x["actor_id"] for x in q if x["actor_id"]}))
     lines, seen = [], set()
     for x in q:
-        if (x["kind"], x["task_id"]) in seen or not evm_wanted(c, uid, s, x["kind"]):
+        if (x["kind"], x["task_id"] or x["comment_id"]) in seen or not evm_wanted(c, uid, s, x["kind"]):
+            continue
+        if x["kind"] == "apbook":  # 2.367.2 (#2969)
+            from ..calendars.apptbook import apb_mail_line
+            seen.add((x["kind"], x["comment_id"]))
+            line = apb_mail_line(c, x["comment_id"], uid, lg)
+            if line:
+                lines.append(line)
             continue
         t = c.execute("""SELECT t.id, t.title, t.deleted_at, t.list_id, l.name AS lname, l.is_inbox FROM tasks t JOIN lists l ON l.id=t.list_id
                          WHERE t.id=?""", (x["task_id"],)).fetchone()
@@ -805,7 +843,7 @@ def evm_user(c, uid, s, lg, now):
         who = names.get(x["actor_id"]) or tr("Someone via the public link", lg=lg)
         title = le2e_neutral(lg) if le2e_mode(c, t["list_id"]) else md_plain(t["title"] or "")
         lname = tr("Basket", lg=lg) if t["is_inbox"] and inbox_default(t["lname"]) else t["lname"]
-        what = tr("{0} assigned you: {1}", who, title, lg=lg) if x["kind"] == "assign" else tr("{0} mentioned you: {1}", who, title, lg=lg)
+        what = evm_line(x["kind"], who, title, lg)
         lines.append((what, lname, f"{PUBLIC_URL}/#t/{t['id']}"))
     if not lines:
         drop()
@@ -819,8 +857,10 @@ def evm_user(c, uid, s, lg, now):
     uset(c, uid, "evmail_day", f"{day}:{sent_today + 1}")
     c.commit()
     m = evm_content(lines[:EVM_LINES], len(lines), lg)
+    off = mail_off_url(c, uid, "event")  # 2.367.5 (#2975): with the sender's name and the one-click off link
+    c.commit()
     try:
-        mail_send(to, *m)
+        mail_send(to, *m, from_name=APP_NAME, unsub=off)
         aa_ok("smtp")
     except Exception as e:  # noqa: BLE001
         print("mail: event mail for user", uid, "failed:", type(e).__name__, flush=True)  # 2.240.0 A (#2883): no addresses

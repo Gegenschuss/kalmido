@@ -113,6 +113,7 @@ def _user_bytes(c, uids):
     k = sum(c.execute(f"SELECT COALESCE(SUM(size),0) FROM {t} WHERE created_by IN ({q})", uids).fetchone()[0]
             for t in ("office_meal_files", "office_contract_files"))
     t_ = c.execute(f"SELECT COALESCE(SUM(size),0) FROM tchat_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.113.1 (#2059): team chat files
+    t_ += c.execute(f"SELECT COALESCE(SUM(size),0) FROM template_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.363.3 (#3134)
     return int(a + b + d + e + g + h + k + t_)
 
 
@@ -282,11 +283,13 @@ def announce_set(c, b, by=None):
         return e
     gset(c, "announce", json.dumps(a, ensure_ascii=False) if a else "")
     if a and b.get("push") is True and g.get("pushes") is not None:
+        from ..collab.news import notif_ok
         from ..notify.push import push_prio, push_reachable
-        from ..core.i18n import lang_of
+        from ..collab.comments import lang_of
+        author = g.user["id"] if g.get("user") else None
         for r in c.execute("SELECT id FROM users WHERE disabled=0 AND kind!='agent'").fetchall():
             s = usettings(c, r[0])
-            if push_reachable(c, r[0], s):
+            if r[0] != author and notif_ok(c, r[0], s, "notice", "push") and push_reachable(c, r[0], s):  # 2.367.4 (#2974): switchable, not to its author
                 g.pushes.append((r[0], tr("{0}: notice", APP_NAME, lg=lang_of(s)), a["text"], f"{PUBLIC_URL}/", push_prio(s)))
     print("announcement", "cleared" if not a else f"set ({a['level']})", "by", by or "?", flush=True)
     return None

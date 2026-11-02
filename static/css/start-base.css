@@ -1,0 +1,6 @@
+/* 2.476.0 (#3487): start style files. Rules needed before any module loads no longer go at the end of app.css (every package
+   wrote the same last lines there): each package / topic gets a file of its own, static/css/start-<topic>.css. The server
+   sends them behind app.css under the same URL, sorted by name (kalmido/core/strip.py with_start_css), so they come later in
+   the cascade than app.css and earlier than the module stylesheets. Rules of a module loaded on demand go into its own
+   static/css/<module>.css instead. tools/check_appcss.py keeps app.css from growing. */
+:root { --kd-start-css: 1; }  /* the start style files arrived (tests/p2476_b_startcss_ui.js) */

@@ -14,6 +14,15 @@ without a person), so an instance admin cannot use them either.
                                  registration mode, the current notice's level and times (never its text)
   POST /api/operator/setup-code  a fresh one-time setup code for the first admin -- only while no account exists
   PUT  /api/operator/notice      sets / clears the maintenance or info notice every client shows (no push)
+  PUT  /api/operator/quota-default   #3939: the instance's default storage per person in MB (null = environment, 0 = unlimited)
+
+#3939: one customer's account, as the user management handles it, without its content (numbers and states only -- never a
+name, display name or e-mail address; agents are unknown here):
+  POST   /api/operator/accounts/find         {email} -> {account} (the address from a support request: never answered, never logged)
+  GET    /api/operator/accounts/<id>         {account: id, disabled, is_admin, created, last_active (days), orgs, projects, storage}
+  PUT    /api/operator/accounts/<id>         {disabled?, storage_quota_mb?} -- locking ends the sessions; never the admin right
+  DELETE /api/operator/accounts/<id>?confirm=<id>   deletes like DELETE /api/users/<id>; 409 with a code and a number for own
+                                                    projects, records kept by law (no waiver here) or a server admin
 
 Every call is logged with its action and the caller's address (never the token)."""
 import hashlib
@@ -26,10 +35,15 @@ from flask import abort, jsonify, request
 
 from ..core.config import app, APP_VERSION, ATT_DIR, PUBLIC_URL
 from ..core.db import body, bump, db, gsetting, iso, now_utc
-from ..core.i18n import tr
+from ..core.i18n import tr, trn
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip, rate_ip
 from ..accounts.login import login_log_ip  # 2.239.0 B (#2888)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.secmail import sec_mail  # 2.485.0 (#3939): earlier in the load order, at module level
+from ..accounts.sessions import ses_end
+from ..accounts.users import _active_admins, user_delete_run
+from .hosting import ANN_TEXT_MAX, _mb, _user_bytes, announce_get, announce_set, hosted, hosting_settings, quota_default_mb
+from .retexport import RX_NEEDED, rx_counts, rx_subject
 
 OP_TOKEN_MIN = 32
 OP_TOKEN_MAX = 512
@@ -72,7 +86,7 @@ class OpDenied(Exception):
 def op_denied(e):
     if e.code == 429:
         return jsonify(error=tr("Too many failed attempts, please wait a few minutes")), 429
-    return jsonify(error=tr("Please log in")), 401
+    return jsonify(error=tr("Please sign in")), 401
 
 
 def op_gate(action):
@@ -102,7 +116,6 @@ def _count(c, sql, args=()):
 
 def _notice(c):
     """Level and times of the current notice -- never its text (an instance admin may have written it)."""
-    from .hosting import announce_get
     a = announce_get(c, True)
     if not a:
         return None
@@ -116,7 +129,6 @@ def op_status(c):
     from ..accounts.orgs import instance_mode
     from ..accounts.signup import signup_mode
     from .backup import BK_ON_ENV, bk_db_bytes
-    from .hosting import hosted, _user_bytes
     from .worker import wrk_health
     now = now_utc()
     d7, d30 = iso(now - timedelta(days=7)), iso(now - timedelta(days=30))
@@ -165,7 +177,7 @@ def operator_setup_code():
     from ..accounts.setupcode import SH_CODE_ENV, SH_CODE_OFF, SH_OP_TTL, sh_code_op_new
     c = db()
     code = ""
-    with system_ctx(c):
+    with system_ctx(c):  # the operator acts without a person, across organisations: numbers and states only
         exists = c.execute("SELECT 1 FROM users LIMIT 1").fetchone()
         if not exists and not (SH_CODE_OFF or SH_CODE_ENV):
             # 2.144.0 D2 (#797): hash + end (24 h) in the database, valid in every web process; replaces the
@@ -182,7 +194,6 @@ def operator_setup_code():
 
 def _notice_error(e):
     """2.144.0 D2 (#797): only the known validation messages go back to the operator, never free text."""
-    from .hosting import ANN_TEXT_MAX
     known = {tr("At most {0} characters", ANN_TEXT_MAX), tr("The end must be after the start")}
     known |= {tr("Invalid value: {0}", k) for k in ("level", "starts_at", "ends_at", "minutes")}
     return e if e in known else tr("Invalid value: {0}", "notice")
@@ -192,7 +203,6 @@ def _notice_error(e):
 def operator_notice():
     """{level: maintenance | info, text, minutes? | starts_at? / ends_at?}; an empty text clears the notice. No push."""
     op_gate("notice")
-    from .hosting import announce_set
     b = body()
     if not isinstance(b, dict):
         b = {}
@@ -207,3 +217,160 @@ def operator_notice():
         return jsonify(error=_notice_error(e), code="invalid_notice"), 400
     c.commit()
     return jsonify(notice=_notice(c))
+
+
+# ---------------------------------------------------------------- #3939: accounts (lock, unlock, quota, delete)
+# The same handles the instance's user management has (accounts/users.py PATCH / DELETE /api/users/<id>), for the hoster
+# without an account of its own. Numbers and states only: never a name, a display name, an e-mail address or content.
+OP_EMAIL_MAX = 200
+
+
+def _op_day(v):
+    return str(v or "")[:10]
+
+
+def _op_account(c, uid):
+    """The account uid as numbers / states, or None (unknown or an agent). Runs as "system" (the caller's block)."""
+    u = c.execute("SELECT id, kind, is_admin, disabled, created_at, storage_quota_mb FROM users WHERE id=?", (uid,)).fetchone()
+    if not u or (u["kind"] or "user") == "agent":
+        return None
+    seen = c.execute("SELECT MAX(NULLIF(last_seen_at, '')) FROM sessions WHERE user_id=?", (uid,)).fetchone()[0]
+    orgs = _count(c, "SELECT COUNT(*) FROM org_members m JOIN orgs o ON o.id=m.org_id WHERE m.user_id=? AND o.personal_of IS NULL", (uid,))
+    projects = _count(c, "SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (uid,))
+    own = u["storage_quota_mb"]
+    return {"id": int(u["id"]), "disabled": bool(u["disabled"]), "is_admin": bool(u["is_admin"]),
+            "created": _op_day(u["created_at"]), "last_active": _op_day(seen), "orgs": orgs, "projects": projects,
+            "storage": {"files_bytes": _user_bytes(c, [uid]), "quota_mb": own,
+                        "effective_mb": own if own is not None else quota_default_mb(c)}}
+
+
+def _op_get(c, uid):
+    with system_ctx(c):  # one account across organisations for the hoster -- only numbers leave this block
+        return _op_account(c, uid)
+
+
+@app.post("/api/operator/accounts/find")
+def operator_account_find():
+    """{email} -> {account} of the person with this address (the customer named it in a support request), else 404. The
+    address is neither answered nor logged."""
+    op_gate("account-find")
+    b = body()
+    email = b.get("email") if isinstance(b, dict) else None
+    email = email.strip() if isinstance(email, str) else ""
+    if not email or len(email) > OP_EMAIL_MAX:
+        return jsonify(error=tr("Invalid value: {0}", "email"), code="invalid_email"), 400
+    c = db()
+    with system_ctx(c):  # the operator acts without a person, across organisations: numbers and states only
+        ids = [r[0] for r in c.execute("SELECT id FROM users WHERE lower(email)=lower(?) AND COALESCE(kind, 'user')<>'agent' "
+                                       "ORDER BY id LIMIT 2", (email,)).fetchall()]
+        if len(ids) > 1:
+            return jsonify(error=tr("Invalid value: {0}", "email"), code="ambiguous", count=len(ids)), 409
+        acc = _op_account(c, ids[0]) if ids else None
+    if not acc:
+        return jsonify(error=tr("unknown person"), code="not_found"), 404
+    return jsonify(account=acc)
+
+
+@app.get("/api/operator/accounts/<int:uid>")
+def operator_account_get(uid):
+    op_gate(f"account-get #{uid}")
+    acc = _op_get(db(), uid)
+    if not acc:
+        return jsonify(error=tr("unknown person"), code="not_found"), 404
+    return jsonify(account=acc)
+
+
+@app.put("/api/operator/accounts/<int:uid>")
+def operator_account_put(uid):
+    """{disabled?: bool, storage_quota_mb?: int | null} -- the checks of the user management (users.user_update): locking ends
+    the sessions, the last active admin stays; never the admin right, the sign-in or anything else."""
+    op_gate(f"account-put #{uid}")
+    b = body()
+    if not isinstance(b, dict):
+        b = {}
+    extra = set(b) - {"disabled", "storage_quota_mb"}
+    if extra or not b:
+        return jsonify(error=tr("Invalid value: {0}", ", ".join(sorted(extra)) or "body"), code="invalid"), 400
+    if "disabled" in b and not isinstance(b["disabled"], bool):
+        return jsonify(error=tr("Invalid value: {0}", "disabled"), code="invalid"), 400
+    q = b.get("storage_quota_mb")
+    if "storage_quota_mb" in b and q is not None and (isinstance(q, bool) or not isinstance(q, int) or not 0 <= q <= 10_000_000):
+        return jsonify(error=tr("Invalid value: {0}", "storage_quota_mb"), code="invalid"), 400  # as users.user_update
+    c = db()
+    locked = False
+    with system_ctx(c):  # the hoster's operating action on one account, without a person
+        u = c.execute("SELECT id, kind, is_admin, disabled, signup FROM users WHERE id=?", (uid,)).fetchone()
+        if not u or (u["kind"] or "user") == "agent":
+            c.rollback()
+            return jsonify(error=tr("unknown person"), code="not_found"), 404
+        if b.get("disabled") and u["is_admin"] and not _active_admins(c, uid):
+            c.rollback()
+            return jsonify(error=tr("At least one active admin is needed"), code="last_admin"), 409
+        if "disabled" in b:
+            c.execute("UPDATE users SET disabled=? WHERE id=?", (1 if b["disabled"] else 0, uid))
+            if b["disabled"]:
+                ses_end(c, uid)  # 2.190.0 A (#1991): with the push subscriptions made in them
+                locked = not u["disabled"] and not u["signup"]
+        if "storage_quota_mb" in b:  # null = the server's default, 0 = unlimited
+            c.execute("UPDATE users SET storage_quota_mb=? WHERE id=?", (q, uid))
+        bump(c)
+    c.commit()
+    if locked:  # 2.266.0 (#2963): the person hears of the lock, as from the user management
+        with system_ctx(c):  # the operator acts without a person, across organisations: numbers and states only
+            sec_mail(c, uid, "disabled")
+    return jsonify(account=_op_get(c, uid))
+
+
+@app.delete("/api/operator/accounts/<int:uid>")
+def operator_account_delete(uid):
+    """?confirm=<id> deletes the account as the user management does (accounts/users.user_delete_run: the retention gate,
+    the purge, the files after the commit, the security log by number with the actor "operator"). Refused (409 with a code
+    and a number): own projects (the console never deletes or hands on projects), records kept by law without a retention
+    export of the last days (the console never waives it), a server admin. Agents: 404."""
+    op_gate(f"account-delete #{uid}")
+    if request.args.get("confirm") != str(uid):
+        return jsonify(error=tr("Invalid value: {0}", "confirm"), code="confirm"), 400
+    c = db()
+    with system_ctx(c):  # the whole deletion runs as "system": the hoster acts without a person, across organisations
+        u = c.execute("SELECT id, kind, is_admin FROM users WHERE id=?", (uid,)).fetchone()
+        if not u or (u["kind"] or "user") == "agent":
+            c.rollback()
+            return jsonify(error=tr("unknown person"), code="not_found"), 404
+        if u["is_admin"]:
+            c.rollback()
+            return jsonify(error=tr("Invalid value: {0}", "is_admin"), code="admin"), 409
+        # review F8: a finished retention export of the last days lets it go (as in the app); a waiver never
+        code, _answer, n = user_delete_run(c, uid, "operator", how="exported")
+        if code == "retention":
+            kept = sum(rx_counts(c, rx_subject(c, "user", uid), False).values())
+            c.rollback()
+    if code == "projects":
+        return jsonify(error=trn("The user still owns {0} project. Delete it or disable the user instead.",
+                                 "The user still owns {0} projects. Delete them or disable the user instead.", n),
+                       code="projects", projects=n), 409
+    if code == "retention":
+        return jsonify(error=tr(RX_NEEDED), code="retention", records=kept), 409
+    if code:
+        return jsonify(error=tr("Invalid value: {0}", code), code=code), 409
+    return jsonify(ok=True, deleted=uid)
+
+
+@app.put("/api/operator/quota-default")
+def operator_quota_default():
+    """{storage_quota_mb: int | null} -- the instance's default storage per person (null = KALMIDO_STORAGE_QUOTA_MB, 0 =
+    unlimited), as the admin settings set it (hosting.hosting_settings)."""
+    op_gate("quota-default")
+    b = body()
+    if not isinstance(b, dict) or "storage_quota_mb" not in b:
+        return jsonify(error=tr("Invalid value: {0}", "storage_quota_mb"), code="invalid"), 400
+    c = db()
+    with system_ctx(c):  # an instance-wide setting, written without a person
+        e = hosting_settings(c, {"storage_quota_mb": b["storage_quota_mb"]})
+        if not e:
+            bump(c)
+    if e:
+        c.rollback()
+        return jsonify(error=tr("Invalid value: {0}", "storage_quota_mb"), code="invalid"), 400
+    c.commit()
+    v = gsetting(c, "storage_quota_mb")
+    return jsonify(storage_quota_mb=_mb(v) if v != "" else None, effective_mb=quota_default_mb(c))

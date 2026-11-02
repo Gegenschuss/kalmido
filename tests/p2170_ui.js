@@ -116,7 +116,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   click(w, d.querySelector('[data-act="news-bundle"]')); await sleep(200);
   // Summarize -> the agent's chat
   click(w, d.querySelector('[data-act="news-sum"]'));
-  const msgs = await until(async () => { const j = await call('GET', `/api/agents/${ag.id}/chat`); return (j.messages || []).find(m => /summarize my \d+ unread news/.test(m.body)); });
+  const msgs = await until(async () => { const j = await call('GET', `/api/agents/${ag.id}/chat`); return (j.messages || []).find(m => /summarise my \d+ unread news/.test(m.body)); });
   check(msgs && /Call the printer/.test(msgs.body), '#452: Summarize sends the unread news to the agent\'s chat');
   check(await until(() => w.eval('S.chat.aid') === ag.id), '… and opens it');
   w.eval('chatClose()'); w.close();
@@ -170,9 +170,10 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   w.close();
   // Bob: unread in the sidebar, the list menu
   w = await boot({user: 'bob', hash: 'today'}); d = w.document;
-  await until(() => d.querySelector('#side [data-go="team"]'));
-  const tr0 = d.querySelector('#side [data-go="team"]');
-  check(tr0 && /\d/.test(tr0.querySelector('.c')?.textContent || ''), '#419: the sidebar row with the unread count');
+  // 2.479.0 (#2814, intended change): the team chat is the area Chat: its icon in the bar carries the unread count
+  await until(() => d.querySelector('#srail [data-sbb="team"]'));
+  const tr0 = d.querySelector('#srail [data-sbb="team"]');
+  check(tr0 && /\d/.test(tr0.querySelector('.srbd')?.textContent || ''), '#419: the sidebar row with the unread count');
   w.eval(`go('l/${L}')`); await sleep(300);
   w.eval(`menu(document.querySelector('#top h1'), listMenuItems(${L}, document.querySelector('#top h1')))`); await sleep(80);
   const lm = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim());
@@ -263,7 +264,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   for (let i = 0; i < 24; i++) await call('POST', `/api/team/rooms/${RID}/messages`, {body: i === 5 ? 'Longword'.repeat(14) : `Update ${i}`}, i % 2 ? CB : CK);
   const ffLogin = async ({ev, nav}, theme = 'light', user = 'alice') => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${user}', password: 'password123'})}).then(r => r.status)`);
   };
   // 2.358.0 C (#2782): settle = the page's requests done (ff.js idle) + two frames drawn, instead of fixed sleeps after an action;

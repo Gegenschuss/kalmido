@@ -14,6 +14,7 @@
    = 404, /portal shows the tickets of the same address in the SAME organisation only, sign-out, a forged cookie
  - agents: a public answer only in a shared list (v1, portal true), the customer's comment reaches a following agent as an event
    with portal + ext_name; another organisation's person sees nothing of the ticket; the client's card lists its reports
+   2.482.0 (#3530): an AI agent's answer carries the mark "AI agent", a bot without AI (ai false) not
 tenant-matrix: portal
 usage: p263_b_api_test.py <datadir>"""
 import email
@@ -292,8 +293,8 @@ dbq("UPDATE agents SET org_id=? WHERE user_id=?", (ORG, AG))
 check(AT.post(V + f"/tasks/{T1}/comments", json={"body": "agent", "portal": True}).status_code in (403, 404), "#1513: an agent without the list: no answer")
 assert A.put(B + f"/api/lists/{L}/members", json={"user_id": AG, "role": "edit"}).ok
 r = AT.post(V + f"/tasks/{T1}/comments", json={"body": "We fixed it in the next version.", "portal": True})
-# 2.126.0 (#1979 G5): an agent's answer to the customer waits for a person's approval, then it is posted
-check(r.status_code == 202 and (r.json().get("job") or {}).get("id"), f"#1513: an agent's answer to the customer waits for an approval {r.status_code} {r.text[:200]}")
+# 2.126.0 (#1979 G5): an agent's answer to the client waits for a person's approval, then it is posted
+check(r.status_code == 202 and (r.json().get("job") or {}).get("id"), f"#1513: an agent's answer to the client waits for an approval {r.status_code} {r.text[:200]}")
 r = A.post(B + f"/api/agents/jobs/{(r.json().get('job') or {}).get('id')}/action", json={"action": "approve"})
 check(r.ok and r.json().get("state") == "done", f"#1513: approved: the agent's answer is posted {r.text[:200]}")
 check(AT.post(V + f"/tasks/{T1}/comments", json={"body": "q", "portal": True, "choices": ["a", "b"]}).status_code == 400, "#1513: no answer buttons to a customer")
@@ -301,6 +302,12 @@ check(AT.post(V + f"/tasks/{T4}/comments", json={"body": "q", "portal": True}).s
 cs = AT.get(V + f"/tasks/{T1}/comments").json()["data"]
 check(any(x["portal"] and x["author"].get("customer") for x in cs) and any(not x["portal"] for x in cs), "#1513: v1 comments carry portal (+ customer)")
 check("Team" in P.get(B + f"/p/{TK1}").text and "Helper" not in P.get(B + f"/p/{TK1}").text, "#1513: an agent's answer shows as 'Team'")
+# 2.482.0 (#3530, EU AI Act Art. 50): the agent's answer is marked "AI agent"; a bot without AI (agents.ai = 0) is not
+pg = P.get(B + f"/p/{TK1}").text
+check(pg.count('class="ptai"') == 1 and "AI agent" in pg, "#3530: the AI agent's answer is marked 'AI agent' (once: people's answers are not)")
+assert A.patch(B + f"/api/admin/agents/{AG}", json={"ai": False}).ok
+check('class="ptai"' not in P.get(B + f"/p/{TK1}").text, "#3530: a bot without AI: no AI mark")
+assert A.patch(B + f"/api/admin/agents/{AG}", json={"ai": True}).ok
 f = key(P.get(B + f"/p/{TK1}").text, f"/p/{TK1}/comment")
 P.post(B + f"/p/{TK1}/comment", data={"text": "Great, thank you!", "f": f})
 evs = [json.loads(x[0]).get("data") or {} for x in dbq("SELECT payload FROM agent_events WHERE agent_id=? AND event='comment' ORDER BY id", (AG,))]

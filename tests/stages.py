@@ -17,8 +17,11 @@ test files and the changed files, nothing is started; Python standard library on
     --touched        2.181.0 (#2696): only the suites of the changed files plus the suites before them in their group that
                      write a state file they read (*ids.json) and
                      the route guards for a new route and (2.381.0, #2853) the static guards ALWAYS_SUITES (never "full":
-                     unmappable files go to stderr);
+                     unmappable files go to stderr as `UNMAPPED: FILE (reason)` lines, #3505: the train's check reads them -
+                     a package with such files is "not checked", never green);
                      prints the suites in run order, exit 3 when none; --why lists the reasons on stderr
+    --unmapped-out F #3505: with --touched also write the unmapped files to F, one `FILE<TAB>reason` line each (empty
+                     file = every changed file has its suites)
   python3 tests/stages.py --ci                       CI mode (ci.yml job "plan"): the stage from the event (environment:
                      GITHUB_EVENT_NAME, CI_BEFORE, CI_INPUT_STAGE, CI_MESSAGE) and the changed files; prints "stage=" /
                      "reason=" lines, writes the groups of the push stage to --groups-out
@@ -43,7 +46,7 @@ from shards import FRESH_RE, RUN_RE  # noqa: E402  (the same group count as tool
 FILE_RE = re.compile(r"\s([A-Za-z0-9_./-]+\.(?:py|js))\b")
 # the CI basics, the stage rules themselves and the release (VERSION): always the full run
 FULL_EXACT = {
-    "VERSION", "Dockerfile", ".dockerignore", "app.py", ".github/workflows/ci.yml",
+    "VERSION", "Dockerfile", ".dockerignore", "tools/requirements.lock", "tools/requirements.static.lock", "tests/.node-version", "app.py", ".github/workflows/ci.yml",
     "tests/run_all.sh", "tests/start.sh", "tests/requirements.txt", "tests/package.json", "tests/package-lock.json",
     "tests/stages.py", "tests/suites.py", "tools/shards.py",
     # test helpers (nearly) every suite uses
@@ -506,6 +509,7 @@ def main(argv=None):
     ap.add_argument("--groups-out")
     ap.add_argument("--security", action="store_true")
     ap.add_argument("--touched", action="store_true")
+    ap.add_argument("--unmapped-out")
     ap.add_argument("--ci", action="store_true")
     ap.add_argument("--run-all", default=os.path.join(HERE, "run_all.sh"))
     ap.add_argument("files", nargs="*")
@@ -540,8 +544,11 @@ def main(argv=None):
             ap.error("give --changed BASE [HEAD], --ci or changed files")
     if a.touched and not a.ci:  # 2.181.0 (#2696)
         order, why, unmapped = touched(repo, files, base, head)
-        for u in unmapped:
-            print(f"stages.py: not mapped to a suite: {u}", file=sys.stderr)
+        for u in unmapped:  # #3505: a fixed prefix - kalmido-mactest.sh passes stderr on, the train's check parses it
+            print(f"UNMAPPED: {u}", file=sys.stderr)
+        if a.unmapped_out:
+            with open(a.unmapped_out, "w", encoding="utf-8") as f:
+                f.writelines(u[:-1].replace(" (", "\t", 1) + "\n" for u in unmapped)
         if a.why:
             for s in order:
                 print(f"  {s}: {why[s]}", file=sys.stderr)

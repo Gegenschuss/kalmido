@@ -108,8 +108,8 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
     from ..accounts.orgs import clean_org_id, list_org, list_space_follow, ws_member_problem
     from ..collab.reactions import list_tidy_update
     from ..lists.lists import list_agent_set
-    lr = c.execute("SELECT id, owner_id, folder, is_inbox, family, life, archived FROM lists WHERE id=?", (lid,)).fetchone()
-    if not lr or lr["is_inbox"] or lr["owner_id"] != uid:
+    lr = c.execute("SELECT id, owner_id, folder, is_inbox, family, life, archived, quicknote FROM lists WHERE id=?", (lid,)).fetchone()
+    if not lr or lr["is_inbox"] or lr["quicknote"] or lr["owner_id"] != uid:  # 2.477.0 (#3881, review F1): + the list Notes
         return [], 0
     eff, _ = folder_effective(c, lr["owner_id"], lr["folder"] or "")
     own = set() if force else set(list_own(c, lid))
@@ -139,6 +139,8 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     skipped.append({"key": k, "reason": tr("Not in the workspace: {0}", names)})
                     continue
                 if not dry:
+                    from ..tasks.movememo import lmm_after, lmm_restore, lmm_snap
+                    memo = lmm_snap(c, lid)  # 2.363.3 (#3133): what the change ends, for the way back (as in a list's own move)
                     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
                     org_out(c, cur, want, "list", lname, list_id=lid, obj=lid)  # 2.148.1 B (#2483): logged, admins told
                     c.execute("UPDATE lists SET org_id=? WHERE id=?", (want, lid))
@@ -149,6 +151,13 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                                   " (SELECT id FROM clients WHERE org_id IS NOT DISTINCT FROM ?)", (lid, want))
                     from ..admin.orgcrypt_cli import oc_settle_kick
                     oc_settle_kick([lid])  # 2.42.0 (#828), 2.64.0 (#1864): the list's files get the key of its new space
+                    from ..lists.orgvis import ov_private_reset
+                    ov_private_reset(c, lid, cur)  # 2.363.3 (#3133): the opening ends as in the list dialog (and the memo keeps it)
+                    back, ended = lmm_restore(c, lid, cur), lmm_after(c, lid, memo, uid)  # 2.363.3 (#3133): restore first: the newest memo is the way out
+                    if getattr(g, "lm_moves", None) is not None:  # the folder dialog names the sum (one Undo for the folder)
+                        for key, got in (("move_restored", back), ("move_ended", ended)):
+                            for x, y in got.items():
+                                g.lm_moves[key][x] = g.lm_moves[key].get(x, 0) + y
                 changed += 1
             elif k == "agent_id":
                 v = v or None  # 0 = "no agent"
@@ -225,7 +234,7 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
 
 def folder_lists(c, owner, folder):
     from ..lists.lists import folder_under
-    return [r for r in c.execute("SELECT id, name, folder FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 ORDER BY sort, id", (owner,))
+    return [r for r in c.execute("SELECT id, name, folder FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND quicknote=0 ORDER BY sort, id", (owner,))
             if folder_under(r["folder"] or "", folder)]
 
 
@@ -343,6 +352,7 @@ def folder_props_put():
     props = {k: v for k, v in {**cur, **new}.items() if v is not None}
     dry = b.get("dry_run") is True
     out, changed = [], 0
+    g.lm_moves = {"move_ended": {}, "move_restored": {}}  # 2.363.3 (#3133): what the lists' workspace change ended / brought back
     if "hide_done" in new:  # 2.46.1 (#1422): what each list shows before the change (counted / kept below)
         g.lc_done_prev = {r["id"]: lc_done_shown(c, me(), r["id"], r["folder"]) for r in folder_lists(c, me(), f)}
     if not dry:
@@ -373,7 +383,7 @@ def folder_props_put():
     bump(c)
     c.commit()
     print("folder", repr(f), "of", login_log_who(g.user), "props", json.dumps(props), "apply", apply, flush=True)
-    return jsonify(props=_norm(props), changed=changed, lists=out)
+    return jsonify(props=_norm(props), changed=changed, lists=out, **{k: v for k, v in g.lm_moves.items() if v})
 
 
 @app.post("/api/lists/<int:lid>/folder-reset")

@@ -341,7 +341,7 @@ def qac_pdf(c, oid, r, s):
                          "rows": [[tr("Accepted online by", lg=lang), s["signer_name"] or ""],
                                   [tr("Time (UTC)", lg=lang), (s["signed_at"] or "")[:19].replace("T", " ")],
                                   [tr("SHA-256 of the quotation", lg=lang), s["doc_hash"] or ""]],
-                         "foot": tr("Accepted through a customer link of {0}.", (model.get("company") or {}).get("name") or "", lg=lang)}
+                         "foot": tr("Accepted through a client link of {0}.", (model.get("company") or {}).get("name") or "", lg=lang)}
     data = _render(c, oid, r, model)[0]
     try:
         os.makedirs(os.path.dirname(p), mode=0o700, exist_ok=True)

@@ -331,11 +331,11 @@ def wsh_create():
     if kind not in ("person", "link"):
         raise BadInput(tr("Invalid value: {0}", "kind"))
     if path.startswith("e2e1:") or wsh_locked(c, oid, owner):
-        return jsonify(error=tr("Pages of a space encrypted in the browser cannot be shared."), code="wiki_e2e_share"), 409
+        return jsonify(error=tr("Pages of a workspace encrypted in the browser cannot be shared."), code="wiki_e2e_share"), 409
     exp = wsh_expiry(b.get("expires"))
     imgs = wsh_images(b.get("images", False))
     if len(wsh_rows(c, oid, owner)) >= WSH_MAX:
-        raise BadInput(tr("Too many shares in this space (at most {0})", WSH_MAX))
+        raise BadInput(tr("Too many shares in this workspace (at most {0})", WSH_MAX))
     ts = iso(now_utc())
     page = None if folder else int(b["page_id"])  # 2.360.0 D (#2496): bound to the page (WSH_COVER); wsh_target checked it
     if kind == "link":
@@ -390,7 +390,7 @@ def wsh_person(c, uid, b):
         who = 0
     u = c.execute("SELECT id, kind FROM users WHERE id=? AND disabled=0", (who,)).fetchone()
     if not u or who == uid or (u["kind"] or "user") == "agent" or not may_see(c, uid, who):
-        raise Denied(404, tr("unknown user"))
+        raise Denied(404, tr("unknown person"))
     return who
 
 
@@ -433,7 +433,7 @@ def wsh_restore(sid):
     if r["kind"] == "link" and not public_links_on(c):
         return jsonify(error=tr("Public links are turned off on this server")), 409
     if wsh_locked(c, r["org_id"], r["owner_id"]):
-        return jsonify(error=tr("Pages of a space encrypted in the browser cannot be shared."), code="wiki_e2e_share"), 409
+        return jsonify(error=tr("Pages of a workspace encrypted in the browser cannot be shared."), code="wiki_e2e_share"), 409
     if r["revoked_at"]:
         c.execute("UPDATE wiki_shares SET revoked_at=NULL WHERE id=?", (sid,))
         bump(c)

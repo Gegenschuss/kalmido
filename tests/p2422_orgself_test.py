@@ -87,6 +87,25 @@ check(A.patch(B + f"/api/admin/orgs/{OID}", json={"domains": "frida-studio.examp
       and sql("SELECT domains FROM orgs WHERE id=?", (OID,)) == [("frida-studio.example",)], "(b) the server's admin sets them")
 A.patch(B + f"/api/admin/orgs/{OID}", json={"domains": ""})
 
+# ---------------------------------------------------------------- 2.467.0 (#3898): the same for every organisation
+assert A.post(B + "/api/users", json={"username": "olga", "display_name": "Olga", "password": PW, "email": "olga@example.com", "orgs": []}).ok
+Ol = sess("olga")
+OLGA = sql("SELECT id FROM users WHERE username='olga'")[0][0]
+ORG0 = A.post(B + "/api/admin/orgs", json={"name": "Nordlicht Example", "admin_id": OLGA, "domains": "nordlicht.example, other.example"}).json()["id"]
+dom0 = lambda: sql("SELECT domains FROM orgs WHERE id=?", (ORG0,))[0][0]  # noqa: E731
+r = Ol.patch(B + f"/api/orgs/{ORG0}", json={"domains": "gmail.example"})
+check(r.status_code == 403, f"(#3898) an organisation admin sets a domain: 403 ({r.status_code} {r.text[:120]})")
+check(dom0() == "nordlicht.example, other.example", f"(#3898) the value stays ({dom0()})")
+check(Ol.patch(B + f"/api/orgs/{ORG0}", json={"domains": ""}).status_code == 403, "(#3898) nor does she clear them")
+r = Ol.patch(B + f"/api/orgs/{ORG0}", json={"name": "Nordlicht Renamed", "domains": "gmail.example"})
+check(r.status_code == 403 and sql("SELECT name FROM orgs WHERE id=?", (ORG0,)) == [("Nordlicht Example",)], "(#3898) a refused change writes nothing else")
+r = Ol.patch(B + f"/api/orgs/{ORG0}", json={"name": "Nordlicht Studio", "domains": "@Nordlicht.example; other.example"})
+check(r.ok and r.json().get("name") == "Nordlicht Studio" and dom0() == "nordlicht.example, other.example",
+      f"(#3898) her own value sent back unchanged: no 403 ({r.status_code} {r.text[:120]})")
+r = A.patch(B + f"/api/admin/orgs/{ORG0}", json={"domains": "nordlicht.example"})
+check(r.ok and dom0() == "nordlicht.example", f"(#3898) the server's admin sets them ({r.status_code})")
+assert A.delete(B + f"/api/admin/orgs/{ORG0}").ok  # (d) below starts without an organisation of the server
+
 # ---------------------------------------------------------------- (c) her personal office into a new company
 GID, Gr = freelancer(B, A, "gina")
 Gr.patch(B + "/api/settings", json={"workspace": "private"})

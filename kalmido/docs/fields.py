@@ -24,14 +24,14 @@ from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
 from . import store as S
-from .web import _no_agent, _ws_manage, ws_param
+from .web import _no_agent, _ws_manage, doc_amount, ws_param
 
 DF_TYPES = ("text", "number", "money", "date", "checkbox", "select", "url")
 DF_MAX = 50           # fields per workspace
 DF_NAME_MAX = 60
 DF_TEXT_MAX = 1000
 CTX = "doc_field_values.value"
-MONEY_RE = re.compile(r"(-?\d{1,12}(?:\.\d{1,2})?)\s*([A-Za-z€$£]{0,3})")
+MONEY_RE = re.compile(r"(-?[\d.,]+)\s*([A-Za-z€$£]{0,3})")
 
 
 def _now():
@@ -180,17 +180,15 @@ def df_value(f, v):
             raise ValueError(tr("{0}: number expected", name))
         return fmt_num(x)
     if t == "money":
-        raw = s.replace(" ", "")
-        if re.search(r"\d,\d{1,2}(?!\d)", raw):  # "1.234,50" -> "1234.50"
-            raw = raw.replace(".", "").replace(",", ".")
-        else:
-            raw = raw.replace(",", "")
-        m = MONEY_RE.fullmatch(raw.replace("€", "EUR").replace("$", "USD").replace("£", "GBP")) or \
-            re.fullmatch(r"([A-Za-z]{3})(-?\d{1,12}(?:\.\d{1,2})?)", raw)
+        raw = s.replace(" ", "").replace("€", "EUR").replace("$", "USD").replace("£", "GBP")
+        m = MONEY_RE.fullmatch(raw) or re.fullmatch(r"([A-Za-z]{3})(-?[\d.,]+)", raw)
         if not m:
             raise ValueError(tr("{0}: number expected", name))
         amount, cur = (m.group(1), m.group(2)) if m.re is MONEY_RE else (m.group(2), m.group(1))
-        return f"{float(amount):.2f} {cur.upper()}".strip()
+        x = len(amount) <= 20 and doc_amount(amount)  # 2.456.0 (#3819): read like a document's amount, by language; too many decimals are refused
+        if not x:
+            raise ValueError(tr("{0}: number expected", name))
+        return f"{float(x):.2f} {cur.upper()}".strip()
     if t == "date":
         try:
             return date.fromisoformat(s[:10]).isoformat()

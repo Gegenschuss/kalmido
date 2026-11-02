@@ -4,9 +4,9 @@
 .dc-up,.dc-acts2 [data-dc="scan"]{min-height:2.75rem}
 .dc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.75rem 0 .25rem}
 .dc-acts2{display:inline-flex;align-items:center;gap:.25rem;margin-left:auto}
-.dc-bar #dc-q{flex:1 1 14rem;min-height:2.75rem}
-.dc-seg button{min-height:2.75rem}
-.dc-sortb{min-height:2.75rem}  /* 2.428.0 (#3579) */  /* 2.138.4 A (#2362): 44 px */
+.dc-bar .ctsearch{flex:1 1 14rem}  /* 2.413.0 B (#3496): the shared search field build */
+.dc-seg button{min-height:2.75rem}  /* 2.138.4 A (#2362): 44 px */
+.dc-sortb{min-height:2.75rem}  /* 2.428.0 (#3579) */
 .dc-count{display:inline-block;min-width:1.25rem;padding:0 .375rem;border-radius:99rem;background:var(--accent);color:var(--accent-ink);font-size:var(--fs-xs);text-align:center}
 .dc-filters{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.25rem 0 .5rem}
 .dc-filters select,.dc-filters input{min-height:2.75rem}
@@ -40,6 +40,25 @@
 .dc-prev{display:flex;justify-content:center;box-sizing:border-box;width:100%;max-height:28rem;padding:0;border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg3);overflow:hidden;cursor:zoom-in}
 .dc-prev img,.dc-prev canvas{display:block;max-width:100%;max-height:28rem;width:auto;height:auto;object-fit:contain;object-position:top}
 .dc-prev .dc-ph{min-height:10rem}
+/* 2.476.0 (#3935): leafing through the open document: "3 of 48" with two arrows above the preview; the preview takes a
+   sideways swipe (up / down scrolls the page), enlarged it moves with the finger; the next document glides in, the end springs back */
+.dc-nav{display:flex;align-items:center;justify-content:center;gap:.25rem;margin-bottom:-.25rem}
+.dc-navn{min-width:5.5rem;text-align:center;font-size:var(--fs-m);color:var(--muted);font-variant-numeric:tabular-nums}
+.dc-navb[disabled]{opacity:.35;pointer-events:none}
+.dc-prev{position:relative;touch-action:pan-y}
+.dc-prev.dc-zoomed{touch-action:none;cursor:grab}
+.dc-prev.dc-zoomed img,.dc-prev.dc-zoomed canvas{max-width:none;max-height:none}
+@media (prefers-reduced-motion:no-preference) {
+  .dc-md .dc-body{transition:transform .18s ease-out}
+  .dc-body.dc-in-n{animation:dc-in-n .22s ease-out}
+  .dc-body.dc-in-p{animation:dc-in-p .22s ease-out}
+  .dc-body.dc-bnc-n{animation:dc-bnc-n .36s ease-out}
+  .dc-body.dc-bnc-p{animation:dc-bnc-p .36s ease-out}
+}
+@keyframes dc-in-n{from{transform:translateX(2.5rem);opacity:.35}to{transform:none;opacity:1}}
+@keyframes dc-in-p{from{transform:translateX(-2.5rem);opacity:.35}to{transform:none;opacity:1}}
+@keyframes dc-bnc-n{30%{transform:translateX(-1.25rem)}to{transform:none}}
+@keyframes dc-bnc-p{30%{transform:translateX(1.25rem)}to{transform:none}}
 /* 2.430.0 (#3582): the list left, the open document in a pane right of it (computer); the card of the open one marked */
 .dc-wrap.dc-paneon{display:flex;align-items:flex-start;gap:1rem;max-width:100rem;margin:0 auto}
 .dc-wrap.dc-paneon>.dc-view{flex:1 1 0;min-width:0;max-width:none;margin:0}

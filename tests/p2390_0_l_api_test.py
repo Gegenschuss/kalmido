@@ -2,7 +2,7 @@
 # kalmido-suite: fresh
 """2.390.0 (#3353): ticket keys APP-123, own container (start.sh) with the fake Git servers of fake_git.py (GitHub :8090).
  - the key of a project (PATCH /api/lists/<id> ticket_key): 2-6 capitals / digits with a letter first, upper-cased,
-   unique per workspace (the same key in another person's private space and in an organisation next to a private list of
+   unique per workspace (the same key in another person's private workspace and in an organisation next to a private list of
    the same person is fine), only owner / project admins; the tasks there before get numbers in the order they were made,
    new ones (app + API v1) the next one
  - a task moved out keeps its old key as an alias and gets the next number of the new project (moved back: its old
@@ -101,7 +101,7 @@ Q = Fr.post(B + "/api/lists", json={"name": "Website", "kind": "project"}).json(
 r = Fr.patch(B + f"/api/lists/{Q}", json={"ticket_key": "APP"})
 check(r.status_code == 400, "#3353: the same key twice in one workspace: 400 " + r.text[:120])
 GQ = Gi.post(B + "/api/lists", json={"name": "Her app", "kind": "project"}).json()["id"]
-check(Gi.patch(B + f"/api/lists/{GQ}", json={"ticket_key": "APP"}).ok, "#3353: another person's private space may use APP too")
+check(Gi.patch(B + f"/api/lists/{GQ}", json={"ticket_key": "APP"}).ok, "#3353: another person's private workspace may use APP too")
 check(Fr.patch(B + f"/api/lists/{Q}", json={"ticket_key": "WEB"}).ok, "#3353: WEB for the second project")
 # only owner / project admins
 AL = A.post(B + "/api/lists", json={"name": "Shared one", "kind": "project"}).json()["id"]

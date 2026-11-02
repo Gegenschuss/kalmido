@@ -213,8 +213,9 @@ function typingHtml(ags, id) {
   const wr = a => (id === 'chat-typing' && !a.busy) || (a.typing || 0) - agentAge() > 0, any = ags.some(wr);
   // 2.161.2 (#2610): the agent chat shows the small bot at work instead of the dots / the dot (same width); the task panel
   // (people too) keeps the dots. The text in the status line stays for screen readers.
-  const fig = id === 'chat-typing';
-  return `<div class="atyping${fig ? ' atyrow' : ''}" id="${id}" role="status" aria-live="polite">${fig ? botFig('arbeitet', 'bchat') : any ? '<span class="atdots" aria-hidden="true"><i></i><i></i><i></i></span>' : hdot('working')}<span class="ttx">${ags.map(a => (fig ? '' : licBot()) /* 2.290.0 B (#3160): the chat shows the figure already */ + esc(wr(a) ? tr('{0} is writing …', a.name) : tr('{0} is working on it', a.name)) + (a.status_text ? ` <span class="muted">· ${esc(a.status_text)}</span>` : '')).join('<br>')}</span></div>`;
+  // 2.413.0 (#3554): the task's comments show the same figure as soon as an agent writes or works there; people keep the dots
+  const isAg = a => id === 'chat-typing' || (S.agents || []).some(g => g.id === a.id), fig = ags.some(isAg);
+  return `<div class="atyping${id === 'chat-typing' ? ' atyrow' : ''}" id="${id}" role="status" aria-live="polite">${fig ? botFig('arbeitet', 'bchat') : any ? '<span class="atdots" aria-hidden="true"><i></i><i></i><i></i></span>' : hdot('working')}<span class="ttx">${ags.map(a => (isAg(a) ? '' : licBot()) /* 2.290.0 B (#3160): the figure stands for the agent already */ + esc(wr(a) ? tr('{0} is writing …', a.name) : tr('{0} is working on it', a.name)) + (a.status_text ? ` <span class="muted">· ${esc(a.status_text)}</span>` : '')).join('<br>')}</span></div>`;
 }
 const agentBusyState = () => { const ags = (S.agents || []).filter(a => a.enabled && !agentOffline(a)); return ags.some(a => a.status === 'working') ? 'working' : ags.some(a => a.status === 'waiting' || a.waiting) ? 'waiting' : ''; };
 const agentStatusLines = () => (S.agents || []).filter(a => a.enabled && a.status !== 'idle').map(agentHstLine);  // 2.13.0 (#453 P10): no stale status text while not connected

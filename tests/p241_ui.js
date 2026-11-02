@@ -193,7 +193,8 @@ async function firefox(fn) {
   check(foot && !foot.querySelector('[data-act="delete"], [data-act="timer-toggle"], .danger') && d.querySelector('#detail [data-act="c-send"]'), 'task panel footer: no Delete / Track time (Send is there)');
   click(w, d.querySelector('#detail [data-act="task-menu"]')); await sleep(200);
   const items = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent.trim());
-  check(items.includes('Delete') && items.includes('Start time tracking'), '"…" menu: Delete + Start time tracking: ' + items.join('|'));
+  // 2.445.0 (#3008): "Start time tracking" is in the panel's header (timer-toggle), the menu does not repeat it
+  check(items.includes('Delete') && items.includes('Add time…') && !!d.querySelector('#detail .dtop [data-act="timer-toggle"]'), '"…" menu: Delete + Start time tracking: ' + items.join('|'));
   click(w, [...d.querySelectorAll('#pop .menu-list button')].find(b => b.textContent.trim() === 'Delete')); await idle(w);
   check((await call('GET', `/api/tasks/${T3}`)).deleted_at || (await call('GET', '/api/state')).tasks.every(t => t.id !== T3), 'Delete from the menu: in the trash');
   check(/Undo/.test(d.querySelector('#toast button')?.textContent || ''), 'with Undo in the toast');

@@ -1,9 +1,9 @@
 // 2.250.0 UI tests, part C (#2994 #2995), own container (start.sh). jsdom, invented data only. freelancer-matrix: settings
 // - #2994 settings search: titles / field names before explanation lines, at most ONE explanation per section, the cut at a word
 //   boundary, a blank between a title and its text, synonyms ("Logo" finds "Symbol", never "Sign out" because "logout" starts with
-//   "logo"), "Vacation" offers the absence sheet, the jump marks its target (class sflash)
+//   "logo"), "Holiday" offers the absence sheet, the jump marks its target (class sflash)
 // - #2995 "+ N more views" unfolds in place: the hidden views with a tick (= shows it in the sidebar, the same setting as
-//   Settings > Appearance > Sidebar), a small "Customize…" link into the settings; folded/unfolded state survives a redraw;
+//   Settings > Appearance > Sidebar), a small "Customise…" link into the settings; folded/unfolded state survives a redraw;
 //   also for a person without an organisation
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -60,7 +60,7 @@ const FEAT = 'cal,comments,collab,time,progress,kanban,timeline,fields,team';
   check(w.eval(`ss_cut('alpha beta gamma delta', 13)`) === 'alpha beta…' && w.eval(`ss_cut('short', 13)`) === 'short', '#2994: the cut is at a word boundary');
   h = JSON.parse(await run('vacation', FX));
   const wl = w.eval('workloadOn()');
-  check(h.some(x => x.act === 'absence') === !!wl, '#2994: "Vacation" offers "Enter an absence" exactly when the module is on ' + JSON.stringify(h));
+  check(h.some(x => x.act === 'absence') === !!wl, '#2994: "Holiday" offers "Enter an absence" exactly when the module is on ' + JSON.stringify(h));
 
   // ================= #2994: the real dialog: type, jump, the target is marked
   w.eval(`settingsModal()`); await until(() => d.querySelector('#s-search'));
@@ -98,7 +98,7 @@ const FEAT = 'cal,comments,collab,time,progress,kanban,timeline,fields,team';
     await until(() => d.querySelectorAll('#side .smorebox .smrow').length === 2);
     check(d.querySelectorAll('#side .smorebox .smrow').length === 2 && [...d.querySelectorAll('#side > * .srow, #side .srow')].some(x => /Tomorrow/.test(x.textContent) && !x.closest('.smorebox')), `#2995 ${who}: Tomorrow moved into the sidebar`);
     click(w, d.querySelector('#side .smcust'));
-    check(!!(await until(() => d.querySelector('#s-sidebar'))), `#2995 ${who}: "Customize…" opens Settings > Appearance > Sidebar`);
+    check(!!(await until(() => d.querySelector('#s-sidebar'))), `#2995 ${who}: "Customise…" opens Settings > Appearance > Sidebar`);
     d.querySelector('.modal [data-m="close"]')?.click();
     click(w, d.querySelector('#side .srow.smore'));
     await sleep(50);

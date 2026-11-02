@@ -6,6 +6,7 @@ from flask import jsonify, request
 from ..core.config import app, PUBLIC_URL, TZ
 from ..core.i18n import tr
 from ..core.db import db, iso, local_now, parse_iso, uset, usettings
+from ..core.usertz import tz_of_s, user_now
 from ..accounts.session import me
 from ..core.access import tvis, vis_sql
 from ..tasks.validation import valid_hm, valid_plan_start
@@ -324,9 +325,10 @@ def dayplan_review(c, uid, day):
     """{done, open, moved, tomorrow}: what uid completed on `day`, what is still open (due on or before it), what they moved
     away from it that day, and the built-in plan for the next working day (first entries)."""
     ds = day.isoformat()
-    a = datetime(day.year, day.month, day.day, tzinfo=TZ).astimezone(timezone.utc)
+    zone = tz_of_s(usettings(c, uid))  # 2.368.3 (#2985): the person's day
+    a = datetime(day.year, day.month, day.day, tzinfo=zone).astimezone(timezone.utc)
     nb = day + timedelta(days=1)  # CI of 2.307.2: the next local midnight, not 24 h (a day of the clock change has 23 / 25 hours)
-    b = datetime(nb.year, nb.month, nb.day, tzinfo=TZ).astimezone(timezone.utc)
+    b = datetime(nb.year, nb.month, nb.day, tzinfo=zone).astimezone(timezone.utc)
     lo, hi = iso(a), iso(b)
     done = [{"task_id": r["id"], "title": r["title"]} for r in c.execute(
         f"""SELECT t.id, t.title FROM tasks t WHERE t.completed_by=? AND t.status=2 AND t.deleted_at IS NULL
@@ -368,12 +370,13 @@ def _wd_review(c, users, S, LG, now):
         try:
             s, lg = S[uid], LG[uid]
             rt = s.get("review_time") or ""
-            today = now.date().isoformat()
-            if not valid_hm(rt) or s.get("review_sent") == today or now.strftime("%H:%M") < rt:
+            pn = user_now(s, now)  # 2.368.3 (#2985)
+            today = pn.date().isoformat()
+            if not valid_hm(rt) or s.get("review_sent") == today or pn.strftime("%H:%M") < rt:
                 continue
             uset(c, uid, "review_sent", today)
             c.commit()
-            r = dayplan_review(c, uid, now.date())
+            r = dayplan_review(c, uid, pn.date())
             if not (r["done"] or r["open"] or r["moved"]):
                 continue
             parts = [tr("{0} done", len(r["done"]), lg=lg), tr("{0} open", len(r["open"]), lg=lg)]

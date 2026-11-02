@@ -14,7 +14,7 @@ function leadSort(its) {  // by follow-up day (none last), then the newest first
 // 2.122.3 A (#2335): "Import CSV" moved to Settings > Import legacy data (office_import.js, section leads)
 function leadBar() {
   const s = PPS.data?.summary || {};
-  return `${s.leads ? `<span class="muted lead-cnt">${esc(trn('{0} lead', '{0} leads', s.leads))}${s.leads_due ? ` · <b class="lead-duen">${esc(tr('{0} to follow up', s.leads_due))}</b>` : ''}</span>` : ''}`;  // 2.224.0 B (#2816): the one "New inquiry" button (office_pipeline.js) leads to a lead too: the stage in its dialog
+  return `${s.leads ? `<span class="muted lead-cnt">${esc(trn('{0} lead', '{0} leads', s.leads))}${s.leads_due ? ` · <b class="lead-duen">${esc(tr('{0} to follow up', s.leads_due))}</b>` : ''}</span>` : ''}`;  // 2.224.0 B (#2816): the one "New enquiry" button (office_pipeline.js) leads to a lead too: the stage in its dialog
 }
 function leadCard(x) {
   const who = [x.contact, x.company].filter(v => v && v !== x.title).join(' · ');
@@ -82,7 +82,7 @@ function leadImpModal(text, p) {
     ${x.error ? `<small class="lead-why">${esc(x.error)}</small>` : x.dup ? `<small class="lead-why">${tr('Already there (same e-mail): skipped')}</small>` : ''}</li>`;
   const md = modal(`<h3>${tr('Import leads')}</h3>
     <p class="muted">${esc(tr('Columns found: {0}', Object.values(p.columns || {}).join(', ')))}</p>
-    <p><b>${esc(trn('{0} lead', '{0} leads', p.count))}</b>${p.dup_count ? ` · ${esc(tr('{0} duplicates', p.dup_count))}` : ''}${p.skipped ? ` · ${esc(tr('{0} rows with errors', p.skipped))}` : ''}</p>
+    <p><b>${esc(trn('{0} lead', '{0} leads', p.count))}</b>${p.dup_count ? ` · ${esc(trn('{0} duplicate', '{0} duplicates', p.dup_count))}` : ''}${p.skipped ? ` · ${esc(trn('{0} row with errors', '{0} rows with errors', p.skipped))}` : ''}</p>
     <ul class="ofclist lead-pv" role="list">${rows.slice(0, 200).map(li).join('')}</ul>${rows.length > 200 ? `<p class="muted">${esc(trn('and {0} more', 'and {0} more', rows.length - 200))}</p>` : ''}
     <div class="aerr" role="alert"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-li="close">${tr('Cancel')}</button><button class="btn pri" data-li="go" ${p.count ? '' : 'disabled'}>${esc(tr('Import {0}', p.count))}</button></div>`);

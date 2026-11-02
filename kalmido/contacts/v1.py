@@ -1,5 +1,5 @@
 """Contacts: the REST API v1 (+ MCP) and its OpenAPI part (scope "contacts": personal data, never a default)."""
-from flask import jsonify, Response
+from flask import jsonify, request, Response
 
 from ..core.config import app
 from ..core.i18n import tr
@@ -10,9 +10,9 @@ from ..tasks.validation import as_int
 from ..core.errors import BadInput, reject_unknown
 from ..api.v1 import v1_limit
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_json, v1_view
-from ..contacts.model import BOOK_ROLES, CT_KINDS, CT_LINKS
+from ..contacts.model import BOOK_ROLES, CT_KINDS, CT_LINKS, need_book
 from ..contacts.web import (
-    op_book_delete, op_book_edit, op_book_member, op_book_member_rm, op_book_new, op_books, op_contact, op_contact_delete,
+    _ct_uploads, ct_gather, op_book_delete, op_book_edit, op_book_member, op_book_member_rm, op_book_new, op_books, op_contact, op_contact_delete,
     op_contact_edit, op_contact_new, op_contacts, op_export, op_import, op_link, op_unlink, VCF_MAX,
 )
 
@@ -73,9 +73,20 @@ def v1_book_member_rm(bid, user_id):
 @app.post("/api/v1/address-books/<int:bid>/import")
 @v1_view
 def v1_book_import(bid):
-    """{vcf: "<the text of a .vcf file>"}"""
+    """{vcf: "<the text of a .vcf file>"}, or 2.465.0 (#2477) multipart with several .vcf files (field "files") or a ZIP of
+    them, as the app: the answer adds files {files, errors, skipped}. vCards only, CSV stays the app's."""
     v1_args(())
     need_feat("contacts")
+    if request.mimetype == "multipart/form-data":
+        need_book(db(), bid, write=True)  # the right to the book before any file is unpacked (as books_import)
+        ups = _ct_uploads()
+        if not ups:
+            raise BadInput(tr("No file"))
+        got = ct_gather(ups)
+        res = op_import(db(), me(), bid, got[0] if got else ups[0][1])
+        if got:
+            res["files"] = got[1]
+        return jsonify(res)
     b = v1_json()
     reject_unknown(b, ("vcf",))
     if not isinstance(b.get("vcf"), str) or not b["vcf"].strip():
@@ -211,7 +222,8 @@ def contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                   body={"type": "object", "properties": {"role": {"type": "string", "enum": list(BOOK_ROLES)}}}, scope=S),
         "delete": op("Stop sharing (owner) or leave a shared address book", K, {"204": {"description": "Removed"}} | errs("403", "404"), [bid_p, uid_p], scope=S)}
     paths["/address-books/{id}/import"] = {"post": op("Import a vCard file (3.0 / 4.0): the same UID is updated", K,
-                                                      ok({"type": "object", "properties": {k: {"type": "integer"} for k in ("created", "updated", "unchanged", "errors")}})
+                                                      ok({"type": "object", "properties": {**{k: {"type": "integer"} for k in ("created", "updated", "unchanged", "errors", "over_limit")},
+                                                                                           "bad": {"type": "array", "items": {"type": "object"}}}})  # 2.363.2 (#3106)
                                                       | errs("400", "403", "404"), [bid_p],
                                                       body={"type": "object", "required": ["vcf"], "properties": {"vcf": {"type": "string"}}}, scope=S)}
     paths["/address-books/{id}/export"] = {"get": op("The address book as a vCard text", K, ok({"type": "object", "properties": {"vcf": {"type": "string"}}})

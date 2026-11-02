@@ -12,7 +12,7 @@
    4th argument gets WAHR; the export writes them back as Excel formulas (a Kalmido VLOOKUP with 3 arguments gets FALSE)
  - the chart (#2115): no chart = null; save / read / change / remove (PUT /api/sheets/<id>/chart), bad kind / columns 400,
    a reader of the list sees it and gets 403, another organisation 404, the agents' GET has it too
- - a person without an organisation uses functions and the chart in the private space
+ - a person without an organisation uses functions and the chart in the private workspace
 tenant-matrix: sheet
 freelancer-matrix: sheets
 usage: p2124_a_api_test.py <datadir>      (a fresh container; P2124A_NOSTART=1 = the server already runs)"""
@@ -114,7 +114,7 @@ for a, (f, want) in F.items():
     else:
         check(x.get("value") == want and not x.get("error"), f"{f} = {want!r} " + json.dumps(x)[:200])
 check(cell(d, "D8").get("error_text") == "Not found", "not found reads 'Not found' " + str(cell(d, "D8").get("error_text")))
-check(cell(d, "D7").get("raw") == '=SVERWEIS("cherry";A1:C4;2;FALSCH)', "the formula shows as typed")
+check(cell(d, "D7").get("raw") == '=VLOOKUP("cherry";A1:C4;2;FALSE)', "the formula shows in the person's language")
 # a change answers the lookups that read it
 r = put(A, SID, [{"cell": "B3", "raw": "4"}])
 check(r.ok and any(x["addr"] == "D7" and x["value"] == 4 for x in r.json()["cells"]), "changing B3 answers the SVERWEIS again " + r.text[:300])
@@ -172,7 +172,7 @@ check(r.ok and cell(get(A, T2), "B5").get("value") == 15, "the column 'Tag' by n
 # the completion offers the new functions with a help
 v = A.get(B + f"/api/sheets/{T2}/vars", params={"q": "sver"}).json()
 items = v if isinstance(v, list) else v.get("items") or v.get("vars") or []
-check(any(x.get("token") == "SVERWEIS" and x.get("kind") == "function" and x.get("help") for x in items), "completion: SVERWEIS with help " + json.dumps(v)[:300])
+check(any(x.get("token") == "VLOOKUP" and x.get("kind") == "function" and x.get("help") for x in items), "completion: SVERWEIS with help " + json.dumps(v)[:300])
 
 # ================================================================== #2109 import / export
 def xlsx(rows):
@@ -230,9 +230,10 @@ rep = r.json().get("report") or {} if r.status_code == 201 else {}
 check(rep.get("formulas") == 5 and not rep.get("as_value"), "all five taken over as formulas " + json.dumps(rep))
 if IM:
     d = get(A, IM)
-    want = {"C1": ("=SUMMEWENN(A1:A3;\"a\";B1:B3)", 4), "C2": ("=SVERWEIS(\"b\";A1:B3;2;FALSCH)", 2),
-            "C3": ("=SVERWEIS(2;B1:B3;1;WAHR)", 2), "C4": ("=XVERWEIS(\"b\";A1:A3;B1:B3;\"-\")", 2),
-            "C5": ("=LINKS(A1;1)&GROSS(A2)&ZÄHLENWENN(A1:A3;\"a\")", "aB2")}
+    # 2.368.3 (#2988): shown in the person's language
+    want = {"C1": ("=SUMIF(A1:A3;\"a\";B1:B3)", 4), "C2": ("=VLOOKUP(\"b\";A1:B3;2;FALSE)", 2),
+            "C3": ("=VLOOKUP(2;B1:B3;1;TRUE)", 2), "C4": ("=XLOOKUP(\"b\";A1:A3;B1:B3;\"-\")", 2),
+            "C5": ("=LEFT(A1;1)&UPPER(A2)&COUNTIF(A1:A3;\"a\")", "aB2")}
     for a, (raw, val) in want.items():
         x = cell(d, a)
         check(x.get("raw") == raw and x.get("value") == val, f"import {a}: {raw} = {val!r} " + json.dumps(x)[:250])

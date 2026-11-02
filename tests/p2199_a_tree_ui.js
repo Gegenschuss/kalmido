@@ -9,7 +9,7 @@
 // - the Share dialog: ab_share opens fs_shareDialog (loaded on first use); with {office: true} the hint that folders rule
 //   documents, not office actions; fs_keptText names what stayed after a folder went into the trash
 // - a phone: the drawer's nodes are not draggable by the mouse (data-sbbdrag), a long press opens the menu
-// freelancer-matrix: n/a (no new route here; alice's private space is the freelancer case, the routes run in p2199_a_fsref_test.py)
+// freelancer-matrix: n/a (no new route here; alice's private workspace is the freelancer case, the routes run in p2199_a_fsref_test.py)
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');

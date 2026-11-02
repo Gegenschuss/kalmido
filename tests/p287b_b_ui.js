@@ -1,7 +1,7 @@
 // 2.87.9 UI tests (part B), own container (start.sh). jsdom:
 // #1940 the shared question before an import (importTargetConfirm): an organisation as target names it and offers "Rather
-//       into private" (resolves 'private'), the private space names it without that button, Cancel starts nothing; a person
-//       without an organisation only ever sees the private space
+//       into private" (resolves 'private'), the private workspace names it without that button, Cancel starts nothing; a person
+//       without an organisation only ever sees the private workspace
 // #1936 Paperless-ngx in Settings > Integrations: a card that jumps to the section, the section names the workspace and
 //       switches between them; the documents settings only keep the progress and a jump to the settings
 // #1938 the progress of a running import keeps going: the settings opened again load afresh (before: the cached "1 of 5"
@@ -60,7 +60,7 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   w.eval(`window._r = 'x'; importTargetConfirm({what: 'the feeds', ws: 'private', privOk: true}).then(v => { window._r = v; })`);
   await until(() => d.querySelector('.itc-dlg'));
   dl = d.querySelector('.itc-dlg');
-  check(dl && /your private space/.test(dl.textContent) && !dl.querySelector('[data-itc]'), '#1940: the private space is named, no extra button');
+  check(dl && /your private workspace/.test(dl.textContent) && !dl.querySelector('[data-itc]'), '#1940: the private workspace is named, no extra button');
   click(w, dl?.querySelector('[data-cd="yes"]'));
   await until(() => w._r !== 'x');
   check(w._r === 'same', '#1940: Import resolves the shown target');
@@ -143,7 +143,7 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   w.eval(`window._r = 'x'; importTargetConfirm({what: 'the tasks', ws: 'private', privOk: true}).then(v => { window._r = v; })`);
   await until(() => d.querySelector('.itc-dlg'));
   dl = d.querySelector('.itc-dlg');
-  check(dl && /your private space/.test(dl.textContent) && !dl.querySelector('[data-itc]') && !/organisation/i.test(dl.textContent), 'P4: without an organisation only the private space');
+  check(dl && /your private workspace/.test(dl.textContent) && !dl.querySelector('[data-itc]') && !/organisation/i.test(dl.textContent), 'P4: without an organisation only the private workspace');
   click(w, dl?.querySelector('[data-cd="no"]'));
   w.eval(`settingsModal('integr')`);
   await until(() => d.querySelector('#s-pl-h'), 40);

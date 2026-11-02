@@ -12,8 +12,10 @@ function sb_rooms() {
   const un = r => r.unread > 0 && (!r.muted || r.mention);
   return [...rs.filter(un), ...rs.filter(r => !un(r))].slice(0, SB_RECENT);
 }
+// 2.479.0 (#2814): with the area bar (computer, phone drawer) the conversations live in the area "Chat", not in Projects
+const sb_msgShown = () => typeof sbb_panelOn !== 'function' || !sbb_panelOn();
 function sb_msgRows() {
-  if (!teamOn()) return '';
+  if (!teamOn() || !sb_msgShown()) return '';
   const rs = sb_rooms(), rid = S.route.mod === 'team' ? (S.cw?.lt ? S.cw.home?.rid : S.tc.rid) : null, lit = rs.some(r => r.id === rid);  // 2.47.1 (#1720): the team view's conversation, not one live in the chat panel
   const n = S.team?.unread || 0, lab = tr('Team chat');  // 2.364.0 B (#3040): one name everywhere (was "Messages")
   const head = `<button class="srow sbmsg ${S.route.mod === 'team' && !lit ? 'on' : ''}" data-go="team" ${isTouch() ? '' : `title="${esc(kt(lab, 'g n'))}"`}>${ic('comment')}<span class="n">${esc(lab)}</span><span class="c ${n ? 'nunread' : ''}">${n ? `${n}<span class="sr"> ${esc(tr('unread'))}</span>` : ''}</span></button>`;
@@ -43,8 +45,8 @@ const SB_PINS = 5;
 const sbp_ids = k => String(S.settings?.[k] || '').split(',').filter(x => /^\d+$/.test(x)).map(Number);
 const sbp_is = (k, id) => sbp_ids(k).includes(+id);
 function sbp_people() {
-  const tp = new Map(teamPeople().map(p => [p.id, p])), dm = new Set(sb_rooms().filter(r => r.kind === 'dm').map(r => r.user_id));
-  return sbp_ids('side_people').filter(id => tp.has(id) && !dm.has(id)).map(id => tp.get(id));
+  const tp = new Map(teamPeople().map(p => [p.id, p])), dm = new Set((sb_msgShown() ? sb_rooms() : []).filter(r => r.kind === 'dm').map(r => r.user_id));
+  return sbp_ids('side_people').filter(id => tp.has(id) && !dm.has(id)).map(id => tp.get(id));  // 2.479.0 (#2814): dm only while the conversations stand here (sb_msgShown)
 }
 function sbp_agents() {
   const pin = new Set(sbp_ids('side_agents'));

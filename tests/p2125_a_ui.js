@@ -1,7 +1,7 @@
 // 2.125.0 UI tests of part A (#2118 working days, #2117 vacation account + requests; own container, start.sh). jsdom:
 // - Settings > General: "Working week" with seven day buttons; a tap saves the working days at once (Undo restores them)
 // - the absences tab: a member sees their vacation account line; with approvals on, a vacation they enter shows the hint,
-//   becomes a request (striped in the grid, "requested" in the list, under "Your open vacation requests")
+//   becomes a request (striped in the grid, "requested" in the list, under "Your open holiday requests")
 // - the admin: the open request with Approve / Reject; Approve = approved on the server, Undo opens it again; the sheet of
 //   a person sets the entitlement and the working days
 // Firefox (real layout, skipped without firefox): 390 px touch - the open request with its buttons stays inside the screen
@@ -47,7 +47,7 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
   const box = await until(() => d.querySelector('.smodal #s-wtdays'));
   check(box && box.querySelectorAll('button').length === 7 && box.querySelectorAll('button.on').length === 5, 'Working week: seven days, Monday..Friday on');
   check(d.querySelector('.smodal #s-wthours'), 'Working week: hours per week');
-  check(w.eval(`NOTIF_ROWS.some(r => r[0] === 'leave')`), 'the notification settings have the row Vacation requests');
+  check(w.eval(`NOTIF_ROWS.some(r => r[0] === 'leave')`), 'the notification settings have the row Holiday requests');
   box?.querySelector('[data-d="4"]').click();
   check(await until(async () => (await call('GET', '/api/state')).settings.workdays === '0,1,2,3'), 'a tap on Friday saves Monday..Thursday');
   check(box && box.querySelector('[data-d="4"]').getAttribute('aria-pressed') === 'false', 'Friday shows off');
@@ -73,7 +73,7 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
   check(ab && ab.items[0].status === 'pending' && ab.items[0].kind === 'vacation', 'saved as a request ' + JSON.stringify(ab && ab.items));
   check(await until(() => d.querySelector('#view .ab2table td.off.req')), 'the grid shows the request striped');
   check(await until(() => /requested/.test(d.querySelector('#view .ab2list:not(.lvlist)')?.textContent || '')), 'the list says "requested"');
-  check(await until(() => d.querySelector('#view .lvlist .lvreq')), 'under "Your open vacation requests"');
+  check(await until(() => d.querySelector('#view .lvlist .lvreq')), 'under "Your open holiday requests"');
   check(!d.querySelector('#view [data-act="lv-ok"]'), 'bob has no Approve button');
   w.close();
 

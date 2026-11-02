@@ -77,10 +77,12 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const dn = d.querySelector('#view .group.ckdone');
   check(/Milk/.test(dn.textContent) && dn.querySelector('.ckback'), 'done item at the bottom, one tap puts it back');
   check(!d.querySelector('#view .trow.ck') && d.querySelector('#view .group.ckdone .trow .dt'), 'rows are full tasks (the date stays)');
+  // 2.445.0 (#3008): the option is the third button of the completed row (title = the old label)
+  const dabBtn = items => items.find(x => x && x.rcls === 'mdone3')?.row.find(b => b.title === 'Show completed at the bottom');
   const more = w.eval('topMoreItems()').map(x => x.label);
-  check(more.includes('Show completed at the bottom'), '"…" offers the option: ' + more.slice(0, 8));
+  check(!!dabBtn(w.eval('topMoreItems()')), '"…" offers the option: ' + more.slice(0, 8));
   w.eval(`sortMenu(document.querySelector('#top h1'))`); await sleep(100);
-  check([...d.querySelectorAll('#pop .dabitem')].length === 1, 'the sort menu offers it too');
+  check([...d.querySelectorAll('#pop .mdone3 button[title="Show completed at the bottom"]')].length === 1, 'the sort menu offers it too');
   w.eval('closePop()');
   w.eval(`setDab(${SH}, false)`);
   await until(() => !d.querySelector('#view .group.ckdone'));
@@ -89,11 +91,12 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w.close();
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'l/' + SH}); d = w.document;
-  check(w.eval('topMoreItems()').some(x => x.label === 'Erledigte unten anzeigen'), 'de: Erledigte unten zeigen');
+  check(w.eval('topMoreItems()').some(x => x.rcls === 'mdone3' && x.row.some(b => b.title === 'Erledigte unten anzeigen' && b.label === 'Unten')), 'de: Erledigte unten zeigen');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 
   // ================= #417 robot before the bell (2.8.0: the dots in the agent band where it shows, here the list has one)
+  await tcall('PUT', '/agent/status', TOK, {status: 'idle'});  // 2.366.0 (#3000): a never connected agent has no band row, this one got in touch
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
   let chip = d.querySelector('#top .achip');
   check(chip && chip.querySelector('.abot') && !chip.querySelector('.hdot') && d.querySelector('#view .agband .hdot'), 'the robot in the header, the agents\' dots in the band');
@@ -194,6 +197,9 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   click(w, md.querySelector('[data-aisub="setup"]')); await sleep(600);
   check(md.querySelector('#s-uag') && !md.querySelector('#s-uag').checked, 'admin: the switch, off by default');
   check(md.querySelectorAll('[data-agseg="os"] [data-agsv]').length === 3 && md.querySelector('#s-agguide .agsteps li'), 'guides with Linux / macOS / Windows');
+  // 2.366.0 (#3001): the one-command way comes first, the steps by hand are folded ("For advanced users")
+  const hand = md.querySelector('details.aghand');
+  check(hand && !hand.open && hand.contains(md.querySelector('#s-agguide')) && /For advanced users/.test(hand.querySelector('summary').textContent) && md.querySelector('.agone') && (md.querySelector('.agone').compareDocumentPosition(hand) & 4), '#3001: one-command hint first, the hand guide folded');
   click(w, md.querySelector('[data-agseg="os"] [data-agsv="win"]')); await sleep(100);
   check(/PowerShell|\.ps1|New-NetFirewallRule|Register-ScheduledTask/i.test(md.querySelector('#s-agguide').textContent), 'Windows: PowerShell steps');
   click(w, md.querySelector('[data-agseg="guide"] [data-agsv="own"]')); await sleep(100);

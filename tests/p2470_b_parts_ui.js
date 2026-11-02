@@ -101,7 +101,7 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
   click(w, d.querySelector('.ofddlg')?.closest('.modal, [role="dialog"], div')?.parentElement?.querySelector('[data-m="ok"]') || [...d.querySelectorAll('[data-m="ok"]')].pop());
   await until(() => w.eval('OFD.doc && OFD.doc.kind') === 'invoice');
   const inv = w.eval('OFD.doc');
-  check(inv && inv.kind === 'invoice' && Math.abs(+inv.totals.net - 2600) < 0.005 && inv.items.every(i => i.title === 'Film production'), 'summary invoice with the quotation\'s net ' + JSON.stringify(inv && inv.items.map(i => i.title)));
+  check(inv && inv.kind === 'invoice' && Math.abs(+inv.totals.net - 2600) < 0.005 && inv.items.every(i => i.title === 'Services'), 'summary invoice with the quotation\'s net ' + JSON.stringify(inv && inv.items.map(i => i.title)));
   check(!errs.length, 'no script errors ' + errs.join(' | ')); errs.splice(0);
   w.close();
 
@@ -120,7 +120,7 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
   // ================= the office settings
   w = await boot({user: 'alice', hash: 'office/settings'}); d = w.document;
   await until(() => d.querySelector('#os-parts-inv'));
-  check(d.querySelector('#os-parts-inv')?.value === 'full' && d.querySelector('#os-parts-t-de')?.value === 'Filmherstellung', 'settings: the preset (like the quotation, "Filmherstellung")');
+  check(d.querySelector('#os-parts-inv')?.value === 'full' && d.querySelector('#os-parts-t-de')?.value === '', 'settings: the preset (like the quotation, no title of its own, 2.449.0 #3766")');
   check(!errs.length, 'no script errors ' + errs.join(' | '));
   w.close();
 

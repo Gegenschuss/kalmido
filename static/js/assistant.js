@@ -86,7 +86,7 @@ function asst_taskMenu(b, tid) {
     return;
   }
   menu(b, [{head: tr('Assistant')},
-    {label: tr('Summarize'), icon: 'note', fn: () => asst_go({kind: 'summary', task_id: tid}, b)},
+    {label: tr('Summarise'), icon: 'note', fn: () => asst_go({kind: 'summary', task_id: tid}, b)},
     {label: tr('Draft a reply…'), icon: 'reply', fn: () => asst_draftAsk(tid, b)},
     {label: tr('Extract tasks'), icon: 'sub', fn: () => asst_extract(tid, b)},
     {label: tr('Suggest tags and due date'), icon: 'tag', fn: () => asst_go({kind: 'tags', task_id: tid}, b)}], null, null, tr('Assistant'));
@@ -130,9 +130,9 @@ document.addEventListener('click', e => {
 function asst_paneHtml(hint) {
   if (!asst_avail()) return '';
   const a = S.assistant, on = new Set(a.list_ids || []);
-  const ls = S.lists.filter(asst_canList).sort((x, y) => String(x.name).localeCompare(String(y.name)));
+  const ls = S.lists.filter(asst_canList).sort((x, y) => cmpText(x.name, y.name));
   return `<h4 id="s-asst-h">${tr('Assistant')}</h4>
-    ${hint(tr('Summarizes, drafts replies, suggests tags and dates, sorts the basket and plans your day. Everything only as a proposal: the assistant changes nothing by itself.'))}
+    ${hint(tr('Summarises, drafts replies, suggests tags and dates, sorts the basket and plans your day. Everything only as a proposal: the assistant changes nothing by itself.'))}
     <div class="row"><label>${tr('Assistant')}</label><label class="chkl"><input type="checkbox" id="s-asst-on" ${a.on ? 'checked' : ''}> ${tr('Use the assistant')}</label></div>
     <div class="shint keep asstprov">${ic('info', 's')} <span>${esc(tr('Shared projects and the texts you choose are sent to {0} ({1}).', a.provider || '', a.host || ''))} ${esc(tr('Model: {0}', a.model || ''))}</span></div>
     <h4 id="s-asst-lists-h">${tr('Projects the assistant may read')}</h4>

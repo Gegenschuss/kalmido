@@ -12,7 +12,7 @@ import urllib.request
 from datetime import timedelta
 from flask import g, jsonify
 
-from ..core.config import app, ATT_DIR, DB, NTFY_URL, PUBLIC_URL
+from ..core.config import app, ATT_DIR, DB, NTFY_URL, PUBLIC_URL, SECRET_KEY, SECRET_KEY_PROBLEM
 from ..core.schema import GLOBAL_DEFAULTS
 from ..core.i18n import lang, LANGS, N_, tr, trn
 from ..core.db import body, connect, db, default_uid, err, gset, gsetting, iso, local_now, now_utc, usettings
@@ -56,15 +56,15 @@ AA_LIST = 50          # rows shown in the settings
 AA_STORAGE_EVERY = 600
 AA_QC_EVERY = 86400
 # names of the watchdog parts in _wd_fail (shown in the alert)
-AA_WD_WHAT = {"section": N_("a whole watchdog part"), "settings of user": N_("user settings"),
+AA_WD_WHAT = {"section": N_("a whole watchdog part"), "settings of user": N_("account settings"),
               "reminder of task": N_("reminders"), "focus session": N_("focus sessions"), "habit": N_("habit reminders"),
               "digest of user": N_("daily digests"),
               "collab push": N_("collaboration pushes"), "time entry": N_("time tracking"), "tick": N_("the watchdog loop")}
 AA_SWITCH_LABEL = {"collab_all": N_("Collaboration for everyone"), "time_all": N_("Time tracking for everyone"),
                    "update_check": N_("Check daily for a new version"), "aa_on": N_("Admin alerts"),
-                   "twofa_required": N_("Require two-factor authentication for built-in logins"),
-                   "passkey_login": N_("Allow logging in with a passkey without the password"),
-                   "oidc_autocreate": N_("Create accounts on the first OIDC login"), "bk_on": N_("Automatic backups"),
+                   "twofa_required": N_("Require two-factor authentication for built-in sign-ins"),
+                   "passkey_login": N_("Allow signing in with a passkey without the password"),
+                   "oidc_autocreate": N_("Create accounts on the first OIDC sign-in"), "bk_on": N_("Automatic backups"),
                    "public_links": N_("Public links to projects")}
 _AA_LOCK = threading.Lock()
 _AA = {"q": [], "b": {}, "int": {}, "disk_at": 0.0, "qc_at": 0.0, "storage": {}, "qc": {}}
@@ -96,15 +96,30 @@ def Nn_(one, other):
     return [one, other]
 
 
-def aa_now(kind, key, text, args=(), n=None, click=None):
+def aa_now(kind, key, text, args=(), n=None, click=None, skip=None):
     """One alert, sent by the next watchdog tick. text: a text marked with N_ (or a plural pair from Nn_, + n); args: plain
-    values or {"t": key} (translated when sent)."""
+    values or {"t": key} (translated when sent). 2.367.4 (#2974): skip = the admin whose own harmless action this is (not for
+    what weakens an account: on a taken-over session that alert is the point)."""
     try:
         with _AA_LOCK:
             if len(_AA["q"]) < 200:
-                _AA["q"].append((kind, str(key)[:200], text, list(args), n, click))
+                _AA["q"].append((kind, str(key)[:200], text, list(args), n, click, skip))
     except Exception:  # noqa: BLE001
         pass
+
+
+# 2.359.3 (#2510): an existing install without a server key keeps starting (a refusal would lock it out with the update);
+# next to the warning in the settings (settings.js shKeyWarn, the same texts) the admins get an alert at every instance start
+AA_KEY_TEXT = {"invalid": N_("KALMIDO_SECRET_KEY (or the key file) is not valid: it must be 32 random bytes, base64."),
+               "file_in_data": N_("KALMIDO_SECRET_FILE lies inside the data or backup folder and was ignored. Put it on its own volume."),
+               "file_error": N_("The key file KALMIDO_SECRET_FILE cannot be read or written, see the server log. After an update: create the folder secret next to data and give it to the user 1000 (mkdir secret && chown 1000 secret), then restart.")}
+AA_KEY_NONE = N_("Without KALMIDO_SECRET_KEY or KALMIDO_SECRET_FILE no access token can be stored and organisation data stays unencrypted. See SELF-HOSTING.md.")
+
+
+def aa_secret_key():
+    """No alert with KALMIDO_NO_SECRET_KEY=1: then running without a key was decided on purpose."""
+    if not SECRET_KEY and not env_bool("KALMIDO_NO_SECRET_KEY", False):
+        aa_now("security", "secret-key:missing", AA_KEY_TEXT.get(SECRET_KEY_PROBLEM, AA_KEY_NONE))
 
 
 AA_IP_KEYS = ("logins", "api", "drop", "ics", "publink")  # security counters whose items are client addresses
@@ -209,14 +224,23 @@ def aa_admin_via(c, uid, s=None):
     return {"ntfy": t if t_ok else "", "webpush": 0 if t_ok and ch == "webpush" else dev}
 
 
-def aa_recipients(c, cfg):
+def aa_org_event(c, key, people):
+    """2.367.4 (#2974): an organisation's event went to people: an instance admin who is not among them gets only a number."""
+    q = ",".join("?" * len(people)) or "0"
+    if c.execute(f"SELECT 1 FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' AND id NOT IN ({q}) LIMIT 1", list(people)).fetchone():
+        aa_count("security", key)
+
+
+def aa_recipients(c, cfg, skip=None):
     """[(via, target, language)]: ("ntfy", the shared admin topic, the first admin's language), else per enabled admin
     ("ntfy", own topic, language) and / or ("webpush", user id, language), see aa_admin_via (a topic shared by two admins
-    gets one message)."""
+    gets one message). 2.367.4 (#2974): without the admin skip (a shared topic reaches everyone)."""
     if cfg["topic"]:
         return [("ntfy", cfg["topic"], lang(c, default_uid(c)))] if NTFY_TOPIC_RE.fullmatch(cfg["topic"]) else []
     out, seen = [], set()
     for (uid,) in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 ORDER BY id").fetchall():
+        if uid == skip:
+            continue
         s = usettings(c, uid)
         lg = s.get("lang") if s.get("lang") in LANGS else "en"
         v = aa_admin_via(c, uid, s)
@@ -228,10 +252,10 @@ def aa_recipients(c, cfg):
     return out
 
 
-def aa_deliver(c, cfg, title_fn, body_fn, click=None):
+def aa_deliver(c, cfg, title_fn, body_fn, click=None, skip=None):
     """ntfy / Web Push to every recipient, each in their language. Returns the number of recipients that accepted it."""
     ok, click = 0, click or f"{PUBLIC_URL}/#settings"
-    for via, target, lg in aa_recipients(c, cfg):
+    for via, target, lg in aa_recipients(c, cfg, skip):
         if via == "ntfy":
             ok += 1 if ntfy(title_fn(lg), body_fn(lg), cfg["prio"], click, topic=target, admin=True) else 0
         else:
@@ -244,7 +268,7 @@ def aa_title(kind, lg):
     return tr("Kalmido test alert", lg=lg) if kind == "test" else tr("Kalmido admin: {0}", tr(AA_LABEL[kind], lg=lg), lg=lg)
 
 
-def aa_emit(c, cfg, kind, key, text, args=(), n=None, click=None):
+def aa_emit(c, cfg, kind, key, text, args=(), n=None, click=None, skip=None):
     """Cooldown per (kind, key), then the daily summary queue or the hourly cap, then ntfy. Stores the alert
     (the settings list) and returns its state: sent | failed | queued | capped | cooldown | '' (off)."""
     if not cfg["on"] or (kind != "test" and kind not in cfg["kinds"]):
@@ -263,10 +287,10 @@ def aa_emit(c, cfg, kind, key, text, args=(), n=None, click=None):
     elif kind != "test" and c.execute("SELECT COUNT(*) FROM admin_alerts WHERE kind!='test' AND state IN ('sent','failed') "
                                       "AND sent_at>?", (iso(now - timedelta(hours=1)),)).fetchone()[0] >= cfg["max_hour"]:
         state = "capped"
-    elif not aa_recipients(c, cfg):  # 2.5.2 (K04): nobody to send it to yet (no device / topic): only listed
+    elif not aa_recipients(c, cfg, skip):  # 2.5.2 (K04): nobody to send it to yet (no device / topic): only listed
         state = "listed"
     else:
-        ok = aa_deliver(c, cfg, lambda lg: aa_title(kind, lg), lambda lg: aa_text(text, n, args, lg), click)
+        ok = aa_deliver(c, cfg, lambda lg: aa_title(kind, lg), lambda lg: aa_text(text, n, args, lg), click, skip)
         state, sent = ("sent" if ok else "failed"), iso(now_utc())
     c.execute("INSERT INTO admin_alerts(kind,key,message,tmpl,created_at,sent_at,delivered,state) VALUES(?,?,?,?,?,?,?,?)",
               (kind, key[:200], aa_text(text, n, args, "en")[:1000],
@@ -316,8 +340,8 @@ def _aa_build(c, kind, key, b):
         if b["n"] < AA_BURST:
             return None
         top = max(items, key=items.get) if items else "?"
-        return ("logins:" + top, Nn_("{0} failed login within {1} min (users: {2}; IPs: {3})",
-                                     "{0} failed logins within {1} min (users: {2}; IPs: {3})"),
+        return ("logins:" + top, Nn_("{0} failed sign-in within {1} min (users: {2}; IPs: {3})",
+                                     "{0} failed sign-ins within {1} min (users: {2}; IPs: {3})"),
                 [mins, _aa_list(b["extra"].get("user", {})), _aa_list(items)], b["n"])
     if kind == "security" and key in ("drop", "ics", "api", "publink"):
         if b["n"] < AA_BURST:
@@ -335,6 +359,16 @@ def _aa_build(c, kind, key, b):
                                        "{0} uploads (/drop) with an invalid token within {1} min, from {2}"), [mins, _aa_list(items)], b["n"])
         return ("ics:" + top, Nn_("{0} calendar feed request with an invalid link within {1} min, from {2}",
                                   "{0} calendar feed requests with an invalid link within {1} min, from {2}"), [mins, _aa_list(items)], b["n"])
+    if kind == "security" and key == "2fa_on":  # 2.367.4 (#2974): a duty to turn it on is one alert; one person is not told of their own step
+        ids = list(b["extra"].get("uid", {}))
+        return ("2fa_on:" + ",".join(sorted(items))[:150], Nn_("{0} person turned on two-factor authentication: {1}",
+                                                              "{0} people turned on two-factor authentication: {1}"),
+                [_aa_list(items)], len(items), None, int(ids[0]) if len(ids) == 1 else None)
+    if kind == "security" and key == "org_usage":  # 2.367.4 (#2974): the instance admins' number; names stay in the organisation
+        return (key, Nn_("{0} agent limit message went to organisations within {1} min", "{0} agent limit messages went to organisations within {1} min"), [mins], b["n"])
+    if kind == "security" and key == "org_login":
+        return (key, Nn_("{0} organisation admin signed in from a new address within {1} min (their organisation was told)",
+                         "{0} organisation admins signed in from a new address within {1} min (their organisations were told)"), [mins], b["n"])
     if kind == "security" and key == "rls":  # 2.37.0 (review K2-1): row-level security refused a write (an app check missed it)
         return ("rls:" + ",".join(sorted(items))[:150], Nn_("{0} request was refused by the database's row-level security within {1} min ({2}; users: {3})",
                                                           "{0} requests were refused by the database's row-level security within {1} min ({2}; users: {3})"),
@@ -392,7 +426,7 @@ def _aa_integrations(c, cfg, ints, now):
             st = aa_emit(c, cfg, "integration", "inbox:" + s["err"],
                          N_("The ntfy share inbox has not reached its ntfy server for {0} min ({1})."), [mins, s["err"]])
         elif s["n"] >= AA_FAIL_ROW and name == "oidc":
-            st = aa_emit(c, cfg, "integration", "oidc:" + s["err"], N_("{0} logins with the OIDC provider in a row failed ({1})."),
+            st = aa_emit(c, cfg, "integration", "oidc:" + s["err"], N_("{0} sign-ins with the OIDC provider in a row failed ({1})."),
                          [s["n"], s["err"]])
         elif s["n"] >= AA_FAIL_ROW and name == "ntfy":
             st = aa_emit(c, cfg, "integration", "ntfy:" + s["err"], N_("{0} ntfy pushes in a row failed ({1})."), [s["n"], s["err"]])
@@ -445,8 +479,8 @@ def _aa_take(now):
 def _aa_send(c, cfg, q, due):
     if not cfg["on"]:
         return
-    for kind, key, text, args, n, click in q:
-        aa_emit(c, cfg, kind, key, text, args, n, click)
+    for kind, key, text, args, n, click, skip in q:
+        aa_emit(c, cfg, kind, key, text, args, n, click, skip)
     for (kind, key), b in due:
         a = _aa_build(c, kind, key, b)
         if a:

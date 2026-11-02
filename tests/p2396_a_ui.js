@@ -40,7 +40,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   check(sec && /publicly in GitHub/.test(sec.textContent), 'the hint: appears publicly in GitHub');
   change(w, sec.querySelector('#agg-mail'), 'not a mail'); await idle(w); await sleep(300);
   const err = sec.querySelector('#agg-err');
-  check(err && !err.hidden && /valid email/.test(err.textContent) && sec.querySelector('#agg-mail').getAttribute('aria-invalid') === 'true',
+  check(err && !err.hidden && /valid e-mail/.test(err.textContent) && sec.querySelector('#agg-mail').getAttribute('aria-invalid') === 'true',
     'an invalid e-mail: the error at the field');
   check((await adm(ag.id)).runtime.git_author_email === '', '... and nothing saved');
   change(w, sec.querySelector('#agg-mail'), 'bot@example.com');

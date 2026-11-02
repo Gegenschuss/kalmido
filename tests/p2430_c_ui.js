@@ -1,8 +1,8 @@
 // 2.43.0 UI tests, part C (#1452 widgets changed right in the view, #1346 the project page as a pin board, #1504 the agents
 // card), own container (start.sh). jsdom:
 // - the project page: every block has a "…" menu; width a third and height tall from it are stored (opts lw / lh) and
-//   shown (classes lw2 / lh3); "Make this the standard for everyone" shows for the owner only while the own arrangement
-//   differs and promotes it; an edit member sees only "Reset to the standard"
+//   shown (classes lw2 / lh3); "Make this the default for everyone" shows for the owner only while the own arrangement
+//   differs and promotes it; an edit member sees only "Reset to the default"
 // - "+ Block" > Notepad: a notepad opens for writing, leaving the field saves it; a colour from the "…" menu for everyone
 // - the start page: the agents card lists both running jobs of an agent; the review is on the builder
 // Firefox: 1440 mouse: the grip resizes a block and it snaps to the columns of six; 390 touch: one column, the "…" menu is a
@@ -97,7 +97,7 @@ const item = (d, t) => items(d).find(x => (x.querySelector('.ml')?.firstChild?.t
   check(d.querySelector(`.lyb[data-lyk="np${np?.id}"].lyc-blue`), '#1346: ... and tints the block');
   w.close();
 
-  // bob (edit member): own change -> only "Reset to the standard"
+  // bob (edit member): own change -> only "Reset to the default"
   w = await boot({user: 'bob', hash: 'l/' + P, ls: pov}); d = w.document;
   await until(() => d.querySelector('#view .pov .lysix .povs'));
   check(d.querySelector(`.lyb[data-lyk="np${np?.id}"].lyc-blue`), '#1346: bob sees the notepad in its colour');

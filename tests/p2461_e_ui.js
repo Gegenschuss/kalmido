@@ -3,9 +3,9 @@
 // jsdom (phone = matchMedia max-width true): a closed menu sheet / dialog / date picker keeps its node for the exit (class an-out) and is
 //   gone afterwards, a second close is a no-op, opening something new removes the leaving twin at once, "reduce motion" and the desktop
 //   remove at once; the scrim and the + button fade out; rows fade before the redraw (and come back when the request fails), opened
-//   rows fade in; a route change restarts the view fade, the calendar's next / previous set the side; the Office tab is "Quotes & invoices"
+//   rows fade in; a route change restarts the view fade, the calendar's next / previous set the side; the Office tab is "Quotations & invoices"
 // Firefox 1345 and 390: the inline title field sits on the circle's line inside its row (top-level row and subtask), with and without
-//   list columns; Office > Quotes & invoices: one "New quotation" button in the empty state (below the text), no heading above the tabs,
+//   list columns; Office > Quotations & invoices: one "New quotation" button in the empty state (below the text), no heading above the tabs,
 //   the three tab levels share the left edge, search field and filter share one height, no horizontal overflow on the phone
 // Screenshots into $P2461E_SHOTS.
 const {execFileSync} = require('child_process');
@@ -143,7 +143,7 @@ const PH = {mobile: true};  // a phone for jsdom
   w = await boot({hash: 'office/offers'}); d = w.document;
   await until(() => d.querySelector('#side [data-ofm="offers"]'), 60);  // 2.87.9 (#1917): the office menu instead of the tab row; 2.98.0 (#2180): the rail  // 2.152.2 (#2617): the points sit in the panel #side
   const tab1 = d.querySelector('#side [data-go="office/offers"]');  // 2.152.2 (#2617): the office points sit in the panel #side
-  check(/^\s*Quotations\s*$/.test(tab1?.textContent || ''), '#1637: the point is named "Quotations" (2.380.0 #3409: was "Quotes & invoices"): ' + (tab1?.textContent || ''));
+  check(/^\s*Quotations\s*$/.test(tab1?.textContent || ''), '#1637: the point is named "Quotations" (2.380.0 #3409: was "Quotations & invoices"): ' + (tab1?.textContent || ''));
   check(!d.querySelector('.office .ofchead h2'), '#1637: no second "Office & finance" heading above the tabs');
   await until(() => d.querySelector('.office .ofdbar'), 60);
   await sleep(300);

@@ -23,6 +23,7 @@ from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gset
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip, set_cookie, start_session
 from ..accounts.login import _reauth, _user, pend_ip_cap
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.env import env_bool  # 2.399.0 (#2687): the hosting switch (KALMIDO_HOSTED)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 
 
@@ -60,15 +61,15 @@ OIDC_STEPUP_AGE = 300  # 2.144.5 A (#2387): s an auth_time of the step-up sign-i
 OIDC_ALGS = {"RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA"}
 _OIDC = {"doc": None, "doc_at": 0.0, "jwks": None, "jwks_at": 0.0, "err": "", "err_at": ""}
 _OIDC_STATES, _OIDC_LOCK = {}, threading.Lock()
-OIDC_ERRORS = {"no_account": N_("There is no account for this login yet. Please ask the admin to create one."),
+OIDC_ERRORS = {"no_account": N_("There is no account for this sign-in yet. Please ask the admin to create one."),
                "disabled": N_("This account is disabled."),
-               "group": N_("Your account at the login provider is not allowed to use this app."),
-               "state": N_("The login took too long or was started in another browser. Please try again."),
-               "denied": N_("The login was cancelled at the login provider."),
-               "taken": N_("The user name from the login provider is already used by another account."),
-               "failed": N_("The login with the provider failed. Please try again or ask the admin."),
+               "group": N_("Your account at the sign-in provider is not allowed to use this app."),
+               "state": N_("The sign-in took too long or was started in another browser. Please try again."),
+               "denied": N_("The sign-in was cancelled at the sign-in provider."),
+               "taken": N_("The user name from the sign-in provider is already used by another account."),
+               "failed": N_("The sign-in with the provider failed. Please try again or ask the admin."),
                # 2.79.0 (#476 M3)
-               "link": N_("This account is not linked to the login provider yet. Log in with your password first, then use the provider's button once in the same browser.")}
+               "link": N_("This account is not linked to the sign-in provider yet. Sign in with your password first, then use the provider's button once in the same browser.")}
 
 
 def oidc_seal(secret):
@@ -334,6 +335,8 @@ def oidc_link_ok(c, u, how, email, sess_uid):
     sign-on (no password, no e-mail). Linked accounts stay as they are."""
     if sess_uid is not None and sess_uid == u["id"]:
         return True
+    if env_bool("KALMIDO_HOSTED", False):  # admin.hosting.hosted() (a higher layer); 2.399.0 (#2687, review F1): the operator sets the provider -- a first link only from the account's own session
+        return False
     from .login import twofa_methods
     if u["kind"] != "user" or u["kid"] or u["is_admin"] or twofa_methods(c, u):
         return False
@@ -387,13 +390,13 @@ def _oidc_account(c, claims, sess_uid=None):
         ensure_inbox(c, uid)
         c.execute("UPDATE users SET oidc_subject=?, email=?, email_proved=? WHERE id=?", (subject, email or None, email, uid))
         bump(c)
-        aa_now("security", f"oidc:new:{uname}", N_("{0} was created by the first login with the OIDC provider."), [uname])
+        aa_now("security", f"oidc:new:{uname}", N_("{0} was created by the first sign-in with the OIDC provider."), [uname])
         grp_oidc_sync(c, uid, groups)  # 2.10.0 (#441)
         return _user(c, uid)
     if u["disabled"]:
         raise OidcError("disabled", u["username"])
     if how != "subject" and not oidc_link_ok(c, u, how, email, sess_uid):
-        msg = N_("A login with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).")
+        msg = N_("A sign-in with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).")
         aa_now("security", f"oidc:nolink:{u['username']}", msg, [u["username"], {"t": N_("user name") if how == "username" else N_("e-mail")}])
         raise OidcError("link", u["username"])
     if how != "subject":
@@ -424,10 +427,10 @@ def _oidc_fail_redirect(code, stepup=False):
 def oidc_start():
     from ..notify.push import _b64u
     if not oidc_cfg()["on"]:
-        return err(tr("OIDC login is not configured"), 404)
+        return err(tr("OIDC sign-in is not configured"), 404)
     ip_key = [("oidc:" + rate_ip(), 60)]
     if _rate_blocked(ip_key):
-        return err(tr("Too many failed logins, please wait a few minutes"), 429)
+        return err(tr("Too many failed sign-ins, please wait a few minutes"), 429)
     _rate_fail(ip_key)  # every start counts (60 per 15 min and IP): the state table cannot be flooded
     c = db()
     try:
@@ -482,7 +485,7 @@ def oidc_start():
 def oidc_callback():
     from ..notify.alerts import aa_count, aa_fail, aa_ok
     if not oidc_cfg()["on"]:
-        return err(tr("OIDC login is not configured"), 404)
+        return err(tr("OIDC sign-in is not configured"), 404)
     state = request.args.get("state") or ""
     with _OIDC_LOCK:
         st = _OIDC_STATES.pop(state, None) if state else None
@@ -654,7 +657,7 @@ def oidc_reauth(c, b):
 def _oidc_alert():
     """The security alert of a changed provider setting (the admins' news)."""
     from ..notify.alerts import aa_now
-    aa_now("security", f"oidc:cfg:{int(time.time())}", N_("{0} changed the OIDC login settings."), [g.user["username"]])
+    aa_now("security", "oidc:cfg", N_("{0} changed the OIDC sign-in settings."), [g.user["username"]])
 
 
 def _oidc_store(c, vals):
@@ -831,7 +834,7 @@ def oidc_admin_check():
         c.commit()
         return jsonify(ok=True, error="", issuer=doc.get("issuer"), draft=oidc_draft_public(c))
     if not oidc_cfg(c)["on"]:
-        return err(tr("OIDC login is not configured"), 409)
+        return err(tr("OIDC sign-in is not configured"), 409)
     try:
         d = oidc_doc(c, force=True)
         oidc_jwks(c, d, force=True)

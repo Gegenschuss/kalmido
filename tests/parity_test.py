@@ -33,6 +33,9 @@ API = {f"{m.upper()} {norm(p)[len('/api/v1'):]}" for m, p in routes if p.startsw
 
 # ---- 1. the web client's routes -> the REST API
 APP_TO_API = {
+    "GET /api/events/freebusy": ["GET /events/freebusy"],  # 2.467.0 (#2586)
+    "PUT /api/tasks/{}/irreversible": ["PATCH /tasks/{}"], "DELETE /api/tasks/{}/irreversible": ["PATCH /tasks/{}"],  # 2.392.0 C (#3370)
+    "GET /api/tasks/{}/decisions": ["GET /tasks/{}/decisions"], "POST /api/tasks/{}/decisions": ["POST /tasks/{}/decisions"],
     "GET /api/state": ["GET /lists", "GET /tasks", "GET /habits", "GET /filters", "GET /me"],
     "GET /api/me/storage": ["GET /me/storage"],  # 2.24.0 (#910)
     "GET /api/tasks": ["GET /tasks", "GET /search", "GET /trash"],
@@ -46,7 +49,10 @@ APP_TO_API = {
     "POST /api/tasks/{}/reopen": ["POST /tasks/{}/reopen"],
     "POST /api/tasks/{}/restore": ["POST /tasks/{}/restore"],
     "POST /api/tasks/{}/skip": ["POST /tasks/{}/skip"],
+    "POST /api/tasks/{}/partial": ["POST /tasks/{}/partial"],  # 2.392.0 B (#3364)
     "POST /api/tasks/{}/take": ["POST /tasks/{}/take"],
+    "GET /api/tasks/{}/watchers": ["GET /tasks/{}/watchers"], "POST /api/tasks/{}/watchers": ["POST /tasks/{}/watchers"],  # 2.473.0 (#3357)
+    "DELETE /api/tasks/{}/watchers/{}": ["DELETE /tasks/{}/watchers/{}"],
     "PUT /api/tasks/{}/waiting": ["PUT /tasks/{}/waiting"],
     "DELETE /api/tasks/{}/waiting": ["DELETE /tasks/{}/waiting"],
     "POST /api/tasks/{}/attachments": ["POST /tasks/{}/attachments"],
@@ -142,10 +148,10 @@ APP_TO_API = {
     "GET /api/dayplan": ["GET /dayplan"],
     "GET /api/dayplan/review": ["GET /dayplan/review"],
     "GET /api/briefing": ["GET /briefing"],  # 2.34.0 (#264)
+    "GET /api/inbox": ["GET /me/waiting"],  # 2.392.0 D (#3369)
     "GET /api/lists/{}/status-report": ["GET /lists/{}/status-report"],  # 2.34.0 (#265)
     "GET /api/export.json": ["GET /export"],
     "POST /api/import/{}": ["POST /import/{}"],
-    "POST /api/import/ticktick": ["POST /import/{}"],
     "POST /api/imports/{}/undo": ["POST /imports/{}/undo"],
     "GET /api/me/app-passwords": ["GET /me/app-passwords"],
     "POST /api/me/app-passwords": ["POST /me/app-passwords"],
@@ -245,6 +251,11 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.477.0 (#3881): the private list Notes of the app's quick note is made by the app's grip for the person; agents never "
+     "see it and cannot be given it (a token makes notes in any list with POST /lists/{}/notes)",
+     ("=POST /api/notes/quick-list",)),
+    ("2.392.0 C (#3370): the yes to a one-way step is a person's, per task, in the app: never an agent or a token",
+     ("=POST /api/tasks/{}/irreversible-yes",)),
     ("2.272.0 E1 (#3038): an address book in the trash is restored or deleted for good by a person -- an agent's delete of a whole "
      "address book waits for a person's approval already, so the way back stays with people too",
      ("=POST /api/books/{}/restore", "=POST /api/books/{}/purge")),
@@ -276,7 +287,7 @@ APP_ONLY = [
      ("=POST /api/videos", "=PATCH /api/videos/{}", "=DELETE /api/videos/{}", "=POST /api/videos/{}/restore", "* /api/videos/{}/versions",
       "=DELETE /api/videos/{}/comments/{}", "=POST /api/videos/{}/comments/{}/restore", "=POST /api/videos/{}/signoff",
       "=POST /api/videos/{}/signoffs/{}/revoke", "=POST /api/videos/{}/move-space")),
-    ("2.96.0 (#1941): moving data between the private space and an organisation stays with people in the app -- an agent belongs "
+    ("2.96.0 (#1941): moving data between the private workspace and an organisation stays with people in the app -- an agent belongs "
      "to ONE workspace and never moves data across its boundary (the routes answer 403 to agents)",
      ("=POST /api/files/move-space", "=POST /api/sheets/{}/move-space", "=POST /api/wiki/move-space",
       "=POST /api/lists/{}/move-space")),  # 2.401.0 (#2924): the dry run of a project's workspace change
@@ -344,13 +355,17 @@ APP_ONLY = [
      "people on purpose -- agents never make, list or revoke them",
      ("=POST /api/files/trash", "=POST /api/files/restore", "=GET /api/files/zip", "=POST /api/files/scan",
       "=GET /api/files/nodes/{}/ext-links", "=POST /api/files/nodes/{}/ext-links", "* /api/files/ext-links/")),
+    ("2.477.0 (#3936): the small preview of a picture is the cards' image in the browser; agents read the file itself (/files/{}/content)",
+     ("=GET /api/files/nodes/{}/thumb",)),
     ("2.48.0 (#1111): documents -- a person's own steps (upload by hand / share sheet, review and accept, recognise again, the "
      "preview image, a task for the due date, the workspace's levels / rules / labels / mail address); agents read and set fields "
      "with /documents and add files with /files; 2.122.0 (#2098): create_document; (#2100) the CSV of chosen documents is a person's download", ("=POST /api/docs", "=POST /api/docs/export.csv", "=POST /api/docs/{}/accept", "=POST /api/docs/{}/review",
-                                                   "=POST /api/docs/{}/redo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
+                                                   "=POST /api/docs/{}/redo", "=POST /api/docs/{}/redo/undo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
                                                    "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
                                                    "* /api/docs/mail", "* /api/docs/fields")),  # 2.153.0 (#2179): agents fill in custom fields via /documents, never define them
     # 2.154.0 A (#1111): splitting a stack and linking a document with a task are a person's steps (an agent suggests, a person confirms)
+    ("2.363.3 (#3134): \"Duplicate\" of a task is a person's step in the task menu; agents create tasks with POST /tasks and copy a whole project with /lists/{id}/duplicate",
+     ("=POST /api/tasks/{}/duplicate",)),
     ("2.154.0 A (#1111): a stack scan split into documents (its pages, previews, split, undo, \"no stack\", the separator sheet) and a "
      "document linked with an existing task / the documents of a task are a person's steps in the app; agents read documents with "
      "/documents and never split, link or delete", ("* /api/docs/{}/split", "=POST /api/docs/{}/unsplit", "=GET /api/docs/split-sheet.pdf",
@@ -410,6 +425,8 @@ APP_ONLY = [
      ("=GET /api/attachments/{}/agents",)),
     ("sign-in, sessions, two-factor, passkeys, OIDC: a person in a browser", ("* /api/auth/", "* /api/me/2fa", "* /api/me/passkeys", "* /api/me/sessions", "=PATCH /api/me", "=GET /api/me",
                                                                      "=POST /api/stepup/passkey")),  # 2.223.2 C (#2871)
+    ("2.485.0 (#3939): support access opens a client's account / organisation to the operator: only the person in a browser, never an agent or a token",
+     ("* /api/support-access",)),
     ("credentials and keys of the account: tokens, webhooks, upload token, avatar, phone shortcut", (
         "* /api/me/tokens", "* /api/me/webhooks", "POST /api/me/drop-token", "* /api/me/avatar", "GET /api/me/share/")),
     ("administration: never through a token (agents are never admins); admins read users / status with admin-read", (
@@ -441,6 +458,7 @@ APP_ONLY = [
     ("repositories: their secrets are entered by people; the API reads them (GET /lists/{id}/repos)", (
         "POST /api/lists/{}/repos", "* /api/repos/", "POST /api/hooks/git/", "POST /api/tasks/{}/git-undo",
         "* /api/folders/repos", "PUT /api/lists/{}/folder-repo",
+        "PUT /api/lists/{}/repos/close-release",  # 2.392.0 B (#3364)
         "PUT /api/lists/{}/repos/version-field")),  # 2.151.0 A (#2558): which field holds the version, set with the repository  # 2.33.0 (#934): folder repositories, read through /lists/{id}/repos
     ("2.18.0: the error-report webhook of a list: its secret URL is shown once to people (owner / list admins); the inbound hook "
      "is called by the error service, not by a client", ("* /api/lists/{}/error-hook", "POST /api/hooks/issues/")),
@@ -452,10 +470,13 @@ APP_ONLY = [
     ("2.60.0 (#1514): environments (Staging, Live) are created, renamed and removed by people in the app, their deploy-webhook token is "
      "shown once to people; agents read them (list_environments) and record deployments (set_deployment)",
      ("* /api/lists/{}/envs", "* /api/envs/", "POST /api/hooks/deploy/")),
+    # 2.469.0 (#3459): called by the payment provider, its token names the office area
+    ("2.469.0 (#3459): the webhook of the online payment provider: signed by the provider, not called by a client", ("POST /api/hooks/pay/",)),
     # 2.144.0 D (#797): the hosting operator's interface: its own token from a file, called by the hoster's console, never
     # by a person or an agent (no account of the instance; numbers only)
     ("2.144.0 (#797): the hosting operator's interface (own token, the hoster's console; not a user or agent API)",
-     ("GET /api/operator/status", "POST /api/operator/setup-code", "PUT /api/operator/notice")),
+     ("GET /api/operator/status", "POST /api/operator/setup-code", "PUT /api/operator/notice",
+      "* /api/operator/accounts", "PUT /api/operator/quota-default")),  # 2.485.0 (#3939)
     ("external calendar subscriptions and the calendar feed link: personal settings", ("* /api/calendars", "* /api/ical")),
     # 2.111.0 (#2056): the secret subscription link of an event calendar is a person's own credential (like the task feed
     # link), and the editor's invitation info only serves the switch; agents send invitations with send_invites on the events
@@ -687,9 +708,8 @@ APP_ONLY = [
     # bundle C (2.152.0 D #2175, 2.155.0 B #2076 #2077): routes of packages built in parallel, judged after the merge
     ("2.152.0 D (#2175): a person deletes messages of their own agent chat (retention); agents never delete chat messages",
      ("=DELETE /api/agents/{}/chat", "=DELETE /api/agents/{}/chat/{}")),
-    ("2.155.0 B (#2076, #2077): the availability bar of the event editor and the absences feed are a person's views of the "
-     "team calendar; agents read events and absences through their own tools",
-     ("=GET /api/events/freebusy", "=GET /api/team/absences/feed")),
+    ("2.155.0 B (#2076): the absences feed is a person's view of the team calendar; agents read absences through their own tool",
+     ("=GET /api/team/absences/feed",)),
     # 2.168.0 A (#2665): a project page's office documents, only for people with office rights in its area
     ("2.168.0 (#2665): a project page's quotations and invoices are a person's office view (agents and people without office "
      "rights get office false); agents read office documents only through /api/v1/office/docs",
@@ -795,6 +815,7 @@ for name, _, schema, fn in mcp.TOOLS:
             check(False, f"tool {name} {extra}: {e.message}")
 reached = {c for s in CALLS.values() for c in s}
 API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
+    "GET /tasks/{}/decisions": "2.392.0 C (#3370): get_task carries them",
     "GET /office/docs/{}/pdf": "2.51.0 (#1348): the PDF preview of a draft is binary; the chat card (notify) links it for the person",
     "GET /office/letters/{}": "2.153.0 (#2031): list_letter_drafts returns the agent's letters with every field; one letter by id is for scripts",
     "GET /openapi.json": "the API description itself",

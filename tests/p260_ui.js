@@ -162,7 +162,8 @@ const TOUCH = `(() => {
   const l0 = w.eval('topMoreItems()').filter(x => x !== '-').map(x => x.label);
   check(!l0.includes('Kanban') && !l0.includes('Timeline') && !l0.includes('Nothing to undo'), 'tl0: nothing folded: ' + l0.join(' | '));
   w.eval(`go('cal')`); await idle(w);
-  check(w.eval('topMoreItems()').some(x => x.label === 'Search and commands') && !d.querySelector('#top [data-act="top-more"]').hidden, '"…" on a view without own actions: search + shortcuts');
+  // 2.366.0 (#3002): a view without own actions has no "…" (it held only the search that sits right next to it)
+  check(!w.eval('topMoreItems()').length && d.querySelector('#top [data-act="top-more"]').hidden, '#3002: no "…" on a view without own actions');
   w.close();
 
   // ================= K09: one term, the switch only under Modules
@@ -302,7 +303,7 @@ const TOUCH = `(() => {
           await v1(ag.token, 'GET', '/agent/events');  // stays connected
           await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: Wd, height: Hh}});
           await nav(B + 'static/icon.svg');
-          await ev(`localStorage.setItem('tasks.theme', ${JSON.stringify(JSON.stringify(theme))}); 1`);
+          await ev(`localStorage.setItem('tasks.theme', ${JSON.stringify(JSON.stringify(theme))}); localStorage.setItem('tasks.lookLocal', 'true'); 1`);
           // K01 / K02: the header on a long project name, Today and the calendar, with and without the task panel
           for (const [hash, name] of [['l/' + L, 'project'], ['today', 'today'], ['cal', 'calendar']]) {
             await open(hash);
@@ -320,7 +321,9 @@ const TOUCH = `(() => {
               // 2.18.0 (review R3, owner rule, intended change): one-tap actions stay in the header on every width and the
               // title is cut (>= 12 characters) instead; before, wide screens folded them into "…" to show the whole title
               check(readable, `${tag}: title readable (${h.full ? 'all' : Math.round(h.htw) + ' px of ' + Math.round(h.w12) + ' for 12 / ' + Math.round(h.w6) + ' for 6 characters'}) "${h.txt}" ${h.lvl}`);
-              check(h.more && h.bell && h.more[0] >= 0 && h.more[1] <= h.vw + 0.5 && h.bell[1] <= h.vw + 0.5 && h.more[1] <= h.bell[0] + 0.5 && !h.out.length, `${tag}: "…" and the bell inside, nothing sticking out ${JSON.stringify({more: h.more, bell: h.bell, vw: h.vw, out: h.out})}`);
+              // 2.366.0 (#3002, intended change): a view without own actions (the calendar) has no "…" any more
+              const noMore = /calendar/.test(tag) && !h.more;
+              check((noMore || (h.more && h.more[0] >= 0 && h.more[1] <= h.vw + 0.5 && h.more[1] <= h.bell[0] + 0.5)) && h.bell && h.bell[1] <= h.vw + 0.5 && !h.out.length, `${tag}: "…" and the bell inside, nothing sticking out ${JSON.stringify({more: h.more, bell: h.bell, vw: h.vw, out: h.out})}`);
               check(h.st || h.ach, `${tag}: the agent shows (pill or status chip)`);
               if (theme === 'dark') await shot(`p260-head-${name}${panel ? '-panel' : ''}-${Wd}.png`);
               // 2.26.1 (#953): closing the task on a touch screen goes back one history step; that traversal must be over before

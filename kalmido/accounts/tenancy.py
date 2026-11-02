@@ -10,8 +10,9 @@ import os
 
 from ..core.i18n import N_
 from ..core.db import gset, gsetting, iso, local_now, now_utc
-from ..accounts.orgs import PRIVATE_FOLDER_RE, has_workspaces
+from ..accounts.orgs import PRIVATE_FOLDER_RE, _operator_apart, has_workspaces, op_foreign_account, op_foreign_org
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import dlg_gone  # 2.473.0 (#3357)
 
 # when the check runs: once a day at this local hour or later; KALMIDO_TENANT_CHECK=always = at every watchdog tick (tests)
 TENANT_CHECK_HOUR = int(os.environ.get("KALMIDO_TENANT_CHECK_HOUR", "3") or 3)
@@ -177,6 +178,10 @@ CHECKS = {
                        "THEN b.owner_org_id IS DISTINCT FROM cl.org_id OR b.org_id IS DISTINCT FROM cl.org_id "
                        "ELSE b.owner_org_id IS NOT NULL OR b.org_id IS NOT NULL OR (b.owner_id IS DISTINCT FROM cl.created_by "
                        "AND NOT EXISTS (SELECT 1 FROM book_members bm WHERE bm.book_id=b.id AND bm.user_id=cl.created_by)) END"),
+    # 2.473.0 (#3357): someone who watches a task of an organisation without being a member of it (boundary_repair removes the row)
+    "task_watcher_person": ("SELECT w.task_id, w.user_id FROM task_watchers w JOIN tasks t ON t.id=w.task_id JOIN lists l ON l.id=t.list_id "
+                            "JOIN users u ON u.id=w.user_id WHERE l.org_id IS NOT NULL AND u.kind!='agent' AND NOT EXISTS (SELECT 1 FROM org_members m "
+                            "WHERE m.org_id=l.org_id AND m.user_id=w.user_id)"),
     # 2.60.0 C (#1512): the reviewer of an organisation's task who is neither its list's owner nor a member of the list
     "task_reviewer": ("SELECT t.id, t.reviewer_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.reviewer_id IS NOT NULL "
                       "AND l.org_id IS NOT NULL AND t.reviewer_id<>l.owner_id AND NOT EXISTS (SELECT 1 FROM list_members m "
@@ -291,7 +296,8 @@ CHECKS = {
     "meal_log": ("SELECT g.meal_id, g.user_id FROM office_meal_log g JOIN office_meals m ON m.id=g.meal_id WHERE g.org_id<>m.org_id"),
     "org_invite": ("SELECT i.org_id, i.user_id FROM org_invites i WHERE NOT EXISTS (SELECT 1 FROM org_members om "
                    "WHERE om.org_id=i.org_id AND om.user_id=i.user_id) AND EXISTS (SELECT 1 FROM org_members o2 "
-                   "WHERE o2.user_id=i.user_id AND o2.org_id<>i.org_id)"),  # 2.190.0 R (#2496): only an account of another organisation
+                   "WHERE o2.user_id=i.user_id AND o2.org_id<>i.org_id) "
+                   "AND NOT EXISTS (SELECT 1 FROM org_joins j WHERE j.org_id=i.org_id AND j.user_id=i.user_id)"),  # 2.190.0 R (#2496): only an account of another organisation; 2.453.0 (#3780): an invitation not accepted (yet) crosses nothing
 }
 TENANT_ALERT = N_("Workspace boundary check: {0} memberships cross the boundary between organisations / private ({1}). Settings > Organisation > People")
 
@@ -321,6 +327,7 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
           "file_person": ("fs_shares", "node_id"),  # 2.48.0 (#1207)
           "doc_mail_person": ("doc_mail", "org_id"),  # 2.48.0 (#1111)
           "task_bell_person": ("task_bell", "task_id"),  # 2.53.0 C (#1424)
+          "task_watcher_person": ("task_watchers", "task_id"),  # 2.473.0 (#3357)
           "assistant_person": ("assistant_access", "list_id"),  # 2.75.0 A (#1411)
           "hub_token_person": ("hub_tokens", "org_id"),  # 2.84.0 A (#1198)
           "sheet_share_person": ("sheet_shares", "sheet_id"),  # 2.124.0 C (#2113)
@@ -328,35 +335,76 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Organisation > People")
 
 
-def boundary_repair(c):
+# 2.480.0 (#3944, F5): the organisation of a repaired row by kind -> SQL on the object id (None: the object id IS the
+# organisation's id); a row without one is private: it belongs to the person in its second column (client_contact, hub_mail_ref)
+RP_ORG = {"list_person": "SELECT org_id FROM lists WHERE id=?", "group": "SELECT org_id FROM lists WHERE id=?",
+          "assistant_person": "SELECT org_id FROM lists WHERE id=?", "cal_person": "SELECT org_id FROM ev_cals WHERE id=?",
+          "book_person": "SELECT org_id FROM books WHERE id=?", "file_person": "SELECT org_id FROM fs_nodes WHERE id=?",
+          "att_person": "SELECT k.org_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?",
+          "task_bell_person": "SELECT l.org_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?",
+          "sheet_share_person": "SELECT org_id FROM sheets WHERE id=?", "tchat_person": "SELECT org_id FROM tchat_rooms WHERE id=?",
+          "doc_mail_person": None, "hub_token_person": None,
+          "client_contact": "SELECT org_id FROM clients WHERE id=?", "hub_mail_ref": "SELECT org_id FROM hub_mails WHERE id=?"}
+
+
+def rp_foreign(c, kind, oid_, uid):
+    """2.480.0 (#3944, F5): hosted -> is the row (kind, object id, person) of a client (an organisation the operator does not
+    administer, or a client's private object)? The operator's button then only counts it. Self-hosted: never."""
+    if not _operator_apart():
+        return False
+    sql = RP_ORG.get(kind)
+    if sql is None and kind in RP_ORG:
+        org = oid_
+    else:
+        r = c.execute(sql, (oid_,)).fetchone() if sql else None
+        org = r[0] if r else None
+    return op_foreign_org(c, org) if org else op_foreign_account(c, uid)
+
+
+def boundary_repair(c, keep=None):
     """Takes out every membership in an organisation's list / calendar / address book of a person who is not a member of
     that organisation. {kind: [[object id, user id], ...]} of what was removed; the
-    caller commits."""
-    out = {}
-    ckl = c.execute(CHECKS["client_contact"] + " ORDER BY 1, 2").fetchall()  # 2.59.0 A (#1735): also without workspaces (freelancers)
+    caller commits. 2.480.0 (#3944, F5): keep(kind, object id, user id) -> True leaves that row as it is (counted only);
+    the rows kept are in out["_kept"] ({kind: n})."""
+    out, kept = {}, {}
+    def skip(k, a, b):
+        if keep and keep(k, a, b):
+            kept[k] = kept.get(k, 0) + 1
+            return True
+        return False
+    ckl = [r for r in c.execute(CHECKS["client_contact"] + " ORDER BY 1, 2").fetchall()  # 2.59.0 A (#1735): also without workspaces (freelancers)
+           if not skip("client_contact", r[0], r[1])]
     for cid, _ in ckl:
         c.execute("UPDATE office_client_contacts k SET contact_id=NULL FROM contacts ct, books b, clients cl WHERE k.client_id=? "
                   "AND cl.id=k.client_id AND ct.id=k.contact_id AND b.id=ct.book_id AND " + CHECKS["client_contact"].split(" WHERE ", 1)[1], (cid,))
     if ckl:
         out["client_contact"] = [[r[0], r[1]] for r in ckl]
-    hbm = c.execute(CHECKS["hub_mail_ref"] + " ORDER BY 1, 2").fetchall()  # 2.84.0 A (#1198): also without workspaces (private <-> org)
+    hbm = [r for r in c.execute(CHECKS["hub_mail_ref"] + " ORDER BY 1, 2").fetchall()  # 2.84.0 A (#1198): also without workspaces (private <-> org)
+           if not skip("hub_mail_ref", r[0], r[1])]
     for mid, _ in hbm:
         c.execute("UPDATE hub_mails SET client_id=NULL, list_id=NULL WHERE id=?", (mid,))
     if hbm:
         out["hub_mail_ref"] = [[r[0], r[1]] for r in hbm]
     if not has_workspaces(c):
+        if kept:
+            out["_kept"] = kept
         return out
     for k, (table, col) in REPAIR.items():
         rows = c.execute(CHECKS[k] + " ORDER BY 1, 2").fetchall()
         done = []
         for oid_, uid in rows:
+            if skip(k, oid_, uid):
+                continue
             c.execute(f"DELETE FROM {table} WHERE {col}=? AND user_id=?", (oid_, uid))
             if table == "list_members":
                 c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (oid_, uid))
+                dlg_gone(c, oid_, uid)  # 2.473.0 (#3357): delegated tasks and watching of this list end
                 c.execute("DELETE FROM task_people WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, oid_))
             done.append([oid_, uid])
         if done:
             out[k] = done
+    if kept:
+        out["_kept"] = kept
     return out
 
 

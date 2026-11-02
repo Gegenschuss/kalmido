@@ -16,7 +16,7 @@ function tg_collect() {
       const lc = cssColor(ltagColor(g, t.list_id)); if (lc && !r.color) r.color = lc;
     }
   }
-  return [...m.values()].sort((a, b) => b.open - a.open || a.name.localeCompare(b.name, 'de')).map(r => ({...r, over: !!r.due && r.due < t0}));
+  return [...m.values()].sort((a, b) => b.open - a.open || cmpText(a.name, b.name)).map(r => ({...r, over: !!r.due && r.due < t0}));
 }
 function tg_card(r) {
   const ls = [...r.lists.values()], shown = ls.slice(0, 3).map(esc).join(' · ') + (ls.length > 3 ? ` +${ls.length - 3}` : '');

@@ -119,6 +119,10 @@ def main(argv):
     i18n = read(os.path.join(STATIC, "i18n.js"))
     write(os.path.join(st, "i18n.js"), replace(i18n, "/static/i18n/", "static/i18n/", "i18n.js"))
     css = read(os.path.join(STATIC, "app.css"))
+    # 2.476.0 (#3487): the start style files (static/css/start-*.css) belong to app.css, as the server sends it
+    for f in sorted(os.listdir(os.path.join(STATIC, "css"))):
+        if f.startswith("start-") and f.endswith(".css"):
+            css += f"\n/* css/{f} */\n" + read(os.path.join(STATIC, "css", f))
     write(os.path.join(st, "app.css"), replace(css, 'url("/static/', 'url("', "app.css", count=2, at_least=True))
     # 2.18.0 (#394): + the favicons and the Apple touch icon that index.html links
     for f in ("icon.svg", "icon-192.png", "favicon.svg", "favicon-16.png", "favicon-32.png", "apple-touch-icon.png"):
@@ -146,6 +150,7 @@ def main(argv):
 
     # the page: the app's index.html, relative paths, no manifest, CSP + noindex, the demo scripts before the app
     html = src_html.replace('.js" defer></script>', '.js"></script>')  # 2.191.0 B (#2505): the demo keeps plain script tags
+    html = re.sub(r"<!-- [^\n]*new start scripts go below this line[^\n]*-->\n", "", html)  # 2.476.0 (#3487): the mark of the sorted part
     html = replace(html, "".join(f'<script src="/static/js/{m}"></script>\n' for m in mods), '<script src="/static/app.js"></script>\n', "index.html")
     html = replace(html, '<link rel="manifest" href="/manifest.json" crossorigin="use-credentials">\n', "", "index.html")
     html = replace(html, "<title>Kalmido</title>",

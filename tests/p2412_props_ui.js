@@ -70,7 +70,9 @@ const ev = (w, s) => JSON.parse(w.eval(`JSON.stringify(${s})`));
   w.eval(`openDetail(${T2})`);
   check(await until(() => d.querySelector('#detail .dtitle') && ![...d.querySelectorAll('#detail .dsec h5')].some(h => h.textContent === 'Tags')), 'the task without tags in the same project: no Tags part');
   w.eval(`taskMenu(document.querySelector('#detail .dtop [data-act="task-menu"]'), ${T2})`);
-  const mi = await until(() => d.querySelectorAll('[role="menuitem"]').length && [...d.querySelectorAll('[role="menuitem"]')].map(b => b.textContent.trim()));
+  let mi = await until(() => d.querySelectorAll('[role="menuitem"]').length && [...d.querySelectorAll('[role="menuitem"]')].map(b => b.textContent.trim()));
+  // 2.445.0 (#3008): both levels (Add code snippet would be under "More…")
+  if (d.querySelector('#pop .mtmore')) { d.querySelector('#pop .mtmore').click(); mi = mi.concat([...d.querySelectorAll('[role="menuitem"]')].map(b => b.textContent.trim())); }
   check(Array.isArray(mi) && !mi.some(x => /^Start time tracking|^Add time|^Add code snippet/.test(x)), 'personal: the task menu has no time / code items ' + JSON.stringify(mi).slice(0, 300));
   d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
   await call('PATCH', '/api/lists/' + PV, {props: {}});

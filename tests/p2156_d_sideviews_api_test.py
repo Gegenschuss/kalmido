@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""2.156.0 API tests, part D (#2186): saved views of the sidebar, the user settings side_views (json list of views) and
+"""2.156.0 API tests, part D (#2186): saved views of the sidebar, the account settings side_views (json list of views) and
 side_view (the active one, '' = "Everything"). Own container (start.sh), invented people only.
  - a view is stored cleaned (doubles dropped, name trimmed, default icon); invalid values are refused with 400 and nothing
    is stored (wrong types, unknown id shape, too many, double ids, control characters, a bad start page)
  - create, change, delete = one PATCH of side_views each; the active view = side_view, read the same by a second session
    of the same person (another device)
  - another person sees none of it
- - a person without an organisation (the private space) works the same
+ - a person without an organisation (the private workspace) works the same
 freelancer-matrix: own
 usage: p2156_d_sideviews_api_test.py <datadir>      (a fresh container; P2156D_NOSTART=1: the container runs already)"""
 import json

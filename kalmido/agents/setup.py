@@ -161,7 +161,7 @@ def ains_admin_code(aid):
     need_api()
     c = db()
     with system_ctx(c):  # the instance admin manages agent accounts (any organisation; structure, no content), like the token route
-        need_agent_admin(c, aid)
+        need_agent_admin(c, aid, cred=True)  # 2.485.0 (#3939): no setup code through support access
         return ains_code_new(c, aid)
 
 

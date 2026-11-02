@@ -92,7 +92,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
     const devRow = [...rows].find(r => /Dev list 2/.test(r.textContent));
     if (!mobile) {
       // 2.152.2 (#2624): project instead of list
-      check(/Projects owned by agents or disabled users/.test(d.querySelector('#s-orph-h')?.textContent || '') && rows.length === 2, `${lab}: the section with the two agent lists (${rows.length})`);
+      check(/Projects owned by agents or disabled accounts/.test(d.querySelector('#s-orph-h')?.textContent || '') && rows.length === 2, `${lab}: the section with the two agent lists (${rows.length})`);
       check(devRow && /owned by the agent Claude/.test(devRow.textContent), `${lab}: the reason`);
       click(w, devRow.querySelector('[data-orph]')); await sleep(300);
       om = d.querySelector('.modal.owmodal');

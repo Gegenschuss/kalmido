@@ -14,7 +14,7 @@ takes it over (as that person, one undo step) or discards it. Invented companies
  - report: only agents the list is shared with (status report dialog: agents, agent_text); the input = the status report as
    the agent sees the list + its fixed Markdown, never comments / notes; take over -> agent_text for the period, undo ->
    the fixed text again; a list not shared: 404
- - a freelancer without an organisation does all three with the own agent in the personal office / private space
+ - a freelancer without an organisation does all three with the own agent in the personal office / private workspace
    (freelancer-matrix: agents, office)
 usage: p21261_a_api_test.py <datadir>   (P21261A_NOSTART=1: against a running instance on KALMIDO_TEST_PORT)"""
 import json
@@ -265,7 +265,7 @@ check((A.get(B + f"/api/lists/{LID}/status-report", params={"days": 7}).json().g
 check(RAGS.get(V + f"/lists/{LID}/status-report").ok and "agent_text" not in RAGS.get(V + f"/lists/{LID}/status-report").json(),
       "report: the API v1 status report stays as it was")
 
-# ---------------------------------------------------------------- a freelancer: all three in the personal office / private space
+# ---------------------------------------------------------------- a freelancer: all three in the personal office / private workspace
 # freelancer-matrix: agents, office
 FID, Fr = freelancer(B, A)
 Fr.get(B + O + "/settings")
@@ -315,7 +315,7 @@ AD = (r.json().get("ids") or [x["id"] for x in r.json().get("docs") or r.json().
 if AD:
     A.post(B + f"/api/files/nodes/{AD}/shares", json={"agent_id": AG, "role": "view"})
     check(agents_for(A, "doc_summary", doc_id=AD) == [], "doc_summary: a private document is not in the agent's office area")
-# report in the private space
+# report in the private workspace
 FL = Fr.post(B + "/api/lists", json={"name": "Portrait Projekt"}).json()["id"]
 Fr.put(B + f"/api/lists/{FL}/members", json={"user_id": FAG, "role": "edit"})
 check(FAG in [a["id"] for a in Fr.get(B + f"/api/lists/{FL}/status-report").json().get("agents", [])], "freelancer: report: her agent in her list")

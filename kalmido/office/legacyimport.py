@@ -18,6 +18,7 @@ Every confirmed import is a run (office_import_runs); its records carry the run 
 builds on yet (a client with a list, document, contract or archived document stays; so does a service used in a
 document) and says what stayed. Only the organisation's admins (the stricter of "master data" and "clients"); agent
 tokens and kids are stopped by office_gate."""
+import codecs
 import hashlib
 import hmac
 import io
@@ -36,7 +37,7 @@ from flask import jsonify, request
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
-from ..core.db import body, bump, db, iso, now_utc, parse_iso
+from ..core.db import body, bump, db, iso, local_now, now_utc, parse_iso
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .model import (MD, pb_cl_org, pb_cl_sql, office_create, office_gate, office_in_use, office_number_format, office_org, office_role, office_rows, office_scheme_period,
@@ -65,6 +66,8 @@ FI_REASONS = {
     "country": N_("Country not recognised"),
     "co": N_("c/o line moved to the contact"),
     "long_name": N_("Name shortened"),
+    "bad_email": N_("E-mail address not readable, left out"),  # 2.363.0 (#3103)
+    "bad_vat": N_("VAT ID too long, left out"),  # 2.363.0 (#3103)
     "one_line": N_("Only one line"),
     "foreign": N_("Address abroad: please check the fields"),
     "person_swap": N_("First line taken as the contact person: please check"),
@@ -144,6 +147,7 @@ def fi_xlsx_read(raw):
                     strings.append("".join(t.text or "" for t in si.iter() if _local(t.tag) == "t" and not _in_rph(si, t)))
         wb = _xml(z, "xl/workbook.xml", budget)
         wrels = _rels(z, "xl/workbook.xml", budget)
+        zeros = _fmt_zeros(z, names, budget)
         out = {}
         parts = 0
         for sh in wb.iter():
@@ -156,7 +160,7 @@ def fi_xlsx_read(raw):
             path = wrels.get(rid)
             if not path or path not in names:
                 continue
-            grid = _sheet(z, path, strings, budget)
+            grid = _sheet(z, path, strings, budget, zeros)
             out.setdefault((sh.get("name") or "").strip().lower(), grid)
             for t in _rels(z, path, budget).values():  # the sheet's tables (Excel "Format as table"; Power Query output)
                 if t in names and "/tables/" in t:
@@ -186,7 +190,27 @@ def _in_rph(si, t):
     return False
 
 
-def _sheet(z, path, strings, budget):
+def _fmt_zeros(z, names, budget):
+    """2.363.0 (#3103): {cell style index: digits} of the styles that show a number with leading zeros (format "00000"):
+    a postcode or customer number stored as a number keeps them, as Excel shows it."""
+    if "xl/styles.xml" not in names:
+        return {}
+    try:
+        st = _xml(z, "xl/styles.xml", budget)
+    except (ET.ParseError, BadInput):
+        return {}  # only a nicety: a broken style part does not stop the import
+    fmts = {x.get("numFmtId"): x.get("formatCode") or "" for x in st.iter() if _local(x.tag) == "numFmt"}
+    out = {}
+    for sec in st:
+        if _local(sec.tag) == "cellXfs":
+            for i, xf in enumerate(x for x in sec if _local(x.tag) == "xf"):
+                m = re.fullmatch(r"(?:\[\$-[0-9A-Fa-f]+\])?(0{2,})", fmts.get(xf.get("numFmtId"), ""))
+                if m:
+                    out[str(i)] = len(m.group(1))
+    return out
+
+
+def _sheet(z, path, strings, budget, zeros=None):
     rows = {}
     for row in _xml(z, path, budget).iter():
         if _local(row.tag) != "row":
@@ -219,6 +243,8 @@ def _sheet(z, path, strings, budget):
                 v = ""
             elif t in (None, "n") and re.fullmatch(r"-?\d+\.0+", v):
                 v = v.split(".")[0]
+            if zeros and t in (None, "n") and v.isdigit() and cel.get("s") in zeros:
+                v = v.zfill(zeros[cel.get("s")])
             cells[ci] = v
         rows[r] = cells
     if not rows:
@@ -584,6 +610,7 @@ def sr_role_rows(c, oid, book, kind):
     t = sr_table(book, *spec["tables"])
     if t is None:
         return None
+    at = fi_head_at(book, *spec["tables"])
     head, rows = t
     head = [eq_head(h) for h in head]
     ix = {f: _col(head, *n) for f, n in spec["cols"].items()}
@@ -596,7 +623,7 @@ def sr_role_rows(c, oid, book, kind):
         nm = get("name_de")
         if not nm or SEP_RE.match(nm):
             continue
-        e = {"row": i + 2, "name_de": nm[:200]}
+        e = {"row": i + at + 2, "name_de": nm[:200]}  # 2.363.2 (#3106): the row in Excel, also below title rows
         for f in spec["cols"]:
             if f in SR_NUMS:
                 e[f] = _num(get(f))
@@ -634,6 +661,11 @@ FI_ADDR_COLS = {
     "city": ("ort", "stadt", "city", "town", "wohnort", "ortschaft", "gemeinde"),
     "country": ("land", "country", "staat", "countrycode", "ländercode", "laendercode"),
     "address": ("addresses", "address", "adresse", "adressen", "anschrift"),
+    # 2.363.0 (#3103): the other client fields such exports have (also beside the one-cell address)
+    "email": ("email", "mail", "emailadresse", "mailadresse"),
+    "phone": ("telefon", "telefonnummer", "tel", "phone", "phonenumber", "telephone", "mobil", "mobile", "handy"),
+    "customer_no": ("kundennummer", "kundennr", "kdnr", "knr", "debitor", "debitornummer", "customerno", "customernumber"),
+    "vat_id": ("ustidnr", "ustid", "ustidnummer", "umsatzsteuerid", "vatid", "vatnumber", "vatno"),
 }
 FI_MAP_KEYS = tuple(FI_ADDR_COLS)
 FI_CSV_NAMES = ("services", "leistungen", "equipment", "geräte", "technik", "freelancer", "staff", "crew")  # a CSV named so is that table
@@ -708,15 +740,27 @@ def fi_book(raw, name=""):
         return fi_xls_read(raw)
     if (name or "").lower().endswith((".xlsx", ".xlsm")):
         raise BadInput(tr("This is not a spreadsheet file (.xlsx)"))
-    if b"\x00" in raw[:4096] or raw.startswith(FI_NOT_CSV) or (name or "").lower().endswith((".pdf", ".zip", ".png", ".jpg", ".jpeg", ".heic")):
+    utf16 = raw[:2] in (codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)  # 2.363.0 (#3103): Excel's "Unicode text"
+    if utf16:
+        pass
+    elif b"\x00" in raw[:4096] or raw.startswith(FI_NOT_CSV) or (name or "").lower().endswith((".pdf", ".zip", ".png", ".jpg", ".jpeg", ".heic")):
         raise BadInput(tr("This is not a spreadsheet file (.xlsx or CSV)"))
     try:
-        text = raw.decode("utf-8-sig")
+        text = raw.decode("utf-16", "replace") if utf16 else raw.decode("utf-8-sig")
     except UnicodeDecodeError:
         text = raw.decode("cp1252", "replace")
     _d, head, body_ = csv_table(text, max_rows=FI_ROWS_MAX)
     stem = re.sub(r"\.[^.]*$", "", (name or "").replace("\\", "/").rsplit("/", 1)[-1]).strip().lower()
     return {stem if stem in FI_CSV_NAMES else "contacts": [head] + body_[:FI_ROWS_MAX]}
+
+
+def fi_head_at(book, *names):
+    """2.363.0 (#3103): the index of the header row of that table (title rows above it count for the row numbers)."""
+    for n in names:
+        for i, row in enumerate((book.get(n) or [])[:10]):
+            if any(str(x).strip() for x in row):
+                return i
+    return 0
 
 
 def fi_head_orig(book, *names):
@@ -805,6 +849,27 @@ def fi_columns_client(row, m):
     return out
 
 
+def fi_client_extras(a, row, m):
+    """2.363.0 (#3103): e-mail, phone, customer number, VAT ID of the client's row into a; what the import would refuse
+    stays out with a flag (one bad cell must not stop the whole file)."""
+    get = lambda k: _clean_line(str(row[m[k]])) if k in m and m[k] < len(row) else ""  # noqa: E731
+    mail = get("email")
+    if mail and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", mail):
+        mail = ""
+        a["flags"].append("bad_email")
+    vat = get("vat_id").replace(" ", "").upper()
+    if len(vat) > 20:
+        vat = ""
+        a["flags"].append("bad_vat")
+    a.update(email=mail[:200], phone=get("phone")[:60], customer_no=get("customer_no")[:40], vat_id=vat)
+
+
+def fi_unused_cols(orig, rows, used):
+    """2.363.0 (#3103): the headers of the columns with content that nothing takes over (the preview names them)."""
+    return [orig[j] or tr("Column {0}", j + 1) for j in range(len(orig))
+            if j not in used and any(j < len(r) and str(r[j]).strip() for r in rows)][:30]
+
+
 def fi_preview(c, oid, raw, name="", amap=None):
     book = fi_book(raw, name)  # 2.146.0 E (#2456): also CSV
     out = {"sheets": sorted(book), "clients": [], "roles": [], "crew": [], "services": [], "equipment": [], "other": {}}
@@ -820,6 +885,13 @@ def fi_preview(c, oid, raw, name="", amap=None):
         if isinstance(amap.get("address"), int) and not cols:
             ci = amap["address"]
         out["columns"] = {"head": orig[:60], "map": amap, "mode": "columns" if cols else "one"}
+        at = fi_head_at(book, "contacts", "kontakte", "kunden", "adressen")
+        used = set(amap.values()) | ({ci} if not cols and ci is not None else set())
+        if cols and "name" not in amap:  # the first free column is the name (fi_columns_client)
+            used.add(next((j for j in range(len(orig)) if j not in used), -1))
+        out["columns"]["unused"] = fi_unused_cols(orig, rows, used)
+        if at + 1 + len(rows) > FI_ROWS_MAX:
+            out["columns"]["cut"] = FI_ROWS_MAX
         known = _org_clients(c, oid)
         kn = [(fi_norm(k["name"]), k["zip"] or "", k) for k in known]
         seen = []
@@ -835,7 +907,8 @@ def fi_preview(c, oid, raw, name="", amap=None):
                 if not txt:
                     continue
                 a = fi_split_address(txt)
-            a["row"] = i + 2
+            fi_client_extras(a, row, amap)
+            a["row"] = i + at + 2  # 2.363.0 (#3103): the row of the file, also below title rows
             n = fi_norm(a["name"])
             a["dup"] = None
             for nn, zz, k in kn:
@@ -857,6 +930,7 @@ def fi_preview(c, oid, raw, name="", amap=None):
     if t:
         head, rows = t
         have = sr_have(c, oid, "services", "name_de")
+        at = fi_head_at(book, "services", "leistungen")
         ix = {k: _col(head, *v) for k, v in {"de": ("servicede", "service", "leistung"), "en": ("serviceen",), "day": ("dailyrate", "tagessatz"),
                                               "hour": ("hourlyrate", "stundensatz"), "raw": ("rawfee",), "prod": ("producingfee", "producing"),
                                               "order": ("order", "sort"), "cat": ("category", "kategorie"), "role": ("freelancer", "role"),
@@ -875,7 +949,7 @@ def fi_preview(c, oid, raw, name="", amap=None):
             if not de:
                 continue
             day, hour = _num(cell(row, "day")), _num(cell(row, "hour"))
-            s = {"row": i + 2, "name_de": de[:200], "name_en": cell(row, "en")[:200], "category": (cell(row, "cat") or cat)[:80],
+            s = {"row": i + at + 2, "name_de": de[:200], "name_en": cell(row, "en")[:200], "category": (cell(row, "cat") or cat)[:80],
                  "daily_rate": day, "hourly_rate": hour, "unit": "hour" if hour is not None and day is None else "day",
                  "raw_fee": _flag01(cell(row, "raw")), "producing": _flag01(cell(row, "prod")),
                  "role": cell(row, "role")[:80], "intext": sr_intext(cell(row, "ie"))}  # 2.47.0 (#1649): also shooting
@@ -904,6 +978,7 @@ def fi_preview(c, oid, raw, name="", amap=None):
     if t:
         head, rows = t
         have = sr_have(c, oid, "equipment", "name", "name_en")  # 2.47.0 (#1648): name -> row (to fill)
+        at = fi_head_at(book, "equipment", "geräte", "technik")
         # 2.45.1 (#1556): "Device DE" / "Device EN" (spaces, underscores, hyphens and case do not matter); DE before the plain names
         head = [eq_head(h) for h in head]
         ni = _col(head, "devicede", "gerätde", "geraetde", "namede", "device", "name", "gerät", "geraet")
@@ -932,7 +1007,7 @@ def fi_preview(c, oid, raw, name="", amap=None):
                     by_id[rid_]["action"] = "fill" if by_id[rid_]["fill"] else "skip"
                 names.add(nm.lower())
                 continue
-            e = {"row": i + 2, "name": nm[:200], "name_en": en[:200], "category": (cell(row, cti) or cat)[:80],
+            e = {"row": i + at + 2, "name": nm[:200], "name_en": en[:200], "category": (cell(row, cti) or cat)[:80],
                  "daily_rate": _num(sr_cell(row[di])) if di is not None and di < len(row) else None}
             e["dup"] = any(v in have or v in names for v in {nm.lower(), en.lower()} - {""})  # 2.45.1 (#1556): either name
             cur = have.get(nm.lower()) or have.get(en.lower())
@@ -961,6 +1036,58 @@ def _run_new(c, oid, uid, kind):
     return insert_id(c, "INSERT INTO office_import_runs(org_id, kind, created_by, created_at) VALUES(?,?,?,?)", (oid, kind, uid, iso(now_utc())))
 
 
+# 2.363.2 (#3104): the imports of fixed costs, trips and leads are runs too: {kind: (table, what still counts as there)}.
+FX_RUNS = {"fixed_costs": ("office_fixed_costs", ""), "trips": ("office_trips", ""), "leads": ("office_deals", " AND t.deleted_at IS NULL")}
+FX_UNDO_LATE = N_("This import is older than 24 hours and can no longer be undone.")
+
+
+def fx_run(c, oid, uid, kind, ids):
+    """A run for the new rows `ids` of kind (no rows: no run). Their rows carry the run id, like the master data. No commit."""
+    if not ids:
+        return None
+    rid = _run_new(c, oid, uid, kind)
+    c.execute("UPDATE office_import_runs SET counts=? WHERE id=? AND org_id=?", (json.dumps({kind: len(ids)}), rid, oid))
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        c.execute(f"UPDATE {FX_RUNS[kind][0]} SET import_run_id=? WHERE org_id=? AND id IN ({','.join('?' * len(part))})", [rid, oid] + part)
+    return rid
+
+
+def fx_settle(c, oid, uid, kind):
+    """The runs of kind with nothing left (the toast's undo, every row deleted by hand) count as undone. No commit."""
+    table, alive = FX_RUNS[kind]
+    c.execute(f"""UPDATE office_import_runs r SET undone_at=?, undone_by=? WHERE org_id=? AND kind=? AND undone_at IS NULL
+                  AND NOT EXISTS (SELECT 1 FROM {table} t WHERE t.org_id=r.org_id AND t.import_run_id=r.id{alive})""",
+              (iso(now_utc()), uid, oid, kind))
+
+
+def fx_undo(c, oid, uid, r):
+    """Undoes a run of FX_RUNS within OLK_UNDO_HOURS, by the rules of the toast's undo (what changed since stays).
+    -> as fi_undo."""
+    if r["undone_at"]:
+        raise Denied(409, tr("This import has already been undone"))
+    try:
+        at = parse_iso(r["created_at"])
+    except (TypeError, ValueError):
+        at = None
+    if at is None or now_utc() - at > timedelta(hours=OLK_UNDO_HOURS):
+        raise Denied(409, tr(FX_UNDO_LATE))
+    kind = r["kind"]
+    table, alive = FX_RUNS[kind]
+    ids = [x[0] for x in c.execute(f"SELECT t.id FROM {table} t WHERE t.org_id=? AND t.import_run_id=?{alive} ORDER BY t.id", (oid, r["id"]))]
+    if kind == "fixed_costs":
+        from .fixedimport import fci_remove
+        n = fci_remove(c, oid, ids)
+    elif kind == "trips":
+        from .vmaimport import vmi_remove
+        n = vmi_remove(c, oid, ids)["deleted"]
+    else:
+        from .leads import lead_bin
+        n = lead_bin(c, oid, ids)
+    c.execute("UPDATE office_import_runs SET undone_at=?, undone_by=? WHERE id=? AND org_id=?", (iso(now_utc()), uid, r["id"], oid))
+    return {kind: n}, {"entries": len(ids) - n}, [], []
+
+
 def _run_row(c, oid, rid):
     r = c.execute("SELECT * FROM office_import_runs WHERE id=? AND org_id=?", (rid, oid)).fetchone()
     if not r:
@@ -968,7 +1095,7 @@ def _run_row(c, oid, rid):
     return r
 
 
-MERGE_FIELDS = ("contact", "street", "zip", "city", "country", "address")
+MERGE_FIELDS = ("contact", "street", "zip", "city", "country", "address", "email", "phone", "customer_no", "vat_id")
 
 
 def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=None, pre=None):
@@ -985,13 +1112,13 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=N
             try:
                 tid = int(x.get("merge_id"))
             except (TypeError, ValueError):
-                raise BadInput(tr("Invalid value: {0}", "merge_id")) from None
+                raise BadInput(tr("The chosen client no longer exists")) from None
         else:
             tid = made.get(x.get("contact_row"))
             if not tid:
                 raise BadInput(tr("The client of row {0} is not imported", x.get("contact_row") if isinstance(x.get("contact_row"), int) else "?"))
         if not c.execute(f"SELECT 1 FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (tid,)).fetchone():
-            raise BadInput(tr("Invalid value: {0}", "merge_id"))
+            raise BadInput(tr("The chosen client no longer exists"))
         name = str(x.get("contact") or "").strip()
         if not name:
             raise BadInput(tr("Name missing"))
@@ -1004,15 +1131,15 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=N
         if isinstance(x.get("row"), int):
             made[x["row"]] = tid
         return
-    f = {k: x.get(k) for k in ("name", "contact", "street", "zip", "city", "country", "address") if x.get(k) is not None}
+    f = {k: x.get(k) for k in ("name", "contact", "street", "zip", "city", "country", "address", "email", "phone", "customer_no", "vat_id") if x.get(k) is not None}
     if act == "merge":
         try:
             mid = int(x.get("merge_id"))
         except (TypeError, ValueError):
-            raise BadInput(tr("Invalid value: {0}", "merge_id")) from None
+            raise BadInput(tr("The chosen client no longer exists")) from None
         cur = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (mid,)).fetchone()
         if not cur:
-            raise BadInput(tr("Invalid value: {0}", "merge_id"))
+            raise BadInput(tr("The chosen client no longer exists"))
         f.pop("name", None)
         f = clean_client(c, uid, f)
         fill = {k: v for k, v in f.items() if k in MERGE_FIELDS and v and not (cur[k] or "").strip()}
@@ -1027,7 +1154,7 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=N
         counts["merged"] += 1
         return
     if act != "new":
-        raise BadInput(tr("Invalid value: {0}", "action"))
+        raise BadInput(tr("Unknown choice for this row"))
     # 2.269.0 D (#3046): sent again (two tabs, a retry) = a client that is there by now is skipped like in the preview;
     # dup_ok = the person chose "new" for a row the preview found (pre = the clients before this run)
     if pre and x.get("dup_ok") not in (1, True, "1"):
@@ -1142,7 +1269,7 @@ def sr_import_rows(c, oid, rid, kind, rows, cols, counts, filled, resolve=None):
             names = [str(x.get(n) or "").strip().lower() for n in SR_NAMES[kind]]
             cur = next((have[n] for n in names if n and n in have), None)
             if not cur:
-                raise BadInput(tr("Row {0}: {1}", x.get("row") if isinstance(x.get("row"), int) else "?", tr("Invalid value: {0}", "action")))
+                raise BadInput(tr("Row {0}: {1}", x.get("row") if isinstance(x.get("row"), int) else "?", tr("Unknown choice for this row")))
             f = sr_fill(kind, cur, vals)
             if not f:
                 counts["skipped"] += 1
@@ -1156,7 +1283,7 @@ def sr_import_rows(c, oid, rid, kind, rows, cols, counts, filled, resolve=None):
             counts[kind + "_filled"] = counts.get(kind + "_filled", 0) + 1
             continue
         if act != "new":
-            raise BadInput(tr("Invalid value: {0}", "action"))
+            raise BadInput(tr("Row {0}: {1}", x.get("row") if isinstance(x.get("row"), int) else "?", tr("Unknown choice for this row")))
         # 2.269.0 D (#3046): sent again = a row of that name there by now is skipped (the preview's dup = "new" on purpose)
         nm = str(x.get(SR_NAMES[kind][0]) or "").strip().lower()
         if nm and not x.get("dup") and nm in have:
@@ -1290,6 +1417,8 @@ def fi_undo(c, oid, uid, rid, kinds=None):
     if r["kind"] == "datev_archive":  # 2.414.0 (#3502): a run of the booking archive (office/bookarch.py)
         from .bookarch import ba_undo
         return ba_undo(c, oid, uid, r)
+    if r["kind"] in FX_RUNS:
+        return fx_undo(c, oid, uid, r)
     if r["undone_at"]:
         raise Denied(409, tr("This import has already been undone"))
     detail = bk_detail(r)
@@ -1504,18 +1633,40 @@ def _unlink_files(oid, files):
 
 # ---------------------------------------------------------------- archive: file names, storage, numbers
 DATE_PATTERNS = ((r"(\d{4})-(\d{1,2})-(\d{1,2})", "ymd"), (r"(\d{1,2})\.(\d{1,2})\.(\d{4})", "dmy"), (r"(\d{1,2})\.(\d{1,2})\.(\d{2})", "dmy2"),
-                 (r"(\d{1,2})-(\d{1,2})-(\d{4})", "dmy"), (r"(\d{1,2})-(\d{1,2})-(\d{2})", "dmy2"), (r"(20\d{2})(\d{2})(\d{2})", "ymd"),
-                 (r"(\d{2})(\d{2})(\d{2})", "ymd2"))
+                 (r"(\d{1,2})-(\d{1,2})-(\d{4})", "dmy"), (r"(\d{1,2})-(\d{1,2})-(\d{2})", "dmy2"), (r"(20\d{2})(\d{2})(\d{2})", "ymd"))
+
+
+def fi_six_digits(s):
+    """2.363.0 (#3103): the readings of six digits as a date, German first: [DDMMYY, YYMMDD], without impossible and future days."""
+    if not re.fullmatch(r"\d{6}", s):
+        return []
+    a, b_, c_ = int(s[:2]), int(s[2:4]), int(s[4:])
+    out = []
+    for y, mo, d in ((2000 + c_, b_, a), (2000 + a, b_, c_)):
+        try:
+            x = date(y, mo, d)
+        except ValueError:
+            continue
+        if x <= local_now().date() and x.isoformat() not in out:
+            out.append(x.isoformat())
+    return out
+
+
+def fi_date_open(s):
+    """2.363.0 (#3103): True when a date in a file name can be read two ways: it is proposed, not "sure"."""
+    return len(fi_six_digits((s or "").strip())) > 1
 
 
 def fi_parse_date(s):
     s = (s or "").strip()
+    if re.fullmatch(r"\d{6}", s):
+        return next(iter(fi_six_digits(s)), "")
     for pat, kind in DATE_PATTERNS:
         m = re.fullmatch(pat, s)
         if not m:
             continue
         a, b_, c_ = (int(x) for x in m.groups())
-        y, mo, d = {"ymd": (a, b_, c_), "dmy": (c_, b_, a), "dmy2": (2000 + c_, b_, a), "ymd2": (2000 + a, b_, c_)}[kind]
+        y, mo, d = {"ymd": (a, b_, c_), "dmy": (c_, b_, a), "dmy2": (2000 + c_, b_, a)}[kind]
         try:
             return date(y, mo, d).isoformat()
         except ValueError:
@@ -1537,13 +1688,13 @@ def fi_parse_filename(name, clients=()):
             out["project_no"] = m.group("proj")
         else:
             out["project"] = m.group("proj")
-        out["sure"] = bool(out["date"])
+        out["sure"] = bool(out["date"]) and not fi_date_open(m.group("date"))
     else:
         m = re.fullmatch(r"(?P<proj>[^_]+)_(?P<client>[^_]+)_(?P<title>.*?)_{2,}(?P<date>[^_]+)_(?:R|RE|Rechnung)", stem, re.I)
         if m:
             out.update(kind="invoice", project_no=m.group("proj"), client_name=m.group("client"), project=m.group("title").replace("_", " ").strip(),
                        date=fi_parse_date(m.group("date")))
-            out["sure"] = bool(out["date"])
+            out["sure"] = bool(out["date"]) and not fi_date_open(m.group("date"))
         else:  # a free form: the first number is the project, a date anywhere, R / KV mark the kind
             if toks and toks[0].isdigit():
                 out["project_no"] = toks[0]

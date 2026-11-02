@@ -9,7 +9,12 @@ office's admins ever get them (model.py admin_cols; members see the device witho
 Depreciation (no tax advice, figures without guarantee): net <= AST_GWG -> written off in full in the purchase year
 (geringwertiges Wirtschaftsgut), else linear by the month from the purchase month on. The book value is what is left;
 the current value for the insurance is the book value unless the admin enters an own one. ast_afa_year hands the
-depreciation of a year to the profit statement (EUeR, #1921); ast_covered tells a policy (#1925) what it covers."""
+depreciation of a year to the profit statement (EUeR, #1921); ast_covered tells a policy (#1925) what it covers.
+
+2.480.0 C (#3528): per device a choice afa_method auto | linear | declining. Declining (§ 7 Abs. 2 EStG, the
+Investitionssofortprogramm, BGBl. 2025 I of 18.07.2025) is open to a purchase from 01.07.2025 to 31.12.2027 only: up to three
+times the linear rate, at most 30 % a year of the book value, the purchase year by the month; it switches to linear (book
+value / remaining life) as soon as that is higher (§ 7 Abs. 3 EStG). A low-value asset stays one; auto = linear."""
 import csv
 import io
 import re
@@ -20,10 +25,10 @@ from flask import Response, jsonify, request
 
 from ..core.config import app
 from ..core.db import db, local_now
-from ..core.i18n import N_, lang, tr, trn
+from ..core.i18n import N_, csv_dialect, lang, tr, trn
 from ..core.access import Denied
 from ..core.errors import BadInput
-from .calc import dec, dstr, money
+from .calc import calc_lang, dec, dstr, money
 from .model import ofx_name1, office_gate, office_org, office_rows, office_settings, pb_owner
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 
@@ -42,6 +47,9 @@ AST_LIFE = (
           "\\bmic\\b", "recorder", "stativ", "tripod", "gimbal", "video", "speedlite", "blitz")),
 )
 AST_LIFE_DEFAULT = 60
+AST_METHODS = ("auto", "linear", "declining")  # 2.480.0 C (#3528): the choice per device (office_equipment.afa_method)
+AST_DECL_FROM, AST_DECL_TO = date(2025, 7, 1), date(2027, 12, 31)  # declining only for a purchase in this window (DE, without guarantee)
+AST_DECL_MAX, AST_DECL_FACTOR = Decimal("0.30"), 3  # at most 30 % a year, at most three times the linear rate
 AST_LIFE_MAX = 600
 AST_DISCLAIMER = N_("No tax advice; figures without guarantee.")
 _VAT_RE = re.compile(r"(?:mwst|ust|umsatzsteuer|mehrwertsteuer|vat|tva|iva|btw)\D{0,30}?(\d{1,2})(?:[.,]0{1,2})?\s*%"
@@ -77,15 +85,53 @@ def ast_life_suggest(category, name):
     return AST_LIFE_DEFAULT
 
 
-def bnk_plan(net, pdate, life):
-    """The depreciation of one device: (method, [{year, afa, book}]) with method 'gwg' | 'linear'; ('', []) without a
-    purchase day or a positive net price. Linear: by the month from the purchase month on; the cumulated amount is
-    rounded per year so the years add up to the net price exactly."""
+def ast_declining_ok(pdate):
+    """2.480.0 C (#3528): may a device bought on pdate (a date or None) be depreciated declining?"""
+    return pdate is not None and AST_DECL_FROM <= pdate <= AST_DECL_TO
+
+
+def ast_declining_rate(life):
+    """2.480.0 C (#3528): the declining rate of a useful life in months: three times the linear one, at most 30 %."""
+    return min(Decimal(12 * AST_DECL_FACTOR) / max(1, int(life or AST_LIFE_DEFAULT)), AST_DECL_MAX)
+
+
+def ast_method_check(method, pdate):
+    """2.480.0 C (#3528): 400 when declining is chosen for a purchase outside the window (or without a purchase day)."""
+    if method == "declining" and not ast_declining_ok(_d(pdate) if not isinstance(pdate, date) else pdate):
+        raise BadInput(tr("Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027."))
+
+
+def _plan_declining(net, pdate, life):
+    """2.480.0 C (#3528): [(year, afa, book, months, mode)] declining with the switch to linear once that is higher; the
+    purchase year by the month, the last year takes the rest (the years add up to the net price)."""
+    rate, out, book, used, y, lin = ast_declining_rate(life), [], net, 0, pdate.year, False
+    while book > 0 and used < life:
+        m = min(12 - pdate.month + 1 if y == pdate.year else 12, life - used)
+        rem = life - used
+        if rem <= m:
+            afa = book  # the last months: the rest
+        else:
+            a_lin, a_dec = money(book * m / rem), money(book * rate * m / 12)
+            lin = lin or a_lin >= a_dec  # § 7 Abs. 3 EStG: once linear, always linear
+            afa = a_lin if lin else a_dec
+        book -= afa
+        out.append((y, afa, book, m, "linear" if lin else "declining"))
+        used, y = used + m, y + 1
+    return out
+
+
+def bnk_plan(net, pdate, life, method="auto"):
+    """The depreciation of one device: (method, [{year, afa, book}]) with method 'gwg' | 'linear' | 'declining'; ('', [])
+    without a purchase day or a positive net price. Linear: by the month from the purchase month on; the cumulated amount is
+    rounded per year so the years add up to the net price exactly. 2.480.0 C (#3528): method 'declining' (only inside the
+    window, else linear): the rows carry mode 'declining' | 'linear' (the year it switched)."""
     if net is None or net <= 0 or pdate is None:
         return "", []
     if net <= AST_GWG:
         return "gwg", [{"year": pdate.year, "afa": dstr(net), "book": "0.00"}]
     life = max(1, int(life or AST_LIFE_DEFAULT))
+    if method == "declining" and ast_declining_ok(pdate):
+        return "declining", [{"year": y, "afa": dstr(a), "book": dstr(b), "mode": md} for y, a, b, _m, md in _plan_declining(net, pdate, life)]
     first = 12 - pdate.month + 1  # months of the purchase year (the purchase month counts)
     out, done, y = [], Decimal(0), pdate.year
     while done < net:
@@ -97,7 +143,8 @@ def bnk_plan(net, pdate, life):
 
 
 def bnk_book_value(net, pdate, life, method, today):
-    """The book value on day today (linear: the months up to and including the current one are written off)."""
+    """The book value on day today (linear: the months up to and including the current one are written off; declining:
+    the book value at the start of the year less the year's depreciation by the month)."""
     if not method:
         return None
     if today < pdate:
@@ -105,6 +152,14 @@ def bnk_book_value(net, pdate, life, method, today):
     if method == "gwg":
         return Decimal(0)
     life = max(1, int(life or AST_LIFE_DEFAULT))
+    if method == "declining":  # 2.480.0 C (#3528)
+        start = net
+        for y, afa, book, m, _md in _plan_declining(net, pdate, life):
+            if y == today.year:
+                k = min(today.month - (pdate.month if y == pdate.year else 1) + 1, m)
+                return start - (afa if k >= m else money(afa * k / m))
+            start = book
+        return start
     k = min((today.year - pdate.year) * 12 + today.month - pdate.month + 1, life)
     return net - (money(net * k / life) if k < life else net)
 
@@ -117,14 +172,17 @@ def ast_values(r, today=None):
     pdate = _d(r.get("purchase_date"))
     sug = ast_life_suggest(r.get("category"), r.get("name"))
     life = r.get("life_months") or sug
-    method, plan = bnk_plan(net, pdate, life)
+    sel = r.get("afa_method") if r.get("afa_method") in AST_METHODS else "auto"  # 2.480.0 C (#3528)
+    method, plan = bnk_plan(net, pdate, life, sel)
     book = bnk_book_value(net, pdate, life, method, today)
     afa_y = next((p["afa"] for p in plan if p["year"] == today.year), "0.00" if method else None)
     new = _money_or_none(r.get("new_value"))
     new = new if new is not None else net
     cur = _money_or_none(r.get("current_value"))
     cur = cur if cur is not None else book
-    return {"life_suggest": sug, "life_eff": int(life), "method": method, "afa_plan": plan, "afa_year": afa_y, "year": today.year,
+    dok = ast_declining_ok(pdate)
+    return {"life_suggest": sug, "life_eff": int(life), "method": method, "afa_method": sel, "declining_ok": dok,
+            "declining_pct": dstr(ast_declining_rate(life) * 100) if dok else None, "afa_plan": plan, "afa_year": afa_y, "year": today.year,
             "book_value": dstr(book) if book is not None else None, "new_value_eff": dstr(new) if new is not None else None,
             "current_value_eff": dstr(cur) if cur is not None else None}
 
@@ -335,24 +393,21 @@ def bnk_csv_cell(s):
     return csv_cell(s)
 
 
-def _de(v):
-    return "" if v in (None, "") else str(v).replace(".", ",")
-
-
 @app.get("/api/office/equipment/value.csv")
 def ast_value_csv():
-    """Office admin: the insurance list as CSV (semicolon, decimal comma, like the other office CSVs)."""
+    """Office admin: the insurance list as CSV (separator and decimal sign of the language, like the other office CSVs)."""
     c, uid, oid = _ctx()
     d = ast_value(c, oid, _aid_arg())
     buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";")
+    sep, num = csv_dialect()  # 2.368.2 (#2984)
+    w = csv.writer(buf, delimiter=sep)
     w.writerow([tr("Device"), tr("Category"), tr("Serial number"), tr("Purchase date"), tr("Purchase price (net)"), tr("New value"),
                 tr("Current value"), tr("Depreciation {0}", d["year"]), tr("Insured by")])
     for r in d["rows"]:
-        w.writerow([bnk_csv_cell(r["name"]), bnk_csv_cell(r["category"]), bnk_csv_cell(r["serial_no"]), r["purchase_date"], _de(r["purchase_net"]),
-                    _de(r["new_value"]), _de(r["current_value"]), _de(r["afa_year"]), bnk_csv_cell(r["agreement_name"])])
+        w.writerow([bnk_csv_cell(r["name"]), bnk_csv_cell(r["category"]), bnk_csv_cell(r["serial_no"]), r["purchase_date"], num(r["purchase_net"]),
+                    num(r["new_value"]), num(r["current_value"]), num(r["afa_year"]), bnk_csv_cell(r["agreement_name"])])
     s = d["sums"]
-    w.writerow([tr("Total"), "", "", "", _de(s["purchase_net"]), _de(s["new_value"]), _de(s["current_value"]), _de(s["afa_year"]), ""])
+    w.writerow([tr("Total"), "", "", "", num(s["purchase_net"]), num(s["new_value"]), num(s["current_value"]), num(s["afa_year"]), ""])
     w.writerow([bnk_csv_cell(d["disclaimer"])])
     return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
                     headers={"Content-Disposition": 'attachment; filename="equipment-value.csv"', "Cache-Control": "no-store"})  # 2.306.0 D2 (#2875)
@@ -364,7 +419,7 @@ def ast_value_pdf():
     from .pdf import A4_H, C_INK2, C_RULE, PDF_CW, PDF_L, _Page, pdf_date, pdf_money, pdf_write
     c, uid, oid = _ctx()
     d = ast_value(c, oid, _aid_arg())
-    lg = "de" if lang(c, uid) == "de" else "en"
+    lg = calc_lang(lang(c, uid))  # 2.449.0 (#3766): every app language (was de, else en)
     cur = d["currency"]
     co = ofx_name1((office_settings(c, oid).get("company") or {}).get("name"))  # 2.99.0 D (#2188): one line
     ppr = pdf_paper_ns(office_settings(c, oid).get("paper"))  # 2.357.0 A (#3156)

@@ -10,12 +10,13 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
-from ..core.access import collab_all, Denied, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES
+from ..core.access import acx_drop, collab_all, Denied, dlg_gone, MANAGE_ROLES, my_inbox, my_max_sort, need_collab, need_list, reading_ids, ROLES
 from ..core.state import visible_lists
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
 from ..tasks.ticketkey import tk_set  # 2.390.0 (#3353)
 from ..core.access import list_other_agent, ONE_AGENT_MSG  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import qn_is, qn_private  # 2.477.0 (#3881)
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 
 
@@ -26,6 +27,7 @@ LIST_FIELDS = ("name", "color", "folder", "sort", "view", "archived", "checklist
                "life", "trip")  # 2.22.0 (#663): '' | contracts | home | health | travel | reading; {from, to, where} of a trip
 LIST_FIELDS += ("time_tracking",)  # 2.41.0 (#1471): time tracking on for this list (owner; any type, default off)
 LIST_FIELDS += ("points_on",)  # 2.60.0 (#1511): story points shown in the app (owner; default off)
+LIST_FIELDS += ("irreversible_needs_yes",)  # 2.392.0 C (#3370): one-way tasks wait for a person's yes at the gates (owner; default off)
 LIST_KINDS = ("list", "project")
 # 2.7.2 (#414): the type "checklist" (2.7.0 "Shopping & packing list") is gone. Every list has the display option "Show
 # completed at the bottom" instead (column lists.checklist, API field done_at_bottom); kind "checklist" is still accepted
@@ -63,7 +65,7 @@ def clean_color(v):
     if v in ("", None):
         return ""
     if not isinstance(v, str) or not LIST_COLOR_RE.fullmatch(v):
-        raise BadInput(tr("Invalid value: {0}", tr("Color")))
+        raise BadInput(tr("Invalid value: {0}", tr("Colour")))
     return v
 
 
@@ -269,7 +271,7 @@ def clean_list_value(k, v, member=False):
         return v
     if k in ("archived", "checklist", "dep_shift", "tickets", "time_tracking"):
         return 1 if v else 0
-    if k == "points_on":  # 2.60.0 (#1511)
+    if k in ("points_on", "irreversible_needs_yes"):  # 2.60.0 (#1511); 2.392.0 C (#3370)
         return 1 if v else 0
     if k == "kind":
         if v not in LIST_KINDS and v not in LIST_KIND_ALIASES:
@@ -314,18 +316,25 @@ def list_create():
         fpt = folder_ptype(db(), me(), folder)  # (ptype "" in the request = chosen: no type; a chosen type goes first)
         if fpt:
             b = {**b, "ptype": fpt, "sections": True}
+    if "bug_inbox" in b and not isinstance(b["bug_inbox"], bool):  # 2.473.0 (#3378)
+        return err(tr("Invalid value: {0}", "bug_inbox"))
     if b.get("ptype"):  # 2.4.0 (#243): a project of a built-in type (sections, fields, view, ticket types, modules)
         c = db()
         if "sections" in b and not isinstance(b["sections"], bool):
             return err(tr("Invalid value: {0}", "sections"))
+        bug = b.get("bug_inbox") is True and b["ptype"] == "software"
+        if bug:  # its rule would be an agent's (agents only propose rules): refused before anything is made
+            from ..lists.rules import _need_person
+            _need_person()
         from ..accounts.orgs import clean_org_id, ws_default_org
         oid = clean_org_id(c, b["org_id"], me()) if "org_id" in b else ws_default_org(c, me(), folder)  # 2.28.0 (#935)
-        lid, on = ptype_create(c, me(), b["ptype"], name, folder, color, sections=b.get("sections") is True, org_id=oid)  # 2.27.0 (#972)
+        made = {}
+        lid, on = ptype_create(c, me(), b["ptype"], name, folder, color, sections=b.get("sections") is True, org_id=oid, bug_inbox=bug, made=made)  # 2.27.0 (#972)
         if "time_tracking" in b:  # 2.41.0 (#1471)
             c.execute("UPDATE lists SET time_tracking=? WHERE id=?", (clean_list_value("time_tracking", b["time_tracking"]), lid))
         bump(c)
         c.commit()
-        return jsonify({**dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()), "modules_on": on})
+        return jsonify({**dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()), "modules_on": on, **made})
     view = clean_list_value("view", b.get("view") or "list")
     kind = clean_list_value("kind", b["kind"]) if b.get("kind") else "list"
     fam = clean_list_value("family", b.get("family"))  # 2.19.0 (#653)
@@ -360,6 +369,14 @@ def list_create():
     return jsonify(dict(c.execute("SELECT * FROM lists WHERE id=?", (cur_id,)).fetchone()))
 
 
+def qn_shares(b):
+    """2.477.0 (#3881): True when a PATCH of a list would bring other people or agents to it: a workspace, a folder (its
+    people and defaults), an agent switch, family / Home & life. The list dialog sends unchanged off values along: they pass."""
+    return bool(b.get("org_id") not in (None, "", 0, "0", "private") or (b.get("folder") or "") != "" or b.get("agent_members")
+                or b.get("agent_peers") or b.get("listen_agent_ids") or b.get("agent_tidy") not in (None, "", "off")
+                or b.get("tidy_agent_id") is not None or b.get("family") or b.get("life") or b.get("org_visibility"))
+
+
 @app.patch("/api/lists/<int:lid>")
 def list_update(lid):
     from ..lists.groups import grp_touch
@@ -374,6 +391,8 @@ def list_update(lid):
     b = {k: v for k, v in b.items() if k != "agent_peers"}  # 2.40.0 (#1373): fixed off, still accepted from old clients, ignored
     c = db()
     role = need_list(c, lid, write=False)
+    if qn_is(c, lid) and qn_shares(b):  # 2.477.0 (#3881): the list "Notes" stays private (no workspace, folder, agents, family)
+        qn_private(c, lid)
     b, conflicts = lp_prev_conflicts(c, lid, role, b)  # 2.270.0 A (#3019): before anything is written (was: only LIST_FIELDS, late)
     given = set(b)  # 2.29.0 (#1030): what this request sets on its own (kept when the list moves into a folder)
     tb_col_on = None  # 2.39.1 (#1293): modules the field columns switched on (None = no field columns sent)
@@ -639,7 +658,8 @@ def list_reorder():
     moved = []
     for lid, folder in fmap.items():
         folder = clean_folder(folder)
-        if c.execute("UPDATE lists SET folder=? WHERE id=? AND owner_id=? AND folder!=?", (folder, int(lid), uid, folder)).rowcount:
+        # 2.477.0 (#3881): the list "Notes" stays out of folders (a folder brings its people and defaults)
+        if c.execute("UPDATE lists SET folder=? WHERE id=? AND owner_id=? AND folder!=? AND quicknote=0", (folder, int(lid), uid, folder)).rowcount:
             moved.append(int(lid))
         c.execute("UPDATE list_members SET folder=? WHERE list_id=? AND user_id=? AND folder!=?", (folder, int(lid), uid, folder))
     if fmap:
@@ -715,7 +735,8 @@ def list_purge(c, lid, inbox):
         tfiles = hard_delete(c, [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))], lists={lid})
     if inbox:  # 2.272.0 F (#3038, review E2-M4): without an inbox (a retired organisation) nothing to carry over
         lp_carry(c, lid, inbox)  # 2.272.0 E2 (#3038): fields, tags and section names go along
-    c.execute("UPDATE tasks SET deleted_at=COALESCE(deleted_at,?), list_id=?, section_id=NULL, assignee_id=NULL WHERE list_id=?",
+    c.execute("DELETE FROM task_watchers WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?)", (lid,))  # 2.473.0 (#3357)
+    c.execute("UPDATE tasks SET deleted_at=COALESCE(deleted_at,?), list_id=?, section_id=NULL, assignee_id=NULL, delegate_agent_id=NULL WHERE list_id=?",
               (ts, inbox, lid))
     icon = c.execute("SELECT icon FROM lists WHERE id=?", (lid,)).fetchone()[0]
     lfiles = [r[0] for r in c.execute("SELECT path FROM list_files WHERE list_id=?", (lid,))] + tfiles  # 2.7.1 (#410)
@@ -792,6 +813,7 @@ def member_set(lid):
     need_list(c, lid, write=False, manage=True)
     if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("The basket cannot be shared"))
+    qn_private(c, lid)  # 2.477.0 (#3881): the list "Notes" stays private
     role = b.get("role", "edit")
     if role not in ROLES:
         return err(tr("Role must be admin, edit, participant or view"))
@@ -825,10 +847,10 @@ def member_set(lid):
             return jsonify(ok=True, by_email=True)
         uid = r[0]
     elif not may_see(c, me(), uid):
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     u = c.execute("SELECT id FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
     if not u or uid == me() or personal_agent_foreign(c, uid, me()):  # 2.7.2 (#420): only the owner shares with a personal agent
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     if uid == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("The owner’s role cannot be changed"), 403)
     from ..collab.liste2eguard import le2b_agent_problem
@@ -932,6 +954,31 @@ def _folder_member_add(c, lid, uid, role, actor):
     return True
 
 
+def member_rejoin(c, oid, uid, rows):
+    """2.463.0 (#3859): uid joined organisation oid again: the memberships of rows [[list id, own role | None], ...] come back
+    (accounts/orgleave.py olv_rejoin), under the rules of a share: a project still in oid, never where uid owns it, a child as a
+    participant, no participant in a project with the lock, no bridge between agents. A project with the lock gets uid on its
+    waiting list (the members trigger): the key comes from somebody who holds it. Roles through groups and folders follow from
+    grp_sync. -> how many."""
+    from ..collab.liste2e import le2a_member_problem
+    from ..family.family import is_kid
+    from ..lists.groups import grp_sync
+    kid, back = is_kid(c, uid), []
+    for lid, role in rows:
+        role = "participant" if kid and role else role
+        if not c.execute("SELECT 1 FROM lists WHERE id=? AND org_id=? AND owner_id!=? AND deleted_at IS NULL", (lid, oid, uid)).fetchone() \
+                or (role and (le2a_member_problem(c, lid, uid, role) or _agent_bridge_blocks(c, lid, uid))):
+            continue
+        back.append(lid)
+        if role and c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?) ON CONFLICT DO NOTHING",
+                              (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc()))).rowcount:
+            member_folder_adopt(c, lid, uid)
+    if back:
+        grp_sync(c, back)
+        acx_drop()
+    return len(back)
+
+
 def _in_folder(path, f):
     return bool(f) and (path == f or path.startswith(f + FOLDER_SEP))
 
@@ -992,7 +1039,7 @@ def folder_people_diff():
         uid = 0
     if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone() or uid == me() \
             or personal_agent_foreign(c, uid, me()) or not may_see(c, me(), uid):
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     return jsonify(lists=fg_people_diff(c, me(), f, uid, role))
 
 
@@ -1020,7 +1067,7 @@ def folder_people_put():
         uid = r[0]
     elif not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone() or uid == me() or personal_agent_foreign(c, uid, me()) \
             or not may_see(c, me(), uid):  # 2.22.0 (#752)
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     from ..agents.core import is_agent
     if role == "admin" and is_agent(c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()):
         return err(tr("An agent cannot be a project admin"))
@@ -1128,7 +1175,7 @@ def agent_share_add(c, lid, aid, actor):
     from ..accounts.orgs import ws_member_problem
     if c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (lid, aid)).fetchone() or \
             c.execute("SELECT 1 FROM lists WHERE id=? AND (life IN ('health', 'budget') OR (life='travel' AND org_id IS NOT NULL))", (lid,)).fetchone() or \
-            reading_ids(c, [lid]) or \
+            reading_ids(c, [lid]) or qn_is(c, lid) or \
             list_other_agent(c, lid, aid) or ws_member_problem(c, lid, aid):  # 2.22.0 (#663) health; 2.26.0: one agent per list; 2.28.0: workspace; 2.172.1 A (#2689): read later
         return False
     from ..agents.safety import bridge_blocks
@@ -1164,7 +1211,7 @@ def agent_share_target(c, aid):
     if not u or u["kind"] == "agent":
         raise Denied(403)
     if not c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent' AND disabled=0", (aid,)).fetchone() or personal_agent_foreign(c, aid, me()):
-        raise Denied(404, tr("unknown user"))
+        raise Denied(404, tr("unknown person"))
 
 
 @app.get("/api/agents/<int:aid>/share")
@@ -1203,6 +1250,8 @@ def list_agent_set(lid):
     if new is not None and (isinstance(new, bool) or not isinstance(new, int) or new not in agent_ids(c)):
         return err(tr("Invalid value: {0}", "agent_id"))
     from ..collab.liste2eguard import le2b_agent_problem
+    if new is not None:
+        qn_private(c, lid)  # 2.477.0 (#3881): no agent in the list "Notes"
     if new is not None and le2b_agent_problem(c, lid, new):  # 2.64.1 B (#1817): no agent in a list with the lock
         return err(le2b_agent_problem(c, lid, new), 409)
     lr = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
@@ -1242,7 +1291,7 @@ def agent_share_all(aid):
     skip = set(d["skip"].get(str(aid), []))
     from ..agents.safety import bridge_blocks
     n, other, bridged = 0, [], []
-    for (lid, name) in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND COALESCE(archived,0)=0 ORDER BY id",
+    for (lid, name) in c.execute("SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND quicknote=0 AND COALESCE(archived,0)=0 ORDER BY id",  # 2.477.0 (#3881): not the list Notes
                                  (me(),)).fetchall():
         if lid in skip:
             continue
@@ -1338,6 +1387,7 @@ def member_remove(lid, uid):
         return jsonify(ok=True, via_group=True)
     c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
+    dlg_gone(c, lid, uid)  # 2.473.0 (#3357): delegated tasks and watching of this list end
     # 2.53.0 (#1424, review): a removed member's task bells of this list go (no old "Urgent" coming back on re-invite)
     c.execute("DELETE FROM task_bell WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
     # 2.82.0 (#1464): their own "My tasks" places of this list's tasks go too (the state filters them anyway)

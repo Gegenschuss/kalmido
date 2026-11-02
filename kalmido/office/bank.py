@@ -35,7 +35,9 @@ from ..docs.store import doc_open  # 2.355.0 B (#2843)
 # 2.299.0 C (#3192): noreceipt = a business booking that needs no receipt (bank fees, tax payments), set and undone like
 # private / ignored. A version before 2.299 reads it as "matched" with an unknown kind (shown, undone as before), never breaks.
 # 2.444.0 (#3447): card = the total of a credit card statement (match_id = office_cc_statements.id): the statement is its receipt
-BNK_KINDS = ("invoice", "receipt", "private", "ignored", "noreceipt", "card")
+# 2.469.0 (#3459): payout = the collective transfer of the online payment provider: no payment (the webhook booked the invoices,
+# office/payonline.py), so nothing counts twice; match_id = office_pay_payouts.id when the payout is known
+BNK_KINDS = ("invoice", "receipt", "private", "ignored", "noreceipt", "card", "payout")
 BNK_STATES = ("open", "matched", "all")
 BNK_LIST_MAX = 2000
 BNK_TEXT_MAX = 300
@@ -57,6 +59,7 @@ BNK_EXTS = (".xml", ".csv", ".txt", ".sta", ".mt940", ".mt942", ".swi")  # 2.299
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 from .homecur import hc_home  # noqa: E402  2.189.0 B (#2475)
 from .invoices import _j as _inv_j, inv_refund_open  # noqa: E402  2.354.0 D (#2837)
+from .payonline import pol_bank_hit, pol_bank_info, pol_bank_match  # noqa: E402  2.469.0 (#3459)
 
 
 def _home(c, oid):
@@ -522,6 +525,8 @@ def _tx_public(t, inv_by_id, rc_by_id, rule_names=None, splits=None):
             m["label"] = (r.get("title") or "") if r else ""
         elif t["match_kind"] == "card":  # 2.444.0 (#3447)
             m["label"] = t.get("card_label") or ""
+        elif t["match_kind"] == "payout":  # 2.469.0 (#3459)
+            m["label"] = tr("Collective payout")
     return {"id": t["id"], "day": t["day"], "amount": dstr(t["amount"]), "currency": t["currency"], "counterpart": t["counterpart"] or "",
             "purpose": t["purpose"] or "", "iban": t["iban"], "ref": t["ref"], "import_id": t["import_id"], "match": m}
 
@@ -571,11 +576,15 @@ def bnk_tx_list():
     rc_by_id = {r["node_id"]: r for r in receipts}
     _card_labels(c, oid, rows)  # 2.444.0 (#3447)
     rules, names = _br.br_rules(c, oid), _br.br_names(c, oid, {t["rule_id"] for t in rows if t["match_kind"]})  # 2.299.0 B (#3191)
+    pol = pol_bank_info(c, oid)  # 2.469.0 (#3459)
     items = []
     for t in rows:
         p = _tx_public(t, inv_lbl, rc_by_id, names, sps)
         if t["match_kind"] is None:
             p["suggestions"] = bnk_suggest(t, invoices, receipts, taken)
+            hit = pol_bank_hit(t, pol, _norm)
+            if hit:  # 2.469.0 (#3459): a collective payout, never an invoice's money again
+                p["suggestions"] = [hit]
             r, best = _br.br_pick(rules, t)
             if best:  # 2.299.0 B (#3191): a category rule, a tie of rules or a rule that could not mark (locked month)
                 p["rule_hint"] = {**_br.br_hint(r or best[0]), "tie": r is None}
@@ -667,7 +676,7 @@ def bnk_match(tid):
         raise Denied(409, tr("This booking is matched already"))
     from .periodlock import period_need_open
     period_need_open(c, oid, t["day"])  # 2.148.0 A (#2471): bookings of a locked month stay as they are
-    mid = pid = differs = None
+    mid = pid = differs = fee_node = None
     split = kind == "invoice" and b.get("parts") is not None  # 2.355.0 B (#2843): one booking on several invoices / with a rest
     if kind in ("invoice", "receipt", "card") and not split:
         try:
@@ -704,6 +713,8 @@ def bnk_match(tid):
         if split:  # each payment knows its booking (unmatch takes all back); the rest of the booking stays visible
             c.execute(f"UPDATE office_payments SET bank_tx_id=? WHERE org_id=? AND id IN ({','.join('?' * len(pids))})", (tid, oid, *pids))
         mid, pid = parts[0][0], pids[0]
+    elif kind == "payout":  # 2.469.0 (#3459)
+        mid, fee_node = pol_bank_match(c, oid, uid, t, int(b["id"]) if isinstance(b.get("id"), int) and not isinstance(b.get("id"), bool) else None)
     elif kind == "card":
         from .cards import cc_bank_check
         cc_bank_check(c, oid, t, mid, b.get("accept_diff") is True)  # 2.444.0 (#3447): the sum of the statement against the booking
@@ -731,6 +742,9 @@ def bnk_match(tid):
     learn = _br.br_learn(c, oid, t, kind, mid)  # 2.299.0 B (#3191): the second time the same way -> "Always like this?"
     bump(c)
     c.commit()
+    if fee_node:  # 2.469.0 (#3459): the fees' receipt goes through the documents' queue
+        from ..docs.ingest import docs_kick
+        docs_kick()
     return jsonify({**_tx_answer(c, oid, uid, tid), "rule_category": rcat, "rule_suggestion": learn, "amount_differs": differs})
 
 

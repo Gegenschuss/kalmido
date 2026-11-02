@@ -16,6 +16,7 @@ from ..integrations.importers import IMPORT_MAX_MB, IMPORT_MAX_TASKS, IMPORT_SOU
 from ..api.v1 import _SPEC, API_PAGE_DEFAULT, API_PAGE_MAX, API_SCOPES, API_VERSION, PRIO_VALUES, STATUS_NAMES, V1_TASK_IN
 from ..api.common import V1_CODES
 from ..tasks.dayplan import dayplan_spec
+from ..tasks.oneway import dec_spec
 
 
 def groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
@@ -41,6 +42,8 @@ def groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
                   scope="write", desc="Every member of the group gets access; members who join later too. A person's role is the "
                                       "higher of their own and the one via groups."),
         "delete": op("Stop sharing a project with a group", G, ok({"type": "object"}) | errs("403", "404"), [pid(desc="Project id"), gp], scope="write")}
+    from ..tasks.watchers import wat_spec
+    wat_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.473.0 (#3357)
     paths["/tasks/{id}/take"] = {"post": op("Take a task assigned to one of your groups", "Tasks", ok(ref("Task")) | errs("403", "404", "409"),
                                             [pid()], scope="write", desc="The task becomes yours (assignee_id) and is no longer assigned to the group.")}
 
@@ -165,6 +168,9 @@ def openapi_spec():
                    "notes, completing and subtasks stay free). Tasks created with an agent token start locked (send "
                    "locked: false to create an open one); the API itself is not bound by the lock and can set or clear it"}}
     # 2.60.0 (#1511): story points
+    task_props["irreversible"] = {"type": ["object", "null"], "description": "2.392.0: a one-way step: PATCH {reason} marks the task (a "
+                                  "new reason takes a yes back), null takes the mark off (people only). Read: reason, yes_by, yes_at. Where the "
+                                  "project has irreversible_needs_yes on, integrate / deploy requests stay open until a person said yes"}
     task_props["points"] = nul("integer", enum=[1, 2, 3, 5, 8, 13, None], description="2.60.0: story points (Fibonacci); "
                                "null = none. Always stored; the app shows them where the project has story points on (points_on)")
     # 2.111.0 C (#2057): a reminder at a fixed local time, with or without a due date
@@ -180,17 +186,29 @@ def openapi_spec():
                                     "project; null = none). Writable, with the checks of POST /tasks/{id}/review action reviewer")
     task_props["review"] = nul("string", enum=["pending", "approved", "changes", None], description="2.390.0: the review state "
                                "(null = none; read only, changed with POST /tasks/{id}/review)")
+    task_props["delegate_agent_id"] = nul("integer", description="2.473.0: the agent the task is delegated to, next to the assignee (the "
+                                          "person stays responsible; null = none). Writable: an agent with access to the project that is open "
+                                          "to you; the task counts in its queue, it gets the event assigned with delegated true")
+    task_props["watchers"] = {"type": "array", "items": {"type": "integer"}, "description": "2.473.0: who watches the task (read only here; "
+                              "POST /tasks/{id}/watchers, DELETE /tasks/{id}/watchers/{user_id}). They get its comments and status changes"}
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}
-    for k in ("list_id", "section_id", "parent_id", "assignee_id", "assignee_group_id"):
+    for k in ("list_id", "section_id", "parent_id", "assignee_id", "assignee_group_id", "delegate_agent_id"):
         task_in[k] = nul("integer")
     task_in["content"] = {"type": "string", "description": "Alias of notes (the web API's name, 2.2.1); not together with a different notes"}
     schemas = {
         "Error": {"type": "object", "required": ["error"], "properties": {"error": {"type": "object", "required": ["code", "message"], "properties": {
-            "code": {"type": "string", "enum": sorted(set(V1_CODES.values()) | {"unknown_field"})}, "message": {"type": "string"},
+            "code": {"type": "string", "enum": sorted(set(V1_CODES.values()) | {"unknown_field", "slots_full", "wip_full"})}, "message": {"type": "string"},
             "fields": {"type": "array", "items": {"type": "string"},
-                       "description": "code unknown_field (2.2.1): the body fields this endpoint does not know (nothing was changed)"}}}}},
+                       "description": "code unknown_field (2.2.1): the body fields this endpoint does not know (nothing was changed)"},
+            # 2.392.0 A (#3367): POST /agent/jobs refused by a hard limit (409)
+            "running": {"type": "integer", "description": "code slots_full: your running jobs"},
+            "max": {"type": "integer", "description": "code slots_full: your max_parallel (the places)"},
+            "section_id": {"type": "integer", "description": "code wip_full: the column that is over its limit"},
+            "section": {"type": "string", "description": "code wip_full: its name"},
+            "count": {"type": "integer", "description": "code wip_full: open tasks in it"},
+            "limit": {"type": "integer", "description": "code wip_full: its wip_limit"}}}}},
         "Task": {"type": "object", "properties": {**task_props, "blocked": {"type": "boolean", "description": "Blocked by an open task (dependencies, shown as Blocked by)"},
                                                   "comment_count": {"type": "integer"},
                                                   "context": {"type": "boolean", "description": "Participant view: the parent of one of your "
@@ -292,7 +310,8 @@ def openapi_spec():
                         "Home & life (health projects are private: never visible to agents, tokens need the scope private); null = none"),
             "trip": {"type": ["object", "null"], "description": "2.22.0: a trip project's {from, to, where?}", "properties": {
                 "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "where": {"type": "string"}}},
-            "client_id": nul("integer", description="2.23.0: the client the project belongs to (GET /clients); null = none")}},
+            "client_id": nul("integer", description="2.23.0: the client the project belongs to (GET /clients); null = none"),
+            "bug_list_id": {"type": "integer", "description": "2.473.0: only in the answer of POST /lists with bug_inbox: the id of the bug inbox list"}}},
         "ListDetail": {"allOf": [ref("List"), {"type": "object", "properties": {"sections": {"type": "array", "items": ref("Section")},
             "fields": {"type": "array", "description": "2.14.0: the project's custom fields (ids for the columns f:<id>)",
                        "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "type": {"type": "string"}}}},
@@ -311,6 +330,9 @@ def openapi_spec():
                              "its standard sections; null / \"\" = no type"},
             "sections": {"type": "boolean", "default": False, "description": "2.27.0: with project_type: create the type's standard sections "
                          "(e.g. Backlog … Done); without it the project starts without sections"},
+            "bug_inbox": {"type": "boolean", "default": False, "description": "2.473.0: with project_type software (no effect on another type): also creates "
+                          "the list \"<name> – Bugs\" next to it, with the field Release and a rule: as soon as Release is filled, the task moves to the project "
+                          "(with sections: its first section), the value goes along. The rule runs as you; the answer carries bug_list_id. An agent gets 403 (agents only propose rules)"},
             "family": nul("string", enum=[*[x for x in FAM_LIST_KINDS if x], None], description="2.19.0: what the project is for in the Family module: "
                           "shopping (sections = shop areas, a new item goes to its area of last time, a shopping mode in the app), meals "
                           "(the meal plan: due = the day, notes = ingredients), birthdays, household, packing, recipes (2.140.0: a task per recipe); null = an ordinary project"),
@@ -418,6 +440,7 @@ def openapi_spec():
             "name": {"type": "string"}, "text": {"type": "string", "description": "Plain text, at most 140 characters (+ …)"},
             "from": {"type": "string", "enum": ["user", "agent"], "description": "Agent chat only"}}},
         "CommentInput": {"type": "object", "additionalProperties": False, "required": ["body"], "properties": {"body": {"type": "string", "maxLength": MAX_COMMENT},
+                                                                                                            "client_ref": {"type": "string", "maxLength": 64, "description": "2.370.2: your own id of this comment; sent again = 200 the comment made the first time"},
                          "reply_to": {"type": "integer", "description": "2.33.0 (#1076): answer this comment of the same task (else 400); its author is notified like a mention"},
                          "portal": {"type": "boolean", "description": "2.63.0 (#1513): a public answer the customer sees on the status page and by mail "
                                     "(only on a task with a customer report and with write access; default false = internal)"},
@@ -501,8 +524,8 @@ def openapi_spec():
         "WaitingInput": {"type": "object", "additionalProperties": False, "properties": {
             "note": {"type": "string", "maxLength": WAIT_NOTE_MAX}, "until": nul("string", format="date", description="Follow-up day (reminder, News, agent event followup_due)")}},
         "Notifications": {"type": "object", "properties": {
-            "events": {"type": "object", "description": "Per event: news (null = the event has no News) and push. Events: " + ", ".join(NOTIF_ROWS),
-                       "additionalProperties": {"type": "object", "properties": {"news": nul("boolean"), "push": {"type": "boolean"}}}},
+            "events": {"type": "object", "description": "Per event: news (null = the event has no News) and push (null = the event has no push). Events: " + ", ".join(NOTIF_ROWS),
+                       "additionalProperties": {"type": "object", "properties": {"news": nul("boolean"), "push": nul("boolean")}}},
             "lists": {"type": "object", "description": "Project id -> bell (projects on default are left out)",
                       "additionalProperties": {"type": "string", "enum": list(BELL_MODES)}},
             "custom": {"type": "object", "description": "Project id -> the own event choice of projects on custom (events: "
@@ -554,6 +577,8 @@ def openapi_spec():
                      q("tag", "One of your tags or a project tag (without #)"), q("list_tag", "A project tag (without #)"),
                      q("assignee", "me, none or a user id"),
                      q("assignee_group", "2.10.0: mine (assigned to one of your groups) or a group id"),
+                     q("delegate", "2.473.0: me, none or an agent id (the task is delegated to it)"),
+                     q("watcher", "2.473.0: me or a user id (who watches the task)"),
                      q("updated_since", "Changed since (ISO date-time)", {"type": "string", "format": "date-time"}),
                      q("parent_id", "Subtasks of this task", {"type": "integer"}), q("top_level", "true = no subtasks", {"type": "boolean"}),
                      q("fields", "compact = only id, title, list_id, section_id, parent_id, status, due, due_time, priority, tags, "
@@ -737,6 +762,7 @@ def openapi_spec():
              q("day", "Local day YYYY-MM-DD", date_s), limit, cursor], scope="admin-read")},
     }
     agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page)
+    dec_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.392.0 C (#3370)
     git_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)
     overview_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)
     groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)  # 2.10.0 (#441)
@@ -787,6 +813,8 @@ def openapi_spec():
     briefing_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#264)
     from ..lists.report import report_spec
     report_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#265)
+    from ..integrations.delivery import delivery_spec
+    delivery_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.392.0 D (#3369)
     from ..tasks.stale import stale_spec
     stale_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#266)
     from ..personal.timegaps import timegaps_spec

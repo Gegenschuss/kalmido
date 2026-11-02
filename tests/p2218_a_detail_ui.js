@@ -18,7 +18,10 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const dq = d => [...d.querySelectorAll('#detail :is(.dtop, .dthumb) [data-act="due-q"]')].map(b => b.dataset.d).join();
-const menuItems = (w, d, id) => { w.eval(`taskMenu(document.querySelector('#detail [data-act="task-menu"]'), ${id})`); return [...d.querySelectorAll('#pop [role="menuitem"]')]; };
+// 2.445.0 (#3008): the first level; Pin is left out while the header shows it (jsdom has no container query: `narrow` hides it
+// the way the phone's CSS does); menuMore = the second level "More…" (Lock, Copy link, …)
+const menuItems = (w, d, id, narrow) => { if (narrow) { const pn = d.querySelector('#detail .dtop [data-act="pin"]'); if (pn) pn.style.display = 'none'; } w.eval(`taskMenu(document.querySelector('#detail [data-act="task-menu"]'), ${id})`); return [...d.querySelectorAll('#pop [role="menuitem"]')]; };
+const menuMore = (w, d, id) => { menuItems(w, d, id); d.querySelector('#pop .mtmore')?.click(); return [...d.querySelectorAll('#pop [role="menuitem"]')]; };
 const item = (its, re) => its.find(b => re.test(b.querySelector('.ml')?.textContent || ''));
 
 (async () => {
@@ -50,20 +53,22 @@ const item = (its, re) => its.find(b => re.test(b.querySelector('.ml')?.textCont
   check(sb && sb.innerHTML.includes(icCols) && !sb.innerHTML.includes(icPlus) && sb.title === 'Move to section…', 'the section button: the section icon, named "Move to section…"');
   // 2.364.0 (#3036): Lock is in "…"; the header shows it only while it is set (to unlock)
   check(d.querySelector('#detail .dtop [data-act="pin"]') && !d.querySelector('#detail .dtop .tlkb'), 'Pin still rendered (CSS hides it on a phone), an unset Lock only in "…"');
-  let its = menuItems(w, d, T0);
+  let its = menuMore(w, d, T0);
   check(item(its, new RegExp('^Copy link · #' + T0 + '$')), '"…": Copy link · #' + T0);
-  check(item(its, /^Pin$/) && !item(its, /^Pin$/).classList.contains('on'), '"…": Pin (not on)');
   const lk = item(its, /^Lock$/);
   check(lk && !lk.classList.contains('on'), '"…": Lock (not on)');
   lk?.click();
   check(await until(async () => (await call('GET', '/api/state')).tasks.find(t => t.id === T0)?.locked), 'a tap on Lock locks the task');
   await until(() => d.querySelector('#detail .dtop .tlkb.on'));
-  its = menuItems(w, d, T0);
+  its = menuMore(w, d, T0);
   check(item(its, /^Locked$/)?.classList.contains('on'), '"…": Locked with its check');
+  w.eval('closePop()');
+  its = menuItems(w, d, T0, true);
+  check(item(its, /^Pin$/) && !item(its, /^Pin$/).classList.contains('on'), '"…": Pin (not on)');
   item(its, /^Pin$/)?.click();
   check(await until(async () => (await call('GET', '/api/state')).tasks.find(t => t.id === T0)?.pinned), 'a tap on Pin pins');
   await sleep(300);
-  its = menuItems(w, d, T0);
+  its = menuItems(w, d, T0, true);
   check(item(its, /^Pinned$/)?.classList.contains('on'), '"…": Pinned with its check');
   w.eval('closePop()');
   w.eval(`openDetail(${T1})`); await sleep(400);
@@ -78,7 +83,7 @@ const item = (its, re) => its.find(b => re.test(b.querySelector('.ml')?.textCont
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   w.eval(`openDetail(${T9})`); await until(() => d.querySelector('#detail .dtop'));
   check(d.querySelector('#detail .dcrumbs') && !d.querySelector('#detail .dcid'), 'computer: no task number in the path');
-  check(item(menuItems(w, d, T9), new RegExp('Copy link · #' + T9)), 'computer: "…" has Copy link · #' + T9);
+  check(item(menuMore(w, d, T9), new RegExp('Copy link · #' + T9)), 'computer: "…" has Copy link · #' + T9);
   w.close();
 
   // ================= a person without an organisation
@@ -91,7 +96,7 @@ const item = (its, re) => its.find(b => re.test(b.querySelector('.ml')?.textCont
   w = await boot({user: 'frida', mobile: true, hash: 'l/' + FL}); d = w.document;
   w.eval(`openDetail(${FT})`); await until(() => d.querySelector('#detail .dtop'));
   check(dq(d) === '1' && !d.querySelector('#detail .dcid'), 'without an organisation: only Tomorrow, no number in the path');
-  its = menuItems(w, d, FT);
+  its = menuMore(w, d, FT);
   check(item(its, new RegExp('Copy link · #' + FT)) && item(its, /^Lock$/), 'without an organisation: Copy link + Lock in "…"');
   w.close();
 

@@ -9,10 +9,11 @@ not compressible), two of them above the per-file limit -- never real documents.
    state goes running (progress {done, total}) -> done with the report of the single POST: pages created, files taken
    over, the two large PDFs skipped with "Larger than 1 MB", the links in the pages point at the stored files
  - cancel: DELETE of an upload removes it (404 afterwards); after the end DELETE clears the result
+ - 2.363.0 (#3280): the next upload right after the end of a run waits for its worker instead of answering 409
  - the old single POST /api/wiki/import keeps working for small ZIPs
  - rights (tenant-matrix: wiki): another organisation's space 404 at the start, another person's upload 404 (read, piece,
    delete); a member of the organisation imports into it. A person without an organisation (freelancer-matrix: wiki)
-   imports into the own private space.
+   imports into the own private workspace.
 usage: p2177_a_api_test.py <datadir>"""
 import base64
 import io
@@ -96,7 +97,7 @@ def wait_end(s, iid, seen=None, t=90):
 
 
 env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + f" -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}"
-           " -e KALMIDO_WIKI_IMPORT_MAX_MB=8 -e KALMIDO_WIKI_FILE_MAX_MB=1")
+           " -e KALMIDO_WIKI_IMPORT_MAX_MB=8 -e KALMIDO_WIKI_FILE_MAX_MB=1 -e KALMIDO_TEST_UMZ_END_DELAY=1")
 r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
 assert r.returncode == 0, r.stdout + r.stderr
 time.sleep(0.8)
@@ -188,6 +189,17 @@ check(r.ok and Bo.get(f"{U}/{IID}").status_code == 404 and Bo.get(U).json().get(
 r = Bo.post(B + "/api/wiki/trash", json={"ids": res.get("created", []), "files": res.get("files", [])})
 check(r.ok, "#2685: the Undo of the import " + r.text[:200])
 
+# ---------------------------------------------------------------- 2.363.0 (#3280): the next step right after the end
+# (KALMIDO_TEST_UMZ_END_DELAY=1 below: the worker lingers 1 s after "done", a new upload then must wait for it, not answer 409)
+_z = small_zip("Direkt")
+r, last = upload(Bo, SP, _z)
+check(r.ok, f"#3280: the first small import starts {r.status_code} {r.text[:120]}")
+_e = wait_end(Bo, r.json()["id"])
+check(_e.get("state") == "done", f"#3280: it ends {_e.get('state')}")
+r = Bo.post(U, json={"size": len(_z), "name": "wiki.zip", "space": SP})
+check(r.status_code == 200, f"#3280: the next upload right after the end waits, no 409 {r.status_code} {r.text[:120]}")
+Bo.delete(f"{U}/{r.json().get('id')}")
+
 # ---------------------------------------------------------------- cancel, again, the old route
 r, last = upload(Bo, SP, DATA_ZIP, stop_after=1)
 iid = r.json()["id"]
@@ -199,13 +211,13 @@ check(r.ok and len(r.json().get("created", [])) == 1 and r.json().get("files_n")
 
 # ---------------------------------------------------------------- a person without an organisation (freelancer-matrix: wiki)
 r, last = upload(Fr, "private", small_zip("Frei"))
-check(r.ok and last is not None and last.ok, "#2685: a freelancer uploads into the private space " + (last.text[:200] if last is not None else r.text[:200]))
+check(r.ok and last is not None and last.ok, "#2685: a freelancer uploads into the private workspace " + (last.text[:200] if last is not None else r.text[:200]))
 if r.ok:
     J = wait_end(Fr, r.json()["id"])
     check(J.get("state") == "done" and len((J.get("result") or {}).get("created", [])) == 1 and (J.get("result") or {}).get("files_n") == 1,
           f"#2685: the freelancer's import {J}")
     fp = {p["path"] for p in Fr.get(B + "/api/wiki", params={"space": "private"}).json()["pages"]}
-    check("Frei/Start" in fp, f"#2685: the page is in the freelancer's private space {fp}")
+    check("Frei/Start" in fp, f"#2685: the page is in the freelancer's private workspace {fp}")
     check("Frei/Start" not in {p["path"] for p in A.get(B + "/api/wiki", params={"space": "private"}).json()["pages"]}, "#2685: nobody else sees it")
 r = Fr.post(U, json={"size": 1000, "space": SP})
 check(r.status_code == 404, f"#2685: the freelancer cannot import into an organisation {r.status_code}")

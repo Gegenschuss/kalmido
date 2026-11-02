@@ -72,7 +72,7 @@ async function lyv_standard(v) {
   const sw = d.src ? null : wgSwitches(wgJ(old.value).opts), nv = sw ? JSON.stringify({opts: sw}) : '';  // a block's switches stay
   try { await lyv_switchTo(v, key, 0, nv); } catch { return; }
   const e = histAdd({label: tr('Arrangement switched'), undo: () => lyv_switchTo(v, key, old.id, old.value), redo: () => lyv_switchTo(v, key, 0, nv)});
-  histToast(tr('Showing the standard'), e);
+  histToast(tr('Showing the default'), e);
 }
 
 // ---- save as / rename / delete / order
@@ -138,13 +138,13 @@ function lyv_btn(v) {
   if (!LY[v] || S.ly.view === v) return '';
   setTimeout(lyv_load, 0);
   const key = lyv_key(v), rows = key ? lyv_rows(key) : []; if (!rows.length) return '';
-  const a = lyv_active(v, key), nm = a ? a.name : tr('Standard');
+  const a = lyv_active(v, key), nm = a ? a.name : tr('Default');
   return `<button type="button" class="btn sm lyvsw${a ? ' on' : ''}" data-act="lyv-menu" data-lyv="${v}" aria-haspopup="menu" title="${esc(tr('Arrangement: {0}', nm))}" aria-label="${esc(tr('Arrangement: {0}', nm))}"><span class="lyvnm">${esc(nm)}</span>${ic('down', 's')}</button>`;
 }
 function lyv_menu(a) {
   const v = a.dataset.lyv, key = lyv_key(v); if (!key) return;
   const rows = lyv_rows(key), act = lyv_active(v, key);
-  menu(a, [{head: tr('Arrangement')}, {label: tr('Standard'), icon: 'grid', on: !act, fn: () => { if (act) lyv_standard(v); }},
+  menu(a, [{head: tr('Arrangement')}, {label: tr('Default'), icon: 'grid', on: !act, fn: () => { if (act) lyv_standard(v); }},
     ...rows.map(r => ({label: r.name, icon: r.source === 'template' ? 'send' : r.source === 'agent' ? 'bot' : 'bookmark', on: act?.id === r.id,
       fn: () => { if (act?.id !== r.id) lyv_activate(r.id, v); }})),
     '-', ...lyv_menuItems(v, true), {label: tr('Manage arrangements…'), icon: 'edit', fn: () => lyv_manage(v)}], null, null, tr('Arrangement'));
@@ -154,7 +154,7 @@ function lyv_viewMenu(v) {
   setTimeout(lyv_load, 0);
   const key = lyv_key(v), rows = key ? lyv_rows(key) : []; if (!rows.length) return [];
   const act = lyv_active(v, key);
-  return [{label: tr('Arrangement: {0}', act ? act.name : tr('Standard')), icon: 'bookmark', more: [{label: tr('Standard'), icon: 'grid', on: !act, fn: () => { if (act) lyv_standard(v); }},
+  return [{label: tr('Arrangement: {0}', act ? act.name : tr('Default')), icon: 'bookmark', more: [{label: tr('Default'), icon: 'grid', on: !act, fn: () => { if (act) lyv_standard(v); }},
     ...rows.map(r => ({label: r.name, icon: 'bookmark', on: act?.id === r.id, fn: () => { if (act?.id !== r.id) lyv_activate(r.id, v); }})),
     '-', {label: tr('Manage arrangements…'), icon: 'edit', fn: () => lyv_manage(v)}]}];
 }
@@ -184,20 +184,21 @@ document.addEventListener('click', e => {
 function lyv_manage(v) {
   const key = lyv_key(v); if (!key) return;
   const md = modal(`<h3 id="lyvm-t">${esc(tr('Manage arrangements'))}</h3><div class="lyvlist" role="list"></div>
-    <p class="muted lyvhint">${esc(tr('The standard is what the view shows without an own arrangement.'))}</p>
+    <p class="muted lyvhint">${esc(tr('The default is what the view shows without an own arrangement.'))}</p>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-lyvm="close">${tr('Done')}</button></div>`);
   md.classList.add('lyvm'); md.setAttribute('role', 'dialog'); md.setAttribute('aria-labelledby', 'lyvm-t');
   const draw = () => {
     if (!md.isConnected) return;
     const rows = lyv_rows(key), n = rows.length;
-    $('.lyvlist', md).innerHTML = rows.length ? rows.map((r, i) => `<div class="lyvrow" role="listitem" data-id="${r.id}"><span class="lyvrn">${esc(r.name)}${r.active ? ` <small class="muted">${tr('active')}</small>` : ''}</span>
-      <button type="button" class="iconbtn" data-lyvm="up" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + r.name)}">${ic('up', 's')}</button>
-      <button type="button" class="iconbtn" data-lyvm="down" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + r.name)}">${ic('down', 's')}</button>
+    $('.lyvlist', md).innerHTML = rows.length ? rows.map((r, i) => `<div class="lyvrow" role="listitem" data-id="${r.id}">${rowd_grip('lyv')}<span class="lyvrn">${esc(r.name)}${r.active ? ` <small class="muted">${tr('active')}</small>` : ''}</span>
+      ${rowd_arrows(`<button type="button" class="iconbtn" data-lyvm="up" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + r.name)}">${ic('up', 's')}</button>
+      <button type="button" class="iconbtn" data-lyvm="down" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + r.name)}">${ic('down', 's')}</button>`)}
       <button type="button" class="iconbtn" data-lyvm="ren" aria-label="${esc(tr('Rename') + ': ' + r.name)}" title="${esc(tr('Rename'))}">${ic('edit', 's')}</button>
       <button type="button" class="iconbtn" data-lyvm="del" aria-label="${esc(tr('Delete') + ': ' + r.name)}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></div>`).join('')
       : `<p class="muted">${esc(tr('No saved arrangements yet.'))}</p>`;
   };
   draw();
+  rowd_attach(md, {kind: 'lyv', row: '.lyvrow', move: (from, to, r) => lyv_move(+r.dataset.id, to - from, draw)});  // 2.456.0 (#3837)
   md.addEventListener('click', e => {
     const b = e.target.closest('[data-lyvm]'); if (!b) return;
     const w = b.dataset.lyvm, id = +b.closest('[data-id]')?.dataset.id;

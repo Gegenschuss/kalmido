@@ -238,13 +238,13 @@ check(pg.status_code == 200 and "Wird im nächsten Schnitt größer" in pg.text 
 check(ro.post(B + f"{V1}/{RR['id']}/comments", json={"body": "x"}).status_code == 403, "without the scope comments: 403")
 cr = A.post(B + f"/api/videos/{RR['id']}/comments", json={"body": "Ton prüfen"}).json()["comment_id"]
 check(ro.patch(B + f"{V1}/{RR['id']}/comments/{cr}", json={"done": True}).status_code == 403, "done without the scope: 403")
-# a viewer agent: comments, but no answer to the customer and no done of others' comments
+# a viewer agent: comments, but no answer to the client and no done of others' comments
 CV = customer_comment(RV, "Musik zu laut", 10.0)
 cv_team = A.post(B + f"/api/videos/{RV['id']}/comments", json={"body": "Farben prüfen"}).json()["comment_id"]
 r = vw.post(B + f"{V1}/{RV['id']}/comments", json={"body": "Notiz für den Schnitt", "at_sec": 3})
 check(r.status_code == 201, f"a viewer agent comments (like viewers in the app) {r.status_code}")
 VMINE = r.json()["comment"]["id"] if r.status_code == 201 else 0
-check(vw.post(B + f"{V1}/{RV['id']}/comments", json={"parent_id": CV, "body": "x"}).status_code == 403, "a viewer agent: no answer to the customer (403)")
+check(vw.post(B + f"{V1}/{RV['id']}/comments", json={"parent_id": CV, "body": "x"}).status_code == 403, "a viewer agent: no answer to the client (403)")
 check(vw.post(B + f"{V1}/{RV['id']}/comments", json={"parent_id": cv_team, "body": "ok"}).status_code == 201, "but an answer to a team comment")
 check(vw.patch(B + f"{V1}/{RV['id']}/comments/{cv_team}", json={"done": True}).status_code == 403, "a viewer agent: done of another's comment 403")
 check(vw.patch(B + f"{V1}/{RV['id']}/comments/{VMINE}", json={"done": True}).ok, "its own comment: done")

@@ -52,7 +52,7 @@ async function sh2Ask(title, html, ok, read) {  // askDialog with fields: read(m
 async function sh2ToTasks(sh) {
   const d = SH2.d[sh.id] || await sh2Fresh(sh), chosen = sh2Chosen();
   const lists = (d?.lists || []).filter(l => l.writable);
-  if (!lists.length) { toast(tr('There is no project in this space you may add tasks to.')); return; }
+  if (!lists.length) { toast(tr('There is no project in this workspace you may add tasks to.')); return; }
   const pre = sh.list_id && lists.some(l => l.id === sh.list_id) ? sh.list_id : lists[0].id;
   const html = `${sh2Field('sh2-list', tr('Project'), lists.map(l => `<option value="${l.id}" ${l.id === pre ? 'selected' : ''}>${esc(l.name)}</option>`).join(''))}
     ${sh2Field('sh2-title', tr('Title'), sh2ColOpts(sh, sh2Find(sh, ['text'])))}
@@ -78,7 +78,7 @@ async function sh2Step(sh, label, path, body, msg, redo = true) {  // one press 
 // ---- sheet -> quotation draft
 async function sh2ToOffer(sh) {
   const d = SH2.d[sh.id] || await sh2Fresh(sh), chosen = sh2Chosen();
-  if (!d?.office) { toast(tr('Office & finance is not available for this table\'s space')); return; }
+  if (!d?.office) { toast(tr('Office & finance is not available for this table\'s workspace')); return; }
   const html = `${sh2Field('sh2-desc', tr('Description'), sh2ColOpts(sh, sh2Find(sh, ['text'], /beschreib|leistung|position|descr|item|titel|title/i)))}
     ${sh2Field('sh2-qty', tr('Quantity'), sh2ColOpts(sh, sh2Find(sh, ['number'], /menge|anzahl|stunden|tage|qty|quant|hours|days/i), true))}
     ${sh2Field('sh2-unit', tr('Unit'), sh2ColOpts(sh, sh2Find(sh, [], /einheit|unit/i), true))}
@@ -98,7 +98,7 @@ async function sh2FromList(sh, lid) {
   const d = SH2.d[sh.id] || await sh2Fresh(sh);
   if (!lid) {
     const ls = d?.lists || [];
-    if (!ls.length) { toast(tr('There is no project in this space.')); return; }
+    if (!ls.length) { toast(tr('There is no project in this workspace.')); return; }
     const pre = sh.list_id && ls.some(l => l.id === sh.list_id) ? sh.list_id : ls[0].id;
     const v = await sh2Ask(tr('Project as rows'), `${sh2Field('sh2-src', tr('Project'), ls.map(l => `<option value="${l.id}" ${l.id === pre ? 'selected' : ''}>${esc(l.name)}</option>`).join(''))}
       <p class="muted mhint">${esc(tr('One row per task, the values stay live. You fetch new tasks later.'))}</p>`,

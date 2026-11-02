@@ -9,7 +9,7 @@
 //   is kept for the person (a second device shows the cards again)
 // - recognition: the line "Recognition on" in the documents folder; a file in a plain folder: "Recognise" in its menu makes
 //   it a document; a folder: "Recognition…"; the card's menu has Share… and the link for external people
-// freelancer-matrix: files (alice has no organisation: her private space)
+// freelancer-matrix: files (alice has no organisation: her private workspace)
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');

@@ -14,7 +14,7 @@ Requests (#2117): an organisation whose admins switch on "vacation needs approva
 as before) turns a vacation a member (not an admin) enters for themselves into a request (hub_absences.status 'pending').
 The person and the admins see it marked "requested"; the team, the workload, the day plan, the booking page and agents
 count only approved absences. The admins approve or reject it (with an optional note); the admins get a News item + push
-about a new request, the person about the decision -- the row "Vacation requests" of the notification settings switches
+about a new request, the person about the decision -- the row "Holiday requests" of the notification settings switches
 both off. Other kinds (sick leave, day off, other) and personal areas never need an approval."""
 from datetime import date, timedelta
 
@@ -107,7 +107,7 @@ def lv_status_edit(c, uid, r, v):
     kind = v.get("kind", old)
     if kind != "vacation":
         if cur != "approved":  # 2.360.0 C (#2496): an open / rejected request does not become approved by another kind
-            raise Denied(409, tr("A vacation request keeps its kind. Delete it and enter the absence anew."))
+            raise Denied(409, tr("A holiday request keeps its kind. Delete it and enter the absence anew."))
         return {}
     moved = kind != old or any(k in v and v[k] != r[k] for k in ("start_date", "end_date", "half_day"))
     return {"status": "pending"} if moved or cur == "rejected" else {}
@@ -140,9 +140,9 @@ def lv_notify(c, rcpts, kind, r, data):
         if not notif_ok(c, u, s, KIND_ROW[kind], "push") or not push_reachable(c, u, s):
             continue
         lg = lang_of(s)
-        title = (tr("{0} asks for vacation", who, lg=lg) if kind == "leavereq" else
-                 tr("{0} approved your vacation", who, lg=lg) if data.get("state") == "approved" else
-                 tr("{0} rejected your vacation", who, lg=lg))
+        title = (tr("{0} asks for holiday", who, lg=lg) if kind == "leavereq" else
+                 tr("{0} approved your holiday", who, lg=lg) if data.get("state") == "approved" else
+                 tr("{0} rejected your holiday", who, lg=lg))
         g.pushes.append((u, title, span, f"{PUBLIC_URL}/#workload", push_prio(s), {"scope": f"o:{r['org_id']}"}))  # 2.240.0 B2 (#2867)
 
 
@@ -213,7 +213,7 @@ def _num(v, name, lo=0, hi=LV_DAYS_MAX):
 
 def _member(c, oid, who):
     if who not in {p["id"] for p in abs_people(c, oid)}:
-        raise Denied(404, tr("unknown user"))
+        raise Denied(404, tr("unknown person"))
 
 
 # ---------------------------------------------------------------- routes
@@ -331,7 +331,7 @@ def lv_decide(aid):
     if r["deleted_at"]:
         raise Denied(404)
     if not abs_admin(c, uid, r["org_id"]):
-        raise Denied(403, tr("Only admins of this workspace can decide on vacation requests"))
+        raise Denied(403, tr("Only admins of this workspace can decide on holiday requests"))
     b = body()
     act = b.get("action")
     if act not in ("approve", "reject", "reopen"):
@@ -343,14 +343,14 @@ def lv_decide(aid):
     cur = r["status"] or "approved"
     if act == "reopen":
         if cur == "pending":
-            raise BadInput(tr("This vacation request is still open"))
+            raise BadInput(tr("This holiday request is still open"))
         # 2.125.0 R (#2117): only the Undo of a decision on a vacation request (a sick leave set to pending would count nowhere)
         if not r["decided_by"] or oc_dec_fields(c, r["org_id"], "hub_absences", r)["kind"] != "vacation":
             raise Denied(409, tr("This absence was not decided on"))
         c.execute("UPDATE hub_absences SET status='pending', decided_by=NULL, decided_at=NULL, decision_note='' WHERE id=?", (aid,))
     else:
         if cur != "pending":
-            raise BadInput(tr("This vacation request was decided already"))
+            raise BadInput(tr("This holiday request was decided already"))
         state = "approved" if act == "approve" else "rejected"
         e = oc_enc_fields(c, r["org_id"], "hub_absences", {"decision_note": note})
         c.execute("UPDATE hub_absences SET status=?, decided_by=?, decided_at=?, decision_note=? WHERE id=?",

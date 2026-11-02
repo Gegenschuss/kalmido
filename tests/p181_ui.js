@@ -56,7 +56,7 @@ const START = {'tasks.lastKey': null};  // boot.js seeds "today" for the older s
   // phone: drawer + default tab bar
   w = await boot({user: 'alice', mobile: true, ls: START}); d = w.document;
   check(w.eval('S.route.key') === 'inbox', 'phone: starts on the Inbox');
-  check([...d.querySelectorAll('#side .sbfix .sbmtop .srow')].map(b => b.dataset.drop).join() === 'today,inbox', 'phone drawer: Today and Inbox fixed on top');  // 2.196.0 (#2737): the drawer like sidebar B: search, Today, Inbox on top (was: Inbox first in Plan)
+  check(!d.querySelector('#side .sbmtop .srow') && [...d.querySelectorAll('#side .sg-focus .srow')].some(b => b.dataset.drop === 'inbox'), 'phone drawer: Today and Inbox are in Plan under the areas');  // 2.450.0 (#3817): Plan like on a computer (was #2737: Today, Inbox fixed on top)
   const tasksTab = d.querySelector('#tabs [data-go]');
   check(tasksTab && tasksTab.dataset.go === 'inbox' && tasksTab.classList.contains('on'), 'default tab bar: Tasks opens the Inbox: ' + tasksTab?.dataset.go);
   w.close();

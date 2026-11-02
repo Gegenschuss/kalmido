@@ -9,7 +9,7 @@ const keyName = k => k === 'Mod' ? (IS_MAC ? '⌘' : 'Ctrl') : k === 'Shift' ? (
 const kb = s => `<span class="kbs">${s.split(' ').map(ch => ch.split('+').map(k => `<kbd>${esc(keyName(k))}</kbd>`).join('')).join('')}</span>`;
 const kbText = s => s.split(' ').map(ch => ch.split('+').map(keyName).join(IS_MAC ? '' : '+')).join(' ');
 const SHORTCUTS_ALL = [
-  [N_('General'), [['Mod+K', N_('Search and commands')], ['?', N_('Keyboard shortcuts')], ['n', N_('New task')], ['q', N_('Quick capture to the basket')], ['a', N_('Chat with an agent (window)')], ['Ctrl+Space', N_('Quick capture, also while typing')], ['/', N_('Search')], ['Mod+Z', N_('Undo')], ['Mod+Shift+Z', N_('Redo')], ['Esc', N_('Close')]]],
+  [N_('General'), [['Mod+K', N_('Search and commands')], ['?', N_('Keyboard shortcuts')], ['n', N_('New task')], ['q', N_('Quick capture to the basket')], ['m', N_('New note')], ['a', N_('Chat with an agent (window)')], ['Ctrl+Space', N_('Quick capture, also while typing')], ['/', N_('Search')], ['Mod+Z', N_('Undo')], ['Mod+Shift+Z', N_('Redo')], ['Esc', N_('Close')]]],
   [N_('Tasks'), [['↓', N_('Next task (or J)')], ['↑', N_('Previous task (or K)')], ['Enter', N_('Open task')], ['Space', N_('Complete task (or X)')], ['e', N_('Edit title in the list (or double-click)')], ['s', N_('Snooze task')], ['d', N_('Change date')], ['t', N_('Due today')], ['Shift+T', N_('Due tomorrow')], ['m', N_('Move to project')], ['Shift+C', N_('Collapse or expand all')]]],
   // 2.0.6 (#191): multi-select and the calendar views
   [N_('Multi-select'), [['Mod+A', N_('Select all tasks of the view')], ['Shift+↓', N_('Extend the selection down (or Shift+J)')], ['Shift+↑', N_('Extend the selection up (or Shift+K)')], ['Shift+X', N_('Select or unselect the task')],
@@ -132,7 +132,7 @@ window.addEventListener('keydown', e => {
     const b = k === 'x' || k === ' ' ? $('#mbar [data-act="mb-done"]') : $(`#detail.multi [data-act="me-f"][data-f="${k === 'm' ? 'list' : 'date'}"]:not([disabled])`);
     if (b) { e.preventDefault(); b.click(); }
     else if (k === 'd') { e.preventDefault(); multiDateMenu($('#mbar .mcount') || document.body); }
-    else if (k === 'm') { e.preventDefault(); menu($('#mbar .mcount') || document.body, S.lists.filter(l => !l.archived && canEditList(l.id)).map(l => ({label: lname(l), lic: l, fn: () => batch('patch', {list_id: l.id, section_id: null})}))); }
+    else if (k === 'm') { e.preventDefault(); mv_batch($('#mbar .mcount') || document.body); }  // 2.455.0 (#3848)
     return;
   }
   if (e.shiftKey && (k === 'X' || k === 'J' || k === 'K' || k === 'ArrowDown' || k === 'ArrowUp')) {  // select / extend
@@ -204,6 +204,7 @@ function palAll() {
   // actions
   add('a:new', 'action', tr('New task'), 'plus', () => { const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); }, {keys: 'n'});
   add('a:capture', 'action', tr('Capture to the basket'), 'zap', () => quickCapture(), {keys: 'q', sub: tr('Lands in the basket, wherever you are')});  // 2.4.0 (#187); 2.25.0 (UX-32): one name that says where it goes
+  add('a:newnote', 'action', tr('New note'), 'note', () => qn_new(), {keys: 'm', sub: tr('Lands in your private list Notes')});  // 2.477.0 (#3881)
   add('a:newlist', 'action', tr('New project'), 'list', () => listModal());
   add('a:newfilter', 'action', tr('New filter'), 'filter', () => filterModal());
   {  // 2.27.0 (#974): the open list's agent, in the share dialog
@@ -254,13 +255,13 @@ function palAll() {
   const dens = document.documentElement.dataset.density;
   add('a:density', 'action', dens === 'compact' ? tr('Density: comfortable') : tr('Density: compact'), 'sliders', () => { LS.set('density', dens === 'compact' ? 'comfortable' : 'compact'); applyDensity(); });
   // appearance (per device): only listed when searching, e.g. "font", "accent", "size", "theme"
-  for (const [k, n] of THEMES) add('a:theme-' + k, 'action', tr('Color scheme: {0}', tr(n)), 'eye', () => lookSet('theme', k), {qonly: true});
+  for (const [k, n] of THEMES) add('a:theme-' + k, 'action', tr('Colour scheme: {0}', tr(n)), 'eye', () => lookSet('theme', k), {qonly: true});
   if (fsPct() < FS_MAX) add('a:fsize-up', 'action', tr('Font size: larger'), 'plus', () => fsStep(5), {qonly: true, keys: 'Mod+='});
   if (fsPct() > FS_MIN) add('a:fsize-down', 'action', tr('Font size: smaller'), 'sliders', () => fsStep(-5), {qonly: true, keys: 'Mod+-'});
   for (const v of FSIZE_ORDER) { const [, n, z] = LOOK.fsize.find(x => x[0] === v); add('a:fsize-' + v, 'action', tr('Font size: {0}', `${tr(n)} (${zPct(z)})`), 'sliders', () => lookSet('fsize', v), {qonly: true}); }
   for (const [v, n] of LOOK.pack) add('a:pack-' + v, 'action', tr('Design: {0}', tr(n)), 'eye', () => o3c_packPick(null, v), {qonly: true});  // 2.83.0 C (#1427)
   for (const [v, n] of LOOK.font) add('a:font-' + v, 'action', tr('Font: {0}', tr(n)), 'edit', () => lookSet('font', v), {qonly: true});
-  for (const [v, n, d, l] of LOOK.accent) add('a:accent-' + v, 'action', tr('Accent color: {0}', tr(n)), 'palette', () => lookSet('accent', v), {qonly: true, sw: light ? l : d});
+  for (const [v, n, d, l] of LOOK.accent) add('a:accent-' + v, 'action', tr('Accent colour: {0}', tr(n)), 'palette', () => lookSet('accent', v), {qonly: true, sw: light ? l : d});
   add('a:look-reset', 'action', tr('Reset appearance to the defaults'), 'undo', () => { for (const k of LOOK_KEYS) LS.del(k); applyTheme(); applyDensity(); applyLook(); render(); }, {qonly: true});
   add('a:keys', 'action', tr('Keyboard shortcuts'), 'help', shortcutsModal, {keys: '?'});
   add('a:tour', 'action', tr('Restart the welcome tour'), 'arrow', () => tourStart());
@@ -311,7 +312,7 @@ function palAll() {
   for (const l of S.lists.filter(x => !x.archived && !x.is_inbox && inWs(x))) add('l:' + l.id, 'list', lname(l), 'list', () => go('l/' + l.id), {sw: cssColor(lp_col(l)), img: liconOk(l.icon) ? l.icon : '', lic: l, ...(l.folder ? {sub: fDisp(l.folder)} : {})});
   for (const f of folderNames()) add('folder:' + f, 'folder', fDisp(f), 'folder', () => go('folder/' + encodeURIComponent(f)));  // 2.4.0 (#361)
   for (const f of S.filters) add('f:' + f.id, 'filter', f.name, 'filter', () => go('f/' + f.id));
-  for (const g of Object.keys(counts().tags).sort()) add('tag:' + g, 'tag', '#' + g, 'tag', () => go('tag/' + encodeURIComponent(g)));
+  for (const g of Object.keys(counts().tags).sort(cmpText)) add('tag:' + g, 'tag', '#' + g, 'tag', () => go('tag/' + encodeURIComponent(g)));
   // settings tabs
   for (const [k, icon, n] of SET_SECS) {
     if (k === 'account' && !S.me) continue;
@@ -356,10 +357,7 @@ function pg_officeItems(add) {
 }
 // 2.250.0 B (#2993 #2996): create actions, only where the button in the UI would be there
 function pg_actions(add) {
-  if (S.me && aiPaneOn()) add('a:ag-new', 'action', tr('Add agent…'), 'bot', () => {
-    settingsModal('agents');
-    pg_waitEl(S.me.is_admin ? '[data-ag="new"]' : '[data-aigo="setup"]', b => b.click());
-  }, {sub: tr('Settings: {0}', tr('Agents'))});
+  if (S.me && aiPaneOn()) add('a:ag-new', 'action', tr('Add agent…'), 'bot', agCreateGo, {sub: tr('Settings: {0}', tr('Agents'))});  // 2.366.0 (#2998): the same way as the Agents area
   if (!S.me?.kid && clientsOn()) add('a:cl-new', 'action', tr('Add client'), 'brief', () => clientModal(null), {sub: tr('Clients')});
   if (!S.me?.kid && mg_on('office') && !o3a_hid('office') && typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'offers'))
     add('v:o-openitems', 'view', tr('Open items'), 'receipt', () => loadModule('office').then(() => kp_openItems('open')), {sub: tr('Office|area'), kw: tr('OP open items unpaid invoices overdue'), prio: 2});  // 2.356.0 D (#3007): only where the invoices are
@@ -368,7 +366,7 @@ function pg_actions(add) {
   if (workloadOn() && !S.me?.kid) add('a:abs-new', 'action', tr('Enter an absence'), 'cal', () => {
     WLV.tab = 'abs'; go('workload');
     loadModule('team').then(() => ab2_load()).then(() => ab2_sheet(null));  // the sheet takes the people of the loaded month (admins pick one)
-  }, {sub: tr('Workload & absences'), kw: tr('vacation sick leave day off away absence')});  // 2.250.0 B (#2996)
+  }, {sub: tr('Workload & absences'), kw: tr('holiday vacation sick leave day off away absence')});  // 2.250.0 B (#2996)
 }
 // 2.250.0 B (#2993): the sections of the settings (only when typing): the same headings the settings search finds; the focus
 // names are the ones settingsModal knows, the heading is scrolled to once it is there
@@ -417,9 +415,13 @@ function palItems() {
   if (PAL.mode === 'ref') return rf_palItems(q);  // 2.53.0 (#1449): pick a reference for the comment / description (refs.js)
   if (PAL.mode === 'move') {
     const t = curTask(); if (!t) return [];
-    return (canEditList(t.list_id) ? S.lists : []).filter(l => !l.archived && canEditList(l.id) && l.id !== t.list_id).map(l => ({id: 'mv:' + l.id, kind: 'list', label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, sw: cssColor(lp_col(l)),
-      fn: () => patchUndoable(t.id, {list_id: l.id, section_id: null}, tr('Moved to {0}', lname(l)))}))
+    // 2.455.0 (#3848): like the picker: the task's workspace (All: every project, its workspace beside it), the others through the entry
+    const ws = mv_scope([t.id]), o = {filter: l => canEditList(l.id) && l.id !== t.list_id, pick: l => patchUndoable(t.id, {list_id: l.id, section_id: null}, tr('Moved to {0}', lname(l)))};
+    const it = (canEditList(t.list_id) ? S.lists : []).filter(l => !l.archived && o.filter(l) && (!ws || inWs(l, ws))).map(l => ({id: 'mv:' + l.id, kind: 'list', label: lname(l), ...(ws === 'all' && !l.is_inbox ? {sub: wsName(wsOf(l))} : {}), icon: l.is_inbox ? 'inbox' : 'list', lic: l, sw: cssColor(lp_col(l)),
+      fn: async () => { if (await mv_ask([t.id], l)) o.pick(l); }}))
       .map(x => ({...x, score: fuzzy(q, x.label)})).filter(x => x.score > 0).map(x => ({...x, score: x.score + lc_favBoost(x)})).sort((a, b) => b.score - a.score);
+    const more = canEditList(t.list_id) && mv_wsItem($(`#view .trow[data-id="${t.id}"]`) || $('#top h1'), [t.id], o);
+    return more ? [...it, {...more, id: 'mv:ws', kind: 'action', score: 1}] : it;
   }
   const all = palAll();
   if (!q) {  // recently viewed tasks / lists, recent commands, then the actions for the current task, the rest of the actions + views
@@ -571,28 +573,56 @@ function tourSteps() {
     : {id: 'side', sel: '#side .sg-focus .srow', t: N_('Smart lists'), d: N_('New tasks without a project land in the Basket. Today, Tomorrow and Next 7 days collect from all projects.'),
       r: () => unionRect($$('#side .sg-focus .srow').slice(0, 4))});
   const org = tourOrg(), wsEl = () => $$('[data-act="ws-menu"]').find(e => e.getBoundingClientRect().width) || null;
-  if (org) s.push({id: 'org', sel: '[data-act="ws-menu"]', t: N_('You are in {0}'), targs: [org.name], d: N_('Your projects and the team chat of {0} are in the menu. Here at the top you switch between {0} and your private space.'), args: [org.name], r: rect(wsEl)});
+  if (org) s.push({id: 'org', sel: '[data-act="ws-menu"]', t: N_('You are in {0}'), targs: [org.name], d: N_('Your projects and the team chat of {0} are in the menu. Here at the top you switch between {0} and your private workspace.'), args: [org.name], r: rect(wsEl)});
   s.push({id: 'add', sel: m ? '#fab' : '#view .qadd .box', t: N_('Quick add'), d: N_('Type the way you think: “Dentist tomorrow 3pm !high #private”. Date, priority, tags and project are picked up as you type.'), r: rect(m ? '#fab' : '#view .qadd .box')});
   s.push({id: 'detail', sel: '#view .trow', t: N_('Details'), d: touch ? N_('Tap a task for its details. Swipe right to complete, left to reschedule.') : N_('Click a task for its details. Drag it onto a day or a project to move it.'), r: rect('#view .trow')});
   // steps only name modules that are on (a "Simple list" setup has no habits / focus)
   // 2.364.0 A (#3016): the bar's step names what the bar really holds (was "Tab bar" with "calendar, habits, focus")
   const tabs = $$('#tabs > button').map(b => (b.querySelector('span:last-child')?.textContent || b.getAttribute('aria-label') || '').trim()).filter(Boolean);
+  // 2.466.0 (#3314): the rail is today's way between the areas; folders and sharing work alike in all of them
+  const rail = !m && $('#srail');
+  if (rail) s.push({id: 'rail', sel: '#srail', t: N_('Your areas'), d: N_('Calendar, Office, Files and more sit in this bar. Folders and sharing work the same in every area.'), r: rect('#srail')});
   if (m) s.push({id: 'tabs', sel: '#tabs', t: N_('The bar at the bottom'), d: tabs.length ? N_('{0}. Pin projects: Settings > Appearance.') : N_('Your projects and views. Pin projects: Settings > Appearance.'), args: tabs.length ? [tabs.join(' · ')] : [], r: rect('#tabs')});
   else if (!touch) s.push({id: 'keys', sel: '#kbar .kbsrch, #top .kbtn', t: N_('Keyboard first'), d: N_('{0} opens search and commands for everything, {1} lists all shortcuts. j and k move through tasks, x completes.'), args: [kbText('Mod+K'), '?'], r: rect('#kbar .kbsrch, #top .kbtn')});  // 2.152.3 A (#2619)
-  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: N_('Modules, language and appearance.'),  // 2.352.0 B (#2752): no switch to point at
-    r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
   // 2.365.0 (#2802): one step for what the start switched on: the office (Office & finance), else the team (Team, Software)
   const ofc = officeOn() && vis('#tabs [data-go^="office"], #srail [data-sbb="office"], #side [data-go^="office"]');
   if (ofc) s.push({id: 'office', sel: '#tabs [data-go^="office"], #srail [data-sbb="office"], #side [data-go^="office"]', t: N_('Office|area'), d: N_('Here you create clients and quotations.'), r: () => ofc.getBoundingClientRect()});
   else if (collab() && !S.me?.kid) s.push({id: 'team', t: N_('Work as a team'), d: N_('Share a project from its “…” menu: the people you add see only what you share, and you assign tasks to them with @name.')});
-  if (collab()) s.push({id: 'news', sel: '#kbar .bell, #top .bell', t: N_('News'), d: N_('Mentions, assignments and comments on your tasks arrive here.'), r: rect('#kbar .bell, #top .bell')});  // 2.152.3 A (#2619): a computer: the head bar
-  return s.slice(0, 7);  // 2.365.0 (#2802): 7 with the step of the chosen start
+  if (collab()) s.push({id: 'news', sel: '#kbar .bell, #top .bell', t: N_('News'), d: N_('Mentions, assignments and comments from all your workspaces arrive here.'), r: rect('#kbar .bell, #top .bell')});  // 2.152.3 A (#2619): a computer: the head bar; 2.466.0 (#3314): all workspaces
+  const agEl = () => vis('#srail [data-sbb="agents"], #tabs [data-go="agents"]');  // 2.466.0 (#3314)
+  if ((S.agents || []).length) s.push({id: 'agents', sel: '#srail [data-sbb="agents"], #tabs [data-go="agents"]', t: N_('Agents'), d: N_('Your connected agents work in the projects you share and answer in the chat.'), r: rect(agEl)});
+  s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: N_('Modules, language and appearance.'),  // 2.352.0 B (#2752): no switch to point at
+    r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
+  return s.slice(0, 8);  // 2.365.0 (#2802): with the step of the chosen start; 2.466.0 (#3314): 8 with the areas' bar
+}
+// 2.466.0 (#3314): the short introduction of an area: once, the first time the area opens (tours_seen, per account), never
+// for a child, a second window or after "Show more introductions" is unticked; the welcome tour goes first. Restart: Settings > Help.
+// A step without a target (or with its target not on the screen) shows its card in the middle.
+const TOUR_AREAS = ['cal', 'office', 'time', 'review', 'life', 'reading', 'ablage', 'wiki', 'sheets', 'habits', 'agents'];  // the steps: tourmods.js, loaded on the first use
+const toursSeen = () => (S.settings.tours_seen || '').split(',').filter(Boolean);
+const tourModBlocked = () => TOUR.on || !S.me || S.me.kid || S.settings.tour === 'pending' || S.settings.tours_more === '0' || MW_ON || S.capturePage || S.sel || S.route?.task || !!$('.modal');
+function tourModAuto() {
+  if (tourModBlocked()) return;
+  const id = sbb_area();
+  if (!TOUR_AREAS.includes(id) || toursSeen().includes(id)) return;
+  setTimeout(() => {  // the view of the area first: the steps point at it
+    if (tourModBlocked() || sbb_area() !== id || toursSeen().includes(id)) return;
+    S.settings.tours_seen = [...toursSeen(), id].join(',');
+    api('PATCH', '/api/settings', {tours_seen: S.settings.tours_seen}).catch(() => { /* offline: once more on the next start */ });
+    loadModule('tourmods').then(() => { if (sbb_area() === id && !tourModBlocked()) tourStart(id); }, () => {});
+  }, 500);
+}
+// Settings > Help: one area's introduction again: there first, the tour when it is open
+function tourModRestart(id) {
+  go(sbb_target(id));
+  const t0 = Date.now(), wait = () => { if (sbb_area() === id) loadModule('tourmods').then(() => setTimeout(() => tourStart(id), 300), () => {}); else if (Date.now() - t0 < 3000) setTimeout(wait, 100); };
+  wait();
 }
 // 2.223.0 A (#2821): the steps point at the area Projects (the panel's smart lists, the quick add, a task row). The automatic
 // start (tour still pending) runs at most once per session and only in Projects: a link with a target (#cal, #office,
 // #client/…, a task) opens that target and the tour waits until one comes back to Projects. Leaving Projects while it runs
 // pauses it (ring and card hidden, keys free); it goes on at the same step on the way back. A child's tour is not bound.
-const tourHome = () => !!S.me?.kid || S.route?.mod === 'tasks';
+const tourHome = () => TOUR.mod ? sbb_area() === TOUR.mod : !!S.me?.kid || S.route?.mod === 'tasks';
 function tourAuto() {
   if (TOUR.on || S.settings.tour !== 'pending') { TOUR.wait = false; return; }
   let seen = ''; try { seen = sessionStorage.getItem('kalmido-tour-' + S.me?.id) || ''; } catch { /* private mode */ }
@@ -609,15 +639,17 @@ function tourPause(on) {
 window.addEventListener('hashchange', () => setTimeout(() => {
   if (TOUR.wait) tourAuto();
   else if (TOUR.on && TOUR.paused === tourHome()) tourPause(!TOUR.paused);
+  else tourModAuto();
 }, 0));
-function tourStart() {
-  TOUR.wait = false; TOUR.paused = false;
+function tourStart(mod) {
+  TOUR.wait = false; TOUR.paused = false; TOUR.mod = mod || '';
   closePalette(); $$('.modal:not(.authscreen)').forEach(x => x.remove()); closePop(); if (S.sel) closeDetail();
   const inList = S.route.mod === 'tasks' && !NOLIST_KEYS.includes(S.route.key) && !isKanban() && !isTimeline();
-  if (!S.me?.kid && (!inList || !$('#view .trow'))) go('today');  // the tour points at a task (a fresh account's Inbox is empty); 2.49.0 (#1533): a child stays in My day
-  TOUR.on = true; TOUR.steps = tourSteps(); TOUR.i = 0;
+  if (!mod && !S.me?.kid && (!inList || !$('#view .trow'))) go('today');  // the tour points at a task (a fresh account's Inbox is empty); 2.49.0 (#1533): a child stays in My day
+  TOUR.on = true; TOUR.steps = mod ? tourModSteps(mod) : tourSteps(); TOUR.i = 0;  // lazy-ok: both callers with mod load tourmods first
+  TOUR.more = S.settings.tours_more !== '0'; TOUR.moreShown = false;  // 2.466.0 (#3314)
   // 1.8.0: first start of an account: "Create a sample project" on the first card (preticked for project setups)
-  TOUR.sample = S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0' && !S.me?.kid && !tourHasProjects() && !tourOrg(); TOUR.sampleOn = false;  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
+  TOUR.sample = !mod && S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0' && !S.me?.kid && !tourHasProjects() && !tourOrg(); TOUR.sampleOn = false;  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
   let el = $('.tour');
   if (!el) { el = document.createElement('div'); el.className = 'tour'; el.innerHTML = '<div class="tring"></div><div class="tcard" role="dialog" aria-live="polite"></div>'; document.body.appendChild(el); }
   el.addEventListener('click', e => {
@@ -625,11 +657,11 @@ function tourStart() {
     const a = b.dataset.tour;
     if (a === 'next') tourGo(TOUR.i + 1); else if (a === 'back') tourGo(TOUR.i - 1); else tourEnd(true);
   });
-  el.addEventListener('change', e => { if (e.target.id === 't-sample') TOUR.sampleOn = e.target.checked; if (e.target.id === 't-ptype') TOUR.ptype = e.target.value; });
+  el.addEventListener('change', e => { if (e.target.id === 't-sample') TOUR.sampleOn = e.target.checked; if (e.target.id === 't-ptype') TOUR.ptype = e.target.value; if (e.target.id === 't-more') TOUR.more = e.target.checked; });
   el.addEventListener('click', e => { const b = e.target.closest('[data-tpurpose]'); if (!b) return; TOUR.purpose = TOUR.purpose === b.dataset.tpurpose ? '' : b.dataset.tpurpose; tourGo(TOUR.i); $(`.tour [data-tpurpose="${b.dataset.tpurpose}"]`)?.focus(); });  // 2.19.0 (#653)
   TOUR.ptype = ''; TOUR.purpose = '';
   // 2.165.0 (#2612): the very first start of the account greets once: the figure waves on the first card (tourGo)
-  TOUR.hi = S.settings.tour === 'pending' && !LS.get('botHi', false); TOUR.hiShown = false;
+  TOUR.hi = !mod && S.settings.tour === 'pending' && !LS.get('botHi', false); TOUR.hiShown = false;
   setTimeout(() => tourGo(0), 60);
 }
 // 2.165.0 (#2612): the figure of the first card. On the very first start (once per account and device: the tour is still
@@ -662,9 +694,10 @@ function tourGo(i) {
   const card = $('.tcard', el), ring = $('.tring', el);
   el.dataset.step = st.id; el.dataset.sel = st.sel || '';
   card.innerHTML = `<div class="tstep"><span>${TOUR.i + 1}/${n}</span><span class="tdots">${TOUR.steps.map((_, j) => `<i class="${j === TOUR.i ? 'on' : j < TOUR.i ? 'past' : ''}"></i>`).join('')}</span></div>
-    <h3>${TOUR.i === 0 ? tourHiFig() : ''}${esc(tr(st.t, ...(st.targs || [])))}</h3><p>${esc(tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
+    <h3>${TOUR.i === 0 && !TOUR.mod ? tourHiFig() : ''}${esc(tr(st.t, ...(st.targs || [])))}</h3><p>${esc(tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
     ${last && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.')}</small></span></label>` : ''}
-    ${last && (S.agents || []).length ? pk2_setupHtml() : ''}
+    ${last && !TOUR.mod && (S.agents || []).length ? pk2_setupHtml() : ''}
+    ${last && !S.me?.kid ? `<label class="tsample"><input type="checkbox" id="t-more" ${TOUR.more ? 'checked' : ''}><span><b>${tr('Show more introductions')}</b></span></label>` : ''}
     <div class="tfoot"><button class="btn sm tskip" data-tour="skip">${tr('Skip tour')}</button><span class="spacer"></span>${TOUR.i ? `<button class="btn sm" data-tour="back">${tr('Back')}</button>` : ''}<button class="btn sm pri" data-tour="next">${last ? tr('Done') : tr('Next')}</button></div>`;
   const r = st.r && st.r();
   let pl = tourPlace(r, innerWidth, innerHeight);
@@ -677,6 +710,7 @@ function tourGo(i) {
     if (cr.height && pl.ring && (cr.bottom > innerHeight - 12 || cr.top < 12)) { card.style.bottom = 'auto'; card.style.top = Math.max(12, Math.min(innerHeight - cr.height - 12, cr.top)) + 'px'; }
   }
   if (last && TOUR.sample) TOUR.sampleShown = true;  // 2.25.0 (UX-24)
+  if (last) TOUR.moreShown = true;
   $('[data-tour="next"]', card)?.focus();
 }
 async function tourSample() {  // 2.25.0 (UX-24): once, when the tour ends and its last card offered the sample project
@@ -694,8 +728,10 @@ async function tourSample() {  // 2.25.0 (UX-24): once, when the tour ends and i
 }
 async function tourEnd(skipped) {
   tourSample();
-  TOUR.on = false; TOUR.paused = false; $('.tour')?.remove();
+  const mod = TOUR.mod; TOUR.on = false; TOUR.paused = false; TOUR.mod = ''; $('.tour')?.remove();
+  if (TOUR.moreShown && !S.me?.kid && TOUR.more !== (S.settings.tours_more !== '0')) { S.settings.tours_more = TOUR.more ? '1' : '0'; api('PATCH', '/api/settings', {tours_more: S.settings.tours_more}).catch(() => { /* offline: stays as it was */ }); }  // 2.466.0 (#3314)
   if (S.settings.tour === 'pending') { S.settings.tour = 'done'; try { await api('PATCH', '/api/settings', {tour: 'done'}); } catch { /* offline: shows again next start */ } }
+  if (mod) return;
   if (!skipped && !S.me?.kid) toast(tr('Tour finished. Restart it any time under Settings > Help.'));  // 2.49.0 (#1533): a child has no Help
 }
 window.addEventListener('resize', () => { if (TOUR.on) tourGo(TOUR.i); });

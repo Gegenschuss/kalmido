@@ -7,7 +7,7 @@
 //      approves; SW v63
 const {execFileSync} = require('child_process');
 const fs = require('fs'), path = require('path');
-const {boot, errs, sleep, B, login} = require('./boot');
+const {boot, errs, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -37,7 +37,7 @@ const cm = (sha, message, at = new Date(Date.now() + 5000)) => ({sha, html_url: 
 const taskOf = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).tasks.find(t => t.id === id);
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   const SW = await (await fetch(B + 'sw.js')).text();
   check(/const CACHE = 'tasks-shell-v(?:(6[3-9]|7[0-9])|8[0-9]|9[0-9]|[1-9][0-9]{2})'/.test(SW), 'service worker cache v63 (2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76, 2.8.0: v77, 2.9.0: v78, 2.10.0: v79, 2.11.0: v80)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
@@ -65,7 +65,7 @@ const taskOf = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)
 
   // ================= the task panel: Code
   for (const [mobile, lab] of [[false, 'desktop'], [true, 'phone']]) {
-    const w = await boot({user: 'alice', mobile, hash: 't/' + T1}), d = w.document; await sleep(500);
+    const w = await boot({user: 'alice', mobile, hash: 't/' + T1}), d = w.document; await until(() => d.querySelectorAll('#d-code .gitrow').length >= 2 && d.querySelector('#d-code .gbranch')); await idle(w);
     const sec = d.querySelector('#d-code');
     check(sec && /Code/.test(sec.querySelector('h5')?.textContent || '') && /acme\/app/.test(sec.querySelector('h5').textContent), `${lab}: section Code with the repository`);
     const rows = [...(sec?.querySelectorAll('.gitrow') || [])];
@@ -79,7 +79,7 @@ const taskOf = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)
     // 2.27.0 (#957): the comments come last again (after "More details")
     check(ic > iti && (it < 0 || ic < it) && !!d.querySelector('#detail #d-more #d-code'), `${lab}: Code after the fields, under "More details": ${order.join(',')}`);
     if (!mobile) {
-      const w2 = await boot({user: 'alice', hash: 'l/' + P}); await sleep(500);
+      const w2 = await boot({user: 'alice', hash: 'l/' + P}); await until(() => [...w2.document.querySelectorAll('.gitc')].find(x => /#5/.test(x.textContent) && x.querySelector('.ci-failure')));
       const chip = [...w2.document.querySelectorAll('.gitc')].find(x => /#5/.test(x.textContent));
       check(chip && chip.querySelector('.ci-failure') && /Pull request #5: open · CI failed/.test(chip.title), 'row chip: #5 + CI: ' + (chip?.title || w2.document.querySelectorAll('.gitc').length));
       w2.close();
@@ -88,13 +88,13 @@ const taskOf = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)
   }
 
   // ================= the history line "Completed by the commit" + Undo
-  let w = await boot({user: 'alice', hash: 't/' + T4}), d = w.document; await sleep(700);
+  let w = await boot({user: 'alice', hash: 't/' + T4}), d = w.document;
   const line = await until(() => [...d.querySelectorAll('.actl')].find(x => /Completed by the commit/.test(x.textContent)), 20);
   check(line && /fixes #\d+/.test(line.textContent) && /acme\/app/.test(line.textContent), 'history: completed by the commit in acme/app: ' + (line?.textContent || [...d.querySelectorAll('.actl')].map(x => x.textContent).join(' | ')));
   const ub = line && line.querySelector('[data-act="git-undo"]');
   check(ub, 'the Undo button');
-  click(w, ub); await sleep(1200);
-  check((await taskOf(T4)).status === 0, 'undo reopened the task');
+  click(w, ub);
+  check(await until(async () => (await taskOf(T4)).status === 0), 'undo reopened the task');
   w.close();
 
   // ================= #339: merge request + agent working on it
@@ -102,17 +102,19 @@ const taskOf = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)
   const mr = await v1(ag.token, 'POST', `/tasks/${T9}/comments`, {body: 'Ready to merge', suggestion: {kind: 'merge_request', pr_url: url, summary: 'Adds the CSV export'}});
   check(mr.status === 201 || mr.status === 200, 'merge request posted: ' + mr.status);
   await v1(ag.token, 'PUT', '/agent/status', {status: 'working', text: 'Writing tests', task_id: T9});
-  w = await boot({user: 'bob', hash: 't/' + T9}); d = w.document; await sleep(700);
+  w = await boot({user: 'bob', hash: 't/' + T9}); d = w.document; await idle(w);
   let box = await until(() => d.querySelector('.sug.mr'), 20);
   check(box && /Ready to merge/.test(box.textContent) && /CSV export/.test(box.textContent) && /Adds the CSV export/.test(box.textContent) && box.querySelector('.ci-success'),
     'bob sees the merge request with the PR and CI');
   check(box && !box.querySelector('[data-act="mr-ok"]'), 'bob (member) gets no Approve button');
-  check(/Claude is working on it/.test(d.querySelector('#d-code')?.textContent || ''), '"Claude is working on it" in the Code section');
+  check(await until(() => /Claude is working on it/.test(d.querySelector('#d-code')?.textContent || '')), '"Claude is working on it" in the Code section');
   w.close();
-  w = await boot({user: 'alice', hash: 't/' + T9}); d = w.document; await sleep(700);
+  w = await boot({user: 'alice', hash: 't/' + T9}); d = w.document; await idle(w);
   box = await until(() => d.querySelector('.sug.mr [data-act="mr-ok"]') && d.querySelector('.sug.mr'), 20);
   check(box && box.querySelector('[data-act="mr-no"]'), 'alice (owner) gets Approve / Reject');
-  click(w, box.querySelector('[data-act="mr-ok"]')); await sleep(1200);
+  click(w, box.querySelector('[data-act="mr-ok"]'));
+  await until(async () => (await call('GET', `/api/tasks/${T9}/timeline`)).comments?.find(c => c.id === mr.id)?.suggestion?.state === 'approved');
+  await until(() => /approved/.test(d.querySelector('.sug.mr')?.textContent || '') && !d.querySelector('.sug.mr [data-act="mr-ok"]'));
   const tl = await call('GET', `/api/tasks/${T9}/timeline`);
   check(tl.comments.find(c => c.id === mr.id)?.suggestion?.state === 'approved', 'Approve approved it');
   check(/approved/.test(d.querySelector('.sug.mr')?.textContent || '') && !d.querySelector('.sug.mr [data-act="mr-ok"]'), 'the box shows approved, no buttons');
@@ -185,7 +187,7 @@ const taskOf = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)
     check(ebob && /On/.test(ebob.textContent) && /2 received/.test(ebob.textContent) && !ebob.querySelector('[data-rp]') && !/hooks\/issues/.test(ebob.innerHTML),
       '2.18.0: bob sees the state, no buttons, no URL: ' + (ebob?.textContent.replace(/\s+/g, ' ') || ''));
     w.close();
-    w = await boot({user: 'alice', hash: 't/' + rr.task_id}); d = w.document; await sleep(700);
+    w = await boot({user: 'alice', hash: 't/' + rr.task_id}); d = w.document;
     const lines = await until(() => { const x = [...d.querySelectorAll('.actl')].map(e => e.textContent).join(' | '); return /happened again/.test(x) && x; }, 20);
     check(/Created from an error report \(webhook\)/.test(lines || '') && /The error happened again \(2×\)/.test(lines || ''), '2.18.0: history lines: ' + lines);
     w.close();
@@ -193,7 +195,8 @@ const taskOf = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)
 
   // ================= German
   await call('PATCH', '/api/settings', {lang: 'de'});
-  w = await boot({user: 'alice', hash: 't/' + T9}); d = w.document; await sleep(900);
+  w = await boot({user: 'alice', hash: 't/' + T9}); d = w.document; await until(() => d.querySelector('#d-code h5') && /freigegeben/.test(d.querySelector('.sug.mr')?.textContent || '')); await idle(w);
+
   check(/Code/.test(d.querySelector('#d-code h5')?.textContent || '') && /Bereit zum Mergen/.test(d.querySelector('.sug.mr')?.textContent || '')
     && /freigegeben/.test(d.querySelector('.sug.mr')?.textContent || ''), 'German: Code, Bereit zum Mergen, freigegeben');
   w.eval(`listModal(${P})`);

@@ -164,15 +164,41 @@ def _fs_receipt_hidden(c, uid, org, n):
     """2.187.0 C (#2476): a receipt of organisation org (a file with an rc_receipts row) for a person ruled by office groups:
     only with the area receipts (level "own": only the receipts they uploaded). Everybody else as before.
     2.187.1 A (#2735): agents are always ruled by office groups (ofr_rights; no group = no area = no receipt)."""
-    from ..office.rights import LV, ofr_rights
-    r = ofr_rights(c, uid, org)
+    from ..office.rights import ofr_rights
+    if not _fs_receipt_locked(ofr_rights(c, uid, org), uid, n):
+        return False
+    return c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (n["id"],)).fetchone() is not None
+
+
+def _fs_receipt_locked(r, uid, n):
+    """Whether node n would be hidden from uid IF it is a receipt; r = ofr_rights of n's organisation (None: not ruled by
+    office groups)."""
+    from ..office.rights import LV
     if r is None:
         return False
     lv = r["levels"].get("receipts", "none")
     mine = (n["created_by"] if "created_by" in n.keys() and n["created_by"] else n["owner_id"]) == uid  # review: the uploader, as the list
-    if LV[lv] >= LV["view"] or (lv == "own" and mine):
-        return False
-    return c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (n["id"],)).fetchone() is not None
+    return not (LV[lv] >= LV["view"] or (lv == "own" and mine))
+
+
+def _fs_receipts_hidden_ids(c, uid, rows):
+    """2.360.5 (#2753): the ids of the rows uid may not read as an organisation's receipt -- _fs_receipt_hidden for a whole
+    listing: the office rights once per organisation, the rc_receipts rows in one query (was one query per file)."""
+    from ..office.rights import ofr_rights
+    rights, cand = {}, []
+    for r in rows:
+        org = r["org_id"] if "org_id" in r.keys() else None  # a caller with fewer columns (public links) as before
+        if not org:
+            continue
+        if org not in rights:
+            rights[org] = ofr_rights(c, uid, org)
+        if _fs_receipt_locked(rights[org], uid, r):
+            cand.append(r["id"])
+    out = set()
+    for i in range(0, len(cand), 500):
+        part = cand[i:i + 500]
+        out |= {x[0] for x in c.execute(f"SELECT node_id FROM rc_receipts WHERE node_id IN ({','.join('?' * len(part))})", part)}
+    return out
 
 
 def _fs_docs_root(c, org):
@@ -353,9 +379,9 @@ def fs_mail_rows(c, uid, rows):
     """2.148.1 D (#2488): rows without the nodes filed with a hub mail uid may not read (a folder's listing).
     2.187.1 A (#2735): also without the organisation receipts uid may not read (_fs_receipt_hidden, people and agents)."""
     seen, out = {}, []
+    hidden = _fs_receipts_hidden_ids(c, uid, rows)  # 2.360.5 (#2753): one query for the listing
     for r in rows:
-        org = r["org_id"] if "org_id" in r.keys() else None  # a caller with fewer columns (public links) as before
-        if org and _fs_receipt_hidden(c, uid, org, r):
+        if hidden and r["id"] in hidden:
             continue
         m = r["hub_mail_id"]
         if m:

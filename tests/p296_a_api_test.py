@@ -5,9 +5,9 @@ POST /api/files/move-space. Invented names only, generated file contents.
    Paperless origin: readable in the target, the same content, sealed with the target's key, the labels in the target's
    workspace, the search finds it there; the undo (items back to the old folder under the old name)
  - the dry run changes nothing; a taken name in the target folder -> "Name (2)"; "docs" = the target's documents folder
- - rights: a plain member does not pull someone else's organisation file into the private space (403, the dry run blocks),
+ - rights: a plain member does not pull someone else's organisation file into the private workspace (403, the dry run blocks),
    the admin may; another organisation 409; someone else's file 404; an agent's token gets nothing
- - a share with an organisation colleague ends on the way into the private space
+ - a share with an organisation colleague ends on the way into the private workspace
  - a person without an organisation (freelancer fixture): 409, there is no other workspace
 tenant-matrix: file
 freelancer-matrix: files
@@ -172,7 +172,7 @@ check(one("SELECT ws FROM doc_senders WHERE id=?", (d["sender"]["id"],)) == f"o{
 hits = [x["id"] for x in Ca.get(B + "/api/docs", params={"ws": f"org:{ORG}", "q": "sonnenblume", "facets": "0"}).json()["docs"]]
 check(DOC in hits, f"the search finds it in Alpha ({hits})")
 check([x["id"] for x in Ca.get(B + "/api/docs", params={"ws": "private", "q": "sonnenblume", "facets": "0"}).json()["docs"]] == [],
-      "and no longer in the private space")
+      "and no longer in the private workspace")
 check(one("SELECT node_id FROM pl_imported WHERE ws=? AND pl_id=77", (f"o{ORG}",)) == DOC and
       one("SELECT COUNT(*) FROM pl_imported WHERE ws=? AND pl_id=77 AND node_id IS NULL", (f"u{CAROL}",)) == 1,
       "the Paperless origin goes along, the source keeps it without the node (no second import)")
@@ -185,7 +185,7 @@ undo_items = [{"id": x["id"], "parent": x["parent_was"], "name": x["name_was"]} 
 check(move(Ca, {"items": undo_items, "to": "private"}).status_code == 403, "#2483: a member does not move files out of Alpha (403)")
 dbx("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=?", (ORG, CAROL))
 r = move(Ca, {"items": undo_items, "to": "private"})
-check(r.ok, f"undo: back into the private space ({r.status_code} {r.text[:300]})")
+check(r.ok, f"undo: back into the private workspace ({r.status_code} {r.text[:300]})")
 check(node(PROJ)["org_id"] is None and node(PROJ)["name"] == "Projekt" and node(NOTE)["org_id"] is None, "undo: the old place and name")
 check(space_of(NOTE) == -CAROL and Ca.get(B + f"/api/files/nodes/{NOTE}/content").content == NOTE_TXT, "undo: carol's key, the same content")
 check(Bo.get(B + f"/api/files/nodes/{NOTE}").status_code == 404, "undo: bob no longer sees it")
@@ -209,7 +209,7 @@ check(Bo.patch(B + f"/api/files/nodes/{PLAN}", json={"org_access": "edit"}).ok, 
 r = move(Ca, {"ids": [PLAN], "to": "private", "dry": 1})
 check(r.ok and r.json().get("block"), f"dry run: a member may not pull bob's file out of Alpha ({r.status_code} {r.text[:200]})")
 r = move(Ca, {"ids": [PLAN], "to": "private"})
-check(r.status_code == 403 and node(PLAN)["org_id"] == ORG, f"a member pulling someone else's Alpha file into the private space: 403 ({r.status_code})")
+check(r.status_code == 403 and node(PLAN)["org_id"] == ORG, f"a member pulling someone else's Alpha file into the private workspace: 403 ({r.status_code})")
 r = move(Ca, {"ids": [NOTE], "to": f"org:{ORG2}"})
 check(r.status_code == 409, f"into an organisation carol is not in: 409 ({r.status_code})")
 r = move(Da, {"ids": [NOTE], "to": f"org:{ORG2}"})
@@ -220,9 +220,9 @@ ag = requests.post(B + "/api/files/move-space", json={"ids": [PLAN], "to": "priv
 check(ag.status_code in (401, 403) and node(PLAN)["org_id"] == ORG, f"an agent's token moves nothing ({ag.status_code})")
 r = move(Bo, {"ids": [PLAN], "to": "private"})
 check(r.ok and node(PLAN)["org_id"] is None and node(PLAN)["owner_id"] == BOB and node(PLAN)["org_access"] == "",
-      f"the admin may take it into his private space; the opening to Alpha ends ({r.status_code})")
+      f"the admin may take it into his private workspace; the opening to Alpha ends ({r.status_code})")
 
-# ---- a share with an organisation colleague ends on the way into the private space
+# ---- a share with an organisation colleague ends on the way into the private workspace
 SH = folder(Ca, "Geteilt", space=f"org:{ORG}")
 dbx("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=?", (ORG, CAROL))  # 2.148.1 (#2483): only an admin moves it out
 r = Ca.post(B + f"/api/files/nodes/{SH}/shares", json={"user_id": BOB, "role": "view"})
@@ -239,7 +239,7 @@ FN = upload(Fr, "eigen.txt", b"Freiberuflich")
 r = move(Fr, {"ids": [FN], "to": f"org:{ORG}"})
 check(r.status_code == 409, f"freelancer into an organisation: 409 ({r.status_code})")
 r = move(Fr, {"ids": [FN], "to": "private", "dry": 1})
-check(r.status_code == 409, f"freelancer: the private space is the only one, 409 ({r.status_code})")
+check(r.status_code == 409, f"freelancer: the private workspace is the only one, 409 ({r.status_code})")
 
 print(f"p296_a_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

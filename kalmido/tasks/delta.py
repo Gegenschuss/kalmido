@@ -20,7 +20,7 @@ from datetime import timedelta
 from flask import jsonify, request
 
 from ..core.config import app, APP_VERSION
-from ..core.db import appver_parse, db, gset, gsetting, iso, now_utc, usettings
+from ..core.db import appver_parse, db, gset, gsetting, iso, now_utc, trigger_ensure, usettings
 from ..accounts.session import me
 from ..core.access import plists, time_all, token_lists, tvis, vis_sql, wr_sql  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
@@ -36,7 +36,7 @@ DL_TABLES = {
     "tasks": ("id",), "task_tags": ("task_id",), "task_list_tags": ("task_id",), "attachments": ("task_id",),
     "comments": ("task_id",), "task_seen": ("task_id",), "task_field_values": ("task_id",),
     "task_deps": ("task_id", "blocker_id"), "agent_usage": ("task_id",), "git_links": ("task_id",), "git_closes": ("task_id",),
-    "task_people": ("task_id",), "events": ("task_id",), "contact_tasks": ("task_id",), "time_entries": ("task_id",),
+    "task_people": ("task_id",), "task_watchers": ("task_id",), "events": ("task_id",), "contact_tasks": ("task_id",), "time_entries": ("task_id",),
     "task_enc_notes": ("task_id",),  # 2.42.0 (#828): the encrypted note marker of a task
     "task_note_locks": ("task_id",),  # 2.48.0 (#1642): the locked note marker of a task
     "task_links": ("task_id",),  # 2.71.0 B (#1459): the further lists a task is shown in (its "also")
@@ -136,12 +136,12 @@ def dl_setup(c):
     for t, cols in DL_TABLES.items():
         if cols == "full":  # per row (a statement that changes nothing, e.g. a start-up repair, is no change)
             sc = ", ".join(f"'{x}'" for x in DL_SCOPE[t]) if t in DL_SCOPE else ""
-            c.execute(f"CREATE OR REPLACE TRIGGER kalmido_dl_{t} AFTER INSERT OR UPDATE OR DELETE ON {t} "
-                      f"FOR EACH ROW EXECUTE FUNCTION kalmido_dl_touch('full'{', ' + sc if sc else ''})")
+            trigger_ensure(c, f"kalmido_dl_{t}", t, f"CREATE OR REPLACE TRIGGER kalmido_dl_{t} AFTER INSERT OR UPDATE OR DELETE ON {t} "
+                           f"FOR EACH ROW EXECUTE FUNCTION kalmido_dl_touch('full'{', ' + sc if sc else ''})")
         else:
             args = ", ".join(f"'{x}'" for x in cols)
-            c.execute(f"CREATE OR REPLACE TRIGGER kalmido_dl_{t} AFTER INSERT OR UPDATE OR DELETE ON {t} "
-                      f"FOR EACH ROW EXECUTE FUNCTION kalmido_dl_touch({args})")
+            trigger_ensure(c, f"kalmido_dl_{t}", t, f"CREATE OR REPLACE TRIGGER kalmido_dl_{t} AFTER INSERT OR UPDATE OR DELETE ON {t} "
+                           f"FOR EACH ROW EXECUTE FUNCTION kalmido_dl_touch({args})")
     dl_floor_check(c, hashlib.sha256(json.dumps([DL_FN, DL_TABLES, DL_SCOPE], sort_keys=True).encode()).hexdigest()[:16])
 
 

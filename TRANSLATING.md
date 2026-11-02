@@ -124,10 +124,42 @@ the web client (`static/js/*.js`) and the server (`app.py`, `kalmido/`) and comp
 - **placeholder mismatch**: `{0}` in the key but not in the translation, or the other way round -> error
 - **plural shape**: a plural key needs `[one, other]`, all other keys a string -> error
 - **_meta / names / date formats**: missing name or locale, wrong number of names, unknown tokens -> error
+- **glossary**: a key with a word the glossary below replaces -> error
 - **unused**: in the file but no longer used by the code -> warning, just delete it
 
 Exit code 1 on any error. When the English texts change, run it for every language: new keys show up as
 missing, removed ones as unused.
+
+## Glossary (English, en-GB)
+
+One English word for one thing, also in new texts. `tools/i18n_check.py` reports the common variants as errors; a text in
+the wording of an office pack (key ending in `|pack`) is checked by the pack, not here.
+
+| German | English | Not |
+| --- | --- | --- |
+| Aufgabe, Liste, Projekt, Ordner | task, list, project, folder | |
+| Organisation | organisation | org |
+| Arbeitsbereich | workspace | space |
+| Kunde | client | customer |
+| Person / Personen, Konto | person / people, account | user (a technical user name stays "user name") |
+| Zuständig | assignee, unassigned | responsible, nobody assigned |
+| Anmelden / Abmelden | sign in / sign out, noun sign-in | log in, login, log out, logout |
+| Büro, Beleg | office, receipt | |
+| Angebot | quotation | quote, offer |
+| Rechnung | invoice (bill only for a received one) | |
+| Mahnung | payment reminder (the level names keep "Reminder" / "Final reminder") | reminder alone in new texts |
+| Erinnerung (Aufgabe) | reminder | |
+| Storno, Freigabe, Abnahme | cancellation, approval, sign-off | |
+| Papierkorb | trash | bin |
+| Zeiteintrag, Einstellungen | time entry, settings | |
+| E-Mail | e-mail | mail, email |
+| Farbe | colour | color |
+| Urlaub, Feiertag | holiday, public holiday | vacation |
+| Anfrage | enquiry | inquiry |
+| Standard | default (a standard VAT rate stays standard) | |
+| Endgültig | permanently | |
+
+Spelling is British, with -ise: customise, organise, recognise, summarise.
 
 ## For developers
 
@@ -150,8 +182,9 @@ missing, removed ones as unused.
 The natural-language quick add (`tomorrow 3pm !!! #tag ~list`) always understands English and German keywords, and
 since 2.12.0 also the words of the interface language for French, Spanish, Italian and Dutch. Those words are not
 translations but parser patterns in `static/js/quickadd.js`: the table `QL` (one entry per language: today / tomorrow / day after
-tomorrow, next week / month, weekend, weekday names, "next <weekday>", "in N days", time words, repeat words; regular
+tomorrow, next week / month, weekend, weekday names, "next <weekday>", "in N days", time words, repeat words, the list word with its
+prepositions and articles ("dans la liste X"); regular
 expression parts, matched case-insensitively between spaces). To teach quick add a new language, add its entry to `QL`
-and cases to `tests/quick_lang_test.js`. Priority, tags and the list stay symbols (`!!!` / `!!` / `!`, `#tag`, `~list`).
+and cases to `tests/quick_lang_test.js`. The month names for dates ("5 octobre", "5 de octubre", "5. Oktober") are not in `QL`: they are read from `_months` / `_months_short` of the language file, so every language with a language file understands them (a month name alone stays text). Priority, tags and the list stay symbols (`!!!` / `!!` / `!`, `#tag`, `~list`).
 Keep the quick-add hints (the keys that start with `today, tomorrow, day after tomorrow`, `tomorrow 3pm ·` and
 `Add task: “Dentist`) in line with what the parser really understands, in the language's own words.

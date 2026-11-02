@@ -51,7 +51,7 @@ from ..agents.workstyle import ws_need_editor
 
 CTL_LEVELS = ("approve_all", "routine", "free")
 CTL_ONE_WAY_FIXED = ("delete", "costs", "login", "migration")  # #2900: fixed, cannot be switched off
-CTL_ONE_WAY_TEXT = {"delete": N_("Deleting"), "costs": N_("Anything that costs money"), "login": N_("Login and registration"),
+CTL_ONE_WAY_TEXT = {"delete": N_("Deleting"), "costs": N_("Anything that costs money"), "login": N_("Sign-in and registration"),
                     "migration": N_("Migrations without a way back")}
 CTL_ONE_WAY_MAX, CTL_ONE_WAY_LEN = 20, 120
 CTL_DEADLINES = {"off": None, "1h": 3600, "4h": 4 * 3600, "1d": 86400, "3d": 3 * 86400}
@@ -77,6 +77,7 @@ CTL_ROUTES = (
     (CTL_WRITE, r"^/agents/\{\}/chat/", "meta"),
     (("POST",), r"^/tasks$", "routine"),
     (("POST",), r"^/tasks/\{\}/(subtasks|comments|complete|reopen|skip)$", "routine"),
+    (("POST", "DELETE"), r"^/tasks/\{\}/watchers(/\{\})?$", "routine"),  # 2.473.0 (#3357): small and reversible, the task itself stays as it is
     (("PATCH",), r"^/tasks/\{\}$", "plan"),
     (("POST",), r"^/tasks/batch$", "batch"),
     (("POST",), r"^/videos/\{\}/comments$", "routine"),

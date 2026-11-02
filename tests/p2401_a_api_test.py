@@ -75,7 +75,7 @@ notes = " | ".join(j.get("notes") or [])
 check(r.ok and not j.get("block"), f"#2924: the dry run out of the organisation (alice is its admin) does not block {r.status_code} {r.text[:200]}")
 check("client of the project" in notes, f"#2924: the dry run names the client that is taken off: {notes}")
 check("1 link to another project" in notes, f"#2924: the dry run names the 'also in' link that ends: {notes}")
-check("1 customer report moves along" in notes, f"#2924: the dry run names the customer report that goes along: {notes}")
+check("1 client report moves along" in notes, f"#2924: the dry run names the customer report that goes along: {notes}")
 check("1 table" in notes and "old workspace" in notes, f"#2924: the dry run names the table that stays behind: {notes}")
 check(one("SELECT org_id FROM lists WHERE id=?", (W,))["org_id"] == ORG, "#2924: the dry run moves nothing")
 r = A.post(B + f"/api/lists/{W}/move-space", json={"to": "private"})
@@ -104,8 +104,8 @@ check(r.ok and me.get("client") == 1 and me.get("links") == 1 and me.get("tclien
       f"#2924: out of the organisation the answer names client, link and the report's client {r.text[:200]}")
 t = one("SELECT org_id, owner_id, client_id FROM portal_tickets WHERE id=?", (PT["id"],))
 check(t and t["org_id"] is None and t["owner_id"] == AID,
-      f"#2924: the customer report goes along into the private space (else it is invisible there) {t}")
-check(t and t["client_id"] is None, f"#2924: the report's client of the organisation is unbound in the private space {t}")
+      f"#2924: the customer report goes along into the private workspace (else it is invisible there) {t}")
+check(t and t["client_id"] is None, f"#2924: the report's client of the organisation is unbound in the private workspace {t}")
 check(one("SELECT COUNT(*) AS n FROM portal_tickets p JOIN lists l ON l.id=p.list_id WHERE p.org_id IS DISTINCT FROM l.org_id")["n"] == 0,
       "#2924: no customer report outside the space of its project (tenancy portal_ticket)")
 

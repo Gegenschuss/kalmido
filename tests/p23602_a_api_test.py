@@ -52,8 +52,8 @@ check(len(re.findall(r"uses:", job["publish"])) == 1 and "gh release" not in job
 
 # ------------------------------------------------------------------ #2913 notices
 notes = read("THIRD_PARTY_NOTICES.md").lower()
-pins = re.findall(r"([A-Za-z0-9_.-]+)(?:\[[a-z]+\])?==[0-9]", read("Dockerfile"))
-check(len(pins) >= 15, f"#2913: the pins of the Dockerfile are read ({len(pins)})")
+pins = re.findall(r"([A-Za-z0-9_.-]+)(?:\[[a-z]+\])?==[0-9]", read("tools", "requirements.in"))  # #2915: the image installs from the lock, the direct pins stand here
+check(len(pins) >= 15, f"#2913: the pins of the image are read ({len(pins)})")
 for p in pins:
     check(p.lower() in notes, f"#2913: {p} is named in THIRD_PARTY_NOTICES.md")
 check("psycopg-binary" in notes and "lgpl-3.0-only" in notes, "#2913: psycopg with its license")

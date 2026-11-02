@@ -3,7 +3,7 @@
 // Public link (acceptance of the project / a section / a milestone). The customer decides on a server page without the app;
 // here: create, copy, stop, and the protocol (who, when, address, device).
 const sg_note = () => tr('Simple electronic signature: usually enough to accept a quotation or confirm an acceptance; not for contracts that the law requires in written form (they need a qualified signature). This is not legal advice.');
-const sg_stTxt = s => ({open: tr('Waiting for the customer'), accepted: tr('Accepted|document'), declined: tr('Declined')})[s] || s;
+const sg_stTxt = s => ({open: tr('Waiting for the client'), accepted: tr('Accepted|document'), declined: tr('Declined')})[s] || s;
 function sg_row(x) {
   const st = x.revoked_at && x.state === 'open' ? tr('Turned off') : !x.live && x.state === 'open' ? tr('Expired') : sg_stTxt(x.state);
   const proto = x.state !== 'open' ? `<div class="sgproto">${esc([x.signer_name, x.signer_email].filter(Boolean).join(' · '))}<br>${esc(fmtWhen(x.signed_at))} · ${esc(tr('IP address {0}', x.ip || '?'))}${x.reason ? `<br>${esc(tr('Reason: {0}', x.reason))}` : ''}<details class="sgproof"><summary>${tr('Proof')}</summary><small class="muted">${esc(x.user_agent || '')}<br>SHA-256 ${esc(x.doc_hash || '')}</small></details></div>` : '';  // 2.298.0 A2 (#3186): device and checksum folded into "Proof"
@@ -19,13 +19,13 @@ function sg_draw(box, j, list) {
     <div class="shint">${esc(sg_note())}</div><div class="calerr" role="alert" data-sgerr hidden></div>`;
 }
 // the quotation (office_docs.js draws the placeholder for sent and decided quotations)
-const SG_ACTIONS = {signoff_link: N_('approval link created'), signoff_revoke: N_('approval link stopped'), signoff_accepted: N_('accepted by the customer'),
-  signoff_declined: N_('declined by the customer'), signoff_delete: N_('approval record of a deleted video deleted')};
+const SG_ACTIONS = {signoff_link: N_('approval link created'), signoff_revoke: N_('approval link stopped'), signoff_accepted: N_('accepted by the client'),
+  signoff_declined: N_('declined by the client'), signoff_delete: N_('approval record of a deleted video deleted')};
 function sg_box(d) {
   if (typeof OFD_ACTIONS === 'object') Object.assign(OFD_ACTIONS, SG_ACTIONS);  // the office log's words (office_docs.js loads later)
   if (d.kind !== 'offer' || d.status === 'draft') return '';
   setTimeout(() => sg_load(d.id), 0);
-  return `<section class="ofdsec sgsec"><h3 class="sgh">${tr('Approval by the customer')}</h3><div id="sg-box" data-doc="${d.id}"><div class="muted mhint">${tr('Loading…')}</div></div></section>`;
+  return `<section class="ofdsec sgsec"><h3 class="sgh">${tr('Approval by the client')}</h3><div id="sg-box" data-doc="${d.id}"><div class="muted mhint">${tr('Loading…')}</div></div></section>`;
 }
 function sg_load(did) {
   const box = document.getElementById('sg-box'); if (!box || +box.dataset.doc !== did) return;
