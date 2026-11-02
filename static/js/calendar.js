@@ -158,18 +158,35 @@ function cevTime(e, d) {
 }
 // 2.52.0 (#1016): cgok = may be dragged into other days (caldrag.js)
 const cevChip = (e, d) => `<div class="cev${cevTimed(e, d) ? '' : ' allday'}${abcX(e) ? ' cevx' : ''}${ap_draftCls(e)}${cg_canDrag(e) ? ' cgok' : ''}" data-cev="${e.id}" style="--cc:${cevColor(e)}" title="${esc(cevTitle(e))}">${cevTimed(e, d) && e.d0 === d ? `<span class="muted">${fmtTimeAt(e.s)}</span> ` : ''}${esc(cevTitle(e))}</div>`;
-const cevRow = (e, d) => `<div class="cevrow${ap_draftCls(e)}" data-cev="${e.id}" style="--cc:${cevColor(e)}" role="button" tabindex="0"><i class="cevdot"></i><span class="cevt">${cevTime(e, d)}</span><span class="cevn">${esc(cevTitle(e))}</span>${e.location ? `<span class="cevl">${esc(e.location)}</span>` : ''}<span class="cevc">${esc(cevCal(e))}</span></div>`;
+const cevRow = (e, d, cls = '', mark = '') => `<div class="cevrow${ap_draftCls(e)}${cls}" data-cev="${e.id}" style="--cc:${cevColor(e)}" role="button" tabindex="0"><i class="cevdot"></i><span class="cevt">${cevTime(e, d)}</span><span class="cevn">${esc(cevTitle(e))}</span>${mark}${e.location ? `<span class="cevl">${esc(e.location)}</span>` : ''}<span class="cevc">${esc(cevCal(e))}</span></div>`;
+// 2.490.0 (#4021): on Today a timed event that ends today and whose end has passed is "past"; all-day / multi-day ones stay until the day ends
+const cevPast = (e, d, now = new Date()) => cevTimed(e, d) && e.d1 === d && e.e <= now;
+const cevNow = (e, d, now = new Date()) => cevTimed(e, d) && e.s <= now && now < e.e;
 function cevTodayBlock() {  // "Events today" at the top of Today (setting cal_today)
   if (!feat('cal') || !calEvOn() || S.settings.cal_today === '0') return '';  // Calendar module off: gone here too
-  const t0 = today();
+  const t0 = today(), now = new Date();
   ensureCalEv(t0, t0);
   const all = cevOn(t0), evs = all.filter(cvxTodayOn).sort(cevSort);  // 2.36.1 (#1127): calendars switched off for Today
   if (!all.length) return '';
   const closed = S.collapsed.has('cev-today');
+  const past = evs.filter(e => cevPast(e, t0, now)), live = evs.filter(e => !past.includes(e));
+  const pastOpen = S.collapsed.has('cev-past');  // here the key means "unfolded" (the past ones are folded by default)
   // the head's "…" menu switches single calendars off / on here (the block stays while a calendar is switched off)
   const mn = `<button class="iconbtn gact cvxtm" data-act="cvx-today-menu" aria-haspopup="menu" title="${esc(tr('Calendars on Today'))}" aria-label="${esc(tr('Calendars on Today'))}">${ic('dots', 's')}</button>`;
-  return `<div class="group cevtoday"><div class="ghead ${closed ? 'closed' : ''}" data-act="collapse" data-key="cev-today">${ic('chev', 's')}${tr('Events today')} <span class="c">${evs.length}</span>${mn}</div>${closed ? '' : `<div class="cevlist">${evs.map(e => cevRow(e, t0)).join('') || `<div class="muted mhint">${tr('All calendars are switched off here. Switch one on in the menu.')}</div>`}</div>`}</div>`;
+  const pl = past.length ? `<div class="cevpastl${pastOpen ? ' open' : ''}" data-act="collapse" data-key="cev-past" role="button" tabindex="0" aria-expanded="${pastOpen}">${ic('chev', 's')}<span>${trn('{0} past', '{0} past', past.length)}</span></div>${pastOpen ? past.map(e => cevRow(e, t0, ' cevpast')).join('') : ''}` : '';
+  const rows = live.map(e => cevRow(e, t0, cevNow(e, t0, now) ? ' cevlive' : '', cevNow(e, t0, now) ? `<span class="cevnow">${tr('now')}</span>` : '')).join('') + pl;
+  return `<div class="group cevtoday"><div class="ghead ${closed ? 'closed' : ''}" data-act="collapse" data-key="cev-today">${ic('chev', 's')}${tr('Events today')} <span class="c">${live.length}</span>${mn}</div>${closed ? '' : `<div class="cevlist">${rows || `<div class="muted mhint">${tr('All calendars are switched off here. Switch one on in the menu.')}</div>`}</div>`}</div>`;
 }
+// 2.490.0 (#4021): once a minute the block follows the clock (an event ends / starts): only the block is redrawn, and only if its content changed
+setInterval(() => {
+  const el = document.querySelector('.cevtoday');
+  if (document.hidden || !el || S.route?.key !== 'today' || S.route?.mod !== 'tasks') return;
+  const h = cevTodayBlock();
+  if (!h) return;
+  const t = document.createElement('div'); t.innerHTML = h;
+  const n = t.firstElementChild;
+  if (n && n.outerHTML !== el.outerHTML) el.replaceWith(n);
+}, 60000);
 function cevLinkify(s) {  // escaped text; only http(s) URLs become links
   const re = /https?:\/\/[^\s<>"'`\\]+/gi;
   let out = '', i = 0, m;

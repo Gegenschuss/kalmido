@@ -15955,5 +15955,6 @@
   "Export|time": "Exporteren",
   "Turn on time tracking for this project?": "Tijdregistratie voor dit project inschakelen?",
   "“{0}” does not track time yet. Turn it on and start the timer for “{1}”?": "„{0}” registreert nog geen tijd. Inschakelen en de timer voor „{1}” starten?",
-  "This project does not track time; only its owner can turn it on.": "Dit project registreert geen tijd; alleen de eigenaar kan dat inschakelen."
+  "This project does not track time; only its owner can turn it on.": "Dit project registreert geen tijd; alleen de eigenaar kan dat inschakelen.",
+  "{0} past": ["{0} voorbij", "{0} voorbij"]
 }

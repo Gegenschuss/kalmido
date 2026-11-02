@@ -981,9 +981,9 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 .cm{display:flex;gap:.625rem;padding:.5rem .375rem;border-radius:var(--radius)}
 .cm.new{background:color-mix(in srgb,var(--accent) 8%,transparent);box-shadow:inset 2px 0 0 var(--accent)}
 .cm .avatar{width:1.625rem;height:1.625rem;margin-top:1px}
-.cmain{flex:1;min-width:0}
-.chead{display:flex;align-items:baseline;gap:.5rem;font-size:var(--fs-m)}
-.chead .muted{font-size:var(--fs-s)}
+.cmain{flex:1;min-width:0;container:cmain / inline-size}
+.chead{display:flex;align-items:baseline;flex-wrap:wrap;gap:.125rem .5rem;font-size:var(--fs-m)}
+.chead .muted{font-size:var(--fs-s)}.chead .cwhen{white-space:nowrap}
 .cacts{margin-left:auto;display:inline-flex;opacity:0;transition:opacity .1s}
 .cm:hover .cacts,.cacts:focus-within{opacity:1}
 .cacts .iconbtn{padding:.1875rem}
@@ -1020,7 +1020,7 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 .featgrid label small{font-size:var(--fs-s);line-height:var(--lh)}
 @media (hover:none){ .cacts{opacity:1} }
 /* 2.421.0 (#3471): narrow phones - the comment buttons wrap into an own right-aligned row under name and time */
-@media (max-width:400px){.chead{flex-wrap:wrap;min-width:0}.cacts{flex-basis:100%;justify-content:flex-end}}
+@media (max-width:400px){.chead{min-width:0}}
 
 /* ---------- News ("Neuigkeiten") ---------- */
 .iconbtn.bell,#tabs button,.rbtn{position:relative}

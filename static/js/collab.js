@@ -593,6 +593,18 @@ function fmtWhen(iso) {
   if (ds(d) === addDays(today(), -1)) return tr('Yesterday') + ' ' + hmTxt;
   return fmtDay(d.getFullYear() !== new Date().getFullYear() ? 'year' : 'short', d) + ' ' + hmTxt;
 }
+// 2.490.0 (#4018): the comment head's time: always short, one line - today "21:14", this year "26.10. 15:21", else "26.10.2025"
+function fmtWhenHead(iso) {
+  const d = new Date(iso), hm = fmtTimeAt(d);
+  if (ds(d) === today()) return hm;
+  if (d.getFullYear() !== new Date().getFullYear()) return d.toLocaleDateString(LOCALE(), {day: '2-digit', month: '2-digit', year: 'numeric'});
+  return d.toLocaleDateString(LOCALE(), {day: '2-digit', month: '2-digit'}) + ' ' + hm;
+}
+document.addEventListener('click', ev => {  // 2.490.0 (#4018): narrow column: a tap on a comment shows / hides its action icons
+  const cm = ev.target.closest?.('.cm');
+  $$('.cm.cacton').forEach(x => { if (x !== cm) x.classList.remove('cacton'); });
+  if (cm && !ev.target.closest('button,a,textarea,input,[data-act]')) cm.classList.toggle('cacton');
+});
 const fmtDayAbs = s => fmtDay(pd(s).getFullYear() !== new Date().getFullYear() ? 'year' : 'short', pd(s));
 function actText(a, U) {  // "via API" after lines written through a personal access token
   return actText0(a, U) + (a.data?.via === 'api' ? ` <span class="via">${tr('via API')}</span>` : a.data?.via === 'caldav' ? ` <span class="via">${tr('via CalDAV')}</span>`
@@ -782,7 +794,7 @@ function commentHtml(c, U, ro = false) {
     : `${ro ? '' : replyQuoteHtml(c, 'c')}${c.body ? `<div class="cbody">${commentBody(c.body, U, taskById(c.task_id || S.sel)?.list_id)}</div>` : ''}${files}${sugHtml(c, ro)}${ccCommentHtml(c, ro)}${reactHtml(c, ro)}`;
   // 2.5.1 (#395): the author's avatar opens the same card as an @mention (only in the comment list, not read-only copies)
   const cav = ro || c.ext_name ? av(c.user_id, cv_who(c, U)) : `<button type="button" class="cmav" data-mcard="${c.user_id}" data-mname="${esc(uname(c.user_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(c.user_id, U)))}">${av(c.user_id, uname(c.user_id, U))}</button>`;  // 2.50.0 (#329): a customer's comment: their name, no card
-  return `<div class="cm ${isNew ? 'new' : ''}${isAgentUser(c.user_id) ? ' agc' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}" data-mid="c:${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(cv_who(c, U))}</b>${isAgentUser(c.user_id) ? agentBadge(c.user_id) : ''}${c.portal && typeof ptl_mark === 'function' ? ptl_mark(c) : '' /* 2.63.0 B (#1513) */}${rul_cmtTag(c) /* 2.71.0 A (#1457) */}<span class="muted">${fmtWhen(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${csv}${acts}</div>${main}</div></div>`;
+  return `<div class="cm ${isNew ? 'new' : ''}${isAgentUser(c.user_id) ? ' agc' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}" data-mid="c:${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(cv_who(c, U))}</b>${isAgentUser(c.user_id) ? agentBadge(c.user_id) : ''}${c.portal && typeof ptl_mark === 'function' ? ptl_mark(c) : '' /* 2.63.0 B (#1513) */}${rul_cmtTag(c) /* 2.71.0 A (#1457) */}<span class="muted cwhen" title="${esc(fmtWhen(c.created_at))}">${fmtWhenHead(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${csv}${acts}</div>${main}</div></div>`;
 }
 function timelineItems(ro = false) {
   const T = S.tl, soc = cmSocial(taskById(T.id));

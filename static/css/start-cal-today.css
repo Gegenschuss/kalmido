@@ -1,0 +1,6 @@
+/* 2.490.0 (#4021): Today: past events folded into a quiet line, the running one marked */
+.cevpastl{display:flex;align-items:center;gap:.25rem;padding:.25rem .5rem;font-size:var(--fs-s);color:var(--muted);cursor:pointer;min-height:1.75rem}
+.cevpastl .i{width:.75rem;height:.75rem;transition:transform .12s;transform:rotate(-90deg)}
+.cevpastl.open .i{transform:none}
+.cevrow.cevpast{opacity:.55}
+.cevnow{font-size:var(--fs-xs);color:var(--accent);border:1px solid currentColor;border-radius:var(--r-s);padding:0 .3125rem;line-height:1rem;white-space:nowrap}

@@ -15955,5 +15955,6 @@
   "Export|time": "Esporta",
   "Turn on time tracking for this project?": "Attivare il tracciamento del tempo per questo progetto?",
   "“{0}” does not track time yet. Turn it on and start the timer for “{1}”?": "«{0}» non traccia ancora il tempo. Attivarlo e avviare il timer per «{1}»?",
-  "This project does not track time; only its owner can turn it on.": "Questo progetto non traccia il tempo; solo il proprietario può attivarlo."
+  "This project does not track time; only its owner can turn it on.": "Questo progetto non traccia il tempo; solo il proprietario può attivarlo.",
+  "{0} past": ["{0} concluso", "{0} conclusi"]
 }

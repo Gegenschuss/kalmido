@@ -1,0 +1,5 @@
+/* 2.490.0 (#4018): narrow column (container, not device): the comment's action icons take no room; hover / focus / a tap on the comment shows them */
+@container cmain (max-width:30rem){
+  .cacts{position:absolute;right:.25rem;top:.25rem;margin:0;display:none;opacity:1;background:var(--bg2);border-radius:var(--radius);box-shadow:0 0 0 1px var(--line)}
+  .cm:hover .cacts,.cm:focus-within .cacts,.cm.cacton .cacts{display:inline-flex}
+}
