@@ -146,9 +146,9 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   // ---- login screen: OIDC button, error after a refused OIDC login, second step with a code / recovery code
   w = await page({hash: 'login-error=no_account'}); d = w.document;
   const scr = d.querySelector('.authscreen');
-  check(!!scr?.querySelector('[data-au="oidc"]') && /Log in with Authentik/.test(scr.querySelector('[data-au="oidc"]').textContent), 'login screen: "Log in with Authentik"');
-  check(!!scr.querySelector('[data-au="passkey"]'), 'login screen: "Log in with a passkey"');
-  check(/no account for this login/.test(scr.querySelector('#au-err').textContent) && !/login-error/.test(w.location.hash), 'OIDC error shown, hash removed');
+  check(!!scr?.querySelector('[data-au="oidc"]') && /Sign in with Authentik/.test(scr.querySelector('[data-au="oidc"]').textContent), 'login screen: "Sign in with Authentik"');
+  check(!!scr.querySelector('[data-au="passkey"]'), 'login screen: "Sign in with a passkey"');
+  check(/no account for this sign-in/.test(scr.querySelector('#au-err').textContent) && !/login-error/.test(w.location.hash), 'OIDC error shown, hash removed');
   scr.querySelector('#au-user').value = 'bob'; scr.querySelector('#au-pw').value = 'password123';
   submit(w, scr.querySelector('#auth-form')); await idle(w);
   check(!!scr.querySelector('#tfa-form') && /authenticator app/.test(scr.textContent) && !w.__jar.has('kalmido_session') && w.__jar.has('kalmido_2fa'), 'second step shown, no session yet');

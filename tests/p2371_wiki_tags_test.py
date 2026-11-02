@@ -6,12 +6,15 @@
    first spelling shown; GET /api/wiki/tags lists them (most used first), &tag= gives the pages that have it (no templates)
  - nothing in plain text: the word index holds only hashes of the tags, the texts stay sealed, the log holds no tag of a text
  - a page changed: its tags follow at once; an index made before 2.371 (no 'tv:1') is read at once and indexed again
+ - 2.469.0 (#3546): the list stays in the process's memory: a hit opens no text; a text written without updated_at, quick saves
+   within one second, trash and restore, a page not indexed yet are seen at once; a person who lost the space 404, a share taken
+   away changes the stamp; a reader through a share starts no index job of the space
  - GET /api/wiki/query (the ```abfrage block): tag / ordner / eigenschaft / zeige: aufgaben / sortiere / grenze / als /
    spalten and the English keys; the page holding the block and the templates are never in the result; unknown lines in
    errors; open checkboxes only ("- [x]" and code blocks left out) with their line
  - rights: another organisation's space 404 (tags and query), a guest reading through a folder share sees only the shared
    pages in a query; a space with the lock: {e2e: true} from both routes (the browser runs them)
- - freelancer-matrix: wiki (a person without an organisation: tags and queries in her private space)
+ - freelancer-matrix: wiki (a person without an organisation: tags and queries in her private workspace)
  - tenant-matrix: wiki (not in the organisation / another person's private page: 404 for tags and query)
 usage: p2371_wiki_tags_test.py <datadir>      (P2371_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import base64
@@ -166,6 +169,60 @@ for _ in range(60):  # the background job indexes it again (a real state: its ma
     time.sleep(0.25)
 check(ok and len(sql("SELECT 1 FROM wiki_words WHERE page_id=? AND h LIKE 't:%'", (PB,))) == 2, "and indexed again in the background")
 
+# ================================================================ 2.469.0 (#3546): the list in the process's memory
+SKIP = "wiki page unreadable, skipped "
+
+
+def reads(pid):
+    """How often the server has opened page pid's text: an unreadable text leaves one line per try (wsb_body_or)."""
+    lg = subprocess.run(["docker", "logs", CT], capture_output=True, text=True, timeout=60)
+    return ((lg.stdout or "") + (lg.stderr or "")).count(f"{SKIP}{pid}\n")
+
+
+def reads_reach(pid, n):
+    for _ in range(40):  # the log is written behind the answer: its line, not a time
+        if reads(pid) >= n:
+            break
+        time.sleep(0.25)
+    return reads(pid)
+
+
+PS = page(Fr, "private", "Cache/Versiegelt", "#zwischenspeicher")
+PW = page(Fr, "private", "Cache/Andere", "#anderes")
+sql("UPDATE wiki_pages SET body=? WHERE id=?", ("kenc1:" + "A" * 80, PS), write=True)  # sealed, cannot be opened; the index stays current
+r0 = reads(PS)
+tags(Fr, "private")
+r1 = reads_reach(PS, r0 + 1)
+check(r1 == r0 + 1, f"setup: a miss opens the text ({r0} -> {r1})")
+t1, t2 = tags(Fr, "private"), tags(Fr, "private")
+check(t1 == t2 and t1.get("anderes") == 1, "a hit gives the same list " + str(t1))
+check(Fr.patch(B + f"/api/wiki/pages/{PW}", json={"body": "#anderes #neuer"}).ok, "setup: another page changed")
+t3 = tags(Fr, "private")
+r2 = reads_reach(PS, r1 + 1)
+check(t3.get("neuer") == 1, "a change is seen at once " + str(t3))
+check(r2 == r1 + 1, f"a hit opens no text: only the one miss after the change counted ({r1} -> {r2})")
+
+sql("UPDATE wiki_pages SET body=? WHERE id=?", ("#ohneDatum", PW), write=True)  # as a move or an import: the text written, updated_at stays
+t = tags(Fr, "private")
+check(t.get("ohneDatum") == 1 and "neuer" not in t, "a text written without updated_at is a miss " + str(t))
+for i in range(4):  # several saves within one second: updated_at (whole seconds) stays the same
+    check(Fr.patch(B + f"/api/wiki/pages/{PW}", json={"body": f"#schnell{'abcd'[i]}"}).ok, "setup: a quick save")
+    t = tags(Fr, "private")
+    check(t.get(f"schnell{'abcd'[i]}") == 1 and len([k for k in t if k.startswith("schnell")]) == 1, "a quick save right after another is seen " + str(t))
+check(Fr.delete(B + f"/api/wiki/pages/{PW}").ok, "setup: a page into the trash")
+check("schnelld" not in tags(Fr, "private"), "a page in the trash is gone from the list")
+check(Fr.post(B + "/api/wiki/restore", json={"ids": [PW]}).ok, "setup: restored")
+check(tags(Fr, "private").get("schnelld") == 1, "a restored page is back, though updated_at did not move")
+sql("DELETE FROM wiki_words WHERE page_id=? AND h='tv:1'", (PW,), write=True)  # late: nothing stored, nothing answered from memory
+sql("UPDATE wiki_pages SET body=? WHERE id=?", ("#spaet", PW), write=True)
+check(tags(Fr, "private").get("spaet") == 1, "a page not indexed yet: read now, not from memory")
+for _ in range(60):
+    if sql("SELECT 1 FROM wiki_words WHERE page_id=? AND h='tv:1'", (PW,)):
+        break
+    time.sleep(0.25)
+check(tags(Fr, "private").get("spaet") == 1, "and the list stays right once it is indexed")
+check(Fr.delete(B + f"/api/wiki/pages/{PS}").ok and Fr.delete(B + f"/api/wiki/pages/{PW}").ok, "setup: the test pages away")
+
 # ================================================================ the ```abfrage block
 PQ = page(Fr, "private", "Übersicht", "#projekt\n\n```abfrage\ntag: projekt\n```")
 check(qpaths(Fr, PQ, "tag: projekt") == ["Kunden/Nord/Plan", "Kunden/Süd", "Kunden/West"], "tag: the pages with it, not the block's own page, no templates "
@@ -219,6 +276,23 @@ check(r.ok and len(r.json()["pages"]) == 1 and r.json()["pages"][0]["path"].ends
 r = query(Gi, P1, "ordner: Internal")
 check(r.ok and "Secret plan" not in r.text and r.json()["total"] == 0, "the folders above the share are not matched: ordner: Internal finds nothing (review) " + r.text[:300])
 
+# ================================================================ 2.469.0 (#3546): a reader through a share starts no index job of the space
+def index_jobs():
+    return sql("SELECT COUNT(*) FROM bg_jobs WHERE kind='wiki:index' AND org_id=?", (ORG,))[0][0]
+
+
+sql("DELETE FROM wiki_words WHERE page_id=? AND h='tv:1'", (P2,), write=True)  # as indexed before 2.371: the page is late
+before = index_jobs()
+r = query(Gi, P1, "tag: kunde")
+check(r.ok and len(r.json()["pages"]) == 1, "#3546: the share reader still gets a page not indexed yet " + r.text[:200])
+check(index_jobs() == before, "#3546: and starts no index job of that space")
+tags(Bo, SP)
+check(index_jobs() > before, "#3546: a person of the space does (the check above can fail)")
+for _ in range(60):  # the background job: a real state, its marker row
+    if sql("SELECT 1 FROM wiki_words WHERE page_id=? AND h='tv:1'", (P2,)):
+        break
+    time.sleep(0.25)
+
 # ================================================================ a space with the lock
 PL = page(Bo, SP, "Locked/Page", "#kunde")
 sql("INSERT INTO wiki_spaces(org_id, e2e, e2e_gen) VALUES(?, 'on', 1) ON CONFLICT DO NOTHING", (ORG,), write=True)
@@ -228,6 +302,31 @@ check(r.ok and r.json().get("e2e") is True and r.json()["tags"] == [], "a space 
 r = query(Bo, PL, "tag: kunde")
 check(r.ok and r.json().get("e2e") is True and r.json()["pages"] == [], "and the query too " + r.text[:200])
 sql("UPDATE wiki_spaces SET e2e=NULL WHERE org_id=?", (ORG,), write=True)
+
+# ================================================================ 2.469.0 (#3546): rights and the list in memory
+check(tags(Bo, SP).get("kunde"), "setup: the member's list in memory")
+check(tags(A, SP).get("kunde") and Fr.get(B + "/api/wiki/tags", params={"space": SP}).status_code == 404, "one entry per person: nobody outside gets it")
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["bob"], "role": "guest"}).ok, "setup: the member becomes a guest")
+check(Bo.get(B + "/api/wiki/tags", params={"space": SP}).status_code == 404, "a person who lost the space: 404, nothing from memory")
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["bob"], "role": "member"}).ok, "setup: a member again")
+check(tags(Bo, SP).get("kunde"), "and back: the list again")
+# the stamp holds what the person may read: nobody reaches the route through a share today, it must still end with the share
+STAMP = f"""
+from kalmido.core.db import connect
+from kalmido.wiki.wktags import _wkt_stamp
+print("STAMP", _wkt_stamp(connect(), {ORG}, None, {uid["gina"]})[-1])
+"""
+
+
+def vis_stamp():
+    x = subprocess.run(["docker", "exec", "-i", CT, "python", "-"], input=STAMP, capture_output=True, text=True, timeout=60)
+    return next((ln for ln in x.stdout.splitlines() if ln.startswith("STAMP ")), x.stderr[-300:])
+
+
+v0 = vis_stamp()
+sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (FA, uid["gina"]), write=True)
+v1 = vis_stamp()
+check(v0.startswith("STAMP ") and v1.startswith("STAMP ") and v0 != v1, "a share taken away changes the stamp " + str((v0, v1)))
 
 # ================================================================ nothing logged
 logs = subprocess.run(["docker", "logs", CT], capture_output=True, text=True, timeout=60)

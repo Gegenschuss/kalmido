@@ -72,7 +72,7 @@ class OpDenied(Exception):
 def op_denied(e):
     if e.code == 429:
         return jsonify(error=tr("Too many failed attempts, please wait a few minutes")), 429
-    return jsonify(error=tr("Please log in")), 401
+    return jsonify(error=tr("Please sign in")), 401
 
 
 def op_gate(action):

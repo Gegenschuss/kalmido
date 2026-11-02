@@ -5,7 +5,7 @@
 // - sections (rename / order), list tags (colour / rename) and the list view switch locally as well
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -20,8 +20,8 @@ function shim(w) {
   w.__st = 0; w.__sDelay = 4000; w.__fail = null; w.__pDelay = 0;
   w.fetch = async (u, o = {}) => {
     const url = String(u), m = (o.method || 'GET').toUpperCase();
-    if (m === 'GET' && /\/api\/state/.test(url)) { w.__st++; w.__stk = (new Error().stack || '').split('\n').slice(2, 6).join(' < '); await sleep(w.__sDelay); }
-    if (m !== 'GET' && w.__pDelay) await sleep(w.__pDelay);
+    if (m === 'GET' && /\/api\/state/.test(url)) { w.__st++; w.__stk = (new Error().stack || '').split('\n').slice(2, 6).join(' < '); await sleep(w.__sDelay); }  // wanted: the held-back state answer
+    if (m !== 'GET' && w.__pDelay) await sleep(w.__pDelay);  // wanted: a slow write
     if (m !== 'GET' && w.__fail && w.__fail.test(url)) return new Response(JSON.stringify({error: 'Test error'}), {status: 500, headers: {'Content-Type': 'application/json'}});
     return of(u, o);
   };
@@ -34,7 +34,7 @@ const holdPoll = w => until(() => w.eval('td_polling ? false : (td_polling = tru
 const freePoll = w => w.eval('td_polling = false');
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
@@ -47,12 +47,16 @@ const freePoll = w => w.eval('td_polling = false');
   const w2 = await boot({user: 'alice', hash: 'today'});
   shim(w);
   // ================= colour from the sidebar menu: visible before /api/state answers
+  // #3927: the change poll held here too (like the steps below), else a poll of its own counts as a GET /api/state
+  await holdPoll(w);
   const st0 = w.__st;
   w.eval(`licColor(${L}, '${C1}')`);
-  await sleep(250);
+  await until(() => lc(w, L) === C1 && d.querySelector('#side').innerHTML.includes(C1), 10);  // short: well before /api/state could answer (4 s)
   check(lc(w, L) === C1, '#1501: the colour is in the local state at once: ' + lc(w, L));
   check(d.querySelector('#side').innerHTML.includes(C1), '#1501: the sidebar shows the colour at once');
+  await idle(w);  // the write is done and quiet: a GET /api/state it started would be counted by now
   check(w.__st === st0, '#1501: no GET /api/state was needed for it (' + (w.__st - st0) + ')');
+  freePoll(w);
   check((await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === L)?.color === C1)), '#1501: the server has the colour');
 
   // ================= the second window gets it with the live update
@@ -67,7 +71,7 @@ const freePoll = w => w.eval('td_polling = false');
   // ================= a server error puts the old colour back
   w.__fail = new RegExp(`/api/lists/${L}$`); w.__pDelay = 600;
   const pe = w.eval(`licColor(${L}, '${C2}')`);
-  await sleep(200);
+  await until(() => lc(w, L) === C2, 3);  // short: the failing write answers after 600 ms
   check(lc(w, L) === C2, '#1501: the colour shows while the failing request runs');
   await pe;
   check(lc(w, L) === '', '#1501: after the error the old colour is back: ' + lc(w, L));
@@ -78,7 +82,7 @@ const freePoll = w => w.eval('td_polling = false');
   // ================= a state fetched while the write runs does not take the change back (no flicker)
   w.__sDelay = 0; w.__pDelay = 1500;
   const pn = w.eval(`listPatch(${L}, {name: 'Garden plan'}, null)`);
-  await sleep(200);
+  await until(() => w.eval(`listById(${L}).name`) === 'Garden plan', 6);  // short: the write answers after 1.5 s
   check(w.eval(`listById(${L}).name`) === 'Garden plan', '#1501: the new name shows at once');
   await w.eval(`load()`);  // what the poll does: the server still has the old name
   check(w.eval(`listById(${L}).name`) === 'Garden plan', '#1501: a state loaded meanwhile keeps the new name (no flicker)');
@@ -94,11 +98,12 @@ const freePoll = w => w.eval('td_polling = false');
   await until(() => w.eval('td_polling ? false : (td_polling = true)'), 80);
   let st1 = w.__st;
   w.eval(`sectionRename(${SA}, 'Raised beds')`);
-  await sleep(250);
+  await until(() => w.eval(`S.sections.find(s => s.id === ${SA})?.name`) === 'Raised beds', 10);
   check(w.eval(`S.sections.find(s => s.id === ${SA})?.name`) === 'Raised beds', '#1501: a section rename shows at once');
   w.eval(`saveSectionOrder(${L}, [${SB}, ${SA}])`);
-  await sleep(250);
+  await until(() => w.eval(`secIds(${L}).join()`) === `${SB},${SA}`, 10);
   check(w.eval(`secIds(${L}).join()`) === `${SB},${SA}`, '#1501: the section order changes at once: ' + w.eval(`secIds(${L}).join()`));
+  await idle(w);  // both writes done and quiet: a GET /api/state they started would be counted by now
   check(w.__st === st1, '#1501: sections without GET /api/state' + (w.__st === st1 ? '' : ' (from ' + w.__stk + ')'));
   w.eval('td_polling = false');
   check(await until(async () => (await call('GET', '/api/state')).sections.filter(s => s.list_id === L).sort((a, b) => a.sort - b.sort).map(s => s.name).join() === 'Pots,Raised beds'), '#1501: the server has name and order');
@@ -114,19 +119,21 @@ const freePoll = w => w.eval('td_polling = false');
   await holdPoll(w);
   st1 = w.__st;
   w.eval(`optWrite(ltagPut(${L}, 'urgent', 'soon'), () => api('PATCH', '/api/list-tags/${TG}', {name: 'soon'}))`);
-  await sleep(250);
+  await until(() => w.eval(`listTags(${L}).map(t => t.name).join()`) === 'soon' && w.eval(`(S.tasks.get(${T})?.ltags || []).join()`) === 'soon', 10);
   check(w.eval(`listTags(${L}).map(t => t.name).join()`) === 'soon', '#1501: a list tag rename shows at once');
   check(w.eval(`(S.tasks.get(${T})?.ltags || []).join()`) === 'soon', '#1501: the task carries the new tag name at once: ' + w.eval(`(S.tasks.get(${T})?.ltags || []).join()`));
+  await idle(w);  // the write is done and quiet: a GET /api/state it started would be counted by now
   check(w.__st === st1, '#1501: list tags without GET /api/state' + (w.__st === st1 ? '' : ' (from ' + w.__stk + ')'));
   freePoll(w);
 
   // ================= the list view switches locally
-  await sleep(1500);  // 2.80.3: late answers of the steps above settle first (slow CI)
+  await idle(w);  // 2.80.3: late answers of the steps above settle first (slow CI); #3927: waits for them instead of 1.5 s
   await until(() => w.eval('td_polling ? false : (td_polling = true)'), 80);  // CI of 2.168.4: the change poll held (as above)
   st1 = w.__st;
   w.eval(`setListView(listById(${L}), 'kanban')`);
-  await sleep(250);
+  await until(() => w.eval(`listById(${L}).view`) === 'kanban', 10);
   check(w.eval(`listById(${L}).view`) === 'kanban', '#1501: the list view switches at once');
+  await idle(w);  // the write is done and quiet: a GET /api/state it started would be counted by now
   check(w.__st === st1, '#1501: the view switch without GET /api/state' + (w.__st === st1 ? '' : ' (from ' + w.__stk + ')'));
   w.eval('td_polling = false');
 

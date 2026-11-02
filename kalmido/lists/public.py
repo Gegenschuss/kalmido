@@ -16,9 +16,10 @@ from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_n
 from ..core.instance import legal_links, privacy_email
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
-from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list, reading_ids, reading_sql, task_visible
+from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list, qn_private, reading_ids, reading_sql, task_visible
 from ..core.pg import insert_id, system_ctx
 from ..tasks.validation import log_act, valid_date
+from ..tasks.watchers import wat_users  # 2.473.0 (#3357)
 from ..tasks.lifecycle import complete_stale, do_complete, trash_task
 from ..collab.comments import task_event
 from ..core.errors import BadInput
@@ -257,7 +258,7 @@ def pub_render(c, link, token, lg):
         title = tr("Done|checklist", lg=lg) if check else tr("Recently completed", lg=lg)
         body_ += (f'<details class="donegrp"{" open" if check else ""}><summary>{e(title)} <span class="n">{len(done_top)}</span></summary>'
                   f'<ul class="tasks">{"".join(row(t) for t in done_top)}</ul></details>')
-    name = tr("Basket") if link["l_inbox"] and inbox_default(link["l_name"]) else link["l_name"]
+    name = tr("Basket", lg=lg) if link["l_inbox"] and inbox_default(link["l_name"]) else link["l_name"]
     mode = tr("You can tick off items on this page.", lg=lg) if tick else tr("View only.", lg=lg)
     brand = ""
     if show["brand"]:  # 2.50.0 (#329): the organisation's name / logo above the project name
@@ -341,7 +342,7 @@ def cv_fb_post(token):
                     (tid, None, text, "", iso_ms(now_utc()), name))
     t = c.execute("SELECT t.*, l.owner_id AS l_owner FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
     from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO
-    rcpt = ({t["l_owner"], t["created_by"], t["assignee_id"]} | tbl_urgent_users(c, tid)) - {None} - agent_ids(c)  # 2.53.0 C (#1424): + "Urgent"
+    rcpt = ({t["l_owner"], t["created_by"], t["assignee_id"]} | tbl_urgent_users(c, tid) | wat_users(c, tid)) - {None} - agent_ids(c)  # 2.53.0 C (#1424): + "Urgent"
     for uid in sorted(rcpt):  # News + push like a comment on my task, the notification switch "comment"
         s = collab_user(c, uid, t["list_id"])
         if not s or not task_visible(c, tid, uid, full=True):
@@ -352,7 +353,7 @@ def cv_fb_post(token):
             continue
         if lv != "mute" and (lv == "urgent" or notif_ok(c, uid, s, KIND_ROW["comment"], "push", t["list_id"])) and push_reachable(c, uid, s):
             ulg = lang_of(s)
-            g.pushes.append((uid, tr("{0} (customer, via the link)", name, lg=ulg) + ": " + t["title"], text[:200],
+            g.pushes.append((uid, tr("{0} (client, via the link)", name, lg=ulg) + ": " + t["title"], text[:200],
                              f"{PUBLIC_URL}/#t/{tid}", TBL_PRIO if lv == "urgent" else push_prio(s)))
     bump(c)
     c.commit()
@@ -535,6 +536,7 @@ def need_pub_owner(c, lid):
     need_list(c, lid, owner=True)
     if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         raise BadInput(tr("The basket cannot be shared"))
+    qn_private(c, lid)  # 2.477.0 (#3881): no public link for the list "Notes"
 
 
 def pub_new_token(c, lid):

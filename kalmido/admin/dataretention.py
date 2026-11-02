@@ -72,7 +72,7 @@ def lgc_expired(c, now):
             ("setup_codes", "DELETE FROM agent_setup_codes WHERE expires_at<? OR (used_at IS NOT NULL AND used_at<?)", (old, old)),
             # 2.273.0 F1 (#3042): the move memos of tasks / lists / files (people, tag and file names) once their day for the
             # move back is over (TMM_KEEP_H / FSM_KEEP_H = 24 h; two days to be safe)
-            ("move_memos", "DELETE FROM space_moves WHERE kind IN ('task','list','files') AND at<?", (iso(now - timedelta(days=2)),))):
+            ("move_memos", "DELETE FROM space_moves WHERE kind IN ('task','list','files','orgleave') AND at<?", (iso(now - timedelta(days=2)),))):
         with c.savepoint():
             out[name] = c.execute(sql, args).rowcount or 0
     return out

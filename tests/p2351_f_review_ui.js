@@ -6,7 +6,7 @@
 // - after a save the editor keeps the folder mark: the More menu offers the preview only, no status pick, no parts
 // - the owner saves in between: the next change gets the conflict bar; Reload shows the owner's state, still read through
 //   the folder
-// freelancer-matrix: office  (a draft of a personal office -- the private space without an organisation -- shared from a private folder)
+// freelancer-matrix: office  (a draft of a personal office -- the private workspace without an organisation -- shared from a private folder)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login, errs} = require('./boot');
@@ -86,7 +86,7 @@ async function viaFolder(owner, space, bobId, CB, tag) {
   check((await call(CB, 'GET', '/api/office/docs')).status === 403, 'setup: the office itself gives bob no quotations');
   await viaFolder(CA, `org:${org.id}`, bob.id, CB, ' (organisation)');
 
-  // ================= freelancer-matrix: office - a draft of alice's personal office (the private space without an organisation,
+  // ================= freelancer-matrix: office - a draft of alice's personal office (the private workspace without an organisation,
   // the same office code a freelancer has), shared from her private folder with bob (a folder share needs a common organisation)
   await viaFolder(CA, 'private', bob.id, CB, ' (personal office)');
 

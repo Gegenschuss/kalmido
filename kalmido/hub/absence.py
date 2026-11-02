@@ -8,7 +8,7 @@ the app adds the rest:
   count as "away" for the team, the workload, the day plan, the booking page and agents);
 - the team sees "absent" and the period; the kind (above all sick leave) and the note only the person and the admins of
   the organisation. Agents never see the kind (health data), at most "absent" (GET /api/v1/absences);
-- German public holidays per state, computed here (Easter formula, no library, no service): one state per organisation
+- public holidays per country and region, computed offline (hub/holidays.py, 2.461 #3773): one choice per organisation
   (its admins), people without an organisation set their own (their personal area);
 - workload (capacity 0 on absent workdays), the day plan (a hint instead of a proposal) and assigning (a warning, never a
   block) read abs_days() / abs_check().
@@ -20,14 +20,15 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, system_ctx
-from ..core.i18n import tr
+from ..core.i18n import lang, tr
 from ..core.db import body, bump, db, iso, local_now, now_utc, usettings
 from ..core.access import Denied
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..accounts.session import me, user_public
-from ..accounts.orgs import visible_people
+from ..accounts.orgs import token_people, visible_people
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_view
+from .holidays import HOL_CODES, HOL_PACKS, hol_year
 
 ABS_KINDS = ("vacation", "sick", "off", "other")
 ABS_HALF = ("", "am", "pm")
@@ -36,75 +37,37 @@ ABS_SPAN_MAX = 366  # days of one absence
 ABS_RANGE_MAX = 370  # days of one view
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
-# ---------------------------------------------------------------- German public holidays
-ABS_STATES = {"BW": "Baden-Württemberg", "BY": "Bayern", "BE": "Berlin", "BB": "Brandenburg", "HB": "Bremen",
-              "HH": "Hamburg", "HE": "Hessen", "MV": "Mecklenburg-Vorpommern", "NI": "Niedersachsen",
-              "NW": "Nordrhein-Westfalen", "RP": "Rheinland-Pfalz", "SL": "Saarland", "SN": "Sachsen",
-              "ST": "Sachsen-Anhalt", "SH": "Schleswig-Holstein", "TH": "Thüringen",
-              "AT": "Österreich"}  # 2.155.0 B (#2076): Austria (nationwide holidays only)
-# names stay German (they are German holidays); regional ones only where they hold in the whole state
-_FIXED = ((1, 1, "Neujahr", None), (1, 6, "Heilige Drei Könige", "BW BY ST"), (3, 8, "Internationaler Frauentag", "BE MV"),
-          (5, 1, "Tag der Arbeit", None), (8, 15, "Mariä Himmelfahrt", "SL"), (9, 20, "Weltkindertag", "TH"),
-          (10, 3, "Tag der Deutschen Einheit", None), (10, 31, "Reformationstag", "BB HB HH MV NI SN ST SH TH"),
-          (11, 1, "Allerheiligen", "BW BY NW RP SL"), (12, 25, "1. Weihnachtstag", None), (12, 26, "2. Weihnachtstag", None))
-_EASTER = ((-2, "Karfreitag", None), (0, "Ostersonntag", "BB"), (1, "Ostermontag", None), (39, "Christi Himmelfahrt", None),
-           (49, "Pfingstsonntag", "BB"), (50, "Pfingstmontag", None), (60, "Fronleichnam", "BW BY HE NW RP SL"))
-# 2.155.0 B (#2076): Austria's nationwide public holidays (Good Friday is none since 2019)
-_AT_FIXED = ((1, 1, "Neujahr"), (1, 6, "Heilige Drei Könige"), (5, 1, "Staatsfeiertag"), (8, 15, "Mariä Himmelfahrt"),
-             (10, 26, "Nationalfeiertag"), (11, 1, "Allerheiligen"), (12, 8, "Mariä Empfängnis"), (12, 25, "Christtag"),
-             (12, 26, "Stefanitag"))
-_AT_EASTER = ((1, "Ostermontag"), (39, "Christi Himmelfahrt"), (50, "Pfingstmontag"), (60, "Fronleichnam"))
-
-
-def abs_easter(y):
-    """Easter Sunday of year y (Gregorian; the anonymous algorithm)."""
-    a, b, c = y % 19, y // 100, y % 100
-    d, e = b // 4, b % 4
-    f = (b + 8) // 25
-    g_ = (b - f + 1) // 3
-    h = (19 * a + b - d - g_ + 15) % 30
-    i, k = c // 4, c % 4
-    l_ = (32 + 2 * e + 2 * i - h - k) % 7
-    m = (a + 11 * h + 22 * l_) // 451
-    month = (h + l_ - 7 * m + 114) // 31
-    return date(y, month, (h + l_ - 7 * m + 114) % 31 + 1)
-
-
-def abs_holidays_year(y, state):
-    """{ISO day: name} of the public holidays of year y in state (one of ABS_STATES; '' = none)."""
-    if state not in ABS_STATES:
-        return {}
-    if state == "AT":  # 2.155.0 B (#2076)
-        e = abs_easter(y)
-        out = {date(y, mo, d).isoformat(): name for mo, d, name in _AT_FIXED}
-        out.update({(e + timedelta(days=off)).isoformat(): name for off, name in _AT_EASTER})
-        return out
-    out = {}
-    for mo, d, name, only in _FIXED:
-        if only is None or state in only.split():
-            if (mo, d) == (3, 8) and (y < 2019 or (state == "MV" and y < 2023)):
-                continue
-            if (mo, d) == (9, 20) and y < 2019:
-                continue
-            if (mo, d) == (10, 31) and state in ("HB", "HH", "NI", "SH") and y < 2018:
-                continue
-            out[date(y, mo, d).isoformat()] = name
-    e = abs_easter(y)
-    for off, name, only in _EASTER:
-        if only is None or state in only.split():
-            out[(e + timedelta(days=off)).isoformat()] = name
-    if state == "SN":  # Buss- und Bettag: the Wednesday before 23 November
-        d = date(y, 11, 22)
-        out[(d - timedelta(days=(d.weekday() - 2) % 7)).isoformat()] = "Buß- und Bettag"
-    return out
+# ---------------------------------------------------------------- public holidays
+# 2.461 (#3773): one file per country, hub/holidays.py; a stored "state" is a region or a country. ABS_STATES: all of them
+ABS_STATES = {code: (HOL_PACKS[cc]["regions"][r] if r else HOL_PACKS[cc]["name"]) for code, (cc, r) in HOL_CODES.items()}
+abs_holidays_year = hol_year
 
 
 def abs_holidays(state, first, last):
-    """{ISO day: name} within [first, last] (dates)."""
+    """{ISO day: name key} within [first, last] (dates)."""
     out = {}
     for y in range(first.year, last.year + 1):
         out.update({k: v for k, v in abs_holidays_year(y, state).items() if first.isoformat() <= k <= last.isoformat()})
     return out
+
+
+def abs_holidays_shown(hol, lg=None):
+    """2.368.4 (#2989): {ISO day: name key} as the sorted list of an answer, the names in the reader's language."""
+    lg = lg or lang()
+    return [{"date": k, "name": tr(v, lg=lg)} for k, v in sorted(hol.items())]
+
+
+def abs_states_shown(lg=None):
+    """2.368.4 (#2989): the states to choose from, in the reader's language."""
+    lg = lg or lang()
+    return {k: tr(v, lg=lg) for k, v in ABS_STATES.items()}
+
+
+def abs_countries_shown(lg=None):
+    """2.461 (#3773): the picker: first the country, then its regions (only countries that have any), in the reader's language."""
+    lg = lg or lang()
+    return [{"code": cc, "name": tr(p["name"], lg=lg), "regions": {k: tr(v, lg=lg) for k, v in (p.get("regions") or {}).items()}}
+            for cc, p in HOL_PACKS.items()]
 
 
 def abs_state(c, oid):
@@ -294,7 +257,7 @@ def abs_mine_today(c, uid, day):
         return None
     if r:
         r = oc_dec_fields(c, r["org_id"], "hub_absences", r)
-    return {"kind": r["kind"] if r else "", "half_day": (r["half_day"] or "") if r else "", "holiday": hol}
+    return {"kind": r["kind"] if r else "", "half_day": (r["half_day"] or "") if r else "", "holiday": tr(hol) if hol else ""}
 
 
 # ---------------------------------------------------------------- routes
@@ -327,13 +290,13 @@ def abs_list():
     with_org = [{"id": r[0], "name": r[1]} for r in c.execute(
         "SELECT id, name FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id") if r[0] in mine]
     # 2.96.0 D (#1941): the personal area (when there is one) is offered next to the organisations
-    return jsonify(org_id=oid, orgs=with_org, personal=pb_personal(c, uid, create=False), admin=adm, state=st, states=ABS_STATES, today=today.isoformat(),
+    return jsonify(org_id=oid, orgs=with_org, personal=pb_personal(c, uid, create=False), admin=adm, state=st, states=abs_states_shown(), countries=abs_countries_shown(), today=today.isoformat(),
                    start=first.isoformat(), end=last.isoformat(),
                    people=[{**user_public(p), "own": p["id"] == uid} for p in people],
                    items=[{**abs_public(r, adm or r["user_id"] == uid, c), "can_edit": adm or r["user_id"] == uid}
                           for r in rows if r["user_id"] in pids
                           and (r["status"] == "approved" or adm or r["user_id"] == uid)],  # 2.125.0 A (#2117): requests only for them
-                   holidays=[{"date": k, "name": v} for k, v in sorted(abs_holidays(st, first, last).items())])
+                   holidays=abs_holidays_shown(abs_holidays(st, first, last)))
 
 
 @app.post("/api/team/absences")
@@ -352,7 +315,7 @@ def abs_create():
         if not abs_admin(c, uid, oid):
             raise Denied(403, tr("Only admins of this workspace can enter absences for other people"))
         if who not in {p["id"] for p in abs_people(c, oid)}:
-            raise Denied(404, tr("unknown user"))
+            raise Denied(404, tr("unknown person"))
     v = abs_clean(b)
     e = oc_enc_fields(c, oid, "hub_absences", {"kind": v["kind"], "note": v.get("note", "")})
     from .leave import lv_requested, lv_status_new
@@ -478,20 +441,24 @@ def v1_absences():
     if (u["kind"] or "user") == "agent":  # 2.223.7 A (#2917): an agent sees only the people it may see, not the whole organisation
         vis = visible_people(c, u["id"])
         people = [p for p in people if p["id"] in vis]
+    keep = token_people(c, u["id"])
+    if keep is not None:  # 2.473.0 (#3907): a token limited to some projects, a person's as well as an agent's
+        people = [p for p in people if p["id"] in keep]
     pids = {p["id"] for p in people}
     rows = c.execute("SELECT * FROM hub_absences WHERE org_id=? AND deleted_at IS NULL AND start_date<=? AND end_date>=? "
                      "AND status='approved' ORDER BY start_date, id",  # 2.125.0 A (#2117): never a request
                      (oid, last.isoformat(), first.isoformat())).fetchall()
     return jsonify(org_id=oid, people=[{"id": p["id"], "display_name": p["display_name"] or p["username"]} for p in people],
                    items=[{k: v for k, v in abs_public(r, False).items() if k not in ("id", "status")} for r in rows if r["user_id"] in pids],
-                   holidays=[{"date": k, "name": v} for k, v in sorted(abs_holidays(abs_state(c, oid), first, last).items())])
+                   holidays=abs_holidays_shown(abs_holidays(abs_state(c, oid), first, last)))
 
 
 def abs_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     paths["/absences"] = {"get": op(
         "2.50.0 (#1195): who of your organisation is away when (vacation, sick leave, days off) -- only \"away\" and the period, "
         "never the kind or the note; an agent sees its own workspace only (a private agent: 404), 2.223.7 (#2917): only the people "
-        "of the projects shared with it and who manages it; plus the public holidays of the "
+        "of the projects shared with it and who manages it; 2.473.0 (#3907): a token limited to some projects only the people of "
+        "those projects; plus the public holidays of the "
         "organisation's state; 2.125.0 (#2117): approved absences only, never an open or rejected vacation request", "Workload",
         ok({"type": "object", "properties": {
             "org_id": nul("integer"),

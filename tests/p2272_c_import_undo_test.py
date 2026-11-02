@@ -8,7 +8,7 @@
    list trash; a calendar with an event added since stays, an untouched one goes
  - office (freelancer-matrix: office, a person without an organisation): the undo of a trips import keeps a trip with a
    receipt added since, the one of a fixed costs import keeps a changed one
- - a person without an organisation: the task import undo the same way (private space)
+ - a person without an organisation: the task import undo the same way (private workspace)
 Every name / address here is invented (@example.com).
 usage: p2272_c_import_undo_test.py <datadir>      (P2272C_NOSTART=1 = the server already runs)"""
 import json

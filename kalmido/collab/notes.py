@@ -7,7 +7,7 @@ from ..core.pg import IntegrityError, insert_id, write_lock
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..accounts.session import me
-from ..core.access import Denied, list_role, plists, vis_sql, WRITE_ROLES
+from ..core.access import Denied, list_people, list_role, plists, qn_is, vis_sql, WRITE_ROLES
 from ..tasks.validation import as_int
 from ..collab.comments import user_names
 from ..core.errors import BadInput, reject_unknown
@@ -58,6 +58,15 @@ def clean_note_tags(v):
         if x and x.casefold() not in (y.casefold() for y in out):
             out.append(x)
     return out[:NOTE_TAGS_MAX]
+
+
+def qn_title(text):
+    """2.477.0 (#3881): the title of a quick note = its first line with text (a heading's # left out), as the app does (qn_titleOf)."""
+    for ln in (text or "").splitlines():
+        t = re.sub(r"\s+", " ", re.sub(r"^\s*#{1,6}\s+", "", ln)).strip()
+        if t:
+            return t[:NOTE_TITLE_MAX]
+    return ""
 
 
 def note_fields(b, partial=False):
@@ -133,10 +142,14 @@ def notes_of_list(lid):
 
 @app.post("/api/lists/<int:lid>/notes")
 def note_create(lid):
-    """{title, body?, tags?, pinned?, client_ref?} -- a new note in the list (owner, admins, members)."""
+    """{title, body?, tags?, pinned?, client_ref?} -- a new note in the list (owner, admins, members). 2.477.0 (#3881): without a
+    title the first line of the body is the title (the quick note: one text field)."""
     c = db()
     note_role(c, lid, write=True)
     b = body()
+    from .liste2e import le2e_is_cipher
+    if not str(b.get("title") or "").strip() and isinstance(b.get("body"), str) and not le2e_is_cipher(b["body"]) and qn_title(b["body"]):
+        b = {**b, "title": qn_title(b["body"])}
     ts, uid = iso(now_utc()), me()
     ref = str(b.get("client_ref") or "")[:64] or None  # 2.143.0 C (#2153): sent again from the offline outbox = the same note
     # 2.143.0 C2 (#2153): only a note of this list counts as the same one
@@ -165,6 +178,30 @@ def note_create(lid):
     return jsonify(note_dict(r)), 201
 
 
+@app.post("/api/notes/quick-list")
+def qn_list_ensure():
+    """2.477.0 (#3881): my private list "Notes" of the quick note: made on the first call (private area, in my language,
+    lists.quicknote = 1), brought back from the archive, else the same one. Answers {list_id, created}. Never shared (see
+    core/access.py qn_private); a deleted one (list trash) stays there, the next call makes a new one."""
+    c = db()
+    uid = me()
+    write_lock(c, f"quicknote-{int(uid)}")  # two first taps at once (tab + phone): one list
+    r = c.execute("SELECT id, archived FROM lists WHERE owner_id=? AND quicknote=1 AND deleted_at IS NULL ORDER BY id LIMIT 1", (uid,)).fetchone()
+    if r:
+        if r["archived"]:
+            c.execute("UPDATE lists SET archived=0, archived_at=NULL WHERE id=?", (r["id"],))
+            bump(c)
+            c.commit()
+        return jsonify(list_id=r["id"], created=False)
+    lg = c.execute("SELECT value FROM user_settings WHERE user_id=? AND key='lang'", (uid,)).fetchone()
+    from ..core.i18n import LANGS
+    lid = insert_id(c, "INSERT INTO lists(name,sort,created_at,owner_id,quicknote) VALUES(?,?,?,?,1)",
+                    (tr("Notes", lg=lg[0] if lg and lg[0] in LANGS else None), -0.5, iso(now_utc()), uid))
+    bump(c)
+    c.commit()
+    return jsonify(list_id=lid, created=True), 201
+
+
 @app.get("/api/notes/<int:nid>")
 def note_get(nid):
     c = db()
@@ -186,6 +223,10 @@ def note_update(nid):
         if isinstance(lid, bool) or not isinstance(lid, int):
             raise BadInput(tr("Invalid value: {0}", "list_id"))
         note_role(c, lid, write=True)
+        if lid != r["list_id"] and qn_is(c, r["list_id"]) and not b.get("share_ok"):
+            who = qn_audience(c, lid)  # 2.477.0 (#3881): out of the private list "Notes" to other people only after a yes
+            if who:
+                return jsonify(error=tr("Others will see this note: {0}", ", ".join(who)), code="quicknote_share", people=who), 409
         f["list_id"] = lid
     from .liste2e import le2a_note_write
     le2a_note_write(c, r, f)  # 2.64.1 (#1817): texts of a list with the lock; a move into / out of one only with both texts
@@ -202,12 +243,32 @@ def note_update(nid):
     return jsonify(note_dict(r, names=user_names(c, [r["updated_by"]] if r["updated_by"] else [])))
 
 
+def qn_audience(c, lid):
+    """2.477.0 (#3881): who sees a note in list lid besides me: the names of its owner and members (agents too), and the
+    organisation when its whole organisation sees the list. [] = only me."""
+    ids = list_people(c, lid) - {me()}
+    names = sorted(user_names(c, ids).values(), key=str.casefold) if ids else []
+    lr = c.execute("SELECT l.org_visibility, o.name FROM lists l LEFT JOIN orgs o ON o.id=l.org_id WHERE l.id=?", (lid,)).fetchone()
+    if lr and lr["org_visibility"] and lr["name"]:
+        names.append(tr("everyone in {0}", lr["name"]))
+    return names
+
+
 @app.delete("/api/notes/<int:nid>")
 def note_delete(nid):
     """2.272.0 E1 (#3038): the note goes to the trash (restore: POST /api/notes/<id>/restore, the app's Undo; deleted for good
-    after the trash period by files/trashpurge.py); answers it in full."""
+    after the trash period by files/trashpurge.py); answers it in full. 2.477.0 (#3881): ?empty=1 = a quick note left empty:
+    gone for good, never into the trash (only an empty note of my own; 409 when it has text)."""
     c = db()
     r = need_note(c, nid, write=True)
+    if request.args.get("empty") == "1":
+        # 2.477.0 (review F2): only a quick note (its list Notes) without text and tags is purged; anything else goes to the trash
+        if (r["body"] or "").strip() or r["created_by"] != me() or not qn_is(c, r["list_id"]) or (r["tags"] or "") not in ("", "[]"):
+            return jsonify(error=tr("The note is not empty"), code="note_not_empty"), 409
+        c.execute("DELETE FROM notes WHERE id=?", (nid,))
+        bump(c)
+        c.commit()
+        return jsonify(ok=True, purged=True)
     c.execute("UPDATE notes SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), nid))
     bump(c)
     c.commit()
@@ -309,7 +370,7 @@ def v1_note_get(nid):
 def v1_note_update(nid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("title", "body", "tags", "pinned", "list_id", "expect_updated_at"))
+    reject_unknown(b, ("title", "body", "tags", "pinned", "list_id", "expect_updated_at", "share_ok"))  # 2.477.0 (#3881): share_ok
     from .liste2e import le2a_api_refuse
     le2a_api_refuse(db(), need_note(db(), nid)["list_id"], b.get("list_id"))  # 2.64.1 (#1817)
     j = v1_call(note_update, nid, body=b)

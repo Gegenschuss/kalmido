@@ -27,7 +27,7 @@ import re
 from flask import jsonify, request, Response
 
 from ..core.config import app
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, csv_dialect, lang, tr
 from ..core.db import body, db, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, need_feat
@@ -378,7 +378,7 @@ def ctx_export_row(r):
 def ctx_export(c, uid, bid):
     need_book(c, bid)
     buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";", lineterminator="\r\n")
+    w = csv.writer(buf, delimiter=csv_dialect(lang(c, uid))[0], lineterminator="\r\n")  # 2.368.2 (#2984)
     w.writerow(CTX_OUT)
     for r in c.execute("SELECT * FROM contacts WHERE book_id=? AND kind!='group' AND deleted_at IS NULL ORDER BY lower(CASE WHEN family!='' THEN family ELSE fn END), id", (bid,)):
         w.writerow(ctx_export_row(r))

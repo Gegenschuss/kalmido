@@ -283,12 +283,12 @@ function rcm_settingsHtml() {
   const d = RCM.d;
   if (!d || !d.enabled) return '';  // no mail input on this server (or not loaded yet)
   return `<h3 id="rcm-h">${tr('Receipts by e-mail')}</h3>
-    <p class="shint keep">${tr('Forward invoices to this address: attached PDFs and download links that need no login become documents and receipt suggestions.')}</p>
+    <p class="shint keep">${tr('Forward invoices to this address: attached PDFs and download links that need no sign-in become documents and receipt suggestions.')}</p>
     ${d.address ? `<p class="rcm-addr"><code id="rcm-addr">${esc(d.address)}</code> <button type="button" class="btn sm" data-rcm="copy">${ic('copy', 's')}<span>${tr('Copy')}</span></button> <button type="button" class="linkbtn" data-rcm="renew">${tr('New address')}</button></p>`
       : `<p><button type="button" class="btn sm" data-rcm="make">${tr('Create address')}</button></p>`}
     <details class="rcm-gmail"><summary>${tr('Forward automatically from Gmail')}</summary><ol>
       <li>${esc(tr('In Gmail: Settings > See all settings > Forwarding and POP/IMAP > Add a forwarding address. Enter this address; the confirmation code arrives here as a document.'))}</li>
-      <li>${esc(tr('Search for the mails of your invoice senders, for example from:(stripe.com OR paddle.com OR apple.com), and choose “Create filter”.'))}</li>
+      <li>${esc(tr('Search for the e-mails of your invoice senders, for example from:(stripe.com OR paddle.com OR apple.com), and choose “Create filter”.'))}</li>
       <li>${esc(tr('Tick “Forward it to”, pick this address and create the filter.'))}</li></ol></details>`;
 }
 document.addEventListener('click', async e => {

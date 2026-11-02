@@ -114,7 +114,7 @@ async function rt9_adminDraw(md) {
   const box = $('#s-rt9', md); if (!box) return;
   let j; try { j = await rawFetch('GET', '/api/admin/related'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   if (!j.configured) { box.innerHTML = `<div class="shint keep">${ic('alert', 's')} ${esc(j.blocked ? tr('Off: the embedding service runs on another host. KALMIDO_EMBED_EXTERNAL=1 allows it; task titles and descriptions then go there.') : tr('Off: the embedding service is not set up (KALMIDO_EMBED_URL), see SELF-HOSTING.md.'))}</div>`; return; }  // 2.240.0 A (#2884): blocked
-  const st = j.reachable ? [tr('Service reachable'), j.model ? tr('Model: {0}', j.model) : '', tr('{0} tasks computed, {1} waiting', fmtNum(j.done), fmtNum(j.open))].filter(Boolean).join(' · ') : tr('Service not reachable');
+  const st = j.reachable ? [tr('Service reachable'), j.model ? tr('Model: {0}', j.model) : '', trn('{1} task computed, {2} waiting', '{1} tasks computed, {2} waiting', j.done, fmtNum(j.done), fmtNum(j.open))].filter(Boolean).join(' · ') : tr('Service not reachable');
   box.innerHTML = `<div class="featgrid"><label class="wide"><input type="checkbox" id="s-rt9-on" ${j.on ? 'checked' : ''}><span>${esc(tr('Show related tasks'))}<small class="muted">${esc(st)}</small></span></label></div>` + (j.external ? `<div class="shint keep">${ic('alert', 's')} ${esc(tr('Task titles and descriptions go to {0}.', j.external))}</div>` : '');  // 2.240.0 A (#2884)
   if (!box._rt9) {
     box._rt9 = true;

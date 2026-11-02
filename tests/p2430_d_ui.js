@@ -61,7 +61,7 @@ const FEAT = 'comments,collab,time,progress';
     check(await until(`!!document.querySelector('#view .trow[data-id="${T}"]')`, 40), '#1500: the list');
     await ev(`(() => { window._wo = []; window.open = (u, n, f) => { window._wo.push([u, n, f]); return {focus() {}}; }; return 1; })()`);
     await ev(`(() => { taskMenu(document.querySelector('#view .trow[data-id="${T}"]'), ${T}); return 1; })()`); await sleep(400);
-    check(await ev(`(() => { const b = [...document.querySelectorAll('#pop .mi, #pop button')].find(x => /Open in its own window/.test(x.textContent)); if (!b) return false; b.click(); return window._wo.length === 1; })()`), '#1500: the task menu has "Open in its own window"');
+    check(await ev(`(() => { document.querySelector('#pop .mtmore')?.click(); const b = [...document.querySelectorAll('#pop .mi, #pop button')].find(x => /Open in its own window/.test(x.textContent)); if (!b) return false; b.click(); return window._wo.length === 1; })()`), '#1500: the task menu has "Open in its own window"');
     const wo = await ev(`window._wo`);
     check(wo[0] && wo[0][0] === `/?mini=1#t/${T}` && wo[0][1] === `kalmido-task-${T}`, '#1500: window.open with the task address and name ' + JSON.stringify(wo));
     // a middle click on the row

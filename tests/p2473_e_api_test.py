@@ -222,7 +222,7 @@ check(any(a[0] == "100000" for a in accts) and any(a[0] == "18100" for a in acct
       "6-digit collective debtor 100000, own bank account 18100, cash 16000")
 check(A.put(B + O + "/settings", json={"datev_extf": {"fy_start": 7}}).ok, "fiscal year from July")
 r = A.get(B + X + "?from=2026-06-01&to=2026-07-31&check=1")
-check(r.status_code == 400 and "30.06.2026" in r.json().get("error", ""), "fiscal year July-June: June + July = two fiscal years " + r.text[:160])
+check(r.status_code == 400 and "30 Jun 2026" in r.json().get("error", ""), "fiscal year July-June: June + July = two fiscal years " + r.text[:160])
 txt = A.get(B + X + P).content.decode("cp1252")
 check(txt.split("\r\n")[0].split(";")[12] == "20250701", "fiscal year start of March 2026 with July start = 20250701")
 log = dbx("SELECT action, target FROM office_doc_log WHERE target='datev'")

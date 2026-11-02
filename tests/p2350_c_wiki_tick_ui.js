@@ -5,7 +5,7 @@
 // - a line with #123 ticks the task along (done / reopened); a task done elsewhere shows its line ticked (the text stays)
 // - right click on a line: "Create as task" (the list dialog), the line then ends with #<id>
 // - without the right to write the page (a read-only member of an organisation) the checkboxes stay disabled
-// freelancer-matrix: wiki (the private space of a person without an organisation)
+// freelancer-matrix: wiki (the private workspace of a person without an organisation)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login, idle} = require('./boot');

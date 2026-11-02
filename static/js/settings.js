@@ -63,6 +63,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-hideblk': ['hide_blocked_today', N_('Hide tasks that are still blocked by another task'), 'chk'], 's-progsub': ['progress_subtasks', N_('Count subtasks in the progress of a project'), 'chk'],
   's-agsteps': ['agent_steps_always', N_('Always show steps'), 'chk'],  // 2.365.2 C (#2789): same setting as the switch in the agent chat
   's-pushch': ['push_channel', N_('Channel|push'), 'sel'], 's-pushprio': ['push_priority', N_('How urgent'), 'sel'],
+  's-pushtitle': ['push_title_only', N_('Only the title in the push'), 'chk'],  // 2.367.5 (#2980)
   's-allday': ['allday_time', N_('All-day reminder at'), 'time'], 's-defrem': ['default_reminder', N_('Default reminder'), 'sel'], 's-digest': ['digest_time', N_('Daily digest at'), 'time'],
   's-pf': ['pomo_focus', N_('Focus session'), 'pos'], 's-ps': ['pomo_short', N_('Short break'), 'pos'], 's-pl': ['pomo_long', N_('Long break'), 'pos'], 's-pe': ['pomo_long_every', N_('Long break after'), 'pos'],
   's-trnd': ['time_rounding', N_('Rounding'), 'sel'], 's-tcur': ['time_currency', N_('Currency'), 'text'], 's-ttarget': ['time_target', N_('Daily target'), 'num'],
@@ -77,6 +78,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-wthours': ['capacity_h', N_('Hours per week'), 'text'],  // 2.125.0 A (#2118): the working week (leave.js)
   's-review': ['review_time', N_('Daily review at'), 'time'],
   's-brief': ['brief_time', N_('Morning briefing at'), 'time'],  // 2.34.0 (#264)
+  's-tmore': ['tours_more', N_('Show more introductions'), 'chk'],  // 2.466.0 (#3314)
   's-lemo': ['list_emoji', N_('Suggest icons for new projects'), 'chk'],  // 2.32.0 (#1077)
   's-sdn': ['show_done_new', N_('Hide completed tasks in new projects'), 'chk'],  // 2.49.0 (#1535)
   's-prbg': ['prio_bg', N_('Priority as background'), 'sel'],  // 2.40.0 (#1416)
@@ -234,7 +236,8 @@ function fmtSetHtml(s, hint) {
       <div class="row"><label for="s-wkst">${tr('First day of the week')}</label>${sel('s-wkst', 'week_start', [['', auto], ['mon', WDL[1]], ['sun', WDL[0]]])}</div>
       <div class="row"><label for="s-tfmt">${tr('Time format')}</label>${sel('s-tfmt', 'time_format', [['', auto], ['24', tr('24 hours ({0})', '14:30')], ['12', tr('12 hours ({0})', '2:30 PM')]])}</div>
       <div class="row"><label for="s-dord">${tr('Date format')}</label>${sel('s-dord', 'date_order', [['', auto], ['dmy', '31.12.2026'], ['mdy', '12/31/2026'], ['ymd', '2026-12-31']])}</div>
-      ${hint(tr('Automatic follows the language and the region of this browser.'))}`;
+      ${hint(tr('Automatic follows the language and the region of this browser.'))}
+      ${tsl_tzRows(s, hint) /* 2.368.3 (#2985) */}`;
 }
 // U04: the modules, grouped, each with one sentence; admins also get the switch for the whole server (collaboration, time)
 // 2.44.0 (#1187): Office, Time, Review and Home are ONE switch each ("a:<area>", areas.js), their parts below it
@@ -286,7 +289,7 @@ function modulesHtmlMain(hint) {
       <div class="row"><label for="s-tcur">${tr('Currency')}</label><input id="s-tcur" value="${esc(s.time_currency ?? '€')}" maxlength="8" class="numin"></div>
       <div class="row"><label for="s-ttarget">${tr('Daily target')}</label><input type="number" id="s-ttarget" value="${esc(s.time_target || '0')}" min="0" max="24" step="0.25" class="numin"><span class="muted">${tr('hours, 0 = none')}</span></div>
       <div class="row"><label for="s-trem">${tr('Reminder after')}</label><input type="number" id="s-trem" value="${esc(s.time_remind_h ?? '4')}" min="0" max="48" step="0.5" class="numin"><span class="muted">${tr('hours, push “still running?”, 0 = off')}</span></div>
-      ${tsl_setRows(s, hint)}
+      ${tsl_setRows(s)}
       <div class="row"><label for="s-tstop">${tr('Stop automatically after')}</label><input type="number" id="s-tstop" value="${esc(s.time_autostop_h ?? '12')}" min="0" max="72" step="0.5" class="numin"><span class="muted">${tr('hours, end = start + value, 0 = off')}</span></div>
       <div class="row"><label>${tr('Focus sessions')}</label><label class="chkl wtfocus"><input type="checkbox" id="s-tfocus" ${s.time_focus !== '0' ? 'checked' : ''}> ${tr('count as time entries (not while a timer runs)')}</label></div></details>` : '';
   const row = k => k.startsWith('a:') ? mg_modAreaHtml(k.slice(2), x => modRowHtml(x, opt)) : modRowHtml(k, opt);  // 2.44.0 (#1187)
@@ -379,12 +382,14 @@ function agSetupPaneHtml(hint) {
   return `<h4 id="s-agg-h">${tr('Who is the agent for?')}</h4>
     ${seg('guide', g, [['own', N_('For me'), 'user'], ['team', N_('For the team'), 'users']])}
     <p class="agwhy muted" id="s-agwhy">${agWhyHtml(g, adm)}</p>
-    ${seg('os', os, [['linux', 'Linux'], ['mac', 'macOS'], ['win', 'Windows']])}
-    <div class="agguidebox" id="s-agguide" role="tabpanel">${agSetupHtml(g, os)}</div>
-    <div class="row aibtns"><button class="btn sm" data-m="ag-guide-cc" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('bot', 's')} ${tr('Let Claude Code set it up (Linux)')}</button></div>
+    <div class="shint keep agone">${ic('download', 's')} <span>${tr('The quick way: create the agent, then “Set up on a computer” at it gives you one command to paste.')}</span></div>
     <h4 id="s-myown-h">${tr('Your personal agents')}</h4>
     ${hint(tr('Only you can chat with it; it runs on your own computer.'))}
-    <div class="members aglist" id="s-myown" aria-labelledby="s-myown-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+    <div class="members aglist" id="s-myown" aria-labelledby="s-myown-h"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <details class="sdet aghand"><summary>${tr('For advanced users: set it up by hand')}</summary>
+    ${seg('os', os, [['linux', 'Linux'], ['mac', 'macOS'], ['win', 'Windows']])}
+    <div class="agguidebox" id="s-agguide" role="tabpanel">${agSetupHtml(g, os)}</div>
+    <div class="row aibtns"><button class="btn sm" data-m="ag-guide-cc" title="${esc(tr('Set up an agent step by step, or let Claude Code do it'))}">${ic('bot', 's')} ${tr('Let Claude Code set it up (Linux)')}</button></div></details>`;  // 2.366.0 (#3001): the one-command way first, the steps by hand folded
 }
 // 2.29.0 (#1024): one sentence per choice, so the difference is clear before the steps
 function agWhyHtml(g, adm) {
@@ -400,7 +405,7 @@ function agTeamWhy(adm) {
 function agAdminPaneHtml(hint) {
   return `${hint(tr('Server-wide rules for every agent. Agents themselves are created under Settings > Agents: Status (team) or Set up (personal).'))}
     <h4 id="s-uag-h">${tr('Personal agents for everyone')}</h4>
-    <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-uag"><span class="swt" aria-hidden="true"></span></span><span>${tr('Users may create their own agents')}</span></label></div>
+    <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-uag"><span class="swt" aria-hidden="true"></span></span><span>${tr('People may create their own agents')}</span></label></div>
     <div class="row"><label for="s-uagmax">${tr('Per person at most')}</label><input id="s-uagmax" type="number" inputmode="numeric" min="1" max="20" value="2" class="numin"></div>
     ${hint(tr('On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Workspaces), in the private area each person themselves.') + ' ' + tr('You see every agent under Status and can pause or delete it.'))}
     <h4 id="s-sclim-h">${tr('Permission limit')}</h4>
@@ -419,7 +424,7 @@ async function agSetupDraw(md) {
     <span class="agacts">${av_setupBtn(a)}<button class="iconbtn" data-myag-act="work" title="${esc(tr('Work style and notifications'))}" aria-label="${esc(tr('Work style and notifications'))}">${ic('cog', 's')}</button><button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="log" title="${esc(tr('Log and usage limit'))}" aria-label="${esc(tr('Log and usage limit of {0}', a.name))}">${ic('chart', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
       <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
       <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
-  const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" title="${esc(tr('for the login and @mentions'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
+  const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" title="${esc(tr('for the sign-in and @mentions'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
     <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself and are responsible for the provider; everyone in the project sees where it runs.'))}</div>${av_whichHtml()}` : '';  // 2.46.6 (#1716)
   box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${j.api === false ? tr('The agent interface is switched off on this server.') : tr('Personal agents are switched off on this server (a server admin can allow them: Settings > Organisation > Agents).')}</div>`)) + add;  // 2.361.4 (#2928); 2.364.0 C (#3041): the agents moved to Settings > Organisation
   userNameFollow(box, 'myag-name', 'myag-user');  // 2.28.0 (#926)
@@ -527,7 +532,7 @@ function aiSubShow(md, want, save) {
 const ADM_SUBS = [['users', 'users', N_('People|admin'), 'org'], ['agents', 'bot', N_('Agents'), 'org'], ['odata', 'download', N_('Data'), 'org'],
   ['signin', 'key', N_('Sign-in'), 'users'], ['server', 'grid', N_('Server'), 'users'], ['log', 'alert', N_('Log & errors'), 'users']];
 const ad_subSec = k => (ADM_SUBS.find(x => x[0] === k) || [])[3];
-const ad_admFocus = f => ({users: 'users', groups: 'users', activity: 'agents', agentpolicy: 'agents', server: 'server', signin: 'signin'})[f];  // settingsModal(focus) -> sub-tab
+const ad_admFocus = f => ({users: 'users', odata: 'odata', groups: 'users', activity: 'agents', agentpolicy: 'agents', server: 'server', signin: 'signin'})[f];  // settingsModal(focus) -> sub-tab
 const ad_subKey = sec => sec === 'org' ? 'orgSub' : 'admSub';  // remembered per device and area
 function admSubCur(sec, ks, want) { const k = (want && ad_subSec(want) === sec ? want : '') || LS.get(ad_subKey(sec), ks[0]); return ks.includes(k) ? k : ks[0]; }
 function admSubsHtml(sec, parts, want) {
@@ -585,7 +590,7 @@ function hostHtml(hint) {
     <div class="row"><label for="s-qpool">${tr('Shared by')}</label><select id="s-qpool"><option value="user">${tr('each person on their own')}</option><option value="org" ${a.storage_pool === 'org' ? 'selected' : ''}>${tr('the organisation (amount × members)')}</option></select></div>
     <div class="row"><label for="s-support">${tr('Support address')}</label><input id="s-support" type="email" value="${esc(a.support_email || '')}" placeholder="${esc(a.support_email_env || 'support@example.com')}" autocomplete="off"></div>
     <h4 id="s-legal-h">${tr('Privacy and imprint')}</h4>
-    ${hint(tr('Links on the login page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).'))}
+    ${hint(tr('Links on the sign-in page, under Help and on public pages (forms, portal, approvals, bookings), e.g. to your privacy statement. Empty = no link (or the value from the server configuration).'))}
     <div class="row"><label for="s-privacy">${tr('Privacy statement')}</label><input id="s-privacy" type="url" value="${esc(a.privacy_url || '')}" placeholder="${esc(a.privacy_url_env || 'https://example.com/privacy')}" autocomplete="off"></div>
     <div class="row"><label for="s-privmail">${tr('Privacy contact')}</label><input id="s-privmail" type="email" value="${esc(a.privacy_email || '')}" placeholder="${esc(a.privacy_email_env || 'privacy@example.com')}" autocomplete="off"></div>
     <div class="row"><label for="s-imprint">${tr('Imprint')}</label><input id="s-imprint" type="url" value="${esc(a.imprint_url || '')}" placeholder="${esc(a.imprint_url_env || 'https://example.com/imprint')}" autocomplete="off"></div>
@@ -643,7 +648,9 @@ function settingsModal(focus) {
   const hint = t => `<div class="shint">${t}</div>`;  // 2.418.0 (#3560): the tab bar is the person's now (no "This device")
   const chk = (id, on, label) => `<label class="chkl"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${label}</label>`;
   const prio = `<div class="row"><label for="s-pushprio">${tr('How urgent')}</label><select id="s-pushprio">${[['3', N_('Normal')], ['4', N_('Loud')], ['5', N_('Urgent')]].map(([v, n]) => `<option value="${v}" ${(s.push_priority || '4') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-      ${hint(tr('Loud rings and vibrates longer; Urgent may also break through “Do not disturb” on some phones.'))}`;
+      ${hint(tr('Loud rings and vibrates longer; Urgent may also break through “Do not disturb” on some phones.'))}
+      <div class="row"><label>${tr('Lock screen')}</label>${chk('s-pushtitle', s.push_title_only === '1', tr('Only the title in the push'))}</div>
+      ${hint(tr('Hides the text of comments and messages on the lock screen. Your notification channels stay as they are.'))}`;
   const pane = {
     account: S.me ? accountHtml() : '',
     // 2.39.1 (#1188): Settings > Organisation; 2.364.0 C (#3041): + the server admins' People, Agents and Data (was Administration)
@@ -663,7 +670,7 @@ function settingsModal(focus) {
       <h4>${tr('Tips')}</h4><div class="row"><label>${tr('Hints')}</label><button class="btn sm" data-m="hints-reset">${ic('undo', 's')} ${tr('Show tips again')}</button></div>
       ${hint(tr('Brings back the one-time hints on this device (touch screens show helper texts once).'))}
       <h4 id="s-tabbar-h">${tr('Tab bar')}</h4>
-      ${hint(tr('A phone fits {0} tabs, the rest goes under “More”.', TAB_MAX))}
+      ${hint(tr('This device fits {0} tabs, the rest goes under “More”.', tabMax()))}
       <div class="navlist" id="s-tabbar"></div>
       <div class="row" style="margin-top:.5rem"><button type="button" class="btn sm tabaddb" id="s-tabadd" data-m="tab-add" style="flex:1" aria-haspopup="dialog">${tr('+ Add tab …')}</button><button class="btn sm" data-m="tab-reset">${tr('Default')}</button></div>
       <h4 id="s-prbg-h">${tr('Task rows')}</h4>
@@ -717,7 +724,7 @@ function settingsModal(focus) {
       <div id="s-ntfy"><h4>${S.webpush?.enabled ? 'ntfy' : tr('Notifications (ntfy)')}</h4>
       <div class="row"><label>${tr('Topic')}</label><code class="topic">${esc(s.ntfy_topic)}</code><button class="btn sm" data-m="test">${ic('bell', 's')} ${tr('Send test')}</button></div>
       ${S.webpush?.enabled ? '' : prio}
-      ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}${/ntfy\.sh/.test(S.ntfyUrl) || !S.me?.ntfy_inbox ? '' : tr(', logged in with the ntfy login your admin gave you')}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
+      ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}${/ntfy\.sh/.test(S.ntfyUrl) || !S.me?.ntfy_inbox ? '' : tr(', signed in with the ntfy sign-in your admin gave you')}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
       <div id="s-ntfyin"></div>
       <div id="s-chn"></div>${''/* 2.142.0 A (#2145, #2146): channels + e-mail for single events (integrations.js chn_meDraw) */}
       ${notifMatrixHtml(s, hint)}${bl9SetHtml(s, hint)}${typeof tbl_setHtml === 'function' ? tbl_setHtml(chk, hint) : ''}
@@ -729,8 +736,9 @@ function settingsModal(focus) {
       <div id="s-digmail-w"></div>
       <div class="row"><label for="s-brief">${tr('Morning briefing at')}</label>${timeIn('s-brief', s.brief_time || '', {label: tr('Morning briefing at'), empty: tr('off')})}</div>
       ${hint(tr('One push with the numbers of your briefing (the first block of Today).'))}
-      <h4 id="s-quiet-h">${tr('Repeated reminders')}</h4>
+      <h4 id="s-quiet-h">${tr('Quiet hours (all pushes)')}</h4>
       <div class="row"><label for="s-qfrom">${tr('Quiet from')}</label>${timeIn('s-qfrom', s.quiet_from ?? '22:00', {label: tr('Quiet from'), empty: tr('none')})}<label for="s-qto" class="qtol">${tr('until|time')}</label>${timeIn('s-qto', s.quiet_to ?? '07:00', {label: tr('Quiet until'), empty: tr('none')})}</div>
+      ${hint(tr('No pushes during these hours, on your clock (the time zone of your time tracking settings). The bell keeps everything; one summary when they end. Urgent tasks, focus timers and times you set yourself (digest, briefing) still come.'))}
       ${hint(tr('A task or a project can repeat its reminder until done (date dialog or project dialog). Nothing repeats during the quiet hours.'))}`,
     integr: integrCardsHtml() + calsHtml(chk, hint) + (typeof famDavHtml === 'function' ? famDavHtml() : '') + `<h4 id="s-ical-h">${tr('Calendar subscription')}</h4>
       ${hint(tr('Read-only. Calendar apps fetch changes every few hours.'))}
@@ -752,7 +760,7 @@ function settingsModal(focus) {
       <h4 id="s-mail-h">${tr('Tasks by e-mail')}</h4><div id="s-mail"></div>
       ${shareHtml(hint)}
       <ul class="slist">
-        ${S.ntfyInbox?.enabled && S.me?.ntfy_inbox ? `<li>${tr('Single files also via the ntfy app:')} ${tr('In the ntfy app, add server {0} once', `<code class="topic">${esc(S.ntfyInbox.server)}</code>`)}${tr(' and log in with the ntfy login your admin gave you.')} ${tr('Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.', `<code class="topic">${esc(S.ntfyInbox.topic)}</code>`)}</li>` : ''}</ul>
+        ${S.ntfyInbox?.enabled && S.me?.ntfy_inbox ? `<li>${tr('Single files also via the ntfy app:')} ${tr('In the ntfy app, add server {0} once and sign in with the ntfy sign-in your admin gave you.', `<code class="topic">${esc(S.ntfyInbox.server)}</code>`)} ${tr('Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.', `<code class="topic">${esc(S.ntfyInbox.topic)}</code>`)}</li>` : ''}</ul>
       ${bmls_html()}
       ${acz_linkHtml(S.webhooks?.enabled)}`,  // 2.166.0 (#2633): the webhooks moved to Access
     access: acz_html(),  // 2.166.0 (#2633): API tokens, webhooks and agent tokens in one place
@@ -775,7 +783,7 @@ function settingsModal(focus) {
       ${hint(tr('Private to you. Save from a task’s menu (…) or the project dialog; use via the template button or Projects > +.'))}
       <div class="members" id="s-tpls"><div class="muted mhint">${tr('Loading…')}</div></div>
       ${sampleHtml(hint)}`,
-    ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage'}[focus]) : '',  // 2.7.0 (#405 S2)
+    ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage', agentsetup: 'setup'}[focus]) : '',  // 2.7.0 (#405 S2)
     assistant: asst_paneHtml(hint),  // 2.75.0 (#1411): only with a configured assistant
     users: S.me?.is_admin ? admSubsHtml('users', {  // 2.24.0 (#826): Administration in sub-tabs like Agents; 2.364.0 C (#3041): "Server"
       signin: `<div id="s-signin">${signinHtml(hint)}</div>`,
@@ -784,6 +792,8 @@ function settingsModal(focus) {
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
       <div class="row"><button class="btn sm" data-m="practice-add">${ic('plus', 's')} ${tr('Create the practice project')}</button>${S.sample ? '' : `<button class="btn sm" data-m="sample-add">${ic('plus', 's')} ${tr('Create sample project')}</button>`}</div>
+      ${S.me?.kid ? '' : `<div class="row">${chk('s-tmore', s.tours_more !== '0', tr('Show more introductions'))}</div>
+      <div class="row">${TOUR_AREAS.filter(id => sbb_def(id)?.[3]()).map(id => `<button class="btn sm" data-m="tour-mod" data-v="${id}">${esc(tr(sbb_def(id)[2]))}</button>`).join('')}</div>`}<!-- 2.466.0 (#3314): one area's introduction again -->
       ${isMobile() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, projects, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}
       <h4>${tr('Quick add')}</h4>
       <div class="shelp">${tr('today, tomorrow, day after tomorrow, friday, next monday, in 3 days, 12.10., 3pm, at 15:00<br>daily, weekdays, weekly, every monday, every 2 weeks, monthly, yearly<br>!high / !medium / !low (or !!!, !!, !) · #tag · ~project, “in project Work” or “… in Work” at the end<br>German works too: morgen 15 uhr, jeden montag, !hoch<br>Keyboard: n = new task, / = search, Esc = close')}</div>
@@ -813,7 +823,7 @@ function settingsModal(focus) {
   pane.data += biz_dataHtml(); pane.integr += biz_integrHtml();  // 2.365.2 D (#2789): the office's data and its Peppol access (both live in Company & office)
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', dayplan: 'general'}[focus] || (INTB_FOCUS[focus] ? 'integr' : focus);  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
+  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', agentsetup: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', odata: 'org', dayplan: 'general'}[focus] || (INTB_FOCUS[focus] ? 'integr' : focus);  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
   if (/^biz-/.test(focus || '')) { S.bizJump = focus.slice(4); cur = 'biz'; }  // 2.365.2 D (#2789): a part of Company & office (office.js biz_jump scrolls there)
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';
@@ -1017,7 +1027,7 @@ function settingsModal(focus) {
   md._show = show;  // 2.364.0 C (#3041): a sub-tab of the other area opens that area (admSubShow)
   if (cur === 'users' || cur === 'org') { ad_secDraw(md); Promise.resolve(admSubShow(md, ad_admFocus(focus), false, cur)).then(() => { if (focus === 'activity') $('#s-adlog-h', md)?.scrollIntoView({block: 'start'}); }); }  // 2.42.0 (#828): + ocAdminDraw  // 2.46.6 (#1710): + the shown sub-tab's data; 'activity' = its log, once the rules above it are drawn
   aiTblWire(md);
-  if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', agentsafe: 'safe'}[focus]);  // 2.5.1 (#393)
+  if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', agentsafe: 'safe', agentsetup: 'setup'}[focus]);  // 2.5.1 (#393)
   md.addEventListener('click', e => { const b = e.target.closest('[data-aisub]'); if (b) aiSubShow(md, b.dataset.aisub, true); const g = e.target.closest('[data-aigo]'); if (g) aiSubShow(md, g.dataset.aigo, true); });
   md.addEventListener('click', e => { const b = e.target.closest('[data-admsub]'); if (b) admSubShow(md, b.dataset.admsub, true); });  // 2.24.0 (#826)
   md.addEventListener('click', e => {  // 2.46.6 (#1710): "Open in Administration" next to an admin switch
@@ -1042,7 +1052,7 @@ function settingsModal(focus) {
   });
   const tabDraw = () => {
     const ids = tabIds(), box = $('#s-tabbar', md); if (!box) return;
-    box.innerHTML = ids.map(tabItem).map((t, i) => t ? `<div class="navrow" data-tab="${esc(t.id)}">${t.icon}<span>${esc(t.label)}</span>${i === TAB_MAX - 1 && ids.length > TAB_MAX ? `<span class="muted" style="font-size:var(--fs-xs)">${tr('from here on “More”')}</span>` : ''}<button class="iconbtn" data-tmove="-1" title="${tr('move forward')}" aria-label="${esc(tr('move forward') + ': ' + t.label)}">${ic('chev', 's up')}</button><button class="iconbtn" data-tmove="1" title="${tr('move back')}" aria-label="${esc(tr('move back') + ': ' + t.label)}">${ic('chev', 's')}</button><button class="iconbtn" data-tdel title="${tr('remove')}" aria-label="${esc(tr('remove') + ': ' + t.label)}">${ic('x', 's')}</button></div>` : '').join('') || `<div class="muted" style="font-size:var(--fs-m)">${tr('Empty: only “More”')}</div>`;
+    box.innerHTML = ids.map(tabItem).map((t, i) => t ? `<div class="navrow" data-tab="${esc(t.id)}">${t.icon}<span>${esc(t.label)}</span>${i === tabMax() - 1 && ids.length > tabMax() ? `<span class="muted" style="font-size:var(--fs-xs)">${tr('from here on “More”')}</span>` : ''}<button class="iconbtn" data-tmove="-1" title="${tr('move forward')}" aria-label="${esc(tr('move forward') + ': ' + t.label)}">${ic('chev', 's up')}</button><button class="iconbtn" data-tmove="1" title="${tr('move back')}" aria-label="${esc(tr('move back') + ': ' + t.label)}">${ic('chev', 's')}</button><button class="iconbtn" data-tdel title="${tr('remove')}" aria-label="${esc(tr('remove') + ': ' + t.label)}">${ic('x', 's')}</button></div>` : '').join('') || `<div class="muted" style="font-size:var(--fs-m)">${tr('Empty: only “More”')}</div>`;
   };
   md._tabDraw = tabDraw;
   // 2.25.0 (UX-03): the sidebar: groups up / down, an eye per group, check boxes for the entries of Plan and Views
@@ -1104,7 +1114,7 @@ function settingsModal(focus) {
     if (b.dataset.vmode) { vpSet(md, b.dataset.vmode); return; }  // 2.310.0 (#3270)
     if (b.dataset.look === 'pack') { o3c_packPick(md, b.dataset.v); return; }  // 2.83.0 C (#1427): theme + scheme in one step
     if (b.dataset.look) {
-      const k = b.dataset.look, v = b.dataset.v, n = {theme: N_('Color scheme'), density: N_('Density'), densitySide: N_('Density'), densityRows: N_('Density'), fsize: N_('Font size'), font: N_('Font'), accent: N_('Accent color'), chatHuman: N_('Messages from people'), chatAgent: N_('Messages from agents')}[k];
+      const k = b.dataset.look, v = b.dataset.v, n = {theme: N_('Colour scheme'), density: N_('Density'), densitySide: N_('Density'), densityRows: N_('Density'), fsize: N_('Font size'), font: N_('Font'), accent: N_('Accent colour'), chatHuman: N_('Messages from people'), chatAgent: N_('Messages from agents')}[k];
       setLocal(tr(n), () => lookCur(k), x => { lookSet(k, x); lookRedraw(md, `[data-look="${k}"][data-v="${x}"]`); }, v); return;
     }
     if (b.dataset.m === 'look-reset') {
@@ -1113,6 +1123,7 @@ function settingsModal(focus) {
       const e = setLocal(tr('Appearance'), snap, put, null); if (e) offerUndo(tr('Appearance reset to the defaults'), e); return;
     }
     if (b.dataset.m === 'tour') { md.remove(); tourStart(); return; }
+    if (b.dataset.m === 'tour-mod') { md.remove(); tourModRestart(b.dataset.v); return; }  // 2.466.0 (#3314)
     if (b.dataset.m === 'keys') { md.remove(); shortcutsModal(); return; }
     if (b.dataset.m === 'hints-reset') { LS.del('hintsSeen'); toast(tr('Done')); render(); return; }
     if (b.dataset.m === 'ag-guide') { aiSubShow(md, 'setup', true); return; }  // 2.4.2 (#392); 2.7.2 (#420): the Set up tab
@@ -1173,15 +1184,15 @@ function impHelp(src) {
     todoist: tr('<b>Todoist:</b> open the project > … > Export as a CSV file (one file per project), or Settings > Backups > download a backup (a ZIP with every project). Sections, subtasks, @labels, priorities, dates (English and German date texts, also recurring ones), durations and comments are taken over; attachments stay links. The project is named after the file.'),
     trello: tr('<b>Trello:</b> open the board > Menu > Print, export and share > Export as JSON. Lists become sections of one project (or one project each, see below), cards tasks, checklists subtasks, labels tags, due dates and “complete” are kept; comments and attachment links go into the notes. Archived cards are skipped unless you choose otherwise.'),
     asana: tr('<b>Asana:</b> open the project > arrow next to its name > Export / Print > CSV. Sections, subtasks, tags, start and due dates and completion are taken over, other fields go into the notes. An assignee is assigned when they are a member of the target project (same e-mail or name), otherwise their name goes into the notes.'),
-    mstodo: tr('<b>Microsoft To Do</b> has no export of its own. Recommended: classic Outlook for Windows > File > Open & Export > Import/Export > Export to a file > Comma Separated Values > your Tasks folder (Outlook for Mac: File > Export > Tasks). CSV files of export tools (columns such as Title, List, Status, Importance, Due) and ICS files work too. English and German Outlook columns are recognized, also in Windows-1252.'),
+    mstodo: tr('<b>Microsoft To Do</b> has no export of its own. Recommended: classic Outlook for Windows > File > Open & Export > Import/Export > Export to a file > Comma Separated Values > your Tasks folder (Outlook for Mac: File > Export > Tasks). CSV files of export tools (columns such as Title, List, Status, Importance, Due) and ICS files work too. English and German Outlook columns are recognised, also in Windows-1252.'),
     ics: tr('<b>ICS files with tasks (VTODO):</b> Nextcloud Tasks (calendar > … > Export), Thunderbird (right-click the calendar > Export), Apple Reminders via an export app or a CalDAV server, Tasks.org via its CalDAV account. Each calendar becomes a project; subtasks, repetitions, reminders, categories (tags), priorities and completion are taken over.'),
-    ticktick: tr('<b>TickTick:</b> Settings > Account > Generate backup (CSV). Imported directly, without a preview.'),
+    ticktick: tr('<b>TickTick:</b> Settings > Account > Generate backup (CSV). Lists, sections, subtasks, tags, dates and reminders are taken over.'),
     // 2.142.0 B (#2147)
-    notion: tr('<b>Notion:</b> Settings > Workspace > Export all workspace content (or … on a page > Export) > Markdown & CSV, include subpages. Choose the ZIP as it is (parts inside it are read too). Every database becomes a project (name, status, date, tags and priority are recognized, other properties go into the notes), pages with checkboxes become projects with tasks. People stay names in the notes.'),
+    notion: tr('<b>Notion:</b> Settings > Workspace > Export all workspace content (or … on a page > Export) > Markdown & CSV, include subpages. Choose the ZIP as it is (parts inside it are read too). Every database becomes a project (name, status, date, tags and priority are recognised, other properties go into the notes), pages with checkboxes become projects with tasks. People stay names in the notes.'),
     gtasks: tr('<b>Google Tasks:</b> takeout.google.com > deselect all > select Tasks > create the export, then choose the ZIP (or the Tasks.json inside it). Lists, subtasks, due dates, notes and completion are taken over.'),
     clickup: tr('<b>ClickUp:</b> open the list or space > … > Export > CSV, all columns. Lists (in folders), subtasks, checklists, tags, priorities, start and due dates, estimates and comments are taken over; assignees stay names in the notes.'),
     jira: tr('<b>Jira:</b> Filters > search the issues > Export > Export CSV (all fields). Each Jira project becomes a project; sub-tasks and child issues become subtasks, labels tags, priorities and due dates are kept; the issue key, description, sprint and components go into the notes, assignees stay names.'),
-    csv: tr('<b>Any CSV file</b> (also from a spreadsheet): one row per task. Columns such as Title / Name / Task, Due / Date, Notes / Description, List / Project, Section, Priority, Tags and Done / Status are recognized in English and German; every other column goes into the notes. The preview shows which column went where.'),
+    csv: tr('<b>Any CSV file</b> (also from a spreadsheet): one row per task. Columns such as Title / Name / Task, Due / Date, Notes / Description, List / Project, Section, Priority, Tags and Done / Status are recognised in English and German; every other column goes into the notes. The preview shows which column went where.'),
     markdown: tr('<b>Markdown checklist</b> (Obsidian, Logseq, a README …): headings become projects (deeper headings sections), - [ ] and - [x] tasks, indented items subtasks, text below a task its notes. Only clear dates (2025-01-15 or 15.01.2025) and #tags are read.'),
   }[src] || '';
 }
@@ -1238,7 +1249,7 @@ function impInit(md) {
     const box = $('#s-imp-hist', md); if (!box) return;
     let j; try { j = await api('GET', '/api/imports'); } catch { return; }
     const rows = j.imports.filter(x => x.can_undo).slice(0, 5);
-    box.innerHTML = rows.length ? `<div class="muted mhint">${tr('Recent imports')}</div>` + rows.map(x => `<div class="mrow"><span class="n">${esc(x.source_name)}${x.file_name ? ' · ' + esc(x.file_name) : ''}</span><span class="muted">${trn('{0} task', '{0} tasks', x.counts.tasks || 0)}</span><button class="btn sm" data-imp="undo" data-id="${+x.id}">${tr('Undo')}</button></div>`).join('') : '';
+    box.innerHTML = rows.length ? `<div class="muted mhint">${tr('Recent imports')}</div>` + rows.map(x => `<div class="mrow"><span class="n">${esc(x.source_name)}${x.file_name ? ' · ' + esc(x.file_name) : ''}</span><span class="muted">${x.source === 'newsletter' ? trn('{0} contact', '{0} contacts', x.counts.contacts || 0) : trn('{0} task', '{0} tasks', x.counts.tasks || 0)}</span><button class="btn sm" data-imp="undo" data-id="${+x.id}" data-src="${esc(x.source)}">${tr('Undo')}</button></div>`).join('') : '';
   }
   hist();
   $('#s-imp-src', md).addEventListener('change', e => {
@@ -1247,14 +1258,6 @@ function impInit(md) {
   });
   inp.addEventListener('change', async e => {
     const f = e.target.files[0]; if (!f) return;
-    if (I.src === 'ticktick') {
-      // 2.87.9 (#1940): TickTick's lists always become private lists of the person
-      if (!await importTargetConfirm({what: tr('the tasks'), ws: 'private'})) { inp.value = ''; const fn = $('#s-import-name', md); if (fn) fn.textContent = tr('No file chosen'); return; }
-      const fd = new FormData(); fd.append('file', f);
-      const j = await api('POST', '/api/import/ticktick', fd);
-      toast(tr('Import: {0} tasks, {1} new projects', j.tasks, j.lists) + (j.skipped ? tr(', {0} already there', j.skipped) : ''));
-      inp.value = ''; await load(); render(); return;
-    }
     // 2.87.9 (#1940): new lists go into the workspace shown in the sidebar
     // 2.144.5 B (#2002): "All" = the private space (the dialog offers the first organisation instead)
     const cur = wsCur();
@@ -1266,7 +1269,13 @@ function impInit(md) {
     if (k === 'target' && e.target.value !== 'new') delete I.opts.list_name;
     if (k !== 'list_name') preview();
   });
-  const undo = async id => {
+  const undo = async (id, src) => {
+    if (src === 'newsletter') {  // 2.363.2 (#3104)
+      if (!await askConfirm(tr('Undo this import?'), tr('The contacts go back to their earlier newsletter status, unless their consent changed since.'), {ok: tr('Undo'), danger: true})) return;
+      const j = await api('POST', `/api/imports/${id}/undo`);
+      toast(trn('Import undone: {0} contact reset', 'Import undone: {0} contacts reset', j.contacts || 0));
+      hist(); return;
+    }
     // 2.272.0 C (#3027): the undo moves into the trash and keeps what changed since -- the texts say exactly that
     if (!await askConfirm(tr('Undo this import?'), tr('The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.'), {ok: tr('Undo'), danger: true})) return;
     const j = await api('POST', `/api/imports/${id}/undo`);
@@ -1279,7 +1288,7 @@ function impInit(md) {
     const b = e.target.closest('[data-imp]'); if (!b || !md.contains(b)) return;
     const a = b.dataset.imp;
     if (a === 'cancel') { out.innerHTML = ''; I.file = null; inp.value = ''; return; }
-    if (a === 'undo') { await undo(+b.dataset.id); return; }
+    if (a === 'undo') { await undo(+b.dataset.id, b.dataset.src); return; }
     if (a === 'go') {
       // 2.87.9 (#1940): where the tasks go, in words; new lists from an organisation can go into the private space instead
       const tl = I.opts.target && I.opts.target !== 'new' ? listById(+I.opts.target) : null, n = I.last?.created?.tasks;
@@ -1300,11 +1309,13 @@ function impInit(md) {
 }
 // Settings > Administration: the instance-wide switches, applied at once
 // 2.45.0 (#1515): no server key = tokens, the sign-on secret and organisation encryption cannot be stored: say so loudly
+// 2.359.3 (#2945): pg_dump older than the database server: every backup would fail
+const shToolsWarn = a => { const [t, sv] = String(a.backup_tools_problem || '').split('|'); return sv ? `<div class="shint warn shkey shtools" role="alert"><b>${tr('Backups are not possible')}</b> ${esc(tr('No backup is possible: pg_dump {0} refuses the newer PostgreSQL {1} of this server. Use a Kalmido image with postgresql-client {1} (see SELF-HOSTING.md).', t, sv))}</div>` : ''; };
 const shKeyWarn = a => a.secret_key === false ? `<div class="shint warn shkey" role="alert"><b>${tr('The server key is missing')}</b> ${esc(a.secret_key_problem === 'invalid' ? tr('KALMIDO_SECRET_KEY (or the key file) is not valid: it must be 32 random bytes, base64.') : a.secret_key_problem === 'file_in_data' ? tr('KALMIDO_SECRET_FILE lies inside the data or backup folder and was ignored. Put it on its own volume.') : a.secret_key_problem === 'file_error' ? tr('The key file KALMIDO_SECRET_FILE cannot be read or written, see the server log. After an update: create the folder secret next to data and give it to the user 1000 (mkdir secret && chown 1000 secret), then restart.') : tr('Without KALMIDO_SECRET_KEY or KALMIDO_SECRET_FILE no access token can be stored and organisation data stays unencrypted. See SELF-HOSTING.md.'))}</div>` : a.secret_key_src === 'file' ? `<div class="shint shkey">${esc(tr('The server key is kept in the key file. Keep a copy of it apart from the backups: without it the encrypted data of a backup cannot be read.'))}</div>` : '';  // 2.45.0 (#1515): review: a new key file is announced
 function instanceHtml(chk, hint) {
   const a = S.about || {};
-  return `${shKeyWarn(a)}<h4 id="s-instance-h">${tr('Whole server')}</h4>
-    ${hint(tr('Apply to every user at once. Nothing is deleted: switched back on, everything is there again.'))}
+  return `${shKeyWarn(a)}${shToolsWarn(a)}<h4 id="s-instance-h">${tr('Whole server')}</h4>
+    ${hint(tr('Apply to every person at once. Nothing is deleted: switched back on, everything is there again.'))}
     <div class="featgrid">${ad_allSwHtml()}
       <label class="wide"><input type="checkbox" id="s-publinks" ${a.public_links !== false && a.public_links_env !== false ? 'checked' : ''} ${a.public_links_env === false ? 'disabled' : ''}><span>${tr('Public links to projects')}<small class="muted">${a.public_links_env === false ? `<span title="KALMIDO_PUBLIC_LINKS=0">${tr('Switched off by the server operator.')}</span>` : tr('Projects and files of the file store can be shared with people without an account through a secret link. Off: every public link stops working at once; nothing is deleted.')}</small></span></label>
       <label class="wide"><input type="checkbox" id="s-updcheck" ${a.update_check !== false && a.update_env !== false ? 'checked' : ''} ${a.update_env === false ? 'disabled' : ''}><span>${tr('Check daily for a new version')}<small class="muted">${a.update_env === false ? `<span title="KALMIDO_UPDATE_CHECK=0">${tr('Switched off by the server operator.')}</span>` : tr('The server asks GitHub once a day for the latest release; nothing is installed automatically and the browser never contacts GitHub. The result shows below.')}</small></span></label>
@@ -1319,7 +1330,7 @@ function instanceHtml(chk, hint) {
     </details>` : ''}`;
 }
 // 2.380 G (#3389): the allowed internal hosts per service (server: calendars/subscriptions.py ALLOW_PURPOSES), saved in calview.js
-const ALLOWP = [['calendar', N_('Calendars')], ['carddav', N_('Address books (CardDAV)')], ['webhooks', N_('Webhooks')], ['mail', N_('Mail (IMAP / SMTP)')],
+const ALLOWP = [['calendar', N_('Calendars')], ['carddav', N_('Address books (CardDAV)')], ['webhooks', N_('Webhooks')], ['mail', N_('E-mail (IMAP / SMTP)')],
   ['git', N_('Git')], ['newsletter', N_('Newsletter')], ['ntfy', N_('ntfy')], ['peppol', N_('Peppol')], ['feeds', N_('Feeds (RSS)')],
   ['oidc', N_('Single sign-on (OIDC)')], ['paperless', N_('Paperless')], ['karakeep', N_('Karakeep')], ['servers', N_('Servers')]];
 // 2.102.0 E (#1999): the browser's own errors (static/js/clienterr.js) as bug tickets in one project list with error reports
@@ -1368,7 +1379,7 @@ async function aaDraw(md, j) {
     <div class="row"><button class="btn sm" data-aa="test" ${j.env ? '' : 'disabled'}>${ic('bell', 's')} ${tr('Send test alert')}</button></div>`;
   const st = j.storage || {}, qc = j.quick_check || {};
   if (j.rls_off) h += hint(tr('Row-level security is OFF: the database user bypasses it and the role kalmido_app cannot be used. Allow the database user to create roles or create the role (see SELF-HOSTING), then restart.'));  // 2.37.0 (review W2-2)
-  if (st.total || qc.at) h += hint([st.total ? tr('Data volume: {0} free ({1} %).', st.free >= 1e9 ? (st.free / 1e9).toFixed(1) + ' GB' : Math.round(st.free / 1e6) + ' MB', st.pct) : '', qc.at ? (!qc.ok ? tr('Database check FAILED ({0}).', aaWhen(qc.at)) : qc.checksums === false ? tr('Database check: data checksums are off ({0}).', aaWhen(qc.at)) : tr('Database check ok ({0}).', aaWhen(qc.at))) : ''].filter(Boolean).join(' '));
+  if (st.total || qc.at) h += hint([st.total ? tr('Data volume: {0} free ({1} %).', fmtBytes(st.free), st.pct) : '', qc.at ? (!qc.ok ? tr('Database check FAILED ({0}).', aaWhen(qc.at)) : qc.checksums === false ? tr('Database check: data checksums are off ({0}).', aaWhen(qc.at)) : tr('Database check ok ({0}).', aaWhen(qc.at))) : ''].filter(Boolean).join(' '));
   h += `<h4>${tr('Recent admin alerts')}</h4>`;
   h += j.items.length ? `<div class="members aalist">${j.items.map(a => `<div class="mrow aarow ${a.delivered || a.state === 'queued' ? '' : 'off'}" data-aaid="${a.id}"><span class="n"><b>${esc(a.label)}</b> · ${esc(a.message)}<small class="muted" style="display:block">${esc(aaWhen(a.created_at))} · ${tr(AA_STATE[a.state] || a.state)}${a.repeats ? ' · ' + trn('repeated {0} time since', 'repeated {0} times since', a.repeats) : ''}</small></span></div>`).join('')}</div>
     <div class="row"><button class="btn sm" data-aa="clear">${ic('trash', 's')} ${tr('Clear list')}</button></div>` : `<div class="muted mhint">${tr('No admin alerts yet.')}</div>`;
@@ -1438,7 +1449,7 @@ function ad_updHtml(hint) {
   return h ? `<h4 id="s-upd-h">${tr('Updates')}</h4>${h}` : '';
 }
 const ADMIN_SW = {'s-collaball': ['collab_all', N_('Collaboration for everyone')], 's-timeall': ['time_all', N_('Time tracking for everyone')], 's-updcheck': ['update_check', N_('Check daily for a new version')],
-  's-2fareq': ['twofa_required', N_('Require two-factor authentication')], 's-pklogin': ['passkey_login', N_('Passkey login')], 's-oidcauto': ['oidc_autocreate', N_('Create accounts on first OIDC login')], 's-publinks': ['public_links', N_('Public links to projects')],
+  's-2fareq': ['twofa_required', N_('Require two-factor authentication')], 's-pklogin': ['passkey_login', N_('Passkey sign-in')], 's-oidcauto': ['oidc_autocreate', N_('Create accounts on first OIDC sign-in')], 's-publinks': ['public_links', N_('Public links to projects')],
   's-collaball-a': ['collab_all', N_('Collaboration for everyone')], 's-timeall-a': ['time_all', N_('Time tracking for everyone')]};  // 2.46.6 (#1710): the same switches under Administration > Server
 async function adminSwitch(md, el, fromHist) {
   const on = el.checked;
@@ -1446,7 +1457,7 @@ async function adminSwitch(md, el, fromHist) {
   const key = ADMIN_SW[el.id][0];
   if (key === 'collab_all' && !on && !await ask(tr('Turn collaboration off for everyone?'), tr('Shared projects are then only visible to their owner; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
   if (key === 'time_all' && !on && !await ask(tr('Turn time tracking off for everyone?'), tr('Running timers are stopped now; entries are kept.'), tr('Turn off'))) { el.checked = true; return; }
-  if (el.id === 's-2fareq' && on && !await ask(tr('Require two-factor authentication?'), tr('Everyone who logs in with a password must set it up at the next login (sessions that are open now stay open).'), tr('Require'))) { el.checked = false; return; }
+  if (el.id === 's-2fareq' && on && !await ask(tr('Require two-factor authentication?'), tr('Everyone who signs in with a password must set it up at the next sign-in (sessions that are open now stay open).'), tr('Require'))) { el.checked = false; return; }
   if (el.id === 's-publinks' && !on && !await ask(tr('Turn public links off for everyone?'), tr('Every public link stops working at once; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
   try {
     // 2.306.0 Fix-1 (#2875 review): accounts by the sign-on's admin rule: switched on with the account password.
@@ -1515,7 +1526,7 @@ function tabAddGroups() {
   })]);
   grp('f', N_('Filters'), S.filters.map(f => it('f:' + f.id, f.name, {ic: 'filter'})));
   grp('folder', N_('Folders'), folderNames().map(f => it('folder:' + f, fDisp(f), {ic: 'folder'})));
-  grp('tag', N_('Tags'), Object.keys(counts().tags).sort((a, b) => a.localeCompare(b, 'de')).map(t => it('tag:' + t, '#' + t, {ic: 'tag'})));
+  grp('tag', N_('Tags'), Object.keys(counts().tags).sort(cmpText).map(t => it('tag:' + t, '#' + t, {ic: 'tag'})));
   grp('o', N_('Other'), [it('home', tr('Start|home')), teamOn() && it('team', tr('Team chat')), collab() && it('news', tr('News')), feat('agents') && agentsOn() && it('agents', tr('Agents')),
     overviewOn() && it('overview', tr('Project status')), feat('wiki') && it('wiki', tr('Knowledge pages')), it('search', tr('Search')), it('lists', tr('Projects')), it('settings', tr('Settings'))]);
   return out;
@@ -1706,7 +1717,7 @@ async function biz_mailDraw(md) {
   if (!box.isConnected) return;
   if (!x || !(x.manage || x.set)) { box.innerHTML = ''; return; }
   const what = !x.set ? tr('No mailbox yet') : [x.receive ? tr('receives') : '', x.send ? tr('sends') : ''].filter(Boolean).join(' · ') + (x.active ? '' : ' · ' + tr('paused'));
-  box.innerHTML = `<h4 id="s-bizmail-h">${tr('E-mail')}</h4><p class="shint">${tr('A workspace can fetch its own mailbox: its mails are filed here like forwarded ones, and replies go out from its address.')}</p>
+  box.innerHTML = `<h4 id="s-bizmail-h">${tr('E-mail')}</h4><p class="shint">${tr('A workspace can fetch its own mailbox: its e-mails are filed here like forwarded ones, and replies go out from its address.')}</p>
     <div class="row"><span class="muted">${x.address ? esc(x.address) + ' · ' : ''}${esc(what)}</span>${x.manage ? `<button type="button" class="btn sm" data-hmba="edit" data-ws="${esc(x.ws)}">${ic('gear', 's')}<span>${tr(x.set ? 'Change' : 'Set up')}</span></button>` : ''}</div>
     ${x.error_text ? `<p class="hmberr" role="status">${ic('info', 's')} ${esc(x.error_text)}</p>` : ''}`;
 }

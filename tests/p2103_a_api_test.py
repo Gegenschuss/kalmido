@@ -10,7 +10,7 @@ freelancer-matrix: orgadmin
    until" in the organisations list and may export it, never change or delete it before the date
  - a member of an organisation: time entries in the organisation's projects stay (no person), the organisation calendar goes
    to an admin of the organisation, the own agent goes with its token (401), the direct conversation stays for the
-   partner, mentions become "@Deleted user", log rows lose the id; the delete dialog's info names all of it
+   partner, mentions become "@Deleted person", log rows lose the id; the delete dialog's info names all of it
  - an organisation with a knowledge page: 409 with the numbers, gone with ?confirm=1
  - an organisation with a finalised invoice: retired with ?confirm=1 (members out, the document stays); the retention run
    after the period only counts while the switch is off and deletes it (with the office folder) when it is on
@@ -228,9 +228,9 @@ check(sql("SELECT a IS NULL OR b IS NULL FROM tchat_rooms WHERE id=?", (DM,)) ==
 msgs = Bo.get(B + f"/api/team/rooms/{DM}/messages")
 bodies = [m.get("body") for m in (msgs.json().get("messages") or [])] if msgs.ok else []
 check(msgs.ok and "The cut is ready" in bodies, f"bob still reads it {msgs.status_code} {bodies}")
-check(any(b and "@Deleted user" in b and f"<@{CAROL}>" not in b for b in bodies), f"the mention in the chat is rewritten {bodies}")
+check(any(b and "@Deleted person" in b and f"<@{CAROL}>" not in b for b in bodies), f"the mention in the chat is rewritten {bodies}")
 cb = sql("SELECT body, mentions FROM comments WHERE id=?", (CM,))
-check(cb and cb[0][0] == "@Deleted user please check the grading" and cb[0][1] == "", f"the mention in the comment is rewritten {cb}")
+check(cb and cb[0][0] == "@Deleted person please check the grading" and cb[0][1] == "", f"the mention in the comment is rewritten {cb}")
 check(not sql("SELECT 1 FROM activity WHERE user_id=?", (CAROL,)), "the task history keeps no id of the account")
 check(Bo.get(B + "/api/team").ok, "bob's chat overview still loads")
 

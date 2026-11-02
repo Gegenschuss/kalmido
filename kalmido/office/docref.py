@@ -276,7 +276,7 @@ OFD_VIEW = frozenset((
     "reminder_deadline_days", "skonto_pct", "skonto_days", "inv_type", "raw_mode", "raw_factor", "producing_on", "producing_mode",
     "producing_rate", "prod_quotient", "discount_pct", "handling_pct", "markup_pct", "handling_label", "markup_label",
     "share_label", "markup_stacked", "fields", "totals", "net_text", "gross_text", "items", "parts", "accept_print", "locked",
-    "can_edit", "trial", "created_at", "updated_at", "lang_notes"))
+    "can_edit", "trial", "created_at", "updated_at", "lang_notes", "lang_gaps"))
 OFD_ITEM = frozenset(("id", "sort", "kind", "title", "detail", "qty", "unit", "rate", "tax", "tax_pct", "net", "tax_amount",
                       "raw_fee", "producing", "in_handling", "in_markup", "intext", "discountable", "part_id", "ref_part_id"))
 OFD_PART = frozenset(("id", "kind", "title", "print", "sort", "settings", "totals", "used", "items"))

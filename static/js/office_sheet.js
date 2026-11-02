@@ -9,7 +9,7 @@ const DK_HEAD = [['shoot_days', N_('Shooting days')], ['travel_days', N_('Travel
   ['sat_days', N_('Saturdays')], ['sat_pct', N_('Saturday surcharge %')], ['sun_days', N_('Sundays / holidays')], ['sun_pct', N_('Sunday surcharge %')]];
 const dkNum = (k, v, label, extra) => `<label class="dkf"><span>${esc(label)}</span><input data-dk="${k}" inputmode="decimal" class="numin" value="${esc(ofdNumIn(v))}" ${extra || ''}></label>`;
 const dkLine = (calc, uid) => (calc?.lines || []).find(l => l.uid === uid);
-const dkName = (r, d) => (ofdLang(d) === 'en' ? r.name_en || r.name : r.name) || '';
+const dkName = (r, d) => { const lg = ofdTl(d); return (lg === 'de' ? r.name : r.name_tr?.[lg] || r.name_en || r.name) || ''; };  // 2.460.0 (#3767): name_tr
 
 function dkSheetHtml(part, doc, adm) {
   if (!part) return '';
@@ -20,7 +20,7 @@ function dkSheetHtml(part, doc, adm) {
   const ie = (k, v) => adm ? `<select data-dk="${k}" aria-label="${esc(tr('intern / extern'))}"><option value="intern" ${v === 'intern' ? 'selected' : ''}>${tr('intern')}</option><option value="extern" ${v !== 'intern' ? 'selected' : ''}>${tr('extern')}</option></select>` : '';
   const mk = (k, v) => adm ? `<label class="dkmk">${tr('Markup %')} <input data-dk="${k}" inputmode="decimal" class="numin" value="${esc(ofdNumIn(v || 0))}"></label>` : '';
   const head = DK_HEAD.map(([k, n]) => dkNum('head.' + k, h[k], tr(n))).join('');
-  const staff = (s.staff || []).map((r, i) => `<li class="ofdit dkrow"><div class="ofditb"><b class="dkn">${esc(dkName(r, d))}</b>
+  const staff = (s.staff || []).map((r, i) => `<li class="ofdit dkrow"><div class="ofditb"><b class="dkn">${esc(dkLine(c, r.uid)?.label || dkName(r, d))}</b>
     <span class="ofdnums"><input data-dk="staff.${i}.qty" inputmode="decimal" class="numin" value="${esc(ofdNumIn(r.qty))}" aria-label="${esc(tr('Number of people'))}"><span class="muted">×</span><span class="muted">${esc(m(r.rate))} ${tr('per day')}</span><b class="ofdlt">${esc(tot(r.uid))}</b></span>
     <span class="ofdflags"><label class="chkl"><input type="checkbox" data-dk="staff.${i}.prep" ${r.prep ? 'checked' : ''}> ${tr('with preparation')}</label>${ie(`staff.${i}.intext`, r.intext)}${mk(`staff.${i}.markup_pct`, r.markup_pct)}</span></div>${del('staff', i)}</li>`).join('');
   const p = s.producing || {}, k = s.km || {}, st = s.set;

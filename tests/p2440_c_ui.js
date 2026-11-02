@@ -41,6 +41,8 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   check(/Set up Deskbot on a computer/.test(md.querySelector('h3').textContent), 'the dialog opens');
   check(['mac', 'windows', 'linux'].every(o => md.querySelector(`[data-ainsos="${o}"]`)), 'Mac / Windows / Linux to choose');
   click(w, md.querySelector(`[data-ainsos="linux"]`));
+  // 2.366.0 (#3001): the example folder stands under the field (a placeholder looked like a filled-in value) and follows the system
+  check(!md.querySelector('#ains-dir').placeholder && /e\.g\. ~\/projects\/website/.test(md.querySelector('#ains-dirhint')?.textContent || ''), '#3001: the example under the folder field, no placeholder');
   click(w, md.querySelector('[data-m="ains-make"]')); await sleep(300);
   check(md.querySelector('#ains-out').hidden, 'no folder: no command (the folder is required)');
   md.querySelector('#ains-dir').value = "~/projects/bob's site";
@@ -55,6 +57,7 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   // Windows: the PowerShell form
   click(w, md.querySelector(`[data-ainsos="windows"]`));
   check(md.querySelector('#ains-out').hidden, 'another system hides the old command');
+  check(/~\\projects\\website/.test(md.querySelector('#ains-dirhint').textContent), '#3001: the Windows example under the field');
   md.querySelector('#ains-dir').value = 'C:\\work\\site';
   click(w, md.querySelector('[data-m="ains-make"]'));
   await until(() => !md.querySelector('#ains-out').hidden);

@@ -113,16 +113,16 @@ async function dpvSumMount(m, o) {
     let foot = $('.dpvfoot', m);
     if (!foot) { foot = document.createElement('div'); foot.className = 'dpvfoot'; $('.tvbox', m)?.appendChild(foot); }
     foot.hidden = false;
-    foot.innerHTML = `${ic('bot', 's')}<span>${esc(tr('To have a file summarized, connect an agent (Settings > Agents) and share this project with it.'))}</span>`;
+    foot.innerHTML = `${ic('bot', 's')}<span>${esc(tr('To have a file summarised, connect an agent (Settings > Agents) and share this project with it.'))}</span>`;
     return;
   }
   const slot = $('.dpvsumslot', m) || $('.tvbar .spacer', m);  // looked up now: the viewer may have drawn its bar again
   if (!slot) return;
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'btn sm dpvsum';
-  b.innerHTML = `${ic('bot', 's')}<span>${esc(tr('Summarize'))}</span>`;
+  b.innerHTML = `${ic('bot', 's')}<span>${esc(tr('Summarise'))}</span>`;
   b.title = tr('An agent reads the file and writes a summary as a comment');
-  b.setAttribute('aria-label', tr('Summarize'));
+  b.setAttribute('aria-label', tr('Summarise'));
   b.addEventListener('click', () => dpvSummarise({...o, task_id: j.task_id}, ags, m));
   slot.classList.contains('spacer') ? slot.after(b) : slot.replaceWith(b);
 }
@@ -130,17 +130,17 @@ async function dpvSumMount(m, o) {
 async function dpvSummarise(o, ags, m) {
   let pick = ags[0];
   const many = ags.length > 1;
-  const html = (many ? `<p>${esc(tr('Which agent should summarize “{0}”?', o.name))}</p><div class="dpvpick" role="radiogroup">${ags.map((a, i) => `<label class="dpvag"><input type="radio" name="dpvag" value="${a.id}"${i ? '' : ' checked'}><span>${esc(a.name)}</span></label>`).join('')}</div>` : '')
+  const html = (many ? `<p>${esc(tr('Which agent should summarise “{0}”?', o.name))}</p><div class="dpvpick" role="radiogroup">${ags.map((a, i) => `<label class="dpvag"><input type="radio" name="dpvag" value="${a.id}"${i ? '' : ' checked'}><span>${esc(a.name)}</span></label>`).join('')}</div>` : '')
     + `<p class="dpvwho">${esc(tr('The file “{0}” goes to {1}, which writes a summary as a comment on the task.', o.name, pick.name))}</p>`;
   m?.remove();  // the dialog would sit behind the preview
-  const ok = await askConfirm(tr('Summarize file'), '', {ok: tr('Summarize'), html, after: md => md.addEventListener('change', e => {
+  const ok = await askConfirm(tr('Summarise file'), '', {ok: tr('Summarise'), html, after: md => md.addEventListener('change', e => {
     const r = e.target.closest('input[name="dpvag"]'); if (!r) return;
     pick = ags.find(a => a.id === +r.value) || pick;
     const w = $('.dpvwho', md); if (w) w.textContent = tr('The file “{0}” goes to {1}, which writes a summary as a comment on the task.', o.name, pick.name);
   })});
   if (!ok) return;
   const tid = o.task_id;
-  const text = `<@${pick.id}> ` + tr('Please summarize the attachment “{0}” (attachment_id {1}) and post the summary as a comment.', o.name, o.aid);
+  const text = `<@${pick.id}> ` + tr('Please summarise the attachment “{0}” (attachment_id {1}) and post the summary as a comment.', o.name, o.aid);
   const post = async () => (await capi('POST', `/api/tasks/${tid}/comments`, {body: text})).id;
   let cid;
   try { cid = await post(); } catch { return; }

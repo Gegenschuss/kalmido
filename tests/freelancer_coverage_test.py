@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.87.9 (#1919) the freelancer parity guard: every route of the server -- the web app's (/api/...), the public pages,
 CalDAV / CardDAV and the REST API's (/api/v1/...) -- is either checked for a person WITHOUT an organisation (a freelancer:
-the own private space, the own personal office, its own admin there) or listed with the reason why there is nothing to
+the own private workspace, the own personal office, its own admin there) or listed with the reason why there is nothing to
 check without an organisation. Static like tests/tenant_coverage_test.py: reads app.py + kalmido/, no container.
  1. every route has an entry in ROUTES (its area), nothing in ROUTES is stale
  2. every area is in KINDS: a matrix area names the suite that calls it as a person without an organisation, and that
@@ -30,7 +30,8 @@ SUITE = "p287b_a_freelancer_api_test.py"
 KINDS = {
     # ---- checked as a freelancer (the suites carry "freelancer-matrix: <area>")
     "tasks": ("matrix", SUITE + ": tasks, comments, subtasks, attachments, tags, notes, search, trash, day plan, roadmap, export "
-                        "and import in the private space; every GET of the area as the freelancer (no 403 / 5xx)"),
+                        "and import in the private workspace; every GET of the area as the freelancer (no 403 / 5xx); "
+                        "p2477_quicknote_api_test.py: her private list Notes of the quick note, sharing refused, an empty note gone for good (2.477.0)"),
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET"),
     "office": ("matrix", SUITE + ", p2199_b_office_test.py (2.199.0: a quotation of the personal office in a private folder, the folder routes, her agent), p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py, p2113c_a_api_test.py, p2110_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
@@ -38,12 +39,12 @@ KINDS = {
                          "p2137_a_api_test.py: the owner exports the personal office (export, recovery key) and imports an organisation's office into it (2.137.0); p2146_d_api_test.py: the retention export of the own records before a deletion (2.146.0)"),
     "files": ("matrix", SUITE + ", p2353_a_lockfolder_test.py, p2353_a_scanlock_test.py (2.353.0: a locked private folder, scans refused there), p2199_a_fsref_test.py (2.199.0: reference nodes, sorting by hand, protected nodes in the private tree), p21121_a_api_test.py, p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
                          "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0); "
-                         "p2154_a_api_test.py: a stack split in the private space, its undo, a private document linked with a private task (2.154.0); "
+                         "p2154_a_api_test.py: a stack split in the private workspace, its undo, a private document linked with a private task (2.154.0); "
                          "p2207_a_scan_keys_test.py: a scan inbox of the own documents, its upload key and the folder watcher downloads (2.207.0); "
-                         "p2429_a_ablage_view_test.py: only the file store's own folders, the collections \"From <area>\" of the private space (2.429.0)"),
-    "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private space (create, change, search, export, trash; "
+                         "p2429_a_ablage_view_test.py: only the file store's own folders, the collections \"From <area>\" of the private workspace (2.429.0)"),
+    "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private workspace (create, change, search, export, trash; "
                        "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0: p2123_b_api_test.py shares of pages / folders, p2123_a_api_test.py page history, text search; 2.143.0: p2143_b_api_test.py the trash, delete for good, empty; "
-                       "2.177.0: p2177_a_api_test.py the large ZIP import in pieces into the private space; "
+                       "2.177.0: p2177_a_api_test.py the large ZIP import in pieces into the private workspace; "
                        "2.200.0: p2200_c_wiki_agent_test.py her own agent on pages / folders she shared with it, API v1)"),
     "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py, p2111_b_api_test.py, p2155_b_absence_cal_test.py, p2351_b_contacts_tree_test.py: own calendars, events, address books, contacts (2.351.0: in folders, her agent), the booking page; CalDAV / CardDAV with an app password; "
                     "invitation mails and the subscription link of an own calendar (2.111.0)"),
@@ -60,16 +61,16 @@ KINDS = {
     "videos": ("matrix", "p2991_a_api_test.py: video sign-offs (2.99.1) at a private task / list / client of a person without an "
                "organisation: create, comments, versions, customer link, export, delete + restore; p2991_c_api_test.py: the own agent "
                "of such a person reads and comments them through the API v1"),
-    "sheets": ("matrix", "p289_b_api_test.py, p289_c_api_test.py, p289_d_api_test.py: tables (2.89.0) in the private space of a "
+    "sheets": ("matrix", "p289_b_api_test.py, p289_c_api_test.py, p289_d_api_test.py: tables (2.89.0) in the private workspace of a "
                          "person without an organisation and with that person's own agent; rows to tasks / quotation drafts; "
                          "p2124_c_api_test.py: sharing a private table (2.124.0); p2199_c_sheets_test.py: tables in her "
                          "private folders, shared with her own agent (2.199.0)"),
-    "bookmarks": ("matrix", "p297_a_api_test.py: bookmarks (2.97.0) in the private space of a person without an organisation"),  # 2.97.0 A (#1950)
+    "bookmarks": ("matrix", "p297_a_api_test.py: bookmarks (2.97.0) in the private workspace of a person without an organisation"),  # 2.97.0 A (#1950)
     "life_org": ("matrix", "p2173_a_travel_care_scope_test.py: trips, staying in touch and travel expenses from a trip (2.173.0) in the "
-                 "private space and the personal office of a person without an organisation"),  # 2.173.0 A (#2680)
-    "reading": ("matrix", "p2172_b_reading_scope_test.py: feeds and read later (2.172.0) in the private space of a person without an organisation"),  # 2.172.0 B (#2677 #2679)
+                 "private workspace and the personal office of a person without an organisation"),  # 2.173.0 A (#2680)
+    "reading": ("matrix", "p2172_b_reading_scope_test.py: feeds and read later (2.172.0) in the private workspace of a person without an organisation"),  # 2.172.0 B (#2677 #2679)
     "sectpl": ("matrix", "p2156_c_api_test.py: own section templates (save from a list, add to another, change, delete) of a person without an organisation"),  # 2.156.0 C (#2073)
-    "polls": ("matrix", "p298_a_api_test.py: scheduling polls (2.98.0) in the private space of a person without an organisation"),  # 2.98.0 A (#1953)
+    "polls": ("matrix", "p298_a_api_test.py: scheduling polls (2.98.0) in the private workspace of a person without an organisation"),  # 2.98.0 A (#1953)
     # 2.138.0 (#1972): the recovery key of the own personal office (organisation id 0 in the route)
     "orgcrypt": ("matrix", "p2138_c_api_test.py: the encryption state and the recovery key (step-up) of the personal office of a "
                            "person without an organisation"),
@@ -91,7 +92,7 @@ KINDS = {
                         "instance-wide numbers and operating actions only, no content of any person or organisation (p2144_d_api_test.py)"),
     "orgadmin": ("n/a", "managing an organisation (members, admins, its lists, export, encryption): only for its members and "
                         "admins; without an organisation there is nothing to manage (the personal office is reached under "
-                        "office, the private space under every other area)"),
+                        "office, the private workspace under every other area)"),
     "link": ("n/a", "pages opened by an unguessable link (public list link, customer status page / portal, approval link, "
                     "calendar feed, the booking page of a person (2.94.0)): the same for the link of a private list or document as for an organisation's"),
     "token": ("n/a", "inbound hooks addressed by the secret of one list / environment / repository: no person, no workspace"),
@@ -171,6 +172,7 @@ ROUTES = {
     "POST /api/office/letters/doc/{}/deadline-task": "office",
     # 2.153.0 (#2029 #2030): letter mail, text blocks (p2106_c_api_test.py) - routes below this line
     "GET /api/office/receipt-mail": "office", "POST /api/office/receipt-mail": "office",  # 2.424.0 B (#3450)
+    "GET /api/office/mail-profile": "office", "PUT /api/office/mail-profile": "office",  # 2.439.0 (#3617): p2439_a_mailsig_test.py
     "GET /api/office/letters/mail-info": "office", "GET /api/office/letters/{}/mail-draft": "office", "POST /api/office/letters/{}/send-mail": "office",
     "GET /api/office/letter-blocks": "office", "GET /api/office/letter-blocks/starters": "office", "POST /api/office/letter-blocks": "office",
     "PATCH /api/office/letter-blocks/{}": "office", "DELETE /api/office/letter-blocks/{}": "office", "POST /api/office/letter-blocks/{}/restore": "office",
@@ -241,6 +243,7 @@ ROUTES = {
     "GET /api/docs/{}/receipt": "files", "GET /api/docs/{}/thumb": "files", "GET /api/files": "files",
     "GET /api/files/collections/{}": "files",  # 2.429.0 (#3580)
     "GET /api/files/folders": "files", "GET /api/files/nodes/{}": "files", "GET /api/files/nodes/{}/content": "files",
+    "GET /api/files/nodes/{}/thumb": "files",  # 2.477.0 (#3936): p2477_ablagethumb_test.py without an organisation
     "GET /api/files/nodes/{}/share-targets": "files", "GET /api/files/search": "files", "GET /api/v1/documents": "files",
     "GET /api/v1/documents/{}": "files", "GET /api/v1/files": "files", "GET /api/v1/files/search": "files",
     "GET /api/v1/files/{}": "files", "GET /api/v1/files/{}/content": "files", "GET /api/v1/files/{}/text": "files",
@@ -256,7 +259,7 @@ ROUTES = {
     # 2.112.1 A (#2058): several nodes into the trash / back, the ZIP download, the phone scan (p21121_a_api_test.py)
     "POST /api/files/trash": "files", "POST /api/files/restore": "files", "GET /api/files/zip": "files", "POST /api/files/scan": "files",
     "POST /api/docs": "files", "POST /api/docs/labels/{}": "files", "POST /api/docs/mail": "files",
-    "POST /api/docs/rules": "files", "POST /api/docs/{}/accept": "files", "POST /api/docs/{}/redo": "files",
+    "POST /api/docs/rules": "files", "POST /api/docs/{}/accept": "files", "POST /api/docs/{}/redo": "files", "POST /api/docs/{}/redo/undo": "files",
     "POST /api/docs/{}/review": "files", "POST /api/docs/{}/task": "files", "POST /api/files/folders": "files",
     "POST /api/files/links": "files", "POST /api/files/nodes/{}/restore": "files", "POST /api/files/nodes/{}/shares": "files",
     "POST /api/files/nodes/{}/order": "files", "POST /api/files/refs": "files", "GET /api/files/refs/{}/{}": "files",  # 2.199.0 A (#2742): p2199_a_fsref_test.py
@@ -291,7 +294,7 @@ ROUTES = {
     "GET /api/team/dispo": "hub", "GET /api/team/dispo/export": "hub", "GET /api/team/dispo/free": "hub", "GET /api/v1/absences": "hub", "GET /api/v1/dispo": "hub",
     "GET /api/v1/dispo/free": "hub", "PATCH /api/team/absences/{}": "hub", "PATCH /api/team/dispo/bookings/{}": "hub",
     "POST /api/hubmail/address": "hub", "POST /api/hubmail/mails/{}/assign": "hub",
-    # 2.141.0 A (#2141, #2138): the own mailbox of the private space, Reply / New e-mail (p2141_a_api_test.py, freelancer-matrix: hub)
+    # 2.141.0 A (#2141, #2138): the own mailbox of the private workspace, Reply / New e-mail (p2141_a_api_test.py, freelancer-matrix: hub)
     "GET /api/hubmail/mailboxes": "hub", "GET /api/hubmail/mailbox": "hub", "PUT /api/hubmail/mailbox": "hub", "DELETE /api/hubmail/mailbox": "hub",
     "POST /api/hubmail/mailbox/check": "hub", "POST /api/hubmail/mailbox/poll": "hub", "GET /api/hubmail/compose": "hub", "POST /api/hubmail/send": "hub",
     "POST /api/hubmail/mails/{}/restore": "hub",
@@ -304,11 +307,12 @@ ROUTES = {
     "PUT /api/team/leave/worktime/{}": "hub", "POST /api/team/absences/{}/decide": "hub",
     # ---- link (22)
     "GET /ical/abs/{}.ics": "link",  # 2.155.0 B (#2076)
+    "GET /mail/off/{}": "link", "POST /mail/off/{}": "link",  # 2.367.5 (#2975): the one-click off link of a notification mail
     "GET /f/{}": "link", "GET /ical/{}.ics": "link", "GET /ical/ev/{}.ics": "link", "GET /p/{}": "link", "GET /p/{}/stop": "link", "GET /portal": "link",
     "GET /portal/login/{}": "link", "GET /s/q/{}": "link", "GET /s/q/{}/pdf": "link", "GET /s/q/{}/terms": "link", "POST /s/q/{}/comments": "link", "GET /s/{}": "link",
     "GET /s/{}/file/{}": "link", "GET /s/{}/logo": "link", "POST /f/{}": "link", "POST /p/{}/comment": "link",
     "POST /p/{}/login": "link", "POST /p/{}/notify": "link", "POST /p/{}/stop": "link", "POST /portal/login/{}": "link",
-    "POST /portal/logout": "link", "POST /s/q/{}": "link", "POST /s/{}/feedback": "link", "POST /s/{}/tick": "link",
+    "POST /portal/logout": "link", "GET /s/pay/{}": "link", "POST /s/pay/{}/go": "link", "POST /s/q/{}": "link", "POST /s/{}/feedback": "link", "POST /s/{}/tick": "link",
     "POST /s/{}/unlock": "link",
     # ---- lists (254)
     "DELETE /api/fields/{}": "lists", "DELETE /api/filters/{}": "lists", "DELETE /api/folders/agents": "lists",
@@ -342,6 +346,7 @@ ROUTES = {
     "GET /api/lists/{}/playbook/versions/{}": "lists", "GET /api/lists/{}/public-link": "lists",
     "GET /api/lists/{}/repos": "lists", "GET /api/lists/{}/build-status": "lists", "GET /api/v1/lists/{}/build-status": "lists",
     "PUT /api/lists/{}/repos/version-field": "lists",  # 2.151.0 A (#2558)
+    "PUT /api/lists/{}/repos/close-release": "lists", "POST /api/tasks/{}/partial": "tasks", "POST /api/v1/tasks/{}/partial": "tasks",  # 2.392.0 B (#3364)
     "GET /api/lists/{}/rules": "lists", "GET /api/lists/{}/signoffs": "lists",
     "GET /api/lists/{}/sprints": "lists", "GET /api/lists/{}/status": "lists", "GET /api/lists/{}/status-report": "lists",
     "GET /api/lists/{}/time/delete-all": "lists", "GET /api/lists/{}/velocity": "lists", "GET /api/templates": "lists",
@@ -356,6 +361,7 @@ ROUTES = {
     "GET /api/v1/lists/{}/overview": "lists", "GET /api/v1/lists/{}/playbook": "lists", "GET /api/v1/lists/{}/repos": "lists",
     "GET /api/v1/lists/{}/rules": "lists", "GET /api/v1/lists/{}/sections": "lists", "GET /api/v1/lists/{}/sprints": "lists",
     "GET /api/v1/lists/{}/status-report": "lists", "GET /api/v1/lists/{}/tags": "lists",
+    "GET /api/v1/lists/{}/delivery-report": "lists",  # 2.392.0 D (#3369)
     "GET /api/v1/lists/{}/velocity": "lists", "GET /api/v1/lists/{}/weekly-status": "lists", "GET /api/v1/templates": "lists",
     "PATCH /api/fields/{}": "lists", "PATCH /api/filters/{}": "lists", "PATCH /api/forms/{}": "lists",
     "PATCH /api/layouts/saved/{}": "lists", "PATCH /api/list-tags/{}": "lists", "PATCH /api/lists/{}": "lists",
@@ -390,6 +396,8 @@ ROUTES = {
     "POST /api/lists/{}/time/restore": "lists", "POST /api/rules/{}/restore": "lists", "POST /api/sections": "lists",
     "POST /api/templates": "lists", "POST /api/templates/{}/apply": "lists", "POST /api/v1/filters": "lists",
     "POST /api/v1/folders/delete": "lists", "POST /api/v1/folders/rename": "lists", "POST /api/v1/layouts/proposals": "lists",
+    "PUT /api/tasks/{}/irreversible": "tasks", "DELETE /api/tasks/{}/irreversible": "tasks", "POST /api/tasks/{}/irreversible-yes": "tasks",  # 2.392.0 C (#3370)
+    "GET /api/tasks/{}/decisions": "tasks", "POST /api/tasks/{}/decisions": "tasks", "GET /api/v1/tasks/{}/decisions": "tasks", "POST /api/v1/tasks/{}/decisions": "tasks",
     "POST /api/v1/lists": "lists", "POST /api/v1/lists/{}/deployments": "lists", "POST /api/v1/lists/{}/duplicate": "lists",
     "POST /api/v1/lists/{}/fields": "lists", "POST /api/v1/lists/{}/files": "lists", "POST /api/v1/lists/{}/forms": "lists",
     "POST /api/v1/lists/{}/join": "lists", "POST /api/v1/lists/{}/links": "lists", "POST /api/v1/lists/{}/milestones": "lists",
@@ -483,8 +491,12 @@ ROUTES = {
     "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/{}/datev": "office",
     # 2.154.0 B (#1960): e-invoices over Peppol (p2154_b_peppol_test.py: the freelancer sets up and sends in the personal office)
     "GET /api/office/peppol": "office", "PUT /api/office/peppol": "office", "POST /api/office/peppol/check": "office",
+    "GET /api/office/payonline": "office", "PUT /api/office/payonline": "office", "POST /api/office/payonline/check": "office",  # 2.469.0 (#3459)
+    "POST /api/office/payonline/rotate": "office", "POST /api/office/payonline/events/{}/retry": "office", "POST /api/office/payonline/events/{}/done": "office",
+    "PUT /api/office/docs/{}/pay-online": "office",
     "GET /api/office/docs/{}/ubl": "office", "GET /api/office/docs/{}/peppol": "office", "POST /api/office/docs/{}/peppol": "office",
     "POST /api/office/docs/{}/peppol/lookup": "office",
+    "POST /api/office/docs/{}/peppol/undelivered": "office",  # 2.370.0 (#2778)
     "POST /api/office/docs/{}/peppol/refresh": "office",  # 2.306.0 D2 (#2875)
     "POST /api/office/docs/{}/cashflow": "office", "POST /api/office/docs/{}/duplicate": "office", "POST /api/office/docs/{}/fee": "office",
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
@@ -561,7 +573,7 @@ ROUTES = {
     "POST /api/account/export": "own", "POST /api/account/import": "own", "POST /api/account/import/{}/key": "own",
     "POST /api/account/import/{}/run": "own", "POST /api/me/app-passwords": "own", "POST /api/me/avatar": "own",
     # 2.97.0 B (#1951): customers (p297_b_api_test.py) - routes below this line
-    # 2.96.0 D (#1941 / #1918): an organisation export into the private space
+    # 2.96.0 D (#1941 / #1918): an organisation export into the private workspace
     "POST /api/me/drop-token": "own", "POST /api/me/mail/test": "own", "POST /api/me/mail/token": "own",
     "POST /api/me/pin/lock": "own", "POST /api/me/pin/unlock": "own", "POST /api/me/purpose": "own",
     "POST /api/me/tokens": "own", "POST /api/me/webhooks": "own", "POST /api/me/webhooks/{}/secret": "own",
@@ -642,6 +654,7 @@ ROUTES = {
     "GET /api/evcals": "pim",
     "GET /api/evinvite": "pim", "GET /api/evcals/{}/feed": "pim", "POST /api/evcals/{}/feed": "pim",  # 2.111.0 B (#2056)
     "GET /api/events/freebusy": "pim",  # 2.155.0 B (#2077): only the own bar without an organisation
+    "GET /api/v1/events/freebusy": "pim",  # 2.467.0 (#2586): the same; a freelancer's agent only about its owner
     "GET /api/evcals/{}/export.ics": "pim", "GET /api/events": "pim", "GET /api/events/{}": "pim",
     "GET /api/v1/address-books": "pim", "GET /api/v1/address-books/{}/export": "pim", "GET /api/v1/contacts": "pim",
     "GET /api/v1/contacts/{}": "pim", "GET /api/v1/event-calendars": "pim", "GET /api/v1/event-calendars/{}/export": "pim",
@@ -678,6 +691,7 @@ ROUTES = {
     "DELETE /api/deps/{}/{}": "tasks", "DELETE /api/envs/{}": "tasks", "DELETE /api/envs/{}/deploys/{}": "tasks",
     "DELETE /api/list-checks/{}": "tasks", "DELETE /api/notepads/{}": "tasks", "DELETE /api/notes/{}": "tasks",
     "POST /api/notes/{}/restore": "tasks", "POST /api/v1/notes/{}/restore": "tasks",  # 2.272.0 E1 (#3038)
+    "POST /api/notes/quick-list": "tasks",  # 2.477.0 (#3881): the private list Notes (p2477_quicknote_api_test.py, freelancer-matrix: tasks)
     "DELETE /api/repos/{}": "tasks", "DELETE /api/sample": "tasks", "DELETE /api/sprints/{}": "tasks",
     "DELETE /api/tasks/{}": "tasks", "DELETE /api/tasks/{}/contacts/{}": "tasks", "DELETE /api/tasks/{}/enc-note": "tasks",
     "DELETE /api/tasks/{}/links/{}": "tasks", "DELETE /api/tasks/{}/note-lock": "tasks",
@@ -692,12 +706,15 @@ ROUTES = {
     "DELETE /api/v1/notes/{}": "tasks", "DELETE /api/v1/tasks/{}": "tasks", "DELETE /api/v1/tasks/{}/contacts/{}": "tasks",
     "DELETE /api/v1/tasks/{}/dependencies/{}": "tasks", "DELETE /api/v1/tasks/{}/links/{}": "tasks",
     "DELETE /api/v1/tasks/{}/waiting": "tasks", "DELETE /api/v1/trash": "tasks", "GET /api/attachments/{}": "tasks",
+    "GET /api/inbox": "tasks", "GET /api/v1/me/waiting": "tasks",  # 2.392.0 D (#3369)
     "GET /api/briefing": "tasks", "GET /api/chat-files/{}": "tasks", "GET /api/comments/{}/choice": "tasks",
     "GET /api/dayplan": "tasks", "GET /api/dayplan/review": "tasks", "GET /api/deps": "tasks", "GET /api/export.json": "tasks", "GET /api/export/todoist.zip": "tasks", "GET /api/export/markdown.zip": "tasks", 
     "GET /api/ical": "tasks", "GET /api/imports": "tasks", "GET /api/news": "tasks", "GET /api/notes": "tasks",
     "GET /api/notes/{}": "tasks", "GET /api/occurrences": "tasks", "GET /api/pomo/stats": "tasks", "GET /api/roadmap": "tasks",
     "GET /api/search": "tasks", "GET /api/search/messages": "tasks", "GET /api/sprints/{}": "tasks", "GET /api/stale": "tasks", "GET /api/state": "tasks",
     "GET /api/state/delta": "tasks", "GET /api/stats": "tasks", "GET /api/tags/count": "tasks", "GET /api/tasks": "tasks",
+    "GET /api/tasks/{}/watchers": "tasks", "POST /api/tasks/{}/watchers": "tasks", "DELETE /api/tasks/{}/watchers/{}": "tasks",  # 2.473.0 (#3357)
+    "GET /api/v1/tasks/{}/watchers": "tasks", "POST /api/v1/tasks/{}/watchers": "tasks", "DELETE /api/v1/tasks/{}/watchers/{}": "tasks",
     "GET /api/tasks/{}": "tasks", "GET /api/tasks/{}/bell": "tasks", "GET /api/tasks/{}/deps": "tasks",
     "GET /api/tasks/{}/enc-note": "tasks", "GET /api/tasks/{}/events": "tasks", "GET /api/tasks/{}/milestone": "tasks",
     "GET /api/tasks/{}/note-lock": "tasks", "GET /api/tasks/{}/related": "tasks", "GET /api/tasks/{}/timeline": "tasks",
@@ -719,7 +736,7 @@ ROUTES = {
     "POST /api/comments/{}/choice": "tasks", "POST /api/comments/{}/decide": "tasks",
     "POST /api/comments/{}/reactions": "tasks", "POST /api/deps": "tasks", "POST /api/envs/{}/deploy": "tasks",
     "POST /api/envs/{}/restore": "tasks", "POST /api/favorites/suggestion": "tasks", "GET /api/favorites/targets": "tasks", "POST /api/ical": "tasks",
-    "POST /api/import/ticktick": "tasks", "POST /api/import/{}": "tasks", "POST /api/imports/{}/undo": "tasks",
+    "POST /api/import/{}": "tasks", "POST /api/imports/{}/undo": "tasks",
     "POST /api/list-checks/{}/run": "tasks", "POST /api/news/dismiss": "tasks", "POST /api/news/read": "tasks",
     "POST /api/pdf-text": "tasks", "POST /api/pomo/start": "tasks", "POST /api/pomo/{}/{}": "tasks",
     "POST /api/repos/{}/refresh": "tasks", "POST /api/sample": "tasks", "POST /api/sprints/{}/close": "tasks",
@@ -729,7 +746,7 @@ ROUTES = {
     "POST /api/tasks/{}/attachments": "tasks", "POST /api/tasks/{}/bell/undo": "tasks",
     "POST /api/tasks/{}/chain/pull": "tasks", "POST /api/tasks/{}/comments": "tasks", "POST /api/tasks/{}/complete": "tasks",
     "POST /api/tasks/{}/contacts": "tasks", "POST /api/tasks/{}/editing": "tasks",
-    "POST /api/tasks/{}/enc-attachments": "tasks", "POST /api/tasks/{}/git-undo": "tasks", "POST /api/tasks/{}/links": "tasks",
+    "POST /api/tasks/{}/duplicate": "tasks", "POST /api/tasks/{}/enc-attachments": "tasks", "POST /api/tasks/{}/git-undo": "tasks", "POST /api/tasks/{}/links": "tasks",
     "POST /api/tasks/{}/list-attachments": "tasks", "POST /api/tasks/{}/reopen": "tasks",
     "POST /api/tasks/{}/restore": "tasks", "POST /api/tasks/{}/review": "tasks", "POST /api/tasks/{}/seen": "tasks",
     "POST /api/tasks/{}/skip": "tasks", "POST /api/tasks/{}/take": "tasks", "POST /api/tasks/{}/to-shopping": "tasks",
@@ -845,6 +862,7 @@ ROUTES = {
     "POST /api/hooks/deploy/{}/{}": "token", "POST /api/hooks/git/{}": "token", "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/issues/{}": "token",
     # 2.115.0 A (#2061): inbound webhooks of a list (p2115_a_api_test.py calls them as a person without an organisation);
     # the hook URL itself is a secret token; the webhooks of an organisation are managed by its admins
+    "POST /api/hooks/pay/{}": "token",  # 2.469.0 (#3459)
     "POST /api/hooks/in/{}": "token", "POST /api/hooks/in": "token", "GET /api/lists/{}/hooks-in": "lists",  # 2.380 G (#2289): header variant
     "POST /api/lists/{}/hooks-in": "lists",
     "PATCH /api/hooks-in/{}": "lists", "DELETE /api/hooks-in/{}": "lists", "POST /api/hooks-in/{}/rotate": "lists",
@@ -867,7 +885,7 @@ ROUTES = {
     "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki", "POST /api/wiki/pages": "wiki",
     "POST /api/wiki/folders": "wiki",  # 2.200.0 A (#2747): an empty knowledge folder (p2200_a_wiki_folder_test.py)
     "GET /api/wiki/tags": "wiki", "GET /api/wiki/query": "wiki",  # 2.371 (#3150): tags + the abfrage block (p2371_wiki_tags_test.py)
-    # 2.200.0 C (#1781): API v1 (p2200_c_wiki_agent_test.py: her token and her own agent in the private space)
+    # 2.200.0 C (#1781): API v1 (p2200_c_wiki_agent_test.py: her token and her own agent in the private workspace)
     "GET /api/v1/wiki/pages": "wiki", "GET /api/v1/wiki/pages/{}": "wiki", "POST /api/v1/wiki/pages": "wiki", "PATCH /api/v1/wiki/pages/{}": "wiki",
     # 2.200.0 B (#2747): a page / folder in a folder shared with me (p2200_b_wiki_share_test.py)
     "POST /api/wiki/shared/pages": "wiki", "POST /api/wiki/shared/folders": "wiki",
@@ -876,24 +894,24 @@ ROUTES = {
     "GET /api/wiki/import/upload/{}": "wiki", "DELETE /api/wiki/import/upload/{}": "wiki",
     # 2.96.0 B (#1941): wiki pages / folders to the other workspace
     "POST /api/wiki/move-space": "wiki",
-    "PUT /api/wiki/style": "wiki",  # 2.371.3 (#3152): the space's reading style (p2371_3_wiki_ui.js: frida sets her private space's)
+    "PUT /api/wiki/style": "wiki",  # 2.371.3 (#3152): the space's reading style (p2371_3_wiki_ui.js: frida sets her private workspace's)
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
-    # 2.143.0 B (#2211): the trash of the private space (p2143_b_api_test.py)
+    # 2.143.0 B (#2211): the trash of the private workspace (p2143_b_api_test.py)
     "GET /api/wiki/trash": "wiki", "POST /api/wiki/purge": "wiki",
     # 2.123.0 C (#2103, #2107): files of the file store / tables in pages (p2123_c_api_test.py: own private file store and tables)
     "POST /api/wiki/pages/{}/refs": "wiki", "GET /api/wiki/refs": "wiki",
     # 2.97.0 D (#2050 #2051): locked spaces / clean-up (p297_d_api_test.py) - routes below this line
-    # 2.99.0 A (#2182): files of knowledge pages (p299_a_api_test.py: import, upload, read, delete in the private space)
+    # 2.99.0 A (#2182): files of knowledge pages (p299_a_api_test.py: import, upload, read, delete in the private workspace)
     "GET /api/wiki/files/{}": "wiki", "GET /api/wiki/files/{}/{}": "wiki", "DELETE /api/wiki/files/{}": "wiki",
     "POST /api/wiki/pages/{}/files": "wiki",
-    # 2.123.0 B (#2104): shares of knowledge pages / folders (p2123_b_api_test.py: person + link in the private space); the public page = link
+    # 2.123.0 B (#2104): shares of knowledge pages / folders (p2123_b_api_test.py: person + link in the private workspace); the public page = link
     "GET /api/wiki/shares": "wiki", "POST /api/wiki/shares": "wiki", "PATCH /api/wiki/shares/{}": "wiki", "DELETE /api/wiki/shares/{}": "wiki",
     "POST /api/wiki/shares/{}/restore": "wiki", "GET /api/wiki/shared": "wiki", "GET /api/wiki/shared/pages/{}": "wiki",
     "GET /api/wiki/shared/files/{}": "wiki", "GET /api/wiki/shared/files/{}/{}": "wiki",
     "GET /api/wiki/shared/pages/{}/img/{}": "wiki",  # 2.380 H (#2356): p2380r_h_api_test.py (a person without an organisation)
     "GET /s/w/{}": "link", "GET /s/w/{}/p/{}": "link", "GET /s/w/{}/file/{}": "link",
     "GET /s/w/{}/img/{}/{}": "link",  # 2.380 H (#2356)
-    # 2.123.0 A (#2102): the history of a page (p2123_a_api_test.py: list, read, restore in the private space)
+    # 2.123.0 A (#2102): the history of a page (p2123_a_api_test.py: list, read, restore in the private workspace)
     "GET /api/wiki/pages/{}/versions": "wiki", "GET /api/wiki/pages/{}/versions/{}": "wiki",
     "POST /api/wiki/pages/{}/versions/{}/restore": "wiki",
     # 2.90.0 - 2.92.0: bookkeeping, bank, tax dates, invoice series, subscriptions, agreements, equipment, file preview
@@ -905,6 +923,9 @@ ROUTES = {
     "GET /api/office/bank/tx/{}/candidates": "office", "GET /api/office/books": "office",
     "GET /api/office/books/euer": "office", "GET /api/office/books/euer.csv": "office", "GET /api/office/books/export": "office",  # 2.147.0 (#2461)
     "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/ustva": "office",
+    "GET /api/office/books/taxform/euer": "office", "GET /api/office/books/taxform/euer.csv": "office", "GET /api/office/books/taxform/euer.pdf": "office",  # 2.467.0 (#3456)
+    "GET /api/office/books/taxform/ust": "office", "GET /api/office/books/taxform/ust.csv": "office", "GET /api/office/books/taxform/ust.pdf": "office",
+    "PUT /api/office/books/taxform/vat": "office",
     "GET /api/office/books/receipts": "office", "GET /api/office/books/receipts.csv": "office", "GET /api/office/books/receipts.zip": "office",  # 2.153.0 (#2055)
     "POST /api/office/books/receipts/checked": "office",  # 2.420.0 C (#3448): p24200_c_api_test.py
     "POST /api/office/receipts/submit": "office", "GET /api/office/receipts/mine": "office", "GET /api/office/receipts/submitted": "office",  # 2.356.0 D (#3129)
@@ -1054,6 +1075,11 @@ def path_rx(path):
     return re.compile(r"(?:" + body + r")(?![\w/.-])")
 
 
+def open_call(prev, mw):
+    """2.449.0 (#3800): the line above counts only as an open multi-line call: the method on it, no path of its own, brackets open"""
+    return bool(mw.search(prev)) and "/api/" not in prev and prev.count("(") > prev.count(")")
+
+
 def write_proven(route, texts):
     """route "METHOD /path": called in one of texts (expanded suite sources)?"""
     m, path = route.split(" ", 1)
@@ -1064,7 +1090,7 @@ def write_proven(route, texts):
         while i >= 0:
             a, b = t.rfind("\n", 0, i) + 1, t.find("\n", i)
             b = len(t) if b < 0 else b
-            if rx.search(t[a:b]) and (mw.search(t[a:b]) or mw.search(t[t.rfind("\n", 0, max(0, a - 1)) + 1:a])):
+            if rx.search(t[a:b]) and (mw.search(t[a:b]) or open_call(t[t.rfind("\n", 0, max(0, a - 1)) + 1:a], mw)):
                 return True
             i = t.find(anchor, b + 1) if b < len(t) else -1
     return False
@@ -1090,7 +1116,6 @@ DELETE /api/disc/requests/{}
 DELETE /api/docs/mail
 DELETE /api/e2e/keys
 DELETE /api/envs/{}
-DELETE /api/envs/{}/deploys/{}
 DELETE /api/family/contacts/{}
 DELETE /api/family/kids/{}/pin
 DELETE /api/family/rewards/{}
@@ -1117,7 +1142,6 @@ DELETE /api/my/agents/{}/machines/{}
 DELETE /api/newsletter
 DELETE /api/newsletter/segments/{}
 DELETE /api/notepads/{}
-DELETE /api/notes/{}
 DELETE /api/office/cashflow/adjust/{}
 DELETE /api/office/cashflow/start
 DELETE /api/office/docs/{}/parts/{}
@@ -1141,7 +1165,6 @@ DELETE /api/tasks/{}/enc-note
 DELETE /api/tasks/{}/links/{}
 DELETE /api/tasks/{}/note-lock
 DELETE /api/tasks/{}/waiting
-DELETE /api/templates/{}
 DELETE /api/v1/address-books/{}
 DELETE /api/v1/address-books/{}/members/{}
 DELETE /api/v1/attachments/{}
@@ -1169,7 +1192,6 @@ DELETE /api/v1/me/app-passwords/{}
 DELETE /api/v1/notepads/{}
 DELETE /api/v1/notes/{}
 DELETE /api/v1/sections/{}
-DELETE /api/v1/tasks/{}
 DELETE /api/v1/tasks/{}/contacts/{}
 DELETE /api/v1/tasks/{}/dependencies/{}
 DELETE /api/v1/tasks/{}/links/{}
@@ -1185,7 +1207,6 @@ PATCH /api/calendars/{}
 PATCH /api/calendars/{}/events
 PATCH /api/comments/{}
 PATCH /api/docs/labels/{}/{}
-PATCH /api/envs/{}
 PATCH /api/evcals/{}
 PATCH /api/family/rewards/{}
 PATCH /api/filters/{}
@@ -1204,7 +1225,6 @@ PATCH /api/office/meals/choices/{}
 PATCH /api/office/trips/purposes/{}
 PATCH /api/office/trips/{}/items/{}
 PATCH /api/office/vehicles/{}
-PATCH /api/sections/{}
 PATCH /api/servers/self
 PATCH /api/servers/{}
 PATCH /api/servers/{}/tasks/{}
@@ -1212,7 +1232,6 @@ PATCH /api/supporter/nudge
 PATCH /api/tasks/{}/links/{}
 PATCH /api/tasks/{}/ticket
 PATCH /api/team/dispo/bookings/{}
-PATCH /api/templates/{}
 PATCH /api/v1/address-books/{}
 PATCH /api/v1/clients/{}
 PATCH /api/v1/comments/{}
@@ -1255,11 +1274,9 @@ POST /api/clients/merge
 POST /api/clients/merges/{}/undo
 POST /api/comments/{}/apply
 POST /api/comments/{}/choice
-POST /api/comments/{}/decide
 POST /api/comments/{}/reactions
 POST /api/contacts/merge
 POST /api/contacts/merges/{}/undo
-POST /api/deps
 POST /api/disc/blocks/{}
 POST /api/disc/check
 POST /api/disc/confirm
@@ -1268,7 +1285,6 @@ POST /api/disc/find
 POST /api/disc/requests
 POST /api/disc/requests/{}/{}
 POST /api/docs/{}/accept
-POST /api/envs/{}/deploy
 POST /api/envs/{}/restore
 POST /api/events/{}/prep-task
 POST /api/events/{}/rsvp
@@ -1302,19 +1318,14 @@ POST /api/life/upkeep
 POST /api/list-checks/{}/run
 POST /api/lists/reorder
 POST /api/lists/{}/checks
-POST /api/lists/{}/e2e/bulk
 POST /api/lists/{}/e2e/files/{}
-POST /api/lists/{}/e2e/finish
 POST /api/lists/{}/e2e/keys
 POST /api/lists/{}/e2e/rotate
-POST /api/lists/{}/e2e/start
 POST /api/lists/{}/e2e/stop
-POST /api/lists/{}/envs
 POST /api/lists/{}/folder-reset
 POST /api/lists/{}/header
 POST /api/lists/{}/icon
 POST /api/lists/{}/join
-POST /api/lists/{}/links
 POST /api/lists/{}/milestones
 POST /api/lists/{}/notepads
 POST /api/lists/{}/playbook/proposals/{}/apply
@@ -1338,7 +1349,6 @@ POST /api/me/webhooks/{}/secret
 POST /api/me/webhooks/{}/test
 POST /api/my/agents/{}/setup-code
 POST /api/news/dismiss
-POST /api/news/read
 POST /api/newsletter/consent/import
 POST /api/newsletter/segments
 POST /api/newsletter/sync
@@ -1358,7 +1368,6 @@ POST /api/office/drives/{}/trip
 POST /api/office/gen-docs/tree/folders
 POST /api/office/import
 POST /api/office/legacy/archive/address
-POST /api/office/legacy/archive/parse
 POST /api/office/legacy/counter
 POST /api/office/legacy/runs/{}/tidy
 POST /api/office/legacy/split
@@ -1407,13 +1416,11 @@ POST /api/tags/delete
 POST /api/tags/restore
 POST /api/tasks/purge-done
 POST /api/tasks/similar
-POST /api/tasks/{}/approval
 POST /api/tasks/{}/bell/undo
 POST /api/tasks/{}/chain/pull
 POST /api/tasks/{}/contacts
 POST /api/tasks/{}/editing
 POST /api/tasks/{}/enc-attachments
-POST /api/tasks/{}/git-undo
 POST /api/tasks/{}/list-attachments
 POST /api/tasks/{}/seen
 POST /api/tasks/{}/take
@@ -1539,9 +1546,7 @@ PUT /api/newsletter/consent
 PUT /api/office/cashflow/actual
 PUT /api/office/cashflow/check
 PUT /api/office/cashflow/start
-PUT /api/office/letterhead
 PUT /api/office/logbook/settings
-PUT /api/office/tax-dates
 PUT /api/paperless
 PUT /api/supporter/{}
 PUT /api/tasks/{}/bell
@@ -1632,6 +1637,12 @@ def main():
                           f"with its ids): call it there as the person without an organisation")
     for r in sorted(WRITE_UNPROVEN - set(ROUTES)):
         check(False, f"WRITE_UNPROVEN names {r}, which is no route of ROUTES: remove it")
+
+    # 2.449.0 (#3800) self-test of the rule: a method on the line above counts only for an open call without a path of its own
+    check(not write_proven("PATCH /api/me", ['A.patch(B + "/api/settings")\nA.get(B + "/api/me")']),
+          "write_proven: a method on a line above with its own path must not count")
+    check(write_proven("PATCH /api/me", ['A.patch(\n    B + "/api/me", json={})']),
+          "write_proven: an open multi-line call must count")
 
     n_m = sum(1 for k in ROUTES.values() if KINDS.get(k, ("",))[0] == "matrix")
     print(f"freelancer_coverage: {oks[0]} ok, {len(fails)} failed -- {len(found)} routes, {n_m} checked without an organisation, "

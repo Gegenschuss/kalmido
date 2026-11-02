@@ -83,6 +83,7 @@ const rowBox = el => { el.getBoundingClientRect = () => ({top: 100, bottom: 140,
   check(await until(async () => ((await taskOf(T2)).blockers || []).includes(T3)), '#1330: "Blocking": the dragged Build waits on Ship');
   // the task menu: "Waiting on a task…" with the search
   await w.eval(`taskMenu(document.querySelector('#view .trow[data-id="${T1}"] .ttl'), ${T1})`); await sleep(100);
+  d.querySelector('#pop .mtmore')?.click(); await sleep(100);  // 2.445.0 (#3008): under "More…"
   const mi = [...d.querySelectorAll('#pop:not(.hidden) button')].find(b => /Waiting on a task…/.test(b.textContent));
   check(!!mi, '#1330: "Waiting on a task…" in the task menu');
   if (mi) {

@@ -11,7 +11,7 @@ next to its page; invented names and contents only).
    the Undo of an import (trash {ids, files})
  - export: the files under _attachments/<page>/, the links as [[_attachments/…]]; a re-import gives the same structure
  - rights (tenant-matrix: wiki): a member of the organisation reads and uploads, another organisation 404 (read, upload,
-   delete, trash); a person without an organisation (freelancer-matrix: wiki) imports into the own private space, nobody
+   delete, trash); a person without an organisation (freelancer-matrix: wiki) imports into the own private workspace, nobody
    else reaches its files; a locked space (encrypted in the browser) takes no file and cannot be locked while files exist
 usage: p299_a_api_test.py <datadir>      (P299A_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import base64
@@ -250,7 +250,7 @@ mp = {p["path"]: p["id"] for p in Ca.get(B + "/api/wiki", params={"space": SP2})
 mf = Ca.get(B + f"/api/wiki/pages/{mp}").json()["files"]
 before = {f["id"]: Ca.get(B + f["url"]).content for f in mf}
 r = Ca.post(B + "/api/wiki/move-space", json={"pages": [mp], "space": SP2, "to": "private", "dest": "Projekte"})
-check(r.ok and mf, "#2182: a page with files moves to the private space " + r.text[:200])
+check(r.ok and mf, "#2182: a page with files moves to the private workspace " + r.text[:200])
 check(all(Ca.get(B + f["url"]).content == before[f["id"]] for f in mf), "#2182: its files are readable after the move")
 check(all(tuple(x) == (None, CAROL) for x in sql(f"SELECT org_id, owner_id FROM wiki_files WHERE page_id={int(mp)}")),
       "#2182: the file rows follow the page (private, owner)")

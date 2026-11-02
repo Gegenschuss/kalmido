@@ -163,7 +163,7 @@ S1 = r.json()
 clear()
 check(decide(S1["url"].split("/s/q/")[1]).status_code == 303, "the customer accepts")
 p = until(lambda: pushes("t-alice"), 6)
-check(p and p[0]["title"] == "Approved by the customer" and str(p[0].get("click") or "").startswith("http"),
+check(p and p[0]["title"] == "Approved by the client" and str(p[0].get("click") or "").startswith("http"),
       f"#2965: the active creator gets the push with an absolute link {p}")
 n = news(A, "signoff")
 check(n and n[0]["data"].get("state") == "accepted" and n[0]["data"].get("name") == "Max Muster", f"#2965: and a News item {n}")
@@ -172,7 +172,7 @@ sql("UPDATE office_signoffs SET created_by=? WHERE id=?", (BOB, S2["id"]), write
 clear()
 check(decide(S2["url"].split("/s/q/")[1], "decline").status_code == 303, "the customer declines a link of the ex-member")
 p = until(lambda: pushes("t-alice"), 6)
-check(p and p[0]["title"] == "Declined by the customer", f"#2965: the office admin hears of it instead {p}")
+check(p and p[0]["title"] == "Declined by the client", f"#2965: the office admin hears of it instead {p}")
 check(not pushes("t-bob") and not news(Bo, "signoff"), "#2965: the ex-member gets neither a push nor a News item")
 
 # ================================================================ #2963 security mails

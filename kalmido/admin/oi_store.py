@@ -38,6 +38,7 @@ _WK_NODE = re.compile(r"/api/files/nodes/(\d{1,15})/content\b")
 _WK_FILE = re.compile(r"/api/wiki/files/(\d{1,15})\b")
 _WK_REF = re.compile(r"(\[\[\s*(datei|tabelle)\s*:\s*)(\d{1,15})(\s*[\]|])", re.I)
 _WK_TASK = re.compile(r"(?<![\w&/#])#(\d{1,12})\b")
+_CF_KEY = re.compile(r"cf\d{1,18}")
 
 
 def _st(run):
@@ -263,8 +264,8 @@ def _df_opts(raw):
 
 
 def _df_skip(run):
-    """A field / value not taken over: named like a row of the documents (no label on the specs: the preview counts documents)."""
-    run.warning(N_("A row could not be taken over: {0}"), tr(N_("Documents")))
+    """A field / value not taken over. 2.369.0 (#2734): one warning of the run, the report counts it ("... (12×)")."""
+    run.warning(N_("Field values not taken over"))
     return False
 
 
@@ -280,6 +281,7 @@ def _field(c, run, src, d, ctx):
     have = c.execute("SELECT id, type, options FROM doc_fields WHERE ws=? AND lower(name)=lower(?)", (ws, name)).fetchone()
     if have and have["type"] == src["type"]:
         mine = _df_opts(have["options"])
+        known = len(mine)
         by_name = {o["name"].lower(): o["id"] for o in mine}
         omap = {}
         for o in opts:
@@ -290,6 +292,8 @@ def _field(c, run, src, d, ctx):
                 omap[o["id"]] = by_name[o["name"].lower()]
         if src["type"] == "select":
             c.execute("UPDATE doc_fields SET options=? WHERE id=?", (json.dumps({"options": mine}, ensure_ascii=False), have["id"]))
+            if mine[known:]:  # 2.369.0 (#2734): four items, oi_undo takes them out again (an option made since stays)
+                run.created.setdefault("oi", []).append(["doc_fields", have["id"], ws, [o["id"] for o in mine[known:]]])
         run.put("doc_fields", src.get("id"), have["id"])
         _st(run).setdefault("opts", {})[have["id"]] = omap
         return False
@@ -339,7 +343,7 @@ def _video_version(c, run, src, d, ctx):
     return d
 
 
-_W_LOCKED = N_("Knowledge pages encrypted in the browser were not taken over: export them as Markdown from the unlocked space and import that file into the knowledge pages.")
+_W_LOCKED = N_("Knowledge pages encrypted in the browser were not taken over: export them as Markdown from the unlocked workspace and import that file into the knowledge pages.")
 
 
 def _page(c, run, src, d, ctx):
@@ -351,7 +355,7 @@ def _page(c, run, src, d, ctx):
         return None
     if _wiki_locked(c, ctx):
         if not st.get("w_dst"):
-            st["w_dst"] = run.warning(N_("The knowledge pages of this space are encrypted in the browser")) or 1
+            st["w_dst"] = run.warning(N_("The knowledge pages of this workspace are encrypted in the browser")) or 1
         return None
     d["owner_id"] = _owner(ctx)
     d["body"] = wkh_seal(c, ctx.space, d["owner_id"], d.get("body") or "")  # ids inside are put right in _finish
@@ -565,10 +569,29 @@ def _finish_docs(c, run):
             print("orgimport: document preview", nid, type(e).__name__, flush=True)
 
 
+def _finish_auto(c, run):
+    """2.369.0 (#2734): the mark "automatic" of a field value (doc_meta.auto, key cf<id>) -> the target's field."""
+    for nid, _ in _st(run)["docs"]:
+        r = c.execute("SELECT auto FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
+        try:
+            auto = json.loads(r["auto"] or "{}") if r else None
+        except (ValueError, TypeError):
+            auto = None
+        if not isinstance(auto, dict) or not any(_CF_KEY.fullmatch(k) for k in auto):
+            continue
+        out = {k: v for k, v in auto.items() if not _CF_KEY.fullmatch(k)}
+        for k, v in auto.items():
+            new = run.m("doc_fields", k[2:]) if _CF_KEY.fullmatch(k) else None
+            if new:
+                out[f"cf{new}"] = v
+        c.execute("UPDATE doc_meta SET auto=? WHERE node_id=?", (json.dumps(out), nid))
+
+
 def _finish(c, run, uid, data, who):
     oi = data.get("oi") or {}
     _finish_store(c, run, oi)
     _finish_docs(c, run)
+    _finish_auto(c, run)
     _finish_sheets(c, run, oi, who)
     _finish_wiki(c, run, oi)
 
@@ -576,7 +599,7 @@ def _finish(c, run, uid, data, who):
 _P = {"created_by": "null"}
 SPECS = [
     # file store: nodes (parents late), versions, shares, history
-    OiT("store/nodes.json", "fs_nodes", people={"owner_id": "me", "created_by": "null", "deleted_by": "null"}, late={"parent_id": "fs_nodes"},
+    OiT("store/nodes.json", "fs_nodes", people={"owner_id": "me", "created_by": "null", "deleted_by": "null"}, late={"parent_id": "fs_nodes", "hub_mail_id": "hub_mails"},  # 2.363.2 (#3106): the mark of a filed mail's nodes (the mail's reading rule)
         label=N_("File store"), prep=_node),
     OiT("store/area_roots.json", "fs_area_roots", rid=False, key=("ws", "area"), prep=_area_root),  # 2.353.0 C (#2829)
     OiT("store/versions.json", "fs_versions", refs={"node_id": "fs_nodes"}, need=("node_id",), people=_P, space=(), prep=_version),

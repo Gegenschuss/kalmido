@@ -34,7 +34,7 @@ const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'ut
     const drawer = async () => { await ev(`(() => { sideDrawerOpen(); renderSide(); return 1; })()`); return wait(`!!document.querySelector('#side.open .sbmr .srb[data-sbb]')`); };
     const GRID = `(() => { const r = document.querySelector('#side .sbmr'), bs = [...r.querySelectorAll('.srb[data-sbb]')], R = e => e.getBoundingClientRect(), s = document.querySelector('#side');
       return {n: bs.length, rows: new Set(bs.map(b => Math.round(R(b).top))).size, inside: bs.every(b => R(b).right <= R(r).right + 1), side: s.scrollWidth <= s.clientWidth + 1, minH: Math.min(...bs.map(b => R(b).height)),
-        cut: bs.map(b => b.querySelector('.srbn')).filter(n => n && getComputedStyle(n).display !== 'none' && (n.scrollHeight > n.clientHeight + 1 || n.scrollWidth > n.clientWidth + 1)).map(n => n.textContent)}; })()`;
+        cut: bs.map(b => b.querySelector('.srbn')).filter(n => n && getComputedStyle(n).display !== 'none' && !n.classList.contains('srcut') /* 2.458.0 (#3880): a word too wide ends in "…", never split */ && (n.scrollHeight > n.clientHeight + 1 || n.scrollWidth > n.clientWidth + 1)).map(n => n.textContent)}; })()`;
     await nav(B + '#today'); await wait(`!!S.booted`);
     // many areas: a long name in place of one of them
     for (const w of [360, 320]) {
@@ -45,7 +45,7 @@ const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'ut
     }
     // 11 areas (the drawer of the report): two copies, the columns sbm_rowHtml sets for 11
     await size(360, 740); await drawer();
-    await ev(`(() => { const r = document.querySelector('#side .sbmr'), bs = r.querySelectorAll('.srb[data-sbb]'); while (r.querySelectorAll('.srb[data-sbb]').length < 11) r.append(bs[2].cloneNode(true)); r.style.setProperty('--sbmc', 6); return 1; })()`);
+    await ev(`(() => { const r = document.querySelector('#side .sbmr'), bs = r.querySelectorAll('.srb[data-sbb]'); while (r.querySelectorAll('.srb[data-sbb]').length < 11) r.append(bs[2].cloneNode(true)); r.style.setProperty('--sbmc', 6); sbb_fit(); return 1; })()`);
     const g11 = await ev(GRID);
     check(g11.n === 11 && g11.rows === 2 && g11.inside && !g11.cut.length, '#3739 11 areas: two rows ' + JSON.stringify(g11));
     check(await ev(`document.querySelector('#side .sbmr').style.getPropertyValue('--sbmc') === '6' && Math.max(Math.ceil(11 / 2), Math.min(11, 5)) === 6 && sbm_rowHtml(() => false).includes('--sbmc:')`), '#3739: the row sets its columns');
@@ -55,7 +55,7 @@ const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'ut
     check(g2.rows <= 2 && g2.inside && g2.side, '#3739: without labels too ' + JSON.stringify(g2));
     await ev(`(() => { document.documentElement.classList.remove('rail-nolabel'); renderSide(); return 1; })()`);
     // scrolling
-    const POS = `(() => { const s = document.querySelector('#side'), R = e => e && e.getBoundingClientRect(), q = x => document.querySelector(x), sr = R(s), se = q('#side .sbmsrch .scmd'), t = q('#side .sbmtop .srow[data-go="today"]'), row = q('#side .sbmr'), d = q('#side .sbdock'), at = se && document.elementFromPoint(R(se).left + 40, R(se).top + R(se).height / 2);
+    const POS = `(() => { const s = document.querySelector('#side'), R = e => e && e.getBoundingClientRect(), q = x => document.querySelector(x), sr = R(s), se = q('#side .sbmsrch .scmd'), t = q('#side .sg-focus .srow[data-go="today"]'), row = q('#side .sbmr'), d = q('#side .sbdock'), at = se && document.elementFromPoint(R(se).left + 40, R(se).top + R(se).height / 2);
       return {top: s.scrollTop, max: s.scrollHeight - s.clientHeight, se: se && Math.round(R(se).top - sr.top), seH: se && Math.round(R(se).height), onSearch: !!(at && at.closest('.scmd')), today: t && Math.round(R(t).bottom - sr.top), row: row && Math.round(R(row).bottom - sr.top), dock: d && Math.round(sr.bottom - R(d).bottom), set: !!(d && d.querySelector('.sset')), acct: !!(d && d.querySelector('.sbacct'))}; })()`;
     const p0 = await ev(POS);
     await ev(`(() => { document.querySelector('#side').scrollTop = 400; return 1; })()`); await sleep(100);

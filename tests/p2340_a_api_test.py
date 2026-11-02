@@ -12,7 +12,7 @@
    milestones / tracked time in the period, Markdown in the person's or the asked language without comments, notes or
    names; period from / to / days (bad values 400); a stranger 404, an agent only in shared lists, a participant only
    their tasks (tenant-matrix: list)
- - nothing new in the schema (only user settings keys): the rollback image 2.33 keeps running
+ - nothing new in the schema (only account settings keys): the rollback image 2.33 keeps running
 usage: p2340_a_api_test.py <datadir>"""
 import json
 import os
@@ -281,7 +281,7 @@ A.patch(B + "/api/settings", json={"features": fs0})
 check((A.get(B + f"/api/lists/{P}/status-report").json()["time"] or {}).get("seconds") == 5400, "M1: back on -> the hours again")
 
 # ================================================================== rollback safety: no new tables / columns from part A
-check(not dbx("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name LIKE '%brief%'"), "schema: nothing new for the briefing (user settings only)")
+check(not dbx("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema() AND table_name LIKE '%brief%'"), "schema: nothing new for the briefing (account settings only)")
 
 print(f"p2340_a_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

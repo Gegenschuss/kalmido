@@ -158,7 +158,7 @@ check(err_of(r) == "ok" and s.get(B + "/api/me").json()["username"] == "frank", 
 
 # ---- no account / disabled / e-mail linking
 s, r = oidc_login({"sub": "sub-ghost", "preferred_username": "ghost"})
-check(err_of(r) == "no_account" and "kalmido_session" not in r.cookies and not dbx("SELECT 1 FROM users WHERE username='ghost'"), "unknown user -> no_account, nothing created")
+check(err_of(r) == "no_account" and "kalmido_session" not in r.cookies and not dbx("SELECT 1 FROM users WHERE username='ghost'"), "unknown person -> no_account, nothing created")
 s, r = oidc_login({"sub": "sub-gina", "preferred_username": "gina.x", "email": "gina@example.test", "email_verified": True})
 check(err_of(r) == "ok" and s.get(B + "/api/me").json()["username"] == "gina", "linked by verified e-mail (case-insensitive)")
 s, r = oidc_login({"sub": "sub-hank", "preferred_username": "hank.x", "email": "hank@example.test", "email_verified": False})

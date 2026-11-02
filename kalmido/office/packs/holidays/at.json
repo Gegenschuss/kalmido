@@ -1,0 +1,20 @@
+{
+ "code": "AT",
+ "name": "Austria",
+ "version": 1,
+ "holidays": [
+  {"date": "01-01", "name": "New Year's Day"},
+  {"date": "01-06", "name": "Epiphany"},
+  {"date": "05-01", "name": "State Holiday"},
+  {"date": "08-15", "name": "Assumption Day"},
+  {"date": "10-26", "name": "Austrian National Day"},
+  {"date": "11-01", "name": "All Saints' Day"},
+  {"date": "12-08", "name": "Immaculate Conception"},
+  {"date": "12-25", "name": "Christmas Day|Austria"},
+  {"date": "12-26", "name": "St Stephen's Day"},
+  {"easter": 1, "name": "Easter Monday"},
+  {"easter": 39, "name": "Ascension Day"},
+  {"easter": 50, "name": "Whit Monday"},
+  {"easter": 60, "name": "Corpus Christi"}
+ ]
+}

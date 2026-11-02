@@ -11,9 +11,9 @@
  - change, delete + restore (undo), restore of a link saved again meanwhile: 409
  - an organisation's bookmark: every member reads it, only its owner or an admin of the organisation changes it (403);
    another organisation / a person without it: 404 (tenant-matrix: bookmark)
- - moving between the private space and an organisation: dry run, move, the picture still served, the move back; the same
+ - moving between the private workspace and an organisation: dry run, move, the picture still served, the move back; the same
    link already in the target blocks; a plain member may not move someone else's (403), a foreign organisation 409, agents 403
- - a person without an organisation (freelancer-matrix: bookmarks): the private space works, there is no other workspace (409)
+ - a person without an organisation (freelancer-matrix: bookmarks): the private workspace works, there is no other workspace (409)
  - the parser on its own (inside the app container) and the nightly boundary check with bookmarks
 usage: p297_a_api_test.py <datadir>      (a fresh container; P297A_NOSTART=1 = the server already runs)"""
 import json
@@ -291,7 +291,7 @@ check(mv(Bo, ids=[], to=SP).status_code == 400 and mv(Bo, ids=["x"], to=SP).stat
 # ================================================================ a person without an organisation (freelancer-matrix: bookmarks)
 FID, Fl = freelancer(B, A)
 r = add(Fl, FS + "/plain.html?free=1", tags=["solo"])
-check(r.status_code == 201 and r.json()["bookmark"]["space"] == "private", "freelancer: saved in the private space")
+check(r.status_code == 201 and r.json()["bookmark"]["space"] == "private", "freelancer: saved in the private workspace")
 FB = r.json()["bookmark"]["id"]
 check([x["id"] for x in lst(Fl)["items"]] == [FB] and lst(Fl, space="private")["items"][0]["can_edit"], "freelancer: listed, may change")
 check(Fl.patch(B + f"/api/bookmarks/{FB}", json={"state": "read"}).ok and Fl.delete(B + f"/api/bookmarks/{FB}").ok

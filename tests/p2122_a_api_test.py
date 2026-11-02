@@ -278,7 +278,7 @@ FID, Fr = freelancer(B, A)
 PF = Fr.post(B + "/api/files/folders", json={"name": "Customer uploads", "space": "private"}).json()["id"]
 r = Fr.post(B + f"/api/files/nodes/{PF}/requests", json={"title": "For my client", "days": 7})
 QF = r.json()
-check(r.status_code == 201 and Fr.get(B + f"/api/files/nodes/{PF}/requests").ok, "freelancer: a request in the private space")
+check(r.status_code == 201 and Fr.get(B + f"/api/files/nodes/{PF}/requests").ok, "freelancer: a request in the private workspace")
 SF = stamp(tok(QF), anon)
 time.sleep(2.2)
 r = up(tok(QF), [("brief.pdf", PDF, "")], SF, js=True, s=anon)

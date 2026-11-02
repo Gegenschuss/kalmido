@@ -2,7 +2,7 @@
 // - a folder opened by hand in the knowledge tree (more than 30 pages = all closed by themselves) stays open after
 //   opening a page and going Back; closing it by hand keeps it closed after the next page and Back
 // - the keys are the ones of the computer panel (LS sbbOpen 'wk:<space>:<path>')
-// freelancer-matrix: wiki (the pages are in the private space of a person without an organisation)
+// freelancer-matrix: wiki (the pages are in the private workspace of a person without an organisation)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');

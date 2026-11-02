@@ -38,7 +38,7 @@ function meFields(ts) {
       open: a => menu(a, [{label: tr('Nobody'), icon: 'x', fn: () => meApply('assignee', t => t.assignee_id || t.assignee_group_id ? {assignee_id: null, assignee_group_id: null} : null, tr('Assignee'))}, '-',
         ...mePeople(ts).map(p => ({label: p.name + (S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''), ...ac_mi(p.user_id), fn: () => meApply('assignee', t => t.assignee_id !== p.user_id || t.assignee_group_id ? {assignee_id: p.user_id, assignee_group_id: null} : null, tr('Assignee'))}))])}] : []),
     {k: 'list', lab: N_('Project'), icon: 'list', get: t => t.list_id, text: v => lname(listById(v)) || '?', perm: t => canEditList(t.list_id),
-      open: a => menu(a, S.lists.filter(l => !l.archived && canEditList(l.id)).map(l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, fn: () => meApply('list', t => t.list_id !== l.id ? {list_id: l.id, section_id: null, ...(t.parent_id && !S.multi.has(t.parent_id) ? {parent_id: null} : {})} : null, tr('Moved to {0}', lname(l)))})))},
+      open: a => mv_picker(a, meTasks().map(t => t.id), {filter: l => canEditList(l.id), pick: l => meApply('list', t => t.list_id !== l.id ? {list_id: l.id, section_id: null, ...(t.parent_id && !S.multi.has(t.parent_id) ? {parent_id: null} : {})} : null, tr('Moved to {0}', lname(l)))})},  // 2.455.0 (#3848)
     ...(lid && S.sections.some(s => s.list_id === lid) ? [{k: 'section', lab: N_('Section'), icon: 'columns', get: t => t.section_id || 0, text: v => v ? secName(v) : tr('No section'),
       open: a => menu(a, [{label: tr('No section'), icon: 'x', fn: () => meApply('section', t => t.section_id ? {section_id: null} : null, tr('Section'))}, '-',
         ...S.sections.filter(s => s.list_id === lid).map(s => ({label: s.name, icon: 'columns', fn: () => meApply('section', t => t.section_id !== s.id ? {section_id: s.id} : null, tr('Section'))}))])}] : []),
@@ -156,7 +156,7 @@ function meWaitDialog() {
   const ts = meTasks(), notes = new Set(ts.map(t => t.wait_note || '')), n0 = notes.size === 1 ? [...notes][0] : '';
   const md = modal(`<h3>${tr('Waiting on someone')}</h3>
     <div class="shint">${trn('For {0} selected task.', 'For all {0} selected tasks.', ts.length)}</div>
-    <div class="row"><label for="mw-note">${tr('Waiting on')}</label><input id="mw-note" maxlength="300" value="${esc(n0)}" placeholder="${esc(tr('who or what, e.g. offer from the carpenter'))}" enterkeyhint="done"></div>
+    <div class="row"><label for="mw-note">${tr('Waiting on')}</label><input id="mw-note" maxlength="300" value="${esc(n0)}" placeholder="${esc(tr('who or what, e.g. quotation from the carpenter'))}" enterkeyhint="done"></div>
     <div class="row"><label for="mw-until">${tr('Follow up on')}</label>${dateIn('mw-until', addDays(today(), 7), {min: today(), label: tr('Follow up on'), empty: tr('none')})}</div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
   md.classList.add('waitmodal');
@@ -181,7 +181,7 @@ function meTagsHtml(ts) {
   const all = new Map();
   for (const t of ts) for (const g of [...(t.ltags || []), ...t.tags]) { const k = g.toLowerCase(); if (!all.has(k)) all.set(k, g); }
   const lock = ts.filter(t => !canEdit(t)).length, chg = ME.chg.has('tags');
-  const chips = [...all.values()].sort((a, b) => a.localeCompare(b)).map(g => {
+  const chips = [...all.values()].sort(cmpText).map(g => {
     const n = ts.filter(t => meHas(t, g)).length, full = n === ts.length;
     return `<button type="button" class="metag ${full ? 'on' : 'half'}" data-act="me-tag" data-tag="${esc(g)}" aria-pressed="${full ? 'true' : 'mixed'}" ${lock ? 'disabled' : ''} title="${esc(full ? tr('All have {0} · click: remove from all', '#' + g) : tr('{0} of {1} have {2} · click: add to all', n, ts.length, '#' + g))}"><i aria-hidden="true"></i>#${esc(g)}</button>`;
   }).join('');

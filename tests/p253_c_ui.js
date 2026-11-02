@@ -46,6 +46,7 @@ const item = (d, re) => items(d).find(b => re.test(b.textContent));
   await until(() => d.querySelector(`#detail [data-tblph="${T}"]`) && w.eval(`!!S.tbl && !!S.tbl[${T}]`));
   check(!d.querySelector(`#detail [data-tblb="${T}"]`), 'as the list: no extra button in the crowded task header');
   w.eval(`taskMenu(document.querySelector('#detail .dtop [data-act="task-menu"]'), ${T})`);
+  click(w, await until(() => d.querySelector('#pop .mtmore')));  // 2.445.0 (#3008): the bell is under "More…"
   const mi = await until(() => item(d, /Notifications for this task…/));
   check(!!mi, 'the task menu "…" has "Notifications for this task…"');
   click(w, mi);

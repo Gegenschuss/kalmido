@@ -1,7 +1,7 @@
 // kalmido-suite: fresh
 // 2.351.0 A (#3312, #2823) UI tests: the office's document areas open as trees in the panel. Own container (start.sh),
 // Firefox. Invented people and companies only. Carol has NO organisation (her personal office, P4).
-// - a computer: Quotes & invoices is a tree node; opened: its folders (with a subfolder), the 20 newest quotations in no
+// - a computer: Quotations & invoices is a tree node; opened: its folders (with a subfolder), the 20 newest quotations in no
 //   folder and "More…" (opens the full list); a quotation dragged onto a folder (the tree's handler and a list row's
 //   drop) is filed there (toast "Filed in …"); the folder's menu: New folder…, Share…, Rename…, Move to the trash; the
 //   filters client / year at the top of the list; Documents / Correspondence / Receipts are tree nodes too; a letter marked
@@ -44,7 +44,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,files,docs';
   const F1 = (await call(CC, 'POST', '/api/office/docs/tree/folders', {name: 'Client Alpha'})).folder?.id;
   const F2 = (await call(CC, 'POST', '/api/office/docs/tree/folders', {name: '2026', parent_id: F1})).folder?.id;
   const F3 = (await call(CC, 'POST', '/api/office/docs/tree/folders', {name: 'Archive box'})).folder?.id;
-  check(F1 && F2 && F3, 'setup: folders at the area Quotes & invoices');
+  check(F1 && F2 && F3, 'setup: folders at the area Quotations & invoices');
   check((await call(CC, 'POST', '/api/files/refs', {ref_kind: 'office_doc', ref_id: Q[0], parent_id: F2})).http === 200, 'setup: the oldest quotation in Client Alpha / 2026');
   const refOf = async (id, kind = 'office_doc') => ((await call(CC, 'GET', `/api/files/refs/${kind}/${id}`)).node || {}).parent_id || null;
   const filedIn = async (id, fid) => { for (let i = 0; i < 40; i++) { if (await refOf(id) === fid) return true; await sleep(250); } return false; };  // the stored state
@@ -65,7 +65,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,files,docs';
     check(await signIn(ev) === 200, 'carol signs in');
     await nav(B + '#office/offers');
     check(await ready(ev, `!!${node('a:offers')} && ${node('a:offers')}.dataset.sbbns === 'oft' && !!document.querySelector('#side [data-ofm="offers"]')`, 80),
-      'computer: Quotes & invoices is a tree node (its name keeps the office point)');
+      'computer: Quotations & invoices is a tree node (its name keeps the office point)');
     check(await ready(ev, `!!${node('a:gendocs')} && !!${node('a:letters')} && !!${node('a:receipts')} && !document.querySelector('#side [data-offolders]')`, 60),  // the admin's points come with the office's settings
       'computer: Documents, Correspondence, Receipts are tree nodes too; no group "Folders" ' + await ev(`[...document.querySelectorAll('#side [data-ofm]')].map(b => b.dataset.ofm + ':' + (b.closest('.sbbt')?.dataset.sbbid || 'row')).join()`));
     await openNode(ev, 'a:offers');
@@ -127,7 +127,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,files,docs';
     await ready(ev, `typeof OFC === 'object' && !!OFC.info`, 80);
     // CI of 2.351.3: a late route render closes the drawer again (core.js closeSide) - opened again until it stays
     const drawer = `(() => { if (!document.querySelector('#side.open')) document.querySelector('#top .menu')?.click(); return !!document.querySelector('#side.open') && !!${node('a:offers')}; })()`;
-    check(await ready(ev, drawer, 60), 'phone: the drawer shows Quotes & invoices as a tree node');
+    check(await ready(ev, drawer, 60), 'phone: the drawer shows Quotations & invoices as a tree node');
     await openNode(ev, 'a:offers');
     check(await ready(ev, `${node('d:offers:' + Q[20])}?.dataset.sbbdrag === '1' && !${node('d:offers:' + Q[20])}.hasAttribute('draggable')`, 60), 'phone: the quotations are held to drag (no mouse drag)');
     await ev(`(() => { const t = ${node('d:offers:' + Q[20])}; if (t) sbb_tmenu(t); return 1; })()`);  // no node = the check above failed, not a JS error on top

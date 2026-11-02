@@ -5,6 +5,8 @@
 // - tapping the button of the area already open = the area's start page: Projects = the new start page #projects, the
 //   office = the office overview (phone tab and computer bar)
 // - the start page of Projects shows the projects grouped by the folders of the sidebar, in the sidebar's order (one source)
+// - 2.482.0 (#3951): the phone's Projects page: "Sort projects" in the head and the project menu, the grip drags (also into
+//   a folder), the order is the sidebar's
 // - Firefox at 390 x 844 and 1280 x 860: the start page fits (no sideways overflow), screenshots (P2417A_SHOTS)
 // P4: a person without an organisation gets the same (freelancer-matrix: navigation)
 const path = require('path');
@@ -95,6 +97,32 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
     check(await until(() => w.location.hash === '#office' && w.eval('S.route.mod') === 'office'), `${u} computer: tapping the office again = the office overview ` + w.location.hash);
     // the sidebar stays reachable over the menu button (phones: #top) and search / settings stay as they were
     check(w.eval(`tabItem('search').act`) === 'palette' && w.eval(`tabItem('settings').act`) === 'settings', `${u}: search and settings unchanged`);
+    w.close();
+
+    // ================= 2.482.0 (#3951): the phone's Projects page sorts with the sidebar's sort mode (one order)
+    w = await boot({user: u, mobile: true, hash: 'projects'}); d = w.document;
+    await until(() => d.querySelector('#view .pstart .ps-lists .pssort'));
+    check(!!d.querySelector('#view .pstart .ps-lists .pshead [data-act="lists-reorder"]'), `${u} phone: the head of Projects offers "Sort projects"`);
+    check(w.eval(`listMenuItems(${I.a1}).some(x => x.label === 'Sort projects')`), `${u} phone: the project's menu offers "Sort projects"`);
+    click(w, d.querySelector('#view .pstart .pssort'));
+    check(await until(() => d.querySelector('#view .pstart .psreobar [data-act="lists-reorder"]') && d.querySelector(`#view .pstart .psrow.reorder[data-list="${I.loose}"] .sgrip`)), `${u} phone: sort mode: the bar with Done, a grip on every row`);
+    check(w.eval('S.listReorder') === true && !d.querySelector('#view .pstart .psrow.reorder[data-go]'), `${u} phone: one sort mode with the sidebar, the rows do not open`);
+    // drag the loose project by its grip before "Gamma list": it moves into the folder Gamma, page and sidebar agree
+    const tch = (el, type, y = 20) => { const e = new w.Event(type, {bubbles: true, cancelable: true}); e.touches = type === 'touchend' ? [] : [{clientX: 40, clientY: y}]; el.dispatchEvent(e); return e; };
+    const prow = id => d.querySelector(`#view .pstart .psrow.reorder[data-list="${id}"]`);
+    d.elementFromPoint = () => prow(I.g1);
+    tch(prow(I.loose).querySelector('.sgrip'), 'touchstart');
+    check(!!d.querySelector('.side-ghost'), `${u} phone: the grip drags at once`);
+    tch(prow(I.loose), 'touchmove', 60); await sleep(50);
+    tch(prow(I.loose), 'touchend');
+    check(await until(async () => ((await call(ck, 'GET', '/api/state')).lists || []).find(l => l.id === I.loose)?.folder === 'Gamma'), `${u} phone: the dragged project is in the folder Gamma now`);
+    await until(() => [...d.querySelectorAll('#view .pstart .ps-folder')].find(x => x.querySelector('.psfold span')?.textContent === 'Gamma')?.querySelector(`[data-list="${I.loose}"]`));
+    const gam = [...[...d.querySelectorAll('#view .pstart .ps-folder')].find(x => x.querySelector('.psfold span')?.textContent === 'Gamma')?.querySelectorAll('[data-list]') || []].map(x => +x.dataset.list);
+    check(gam.join() === [I.loose, I.g1].join(), `${u} phone: on the page before Gamma list ` + JSON.stringify(gam));
+    const ord = w.eval('sideOrder().map(l => l.id)');
+    check(ord.indexOf(I.loose) === ord.indexOf(I.g1) - 1, `${u} phone: the same order in the sidebar ` + JSON.stringify(ord));
+    click(w, d.querySelector('#view .pstart .psreobar [data-act="lists-reorder"]'));
+    check(await until(() => !d.querySelector('#view .pstart .psrow.reorder') && d.querySelector(`#view .pstart [data-go="l/${I.loose}"]`)) && !w.eval('S.listReorder'), `${u} phone: Done ends the sort mode, rows open again`);
     w.close();
   }
 

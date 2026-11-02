@@ -28,12 +28,13 @@ organisation's documents like POST /api/files/move-space (files/fsmove.py), so i
 One entry "move" in the target's office log."""
 import os
 import re
+from datetime import timedelta
 
 from flask import g, jsonify, request
 
 from ..core.config import OFFICE_DIR, app
 from ..core.access import Denied, acx_drop
-from ..core.db import body, bump, db, err, uset
+from ..core.db import body, bump, db, err, iso, now_utc, uset
 from ..core.i18n import N_, tr, trn
 from ..core.orgcrypt import FIELDS, JSON_KEYS, oc_dec_fields, oc_log_detail, oc_read_file, oc_write_file
 from ..core.pg import IntegrityError, system_ctx, table_columns, write_lock
@@ -41,12 +42,14 @@ from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from .ledger import ofx_log
 from .model import office_gate, office_org, pb_owner
 from .officemove import ofm_reseal
+from .payonline import POL_EXPIRE_S
 from .periodlock import pl_lock, pl_through  # 2.355.0 B (#2845)
 from ..files.fsmove import fsm_apply, fsm_plan  # 2.356.0 A (#2926)
 
 PBT_KEEP = ("office_settings", "office_company", "office_cf_start", "office_cf_actual", "office_numbers",
             "office_period_locks",  # 2.148.0 A (#2471): the locks of each area stay its own
             "office_rgroups", "office_rgroup_members",  # 2.187.0 C (#2476): the personal office's rights groups (its agents) stay; the log goes
+            "office_payonline",  # 2.469.0 (#3459): as the Peppol connection: the webhook URL and the provider account stay the area's
             "office_peppol")  # 2.306.0 D2 (#2875): the Peppol connection stays (its key is sealed for the area; the target has its own)
 PBT_SEALED = set(FIELDS) | {t for t, _c in JSON_KEYS} | {"office_doc_items"}
 PBT_STAY_FILE = re.compile(r"logo\.png|letterhead-[0-9a-f]{16}\.pdf")  # the settings' own files (pdfweb.LOGO_FILE, letterhead.BP_FILE_RE)
@@ -138,6 +141,12 @@ def pbt_plan(c, uid, src, dst):
                         pl_label(pl_through(c, src))))
         # 2.355.0 E (#2845, review F4): what the lock dialog would point out
         notes += [tr("In the organisation up to {0}: {1}", pl_label(pl_through(c, src)), h["text"]) for h in pl_hints(c, dst, pl_through(c, src))]
+    # 2.469.0 (#3459): a payment under way finds its session only in the area it was started in; the connection stays here
+    since = iso(now_utc() - timedelta(seconds=POL_EXPIRE_S))
+    if c.execute("SELECT 1 FROM office_pay_sessions WHERE org_id=? AND (state='pending' OR (state IN ('new', 'open') AND created_at>=?)) LIMIT 1", (src, since)).fetchone():
+        conflicts.append(tr("An online payment is under way; please wait until it has arrived"))
+    if c.execute("SELECT 1 FROM office_pay_links WHERE org_id=? LIMIT 1", (src,)).fetchone():
+        notes.append(tr("Pay links already sent or printed work again once the organisation has set up online payment"))
     for t in tables:
         w, n = pbt_where(t)
         if t in PBT_KEEP:

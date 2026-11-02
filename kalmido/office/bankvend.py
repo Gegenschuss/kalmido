@@ -164,7 +164,7 @@ def bv_missing(c, oid, lg, today=None, vendors=None):
 def bv_task_lines(c, oid, person, today=None):
     """The hints as lines of the reminder task (markdown, at most BV_HINTS_MAX, the portal as a link)."""
     hs = bv_missing(c, oid, lang(c, person), today)
-    lines = [f"- {h['text']}" + (f" ([{tr('Customer portal', lg=lang(c, person))}]({h['portal']}))" if h["portal"] else "")
+    lines = [f"- {h['text']}" + (f" ([{tr('Client portal', lg=lang(c, person))}]({h['portal']}))" if h["portal"] else "")
              for h in hs[:BV_HINTS_MAX]]
     if len(hs) > BV_HINTS_MAX:
         lines.append(f"- … +{len(hs) - BV_HINTS_MAX}")

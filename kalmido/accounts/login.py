@@ -25,6 +25,7 @@ from werkzeug.security import check_password_hash
 from ..core.config import app, APP_NAME, COOKIE, MIN_PASSWORD, NTFY_TOPIC, PUBLIC_URL, USERNAME_RE
 from ..core.pg import insert_id
 from ..core.i18n import lang, languages, N_, tr, LANGS
+from ..core.usertz import tz_names
 from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, local_now, now_utc, uset, write_lock
 from ..accounts.session import (
     _DUMMY_HASH, _peer_trusted, _rate_fail, _rate_keys, _rate_reset, _token_hash,
@@ -128,6 +129,17 @@ def _org_label(c):
     return org_label(c)
 
 
+def first_tz(c, uid, name):
+    """2.368.3 (#2985): the time zone of the browser at a person's very first login, unless they chose one (Settings > General shows
+    a later difference and offers the change); nothing else ever writes it."""
+    if not isinstance(name, str) or name not in tz_names():
+        return
+    if c.execute("SELECT 1 FROM sessions WHERE user_id=? LIMIT 1", (uid,)).fetchone() \
+            or c.execute("SELECT value FROM user_settings WHERE user_id=? AND key='tz' AND value<>''", (uid,)).fetchone():
+        return
+    uset(c, uid, "tz", name)
+
+
 def finish_login(c, u, remember, via, extra=None):
     """Last step of every login: ends the session this browser brought along (if any), starts a new one, resets
     the failure counter of the user name."""
@@ -166,14 +178,14 @@ def auth_login():
         # admin alerts: only real usernames are named (a typo in the name field could be a password)
         for k in _rate_fail(keys):
             if k.startswith("ip:"):  # 2.282.0 (#3111): delayed, not refused
-                aa_now("security", "ratelimit:" + k, N_("Many failed logins from IP {0}: logins from there are slowed down for {1} min, right passwords still work. Behind a shared address (office, NAT) everyone there is affected."),
+                aa_now("security", "ratelimit:" + k, N_("Many failed sign-ins from IP {0}: sign-ins from there are slowed down for {1} min, right passwords still work. Behind a shared address (office, NAT) everyone there is affected."),
                        [fx2_mask_ip(client_ip()), FAIL_WINDOW // 60])
             elif u:
-                aa_now("security", "ratelimit:" + k, N_("Login rate limit reached for user {0} (logins refused for {1} min)."),
+                aa_now("security", "ratelimit:" + k, N_("Sign-in rate limit reached for user {0} (sign-ins refused for {1} min)."),
                        [username, FAIL_WINDOW // 60])
             else:
                 aa_now("security", "ratelimit:u:?",
-                       N_("Login rate limit reached for an unknown user name (logins refused for {0} min)."), [FAIL_WINDOW // 60])
+                       N_("Sign-in rate limit reached for an unknown user name (sign-ins refused for {0} min)."), [FAIL_WINDOW // 60])
         aa_count("security", "logins", client_ip(), user=username if u else "?")
         print("login failed for", login_log_name(username, c), "from", login_log_ip(client_ip()), flush=True)  # 2.148.1 C (#2494)
         return err(tr("Wrong username or password"), 401)  # 2.13.0 (#453 P7): the page's language
@@ -185,6 +197,7 @@ def auth_login():
     if gsetting(c, "twofa_required") == "1":  # admin policy: enrol now, the session starts afterwards
         tok = pend_new("enrol", u["id"], remember=remember)
         return pend_cookie(jsonify(ok=False, enrol=True, methods=["totp", "passkey"]), tok)
+    first_tz(c, u["id"], b.get("tz"))  # the login is complete here (a second factor: Settings show the difference); finish_login commits
     return finish_login(c, u, remember, "password")
 
 
@@ -221,6 +234,7 @@ def auth_setup():
     if b.get("lang") in LANGS:  # 2.24.0 (UX-22): the language of the setup page (a reload in step 2 keeps it, the sample too)
         uset(c, uid, "lang", b["lang"])
         gset(c, "default_lang", b["lang"])
+    first_tz(c, uid, b.get("tz"))
     if b.get("wizard") is True:  # 2.13.0 (#453 A16): the setup page's step 2 comes back after a reload until it is finished
         gset(c, "setup_step2", "pending")
     if not gsetting(c, "bk_enabled_at") and not gsetting(c, "bk_last_ok"):  # 2.45.0 (#1515): a new server backs up daily
@@ -479,11 +493,11 @@ def _ticket(kinds):
     """(ticket, user) of this browser or an error response."""
     p = pend_get(kinds)
     if not p:
-        return None, None, (jsonify(error=tr("The login has expired, please log in again"), expired=True), 401)
+        return None, None, (jsonify(error=tr("The sign-in has expired, please sign in again"), expired=True), 401)
     u = _user(db(), p["uid"])
     if not u or u["disabled"] or not u["password_hash"]:
         pend_drop()
-        return None, None, (jsonify(error=tr("The login has expired, please log in again"), expired=True), 401)
+        return None, None, (jsonify(error=tr("The sign-in has expired, please sign in again"), expired=True), 401)
     e = login_wait(_rate_keys(u["username"]), u["username"])  # 2.282.0 (#3111)
     if e:
         return None, None, e
@@ -661,8 +675,8 @@ def auth_2fa():
     pend_drop()
     left = rc_left(c, u["id"])
     if via == "recovery":
-        aa_now("security", f"recovery:{u['username']}:{int(time.time())}",
-               N_("{0} logged in with a recovery code ({1} left)."), [u["username"], left])
+        aa_now("security", f"recovery:{u['username']}:{left}",
+               N_("{0} signed in with a recovery code ({1} left)."), [u["username"], left])
         from .secmail import sec_mail
         sec_mail(c, u["id"], "code_used", left)  # 2.266.0 (#2963)
     return finish_login(c, u, p.get("remember", True), "2fa", {"recovery_left": left} if via == "recovery" else None)
@@ -755,7 +769,7 @@ def auth_enrol_pk():
 def auth_pk_options():
     c = db()
     if gsetting(c, "passkey_login") == "0":
-        return err(tr("Logging in with a passkey is turned off on this server"), 403)
+        return err(tr("Signing in with a passkey is turned off on this server"), 403)
     # 2.282.0 (#3111): no address lock here any more; POST /api/auth/passkey delays above the address limit
     chal, rp, opts = wa_auth_options(c, None, uv=True)
     tok = pend_new("pk", None, chal=chal, rp=rp, remember=bool(body().get("remember", True)))
@@ -768,7 +782,7 @@ def auth_pk():
     c = db()
     keys = [("ip:" + rate_ip(), 20)]
     if gsetting(c, "passkey_login") == "0":
-        return err(tr("Logging in with a passkey is turned off on this server"), 403)
+        return err(tr("Signing in with a passkey is turned off on this server"), 403)
     e = login_wait(keys, "")  # 2.282.0 (#3111): no name, so never "known": delayed above the address limit
     if e:
         return e
@@ -793,7 +807,7 @@ def _reauth(u, b):
     if e:
         return e
     if not u["password_hash"]:
-        return err(tr("Two-factor authentication is only for logins with a password"), 409)
+        return err(tr("Two-factor authentication is only for sign-ins with a password"), 409)
     pw = b.get("password") if isinstance(b.get("password"), str) else ""
     if not check_password_hash(u["password_hash"], pw):
         _rate_fail(keys)
@@ -853,7 +867,7 @@ def me_totp_begin():
 
 @app.post("/api/me/2fa/totp/confirm")
 def me_totp_confirm():
-    from ..notify.alerts import aa_now
+    from ..notify.alerts import aa_count
     u, c = g.user, db()
     keys = _rate_keys(u["username"])
     e = login_wait(keys, u["username"])  # 2.282.0 (#3111): signed in as this name
@@ -874,8 +888,7 @@ def me_totp_confirm():
     if first:
         _end_other_sessions(c, u["id"])
     c.commit()
-    aa_now("security", f"2fa:{u['username']}:{int(time.time())}", N_("{0} turned on two-factor authentication ({1})."),
-           [u["username"], {"t": N_("authenticator app")}])
+    aa_count("security", "2fa_on", u["username"], uid=u["id"])  # 2.367.4 (#2974): summed up per window
     return jsonify(recovery_codes=codes, **twofa_state(c, _user(c, u["id"])))
 
 
@@ -941,7 +954,7 @@ def me_pk_options():
 
 @app.post("/api/me/passkeys")
 def me_pk_add():
-    from ..notify.alerts import aa_now
+    from ..notify.alerts import aa_count
     u, c, b = g.user, db(), body()
     p = pend_take(f"wareg:{u['id']}")
     if not p:
@@ -956,8 +969,7 @@ def me_pk_add():
     if first:
         _end_other_sessions(c, u["id"])
     c.commit()
-    aa_now("security", f"2fa:{u['username']}:{int(time.time())}", N_("{0} turned on two-factor authentication ({1})."),
-           [u["username"], {"t": N_("passkey")}])
+    aa_count("security", "2fa_on", u["username"], uid=u["id"])  # 2.367.4 (#2974): summed up per window
     return jsonify(recovery_codes=codes, **twofa_state(c, _user(c, u["id"])))
 
 

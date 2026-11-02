@@ -9,7 +9,7 @@ the history of the cells (#2112). Invented names only.
    makes a checkbox column and writes no history
  - kept rows / columns: saved, 400 out of range, a reader of the attached list 403, another organisation 404
  - history: who / when / before -> after for people, agents marked; the agents' batches and their undo stay as they were
- - moving the table to the private space takes its files (sealed again) and its history along
+ - moving the table to the private workspace takes its files (sealed again) and its history along
  - a person without an organisation (freelancer-matrix: sheets) uses every new route in a private table
 usage: p2124_b_api_test.py <datadir>      (a fresh container; P2124B_NOSTART=1 = the server already runs)"""
 import base64
@@ -249,11 +249,11 @@ check(r.ok and r.json().get("undone") == 1 and not (cell(lsd, "D1") or {}).get("
       "#2112: the agent's undo still takes back exactly its call " + r.text[:200])
 check(ag.get(V + f"/sheets/{LS}").json().get("freeze_rows") == 0, "#2111: v1 answers freeze_rows too")
 
-# ================================================================== the move to the private space takes files + history along
+# ================================================================== the move to the private workspace takes files + history along
 check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["bob"], "role": "admin"}).ok,
       "setup: bob an admin (2.148.1 #2483: only admins move data out of an organisation)")
 r = Bo.post(B + f"/api/sheets/{SID}/move-space", json={"to": "private"})
-check(r.ok and r.json().get("ok"), "bob moves the table into his private space " + r.text[:200])
+check(r.ok and r.json().get("ok"), "bob moves the table into his private workspace " + r.text[:200])
 row = sql("SELECT org_id, owner_id, path FROM sheet_files WHERE id=?", (F1,))
 check(row and row[0][0] is None and row[0][1] == uid["bob"] and sealed(row[0][2]), "#2110: the file moved along (private, sealed) " + str(row))
 r = Bo.get(B + f"/api/sheets/{SID}/files/{F1}")

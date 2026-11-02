@@ -135,7 +135,7 @@ const task = async id => (await call('GET', '/api/state')).tasks.find(t => t.id 
   const ffLogin = async ({ev, nav}, theme = 'light', user = 'alice', ls0 = {}) => {
     const ls = {'tasks.tabbar': '["s:inbox","s:today","lists"]', ...ls0};
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); ${Object.entries(ls).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join(' ')} return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); ${Object.entries(ls).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`).join(' ')} return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${user}', password: 'password123'})}).then(r => r.status)`);
   };
   // 2.358.0 C (#2782): settle = the page's requests done (ff.js idle) + two frames drawn, instead of fixed sleeps after an action;

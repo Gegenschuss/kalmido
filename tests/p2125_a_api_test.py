@@ -256,7 +256,7 @@ r = Ca.patch(B + f"/api/team/absences/{REQ}", json={"end_date": "2027-03-04"})
 check(r.ok and r.json()["status"] == "pending", "#2117: changing the period asks again")
 check(Bo.patch(B + f"/api/team/absences/{REQ}", json={"end_date": "2027-03-05"}).json()["status"] == "pending", "#2117: an admin's change keeps the status")
 # notifications can be switched off (the row "leave" of the admin's notification settings)
-check(Bo.patch(B + "/api/settings", json={"notify": {"leave": {"news": 0, "push": 0}}}).ok, "setup: bob switches off the row Vacation requests")
+check(Bo.patch(B + "/api/settings", json={"notify": {"leave": {"news": 0, "push": 0}}}).ok, "setup: bob switches off the row Holiday requests")
 n2 = len(dbx("SELECT 1 FROM notifications WHERE user_id=? AND kind='leavereq'", (BOB,)))
 r = Ca.post(B + "/api/team/absences", json={"kind": "vacation", "start_date": "2027-07-05"})
 check(r.json()["status"] == "pending" and len(dbx("SELECT 1 FROM notifications WHERE user_id=? AND kind='leavereq'", (BOB,))) == n2,

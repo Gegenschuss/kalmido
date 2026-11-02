@@ -201,9 +201,9 @@ const CUR_SIGNS = {'€': 'EUR', '$': 'USD', '£': 'GBP'};
 function curMoney(n, cur, loc) {
   if (n == null || n === '' || !Number.isFinite(+n)) return '';
   const c = String(cur ?? '').trim(), code = CUR_SIGNS[c] || (/^[A-Za-z]{3}$/.test(c) ? c.toUpperCase() : ''), l = loc || LOCALE();
-  if (code) try { return (+n).toLocaleString(l, {style: 'currency', currency: code, currencyDisplay: 'narrowSymbol'}).replace(/[\u00a0\u202f]/g, ' ').replace(/(\d) (?=\d)/g, '$1\u00a0'); } catch { /* an unknown code */ }
+  if (code) try { return (+n).toLocaleString(l, {style: 'currency', currency: code, currencyDisplay: 'narrowSymbol'}).replace(/[\u00a0\u202f]/g, '\u00a0'); } catch { /* an unknown code */ }
   const s = (+n).toLocaleString(l, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-  return c ? s + ' ' + c : s;
+  return c ? s + '\u00a0' + c : s;  // 2.458.0 (#3855): number and sign never part at a line end
 }
 const i18nFmt = (s, a) => a.length ? s.replace(/\{(\d+)\}/g, (m, i) => a[i] ?? m) : s;
 const i18nKey = k => { const bar = k.indexOf('|'); return bar > 0 && !/[<>]/.test(k) ? k.slice(0, bar) : k; };

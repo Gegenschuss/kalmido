@@ -272,15 +272,15 @@ check(A.post(B + CBS, json={"name": ""}).status_code == 400, "a box without name
 # ---------------------------------------------------------------- exports, EUeR
 r = A.get(B + O + f"/cashbook.csv?book_id={BK}&year=2026")
 check(r.ok and "text/csv" in r.headers.get("Content-Type", ""), "CSV")
-rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=";"))
+rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=","))  # 2.368.2 (#2984): English file
 flat = [c for row in rows for c in row]
 hdr = next((row for row in rows if row[:3] == ["No.", "Date", "Text"]), None)
 check(hdr is not None and hdr[4:8] == ["Income", "Expense", "VAT", "Balance"], f"CSV header {hdr}")
 e1 = next((row for row in rows if row[:1] == ["1"]), [])
-check(e1[1:3] == ["2026-03-01", "Verkauf Theke"] and e1[4] == "50,00" and e1[6] == "19 %" and e1[7] == "150,00" and e1[8] == "Cancelled by no. 11", f"CSV row 1 {e1}")
+check(e1[1:3] == ["2026-03-01", "Verkauf Theke"] and e1[4] == "50.00" and e1[6] == "19 %" and e1[7] == "150.00" and e1[8] == "Cancelled by no. 11", f"CSV row 1 {e1}")
 check(any(row[:1] == ["11"] and row[8] == "Cancels no. 1" for row in rows), "CSV: the cancellation names its original")
 check("'=HYPERLINK(1)" in flat and "=HYPERLINK(1)" not in flat, "CSV: formula injection made harmless")
-check("Day closings" in flat and any(row[:1] == ["2026-03-02"] and row[4:5] == ["130,00"] for row in rows), "CSV: the day closings")
+check("Day closings" in flat and any(row[:1] == ["2026-03-02"] and row[4:5] == ["130.00"] for row in rows), "CSV: the day closings")
 check("Change log" in flat and "Cancelled" in flat, "CSV: the change log")
 r = A.get(B + O + f"/cashbook.pdf?book_id={BK}&year=2026")
 check(r.ok and r.content[:5] == b"%PDF-" and len(r.content) > 1500, "PDF")

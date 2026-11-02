@@ -686,13 +686,37 @@ def bm_move(c, uid, b):
             oc_copy_file(c, bm_path(rel), bm_path(new), int(to) if to else oc_user_space(uid))
             old_files.append(rel)
             rel = new
-        c.execute("UPDATE bookmarks SET org_id=?, user_id=?, image=?, updated_at=? WHERE id=?", (to, uid, rel, ts, r["id"]))
+        c.execute("UPDATE bookmarks SET org_id=?, user_id=?, image=?, updated_at=?, brought_by=? WHERE id=?",
+                  (to, uid, rel, ts, uid if to and not r["org_id"] else None, r["id"]))  # 2.365.1 (#3395): accounts/orgback.py
         c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('bookmark',?,?,?,?,?,?)",
                   (r["id"], r["org_id"], to, uid, ts, json.dumps({"owner": r["user_id"]})))
     c.commit()
     for rel in old_files:
         bm_rm_file(rel)
     return smv_answer(notes, None, ok=True, moved=[r["id"] for r in go], from_space=bm_space_key(go[0]["org_id"]), space=bm_space_key(to))
+
+
+def bm_home_rows(c, oid, uid):
+    """2.365.1 (#3395): (the bookmarks uid brought into organisation oid that go back with them, how many stay: the same link is
+    already saved in the private space)."""
+    rows = c.execute("SELECT * FROM bookmarks WHERE org_id=? AND brought_by=? AND deleted_at IS NULL ORDER BY id", (oid, uid)).fetchall()
+    have = {x[0] for x in c.execute("SELECT url_key FROM bookmarks WHERE user_id=? AND org_id IS NULL AND deleted_at IS NULL", (uid,)).fetchall()}
+    go = [r for r in rows if r["url_key"] not in have]
+    return go, len(rows) - len(go)
+
+
+def bm_home(c, r, uid, old_paths):
+    """2.365.1 (#3395): bookmark r goes back into uid's private space with their leaving: the picture sealed with their key
+    (the old one goes after the commit: a clean-up for unlink_files). The caller commits."""
+    rel, ts = r["image"], iso_ms(now_utc())
+    if rel and os.path.exists(bm_path(rel)):
+        new = os.path.join("bookmarks", f"{int(r['id'])}-{uuid.uuid4().hex[:12]}{os.path.splitext(rel)[1]}")
+        oc_copy_file(c, bm_path(rel), bm_path(new), oc_user_space(uid))
+        old_paths.append(lambda: bm_rm_file(r["image"]))
+        rel = new
+    c.execute("UPDATE bookmarks SET org_id=NULL, image=?, updated_at=?, brought_by=NULL WHERE id=?", (rel, ts, r["id"]))
+    c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('bookmark',?,?,NULL,?,?,?)",
+              (r["id"], r["org_id"], uid, ts, json.dumps({"owner": r["user_id"]})))
 
 
 # ---- routes (/api/bookmarks; people only)

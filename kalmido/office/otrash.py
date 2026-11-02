@@ -82,6 +82,8 @@ def otb_put(c, oid, uid, kind, table, rid, label, sub="", extra_nulls=()):
 
 
 def _insert(c, table, row):
+    if table == "office_docs":  # 2.370.2 (#3088): the same request may have made a new document meanwhile (ofi_ref_doc)
+        row = {**row, "client_ref": None}
     c.execute(f"INSERT INTO {table}({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
 
 

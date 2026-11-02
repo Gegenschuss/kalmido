@@ -1,20 +1,27 @@
 """2.361.0 (#2920 / #2922): what leaving or deleting an organisation means for its members -- before it happens.
 
 - Leaving (or being removed): GET /api/orgs/<oid>/leave-info[?uid=<member>] = the projects the person brought in from their
-  private space (they go back there, org_leave), the projects / calendars / address books that go to an admin, what stays in
-  the organisation (files, knowledge pages, tables, office drafts, absences ... counted per area) and the assignments that end.
+  private space (they go back there, org_leave), 2.365.1 (#3395) the numbers of what else goes back (back_counts, back_text,
+  accounts/orgback.py) and of what they brought in but cannot go by itself (kept), the projects / calendars / address books
+  that go to an admin, what stays in the organisation (files, knowledge pages, tables, office drafts, absences ... counted per
+  area) and the assignments that end.
 - Deleting: odl_delete_info (orgs.py) adds per member what they own in it (olv_members); the instance admin may tell the
   members first (POST /api/admin/orgs/<oid>/delete-notice: a News item with the day, the deletion waits until then), and
   every member gets a News item when it is gone (olv_gone_news, kinds orgdelnotice / orggone, no push).
+- 2.363.3 (#3133): coming back within OLV_BACK_H hours: org_leave keeps the tasks the person's assignments and "coming along"
+  ended in (space_moves kind 'orgleave', obj_id = the person, ids only), org_member_add puts back what still exists there and
+  what the person may see again (olv_rejoin). 2.463.0 (#3859): the memberships of projects (with the role) too, so a closed
+  project is back with its assignments; a project with the lock waits for a key the usual way, their own projects stay with the heir.
 Numbers only: no names of files, pages or tables leave the organisation's boundary.
 """
 import json
 from datetime import timedelta
 
-from flask import jsonify, request
+from flask import g, has_request_context, jsonify, request
 
+from ..core.access import list_people, ov_role, task_visible
 from ..core.config import app
-from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
+from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, parse_iso
 from ..core.i18n import trn, tr
 from ..core.pg import system_ctx
 from ..core.access import Denied
@@ -39,13 +46,17 @@ OLV_STAYS = (
      "SELECT COUNT(*) FROM office_docs WHERE org_id=? AND created_by=? AND status='draft'"),
     ("clients", Nn_("{0} client", "{0} clients"), "SELECT COUNT(*) FROM clients WHERE org_id=? AND created_by=? AND deleted_at IS NULL"),
     ("absences", Nn_("{0} absence", "{0} absences"), "SELECT COUNT(*) FROM hub_absences WHERE org_id=? AND user_id=? AND deleted_at IS NULL"),
-    ("leave_quota", Nn_("{0} vacation account", "{0} vacation accounts"), "SELECT COUNT(*) FROM hub_leave_quota WHERE org_id=? AND user_id=?"),
+    ("leave_quota", Nn_("{0} holiday account", "{0} holiday accounts"), "SELECT COUNT(*) FROM hub_leave_quota WHERE org_id=? AND user_id=?"),
     ("timesheets", Nn_("{0} timesheet", "{0} timesheets"), "SELECT COUNT(*) FROM time_sheets WHERE org_id=? AND user_id=?"),
     ("time", Nn_("{0} time entry", "{0} time entries"),
      "SELECT COUNT(*) FROM time_entries WHERE list_id IN (SELECT id FROM lists WHERE org_id=?) AND user_id=?"),
     ("drives", Nn_("{0} drive", "{0} drives"), "SELECT COUNT(*) FROM office_drives WHERE org_id=? AND user_id=? AND deleted_at IS NULL"),
 )
+OLV_FOLDERS = Nn_("{0} folder", "{0} folders")  # 2.365.1 (#3395): back_text
+OLV_AREAS = {}  # 2.365.1 (#3395): preview, home of accounts/orgback.py (a higher layer: it calls every area and enters itself here)
+OLV_BACK = ("files", "folders", "wiki_pages", "tables", "bookmarks", "polls", "videos")
 OLV_NOTICE_DAYS = 14  # the default period between telling the members and the deletion
+OLV_BACK_H = 24  # how long joining again restores assignments and "coming along" (the undo window of the moves)
 
 
 def _names(c, ids):
@@ -57,16 +68,25 @@ def _names(c, ids):
             for r in c.execute(f"SELECT id, username, display_name FROM users WHERE id IN ({','.join('?' * len(ids))})", ids)}
 
 
-def olv_stays(c, oid, uid, skip=()):
-    """{key: n} of OLV_STAYS for uid in oid (zeros left out). skip: keys not to count."""
+def olv_stays(c, oid, uid, skip=(), gone=None):
+    """{key: n} of OLV_STAYS for uid in oid (zeros left out). skip: keys not to count. 2.365.1 (#3395): gone = {key: ids} that
+    do not stay (they go back private)."""
+    gone = gone or {}
     with system_ctx(c):  # numbers only
-        out = {k: c.execute(sql, (int(oid), int(uid))).fetchone()[0] for k, _w, sql in OLV_STAYS if k not in skip}
+        out = {k: c.execute(sql + " AND id != ALL(?)", (int(oid), int(uid), list(gone[k]))).fetchone()[0] if gone.get(k)
+               else c.execute(sql, (int(oid), int(uid))).fetchone()[0] for k, _w, sql in OLV_STAYS if k not in skip}
     return {k: v for k, v in out.items() if v}
 
 
 def olv_text(counts):
     """"3 files, 2 tables" (translated) of olv_stays, in the order of OLV_STAYS."""
     return ", ".join(trn(*w, counts[k]) for k, w, _s in OLV_STAYS if counts.get(k))
+
+
+def olb_text(counts):
+    """"3 files, 1 folder, 2 tables" (translated) of what goes back (olb_preview)."""
+    words = {k: w for k, w, _s in OLV_STAYS} | {"folders": OLV_FOLDERS}
+    return ", ".join(trn(*words[k], counts[k]) for k in OLV_BACK if counts.get(k))
 
 
 def olv_info(c, oid, uid, heir):
@@ -82,8 +102,10 @@ def olv_info(c, oid, uid, heir):
         assigned = c.execute("SELECT COUNT(*) FROM tasks WHERE assignee_id=? AND deleted_at IS NULL AND list_id IN "
                              "(SELECT id FROM lists WHERE org_id=? AND owner_id!=?)", (uid, oid, uid)).fetchone()[0]
         hname = _names(c, [heir]).get(heir, "") if heir and heir != uid else ""
-    stays = olv_stays(c, oid, uid)
-    return {"back": back, "to_heir": {"lists": given if hname else 0, "calendars": cals if hname else 0, "books": books if hname else 0},
+    counts, gone, kept = OLV_AREAS["preview"](c, oid, uid)
+    stays = olv_stays(c, oid, uid, gone=gone)
+    return {"back": back, "back_counts": counts, "back_text": olb_text(counts), "kept": kept,
+            "to_heir": {"lists": given if hname else 0, "calendars": cals if hname else 0, "books": books if hname else 0},
             "heir": hname, "stays": stays, "stays_text": olv_text(stays), "assigned": assigned}
 
 
@@ -111,6 +133,69 @@ def olv_leave_info(oid):
         heir = (c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' AND id!=? ORDER BY id LIMIT 1",
                           (uid,)).fetchone() or [None])[0]
     return jsonify(olv_info(c, oid, uid, heir))
+
+
+def olv_snap(c, oid, uid):
+    """2.363.3 (#3133): before uid leaves oid: the tasks of the organisation uid is assigned to / comes along to. 2.463.0 (#3859):
+    + the projects of others uid is a member of {list id: uid's own role, None = only through a group or folder}."""
+    with system_ctx(c):  # the person's own rows in lists of the organisation, also when an admin removes them
+        return {"assign": {r[0] for r in c.execute("SELECT id FROM tasks WHERE assignee_id=? AND list_id IN (SELECT id FROM lists WHERE org_id=?)", (uid, oid))},
+                "people": {r[0] for r in c.execute("SELECT task_id FROM task_people WHERE user_id=? AND task_id IN "
+                                                   "(SELECT id FROM tasks WHERE list_id IN (SELECT id FROM lists WHERE org_id=?))", (uid, oid))},
+                "lists": {r["list_id"]: r["own_role"] if r["own_role"] is not None else (r["role"] if r["grole"] is None and r["frole"] is None else None)
+                          for r in c.execute("""SELECT m.list_id, m.role, m.own_role, m.grole, m.frole FROM list_members m JOIN lists l ON l.id=m.list_id
+                                                WHERE m.user_id=? AND l.org_id=? AND l.owner_id!=?""", (uid, oid, uid))}}
+
+
+def olv_memo(c, oid, uid, snap):
+    """2.363.3 (#3133): after uid left oid: what ended of snap (olv_snap) as one space_moves row, nothing when nothing ended."""
+    with system_ctx(c):
+        assign = sorted(t for t in snap["assign"] if not c.execute("SELECT 1 FROM tasks WHERE id=? AND assignee_id=?", (t, uid)).fetchone())
+        people = sorted(t for t in snap["people"] if not c.execute("SELECT 1 FROM task_people WHERE task_id=? AND user_id=?", (t, uid)).fetchone())
+        lists = sorted([k, v] for k, v in snap["lists"].items() if not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (k, uid)).fetchone())
+        if assign or people or lists:
+            c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('orgleave',?,?,NULL,?,?,?)",
+                      (uid, oid, me() if has_request_context() and getattr(g, "user", None) else None, iso(now_utc()),
+                       json.dumps({"assign": assign, "people": people, "lists": lists}, separators=(",", ":"))))
+
+
+def olv_rejoin(c, oid, uid):
+    """2.363.3 (#3133): uid just joined oid (org_member_add): within OLV_BACK_H hours of leaving, the assignments and "coming
+    along" that ended come back, for tasks that still exist in the organisation and that uid may see now (an assignment only
+    where uid may be assigned: check_assignee's rule; a task somebody else took over stays theirs). 2.463.0 (#3859): the
+    project memberships first (member_rejoin). -> how many came back."""
+    from ..lists.lists import member_rejoin
+    n = 0
+    with system_ctx(c):  # the person may not be the one making the request (an admin adds them); only their own rows change
+        m = c.execute("SELECT id, at, detail FROM space_moves WHERE kind='orgleave' AND obj_id=? AND from_org=? ORDER BY id DESC LIMIT 1",
+                      (uid, oid)).fetchone()
+        if not m:
+            return 0
+        try:
+            d = json.loads(m["detail"])
+            young = parse_iso(m["at"]) > now_utc() - timedelta(hours=OLV_BACK_H)
+        except (TypeError, ValueError):
+            return 0
+        if not young or d.get("restored"):
+            return 0
+
+        def live(tid):
+            t = c.execute("""SELECT t.list_id, t.assignee_id, t.assignee_group_id FROM tasks t JOIN lists l ON l.id=t.list_id
+                             WHERE t.id=? AND t.deleted_at IS NULL AND l.deleted_at IS NULL AND l.org_id=?""", (tid, oid)).fetchone()
+            return t if t and task_visible(c, tid, uid) else None
+        n += member_rejoin(c, oid, uid, d.get("lists") or [])
+        for tid in d.get("assign") or []:
+            t = live(tid)
+            if t and not t["assignee_id"] and not t["assignee_group_id"] \
+                    and (uid in list_people(c, t["list_id"]) or ov_role(c, t["list_id"], uid) == "edit"):
+                c.execute("UPDATE tasks SET assignee_id=? WHERE id=?", (uid, tid))
+                n += 1
+        for tid in d.get("people") or []:
+            if live(tid):
+                n += c.execute("INSERT INTO task_people(task_id,user_id) VALUES(?,?) ON CONFLICT DO NOTHING", (tid, uid)).rowcount
+        d["restored"] = iso(now_utc())
+        c.execute("UPDATE space_moves SET detail=? WHERE id=?", (json.dumps(d, separators=(",", ":")), m["id"]))
+    return n
 
 
 def olv_people(c, oid):

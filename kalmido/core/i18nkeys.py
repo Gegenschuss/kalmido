@@ -27,6 +27,35 @@ def key_sources(root):
             + sorted(os.path.relpath(p, root) for p in glob.glob(os.path.join(root, "kalmido", "**", "*.py"), recursive=True)))
 
 
+def reason_keys(root):
+    """2.464.0 (#3841): the reasons why a table stays out of an export (admin/exportleft.py left_lines translates them): plain strings
+    in dicts tools/check_export_tables.py reads without the app, so no N_ there. -> {reason: "file:line"}"""
+    out = {}
+    for rel, dicts in (("kalmido/admin/exportleft.py", ("UMZ_LEFT_TABLES", "RX_LEFT_TABLES")), ("kalmido/admin/orgexport.py", ("OX_LEFT",))):
+        path = os.path.join(root, *rel.split("/"))
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            tree = ast.parse(f.read())
+        at = {n.targets[0].id: n.value for n in tree.body if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)}
+        for d in dicts:
+            for v in at[d].values:
+                v = at.get(v.id) if isinstance(v, ast.Name) else v
+                if isinstance(v, ast.Constant) and isinstance(v.value, str):
+                    out.setdefault(v.value.replace(" (not_included)", ""), f"{rel}:{v.lineno}")
+    return out
+
+
+def data_keys(root):
+    """2.461 (#3773): the keys held in data files, not in code: the names of the holiday files (kalmido/office/packs/holidays/)."""
+    keys = set()
+    for p in glob.glob(os.path.join(root, "kalmido", "office", "packs", "holidays", "*.json")):
+        with open(p, encoding="utf-8") as f:
+            d = json.load(f)
+        keys |= {d["name"], *(d.get("regions") or {}).values(), *(h["name"] for h in d["holidays"])}
+    return keys
+
+
 def skip_ws(src, i):
     return _WS.match(src, i).end()
 

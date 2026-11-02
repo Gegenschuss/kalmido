@@ -6,7 +6,7 @@ Invented names and texts only (example.com / example.test).
    the history (search, mood filter, cursor), the statistics, the export (Markdown / CSV, "my data"), the 409 of a stale save
  - nobody else reads it: another person sees no entry, an agent and a token without the scope "private" get no journal
  - a plain entry from before (written straight into the database) is read and sealed by encrypt-all
- - a private filed mail (hub inbox of the private space): sender, subject, text sealed, shown plain to its owner
+ - a private filed mail (hub inbox of the private workspace): sender, subject, text sealed, shown plain to its owner
  - the way back: decrypt-private opens journal + private mails (organisation mails stay sealed), new entries stay plain
    (private_encrypt=0, the privacy line says so), encrypt-private seals everything again
  - 2.306.0 Fix-2a: a text that only looks sealed stays a text, a sent private mail is sealed, a plain mood written later wins,
@@ -125,7 +125,7 @@ def export_of(s, secs=120):
 
 
 def import_into(s, data, secs=180):
-    """2.306.0 Fix-2a: the account import of the ZIP data into the private space of session s -> its final state."""
+    """2.306.0 Fix-2a: the account import of the ZIP data into the private workspace of session s -> its final state."""
     r = s.post(B + "/api/account/import", json={"size": len(data), "name": "kalmido-account.zip"})
     assert r.ok, r.text
     iid, off = r.json()["id"], 0

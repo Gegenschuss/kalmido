@@ -4,7 +4,7 @@
  - since=<updated_at>: only the pages changed at or after it carry their text, the others only their entry (id, updated_at);
    a deleted page is no longer listed; a page moved in from another space is listed (the browser fetches everything then)
  - a space of another organisation stays closed (403), also with offline=1
- - a person without an organisation (freelancer-matrix: wiki): the private space the same way, nobody else reads it
+ - a person without an organisation (freelancer-matrix: wiki): the private workspace the same way, nobody else reads it
 usage: p2169_a_api_test.py <datadir>      (P2169A_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import os
 import subprocess
@@ -98,7 +98,7 @@ FID, Fr = freelancer(B, A, features="cal,comments,collab,wiki")
 F1 = page(Fr, "private", "Diary", "Papaya private notes")
 st, j = idx(Fr, "private", offline="1")
 by = {p["id"]: p for p in j.get("pages", [])}
-check(st == 200 and by.get(F1, {}).get("body") == "Papaya private notes" and j.get("may_write") is not False, f"freelancer: the private space with its texts {st}")
+check(st == 200 and by.get(F1, {}).get("body") == "Papaya private notes" and j.get("may_write") is not False, f"freelancer: the private workspace with its texts {st}")
 fs = max(p["updated_at"] for p in j["pages"])
 time.sleep(1.1)
 F2 = page(Fr, "private", "Ideas", "Quince ideas")
@@ -106,7 +106,7 @@ st, j = idx(Fr, "private", offline="1", since=fs)
 by = {p["id"]: p for p in j.get("pages", [])}
 check(by.get(F2, {}).get("body") == "Quince ideas" and set(by) == {F1, F2}, f"freelancer: since sends the new text, lists both {by}")
 st, j = idx(A, "private", offline="1")
-check(st == 200 and not any(p["id"] in (F1, F2) for p in j.get("pages", [])), "freelancer: nobody else's private space shows the pages")
+check(st == 200 and not any(p["id"] in (F1, F2) for p in j.get("pages", [])), "freelancer: nobody else's private workspace shows the pages")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

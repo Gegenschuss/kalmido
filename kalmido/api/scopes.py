@@ -16,6 +16,7 @@ from ..core.db import bump, db, err, gsetting, iso, now_utc, usettings
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import Denied, need_list, need_task, need_time, ROLES, task_visible, token_lists, tvis, vis_sql, wr_sql, list_role
+from ..core.access import qn_private  # 2.477.0 (#3881)
 from ..core.serializers import load_tasks
 from ..core.state import visible_lists
 from ..lists.lists import list_delete, member_remove, member_set
@@ -39,7 +40,8 @@ from ..tasks.dependencies import dep_add, dep_remove, deps_get
 from ..lists.projects import list_status_set, LIST_STATUSES
 from ..lists.fields import field_create, field_delete, field_dict, field_update, need_field
 from ..api.v1 import (
-    _v1_live, API_SCOPES, api_scopes, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, SCOPES_WRITE, STATUS_NAMES, v1_comment, v1_entry, v1_habit, v1_limit, v1_one, v1_task, V1_TASK_IN, v1_task_in,
+    _V1_FIELD_OUT, _v1_live, API_SCOPES, api_scopes, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, SCOPES_WRITE, STATUS_NAMES, v1_comment, v1_entry, v1_habit, v1_limit, v1_one, v1_prev_in, v1_task,
+    V1_TASK_IN, v1_task_in,
 )
 from ..api.common import cursor_dec, v1_args, v1_call, v1_feature, v1_json, v1_page, v1_view
 from ..api.openapi import openapi_spec
@@ -103,7 +105,7 @@ SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, searc
               "files:read": N_("List and read the folders and files shared with you"),  # 2.48.0 (#1207)
               "files:write": N_("Add files and new versions where you may edit"),
               # 2.51.0 A (#1348): also needs the agent's switch and the office's privacy switch
-              "office": N_("Read clients, services and prices of the office; quotation, invoice and reminder drafts, payment suggestions"),
+              "office": N_("Read clients, services and prices of the office; quotation, invoice and payment reminder drafts, payment suggestions"),
               "pinboard": N_("Write notepads on project pages (an agent changes only its own, e.g. a weekly status)"),  # 2.51.0 (#1352)
               "layouts": N_("See how your views are arranged (blocks only, never their content) and propose arrangements you accept or decline"),  # 2.55.0 (#1066)
               "import": N_("Read your old data (for example fixed costs) and send it as an import proposal you check and take over into the office; never sees the office itself"),  # 2.68.0 (#1839)
@@ -112,7 +114,7 @@ SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, searc
               "docs:upload": N_("Only upload documents into one place; reads nothing, deletes nothing"),  # 2.207.0 A (#2763)
               "wiki:read": N_("Knowledge pages shared with you (the page or a folder above it): their text"),  # 2.200.0 C (#1781)
               "wiki:write": N_("Change the text of knowledge pages shared with you to edit and add pages in such folders; every save stays in the page history"),
-              "account": N_("Notification settings and app passwords (an app password gives calendar apps full access to your tasks)"), "admin-read": N_("Users and server status (admins only)")}
+              "account": N_("Notification settings and app passwords (an app password gives calendar apps full access to your tasks)"), "admin-read": N_("People and server status (admins only)")}
 ROLE_WORD = {"admin": N_("Admin"), "edit": N_("Member"), "participant": N_("Participant"), "view": N_("Read-only")}  # 2.364.0 C (#3041): one role word
 BATCH_TITLE = {"update": N_("Change {0} tasks at once"), "complete": N_("Complete {0} tasks at once"), "reopen": N_("Reopen {0} tasks at once"),
                "wont_do": N_("Mark {0} tasks as won’t do"), "delete": N_("Move {0} tasks to the trash"),
@@ -500,7 +502,7 @@ def _v1_body(allowed):
 
 def v1_section(r):
     return {"id": r["id"], "list_id": r["list_id"], "name": r["name"], "sort": r["sort"],
-            "wip_limit": r["wip_limit"]}  # 2.60.0 (#1510): null = no limit
+            "wip_limit": r["wip_limit"], "wip_hard": bool(r["wip_hard"])}  # 2.60.0 (#1510): null = no limit; 2.392.0 A (#3367): wip_hard
 
 
 @app.get("/api/v1/lists/<int:lid>/sections")
@@ -517,10 +519,10 @@ def v1_sections(lid):
 def v1_section_create(lid):
     """{name, before_id?}: a new section at the end (or in front of section before_id)."""
     v1_args(())
-    b = _v1_body(("name", "before_id", "wip_limit"))
+    b = _v1_body(("name", "before_id", "wip_limit", "wip_hard"))
     c = db()
     need_list(c, lid)
-    fwd = {"list_id": lid, "name": b.get("name"), "wip_limit": b.get("wip_limit")}  # 2.60.0 (#1510)
+    fwd = {"list_id": lid, "name": b.get("name"), "wip_limit": b.get("wip_limit"), "wip_hard": b.get("wip_hard")}  # 2.60.0 (#1510); 2.392.0 A (#3367)
     if b.get("before_id") is not None:
         bid = as_int(b["before_id"], "before_id", 1)
         cur = c.execute("SELECT id, sort FROM sections WHERE list_id=? ORDER BY sort, id", (lid,)).fetchall()
@@ -536,10 +538,10 @@ def v1_section_create(lid):
 @v1_view
 def v1_section_update(sid):
     v1_args(())
-    b = _v1_body(("name", "wip_limit"))  # 2.60.0 (#1510): + wip_limit (null = no limit)
-    if "name" not in b and "wip_limit" not in b:
+    b = _v1_body(("name", "wip_limit", "wip_hard"))  # 2.60.0 (#1510): + wip_limit (null = no limit); 2.392.0 A (#3367): + wip_hard
+    if not any(k in b for k in ("name", "wip_limit", "wip_hard")):
         raise BadInput(tr("Nothing to change"))
-    v1_call(section_update, sid, body={k: b[k] for k in ("name", "wip_limit") if k in b})
+    v1_call(section_update, sid, body={k: b[k] for k in ("name", "wip_limit", "wip_hard") if k in b})
     return jsonify(v1_section(db().execute("SELECT * FROM sections WHERE id=?", (sid,)).fetchone()))
 
 
@@ -620,13 +622,31 @@ def v1_task_move(tid):
 BATCH_ACTIONS = ("update", "complete", "reopen", "wont_do", "delete", "restore")
 
 
+def _v1_batch_per(raw, name, ids):
+    """2.370.0 (#3126): `_prev` / `expect` of a batch: an object with the ids of the batch as keys."""
+    if not isinstance(raw, dict) or any(not k.isdigit() or int(k) not in ids for k in raw):
+        raise BadInput(tr("Invalid value: {0}", name))
+    return raw
+
+
+def _v1_batch_expect(e):
+    """2.370.0 (#3126): {expect_due, expect_time?} of one task -> what the web batch compares ({due, due_time?})."""
+    if not isinstance(e, dict) or "expect_due" not in e or set(e) - {"expect_due", "expect_time"} \
+            or any(v is not None and (not isinstance(v, str) or len(v) > 32) for v in e.values()):
+        raise BadInput(tr("Invalid value: {0}", "expect"))
+    return {"due": e["expect_due"], **({"due_time": e["expect_time"]} if "expect_time" in e else {})}
+
+
 @app.post("/api/v1/tasks/batch")
 @v1_view
 def v1_task_batch():
     """{ids (1-500), action: update | complete | reopen | wont_do | delete | restore, changes? (update: task fields)} --
-    one transaction; tasks you may not change are skipped and reported in errors."""
+    one transaction; tasks you may not change are skipped and reported in errors. 2.370.0 (#3126), as the single changes:
+    update takes _prev {id: {field: value read}}: a field changed since stays and a task with nothing left is skipped;
+    complete / wont_do take expect {id: {expect_due, expect_time?}}: a task that moved on is skipped. Both are listed in
+    conflicts. Without them nothing is compared."""
     v1_args(())
-    b = _v1_body(("ids", "action", "changes"))
+    b = _v1_body(("ids", "action", "changes", "_prev", "expect"))
     ids = b.get("ids")
     if not isinstance(ids, list) or not 1 <= len(ids) <= 500 or any(isinstance(i, bool) or not isinstance(i, int) for i in ids):
         raise BadInput(tr("Invalid value: {0}", "ids"))
@@ -643,6 +663,11 @@ def v1_task_batch():
         data = v1_task_in(ch, tuple(k for k in V1_TASK_IN if k not in ("parent_id", "reviewer_id")))  # 2.390.0 B (#3355): reviewer one by one
     elif b.get("changes"):
         raise UnknownFields(["changes"])
+    for k, acts in (("_prev", ("update",)), ("expect", ("complete", "wont_do"))):
+        if k in b and act not in acts:
+            raise UnknownFields([k])
+    prev = {k: v1_prev_in(v) for k, v in _v1_batch_per(b["_prev"], "_prev", ids).items()} if "_prev" in b else {}
+    expect = {k: _v1_batch_expect(v) for k, v in _v1_batch_per(b["expect"], "expect", ids).items()} if "expect" in b else {}
     c = db()
     ids = list(dict.fromkeys(ids))
     vis = [i for i in ids if task_visible(c, i, me())]
@@ -664,13 +689,15 @@ def v1_task_batch():
         with _BATCH_LOCK:
             _BATCH_SEEN.setdefault(me(), []).append((time.time(), len(vis)))
     if act == "wont_do":
-        act, data = "complete", {"status": -1}
+        act, data = "complete", {"status": -1, "expect": expect}
     elif act == "complete":
-        data = {"status": 2}
+        data = {"status": 2, "expect": expect}
+    elif prev:
+        data = {**data, "prev": prev}
     j = v1_call(task_batch, body={"ids": vis, "action": "patch" if act == "update" else act, "data": data})
     hidden = len(ids) - len(vis)
     return jsonify(count=j.get("count", 0), errors=j.get("errors", []) + ([trn("{0} task not found", "{0} tasks not found", hidden)] if hidden else []),
-                   conflicts=j.get("conflicts", []))
+                   conflicts=[{**x, "field": _V1_FIELD_OUT.get(x["field"], x["field"])} for x in j.get("conflicts", [])])
 
 
 @app.post("/api/v1/tasks/<int:tid>/skip")
@@ -851,8 +878,8 @@ def v1_template_apply(tid):
 @app.post("/api/v1/lists/<int:lid>/duplicate")
 @v1_view
 def v1_list_duplicate(lid):
-    """2.78.0 (#1881): a copy of the list ({name?, done?, folder?}): sections, tasks with their dates, fields, dependencies,
-    Playbook, notepads, page; without members, shares and assignees. done = the completed tasks too."""
+    """2.78.0 (#1881): a copy of the list ({name?, done?, folder?}): everything except comments and times (2.363.3, #3134), without
+    members and shares; assignees stay where they may be assigned in the copy. done = the completed tasks too."""
     v1_args(())
     b = _v1_body(("name", "done", "folder"))
     if "done" in b and not isinstance(b["done"], bool):
@@ -1026,6 +1053,7 @@ def v1_member_set(lid, user_id):
     uid = as_int(user_id, "user_id", 1)
     c = db()
     need_list(c, lid, write=False, manage=True)
+    qn_private(c, lid)  # 2.477.0 (#3881): the list "Notes" stays private
     role = str(b.get("role") or "edit")
     if role not in ROLES:
         raise BadInput(tr("Role must be admin, edit, participant or view"))
@@ -1263,7 +1291,10 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                                          # 2.60.0 (#1510)
                                                          "wip_limit": nul("integer", minimum=1, maximum=999, description="2.60.0: the "
                                                                           "most open tasks the kanban column should hold (a hint, "
-                                                                          "moving stays allowed); null = no limit")}}
+                                                                          "moving stays allowed); null = no limit"),
+                                                         "wip_hard": {"type": "boolean", "description": "2.392.0: true = while the column holds "
+                                                                      "more open tasks than wip_limit, an agent cannot start a job on a task "
+                                                                      "of this project (409 wip_full); default false"}}}
     schemas["SectionPage"] = page("Section")
     schemas["Field"] = {"type": "object", "properties": {"id": {"type": "integer"}, "list_id": {"type": "integer"}, "name": {"type": "string"},
                                                        "type": {"type": "string"}, "options": obj, "pinned": {"type": "integer"},
@@ -1295,7 +1326,8 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
             "post": op("Create a section (at the end or before before_id)", S, ok(ref("Section"), "Created", "201") | errs("400", "403", "404"),
                        [lp], scope="structure", body={"type": "object", "required": ["name"], "properties": {
                            "name": {"type": "string", "maxLength": 200}, "before_id": {"type": "integer"},
-                           "wip_limit": nul("integer", minimum=0, maximum=999)}})},  # 2.60.0 (#1510)
+                           "wip_limit": nul("integer", minimum=0, maximum=999),
+                           "wip_hard": {"type": "boolean"}}})},  # 2.60.0 (#1510); 2.392.0 A (#3367)
         "/lists/{id}/sections/order": {"put": op("Reorder all sections of a project", S, ok(ref("SectionPage")) | errs("400", "403", "404"), [lp],
                                                  scope="structure", body={"type": "object", "required": ["ids"], "properties": {"ids": ids}},
                                                  desc="ids: every section of the project exactly once, in the new order.")},
@@ -1303,8 +1335,10 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
             # 2.60.0 (#1510): + wip_limit
             "patch": op("Rename a section / set its WIP limit", S, ok(ref("Section")) | errs("400", "403", "404"), [pid("id", "Section id")],
                         scope="structure", body={"type": "object", "properties": {"name": {"type": "string"},
-                                                                                   "wip_limit": nul("integer", minimum=0, maximum=999)}},
-                        desc="wip_limit: the most open tasks the kanban column should hold (a hint only); null or 0 = no limit."),
+                                                                                   "wip_limit": nul("integer", minimum=0, maximum=999),
+                                                                                   "wip_hard": {"type": "boolean"}}},
+                        desc="wip_limit: the most open tasks the kanban column should hold (a hint only); null or 0 = no limit. "
+                             "wip_hard (2.392.0, #3367): true = while the column is over the limit, an agent cannot start a new job on its tasks."),
             "delete": op("Delete a section (its tasks stay in the project)", S, ok(obj) | errs("403", "404"), [pid("id", "Section id")], scope="delete")},
         "/tasks/{id}/move": {"post": op("Move a task: project, section, parent and place", T, ok(ref("Task")) | errs("400", "403", "404"), [pid()],
                                         scope="tasks:write", body={"type": "object", "properties": {
@@ -1316,9 +1350,15 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "/tasks/batch": {"post": op("Change many tasks at once", T, ok(obj) | acc | errs("400", "403"), scope="tasks:write",
                                     body={"type": "object", "required": ["ids", "action"], "properties": {
                                         "ids": {**ids, "minItems": 1, "maxItems": 500}, "action": {"type": "string", "enum": list(BATCH_ACTIONS)},
-                                        "changes": {"type": "object", "description": "update: task fields (as PATCH /tasks/{id})"}}},
+                                        "changes": {"type": "object", "description": "update: task fields (as PATCH /tasks/{id})"},
+                                        "_prev": {"type": "object", "description": "update, 2.370.0: {id: {field: the value you read}}: a field changed since "
+                                                                                   "stays as it is, a task with nothing left is skipped; listed in conflicts"},
+                                        "expect": {"type": "object", "description": "complete / wont_do, 2.370.0: {id: {expect_due, expect_time?}} (expect_due: the "
+                                                                                    "due date you read, null = none): a task that moved on or is done already is "
+                                                                                    "skipped and listed in conflicts"}}},
                                     desc="One transaction; tasks you may not change are skipped (errors). delete / restore also need the "
-                                         f"scope delete. Agents: {APPROVAL_BATCH_MIN} or more tasks wait for a person's approval (202).")},
+                                         f"scope delete. Agents: {APPROVAL_BATCH_MIN} or more tasks wait for a person's approval (202). The answer: "
+                                         "count, errors, conflicts [{id, title, field, server, mine}]. Without _prev / expect nothing is compared.")},
         "/tasks/{id}/skip": {"post": op("Skip this occurrence of a repeating task", T, ok(ref("Task")) | errs("400", "403", "404"), [pid()],
                                         scope="tasks:write")},
         "/tasks/{id}/restore": {"post": op("Restore a task from the trash", T, ok(ref("Task")) | errs("403", "404", "409"), [pid()], scope="delete")},

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.98.0 API tests, part A (#1953): scheduling polls, own container (start.sh). Invented names only, addresses @example.com.
  - module "events" needed (409 without); people only: an agent token and a personal API token are refused (403)
- - creating: 2-20 times (1 or 21: 400), a link, the poll in the private space; changing the times keeps the votes of a time
+ - creating: 2-20 times (1 or 21: 400), a link, the poll in the private workspace; changing the times keeps the votes of a time
  - the public page /s/v/<token> without an account: the times, a name + yes / maybe / no, the signed page stamp (too quick or
    used twice: sent again), the honeypot (pretends, nothing stored), the own vote changed through the cookie and through the
    edit link; the names of the voters with their answers, never an address; show_votes off: no names
@@ -293,7 +293,7 @@ check(r.ok and r.json()["space"] == "private" and Ca.get(B + f"/api/polls/{TP}")
 # ================================================================ a person without an organisation (freelancer-matrix: polls)
 FID, Fl = freelancer(B, A)
 r = mk(Fl, title="Freelance kickoff")
-check(r.status_code == 201 and r.json()["poll"]["space"] == "private", "freelancer: created in the private space")
+check(r.status_code == 201 and r.json()["poll"]["space"] == "private", "freelancer: created in the private workspace")
 FP = r.json()["poll"]
 FPP = path(FP["url"])
 _, _, sf = page(V3, FPP)

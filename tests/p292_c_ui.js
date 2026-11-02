@@ -2,7 +2,7 @@
 // - a task's .docx opens in the document preview (not a download): heading, bold text, list, table, built from the model
 //   (an HTML tag in the file stays text); Close and Escape close it
 // - a task's .xlsx: one tab per sheet, column letters and row numbers, a tap on the second tab shows its cells
-// - "Summarize" only when an agent that sees the task can be asked: without one the hint how to connect / share; with the
+// - "Summarise" only when an agent that sees the task can be asked: without one the hint how to connect / share; with the
 //   agent in the list the button, the dialog names the agent, the comment mentions it; one undo step removes it again
 // - an Ablage file (.docx) opens in the same preview
 // - phone width: the preview fits the screen, large tap targets, screenshot
@@ -103,7 +103,7 @@ const post = async (url, name, data, type, extra = {}) => {
     check(await ev(`(() => { const d = document.querySelector('.dpvdoc'); return !d.querySelector('img') && /<img src=x/.test(d.textContent); })()`), '#1926: markup in the file stays text');
     check(await ev(`!!document.querySelector('.dpview a[download]')`), '#1926: download in the bar');
     check(await ready(ev, `!!document.querySelector('.dpview .dpvfoot:not([hidden])') && !document.querySelector('.dpview .dpvsum')`) || await ev(`!document.querySelector('.dpview .dpvsum')`),
-      '#1926: no agent in the list: no "Summarize" (a hint instead when agents are on)');
+      '#1926: no agent in the list: no "Summarise" (a hint instead when agents are on)');
     await shot('p292c-docx.png');
     await ev(`(() => { document.querySelector('.dpview').dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.lightbox')`), '#1926: Escape closes the preview');
@@ -118,11 +118,11 @@ const post = async (url, name, data, type, extra = {}) => {
     await shot('p292c-xlsx.png');
     await click(ev, '[data-dpv="x"]');
     check(await ready(ev, `!document.querySelector('.lightbox')`), '#1926: Close closes it');
-    // ---- the agent in the list: "Summarize"
+    // ---- the agent in the list: "Summarise"
     const m = await call('PUT', `/api/lists/${L}/members`, {user_id: ag.id, role: 'edit'});
     check(m.status < 300, 'setup: the agent in the list ' + m.status);
     await ev(`(() => { ${tile('plan.docx')}.click(); return 1; })()`);
-    check(await ready(ev, `!!document.querySelector('.dpview .dpvsum')`, 60), '#1926: with an agent that sees the task: "Summarize"');
+    check(await ready(ev, `!!document.querySelector('.dpview .dpvsum')`, 60), '#1926: with an agent that sees the task: "Summarise"');
     await click(ev, '.dpview .dpvsum');
     check(await ready(ev, `!!document.querySelector('.modal.cdlg') && /plan\\.docx/.test(document.querySelector('.modal .dpvwho')?.textContent || '') && /Claude/.test(document.querySelector('.modal .dpvwho').textContent)`),
       '#1926: the dialog names the file and the agent');
@@ -140,7 +140,7 @@ const post = async (url, name, data, type, extra = {}) => {
     check(await ready(ev, `[...document.querySelectorAll('[data-ab="open"]')].some(b => /brief\\.docx/.test(b.textContent))`, 60), 'the Ablage lists the file');
     await ev(`(() => { [...document.querySelectorAll('[data-ab="open"]')].find(b => /brief\\.docx/.test(b.textContent)).click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.dpview .dpvdoc h2')`, 60), '#1926: an Ablage .docx opens in the preview');
-    check(await ev(`!document.querySelector('.dpview .dpvsum')`), '#1926: no "Summarize" for an Ablage file (no comments there)');
+    check(await ev(`!document.querySelector('.dpview .dpvsum')`), '#1926: no "Summarise" for an Ablage file (no comments there)');
     await click(ev, '[data-dpv="x"]');
     // ---- phone
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});

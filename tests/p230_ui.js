@@ -94,6 +94,7 @@ async function firefox(fn) {
   w = await boot({user: 'alice', hash: 'l/' + TEAM}); d = w.document;
   check(w.eval('propOn()') === true && w.eval('S.proposers.length') === 1, 'proposers loaded');
   w.eval(`taskMenu(document.querySelector('#top h1'), ${T})`);
+  click(w, d.querySelector('#pop .mtmore'));  // 2.445.0 (#3008): the rare entries are under "More…"
   check(menuTexts(d).some(x => x === 'Break down with Claude…'), 'task menu: Break down with Claude… ' + menuTexts(d).join('|'));
   menuClick(w, d, /Break down with Claude/);
   let md = await until(() => d.querySelector('.modal.ppreq'));
@@ -279,6 +280,7 @@ async function firefox(fn) {
   await call('PATCH', '/api/settings', {lang: 'de'});
   w = await boot({user: 'alice', hash: 'l/' + TEAM}); d = w.document;
   w.eval(`taskMenu(document.querySelector('#top h1'), ${T})`);
+  click(w, d.querySelector('#pop .mtmore'));  // 2.445.0 (#3008): under "Mehr…"
   check(menuTexts(d).includes('Mit Claude aufteilen…'), 'German: Mit Claude aufteilen…');
   menuClick(w, d, /Mit Claude aufteilen/);
   md = await until(() => d.querySelector('.modal.ppreq'));

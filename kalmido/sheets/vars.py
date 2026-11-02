@@ -1,5 +1,6 @@
 """2.89.0 (#1916): Kalmido variables of table formulas -- projekt.<name>.<field>, liste.<name>.<field>, kunde.<name>.<field>,
-hier.<field> (the sheet's attached project / list), evaluated PER VIEWER.
+hier.<field> (the sheet's attached project / list), evaluated PER VIEWER. 2.368.3 (#2988): in English project. list. client. task.
+here. with English fields; both are understood, each person reads their own.
 
 A source counts for a viewer only when they see it right now (lists: list_role, which already applies the organisation
 boundary, health / budget lists, an API token's list limit; agents also their own list limit and never a list with the lock;
@@ -15,7 +16,7 @@ from flask import g, has_request_context
 
 from ..core.access import list_role, tvis, vis_sql, plists, task_visible
 from ..core.i18n import N_, LANGS, tr
-from .formula import ShErr, sh_slug
+from .formula import ShErr, sh_is_de, sh_slug
 
 SH_LIST_FIELDS = ("zeit_gesamt", "aufgaben", "offen", "erledigt", "budget_h")
 SH_CLIENT_FIELDS = ("satz", "budget_h", "budget_betrag", "zeit_gesamt")
@@ -23,11 +24,36 @@ SH_FIELD_HELP = {"zeit_gesamt": N_("Tracked time in hours"), "aufgaben": N_("Num
                  "erledigt": N_("Completed tasks"), "budget_h": N_("Budget in hours"), "satz": N_("Hourly rate"),
                  "budget_betrag": N_("Budget amount")}
 SH_VAR_WORD = {"p": "projekt", "l": "liste", "k": "kunde", "t": "aufgabe"}
+# 2.368.3 (#2988): the English words, equal to the German ones when typed; stored are the ids and the German field keys, shown the
+# viewer's language. No reserved words: a dotted name is never a cell or column, so "Project" or "Client" stay free as names.
+SH_VAR_WORD_EN = {"p": "project", "l": "list", "k": "client", "t": "task"}
+SH_VAR_TYPE = {**{w: t for t, w in SH_VAR_WORD.items()}, **{w: t for t, w in SH_VAR_WORD_EN.items()}}
+SH_HERE_WORDS = ("hier", "here")
+SH_FIELD_EN = {"zeit_gesamt": "total_time", "aufgaben": "tasks", "offen": "open", "erledigt": "done", "satz": "rate",
+               "budget_betrag": "budget_amount", "titel": "title", "faellig": "due", "zeit": "time", "zustaendig": "assignee"}
+SH_FIELD_KEY = {w: k for k, w in SH_FIELD_EN.items()}
 # 2.89.0 (#1916, D): aufgabe.<id>.<field> = one task (the rows "list as rows" puts into a sheet); its name is the id (task
 # titles are not unique), the viewer must see the task (participants: only their own) in a list of the sheet's space
 SH_TASK_FIELDS = ("titel", "status", "faellig", "zeit", "zustaendig")
 SH_FIELD_HELP.update({"titel": N_("Title"), "status": N_("Status"), "faellig": N_("Due"), "zeit": N_("Tracked time in hours"),
                       "zustaendig": N_("Assignee")})
+
+
+def sh_field_key(word):
+    """The stored key of a field typed in either language (an unknown word stays itself)."""
+    return SH_FIELD_KEY.get(word, word)
+
+
+def sh_var_word(typ, lg):
+    return (SH_VAR_WORD if sh_is_de(lg) else SH_VAR_WORD_EN)[typ]
+
+
+def sh_here_word(lg):
+    return SH_HERE_WORDS[0 if sh_is_de(lg) else 1]
+
+
+def sh_field_word(key, lg):
+    return key if sh_is_de(lg) else SH_FIELD_EN.get(key, key)
 
 
 def sh_fields_of(typ):

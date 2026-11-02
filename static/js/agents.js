@@ -21,11 +21,36 @@ const agentAge = () => (Date.now() - (S.agentsAt || Date.now())) / 1000;
 // 2.6.0 (K08): "not connected" (grey) instead of a green "ready" for an agent that never got in touch (no event poll, no API
 // call) or has not for 5 minutes; a webhook agent is told about events, so only its explicit "offline" counts
 const agentOffline = a => !!a && (a.online === false || (!a.webhook && (a.contact_age === null || a.contact_age === undefined || a.contact_age + agentAge() > 300)));
+// 2.366.0 (#3000): never got in touch at all (set up, but not yet connected on a computer)
+const agentNever = a => !!a && !a.webhook && (a.contact_age === null || a.contact_age === undefined);
 // 2.26.0 (#949): paused with a reason ("does not answer right now: …"); (#933) "connected, but no service running": its
 // token is used (an interactive session) but nothing has collected its events for 10 minutes
-const agentSt = a => !a.enabled ? tr('paused') : a.status === 'paused' ? tr('paused: {0}', a.pause_reason || a.status_text || '') : agentOffline(a) ? tr('not connected') : a.limit_reached ? tr('limit reached') : a.no_service && (a.status || 'idle') === 'idle' ? tr('connected, but no service running') : tr(AGENT_ST[a.status] || AGENT_ST.idle);  // 2.1.1 (#326)
+const AGENT_TXT = {status_chat: N_('Answering in the chat'), status_event: N_('Working on an event'), status_no_command: N_('The agent command cannot be started'), status_run_failed: N_('The last run failed'),
+  status_outside_hours: N_('Outside working hours'), status_outside_hours_at: N_('Outside working hours, back {0}'), status_plan_limit: N_('Plan limit reached'), status_plan_limit_at: N_('Plan limit reached, back at {0}')};
+// 2.450.0 (#3769): the status text of the reference starter in the language of whoever looks; an unknown key or an older starter: its own text
+const agentStTx = a => { if (!a.status_text) return ''; const at = a.status_key_at ? new Date(a.status_key_at) : null, tim = at && !isNaN(at) ? AGENT_TXT[a.status_key + '_at'] : ''; return tim ? tr(tim, fmtStamp(at)) : AGENT_TXT[a.status_key] ? tr(AGENT_TXT[a.status_key]) : a.status_text; };
+const agentSt = a => !a.enabled ? tr('paused') : a.status === 'paused' ? tr('paused: {0}', agentStTx(a) || a.pause_reason || '') : agentOffline(a) ? tr('not connected') : a.limit_reached ? tr('limit reached') : a.no_service && (a.status || 'idle') === 'idle' ? tr('connected, but no service running') : tr(AGENT_ST[a.status] || AGENT_ST.idle);  // 2.1.1 (#326)
 const agentDot = id => { const a = agentById(id); return a ? `<i class="adot st-${!a.enabled || a.status === 'paused' ? 'paused' : agentOffline(a) ? 'offline' : esc(a.status)}" title="${esc(agentHstLine(a))}"></i>` : ''; };
-const agentBadge = () => `<span class="abadge" title="${esc(tr('Agent: an AI assistant or bot that works through the API'))}">${ic('bot', 's')}${tr('Agent')}</span>`;
+// 2.482.0 (#3530, EU AI Act Art. 50): "AI agent" unless the agent is marked as a bot without AI (ai: false); an agent the
+// viewer does not know counts as AI (the safe side)
+const agentIsAi = id => agentById(id)?.ai !== false;
+const agentBadge = id => agentIsAi(id) ? `<span class="abadge abai" title="${esc(tr('AI agent: an AI assistant that works through the API. Its texts are written by AI.'))}">${ic('bot', 's')}${tr('AI agent')}</span>`
+  : `<span class="abadge" title="${esc(tr('Agent: a bot without AI that works through the API'))}">${ic('bot', 's')}${tr('Agent')}</span>`;
+// 2.482.0 (#3530, EU AI Act Art. 50 (4)): a quiet note once per document where a text an agent wrote goes out (a letter
+// being sent, a wiki page getting a public link). "Insert label" adds one line; closing or inserting = not shown again for
+// that document (this device). No obligation, nothing is blocked. AIPH_INS[kind](id) inserts the line for its kind.
+const AIPH_INS = {};
+const aiphKey = (kind, id) => `aiph.${kind}.${id}`;
+const aiphLine = () => tr('Created with AI support');
+const aiphHtml = (kind, id) => LS.get(aiphKey(kind, id), false) ? '' : `<div class="aiph" role="note" data-aiph="${esc(kind)}" data-aiph-id="${esc(String(id))}">${ic('info', 's')}<span class="aipht">${esc(tr('Created by an AI agent. Texts for the public must be labelled as such, unless a person has checked them and takes responsibility.'))}</span><button type="button" class="btn sm" data-aiph-ins>${esc(tr('Insert label'))}</button><button type="button" class="ib" data-aiph-x aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x', 's')}</button></div>`;
+document.addEventListener('click', async e => {
+  const b = /** @type {any} */ (e.target)?.closest?.('[data-aiph-ins], [data-aiph-x]'); if (!b) return;
+  const box = b.closest('[data-aiph]'); if (!box) return;
+  e.preventDefault(); e.stopPropagation();
+  const kind = box.dataset.aiph, id = box.dataset.aiphId;
+  if (b.hasAttribute('data-aiph-ins')) { const fn = AIPH_INS[kind]; b.disabled = true; try { if (fn && await fn(id) === false) { b.disabled = false; return; } } catch (x) { b.disabled = false; toast(x.message || tr('unknown')); return; } }
+  LS.set(aiphKey(kind, id), true); box.remove();
+});
 // agents of a list that can pick up this task (participant agents only their own tasks)
 function taskAgents(t) {
   const l = t && listById(t.list_id); if (!l || !collab()) return [];
@@ -105,7 +130,8 @@ function agentChip() {
 const BAND_KEYS = ['inbox', 'today', 'tomorrow', 'week', 'all', 'assigned', 'doable'];
 function bandAgents() {
   if (isMobile() || S.route.mod !== 'tasks' || !feat('agents')) return [];
-  const sh = shownAgents(); if (!sh.length) return [];
+  // 2.366.0 (#3000): an agent that never connected takes no row over the tasks (its grey dot in the header says it) until it asks something
+  const sh = shownAgents().filter(a => !agentNever(a) || a.waiting || a.chat_unread || a.approvals_open); if (!sh.length) return [];
   const k = S.route.key;
   if (k.startsWith('l:')) { const l = listById(+k.slice(2)), ids = new Set(listAgents(l).map(a => a.id)); return sh.filter(a => ids.has(a.id)); }
   if (k.startsWith('folder:')) { const ids = new Set(folderLists(k.slice(7)).flatMap(listAgents).map(a => a.id)); return sh.filter(a => ids.has(a.id)); }
@@ -141,11 +167,12 @@ const waitJobBtns = j => j.kind ? `<button class="btn sm pri" data-act="prop-ope
 function waitCard() {
   // 2.13.2 (#478 F14): like the agent pill and the chat, the card follows "agents share lists with me", not the Agents
   // module (that is the tab + the band): what waits for my approval never disappears with a switch
-  if (S.route.key !== 'today' || !agentsOn()) return '';
-  const js = waitJobs(); if (!js.length) return '';
+  if (S.route.key !== 'today') return '';
+  const js = agentsOn() ? waitJobs() : [], n = mwToDo();  // 2.392.0 D (#3369): the rest stands in the view "Waiting for me", not here
+  if (!js.length) return n ? `<section class="waitcard"><a class="linkbtn" href="#mine_wait">${esc(trn('{0} thing waits for you', '{0} things wait for you', n))}</a></section>` : '';
   return `<section class="waitcard" aria-labelledby="wc-h"><h3 id="wc-h">${hdot('waiting')} ${esc(trn('{0} job waits for you', '{0} jobs wait for you', js.length))}</h3>
     ${js.slice(0, 5).map(j => `<div class="wcrow"><div class="wci"><b>${esc(j.title)}</b><span class="muted">${esc(j.agent_name)}${j.task_id ? ` · #${j.task_id} ${esc(j.task_title || '')}` : ''}</span></div><div class="wcb">${waitJobBtns(j)}</div></div>`).join('')}
-    ${js.length > 5 ? `<a class="linkbtn" href="#agents">${esc(trn('and {0} more', 'and {0} more', js.length - 5))}</a>` : ''}</section>`;
+    ${n > 5 || js.length > 5 ? `<a class="linkbtn" href="#mine_wait">${esc(tr('Everything that waits for you'))}</a>` : ''}</section>`;
 }
 function agBandHtml() {
   const ags = bandAgents(); if (!ags.length) return '';
@@ -296,7 +323,7 @@ async function tagPromote(t, g) {
 // list dialog: the list tags (members with edit rights manage them) and "Agent may tidy up entries"
 function ltagsBoxHtml(l) {
   const lt = listTags(l.id), may = canEditList(l.id);
-  return `${lt.length ? lt.map(x => `<div class="mrow" data-ltid="${x.id}"><span class="ltsw" style="${cssColor(x.color) ? 'background:' + cssColor(x.color) : ''}"></span><span class="n">#${esc(x.name)}</span>${may ? `<button class="iconbtn" data-lt="color" title="${tr('Color')}">${ic('palette', 's')}</button><button class="iconbtn" data-lt="ren" title="${tr('Rename')}">${ic('edit', 's')}</button><button class="iconbtn danger" data-lt="del" title="${tr('Delete')}">${ic('trash', 's')}</button>` : ''}</div>`).join('')
+  return `${lt.length ? lt.map(x => `<div class="mrow" data-ltid="${x.id}"><span class="ltsw" style="${cssColor(x.color) ? 'background:' + cssColor(x.color) : ''}"></span><span class="n">#${esc(x.name)}</span>${may ? `<button class="iconbtn" data-lt="color" title="${tr('Colour')}">${ic('palette', 's')}</button><button class="iconbtn" data-lt="ren" title="${tr('Rename')}">${ic('edit', 's')}</button><button class="iconbtn danger" data-lt="del" title="${tr('Delete')}">${ic('trash', 's')}</button>` : ''}</div>`).join('')
     : `<div class="muted mhint">${tr('No project tags yet.')}</div>`}${may ? `<div class="row"><input id="l-ltnew" placeholder="${tr('New project tag')}" maxlength="60"><button class="btn sm" data-lt="new">${ic('plus', 's')} ${tr('Add')}</button></div>` : ''}`;
 }
 // 2.41.2 (#1501): a list tag renamed (to = new name) or deleted (to = null) in the list and on its tasks, locally
@@ -319,7 +346,7 @@ function ltagsWire(md, lid) {
       if (a === 'new') { const v = $('#l-ltnew', md).value.trim().replace(/^#/, ''); if (!v) return; const t = await api('POST', `/api/lists/${lid}/tags`, {name: v}); const l = listById(lid); if (l && t?.id) l.tags = [...(l.tags || []).filter(y => y.id !== t.id), {id: t.id, name: t.name, color: t.color || ''}]; }
       if (a === 'ren' && x) { const v = await askPrompt(tr('Rename the project tag'), x.name, {ok: tr('Rename')}); if (!v || v.trim() === x.name) return; const nn = v.trim().replace(/^#/, ''); await optWrite(ltagPut(lid, x.name, nn), () => api('PATCH', `/api/list-tags/${tid}`, {name: nn})); redraw(); return; }
       if (a === 'color' && x) {
-        const p = openPop(b, `<div class="colors ltcols" role="group" aria-label="${esc(tr('Color'))}">${LCOLORS.map(c => `<button data-c="${c}" style="background:${c || 'var(--bg4)'}" class="${(x.color || '') === c ? 'on' : ''}" aria-label="${esc(c || tr('No color'))}"></button>`).join('')}</div>`);
+        const p = openPop(b, `<div class="colors ltcols" role="group" aria-label="${esc(tr('Colour'))}">${LCOLORS.map(c => `<button data-c="${c}" style="background:${c || 'var(--bg4)'}" class="${(x.color || '') === c ? 'on' : ''}" aria-label="${esc(c || tr('No colour'))}"></button>`).join('')}</div>`);
         p.onclick = async ev => {
           const cb = ev.target.closest('[data-c]'); if (!cb) return;
           closePop();
@@ -504,6 +531,12 @@ function jobHtml(j) {
     ${j.action && !(j.action === 'approve' && j.state === 'waiting') ? `<div class="muted jact">${j.action === 'approve' ? thumbIc(true) + ' ' : j.action === 'reject' ? thumbIc(false) + ' ' : ''}${esc({approve: tr('Approved by {0}', j.action_by_name), reject: tr('Rejected by {0}', j.action_by_name), stop: tr('Stopped by {0}', j.action_by_name)}[j.action] || '')}</div>` : ''}
     ${acts ? `<div class="jobb">${acts}</div>` : ''}</div>`;
 }
+// 2.366.0 (#2998): ONE way to create an agent (the Agents area's button, its empty state, the palette): admins get the
+// chooser team / personal, everybody else the "Set up" tab with their personal agents (it says when an admin has to allow them)
+function agCreateGo() {
+  if (S.me?.is_admin) { settingsModal('agents'); pg_waitEl('[data-ag="new"]', b => b.click()); } else settingsModal('agentsetup');
+}
+const agSteps = () => `<ol class="agfirst">${[N_('Create the agent'), N_('Share a project with it'), N_('Set it up on your computer')].map(x => `<li>${tr(x)}</li>`).join('')}</ol>`;
 function viewAgents() {
   if (S.jobs.items === null) { S.jobs.items = []; S.jobs.older = []; S.jobs.next = S.jobs.more = null; loadJobs(); aiuLoad().then(() => { if (S.route.mod === 'agents') renderView(); }); }  // 2.1.1: the usage card
   if (S.route.agent && chatFull()) return chatViewHtml(S.route.agent);
@@ -525,7 +558,7 @@ function viewAgents() {
     return `<div class="agview">${S.ly.view === 'agents' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('agents')}</div>`}${lyHtml('agents', P)}</div>`;
   }
   return `<div class="agview">
-    ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty hempty">${botFig('ruhig')}<b>${tr('No agent is available to you yet.')}</b><span>${tr('The owner of a project can let its members use the project’s agent (Share › Agents). You can also connect an agent of your own.')}</span><button type="button" class="btn" data-act="ag-setup">${ic('bot', 's')} ${tr('Connect your own agent…')}</button></div>`}
+    ${ags.length ? `<div class="agcards">${ags.map(card).join('')}</div>` : `<div class="empty hempty">${botFig('ruhig')}<b>${tr('No agent is available to you yet.')}</b><span>${tr('The owner of a project can let its members use the project’s agent (Share › Agents). You can also connect an agent of your own.')}</span>${agSteps()}<button type="button" class="btn pri" data-act="ag-setup">${ic('plus', 's')} ${tr('Add agent…')}</button></div>`}
     ${ags.length ? aiuCardHtml() : ''}
     <div class="agjh"><h2>${tr('Jobs')}</h2><span class="spacer"></span><div class="seg" role="group"><button class="${S.jobs.f === 'open' ? 'on' : ''}" data-act="jobs-f" data-f="open">${tr('Open|jobs')}</button><button class="${S.jobs.f === 'all' ? 'on' : ''}" data-act="jobs-f" data-f="all">${tr('All')}</button></div></div>
     ${S.jobs.err ? `<div class="muted mhint">${esc(S.jobs.err)}</div>` : ''}
@@ -535,7 +568,7 @@ function viewAgents() {
 async function jobDo(jid, a) {
   if (a !== 'approve' && !await askConfirm(a === 'stop' ? tr('Stop this job?') : tr('Reject this job?'), tr('The agent is told at once.'), {ok: a === 'stop' ? tr('Stop') : tr('Reject'), danger: true})) return;
   try { await api('POST', `/api/agents/jobs/${jid}/action`, {action: a}); toast({approve: tr('Approved'), reject: tr('Rejected'), stop: tr('Stopped')}[a]); } catch { return; }
-  await load(); loadJobs(); render();
+  await load(); await mwLoad(true); loadJobs(); render();  // the settled job leaves "Waiting for me" and the Today card at once, not within the minute
 }
 
 // ---- 2.3.0 (#260 #261 #262 #263): agent proposals. A person asks an agent (project from a briefing, break down a task,
@@ -668,7 +701,7 @@ async function propOpen(jid) {
   if (v?.kind === 'ideas') { await loadModule('mindmap').catch(() => {}); if (typeof mm_ideasOpen === 'function') mm_ideasOpen(v); return; }  // 2.156.0 A (#1201): ideas show in the mind map
   if (aim_is(v) && typeof ofcMoney !== 'function') await loadModule('office').catch(() => {});  // 2.68.0 (#1839, review): the preview uses the office module (lazy)
   if (ctr_is(v) && typeof noticeWord !== 'function') await loadModule('life').catch(() => {});  // 2.70.0 C (#1359): the card uses life.js (loaded on demand since 2.65.0)
-  if (['office_text', 'doc_summary', 'report', 'receipt_read', 'sheet_tasks'].includes(v?.kind) && (typeof ast_is !== 'function' || typeof sht_is !== 'function')) await loadModule('asstprop').catch(() => {});  // 2.126.1 A (#2123 #2124): asstprop.js on demand
+  if (['office_text', 'doc_summary', 'report', 'receipt_read', 'card_statement_read', 'sheet_tasks'].includes(v?.kind) && (typeof ast_is !== 'function' || typeof sht_is !== 'function')) await loadModule('asstprop').catch(() => {});  // 2.126.1 A (#2123 #2124): asstprop.js on demand
   if (v?.input?.assistant) v.agent = {...(v.agent || {}), name: tr('Assistant')};  // 2.75.0 (#1411): the built-in assistant, not an agent
   $('.ppm')?.remove();
   const md = modal('');
@@ -823,7 +856,7 @@ async function propApply(b) {
   let r;
   try { r = await calReq('POST', `/api/proposals/${P.jid}/apply`, q); } catch (x) { const e = $('#pp-err', P.md); e.textContent = x.message; e.hidden = false; b.disabled = false; return; }
   P.md.remove(); S.prop = null;
-  await load().catch(() => {}); if (lyp_is(v)) await lyp_after(v); if (aim_is(v)) aim_after(); render();
+  await load().catch(() => {}); await mwLoad(true); if (lyp_is(v)) await lyp_after(v); if (aim_is(v)) aim_after(); render();
   const name = v.agent.name, jid = P.jid, ly = lyp_is(v) ? () => load().then(() => lyp_after(v)).then(render).catch(() => {}) : aim_is(v) ? aim_after : () => {};  // 2.55.0 (#1066); 2.68.0 (#1839)
   // 2.58.0 (#1810): a new project opens its list; Undo removes it again, so it goes back to the view before (when still on it)
   const proj = (v.kind === 'project' || v.kind === 'inquiry') && r.list_id && listById(r.list_id), back = location.hash.slice(1) || LS.get('lastKey', START_KEY);
@@ -845,7 +878,7 @@ async function propDiscard() {
   try { await calReq('POST', `/api/proposals/${P.jid}/discard`); } catch (x) { toast(x.message); return; }
   P.md.remove(); S.prop = null;
   toast(req ? tr('Request cancelled') : tr('Proposal discarded'));
-  load().then(render).catch(() => {});
+  load().then(() => mwLoad(true)).then(render).catch(() => {});
   if (S.route.mod === 'agents') loadJobs();
 }
 
@@ -866,8 +899,8 @@ const AG_SAFE = [
   [N_('Look at the access log'), N_('The project menu > Agent access shows which agents read or changed the project in the last 30 days. Every member of the project sees it.')],
   [N_('End access when it is no longer needed'), N_('Pause the agent or create a new token (the old one stops at once); give tokens an expiry date.')]];
 const AG_SAFE_ADMIN = [N_('By default members may not connect their own agents: allow it only when there is a rule for it.'),
-  N_('Agree which AI providers are allowed (privacy, customer data).'),
-  N_('Share projects with customer data only with agents whose provider has a data processing agreement, or with a local model.')];
+  N_('Agree which AI providers are allowed (privacy, client data).'),
+  N_('Share projects with client data only with agents whose provider has a data processing agreement, or with a local model.')];
 function agSafeHtml() {
   return `<div class="agsafe"><p class="agsafe-lead">${esc(tr('An agent sees only what you share with it. Share as little as needed, and keep private and shared work apart.'))}</p>
     <ol class="agsafe-rules">${AG_SAFE.map(([h, t]) => `<li><b>${esc(tr(h))}</b> <span>${esc(tr(t))}</span></li>`).join('')}</ol>

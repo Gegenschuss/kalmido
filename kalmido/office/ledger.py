@@ -30,11 +30,11 @@ from flask import g, jsonify, request, has_app_context
 
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import N_, tr
-from ..core.db import bump, db, iso, now_utc
+from ..core.db import bump, db, iso, now_utc, ix_ensure
 from ..core.pg import write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_json_store, oc_log_detail
 from ..core.access import Denied
-from ..core.errors import BadInput
+from ..core.errors import BadInput, DeniedKey
 from .model import ofx_name1, ofx_name_clean, ofx_name_lines, office_gate, office_org, office_role, office_settings, pb_cl_sql
 from .packs import office_pack_for
 from .doclang import doc_lg, doc_pack
@@ -60,7 +60,7 @@ FE_MD_LABELS = {"": N_("Managing directors|company"), "shareholders": N_("Shareh
                 "partners": N_("Partners|company"),
                 "gbr_partners": N_("Partners|company, GbR")}  # 2.138.0 E (#2242): GbR partners; "shareholders" stays as stored
 # words of the printed company lines (the document's language); a pack may override them with labels[lang]["company_<key>"]
-COMPANY_WORDS = {"phone": N_("Phone|company"), "email": N_("Email|company"), "tax_number": N_("Tax number|company"), "vat_id": N_("VAT ID|company"),
+COMPANY_WORDS = {"phone": N_("Phone|company"), "email": N_("E-mail|company"), "tax_number": N_("Tax number|company"), "vat_id": N_("VAT ID|company"),
                  "iban": "IBAN", "bic": "BIC", "register": N_("Register court|company"), "managing_directors": N_("Managing directors|company")}
 
 
@@ -76,9 +76,9 @@ def ofx_need_editable(r):
     """409 with a readable reason when document row r is finalised (head, positions, number, delete). 2.38.0: a sent
     document (quotations too, decision of 2026-10-10) is locked the same way; a new version = duplicate."""
     if ofx_locked(r):
-        raise Denied(409, tr(OFX_LOCKED))
+        raise DeniedKey(409, OFX_LOCKED)
     if r is not None and r["status"] == "sent":
-        raise Denied(409, tr(OFX_SENT))
+        raise DeniedKey(409, OFX_SENT)
 
 
 def ofx_number_at_finalize(s, kind):
@@ -373,6 +373,10 @@ def ofx_finalize(c, oid, uid, did):
     sender["company"]["sender_line"] = ofx_sender_line(sender["company"])  # 2.97.1 (#2224): frozen with the rest
     sender["logo_size"], sender["logo_pos"] = s.get("logo_size") or "m", s.get("logo_pos") or "r"  # 2.406.0 (#3501): frozen
     sender["girocode"] = 1 if int(s.get("girocode", 1) or 0) else 0  # 2.147.1 B (#2054): the GiroCode decision, frozen (girocode.py)
+    from .payonline import pol_freeze
+    pay_url = pol_freeze(c, oid, r)
+    if pay_url:
+        sender["payonline"] = pay_url  # 2.469.0 (#3459): the pay link the stored PDF prints, frozen with the rest
     if s.get("exempt_reason"):
         sender["exempt_reason"] = s["exempt_reason"]  # 2.296.0 B (#3169): the exemption reason, frozen (invoices.inv_render)
     if s.get("paper") == "letter":
@@ -413,6 +417,9 @@ def ofx_finalize(c, oid, uid, did):
              "texts": {k: {lang: v.get(lang) or ""} for k, v in (pack.get("texts") or {}).items() if isinstance(v, dict) and isinstance(v.get(lang) or "", str)}}
     from .catalog import pkc_origin  # 2.76.0 (#1023): which pack file exactly (built in or installed from a catalogue)
     tsnap["pack_sha256"], tsnap["pack_source"] = pkc_origin("country", tsnap["pack"])
+    if r["kind"] == "offer":  # 2.453.0 (#3816): the heading in the document's language, frozen (an industry pack may name its own)
+        from .docs import _offer_title
+        tsnap["offer_title"] = _offer_title(s, (pack.get("labels") or {}).get(lang) or {}, lang)
     from .terms import agb_freeze
     agb_freeze(c, oid, r)  # 2.113.2 (#2253): the terms of the document's language, before the stored PDF is written
     ts = iso(now_utc())
@@ -450,7 +457,7 @@ def ofx_migrate(c):
                  "AND column_name='org_id' AND is_nullable='YES'").fetchone() \
             and not c.execute("SELECT 1 FROM office_doc_items WHERE org_id IS NULL LIMIT 1").fetchone():
         c.execute("ALTER TABLE office_doc_items ALTER COLUMN org_id SET NOT NULL")
-    c.execute("CREATE INDEX IF NOT EXISTS office_doc_items_org ON office_doc_items(org_id, doc_id)")
+    ix_ensure(c, "CREATE INDEX IF NOT EXISTS office_doc_items_org ON office_doc_items(org_id, doc_id)")
 
 
 # ---------------------------------------------------------------- routes

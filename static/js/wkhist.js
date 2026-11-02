@@ -53,7 +53,7 @@ async function wkh_dlg(p) {
   };
   try {
     const j = await rawFetch('GET', `/api/wiki/pages/${p.id}/versions`);
-    if (j.e2e) { box.innerHTML = `<div class="muted mhint">${esc(tr('Spaces encrypted in the browser keep no history: the server cannot read their texts.'))}</div>`; return; }
+    if (j.e2e) { box.innerHTML = `<div class="muted mhint">${esc(tr('Workspaces encrypted in the browser keep no history: the server cannot read their texts.'))}</div>`; return; }
     vs = j.versions || []; list();
   } catch (e) { box.innerHTML = `<div class="muted mhint">${esc(e.message)}</div>`; return; }
   md.addEventListener('click', async e => {

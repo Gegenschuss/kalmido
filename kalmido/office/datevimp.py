@@ -67,7 +67,7 @@ R_NOT_EB = N_("No opening booking")
 R_DATE = N_("Document date not valid")
 R_AMOUNT = N_("Amount not valid")
 R_REPLACE = N_("Replaces the opening balance of account {0} in {1}")
-R_SAME_NAME = N_("Same name, no customer number yet")
+R_SAME_NAME = N_("Same name, no client number yet")
 
 _TEXT_CTRL = re.compile(r"[\x00-\x1f\x7f]+")
 _EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")

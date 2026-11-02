@@ -133,7 +133,7 @@ function wgStdBar(v, o) {
   const hk = wgHideKey(v), hs = wgHideSig(v, own, std);
   if (hk && wgHideMap()[hk] === hs) return '';  // 2.46.2 (#1726): dismissed for exactly this arrangement and standard
   const can = d.src ? !!o.canStd : S.lyStdCan;
-  return `<div class="wgstd"><span class="muted">${tr('Your own arrangement differs from the standard.')}</span><span class="spacer"></span>${can ? `<button type="button" class="btn sm" data-act="wg-promote" data-lyv="${v}">${ic('users', 's')}<span>${tr('Make this the standard for everyone')}</span></button>` : ''}<button type="button" class="btn sm" data-act="wg-reset" data-lyv="${v}">${ic('undo', 's')}<span>${tr('Reset to the standard')}</span></button><button type="button" class="iconbtn wgstdx" data-act="wg-hide" data-lyv="${v}" title="${esc(tr('Hide this note'))}" aria-label="${esc(tr('Hide this note'))}">${ic('x', 's')}</button></div>`;
+  return `<div class="wgstd"><span class="muted">${tr('Your own arrangement differs from the default.')}</span><span class="spacer"></span>${can ? `<button type="button" class="btn sm" data-act="wg-promote" data-lyv="${v}">${ic('users', 's')}<span>${tr('Make this the default for everyone')}</span></button>` : ''}<button type="button" class="btn sm" data-act="wg-reset" data-lyv="${v}">${ic('undo', 's')}<span>${tr('Reset to the default')}</span></button><button type="button" class="iconbtn wgstdx" data-act="wg-hide" data-lyv="${v}" title="${esc(tr('Hide this note'))}" aria-label="${esc(tr('Hide this note'))}">${ic('x', 's')}</button></div>`;
 }
 const wgStr = o => o && Object.keys(o).length ? JSON.stringify(o) : '';
 async function wgPromote(v) {
@@ -143,16 +143,16 @@ async function wgPromote(v) {
     const put = async (std, mine) => { await api('PUT', `/api/lists/${l.id}/layout`, {layout: std, scope: 'standard'}); const r = await api('PUT', `/api/lists/${l.id}/layout`, {layout: mine, scope: 'mine'}); if (dd.j) { dd.j.layout = r; renderView(); } return {}; };
     const old = {std: y.std, mine: y.mine};
     try { const r = await api('PUT', `/api/lists/${l.id}/layout`, {layout: y.mine, scope: 'promote'}); dd.j.layout = r; renderView(); } catch { return; }
-    const e = histAdd({label: tr('Standard changed'), undo: () => put(old.std, old.mine), redo: async () => { const r = await api('PUT', `/api/lists/${l.id}/layout`, {layout: old.mine, scope: 'promote'}); if (dd.j) { dd.j.layout = r; renderView(); } return {}; }});
-    histToast(tr('This is the standard for everyone in the project now'), e);
+    const e = histAdd({label: tr('Default changed'), undo: () => put(old.std, old.mine), redo: async () => { const r = await api('PUT', `/api/lists/${l.id}/layout`, {layout: old.mine, scope: 'promote'}); if (dd.j) { dd.j.layout = r; renderView(); } return {}; }});
+    histToast(tr('This is the default for everyone in the project now'), e);
     return;
   }
   const raw = wgJ(LY_PEND[d.key] ?? S.settings?.[d.key]), oldStd = S.lyStd?.[d.key] || '', oldOwn = wgStr(raw);
   const go = async (std, own) => { const j = await api('PUT', `/api/layouts/std/${d.key}`, {layout: std}); S.lyStd = j.layouts; S.settings[d.key] = own; lyPatch(d.key, own); renderView(); return {}; };
   const sw = wgSwitches(raw.opts), newStd = wgStr(wgLayoutOnly(raw)), newOwn = sw ? JSON.stringify({opts: sw}) : '';
   try { await go(newStd, newOwn); } catch { return; }
-  const e = histAdd({label: tr('Standard changed'), undo: () => go(oldStd, oldOwn), redo: () => go(newStd, newOwn)});
-  histToast(tr('This is the standard for everyone now'), e);
+  const e = histAdd({label: tr('Default changed'), undo: () => go(oldStd, oldOwn), redo: () => go(newStd, newOwn)});
+  histToast(tr('This is the default for everyone now'), e);
 }
 function wgReset(v) {
   const d = LY[v];
@@ -161,13 +161,13 @@ function wgReset(v) {
     const l = routeList(), y = l && S.povD[l.id]?.j?.layout; if (!y) return;
     const old = y.mine, put = s => () => { LY.project.save(s, false); return {}; };
     LY.project.save('', false);
-    histToast(tr('Back to the standard'), histAdd({label: tr('Back to the standard'), undo: put(old), redo: put('')}));
+    histToast(tr('Back to the default'), histAdd({label: tr('Back to the default'), undo: put(old), redo: put('')}));
     return;
   }
   const old = wgStr(wgJ(LY_PEND[d.key] ?? S.settings?.[d.key])), sw = wgSwitches(wgJ(old).opts), nw = sw ? JSON.stringify({opts: sw}) : '';
   const put = s => () => { S.settings[d.key] = s; lyPatch(d.key, s); renderView(); return {}; };
   put(nw)();
-  histToast(tr('Back to the standard'), histAdd({label: tr('Back to the standard'), undo: put(old), redo: put(nw)}));
+  histToast(tr('Back to the default'), histAdd({label: tr('Back to the default'), undo: put(old), redo: put(nw)}));
 }
 
 // ---- a computer: the grip resizes (snaps to the columns of six and three heights), the header moves the block

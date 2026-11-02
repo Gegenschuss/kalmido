@@ -1,7 +1,7 @@
 // 2.312.0 B (#3264) UI test (jsdom), own container (start.sh): the note on health data (Art. 9 GDPR, 2.306.0 B #2887: in the
 // module rows Health and Review & journal) also where these modules are switched on together with others:
 //  - Settings > Modules: the area rows Home (health) and Review (journal), not the other areas
-//  - the first-run setup: below the purposes while Home (or Review) is picked, also when ticked under "Customize…"
+//  - the first-run setup: below the purposes while Home (or Review) is picked, also when ticked under "Customise…"
 // freelancer-matrix: settings (the person has no organisation)
 const {execFileSync} = require('child_process');
 const path = require('path');

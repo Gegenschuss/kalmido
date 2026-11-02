@@ -113,12 +113,20 @@ def rvw_gate(c, tid):
     return None
 
 
-def _notify(c, t, rcpt, state, note=""):
-    """News + push (row "review") to a person; an agent reviewer gets the event review_requested instead."""
+def _owner(c, t):
+    """Who hears of the decision on a review: the person assigned, else (nobody, an agent) the creator."""
+    a = t["assignee_id"]
+    return a if a and not _is_agent(c, a) else t["created_by"]
+
+
+def _notify(c, t, rcpt, state, note="", pr=None, actor=None):
+    """News + push (row "review") to a person; an agent reviewer gets the event review_requested instead.
+    2.367.2 (#2968): a request and a decision go past the burst gate (a gate waits for it); state "approved" is new, pr = the
+    linked pull request that approved it (no person acted; actor = who gave the 👍, the sync has no request)."""
     from ..collab.news import news_add, notif_ok
-    from ..collab.comments import burst_gate, collab_user, lang_of
-    from ..notify.push import push_prio, push_reachable
-    actor = me()
+    from ..collab.comments import collab_user, lang_of
+    from ..notify.push import notify, push_prio, push_reachable
+    actor = actor if actor is not None or pr else me()
     if not rcpt or rcpt == actor:
         return
     if _is_agent(c, rcpt):
@@ -131,15 +139,19 @@ def _notify(c, t, rcpt, state, note=""):
     s = collab_user(c, rcpt, t["list_id"])
     if not s or not task_visible(c, t["id"], rcpt, full=True):
         return
-    news_add(c, rcpt, "review", task_id=t["id"], actor=actor, data={"state": state, **({"note": note[:300]} if note else {})}, s=s)
-    if not has_request_context() or not notif_ok(c, rcpt, s, "review", "push", t["list_id"]) or not push_reachable(c, rcpt, s) \
-            or not burst_gate(c, rcpt, t["id"], event=True):
+    news_add(c, rcpt, "review", task_id=t["id"], actor=actor or 0, data={"state": state, **({"note": note[:300]} if note else {}),
+                                                                         **({"pr": pr[:200]} if pr else {})}, s=s)
+    if not notif_ok(c, rcpt, s, "review", "push", t["list_id"]) or not push_reachable(c, rcpt, s):
         return
     lg = lang_of(s)
-    who = _name(c, actor)
+    who = _name(c, actor) if actor else ""
     title = tr("{0} asks you to review: {1}", who, t["title"], lg=lg) if state == "pending" \
-        else tr("{0} sent back: {1}", who, t["title"], lg=lg)
-    g.pushes.append((rcpt, title, note[:200], f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s)))
+        else tr("Review approved: {0}", t["title"], lg=lg) if state == "approved" else tr("{0} sent back: {1}", who, t["title"], lg=lg)
+    msg = pr[:200] if pr else note[:200] or (tr("Approved by {0}", who, lg=lg) if state == "approved" else "")
+    if has_request_context():
+        g.setdefault("pushes", []).append((rcpt, title, msg, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s)))
+    elif state == "approved":  # the sync of the linked repositories runs without a request
+        notify(rcpt, title, msg, push_prio(s), f"{PUBLIC_URL}/#t/{t['id']}", s=s, kind="other")
 
 
 def _set(c, tid, **kv):
@@ -192,6 +204,7 @@ def rvw_approved_by_pr(c, tid, label, url, uid=None):
         return False
     _set(c, tid, review="approved", review_at=iso(now_utc()), review_by=None)
     log_act(c, tid, "review", {"state": "approved", "pr": str(label)[:200], "url": str(url or "")[:500]}, uid=uid)
+    _notify(c, t, _owner(c, t), "approved", pr=str(label), actor=uid)  # 2.367.2 (#2968)
     return True
 
 
@@ -233,9 +246,8 @@ def rvw_apply(c, tid, b):
                 kv["section_id"] = back
             _set(c, tid, **kv)
         log_act(c, tid, "review", {"state": "approved" if act == "approve" else "changes", **({"note": note} if note else {})})
-        if act == "changes":
-            t2 = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
-            _notify(c, t2, t2["assignee_id"] or t2["created_by"], "changes", note)
+        t2 = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+        _notify(c, t2, _owner(c, t2), "approved" if act == "approve" else "changes", note)  # 2.367.2 (#2968): approved too
         return one_task(c, tid)
     need_task(c, tid)  # change the task
     locked = _gate_holds(c, t) and not rvw_may(c, t, uid)

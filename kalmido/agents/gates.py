@@ -4,13 +4,14 @@
 target (e.g. feat/x -> main) and attaches its evidence (build, start, logs, tests -- free text). "Ready to deploy" (kind
 deploy): bundles approved integrations (the comment ids) and a checklist: every open task of the list with the list tag
 "deploy" (KALMIDO_DEPLOY_TAG). Like a merge request (#339) only an approver decides (list owner / admin, an instance
-admin; never an agent; 2.148.1 D (#2495): not the task's assignee alone): 👍 approves, 👎 rejects. A deploy request with open checklist items is NOT
+admin; never an agent; 2.148.1 D (#2495): not the task's assignee alone): 👍 approves, 👎 rejects. 2.392.0 C (#3370): where the list has "irreversible needs a yes" on, tasks marked irreversible
+without a yes block: a deploy all open ones of the list, an integrate request the task it is on. No "Approve anyway" passes that (state stays open, the tasks stand
+in the suggestion under "irreversible"); only an approver's yes per task does (agents/taskdec.py). A deploy request with open checklist items is NOT
 approved by 👍: the approver either finishes those tasks first or approves on purpose with "Approve anyway" (POST
 /api/comments/<id>/decide {decision: approve, skip_checklist: true}); the skipped tasks are recorded in the request.
 Kalmido never integrates or deploys anything: the agent does, after the approval event ("reaction" with data.gate).
 """
 import json
-import os
 from flask import g, jsonify
 
 from ..core.config import app
@@ -19,9 +20,9 @@ from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_collab, task_visible, tvis
 from ..core.errors import BadInput, UnknownFields
+from ..tasks.oneway import DEPLOY_TAG, gate_irreversible, irreversible_open  # noqa: F401  (irreversible_open: the name other modules use here)
 
 GATE_KINDS = ("integrate", "deploy")
-DEPLOY_TAG = (os.environ.get("KALMIDO_DEPLOY_TAG") or "deploy").strip() or "deploy"
 GATE_REF_MAX, GATE_TEXT_MAX, GATE_INTEGRATIONS_MAX, CHECKLIST_MAX = 200, 4000, 50, 100
 
 
@@ -51,6 +52,12 @@ def _text(s, k, mx, need=False):
     return v.strip()[:mx]
 
 
+def _gate_irr_in(c, t, out):
+    """2.392.0 C (#3370): what blocks the request stands in it at once (the key only when something does)."""
+    irr = gate_irreversible(c, t, out["kind"], me())
+    return {**out, "irreversible": irr} if irr else out
+
+
 def gate_clean(c, t, s):
     """Validates an agent's integrate / deploy request (comment suggestion) on task t; returns the stored suggestion."""
     kind = s.get("kind")
@@ -64,7 +71,7 @@ def gate_clean(c, t, s):
     if kind == "integrate":
         out["source"] = _text(s, "source", GATE_REF_MAX, need=True)
         out["target"] = _text(s, "target", GATE_REF_MAX) or "main"
-        return out
+        return _gate_irr_in(c, t, out)
     ids = s.get("integrations") or []
     if not isinstance(ids, list) or len(ids) > GATE_INTEGRATIONS_MAX or not all(isinstance(x, int) and not isinstance(x, bool) for x in ids):
         raise BadInput(tr("Invalid value: {0}", "integrations"))
@@ -81,25 +88,33 @@ def gate_clean(c, t, s):
     out["integrations"] = items
     out["checklist"] = deploy_checklist(c, t["list_id"], me())
     out["tag"] = DEPLOY_TAG
-    return out
+    return _gate_irr_in(c, t, out)
 
 
 def gate_decide(c, k, t, uid, approve, skip=False):
     """An approver's decision on a gate comment (the caller checked is_approver and commits). Returns the new state:
-    approved | rejected | blocked (deploy with open checklist items and no skip: stays open)."""
+    approved | rejected | blocked (deploy with open checklist items and no skip, or irreversible tasks without a yes: stays
+    open; skip does not pass those, 2.392.0 C #3370)."""
     sug = json.loads(k["suggestion"])
     if sug.get("state") != "open":
         return sug.get("state")
     new = {**sug}
+    irr = gate_irreversible(c, t, sug["kind"]) if approve else []
+    new.pop("irreversible", None)
+    if irr:  # the stored suggestion goes back to the requesting agent: only what it may see, blocking counts all
+        new["irreversible"] = gate_irreversible(c, t, sug["kind"], k["user_id"]) if _gt_is_agent(c, k["user_id"]) else irr
     if approve and sug["kind"] == "deploy":
         left = deploy_checklist(c, t["list_id"])
         # 2.223.7 (#2941): the stored suggestion goes back to the requesting agent -- only the tasks it may see (blocking still counts all)
         new["checklist"] = deploy_checklist(c, t["list_id"], k["user_id"]) if left and _gt_is_agent(c, k["user_id"]) else left
-        if left and not skip:
+        if left and not skip and not irr:
             c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(new, ensure_ascii=False), k["id"]))
             return "blocked"
-        if left:
+        if left and not irr:
             new["skipped"] = new["checklist"]
+    if irr:
+        c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(new, ensure_ascii=False), k["id"]))
+        return "blocked"
     new.update(state="approved" if approve else "rejected", by=uid, at=iso(now_utc()))
     c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(new, ensure_ascii=False), k["id"]))
     return new["state"]
@@ -108,7 +123,7 @@ def gate_decide(c, k, t, uid, approve, skip=False):
 def gate_event(sug):
     """The part of the agent's reaction event about the request (data.gate)."""
     out = {"kind": sug["kind"], "state": sug.get("state")}
-    for k in ("source", "target", "integrations", "checklist", "skipped"):
+    for k in ("source", "target", "integrations", "checklist", "skipped", "irreversible"):
         if k in sug:
             out[k] = sug[k]
     return out

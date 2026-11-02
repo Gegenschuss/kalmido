@@ -6,7 +6,11 @@
 // 2.13.0: versioned by its size, so a repaired / replaced file gets a new address (no stale cached broken answer)
 // 2.13.1 (#465): chat files bring their own address (a.url, /api/chat-files/<id>)
 const attUrl = (a, dl) => `${a.url || '/api/attachments/' + encodeURIComponent(a.id)}?v=${encodeURIComponent(a.size ?? 0)}${dl ? '&dl=1' : ''}`;
-const fmtSize = b => b < 1024 ? b + ' B' : b < 1048576 ? Math.round(b / 1024) + ' KB' : b < 1073741824 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : (b / 1073741824).toFixed(1).replace('.', ',').replace(/,0$/, '') + ' GB';
+// 2.450.0 (#3770): ONE size format through fmtNum, in every language ("1.5 MB", "1,5 Mo"); French counts in octets
+const fmtSize = b => {
+  const [o, k, m, g] = LOCALE().startsWith('fr') ? ['o', 'Ko', 'Mo', 'Go'] : ['B', 'KB', 'MB', 'GB'];
+  return b < 1024 ? `${b} ${o}` : b < 1048576 ? `${fmtNum(b / 1024, 0)} ${k}` : b < 1073741824 ? `${fmtNum(b / 1048576, 1)} ${m}` : `${fmtNum(b / 1073741824, 1)} ${g}`;
+};
 const isImg = a => /^image\/(png|jpeg|gif|webp|avif|bmp)$/.test(a.mime);
 // 2.13.0: an image that cannot be loaded (the file is missing / empty on the server) becomes a file tile that says so,
 // not a broken-image icon
@@ -34,6 +38,14 @@ function noEmpty(files) {
   if (e) toast(tr('{0}: the file is empty and was not uploaded', e.name || tr('Image')));
   return files.filter(f => f.size !== 0);
 }
+// 2.363.3 (#3134): the server's limit for all file dialogs: the message for files it would refuse, '' = fine. one: each file goes
+// in its own request, so only the size per file counts
+function upLimit(files, one) {
+  const mb = S.maxFileMb || 50, max = mb * 1024 * 1024, big = files.find(f => f.size > max);  // 2.273.0 D (#3051): the server's limit
+  if (big) return tr('{0} is larger than {1} MB', big.name || tr('Image'), mb);
+  return !one && files.reduce((n, f) => n + f.size, 0) > max * 4 ? tr('The files together are larger than {0} MB: send fewer files at once', mb * 4) : '';  // the request limit is 4 files' worth
+}
+const upFits = f => f.size <= (S.maxFileMb || 50) * 1024 * 1024;
 const upBusy = new Set();  // 2.273.0 D (#3051): one upload at a time per task (F2: another task's files are not dropped)
 async function uploadFiles(taskId, files) {
   files = noEmpty(files);
@@ -41,9 +53,7 @@ async function uploadFiles(taskId, files) {
   if (taskId < 0) { toast(tr('Task is still syncing, try again in a moment')); return; }
   if (!canEdit(taskById(taskId))) { roToast(); return; }
   if (typeof le2eFileUpload === 'function' && le2eOn(taskById(taskId)?.list_id)) return le2eFileUpload(taskId, files);  // 2.64.2 B (#1817): encrypted with the list key
-  const mb = S.maxFileMb || 50, max = mb * 1024 * 1024, big = files.find(f => f.size > max);  // 2.273.0 D (#3051): the server's limit
-  if (big) { toast(tr('{0} is larger than {1} MB', big.name, mb)); return; }
-  if (files.reduce((n, f) => n + f.size, 0) > max * 4) { toast(tr('The files together are larger than {0} MB: send fewer files at once', mb * 4)); return; }  // the request limit is 4 files' worth
+  const lim = upLimit(files); if (lim) { toast(lim); return; }
   if (upBusy.has(taskId)) { toast(tr('Uploading…')); return; }  // 2.273.0 D (#3051): a second tap during the upload would attach the files twice
   upBusy.add(taskId);
   const fd = new FormData();
@@ -54,7 +64,7 @@ async function uploadFiles(taskId, files) {
     putTask(t); render(); if (S.sel === taskId) renderDetail();
     toast(files.length === 1 ? tr('Attached') : tr('{0} files attached', files.length));
     return true;
-  } catch (e) { return false; /* api() already showed the error / offline notice */ }
+  } catch (e) { return e?.cancelled ? undefined : false; /* api() already showed the error / offline notice; 2.363.3 (#3134): cancelled = not again on the next flush */ }
   finally { upBusy.delete(taskId); }
 }
 // 2.359.0 A (#3023): files of a quick add made offline (the task has only its temporary id): kept in IndexedDB "kalmido-qfiles"

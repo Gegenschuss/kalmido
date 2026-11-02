@@ -2,7 +2,7 @@
 // - without a configuration: no "assistant" in /api/state, /api/assistant 404, no settings section, no entry points
 // - with a configuration (fake OpenAI-compatible endpoint tests/fake_ai.py in the container): Settings > Assistant shows
 //   the provider, the switch turns it on (PATCH /api/settings), a ticked list is shared (PUT /api/assistant/lists)
-// - entry points only while it is on: task detail "Assistant" > "Summarize" = the text dialog (Copy, Add as comment);
+// - entry points only while it is on: task detail "Assistant" > "Summarise" = the text dialog (Copy, Add as comment);
 //   basket "Sort with the assistant" = the proposal dialog named "Assistant"; Today's "…" menu has "Assistant plan"
 // - the log in the settings lists the calls; a child account sees no entry point
 const {execFileSync, spawnSync} = require('child_process');
@@ -81,7 +81,7 @@ const menuItem = (d, re) => [...d.querySelectorAll('#pop [role="menuitem"]')].fi
   const ab = await until(() => d.querySelector(`#detail [data-asst="task"][data-id="${T}"]`));
   check(ab, 'the task detail has the assistant button');
   click(w, ab);
-  const sm = await until(() => menuItem(d, /Summarize/));
+  const sm = await until(() => menuItem(d, /Summarise/));
   check(sm && menuItem(d, /Extract tasks/) && menuItem(d, /Suggest tags and due date/) && menuItem(d, /Draft a reply/), 'its menu has the four kinds');
   click(w, sm);
   const tm = await until(() => { const m = d.querySelector('.modal.asstmd'); return m && m.querySelector('.assttext')?.textContent.trim() && m; }, 150);

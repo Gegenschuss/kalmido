@@ -6,7 +6,7 @@
    values, the references, the finalised state and the numbers come along, the files are readable and sealed at rest
    where the app seals them; the source organisation stays unchanged; the undo removes everything again
  - the same export into the source organisation itself: existing document numbers are skipped with a warning, never twice
- - a person without an organisation imports it into the private space: it lands in the personal office
+ - a person without an organisation imports it into the private workspace: it lands in the personal office
  - that person exports the personal office (only the owner; others 404) and an admin imports it into an organisation:
    the office and the private clients come along, the private lists do not
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY (P2137A_NOSTART=1 = the server already runs like that).
@@ -332,6 +332,10 @@ check(Fr.get(B + f"/api/orgs/{PB}/export").status_code == 404, "the owner: the h
 check(requests.post(B + "/api/v1/orgs/0/export", headers=TKH).status_code in (403, 404), "an API token of the owner cannot export it (0)")
 check(requests.post(B + "/api/v1/orgs/0/export", headers=AGH).status_code in (403, 404), "an agent cannot export it (0)")
 PX, PRK = export(Fr, 0)
+# 2.449.0 (#3800): the person clears her finished archive herself (DELETE /api/orgs/<id>/export); a foreign organisation stays closed
+check(Fr.delete(B + f"/api/orgs/{ORG}/export").status_code == 404, "the person cannot clear the archive of a foreign organisation")
+r = Fr.delete(B + "/api/orgs/0/export")
+check(r.ok and Fr.get(B + "/api/orgs/0/export").json().get("state") != "done", f"the person clears her own archive {r.status_code} {r.text[:120]}")
 iid, pv = opened(Do, PX, PRK)
 j = run(Do, iid, ORG3)
 check(j.get("state") == "done", f"personal office into an organisation {j.get('error')} {warnings(j)}")

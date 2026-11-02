@@ -24,6 +24,7 @@ from ..core.db import iso, now_utc
 from ..core.i18n import N_, tr, trn
 from ..core.merges import mg_fk_refs
 from ..core.pg import system_ctx
+from ..core.env import env_bool  # 2.399.0 (#2687): the hosting switch (KALMIDO_HOSTED)
 from ..core.retention import RET_LEGAL_YEARS, ret_on, ret_report
 
 # (count key, legal kind, SQL of the years per row: org_id = ?) -- the year a period starts from (its end + N years)
@@ -79,7 +80,7 @@ def Nn_(one, other):  # a plural pair for trn (marked for tools/i18n_check.py, l
 
 
 ODL_MORE = (
-    ("mails", Nn_("{0} mail", "{0} mails"), "hub_mails"),
+    ("mails", Nn_("{0} e-mail", "{0} e-mails"), "hub_mails"),
     ("mailboxes", Nn_("{0} mailbox", "{0} mailboxes"), "hub_mailboxes"),
     ("mail_addresses", Nn_("{0} mail-in address", "{0} mail-in addresses"), "hub_tokens"),
     ("deals", Nn_("{0} deal", "{0} deals"), "office_deals"),
@@ -105,6 +106,7 @@ ODL_MORE_SKIP = frozenset((
     "org_members", "org_list_log", "org_keys", "org_invites", "org_joins", "office_settings", "office_company", "office_numbers",
     "office_import_runs", "office_undo", "office_rights_log", "office_period_locks", "office_pack_installs", "office_rgroups",
     "office_rgroup_members", "office_inv_series", "office_datev_guids", "office_peppol", "office_pay_props", "bg_jobs",
+    "office_payonline", "office_pay_links", "office_pay_sessions", "office_pay_events", "office_pay_payouts",  # 2.469.0 (#3459)
     "notify_channels", "reading_orgs", "task_vectors", "upload_scan", "file_text", "merge_runs", "task_bell", "task_links",
     "hub_leave_quota", "fs_area_roots", "fs_upload_requests", "fs_ext_links", "wiki_spaces", "doc_cfg", "doc_models",
     "doc_types", "doc_tags", "doc_rules", "doc_fields", "doc_senders", "pl_sources", "pl_rules", "nl_conns", "nl_segments",
@@ -262,7 +264,9 @@ def odl_admin_export(c, oid, retention=False):
     ids, alive = odl_ids(r["retired_admins"]), None
     if ids:  # 2.186.0 review M3: none of them left (deleted / disabled, or no person was its admin) = the instance admins
         with system_ctx(c):  # instance structure
-            q = f"SELECT 1 FROM users WHERE id IN ({','.join('?' * len(ids))}) AND disabled=0 LIMIT 1"
+            # 2.399.0 (#2687, review F3): hosted, a locked former admin still counts (the operator may lock accounts, so locking
+            # them all must not hand it the client's records); only deleted ones are gone
+            q = f"SELECT 1 FROM users WHERE id IN ({','.join('?' * len(ids))}){'' if env_bool('KALMIDO_HOSTED', False) else ' AND disabled=0'} LIMIT 1"
             alive = c.execute(q, sorted(ids)).fetchone()
     if r["retired_admins"] is None or not ids or not alive:
         return bool(retention and g.user["is_admin"])
@@ -589,7 +593,7 @@ UPG_MENTION = "<@{0}>"
 def upg_mentions(c, uid):
     """Mentions of the deleted person in comments and chat messages (plain text; locked ones the server cannot read stay)
     become the words "@Deleted user"; the id leaves the comments' mention lists."""
-    tok, word = UPG_MENTION.format(int(uid)), "@" + tr("Deleted user")
+    tok, word = UPG_MENTION.format(int(uid)), "@" + tr("Deleted person")
     for table in ("comments", "tchat_msgs"):
         extra = " AND enc IS NULL" if table == "tchat_msgs" else ""
         c.execute(f"UPDATE {table} SET body=replace(body, ?, ?) WHERE body LIKE ?{extra}", (tok, word, f"%{tok}%"))  # pg-ok: the token is <@digits>, case does not matter

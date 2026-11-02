@@ -58,6 +58,7 @@ async function mb_drop(t, el) {
     if (!lid || lid === t.list_id) return true;
     if (!canEditList(lid)) { roToast(); return true; }
     if (tlkHits(t, {list_id: lid})) { tlkToast(t); render(); return true; }
+    if (!await mv_ask([t.id], listById(lid))) return true;  // 2.455.0 (#3848)
     await patchUndoable(t.id, {list_id: lid, section_id: null, ...(t.parent_id ? {parent_id: null} : {})}, t.parent_id ? tr('Standalone in {0}', lname(listById(lid))) : tr('Moved to {0}', lname(listById(lid)))).catch(() => {});
     return true;
   }

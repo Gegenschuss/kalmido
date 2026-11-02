@@ -24,13 +24,14 @@ from flask import jsonify, request, Response
 from ..core.config import app
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
-from ..core.i18n import N_, lang, tr
-from ..core.db import bump, db, iso, local_day, now_utc
+from ..core.i18n import N_, csv_dialect, lang, tr
+from ..core.db import bump, db, iso, local_day, local_stamp, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
-from .calc import dec, dstr, money
+from .calc import calc_lang, dec, dstr, money
 from .logbook import _body, _day, _id, _text
 from .model import ofx_name1, office_gate, office_org, office_settings
+from ..personal.timesheet import tz_of
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 from .invoices import inv_pay_add, inv_pay_del  # 2.355.0 B (#2843)
 
@@ -91,10 +92,6 @@ def _amount(v, name="amount", zero=False):
     return d
 
 
-def _de(v):
-    return "" if v in (None, "") else str(v).replace(".", ",")
-
-
 def _locked(msg):
     return Denied(409, tr(msg))
 
@@ -140,7 +137,7 @@ def _neg_check(opening, rows):
     hit = cb_negative(opening, rows)
     if hit:
         raise BadInput(tr("The cash balance would drop below zero on {0} ({1}). Book the income first or check the amount.",
-                          hit[0], _de(dstr(hit[1])) if lang() != "en" else dstr(hit[1])))
+                          hit[0], _num(dstr(hit[1]))))
 
 
 def cb_balance(opening, rows, upto=None):
@@ -530,6 +527,9 @@ def cb_entry_patch(eid):
         if "day" in prev:
             _day_rules(c, book, row["day"])
         _neg_check(book["opening"], [dict(r, **row) if r["id"] == eid else r for r in rows])
+        if "node_id" in prev and cur.get("node_id"):  # 2.360.3 (#2733): taking the receipt off the entry keeps its lock
+            from ..receipts.suggest import olk_rc_keep
+            olk_rc_keep(c, cur["node_id"])
         row["updated_at"] = iso(now_utc())
         row = oc_enc_fields(c, oid, "office_cash_entries", row)
         c.execute(f"UPDATE office_cash_entries SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [eid, oid])
@@ -736,7 +736,7 @@ def _label(frm, to, y):
 
 
 def _num(v):
-    return _de(v) if lang() != "en" else (v or "")
+    return csv_dialect()[1](v)
 
 
 def _ref(e):
@@ -775,39 +775,40 @@ def _prev_text(prev):
 @app.get("/api/office/cashbook.csv")
 def cb_csv():
     """?book_id=&year= | &from=&to= -> the entries (number, date, text, income, expense, VAT, balance, cancellation link),
-    the day closings and the change log (semicolon, decimal comma like the EUeR CSV)."""
+    the day closings and the change log (separator and decimal sign of the language like the EUeR CSV)."""
     from .ledger import ofx_log
     c, uid, oid = _ctx()
     book, frm, to, y, ents, closings, log, start, end = _export_data(c, oid, uid)
-    data = cb_csv_text(book, frm, to, y, ents, closings, log, start, end)
+    data = cb_csv_text(book, frm, to, y, ents, closings, log, start, end, tz_of(c, uid))
     ofx_log(c, oid, "export", target="cashbook", detail={"what": "cashbook.csv", "book_id": book["id"], "from": frm, "to": to})
     c.commit()
     return Response(data, mimetype="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="cashbook-{_label(frm, to, y).replace(" – ", "_")}.csv"', "Cache-Control": "no-store"})
 
 
-def cb_csv_text(book, frm, to, y, ents, closings, log, start, end):
+def cb_csv_text(book, frm, to, y, ents, closings, log, start, end, tz=None):
     """The cash book CSV (with the byte order mark) of cb_export_data's values; 2.146.0 D (#2468): also for the retention export."""
     from .books import bk_csv_cell as cell
     buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";", lineterminator="\r\n")
+    sep, num = csv_dialect()  # 2.368.2 (#2984): separator and decimal sign of the language, times local
+    w = csv.writer(buf, delimiter=sep, lineterminator="\r\n")
     w.writerow([cell(tr("Cash book")), cell(book["name"]), _label(frm, to, y)])
-    w.writerow([tr("Opening balance"), _de(dstr(start))])
+    w.writerow([tr("Opening balance"), num(dstr(start))])
     w.writerow([tr("No."), tr("Date"), tr("Text"), tr("Category"), tr("Income"), tr("Expense"), tr("VAT"), tr("Balance"), tr("Cancellation"), tr("Receipt / invoice")])
     for e in ents:
-        w.writerow([e["no"], e["day"], cell(e["text"]), cell(e["category"]), _de(e["amount"]) if e["dir"] == "in" else "", _de(e["amount"]) if e["dir"] == "out" else "",
-                    f"{e['vat_pct']} %" if e["vat_pct"] else "", _de(e["balance"]), cell(_ref(e)), cell(_link(e))])
-    w.writerow([tr("Closing balance"), _de(dstr(end))])
+        w.writerow([e["no"], e["day"], cell(e["text"]), cell(e["category"]), num(e["amount"]) if e["dir"] == "in" else "", num(e["amount"]) if e["dir"] == "out" else "",
+                    f"{num(e['vat_pct'])} %" if e["vat_pct"] else "", num(e["balance"]), cell(_ref(e)), cell(_link(e))])
+    w.writerow([tr("Closing balance"), num(dstr(end))])
     w.writerow([])
     w.writerow([cell(tr("Day closings"))])
     w.writerow([tr("Date"), tr("Opening balance"), tr("Income"), tr("Expense"), tr("Closing balance"), tr("Entries"), tr("By"), tr("Time")])
     for x in closings:
-        w.writerow([x["day"], _de(x["opening"]), _de(x["sum_in"]), _de(x["sum_out"]), _de(x["closing"]), x["count"], cell(x["by"]), x["closed_at"]])
+        w.writerow([x["day"], num(x["opening"]), num(x["sum_in"]), num(x["sum_out"]), num(x["closing"]), x["count"], cell(x["by"]), local_stamp(x["closed_at"], tz)])
     w.writerow([])
     w.writerow([cell(tr("Change log"))])
     w.writerow([tr("Time"), tr("No."), tr("Action"), tr("By"), tr("Values")])
     for r in log:
-        w.writerow([r["at"], r["no"] or "", cell(tr(CB_ACTIONS.get(r["action"], r["action"]))), cell(r["by"]), cell(_prev_text(r["prev"]))])
+        w.writerow([local_stamp(r["at"], tz), r["no"] or "", cell(tr(CB_ACTIONS.get(r["action"], r["action"]))), cell(r["by"]), cell(_prev_text(r["prev"]))])
     w.writerow([cell(tr(CB_NOTE))])
     return "﻿" + buf.getvalue()
 
@@ -820,7 +821,7 @@ def cb_pdf_bytes(c, oid, book, frm, to, y, ents, closings, log, start, end, lg):
     ppr = pdf_paper_ns(s.get("paper"))  # 2.357.0 A (#3156): the office's paper size
     A4_H, A4_W, _Page = ppr.A4_H, ppr.A4_W, ppr._Page
     company = ofx_name1(ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name"))
-    lg = "de" if lg == "de" else "en"
+    lg = calc_lang(lg)  # 2.449.0 (#3766): every app language (was de, else en)
     cur = hc_home(s)  # 2.189.0 B (#2475): the home currency
     x0, x1 = 40, A4_W - 40
     pages, st = [], {"pg": None, "y": 0}
@@ -896,7 +897,7 @@ def cb_pdf_bytes(c, oid, book, frm, to, y, ents, closings, log, start, end, lg):
     st["y"] += 22
     for r in log:
         need(24)
-        pg().text(x0, st["y"], f"{r['at'][:16].replace('T', ' ')} · {tr(CB_ACTIONS.get(r['action'], r['action']))} · {r['by']}"
+        pg().text(x0, st["y"], f"{local_stamp(r['at'])[:16]} · {tr(CB_ACTIONS.get(r['action'], r['action']))} · {r['by']}"
                   + (f" · {tr('No.')} {r['no']}" if r["no"] else ""), 8, bold=True)
         st["y"] += 11
         t = _prev_text(r["prev"])

@@ -74,9 +74,9 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_paperless.py']);
   if (drop) { const s = drop.querySelector('select'); s.value = 'skip'; s.dispatchEvent(new w.Event('change', {bubbles: true})); }
   check(drop?.querySelector('input').disabled, 'leave out: the name field is off');
   pm?.querySelector('[data-plp="start"]').click();
-  // 2.87.9 (#1940): the import first names its target (no organisation: the private space)
+  // 2.87.9 (#1940): the import first names its target (no organisation: the private workspace)
   await until(() => d.querySelector('.itc-dlg [data-cd="yes"]'));
-  check(/2 documents into your private space/.test(d.querySelector('.itc-dlg')?.textContent || ''), '2.87.9 (#1940): the target named before the start');
+  check(/2 documents into your private workspace/.test(d.querySelector('.itc-dlg')?.textContent || ''), '2.87.9 (#1940): the target named before the start');
   d.querySelector('.itc-dlg [data-cd="yes"]')?.click();
   await until(async () => (await call('GET', '/api/paperless?ws=private')).conn?.run?.state === 'idle' && (await call('GET', '/api/docs?ws=private')).docs?.length === 2, 150);
   const docs = (await call('GET', '/api/docs?ws=private')).docs || [];

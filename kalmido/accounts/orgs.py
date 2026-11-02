@@ -11,7 +11,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc
 from ..core.db import usettings, uset  # 2.356.0 B (#2932)
 from ..accounts.session import me
-from ..core.access import Denied, acx_drop, acx_lists_sql, plists, pvis
+from ..core.access import Denied, acx_drop, acx_lists_sql, dlg_gone, plists, pvis, qn_private, token_lists
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.orgcrypt import oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -161,6 +161,9 @@ def org_member_add(c, oid, uid, role="member", keep_office=True):
     acx_drop()
     if n == 1 and keep_office:  # 2.356.0 B (#2932): a person with an own office keeps working in it (every way of joining comes here)
         _office_keep_on_join(c, uid)
+    if n == 1:  # 2.363.3 (#3133): back within a day: their assignments and "coming along" return (every way of joining comes here)
+        from .orgleave import olv_rejoin
+        olv_rejoin(c, oid, uid)
 
 
 def _office_keep_on_join(c, uid):
@@ -226,6 +229,20 @@ def visible_people(c, uid):
         return _visible_people(c, uid)
 
 
+def token_people(c, uid):
+    """2.473.0 (#3907): None = no limit; a token limited to some projects (a person's or an agent's): the set of the people
+    of those projects, oneself and an agent's owner -- the people of the account's other projects stay out. Ids only."""
+    lids = token_lists()
+    if lids is None:
+        return None
+    q = ",".join("?" * len(lids)) or "NULL"
+    with system_ctx(c):
+        keep = {uid, *(r[0] for r in c.execute("SELECT owner_id FROM agents WHERE user_id=?", (uid,)))}
+        keep |= {r[0] for r in c.execute(f"SELECT owner_id FROM lists WHERE id IN ({q})", [*lids])}
+        keep |= {r[0] for r in c.execute(f"SELECT user_id FROM list_members WHERE list_id IN ({q})", [*lids])}
+    return keep
+
+
 def _agent_visible_people(c, uid):
     """2.223.7 A (#2917): the people an agent account may see -- itself, its owner (a personal / freelancer agent) or the
     admins of its organisation (a team agent), and the owners / members of the projects shared with it. Never the whole
@@ -280,7 +297,7 @@ def may_see(c, uid, other):
 def need_visible(c, other):
     """404 (as for an unknown user) when the current person must not see `other`."""
     if not may_see(c, me(), other):
-        raise Denied(404, tr("unknown user"))
+        raise Denied(404, tr("unknown person"))
 
 
 def org_icon_fields(r, member=True):
@@ -484,6 +501,8 @@ def list_org_set(c, lid, v):
     oid = clean_org_id(c, v, me())
     if lr["is_inbox"] and oid:
         raise Denied(409, tr("The basket is always private"))
+    if oid:
+        qn_private(c, lid)  # 2.477.0 (#3881)
     if oid and (lr["family"] or (lr["life"] and lr["life"] != "travel")):  # 2.173.0 A (#2680): a trip may belong to an organisation
         raise Denied(409, tr(WS_MSG_PRIVATE_ONLY))
     if (oid or None) == (list_org(c, lid) or None):
@@ -697,9 +716,11 @@ def _member_ops(c, oid, b):
             org_join_or_add(c, oid, u, "admin" if have[u] != "agent" and u in ops.get("admins_add", []) else "member")
     # 2.306.0 D1 (#2875): the new admins first, so the people taken out leave their lists to them (not to the operator)
     for u in ops.get("admins_add", []):
-        c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND user_id IN (SELECT id FROM users WHERE kind!='agent')", (oid, u))
+        if c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND role!='admin' AND user_id IN (SELECT id FROM users WHERE kind!='agent')", (oid, u)).rowcount:
+            org_role_news(c, oid, u, "admin")  # 2.367.4 (#2974)
     for u in ops.get("admins_remove", []):  # only an admin becomes a member; guest / read-only / accounting keep their role (#2151)
-        c.execute("UPDATE org_members SET role='member' WHERE org_id=? AND user_id=? AND role='admin'", (oid, u))
+        if c.execute("UPDATE org_members SET role='member' WHERE org_id=? AND user_id=? AND role='admin'", (oid, u)).rowcount:
+            org_role_news(c, oid, u, "member")
     gone = [u for u in ops.get("members_remove", []) if c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, u)).fetchone()]
     for u in gone:
         c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, u))
@@ -715,6 +736,38 @@ def _operator_apart():
     (an invitation, org_join_or_add). A self-hosted server keeps both as before."""
     from ..admin.hosting import hosted
     return hosted()
+
+
+# 2.399.0 (#2687): on a hosted instance the operator (an instance admin) runs the server, not its customers' organisations: every
+# instance-admin way into an organisation it does not administer itself (members, roles, creating one for somebody else) and into
+# an account of a customer (password, sign-in link, e-mail, organisations, its agents) answers 403. Locking, deleting and quotas stay.
+OP_APART_MSG = N_("On a hosted instance the operator does not reach into the organisations and accounts of its clients")
+
+
+def op_apart_deny():
+    raise Denied(403, tr(OP_APART_MSG))
+
+
+def op_foreign_org(c, oid):
+    """2.399.0 (#2687): hosted and the current person is no admin of organisation oid (a self-hosted server: False)."""
+    return bool(_operator_apart()) and org_role(c, me(), oid) != "admin"
+
+
+def op_foreign_account(c, uid):
+    """2.399.0 (#2687): hosted and account uid belongs to a customer: not the current person, no account of an organisation the
+    current person administers. An agent follows its owner (a personal one: only one's own) or its organisation; a server agent
+    without both belongs to the operator."""
+    if not _operator_apart() or uid == me():
+        return False
+    with system_ctx(c):  # membership structure, no content
+        a = c.execute("SELECT owner_id, org_id FROM agents WHERE user_id=?", (uid,)).fetchone()
+        if a:
+            if a["owner_id"]:
+                return a["owner_id"] != me()
+            return bool(a["org_id"]) and op_foreign_org(c, a["org_id"])
+        return not c.execute("SELECT 1 FROM org_members a JOIN org_members b ON b.org_id=a.org_id JOIN orgs o ON o.id=a.org_id "
+                             "WHERE a.user_id=? AND a.role='admin' AND b.user_id=? AND o.retired_at IS NULL LIMIT 1",
+                             (me(), uid)).fetchone()  # review F7: a retired organisation grants nothing
 
 
 def org_own_admin(c, oid, but=0):
@@ -739,7 +792,7 @@ def org_join_or_add(c, oid, uid, role="member"):
     if _operator_apart() and c.execute("SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'user')!='agent'", (uid,)).fetchone():
         if uid == me():  # 2.306.0 Fix-1 (#2875 review): the operator does not invite itself into a customer's organisation
             c.rollback()
-            raise Denied(409, tr("On a hosted instance the operator does not join the organisations of its customers"))
+            raise Denied(409, tr("On a hosted instance the operator does not join the organisations of its clients"))
         from .orginvite import ojn_invite
         ojn_invite(c, oid, uid, role)
         return True
@@ -763,6 +816,15 @@ def _members_gone(c, oid, gone):
             org_leave(c, oid, u, heir)
 
 
+def op_org_public(c, r):
+    """2.399.0 (#2687): an organisation for the instance admin's list -- hosted, one it does not administer comes without its
+    people and domains (name, symbol, the number of people) and marked apart (no edit button)."""
+    d = org_public(c, r)
+    if op_foreign_org(c, r["id"]):
+        d.update(members=[], admins=[], domains="", apart=True)
+    return d
+
+
 @app.get("/api/admin/orgs")
 def orgs_get():
     """2.23.0 (#799): + mode (organisation | shared | multi | workspaces) and whether names / members can be changed here
@@ -774,7 +836,7 @@ def orgs_get():
         rows = [] if m == "shared" else c.execute("SELECT * FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id").fetchall()  # 2.47.3 (#1360): never the personal offices
         from ..accounts.tenancy import boundary_summary
         # 2.152.0 A (#2167): + retired_at / retain_until / retired_personal (a retired one: kept by law, export only)
-        return jsonify(orgs=[{**org_public(c, r), "retired_at": r["retired_at"], "retain_until": r["retain_until"] or "",
+        return jsonify(orgs=[{**op_org_public(c, r), "retired_at": r["retired_at"], "retain_until": r["retain_until"] or "",
                               "retired_personal": bool(r["retired_personal"])} for r in rows],
                        visibility=vis_mode(c), mode=m, editable=m == "workspaces",
                        creatable=m == "workspaces", name_env=bool(ORG_NAME_ENV),
@@ -821,6 +883,9 @@ def org_create():
         if not isinstance(adm, int) or isinstance(adm, bool) or not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND disabled=0", (adm,)).fetchone():
             c.rollback()
             return err(tr("Invalid value: {0}", "admin_id"))
+        if adm != me() and _operator_apart():  # 2.399.0 (#2687): hosted: a customer creates its organisation itself (POST /api/orgs)
+            c.rollback()
+            op_apart_deny()
         org_member_add(c, oid, adm, "admin", keep_office=adm != me())
         bump(c)
         c.commit()
@@ -874,6 +939,8 @@ def org_update(oid):
     admins_add / admins_remove (or members / admins with _prev: {members, admins}) change only those people."""
     _need_admin()
     c, b = db(), body()
+    if op_foreign_org(c, oid):  # 2.399.0 (#2687): hosted: name, members and roles of a customer's organisation are its admins' own
+        op_apart_deny()
     with system_ctx(c):  # 2.37.0 (#1150): instance admin manages the organisations themselves (also ones he is not in)
         if instance_mode(c) != "workspaces":
             _no_change()
@@ -910,7 +977,7 @@ def wsc_clean_color(v):
     if v in ("", None):
         return ""
     if not isinstance(v, str) or not LIST_COLOR_RE.fullmatch(v):
-        raise Denied(400, tr("Invalid value: {0}", tr("Color")))
+        raise Denied(400, tr("Invalid value: {0}", tr("Colour")))
     return v
 
 
@@ -925,10 +992,13 @@ def _org_patch(c, oid, b):
             c.execute("UPDATE orgs SET icon=? WHERE id=?", (v, oid))
             org_icon_drop_file(oid, old)  # an emoji replaces the own picture
     if "domains" in b:
-        # 2.422.0 (#2937): a company a person created herself takes e-mail domains only from an admin of the server
-        if not g.user["is_admin"] and (c.execute("SELECT self_made FROM orgs WHERE id=?", (oid,)).fetchone() or [0])[0]:
-            raise Denied(403, tr("Only an admin of this server sets the e-mail domains of this company"))
-        c.execute("UPDATE orgs SET domains=? WHERE id=?", (_clean_domains(b["domains"]), oid))
+        # 2.422.0 (#2937), 2.467.0 (#3898): only an admin of the server sets e-mail domains, for every organisation: they decide
+        # whose registrations land here. What an organisation has stays; its own value sent back unchanged is no change.
+        v = _clean_domains(b["domains"])
+        if g.user["is_admin"]:
+            c.execute("UPDATE orgs SET domains=? WHERE id=?", (v, oid))
+        elif v != _clean_domains((c.execute("SELECT domains FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0] or ""):
+            raise Denied(403, tr("Only an admin of this server sets the e-mail domains of an organisation"))
 
 
 @app.delete("/api/admin/orgs/<int:oid>")
@@ -1095,13 +1165,14 @@ def org_need_person(c, oid):
 
 def org_mine_dict(c, r, uid):
     from ..collab.comments import user_names
-    mem = c.execute("SELECT m.user_id, m.role, u.kind, u.disabled FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? ORDER BY lower(u.display_name), u.id", (r["id"],)).fetchall()
+    mem = c.execute("SELECT m.user_id, m.role, u.kind, u.disabled, u.signup FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? ORDER BY lower(u.display_name), u.id", (r["id"],)).fetchall()
     from .orgroles import org_sees_all, org_writes, roles_public
     full = org_sees_all(c, uid, r["id"])
     if not full:  # 2.143.0 A (#2151): a guest / accounting sees only the people they share something with (and the admins)
         near = _connections(c, uid) | {uid}
         mem = [m for m in mem if m["user_id"] in near or m["role"] == "admin"]
     names = user_names(c, [m["user_id"] for m in mem])
+    admin = org_role(c, uid, r["id"]) == "admin"  # 2.464.0 (#3882): they see a waiting registration and decide it
     return {"id": r["id"], "name": r["name"], **org_icon_fields(r), "color": r["color"] or "", "domains": r["domains"],  # 2.87.9 (#1913)
             "photo_meta_strip": bool(r["photo_meta_strip"]),  # 2.61.0 B (#1819)
             "ext_links": bool(r["ext_links"]),  # 2.112.1 B (#2058): external share links of the file store allowed
@@ -1112,7 +1183,8 @@ def org_mine_dict(c, r, uid):
             "nav_off": nav_org_off(r),  # 2.418.0 (#3560): menu points its admins switched off for the members
             "role": org_role(c, uid, r["id"]) or "member",
             "members": [{"id": m["user_id"], "name": names.get(m["user_id"], ""), "role": m["role"] if m["role"] in ORG_ROLES else "guest",
-                         "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"])} for m in mem],
+                         "agent": (m["kind"] or "user") == "agent", "disabled": bool(m["disabled"]),
+                         **({"pending": True} if admin and m["signup"] == "pending" else {})} for m in mem],  # 2.464.0 (#3882)
             "lists": c.execute("SELECT COUNT(*) FROM lists WHERE org_id=? AND deleted_at IS NULL", (r["id"],)).fetchone()[0] if full else 0,
             "limited": not full or not org_writes(c, uid, r["id"]),  # 2.143.0 A (#2151): guest / read-only / accounting
             "roles": roles_public(c)}  # 2.143.0 A (#2151): the roles an admin hands out, with their explanation
@@ -1139,8 +1211,8 @@ def orgs_mine():
 
 @app.patch("/api/orgs/<int:oid>")
 def org_mine_update(oid):
-    """2.28.0 (#935): {name?, icon?, domains?} -- an organisation admin renames it / sets its e-mail domains (modes multi /
-    workspaces; in the mode organisation the name comes from the configuration or the instance admin).
+    """2.28.0 (#935): {name?, icon?, domains?} -- an organisation admin renames it (modes multi / workspaces; in the mode
+    organisation the name comes from the configuration or the instance admin). 2.467.0 (#3898): domains only by a server admin.
     2.53.0 B (#1474): {color?} -- its colour for every member ('' = the default tone); only here (an admin of this
     organisation), not in the instance admin's routes. 2.61.0 B (#1819): {photo_meta_strip?: bool} likewise."""
     c, b = db(), body()
@@ -1272,7 +1344,7 @@ def org_member_put(oid):
         return err(tr("Invalid value: {0}", "user_id"))
     u = c.execute("SELECT id, kind FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
     if not u or (u["kind"] or "user") == "agent" or (uid != me() and not by_mail and not may_see(c, me(), uid)):
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
     cur = c.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
     if cur and uid == me() and role != "admin" and _admins(c, oid) <= 1:
         return err(tr("The last admin of an organisation cannot step down: make somebody else an admin first"), 409)
@@ -1281,6 +1353,8 @@ def org_member_put(oid):
         c.execute("UPDATE org_members SET role=? WHERE org_id=? AND user_id=?", (role, oid, uid))
         from ..core.access import acx_drop
         acx_drop()  # 2.143.0 A (#2151): the cached roles of this request
+        if cur["role"] != role:
+            org_role_news(c, oid, uid, role)  # 2.367.4 (#2974)
     elif uid != me() and (not g.user["is_admin"] or _operator_apart()):  # 2.148.1 A (#2480): an existing account joins only by accepting an invitation (2.306.0 D1, #2875: also the operator's)
         from .orginvite import ojn_invite
         ojn_invite(c, oid, uid, role)
@@ -1295,6 +1369,13 @@ def org_member_put(oid):
         return jsonify(ok=True, by_email=True)
     return jsonify(ok=True, by_email=False, **({"pending": True} if pending else {}),
                    org=org_mine_dict(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone(), me()))
+
+
+def org_role_news(c, oid, uid, role):
+    """2.367.4 (#2974): the person's role in the organisation changed: a News item (row "share"), never for one's own change."""
+    from ..collab.news import news_add
+    name = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]
+    news_add(c, uid, "orgrole", row="share", data={"org_id": oid, "name": name, "role": role})
 
 
 def _admins(c, oid):
@@ -1325,6 +1406,7 @@ def ol_private(c, lid, uid):
                             "AND a.owner_id IS DISTINCT FROM ? AND a.org_id IS NOT NULL", (lid, uid)).fetchall():
         c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, aid))
         c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, aid))
+        dlg_gone(c, lid, aid)  # 2.473.0 (#3357): delegated tasks and watching of this list end
     from ..admin.orgcrypt_cli import oc_settle_kick
     oc_settle_kick([lid])  # 2.64.0 (#1864): its files get the owner's account key
 
@@ -1342,8 +1424,11 @@ def org_leave(c, oid, uid, heir, back=None):
     """uid leaves organisation oid: their lists of that workspace go to heir (an organisation admin), uid leaves every list
     of the organisation (members and the agents it owns there stay with the lists), their personal agents of that workspace
     become private. 2.361.0 (#2922): a list uid brought in from the private space (lists.brought_by) goes back there instead
-    (its id appended to back). The caller commits. Returns the number of lists transferred."""
+    (its id appended to back), 2.365.1 (#3395) and so does what else they brought in (accounts/orgback.py, [kind, id] appended).
+    The caller commits. Returns the number of lists transferred."""
     from ..lists.ownership import owner_transfer
+    from .orgleave import OLV_AREAS, olv_memo, olv_snap
+    snap = olv_snap(c, oid, uid)  # 2.363.3 (#3133): what the end of the membership takes away, for coming back within a day
     n, priv = 0, []
     for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND org_id=? AND is_inbox=0", (uid, oid)).fetchall():
         if lr["brought_by"] == uid and not lr["deleted_at"]:
@@ -1366,12 +1451,18 @@ def org_leave(c, oid, uid, heir, back=None):
     for (lid,) in c.execute("SELECT m.list_id FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.org_id=?", (uid, oid)).fetchall():
         c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
         c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
+        dlg_gone(c, lid, uid)  # 2.473.0 (#3357): delegated tasks and watching of this list end
         c.execute("DELETE FROM task_people WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
     if priv:  # 2.352.0 F (#2748, review N3): the lists now private leave the organisation's tree, its folders' roles end
         from ..lists.groups import grp_sync
         grp_sync(c, priv)
+    OLV_AREAS["home"](c, oid, uid, back)  # 2.365.1 (#3395): after the lists: what hangs at a project that went back stays attached
+    # 2.473.0 (#3357): watching without a membership ends the same way (a list open to the organisation)
+    c.execute("DELETE FROM task_watchers WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id IN (SELECT id FROM lists WHERE org_id=? AND owner_id!=?))", (uid, oid, uid))
     # 2.83.0 (#1725): tasks assigned without joining (a list everyone in the organisation may edit)
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=? AND list_id IN (SELECT id FROM lists WHERE org_id=? AND owner_id!=?)", (uid, oid, uid))
+    # 2.363.3 (#3133): coming along without a membership too (brought back by joining again in a list open to the organisation)
+    c.execute("DELETE FROM task_people WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id IN (SELECT id FROM lists WHERE org_id=? AND owner_id!=?))", (uid, oid, uid))
     from ..contacts.orgbooks import obk_leave
     obk_leave(c, oid, uid, heir)  # 2.52.0 C (#1438): the organisation's own address books stay with it (another manager)
     # 2.30.0 (#1036): the organisation's calendars and address books follow the same way: the leaver's go to heir (else
@@ -1410,6 +1501,7 @@ def org_leave(c, oid, uid, heir, back=None):
     from ..sheets.shshare import shs_leave
     shs_leave(c, oid, [uid, *ags])  # 2.124.0 C (#2113): their shares of the organisation's tables end
     acx_drop()  # 2.36.2 (#1142): the request's access contexts follow the new memberships
+    olv_memo(c, oid, uid, snap)
     return n
 
 
@@ -1453,12 +1545,11 @@ def org_member_remove(oid, uid):
     oname = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]  # 2.37.0 (#1150): before leaving it (then invisible)
     back = []
     n = org_leave(c, oid, uid, heir, back=back)  # 2.361.0 (#2922): what the person brought in goes back to their private space
+    from ..collab.news import news_add
     if operator:
-        from ..collab.news import news_add
         news_add(c, operator, "share", list_id=None, data={"org": True, "name": oname, "role": "admin", "handover": n}, actor=uid)
         print("organisation", oid, "last admin", uid, "left: operator", operator, "took it over,", n, "lists", flush=True)
     if uid != me():
-        from ..collab.news import news_add
         from ..collab.comments import user_names
         # 2.148.1 A (#2480): the person learns that their lists of the organisation stayed with it (and with whom)
         news_add(c, uid, "unshare", list_id=None, data={"org": True, "name": oname, **({"lists": n, "to": user_names(c, [heir]).get(heir, "")} if n else {}),

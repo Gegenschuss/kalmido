@@ -30,7 +30,7 @@ async function calsDraw(md, j) {
   S.calendars = {...(S.calendars || {}), enabled: j.enabled, subs: j.subs.filter(x => x.visible).length};
   calInvalidate();
   box.innerHTML = j.subs.length ? j.subs.map(x => `<div class="calsub ${x.visible ? '' : 'off'}" data-cal="${x.id}" style="--cc:${cssColor(x.color) || '#94a3b8'}">
-      <button class="cswatch" data-calact="color" title="${tr('Color')}" aria-label="${tr('Color')}"></button>
+      <button class="cswatch" data-calact="color" title="${tr('Colour')}" aria-label="${tr('Colour')}"></button>
       <div class="calsub-main"><b>${esc(x.name)}</b><small class="muted">${esc(x.kind === 'caldav' ? `CalDAV · ${x.username}` : x.url_hint)} · ${calStatus(x)}${x.write && x.can_write ? ' · ' + esc(tr('writable')) : ''}</small></div>
       <label class="calvis" title="${tr('Show')}"><input type="checkbox" data-calact="vis" ${x.visible ? 'checked' : ''} aria-label="${tr('Show')}"></label>
       <button class="iconbtn" data-calact="refresh" title="${tr('Refresh now')}" aria-label="${tr('Refresh now')}">${ic('repeat', 's')}</button>
@@ -134,7 +134,7 @@ function calEditModal(x, colors, done) {
   let color = x.color;
   const md = modal(`<h3>${tr('Edit calendar')}</h3>
     <div class="row"><label for="ce-name">${tr('Name')}</label><input id="ce-name" maxlength="100" value="${esc(x.name)}"></div>
-    <div class="row"><label>${tr('Color')}</label><div class="cpal inline">${colors.map(c => `<button data-c="${c}" style="--cc:${c}" class="${c === color ? 'on' : ''}" aria-label="${c}"></button>`).join('')}</div></div>
+    <div class="row"><label>${tr('Colour')}</label><div class="cpal inline">${colors.map(c => `<button data-c="${c}" style="--cc:${c}" class="${c === color ? 'on' : ''}" aria-label="${c}"></button>`).join('')}</div></div>
     <div class="row"><label for="ce-int">${tr('Refresh')}</label><select id="ce-int"><option value="15">${tr('every 15 minutes')}</option><option value="60" ${x.interval === 60 ? 'selected' : ''}>${tr('every hour')}</option></select></div>
     ${x.kind === 'ics' ? `<div class="row"><label for="ce-url">${tr('Link')}</label><input id="ce-url" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${tr('saved ({0}), empty = keep', x.url_hint)}"></div>`
     : `<div class="row"><label for="ce-user">${tr('Username')}</label><input id="ce-user" autocomplete="off" autocapitalize="off" value="${esc(x.username)}"></div>

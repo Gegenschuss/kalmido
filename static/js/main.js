@@ -156,5 +156,6 @@ function bootDone() {
     try { const j = await api('POST', '/api/onboarding', {touch: isTouch(), mac: IS_MAC}); if (j?.created) { await load(); render(); } } catch { /* offline: next start */ }
   }
   if (S.settings.tour === 'pending' && !new URLSearchParams(location.search).get('share') && !S.capturePage) setTimeout(tourAuto, 400);  // 2.223.0 A (#2821): once per session, only in Projects
+  else if (!new URLSearchParams(location.search).get('share')) setTimeout(tourModAuto, 400);  // 2.466.0 (#3314): an area opened directly
   setTimeout(quipsLoad, 1500);
 })();

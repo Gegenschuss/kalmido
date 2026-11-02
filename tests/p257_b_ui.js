@@ -67,13 +67,13 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
   w.eval(`settingsModal(lmOrgPaneOn() ? 'org' : 'account')`); await until(() => d.querySelector('.wsp-pane'));
   const prow = () => d.querySelector('.wsp-row[data-wsp="private"]'), orow = () => d.querySelector(`.wsp-row[data-wsp="org:${ORG}"]`);
   check(prow()?.querySelectorAll('[data-wspc]').length === 13 && orow()?.querySelectorAll('[data-wspc]').length === 14, '#1807: Private: no colour + 12 tones; an organisation: Default + no colour + 12');
-  check(prow().querySelector('[data-wspc=""]').getAttribute('aria-pressed') === 'true' && orow().querySelector('[data-wspc=""].wsp-def[aria-pressed="true"]'), '#1807: no choice: "No color" / "Default" pressed');
+  check(prow().querySelector('[data-wspc=""]').getAttribute('aria-pressed') === 'true' && orow().querySelector('[data-wspc=""].wsp-def[aria-pressed="true"]'), '#1807: no choice: "No colour" / "Default" pressed');
   check(orow().querySelector('[data-wspc=""]').getAttribute('aria-label') === 'Default (colour of the organisation)' && orow().querySelector('.colors[role="group"][aria-label]'), '#1807: the swatches are named for screen readers');
   click(w, prow().querySelector('[data-wspc="teal"]'));
   check(await until(async () => (await call('GET', '/api/state')).settings.ws_colors === '{"private":"teal"}'), '#1807: a tap stores my colour of Private');
   check(prow().querySelector('[data-wspc="teal"]').getAttribute('aria-pressed') === 'true', '#1807: the tapped tone is pressed');
   click(w, orow().querySelector('[data-wspc="none"]'));
-  check(await until(async () => JSON.parse((await call('GET', '/api/state')).settings.ws_colors)['org:' + ORG] === 'none'), '#1807: "No color" for the organisation');
+  check(await until(async () => JSON.parse((await call('GET', '/api/state')).settings.ws_colors)['org:' + ORG] === 'none'), '#1807: "No colour" for the organisation');
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await call('GET', '/api/state')).settings.ws_colors === '{"private":"teal"}'), '#1807: one Undo step takes the last change back');
   check(orow().querySelector('[data-wspc=""]').getAttribute('aria-pressed') === 'true', '#1807: after Undo "Default" is pressed again');

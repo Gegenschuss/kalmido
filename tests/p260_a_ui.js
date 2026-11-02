@@ -51,7 +51,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
     await nav(B + '#l/' + P); await ready(ev, '#view .sprh');
     check(await ev(`!!document.querySelector('#view .sprh[data-sprdrop="${S1}"]') && document.querySelector('#view .sprh .sprtg b').textContent === 'Sprint 1'`), 'the sprint header shows Sprint 1');
     // a task into the sprint by its menu, one undo step
-    await ev(`(() => { taskMenu(document.querySelector('#view .trow[data-id="${T[0]}"]'), ${T[0]}); return 1; })()`); await sleep(400);
+    await ev(`(() => { taskMenu(document.querySelector('#view .trow[data-id="${T[0]}"]'), ${T[0]}); document.querySelector('#pop .mtmore')?.click(); return 1; })()`); await sleep(400);  // 2.445.0 (#3008): under "More…"
     const hasItem = await ev(`[...document.querySelectorAll('[role="menuitem"]')].some(b => b.textContent.includes('Sprint…'))`);
     check(hasItem, 'the task menu has "Sprint…"');
     await ev(`(() => { [...document.querySelectorAll('[role="menuitem"]')].find(b => b.textContent.includes('Sprint…'))?.click(); return 1; })()`); await sleep(400);

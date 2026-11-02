@@ -40,6 +40,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, now_utc, connect
 from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, need_list
+from ..collab.integfail import INTEG_FAILS, integ_org_admins, integ_tell
 from ..accounts.session import me
 from . import hubmail as H
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
@@ -449,7 +450,7 @@ def mbx_put():
     cols = ("active", "imap_host", "imap_port", "imap_ssl", "imap_user", "imap_folder", "smtp_host", "smtp_port", "smtp_tls", "smtp_user",
             "from_addr", "from_name")
     if r:
-        c.execute(f"UPDATE hub_mailboxes SET {', '.join(k + '=?' for k in cols)}, secret=?, error='', error_at=NULL, updated_at=? WHERE id=?",
+        c.execute(f"UPDATE hub_mailboxes SET {', '.join(k + '=?' for k in cols)}, secret=?, error='', error_at=NULL, fails=0, updated_at=? WHERE id=?",
                   (*[v[k] for k in cols], sealed, ts, r["id"]))
     else:
         c.execute(f"INSERT INTO hub_mailboxes(org_id, owner_id, ws, {', '.join(cols)}, secret, created_by, created_at, updated_at) "
@@ -630,8 +631,13 @@ def mbx_poll_one(box, hold=None):
 
     def done(c):
         with system_ctx(c):
-            c.execute("UPDATE hub_mailboxes SET polled_at=?, error=?, error_at=? WHERE id=?",
-                      (_now(), code, _now() if code else None, box["id"]))
+            # 2.367.3 (#2971): error_at = since when it fails (the first failure of this outage); fails = in a row
+            r = c.execute("""UPDATE hub_mailboxes SET polled_at=?, error=?, error_at=CASE WHEN ?='' THEN NULL WHEN fails>0 THEN error_at ELSE ? END,
+                             fails=CASE WHEN ?='' THEN 0 ELSE fails+1 END WHERE id=? RETURNING fails, error_at""",
+                          (_now(), code, code, _now(), code, box["id"])).fetchone()
+            if r and r["fails"] == INTEG_FAILS:
+                integ_tell(c, integ_org_admins(c, box["org_id"]) if box["org_id"] else [box["owner_id"] or box["created_by"]], "mailbox",
+                           box["imap_user"] or box["imap_host"], (r["error_at"] or "")[:10], ws=box["ws"])
         c.commit()
     _bg(done)
     return n
@@ -863,7 +869,7 @@ def _file_sent(c, uid, org, cid, lid, ws, m, raw, plain):
             eml_id = fs_put(c, uid, folder, name, raw, "message/rfc822", org)
     except (Denied, ValueError, UploadRefused, QuotaExceeded) as e:
         print("hubmail: sent mail without .eml", type(e).__name__, flush=True)
-        notes.append(tr("The original mail and its attachments could not be filed", lg=lg))
+        notes.append(tr("The original e-mail and its attachments could not be filed", lg=lg))
     if eml_id:  # 2.148.1 G (#2488): the filed nodes follow the mail's rights, as for received mail
         c.execute("UPDATE fs_nodes SET hub_mail_id=? WHERE id=?", (mid, eml_id))
     if folder:
@@ -900,7 +906,7 @@ def mbx_send():
     subj = re.sub(r"\s+", " ", _CTRL.sub(" ", subj)).strip()
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     if not subj and not text.strip():
-        return err(tr("The mail is empty"))
+        return err(tr("The e-mail is empty"))
     smtp, name, reply_to, via = _sender(c, org, uid)
     if not via:
         return jsonify(error=tr("Sending is not set up: an admin of the workspace enters the mailbox's SMTP access (E-mail filing > Mailbox)."),

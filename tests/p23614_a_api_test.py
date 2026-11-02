@@ -111,4 +111,9 @@ check(F.patch(B + f"/api/my/agents/{FA}", json={"limits": {"period": "month", "m
 r = F.patch(B + f"/api/my/agents/{FA}", json={"limits": {"period": "month", "metric": "tokens", "hard": 4000}})
 check(r.ok and (r.json().get("limits") or {}).get("hard") == 4000, f"#2928: ... but set a lower one {r.status_code} {r.text[:160]}")
 
+# 2.449.0 (#3800): the owner deletes her agent (DELETE /api/my/agents/<id>), nobody else does
+check(Bo.delete(B + f"/api/my/agents/{FA}").status_code == 404 and dbx("SELECT COUNT(*) FROM users WHERE id=?", (FA,)) == [(1,)], "#3800: somebody else cannot delete her agent")
+r = F.delete(B + f"/api/my/agents/{FA}")
+check(r.ok and dbx("SELECT COUNT(*) FROM users WHERE id=?", (FA,)) == [(0,)], f"#3800: the freelancer deletes her own agent {r.status_code} {r.text[:160]}")
+
 sys.exit(done("p23614_a_api"))

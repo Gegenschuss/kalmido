@@ -14,7 +14,7 @@ freelancer-matrix: office
  - the mail import (docs_ingest via docs_mail_import, downloads faked): a link PDF becomes a document (source mail), the same
    invoice as a PDF attachment (other bytes) is marked as duplicate (supplier + invoice number + amount), the same PDF again
    from a second mail is not stored twice, the same mail twice gives one document, a mail with an attachment downloads
-   nothing, a link that needs a login -> the mail itself (.eml) tagged "Receipt link needs a login", a mail without file
+   nothing, a link that needs a login -> the mail itself (.eml) tagged "Receipt link needs a sign-in", a mail without file
    and link -> the mail itself without the tag; the documents run through the recognition (invoice number read)
  - the forwarding address in the office settings (GET / POST /api/office/receipt-mail): the personal office of a person
    without an organisation and the company office are separate addresses, equal to the documents settings' address of that
@@ -307,7 +307,7 @@ def done(s, i, secs=90):
 check(DL and calls("link") == 1, f"a link mail: one download, one document ({j.get('link')})")
 d = done(Fr, DL) if DL else None
 check(d and d["name"] == "Invoice-INV-4711.pdf" and d["source"] == "mail" and d["ws"] == f"u{FID}",
-      f"the link PDF is a document of the private space ({d and (d['name'], d['source'], d['ws'])})")
+      f"the link PDF is a document of the private workspace ({d and (d['name'], d['source'], d['ws'])})")
 check(d and d["state"] == "done" and (d.get("extracted") or {}).get("invoice_no") == "INV-4711",
       f"and runs through the recognition (invoice number read: {d and (d['state'], (d.get('extracted') or {}).get('invoice_no'))})")
 check(dbx("SELECT ext_id FROM doc_meta WHERE node_id=?", (DL,)) == [("mail:<p2424b-1@example.com>:link:0",)], "ext_id mail:<id>:link:0")
@@ -321,9 +321,9 @@ DLG = nid("login")
 dl = done(Fr, DLG) if DLG else None
 check(dl and dl["name"].endswith(".eml") and dl["name"] == "Your receipt.eml" and calls("login") == 1,
       f"a link that needs a login: the mail itself is the document ({dl and dl['name']}, {calls('login')})")
-check(dl and "Receipt link needs a login" in [t["name"] for t in dl.get("tags") or []],
-      f"tagged 'Receipt link needs a login' ({dl and dl.get('tags')})")
-check(dl and (dl.get("text") or "").startswith("Receipt link needs a login"), "the hint stands first in its text")
+check(dl and "Receipt link needs a sign-in" in [t["name"] for t in dl.get("tags") or []],
+      f"tagged 'Receipt link needs a sign-in' ({dl and dl.get('tags')})")
+check(dl and (dl.get("text") or "").startswith("Receipt link needs a sign-in"), "the hint stands first in its text")
 DP = nid("plain")
 dp = done(Fr, DP) if DP else None
 check(dp and dp["name"] == "Bestätigungscode.eml" and not dp.get("tags") and "482913" in (dp.get("text") or "") and calls("plain") == 0,

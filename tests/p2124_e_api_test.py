@@ -128,7 +128,7 @@ check(d2.get("book_id") == T and d2.get("tab_name") == "Costs" and d2.get("book_
       "the further sheet knows its table " + str({k: d2.get(k) for k in ("book_id", "tab_name", "book_title")}))
 ix = index(Bo)
 check(T in ix and S2 not in ix and ix[T].get("sheets") == 2, "the index: the table once, with 2 sheets")
-check(S2 not in [x["id"] for x in index(Bo, "private").values()], "... also in the private space")
+check(S2 not in [x["id"] for x in index(Bo, "private").values()], "... also in the private workspace")
 S3 = Bo.post(B + f"/api/sheets/{S2}/tabs", json={"name": "Notes", "after_id": T}).json()["tab"]["id"]  # through a further sheet
 check(tabs(Bo, T) == [T, S3, S2], "after_id: the new sheet right after the first " + str(tabs(Bo, T)))
 check(Bo.patch(B + f"/api/sheets/{T}/tabs/{S2}", json={"pos": 0}).ok and tabs(Bo, T) == [S2, T, S3], "moved to the front")
@@ -147,7 +147,7 @@ check(put(Bo, T, "A4", '=SUMMEWENN(Costs!A1:A3;">6")').ok and at(get(Bo, T), "A4
 check(Bo.patch(B + f"/api/sheets/{T}/tabs/{S2}", json={"name": "Cost data"}).ok, "Costs renamed")
 d = get(Bo, T)
 check(at(d, "A1").get("raw") == "='Cost data'!A1*2" and at(d, "A1").get("value") == 10, "a renamed sheet keeps the formula " + str(at(d, "A1").get("raw")))
-check(at(d, "A2").get("raw") == "=SUMME('Cost data'!A1:A3)", "a range is written Name!A1:A3 " + str(at(d, "A2").get("raw")))
+check(at(d, "A2").get("raw") == "=SUM('Cost data'!A1:A3)", "a range is written Name!A1:A3 " + str(at(d, "A2").get("raw")))
 check(put(Bo, S2, "A1", "8").ok and at(get(Bo, T), "A1").get("value") == 16, "a change in the other sheet shows")
 check(put(Bo, T, "B1", "=Nowhere!A1").status_code == 400, "an unknown sheet: 400")
 check(put(Bo, T, "B1", "='Cost data'!Z99").status_code == 400, "a cell that does not exist: 400")

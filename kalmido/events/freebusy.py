@@ -12,22 +12,26 @@ of the calendars the person sees and did not hide, events they accepted, timed e
 reminder), as in the day plan. away = an approved absence (half days: the morning or the afternoon) or a public holiday
 of the person's state (hub/abscal.py). skip = the event being edited (it should not collide with itself).
 The colleagues' calendars are read as "system" (core/pg.py system_ctx) because they lie outside one's own rights; only
-the merged spans leave this module. Agents get 403 (not opened for them yet).
+the merged spans leave this module.
 2.240.0 C (#2868): a colleague sees only the sources of the organisations both share (that organisation's calendars, invitations
 to its events, its absences) -- private calendars, other organisations and subscriptions only if the person chose "all"
-(setting freebusy_share), nothing at all with "off". Asking about oneself still sees everything. Counted per person (EFB_RATE)."""
+(setting freebusy_share), nothing at all with "off". Asking about oneself still sees everything. Counted per person (EFB_RATE).
+2.467.0 (#2586): agents ask through GET /api/v1/events/freebusy (scope calendar; the web route stays closed to them), only about
+the people shared with them (efb_scopes_agent): the same answer, the same limit, anyone else left out."""
 import re
 from datetime import date, datetime, timedelta
 
 from flask import g, jsonify, request
 
-from ..api.common import hit_limit
+from ..api.common import hit_limit, v1_args, v1_view
 from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import db, parse_iso, usettings
 from ..core.pg import system_ctx
-from ..core.access import Denied, need_feat
+from ..core.access import Denied, need_feat, token_lists
 from ..personal.timetrack import BadInput
+from ..accounts.orgs import user_orgs, visible_people
+from ..accounts.orgroles import user_orgs_full
 
 EFB_USERS_MAX = 20
 EFB_RATE = 120  # 2.240.0 C (#2868): answers per person and minute (the editor asks once per change of day / people, cached 60 s)
@@ -43,7 +47,6 @@ def efb_scopes(c, uid, ids):
     """2.240.0 C (#2868): {id: the organisations whose sources uid sees of that person (None = all of them)} for the ids of
     `ids` uid may ask about (efb_allowed). None for oneself and for a person sharing "all"; a person sharing "off" is left out."""
     from ..accounts.orgs import user_orgs
-    from ..accounts.orgroles import user_orgs_full
     with system_ctx(c):  # memberships of other people (structure, ids only)
         mine = set(user_orgs(c, uid)) & set(user_orgs_full(c, uid))
         out = {}
@@ -62,6 +65,48 @@ def efb_scopes(c, uid, ids):
                 continue
             out[t] = None if share == "all" else both
     return out
+
+
+def efb_scopes_agent(c, aid, ids):
+    """2.467.0 (#2586): efb_scopes for an agent: only people shared with it (visible_people, as for GET /api/v1/absences: the
+    people of its projects and who owns / manages it), never itself or another agent. Its owner counts as "oneself" (the
+    owner's whole bar, whatever freebusy_share says: that setting is about colleagues). Anyone else is treated as a colleague
+    in the agent's workspace (agents.org_id): a full member of it, freebusy_share applies and "org" means the sources of that
+    workspace. An agent without a workspace therefore only ever sees its owner."""
+    vis = visible_people(c, aid)
+    out = {}
+    with system_ctx(c):  # the person's memberships and setting (structure, ids only)
+        a = c.execute("SELECT owner_id, org_id FROM agents WHERE user_id=?", (aid,)).fetchone()
+        for t in ids:
+            if t == aid or t not in vis or not a:
+                continue
+            u = c.execute("SELECT disabled, kid, kind FROM users WHERE id=?", (t,)).fetchone()
+            if not u or u["disabled"] or u["kid"] or (u["kind"] or "user") == "agent":
+                continue
+            if t == a["owner_id"]:
+                out[t] = None
+                continue
+            org = a["org_id"]
+            if not org or org not in set(user_orgs(c, t)) & set(user_orgs_full(c, t)):
+                continue
+            share = usettings(c, t).get("freebusy_share") or "org"
+            if share != "off":
+                out[t] = None if share == "all" else {org}
+    return out
+
+
+def efb_token_cut(c, uid, allowed):
+    """2.467.0 (#2586, review): a token limited to some projects answers only for the people of those projects, and for
+    oneself and an agent's owner; the people of the account's other projects stay out."""
+    lids = token_lists()
+    if lids is None:
+        return allowed
+    q = ",".join("?" * len(lids)) or "NULL"
+    with system_ctx(c):  # structure, ids only
+        keep = {uid, *(r[0] for r in c.execute("SELECT owner_id FROM agents WHERE user_id=?", (uid,)))}
+        keep |= {r[0] for r in c.execute(f"SELECT owner_id FROM lists WHERE id IN ({q})", [*lids])}
+        keep |= {r[0] for r in c.execute(f"SELECT user_id FROM list_members WHERE list_id IN ({q})", [*lids])}
+    return {t: o for t, o in allowed.items() if t in keep}
 
 
 def efb_spans(c, uid, day, zone, skip=None, orgs=None):
@@ -133,17 +178,11 @@ def efb_hm(m):
     return "24:00" if m >= 1440 else f"{m // 60:02d}:{m % 60:02d}"
 
 
-@app.get("/api/events/freebusy")
-def efb_get():
-    u = g.user
-    if u is None:
-        raise Denied(401)
-    if (u["kind"] or "user") == "agent" or u["kid"]:
-        raise Denied(403, tr("Agents cannot use this endpoint"))
+def efb_answer(u, a):
+    """The answer of both routes for account u (a person or, through /api/v1, an agent); a = the query arguments."""
     need_feat("events")
     if hit_limit(f"efb:{u['id']}", EFB_RATE):  # 2.240.0 C (#2868)
         raise Denied(429, tr("Too many requests, please slow down"))
-    a = request.args
     try:
         day = date.fromisoformat((a.get("day") or "").strip())
     except ValueError:
@@ -167,9 +206,30 @@ def efb_get():
     tz = (a.get("tz") or "").strip()
     zone = ev_zone(tz if tz_ok(tz) else "")
     people = []
-    allowed = efb_scopes(c, uid, ids)
+    allowed = efb_scopes_agent(c, uid, ids) if (u["kind"] or "user") == "agent" else efb_scopes(c, uid, ids)
+    allowed = efb_token_cut(c, uid, allowed)
     with system_ctx(c):  # the colleagues' calendars lie outside my rights; only merged spans leave this block
         for t, orgs in allowed.items():
             people.append({"user_id": t, "slots": [{"start": efb_hm(s), "end": efb_hm(e), "kind": k}
                                                    for s, e, k in efb_spans(c, t, day, zone, skip, orgs)]})
     return jsonify(day=day.isoformat(), tz=getattr(zone, "key", ""), people=people)
+
+
+@app.get("/api/events/freebusy")
+def efb_get():
+    u = g.user
+    if u is None:
+        raise Denied(401)
+    if (u["kind"] or "user") == "agent" or u["kid"]:
+        raise Denied(403, tr("Agents cannot use this endpoint"))
+    return efb_answer(u, request.args)
+
+
+@app.get("/api/v1/events/freebusy")
+@v1_view
+def v1_efb_get():
+    """2.467.0 (#2586): the same answer for a token (scope calendar): agents (efb_scopes_agent) and people."""
+    a = v1_args(("day", "users", "tz", "skip"))
+    if g.user["kid"]:
+        raise Denied(403)
+    return efb_answer(g.user, a)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """2.123.0 B (#2104) API tests: read-only shares of knowledge pages and folders (own container, org encryption on).
- - person share (private space only): a folder "Customer A" covers its own page and every page below it, also one made
+ - person share (private workspace only): a folder "Customer A" covers its own page and every page below it, also one made
    later; never "Customer AB/…" (prefix trick) nor another page; the guest reads only through /api/wiki/shared* (index,
    page, files of shared pages), never the space's index, search, backlinks or the normal page routes; [[links]] to pages
    that are not shared stay text; by e-mail address without revealing the account; oneself 404; in an organisation 409
@@ -9,7 +9,7 @@
  - rename (page, folder) takes the shares along; the trash hides a shared page; moving to the other workspace ends shares
  - rights (tenant-matrix: wiki): another organisation 404 (list, create, change, revoke); a member manages the
    organisation's links; a locked space (encrypted in the browser) shares nothing (409) and its links stop
- - a person without an organisation (freelancer-matrix: wiki): shares pages of the own private space (person + link)
+ - a person without an organisation (freelancer-matrix: wiki): shares pages of the own private workspace (person + link)
 usage: p2123_b_api_test.py <datadir>      (P2123B_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import base64
 import os
@@ -93,7 +93,7 @@ DAVE = Da.get(B + "/api/state").json()["me"]["id"]
 ORG2 = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": CAROL}).json()["id"]
 SP, SP2 = f"org:{ORG}", f"org:{ORG2}"
 
-# ---------------------------------------------------------------- the private space of Alice
+# ---------------------------------------------------------------- the private workspace of Alice
 start = page(A, "private", "Customer A", "# Overview\nThe folder's own page.")
 plan = page(A, "private", "Customer A/Plan", "")
 intro = page(A, "private", "Customer A/Intro", "Hello **customer**.\n\n- [x] kick-off\n- [ ] sign-off\n")
@@ -249,7 +249,7 @@ ftok = r.json().get("url", "").rsplit("/", 1)[-1]
 r = share(Fr, space="private", folder="Offer", kind="person", email="dave@example.com")
 check(r.ok and r.json().get("by_email") is True and "Offer/Terms" in shared(Da), "#2104: the freelancer shares a folder with a person " + r.text[:200])  # 2.123.0 (#2104, review): by e-mail = 200 by_email
 r = Fr.get(B + "/api/wiki/shares", params={"space": "private"})
-check(r.ok and len(r.json().get("shares", [])) == 2, "#2104: the freelancer lists the shares of the private space")
+check(r.ok and len(r.json().get("shares", [])) == 2, "#2104: the freelancer lists the shares of the private workspace")
 fsid = r.json()["shares"][0]["id"]
 check(Fr.delete(B + f"/api/wiki/shares/{fsid}").ok and Fr.post(B + f"/api/wiki/shares/{fsid}/restore").ok, "#2104: the freelancer revokes and restores")
 check(Fr.patch(B + f"/api/wiki/shares/{fsid}", json={"expires": time.strftime("%Y-%m-%d", time.localtime(time.time() + 86400 * 3))}).ok,

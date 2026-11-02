@@ -17,6 +17,7 @@ const LD_MODS = {
     'office_cards',  // 2.444.0 (#3447): credit card statements
     'office_recurring', 'office_subs', 'office_dunning',  // 2.91.0 (#1923, #1924); 2.147.1 B (#2054): office_dunning
     'office_peppol',  // 2.154.0 B (#1960): e-invoices over Peppol
+    'office_payonline',  // 2.469.0 (#3459): online payment of invoices
     'office_bankrules',  // 2.299.0 B (#3191): bank rules
     'office_docproject',  // 2.168.0 A (#2665): documents bound to a project
     'office_agreements', 'office_assets',  // 2.92.0 (#1925, #1931)
@@ -59,6 +60,7 @@ const LD_MODS = {
   polls: ['polls'],  // 2.102.0 C (#2208): scheduling polls (#1953), on the first "Find a date"
   formq: ['formq'],  // 2.102.0 C (#2208): questionnaires (#1954), with the forms dialog of a list
   navmenu: ['navmenu'],  // 2.418.0 (#3560): the editor of the areas' menus (Customize / the pen, Settings > Navigation)
+  tourmods: ['tourmods'],  // 2.466.0 (#3314): the steps of the areas' introductions
   ofundo: ['office_undo'],  // 2.111.0 A (#2233): undo of the office editors, clients and tables (office, sheets and the client dialog load it)
   voice: ['voice'],  // 2.139.0 B (#2128): voice messages of the team chat (the composer's microphone, the audio player)
   hubmailbox: ['hubmailbox'],
@@ -263,7 +265,7 @@ const lifeOn = () => LIFE_MODS.some(m => feat(m));
 // 2.312.0 B (#3264): the notes on health data (Art. 9 GDPR) of the modules health and review (2.306.0 B #2887, moved here
 // from settings.js): the module row, the area switch (areas.js mg_modAreaHtml) and the first-run setup (account.js)
 const MOD_PRIV = {health: N_('Health data is specially protected. Only you see it, unless you share a list.'),
-  review: N_('Journal and mood entries can be health data and are specially protected. Only you see them; the encryption of your private space protects them on the server too.')};
+  review: N_('Journal and mood entries can be health data and are specially protected. Only you see them; the encryption of your private workspace protects them on the server too.')};
 const modPrivHtml = ks => ks.filter(k => MOD_PRIV[k]).map(k => `<small class="modpriv">${ic('info', 's')} ${tr(MOD_PRIV[k])}</small>`).join('');
 const fmtMoney = n => curMoney(n, S.settings.time_currency ?? '€');  // 2.368.0 C (#2983): one money format (i18n.js curMoney)
 window.lifeBar = l => { if (l?.life && !l.archived && (lifeOn() || (l.life === 'reading' && feat('reading')))) ld_later('life'); return ''; };  // 2.172.0 B (#2679): + a read-later project
@@ -312,7 +314,7 @@ function lexCsv(lid) {
   a.href = `/api/lists/${lid}/export.csv?done=${LS.get('lexDone', true) ? 1 : 0}`;
   a.download = ''; a.hidden = true;
   document.body.appendChild(a); a.click(); a.remove();
-  toast(tr('The CSV has no comments, attachments, repeats, reminders or dependencies. For everything, use the account export.'), null, 9000);  // 2.273.0 D (#3051)
+  toast(tr('The CSV counts comments and attachments but does not contain them. For everything, use the account export.'), null, 9000);  // 2.273.0 D (#3051), 2.363.3 (#3134)
 }
 const pv_attr = o => ` data-pview="${esc(JSON.stringify(o))}"`;
 // 2.92.0 C (#1926): a Word / Excel file opens in the document preview (docpreview.js, module pdf) like a PDF:

@@ -411,6 +411,22 @@ def revive_lost(api=None):
 # kalmido-capability: jobs (2.44.0)
 # ---- commands
 
+def refused(err):
+    """2.392.0 A (#3367): the plain sentence for a 409 slots_full / wip_full of POST /agent/jobs (nothing was started), else ''."""
+    if "HTTP 409" not in err:
+        return ""
+    try:
+        e = json.loads(err.split(" ", 2)[2]).get("error", {})
+    except (IndexError, ValueError, AttributeError):
+        e = {}
+    if e.get("code") == "slots_full":
+        return f"no job started: all {e.get('max')} places are taken ({e.get('running')} jobs running). Wait until one is done, then start it again."
+    if e.get("code") == "wip_full":
+        return (f"no job started: the column {e.get('section')} holds {e.get('count')} open tasks, its limit is {e.get('limit')}. "
+                "Finish or move a task of that column first, then start it again.")
+    return ""
+
+
 def cmd_start(argv):
     title, task, worktree, timeout_h, src = "", None, False, float(os.environ.get("KALMIDO_JOB_TIMEOUT_H") or 6), None
     name, parent = "", None  # 2.58.0 (#1803): own name (POST /agent/jobs {name}); 2.59.0 (#1827): part job of job ID
@@ -466,7 +482,7 @@ def cmd_start(argv):
     try:
         kj = api.req("POST", "/agent/jobs", body)
     except RuntimeError as e:
-        print("the Kalmido job could not be created: " + str(e)[:200])
+        print(refused(str(e)) or "the Kalmido job could not be created: " + str(e)[:200])  # 2.392.0 A (#3367)
         return 1
     jid = int(kj["id"])
     d = job_dir(jid)

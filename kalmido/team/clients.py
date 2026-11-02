@@ -9,7 +9,7 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.pg import insert_id, system_ctx, table_columns, write_lock
 from ..core.conflict import ccf_check
-from ..core.i18n import N_, tr, trn
+from ..core.i18n import LANGS, N_, tr, trn
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, usettings
 from ..core.retention import ret_days
 from ..accounts.session import me
@@ -33,12 +33,12 @@ CLIENT_FIELDS = ("name", "name_extra", "display_name", "short_code", "icon", "co
 CLIENT_TEXT_MAX = {"name": 80, "name_extra": 120, "display_name": 80, "short_code": 6, "icon": 8, "color": 20, "contact": 120, "email": 200, "phone": 60, "address": 500, "note": 4000}
 # 2.36.2 (#1021, E): structured billing fields (office & finance; people only, never in agent answers)
 CLIENT_BILLING = ("street", "address_extra", "zip", "city", "country", "vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days",
-                  "peppol_id")  # 2.154.0 B (#1960): the Peppol id "<scheme>:<id>" of e-invoices over Peppol
+                  "peppol_id", "doc_lang")  # 2.154.0 B (#1960): the Peppol id "<scheme>:<id>" of e-invoices over Peppol; 2.460.0 (#3767): doc_lang
 CLIENT_BILLING_MAX = {"street": 200, "address_extra": 200, "zip": 20, "city": 120, "country": 2, "vat_id": 20, "customer_no": 40, "buyer_reference": 60,
-                      "email_invoice": 200, "peppol_id": 90}
+                      "email_invoice": 200, "peppol_id": 90, "doc_lang": 5}
 # 2.187.1 A (#2735): the invoicing part of the billing fields belongs to the office area "Quotes & invoices" (offers): a person
 # ruled by office groups sees it with offers >= view and changes it with offers >= edit; the address stays for everybody
-CLIENT_BILL_GATED = ("vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days", "peppol_id")
+CLIENT_BILL_GATED = ("vat_id", "customer_no", "buyer_reference", "email_invoice", "payment_terms_days", "peppol_id", "doc_lang")
 COLOR_RE = re.compile(r"#[0-9a-fA-F]{6}")
 
 
@@ -195,6 +195,8 @@ def clean_client(c, uid, b, new=False):
             v = fk_country(v)
         if k == "vat_id":
             v = v.replace(" ", "").upper()
+        if k == "doc_lang" and v and v not in LANGS:  # 2.460.0 (#3767): '' = the office's language
+            raise BadInput(tr("Invalid value: {0}", k))
         if k == "peppol_id":  # 2.154.0 B (#1960): known scheme, check digits (office/peppol.py)
             from ..office.peppol import pep_id_clean
             v = pep_id_clean(v)
@@ -580,7 +582,7 @@ CL_REF_WORDS = {
     "office_privacy_sheets": Nn_("{0} data protection sheet", "{0} data protection sheets"),
     "video_reviews": Nn_("{0} video review", "{0} video reviews"),
     "hub_tokens": Nn_("{0} mail-in address", "{0} mail-in addresses"),
-    "hub_mails": Nn_("{0} mail", "{0} mails"),
+    "hub_mails": Nn_("{0} e-mail", "{0} e-mails"),
     "office_deals": Nn_("{0} deal", "{0} deals"),
     "office_letters": Nn_("{0} letter", "{0} letters"),
     "office_gen_docs": Nn_("{0} document", "{0} documents"),

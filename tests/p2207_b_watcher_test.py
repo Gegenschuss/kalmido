@@ -4,7 +4,7 @@ real server - run INSIDE the test container in its one-round mode (--once --conf
 freelancer-matrix: docs
  - the image carries every download (Mac zips, Windows, Linux, the Go license) and SHA256SUMS matches them; the Linux file reports the
    version of the image
- - a person without an organisation creates an upload-only key (POST /api/docs/scan-keys, private space); the watcher
+ - a person without an organisation creates an upload-only key (POST /api/docs/scan-keys, private workspace); the watcher
    uploads a finished PDF from its folder, the document is there, the file lies in "Uploaded" afterwards; hidden files
    stay where they are; the duplicate guard journal is private (0600)
  - after the key is revoked the watcher stops that inbox (paused, exit code 2) and leaves the new file in place
@@ -78,8 +78,8 @@ ver = subprocess.run(["docker", "exec", CT, "cat", "/app/VERSION"], capture_outp
 r = subprocess.run(["docker", "exec", CT, BIN, "--version"], capture_output=True, text=True)
 check(r.returncode == 0 and r.stdout.strip() == f"kalmido-folder-watcher {ver}", f"--version: {r.stdout!r} {r.stderr!r}")
 
-# a person without an organisation sets up an inbox in the private space
-FID, Fr = freelancer(B, A)  # freelancer-matrix: docs (upload-only key, the watcher uploads into the private space)
+# a person without an organisation sets up an inbox in the private workspace
+FID, Fr = freelancer(B, A)  # freelancer-matrix: docs (upload-only key, the watcher uploads into the private workspace)
 r = Fr.post(B + "/api/docs/scan-keys", json={"ws": "private", "name": "Scanner"})
 check(r.status_code == 201, f"scan key created: {r.status_code} {r.text[:200]}")
 j = r.json() if r.status_code == 201 else {}
@@ -105,7 +105,7 @@ m = re.search(r"uploaded scan-2207\.pdf \(document (\d+)\)", err)
 check(bool(m), f"the log names the document: {err[-300:]!r}")
 if m:
     d = Fr.get(B + f"/api/docs/{m.group(1)}")
-    check(d.ok and d.json().get("name") == "scan-2207.pdf" and not d.json().get("org_id"), f"the document is in the private space: {d.status_code} {d.text[:200]}")
+    check(d.ok and d.json().get("name") == "scan-2207.pdf" and not d.json().get("org_id"), f"the document is in the private workspace: {d.status_code} {d.text[:200]}")
 r = cx("import os; print(oct(os.stat(%r).st_mode & 0o777))" % (ROOT + "/cfg/journal.json"))
 check(r.stdout.decode().strip() in ("0o600", ""), f"journal private: {r.stdout!r}")
 

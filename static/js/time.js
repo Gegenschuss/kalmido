@@ -353,8 +353,8 @@ function viewTime() {
   let tot = jt.total, hasAmt = jt.lists.some(l => l.rate);
   // U20: one tile for the range (time and decimal hours together), "today" only when the range is longer than today
   const tiles = [[hmm(tot.seconds), tr('tracked'), [rm ? tr('rounded: {0}', `${hmm(tot.rounded)} (${hoursDec(tot.rounded)} h)`) : `${hoursDec(tot.rounded)} h`, trn('{0} entry', '{0} entries', tot.count)].join(' · ')]];
-  if (!(f === t && f === today())) tiles.push([hmm(jt.today.seconds), tr('today'), tgt ? tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), String(tgt).replace('.', LOCALE().startsWith('de') ? ',' : '.')) : tr('your time')]);
-  else if (tgt) tiles[0][2] += ' · ' + tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), String(tgt).replace('.', LOCALE().startsWith('de') ? ',' : '.'));
+  if (!(f === t && f === today())) tiles.push([hmm(jt.today.seconds), tr('today'), tgt ? tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), fmtNum(tgt, 2)) : tr('your time')]);
+  else if (tgt) tiles[0][2] += ' · ' + tr('{0}% of the daily target ({1} h)', Math.round(100 * jt.today.seconds / 3600 / tgt), fmtNum(tgt, 2));
   if (hasAmt) tiles.push([money(tot.amount, j.currency), tr('amount'), tr('hourly rates of the projects')]);
   P.tiles = lyo_note(jt.lyoLabel) + `<div class="sttiles">${tiles.map(([v, l, s]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span><small>${esc(s)}</small></div>`).join('')}</div>`;
   // per day (per week for long ranges)
@@ -419,7 +419,7 @@ function timesheet() {
     ${j.lists.map(l => `<tr class="p"><td>${esc(tvListName(l))}</td><td class="muted">${ustr(l.users)}</td>${cols(l, l.rate ? money(l.rate, cur) : '', l.rate ? money(l.amount, cur) : '')}</tr>${l.tasks.map(x => `<tr class="t"><td>${esc(x.title || tr('No task'))}</td><td class="muted">${ustr(x.users)}</td>${cols(x, '', l.rate ? money(x.amount, cur) : '')}</tr>`).join('')}`).join('')}
     <tr class="g"><td>${tr('Total')}</td><td class="muted">${esc(j.users.map(u => `${u.name} ${hmm(u.rounded)}`).join(', '))}</td><td class="n">${hmm(j.total.rounded)}</td><td class="n">${hoursDec(j.total.rounded)}</td>${hasAmt ? `<td></td><td class="n">${money(j.total.amount, cur)}</td>` : ''}</tr></tbody></table>
     <h2>${tr('Per day')}</h2><table class="tsdays"><thead><tr><th>${tr('Date')}</th><th class="n">h:mm</th><th class="n">${tr('Hours')}</th></tr></thead><tbody>${j.days.map(d => `<tr><td>${esc(fmtDay('year', pd(d.date)))}</td><td class="n">${hmm(d.rounded)}</td><td class="n">${hoursDec(d.rounded)}</td></tr>`).join('')}</tbody></table>
-    <div class="tsentries">${Object.keys(byList).map(id => `<h2>${esc(lname2(+id))}</h2><table class="entries"><thead><tr><th>${tr('Date')}</th><th>${tr('Time|tracked')}</th><th>${tr('Task')}</th><th>${tr('Note')}</th>${all ? `<th>${tr('User')}</th>` : ''}<th class="n">h:mm</th>${rm ? `<th class="n">${tr('Rounded')}</th>` : ''}</tr></thead><tbody>
+    <div class="tsentries">${Object.keys(byList).map(id => `<h2>${esc(lname2(+id))}</h2><table class="entries"><thead><tr><th>${tr('Date')}</th><th>${tr('Time|tracked')}</th><th>${tr('Task')}</th><th>${tr('Note')}</th>${all ? `<th>${tr('Person')}</th>` : ''}<th class="n">h:mm</th>${rm ? `<th class="n">${tr('Rounded')}</th>` : ''}</tr></thead><tbody>
       ${byList[id].map(e => { const s = new Date(e.start), en = e.end ? new Date(e.end) : null; return `<tr><td>${esc(fmtDate(ds(s)))}</td><td>${fmtTimeAt(s)} – ${en ? fmtTimeAt(en) : tr('running')}</td><td>${esc(e.title || tr('No task'))}</td><td class="note">${esc(e.note)}</td>${all ? `<td class="muted">${esc(e.user_name)}</td>` : ''}<td class="n">${hmm(e.seconds)}</td>${rm ? `<td class="n">${hmm(e.rounded)}</td>` : ''}</tr>`; }).join('')}</tbody></table>`).join('')}</div>`;
   $('.tsheet')?.remove();
   const el = document.createElement('div');

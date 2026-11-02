@@ -133,6 +133,46 @@ check(r.ok and [c["field"] for c in j.get("conflicts") or []] == ["priority"] an
 r = A.post(B + "/api/tasks/reorder", json={"items": [{"id": T2, "sort": 6, "priority": 5, "_prev": {"priority": 3}}]})
 check(r.ok and not r.json().get("conflicts") and A.get(B + f"/api/tasks/{T2}").json()["priority"] == 5, "#3028: reorder with the current _prev writes")
 
+# ================================================================== 2.370.0 (#3126): the agents' batch, the settings of a list
+BT = [A.post(B + "/api/tasks", json={"title": f"Batch {i}", "list_id": L, "due": "2027-04-01", "priority": 1}).json()["id"] for i in range(3)]
+check(Bo.patch(B + f"/api/tasks/{BT[0]}", json={"due": "2027-04-02"}).ok, "#3126 setup: a person moves the first one")
+r = agent("POST", "/tasks/batch", json={"ids": BT, "action": "update", "changes": {"due": "2027-04-09"}, "_prev": {str(i): {"due": "2027-04-01"} for i in BT}})
+j = r.json()
+check(r.ok and j["count"] == 2 and [(c["id"], c["field"]) for c in j["conflicts"]] == [(BT[0], "due")], f"#3126 update: the changed task is skipped and named {r.text[:300]}")
+check([A.get(B + f"/api/tasks/{i}").json()["due"] for i in BT] == ["2027-04-02", "2027-04-09", "2027-04-09"], "#3126 update: it keeps its date, the others move")
+r = agent("POST", "/tasks/batch", json={"ids": BT[:1], "action": "update", "changes": {"notes": "Neu", "priority": "high"}, "_prev": {str(BT[0]): {"notes": "x", "priority": "low"}}})
+check(r.ok and r.json()["count"] == 1 and {c["field"] for c in r.json()["conflicts"]} == {"notes"}, f"#3126 update: API field names, the unchanged field writes {r.text[:300]}")
+r = agent("POST", "/tasks/batch", json={"ids": BT[1:2], "action": "update", "changes": {"due": "2027-04-10"}})
+check(r.ok and r.json()["count"] == 1 and A.get(B + f"/api/tasks/{BT[1]}").json()["due"] == "2027-04-10", "#3126 without _prev: as before (old agents)")
+for bad, why in (({"action": "update", "changes": {"title": "x"}, "_prev": {"999999": {"title": "a"}}}, "an id outside the batch"),
+                 ({"action": "update", "changes": {"title": "x"}, "_prev": {str(BT[1]): {"nonsense": 1}}}, "an unknown field"),
+                 ({"action": "update", "changes": {"title": "x"}, "_prev": []}, "no object"),
+                 ({"action": "reopen", "_prev": {}}, "_prev with another action"),
+                 ({"action": "reopen", "expect": {}}, "expect with another action"),
+                 ({"action": "complete", "expect": {str(BT[1]): "2027-04-10"}}, "expect without its object"),
+                 ({"action": "complete", "expect": {str(BT[1]): {"expect_time": "09:00"}}}, "expect without a date")):
+    check(agent("POST", "/tasks/batch", json={"ids": BT, **bad}).status_code == 400, f"#3126 400: {why}")
+RT = [A.post(B + "/api/tasks", json={"title": f"Serie {i}", "list_id": L, "due": "2027-05-03", "repeat": "FREQ=DAILY"}).json()["id"] for i in range(3)]
+check(A.post(B + f"/api/tasks/{RT[0]}/complete").ok, "#3126 setup: ticked elsewhere")
+moved = A.get(B + f"/api/tasks/{RT[0]}").json()["due"]
+r = agent("POST", "/tasks/batch", json={"ids": RT, "action": "complete", "expect": {str(i): {"expect_due": "2027-05-03"} for i in RT}})
+j = r.json()
+check(r.ok and j["count"] == 2 and [(c["id"], c["field"]) for c in j["conflicts"]] == [(RT[0], "due")], f"#3126 complete: the task that moved on is skipped and named {r.text[:300]}")
+check(A.get(B + f"/api/tasks/{RT[0]}").json()["due"] == moved and A.get(B + f"/api/tasks/{RT[1]}").json()["due"] != "2027-05-03", "#3126 complete: never advanced twice, the others advance")
+r = agent("POST", "/tasks/batch", json={"ids": BT[2:], "action": "wont_do", "expect": {str(BT[2]): {"expect_due": "2027-04-30"}}})
+check(r.ok and r.json()["count"] == 0 and r.json()["conflicts"][0]["field"] == "due", f"#3126 wont_do: expect too {r.text[:300]}")
+# the list settings the client now sends with _prev
+LF = A.post(B + f"/api/lists/{L}/fields", json={"name": "Betrag", "type": "number"}).json()["id"]
+k = f"f:{LF}"
+for field, one, two in (("sort_mode", "title", "date"), ("col_sums", {k: "avg"}, {k: "max"}), ("kpis", [{"title": "A", "agg": "count", "state": "all"}], [{"title": "B", "agg": "count", "state": "all"}])):
+    r = A.patch(B + f"/api/lists/{L}", json={field: one})
+    check(r.ok and not r.json().get("conflicts"), f"#3126 {field}: setup {r.text[:200]}")
+    r = A.patch(B + f"/api/lists/{L}", json={field: two, "_prev": {field: "nope" if field == "sort_mode" else ({"x": "sum"} if field == "col_sums" else [{"title": "C"}])}})
+    check(r.ok and [c["field"] for c in r.json().get("conflicts") or []] == [field], f"#3126 {field}: changed elsewhere stays {r.text[:200]}")
+    cur = next(x for x in A.get(B + "/api/state").json()["lists"] if x["id"] == L)[field]
+    r = A.patch(B + f"/api/lists/{L}", json={field: two, "_prev": {field: cur}})
+    check(r.ok and not r.json().get("conflicts"), f"#3126 {field}: the value as read writes {r.text[:200]}")
+
 # ================================================================== freelancer: tasks + office draft positions
 A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
 FID, Fr = freelancer(B, A)
@@ -152,6 +192,17 @@ time.sleep(1.1)
 check(Fr.patch(B + f"/api/tasks/{FT}", json={"content": "Frida's own words"}).ok, "setup: the freelancer changes the task")
 r = requests.patch(V + f"/tasks/{FT}", headers=FH, json={"notes": "Agent", "expect_updated_at": fseen["updated_at"]})
 check(r.status_code == 409, f"#3028: freelancer: a stale agent write = 409 {r.status_code}")
+r = requests.post(V + "/tasks/batch", headers=FH, json={"ids": [FT], "action": "update", "changes": {"notes": "Agent"}, "_prev": {str(FT): {"notes": ""}}})
+check(r.ok and r.json()["count"] == 0 and r.json()["conflicts"][0]["field"] == "notes" and Fr.get(B + f"/api/tasks/{FT}").json()["content"] == "Frida's own words",
+      f"#3126 freelancer: the agent's batch keeps the person's text {r.text[:300]}")
+TT = Fr.post(B + "/api/tasks", json={"title": "Zweimal am Tag", "list_id": FL, "due": "2027-06-01", "due_time": "15:00", "repeat": "FREQ=DAILY;TIMES=0900,1500"}).json()
+r = requests.post(V + "/tasks/batch", headers=FH, json={"ids": [TT["id"]], "action": "complete", "expect": {str(TT["id"]): {"expect_due": "2027-06-01", "expect_time": "09:00"}}})
+check(r.ok and r.json()["count"] == 0 and [c["field"] for c in r.json()["conflicts"]] == ["due_time"], f"#3126 complete: the time of a several-times-a-day rule counts {r.text[:300]}")
+r = requests.post(V + "/tasks/batch", headers=FH, json={"ids": [TT["id"]], "action": "complete", "expect": {str(TT["id"]): {"expect_due": "2027-06-01", "expect_time": TT["due_time"]}}})
+check(r.ok and r.json()["count"] == 1, f"#3126 complete: the right time completes {r.text[:300]}")
+TN = Fr.post(B + "/api/tasks", json={"title": "Ohne Vergleich", "list_id": FL}).json()["id"]
+r = requests.post(V + "/tasks/batch", headers=FH, json={"ids": [TN], "action": "complete"})
+check(r.ok and r.json()["count"] == 1, "#3126 complete without expect: as before (old agents)")
 
 check(Fr.patch(B + f"{O}/agents/{FAG}", json={"office_drafts": True}).ok, "setup: the freelancer switches her agent on")
 check(Fr.put(B + O + "/settings", json={"agents_read": 1}).ok, "setup: the privacy switch of the personal office")

@@ -44,7 +44,7 @@ SH2_UNITS = {"day": ("tag", "tage", "tg", "day", "days", "d", "jour", "jours", "
              "flat": ("pauschal", "pausch.", "psch", "flat", "pauschale", "forfait", "forfait", "a corpo", "vast", "tanto alzado"),
              "piece": ("stk", "stk.", "stück", "st", "st.", "piece", "pieces", "pc", "pcs", "x", "pièce", "pièces", "pezzo", "pezzi",
                        "stuk", "stuks", "pieza", "piezas")}
-SH2_NO_OFFICE = N_("Office & finance is not available for this table's space")
+SH2_NO_OFFICE = N_("Office & finance is not available for this table's workspace")
 
 
 def _gate(c, sid, write=True):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.97.0 API tests, part D (#2050, #2051), own container (start.sh). Invented names only. The server never sees a space key or
 a plain text of a space with the lock: these tests send ciphertext-shaped values (the WebCrypto round trip is in p297_d_ui.js).
- - a private space with the lock -> an open organisation: the dry run names both states and warns that the pages are no longer
+ - a private workspace with the lock -> an open organisation: the dry run names both states and warns that the pages are no longer
    end-to-end encrypted; the move needs the generations of the dry run (409), plain texts for an open target (400), every page
    with path and text (400), no folder (400); a taken name 409; the page is readable in the organisation, links rebuilt
  - the way back (the undo) into the space with the lock: only ciphertexts of its current generation (plain 400, another
@@ -134,9 +134,9 @@ check(m.get("from") == GSP and m.get("from_name") == "Gamma", "carol (member of 
 SID = Bo.post(B + "/api/sheets", json={"title": "Budget", "space": "private"}).json()["id"]
 check(Bo.post(B + f"/api/sheets/{SID}/move-space", json={"to": SP}).ok, "bob moves his table into Alpha")
 m = A.get(B + f"/api/sheets/{SID}").json().get("moved") or {}
-check(m.get("from") is None and m.get("from_name") == "private space", "alice: bob's private space without key or person " + str(m))
+check(m.get("from") is None and m.get("from_name") == "private workspace", "alice: bob's private workspace without key or person " + str(m))
 m = Bo.get(B + f"/api/sheets/{SID}").json().get("moved") or {}
-check(m.get("from") == "private" and m.get("from_name") == "Private", "bob: his own private space " + str(m))
+check(m.get("from") == "private" and m.get("from_name") == "Private", "bob: his own private workspace " + str(m))
 
 # ================================================================ #2050: private with the lock -> open organisation
 SEC = page(Ca, "Secret", "see [[Other]] and #5")
@@ -144,7 +144,7 @@ OTH = page(Ca, "Other", "")
 assert Ca.put(B + "/api/e2e/keys", json=e2e_keys()).ok
 lock(Ca, "private", [uid["carol"]])
 src = {r["id"]: r for r in dbx("SELECT id, path, body FROM wiki_pages WHERE id IN (?, ?)", (SEC, OTH))}
-check(src[SEC]["path"].startswith("e2e1:"), "carol's private space is locked")
+check(src[SEC]["path"].startswith("e2e1:"), "carol's private workspace is locked")
 
 r = mv(Ca, pages=[SEC], space="private", to=SP, dry=1)
 d = r.json() if r.ok else {}

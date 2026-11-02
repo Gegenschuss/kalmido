@@ -7,6 +7,7 @@ tmm_after compares afterwards and keeps what ended as one space_moves row (kind 
 for the answer ("move_ended"); tmm_restore runs when the task goes back to where it came from (the undo step or a move back
 by hand) within TMM_KEEP_H hours and puts back what is still valid there (people with access, an open sprint / milestone of
 that list, links into lists of the same workspace, detached subtasks that are still top level in their list).
+2.363.3 (#3133): tmm_wish keeps an "also in" request that arrives after the move (the offline queue) for that way back too.
 """
 import json
 from datetime import timedelta
@@ -187,6 +188,32 @@ def tmm_restore(c, tid, prev, skip=()):
     d["restored"] = iso(now_utc())
     c.execute("UPDATE space_moves SET detail=? WHERE id=?", (json.dumps(d, separators=(",", ":")), m["id"]))
     return out
+
+
+def tmm_wish(c, tid, lid, sid, sort):
+    """2.363.3 (#3133): "also in" list lid was asked for, but a move took task tid to where it cannot be shown there (the
+    other workspace, under a parent, into that very list; kalmido_ml_prune dropped the links already): an offline request
+    waiting in the queue during that move. It joins the links of the move's memo, a move back within TMM_KEEP_H hours brings
+    it (tmm_restore with its checks). False: no such move, the refusal stands."""
+    m = c.execute("SELECT id, at, detail FROM space_moves WHERE kind='task' AND obj_id=? ORDER BY id DESC LIMIT 1", (tid,)).fetchone()
+    t = c.execute("SELECT t.list_id, t.parent_id, l.org_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
+    if not m or not t:
+        return False
+    try:
+        d = json.loads(m["detail"])
+        young = parse_iso(m["at"]) > now_utc() - timedelta(hours=TMM_KEEP_H)
+        orgs = [r["id"] for r in c.execute("SELECT id FROM lists WHERE org_id IS NOT DISTINCT FROM (SELECT org_id FROM lists WHERE id=?) "
+                                           "AND id=?", (d["from"][0], lid))]
+    except (TypeError, ValueError, KeyError, IndexError):
+        return False
+    if not young or d.get("restored") or d.get("to") != [t["list_id"], t["parent_id"]] or not orgs or lid == d["from"][0] or d["from"][1]:
+        return False  # the place it came from must take the link: its workspace, top level, another list
+    x = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if not (t["parent_id"] or lid == t["list_id"] or x["org_id"] != t["org_id"]):
+        return False  # the move is not why it was refused
+    d["links"] = [k for k in d.get("links") or [] if k.get("list_id") != lid] + [{"list_id": lid, "section_id": sid, "sort": sort or 0}]
+    c.execute("UPDATE space_moves SET detail=? WHERE id=?", (json.dumps(d, separators=(",", ":")), m["id"]))
+    return True
 
 
 # ---- 2.273.0 B (#3042): a list into another workspace (list_org_set + ov_private_reset) ends its client, its opening to the

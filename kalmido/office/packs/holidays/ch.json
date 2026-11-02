@@ -1,0 +1,15 @@
+{
+ "code": "CH",
+ "name": "Switzerland",
+ "version": 1,
+ "holidays": [
+  {"date": "01-01", "name": "New Year's Day"},
+  {"date": "08-01", "name": "Swiss National Day"},
+  {"date": "12-25", "name": "Christmas Day"},
+  {"date": "12-26", "name": "St Stephen's Day"},
+  {"easter": -2, "name": "Good Friday"},
+  {"easter": 1, "name": "Easter Monday"},
+  {"easter": 39, "name": "Ascension Day"},
+  {"easter": 50, "name": "Whit Monday"}
+ ]
+}

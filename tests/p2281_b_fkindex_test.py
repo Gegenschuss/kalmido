@@ -8,7 +8,7 @@
    clean-ups (notifications.created_at, ev_reminded.at, sessions.expires_at) use their index
  - "Empty trash" with more than 200 tasks answers at once (queued), the job in bg_jobs ends "done", every task is gone;
    a small trash goes in the request as before (no queued)
- - a person without an organisation (freelancer-matrix: tasks): the big trash of the private space the same way
+ - a person without an organisation (freelancer-matrix: tasks): the big trash of the private workspace the same way
 usage: p2281_b_fkindex_test.py <datadir>      (KMT_NOSTART=1 / P2281B_NOSTART=1: a running server)"""
 import json
 import os

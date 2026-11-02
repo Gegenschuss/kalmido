@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.187.1 part A (#2735): follow-ups of the office rights review. Invented names only.
  - clients' invoicing fields (VAT ID, customer number, buyer reference, invoice e-mail, payment terms, Peppol ID) belong to
-   "Quotes & invoices": Staff (offers none) gets them left out and cannot set them (create / update ignore them), an own group
+   "Quotations & invoices": Staff (offers none) gets them left out and cannot set them (create / update ignore them), an own group
    with offers "view" reads them but does not change them; a member without a group and the admin as before; the address stays
  - sets / freelancer roles / crew belong to the equipment area: Staff reads sets (equipment view) but does not add one, an own
    group with only offers "view" gets 403, "Project management" adds crew (equipment edit); undo of a set = equipment

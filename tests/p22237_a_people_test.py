@@ -7,9 +7,10 @@ shared), Anna's private agent P (only Lp1), Frida's freelancer agent F (only Lf1
  - GET /api/v1/groups and /groups/{id}: the agent knows no group of the organisation it is not in (Carl's name never shows)
  - GET /api/v1/absences: Bert (shares L1) in people / items, Carl (shares nothing) not; a person (Anna) still sees Carl
  - a mention <@carl> by the agent becomes '@?', no News for Carl; <@bert> stays
- - event attendees: Carl is an unknown user (400), Bert works (201)
+ - event attendees: Carl is an unknown person (400), Bert works (201)
  - PUT /api/v1/lists/{own}/members/{carl}: 404 without a waiting job naming Carl; Bert: 202 approval
  - private agent P and freelancer agent F: their owner and the people of their projects only
+ - #3907: a token limited to L1 (agent, person) does not see the people of the account's other projects in /absences
  - #2941: a server without organisations: a person sees everyone (household), an agent only its owner / projects
 usage: p22237_a_people_test.py <datadir>"""
 import os
@@ -163,7 +164,7 @@ check(f"<@{ANNA}>" in body, f"#2917: the private agent mentions its owner ({body
 
 # ---- event attendees
 r = attendee(GH, CARL, "c")
-check(r.status_code == 400 and "Carl" not in r.text, f"#2917: Carl as attendee: unknown user 400 ({r.status_code} {r.text[:120]})")
+check(r.status_code == 400 and "Carl" not in r.text, f"#2917: Carl as attendee: unknown person 400 ({r.status_code} {r.text[:120]})")
 r = attendee(GH, BERT, "b")
 check(r.status_code == 201, f"#2917: Bert as attendee: 201 ({r.status_code} {r.text[:120]})")
 check(attendee(PH, CARL, "pc").status_code == 400, "#2917: the private agent: Carl unknown")
@@ -189,6 +190,26 @@ check(r.ok and CARL not in {p["id"] for p in r.json().get("people", [])}, "#2918
 t3 = A.post(B + "/api/tasks", json={"title": "for the bot", "list_id": L3}).json()["id"]
 assert A.patch(B + f"/api/tasks/{t3}", json={"assignee_id": G}).ok
 check(attendee(GH, CARL, "p4").status_code == 201, "#2918: with a task of its own the full members of L3 are visible (like people)")
+
+# ---- 2.473.0 (#3907): a token limited to some projects answers for their people only, an agent's as well as a person's
+assert requests.post(V + "/tasks", headers=GH, json={"title": "visible", "list_id": L1}).ok
+r = requests.get(V + "/absences", headers=GH, params=q)
+check(r.ok and CARL in {p["id"] for p in r.json()["people"]}, "#3907: without a limit the agent sees Carl (member of L3)")
+kt.dbx("UPDATE api_tokens SET list_ids=? WHERE user_id=?", (str(L1), G))
+r = requests.get(V + "/absences", headers=GH, params=q)
+pp = {p["id"] for p in r.json().get("people", [])}
+check(r.ok and BERT in pp and ANNA in pp and CARL not in pp, f"#3907: agent token limited to L1: Bert and Anna, not Carl ({r.text[:200]})")
+check(CARL not in {x["user_id"] for x in r.json()["items"]}, "#3907: nor Carl's absence")
+kt.dbx("UPDATE api_tokens SET list_ids='' WHERE user_id=?", (G,))
+r = A.post(B + "/api/me/tokens", json={"name": "narrow", "scopes": ["read"]})
+assert r.status_code == 201, r.text
+TH = ahead(r.json()["token"])
+r = requests.get(V + "/absences", headers=TH, params=q)
+check(r.ok and CARL in {p["id"] for p in r.json()["people"]}, "#3907: a person's token without a limit still sees Carl")
+kt.dbx("UPDATE api_tokens SET list_ids=? WHERE name='narrow'", (str(L1),))
+r = requests.get(V + "/absences", headers=TH, params=q)
+pp = {p["id"] for p in r.json().get("people", [])}
+check(r.ok and BERT in pp and ANNA in pp and CARL not in pp and "Carl" not in r.text, f"#3907: a person's token limited to L1: no Carl ({r.text[:200]})")
 
 # ---- the freelancer's agent (freelancer-matrix: agents)
 body, _, _ = mention(FH, LF1, FRIDA, "f")

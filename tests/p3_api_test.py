@@ -329,8 +329,8 @@ check(Bb.patch(B + f"/api/fields/{FT['id']}", json={"name": "Hacked"}).status_co
       "member cannot change / stranger cannot delete a field")
 xs = [A.post(B + f"/api/lists/{P}/fields", json={"name": f"f{i}", "type": "text"}).status_code for i in range(21)]
 check(xs[:20] == [200] * 20 and xs[20] == 400, "at most 20 fields per list")
-r = A.patch(B + f"/api/fields/{FT['id']}", json={"name": "Customer", "type": "number"}).json()
-check(r["name"] == "Customer" and r["type"] == "text", "rename; the type cannot change")
+r = A.patch(B + f"/api/fields/{FT['id']}", json={"name": "Client", "type": "number"}).json()
+check(r["name"] == "Client" and r["type"] == "text", "rename; the type cannot change")
 check(state(Bb)["fields"] and {f["id"] for f in state(Bb)["fields"]} >= {F["id"], FN["id"]} and not any(f["list_id"] == P for f in state(Bb)["fields"]),
       "member sees the fields of the shared list, not of alice's private list")
 
@@ -402,7 +402,7 @@ with db() as c:
 A.patch(B + f"/api/tasks/{t3}", json={"fields": {str(FD["id"]): D(4), str(FP["id"]): BOB, str(FN["id"]): "5"}})
 tpl = A.post(B + "/api/templates", json={"list_id": W, "name": "Project tpl"}).json()
 fd = tpl["data"]["fields"]
-check([f["name"] for f in fd][:3] == ["Stage", "Budget", "Customer"] and fd[0]["options"]["options"][0]["name"] == "In progress", "list template: field definitions")
+check([f["name"] for f in fd][:3] == ["Stage", "Budget", "Client"] and fd[0]["options"]["options"][0]["name"] == "In progress", "list template: field definitions")
 node = next(n for n in tpl["data"]["tasks"] if n["title"] == "Ship")
 idx = {f["name"]: str(i) for i, f in enumerate(fd)}
 # 2.352.0 B (#2752): list templates are always relative - the offset counts from the project start (earliest open date)

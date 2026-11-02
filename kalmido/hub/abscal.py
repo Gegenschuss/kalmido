@@ -19,15 +19,15 @@ from datetime import date, timedelta
 from flask import jsonify, Response
 
 from ..core.config import app, APP_NAME, PUBLIC_URL
-from ..core.i18n import tr
+from ..core.i18n import lang, tr
 from ..core.db import body, db, iso, local_now, now_utc, usettings
 from ..core.access import Denied
 from ..core.orgcrypt import oc_dec_fields
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip
 from ..personal.timetrack import BadInput
-from .absence import ABS_STATES, _gate, abs_holidays, abs_org, abs_people, abs_state
+from .absence import ABS_STATES, _gate, abs_holidays, abs_holidays_shown, abs_org, abs_countries_shown, abs_people, abs_state, abs_states_shown
 
-ABC_KIND = {"vacation": "Vacation", "sick": "Sick leave", "off": "Day off", "other": "Other absence"}
+ABC_KIND = {"vacation": "Holiday", "sick": "Sick leave", "off": "Day off", "other": "Other absence"}
 ABC_MAX = 2000  # absences in one answer / feed
 ABC_FAIL_LIMIT = 30  # wrong links per client address within the login fail window, then 429 (as events/evfeed.py)
 
@@ -51,27 +51,27 @@ def abc_state(c, uid, s=None):
         return ""
 
 
-def abc_kind_title(c, r, feed=False):
+def abc_kind_title(c, r, feed=False, lg=None):
     """The title of one of my own absences: its kind (the feed says "Away" for a sick leave), a half day and an open
-    request said so."""
+    request said so. 2.368.4 (#2989): lg = the owner's language in the feed, which has no signed-in reader."""
     kind = ""
     try:
         kind = oc_dec_fields(c, r["org_id"], "hub_absences", r).get("kind") or ""
     except Exception as e:  # noqa: BLE001 -- a sealed area without its key: "Away" instead of an error
         print("abscal: kind not readable", type(e).__name__, flush=True)
-    t = tr("Away") if feed and kind == "sick" else tr(ABC_KIND.get(kind, "Away"))
-    t += abc_half(r)
+    t = tr("Away", lg=lg) if feed and kind == "sick" else tr(ABC_KIND.get(kind, "Away"), lg=lg)
+    t += abc_half(r, lg)
     if (r["status"] or "approved") == "pending":
-        t += " · " + tr("requested")
+        t += " · " + tr("requested", lg=lg)
     return t
 
 
-def abc_half(r):
-    return (" · " + (tr("morning") if r["half_day"] == "am" else tr("afternoon"))) if r["half_day"] else ""
+def abc_half(r, lg=None):
+    return (" · " + (tr("morning", lg=lg) if r["half_day"] == "am" else tr("afternoon", lg=lg))) if r["half_day"] else ""
 
 
-def abc_holidays(state, lo, hi):
-    return [{"date": k, "name": v} for k, v in sorted(abs_holidays(state, lo, hi).items())] if state else []
+def abc_holidays(state, lo, hi, lg=None):
+    return abs_holidays_shown(abs_holidays(state, lo, hi), lg) if state else []
 
 
 def abc_own_rows(c, uid, lo, hi):
@@ -140,20 +140,21 @@ def abc_ics(c, uid):
     """VCALENDAR of uid's own absences (a year back, every coming one) and the holidays of their state (this year and the
     next two). All-day events; the absences busy, the holidays free (TRANSP)."""
     from ..calendars.icalfeed import ics_fold, ics_text
+    lg = lang(c, uid)  # 2.368.4 (#2989): the owner's language: the calendar app that fetches the link is no signed-in reader
     today = local_now().date()
     stamp = now_utc().strftime("%Y%m%dT%H%M%SZ")
     lo, hi = today - timedelta(days=366), date(today.year + 2, 12, 31)
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", f"PRODID:-//{ics_text(APP_NAME)}//Absences//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
-             f"X-WR-CALNAME:{ics_text(APP_NAME + ' · ' + tr('Absences'))}", "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H"]
+             f"X-WR-CALNAME:{ics_text(APP_NAME + ' · ' + tr('Absences', lg=lg))}", "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H"]
 
     def ev(uid_, d0, d1, title, transp):
         lines.extend(["BEGIN:VEVENT", f"UID:{uid_}", f"DTSTAMP:{stamp}", f"DTSTART;VALUE=DATE:{d0.strftime('%Y%m%d')}",
                       f"DTEND;VALUE=DATE:{d1.strftime('%Y%m%d')}", ics_fold("SUMMARY:" + ics_text(title)), f"TRANSP:{transp}", "END:VEVENT"])
     for r in abc_own_rows(c, uid, lo, hi):
         ev(f"absence-{r['id']}@kalmido", date.fromisoformat(r["start_date"]), date.fromisoformat(r["end_date"]) + timedelta(days=1),
-           abc_kind_title(c, r, feed=True), "OPAQUE")
+           abc_kind_title(c, r, feed=True, lg=lg), "OPAQUE")
     st = abc_state(c, uid)
-    for h in abc_holidays(st, date(today.year, 1, 1), hi):
+    for h in abc_holidays(st, date(today.year, 1, 1), hi, lg):
         d = date.fromisoformat(h["date"])
         ev(f"holiday-{st}-{h['date']}@kalmido", d, d + timedelta(days=1), h["name"], "TRANSPARENT")
     lines.append("END:VCALENDAR")
@@ -196,7 +197,7 @@ def abc_feed_info():
     own choice (holiday_state, '' = my area's), the state that applies now and my area's."""
     c, uid = _gate()
     s = usettings(c, uid)
-    return jsonify(url=abc_url(abc_feed_row(c, uid)), states=ABS_STATES, own=s.get("holiday_state") or "", state=abc_state(c, uid, s),
+    return jsonify(url=abc_url(abc_feed_row(c, uid)), states=abs_states_shown(), countries=abs_countries_shown(), own=s.get("holiday_state") or "", state=abc_state(c, uid, s),
                    area=abc_state(c, uid, {}))
 
 

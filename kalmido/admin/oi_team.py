@@ -10,6 +10,7 @@ private). Browser ciphertexts (chat messages of locked channels, encrypted / loc
 Secrets never come with an export: forms and customer reports get new links, a newsletter connection must be connected again."""
 import json
 import os
+import re
 import secrets
 
 from ..core.i18n import N_
@@ -21,6 +22,9 @@ from ..accounts.login import seal  # 2.380 H (#2398)
 from ..accounts.session import _token_hash  # 2.380 H (#2398)
 from .orgexport import _safe_part  # 2.380 H (#2398)
 from .acctimport import umz_legacy_aad  # 2.362.0 (#3090)
+from ..life.rss import _norm, RSS_MAX_FEEDS  # 2.455.0 (#3469)
+from ..lists.rules import RUL_ACTIONS, RUL_DAYS_MAX, RUL_LIST_MAX, RUL_NAME_MAX, RUL_PRIO, RUL_TEXT_MAX, RUL_TRIGGERS  # 2.455.0 (#3469)
+from .acctimport import umz_mentions  # 2.362.4 (#3100)
 
 # the person columns of the rows of one person (the row is left out when the person does not map)
 _W_PEOPLE = N_("Entries of people who were not chosen were not taken over: {0}")
@@ -140,6 +144,8 @@ def _chat_file(c, run, src, d, ctx):
 def _msg(c, run, src, d, ctx):
     if _txt(src.get("enc"), 10):
         run.warning(N_("Chat messages encrypted in the browser were taken over as they are: they open with the keys of their channel."))
+    elif d.get("body"):  # 2.362.4 (#3100)
+        d["body"] = umz_mentions(d["body"], run.names, ctx.who)
     return d
 
 
@@ -287,47 +293,168 @@ def _form(c, run, src, d, ctx):
     return d
 
 
-def _ticket(c, run, src, d, ctx):
-    """A customer report: the address sealed again with this server's key, a new status link (the old one is not exported)."""
+def ticket_seal(c, run, uid, src, d):
+    """A customer report: the address sealed again with this server's key, a new status link (the old one is not exported).
+    2.455.0 (#3469): in the space of its list (an account import keeps a home project private), for both imports."""
     from ..accounts.login import seal
     from ..accounts.session import _token_hash
     from ..team.portal import pt_email_hash, pt_email_norm
     e = pt_email_norm(src.get("email"))
     tok = secrets.token_urlsafe(24)
-    d.update(owner_id=None if run.org else ctx.uid, email=seal(c, "portal-email", e) if e else "", email_hash=pt_email_hash(c, e) if e else "",
+    org = run.list_org.get(d["list_id"], run.org)
+    d.update(org_id=org, owner_id=None if org else uid, email=seal(c, "portal-email", e) if e else "", email_hash=pt_email_hash(c, e) if e else "",
              token=seal(c, "portal-token", tok), token_hash=_token_hash(tok), notify=d.get("notify", 1) if e else 0)
-    run.warning(N_("Customer reports got new status links: the old links no longer open."))
+    run.warning(N_("Client reports got new status links: the old links no longer open."))
     return d
 
 
+def _ticket(c, run, src, d, ctx):
+    return ticket_seal(c, run, ctx.uid, src, d)
+
+
 # ---------------------------------------------------------------- rules, histories
-def _rule(c, run, src, d, ctx):
-    """Trigger and action point at columns, tags, people and lists of the list: mapped; what does not map pauses the rule
-    (the settings name why), like the app does when a column / person goes."""
-    pause = ""
-    tv = _txt(src.get("trig_val"), 40)
-    if d.get("trig") in ("section", "ltag") and tv:
-        new = run.m("sections" if d["trig"] == "section" else "list_tags", tv)
-        d["trig_val"] = str(new) if new else ""
-        pause = pause or ("" if new else "section")
+_RULE_AT = re.compile(r"<@(\d{1,18})>")  # as in collab/comments.py
+
+
+_W_RULE_PAUSED = N_("A rule was paused because something it refers to did not come along: {0}")
+_W_RULE_LEFT = N_("A rule was left out because this version cannot read it or the project has too many: {0}")
+
+
+def rule_fields(data):
+    """2.455.0 (#3469): {old field id: type} of the file (a rule's field value can be a person)."""
+    return {_oid(f.get("id")): f.get("type") for f in data.get("list_fields") or [] if isinstance(f, dict)}
+
+
+def rule_ids(c, run, who, types, src, d):
+    """2.455.0 (#3469): the row d of rule src with every id inside it mapped, for the account and the organisation import. Trigger
+    and action point at columns, tags, fields, people and lists of the list; what did not come along pauses the rule (the settings
+    name why, like the app does when a column / person goes) with a word in the report, never an old id: it would name a row of
+    this server. What the app itself would refuse (rules.py) leaves the rule out. -> d or None."""
+    name, lid = _txt(src.get("name"), RUL_NAME_MAX).strip() or tr("Rules"), d["list_id"]
+    n = c.execute("SELECT COUNT(*) FROM list_rules WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchone()[0]
+    trig, act = src.get("trig"), src.get("act")
+    if n >= RUL_LIST_MAX or trig not in RUL_TRIGGERS or act not in RUL_ACTIONS:
+        run.warning(_W_RULE_LEFT, name)
+        return None
+    pause, tv = "", _txt(src.get("trig_val"), 300)
+    if trig in ("section", "ltag"):
+        new = run.m("sections" if trig == "section" else "list_tags", tv)
+        tv, pause = str(new or ""), "" if new else "section" if trig == "section" else "tag"
+    elif trig == "assigned":
+        new = who(tv) if tv else None
+        tv, pause = str(new or ""), "assignee" if tv and not new else ""
+    elif trig == "field":  # "<field id>" or "<field id>=<value>": an option's id is the field's own, it moves with the field
+        fid, eq, val = tv.partition("=")
+        new = run.m("list_fields", fid)
+        tv, pause = f"{new}{eq}{val}" if new else "", "" if new else "field"
+    else:
+        tv = ""
     try:
         a = json.loads(src.get("act_val") or "{}") if isinstance(src.get("act_val"), str) else (src.get("act_val") or {})
-    except ValueError:
+    except (ValueError, RecursionError):
         a = {}
-    a = a if isinstance(a, dict) else {}
-    if d.get("act") == "assign":
-        a["user_id"] = _who(ctx, a.get("user_id"))
-        pause = pause or ("" if a["user_id"] else "assignee")
-    elif d.get("act") == "move":
-        if a.get("list_id") is not None:
-            a["list_id"] = run.m("lists", a.get("list_id"))
-            pause = pause or ("" if a["list_id"] else "target")
-        if a.get("section_id") is not None:
-            a["section_id"] = run.m("sections", a.get("section_id"))
-            pause = pause or ("" if a["section_id"] else "section")
-    d["act_val"] = json.dumps(a, separators=(",", ":"))
+    a, v, target = a if isinstance(a, dict) else {}, {}, None
+    if act == "assign":
+        v = {"user_id": who(a.get("user_id"))}
+        pause = pause or ("" if v["user_id"] else "assignee")
+    elif act == "move":
+        dst = run.m("lists", a.get("list_id")) if a.get("list_id") else lid if not src.get("target_list_id") and a else None
+        sid = run.m("sections", a.get("section_id")) if a.get("section_id") else None
+        v, target = {"list_id": dst, "section_id": sid}, dst if dst != lid else None
+        pause = pause or ("target" if not dst else "section" if a.get("section_id") and not sid else "")
+    elif act == "due":
+        days = a.get("days")
+        if days is not None and not (isinstance(days, int) and not isinstance(days, bool) and 0 <= days <= RUL_DAYS_MAX):
+            run.warning(_W_RULE_LEFT, name)
+            return None
+        v = {"days": days}
+    elif act == "comment":
+        text = a.get("text")
+        if not isinstance(text, str) or not text.strip() or len(text) > RUL_TEXT_MAX:
+            run.warning(_W_RULE_LEFT, name)
+            return None
+        v = {"text": _RULE_AT.sub(lambda m: f"<@{who(m.group(1))}>" if who(m.group(1)) else "@?", text.strip())}  # a mention by id
+    elif act == "priority":
+        if a.get("priority") not in RUL_PRIO:
+            run.warning(_W_RULE_LEFT, name)
+            return None
+        v = {"priority": a["priority"]}
+    elif act == "tag":
+        v = {"tag_id": run.m("list_tags", a.get("tag_id"))}
+        pause = pause or ("" if v["tag_id"] else "tag")
+    else:  # field: a person's value is an id too; a value of other types has none
+        fid, val = run.m("list_fields", a.get("field_id")), a.get("value")
+        if types.get(_oid(a.get("field_id"))) == "person" and val is not None:
+            val = who(val)
+            pause = pause or ("" if val else "field")
+        v = {"field_id": fid, "value": val}
+        pause = pause or ("" if fid else "field")
+    d.update(name=name, trig=trig, trig_val=tv, act=act, act_val=json.dumps(v, separators=(",", ":")), target_list_id=target)
     if pause:
         d.update(active=0, paused_reason=pause)
+        run.warning(_W_RULE_PAUSED, name)
+    return d
+
+
+def _rule(c, run, src, d, ctx):
+    return rule_ids(c, run, ctx.who, rule_fields(ctx.data), src, d)
+
+
+def sprint_finish(c, run, rows):
+    """2.455.0 (#3469): after the tasks: the close-out of an imported sprint names the new tasks (an old id would count a task of
+    this server); at most one running sprint per list, also with one already there, the app keeps that (a state it does not know:
+    planned)."""
+    for r in rows:
+        nid = run.m("sprints", r.get("id"))
+        if not nid:
+            continue
+        try:
+            rv = json.loads(r["review"]) if isinstance(r.get("review"), str) else None
+        except (ValueError, RecursionError):
+            rv = None
+        if isinstance(rv, dict):
+            rv.update({k: [n for n in (run.m("tasks", x) for x in rv.get(k) or [] if not isinstance(x, (list, dict))) if n]
+                       for k in ("done", "moved", "added") if isinstance(rv.get(k) or [], list)})
+            rv["next_id"] = run.m("sprints", rv.get("next_id"))
+        state = r.get("state")
+        if state not in ("planned", "active", "closed") or (state == "active" and c.execute(
+                "SELECT 1 FROM sprints WHERE state='active' AND id<>? AND list_id=(SELECT list_id FROM sprints WHERE id=?)", (nid, nid)).fetchone()):
+            state = "planned"
+        c.execute("UPDATE sprints SET state=?, review=? WHERE id=?", (state, json.dumps(rv) if isinstance(rv, dict) else None, nid))
+
+
+def _sprint(c, run, src, d, ctx):
+    """2.455.0 (#3469): state and close-out only from sprint_finish: a stop before it keeps no old id."""
+    d.update(review=None, state="planned")
+    return d
+
+
+def _sprints(c, run, uid, data, who):
+    sprint_finish(c, run, (data.get("oi") or {}).get("lists/sprints.json") or [])
+
+
+# ---------------------------------------------------------------- feeds
+def _feed(c, run, src, d, ctx):
+    """2.455.0 (#3469): a feed of the file comes in like a new one: its address checked as in the app (the fetch has its own guard),
+    the limit of a space, none twice; the articles are fetched again."""
+    url = _norm(src.get("url"))
+    if not url:
+        run.warning(N_("A feed without its address was not taken over: {0}"), _txt(src.get("title"), 80))
+        return False
+    w = ("org_id=?", run.org) if run.org else ("org_id IS NULL AND user_id=?", ctx.uid)
+    if c.execute(f"SELECT 1 FROM rss_feeds WHERE {w[0]} AND url=? AND deleted_at IS NULL", (w[1], url)).fetchone():
+        return False
+    if c.execute(f"SELECT COUNT(*) FROM rss_feeds WHERE {w[0]} AND deleted_at IS NULL", (w[1],)).fetchone()[0] >= RSS_MAX_FEEDS:
+        run.warning(N_("A feed was not taken over, the limit is reached: {0}"), _txt(src.get("title"), 80))
+        return False
+    d["url"] = url
+    return d
+
+
+def _reading(c, run, src, d, ctx):
+    """2.455.0 (#3469): the read-later project of the organisation; a target that has one keeps its own."""
+    if c.execute("SELECT 1 FROM reading_orgs WHERE org_id=? AND list_id IS NOT NULL", (run.org,)).fetchone():
+        return False
     return d
 
 
@@ -339,7 +466,7 @@ _ACT_KIND_IDS = {"field": {"id": "list_fields"}, "subtask": {"id": "tasks"}, "mi
                  "dep_rm": {"id": "tasks"}, "blocks_add": {"id": "tasks"}, "blocks_rm": {"id": "tasks"}, "unblocked": {"id": "tasks"}}
 _ACT_PEOPLE = ("user_id", "assignee_id", "agent_id", "agent", "approver", "reviewer", "by")  # by: tidy (comments.py names it)
 _ACT_DROP = ("hook",)  # the inbound webhook of the old server (log_act "via": "webhook")
-_ACT_KIND_PEOPLE = {"assign": ("to", "from"), "owner": ("from", "to")}
+_ACT_KIND_PEOPLE = {"assign": ("to", "from"), "owner": ("from", "to"), "delegate": ("to", "from"), "watch": ("to",)}
 
 
 def _act_data(run, who, kind, v):
@@ -362,7 +489,7 @@ def _act_data(run, who, kind, v):
         if new:
             v[k] = new
         elif kind == "assign" and k == "to":
-            v[k] = -1  # still "assigned to" (the history shows "Deleted user"), not "removed the assignee"
+            v[k] = -1  # still "assigned to" (the history shows "Deleted person"), not "removed the assignee"
         else:
             del v[k]
     return v
@@ -459,7 +586,7 @@ SPECS = [
     # 2.362.0 (#3096): section templates of the organisation (into the private space: the importing person's own)
     OiT("lists/section_templates.json", "section_templates", people={"user_id": "me"}, enc=False, label=N_("Section templates")),
     OiT("lists/sprints.json", "sprints", refs={"list_id": "lists"}, need=("list_id",), people={"created_by": "null"}, space=(),
-        label=N_("Sprints")),
+        label=N_("Sprints"), prep=_sprint),
     OiT("lists/rules.json", "list_rules", refs={"list_id": "lists", "target_list_id": "lists"}, need=("list_id",),
         people={"created_by": "null"}, label=N_("Rules"), prep=_rule),
     OiT("lists/history.json", "list_activity", refs={"list_id": "lists"}, need=("list_id",), people={"user_id": "null"}, space=(),
@@ -467,12 +594,16 @@ SPECS = [
     OiT("lists/admin_log.json", "org_list_log", refs={"list_id": "lists"},
         people={"by_id": "null", "owner_id": "null", "to_id": "null"}, private=False, label=N_("History")),
     OiT("portal/tickets.json", "portal_tickets", refs={"task_id": "tasks", "list_id": "lists", "form_id": "forms", "client_id": "clients"},
-        need=("task_id", "list_id"), fixed=_NEW_TOKEN, label=N_("Customer reports"), prep=_ticket),
+        need=("task_id", "list_id"), fixed=_NEW_TOKEN, label=N_("Client reports"), prep=_ticket),
     # tasks
     OiT("tasks/people.json", "task_people", refs={"task_id": "tasks"}, need=("task_id",), people={"user_id": "member"}, space=(), rid=False,
         label=N_("People")),
+    OiT("tasks/watchers.json", "task_watchers", refs={"task_id": "tasks"}, need=("task_id",), people={"user_id": "member"}, space=(), rid=False,
+        label=N_("People")),  # 2.473.0 (#3357)
     OiT("tasks/links.json", "task_links", refs={"task_id": "tasks", "list_id": "lists", "section_id": "sections"},
         need=("task_id", "list_id"), people={"added_by": "null"}, rid=False, label=N_("Tasks")),
+    OiT("tasks/decisions.json", "task_decisions", refs={"task_id": "tasks"}, need=("task_id",), people={"by_id": "null"},
+        late={"superseded_by": "task_decisions"}, space=(), label=N_("History")),  # 2.392.0 C (#3370)
     OiT("tasks/history.json", "activity", refs={"task_id": "tasks"}, need=("task_id",), people={"user_id": "null"}, space=(),
         label=N_("History"), prep=_activity),
     OiT("tasks/encrypted_notes.json", "task_enc_notes", refs={"task_id": "tasks"}, need=("task_id",), space=(), rid=False, enc=False,
@@ -535,5 +666,10 @@ SPECS = [
     OiT("polls/votes.json", "sched_poll_votes", refs={"poll_id": "sched_polls"}, need=("poll_id",), space=(), label=N_("Scheduling polls"),
         prep=_vote),
     OiT("bookmarks.json", "bookmarks", people={"user_id": "me"}, label=N_("Bookmarks"), prep=_bookmark),
+    # 2.455.0 (#3469): the feeds of the organisation (into the private space: the importing person's own) and its read-later project
+    OiT("feeds/feeds.json", "rss_feeds", people={"user_id": "me"}, enc=False, label=N_("Feeds"), prep=_feed),
+    OiT("feeds/reading.json", "reading_orgs", refs={"list_id": "lists"}, need=("list_id",), rid=False, key=("list_id",), private=False,
+        enc=False, label=N_("Read later"), prep=_reading),
 ]
 FIXES = [OiFix("tasks", "tasks", "sprint_id", "sprints")]  # the sprint of a task
+FINISH = [_sprints]  # 2.455.0 (#3469)

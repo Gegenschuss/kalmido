@@ -85,19 +85,19 @@ con = by["Write the concept and treatment"]
 # 2.280.0 (#3108): a note longer than 200 characters is not in /api/state (content_n); the task's own route has it
 con = {**con, "content": A.get(B + f"/api/tasks/{con['id']}").json()["content"]} if "content" not in con else con
 check("- [ ] " in con["content"] and "**Goal:**" in con["content"], "Markdown description with a checklist")
-check("concept" in con["tags"] and "client" in by["Get the quote and budget approved"]["tags"], "tags")
+check("concept" in con["tags"] and "client" in by["Get the quotation and budget approved"]["tags"], "tags")
 call = by["Weekly status call with the client"]
 check(call["repeat"] == "FREQ=WEEKLY;BYDAY=TU" and date.fromisoformat(call["due"]).weekday() == 1 and call["due_time"] == "10:00", "repeating task on the next Tuesday")
 check(call["reminders"] == "" and all(t["reminders"] == "" for t in TT), "no reminders anywhere")
 check(by["Shoot day 1: interviews"]["duration"] == 540, "timed shoot day with a duration")
 nb = sum(len(t["blockers"]) for t in TT)
 check(nb == 4, f"4 dependencies ({nb})")
-check(by["Get the quote and budget approved"]["blocked"] and not con["blocked"], "budget waits on the concept, the concept is doable")
+check(by["Get the quotation and budget approved"]["blocked"] and not con["blocked"], "budget waits on the concept, the concept is doable")
 fl = [f for f in S["fields"] if f["list_id"] == L["id"]]
 check(sorted(f["name"] for f in fl) == ["Budget", "Effort"] and all(f["pinned"] for f in fl), "two pinned custom fields")
 bud = next(f for f in fl if f["name"] == "Budget")
-check(by["Get the quote and budget approved"]["fields"].get(str(bud["id"])) == "12500", "budget value: " + str(by["Get the quote and budget approved"]["fields"]))
-tl = A.get(B + f"/api/tasks/{by['Get the quote and budget approved']['id']}/timeline").json()
+check(by["Get the quotation and budget approved"]["fields"].get(str(bud["id"])) == "12500", "budget value: " + str(by["Get the quotation and budget approved"]["fields"]))
+tl = A.get(B + f"/api/tasks/{by['Get the quotation and budget approved']['id']}/timeline").json()
 check(len(tl["comments"]) == 1 and "budget" in tl["comments"][0]["body"], "a comment")
 check(tl["activity"] == [], "no activity entries (quiet)")
 te = A.get(B + f"/api/time/entries?task_id={con['id']}").json()

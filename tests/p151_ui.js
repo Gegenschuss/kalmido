@@ -480,7 +480,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(w.eval(`mxTasks().every(t => t.list_id === ${WORK} && t.due && t.due <= today())`), 'filter scope (same engine) + due by today');
   check(!!d.querySelector('.mxbar [data-act="mx-reset"]'), 'reset × shown');
   click(w, d.querySelector('.mxbar [data-act="mx-reset"]')); await sleep(100);
-  check(!w.eval(`mxActive(mxGet())`) && d.querySelector('#top h1').textContent.startsWith('Eisenhower'), 'reset: everything again');
+  check(!w.eval(`mxActive(mxGet())`) && d.querySelector('#top h1').textContent.startsWith('Matrix'), 'reset: everything again');
   w.eval(`go('l/${SIDE}')`); await sleep(300);
   click(w, d.querySelector('#top [data-act="top-more"]')); await sleep(80);
   const smx = [...d.querySelectorAll('#pop .menu-list button')].find(x => /Show as matrix/.test(x.textContent));

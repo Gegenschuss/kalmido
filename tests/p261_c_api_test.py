@@ -221,7 +221,7 @@ check(any(x["id"] == NF and x["hit"] == "text" for x in j.get("items", [])), f"#
 j = fsearch(Bo, "contract").json()
 check(any(x["id"] == NF and x["hit"] == "name" for x in j.get("items", [])), "#1820: the Ablage search finds a file by its name")
 check(any(x["id"] == NF for x in fsearch(A, "zitronenbaum", f"org:{ORG}").json().get("items", [])), "#1820: the space filter keeps the organisation's file")
-check(not any(x["id"] == NF for x in fsearch(Bo, "zitronenbaum", "private").json().get("items", [])), "#1820: the private space does not show it")
+check(not any(x["id"] == NF for x in fsearch(Bo, "zitronenbaum", "private").json().get("items", [])), "#1820: the private workspace does not show it")
 check(not fsearch(Zo, "zitronenbaum").json().get("items") and not fsearch(Er, "zitronenbaum").json().get("items"),
       "#1820: the Ablage search shows nothing of another organisation / to a person without it")
 check(fsearch(Zo, "zitronenbaum", f"org:{ORG}").status_code == 404, "#1820: a foreign organisation's space: 404")

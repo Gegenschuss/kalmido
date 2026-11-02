@@ -52,14 +52,14 @@ const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())
 
     // ---- #2076: the holiday in the month view
     await ev(`(() => { S.calSel = '2027-01-01'; S.calMonth = '2027-01'; S.calMode = 'month'; renderView(); return 1; })()`);
-    const ny = await ready(ev, `[...document.querySelectorAll('#view .cal .cev.cevx')].some(x => x.textContent.includes('Neujahr'))`, 60);
+    const ny = await ready(ev, `[...document.querySelectorAll('#view .cal .cev.cevx')].some(x => /Neujahr|New Year/.test(x.textContent))`, 60);
     check(ny, 'New Year as a quiet chip in January');
     if (!ny) console.log('debug:', JSON.stringify(await call(ev, 'GET', '/api/calendars/events?from=2027-01-01&to=2027-01-07')).slice(0, 400),
       await ev(`JSON.stringify({key: S.cal.key, n: S.cal.items.length, on: calEvOn(), set: [S.settings.cal_holidays, S.settings.cal_abs], cells: document.querySelectorAll('#view .cal .cell').length, cev: document.querySelectorAll('#view .cal .cev').length})`));
-    check(await ev(`[...document.querySelectorAll('#view .cal .cev.cevx')].some(x => x.textContent.includes('Heilige Drei'))`), 'Epiphany too (Bavaria)');
+    check(await ev(`[...document.querySelectorAll('#view .cal .cev.cevx')].some(x => /Heilige Drei|Epiphany/.test(x.textContent))`), 'Epiphany too (Bavaria)');
     check(await ev(`getComputedStyle(document.querySelector('#view .cal .cev.cevx')).borderTopStyle === 'dashed'`), 'the chip is outlined, not filled');
     await shot('p2155-b-month.png');
-    await ev(`(() => { [...document.querySelectorAll('#view .cal .cev.cevx')].find(x => x.textContent.includes('Neujahr'))?.click(); return 1; })()`);
+    await ev(`(() => { [...document.querySelectorAll('#view .cal .cev.cevx')].find(x => /Neujahr|New Year/.test(x.textContent))?.click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.cevpop')`), 'a click opens the popover');
     check(await ev(`/Public holidays/.test(document.querySelector('.cevpop').textContent) && !document.querySelector('.cevpop [data-cevtask]')`),
       'the popover names "Public holidays", no "Create task from event"');
@@ -71,7 +71,7 @@ const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())
     check(await ev(`document.querySelector('.evcmodal [data-key="x:hol"]').checked && document.querySelector('.evcmodal [data-key="x:abs"]').checked && !document.querySelector('.evcmodal [data-key="x:team"]').checked`),
       'holidays + my absences on, the team off');
     // 2.365.2 C (#2789): the state picker moved to Settings > General; the window shows the state and a link
-    check(await ready(ev, `!document.querySelector('#abc-state') && /Bayern/.test(document.querySelector('.evcmodal .abcst [data-act="mod-settings"]')?.textContent || '')`),
+    check(await ready(ev, `!document.querySelector('#abc-state') && /Bayern|Bavaria/.test(document.querySelector('.evcmodal .abcst [data-act="mod-settings"]')?.textContent || '')`),
       'the state: "As my organisation (Bayern)" with a link to Settings');
     check(!!(await ev(`document.querySelector('.evcmodal [data-abc="feed"]')`)), 'the subscription link button');
     // 2.240.0 C (#2868): whose busy times colleagues see (org | all | off), saved like the other settings

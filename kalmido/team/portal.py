@@ -22,12 +22,13 @@ import time
 from datetime import date, timedelta
 
 from ..core.config import app, PUBLIC_URL, APP_NAME
-from ..core.db import db, iso, now_utc, body, bump, err, iso_ms, parse_iso
+from ..core.db import db, iso, now_utc, body, bump, err, iso_ms, parse_iso, usettings
 from ..core.i18n import browser_lang, N_, lang, short_day, tr
 from ..core.pg import insert_id, system_ctx
 from ..accounts.session import _token_hash
 from ..accounts.login import auth_key, seal, unseal
 from ..accounts.bgjobs import bgj_add, bgj_fn
+from ..tasks.watchers import wat_users  # 2.473.0 (#3357)
 from ..core.access import acx_anon_bind, need_task, task_visible  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import hit_budget, hit_limit  # 2.149.0 G (#2517): pulled up from functions
 from ..core.mailframe import Safe, mail_html
@@ -199,13 +200,15 @@ def pt_plain(text):
 def pt_answers(c, task_id):
     """The comments the customer sees: public answers + their own, oldest first, with the shown author name."""
     out = []
-    rows = c.execute("""SELECT k.id, k.user_id, k.body, k.created_at, k.ext_name, u.display_name, u.kind FROM comments k
-                        LEFT JOIN users u ON u.id=k.user_id WHERE k.task_id=? AND k.portal=1 AND k.deleted_at IS NULL ORDER BY k.id""",
+    rows = c.execute("""SELECT k.id, k.user_id, k.body, k.created_at, k.ext_name, u.display_name, u.kind, ag.ai FROM comments k
+                        LEFT JOIN users u ON u.id=k.user_id LEFT JOIN agents ag ON ag.user_id=k.user_id WHERE k.task_id=? AND k.portal=1 AND k.deleted_at IS NULL ORDER BY k.id""",
                      (task_id,)).fetchall()
     for r in rows:
         mine = r["user_id"] is None
         who = (r["ext_name"] or "") if mine else ("" if (r["kind"] or "user") == "agent" else (r["display_name"] or "").strip())
-        out.append({"id": r["id"], "customer": mine, "who": who, "body": pt_plain(r["body"]), "at": r["created_at"]})
+        # 2.482.0 (#3530, EU AI Act Art. 50): an answer of an AI agent is marked as such (the name stays "Team")
+        ai = not mine and (r["kind"] or "user") == "agent" and (r["ai"] is None or int(r["ai"]) != 0)
+        out.append({"id": r["id"], "customer": mine, "who": who, "body": pt_plain(r["body"]), "at": r["created_at"], "is_ai": ai})
     return out
 
 
@@ -237,15 +240,16 @@ def pt_render(c, p, token, lg, note=""):
     meta = " · ".join(x for x in (t(kind) if kind else "", t(N_("Reported on {0}"), pt_day(p["created_at"], lg))) if x)
     head = (f'<header><p class="sub">{e(meta)}</p><h1>{e(p["title"])}</h1>'
             f'<p class="ptst ptst-{st}">{e(t(PT_STATE_TXT[st]))}</p></header>')
-    msgs = {"sent": t(N_("Thank you, your answer has arrived.")), "mail": t(N_("If there are reports for this address, a mail with a sign-in link is on its way.")),
-            "on": t(N_("Mails about this report are on again."))}
+    msgs = {"sent": t(N_("Thank you, your answer has arrived.")), "mail": t(N_("If there are reports for this address, a e-mail with a sign-in link is on its way.")),
+            "on": t(N_("E-mails about this report are on again."))}
     flash = msgs.get(request.args.get("m") or "", "") or note
     out = head + (f'<p class="ok" role="status">{e(flash)}</p>' if flash else "")
     if orig:
         out += f'<section class="ptd"><h2>{e(t(N_("Your report")))}</h2>{_pt_paras(orig)}</section>'
     items = "".join(
         f'<li class="{"me" if a["customer"] else "tm"}"><div class="ptw"><b>{e(a["who"] or (t(N_("You|public")) if a["customer"] else t(N_("Team"))))}</b>'
-        f'<span>{e(pt_day(a["at"], lg))}</span></div>{_pt_paras(a["body"])}</li>' for a in ans)
+        + (f'<span class="ptai">{e(t(N_("AI agent")))}</span>' if a.get("is_ai") else '')  # 2.482.0 (#3530)
+        + f'<span>{e(pt_day(a["at"], lg))}</span></div>{_pt_paras(a["body"])}</li>' for a in ans)
     out += (f'<section class="ptc"><h2>{e(t(N_("Answers")))}</h2>'
             + (f'<ol class="ptlist">{items}</ol>' if items else f'<p class="empty">{e(t(N_("No answer yet. You will see it here.")))}</p>') + '</section>')
     out += (f'<section class="fb" id="answer"><h2>{e(t(N_("Your answer|public")))}</h2><form method="post" action="/p/{e(token)}/comment" class="fform">'  # 2.165.3 (#2650): the customer side says Sie
@@ -257,7 +261,7 @@ def pt_render(c, p, token, lg, note=""):
             f'<label for="pt-mail">{e(t(N_("Your e-mail")))}</label><input id="pt-mail" name="email" type="email" autocomplete="email" maxlength="{PT_EMAIL_MAX}" required>'
             f'<button type="submit">{e(t(N_("Send the link")))}</button></form></section>')
     if p["notify"] and p["email"]:
-        out += f'<p class="sub ptstop"><a href="/p/{e(token)}/stop">{e(t(N_("No more mails about this report")))}</a></p>'
+        out += f'<p class="sub ptstop"><a href="/p/{e(token)}/stop">{e(t(N_("No more e-mails about this report")))}</a></p>'
     return _pt_rt().pub_html(f'{p["title"]} · {APP_NAME}', out, lg)
 
 
@@ -289,6 +293,11 @@ def _pt_denied(lg):
     return _pt_rt().pub_html(tr("Not allowed", lg=lg), f'<div class="msg"><h1>{html.escape(tr("Not allowed", lg=lg))}</h1></div>', lg, 403)
 
 
+def _pt_one_click():
+    from flask import request
+    return request.form.get("List-Unsubscribe") == "One-Click"
+
+
 def _pt_post_ok(c, p, what):
     from flask import request
     return request.headers.get("Sec-Fetch-Site", "") != "cross-site" and hmac.compare_digest(request.form.get("f") or "", pt_key(c, p, what))
@@ -313,7 +322,7 @@ def pt_comment(token):
     text = _pt_rt().cv_fb_clean(request.form.get("text"), PT_CMT_MAX)
     if not text:
         return pt_render(c, p, token, lg, tr("Please write a message.", lg=lg))
-    name = (p["name"] or "").strip() or tr("Customer", lg=lg)
+    name = (p["name"] or "").strip() or tr("Client", lg=lg)
     cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,ext_name,portal) VALUES(?,?,?,?,?,?,1)",
                     (p["task_id"], None, text, "", iso_ms(now_utc()), name))
     t = c.execute("SELECT t.*, l.owner_id AS l_owner FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (p["task_id"],)).fetchone()
@@ -334,7 +343,7 @@ def pt_team_news(c, t, cid, text, name):
     from ..notify.push import push_prio, push_reachable
     from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO
     from ..agents.core import agent_ids
-    rcpt = ({t["l_owner"], t["created_by"], t["assignee_id"]} | tbl_urgent_users(c, t["id"])) - {None} - agent_ids(c)
+    rcpt = ({t["l_owner"], t["created_by"], t["assignee_id"]} | tbl_urgent_users(c, t["id"]) | wat_users(c, t["id"])) - {None} - agent_ids(c)
     for uid in sorted(rcpt):
         s = collab_user(c, uid, t["list_id"])
         if not s or not task_visible(c, t["id"], uid, full=True):
@@ -344,7 +353,7 @@ def pt_team_news(c, t, cid, text, name):
         if lv == "urgent" and tbl_sent(uid, t["id"]):
             continue
         if lv != "mute" and (lv == "urgent" or notif_ok(c, uid, s, KIND_ROW["comment"], "push", t["list_id"])) and push_reachable(c, uid, s):
-            g.pushes.append((uid, tr("{0} (customer, via the link)", name, lg=lang_of(s)) + ": " + t["title"], text[:200],
+            g.pushes.append((uid, tr("{0} (client, via the link)", name, lg=lang_of(s)) + ": " + t["title"], text[:200],
                              f"{PUBLIC_URL}/#t/{t['id']}", TBL_PRIO if lv == "urgent" else push_prio(s)))
 
 
@@ -358,10 +367,10 @@ def pt_stop_ask(token):
         return bad
     lg = pt_lang(c, p)
     e = html.escape
-    return _pt_rt().pub_html(tr("Turn mails off", lg=lg), f'<div class="msg"><h1>{e(tr("Turn mails off", lg=lg))}</h1>'
-                             f'<p>{e(tr("No more mails about “{0}”? The status page stays available.", p["title"], lg=lg))}</p>'
+    return _pt_rt().pub_html(tr("Turn e-mails off", lg=lg), f'<div class="msg"><h1>{e(tr("Turn e-mails off", lg=lg))}</h1>'
+                             f'<p>{e(tr("No more e-mails about “{0}”? The status page stays available.", p["title"], lg=lg))}</p>'
                              f'<form method="post" action="/p/{e(token)}/stop" class="fform"><input type="hidden" name="f" value="{pt_key(c, p, "s")}">'
-                             f'<button type="submit">{e(tr("Turn mails off", lg=lg))}</button></form>'
+                             f'<button type="submit">{e(tr("Turn e-mails off", lg=lg))}</button></form>'
                              f'<a class="btn" href="/p/{e(token)}">{e(tr("To the status page", lg=lg))}</a></div>', lg)
 
 
@@ -372,15 +381,16 @@ def pt_stop(token):
     if bad:
         return bad
     lg = pt_lang(c, p)
-    if not _pt_post_ok(c, p, "s"):
+    # 2.367.5 (#2975): the mail client's one-click button (RFC 8058) posts this field; the link is the credential
+    if not _pt_one_click() and not _pt_post_ok(c, p, "s"):
         return _pt_denied(lg)
     c.execute("UPDATE portal_tickets SET notify=0 WHERE id=?", (p["id"],))
     c.commit()
     e = html.escape
-    return _pt_rt().pub_html(tr("Mails turned off", lg=lg), f'<div class="msg"><h1>{e(tr("Mails turned off", lg=lg))}</h1>'
-                             f'<p>{e(tr("You get no more mails about “{0}”. The status page stays available.", p["title"], lg=lg))}</p>'
+    return _pt_rt().pub_html(tr("E-mails turned off", lg=lg), f'<div class="msg"><h1>{e(tr("E-mails turned off", lg=lg))}</h1>'
+                             f'<p>{e(tr("You get no more e-mails about “{0}”. The status page stays available.", p["title"], lg=lg))}</p>'
                              f'<form method="post" action="/p/{e(token)}/notify" class="fform"><input type="hidden" name="f" value="{pt_key(c, p, "n")}">'
-                             f'<button type="submit">{e(tr("Turn mails on again", lg=lg))}</button></form>'
+                             f'<button type="submit">{e(tr("Turn e-mails on again", lg=lg))}</button></form>'
                              f'<a class="btn" href="/p/{e(token)}">{e(tr("To the status page", lg=lg))}</a></div>', lg)
 
 
@@ -402,10 +412,10 @@ def pt_notify_on(token):
 # ---- the portal: a sign-in link by mail (one-time, PT_LOGIN_TTL), then a cookie for /portal (signed, PT_COOKIE_DAYS days)
 # that lists every ticket of the same address in the same space. The request always gets the same answer.
 @bgj_fn("mail:portal", tries=1)
-def _pt_mail_bg(to, subject, text, html_body):
+def _pt_mail_bg(to, subject, text, html_body, unsub=None):
     from ..integrations.mail import mail_send
     try:
-        mail_send(to, subject, text, html_body, from_name=APP_NAME)
+        mail_send(to, subject, text, html_body, from_name=APP_NAME, unsub=unsub)  # 2.367.5 (#2975): unsub on the answers only
     except Exception as ex:  # noqa: BLE001  (nobody waits for this; the reporter can ask again)
         print("portal mail failed:", type(ex).__name__, flush=True)
 
@@ -419,6 +429,7 @@ def pt_limit_note(c, org_id, owner_id):
     """2.138.4 C (#2380): the space's budget of sign-in mails (ptls) is used up: a News item for its admins (an organisation)
     or its owner (the private space), at most once per window and process; no push, no mail. Caller commits."""
     import json
+    from ..collab.news import notif_ok
     if hit_limit(f"ptlsn:{org_id or ''}:{owner_id or ''}", 1, PT_LOGIN_WIN):
         return 0
     with system_ctx(c):  # who administers the space (structure); the notice names no customer
@@ -428,6 +439,7 @@ def pt_limit_note(c, org_id, owner_id):
             on = (c.execute("SELECT name FROM orgs WHERE id=?", (int(org_id),)).fetchone() or [""])[0]
         else:
             ids, on = [int(owner_id)] if owner_id else [], ""
+        ids = [uid for uid in ids if notif_ok(c, uid, usettings(c, uid), "limits", "news")]  # 2.453.0 (#3781): can be switched off
         for uid in ids:
             c.execute("INSERT INTO notifications(user_id,kind,task_id,list_id,actor_id,comment_id,data,created_at) VALUES(?,?,?,?,?,?,?,?)",
                       (uid, "ptlimit", None, None, None, None, json.dumps({"org_id": org_id, "org": on, "limit": PT_LOGIN_SPACE,
@@ -470,7 +482,7 @@ def pt_login_ask(token):
                       (eh, p["org_id"], p["owner_id"], _token_hash(tok), iso(now), iso(now + timedelta(seconds=PT_LOGIN_TTL))))
             url = f"{PUBLIC_URL}/portal/login/{tok}"
             lines = [tr("Hello,", lg=lg), tr("here is your link to all your reports. It is valid for 30 minutes and can be used once.", lg=lg),
-                     tr("If you did not ask for it, you can ignore this mail.", lg=lg)]
+                     tr("If you did not ask for it, you can ignore this e-mail.", lg=lg)]
             mail = (em, tr("Your reports: sign-in link", lg=lg), "\n\n".join(lines[:2]) + f"\n\n{url}\n\n" + lines[2],
                     _pt_mail_html(lines[:2], url, tr("Show my reports", lg=lg), html.escape(lines[2])))
     # 2.81.0 (#1866): a used sign-in row is the cookie's (PT_COOKIE_DAYS); unused ones go a day after their link expired
@@ -515,7 +527,7 @@ def pt_login_page(tok):
     e = html.escape
     from ..office.portaldocs import kp_login_docs
     if kp_login_docs(c, r):  # 2.120.0 (#2088): a space with documents in the portal
-        head, btn = tr("Customer portal", lg=lg), tr("Show my documents", lg=lg)
+        head, btn = tr("Client portal", lg=lg), tr("Show my documents", lg=lg)
     else:
         head, btn = tr("Your reports", lg=lg), tr("Show my reports", lg=lg)
     return _pt_rt().pub_html(head, f'<div class="msg"><h1>{e(head)}</h1>'
@@ -617,7 +629,7 @@ def pt_portal():
     tickets = f'<ul class="ptall">{"".join(items)}</ul>' if items else f'<p class="empty">{e(tr("No reports for this address.", lg=lg))}</p>'
     if docs is not None:
         tickets = docs + (f'<h2>{e(tr("Your reports", lg=lg))}</h2>{tickets}' if items else "")
-    out = (f'<header><h1>{e(tr("Your reports", lg=lg) if docs is None else tr("Customer portal", lg=lg))}</h1></header>'
+    out = (f'<header><h1>{e(tr("Your reports", lg=lg) if docs is None else tr("Client portal", lg=lg))}</h1></header>'
            + tickets
            + f'<form method="post" action="/portal/logout" class="ptout"><input type="hidden" name="f" value="{pt_out_key(c)}">'
            f'<button type="submit">{e(tr("Sign out", lg=lg))}</button></form>')
@@ -697,9 +709,9 @@ def pt_comment_flag(c, tid, uid, v):
     if v not in (True, 1, "1", "true", "on"):
         raise BadInput(tr("portal: true or false"))
     if not pt_ticket_of(c, tid):
-        raise BadInput(tr("This task has no customer report: the comment cannot go to a customer"))
+        raise BadInput(tr("This task has no client report: the comment cannot go to a client"))
     if not task_visible(c, tid, uid, write=True):
-        raise BadInput(tr("Only people who may change the task answer the customer"))
+        raise BadInput(tr("Only people who may change the task answer the client"))
     return 1
 
 
@@ -713,7 +725,7 @@ def pt_ticket_set(tid):
     p = pt_ticket_of(c, tid)
     b = body()
     if not p:
-        return err(tr("This task has no customer report"), 404)
+        return err(tr("This task has no client report"), 404)
     if set(b) - {"notify"} or not isinstance(b.get("notify"), bool):
         return err(tr("Expected {0}", '{"notify": true|false}'))
     if b["notify"] and not p["email"]:
@@ -774,14 +786,14 @@ def pt_mail_tick(c):
             url, stop = pt_mail_url(c, p, tok), pt_status_url(tok) + "/stop"  # 2.360.0 A (#2496): the mail's link confirms
             head = tr("Your report “{0}” is done.", p["title"], lg=lg) if done else \
                 tr("There is a new answer to your report “{0}”.", p["title"], lg=lg)
-            body_ = [(a["who"] or tr("Team", lg=lg)) + ":\n" + a["body"][:2000] for a in new[-3:]]
-            foot = tr("You get this mail because you sent the report. No more mails about it: {0}", stop, lg=lg)
+            body_ = [(a["who"] or tr("Team", lg=lg)) + (" (" + tr("AI agent", lg=lg) + ")" if a.get("is_ai") else "") + ":\n" + a["body"][:2000] for a in new[-3:]]  # 2.482.0 (#3530)
+            foot = tr("You get this e-mail because you sent the report. No more e-mails about it: {0}", stop, lg=lg)
             ttl = " ".join(p["title"].split())  # review: no line breaks in the subject
             subj = (tr("Done: {0}", ttl, lg=lg) if done else tr("New answer: {0}", ttl, lg=lg))[:200]
             text = "\n\n".join([head, *body_, tr("Status and answers: {0}", url, lg=lg), foot])
-            hfoot = html.escape(tr("You get this mail because you sent the report.", lg=lg)) + \
-                f' <a href="{html.escape(stop)}">{html.escape(tr("No more mails about this report", lg=lg))}</a>'
-            mails.append((em, subj, text, _pt_mail_html([head, *body_], url, tr("Show the report", lg=lg), hfoot, subj)))
+            hfoot = html.escape(tr("You get this e-mail because you sent the report.", lg=lg)) + \
+                f' <a href="{html.escape(stop)}">{html.escape(tr("No more e-mails about this report", lg=lg))}</a>'
+            mails.append((em, subj, text, _pt_mail_html([head, *body_], url, tr("Show the report", lg=lg), hfoot, subj), stop))
         c.commit()
     for m in mails:
         bgj_add("mail:portal", *m)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)

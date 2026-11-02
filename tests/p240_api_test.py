@@ -239,7 +239,8 @@ r = A.post(B + "/api/lists", json={"name": "Kalmido", "ptype": "software", "fold
 check(r.ok, f"software project: {r.status_code} {r.text[:120]}")
 j = r.json()
 SW = j["id"]
-check(sorted(j["modules_on"]) == ["deps", "kanban"], f"modules switched on: {j['modules_on']}")
+check(sorted(j["modules_on"]) == ["deps", "fields", "kanban"] if "fields" not in FE.split(",") else sorted(j["modules_on"]) == ["deps", "kanban"],
+      f"modules switched on (2.473.0: + fields when it was off): {j['modules_on']}")
 check(all(f in settings(A)["features"].split(",") for f in ("kanban", "deps")), "features now on")
 L = lst(A, SW)
 check(L["kind"] == "project" and L["view"] == "list" and L["tickets"] == 1 and L["dep_shift"] == 1 and L["folder"] == "Dev/Tools",

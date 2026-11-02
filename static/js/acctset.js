@@ -87,7 +87,7 @@ function notifPatch(s, row, ch, on) {
 // 2.46.6 (#1710): adm = only the admins' rows (Settings > Administration > Agents); the own matrix leaves them out
 function notifMatrixHtml(s, hint, adm = false) {
   const m = notifMatrix(s), social = collab();
-  const rows = NOTIF_ROWS.filter(([r, , , f]) => adm ? f === 'admin' && !!S.me?.is_admin : (social || !NM_SOCIAL.includes(r)) && (!f || (f === 'deps' ? depsOn() : f === 'admin' ? false : f === 'propose' ? propOn() : f === 'office' ? feat('office') : feat('agents'))));
+  const rows = NOTIF_ROWS.filter(([r, , , f]) => adm ? f === 'admin' && !!S.me?.is_admin : (social || !NM_SOCIAL.includes(r)) && (!f || (f === 'deps' ? depsOn() : f === 'admin' ? !S.me?.is_admin && (S.me?.workspaces || []).some(o => o.role === 'admin') : f === 'propose' ? propOn() : f === 'office' ? feat('office') : feat('agents'))));
   if (!rows.length) return '';
   const hid = adm ? 's-newsadm-h' : 's-news-h';
   const box = (r, ch, lab) => m[r][ch] === null ? `<span class="nmna" aria-label="${esc(tr('not available'))}">–</span>`
@@ -112,7 +112,7 @@ function storageHtml() {
 function accountHtml() {
   const m = S.me, pw = m.auth === 'session' || m.has_password;
   return `<h4 id="s-account-h">${tr('Account')}</h4>
-    <div class="row"><label>${tr('Logged in as')}</label><span class="acct">${av(m.id, m.display_name)}<b>${esc(m.display_name)}</b> <span class="muted">${esc(m.username)}${m.auth === 'proxy' ? ' · ' + tr('via single sign-on') : ''}</span></span></div>
+    <div class="row"><label>${tr('Signed in as')}</label><span class="acct">${av(m.id, m.display_name)}<b>${esc(m.display_name)}</b> <span class="muted">${esc(m.username)}${m.auth === 'proxy' ? ' · ' + tr('via single sign-on') : ''}</span></span></div>
     ${sup_accountRow()}${''/* 2.74.0 (#338): the supporter badge (self-hosted only) */}
     <div class="row"><label for="a-name">${tr('Display name')}</label><input id="a-name" value="${esc(m.display_name)}" maxlength="60" autocomplete="name" enterkeyhint="done"></div>
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="a-avpick">${avPickHtml()}</div></div>
@@ -125,7 +125,7 @@ function accountHtml() {
     <div class="shint">${tr('Kalmido looks like it does for a member: settings and administration of your organisations and of the server are hidden; your private area, your own agents and the daily office work stay. Only the display changes, your rights stay the same. The way back is at the bottom of the settings and in the account menu.')}</div>` : ''}${''/* 2.436.0 (#3620) */}
     ${tfaHtml()}
     ${typeof officeOn === 'function' && officeOn() ? `<h4 id="s-sig-h">${tr('Signature for letters')}</h4>
-    <div class="row"><button type="button" class="btn sm" data-act="lt-sigset">${ic('edit', 's')} ${tr('Edit signature…')}</button></div>
+    <div class="row"><button type="button" class="btn sm" data-act="lt-sigset">${ic('edit', 's')} ${tr('Edit signature…')}</button> <button type="button" class="btn sm" data-act="ofm-sigset">${ic('edit', 's')} ${tr('E-mail signature…')}</button></div>
     <div class="shint">${tr('Greeting, name and picture under your letters (the same dialog as in the Office, Letters).')}</div>` : ''}${''/* 2.365.2 C (#2789) */}
     ${typeof sesHtml === 'function' ? sesHtml() : ''}${''/* 2.115.0 B (#2062): active sessions */}
     ${e2eHtml()}${''/* 2.42.0 (#828, #909) */}
@@ -134,17 +134,17 @@ function accountHtml() {
     <div class="row"><label>${tr('Upload token')}</label><button class="btn sm" data-m="go-share">${ic('phone', 's')} ${tr('Share from your phone')}</button><span class="muted" style="font-size:var(--fs-s)">${tr('shown and renewed there')}</span></div>
     ${acz_linkHtml(S.api?.enabled)}</details>${''/* 2.166.0 (#2633): the API tokens moved to Access */}
     ${shellServerUrl() ? `<div class="row"><label>${tr('Server|settings')}</label><button class="btn sm" data-acc="shell-server">${ic('link', 's')} ${tr('Change server')}</button></div>` : ''}${''/* 2.435.0 B (#3578): only in the app shell */}
-    ${m.auth === 'session' ? `<div class="row alogout"><button class="btn sm" data-acc="logout">${ic('logout', 's')} ${tr('Log out')}</button></div>` : ''}`;  // 2.24.0 (UX-21): at the very end, set apart
+    ${m.auth === 'session' ? `<div class="row alogout"><button class="btn sm" data-acc="logout">${ic('logout', 's')} ${tr('Sign out')}</button></div>` : ''}`;  // 2.24.0 (UX-21): at the very end, set apart
 }
 // 2.88.0 (#1980): search, filter and pages (hundreds of accounts), several accounts at once
 const UA8_FLT = [['people', N_('People')], ['active', N_('Active')], ['disabled', N_('Disabled')], ['admin', N_('Admins')], ['invited', N_('Invited')], ['pending', N_('Waiting for approval')], ['agents', N_('Agents')]];
 const UA8_PAGE = 50;
-const usersHtml = () => `<h4>${tr('Users')}</h4>
-  <div class="ua8bar"><input type="search" id="a-uq" placeholder="${esc(tr('Name, user name or e-mail'))}" aria-label="${esc(tr('Search users'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><select id="a-uflt" aria-label="${esc(tr('Filter'))}">${UA8_FLT.map(([k, n]) => `<option value="${k}">${esc(tr(n))}</option>`).join('')}</select></div>
-  <div id="a-usel" role="region" aria-label="${esc(tr('Selected users'))}" hidden></div>
+const usersHtml = () => `<h4>${tr('People')}</h4>
+  <div class="ua8bar"><input type="search" id="a-uq" placeholder="${esc(tr('Name, user name or e-mail'))}" aria-label="${esc(tr('Search people'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><select id="a-uflt" aria-label="${esc(tr('Filter'))}">${UA8_FLT.map(([k, n]) => `<option value="${k}">${esc(tr(n))}</option>`).join('')}</select></div>
+  <div id="a-usel" role="region" aria-label="${esc(tr('Selected people'))}" hidden></div>
   <div class="members" id="a-users" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div class="ua8pg" id="a-upg"></div>
-  <div class="row" style="margin-top:.5rem"><button class="btn sm" data-acc="user-new">${ic('plus', 's')} ${tr('New user')}</button></div>`;
+  <div class="row" style="margin-top:.5rem"><button class="btn sm" data-acc="user-new">${ic('plus', 's')} ${tr('New person')}</button></div>`;
 // ------------------------------------------------------------------ 2.10.0 (#441): groups
 // Settings > Administration > Groups (admins): name, members (people), optionally a sign-in group (OIDC) the members follow
 const grpHtml = () => collab() ? `<h4 id="s-groups-h">${tr('Groups')}</h4>
@@ -172,9 +172,9 @@ async function grpEdit(smd, gid) {
     <div class="row"><label for="gr-name">${tr('Name')}</label><input id="gr-name" maxlength="60" value="${esc(g?.name || '')}" placeholder="${esc(tr('e.g. Office'))}"></div>
     ${fg_pickRow(g)}
     <div class="row"><label for="gr-oidc">${tr('Sign-in group')}</label><input id="gr-oidc" maxlength="200" value="${esc(g?.oidc_group || '')}" placeholder="${esc(tr('optional · OIDC group name'))}"></div>
-    <div class="shint">${tr('With a sign-in group the members come from the sign-in provider (OIDC): whoever has that group in their login is a member, checked at every login.')}</div>
+    <div class="shint">${tr('With a sign-in group the members come from the sign-in provider (OIDC): whoever has that group in their sign-in is a member, checked at every sign-in.')}</div>
     <h4 id="gr-mem-h">${tr('Members')}</h4>
-    <div class="grpmem" id="gr-mem" role="group" aria-labelledby="gr-mem-h">${users.map(u => `<label class="chkl"><input type="checkbox" data-gm="${u.id}" ${sel.has(u.id) ? 'checked' : ''} ${synced ? 'disabled' : ''}> ${esc(u.display_name)} <span class="muted">${esc(u.username)}</span></label>`).join('') || `<div class="muted mhint">${tr('No other users yet. An admin can add them in the settings.')}</div>`}</div>
+    <div class="grpmem" id="gr-mem" role="group" aria-labelledby="gr-mem-h">${users.map(u => `<label class="chkl"><input type="checkbox" data-gm="${u.id}" ${sel.has(u.id) ? 'checked' : ''} ${synced ? 'disabled' : ''}> ${esc(u.display_name)} <span class="muted">${esc(u.username)}</span></label>`).join('') || `<div class="muted mhint">${tr('No other people yet. An admin can add them in the settings.')}</div>`}</div>
     <div class="calerr" role="alert" id="gr-err" hidden></div>
     <div class="foot">${g ? `<button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="ok">${g ? tr('Save') : tr('Create')}</button></div>`);
   md.classList.add('grpmodal');
@@ -205,8 +205,8 @@ const orgsHtml = () => S.instanceMode === 'shared' ? `<h4 id="a-orgs-h">${tr('Or
   <div class="members" id="a-orgs"><div class="muted mhint">${tr('Loading…')}</div></div><div class="row"><button class="btn sm" data-acc="org-new">${ic('plus', 's')} ${tr('New organisation')}</button></div>`;
 // 2.46.0 (#1561): "Add person": the organisation (none / each one; exactly one: preselected, as a member) and the role in it
 function omNewOrgRows() {
-  const os = S.orgs || [], one = os.length === 1 ? os[0].id : 0;
-  return `<div class="row"><label for="u-org">${tr('Organisation')}</label><select id="u-org"><option value="0">${tr('None (private space only)')}</option>${os.map(o => `<option value="${o.id}" ${o.id === one ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select></div>
+  const os = (S.orgs || []).filter(o => !o.apart), one = os.length === 1 ? os[0].id : 0;  // 2.399.0 (#2687): hosted, a client's organisation is not offered
+  return `<div class="row"><label for="u-org">${tr('Organisation')}</label><select id="u-org"><option value="0">${tr('None (private workspace only)')}</option>${os.map(o => `<option value="${o.id}" ${o.id === one ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select></div>
     <div class="row" id="u-orgrow" ${one ? '' : 'hidden'}><label for="u-orgrole">${tr('Role in the organisation')}</label><select id="u-orgrole"><option value="member">${tr('Member')}</option><option value="admin">${tr('Admin of the organisation')}</option></select></div>`;
 }
 // 2.138.3 B (#2407): the avatar of a person row (Users and the organisation's member list)
@@ -234,7 +234,7 @@ async function orgModal(o, done) {
     <div class="row"><label for="og-icon">${tr('Symbol')}</label><span class="wsicprev" id="og-icprev">${icPrev(o?.icon || '')}</span><input id="og-icon" maxlength="8" class="numin" value="${esc(o?.icon || '')}" placeholder="${esc(tr('optional'))}"${o && !picAdm ? ' aria-describedby="og-pich"' : ''}>${o ? `<span id="og-pic">${picRow()}</span>` : ''}</div>
     <div class="row"><label for="og-dom">${tr('E-mail domains')}</label><div class="ogfld"><input id="og-dom" maxlength="500" value="${esc(o?.domains || '')}" placeholder="example.com" autocapitalize="off" aria-describedby="og-domh"><span class="muted" id="og-domh">${tr('registrations with these addresses join it')}</span></div></div>
     ${o ? `<div class="oghd"><b id="og-mh">${tr('Members')}</b><span class="muted" id="og-cnt" aria-live="polite"></span></div>
-    <div class="ua8bar"><input type="search" id="og-q" placeholder="${esc(tr('Name, user name or e-mail'))}" aria-label="${esc(tr('Search users'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><select id="og-flt" aria-label="${esc(tr('Filter'))}"><option value="mem">${tr('Members')}</option><option value="all">${tr('All')}</option></select></div>
+    <div class="ua8bar"><input type="search" id="og-q" placeholder="${esc(tr('Name, user name or e-mail'))}" aria-label="${esc(tr('Search people'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><select id="og-flt" aria-label="${esc(tr('Filter'))}"><option value="mem">${tr('Members')}</option><option value="all">${tr('All')}</option></select></div>
     <div class="members ogml" id="og-list" role="group" aria-labelledby="og-mh"></div>
     <div class="shint">${tr('Admins of an organisation manage its members, name and e-mail domains (Settings > Workspaces); they are not admins of the server.')}${picAdm ? '' : ` <span id="og-pich">${tr('Only an admin of the organisation can upload a picture.')}</span>`}</div>` : `<div class="shint">${tr('You become its first member and admin; add people afterwards.')}</div>`}
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${o ? tr('Save') : tr('Create')}</button></div>`);
@@ -290,7 +290,7 @@ async function orgModal(o, done) {
 function wsPaneHtml(hint) {
   return `<h4 id="s-ws-h">${tr('Workspaces')}</h4>${hint(tr('Every project belongs to one workspace; the sidebar shows one at a time. An organisation’s project is shared only inside it; private sharing stays invisible to it.'))}
     <div class="members" id="s-ws" aria-labelledby="s-ws-h"><div class="muted mhint">${tr('Loading…')}</div></div>
-    ${(S.me.workspaces || []).length ? `<h4 id="s-wsr-h">${tr('Absences and vacation')}</h4><div id="s-wsr"><div class="muted mhint">${tr('Loading…')}</div></div>` : ''}${''/* 2.365.2 C (#2789) */}`;
+    ${(S.me.workspaces || []).length ? `<h4 id="s-wsr-h">${tr('Absences and holiday')}</h4><div id="s-wsr"><div class="muted mhint">${tr('Loading…')}</div></div>` : ''}${''/* 2.365.2 C (#2789) */}`;
 }
 // 2.365.2 C (#2789): the rules of an organisation that the Absences tab used to hold: vacation needs an approval, the state
 // of the public holidays (same routes; only admins of the organisation write)
@@ -303,9 +303,9 @@ async function wsr_draw(md, oid) {
   if (!md.isConnected) return;
   const dis = lv.admin ? '' : 'disabled';
   box.innerHTML = `${orgs.length > 1 ? `<div class="row"><label for="s-wsr-org">${tr('Organisation')}</label><select id="s-wsr-org">${orgs.map(w => `<option value="${w.id}" ${w.id === oid ? 'selected' : ''}>${esc(w.name)}</option>`).join('')}</select></div>` : ''}
-    ${lv.personal ? '' : `<div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-wsr-appr" data-org="${oid}" ${lv.approval ? 'checked' : ''} ${dis}><span class="swt" aria-hidden="true"></span></span><span>${tr('Vacation of members needs an approval')}</span></label></div>
-    <div class="shint">${tr('On: vacation a member enters is a request until an admin approves it. Sick leave and days off need no approval. Admins entering vacation for someone approve it at once.')}</div>`}
-    <div class="row"><label for="s-wsr-state">${tr('Public holidays')}</label><select id="s-wsr-state" data-org="${oid}" ${dis}><option value="">${tr('None')}</option>${Object.entries(ab.states).map(([k, v]) => `<option value="${esc(k)}" ${k === ab.state ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></div>
+    ${lv.personal ? '' : `<div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-wsr-appr" data-org="${oid}" ${lv.approval ? 'checked' : ''} ${dis}><span class="swt" aria-hidden="true"></span></span><span>${tr('Holiday of members needs an approval')}</span></label></div>
+    <div class="shint">${tr('On: holiday a member enters is a request until an admin approves it. Sick leave and days off need no approval. Admins entering holiday for someone approve it at once.')}</div>`}
+    <div class="row"><label for="s-wsr-state-cc">${tr('Public holidays')}</label>${hol_selects('s-wsr-state', ab.countries, ab.state, tr('None'), `data-org="${oid}" data-was="${esc(ab.state)}" ${dis}`)}</div>
     ${lv.admin ? '' : `<div class="shint">${tr('Only admins of this workspace can change this')}</div>`}`;
 }
 function wsr_wire(md) {
@@ -316,10 +316,10 @@ function wsr_wire(md) {
     const org = +t.dataset.org;
     if (t.id === 's-wsr-appr') {
       const to = t.checked, put = v => async () => { await api('PUT', '/api/team/leave/approval', {org, on: v}); };
-      try { await put(to)(); histAdd({label: tr('Changed setting: {0}', tr('Vacation of members needs an approval')), sett: true, undo: put(!to), redo: put(to), post: () => wsr_draw(md, org)}); savedTick(t); } catch { t.checked = !to; /* api() said it */ }
+      try { await put(to)(); histAdd({label: tr('Changed setting: {0}', tr('Holiday of members needs an approval')), sett: true, undo: put(!to), redo: put(to), post: () => wsr_draw(md, org)}); savedTick(t); } catch { t.checked = !to; /* api() said it */ }
     } else {
-      const from = t.dataset.was ?? [...t.options].find(o => o.defaultSelected)?.value ?? '', to = t.value, put = v => async () => { await api('PUT', '/api/team/absences/holidays', {state: v, org}); };
-      try { await put(to)(); t.dataset.was = to; histAdd({label: tr('Changed setting: {0}', tr('Public holidays')), sett: true, undo: put(from), redo: put(to), post: () => wsr_draw(md, org)}); savedTick(t); } catch { t.value = from; /* api() said it */ }
+      const from = t.dataset.was ?? '', to = t.value, put = v => async () => { await api('PUT', '/api/team/absences/holidays', {state: v, org}); };
+      try { await put(to)(); t.dataset.was = to; histAdd({label: tr('Changed setting: {0}', tr('Public holidays')), sett: true, undo: put(from), redo: put(to), post: () => wsr_draw(md, org)}); savedTick(t); } catch { wsr_draw(md, org); /* api() said it */ }
     }
   });
 }
@@ -337,9 +337,9 @@ function accountWire(md) {
     const nAg = us.flt === 'people' && !us.q ? j.agents : 0;
     box.innerHTML = (nAg ? `<div class="mrow agsum"><span class="avatar agent">${ic('bot', 's')}</span><span class="n">${esc(trn('{0} agent', '{0} agents', nAg))}</span><button class="linkbtn" data-act="agents-go">${tr('Manage under Agents')}</button></div>` : '')
       + (users.length ? '' : `<div class="muted mhint">${tr('Nothing found')}</div>`)
-      + users.map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}"><label class="ua8hit"><input type="checkbox" class="ua8chk" data-usel="${u.id}" aria-label="${esc(tr('Select {0}', u.display_name))}" ${us.sel.has(u.id) ? 'checked' : ''} ${u.id === S.me.id ? 'disabled' : ''}></label>${uRowAv(u)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge() : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Manages the server') /* 2.364.0 C (#3041) */ : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}${u.invite === 'invited' ? ' · ' + tr('Invited') : u.invite === 'expired' ? ' · ' + tr('Invitation expired') : ''}${u.signup === 'pending' ? ' · ' + tr('waits for approval') : u.signup === 'confirm' ? ' · ' + tr('registration not confirmed') : ''}</span></span>${u.signup === 'pending' ? `<button class="btn sm pri" data-acc="user-approve" data-uid="${u.id}">${ic('check', 's')} ${tr('Approve')}</button>` : ''}${u.kind === 'agent'
+      + users.map(u => `<div class="mrow ${u.disabled ? 'off' : ''}" data-urow="${u.id}"><label class="ua8hit"><input type="checkbox" class="ua8chk" data-usel="${u.id}" aria-label="${esc(tr('Select {0}', u.display_name))}" ${us.sel.has(u.id) ? 'checked' : ''} ${u.id === S.me.id ? 'disabled' : ''}></label>${uRowAv(u)}<span class="n">${esc(u.display_name)}${u.kind === 'agent' ? ' ' + agentBadge(u.id) : ''} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Manages the server') /* 2.364.0 C (#3041) */ : ''}${u.disabled ? ' · ' + tr('disabled') : ''}${u.proxy_login ? ' · ' + tr('SSO: {0}', u.proxy_login) : ''}${u.twofa?.length ? ' · ' + tr('2FA') : ''}${u.oidc_linked ? ' · OIDC' : ''}${u.invite === 'invited' ? ' · ' + tr('Invited') : u.invite === 'expired' ? ' · ' + tr('Invitation expired') : ''}${u.signup === 'pending' ? ' · ' + tr('waits for approval') : u.signup === 'confirm' ? ' · ' + tr('registration not confirmed') : ''}</span></span>${u.signup === 'pending' ? `<button class="btn sm pri" data-acc="user-approve" data-uid="${u.id}">${ic('check', 's')} ${tr('Approve')}</button>` : ''}${u.kind === 'agent'
       ? `<button class="linkbtn agmng" data-acc="agent-edit" data-uid="${u.id}" title="${esc(tr('Open the agent dialog'))}">${tr('Managed under Agents')}</button>`
-      : `<button class="iconbtn" data-acc="user-edit" data-uid="${u.id}" title="${tr('Edit user')}">${ic('edit', 's')}</button>`}</div>`).join('');
+      : `<button class="iconbtn" data-acc="user-edit" data-uid="${u.id}" title="${tr('Edit person')}">${ic('edit', 's')}</button>`}</div>`).join('');
     ua8_pagerDraw(md, us); ua8_selDraw(md, us);
   };
   ua8_wire(md, us, drawUsers);
@@ -374,7 +374,7 @@ function accountWire(md) {
       if (a === 'logout') logout();
       if (a === 'shell-server') { const u = shellServerUrl(); if (u) location.href = u; }  // 2.435.0 B (#3578)
       if (a === 'user-new') userModal(null, () => { drawUsers(); orgsDraw(md); });  // 2.58.0 (#1724): the organisations' member counts follow at once
-      if (a === 'user-approve') { await api('POST', `/api/users/${b.dataset.uid}/approve`, {}); toast(tr('Approved: the person can log in now')); drawUsers(); }  // 2.23.0 (#711)
+      if (a === 'user-approve') { await api('POST', `/api/users/${b.dataset.uid}/approve`, {}); toast(tr('Approved: the person can sign in now')); drawUsers(); }  // 2.23.0 (#711)
       if (a === 'org-edit') orgModal((S.orgs || []).find(o => o.id === +b.dataset.oid), () => orgsDraw(md));
       if (a === 'org-new') orgModal(null, () => { orgsDraw(md); load().then(render).catch(() => {}); });  // 2.28.0 (#935)
       if (a === 'org-del') {
@@ -391,18 +391,19 @@ function accountWire(md) {
   });
 }
 function userModal(u, done) {
-  const md = modal(`<h3>${u ? tr('Edit user') : tr('New user')}</h3>
+  const md = modal(`<h3>${u ? tr('Edit person') : tr('New person')}</h3>
     <div class="row"><label for="u-name">${tr('Display name')}</label><input id="u-name" value="${esc(u?.display_name || '')}" maxlength="60" placeholder="${esc(tr('e.g. Alice Example'))}"></div>
-    <div class="row"><label for="u-user">${tr('Username')}</label><input id="u-user" class="unin" value="${esc(u?.username || '')}" ${u ? 'disabled' : ''} autocapitalize="off" placeholder="${tr('a-z, 0-9, . - _')}"><span class="muted">${tr('for the login and @mentions')}</span></div>
+    <div class="row"><label for="u-user">${tr('Username')}</label><input id="u-user" class="unin" value="${esc(u?.username || '')}" ${u ? 'disabled' : ''} autocapitalize="off"></div>
+    <div class="shint keep">${tr('for the sign-in and @mentions')} · ${tr('a-z, 0-9, . - _')}</div>${''/* 2.366.0 (#3001): under the field, the field keeps the row's width (the placeholder was cut) */}
     <div class="shint keep" id="u-userhint" hidden></div>
     <div class="row"><label for="u-pw">${tr('Password')}</label><input type="password" id="u-pw" autocomplete="new-password" placeholder="${u ? (u.has_password ? tr('unchanged') : tr('none (single sign-on only)')) : tr('optional, min. 8 characters')}"></div>
     <div class="row"><label for="u-email">${tr('E-mail')}</label><input id="u-email" type="email" value="${esc(u?.email || '')}" autocapitalize="off" placeholder="${tr('optional')}"></div>
     ${!u && S.instanceMode === 'workspaces' && (S.orgs || []).length ? omNewOrgRows() : ''}
-    ${u && S.instanceMode === 'workspaces' && (S.orgs || []).length ? `<div class="row"><label>${tr('Organisations')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Organisations'))}">${S.orgs.map(o => { const on = u ? (u.orgs || []).includes(o.id) : o.members.includes(S.me.id); return `<button type="button" class="fperson ${on ? 'on' : ''}" data-uorg="${o.id}" aria-pressed="${on}"><span aria-hidden="true">${esc(o.icon || '🏢')}</span><span>${esc(o.name)}</span></button>`; }).join('')}</div></div>` : ''}
+    ${u && S.instanceMode === 'workspaces' && (S.orgs || []).length ? `<div class="row"><label>${tr('Organisations')}</label><div class="fpeople" role="group" aria-label="${esc(tr('Organisations'))}">${S.orgs.map(o => { const on = u ? (u.orgs || []).includes(o.id) : o.members.includes(S.me.id); return `<button type="button" class="fperson ${on ? 'on' : ''}" data-uorg="${o.id}" aria-pressed="${on}" ${o.apart ? 'disabled' : ''}><span aria-hidden="true">${esc(o.icon || '🏢')}</span><span>${esc(o.name)}</span></button>`; }).join('')}</div></div>` : ''}
     ${u ? `<div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="u-avpick" data-cur="${esc(u.avatar || '')}">${avPickHtml(u.avatar || '', false, u.display_name || u.username)}</div></div>` : ''}
     <div class="row"><label>${tr('Rights')}</label><label class="chkl"><input type="checkbox" id="u-admin" ${u?.is_admin ? 'checked' : ''}> ${tr('Manage the server')}</label>${''/* 2.364.0 C (#3041): the server admin, not an organisation's */}${u ? `<label class="chkl"><input type="checkbox" id="u-dis" ${u.disabled ? 'checked' : ''}> ${tr('disabled')}</label>` : ''}</div>
     ${''/* 2.364.0 C (#3044): the special fields folded under "Advanced" (open when one of them is in use; same fields, same effect) */}<details class="sdet uadv" ${u && (u.proxy_login || u.kid || u.oidc_linked) ? 'open' : ''}><summary>${tr('Advanced')}</summary>
-    <div class="row"><label for="u-proxy">${tr('SSO login')}</label><input id="u-proxy" value="${esc(u?.proxy_login || '')}" autocapitalize="off" placeholder="${tr('user name at the login proxy (optional)')}"></div>
+    <div class="row"><label for="u-proxy">${tr('SSO sign-in')}</label><input id="u-proxy" value="${esc(u?.proxy_login || '')}" autocapitalize="off" placeholder="${tr('user name at the sign-in proxy (optional)')}"></div>
     <div class="row"><label for="u-topic">${tr('ntfy topic')}</label><input id="u-topic" value="${esc(u?.ntfy_topic || '')}" autocapitalize="off" placeholder="${tr('empty = random')}"></div>
     ${!u || (u.kind !== 'agent' && u.id !== S.me.id) ? `<div class="row"><label>${tr('Child account')}</label><label class="chkl"><input type="checkbox" id="u-kid" aria-controls="u-parrow" aria-expanded="${!!u?.kid}" ${u?.kid ? 'checked' : ''}> ${tr('A simple view with big buttons, stars and rewards; takes part in shared projects only with what is assigned to it')}</label></div>
     <div class="row kidopts" id="u-parrow" ${u?.kid ? '' : 'hidden'}><label>${tr('Parents')}</label><div class="fpeople" id="u-parents" role="group" aria-label="${esc(tr('Parents'))}"><span class="muted">${tr('Loading…')}</span></div></div>
@@ -414,9 +415,13 @@ function userModal(u, done) {
       : u.kind !== 'agent' && !u.disabled ? `<div class="row"><label>${u.has_password ? tr('Password') : tr('Invitation')}</label><button type="button" class="btn sm" data-m="invite">${ic(u.has_password ? 'key' : 'send', 's')} ${u.has_password ? tr('Send a link to set a new password') : u.invite ? tr('Send the invitation again') : tr('Send an invitation')}</button></div>` : ''}
     ${u && u.kind !== 'agent' && !u.is_admin && !u.disabled && u.id !== S.me.id ? `<div class="row"><label>${tr('Sign-in link')}</label><button type="button" class="btn sm" data-m="signin">${ic('key', 's')} ${tr('Sign-in link / QR code…')}</button><span class="muted">${tr('for family members without e-mail')}</span></div>` : ''}
     ${u?.twofa?.length ? `<div class="row"><label>${tr('Two-factor')}</label><label class="chkl"><input type="checkbox" id="u-2fareset"> ${tr('Reset (lost phone / passkey and recovery codes)')}</label></div>` : ''}
-    ${u?.oidc_linked ? `<div class="row"><label>OIDC</label><label class="chkl"><input type="checkbox" id="u-oidcun"> ${tr('Unlink (the next OIDC login links again by user name or e-mail)')}</label></div>` : ''}
+    ${u?.oidc_linked ? `<div class="row"><label>OIDC</label><label class="chkl"><input type="checkbox" id="u-oidcun"> ${tr('Unlink (the next OIDC sign-in links again by user name or e-mail)')}</label></div>` : ''}
     <div class="muted" style="font-size:var(--fs-s);line-height:1.6">${tr('Every person has their own settings, filters and habits; projects are shared.')}</div>
     <div class="foot">${u && u.id !== S.me.id ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  if (u?.apart) {  // 2.399.0 (#2687): hosted, a customer's account: the operator locks it (or sets its quota), nothing else
+    $$('input, select, [data-uorg], [data-av], [data-m="invite"], [data-m="signin"]', md).forEach(x => { if (x.id !== 'u-admin' && x.id !== 'u-dis') x.disabled = true; });
+    $('h3', md).insertAdjacentHTML('afterend', `<div class="shint">${ic('info', 's')} ${esc(tr('Hosted: the account belongs to a client. You can lock or delete it; its sign-in, e-mail address and organisations stay with the client.'))}</div>`);
+  }
   // 2.19.0 (#653): a child account and its parents (people, never agents or other children)
   const par = new Set(u?.parents || []);
   const parDraw = async () => {
@@ -453,7 +458,7 @@ function userModal(u, done) {
       }
       if (b.dataset.m === 'save') {
         const body = {display_name: $('#u-name', md).value.trim(), proxy_login: $('#u-proxy', md).value.trim(), email: $('#u-email', md).value.trim(), ntfy_topic: $('#u-topic', md).value.trim(), is_admin: $('#u-admin', md).checked};
-        if ($('#u-2fareset', md)?.checked) { if (!await askConfirm(tr('Reset the two-factor authentication of “{0}”?', u.display_name), tr('They log in with the password alone (or must set it up again if it is required).'), {ok: tr('Reset'), danger: true})) return; body.reset_2fa = true; }
+        if ($('#u-2fareset', md)?.checked) { if (!await askConfirm(tr('Reset the two-factor authentication of “{0}”?', u.display_name), tr('They sign in with the password alone (or must set it up again if it is required).'), {ok: tr('Reset'), danger: true})) return; body.reset_2fa = true; }
         if ($('#u-oidcun', md)?.checked) body.oidc_unlink = true;
         if ($('#u-kid', md) && ($('#u-kid', md).checked || u?.kid)) { body.kid = $('#u-kid', md).checked; if (body.kid) { body.parents = [...par]; body.is_admin = false; } }
         const avk = $('#u-avpick', md)?.dataset.pick; if (avk) body.avatar_preset = avk === 'none' ? null : avk;
@@ -462,11 +467,12 @@ function userModal(u, done) {
         const pw = $('#u-pw', md).value;
         if (pw) body.password = pw; else if ($('#u-nopw', md)?.checked) body.password = '';
         if ($('#u-kind', md) && $('#u-kind', md).value !== (u.kind || 'user')) {
-          if ($('#u-kind', md).value === 'agent' && !await askConfirm(tr('Make “{0}” an agent?', u.display_name), tr('An agent works only through its API tokens: no web login, never admin. Its projects and tokens stay. Manage it under Settings > Agents.'), {ok: tr('Make agent')})) return;
+          if ($('#u-kind', md).value === 'agent' && !await askConfirm(tr('Make “{0}” an agent?', u.display_name), tr('An agent works only through its API tokens: no web sign-in, never admin. Its projects and tokens stay. Manage it under Settings > Agents.'), {ok: tr('Make agent')})) return;
           body.kind = $('#u-kind', md).value;
         }
         if (u) {  // 2.270.0 A (#3019): only the fields changed here; organisations / parents with _prev (only the difference counts)
           body.disabled = $('#u-dis', md).checked;
+          if (u.apart) { delete body.kid; delete body.parents; delete body.orgs; }  // 2.399.0 (#2687): lock / admin only
           for (const k of ['display_name', 'proxy_login', 'email', 'ntfy_topic', 'is_admin', 'disabled']) if (k in body && (typeof body[k] === 'boolean' ? body[k] === !!u[k] : body[k] === (u[k] || ''))) delete body[k];
           const same = (x, y) => JSON.stringify([...x].sort()) === JSON.stringify([...y].sort());
           const prev = {};
@@ -520,7 +526,7 @@ async function tfaDraw(md, j) {
   box._j = j;
   const hint = t => `<div class="shint">${t}</div>`;
   if (!j.available) {
-    box.innerHTML = hint(j.via === 'proxy' || j.via === 'oidc' || S.me?.auth === 'proxy' ? tr('You log in with single sign-on: a second factor is set up at your login provider, not here.')
+    box.innerHTML = hint(j.via === 'proxy' || j.via === 'oidc' || S.me?.auth === 'proxy' ? tr('You sign in with single sign-on: a second factor is set up at your sign-in provider, not here.')
       : tr('Two-factor authentication is available for accounts with a password.'));
     return;
   }
@@ -533,8 +539,8 @@ async function tfaDraw(md, j) {
   if (!pkSupported()) h += hintK(tr('Passkeys need HTTPS (or localhost), a host name instead of an IP address and a current browser.'));
   if (j.passkeys.length) h += `<div class="members pklist">${j.passkeys.map(p => `<div class="mrow" data-pk="${p.id}"><span class="avatar">${ic('key', 's')}</span><span class="n">${esc(p.name)} <small class="muted">${tr('added {0}', esc(when(p.created_at)))}${p.last_used_at ? ' · ' + tr('last used {0}', esc(when(p.last_used_at))) : ''}${p.synced ? ' · ' + tr('synced') : ''}</small></span><button class="iconbtn" data-tfa="pk-ren" title="${tr('Rename')}">${ic('edit', 's')}</button><button class="iconbtn" data-tfa="pk-del" title="${tr('Remove')}">${ic('trash', 's')}</button></div>`).join('')}</div>`;
   if (on) h += `<div class="row"><label>${tr('Recovery codes')}</label><span class="muted">${trn('{0} left', '{0} left', j.recovery_left)}</span><button class="btn sm" data-tfa="rc-new">${tr('New codes')}</button></div>`;
-  h += hint(on ? tr('After your password, the login asks for a code from the app or your passkey.') + (j.passkey_login && j.passkeys.length ? ' ' + tr('A passkey also logs you in without the password (“Log in with a passkey”).') : '')
-    : tr('Protects your account if your password gets out: after the password, the login also asks for a code from an app on your phone or for a passkey (fingerprint, face or security key).'));
+  h += hint(on ? tr('After your password, the sign-in asks for a code from the app or your passkey.') + (j.passkey_login && j.passkeys.length ? ' ' + tr('A passkey also logs you in without the password (“Sign in with a passkey”).') : '')
+    : tr('Protects your account if your password gets out: after the password, the sign-in also asks for a code from an app on your phone or for a passkey (fingerprint, face or security key).'));
   box.innerHTML = h;
 }
 function tfaWire(md) {
@@ -602,7 +608,7 @@ function bkRestore(md, src) {
   return new Promise(done => {
     const m = modal(`<h3>${tr('Restore backup')}</h3>
       <p>${tr('This replaces <b>all data on this server</b> (every user’s projects, tasks, files and settings) with the state of {0}.', `<b>${esc(aaWhen(src.created_at) || '?')}</b>`)}</p>
-      <p class="muted">${trn('{0} task', '{0} tasks', src.counts?.tasks || 0)}, ${trn('{0} file', '{0} files', src.attachment_files || 0)}, ${trn('{0} user', '{0} users', src.counts?.users || 0)}. ${tr('A safety backup of the current state is made first. Everyone else is logged out.')}</p>
+      <p class="muted">${trn('{0} task', '{0} tasks', src.counts?.tasks || 0)}, ${trn('{0} file', '{0} files', src.attachment_files || 0)}, ${trn('{0} person', '{0} people', src.counts?.users || 0)}. ${tr('A safety backup of the current state is made first. Everyone else is signed out.')}</p>
       <form class="pwform">${src.encrypted ? `<input type="password" id="bkr-pass" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore placeholder="${tr('Passphrase (empty = the saved one)')}">` : ''}
       <label for="bkr-word">${tr('Type {0} to confirm', '<b>' + esc(src.word) + '</b>')}</label><input id="bkr-word" autocomplete="off" autocapitalize="characters" spellcheck="false">
       <div class="aerr" role="alert" id="bkr-err"></div>
@@ -617,7 +623,8 @@ function bkRestore(md, src) {
         const r = await suApi('POST', '/api/admin/backups/restore', {...(src.upload ? {upload: src.upload} : {name: src.name}), confirm: $('#bkr-word', m).value.trim(), passphrase: $('#bkr-pass', m)?.value || ''}, tr('Restore'));  // 2.360.0 A (#2496): with the step-up
         m.remove(); md.remove();
         clearLocal();
-        if (r.notes?.length) await askConfirm(tr('Backup restored. Safety backup: {0}', r.safety), r.notes.join('\n\n'), {ok: tr('Reload')});  // 2.273.0 A (#3051)
+        const notes = [r.key_warning, ...r.notes || []].filter(Boolean);  // 2.359.3 (#2893): the server key first, in red
+        if (notes.length) await askConfirm(tr('Backup restored. Safety backup: {0}', r.safety), notes.join('\n\n'), {ok: tr('Reload'), danger: !!r.key_warning});  // 2.273.0 A (#3051)
         else toast(tr('Backup restored. Safety backup: {0}', r.safety));
         setTimeout(() => location.replace('/'), 1200);
         done(true);
@@ -706,7 +713,8 @@ function bkWire(md) {
         if (pass === null) return;
         const r = await api('POST', `/api/admin/backups/${encodeURIComponent(name)}/verify`, {passphrase: pass || ''});
         toast(tr('Backup is complete and readable ({0}, {1}).', trn('{0} task', '{0} tasks', r.counts?.tasks || 0), trn('{0} file', '{0} files', r.attachment_files || 0))
-          + (r.missing_files ? ' ' + trn('{0} file was missing when it was written (deleted or moved meanwhile).', '{0} files were missing when it was written (deleted or moved meanwhile).', r.missing_files) : ''));  // 2.273.0 A (#3050)
+          + (r.missing_files ? ' ' + trn('{0} file was missing when it was written (deleted or moved meanwhile).', '{0} files were missing when it was written (deleted or moved meanwhile).', r.missing_files) : '')
+          + (r.key_warning ? ' ' + r.key_warning : ''));  // 2.273.0 A (#3050); 2.359.3 (#2893)
       }
       if (b.dataset.bk === 'restore' && item) await bkRestore(md, {name, encrypted: item.encrypted, created_at: item.created_at, counts: item.counts, attachment_files: item.attachment_files, word: j.confirm_word || 'RESTORE'});
     } catch { /* api() showed it */ } finally { b.disabled = false; }
@@ -767,7 +775,7 @@ function ua8_wire(md, us, draw) {
     if (k === 'close' || k === 'clear') { clear(); return; }
     if (k === 'all') { $$('[data-usel]:not(:disabled)', md).forEach(x => { x.checked = true; us.sel.add(+x.dataset.usel); }); ua8_selDraw(md, us); return; }
     if (k === 'more') { menu(b, ua8_orgs().map(o => ({label: o.name, icon: 'building', fn: () => orgAdd(o)})), null, null, tr('Add to an organisation')); return; }
-    if (k === 'disable' && !await askConfirm(trn('Disable {0} account?', 'Disable {0} accounts?', us.sel.size), tr('They are logged out and cannot log in until enabled again. Nothing is deleted.'), {ok: tr('Disable'), danger: true})) return;
+    if (k === 'disable' && !await askConfirm(trn('Disable {0} account?', 'Disable {0} accounts?', us.sel.size), tr('They are signed out and cannot sign in until enabled again. Nothing is deleted.'), {ok: tr('Disable'), danger: true})) return;
     await ua8_bulk(md, us, draw, k);
   });
 }
@@ -793,7 +801,7 @@ async function ua8_bulk(md, us, draw, action, orgId) {
   const msg = j.failed.length ? tr('{0} changed, {1} not: {2}', j.ok.length, j.failed.length, j.failed[0].error) : tr('{0} changed', j.ok.length);
   if (action === 'org_add' || !j.ok.length) { toast(msg); return; }
   const back = action === 'disable' ? 'enable' : 'disable', ok = j.ok;  // one undo step: the same accounts back
-  offerUndo(msg, histAdd({label: tr('Users'),
+  offerUndo(msg, histAdd({label: tr('People'),
     undo: async () => { await api('POST', '/api/users/bulk', {ids: ok, action: back}); if (md.isConnected) draw(); return {skipped: []}; },
     redo: async () => { await api('POST', '/api/users/bulk', {ids: ok, action}); if (md.isConnected) draw(); return {skipped: []}; }}));
 }
@@ -806,7 +814,7 @@ async function ua8_delete(u) {
   const name = u.display_name || u.name || '';
   if (!j.can_delete) return ua8_orgRemove(u, name, j);
   // 2.360.4 (#3243): nobody may take over: said now, before the steps of the dialog (the server refuses it as well)
-  if (j.purge?.no_heir) { await askConfirm(tr('Delete user “{0}”?', name), j.purge.no_heir, {ok: tr('OK'), after: md => { $('[data-cd="no"]', md).hidden = true; }}); return false; }
+  if (j.purge?.no_heir) { await askConfirm(tr('Delete account “{0}”?', name), j.purge.no_heir, {ok: tr('OK'), after: md => { $('[data-cd="no"]', md).hidden = true; }}); return false; }
   // 2.146.0 D (#2468): records to keep (the personal office): the retention step first (the server checks it too)
   let rx = '';
   // 2.186.0 A (#2599): records that are retired (self-hosting) need no export step: no waiver is noted
@@ -814,7 +822,7 @@ async function ua8_delete(u) {
   const rxq = () => rx ? `retention=${rx}` : '';
   if (!j.lists.length) {
     // 2.152.0 A (#2164): + what happens to the personal office, agents, calendars, time entries, direct messages
-    if (!await askConfirm(tr('Delete user “{0}”?', name), '', {html: `<p>${esc(tr('Their basket, habits, filters and focus history are deleted.'))}</p>${ua8PurgeHtml(j.purge)}`, ok: tr('Delete user'), danger: true})) return false;
+    if (!await askConfirm(tr('Delete account “{0}”?', name), '', {html: `<p>${esc(tr('Their basket, habits, filters and focus history are deleted.'))}</p>${ua8PurgeHtml(j.purge)}`, ok: tr('Delete account'), danger: true})) return false;
     try { await api('DELETE', '/api/users/' + u.id + (rx ? '?' + rxq() : '')); } catch { return false; }
     return true;
   }
@@ -823,7 +831,7 @@ async function ua8_delete(u) {
   // 2.186.0 A (#2566): hosted, projects with receipts go along after the retention step (the keeping lies with the person)
   const alone = j.lists.filter(l => l.key_alone).length, receipts = j.lists.some(l => l.receipts), rhost = !!j.retention?.hosted, nodel = foreign || (receipts && !rhost);
   const lname = l => l.name != null ? esc(l.name) : esc(l.org ? tr('A project of {0}', l.org) : l.org_id ? tr('A project of another organisation') : tr('A private project'));
-  const md = modal(`<h3>${esc(tr('Delete user “{0}”?', name))}</h3>
+  const md = modal(`<h3>${esc(tr('Delete account “{0}”?', name))}</h3>
     <div class="shint keep">${esc(trn('{1} still owns {0} project. Choose what happens to it.', '{1} still owns {0} projects. Choose what happens to them.', j.lists.length, name))}</div>
     <div class="members ua8lists">${j.lists.map(l => `<div class="mrow"><span class="n">${l.locked ? ic('lock', 's') + ' ' : ''}${lname(l)} <span class="muted">${l.org && l.name != null ? esc(l.org) + ' · ' : ''}${l.shared ? esc(l.members.length ? tr('shared with {0}', l.members.join(', ') + (l.shared > l.members.length ? ' ' + tr('+{0}', l.shared - l.members.length) : '')) : trn('shared with {0} person', 'shared with {0} people', l.shared)) : esc(tr('not shared'))}</span></span></div>`).join('')}</div>
     <fieldset class="ua8how"><legend>${tr('The projects')}</legend>
@@ -843,7 +851,7 @@ async function ua8_delete(u) {
     </fieldset>
     ${ua8PurgeHtml(j.purge)}
     <div class="shint">${tr('Invoices and filed documents do not belong to a project: they stay.')}</div>
-    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" data-m="go">${tr('Delete user')}</button></div>`);
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" data-m="go">${tr('Delete account')}</button></div>`);
   const how = () => $('[name="ua8how"]:checked', md)?.value;
   const sync = () => { $('#ua8-del', md).hidden = how() !== 'delete'; $('#ua8-to', md).disabled = how() !== 'transfer'; $('[data-m="go"]', md).disabled = how() === 'delete' ? $('#ua8-conf', md).value.trim() !== j.username : !how() || !+$('#ua8-to', md).value; };
   md.addEventListener('change', sync); md.addEventListener('input', sync); sync();
@@ -864,7 +872,7 @@ async function ua8_delete(u) {
 // "Remove from the organisation", its lists of the organisation going to the member chosen here
 async function ua8_orgRemove(u, name, j) {
   if (!j.org_id) { toast(j.reason); return false; }
-  const md = modal(`<h3>${esc(tr('Delete user “{0}”?', name))}</h3><div class="shint keep">${esc(j.reason)}</div>
+  const md = modal(`<h3>${esc(tr('Delete account “{0}”?', name))}</h3><div class="shint keep">${esc(j.reason)}</div>
     <div class="row"><label for="ua8-heir">${tr('Projects of the organisation go to')}</label><select id="ua8-heir">${[{id: S.me.id, name: tr('Me')}, ...j.heirs.filter(p => p.id !== S.me.id)].map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" data-m="go">${tr('Remove from the organisation')}</button></div>`);
   return new Promise(res => {
@@ -965,6 +973,13 @@ function ua8PurgeHtml(p) {
   return rows.map(([w, t]) => `<div class="shint keep ua8purge${w ? ' warn' : ''}">${w ? ic('alert', 's') + ' ' : ''}${esc(t)}</div>`).join('');
 }
 
+// 2.439.0 (#3617): the e-mail signature of the Office, also for members (the Office's settings are read-only for them)
+async function ofmSigSettings() {
+  try {
+    if (typeof ofmSigModal !== 'function') await loadModule('office');
+    await ofmSigModal();
+  } catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); }
+}
 // 2.365.2 C (#2789): the letter signature dialog of the Office, opened from Settings > Account (the Office module loads first)
 async function ltSigSettings() {
   try {

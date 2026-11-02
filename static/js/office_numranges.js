@@ -4,7 +4,7 @@
 // editor (click on the number). Own save per row via /api/office/number-ranges (not the settings' save, hence the ids
 // without "os-" and data-fg-skip); only upwards, a jump in the invoice / credit note series needs a reason (office log).
 const ONUM = {ranges: null, loading: false, err: '', doc: null};
-const ONUM_NAMES = {offer: N_('Quotation numbers'), invoice: N_('Invoice numbers'), credit: N_('Credit note numbers'), reminder: N_('Reminder numbers'), delivery: N_('Delivery note numbers')};
+const ONUM_NAMES = {offer: N_('Quotation numbers'), invoice: N_('Invoice numbers'), credit: N_('Credit note numbers'), reminder: N_('Payment reminder numbers'), delivery: N_('Delivery note numbers')};
 const ONUM_SCHEME_IDS = {offer: 'os-scheme', invoice: 'os-inv-scheme', credit: 'os-cr-scheme', reminder: 'os-rm-scheme', delivery: 'os-ls-scheme'};
 
 // a number of the scheme with example values (the same building blocks the server knows, office/model.py)

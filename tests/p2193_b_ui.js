@@ -10,7 +10,7 @@
 //   bar follows the scrolled days; a press inside the edge zone without moving that way does not scroll
 // - roadmap: a summary bar dragged with the mouse, Esc puts it back (no shift on the server); finger: a swipe cancels the
 //   long press, the hold opens "Move project by…"
-const {boot, errs, sleep, B, login} = require('./boot');
+const {boot, errs, sleep, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -18,7 +18,7 @@ let CK;
 const call = async (method, url, body, ck = CK) => {
   for (let i = 0; ; i++) {
     const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, ...(ck ? {Cookie: ck} : {})}, body: body ? JSON.stringify(body) : undefined});
-    if (r.status === 429 && i < 8) { await sleep(500 * (i + 1)); continue; }
+    if (r.status === 429 && i < 8) { await sleep(500 * (i + 1)); continue; }  // wanted: back off on the rate limit
     return r.json().catch(() => ({}));
   }
 };
@@ -31,11 +31,12 @@ const ptr = (w, el, type, x = 0, extra = {}) => {  // jsdom has no PointerEvent:
 };
 const touch = (w, el, type, x = 10, y = 10) => { const e = new w.Event(type, {bubbles: true, cancelable: true}); e.touches = type === 'touchend' || type === 'touchcancel' ? [] : [{clientX: x, clientY: y}]; el.dispatchEvent(e); return e; };
 const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true}));
+const held = w => w.eval('!!drg_cur?.lifted');  // drag.js: the long press (hold) of the current touch drag is over (onHold ran)
 const frames = (w, n) => new Promise(r => { const f = () => (n-- <= 0 ? r() : w.requestAnimationFrame(f)); f(); });
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields';
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ALL.split(',').filter(x => x !== 'collab')});
@@ -59,23 +60,23 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   bar(A).dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));  // the click that follows the pointerup
   check(await until(async () => (await taskOf(A)).due === day(4) && (await taskOf(A)).start === day(2)), 'mouse: moved by two days (start + due)');
   check(w.eval('S.sel') !== A, 'the click right after the drag does not open the task');
-  await w.eval('load()'); w.eval('render()'); await sleep(450);
+  await w.eval('load()'); w.eval('render()'); await idle(w); await until(() => bar(A) && !w.eval('tlDragged'));  // tlDragged: 400 ms after a drop (also past drg_noClick)
   // the right end: due only
   ptr(w, bar(A).querySelector('.h.r'), 'pointerdown', 100); ptr(w, d, 'pointermove', 100 + DW); ptr(w, d, 'pointerup', 100 + DW);
   check(await until(async () => (await taskOf(A)).due === day(5) && (await taskOf(A)).start === day(2)), 'mouse: the right end changes the due date only');
-  await sleep(450);
+  await idle(w); await until(() => bar(A) && !w.eval('tlDragged'));  // the next click is no longer swallowed (tlDragged, drg_noClick)
   // below the threshold: a click opens the task
   ptr(w, bar(A), 'pointerdown', 100); ptr(w, d, 'pointermove', 102); ptr(w, d, 'pointerup', 102);
   check(!bar(A).classList.contains('drag'), 'mouse: 2 px is no drag');
-  bar(A).dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await sleep(200);
+  bar(A).dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true})); await until(() => w.eval('S.sel') === A);
   check(w.eval('S.sel') === A, 'below the threshold the click opens the task');
-  w.eval('closeDetail?.()'); await sleep(100);
+  w.eval('closeDetail?.()'); await until(() => !w.eval('S.sel'));
   // Esc cancels
   const left0 = bar(A).style.left;
   ptr(w, bar(A), 'pointerdown', 100); ptr(w, d, 'pointermove', 100 + 3 * DW);
   check(bar(A).style.left !== left0, 'the bar follows the mouse');
-  key(w, d.body, 'Escape'); await sleep(150);
-  ptr(w, d, 'pointerup', 100 + 3 * DW); await sleep(300);
+  key(w, d.body, 'Escape'); await until(() => !d.querySelector('.tl-bar.drag'));
+  ptr(w, d, 'pointerup', 100 + 3 * DW); await sleep(300);  // wanted: time for a save that must not come
   check((await taskOf(A)).due === day(5) && !d.querySelector('.tl-bar.drag'), 'Esc: nothing saved, the bar is no longer dragged');
   check(!bar(A) || bar(A).style.left === left0, 'Esc: the bar back where it was');
 
@@ -88,7 +89,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   ptr(w, bar(A), 'pointerdown', 580); ptr(w, d, 'pointermove', 585);
   await frames(w, 6);
   check(steps === 0, 'a press inside the edge zone without moving that way does not scroll');
-  ptr(w, d, 'pointerup', 585); await sleep(450);
+  ptr(w, d, 'pointerup', 585); await idle(w); await until(() => bar(A) && !w.eval('tlDragged'));
   ptr(w, bar(A), 'pointerdown', 300); ptr(w, d, 'pointermove', 590);
   await frames(w, 8);
   const s1 = steps;
@@ -96,7 +97,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   const n = Math.round((590 - 300 + sl) / DW);
   ptr(w, d, 'pointerup', 590);
   check(await until(async () => (await taskOf(A)).due === day(5 + n)), `the bar follows the scrolled days (+${n}): ${(await taskOf(A)).due} / ${day(5 + n)}`);
-  await sleep(150);
+  await sleep(150);  // wanted: frames that would scroll on if it did not stop
   check(steps === s1 || steps === s1 + 1, 'scrolling stops with the drop');
   delete sc.scrollLeft; delete sc.scrollBy; delete sc.getBoundingClientRect;
   check(errs.length === 0, 'no script errors (mouse): ' + errs.join(' | '));
@@ -110,38 +111,38 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   // a swipe during the hold: nothing moves, no menu
   touch(w, bar(A), 'touchstart', 50); const sw = touch(w, bar(A), 'touchmove', 80);
   check(!sw.defaultPrevented, 'a swipe on a bar during the hold stays the page\'s scroll');
-  await sleep(380); touch(w, bar(A), 'touchend'); await sleep(150);
+  await sleep(380); touch(w, bar(A), 'touchend'); await sleep(150);  // wanted: the hold time passes, no menu and no move may come
   check(!d.querySelector('#pop:not(.hidden) .menu-list') && (await taskOf(A)).due === day(2), 'a swipe: no menu, nothing moved');
   // hold, then drag
-  touch(w, bar(A), 'touchstart', 50); await sleep(380);
+  touch(w, bar(A), 'touchstart', 50); await until(() => held(w));
   const mv = touch(w, bar(A), 'touchmove', 50 + 2 * DWm);
   check(mv.defaultPrevented, 'after the hold the move is the drag\'s (the page does not scroll)');
   touch(w, bar(A), 'touchend');
   check(await until(async () => (await taskOf(A)).due === day(4)), 'finger: hold + drag moves the bar by two days');
-  await sleep(450);
+  await idle(w); await until(() => bar(A) && !w.eval('tlDragged'));
   // held and let go: the bar menu, no click
-  touch(w, bar(A), 'touchstart', 50); await sleep(380);
-  const up = touch(w, bar(A), 'touchend'); await sleep(150);
+  touch(w, bar(A), 'touchstart', 50); await until(() => held(w));
+  const up = touch(w, bar(A), 'touchend'); await until(() => /Open/.test(d.querySelector('#pop:not(.hidden)')?.textContent || ''));
   check(up.defaultPrevented && /Open/.test(d.querySelector('#pop:not(.hidden)')?.textContent || ''), 'held and let go: the bar menu, no click after it');
-  w.eval('closePop()'); await sleep(100);
+  w.eval('closePop()'); await until(() => !d.querySelector('#pop:not(.hidden)'));
 
   // a new task drawn into the empty days of the "Design" row
   const track = k => d.querySelector(`.tl-track.tl-cr[data-k="${k}"]`);
   const k = 'tlsec:' + SD;
   check(track(k), 'the section row has an empty track');
   touch(w, track(k), 'touchstart', 10 * DWm + 5); const sw2 = touch(w, track(k), 'touchmove', 10 * DWm + 40);
-  await sleep(520); touch(w, track(k), 'touchend'); await sleep(150);
+  await sleep(520); touch(w, track(k), 'touchend'); await sleep(150);  // wanted: past the hold (450 ms), nothing may start
   check(!sw2.defaultPrevented && !track(k).querySelector('.tl-ghost') && !d.querySelector('#tl-new-in'), 'a swipe over the empty track starts nothing (it scrolls)');
   touch(w, track(k), 'touchstart', 10 * DWm + 5);
   check(await until(() => track(k)?.querySelector('.tl-ghost'), 2000), 'the hold shows the ghost bar');
   // 2.358 (#3402): the live follow-up and a stale view during the hold leave the held ghost alone (drawn after letting go)
   const gh = track(k)?.querySelector('.tl-ghost');
-  w.eval('lpFollow(); td_renderSoon(); S.viewStale = true; viewSafeRender(); lpViewSafe()'); await sleep(450);
+  w.eval('lpFollow(); td_renderSoon(); S.viewStale = true; viewSafeRender(); lpViewSafe()'); await sleep(450);  // wanted: the redraw timers run (they must not drop the ghost)
   check(gh?.isConnected && w.eval('S.viewStale === true'), 'a redraw during the hold keeps the ghost bar (the view stays stale until let go)');
-  touch(w, track(k), 'touchmove', 13 * DWm + 5); touch(w, track(k), 'touchend'); await sleep(200);
+  touch(w, track(k), 'touchmove', 13 * DWm + 5); touch(w, track(k), 'touchend'); await until(() => d.querySelector('#tl-new-in') && w.eval('!!S.tlNew'));
   const N = w.eval('S.tlNew && [S.tlNew.d0, S.tlNew.d1]');
   check(d.querySelector('#tl-new-in') && N && N[0] === w.eval('addDays(S.tlStart, 10)') && N[1] === w.eval('addDays(S.tlStart, 13)'), 'hold + drag: the title field for that range: ' + JSON.stringify(N));
-  w.eval('tlNewEnd()'); await sleep(150);
+  w.eval('tlNewEnd()'); await until(() => !d.querySelector('#tl-new-in'));
 
   // an undated task: a quick tap sets the day, hold + drag a range
   const nd = () => d.querySelector(`.tl-track.ndt.ed[data-nd="${U}"]`);
@@ -150,10 +151,10 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   const t5 = at(5), t7 = at(7);
   touch(w, nd(), 'touchstart', 5 * ndDw + 3); touch(w, nd(), 'touchend');
   check(await until(async () => (await taskOf(U)).due === t5), 'undated: a quick tap sets that day: ' + t5);
-  await call('PATCH', `/api/tasks/${U}`, {due: null, start: null}); await w.eval('load()'); w.eval('render()'); await sleep(300);
-  touch(w, nd(), 'touchstart', 5 * ndDw + 3); touch(w, nd(), 'touchmove', 5 * ndDw + 40); touch(w, nd(), 'touchend'); await sleep(400);
+  await call('PATCH', `/api/tasks/${U}`, {due: null, start: null}); await w.eval('load()'); w.eval('render()'); await idle(w); await until(() => nd());
+  touch(w, nd(), 'touchstart', 5 * ndDw + 3); touch(w, nd(), 'touchmove', 5 * ndDw + 40); touch(w, nd(), 'touchend'); await sleep(400);  // wanted: time for a save that must not come
   check(!(await taskOf(U)).due, 'undated: a swipe sets nothing');
-  touch(w, nd(), 'touchstart', 5 * ndDw + 3); await sleep(380);
+  touch(w, nd(), 'touchstart', 5 * ndDw + 3); await until(() => held(w));
   touch(w, nd(), 'touchmove', 7 * ndDw + 3); touch(w, nd(), 'touchend');
   check(await until(async () => { const t = await taskOf(U); return t.start === t5 && t.due === t7; }), 'undated: hold + drag = a range');
   check(errs.length === 0, 'no script errors (finger): ' + errs.join(' | '));
@@ -167,16 +168,16 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   const G = w.eval('S.rmV.G.dw'), a0 = (await taskOf(A)).due;
   ptr(w, sum(), 'pointerdown', 100); ptr(w, d, 'pointermove', 100 + 3 * G);
   check(sum().classList.contains('drag') && /3 days later/.test(d.querySelector('.rm-delta')?.textContent || ''), 'mouse: the project slides, the label counts the days');
-  key(w, d.body, 'Escape'); await sleep(100);
+  key(w, d.body, 'Escape'); await until(() => !sum().classList.contains('drag'));
   check(!sum().classList.contains('drag') && !sum().style.transform, 'Esc: the project back');
-  ptr(w, d, 'pointerup', 100 + 3 * G); await sleep(500);
+  ptr(w, d, 'pointerup', 100 + 3 * G); await sleep(500);  // wanted: time for a shift that must not come
   check((await taskOf(A)).due === a0, 'Esc: nothing shifted on the server');
   w.close();
   w = await boot({user: 'alice', hash: 'all', mobile: true, media: {'(hover: none)': true}}); d = w.document;
   check(await until(() => sum()), 'phone: roadmap');
-  touch(w, sum(), 'touchstart'); await sleep(200); touch(w, sum(), 'touchmove', 40); await sleep(400); touch(w, sum(), 'touchend');
+  touch(w, sum(), 'touchstart'); await sleep(200); touch(w, sum(), 'touchmove', 40); await sleep(400); touch(w, sum(), 'touchend');  // wanted: the swipe inside the hold (450 ms), then past it: no dialog may come
   check(!d.querySelector('.rmmodal'), 'phone: a swipe cancels the long press');
-  touch(w, sum(), 'touchstart'); await sleep(520);
+  touch(w, sum(), 'touchstart'); await until(() => d.querySelector('.rmmodal'));
   check(d.querySelector('.rmmodal'), 'phone: the hold opens "Move project by…"');
   const ue = touch(w, sum(), 'touchend');
   check(ue.defaultPrevented, 'no click after the hold');

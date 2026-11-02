@@ -102,7 +102,7 @@ for s in (A, Bo, Ca, Fi):
 
 PATH = {"bob": "/b2240-bob", "carol": "/b2240-carol", "frida": "/b2240-frida"}
 for u, s in (("bob", Bo), ("carol", Ca), ("frida", Fi)):
-    r = s.post(B + "/api/me/channels", json={"kind": "slack", "name": "Mine", "url": STUB + PATH[u], "events": ["reminder", "assign", "comment", "lists"]})
+    r = s.post(B + "/api/me/channels", json={"kind": "slack", "name": "Mine", "url": STUB + PATH[u], "events": ["reminder", "assign", "comment", "lists", "own"]})  # 2.367.3 (#2973): own = the owner's own changes too
     assert r.status_code == 201, r.text
 # 2.240.0 B2 (#2867): a second channel of carol and frida for the summary and the other pushes (team chat, office, ...)
 for s, pth in ((Ca, "/b2240-carol-more"), (Fi, "/b2240-frida-more")):
@@ -290,7 +290,7 @@ poid = in_app(f"from kalmido.office.model import pb_personal\nwith system_ctx(c)
 check(poid.isdigit(), f"setup: frida's personal office {poid}")
 check(scope(FID, scope=f"o:{poid}") == repr(""), "#2867 B2 (3): the own personal office: the full text")
 check(scope(uid["carol"], scope=f"o:{poid}") == repr("Kalmido"), "#2867 B2 (3): another person's personal office: neutral, no name")
-push(FID, "Approved by the customer", "Studio client: offer words", click=f"{B}/#office/offers/1", scope=f"o:{poid}")
+push(FID, "Approved by the client", "Studio client: offer words", click=f"{B}/#office/offers/1", scope=f"o:{poid}")
 check(wait_for(FM, "Studio client: offer words"), "#2867 B2 (3): a customer's approval in the personal office arrives in full")
 push(FID, "Plain", "Frida words without a reference", click=f"{B}/#workload")
 check(wait_for(FM, "New notification in Kalmido") and not [t for t in texts(FM) if "Frida words without" in t],

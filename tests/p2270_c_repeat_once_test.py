@@ -7,7 +7,7 @@
  - header Idempotency-Key (offline queue, service worker, agents): the same key twice = one effect, the second answer is the
    first one (Idempotent-Replayed); also POST /api/tasks (one task, the same id) and API v1; a request that failed frees its
    key; another person's same key is their own; without the header everything stays as before
- - a person without an organisation (the own private space): the same -- freelancer-matrix: tasks
+ - a person without an organisation (the own private workspace): the same -- freelancer-matrix: tasks
 usage: p2270_c_repeat_once_test.py <datadir>      (P2270C_NOSTART=1: use a running server)"""
 import sys
 import uuid

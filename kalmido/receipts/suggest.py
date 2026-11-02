@@ -572,6 +572,20 @@ def olk_fs_locked(c, node_id, arrival=False):
     until = max((e for e in ends if e), default=None)
     return until.isoformat() if olk_active(until) else None
 
+def olk_fs_maybe(c, ids):
+    """2.360.3 (#2733): those of the nodes ids that olk_fs_locked (without arrival) can find locked at all: kept_until, a
+    booked or billed receipt, a cash book entry, the equipment list. One query for a whole folder."""
+    ids = [int(i) for i in ids]
+    if not ids:
+        return set()
+    q = ",".join("?" * len(ids))
+    return {r[0] for r in c.execute(f"""SELECT node_id FROM doc_meta WHERE node_id IN ({q}) AND kept_until IS NOT NULL AND kept_until<>''
+                                        UNION SELECT node_id FROM rc_receipts WHERE node_id IN ({q})
+                                          AND (paid_at IS NOT NULL OR vat_pct IS NOT NULL OR billed_doc_id IS NOT NULL)
+                                        UNION SELECT node_id FROM office_cash_entries WHERE node_id IN ({q})
+                                        UNION SELECT receipt_node_id FROM office_equipment WHERE receipt_node_id IN ({q})""", ids * 4)}
+
+
 def olk_office_ws(c, ws, org_id):
     """2.355.0 E (#2845): whether workspace ws belongs to an office: an organisation's, or the space of a person with a
     personal office (structure only)."""

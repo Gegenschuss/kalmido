@@ -117,7 +117,7 @@ check(c1.get("D1", {}).get("value") == 950 and c1.get("D2", {}).get("value") == 
 check(c1.get("F1", {}).get("value") == 1 and c1.get("F1", {}).get("origin") == "kalmido", "liste.garden.offen = 1 open task " + str(c1.get("F1")))
 check(c1.get("F2", {}).get("value") == 1, "hier.offen = the attached list " + str(c1.get("F2")))
 check(c1.get("E1", {}).get("display") == "Offen" and (c1["E1"].get("agent") or {}).get("batch") == BATCH0, "a choice by label, the cell marked with the agent")
-check(c1.get("D1", {}).get("raw") == "=B1*C1" and c1.get("F1", {}).get("raw") == "=liste.garden.offen", "formulas shown with names")
+check(c1.get("D1", {}).get("raw") == "=B1*C1" and c1.get("F1", {}).get("raw") == "=list.garden.open", "formulas shown with names")
 check(S1["columns"][4]["color_mode"] == "row" and S1["columns"][4]["options"][0]["color"] == "#f5b041", "choices with colours, colour per row")
 r = Bo.get(B + f"/api/sheets/{SID}")
 check(r.ok and r.json()["batches"] and r.json()["batches"][0]["agent_id"] == TA, "the person sees the table and the agent's call " + r.text[:200])
@@ -150,7 +150,7 @@ check(r.status_code == 201 and r.json()["col_id"], "add a column " + r.text[:200
 check(ta.patch(V + f"/sheets/{SID}", json={"title": "Angebot Garten 2"}).json()["title"] == "Angebot Garten 2", "rename")
 vs = ta.get(V + f"/sheets/{SID}/vars").json()["data"]
 toks = {v["token"] for v in vs}
-check("liste.garden.offen" in toks and "hier.offen" in toks, "vars: the shared list and hier")
+check("list.garden.open" in toks and "here.open" in toks, "vars: the shared list and hier")
 check(not any("secret" in t for t in toks), "vars: never a list not shared with the agent")
 S9 = Bo.post(B + "/api/sheets", json={"title": "Orchard", "space": f"org:{ORG}", "list_id": W2}).json()["id"]
 check(ro.get(V + f"/sheets/{S9}").ok and ro.put(V + f"/sheets/{S9}/cells", json={"cells": [{"cell": "A1", "raw": "x"}]}).status_code == 403,
@@ -161,7 +161,7 @@ check(ro.get(V + f"/sheets/{SID}").status_code == 404, "another agent's list: 40
 r = ta.post(V + "/sheets", json={"title": "Scratch", "space": f"org:{ORG}"})
 S2, b4 = r.json()["id"], r.json()["batch"]
 check(r.status_code == 201 and Bo.get(B + f"/api/sheets/{S2}").ok, "an agent's table in its workspace: the members see it")
-check(ta.post(V + "/sheets", json={"title": "Mine", "space": "private"}).status_code == 400, "a team agent has no private space: 400")
+check(ta.post(V + "/sheets", json={"title": "Mine", "space": "private"}).status_code == 400, "a team agent has no private workspace: 400")
 r = ta.post(V + f"/sheets/{S2}/batches/{b4}/undo")
 check(r.ok and ta.get(V + f"/sheets/{S2}").status_code == 404 and Bo.get(B + f"/api/sheets/{S2}").status_code == 404,
       "taking back the creating call: the table is in the trash " + r.text[:200])
@@ -208,7 +208,7 @@ check(Ca.get(B + f"/api/sheets/{S5}/export.xlsx").status_code == 404, "a colleag
 # freelancer-matrix: sheets
 r = da.post(V + "/sheets", json={"title": "Dave list", "columns": [{"title": "Name"}], "rows": [["Ann"]]})
 S6 = r.json().get("id")
-check(r.status_code == 201 and r.json()["space"] == "private", "dave's agent creates in dave's private space " + r.text[:200])
+check(r.status_code == 201 and r.json()["space"] == "private", "dave's agent creates in dave's private workspace " + r.text[:200])
 check(S6 in [x["id"] for x in Da.get(B + "/api/sheets", params={"space": "private"}).json()["sheets"]], "dave sees his agent's table")
 check(A.get(B + f"/api/sheets/{S6}").status_code == 404 and Bo.get(B + f"/api/sheets/{S6}").status_code == 404, "nobody else sees it")
 check(ta.get(V + f"/sheets/{S6}").status_code == 404, "another agent does not see it")

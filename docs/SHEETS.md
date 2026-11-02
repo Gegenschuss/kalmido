@@ -30,8 +30,10 @@ budget against the time booked, or plain lists (equipment, shooting plan, contac
   while writing a formula inserts its address.
 - **Kalmido values:** `projekt.<name>.zeit_gesamt` (hours), `.aufgaben`, `.offen`, `.erledigt`, `.budget_h`, the same with
   `liste.`, `kunde.<name>.satz` / `.budget_h` / `.budget_betrag` / `.zeit_gesamt`, and `hier.<field>` for the project
-  the table is attached to. Formulas are stored with ids, so renaming a project, a column or a cell, or sorting, never
-  breaks them.
+  the table is attached to. In English `project.`, `list.`, `client.`, `task.`, `here.` with `total_time`, `tasks`, `open`,
+  `done`, `rate`, `budget_amount`. Formulas are stored with ids, so renaming a project, a column or a cell, or sorting, never
+  breaks them. Both languages are understood; everybody reads a formula in their own language (German in German, English
+  in all others), the same table works for a mixed team.
 - **Where a value comes from.** Own values look normal, results of formulas a little quieter, values from Kalmido in the
   accent colour, frozen values grey. Hover a cell (or press it long on a phone) to see its name and formula. The panel next
   to the grid (below it on a phone) shows the chosen cell's name, formula, *Comes from* and *Goes into*, and the button
@@ -125,10 +127,10 @@ never breaks a formula - it simply shows the new name or address.
 
 | Variable | Fields |
 |---|---|
-| `projekt.<name>.<field>` | `zeit_gesamt` (tracked hours), `aufgaben` (tasks), `offen` (open), `erledigt` (done), `budget_h` (the "Budget h" field) |
-| `liste.<name>.<field>` | the same fields for any list |
-| `kunde.<name>.<field>` | `satz` (hourly rate), `budget_h`, `budget_betrag` (budget amount), `zeit_gesamt` (hours of the client's lists) |
-| `hier.<field>` | the project / list the table is attached to |
+| `projekt.<name>.<field>` / `project.` | `zeit_gesamt` / `total_time` (tracked hours), `aufgaben` / `tasks`, `offen` / `open`, `erledigt` / `done`, `budget_h` (the "Budget h" field) |
+| `liste.<name>.<field>` / `list.` | the same fields for any list |
+| `kunde.<name>.<field>` / `client.` | `satz` / `rate` (hourly rate), `budget_h`, `budget_betrag` / `budget_amount`, `zeit_gesamt` / `total_time` (hours of the client's lists) |
+| `hier.<field>` / `here.` | the project / list the table is attached to |
 
 `<name>` is the name in lower case with `_` for spaces (`Shoot Berlin` -> `projekt.shoot_berlin`); two equal names get `_2`,
 `_3`. Typing `=` offers every cell name, column, project, client and function you may use here, with its current value.

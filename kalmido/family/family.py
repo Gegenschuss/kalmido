@@ -7,6 +7,7 @@ from flask import g, has_request_context
 from ..core.config import PUBLIC_URL
 from ..core.pg import insert_id, st_ids, system_ctx
 from ..core.i18n import lang, LANGS, N_, tr
+from ..core.numtext import parse_num, user_dec
 from ..core.db import iso, local_now, now_utc, uset, usettings
 from ..accounts.session import me, user_public
 from ..core.access import collab_all, Denied, list_people, my_max_sort, need_list, vis_sql, wr_sql, task_visible, time_all
@@ -319,8 +320,8 @@ def qty_parse(s):
     m = re.fullmatch(r"(\d{1,6})\s*/\s*(\d{1,4})", s)
     if m:
         return int(m.group(1)) / int(m.group(2)) if int(m.group(2)) else None
-    m = re.fullmatch(r"\d{1,6}(?:[.,]\d{1,3})?", s)
-    return float(s.replace(",", ".")) if m else None
+    # 2.368.5 (#2991): like qtyParse in family.js: "1,000 g" in English is 1000, not 1
+    return parse_num(s, user_dec()) if re.fullmatch(r"\d{1,6}(?:[.,]\d{1,3})?", s) else None
 
 
 def clean_rotation(v):
@@ -1028,6 +1029,8 @@ def purpose_apply(c, uid, purpose, examples=False, all_mods=None, only=False):
         with system_ctx(c):  # a member of an organisation keeps collaboration (team chat, sharing); memberships as user_orgs
             org = c.execute("SELECT 1 FROM org_members m JOIN orgs o ON o.id=m.org_id WHERE m.user_id=? AND o.retired_at IS NULL LIMIT 1",
                             (uid,)).fetchone()
+        from ..accounts.orginvite import ojn_waiting
+        org = org or ojn_waiting(c, uid)  # 2.453.0 (#3780): a new account answers this before it accepts its invitation
         sw = tuple(x for x in sw + ("docs",) if not (x == "collab" and org))
     fs = [x for x in fs if x not in sw or x in on] + [x for x in PURPOSE_MODS if x in on and x not in fs]
     fs += [x for x in PURPOSE_EXTRA.get(purpose, ()) if x in on and x not in fs]

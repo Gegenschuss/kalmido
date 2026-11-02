@@ -4,7 +4,7 @@
 // #957 the comments come last in the task panel again ("More details" folded above them, with a summary line)
 // #966 / #975 / #977 the list dialog: Type = Simple list | Project at the top; "Used for" only for a simple list; the family
 //      fields of a task only in family lists (never in a project)
-// #972 New project: the box "With the standard sections" (off) names the type's sections; #990 "+ Section" in an empty list
+// #972 New project: the box "With the default sections" (off) names the type's sections; #990 "+ Section" in an empty list
 //      and "Add section…" in the list's menu; #974 "Agent: <name>…" opens the share dialog at its agents
 // #964 Settings > Agents > Lists grouped by folder, a filter, one agent for a whole folder (one undo); the one agent's
 //      "Agent reads every comment" is a switch
@@ -17,7 +17,7 @@
 // height and offset on every key), screenshots in $P2270_SHOTS when set.
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2270_ui', check, shots: 'P2270_SHOTS'});
@@ -27,13 +27,14 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
 const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
+const funtil = (ev, expr) => require('./boot').until(() => ev(expr).catch(() => false), {timeout: 15000, step: 200});  // Firefox side: wait until the page expression is truthy
 const click = (w, el, o = {}) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const change = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
 const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,family,team';
 const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim());
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   let r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
@@ -75,7 +76,7 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   w.eval(`verCheck('99.0.0')`);
   check(d.querySelector('#newver') && /New version available/.test(d.querySelector('#newver').textContent) && /Reload/.test(d.querySelector('#newver button').textContent), '#968: another version: the bar with Reload');
   check(!w.__rl, '#968: never reloads while someone types');
-  click(w, d.querySelector('#newver [data-nv="go"]')); await sleep(50);
+  click(w, d.querySelector('#newver [data-nv="go"]')); await until(() => w.__rl === 1);
   check(w.__rl === 1, '#968: Reload reloads');
   w.eval(`settingsModal('help')`); await until(() => d.querySelector('.aboutapp'));
   check(/v\d/.test(d.querySelector('.aboutapp')?.textContent || '') && /Server: v99\.0\.0/.test(d.querySelector('.aboutapp')?.textContent || '') && d.querySelector('.aboutapp.off [data-nv="go"]'),
@@ -113,11 +114,11 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   check(!md.querySelector('#l-kindp') && !md.querySelector('.lkrow'), '#977: no type switch any more ' + rowsOrder.slice(0, 4));
   check(!md.querySelector('.lfamrow') && !md.querySelector('#l-fam'), '2.396.0 (#3385): no "Used for" any more');
   md.remove();
-  await call('PATCH', `/api/lists/${L}`, {kind: 'project'}); await w.eval('load().then(render)'); await sleep(300);
+  await call('PATCH', `/api/lists/${L}`, {kind: 'project'}); await w.eval('load().then(render)'); await idle(w);
   w.eval(`listModal(${L})`); md = await until(() => d.querySelector('.modal.lmodal'));
   check(!md.querySelector('.lfamrow') && md.querySelector('#lm-sec-proj'), '#966: a kind=project project: no "Used for" (2.396.0, #3385), the project fields');
   md.remove();
-  await call('PATCH', `/api/lists/${L}`, {kind: 'list'}); await w.eval('load().then(render)'); await sleep(300);
+  await call('PATCH', `/api/lists/${L}`, {kind: 'list'}); await w.eval('load().then(render)'); await idle(w);
   w.eval(`listModal(null, '', {kind: 'project'})`); md = await until(() => d.querySelector('.modal.lnew'));
   click(w, md.querySelector('[data-pt="software"]'));
   check(!md.querySelector('.ptsecs').hidden && !md.querySelector('#l-ptsecs').checked && /Backlog, Next, In progress, Review, Done/.test(md.querySelector('#l-ptsecsl').textContent), '#972: the box (off) names the sections');
@@ -140,7 +141,7 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   // #975 family fields
   w.eval(`openDetail(${TF})`); await until(() => d.querySelector('#d-title'));
   check(await until(() => /Who comes along|Take turns/.test(d.querySelector('#detail')?.textContent || '')), '#975: a family list: the family fields ' + (d.querySelector('#detail .famsec')?.textContent || 'no famsec') + ' ' + JSON.stringify(w.eval(`(() => { const l = listById(${FAM}); return {f: l.family, sh: l.shared, n: listPeople(l).length, rep: taskById(${TF})?.repeat}; })()`)));
-  w.eval(`openDetail(${TP})`); await sleep(500);
+  w.eval(`openDetail(${TP})`); await until(() => w.eval('S.sel') === TP && d.querySelector('#d-title')); await idle(w);
   check(!/Who comes along|Take turns/.test(d.querySelector('#detail')?.textContent || ''), '#975: a project: none');
   w.eval('closeDetail()');
   // #990 + Section in an empty list, Add section… in the menu
@@ -159,7 +160,7 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   w.eval(`moveListEnd(${W1}, 1)`);
   await until(async () => { const ls = (await call('GET', '/api/state')).lists; return ls.find(l => l.id === W1).sort > ls.find(l => l.id === W2).sort; });
   check(w.eval(`(load().then(render), 1)`) && true, 'reload');
-  await sleep(500);
+  await idle(w); await until(() => w.eval(`sideOrder().filter(l => l.folder === 'Work').map(l => l.id).join()`) === `${W2},${W1}`);
   check(w.eval(`sideOrder().filter(l => l.folder === 'Work').map(l => l.id).join()`) === `${W2},${W1}`, '#991: Website now the last of Work');
   const sm = w.eval(`listMenuItems(${W1}, document.querySelector('#side .srow[data-list="${W1}"]')).map(x => x.label || x)`);
   // 2.62.0 (#1853): top / bottom (and up / down) sit in the second level of "Change position…"
@@ -177,43 +178,51 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   w = await boot({user: 'bob', hash: 'l/' + W2}); d = w.document;
   await until(() => d.querySelector('#top h1'));
   check(w.eval(`listById(${W2}).mirrored`) && w.eval(`listById(${W2}).folder`) === 'Work', '#988: bob sees Shop in Alice\'s folder Work');
-  w.eval(`moveList(${W2}, -1)`); await sleep(200);
+  w.eval(`moveList(${W2}, -1)`); await until(() => /arranges the projects of this shared folder/.test(d.querySelector('#toast')?.textContent || ''));
   // 2.152.2 (#2624): project instead of list
   check(/arranges the projects of this shared folder/.test(d.querySelector('#toast')?.textContent || ''), '#988: bob cannot move it: says who arranges it');
   await call('PATCH', `/api/lists/${W2}`, {sort_mode: 'title'});
-  await w.eval('load().then(render)'); await sleep(400);
+  await w.eval('load().then(render)'); await idle(w); await until(() => w.eval('sortMode()') === 'title' && !d.querySelector('.sortown'));
   check(w.eval('sortMode()') === 'title' && !d.querySelector('.sortown'), '#988: the list\'s sort for bob too, no hint');
-  w.eval(`LS.set('sort2.l:${W2}', 'date'); render()`); await sleep(200);
+  w.eval(`LS.set('sort2.l:${W2}', 'date'); render()`); await until(() => d.querySelector('.sortown [data-act="sort-shared"]'));
   check(w.eval('sortMode()') === 'date' && d.querySelector('.sortown [data-act="sort-shared"]'), '#988: his own sort is pointed out');
-  click(w, d.querySelector('.sortown [data-act="sort-shared"]')); await sleep(200);
+  click(w, d.querySelector('.sortown [data-act="sort-shared"]')); await until(() => w.eval('sortMode()') === 'title' && !d.querySelector('.sortown'));
   check(w.eval('sortMode()') === 'title' && !d.querySelector('.sortown'), '#988: back to the shared sort');
   w.eval(`go('team')`); await until(() => d.querySelector('.tclist'));
-  await sleep(600);
+  await idle(w); await until(() => d.querySelector('.tcempty [data-act="tc-new"]'));
   check(!d.querySelector('.tclist .tcrow') && d.querySelector('.tcempty [data-act="tc-new"]'), '#986: no empty conversations, "Start a conversation"');
-  click(w, d.querySelector('.tcempty [data-act="tc-new"]')); await sleep(200);
+  click(w, d.querySelector('.tcempty [data-act="tc-new"]')); await until(() => menuItems(d).some(x => /Family plans|Client work|Shop|Website/.test(x)));
   check(menuItems(d).some(x => /Family plans|Client work|Shop|Website/.test(x)), '#986: the chats of shared lists to start ' + menuItems(d).join('|'));
   w.eval('closePop()');
   w.eval(`settingsModal('agents')`); await until(() => d.querySelector('#s-myags .agnone, #s-myags .mhint'));
   check(/No agent is available to you yet/.test(d.querySelector('#s-myags')?.textContent || '') && d.querySelector('#s-myags [data-aigo="setup"]'), '#955: why it is empty + connect your own');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
+  // 2.366.0 (#2998): the Agents area has "Add agent…" (header + empty state with the three steps); it opens "Set up" at once,
+  // not the Agents tab with the same button again (the focus "agents" used to win over "Set up")
+  w.eval(`go('agents')`); await until(() => d.querySelector('#view .agview .hempty [data-act="ag-setup"]'));
+  const agE = d.querySelector('#view .agview .hempty');
+  check(agE && agE.querySelectorAll('.agfirst li').length === 3 && /Add agent/.test(agE.querySelector('[data-act="ag-setup"]').textContent) && d.querySelector('#top [data-act="ag-setup"]'), '#2998: "Add agent…" in the header and the empty state with three steps');
+  click(w, agE.querySelector('[data-act="ag-setup"]')); await until(() => d.querySelector('.modal #aisp-setup'));
+  check(d.querySelector('.modal #aisp-setup') && !d.querySelector('.modal #aisp-setup').hidden && d.querySelector('.modal #aisp-agents').hidden, '#2998: "Add agent…" opens Settings > Agents > Set up directly');
+  [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   w.close();
 
   // ================= #964 Settings > Agents > Lists
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('agents')`); await sleep(400);
+  w.eval(`settingsModal('agents')`); await until(() => d.querySelector('[data-aisub="lists"]'));
   click(w, d.querySelector('[data-aisub="lists"]'));
   await until(() => d.querySelector('#s-ai-tbl .aigrp'), 60);
   const gs = [...d.querySelectorAll('#s-ai-tbl .aigrp')].map(x => x.dataset.aig);
   check(gs[0] === '' && gs.includes('Work') && gs.includes('Home'), '#964: grouped by folder, lists without one first ' + JSON.stringify(gs));
-  change(w, d.querySelector('#ai-f'), 'with'); await sleep(200);
+  change(w, d.querySelector('#ai-f'), 'with'); await until(() => [...d.querySelectorAll('#s-ai-tbl .airow[data-lid]')].map(x => +x.dataset.lid).join() === String(W1));
   check([...d.querySelectorAll('#s-ai-tbl .airow[data-lid]')].map(x => +x.dataset.lid).join() === String(W1), '#964: filter "With an agent"');
-  change(w, d.querySelector('#ai-f'), ''); await sleep(200);
+  change(w, d.querySelector('#ai-f'), ''); await until(() => d.querySelectorAll('#s-ai-tbl .airow[data-lid]').length > 1 && d.querySelector('#s-ai-tbl [data-aigsel="Work"]'));
   w.confirm = () => true;
   change(w, d.querySelector('#s-ai-tbl [data-aigsel="Work"]'), String(AG));
   check(await until(async () => (await call('GET', '/api/state')).lists.find(l => l.id === W2).members.some(m => m.user_id === AG), 60), '#964: one agent for the whole folder');
   // 2.152.2 (#2624): project instead of list
   check(/now works in 1 projects|now works in/.test(d.querySelector('#toast')?.textContent || ''), '#964: with an undo ' + d.querySelector('#toast')?.textContent);
-  click(w, d.querySelector('#s-ai-tbl [data-aifold="Work"]')); await sleep(200);
+  click(w, d.querySelector('#s-ai-tbl [data-aifold="Work"]')); await until(() => d.querySelector('#s-ai-tbl [data-aifold="Work"][aria-expanded="false"]') && !d.querySelector(`#s-ai-tbl .airow[data-lid="${W1}"]`));
   check(!d.querySelector(`#s-ai-tbl .airow[data-lid="${W1}"]`) && d.querySelector('#s-ai-tbl [data-aifold="Work"][aria-expanded="false"]'), '#964: a folder group folds');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   w.eval(`shareModal(${W1})`); await until(() => d.querySelector('#l-tidyrow'), 60);
@@ -224,34 +233,34 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
   // ================= Firefox 1440: #966 visibility, #976 grips under menus, #1006 the column line
   const ffLogin = async ({ev, nav}, theme = 'light', user = 'alice') => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${user}', password: 'password123'})}).then(r => r.status)`);
   };
-  const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await sleep(800); };
+  const ready = (ev, sel) => funtil(ev, `!!document.querySelector('#top h1') && !!document.querySelector('${sel}')`);  // the page and its view are drawn
   await call('PATCH', `/api/lists/${PRJ}`, {columns: ['due', 'who', 'created']});
   for (const th of ['light', 'dark']) await firefox(async o => {
     const {cmd, ev, ctx, shot} = o, tag = '1440 ' + th;
     check(await ffLogin(o, th) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
-    await o.nav(B + '#l/' + PRJ); await ready(ev);
+    await o.nav(B + '#l/' + PRJ); await ready(ev, '.lchead .lcg');
     check(await ev(`(() => { const g = document.querySelector('.lchead .lcg'); if (!g) return false; const s = getComputedStyle(g, '::after'); return s.backgroundColor !== 'rgba(0, 0, 0, 0)' && s.backgroundColor !== 'transparent'; })()`), `${tag}: #1006 a visible line between the column titles`);
     check(/Drag the column width/.test(await ev(`document.querySelector('.lchead .lcg')?.title || ''`)), `${tag}: #1006 its tooltip`);
     await shot(`p2270-${th}-1440-columns.png`);
-    await ev(`(() => { openDetail(${TP}); return 1; })()`); await sleep(900);
+    await ev(`(() => { openDetail(${TP}); return 1; })()`); await funtil(ev, `!!document.querySelector('#detail #d-tl')`);
     const ord = await ev(`[...document.querySelectorAll('#detail .dbody > *, #detail .dcpane > *')].map(x => x.id || x.className).join('|')`);
     check(/d-more.*d-tl|d-tl$/.test(ord), `${tag}: #957 the comments last ` + ord.slice(-80));
     await shot(`p2270-${th}-1440-panel.png`);
     // a menu open: the grips step aside
-    await ev(`(() => { listMenu(document.querySelector('#top h1'), ${PRJ}); return 1; })()`); await sleep(300);
+    await ev(`(() => { listMenu(document.querySelector('#top h1'), ${PRJ}); return 1; })()`); await funtil(ev, `!!document.querySelector('#pop:not(.hidden) [role="menuitem"]')`); await funtil(ev, `[...document.querySelectorAll('.pgrip')].filter(g => !g.hidden).every(g => getComputedStyle(g).visibility === 'hidden')`);
     check(await ev(`[...document.querySelectorAll('.pgrip')].filter(g => !g.hidden).every(g => getComputedStyle(g).visibility === 'hidden')`), `${tag}: #976 the grips step aside while a menu is open`);
     check(await ev(`(() => { const p = document.querySelector('#pop'), r = p.getBoundingClientRect(), e = document.elementFromPoint(r.left + r.width / 2, r.top + 12); return p.contains(e); })()`), `${tag}: #976 the menu is on top`);
     await shot(`p2270-${th}-1440-menu.png`);
-    await ev(`(() => { closePop(); return 1; })()`); await sleep(200);
+    await ev(`(() => { closePop(); return 1; })()`); await funtil(ev, `[...document.querySelectorAll('.pgrip')].filter(g => !g.hidden).every(g => getComputedStyle(g).visibility === 'visible')`);
     check(await ev(`[...document.querySelectorAll('.pgrip')].filter(g => !g.hidden).every(g => getComputedStyle(g).visibility === 'visible')`), `${tag}: #976 back after the menu`);
     check(await ev(`(() => { const g = document.querySelector('#pgrip-chat'); return !g || g.hidden && getComputedStyle(g).display === 'none'; })()`), `${tag}: #978 no chat grip while the chat is closed`);
     // #966: a hidden row is invisible; 2.352.0 C (#2751 / #2752): "Used for" is offered for every project, folded in
     // "Display and behaviour" (closed at first)
-    await ev(`(() => { closeDetail(); listModal(${PRJ}); return 1; })()`); await sleep(500);
+    await ev(`(() => { closeDetail(); listModal(${PRJ}); return 1; })()`); await funtil(ev, `!!document.querySelector('.modal.lmodal')`);
     check(await ev(`(() => { const r = document.querySelector('.lfamrow'); return !r || (!r.hidden && !!r.closest('details.lmsec:not([open])')); })()`), `${tag}: #966 "Used for" folded away in a project`);
     await shot(`p2270-${th}-1440-listdialog.png`);
     await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
@@ -261,6 +270,38 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
     await shot(`p2270-${th}-1440-newversion.png`);
   }, false);
 
+  // ================= 2.370.0 (#3126): the writes that carry what this device saw
+  w = await boot({user: 'alice', hash: 'l/' + W1}); d = w.document;
+  await until(() => d.querySelector('#top h1'));
+  const STASK = (await call('POST', '/api/tasks', {title: 'Sprint task', list_id: W1})).id;
+  await w.eval('load().then(render)'); await idle(w);
+  w.eval(`window.__calls = []; window.__cf = null; window.__api = api; api = async (m, u, b, ...x) => {
+    if (m === 'GET') return window.__api(m, u, b, ...x);
+    window.__calls.push({m, u, b}); return {count: 0, errors: [], conflicts: window.__cf || []}; }`);
+  const sent = () => w.eval('JSON.stringify(window.__calls.splice(0))');
+  await w.eval(`(async () => { const e = histDone('x', [991], [{id: 991, due: '2027-01-05', due_time: '15:00', repeat: 'FREQ=DAILY;TIMES=09:00,15:00'}], {}); await e.redo(e); })()`);
+  await w.eval(`(async () => { const e = histDone('x', [992], [{id: 992, due: '2027-01-05', due_time: '15:00', repeat: 'FREQ=DAILY'}], {}); await e.redo(e); })()`);
+  const rd = JSON.parse(await sent());
+  check(JSON.stringify(rd[0].b.data.expect) === '{"991":{"due":"2027-01-05","due_time":"15:00"}}', '#3126: the redo of a several-times-a-day task names the time ' + JSON.stringify(rd[0].b));
+  check(JSON.stringify(rd[1].b.data.expect) === '{"992":"2027-01-05"}', '#3126: another series only its date');
+  await w.eval(`(async () => { window.__cf = [{field: 'sort_mode', server: 'date'}]; await sortSet('title'); })()`);
+  const so = JSON.parse(await sent());
+  check(so[0].b.sort_mode === 'title' && so[0].b._prev?.sort_mode === '', '#3126: the sort with the one seen ' + JSON.stringify(so[0].b));
+  check(w.eval(`listById(${W1}).sort_mode`) === 'date', '#3126: a sort set elsewhere meanwhile stays');
+  w.eval('window.__cf = null');
+  await w.eval(`fxSumSave(${W1}, {'f:1': 'sum'}, {'f:1': 'avg'})`);
+  await w.eval(`fxKpiSave(${W1}, [{title: 'B'}], [{title: 'A'}])`);
+  const fx = JSON.parse(await sent());
+  check(fx[0].b._prev?.col_sums?.['f:1'] === 'sum', '#3126: the sum row with the one seen ' + JSON.stringify(fx[0].b));
+  check(fx[1].b._prev?.kpis?.[0]?.title === 'A', '#3126: the key figures with the ones seen ' + JSON.stringify(fx[1].b));
+  check(await w.eval(`(async () => { window.__cf = [{field: 'col_sums'}]; const a = await fxSumSave(${W1}, {}, {}, true), b = await fxKpiSave(${W1}, [], [], true); window.__cf = null; return !a && !b; })()`), '#3126: a conflict is said, no history step');
+  await sent();
+  await w.eval(`spr_assign([${STASK}], 77, 'x')`);
+  const spc = JSON.parse(await sent());
+  check(spc[0]?.b?.data?.sprint_id === 77 && spc[0].b.data.prev?.[STASK]?.sprint_id === null, '#3126: the sprint with the one seen ' + JSON.stringify(spc[0]));
+  w.eval('api = window.__api');
+  w.close();
+
   // ================= Firefox 390 touch: #958 typing never moves the list behind
   const many = (await call('POST', '/api/lists', {name: 'Long list'})).id;
   for (let i = 0; i < 40; i++) await call('POST', '/api/tasks', {title: 'Row ' + i, list_id: many});
@@ -269,19 +310,19 @@ const menuItems = d => [...d.querySelectorAll('#pop [role="menuitem"]')].map(x =
     const {cmd, ev, ctx, shot} = o, tag = '390';
     check(await ffLogin(o, 'light') === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
-    await o.nav(B + '#l/' + many); await ready(ev);
-    await ev(`(() => { document.querySelector('#view').scrollTop = 600; return 1; })()`); await sleep(300);
+    await o.nav(B + '#l/' + many); await ready(ev, '#view .trow');
+    await ev(`(() => { document.querySelector('#view').scrollTop = 600; return 1; })()`); await funtil(ev, `document.querySelector('#view').scrollTop > 300`);
     const s0 = await ev(`document.querySelector('#view').scrollTop`);
     check(s0 > 300, `${tag}: the list scrolled up (${s0})`);
     // the add sheet: keys with a keyboard whose height and offset change (suggestion bar, iOS caret reveal)
-    await ev(`(() => { openQuickSheet(); return 1; })()`); await sleep(500);
+    await ev(`(() => { openQuickSheet(); return 1; })()`); await funtil(ev, `!!document.querySelector('#qsheet')`);
     const res = await ev(`(async () => { const el = document.querySelector('#qsheet'); el.focus(); const out = [];
       for (let i = 0; i < 8; i++) { ${FAKEVV('(i % 2 ? 336 : 291)', '(i % 3) * 40')} vvSync(); el.value += 'x'; el.dispatchEvent(new InputEvent('input', {bubbles: true})); await new Promise(r => setTimeout(r, 140));
         out.push(document.querySelector('#view').scrollTop + '/' + (window.scrollY || 0)); }
       return out; })()`);
     check(res.every(x => +x.split('/')[0] === s0), `${tag}: #958 the list behind never moves while typing in the add sheet ` + res.join(' '));
     await shot('p2270-light-390-quicksheet-typing.png');
-    await ev(`(() => { document.activeElement.blur(); ${FAKEVV(0, 0)} vvSync(); closePop(); return 1; })()`); await sleep(500);
+    await ev(`(() => { document.activeElement.blur(); ${FAKEVV(0, 0)} vvSync(); closePop(); return 1; })()`); await funtil(ev, `!document.querySelector('#pop:not(.hidden)')`);
   }, true);
 
   console.log(`${ok} ok, ${F.length} failed`);

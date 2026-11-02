@@ -153,7 +153,8 @@ def agent_job_action(jid):
     if j["task_id"]:
         t = c.execute("SELECT * FROM tasks WHERE id=?", (j["task_id"],)).fetchone()
         if t:
-            log_act(c, t["id"], "agent_job", {"agent": j["agent_id"], "action": action, "title": j["title"][:200]})
+            log_act(c, t["id"], "agent_job", {"agent": j["agent_id"], "action": action, "title": j["title"][:200],
+                                              **({"title_key": json.loads(j["title_key"])} if j["title_key"] else {})})  # 2.454.0 (#3808)
             if task_visible(c, t["id"], j["agent_id"], full=True):
                 data.update(task=task_for(c, t, j["agent_id"]), list=lst_brief(c, t["list_id"]))
     agent_emit(c, j["agent_id"], "job", data)
@@ -185,6 +186,7 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None, edits=False):
             "job_id": r["job_id"] if "job_id" in r.keys() else None,  # 2.32.0 (#1081): the job whose result this is
             "job_parent": r["job_parent"] if "job_parent" in r.keys() else None,  # 2.47.3 (#1764): the leading job of that part job
             "job_msg": r["job_msg"] if "job_msg" in r.keys() else None,  # 2.96.0 C (#2015): say | question | result | error (null = unknown)
+            "source": r["source"] if "source" in r.keys() else None,  # 2.388.0 (#3341): e.g. dispatcher, the app can hide it (null = the agent itself)
             # 2.37.0 (#1159): the agent offers "Save as task" under this message (the person saves, never the agent)
             "offer_save": bool(r["offer_save"]) if "offer_save" in r.keys() and r["sender"] == "agent" else False,
             **chat_reply(r),  # 2.33.0 (#1076): reply_to + reply (the quote of the answered message)
@@ -496,16 +498,20 @@ def chat_approval_clean(v, expires_in=None):
     return json.dumps(d, ensure_ascii=False)
 
 
+CHAT_CARD_SQL = """sender='agent' AND choice IS NULL AND choices IS NOT NULL AND choices->>'withdrawn_at' IS NULL
+                   AND (choices->>'approval' IS NOT NULL OR COALESCE(choices->>'permission', '0') NOT IN ('0', 'false'))"""
+
+
 def chat_approvals_open(c, aid, uid):
     """2.35.0 (#1103): the open approval requests + permission questions of agent aid to person uid (newest last)."""
-    out = []
-    for r in c.execute("""SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND sender='agent' AND choice IS NULL
-                          AND choices IS NOT NULL AND choices->>'withdrawn_at' IS NULL
-                          AND (choices->>'approval' IS NOT NULL OR COALESCE(choices->>'permission', '0') NOT IN ('0', 'false'))
-                          ORDER BY id""", (aid, uid)):
-        if choice_state(r, _jload(r["choices"]), None) == "open":
-            out.append(r)
-    return out
+    return [r for r in c.execute(f"SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND {CHAT_CARD_SQL} ORDER BY id", (aid, uid))
+            if choice_state(r, _jload(r["choices"]), None) == "open"]
+
+
+def chat_approvals_of(c, uid, aid, scan):
+    """2.392.0 D (#3369): the same over all agents of person uid (aid: only that one), newest first, of the newest scan cards."""
+    q = f"SELECT * FROM agent_chat WHERE user_id=? {'AND agent_id=?' if aid else ''} AND {CHAT_CARD_SQL} ORDER BY id DESC LIMIT ?"
+    return [r for r in c.execute(q, (uid, aid, scan) if aid else (uid, scan)) if choice_state(r, _jload(r["choices"]), None) == "open"]
 
 
 def _approval_of(ids):
@@ -670,6 +676,23 @@ def chat_post(c, aid, uid, sender, b, files, allowed_keys=("body", "task_id")):
 # push, never unread, no buttons, no live steps taken along, no event to anyone; it does not make older buttons expire and
 # is no answer to an edited message. At most one file (the summary): a tap on the line opens it.
 NOTICE_MAX = 200
+
+
+def chat_source(v):
+    """2.388.0 (#3341): the checked field source of POST /api/v1/agent/chats/{uid}: a short name, None without."""
+    if v in (None, ""):
+        return None
+    if not isinstance(v, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,23}", v):
+        raise BadInput(tr("Invalid value: {0}", "source"))
+    return v
+
+
+def chat_set_source(c, r, src):
+    """Writes the source on the new row r -> the row (caller commits)."""
+    if not src:
+        return r
+    c.execute("UPDATE agent_chat SET source=? WHERE id=?", (src, r["id"]))
+    return c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone()
 
 
 def cx_notice_post(c, aid, uid, b, files):
@@ -1259,6 +1282,8 @@ def task_wake(tid):
         aid = as_int(b["agent_id"], "agent_id", 1)
         if aid not in cands:
             raise Denied(404)
+    elif t["delegate_agent_id"] in cands:  # 2.473.0 (#3357): the agent the task is delegated to
+        aid = t["delegate_agent_id"]
     elif t["assignee_id"] in cands:
         aid = t["assignee_id"]
     elif len(cands) == 1:

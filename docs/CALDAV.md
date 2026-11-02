@@ -335,7 +335,7 @@ absences plus the holidays (`…/ical/abs/<id>.<secret>.ics`; a sick leave shows
 
 **Availability when inviting (2.155).** The event editor shows a free / busy bar for you and every invited colleague of your
 organisation for the day of the event (7 to 20 o'clock, wider when the event lies outside): busy spans grey, absences and
-holidays hatched, the event's time marked. The server sends only the spans (`GET /api/events/freebusy`), never titles,
+holidays hatched, the event's time marked. The server sends only the spans (`GET /api/events/freebusy`, for agents with the calendar permission `GET /api/v1/events/freebusy`, only the people shared with them), never titles,
 places or calendars; events shown as free, all-day and cancelled events do not count. People of other organisations get no
 bar; without an organisation you see your own. Since 2.240 a colleague sees only your calendars, invitations and absences of
 the organisations you share; Calendar > Calendars > *Show my free / busy times* widens that to all your calendars (private

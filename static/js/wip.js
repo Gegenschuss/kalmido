@@ -25,21 +25,27 @@ function wip_msg(msg, sid) {
 const wip_menuItem = sid => ({label: wip_sec(sid)?.wip_limit ? tr('WIP limit: {0}', wip_sec(sid).wip_limit) : tr('WIP limit…'), icon: 'chart', fn: () => wip_set(sid)});
 async function wip_set(sid) {
   const s = wip_sec(sid); if (!s) return;
-  const v0 = s.wip_limit ?? null;
-  const raw = await askPrompt(tr('WIP limit of {0}', s.name), v0 ? String(v0) : '', {ok: tr('Save'),
-    body: tr('The most open tasks this column should hold. Above it the column head is marked; moving stays allowed. Empty = no limit.'),
-    input: {type: 'number', placeholder: tr('No limit')}});
-  if (raw == null) return;
-  const n = parseInt(String(raw).trim(), 10), v = n > 0 ? Math.min(n, 999) : null;
-  if (v === v0) return;
-  try { await optWrite(optSet(() => wip_sec(sid), {wip_limit: v}), () => api('PATCH', '/api/sections/' + sid, {wip_limit: v})); } catch { return; }
+  const v0 = {wip_limit: s.wip_limit ?? null, wip_hard: s.wip_hard ? 1 : 0};
+  let md = null;
+  // 2.392.0 A (#3367): + the switch "no new agent jobs while over the limit" (sections.wip_hard)
+  const ok = await askDialog({title: tr('WIP limit of {0}', s.name), ok: tr('Save'),
+    html: `<p>${esc(tr('The most open tasks this column should hold. Above it the column head is marked; moving stays allowed. Empty = no limit.'))}</p>
+      <div class="row"><label for="wip-n">${esc(tr('WIP limit'))}</label><input id="wip-n" type="number" min="0" max="999" step="1" inputmode="numeric" value="${v0.wip_limit || ''}" placeholder="${esc(tr('No limit'))}"></div>
+      <label class="chkl"><input type="checkbox" id="wip-hard"${v0.wip_hard ? ' checked' : ''}> ${esc(tr('No new jobs while over the limit'))}</label>
+      <div class="shint">${esc(tr('An agent cannot start a new job on a task of this column while it holds more open tasks than the limit.'))}</div>`,
+    after: m => { md = m; }});
+  if (!ok || !md) return;
+  const n = parseInt($('#wip-n', md).value.trim(), 10), lim = n > 0 ? Math.min(n, 999) : null;
+  const v = {wip_limit: lim, wip_hard: lim && $('#wip-hard', md).checked ? 1 : 0};
+  if (v.wip_limit === v0.wip_limit && v.wip_hard === v0.wip_hard) return;
+  try { await optWrite(optSet(() => wip_sec(sid), v), () => api('PATCH', '/api/sections/' + sid, v)); } catch { return; }
   const go = (to, from) => async e => {
-    const r = await api('PATCH', '/api/sections/' + secId(e.sid), {wip_limit: to, _prev: {wip_limit: from}});
+    const r = await api('PATCH', '/api/sections/' + secId(e.sid), {...to, _prev: from});
     if (r.conflicts?.length) return {skipped: [tr('Section {0}', qn(s.name.slice(0, 40)))], none: true};
-    const x = wip_sec(secId(e.sid)); if (x) x.wip_limit = to;
+    const x = wip_sec(secId(e.sid)); if (x) Object.assign(x, to);
     return {};
   };
-  offerUndo(v ? tr('WIP limit of {0}: {1}', qn(s.name.slice(0, 40)), v) : tr('WIP limit of {0} removed', qn(s.name.slice(0, 40))),
+  offerUndo(v.wip_limit ? tr('WIP limit of {0}: {1}', qn(s.name.slice(0, 40)), v.wip_limit) : tr('WIP limit of {0} removed', qn(s.name.slice(0, 40))),
     histAdd({label: tr('WIP limit of {0}', qn(s.name.slice(0, 40))), lids: [s.list_id], sid, undo: go(v0, v), redo: go(v, v0)}));
 }
 

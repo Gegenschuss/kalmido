@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.96.0 API tests, part E (#1941): the separation when data moves between the private space and an organisation, and the
+"""2.96.0 API tests, part E (#1941): the separation when data moves between the private workspace and an organisation, and the
 target learning a moved document at once. Invented names only, generated file contents. After a move the old workspace
 sees nothing of it any more (no lists, searches, filters, links, shares, agents), the files and their history moved along.
  - files / documents, organisation -> private: a folder with a file (shared with a colleague, opened to an agent) and a
@@ -15,9 +15,9 @@ sees nothing of it any more (no lists, searches, filters, links, shares, agents)
  - a table bound to a list of the organisation with a carried-over row: detached, the carry-over ended, the old workspace
    neither lists nor opens it
  - a list with a task, a comment and a file (open to everyone in the organisation, a group, an agent): an agent of the
-   organisation blocks the move (409); after the move into the private space nobody of the organisation (and the agent)
+   organisation blocks the move (409); after the move into the private workspace nobody of the organisation (and the agent)
    sees list, task, comment, file or the link to the file in the organisation's file store; the file is sealed for the
-   private space (after the settle pass) and its recognised text belongs to the private workspace; a private list shared
+   private workspace (after the settle pass) and its recognised text belongs to the private workspace; a private list shared
    with someone of another organisation does not go into an organisation (409)
  - learning: the source's models forget a moved document, the target's models know it at once (doc_meta.trained)
 tenant-matrix: file
@@ -242,7 +242,7 @@ dbx("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=?", (ORG, CA
 r = fmove(Ca, {"ids": [AKTE, DOC], "to": "private", "dry": 1})
 check(r.ok and r.json().get("block") is None and r.json().get("shares") == 3, f"dry run: 3 shares end, no block ({r.text[:300]})")
 r = fmove(Ca, {"ids": [AKTE, DOC], "to": "private", "parent": None})
-check(r.ok, f"carol takes her folder and document into her private space ({r.status_code} {r.text[:300]})")
+check(r.ok, f"carol takes her folder and document into her private workspace ({r.status_code} {r.text[:300]})")
 U = f"u{CAROL}"
 # -- the colleague
 for nid in (AKTE, FILE, DOC):
@@ -360,7 +360,7 @@ r = Ca.post(B + "/api/wiki/move-space", json={"folder": "Handbuch", "space": SP,
 check(r.ok and any("2 links point to the other workspace" in n for n in r.json().get("notes", [])),
       f"dry run: names the 2 links over the boundary ({r.text[:300]})")
 r = Ca.post(B + "/api/wiki/move-space", json={"folder": "Handbuch", "space": SP, "to": "private", "dest": ""})
-check(r.ok, f"carol takes her pages into her private space ({r.text[:200]})")
+check(r.ok, f"carol takes her pages into her private workspace ({r.text[:200]})")
 check(not {"Handbuch/Start", "Handbuch/Start/Unter"} & set(wpaths(Bo, SP)), "after: Alpha's page list no longer shows them")
 check(not {W1, W2} & set(wsearch(Bo, "zitronenbaum")), "after: bob's search finds nothing")
 check(gone(Bo.get(B + f"/api/wiki/pages/{W1}")) and gone(Bo.get(B + f"/api/wiki/pages/{W2}")),
@@ -382,7 +382,7 @@ check(any(x["id"] == W1 for x in Ca.get(B + f"/api/wiki/pages/{W2}").json()["bac
 r = Ca.post(B + "/api/wiki/move-space", json={"pages": [W2], "space": "private", "to": SP, "dest": "Archiv"})
 check(r.ok and wpaths(Bo, SP).get("Archiv/Unter") == W2, f"private -> Alpha: bob sees the page ({r.text[:200]})")
 check("Handbuch/Start/Unter" not in wpaths(Ca, "private") and gone(Da.get(B + f"/api/wiki/pages/{W2}")) and W2 not in wsearch(Da, "zitronenbaum"),
-      "gone from the private space, Beta gets 404")
+      "gone from the private workspace, Beta gets 404")
 
 # ================================================================ 4. a table bound to a list of Alpha
 TL = Ca.post(B + "/api/lists", json={"name": "Tabellenliste", "org_id": ORG}).json()["id"]
@@ -398,13 +398,13 @@ dbx("INSERT INTO sheet_links(sheet_id, row_id, kind, target_id, list_id, batch, 
 check(Bo.get(B + f"/api/sheets/{SID}").ok and SID in [x["id"] for x in Bo.get(B + "/api/sheets", params={"space": SP}).json().get("sheets", [])],
       "before: bob opens and lists the table")
 r = Ca.post(B + f"/api/sheets/{SID}/move-space", json={"to": "private"})
-check(r.ok and r.json()["sheet"]["list_id"] is None, f"carol takes the table into her private space, detached ({r.text[:200]})")
+check(r.ok and r.json()["sheet"]["list_id"] is None, f"carol takes the table into her private workspace, detached ({r.text[:200]})")
 check(gone(Bo.get(B + f"/api/sheets/{SID}")), "after: bob gets 404 on the table")
 for q in ({"space": SP}, {"space": "all"}, {"list_id": TL}):
     check(SID not in [x["id"] for x in (Bo.get(B + "/api/sheets", params=q).json() or {}).get("sheets", [])], f"after: bob's table list {q} no longer shows it")
 check(one("SELECT COUNT(*) FROM sheet_links WHERE sheet_id=? AND undone_at IS NULL", (SID,)) == 0, "db: the carry-over to Alpha's task ended")
 check(list(dbx("SELECT org_id, owner_id, list_id FROM sheets WHERE id=?", (SID,))[0]) == [None, CAROL, None], "db: carol's private table, no list")
-check(Ca.get(B + f"/api/sheets/{SID}").json().get("space") == "private", "carol opens it in her private space")
+check(Ca.get(B + f"/api/sheets/{SID}").json().get("space") == "private", "carol opens it in her private workspace")
 
 # ================================================================ 5. a list with task, comment and file (existing move: PATCH org_id)
 # bob owns the list (and Alpha's agent); carol and erin are colleagues who see it only through "everyone in the organisation"
@@ -430,7 +430,7 @@ r = Bo.patch(B + f"/api/lists/{L}", json={"org_id": None})
 check(r.status_code == 409 and one("SELECT org_id FROM lists WHERE id=?", (L,)) == ORG, f"an agent of Alpha in the list blocks the move ({r.status_code})")
 check(Bo.delete(B + f"/api/lists/{L}/members/{AGID}").ok, "bob takes the agent out")
 r = Bo.patch(B + f"/api/lists/{L}", json={"org_id": None})
-check(r.ok and one("SELECT org_id FROM lists WHERE id=?", (L,)) is None, f"bob takes the list into his private space ({r.status_code} {r.text[:200]})")
+check(r.ok and one("SELECT org_id FROM lists WHERE id=?", (L,)) is None, f"bob takes the list into his private workspace ({r.status_code} {r.text[:200]})")
 for who, s in (("carol", Ca), ("erin", Er)):
     check(lst(s, L) is None and T not in task_ids(s), f"after: {who}'s state shows neither list nor task")
     check(gone(s.get(B + f"/api/tasks/{T}")) and gone(s.get(B + f"/api/tasks/{T}/timeline")), f"after: {who} gets 404 on the task and its comments")

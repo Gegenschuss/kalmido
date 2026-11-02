@@ -9,6 +9,7 @@ freelancer-matrix: office
    mask, constant opacity with a transparency group, optional content (all valid PDF/A-3b)
  - a letterhead stored before the check (written into the office folder + the setting, without the stored result):
    GET /api/office/letterhead names the problem (pdfa_hint), the letterhead stays and still prints
+ - 2.469.0 (#3352): that old letterhead gets its paper format read from the file (paper a4, no mismatch)
  - a finalised invoice: PDF / XML served while they match pdf_sha256 / xml_sha256; a changed stored PDF or a hash that
    no longer matches the XML answers 409 (no file) and logs store_mismatch; a row without a hash (older) is served as before
  - the same for a person without organisation (personal office, tests/freelancer_fixture.py)
@@ -184,6 +185,8 @@ def run(S, who, rx):
     lh = S.get(B + LH).json()["letterhead"]
     check(lh["on"] and lh["pdfa_issues"] == ["cmyk"] and "PDF/A" in lh["pdfa_hint"] and "CMYK" in lh["pdfa_hint"],
           f"{who}: an old letterhead with CMYK is named in the settings {lh.get('pdfa_issues')} {lh.get('pdfa_hint', '')[:120]}")
+    check(lh["paper"] == "a4" and lh["paper_mismatch"] is False,  # 2.469.0 (#3352): no stored format -> read once from the file
+          f"{who}: an old letterhead without the stored format is read from its file {lh.get('paper')!r} {lh.get('paper_mismatch')}")
     if rows:  # 2.296.0 F (#3177): a letterhead file that cannot be decrypted -> GET still answers (no hint), never 500
         bsha = "ab" * 32
         sh(f"cat > {os.path.dirname(p)}/letterhead-{bsha[:16]}.pdf", b"KENC1\n\x00\x00")

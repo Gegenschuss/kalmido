@@ -2,7 +2,7 @@
 """2.139.0 C API tests (#2386, own container, org encryption on, knowledge page texts sealed at rest):
  - search: a page whose key is missing is found by its name only and marked 'x:' (not read again at every search); once the
    key is back the next search reads it again and finds its text
- - the message of an unreadable page names the way out (organisation: the recovery key; private space: the server key) and
+ - the message of an unreadable page names the way out (organisation: the recovery key; private workspace: the server key) and
    that it can only be deleted; save / rename stay refused, deleting works
  - import: a page of the same name that cannot be read is skipped by name (never overwritten), the rest is imported; the page
    "Imported files" that cannot be read skips the files for it and is named

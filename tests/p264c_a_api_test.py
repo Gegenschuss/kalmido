@@ -2,7 +2,7 @@
 """2.64.3 API tests, part A (#1817: the lock per knowledge space, stage 3), own container (start.sh).
 Invented names only. The server never sees a space key or a plain text; these tests send ciphertext-shaped values and wrapped keys
 of the right shape (the WebCrypto round trip is in the UI suite of part B).
- - GET / start (prepare, rights: organisation admins only, private space only its owner, agents / API tokens 403; a missing key
+ - GET / start (prepare, rights: organisation admins only, private workspace only its owner, agents / API tokens 403; a missing key
    409 with the names; members without encryption on the waiting list), a second start 409
  - encrypting: page writes 409 busy, todo / bulk / finish (trash included), only ciphertexts of the current generation
  - 'on': plain writes 409 wiki_e2e, ciphertexts ok, e2e1: in an open space 400, template_id 400, no links on the server, search /
@@ -331,7 +331,7 @@ check(pages_of()[PG["tpl"]]["attrs"].get("tags") == ["daily"] and pages_of()[PG[
 check(PG["check"] in [p["id"] for p in A.get(B + "/api/wiki/mentions", params={"task": T}).json()["pages"]], "open again: mentions")
 check(A.get(B + "/api/wiki/export", params={"space": SP}).ok, "open again: export")
 
-# ---------------------------------------------------------------- private space
+# ---------------------------------------------------------------- private workspace
 r = Bo.post(B + "/api/wiki/e2e/start", json={"space": "private", "keys": [{"user_id": BOB, "wrapped": wrapped()}, {"user_id": 1, "wrapped": wrapped()}]})
 check(r.status_code == 400, "private: a key for somebody else 400")
 r = Bo.post(B + "/api/wiki/e2e/start", json={"space": "private", "keys": [{"user_id": BOB, "wrapped": wrapped()}]})

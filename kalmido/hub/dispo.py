@@ -27,7 +27,7 @@ from ..core.db import body, bump, db, iso, local_now, now_utc
 from ..core.access import Denied, need_feat
 from ..accounts.session import me, user_public
 from ..core.errors import BadInput
-from .absence import abs_admin, abs_days, abs_holidays, abs_org, abs_people, abs_state
+from .absence import abs_admin, abs_days, abs_holidays, abs_holidays_shown, abs_org, abs_people, abs_state
 
 DSP_KINDS = ("user", "contact", "equipment", "set")
 DSP_STATUS = ("option", "firm")
@@ -243,7 +243,7 @@ def dsp_get():
         can_book=True, admin=abs_admin(c, uid, oid), today=today.isoformat(), start=first.isoformat(), end=last.isoformat(),
         resources=res, bookings=[dsp_public(r, conf.get(r["id"])) for r in rows],
         away={str(k): v for k, v in gone.items()},
-        holidays=[{"date": k, "name": v} for k, v in sorted(abs_holidays(abs_state(c, oid), first, last).items())])
+        holidays=abs_holidays_shown(abs_holidays(abs_state(c, oid), first, last)))
 
 
 # 2.141.0 C (#2142): the visible disposition (period, filter and area like the view) as CSV or ICS

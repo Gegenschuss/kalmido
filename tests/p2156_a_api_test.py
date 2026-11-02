@@ -10,7 +10,7 @@ Invented names only, addresses @example.com.
    the person takes single ideas over (a sub-idea brings its idea along, tasks as the person, history "proposal"), drops the
    rest, the job ends and the agent hears it; replacing after a take 409; the generic apply / discard work too; the
    tenant boundary (another person, another organisation's agent, an agent's token on the person routes)
- - a freelancer without an organisation does the same with the own agent in the private space
+ - a freelancer without an organisation does the same with the own agent in the private workspace
 usage: p2156_a_api_test.py <datadir>   (P2156A_NOSTART=1: against a running instance on KALMIDO_TEST_PORT)
 freelancer-matrix: agents, tasks
 tenant-matrix: agent"""
@@ -243,7 +243,7 @@ A.delete(B + f"/api/lists/{P}/members/{AG}")
 if agents_for(A, P) == []:
     check(answer(AGS, J5, {"items": [{"title": "Late"}]}).status_code == 403, "#1201: the list no longer shared: 403")
 
-# ================================================================ a freelancer: five levels + ideas in the private space
+# ================================================================ a freelancer: five levels + ideas in the private workspace
 FID, Fr = freelancer(B, A)
 FL = Fr.post(B + "/api/lists", json={"name": "Portrait shoot"}).json()["id"]
 FC = chain(Fr, FL, 5, "Step")

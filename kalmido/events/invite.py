@@ -15,9 +15,10 @@ from datetime import date, timedelta
 from flask import jsonify, request
 
 from ..core.config import app, APP_NAME
-from ..core.i18n import short_day, tr
+from ..core.i18n import LANGS, short_day, tr
 from ..core.db import db, iso, local_now, now_utc, usettings
 from ..core.env import env_int
+from ..accounts.orgs import user_orgs
 from ..accounts.session import me
 from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..core.access import Denied
@@ -200,11 +201,20 @@ def evi_when(r, lg):
     return f"{short_day(s.date(), lg, year=True)} {s:%H:%M} - {short_day(e.date(), lg, year=True)} {e:%H:%M}{tail}"
 
 
+def _client_lang(c, uid, email):
+    """2.460.0 (#3767): the language set on a client with this address among the inviting person's own clients ('' = none)."""
+    orgs = [o for o in user_orgs(c, uid) if o]
+    area = f"(created_by=? AND org_id IS NULL{' OR org_id IN (' + ','.join('?' * len(orgs)) + ')' if orgs else ''})"
+    x = c.execute(f"SELECT doc_lang FROM clients WHERE lower(email)=? AND doc_lang<>'' AND deleted_at IS NULL AND {area} ORDER BY id LIMIT 1",
+                  (str(email or "").strip().lower(), uid, *orgs)).fetchone()
+    return x["doc_lang"] if x and x["doc_lang"] in LANGS else ""
+
+
 def evi_mail(c, uid, r, method, a, ics_atts, update=False):
     """(to, subject, text, html, reply_to, from_name, attachments) of one invitation / cancellation mail to attendee a;
     ics_atts = the attendees the attached calendar lists."""
     from ..collab.comments import lang_of
-    lg = lang_of(usettings(c, uid))
+    lg = _client_lang(c, uid, a["email"]) or lang_of(usettings(c, uid))
     addr, name = _sender(c, uid, r)
     title = r["title"]
     if method == "CANCEL":

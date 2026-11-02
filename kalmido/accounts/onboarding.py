@@ -30,7 +30,7 @@ def onboarding_tasks(feats, touch, mac):
          N_("Everything about a task lives in this panel:\n\n- a description with **Markdown**\n- [ ] checklists like this one\n- files, links, dates and reminders"),
          3, True, [N_("Subtasks work like tasks"), N_("Tick this one off, too")]),
         (N_("Try quick add: Dentist tomorrow 3pm !high #private"),
-         N_("Type it into the add bar (the + button on a phone): dates, times, !priority, #tags and ~project are recognized while you type."), 3, True, []),
+         N_("Type it into the add bar (the + button on a phone): dates, times, !priority, #tags and ~project are recognised while you type."), 3, True, []),
         (N_("Swipe me left to reschedule") if touch else N_("Drag me onto Tomorrow in the sidebar"),
          N_("Swipe left for snooze, other dates and delete; long-press for the task’s menu, long-press and drag to reorder.") if touch
          else N_("Drag tasks onto a day, a project or another place in the list. Right-click is not needed: the … menu has the rest."), 1, True, []),
@@ -53,7 +53,11 @@ def onboarding_tasks(feats, touch, mac):
 
 
 def _org_member(c, uid):
-    """2.364.0 A (#3037): uid belongs to an organisation as a member (invited, placed in a team), not as its admin."""
+    """2.364.0 A (#3037): uid belongs to an organisation as a member (invited, placed in a team), not as its admin.
+    2.453.0 (#3780): or is about to: a new account joins by accepting its invitation after the first start."""
+    from ..accounts.orginvite import ojn_waiting
+    if ojn_waiting(c, uid, plain=True):
+        return True
     with system_ctx(c):  # memberships are structure (as accounts/orgs.py user_orgs / org_role)
         return bool(c.execute("SELECT 1 FROM org_members m JOIN orgs o ON o.id=m.org_id WHERE m.user_id=? AND o.retired_at IS NULL "
                               "AND COALESCE(m.role, 'member')<>'admin' LIMIT 1", (uid,)).fetchone())
@@ -121,7 +125,7 @@ def _sample_tasks():
             "tags": [N_("concept")], "content": N_("**Goal:** a 90-second image film for the website and trade fairs.\n\n- [x] Read the briefing notes\n- [ ] First draft of the treatment\n- [ ] Internal review\n- [ ] Send it to the client\n\nInterviews: managing director and head of production."),
             "subs": [(N_("Define the target audience"), True), (N_("Phrase the key message"), False),
                      (N_("Collect reference films"), False)], "effort": "m"}),
-        ("budget", 0, N_("Get the quote and budget approved"), 5, None, 0, {
+        ("budget", 0, N_("Get the quotation and budget approved"), 5, None, 0, {
             "tags": [N_("client")], "budget": 12500,
             "comment": N_("The client agreed to the budget on the phone, the written approval follows.")}),
         ("scout", 1, N_("Scout the locations"), 3, 1, 3, {}),
@@ -132,7 +136,7 @@ def _sample_tasks():
         ("day2", 2, N_("Shoot day 2: B-roll at the plant"), 3, None, 9, {"time": "08:00", "dur": 480}),
         ("rough", 3, N_("Rough cut"), 3, 10, 14, {"budget": 1800, "effort": "l"}),
         ("music", 3, N_("License the music"), 0, None, None, {}),
-        ("grade", 3, N_("Color grading and sound mix"), 1, 15, 17, {"effort": "m"}),
+        ("grade", 3, N_("Colour grading and sound mix"), 1, 15, 17, {"effort": "m"}),
         ("feedback", 4, N_("Feedback round with the client"), 5, None, 19, {"tags": [N_("client")]}),
         ("deliver", 4, N_("Final delivery (4K and social formats)"), 3, None, 21, {}),
         ("call", None, N_("Weekly status call with the client"), 0, None, "tue", {"time": "10:00", "dur": 30,

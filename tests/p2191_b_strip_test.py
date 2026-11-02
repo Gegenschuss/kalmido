@@ -154,6 +154,8 @@ css_v = (re.search(r'<link rel="stylesheet" href="/static/app\.css\?v=([0-9a-f]{
 for who, s in (("no cookie", anon), ("freelancer", Fr), ("admin", A)):
     for u, v in (("/static/js/core.js", hashes.get("/static/js/core.js")), ("/static/app.css", css_v)):
         src = open(os.path.join(ROOT, u.lstrip("/")), "rb").read()
+        if u == "/static/app.css":  # 2.476.0 (#3487): the start style files (static/css/start-*.css) go out behind app.css
+            src = st.with_start_css(os.path.join(ROOT, "static"), src)
         r = s.get(B + u)
         body = r.content
         check(r.ok and len(body) < len(src) and b"/*" not in body.split(b"\n", 3)[0], f"#1824: {u} without comments ({who}, {len(src)} -> {len(body)})")

@@ -102,6 +102,7 @@ if ($env:KALMIDO_EVENTS -eq '1') { $Events = $true }
 # kalmido-capability: text_proposal (2.126.1: an office text, a document summary, a client report as a proposal, in mcp/agent_run.py)
 # kalmido-capability: ideas_proposal (2.156.0: ideas for a branch of the mind map as a proposal, in mcp/agent_run.py)
 # kalmido-capability: receipt_read (2.299.0: a receipt read by the agent from the file itself as a proposal, in mcp/agent_run.py)
+# kalmido-capability: card_statement_read (2.469.0: a credit card statement read by the agent from the PDF itself as a proposal, in mcp/agent_run.py)
 # kalmido-capability: abort (2.144.0: Stop in the chat ends the running command and confirms it, in mcp/agent_run.py)
 # kalmido-capability: contract_notice (2.70.0: a contract's notice deadline -> ONE propose_contract_notice, in mcp/agent_run.py)
 # kalmido-capability: perm_user_choice (2.312.0, #3266: the person for permission questions chosen in Kalmido before KALMIDO_PERM_USER, in mcp/agent_run.py)
@@ -361,6 +362,7 @@ try {
   if ($Once) { Start-Agent $s; exit 0 }
   $sig = "$($s.model)|$($s.ac)|$($s.pct)|$($s.gname)|$($s.gmail)|$($s.gco)"
   # kalmido-capability: standing_rules (2.235.0, #2903: the active standing rules under the rules block, in mcp/agent_run.py)
+  # kalmido-capability: lang_texts (2.450.0, #3769: the texts by the agent's language, in mcp/agent_run.py)
   # kalmido-capability: work_window (2.236.0, #2905): outside the work window of the work style (work_style.state.working
   # false) no new session starts until work_resumes_at; the events wait in Kalmido (event mode: mcp/agent_run.py holds its queue)
   $script:Closed = $false

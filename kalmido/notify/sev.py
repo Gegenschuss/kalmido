@@ -18,7 +18,7 @@ from datetime import timedelta
 from ..core.config import app, SECRET_KEY
 from ..core.i18n import N_
 from ..core.db import iso, now_utc
-from .alerts import _AA, _AA_LOCK, aa_now, fx2_mask_ip
+from .alerts import _AA, _AA_LOCK, aa_now, aa_org_event, fx2_mask_ip
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.login import login_log_ip  # 2.239.0 B (#2888): unless KALMIDO_LOG_FULL_IP=1
 
@@ -121,6 +121,27 @@ def _sev_is_admin(c, uid):
                           "(SELECT user_id FROM org_members WHERE role='admin'))", (uid,)).fetchone())
 
 
+def sev_login_tell(c, uid, h, name, ip):
+    """2.367.4 (#2974): an instance admin: the admin alert. An admin of organisations only: News for the person and that
+    organisation's admins (row "usage"), a number for the instance admins."""
+    from ..collab.news import news_add
+    from ..core.access import org_admin_people
+    with c.savepoint(), system_ctx(c):  # a database error here must not abort the sign-in's transaction (like sev_login's own part)
+        operator = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()["is_admin"]
+        orgs = [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? AND role='admin'", (uid,)).fetchall()]
+        if operator or not orgs:
+            aa_now("security", f"sev:login:{uid}:{h[:16]}", N_("Admin {0} signed in from a new address: {1}."), [name, ip])
+            return
+        told = set()
+        for oid in orgs:
+            for p in org_admin_people(c, oid):
+                if p not in told:
+                    told.add(p)
+                    news_add(c, p, "orglogin", actor=0, row="usage", data={"org_id": oid, "user_id": uid, "name": name, "ip": ip})
+        aa_org_event(c, "org_login", told)
+    c.commit()
+
+
 def sev_login(c, uid, ip, via="password"):
     """A sign-in (start_session): an admin from an address not among their last SEV_IPS ones is reported. The first sign-in
     of an admin after the update only stores the address. Never raises (a sign-in never fails on this)."""
@@ -144,7 +165,7 @@ def sev_login(c, uid, ip, via="password"):
             return
         if rows:
             name = (c.execute("SELECT username FROM users WHERE id=?", (uid,)).fetchone() or [""])[0]
-            aa_now("security", f"sev:login:{uid}:{h[:16]}", N_("Admin {0} signed in from a new address: {1}."), [name, fx2_mask_ip(ip)])
+            sev_login_tell(c, uid, h, name, fx2_mask_ip(ip))
             sev_log("admin_login_new_ip", user_id=uid, username=name, ip=login_log_ip(ip), via=via)  # 2.239.0 B (#2888): shortened
     except Exception as e:  # noqa: BLE001
         print("admin sign-in check skipped:", type(e).__name__, e, flush=True)

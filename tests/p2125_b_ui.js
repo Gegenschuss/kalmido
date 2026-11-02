@@ -69,15 +69,18 @@ const FEAT = 'time,collab,comments';
   check(c2 && !c2.querySelector('[data-tsl="reopen"]'), 'approved: no Reopen for bob');
   w.eval(`settingsModal('time')`); await sleep(400);
   const md = d.querySelector('.smodal');
-  const tz = md?.querySelector('#s-ttz'), sp = md?.querySelector('#s-tsplit');
-  check(tz && [...tz.options].some(o => o.value === 'America/New_York') && tz.value === '', 'the time zone: the server\'s by default, IANA names offered');
+  const sp = md?.querySelector('#s-tsplit');
   check(sp && sp.checked, 'entries over midnight: split by default');
+  if (sp) { sp.checked = false; sp.dispatchEvent(new w.Event('change', {bubbles: true})); }
+  await sleep(500);
+  w.eval(`settingsModal('general')`); await sleep(400);  // 2.368.3 (#2985): the zone moved to Region and formats
+  const tz = d.querySelector('.smodal #s-ttz');
+  check(tz && [...tz.options].some(o => o.value === 'America/New_York') && tz.value === '', 'the time zone: the server\'s by default, IANA names offered');
   if (tz) { tz.value = 'America/New_York'; tz.dispatchEvent(new w.Event('change', {bubbles: true})); }
   await sleep(500);
-  if (sp) { sp.checked = false; sp.dispatchEvent(new w.Event('change', {bubbles: true})); }
   const st = await until(async () => { const s = (await call('GET', '/api/state', null, BK)).settings; return s.tz === 'America/New_York' && s.time_split_midnight === '0' ? s : null; });
   check(st, 'both settings saved');
-  md?.remove();
+  d.querySelector('.smodal')?.remove();
   w.close();
 
   check(errs.length === 0, 'no JS errors: ' + errs.slice(0, 3).join(' | '));

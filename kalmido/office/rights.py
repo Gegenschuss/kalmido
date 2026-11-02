@@ -43,8 +43,8 @@ SPECIAL_KEYS = tuple(k for k, _ in SPECIALS)
 # legacy: what an org member had before 2.187 ("member" = the routes without the admin check, "admin" = none)
 OFFICE_AREAS = (
     ("pipeline", N_("Pipeline"), "sell", ("deals", "leads"), False, "admin"),
-    ("offers", N_("Quotes & invoices"), "sell", ("docs", "series", "signoffs", "number-preview", "trial", "mail-status",
-                                                  "peppol", "undo", "catalog", "clients", "trash"), False, "member"),  # trash: 2.304 (#3038, the route asks for manage)
+    ("offers", N_("Quotations & invoices"), "sell", ("docs", "series", "signoffs", "number-preview", "trial", "mail-status",
+                                                  "peppol", "payonline", "undo", "catalog", "clients", "trash"), False, "member"),  # trash: 2.304 (#3038, the route asks for manage)
     ("time", N_("Times to bill"), "sell", ("time-open",), True, "member"),
     ("gendocs", N_("Documents"), "sell", ("gen-docs", "doc-templates", "privacy-sheets"), False, "admin"),
     ("letters", N_("Correspondence"), "sell", ("letters", "letter-blocks"), False, "admin"),
@@ -79,13 +79,16 @@ _SEG = sorted(((s, a[0]) for a in OFFICE_AREAS for s in a[3]), key=lambda x: -le
 
 # routes every person with any office access reads (the office's settings carry the person's rights, the menu needs them)
 ANY_READ = frozenset({"/api/office/settings", "/api/office/number-preview", "/api/office/mail-status"})
+# 2.439.0 (#3617): a person's own settings, read and written with any office access (not an area of the office)
+ANY_OWN = frozenset({"/api/office/mail-profile"})
 # routes whose writes need "manage" of their area ("the area's settings"); everything else writes with "edit"
 MANAGE_ROUTES = frozenset({
     "/api/office/settings", "/api/office/logbook/settings", "/api/office/trips/purposes", "/api/office/trips/vma-rates",
     "/api/office/equipment/policies", "/api/office/cashflow/start", "/api/office/letters/profile",
     # 2.187.0 B (#2476): the set-up of the areas (purposes, vehicles, cash books, e-invoice transmission, tax dates, process doc)
     "/api/office/trips/purposes/<int:pid>", "/api/office/letters/profile/image", "/api/office/vehicles",
-    "/api/office/vehicles/<int:vid>", "/api/office/cashbooks", "/api/office/cashbooks/<int:bid>", "/api/office/peppol",
+    "/api/office/vehicles/<int:vid>", "/api/office/cashbooks", "/api/office/cashbooks/<int:bid>", "/api/office/peppol", "/api/office/payonline", "/api/office/payonline/check", "/api/office/payonline/rotate",
+    "/api/office/payonline/events/<int:eid>/retry", "/api/office/payonline/events/<int:eid>/done",
     "/api/office/peppol/check", "/api/office/tax-dates", "/api/office/procdoc",
     "/api/office/cards/reminder",  # 2.444.0 (#3447)
 })
@@ -97,11 +100,13 @@ SPECIAL_ROUTES = {
     "POST /api/office/docs/<int:did>/finalize": "release", "GET /api/office/docs/<int:did>/number-preview": "release",  # 2.431.0 (#3605 review): who may finalise sees the number
     "POST /api/office/docs/<int:did>/unlock": "release",
     "POST /api/office/docs/<int:did>/send": "release", "POST /api/office/docs/<int:did>/peppol": "release",
+    "POST /api/office/docs/<int:did>/peppol/undelivered": "release",  # 2.370.0 (#2778): frees "send again"
     "GET /api/office/docs/<int:did>/recipients": "release",  # 2.433.0 (#3599): the send dialog's addresses (the e-mail for invoices)
     "POST /api/office/series/<int:sid>/run": "release",
     # pay: payments of invoices, reminder fees, payment proposals, the bank matching that books
     "POST /api/office/docs/<int:did>/payments": "pay", "DELETE /api/office/docs/<int:did>/payments/<int:pid>": "pay",
     "POST /api/office/docs/<int:did>/fee": "pay", "POST /api/office/pay-props/<int:pid>": "pay",
+    "PUT /api/office/docs/<int:did>/pay-online": "pay",  # 2.469.0 (#3459): the invoice's online payment switch
     "POST /api/office/bank/tx/<int:tid>/match": "pay", "POST /api/office/bank/tx/<int:tid>/unmatch": "pay",
     # lock: periods, the cash book's daily closing, the logbook's month
     "POST /api/office/periods/lock": "lock", "POST /api/office/cashbooks/<int:bid>/closing": "lock",
@@ -172,7 +177,7 @@ TEMPLATES = {
     "bookkeeping": (N_("Bookkeeping"), N_("Works in the finance areas and the invoices, exports for the tax adviser"),
                     _mix(_all("view"), edit=MONEY + ("offers",)), ("pay", "lock", "export")),
     # 2.187.1 A (#2735): equipment "edit" -- the project management plans sets / crew (they moved out of the quotes' area)
-    "projects": (N_("Project management"), N_("Quotes, invoices, documents and correspondence; own expenses like everybody"),
+    "projects": (N_("Project management"), N_("Quotations, invoices, documents and correspondence; own expenses like everybody"),
                  _mix(_all("none"), edit=SELL + ("receipts", "travel", "logbook", "meals", "equipment"), view=("kpi", "services", "texts", "settings")),
                  ("release",)),
     "staff": (N_("Staff"), N_("Only their own receipts, travel expenses, drives, entertainment receipts and times"),
@@ -407,6 +412,8 @@ def ofr_check(c, uid, oid, area=None, admin=False):
         return False
     if request.path.startswith("/api/office/rights"):
         return True  # the rights page checks on its own (ofr_manager)
+    if request.url_rule is not None and request.url_rule.rule in ANY_OWN and any(v != "none" for v in r["levels"].values()):
+        return True  # 2.439.0 (#3617): no area of the office, only the person's own row
     area = area or ofr_area_of(request.path)
     if area is None:
         raise Denied(403, tr(NO_AREA))

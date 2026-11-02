@@ -5,7 +5,6 @@ import os
 import re
 import uuid
 import secrets
-import time
 import zipfile
 from flask import g, jsonify, request, Response, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -64,7 +63,13 @@ def user_admin_dict(c, u):
             "signup": u["signup"] or "",  # 2.23.0 (#711): confirm (e-mail not confirmed) | pending (waits for approval) | ''
             "kid": bool(u["kid"]),
             **_admin_struct(c, u),  # 2.22.0 (#752) orgs, 2.28.0 (#935) org_id of an agent, number of lists
-            "storage": _storage(c, u["id"])}  # 2.24.0 (#910): {used, quota_mb}
+            "storage": _storage(c, u["id"]),  # 2.24.0 (#910): {used, quota_mb}
+            **({"apart": True} if _op_foreign(c, u["id"]) else {})}  # 2.399.0 (#2687): hosted, a customer's account (lock / quota only)
+
+
+def _op_foreign(c, uid):
+    from ..accounts.orgs import op_foreign_account
+    return op_foreign_account(c, uid)
 
 
 def _admin_struct(c, u):
@@ -88,6 +93,11 @@ def admin_sees(c, uid):
     connections) -- groups, agents. 2.46.0 (#1592): every instance; the user management itself: om_admin_all."""
     from ..accounts.orgs import may_see
     return may_see(c, me(), uid)
+
+
+# 2.399.0 (#2687): what the instance admin of a hosted instance still changes on a customer's account (users.op_foreign_account):
+# lock / unlock, the storage quota, the server admin right -- never its sign-in, address, organisations or notifications
+OP_ACCOUNT_KEYS = {"disabled", "storage_quota_mb", "is_admin", "_prev"}
 
 
 def om_admin_all(c, uid):
@@ -194,13 +204,16 @@ def user_create():
         return err(tr("Password: at least {0} characters", MIN_PASSWORD))
     proxy = (b.get("proxy_login") or "").strip() or None
     if _proxy_taken(c, proxy):
-        return err(tr("This proxy login is already assigned"), 409)
+        return err(tr("This proxy sign-in is already assigned"), 409)
     topic = str(b.get("ntfy_topic") or "").strip()
     if topic and not NTFY_TOPIC_RE.fullmatch(topic):
         return err(tr("ntfy topic: 1-64 characters a-z, A-Z, 0-9, dash, underscore"))
     orgs = om_orgs_arg(c, b)  # 2.46.0 (#1561): checked before the account exists
     if isinstance(orgs, str):
         return err(orgs)
+    from ..accounts.orgs import op_apart_deny, op_foreign_org
+    if any(op_foreign_org(c, o) for o, _role in orgs):  # 2.399.0 (#2687): hosted: nobody new in a customer's organisation by the operator
+        op_apart_deny()
     uid = create_user(c, username, (b.get("display_name") or "").strip()[:60] or username, pw or None, proxy,
                       bool(b.get("is_admin")), ntfy_topic=topic or None, onboard=True,
                       ask_purpose=None if b.get("kid") is True else me() if orgs else 0)  # 2.364.0 A (#3032)
@@ -250,14 +263,17 @@ def user_update(uid):
     from ..notify.push import NTFY_TOPIC_RE
     from ..notify.alerts import aa_now
     from ..agents.core import agent_row, is_agent
-    from ..agents.admin import make_agent
+    from ..agents.admin import agent_org_set, make_agent
     from ..family.family import kid_parents, kid_set
     need_admin()
     b = body()
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or not om_admin_all(c, uid):  # 2.46.0 (#1592): the user management: every account
-        return err(tr("unknown user"), 404)
+        return err(tr("unknown person"), 404)
+    from ..accounts.orgs import op_apart_deny, op_foreign_account, op_foreign_org
+    if op_foreign_account(c, uid) and set(b) - OP_ACCOUNT_KEYS:  # 2.399.0 (#2687): hosted: a customer's account only locked / its quota
+        op_apart_deny()
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else {}
     for k in ("orgs", "parents"):  # 2.270.0 A (#3019): with _prev only what the dialog changed (who joined meanwhile stays)
         if all(isinstance(v, list) and all(isinstance(x, int) and not isinstance(x, bool) for x in v) for v in (b.get(k), prev.get(k))):
@@ -270,6 +286,9 @@ def user_update(uid):
         from ..accounts.orgs import _operator_apart, org_join_or_add, org_leave, org_own_admin
         with system_ctx(c):  # 2.37.0 (#1150): the instance admin moves the account between organisations (structure)
             have = {r[0]: r[1] for r in c.execute("SELECT org_id, role FROM org_members WHERE user_id=?", (uid,))}
+        if any(op_foreign_org(c, o) for o in set(have) ^ set(b["orgs"])):  # 2.399.0 (#2687): hosted: in or out of a customer's organisation
+            op_apart_deny()
+        with system_ctx(c):
             for o in sorted(set(have) - set(b["orgs"])):  # 2.28.0 (#935): taken out of an organisation = leaving it (lists stay with it)
                 if _operator_apart():  # 2.306.0 Fix-1 (#2875 review): hosted: the lists go to an admin of its own, never the operator (409 without one)
                     heir = org_own_admin(c, o, uid)
@@ -296,7 +315,7 @@ def user_update(uid):
             was = user_orgs(c, uid)
             make_agent(c, uid)
             if was:  # 2.37.0 (#1150): the converted account keeps working in its organisation (row-level security: a private
-                from ..agents.admin import agent_org_set  # agent never reads an organisation's lists, not even its own)
+                # agent never reads an organisation's lists, not even its own)
                 from ..core.errors import BadInput as _BadInput
                 try:
                     with c.savepoint():
@@ -320,7 +339,7 @@ def user_update(uid):
     if "proxy_login" in b:
         proxy = (b["proxy_login"] or "").strip() or None
         if _proxy_taken(c, proxy, uid):
-            return err(tr("This proxy login is already assigned"), 409)
+            return err(tr("This proxy sign-in is already assigned"), 409)
         c.execute("UPDATE users SET proxy_login=? WHERE id=?", (proxy, uid))
     if "is_admin" in b:
         c.execute("UPDATE users SET is_admin=? WHERE id=?", (1 if b["is_admin"] else 0, uid))
@@ -389,8 +408,8 @@ def user_update(uid):
     if nu["disabled"] and not u["disabled"] and not u["signup"]:
         sec_mail(c, uid, "disabled")
     if reset:
-        aa_now("security", f"2fareset:{u['username']}:{int(time.time())}", N_("{0} reset the two-factor authentication of {1}."),
-               [g.user["username"], u["username"]])
+        aa_now("security", f"2fareset:{u['username']}", N_("{0} reset the two-factor authentication of {1}."),
+               [g.user["username"], u["username"]], skip=g.user["id"])  # 2.367.4 (#2974): the key without a time keeps the cooldown; the person gets a mail
     if b.get("is_admin") and not u["is_admin"]:
         aa_now("security", f"admin:{u['username']}", N_("{0} is now an admin (set by {1})."), [u["username"], g.user["username"]])
     return jsonify(user_admin_dict(c, c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()))
@@ -501,6 +520,8 @@ def _user_purge(c, uid):
     c.execute("DELETE FROM filters WHERE user_id=?", (uid,))
     c.execute("DELETE FROM task_tags WHERE user_id=?", (uid,))
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=?", (uid,))
+    c.execute("UPDATE tasks SET delegate_agent_id=NULL WHERE delegate_agent_id=?", (uid,))  # 2.473.0 (#3357)
+    c.execute("DELETE FROM task_watchers WHERE user_id=?", (uid,))
     c.execute("UPDATE tasks SET created_by=NULL WHERE created_by=?", (uid,))
     c.execute("DELETE FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields WHERE type='person')", (str(uid),))
     user_forget_conns(c, uid)  # personal connection rows, stored tokens, grants; list bells
@@ -531,6 +552,8 @@ def _user_purge(c, uid):
     files += wka_user_files(c, uid)  # 2.99.0 A (#2182): the files of its private pages (the rows go with the account)
     from ..sheets.shkinds import shk_user_files
     files += shk_user_files(c, uid)  # 2.124.0 B (#2110): the files of its private tables' file cells
+    from ..lists.tplextra import tx_user_files
+    files += tx_user_files(c, uid)  # 2.363.3 (#3134): the files of its templates
     from ..wiki.wikie2e import wke_user_purge
     wke_user_purge(c, uid)  # 2.64.3 A (#1817): knowledge spaces with the lock whose key the person held: rotation pending
     av = (c.execute("SELECT avatar FROM users WHERE id=?", (uid,)).fetchone() or [None])[0]
@@ -554,6 +577,8 @@ def _user_purge(c, uid):
             h = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone()
             if h:
                 c.execute("UPDATE bookmarks SET user_id=? WHERE user_id=? AND org_id=?", (h[0], uid, o))
+        from ..sheets.shshare import shs_forget
+        shs_forget(c, uid)  # 2.453.0 (#3781)
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions
     return files
 
@@ -586,7 +611,7 @@ def h6a_first_password_check(c):
     tok = request.cookies.get(COOKIE)
     r = c.execute("SELECT created_at FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone() if tok else None
     if not r or r[0] < iso(now_utc() - timedelta(seconds=FIRST_PW_FRESH)):
-        return err(tr("For a first password, please log out and sign in again (at most {0} minutes ago).", FIRST_PW_FRESH // 60), 403)
+        return err(tr("For a first password, please sign out and sign in again (at most {0} minutes ago).", FIRST_PW_FRESH // 60), 403)
     return None
 
 
@@ -622,7 +647,7 @@ def me_update():
             return err(tr("Password: at least {0} characters", MIN_PASSWORD))
         if not u["password_hash"]:
             from ..notify.alerts import aa_now
-            aa_now("security", f"pw-first:{u['username']}:{int(time.time())}",
+            aa_now("security", f"pw-first:{u['username']}",
                    N_("{0} set a first local password (the account signed in by single sign-on before)."), [u["username"]])
         c.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(pw), u["id"]))
         tok = request.cookies.get(COOKIE)  # other sessions end, this one stays

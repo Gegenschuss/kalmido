@@ -20,14 +20,14 @@ from datetime import date, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import PUBLIC_URL, app, WATCHDOG_INTERVAL
-from ..core.db import IntegrityError, body, bump, db, iso, local_now, now_utc
+from ..core.db import IntegrityError, body, bump, db, iso, local_now, now_utc, uset, usettings
 from ..core.access import Denied, my_inbox
-from ..core.i18n import LANGS, N_, lang, tr
+from ..core.i18n import LANGS, N_, lang, short_day, tr, tr_stored, trn
 from .doclang import doc_lg  # 2.185.0 C (#2520)
 from .pdfweb import epdf_sweep  # 2.355.0 A (#2847)
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_item_store, oc_dec_fields
-from ..core.errors import BadInput
+from ..core.errors import BadInput, err_stored
 from .calc import dec, dstr, fmt_money, money
 from .model import office_gate, office_on, office_org, office_role, office_settings, onc_ready, pb_cl_sql, pb_owner
 from .contacts_cl import fk_send_rcpts  # 2.433.0 (#3599)
@@ -116,7 +116,7 @@ def rin_fill(text, period, nxt, lg, pack):
     from .docs import _fmt_date
     p = date.fromisoformat(period)
     last = (date.fromisoformat(nxt) - timedelta(days=1)).isoformat()
-    vals = {"period": f"{_fmt_date(period, pack)} - {_fmt_date(last, pack)}",
+    vals = {"period": f"{_fmt_date(period, pack, lg)} - {_fmt_date(last, pack, lg)}",  # 2.368.2 (#2986): the document's language first
             "month": f"{(RIN_MONTHS.get(lg) or _rin_months(lg))[p.month - 1]} {p.year}",
             "quarter": f"Q{(p.month - 1) // 3 + 1} {p.year}", "year": str(p.year)}
     return RIN_PH_RE.sub(lambda m: vals[m.group(1)], text)
@@ -301,38 +301,39 @@ def rin_client_mail(c, oid, cid):
 
 def rin_send(c, oid, uid, did):
     """auto_send: finalise and mail invoice did (its client's invoice address) like the routes /finalize and /send do. On
-    any failed check nothing is kept (savepoint): the invoice stays a draft. (ok, reason text, datev due, mail).
+    any failed check nothing is kept (savepoint): the invoice stays a draft. (ok, reason, datev due, mail). 2.448.0 (#3765):
+    reason = a stored text (tr_stored): the timer has no reader, each person gets it in their own language.
     2.269.0 D (#3046): only finalised and checked here (number, the day's counters); the mail goes out after the caller's
     commit (rin_mail), so a failed commit never leaves a mailed invoice whose number is given again."""
-    from ..integrations.mail import MAIL_OUT_ON
     from .docs import doc_row
     from .invoices import inv_send
     from .ledger import ofx_finalize
-    if not MAIL_OUT_ON:
-        return False, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"), False, None
+    from .mailsig import ofm_sender
+    if not ofm_sender(c, oid, uid, {})["via"]:  # 2.439.0 (#3617): also through the mailbox of the series' person
+        return False, [N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)")], False, None
     cid = doc_row(c, oid, did)["client_id"]
     to = rin_client_mail(c, oid, cid)
     if not to:
-        return False, tr("The client has no e-mail address for invoices"), False, None
+        return False, [N_("The client has no e-mail address for invoices")], False, None
     cc = ", ".join(fk_send_rcpts(c, cid, oid, "invoice")["cc"])  # 2.433.0 (#3599): the contact persons for invoices in copy
     try:
         with c.savepoint():
             r = ofx_finalize(c, oid, uid, did)
-            _files, datev, m = inv_send(c, oid, uid, r, {"to": to, "cc": cc}, later=True)
+            _files, datev, m = inv_send(c, oid, uid, r, {"to": to, "cc": cc}, later=True, auto=True)
     except (BadInput, Denied) as e:
         epdf_sweep(c)  # 2.355.0 A (#2847): the files of the finalising just rolled back
-        return False, (e.text() if hasattr(e, "text") else str(e)) or tr("unknown"), False, None
+        return False, err_stored(e) or [N_("unknown")], False, None  # 2.454.0 (#3808): key + values, every person's own language
     except Exception as e:  # noqa: BLE001 -- a broken file / check: the draft stays, the reason goes to the person
         epdf_sweep(c)
         print("invoice series: sending", did, "failed:", e, flush=True)  # 2.91.0 review L3: the raw error (host, port) only in the log
-        return False, tr("The mail server refused the mail or could not be reached"), False, None
+        return False, [N_("The e-mail server refused the e-mail or could not be reached")], False, None
     c.__dict__.pop("epdf_new", None)  # 2.355.0 A (#2847): kept -- the caller commits them
     return True, "", datev, m
 
 
 def rin_mail(c, oid, uid, m):
     """2.269.0 D (#3046): the customer mail of a finalised series invoice after its commit (marked sent, committed);
-    (ok, reason text). A refused mail leaves the invoice finalised and not sent (the person sends it from the invoice)."""
+    (ok, reason: a stored text). A refused mail leaves the invoice finalised and not sent (the person sends it from the invoice)."""
     try:
         m["send"](c, oid, uid, m)  # invoices.inv_send_mail
         bump(c)
@@ -340,11 +341,11 @@ def rin_mail(c, oid, uid, m):
         return True, ""
     except (BadInput, Denied) as e:
         c.rollback()
-        return False, (e.text() if hasattr(e, "text") else str(e)) or tr("unknown")
+        return False, err_stored(e) or [N_("unknown")]
     except Exception as e:  # noqa: BLE001 -- a mail server error
         c.rollback()
         print("invoice series: mailing", m.get("did"), "failed:", e, flush=True)
-        return False, tr("The mail server refused the mail or could not be reached")
+        return False, [N_("The e-mail server refused the e-mail or could not be reached")]
 
 
 def rin_datev(c, oid, did):
@@ -384,10 +385,30 @@ def rin_task(c, person, title, text, doc_id=None):
     return tid
 
 
+def rin_bundle(c, person, title, text, doc_id=None):
+    """2.367.4 (#2972): the series of one day share ONE task per person: the first keeps its own title and link, the next ones
+    turn it into "3 invoice series need you" with a line each and the link to the invoices. Setting rin_open = day:task:count."""
+    day = local_now().date().isoformat()
+    o = str(usettings(c, person).get("rin_open") or "").split(":")
+    t = None
+    if len(o) == 3 and o[0] == day and o[1].isdigit() and o[2].isdigit():
+        t = c.execute("SELECT id, title, content FROM tasks WHERE id=? AND created_by=? AND assignee_id=? AND list_id=? AND completed_at IS NULL AND deleted_at IS NULL",
+                      (int(o[1]), person, person, my_inbox(c, person))).fetchone()
+    if t is None:
+        uset(c, person, "rin_open", f"{day}:{rin_task(c, person, title, text, doc_id)}:1")
+        return
+    n = int(o[2]) + 1
+    old = t["content"] if n > 2 else f"{t['title']}\n{t['content']}"
+    c.execute("UPDATE tasks SET title=?, content=?, url=?, updated_at=? WHERE id=?",
+              (trn("{0} invoice series needs you", "{0} invoice series need you", n, lg=lang(c, person)), f"{old}\n\n{title}\n{text}"[:4000],
+               PUBLIC_URL.rstrip("/") + "/#office/invoices", iso(now_utc()), t["id"]))
+    uset(c, person, "rin_open", f"{day}:{t['id']}:{n}")
+
+
 def _tell(c, people, key, name, text, doc_id=None):
     for p in people:
         lg = lang(c, p)
-        rin_task(c, p, tr(key, name, lg=lg), text(lg), doc_id)
+        rin_bundle(c, p, tr(key, name, lg=lg), text(lg), doc_id)
 
 
 def _name(c, oid, s):
@@ -402,9 +423,10 @@ def rin_bare(text):
     return re.sub(r"\s{2,}", " ", RIN_PH_RE.sub("", text or "")).strip(" -·,")
 
 
-def _period_txt(period, nxt):
+def _period_txt(period, nxt, lg):
+    """2.368.2 (#2986): the period in the language of the person who reads it (was German for everyone)."""
     try:
-        return f"{date.fromisoformat(period).strftime('%d.%m.%Y')} - {(date.fromisoformat(nxt) - timedelta(days=1)).strftime('%d.%m.%Y')}"
+        return f"{short_day(date.fromisoformat(period), lg, True)} - {short_day(date.fromisoformat(nxt) - timedelta(days=1), lg, True)}"
     except ValueError:
         return period
 
@@ -423,19 +445,19 @@ def rin_step(c, oid, uid, s, period, people, missed=()):
         return None, False, False, "", None
     sent, why, datev, m = (rin_send(c, oid, uid, did) if s["auto_send"] else (False, "", False, None))
     name = _name(c, oid, s)
-    pt = _period_txt(period, nxt)
-    gone = (lambda lg: "\n" + tr("Missed periods without an invoice: {0}", ", ".join(missed), lg=lg)) if missed else (lambda lg: "")
+    pt = lambda lg: _period_txt(period, nxt, lg)  # noqa: E731
+    gone = (lambda lg: "\n" + tr("Missed periods without an invoice: {0}", ", ".join(_period_txt(p, n, lg) for p, n in missed), lg=lg)) if missed else (lambda lg: "")
     if s["auto_send"] and not sent:
-        _tell(c, people, RIN_TASK_FAIL, name, lambda lg: tr("Period {0}. The invoice stays a draft: {1}", pt, why, lg=lg) + gone(lg), did)
+        _tell(c, people, RIN_TASK_FAIL, name, lambda lg: tr("Period {0}. The invoice stays a draft: {1}", pt(lg), tr_stored(why, lg), lg=lg) + gone(lg), did)
     elif not sent:
-        _tell(c, people, RIN_TASK_DRAFT, name, lambda lg: tr("Period {0}. Open the draft, check it and send it like any invoice.", pt, lg=lg) + gone(lg), did)
+        _tell(c, people, RIN_TASK_DRAFT, name, lambda lg: tr("Period {0}. Open the draft, check it and send it like any invoice.", pt(lg), lg=lg) + gone(lg), did)
 
     def post():  # 2.269.0 D (#3046): the mail after the number's commit, then its task
         ok, why2 = rin_mail(c, oid, uid, m)
         if not ok:
-            _tell(c, people, RIN_TASK_FAIL, name, lambda lg: tr("Period {0}. The invoice is finalised, the mail did not go out: {1}", pt, why2, lg=lg) + gone(lg), did)
+            _tell(c, people, RIN_TASK_FAIL, name, lambda lg: tr("Period {0}. The invoice is finalised, the e-mail did not go out: {1}", pt(lg), tr_stored(why2, lg), lg=lg) + gone(lg), did)
         elif missed:
-            _tell(c, people, RIN_TASK_DRAFT, name, lambda lg: tr("Period {0} was sent.", pt, lg=lg) + gone(lg), did)
+            _tell(c, people, RIN_TASK_DRAFT, name, lambda lg: tr("Period {0} was sent.", pt(lg), lg=lg) + gone(lg), did)
         bump(c)
         c.commit()
         return ok, why2
@@ -520,7 +542,7 @@ def _rin_as(c, oid, sid, today, actor, people):
         period = s["next_date"]
         if len(due) > RIN_MAX_MISSED:
             period, missed = due[-1], due[:-1]
-        did, sent, datev, _why, post = rin_step(c, oid, actor, s, period, people, [_period_txt(p, rin_after(s["start"], s["every"], p)) for p in missed[-12:]])
+        did, sent, datev, _why, post = rin_step(c, oid, actor, s, period, people, [(p, rin_after(s["start"], s["every"], p)) for p in missed[-12:]])
         bump(c)
         c.commit()
         if post:  # 2.269.0 D (#3046): number committed, now the mail
@@ -676,10 +698,10 @@ def rin_run(sid):
     c.commit()
     if nid is None:
         raise Denied(409, tr("This period has its invoice already"))
-    error = tr("The invoice stays a draft: {0}", why) if s["auto_send"] and not sent else None
+    error = tr("The invoice stays a draft: {0}", tr_stored(why)) if s["auto_send"] and not sent else None
     if post:  # 2.269.0 D (#3046): number committed, now the mail
         sent, why = post()
-        error = None if sent else tr("The invoice is finalised, the mail did not go out: {0}", why)
+        error = None if sent else tr("The invoice is finalised, the e-mail did not go out: {0}", tr_stored(why))
     if sent and datev:
         rin_datev(c, oid, nid)
     return jsonify(series=rin_public(c, oid, rin_row(c, oid, sid)), doc_id=nid, sent=bool(sent), prev_next_date=prev, error=error)

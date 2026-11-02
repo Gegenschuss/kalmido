@@ -256,6 +256,19 @@ def events_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                    q("calendar_id", "Only this calendar", {"type": "integer"})], scope=S),
         "post": op("Create an event", E, ok(ref("Event"), "Created", "201") | errs("400", "403", "404", "409"),
                    body={**ev_in, "required": ["title", "start"]}, scope=S)}
+    paths["/events/freebusy"] = {"get": op(
+        "2.467.0 (#2586): busy / away time spans of one day per person, never a title, a place or a calendar. An agent asks only "
+        "about the people shared with it (its owner; a team agent: full members of its workspace, by their setting freebusy_share); "
+        "anyone else is left out of the answer", E,
+        ok({"type": "object", "properties": {
+            "day": {"type": "string"}, "tz": {"type": "string"},
+            "people": {"type": "array", "items": {"type": "object", "properties": {
+                "user_id": {"type": "integer"},
+                "slots": {"type": "array", "items": {"type": "object", "properties": {
+                    "start": {"type": "string", "description": "HH:MM, local in tz"}, "end": {"type": "string", "description": "HH:MM, local in tz, up to 24:00"},
+                    "kind": {"type": "string", "enum": ["busy", "away"]}}}}}}}}}) | errs("400", "403", "429"),
+        [q("day", "Required: the day YYYY-MM-DD", {"type": "string", "format": "date"}), q("users", "Required: user ids, comma separated (at most 20)"),
+         q("tz", "IANA time zone"), q("skip", "An event of yours to leave out", {"type": "integer"})], scope=S)}
     paths["/events/{id}"] = {
         "get": op("One event (the series with its rule, changed and left-out occurrences, attendees)", E, ok(ref("Event")) | errs("404"), [eid_p], scope=S),
         "patch": op("Change an event (the whole series), or with ?occurrence= only that occurrence (title, location, description, all_day, "

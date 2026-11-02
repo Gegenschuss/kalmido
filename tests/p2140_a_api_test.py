@@ -156,7 +156,7 @@ def run(S, who):
     return RID
 
 
-# freelancer-matrix: personal (a person without an organisation: the same routes in its private space)
+# freelancer-matrix: personal (a person without an organisation: the same routes in its private workspace)
 RID = run(A, "alice")
 FID, Fr = freelancer(B, A)
 run(Fr, "freelancer")

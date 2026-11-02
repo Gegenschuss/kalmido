@@ -59,7 +59,7 @@ const TEST_IBAN = 'DE02120300000000202051';
   check(partial && /Partly paid/.test(partial.querySelector('.rotag')?.textContent || '') && partial.classList.contains('st-partial') && /open: .*1,380\.00/.test(partial.textContent), 'the finalised invoice shows "Partly paid" and the open amount: ' + (partial?.textContent || '').slice(0, 120));
   const draft = rows.find(x => /no number/.test(x.textContent));
   check(draft && /Draft/.test(draft.querySelector('.rotag')?.textContent || ''), 'the draft shows "Draft" without a number');
-  check(!!d.querySelector('[data-ofd="remind"]') && !!d.querySelector('[data-ofd="new-inv"]'), 'invoice list: "Create reminder" and "New invoice"');
+  check(!!d.querySelector('[data-ofd="remind"]') && !!d.querySelector('[data-ofd="new-inv"]'), 'invoice list: "Create payment reminder" and "New invoice"');
   const sel = d.querySelector('#ofd-status');
   check(sel && [...sel.options].some(o => o.value === 'overdue') && [...sel.options].some(o => o.value === 'partial'), 'status filter offers the derived states');
   w.close();

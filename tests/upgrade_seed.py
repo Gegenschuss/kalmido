@@ -9,7 +9,7 @@ requests and docker (no kt.py: that came later).
     # shots: 'P2192C_DUMP_SHOTS'          the folder the dump + JSON are written to (default: tests/fixtures/upgrade)
 
 Data (invented, addresses @example.com): instance admin alice with the organisation "Nordwind Studio", member bob, frida
-without an organisation (her own private space and personal office); an org project and a private list with tasks (due
+without an organisation (her own private workspace and personal office); an org project and a private list with tasks (due
 date + time, repeat rule, subtasks, a done task), comments of two people, an attachment, an org office (client, quotation
 with items, invoice from it, finalized), frida's personal office (client + quotation), time entries, a personal agent."""
 import gzip

@@ -22,7 +22,7 @@ from ..core.errors import reject_unknown
 from .review import vdr_comment_add, vdr_comment_row, vdr_dict, vdr_list_of, vdr_may, vdr_reload, vdr_tc, vdr_touch, vdr_versions
 
 VDR_V1_LIMIT = 200
-VDR_V1_CUSTOMER = N_("Only people who may change the task answer the customer")  # the portal answers' text (team/portal.py)
+VDR_V1_CUSTOMER = N_("Only people who may change the task answer the client")  # the portal answers' text (team/portal.py)
 
 
 def vdr_v1_need(c, vid, write=False):

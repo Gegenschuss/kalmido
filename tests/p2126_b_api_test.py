@@ -97,7 +97,7 @@ r.agent = {"owner_id": 7}
 ans, asked = perm_ask(r, 7, 1)
 check(asked and ans is None, "#1973: the owner chatting is asked in the chat")
 ans, asked = perm_ask(r, 8, 2)
-check(not asked and ans == "operator" and r.api.posts and r.api.posts[-1] == {"uid": 8, "body": ar.PERM_OPERATOR_ONLY},
+check(not asked and ans == "operator" and r.api.posts and r.api.posts[-1] == {"uid": 8, "body": ar.say("perm_operator_only")},
       f"#1973: someone else chatting: denied at once, with a note to them {r.api.posts[-1:]}")
 # a team agent: only KALMIDO_PERM_USER / KALMIDO_OWNER_IDS answer; without them nobody
 r = ar.Runner(["claude"], os.path.join(TMP, "perm2"))

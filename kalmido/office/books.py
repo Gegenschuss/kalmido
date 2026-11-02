@@ -26,10 +26,10 @@ from flask import Response, g, has_request_context, jsonify, request
 from ..core.config import app
 from ..core.db import db, local_now
 from ..core.access import Denied
-from ..core.i18n import N_, tr, lang
+from ..core.i18n import N_, csv_dialect, tr, trn, lang
 from ..core.errors import BadInput
 from .abschlag import abs_skonto_rows  # 2.355.0 C (#2840)
-from .calc import dec, dstr, money
+from .calc import calc_lang, dec, dstr, money
 from .countries import fk_reverse_case  # 2.355.0 C (#2844)
 from .einvoice_in import ei_amount, ei_details, ei_rc_offer  # 2.237.0 C (#2865)
 from .homecur import hc_code, hc_doc_fx, hc_home, hc_office_rate
@@ -181,7 +181,7 @@ def bk_gaps_text(gaps, missing=()):
         out.append(tr("Receipts without an amount (not in the export, complete them under Office > Receipts):"))
         out += [f"- {n}" for n in gaps["no_amount"]]
     if gaps.get("hidden"):
-        out.append(tr("{0} receipts lie in folders you cannot open and are not in this export; the GoBD export holds them.", gaps["hidden"]))
+        out.append(trn("{0} receipt lies in a folder you cannot open and is not in this export; the GoBD export holds it.", "{0} receipts lie in folders you cannot open and are not in this export; the GoBD export holds them.", gaps["hidden"]))
     return "\r\n".join(out) + ("\r\n" if out else "")
 
 
@@ -549,30 +549,27 @@ def bk_csv_cell(v):
     return csv_cell(v)
 
 
-def _de(v):
-    return str(v).replace(".", ",")
-
-
 @app.get("/api/office/books/euer.csv")
 def bk_euer_csv():
-    """?year=YYYY -> the EUeR as CSV (semicolon, decimal comma: German spreadsheets): group;net;VAT;gross."""
+    """?year=YYYY -> the EUeR as CSV (separator and decimal sign of the language, 2.368.2 #2984): group, net, VAT, gross."""
     from .ledger import ofx_log
     c, uid, oid = _ctx()
     d = bk_euer(c, oid, _year(request.args.get("year")))
     buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";", lineterminator="\r\n")
+    sep, num = csv_dialect()
+    w = csv.writer(buf, delimiter=sep, lineterminator="\r\n")
     w.writerow([tr("Group"), tr("Net"), tr("VAT"), tr("Gross")])
     for title, rows, tot in ((tr("Income"), d["income"], d["income_total"]), (tr("Expenses"), d["expenses"], d["expense_total"])):
         w.writerow([bk_csv_cell(title), "", "", ""])
         for r in rows:
-            w.writerow([bk_csv_cell(r["label"]), _de(r["net"]), _de(r["vat"]), _de(r["gross"])])
-        w.writerow([bk_csv_cell(tr("Total")), _de(tot["net"]), _de(tot["vat"]), _de(tot["gross"])])
-    w.writerow([bk_csv_cell(tr("Profit")), _de(d["profit"]), "", ""])
+            w.writerow([bk_csv_cell(r["label"]), num(r["net"]), num(r["vat"]), num(r["gross"])])
+        w.writerow([bk_csv_cell(tr("Total")), num(tot["net"]), num(tot["vat"]), num(tot["gross"])])
+    w.writerow([bk_csv_cell(tr("Profit")), num(d["profit"]), "", ""])
     w.writerow([bk_csv_cell(tr(BK_NOTE)), "", "", ""])
     ofx_log(c, oid, "export", target="books", detail={"what": "euer.csv", "year": d["year"]})
     c.commit()
     return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": f'attachment; filename="euer-{d["year"]}.csv"', "Cache-Control": "no-store"})
+                    headers={"Content-Disposition": f'attachment; filename="{tr("euer|file name")}-{d["year"]}.csv"', "Cache-Control": "no-store"})
 
 
 def bk_euer_pdf_bytes(c, oid, d, lang):
@@ -584,7 +581,7 @@ def bk_euer_pdf_bytes(c, oid, d, lang):
     A4_H, A4_W, _Page = ppr.A4_H, ppr.A4_W, ppr._Page
     company = ofx_name1(ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name"))  # 2.99.0 D (#2188): one line
     cur = d["currency"]
-    lg = "de" if lang == "de" else "en"
+    lg = calc_lang(lang)  # 2.449.0 (#3766): every app language (was de, else en)
     m = lambda v: pdf_money(v, lg, cur)  # noqa: E731
     x0, x1 = 56, A4_W - 56
     cols = [x1 - 230, x1 - 140, x1 - 50]  # right edges of net / VAT / gross minus their width
@@ -652,4 +649,4 @@ def bk_euer_pdf():
     ofx_log(c, oid, "export", target="books", detail={"what": "euer.pdf", "year": d["year"]})
     c.commit()
     return Response(data, mimetype="application/pdf",
-                    headers={"Content-Disposition": f'attachment; filename="euer-{d["year"]}.pdf"', "Cache-Control": "no-store"})
+                    headers={"Content-Disposition": f'attachment; filename="{tr("euer|file name")}-{d["year"]}.pdf"', "Cache-Control": "no-store"})

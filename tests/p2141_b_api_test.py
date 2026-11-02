@@ -9,7 +9,7 @@
    description = text start + sender; into another workspace 409, a list I may only read 404; the task / event remembers
    the mail (hub_mail_links), the mail lists what was made from it; the mail of a task: subject only for who may read the
    mail, else neither subject nor id
- - another organisation / agents: nothing (tenant-matrix: hubmail); a person without organisation in the private space
+ - another organisation / agents: nothing (tenant-matrix: hubmail); a person without organisation in the private workspace
    (freelancer-matrix: hub)
 usage: p2141_b_api_test.py <datadir>      (a fresh container; P2141B_NOSTART=1: a running server with the stub mailbox)"""
 import email.message

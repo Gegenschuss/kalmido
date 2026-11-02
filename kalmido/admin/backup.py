@@ -1,5 +1,6 @@
 """Backups and restore (admins)."""
 import contextlib
+import glob
 import hashlib
 import hmac
 import json
@@ -19,23 +20,26 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from flask import Response, g, jsonify, request, send_file
 
-from ..core.config import app, APP_VERSION, ATT_DIR, DATABASE_URL, DB, OFFICE_DIR, SESSION_DAYS, TZ
+from ..core.config import app, APP_NAME, APP_VERSION, ATT_DIR, DATABASE_URL, DB, OFFICE_DIR, PUBLIC_URL, SECRET_KEY, SESSION_DAYS, TZ
 from ..core.schema import PURGED_TABLES, SCHEMA_TRIGGERS, SCHEMA_VERSION
 from ..core import pg as _pg
-from ..core.i18n import N_, tr
-from ..core.db import body, connect, db, err, gset, gsetting, init_db, iso, local_now, now_utc, parse_iso
+from ..core.i18n import LANGS, N_, tr
+from ..core.db import body, connect, db, err, gset, gsetting, init_db, iso, local_now, now_utc, parse_iso, usettings
+from ..core.mailframe import mail_html
+from ..core.pg import system_ctx
 from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database errors in the log
-from ..core.db import appver_newer_minor
+from ..core.db import appver_newer_minor, appver_parse, skfp_kek, skfp_of, skfp_row_opens, SKFP_KEY
 from ..core.serializers import unlink_files
 from ..core.env import env_bool
 from ..core.retention import ret_on as bk_ret_on  # 2.186.0 C (#2602)
 from ..accounts.session import _rate_fail, _rate_keys, GATE, login_wait, set_cookie, start_session
-from ..accounts.bgjobs import bgj_add, bgj_fn, bgj_pending
+from ..accounts.bgjobs import BGJ_FNS, bgj_add, bgj_fn, bgj_pending
 from ..accounts.login import _AUTH_KEY, _PEND, _PEND_LOCK, seal, unseal
 from ..accounts.oidc import _OIDC_LOCK, _OIDC_STATES, oidc_reset
 from ..core.access import Denied, acx_drop
 from ..tasks.validation import valid_hm
 from ..tasks.lifecycle import UNDO_KEY
+from ..collab.integfail import integ_tell
 from ..collab.news import NEWS_CLEAN
 from ..accounts.users import need_admin
 from ..calendars.caldav import _DAV_CACHE, _DAV_CACHE_LOCK, _DAV_INST
@@ -118,7 +122,8 @@ BK_SHARED_MIN = max(1, _env_int("KALMIDO_BACKUP_SHARED_MIN", 64 * 1024))
 # files), listheads (list header pictures), bookmarks (bookmark pictures)
 # 2.152.0 B (#2172, review C-H3) found the same gaps (listheads, sheets, tchat, bookmarks): one list for both
 BK_FLAT = ("avatars", "listicons", "docthumbs", "listheads", "bookmarks")
-BK_PER_ID = ("files", "lists", "budget", "wiki", "tchat", "sheets")
+# 2.363.3 (#3134): + tplfiles (the files of templates)
+BK_PER_ID = ("files", "lists", "budget", "wiki", "tchat", "sheets", "tplfiles")
 BK_MEMBER_RE = re.compile(r"(attachments|office)/(\d{1,12}|" + "|".join(BK_FLAT) + "|(?:" + "|".join(BK_PER_ID) + r")/\d{1,12}|chat/\d{1,12}-\d{1,12})"
                           r"/([^/\\\x00-\x1f]{1,255})")
 # 2.359.2 (#2895): the own industry packs of the instance (office/sheet.py IND_DATA_DIR, /data/packs/industry): flat files
@@ -146,14 +151,21 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           "objects": N_("The database in the backup contains unexpected objects or statements and was refused."),
           "legacy": N_("This backup is from a version before 2.37 (SQLite). Restore it with Kalmido 2.36, then update to 2.37: the data is moved over during the update."),
           "tools": N_("The database tools (pg_dump / pg_restore) are missing on this server."),
+          # 2.359.3 (#2945)
+          "tools_version": N_("No backup is possible: pg_dump {0} refuses the newer PostgreSQL {1} of this server. Use a Kalmido image with postgresql-client {1} (see SELF-HOSTING.md)."),
           "passphrase": N_("Wrong passphrase, or the encrypted backup is damaged."),
           "need_passphrase": N_("This backup is encrypted: enter its passphrase."),
           "no_passphrase": N_("Encryption needs a passphrase (at least 10 characters)."),
           # 2.152.0 B (#2172)
           "encrypt_required": N_("This server only writes encrypted backups: set a passphrase (at least 10 characters)."),
+          # 2.359.3 (#2893)
+          "server_key": N_("This backup was made with another server key, so its encrypted data could not be read here. Nothing was changed. Put the key of the old server in place, restart and restore again (see SELF-HOSTING.md)."),
+          "server_key_none": N_("This server has no server key, so the encrypted data of this backup could not be read here. Nothing was changed. Set the key of the server that made the backup, restart and restore again (see SELF-HOSTING.md)."),
           "not_found": N_("Backup not found."),
           "confirm": N_("Type {0} to confirm."),
           "maint": N_("The server is still busy; the restore did not start. Please try again."),
+          # 2.370.2 (#2779): a folder that is a mount of its own cannot be renamed (EXDEV / EBUSY)
+          "mounts": N_("The attachments or office folder is a mount of its own, so a restore cannot swap it. Nothing was changed. Mount the data folder as a whole, see SELF-HOSTING.md."),
           # 2.148.1 C (#2482): the maintenance mode of a restore holds in this process only
           "procs": N_("A restore needs a single server process (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1). Stop the other processes first, see SELF-HOSTING.md."),
           "restore": N_("The restore failed ({0}); nothing was changed."),
@@ -162,6 +174,10 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           # 2.432.0 (#3584): the shared files of a backup (bkstore.py)
           "shared_missing": N_("{0} shared files of this backup are missing in the backup folder. Download the backup from the server that made it (a complete file), or put the shared files back."),
           "old_passphrase": N_("This backup was encrypted with an earlier passphrase. Enter that passphrase to check, restore or download it.")}
+BK_LEFTOVER_NOTE = N_("Folders from a restore are lying next to the data folder ({0}). After a hard stop the database and the files may not match: check them, a successful restore removes them.")  # 2.370.2 (#2779)
+# 2.359.3 (#2893): what a restore warns about (bk_key_state; "foreign" only gets this far with KALMIDO_SECRET_KEY_CHANGED=1)
+BK_KEY_WARN = {"foreign": N_("This backup was made with another server key: attachments, private files and encrypted fields stay unreadable until that key is back in place."),
+               "secrets": N_("This backup may come from another server key: stored access tokens (Git, documents, single sign-on) may be unreadable. Enter them again or put the old key back.")}
 _BK = {"running": "", "started": 0.0, "next_try": 0.0, "stale_at": 0.0, "meta": {}}
 _BK_LOCK = threading.Lock()
 
@@ -340,6 +356,44 @@ def _pg_tool(name):
     return exe
 
 
+def bk_tools_majors(c):
+    """2.359.3 (#2945): (major of pg_dump, major of the server); None for what cannot be told (pg_dump then speaks for itself)."""
+    txt = os.environ.get("KALMIDO_TEST_PG_DUMP_VERSION", "") if os.environ.get("KALMIDO_TEST") == "1" else ""  # tests only
+    try:
+        txt = txt or subprocess.run([_pg_tool("pg_dump"), "--version"], stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                                    timeout=15, check=False, env={"PATH": os.environ.get("PATH", "")}).stdout
+    except (BackupError, OSError, subprocess.TimeoutExpired):
+        txt = ""
+    m = re.search(r"(?:^|\s)(\d{1,3})(?:\.\d+|\s|$)", txt or "")
+    try:
+        num = int(c.execute("SHOW server_version_num").fetchone()[0])
+    except Exception:  # noqa: BLE001 -- no answer: the dump names the problem
+        c.rollback()
+        num = 0
+    return int(m.group(1)) if m else None, num // 10000 or None
+
+
+def bk_tools_check(c):
+    """2.359.3 (#2945): pg_dump refuses a server of a newer major version: BackupError before anything is written."""
+    tool, server = bk_tools_majors(c)
+    if tool and server and tool < server:
+        raise BackupError("tools_version", str(tool), str(server))
+
+
+def bk_tools_note():
+    """2.359.3 (#2945): once per instance start: Admin > Server names the problem before the next backup fails."""
+    c = connect()
+    try:
+        tool, server = bk_tools_majors(c)
+        bad = bool(tool and server and tool < server)
+        gset(c, "bk_tools_problem", f"{tool}|{server}" if bad else "")
+        c.commit()
+    finally:
+        c.close()
+    if bad:
+        aa_now("storage", "backup:tools_version", BK_ERR["tools_version"], [str(tool), str(server)])
+
+
 def _pg_errline(raw, tool):
     """First meaningful line of a tool's stderr (short; libpq never prints the password)."""
     for ln in (raw or b"").decode("utf-8", "replace").splitlines():
@@ -413,6 +467,7 @@ def bk_create(kind="manual", c=None, keep_dump=None):
             raise BackupError("encrypt_required")
         if encrypt and len(pw) < 10:
             raise BackupError("no_passphrase")
+        bk_tools_check(c)  # 2.359.3 (#2945)
         # 2.432.0 (#3584): every file is hashed first; only what the shared store does not hold yet needs room (before:
         # all files again, twice with encryption). The zip holds the database and the small files, so it stays small
         db_bytes = bk_db_bytes(c)
@@ -734,7 +789,7 @@ def bk_run(kind):
                 c.commit()  # a SET survives only a committed transaction
             name = bk_create(kind, c)
             bk_prune(c)
-            for k, v in (("bk_last_ok", iso(now_utc())), ("bk_last_name", name), ("bk_last_error", ""), ("bk_last_error_at", "")):
+            for k, v in (("bk_last_ok", iso(now_utc())), ("bk_last_name", name), ("bk_last_error", ""), ("bk_last_error_at", ""), ("bk_tools_problem", "")):
                 gset(c, k, v)
             c.commit()
         except BackupError:
@@ -749,6 +804,8 @@ def bk_run(kind):
             c.rollback()
             gset(c, "bk_last_error", e.text("en"))
             gset(c, "bk_last_error_at", iso(now_utc()))
+            if e.code == "tools_version":  # 2.359.3 (#2945): Admin > Server (about: backup_tools_problem)
+                gset(c, "bk_tools_problem", "|".join(str(x) for x in e.args_))
             c.commit()
         except Exception:  # noqa: BLE001 -- no database: the alert below still goes out (log + admin alert queue)
             pass
@@ -756,6 +813,7 @@ def bk_run(kind):
         print("backup FAILED:", e.text("en"), flush=True)
         aa_now("storage", f"backup:{e.code}", N_("Backup failed: {0}"), [{"t": BK_ERR.get(e.code, BK_ERR["format"])} if not e.args_
                                                                        else e.text("en")])
+        bk_fail_tell(c, e)
         return None
     finally:
         if c is not None:
@@ -821,6 +879,31 @@ def backup_tick(c):
             last = gsetting(c, "bk_last_ok")
             aa_now("storage", "backup:stale", N_("The last successful backup is older than 2 days ({0})."),
                    [last[:16].replace("T", " ") + " UTC" if last else {"t": N_("none yet")}])
+
+
+def bk_fail_tell(c, e):
+    """2.367.3 (#2971): a failed backup reaches every instance admin as a News item, a push and a mail, whatever the admin alerts
+    are set to (an error with a backup is worth a second way); once a day per error, the next try comes within the hour."""
+    key = f"{local_now().date().isoformat()}:{e.code}"
+    try:
+        if c is None or gsetting(c, "bk_fail_told") == key:
+            return
+        gset(c, "bk_fail_told", key)
+        with system_ctx(c):  # every instance admin
+            rows = c.execute("SELECT id, email FROM users WHERE is_admin=1 AND disabled=0 AND kind<>'agent' ORDER BY id").fetchall()
+            langs = {r["id"]: usettings(c, r["id"]).get("lang") for r in rows}
+        integ_tell(c, [r["id"] for r in rows], "backup", e.text, click="settings/odata", focus="odata")
+        c.commit()
+    except Exception as x:  # noqa: BLE001 -- no database: the log and the admin alert above are what is left
+        print("backup: telling the admins failed:", type(x).__name__, flush=True)
+        return
+    link = f"{PUBLIC_URL}/#settings/odata"
+    for r in rows if "mail:security" in BGJ_FNS else ():  # the background mail of integrations/mail.py: only with outgoing mail
+        if not (r["email"] or "").strip():
+            continue
+        lg = langs[r["id"]] if langs[r["id"]] in LANGS else "en"
+        subject, line = f"{APP_NAME}: {tr('Backup failed: {0}', e.text(lg), lg=lg)}", tr("Please check the backup settings.", lg=lg)
+        bgj_add("mail:security", r["email"], subject, f"{line}\n\n{link}", mail_html(subject, [line], tr("Open settings", lg=lg), link, lang=lg), user_id=r["id"])
 
 
 def backup_loop():
@@ -1135,6 +1218,44 @@ def _restore_args(toc):
     return ["--clean", "--if-exists", "--no-owner", "--no-privileges", "--single-transaction", f"--use-list={toc}"]
 
 
+# 2.359.3 (#2893): the same columns as core/db.py skfp_keys_match, the start check of the server key
+BK_KEY_COLS = {"org_keys": ("org_id", "kek_check", "kek_check_rot"), "user_keys": ("user_id", "kek_check")}
+
+
+def bk_key_cols(table, copy_line):
+    """Positions of the id and the check values in a COPY block of org_keys / user_keys; None for every other table."""
+    want = BK_KEY_COLS.get(table)
+    if not want:
+        return None
+    cols = [x.strip().strip('"') for x in copy_line[copy_line.index(b"(") + 1:copy_line.rindex(b")")].decode("utf-8", "replace").split(",")]
+    return [cols.index(x) for x in want if x in cols]
+
+
+def bk_key_row(kek, table, kcols, line):
+    """Does this data row of org_keys / user_keys open with kek? (column values of a server-made COPY block: digits and hex)"""
+    v = line.rstrip(b"\n").split(b"\t")
+    try:
+        sid = int(v[kcols[0]])
+        return skfp_row_opens(kek, sid if table == "org_keys" else -sid, [v[i].decode("ascii", "replace") for i in kcols[1:] if v[i] != b"\\N"])
+    except (IndexError, TypeError, ValueError):  # (a crafted archive; TypeError: compare_digest refuses non-ASCII text)
+        return False
+
+
+def bk_key_state(man):
+    """2.359.3 (#2893): does a checked backup fit the server key here (read from the dump, nothing restored)? "ok"; "foreign":
+    it holds organisation / account keys and none opens; "secrets": no such keys, but its fingerprint is another one (or a
+    version before the fingerprint, 2.190, made it): only stored tokens are at stake."""
+    d = man.get("db")
+    if not d:
+        return "ok"  # format 1, before 2.37: no sealed data yet
+    if d["key_rows"]:
+        return "ok" if d["key_opens"] else "foreign"
+    if d["secret_fp"]:
+        return "ok" if SECRET_KEY and skfp_of(SECRET_KEY) == d["secret_fp"] else "secrets"
+    v = appver_parse(man.get("app_version"))
+    return "secrets" if v and v < (2, 190, 0) else "ok"
+
+
 def bk_scan_dump(dump):
     """Reads the whole dump through pg_restore (to SQL text; no database involved): every data block must be readable
     (else "integrity"), every statement one of a Kalmido dump ("objects"), the schema version (kalmido_meta) not newer
@@ -1142,6 +1263,7 @@ def bk_scan_dump(dump):
     exe = _pg_tool("pg_restore")
     toc, _ = _toc_file(dump)
     rows, ddl, ddl_n, meta, table = {}, [], 0, {}, None
+    kek, key_rows, key_opens, kcols = skfp_kek(SECRET_KEY) if SECRET_KEY else None, 0, False, None  # 2.359.3 (#2893)
     with tempfile.TemporaryFile() as errf:
         p = subprocess.Popen([exe, *_restore_args(toc), "-f", "-", dump], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                              stderr=errf, env={"PATH": os.environ.get("PATH", "")})
@@ -1156,6 +1278,10 @@ def bk_scan_dump(dump):
                         if table == "kalmido_meta" and len(meta) < 100:
                             k, _, v = line.rstrip(b"\n").partition(b"\t")
                             meta[k.decode("utf-8", "replace")] = v.decode("utf-8", "replace")
+                        if kcols:
+                            key_rows += 1
+                            if kek and not key_opens:
+                                key_opens = bk_key_row(kek, table, kcols, line)
                     continue
                 if line.startswith(b"COPY "):
                     m = _COPY.fullmatch(line)
@@ -1167,6 +1293,7 @@ def bk_scan_dump(dump):
                         bad = "objects"
                         break
                     rows[table] = 0
+                    kcols = bk_key_cols(table, line)
                     continue
                 if line.startswith(b"\\"):  # psql meta commands: only the \restrict / \unrestrict pair of pg_dump 17.6+
                     if not re.fullmatch(rb"\\(un)?restrict [A-Za-z0-9]{1,128}\n", line):
@@ -1205,7 +1332,8 @@ def bk_scan_dump(dump):
         raise BackupError("format")
     if int(sv) > SCHEMA_VERSION:
         raise BackupError("schema", int(sv))
-    return {"schema_version": int(sv), "rows": rows, "users": rows.get("users", 0)}
+    return {"schema_version": int(sv), "rows": rows, "users": rows.get("users", 0), "key_rows": key_rows, "key_opens": key_opens,
+            "secret_fp": meta.get(SKFP_KEY, "")}
 
 
 def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False, pack_dest=None):
@@ -1277,6 +1405,7 @@ def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False, p
         raise BackupError("format") from None
     if not man["_legacy"]:
         man["db"] = bk_scan_dump(dbp)
+        man["key_state"] = bk_key_state(man)  # 2.359.3 (#2893)
     elif restore:
         from .migrate import is_kalmido_sqlite
         if not is_kalmido_sqlite(dbp):
@@ -1607,11 +1736,50 @@ def bkr_after_restore(c, rows):
 _BK_RESEAL = {"bk_pass": "backup", "bko_sec": "backup-offsite"}  # 2.359.0 (#2894): kept settings sealed with auth_secret (offsite.BKO_SEAL)
 
 
+def bk_own_mounts():
+    """2.370.2 (#2779): the folders a restore swaps by a rename that are a mount of their own (the rename always fails there)."""
+    if os.environ.get("KALMIDO_TEST") == "1" and os.environ.get("KALMIDO_TEST_BK_OWN_MOUNT"):  # tests only: a container has no second mount
+        return [ATT_DIR]
+    return [p for p in (ATT_DIR, OFFICE_DIR) if os.path.ismount(p)]
+
+
+def bk_leftovers():
+    """2.370.2 (#2779): folders of a restore next to the data folders: a hard stop left them behind, or a restore kept them
+    for files the backup format does not cover. -> [(path, prefix of bk_outside)], the packs have their own rule."""
+    out = []
+    for base, prefix in ((ATT_DIR, "attachments/"), (OFFICE_DIR, "office/")):
+        base = base.rstrip(os.sep)
+        out += [(p, prefix) for p in sorted(glob.glob(glob.escape(base) + ".pre-restore-*") + glob.glob(glob.escape(base) + ".restore-*"))
+                if os.path.isdir(p)]
+    return out
+
+
+def bk_leftovers_alert():
+    """At the start of the server: an admin alert when such folders lie around (Backups in the settings names them too)."""
+    left = [os.path.basename(p) for p, _ in bk_leftovers()]
+    if left:
+        print("restore: folders left from a restore:", ", ".join(left), flush=True)
+        aa_now("storage", "restore:leftover", BK_LEFTOVER_NOTE, [", ".join(left)])
+
+
+def bk_leftovers_clean(listed):
+    """After a good restore: what is left from earlier ones goes, unless it holds files the archive does not bring (kept like
+    the folder of before, never deleted unseen). An unfinished copy (.restore-) is nothing of value."""
+    for p, prefix in bk_leftovers():
+        left = bk_outside(p, prefix, listed) if ".pre-restore-" in os.path.basename(p) else {}
+        if left:
+            print(f"restore: kept {os.path.basename(p)}: files the backup format does not cover:", json.dumps(left, sort_keys=True), flush=True)
+        else:
+            shutil.rmtree(p, ignore_errors=True)
+
+
 def bk_restore(path, pw, admin, via):
     """The whole restore (see the section comment). Returns (new session token or None, safety backup name)."""
     from .worker import WRK_REPLICAS, WRK_ROLE
     if WRK_ROLE != "all" or WRK_REPLICAS > 1:  # 2.148.1 C (#2482): other processes would keep writing during the swap
         raise BackupError("procs")
+    if bk_own_mounts():  # 2.370.2 (#2779)
+        raise BackupError("mounts")
     if not _BK_LOCK.acquire(blocking=False):
         raise BackupError("busy")
     _BK.update(running="restore", started=time.time())
@@ -1627,6 +1795,9 @@ def bk_restore(path, pw, admin, via):
         pack_new = os.path.join(work, "packs")  # 2.359.2 (#2895)
         os.makedirs(pack_new, mode=0o755)
         man, dbp = bk_prepare(path, pw, work, att_new, off_new, restore=True, pack_dest=pack_new)
+        kstate = man.get("key_state", "ok")
+        if kstate == "foreign" and not env_bool("KALMIDO_SECRET_KEY_CHANGED", False):  # 2.359.3 (#2893): before anything changes
+            raise BackupError("server_key" if SECRET_KEY else "server_key_none")
         cur = connect()
         try:
             keep = {r[0]: r[1] for r in cur.execute("SELECT key, value FROM settings WHERE key ILIKE 'bk\\_%' ESCAPE '\\' OR key ILIKE 'bko\\_%' ESCAPE '\\'")}  # 2.223.2 C (#2871): bko_ = the off-site target
@@ -1652,12 +1823,13 @@ def bk_restore(path, pw, admin, via):
         gate = True
         pre = os.path.join(work, "pre-restore.dump")  # the current database, for a rollback if anything below fails
         safety = bk_create("safety", keep_dump=pre)
-        moved = swapped = omoved = oswapped = False
+        moved = aswapped = swapped = omoved = oswapped = False
         try:
             if os.path.isdir(ATT_DIR):
                 os.rename(ATT_DIR, att_old)
                 moved = True
             os.rename(att_new, ATT_DIR)
+            aswapped = True
             if os.path.isdir(OFFICE_DIR):
                 os.rename(OFFICE_DIR, off_old)
                 omoved = True
@@ -1703,8 +1875,9 @@ def bk_restore(path, pw, admin, via):
                     back_failed = True  # 2.273.0 A (#3050): never "nothing was changed" then
                     print("restore: rolling back to the state before FAILED:", type(e2).__name__, getattr(e2, "args_", e2),
                           f"(the safety backup {safety} holds it)", flush=True)
-            if os.path.isdir(ATT_DIR) and moved:
+            if aswapped:  # 2.370.2 (#2779): also on a fresh instance (nothing moved), and the old folder back when the new one never came in
                 os.rename(ATT_DIR, att_new)
+            if moved:
                 os.rename(att_old, ATT_DIR)
             if oswapped:
                 os.rename(OFFICE_DIR, off_new)
@@ -1713,15 +1886,13 @@ def bk_restore(path, pw, admin, via):
             if back_failed:
                 raise BackupError("rollback", safety) from None
             raise
-        for old, prefix in ((att_old, "attachments/"), (off_old, "office/")):  # 2.148.1 C (#2482): files outside the archive
-            left = bk_outside(old, prefix, man["_listed"])  # format stay in the folder of before (never deleted unseen)
-            if left:
-                print(f"restore: kept {os.path.basename(old)}: files the backup format does not cover:", json.dumps(left, sort_keys=True), flush=True)
-            else:
-                shutil.rmtree(old, ignore_errors=True)
+        bk_leftovers_clean(man["_listed"])  # 2.148.1 C (#2482): files outside the archive format stay in the folder of before; 2.370.2 (#2779): also older leftovers
         bk_restore_packs(pack_new)  # 2.359.2 (#2895)
         print(f"restore: {os.path.basename(path)} restored by an admin (safety backup {safety})", flush=True)  # 2.239.0 B (#2888): no name in the log
         man["_again"] = bkr_restore_journal(journal, purged)  # 2.152.0 B (#2172)
+        if kstate != "ok":  # 2.359.3 (#2893)
+            print(f"restore: server key check: {kstate}", flush=True)
+            aa_now("security", f"restore-key:{int(time.time())}", BK_KEY_WARN[kstate], [])
         # 2.273.0 A (#3051 p. 12, 13): what a restore cannot bring back, in the result and the log
         man["_notes"] = ([(N_("{0} waiting background jobs were not restored (a backup never holds them): start what is still needed again."), jobs)]
                          if jobs else []) + [(BK_OFFLINE_NOTE,)]
@@ -1819,7 +1990,7 @@ def bk_state(c):
             "last_ok": gsetting(c, "bk_last_ok"), "last_name": gsetting(c, "bk_last_name"), "last_error": gsetting(c, "bk_last_error"),
             "last_error_at": gsetting(c, "bk_last_error_at"),
             "running": _BK["running"] or ("manual" if bgj_pending(c, "backup") else ""),  # 2.193.0 D (#2220): also queued / in the worker
-            "confirm_word": BK_CONFIRM,
+            "confirm_word": BK_CONFIRM, "leftovers": [os.path.basename(p) for p, _ in bk_leftovers()],  # 2.370.2 (#2779)
             "total_bytes": sum(x["size"] for x in items) + store[1], "free_bytes": aa_disk().get("free"),
             "store_files": store[0], "store_bytes": store[1],  # 2.432.0 (#3584): the shared store (one line in the list)
             "max_mb": BK_MAX_BYTES // 1048576, "items": [bk_public(x) for x in items],
@@ -1839,6 +2010,8 @@ def need_backups():
 def storage_check():
     need_admin()
     c, out, n = db(), [], 0
+    from .hosting import hosted
+    apart = hosted()
     for kind, sql in (("attachment", "SELECT a.id, a.task_id AS owner, a.name, a.size, a.path, t.title AS where_ FROM attachments a "
                                      "LEFT JOIN tasks t ON t.id=a.task_id"),
                       ("list_file", "SELECT f.id, f.list_id AS owner, f.name, f.size, f.path, l.name AS where_ FROM list_files f "
@@ -1864,7 +2037,8 @@ def storage_check():
             from ..core.orgcrypt import oc_plain_size
             disk = oc_plain_size(full) if r["path"] and os.path.isfile(full) else None  # 2.42.0 (#828): sealed = plain size
             if disk is None or (r["size"] and disk != r["size"]):
-                out.append({"kind": kind, "id": r["id"], "owner": r["owner"], "where": r["where_"] or "", "name": r["name"],
+                out.append({"kind": kind, "id": r["id"], "owner": r["owner"], "where": "" if apart else r["where_"] or "",
+                            "name": "" if apart else r["name"],  # 2.399.0 (#2687): hosted: numbers only, no titles / file names
                             "size": r["size"], "disk": disk, "problem": "missing" if disk is None else "empty" if not disk else "size"})
     return jsonify(checked=n, problems=out)
 
@@ -1936,6 +2110,9 @@ def backups_now():
 def backups_download(name):
     from .offsite import stepup_download
     need_backups()
+    from .hosting import hosted
+    if hosted():  # 2.399.0 (#2687): a backup holds every client's content: on a hosted instance it stays on the server / offsite
+        raise Denied(403, tr("On a hosted instance a backup is not downloaded in the app: it holds the content of every client (it stays on the server and its offsite copy)"))
     p = bk_path(name)
     enc = bool(bk_parse_name(name)["encrypted"])
     fmt3 = bk_meta(p, enc).get("format_version") == 3
@@ -2037,6 +2214,11 @@ def backups_delete(name):
     return jsonify(bk_state(db()))
 
 
+def bk_key_warning(man):
+    t = BK_KEY_WARN.get(man.get("key_state", "ok"))
+    return tr(t) if t else ""
+
+
 @app.post("/api/admin/backups/<name>/verify")
 def backups_verify(name):
     """Full check without changing anything: decrypt, member list, every checksum, database integrity."""
@@ -2053,6 +2235,7 @@ def backups_verify(name):
                    schema_version=man.get("schema_version"), counts=man.get("counts") or {}, legacy=man["_legacy"],
                    attachment_files=man.get("attachment_files"), attachment_bytes=man.get("attachment_bytes"),
                    pack_files=man.get("pack_files") or 0,  # 2.359.2 (#2895)
+                   key_warning=bk_key_warning(man),  # 2.359.3 (#2893)
                    missing_files=man.get("missing_files") or 0, missing_paths=man.get("missing_paths") or [])  # 2.273.0 A (#3050)
 
 
@@ -2137,6 +2320,7 @@ def backups_restore():
         with contextlib.suppress(OSError):
             os.remove(p)
     resp = jsonify(ok=True, safety=safety, relogin=tok is None and via != "proxy", created_at=man.get("created_at"),
+                   key_warning=bk_key_warning(man),  # 2.359.3 (#2893)
                    deleted_again=man.get("_again") or {},  # 2.152.0 B (#2172): accounts of the journal
                    notes=[tr(*n) for n in man.get("_notes") or []])  # 2.273.0 A (#3051 p. 12, 13)
     if tok:

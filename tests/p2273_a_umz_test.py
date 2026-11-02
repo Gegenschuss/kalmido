@@ -63,7 +63,7 @@ check({"sheets", "wiki_pages", "bookmarks", "budgets", "people"} <= parts, f"gua
 silent = sorted(p for p in parts if p not in READ and p not in LEFT)
 check(not silent, f"guard: every export part is read by the import or named as staying behind (UMZ_READ / UMZ_LEFT): {silent}")
 check(not READ & set(LEFT), f"guard: a part is read and named as left behind at once {sorted(READ & set(LEFT))}")
-wsrc = ast.unparse(fn_of(imp, "umz_write"))
+wsrc = ast.unparse(fn_of(imp, "umz_write")) + ast.unparse(fn_of(imp, "umz_files"))  # 2.362.4 (#3100): the files have their own function
 used = set(re.findall(r"data\.get\('([a-z0-9_]+)'", wsrc)) | set(re.findall(r"data\['([a-z0-9_]+)'\]", wsrc))
 for tup in re.findall(r"for (?:table|src), [^:]*? in \((.*?)\):", wsrc, re.S):  # the loops over (table, ...) tuples
     used |= set(re.findall(r"\('([a-z0-9_]+)', ", tup))

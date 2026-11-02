@@ -53,7 +53,7 @@ const orgOf = async id => (await call('GET', '/api/state')).lists.find(l => l.id
   dlg = await until(() => { const x = d.querySelector('.smv-dlg'); const b = x?.querySelector('[data-smv="yes"]'); return b && !b.disabled ? x : null; });
   check(!!dlg, '#2924: the dialog again, Move enabled');
   if (dlg) dlg.querySelector('form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
-  check(await until(async () => await orgOf(W) === null), '#2924: Move moves the project into the private space');
+  check(await until(async () => await orgOf(W) === null), '#2924: Move moves the project into the private workspace');
   d.querySelectorAll('.modal').forEach(x => x.remove());
 
   // a member outside the organisation: the dialog blocks

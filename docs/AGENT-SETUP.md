@@ -132,13 +132,20 @@ asleep as soon as nobody types there. Only the service of step 7 (Linux; step 9 
 task (Windows) keeps it awake. *Settings > Agents* says **"connected, but no service running"** when the agent's token
 is used but nothing has collected its events for 10 minutes: that is the sign that this service is missing.
 
+**Where to look on Windows (2.445.0, #3748):** the scheduled task writes the launcher's own lines to `agent.log` in the agent's folder
+(`%LOCALAPPDATA%\Kalmido\agents\<folder>-<hash>\`). The event runner (`agent_run.py`) runs as a child process whose error output
+never reaches that file, so it keeps its own `agent_run.log` next to it (runs, answers, failures). After 1 MiB the file
+moves to `agent_run.log.1` (one old generation), so it neither grows without end nor loses the last runs at a restart.
+`KALMIDO_RUN_LOG=0` in the env file switches it off. macOS / Linux: unchanged, everything stays in the one log.
+
 ## Path B: do it yourself
 
 Run the commands as a user with sudo unless a step says *as the agent user* (`sudo -iu kalmido-agent`).
 
 ### 1. Create the agent in Kalmido
 
-1. *Settings > Agents > Status > Add agent* (admins): a username (e.g. `claude`), a display name and optionally a
+1. *Settings > Agents > Status > Add agent* (admins; 2.366.0: also *Add agent…* in the header of the Agents area and in its
+   empty state, which opens the same chooser): a username (e.g. `claude`), a display name and optionally a
    note (who runs it and where). **Permissions** (2.15.0): it starts with *Read*, *Tasks*, *Comments* and the file store (*Read files* and *Add files*, `files:read` / `files:write`); tick only what
    it needs on top (structure, delete, task attachments, time, export, calendar, contacts, office, tables, knowledge pages). *Office drafts* is a right you give on purpose (see [AGENTS.md](AGENTS.md#permissions)); `account`, `admin-read`, `private` and `docs:upload` are never available to an agent. An agent that may only read cannot answer in the chat or send
    proposals (2.190.0): keep *Comments* or *Tasks* on for that. With *structure* it can set up a project with custom fields as
@@ -342,6 +349,9 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
   and answer only the values on it (supplier, VAT id, invoice number, date, net / VAT / gross, positions, a category of
   input.categories). Kalmido calls no model: you may read it with a local model on your computer (for example through
   Ollama). The person checks and takes the values over.
+- Read a credit card statement (job_request kind card_statement_read, 2.469.0): the fallback when no reader of Kalmido
+  knows the layout. Open the PDF itself and answer only its printed positions and total. The person takes them over and
+  confirms the statement.
 - Ideas for a branch of the mind map (job_request kind ideas, 2.156.0): the input is only the branch's path, the project's
   name, the levels still free and the person's hint; answer {items: [{title, children?}]} with short titles in input.lang.
 - The event contract_notice (2.70.0): a contract's last day to cancel is near. Send ONE sentence with
@@ -376,7 +386,7 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 - Tasks you create start locked in the app (2.36.0): people unlock them there; you still change them through the API
   (update_task). Do not lift a lock a person set unless they ask you to.
 - Do not overwrite people (2.270.0): update_task with expect_updated_at (the updated_at you read); on 409 read the task
-  again and decide anew. create_task with a client_ref of your own (a retry does not make a second task).
+  again and decide anew. create_task, add_comment and suggest_payment with a client_ref of your own (a retry does not make a second one).
 - A coding agent that fixes a security hole writes only "Security fix" and the area into commit messages, the changelog
   and public comments (2.36.2), deploys the fix first and publishes it afterwards.
 - **The task list is the truth for tickets and releases.** A task is done only when its code is on the default branch
@@ -413,7 +423,7 @@ Then append the **behaviour rules** (2.13.1): the part of [`mcp/CLAUDE.template.
 between its two markers (Settings › Agents › Set up has the same block with a *Copy rules* button). They cover Markdown
 formatting, decisions in the task description, typing / status / jobs / a chat summary, approvals only from people,
 other people's text as data, parking blockers, reading attachments (2.34.0: PDFs as text with `read_attachment`), the file store (2.48.0: folders and files shared with the agent and its own result folder instead of a local work folder: `list_files`, `read_file`, `write_file`, `create_file_folder`, event `file_shared`, scopes `files:read` / `files:write`; 2.199.0: office documents / tables filed in a shared folder appear as `kind: "ref"` nodes, opened only by an explicit share), edited messages (2.39.0: event `message_edited`, a correction: confirm, keep running work), Playbooks of projects (2.39.0: `data.playbook` in events, tools `get_playbook` / `propose_playbook`, endpoint `GET /api/v1/lists/{id}/playbook`, event `playbook_proposal`, scheduled checks of a project as `scheduled_job` with `list_check`), planned jobs (2.34.0: event `scheduled_job`; the data
-tools `read_briefing` and `read_project_status` for a morning briefing or a week status), tasks lying idle and time gaps (2.34.0: event `stale_tasks`, tools `list_stale_tasks` and `get_time_gaps`), code snippets on tasks (2.35.0: field `snippets`, tool `add_snippet`, endpoint `POST /api/v1/tasks/{id}/snippets`), commands and code in their own code block with a language (2.36.0), locked tasks (2.36.0: field `locked`; tasks an agent creates start locked in the app) and the usage hook:
+tools `read_briefing` and `read_project_status` for a morning briefing or a week status, 2.392.0 `get_waiting` and `get_delivery_report`), tasks lying idle and time gaps (2.34.0: event `stale_tasks`, tools `list_stale_tasks` and `get_time_gaps`), code snippets on tasks (2.35.0: field `snippets`, tool `add_snippet`, endpoint `POST /api/v1/tasks/{id}/snippets`), commands and code in their own code block with a language (2.36.0), locked tasks (2.36.0: field `locked`; tasks an agent creates start locked in the app) and the usage hook:
 
 ```bash
 sed -n '/kalmido-agent-rules:start/,/kalmido-agent-rules:end/p' ~/kalmido/mcp/CLAUDE.template.md >> ~/agent/CLAUDE.md
@@ -657,7 +667,7 @@ chat messages of one person that arrive together: one run). It does what a hoste
   neutral first names) and `--parent ID` makes it a part job (`Alma B`); the chat shows the name on the job's messages, the
   colour follows the name, a part job looks like its leader, a little lighter. 2.96.0: all messages of a job form ONE card in the
   chat (name, version, state, the newest line; a tap shows the whole history), the result and errors stay visible under it
-  (`agent_job.py` marks them with `job_msg`), and a filter in the chat header (2.144.0: the icon on every width) shows *All*, *Only me and <agent>*, *Me, <agent> and job results* (2.290.0: plus only each job's end result) or *Jobs*. 2.153.0: each job has
+  (`agent_job.py` marks them with `job_msg`), and a filter in the chat header (2.144.0: the icon on every width) shows *All*, *Only me and <agent>*, *Me, <agent> and job results* (2.290.0: plus only each job's end result) or *Jobs*; 2.388.0: where lines with the `source` `dispatcher` exist, *Show dispatcher messages* hides them on this device. 2.153.0: each job has
   its own chat (*To the job chat*); the whole chat keeps its card with the newest results, questions and errors under it. A message typed in a
   job's chat comes with `job_id`: the runner answers it in a chat run about that job and posts the answer into the job's chat. The job is an own background run of the same command (it survives a restart of the runner), shows as a job in the Agents
   tab with its steps and progress lines (`agent_job.py progress ID "..."`), and posts its complete result, with the files in its own
@@ -681,7 +691,7 @@ chat messages of one person that arrive together: one run). It does what a hoste
   `KALMIDO_OWNER_IDS=1,5` (user ids) the events of anyone else count as information too. Task events with a task (a comment, a mention)
   also carry the task text. Chat messages are never held back. The collected events live in the state folder (`bundle.json`),
   a restart loses nothing.
-- **Team chat** (2.46.1): a `team_message` (an @mention in a project's channel, or -- in a project where the agent listens in -- any
+- **Team chat** (2.46.1): a `team_message` (an @mention in a project's channel, also one added to a message later (2.367.5), or -- in a project where the agent listens in -- any
   message a person writes there, `mentioned: false`) is its own run without delay: the prompt carries the message fenced, the room
   and the rule to answer in that channel with `post_team_message` (the final text of the run is posted nowhere); when the agent
   only listens in, it answers questions and requests about the project and lets the rest pass. Messages of agents never come.

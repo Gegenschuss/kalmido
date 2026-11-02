@@ -7,7 +7,6 @@
 'use strict';
 
 const AGB = {data: null, loading: false, ws: null};
-const AGB_LANGS = [['de', 'Deutsch'], ['en', 'English']];
 
 async function agbLoad(force) {
   if (AGB.loading || (AGB.data && !force && AGB.ws === OFC.ws)) return;
@@ -26,19 +25,19 @@ function agbRowHtml(lg, name, t, adm) {
   const acts = t ? `<a class="btn sm" href="${agbFileUrl(lg, true)}" target="_blank" rel="noopener">${tr('Show')}</a>`
     + (adm ? `<button type="button" class="btn sm" data-agb="up" data-lg="${lg}">${tr('Replace')}</button><button type="button" class="btn sm" data-agb="del" data-lg="${lg}">${tr('Remove')}</button>` : '')
     : (adm ? `<button type="button" class="btn sm" data-agb="up" data-lg="${lg}">${ic('upload', 's')}<span>${tr('Upload')}</span></button>` : '');
-  return `<li class="agbrow" data-lg="${lg}"><span class="ofcn"><b>${esc(name)}</b><small class="muted">${esc(info)}</small></span>${acts ? `<span class="lacts">${acts}</span>` : ''}</li>`;
+  return `<li class="agbrow" data-lg="${lg}"><span class="ofcn"><b>${esc(name)}</b><small class="muted">${esc(info)}${t ? upMarkHtml(t.up) : ''}</small></span>${acts ? `<span class="lacts">${acts}</span>` : ''}</li>`;
 }
 // the block in the office settings (next to the logo); loads once per workspace
 function agbSettingsHtml() {
   if (!AGB.data || AGB.ws !== OFC.ws) { setTimeout(() => agbLoad(), 0); return `<div class="row" id="agb-box"><label>${tr('Terms and conditions (PDF)')}</label><span class="muted">${tr('Loading…')}</span></div>`; }
   const t = AGB.data.terms || {}, adm = !!AGB.data.admin;
-  return `<div class="row" id="agb-box"><label>${tr('Terms and conditions (PDF)')}</label><ul class="ofclist agblist" role="list">${AGB_LANGS.map(([lg, n]) => agbRowHtml(lg, n, t[lg], adm)).join('')}</ul>
+  return `<div class="row" id="agb-box"><label>${tr('Terms and conditions (PDF)')}</label><ul class="ofclist agblist" role="list">${ofcLangList().map(([lg, n]) => agbRowHtml(lg, n, t[lg], adm)).join('')}</ul>
     <span class="muted ofchint">${esc(tr('Sent along with quotations in the same language; the quotation names the date. At most {0} MB.', AGB.data.max_mb || 10))}</span></div>`;
 }
 function agbUploadDialog(lg) {
   const cur = AGB.data?.terms?.[lg], today = ds(new Date());
   if (typeof loadCss === 'function') loadCss('calendar').catch(() => {});  // the app's own date picker
-  const lname = (AGB_LANGS.find(x => x[0] === lg) || [lg, lg])[1];
+  const lname = (ofcLangList().find(x => x[0] === lg) || [lg, lg])[1];
   ofdDlg(cur ? tr('Replace terms and conditions ({0})', lname) : tr('Upload terms and conditions ({0})', lname),
     ofdF('agb-file', tr('PDF file'), `<input type="file" id="ofd-agb-file" accept="application/pdf,.pdf">`)
     + ofdF('agb-date', tr('As of'), dateIn('ofd-agb-date', today, {label: tr('As of'), clear: false}))

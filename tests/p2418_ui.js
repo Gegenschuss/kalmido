@@ -1,7 +1,7 @@
 // kalmido-suite: fresh
 // 2.418.0 (#3560) UI test (jsdom), own container (start.sh): the menus of the areas, arranged per person
-//  - computer: the office's panel ends with "Customize"; it opens the editor in place (Minus, grip, Hidden with Plus,
-//    Done); the points not used yet (cash flow, figures, travel, entertainment, subscriptions) start under Hidden, no "More"
+//  - computer: the office's panel ends with "Customise"; it opens the editor in place (Minus, grip, Hidden with Plus,
+//    Done); 2.448.0 (#3784): every point of Money shows before its first use (#3411), no "More"
 //  - Minus hides a point (only the menu: its route still opens), Plus brings one back, the arrow keys on the grip move a
 //    point inside its group; everything lands in the setting nav_menus (the same on every device) and can be undone
 //  - right-click on a point of the panel: "Hide from menu"
@@ -45,19 +45,22 @@ const menus = async ck => JSON.parse((await call('GET', '/api/state', null, ck))
   const ev = s => w.eval(s);
   check(await until(() => ev(`typeof OFC === 'object' && !!OFC.info`) && d.querySelector('#side [data-ofm="offers"]')), 'computer: the office panel');
   const side = () => [...d.querySelectorAll('#side [data-ofm]')].map(b => b.dataset.ofm);
-  check(!side().includes('kpi') && !side().includes('cashflow') && side().includes('receipts'), '#3560: unused points not in the menu ' + side());
+  // 2.448.0 (#3784): points of Money not used yet show at once, nothing starts hidden
+  check(['cashflow', 'kpi', 'travel', 'meals', 'subs', 'receipts'].every(k => side().includes(k)), '#3784: the unused points are in the menu ' + side());
   check(!d.querySelector('#side [data-act="ofm-more"]'), '#3560: no "Show more" any more');
   const cust = d.querySelector('#side [data-act="nav-edit"][data-area="office"]');
-  check(cust && /Customize/.test(cust.textContent), '#3560: "Customize" ends the panel');
+  check(cust && /Customise/.test(cust.textContent), '#3560: "Customise" ends the panel');
   cust.click();
   const ed = () => d.querySelector('#side .naved[data-naved="office"]');
   check(await until(() => ed()), '#3560: Customize opens the editor in place (navmenu.js loads)');
   const hidKeys = () => [...(ed()?.querySelectorAll('.navoffl .navr') || [])].map(li => li.dataset.k);
-  check(['cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => hidKeys().includes(k)), '#3560: the unused points start under Hidden ' + hidKeys());
+  check(!hidKeys().length, '#3784: nothing starts under Hidden ' + hidKeys());
   check(ed().querySelector('.navl[data-navg="sell"] .navr[data-k="offers"] [data-act="nav-hide"]') && ed().querySelector('.navr[data-k="offers"] .navgrip') && ed().querySelector('[data-act="nav-done"]'), '#3560: a row: Minus, grip; Done on top');
-  // Plus brings the figures back
+  // Minus hides the figures, Plus brings them back
+  ed().querySelector('.navr[data-k="kpi"] [data-act="nav-hide"]').click();
+  check(await until(() => hidKeys().includes('kpi')), '#3560: Minus: the figures are under Hidden');
   ed().querySelector('.navoffl [data-k="kpi"] [data-act="nav-show"]').click();
-  check(await until(async () => ((await menus(CF)).office?.shown || []).includes('kpi')), '#3560: Plus saves shown: kpi');
+  check(await until(async () => !((await menus(CF)).office?.hidden || []).includes('kpi')), '#3560: Plus takes the figures out of hidden');
   check(await until(() => ed()?.querySelector('.navl[data-navg="money"] .navr[data-k="kpi"]')), '#3560: the figures move into the menu (group Money)');
   // Minus hides the contacts (address book)
   ed().querySelector('.navr[data-k="contacts"] [data-act="nav-hide"]').click();

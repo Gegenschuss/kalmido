@@ -179,7 +179,7 @@ const feats = st => st.settings.features.split(',');
   check(feats(await api(jar, 'GET', '/api/state')).includes('habits'), 'later: modules can be switched on again');
   w.close();
 
-  // ---- 5: 1.5: no "Skip"; the single modules sit under "Customize…"; "Team" = everything (but Family) on
+  // ---- 5: 1.5: no "Skip"; the single modules sit under "Customise…"; "Team" = everything (but Family) on
   fresh();
   jar = {}; w = await open(jar); d = w.document;
   await step1(w);

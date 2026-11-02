@@ -1,17 +1,17 @@
 // 2.141.0 part A UI test (#2141, #2138), own container (start.sh with the stub mail server inside: IMAP 1143, SMTP 1025),
-// jsdom. The server has no mailbox of its own: alice's private space has its own (IMAP + SMTP of the stub).
-// - #mailhub: the section "Mailbox" with the private space; its dialog shows the stored servers, the passwords only as
+// jsdom. The server has no mailbox of its own: alice's private workspace has its own (IMAP + SMTP of the stub).
+// - #mailhub: the section "Mailbox" with the private workspace; its dialog shows the stored servers, the passwords only as
 //   "unchanged"; "Check connection" shows both logins as working (2.166.0, #2633: fields save themselves)
 // - the client's card: "New e-mail" (also when hubmailbox.js is loaded on demand); suggested recipients from the client
 // - the reading view: "Reply" opens the writing dialog with the sender, "Re: ..." and the quote; Send = a toast, the sent
 //   mail is filed in the list ("Sent"), the stub SMTP got it
 // - an SMTP that fails: the dialog stays open with the error, the list shows "Not sent"
-// freelancer-matrix: hub  (the person here is the instance admin in the own private space; the freelancer case of the same
+// freelancer-matrix: hub  (the person here is the instance admin in the own private workspace; the freelancer case of the same
 // routes is p2141_a_api_test.py)
 const fs = require('fs');
 const path = require('path');
 const {execFileSync} = require('child_process');
-const {boot, errs, sleep, B, login} = require('./boot');
+const {boot, errs, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
@@ -37,7 +37,7 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 20000, ste
 const FEAT = 'collab,comments,clients,contacts';
 
 (async () => {
-  await sleep(800);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
@@ -54,7 +54,7 @@ const FEAT = 'collab,comments,clients,contacts';
   // ---- #mailhub: the section "Mailbox" and its dialog
   let w = await boot({user: 'alice', hash: 'mailhub'}), d = w.document;
   const sp = await until(async () => d.querySelector('.hbmhub .hmbsp[data-hmbws="private"]'), 20000);
-  check(sp && /office@example\.test/.test(sp.textContent), 'mailhub: the private space shows its mailbox address');
+  check(sp && /office@example\.test/.test(sp.textContent), 'mailhub: the private workspace shows its mailbox address');
   click(w, sp && sp.querySelector('[data-hmba="edit"]'));
   let md = await until(async () => d.querySelector('.modal.hmbdlg'), 20000);
   check(md && md.querySelector('#hmb-ih').value === '127.0.0.1' && md.querySelector('#hmb-ip').value === '1143' && md.querySelector('#hmb-fa').value === 'office@example.test',
@@ -74,7 +74,7 @@ const FEAT = 'collab,comments,clients,contacts';
   check(md && md.querySelectorAll('.hmbcheck .hmbok').length === 2, 'Check connection: receiving and sending work');
   check(outbox().length === 0, 'the check sends nothing');
   if (md) click(w, md.querySelector('[data-m="close"]'));
-  await sleep(300);
+  await until(async () => !d.querySelector('.modal.hmbdlg'));
 
   // ---- the client's card: New e-mail with suggested recipients
   w.eval(`go('client/${ACME}')`);

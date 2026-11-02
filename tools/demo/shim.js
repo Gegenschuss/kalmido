@@ -411,7 +411,7 @@
     'GET /api/agents/usage': () => ({days: [], agents: []}), 'POST /api/news/read': () => ({ok: true}),
     'GET /api/proposals/agents': () => ({agents: []}),  // 2.126.3 (#2123 #2124): the office / documents / status report ask which agents may draft - none in the demo
     'GET /api/pomo/stats': () => ({days: [], total: 0}), 'GET /api/stale': () => ({tasks: [], count: 0, default_days: 7}),
-    'GET /api/briefing': () => ({}), 'GET /api/layouts/saved': () => ({saved: []}), 'GET /api/layouts/std': () => ({layouts: {}, can: false}),
+    'GET /api/briefing': () => ({}), 'GET /api/inbox': () => ({total: 0, counts: {}, items: []}), 'GET /api/layouts/saved': () => ({saved: []}), 'GET /api/layouts/std': () => ({layouts: {}, can: false}),
     'POST /api/favorites/suggestion': () => ({list_id: null}),  // 2.74.0 (#1653): was a write -> the notice popped up 8 s after the start 'GET /api/ical': () => ({enabled: false}),
   };
   const R = [], MISS = [], GATE = [], UNKNOWN = [], CALLS = [];  // 2.125.0 D (#1653): UNKNOWN = reads no route here knows (console.warn + a line)  // MISS: calls answered by the fallback (tests list them); GATE (2.74.0): office reads gated on purpose
@@ -1296,6 +1296,9 @@
   // absences (kalmido/hub/absence.py): own ones, holidays of a chosen German state (the nationwide days + Easter based)
   const STATES = {BW: 'Baden-Württemberg', BY: 'Bayern', BE: 'Berlin', BB: 'Brandenburg', HB: 'Bremen', HH: 'Hamburg', HE: 'Hessen', MV: 'Mecklenburg-Vorpommern', NI: 'Niedersachsen',
     NW: 'Nordrhein-Westfalen', RP: 'Rheinland-Pfalz', SL: 'Saarland', SN: 'Sachsen', ST: 'Sachsen-Anhalt', SH: 'Schleswig-Holstein', TH: 'Thüringen'};
+  // 2.461 (#3773): the picker: first the country, then its regions
+  const COUNTRIES = [{code: 'DE', name: 'Deutschland', regions: Object.fromEntries(Object.entries(STATES).filter(([k]) => k !== 'AT'))}, {code: 'AT', name: 'Österreich', regions: {}}];
+  STATES.DE = 'Deutschland';
   const easter = y => { const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30,
     i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451), mo = Math.floor((h + l - 7 * m + 114) / 31), da = ((h + l - 7 * m + 114) % 31) + 1; return `${y}-${pad(mo)}-${pad(da)}`; };
   const holidays = (from, to) => { if (!MD().state) return []; const out = [];
@@ -1307,7 +1310,7 @@
   const absSet = (a, b) => { for (const k of ['kind', 'start_date', 'end_date', 'half_day', 'note']) if (k in b) a[k] = b[k]; if (!a.end_date) a.end_date = a.start_date;
     if (!/^\d{4}-\d\d-\d\d$/.test(a.start_date || '') || a.end_date < a.start_date) bad(tx('Invalid value: {0}').replace('{0}', 'date')); };
   on('GET', '/api/team/absences', q => { const st = q.get('start') || today().slice(0, 8) + '01', en = q.get('end') || monthEnd(today().slice(0, 7));
-    return {org_id: null, orgs: [], personal: 1, admin: true, state: MD().state || '', states: STATES, today: today(), start: st, end: en,
+    return {org_id: null, orgs: [], personal: 1, admin: true, state: MD().state || '', states: STATES, countries: COUNTRIES, today: today(), start: st, end: en,
       people: [{id: 1, username: DB.me.username, display_name: DB.me.display_name, avatar: '', own: true}],
       items: mcol('absences').filter(a => !a.deleted_at && a.end_date >= st && a.start_date <= en).map(absOut), holidays: holidays(st, en)}; });
   on('GET', '/api/team/absences/check', q => { const d = q.get('date') || today(), a = mcol('absences').find(x => !x.deleted_at && d >= x.start_date && d <= x.end_date);

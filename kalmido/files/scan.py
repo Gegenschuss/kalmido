@@ -144,6 +144,12 @@ def sc_needs_retry(st, data):
     return st == "unchecked" and len(data) <= sc_max_bytes()
 
 
+def sc_size_mark(size):
+    """2.453.0 (#3781): the mark of a file of `size` bytes kept outside the file store (letterhead, terms): like a stored file,
+    a file larger than the scanner takes reads "unchecked". None when it fits or the scanner is off."""
+    return {"scan": "unchecked", "scan_why": "size"} if sc_target() and size > sc_max_bytes() else None
+
+
 SC_RETRY_TEXT = N_("The virus scanner cannot check the file right now. Please try again in a few minutes.")
 
 

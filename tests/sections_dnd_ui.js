@@ -3,7 +3,7 @@
 // sections are reordered by their handle (list view and kanban columns) in one request with one undo, "Move up / down"
 // in the section menu uses the same request, a view-only member gets no handles and a notice, and on a phone a
 // long-press on a task opens "Move to section…" and a long-press on a section header "Move section up / down".
-const {boot, errs, sleep, B, login} = require('./boot');
+const {boot, errs, sleep, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -43,7 +43,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(head(A)?.querySelector('.shandle[draggable="true"]') && head(C)?.querySelector('.shandle') && !head('')?.querySelector('.shandle'), 'a drag handle on every named section header');
   check(!d.querySelector(`.sdrop[data-section="${C}"]`) && head(C) && !d.body.classList.contains('tdrag'), 'empty section: stays visible, no drop field (2.46.2 #1662)');
   // ---- a task onto a header: top of that section
-  dnd(w, row(t4), 'dragstart'); await sleep(20);  // 2.19.0 (#667): set right after dragstart, not inside it
+  dnd(w, row(t4), 'dragstart'); await until(() => d.body.classList.contains('tdrag'));  // 2.19.0 (#667): set right after dragstart, not inside it
   check(d.body.classList.contains('tdrag'), 'while dragging: body.tdrag (drop zones show)');
   const ov = dnd(w, head(A), 'dragover');
   check(ov.defaultPrevented && head(A).classList.contains('drop'), 'section header is a drop target with a highlight');
@@ -56,7 +56,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   d.querySelector('#toast button').click();
   check(await until(async () => (await taskOf(t4)).section_id === Bs), 'undo: back in "Next"');
   // ---- into an empty section via its drop zone
-  await sleep(200);
+  await until(() => w.eval(`taskById(${t4})?.section_id === ${Bs}`) && row(t4)?.closest('.group')?.querySelector('.ghead')?.dataset.section === String(Bs)); await idle(w);  // the page knows the undo too
   dnd(w, row(t5), 'dragstart');
   const zone = head(C);  // 2.46.2 (#1662): the section name takes the drop
   check(dnd(w, zone, 'dragover').defaultPrevented && zone.classList.contains('drop'), 'empty section: the name accepts the task');
@@ -89,7 +89,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   await call('POST', `/api/lists/${L}/sections/order`, {ids: [A, Bs, C]});
   // ---- kanban columns
   await call('PATCH', `/api/lists/${L}`, {view: 'kanban'});
-  await w.eval('load().then(() => render())'); await sleep(300);
+  await w.eval('load().then(() => render())'); await until(() => d.querySelector(`.kcol[data-kcol="${Bs}"] .khead .shandle`));
   const col = sid => d.querySelector(`.kcol[data-kcol="${sid}"]`);
   check(col(Bs)?.querySelector('.khead .shandle'), 'kanban: handle on the column header');
   dnd(w, col(Bs).querySelector('.shandle'), 'dragstart'); dnd(w, col(A), 'dragover');
@@ -106,36 +106,38 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   // ================= view-only member
   w = await boot({user: 'carol', hash: 'l/' + L}); d = w.document;
   check(d.querySelector(`#view .ghead[data-section="${A}"]`) && !d.querySelector('.shandle') && !d.querySelector('.sdrop'), 'view-only: no handles, no drop zones');
-  w.eval(`taskToSection(${t2}, ${C})`); await sleep(200);
+  w.eval(`taskToSection(${t2}, ${C})`); await until(() => /View only/.test(toastText(d))); await idle(w);
   check(/View only/.test(toastText(d)), 'view-only: a move gives the notice');
   check((await taskOf(t2)).section_id === A, 'nothing moved');
   const r = await call('POST', `/api/lists/${L}/sections/order`, {ids: [C, A, Bs]}, CKc);
   check(r.status === 403, `view-only: the server refuses the order too (${r.status})`);
   const cmob = await boot({user: 'carol', hash: 'l/' + L, mobile: true, media: {'(hover: none)': true}});
   const hc = cmob.document.querySelector(`#view .ghead[data-section="${A}"]`);
-  touch(cmob, hc, 'touchstart'); await sleep(520); touch(cmob, hc, 'touchend'); await sleep(100);
+  touch(cmob, hc, 'touchstart'); await sleep(520); touch(cmob, hc, 'touchend');  // wanted: a hold longer than the long-press timer (450 ms, dnd.js)
+  await until(() => /Nur ansehen|View only/.test(cmob.document.querySelector('#toast:not(.hidden)')?.textContent || ''));
   check(/Nur ansehen|View only/.test(cmob.document.querySelector('#toast:not(.hidden)')?.textContent || ''), 'view-only: long-press on a header gives the notice');
   cmob.close(); w.close();
 
   await call('POST', `/api/lists/${L}/sections/order`, {ids: [A, Bs, C]});
   // ================= phone (bob, German): long-press task -> "Move to section…", long-press header -> up / down
   w = await boot({user: 'bob', hash: 'l/' + L, mobile: true, media: {'(hover: none)': true}}); d = w.document;
-  touch(w, row(t2), 'touchstart'); await sleep(450);
-  const te = touch(w, row(t2), 'touchend'); await sleep(150);
+  touch(w, row(t2), 'touchstart'); await sleep(450);  // wanted: the long press (dnd.js timer)
+  const te = touch(w, row(t2), 'touchend'); await until(() => w.eval(`S.multiMode && S.multi.has(${t2})`));
   // 2.13.0 (#453 A14): a long press without moving selects the task in a list (Kanban keeps "Move to column…"); the
   // section picker itself is the same
   // 2.32.0 (#1055): the long press selects the task at once (2.25.0 UX-11 opened its menu with "Select" first)
   check(te.defaultPrevented && !d.querySelector('#pop:not(.hidden)') && w.eval('S.multiMode') && w.eval(`S.multi.has(${t2})`), 'long-press on a task without moving selects it (2.32.0)');
   w.eval('S.multi.clear(); S.multiMode = false; render()');
-  w.eval(`sectionPicker(document.querySelector('#view .trow[data-id="${t2}"]'), ${t2})`); await sleep(150);
+  w.eval(`sectionPicker(document.querySelector('#view .trow[data-id="${t2}"]'), ${t2})`); await until(() => /Later/.test(d.querySelector('#pop:not(.hidden)')?.textContent || ''));
   let pop = d.querySelector('#pop:not(.hidden)');
   check(pop && /Nicht zugeordnet/.test(pop.textContent) && /Later/.test(pop.textContent), 'section picker (German)');
   [...pop.querySelectorAll('button')].find(b => b.textContent.trim() === 'Later').click();
   check(await until(async () => (await taskOf(t2, BK)).section_id === C), 'picked: moved to "Later"');
   check(await until(() => /In Abschnitt „Later“ verschoben/.test(toastText(d)), 15000), `German toast: ${toastText(d)}`);
   const hb = () => d.querySelector(`#view .ghead[data-section="${Bs}"]`);
-  touch(w, hb(), 'touchstart'); await sleep(520);
-  const he = touch(w, hb(), 'touchend'); await sleep(150);
+  touch(w, hb(), 'touchstart'); await sleep(520);  // wanted: a hold longer than the long-press timer (450 ms, dnd.js)
+  const he = touch(w, hb(), 'touchend'); await until(() => /Abschnitt nach oben/.test(d.querySelector('#pop:not(.hidden)')?.textContent || ''));
+
   pop = d.querySelector('#pop:not(.hidden)');
   check(he.defaultPrevented && pop && /Abschnitt nach oben/.test(pop.textContent) && /Abschnitt nach unten/.test(pop.textContent), 'long-press on a section header: move up / down');
   [...pop.querySelectorAll('button')].find(b => /Abschnitt nach oben/.test(b.textContent)).click();

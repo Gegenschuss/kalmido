@@ -1,6 +1,6 @@
 // kalmido-suite: fresh
 // 2.435.0 part B UI tests (jsdom), fresh DB:
-// - #3618 the row menu of the document list: a finalised invoice offers Preview, Download PDF, Send by mail… in that order;
+// - #3618 the row menu of the document list: a finalised invoice offers Preview, Download PDF, Send by e-mail… in that order;
 //   a draft offers Download PDF (it asks first) but no sending; sending opens the send dialog
 // - #3578 the app shell is recognised (window.__KALMIDO_SHELL__ or "KalmidoApp/" in the user agent): Account settings offer
 //   "Change server", no install hint, no Web Push offer in the iPhone shell; a plain browser shows none of that
@@ -32,10 +32,10 @@ const ua = v => w => Object.defineProperty(w.navigator, 'userAgent', {configurab
   await until(() => w.eval('typeof ofdMoreItems') === 'function');
   const labels = id => w.eval(`api('GET', '/api/office/docs/${id}').then(d => ofdMoreItems({id: d.id, kind: d.kind, number: d.number, status: d.status, locked: d.locked, can_edit: d.can_edit}, true).filter(Boolean).map(x => x.label || x))`);
   const lf = await labels(inv.id), ld = await labels(dr.id);
-  const iP = lf.indexOf('Preview (PDF)'), iD = lf.indexOf('Download PDF'), iS = lf.indexOf('Send by mail…');
-  check(iP >= 0 && iD === iP + 1 && iS === iD + 1, 'finalised invoice: Preview, Download PDF, Send by mail… in this order: ' + lf.join(' | '));
-  check(ld.includes('Download PDF') && !ld.includes('Send by mail…'), 'draft: Download PDF, no sending: ' + ld.join(' | '));
-  await w.eval(`api('GET', '/api/office/docs/${inv.id}').then(d => ofdMoreItems({id: d.id, kind: d.kind, number: d.number, status: d.status, locked: d.locked}, true).find(x => x && x.label === 'Send by mail…').fn())`);
+  const iP = lf.indexOf('Preview (PDF)'), iD = lf.indexOf('Download PDF'), iS = lf.indexOf('Send by e-mail…');
+  check(iP >= 0 && iD === iP + 1 && iS === iD + 1, 'finalised invoice: Preview, Download PDF, Send by e-mail… in this order: ' + lf.join(' | '));
+  check(ld.includes('Download PDF') && !ld.includes('Send by e-mail…'), 'draft: Download PDF, no sending: ' + ld.join(' | '));
+  await w.eval(`api('GET', '/api/office/docs/${inv.id}').then(d => ofdMoreItems({id: d.id, kind: d.kind, number: d.number, status: d.status, locked: d.locked}, true).find(x => x && x.label === 'Send by e-mail…').fn())`);
   check(await until(() => w.document.querySelector('#ofd-s-to')), 'sending opens the send dialog');
   w.close();
 

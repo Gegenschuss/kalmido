@@ -63,7 +63,7 @@ function ccSheetHtml() {
     : `<button class="btn sm ghost" data-cc="reopen">${tr('Take confirmation back')}</button>${CC.data.manage && !s.bank && ofcCan('bank', 'edit', 'pay') ? `<button class="btn sm" data-cc="bank" aria-expanded="${!!CC.bank}">${ic('bank', 's')}<span>${tr('Match bank booking')}</span></button>` : ''}`}
     ${lock ? '' : `<button class="btn sm ghost" data-cc="delstmt">${tr('Delete')}</button>`}`;
   return `<div class="ofcbar"><button class="btn ghost" data-cc="tocard">${ic('back', 's')}<span>${tr('Back')}</span></button><span class="spacer"></span></div>
-    <h3 class="ofcgrp">${esc(ccMon(s.month))}</h3>${facts}${hint}<div class="bnkacts">${acts}</div>${CC.bank ? ccBankHtml(s) : ''}
+    <h3 class="ofcgrp">${esc(ccMon(s.month))}</h3>${facts}${hint}${draft && !lock && !ls.length && typeof ccs_html === 'function' ? ccs_html(s, CC.sheet.agent_read) : ''}<div class="bnkacts">${acts}</div>${CC.bank ? ccBankHtml(s) : ''}
     ${ls.length ? `<ul class="bnklist ccl" role="list">${ls.map(x => ccLine(x, s)).join('')}</ul>` : ''}`;
 }
 function ccBankHtml(s) {

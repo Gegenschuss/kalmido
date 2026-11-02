@@ -10,7 +10,7 @@ Invented texts and figures only (every file is written here). freelancer-matrix:
  - 2.273.0 F2 (#3047): a recognition run that finds an archive number code does not hold the workspace's archive number
    lock while it classifies (a probe from a second connection inside classify gets the lock); the number is still stored
  - 2.273.0 (#3047): the recognised value behind a hand value is stored only as a keyed digest (no plain amount in auto)
- - the same for a person without an organisation (private space)
+ - the same for a person without an organisation (private workspace)
 usage: p2273_c_docs_test.py <datadir>   (P2273C_NOSTART=1: a running server on KALMIDO_TEST_PORT)"""
 import os
 import subprocess

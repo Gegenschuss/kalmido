@@ -344,7 +344,7 @@ def lyo_send():
     ags = agent_ids(c)
     for x in dict.fromkeys(to):
         if x == sender or x in ags or not may_see(c, sender, x):
-            raise Denied(404, tr("unknown user"))
+            raise Denied(404, tr("unknown person"))
         if not _page_ok(c, key, x):  # someone the sender sees: naming them tells nothing new
             raise Denied(409, tr("{0} cannot see this project page", _uname(c, x)))
     who, ts = _uname(c, sender), iso(now_utc())

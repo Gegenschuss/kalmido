@@ -4,7 +4,8 @@
 
 // ---- #1516: #notes (no list id) = every note I may read: pinned first, then the newest change; the list's name on each card;
 // a filter by list / project and a search in title and text (the server's GET /api/notes, the same rights as a list's notes);
-// "New note" asks for the list (only lists with notes that I may write in). #notes/<id> stays the notes of one list.
+// "New note" opens a quick note (2.477.0, #3881: in the filtered list, else in the private list "Notes"). #notes/<id> stays the
+// notes of one list.
 S.sbn = {q: '', lid: 0, hits: null, ex: {}, exLoaded: false, qT: null};
 const sb_noteCount = () => (S.notes || []).length;
 const sb_noteWritable = () => S.lists.filter(l => !l.archived && notesOn(l) && canEditList(l.id));
@@ -39,7 +40,7 @@ function sb_notesView() {
   const sel = ls.length > 1 || S.sbn.lid ? `<select id="sbn-l" class="sbnsel" aria-label="${esc(tr('Project'))}"><option value="0">${tr('All projects')}</option>${prj.length && oth.length ? `<optgroup label="${esc(tr('Projects'))}">${prj.map(opt).join('')}</optgroup><optgroup label="${esc(tr('Other projects'))}">${oth.map(opt).join('')}</optgroup>` : ls.map(opt).join('')}</select>` : '';
   return `<div class="ntwrap"><div class="ntview sbnall"><div class="ntlist">
     <div class="ntbar sbnbar"><div class="ssearch">${ic('search', 's')}<input id="sbn-q" type="search" value="${esc(S.sbn.q)}" placeholder="${esc(tr('Search notes'))}" aria-label="${esc(tr('Search notes'))}" autocomplete="off"></div>${sel}
-      ${sb_noteWritable().length ? `<button type="button" class="btn sm pri" data-sb="note-new" aria-haspopup="menu">${ic('plus', 's')}${tr('New note')}</button>` : ''}</div>
+      ${S.me?.kid ? '' : `<button type="button" class="btn sm pri" data-sb="note-new">${ic('plus', 's')}${tr('New note')}</button>` /* 2.477.0 (#3881): always (the list Notes comes with it) */}</div>
     <div id="sbn-res">${sb_noteCardsHtml()}</div></div></div></div>`;
 }
 function sb_notesPatch() { const r = $('#sbn-res'); if (r) fl_set(r, sb_noteCardsHtml()); }  // 2.46.2 (#1718)
@@ -54,12 +55,6 @@ function sb_notesSearch() {
     announce(trn('{0} note', '{0} notes', S.sbn.hits.length));
   }, 250);
 }
-async function sb_noteNew(l) {
-  let r; try { r = await rawFetch('POST', `/api/lists/${l.id}/notes`, {title: tr('New note')}); } catch (e) { toast(e.message); return; }
-  S.notes = [{id: r.id, list_id: l.id, title: r.title, tags: [], pinned: false, updated_at: r.updated_at}, ...(S.notes || [])];
-  S.nt.newId = r.id; go('note/' + r.id);
-  setTimeout(() => { const t = $('#nt-title'); if (t) { t.focus(); t.select(); } }, 150);
-}
 document.addEventListener('input', e => {
   if (e.target.id !== 'sbn-q') return;
   S.sbn.q = e.target.value; if (S.sbn.q.trim()) S.sbn.hits = null; sb_notesSearch();
@@ -72,8 +67,131 @@ document.addEventListener('change', e => {
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-sb="note-new"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();
-  const ls = sb_noteWritable(), f = ls.find(l => l.id === S.sbn.lid);
-  if (f) { sb_noteNew(f); return; }
-  if (ls.length === 1) { sb_noteNew(ls[0]); return; }
-  tch_listPicker(b, {filter: l => ls.includes(l), pick: l => sb_noteNew(l), title: tr('New note in…')});
+  // 2.477.0 (#3881): no question any more: a list filtered here takes it, else the private list "Notes"
+  const f = sb_noteWritable().find(l => l.id === S.sbn.lid);
+  qn_new(f ? f.id : 0);
 }, true);
+
+// ---- 2.477.0 (#3881): the quick note, like Apple Notes. One grip (holding the phone's Plus button, the key m, "New note" in
+// the command field and in the notes) opens an empty note with the cursor in its text: no question for the list, no title
+// field. The first line is the title, it saves by itself; a note left empty goes for good (never into the trash). Its home is
+// the private list "Notes" (lists.quicknote, made by the server on the first grip, POST /api/notes/quick-list): a flat
+// list, newest first, a fixed entry in the sidebar; it can never be shared (the server refuses, core/access.py qn_private).
+// A note of that list may move into a shared list only after a warning that names who sees it then.
+// The note being written is a draft (id QN_DRAFT, S.nt.draft) until its first character: then it is made (online, or in the
+// outbox like any note: offline as before), so an empty one never reaches the server.
+const QN_DRAFT = -1;
+const qn_isList = lid => !!listById(lid)?.quicknote;
+const qn_list = () => S.lists.find(l => l.quicknote && !l.archived && l.owner_id === S.me?.id);
+const QN_MADE = new Set();  // the notes made as a quick note in this tab: they keep the one text field (also in another list)
+const qn_plain = n => !!n && (n.id === QN_DRAFT || qn_isList(n.list_id) || QN_MADE.has(n.id));
+// the title of a quick note: its first line with text, a heading's # left out (the server's qn_title, collab/notes.py)
+function qn_titleOf(text) {
+  for (const ln of String(text || '').split(/\r?\n/)) { const t = ln.replace(/^\s*#{1,6}\s+/, '').replace(/\s+/g, ' ').trim(); if (t) return t.slice(0, 300); }
+  return '';
+}
+async function qn_listId() {
+  const l = qn_list(); if (l) return l.id;
+  let j; try { j = await rawFetch('POST', '/api/notes/quick-list'); } catch (e) { toast(e instanceof Offline ? tr('The list Notes is made with the first quick note: that needs a connection once.') : e.message); return 0; }
+  await load();
+  return j.list_id;
+}
+/** @param {number} [lid] the list (default: the private list "Notes") */
+async function qn_new(lid) {
+  if (S.me?.kid || S.qnBusy) return;
+  S.qnBusy = true;
+  try {
+    const id = lid || await qn_listId(); if (!id) return;
+    if (S.nt.id === QN_DRAFT && S.nt.draft?.list_id === id) { qn_focus(); return; }
+    const now = new Date().toISOString();
+    S.nt.draft = {id: QN_DRAFT, list_id: id, title: '', body: '', text: '', tags: [], pinned: false, created_by: S.me?.id, updated_by: S.me?.id, created_at: now, updated_at: now, updated_by_name: ''};
+    if (location.hash !== '#notes/' + id && !/^#note\//.test(location.hash)) history.pushState(null, '', '#notes/' + id);  // Back from the note = its list
+    go('note/' + QN_DRAFT);
+    qn_focus();
+  } finally { S.qnBusy = false; }
+}
+function qn_focus(n = 0) {
+  const b = $('#nt-body');
+  if (b && S.nt.id === QN_DRAFT) { b.focus(); b.setSelectionRange(b.value.length, b.value.length); return; }
+  if (n < 30) requestAnimationFrame(() => qn_focus(n + 1));
+}
+// the editor: one text field, nothing in front of it
+function qn_editHtml(n) {
+  const dr = n.id === QN_DRAFT;
+  return `<div class="nthead ntqhead">${isMobile() ? `<button type="button" class="iconbtn" data-act="nt-close" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}<span class="spacer"></span>
+    ${dr ? '' : `<button type="button" class="iconbtn" data-act="nt-menu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>`}
+    ${isMobile() ? '' : `<button type="button" class="iconbtn" data-act="nt-close" title="${esc(tr('Close'))}" aria-label="${esc(tr('Close'))}">${ic('x')}</button>`}</div>
+    <textarea id="nt-body" class="ntbody ntplain" aria-label="${esc(tr('Note'))}" placeholder="${esc(tr('Note … (#123 links a task)'))}">${esc(dr ? n.text : n.body)}</textarea>
+    <div class="ntfoot muted"><span id="nt-saved" role="status" aria-live="polite"></span><span class="spacer"></span>${dr ? '' : `<span>${esc(tr('Changed {0}', fmtWhen(n.updated_at)))}</span>`}</div>`;
+}
+// the first character: the note is made (the text typed meanwhile follows as a change; left empty meanwhile: gone again)
+function qn_create() {
+  const d = S.nt.draft, b = $('#nt-body'); if (!d) return;
+  if (b && S.nt.id === QN_DRAFT) d.text = b.value;
+  S.nt.dirty = false; clearTimeout(S.nt.saveT);
+  if (S.nt.creating || !d.text.trim()) return;
+  const sent = d.text, url = `/api/lists/${d.list_id}/notes`, body = {title: qn_titleOf(sent), body: sent, client_ref: outKey()};
+  S.nt.creating = (async () => {
+    let r = null;
+    try { r = await rawFetch('POST', url, body); } catch (e) { if (!(e instanceof Offline) || ntLocked(d.list_id)) { toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.message); return; } }
+    if (S.nt.lid === d.list_id && !S.nt.notes) S.nt.notes = [];
+    if (!r) r = enqueue('POST', url, body);  // offline: the outbox (ntLocal draws it)
+    else {
+      if (S.nt.lid === d.list_id) S.nt.notes = [r, ...S.nt.notes.filter(x => x.id !== r.id)];
+      S.notes = [{id: r.id, list_id: d.list_id, title: r.title, tags: [], pinned: false, updated_at: r.updated_at}, ...(S.notes || []).filter(x => x.id !== r.id)];
+    }
+    QN_MADE.add(r.id);
+    const on = S.nt.id === QN_DRAFT && S.nt.draft === d;
+    if (S.nt.draft === d) S.nt.draft = null;
+    if (on) { S.nt.id = r.id; if (S.route.mod === 'notes') history.replaceState(null, '', '#note/' + r.id); }
+    const n = (S.nt.notes || []).find(x => x.id === r.id) || r;
+    if (!d.text.trim()) qn_purge(n);
+    else if (d.text !== sent) { if (on) { S.nt.dirty = true; noteFlush(); } else ntWrite(n, {body: d.text, title: qn_titleOf(d.text)}).catch(() => {}); }
+    else if (on) { const s = $('#nt-saved'); if (s) s.textContent = r.queued || r.id < 0 ? tr('You are offline: the note is saved as soon as the server is reachable') : tr('Saved'); }
+    if (!on && S.route.mod === 'notes') renderView();  // left already: the list shows it
+  })().finally(() => { S.nt.creating = null; });
+}
+// leaving a quick note (another note, its list, another view): left empty = gone for good. true = handled (no save)
+function qn_leave() {
+  const n = noteCur(); if (!n || !qn_plain(n)) return false;
+  const b = $('#nt-body'), text = b ? b.value : n.id === QN_DRAFT ? n.text : n.body;
+  if (n.id === QN_DRAFT) n.text = text;
+  if (text.trim()) return false;
+  clearTimeout(S.nt.saveT); S.nt.dirty = false;
+  if (n.id === QN_DRAFT) S.nt.draft = null;  // never made (or still being made: qn_create takes it back)
+  else qn_purge(n);
+  return true;
+}
+// an empty quick note goes for good: DELETE ?empty=1 (the server checks that it is empty); one made offline and not sent yet
+// leaves the outbox with its changes
+async function qn_purge(n, empty = false) {
+  S.nt.notes = (S.nt.notes || []).filter(x => x.id !== n.id); S.notes = (S.notes || []).filter(x => x.id !== n.id);
+  const url = `/api/notes/${n.id}`, del = url + '?empty=1';
+  if (n.id < 0) {
+    const mine = OUT.q.filter(x => x.tmp === n.id || x.url === url);
+    if (mine.length && !mine.some(x => x.sending)) { outSave(() => { OUT.q = OUT.q.filter(x => !mine.includes(x)); }); renderTop(); return; }
+  }
+  try {
+    if (!empty && (await ntWrite(n, {body: ''})).queued) { enqueue('DELETE', del); return; }
+    if (n.id < 0 || OUT.q.some(x => x.url === url)) { enqueue('DELETE', del); return; }
+    await rawFetch('DELETE', del);
+  } catch (e) { if (e instanceof Offline) enqueue('DELETE', del); }
+}
+// the notes of the list "Notes" loaded: an empty one of mine left behind (the tab closed while it was empty) goes too
+function qn_heal(lid) {
+  if (!qn_isList(lid)) return;
+  for (const n of (S.nt.notes || []).filter(x => x.id > 0 && x.id !== S.nt.id && x.created_by === S.me?.id && !String(x.body || '').trim())) qn_purge(n, true);
+}
+// moving a note out of the list "Notes" to other people: the server answers 409 quicknote_share with their names; only after
+// a yes it goes (share_ok)
+async function qn_shareAsk(people, l) {
+  return askDialog({title: tr('Move the note to {0}?', lname(l)), html: `<p><b>${esc(tr('After the move these people see this note:'))}</b></p><ul class="qnwho">${people.map(p => `<li><b>${esc(p)}</b></li>`).join('')}</ul><p class="muted">${esc(tr('The list Notes itself stays private.'))}</p>`, ok: tr('Move'), cancel: tr('Cancel')});
+}
+// the fixed row of the list "Notes" in the sidebar's Plan (computer and the phone's drawer), under the basket
+function qn_sideRow() {
+  const l = qn_list(); if (!l || S.me?.kid) return '';
+  const on = S.route.mod === 'notes' && S.nt.lid === l.id, n = (S.notes || []).filter(x => x.list_id === l.id).length;
+  return `<button class="srow smod sqn ${on ? 'on' : ''}" data-go="notes/${l.id}" data-qn="1">${ic('edit')}<span class="n">${esc(lname(l))}</span><span class="c">${n || ''}</span></button>`;
+}
+// the phone: holding the Plus button = a quick note (a tap stays a new task)
+const QN_FAB = ms_longPress('#fab', () => false, () => qn_new());

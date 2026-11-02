@@ -248,7 +248,7 @@ check(A.post(B + f"/api/tasks/{AP}/approval", json={"action": "request", "approv
 check(A.post(B + f"/api/tasks/{AP}/approval", json={"action": "approve"}).status_code == 400, "no request yet: no decision")
 r = A.post(B + f"/api/tasks/{AP}/approval", json={"action": "request", "approver_id": BOB, "note": "Please by Friday"})
 check(r.ok and r.json()["approval"] == "pending" and r.json()["approver_id"] == BOB and r.json()["assignee_id"] == BOB, "requested: assigned to Bob " + r.text[:200])
-check(dbx("SELECT COUNT(*) FROM notifications WHERE user_id=? AND kind='assign' AND task_id=?", (BOB, AP))[0][0] == 1, "Bob gets the assignment News")
+check(dbx("SELECT COUNT(*) FROM notifications WHERE user_id=? AND kind='aprequest' AND task_id=?", (BOB, AP))[0][0] == 1, "Bob gets the News (2.367.2, #2968: its own kind)")
 check(A.post(B + f"/api/tasks/{AP}/approval", json={"action": "approve"}).status_code == 403, "only the approver decides")
 r = requests.post(V + f"/tasks/{AP}/approval", headers=AGH, json={"action": "approve"})
 check(r.status_code == 403, "an agent never decides")
@@ -292,7 +292,7 @@ tokf = F1["url"].rsplit("/", 1)[1]
 check(len(tokf) >= 30 and not dbx("SELECT 1 FROM forms WHERE token=?", (tokf,)), "the token is stored sealed")
 anon = requests.Session()
 p = anon.get(B + "/f/" + tokf)
-check(p.status_code == 401 and "log in" in p.text.lower(), "an org form: log in first")
+check(p.status_code == 401 and "sign in" in p.text.lower(), "an org form: log in first")
 p = Bo.get(B + "/f/" + tokf)
 check(p.ok and "IT request" in p.text and "Tell us what is broken." in p.text and 'name="subject"' in p.text and "<script" not in p.text
       and "default-src 'none'" in p.headers.get("Content-Security-Policy", ""), "Bob (same organisation) sees the form, no scripts, a strict CSP")

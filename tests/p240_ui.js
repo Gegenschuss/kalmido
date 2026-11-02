@@ -209,7 +209,7 @@ async function firefox(fn) {
   check(await until(async () => { const t = (await st()).tasks.find(x => x.title === 'Call mum'); return t && t.list_id === w.eval('inbox().id') && !!t.due; }), 'captured into the inbox (not the open list), date parsed');
   check(!d.querySelector('.qadd.sheet'), 'the box closes after saving');
   d.querySelector('#view').insertAdjacentHTML('beforeend', '<input id="xin">');
-  key(w, d.querySelector('#xin'), ' ', {ctrlKey: true, code: 'Space'});
+  key(w, d.querySelector('#xin'), ' ', {ctrlKey: true, code: 'Workspace'});
   check(await until(() => d.querySelector('.qadd.sheet.capture')), 'Ctrl+Space opens it while typing');
   w.eval('closePop()');
   check(w.eval(`palAll().some(x => x.id === 'a:capture')`), 'palette: Quick capture');

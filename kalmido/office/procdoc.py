@@ -12,7 +12,8 @@ texts of that moment (data, JSON, encrypted at rest like the other office free t
 The current view = the prefilled texts of now + the own texts of the latest version. Markdown and PDF of the current state
 or of a version carry the version, its date and the company.
 
-The template texts are document content in German and English (like doctpl_samples; other app languages get English).
+The template texts are document content in German and English; other app languages get English. 2.449.0 (#3768): GoBD is
+German law, so only an office on the German pack is offered it (pd_offered); an area that already has versions keeps them.
 Reading: everybody with office access (members, read-only, accounting); saving: the area's admin (office_org admin=True:
 accounting / read-only answer 403 on writes). A person without an organisation is the admin of the personal office.
 Agents never reach it (office_gate)."""
@@ -69,10 +70,19 @@ PD_ROLE_NAMES = {"admin": ("Admin", "Admin"), "member": ("Mitglied", "Member"), 
 PD_EINV = {"zugferd": "ZUGFeRD", "xrechnung": "XRechnung", "none": "-", "": "-"}
 
 
+def pd_offered(c, oid, s=None):
+    """2.449.0 (#3768): the German pack, or an area that saved versions before it changed its pack."""
+    s = s if s is not None else office_settings(c, oid)
+    return (s.get("pack") or "DE").upper() == "DE" or bool(c.execute("SELECT 1 FROM office_procdocs WHERE org_id=? LIMIT 1", (oid,)).fetchone())
+
+
 def _ctx(admin=False):
     c = db()
     uid = office_gate(c)
-    return c, uid, office_org(c, uid, admin=admin)
+    oid = office_org(c, uid, admin=admin)
+    if not pd_offered(c, oid):
+        raise Denied(404)
+    return c, uid, oid
 
 
 def _lg(v=None):

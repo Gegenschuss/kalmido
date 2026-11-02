@@ -116,7 +116,7 @@ function ltEditHtml(d) {
     <div class="lt-two">${ltRow('channel', tr('Sent by'), ofcSel('lt-channel', d.channel || 'post', chOpts).replace('<select ', '<select name="channel" '))}
       <div class="row lt-trk" ${d.channel === 'registered' ? '' : 'hidden'}><label for="lt-tracking_no">${esc(tr('Tracking number'))}</label>${ltIn('tracking_no', d.tracking_no, {max: 120})}</div></div>
     ${ltRow('followup_days', tr('Follow-up after days'), ltIn('followup_days', d.followup_days || '', {max: 3, num: 1, ph: '14'}), tr('0 or empty = no follow-up'))}
-    <div class="aerr" role="alert" id="lt-err"></div>
+    <div class="aerr" role="alert" id="lt-err"></div>${d.agent_id && d.status === 'draft' && typeof aiphHtml === 'function' && !(d.body || '').includes(aiphLine()) ? aiphHtml('letter', d.id) : ''/* 2.482.0 (#3530): an agent's draft before it goes out */}
     <div class="foot dtp-acts"><button class="btn danger ghost" data-lt="arch">${ic('archive', 's')}<span>${tr('Delete')}</span></button><span class="spacer"></span>
       ${ltHooks('actions', d)}<button class="btn" data-lt="save">${tr('Save')}</button><button class="btn pri" data-lt="sent">${ic('send', 's')}<span>${tr('Mark as sent')}</span></button></div>
   </div>${ltHooks('sections', d)}`;
@@ -471,6 +471,8 @@ document.addEventListener('change', e => {
     if (id !== 'lt-rsearch') ltSaveSoon();
   }
 });
+// 2.482.0 (#3530): "Insert label" of the AI note: one line at the end of the text, saved like typing
+if (typeof AIPH_INS !== 'undefined') AIPH_INS.letter = () => { const ta = $('#lt-body'); if (!ta) return false; ta.value = ta.value.replace(/\s+$/, '') + (ta.value.trim() ? '\n\n' : '') + aiphLine(); ta.dispatchEvent(new Event('input', {bubbles: true})); return true; };
 document.addEventListener('input', e => {
   const x = /** @type {any} */ (e.target);
   if (x.id === 'lt-q') { LT.q = x.value; ofcDraw(); return; }

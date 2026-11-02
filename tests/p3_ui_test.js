@@ -226,6 +226,7 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   check((await call('GET', '/api/state')).tasks.find(t => t.id === t3).fields[FS.id] === OPT.Idea, 'offline edit replayed');
   w.eval('closeDetail()');
   await w.eval(`taskMenu($('#top h1'), ${t2})`); await sleep(100);
+  d.querySelector('#pop .mtmore').click(); await sleep(100);  // 2.445.0 (#3008): Duplicate is under "More…"
   [...d.querySelectorAll('#pop .menu-list button')].find(b => b.textContent === 'Duplicate').click(); await idle(w);
   st = await call('GET', '/api/state');
   const dup = st.tasks.filter(t => t.title === 'Build').find(t => t.id !== t2);

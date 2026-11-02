@@ -177,7 +177,7 @@ function caldavHtml(hint) {
     ${hint(tr('Your projects as task lists in Reminders, Thunderbird, Evolution or on Android with Tasks.org or DAVx⁵; changes go both ways. Completed tasks stay for {0} days.', d.done_days))}
     ${cp(tr('Server'), d.server, 'dav-srv')}${cp(tr('CalDAV address'), d.url, 'dav-url')}${cp(tr('User name'), d.username, 'dav-user')}
     <div class="row"><label>${tr('Password')}</label><button class="btn sm pri" data-apw="new">${ic('key', 's')} ${tr('New app password')}</button><button class="linkbtn" data-apw="list">${tr('Manage app passwords')}</button></div>
-    ${hint(tr('Log in with your user name and an app password, never with your Kalmido password.'))}
+    ${hint(tr('Sign in with your user name and an app password, never with your Kalmido password.'))}
     ${feat('events') || feat('contacts') ? `${hint(tr('Your events and address books come along in the same account: calendars next to the task lists, contacts over CardDAV.'))}<div class="row"><button class="btn sm" data-act="dav-guide">${ic('phone', 's')} ${tr('Calendar and contacts on the phone')}</button></div>` : ''}
     <details class="shelp sdet"><summary>${tr('Step by step')}</summary><ul class="slist">
       <li>${tr('<b>iPhone / iPad:</b> Settings > Apps > Calendar > Calendar Accounts > Add Account > Other > Add CalDAV Account. Server {0}, your user name and the app password. Then switch on Reminders in the new account. Not found? Advanced Settings > Account URL {1}.', srv, prin)}</li>
@@ -191,8 +191,8 @@ function caldavHtml(hint) {
       <li>${tr('Title, notes, due date and time, start, priority, done / won\'t do, tags, subtasks, repeat rules (daily to yearly), reminders and the link. Assignee, sections, comments, files and custom fields stay in Kalmido; other details a calendar app saves come back to it unchanged.')}</li>
       <li>${tr('Projects you may only view are read-only there. Deleting a task in a calendar app moves it to the trash in Kalmido. New projects are created in Kalmido.')}</li>
       <li>${tr('Reminders on iPhone and Mac keep tags and subtasks to themselves: what you set in Kalmido stays.')}</li></ul></details>
-    ${S.me.is_admin && feat('contacts') ? hint(tr('Admins: contacts apps look for /.well-known/carddav; it must bypass a login proxy like /dav/.')) : ''}
-    ${S.me.is_admin ? hint(tr('Admins: behind a login proxy (forward auth, single sign-on) the paths /dav/ and /.well-known/caldav must bypass the proxy login, because calendar apps cannot log in there. Kalmido checks the app password itself.')) + `<a class="slink" href="${DAV_DOCS}" target="_blank" rel="noopener noreferrer">${tr('CalDAV guide')}</a>` : ''}`;
+    ${S.me.is_admin && feat('contacts') ? hint(tr('Admins: contacts apps look for /.well-known/carddav; it must bypass a sign-in proxy like /dav/.')) : ''}
+    ${S.me.is_admin ? hint(tr('Admins: behind a sign-in proxy (forward auth, single sign-on) the paths /dav/ and /.well-known/caldav must bypass the proxy sign-in, because calendar apps cannot sign in there. Kalmido checks the app password itself.')) + `<a class="slink" href="${DAV_DOCS}" target="_blank" rel="noopener noreferrer">${tr('CalDAV guide')}</a>` : ''}`;
 }
 // Settings > Integrations > Webhooks
 const WH_EV_NAMES = {'task.created': N_('Task created'), 'task.updated': N_('Task changed'), 'task.completed': N_('Task completed'), 'task.reopened': N_('Task reopened'),
@@ -212,7 +212,7 @@ const whHtml = () => S.webhooks?.enabled ? `<h4 id="s-wh-h">${tr('Webhooks')}</h
 // the tokens of my personal agents (also on their rows in Agents) in one place; the old places link here (acz_linkHtml)
 const acz_on = () => !!(S.api?.enabled || S.webhooks?.enabled || aiPaneOn());
 const acz_html = () => acz_on() ? `${apiHtml()}${whHtml()}${aiPaneOn() ? `<h4 id="s-acz-ag-h">${tr('Agents')}</h4>
-  <div class="shint">${tr('Each of your agents logs in with its own API token. A new token replaces the old one at once; “Set up on a computer” connects it on another machine.')}</div>
+  <div class="shint">${tr('Each of your agents signs in with its own API token. A new token replaces the old one at once; “Set up on a computer” connects it on another machine.')}</div>
   <div class="members" id="s-acz-ags"><div class="muted mhint">${tr('Loading…')}</div></div>` : ''}` : '';
 // 2.364.0 C (#3044): Access is listed only with an own API token / webhook (acz_mine); else it waits under "For advanced users"
 const acz_mine = () => !!(S.api?.mine || S.webhooks?.mine);
@@ -221,17 +221,20 @@ const acz_linkHtml = on => { const row = `<div class="row aczlink"><span class="
 async function acz_draw(md) {
   tokDraw(md); whDraw(md);
   const box = $('#s-acz-ags', md); if (!box) return;
-  let j; try { j = await api('GET', '/api/my/agents'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  // 2.366.0 (#2999): admins see the team agents here too (their tokens used to be only in the agent's "Set up" dialog)
+  let j, t; try { [j, t] = await Promise.all([api('GET', '/api/my/agents'), S.me?.is_admin ? api('GET', '/api/admin/agents') : null]); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  j = {agents: [...(j.agents || []), ...(t?.agents || []).filter(a => !a.owner).map(a => ({...a, acz_team: true}))]};
   box._j = j;
-  box.innerHTML = (j.agents || []).length ? j.agents.map(a => `<div class="mrow ${a.enabled ? '' : 'off'}" data-aczag="${a.id}">${av(a.id, a.name)}<span class="n"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span><small class="muted">${esc(scopeSummary(a.effective_scopes || a.scopes))}</small></span>
+  box.innerHTML = j.agents.length ? j.agents.map(a => `<div class="mrow ${a.enabled ? '' : 'off'}" data-aczag="${a.id}">${av(a.id, a.name)}<span class="n"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span>${a.acz_team ? ` <span class="agown agteam">${ic('users', 's')}${esc(tr('Team'))}</span>` : ''}<small class="muted">${esc(scopeSummary(a.effective_scopes || a.scopes))}</small></span>
       <button type="button" class="iconbtn" data-acz="setup" title="${esc(tr('Set up on a computer'))}" aria-label="${esc(tr('Set up {0} on a computer', a.name))}">${ic('download', 's')}</button><button type="button" class="iconbtn" data-acz="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button></div>`).join('')
-    : `<div class="muted mhint">${tr('No personal agents yet.')}</div>`;
+    : `<div class="muted mhint">${S.me?.is_admin ? tr('No agents yet.') : tr('No personal agents yet.')}</div>`;
 }
 document.addEventListener('click', e => {
   const b = e.target.closest?.('#s-acz-ags [data-acz]'); if (!b) return;
   const a = (($('#s-acz-ags')._j || {}).agents || []).find(x => x.id === +b.closest('[data-aczag]').dataset.aczag); if (!a) return;
-  if (b.dataset.acz === 'token') agTokenModal(a, `/api/my/agents/${a.id}/token`);
-  else ains_setupModal(a, `/api/my/agents/${a.id}`);  // lazy-ok: the settings dialog (LD_NEED settings -> agentchat bundle with agentsetup.js)
+  const base = a.acz_team ? `/api/admin/agents/${a.id}` : `/api/my/agents/${a.id}`;  // 2.366.0 (#2999)
+  if (b.dataset.acz === 'token') agTokenModal(a, `${base}/token`);
+  else ains_setupModal(a, base);  // lazy-ok: the settings dialog (LD_NEED settings -> agentchat bundle with agentsetup.js)
 });
 function whState(w) {
   if (!w.enabled) return `<span class="calerr" role="alert">${w.disabled_reason === 'failures' ? tr('turned off after failed deliveries') : tr('off')}</span>`;
@@ -432,7 +435,7 @@ function whoDraw(root) {
 // from the server: a row shows kind, name and a masked end; editing leaves the address empty unless a new one is typed.
 const CHN_KINDS = {slack: 'Slack', matrix: 'Matrix', telegram: 'Telegram', signal: 'Signal'};
 const CHN_EV = {reminder: N_('Reminders'), assign: N_('Assignments'), comment: N_('Mentions and comments'), digest: N_('Daily digest and briefing'),
-  other: N_('Other notifications'), lists: N_('Changes in my own projects'), newtask: N_('New task'), complete: N_('Task completed')};
+  other: N_('Other notifications'), lists: N_('Changes in my own projects'), own: N_('Including my own changes'), newtask: N_('New task'), complete: N_('Task completed')};
 const CHN_EV_ORG = {assign: N_('Assignment'), comment: N_('Comment')};
 const chn_evName = (e, org) => tr((org && CHN_EV_ORG[e]) || CHN_EV[e] || e);
 function chn_state(ch) {
@@ -451,7 +454,7 @@ function chn_mailHtml(m) {
   return `<h4 id="s-evmail-h">${tr('E-mail for single events')}</h4>
     <div class="row"><label for="s-evm-assign">${tr('Assigned to me')}</label>${chn_mailSel('s-evm-assign', m.assign)}</div>
     <div class="row"><label for="s-evm-mention">${tr('Mentioned')}</label>${chn_mailSel('s-evm-mention', m.mention)}</div>
-    <div class="shint">${esc(!m.address ? tr('No e-mail address is stored for you: an admin adds it (Settings > Organisation > People)') : m.device ? tr('You have a push device, so “Only without a push device” sends nothing at the moment.') : tr('Collected and sent as one e-mail at most every 10 minutes, with links to the tasks.') + ' ' + tr('The e-mail leaves Kalmido through the mail server of this instance.'))}</div>`;  // 2.306.0 C (#2889)
+    <div class="shint">${esc(!m.address ? tr('No e-mail address is stored for you: an admin adds it (Settings > Organisation > People)') : m.device ? tr('You have a push device, so “Only without a push device” sends nothing at the moment.') : tr('Collected and sent as one e-mail at most every 10 minutes, with links to the tasks.') + ' ' + tr('The e-mail leaves Kalmido through the e-mail server of this instance.'))}</div>`;  // 2.306.0 C (#2889)
 }
 async function chn_meDraw(md) {  // Settings > Notifications (settings.js: the box #s-chn)
   const box = $('#s-chn', md); if (!box) return;
@@ -586,6 +589,19 @@ function intB_draw(md) {
 }
 // ---- Karakeep: connect, the project, fetch (one connection per person; was life.js kkModal)
 const kks_html = () => feat('reading') ? `<h4 id="s-kk-h">${tr('Karakeep')}</h4><div id="s-kk" class="kks"><div class="muted mhint">${tr('Loading…')}</div></div>` : '';
+// 2.453.0 (#3781): the fetch runs in the background: an error of it (a wrong key) appears here once it is through
+async function kksFetch(box) {
+  const was = box._cur?.synced_at;
+  await rawFetch('POST', '/api/life/karakeep/sync', {});
+  toast(tr('Bookmarks are being fetched in the background'));
+  const look = async n => {
+    if (!box.isConnected || n > 30) return;
+    let cur; try { cur = await api('GET', '/api/life/karakeep'); } catch { return; }
+    if (cur.synced_at === was) { setTimeout(() => look(n + 1), 2000); return; }
+    if (cur.error) kks_draw(box.parentElement);
+  };
+  setTimeout(() => look(0), 1000);
+}
 async function kks_draw(md) {
   const box = $('#s-kk', md); if (!box) return;
   let cur; try { cur = await api('GET', '/api/life/karakeep'); } catch { box.innerHTML = ''; return; }
@@ -597,7 +613,7 @@ async function kks_draw(md) {
     <div class="row"><label for="kk-tok">${tr('API key')}</label><input id="kk-tok" type="password" autocomplete="new-password" placeholder="${esc(cur.token_set ? tr('saved – enter a new one to replace it') : tr('Karakeep > Settings > API keys'))}"></div>
     ${rl.length > 1 ? `<div class="row"><label for="kk-list">${tr('Project')}</label><select id="kk-list">${rl.map(l => `<option value="${l.id}" ${l.id === cur.list_id ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
     <div class="row"><label>${tr('When ticked')}</label><label class="chkl"><input type="checkbox" id="kk-arch" ${cur.connected && !cur.archive ? '' : 'checked'}> ${tr('archive the bookmark in Karakeep')}</label></div>
-    ${cur.error ? `<p class="aerr">${esc(cur.error)}</p>` : ''}
+    ${cur.error ? `<p class="aerr">${esc(cur.error_text || cur.error)}</p>` : ''}
     <div class="aerr" role="alert" data-kks="err"></div>
     <div class="row">${cur.connected ? `<button type="button" class="btn sm" data-kks="sync">${ic('sync', 's')} ${tr('Fetch now')}</button><button type="button" class="btn sm danger" data-kks="del">${tr('Disconnect')}</button>` : ''}<span class="spacer"></span><button type="button" class="btn sm pri" data-kks="save">${cur.connected ? tr('Save') : tr('Connect')}</button></div>`;
   if (box._on) return;
@@ -605,15 +621,14 @@ async function kks_draw(md) {
   box.addEventListener('click', async e => {
     const b = e.target.closest('button[data-kks]'); if (!b) return;
     const c = box._cur || {}, a = b.dataset.kks, err = $('[data-kks="err"]', box), v = id => $(id, box)?.value?.trim() ?? '';
-    const fetched = j => toast(trn('{0} bookmark fetched', '{0} bookmarks fetched', j.added));
     if (a === 'del' && !await askConfirm(tr('Disconnect Karakeep?'), tr('The API key is removed; the tasks stay.'), {ok: tr('Disconnect'), danger: true})) return;
     const body = {url: v('#kk-url'), archive: !!$('#kk-arch', box)?.checked, ...(v('#kk-tok') ? {token: v('#kk-tok')} : {}), ...(v('#kk-list') ? {list_id: +v('#kk-list')} : {})};
     if (a === 'save' && !body.url) { $('#kk-url', box).focus(); err.textContent = tr('Please enter the address'); return; }
     if (a === 'save' && !c.token_set && !body.token) { $('#kk-tok', box).focus(); err.textContent = tr('Please enter the API key'); return; }
     b.disabled = true; err.textContent = '';
     try {
-      if (a === 'save') { await rawFetch('PUT', '/api/life/karakeep', body); fetched(await rawFetch('POST', '/api/life/karakeep/sync', {})); }
-      if (a === 'sync') fetched(await rawFetch('POST', '/api/life/karakeep/sync', {}));
+      if (a === 'save') await rawFetch('PUT', '/api/life/karakeep', body);
+      if (a === 'save' || a === 'sync') await kksFetch(box);  // 2.453.0 (#3781): in the background, no count
       if (a === 'del') await rawFetch('DELETE', '/api/life/karakeep');
       await load();
       if (typeof lifeReload === 'function') lifeReload();

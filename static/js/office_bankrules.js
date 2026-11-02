@@ -33,7 +33,7 @@ function brl_settingsHtml() {
   if (it === null) return '';  // no right to the bank (the server said no)
   const list = it === undefined ? `<p class="muted">${tr('Loading…')}</p>`
     : !it.length ? `<p class="muted brlempty">${tr('No rules yet. Mark a booking the same way twice and the bank list offers one.')}</p>`
-      : `<ul class="ofclist brllist" role="list">${it.map(r => `<li class="ofcrow brlrow ${r.active ? '' : 'arch'}" data-rule="${r.id}"><span class="ofcn"><b>${esc(r.name)}</b>
+      : `${hintOnce('ofclp', tr('Hold a row to see what you can do with it.'))}<ul class="ofclist brllist" role="list">${it.map(r => `<li class="ofcrow brlrow ${r.active ? '' : 'arch'}" data-rule="${r.id}" data-brl="tap" data-id="${r.id}"><span class="ofcn"><b>${esc(r.name)}</b>
         <small class="muted">${esc(brl_cond(r))} → ${esc(brl_act(r))}${r.account ? ` (${esc(r.account)})` : ''}</small><small class="muted">${esc(trn('{0} hit', '{0} hits', r.hits))}${r.last_hit_at ? ` · ${esc(fmtDateLoc(r.last_hit_at.slice(0, 10)))}` : ''}</small></span>
         <label class="chkl swl" title="${esc(r.active ? tr('Active') : tr('Paused'))}"><span class="swc"><input type="checkbox" role="switch" data-brl-on="${r.id}" ${r.active ? 'checked' : ''} aria-label="${esc(tr('Active'))}"><span class="swt" aria-hidden="true"></span></span></label>
         <button type="button" class="btn sm ghost" data-brl="edit" data-id="${r.id}">${tr('Edit')}</button>
@@ -149,13 +149,23 @@ document.addEventListener('click', e => {
   const b = /** @type {any} */ (e.target).closest?.('[data-brl]'); if (!b) return;
   const a = b.dataset.brl, id = +b.dataset.id;
   if (a === 'new') brl_edit(null);
-  else if (a === 'edit') { const r = (BRL.items || []).find(x => x.id === id); if (r) brl_edit(r); }
+  else if (a === 'tap' && (!isMobile() || /** @type {any} */ (e.target).closest('.swl'))) return;  // 2.452.0 (#3836): only a phone opens a rule by tapping its row
+  else if (a === 'edit' || a === 'tap') { const r = (BRL.items || []).find(x => x.id === id); if (r) brl_edit(r); }
   else if (a === 'del') brl_del(id);
   else if (a === 'revert') brl_revert(id);
   else if (a === 'sugok') brl_sugTake(true);
   else if (a === 'sugno') brl_sugTake(false);
   else return;
   e.preventDefault();
+});
+// 2.452.0 (#3836): on a phone the row has no symbols (office.css), a long press opens what they did
+ms_rowMenu('.brlrow[data-rule]', r => {
+  const it = (BRL.items || []).find(x => x.id === +r.dataset.rule); if (!it) return;
+  const by = k => () => $(`[data-brl="${k}"]`, r).click();
+  menu(r, [{label: tr('Edit'), icon: 'edit', fn: by('edit')},
+    {label: it.active ? tr('Pause') : tr('Resume'), icon: 'clock', fn: () => $('[data-brl-on]', r).click()},
+    $('[data-brl="revert"]', r) ? {label: tr('Undo its marks'), icon: 'undo', fn: by('revert')} : null,
+    '-', {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: by('del')}]);
 });
 document.addEventListener('change', e => {
   const i = /** @type {any} */ (e.target).closest?.('[data-brl-on]'); if (!i) return;

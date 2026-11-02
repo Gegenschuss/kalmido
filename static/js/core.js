@@ -60,6 +60,11 @@ function parseNum(v, frac) {
   const n = parseFloat(sign + s); return Number.isFinite(n) ? n : null;
 }
 // a typed number for a request body: '' = null, a number = the number, anything else = the text (the server names the field)
+// 2.450.0 (#3770): a stored number as the text of an input field in the app language, without groups ("1234,5"); parseNum reads it back
+const numField = (v, d = 6, min = 0) => v == null || v === '' ? '' : Number.isFinite(+v) ? (+v).toLocaleString(LOCALE(), {useGrouping: false, minimumFractionDigits: min, maximumFractionDigits: d}) : String(v);
+// 2.450.0 (#3770): ONE order for names, tags and titles: the app language's (Spanish ñ after n, Swedish ä at the end), never a fixed one
+const cmpColl = {};
+const cmpText = (a, b) => (cmpColl[LOCALE()] ||= new Intl.Collator(LOCALE())).compare(String(a ?? ''), String(b ?? ''));
 const numBody = v => { const t = String(v ?? '').trim(); if (!t) return null; const n = parseNum(t); return n == null ? t : n; };
 // weekday / month names + date patterns come from the language file (i18n.js: WD, WDL, MON, MONS, fmtDay), weeks still start on Monday
 const WD_MO = () => [1, 2, 3, 4, 5, 6, 0].map(i => WD[i]);  // calendar header, Monday first
@@ -344,6 +349,8 @@ function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.sta
 // offline get a negative temp id that is mapped to the real id during replay. The last server state is
 // cached for offline start. Every queued op carries the user id: ops of another user are never replayed.
 class Offline extends Error {}
+const ML_WAITS = N_('The task was moved meanwhile: it is shown in that project again if it moves back within 24 hours.');  // 2.363.3 (#3133): POST .../links answers link_waits
+const MO_KEPT = N_('Your order of My tasks was changed on another device: that order stays, this change was not applied.');  // 2.363.3 (#3133): PUT /api/tasks/mine-order answers order_kept
 // 2.306.0 B (#2889): the session ended (401 / the login proxy's page): the stored state of the account (cache, tabs, chat
 // windows, session keys) goes like at logout, so the next person on this browser does not find it. Changes still waiting
 // to be sent (outbox, conflicts) keep everything as before: they go out after the next login of the same account.
@@ -508,6 +515,16 @@ function setOnline(b) { if (OUT.online !== b) { OUT.online = b; if (S.booted) re
 // 2.13.4 (p210 flake, a real race): every write counts up when it starts and when it ends (S.wseq), so load() can tell that
 // a write finished while its GET /api/state was on the way: that answer may predate the write and would undo it locally
 // (S.settings went back to the old value; an Undo right after then saw "changed elsewhere" and skipped the step)
+// 2.369.0 A (#3200): every page of GET /api/office/docs (a list that must not stop at one page; f: rawFetch or api)
+async function docsAll(url, f = rawFetch) {
+  const rows = [];
+  for (let cur = null, i = 0; i < 200; i++) {
+    const j = await f('GET', url + (cur ? `&before=${encodeURIComponent(cur)}` : ''));
+    rows.push(...(j.docs || [])); cur = j.next_cursor;
+    if (!cur) break;
+  }
+  return rows;
+}
 async function rawFetch(method, url, body, key) {  // key: 2.270.0 C (#3022) the outbox entry's idempotency key
   // 2.64.1 (#1817): texts of a locked list leave encrypted, ciphers in answers become plain texts in memory (liste2e.js)
   if (typeof le2eOut === 'function') body = await le2eOut(method, url, body);
@@ -533,7 +550,8 @@ async function rawFetch0(method, url, body, key) {
   if (body instanceof FormData) opt.body = body;
   else if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
   let r;
-  try { r = await fetch(url, opt); } catch { const ch = OUT.down; OUT.down = false; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('offline'); }
+  // 2.363.3 (#3134): a form with files of some size goes with a progress bar and Cancel (upbar.js); Cancel is no lost connection
+  try { r = await (body instanceof FormData && typeof upSend === 'function' && upWanted(body) ? upSend(url, opt, body) : fetch(url, opt)); } catch (e) { if (e.cancelled) throw e; const ch = OUT.down; OUT.down = false; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('offline'); }
   // 2.21.0 (#673): the device is online but the server is not (a proxy answers 502 / 503 / 504 without Kalmido's JSON): the
   // same as offline (cached data, changes wait), the hint says "server not reachable"; never a reload loop on a proxy page
   // 2.24.0 (#907): 503 (the proxy's maintenance page) or a notice of the kind "maintenance": "server in maintenance"
@@ -688,6 +706,9 @@ function enqueue(method, url, body) {
     const q = outSync().find((x, i) => (i > 0 || !OUT.flushing) && !x.sending && x.method === 'PATCH' && x.url === url && !x.done && Object.keys(x.body || {}).filter(k => !k.startsWith('_')).join() === tk[0]);  // 2.126.0 D (#1989): sending = on its way from another tab
     if (q) { outSave(() => { q.body = {...q.body, [tk[0]]: body[tk[0]]}; }); return applyLocal({method, url, body}); }  // 2.143.0 C (#2153): outSave (IndexedDB)
   }
+  // 2.363.3 (#3133): a whole new order of "My tasks" replaces the one still waiting, whose _prev stays the base the server confirmed
+  const mo = method === 'PUT' && url === '/api/tasks/mine-order' && outSync().find((x, i) => (i > 0 || !OUT.flushing) && !x.sending && !x.done && x.url === url);
+  if (mo) { outSave(() => { mo.body = {...mo.body, ids: body.ids}; }); return {ok: true}; }
   const e = {method, url, body, uid: S.me?.id, k: outKey()};
   if (method === 'POST' && (url === '/api/tasks' || /^\/api\/lists\/\d+\/notes$/.test(url))) e.tmp = -Date.now() - Math.floor(Math.random() * 1000);  // 2.143.0 C (#2153): + a note
   outSave(() => OUT.q.push(e));  // 2.126.0 D (#1989)
@@ -795,6 +816,8 @@ async function outFlush() {
           addConflicts(j.id, j.conflicts, j.title);
         }
         if (j && j.skipped) skipped++;
+        if (j?.link_waits) toast(tr(ML_WAITS));  // 2.363.3 (#3133): "also in" sent after a move: kept for the way back
+        if (j?.order_kept) toast(tr(MO_KEPT));  // 2.363.3 (#3133)
         outSave(() => { OUT.q = OUT.q.filter(x => x !== e); });  // 2.126.0 D (#1989): out of the shared queue first
         e.res = j;
       } catch (err) {
@@ -1120,6 +1143,7 @@ async function load(auto) {
   if (S.chat.aid && collab()) chatLoad();
   if (S.route.mod === 'agents' && S.jobs.items !== null) loadJobs();
   if (typeof staleLoad === 'function') staleLoad(S.route.key === 'stale');  // 2.34.0 (#266): at most every 5 minutes, at once in its view
+  mwLoad(S.route.key === 'mine_wait');  // 2.392.0 D (#3369): at most once a minute, at once in its view
 }
 // 2.40.0 (#1432): Completed / Trash show 100 tasks first, "Load more" adds 100; a change reloads as many as are shown
 const HIST_PAGE = 100;
@@ -1327,6 +1351,7 @@ const SMART = {
   doable: {name: N_('Now doable'), icon: 'zap'},  // 1.7.0
   waiting: {name: N_('Waiting on someone'), icon: 'hourglass'},  // 2.1.0 (#335)
   stale: {name: N_('Lying idle'), icon: 'clock'},  // 2.34.0 (#266)
+  mine_wait: {name: N_('Waiting for me'), icon: 'flag'},  // 2.392.0 D (#3369): minewait.js
   pinned: {name: N_('Pinned|view'), icon: 'pin'},  // 2.16.0 (#648): every pinned task of every list
   assigned: {name: N_('My tasks'), icon: 'user'},
   byme: {name: N_('Assigned by me'), icon: 'send'},  // 2.36.2 (#1138)
@@ -1348,6 +1373,7 @@ function parseHash() {
   if (a === 'msg' && (b === 'a' || b === 't')) { const p = h.split('/'); return {mod: 'tasks', key: S.route.key || LS.get('lastKey', START_KEY), msg: {art: b, place: +p[2], id: +p[3]}}; }  // 2.37.0 (#1159): link back to a saved message
   if (a === 'notes' && +b) return {mod: 'notes', key: 'notes', lid: +b};  // 2.17.0 (#442)
   if (a === 'notes' && !b) return {mod: 'notes', key: 'notes', lid: null};  // 2.45.0 (#1516): the notes of all lists (notesall.js)
+  if (a === 'note' && +b === QN_DRAFT) { const d = S.nt.draft; return d ? {mod: 'notes', key: 'notes', lid: d.list_id, nid: QN_DRAFT} : {mod: 'notes', key: 'notes', lid: qn_list()?.id || null}; }  // 2.477.0 (#3881): the quick note being written
   if (a === 'note' && +b) { const n = (S.notes || []).find(x => x.id === +b); return n ? {mod: 'notes', key: 'notes', lid: n.list_id, nid: n.id} : {mod: 'tasks', key: LS.get('lastKey', START_KEY), noteMissing: true}; }
   if (a === 'reply' && b) return {mod: 'tasks', key: S.route.key || START_KEY, task: +b, reply: true};  // 2.0.8 (#331): push button "Reply"
   if (a === 'snooze' && b) return {mod: 'tasks', key: LS.get('lastKey', START_KEY), snooze: +b};
@@ -1386,6 +1412,7 @@ function parseHash() {
 }
 function go(hash) { if (location.hash !== '#' + hash) location.hash = hash; else route(); }
 async function route() {
+  vm_leave();  // 2.413.0 A (#3439): the view left keeps its place (viewmem.js)
   const r = parseHash();
   if (S.me?.kid && r.mod !== 'family' && !r.complete && !r.snooze) { r.mod = 'family'; r.key = 'family'; }  // 2.19.0 (#653): a kid's home
   o3a_toPrivate(r.mod);  // 2.83.0 (#1845): a private module in an organisation's view -> Private
@@ -1409,7 +1436,7 @@ async function route() {
   sbb_seen(r);  // 2.152.2 (#2622): the area keeps this page (sidebar B, areas.js)
   wsv_seen(r);  // 2.397.0 (#3404): and its workspace (workspace.js)
   if (r.mod === 'team') teamRoute(r.rid || null); else if (S.tc.rid) teamRoute(null);  // 2.17.0
-  if (r.mod === 'notes') noteRoute(r.lid, r.nid || null); else if (S.nt.id) { noteFlush(); S.nt.id = null; }
+  if (r.mod === 'notes') noteRoute(r.lid, r.nid || null); else if (S.nt.id) { if (!qn_leave()) noteFlush(); S.nt.id = null; }  // 2.477.0 (#3881): qn_leave
   if (r.noteMissing) setTimeout(() => toast(tr('This note does not exist or you cannot see it.')), 0);  // 2.10.0: review = #today/review
   if (r.mod === 'agents') S.jobs.items = null;
   S.jobFocus = r.job || null;  // 2.36.2 (#1141): #job/<id>
@@ -1460,3 +1487,28 @@ const keyToHash = k => k.startsWith('lists:') ? 'lists/' + k.slice(6) : k.starts
 // 1.5.2: folder view (key "folder:<name>"): the open tasks of every active list in that sidebar folder, grouped by list
 const folderLists = f => sideOrder().filter(l => fUnder(l.folder, f) && !l.archived && !l.is_inbox);  // 2.4.0: subfolders too
 window.addEventListener('hashchange', route);
+
+// 2.461 (#3773): the holiday picker of Settings and the Absences tab: first the country, then its region. What is stored is one
+// code (the select `id`): a region, or the country itself ("only the nationwide ones"); `blank` names "no choice"; `attrs` go on
+// the select `id`, which fires the usual change. cs: the answer's countries.
+let HOL_CS = [];
+function hol_country(cs, v) { return cs.find(c => c.code === v || v in c.regions); }
+function hol_regions(c, v, blank) {
+  if (!c) return `<option value="">${esc(blank)}</option>`;
+  return `<option value="${esc(c.code)}">${tr('Nationwide holidays only')}</option>` + Object.entries(c.regions).map(([k, n]) => `<option value="${esc(k)}" ${k === v ? 'selected' : ''}>${esc(n)}</option>`).join('');
+}
+function hol_selects(id, cs, v, blank, attrs = '') {
+  HOL_CS = cs;
+  const c = hol_country(cs, v), off = /\bdisabled\b/.test(attrs) ? 'disabled' : '';
+  return `<span class="holsel"><select id="${id}-cc" aria-label="${esc(tr('Country'))}" ${off}><option value="">${esc(blank)}</option>${cs.map(x => `<option value="${esc(x.code)}" ${x === c ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
+    <select id="${id}" aria-label="${esc(tr('Region'))}" ${attrs} ${c && Object.keys(c.regions).length ? '' : 'hidden'}>${hol_regions(c, v, blank)}</select></span>`;
+}
+document.addEventListener('change', e => {  // the country changed: its regions, starting on the nationwide holidays
+  const t = /** @type {any} */ (e.target), box = t.closest?.('.holsel');
+  if (!box || t !== box.firstElementChild) return;
+  const rg = /** @type {any} */ (t.nextElementSibling), c = HOL_CS.find(x => x.code === t.value);
+  rg.innerHTML = hol_regions(c, '', t.options[0].textContent);
+  rg.hidden = !c || !Object.keys(c.regions).length;
+  rg.value = t.value;
+  rg.dispatchEvent(new Event('change', {bubbles: true}));
+});

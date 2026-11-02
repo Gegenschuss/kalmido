@@ -148,13 +148,19 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   const q = d.querySelector('#sbn-q'); q.value = 'harbour'; q.dispatchEvent(new w.Event('input', {bubbles: true}));
   check(await until(() => cards().length === 1 && cards()[0].getAttribute('href') === `#note/${N1}`), '#1516: the search finds the text');
   q.value = ''; q.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(150);
-  // a new note: a list is asked for (two lists with notes I may write in)
-  click(w, d.querySelector('[data-sb="note-new"]')); await sleep(200);
-  const items = [...d.querySelectorAll('#pop [role="menuitem"]')];
-  check(items.some(b => /Garden/.test(b.textContent)) && items.some(b => /Website/.test(b.textContent)) && !items.some(b => /Basket|Inbox/.test(b.textContent)), '#1516: "New note" asks for the list (no Inbox)');
-  click(w, items.find(b => /Garden/.test(b.textContent)));
-  check(await until(() => w.eval(`S.route.mod === 'notes' && S.nt.lid === ${GAR} && !!S.nt.id`)), '#1516: the new note opens in Garden');
-  check((await call('GET', `/api/lists/${GAR}/notes`)).notes.length === 2, '#1516: stored in Garden');
+  // 2.477.0 (#3881): "New note" asks for no list any more: without a filter a quick note in the private list Notes, with a
+  // list filtered in that list (the first line of the text is the title)
+  click(w, d.querySelector('[data-sb="note-new"]'));
+  check(await until(() => w.eval('S.nt.id === QN_DRAFT') && !!d.querySelector('#nt-body')) && d.querySelector('#pop').classList.contains('hidden'), '#1516 / #3881: "New note" asks for no list');
+  check(w.eval('listById(S.nt.draft.list_id)?.quicknote') === 1, '#3881: … no filter: into the private list Notes');
+  w.eval("go('notes')");
+  check(await until(() => w.eval("S.route.mod === 'notes' && !S.nt.lid && !S.nt.draft") && !!d.querySelector('#sbn-l')), '#3881: left empty, back in the overview');
+  const sel2 = d.querySelector('#sbn-l'); sel2.value = String(GAR); sel2.dispatchEvent(new w.Event('change', {bubbles: true}));
+  click(w, d.querySelector('[data-sb="note-new"]'));
+  check(await until(() => w.eval(`S.nt.id === QN_DRAFT && S.nt.draft.list_id === ${GAR}`) && !!d.querySelector('#nt-body')), '#1516 / #3881: Garden filtered: the new note opens in Garden');
+  const nb = d.querySelector('#nt-body'); nb.focus(); nb.value = 'Compost\nturn it in spring'; nb.dispatchEvent(new w.Event('input', {bubbles: true}));
+  check(await until(async () => (await call('GET', `/api/lists/${GAR}/notes`)).notes.some(n => n.title === 'Compost')), '#1516: stored in Garden');
+  check((await call('GET', `/api/lists/${GAR}/notes`)).notes.length === 2, '#1516: … one more note in Garden');
   w.eval(`go('notes/${WEB}')`);
   check(await until(() => d.querySelector('#view .ntview .ntcard') && !d.querySelector('#view .sbnall') && /Website/.test(d.querySelector('#top h1')?.textContent || '')), '#1516: #notes/<id> stays the notes of one list ' + d.querySelector('#top h1')?.textContent + ' ' + d.querySelector('#view')?.textContent.slice(0, 80));
   w.close();
@@ -165,7 +171,8 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   w.close();
   w = await boot({user: 'carol', hash: 'notes'}); d = w.document;
   await until(() => d.querySelector('#view .sbnall'));
-  check(cards().length === 2 && !d.querySelector('[data-sb="note-new"]'), '#1516: Carol (view): reads, no "New note"');
+  // 2.477.0 (#3881): "New note" is her own quick note now (her private list Notes), never one in the list she only reads
+  check(cards().length === 2 && !!d.querySelector('[data-sb="note-new"]'), '#1516: Carol (view): reads; "New note" = her own quick note');
   w.close();
 
   // ================= #1532 a new folder belongs to the shown workspace (shows at once while empty)

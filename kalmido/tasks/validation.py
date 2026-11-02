@@ -28,6 +28,7 @@ TASK_FIELDS = ("list_id", "section_id", "parent_id", "title", "content", "priori
                "snippets",  # 2.35.0 (#1095): code snippets (JSON list, tasks/snippets.py)
                "locked")  # 2.36.0 (#1118): the lock (1 = the app shows the task read-only, see lock_problem)
 TASK_FIELDS += ("points",)  # 2.60.0 (#1511): story points (POINTS; NULL = none)
+TASK_FIELDS += ("delegate_agent_id",)  # 2.473.0 (#3357): delegated to this agent, next to the assignee (tasks/watchers.py)
 TASK_FIELDS += ("remind_at",)  # 2.111.0 C (#2057): a reminder at a fixed local time (tasks/remindat.py)
 # 2.60.0 (#1511): the allowed story points (Fibonacci); saving is always allowed, only the display follows lists.points_on
 POINTS = (1, 2, 3, 5, 8, 13)
@@ -60,6 +61,8 @@ def log_act(c, tid, kind, data=None, uid=None):
         wh_note(c, tid, kind)  # webhooks: collected per request, queued after a successful response
         from ..notify.taskbell import tbl_note
         tbl_note(c, tid, kind, uid)  # 2.53.0 C (#1424): "Urgent" on the task: every change is a push
+        from ..tasks.watchers import wat_note
+        wat_note(c, tid, kind, uid)  # 2.473.0 (#3357): a status change reaches the task's watchers
         from ..notify.channels import chn_note
         chn_note(c, tid, kind)  # 2.142.0 A (#2145): new / completed / assigned -> organisation channels, own list channels
     from ..collab.liste2eguard import le2b_act_data
@@ -107,6 +110,8 @@ def log_changes(c, tid, old, act=None):
         log_act(c, tid, "priority", {"p": new["priority"]})
     if ch("assignee_id"):
         log_act(c, tid, "assign", {"to": new["assignee_id"], "from": old["assignee_id"]})
+    if ch("delegate_agent_id"):  # 2.473.0 (#3357)
+        log_act(c, tid, "delegate", {"to": new["delegate_agent_id"], "from": old["delegate_agent_id"]})
     if ch("list_id"):
         lst = c.execute("SELECT name, is_inbox FROM lists WHERE id=?", (new["list_id"],)).fetchone()
         log_act(c, tid, "list", {"name": lst["name"] if lst else "", "inbox": bool(lst and lst["is_inbox"])})
@@ -396,7 +401,7 @@ def clean_task(b):
             v = b[k]
             if k in ("due", "due_time", "section_id", "parent_id", "start", "duration", "list_id", "plan_start") and v in ("", None):
                 v = None
-            if k in ("assignee_id", "assignee_group_id") and v in ("", None, 0):
+            if k in ("assignee_id", "assignee_group_id", "delegate_agent_id") and v in ("", None, 0):
                 v = None
             if k == "title":
                 if v is not None and not isinstance(v, str):
@@ -407,7 +412,7 @@ def clean_task(b):
                 if v is not None and not isinstance(v, str):
                     raise BadInput(tr("Invalid value: {0}", tr("Description")))
                 v = le2a_clean_cipher(v, tr("Description")) if le2e_is_cipher(v) else (v or "")[:CONTENT_MAX]
-            if k in ("list_id", "section_id", "parent_id", "assignee_id", "assignee_group_id") and v is not None:
+            if k in ("list_id", "section_id", "parent_id", "assignee_id", "assignee_group_id", "delegate_agent_id") and v is not None:
                 v = as_int(v, k, 1)
             if k == "priority":
                 v = as_int(v or 0, tr("Priority"))
@@ -490,7 +495,7 @@ def clean_task(b):
 # (and public links) too, so a second device with an old state cannot get around it; the agent API (token) and CalDAV
 # are not bound by it (the lock is a guard of the user interface). A request that unlocks may change the rest at once.
 LOCK_FIELDS = ("title", "content", "due", "due_time", "start", "priority", "list_id", "repeat", "repeat_from",
-               "assignee_id", "assignee_group_id", "rotation")
+               "assignee_id", "assignee_group_id", "rotation", "delegate_agent_id")  # 2.473.0 (#3357): + delegate_agent_id
 _LOCK_CB = re.compile(r"^(\s*(?:[-*+]|\d+[.)])\s+\[)[ xX](\])", re.M)
 
 

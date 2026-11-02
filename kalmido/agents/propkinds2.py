@@ -20,7 +20,7 @@ from flask import g, jsonify
 
 from ..core.config import app
 from ..core.db import bump, db, iso, now_utc
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..core.pg import insert_id, write_lock
 from ..core.access import Denied, list_role, my_max_sort, list_other_agent
 from ..accounts.session import me
@@ -30,7 +30,7 @@ from ..lists.lists import list_created, clean_color, clean_folder, FOLDER_MAX
 from ..api.common import v1_err  # 2.149.0 G (#2517): pulled up from functions
 
 PK2_KINDS = ("inquiry", "setup")
-PK2_TITLES = {"inquiry": N_("Project from an inquiry"), "setup": N_("Set up Kalmido")}
+PK2_TITLES = {"inquiry": N_("Project from an enquiry"), "setup": N_("Set up Kalmido")}
 PK2_SHOOT_MAX, PK2_OFFER_ITEMS_MAX, PK2_LISTS_MAX, PK2_CLIENTS_MAX = 30, 100, 20, 500
 PK2_SHOOT_KEY, PK2_OFFER_KEY, PK2_LIST_KEY, PK2_PROJECT_KEY = 300, 400, 100, 200
 # the modules a setup proposal may switch (the keys of the client's FEATS, static/js/core.js)
@@ -166,12 +166,12 @@ def pk2_input(c, uid, kind, b):
         _p_keys(b, "", ("agent_id", "kind", "text"))
         inp = pk2_make_input(c, uid, aid, kind)
         inp["text"] = _p_str(b.get("text"), "text", PROP_TEXT_MAX, line=False) or None
-        return inp, tr(PK2_TITLES["setup"]), None, None
+        return inp, tr(PK2_TITLES["setup"], lg=lang(c, uid)), None, None
     _p_keys(b, "", ("agent_id", "kind", "text", "file_name", "offer_id"))
     oid = None if b.get("offer_id") in (None, "") else _p_int(b.get("offer_id"), "offer_id")
     text = _p_str(b.get("text"), "text", PROP_TEXT_MAX, oid is None, line=False) or None
     inp = pk2_make_input(c, uid, aid, kind, text, _p_str(b.get("file_name"), "file_name", 200) or None, oid)
-    return inp, tr(PK2_TITLES["inquiry"]), None, None
+    return inp, tr(PK2_TITLES["inquiry"], lg=lang(c, uid)), None, None
 
 
 # ---------------------------------------------------------------- validation (BadInput -> 400)

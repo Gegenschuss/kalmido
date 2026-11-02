@@ -19,10 +19,11 @@ from flask import jsonify, request, Response
 from ..core.config import app
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, csv_dialect, tr
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
+from .pdf import pdf_date
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings
 from .ledger import ofx_items_brief, ofx_log, ofx_need_editable
@@ -770,12 +771,13 @@ def rk_report_get():
         if not ofr_allows(c, uid, oid, "travel", "own", "export"):  # 2.237.0 A (#2861): the file needs the special export
             raise Denied(403, tr(NO_SPECIAL))
         buf = io.StringIO()
-        w = csv.writer(buf, delimiter=";")
+        sep, num = csv_dialect()  # 2.368.2 (#2984): separator and decimal sign of the language
+        w = csv.writer(buf, delimiter=sep)
         head = {"month": tr("Month"), "year": tr("Year"), "person": tr("Person"), "project": tr("Project"), "client": tr("Client"), "category": tr("Category"), "purpose": tr("Purpose")}[by]
         w.writerow([head, tr("Receipts"), tr("Amount") + f" ({cur})"])
         for g in rep["rows"]:
-            w.writerow([_csv_safe(g["label"]), g["count"], g["amount"].replace(".", ",")])
-        w.writerow([tr("Total"), rep["count"], rep["total"].replace(".", ",")])
+            w.writerow([_csv_safe(g["label"]), g["count"], num(g["amount"])])
+        w.writerow([tr("Total"), rep["count"], num(rep["total"])])
         name = f"travel-{by}-{df or 'all'}-{dt or 'all'}{'-' + re.sub(r'[^a-z0-9]+', '-', person.lower()).strip('-') if person else ''}.csv"
         return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{name}"',
                                                                                                "Cache-Control": "no-store"})  # 2.190.0 D (#2496)
@@ -859,10 +861,8 @@ def rk_bill_post():
 
 
 def _fmt_day(s, lg):
-    if not s or not DATE_RE.match(s):
-        return s or ""
-    y, m, d = s.split("-")
-    return f"{d}.{m}.{y}" if lg == "de" else s
+    """2.368.2 (#2986): the date of an invoice line as on the rest of the document (was ISO in every language but German)."""
+    return pdf_date(s, str(lg).split("-")[0]) if s and DATE_RE.match(s) else s or ""
 
 
 @app.post("/api/office/trips/unbill")

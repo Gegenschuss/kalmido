@@ -29,7 +29,7 @@ check(DE.get("This conversation is no longer available.") == "Diese Unterhaltung
 check(DE.get(NF_EN) == NF_DE, "the German 404 text")
 check(not any("auch nicht der Administrator" in v or "auch nicht die Administratoren" in v for v in vals),
       "encryption texts: 'auch nicht der Betreiber' everywhere")
-for k in ("Too many requests, wait a moment", "Server error, please try again later", "File too large", "Login failed. Please try again."):
+for k in ("Too many requests, wait a moment", "Server error, please try again later", "File too large", "Sign-in failed. Please try again."):
     check(k in DE, f"the status text is translated: {k}")
 
 # ---------------------------------------------------------------- server: the 404 text

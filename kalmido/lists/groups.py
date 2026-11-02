@@ -2,12 +2,12 @@
 import re
 from flask import g, has_request_context, jsonify, request
 
-from ..core.config import app
+from ..core.config import app, PUBLIC_URL
 from ..core.pg import insert_id, st_ids, system_ctx
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
-from ..core.access import Denied, my_max_sort, need_collab, need_list, ROLES, task_visible
+from ..core.access import Denied, dlg_gone, my_max_sort, need_collab, need_list, qn_private, ROLES, task_visible
 from ..lists.lists import clean_folder, folder_under
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 
@@ -178,6 +178,7 @@ def grp_sync(c, lids, actor=None):
             elif eff is None:
                 c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
                 c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
+                dlg_gone(c, lid, uid)  # 2.473.0 (#3357): delegated tasks and watching of this list end
                 # 2.352.0 F (#2748, review N7): like removing a member by hand (lists.py member_remove)
                 c.execute("DELETE FROM task_bell WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
                 c.execute("DELETE FROM user_task_order WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
@@ -258,13 +259,13 @@ def grp_set_members(c, gid, ids, actor=None):
         try:
             x = int(x)
         except (TypeError, ValueError):
-            raise BadInput(tr("unknown user")) from None
+            raise BadInput(tr("unknown person")) from None
         u = c.execute("SELECT kind FROM users WHERE id=?", (x,)).fetchone()
         if not u or u["kind"] == "agent":
             raise BadInput(tr("Only people can be group members"))
         from ..accounts.users import admin_sees
         if has_request_context() and getattr(g, "user", None) is not None and not admin_sees(c, x):  # 2.28.0 (#935): mode workspaces
-            raise BadInput(tr("unknown user"))
+            raise BadInput(tr("unknown person"))
         want.add(x)
     before = grp_list_ids(c, gid)
     cur = set(grp_members(c, gid))
@@ -417,6 +418,7 @@ def list_group_set(lid, gid):
     need_group(c, gid)
     if c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0]:
         return err(tr("The basket cannot be shared"))
+    qn_private(c, lid)  # 2.477.0 (#3881)
     role = grp_role(body())
     from ..collab.liste2e import le2e_mode
     if role == "participant" and le2e_mode(c, lid):  # 2.64.1 (#1817)
@@ -547,16 +549,35 @@ def check_group_assignee(c, lid, gid):
 
 
 def grp_assign_events(c, tid, gid):
-    """News (+ the usual assignment push gate) for every member of the group the task was just assigned to."""
-    from ..collab.news import news_add
+    """News, 2.367.2 (#2968) push + mail with the rules of a plain assignment for every member of the group the task was just
+    assigned to (only the group's name differs in the text)."""
+    from ..agents.core import agent_ids
+    from ..collab.comments import burst_gate, collab_user, lang_of, user_names
+    from ..collab.news import KIND_ROW, news_add, notif_ok
+    from ..notify.channels import evm_note
+    from ..notify.push import push_prio, push_reachable
+    from ..notify.taskbell import tbl_level
     actor = me() if has_request_context() and getattr(g, "user", None) else None
     t = c.execute("SELECT title, list_id FROM tasks WHERE id=?", (tid,)).fetchone()
     if not t:
         return
     gname = grp_name(c, gid)
+    bots = agent_ids(c)
+    who = user_names(c, [actor]).get(actor, "?") if actor else None
     for uid in grp_members(c, gid):
-        if uid != actor and task_visible(c, tid, uid, full=True):
-            news_add(c, uid, "assign", task_id=tid, actor=actor, data={"group": gname, "group_id": gid})
+        if uid == actor or uid in bots or not task_visible(c, tid, uid, full=True):
+            continue
+        s = collab_user(c, uid, t["list_id"])
+        if not s:
+            continue
+        news_add(c, uid, "assign", task_id=tid, actor=actor, data={"group": gname, "group_id": gid}, s=s)
+        if not actor or tbl_level(c, uid, tid, s) or not notif_ok(c, uid, s, KIND_ROW["assign"], "push", t["list_id"]):
+            continue
+        evm_note(c, uid, "assign", tid, actor, s)
+        if push_reachable(c, uid, s) and burst_gate(c, uid, tid, event=True):
+            lg = lang_of(s)
+            g.pushes.append((uid, tr("{0} assigned {1}: {2}", who, gname, t["title"], lg=lg), tr("Whoever has time takes it", lg=lg),
+                             f"{PUBLIC_URL}/#t/{tid}", push_prio(s), {"kind": "assign"}))
 
 
 def task_take(c, tid, uid):

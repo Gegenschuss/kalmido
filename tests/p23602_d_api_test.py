@@ -81,7 +81,7 @@ check(str(BOB) not in str(dbx("SELECT user_id FROM time_sheets")) and not dbx("S
       "the private month went with the account")
 check(all(x.get("by") != BOB for x in json.loads(rows[0][4])), "the person's id left the history")
 rv = A.get(B + "/api/time/sheets", params={"month": "2026-05"}).json().get("review") or []
-check([(x["user_id"], x["state"], x["seconds"], x["name"]) for x in rv] == [(None, "approved", 7200, "Deleted user")],
+check([(x["user_id"], x["state"], x["seconds"], x["name"]) for x in rv] == [(None, "approved", 7200, "Deleted person")],
       f"the admin sees the month with its noted hours {rv}")
 rv = A.get(B + "/api/time/sheets", params={"month": "2026-09"}).json().get("review") or []
 check(rv == [], f"a deleted person's closed month does not wait in every month {rv}")

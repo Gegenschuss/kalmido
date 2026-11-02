@@ -177,6 +177,7 @@ The most used helpers:
 | `api/v1.py` | REST API /api/v1 with personal access tokens: token management, authentication, the routes, errors, groups. |
 | `tasks/dayplan.py` | Day planning ("Plan my day") and the evening review. |
 | `api/openapi.py` | The OpenAPI 3.1 document of /api/v1 (served at /api/v1/openapi.json, built once). |
+| `collab/integfail.py` | 2.367.3 (#2971): an integration stopped working: one News item + push to who can repair it (`integ_tell`). |
 | `integrations/webhooks.py` | Webhooks per user: collecting events during a request, delivery, settings. |
 | `agents/core.py` | Agents: accounts, event queue + long polling, runtime settings, permissions of people towards agents. |
 | `collab/reactions.py` | Reactions on comments, tidy suggestions and shared list tags. |
@@ -243,6 +244,7 @@ The most used helpers:
 | `team/clients.py` | Clients (module "clients"): clients of an organisation above the lists, hours, budget, estimate vs. actual. |
 | `team/workload.py` | Workload (module "workload"): planned hours per person and week against their capacity. |
 | `hub/absence.py` | 2.50.0 (#1195): absences per person and area (the team sees "away", the kind only the person and the admins; kind + note encrypted at rest), German public holidays per state, the effect on workload, day plan and assigning, `GET /api/v1/absences`. See docs/TEAM.md. |
+| `hub/holidays.py` | 2.461 (#3773): public holidays per country from the data files `office/packs/holidays/<code>.json`, regions, Easter formula. |
 | `hub/leave.py` | 2.125.0 (#2118, #2117): working days per person (setting `workdays`, read by workload, time gaps and the vacation account), the vacation account per person / area / year (`hub_leave_quota`), vacation requests (`hub_absences.status`, the organisation's switch `orgs.hub_leave_approval`) and their decision with News / push. See docs/TEAM.md. |
 | `hub/dispo.py` | 2.50.0 (#1194): resources and disposition (module "dispo"): bookings of members, contacts, equipment and sets (option / firm), double bookings and absences as warnings, "who is free", my bookings. See docs/TEAM.md. |
 | `team/approvals.py` | Approvals as a step of a task: request, approve / changes / reject, withdraw. |
@@ -342,6 +344,7 @@ registering the ones of its area.
 | `countries.js` | 2.40.0: the country picker (names from the browser, ISO 3166 alpha-2 codes) of the client card, company data and import preview. |
 | `collab.js` | News and comments + activity (module "collab"). |
 | `attachments.js` | Attachments and the share target. |
+| `upbar.js` | 2.363.3 (#3134): upload progress with Cancel. `rawFetch0` sends every form with at least 1 MB of files through `upSend` (XHR), so all file dialogs share one bar; Cancel ends only while the body is on its way. `upLimit` in `attachments.js` holds the server's limit for all file dialogs. |
 | `pdfview.js` | 2.48.0 (#1367): the PDF preview `pdfView({url, name, size, dlUrl})` (lightbox: pages drawn on demand, turn pages, zoom, swipe, a clear message offline or for a damaged file) for attachments, project files, office documents and archive PDFs; links carry `data-pview`. Uses the bundled pdf.js (`static/vendor/pdfjs/`, loaded on first use, `isEvalSupported: false`, no scripting). |
 | `undo.js` | Undo / redo history. |
 | `popovers.js` | Popovers (date, priority, list, tags, reminders, repeat ...). |
@@ -397,6 +400,7 @@ registering the ones of its area.
 | `mindmap.js` | 2.49.0 (#1201): the list view "Mind map" (SVG, keys like Mindjet, drag to rehang, pan / pinch, outline, export Markdown / SVG / PNG, outline import) and the ```mindmap block of knowledge pages. |
 | `notesall.js` | 2.45.0 (#1516): `#notes` = the notes of all lists and projects (pinned first, a filter by list, a search in title and text, a new note in a picked list). |
 | `navmenu.js` | 2.418.0 (#3560): the editor of the areas' menus and the tab bar (Minus / Plus / grip, Hidden, Done), in place of a panel / the office's start page and under Settings > Navigation; the org admins' menu points (`nav_orgDraw`). Loaded on demand (module `navmenu`); the model (`nav_pref`, `nav_hid`, `nav_sort`) is in `areas.js`, the setting `nav_menus` and `orgs.nav_off` in `kalmido/accounts/navmenus.py`. |
+| `tourmods.js` | 2.466.0 (#3314): the steps of the areas' short introductions (when they start: `palette.js`). |
 | `lazyload.js` | 2.53.0 (#1410): modules loaded on demand (`loadModule`, the stand-ins of their functions, `officeOn`), see below. |
 | `setcore.js` | 2.53.0 (#1410): the parts of the settings needed from the start: Web Push on this device, the app badge, the service worker's messages, the settings sections and modules, the project links. |
 | `ctlinks.js` | 2.53.0 (#1410): the contacts in the task panel ("People and dates", linking a contact). |
@@ -405,9 +409,10 @@ registering the ones of its area.
 ### Adding a client file
 
 1. Create `static/js/<name>.js` with `// @ts-check` as its first line (2.102.0), the header comment and `'use strict';`.
-2. Add its `<script>` tag to `static/index.html` (before `main.js`, after the files whose functions it calls while it
-   loads), add it to `SHELL` in `static/sw.js` in the same order and bump `CACHE` there.
-3. `python3 tools/check_layout.py` compares the three lists; `node --check` runs on every file in CI.
+2. Prefer loading it on demand (`LD_MODS` in `static/js/lazyload.js`, see "Modules loaded on demand"). A file needed at
+   start gets its `<script>` tag in `static/index.html` in the part below the mark before `main.js`, sorted by name (2.476,
+   see "Styles and start scripts" below); `python3 tools/sw_lists.py` rewrites `SHELL` in `static/sw.js` from it.
+3. `python3 tools/check_layout.py` compares the lists; `node --check` runs on every file in CI.
 
 ### Caching of static files and request timing
 
@@ -479,6 +484,27 @@ hand used to conflict in almost every merge; they are handled now so two package
 
 The merge drivers are registered once per clone with `tools/git_setup.sh` (`.gitattributes` names them; CI never merges).
 
+### Styles and start scripts (2.476, #3487)
+
+Two more files every package used to append to - `static/app.css` (new rules at its end) and `static/index.html` (a new
+`<script>` right before `main.js`) - collided most often after that. They take nothing new at their end any more:
+
+- **`static/app.css` does not grow.** Rules of a module loaded on demand go into its own `static/css/<module>.css`
+  (`LD_CSS` in `static/js/lazyload.js`). Rules needed at start go into a file of their own,
+  `static/css/start-<topic>.css`, one per package or topic. The server sends them behind `app.css` under the same URL
+  `/static/app.css`, sorted by name (`with_start_css` in `kalmido/core/strip.py`: one content hash, one ETag, the service
+  worker precaches it as before); a start file comes after `app.css` in the cascade and before the module stylesheets.
+  `tools/perf_budget.py`, `tools/pack_static.py` and `tools/build_demo.py` count / pack / build the whole, and
+  `tests/boot.js` `allCssSync()` reads it in the same order. `tools/check_appcss.py` (inside `tools/check_layout.py`)
+  fails when `app.css` has more lines than its fixed limit (changing or deleting rules stays allowed; the limit is only
+  ever lowered) and checks every start file's braces and comments on its own.
+- **Start scripts go below the mark.** The scripts above the comment `new start scripts go below this line` in
+  `static/index.html` keep their order (defer runs them in it, some rely on it); their number only goes down. A new start
+  script - better: a module loaded on demand - goes into the part between the mark and `main.js`, one tag per line,
+  sorted by name, so two packages land on different lines. It runs after every script above and before `main.js`; it may
+  only declare functions and must not call into a script that sorts after it while it loads. `tools/check_layout.py`
+  checks the order and the limit.
+
 ### Dragging
 
 *Since 2.102.0.*
@@ -494,6 +520,13 @@ a second finger or a cancel event, and swallows the click after a drag. The call
 2.193.0 A (#2219): the calendar (`caldrag.js`: the 15-minute grid in `onMove`, `scroll` = the hours, touch after a 0.4 s
 hold) and the mind map (`mindmap.js`: rehanging a branch, the drop target in map coordinates; moving the map and pinch stay
 its own pointer handling) use it.
+
+2.456.0 (#3837): the order of the rows of a list is the same gesture everywhere: `rowd_attach(root, {kind, row, move})` in
+`drag.js` on `drg_attach`. The grip (`data-rowd="kind"`, `rowd_grip` / `rowd_attr`; a position's symbol where the row is full
+of fields) drags with a mouse at once, with a finger after a 0.38 s hold; a line shows where the row lands, `move(from, to,
+row, list)` saves with the same code as the arrows. `rowd_arrows` keeps the arrows on a computer for the keyboard and leaves
+them out on a touch screen (no hover). Used by quotation positions and parts, form questions, budget categories, the
+arrangements, sidebar views, key links, scanned pages and the phone list of "Arrange blocks".
 
 2.193.0 C (#2219): task rows and chips (`dnd.js`, list / board / matrix / calendar, the selection's grip) drag by finger
 on `drg_attach`: the long press is `hold` (0.38 s, 8 px; 0 on the grip), `onHold` lifts the row at once (ghost, "Move to
@@ -591,7 +624,7 @@ desktop switch of the chat, the pop-up button, reaction rows, `patchKids`, the t
 - `LD_NOP`: stand-ins that do nothing before the module is loaded (they only update what the module drew, e.g. `chatPatch`).
 - Styles: `LD_CSS` names each module's stylesheets in `static/css/<name>.css`; `loadModule` loads them next to the
   scripts and resolves only once both apply (no unstyled flash); `loadCss(name)` loads one alone. `LAZY_CSS` in
-  `static/sw.js` precaches them (offline); `tools/check_layout.py` checks `LAZY_CSS` = `LD_CSS` = `static/css/*.css`. A
+  `static/sw.js` precaches them (offline); `tools/check_layout.py` checks `LAZY_CSS` = `LD_CSS` = `static/css/*.css` (without `start-*.css`). A
   module stylesheet comes after `app.css` in the cascade: only rules whose every selector names a class / id that only the
   module's scripts use move there, and none that a later rule of `app.css` for the same class would override. Suites that
   read rules use `allCss()` / `allCssSync()` of `tests/boot.js` (app.css + the module stylesheets).
@@ -761,6 +794,11 @@ Who may see what is decided in one module, `kalmido/core/access.py`:
   (`acx_task_ok()`), whatever triggered them.
 - **Repair.** The nightly boundary check (`accounts/tenancy.py`) removes memberships in an organisation's list, calendar or
   address book of people outside it and reports counts and ids as a security alert; other findings are counted as before.
+- **Coming back (2.363.3, 2.463.0).** `org_leave` notes what the end of a membership took away (`space_moves` kind `orgleave`,
+  ids and roles only, gone after two days); `org_member_add` within 24 hours puts back the memberships of other people's projects
+  with their role, then the assignments and coming along (`olv_rejoin`, `accounts/orgleave.py`). A project in the trash or no
+  longer in the organisation stays away, the person's own projects stay with the heir, a project with the lock takes them onto
+  its waiting list (no key comes along).
 - **Invitations (2.87.0).** Leaving an organisation also ends the invitations to the events of its calendars (the person's
   and their agents'). An invitation counts only while the person may see the calendar's workspace (`ev_att_ok()`: event
   view, range, reply, CalDAV invitations, reminders); an organisation's event invites only its people, and a calendar moves

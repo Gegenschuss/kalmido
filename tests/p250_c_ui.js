@@ -1,8 +1,8 @@
 // 2.50.0 UI tests of part C (#329 customer view of public links, #1200 approval links; own container, start.sh). jsdom:
-// - Share dialog > Public link: "What does the customer see?" with the switches (new link: sections + due dates on), the
+// - Share dialog > Public link: "What does the client see?" with the switches (new link: sections + due dates on), the
 //   list's fields and "only tasks with tag"; saving sends them, the server keeps them
 // - the list's acceptance block appears once the link exists: "Request acceptance" creates a link to copy
-// - a sent quotation: "Approval by the customer" -> "Create approval link" shows the link; draft quotations have no block
+// - a sent quotation: "Approval by the client" -> "Create approval link" shows the link; draft quotations have no block
 // Firefox (real layout, skipped without firefox): 390 px touch - the customer page and the approval page stay inside the screen,
 // the decision buttons are big enough to tap
 const {execFileSync} = require('child_process');
@@ -37,7 +37,7 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   let w = await boot({user: 'alice'}), d = w.document;
   w.eval(`shareModal(${L})`);
   let md = await until(() => d.querySelector('.modal.shmodal #cv-sec') && d.querySelector('.modal.shmodal'));
-  check(md && md.querySelector('#cv-sec .cvh')?.textContent === 'What does the customer see?', 'the section "What does the customer see?"');
+  check(md && md.querySelector('#cv-sec .cvh')?.textContent === 'What does the client see?', 'the section "What does the client see?"');
   const box = id => md.querySelector(`[data-cv="${id}"]`);
   check(box('sections')?.checked && box('due')?.checked && !box('progress')?.checked && !box('assignees')?.checked && !box('files')?.checked && !box('brand')?.checked,
     'a new link: sections + due dates on, the rest off (as before)');
@@ -67,7 +67,7 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   w.close();
   w = await boot({user: 'alice', hash: 't/' + TID}); d = w.document;
   const who = await until(() => [...d.querySelectorAll('.cm .chead b')].find(b => /Kim Client/.test(b.textContent)));
-  check(who && who.textContent === 'Kim Client (customer, via the link)' && !who.closest('.cm').querySelector('button.cmav'), 'the comment shows the customer\'s name, no person card');
+  check(who && who.textContent === 'Kim Client (client, via the link)' && !who.closest('.cm').querySelector('button.cmav'), 'the comment shows the customer\'s name, no person card');
   w.close();
 
   // ================= a quotation: draft without, sent with the approval block
@@ -82,10 +82,10 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   await call('POST', `/api/office/docs/${DOC}/status`, {status: 'sent'});
   w = await boot({user: 'alice', hash: `office/offers/${DOC}`}); d = w.document;
   const nb = await until(() => d.querySelector('#sg-box [data-sg="new"]'));
-  check(nb && /Approval by the customer/.test(d.querySelector('.sgsec')?.textContent || ''), 'a sent quotation: "Approval by the customer"');
+  check(nb && /Approval by the client/.test(d.querySelector('.sgsec')?.textContent || ''), 'a sent quotation: "Approval by the client"');
   click(w, nb);
   const qu = await until(() => d.querySelector('#sg-box [data-sgurl]'));
-  check(qu && /\/s\/q\//.test(qu.value) && /Waiting for the customer/.test(d.querySelector('#sg-box').textContent), 'Create approval link: link + state');
+  check(qu && /\/s\/q\//.test(qu.value) && /Waiting for the client/.test(d.querySelector('#sg-box').textContent), 'Create approval link: link + state');
   const OFF = qu ? qu.value.slice(qu.value.indexOf('/s/q/') + 1) : '';
   check(d.querySelector('#sg-box') && !d.querySelector('#sg-box').closest('fieldset[disabled]'), 'the block is outside the locked editor');
   w.close();
