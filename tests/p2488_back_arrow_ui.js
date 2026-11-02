@@ -71,6 +71,27 @@ if (!process.env.P2488A_NOSTART) execFileSync('bash', [path.join(__dirname, 'sta
     check(await ev(`location.hash`) === '#l/' + lid, 'no step back from an input');
     await ev(`document.getElementById('bn-in').remove()`);
 
+    // 2.488.0 (#3988, self-review): history.length stops at 50 in Firefox / WebKit - a new view must still count as a step
+    // (before, every view after the 50th looked like a step back and the arrow greyed out)
+    await nav(B + '#today');
+    await route('today');
+    await ev(`Object.defineProperty(history, 'length', {configurable: true, get: () => 50})`);
+    await ev(`location.hash = '#l/${lid}'`);
+    await route(`l:${lid}`);
+    await ev(`location.hash = '#cal'`);
+    check(await route('cal'), 'a third view opens');
+    check(await ready(ev, `${btn}.disabled === false`, 12), 'active with a full history (length frozen at 50)');
+    await ev(`history.back()`);
+    check(await route(`l:${lid}`) && await ready(ev, `${btn}.disabled === false`, 12), 'one step back: still active');
+    await ev(`history.back()`);
+    check(await route('today') && await ready(ev, `${btn}.disabled === true`, 12), 'two steps back: greyed out at the first view');
+    // a pushState to a new hash (the note view does that) is a new view
+    await ev(`history.pushState(null, '', '#l/${lid}')`);
+    check(await ready(ev, `${btn}.disabled === false`, 12), 'pushState to a new hash makes the arrow active');
+    await ev(`history.back()`);
+    check(await ready(ev, `${btn}.disabled === true`, 12), 'and Back from it greys it out again');
+    await ev(`delete history.length`);
+
     // the phone view: no arrow
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await nav(B + '#today');

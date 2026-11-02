@@ -4,7 +4,7 @@
    nothing (the browser's own jump out of the app is swallowed too, so a browser and the desktop shell behave the same).
    An overlay entry (task panel on touch, shopping mode, job chat, dialogs on touch) counts as "something to go back from":
    Back closes it first (backclose.js / detail.js handle that popstate), it is not a view of its own. */
-const BN = {st: [location.hash], i: 0, type: '', len: history.length};
+const BN = {i: 0};  // index of the current view; every history entry of Kalmido carries it as state.bn
 const bnOverlay = () => { const s = history.state; return !!(s && (s.f8d || s.jc || s.shop || s.detail)); };
 const bnCan = () => BN.i > 0 || bnOverlay();
 const bnTip = () => tr('Back') + ' (' + kbText(IS_MAC ? 'Mod+[' : 'Alt+←') + ')';
@@ -17,22 +17,31 @@ function bnSync() {
   el.disabled = !bnCan();
 }
 function bnBack() { if (!isMobile() && bnCan()) history.back(); }
-// push or traverse? A hash change fires popstate either way, so ask the Navigation API where there is one (it fires first),
-// otherwise the length of the history (a new entry makes it longer)
-window.navigation?.addEventListener?.('navigate', e => { BN.type = e.navigationType || ''; });
-{ const push = history.pushState.bind(history); history.pushState = (...a) => { push(...a); BN.len = history.length; setTimeout(bnSync, 0); }; }  // an overlay entry is no view, but the length moves
-window.addEventListener('popstate', () => setTimeout(bnSync, 0), true);
-window.addEventListener('hashchange', () => {
-  const h = location.hash, n = history.length;
-  const trav = BN.type ? BN.type === 'traverse' : n <= BN.len;
-  BN.type = ''; BN.len = n;
-  if (trav) {  // Back / Forward: the neighbour in our list, an unknown target counts as a step back
-    if (BN.st[BN.i - 1] === h) BN.i--;
-    else if (BN.st[BN.i + 1] === h) BN.i++;
-    else if (BN.st[BN.i] !== h) { BN.i = Math.max(0, BN.i - 1); BN.st[BN.i] = h; }
-  } else if (BN.st[BN.i] !== h) { BN.st.length = BN.i + 1; BN.st.push(h); BN.i++; }
+// 2.488.0 (#3988, self-review): push or traverse is read from a mark in the entry's own state (state.bn = the view index), not
+// from history.length (it stops growing at 50 entries in Firefox / WebKit, then every new view looked like a step back).
+// The other modules' pushState / replaceState keep their state; the mark rides along. An overlay entry keeps the view index,
+// a pushState to a new hash (notesall.js) is a new view.
+const bnMark = () => { const s = history.state; return s && typeof s === 'object' && Number.isInteger(s.bn) ? s.bn : null; };
+const bnKeep = (s, i) => s == null ? {bn: i} : (typeof s === 'object' && !Array.isArray(s) ? {...s, bn: i} : s);
+const bnRep = history.replaceState.bind(history);
+{
+  const push = history.pushState.bind(history);
+  history.replaceState = (s, t, u) => bnRep(bnKeep(s, BN.i), t, u);
+  history.pushState = (s, t, u) => {
+    let h = location.hash; try { h = new URL(u ?? location.href, location.href).hash; } catch { /* keep */ }
+    if (h !== location.hash) BN.i++;
+    push(bnKeep(s, BN.i), t, u); setTimeout(bnSync, 0);
+  };
+}
+try { bnRep(bnKeep(history.state, 0), '', location.href); } catch { /* old browser */ }  // the first view of this page load
+function bnOnNav() {
+  const m = bnMark();
+  if (m !== null) BN.i = m;  // back / forward to an entry of Kalmido
+  else { BN.i++; try { bnRep(bnKeep(history.state, BN.i), '', location.href); } catch { /* old browser */ } }  // a new view (location.hash = ...)
   bnSync();
-});
+}
+window.addEventListener('popstate', () => { const m = bnMark(); if (m !== null) BN.i = m; setTimeout(bnSync, 0); }, true);
+window.addEventListener('hashchange', bnOnNav);
 const bnField = t => !!(t && t.closest && t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], .ProseMirror'));
 document.addEventListener('keydown', e => {
   if (isMobile() || e.defaultPrevented || e.shiftKey) return;
