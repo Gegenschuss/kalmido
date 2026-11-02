@@ -1153,6 +1153,8 @@ ROUTES = {
     # 2.97.0 D (#2050 #2051): locked spaces / clean-up (p297_d_api_test.py) - routes below this line
     # 2.60.0 B (#1511): the velocity of a list (need_list read; p260_b_api_test.py: a stranger / another organisation's agent 404)
     "GET /api/lists/{}/velocity": "list", "GET /api/v1/lists/{}/velocity": "list",
+    # 2.393.2 A (#3374): the flow figures of a list (need_list read; p2393_2_a_api_test.py: a stranger 404)
+    "GET /api/lists/{}/flow": "list", "GET /api/v1/lists/{}/flow": "list",
     # 2.60.0 C (#1512): the review step (need_task / need_list of the task's list; p260_c_api_test.py: a stranger 404, a viewer 403)
     "POST /api/tasks/{}/review": "task", "POST /api/v1/tasks/{}/review": "task",
     "PUT /api/tasks/{}/irreversible": "task", "DELETE /api/tasks/{}/irreversible": "task", "POST /api/tasks/{}/irreversible-yes": "task",  # 2.392.0 C (#3370)

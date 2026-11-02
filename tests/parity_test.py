@@ -109,6 +109,7 @@ APP_TO_API = {
     "POST /api/lists/{}/sections/order": ["PUT /lists/{}/sections/order"],
     "GET /api/lists/{}/overview": ["GET /lists/{}/overview"],
     "GET /api/lists/{}/kpis": ["GET /lists/{}/kpis"],  # 2.43.0 (#1328): key figures
+    "GET /api/lists/{}/flow": ["GET /lists/{}/flow"],  # 2.393.2 A (#3374): flow figures
     "GET /api/tasks/{}/related": ["GET /tasks/{}/related"],  # 2.59.0 (#1375): related tasks
     "POST /api/lists/{}/join": ["POST /lists/{}/join"],  # 2.46.0 (#1603): join a list visible to the organisation
     "PATCH /api/lists/{}/overview": ["PATCH /lists/{}/overview"],
