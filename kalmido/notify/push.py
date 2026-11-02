@@ -23,14 +23,14 @@ from ..core.pg import system_ctx
 from ..core.usertz import hm_text, tz_gap, tz_of_s, user_now
 from ..core.db import bump, connect, DbError, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
 from ..accounts.session import GATE
-from ..core.access import list_role, task_visible, vis_sql
+from ..core.access import list_role, pvis, task_visible, vis_sql
 from ..tasks.validation import NAG_HOUR_CAP, NAG_MINUTES, valid_hm
 from ..tasks.tasks import _wd_followups
 from ..collab.comments import collab_on, push_gate_tick, task_push_tick
 from ..collab.news import news_cleanup, news_unread_me, notif_ok
 from ..personal.habits import habit_times, pomo_close, pomo_elapsed, pomo_planned_end
 from ..personal.timetrack import _num, time_watchdog
-from ..core.env import env_bool
+from ..core.env import env_bool, env_int
 from ..core.merges import mg_prune  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.lffolder import lf_expire_tick  # 2.352.0 A (#2748)
 
@@ -575,14 +575,64 @@ def reminder_recipient(c, t, users, memo=None):
     return None
 
 
-def _wd_sees(c, t, uid, memo):
-    """task_visible(c, t["id"], uid, full=True) with the list role of the tick's memo."""
+def _wd_sees(c, t, uid, memo, full=True):
+    """task_visible(c, t["id"], uid, full=full) with the list role of the tick's memo.
+    2.369.4 (#2516): a participant's visible tasks of a list (pvis) and whether the account has a data lock are read once
+    per tick too (was task_visible per task: list role, data lock, two task-set queries each time)."""
     if memo is None:
-        return task_visible(c, t["id"], uid, full=True)
+        return task_visible(c, t["id"], uid, full=full)
     k = ("role", t["list_id"], uid)
     if k not in memo:
         memo[k] = list_role(c, t["list_id"], uid)
-    return task_visible(c, t["id"], uid, full=True) if memo[k] == "participant" else bool(memo[k])
+    if not memo[k]:
+        return False
+    from ..core.dlock import dl_of, dl_task_hidden
+    dk = ("dl", uid)
+    if dk not in memo:
+        memo[dk] = bool(dl_of(c, uid))
+    if memo[dk] and dl_task_hidden(c, t["id"], uid):
+        return False  # as task_visible: a task the agent's data lock leaves out
+    if memo[k] != "participant":
+        return True
+    pk = ("pvis", t["list_id"], uid)
+    if pk not in memo:
+        memo[pk] = pvis(c, uid, t["list_id"])
+    return t["id"] in memo[pk][1 if full else 0]
+
+
+def _wd_prefetch(c, rows, users, memo):
+    """2.369.4 (#2516): the recipients' list roles and the people who come along for the due tasks rows of one tick, as
+    queries over all of them (the list rows, the memberships of every candidate, task_people) instead of per task and
+    person; the roles themselves come from the same rule as list_role (_list_role with the rows read here)."""
+    if not rows:
+        return
+    from ..core.access import _list_role
+    tids = sorted({int(t["id"]) for t in rows})
+    ppl = memo.setdefault("people", {})
+    for tid in tids:
+        ppl[tid] = []
+    for r in c.execute("SELECT task_id, user_id FROM task_people WHERE task_id = ANY(CAST(? AS BIGINT[])) ORDER BY task_id, user_id", (tids,)):
+        ppl[r[0]].append(r[1])
+    pairs = {(int(t["list_id"]), int(u)) for t in rows for u in (t["assignee_id"], t["created_by"], *ppl[int(t["id"])])
+             if u and u in users and u != t["list_owner"]}
+    if not pairs:
+        return
+    lids, uids = sorted({p[0] for p in pairs}), sorted({p[1] for p in pairs})
+    lr = {r[7]: r for r in c.execute("SELECT owner_id, life, org_id, family, org_visibility, org_edit, deleted_at, id FROM lists "
+                                     "WHERE id = ANY(CAST(? AS BIGINT[]))", (lids,))}
+    lm = {(r[1], r[2]): r for r in c.execute("SELECT role, list_id, user_id FROM list_members WHERE list_id = ANY(CAST(? AS BIGINT[])) "
+                                             "AND user_id = ANY(CAST(? AS BIGINT[]))", (lids, uids))}
+    for lid, u in sorted(pairs):
+        if ("role", lid, u) not in memo:
+            memo[("role", lid, u)] = _list_role(c, lid, u, lr.get(lid), lm.get((lid, u)))
+
+
+def _wd_people(c, t, users, rcpt, memo):
+    """reminder_people (everyone who comes along and can still see the task) from the tick's memo (_wd_prefetch)."""
+    from ..family.v1 import reminder_people
+    if memo is None or int(t["id"]) not in memo.get("people", {}):
+        return reminder_people(c, t, users, rcpt)
+    return [u for u in memo["people"][int(t["id"])] if u != rcpt and u in users and _wd_sees(c, t, u, memo, full=False)]
 
 
 def _wd_notif_ok(c, uid, s, lid, memo, own=False):
@@ -608,7 +658,35 @@ WD_TICKS = []  # 2.235.0 A (#2901): (name, fn(c, users, S, LG)) of higher layers
 WD_SLOW_MS = 200  # 2.149.0 C (#2516): a watchdog section that takes longer leaves a log line (name + duration only)
 
 
+# 2.369.4 (#2516): the clean-up / prune / GC sections run at most every KALMIDO_WD_SLOW_S seconds (default 600 = 10 min;
+# the tests' containers set 0 = every tick as before); reminders, nags, events, time and pushes keep every tick. The last
+# start is kept in the worker's memory: after a restart every section runs once at the first tick. A stored "next due" per
+# section is not built (every write would have to keep it).
+WD_SLOW_S = env_int("KALMIDO_WD_SLOW_S", 600, lo=0, hi=86400)
+WD_SLOW = frozenset((
+    "news cleanup", "office log prune", "usage cleanup", "audit cleanup", "proposal cleanup", "chat files cleanup",
+    "team chat files cleanup", "org export cleanup", "merge snapshots", "office undo copies", "video trash", "list trash",
+    "task trash", "old logs", "orphan files", "agent chat days", "trash periods", "booking archive", "retired organisations",
+    "account export cleanup", "server link tokens", "files cleanup", "contract files trash", "terms files",
+    "entertainment receipts trash", "wiki files", "wiki trash", "table files"))
+_WD_LAST = {}  # section name -> time.monotonic() of its last start (this process)
+
+
+def _wd_due(name, now=None):
+    """2.369.4 (#2516): may section name run in this tick? (and notes the start when yes)"""
+    if name not in WD_SLOW or WD_SLOW_S <= 0:
+        return True
+    now = time.monotonic() if now is None else now
+    last = _WD_LAST.get(name)
+    if last is not None and now - last < WD_SLOW_S:
+        return False
+    _WD_LAST[name] = now
+    return True
+
+
 def _wd_section(c, name, fn, *a):
+    if not _wd_due(name):
+        return
     t0 = time.monotonic()
     try:
         fn(c, *a)
@@ -809,9 +887,14 @@ def _wd_reminders(c, users, S, LG, now):
     early, margin = wd_early_allday(S), WD_EARLY_MARGIN + tz_gap(S, now)  # 2.368.3 (#2985): + the distance to the people's clocks
     # 2.281.0 B (#3117): list roles / push settings per person, once per tick (a wave of 100 reminders)
     memo = {"bundle": {}}  # 2.367 (#2967): + the all-day reminders of this tick per person
+    # 2.191.0 C (#2516): nothing of a task the check skips can be due yet -- _wd_reminder would only read
+    rows = [t for t in rows if wd_rem_maybe(t, early, now, margin)]
+    try:
+        _wd_prefetch(c, rows, users, memo)  # 2.369.4 (#2516): roles + who comes along for all of them at once
+    except Exception as e:  # noqa: BLE001
+        _wd_fail(c, "reminder recipients", "all", e)  # the old way, one by one
+        memo = {"bundle": {}}
     for t in rows:
-        if not wd_rem_maybe(t, early, now, margin):
-            continue  # 2.191.0 C (#2516): nothing of this task can be due yet -- _wd_reminder would only read
         try:
             _wd_reminder(c, t, users, S, LG, now, memo)
         except Exception as e:  # noqa: BLE001
@@ -878,7 +961,6 @@ def wd_nag_maybe(t, early, now, margin=WD_EARLY_MARGIN):
 
 
 def _wd_reminder(c, t, users, S, LG, now, memo=None):
-    from ..family.v1 import reminder_people
     memo = {} if memo is None else memo
     rcpt = reminder_recipient(c, t, users, memo)
     s = S.get(rcpt, USER_DEFAULTS)
@@ -898,7 +980,7 @@ def _wd_reminder(c, t, users, S, LG, now, memo=None):
         if now - at > timedelta(hours=6):
             continue
         # 2.19.0 (#653): everyone who comes along gets it too (in their language, with their settings)
-        for who in ([rcpt] if rcpt else []) + reminder_people(c, t, users, rcpt):
+        for who in ([rcpt] if rcpt else []) + _wd_people(c, t, users, rcpt, memo):  # 2.369.4 (#2516): from the tick's memo
             sw, lgw = S.get(who, USER_DEFAULTS), LG.get(who, "en")
             if not _wd_notif_ok(c, who, sw, t["list_id"], memo, own=who == rcpt):  # 2.33.0 (#927): + the list (owner's template); 2.266.0 (#2962): not for rcpt's own
                 continue  # 2.1.0 (#317): reminders can be switched off in the notification settings

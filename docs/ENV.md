@@ -300,6 +300,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_ACCOUNT_IMPORT_PARALLEL` | `2` | At most this many account checks / imports run at once on the whole server (2.148.1). |
 | `KALMIDO_LOOP_LOCKS` | `1` | Each background loop runs in one process of the instance; 0 = every process runs its loops. |
 | `KALMIDO_STALE_HOUR` | `09:00` | Local time from which the daily event about stale tasks goes out. |
+| `KALMIDO_WD_SLOW_S` | `600` | Seconds between two runs of the watchdog's clean-up sections (trashes, old logs, exports, file clean-ups); reminders, nags, events and pushes keep every round. 0 = every round (2.369.4, #2516). |
 | `KALMIDO_WORKER_HEARTBEAT` | `30` | Seconds between two heartbeats of a background loop. |
 | `TASKS_WATCHDOG` | `1` | Switch: the background work of this process (reminders, backups, calendars, encryption pass). Helper processes set 0. |
 | `TASKS_WATCHDOG_INTERVAL` | `30` | Seconds between two watchdog rounds (reminders, schedules). |
