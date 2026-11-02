@@ -135,9 +135,11 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
   click(w, [...d.querySelectorAll('#view .wcev')].find(x => /Standup/.test(x.textContent)));
   await until(() => d.querySelector('#pop [data-evp="del"]'));
   click(w, d.querySelector('#pop [data-evp="del"]'));
-  await until(() => d.querySelector('.modal [data-sc="one"]'));
-  click(w, d.querySelector('.modal [data-sc="one"]'));
-  check(await until(async () => (await call('GET', `/api/events/${SU.id}`)).exdates.length === 1), '"Only this date" deleted: left out');
+  // 2.484.0 (#3945): this date has its own change now (above): it is a single event, deleting asks the plain question
+  await until(() => d.querySelector('.modal [data-cd="yes"]'));
+  check(!d.querySelector('.modal [data-sc]'), 'the changed date: no "Only this date / All dates" when deleting');
+  click(w, d.querySelector('.modal [data-cd="yes"]'));
+  check(await until(async () => (await call('GET', `/api/events/${SU.id}`)).exdates.length === 1), 'the changed date deleted: left out');
   // the quick sheet from a free slot: "Event"
   w.eval(`S.calMode = 'week'; S.calSel = '${t1}'; renderView()`); await sleep(100);
   const col = d.querySelector(`#view .wcol[data-day="${t1}"]`);

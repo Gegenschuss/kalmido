@@ -77,9 +77,15 @@ async function evPop(anchor, e) {
     else if (k === 'totask') cevToTask(cevPrep({...e}));
   };
 }
+// 2.484.0 (#3945): a date of a series with its own change (an override, RECURRENCE-ID) is a single event to the user: dragging,
+// the editor and deleting change only it, never ask "Only this date / All dates"; the series' changes leave it as it is
+const evOccOwn = (ev, occ) => !!occ && (ev?.overrides || []).some(x => x.rid === occ);
 async function evDelete(ev, occ) {
   let mode = 'all';
-  if (occ) {
+  if (evOccOwn(ev, occ)) {
+    if (!await askConfirm(tr('Delete the event “{0}”?', (ev.overrides.find(x => x.rid === occ).title) || ev.title), '', {ok: tr('Delete'), danger: true})) return;
+    mode = 'one';
+  } else if (occ) {
     const r = await evAskScope(tr('Delete a repeating event'), tr('Delete'));
     if (!r) return;
     mode = r;
@@ -144,11 +150,14 @@ async function evEditor(o = {}) {
   if (!ev && o.attendees) st.attendees = o.attendees;
   if (!cals.some(c => c.id === st.cal_id) && !dvw_cals(o).some(c => c.id === st.cal_id)) st.cal_id = cals[0].id;  // 2.52.0 (#1128): or a writable subscription
   if (!st.end) st.end = st.all_day ? addDays(st.start.slice(0, 10), 1) : evAddMin(st.start, 60);
-  let scope = o.occ ? 'all' : null;
+  const single = evOccOwn(ev, o.occ);  // 2.484.0 (#3945): a changed date of a series: edited like a single event
+  let scope = o.occ ? (single ? 'one' : 'all') : null;
   if (o.occ && ev) {  // opened from one date of a repeating event: that date's times are the ones shown for "Only this date"
     const ov = (ev.overrides || []).find(x => x.rid === o.occ);
     st.occStart = ov?.start || o.occ;
     st.occEnd = ov?.end || (ev.all_day ? addDays(o.occ, Math.max(1, diffDays(ev.start.slice(0, 10), ev.end.slice(0, 10)))) : evAddMin(o.occ, evMin(ev.start, ev.end)));
+    if (single) Object.assign(st, {title: ov.title ?? st.title, location: ov.location ?? st.location, description: ov.description ?? st.description,
+      all_day: ov.all_day ?? st.all_day, start: st.occStart, end: st.occEnd});
   }
   const [people] = await Promise.all([evPeople(), loadModule('evinvite').catch(() => {}),  // 2.149.0 F (#2518): evinvite.js loads with the people
     loadModule('calrrule').catch(() => { /* offline without the copy: the list has no own rules */ })]);  // 2.155.0 C (#2075)
@@ -157,7 +166,7 @@ async function evEditor(o = {}) {
   const endDay = s => st.all_day ? addDays(s, -1) : s.slice(0, 10);  // all day: the shown end is the last day (stored exclusive)
   const repK = evRepKey(st.rrule, st.start);
   const md = modal(`<div class="lhdr"><h3>${ev || o.dvw ? tr('Edit event') : tr('New event')}</h3><span class="spacer"></span><button class="iconbtn" data-evm="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
-    ${o.occ ? `<div class="row"><span class="rlab">${tr('Change')}</span><div class="seg" role="radiogroup" aria-label="${esc(tr('Change'))}"><button type="button" role="radio" data-evsc="one" aria-checked="false">${tr('Only this date')}</button><button type="button" role="radio" data-evsc="all" class="on" aria-checked="true">${tr('All dates')}</button></div></div>` : ''}
+    ${o.occ && !single ? `<div class="row"><span class="rlab">${tr('Change')}</span><div class="seg" role="radiogroup" aria-label="${esc(tr('Change'))}"><button type="button" role="radio" data-evsc="one" aria-checked="false">${tr('Only this date')}</button><button type="button" role="radio" data-evsc="all" class="on" aria-checked="true">${tr('All dates')}</button></div></div>` : ''}
     <div class="row"><label for="ev-title">${tr('Title')}</label><input id="ev-title" maxlength="500" value="${esc(st.title)}" autocomplete="off" enterkeyhint="done"></div>
     <div class="row"><label for="ev-cal">${tr('Calendar')}</label><select id="ev-cal" data-sheet-ico="cal">${o.dvw ? '' : cals.map(c => `<option value="${c.id}" ${c.id === st.cal_id ? 'selected' : ''}>${esc(c.name)}${c.role !== 'owner' ? ' · ' + esc(c.owner_name || '') : ''}</option>`).join('')}${dvw_options(o, st.cal_id)}</select></div>
     <div class="row"><label for="ev-allday">${tr('All day')}</label><label class="swc"><input type="checkbox" id="ev-allday" ${st.all_day ? 'checked' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('All day'))}</span></label></div>
@@ -181,6 +190,8 @@ async function evEditor(o = {}) {
     </details>
     <div class="foot">${ev && evWrite(evCal(ev.cal_id)) ? `<button class="btn danger" data-evm="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-evm="close">${tr('Cancel')}</button><button class="btn pri" data-evm="save">${tr('Save')}</button></div>`);
   md.classList.add('evmodal');
+  // 2.484.0 (#3945): a changed date of a series shows the rows of "Only this date" (after dvw_rows, which shows them again)
+  const rows = () => { dvw_rows(md); if (single) $('.evrep', md).hidden = $('.evatts', md).hidden = $('.evrems', md).hidden = true; };
   const val = id => $('#' + id, md)?.value || '';
   const drawRems = () => {
     const ad = $('#ev-allday', md).checked, opts = ad ? EV_REM_DAY.map(x => x[0]) : EV_REM_TIMED;
@@ -194,7 +205,7 @@ async function evEditor(o = {}) {
       : `<span class="muted">${tr('Only you')}</span>`;
     if (typeof evi_draw === 'function') evi_draw(md, atts);  // 2.111.0 B (#2056): the invitation switch (evinvite.js)
   };
-  drawRems(); drawAtts(); dvw_rows(md); if (typeof evi_init === 'function') evi_init(md, ev, atts);
+  drawRems(); drawAtts(); rows(); if (typeof evi_init === 'function') evi_init(md, ev, atts);
   if (typeof crr_wire === 'function') crr_wire(md, st, () => val('ev-sd') || st.start);  // 2.155.0 C (#2075)
   const attList = async q => {  // suggestions: people of this server + contacts (name / e-mail)
     const opts = people.filter(u => !atts.some(a => a.user_id === u.id) && (!q || u.display_name.toLowerCase().includes(q.toLowerCase()))).slice(0, 8).map(u => ({v: u.display_name, k: 'u' + u.id}));
@@ -217,7 +228,7 @@ async function evEditor(o = {}) {
   md.addEventListener('keydown', e => { if (e.target.id === 'ev-attin' && e.key === 'Enter') { e.preventDefault(); attAdd(); } });
   md.addEventListener('change', e => {
     const id = e.target.id;
-    if (id === 'ev-cal') dvw_rows(md);  // 2.52.0 (#1128)
+    if (id === 'ev-cal') rows();  // 2.52.0 (#1128)
     if (id === 'ev-allday') { const ad = e.target.checked; $$('.evtm', md).forEach(x => { x.hidden = ad; }); st.reminders = ad ? [-540] : [15]; drawRems(); }
     if (id === 'ev-rep') { const k = e.target.value; $('#ev-repend', md).hidden = !k; if (!k) { $('#ev-reu', md).hidden = true; $('#ev-count', md).hidden = true; } }
     if (id === 'ev-repend') { $('#ev-reu', md).hidden = e.target.value !== 'until'; $('#ev-count', md).hidden = e.target.value !== 'count'; }
