@@ -195,6 +195,7 @@ function meHtml() {
   return `<div class="dtop metop"><h2 class="mecount" id="me-h">${esc(trn('{0} task', '{0} tasks', ts.length))}</h2><span class="spacer"></span>
       ${clnSel() ? `<button type="button" class="iconbtn" data-act="mb-clean" title="${esc(tr('Tidy up…'))}" aria-label="${esc(tr('Tidy up…'))}">${ic('bot')}</button>` : ''}
       ${propInboxSel() ? `<button type="button" class="iconbtn" data-act="mb-sort" title="${esc(propWith(N_('Sort with {0}…'), N_('Sort with an agent…')))}" aria-label="${esc(propWith(N_('Sort with {0}…'), N_('Sort with an agent…')))}">${ic('bot')}</button>` : ''}
+      <button type="button" class="iconbtn" data-act="mb-brief" title="${esc(tr('Copy as brief'))}" aria-label="${esc(tr('Copy as brief'))}">${ic('copy')}</button>${''/* 2.392.3 (#3368) */}
       <button type="button" class="iconbtn" data-act="mb-all" title="${esc(tr('Select all'))}" aria-label="${esc(tr('Select all'))}">${ic('all')}</button>
       ${mob ? `<button type="button" class="btn sm pri" data-act="me-sheet-close">${tr('Done')}</button>` : `<button type="button" class="iconbtn dclose" data-act="mb-close" title="${esc(tr('Clear selection') + ' (Esc)')}" aria-label="${esc(tr('Clear selection'))}">${ic('x')}</button>`}</div>
     <div class="dbody mebody" role="group" aria-labelledby="me-h">
@@ -205,6 +206,28 @@ function meHtml() {
       ${ml_meHtml(ts)}${''/* 2.320.0 (#3289): Show also in project… */}
       <div class="dsec melist"><h5>${tr('Selected tasks')}</h5><ul>${ts.map(t => `<li data-id="${t.id}"><button type="button" class="metl" data-act="open-id" data-id="${t.id}" title="${esc(tr('Open only this task'))}">${t.status ? ic('check', 's') : ''}<span>${esc(t.title)}</span></button><button type="button" class="iconbtn" data-act="me-drop" data-id="${t.id}" title="${esc(tr('Remove from the selection'))}" aria-label="${esc(tr('Remove {0} from the selection', t.title))}">${ic('x', 's')}</button></li>`).join('')}</ul></div>
     </div>`;
+}
+// 2.392.3 (#3368): "Copy as brief" -- the selected tasks as one Markdown document (POST /api/tasks/brief, the same as the API's
+// /api/v1/tasks/brief and the MCP tool export_brief), for a person or another tool. Straight to the server (rawFetch): it reads
+// only, so it never waits in the offline outbox. The clipboard gets a promise (Safari keeps the click's permission across the
+// request); without a clipboard the text is saved as a .md file.
+async function tbCopy(ids) {
+  ids = ids.filter(i => i > 0).slice(0, 50);
+  if (!ids.length) return;
+  const req = rawFetch('POST', '/api/tasks/brief', {task_ids: ids});
+  const note = j => j.skipped?.length ? ' · ' + trn('{0} task left out', '{0} tasks left out', j.skipped.length) : '';
+  let j;
+  try {
+    if (navigator.clipboard?.write && typeof ClipboardItem === 'function') {
+      await navigator.clipboard.write([new ClipboardItem({'text/plain': req.then(x => { j = x; return new Blob([x.markdown], {type: 'text/plain'}); })})]);
+    } else { j = await req; await navigator.clipboard.writeText(j.markdown); }
+    toast(tr('Brief copied') + note(j));
+  } catch (e) {
+    try { j = j || await req; } catch (e2) { toast(e2 instanceof Offline ? tr('Offline: only works again with a connection') : e2.message); return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([j.markdown], {type: 'text/markdown'}));
+    a.download = `brief-${today()}.md`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast(tr('Brief saved as a file') + note(j));
+  }
 }
 function meRender() { const d = $('#detail'); if (!d || !ME.on) return; keepFocus(d, () => setHtml(d, meHtml())); }
 // called with every change of the selection (renderMultiBar): shows / updates / closes the multi panel

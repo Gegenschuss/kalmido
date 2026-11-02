@@ -838,6 +838,8 @@ def openapi_spec():
     report_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#265)
     from ..integrations.delivery import delivery_spec
     delivery_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.392.0 D (#3369)
+    from ..integrations.taskbrief import tb_spec
+    tb_spec(paths, schemas, op, ok, errs, ref, nul)  # 2.392.3 (#3368)
     from ..tasks.stale import stale_spec
     stale_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#266)
     from ..personal.timegaps import timegaps_spec

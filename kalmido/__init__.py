@@ -177,6 +177,7 @@ ORDER = (
     "agents.taskdec",  # 2.392.0 C (#3370): the yes to a one-way task
     "agents.waiting",  # 2.392.0 D (#3369): what waits for a person
     "integrations.delivery",  # 2.392.0 D (#3369): the delivery report of a list
+    "integrations.taskbrief",  # 2.392.3 (#3368): a work package, the brief of a choice of tasks
     "agents.safety",  # 2.30.0 (#919)
     "agents.usage",
     "lists.custview",  # 2.50.0 C (#329): customer view of public links (no routes; used by lists.public)

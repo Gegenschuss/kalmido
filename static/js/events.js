@@ -769,6 +769,7 @@ document.addEventListener('click', async e => {
     case 'mb-menu': multiMoreMenu(a); break;
     case 'mb-sort': propRequest('triage', {ids: [...S.multi]}); break;  // 2.3.0 (#262)
     case 'mb-clean': { const l = clnSel(); if (l) clnRequest(l.id, [...S.multi]); break; }  // 2.39.0 (#1151)
+    case 'mb-brief': tbCopy([...S.multi]); break;  // 2.392.3 (#3368)
     case 'mb-all': vl_ids().forEach(i => S.multi.add(i)); render(); break;  // 2.65.0 (#1825): vl_ids = all rows of the view, also the ones a long list does not draw
     case 'mb-close': S.multi.clear(); S.multiMode = false; render(); break;
     case 'mb-more': menu(a, $$('#mbar .mbh').map(h => ({label: h.getAttribute('aria-label'), icon: h.dataset.ico, cls: h.classList.contains('danger') ? 'flag-5' : '', fn: () => h.click()}))); break;  // 2.13.0 (#453 A14)

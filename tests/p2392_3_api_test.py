@@ -48,7 +48,7 @@ FU, F = freelancer(B, A, "frida")  # a person without an organisation is the mai
 XU, X = freelancer(B, A, "xena")   # a stranger
 L = F.post(B + "/api/lists", json={"name": "Release", "kind": "project", "ptype": "software"}).json()["id"]
 L2 = F.post(B + "/api/lists", json={"name": "Private", "kind": "project"}).json()["id"]
-LK = F.post(B + "/api/lists", json={"name": "Vault", "kind": "project"}).json()["id"]
+LK = F.post(B + "/api/lists", json={"name": "Locked", "kind": "project"}).json()["id"]
 r = F.post(B + "/api/my/agents", json={"username": "fridabot", "display_name": "Fridabot", "scopes": ["read", "tasks:write", "comments"]})
 AID = r.json()["id"]
 check(F.put(B + f"/api/lists/{L}/members", json={"user_id": AID, "role": "edit"}).ok, "setup: the agent in the list")
@@ -64,7 +64,7 @@ S1 = task(F, L, "Sub one", parent_id=T1)
 S2 = task(F, L, "Sub two", parent_id=T1)
 check(F.post(B + f"/api/tasks/{S2}/complete").ok, "setup: a subtask done")
 TP = task(F, L2, "Private blocker")
-TK = task(F, LK, "Secret plan in the vault")
+TK = task(F, LK, "Secret plan in the safe")
 check(F.post(B + "/api/deps", json={"task_id": T1, "blocker_id": T2}).ok, "setup: T1 waits for T2")
 check(F.post(B + "/api/deps", json={"task_id": T3, "blocker_id": T1}).ok, "setup: T3 waits for T1")
 check(F.post(B + "/api/deps", json={"task_id": T1, "blocker_id": TP}).ok, "setup: T1 waits for a task of another list")

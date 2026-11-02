@@ -222,6 +222,8 @@ def le2b_v1_guard():
         return None
     if request.method == "DELETE" and "/members/" in request.path:
         return None  # removing a member (or oneself) only makes the circle smaller
+    if request.method == "POST" and request.path == f"{API_PREFIX}tasks/brief":
+        return None  # 2.392.3 (#3368): reads only and leaves the tasks of a locked list out itself (skipped: locked); the mask below stays
     c = db()
     if le2b_any(c) and le2b_v1_target(c):
         return v1_err(403, le2b_msg(), name="list_e2e")

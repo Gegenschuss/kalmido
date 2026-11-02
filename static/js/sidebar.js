@@ -119,6 +119,7 @@ function multiMoreMenu(a) {
     ...(ids.length && ids.some(i => canEdit(taskById(i))) ? dgMenuItems(ids) : []),  // 2.43.0 (#1003): Subtasks of… / Out of the parent task
     ...ml_multiItems(ids, a),  // 2.320.0 (#3289): Show also in project…
     {label: tr('Select all'), icon: 'all', fn: () => { vl_ids().forEach(i => S.multi.add(i)); render(); }},  // 2.65.0 (#1825): also the rows a long list does not draw
+    ...(ids.length ? [{label: tr('Copy as brief'), icon: 'copy', fn: () => tbCopy(ids)}] : []),  // 2.392.3 (#3368)
     ...(clnSel() ? [{label: tr('Tidy up…'), icon: 'bot', cls: 'mclean', fn: () => clnRequest(clnSel().id, ids)}] : []),  // 2.39.0 (#1151)
     '-',
     {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => batch('delete', {}, true)},
