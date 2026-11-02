@@ -27,8 +27,11 @@ import subprocess
 import sys
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from xml.etree import ElementTree as ET
-from ..tasks.attachtext import PDF_MEM, PDF_SECONDS, PDF_WAIT, _SEM  # 2.369.5 (#2517): pulled up from functions
-from .model import office_on, pb_personal  # 2.369.5 (#2517): pulled up from functions
+try:  # 2.369.5 (#2517): pulled up from functions; #3506: guarded, the reader is also loaded as a single file (tests)
+    from ..tasks.attachtext import PDF_MEM, PDF_SECONDS, PDF_WAIT, _SEM
+    from .model import office_on, pb_personal
+except ImportError:  # loaded as a single file (tests, no package): no PDF worker, no office lookup
+    PDF_MEM = PDF_SECONDS = PDF_WAIT = _SEM = office_on = pb_personal = None
 
 try:
     from ..core.i18n import lang, N_, tr
@@ -420,7 +423,7 @@ def ei_from_pdf(data, owner=None):
     """The e-invoice XML embedded in a PDF (bytes) or None. Only PDFs that carry an embedded file are opened."""
     if not data or not bytes(data[:1024]).lstrip().startswith(b"%PDF") or b"/EmbeddedFile" not in data:
         return None
-    if not _SEM.acquire(timeout=PDF_WAIT * 5):
+    if _SEM is None or not _SEM.acquire(timeout=PDF_WAIT * 5):
         return None
     try:
         p = subprocess.run([sys.executable, "-I", "-c", PDF_WORKER, str(PDF_MEM), str(PDF_SECONDS), str(XML_MAX), json.dumps(PDF_NAMES)],
