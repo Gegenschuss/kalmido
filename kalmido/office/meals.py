@@ -39,7 +39,7 @@ from ..core.db import body, bump, iso, local_now, local_stamp, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.i18n import N_, csv_dialect, tr
 from ..personal.timesheet import tz_of
-from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_read_file, oc_write_file
+from ..core.orgcrypt import oc_dec_col, oc_dec_fields, oc_enc_fields, oc_read_file, oc_write_file
 from ..core.pg import insert_id, write_lock, system_ctx
 from ..core.errors import BadInput
 from ..files.scan import sc_after_store, sc_guard, sc_scan  # 2.190.0 D (#2561): pulled up, the later scan
@@ -285,7 +285,7 @@ def bw_rows(c, oid, year=None, mid=None, deleted=False):
         args.append(str(year))
     rows = c.execute(sql + " ORDER BY date DESC, id DESC", args).fetchall()
     if own is not None:  # 2.187.1 B (#2735): own = entered by the person or with the person as host (the host may be encrypted)
-        rows = [r for r in rows if bw_own_sees(c, oid, r, own)]
+        rows = bw_own_rows(c, oid, rows, own)  # 2.360.5 (#2753)
     ids = [r["id"] for r in rows]
     logs, files = bw_logs(c, oid, ids), bw_files(c, oid, ids)
     years = bw_years(c, oid)
@@ -299,8 +299,21 @@ def bw_rows(c, oid, year=None, mid=None, deleted=False):
 
 def bw_host_id(c, oid, r):
     """2.187.1 B (#2735): the account id of the meal row's host (None: a free name / none)."""
-    h = _j(oc_dec_fields(c, oid, "office_meals", r).get("host"), {})
+    return _host_id(oc_dec_col(c, oid, "office_meals", "host", [r["host"]])[0])
+
+
+def _host_id(v):
+    h = _j(v, {})
     return h.get("id") if isinstance(h, dict) and isinstance(h.get("id"), int) else None
+
+
+def bw_own_rows(c, oid, rows, own):
+    """2.360.5 (#2753): the rows of person own (bw_own_sees for a whole list): the host column decrypted only for the rows
+    somebody else entered, the key read once."""
+    other = [r for r in rows if r["created_by"] != own]
+    hosts = oc_dec_col(c, oid, "office_meals", "host", [r["host"] for r in other])
+    keep = {r["id"] for r, h in zip(other, hosts) if _host_id(h) == own}
+    return [r for r in rows if r["created_by"] == own or r["id"] in keep]
 
 
 def bw_own_sees(c, oid, r, own):

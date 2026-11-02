@@ -485,6 +485,18 @@ def oc_dec_fields(c, org_id, table, row):
 oc_dec_row = oc_dec_fields  # the name agent C asked for (#833)
 
 
+def oc_dec_col(c, org_id, table, col, values):
+    """2.360.5 (#2753): the plain values of ONE protected whole column for many rows of one organisation, the key read once
+    (the "own" filters of meals / travel need only the host / the people, not every column of every row)."""
+    key, out = None, []
+    for v in values:
+        if oc_is_enc(v):
+            key = key or oc_key(c, org_id, create=False)
+            v = oc_dec_k(key, org_id, f"{table}.{col}", v)
+        out.append(v)
+    return out
+
+
 def oc_enc_fields(c, org_id, table, values):
     """values (dict column -> plain value) with the protected columns of table encrypted (when active)."""
     d = dict(values)

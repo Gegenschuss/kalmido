@@ -412,6 +412,8 @@ def ofr_check(c, uid, oid, area=None, admin=False):
         return False
     if request.path.startswith("/api/office/rights"):
         return True  # the rights page checks on its own (ofr_manager)
+    if request.path.startswith("/api/office/undo/client/"):
+        return True  # 2.360.5 (#2753): a client's undo has the rights of its normal change (team/clients.py need_client), no office area
     if request.url_rule is not None and request.url_rule.rule in ANY_OWN and any(v != "none" for v in r["levels"].values()):
         return True  # 2.439.0 (#3617): no area of the office, only the person's own row
     area = area or ofr_area_of(request.path)

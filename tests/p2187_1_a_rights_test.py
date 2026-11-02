@@ -9,6 +9,8 @@
    a shared folder's children); with
    a group that has receipts: readable; a shared file that is no receipt stays readable
  - organisation import: the rights log's group refs map to the target's groups, a group that did not come along = g:0
+ - 2.360.5 (#2753): Staff (no quotes area) undoes and redoes the own change of a client (the rights of the client's change,
+   not the quotes area); another person's session has nothing to undo
  - a person without an organisation (freelancer-matrix: clients): her private client shows the invoicing fields
 usage: p2187_1_a_rights_test.py <datadir>"""
 import base64
@@ -139,6 +141,18 @@ Da.patch(B + f"/api/clients/{CL}", json={"customer_no": "K-999"})
 check(bill(A).get("billing", {}).get("customer_no") == "K-100", "offers view: the change is ignored")
 r = Ca.patch(B + f"/api/clients/{CL}", json={"customer_no": "K-101"})
 check(r.ok and bill(A).get("billing", {}).get("customer_no") == "K-101", "member without a group: changes them as before")
+
+# ---------------------------------------------------------------- 1b. 2.360.5 (#2753): a client's undo without the quotes area
+TOK = os.urandom(12).hex()
+r = Bo.patch(B + f"/api/clients/{CL}", json={"note": "Undo me"}, headers={"X-Kalmido-Undo": TOK})
+check(r.ok and bill(A).get("note") == "Undo me", f"staff (offers none): changes the client with an undo session ({r.status_code})")
+r = Bo.post(B + O + f"/undo/client/{CL}", json={"sess": TOK, "op": "undo"})
+check(r.ok and bill(A).get("note") == "Called on Monday", f"staff: undoes the own client change without the quotes area ({r.status_code} {r.text[:200]})")
+r = Bo.post(B + O + f"/undo/client/{CL}", json={"sess": TOK, "op": "redo"})
+check(r.ok and bill(A).get("note") == "Undo me", f"staff: and redoes it ({r.status_code})")
+r = Er.post(B + O + f"/undo/client/{CL}", json={"sess": TOK, "op": "undo"})
+check(r.status_code == 409, f"somebody else's session: nothing to undo for erin (409, {r.status_code})")
+Bo.patch(B + f"/api/clients/{CL}", json={"note": "Called on Monday"})
 
 # ---------------------------------------------------------------- 7. sets / roles / crew = equipment
 r = in_app("import app\nfrom kalmido.office.rights import ofr_area_of, TEMPLATES\n"

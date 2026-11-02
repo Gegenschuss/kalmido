@@ -9,6 +9,8 @@ companies and figures only. Sam = template Staff, Bob = a second Staff member ("
       new drive from the own drives
  (4)  confirming an entertainment receipt on the level "own": only as its host (403 else)
  (f)  a person without an organisation: all of it as the admin of the personal office
+ 2.360.5 (#2753): runs with the organisation encryption on: the "own" lists decrypt only the host / people column, once
+      per list (office/meals.py bw_own_rows, office/travel.py rk_own_rows)
 usage: p2187_1_b_own_test.py <datadir>      (KMT_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)
 freelancer-matrix: office"""
 import os
@@ -26,7 +28,7 @@ from freelancer_fixture import freelancer  # noqa: E402
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, dbx, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 FEAT = "cal,comments,collab,office,clients,time,docs,files,travel"
 O = "/api/office"
 
@@ -45,7 +47,11 @@ def meal_body(host, **kw):
 
 
 if not os.environ.get("KMT_NOSTART"):
-    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True)
+    # 2.360.5 (#2753): with the organisation encryption on (host / people encrypted), so the "own" filters decrypt for real
+    import base64
+    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY="
+               + base64.b64encode(os.urandom(32)).decode())
+    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True, env=env)
     assert r.returncode == 0, r.stdout + r.stderr
     time.sleep(0.8)
 s0 = requests.Session()
@@ -122,6 +128,8 @@ check(A.get(B + O + "/trips").json()["trips"][0].get("own_ro") is None, "(2b) th
 M_FOR = made(A.post(B + O + "/meals", json=meal_body({"id": SAM})), "meal hosted by sam")
 M_ADM = made(A.post(B + O + "/meals", json=meal_body({"id": ALICE})), "meal of alice")
 M_OWN = made(Sa.post(B + O + "/meals", json=meal_body({"id": ALICE})), "sam's meal hosted by alice")
+enc = [r[0] for r in dbx("SELECT host FROM office_meals WHERE id=?", (M_FOR,))] + [r[0] for r in dbx("SELECT people FROM office_trips WHERE id=?", (T_FOR,))]
+check(len(enc) == 2 and all(str(v).startswith("kenc1:") for v in enc), f"2.360.5 (#2753): host / people are stored encrypted {[str(v)[:12] for v in enc]}")
 r = Sa.get(B + O + "/meals")
 ml = {m["id"]: m for m in (r.json().get("meals", []) if r.ok else [])}
 check(set(ml) == {M_FOR, M_OWN}, f"(2b) staff: the own receipt and the one with them as host {sorted(ml)}")
