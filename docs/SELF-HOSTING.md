@@ -25,6 +25,7 @@ addresses and paths to your setup.
 - [Organisation export](#organisation-export)
 - [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom)
 - [Server hardening](#server-hardening)
+  - [Public links per kind](#public-links-per-kind)
 - [Intrusion alerts](#intrusion-alerts)
 - [Errors in the browser (2.102)](#errors-in-the-browser)
 - [Mail (SMTP settings in ENV.md)](ENV.md#e-mail)
@@ -1241,6 +1242,19 @@ A short checklist for a new server:
 - **Changed `.env`? Recreate, do not restart.** `docker compose restart` keeps the old environment; run
   `docker compose up -d` so the container is recreated with the new values.
 
+### Public links per kind
+
+*Since 2.489.0.*
+
+*Settings > Administration > Whole server > Allow public links* is the switch for every link without an account; below it
+each kind can be switched off on its own: projects and folders, files, upload links, booking pages and polls, sign-off and
+signature, wiki pages, forms, the client portal and online payment. Off works like the main switch did for everything:
+no new link of that kind can be made (`409`), existing ones stop answering, nothing is deleted. The main switch off (or
+`KALMIDO_PUBLIC_LINKS=0`) still turns every kind off. Turning a kind back on asks for the admin's password, each change sends
+a security alert. API (instance admins): `PATCH /api/admin/settings {"public_links_off": ["files", "forms"]}` (keys `lists`,
+`files`, `uploads`, `calendar`, `signoff`, `wiki`, `forms`, `portal`, `pay`; `[]` = all on; an unknown key `400`);
+`/api/about` and `/api/state` carry `public_links_off`. Servers without the setting keep every kind on.
+
 ## Intrusion alerts
 
 Uptime monitoring tells you when the app is down, not when someone got in while it keeps running. Two layers help.
@@ -1612,7 +1626,7 @@ the security model: [PACKS.md](PACKS.md)). Without a catalogue Kalmido makes no 
 Kalmido calls no language model itself -- except the built-in assistant, and only when you configure it. It talks to any
 OpenAI-compatible chat-completions endpoint (`POST <base>/chat/completions`): a local model (Ollama, vLLM, LocalAI) or a
 provider of your choice. Nothing is wired in; without the two variables below the assistant does not exist (no menu, no
-routes, nothing in `/api/state`). Each person switches it on for themselves (*Settings > Assistant*) and shares single projects
+routes, nothing in `/api/state`). Each person switches it on for themselves (*Settings > Agents > Built-in assistant*) and shares single projects
 with it; only those projects, basket items they pick and texts they type are sent, as a summary, a draft or a proposal they
 apply or discard (nothing is changed directly). Locked notes, health lists, attachments, files and office documents are never
 sent. Every call leaves a log row with numbers only (no texts), kept `KALMIDO_AUDIT_DAYS` days; admins see the daily counts.
