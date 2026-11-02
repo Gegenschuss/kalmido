@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.487.2] - 2026-11-02
+
+### Fixed
+- CI of 2.487.1: p2270_api accepts a software project with or without the fields Size and Release (2.473.0 is not on this train); the main fixes #2280 (a poll while an element is held keeps the view marked stale) and #2191 (Waiting for me after a settled job) are on the train now, p2123_d_ui and p2361_b_ui pass with them (job/2284).
+
 ## [2.487.1] - 2026-11-02
 
 ### Fixed
@@ -9908,7 +9913,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.487.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.487.2...HEAD
+[2.487.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.487.2
 [2.487.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.487.1
 [2.487.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.487.0
 [2.468.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.468.3
