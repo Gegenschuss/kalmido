@@ -206,12 +206,13 @@ check(r.ok and r.headers.get("content-type", "").startswith("text/csv") and "att
 raw = r.content
 check(raw.startswith(codecs.BOM_UTF8), "#2080 export: UTF-8 with BOM (Excel)")
 text = raw.decode("utf-8-sig")
-head = text.split("\r\n", 1)[0].split(";")
+SEP = ","  # 2.368.2 (#2984): the separator follows the language; this suite runs in English (",", German would be ";")
+head = text.split("\r\n", 1)[0].split(SEP)
 check(head[:4] == ["Name", "First Name", "Middle Name", "Last Name"] and "E-mail Address" in head and "Categories" in head,
-      f"#2080 export: semicolons + Outlook's header names ({head[:6]})")
+      f"#2080 export: the language's separator + Outlook's header names ({head[:6]})")
 # 2.119.1 review F3: a phone number stays without the ' (Outlook / Google keep it), a "+" / "-" cell with more is defused
-check("'=HYPERLINK" in text and ";=HYPERLINK" not in text and "'-2+3+cmd" in text, "#2080 export: formulas defused (')")
-check(";+49 170 1234567" in text and "'+49 170 1234567" not in text, "#2080 F3 export: a phone number stays as it is")
+check("'=HYPERLINK" in text and SEP + "=HYPERLINK" not in text and "'-2+3+cmd" in text, "#2080 export: formulas defused (')")
+check(SEP + "+49 170 1234567" in text and "'+49 170 1234567" not in text, "#2080 F3 export: a phone number stays as it is")
 # 2.119.1 review F4: a cut UTF-16 file (odd length) is a 400, not a 500
 check(imp(A, BK, codecs.BOM_UTF16_LE + "Name\tE-mail".encode("utf-16-le") + b"x", "cut.txt").status_code == 400,
       "#2080 F4: a cut UTF-16 file: 400")
