@@ -1055,6 +1055,12 @@ approval their admin) reopen it in the app.
 last) to be safe against a person editing the client at the same time: changed in between answers `409` with the code
 `conflict` - read the client again and decide with the person, never send the old state once more.
 
+**Clients are managed by people (2.370.4).** The client tools (`list_clients`, `get_client`, `create_client`,
+`update_client`, `delete_client`, `bulk_clients`) are for a person's own MCP client with their own token. An agent account
+sees no clients there (`list_clients` answers an empty list, `get_client` `404`) and every change - creating, changing,
+deleting, moving into the trash, `bulk_clients` with `untrash` - answers `403` (*Only people can manage clients*). The
+clients of the office area reach an agent read-only through `list_office_data`. Ask the person to delete or restore a client.
+
 Example `reaction`:
 
 ```json

@@ -1997,12 +1997,13 @@ TOOLS += [
      _obj(_CLIENT, ["name"]), lambda api, a: api.call("POST", "/clients", body=_pick(a, tuple(_CLIENT)))),
     ("update_client", "2.23.0: change a client.", _obj({"client_id": S_ID, **_CLIENT_UP}, ["client_id"]),
      lambda api, a: api.call("PATCH", f"/clients/{int(a['client_id'])}", body=_pick(a, tuple(_CLIENT_UP)))),
-    ("delete_client", "2.23.0: delete a client (its creator or an admin); its projects stay. 2.152.0: a client used in quotations, invoices or contracts is archived instead (answer archived: true). 2.272.0: it goes to the trash (answer trashed: true), bulk_clients untrash brings it back.", _obj({"client_id": S_ID}, ["client_id"]),
+    ("delete_client", "2.23.0: delete a client (its creator or an admin); its projects stay. 2.152.0: a client used in quotations, invoices or contracts is archived instead (answer archived: true). 2.272.0: it goes to the trash (answer trashed: true), bulk_clients untrash brings it back. 2.370.4: people only - an agent account gets 403.", _obj({"client_id": S_ID}, ["client_id"]),
      lambda api, a: api.call("DELETE", f"/clients/{int(a['client_id'])}")),
     ("bulk_clients", "2.47.3: several clients at once (ids from list_clients, up to 1000). delete: a client used in quotations, invoices or "
                      "framework contracts is archived instead (only its creator or an admin deletes; others are skipped); archive / "
                      "unarchive; set: rate, budget_h, budget_amount, color (null clears), note_append (appended); restore: items = the "
-                     "undo of an answer; untrash: ids back from the trash (delete moves into it, answer trashed). Ask the person before deleting many.",
+                     "undo of an answer; untrash: ids back from the trash (delete moves into it, answer trashed). Ask the person before deleting many. "
+                     "2.370.4: people only - an agent account gets 403.",
      _obj({"ids": {"type": "array", "items": S_ID}, "action": {"type": "string", "enum": ["delete", "archive", "unarchive", "set", "restore", "untrash"]},
            "rate": {"type": ["number", "null"]}, "budget_h": {"type": ["number", "null"]}, "budget_amount": {"type": ["number", "null"]},
            "color": {"type": "string"}, "note_append": {"type": "string"}, "items": {"type": "array", "items": {"type": "object"}}}, ["action"]),

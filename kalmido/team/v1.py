@@ -170,15 +170,17 @@ def pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                    body={**cin, "required": ["name"]}, scope="structure")}
     paths["/clients/{id}"] = {
         "get": op("A client with estimate vs. actual per list", C, ok(ref("Client")) | errs("404", "409"), [pid("id", "Client id"), month]),
-        "patch": op("Change a client", C, ok(ref("Client")) | errs("400", "403", "404", "409"), [pid("id", "Client id")], body=cup, scope="structure"),
+        "patch": op("Change a client (people only, an agent account: 403)", C, ok(ref("Client")) | errs("400", "403", "404", "409"), [pid("id", "Client id")], body=cup, scope="structure"),
         "delete": op("Delete a client (its creator or an admin); its lists stay. 2.272.0 (#3029): it goes to the trash (answer trashed: true, "
-                     "trash_days), back with bulk action untrash, deleted for good after the trash period", C, ok({"type": "object"}) | errs("403", "404"),
+                     "trash_days), back with bulk action untrash, deleted for good after the trash period. 2.370.4 (#3089): people only "
+                     "(an agent account: 403)", C, ok({"type": "object"}) | errs("403", "404"),
                      [pid("id", "Client id")], scope="structure")}
     paths["/clients/bulk"] = {"post": op(  # 2.47.3 (#1733)
         "Several clients at once (up to 1000 ids; one you do not see -> 404, nothing changes). delete: a client used in quotations, "
         "invoices or framework contracts is archived instead; only its creator or an admin deletes (others: skipped). archive / unarchive; "
         "set: rate, budget_h, budget_amount, color (null clears), note_append; restore: items = the undo of an answer. 2.272.0 (#3029): "
-        "delete moves into the trash (answer trashed: ids), untrash brings ids back from it", C,
+        "delete moves into the trash (answer trashed: ids), untrash brings ids back from it. 2.370.4 (#3089): people only "
+        "(an agent account: 403)", C,
         ok({"type": "object", "properties": {"action": {"type": "string"}, "deleted": {"type": "integer"}, "archived": {"type": "integer"},
                                              "changed": {"type": "integer"}, "unchanged": {"type": "integer"}, "skipped": {"type": "integer"},
                                              "undo": {"type": "array", "items": {"type": "object"}}}}) | errs("400", "403", "404"),

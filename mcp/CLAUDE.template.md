@@ -543,6 +543,10 @@ switches as the office tools and for a person who is an **admin** of the office:
 note; source `agent` by default) and `update_office_lead` (only the next step, the follow-up day and the note, only while
 it is a lead). A person converts a lead into a client; you never convert, delete or move it to another stage.
 
+Clients are managed by people (2.370.4): for you `list_clients` is empty, and `create_client`, `update_client`,
+`delete_client` and `bulk_clients` (also `untrash` out of the trash) answer `403`. The office area's clients you read with
+`list_office_data`; deleting or restoring a client you leave to the person.
+
 ### Invoice series and subscriptions (2.483.0)
 
 With the same switches as the office tools you may READ the invoice series (`list_invoice_series`: template, interval,
