@@ -209,26 +209,22 @@ def system_ctx(c):
     organisation's rows), then restore the previous context -- also after an exception. Greppable on purpose: use it only
     where the app deliberately works across organisations (resolving a public token, counting for the admin overview,
     creating an organisation, accepting an invitation) and never to hand content of foreign organisations to a person."""
-    # 2.149.0 C (#2508): set_config only when the context really changes. Inside a running transaction c._ctx is what
-    # the database holds, so a nested block (or one entered while "system" already) applies nothing, and an idle
-    # connection opens its transaction with "system" directly; a request context the hook would have chosen first is
-    # resolved by the next statement after the block, as before.
-    same = c._ctx == SYSTEM and c._pg.info.transaction_status == TransactionStatus.INTRANS
+    # 2.149.0 C (#2508) / 2.369.6 (#3139): entering and leaving apply nothing themselves. The block only says which context
+    # its statements need (c._ctx); Conn._begin compares that with what the transaction holds (c._db_ctx) before EVERY
+    # statement and runs set_config only on a difference. Leaving is lazy: the caller's context comes back with its next
+    # statement (two system blocks in a row, or a block followed by the end of the transaction, cost no switch back).
+    # So after a block every statement must go through Conn (execute / executemany / executescript / savepoint): the
+    # driver connection (c._pg) directly would still hold "system".
     if not c._sys:
         c._sys_prev = c._ctx
     c._sys += 1
     c._ctx = SYSTEM
-    if not same:
-        c._apply_ctx()
     try:
         yield c
     finally:
         c._sys -= 1
         if not c._sys:
             c._ctx, c._sys_prev = c._sys_prev, None
-            if not c.closed and not c._pg.closed and c._pg.info.transaction_status == TransactionStatus.INTRANS \
-                    and c._ctx != SYSTEM:
-                c._apply_ctx()  # same transaction goes on: back to the caller's context (aborted / ended: next _begin)
 
 
 class Conn:
@@ -238,6 +234,9 @@ class Conn:
         self._pg = pg
         self._release = release
         self._ctx = SYSTEM
+        # 2.369.6 (#3139): the context the running transaction holds (set_config ... true lives until commit / rollback);
+        # None = unknown / none (no transaction yet, ended, or rolled back to a savepoint). Conn._begin keeps it equal to _ctx.
+        self._db_ctx = None
         self._sys, self._sys_prev, self._resolving = 0, None, False  # system_ctx() nesting / the context hook running
         self._auto = release is not None  # pooled connections follow the request (hook); direct ones (init_db, CLI) keep theirs
         self._sp = itertools.count(1)
@@ -249,9 +248,7 @@ class Conn:
         if self._sys:  # inside system_ctx(): takes effect when the block ends
             self._sys_prev = ctx
             return
-        self._ctx = ctx
-        if self._pg.info.transaction_status != TransactionStatus.IDLE:
-            self._apply_ctx()
+        self._ctx = ctx  # 2.369.6 (#3139): applied by the next statement (Conn._begin)
 
     @property
     def ctx(self):
@@ -259,9 +256,11 @@ class Conn:
 
     def _apply_ctx(self):
         uid, orgs, role = self._ctx
+        self._db_ctx = None  # a failed set_config leaves it unknown
         self._pgx("SELECT set_config('app.user_id', %s, true), set_config('app.org_ids', %s, true), "
                   "set_config('app.role', %s, true)",
                   ("" if uid is None else str(uid), ",".join(str(int(o)) for o in orgs), role))
+        self._db_ctx = self._ctx
 
     def _pgx(self, sql, args=None):
         """2.149.0 B (#2504): one statement on the driver; inside a request (rt_begin) it is counted with its time."""
@@ -276,43 +275,47 @@ class Conn:
             st[1] += time.perf_counter() - t0
 
     def _begin(self):
-        idle = self._pg.info.transaction_status == TransactionStatus.IDLE
-        if self._auto and _CTX_HOOK[0] is not None and not self._sys and not self._resolving and self._resolve_ctx(idle):
-            return
-        if idle:
-            self._apply_ctx()  # opens the transaction; SET LOCAL lives until commit / rollback
+        """Before every statement: the transaction must hold the context the statement needs (security rule of #3139). An
+        idle connection holds none (the set_config of the last transaction ended with it), so the first statement opens the
+        transaction with set_config; inside a transaction set_config runs only when the needed context differs from the
+        held one (a system_ctx() block left, the hook found another person)."""
+        ts = self._pg.info.transaction_status
+        if ts == TransactionStatus.IDLE:
+            self._db_ctx = None
+        elif ts == TransactionStatus.INERROR:
+            return  # aborted: only ROLLBACK (TO SAVEPOINT) runs now; the context follows with the statement after it
+        if self._auto and _CTX_HOOK[0] is not None and not self._sys and not self._resolving:
+            self._resolve_ctx()
+        if self._db_ctx != self._ctx:
+            self._apply_ctx()  # opens the transaction when idle; SET LOCAL lives until commit / rollback
 
-    def _resolve_ctx(self, idle):
+    def _resolve_ctx(self):
         """2.37.0 (#1150, W-2): before every statement the context hook (core/access.py acx_conn_hook) says who is asking,
         so a route that sets g.user late (DAV, public links, forms, hooks, API tokens) can never read with a stale or the
-        system context; a change is applied at once (also in the middle of a transaction). The hook answers a context,
-        None (no request: keep the stored one) or LOOKUP (the memberships must be read first: that read runs as "system",
-        then the real context replaces it). True when the context was applied here."""
+        system context; Conn._begin applies a change at once (also in the middle of a transaction). The hook answers a
+        context, None (no request: keep the stored one) or LOOKUP (the memberships must be read first: that read runs as
+        "system", then the real context replaces it)."""
         hook = _CTX_HOOK[0]
         ctx = hook(None)
         if ctx is None:
-            return False
+            return
         if ctx is LOOKUP:
-            self._resolving = True
+            self._resolving, prev = True, self._ctx
             try:
                 self._ctx = SYSTEM
-                self._apply_ctx()
-                ctx = hook(self)
+                ctx = hook(self)  # its statements open / switch the transaction to "system" (Conn._begin)
+            except BaseException:
+                self._ctx = prev  # 2.369.6 (#3139, review): a failed lookup leaves no "system" behind as the wanted context
+                raise
             finally:
                 self._resolving = False
-            idle = True  # applied below in any case
-        ctx = (ctx[0], tuple(ctx[1] or ()), ctx[2])
-        if not idle and ctx == self._ctx:
-            return False
-        self._ctx = ctx
-        self._apply_ctx()
-        return True
+        self._ctx = (ctx[0], tuple(ctx[1] or ()), ctx[2])
 
     def execute(self, sql, args=None):
         self._begin()
         if args is None and sql.lstrip()[:11].upper() == "ROLLBACK TO":  # 2.306.0 D1 (#2875): a savepoint of the caller's own
             cur = self._pgx(_raw(sql))  # (tasks/batch.py): set_config is undone with it, the stored context applies again (as savepoint())
-            self._apply_ctx()
+            self._db_ctx = None  # 2.369.6 (#3139): with the next statement
             return cur
         if args is None or (not args and "?" not in sql):
             return self._pgx(sql.replace("%", "%%") if args is not None else _raw(sql), None if args is None else ())
@@ -334,7 +337,10 @@ class Conn:
 
     def executescript(self, sql):
         self._begin()
-        return self._pgx(_raw(sql))
+        try:
+            return self._pgx(_raw(sql))
+        finally:
+            self._db_ctx = None  # 2.369.6 (#3139, review): a script may end / roll back the transaction or a savepoint
 
     def commit(self):
         self._pg.commit()
@@ -368,7 +374,7 @@ class Conn:
             yield self
         except BaseException:
             self._pgx(f"ROLLBACK TO SAVEPOINT {name}")
-            self._apply_ctx()  # 2.37.0 (#1150): a context set inside the savepoint was rolled back with it
+            self._db_ctx = None  # 2.37.0 (#1150): a context set inside the savepoint was rolled back with it (2.369.6: applied by the next statement)
             raise
         else:
             self._pgx(f"RELEASE SAVEPOINT {name}")

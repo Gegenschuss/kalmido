@@ -4,7 +4,7 @@ import os
 import time
 from typing import NamedTuple, Optional
 
-from flask import g, has_request_context, jsonify
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.schema import MAX_DEPTH
@@ -315,7 +315,21 @@ def acx_conn_hook(c):
         if c is None:
             return LOOKUP
         hit = acx_of(c, uid)
+        warm = _ACX_WARM.get(request.path) if request.method in ("GET", "HEAD") else None
+        if warm is not None and u is not None:
+            warm(c, uid)  # 2.369.6 (#3139): still "system" here - the request's structure reads in the same breath
     return (uid, hit.org_ids, hit.role)
+
+
+_ACX_WARM = {}
+
+
+def acx_warm_register(path, fn):
+    """2.369.6 (#3139): fn(c, uid) fills request caches of structure read as "system" (memberships, visible people) for a
+    GET of path. It runs in acx_conn_hook's lookup phase, which reads as "system" anyway, so the request needs no further
+    context switches for them. fn must only read and cache, never hand rows to the person by itself; it runs inside the
+    request's first statement, so an error in it surfaces there (fn reads only what the route reads anyway)."""
+    _ACX_WARM[path] = fn
 
 
 def _acx_hook_register():
@@ -354,6 +368,7 @@ def acx_drop():
         g.pop("acx_users", None)
         g.pop("org_roles", None)  # 2.143.0 A (#2151): accounts/orgroles.py
         g.pop("_lr_cache", None)  # 2.280.0 B (#3116): list_role's request cache
+        g.pop("org_rq", None)  # 2.369.6 (#3139): accounts/orgs.py _rq (visible people, organisation names / peers, workspaces)
 
 
 def acx_session_apply(ctx=None):

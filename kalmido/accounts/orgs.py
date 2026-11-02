@@ -11,7 +11,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc
 from ..core.db import usettings, uset  # 2.356.0 B (#2932)
 from ..accounts.session import me
-from ..core.access import Denied, acx_drop, acx_lists_sql, joined_lists_sql, dlg_gone, plists, pvis, qn_private, token_lists
+from ..core.access import Denied, acx_drop, acx_warm_register, acx_lists_sql, joined_lists_sql, dlg_gone, plists, pvis, qn_private, token_lists
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.orgcrypt import oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -93,12 +93,27 @@ def main_org(c):
     return r[0] if r else None
 
 
+def _rq(name):
+    """2.369.6 (#3139): the request cache of a read (GET / HEAD only, like user_orgs; core/access.py acx_drop forgets it),
+    else None. Structure read as "system" is asked once per request, so a GET does not switch its context per call.
+    A GET that changes memberships / shares / connections must call acx_drop() afterwards (as every membership write does)."""
+    if has_request_context() and request.method in ("GET", "HEAD"):
+        return g.setdefault("org_rq", {}).setdefault(name, {})
+    return None
+
+
 def has_workspaces(c):
     """2.28.0 (#935): the instance knows organisations (any mode but shared) -> lists and agents have a workspace."""
     if instance_mode(c) == "shared":
         return False
+    rq = _rq("hw")
+    if rq is not None and "v" in rq:
+        return rq["v"]
     with system_ctx(c):  # 2.37.0 (#1150): instance structure
-        return bool(c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL LIMIT 1").fetchone())  # 2.152.0 A
+        v = bool(c.execute("SELECT 1 FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL LIMIT 1").fetchone())  # 2.152.0 A
+    if rq is not None:
+        rq["v"] = v
+    return v
 
 
 def instance_sync(c):
@@ -190,8 +205,17 @@ def _office_keep_on_join(c, uid):
 
 
 def org_names(c, uid):
+    rq = _rq("on")  # 2.369.6 (#3139)
+    if rq is not None and uid in rq:
+        return list(rq[uid])
+    oids = user_orgs(c, uid)
+    if not oids:
+        return []  # 2.369.6 (#3139): no organisation, no statement
     with system_ctx(c):  # 2.37.0 (#1150): the names of uid's own organisations (also before a login: mails, the login page)
-        return [r[0] for r in c.execute(f"SELECT name FROM orgs WHERE id IN ({','.join(str(int(x)) for x in user_orgs(c, uid)) or 'NULL'}) ORDER BY id")]
+        v = [r[0] for r in c.execute(f"SELECT name FROM orgs WHERE id IN ({','.join(str(int(x)) for x in oids)}) ORDER BY id")]
+    if rq is not None:
+        rq[uid] = tuple(v)
+    return v
 
 
 def org_role(c, uid, oid):
@@ -199,6 +223,9 @@ def org_role(c, uid, oid):
     accounting (what each may do: accounts/orgroles.py; is_org_admin and == "admin" checks stay as they are)."""
     if not oid or oid not in user_orgs(c, uid):
         return None
+    if _rq("or") is not None:  # 2.369.6 (#3139): a read takes the role from the request cache user_orgs read (same rows)
+        from .orgroles import org_roles_of
+        return org_roles_of(c, uid).get(oid)
     with system_ctx(c):  # 2.37.0 (#1150): membership structure (also asked for other people)
         r = c.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
     if not r:
@@ -228,8 +255,15 @@ def _connections(c, uid):
 def visible_people(c, uid):
     """None = everyone; else the set of user ids uid may see (uid included). 2.37.0 (#1150): computed over the memberships
     as "system" (ids only), so the rule is the same whoever asks -- row-level security does not narrow it."""
+    rq = _rq("vp")  # 2.369.6 (#3139): once per request and person (a copy: callers may change the set)
+    if rq is not None and uid in rq:
+        v = rq[uid]
+        return None if v is None else set(v)
     with system_ctx(c):
-        return _visible_people(c, uid)
+        v = _visible_people(c, uid)
+    if rq is not None:
+        rq[uid] = None if v is None else frozenset(v)
+    return v
 
 
 def token_people(c, uid):
@@ -347,10 +381,16 @@ def org_peers(c, uid):
     oids = user_orgs(c, uid)
     if not oids:
         return False
+    rq = _rq("op")  # 2.369.6 (#3139)
+    if rq is not None and uid in rq:
+        return rq[uid]
     q = ",".join("?" * len(oids))
     with system_ctx(c):  # memberships are structure (ids only), as user_orgs
-        return bool(c.execute(f"SELECT 1 FROM org_members WHERE org_id IN ({q}) AND user_id<>? LIMIT 1", (*oids, uid)).fetchone()
+        v = bool(c.execute(f"SELECT 1 FROM org_members WHERE org_id IN ({q}) AND user_id<>? LIMIT 1", (*oids, uid)).fetchone()
                     or c.execute(f"SELECT 1 FROM agents WHERE org_id IN ({q}) LIMIT 1", oids).fetchone())
+    if rq is not None:
+        rq[uid] = v
+    return v
 
 
 def list_org(c, lid):
@@ -1592,3 +1632,19 @@ def org_member_remove(oid, uid):
     c.commit()
     print("organisation", oid, "member", uid, "removed by" if uid != me() else "left,", login_log_who(g.user), "lists transferred:", n, flush=True)
     return jsonify(ok=True, transferred=n, back=len(back))
+
+
+def org_warm(c, uid):
+    """2.369.6 (#3139): GET /api/state asks this structure of the signed-in person anyway; read it in the context hook's
+    "system" phase (core/access.py acx_conn_hook), before the first statement as the person, into the request caches above
+    -- so the state does not switch its database context back and forth per helper (22 set_config before)."""
+    from .orgroles import org_roles_of
+    org_roles_of(c, uid)
+    has_workspaces(c)
+    visible_people(c, uid)
+    org_peers(c, uid)
+    if user_orgs(c, uid):
+        org_names(c, uid)
+
+
+acx_warm_register("/api/state", org_warm)

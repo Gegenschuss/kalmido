@@ -18,6 +18,7 @@ from ..core.config import (
 )
 from ..core.i18n import browser_lang, tr
 from ..core.db import connect, db, err, gsetting, iso, now_utc
+from ..core.pg import system_ctx  # 2.369.6 (#3139)
 from ..core.orgcrypt import ROT_LOCK_KEY, ROT_LOCK_TTL
 from ..core.ratedb import rate_clear, rate_counts  # 2.306.0 D1 (#2875): failures counted for every process
 from ..core.ratedb import rate_known_add, rate_known_at  # 2.312.0 C (#3265): known addresses for every process
@@ -327,13 +328,17 @@ def authenticate():
     if not g.user and not g.auth_error:
         tok = request.cookies.get(COOKIE)
         if tok:
-            r = c.execute("""SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id
-                             WHERE s.token_hash=? AND s.expires_at>? AND u.disabled=0 AND u.kind!='agent'""",
-                          (_token_hash(tok), iso(now_utc()))).fetchone()
-            if r:
-                g.user, g.auth_via = r, "session"
-                from ..accounts.sessions import ses_touch
-                ses_touch(c, _token_hash(tok))  # 2.115.0 B (#2062): last activity, at most every few minutes
+            # 2.369.6 (#3139): the credential check reads as "system" like resolving a public token (sessions and users have no
+            # row-level policy, so it sees the same rows as "anon"): the transaction goes on with the membership lookup of the
+            # person (also "system") without a switch in between
+            with system_ctx(c):
+                r = c.execute("""SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id
+                                 WHERE s.token_hash=? AND s.expires_at>? AND u.disabled=0 AND u.kind!='agent'""",
+                              (_token_hash(tok), iso(now_utc()))).fetchone()
+                if r:
+                    g.user, g.auth_via = r, "session"
+                    from ..accounts.sessions import ses_touch
+                    ses_touch(c, _token_hash(tok))  # 2.115.0 B (#2062): last activity, at most every few minutes
     path = request.path
     if request.method not in ("GET", "HEAD", "OPTIONS") and path.startswith("/api/") \
             and request.headers.get(CSRF_HEADER) != CSRF_VALUE:
