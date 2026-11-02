@@ -87,7 +87,8 @@ def about_info(c, u):
                  cal_allow_env=cal_allow_text(cal_allow_parse(CAL_ALLOW_ENV)[0]),
                  twofa_required=gsetting(c, "twofa_required") == "1", passkey_login=gsetting(c, "passkey_login") != "0",
                  oidc=oidc_public(c), backups_env=BK_ON_ENV,
-                 public_links=gsetting(c, "public_links") != "0", public_links_env=PUB_ENV)
+                 public_links=gsetting(c, "public_links") != "0", public_links_env=PUB_ENV,
+                 public_links_off=sorted(pub_kinds_off(c)))  # 2.489.0 C (#2656): the kinds switched off on their own
         from ..core.config import SECRET_KEY, SECRET_KEY_PROBLEM, SECRET_KEY_SRC
         d.update(secret_key=bool(SECRET_KEY), secret_key_problem=SECRET_KEY_PROBLEM, secret_key_src=SECRET_KEY_SRC)  # 2.45.0 (#1515)
         d.update(backup_tools_problem=gsetting(c, "bk_tools_problem"))  # 2.359.3 (#2945): "<pg_dump>|<server>", else empty
@@ -185,8 +186,15 @@ def admin_settings():
     # without a password: its session)
     eff = {"twofa_required": gsetting(c, "twofa_required") == "1", "oidc_autocreate": gsetting(c, "oidc_autocreate") == "1",
            "public_links": gsetting(c, "public_links") != "0"}
+    pub_off, pub_new = pub_kinds_off(c), None
+    if "public_links_off" in b:  # 2.489.0 C (#2656): [kind, ...] = the kinds of public links switched off on their own
+        v = b["public_links_off"]
+        if not isinstance(v, list) or any(k not in PUB_KINDS for k in v):
+            return err(tr("Invalid value: {0}", "public_links_off"))
+        pub_new = set(v)
     if ((b.get("twofa_required") is False and eff["twofa_required"]) or (b.get("oidc_autocreate") is True and not eff["oidc_autocreate"])
             or (b.get("public_links") is True and not eff["public_links"])
+            or (pub_new is not None and pub_off - pub_new)  # 2.489.0 C (#2656): a kind switched back on opens the server too
             or (b.get("signup_mode") in ("approval", "domain", "open") and b["signup_mode"] != gsetting(c, "signup_mode"))
             or (b.get("signup_private") is True and gsetting(c, "signup_private") != "1")):  # 2.422.0 (#2937)
         e = oidc_reauth(c, b)
@@ -232,6 +240,8 @@ def admin_settings():
     e = _apply_instance(c, b)
     if e:
         return e
+    if pub_new is not None and pub_new != pub_off:
+        gset(c, "public_links_off", ",".join(sorted(pub_new)))
     from ..admin.hosting import hosting_settings
     e = hosting_settings(c, b)  # 2.24.0: storage quota, support address, mail limit, the notice
     if not e:
@@ -245,6 +255,10 @@ def admin_settings():
     for k, was in old.items():
         if k in b and b[k] != was:
             aa_switch(c, g.user, k, b[k])
+    if pub_new is not None:  # 2.489.0 C (#2656): one security alert per kind switched
+        for k in sorted(pub_off ^ pub_new):
+            aa_now("security", f"publinks:{k}:{int(k not in pub_new)}:{int(time.time())}", N_("{0} set public links for “{1}” to {2}."),
+                   [g.user["username"], {"t": PUB_KIND_LABEL[k]}, {"t": N_("on|switch") if k not in pub_new else N_("off|switch")}])
     if hosts is not None:
         aa_now("security", f"calhosts:{int(time.time())}", N_("{0} changed the internal hosts calendar subscriptions may reach: {1}"),
                [g.user["username"], hosts or "-"])
@@ -323,6 +337,25 @@ def admin_setup():
 
 
 AUTH_SWITCHES = ("twofa_required", "passkey_login", "oidc_autocreate", "public_links")
+# 2.489.0 C (#2656): "Allow public links" per kind (Settings > Administration). The instance switch public_links stays the
+# default for all: off = every kind off. Under it each kind can be switched off on its own (setting public_links_off = the
+# kinds off, comma separated; nothing set = all on, so an existing server keeps its behaviour); lists/public.py
+# public_links_on(c, kind) checks both wherever a link is made or opened.
+#   lists = public links of projects and folders, files = public links of the file store, uploads = upload links (file
+#   requests), calendar = booking pages and date polls, signoff = sign-off and signature links (milestones, documents, privacy
+#   sheets, video reviews), wiki = wiki pages, forms = public forms, portal = the client portal, pay = online payment
+# The client: settings.js SH_PUBK (same order).
+PUB_KIND_LABEL = {"lists": N_("Projects and folders"), "files": N_("Files"), "uploads": N_("Upload links"), "calendar": N_("Booking pages and polls"),
+                  "signoff": N_("Sign-off and signature"), "wiki": N_("Wiki pages"), "forms": N_("Forms"), "portal": N_("Client portal"),
+                  "pay": N_("Online payment")}
+
+
+PUB_KINDS = tuple(PUB_KIND_LABEL)
+
+
+def pub_kinds_off(c):
+    """The kinds switched off on their own (a set of PUB_KINDS)."""
+    return {k for k in (gsetting(c, "public_links_off") or "").split(",") if k in PUB_KINDS}
 
 
 def _apply_instance(c, b):

@@ -21,7 +21,7 @@ function folderShareModal(f, opt = {}) {
       ${fshGrey(tr('Members may see and use the agent') + ' · ' + tr('Agent follows up') + ' · ' + tr('Agent may tidy up entries'), tr('For a folder in the folder settings (defaults for its projects).'))}
       <div class="row"><span class="spacer"></span><button type="button" class="linkbtn" data-m="fsh-props">${ic('sliders', 's')} ${tr('Folder settings…')}</button></div>`, opt.focus === 'agents') : ''}
     ${fshSec('ntf', tr('Notifications for members'), `<div id="fp-ntf"><div class="muted mhint">${tr('Loading…')}</div></div>`, opt.focus === 'ntf')}
-    ${S.publicLinks ? fshSec('pub', tr('Public link'), `<div id="fsh-pub"><div class="muted mhint">${tr('Loading…')}</div></div>`) : ''}
+    ${pubOn('lists') ? fshSec('pub', tr('Public link'), `<div id="fsh-pub"><div class="muted mhint">${tr('Loading…')}</div></div>`) : ''}
     ${fshSec('own', tr('Owner'), `<div id="fsh-own"></div>`)}
     <div class="foot"><button class="btn" data-m="fsh-props">${ic('sliders', 's')} ${tr('Folder settings…')}</button><span class="spacer"></span><button class="btn pri" data-m="close">${opt.back ? ic('back', 's') + ' ' + tr('Back') : tr('Done')}</button></div>`);
   md.classList.add('shmodal', 'fshmodal');
@@ -85,7 +85,7 @@ function folderShareModal(f, opt = {}) {
   };
   const reload = async () => { try { have = (await api('GET', '/api/folders/people?folder=' + encodeURIComponent(f))).people; } catch { have = []; } drawPeople(); st('people', ''); };
   api('GET', '/api/users').then(j => { users = j.users.filter(u => !u.disabled && S.me && u.id !== S.me.id).map(u => ({id: u.id, display_name: u.display_name, agent: !!(u.agent || u.kind === 'agent'), orgs: u.orgs || [], org_id: u.org_id ?? null})); drawPeople(); drawAgents(); }).catch(() => { users = []; drawPeople(); drawAgents(); });
-  reload(); drawGroups(); if (agentsOn()) loadAgents(); if (S.publicLinks) loadPub(); drawOwn();
+  reload(); drawGroups(); if (agentsOn()) loadAgents(); if (pubOn('lists')) loadPub(); drawOwn();
   ntfLoad($('#fp-ntf', md), 'folder', f, j => { st('ntf', ntfName(j.effective?.tpl)); if (opt.focus === 'ntf' && !md._ntfs) { md._ntfs = 1; $('#fp-sec-ntf', md)?.scrollIntoView?.({block: 'start'}); } });
   if (opt.focus === 'agents' || opt.focus === 'grp') setTimeout(() => $(opt.focus === 'grp' ? '#fsh-sec-grp' : '#fsh-sec-ag', md)?.scrollIntoView?.({block: 'start'}), 0);
   const done = async () => { await load(); render(); };

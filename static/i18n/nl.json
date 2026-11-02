@@ -15942,5 +15942,15 @@
   "The client is in the trash": "De klant staat in de prullenbak",
   "Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.": "Agenda’s worden alleen verwijderd als er niets in is veranderd; ongewijzigde adresboeken gaan naar de prullenbak.",
   "The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "De geïmporteerde klanten gaan naar de prullenbak van de klanten; de overige geïmporteerde kantoorgegevens, tijden, gewoontes en dagboekitems worden definitief verwijderd; sindsdien gefactureerde tijden blijven.",
-  "Subscriptions|office": "Abonnementen"
+  "Subscriptions|office": "Abonnementen",
+  "Allow public links": "Openbare links toestaan",
+  "Shared with people without an account through a secret link, switched on or off per kind below. Off: every public link stops working at once; nothing is deleted.": "Delen met mensen zonder account via een geheime link, per soort hieronder aan- of uitgezet. Uit: elke openbare link werkt meteen niet meer; er wordt niets verwijderd.",
+  "Projects and folders": "Projecten en mappen",
+  "Upload links": "Uploadlinks",
+  "Booking pages and polls": "Boekingspagina's en peilingen",
+  "Sign-off and signature": "Akkoord en handtekening",
+  "Wiki pages": "Wikipagina's",
+  "Turn these public links off?": "Deze openbare links uitzetten?",
+  "Every link of this kind stops working at once; nothing is deleted.": "Elke link van deze soort werkt direct niet meer; er wordt niets verwijderd.",
+  "{0} set public links for “{1}” to {2}.": "{0} heeft openbare links voor ‘{1}’ op {2} gezet."
 }

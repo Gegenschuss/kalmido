@@ -353,7 +353,7 @@ def dsb_mail_get(sid):
     if not d or d["status"] == "draft":
         raise Denied(409, tr("Finish the document first"))
     sign = DSB_KINDS[r["kind"]][2]
-    link = bool(sign and public_links_on(c))
+    link = bool(sign and public_links_on(c, "signoff"))
     to, subject, text, reply, _code = dsb_mail_parts(c, oid, r, d, link)
     c.commit()  # a new code is kept
     smtp, rin = dsb_mail_on()
@@ -383,7 +383,7 @@ def dsb_send(sid):
     if not re.fullmatch(r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+", to):
         raise BadInput(tr("Invalid value: {0}", "to"))
     sign = DSB_KINDS[r["kind"]][2]
-    link = bool(sign and public_links_on(c))
+    link = bool(sign and public_links_on(c, "signoff"))
     _to, subject0, text0, reply, code = dsb_mail_parts(c, oid, r, d, link)
     subject = inv_clean_subject(b.get("subject")) or subject0
     if code and f"[DS-{code}]" not in subject:

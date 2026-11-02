@@ -610,7 +610,7 @@ def vdr_sig_new(vid):
     """{expires: YYYY-MM-DD | null} -> the customer link of the review (an open older one stops: one live link)."""
     c, uid = db(), me()
     r = vdr_need(c, vid, write=True)
-    if not public_links_on(c):
+    if not public_links_on(c, "signoff"):
         return err(tr("Public links are turned off on this server"), 409)
     if not vdr_versions(c, vid):
         return err(tr("Invalid value: {0}", "url"), 409)

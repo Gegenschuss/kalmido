@@ -105,7 +105,7 @@ def form_public(c, r):
             "section_id": r["section_id"], "ask_email": bool(r["ask_email"]), "enabled": bool(r["enabled"]), "count": r["count"],
             "last_at": r["last_at"], "created_at": r["created_at"], "url": form_url(c, r),
             "ttype": r["ttype"] or "", "files": bool(r["files"]), "portal": bool(r["portal"]),  # 2.63.0 (#1513)
-            "live": bool(r["enabled"]) and (r["access"] != "public" or public_links_on(c)), **fq_public(r)}  # 2.98.0 B (#1954)
+            "live": bool(r["enabled"]) and (r["access"] != "public" or public_links_on(c, "forms")), **fq_public(r)}  # 2.98.0 B (#1954)
 
 
 def clean_form(c, lid, b, new=False):
@@ -172,7 +172,7 @@ def forms_list(lid):
     _gate()
     need_form_manager(c, lid)
     return jsonify(forms=[form_public(c, r) for r in c.execute("SELECT * FROM forms WHERE list_id=? ORDER BY id", (lid,))],
-                   public_links=public_links_on(c))
+                   public_links=public_links_on(c, "forms"))
 
 
 @app.post("/api/lists/<int:lid>/forms")
@@ -187,7 +187,7 @@ def form_create(lid):
         _public_approval(c, lid, f.get("title"))
     if f.get("portal"):
         f["ask_email"] = 1  # 2.63.0 (#1513): the status link goes to the reporter's address
-    if f["access"] == "public" and not public_links_on(c):
+    if f["access"] == "public" and not public_links_on(c, "forms"):
         return err(tr("Public links are turned off on this server"), 409)
     if c.execute("SELECT COUNT(*) FROM forms WHERE list_id=?", (lid,)).fetchone()[0] >= FORMS_PER_LIST:
         return err(tr("At most {0} forms per project", FORMS_PER_LIST), 409)
@@ -209,7 +209,7 @@ def form_update(fid):
     f = clean_form(c, r["list_id"], {k: v for k, v in b.items() if k != "regenerate"})
     if (f.get("access") == "public" and r["access"] != "public") or (r["access"] == "public" and (f.get("enabled") or b.get("regenerate") is True)):
         _public_approval(c, r["list_id"], f.get("title") or r["title"])
-    if f.get("access") == "public" and not public_links_on(c):
+    if f.get("access") == "public" and not public_links_on(c, "forms"):
         return err(tr("Public links are turned off on this server"), 409)
     if f.get("portal", r["portal"]):
         f["ask_email"] = 1  # 2.63.0 (#1513): a status link needs the address
@@ -289,7 +289,7 @@ def _msg(title, text, lg, code=200, link=None):
 def _may_use(c, f):
     """None if the current visitor may use form f, else a response."""
     if f["access"] == "public":
-        return None if public_links_on(c) else _gone()
+        return None if public_links_on(c, "forms") else _gone()
     lg = _lang(c, f)
     if not g.user:
         return _msg(tr("Please sign in", lg=lg), tr("This form is for the people of {0}. Sign in and open the link again.", APP_NAME, lg=lg),

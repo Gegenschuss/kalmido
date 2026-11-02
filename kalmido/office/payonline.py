@@ -262,7 +262,7 @@ def pol_adapter(conf):
 def pol_ready(c, oid, conf=None):
     """Set up and switched on: the pay link is offered."""
     conf = conf or pol_conf(c, oid)
-    return bool(conf["enabled"] and conf["provider"] in POL_ADAPTERS and conf["secret_key"] and conf["webhook_secret"] and public_links_on(c))
+    return bool(conf["enabled"] and conf["provider"] in POL_ADAPTERS and conf["secret_key"] and conf["webhook_secret"] and public_links_on(c, "pay"))
 
 
 def pol_hook_url(tok):
@@ -626,7 +626,7 @@ def pol_page_headers(resp, ad=None):
 
 def pol_find(c, token):
     """(link row with org, invoice row, connection) of a live pay link -- bound as nobody to exactly its office area -- or None."""
-    if not POL_TOKEN_RE.fullmatch(token or "") or not public_links_on(c):
+    if not POL_TOKEN_RE.fullmatch(token or "") or not public_links_on(c, "pay"):
         return None
     with system_ctx(c):  # resolve the token (one row by its hash) across organisations
         link = c.execute("SELECT * FROM office_pay_links WHERE token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),)).fetchone()

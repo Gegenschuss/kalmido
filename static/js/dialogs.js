@@ -614,8 +614,8 @@ function shareModal(id, opt = {}) {
     ${collab() && agentsOn() ? shSec('ag', tr('Agents'), `<div class="shint lhint keep">${tr('An agent sees exactly the projects shared with it, nothing else. Stopping the sharing ends its access at once.')}</div><div id="sh-agwrap"></div>`, true) : ''}
     ${own && collab() ? shSec('ntf', tr('Notifications for members'), `<div id="sh-ntf"><div class="muted mhint">${tr('Loading…')}</div></div>`, false, opt.focus === 'ntf') : ''}
     ${!own && collab() ? ntfMemberHint(l0) : ''}
-    ${own && S.publicLinks && l0.e2e && typeof le2u_pubHtml === 'function' ? shSec('pub', tr('Public link'), le2u_pubHtml()) : ''}${''/* 2.64.1 (#1817) */}
-    ${own && S.publicLinks && !l0.e2e ? shSec('pub', tr('Public link'), `<div id="l-pub"><div class="muted mhint">${tr('Loading…')}</div></div>`) : ''}
+    ${own && pubOn('lists') && l0.e2e && typeof le2u_pubHtml === 'function' ? shSec('pub', tr('Public link'), le2u_pubHtml()) : ''}${''/* 2.64.1 (#1817) */}
+    ${own && pubOn('lists') && !l0.e2e ? shSec('pub', tr('Public link'), `<div id="l-pub"><div class="muted mhint">${tr('Loading…')}</div></div>`) : ''}
     ${shSec('own', tr('Owner'), `<div id="sh-ownwrap"><div class="muted mhint" id="sh-owner"></div><div id="l-owner"></div></div>`, false, !collab())}
     <div class="foot"><button class="btn" data-m="list-edit">${ic('edit', 's')} ${tr('Project settings…')}</button><span class="spacer"></span><button class="btn pri" data-m="close">${opt.back ? ic('back', 's') + ' ' + tr('Back') : tr('Done')}</button></div>`);
   md.classList.add('shmodal');
@@ -668,7 +668,7 @@ function shareModal(id, opt = {}) {
       : j.mode === 'takeover' ? `<div class="shint keep lhint">${esc(why)}</div><div class="row owrow"><button class="btn sm" data-m="own-xfer">${ic('user', 's')} ${tr('Take over…')}</button></div>` : '') + hist;
   };
   draw(); drawOwner();
-  if (own && S.publicLinks && !l0.e2e) pubWire(md, id);
+  if (own && pubOn('lists') && !l0.e2e) pubWire(md, id);
   if (own && collab() && $('#sh-ntf', md)) ntfLoad($('#sh-ntf', md), 'list', id, j => { shSecSet('ntf', true, ntfName(j.effective?.tpl)); if (opt.focus === 'ntf' && !md._ntfs) { md._ntfs = 1; $('#sh-sec-ntf', md)?.scrollIntoView?.({block: 'start'}); } });  // 2.33.0 (#927)
   if (collab()) {
     tidyWire(md, id);

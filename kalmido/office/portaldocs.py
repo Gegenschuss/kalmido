@@ -67,7 +67,7 @@ def kp_area(c, org_id, owner_id):
 
 def kp_on(c, oid):
     """Documents show in the portal of office area oid (setting portal_docs, public links on)."""
-    return bool(oid) and public_links_on(c) and bool(office_settings(c, oid).get("portal_docs"))
+    return bool(oid) and public_links_on(c, "portal") and bool(office_settings(c, oid).get("portal_docs"))
 
 
 def kp_bind(c, who):
@@ -176,7 +176,7 @@ def kp_pdf(did):
     lg = _accept_lang()
     if hit_limit("ptv:" + rate_ip(), PT_VIEW_RATE):
         return pub_limited(lg)
-    who = pt_cookie_read(c) if public_links_on(c) else None
+    who = pt_cookie_read(c) if public_links_on(c, "portal") else None
     oid, cids = kp_bind(c, who) if who else (None, [])
     rows = kp_docs(c, oid, cids, did) if oid else []
     if not rows:
@@ -213,7 +213,7 @@ def kp_link_send(cid):
         raise Denied(404)
     b = body()
     b = b if isinstance(b, dict) else {}
-    if not public_links_on(c) or not office_settings(c, oid).get("portal_docs"):
+    if not public_links_on(c, "portal") or not office_settings(c, oid).get("portal_docs"):
         raise Denied(409, tr("Documents in the client portal are switched off in the office settings"))
     if not MAIL_OUT_ON:
         raise Denied(409, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))

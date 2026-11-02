@@ -317,7 +317,7 @@ def wsh_list():
     names = user_names(c, ({r["created_by"] for r in rows} | {r["user_id"] for r in rows}) - {None})
     locked = wsh_locked(c, oid, owner)
     gone = wsh_gone(c, rows)
-    return jsonify(enabled=public_links_on(c), locked=locked, person=oid is None and not locked, space=wiki_space_key(oid),
+    return jsonify(enabled=public_links_on(c, "wiki"), locked=locked, person=oid is None and not locked, space=wiki_space_key(oid),
                    shares=[] if locked else [wsh_dict(c, r, names, (path, folder) if path is not None else None, gone) for r in rows])
 
 
@@ -343,7 +343,7 @@ def wsh_create():
     ts = iso(now_utc())
     page = None if folder else int(b["page_id"])  # 2.360.0 D (#2496): bound to the page (WSH_COVER); wsh_target checked it
     if kind == "link":
-        if not public_links_on(c):
+        if not public_links_on(c, "wiki"):
             return jsonify(error=tr("Public links are turned off on this server")), 409
         tok = secrets.token_urlsafe(24)  # 192 bits, the shape of the list links (lists/public.py PUB_TOKEN_RE)
         h = _token_hash(tok)
@@ -431,7 +431,7 @@ def wsh_restore(sid):
     """Undo of a revoke (the same token: the link works again)."""
     c = db()
     r = wsh_need(c, sid)
-    if r["kind"] == "link" and not public_links_on(c):
+    if r["kind"] == "link" and not public_links_on(c, "wiki"):
         return jsonify(error=tr("Public links are turned off on this server")), 409
     if wsh_locked(c, r["org_id"], r["owner_id"]):
         return jsonify(error=tr("Pages of a workspace encrypted in the browser cannot be shared."), code="wiki_e2e_share"), 409
@@ -592,7 +592,7 @@ def wsh_send(c, f, public):
 def wsh_find(c, token):
     """The live link share of a token (its space open, its owner / maker still active and, in an organisation, still a
     member) or None. Then the request reads as nobody, bound to exactly the share's organisation (like the list links)."""
-    if not PUB_TOKEN_RE.fullmatch(token or "") or not public_links_on(c):
+    if not PUB_TOKEN_RE.fullmatch(token or "") or not public_links_on(c, "wiki"):
         return None
     with system_ctx(c):  # resolve the token (one row) across organisations; nothing else is read here
         r = c.execute("SELECT s.* FROM wiki_shares s JOIN users u ON u.id=COALESCE(s.owner_id, s.created_by) WHERE s.token_hash=? "

@@ -241,7 +241,7 @@ def frq_list(nid):
     rows = c.execute("SELECT * FROM fs_upload_requests WHERE node_id=? AND deleted_at IS NULL ORDER BY id DESC", (nid,)).fetchall()
     names = _names(c, [r["created_by"] for r in rows])
     d = sd_for(c, n["org_id"], me())  # 2.470.0 (#3596): the workspace's defaults (the limits stay)
-    return jsonify(requests=[frq_json(c, r, n["role"], names) for r in rows], public_links=public_links_on(c),
+    return jsonify(requests=[frq_json(c, r, n["role"], names) for r in rows], public_links=public_links_on(c, "uploads"),
                    limits={"max_mb": MAX_FILE_MB, "max_files": FRQ_FILES_MAX, "days": FRQ_DAYS_MAX, "types": list(FRQ_TYPES),
                            "default_mb": d["req_mb"], "default_files": d["req_files"], "default_days": d["req_days"],
                            "default_types": d["req_types"]})
@@ -253,7 +253,7 @@ def frq_create(nid):
     c = db()
     _gate()
     n = _folder(c, nid)
-    if not public_links_on(c):
+    if not public_links_on(c, "uploads"):
         return err(tr("Public links are turned off on this server"), 409)
     fsl_need_unlocked(c, nid, "fs_locked_link")  # 2.353.0 A (#2758): an external person has no key
     f = frq_clean(body(), new=True)
@@ -332,7 +332,7 @@ def _log(c, nid, uid, action, detail=""):
 # ---------------------------------------------------------------- the page /u/<token>
 def frq_find(c, token):
     """The live request of a token (frq_alive), else None. A visitor then works inside exactly the folder's workspace."""
-    if not FRQ_TOKEN_RE.fullmatch(token or "") or not public_links_on(c):
+    if not FRQ_TOKEN_RE.fullmatch(token or "") or not public_links_on(c, "uploads"):
         return None
     with system_ctx(c):  # resolve the token (one row) across organisations, like the forms' links
         r = c.execute("SELECT * FROM fs_upload_requests WHERE token_hash=?", (_token_hash(token),)).fetchone()

@@ -1193,7 +1193,7 @@ def dt_signoff_new(gid):
     r = dt_doc(c, oid, gid)
     if r["status"] != "final" or r["archived"] or not r["sign"]:
         return err(tr("Signature links exist for finished documents that may be signed"), 409)
-    if not public_links_on(c):
+    if not public_links_on(c, "signoff"):
         return err(tr("Public links are turned off on this server"), 409)
     b = body()
     try:

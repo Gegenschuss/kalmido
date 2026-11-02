@@ -302,7 +302,7 @@ def tpo_tally(opts, votes):
 
 def tpo_live(c, r):
     """Is the link of poll r open right now (for the app's hint; the page checks the same in tpo_find)?"""
-    return bool(r["link_on"]) and not r["deleted_at"] and (not r["expires_at"] or r["expires_at"] > iso(now_utc())) and public_links_on(c)
+    return bool(r["link_on"]) and not r["deleted_at"] and (not r["expires_at"] or r["expires_at"] > iso(now_utc())) and public_links_on(c, "calendar")
 
 
 def tpo_space_key(oid):
@@ -344,7 +344,7 @@ def tpo_list():
     tpo_gate()
     c, uid = db(), me()
     rows = tpo_rows(c, uid, request.args)
-    return jsonify(items=[tpo_dict(c, r, uid, full=False) for r in rows], public_links=public_links_on(c))
+    return jsonify(items=[tpo_dict(c, r, uid, full=False) for r in rows], public_links=public_links_on(c, "calendar"))
 
 
 def tpo_rows(c, uid, a):
@@ -710,7 +710,7 @@ def tpo_home(c, r, uid):
 # ---------------------------------------------------------------- the public page /s/v/<token>
 def tpo_find(c, token):
     """The open poll of a link (its owner enabled, the link on, not deleted, not expired, public links on) or None."""
-    if not TPO_TOKEN_RE.fullmatch(token or "") or not public_links_on(c):
+    if not TPO_TOKEN_RE.fullmatch(token or "") or not public_links_on(c, "calendar"):
         return None
     with system_ctx(c):  # resolve the token (one row) across organisations ...
         r = c.execute("""SELECT p.*, u.display_name AS u_name, u.username AS u_login FROM sched_polls p JOIN users u ON u.id=p.user_id

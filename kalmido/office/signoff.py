@@ -320,7 +320,7 @@ def sig_offer_new(did):
     r = doc_row(c, oid, did)
     if r["kind"] != "offer" or r["status"] != "sent":
         return err(tr("Approval links exist for sent quotations only"), 409)
-    if not public_links_on(c):
+    if not public_links_on(c, "signoff"):
         return err(tr("Public links are turned off on this server"), 409)
     b = body()
     try:
@@ -461,7 +461,7 @@ def sig_list_list(lid):
     rows = c.execute("SELECT * FROM office_signoffs WHERE list_id=? AND kind='acceptance' ORDER BY id DESC LIMIT 50", (lid,)).fetchall()
     ms = [{"id": r["id"], "title": r["title"]} for r in c.execute("SELECT id, title FROM tasks WHERE list_id=? AND ms=1 AND deleted_at IS NULL ORDER BY sort, id LIMIT 100", (lid,))]
     secs = [{"id": r["id"], "name": r["name"]} for r in c.execute("SELECT id, name FROM sections WHERE list_id=? ORDER BY sort, id", (lid,))]
-    return jsonify(signoffs=[sig_public(c, r) for r in rows], milestones=ms, sections=secs, enabled=public_links_on(c))
+    return jsonify(signoffs=[sig_public(c, r) for r in rows], milestones=ms, sections=secs, enabled=public_links_on(c, "signoff"))
 
 
 @app.post("/api/lists/<int:lid>/signoffs")
@@ -470,7 +470,7 @@ def sig_list_new(lid):
     c = db()
     need_pub_owner(c, lid)
     sig_list_rights(c, lid, "edit")
-    if not public_links_on(c):
+    if not public_links_on(c, "signoff"):
         return err(tr("Public links are turned off on this server"), 409)
     b = body()
     b = b if isinstance(b, dict) else {}
@@ -541,7 +541,7 @@ def sig_check(c, r):
 
 def sig_open(c, token):
     ip = rate_ip()
-    if not public_links_on(c):
+    if not public_links_on(c, "signoff"):
         return None, pub_gone()
     bad = [("pubbad:" + ip, SIG_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
     r = sig_find(c, token)

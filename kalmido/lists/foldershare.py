@@ -317,7 +317,7 @@ def sh_pub_get():
         f = _folder_arg(strict=False)
     except _Bad as e:
         return err(str(e))
-    return jsonify(enabled=public_links_on(c), lists=_pub_rows(c, f))
+    return jsonify(enabled=public_links_on(c, "lists"), lists=_pub_rows(c, f))
 
 
 @app.put("/api/folders/public-links")
@@ -335,7 +335,7 @@ def sh_pub_put():
     on = b.get("on")
     if not isinstance(on, bool) or ("notes" in b and not isinstance(b["notes"], bool)):
         return err(tr("Invalid value: {0}", "on"))
-    if on and not public_links_on(c):
+    if on and not public_links_on(c, "lists"):
         return err(tr("Public links are turned off on this server"), 409)
     created = removed = 0
     for r in _pub_rows(c, f):
@@ -351,7 +351,7 @@ def sh_pub_put():
         bump(c)  # 2.41.0 (#1420): the owner's other devices see the new / removed links at once
     c.commit()
     print("folder", repr(f), "public links", "on" if on else "off", created, removed, flush=True)
-    return jsonify(enabled=public_links_on(c), lists=_pub_rows(c, f), created=created, removed=removed)
+    return jsonify(enabled=public_links_on(c, "lists"), lists=_pub_rows(c, f), created=created, removed=removed)
 
 
 def sh_folder_shares(c, uid):

@@ -1005,6 +1005,8 @@ function userSwitch(id) {
     (async () => { if (typeof caches !== 'undefined') for (const k of await caches.keys()) await caches.delete(k); })()]);
   Promise.race([gone, new Promise(r => setTimeout(r, 3000))]).finally(() => location.reload());
 }
+// 2.489.0 C (#2656): public links of this kind may be made (the instance switch and the kind's switch; the server checks too)
+const pubOn = kind => !!S.publicLinks && !(S.publicLinksOff || []).includes(kind);
 function applyState(j) {
   if (j.me) {  // another user than last time in this browser: drop everything local of the previous one (userSwitch)
     const last = LS.get('uid', null);
@@ -1050,7 +1052,7 @@ function applyState(j) {
   S.collabAll = j.collab_all !== false; S.timeAll = j.time_all !== false; S.about = j.about || {};
   S.orgPeers = !!j.org_peers;  // 2.364.0 D (#3036): see hasPeers
   S.calendars = j.calendars || {enabled: false, subs: 0};
-  S.api = j.api || {enabled: false}; S.caldav = j.caldav || {enabled: false}; S.webhooks = j.webhooks || {enabled: false}; S.publicLinks = !!j.public_links;
+  S.api = j.api || {enabled: false}; S.caldav = j.caldav || {enabled: false}; S.webhooks = j.webhooks || {enabled: false}; S.publicLinks = !!j.public_links; S.publicLinksOff = j.public_links_off || [];
   S.sample = j.sample || null;
   S.agents = j.agents || []; S.agentsAt = Date.now(); S.setupPending = !!j.setup_pending;  // 2.13.0 (#453 A16)
   S.proposers = j.proposers || [];  // 2.3.0: agents I may ask for a proposal

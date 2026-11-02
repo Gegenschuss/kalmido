@@ -19,7 +19,7 @@ from ..core.access import (
 from ..core.serializers import load_tasks, running_pomo, tags_for
 from ..core.pg import st_ids
 from ..core.pages import inbox_user
-from ..core.instance import about_info
+from ..core.instance import about_info, pub_kinds_off
 from ..core.env import env_int  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
 
@@ -387,7 +387,7 @@ def state():
         # 2.364.0 C (#3044): mine = own API tokens / webhooks (Settings > Access is listed only then, else under Integrations)
         api={"enabled": API_ON, "mine": API_ON and c.execute("SELECT 1 FROM api_tokens WHERE user_id=? LIMIT 1", (uid,)).fetchone() is not None},
         webhooks={"enabled": WH_ON, "mine": WH_ON and c.execute("SELECT 1 FROM webhooks WHERE user_id=? AND org_id IS NULL LIMIT 1", (uid,)).fetchone() is not None},
-        caldav=dav_info(u), public_links=public_links_on(c),
+        caldav=dav_info(u), public_links=public_links_on(c), public_links_off=sorted(pub_kinds_off(c)),  # 2.489.0 C (#2656)
         share={"drop_url": PUBLIC_URL.rstrip("/") + "/drop", "ios_shortcut": IOS_SHORTCUT_URL},
         sample=sample_state(c, uid),
         notes=notes_brief(c, uid),  # 2.17.0 (#442)

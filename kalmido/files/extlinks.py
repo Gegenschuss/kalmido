@@ -91,7 +91,7 @@ def xl_chain_ok(chain):
 
 def xl_why_not(c, n, chain):
     """Why node n cannot get an external link (a text for the dialog), or None."""
-    if not public_links_on(c):
+    if not public_links_on(c, "files"):
         return tr("Public links are turned off on this server")
     if n["kind"] == "link":
         return tr("A linked file of a task or project cannot be shared outside. Share the original instead.")
@@ -154,7 +154,7 @@ def xl_find(c, token):
 def xl_open(c, token):
     """Common checks of every /s/f/ request -> (link, chain, None) or (None, None, response)."""
     ip = rate_ip()
-    if not public_links_on(c):
+    if not public_links_on(c, "files"):
         return None, None, pub_gone()
     bad = [("pubbad:" + ip, PUB_BAD_LIMIT)]  # unknown tokens count together with the list links
     if _rate_blocked(bad):
@@ -497,7 +497,7 @@ def xl_answer(c, n, extra=None):
               (n["id"], iso(now_utc() - timedelta(days=XL_REVOKED_DAYS))))
     rows = c.execute("SELECT * FROM fs_ext_links WHERE node_id=? AND revoked_at IS NULL ORDER BY id", (n["id"],)).fetchall()
     names = _names(c, [r["created_by"] for r in rows])
-    out = {"enabled": public_links_on(c), "blocked": xl_why_not(c, n, fs_chain(c, n["id"])), "links": [xl_json(c, r, names) for r in rows],
+    out = {"enabled": public_links_on(c, "files"), "blocked": xl_why_not(c, n, fs_chain(c, n["id"])), "links": [xl_json(c, r, names) for r in rows],
            "default_expires": sd_for(c, n["org_id"], me())["link_expires"]}  # 2.470.0 (#3596): what the dialog starts with
     return {**out, **(extra or {})}
 

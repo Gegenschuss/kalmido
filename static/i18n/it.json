@@ -15942,5 +15942,15 @@
   "The client is in the trash": "Il cliente è nel cestino",
   "Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.": "I calendari vengono rimossi solo se in essi non è cambiato nulla; le rubriche invariate finiscono nel cestino.",
   "The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "I clienti importati finiscono nel cestino dei clienti; gli altri dati d’ufficio, tempi, abitudini e voci del diario importati vengono eliminati definitivamente; i tempi fatturati nel frattempo restano.",
-  "Subscriptions|office": "Abbonamenti"
+  "Subscriptions|office": "Abbonamenti",
+  "Allow public links": "Consenti i link pubblici",
+  "Shared with people without an account through a secret link, switched on or off per kind below. Off: every public link stops working at once; nothing is deleted.": "Condivisione con persone senza account tramite un link segreto, attivata o disattivata per tipo qui sotto. Disattivato: ogni link pubblico smette subito di funzionare; non si cancella nulla.",
+  "Projects and folders": "Progetti e cartelle",
+  "Upload links": "Link di caricamento",
+  "Booking pages and polls": "Pagine di prenotazione e sondaggi",
+  "Sign-off and signature": "Approvazione e firma",
+  "Wiki pages": "Pagine wiki",
+  "Turn these public links off?": "Disattivare questi link pubblici?",
+  "Every link of this kind stops working at once; nothing is deleted.": "Ogni link di questo tipo smette subito di funzionare; non viene eliminato nulla.",
+  "{0} set public links for “{1}” to {2}.": "{0} ha impostato i link pubblici per «{1}» su {2}."
 }

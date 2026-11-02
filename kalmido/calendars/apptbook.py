@@ -194,7 +194,7 @@ def apb_page_out(c, uid, p):
         {"slug": apb_slug_suggest(c, uid), "enabled": False, "title": "", "intro": "", "cal_id": None, "office_org_id": None,
          "hours": DEFAULT_HOURS, "tz": getattr(TZ, "key", ""), "url": None}
     return {"page": d, "exists": bool(p), "calendars": cals, "offices": apb_offices(c, uid), "mail_ok": apb_mail_on(),
-            "links_ok": bool(public_links_on(c)), "contacts_on": contacts_on(c, uid)}
+            "links_ok": bool(public_links_on(c, "calendar")), "contacts_on": contacts_on(c, uid)}
 
 
 # ---------------------------------------------------------------- the person's settings
@@ -264,7 +264,7 @@ def apb_page_put():
     if f.get("enabled"):
         if not apb_mail_on():
             return err(tr("This server sends no e-mail: the booking page cannot be switched on"), 409)
-        if not public_links_on(c):
+        if not public_links_on(c, "calendar"):
             return err(tr("Public links are turned off on this server"), 409)
         cid = f.get("cal_id", p["cal_id"] if p else None)
         if not cid or not apb_cal_ok(c, uid, cid):
@@ -622,7 +622,7 @@ def apb_live(c, uid):
         u = c.execute("SELECT disabled, kind, kid FROM users WHERE id=?", (uid,)).fetchone()
     if not u or u["disabled"] or u["kind"] == "agent" or u["kid"]:
         return False
-    return apb_mail_on() and public_links_on(c) and "events" in (usettings(c, uid).get("features") or "").split(",")
+    return apb_mail_on() and public_links_on(c, "calendar") and "events" in (usettings(c, uid).get("features") or "").split(",")
 
 
 def apb_retired(c, p):

@@ -13,7 +13,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from ..core.config import app, APP_NAME, PUB_PREFIX, PUBLIC_URL, TZ
 from ..core.i18n import browser_lang, lang, N_, short_day, tr, trn
 from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_now, now_utc, parse_iso, iso_ms
-from ..core.instance import legal_links, privacy_email
+from ..core.instance import legal_links, privacy_email, pub_kinds_off
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..core.access import acx_anon_bind, Denied, MANAGE_ROLES, need_list, qn_private, reading_ids, reading_sql, task_visible
@@ -62,8 +62,11 @@ PUB_ACTOR = {"id": 0, "username": "", "display_name": "", "is_admin": 0, "disabl
 _PUB_VIEWS, _PUB_LOCK = {}, threading.Lock()
 
 
-def public_links_on(c):
-    return PUB_ENV and gsetting(c, "public_links") != "0"
+# 2.489.0 C (#2656): "Allow public links" per kind (core/instance.py PUB_KINDS): every place that asks names its kind and so
+# refuses to make a link and to open one exactly like the instance switch did; the instance switch off = every kind off
+def public_links_on(c, kind=None):
+    """Public links on: the operator (KALMIDO_PUBLIC_LINKS), the instance switch and (kind given) that kind's switch."""
+    return PUB_ENV and gsetting(c, "public_links") != "0" and (kind is None or kind not in pub_kinds_off(c))
 
 
 def pub_find(c, token):
@@ -154,7 +157,7 @@ def pub_limited(lg):
 def pub_open(c, token):
     """Common checks of every /s/ request -> (link, None) or (None, response)."""
     ip = rate_ip()
-    if not public_links_on(c):
+    if not public_links_on(c, "lists"):
         return None, pub_gone()
     bad = [("pubbad:" + ip, PUB_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
     link = pub_find(c, token)
@@ -549,7 +552,7 @@ def pub_get(lid):
     c = db()
     need_list(c, lid, owner=True)
     r = c.execute("SELECT * FROM public_links WHERE list_id=?", (lid,)).fetchone()
-    return jsonify(enabled=public_links_on(c), link=pub_public(c, r) if r else None, options=cv_options(c, lid))
+    return jsonify(enabled=public_links_on(c, "lists"), link=pub_public(c, r) if r else None, options=cv_options(c, lid))
 
 
 @app.put("/api/lists/<int:lid>/public-link")
@@ -558,7 +561,7 @@ def pub_set(lid):
     (created on the first call; the token stays the same on later changes)."""
     c = db()
     need_pub_owner(c, lid)
-    if not public_links_on(c):
+    if not public_links_on(c, "lists"):
         return err(tr("Public links are turned off on this server"), 409)
     from ..collab.liste2e import le2e_mode
     if le2e_mode(c, lid):  # 2.64.1 (#1817): its texts are encrypted in the browser
@@ -625,7 +628,7 @@ def pub_regen(lid):
     c.execute("UPDATE public_links SET token_hash=?, token=?, pw_rev=pw_rev+1, views=0, last_used_at=NULL, created_at=? WHERE list_id=?",
               (h, sealed, iso(now_utc()), lid))
     c.commit()
-    return jsonify(enabled=public_links_on(c), link=pub_public(c, c.execute("SELECT * FROM public_links WHERE list_id=?", (lid,)).fetchone()))
+    return jsonify(enabled=public_links_on(c, "lists"), link=pub_public(c, c.execute("SELECT * FROM public_links WHERE list_id=?", (lid,)).fetchone()))
 
 
 @app.delete("/api/lists/<int:lid>/public-link")
@@ -634,7 +637,7 @@ def pub_delete(lid):
     need_list(c, lid, owner=True)
     c.execute("DELETE FROM public_links WHERE list_id=?", (lid,))
     c.commit()
-    return jsonify(enabled=public_links_on(c), link=None)
+    return jsonify(enabled=public_links_on(c, "lists"), link=None)
 
 
 @app.post("/api/lists/<int:lid>/checklist")

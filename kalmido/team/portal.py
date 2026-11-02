@@ -153,7 +153,7 @@ def pt_find(c, token):
 def pt_open(c, token):
     """Common checks of every /p/ request -> (ticket, None) or (None, response)."""
     P = _pt_rt()
-    if not P.public_links_on(c):
+    if not P.public_links_on(c, "portal"):
         return None, P.pub_gone()
     bad = [("ptbad:" + rate_ip(), PT_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
     p = pt_find(c, token)
@@ -513,7 +513,7 @@ def pt_login_page(tok):
     c = db()
     lg = _accept_lang()
     bad = [("ptbad:" + rate_ip(), PT_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
-    r = _pt_login_row(c, tok) if _pt_rt().public_links_on(c) else None
+    r = _pt_login_row(c, tok) if _pt_rt().public_links_on(c, "portal") else None
     if not r:
         if _rate_blocked(bad):
             return _pt_rt().pub_limited(lg)
@@ -567,7 +567,7 @@ def pt_login(tok):
     bad = [("ptbad:" + rate_ip(), PT_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
     if request.headers.get("Sec-Fetch-Site", "") == "cross-site":
         return _pt_denied(lg)
-    r = _pt_login_row(c, tok) if _pt_rt().public_links_on(c) else None
+    r = _pt_login_row(c, tok) if _pt_rt().public_links_on(c, "portal") else None
     if not r:
         if _rate_blocked(bad):
             return _pt_rt().pub_limited(lg)
@@ -602,7 +602,7 @@ def pt_portal():
     if hit_limit("ptv:" + rate_ip(), PT_VIEW_RATE):
         return _pt_rt().pub_limited(lg)
     e = html.escape
-    who = pt_cookie_read(c) if _pt_rt().public_links_on(c) else None
+    who = pt_cookie_read(c) if _pt_rt().public_links_on(c, "portal") else None
     if not who:
         return _pt_rt().pub_html(tr("Your reports", lg=lg), f'<div class="msg"><h1>{e(tr("Your reports", lg=lg))}</h1>'
                                  f'<p>{e(tr("Open the status link of one of your reports and choose “All my reports”: we send you a sign-in link.", lg=lg))}</p></div>', lg)

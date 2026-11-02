@@ -210,3 +210,4 @@
   .smodal.sidx .sbody:has(.snmv) .snav{padding-bottom:1rem}
   .smodal:not(.sidx) .snmv{display:none}
 }
+.featgrid label.shpubk{padding-left:1.5rem}  /* 2.489.0 C (#2656): the kinds of public links under the instance switch */

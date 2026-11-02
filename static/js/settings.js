@@ -948,7 +948,7 @@ function settingsModal(focus) {
     }
   });
   md.addEventListener('keydown', e => { if (e.key === 'Enter' && (SETS[e.target.id] || e.target.id === 'a-name') && isText(e.target)) { e.preventDefault(); e.target.id === 'a-name' ? saveName() : saveEl(e.target); } });
-  md.addEventListener('change', e => { if (['s-collaball', 's-timeall', 's-collaball-a', 's-timeall-a', 's-updcheck', 's-2fareq', 's-pklogin', 's-oidcauto', 's-publinks'].includes(e.target.id)) adminSwitch(md, e.target); });
+  md.addEventListener('change', e => { if (['s-collaball', 's-timeall', 's-collaball-a', 's-timeall-a', 's-updcheck', 's-2fareq', 's-pklogin', 's-oidcauto', 's-publinks'].includes(e.target.id)) adminSwitch(md, e.target); else if (e.target.dataset?.pubk) sh_pubKind(md, e.target); });  // 2.489.0 C (#2656): + the kinds
   md.addEventListener('change', async e => {  // 2.7.0 (#407): hours per day / shift for the whole server, one history step
     if (e.target.id !== 's-dayh') return;
     const from = S.timeDayH || 8, to = +String(e.target.value).replace(',', '.');
@@ -1319,7 +1319,7 @@ function instanceHtml(chk, hint) {
   return `${shKeyWarn(a)}${shToolsWarn(a)}<h4 id="s-instance-h">${tr('Whole server')}</h4>
     ${hint(tr('Apply to every person at once. Nothing is deleted: switched back on, everything is there again.'))}
     <div class="featgrid">${ad_allSwHtml()}
-      <label class="wide"><input type="checkbox" id="s-publinks" ${a.public_links !== false && a.public_links_env !== false ? 'checked' : ''} ${a.public_links_env === false ? 'disabled' : ''}><span>${tr('Public links to projects')}<small class="muted">${a.public_links_env === false ? `<span title="KALMIDO_PUBLIC_LINKS=0">${tr('Switched off by the server operator.')}</span>` : tr('Projects and files of the file store can be shared with people without an account through a secret link. Off: every public link stops working at once; nothing is deleted.')}</small></span></label>
+      <label class="wide"><input type="checkbox" id="s-publinks" ${a.public_links !== false && a.public_links_env !== false ? 'checked' : ''} ${a.public_links_env === false ? 'disabled' : ''}><span>${tr('Allow public links')}<small class="muted">${a.public_links_env === false ? `<span title="KALMIDO_PUBLIC_LINKS=0">${tr('Switched off by the server operator.')}</span>` : tr('Shared with people without an account through a secret link, switched on or off per kind below. Off: every public link stops working at once; nothing is deleted.')}</small></span></label>${sh_pubKindsHtml(a)}
       <label class="wide"><input type="checkbox" id="s-updcheck" ${a.update_check !== false && a.update_env !== false ? 'checked' : ''} ${a.update_env === false ? 'disabled' : ''}><span>${tr('Check daily for a new version')}<small class="muted">${a.update_env === false ? `<span title="KALMIDO_UPDATE_CHECK=0">${tr('Switched off by the server operator.')}</span>` : tr('The server asks GitHub once a day for the latest release; nothing is installed automatically and the browser never contacts GitHub. The result shows below.')}</small></span></label>
     </div>
     ${S.timeAll !== false ? `<h4 id="s-dayh-h">${tr('Time sums')}</h4>
@@ -1451,8 +1451,35 @@ function ad_updHtml(hint) {
   return h ? `<h4 id="s-upd-h">${tr('Updates')}</h4>${h}` : '';
 }
 const ADMIN_SW = {'s-collaball': ['collab_all', N_('Collaboration for everyone')], 's-timeall': ['time_all', N_('Time tracking for everyone')], 's-updcheck': ['update_check', N_('Check daily for a new version')],
-  's-2fareq': ['twofa_required', N_('Require two-factor authentication')], 's-pklogin': ['passkey_login', N_('Passkey sign-in')], 's-oidcauto': ['oidc_autocreate', N_('Create accounts on first OIDC sign-in')], 's-publinks': ['public_links', N_('Public links to projects')],
+  's-2fareq': ['twofa_required', N_('Require two-factor authentication')], 's-pklogin': ['passkey_login', N_('Passkey sign-in')], 's-oidcauto': ['oidc_autocreate', N_('Create accounts on first OIDC sign-in')], 's-publinks': ['public_links', N_('Allow public links')],
   's-collaball-a': ['collab_all', N_('Collaboration for everyone')], 's-timeall-a': ['time_all', N_('Time tracking for everyone')]};  // 2.46.6 (#1710): the same switches under Administration > Server
+// 2.489.0 C (#2656): "Allow public links" per kind under the instance switch (core/instance.py PUB_KINDS, same order). The
+// server keeps the kinds switched off (public_links_off) and refuses to make or open a link of such a kind; switching one
+// back on opens the server again and asks for the account password like the instance switch
+const SH_PUBK = [['lists', N_('Projects and folders')], ['files', N_('Files')], ['uploads', N_('Upload links')], ['calendar', N_('Booking pages and polls')],
+  ['signoff', N_('Sign-off and signature')], ['wiki', N_('Wiki pages')], ['forms', N_('Forms')], ['portal', N_('Client portal')], ['pay', N_('Online payment')]];
+function sh_pubKindsHtml(a) {
+  const all = a.public_links !== false && a.public_links_env !== false, off = a.public_links_off || [];
+  return SH_PUBK.map(([k, n]) => `<label class="shpubk"><input type="checkbox" id="s-pubk-${k}" data-pubk="${k}" ${off.includes(k) ? '' : 'checked'} ${all ? '' : 'disabled'}><span>${esc(tr(n))}</span></label>`).join('');
+}
+async function sh_pubKind(md, el, fromHist) {
+  const k = el.dataset.pubk, on = el.checked, was = S.about?.public_links_off || [];
+  const off = on ? was.filter(x => x !== k) : [...new Set([...was, k])];
+  if (!on && !fromHist && !await askConfirm(tr('Turn these public links off?'), tr('Every link of this kind stops working at once; nothing is deleted.'), {ok: tr('Turn off'), danger: true})) { el.checked = true; return; }
+  try {
+    let j; try { j = await rawFetch('PATCH', '/api/admin/settings', {public_links_off: off}); } catch (x) {
+      if (!x.data?.password_needed) { toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); throw x; }
+      const p = await pwPrompt(tr('Confirm with your password')); if (!p) throw x;
+      j = await api('PATCH', '/api/admin/settings', {public_links_off: off, password: p.password});
+    }
+    if (j && j.version) S.about = j;
+  } catch { el.checked = !on; return; }
+  S.publicLinksOff = S.about?.public_links_off || off;
+  if (!fromHist) {
+    const flip = v => async () => { const m = $('.smodal'), x = m && $('#' + el.id, m); if (x) { x.checked = v; await sh_pubKind(m, x, true); } else { await api('PATCH', '/api/admin/settings', {public_links_off: v ? off.filter(y => y !== k) : [...off, k]}); await load(); } return {skipped: []}; };
+    setSaved(histAdd({label: tr('Changed setting: {0}', tr(SH_PUBK.find(x => x[0] === k)[1])), sett: true, undo: flip(!on), redo: flip(on)}));
+  }
+}
 async function adminSwitch(md, el, fromHist) {
   const on = el.checked;
   const ask = async (t, b, ok) => fromHist || await askConfirm(t, b, {ok, danger: true});
@@ -1478,7 +1505,7 @@ async function adminSwitch(md, el, fromHist) {
   }
   if (key === 'collab_all') S.collabAll = on;
   else if (key === 'time_all') S.timeAll = on;
-  else if (key === 'public_links') { S.publicLinks = on; return; }
+  else if (key === 'public_links') { S.publicLinks = on; md.querySelectorAll?.('[data-pubk]').forEach(x => { x.disabled = !on; }); return; }  // 2.489.0 C (#2656)
   else return;
   await load(); render();
   if ((key === 'collab_all' || key === 'time_all') && md.isConnected) {
