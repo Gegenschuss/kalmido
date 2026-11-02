@@ -70,7 +70,7 @@ def sga_open(c, uid=None, oid=None, note=True):
 
 def sga_until(c, uid):
     """The end of the open support access of account uid ('' = none), for the operator's account list."""
-    with system_ctx(c):
+    with system_ctx(c):  # support grants of other accounts / organisations (row-level security): structure, no content
         r = c.execute("SELECT ends_at FROM support_grants WHERE user_id=? AND org_id IS NULL AND ended_at IS NULL AND ends_at>? "
                       "ORDER BY id DESC LIMIT 1", (uid, iso(now_utc()))).fetchone()
     return r[0] if r else ""
@@ -95,7 +95,7 @@ def sga_link_exp(c, exp):
     used = sorted(g.get("sga_used") or ()) if has_request_context() else []
     if not used:
         return exp
-    with system_ctx(c):
+    with system_ctx(c):  # support grants of other accounts / organisations (row-level security): structure, no content
         r = c.execute(f"SELECT MIN(ends_at) FROM support_grants WHERE id IN ({','.join('?' * len(used))})", used).fetchone()
     return min(exp, r[0]) if r and r[0] else exp
 
@@ -105,7 +105,7 @@ def sga_link_support(c, uid):
     the person's parents / organisation admins, or none)."""
     if not sga_hosted():
         return ""
-    with system_ctx(c):
+    with system_ctx(c):  # support grants of other accounts / organisations (row-level security): structure, no content
         r = c.execute("SELECT i.created_at FROM user_invites i JOIN users a ON a.id=i.created_by WHERE i.user_id=? AND i.kind='login' "
                       "AND i.created_by<>i.user_id AND a.is_admin=1", (uid,)).fetchone()
         if not r:
@@ -120,7 +120,7 @@ def sga_session_cap(c, uid, token_hash):
     that access at the latest and is marked via 'support' (no credentials in it, sga_guard; ended with the access, sga_close)."""
     end = sga_link_support(c, uid)
     if end:
-        with system_ctx(c):
+        with system_ctx(c):  # support grants of other accounts / organisations (row-level security): structure, no content
             c.execute("UPDATE sessions SET via='support', expires_at=LEAST(expires_at, ?) WHERE token_hash=?", (end, token_hash))
 
 
@@ -130,7 +130,7 @@ def sga_close(c, r, now):
     longer one still caps its sessions at its own end, sga_session_cap). An organisation's grant opens no account."""
     if r["org_id"]:
         return
-    with system_ctx(c):
+    with system_ctx(c):  # support grants of other accounts / organisations (row-level security): structure, no content
         since = c.execute("SELECT MIN(created_at) FROM support_grants WHERE user_id=? AND org_id IS NULL AND ends_at>?",
                           (r["user_id"], iso(now))).fetchone()[0] or r["created_at"]
         since = min(since, r["created_at"])
@@ -247,7 +247,7 @@ def _need_person():
 
 def _my_orgs(c):
     """The organisations the current person administers (not a personal office, not retired): [(id, name)]."""
-    with system_ctx(c):
+    with system_ctx(c):  # support grants of other accounts / organisations (row-level security): structure, no content
         return [(r["id"], r["name"]) for r in c.execute(
             "SELECT o.id, o.name FROM orgs o JOIN org_members m ON m.org_id=o.id WHERE m.user_id=? AND m.role='admin' "
             "AND o.personal_of IS NULL AND o.retired_at IS NULL ORDER BY o.name, o.id", (me(),)).fetchall()]
@@ -255,7 +255,7 @@ def _my_orgs(c):
 
 def _may_end(c, r):
     if r["org_id"]:
-        with system_ctx(c):
+        with system_ctx(c):  # support grants of other accounts / organisations (row-level security): structure, no content
             return bool(c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=? AND role='admin'", (r["org_id"], me())).fetchone())
     return r["user_id"] == me()
 
@@ -265,7 +265,7 @@ def support_access_get():
     c = db()
     orgs = _my_orgs(c)
     oids = [o for o, _n in orgs]
-    with system_ctx(c):
+    with system_ctx(c):  # support grants of other accounts / organisations (row-level security): structure, no content
         q = "SELECT * FROM support_grants WHERE (user_id=? AND org_id IS NULL)"
         args = [me()]
         if oids:
@@ -317,13 +317,13 @@ def support_access_grant():
 def support_access_end(gid):
     _need_person()
     c = db()
-    with system_ctx(c):
+    with system_ctx(c):  # support grants of other accounts / organisations (row-level security): structure, no content
         r = c.execute("SELECT * FROM support_grants WHERE id=?", (gid,)).fetchone()
     if not r or not _may_end(c, r):
         return err(tr("Not found"), 404)
     if not r["ended_at"]:
         now = now_utc()
-        with system_ctx(c):
+        with system_ctx(c):  # support grants of other accounts / organisations (row-level security): structure, no content
             c.execute("UPDATE support_grants SET ended_at=?, ended_by=? WHERE id=? AND ended_at IS NULL", (iso(now), me(), gid))
         sga_close(c, r, now)
         c.commit()

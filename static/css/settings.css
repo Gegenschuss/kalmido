@@ -193,8 +193,8 @@
 .sesrow .n,.oinvrow .n,.sgvrow .n{white-space:normal}
 .sesrow .n small,.oinvrow .n small,.sgvrow .n small{display:block}
 @media (pointer:coarse){.sesrow .btn,.oinvrow .btn,.sgvrow .btn,.sgvrow select{min-height:2.75rem}}
-.sgvrow{flex-wrap:wrap;gap:.4rem}  /* 2.485.0 (#3939): support access */
-.sgvuses{margin:0 0 .5rem 2.4rem;font-size:var(--fs-s)}
+.sgvrow{flex-wrap:wrap;gap:.375rem}  /* 2.485.0 (#3939): support access */
+.sgvuses{margin:0 0 .5rem 2.5rem;font-size:var(--fs-s)}
 .sgvuses code{font-size:var(--fs-xs)}
 /* 2.364.0 C (#3041): an info button at the right end of a wide switch row keeps its tap area inside the area (no sideways scroll) */
 .spane .featgrid label.wide>.ib:last-child{margin-right:.6875rem}

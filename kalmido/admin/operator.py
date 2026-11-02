@@ -177,7 +177,7 @@ def operator_setup_code():
     from ..accounts.setupcode import SH_CODE_ENV, SH_CODE_OFF, SH_OP_TTL, sh_code_op_new
     c = db()
     code = ""
-    with system_ctx(c):
+    with system_ctx(c):  # the operator acts without a person, across organisations: numbers and states only
         exists = c.execute("SELECT 1 FROM users LIMIT 1").fetchone()
         if not exists and not (SH_CODE_OFF or SH_CODE_ENV):
             # 2.144.0 D2 (#797): hash + end (24 h) in the database, valid in every web process; replaces the
@@ -260,7 +260,7 @@ def operator_account_find():
     if not email or len(email) > OP_EMAIL_MAX:
         return jsonify(error=tr("Invalid value: {0}", "email"), code="invalid_email"), 400
     c = db()
-    with system_ctx(c):
+    with system_ctx(c):  # the operator acts without a person, across organisations: numbers and states only
         ids = [r[0] for r in c.execute("SELECT id FROM users WHERE lower(email)=lower(?) AND COALESCE(kind, 'user')<>'agent' "
                                        "ORDER BY id LIMIT 2", (email,)).fetchall()]
         if len(ids) > 1:
@@ -316,7 +316,7 @@ def operator_account_put(uid):
         bump(c)
     c.commit()
     if locked:  # 2.266.0 (#2963): the person hears of the lock, as from the user management
-        with system_ctx(c):
+        with system_ctx(c):  # the operator acts without a person, across organisations: numbers and states only
             sec_mail(c, uid, "disabled")
     return jsonify(account=_op_get(c, uid))
 
