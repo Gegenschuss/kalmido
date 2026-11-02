@@ -10,7 +10,6 @@ import json
 from ..core.db import iso, now_utc
 from ..core.errors import BadInput
 from ..core.access import Denied
-from ..core.pg import insert_id
 from ..core.i18n import N_
 from ..accounts.layouts import clean_layout
 from ..accounts.layoutsets import lyv_key_ok, lyv_save
@@ -61,10 +60,13 @@ def _bookmarks(c, run, uid, data, ts):
             tags = []
         st = r.get("state") if r.get("state") in BM_STATES else "unread"
         at = r.get("created_at") if _iso_ts(r.get("created_at")) else ts
-        nid = insert_id(c, """INSERT INTO bookmarks(user_id,org_id,url,url_key,title,description,site,tags,note,state,preview,created_at,updated_at)
-                               VALUES(?,NULL,?,?,?,?,?,?,?,?,'pending',?,?)""",
-                        (uid, url, key, _txt(r.get("title"), BM_TITLE_MAX), _txt(r.get("description"), BM_DESC_MAX), bm_site(url)[:BM_SITE_MAX],
-                         json.dumps(tags, ensure_ascii=False), _txt(r.get("note"), BM_NOTE_MAX), st, at, ts))
+        d = {"user_id": uid, "org_id": None, "url": url, "url_key": key, "title": _txt(r.get("title"), BM_TITLE_MAX),
+             "description": _txt(r.get("description"), BM_DESC_MAX), "site": bm_site(url)[:BM_SITE_MAX],
+             "tags": json.dumps(tags, ensure_ascii=False), "note": _txt(r.get("note"), BM_NOTE_MAX), "state": st, "preview": "pending",
+             "created_at": at, "updated_at": ts}
+        nid = umz_insert(c, "bookmarks", d)  # review: in a savepoint like every other row
+        if not nid:
+            continue
         have.add(key)
         n += 1
         _more(run, "bookmarks", nid)
@@ -120,6 +122,8 @@ def _layouts(c, run, uid, data, ts):
             lay = clean_layout(r.get("layout") if isinstance(r.get("layout"), str) else None)
         except BadInput:
             continue
+        if not lay:  # review: an empty own arrangement would only hide the project's standard
+            continue
         if umz_insert(c, "list_layouts", {"list_id": lid, "user_id": uid, "layout": lay, "updated_at": ts}, rid=False):
             _more(run, "list_layouts", {"list_id": lid})
 
@@ -147,6 +151,7 @@ def _bells(c, run, uid, me_old, data, ts):
 def umz_more_write(c, run, uid, me_old, data):
     """Inside the run's transaction (the caller commits)."""
     ts = iso(now_utc())
+    run.created["more_at"] = ts  # review: a bookmark changed after the import stays with the undo
     _bookmarks(c, run, uid, data, ts)
     _pomos(c, run, uid, data, ts)
     _care(c, run, uid, data, ts)
@@ -170,7 +175,7 @@ def umz_more_undo(c, uid, cr):
         v = key.get(col) if isinstance(key, dict) else key
         if not isinstance(v, int):
             continue
-        extra = " AND updated_at<=created_at" if table == "view_layouts" else ""
-        n += c.execute(f"DELETE FROM {table} WHERE {col}=? AND user_id=?{extra}", (v, uid)).rowcount
+        extra = " AND updated_at<=?" if table == "bookmarks" else " AND updated_at<=created_at" if table == "view_layouts" else ""
+        n += c.execute(f"DELETE FROM {table} WHERE {col}=? AND user_id=?{extra}", (v, uid, *((cr.get("more_at") or "9999",) if table == "bookmarks" else ()))).rowcount
     return n
 

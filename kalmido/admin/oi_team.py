@@ -658,7 +658,7 @@ SPECS = [
     OiT("hub/leave_quota.json", "hub_leave_quota", people={"user_id": "null", "updated_by": "null"}, private="office", label=N_("Absences and bookings"),
         prep=_person("user_id", member=True)),
     OiT("hub/mails.json", "hub_mails", refs={"client_id": "clients", "list_id": "lists", "eml_id": "fs_nodes", "folder_id": "fs_nodes"},
-        people={"deleted_by": "null"}, fixed={"message_id": ""}, label=N_("Absences and bookings"), prep=_mail, after=_mail_index),
+        people={"deleted_by": "null"}, fixed={"message_id": ""}, label=N_("E-mails"), prep=_mail, after=_mail_index),
     OiT("hub/mail_links.json", "hub_mail_links", refs={"mail_id": "hub_mails"}, need=("mail_id",), people={"created_by": "null"},
         fixed={"ref_id": 0}, label=N_("E-mails"), prep=_mail_link),  # 2.362.0 (#3096)
     # 2.144.5 B (#2410): the workspace mailbox (into the private space: the importing person's own)

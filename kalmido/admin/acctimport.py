@@ -1770,7 +1770,7 @@ def umz_private(c, run, uid, man, zf, files, data, who):
     rest goes into an organisation (they are mine alone, like the Home & life projects). Sealed, counted on my storage and
     checked by the virus scanner per file like an upload (orgimport.oi_file); undone with the import (run.created["oi"])."""
     from .umz_more import umz_more_has, umz_more_write, umz_more_space
-    me_old = _oid((man.get("user") or {}).get("id"))
+    me_old = _oid((man.get("user") or {}).get("id")) or -1  # review: a file without its account id: the mails are still mine
     oi = umz_private_oi(data, files, me_old)
     if not oi and not umz_more_has(data):
         return
