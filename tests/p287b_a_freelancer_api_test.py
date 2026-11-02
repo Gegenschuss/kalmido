@@ -51,6 +51,7 @@ EXPECT_4XX = {
     "GET /api/docs/{}/split": (409, "the own document is no PDF with two pages or more"),
     "GET /api/docs/{}/thumb": (404, "the own document is a text receipt: no thumbnail"),
     "GET /api/hubmail/targets": (404, "no filed mail on the test server (?mail= names one)"),
+    "GET /api/v1/mails/{}": (404, "no filed mail on the test server (the id is the own client's)"),  # 2.483.0 (#1902)
     "GET /api/life/karakeep/lists": (400, "Karakeep (an outside service) is not connected"),
     "GET /api/newsletter/lists": (404, "no newsletter connection (an outside service)"),
     "GET /api/paperless/preview": (404, "no Paperless connection (an outside service)"),
@@ -79,7 +80,10 @@ def ok(r, what, codes=(200, 201, 204)):
 
 
 if not os.environ.get("KMT_NOSTART"):
-    subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL)
+    # 2.483.0 (#1902 #2007): the sweep calls 120+ API routes with one token within a minute (the default limit 120): no
+    # rate limit in this container (the limit itself is api_v1_test.py's)
+    subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], check=True, stdout=subprocess.DEVNULL,
+                   env=dict(os.environ, EXTRA=(os.environ.get("EXTRA", "") + " -e KALMIDO_API_RATE=100000").strip()))
 s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
@@ -285,6 +289,7 @@ SUBST = [
     (r"/office/cards/lines/$", "cardline"), (r"/office/cards/statements/$", "cardstmt"), (r"/office/cards/$", "card"), (r"/files/collections/$", "collection"),
     (r"/budget/files/$", None), (r"/team/files/$", None), (r"/wiki/files/$", None), (r"/wiki/shared/files/$", None),
     (r"/lists/\d+/files/$", None),
+    (r"/api/v1/mails/$", "client"),  # 2.483.0 (#1902): no filed mail on the test server (EXPECT_4XX)
     (r"/office/docs/$", "doc"), (r"/office/services/$", "service"), (r"/api(/v1)?/office/$", "officekind"),
     (r"/files/nodes/$", "node"), (r"/e2e/pub/$", "me"), (r"/api/docs/$", "docnode"), (r"/documents/$", "docnode"), (r"/clients/$", "client"),
     (r"/lists/$", "list"), (r"/list-files/$", None), (r"/tasks/$", "task"), (r"/comments/$", "comment"),
@@ -312,7 +317,7 @@ QUERY = {
     "GET /api/folders/notify-template": {"folder": "Work"}, "GET /api/folders/people/diff": {"folder": "Work", "role": "edit", "user_id": "{agent}"},
     "GET /api/folders/playbook": {"folder": "Work"}, "GET /api/folders/playbook/versions": {"folder": "Work"},
     "GET /api/folders/props": {"folder": "Work"}, "GET /api/folders/public-links": {"folder": "Work"}, "GET /api/folders/repos": {"folder": "Work"},
-    "GET /api/hubmail/compose": {"client_id": "{client}"}, "GET /api/hubmail/mails": {"client_id": "{client}"},
+    "GET /api/hubmail/compose": {"client_id": "{client}"}, "GET /api/hubmail/mails": {"client_id": "{client}"}, "GET /api/v1/mails": {"client_id": "{client}"},
     "GET /api/hubmail/links": {"task_id": "{task}"}, "GET /api/office/books/ustva": {"year": "2026", "period": "q3"},
     "GET /api/office/datev/extf": {"from": "2026-01-01", "to": "2026-12-31"}, "GET /api/office/datev/zip": {"from": "2026-01-01", "to": "2026-12-31"},
     "GET /api/office/letters/threads": {"client_id": "{client}"}, "GET /api/office/pack-switch": {"code": "XX"},

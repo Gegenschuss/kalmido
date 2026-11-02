@@ -15,6 +15,7 @@ from ..core.state import visible_lists
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
 from ..tasks.ticketkey import tk_set  # 2.390.0 (#3353)
+from ..tasks.validation import TICKET_TYPES  # 2.483.0 (#3916)
 from ..core.access import list_other_agent, ONE_AGENT_MSG  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import qn_is, qn_private  # 2.477.0 (#3881)
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
@@ -28,6 +29,7 @@ LIST_FIELDS = ("name", "color", "folder", "sort", "view", "archived", "checklist
 LIST_FIELDS += ("time_tracking",)  # 2.41.0 (#1471): time tracking on for this list (owner; any type, default off)
 LIST_FIELDS += ("points_on",)  # 2.60.0 (#1511): story points shown in the app (owner; default off)
 LIST_FIELDS += ("irreversible_needs_yes",)  # 2.392.0 C (#3370): one-way tasks wait for a person's yes at the gates (owner; default off)
+LIST_FIELDS += ("def_ttype",)  # 2.483.0 (#3916): default type of new tasks (owner; '' | bug | feature | task, needs ticket types on)
 LIST_KINDS = ("list", "project")
 # 2.7.2 (#414): the type "checklist" (2.7.0 "Shopping & packing list") is gone. Every list has the display option "Show
 # completed at the bottom" instead (column lists.checklist, API field done_at_bottom); kind "checklist" is still accepted
@@ -273,6 +275,11 @@ def clean_list_value(k, v, member=False):
         return 1 if v else 0
     if k in ("points_on", "irreversible_needs_yes"):  # 2.60.0 (#1511); 2.392.0 C (#3370)
         return 1 if v else 0
+    if k == "def_ttype":  # 2.483.0 (#3916)
+        v = v or ""
+        if v and v not in TICKET_TYPES:
+            raise BadInput(tr("Invalid value: {0}", tr("Type")))
+        return v
     if k == "kind":
         if v not in LIST_KINDS and v not in LIST_KIND_ALIASES:
             raise BadInput(tr("Invalid value: {0}", "kind"))

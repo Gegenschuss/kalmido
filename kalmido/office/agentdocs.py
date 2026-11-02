@@ -9,7 +9,8 @@ the token scope "office". It acts for one person (requested_by, default: its own
 What an agent may do: read services, text blocks, framework contracts, clients and the area's documents (never purchase
 prices); create quotation drafts and change its own drafts (never a number, a status, finalising, sending, deleting);
 draft an invoice from an accepted quotation and a reminder over open invoices; suggest payments it read from what a
-person gave it (office_pay_props) for an admin to accept (booked through the normal payment) or reject. Positions without
+person gave it (office_pay_props) for an admin to accept (booked through the normal payment) or reject. 2.483.0 (#2007):
+read the invoice series and the subscriptions overview (never change them). Positions without
 a service, with another price than the catalogue / framework contract or with a discount are marked (office_doc_items.
 agent_flag) until a person changes or confirms them. Every request of an agent is one line in the office log (user_id =
 the agent, action agent_read / agent_write, no contents).
@@ -34,7 +35,7 @@ from ..core.errors import BadInput
 from ..api.v1 import UnknownFields
 from ..api.common import v1_args, v1_err, v1_json, v1_view
 from .calc import dec, dstr, fmt_money, money
-from .model import office_on, office_role, office_rows, office_seed_texts, office_settings, pb_cl_sql, pb_owner, pb_personal, sr_public
+from .model import OF_FEATURE_OFF, office_on, office_role, office_rows, office_seed_texts, office_settings, pb_cl_sql, pb_owner, pb_personal, sr_public
 from .packs import office_features
 from .rights import LV, NO_RIGHT, office_can, ofr_admin_or, ofr_groups_of, ofr_rights
 from .invoices import ofi_ref, ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
@@ -45,7 +46,7 @@ OFA_ITEM_KEYS += ("id",)  # 2.270.0 D (#3028): the stored position it changes (f
 OFA_DATA_KEYS = ("client_id", "title", "intro", "items", "list_id")
 OFA_CONF = ("high", "medium", "low")
 OFA_MASTER = ("services", "texts", "contracts")
-OFA_LOG_TARGETS = ("office", "services", "texts", "contracts", "clients", "docs", "doc", "pdf", "offer", "invoice", "reminder", "payment", "leads", "letter")  # 2.94.0 A (#1930): + leads; 2.153.0 (#2031): + letter
+OFA_LOG_TARGETS = ("office", "services", "texts", "contracts", "clients", "docs", "doc", "pdf", "offer", "invoice", "reminder", "payment", "leads", "letter", "series", "subs")  # 2.94.0 A (#1930): + leads; 2.153.0 (#2031): + letter; 2.483.0 (#2007): + series, subs
 # link buttons in the chat (agents/chat.py): only the office document view, a list, and a document's PDF preview -- no other
 # app route (some do something when opened), no outside address; 2.153.0 (#2031): + a letter (#office/letters/<id>)
 NOTIFY_HREF_RE = re.compile(r"^(#office/offers/\d{1,12}|#office/letters/\d{1,12}|#l/\d{1,12}|/api/office/docs/\d{1,12}/pdf\?inline=1)$")
@@ -71,7 +72,8 @@ def ofa_area(c, a):
 # 2.187.0 C (#2476): what an agent's office request needs from its office groups, by the log target of _v1ctx
 OFA_TARGET_AREA = {"services": "services", "texts": "texts", "contracts": "contracts", "clients": "offers", "docs": "offers",
                    "doc": "offers", "pdf": "offers", "offer": "offers", "invoice": "offers", "reminder": "offers",
-                   "payment": "bank", "leads": "pipeline", "letter": "letters"}
+                   "payment": "bank", "leads": "pipeline", "letter": "letters",
+                   "series": "offers", "subs": "subs"}  # 2.483.0 (#2007): invoice series, subscriptions (read only)
 
 
 # 2.223.2 B (#2862): what an organisation's agent without a row in the office groups reaches with its switch office_drafts
@@ -563,6 +565,7 @@ def v1_office_docs():
             continue
         b = doc_brief(r, pm)
         b["agent_id"] = r["agent_id"]
+        b["series_id"], b["series_period"] = r["series_id"], r["series_period"] or None  # 2.483.0 (#2007): an invoice made by a series
         if only_open and b.get("state") not in ("issued", "sent", "partial", "overdue"):
             continue
         if len(rows) == n:
@@ -572,6 +575,54 @@ def v1_office_docs():
         last = r
     c.commit()
     return jsonify(data=rows, next_cursor=next_cursor)
+
+
+# 2.483.0 (#2007): invoice series and the subscriptions overview, read only (as GET /api/office/series and /api/office/subs,
+# which are for the office's admins): the person in requested_by must reach them in the app (series: the admin check of the
+# quotes' area, ofr_admin_or; subscriptions: the area "subs"), the agent's office groups too (_v1ctx); never the bin, never
+# a change. A series whose template invoice lies in a project outside the agent's list restriction is left out, and so is
+# every invoice made from a series outside it.
+@app.get("/api/v1/office/series")
+@v1_view
+def v1_office_series():
+    from .recurring import _made, rin_public
+    a = _args(())
+    c = db()
+    aid, oid, uid = _v1ctx(c, a.get("requested_by"), target="series")
+    if not ofr_admin_or(c, uid, oid, "offers", "manage"):  # review 2.483 F2: like the app (office_ctx_admin: a group ruled person needs manage)
+        raise Denied(403, tr(NO_RIGHT))
+    rows = c.execute("SELECT * FROM office_inv_series WHERE org_id=? AND deleted_at IS NULL ORDER BY lower(title), id", (oid,)).fetchall()
+    keep = []
+    for r in rows:
+        t = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (r["template_id"], oid)).fetchone() if r["template_id"] else None
+        if t is None or ofa_doc_in_lists(c, aid, t):
+            keep.append(r)
+    made = _made(c, oid, [r["id"] for r in keep])
+    if ofa_restricted(c, aid):
+        made = {sid: [x for x in xs if ofa_doc_in_lists(c, aid, x)] for sid, xs in made.items()}
+    out = [rin_public(c, oid, r, made) for r in keep]
+    for d in out:
+        d.pop("deleted", None)
+        d.pop("deleted_at", None)
+    c.commit()
+    return jsonify(data=out)
+
+
+@app.get("/api/v1/office/subs")
+@v1_view
+def v1_office_subs():
+    from .packs import office_feature_on
+    from .subs import abo_view
+    a = _args(())
+    c = db()
+    aid, oid, uid = _v1ctx(c, a.get("requested_by"), target="subs")
+    if not ofr_admin_or(c, uid, oid, "subs", "view"):
+        raise Denied(403, tr(NO_RIGHT))
+    if not office_feature_on(office_settings(c, oid), "money.subs"):  # switched off in this office: as the app (404)
+        raise Denied(404, tr(OF_FEATURE_OFF))
+    v = abo_view(c, oid)
+    c.commit()
+    return jsonify(items=v["items"], totals=v["totals"], candidates=v["candidates"], today=v["today"])
 
 
 @app.get("/api/v1/office/docs/<int:did>")
@@ -1039,7 +1090,18 @@ def ofa_spec(paths, schemas, op, ok, errs, ref, pid, q):
                                         q("trial", "2.144.10: 1 = only trial documents, 0 = only real ones (each document carries trial)", {"type": "string"}),
                                         q("before", "2.463.0: next_cursor of the page before: the next, older page", {"type": "string"}),
                                         q("limit", "2.463.0: documents per page, at most 500", {"type": "integer"}), rb],
-                                       scope="office")}
+                                       scope="office", desc="2.483.0: an invoice made by an invoice series carries series_id and series_period (its period start); null otherwise.")}
+    # 2.483.0 (#2007): invoice series and subscriptions, read only
+    paths["/office/series"] = {"get": op("The invoice series of the office, read only (2.483.0)", T, ok(o) | errs("400", "403", "404"), [rb], scope="office",
+                                         desc="data: per series its template invoice (number, client, gross), every (monthly / quarterly / yearly), "
+                                              "start, until, next_date, auto_send, active, the newest invoices made (made: doc_id, number, state, period, "
+                                              "gross, open) and the next periods. The person (requested_by) must manage the quotes in the office "
+                                              "(an admin); never the bin, never a change. The invoices made carry series_id and series_period in /office/docs.")}
+    paths["/office/subs"] = {"get": op("The subscriptions and tools of the office, read only (2.483.0)", T, ok(o) | errs("400", "403", "404"), [rb], scope="office",
+                                       desc="As the app's overview: items (fixed costs marked as subscription: label, category, amount, gross, repeat, "
+                                            "next_renewal, cancel_by, cancel_missed, cancel_next, notice_days, per_month / per_year gross and net, seats, "
+                                            "seat_names, low_use, url, running), totals, candidates (fixed costs that look like one), today. Needs the area "
+                                            "Subscriptions & tools for the agent and the person; 404 when the function is switched off in the office.")}
     paths["/office/docs/{id}"] = {"get": op("One document with its positions (2.51.0)", T, ok(o) | errs("400", "403", "404"), [pid("id", "Document id"), rb], scope="office")}
     paths["/office/docs/{id}/pdf"] = {"get": {**op("The PDF preview of a draft (2.51.0)", T, errs("400", "403", "404", "409"), [pid("id", "Document id"), rb], scope="office"),
                                               "responses": {"200": {"description": "application/pdf"}, **errs("400", "403", "404", "409")}}}

@@ -845,7 +845,7 @@ def ptype_bug_inbox(c, uid, build, name, folder, color, org_id, start):
     d = ptype_template("software", lg)
     d["fields"] = [f for f in d["fields"] if f["name"] == tr(BUG_INBOX_FIELD, lg=lg)]
     lid = tpl_apply_list(c, uid, d, tr("{0} – Bugs", name, lg=lg)[:200], folder, start, color=color, org_id=org_id)
-    c.execute("UPDATE lists SET ptype='software' WHERE id=?", (lid,))
+    c.execute("UPDATE lists SET ptype='software', tickets=1, def_ttype='bug' WHERE id=?", (lid,))  # 2.483.0 (#3916): new tasks are bugs
     token_list_add(c, build)  # a token limited to selected lists keeps both, and the rule's checks below see them
     token_list_add(c, lid)
     sec = c.execute("SELECT id FROM sections WHERE list_id=? ORDER BY sort, id LIMIT 1", (build,)).fetchone()

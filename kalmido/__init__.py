@@ -303,6 +303,7 @@ ORDER = (
     "hub.dispo",  # 2.50.0 A (#1194): resources and disposition (bookings of crew and equipment)
     "hub.agentdispo",  # 2.51.0 C (#1355): shoot planning by agents (event drafts, options), the disposition in the REST API
     "hub.hubmail",  # 2.84.0 A (#1198): e-mail as an input of the hub (mails filed with clients / projects)
+    "hub.hmv1",  # 2.483.0 (#1902): the filed mails in the REST API v1 (read only, agents too)
     "hub.mailview",  # 2.141.0 B (#2140, #2139): the HTML view of a filed mail, a task / an event made from it
     "hub.mailbox",  # 2.141.0 A (#2141, #2138): the own mailbox of a workspace, sending from the e-mail filing
     "office.packs",  # 2.36.1 (#1021): country packs (data), used by office.model

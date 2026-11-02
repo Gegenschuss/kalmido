@@ -3057,6 +3057,8 @@ MIGRATIONS = [
     ("tasks", "ttype", "ALTER TABLE tasks ADD COLUMN ttype TEXT NOT NULL DEFAULT ''"),
     ("lists", "tickets", "ALTER TABLE lists ADD COLUMN tickets BIGINT NOT NULL DEFAULT 0"),
     ("lists", "ticket_tpl", "ALTER TABLE lists ADD COLUMN ticket_tpl TEXT NOT NULL DEFAULT ''"),
+    # 2.483.0 (#3916): the type a new task of this list gets when it is created without one ('' = none; only with ticket types on)
+    ("lists", "def_ttype", "ALTER TABLE lists ADD COLUMN def_ttype TEXT NOT NULL DEFAULT ''"),
     # 2.4.1 (#377): runtime preferences of an agent (json {model, autocompact, autocompact_pct, nightly_reset}; '' = the
     # agent's defaults) and the "Reset now" counter; Kalmido only stores them, the agent host applies them
     ("agents", "runtime", "ALTER TABLE agents ADD COLUMN runtime TEXT NOT NULL DEFAULT ''"),

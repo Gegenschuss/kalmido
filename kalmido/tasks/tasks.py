@@ -303,6 +303,10 @@ def task_create():
             # order they are typed
             f["sort"] = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM tasks WHERE list_id=? AND parent_id IS NULL",
                                   (f["list_id"],)).fetchone()[0]
+    if "ttype" not in b and not f.get("parent_id"):  # 2.483.0 (#3916): created without a type = the list's default type
+        r = c.execute("SELECT tickets, def_ttype FROM lists WHERE id=?", (f["list_id"],)).fetchone()
+        if r and r["tickets"] and r["def_ttype"]:
+            f["ttype"] = r["def_ttype"]
     if f.get("ttype") and not (f.get("content") or "").strip() and not le2_on:  # 2.4.0 (#340): a new bug / feature gets its note template
         tpl = ticket_template(c, f["list_id"], f["ttype"])
         if tpl:

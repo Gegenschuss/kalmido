@@ -30,7 +30,7 @@ Create a token under **Settings > Access** (API tokens, webhooks and the tokens 
 
   | Scope | What it allows |
   |---|---|
-  | `read` (always on) | the `GET`s of projects, tasks, subtasks, tags, comments, time entries, habits, search, trash, News. Not every `GET`: reading calendar, contacts, files, tables, office, pin board, layouts and the other areas below needs the scope of that area (the OpenAPI document names it per operation) |
+  | `read` (always on) | the `GET`s of projects, tasks, subtasks, tags, comments, time entries, habits, search, trash, News, 2.483: the e-mails filed with clients and projects (`GET /mails`). Not every `GET`: reading calendar, contacts, files, tables, office, pin board, layouts and the other areas below needs the scope of that area (the OpenAPI document names it per operation) |
   | `tasks:write` | create, change, complete, reopen, move and batch-change tasks and subtasks; dependencies, waiting, habits, the day plan |
   | `comments` | write, edit and delete comments, reactions, mark News read |
   | `structure` | projects (create, change, archive, share), sections, custom fields, project tags, templates, saved filters, folders, project pages and status, import |
@@ -215,7 +215,7 @@ had been made in the app. Webhooks fire too.
 | `POST /lists/{id}/join` | structure | 2.46.0: join a list you see through `org_visibility: "org"` (`org_reader`): you become a member with the role `edit` and get its notifications; 409 when you are a member already, 404 for anybody else (agents never see lists this way). Leave again with `DELETE /lists/{id}/members/{your id}`. Readers find the list's tasks in search and in `GET /lists`, but not in the calendar feed, CalDAV, the briefing or the list's channel, and get no notifications until they join |
 | `POST /lists/{id}/owner` | structure | 2.1.2: transfer the ownership `{user_id}` to another active person (never an agent); the old owner stays as a list admin. Admins may take over a list whose owner is an agent or a disabled user. Agent tokens always `403`, inboxes `409` |
 | `GET /tasks` | read | Tasks (not in the trash), oldest first; filters below |
-| `POST /tasks` | tasks:write | Create a task (default list: the user's inbox) |
+| `POST /tasks` | tasks:write | Create a task (default list: the user's inbox). 2.483.0 (#3916): without `type` it gets the list's default type when the list has ticket types on and one is set (the bug list of a software project: `bug`); an explicit `type` (also `null`) wins |
 | `GET /tasks/{id}` | read | One task. 2.390.0: `{id}` may also be a ticket key like `APP-12` (a current or an old one, see [Ticket keys](#ticket-keys)) |
 | `PATCH /tasks/{id}` | tasks:write | Change the fields you send |
 | `DELETE /tasks/{id}` | delete | Move the task with its subtasks to the trash (204); restorable in the app |
@@ -1462,7 +1462,7 @@ number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENT
 |---|---|---|
 | `GET /office` | office | The area (`{id, personal}`), `person_id`, `role`, currency (of new documents), 2.189.0 (#2475) `home_currency` (ISO code of the price list and books), language, the rules |
 | `GET /office/{services\|texts\|contracts\|clients}` | office | Master data of the area (`q` = search); never purchase prices or markups |
-| `GET /office/docs` | office | `?kind=offer\|invoice\|credit\|reminder&client_id=&status=&open=1&trial=1\|0&before=&limit=` -> `{data: [brief documents], next_cursor}` (2.463: newest first, at most 500 per page: `next_cursor` is set when there is more, pass it as `before`; `open=1` and an agent's list restriction count before the page is cut; 2.88: quotations with `version_of` = the first quotation of their chain of versions, `cashflow`; 2.437: quotations also `replaces_id`, `status` of a quotation = `draft`, `sent`, `accepted`, `declined` or `superseded`; 2.144.10: every document carries `trial`, `trial=1` only trial documents, `0` only real ones) |
+| `GET /office/docs` | office | `?kind=offer\|invoice\|credit\|reminder&client_id=&status=&open=1&trial=1\|0&before=&limit=` -> `{data: [brief documents], next_cursor}` (2.463: newest first, at most 500 per page: `next_cursor` is set when there is more, pass it as `before`; `open=1` and an agent's list restriction count before the page is cut; 2.88: quotations with `version_of` = the first quotation of their chain of versions, `cashflow`; 2.437: quotations also `replaces_id`, `status` of a quotation = `draft`, `sent`, `accepted`, `declined` or `superseded`; 2.144.10: every document carries `trial`, `trial=1` only trial documents, `0` only real ones; 2.483.0 (#2007): an invoice made by an invoice series carries `series_id` and `series_period`, null otherwise) |
 | `GET /office/docs/{id}` | office | One document with positions (`agent_flag` per position: `free`, `price`, `discount:<pct>`), sums, `agent_id`; 2.88: a quotation also `version_of`, `cashflow` and `cf_chain` (which version counts in the cash flow); 2.437: a quotation also `replaces` (the quotation it replaces or null) and `replaced_by` (the quotations that replace it), each `{id, number, status, status_text}`; status `superseded` counts nowhere, like `declined`; 2.91: an invoice made by an invoice series carries `series_id` and `series_period` (the start of its period; null / empty otherwise); 2.154: an invoice / credit note carries `peppol` = its newest send over the Peppol network `{status: sending\|sent\|delivered\|rejected\|error, status_text, message, at}` or null (read only: agents never send) |
 | `GET /office/docs/{id}/pdf` | office | The PDF preview of a draft (2.138.2: DRAFT / ENTWURF in bold at the number and on every page); `409` for others |
 | `POST /office/offers` | office | `{client_id?, title, intro?, items: [{service_id?, text?, detail?, qty?, unit?, price?, discount?, kind?}], list_id?, notify?, trial?}` -> `201 {doc, chat_message_id?}` (2.144.10: `trial: true` = a trial quotation: TEST number, SAMPLE on the PDF, never in bookkeeping; only at creation) |
@@ -1476,6 +1476,8 @@ number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENT
 | `PATCH /office/leads/{id}` | office | 2.94.0: `{next_step?, follow_up?, note?}` only, only while it is a lead (`409` once converted). Agents never convert, delete or set another stage |
 | `GET /office/letters` | office | 2.153.0: the letters the agent made, newest first (`?status=draft` default \| `sent` \| `delivered` \| `all`) -> `{data: [letter]}`; the person (`requested_by`) must be an admin of the office |
 | `POST /office/letters` | office | 2.153.0: `{answers?, client_id?, rcpt_name?, rcpt_address?, rcpt_email?, letter_date?, subject, body, ref_line?, greeting?, lang?, notify?}` -> `201` a letter draft (`agent_id` set; subject or text required; `answers` = a document shared with the agent in the office's documents space, else `404`; `chat_message_id` with `notify`, default true) |
+| `GET /office/series` | office | 2.483.0 (#2007): the invoice series of the area, read only -> `{data: [{id, title, template_id, template: {id, number, status, client_id, client, project_title, currency, gross, gross_text}, every, start, until, next_date, auto_send, active, made: [{doc_id, number, status, state, period, gross, gross_text, open}], made_count, next_periods, updated_at}]}`; the person (`requested_by`) must be an admin of the office (`403` for a member, like the app; a person ruled by office groups needs *manage* in Quotes & invoices); never the bin; a series whose template lies in a project outside the agent's list restriction is left out |
+| `GET /office/subs` | office | 2.483.0 (#2007): the subscriptions and tools, read only -> `{items, totals, candidates, today}` as `GET /api/office/subs` without the people lists; needs the area *Subscriptions & tools* for the agent (an office group) and the person; `404` when the function is switched off in the office |
 | `GET /office/letters/{id}` | office | 2.153.0: one letter the agent made (`404` for any other) with `links` (documents it sees) and `app_url` |
 | `PATCH /office/letters/{id}` | office | 2.153.0: the agent's own draft, the fields of the create call except `answers`; `400` once a person sent it |
 | `POST /office/letters/{id}/links` | office | 2.153.0: `{node_id, kind?: answers\|reply}` links the agent's own draft with a document shared with it (`404` otherwise, `400` once sent) |
@@ -1735,6 +1737,19 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
        "rows": [["Kamera", 10, 95, "=B1*C1", "Offen"], ["Schnitt", 16, 80, "=B2*C2", "Fix"], ["Summe", "", "", "=SUMME(D1:D2)", ""]]}' \
   https://kalmido.example/api/v1/sheets
 ```
+
+## Filed e-mails
+
+*Since 2.483.0 (#1902).*
+
+Scope `read`. `GET /mails?client_id=|list_id=` (exactly one, else `400`; `q`, `limit` up to 200, `cursor`) -> `{data: [mail],
+next_cursor}` newest first (`id, org_id, client_id, client_name, list_id, list_name, from_addr, from_name, subject, sent_at,
+created_at, files, dir, state`), and `GET /mails/{id}` -> one mail with `body`, `body_short`, `to` and `attachments` (name,
+size, mime, scan; no download through the API). Only mails filed with a client or a project the token's user sees, in that
+client's / project's workspace; an agent sees a client's mails through a project of that client shared with it. Never the
+mails *Not assigned* (also not the token user's own), never deleted ones, never another organisation's: `404`. An agent with the data lock *Private e-mails* (the default): none of a private space either (`404`). Kid
+accounts `403`. Everything else of the filing (addresses, the hub inbox, assigning, deleting, attachments, HTML view,
+sending) stays in the app (session only).
 
 ## Knowledge pages
 

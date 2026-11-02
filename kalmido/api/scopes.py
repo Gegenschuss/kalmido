@@ -92,7 +92,7 @@ SCOPE_LABELS = {"read": N_("Read"), "tasks:write": N_("Tasks"), "comments": N_("
                 "docs:upload": N_("Only upload documents"),  # 2.207.0 A (#2763)
                 "wiki:read": N_("Read knowledge pages"), "wiki:write": N_("Write knowledge pages"),  # 2.200.0 C (#1781)
                 "write": N_("Everything (old token)")}
-SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, search"),
+SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, search, e-mails filed with clients and projects"),  # 2.483.0 (#1902): + filed e-mails
               "tasks:write": N_("Create, change, complete and move tasks; dependencies, habits"),
               "comments": N_("Write, edit and delete comments, reactions, mark News read"),
               "structure": N_("Projects, sections, custom fields, project tags, templates, filters, folders, project pages"),

@@ -34,6 +34,7 @@ API = {f"{m.upper()} {norm(p)[len('/api/v1'):]}" for m, p in routes if p.startsw
 # ---- 1. the web client's routes -> the REST API
 APP_TO_API = {
     "GET /api/events/freebusy": ["GET /events/freebusy"],  # 2.467.0 (#2586)
+    "GET /api/hubmail/mails": ["GET /mails"], "GET /api/hubmail/mails/{}": ["GET /mails/{}"],  # 2.483.0 (#1902): read only
     # 2.484.0 (#2200): agents read the scheduling polls they may see and create new ones (never vote, never decide)
     "GET /api/polls": ["GET /polls"], "POST /api/polls": ["POST /polls"], "GET /api/polls/{}": ["GET /polls/{}"],
     "PUT /api/tasks/{}/irreversible": ["PATCH /tasks/{}"], "DELETE /api/tasks/{}/irreversible": ["PATCH /tasks/{}"],  # 2.392.0 C (#3370)
@@ -679,8 +680,15 @@ APP_ONLY = [
     ("2.75.0 (#1411): the built-in assistant (session only: a person's own switch, shared lists, log; the admin overview); agents "
      "never use it and have their own proposals API", ("* /api/assistant", "* /api/admin/assistant")),
     # 2.84.0 A (#1198): agents get no access to filed mails in this release (a follow-up step of the agents list)
-    ("2.84.0 (#1198): mails filed with clients / projects (addresses, the hub inbox, assigning, deleting): people only in 2.84.0; "
-     "agent access to filed mails comes as its own step", ("* /api/hubmail",)),
+    # 2.483.0 (#1902): reading the mails of a client / project is mapped above (GET /mails, GET /mails/{}); the rest stays here
+    ("2.84.0 (#1198) / 2.483.0 (#1902): mails filed with clients / projects -- agents read the mails of a client / project they see "
+     "(GET /mails, GET /mails/{id}); the addresses, the hub inbox (\"Not assigned\"), assigning, deleting, restoring, the attachments, "
+     "the HTML view, tasks / events from a mail, the workspace mailbox and sending stay with people",
+     ("=GET /api/hubmail/inbox", "=GET /api/hubmail/targets", "=GET /api/hubmail/links", "=GET /api/hubmail/compose",
+      "=POST /api/hubmail/send", "* /api/hubmail/address", "* /api/hubmail/mailbox", "=GET /api/hubmail/mails/{}/files/{}",
+      "=POST /api/hubmail/mails/{}/assign", "=DELETE /api/hubmail/mails/{}", "=POST /api/hubmail/mails/{}/restore",
+      "=GET /api/hubmail/mails/{}/html", "=GET /api/hubmail/mails/{}/make", "=POST /api/hubmail/mails/{}/task",
+      "=POST /api/hubmail/mails/{}/event")),
     # 2.85.0 B (#1162): feeds are a person's own reading in the app
     ("2.85.0 (#1162): Feeds are only for people in 2.85.0 (a person's own feeds, never shared, never an agent's; no REST v1 / MCP)",
      ("* /api/feeds",)),

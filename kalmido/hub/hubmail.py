@@ -22,7 +22,8 @@ Visibility (strict): a project's mail = whoever sees the list, a client's mail =
 not assigned = its recipient; always inside the mail's workspace (client / list of another organisation = nobody).
 Writing (assign, delete, restore) = the write right on the list / for a client its mail's recipient, who created the
 client or an organisation admin (2.360.0) / the recipient. Agents and kid
-accounts get nothing (no v1 route, no MCP tool in 2.84.0). Deleting sets deleted_at (Undo restores)."""
+accounts get nothing here (these app routes stay 403 for them); 2.483.0 (#1902): agents and tokens READ the mails of a
+client / project they see through the API v1 (hub/hmv1.py), never "Not assigned". Deleting sets deleted_at (Undo restores)."""
 import email.utils
 import hashlib
 import json

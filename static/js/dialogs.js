@@ -235,6 +235,7 @@ function ticketTplModal(lid) {
   let cur = {}; try { cur = JSON.parse(l.ticket_tpl || '{}') || {}; } catch { /* bad json */ }
   const def = {bug: tr('**Steps to reproduce**\n1. \n\n**Expected**\n\n**Actual**\n\n**Environment**\n\n**Version / found in**\n'), feature: tr('**Goal**\n\n**Acceptance criteria**\n- [ ] \n')};
   const md = modal(`<h3>${tr('Ticket templates')}</h3><div class="shint">${tr('New tickets of this type start with these notes (Markdown) when their notes are empty. Empty = the built-in text.')}</div>
+    <div class="row"><label for="tt-def">${tr('Type of new tasks')}</label><select id="tt-def"><option value="">${tr('No type')}</option>${TTYPES.map(x => `<option value="${x[0]}" ${l.def_ttype === x[0] ? 'selected' : ''}>${esc(tr(x[1]))}</option>`).join('')}</select></div>
     ${['bug', 'feature'].map(k => `<div class="row ppcol"><label for="tt-${k}">${ic(k === 'bug' ? 'bug' : 'bulb', 's')} ${ttName(k)}</label><textarea id="tt-${k}" rows="6" maxlength="5000" placeholder="${esc(def[k])}">${esc(cur[k] || '')}</textarea></div>`).join('')}
     <div class="foot"><button class="btn" data-m="reset">${tr('Built-in texts')}</button><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.classList.add('ttmodal');
@@ -244,9 +245,9 @@ function ticketTplModal(lid) {
     if (b.dataset.m === 'reset') { $('#tt-bug', md).value = ''; $('#tt-feature', md).value = ''; return; }
     if (b.dataset.m === 'save') {
       // 2.46.2 (#1659): at once (optimistic), no reload of the whole state; an error puts the old templates back
-      const tpl = {bug: $('#tt-bug', md).value, feature: $('#tt-feature', md).value};
+      const tpl = {bug: $('#tt-bug', md).value, feature: $('#tt-feature', md).value}, dt = $('#tt-def', md).value;  // 2.483.0 (#3916): + the default type
       // the dialog closes once the server has it: on an error the typed texts are still there
-      optWrite(optSet(() => listById(lid), {ticket_tpl: JSON.stringify(tpl)}), () => api('PATCH', '/api/lists/' + lid, {ticket_tpl: tpl}))
+      optWrite(optSet(() => listById(lid), {ticket_tpl: JSON.stringify(tpl), def_ttype: dt}), () => api('PATCH', '/api/lists/' + lid, {ticket_tpl: tpl, def_ttype: dt}))
         .then(() => { md.remove(); toast(tr('Saved')); }).catch(() => {});
     }
   });

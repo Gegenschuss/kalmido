@@ -17,6 +17,7 @@ from ..api.v1 import _SPEC, API_PAGE_DEFAULT, API_PAGE_MAX, API_SCOPES, API_VERS
 from ..api.common import V1_CODES
 from ..tasks.dayplan import dayplan_spec
 from ..tasks.oneway import dec_spec
+from ..hub.hmv1 import hmv_spec  # 2.483.0 (#1902)
 
 
 def groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
@@ -806,6 +807,7 @@ def openapi_spec():
     lead_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.94.0 A (#1930): leads for agents
     from ..office.letteragent import lta_spec
     lta_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.153.0 (#2031): letter drafts of agents
+    hmv_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.483.0 (#1902): filed e-mails, read only
     from ..hub.absence import abs_spec
     abs_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.50.0 (#1195)
     hosting_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.24.0 (#907 #910)

@@ -176,7 +176,9 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    Since 2.187.0 the office access of an agent comes from the **office rights groups** (Settings > Company & office > Rights in the office), the
    same groups as for people: an agent without a group has no office access (a new agent starts without one; an agent
    that had its switch *May draft office documents* on keeps that previous access until it is put into a group). It
-   never gets more than the person it acts for, and never *Manage office rights*.
+   never gets more than the person it acts for, and never *Manage office rights*. 2.483.0: it may also read the invoice
+   series and the subscriptions overview (`list_invoice_series`, `get_office_subscriptions`; subscriptions need the area
+   *Subscriptions & tools* in its group), never change them.
 7. Optional, **Arrangements of views** (2.55.0): turn on the permission *Propose arrangements* (scope `layouts`, off by
    default) when the agent may suggest how the start page, Today or a shared project page could be arranged. It reads only
    block names and widths, never their content, and every proposal waits for the person's 👍 / 👎
@@ -200,6 +202,11 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    `wiki:write`, off by default) and share a knowledge folder or page with exactly this agent (the share dialog of the
    folder / page, view or edit). The agent sees nothing else of the knowledge area: no page through the workspace, never an
    encrypted space ([AGENTS.md](AGENTS.md#knowledge-pages)). The reference starter needs no change.
+13. **Filed e-mails** (2.483.0): with *Read* the agent reads the e-mails filed with a client or a project it sees
+   (`list_filed_mails`, `get_filed_mail`): a project shared with it, a client through such a project. Never the mails *Not
+   assigned*, never another organisation's; filing, assigning and sending stay with people
+   ([AGENTS.md](AGENTS.md#filed-e-mails)). Share a project of the client only when its mails may go to the agent's model.
+   The reference starter needs no change.
 
 ### 2. A Linux user without sudo
 
