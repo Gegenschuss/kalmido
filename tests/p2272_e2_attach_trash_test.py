@@ -207,6 +207,36 @@ check(one("SELECT COUNT(*) FROM task_list_tags x JOIN list_tags t ON t.id=x.tag_
       "list_purge: the tag went along")
 check(one("SELECT trash_section FROM tasks WHERE id=?", (TP,)) == "Edit", "list_purge: the section's name is kept")
 
+# 2.370.4 (#3089 E2-M4): a select field the inbox already has gets the missing option, the values point at the inbox's
+# options; a person value stays only when it is the inbox owner
+import json  # noqa: E402
+LQ = A.post(B + "/api/lists", json={"name": "Old project 2"}).json()["id"]
+check(A.put(B + f"/api/lists/{LQ}/members", json={"user_id": BOB, "role": "edit"}).ok, "setup: bob in the second project")
+FS = A.post(B + f"/api/lists/{LQ}/fields", json={"name": "Status", "type": "select", "options": {"options": [
+    {"id": "op1", "name": "Open"}, {"id": "dn1", "name": "Done"}]}}).json()["id"]
+FPN = A.post(B + f"/api/lists/{LQ}/fields", json={"name": "Owner", "type": "person"}).json()["id"]
+sql("INSERT INTO list_fields(list_id, name, type, options, pinned, sort, created_at) VALUES(?,?,?,?,0,0,?)",
+    (INBOX, "Status", "select", json.dumps({"options": [{"id": "zz9", "name": "done"}]}), OLD))
+IFS = one("SELECT id FROM list_fields WHERE list_id=? AND name='Status'", (INBOX,))
+TQ1 = A.post(B + "/api/tasks", json={"title": "Q one", "list_id": LQ}).json()["id"]
+TQ2 = A.post(B + "/api/tasks", json={"title": "Q two", "list_id": LQ}).json()["id"]
+check(A.patch(B + f"/api/tasks/{TQ1}", json={"fields": {str(FS): "dn1"}}).ok
+      and A.patch(B + f"/api/tasks/{TQ2}", json={"fields": {str(FS): "op1"}}).ok, "setup: select values")
+for t_, u_ in ((TQ1, BOB), (TQ2, A_ID)):
+    sql("INSERT INTO task_field_values(task_id, field_id, value) VALUES(?,?,?)", (t_, FPN, str(u_)))
+out = in_app(f"from kalmido.core.pg import system_ctx\nfrom kalmido.lists.lists import list_purge\nwith system_ctx(c):\n    list_purge(c, {LQ}, {INBOX})\nc.commit()\nprint('ok')")
+check("ok" in out and "Traceback" not in out, "list_purge 2 ran " + out[-600:])
+opts = {o["name"]: o["id"] for o in json.loads(one("SELECT options FROM list_fields WHERE id=?", (IFS,)))["options"]}
+check(one("SELECT COUNT(*) FROM list_fields WHERE list_id=? AND name='Status'", (INBOX,)) == 1 and set(opts) == {"done", "Open"},
+      f"list_purge: the inbox's select field got the missing option, no second field {opts}")
+check(one("SELECT value FROM task_field_values WHERE task_id=? AND field_id=?", (TQ1, IFS)) == "zz9"
+      and one("SELECT value FROM task_field_values WHERE task_id=? AND field_id=?", (TQ2, IFS)) == opts.get("Open"),
+      "list_purge: the select values point at the inbox's options (by name)")
+IFP = one("SELECT id FROM list_fields WHERE list_id=? AND name='Owner'", (INBOX,))
+check(one("SELECT COUNT(*) FROM task_field_values WHERE task_id=? AND field_id=?", (TQ1, IFP)) == 0
+      and one("SELECT value FROM task_field_values WHERE task_id=? AND field_id=?", (TQ2, IFP)) == str(A_ID),
+      "list_purge: a person value of another member does not go into the private inbox, the owner's stays")
+
 # ---- removing a member: the question names what goes (dry: nothing changes)
 LS = A.post(B + "/api/lists", json={"name": "Shared"}).json()["id"]
 check(A.put(B + f"/api/lists/{LS}/members", json={"user_id": BOB, "role": "edit"}).ok, "setup: bob in the list")

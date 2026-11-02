@@ -2,6 +2,7 @@
 import json
 import math
 import re
+import secrets
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
@@ -764,17 +765,31 @@ def lp_carry(c, lid, inbox):
     """2.272.0 E2 (#3038): before list_purge moves the tasks of list lid into the trash of inbox: the fields with values and
     the tags in use are taken over into the inbox (one of the same name / type there, else made anew; never pinned), the
     tasks' values and tags point at them; the tasks remember their section's name (trash_section, restoring them makes
-    the section in the inbox). Who was assigned stays lost (the inbox is private)."""
+    the section in the inbox). Who was assigned stays lost (the inbox is private).
+    2.370.4 (#3089 E2-M4): a select / multiselect field the inbox already has gets the missing options (matched by name,
+    else added) and the values point at the inbox's option ids; a person value stays only when it is the inbox's owner
+    (the inbox is private: nobody else is a member there)."""
     c.execute("UPDATE tasks SET trash_section=s.name FROM sections s WHERE s.id=tasks.section_id AND tasks.list_id=? "
               "AND tasks.trash_section IS NULL", (lid,))
+    owner = c.execute("SELECT owner_id FROM lists WHERE id=?", (inbox,)).fetchone()
+    owner = str(owner[0]) if owner else None
     for f in c.execute("SELECT * FROM list_fields WHERE list_id=? AND EXISTS (SELECT 1 FROM task_field_values v WHERE v.field_id=list_fields.id) "
                        "ORDER BY sort, id",
                        (lid,)).fetchall():
-        x = c.execute("SELECT id FROM list_fields WHERE list_id=? AND name=? AND type=? ORDER BY id LIMIT 1", (inbox, f["name"], f["type"])).fetchone()
+        x = c.execute("SELECT id, options FROM list_fields WHERE list_id=? AND name=? AND type=? ORDER BY id LIMIT 1", (inbox, f["name"], f["type"])).fetchone()
         nid = x[0] if x else insert_id(c, "INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,0,?,?)",
                                        (inbox, f["name"], f["type"], f["options"], f["sort"], iso(now_utc())))
-        c.execute("INSERT INTO task_field_values(task_id,field_id,value) SELECT task_id, ?, value FROM task_field_values WHERE field_id=? "
-                  "ON CONFLICT DO NOTHING", (nid, f["id"]))
+        omap = lp_carry_options(c, f, x) if x and f["type"] in ("select", "multiselect") else None
+        for v in c.execute("SELECT task_id, value FROM task_field_values WHERE field_id=?", (f["id"],)).fetchall():
+            val = v["value"]
+            if f["type"] == "person" and val != owner:
+                continue
+            if omap is not None:
+                val = ",".join(dict.fromkeys(omap[o] for o in (val or "").split(",") if o in omap)) or None
+                if f["type"] == "select" and val and "," in val:
+                    val = val.split(",")[0]
+            if val is not None:
+                c.execute("INSERT INTO task_field_values(task_id,field_id,value) VALUES(?,?,?) ON CONFLICT DO NOTHING", (v["task_id"], nid, val))
     for t in c.execute("SELECT * FROM list_tags WHERE list_id=? AND EXISTS (SELECT 1 FROM task_list_tags x WHERE x.tag_id=list_tags.id) "
                        "ORDER BY sort, id",
                        (lid,)).fetchall():
@@ -784,6 +799,33 @@ def lp_carry(c, lid, inbox):
         c.execute("INSERT INTO task_list_tags(task_id,tag_id) SELECT task_id, ? FROM task_list_tags WHERE tag_id=? ON CONFLICT DO NOTHING",
                   (nid, t["id"]))
 
+
+
+def lp_carry_options(c, f, x):
+    """2.370.4 (#3089 E2-M4): source field f's options merged into the inbox's field x of the same name / type: an option of
+    the same name (case-insensitive) is taken as it is, a missing one is added (at most 50 options a field, as fields.py
+    allows; beyond that its values are dropped). -> {source option id: inbox option id}."""
+    src = json.loads(f["options"] or "{}").get("options", [])
+    dst_opts = json.loads(x["options"] or "{}")
+    dst = dst_opts.setdefault("options", [])
+    by_name = {str(o.get("name", "")).lower(): o["id"] for o in dst if isinstance(o, dict) and o.get("id")}
+    ids = {o.get("id") for o in dst if isinstance(o, dict)}
+    out, added = {}, False
+    for o in src:
+        if not isinstance(o, dict) or not o.get("id"):
+            continue
+        hit = by_name.get(str(o.get("name", "")).lower())
+        if hit is None and len(dst) < 50:
+            oid = o["id"] if o["id"] not in ids else secrets.token_hex(4)
+            dst.append({k: o[k] for k in ("name", "color", "special") if k in o} | {"id": oid})
+            ids.add(oid)
+            by_name[str(o.get("name", "")).lower()] = hit = oid
+            added = True
+        if hit is not None:
+            out[o["id"]] = hit
+    if added:
+        c.execute("UPDATE list_fields SET options=? WHERE id=?", (json.dumps(dst_opts, ensure_ascii=False), x["id"]))
+    return out
 
 def list_keep(c, lid, by, until, owner=None):
     """2.186.0 A (#2566): instead of list_purge, list lid goes into the trash (archived, with its tasks; listtrash.otr_trash)
