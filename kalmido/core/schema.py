@@ -4011,9 +4011,6 @@ MIGRATIONS = [
     # 2.332.0 C (#3301): the approver's signature picture on the receipt PDF (office/meals.py approve; 0 = the confirmation
     # text only, as before). Older versions ignore it
     ("office_meals", "sign_image", "ALTER TABLE office_meals ADD COLUMN IF NOT EXISTS sign_image BIGINT NOT NULL DEFAULT 0"),
-    # 2.372.0 (#3316): the snapshot of the approver's signature picture taken at approving (base64, encrypted like the
-    # profile; '' = none / approved before 2.372, then the PDF reads the profile as before). Older versions ignore it
-    ("office_meals", "sign_pic", "ALTER TABLE office_meals ADD COLUMN IF NOT EXISTS sign_pic TEXT NOT NULL DEFAULT ''"),
     # 2.408.0 (#3494): the company's website (printed in the contact block under the e-mail). Older versions ignore it
     ("office_company", "website", "ALTER TABLE office_company ADD COLUMN IF NOT EXISTS website TEXT NOT NULL DEFAULT ''"),
     # 2.409.0 (#3490): the areas the organisation's admins switched off for its members (csv of area ids, accounts/wsareas.py;
