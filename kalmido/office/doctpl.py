@@ -1225,6 +1225,8 @@ def dt_sig_row(c, r):
 def dt_sig_valid(c, r):
     """An open document link still fits: the document is finished (not archived) and its text unchanged."""
     d = dt_sig_row(c, r) if r["gen_doc_id"] else None
+    if d and d.get("client_id") and c.execute("SELECT 1 FROM clients WHERE id=? AND deleted_at IS NOT NULL", (d["client_id"],)).fetchone():
+        return False  # 2.370.4 (#3089): a client in the trash signs nothing (like the video link and the sheet's mail code)
     return bool(d) and d["status"] == "final" and not d["archived"] and d["body_hash"] == r["doc_hash"] and dt_hash(d["body"]) == r["doc_hash"]
 
 
