@@ -93,7 +93,6 @@ def wsa_space_lists(c, uid, v):
         raise BadInput(tr("Invalid value: {0}", "space"))
     if v == "private":
         return "(SELECT id FROM lists WHERE org_id IS NULL)"
-    from .orgs import user_orgs
     oid = int(v[4:])
     if oid not in user_orgs(c, uid):
         raise Denied(404)
