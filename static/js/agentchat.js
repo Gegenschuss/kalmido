@@ -1282,7 +1282,7 @@ const AG_GUIDES = {
   team: {
     linux: [AG_S.create, AG_S.share, AG_S.safe,
       [N_('A user without admin rights'), N_('Its own Linux user: no sudo or docker group, no SSH keys, a locked password.'), 'sudo useradd --create-home --shell /bin/bash kalmido-agent\nsudo passwd --lock kalmido-agent\nsudo chmod 0700 ~kalmido-agent'],
-      [N_('Token in an env file'), N_('Two lines, KALMIDO_URL=… and KALMIDO_TOKEN=…, readable only by the agent’s account.'), 'sudo -iu kalmido-agent\nmkdir -p ~/.config/kalmido && (umask 077; nano ~/.config/kalmido/agent.env)'],
+      [N_('Token in an env file'), N_('Two lines, KALMIDO_URL=… and KALMIDO_TOKEN=…, readable only by the agent’s account.'), 'sudo -iu kalmido-agent\nmkdir -p ~/.config/kalmido && (umask 077; nano ~/.config/kalmido/agent.env)\n# optional line in that file: KALMIDO_TOOLSETS=tickets,code,chat (only these tool packages; default all)'],
       [N_('Egress firewall'), N_('Only DNS, Kalmido and public HTTPS (the model API); no local network. nftables matches only the agent user (meta skuid).'), 'sudo nft -f /etc/nftables.d/kalmido-agent.nft'],
       [N_('Claude Code and the MCP server'), N_('Install Claude Code as the agent user and sign in once. A small wrapper reads the env file and starts the MCP server, so the token is never in a configuration.'), 'curl -fsSL https://claude.ai/install.sh | bash\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido\ncd ~/agent && claude mcp add -s local kalmido -- "$HOME/kalmido/mcp/run.sh"'],
       AG_S.rules,
@@ -1290,7 +1290,7 @@ const AG_GUIDES = {
       AG_S.test],
     mac: [AG_S.create, AG_S.share, AG_S.safe,
       [N_('A user without admin rights'), N_('A standard account for the agent, hidden from the sign-in window.'), 'sudo sysadminctl -addUser kalmido-agent -fullName "Kalmido agent" -password -\nsudo dscl . create /Users/kalmido-agent IsHidden 1\nsudo chmod 700 /Users/kalmido-agent'],
-      [N_('Token in an env file'), N_('Two lines, KALMIDO_URL=… and KALMIDO_TOKEN=…, readable only by the agent’s account.'), 'sudo -iu kalmido-agent\nmkdir -p ~/.config/kalmido && (umask 077; nano ~/.config/kalmido/agent.env)'],
+      [N_('Token in an env file'), N_('Two lines, KALMIDO_URL=… and KALMIDO_TOKEN=…, readable only by the agent’s account.'), 'sudo -iu kalmido-agent\nmkdir -p ~/.config/kalmido && (umask 077; nano ~/.config/kalmido/agent.env)\n# optional line in that file: KALMIDO_TOOLSETS=tickets,code,chat (only these tool packages; default all)'],
       [N_('Egress firewall'), N_('pf rules for the agent user only: DNS, Kalmido and public HTTPS allowed, the local network blocked. Check them again after macOS updates.'), 'sudo pfctl -f /etc/pf.conf && sudo pfctl -e'],
       [N_('Claude Code and the MCP server'), N_('Install Claude Code as the agent user and sign in once. A small wrapper reads the env file and starts the MCP server, so the token is never in a configuration.'), 'curl -fsSL https://claude.ai/install.sh | bash\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido\ncd ~/agent && claude mcp add -s local kalmido -- "$HOME/kalmido/mcp/run.sh"'],
       AG_S.rules,
@@ -1298,7 +1298,7 @@ const AG_GUIDES = {
       AG_S.test],
     win: [AG_S.create, AG_S.share, AG_S.safe,
       [N_('A user without admin rights'), N_('A standard local account, member of Users only, never Administrators. Sign in once to create its profile.'), '$pw = Read-Host -AsSecureString\nNew-LocalUser -Name kalmido-agent -Password $pw -PasswordNeverExpires\nAdd-LocalGroupMember -Group Users -Member kalmido-agent'],
-      [N_('Token in an env file'), N_('Two lines, KALMIDO_URL=… and KALMIDO_TOKEN=…, readable only by the agent’s account.'), 'New-Item -ItemType Directory -Force $HOME\\.config\\kalmido, $HOME\\agent | Out-Null\nnotepad $HOME\\.config\\kalmido\\agent.env\nicacls $HOME\\.config\\kalmido\\agent.env /inheritance:r /grant:r "kalmido-agent:(R,W)" "Administrators:F"'],
+      [N_('Token in an env file'), N_('Two lines, KALMIDO_URL=… and KALMIDO_TOKEN=…, readable only by the agent’s account.'), 'New-Item -ItemType Directory -Force $HOME\\.config\\kalmido, $HOME\\agent | Out-Null\nnotepad $HOME\\.config\\kalmido\\agent.env\n# optional line in that file: KALMIDO_TOOLSETS=tickets,code,chat (only these tool packages; default all)\nicacls $HOME\\.config\\kalmido\\agent.env /inheritance:r /grant:r "kalmido-agent:(R,W)" "Administrators:F"'],
       [N_('Egress firewall'), N_('Windows Defender Firewall: block the local network for the programs the agent runs (Claude Code, Python). Block rules win, so leave a Kalmido in your network out of the ranges.'), 'New-NetFirewallRule -DisplayName "Kalmido agent: no LAN" -Direction Outbound -Program <claude.exe> -RemoteAddress 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16 -Action Block'],
       [N_('Claude Code and the MCP server'), N_('Install Python 3, Git, PowerShell 7 and Claude Code, sign in once. The wrapper run.ps1 reads the env file and starts the MCP server.'), 'winget install Python.Python.3.12 Git.Git Microsoft.PowerShell\nirm https://claude.ai/install.ps1 | iex\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git $HOME\\kalmido\n' + AG_WIN_RUN + '\ncd $HOME\\agent; claude mcp add -s local kalmido -- pwsh -NoProfile -File "$HOME\\kalmido\\mcp\\run.ps1"\n' + AG_WIN_MCP],
       AG_S.rules,
@@ -1317,21 +1317,71 @@ const AG_GUIDES = {
       [N_('Usage hook'), N_('In .claude/settings.json as Stop and SubagentStop hook (the same command): reports token usage to Kalmido, subagents included, never text.'), 'python3 ~/kalmido/mcp/claude_usage_hook.py ~/.config/kalmido/agent.env'],
       [AG_S.ownRun[0], AG_S.ownRun[1], '~/kalmido/mcp/agent_launcher.sh -e ~/.config/kalmido/agent.env --events --once -- claude --mcp-config ~/agent/.mcp.json']],  // 2.44.0 (#962): no PowerShell on a Mac
     win: [AG_S.ownAllowed, AG_S.ownCreate,
-      [N_('Install Claude Code and the MCP server'), N_('Sign in to Claude Code once. Put the token into an env file only you can read; the wrapper run.ps1 starts the MCP server with it.'), 'winget install Python.Python.3.12 Git.Git Microsoft.PowerShell\nirm https://claude.ai/install.ps1 | iex\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git $HOME\\kalmido\nNew-Item -ItemType Directory -Force $HOME\\.config\\kalmido, $HOME\\agent | Out-Null\nnotepad $HOME\\.config\\kalmido\\agent.env\n' + AG_WIN_RUN + '\ncd $HOME\\agent; claude mcp add -s local kalmido -- pwsh -NoProfile -File "$HOME\\kalmido\\mcp\\run.ps1"\n' + AG_WIN_MCP],
+      [N_('Install Claude Code and the MCP server'), N_('Sign in to Claude Code once. Put the token into an env file only you can read; the wrapper run.ps1 starts the MCP server with it.'), 'winget install Python.Python.3.12 Git.Git Microsoft.PowerShell\nirm https://claude.ai/install.ps1 | iex\ngit clone --depth 1 https://github.com/Gegenschuss/kalmido.git $HOME\\kalmido\nNew-Item -ItemType Directory -Force $HOME\\.config\\kalmido, $HOME\\agent | Out-Null\nnotepad $HOME\\.config\\kalmido\\agent.env\n# optional line in that file: KALMIDO_TOOLSETS=tickets,code,chat (only these tool packages; default all)\n' + AG_WIN_RUN + '\ncd $HOME\\agent; claude mcp add -s local kalmido -- pwsh -NoProfile -File "$HOME\\kalmido\\mcp\\run.ps1"\n' + AG_WIN_MCP],
       AG_S.ownShare, AG_S.safe, AG_S.ownRules,
       [N_('Usage hook'), N_('In .claude/settings.json as Stop and SubagentStop hook (the same command): reports token usage to Kalmido, subagents included, never text.'), 'python C:/Users/<you>/kalmido/mcp/claude_usage_hook.py C:/Users/<you>/.config/kalmido/agent.env'],
       [AG_S.ownRun[0], AG_S.ownRun[1], 'pwsh -File $HOME\\kalmido\\mcp\\agent_launcher.ps1 -e $HOME\\.config\\kalmido\\agent.env --events --once -- claude --mcp-config $HOME\\agent\\.mcp.json']]
   }
 };
-function agSetupHtml(guide, os) {
+// ---- 2.391.0 D (#3359): which tool runs the agent. The steps by hand are written for Claude Code; Codex CLI gets its own
+// install / MCP / launcher lines (the launcher runs `codex exec --json` per event), other MCP clients (Cursor, Windsurf,
+// Gemini CLI) only the MCP connection: no launcher, no events of their own. One switch above the steps swaps the lines.
+const AG_TOOLS = [['claude', 'Claude Code'], ['codex', 'Codex CLI'], ['mcp', N_('Other MCP clients')]];
+const AG_T_MCP = new Set(['Claude Code and the MCP server', 'Install Claude Code and the MCP server']);
+const AG_T_CLAUDE_ONLY = new Set(['Usage hook']);  // the Stop / SubagentStop hook exists only in Claude Code
+const AG_T_RUN = new Set(['Launcher as a service', 'Run it']);
+const AG_CODEX_SUB = [
+  [/curl -fsSL https:\/\/claude\.ai\/install\.sh \| bash/g, 'npm install -g @openai/codex\ncodex login'],
+  [/irm https:\/\/claude\.ai\/install\.ps1 \| iex/g, 'npm install -g @openai/codex\ncodex login'],
+  [/claude mcp add -s local kalmido -- /g, 'codex mcp add kalmido -- '],
+  [/-- claude --mcp-config [^\s"]+/g, '-- codex'],
+  [/<claude\.exe>/g, '<codex.exe>']];
+function agMcpClients(os) {  // the JSON for Cursor (.cursor/mcp.json), Windsurf (mcp_config.json), Gemini CLI (settings.json)
+  const server = os === 'win'
+    ? {command: 'pwsh', args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'C:/path/to/kalmido/mcp/run.ps1']}
+    : {command: '/path/to/kalmido/mcp/run.sh'};
+  const files = os === 'win'
+    ? '# Cursor: .cursor\\mcp.json  ·  Windsurf: $HOME\\.codeium\\windsurf\\mcp_config.json  ·  Gemini CLI: $HOME\\.gemini\\settings.json'
+    : '# Cursor: .cursor/mcp.json  ·  Windsurf: ~/.codeium/windsurf/mcp_config.json  ·  Gemini CLI: ~/.gemini/settings.json';
+  return (os === 'win' ? 'git clone --depth 1 https://github.com/Gegenschuss/kalmido.git $HOME\\kalmido\nNew-Item -ItemType Directory -Force $HOME\\.config\\kalmido | Out-Null\nnotepad $HOME\\.config\\kalmido\\agent.env\n' + AG_WIN_RUN
+    : 'git clone --depth 1 https://github.com/Gegenschuss/kalmido.git ~/kalmido\nmkdir -p ~/.config/kalmido && (umask 077; nano ~/.config/kalmido/agent.env)') + '\n' + files + '\n' +
+    JSON.stringify({mcpServers: {kalmido: server}}, null, 2);
+}
+function agToolSteps(steps, tool, os) {
+  if (tool === 'codex') {
+    return steps.filter(([h]) => !AG_T_CLAUDE_ONLY.has(h)).map(([h, t, cmd]) => {
+      let c = cmd || '';
+      for (const [re, to] of AG_CODEX_SUB) c = c.replace(re, to);
+      if (AG_T_MCP.has(h)) {
+        c = c.replace('\n' + AG_WIN_MCP, '');  // .mcp.json is Claude Code's; Codex keeps its servers in config.toml
+        return [N_('Codex CLI and the MCP server'), N_('Install Codex CLI as the agent user and sign in once (the command is below). The same wrapper starts the MCP server; codex mcp add writes it into ~/.codex/config.toml.'), c];
+      }
+      return [h, t, c];
+    });
+  }
+  if (tool === 'mcp') {
+    return steps.filter(([h]) => !AG_T_CLAUDE_ONLY.has(h) && !AG_T_RUN.has(h)).map(([h, t, cmd]) => AG_T_MCP.has(h)
+      ? [N_('Connect your MCP client'), N_('Clone the Kalmido repository and put the token into the env file; the wrapper starts the MCP server with it. Add the server to your client’s MCP file (one block, the same for Cursor, Windsurf and Gemini CLI).'), agMcpClients(os)]
+      : [h, t, cmd]);
+  }
+  return steps;
+}
+function agSetupHtml(guide, os, tool) {
   const g = AG_GUIDES[guide] ? guide : 'team', o = AG_GUIDES[g][os] ? os : 'linux';
+  const tl = AG_TOOLS.some(([v]) => v === tool) ? tool : AG_TOOLS.some(([v]) => v === LS.get('agTool', '')) ? LS.get('agTool', '') : 'claude';
+  const toolSeg = `<div class="seg agsseg agtool" role="tablist" aria-label="${esc(tr('Which tool runs the agent?'))}" data-agtoolseg="1">${AG_TOOLS.map(([v, n]) =>
+    `<button type="button" role="tab" data-agtool="${v}" aria-selected="${v === tl}" class="${v === tl ? 'on' : ''}"><span>${esc(tr(n))}</span></button>`).join('')}</div>`;
+  const toolHint = tl === 'mcp' ? `<div class="shint">${esc(tr('Without the launcher the agent gets no events by itself: it works while you use it in your client. Runs per event (chat, comments, jobs) need Claude Code or Codex CLI.'))}</div>`
+    : tl === 'codex' ? `<div class="shint">${esc(tr('The launcher runs codex exec --json once per event: steps, the answer and the conversation as with Claude Code; permission questions in the chat and the plan usage ring stay with Claude Code.'))}</div>` : '';
   const intro = g === 'team'
     ? tr('A team agent runs on a server you control, as its own user without admin rights, walled off from your network. Everyone who shares a project with it can work with it.')
     : tr('A personal agent runs on your own computer and belongs to you: it sees only the projects you share with it, and only you can chat with it.');
-  const steps = AG_GUIDES[g][o].map(([h, t, cmd]) => `<li><b>${tr(h)}</b><span>${tr(t)}</span>${cmd ? `<pre class="agcmd">${esc(cmd)}</pre>` : ''}</li>`).join('');
+  const steps = agToolSteps(AG_GUIDES[g][o], tl, o).map(([h, t, cmd]) => `<li><b>${tr(h)}</b><span>${tr(t)}</span>${cmd ? `<pre class="agcmd">${esc(cmd)}</pre>` : ''}</li>`).join('');
   return `<div class="shint">${esc(intro)} ${esc(tr('Kalmido never starts or downloads an agent: you run the agent yourself.'))}</div>
     <div class="shint keep">${esc(g === 'own' ? tr('Quickest on your own computer: the download button in your agent’s row (Set up on a computer) installs it with one command.') : tr('Quickest: create the agent, then “Set up on a computer” installs it with one command.'))}</div>
     <details class="agadv agbyhand"><summary>${tr('For advanced users')}</summary>${''/* 2.364.0 D (#3035): the way by hand (useradd …) folded; first the one-command setup in the agent's row */}
+    <h4 class="agrh">${esc(tr('Which tool runs the agent?'))}</h4>
+    ${toolSeg}${toolHint}
     <ol class="agsteps agb">${steps}</ol>
     <div class="shint">${esc(tr('Recommended since 2.35: start the launcher with --events. It then runs the agent once per event (headless) and shows its steps, model, permission mode, plan usage and approval cards in the chat; the agent command needs no prompt.'))}</div></details>
     ${agRulesHtml()}
@@ -1348,6 +1398,16 @@ const agRulesHtml = () => `<h4 class="agrh">${tr('Behaviour rules for the agent'
     <div class="row"><button type="button" class="btn sm" data-agr-copy="1">${ic('copy', 's')} ${tr('Copy rules')}</button><span class="muted aighint">${tr('Also in mcp/CLAUDE.template.md.')}</span></div>
     <h4 class="agrh">${esc(tr('Teaching the agent'))}</h4>
     <div class="shint">${esc(tr('Tell the agent how you work: where orders come from, where new things arrive, where results go and how it reports status. It writes this into WORKFLOW-KALMIDO.md in its project folder and reads it first for every order; interim results go into NOTIZEN.md. The starter asks for it once after the setup.'))}</div>`;
+document.addEventListener('click', e => {  // 2.391.0 D (#3359): the tool switch swaps the command lines in place
+  const b = e.target.closest?.('[data-agtool]'); if (!b) return;
+  LS.set('agTool', b.dataset.agtool);
+  const box = b.closest('.agguidebox'); if (!box) return;
+  const g = $('[data-agseg="guide"] .on')?.dataset.agsv || 'own', o = $('[data-agseg="os"] .on')?.dataset.agsv || 'linux';
+  const open = !!box.querySelector('details.agbyhand')?.open;
+  box.innerHTML = agSetupHtml(g, o, b.dataset.agtool);
+  const d = box.querySelector('details.agbyhand'); if (d && open) d.open = true;
+  box.querySelector(`[data-agtool="${b.dataset.agtool}"]`)?.focus();
+});
 document.addEventListener('click', async e => {
   if (!e.target.closest?.('[data-agr-copy]')) return;
   try { await navigator.clipboard.writeText(AG_RULES); toast(tr('Copied')); } catch { toast(tr('Copy failed, select the text by hand')); }

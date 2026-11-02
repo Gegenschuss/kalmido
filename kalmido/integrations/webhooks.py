@@ -604,6 +604,7 @@ def wh_create_do(oid=None):
                     (me(), f["name"], f["url"], f["events"], f.get("enabled", 1), ts, ts, oid))
     c.execute("UPDATE webhooks SET secret=? WHERE id=?", (seal(c, f"webhook:{wid}", secret), wid))
     c.commit()
+    g.idem_no_body = True  # 2.391.0 (#3362 review B1): the secret is shown once, never kept with an idempotency key
     return jsonify({**wh_public(c, need_webhook(c, wid, oid)), "secret": secret}), 201
 
 
@@ -638,6 +639,7 @@ def wh_secret_do(wid, oid=None):
     secret = "whsec_" + secrets.token_urlsafe(32)
     c.execute("UPDATE webhooks SET secret=?, updated_at=? WHERE id=?", (seal(c, f"webhook:{wid}", secret), iso(now_utc()), wid))
     c.commit()
+    g.idem_no_body = True  # 2.391.0 (#3362 review B1)
     return jsonify(secret=secret)
 
 

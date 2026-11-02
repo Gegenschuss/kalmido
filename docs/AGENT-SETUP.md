@@ -35,6 +35,7 @@ subscription or API key. Kalmido provides:
   9. [Autostart with the runtime launcher](#9-autostart-with-the-runtime-launcher)
   10. [Usage reporting](#10-usage-reporting)
   11. [Test checklist](#11-test-checklist)
+- [Other tools: Codex CLI, Cursor, Windsurf, Gemini CLI](#other-tools-codex-cli-cursor-windsurf-gemini-cli) (2.391.0)
 - [Several specialist agents under one Kalmido agent](#several-specialist-agents-under-one-kalmido-agent)
 - [A meeting becomes tasks](#a-meeting-becomes-tasks) (2.70.0)
 - [Troubleshooting](#troubleshooting)
@@ -147,7 +148,7 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
 1. *Settings > Agents > Status > Add agent* (admins; 2.366.0: also *Add agent…* in the header of the Agents area and in its
    empty state, which opens the same chooser): a username (e.g. `claude`), a display name and optionally a
    note (who runs it and where). **Permissions** (2.15.0): it starts with *Read*, *Tasks*, *Comments* and the file store (*Read files* and *Add files*, `files:read` / `files:write`); tick only what
-   it needs on top (structure, delete, task attachments, time, export, calendar, contacts, office, tables, knowledge pages). *Calendar* also covers scheduling polls (2.484.0): the agent reads the polls of its own account and its workspaces and creates new ones; it never votes, a person chooses the time. *Office drafts* is a right you give on purpose (see [AGENTS.md](AGENTS.md#permissions)); `account`, `admin-read`, `private` and `docs:upload` are never available to an agent. An agent that may only read cannot answer in the chat or send
+   it needs on top (structure, delete, task attachments, time, export, calendar, contacts, office, tables, knowledge pages). *Calendar* also covers scheduling polls (2.484.0): the agent reads the polls of its own account and its workspaces and creates new ones; it never votes, a person chooses the time. *Office drafts* is a right you give on purpose (see [AGENTS.md](AGENTS.md#permissions)); `account`, `admin-read`, `private`, `docs:upload` and `integrations` (2.391.0) are never available to an agent. An agent that may only read cannot answer in the chat or send
    proposals (2.190.0): keep *Comments* or *Tasks* on for that. With *structure* it can set up a project with custom fields as
    columns; that switches the module *Custom fields* on for the project's owner (2.39.1). Copy the **API token**: it is shown only once. You can
    rotate it later in the agent's dialog (optionally with an expiry); the old token stops at once. Deleting projects or
@@ -229,6 +230,7 @@ mkdir -p ~/.config/kalmido && chmod 700 ~/.config/kalmido
 ( umask 077; cat > ~/.config/kalmido/agent.env ) <<'EOF'
 KALMIDO_URL=https://tasks.example.com
 KALMIDO_TOKEN=abk_paste_the_token_here
+# KALMIDO_TOOLSETS=tickets,code,chat      optional: only these tool packages (default: all)
 EOF
 stat -c '%a %U' ~/.config/kalmido/agent.env      # 600 kalmido-agent
 ```
@@ -293,7 +295,7 @@ claude                                          # log in once, then /exit
 
 ### 5. The MCP server behind a wrapper
 
-The MCP server needs only Python 3 and reads `KALMIDO_URL` and `KALMIDO_TOKEN` from its environment. A wrapper hands
+The MCP server needs only Python 3 and reads `KALMIDO_URL` and `KALMIDO_TOKEN` from its environment. Optionally `KALMIDO_TOOLSETS` (e.g. `tickets,code`; `chat` is always on, default all) or the start option `--toolsets` limits the tools to those packages, which saves context (see [mcp/README.md](../mcp/README.md#toolsets---toolsets-kalmido_toolsets)). A wrapper hands
 them over from the env file, so the token is neither in Claude Code's configuration nor visible to the model:
 
 ```sh
@@ -878,6 +880,79 @@ with the agent; delete both afterwards. Watch the answers and *Settings > Organi
 directory and other services' configuration are not readable; `/var/run/docker.sock` is not accessible; SSH to other
 hosts and connections to LAN addresses time out; only DNS, Kalmido and public HTTPS work.
 
+## Other tools: Codex CLI, Cursor, Windsurf, Gemini CLI
+
+This guide is written for Claude Code. Other tools connect to the same MCP server; use the wrapper of
+[step 5](#5-the-mcp-server-behind-a-wrapper) (it reads the env file, so the token is in no configuration). The in-app guide
+(*Settings > Agents > Set up*, *For advanced users*) swaps the command lines with its tool switch.
+
+### Codex CLI (runs per event)
+
+Codex CLI connects through MCP **and** runs per event through the launcher (2.391.0, #3359): the event runner starts
+`codex exec --json -` once per event and reads its JSONL events for steps, the answer and the conversation (a chat goes on
+with `codex exec --json resume <id> -`).
+
+```sh
+npm install -g @openai/codex
+codex login
+codex mcp add kalmido -- "$HOME/kalmido/mcp/run.sh"     # writes [mcp_servers.kalmido] into ~/.codex/config.toml
+```
+
+The same in `~/.codex/config.toml` by hand:
+
+```toml
+[mcp_servers.kalmido]
+command = "/path/to/kalmido/mcp/run.sh"
+```
+
+Launcher with the command in the env file (or after `--` as for Claude Code):
+
+```sh
+# ~/.config/kalmido/agent.env
+KALMIDO_AGENT_CMD="codex --skip-git-repo-check --sandbox workspace-write"
+KALMIDO_AGENT_PROFILE=codex
+```
+
+```sh
+~/kalmido/mcp/agent_launcher.sh -e ~/.config/kalmido/agent.env --events --once   # dry run
+```
+
+What is different from Claude Code: no permission questions in the chat (Codex decides with its own sandbox and approval
+settings: `--sandbox`, `-c approval_policy=...`), no usage hook and no plan usage ring, and Kalmido's model setting does not
+reach Codex (set `model` in `config.toml` or `-m` in the command). Approval cards work as for every agent: the answer ends in
+an ` ```approval ` block. Codex reads `AGENTS.md` in the project folder as its rules file; put the rules of
+[step 6](#6-claudemd-the-agents-rules) there. The one-command setup does all of this with `--tool codex` (`-Tool codex` on
+Windows); without the option it asks once.
+
+### Cursor
+
+`.cursor/mcp.json` in the project folder (or `~/.cursor/mcp.json` for every project):
+
+```json
+{ "mcpServers": { "kalmido": { "command": "/path/to/kalmido/mcp/run.sh" } } }
+```
+
+### Windsurf
+
+`~/.codeium/windsurf/mcp_config.json`, the same block:
+
+```json
+{ "mcpServers": { "kalmido": { "command": "/path/to/kalmido/mcp/run.sh" } } }
+```
+
+### Gemini CLI
+
+`~/.gemini/settings.json` (or `.gemini/settings.json` in the project), the same block under `mcpServers`:
+
+```json
+{ "mcpServers": { "kalmido": { "command": "/path/to/kalmido/mcp/run.sh" } } }
+```
+
+Cursor, Windsurf and Gemini CLI use the Kalmido tools while you work with them; they get no events by themselves (the
+launcher runs only Claude Code and Codex CLI per event, or any command that answers on stdout with
+`KALMIDO_AGENT_PROFILE=generic`). On Windows the command is `pwsh` with
+`"args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:/path/to/kalmido/mcp/run.ps1"]`.
+
 ## Several specialist agents under one Kalmido agent
 
 When one agent covers several topics (code, docs, reviews, planning), resist running one long interactive session per
@@ -930,7 +1005,7 @@ them with the right people.
   kalmido-agent` as the agent user; run `~/agent/bin/events.sh` by hand (stop the service first, it moves the cursor).
 - **`EVENTS: http 403`**: the agent is paused or the token was rotated; fix the env file and restart the service.
 - **`EVENTS: http 000`**: Kalmido is not reachable: check the firewall rule for Kalmido (step 3) and `KALMIDO_URL`.
-- **`"busy": true`**: too many waiting requests (2 per agent); only one event loop per agent.
+- **`"busy": true`**: too many waiting requests (2 per agent, and on the whole server as many as the web threads less 8, see `KALMIDO_AGENT_WAITERS`); only one event loop per agent. The answer carries `Retry-After` (3-8 s): come back after it.
 - **Long polling ends early behind a proxy**: allow responses longer than 60 seconds (nginx `proxy_read_timeout 75s;`).
 - **The MCP server is not connected**: `claude mcp list` in `~/agent`; run `~/kalmido/mcp/run.sh < /dev/null` to see
   its error message.

@@ -23,7 +23,9 @@
 #               KALMIDO_URL=https://tasks.example.com
 #               KALMIDO_TOKEN=abk_...            the agent's API token (Settings > Agents)
 #             everything in it is exported to the command too (the MCP server mcp/kalmido_mcp.py reads the same two)
-#   COMMAND   what to start (default: claude). Example, a headless loop that works through its events:
+#             optional: KALMIDO_TOOLSETS=tickets,code,office  (only those tool packages in the MCP server; chat is always on)
+#   COMMAND   what to start (default: KALMIDO_AGENT_CMD of the env file, else claude; KALMIDO_AGENT_PROFILE claude | codex |
+#             generic names the tool, 2.391.0). Example, a headless loop that works through its events:
 #               agent_launcher.sh -e ~/.config/kalmido/agent.env -- claude -p "$(cat ~/agent/prompt.md)" --permission-mode acceptEdits
 #   --once    print the command line and environment it would use, then exit (a dry run; the token is never printed)
 #   --events  event mode (2.35.0, recommended for Claude Code): the launcher starts mcp/agent_run.py, which waits for the
@@ -61,8 +63,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 CMD=("$@")
-[[ ${#CMD[@]} -gt 0 ]] || CMD=(claude)
-AGENT0=${CMD[0]}  # the agent command itself (event mode puts python3 agent_run.py in front)
 [[ -r "$ENV_FILE" ]] || { log "cannot read $ENV_FILE"; exit 2; }
 [[ "$ENV_FILE" == */* ]] || ENV_FILE=./$ENV_FILE  # "." would search PATH for a bare name
 set -a
@@ -73,6 +73,18 @@ set +a
 [[ -n "${KALMIDO_URL:-}" ]] || { log "KALMIDO_URL missing in $ENV_FILE"; exit 2; }
 [[ -n "${KALMIDO_TOKEN:-}" ]] || { log "KALMIDO_TOKEN missing in $ENV_FILE"; exit 2; }
 [[ "${KALMIDO_EVENTS:-0}" == 1 ]] && EVENTS=1
+# kalmido-capability: toolsets (2.391.0, #3358: KALMIDO_TOOLSETS from the env file is exported by set -a above and read by mcp/kalmido_mcp.py)
+# kalmido-capability: profile (2.391.0, #3359): the command and its tool may come from the env file: KALMIDO_AGENT_CMD (the
+# command line, shell words, e.g. "codex" or "claude --mcp-config ~/agent/.mcp.json"; a COMMAND after -- wins) and
+# KALMIDO_AGENT_PROFILE (claude | codex | generic, else from the command's name). mcp/agent_run.py builds each run for the
+# profile (Codex CLI: codex exec --json); Kalmido's model setting is a Claude model and goes only to a claude command.
+if [[ ${#CMD[@]} -eq 0 && -n "${KALMIDO_AGENT_CMD:-}" ]]; then eval "CMD=($KALMIDO_AGENT_CMD)"; fi
+[[ ${#CMD[@]} -gt 0 ]] || CMD=(claude)
+AGENT0=${CMD[0]}  # the agent command itself (event mode puts python3 agent_run.py in front)
+PROFILE=${KALMIDO_AGENT_PROFILE:-}
+if [[ -z "$PROFILE" ]]; then
+  case "$(basename "$AGENT0")" in codex|codex.*) PROFILE=codex ;; *) PROFILE=claude ;; esac
+fi
 # kalmido-capability: steps, model, permission_mode, quota, reply_ref, status_typing, approval, old_server, proposals, message_edited, playbook, approval_check, notice, comment_answer, comment_blocks
 # kalmido-capability: outbox, jobs, event_bundling (2.44.0: mcp/agent_extras.py and mcp/agent_job.py, loaded by agent_run.py)
 # kalmido-capability: approval_closed, perm_relay, approval_lifecycle, session_resume, robust_runs
@@ -101,7 +113,7 @@ set +a
 # kalmido-capability: contract_notice (2.70.0: a contract's notice deadline -> ONE propose_contract_notice, in mcp/agent_run.py)
 # kalmido-capability: perm_user_choice (2.312.0, #3266: the person for permission questions chosen in Kalmido before KALMIDO_PERM_USER, in mcp/agent_run.py)
 # kalmido-capability: letter_draft (2.153.0: a request to draft an answer to a document -> ONE create_letter_draft, in mcp/agent_run.py)
-# (2.44.0: agent_run.py; perm_relay and session_resume only when COMMAND is Claude Code)
+# (2.44.0: agent_run.py; perm_relay and session_resume only when COMMAND is Claude Code; 2.391.0: session_resume also Codex CLI)
 # (2.126.0: perm_relay asks only the agent's operator: owner, KALMIDO_PERM_USER, KALMIDO_OWNER_IDS)
 # kalmido-capability: usage_hook (2.306.0, #2927: claude_usage_hook.py as Stop / SubagentStop hook in the run settings, in mcp/agent_run.py)
 # (2.126.0: playbook names the authors of a foreign Playbook; texts marked untrusted are framed as data)
@@ -151,7 +163,7 @@ PID=""
 # kalmido-capability: runtime (model, auto-compact, fresh session, restart on change / reset / nightly, pause)
 start() {  # start the command with the current settings (its own process group, so a restart ends all of it)
   local args=("${CMD[@]}") envs=()
-  [[ "$MODEL" != "-" ]] && args+=(--model "$MODEL")
+  [[ "$MODEL" != "-" && "$PROFILE" == claude ]] && args+=(--model "$MODEL")
   if [[ "$AC" == "0" ]]; then envs+=(DISABLE_AUTO_COMPACT=1)
   elif [[ "$PCT" != "-" ]]; then envs+=(CLAUDE_AUTOCOMPACT_PCT_OVERRIDE="$PCT"); fi
   # kalmido-capability: git_author (2.396.0, #3386): the agent's commits carry the git author set in Kalmido
@@ -160,7 +172,7 @@ start() {  # start the command with the current settings (its own process group,
   fi
   if [[ $ONCE == 1 ]]; then echo "env ${envs[*]:-} ${args[*]}"; return; fi
   local acs=off; [[ "$AC" == 1 ]] && acs="on at ${PCT/#-/the default }%"
-  log "starting (fresh session): ${args[0]}, model ${MODEL/#-/default}, auto-compact $acs"
+  log "starting (fresh session, profile $PROFILE): ${args[0]}, model ${MODEL/#-/default}, auto-compact $acs"
   # ${envs[@]+...}: bash 3.2 calls an empty array unbound under set -u
   # 2.157.0 (#1517): KALMIDO_LAUNCHER_PID -- the event runner ends when this launcher was killed hard (no orphan left behind)
   env -u DISABLE_AUTO_COMPACT -u CLAUDE_AUTOCOMPACT_PCT_OVERRIDE -u KALMIDO_GIT_COAUTHOR KALMIDO_LAUNCHER_PID=$$ ${envs[@]+"${envs[@]}"} "${NEWSESS[@]}" "${args[@]}" &

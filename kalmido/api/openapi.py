@@ -20,6 +20,9 @@ from ..tasks.oneway import dec_spec
 from ..hub.hmv1 import hmv_spec  # 2.483.0 (#1902)
 
 
+RATE_HEADERS = ("RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset")
+
+
 def groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
     G = "Groups"
     schemas["Group"] = {"type": "object", "properties": {
@@ -78,14 +81,18 @@ def openapi_spec():
         return {"type": "object", "required": ["data", "next_cursor"],
                 "properties": {"data": {"type": "array", "items": ref(n)}, "next_cursor": nul("string", description="Pass as ?cursor= for the next page; null = last page")}}
 
+    def rate_hdrs():  # 2.391.0 A (#3361): every answer of a token request carries them (components.headers)
+        return {n: {"$ref": f"#/components/headers/{n}"} for n in RATE_HEADERS}
+
     def ok(schema, desc="OK", code="200"):
-        return {code: {"description": desc, "content": {"application/json": {"schema": schema}}}}
+        return {code: {"description": desc, "headers": rate_hdrs(), "content": {"application/json": {"schema": schema}}}}
 
     def errs(*codes):
         text = {"400": "Invalid input", "401": "Missing, invalid or expired token", "403": "Not allowed (scope, role or a switched-off module)",
                 "404": "Not found or not visible to the token's user", "409": "Conflict", "410": "The file is damaged or missing on the server", "413": "Too large",
                 "429": "Rate limit reached (see Retry-After)", "503": "Not available on this server"}
-        return {c: {"description": text[c], "content": {"application/json": {"schema": ref("Error")}}} for c in ("401", "429") + codes}
+        return {c: {"description": text[c], **({"headers": {**rate_hdrs(), "Retry-After": {"description": "Seconds to wait", "schema": {"type": "integer"}}}} if c == "429" else {}),
+                    "content": {"application/json": {"schema": ref("Error")}}} for c in ("401", "429") + codes}
 
     def op(summary, tag, responses, params=(), body=None, desc=None, scope="read"):
         o = {"summary": summary, "tags": [tag], "responses": responses, "x-kalmido-scope": scope}
@@ -853,6 +860,8 @@ def openapi_spec():
     ml_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.71.0 B (#1459)
     from ..lists.rules import rul_spec
     rul_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.71.0 A (#1457)
+    from ..api.v1setup import v1s_spec
+    v1s_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.391.0 (#3362): webhooks, tokens, repository connections
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",
@@ -867,6 +876,15 @@ def openapi_spec():
         "tags": [{"name": n} for n in ("Account", T, L, "Structure", "Roadmap", C, S_, TI, H, "Import", A, "Agents", "Groups", "Day plan", "Notes", "Team chat", "Family", "Events", "Contacts", "Home & life", "Clients", "Workload", "Forms")],
         "paths": paths,
         "components": {"securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "abk_ token"}},
+                       "headers": {
+                           "RateLimit-Limit": {"description": "Requests allowed per token and minute", "schema": {"type": "integer"}},
+                           "RateLimit-Remaining": {"description": "Requests left in the current window", "schema": {"type": "integer"}},
+                           "RateLimit-Reset": {"description": "Seconds until the window frees a place", "schema": {"type": "integer"}},
+                           "X-RateLimit-Limit": {"description": "Same as RateLimit-Limit", "schema": {"type": "integer"}},
+                           "X-RateLimit-Remaining": {"description": "Same as RateLimit-Remaining", "schema": {"type": "integer"}},
+                           "X-RateLimit-Reset": {"description": "Unix time (seconds) when the window frees a place, like GitHub's", "schema": {"type": "integer"}},
+                           "Deprecation": {"description": "Present when the request used something deprecated", "schema": {"type": "string"}},
+                           "Sunset": {"description": "HTTP date after which a deprecated thing may be removed (at least 90 days after the announcement)", "schema": {"type": "string"}}},
                        "schemas": schemas},
     }
     return _SPEC["s"]

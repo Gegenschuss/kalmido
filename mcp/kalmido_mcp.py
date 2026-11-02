@@ -56,9 +56,24 @@ ATT_CAP_MAX = 20 * 1024 * 1024
 
 
 class ApiError(Exception):
-    def __init__(self, status, message):
+    def __init__(self, status, message, retry_after=None):
         super().__init__(message)
-        self.status, self.message = status, message
+        self.status, self.message, self.retry_after = status, message, retry_after  # retry_after: seconds from the header, or None
+
+
+# 2.391.0 A (#3360): HTTP 429 / 503 are tried again (at most RETRY_TRIES requests, at most RETRY_TOTAL_S s of waiting together), the
+# waits as in the starter's agent_run.py (RETRY_429_S) when a 503 names none (a 429 without Retry-After is a quota: not retried); never for the long poll (wait_for_events).
+RETRY_429_S = (5, 15, 30, 60)
+RETRY_TRIES, RETRY_TOTAL_S = 3, 60
+_sleep = time.sleep  # tests replace it
+
+
+def _retry_after(headers, default):
+    try:
+        v = float((headers.get("Retry-After") or "").strip())
+        return min(max(v, 0.0), 3600.0)
+    except ValueError:
+        return default
 
 
 class Kalmido:
@@ -69,6 +84,7 @@ class Kalmido:
         self.approval = None  # 2.235.0 (#2891): the approved card (use_approval) the next write request carries, once
         self.approval_step = None  # 2.235.0 A2 (#2891): (method, path) of that card when known: only that call carries it
         self.cards = {}  # 2.235.0 A2: message id -> step of the approval cards this process sent
+        self.rl_until = 0.0  # 2.391.0 A (#3360): RateLimit-Remaining was 0: no request before this time (the header's Reset)
 
     def call(self, method, path, query=None, body=None, timeout=None, multipart=None, binary_cap=None):
         """multipart: (fields dict, [(name, mime, bytes)]) -> a multipart/form-data body (field `file` per file).
@@ -88,11 +104,35 @@ class Kalmido:
         if self.approval and method in ("POST", "PUT", "PATCH", "DELETE") and not path.startswith("/agent/") and \
                 (not self.approval_step or self.approval_step == (method, "/api/v1" + urllib.parse.unquote(path))):
             ctype["X-Kalmido-Approval"], self.approval = str(self.approval), None  # 2.235.0 (#2891): once, the (matching) next write
+        if method in ("POST", "PUT", "PATCH", "DELETE") and not path.startswith("/agent/"):
+            ctype["Idempotency-Key"] = uuid.uuid4().hex  # 2.391.0 A (#3360): one per call, the same on every retry (core/idem.py answers a repeat from the stored result)
         req = urllib.request.Request(url, data=data, method=method, headers={
             "Authorization": "Bearer " + self.token, "Accept": "*/*" if binary_cap else "application/json",
             "User-Agent": f"kalmido-mcp/{SERVER_VERSION}", **ctype})
+        poll = path.startswith("/agent/events")
+        gap = self.rl_until - time.time()
+        if gap > 0 and not poll:  # RateLimit-Remaining 0 on the last answer: wait for the reset (at most one window)
+            _sleep(min(gap, RETRY_TOTAL_S))
+        waited = 0.0
+        for attempt in range(1, RETRY_TRIES + 1):
+            try:
+                return self._send(req, timeout or self.timeout, binary_cap)
+            except ApiError as e:
+                if e.status not in (429, 503) or poll or attempt == RETRY_TRIES:
+                    raise
+                if e.status == 429 and e.retry_after is None:  # a quota (open proposals, a day's limit ...) names no wait: not a wait-and-see case
+                    raise
+                wait = e.retry_after if e.retry_after is not None else RETRY_429_S[min(attempt - 1, len(RETRY_429_S) - 1)]
+                if waited + wait > RETRY_TOTAL_S:
+                    raise
+                waited += wait
+                _sleep(wait)
+
+    def _send(self, req, timeout, binary_cap):
+        """One request. Remembers an exhausted rate limit (RateLimit-Remaining 0 + Reset) for the next call."""
         try:
-            with urllib.request.urlopen(req, timeout=timeout or self.timeout) as r:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                self._note_limit(r.headers)
                 if binary_cap:
                     n = int(r.headers.get("Content-Length") or 0)
                     if n > binary_cap:
@@ -114,9 +154,19 @@ class Kalmido:
                 msg = f"HTTP {e.code}: {msg}"
             except (ValueError, AttributeError):
                 pass
-            raise ApiError(e.code, msg) from None
+            self._note_limit(e.headers)
+            raise ApiError(e.code, msg, _retry_after(e.headers, None) if e.code in (429, 503) else None) from None
         except (urllib.error.URLError, OSError) as e:
             raise ApiError(0, f"cannot reach Kalmido: {getattr(e, 'reason', e)}") from None
+
+    def _note_limit(self, headers):
+        try:
+            if headers.get("RateLimit-Remaining") is not None and int(headers["RateLimit-Remaining"]) <= 0:
+                self.rl_until = time.time() + min(float(headers.get("RateLimit-Reset") or 0), RETRY_TOTAL_S)
+            else:
+                self.rl_until = 0.0
+        except (ValueError, TypeError):
+            self.rl_until = 0.0
 
 
 def _multipart(fields, files):
@@ -2423,6 +2473,66 @@ TOOLS += [
            "show_votes": {"type": "boolean"}}, ["title", "options"]),
      lambda api, a: api.call("POST", "/polls", body=_pick(a, POLL_KEYS))),
 ]
+# 2.391.0 (#3362): setting up integrations (scope "integrations"; tokens also "account"). People's scripts only: an agent
+# never gets the scope, so tools/list hides these for agents and the server refuses them (403).
+_WH_IN = {"name": {"type": "string", "maxLength": 60}, "url": {"type": "string", "description": "https address the events are POSTed to"},
+          "events": {"type": "array", "items": {"type": "string"}, "description": "event names, see list_webhooks (events)"},
+          "enabled": {"type": "boolean"}}
+_WH_ORG = {"org_id": {**S_ID, "description": "an organisation's webhooks (its admins); without: your own"}}
+
+
+def _wh_base(a):
+    return f"/orgs/{_id(a, 'org_id')}/webhooks" if a.get("org_id") else "/me/webhooks"
+
+
+TOOLS += [
+    ("list_webhooks", "2.391.0 (scope integrations, people only): your webhooks (or an organisation's with org_id, its admins) with their "
+                      "events and last delivery; never their signing secret. Needs a token for all projects.",
+     _obj(_WH_ORG), lambda api, a: api.call("GET", _wh_base(a))),
+    ("create_webhook", "2.391.0 (scope integrations): create a webhook (url, events); the answer carries its signing secret ONCE "
+                       "(secret) -- store it at once, it is never shown again.",
+     _obj({**_WH_IN, **_WH_ORG}, ["url", "events"]), lambda api, a: api.call("POST", _wh_base(a), body=_pick(a, ("name", "url", "events", "enabled")))),
+    ("update_webhook", "2.391.0 (scope integrations): change a webhook's name, url, events or switch it on / off (enabled).",
+     _obj({"webhook_id": S_ID, **_WH_IN, **_WH_ORG}, ["webhook_id"]),
+     lambda api, a: api.call("PATCH", f"{_wh_base(a)}/{_id(a, 'webhook_id')}", body=_pick(a, ("name", "url", "events", "enabled")))),
+    ("delete_webhook", "2.391.0 (scope integrations): delete a webhook.",
+     _obj({"webhook_id": S_ID, **_WH_ORG}, ["webhook_id"]), lambda api, a: api.call("DELETE", f"{_wh_base(a)}/{_id(a, 'webhook_id')}")),
+    ("rotate_webhook_secret", "2.391.0 (scope integrations): a new signing secret for a webhook (the old one stops at once); shown ONCE.",
+     _obj({"webhook_id": S_ID, **_WH_ORG}, ["webhook_id"]), lambda api, a: api.call("POST", f"{_wh_base(a)}/{_id(a, 'webhook_id')}/secret")),
+    ("test_webhook", "2.391.0 (scope integrations): send a ping event to a webhook now (no retries) and get the result.",
+     _obj({"webhook_id": S_ID, **_WH_ORG}, ["webhook_id"]), lambda api, a: api.call("POST", f"{_wh_base(a)}/{_id(a, 'webhook_id')}/test")),
+    ("get_webhook_log", "2.391.0 (scope integrations): the recent deliveries of a webhook (event, attempt, status, error).",
+     _obj({"webhook_id": S_ID, **_WH_ORG}, ["webhook_id"]), lambda api, a: api.call("GET", f"{_wh_base(a)}/{_id(a, 'webhook_id')}/log")),
+    ("list_api_tokens", "2.391.0 (scopes integrations + account, people only): your API tokens (name, prefix, scopes, expiry, last use); "
+                        "never their value.",
+     _obj({}), lambda api, a: api.call("GET", "/me/tokens")),
+    ("create_api_token", "2.391.0 (scopes integrations + account): create an API token; it never gets more than the token you use "
+                         "(scopes, addresses, projects, expiry; not given = the same as yours). The answer carries the token ONCE (token).",
+     _obj({"name": {"type": "string", "minLength": 1, "maxLength": 60}, "scopes": STRS,
+           "allowed_ips": STRS, "list_ids": {"type": "array", "items": S_ID},
+           "expires_days": {"type": "integer", "minimum": 1, "maximum": 3650}}, ["name"]),
+     lambda api, a: api.call("POST", "/me/tokens", body=_pick(a, ("name", "scopes", "allowed_ips", "list_ids", "expires_days")))),
+    ("revoke_api_token", "2.391.0 (scopes integrations + account): revoke one of your API tokens (it stops at once; also the one you use).",
+     _obj({"token_id": S_ID}, ["token_id"]), lambda api, a: api.call("DELETE", f"/me/tokens/{_id(a, 'token_id')}")),
+    ("add_repo_connection", "2.391.0 (scope integrations, project owner / admins, people only): connect a repository to a project: repo "
+                            "= owner/name or its address, provider github | gitlab | gitea | bitbucket (detected from the address), "
+                            "base_url for an own server, token = the provider's access token (only stored, never returned). "
+                            "list_repos shows the connections.",
+     _obj({"list_id": S_ID, "repo": {"type": "string", "minLength": 1}, "provider": {"type": "string", "enum": ["github", "gitlab", "gitea", "bitbucket"]},
+           "base_url": {"type": "string"}, "owner": {"type": "string"}, "token": {"type": "string"}}, ["list_id", "repo"]),
+     lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/repos", body=_pick(a, ("repo", "provider", "base_url", "owner", "token")))),
+    ("update_repo_connection", "2.391.0 (scope integrations): change a repository connection: token (\"\" = remove), hook on (its secret "
+                               "comes ONCE as hook_secret) | off, hash_ids, author_name / author_email (git author for AI commits).",
+     _obj({"repo_id": S_ID, "token": {"type": "string"}, "hook": {"type": "string", "enum": ["on", "off"]}, "hash_ids": {"type": "boolean"},
+           "author_name": {"type": "string"}, "author_email": {"type": "string"}}, ["repo_id"]),
+     lambda api, a: api.call("PATCH", f"/repos/{_id(a, 'repo_id')}", body=_pick(a, ("token", "hook", "hash_ids", "author_name", "author_email")))),
+    ("remove_repo_connection", "2.391.0 (scope integrations): remove a repository connection with its stored pull requests and commits.",
+     _obj({"repo_id": S_ID}, ["repo_id"]), lambda api, a: api.call("DELETE", f"/repos/{_id(a, 'repo_id')}")),
+    ("set_repo_version_field", "2.391.0 (scope integrations): which field of a project holds the package / target version: auto, off "
+                               "or the id of a text / select field.",
+     _obj({"list_id": S_ID, "field": {"type": ["string", "integer"]}}, ["list_id", "field"]),
+     lambda api, a: api.call("PUT", f"/lists/{_id(a, 'list_id')}/repos/version-field", body={"field": a["field"]})),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -2486,7 +2596,109 @@ TOOL_SCOPES["tasks:write"] += ("review_task", "set_working", "end_working")  # 2
 TOOL_SCOPES["files:read"] += ("list_documents", "get_document")
 TOOL_SCOPES["files:write"] += ("update_document",)
 TOOL_SCOPES["agent"] += ("confirm_abort",)
+# 2.391.0 (#3362): setting up integrations (people only; the tokens also need "account", checked by the server)
+TOOL_SCOPES["integrations"] = ("list_webhooks", "create_webhook", "update_webhook", "delete_webhook", "rotate_webhook_secret", "test_webhook",
+                               "get_webhook_log", "list_api_tokens", "create_api_token", "revoke_api_token", "add_repo_connection",
+                               "update_repo_connection", "remove_repo_connection", "set_repo_version_field")
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
+
+
+# 2.391.0 B (#3358): toolsets. --toolsets tickets,code,... / KALMIDO_TOOLSETS limits tools/list and tools/call to those packages
+# (fewer tools = less context for the model). Every tool sits in exactly ONE package; tests/p2391_b_toolsets_test.py fails
+# for a tool without an entry or with two. "all" = every package except "integrations"; no option = all; "chat" is always on.
+TOOLSETS = {
+    "tickets": """
+        list_watchers watch_task unwatch_task
+        list_lists set_list_columns get_project_overview list_list_tags list_tasks get_milestone list_groups list_list_groups search_tasks related_tasks
+        get_task create_task update_task add_snippet complete_task set_waiting clear_waiting list_waiting list_stale_tasks add_decision add_comment
+        request_comment_approval withdraw_comment_choices set_working end_working list_attachments get_attachment read_attachment read_briefing
+        read_project_status get_waiting tidy_task get_delivery_report get_storage get_list get_playbook propose_playbook create_list update_list delete_list
+        shift_list_dates list_members share_list unshare_list share_list_with_group unshare_list_from_group get_group list_sections create_section
+        rename_section reorder_sections delete_section list_folders rename_folder delete_folder move_task link_task_to_list unlink_task_from_list
+        batch_tasks reopen_task delete_task partial_task skip_occurrence take_task list_subtasks add_subtask list_trash restore_task empty_trash list_tags
+        get_roadmap get_dependencies add_dependency remove_dependency list_fields create_field update_field delete_field get_key_figures create_list_tag
+        update_list_tag delete_list_tag list_templates create_template update_template delete_template apply_template duplicate_list list_filters
+        create_filter update_filter delete_filter upload_attachment create_text_file delete_attachment update_comment delete_comment set_project_overview
+        add_project_link update_project_link delete_project_link reorder_project_links add_milestone update_milestone delete_milestone list_sprints
+        get_sprint set_task_sprint set_project_status list_project_files upload_project_file delete_project_file export_data request_approval review_task
+        set_list_review list_forms create_form update_form delete_form list_files read_file search_files write_file create_file_folder list_documents
+        get_document update_document create_document list_notepads create_notepad update_notepad delete_notepad write_status_pad get_weekly_status
+        list_layout_blocks get_view_layout propose_layout set_wip_limit get_velocity propose_import propose_rule list_video_reviews get_video_review
+        add_video_comment set_video_comment_done get_workload get_absences get_day_plan get_day_review
+    """,
+    "code": """
+        list_repos list_build_status list_environments set_deployment request_merge_approval request_integration_approval request_deploy_approval
+    """,
+    "chat": """
+        get_agent get_queue get_rules add_rule set_queue_order search_messages propose_to_other_topic propose_to_person react react_to_chat
+        pin_chat_message set_status report_progress list_events wait_for_events list_jobs create_job get_job submit_proposal update_job list_chats
+        confirm_abort chat_typing send_chat request_chat_approval use_approval withdraw_chat_choices delete_chat_attachment comment_typing report_usage
+        get_usage report_plan_usage get_plan_usage clear_plan_usage list_schedules list_rules get_me get_announcement list_news mark_news_read list_agents
+        list_team_chats read_team_chat post_team_message list_team_channels leave_team_channel edit_team_message delete_team_message react_team_message
+        pin_team_message mark_team_chat_read
+    """,
+    "office": """
+        get_office list_office_data list_office_documents get_office_document create_offer_draft update_offer_draft draft_invoice_from_offer
+        draft_reminder suggest_payment list_payment_suggestions list_office_leads create_office_lead update_office_lead create_letter_draft
+        list_letter_drafts update_letter_draft link_letter_document suggest_receipt list_receipt_suggestions
+        list_invoice_series get_office_subscriptions list_filed_mails get_filed_mail
+        list_clients get_client create_client update_client delete_client bulk_clients
+        get_timer start_timer stop_timer list_time_entries get_time_gaps add_time_entry update_time_entry delete_time_entry check_time_entries
+        time_from_events propose_time_entries
+        sheets_list sheet_read sheet_create sheet_update sheet_set_cells sheet_append_rows sheet_add_column sheet_vars sheet_undo_batch sheet_tabs
+        sheet_add_tab propose_sheet_tasks
+        list_address_books create_address_book update_address_book delete_address_book share_address_book unshare_address_book import_vcards
+        export_vcards search_contacts get_contact create_contact update_contact delete_contact bulk_contacts link_contact unlink_contact set_contact_care
+    """,
+    "calendar": """
+        list_event_calendars create_event_calendar update_event_calendar delete_event_calendar share_event_calendar unshare_event_calendar import_ics
+        export_ics list_calendar_events get_event create_event update_event delete_event restore_event reply_to_event add_preparation_task
+        get_task_events get_dispo get_dispo_free propose_shoot freebusy
+        list_polls get_poll create_poll
+    """,
+    "wiki": """
+        wiki_list wiki_read wiki_write wiki_create list_notes search_notes get_note create_note update_note delete_note restore_note
+    """,
+    "life": """
+        list_habits create_habit update_habit delete_habit check_in_habit get_habit_stats get_family add_occasion list_deadline_types add_deadline
+        ingredients_to_shopping add_shop_areas list_packing_templates create_packing_list list_kids give_stars add_reward update_reward delete_reward
+        request_reward decide_reward get_life list_upkeep_presets add_contract add_device add_upkeep add_health_entry create_trip get_review
+        write_journal sync_read_later propose_contract_notice
+    """,
+    "integrations": """
+        list_webhooks create_webhook update_webhook delete_webhook rotate_webhook_secret test_webhook get_webhook_log
+        list_api_tokens create_api_token revoke_api_token add_repo_connection update_repo_connection remove_repo_connection
+        set_repo_version_field
+    """,  # 2.391.0 (#3362): setting up webhooks / tokens / repositories (scope integrations; only on request, not in "all")
+}
+TOOLSETS = {k: tuple(v.split()) for k, v in TOOLSETS.items()}
+TOOLSET_OF = {n: k for k, names in TOOLSETS.items() for n in names}
+ALL_TOOLSETS = tuple(k for k in TOOLSETS if k != "integrations")  # what "all" means (and the default)
+
+
+def parse_toolsets(spec):
+    """'tickets,code' -> frozenset of package names (chat always in); None or '' -> None (no limit, every tool);
+    'all' = every package but integrations. An unknown name raises ValueError (a typo must not silently list nothing)."""
+    names = [s.strip().lower() for s in str(spec or "").replace(" ", ",").split(",") if s.strip()]
+    if not names:
+        return None
+    out = {"chat"}
+    for n in names:
+        if n == "all":
+            out.update(ALL_TOOLSETS)
+        elif n in TOOLSETS:
+            out.add(n)
+        else:
+            raise ValueError(f"unknown toolset {n!r} (known: all, {', '.join(TOOLSETS)})")
+    return frozenset(out)
+
+
+ACTIVE_TOOLSETS = None  # set by main() from --toolsets / KALMIDO_TOOLSETS; None = no limit (the default, as before 2.391)
+
+
+def in_toolsets(name):
+    """True when the tool is in an active package. A tool without an entry is never hidden (the test makes that impossible)."""
+    return ACTIVE_TOOLSETS is None or TOOLSET_OF.get(name) is None or TOOLSET_OF[name] in ACTIVE_TOOLSETS
 ALL_SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "calendar", "contacts",
               "private", "files:read", "files:write", "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write", "wiki:read", "wiki:write")  # 2.48.0 (#1207): + files; 2.51.0 (#1348): + office; 2.51.0 (#1352): + pinboard; 2.55.0 (#1066): + layouts; 2.68.0 (#1839): + import; 2.89.0 C (#1916): + sheets; 2.200.0 C (#1781): + wiki
 _ME = {"at": 0.0, "v": None}
@@ -2587,13 +2799,16 @@ def handle(api, msg):
         return None
     if m == "ping":
         return None if notif else _result(i, {})
-    if m == "tools/list":  # 2.15.0 (#479): only the tools this token may use
-        return _result(i, {"tools": [{"name": n, "description": d, "inputSchema": s} for n, d, s, _ in TOOLS if tool_allowed(api, n)]})
+    if m == "tools/list":  # 2.15.0 (#479): only the tools this token may use; 2.391.0 B (#3358): and the active toolsets
+        return _result(i, {"tools": [{"name": n, "description": d, "inputSchema": s} for n, d, s, _ in TOOLS if in_toolsets(n) and tool_allowed(api, n)]})
     if m == "tools/call":
         name, args = p.get("name"), p.get("arguments") or {}
         t = TOOL_MAP.get(name)
         if not t:
             return _error(i, -32602, f"Unknown tool: {name}")
+        if not in_toolsets(name):  # 2.391.0 B (#3358)
+            return _result(i, {"content": [{"type": "text", "text": f"{name} is not in the active toolsets ({', '.join(sorted(ACTIVE_TOOLSETS))}); "
+                                            f"it belongs to the toolset {TOOLSET_OF[name]} (start the server with --toolsets / KALMIDO_TOOLSETS including it)"}], "isError": True})
         if not tool_allowed(api, name):
             need = TOOL_SCOPE.get(name, "read")
             return _result(i, {"content": [{"type": "text", "text": f"not allowed for this token: needs the scope {need}" if need != "agent"
@@ -2702,7 +2917,16 @@ def main(argv=None):
     ap.add_argument("--http", action="store_true", help="serve Streamable HTTP (POST /mcp) instead of stdio")
     ap.add_argument("--host", default="127.0.0.1", help="HTTP bind address (default 127.0.0.1)")
     ap.add_argument("--port", type=int, default=8765, help="HTTP port (default 8765)")
+    ap.add_argument("--toolsets", default=os.environ.get("KALMIDO_TOOLSETS", ""),
+                    help="limit the tools to these packages, comma separated: " + ", ".join(TOOLSETS) + ", all (= all but integrations; default; chat is always on). "
+                    "Also KALMIDO_TOOLSETS")
     a = ap.parse_args(argv)
+    global ACTIVE_TOOLSETS
+    try:
+        ACTIVE_TOOLSETS = parse_toolsets(a.toolsets)
+    except ValueError as e:
+        print(f"kalmido-mcp: {e}", file=sys.stderr)
+        return 2
     api = Kalmido(os.environ.get("KALMIDO_URL", ""), os.environ.get("KALMIDO_TOKEN", ""))
     if not api.base or not api.token:
         print("kalmido-mcp: KALMIDO_URL and KALMIDO_TOKEN must be set", file=sys.stderr)

@@ -45,7 +45,7 @@ addresses and paths to your setup.
 
 ## Requirements
 
-Measured with an empty server, plus headroom for daily use. Kalmido is one Python process (waitress, 16 threads)
+Measured with an empty server, plus headroom for daily use. Kalmido is one Python process (waitress, 24 threads)
 next to PostgreSQL 17.
 
 | | Minimum | Recommended |
@@ -372,7 +372,7 @@ version: [Upgrade to 2.37](#upgrade-to-237-postgresql-required).
   Kalmido waits for, and no published port. Keep the image on major version 17 (see "major upgrade" below).
 - **Extensions need the database owner.** `init_db` creates `unaccent` and `pg_trgm` (both trusted extensions in the
   official image). With an external server, the user in `DATABASE_URL` must own the database, or create them once yourself.
-- **Connections.** Kalmido keeps up to 56 connections (`KALMIDO_DB_POOL_MAX`); `max_connections` of the server must be
+- **Connections.** Kalmido keeps up to 80 connections (`KALMIDO_DB_POOL_MAX`); `max_connections` of the server must be
   higher (the default 100 is enough for one instance). Since 2.102 the pool follows the web threads (`KALMIDO_THREADS`,
   see [Capacity, health and a worker process](#capacity-health-and-a-worker-process)), and the start warns in the log
   when the containers could open more connections than the server allows.
@@ -1760,7 +1760,7 @@ instances the numbers can be set and the work can be split:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `KALMIDO_THREADS` | `16` | request threads of the web server |
+| `KALMIDO_THREADS` | `24` | request threads of the web server |
 | `KALMIDO_DB_POOL_MAX` | threads x 3 + 8 (= 56) | database connections per container (`KALMIDO_POOL_MAX` works too) |
 | `KALMIDO_REPLICAS` | `1` | how many Kalmido containers share the database: only for the start-up check of `max_connections` |
 | `KALMIDO_ROLE` | `all` | `all` = web + background work, `web` = requests only, `worker` = background work only |

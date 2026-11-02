@@ -84,7 +84,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       # page checksums: damaged pages are reported instead of read silently
       POSTGRES_INITDB_ARGS: --data-checksums
-    # Kalmido keeps up to 56 connections (KALMIDO_DB_POOL_MAX); the server must allow more
+    # Kalmido keeps up to 80 connections (24 threads x 3 + 8) (KALMIDO_DB_POOL_MAX); the server must allow more
     command: ["postgres", "-c", "max_connections=100"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kalmido -d kalmido"]

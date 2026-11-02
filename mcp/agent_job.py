@@ -17,7 +17,9 @@ How it works
     <state dir>/jobs/<id>/ and starts `agent_job.py _run <id>` as a detached process (own session / process group).
   - the job runs COMMAND -p --output-format stream-json --verbose with the brief on stdin (COMMAND = the command of the
     runner, KALMIDO_JOB_CMD as a JSON list; model neutral). Its prose between tool calls goes to the job's history
-    (POST /api/v1/agent/progress with job_id), milestones to the job log.
+    (POST /api/v1/agent/progress with job_id), milestones to the job log. 2.391.0 (#3359): the profile of agent_run.py
+    (KALMIDO_AGENT_PROFILE, else the command's name) builds the run: Codex CLI runs `codex exec --json -` and goes on with
+    `codex exec --json resume <id> -`; a generic command gets the brief on stdin and its stdout text is the result.
   - the job's own outbox ($KALMIDO_OUTBOX) is attached to the result message.
   - after a compaction of the conversation (stream event compact_boundary) the brief is played in again, when the command
     takes a stream of user messages (Claude Code: --input-format stream-json); other commands cannot be reminded.
@@ -594,14 +596,29 @@ def footer(j):
             "park the work and report.)")
 
 
+_RUNNER = []
+
+
+def runner_module():
+    """agent_run.py next to this file (loaded once; None when it cannot be loaded): shared helpers (rules block, profile)."""
+    if not _RUNNER:
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("agent_run", os.path.join(HERE, "agent_run.py"))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            _RUNNER.append(mod)
+        except Exception as e:
+            log(f"agent_run.py not loaded: {type(e).__name__}")
+            _RUNNER.append(None)
+    return _RUNNER[0]
+
+
 def rules_for_job(api):
     """2.46.6 (#1715): the launcher's fixed rules block in front of the brief (also when it is played in again after a
     compaction); who may give orders and the language come from GET /api/v1/agent."""
     try:
-        import importlib.util
-        spec = importlib.util.spec_from_file_location("agent_run", os.path.join(HERE, "agent_run.py"))
-        ar = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(ar)
+        ar = runner_module()
         return ar.rules_block(api.soft("GET", "/agent") or {}) + "\n\n"
     except Exception as e:  # never a job without rules: the short built-in block, narrowest reading of who gives orders
         log(f"rules block: {type(e).__name__}")
@@ -632,12 +649,15 @@ def cmd_run(argv):
     d = job_dir(j["id"])
     outbox = os.path.join(d, "outbox")
     brief = rules_for_job(api) + open(os.path.join(d, "brief.txt"), encoding="utf-8").read() + footer(j)
-    base = list(j["cmd"])
-    if "-p" not in base and "--print" not in base:
-        base.append("-p")
-    if "--output-format" not in base:
-        base += ["--output-format", "stream-json", "--verbose"]
-    streaming = "claude" in os.path.basename(base[0]).lower()
+    ar = runner_module()  # kalmido-capability: profile (2.391.0, #3359): claude | codex | generic, as in agent_run.py
+    profile = ar.agent_profile(j["cmd"]) if ar else "claude"
+    base = ar.profile_args(profile, j["cmd"]) if ar else list(j["cmd"])
+    if not ar:
+        if "-p" not in base and "--print" not in base:
+            base.append("-p")
+        if "--output-format" not in base:
+            base += ["--output-format", "stream-json", "--verbose"]
+    streaming = profile == "claude" and "claude" in os.path.basename(base[0]).lower()
     if streaming and "--input-format" not in base:
         base += ["--input-format", "stream-json"]
     env = dict(os.environ, KALMIDO_OUTBOX=outbox, KALMIDO_JOB_ID=str(j["id"]))
@@ -651,7 +671,8 @@ def cmd_run(argv):
         j = load(j["id"]) or j
         if j["state"] == "stopped":
             break
-        args = [exe] + base[1:] + (["--resume", j["session"]] if not first and j.get("session") else [])
+        sid = j["session"] if not first and j.get("session") else None
+        args = [exe] + (ar.with_session(profile, base, sid)[1:] if ar else base[1:] + (["--resume", sid] if sid else []))
         err_path = os.path.join(d, "stderr.txt")
         try:
             with open(err_path, "ab" if not first else "wb") as err:
@@ -665,15 +686,36 @@ def cmd_run(argv):
         save(j)
         api.soft("PATCH", f"/agent/jobs/{int(j['id'])}", {"state": "running"})
         result = {}
-        state = {"text": "", "pending": "", "last": 0.0, "compact": False, "sent_result": False}
+        state = {"text": "", "pending": "", "last": 0.0, "compact": False, "sent_result": False, "raw": []}
 
         def reader():
             for line in p.stdout:
+                if profile == "generic":  # 2.391.0 (#3359): its text on stdout is the result
+                    state["raw"].append(line)
+                    continue
                 try:
                     ev = json.loads(line)
                 except ValueError:
                     continue
+                if not isinstance(ev, dict):
+                    continue
                 t = ev.get("type")
+                if ar and "." in str(t or ""):  # 2.391.0 (#3359): Codex CLI (`codex exec --json`)
+                    r = ar.codex_event(ev)
+                    kind, v = r if r else ("", None)
+                    if kind == "session" and not state.get("session"):
+                        state["session"] = v
+                    elif kind == "text":
+                        state["text"] = state["answer"] = v
+                    elif kind == "tool" and state["text"]:
+                        state["pending"], state["text"] = state["text"], ""
+                    elif kind == "usage":
+                        result.update(type="result", result=state.get("answer") or "", is_error=not state.get("answer"))
+                    elif kind in ("failed", "error"):
+                        state["error"] = v
+                        if kind == "failed":
+                            result.update(type="result", result=v, is_error=True)
+                    continue
                 if ev.get("session_id") and not state.get("session"):
                     state["session"] = str(ev["session_id"])
                 if t == "assistant":
@@ -731,8 +773,11 @@ def cmd_run(argv):
                 timed_out = True
                 kill_tree(p.pid)
                 break
-        p.wait()
+        rc = p.wait()
         th.join(3)
+        if profile == "generic" and not result:
+            text = "".join(state["raw"]).strip()
+            result.update(type="result", result=text, is_error=rc != 0 or not text)
         j = load(j["id"]) or j
         if state.get("session") and not j.get("session"):
             j["session"] = state["session"]

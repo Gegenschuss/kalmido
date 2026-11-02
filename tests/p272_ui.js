@@ -204,6 +204,21 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(/PowerShell|\.ps1|New-NetFirewallRule|Register-ScheduledTask/i.test(md.querySelector('#s-agguide').textContent), 'Windows: PowerShell steps');
   click(w, md.querySelector('[data-agseg="guide"] [data-agsv="own"]')); await sleep(100);
   check(/its admins allow it/i.test(md.querySelector('#s-agguide').textContent), 'the personal guide says the admin allows it first (2.361.4, #2928: the organisation admins)');
+  // 2.391.0 D (#3359): the tool switch above the steps by hand swaps the command lines (Claude Code / Codex CLI / other MCP clients)
+  const gtxt = () => md.querySelector('#s-agguide').textContent;
+  check(md.querySelectorAll('#s-agguide [data-agtool]').length === 3 && md.querySelector('#s-agguide [data-agtool="claude"]').classList.contains('on')
+    && /claude mcp add/.test(gtxt()), '#3359: three tools, Claude Code first');
+  click(w, md.querySelector('#s-agguide [data-agtool="codex"]'));
+  check(await until(() => /codex mcp add kalmido/.test(gtxt())), '#3359: Codex CLI: its install and MCP lines');
+  const stxt = () => md.querySelector('#s-agguide .agsteps').textContent;  // the steps (the behaviour rules below name the usage hook)
+  check(!/claude mcp add|claude --mcp-config|claude_usage_hook/.test(stxt()) && /--events --once -- codex/.test(stxt()) && /codex exec --json/.test(gtxt()),
+    '#3359: Codex CLI: no Claude Code lines left, the launcher runs codex');
+  click(w, md.querySelector('#s-agguide [data-agtool="mcp"]'));
+  check(await until(() => /mcpServers/.test(gtxt())), '#3359: other MCP clients: the mcpServers block');
+  check(/Cursor/.test(gtxt()) && /Windsurf/.test(gtxt()) && /Gemini CLI/.test(gtxt()) && !/agent_launcher/.test(stxt()) && /no events by itself/.test(gtxt()),
+    '#3359: other MCP clients: the three files, no launcher, the hint');
+  click(w, md.querySelector('#s-agguide [data-agtool="claude"]'));
+  check(await until(() => /claude mcp add/.test(gtxt())), '#3359: back to Claude Code');
   md.querySelector('#s-uag').checked = true; md.querySelector('#s-uag').dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', '/api/admin/agent-policy')).user_agents);
   check((await call('GET', '/api/admin/agent-policy')).user_agents === true, 'admin switches it on');

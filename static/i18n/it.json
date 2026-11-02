@@ -15862,5 +15862,22 @@
   "Support (support access)": "Supporto (accesso del supporto)",
   "A team agent creates polls in its workspace (space org:<id>)": "Un agente di team crea sondaggi nel suo spazio di lavoro (space org:<id>)",
   "Switched to {0}": "Passato a {0}",
-  "Add signature picture": "Aggiungi l'immagine della firma"
+  "Add signature picture": "Aggiungi l'immagine della firma",
+  "Other MCP clients": "Altri client MCP",
+  "Which tool runs the agent?": "Quale strumento esegue l’agente?",
+  "Codex CLI and the MCP server": "Codex CLI e il server MCP",
+  "Install Codex CLI as the agent user and sign in once (the command is below). The same wrapper starts the MCP server; codex mcp add writes it into ~/.codex/config.toml.": "Installa Codex CLI con l’utente dell’agente e accedi una volta (il comando è qui sotto). Lo stesso wrapper avvia il server MCP; codex mcp add lo scrive in ~/.codex/config.toml.",
+  "Connect your MCP client": "Collega il tuo client MCP",
+  "Clone the Kalmido repository and put the token into the env file; the wrapper starts the MCP server with it. Add the server to your client’s MCP file (one block, the same for Cursor, Windsurf and Gemini CLI).": "Clona il repository di Kalmido e metti il token nel file env; il wrapper avvia il server MCP con esso. Aggiungi il server al file MCP del tuo client (un blocco, uguale per Cursor, Windsurf e Gemini CLI).",
+  "Without the launcher the agent gets no events by itself: it works while you use it in your client. Runs per event (chat, comments, jobs) need Claude Code or Codex CLI.": "Senza il launcher l’agente non riceve eventi da solo: lavora mentre lo usi nel tuo client. Le esecuzioni per evento (chat, commenti, lavori) richiedono Claude Code o Codex CLI.",
+  "The launcher runs codex exec --json once per event: steps, the answer and the conversation as with Claude Code; permission questions in the chat and the plan usage ring stay with Claude Code.": "Il launcher esegue codex exec --json una volta per evento: passaggi, risposta e conversazione come con Claude Code; le richieste di permesso nella chat e l’anello di utilizzo del piano restano a Claude Code.",
+  "Set up integrations": "Configurare le integrazioni",
+  "Set up webhooks and repository connections; with “Account settings” also create and revoke API tokens (never more than this token may). Never for agents": "Configurare webhook e connessioni ai repository; con “Impostazioni dell’account” anche creare e revocare token API (mai più di quanto consente questo token). Mai per gli agenti",
+  "Agents cannot set up integrations": "Gli agenti non possono configurare integrazioni",
+  "Only a token for all projects may manage webhooks": "Solo un token per tutti i progetti può gestire i webhook",
+  "A token cannot create a token with more permissions than its own: {0}": "Un token non può creare un token con più permessi dei propri: {0}",
+  "A token cannot create a token for more addresses than its own": "Un token non può creare un token per più indirizzi dei propri",
+  "A token cannot create a token for more projects than its own": "Un token non può creare un token per più progetti dei propri",
+  "A token cannot create a token that lives longer than itself (until {0})": "Un token non può creare un token che duri più di sé stesso (fino al {0})",
+  "A scan inbox key is removed in the document settings": "La chiave di una casella di scansione si rimuove nelle impostazioni dei documenti"
 }

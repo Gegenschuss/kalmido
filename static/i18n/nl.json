@@ -15862,5 +15862,22 @@
   "Support (support access)": "Support (toegang voor support)",
   "A team agent creates polls in its workspace (space org:<id>)": "Een teamagent maakt peilingen in zijn werkruimte (space org:<id>)",
   "Switched to {0}": "Gewisseld naar {0}",
-  "Add signature picture": "Afbeelding van de handtekening toevoegen"
+  "Add signature picture": "Afbeelding van de handtekening toevoegen",
+  "Other MCP clients": "Andere MCP-clients",
+  "Which tool runs the agent?": "Welk programma voert de agent uit?",
+  "Codex CLI and the MCP server": "Codex CLI en de MCP-server",
+  "Install Codex CLI as the agent user and sign in once (the command is below). The same wrapper starts the MCP server; codex mcp add writes it into ~/.codex/config.toml.": "Installeer Codex CLI als de gebruiker van de agent en meld je één keer aan (de opdracht staat hieronder). Dezelfde wrapper start de MCP-server; codex mcp add zet hem in ~/.codex/config.toml.",
+  "Connect your MCP client": "Je MCP-client koppelen",
+  "Clone the Kalmido repository and put the token into the env file; the wrapper starts the MCP server with it. Add the server to your client’s MCP file (one block, the same for Cursor, Windsurf and Gemini CLI).": "Kloon de Kalmido-repository en zet het token in het env-bestand; de wrapper start daarmee de MCP-server. Voeg de server toe aan het MCP-bestand van je client (één blok, hetzelfde voor Cursor, Windsurf en Gemini CLI).",
+  "Without the launcher the agent gets no events by itself: it works while you use it in your client. Runs per event (chat, comments, jobs) need Claude Code or Codex CLI.": "Zonder de starter krijgt de agent zelf geen gebeurtenissen: hij werkt zolang je hem in je client gebruikt. Runs per gebeurtenis (chat, reacties, taken) hebben Claude Code of Codex CLI nodig.",
+  "The launcher runs codex exec --json once per event: steps, the answer and the conversation as with Claude Code; permission questions in the chat and the plan usage ring stay with Claude Code.": "De starter voert codex exec --json één keer per gebeurtenis uit: stappen, antwoord en gesprek zoals bij Claude Code; toestemmingsvragen in de chat en de ring voor het abonnementsgebruik blijven bij Claude Code.",
+  "Set up integrations": "Integraties instellen",
+  "Set up webhooks and repository connections; with “Account settings” also create and revoke API tokens (never more than this token may). Never for agents": "Webhooks en repositoryverbindingen instellen; met “Accountinstellingen” ook API-tokens aanmaken en intrekken (nooit meer dan dit token mag). Nooit voor agents",
+  "Agents cannot set up integrations": "Agents kunnen geen integraties instellen",
+  "Only a token for all projects may manage webhooks": "Alleen een token voor alle projecten mag webhooks beheren",
+  "A token cannot create a token with more permissions than its own: {0}": "Een token kan geen token aanmaken met meer rechten dan het eigen token: {0}",
+  "A token cannot create a token for more addresses than its own": "Een token kan geen token aanmaken voor meer adressen dan de eigen",
+  "A token cannot create a token for more projects than its own": "Een token kan geen token aanmaken voor meer projecten dan de eigen",
+  "A token cannot create a token that lives longer than itself (until {0})": "Een token kan geen token aanmaken dat langer geldig is dan het zelf (tot {0})",
+  "A scan inbox key is removed in the document settings": "De sleutel van een scaninbox wordt verwijderd in de documentinstellingen"
 }

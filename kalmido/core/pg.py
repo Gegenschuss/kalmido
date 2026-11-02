@@ -466,13 +466,14 @@ def pool_refresh():
 
 # 2.37.0 (#1150): 16 waitress threads x up to 3 connections each (a request may borrow a second one, e.g. for a push) plus the
 # background threads. Postgres' max_connections must stay above this (its default 100 does). KALMIDO_DB_POOL_MAX overrides it.
-# 2.102.0 D (#1994): the threads come from KALMIDO_THREADS (default 16, as before) and the pool follows them: 3 per thread + 8 for
+# 2.391.0 A (#3360): the default is 24 threads now (was 16; the pool 24 -> 80 connections, below Postgres' default max_connections of 100;
+# the agents' long-poll places follow: threads - 8). 2.102.0 D (#1994): the threads come from KALMIDO_THREADS (default 16 then) and the pool follows them: 3 per thread + 8 for
 # the background threads (16 -> 56, unchanged); KALMIDO_DB_POOL_MAX (or KALMIDO_POOL_MAX) still sets it explicitly.
 try:
-    WEB_THREADS = min(256, max(2, int(os.environ.get("KALMIDO_THREADS", "") or 16)))
+    WEB_THREADS = min(256, max(2, int(os.environ.get("KALMIDO_THREADS", "") or 24)))
 except ValueError:
-    print("warning: KALMIDO_THREADS is not a number; using 16", flush=True)
-    WEB_THREADS = 16
+    print("warning: KALMIDO_THREADS is not a number; using 24", flush=True)
+    WEB_THREADS = 24
 POOL_MIN = 4
 POOL_MAX = max(POOL_MIN, int(os.environ.get("KALMIDO_DB_POOL_MAX", "") or os.environ.get("KALMIDO_POOL_MAX", "") or WEB_THREADS * 3 + 8))
 POOL_WAIT_S = 30

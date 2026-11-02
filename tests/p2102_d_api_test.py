@@ -130,10 +130,10 @@ check(requests.get(B + "/api/admin/health", headers=H).status_code in (401, 403)
 j = r.json()
 check(j.get("ok") is True and j.get("version") and j.get("role") == "all", f"#1994: version + role all (the default) {j.get('role')}")
 th, pl, cn = j.get("threads") or {}, j.get("pool") or {}, j.get("connections") or {}
-check(th.get("configured") == 16 and th.get("busy", 0) >= 1 and th.get("peak", 0) >= th.get("busy", 0),
-      f"#1994: 16 threads by default, this request counts as busy {th}")
-check(pl.get("max") == int(os.environ.get("KALMIDO_DB_POOL_MAX") or 56) and pl.get("min") == 4 and pl.get("timeouts") == 0
-      and "pool_size" in pl and "requests_waiting" in pl, f"#1994: the pool's counters (4..56 = 16 x 3 + 8) {pl}")
+check(th.get("configured") == 24 and th.get("busy", 0) >= 1 and th.get("peak", 0) >= th.get("busy", 0),
+      f"#1994: 24 threads by default (2.391.0 #3360, was 16), this request counts as busy {th}")
+check(pl.get("max") == int(os.environ.get("KALMIDO_DB_POOL_MAX") or 80) and pl.get("min") == 4 and pl.get("timeouts") == 0
+      and "pool_size" in pl and "requests_waiting" in pl, f"#1994: the pool's counters (4..80 = 24 x 3 + 8; 2.391.0 #3360) {pl}")
 check(cn.get("max_connections", 0) >= 100 and cn.get("replicas") == 1 and cn.get("need") == pl.get("max", 0) + 6 and cn.get("ok") is True,
       f"#1994: the connection budget {cn}")
 check(all(isinstance(v, (int, float)) for v in pl.values()), "#1994: pool = numbers only")

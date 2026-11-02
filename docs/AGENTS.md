@@ -93,7 +93,7 @@ Every agent has **permissions** (scopes) on top of its projects and roles. New a
 | Tables shared with the agent: read / change (2.89.0) | `sheets:read` / `sheets:write` | off |
 | Knowledge pages shared with the agent: read / change (2.200.0) | `wiki:read` / `wiki:write` | off |
 
-Account settings (`account`), admin data (`admin-read`), health projects and the journal (`private`) and the upload key for scan inboxes (`docs:upload`) are never given to an agent. Team agents get theirs from an
+Account settings (`account`), admin data (`admin-read`), health projects and the journal (`private`), the upload key for scan inboxes (`docs:upload`) and, 2.391.0, setting up integrations (`integrations`: webhooks, API tokens, repository connections; a person's scripts do that through the API, an agent on purpose cannot, also not with `write`) are never given to an agent; the matching MCP tools `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook`, `rotate_webhook_secret`, `test_webhook`, `get_webhook_log`, `list_api_tokens`, `create_api_token`, `revoke_api_token`, `add_repo_connection`, `update_repo_connection`, `remove_repo_connection`, `set_repo_version_field` sit in the toolset `integrations` for a person's own MCP client. Team agents get theirs from an
 admin (the agent's dialog), personal agents from their owner (the lock button in *Settings > Agents > Set up*). An
 admin also sets the **permission limit** for the whole server (one for agents, one for personal tokens): what is off
 there stops working for every token at once. The agent's own channel (`/agent/*`: status, events, jobs, chat, usage)
@@ -640,7 +640,7 @@ GET /api/v1/agent/events?since=1042&wait=60
   `Restart=always`, a LaunchAgent with `KeepAlive`, a Windows task that restarts on failure). As a safety net, let the
   service look now and then (for example every 15 minutes) for comments of its owners on tasks in its projects that have no
   answer from the agent yet, and handle them: an event lost in a crash or a restart is then still answered.
-- The number of waiting requests is capped (2 per agent, 4 per server). When the cap is reached, the request returns at once with the events that are there (usually none) and `"busy": true`. Wait a few seconds before you try again.
+- The number of waiting requests is capped (2 per agent; on the server the web threads less 8, 16 with the default 24 threads, at least 6, see `KALMIDO_AGENT_WAITERS`). When the cap is reached, the request returns at once with the events that are there (usually none) and `"busy": true`. `Retry-After` (3-8 s, spread) says when to come back.
 - Reverse proxies must allow responses that take longer than `wait`:
   - Caddy: works with the defaults.
   - nginx: `proxy_read_timeout 75s;` or more.
@@ -2638,7 +2638,10 @@ as `--events`), `KALMIDO_PROMPT_FILE`, `KALMIDO_STATE_DIR` (event cursor, defaul
 person chosen in the agent's runtime settings comes first), `KALMIDO_APPROVAL_REMIND`,
 `KALMIDO_APPROVAL_TTL`, `KALMIDO_SESSION_RESUME`, `KALMIDO_SESSION_MAX_TOKENS`, `KALMIDO_SESSION_MAX_RUNS`,
 `KALMIDO_SESSION_IDLE_MIN`, `KALMIDO_RUN_TIMEOUT` (2.44.0), `KALMIDO_USAGE_LIMIT`, `KALMIDO_USAGE_FILE`, `KALMIDO_USAGE_MAX_AGE_H` (default 6: older
-values count as unknown), `KALMIDO_PYTHON` (2.443.0: both launchers and both setup scripts use it for every Python call).
+values count as unknown), `KALMIDO_PYTHON` (2.443.0: both launchers and both setup scripts use it for every Python call),
+`KALMIDO_AGENT_CMD` and `KALMIDO_AGENT_PROFILE` (2.391.0: the command when none follows `--`, and its tool `claude` | `codex` |
+`generic`; Codex CLI runs `codex exec --json` per event, see [mcp/README.md](../mcp/README.md) and
+[AGENT-SETUP.md](AGENT-SETUP.md#other-tools-codex-cli-cursor-windsurf-gemini-cli)).
 2.443.0: both launchers stop alike: TERM / INT end the command and all it started (KILL after 30 s; Windows `taskkill /T`,
 `/F` after 30 s), a command that cannot start or an error in one round never ends the launcher. The list of these capabilities is
 [`mcp/launcher_capabilities.json`](../mcp/launcher_capabilities.json); `tests/launcher_parity_test.py` fails when one of the

@@ -23,7 +23,8 @@ usage: pwsh -File agent_launcher.ps1 [-e ENV_FILE] [--once] [-- COMMAND ...]
                    KALMIDO_URL=https://tasks.example.com
                    KALMIDO_TOKEN=abk_...          the agent's API token (Settings > Agents)
                  every variable in it is passed to the command too (the MCP server mcp/kalmido_mcp.py reads the same two)
-  COMMAND        what to start (default: claude). Example:
+  COMMAND        what to start (default: KALMIDO_AGENT_CMD of the env file, else claude; KALMIDO_AGENT_PROFILE claude |
+                 codex | generic names the tool, 2.391.0). Example:
                    pwsh -File agent_launcher.ps1 -e $HOME\.config\kalmido\agent.env -- claude -p "Work through your Kalmido events"
   --once         print the command line and environment it would use, then exit (a dry run; the token is never printed)
   --events       event mode (2.35.0, recommended for Claude Code): starts mcp/agent_run.py (Python 3), which waits for the
@@ -38,6 +39,7 @@ usage: pwsh -File agent_launcher.ps1 [-e ENV_FILE] [--once] [-- COMMAND ...]
   -EnvFile, -Once, -Events  the same as -e, --once, --events (PowerShell spelling, this script only)
   KALMIDO_HOST   the computer name shown in Kalmido (2.44.0; default: the computer name), sent once at start
   KALMIDO_PYTHON the Python to use (default: python3 / py / python on PATH)
+  KALMIDO_TOOLSETS only these MCP tool packages, e.g. tickets,code,office (2.391.0; chat is always on, default: all)
 Exit codes: 0 stopped (TERM / INT end the command with everything it started, KILL after 30 s; Windows: taskkill /T, /F after
 30 s), 1 Kalmido not reachable at the start, 2 a wrong start (no env file, KALMIDO_URL / KALMIDO_TOKEN missing, no event runner).
 Needs: Windows PowerShell 5.1 or PowerShell 7+. See docs/AGENTS.md "Set up an agent" for a scheduled task.
@@ -61,8 +63,6 @@ for ($i = 0; $i -lt $args.Count; $i++) {
   else { $Command = @($args | Select-Object -Skip $i | ForEach-Object { [string]$_ }); break }
 }
 $ErrorActionPreference = 'Stop'
-if ($Command.Count -eq 0) { $Command = @('claude') }
-$Agent0 = $Command[0]  # the agent command itself (event mode puts Python + agent_run.py in front)
 
 if (-not (Test-Path -LiteralPath $EnvFile -PathType Leaf)) { Log "cannot read $EnvFile"; exit 2 }
 # the env file: KEY=VALUE per line (an optional "export ", quotes around the value), # comments (2.443.0, #2940: also behind
@@ -80,6 +80,21 @@ foreach ($raw in Get-Content -LiteralPath $EnvFile) {
 if (-not $env:KALMIDO_URL) { Log "KALMIDO_URL missing in $EnvFile"; exit 2 }
 if (-not $env:KALMIDO_TOKEN) { Log "KALMIDO_TOKEN missing in $EnvFile"; exit 2 }
 if ($env:KALMIDO_EVENTS -eq '1') { $Events = $true }
+# kalmido-capability: toolsets (2.391.0, #3358: KALMIDO_TOOLSETS from the env file is in the process environment above and read by mcp/kalmido_mcp.py)
+# kalmido-capability: profile (2.391.0, #3359): the command and its tool may come from the env file: KALMIDO_AGENT_CMD (the
+# command line, words split at spaces, "..." / '...' keep a word together; a COMMAND after -- wins) and KALMIDO_AGENT_PROFILE
+# (claude | codex | generic, else from the command's name). mcp/agent_run.py builds each run for the profile (Codex CLI:
+# codex exec --json); Kalmido's model setting is a Claude model and goes only to a claude command.
+if ($Command.Count -eq 0 -and $env:KALMIDO_AGENT_CMD) {
+  $Command = @([regex]::Matches($env:KALMIDO_AGENT_CMD, '"([^"]*)"|''([^'']*)''|(\S+)') | ForEach-Object {
+    if ($_.Groups[1].Success) { $_.Groups[1].Value } elseif ($_.Groups[2].Success) { $_.Groups[2].Value } else { $_.Groups[3].Value } })
+}
+if ($Command.Count -eq 0) { $Command = @('claude') }
+$Agent0 = $Command[0]  # the agent command itself (event mode puts Python + agent_run.py in front)
+$AgentProfile = [string]$env:KALMIDO_AGENT_PROFILE
+if (-not $AgentProfile) {
+  $AgentProfile = if ([IO.Path]::GetFileNameWithoutExtension($Agent0).ToLower() -eq 'codex') { 'codex' } else { 'claude' }
+}
 # kalmido-capability: steps, model, permission_mode, quota, reply_ref, status_typing, approval, old_server, proposals, message_edited, playbook, approval_check, notice, comment_answer, comment_blocks
 # kalmido-capability: outbox, jobs, event_bundling (2.44.0: mcp/agent_extras.py and mcp/agent_job.py, loaded by agent_run.py)
 # kalmido-capability: approval_closed, perm_relay, approval_lifecycle, session_resume, robust_runs
@@ -108,7 +123,7 @@ if ($env:KALMIDO_EVENTS -eq '1') { $Events = $true }
 # kalmido-capability: contract_notice (2.70.0: a contract's notice deadline -> ONE propose_contract_notice, in mcp/agent_run.py)
 # kalmido-capability: perm_user_choice (2.312.0, #3266: the person for permission questions chosen in Kalmido before KALMIDO_PERM_USER, in mcp/agent_run.py)
 # kalmido-capability: letter_draft (2.153.0: a request to draft an answer to a document -> ONE create_letter_draft, in mcp/agent_run.py)
-# (2.44.0: agent_run.py; perm_relay and session_resume only when COMMAND is Claude Code)
+# (2.44.0: agent_run.py; perm_relay and session_resume only when COMMAND is Claude Code; 2.391.0: session_resume also Codex CLI)
 # (2.126.0: perm_relay asks only the agent's operator: owner, KALMIDO_PERM_USER, KALMIDO_OWNER_IDS)
 # kalmido-capability: usage_hook (2.306.0, #2927: claude_usage_hook.py as Stop / SubagentStop hook in the run settings, in mcp/agent_run.py)
 # (2.126.0: playbook names the authors of a foreign Playbook; texts marked untrusted are framed as data)
@@ -215,7 +230,7 @@ $script:Started = Get-Date
 # kalmido-capability: runtime (model, auto-compact, fresh session, restart on change / reset / nightly, pause)
 function Start-Agent($s) {
   $cmdArgs = @($Command)
-  if ($s.model -ne '-') { $cmdArgs += @('--model', $s.model) }
+  if ($s.model -ne '-' -and $AgentProfile -eq 'claude') { $cmdArgs += @('--model', $s.model) }
   $envs = @()
   if ($s.ac -eq '0') { $envs += 'DISABLE_AUTO_COMPACT=1' } elseif ($s.pct -ne '-') { $envs += "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=$($s.pct)" }
   # kalmido-capability: git_author (2.396.0, #3386): the agent's commits carry the git author set in Kalmido
@@ -225,7 +240,7 @@ function Start-Agent($s) {
   if ($Once) { Write-Output ("env $($envs -join ' ') $($cmdArgs -join ' ')"); return }
   $acs = if ($s.ac -eq '1') { if ($s.pct -ne '-') { "on at $($s.pct)%" } else { 'on at the default %' } } else { 'off' }
   $mn = if ($s.model -eq '-') { 'default' } else { $s.model }
-  Log "starting (fresh session): $($cmdArgs[0]), model $mn, auto-compact $acs"
+  Log "starting (fresh session, profile $AgentProfile): $($cmdArgs[0]), model $mn, auto-compact $acs"
   $env:KALMIDO_LAUNCHER_PID = "$PID"  # 2.443.0 (#2940): as in the .sh, the event runner ends when this launcher was killed hard
   Remove-Item Env:DISABLE_AUTO_COMPACT, Env:CLAUDE_AUTOCOMPACT_PCT_OVERRIDE, Env:KALMIDO_GIT_COAUTHOR, Env:GIT_AUTHOR_NAME, Env:GIT_AUTHOR_EMAIL, Env:GIT_COMMITTER_NAME, Env:GIT_COMMITTER_EMAIL -ErrorAction SilentlyContinue
   foreach ($e in $envs) { $k, $v = $e -split '=', 2; [Environment]::SetEnvironmentVariable($k, $v, 'Process') }

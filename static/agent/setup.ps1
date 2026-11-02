@@ -12,7 +12,10 @@ per project folder. Needs: Windows PowerShell 5.1 or PowerShell 7, Python 3.9+, 
   -Code         the one-time setup code (15 minutes, works once; make a new one in Kalmido when it expired); better in the
                 environment as KALMIDO_SETUP_CODE (not in the process list of the computer; removed from it once read)
   -Dir          the project folder the agent works in (created when missing)
-  -Cmd          the agent command (default claude); it gets --mcp-config with the Kalmido MCP server
+  -Tool         2.391.0 (#3359): which tool runs the agent: claude (Claude Code, the default) or codex (Codex CLI); without
+                -Tool and -Cmd the setup asks once (Enter = Claude Code; not interactive = Claude Code)
+  -Cmd          the agent command (default: the tool's, claude / codex); Claude Code gets --mcp-config with the Kalmido MCP
+                server, Codex CLI the same server with -c mcp_servers.kalmido.command=... (no change of config.toml)
   -From DIR     take the starter files from a local copy of mcp\ instead of downloading them
   -NoAutostart  install everything but the autostart
   -Lang         language of the messages: de or en (Kalmido adds the language of your account; anything else = en)
@@ -22,8 +25,8 @@ per project folder. Needs: Windows PowerShell 5.1 or PowerShell 7, Python 3.9+, 
   -Uninstall    stop and remove the autostart, revoke this computer's token in Kalmido, delete the instance folder
 Files: %LOCALAPPDATA%\Kalmido\agents\<folder name>-<hash>\ (starter files, kalmido-agent.env, mcp.json, agent.log).
 #>
-param([string]$Url = '', [string]$Code = '', [string]$Dir = '', [string]$Cmd = 'claude', [string]$From = '',
-      [switch]$NoAutostart, [switch]$DryRun, [switch]$Uninstall, [string]$Lang = 'en', [switch]$AllowHttp)
+param([string]$Url = '', [string]$Code = '', [string]$Dir = '', [string]$Cmd = '', [string]$From = '',
+      [switch]$NoAutostart, [switch]$DryRun, [switch]$Uninstall, [string]$Lang = 'en', [switch]$AllowHttp, [string]$Tool = '')
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'  # Invoke-WebRequest is slow with the progress bar in 5.1
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
@@ -37,6 +40,10 @@ $MsgEn = @{
   py = '  - Python 3.9 or newer: winget install Python.Python.3.12  (then open a new PowerShell window)'
   claude = '  - Claude Code: irm https://claude.ai/install.ps1 | iex  and then  claude  once to log in'
   cmd = '  - the agent command {0}'
+  codex = '  - Codex CLI: npm install -g @openai/codex  and then  codex login  once to log in'
+  notlogged_codex = '  note: Codex CLI seems not logged in yet; run  codex login  once'
+  ask_tool = 'Which tool should run the agent? 1 = Claude Code (default), 2 = Codex CLI'
+  badtool = 'unknown tool {0} (-Tool claude or codex)'
   missing = 'missing on this computer:\n{0}\nInstall it and run the same command again (make a new code in Kalmido if 15 minutes have passed).'
   agentcmd = '  agent command: {0}'
   notlogged = '  note: Claude Code seems not logged in yet; run  claude  once and log in'
@@ -93,6 +100,10 @@ $MsgDe = @{
   py = '  - Python 3.9 oder neuer: winget install Python.Python.3.12  (danach ein neues PowerShell-Fenster öffnen)'
   claude = '  - Claude Code: irm https://claude.ai/install.ps1 | iex  und danach einmal  claude  zum Anmelden'
   cmd = '  - der Agent-Befehl {0}'
+  codex = '  - Codex CLI: npm install -g @openai/codex  und danach einmal  codex login  zum Anmelden'
+  notlogged_codex = '  Hinweis: Codex CLI scheint noch nicht angemeldet zu sein; führe  codex login  einmal aus'
+  ask_tool = 'Welches Werkzeug soll den Agenten ausführen? 1 = Claude Code (Vorgabe), 2 = Codex CLI'
+  badtool = 'unbekanntes Werkzeug {0} (-Tool claude oder codex)'
   missing = 'auf diesem Computer fehlt noch:\n{0}\nInstalliere es und führe denselben Befehl noch einmal aus (erzeuge in Kalmido einen neuen Code, wenn 15 Minuten vorbei sind).'
   agentcmd = '  Agent-Befehl: {0}'
   notlogged = '  Hinweis: Claude Code scheint noch nicht angemeldet zu sein; führe  claude  einmal aus und melde dich an'
@@ -154,6 +165,18 @@ function Die([string]$m) {
 $OnWindows = ($env:OS -eq 'Windows_NT')
 if (-not $OnWindows -and -not $DryRun) { Die (M 'wrongos') }
 
+# 2.391.0 (#3359): the tool (Claude Code by default), asked once when neither -Tool nor -Cmd names it and the console is
+# interactive; a dry run, the uninstall or no console: Claude Code
+if (-not $Tool -and $Cmd) { $Tool = if ([IO.Path]::GetFileNameWithoutExtension($Cmd).ToLower() -eq 'codex') { 'codex' } else { 'claude' } }
+if (-not $Tool -and -not $DryRun -and -not $Uninstall -and [Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
+  try { $ans = Read-Host (M 'ask_tool') } catch { $ans = '' }
+  if ("$ans".Trim() -in @('2', 'codex', 'Codex', 'Codex CLI')) { $Tool = 'codex' }
+}
+if (-not $Tool) { $Tool = 'claude' }
+$Tool = $Tool.ToLowerInvariant()
+if ($Tool -notin @('claude', 'codex')) { Die (M 'badtool' @($Tool)) }
+if (-not $Cmd) { $Cmd = $Tool }
+
 # kalmido-setup-step: prereq
 Step (M 's_prereq')
 $missing = @()
@@ -173,6 +196,7 @@ if (-not $Uninstall) {
   foreach ($p in @("$env:USERPROFILE\.local\bin\$Cmd.exe", "$env:USERPROFILE\.claude\local\$Cmd.exe")) { if (-not $Agent -and (Test-Path -LiteralPath $p)) { $Agent = $p } }
   if (-not $Agent) {
     if ($Cmd -eq 'claude') { $missing += (M 'claude') }
+    elseif ($Cmd -eq 'codex') { $missing += (M 'codex') }
     else { $missing += (M 'cmd' @($Cmd)) }
   }
 }
@@ -182,6 +206,10 @@ if ($missing.Count) {
 }
 if ($Agent) { Say (M 'agentcmd' @($Agent)) }
 if ($Cmd -eq 'claude' -and $Agent -and -not (Test-Path -LiteralPath "$env:USERPROFILE\.claude")) { Say (M 'notlogged') }
+if ($Tool -eq 'codex' -and $Agent) {
+  $CodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } elseif ($env:USERPROFILE) { Join-Path $env:USERPROFILE '.codex' } else { Join-Path $HOME '.codex' }
+  if (-not (Test-Path -LiteralPath (Join-Path $CodexHome 'auth.json'))) { Say (M 'notlogged_codex') }
+}
 
 # kalmido-setup-step: instance
 if (-not $Dir) { Die (M 'nodir') }
@@ -273,7 +301,7 @@ else {
   $AgName = [string]$r.agent.name -replace '[\x00-\x1f\x7f]', ' '
   $AgUser = [string]$r.agent.username -replace '[\x00-\x1f\x7f]', ' '
   $lines = @("# Kalmido agent $AgName ($AgUser), set up by agent-setup.ps1 -- keep this file private",
-             "KALMIDO_URL=$Url", "KALMIDO_TOKEN=$($r.token)", 'KALMIDO_EVENTS=1',
+             "KALMIDO_URL=$Url", "KALMIDO_TOKEN=$($r.token)", 'KALMIDO_EVENTS=1', '# KALMIDO_TOOLSETS=tickets,code,chat   # optional (2.391.0): only these MCP tool packages, chat is always on; default: all',
              "KALMIDO_STATE_DIR=`"$(Join-Path $Inst 'state')`"")  # one state folder per instance (cursor, approvals, lock); 2.443.0 (#2940): quoted, a " #" in a value starts a comment
   if ($env:KALMIDO_PYTHON) { $lines += "KALMIDO_PYTHON=`"$env:KALMIDO_PYTHON`"" }  # 2.443.0 (#2940): the autostart runs without this shell's variables
   # 2.306.0 E (#2927): who answers permission questions -- kept from an earlier setup of this folder, else (team agent) the
@@ -352,7 +380,22 @@ else {
 # launcher's environment, so it is in no config file but the env file
 $McpJ = Join-Path $Inst 'mcp.json'
 $pyArgsJ = @($PyArgs + @((Join-Path $Inst 'kalmido_mcp.py')))
+function Q([string]$s) { "'" + $s.Replace("'", "''") + "'" }
+$McpArgs = "--mcp-config $(Q $McpJ)"
+if ($Tool -eq 'codex') {
+  # 2.391.0 (#3359): Codex CLI takes the same server per run (-c, nothing written into config.toml); Codex hands MCP servers
+  # only a few environment variables, so a small wrapper next to the env file reads it and starts the server
+  $McpJ = Join-Path $Inst 'kalmido_mcp_run.ps1'
+  $PsHost = (Get-Process -Id $PID).Path -replace '\\', '/'
+  $McpArgs = "--skip-git-repo-check -c $(Q ("mcp_servers.kalmido.command='" + $PsHost + "'")) -c $(Q ("mcp_servers.kalmido.args=['-NoProfile','-ExecutionPolicy','Bypass','-File','" + ($McpJ -replace '\\', '/') + "']"))"  # TOML literal strings: no double quotes inside -Command "..."
+}
 if ($DryRun) { Say (M 'dry_mcp' @($McpJ, $Py, ($pyArgsJ -join ' '))) }
+elseif ($Tool -eq 'codex') {
+  $w = @('# 2.391.0 (#3359): the Kalmido MCP server for Codex CLI, with the env file of this agent',
+         "foreach (`$l in Get-Content -LiteralPath $(Q $EnvF)) { if (`$l -match '^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$') { [Environment]::SetEnvironmentVariable(`$Matches[1], `$Matches[2].Trim().Trim('`"', `"'`"), 'Process') } }",
+         "& $(Q $Py) $(($pyArgsJ | ForEach-Object { Q $_ }) -join ' ')")
+  [IO.File]::WriteAllLines($McpJ, $w)
+}
 else {
   $mcp = @{ mcpServers = @{ kalmido = @{ command = $Py; args = $pyArgsJ } } } | ConvertTo-Json -Depth 5
   [IO.File]::WriteAllText($McpJ, $mcp)
@@ -382,10 +425,9 @@ elseif (Test-Path -LiteralPath $Tpl) {
 
 # kalmido-setup-step: autostart
 Step (M 's_auto')
-function Q([string]$s) { "'" + $s.Replace("'", "''") + "'" }
 $PsExe = (Get-Process -Id $PID).Path
 $Log = Join-Path $Inst 'agent.log'
-$Inner = "Set-Location -LiteralPath $(Q $Dir); & $(Q (Join-Path $Inst 'agent_launcher.ps1')) -e $(Q $EnvF) --events -- $(Q $(if ($Agent) { $Agent } else { $Cmd })) --mcp-config $(Q $McpJ) *>> $(Q $Log)"
+$Inner = "Set-Location -LiteralPath $(Q $Dir); & $(Q (Join-Path $Inst 'agent_launcher.ps1')) -e $(Q $EnvF) --events -- $(Q $(if ($Agent) { $Agent } else { $Cmd })) $McpArgs *>> $(Q $Log)"
 $PsArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command `"$Inner`""
 # 2.443.0 (#2940): the Startup folder has no restart of its own: this loop does what RestartSec=30 / ThrottleInterval do in setup.sh
 $LoopArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command `"while (`$true) { $Inner; Start-Sleep -Seconds 30 }`""

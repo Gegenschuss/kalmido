@@ -767,3 +767,5 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `upload_attachment`, `upload_project_file`, `wait_for_events`, `watch_task`, `wiki_create`, `wiki_list`, `wiki_read`, `wiki_write`,
 `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`, `write_journal`, `write_status_pad`
 <!-- kalmido-tool-index:end -->
+
+2.391.0: the set-up tools `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook`, `rotate_webhook_secret`, `test_webhook`, `get_webhook_log`, `list_api_tokens`, `create_api_token`, `revoke_api_token`, `add_repo_connection`, `update_repo_connection`, `remove_repo_connection`, `set_repo_version_field` need the scope `integrations`, which an agent never gets: they are for a person's own MCP client (toolset `integrations`), not for you - do not try them.

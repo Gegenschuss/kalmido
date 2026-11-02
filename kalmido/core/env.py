@@ -26,7 +26,7 @@ VARS = (
     _v("KALMIDO_DB_POOL_MAX", "", "Largest number of pooled database connections per process (empty = threads x 3 + 8).", "core"),
     _v("KALMIDO_POOL_MAX", "", "Older name of KALMIDO_DB_POOL_MAX (used when that one is not set).", "core"),
     _v("KALMIDO_DB_STATEMENT_TIMEOUT", "30", "Seconds one database statement of a request may run (0 = no limit).", "core"),
-    _v("KALMIDO_THREADS", "16", "Web server threads per process (2-256).", "core"),
+    _v("KALMIDO_THREADS", "24", "Web server threads per process (2-256).", "core"),
     _v("PUBLIC_URL", "http://localhost:3040", "The address people use to open Kalmido (https://tasks.example.com). Used for links in notifications and mails, passkeys and the origin check; set it on every server.", "core"),
     _v("PORT", "3040", "Port the web server listens on inside the container.", "core"),
     _v("TZ", "Europe/Berlin", "Time zone of the server (due dates, daily jobs; people without their own time zone follow it).", "core"),
@@ -248,7 +248,7 @@ VARS = (
     _v("KALMIDO_ERROR_REPORTS_PER_HOUR", "30", "New error reports per hour.", "integrations"),
 
     # ---- agents and assistant
-    _v("KALMIDO_AGENT_WAITERS", "6", "Agent connections waiting for events on the whole server at the same time.", "agents"),
+    _v("KALMIDO_AGENT_WAITERS", "threads - 8 (at least `6` but at most half of the threads; `16` with the default 24 threads)", "Agent connections waiting for events on the whole server at the same time. Each one holds a web thread, so the default follows `KALMIDO_THREADS`; beyond it the answer is `busy: true` with a `Retry-After` of 3-8 s.", "agents"),
     _v("KALMIDO_AGENT_EVENTS_STALE_H", "48", "Hours after which unread agent events count as stale.", "agents"),
     _v("KALMIDO_AGENT_CONTROL_NEW", "approve_all", "Control level a new agent starts with: approve_all, routine, free, or legacy (no level, works as before 2.235.0; the test containers use it).", "agents"),  # 2.235.0 A (#2891)
     _v("KALMIDO_AGENT_PUSH_DAY", "500", "Push notifications per agent and day.", "agents"),

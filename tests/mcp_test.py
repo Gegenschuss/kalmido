@@ -225,6 +225,18 @@ CASES = [
     ("react_to_chat", {"user_id": 3, "message_id": 41, "emoji": "heart", "remove": True}, "POST", "/api/v1/agent/chats/3/messages/41/reactions", {"emoji": "heart", "on": False}, {}),
     # 2.13.1 (#465) attachments
     ("list_attachments", {"task_id": 7}, "GET", "/api/v1/tasks/7/attachments", None, {}),
+    # 2.391.0 C (#3362): setting up integrations (people's scripts; an agent never has the scope)
+    ("list_webhooks", {}, "GET", "/api/v1/me/webhooks", None, {}),
+    ("list_webhooks", {"org_id": 3}, "GET", "/api/v1/orgs/3/webhooks", None, {}),
+    ("create_webhook", {"url": "https://example.com/h", "events": ["task.created"]}, "POST", "/api/v1/me/webhooks",
+     {"url": "https://example.com/h", "events": ["task.created"]}, {}),
+    ("rotate_webhook_secret", {"webhook_id": 5, "org_id": 3}, "POST", "/api/v1/orgs/3/webhooks/5/secret", None, {}),
+    ("create_api_token", {"name": "ci", "scopes": ["read"], "expires_days": 7}, "POST", "/api/v1/me/tokens",
+     {"name": "ci", "scopes": ["read"], "expires_days": 7}, {}),
+    ("revoke_api_token", {"token_id": 9}, "DELETE", "/api/v1/me/tokens/9", None, {}),
+    ("add_repo_connection", {"list_id": 4, "repo": "acme/app"}, "POST", "/api/v1/lists/4/repos", {"repo": "acme/app"}, {}),
+    ("set_repo_version_field", {"list_id": 4, "field": "auto"}, "PUT", "/api/v1/lists/4/repos/version-field", {"field": "auto"}, {}),
+    ("remove_repo_connection", {"repo_id": 2}, "DELETE", "/api/v1/repos/2", None, {}),
 ]
 for name, args, m, p, b, q in CASES:
     n0 = len(REQS)

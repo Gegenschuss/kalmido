@@ -49,6 +49,18 @@ def hit_limit(key, limit, window=None):
     return False
 
 
+def limit_state(key, limit, window=None):
+    """2.391.0 A (#3361): (remaining, reset_seconds) of hit_limit's counter for `key`, read without counting: remaining = hits left
+    in the window, reset_seconds = until the oldest hit falls out (0 when there is none)."""
+    window = window or RATE_WINDOW_S
+    now = time.time()
+    with _HITS_LOCK:
+        arr = [t for t in _HITS.get(key, ()) if now - t < window]
+    if not arr:
+        return limit, 0
+    return max(0, limit - len(arr)), max(1, int(arr[0] + window - now + 0.999))
+
+
 def hit_budget(key, limit, ip, window=3600, share=3):
     """2.126.0 C (#1979 I1): a per-resource budget (a form, a link per hour) of which one address uses at most a share,
     so a single address cannot use it up for everyone else. Refused by the address part = the resource is not counted."""

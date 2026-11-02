@@ -938,6 +938,17 @@ ROUTES = {
     "GET /api/orgs/{}/webhooks": "webhook", "POST /api/orgs/{}/webhooks": "webhook", "PATCH /api/orgs/{}/webhooks/{}": "webhook",
     "DELETE /api/orgs/{}/webhooks/{}": "webhook", "POST /api/orgs/{}/webhooks/{}/secret": "webhook",
     "POST /api/orgs/{}/webhooks/{}/test": "webhook", "GET /api/orgs/{}/webhooks/{}/log": "webhook",
+    # 2.391.0 C (#3362): the same webhooks through /api/v1 (the very same views and checks; p2391_c_setup_api_test.py: another
+    # person 404, a person outside the organisation refused)
+    "GET /api/v1/me/webhooks": "webhook", "POST /api/v1/me/webhooks": "webhook", "PATCH /api/v1/me/webhooks/{}": "webhook",
+    "DELETE /api/v1/me/webhooks/{}": "webhook", "POST /api/v1/me/webhooks/{}/secret": "webhook",
+    "POST /api/v1/me/webhooks/{}/test": "webhook", "GET /api/v1/me/webhooks/{}/log": "webhook",
+    "GET /api/v1/orgs/{}/webhooks": "webhook", "POST /api/v1/orgs/{}/webhooks": "webhook", "PATCH /api/v1/orgs/{}/webhooks/{}": "webhook",
+    "DELETE /api/v1/orgs/{}/webhooks/{}": "webhook", "POST /api/v1/orgs/{}/webhooks/{}/secret": "webhook",
+    "POST /api/v1/orgs/{}/webhooks/{}/test": "webhook", "GET /api/v1/orgs/{}/webhooks/{}/log": "webhook",
+    "GET /api/v1/me/tokens": "own", "POST /api/v1/me/tokens": "own", "DELETE /api/v1/me/tokens/{}": "own",
+    "POST /api/v1/lists/{}/repos": "list", "PUT /api/v1/lists/{}/repos/version-field": "list",
+    "PATCH /api/v1/repos/{}": "list", "DELETE /api/v1/repos/{}": "list",
     # 2.142.0 A (#2145): notification channels of a person / of an organisation (its admins; messages only of lists open to every
     # member) -- p2142_a_api_test.py
     "GET /api/me/channels": "channel", "POST /api/me/channels": "channel", "PATCH /api/me/channels/{}": "channel",

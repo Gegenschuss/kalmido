@@ -188,6 +188,7 @@ ORDER = (
     "lists.kpis",  # 2.43.0 (#1328): sum row + key figures (web + token API)
     "lists.orgvis",  # 2.46.0 (#1603): organisation lists visible to the whole organisation
     "api.scopes",
+    "api.v1setup",  # 2.391.0 (#3362): webhooks, API tokens, repository connections through /api/v1 (after git, gitbuild, webhooks, api.v1, api.scopes)
     "collab.notes",
     "wiki.pages",  # 2.49.0 C (#1199): knowledge pages
     "wiki.outline",  # 2.49.0 C (#1201): outline import of the mind map (no storage)

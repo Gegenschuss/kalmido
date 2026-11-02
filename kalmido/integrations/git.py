@@ -1150,6 +1150,7 @@ def git_update(cid):
             sec = secrets.token_urlsafe(24)
             c.execute("UPDATE git_conns SET hook_secret=? WHERE id=?", (git_seal(cid, "hook", sec), cid))
             out["hook_secret"] = sec  # the only time it is shown
+            g.idem_no_body = True  # 2.391.0 (#3362 review B1): never kept with an idempotency key
         else:
             c.execute("UPDATE git_conns SET hook_secret='' WHERE id=?", (cid,))
     bump(c)

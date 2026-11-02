@@ -47,7 +47,7 @@ from ..notify.alerts import _env_int, aa_count, aa_now, fx2_mask_ip
 from ..admin.backup import BK_ON_ENV
 from ..core.env import env_bool
 from ..api.common import (  # noqa: F401  2.149.0 G (#2517): the route helpers moved to api/common.py, re-exported here
-    _HITS, _HITS_LOCK, act_via, cursor_dec, cursor_enc, hit_budget, hit_limit, RATE_WINDOW_S, v1_args, v1_call, v1_err,
+    _HITS, _HITS_LOCK, act_via, cursor_dec, cursor_enc, hit_budget, hit_limit, limit_state, RATE_WINDOW_S, v1_args, v1_call, v1_err,
     v1_error, v1_feature, v1_json, v1_out, v1_page, v1_view, V1_CODES, V1Error,
 )
 from ..api.common import V1_KEY_KINDS  # 2.425.0 C (#3453)
@@ -90,12 +90,13 @@ SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments
           "import",  # 2.68.0 (#1839): agents propose old data for the office as an import card (off for new agents)
           "sheets:read", "sheets:write",  # 2.89.0 C (#1916): tables (an agent: only shared ones; off for new agents)
           "docs:upload",  # 2.207.0 A (#2763): upload documents into one bound place only (scan inboxes; alone on its token, never agents)
-          "wiki:read", "wiki:write")  # 2.200.0 C (#1781): knowledge pages (an agent: only shared ones; off for new agents)
+          "wiki:read", "wiki:write",  # 2.200.0 C (#1781): knowledge pages (an agent: only shared ones; off for new agents)
+          "integrations")  # 2.391.0 (#3362): webhooks, API tokens (with "account") and repository connections through the API; people only
 # 2.22.0 (#663): "private" = health lists and the journal (reading included); like "contacts" never part of the legacy
 # "write" and never in an agent's default (agents never see health lists at all, see core/access.py)
 # 2.51.0 (#1352): nor "pinboard" (an old "write" token must not open the pin board for agents)
-SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts", "private", "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write", "docs:upload", "wiki:read", "wiki:write"))   # what the legacy "write" stands for; 2.200.0 C (#1781): nor wiki; 2.55.0 (#1066): nor layouts; 2.68.0 (#1839): nor import; 2.89.0 C (#1916): nor sheets
-SCOPES_AGENT_NEVER = ("account", "admin-read", "private", "docs:upload")   # never for an agent: credentials / settings of the account, admin data, health + journal (2.22.0); 2.207.0 A (#2763): scan inboxes
+SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "contacts", "private", "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write", "docs:upload", "wiki:read", "wiki:write", "integrations"))   # what the legacy "write" stands for; 2.391.0 (#3362): nor integrations; 2.200.0 C (#1781): nor wiki; 2.55.0 (#1066): nor layouts; 2.68.0 (#1839): nor import; 2.89.0 C (#1916): nor sheets
+SCOPES_AGENT_NEVER = ("account", "admin-read", "private", "docs:upload", "integrations")   # never for an agent: credentials / settings of the account, admin data, health + journal (2.22.0); 2.207.0 A (#2763): scan inboxes; 2.391.0 (#3362): setting up webhooks / tokens / repositories
 # 2.48.0 (#1207): a new agent may use the file store: it sees only what is shared with it (and its own folder) anyway
 SCOPES_AGENT_DEFAULT = ("read", "tasks:write", "comments", "files:read", "files:write")
 API_SCOPES = SCOPES + ("write",)
@@ -202,14 +203,60 @@ def api_authenticate():
         if not scopes - {"read", "attachments:read"}:
             return v1_err(403, tr("This token is read-only"), required_scope=need)
         return v1_err(403, tr("This token lacks the permission “{0}”", tr(SCOPE_LABELS.get(need, need))), required_scope=need)
-    if hit_limit(f"api:{row['id']}", API_RATE):
-        return v1_err(429, tr("Too many requests, please slow down"), {"Retry-After": "60"})
+    limited = hit_limit(f"api:{row['id']}", API_RATE)
+    g.rate_state = limit_state(f"api:{row['id']}", API_RATE)  # 2.391.0 A (#3361): read after the count, shown by rate_headers_after
+    if limited:
+        return v1_err(429, tr("Too many requests, please slow down"), {"Retry-After": str(max(1, g.rate_state[1]))})
     g.user, g.auth_via, g.token, g.scopes = u, "token", row, scopes
     last = row["last_used_at"]
     if not last or (now_utc() - parse_iso(last)).total_seconds() >= API_USED_EVERY:
         c.execute("UPDATE api_tokens SET last_used_at=? WHERE id=?", (iso(now_utc()), row["id"]))
         c.commit()
     return None
+
+
+# ---- 2.391.0 A (#3361): rate limit and deprecation headers (own block; the routes are untouched)
+def deprecated(route, sunset=None, link=None):
+    """Marks the current response as using something deprecated (a route or an alias field of `route`): `Deprecation: true`, with
+    `sunset` (a datetime or HTTP-date text) `Sunset`, with `link` (a URL of the notice) `Link: <link>; rel="deprecation"`. The
+    API's change rule (docs/API.md): a removal is announced with a Sunset at least 90 days ahead."""
+    if has_request_context():
+        g.deprecation = (route, sunset, link)
+
+
+def _http_date(v):
+    from email.utils import format_datetime
+    from datetime import timezone
+    if isinstance(v, datetime):
+        return format_datetime(v if v.tzinfo else v.replace(tzinfo=timezone.utc), usegmt=True)
+    return str(v)
+
+
+def rate_headers(limit, remaining, reset):
+    """RateLimit-* (IETF draft names) and X-RateLimit-* (like GitHub): reset = seconds until the window frees a place."""
+    reset = int(reset)
+    return {"RateLimit-Limit": str(limit), "RateLimit-Remaining": str(remaining), "RateLimit-Reset": str(reset),
+            "X-RateLimit-Limit": str(limit), "X-RateLimit-Remaining": str(remaining),
+            "X-RateLimit-Reset": str(int(time.time()) + reset)}  # the X- one is a Unix time, as GitHub's
+
+
+@app.after_request
+def rate_headers_after(resp):
+    if not has_request_context():
+        return resp
+    st = g.get("rate_state")
+    if st:
+        for k, v in rate_headers(API_RATE, *st).items():
+            resp.headers.setdefault(k, v)
+    dep = g.get("deprecation")
+    if dep:
+        _route, sunset, link = dep
+        resp.headers["Deprecation"] = "true"
+        if sunset:
+            resp.headers["Sunset"] = _http_date(sunset)
+        if link:
+            resp.headers.add("Link", f'<{link}>; rel="deprecation"')
+    return resp
 
 
 def v1_limit(a):
@@ -503,6 +550,12 @@ def token_create():
     exp = None
     if days not in (None, "", 0):
         exp = iso(now_utc() + timedelta(days=as_int(days, tr("Expiry"), 1, 3650)))
+    return token_insert(c, name, scopes, exp, ips, lids)
+
+
+def token_insert(c, name, scopes, exp, ips, lids):
+    """Stores one token of the current person (checked values) -> 201 with the token, shown this once.
+    2.391.0 (#3362): also POST /api/v1/me/tokens (kalmido/api/v1setup.py, after its checks against the calling token)."""
     if c.execute("SELECT COUNT(*) FROM api_tokens WHERE user_id=?", (me(),)).fetchone()[0] >= API_TOKEN_MAX:
         return err(tr("At most {0} tokens", API_TOKEN_MAX), 409)
     tok = "abk_" + secrets.token_urlsafe(32)
@@ -510,6 +563,7 @@ def token_create():
                     (me(), name, _token_hash(tok), tok[:12], ",".join(scopes), exp, iso(now_utc()), ips, lids))
     c.commit()
     print("api token", tid, "created for user", me(), "scopes", ",".join(scopes), flush=True)
+    g.idem_no_body = True  # 2.391.0 (#3362 review B1): the token is shown once, never kept with an idempotency key
     return jsonify({**token_public(c.execute("SELECT * FROM api_tokens WHERE id=?", (tid,)).fetchone()), "token": tok}), 201
 
 
@@ -708,6 +762,8 @@ def v1_list_create():
     for k in ("checklist", "done_at_bottom"):
         if k in b and not isinstance(b[k], bool):
             raise BadInput(tr("Invalid value: {0}", k))
+    if "checklist" in b or b.get("kind") == "checklist":  # 2.391.0 A (#3361): the documented deprecated aliases
+        deprecated("POST /lists: checklist")
     if "tickets" in b and not isinstance(b["tickets"], bool):
         raise BadInput(tr("Invalid value: {0}", "tickets"))
     if b.get("project_type") is not None and b["project_type"] not in PTYPES:
@@ -760,6 +816,8 @@ def v1_list_patch(lid):
         if b["project_type"] not in (None, "") and b["project_type"] not in PTYPES:
             raise BadInput(tr("Invalid value: {0}", "project_type"))
         b = {**{k: v for k, v in b.items() if k != "project_type"}, "ptype": b["project_type"] or ""}
+    if "checklist" in b or b.get("kind") == "checklist":  # 2.391.0 A (#3361): the documented deprecated aliases
+        deprecated("PATCH /lists/{id}: checklist")
     for k in ("checklist", "done_at_bottom", "archived", "agent_members", "agent_peers", "time_tracking", "org_edit"):  # 2.41.0 (#1471): time_tracking
         if k in b and not isinstance(b[k], bool):
             raise BadInput(tr("Invalid value: {0}", k))

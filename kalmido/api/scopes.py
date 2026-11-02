@@ -91,6 +91,7 @@ SCOPE_LABELS = {"read": N_("Read"), "tasks:write": N_("Tasks"), "comments": N_("
                 "sheets:read": N_("Read tables"), "sheets:write": N_("Write tables"),  # 2.89.0 C (#1916)
                 "docs:upload": N_("Only upload documents"),  # 2.207.0 A (#2763)
                 "wiki:read": N_("Read knowledge pages"), "wiki:write": N_("Write knowledge pages"),  # 2.200.0 C (#1781)
+                "integrations": N_("Set up integrations"),  # 2.391.0 (#3362)
                 "write": N_("Everything (old token)")}
 SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, search, e-mails filed with clients and projects"),  # 2.483.0 (#1902): + filed e-mails
               "tasks:write": N_("Create, change, complete and move tasks; dependencies, habits"),
@@ -114,6 +115,8 @@ SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, searc
               "docs:upload": N_("Only upload documents into one place; reads nothing, deletes nothing"),  # 2.207.0 A (#2763)
               "wiki:read": N_("Knowledge pages shared with you (the page or a folder above it): their text"),  # 2.200.0 C (#1781)
               "wiki:write": N_("Change the text of knowledge pages shared with you to edit and add pages in such folders; every save stays in the page history"),
+              # 2.391.0 (#3362): with "account" also API tokens; never for agents
+              "integrations": N_("Set up webhooks and repository connections; with “Account settings” also create and revoke API tokens (never more than this token may). Never for agents"),
               "account": N_("Notification settings and app passwords (an app password gives calendar apps full access to your tasks)"), "admin-read": N_("People and server status (admins only)")}
 ROLE_WORD = {"admin": N_("Admin"), "edit": N_("Member"), "participant": N_("Participant"), "view": N_("Read-only")}  # 2.364.0 C (#3041): one role word
 BATCH_TITLE = {"update": N_("Change {0} tasks at once"), "complete": N_("Complete {0} tasks at once"), "reopen": N_("Reopen {0} tasks at once"),

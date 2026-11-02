@@ -27,7 +27,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_SEARCH_INDEX` | `0` | Switch: allow search engines to index this server (public links and forms stay noindex). |
 | `KALMIDO_SLOW_REQUEST_MS` | `500` | Requests slower than this many milliseconds get a log line with route, duration and statement count (0 = off). |
 | `KALMIDO_STATE_LAZY_MIN` | `3000` | Tasks in the start state of one person above which a new web client gets only the start set (Today, Upcoming, My tasks, the lists it had open) and loads a list's tasks when it is opened (0 = always the start set). |
-| `KALMIDO_THREADS` | `16` | Web server threads per process (2-256). |
+| `KALMIDO_THREADS` | `24` | Web server threads per process (2-256). |
 | `KALMIDO_UPDATE_CHECK` | `1` | Switch: admins see when a newer release exists (one request a few times a day, never updates anything). |
 | `KALMIDO_UPDATE_URL` | `https://api.github.com/repos/Gegenschuss/kalmido/releases/latest` | Address the update check asks for the latest release. |
 | `PATH` | `(empty)` | Search path for the helper programs (pg_dump, tesseract); passed on to them unchanged. |
@@ -268,7 +268,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_AGENT_CONTROL_NEW` | `approve_all` | Control level a new agent starts with: approve_all, routine, free, or legacy (no level, works as before 2.235.0; the test containers use it). |
 | `KALMIDO_AGENT_EVENTS_STALE_H` | `48` | Hours after which unread agent events count as stale. |
 | `KALMIDO_AGENT_PUSH_DAY` | `500` | Push notifications per agent and day. |
-| `KALMIDO_AGENT_WAITERS` | `6` | Agent connections waiting for events on the whole server at the same time. |
+| `KALMIDO_AGENT_WAITERS` | `threads - 8 (at least `6` but at most half of the threads; `16` with the default 24 threads)` | Agent connections waiting for events on the whole server at the same time. Each one holds a web thread, so the default follows `KALMIDO_THREADS`; beyond it the answer is `busy: true` with a `Retry-After` of 3-8 s. |
 | `KALMIDO_AI_BASE_URL` | `(empty)` | Address of an OpenAI-compatible service for the optional assistant (empty = assistant off); the assistant sends task texts to it. |
 | `KALMIDO_AI_KEY` | `(empty)` | Key of that service. |
 | `KALMIDO_AI_KEY_FILE` | `(empty)` | File that holds that key. |

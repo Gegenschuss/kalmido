@@ -315,7 +315,11 @@ SCAN_EXCEPT = {"GET /api/v1/agent/jobs/<int:jid>", "GET /api/v1/tasks/<int:tid>/
                "GET /api/users/<int:uid>/delete-info",
                # 2.144.11 (#2354): the cash book hint of a receipt goes through the office gate first (office off: 403, the
                # same for every id, before any lookup); with the office on a person outside gets 404
-               "GET /api/docs/<int:nid>/cashbook"}
+               "GET /api/docs/<int:nid>/cashbook",
+               # 2.391.0 (#3362): the set-up routes check the token's permission "integrations" before any lookup (403, the
+               # same for every id); with it a webhook of somebody else / an organisation outside answers 404
+               "GET /api/v1/me/webhooks/<int:wid>/log", "GET /api/v1/orgs/<int:oid>/webhooks",
+               "GET /api/v1/orgs/<int:oid>/webhooks/<int:wid>/log"}
 bad = [b for b in bad if " ".join(b.split(" ")[:2]) not in SCAN_EXCEPT]
 check(not bad, f"route scan: every id route refuses a person outside ({len(bad)} of {len(routes)}):\n  " + "\n  ".join(bad[:80]))
 check(S["alice"].get(B + f"/api/tasks/{TA}").ok and MARK in S["alice"].get(B + f"/api/tasks/{TA}").text, "route scan: alice's data is untouched")

@@ -15862,5 +15862,22 @@
   "Support (support access)": "Support (accès du support)",
   "A team agent creates polls in its workspace (space org:<id>)": "Un agent d’équipe crée les sondages dans son espace de travail (space org:<id>)",
   "Switched to {0}": "Passé à {0}",
-  "Add signature picture": "Ajouter l'image de la signature"
+  "Add signature picture": "Ajouter l'image de la signature",
+  "Other MCP clients": "Autres clients MCP",
+  "Which tool runs the agent?": "Quel outil exécute l’agent ?",
+  "Codex CLI and the MCP server": "Codex CLI et le serveur MCP",
+  "Install Codex CLI as the agent user and sign in once (the command is below). The same wrapper starts the MCP server; codex mcp add writes it into ~/.codex/config.toml.": "Installez Codex CLI avec le compte de l’agent et connectez-vous une fois (la commande est ci-dessous). Le même wrapper démarre le serveur MCP ; codex mcp add l’inscrit dans ~/.codex/config.toml.",
+  "Connect your MCP client": "Connecter votre client MCP",
+  "Clone the Kalmido repository and put the token into the env file; the wrapper starts the MCP server with it. Add the server to your client’s MCP file (one block, the same for Cursor, Windsurf and Gemini CLI).": "Clone le dépôt Kalmido et mets le jeton dans le fichier env ; le wrapper démarre le serveur MCP avec. Ajoute le serveur au fichier MCP de ton client (un bloc, le même pour Cursor, Windsurf et Gemini CLI).",
+  "Without the launcher the agent gets no events by itself: it works while you use it in your client. Runs per event (chat, comments, jobs) need Claude Code or Codex CLI.": "Sans le lanceur, l’agent ne reçoit aucun événement de lui-même : il travaille tant que tu l’utilises dans ton client. Les exécutions par événement (chat, commentaires, tâches de fond) nécessitent Claude Code ou Codex CLI.",
+  "The launcher runs codex exec --json once per event: steps, the answer and the conversation as with Claude Code; permission questions in the chat and the plan usage ring stay with Claude Code.": "Le lanceur exécute codex exec --json une fois par événement : étapes, réponse et conversation comme avec Claude Code ; les demandes d’autorisation dans le chat et l’anneau d’utilisation du forfait restent propres à Claude Code.",
+  "Set up integrations": "Configurer les intégrations",
+  "Set up webhooks and repository connections; with “Account settings” also create and revoke API tokens (never more than this token may). Never for agents": "Configurer les webhooks et les connexions de dépôts ; avec « Paramètres du compte », créer et révoquer aussi des jetons d’API (jamais plus que ce que permet ce jeton). Jamais pour les agents",
+  "Agents cannot set up integrations": "Les agents ne peuvent pas configurer d’intégrations",
+  "Only a token for all projects may manage webhooks": "Seul un jeton pour tous les projets peut gérer les webhooks",
+  "A token cannot create a token with more permissions than its own: {0}": "Un jeton ne peut pas créer un jeton avec plus de droits que les siens : {0}",
+  "A token cannot create a token for more addresses than its own": "Un jeton ne peut pas créer un jeton pour plus d’adresses que les siennes",
+  "A token cannot create a token for more projects than its own": "Un jeton ne peut pas créer un jeton pour plus de projets que les siens",
+  "A token cannot create a token that lives longer than itself (until {0})": "Un jeton ne peut pas créer un jeton qui dure plus longtemps que lui (jusqu’au {0})",
+  "A scan inbox key is removed in the document settings": "La clé d’une boîte de numérisation se supprime dans les paramètres des documents"
 }

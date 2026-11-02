@@ -86,6 +86,8 @@ def idem_store(resp):
     if ok and not resp.direct_passthrough and not resp.is_streamed and "json" in (resp.content_type or ""):
         data = resp.get_data()
         body = data.decode("utf-8", "replace") if len(data) <= IDEM_MAX_BODY else None
+    if g.pop("idem_no_body", False):  # 2.391.0 (#3362 review B1): an answer with a secret shown once is never stored
+        body = None  # (a repeat gets {"ok": true}: the effect happened, the secret is not handed out twice)
     c = None
     try:
         c = connect()

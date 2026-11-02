@@ -134,6 +134,14 @@ ROUTES = {
     "POST /api/v1/tasks/{}/partial": "change", "POST /api/v1/tasks/{}/decisions": "change",
     # 2.484.0 (#2200): an agent creates a scheduling poll (read + create only, never a vote): like POST /events, the default class
     "POST /api/v1/polls": "change",
+    # 2.391.0 C (#3362): setting up integrations (scope integrations: never an agent's, it gets 403): the default classes stay
+    "POST /api/v1/me/tokens": "change", "DELETE /api/v1/me/tokens/{}": "one_way",
+    "POST /api/v1/me/webhooks": "change", "PATCH /api/v1/me/webhooks/{}": "change", "DELETE /api/v1/me/webhooks/{}": "one_way",
+    "POST /api/v1/me/webhooks/{}/secret": "change", "POST /api/v1/me/webhooks/{}/test": "change",
+    "POST /api/v1/orgs/{}/webhooks": "change", "PATCH /api/v1/orgs/{}/webhooks/{}": "change", "DELETE /api/v1/orgs/{}/webhooks/{}": "one_way",
+    "POST /api/v1/orgs/{}/webhooks/{}/secret": "change", "POST /api/v1/orgs/{}/webhooks/{}/test": "change",
+    "POST /api/v1/lists/{}/repos": "change", "PUT /api/v1/lists/{}/repos/version-field": "change",
+    "PATCH /api/v1/repos/{}": "change", "DELETE /api/v1/repos/{}": "one_way",
 }
 
 FOUND, PROBLEMS = app_routes(ROOT)

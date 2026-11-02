@@ -100,6 +100,16 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.391.0 C (#3362): setting up integrations through /api/v1 (p2391_c_setup_api_test.py as the freelancer; an organisation's webhooks: its admins)
+    "GET /api/v1/me/tokens": "own", "POST /api/v1/me/tokens": "own", "DELETE /api/v1/me/tokens/{}": "own",
+    "GET /api/v1/me/webhooks": "own", "POST /api/v1/me/webhooks": "own", "PATCH /api/v1/me/webhooks/{}": "own",
+    "DELETE /api/v1/me/webhooks/{}": "own", "POST /api/v1/me/webhooks/{}/secret": "own", "POST /api/v1/me/webhooks/{}/test": "own",
+    "GET /api/v1/me/webhooks/{}/log": "own",
+    "GET /api/v1/orgs/{}/webhooks": "orgadmin", "POST /api/v1/orgs/{}/webhooks": "orgadmin", "PATCH /api/v1/orgs/{}/webhooks/{}": "orgadmin",
+    "DELETE /api/v1/orgs/{}/webhooks/{}": "orgadmin", "POST /api/v1/orgs/{}/webhooks/{}/secret": "orgadmin",
+    "POST /api/v1/orgs/{}/webhooks/{}/test": "orgadmin", "GET /api/v1/orgs/{}/webhooks/{}/log": "orgadmin",
+    "POST /api/v1/lists/{}/repos": "lists", "PUT /api/v1/lists/{}/repos/version-field": "lists",
+    "PATCH /api/v1/repos/{}": "tasks", "DELETE /api/v1/repos/{}": "tasks",
     # 2.353.0 A (#2758): locked folders of the file store (files/fslock.py, p2353_a_lockfolder_test.py)
     "GET /api/files/lock/{}": "files", "POST /api/files/lock/{}/start": "files", "GET /api/files/lock/{}/todo": "files", "GET /api/files/lock/{}/raw/{}": "files", "POST /api/files/lock/{}/convert/{}": "files", "POST /api/files/lock/{}/finish": "files", "POST /api/files/lock/{}/stop": "files", "POST /api/files/lock/{}/keys": "files", "POST /api/files/lock/upload": "files", "POST /api/files/lock/folder": "files", "POST /api/files/lock/rename/{}": "files", "POST /api/files/lock/version/{}": "files", "POST /api/files/lock/move/{}": "files",
     # ---- admin (54)

@@ -9,7 +9,7 @@ from datetime import timedelta
 from flask import g, has_request_context
 
 from ..core.config import app, EMAIL_RE
-from ..core.pg import insert_id
+from ..core.pg import insert_id, WEB_THREADS
 from ..core.i18n import tr
 from ..core.db import inbox_default, iso, iso_ms, now_utc, parse_iso
 from ..accounts.session import me
@@ -109,7 +109,10 @@ JOB_LOG_MAX, JOB_TITLE_MAX, AGENT_NOTE_MAX, STATUS_TEXT_MAX = 8000, 200, 2000, 2
 CHAT_MAX, CHAT_KEEP = 8000, 1000                            # characters per message, messages per person and agent
 AGENT_WAIT_MAX = 60                                         # s: long-polling (GET /api/v1/agent/events?wait=)
 AGENT_WAITERS_PER = 2                                       # concurrent long-polls per agent
-AGENT_WAITERS_ALL = _env_int("KALMIDO_AGENT_WAITERS", 6)     # ... on the whole server (each holds a server thread)
+AGENT_WAITERS_RESERVE, AGENT_WAITERS_MIN = 8, 6             # 2.391.0 A (#3360): threads kept free for normal requests; the least places
+# ... on the whole server (each holds a server thread): the web threads less the reserve (at least 6, but never more than half
+# of the threads: review S2, a small KALMIDO_THREADS keeps room for normal requests); KALMIDO_AGENT_WAITERS overrides
+AGENT_WAITERS_ALL = _env_int("KALMIDO_AGENT_WAITERS", max(min(AGENT_WAITERS_MIN, WEB_THREADS // 2), WEB_THREADS - AGENT_WAITERS_RESERVE))
 WAKE_LIMIT = 20                                             # wake requests per person within 10 minutes
 AGENT_OFFLINE_S = 300                                       # 2.4.1 (#375): no event poll for this long = "offline"
 AGENT_POLL_WRITE_S = 30                                     # ... the last poll is written at most this often

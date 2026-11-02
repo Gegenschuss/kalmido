@@ -33,6 +33,14 @@ API = {f"{m.upper()} {norm(p)[len('/api/v1'):]}" for m, p in routes if p.startsw
 
 # ---- 1. the web client's routes -> the REST API
 APP_TO_API = {
+    # 2.391.0 (#3362): setting up integrations through the API (scope integrations; tokens also account; people only)
+    "GET /api/me/tokens": ["GET /me/tokens"], "POST /api/me/tokens": ["POST /me/tokens"], "DELETE /api/me/tokens/{}": ["DELETE /me/tokens/{}"],
+    "GET /api/me/webhooks": ["GET /me/webhooks"], "POST /api/me/webhooks": ["POST /me/webhooks"],
+    "PATCH /api/me/webhooks/{}": ["PATCH /me/webhooks/{}"], "DELETE /api/me/webhooks/{}": ["DELETE /me/webhooks/{}"],
+    "POST /api/me/webhooks/{}/secret": ["POST /me/webhooks/{}/secret"], "POST /api/me/webhooks/{}/test": ["POST /me/webhooks/{}/test"],
+    "GET /api/me/webhooks/{}/log": ["GET /me/webhooks/{}/log"],
+    "POST /api/lists/{}/repos": ["POST /lists/{}/repos"], "PATCH /api/repos/{}": ["PATCH /repos/{}"], "DELETE /api/repos/{}": ["DELETE /repos/{}"],
+    "PUT /api/lists/{}/repos/version-field": ["PUT /lists/{}/repos/version-field"],
     "GET /api/events/freebusy": ["GET /events/freebusy"],  # 2.467.0 (#2586)
     "GET /api/hubmail/mails": ["GET /mails"], "GET /api/hubmail/mails/{}": ["GET /mails/{}"],  # 2.483.0 (#1902): read only
     # 2.484.0 (#2200): agents read the scheduling polls they may see and create new ones (never vote, never decide)
@@ -432,8 +440,10 @@ APP_ONLY = [
                                                                      "=POST /api/stepup/passkey")),  # 2.223.2 C (#2871)
     ("2.485.0 (#3939): support access opens a client's account / organisation to the operator: only the person in a browser, never an agent or a token",
      ("* /api/support-access",)),
-    ("credentials and keys of the account: tokens, webhooks, upload token, avatar, phone shortcut", (
-        "* /api/me/tokens", "* /api/me/webhooks", "POST /api/me/drop-token", "* /api/me/avatar", "GET /api/me/share/")),
+    # 2.391.0 (#3362): tokens (list, create, revoke) and webhooks are mapped to /me/tokens and /me/webhooks (scope integrations);
+    # changing what an existing token may do stays in the app (a token must never widen another one)
+    ("credentials and keys of the account: changing an existing token's rights, upload token, avatar, phone shortcut", (
+        "=PATCH /api/me/tokens/{}", "POST /api/me/drop-token", "* /api/me/avatar", "GET /api/me/share/")),
     ("administration: never through a token (agents are never admins); admins read users / status with admin-read", (
         "* /api/admin/", "* /api/users", "GET /api/version", "GET /api/about", "GET /api/health")),
     ("agents are managed by people (admins / owners), not by tokens", ("* /api/my/agents",
@@ -460,11 +470,12 @@ APP_ONLY = [
     # 2.53.0 (#1424): agents get no pushes, and they never mark people urgent (only people do, in the app)
     ("2.53.0 (#1424): the bell of one task (as the list / muted / urgent) is a person's own push setting, set in the app",
      ("* /api/tasks/{}/bell",)),
-    ("repositories: their secrets are entered by people; the API reads them (GET /lists/{id}/repos)", (
-        "POST /api/lists/{}/repos", "* /api/repos/", "POST /api/hooks/git/", "POST /api/tasks/{}/git-undo",
+    # 2.391.0 (#3362): connecting / changing / removing a project's repository and its version field are mapped (scope
+    # integrations, people only); polling now, the inbound hook, folder repositories and the release closing stay here
+    ("repositories: folder repositories, polling now and the release closing are set by people; the API reads them (GET /lists/{id}/repos)", (
+        "=POST /api/repos/{}/refresh", "POST /api/hooks/git/", "POST /api/tasks/{}/git-undo",
         "* /api/folders/repos", "PUT /api/lists/{}/folder-repo",
-        "PUT /api/lists/{}/repos/close-release",  # 2.392.0 B (#3364)
-        "PUT /api/lists/{}/repos/version-field")),  # 2.151.0 A (#2558): which field holds the version, set with the repository  # 2.33.0 (#934): folder repositories, read through /lists/{id}/repos
+        "PUT /api/lists/{}/repos/close-release")),  # 2.151.0 A (#2558): which field holds the version, set with the repository  # 2.33.0 (#934): folder repositories, read through /lists/{id}/repos
     ("2.18.0: the error-report webhook of a list: its secret URL is shown once to people (owner / list admins); the inbound hook "
      "is called by the error service, not by a client", ("* /api/lists/{}/error-hook", "POST /api/hooks/issues/")),
     # 2.115.0 A (#2061): inbound webhooks of a list -- a secret URL shown once to people (owner / list admins), called by the
@@ -807,6 +818,9 @@ TOOL_VARIANTS = {  # extra arguments that reach other routes of the same tool
     "list_files": [{"folder_id": 1}], "read_file": [{"as": "base64"}], "write_file": [{"file_id": 1}],  # 2.48.0 (#1207)
     "get_attachment": [{"source": "chat"}, {"source": "project", "list_id": 1}, {"source": "team"}],  # 2.113.1 (#2059): team
     "react": [{"remove": True}],
+    # 2.391.0 (#3362): an organisation's webhooks (/orgs/{id}/webhooks) through the same tools
+    **{t: [{"org_id": 1}] for t in ("list_webhooks", "create_webhook", "update_webhook", "delete_webhook", "rotate_webhook_secret",
+                                    "test_webhook", "get_webhook_log")},
     "upload_attachment": [],
 }
 rec = Rec()

@@ -8,7 +8,7 @@
 # a launchd LaunchAgent on macOS, a systemd --user service on Linux. One instance per project folder (several agents on one
 # computer = several folders). Needs: bash (3.2 is enough), curl, python3 3.9+, the agent command (default: claude).
 #
-# usage: agent-setup.sh --url URL --code CODE --dir FOLDER [--cmd COMMAND] [--from DIR] [--no-autostart] [--dry-run] [--lang de|en]
+# usage: agent-setup.sh --url URL --code CODE --dir FOLDER [--tool claude|codex] [--cmd COMMAND] [--from DIR] [--no-autostart] [--dry-run] [--lang de|en]
 #        [--allow-http]
 #        agent-setup.sh --uninstall --dir FOLDER [--dry-run]
 #   --url        your Kalmido address
@@ -16,7 +16,10 @@
 #                better in the environment as KALMIDO_SETUP_CODE (not in the process list of the computer)
 #   --allow-http 2.360.0: an http:// address that is not this computer (localhost) -- only for a Kalmido without https
 #   --dir        the project folder the agent works in (created when missing)
-#   --cmd        the agent command (default claude); it gets --mcp-config with the Kalmido MCP server
+#   --tool       2.391.0 (#3359): which tool runs the agent: claude (Claude Code, the default) or codex (Codex CLI); without
+#                --tool and --cmd the setup asks once on the terminal (Enter = Claude Code; no terminal = Claude Code)
+#   --cmd        the agent command (default: the tool's, claude / codex); Claude Code gets --mcp-config with the Kalmido MCP
+#                server, Codex CLI the same server with -c mcp_servers.kalmido.command=... (no change of ~/.codex/config.toml)
 #   --from DIR   take the starter files from a local copy of mcp/ instead of downloading them
 #   --no-autostart  install everything but the autostart (start agent_launcher.sh yourself)
 #   --lang       language of the messages: de or en (Kalmido adds the language of your account; anything else = en)
@@ -25,20 +28,21 @@
 # Files: ~/.kalmido/agents/<folder name>-<hash>/ (starter files, kalmido-agent.env with mode 600, mcp.json, agent.log).
 set -uo pipefail
 
-URL="" CODE=${KALMIDO_SETUP_CODE:-} DIR="" CMD=claude FROM="" DRY=0 UNINSTALL=0 NOAUTO=0 LANGC=en HTTPOK=0
+URL="" CODE=${KALMIDO_SETUP_CODE:-} DIR="" CMD="" TOOL="" FROM="" DRY=0 UNINSTALL=0 NOAUTO=0 LANGC=en HTTPOK=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --url) URL=${2:-}; shift 2 ;;
     --code) CODE=${2:-}; shift 2 ;;
     --dir) DIR=${2:-}; shift 2 ;;
     --cmd) CMD=${2:-}; shift 2 ;;
+    --tool) TOOL=${2:-}; shift 2 ;;
     --from) FROM=${2:-}; shift 2 ;;
     --dry-run) DRY=1; shift ;;
     --no-autostart) NOAUTO=1; shift ;;
     --allow-http) HTTPOK=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
     --lang) LANGC=${2:-en}; shift 2 ;;
-    -h|--help) sed -n '2,25p' "$0" 2>/dev/null || echo "see the comment at the top of agent-setup.sh"; exit 0 ;;
+    -h|--help) sed -n '2,28p' "$0" 2>/dev/null || echo "see the comment at the top of agent-setup.sh"; exit 0 ;;
     *) UNKNOWN=$1; break ;;
   esac
 done
@@ -56,6 +60,10 @@ msg_de() {
     curl) echo "\n  - curl" ;;
     claude) echo "\n  - Claude Code: führe  curl -fsSL https://claude.ai/install.sh | bash  aus und danach einmal  claude  zum Anmelden" ;;
     cmd) echo "\n  - der Agent-Befehl %s" ;;
+    codex) echo "\n  - Codex CLI: führe  npm install -g @openai/codex  aus und danach einmal  codex login  zum Anmelden" ;;
+    notlogged_codex) echo "  Hinweis: Codex CLI scheint noch nicht angemeldet zu sein; führe  codex login  einmal aus" ;;
+    ask_tool) echo "Welches Werkzeug soll den Agenten ausführen? 1 = Claude Code (Vorgabe), 2 = Codex CLI: " ;;
+    badtool) echo "unbekanntes Werkzeug %s (--tool claude oder codex)" ;;
     missing) echo "agent-setup: auf diesem Computer fehlt noch:%b\nInstalliere es und führe denselben Befehl noch einmal aus (erzeuge in Kalmido einen neuen Code, wenn 15 Minuten vorbei sind)." ;;
     agentcmd) echo "  Agent-Befehl: %s" ;;
     notlogged) echo "  Hinweis: Claude Code scheint noch nicht angemeldet zu sein; führe  claude  einmal aus und melde dich an" ;;
@@ -125,6 +133,10 @@ msg_en() {
     curl) echo "\n  - curl" ;;
     claude) echo "\n  - Claude Code: run  curl -fsSL https://claude.ai/install.sh | bash  and then  claude  once to log in" ;;
     cmd) echo "\n  - the agent command %s" ;;
+    codex) echo "\n  - Codex CLI: run  npm install -g @openai/codex  and then  codex login  once to log in" ;;
+    notlogged_codex) echo "  note: Codex CLI seems not logged in yet; run  codex login  once" ;;
+    ask_tool) echo "Which tool should run the agent? 1 = Claude Code (default), 2 = Codex CLI: " ;;
+    badtool) echo "unknown tool %s (--tool claude or codex)" ;;
     missing) echo "agent-setup: missing on this computer:%b\nInstall it and run the same command again (make a new code in Kalmido if 15 minutes have passed)." ;;
     agentcmd) echo "  agent command: %s" ;;
     notlogged) echo "  note: Claude Code seems not logged in yet; run  claude  once and log in" ;;
@@ -207,6 +219,20 @@ case "$(uname -s)" in
   *) dief wrongos ;;
 esac
 
+# 2.391.0 (#3359): the tool (Claude Code by default). Asked once on the terminal when neither --tool nor --cmd names it (curl |
+# bash: the answer comes from /dev/tty, stdin is the script); no terminal, a dry run or the uninstall: Claude Code.
+if [ -z "$TOOL" ] && [ -n "$CMD" ]; then
+  case "$(basename "$CMD")" in codex|codex.*) TOOL=codex ;; *) TOOL=claude ;; esac
+fi
+if [ -z "$TOOL" ] && [ "$DRY" = 0 ] && [ "$UNINSTALL" = 0 ] && [ -t 2 ] && (: < /dev/tty) 2>/dev/null; then
+  printf '%s' "$(msg ask_tool)" >&2
+  ans=""; read -r -t 120 ans < /dev/tty || ans=""
+  case "$ans" in 2|codex|Codex*) TOOL=codex ;; esac
+fi
+TOOL=${TOOL:-claude}
+case "$TOOL" in claude|codex) ;; *) dief badtool "$TOOL" ;; esac
+[ -n "$CMD" ] || CMD=$TOOL
+
 # kalmido-setup-step: prereq
 stepf s_prereq
 missing=""
@@ -225,6 +251,7 @@ if [ "$UNINSTALL" = 0 ]; then
   done
   if [ -z "$AGENT" ]; then
     if [ "$CMD" = claude ]; then missing="$missing$(msg claude)"
+    elif [ "$CMD" = codex ]; then missing="$missing$(msg codex)"
     else missing="$missing$(printf "$(msg cmd)" "$CMD")"; fi
   fi
 fi
@@ -234,6 +261,7 @@ if [ -n "$missing" ]; then
 fi
 [ -n "$AGENT" ] && sayf agentcmd "$AGENT"
 [ "$CMD" = claude ] && [ -n "$AGENT" ] && [ ! -d "$HOME/.claude" ] && sayf notlogged
+[ "$TOOL" = codex ] && [ -n "$AGENT" ] && [ ! -f "${CODEX_HOME:-$HOME/.codex}/auth.json" ] && sayf notlogged_codex
 
 # kalmido-setup-step: instance
 [ -n "$DIR" ] || dief nodir
@@ -368,6 +396,7 @@ old = os.umask(0o077)
 with open(e["KALMIDO_SETUP_ENV"] + ".new", "w", encoding="utf-8") as f:
     f.write("# Kalmido agent %s (%s), set up by agent-setup.sh -- keep this file private\n" % (nm, un))
     f.write("KALMIDO_URL=%s\nKALMIDO_TOKEN=%s\nKALMIDO_EVENTS=1\n" % (e["KALMIDO_SETUP_URL"], r["token"]))  # the address that worked here
+    f.write("# KALMIDO_TOOLSETS=tickets,code,chat   # optional (2.391.0): only these MCP tool packages, chat is always on; default: all\n")
     # one state folder per instance (event cursor, approvals, lock): two project folders on one computer never share one
     # 2.443.0 (#2940): quoted, the launcher reads this file as shell (a space in the home folder)
     f.write("KALMIDO_STATE_DIR=%s\n" % shlex.quote(os.path.join(os.path.dirname(e["KALMIDO_SETUP_ENV"]), "state")))
@@ -457,7 +486,18 @@ fi
 # the agent command gets the MCP server with --mcp-config (works headless without a trust prompt); the token comes from the
 # launcher's environment, so it is in no config file but the env file
 MCPJ=$INST/mcp.json
+MCPARGS=(--mcp-config "$MCPJ")
+if [ "$TOOL" = codex ]; then
+  # 2.391.0 (#3359): Codex CLI takes the same server per run (-c, nothing written into ~/.codex/config.toml); Codex hands MCP
+  # servers only a few environment variables, so a small wrapper next to the env file reads it and starts the server
+  MCPJ=$INST/kalmido_mcp_run.sh
+  MCPARGS=(--skip-git-repo-check -c "mcp_servers.kalmido.command=\"$MCPJ\"")
+fi
 if [ "$DRY" = 1 ]; then sayf dry_mcp "$MCPJ" "$PY" "$INST/kalmido_mcp.py"
+elif [ "$TOOL" = codex ]; then
+  printf '#!/usr/bin/env bash\n# 2.391.0 (#3359): the Kalmido MCP server for Codex CLI, with the env file of this agent\nset -a\n. %q\nset +a\nexec %q %q\n' \
+    "$ENVF" "$(command -v "$PY")" "$INST/kalmido_mcp.py" > "$MCPJ"
+  chmod 700 "$MCPJ"
 else
   "$PY" -c 'import json, sys; json.dump({"mcpServers": {"kalmido": {"command": sys.argv[1], "args": [sys.argv[2]]}}}, open(sys.argv[3], "w"), indent=2)' \
     "$(command -v "$PY")" "$INST/kalmido_mcp.py" "$MCPJ"
@@ -489,7 +529,7 @@ fi
 stepf s_auto
 if [ "$NOAUTO" = 1 ]; then
   sayf noauto
-  say "  cd $(printf '%q' "$DIR") && bash $(printf '%q' "$INST/agent_launcher.sh") -e $(printf '%q' "$ENVF") --events -- $(printf '%q' "${AGENT:-$CMD}") --mcp-config $(printf '%q' "$MCPJ")"
+  say "  cd $(printf '%q' "$DIR") && bash $(printf '%q' "$INST/agent_launcher.sh") -e $(printf '%q' "$ENVF") --events -- $(printf '%q' "${AGENT:-$CMD}")$(printf ' %q' "${MCPARGS[@]}")"
 fi
 APATH="$(dirname "${AGENT:-/usr/bin/$CMD}"):$(dirname "$(command -v "$PY" 2>/dev/null || echo /usr/bin/python3)"):$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 xml() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
@@ -504,7 +544,7 @@ elif [ "$OS" = mac ]; then
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string><string>$(xml "$INST/agent_launcher.sh")</string><string>-e</string><string>$(xml "$ENVF")</string>
-    <string>--events</string><string>--</string><string>$(xml "${AGENT:-$CMD}")</string><string>--mcp-config</string><string>$(xml "$MCPJ")</string>
+    <string>--events</string><string>--</string><string>$(xml "${AGENT:-$CMD}")</string>$(for a in "${MCPARGS[@]}"; do printf '<string>%s</string>' "$(xml "$a")"; done)
   </array>
   <key>WorkingDirectory</key><string>$(xml "$DIR")</string>
   <key>EnvironmentVariables</key><dict><key>PATH</key><string>$(xml "$APATH")</string></dict>
@@ -541,7 +581,7 @@ After=network-online.target
 [Service]
 WorkingDirectory=$(q "$DIR")
 Environment=$(q "PATH=$APATH")
-ExecStart=/usr/bin/env bash $(q "$INST/agent_launcher.sh") -e $(q "$ENVF") --events -- $(q "${AGENT:-$CMD}") --mcp-config $(q "$MCPJ")
+ExecStart=/usr/bin/env bash $(q "$INST/agent_launcher.sh") -e $(q "$ENVF") --events -- $(q "${AGENT:-$CMD}")$(for a in "${MCPARGS[@]}"; do printf ' %s' "$(q "$a")"; done)
 Restart=always
 RestartSec=30
 StandardOutput=append:$INST/agent.log

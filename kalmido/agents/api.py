@@ -1,4 +1,5 @@
 """The REST API of an agent itself (token of an agent account)."""
+import random
 import json
 import re
 import time
@@ -279,7 +280,7 @@ def v1_agent_events():
             c2.commit()
     resp = jsonify(data=data, cursor=rows[-1]["id"] if rows else since, has_more=more, busy=busy, waited=waited)
     if busy:
-        resp.headers["Retry-After"] = "5"
+        resp.headers["Retry-After"] = str(random.randint(3, 8))  # 2.391.0 A (#3360): spread, so ten agents do not come back together
     return resp
 
 

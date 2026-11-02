@@ -201,6 +201,7 @@ L1 = r.json()
 check(r.status_code == 201 and L1["checklist"] is True and L1["role"] == "owner" and L1["name"] == "Shop", "list create " + str(L1))
 check(is_err(a.post("/lists", {"name": "x", "owner_id": 2}), 400), "list create: unknown field refused")
 check(is_err(a.post("/lists", {"name": ""}), 400), "list create: name required")
+check(r.headers.get("Deprecation") == "true" and "Sunset" not in r.headers, "2.391.0 (#3361): the deprecated alias `checklist` answers with Deprecation")
 check(is_err(a.post("/lists", {"name": "x", "checklist": "yes"}), 400), "list create: checklist must be boolean")
 L2 = a.post("/lists", {"name": "Private"}).json()
 L3 = a.post("/lists", {"name": "Shared", "kind": "project", "time_tracking": True}).json()  # project: time entries + fields
@@ -437,16 +438,22 @@ extra = [(p, m) for p, ms in sp.items() for m in ms if m not in v1r.get(p, set()
 check(v1r and not missing and not extra, f"every route documented: missing {missing}, extra {extra}")
 SCOPES = ("read", "tasks:write", "comments", "structure", "delete", "attachments:read", "attachments:write", "time", "export", "account",
           "admin-read", "agent", "calendar", "contacts", "private", "files:read", "files:write",
-          "pinboard", "office", "layouts", "import", "sheets:read", "sheets:write", "docs:upload", "wiki:read", "wiki:write")  # 2.200.0 C (#1781): wiki; 2.207.0 (#2763): docs:upload (upload-target); 2.89.0 (#1916): sheets; 2.68.0 (#1839): import; 2.55.0 (#1066): layouts; 2.15.0 (#479): fine scopes; 2.21.0: calendar, contacts; 2.22.0: private; 2.48.0 (#1207): files; 2.51.0 (#1352): pinboard; 2.51.0 (#1348): office
+          "pinboard", "office", "layouts", "import", "sheets:read", "sheets:write", "docs:upload", "wiki:read", "wiki:write", "integrations")  # 2.391.0 (#3362): integrations; 2.200.0 C (#1781): wiki; 2.207.0 (#2763): docs:upload (upload-target); 2.89.0 (#1916): sheets; 2.68.0 (#1839): import; 2.55.0 (#1066): layouts; 2.15.0 (#479): fine scopes; 2.21.0: calendar, contacts; 2.22.0: private; 2.48.0 (#1207): files; 2.51.0 (#1352): pinboard; 2.51.0 (#1348): office
 check(all(op.get("x-kalmido-scope") in SCOPES for ms in spec["paths"].values() for op in ms.values()), "spec: scope per operation")
 
 # ---- per-token rate limit (KALMIDO_API_RATE=200 in this container)
 TL = tok(A, "limited")["token"]
 lim = Api(TL)
-hits = [lim.get("/me").status_code for _ in range(205)]
+r0 = lim.get("/me")  # 2.391.0 (#3361): the headers of a normal answer count down with the token's counter
+r1 = lim.get("/me")
+check(r0.headers.get("RateLimit-Limit") == "200" and r0.headers.get("X-RateLimit-Limit") == "200" and r1.headers.get("RateLimit-Remaining") == str(int(r0.headers.get("RateLimit-Remaining", "0")) - 1)
+      and r1.headers.get("RateLimit-Remaining") == "198" and r1.headers.get("RateLimit-Reset", "").isdigit(), "2.391.0 (#3361): RateLimit-* on an answer, Remaining counts down")
+hits = [200, 200] + [lim.get("/me").status_code for _ in range(203)]  # the two above counted
 check(hits[:200] == [200] * 200 and hits[200:] == [429] * 5, f"rate limit per token: {hits.count(200)} ok, then 429")
 r = lim.get("/me")
-check(is_err(r, 429, "rate_limited") and r.headers.get("Retry-After") == "60", "429 with Retry-After")
+check(is_err(r, 429, "rate_limited") and 1 <= int(r.headers.get("Retry-After", "0")) <= 60, "429 with Retry-After")  # 2.391.0 (#3361): the real reset, was fixed 60
+check(r.headers.get("RateLimit-Limit") == "200" and r.headers.get("RateLimit-Remaining") == "0" and 1 <= int(r.headers.get("RateLimit-Reset", "0")) <= 60
+      and r.headers.get("X-RateLimit-Limit") == "200" and r.headers.get("X-RateLimit-Remaining") == "0", "2.391.0 (#3361): 429 carries the RateLimit-* and X-RateLimit-* headers")
 check(ar.get("/me").ok and a.get("/me").ok, "other tokens are not limited by it")
 
 # ---- invalid tokens: limit per client address + admin alert (last: it blocks this address for 15 min)

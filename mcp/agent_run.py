@@ -35,6 +35,9 @@ that arrive together: one run), the same way a hosted chat service does it:
   - conversations:    Claude Code: each person's chat goes on in one conversation (--resume); a new one after size, runs,
                       a pause, a new day, a model change, Reset now -- with a summary as context (#1446)
   - robust runs:      429 tried again, time limit per run (process group), 2 tries, event queue on disk, a lock (#1448)
+  - profiles:         KALMIDO_AGENT_PROFILE claude | codex | generic (else the command's name): Codex CLI runs
+                      `codex exec --json -` (steps, answer, conversation from its event stream; no permission questions, no
+                      plan usage); generic = the prompt on stdin, stdout is the answer (2.391.0, #3359)
 
 usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [ARGS...]   |   agent_run.py --perm-hook
   KALMIDO_URL, KALMIDO_TOKEN    from the environment (the launcher loads the env file)
@@ -49,6 +52,7 @@ usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [AR
   KALMIDO_PERMISSION_MODE       the permission mode of a Claude Code COMMAND without --permission-mode; set, the mode counts as
                                 fixed by this computer: the switch in the chat header (runtime permission_mode) is not applied
   KALMIDO_APPROVAL_CHECK        0 = no approval check of chat answers (default 1)
+  KALMIDO_AGENT_PROFILE         claude | codex | generic (default: from the command's name; other names = as Claude Code)
   KALMIDO_RUN_LOG               the runner's own log file (default on Windows: agent_run.log next to agent_run.py; "0" = none;
                                 one old generation .1 after 1 MiB) -- stderr of Start-Process never reaches agent.log there
   --once-event FILE             handle the events of FILE (one JSON object per line) and exit (for tests)
@@ -514,8 +518,13 @@ class Stream:
         self.aborted = False  # 2.144.0 (#2412): ended by Stop in the chat
         self.rules_added = False  # 2.235.0 C (#2903): the run saved a standing rule (add_rule) -> read GET /api/v1/agent again
         self._lock = threading.Lock()  # tick() runs from the reader and from the ticker thread
+        self.raw, self.raw_out = False, []  # 2.391.0 (#3359): profile generic, plain text on stdout
+        self.model_hint, self.tool_ids = "", set()  # 2.391.0 (#3359): Codex: the model from COMMAND / config, tool items seen
 
     def feed(self, line):
+        if self.raw:  # 2.391.0 (#3359): profile generic -- its text on stdout is the answer
+            self.raw_out.append(line)
+            return
         line = line.strip()
         if not line:
             return
@@ -523,9 +532,15 @@ class Stream:
             ev = json.loads(line)
         except ValueError:
             return
+        if not isinstance(ev, dict):
+            return
         t = ev.get("type")
         if self.on_event:  # 2.44.0 B (#1443)
             self.on_event(ev)
+        if "." in str(t or ""):  # 2.391.0 (#3359): Codex CLI (`codex exec --json`): thread.started, item.*, turn.*
+            self.feed_codex(ev)
+            self.tick()
+            return
         if ev.get("session_id") and not self.session_id:
             self.session_id = str(ev["session_id"])
         if t == "system" and ev.get("subtype") == "init":
@@ -555,6 +570,46 @@ class Stream:
             self.result = ev
         self.tick()
 
+    def feed_codex(self, ev):
+        """2.391.0 (#3359): one event of `codex exec --json`. An agent message followed by a tool item is a step, the last
+        agent message is the answer once the turn is over; tool items are counted, their input and output never looked at."""
+        r = codex_event(ev)
+        if not r:
+            return
+        kind, v = r
+        if kind == "session":
+            if not self.session_id:
+                self.session_id = v
+            if self.model_hint and not self.model:
+                self.model = self.model_hint
+                self.on_model(self.model)
+        elif kind == "text":
+            self.text = self.last_text = v
+        elif kind == "tool":
+            iid, name = v
+            if iid not in self.tool_ids:
+                self.tool_ids.add(iid)
+                self.tools += 1
+                if name.endswith("add_rule"):
+                    self.rules_added = True
+            if self.text:
+                self.pending, self.text = self.text, ""
+        elif kind == "usage":
+            self.context_tokens = v or self.context_tokens
+            self.result = {"type": "result", "result": self.last_text, "is_error": not self.last_text}
+        elif kind == "failed":
+            self.err_tail.append(v)
+            self.result = {"type": "result", "result": "", "is_error": True}
+        elif kind == "error":
+            self.err_tail.append(v)
+
+    def end_raw(self, rc):
+        """Profile generic: everything on stdout is the answer (a failed command: none)."""
+        if self.raw:
+            text = "".join(self.raw_out).strip()
+            self.result = {"type": "result", "result": text, "is_error": rc != 0 or not text}
+            self.last_text = text
+
     def tick(self):
         with self._lock:
             if not self.pending or time.time() - self.last_sent < STEP_GAP_S:
@@ -573,6 +628,119 @@ def model_label(model):
     if not m:
         return (model or "").strip()[:80]
     return f"{m.group(1).capitalize()} {m.group(2)}" + (f".{m.group(3)}" if m.group(3) else "")
+
+
+# kalmido-capability: profile (2.391.0, #3359): which tool COMMAND is, and how a run of it is built and read.
+#   claude   Claude Code: -p --output-format stream-json --verbose, hooks (perm_relay, usage), --resume, plan usage
+#   codex    Codex CLI: `codex exec --json -` (prompt on stdin), the JSONL event stream (thread.started, item.*, turn.*)
+#            gives steps / the answer / the session; the conversation goes on with `codex exec --json resume <id> -`;
+#            no permission questions in the chat, no plan usage (approvals: the ```approval block as for every command)
+#   generic  any other command: the prompt on stdin, its text on stdout is the answer; no steps, no permission questions,
+#            no conversation
+# KALMIDO_AGENT_PROFILE chooses; without it the command's name does (claude / codex). Any other name without the variable
+# stays as before (the stream-json arguments of Claude Code, no hooks), so a wrapper script of Claude Code keeps working.
+PROFILES = ("claude", "codex", "generic")
+CODEX_TOOL_ITEMS = ("command_execution", "file_change", "mcp_tool_call", "web_search")
+
+
+def cmd_name(cmd):
+    """The bare program name of COMMAND (claude.cmd, C:\\npm\\codex.cmd -> claude, codex), lower case."""
+    return re.split(r"[\\/]", str((cmd or ["claude"])[0]))[-1].lower().split(".")[0]
+
+
+def agent_profile(cmd):
+    """The profile of COMMAND: KALMIDO_AGENT_PROFILE (claude | codex | generic), else from the command's name."""
+    env = (os.environ.get("KALMIDO_AGENT_PROFILE") or "").strip().lower()
+    if env in PROFILES:
+        return env
+    return "codex" if cmd_name(cmd) == "codex" else "claude"
+
+
+def claude_native(cmd):
+    """Claude Code itself (hooks, --settings, --resume): the name claude, or KALMIDO_AGENT_PROFILE=claude for a wrapper."""
+    if (os.environ.get("KALMIDO_AGENT_PROFILE") or "").strip().lower() in ("codex", "generic"):
+        return False
+    return cmd_name(cmd) == "claude" or \
+        (os.environ.get("KALMIDO_AGENT_PROFILE") or "").strip().lower() == "claude"
+
+
+def profile_args(profile, cmd):
+    """The arguments of one headless run of COMMAND for its profile (without the conversation part, see with_session)."""
+    args = list(cmd)
+    if profile == "codex":
+        if "exec" not in args[1:] and args[1:2] != ["e"]:
+            args.insert(1, "exec")
+        if "--json" not in args and "--experimental-json" not in args:
+            args.append("--json")
+        return args
+    if profile == "generic":
+        return args
+    if "-p" not in args and "--print" not in args:
+        args.append("-p")
+    if "--output-format" not in args:
+        args += ["--output-format", "stream-json", "--verbose"]
+    return args
+
+
+def with_session(profile, args, sid):
+    """args of profile_args + going on in conversation sid (None: a fresh one). Codex: the resume subcommand after the exec
+    options and `-` = the prompt comes on stdin."""
+    if profile == "codex":
+        return list(args) + (["resume", str(sid)] if sid else []) + ["-"]
+    if profile == "claude" and sid:
+        return list(args) + ["--resume", str(sid)]
+    return list(args)
+
+
+def codex_model(cmd):
+    """Codex names no model in its event stream: -m / --model / -c model=... of COMMAND, else model = of
+    $CODEX_HOME/config.toml (default ~/.codex), else ""."""
+    for i, a in enumerate(cmd):
+        if a in ("-m", "--model") and i + 1 < len(cmd):
+            return cmd[i + 1]
+        if a.startswith("--model="):
+            return a.split("=", 1)[1]
+        if a in ("-c", "--config") and i + 1 < len(cmd) and re.match(r"\s*model\s*=", cmd[i + 1]):
+            return cmd[i + 1].split("=", 1)[1].strip().strip("\"'")
+    home = os.environ.get("CODEX_HOME") or os.path.join(os.path.expanduser("~"), ".codex")
+    try:
+        with open(os.path.join(home, "config.toml"), encoding="utf-8") as f:
+            for ln in f:
+                if ln.lstrip().startswith("["):
+                    break  # only the top level, not a profile's model
+                m = re.match(r"\s*model\s*=\s*[\"']([^\"']+)[\"']", ln)
+                if m:
+                    return m.group(1)
+    except OSError:
+        pass
+    return ""
+
+
+def codex_event(ev):
+    """One line of `codex exec --json`, mapped to what the runner needs -> (kind, value) or None:
+    ("session", thread id), ("text", an agent message), ("tool", (item id, tool name)), ("usage", tokens: the turn is
+    over), ("failed", error text), ("error", error text)."""
+    t = str(ev.get("type") or "")
+    it = ev.get("item") if isinstance(ev.get("item"), dict) else {}
+    if t == "thread.started" and ev.get("thread_id"):
+        return "session", str(ev["thread_id"])
+    if t in ("item.started", "item.updated", "item.completed"):
+        typ = str(it.get("type") or it.get("item_type") or "")  # item_type: the field name of early versions
+        if typ == "agent_message" and t == "item.completed" and str(it.get("text") or "").strip():
+            return "text", str(it["text"]).strip()
+        if typ in CODEX_TOOL_ITEMS:
+            return "tool", (str(it.get("id") or ""), str(it.get("tool") or typ))
+        if typ == "error" and it.get("message"):
+            return "error", str(it["message"])
+        return None
+    if t == "turn.completed":
+        u = ev.get("usage") if isinstance(ev.get("usage"), dict) else {}
+        return "usage", sum(int(u.get(k) or 0) for k in ("input_tokens", "output_tokens"))
+    if t == "turn.failed":
+        return "failed", str(((ev.get("error") or {}) if isinstance(ev.get("error"), dict) else {}).get("message") or "turn failed")
+    if t == "error":
+        return "error", str(ev.get("message") or "error")
+    return None
 
 
 PERM_FLAG = {"ask": "default", "auto": "auto"}  # runtime permission_mode -> --permission-mode of Claude Code
@@ -1652,6 +1820,7 @@ def kill_tree(p):
 class Runner:
     def __init__(self, cmd, state_dir, dry=False):
         self.cmd, self.dry = cmd, dry
+        self.profile = agent_profile(cmd)  # kalmido-capability: profile (2.391.0, #3359): claude | codex | generic
         self.api = Api(os.environ["KALMIDO_URL"], os.environ["KALMIDO_TOKEN"])
         self.usage = Usage(self.api)
         self.state_dir = os.path.expanduser(state_dir)
@@ -1680,8 +1849,16 @@ class Runner:
         self.state.data["approvals"] = v
 
     def is_claude(self):
-        """The command is Claude Code (hooks, --settings, --resume, stream-json): only then perm_relay / session_resume."""
-        return os.path.basename(self.cmd[0]).lower().split(".")[0] == "claude"
+        """The command is Claude Code (hooks, --settings, --resume, stream-json): only then perm_relay / the usage hook /
+        the permission mode switch (2.391.0, #3359: profile claude, see claude_native)."""
+        return self.profile == "claude" and claude_native(self.cmd)
+
+    def can_resume(self):
+        """2.391.0 (#3359): a conversation can go on -- Claude Code (--resume) or Codex CLI (exec resume)."""
+        return self.is_claude() or self.profile == "codex"
+
+    def session_args(self, args, sid):
+        return with_session(self.profile, args, sid)
 
     def perm_dir(self):
         return os.path.join(self.state_dir, "perm")
@@ -1891,16 +2068,13 @@ class Runner:
 
     def run(self, uid, evs):
         self.pick_suggestion(uid, evs)
-        args = list(self.cmd)
-        if "-p" not in args and "--print" not in args:
-            args.append("-p")
-        if "--output-format" not in args:
-            args += ["--output-format", "stream-json", "--verbose"]
+        args = profile_args(self.profile, self.cmd)  # 2.391.0 (#3359): per profile (claude: -p --output-format stream-json)
         task = next(((ev.get("data") or {}).get("task") or {} for ev in evs if (ev.get("data") or {}).get("task")), {})
         if self.dry:
             prompt = self.make_prompt(evs, uid, self.prompt_extra(uid, None, consume=False))
             log(f"run: {'+'.join(str(e.get('event')) for e in evs)} ({'chat ' + str(uid) if uid else 'task event'}), prompt {len(prompt)} chars")
-            print(json.dumps({"args": args, "chat_user_id": uid, "prompt": prompt}, ensure_ascii=False))
+            print(json.dumps({"args": self.session_args(args, None), "chat_user_id": uid, "prompt": prompt, "profile": self.profile},
+                             ensure_ascii=False))
             return
         what = "status_chat" if uid else "status_event"  # 2.450.0 (#3769): a key of TEXTS
         if self.extras:  # 2.44.0 B (#1443): a fresh outbox folder for a chat run
@@ -1983,7 +2157,7 @@ class Runner:
         st, rc, why = None, -1, ""
         for n in (1, 2):
             sess = self.state.data["sessions"].get(key) if key else None
-            st, rc = self._exec(self.run_args(args + (["--resume", sess["id"]] if sess else [])), prompt, uid, what, tid)
+            st, rc = self._exec(self.run_args(self.session_args(args, sess["id"] if sess else None)), prompt, uid, what, tid)
             if st is not None and st.rules_added:  # 2.235.0 C (#2903): its own new rule is in the next prompt's rules block
                 self.refresh_agent()
             if st is not None and st.aborted:  # 2.144.0 (#2412): stopped by the person, never a second try
@@ -2019,8 +2193,9 @@ class Runner:
         events always run fresh; each person has a conversation of their own (nothing of one chat reaches another). A
         conversation that is due to end (size, runs, pause, a new day, model change, Reset now) first writes a short
         summary (own short run, not after a reset) that the next prompt carries fenced as context only."""
-        if not uid or not SESSION_RESUME or not self.is_claude() or \
-                any(a in ("--resume", "-r", "--continue", "-c", "--session-id") or a.startswith("--resume=") for a in self.cmd):
+        if not uid or not SESSION_RESUME or not self.can_resume() or \
+                any(a in (("resume", "--last") if self.profile == "codex" else ("--resume", "-r", "--continue", "-c", "--session-id"))
+                    or a.startswith("--resume=") for a in self.cmd):
             return None
         if self.refresh_due:
             self.refresh_agent()
@@ -2030,7 +2205,7 @@ class Runner:
         if why:
             log(f"conversation of chat {uid} ends: {why}")
             if why != "reset":
-                st, _ = self._exec(self.run_args(args + ["--resume", s["id"]]), SUMMARY_PROMPT.format(why=why), uid, what, None, steps=False)
+                st, _ = self._exec(self.run_args(self.session_args(args, s["id"])), SUMMARY_PROMPT.format(why=why), uid, what, None, steps=False)
                 t = result_text(st) if st else ""
                 if t:
                     self.state.data["summaries"][key] = {"text": redact(t)[:6000], "at": time.time()}
@@ -2265,7 +2440,7 @@ class Runner:
             return body, appr, sugg
         log("the answer asks for a decision without an approval block: asking the agent once for the block")
         if session_id:
-            st2, _ = self._exec(args + ["--resume", session_id], CARD_FIX.format(line=line.replace('"', "'")), uid, what, None,
+            st2, _ = self._exec(self.session_args(args, session_id), CARD_FIX.format(line=line.replace('"', "'")), uid, what, None,
                                 steps=False)
             if st2 is not None and st2.aborted:  # 2.144.0 (#2412): Stop during this second run ends the whole answer
                 return None, None, []
@@ -2494,6 +2669,8 @@ class Runner:
 
         st = Stream((lambda t: self.api.progress(t, uid)) if uid and steps else (lambda t: False), on_model, on_usage, on_compact)
         st.on_event = self.extras.watch if self.extras else None  # 2.44.0 B (#1443)
+        st.raw = self.profile == "generic"  # 2.391.0 (#3359)
+        st.model_hint = codex_model(self.cmd) if self.profile == "codex" else ""
         typing()
         exe = shutil.which(args[0]) or args[0]  # Windows: claude.exe / claude.cmd (PATHEXT); a .cmd runs through cmd.exe
         run_args = (["cmd.exe", "/d", "/c", exe] if os.name == "nt" and exe.lower().endswith((".cmd", ".bat")) else [exe]) + args[1:]
@@ -2546,6 +2723,7 @@ class Runner:
         if timer:
             timer.cancel()
         te.join(2)
+        st.end_raw(rc)
         return st, rc
 
     def handle(self, evs, save=False):

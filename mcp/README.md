@@ -30,6 +30,32 @@ claude mcp add kalmido -e KALMIDO_URL=https://tasks.example.com -e KALMIDO_TOKEN
 }
 ```
 
+## Codex CLI (2.391.0)
+
+`~/.codex/config.toml` (or `codex mcp add kalmido -- /path/to/run.sh`, a wrapper that reads the env file, see
+[docs/AGENT-SETUP.md](../docs/AGENT-SETUP.md#other-tools-codex-cli-cursor-windsurf-gemini-cli)):
+
+```toml
+[mcp_servers.kalmido]
+command = "python3"
+args = ["/path/to/kalmido/mcp/kalmido_mcp.py"]
+env = { KALMIDO_URL = "https://tasks.example.com", KALMIDO_TOKEN = "abk_..." }
+```
+
+Codex hands an MCP server only a few environment variables of its own, so the two values go into `env` (or the wrapper).
+
+## Cursor, Windsurf, Gemini CLI (2.391.0)
+
+The same `mcpServers` block as above (command, args, env), in the client's file:
+
+| Client | File |
+|---|---|
+| Cursor | `.cursor/mcp.json` in the project, or `~/.cursor/mcp.json` for all projects |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+| Gemini CLI | `~/.gemini/settings.json`, or `.gemini/settings.json` in the project |
+
+These clients use the MCP tools while you work with them. The event runner (below) runs only Claude Code and Codex CLI.
+
 ## HTTP mode
 
 For clients that connect over HTTP, the server supports a subset of Streamable HTTP: `POST /mcp` with JSON responses (no SSE stream and no sessions).
@@ -54,6 +80,29 @@ the complete, tested lists are elsewhere:
 - [docs/API.md](../docs/API.md): the REST calls behind the tools and the permission (scope) of each.
 - `tools/list` of a running server: only the tools the token may use (from `GET /api/v1/me`, refreshed every 5 minutes).
 
+### Toolsets (`--toolsets`, `KALMIDO_TOOLSETS`)
+
+A model that sees 320 tool descriptions spends a lot of context on them. Start the server with the packages the agent needs:
+
+```sh
+python3 mcp/kalmido_mcp.py --toolsets tickets,code        # or KALMIDO_TOOLSETS=tickets,code in the environment / the agent env file
+```
+
+| Package | What it holds |
+|---|---|
+| `tickets` | tasks, projects and lists, comments, fields, sprints, filters, templates, files and attachments, forms, notepads, views and layouts, proposals for them |
+| `code` | repositories, builds, environments and deployments, merge / integration / deploy approvals |
+| `chat` | the agent channel: events, status, jobs, chat, approvals, usage, team chat, news. Always on, otherwise the agent hears nothing |
+| `office` | office (offers, letters, leads, receipts, payments), clients, time tracking, sheets, contacts |
+| `calendar` | calendars, events, dispo |
+| `wiki` | wiki pages and notes |
+| `life` | family, household, habits, contracts, trips, journal |
+| `integrations` | set-up tools for webhooks, tokens and repositories; only when named |
+
+`all` = every package except `integrations` (`--toolsets all,integrations` adds it). Without the option every tool is offered, as before.
+A tool outside the active packages is not listed, and calling it returns the error "not in the active toolsets". The token's scopes
+still apply on top. A misspelled package name ends the server with exit code 2. It is only a start option, there is no setting in Kalmido.
+
 | Area | Tools (examples) | Scope |
 |---|---|---|
 | Projects and tasks | `list_lists`, `list_tasks`, `search_tasks`, `get_task`, `list_subtasks`, `get_dependencies`, `get_project_overview` | `read` |
@@ -72,7 +121,8 @@ the complete, tested lists are elsewhere:
 
 A new agent starts with `read`, `tasks:write`, `comments`, `files:read` and `files:write`; the other scopes (including
 `office`, `pinboard`, `layouts`, `import`, `sheets:*`, `wiki:*`) an admin ticks on purpose. Never for an agent: `account`,
-`admin-read`, `private` and `docs:upload`. A few tools check a scope that depends on the request body (a batch with deletions,
+`admin-read`, `private`, `docs:upload` and `integrations` (2.391.0: the setup tools such as `create_webhook`, `create_api_token`,
+`add_repo_connection` are for a person's own scripts). A few tools check a scope that depends on the request body (a batch with deletions,
 `export_data`, linking a contact), and answer a plain `403` without `required_scope` when it is missing.
 
 An agent's dangerous requests (deleting a project or a field, emptying the trash, batches of 10+ tasks, moving projects,
@@ -80,6 +130,12 @@ folders, sharing) answer `approval_required` with a waiting job: a person approv
 result as a `job` event. `tests/parity_test.py` fails when a REST route has no tool (or no documented reason).
 
 API errors come back as tool results with `isError: true` and the API's message, for example `HTTP 403: No permission (view only)`.
+
+2.391.0 (#3360): the client is robust against the API's limits. `429` (with `Retry-After`) and `503` are tried again after the
+wait, at most 3 requests and 60 s of waiting together (a longer wait is returned as the error; never for `wait_for_events`).
+When an answer says `RateLimit-Remaining: 0`, the next call first waits for `RateLimit-Reset`. Every change (`POST`, `PATCH`,
+`PUT`, `DELETE`, not the `/agent/` channel) carries an `Idempotency-Key`, the same on a retry, so a lost answer never does
+a change twice.
 
 ## Runtime launcher (2.4.1)
 
@@ -124,6 +180,24 @@ buttons; a typed number picks one. Long answers go in numbered parts with code b
 
 ```sh
 ./agent_launcher.sh -e /path/to/kalmido-agent.env --events -- claude --mcp-config ~/.kalmido-mcp.json
+```
+
+**Profiles (2.391.0, #3359):** the runner builds each run for the tool the command is. `KALMIDO_AGENT_PROFILE` in the env
+file chooses (`claude`, `codex`, `generic`); without it the command's name does (`claude`, `codex`; any other name is run
+like Claude Code, without its hooks). The launchers also take the command from `KALMIDO_AGENT_CMD` in the env file when none
+follows `--`.
+
+| Profile | A run | Steps, answer, conversation | Not there |
+|---|---|---|---|
+| `claude` | `COMMAND -p --output-format stream-json --verbose` | stream-json; `--resume` | -- |
+| `codex` | `codex exec --json -` (prompt on stdin) | the JSONL events (`thread.started`, `item.completed` agent_message / tool items, `turn.completed`, `turn.failed`, `error`); `codex exec --json resume <id> -` | permission questions in the chat, usage hook, plan usage ring, Kalmido's model setting (set the model in `config.toml` or with `-m`) |
+| `generic` | `COMMAND` with the prompt on stdin | the text on stdout is the answer | steps, conversation, permission questions, plan usage |
+
+Approval cards come from the final ` ```approval ` block of the answer for every profile. Jobs (`agent_job.py`) use the same
+profile.
+
+```sh
+KALMIDO_AGENT_CMD="codex --skip-git-repo-check --sandbox workspace-write" ./agent_launcher.sh -e /path/to/kalmido-agent.env --events
 ```
 
 What a launcher has to do is listed in [`launcher_capabilities.json`](launcher_capabilities.json); a test fails when the

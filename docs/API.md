@@ -51,13 +51,14 @@ Create a token under **Settings > Access** (API tokens, webhooks and the tokens 
   | `sheets:read` / `sheets:write` (2.89.0) | tables: read / change (agents: only tables shared with them; never part of the old `write`, off for new agents) |
   | `account` | your notification settings and app passwords (never for agents; `private` and `docs:upload` neither) |
   | `wiki:read` / `wiki:write` (2.200.0) | knowledge pages: read / change their text and add pages in folders where the account may edit (agents: only pages shared with exactly them); see [Knowledge pages](#knowledge-pages) |
+  | `integrations` (2.391.0) | set up integrations from a script: webhooks (your own and, as its admin, an organisation's), API tokens (with `account` too) and repository connections of your projects; see [Setting up integrations](#setting-up-integrations-through-the-api). People only: never for agents, never part of the old `write`, never a default |
   | `docs:upload` (2.207.0) | only upload documents into one bound place (a scan inbox for the folder watcher, made in the document settings): see [Scan inboxes](#scan-inboxes-folder-watcher) |
   | `admin-read` (admins only) | `GET /api/v1/admin/users`, `/admin/status`, `/admin/orgs/activity`, `/admin/agents/{id}/audit`; checked on every request: if the user stops being an admin, it stops working (never for agents) |
 
   A new token starts with `read`. A request without the needed scope gets `403` with `error.required_scope`. Exception: a check that depends on the request body (a batch that also deletes, `GET /export`, `POST /time/from-events`, `POST /events/{id}/prep-task`, linking a contact, the proposals `time`, `shoot`, `layout`, `import` and `structure` replace) answers a plain `403` with the message “This token lacks the permission …” and no `required_scope`. 2.190.0: the
   agent channel (`/agent/*`) needs no scope, but a read-only token (only `read`, `attachments:read`, `files:read`,
   `sheets:read`, 2.200.0: `wiki:read`) may not post chat messages, reactions, pins or proposals there (`403`, `required_scope: comments`; 2.360.0: nor a job for a person (`user_id`) or one that waits (`state: waiting`), nor withdraw answer buttons; its own jobs, status and usage stay open). Tokens
-  created before 2.15.0 keep what they could do: `write` stands for the scopes that stay open to old tokens (`read`, `tasks:write`, `comments`, `structure`, `delete`, `attachments:*`, `time`, `export`, `calendar`, `account`, `files:*`), not for `admin-read`, `contacts`, `private`, `office`, `pinboard`, `layouts`, `import`, `sheets:*`, `wiki:*` or `docs:upload`, and old read-only
+  created before 2.15.0 keep what they could do: `write` stands for the scopes that stay open to old tokens (`read`, `tasks:write`, `comments`, `structure`, `delete`, `attachments:*`, `time`, `export`, `calendar`, `account`, `files:*`), not for `admin-read`, `contacts`, `private`, `office`, `pinboard`, `layouts`, `import`, `sheets:*`, `wiki:*`, `docs:upload` or `integrations`, and old read-only
   tokens got `attachments:read` once. `POST /api/me/tokens` still accepts `write` (scripts).
 - **Only from** (optional): IP addresses or networks (`203.0.113.0/24`); requests from anywhere else get `403`. Behind a
   reverse proxy the client address comes from `X-Forwarded-For` of the trusted proxies (`KALMIDO_TRUSTED_PROXIES`), so
@@ -140,9 +141,22 @@ warning (once per endpoint and set of names per hour, never values).
 **Pages**: endpoints that return lists answer `{"data": [...], "next_cursor": "..."}`. Pass `?cursor=<next_cursor>` for
 the next page; `next_cursor: null` means there is no more. `?limit=` sets the page size (1-500, default 100).
 
-**Limits**: 120 requests per token and minute (`KALMIDO_API_RATE`), then 429 with `Retry-After: 60`. Requests with an
-invalid token count per client address: after 30 within 15 minutes that address gets 429 for a while, and the admins
-get an alert.
+**Limits**: 120 requests per token and minute (`KALMIDO_API_RATE`), then 429 with `Retry-After` (seconds until a place is
+free, at most 60). Requests with an invalid token count per client address: after 30 within 15 minutes that address gets 429
+for a while, and the admins get an alert.
+
+**Rate limit headers** (2.391.0, #3361): every answer to a token request, the 429 too, carries the token's counter:
+`RateLimit-Limit` (requests per minute), `RateLimit-Remaining` (left in the current window) and `RateLimit-Reset` (seconds
+until the window frees a place; the names of the IETF draft), and the same as `X-RateLimit-Limit`, `X-RateLimit-Remaining`
+and `X-RateLimit-Reset` (a Unix time in seconds, like GitHub). Reading them does not count a request. A client with
+`RateLimit-Remaining: 0` waits for `RateLimit-Reset` before its next call. The headers are also in the OpenAPI document
+(`components.headers`).
+
+**Rule for changing the API**: `/api/v1` stays; fields and routes are added, none is changed in meaning. A removal is
+announced first: from the announcement on, answers that use the deprecated thing carry `Deprecation: true`, a `Sunset`
+header (HTTP date) and, if there is a notice, `Link: <url>; rel="deprecation"`. The `Sunset` date lies at least 90 days
+after the announcement. Today `Deprecation` marks the aliases below (`checklist`, `kind: "checklist"`); they have no
+`Sunset` date yet.
 
 **Switches**: time entries need time tracking, both on the server (admin) and in the user's own settings; otherwise
 those endpoints answer 403. Since 2.0.6 comments no longer need collaboration: writing one needs the user's *Comments*
@@ -210,7 +224,7 @@ had been made in the app. Webhooks fire too.
 | `GET /lists/{id}/playbook` | read | 2.39.0 (#1168): the list's Playbook, the owner's working rules for agents: `{list_id, text` (effective: the folders' parts, then the list's own)`, list_text, folders [{folder, text}], version` (a short marker)`, list_version, updated_at}`; health lists `404`. See [AGENTS.md](AGENTS.md#playbook) |
 | `POST /lists/{id}/playbook/proposals` | agent | 2.39.0: **agent tokens only**, members of the list: propose a new text of the list's own Playbook `{text, note?}` -> `201 {id, state, base_version}`; at most 3 open per agent and list (`409`); people apply or discard it in the app (event `playbook_proposal`) |
 | `PATCH /lists/{id}` | structure | 2.144.0: `sort_mode` (the list's sort, the same for every member: `""` = default, `prio`, `prio_asc`, `custom`, `date`, `date_desc`, `title`, `creator`, `flow`, `created`, `created_asc`, `cf:<field id>[_desc]`, `col:who|tags|time|progress|deps[_desc]`) and `group_field` (the list view grouped by a custom field for every member: `"cf:<field id>"` or the id of a **text or select** field of this list: one group per value, select fields in the order of their options, *No value* last; `""` / `null` = by sections again, the sections themselves never change), owner / list admins (others `403`, an unknown value or a field of another list `400`); lists carry both. 2.46.0: `org_visibility` (`""` = only the people the list is shared with, default; `"org"` = everyone in the list's organisation: members who are not shared with it see it read-only, `org_reader: true`, role `view`) and `org_edit` (boolean: they may edit without joining, role `edit`; 2.83.0: then they can also be the `assignee_id` of its tasks without joining, the assignment goes when `org_edit` is switched off), owner / list admins, only for lists of an organisation and never for health / Home & life / family lists (409); a list that becomes private is reset; an agent opening a list waits for approval (202). 2.41.0: `time_tracking` (the owner, boolean): time tracking on for this list. 2.40.0: `name` and `color` also by list admins (a rename puts a News entry at the owner; the rest stays the owner's, `403`). 2.28.0: `org_id` (the owner): the list's workspace, an organisation you belong to or `null` = private (`409` while people / agents in it do not fit, for family / Home & life lists and the inbox); lists carry `org_id`. 2.18.0: `project_type` (owner / list admins): `agency`, `software`, `private` or `null` / `""` (none); switching turns on what the type needs, nothing is deleted; lists carry `project_type`. 2.15.0: `archived` (true / false; the owner). 2.14.0: `columns` (owner / list admins; others `403`): the row columns of the list in order, the same for every member: `id` (task number in front of the title), `due`, `prio`, `who`, `tags`, `time`, `progress`, `deps`, `created`, `f:<field id>`; a key that is not listed is not shown; `null` = the default layout; unknown keys or fields of another list `400`. A new custom field joins configured columns at the end. 2.39.1 (#1293): `f:<id>` columns switch the module *Custom fields* on for the list's owner; the answer then carries `modules_on` (`["fields"]`, also with `project_type`: the modules it switched on). 2.13.1: `listen_agent_ids` (owner / list admins): the agents that read every comment of a person in the list ([AGENTS.md](AGENTS.md#agent-listens-in)). 2.7.0: change a list. The owner: `name`, `color`, `kind`, `done_at_bottom` (2.7.2), `nag` (default nag interval of its tasks: `5`, `10`, `15`, `30`, `60` minutes, `1d`; empty / `off` = none), `day_hours` (hours per day / shift for the time sums, 1 to 24; `null` = the server's value). Members change only their own `folder` and `view` |
-| `GET /lists/{id}/repos` | read | 2.2.0: repositories connected to a (project) list (2.390.0: + `hash_ids`, see [Ticket keys](#ticket-keys)): `provider` (`github` / `gitea` / `gitlab` / `bitbucket`, 2.18.0), `base_url`, `web_url`, `owner`, `repo`, `full_name`, `default_branch`, `status` (`new` / `ok` / `error`), `error`, `polled_at`, `author_name` / `author_email` (2.396.0: the git author for AI commits set at the repository, `""` = the agent's own; set in the app with `PATCH /api/repos/{id}`, 400 for an invalid e-mail address). Never a token; connecting is only in the app (list owner / list admins). Lists also carry `repos`. 2.33.0: a list without repositories of its own lists the ones of its folder that it uses (`folder` = the folder's path for the folder's owner, `""` for everyone else and for agents, `null` = the list's own repository; connected by the folder's owner in the folder settings, switchable off per list); `#id` / `fixes #id` then work for the tasks of every project list in that folder |
+| `GET /lists/{id}/repos` | read | 2.2.0: repositories connected to a (project) list (2.390.0: + `hash_ids`, see [Ticket keys](#ticket-keys)): `provider` (`github` / `gitea` / `gitlab` / `bitbucket`, 2.18.0), `base_url`, `web_url`, `owner`, `repo`, `full_name`, `default_branch`, `status` (`new` / `ok` / `error`), `error`, `polled_at`, `author_name` / `author_email` (2.396.0: the git author for AI commits set at the repository, `""` = the agent's own; set in the app with `PATCH /api/repos/{id}`, 400 for an invalid e-mail address). Never a token; connecting: the list owner / list admins in the app or, 2.391.0, with `POST /lists/{id}/repos` (scope `integrations`, see [Setting up integrations](#setting-up-integrations-through-the-api)). Lists also carry `repos`. 2.33.0: a list without repositories of its own lists the ones of its folder that it uses (`folder` = the folder's path for the folder's owner, `""` for everyone else and for agents, `null` = the list's own repository; connected by the folder's owner in the folder settings, switchable off per list); `#id` / `fixes #id` then work for the tasks of every project list in that folder |
 | `GET /lists/{id}/build-status` | read | 2.151.0 (#2558): the build state of a list with a repository: `data` = the OPEN tasks that need a look, each `{id, title, build}` (`build.stale` = open although its package or code is released, or work only on a branch not in the default branch), `latest` (the highest version tag), `repos`, `checked_at`. A version tag is a tag of digits with dots (optional `v`); per new tag Kalmido compares it with the version before it, so the first version that holds a commit is known (an existing connection: the newest 10 tags once). Once the newest version tag or the default branch moved, one compare newest tag...default branch tells which untagged default-branch commits are in an earlier version (`version: null`). Only the tasks the caller sees (not a participant's context tasks); branch names carry `origin: "git"`, `untrusted: true` |
 | `POST /lists/{id}/join` | structure | 2.46.0: join a list you see through `org_visibility: "org"` (`org_reader`): you become a member with the role `edit` and get its notifications; 409 when you are a member already, 404 for anybody else (agents never see lists this way). Leave again with `DELETE /lists/{id}/members/{your id}`. Readers find the list's tasks in search and in `GET /lists`, but not in the calendar feed, CalDAV, the briefing or the list's channel, and get no notifications until they join |
 | `POST /lists/{id}/owner` | structure | 2.1.2: transfer the ownership `{user_id}` to another active person (never an agent); the old owner stays as a list admin. Admins may take over a list whose owner is an agent or a disabled user. Agent tokens always `403`, inboxes `409` |
@@ -890,6 +904,41 @@ case "${1:-today}" in
   *)     echo "usage: kalmido add TITLE [DATE] | done ID | today" >&2; exit 2 ;;
 esac
 ```
+
+## Setting up integrations through the API
+
+2.391.0 (#3362): a script can set up what Settings > Access offers, with the scope `integrations` (people only: an agent's
+token never gets it, also not through the old `write`; agents set up nothing of this on purpose). The routes run the very
+checks of the app (who may manage a webhook, an organisation admin, the project owner / project admins for repositories).
+
+| Route | Scope | |
+|---|---|---|
+| `GET /me/webhooks` | integrations | your webhooks with `events` (the event names) and their last delivery; never the signing secret |
+| `POST /me/webhooks` | integrations | `{name?, url, events, enabled?}` -> `201` with `secret` (`whsec_...`, shown only in this answer) |
+| `PATCH /me/webhooks/{id}` | integrations | change `name`, `url`, `events`, `enabled` |
+| `DELETE /me/webhooks/{id}` | integrations | delete it |
+| `POST /me/webhooks/{id}/secret` | integrations | a new signing secret (the old one stops at once), shown only in this answer |
+| `POST /me/webhooks/{id}/test` | integrations | send a `ping` now (no retries): `{ok, status, ms, error}` |
+| `GET /me/webhooks/{id}/log` | integrations | the recent deliveries |
+| `… /orgs/{id}/webhooks…` | integrations | the same for an organisation's webhooks: its admins only |
+| `GET /me/tokens` | integrations + account | your tokens (`name`, `prefix`, `scopes`, `effective_scopes`, `allowed_ips`, `list_ids`, `expires_at`, `last_used_at`); never their value |
+| `POST /me/tokens` | integrations + account | `{name, scopes?, allowed_ips?, list_ids?, expires_days?}` -> `201` with `token` (shown only in this answer) |
+| `DELETE /me/tokens/{id}` | integrations + account | revoke a token (also the calling one); a scan inbox key is removed in the document settings (`403`) |
+| `POST /lists/{id}/repos` | integrations | `{repo, provider?, base_url?, owner?, token?}` connects a repository (the provider's `token` is only stored, sealed, and never returned: `token: true`) |
+| `PATCH /repos/{id}` | integrations | `{token?, hook?: "on" \| "off", hash_ids?, author_name?, author_email?}`; `hook: "on"` answers `hook_secret` once |
+| `DELETE /repos/{id}` | integrations | remove the connection with its stored pull requests and commits |
+| `PUT /lists/{id}/repos/version-field` | integrations | `{field: "auto" \| "off" \| <field id>}`: the field with the package / target version |
+
+A token never creates a token that may more than itself (`403`): its scopes stay within the calling token's effective
+scopes (the old `write` is stored as the fine scopes it stands for), its addresses within the calling token's networks,
+its projects within the calling token's projects and its life within the calling token's expiry. Left out, they are the
+calling token's (a calling token without expiry lets you pick one or none). Webhooks deliver the events of every project
+their owner sees, so only a token for all projects manages them (`403` otherwise). Changing what an existing token may do
+stays in the app. Secrets (the new token, a signing secret, a hook secret) come only in the answer that makes them, never
+in a list and never in the server's log. MCP tools: `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook`,
+`rotate_webhook_secret`, `test_webhook`, `get_webhook_log` (each with `org_id` for an organisation), `list_api_tokens`,
+`create_api_token`, `revoke_api_token`, `add_repo_connection`, `update_repo_connection`, `remove_repo_connection`,
+`set_repo_version_field` (`list_repos` reads).
 
 ## Webhooks
 
