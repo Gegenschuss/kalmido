@@ -26,6 +26,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_ROLE` | `all` | What this process runs: all (web + background work), web (requests only) or worker (background work only). |
 | `KALMIDO_SEARCH_INDEX` | `0` | Switch: allow search engines to index this server (public links and forms stay noindex). |
 | `KALMIDO_SLOW_REQUEST_MS` | `500` | Requests slower than this many milliseconds get a log line with route, duration and statement count (0 = off). |
+| `KALMIDO_STATE_LAZY_MIN` | `3000` | Tasks in the start state of one person above which a new web client gets only the start set (Today, Upcoming, My tasks, the lists it had open) and loads a list's tasks when it is opened (0 = always the start set). |
 | `KALMIDO_THREADS` | `16` | Web server threads per process (2-256). |
 | `KALMIDO_UPDATE_CHECK` | `1` | Switch: admins see when a newer release exists (one request a few times a day, never updates anything). |
 | `KALMIDO_UPDATE_URL` | `https://api.github.com/repos/Gegenschuss/kalmido/releases/latest` | Address the update check asks for the latest release. |

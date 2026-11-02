@@ -17,6 +17,7 @@ from ..core.access import (
     acx_lists_sql, collab_all, Denied, health_hidden, need_task, org_trips_hidden, plists, reading_ids, time_all, tvis, vis_sql, wr_sql, WRITE_ROLES,
 )
 from ..core.serializers import load_tasks, running_pomo
+from ..core.pg import st_ids
 from ..core.pages import inbox_user
 from ..core.instance import about_info
 
@@ -304,8 +305,12 @@ def state():
     s = usettings(c, uid)
     cutoff = iso(now_utc() - timedelta(days=14))
     # checklist lists (package B): every done item stays (the "Done" section is the reusable part of such a list)
-    tasks = load_tasks(c, f"list_id IN {vis_sql()} AND deleted_at IS NULL AND (status=0 OR completed_at>=? OR "
-                          "list_id IN (SELECT id FROM lists WHERE checklist=1)) ORDER BY id", (uid, uid, cutoff),
+    base, bargs = st_where(), (uid, uid, cutoff)
+    # 2.369.2 (#3136): a big account (more than KALMIDO_STATE_LAZY_MIN tasks) of a client that asks for it (lz=1) gets the
+    # start set only; the lists' tasks come with GET /api/state/lists when the client opens them (lz_plan)
+    lz = lz_plan(c, uid, base, bargs) if request.args.get("lz") == "1" else None
+    tasks = load_tasks(c, base + (" AND id = ANY(CAST(? AS BIGINT[]))" if lz else "") + " ORDER BY id",
+                       (*bargs, st_ids(sorted(lz["ids"]))) if lz else bargs,
                        lean_notes=True)  # 2.280.0 A (#3108): long notes come with the detail
     habits = [dict(r) for r in c.execute("SELECT * FROM habits WHERE user_id=? ORDER BY archived, sort, id", (uid,))]
     since = (local_now().date() - timedelta(days=400)).isoformat()
@@ -407,7 +412,137 @@ def state():
         storage=_quota(c, uid),  # 2.24.0 (#910): used / limit / level
         announce=_announce(c),  # 2.24.0 (#907): the notice above the app (or null)
         notif_ask=notif_ask_state(c, uid, s),  # 2.33.0 (#927): owners of lists shared before 2.33 are asked once
+        **({"lz": {"pending": lz["pending"], "counts": lz["counts"]}} if lz else {}),  # 2.369.2 (#3136)
     )
+
+
+# ---------------------------------------------------------------- 2.369.2 (#3136): the start set of a big account
+# Audit Q (#3108): /api/state of a person who sees 200 lists with 20.600 tasks was 18 MB. Such an account (more than
+# KALMIDO_STATE_LAZY_MIN tasks in its start state; only clients that send lz=1) gets the start set: the tasks Today,
+# Tomorrow, Next 7 days, Pinned, Waiting and My tasks need (due up to 8 days ahead or overdue, deadlines, planned, assigned
+# to the person or one of their groups, pinned, waiting), every task of the lists the client names in lzl (the open list,
+# the basket, the lists it loaded before = its offline cache) and of the lists where the person is a participant, plus the
+# parents and subtasks of all those (the views show trees). lz.pending = the visible lists whose tasks are not all in it,
+# lz.counts = their open top-level tasks and tags (the sidebar's numbers); GET /api/state/lists?ids= loads them.
+LZ_DAYS = 8         # due up to this many days ahead (Next 7 days + a day for time zones)
+LZ_KEEP_MAX = 2000  # lists named in lzl / ids at most
+
+
+def st_where():
+    """The where clause of the tasks of /api/state (three parameters: uid, uid, the 14-day cutoff of completed tasks)."""
+    return (f"list_id IN {vis_sql()} AND deleted_at IS NULL AND (status=0 OR completed_at>=? OR "
+            "list_id IN (SELECT id FROM lists WHERE checklist=1))")
+
+
+def lz_min():
+    from ..core.env import env_int
+    return env_int("KALMIDO_STATE_LAZY_MIN", 3000, lo=0)
+
+
+def lz_ids_arg(raw):
+    """'all' -> None (every list), '1,2,x' -> {1, 2} (at most LZ_KEEP_MAX)."""
+    if (raw or "").strip() == "all":
+        return None
+    return {int(x) for x in (raw or "").split(",")[:LZ_KEEP_MAX] if x.strip().isdigit()}
+
+
+def lz_tree(c, base, bargs, ids):
+    """ids + their parents (up the tree) + their subtasks (down), all within the state's where clause."""
+    ids = set(ids)
+    for col, other in (("id", "parent_id"), ("parent_id", "id")):  # up: the rows' parents; down: rows whose parent is in
+        front = set(ids)
+        for _ in range(MAX_DEPTH + 2):
+            if not front:
+                break
+            if col == "id":
+                want = {r[0] for r in c.execute("SELECT parent_id FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) AND parent_id IS NOT NULL",
+                                                (st_ids(sorted(front)),))} - ids
+                rows = {r[0] for r in c.execute(f"SELECT id FROM tasks WHERE {base} AND id = ANY(CAST(? AS BIGINT[]))",
+                                                (*bargs, st_ids(sorted(want))))} if want else set()
+            else:
+                rows = {r[0] for r in c.execute(f"SELECT id FROM tasks WHERE {base} AND parent_id = ANY(CAST(? AS BIGINT[]))",
+                                                (*bargs, st_ids(sorted(front))))} - ids
+            ids |= rows
+            front = rows
+    return ids
+
+
+def lz_plan(c, uid, base, bargs):
+    """None = the whole state (a small account, lzl=all); else {ids, pending, counts} (see above)."""
+    from ..lists.groups import grp_of_user
+    keep = lz_ids_arg(request.args.get("lzl", ""))
+    if keep is None:
+        return None
+    lim = lz_min()
+    if lim and c.execute(f"SELECT COUNT(*) FROM tasks WHERE {base}", bargs).fetchone()[0] <= lim:
+        return None
+    keep |= set(plists(c, uid))  # a participant's view hangs on assignments and the tree: those lists come whole
+    keep |= {r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (uid,))}  # the basket (Today can show it)
+    t0 = local_now().date()
+    grp = ",".join(str(int(x)) for x in grp_of_user(c, uid))
+    kl = ",".join(str(int(x)) for x in sorted(keep))
+    start = ("(status=0 OR completed_at>=?) AND ((due IS NOT NULL AND due<>'' AND due<=?) OR (deadline=2 AND due IS NOT NULL) "
+             "OR COALESCE(plan_start, '')>=? OR assignee_id=? OR pinned=1 OR COALESCE(waiting_at, '')<>''"
+             + (f" OR assignee_group_id IN ({grp})" if grp else "") + ")")
+    sargs = (bargs[2], (t0 + timedelta(days=LZ_DAYS)).isoformat(), (t0 - timedelta(days=1)).isoformat(), uid)
+    more = (f" OR list_id IN ({kl}) OR id IN (SELECT task_id FROM task_links WHERE list_id IN ({kl}))") if kl else ""
+    ids = {r[0] for r in c.execute(f"SELECT id FROM tasks WHERE {base} AND (({start}){more})", (*bargs, *sargs))}
+    ids = lz_tree(c, base, bargs, ids)
+    vis = [r[0] for r in c.execute(f"SELECT id FROM lists WHERE id IN {vis_sql()}", (uid, uid))]
+    pending = sorted(set(vis) - keep)
+    return {"ids": ids, "pending": pending, "counts": lz_counts(c, uid, pending)}
+
+
+def lz_counts(c, uid, lids):
+    """{list id: {n, tags}} = the open top-level tasks of these lists the person sees (with the further lists' links, as the
+    client counts a task's "also") and their tags (own + list tags, each tag once per task): the sidebar of the start set."""
+    from ..core.serializers import tags_for
+    from ..collab.reactions import ltags_for
+    if not lids:
+        return {}
+    q = ",".join(str(int(x)) for x in lids)
+    rows = [(r[0], r[1]) for r in c.execute(f"SELECT id, list_id FROM tasks WHERE list_id IN ({q}) AND deleted_at IS NULL AND status=0 "
+                                            f"AND parent_id IS NULL AND {tvis(c, uid)}")]
+    rows += [(r[0], r[1]) for r in c.execute(f"""SELECT k.task_id, k.list_id FROM task_links k JOIN tasks t ON t.id=k.task_id
+                     JOIN lists o ON o.id=t.list_id JOIN lists x ON x.id=k.list_id
+                     WHERE k.list_id IN ({q}) AND k.list_id!=t.list_id AND t.parent_id IS NULL AND t.status=0 AND t.deleted_at IS NULL
+                     AND o.org_id IS NOT DISTINCT FROM x.org_id AND t.list_id IN {vis_sql()} AND {tvis(c, uid, 't.')}""", (uid, uid))]
+    ids = {i for i, _ in rows}
+    tg, lt = (tags_for(c, ids, uid), ltags_for(c, ids)) if ids else ({}, {})
+    out = {str(x): {"n": 0, "tags": {}} for x in lids}
+    for i, lid in rows:
+        o = out[str(lid)]
+        o["n"] += 1
+        for t in set(tg.get(i, [])) | set(lt.get(i, [])):
+            o["tags"][t] = o["tags"].get(t, 0) + 1
+    return out
+
+
+@app.get("/api/state/lists")
+def state_lists():
+    """2.369.2 (#3136): the tasks of the lists ids (comma separated, or all) as /api/state has them (same where clause, same
+    serialization), with the tasks linked into them and the trees -> {v, tasks, evlinks, tcontacts}. Lists the person does
+    not see give nothing."""
+    c, uid = db(), me()
+    v0 = int(gsetting(c, "version"))  # before the tasks (as /api/state: they are at least this new)
+    keep = lz_ids_arg(request.args.get("ids", ""))
+    base, bargs = st_where(), (uid, uid, iso(now_utc() - timedelta(days=14)))
+    if keep is None:
+        where, args = base, bargs
+    elif not keep:
+        return jsonify(v=v0, tasks=[])
+    else:
+        kl = ",".join(str(int(x)) for x in sorted(keep))
+        ids = {r[0] for r in c.execute(f"SELECT id FROM tasks WHERE {base} AND (list_id IN ({kl}) OR "
+                                       f"id IN (SELECT task_id FROM task_links WHERE list_id IN ({kl})))", bargs)}
+        where, args = base + " AND id = ANY(CAST(? AS BIGINT[]))", (*bargs, st_ids(sorted(lz_tree(c, base, bargs, ids))))
+    from ..events.model import events_on
+    from ..contacts.model import task_contacts
+    tasks = load_tasks(c, where + " ORDER BY id", args, lean_notes=True)
+    ids = [t["id"] for t in tasks]
+    # the events and contacts of these tasks, as /api/state has them for its tasks (the client adds them to its maps)
+    return jsonify(v=v0, tasks=tasks, evlinks=ev_links(c, uid, ids) if ids and events_on(c, uid) else {},
+                   tcontacts=task_contacts(c, uid, set(ids)) if ids else {})
 
 
 def _quota(c, uid):

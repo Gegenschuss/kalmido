@@ -1152,7 +1152,7 @@ const SU_ADDS = {team: () => [tr('Agents')], software: () => [tr('a software pro
   office: () => ['clients', 'workload', 'forms', 'office', 'agents'].map(k => tr(FEATS.find(x => x[0] === k)?.[1] || k))};
 async function setupChoices(el, logo) {
   let st = {};
-  try { st = await (await fetch('/api/state', {headers: {'X-Requested-With': 'kalmido'}})).json(); } catch { /* offline: defaults */ }
+  try { st = await (await fetch('/api/state?lz=1&lzl=', {headers: {'X-Requested-With': 'kalmido'}})).json(); } catch { /* offline: defaults */ }
   const langs = st.languages || [{code: 'en', name: 'English'}];
   const all = [...SETUP_MAIN, ...SETUP_MODS].map(x => x[0]);
   let lang = I18N.code || 'en', preset = 'me', picked, custOpen = false, start = '';

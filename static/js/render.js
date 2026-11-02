@@ -21,7 +21,7 @@ function render0() {
   fabSync();
   o3c_sync();  // 2.83.0 C (#1427): the header strip of a list / folder (listhead.js)
   if (S.sel && S.tasks.has(S.sel) && !$('#detail').contains(document.activeElement)) renderDetail();
-  if (S.sel && !S.tasks.has(S.sel) && !(S.extra || []).some(t => t.id === S.sel)) closeDetail();
+  if (S.sel && !S.tasks.has(S.sel) && !(S.extra || []).some(t => t.id === S.sel) && !lzSel(S.sel)) closeDetail();  // 2.369.2 (#3136): lzSel = its list is on the way
   agentLive();
 }
 // ---- 2.24.0 (#907): the server's notice (maintenance / announcement) as a slim bar above the header. Hidden per device until
@@ -197,12 +197,13 @@ function counts() {
     if (t.waiting_at && !(t.parent_id && S.tasks.get(t.parent_id)?.waiting_at)) c.waiting++;  // 2.1.0 (#335)
     if (t.pinned && !t.context && !(t.parent_id && S.tasks.get(t.parent_id)?.pinned)) c.pinned++;  // 2.16.0 (#648)
     if (t.parent_id) continue;
-    c.all++;
+    const lzc = lzCounted(t.list_id);  // 2.369.2 (#3136): a list not loaded is counted by the server (lzCounts)
+    if (!lzc) c.all++;
     if (mineAssigned(t) && mtCounts(t, t0)) c.assigned++;  // 2.41.0 (#1365): not the hidden lists (except due today / overdue)
     if (dsxByMe(t)) c.byme++;  // 2.36.2 (#1138)
-    c.lists[t.list_id] = (c.lists[t.list_id] || 0) + 1;
-    for (const x of t.also || []) c.lists[x.list_id] = (c.lists[x.list_id] || 0) + 1;  // 2.71.0 B (#1459): a further list counts it too (everything else once)
-    for (const g of new Set([...t.tags, ...(t.ltags || [])])) c.tags[g] = (c.tags[g] || 0) + 1;
+    if (!lzc) c.lists[t.list_id] = (c.lists[t.list_id] || 0) + 1;
+    for (const x of t.also || []) if (!lzCounted(x.list_id)) c.lists[x.list_id] = (c.lists[x.list_id] || 0) + 1;  // 2.71.0 B (#1459): a further list counts it too (everything else once)
+    if (!lzc) for (const g of new Set([...t.tags, ...(t.ltags || [])])) c.tags[g] = (c.tags[g] || 0) + 1;
     if ((t.due && t.due <= t0 || dlToday(t) || planToday(t, t0)) && !(t.blocked && hideBlockedToday())) c.today++;  // 2.11.0: + planned for today
     else if (todayInbox() && isTodayInbox(t, t0)) c.today++;  // 2.22.0 (#681): the inbox counts in Today when it is shown there
     if (!t.due) continue;
@@ -210,6 +211,7 @@ function counts() {
     if (t.due === addDays(t0, 1)) c.tomorrow++;
     if (t.due <= addDays(t0, 6)) c.week++;
   }
+  lzCounts(c);  // 2.369.2 (#3136)
   return c;
 }
 // 2.8.0 (#434) "Leitstand": one sidebar, grouped text navigation. Focus (smart lists, with icons), Views (the modules),
@@ -964,6 +966,7 @@ function renderView() { FL.vlast = Date.now(); return td_rcRun(() => { const r =
     rowRove(); rowMoreWatch(); vl_after(); vm_after(); td_lcSweep(); return r; }); }  // 2.65.0 (#1825): vl_after = the window of a long list; 2.413.0 A (#3439): vm_after = a view entered again gets its place back (viewmem.js)
 function renderView0() {
   const m = S.route.mod, el = $('#view');
+  lzGate();  // 2.369.2 (#3136): a view of the start set loads the lists it shows first (liveparts.js)
   // 2.12.2 (#451): the open phone chat is never rebuilt (that took the focus, closed the keyboard and jumped to the top):
   // it is patched in place
   if (m === 'agents' && S.route.agent && chatFull() && S.chat.aid === +S.route.agent && $('#view .chview')?.dataset.aid === String(S.chat.aid) && $('#chat-in')) { chatPatch(); agentLive(); renderMultiBar(); return; }

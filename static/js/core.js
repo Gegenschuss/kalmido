@@ -573,7 +573,7 @@ async function rawFetch0(method, url, body, key) {
     throw new Error('auth');
   }
   const j = await r.json().catch(() => ({}));
-  if (url === '/api/state' && (r.status === 401 || (r.status === 403 && j.auth))) await sessGone();  // 2.238.0 B (#2872)
+  if (String(url).split('?')[0] === '/api/state' && (r.status === 401 || (r.status === 403 && j.auth))) await sessGone();  // 2.238.0 B (#2872); 2.369.2 (#3136): with its query (lz, auto)
   if ((r.status === 401 || r.status === 403) && j.auth) { keepW(); await authGone(); authScreen(j); throw new Error('auth'); }  // built-in login
   if (r.status === 401) { keepW(); await authGone(); location.reload(); throw new Error('auth'); }
   if (!r.ok) { const e = new Error(j.error || httpErrText(r.status)); e.status = r.status; e.data = j;
@@ -1033,6 +1033,7 @@ function applyState(j) {
   // it is being typed / waits to be saved
   const was = S.tasks, tkNoteBusy = id => !!saveTimers[id + ':content'] || (S.sel === id && document.activeElement?.id === 'd-content');
   S.tasks = new Map(j.tasks.map(t => { if (!('content' in t)) { const o = was?.get(t.id); if (o && 'content' in o && o.updated_at === t.updated_at && (String(o.content).length === t.content_n || tkNoteBusy(t.id))) t.content = o.content; } return [t.id, t]; }));
+  lzTake(j);  // 2.369.2 (#3136): the lists whose tasks are not all here (liveparts.js)
   S.filters = j.filters || [];
   S.notify = j.notify || null;  // 2.1.0 (#317) the notification matrix (the server's view)
   S.ntfyInbox = j.ntfy_inbox || {enabled: false};
@@ -1108,7 +1109,7 @@ async function load(auto) {
     let crossed = false;
     for (let i = 0; i < 3; i++) {  // 2.13.4: an answer that a write overtook is fetched again (see rawFetch)
       const w0 = S.wseq || 0;
-      j = await api('GET', auto && !i ? '/api/state?auto=1' : '/api/state');  // 2.280.0 F (#3109): a repeat is no herd reload (it would brake itself)
+      j = await api('GET', (auto && !i ? '/api/state?auto=1&' : '/api/state?') + lzQuery());  // 2.369.2 (#3136): + the start set  // 2.280.0 F (#3109): a repeat is no herd reload (it would brake itself)
       crossed = (S.wseq || 0) !== w0;
       if (!crossed) break;
     }

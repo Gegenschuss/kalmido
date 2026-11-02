@@ -50,7 +50,7 @@ function upSend(url, opt, fd) {
     // a redirect to a login on another host ends as a network error here: a bodyless look tells it from being offline
     x.onerror = async () => {
       row.done();
-      const r = await fetch('/api/state', {redirect: 'manual', headers: {'X-Requested-With': 'kalmido'}}).catch(() => null);
+      const r = await fetch('/api/state?lz=1&lzl=', {redirect: 'manual', headers: {'X-Requested-With': 'kalmido'}}).catch(() => null);
       if (r?.type === 'opaqueredirect') ok(r); else no(new Error('offline'));
     };
     x.send(fd);

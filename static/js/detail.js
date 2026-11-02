@@ -606,7 +606,7 @@ async function tkNotesLoad(ids) {
   return out;
 }
 function renderDetail0() {
-  const t = taskById(S.sel); if (!t) return;
+  const t = taskById(S.sel); if (!t) { lzSel(S.sel); return; }  // 2.369.2 (#3136): a task of a list not loaded yet: its list comes (liveparts.js)
   const noteOut = tkNoteMissing(t);
   if (noteOut && !TKN_WAIT.has(t.id) && !(Date.now() - (TKN_OFF.get(t.id) || 0) < TKN_RETRY_MS)) {
     const id = t.id, done = () => { if (S.sel === id) renderDetail(); };

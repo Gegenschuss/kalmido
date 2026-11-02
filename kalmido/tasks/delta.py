@@ -24,7 +24,7 @@ from ..core.db import appver_parse, db, gset, gsetting, iso, now_utc, trigger_en
 from ..accounts.session import me
 from ..core.access import plists, time_all, token_lists, tvis, vis_sql, wr_sql  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
-from ..core.state import ev_links, ev_sig  # 2.149.0 G (#2517): pulled up from functions
+from ..core.state import ev_links, ev_sig, lz_counts  # 2.149.0 G (#2517): pulled up from functions
 
 DL_MAX = 200     # more changed tasks than this: the full state is cheaper
 DL_ROWS = 5000  # rows of dl_changes read at most (more: full)
@@ -349,4 +349,6 @@ def state_delta():
         time_totals=time_totals(c, uid) if tall else {},
         time_lists=time_list_totals(c, uid, own=True) if tall else {},  # 2.144.5 C (#1523)
         **(dl_side(c, uid) if request.args.get("side") == "1" else {}),  # 2.280.0 A (#3109)
+        # 2.369.2 (#3136): a client with the start set (lz=1) takes the counts of the touched lists it has not loaded
+        **({"lzc": lz_counts(c, uid, sorted(lids))} if request.args.get("lz") == "1" and lids else {}),
     )

@@ -418,6 +418,8 @@ APP_ONLY = [
     ("2.27.0 (#999): the web panel says a person edits a task (tidy-up waits); agents never edit in a panel", ("=POST /api/tasks/{}/editing",)),
     ("2.42.0 (#1376): the web app's live updates (only the tasks changed since its state); agents follow their events and GET /tasks",
      ("=GET /api/state/delta",)),
+    ("2.369.2 (#3136): the web app's start set of a big account loads a list's tasks when it is opened; agents read GET /tasks",
+     ("=GET /api/state/lists",)),
     ("2.34.0 (#368): the briefing field reads a PDF the person picks (nothing stored); agents read stored files with GET /attachments/{id}/text",
      ("=POST /api/pdf-text",)),
     # 2.102.0 (#1999): the web app reports its own unexpected errors; a service reports to a list's error hook (token)

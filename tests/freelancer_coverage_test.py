@@ -719,7 +719,7 @@ ROUTES = {
     "GET /api/ical": "tasks", "GET /api/imports": "tasks", "GET /api/news": "tasks", "GET /api/notes": "tasks",
     "GET /api/notes/{}": "tasks", "GET /api/occurrences": "tasks", "GET /api/pomo/stats": "tasks", "GET /api/roadmap": "tasks",
     "GET /api/search": "tasks", "GET /api/search/messages": "tasks", "GET /api/sprints/{}": "tasks", "GET /api/stale": "tasks", "GET /api/state": "tasks",
-    "GET /api/state/delta": "tasks", "GET /api/stats": "tasks", "GET /api/tags/count": "tasks", "GET /api/tasks": "tasks",
+    "GET /api/state/delta": "tasks", "GET /api/state/lists": "tasks", "GET /api/stats": "tasks", "GET /api/tags/count": "tasks", "GET /api/tasks": "tasks",
     "GET /api/tasks/{}/watchers": "tasks", "POST /api/tasks/{}/watchers": "tasks", "DELETE /api/tasks/{}/watchers/{}": "tasks",  # 2.473.0 (#3357)
     "GET /api/v1/tasks/{}/watchers": "tasks", "POST /api/v1/tasks/{}/watchers": "tasks", "DELETE /api/v1/tasks/{}/watchers/{}": "tasks",
     "GET /api/tasks/{}": "tasks", "GET /api/tasks/{}/bell": "tasks", "GET /api/tasks/{}/deps": "tasks",

@@ -129,7 +129,7 @@ async function lpDelta(v, ch, n, since) {
   const light = ch.filter(k => LP_LIGHT.has(k)), follow = since !== undefined, wside = follow || light.length > 0;
   const w0 = S.wseq || 0;
   let j;
-  try { j = await api('GET', `/api/state/delta?since=${follow ? since : S.v}&lean=1${wside ? '&side=1' : ''}`); } catch { return false; }
+  try { j = await api('GET', `/api/state/delta?since=${follow ? since : S.v}&lean=1${wside ? '&side=1' : ''}${S.lz ? '&lz=1' : ''}`); } catch { return false; }  // 2.369.2 (#3136): + lz
   if (!j || j.full !== false || (S.wseq || 0) !== w0 || OUT.q.length) return false;  // a write of mine overtook it: the full way
   if (light.length && !follow) lpLive(v, light, n, true);  // comments of the open task, the open chat, news (their own fetches)
   S.lpN.delta++;
@@ -141,6 +141,7 @@ async function lpDelta(v, ch, n, since) {
   const pr = j.progress || {};
   for (const l of S.lists || []) if (pr[l.id]) l.progress = pr[l.id];
   if (j.counts) S.counts = j.counts;
+  lzDelta(j);  // 2.369.2 (#3136)
   if (!j.lean) S.mineOrder = moFromState(j);  // 2.191.0 C (#2507): lean = nothing of mine changed, the order stays
   for (const [k, src] of [['evlinks', j.evlinks || {}], ['tcontacts', j.tcontacts || {}]]) {
     const m = S[k] || (S[k] = {});
@@ -193,6 +194,99 @@ function lpCacheSoon() {
     lpCacheT = 0;
     const c = S.lpCache; if (!c) return;
     Object.assign(c, {v: S.v, tasks: [...S.tasks.values()], lists: S.lists, counts: S.counts});
+    if (S.lz) c.lz = {pending: [...S.lz.pending], counts: S.lz.counts}; else delete c.lz;  // 2.369.2 (#3136): the loaded lists stay
     LS.set('cache', c);
   }, 30000);
 }
+
+// ---- 2.369.2 (#3136): the start set of a big account. /api/state?lz=1 answers a person with many tasks (server switch
+// KALMIDO_STATE_LAZY_MIN) with the tasks Today / Upcoming / My tasks need plus the lists named in lzl; lz.pending = the
+// lists whose tasks are not all here, lz.counts = their open top-level tasks and tags (the sidebar). A view loads what it
+// shows before it is complete: a list its tasks, a folder its lists, every view not known to need less all of them
+// (lzNeed). Loaded lists stay (the offline cache keeps them, the next /api/state names them in lzl). S.lz = null: the
+// whole state (a small account, an old server).
+S.lz = null;
+const LZ_SET = new Set(['today', 'tomorrow', 'week', 'pinned', 'waiting', 'inbox']);  // covered by the start set
+const LZ_FREE = new Set([...LP_NOTASKS, 'news', 'contacts', 'budget', 'feeds', 'bookmarks', 'reading', 'wiki', 'sheets', 'ablage', 'docs', 'msv']);
+function lzTake(j) {
+  S.lz = j.lz ? {pending: new Set(j.lz.pending || []), counts: j.lz.counts || {}} : null;
+}
+// the query of the next /api/state: the lists this window has whole (all = every one, nothing is pending)
+function lzQuery() {
+  if (!S.lz) return S.booted && S.tasks.size ? 'lz=1&lzl=all' : 'lz=1&lzl=' + lzRecent().join(',');
+  if (!S.lz.pending.size) return 'lz=1&lzl=all';
+  return 'lz=1&lzl=' + (S.lists || []).map(l => l.id).filter(id => !S.lz.pending.has(id)).join(',');
+}
+// the lists opened last on this device (the first load of a new window keeps them whole: they are what is opened next)
+const lzRecent = () => (LS.get('lzOpen', []) || []).filter(Number.isInteger).slice(0, 20);
+function lzRemember(ids) { LS.set('lzOpen', [...new Set([...ids, ...lzRecent()])].slice(0, 20)); }
+// what the current view needs loaded: [] = nothing more, [list ids], null = every list
+function lzNeed(r = S.route) {
+  const k = r?.key || '';
+  if (r?.mod === 'tasks') {
+    if (LZ_SET.has(k)) return [];
+    if (k === 'assigned' || k === 'doable') return collab() ? (S.lists || []).filter(isOwner).map(l => l.id) : null;  // + the unassigned ones of my lists
+    if (k.startsWith('l:')) return [+k.slice(2)];
+    if (k.startsWith('folder:')) return folderLists(k.slice(7)).map(l => l.id);
+    if (k.startsWith('lists:')) return dx_listIds(k);
+    if (k === 'done' || k === 'trash') return [];  // their own pages (loadExtra)
+    return null;
+  }
+  return LZ_FREE.has(r?.mod) ? [] : null;
+}
+// before a view draws: load what it needs (in the background, the view is drawn again when it is there)
+function lzGate() {
+  if (!S.lz?.pending.size) return;
+  const need = lzNeed();
+  if (need && !need.some(id => S.lz.pending.has(id))) return;
+  lzLoad(need).then(ok => { if (ok) render(); });
+}
+const lzBusy = new Set();  // list ids being loaded ('all' = every pending one)
+async function lzLoad(want) {
+  if (!S.lz?.pending.size || lzBusy.has('all')) return false;
+  const ids = want === null ? [...S.lz.pending] : want.filter(id => S.lz.pending.has(id) && !lzBusy.has(id));
+  if (!ids.length) return false;
+  const key = want === null ? 'all' : null;
+  if (key) lzBusy.add(key);
+  ids.forEach(id => lzBusy.add(id));
+  let j;
+  try { j = await api('GET', '/api/state/lists?ids=' + (key || ids.join(','))); }
+  catch { return false; }  // offline: the view shows what it has
+  finally { if (key) lzBusy.delete(key); ids.forEach(id => lzBusy.delete(id)); }
+  if (!S.lz) return true;  // a whole state came meanwhile
+  // a task changed after the answer was read (the live update brought it already) keeps its newer copy
+  for (const t of j.tasks || []) { const o = S.tasks.get(t.id); if (!o || j.v >= S.v || !o.updated_at || o.updated_at <= t.updated_at) S.tasks.set(t.id, t); }
+  for (const k of ['evlinks', 'tcontacts']) Object.assign(S[k] || (S[k] = {}), j[k] || {});  // their events / contacts, as the state has them
+  _kidsIx = null;
+  ids.forEach(id => { S.lz.pending.delete(id); delete S.lz.counts[id]; });
+  if (want !== null) lzRemember(ids);
+  lpCacheSoon();
+  return true;
+}
+// the open task is not loaded (an address, a notification): its list comes first
+const lzSelBusy = new Set();
+function lzSel(id) {
+  if (!S.lz?.pending.size || !(id > 0)) return false;
+  if (lzSelBusy.has(id)) return true;
+  lzSelBusy.add(id);
+  api('GET', `/api/tasks/${id}`).then(t => t?.list_id ? lzLoad([t.list_id]) : false).catch(() => false)
+    .then(ok => { lzSelBusy.delete(id); if (ok && S.tasks.has(id)) render(); else if (S.sel === id && !S.tasks.has(id)) closeDetail(); });
+  return true;
+}
+// counts(): a list the server counts (pending, not one where only my own tasks show)
+let lzRd = {lists: null, ids: null};  // the lists where only my own tasks show (org_reader), per S.lists (counts() runs per task)
+const lzReader = lid => { if (lzRd.lists !== S.lists) lzRd = {lists: S.lists, ids: new Set((S.lists || []).filter(l => l.org_reader).map(l => l.id))}; return lzRd.ids.has(lid); };
+const lzCounted = lid => !!S.lz?.pending.has(lid) && !lzReader(lid);
+function lzCounts(c) {
+  if (!S.lz?.pending.size) return;
+  for (const lid of S.lz.pending) {
+    const x = S.lz.counts[lid], t = {list_id: lid, status: 0};
+    if (!x || !lzCounted(lid) || archHidden(t) || wsHidden(t)) continue;
+    c.lists[lid] = (c.lists[lid] || 0) + x.n; c.all += x.n;
+    for (const [g, n] of Object.entries(x.tags || {})) c.tags[g] = (c.tags[g] || 0) + n;
+  }
+  // over all tasks: not known while lists are missing (the row shows no number, the view loads them)
+  c.doable = c.byme = undefined; c.filters = {};
+}
+// the delta's counts of the touched lists I have not loaded
+function lzDelta(j) { if (S.lz && j.lzc) for (const [lid, x] of Object.entries(j.lzc)) if (S.lz.pending.has(+lid)) S.lz.counts[lid] = x; }

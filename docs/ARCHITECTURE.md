@@ -61,6 +61,11 @@ project in the app, and this document keeps the technical name.
    stamps them with the new version; a change of what someone sees (lists, shares, sections, fields) or too many / too old
    changes answer `full` and the client loads the whole state as before. The view is morphed (unchanged rows keep their
    nodes), the sidebar is redrawn only when a counter moved.
+   2.369.2 (#3136): a big account (more than `KALMIDO_STATE_LAZY_MIN` tasks) gets the start set only (`/api/state?lz=1`:
+   what Today / Upcoming / My tasks need plus the lists the device had open); `S.lz.pending` names the lists not loaded,
+   their sidebar numbers come from the server (`lz.counts`, the delta's `lzc`). A view loads what it shows before it is
+   complete (`lzNeed` / `lzGate` in `static/js/liveparts.js`, `GET /api/state/lists`): a list its tasks, every view not
+   known to need less all of them. Loaded lists stay in the offline cache and are named in the next `lzl`.
    2.369.4 (#2507): `bump()` also notes the new version under the keys of whoever the change is for (`version:org:<id>`,
    `version:u:<id>`, worked out from the unstamped `dl_changes` rows: the changed lists' owners, members and organisation;
    `version:all` when that is not known), and `/api/version` carries `vs`, the newest of the person's own keys. A `v` that
