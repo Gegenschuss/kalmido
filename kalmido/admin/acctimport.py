@@ -1701,7 +1701,8 @@ def umz_mails_oi(data, nodes, me_old):
         d = {k: v for k, v in r.items() if k not in ("eml_file", "attachment_files", "eml_id", "files", "folder_id")}
         att = r.get("attachment_files") if isinstance(r.get("attachment_files"), list) else []
         ids = [by_file[f] for f in att if isinstance(f, str) and by_file.get(f)]
-        d.update(owner_id=me_old, eml_id=by_file.get(r.get("eml_file")) if isinstance(r.get("eml_file"), str) else None, files=json.dumps(ids))
+        # the account export names no workspace (oi_team._mail sets it; a required column without a value drops the row)
+        d.update(owner_id=me_old, ws="", eml_id=by_file.get(r.get("eml_file")) if isinstance(r.get("eml_file"), str) else None, files=json.dumps(ids))
         used.update(x for x in (d["eml_id"], *ids) if x)
         rows.append(d)
     return rows, used

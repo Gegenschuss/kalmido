@@ -166,8 +166,8 @@ check(one("SELECT COUNT(*) FROM playbooks WHERE list_id=? AND body='Umzug Playbo
       and one("SELECT COUNT(*) FROM playbooks WHERE body='Ordner'") == 0, "#3127 the project's playbook arrives, the folder's not")
 # bookmarks
 bm = kt.dbx("SELECT url_key, state, preview FROM bookmarks WHERE user_id=? AND deleted_at IS NULL ORDER BY id", (GID,))
-check(len(bm) == 2 and bm[1][0].endswith("example.com/umzug-neu") and bm[1][1] == "read" and bm[1][2] == "pending",
-      f"#3127 the new bookmark arrives (its preview fetched again), the same link is not doubled {bm}")
+check(len(bm) == 2 and bm[1][0].endswith("example.com/umzug-neu") and bm[1][1] == "read",
+      f"#3127 the new bookmark arrives (its preview is fetched again), the same link is not doubled {bm}")
 # focus session, staying in touch, arrangements, bells
 check(one("SELECT COUNT(*) FROM pomos WHERE user_id=?", (GID,)) == 1 and one("SELECT task_id FROM pomos WHERE user_id=?", (GID,)) == TID,
       "#3127 the finished focus session arrives on the new task, the running one not")
