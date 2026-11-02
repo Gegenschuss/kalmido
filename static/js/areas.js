@@ -64,6 +64,7 @@ const mg_wrap = (mod, html) => mg_areaOf(mod)?.[0] === 'office' && !isMobile() &
 // text blocks are no menu points any more but Settings > Company & office > Texts & templates (2.470.0, #3596), their routes stay
 // 2.489.0 (#2664, decision #2647): the address book is no part of Sell any more but an entry of its own (group 'book', [3] = 1:
 // no heading, never folded), below the groups and right above its folders
+/** @type {Array<[string, string, string, number?]>} */
 const OFM_GROUPS = [['sell', 'tag', N_('Sell|office')], ['money', 'wallet', N_('Money|office')], ['admin', 'sliders', N_('Administration|office')], ['book', 'users', N_('Address book'), 1]];
 const ofm_ofc = () => officeOn();
 const ofm_sub = () => typeof OFC !== 'undefined' && !!OFC.info?.submit;  // 2.356.0 D (#3129)

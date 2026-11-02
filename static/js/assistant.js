@@ -176,7 +176,7 @@ function asst_paneDraw(md) {  // the shown section loads its data (Assistant: th
   if (p === 'users') asst_admDraw(md);
 }
 function asst_setWire(md) {
-  md.addEventListener('click', e => { if (e.target.closest('[data-asstlog="more"]')) asst_logDraw(md, true); if (e.target.closest('[data-asstgo]')) { $('.snav [data-sec="ai"]', md)?.click(); if ($('[data-aisp]', md)) aiSubShow(md, 'assistant', true); } });  // 2.489.0 (#2664)
+  md.addEventListener('click', e => { if (e.target.closest('[data-asstlog="more"]')) asst_logDraw(md, true); if (e.target.closest('[data-asstgo]')) { $('.snav [data-sec="ai"]', md)?.click(); if ($('[data-aisp]', md) && typeof aiSubShow === 'function') aiSubShow(md, 'assistant', true); } });  // 2.489.0 (#2664)
   md.addEventListener('change', async e => {
     const el = e.target; if (!el.dataset?.asstl) return;
     const from = [...(S.assistant?.list_ids || [])], to = $$('[data-asstl]:checked', md).map(x => +x.dataset.asstl);
