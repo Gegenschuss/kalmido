@@ -16,7 +16,7 @@ from flask import g, jsonify
 from ..accounts.session import me
 from ..api.common import v1_args, v1_json, v1_view
 from ..api.v1 import STATUS_NAMES, v1_one
-from ..collab.comments import comment_plain, user_names
+from ..collab.comments import MENTION_RE, user_names
 from ..collab.liste2eguard import le2b_net, le2b_task_locked
 from ..core.access import need_task
 from ..core.config import app
@@ -74,6 +74,12 @@ def _deps(c, tid):
     return out
 
 
+def _plain(c, text):
+    """A comment's text with its mention tokens as @name, its line breaks kept (comment_plain makes one line for a push)."""
+    names = user_names(c, [int(x) for x in MENTION_RE.findall(text)])
+    return MENTION_RE.sub(lambda m: "@" + (names.get(int(m.group(1))) or "?"), text).strip()
+
+
 def _comments(c, tid, agent):
     rows = c.execute("SELECT id, user_id, ext_name, body, created_at FROM comments WHERE task_id=? AND deleted_at IS NULL ORDER BY id",
                      (tid,)).fetchall()
@@ -85,7 +91,7 @@ def _comments(c, tid, agent):
     for r in rows:
         d = {"id": r["id"], "author": {"id": r["user_id"], "name": names.get(r["user_id"], "") or r["ext_name"] or "",
                                        "agent": kinds.get(r["user_id"]) == "agent", **({"customer": True} if r["ext_name"] else {})},
-             "created_at": r["created_at"], "text": comment_plain(c, r["body"] or "")}
+             "created_at": r["created_at"], "text": _plain(c, r["body"] or "")}
         if agent and r["user_id"] != me():  # 2.392.3 (#3368): someone else's words are data for an agent
             d.update(origin="comment", untrusted=True)
         out.append(d)
