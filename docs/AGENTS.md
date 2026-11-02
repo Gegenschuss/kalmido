@@ -38,7 +38,7 @@ The one exception is the optional [built-in assistant](ASSISTANT.md) (2.75.0, of
 - [Reactions and suggestions](#reactions-and-suggestions)
 - [Coding agent workflow](#coding-agent-workflow)
 - [Example: a Claude Code session that polls Kalmido](#example-a-claude-code-session-that-polls-kalmido)
-- [MCP server](#mcp-server)
+- [MCP server](#mcp-server); [Hosted MCP](#hosted-mcp) (2.488.0: apps connect to Kalmido itself with OAuth)
 - [Use agents safely](#use-agents-safely) (2.30.0)
 - [Security](#security)
 - [Built-in assistant vs. your own agents](#built-in-assistant-vs-your-own-agents) (2.75.0)
@@ -3766,6 +3766,36 @@ when there are none). Linking needs edit rights on the task and on the project, 
 organisation, or private), no health or locked projects, top-level tasks only, at most 10 further projects. Rules and events
 belong to the task's own project; a column change in a further project is no change of the task. Moving the task into another
 workspace (or the project into another organisation) drops the links that would cross it.
+
+## Hosted MCP
+
+2.488.0 (#3363): besides the starter on your own computer, Kalmido can answer MCP clients itself: a chat app's connector,
+an editor or any client that speaks MCP over HTTP connects to **`https://tasks.example.com/mcp`** and signs in with OAuth.
+Kalmido starts no agent and runs no model; it only answers the tool calls of the client.
+
+- **Switch.** An instance admin turns it on under *Settings > Administration > Agents > Hosted MCP access* (off by
+  default; switching it on asks for the password). Off: `/mcp`, every `/oauth/...` address and the OAuth metadata answer 404.
+  The REST API must be on as well (`KALMIDO_API`).
+- **Connect.** Enter the address `/mcp` of your server as the connector (*Settings > Agents* shows it under *Connected
+  apps*). The client registers itself, opens Kalmido's consent page in the browser (sign in first if needed) and you
+  choose **which agent** it works as: one of your personal agents, a new personal agent made right there, or (instance
+  admins) a team agent. The page names the app and the host it returns to (a program on your own computer is marked as
+  such).
+- **Rights.** The app gets exactly the rights of the chosen agent: its permissions (scopes), its address restriction,
+  only the projects shared with it, its usage limit and pause. The token is an ordinary API token of that agent that
+  runs out after one hour; the app renews it with a refresh token that changes at every use. Changing the agent's
+  permissions applies at once.
+- **Revoke.** *Settings > Agents > Connected apps* lists every access (app, agent, given, last used); *Disconnect* ends
+  the access token and the refresh token at once. A new API token for the agent (*New API token*) also ends the current
+  access token (the app gets a new one with its refresh token); deleting the agent ends everything.
+- **Tools.** The same tools as the starter's MCP server (`mcp/kalmido_mcp.py`, which the image carries for this; without
+  it `/mcp` answers 503), filtered by the agent's permissions. `wait_for_events` works too, but a connector usually calls
+  tools only while you chat with it: for an agent that reacts to events on its own, keep using the starter.
+- **Transport.** Streamable HTTP of the MCP specification 2025-06-18 in its plain form: `POST /mcp` with JSON-RPC and a
+  JSON answer, no SSE stream and no sessions (`GET` / `DELETE /mcp` answer 405). The OAuth endpoints are described in
+  [API.md](API.md#oauth-for-the-hosted-mcp-access).
+
+The local MCP server with its fixed token stays as it is.
 
 ## Use agents safely
 

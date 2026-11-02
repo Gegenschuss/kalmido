@@ -68,6 +68,15 @@ KALMIDO_URL=https://tasks.example.com KALMIDO_TOKEN=abk_... MCP_HTTP_TOKEN=$(ope
 
 By default the server binds to `127.0.0.1`. It rejects requests with an `Origin` that is not localhost (DNS rebinding) and requests without the bearer token. Since 2.126.0 `MCP_HTTP_TOKEN` (at least 16 characters) is required: without it `--http` does not start. If you bind to another address, put TLS in front.
 
+## Hosted MCP (2.488.0)
+
+The Kalmido server itself can answer MCP clients at `https://tasks.example.com/mcp`, with OAuth 2.1 instead of a fixed
+token (#3363): an instance admin switches *Hosted MCP access* on, you enter that address as the connector of your client,
+and a consent page in Kalmido lets you pick the agent whose rights the client gets. The server runs the tool table of
+this file (`kalmido_mcp.py` is copied into the image for that), so the tools are the same; nothing has to run on your
+computer. Details: [docs/AGENTS.md, Hosted MCP](../docs/AGENTS.md#hosted-mcp) and the OAuth endpoints in
+[docs/API.md](../docs/API.md#oauth-for-the-hosted-mcp-access). The launcher and the event runner are not part of it.
+
 ## Tools
 
 Projects are called lists in the API (`list_id`, `/api/v1/lists`, `kind=list|project`); `kind=project` is the switch "Progress and status".

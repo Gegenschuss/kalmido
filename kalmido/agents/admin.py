@@ -689,10 +689,22 @@ def my_agents_get():
 @app.post("/api/my/agents")
 def my_agent_create():
     """{username, display_name?, note?} -> my new personal agent + its API token (shown this once)."""
-    from ..api.scopes import agent_scopes_set
     c = db()
     need_person(403, tr("Agents cannot use this endpoint"))
     need_api()
+    uid = my_agent_make(c, body())
+    tok = agent_token_new(c, uid, name=AGENT_TOKEN_CREATED)
+    bump(c)
+    c.commit()
+    print("personal agent", uid, "created by", login_log_who(g.user), flush=True)
+    return jsonify({**agent_admin_dict(c, agent_row(c, uid)), "token": tok}), 201
+
+
+def my_agent_make(c, b):
+    """2.488.0 (#3363): a new personal agent of the current person from b ({username, display_name?, note?, provider?, org_id?,
+    scopes?, allowed_ips?}) -> its user id; no token, the caller commits (also the consent page of the hosted MCP access,
+    agents/mcpremote.py). Denied / BadInput (rolled back) when it cannot be made."""
+    from ..api.scopes import agent_scopes_set
     pol = agent_policy(c)
     if not agent_ws_allowed_any(c, me()):  # 2.361.4 (#2928): with organisations the workspace decides (agent_org_set)
         raise Denied(403, tr("Personal agents are switched off on this server"))
@@ -700,15 +712,14 @@ def my_agent_create():
     n = c.execute("SELECT COUNT(*) FROM agents WHERE owner_id=?", (me(),)).fetchone()[0]
     if n >= pol["max_per_user"]:
         c.rollback()
-        return err(trn("You can have at most {0} personal agent", "You can have at most {0} personal agents", pol["max_per_user"]), 409)
-    b = body()
+        raise Denied(409, trn("You can have at most {0} personal agent", "You can have at most {0} personal agents", pol["max_per_user"]))
     username = (b.get("username") or "").strip().lower()
     if not USERNAME_RE.fullmatch(username):
         c.rollback()
-        return err(tr("Username: 1-32 characters a-z, 0-9, dot, dash, underscore"))
+        raise BadInput(tr("Username: 1-32 characters a-z, 0-9, dot, dash, underscore"))
     if c.execute("SELECT 1 FROM users WHERE username=?", (username,)).fetchone():
         c.rollback()
-        return err(tr("Username already exists"), 409)
+        raise Denied(409, tr("Username already exists"))
     uid = create_user(c, username, _agent_name(b.get("display_name")) or username, None, None, False, paperless_access=False)
     make_agent(c, uid)
     c.execute("UPDATE agents SET note=?, owner_id=?, usage_limits=?, provider=? WHERE user_id=?",
@@ -726,12 +737,8 @@ def my_agent_create():
         raise
     uset(c, uid, "lang", usettings(c, me())["lang"])
     ensure_inbox(c, uid)
-    tok = agent_token_new(c, uid, name=AGENT_TOKEN_CREATED)
     ac_assign(c, [uid])  # 2.47.1 (#1721)
-    bump(c)
-    c.commit()
-    print("personal agent", uid, "created by", login_log_who(g.user), flush=True)
-    return jsonify({**agent_admin_dict(c, agent_row(c, uid)), "token": tok}), 201
+    return uid
 
 
 @app.patch("/api/my/agents/<int:aid>")

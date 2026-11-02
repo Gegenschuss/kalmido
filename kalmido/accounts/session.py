@@ -81,8 +81,9 @@ def client_ip():
 
 
 def _is_open(path, method):
+    # 2.488.0 (#3363): /mcp (its own bearer check) and /oauth/* (the consent page asks for a sign-in itself) - agents/mcpremote.py
     return path in OPEN_PATHS or path.startswith(("/static/", ICAL_PREFIX, PUB_PREFIX, "/f/", "/u/")) or (path in ("/share", "/capture") and method == "GET") \
-        or path.startswith(PT_PREFIXES) or path == "/portal"  # 2.4.0: /capture (#187); 2.63.0 B (#1513): status links + the customer portal; 2.122.0 A (#2097): /u/ file requests
+        or path.startswith(PT_PREFIXES) or path == "/portal" or path == "/mcp" or path.startswith("/oauth/")  # 2.4.0: /capture (#187); 2.63.0 B (#1513): status links + the customer portal; 2.122.0 A (#2097): /u/ file requests
 
 
 def rate_ip():

@@ -88,7 +88,8 @@ def about_info(c, u):
                  twofa_required=gsetting(c, "twofa_required") == "1", passkey_login=gsetting(c, "passkey_login") != "0",
                  oidc=oidc_public(c), backups_env=BK_ON_ENV,
                  public_links=gsetting(c, "public_links") != "0", public_links_env=PUB_ENV,
-                 public_links_off=sorted(pub_kinds_off(c)))  # 2.489.0 C (#2656): the kinds switched off on their own
+                 public_links_off=sorted(pub_kinds_off(c)),  # 2.489.0 C (#2656): the kinds switched off on their own
+                 mcp_remote=gsetting(c, "mcp_remote") == "1")  # 2.488.0 (#3363): the hosted MCP access (default off)
         from ..core.config import SECRET_KEY, SECRET_KEY_PROBLEM, SECRET_KEY_SRC
         d.update(secret_key=bool(SECRET_KEY), secret_key_problem=SECRET_KEY_PROBLEM, secret_key_src=SECRET_KEY_SRC)  # 2.45.0 (#1515)
         d.update(backup_tools_problem=gsetting(c, "bk_tools_problem"))  # 2.359.3 (#2945): "<pg_dump>|<server>", else empty
@@ -195,6 +196,7 @@ def admin_settings():
     if ((b.get("twofa_required") is False and eff["twofa_required"]) or (b.get("oidc_autocreate") is True and not eff["oidc_autocreate"])
             or (b.get("public_links") is True and not eff["public_links"])
             or (pub_new is not None and pub_off - pub_new)  # 2.489.0 C (#2656): a kind switched back on opens the server too
+            or (b.get("mcp_remote") is True and gsetting(c, "mcp_remote") != "1")  # 2.488.0 (#3363): opens /mcp + /oauth/*
             or (b.get("signup_mode") in ("approval", "domain", "open") and b["signup_mode"] != gsetting(c, "signup_mode"))
             or (b.get("signup_private") is True and gsetting(c, "signup_private") != "1")):  # 2.422.0 (#2937)
         e = oidc_reauth(c, b)
@@ -336,7 +338,7 @@ def admin_setup():
     return jsonify(about_info(c, g.user))
 
 
-AUTH_SWITCHES = ("twofa_required", "passkey_login", "oidc_autocreate", "public_links")
+AUTH_SWITCHES = ("twofa_required", "passkey_login", "oidc_autocreate", "public_links", "mcp_remote")  # 2.488.0 (#3363): + the hosted MCP access
 # 2.489.0 C (#2656): "Allow public links" per kind (Settings > Administration). The instance switch public_links stays the
 # default for all: off = every kind off. Under it each kind can be switched off on its own (setting public_links_off = the
 # kinds off, comma separated; nothing set = all on, so an existing server keeps its behaviour); lists/public.py

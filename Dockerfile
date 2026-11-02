@@ -40,7 +40,9 @@ RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock && rm 
 WORKDIR /app
 # 2.380 G (#3390): + the hashes of the agent starter files (mcp/starter_sha256.txt, tools/starter_sha.py); the pattern lets a
 # checkout without mcp/ build too (then the agent setup gets no hashes and checks nothing, as before)
-COPY app.py VERSION mcp/starter_sha256.tx[t] /app/
+# 2.488.0 (#3363): + mcp/kalmido_mcp.py, the tool table of the hosted MCP access (agents/mcpremote.py loads it; without it /mcp
+# answers 503)
+COPY app.py VERSION mcp/starter_sha256.tx[t] mcp/kalmido_mcp.p[y] /app/
 COPY kalmido /app/kalmido
 COPY static /app/static
 COPY --from=staticpack /out/ /app/static_packed/

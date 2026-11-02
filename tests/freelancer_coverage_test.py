@@ -101,6 +101,12 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.488.0 (#3363): the hosted MCP access (p2488_mcp_oauth_test.py: the person without an organisation connects her own agent)
+    "GET /.well-known/oauth-protected-resource": "public", "GET /.well-known/oauth-protected-resource/mcp": "public",
+    "GET /.well-known/oauth-authorization-server": "public", "GET /.well-known/oauth-authorization-server/mcp": "public",
+    "POST /oauth/register": "agents", "GET /oauth/authorize": "agents", "POST /oauth/authorize": "agents", "POST /oauth/token": "agents",
+    "POST /oauth/revoke": "agents", "GET /mcp": "agents", "POST /mcp": "agents", "DELETE /mcp": "agents",
+    "GET /api/my/mcp-grants": "agents", "DELETE /api/my/mcp-grants/{}": "agents",
     # 2.391.0 C (#3362): setting up integrations through /api/v1 (p2391_c_setup_api_test.py as the freelancer; an organisation's webhooks: its admins)
     "GET /api/v1/me/tokens": "own", "POST /api/v1/me/tokens": "own", "DELETE /api/v1/me/tokens/{}": "own",
     "GET /api/v1/me/webhooks": "own", "POST /api/v1/me/webhooks": "own", "PATCH /api/v1/me/webhooks/{}": "own",

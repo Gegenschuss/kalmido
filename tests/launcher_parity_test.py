@@ -25,6 +25,9 @@ def read(name):
 
 
 caps = json.loads(read("launcher_capabilities.json"))["capabilities"]
+# 2.488.0 (#3363): an entry with "server": true is done by the server alone (no launcher part): a hint, not checked here
+check(all(not c.get("core") and not c.get("launcher") for c in caps if c.get("server")), "server-side entries name no launcher or runner code")
+caps = [c for c in caps if not c.get("server")]
 ids = [c["id"] for c in caps]
 check(len(ids) == len(set(ids)) and len(ids) >= 9, f"capability ids unique, at least 9: {ids}")
 core = read("agent_run.py") + read("agent_extras.py") + read("agent_job.py")  # 2.44.0 (#1443 #1445 #1447): the additions live in modules of their own

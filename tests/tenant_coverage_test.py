@@ -232,6 +232,14 @@ ROUTES = {
     "PATCH /api/admin/alerts": "admin", "POST /api/admin/alerts/test": "admin", "DELETE /api/admin/alerts": "admin",
     # ---- agent (44)
     "GET /api/agents/{}/bridges": "agent", "POST /api/v1/agent/chats/{}/messages/{}/withdraw": "agent",  # 2.30.0 (#919 / #1037)
+    # 2.488.0 (#3363): the hosted MCP access - accesses only to the person's own agents (an instance admin: team agents), the list /
+    # revoke only of accesses the person gave or of their agents; the calls of /mcp run through /api/v1 with the agent's token
+    # (p2488_mcp_oauth_test.py: another person neither sees nor revokes, nor picks another's agent; a project not shared stays unseen)
+    "POST /oauth/register": "public", "GET /oauth/authorize": "agent", "POST /oauth/authorize": "agent", "POST /oauth/token": "agent",
+    "POST /oauth/revoke": "agent", "GET /mcp": "agent", "POST /mcp": "agent", "DELETE /mcp": "agent",
+    "GET /api/my/mcp-grants": "agent", "DELETE /api/my/mcp-grants/{}": "agent",
+    "GET /.well-known/oauth-protected-resource": "public", "GET /.well-known/oauth-protected-resource/mcp": "public",
+    "GET /.well-known/oauth-authorization-server": "public", "GET /.well-known/oauth-authorization-server/mcp": "public",
     "GET /api/my/agents": "agent", "POST /api/my/agents": "agent", "PATCH /api/my/agents/{}": "agent",
     "PATCH /api/agents/{}/color": "agent",  # 2.47.1 (#1721): also p247c_b_api_test.py
     "POST /api/agents/{}/chat/{}/pin": "agent", "POST /api/v1/agent/chats/{}/messages/{}/pin": "agent",  # 2.62.0 (#1848): also p262_a_api_test.py

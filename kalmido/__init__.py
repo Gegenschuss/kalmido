@@ -167,6 +167,7 @@ ORDER = (
     "agents.cleanup",  # 2.39.0 (#1151)
     "agents.propkinds2",  # 2.51.0 B (#1351 #1358)
     "agents.setup",  # 2.44.0 (#1517)
+    "agents.mcpremote",  # 2.488.0 (#3363): the hosted MCP access (/mcp, OAuth 2.1, after agents.admin)
     "lists.playbook",  # 2.39.0 (#1168)
     "tasks.attachtext",  # 2.34.0 (#368)
     "tasks.snippets",  # 2.35.0 (#1095)

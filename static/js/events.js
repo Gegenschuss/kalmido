@@ -274,7 +274,9 @@ function openQuickSheet(prefill = '', preset = {}) {
 // "Quick add" (/?action=capture) and the bookmarklet page /capture (a popup with ?title&url of the page you are on). The
 // quick add syntax applies; without ~list / "in list …" it goes to the inbox, whatever view is open.
 // 2.4.0 (#187): signing in on the capture page keeps the page (title + link of the bookmarklet)
-const afterLogin = () => location.pathname === '/capture' ? '/capture' + location.search : '/';
+// 2.488.0 (#3363): signed in from the consent page of the hosted MCP access (/?oauth=?<its query>): back to /oauth/authorize, only
+// with a plain query (never another path or host)
+const afterLogin = () => { if (location.pathname === '/capture') return '/capture' + location.search; const q = new URLSearchParams(location.search).get('oauth'); return q && /^\?[\w%=&.~+-]{1,4000}$/.test(q) ? '/oauth/authorize' + q : '/'; };
 function quickCapture(prefill = '', preset = {}) {
   if (typeof closePalette === 'function') closePalette();
   closePop();

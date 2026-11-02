@@ -389,6 +389,7 @@ function agSetupPaneHtml(hint) {
     <h4 id="s-myown-h">${tr('Your personal agents')}</h4>
     ${hint(tr('Only you can chat with it; it runs on your own computer.'))}
     <div class="members aglist" id="s-myown" aria-labelledby="s-myown-h"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div id="s-mcpgr"></div>
     <details class="sdet aghand"><summary>${tr('For advanced users: set it up by hand')}</summary>
     ${seg('os', os, [['linux', 'Linux'], ['mac', 'macOS'], ['win', 'Windows']])}
     <div class="agguidebox" id="s-agguide" role="tabpanel">${agSetupHtml(g, os)}</div>
@@ -411,6 +412,9 @@ function agAdminPaneHtml(hint) {
     <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-uag"><span class="swt" aria-hidden="true"></span></span><span>${tr('People may create their own agents')}</span></label></div>
     <div class="row"><label for="s-uagmax">${tr('Per person at most')}</label><input id="s-uagmax" type="number" inputmode="numeric" min="1" max="20" value="2" class="numin"></div>
     ${hint(tr('On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Workspaces), in the private area each person themselves.') + ' ' + tr('You see every agent under Status and can pause or delete it.'))}
+    <h4 id="s-mcpr-h">${tr('Hosted MCP access')}</h4>
+    <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-mcpr" ${S.about?.mcp_remote ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Apps may connect to agents with a sign-in (OAuth)')}</span></label></div>
+    ${hint(tr('On: apps with an MCP connector connect to this server at /mcp; a signed-in person chooses one of their agents, and the app gets exactly its permissions (revocable under Settings > Agents). Off: /mcp and the sign-in addresses do not exist.'))}
     <h4 id="s-sclim-h">${tr('Permission limit')}</h4>
     ${hint(tr('What agents and API tokens may get at most on this server. A permission switched off here applies to every existing token at once.'))}
     <div id="s-sclim" aria-labelledby="s-sclim-h"></div>`;
@@ -431,6 +435,21 @@ async function agSetupDraw(md) {
     <div class="shint keep">${esc(trn('You can have {0} personal agent.', 'You can have {0} personal agents.', j.max))} ${esc(tr('You connect it yourself and are responsible for the provider; everyone in the project sees where it runs.'))}</div>${av_whichHtml()}` : '';  // 2.46.6 (#1716)
   box.innerHTML = (j.agents.map(row).join('') || (j.allowed ? '' : `<div class="muted mhint">${j.api === false ? tr('The agent interface is switched off on this server.') : tr('Personal agents are switched off on this server (a server admin can allow them: Settings > Organisation > Agents).')}</div>`)) + add;  // 2.361.4 (#2928); 2.364.0 C (#3041): the agents moved to Settings > Organisation
   userNameFollow(box, 'myag-name', 'myag-user');  // 2.28.0 (#926)
+  mcpGrantsDraw(md);
+}
+// 2.488.0 (#3363): the hosted MCP access - the address for an app's connector and the accesses given (revocable at once)
+async function mcpGrantsDraw(md) {
+  const box = $('#s-mcpgr', md); if (!box) return;
+  let j; try { j = await api('GET', '/api/my/mcp-grants'); } catch { box.innerHTML = ''; return; }
+  if (!j.on && !j.grants.length) { box.innerHTML = ''; return; }
+  const when = v => v ? fmtStamp(new Date(v)) : tr('never');
+  const row = x => `<div class="mrow" data-mcpg="${x.id}"><span class="n"><b>${esc(x.client)}</b> <span class="muted">${esc(x.redirect_host)}</span>
+      <small class="muted">${esc(tr('Agent: {0}', x.agent.name))} · ${esc(tr('given {0}', when(x.created_at)))} · ${esc(tr('last used {0}', when(x.last_used_at)))}</small></span>
+    <button class="btn sm danger" data-mcpg-act="revoke" aria-label="${esc(tr('Disconnect {0}', x.client))}">${tr('Disconnect')}</button></div>`;
+  box.innerHTML = `<h4 id="s-mcpgr-h">${tr('Connected apps')}</h4>
+    ${j.on ? `<div class="shint keep">${esc(tr('Apps with an MCP connector (e.g. a chat app or an editor) connect here; you choose the agent whose permissions they get.'))}</div>
+    <div class="row"><label for="s-mcpurl">${tr('Connector address')}</label><input id="s-mcpurl" readonly value="${esc(j.url)}"></div>` : ''}
+    <div class="members" aria-labelledby="s-mcpgr-h">${j.grants.map(row).join('') || `<div class="muted mhint">${tr('No app is connected.')}</div>`}</div>`;
 }
 // 2.46.6 (#1710): the admins' agent rules (Administration > Agents), filled wherever the pane is
 async function ad_agPolicyDraw(md) {
@@ -452,6 +471,13 @@ function agSetupWire(md) {
       return;
     }
     if (e.target.closest('[data-m="ag-guide-cc"]')) { agGuideModal(); return; }
+    const mg = e.target.closest('[data-mcpg-act="revoke"]');
+    if (mg) {  // 2.488.0 (#3363)
+      const name = mg.closest('[data-mcpg]').querySelector('b')?.textContent || '';
+      if (!await askConfirm(tr('Disconnect {0}?', name), tr('The app loses its access at once; it can only connect again through the consent page.'), {ok: tr('Disconnect'), danger: true})) return;
+      try { await api('DELETE', `/api/my/mcp-grants/${mg.closest('[data-mcpg]').dataset.mcpg}`); toast(tr('Disconnected')); } catch { /* shown */ }
+      mcpGrantsDraw(md); return;
+    }
     const b = e.target.closest('[data-myag-act]'); if (!b) return;
     const box = $('#s-myown', md), k = b.dataset.myagAct, a = (box?._j?.agents || []).find(x => x.id === +b.closest('[data-myag]')?.dataset.myag);
     try {
@@ -953,7 +979,7 @@ function settingsModal(focus) {
     }
   });
   md.addEventListener('keydown', e => { if (e.key === 'Enter' && (SETS[e.target.id] || e.target.id === 'a-name') && isText(e.target)) { e.preventDefault(); e.target.id === 'a-name' ? saveName() : saveEl(e.target); } });
-  md.addEventListener('change', e => { if (['s-collaball', 's-timeall', 's-collaball-a', 's-timeall-a', 's-updcheck', 's-2fareq', 's-pklogin', 's-oidcauto', 's-publinks'].includes(e.target.id)) adminSwitch(md, e.target); else if (e.target.dataset?.pubk) sh_pubKind(md, e.target); });  // 2.489.0 C (#2656): + the kinds
+  md.addEventListener('change', e => { if (['s-collaball', 's-timeall', 's-collaball-a', 's-timeall-a', 's-updcheck', 's-2fareq', 's-pklogin', 's-oidcauto', 's-publinks', 's-mcpr'].includes(e.target.id)) adminSwitch(md, e.target); else if (e.target.dataset?.pubk) sh_pubKind(md, e.target); });  // 2.489.0 C (#2656): + the kinds
   md.addEventListener('change', async e => {  // 2.7.0 (#407): hours per day / shift for the whole server, one history step
     if (e.target.id !== 's-dayh') return;
     const from = S.timeDayH || 8, to = +String(e.target.value).replace(',', '.');
@@ -1456,7 +1482,7 @@ function ad_updHtml(hint) {
   return h ? `<h4 id="s-upd-h">${tr('Updates')}</h4>${h}` : '';
 }
 const ADMIN_SW = {'s-collaball': ['collab_all', N_('Collaboration for everyone')], 's-timeall': ['time_all', N_('Time tracking for everyone')], 's-updcheck': ['update_check', N_('Check daily for a new version')],
-  's-2fareq': ['twofa_required', N_('Require two-factor authentication')], 's-pklogin': ['passkey_login', N_('Passkey sign-in')], 's-oidcauto': ['oidc_autocreate', N_('Create accounts on first OIDC sign-in')], 's-publinks': ['public_links', N_('Allow public links')],
+  's-2fareq': ['twofa_required', N_('Require two-factor authentication')], 's-pklogin': ['passkey_login', N_('Passkey sign-in')], 's-oidcauto': ['oidc_autocreate', N_('Create accounts on first OIDC sign-in')], 's-publinks': ['public_links', N_('Allow public links')], 's-mcpr': ['mcp_remote', N_('Hosted MCP access')],
   's-collaball-a': ['collab_all', N_('Collaboration for everyone')], 's-timeall-a': ['time_all', N_('Time tracking for everyone')]};  // 2.46.6 (#1710): the same switches under Administration > Server
 // 2.489.0 C (#2656): "Allow public links" per kind under the instance switch (core/instance.py PUB_KINDS, same order). The
 // server keeps the kinds switched off (public_links_off) and refuses to make or open a link of such a kind; switching one
@@ -1496,7 +1522,7 @@ async function adminSwitch(md, el, fromHist) {
   try {
     // 2.306.0 Fix-1 (#2875 review): accounts by the sign-on's admin rule: switched on with the account password.
     // 2.360.0 A (#2496): every security switch (core/instance.py AUTH_SWITCHES) asks for it when it changes
-    const pw = ['twofa_required', 'passkey_login', 'oidc_autocreate', 'public_links'].includes(key);
+    const pw = ['twofa_required', 'passkey_login', 'oidc_autocreate', 'public_links', 'mcp_remote'].includes(key);  // 2.488.0 (#3363): + mcp_remote
     let j; try { j = await (pw ? rawFetch : api)('PATCH', '/api/admin/settings', {[key]: on}); } catch (x) {
       if (!pw || !x.data?.password_needed) { if (pw) toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); throw x; }
       const p = await pwPrompt(tr('Confirm with your password')); if (!p) throw x;

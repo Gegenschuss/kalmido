@@ -35,6 +35,7 @@ subscription or API key. Kalmido provides:
   9. [Autostart with the runtime launcher](#9-autostart-with-the-runtime-launcher)
   10. [Usage reporting](#10-usage-reporting)
   11. [Test checklist](#11-test-checklist)
+- [Connector in a chat app or editor (hosted MCP)](#connector-in-a-chat-app-or-editor-hosted-mcp) (2.488.0)
 - [Other tools: Codex CLI, Cursor, Windsurf, Gemini CLI](#other-tools-codex-cli-cursor-windsurf-gemini-cli) (2.391.0)
 - [Several specialist agents under one Kalmido agent](#several-specialist-agents-under-one-kalmido-agent)
 - [A meeting becomes tasks](#a-meeting-becomes-tasks) (2.70.0)
@@ -880,6 +881,13 @@ with the agent; delete both afterwards. Watch the answers and *Settings > Organi
 **Operating system** (as the agent user): `sudo -n true` fails; `id` shows no sudo / docker group; Kalmido's data
 directory and other services' configuration are not readable; `/var/run/docker.sock` is not accessible; SSH to other
 hosts and connections to LAN addresses time out; only DNS, Kalmido and public HTTPS work.
+
+## Connector in a chat app or editor (hosted MCP)
+
+2.488.0 (#3363): when an admin has switched on *Hosted MCP access*, a client with MCP connectors needs no setup on a
+computer: add a connector with the address shown under *Settings > Agents > Connected apps* (your server followed by
+`/mcp`), sign in when the client opens Kalmido, choose the agent (or create one) and confirm. Disconnect it there again.
+Details: [AGENTS.md, Hosted MCP](AGENTS.md#hosted-mcp).
 
 ## Other tools: Codex CLI, Cursor, Windsurf, Gemini CLI
 

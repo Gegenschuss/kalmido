@@ -15,7 +15,7 @@ the prose below says project and the technical names keep saying list.
 - [Webhooks](#webhooks): events, payload, signature, retries
 - [Behind a reverse proxy](#behind-a-reverse-proxy)
 - [Folders: sharing and settings](#folders-sharing-and-settings), [Projects, people and agents](#lists-people-and-agents-2300)
-- AI agents and bots (events, long-polling, jobs, chat, approvals) and the MCP server: [AGENTS.md](AGENTS.md), [mcp/](../mcp/)
+- AI agents and bots (events, long-polling, jobs, chat, approvals) and the MCP server: [AGENTS.md](AGENTS.md), [mcp/](../mcp/); [OAuth for the hosted MCP access](#oauth-for-the-hosted-mcp-access) (2.488.0)
 
 The machine-readable description is an OpenAPI 3.1 document at **`/api/v1/openapi.json`** on your server (it contains no
 data and needs no token). Import it into Postman, Bruno, Insomnia or an n8n HTTP node, or read it with any OpenAPI viewer.
@@ -906,6 +906,28 @@ case "${1:-today}" in
   *)     echo "usage: kalmido add TITLE [DATE] | done ID | today" >&2; exit 2 ;;
 esac
 ```
+
+## OAuth for the hosted MCP access
+
+2.488.0 (#3363): with the admin switch *Hosted MCP access* on, the server is an OAuth 2.1 authorization server for its own
+MCP endpoint `/mcp` ([AGENTS.md, Hosted MCP](AGENTS.md#hosted-mcp)). Off, every address below answers 404.
+
+| Address | What |
+| --- | --- |
+| `GET /.well-known/oauth-protected-resource` (also `.../mcp`) | RFC 9728: `resource` (`<server>/mcp`), `authorization_servers` |
+| `GET /.well-known/oauth-authorization-server` (also `.../mcp`) | RFC 8414: endpoints, `code_challenge_methods_supported: ["S256"]`, `token_endpoint_auth_methods_supported: ["none"]` |
+| `POST /oauth/register` | RFC 7591 dynamic client registration (JSON): `redirect_uris` (1 to 5; `https`, or `http` on `localhost` / `127.0.0.1` / `[::1]`; no fragment), `client_name`; answers `client_id` (public client, no secret). At most 20 per address and hour |
+| `GET /oauth/authorize` | Authorization code with PKCE: `response_type=code`, `client_id`, `redirect_uri` (exactly as registered; may be left out when only one is registered), `code_challenge` + `code_challenge_method=S256` (required; `plain` is refused), `state` (returned unchanged), optional `resource`. Shows the consent page (sign-in first) |
+| `POST /oauth/token` | `grant_type=authorization_code` (`code`, `redirect_uri`, `client_id`, `code_verifier`) or `grant_type=refresh_token` (`refresh_token`, `client_id`); form or JSON. Answers `access_token` (1 hour), `refresh_token`, `token_type: Bearer`, `expires_in` |
+| `POST /oauth/revoke` | RFC 7009: `token` (access or refresh token) and `client_id`; ends the whole access; always 200 |
+
+- A code is valid for 10 minutes and once: using it a second time ends the access made with it. A refresh token is valid
+  once (it is replaced at every use, at the latest after 30 days); the previous one used again ends the access.
+- The access token is an API token of the chosen agent (`abk_...`) and works on `/api/v1` with that agent's rights as
+  well; `/mcp` takes only tokens issued here. Tokens and codes are stored only as SHA-256.
+- `/mcp` without a valid token answers 401 with `WWW-Authenticate: Bearer resource_metadata="<server>/.well-known/oauth-protected-resource"`.
+- Settings > Agents: `GET /api/my/mcp-grants` (the accesses you gave or that use one of your agents, plus the connector
+  address) and `DELETE /api/my/mcp-grants/{id}` (web session only).
 
 ## Setting up integrations through the API
 

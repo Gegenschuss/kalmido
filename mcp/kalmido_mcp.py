@@ -2777,7 +2777,9 @@ ME_TTL = 300  # s: a changed scope shows in tools/list within 5 minutes (a call 
 
 def token_scopes(api):
     """(effective scopes, is agent) of the token, from GET /me, cached for ME_TTL; None when unknown (older server,
-    unreachable): then every tool is listed and the server decides."""
+    unreachable): then every tool is listed and the server decides. 2.488.0 (#3363): a client with its own me_cache (the
+    hosted access of the server, one per request and token) keeps it there, never in the process-wide _ME."""
+    _ME = getattr(api, "me_cache", None) or globals()["_ME"]
     now = time.monotonic()
     if not _ME["at"] or now - _ME["at"] > ME_TTL:
         try:
