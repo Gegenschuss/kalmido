@@ -1198,6 +1198,11 @@ client". Kalmido writes no prose itself: you get the data and formulate the text
   `stuck` (`reason`: `branch`, `job`, `waiting`, `blocked`), `completed`, `counts`, `repository` and `markdown` with fixed headings. It
   works without a repository. `date` is a day in the time zone of the instance. A project with the lock answers 409 `list_e2e`. Kalmido
   sends nothing by itself: a scheduled job can post it.
+- **Work package (brief of tasks)** `POST /tasks/brief` `{task_ids: [...], lang?}`, at most 50 tasks (MCP `export_brief`, scope read;
+  2.392.3, #3368). Per task: title, status line, `decisions` (recorded, replaced ones with `superseded_by`) and `note_decisions` (bold
+  Decision lines of the notes), `notes`, `subtasks`, `waits_for`, `blocks`, `repo` (suggested branch), `build`, `comments` (without the
+  deleted ones; for an agent someone else's are marked `untrusted`), plus `markdown` with fixed headings. Only what you see: other tasks
+  come back in `skipped` as `not_found`, tasks of a project with the lock as `locked`. In the app: multi-select, "Copy as brief".
 
 ```bash
 curl -s -H "Authorization: Bearer $KALMIDO_TOKEN" "$KALMIDO_URL/api/v1/briefing?user_id=1"
@@ -3695,7 +3700,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `delete_field`, `delete_filter`, `delete_folder`, `delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`,
 `delete_milestone`, `delete_note`, `delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`,
 `delete_task`, `delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`,
-`draft_reminder`, `duplicate_list`, `edit_team_message`, `empty_trash`, `end_working`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
+`draft_reminder`, `duplicate_list`, `edit_team_message`, `empty_trash`, `end_working`, `export_brief`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
 `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`,
 `get_delivery_report`, `get_dependencies`, `get_document`, `get_event`, `get_family`, `get_filed_mail`, `get_group`, `get_habit_stats`, `get_job`, `get_life`, `get_list`, `get_me`,
 `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_office_subscriptions`, `get_plan_usage`, `get_playbook`, `get_poll`,

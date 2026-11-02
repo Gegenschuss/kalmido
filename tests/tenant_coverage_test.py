@@ -966,6 +966,8 @@ ROUTES = {
     "GET /api/lists/{}/status-report": "list", "GET /api/v1/lists/{}/status-report": "list",
     # 2.392.0 D (#3369): p2392_d_api_test.py has the stranger and the shared-only cases
     "GET /api/inbox": "aggregate", "GET /api/v1/me/waiting": "aggregate", "GET /api/v1/lists/{}/delivery-report": "list",
+    # 2.392.3 (#3368): every task of the brief passes need_task (p2392_3_api_test.py: a stranger and a stranger's agent get not_found)
+    "POST /api/tasks/brief": "task", "POST /api/v1/tasks/brief": "task",
     # ---- 2.34.0 (#266 #269 #272 #368): stale tasks, time gaps, planned agent jobs, a file's text (p2300_tenant_test.py has the
     # cross-tenant cases: the other organisation's people and agent get 404 / nothing of the first one); the briefing field's
     # PDF reader reads only the uploaded file of the signed-in person and stores nothing (own)

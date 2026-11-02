@@ -382,6 +382,7 @@ ROUTES = {
     "GET /api/v1/lists/{}/rules": "lists", "GET /api/v1/lists/{}/sections": "lists", "GET /api/v1/lists/{}/sprints": "lists",
     "GET /api/v1/lists/{}/status-report": "lists", "GET /api/v1/lists/{}/tags": "lists",
     "GET /api/v1/lists/{}/delivery-report": "lists",  # 2.392.0 D (#3369)
+    "POST /api/tasks/brief": "tasks", "POST /api/v1/tasks/brief": "tasks",  # 2.392.3 (#3368)
     "GET /api/v1/lists/{}/velocity": "lists", "GET /api/v1/lists/{}/weekly-status": "lists", "GET /api/v1/templates": "lists",
     "PATCH /api/fields/{}": "lists", "PATCH /api/filters/{}": "lists", "PATCH /api/forms/{}": "lists",
     "PATCH /api/layouts/saved/{}": "lists", "PATCH /api/list-tags/{}": "lists", "PATCH /api/lists/{}": "lists",
