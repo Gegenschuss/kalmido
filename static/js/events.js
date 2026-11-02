@@ -813,6 +813,52 @@ function closeSide() {
   sideRet = null;
   $('#side').classList.remove('open'); if (!$('.qadd.sheet') && $('#pop').classList.contains('hidden')) $('#scrim').classList.add('hidden'); }
 $('#scrim').addEventListener('click', () => { closeSide(); closePop(); });
+// 2.490.0 (#4032): a swipe to the left on the panel closes it: the panel follows the finger, from a third of its width on it
+// closes (the drawer: closeSide, the panel beside the content: the button's way, sbb_panel, the state is kept as before),
+// otherwise it snaps back. Starts only after a clear sideways move (8 px, like calgest.js), vertical scrolling stays, a
+// second finger cancels. Mouse / keyboard are untouched (touch events only).
+const SWP = {s: null, MIN: 8};
+function swp_target() {
+  const sd = $('#side'); if (!sd) return null;
+  if (sd.classList.contains('open')) return {el: sd, fn: closeSide};
+  const app = $('#app');
+  if (typeof sbb_on === 'function' && sbb_on() && !app?.classList.contains('side-rail') && !sbb_noPan() && !LS.get('sideFold', false)) return {el: sd, fn: () => sbb_panel()};
+  return null;
+}
+function swp_reset(el, snap) {
+  if (!el) return;
+  el.style.transition = snap ? '' : 'none'; el.style.transform = '';
+  if (!snap) requestAnimationFrame(() => { el.style.transition = ''; });
+}
+document.addEventListener('touchstart', e => {
+  if (!e.touches) return;  // a plain Event("touchstart") (tests, synthetic taps) has no touch list
+  if (e.touches.length !== 1) { if (SWP.s) { swp_reset(SWP.s.el, true); SWP.s = null; } return; }
+  const t = e.touches[0], tg = e.target?.closest ? e.target : null;
+  if (!tg || !tg.closest('#side') || tg.closest('input, textarea, select, .sv-row')) { SWP.s = null; return; }
+  const w = swp_target(); if (!w) { SWP.s = null; return; }
+  SWP.s = {...w, x0: t.clientX, y0: t.clientY, dx: 0, lock: null, w: w.el.getBoundingClientRect().width || 1};
+}, {passive: true});
+document.addEventListener('touchmove', e => {
+  const s = SWP.s; if (!s) return;
+  if (!e.touches || e.touches.length !== 1) { swp_reset(s.el, true); SWP.s = null; return; }
+  const t = e.touches[0], dx = t.clientX - s.x0, dy = t.clientY - s.y0;
+  if (!s.lock) {
+    if (Math.abs(dx) < SWP.MIN && Math.abs(dy) < SWP.MIN) return;
+    if (Math.abs(dx) > Math.abs(dy) && dx < 0) { s.lock = 'x'; s.el.style.transition = 'none'; } else { SWP.s = null; return; }  // vertical / to the right: not ours
+  }
+  s.dx = Math.min(0, dx);
+  s.el.style.transform = `translateX(${s.dx}px)`;
+  if (e.cancelable) e.preventDefault();
+}, {passive: false});
+function swp_end(cancel) {
+  const s = SWP.s; SWP.s = null; if (!s || s.lock !== 'x') return;
+  if (!cancel && -s.dx > s.w / 3) {
+    s.el.style.transition = ''; s.el.style.transform = '';  // the class / state change below animates on from here
+    s.fn();
+  } else swp_reset(s.el, true);
+}
+document.addEventListener('touchend', () => swp_end(false));
+document.addEventListener('touchcancel', () => swp_end(true));
 $('#fab').addEventListener('click', () => { if (typeof QN_FAB === 'object' && ms_lpRecent(QN_FAB)) return; openQuickSheet(); });  // 2.477.0 (#3881): the click ending a hold opens no task
 
 document.addEventListener('input', e => {

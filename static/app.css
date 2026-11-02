@@ -8863,3 +8863,6 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 .aiph{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.5rem 0;padding:.5rem .625rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);color:var(--muted);font-size:var(--fs-s)}
 .aiph .aipht{flex:1 1 14rem;min-width:0}
 .abadge.abai{white-space:nowrap}
+
+/* 2.490.0 (#4032): the rail's show / hide button stays on top while the rail scrolls */
+#srail .srb.srpanel{position:sticky;top:0;z-index:2;background:var(--sbbg,var(--bg2))}
