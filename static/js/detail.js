@@ -733,8 +733,9 @@ function renderDetail0() {
         const keep = k => (k === 'snippets' && (snipCount(t) || S.snip?.tid === t.id || (listById(t.list_id)?.ptype === 'software' && pz_on(t.list_id, 'repo'))))  // 2.35.0 (#1095)
           || (k === 'custom' && (dfSum('custom', t)[0] || fieldsOf(t.list_id).some(cfst_on)))  // 2.410.0 A (#3514): a stage bar is seen at once
           || (k === 'attachments' && (t.attachments || []).length) || (k === 'video' && typeof vdr_count === 'function' && vdr_count(t)) || (k === 'deps' && (t.waiting_at || (t.blockers || []).length)) || (k === 'links' && (((S.tcontacts || {})[t.id] || []).length || ((S.evlinks || {})[t.id] || []).length))
-          || (k === 'tags' && (t.tags || []).length + (t.ltags || []).length) || (k === 'time' && dfSum('time', t)[0])
+          || (k === 'tags' && (t.tags || []).length + (t.ltags || []).length) || (k === 'time' && (dfSum('time', t)[0] || (!isMobile() && tFor(t))))
           || (k === 'fields' && (t.url || t.ttype || t.milestone_id || isMs(t)));
+        // 2.489.0 (#2798): on the desktop "Track time" of a list with time tracking stands outside the fold even with nothing tracked yet
         const top = DETAIL_TOP.map(k => SEC[k]).concat(DETAIL_MORE.filter(keep).map(k => SEC[k]));
         const rest = DETAIL_MORE.filter(k => !keep(k)).map(k => SEC[k]).filter(x => x && x.trim());
         const sum = moreSummary(t, DETAIL_MORE.filter(k => !keep(k)));

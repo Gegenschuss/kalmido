@@ -15951,5 +15951,11 @@
   "Wiki pages": "Páginas wiki",
   "Turn these public links off?": "¿Desactivar estos enlaces públicos?",
   "Every link of this kind stops working at once; nothing is deleted.": "Todos los enlaces de este tipo dejan de funcionar al instante; no se elimina nada.",
-  "{0} set public links for “{1}” to {2}.": "{0} ha puesto los enlaces públicos de «{1}» en {2}."
+  "{0} set public links for “{1}” to {2}.": "{0} ha puesto los enlaces públicos de «{1}» en {2}.",
+  "no time tracking": "sin registro de tiempo",
+  "Turn on and start": "Activar e iniciar",
+  "Export|time": "Exportar",
+  "Turn on time tracking for this project?": "¿Activar el registro de tiempo en este proyecto?",
+  "“{0}” does not track time yet. Turn it on and start the timer for “{1}”?": "«{0}» aún no registra tiempo. ¿Activarlo e iniciar el temporizador para «{1}»?",
+  "This project does not track time; only its owner can turn it on.": "Este proyecto no registra tiempo; solo su propietario puede activarlo."
 }

@@ -83,7 +83,9 @@ check(requests.put(B + f"/api/lists/{TEAM}/in-mine", headers={**AGH, **H}, json=
 # ================= #1471 time tracking per list
 P = A.post(B + "/api/lists", json={"name": "Client X", "kind": "project"}).json()["id"]
 PT = A.post(B + "/api/tasks", json={"title": "Concept", "list_id": P}).json()["id"]
-check(lst(A, P)["time_tracking"] == 0 and lst(A, PRIV)["time_tracking"] == 0, "#1471: off by default, also for projects")
+# 2.489.0 (#2798): a new list tracks time by default while the module Time is on (was: off); the rest below switches P off
+check(lst(A, P)["time_tracking"] == 1 and lst(A, PRIV)["time_tracking"] == 1, "#2798: on by default with the module Time on")
+check(A.patch(B + f"/api/lists/{P}", json={"time_tracking": False}).ok and lst(A, P)["time_tracking"] == 0, "#1471: switched off")
 r = A.post(B + "/api/time/start", json={"task_id": PT})
 check(r.status_code == 409 and "time tracking" in r.json().get("error", ""), "#1471: no timer with the switch off: " + r.text[:160])
 check(A.post(B + "/api/time/entries", json={"list_id": P, "start": D(-1) + "T09:00", "minutes": 30}).status_code == 409, "#1471: no entry on the list either")

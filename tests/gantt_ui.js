@@ -199,7 +199,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   w.close();
 
   // ================= list types: selector, badge, hidden controls, sidebar menu, progress "x"
-  const PL = (await call('POST', '/api/lists', {name: 'Groceries'})).id;
+  const PL = (await call('POST', '/api/lists', {name: 'Groceries', time_tracking: false})).id;  // 2.489.0 (#2798): new lists track time by default now
   const pt = (await call('POST', '/api/tasks', {title: 'Milk', list_id: PL})).id;
   w = await boot({user: 'alice', hash: 'l/' + PL}); d = w.document;
   check(!d.querySelector('#top .kbadge'), 'no type badge (2.352.0 B #2752: every list is a project)');

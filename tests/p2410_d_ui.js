@@ -35,7 +35,7 @@ const ghead = (d, cls) => d.querySelector(`#view .ghead.${cls}`);
   const TEAM = (await call('POST', '/api/lists', {name: 'Team'})).id;
   await call('PUT', `/api/lists/${TEAM}/members`, {user_id: bob.id, role: 'edit'});
   const INS = (await call('POST', '/api/lists', {name: 'Insurance'})).id;
-  const PRJ = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project'})).id;
+  const PRJ = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project', time_tracking: false})).id;  // 2.489.0 (#2798): new lists track time by default now
   const mk = async (title, list_id, extra = {}) => (await call('POST', '/api/tasks', {title, list_id, ...extra})).id;
   const TT = await mk('Team work', TEAM, {assignee_id: ME.id});
   const PAY = await mk('Pay the premium', INS, {assignee_id: ME.id, due: day(0)});

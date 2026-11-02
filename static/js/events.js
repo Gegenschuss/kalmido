@@ -474,6 +474,8 @@ document.addEventListener('click', async e => {
     case 'crumb-menu': crumbMenu(a, a.dataset.k, a.dataset.id); break;  // 2.25.0 (UX-44)
     case 'chat-react': e.stopPropagation(); chatReact(+a.dataset.mid, a.dataset.e); break;  // 2.7.2 (#421)
     case 'tv-stop': timerStop(); break;
+    case 'tv-start': tv_startPick(); break;  // 2.489.0 (#2798)
+    case 'tv-export': tv_exportMenu(a); break;  // 2.489.0 (#2798)
     case 'news-open': newsOpen(+a.dataset.i); break;
     case 'bell-pop': bellPop(a); break;
     case 'news-kind': newsKindSet(a.dataset.nk); renderView(); break;

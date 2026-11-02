@@ -5,6 +5,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
+const until = fn => require('./boot').until(fn, {timeout: 15000, step: 100});  // 2.489.0 (#2798)
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -51,7 +52,9 @@ const call = async (method, url, body) => {
 
   // ---- the XLSX buttons
   w.location.hash = '#time'; await sleep(1000);
-  const a1 = d.querySelector('a[href^="/api/time/export.xlsx"]'), c1 = d.querySelector('a[href^="/api/time/export.csv"]');
+  // 2.489.0 (#2798): the export links sit in the menu "Export"
+  d.querySelector('[data-act="tv-export"]')?.click(); await until(() => d.querySelector('#pop a[href^="/api/time/export.xlsx"]'));
+  const a1 = d.querySelector('#pop a[href^="/api/time/export.xlsx"]'), c1 = d.querySelector('#pop a[href^="/api/time/export.csv"]');
   check(a1 && c1 && a1.getAttribute('href').split('?')[1] === c1.getAttribute('href').split('?')[1], 'time view: XLSX button with the query of the CSV button');
   check(a1 && /Excel/.test(a1.textContent), 'time view: the label says Excel');
   w.close();

@@ -15951,5 +15951,11 @@
   "Wiki pages": "Wiki-Seiten",
   "Turn these public links off?": "Diese öffentlichen Links ausschalten?",
   "Every link of this kind stops working at once; nothing is deleted.": "Jeder Link dieser Art funktioniert sofort nicht mehr; nichts wird gelöscht.",
-  "{0} set public links for “{1}” to {2}.": "{0} hat öffentliche Links für „{1}“ auf {2} gestellt."
+  "{0} set public links for “{1}” to {2}.": "{0} hat öffentliche Links für „{1}“ auf {2} gestellt.",
+  "no time tracking": "keine Zeiterfassung",
+  "Turn on and start": "Einschalten und starten",
+  "Export|time": "Exportieren",
+  "Turn on time tracking for this project?": "Zeiterfassung für dieses Projekt einschalten?",
+  "“{0}” does not track time yet. Turn it on and start the timer for “{1}”?": "„{0}“ erfasst noch keine Zeit. Einschalten und die Zeitmessung für „{1}“ starten?",
+  "This project does not track time; only its owner can turn it on.": "Dieses Projekt erfasst keine Zeit; nur die Eigentümerin oder der Eigentümer kann das einschalten."
 }

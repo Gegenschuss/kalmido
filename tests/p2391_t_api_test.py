@@ -53,7 +53,7 @@ TK = {"Authorization": "Bearer " + r.json()["token"]}
 # ================================================================== #1217: custom fields in a plain list
 fields_off(A)
 before = set(feats(A))
-L = A.post(B + "/api/lists", json={"name": "Receipts"}).json()["id"]
+L = A.post(B + "/api/lists", json={"name": "Receipts", "time_tracking": False}).json()["id"]  # 2.489.0 (#2798): new lists track time by default now
 r = A.post(B + f"/api/lists/{L}/fields", json={"name": "Amount", "type": "number", "options": {"unit": "EUR"}})
 check(r.ok and r.json().get("list_id") == L, f"#1217: a plain list gets a custom field: {r.status_code} {r.text[:160]}")
 FA = r.json().get("id")

@@ -50,7 +50,7 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   const stopBtn = [...w2.document.querySelectorAll('#pop .menu-list button')].find(b => /Stop timer/.test(b.textContent));
   check(stopBtn, 'pill menu: Stop timer'); stopBtn.click();
   check(await until(() => !w2.document.querySelector('#top .tmini')), 'device 2: pill gone after stop');
-  check(/Timer stopped: 0:00/.test(w2.document.querySelector('#toast').textContent), 'stop toast');
+  check(/Timer stopped: under 1 minute/.test(w2.document.querySelector('#toast').textContent), 'stop toast: under a minute in words');  // 2.489.0 (#2798): was 0:00
   await w.eval('load().then(render)'); await idle(w);
   check(!d.querySelector('#top .tmini'), 'device 1: pill gone after reload');
   let st = await call('GET', '/api/state');
@@ -128,7 +128,10 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   check(d.querySelectorAll('.timev .sttiles > div').length === 3, 'tiles: range (time + decimal hours), today, amount');
   check(d.querySelector('.ttable .tvl') && [...d.querySelectorAll('.ttable .tvt')].some(r => /Review/.test(r.textContent)), 'table: list and task rows');
   check(!d.querySelector('[data-act="tv-scope"]') === false, 'scope toggle shown (shared list)');
-  const csv = d.querySelector('.timev a[href^="/api/time/export.csv"]').getAttribute('href');
+  // 2.489.0 (#2798): CSV, Excel and the timesheet sit in the menu "Export"
+  d.querySelector('.timev [data-act="tv-export"]').click(); await until(() => d.querySelector('#pop .tvexp a[href^="/api/time/export.csv"]'));
+  check(!d.querySelector('.timev a[href^="/api/time/export.csv"]') && d.querySelectorAll('#pop .tvexp a, #pop .tvexp [data-tvx]').length === 3, '#2798: the export menu holds CSV, Excel and the timesheet');
+  const csv = d.querySelector('#pop .tvexp a[href^="/api/time/export.csv"]').getAttribute('href'); w.eval('closePop()');
   check(/from=\d{4}-\d\d-\d\d&to=\d{4}-\d\d-\d\d&scope=mine/.test(csv), 'CSV link carries the filters ' + csv);
   d.querySelector('[data-act="tv-scope"][data-k="all"]').click(); await idle(w);
   // 2.63.0 (#1523): Alice is an editor of Shared: "all" shows only her own entries there, never Bob's
@@ -142,7 +145,8 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   d.querySelector('[data-act="tv-entries"]').click(); await until(() => d.querySelectorAll('.timev .terow').length >= 3);
   check(d.querySelectorAll('.timev .terow').length >= 3, 'entries section expands');
   // timesheet
-  d.querySelector('[data-act="tv-sheet"]').click(); await until(() => d.querySelector('.tsheet .tsentries table'));
+  d.querySelector('[data-act="tv-export"]').click(); await until(() => d.querySelector('#pop [data-tvx="sheet"]:not([disabled])'));  // 2.489.0 (#2798): in the menu
+  d.querySelector('#pop [data-tvx="sheet"]').click(); await until(() => d.querySelector('.tsheet .tsentries table'));
   const sh = d.querySelector('.tsheet');
   check(sh && sh.querySelector('h1').textContent === 'Timesheet' && /Alice|All members/.test(sh.querySelector('.tssub').textContent), 'timesheet: title and subtitle');
   check(sh.querySelectorAll('.tskpi > div').length === 4 && sh.querySelector('tr.g') && sh.querySelector('.tsdays') && sh.querySelector('.tsentries table'), 'timesheet: KPIs, totals, per day, entries');
@@ -178,13 +182,45 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   check(/rounded/.test(d.querySelector('.timev .sttiles').textContent) && /of the daily target/.test(d.querySelector('.timev .sttiles').textContent), 'tiles: rounded + daily target');
 
   // ================= German (bob)
-  const wb = await boot({user: 'bob', hash: 'time'}); const db2 = wb.document; await until(() => db2.querySelector('[data-act="tv-sheet"]') && db2.querySelector('.tvseg')); await idle(wb);
+  const wb = await boot({user: 'bob', hash: 'time'}); const db2 = wb.document; await until(() => db2.querySelector('[data-act="tv-export"]') && db2.querySelector('.tvseg')); await idle(wb);
   check(/^(Zeiterfassung|Zeit)$/.test(db2.querySelector('#top h1').textContent) && /Zeiterfassung/.test(db2.querySelector('#side [data-sbbpart="time"], #view .mgtabs [data-go="time"]')?.textContent || ''), 'German title: ' + db2.querySelector('#top h1').textContent);  // 2.224.0 A (#2817): the tab on top  // 2.44.0 (#1187)  // 2.152.2 (#2618): the part's own name, the part in the panel
-  check(/Stundennachweis/.test(db2.querySelector('[data-act="tv-sheet"]').textContent) && /Diese Woche/.test(db2.querySelector('.tvseg').textContent), 'German buttons');
-  db2.querySelector('[data-act="tv-sheet"]').click(); await until(() => db2.querySelector('.tsheet h1'));
+  // 2.489.0 (#2798): the timesheet is an entry of the menu "Exportieren"
+  check(/Exportieren/.test(db2.querySelector('[data-act="tv-export"]').textContent) && /Diese Woche/.test(db2.querySelector('.tvseg').textContent), 'German buttons');
+  db2.querySelector('[data-act="tv-export"]').click(); await until(() => db2.querySelector('#pop [data-tvx="sheet"]:not([disabled])'));
+  check(/Stundennachweis/.test(db2.querySelector('#pop [data-tvx="sheet"]').textContent), 'German menu entry');
+  db2.querySelector('#pop [data-tvx="sheet"]').click(); await until(() => db2.querySelector('.tsheet h1'));
   check(db2.querySelector('.tsheet h1').textContent === 'Stundennachweis' && /Summe/.test(db2.querySelector('.tsheet').textContent), 'German timesheet');
   const EN = /\b(Timer running|Total|Entries|Rounded|Timesheet|hours|tracked|Amount|Print|Individual|List \/ task|No task|Per day|Only mine|All members|Custom|This week)\b/;
   check(!EN.test(db2.querySelector('.tsheet').textContent + db2.querySelector('#view').textContent), 'no English leftovers (German view + timesheet)');
+
+  // ================= 2.489.0 (#2798): a way to start for a new person: "Start time tracking" on the empty card, the search,
+  // the question for a project without time tracking; on a computer "Time" stands outside the fold of the task panel
+  await call('POST', '/api/time/stop', {});
+  const NOT = (await call('POST', '/api/lists', {name: 'Offsite', time_tracking: false})).id;
+  const tno = (await call('POST', '/api/tasks', {title: 'Plan offsite', list_id: NOT})).id;
+  const tfr = (await call('POST', '/api/tasks', {title: 'Fresh untracked', list_id: WORK})).id;
+  w = await boot({user: 'alice', hash: 'time'}); d = w.document;
+  check(await until(() => d.querySelector('.tvrun.idle [data-act="tv-start"]')), '#2798: the empty card has "Start time tracking"');
+  const pick = async q => {
+    d.querySelector('.tvrun.idle [data-act="tv-start"]').click(); await until(() => d.querySelector('#tvs-q'));
+    const inp = d.querySelector('#tvs-q'); inp.value = q; inp.dispatchEvent(new w.Event('input', {bubbles: true}));
+  };
+  await pick('Write report');
+  check(await until(() => d.querySelector(`#tvs-list [data-tvs="${t1}"]`)) && !d.querySelector(`#tvs-list [data-tvs="${tno}"]`), '#2798: the search finds the task');
+  d.querySelector(`#tvs-list [data-tvs="${t1}"]`).click();
+  check(await until(async () => (await call('GET', '/api/state')).timer?.task_id === t1), '#2798: search -> the timer runs');
+  await w.eval('timerStop()'); await until(() => d.querySelector('.tvrun.idle [data-act="tv-start"]'));
+  await pick('Plan offsite');
+  check(await until(() => /no time tracking/.test(d.querySelector(`#tvs-list [data-tvs="${tno}"]`)?.textContent || '')), '#2798: a task of a project without time tracking is marked');
+  d.querySelector(`#tvs-list [data-tvs="${tno}"]`).click();
+  check(await until(() => /Turn on time tracking for this project/.test(d.querySelector('.cdlg')?.textContent || '')), '#2798: asks to turn it on first');
+  check(!(await call('GET', '/api/state')).timer, '#2798: nothing starts before the yes');
+  d.querySelector('.cdlg [data-cd="yes"]').click();
+  check(await until(async () => { const j = await call('GET', '/api/state'); return j.timer?.task_id === tno && j.lists.find(l => l.id === NOT)?.time_tracking === 1; }), '#2798: yes turns it on and starts');
+  await w.eval('timerStop()');
+  w.eval(`openDetail(${tfr})`); await until(() => d.querySelector('#detail #d-title')); await idle(w);
+  check(!!d.querySelector('#detail #d-time [data-act="timer-toggle"]') && !d.querySelector('#d-more #d-time'), '#2798: desktop: "Time" outside the fold although nothing is tracked yet');
+  w.close();
 
   // ================= module off
   await call('PATCH', '/api/settings', {features: 'cal,habits,pomo,stats,collab'});

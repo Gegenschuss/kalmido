@@ -248,6 +248,13 @@ def lp_prev_conflicts(c, lid, role, b):
     return b, conflicts
 
 
+def tt_new_default(c, uid):
+    """2.489.0 (#2798): a new list tracks time when the module Time is on for its creator (server switch + the person's own
+    module switch, with or without an organisation); existing lists and the column default (0) stay as they are."""
+    from ..personal.timetrack import time_on
+    return 1 if time_on(usettings(c, uid)) else 0
+
+
 def clean_list_value(k, v, member=False):
     """One list column from the client, validated (BadInput)."""
     from ..tasks.validation import NAG_VALUES
@@ -340,8 +347,8 @@ def list_create():
         oid = clean_org_id(c, b["org_id"], me()) if "org_id" in b else ws_default_org(c, me(), folder)  # 2.28.0 (#935)
         made = {}
         lid, on = ptype_create(c, me(), b["ptype"], name, folder, color, sections=b.get("sections") is True, org_id=oid, bug_inbox=bug, made=made)  # 2.27.0 (#972)
-        if "time_tracking" in b:  # 2.41.0 (#1471)
-            c.execute("UPDATE lists SET time_tracking=? WHERE id=?", (clean_list_value("time_tracking", b["time_tracking"]), lid))
+        c.execute("UPDATE lists SET time_tracking=? WHERE id=?", (clean_list_value("time_tracking", b["time_tracking"]) if "time_tracking" in b
+                                                                  else tt_new_default(c, me()), lid))  # 2.41.0 (#1471); 2.489.0 (#2798)
         bump(c)
         c.commit()
         return jsonify({**dict(c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()), "modules_on": on, **made})
@@ -372,7 +379,7 @@ def list_create():
                     (name, color, folder, srt, view, iso(now_utc()), uid, dab, kind,
                      # 2.67.0 B (#1865): "Move dependent tasks along" is on by default in a new project list
                      clean_list_value("dep_shift", b["dep_shift"] if "dep_shift" in b else True), clean_list_value("tickets", b.get("tickets")), oid,
-                     clean_list_value("time_tracking", b.get("time_tracking"))))
+                     clean_list_value("time_tracking", b["time_tracking"]) if "time_tracking" in b else tt_new_default(c, uid)))  # 2.489.0 (#2798)
     list_created(c, uid, cur_id)  # 2.4.2 (#391) agents, 2.10.0 (#441) groups, 2.22.0 (#740) / 2.25.0 (#931) folder people
     bump(c)
     c.commit()

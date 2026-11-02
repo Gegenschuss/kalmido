@@ -379,6 +379,38 @@ r = Bb.post(B + "/api/time/entries", json={"task_id": TS, "start": utc(now - tim
 check(r.status_code == 400 and r.json()["error"] == "Ende oder Dauer fehlt", "German error message")
 check(Bb.patch(B + f"/api/time/entries/{ra['id']}", json={"note": "x"}).json()["error"] == "Nur wer den Eintrag erfasst hat, kann ihn ändern", "German 403 text")
 check(A.post(B + "/api/time/entries", json={"task_id": T1, "start": "2026-13-45T25:00", "minutes": 5}).json()["error"] == "Invalid date or time", "invalid date message")
+# ================= 2.489.0 (#2798): a new list tracks time while the module Time is on (also for a person without an organisation)
+from freelancer_fixture import freelancer  # noqa: E402
+
+
+def tt_of(s, lid):
+    return next(l for l in s.get(B + "/api/state").json()["lists"] if l["id"] == lid)["time_tracking"]
+
+
+N1 = A.post(B + "/api/lists", json={"name": "Fresh list"}).json()["id"]
+check(tt_of(A, N1) == 1, "#2798: a new list tracks time with the module on")
+r = A.post(B + "/api/lists", json={"name": "Fresh agency", "ptype": "agency"})
+check(r.ok and tt_of(A, r.json()["id"]) == 1, "#2798: a new project of a type too " + r.text[:120])
+N3 = A.post(B + "/api/lists", json={"name": "Fresh off", "time_tracking": False}).json()["id"]
+check(tt_of(A, N3) == 0, "#2798: an explicit off is kept")
+T3 = A.post(B + "/api/tasks", json={"title": "Fresh work", "list_id": N1}).json()["id"]
+r = A.post(B + "/api/time/start", json={"task_id": T3})
+check(r.ok and (r.json().get("timer") or {}).get("task_id") == T3, "#2798: the timer starts at once in a new list " + r.text[:120])
+A.post(B + "/api/time/stop", json={})
+check(tt_of(A, WORK) == 1 and tt_of(A, N3) == 0, "#2798: existing lists stay as they are")
+FT0 = A.get(B + "/api/state").json()["settings"]["features"]
+A.patch(B + "/api/settings", json={"features": ",".join(f for f in FT0.split(",") if f != "time")})
+N4 = A.post(B + "/api/lists", json={"name": "Fresh, module off"}).json()["id"]
+check(tt_of(A, N4) == 0, "#2798: module Time off: a new list does not track time")
+A.patch(B + "/api/settings", json={"features": FT0})
+# freelancer-matrix: lists
+FID, Fr = freelancer(B, A, "frank2798")
+NF = Fr.post(B + "/api/lists", json={"name": "Freelance client"}).json()["id"]
+check(tt_of(Fr, NF) == 1, "#2798: a person without an organisation: a new list tracks time")
+Fr.patch(B + "/api/settings", json={"features": "cal,stats"})
+NF2 = Fr.post(B + "/api/lists", json={"name": "Freelance, module off"}).json()["id"]
+check(tt_of(Fr, NF2) == 0, "#2798: a person without an organisation, module Time off: off")
+
 # CSRF header required
 check(requests.post(B + "/api/time/start", json={"task_id": T1}, cookies=A.cookies).status_code == 403, "CSRF header required")
 

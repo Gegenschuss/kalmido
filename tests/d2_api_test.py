@@ -133,7 +133,7 @@ check((t3, b3) in {tuple(e) for e in jb["edges"]}, "GET /api/deps: a member sees
 check(C.get(B + "/api/deps").json()["edges"] == [] or all(t3 not in e for e in C.get(B + "/api/deps").json()["edges"]), "GET /api/deps: nothing of lists I cannot see (IDOR)")
 
 # ---- list types: list | checklist | project; project-only features refused elsewhere (409), checklist compat
-PL = A.post(B + "/api/lists", json={"name": "Plain"}).json()["id"]
+PL = A.post(B + "/api/lists", json={"name": "Plain", "time_tracking": False}).json()["id"]  # 2.489.0 (#2798): new lists track time by default now
 lst = lambda s, i: next(l for l in state(s)["lists"] if l["id"] == i)  # noqa: E731
 check(lst(A, PL)["kind"] == "list" and lst(A, W)["kind"] == "project", "new list: type list by default; kind project on request")
 pt = A.post(B + "/api/tasks", json={"list_id": PL, "title": "Plain task"}).json()["id"]

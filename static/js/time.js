@@ -49,7 +49,7 @@ async function timerStart(target, note = '') {
   let j;
   try { j = await api('POST', '/api/time/start', {...target, note, at: new Date().toISOString(), client_id: newCid()}); } catch { return; }
   if (j.timer !== undefined) S.timer = j.timer;
-  if (j.stopped) toast(tr('Previous timer stopped ({0})', hmm(j.stopped.seconds)));
+  if (j.stopped) toast(tr('Previous timer stopped ({0})', tv_durText(j.stopped.seconds)));
   else if (j.queued) toast(tr('Timer started (offline, will be sent later)'));
   await timeChanged(j);
 }
@@ -58,8 +58,56 @@ async function timerStop() {
   let j;
   try { j = await api('POST', '/api/time/stop', {...(r.id ? {id: r.id} : {}), ...(r.client_id ? {client_id: r.client_id} : {}), at: new Date().toISOString()}); } catch { return; }
   S.timer = j.timer ?? null;
-  toast(j.discarded ? tr('Timer discarded (shorter than a second)') : tr('Timer stopped: {0}', hmm(j.entry ? j.entry.seconds : timerElapsed())));
+  toast(j.discarded ? tr('Timer discarded (shorter than a second)') : tr('Timer stopped: {0}', tv_durText(j.entry ? j.entry.seconds : timerElapsed())));
   await timeChanged(j);
+}
+// 2.489.0 (#2798): a stopped timer under a minute said "0:00"; now "under 1 minute"
+const tv_durText = sec => sec < 60 ? tr('under 1 minute') : hmm(sec);
+// 2.489.0 (#2798): a new person found no way to start: "Start time tracking" searches an open task; one in a project without
+// time tracking asks to turn it on (the owner only) and then starts
+function tv_startPick() {
+  const md = /** @type {any} */ (modal(`<h3>${esc(tr('Start time tracking'))}</h3>
+    <input id="tvs-q" placeholder="${esc(tr('Search open tasks'))}" autocomplete="off" style="width:100%;margin-top:.5rem" aria-label="${esc(tr('Search open tasks'))}">
+    <div class="dplist tpk" id="tvs-list" role="listbox" aria-label="${esc(tr('Open tasks'))}"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button></div>`));
+  md.classList.add('dpmodal', 'tvsmodal');
+  const tot = S.timeTotals || {};
+  const draw = () => {
+    const q = norm(/** @type {HTMLInputElement} */ ($('#tvs-q', md)).value || '');
+    const arr = openTasks().filter(x => x.id > 0 && !x.context && (!q || norm(x.title).includes(q)))
+      .sort((a, b) => (mtTime(b.list_id) ? 1 : 0) - (mtTime(a.list_id) ? 1 : 0) || ((tot[b.id] || [])[1] || 0) - ((tot[a.id] || [])[1] || 0) || bySort(a, b)).slice(0, 60);
+    $('#tvs-list', md).innerHTML = arr.length ? arr.map(x => `<button type="button" class="tpkrow" role="option" data-tvs="${x.id}"><span class="tpkt">${esc(x.title)}</span><span class="tpkm">${esc(lname(listById(x.list_id)))}${mtTime(x.list_id) ? '' : ` · ${esc(tr('no time tracking'))}`}</span></button>`).join('')
+      : `<div class="muted mhint">${tr('No matching open task.')}</div>`;
+  };
+  draw();
+  md.addEventListener('input', e => { if (/** @type {any} */ (e.target).id === 'tvs-q') draw(); });
+  md.addEventListener('click', e => {
+    const b = /** @type {any} */ (e.target).closest('button'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.tvs) { md.remove(); tv_startTask(taskById(+b.dataset.tvs)); }
+  });
+  setTimeout(() => { if (!isMobile()) /** @type {HTMLInputElement} */ ($('#tvs-q', md)).focus(); }, 50);
+}
+async function tv_startTask(t) {
+  if (!t) return;
+  const l = listById(t.list_id);
+  if (!mtTime(t.list_id)) {
+    if (!l || !isOwner(l)) { toast(tr('This project does not track time; only its owner can turn it on.')); return; }
+    if (!await askConfirm(tr('Turn on time tracking for this project?'), tr('“{0}” does not track time yet. Turn it on and start the timer for “{1}”?', lname(l), t.title), {ok: tr('Turn on and start')})) return;
+    try { await api('PATCH', `/api/lists/${l.id}`, {time_tracking: true}); } catch { return; }
+    l.time_tracking = 1;
+  }
+  await timerStart({task_id: t.id});
+}
+// 2.489.0 (#2798): CSV, Excel and the timesheet in one menu "Export"
+function tv_exportMenu(a) {
+  const q = timeQuery(), j = S.tv.data && S.tv.data._q === q ? S.tv.data : null;
+  const p = openPop(a, `<div class="menu-list tvexp"><a href="/api/time/export.csv?${esc(q)}" download>${ic('download', 's')} CSV</a><a href="/api/time/export.xlsx?${esc(q)}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a><button data-tvx="sheet" ${j ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet')}</button></div>`);
+  p.onclick = e => {
+    const b = /** @type {any} */ (e.target).closest('a,[data-tvx]'); if (!b) return;
+    if (b.dataset.tvx === 'sheet') { closePop(); timesheet(); return; }
+    setTimeout(closePop, 0);  // the download link goes first
+  };
 }
 const timerToggle = tid => S.timer && S.timer.task_id === tid ? timerStop() : timerStart({task_id: tid});
 // 1.2: one running indicator for everything that runs: the time-tracking timer, a focus session / break, the
@@ -299,6 +347,7 @@ function tvListsLabel() {
 }
 // 1.5.2: the running timer as a large card on top of the time page: live time, task (opens it), list, start, Stop.
 // Nothing running: a short hint with the tasks you tracked time on lately (one tap starts the timer again)
+// 2.489.0 (#2798): + "Start time tracking" (search a task, tv_startPick)
 // 2.0.6 (#190): a running focus session, break or stopwatch gets the same card (own icon and colour per kind, live
 // time, task, Pause / Resume, Stop), next to or instead of the time-tracking one
 function tvPomoCard() {
@@ -318,7 +367,7 @@ function tvRunCard() {
   if (!r && pc) return pc;
   if (!r) {
     const recent = Object.entries(S.timeTotals || {}).map(([id, v]) => [taskById(+id), v[1]]).filter(([x, m]) => x && x.status === 0 && m > 0 && tFor(x)).sort((a, b) => b[1] - a[1]).slice(0, 3);
-    return `<section class="tvrun idle"><span class="tvr-idle">${ic('clock', 's')}${tr('No timer running')}</span>${recent.map(([x]) => `<button class="btn sm tvr-go" data-act="timer-toggle" data-id="${x.id}" title="${esc(tr('Start timer'))}">${ic('play', 's')}<span>${esc(x.title)}</span></button>`).join('')}</section>`;
+    return `<section class="tvrun idle"><span class="tvr-idle">${ic('clock', 's')}${tr('No timer running')}</span><button class="btn sm pri tvr-start" data-act="tv-start">${ic('play', 's')} ${tr('Start time tracking')}</button>${recent.map(([x]) => `<button class="btn sm tvr-go" data-act="timer-toggle" data-id="${x.id}" title="${esc(tr('Start timer'))}">${ic('play', 's')}<span>${esc(x.title)}</span></button>`).join('')}</section>`;
   }
   const t = r.task_id && taskById(r.task_id), l = listById(r.list_id ?? t?.list_id), col = l && cssColor(lp_col(l));
   return `<section class="tvrun" aria-label="${esc(tr('Timer running'))}">
@@ -342,9 +391,7 @@ function viewTime() {
     <div class="tvbar">${hasSharing() ? `<div class="seg"><button class="${timeScope() === 'mine' ? 'on' : ''}" data-act="tv-scope" data-k="mine">${tr('Only mine')}</button><button class="${timeScope() === 'all' ? 'on' : ''}" data-act="tv-scope" data-k="all">${tr('All members')}</button></div>` : ''}
       ${tvClient() ? `<span class="tvclient">${ic('brief', 's')}<a href="#client/${tvClient().id}">${esc(tvClient().name)}</a><button class="iconbtn" data-act="client-tvx" title="${esc(tr('All projects'))}" aria-label="${esc(tr('Show all projects again'))}">${ic('x', 's')}</button></span>` : `<button class="btn sm" data-act="tv-lists">${ic('filter', 's')} ${esc(tvListsLabel())}</button>`}<span class="spacer"></span>
       <button class="btn sm" data-act="te-add">${ic('plus', 's')} ${tr('Entry|time')}</button>
-      <a class="btn sm" href="/api/time/export.csv?${esc(q)}" download>${ic('download', 's')} CSV</a>
-      <a class="btn sm" href="/api/time/export.xlsx?${esc(q)}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a>
-      <button class="btn sm" data-act="tv-sheet" ${j ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet')}</button>${lyCustomBtn('time')}<button type="button" class="btn sm" data-act="mod-settings" data-sec="time">${ic('gear', 's')} ${tr('Settings…')}</button></div>`;  // 2.365.2 C (#2789): the way to Settings
+      <button class="btn sm" data-act="tv-export" aria-haspopup="menu">${ic('download', 's')} ${tr('Export|time')}</button>${lyCustomBtn('time')}<button type="button" class="btn sm" data-act="mod-settings" data-sec="time">${ic('gear', 's')} ${tr('Settings…')}</button></div>`;  // 2.365.2 C (#2789): the way to Settings
   if (S.ly.view === 'time') return h + lyHtml('time', {}) + '</div>';
   if (!j) return h + lyHtml('time', P) + `<div class="empty">${tv.err ? (tv.err === 'offline' ? tr('Reports are only available online.') : esc(tv.err)) : tr('Loading…')}</div></div>`;
   const rm = j.rounding, tgt = j.today.target_h;

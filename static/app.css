@@ -2006,6 +2006,9 @@ button.tvr-task:hover{color:var(--accent)}
 .terow .tslock{color:var(--muted)}
 .tvr-idle{display:inline-flex;align-items:center;gap:.375rem;color:var(--muted);font-size:var(--fs-m);margin-right:.25rem}
 .tvr-go{max-width:14rem}
+/* 2.489.0 (#2798): the export menu holds two download links next to a button */
+.menu-list.tvexp a{display:flex;align-items:center;gap:.625rem;padding:.5rem;border-radius:var(--r-s);color:var(--text2);text-decoration:none}
+.menu-list.tvexp a:hover{background:var(--bg3);color:var(--text)}
 .tvr-go span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (prefers-reduced-motion:no-preference){ .tvrun:not(.idle) .rec{animation:recpulse 1.6s ease-in-out infinite} }
 /* 2.0.6 (#190): focus session / break / stopwatch as a card too (same layout, colour of its kind) */
