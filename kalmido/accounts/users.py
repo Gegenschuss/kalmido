@@ -462,7 +462,7 @@ def user_delete_run(c, uid, actor, along=False, settle=None, how=None):
     writes the security log with actor (a user name or "operator") and the account by number.
     -> (None, None, projects) when deleted, ("projects", None, n) when projects block, ("retention" | "lists", 409 answer, n)."""
     from ..accounts.useradmin import ua8_audit
-    from ..admin.retexport import rx_gate, rx_subject
+    from ..admin.retexport import rx_alert, rx_gate, rx_subject
     with system_ctx(c):  # #3090: the documents going along locked before the first write, in one order: a recognition run
         # (docs/store.process, its first write is the document's own row) ends first or waits (else both waited: deadlock, 500)
         c.execute("SELECT node_id FROM doc_meta WHERE node_id IN (SELECT id FROM fs_nodes WHERE owner_id=?) "
@@ -496,7 +496,6 @@ def user_delete_run(c, uid, actor, along=False, settle=None, how=None):
         list_files_drop(lfiles)
     ua8_audit(actor, f"#{uid}", *audit)  # 2.88.0 (#1980): the security log; 2.239.0 C (#2866): by number, not by name
     if retained:  # 2.146.0 D (#2468): deleted after the retention export / with its waiver
-        from ..admin.retexport import rx_alert
         rx_alert(retained[0], [actor, f"#{uid}"])
     return None, None, n
 

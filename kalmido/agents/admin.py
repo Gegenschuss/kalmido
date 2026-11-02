@@ -26,7 +26,7 @@ from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..accounts.users import admin_sees, avatar_upload, need_admin, user_purge
 from ..accounts.orgs import may_see
-from ..accounts.orgs import _operator_apart, op_apart_deny, op_foreign_account, op_foreign_org  # 2.399.0 (#2687)
+from ..accounts.orgs import _operator_apart, op_apart_deny, op_foreign_account, op_foreign_org, op_support_deny, op_support_only  # 2.399.0 (#2687), 2.485.0 (#3939)
 from ..agents.workstyle import WS_NEW
 from ..agents.control import ctl_new  # 2.235.0 A (#2891): a new agent asks before every change
 from ..api.v1 import API_ON, need_api, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, token_public, WH_ON
@@ -78,7 +78,6 @@ def need_agent_admin(c, aid, kill=False, cred=False):
     if not kill and op_foreign_account(c, aid):
         op_apart_deny()
     if cred:
-        from ..accounts.orgs import op_support_deny, op_support_only
         if op_support_only(c, uid=aid):
             op_support_deny()
     return a

@@ -19,7 +19,7 @@ from ..core.access import Denied
 from ..core.mailframe import MAIL_ACC, MAIL_BG, MAIL_MUTED, Safe, mail_html
 from ..core.pg import system_ctx
 from ..integrations.mail import MAIL_OUT_ON, mail_send
-from .orgs import op_apart_deny, op_foreign_account  # 2.399.0 (#2687)
+from .orgs import op_apart_deny, op_foreign_account, op_support_only  # 2.399.0 (#2687), 2.485.0 (#3939)
 
 
 # ---------------------------------------------------------------- 2.22.0 (#697): invitations
@@ -269,7 +269,6 @@ def user_invite(uid):
     if op_foreign_account(c, uid):  # 2.399.0 (#2687): hosted: the link sets the password -- the client asks for it itself (pwreset)
         op_apart_deny()
     b = body()
-    from .orgs import op_support_only
     sup = op_support_only(c, uid=uid)  # 2.485.0 (#3939, review F1): through support access the link goes to the client's address only
     out = invite_new(c, uid, g.user["id"], send=sup or b.get("send", True) is not False)
     if sup:

@@ -35,10 +35,15 @@ from flask import abort, jsonify, request
 
 from ..core.config import app, APP_VERSION, ATT_DIR, PUBLIC_URL
 from ..core.db import body, bump, db, gsetting, iso, now_utc
-from ..core.i18n import tr
+from ..core.i18n import tr, trn
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip, rate_ip
 from ..accounts.login import login_log_ip  # 2.239.0 B (#2888)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.secmail import sec_mail  # 2.485.0 (#3939): earlier in the load order, at module level
+from ..accounts.sessions import ses_end
+from ..accounts.users import _active_admins, user_delete_run
+from .hosting import ANN_TEXT_MAX, _mb, _user_bytes, announce_get, announce_set, hosted, hosting_settings, quota_default_mb
+from .retexport import RX_NEEDED, rx_counts, rx_subject
 
 OP_TOKEN_MIN = 32
 OP_TOKEN_MAX = 512
@@ -111,7 +116,6 @@ def _count(c, sql, args=()):
 
 def _notice(c):
     """Level and times of the current notice -- never its text (an instance admin may have written it)."""
-    from .hosting import announce_get
     a = announce_get(c, True)
     if not a:
         return None
@@ -125,7 +129,6 @@ def op_status(c):
     from ..accounts.orgs import instance_mode
     from ..accounts.signup import signup_mode
     from .backup import BK_ON_ENV, bk_db_bytes
-    from .hosting import hosted, _user_bytes
     from .worker import wrk_health
     now = now_utc()
     d7, d30 = iso(now - timedelta(days=7)), iso(now - timedelta(days=30))
@@ -191,7 +194,6 @@ def operator_setup_code():
 
 def _notice_error(e):
     """2.144.0 D2 (#797): only the known validation messages go back to the operator, never free text."""
-    from .hosting import ANN_TEXT_MAX
     known = {tr("At most {0} characters", ANN_TEXT_MAX), tr("The end must be after the start")}
     known |= {tr("Invalid value: {0}", k) for k in ("level", "starts_at", "ends_at", "minutes")}
     return e if e in known else tr("Invalid value: {0}", "notice")
@@ -201,7 +203,6 @@ def _notice_error(e):
 def operator_notice():
     """{level: maintenance | info, text, minutes? | starts_at? / ends_at?}; an empty text clears the notice. No push."""
     op_gate("notice")
-    from .hosting import announce_set
     b = body()
     if not isinstance(b, dict):
         b = {}
@@ -230,7 +231,6 @@ def _op_day(v):
 
 def _op_account(c, uid):
     """The account uid as numbers / states, or None (unknown or an agent). Runs as "system" (the caller's block)."""
-    from .hosting import _user_bytes, quota_default_mb
     u = c.execute("SELECT id, kind, is_admin, disabled, created_at, storage_quota_mb FROM users WHERE id=?", (uid,)).fetchone()
     if not u or (u["kind"] or "user") == "agent":
         return None
@@ -285,8 +285,6 @@ def operator_account_put(uid):
     """{disabled?: bool, storage_quota_mb?: int | null} -- the checks of the user management (users.user_update): locking ends
     the sessions, the last active admin stays; never the admin right, the sign-in or anything else."""
     op_gate(f"account-put #{uid}")
-    from ..accounts.sessions import ses_end
-    from ..accounts.users import _active_admins
     b = body()
     if not isinstance(b, dict):
         b = {}
@@ -318,7 +316,6 @@ def operator_account_put(uid):
         bump(c)
     c.commit()
     if locked:  # 2.266.0 (#2963): the person hears of the lock, as from the user management
-        from ..accounts.secmail import sec_mail
         with system_ctx(c):
             sec_mail(c, uid, "disabled")
     return jsonify(account=_op_get(c, uid))
@@ -331,9 +328,6 @@ def operator_account_delete(uid):
     and a number): own projects (the console never deletes or hands on projects), records kept by law without a retention
     export of the last days (the console never waives it), a server admin. Agents: 404."""
     op_gate(f"account-delete #{uid}")
-    from ..accounts.users import user_delete_run
-    from ..core.i18n import trn
-    from .retexport import RX_NEEDED, rx_counts, rx_subject
     if request.args.get("confirm") != str(uid):
         return jsonify(error=tr("Invalid value: {0}", "confirm"), code="confirm"), 400
     c = db()
@@ -366,7 +360,6 @@ def operator_quota_default():
     """{storage_quota_mb: int | null} -- the instance's default storage per person (null = KALMIDO_STORAGE_QUOTA_MB, 0 =
     unlimited), as the admin settings set it (hosting.hosting_settings)."""
     op_gate("quota-default")
-    from .hosting import _mb, hosting_settings, quota_default_mb
     b = body()
     if not isinstance(b, dict) or "storage_quota_mb" not in b:
         return jsonify(error=tr("Invalid value: {0}", "storage_quota_mb"), code="invalid"), 400

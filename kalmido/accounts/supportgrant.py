@@ -26,12 +26,14 @@ from datetime import timedelta
 
 from flask import g, has_request_context, jsonify, request
 
-from ..core.config import app
+from ..core.config import app, COOKIE
 from ..core.db import body, connect, db, err, iso, now_utc, parse_iso
 from ..core.errors import Denied
 from ..core.i18n import tr
 from ..core.pg import insert_id, system_ctx
-from .session import me
+from ..core.env import env_bool
+from .session import _token_hash, me
+from .sessions import ses_end
 
 SGA_HOURS = (1, 24, 72, 168)
 SGA_USES_MAX = 300
@@ -40,8 +42,7 @@ SGA_PAST = 10
 
 
 def sga_hosted():
-    from .orgs import _operator_apart
-    return bool(_operator_apart())
+    return env_bool("KALMIDO_HOSTED", False)  # admin.hosting.hosted() / orgs._operator_apart (the same switch)
 
 
 def sga_open(c, uid=None, oid=None, note=True):
@@ -138,7 +139,6 @@ def sga_close(c, r, now):
                   "AND created_by IN (SELECT id FROM users WHERE is_admin=1)", (r["user_id"], since))
         gone = [x[0] for x in c.execute("SELECT token_hash FROM sessions WHERE user_id=? AND via='support'", (r["user_id"],)).fetchall()]
     if gone:
-        from .sessions import ses_end
         ses_end(c, r["user_id"], gone)
 
 
@@ -161,7 +161,6 @@ def sga_guard():
         hit = isinstance(b, dict) and bool(set(b) & SGA_GUARD_ME)
     if not hit:
         return None
-    from .session import COOKIE, _token_hash
     tok = request.cookies.get(COOKIE)
     if not tok:
         return None
@@ -242,8 +241,7 @@ def sga_public(c, r, names=None):
 
 def _need_person():
     """A person in a session (or the proxy sign-in) -- never an agent or an API token: a door into the account."""
-    from ..agents.core import is_agent
-    if g.user is None or is_agent(g.user) or g.get("auth_via") not in ("session", "proxy"):
+    if g.user is None or (g.user["kind"] or "user") == "agent" or g.get("auth_via") not in ("session", "proxy"):
         raise Denied(403, tr("Only you can grant support access, signed in in the app"))
 
 
@@ -257,8 +255,8 @@ def _my_orgs(c):
 
 def _may_end(c, r):
     if r["org_id"]:
-        from .orgs import is_org_admin
-        return is_org_admin(c, me(), r["org_id"])
+        with system_ctx(c):
+            return bool(c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=? AND role='admin'", (r["org_id"], me())).fetchone())
     return r["user_id"] == me()
 
 

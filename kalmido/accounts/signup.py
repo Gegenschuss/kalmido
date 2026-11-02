@@ -17,6 +17,7 @@ from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
 from .orgs import op_apart_deny, op_foreign_account  # 2.399.0 (#2687)
+from .supportgrant import sga_link_support  # 2.485.0 (#3939)
 
 
 # ---------------------------------------------------------------- 2.23.0 (#711): self-registration
@@ -336,7 +337,6 @@ def auth_link():
         # 2.86.0 (N4): checked again on use: the account may have become an admin after the link was made (the link is used up)
         return err(tr("Admins sign in with their password"), 409)
     print("signed in with a sign-in link:", login_log_who(u), "from", login_log_ip(client_ip()), flush=True)
-    from .supportgrant import sga_link_support
     if (twofa_methods(c, u) or gsetting(c, "twofa_required") == "1") and sga_link_support(c, u["id"]):
         # 2.485.0 (#3939, review F2): the operator's link through support access never passes a second factor or enrols one
         # (that session would be no support session: uncapped, and the factor would outlive the access)
