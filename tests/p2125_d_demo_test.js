@@ -11,7 +11,6 @@ const http = require('http'), fs = require('fs'), path = require('path'), {execF
 const ROOT = path.join(__dirname, '..'), OUT = path.join(__dirname, '.demo-all');
 // #3927: wait for a state instead of a fixed sleep: until(fn) like tests/boot.js (not required here: boot.js hooks the process);
 // quiet(w) = the page is still for ms: no new shim call, the body unchanged (the demo has no network for idle() to count)
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 const until = async (fn, {timeout = 15000, step = 50} = {}) => {
   const end = performance.now() + timeout;
   for (;;) { const x = await fn(); if (x || performance.now() >= end) return x; await new Promise(r => setTimeout(r, step)); }
@@ -108,7 +107,7 @@ const srv = http.createServer((req, res) => {
   check(!offV.length, 'module views switched on: missing ' + offV.join(', '));
   const visit = async (route, label) => {
     const m0 = w.KDEMO.miss.length, g0 = w.KDEMO.gated.length, e0 = errs.length, n0 = w.KDEMO.unknown.length;
-    w.eval(`go(${JSON.stringify(route)})`); await quiet(w, 500); await sleep(1100);  // wanted: each view keeps its own window for late errors of its timers (a shorter one moves them into the next view)
+    w.eval(`go(${JSON.stringify(route)})`); await quiet(w, 500);  // 2.484.0 (#3942): back to 500 ms of quiet per view - the late error of the 1.6 s window was the pomo stats of the shim
     const txt = (d.querySelector('#view')?.textContent || '').replace(/\s+/g, ' ').trim();
     const r = {label, miss: w.KDEMO.miss.slice(m0), gated: w.KDEMO.gated.slice(g0), errs: errs.slice(e0).map(x => x.slice(0, 300)), unknown: w.KDEMO.unknown.slice(n0), txt: txt.slice(0, 140)};
     console.log('VIEW', JSON.stringify(r));
@@ -120,6 +119,8 @@ const srv = http.createServer((req, res) => {
     return r;
   };
   for (const v of views) await visit(v, v);
+  // 2.484.0 (#3942): the second drawing of the pomodoro view reads the cached stats (per_day, today, week, per_task): the shim answers in the server's form
+  if (views.includes('pomo')) { await visit('today', 'today (before pomo again)'); await visit('pomo', 'pomo again'); }
   // the office's pages (rail on a computer)
   const opages = JSON.parse(w.eval(`JSON.stringify(typeof ofm_all === 'function' ? ofm_all().filter(i => i.go.startsWith('office/') && (!i.on || i.on())).map(i => i.go) : [])`));
   check(opages.length >= 8, 'office pages: ' + opages.join(' '));

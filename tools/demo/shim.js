@@ -410,7 +410,7 @@
     'GET /api/me/2fa': () => ({totp: false, passkeys: [], recovery_left: 0}),
     'GET /api/agents/usage': () => ({days: [], agents: []}), 'POST /api/news/read': () => ({ok: true}),
     'GET /api/proposals/agents': () => ({agents: []}),  // 2.126.3 (#2123 #2124): the office / documents / status report ask which agents may draft - none in the demo
-    'GET /api/pomo/stats': () => ({days: [], total: 0}), 'GET /api/stale': () => ({tasks: [], count: 0, default_days: 7}),
+    'GET /api/pomo/stats': () => ({per_day: {}, today: {count: 0, minutes: 0}, week: {count: 0, minutes: 0}, per_task: [], recent: []}), 'GET /api/stale': () => ({tasks: [], count: 0, default_days: 7}),
     'GET /api/briefing': () => ({}), 'GET /api/inbox': () => ({total: 0, counts: {}, items: []}), 'GET /api/layouts/saved': () => ({saved: []}), 'GET /api/layouts/std': () => ({layouts: {}, can: false}),
     'POST /api/favorites/suggestion': () => ({list_id: null}),  // 2.74.0 (#1653): was a write -> the notice popped up 8 s after the start 'GET /api/ical': () => ({enabled: false}),
   };
