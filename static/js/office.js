@@ -937,7 +937,7 @@ function ost_mark(el, st, x) {
 // 2.440.0 (#3782): a redraw after the save (a part that finished loading) took "Saved" away: the mark goes back to its field
 function ost_markBack() {
   const k = OST.mk; if (!k || k.m.isConnected || !k.m.classList.contains('on')) return;
-  const row = $('#ofc-set #' + CSS.escape(k.id))?.closest('.row, .pkc-on');
+  const row = $(`#ofc-set [id="${k.id}"]`)?.closest('.row, .pkc-on');  // 2.368.4: an own id (os-...), no CSS.escape needed
   if (row && !row.querySelector(':scope > .ostok')) row.append(k.m);
 }
 // 2.40.0 (#1378): one upload helper for the office (FormData + the CSRF header X-Requested-With via rawFetch, the server's error text)
