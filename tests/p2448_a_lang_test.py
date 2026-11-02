@@ -191,7 +191,7 @@ def sha(b):
 
 
 def areas_zip():
-    entries = {f"data/{t}.json": json.dumps(rows).encode() for t, rows in {"lists": [{"id": 7, "name": "Moved"}], "tasks": [], "wiki_pages": [{"id": 1}], "bookmarks": [{"id": 3, "url": "https://example.com/a"}]}.items()}
+    entries = {f"data/{t}.json": json.dumps(rows).encode() for t, rows in {"lists": [{"id": 7, "name": "Moved"}], "tasks": [], "wiki_pages": [{"id": 1}], "polls": [{"id": 3, "title": "Lunch"}]}.items()}
     flist = [{"path": p, "size": len(x), "sha256": sha(x)} for p, x in entries.items()]
     m = json.dumps({"format": "kalmido-account", "v": 1, "kalmido_version": "test", "created_at": "2026-10-20T06:00:00Z",
                     "source": {"url": "https://example.com", "hosted": True}, "user": {"id": 1000, "name": "Test Person", "email": "test@example.com"},
@@ -214,20 +214,20 @@ IID = r.json()["id"]
 Fr.put(B + f"/api/account/import/{IID}?offset=0", data=ZIP, headers={"Content-Type": "application/octet-stream"})
 st = until(lambda: (lambda j: j if j.get("state") == "preview" else None)(Fr.get(B + f"/api/account/import/{IID}").json()), 60) or {}
 left = lambda j: [x["what"] for x in (j.get("preview") or {}).get("not_taken") or []]  # noqa: E731
-check("Lesezeichen" in left(st), f"#3808: the preview in German (bookmarks stay, knowledge pages come along since #3470) {st}")
+check("Umfragen" in left(st), f"#3808: the preview in German (polls stay; knowledge pages since #3470 and bookmarks since #3127 come along) {st}")
 speak(Fr, "fr")
 st = Fr.get(B + f"/api/account/import/{IID}").json()
-check("Signets" in left(st), f"#3808: the same preview read in French {left(st)}")
+check("Sondages" in left(st), f"#3808: the same preview read in French {left(st)}")
 r = Fr.post(B + f"/api/account/import/{IID}/run", json={"target": "private", "people": {}})
 check(r.status_code == 202, f"the run starts {r.text[:200]}")
 st = until(lambda: (lambda j: j if j.get("state") == "done" else None)(Fr.get(B + f"/api/account/import/{IID}").json()), 60) or {}
 speak(Fr, "de")
 st = Fr.get(B + f"/api/account/import/{IID}").json()
 w = " | ".join(x["text"] for x in (st.get("result") or {}).get("warnings") or [])
-check("Diese Bereiche bleiben" in w and "Lesezeichen (1)" in w, f"#3808: the warning written under French, read in German {w}")
+check("Diese Bereiche bleiben" in w and "Umfragen (1)" in w, f"#3808: the warning written under French, read in German {w}")
 check("Pages de connaissances" not in w and "Ein Eintrag konnte nicht übernommen werden: Wissensseiten" in w, f"#3808: the area of a row warning is a key too, read in German {w}")
 imp = Fr.get(B + "/api/imports").json()["imports"][0]["counts"]
-check({"what": "Lesezeichen", "count": 1} in imp.get("not_taken", []), f"#3808: the import's record in German too {imp}")
+check({"what": "Umfragen", "count": 1} in imp.get("not_taken", []), f"#3808: the import's record in German too {imp}")
 
 # ================================================================ wiki import: a check of the background run (2.454.0, #3808)
 speak(Fr, "de")
