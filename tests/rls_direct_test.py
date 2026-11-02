@@ -201,6 +201,12 @@ check(count("lists", f"org_id IS NULL AND owner_id={CAROL}", role="user", orgs=s
 
 # ---- writing
 for t in ORG_T:
+    # 2.369.6 (#3139): the watchdog's upload clean-up (files/scan.py _sc_gc, every 10 min) deletes upload_scan rows without a
+    # file - the made-up rows of this suite. On a busy runner the suite passes the 10 minutes and the write checks met an
+    # empty table; put back what went right before checking (the state, not a time)
+    for o in (ALPHA, BETA):
+        if not sql(f"SELECT 1 FROM {t} WHERE org_id=?", (o,)):
+            fill_row(t, o)
     out, e = as_app([f"UPDATE {t} SET org_id={ALPHA} WHERE org_id={BETA};"], role="user", orgs=str(BETA), uid=CAROL)
     check(e is not None and "row-level security" in e, f"{t}: moving a row into a foreign organisation is refused ({(e or '')[:80]})")
     out, e = as_app([f"WITH u AS (UPDATE {t} SET org_id=org_id WHERE org_id={ALPHA} RETURNING 1) SELECT COUNT(*) FROM u;"],
