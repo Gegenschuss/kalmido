@@ -15,12 +15,11 @@ or retired; the rest of the account goes (upg_* helpers).
 import json
 import os
 import re
-from datetime import date
 
 from flask import g, has_request_context
 
 from ..core.access import Denied
-from ..core.db import iso, now_utc
+from ..core.db import iso, local_now, now_utc  # 2.488.0 (#4004): local_now knows the test clock
 from ..core.i18n import N_, tr, trn
 from ..core.merges import mg_fk_refs
 from ..core.pg import system_ctx
@@ -142,7 +141,7 @@ def _until(kind, years):
     review A8: an expired period keeps nothing, it neither retires an organisation nor a personal office)."""
     ys = [y for y in (_year(v) for v in years) if y]
     end = f"{max(ys) + RET_LEGAL_YEARS[kind]}-12-31" if ys else None
-    return end if end and end >= date.today().isoformat() else None
+    return end if end and end >= local_now().date().isoformat() else None
 
 
 # 2.186.0 review M1: the file-store nodes a lock can sit on; olk_fs_locked (receipts/suggest.py) decides which are kept
@@ -388,7 +387,7 @@ def odl_retired_prune(c, force=False):
     if not force and time.time() - ODL_PRUNE["at"] < 6 * 3600:
         return 0
     ODL_PRUNE["at"] = time.time()
-    today = date.today().isoformat()
+    today = local_now().date().isoformat()
     with system_ctx(c):  # retention run over every organisation (no person's context, nothing handed out)
         due = [r[0] for r in c.execute("SELECT id FROM orgs WHERE retired_at IS NOT NULL AND retain_until IS NOT NULL "
                                        "AND retain_until!='' AND retain_until<?", (today,)).fetchall()]

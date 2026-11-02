@@ -23,7 +23,7 @@ import hmac
 import io
 import json
 import re
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from flask import jsonify, request
@@ -31,7 +31,7 @@ from flask import jsonify, request
 from ..core.config import app, SECRET_KEY
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
-from ..core.db import body, bump, db, iso, now_utc
+from ..core.db import body, bump, db, iso, local_now, now_utc  # 2.488.0 (#4004): the test clock
 from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 F (#3026, review M4)
 from ..core.access import Denied
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
@@ -388,7 +388,7 @@ def _day(s, fy_start, period_from=None):
         if len(s) in (3, 4):
             s = s.zfill(4)
             d, m = int(s[0:2]), int(s[2:4])
-            base = fy_start or period_from or date.today().replace(month=1, day=1)
+            base = fy_start or period_from or local_now().date().replace(month=1, day=1)
             y = base.year if (m, d) >= (base.month, base.day) else base.year + 1
             return date(y, m, d)
     except ValueError:
@@ -746,7 +746,7 @@ def di_opening_get():
     """Org admin: the opening balances of ?year= (default: this year) {year, years (with balances), items, debit, credit}."""
     c, uid, oid = _ctx()
     try:
-        year = int(request.args.get("year") or datetime.now(timezone.utc).year)
+        year = int(request.args.get("year") or now_utc().year)
     except ValueError:
         raise BadInput(tr("Invalid value: {0}", "year")) from None
     if not 1900 <= year <= 2999:

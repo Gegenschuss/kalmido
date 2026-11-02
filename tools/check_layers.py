@@ -102,12 +102,12 @@ def scan(mod, tree):
 #   local_upward:  a function imports from a HIGHER layer (allowed, but every new one is a new upward dependency)
 #   local_needless: the target comes EARLIER in ORDER and sits in the same or a lower layer -- the import could stand at
 #                  module level (it only hides the real cycle-avoiding imports)
-#   clock:         (warning only) datetime.now() / date.today() / datetime.utcnow() outside core/db.py (now_utc / local_now know the test
+#   clock:         (hard since 2.488.0 #4004) datetime.now() / date.today() / datetime.utcnow() outside core/db.py (now_utc / local_now know the test
 #                  clock, 2.149.0 E #2512); CLOCK_OK are the places that need the real wall clock
 BUDGET = os.path.join(ROOT, "tools", "layers_budget.json")
 CLOCK_OK = {"core.db", "admin.offsite", "office.terms", "docs.extract", "office.pdf",
             "accounts.bgjobs"}  # 2.193.0 D (#2220): the queue's process times (beats) on the real clock
-WARN_ONLY = {"clock"}  # a warning only for now (the CI log shows it, the step stays green)
+WARN_ONLY = set()  # 2.488.0 (#4004): clock is hard now (budget 0, was a warning only)
 
 
 def clock_calls(tree):

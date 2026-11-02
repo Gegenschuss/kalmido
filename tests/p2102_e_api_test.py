@@ -131,7 +131,9 @@ rc, out = fake({"tasks/c.py": "from ..accounts.b import f\n\n\ndef g():\n    fro
 check(rc == 1 and "local_needless: 1 > budget 0" in out, f"check_layers: a needless function-local import fails ({out})")
 rc, out = fake({"tasks/c.py": "from datetime import datetime\n\n\ndef g():\n    return datetime.now()\n"}, known=set(),
                budget={"local_upward": 1, "local_needless": 0, "clock": 0})
-check(rc == 0 and "warning: clock: 1 > budget 0" in out, f"check_layers: a wall-clock call outside core/db.py only warns ({out})")
+# 2.488.0 (#4004): clock is hard now (was a warning only) -- the last 4 calls (orgretain, datevimp) use the test clock
+check(rc == 1 and "clock: 1 > budget 0" in out and "warning: clock" not in out,
+      f"check_layers: a wall-clock call outside core/db.py fails ({out})")
 rc, out = fake(known=set(), budget=None)
 check(rc == 1 and "no budget" in out, f"check_layers: a missing budget file fails ({out})")
 
