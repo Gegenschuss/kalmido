@@ -63,7 +63,7 @@ LYP_BLOCKS = {
 LYP_PAGE = (("kpis", "Key figures", 6, False), ("desc", "Description", 6, False), ("status", "Status updates", 3, False),
             ("ms", "Milestones", 3, False), ("files", "Project files", 6, False), ("links", "Key links", 3, False),
             ("people", "Members", 3, False), ("notes", "Notes", 3, False), ("chat", "Team chat", 3, False),
-            ("time", "Tracked time", 3, False))
+            ("time", "Tracked time", 3, False), ("flow", "Flow", 6, False))  # 2.393.2 A (#3374): flow
 # the start page's own default (dashboard.js LY.home.def, 2.45.0 #1504) when neither the person nor an admin arranged it
 LYP_DEFAULTS = {"dashboard": {"order": ["today", "agents", "news", "projects", "wait", "pinned", "chat", "notes", "stats", "family",
                                         "search"], "hidden": ["search"], "opts": {"today": {"lw": 4}, "news": {"lw": 4}}}}

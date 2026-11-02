@@ -32,7 +32,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/js/notelock.js', '/static/js/related.js', '/static/js/liste2e.js', '/static/js/liste2eui.js', '/static/js/liste2efile.js',
   '/static/js/liste2echan.js', '/static/js/wikie2e.js', '/static/js/orgvis.js', '/static/js/discover.js', '/static/js/ablage.js',
   '/static/js/listcolor.js', '/static/js/wscolor.js', '/static/js/rowsym.js', '/static/js/review.js', '/static/js/wip.js', '/static/js/swimlanes.js',
-  '/static/js/points.js', '/static/js/oneway.js', '/static/js/photometa.js', '/static/js/ablinks.js', '/static/js/filetext.js',
+  '/static/js/points.js', '/static/js/flow.js', '/static/js/oneway.js', '/static/js/photometa.js', '/static/js/ablinks.js', '/static/js/filetext.js',
   '/static/js/depchain.js', '/static/js/importprop.js', '/static/js/meetprop.js', '/static/js/dupprop.js', '/static/js/contractprop.js',
   '/static/js/multilist.js', '/static/js/rules.js', '/static/js/supporter.js', '/static/js/assistant.js', '/static/js/main.js'];
 // 2.53.0 (#1410): the modules loaded on demand (static/js/lazyload.js LD_MODS; no script tag in index.html, tools/check_layout.py

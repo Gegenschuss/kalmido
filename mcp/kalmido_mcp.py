@@ -2381,6 +2381,13 @@ TOOLS += [
     ("get_velocity", "2.60.0: the velocity of a project: completed story points (and tasks) of its last up to 6 closed sprints and their "
                      "average, a planning aid for the next sprint.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/velocity")),
+    # 2.393.2 A (#3374): flow figures of a project
+    ("list_flow", "2.393.2: the flow figures of a project over the last 30 or 90 days, computed from the task history: lead time "
+                  "(created -> completed) and cycle time (first entry into an in-progress column -> completed) as median and 85th "
+                  "percentile in days, the cumulative flow (open tasks per column and day, done) and the bug trend per ISO week "
+                  "(created / completed). Read-only; counts only the tasks you see. Describe the flow, never measure a person.",
+     _obj({"list_id": S_ID, "days": {"type": "integer", "enum": [30, 90]}}, ["list_id"]),
+     lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/flow", query={"days": a.get("days")})),
 ]
 
 # 2.68.0 (#1839): old data for the office (scope import, off until a person turns it on): you read the old data yourself
@@ -2649,7 +2656,7 @@ TOOLSETS = {
         get_sprint set_task_sprint set_project_status list_project_files upload_project_file delete_project_file export_data request_approval review_task
         set_list_review list_forms create_form update_form delete_form list_files read_file search_files write_file create_file_folder list_documents
         get_document update_document create_document list_notepads create_notepad update_notepad delete_notepad write_status_pad get_weekly_status
-        list_layout_blocks get_view_layout propose_layout set_wip_limit get_velocity propose_import propose_rule list_video_reviews get_video_review
+        list_layout_blocks get_view_layout propose_layout set_wip_limit get_velocity list_flow propose_import propose_rule list_video_reviews get_video_review
         add_video_comment set_video_comment_done get_workload get_absences get_day_plan get_day_review
     """,
     "code": """

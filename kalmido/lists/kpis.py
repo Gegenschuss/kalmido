@@ -4,7 +4,7 @@ on a project page. Both are list settings, the same for everyone (owner / list a
 import json
 import secrets
 
-from flask import g, jsonify
+from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.db import db, err
@@ -13,6 +13,9 @@ from ..core.access import Denied, MANAGE_ROLES, need_list
 from ..lists.fields import fmt_num
 from ..api.common import v1_args, v1_view
 from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
+from ..core.errors import BadInput
+from ..core.ctx import me
+from .flow import FLW_DAYS, FLW_MAX, flw_compute, flw_days_arg  # 2.393.2 A (#3374)
 
 FX_AGGS = ("sum", "avg", "count", "min", "max")         # the sum row
 FX_KPI_AGGS = ("sum", "count", "avg", "ratio")          # a tile: ratio = sum(field) / sum(field2) in %
@@ -204,6 +207,34 @@ def fx_v1_kpis(lid):
     return jsonify(data=fx_kpi_values(c, lid), next_cursor=None)
 
 
+# 2.393.2 A (#3374): the flow figures of a project (lists/flow.py), visible like the key figures
+def fx_flow_days(args):
+    v = args.get("days")
+    if v in (None, ""):
+        return FLW_DAYS[0]
+    n = flw_days_arg(v)
+    if n is None:
+        raise BadInput(tr("Invalid value: {0}", "days"))
+    return n
+
+
+@app.get("/api/lists/<int:lid>/flow")
+def fx_flow_get(lid):
+    c = db()
+    fx_need_kpis(c, lid)
+    return jsonify(flw_compute(c, lid, me(), fx_flow_days(request.args)))
+
+
+@app.get("/api/v1/lists/<int:lid>/flow")
+@v1_view
+def fx_v1_flow(lid):
+    """Lead / cycle time, cumulative flow and bug trend of a list (read; only inside the list, never of a health list)."""
+    a = v1_args(("days",))
+    c = db()
+    fx_need_kpis(c, lid)
+    return jsonify(flw_compute(c, lid, me(), fx_flow_days(a)))
+
+
 def fx_spec(paths, schemas, op, ok, errs, ref, pid):
     """OpenAPI: the key figures of a list (called from openapi_spec)."""
     schemas["KeyFigure"] = {"type": "object", "description": "2.43.0 (#1328): a key figure of a list, computed over the tasks the caller "
@@ -219,3 +250,43 @@ def fx_spec(paths, schemas, op, ok, errs, ref, pid):
         | errs("404"), [pid("id", "List id")],
         desc="Tiles of a project page set up by the owner / list admins (sum, count, average, ratio over number and formula "
              "fields, open / done tasks, a choice as condition). Read-only; only inside a list shared with you; health lists: 404.")}
+    fx_flow_spec(paths, schemas, op, ok, errs, ref, pid)
+
+
+def fx_flow_spec(paths, schemas, op, ok, errs, ref, pid):
+    """OpenAPI: the flow figures of a list (2.393.2 A, #3374)."""
+    nn = {"type": ["number", "null"]}
+    tm = lambda what: {"type": "object", "properties": {  # noqa: E731
+        "median": {**nn, "description": f"{what}: median in days (one decimal); null = no completed task in the period"},
+        "p85": {**nn, "description": "85th percentile in days (linear between ranks)"},
+        "n": {"type": "integer", "description": "how many completed tasks were measured"}}}
+    ct = tm("Cycle time (first entry into an in-progress column -> completed)")
+    ct["properties"]["columns"] = {"type": "array", "items": {"type": "integer"},
+                                   "description": "the columns counted as in progress (by name: In Arbeit, In progress, Doing, WIP)"}
+    schemas["ListFlow"] = {"type": "object", "description": "2.393.2 A (#3374): flow figures, computed from the task history over "
+                           "the top-level tasks the caller fully sees", "properties": {
+        "days": {"type": "integer", "enum": list(FLW_DAYS)}, "start": {"type": "string", "format": "date"},
+        "end": {"type": "string", "format": "date", "description": "today (server time zone)"},
+        "capped": {"type": "boolean", "description": f"more than {FLW_MAX} tasks: only the newest {FLW_MAX} were counted"},
+        "tasks": {"type": "integer"}, "e2e": {"type": "boolean", "description": "list with the lock: only metadata (no columns, no "
+                                                                                 "cycle time)"},
+        "lead_time": tm("Lead time (created -> completed)"), "cycle_time": ct,
+        "cfd": {"type": "object", "description": "cumulative flow: open tasks per column at the end of each day, done = completed in "
+                "the period so far", "properties": {
+            "columns": {"type": "array", "items": {"type": "object", "properties": {
+                "id": {"type": ["integer", "null"]}, "name": {"type": ["string", "null"]},
+                "kind": {"type": "string", "enum": ["column", "none", "gone"], "description": "none = no column, gone = a column that "
+                         "does not exist any more"}, "wip": {"type": "boolean"}}}},
+            "days": {"type": "array", "items": {"type": "object", "properties": {
+                "day": {"type": "string", "format": "date"}, "done": {"type": "integer"},
+                "columns": {"type": "array", "items": {"type": "integer"}, "description": "counts in the order of cfd.columns"}}}}}},
+        "bugs": {"type": "array", "description": "per ISO week: bugs (ticket type bug) created / completed", "items": {
+            "type": "object", "properties": {"week": {"type": "string", "example": "2026-W44"}, "created": {"type": "integer"},
+                                             "done": {"type": "integer"}}}}}}
+    paths["/lists/{id}/flow"] = {"get": op(
+        "Flow figures of a list (2.393.2)", "Lists", ok(ref("ListFlow")) | errs("400", "404"),
+        [pid("id", "List id"), {"name": "days", "in": "query", "required": False,
+                                "schema": {"type": "integer", "enum": list(FLW_DAYS), "default": FLW_DAYS[0]}}],
+        desc="Lead time and cycle time (median, 85th percentile), cumulative flow per column and day and the bug trend per week "
+             "over the last 30 or 90 days, computed from the task history. Read-only; only inside a list shared with you "
+             "(participants: only their tasks); health lists: 404.")}

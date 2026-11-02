@@ -1,0 +1,9 @@
+/* 2.393.2 A (#3374): the card "Flow" of a project page (static/js/flow.js) */
+.flw h6{margin:.75rem 0 .25rem}
+.flwnote{font-size:var(--fs-xs);margin:.375rem 0 0}
+.flwcfd{height:7.5rem}
+.flwbug{display:block;max-width:100%;height:5.5rem}
+.flwbug .sptlab{fill:var(--muted);font:400 var(--fs-xs) var(--mono)}
+.flwlg{display:flex;flex-wrap:wrap;gap:.25rem .75rem;font-size:var(--fs-xs);color:var(--text2);margin:.25rem 0}
+.flwlg i{display:inline-block;width:.625rem;height:.625rem;border-radius:2px;margin-right:.25rem;vertical-align:-1px}
+.flw .msbtab{overflow-x:auto}

@@ -112,6 +112,8 @@ ROUTES = {
     "PATCH /api/v1/repos/{}": "tasks", "DELETE /api/v1/repos/{}": "tasks",
     # 2.353.0 A (#2758): locked folders of the file store (files/fslock.py, p2353_a_lockfolder_test.py)
     "GET /api/files/lock/{}": "files", "POST /api/files/lock/{}/start": "files", "GET /api/files/lock/{}/todo": "files", "GET /api/files/lock/{}/raw/{}": "files", "POST /api/files/lock/{}/convert/{}": "files", "POST /api/files/lock/{}/finish": "files", "POST /api/files/lock/{}/stop": "files", "POST /api/files/lock/{}/keys": "files", "POST /api/files/lock/upload": "files", "POST /api/files/lock/folder": "files", "POST /api/files/lock/rename/{}": "files", "POST /api/files/lock/version/{}": "files", "POST /api/files/lock/move/{}": "files",
+    # 2.393.2 A (#3374): flow figures of a project (p2393_2_a_api_test.py as the freelancer)
+    "GET /api/lists/{}/flow": "lists", "GET /api/v1/lists/{}/flow": "lists",
     # ---- admin (54)
     "DELETE /api/admin/agents/{}": "admin", "DELETE /api/admin/agents/{}/machines/{}": "admin",
     "DELETE /api/admin/alerts": "admin", "DELETE /api/admin/backups/{}": "admin", "DELETE /api/admin/groups/{}": "admin",

@@ -504,7 +504,8 @@ proposals (or your own notepads).
 In projects with story points on (`points_on`) a task can carry `points` (1, 2, 3, 5, 8, 13); set them with `update_task` only
 when the project's rules or a person ask, never overwrite a person's estimate. A section's `wip_limit` (`set_wip_limit`) is a hint
 for the kanban column, moving stays allowed; with `wip_hard` set, a column over its limit takes no new job (409 `wip_full`). `get_velocity` gives the completed points of the last closed sprints and their
-average: a planning aid, never a measure of a person.
+average: a planning aid, never a measure of a person. `list_flow` (2.393.2) gives lead time, cycle time (median, 85 %), the
+cumulative flow per column and the bug trend of the last 30 / 90 days: describe the flow, never measure a person.
 
 ### Finding tasks (2.390.0)
 Ask `list_tasks` precisely instead of reading whole projects: `priority` / `priority_min`, `section_id`, `sprint_id`
@@ -749,7 +750,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `ingredients_to_shopping`, `link_contact`, `link_letter_document`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_environments`,
 `set_deployment`,
 `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`,
-`list_events`, `list_fields`, `list_filed_mails`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`,
+`list_events`, `list_fields`, `list_filed_mails`, `list_files`, `list_filters`, `list_flow`, `list_folders`, `list_forms`, `list_groups`, `list_habits`,
 `list_invoice_series`, `list_jobs`, `list_kids`, `list_layout_blocks`, `list_letter_drafts`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
 `list_notepads`, `list_notes`, `list_office_data`, `list_office_documents`, `list_office_leads`, `list_packing_templates`,
 `list_payment_suggestions`, `list_polls`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_rules`, `list_schedules`,

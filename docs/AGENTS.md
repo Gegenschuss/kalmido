@@ -3915,11 +3915,16 @@ someone switches them on: story points per project (`points_on`, the owner), a W
 | Story points on in a project (the owner) | `PATCH /api/v1/lists/{id}` `{points_on}` | `update_list` (`points_on`) | structure |
 | The WIP limit of a kanban column (`null` / `0` = none) | `PATCH /api/v1/sections/{id}` `{wip_limit, wip_hard}` | `set_wip_limit` | structure |
 | Completed points of the last closed sprints and their average | `GET /api/v1/lists/{id}/velocity` | `get_velocity` | read |
+| Flow figures: lead / cycle time (median, 85 %), cumulative flow, bug trend (2.393.2) | `GET /api/v1/lists/{id}/flow?days=30\|90` | `list_flow` | read |
 
 - A WIP limit is a hint: moving a task into a full column stays allowed. Do not hold back work because of it; mention it
   when you plan ("In progress already holds 3 of 3").
 - Estimate only when the project's rules or a person ask for it; a person's estimate is never overwritten.
 - Use the velocity as a planning aid for the next sprint ("about 21 points"), never as a measure of a person.
+- The flow figures (2.393.2) are computed from the task history over the tasks you see: lead time = created -> completed,
+  cycle time = first entry into a column named In Arbeit / In progress / Doing / WIP -> completed, both in days. `capped`
+  true = more than 2000 tasks, only the newest counted. In a list with the lock only metadata counts (no columns, no cycle
+  time). Use them to describe the flow ("bugs pile up since week 44"), never to rate a person.
 ## Customer reports
 
 *Since 2.63.0.*
