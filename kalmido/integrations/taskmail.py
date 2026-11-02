@@ -107,7 +107,7 @@ def tmr_reporter(c, tid):
 
 
 def tmr_ids(c, tid):
-    return [r[0] for r in c.execute("SELECT msg_id FROM task_mail WHERE task_id=? AND msg_id LIKE '<%%' ORDER BY id DESC LIMIT 20", (tid,))][::-1]
+    return [r[0] for r in c.execute("SELECT msg_id FROM task_mail WHERE task_id=? AND substr(msg_id, 1, 1) = '<' ORDER BY id DESC LIMIT 20", (tid,))][::-1]
 
 
 def _hdrs(msg):
