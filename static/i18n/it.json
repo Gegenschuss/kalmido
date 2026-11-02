@@ -2122,8 +2122,6 @@
   "Reading the file…": "Lettura del file…",
   "Recent imports": "Importazioni recenti",
   "The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.": "Le attività importate che nessuno ha modificato da allora finiscono nel cestino, dove puoi ripristinarle; un nuovo progetto solo se non contiene nient’altro. Le attività modificate da allora o con nuovi commenti, file o tempi restano, come tutto ciò che altri hanno aggiunto.",
-  "Calendars and address books are removed only if nothing changed in them.": "Calendari e rubriche vengono rimossi solo se non è cambiato nulla al loro interno.",
-  "The imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "I dati d’ufficio, i tempi, le abitudini e le voci di diario importati vengono eliminati definitivamente; i tempi fatturati nel frattempo restano.",
   "Import undone: {0} task moved to the trash": ["Importazione annullata: {0} attività spostata nel cestino", "Importazione annullata: {0} attività spostate nel cestino"],
   "{0} changed task stays": ["{0} attività modificata resta", "{0} attività modificate restano"],
   "{0} project stays because something was added to it": ["{0} progetto resta perché vi è stato aggiunto qualcosa", "{0} progetti restano perché vi è stato aggiunto qualcosa"],
@@ -15941,5 +15939,7 @@
   "{0}: work lies on a branch without a merge": "{0}: c'è lavoro su un ramo senza merge",
   "The contact the others were merged into is in the trash; restore it first, then undo the merge": "Il contatto in cui sono stati uniti gli altri è nel cestino; ripristinalo prima, poi annulla l'unione",
   "The address book is in the trash; restore it first, then undo the merge": "La rubrica è nel cestino; ripristinala prima, poi annulla l'unione",
-  "The client is in the trash": "Il cliente è nel cestino"
+  "The client is in the trash": "Il cliente è nel cestino",
+  "Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.": "I calendari vengono rimossi solo se in essi non è cambiato nulla; le rubriche invariate finiscono nel cestino.",
+  "The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "I clienti importati finiscono nel cestino dei clienti; gli altri dati d’ufficio, tempi, abitudini e voci del diario importati vengono eliminati definitivamente; i tempi fatturati nel frattempo restano."
 }

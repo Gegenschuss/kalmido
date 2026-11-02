@@ -433,6 +433,7 @@ def oi_undo(c, cr):
     space_cols = {s.table: s.space for s in oi_specs()}
     n = 0
     keyed = oi_key_tables()
+    cl_gone, cl_kids = _oi_undo_clients(c, cr, space_cols)
     for item in reversed(cr.get("oi") or []):
         if isinstance(item, list) and len(item) == 4 and item[0] == "doc_fields":
             _oi_undo_options(c, *item[1:])
@@ -443,6 +444,15 @@ def oi_undo(c, cr):
         if not (isinstance(item, list) and len(item) == 3 and item[0] in tables and isinstance(item[1], int)):
             continue
         table, rid, space = item
+        if table == "clients":  # 2.370.4 (#3089) M6: an imported client goes into the client trash (restorable), not for good
+            if rid in cl_gone:
+                from ..team.clients import cl_trash
+                cl_trash(c, rid)
+                n += 1
+            continue
+        if table in cl_kids and c.execute(f"SELECT 1 FROM {table} WHERE id=? AND {cl_kids[table]} IN ({','.join('?' * len(cl_gone))})",
+                                          (rid, *sorted(cl_gone))).fetchone():
+            continue  # its contact persons, data protection sheets ... stay with it (they go with the client for good)
         col = (space_cols.get(table) or (None,))[0]
         if col and col in umz_cols(c, table)[0]:
             if space is None:
@@ -453,6 +463,29 @@ def oi_undo(c, cr):
             n += c.execute(f"DELETE FROM {table} WHERE id=?", (rid,)).rowcount
     _oi_undo_pics(c, cr)
     return n
+
+
+def _oi_undo_clients(c, cr, space_cols):
+    """2.370.4 (#3089) M6: (ids of the imported clients still in their space and not in the trash, {table: client column} of the
+    tables hanging on a client by ON DELETE CASCADE) for oi_undo."""
+    col = (space_cols.get("clients") or (None,))[0]
+    gone = set()
+    for item in cr.get("oi") or []:
+        if not (isinstance(item, list) and len(item) == 3 and item[0] == "clients" and isinstance(item[1], int)):
+            continue
+        rid, space = item[1], item[2]
+        if not col:
+            w, a = "", (rid,)
+        elif space is None:
+            w, a = f" AND {col} IS NULL", (rid,)
+        else:
+            w, a = f" AND {col}=?", (rid, space)
+        if c.execute(f"SELECT 1 FROM clients WHERE id=? AND deleted_at IS NULL{w}", a).fetchone():
+            gone.add(rid)
+    if not gone:
+        return gone, {}
+    from ..core.merges import mg_fk_refs
+    return gone, {t: k for t, k, d in mg_fk_refs(c, "clients") if d == "c" and t != "clients"}
 
 
 def _oi_undo_pics(c, cr):

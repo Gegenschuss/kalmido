@@ -269,7 +269,10 @@ check(Do.get(B + f"{D}/{INV2}").status_code in (403, 404), "an admin of a third 
 r = Ca.post(B + f"/api/imports/{IMP}/undo")
 check(r.ok, f"undo {r.status_code} {r.text[:160]}")
 left = {k: v for k, v in office_counts(ORG2).items() if v}
-check(not left and not dbx("SELECT 1 FROM clients WHERE org_id=?", (ORG2,)), f"the undo removed the office {left}")
+# 2.370.4 (#3089): the imported clients lie in the client trash (restorable), the rest of the office is gone
+check(not left and not dbx("SELECT 1 FROM clients WHERE org_id=? AND deleted_at IS NULL", (ORG2,))
+      and dbx("SELECT COUNT(*) AS n FROM clients WHERE org_id=? AND deleted_at IS NOT NULL", (ORG2,))[0]["n"] == SRC_CLIENTS,
+      f"the undo removed the office {left}")
 check(not p or not os.path.exists(p), "the undo removed the files")
 Ca.delete(B + f"/api/account/import/{iid}")
 

@@ -129,7 +129,8 @@ def export(s, oid):
 def counts(oid):
     """What an undo would remove in organisation oid (bundle 2.305: lists in the trash do not count, 2.272.0 C #3027: the undo
     puts the lists into the list trash, restorable, instead of deleting them)."""
-    return {t: one(f"SELECT COUNT(*) FROM {t} WHERE org_id=?" + (" AND deleted_at IS NULL" if t == "lists" else ""), (oid,))
+    # 2.370.4 (#3089): the undo puts the clients into the client trash, too
+    return {t: one(f"SELECT COUNT(*) FROM {t} WHERE org_id=?" + (" AND deleted_at IS NULL" if t in ("lists", "clients") else ""), (oid,))
             for t in ("lists", "office_docs", "clients", "hub_absences", "time_sheets")}
 
 

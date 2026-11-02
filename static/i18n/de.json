@@ -2114,8 +2114,6 @@
   "Reading the file…": "Datei wird gelesen…",
   "Recent imports": "Letzte Importe",
   "The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.": "Importierte Aufgaben, die seitdem niemand geändert hat, kommen in den Papierkorb, wo du sie wiederherstellen kannst; ein neues Projekt nur, wenn sonst nichts darin ist. Aufgaben, die seitdem geändert wurden oder neue Kommentare, Dateien oder Zeiten haben, bleiben, ebenso alles, was andere hinzugefügt haben.",
-  "Calendars and address books are removed only if nothing changed in them.": "Kalender und Adressbücher werden nur entfernt, wenn sich darin nichts geändert hat.",
-  "The imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "Die importierten Büro-Daten, Zeiten, Gewohnheiten und Tagebuch-Einträge werden endgültig gelöscht; seither abgerechnete Zeiten bleiben.",
   "Import undone: {0} task moved to the trash": ["Import rückgängig gemacht: {0} Aufgabe in den Papierkorb gelegt", "Import rückgängig gemacht: {0} Aufgaben in den Papierkorb gelegt"],
   "{0} changed task stays": ["{0} geänderte Aufgabe bleibt", "{0} geänderte Aufgaben bleiben"],
   "{0} project stays because something was added to it": ["{0} Projekt bleibt, weil etwas hinzugekommen ist", "{0} Projekte bleiben, weil etwas hinzugekommen ist"],
@@ -15941,5 +15939,7 @@
   "{0}: work lies on a branch without a merge": "{0}: Arbeit liegt auf einem Zweig ohne Merge",
   "The contact the others were merged into is in the trash; restore it first, then undo the merge": "Der Kontakt, in den die anderen zusammengeführt wurden, liegt im Papierkorb; erst wiederherstellen, dann die Zusammenführung rückgängig machen",
   "The address book is in the trash; restore it first, then undo the merge": "Das Adressbuch liegt im Papierkorb; erst wiederherstellen, dann die Zusammenführung rückgängig machen",
-  "The client is in the trash": "Kunde liegt im Papierkorb"
+  "The client is in the trash": "Kunde liegt im Papierkorb",
+  "Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.": "Kalender werden nur entfernt, wenn sich in ihnen nichts geändert hat; unveränderte Adressbücher kommen in den Papierkorb.",
+  "The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "Die importierten Kunden kommen in den Papierkorb der Kunden; die übrigen importierten Bürodaten, Zeiten, Gewohnheiten und Tagebucheinträge werden endgültig gelöscht; seither abgerechnete Zeiten bleiben."
 }

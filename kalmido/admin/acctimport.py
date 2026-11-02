@@ -43,7 +43,7 @@ from ..lists.projects import LIST_FILES_SUB
 from ..lists.tplextra import tx_import, tx_keys
 from ..tasks.attachments import safe_name
 from .hosting import QuotaExceeded, fmt_bytes, quota_guard, quota_info
-from ..core.db import body, bump, connect, db, err, iso, now_utc, parse_iso, usettings, uset, create_user, DataError, IntegrityError
+from ..core.db import body, bump, connect, db, err, iso, iso_ms, now_utc, parse_iso, usettings, uset, create_user, DataError, IntegrityError
 from ..core.pg import insert_id, system_ctx
 from ..core.errors import BadInput  # 2.273.0 A (#3030)
 from ..accounts.settings import clean_look_pref, clean_setting  # 2.273.0 A (#3030); 2.363.4 (#3127): clean_setting
@@ -2256,6 +2256,19 @@ def umz_undo_parts(c, cr):
             c.execute(f"DELETE FROM {table} WHERE id=?", (int(key),))
 
 
+def umz_undo_books(c, uid, bids):
+    """2.370.4 (#3089) M6: the address books bids of uid into the trash like op_book_delete (birthday tasks to the trash, the
+    clients' contact persons unlinked until a restore); restore and the purge after the trash days as there."""
+    from ..contacts.bulk import bk_occ_drop, ctt_unlink
+    for bid in bids:
+        if not c.execute("SELECT 1 FROM books WHERE id=? AND owner_id=? AND deleted_at IS NULL", (bid, uid)).fetchone():
+            continue
+        live = [x[0] for x in c.execute("SELECT id FROM contacts WHERE book_id=? AND deleted_at IS NULL", (bid,)).fetchall()]
+        bk_occ_drop(c, uid, live)
+        ctt_unlink(c, live)
+        c.execute("UPDATE books SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), bid))
+
+
 def umz_undo(c, uid, r):
     """Undo of an account import (called by importers.imp_undo after its own checks): everything the run created.
     2.272.0 C (#3027): tasks and lists go into the trash (restorable) instead of being deleted, and only what nobody touched
@@ -2303,6 +2316,9 @@ def umz_undo(c, uid, r):
             part = [x["id"] for i in range(0, len(part), 500) for x in c.execute(
                 f"SELECT id, task_id FROM time_entries WHERE id IN ({','.join('?' * len(part[i:i + 500]))})", part[i:i + 500]).fetchall()
                 if x["task_id"] not in kept]
+        if table == "books":  # 2.370.4 (#3089) M6: an imported address book goes to the trash with its contacts (op_book_delete)
+            umz_undo_books(c, uid, part)
+            continue
         for i in range(0, len(part), 500):
             p = part[i:i + 500]
             # 2.272.0 F (#3027, review M6): a time entry billed since is part of an invoice's basis and stays
