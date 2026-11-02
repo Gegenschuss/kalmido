@@ -19,7 +19,7 @@
 
 ## What's new
 
-**2.475.0** (2026-11-01):
+**2.487.0** (2026-11-02):
 - **Favourites**: favourites of everything - one row of symbols in the head bar for all workspaces, from a project to a single invoice.
 
 **2.468.0** (2026-11-01):
