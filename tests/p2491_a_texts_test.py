@@ -10,18 +10,10 @@ import re
 import sys
 
 N = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, N)
+from kt import check, done  # noqa: E402
+
 R = os.path.join(N, "..")
-F = []
-ok = 0
-
-
-def check(c, what):
-    global ok
-    if c:
-        ok += 1
-    else:
-        F.append(what)
-        print("FAIL:", what)
 
 
 src = open(os.path.join(R, "static", "js", "clientpage.js"), encoding="utf-8").read()
@@ -44,5 +36,4 @@ de = json.load(open(os.path.join(R, "static", "i18n", "de.json"), encoding="utf-
 check(de.get("No letters or contracts yet.") == "Noch keine Schreiben oder Verträge.", "#4020: German empty text")
 check(de.get("New letter or contract") == "Neues Schreiben oder Vertrag", "#4020: German button")
 
-print(f"p2491_a_texts: {ok} ok, {len(F)} failed")
-sys.exit(1 if F else 0)
+sys.exit(done("p2491_a_texts"))
