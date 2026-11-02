@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.487.4] - 2026-11-02
+
+### Fixed
+- CI of 2.487.3: in Settings > Company & office > Bank & taxes a reference date picked before the starting balance fell back to today when another part of the settings finished loading and redrew them, so the start balance was saved for the wrong day and the cash flow left out the costs before it; the picked day now stays until it is saved. The client lint is green again (agents.js reaches the refresh of Waiting for me through window, as the build without that view has no such name), and p2130_ui waits for the agent's chat box before it focuses it (job/2299).
+
 ## [2.487.3] - 2026-11-02
 
 ### Fixed
@@ -9918,7 +9923,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.487.3...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.487.4...HEAD
+[2.487.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.487.4
 [2.487.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.487.3
 [2.487.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.487.2
 [2.487.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.487.1
