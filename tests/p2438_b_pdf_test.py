@@ -209,6 +209,13 @@ pr = dict(pt, lines=list(reversed(pt["lines"][:2])) + pt["lines"][2:])
 pr5 = pdfcheck.layout(pdf.office_pdf(pr))
 first5 = min(n for t in ("Dreh", "Schnitt") for n in texts(pr5, t) if n > 1)
 check(texts(pr5, f"Die Einzelpositionen je Teil stehen ab Seite {first5}.") == [1], "printed parts: the hint names the first part printed, not the first row")
+# 2.484.0 (#3738): a part row higher than a page (a long detail text) takes the line-by-line way and still carries its tag
+ph = dict(pt, lines=[line(1, 900, part_id=7, title="Dreh", detail="\n".join(f"Drehtag {i}: Kamera, Licht und Ton am Set" for i in range(1, 121)))] + pt["lines"][1:])
+d6 = pdf.office_pdf(ph)
+p6 = pdfcheck.layout(d6)
+tg6 = [t["s"] for _, t in tags(p6)]
+check(len(tg6) == 2 and tg6[0].startswith("SEITE ") and tg6[1] == f"SEITE {next(n for n in texts(p6, 'Schnitt') if n > 1)}", f"tall part row: both rows carry their tag {tg6}")
+check(len(texts(p6, "Drehtag 120: Kamera, Licht und Ton am Set")) == 1 and texts(p6, "Drehtag 120: Kamera, Licht und Ton am Set")[0] > 1, "tall part row: the detail really runs over page 1")
 
 
 # ---------------------------------------------------------------- through the API

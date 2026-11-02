@@ -1530,7 +1530,7 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                     rs = [lh] * max(len(t_lines), len(q_lines)) + [FS_SMALL * 1.42] * len(d_lines)
                     rb = 4 + (2 if d_lines else 0)
 
-                    def draw_row(p, y, r, q, n=len(rr), rs=rs, rb=rb, pos_s=pos_s, q_lines=q_lines, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s):
+                    def draw_row(p, y, r, q, n=len(rr), rs=rs, rb=rb, pos_s=pos_s, q_lines=q_lines, rate_s=rate_s, vat_s=vat_s, tot_s=tot_s, tag=tag, nt=len(t_lines)):
                         if q == 0:
                             p.text(x_pos + 3, y + 1, pos_s, FS_SMALL, False, C_INK2)
                             for j, s_ in enumerate(q_lines):
@@ -1539,6 +1539,8 @@ def office_pdf(model, logo_bytes=None, xml=None, meta=None):
                             p.text(x_vat, y + 1, vat_s, FS_SMALL, False, C_INK2, align="c", width=c_vat)
                             p.text(x_tot, y, tot_s, FS_BODY, align="r", width=c_tot - 3)
                         p.text(x_title + 3, y, r[0], r[1], False, r[2])
+                        if tag is not None and q == nt - 1:  # 2.484.0 (#3738): the page hint like the normal row, on the last title line
+                            ov_tag(p, x_title + 3 + pdf_text_width(r[0], body) + 6, y, tag)
                         if q == n - 1:
                             p.line(PDF_L, y + rs[q] + rb - 0.5, PDF_L + PDF_CW, y + rs[q] + rb - 0.5, 0.5, C_RULE2)
                     para_blocks(rr, rs, 4, rb, draw_row, table=True)
