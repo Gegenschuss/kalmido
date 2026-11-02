@@ -5,8 +5,8 @@ that survives a restart of the event runner (agent_run.py), reports to a Kalmido
 (with the files in its outbox) into the chat when it is done.
 
 usage (from inside a run; KALMIDO_URL / KALMIDO_TOKEN / KALMIDO_CHAT_USER are in the environment of the run):
-  agent_job.py start --title "Release 2.29" [--name Alma] [--parent ID] [--worktree] [--task ID] [--timeout-h 6] -
-                                            brief on stdin ("-") or a file
+  agent_job.py start --title "Release 2.29" [--name Alma] [--parent ID] [--continue-of ID] [--worktree] [--task ID ...]
+                    [--timeout-h 6] -       brief on stdin ("-") or a file; --task more than once = a job of several tasks
   agent_job.py list                         the jobs of this host (open ones first)
   agent_job.py status ID                    one job: state, pid, resumes, last progress line
   agent_job.py progress ID "text"           a milestone for the person (job log + status line)
@@ -29,6 +29,8 @@ How it works
   - 2.59.0 (#1827): every job gets a name, its title starts with it ("Alma: Release 2.29"): --name, else the next free one
     of JOB_NAMES; --parent ID makes it a part job of job ID ("Alma B", the result posts job_parent). The app shows the
     name on the job's messages and derives the job's colour from it; a part job takes its leader's colour, lighter.
+  - 2.392.2 (#3366): Kalmido knows the chain: --parent ID goes as parent_id, --continue-of ID (the job this one continues)
+    as continue_of, several --task as task_ids (the first one is the job's task); status prints them. A Kalmido job id only.
   - --worktree: its own `git worktree` + branch job/<id> next to the state, at most KALMIDO_JOB_WORKTREES (default 2) open.
   - the result goes to the chat of the person; then (2.46.6) the job wakes the chat agent: one file in <state dir>/wakes/ that
     the runner turns into ONE chat run (event job_wake); without a chat person a line in the runner's notes instead. The
@@ -432,13 +434,17 @@ def refused(err):
 def cmd_start(argv):
     title, task, worktree, timeout_h, src = "", None, False, float(os.environ.get("KALMIDO_JOB_TIMEOUT_H") or 6), None
     name, parent = "", None  # 2.58.0 (#1803): own name (POST /agent/jobs {name}); 2.59.0 (#1827): part job of job ID
+    tasks, cont = [], None  # 2.392.2 (#3366): --task more than once, --continue-of ID
     i = 0
     while i < len(argv):
         a = argv[i]
         if a == "--title":
             title = argv[i + 1]; i += 2
         elif a == "--task":
-            task = int(argv[i + 1]); i += 2
+            tasks.append(int(argv[i + 1])); i += 2
+            task = tasks[0]
+        elif a == "--continue-of":
+            cont = int(argv[i + 1]); i += 2
         elif a == "--name":
             name = argv[i + 1].strip(); i += 2
         elif a == "--parent":
@@ -450,7 +456,7 @@ def cmd_start(argv):
         else:
             src = a; i += 1
     if not title.strip() or not src:
-        print("usage: agent_job.py start --title TITLE [--name NAME] [--parent ID] [--worktree] [--task ID] [--timeout-h N] - (brief on stdin) | FILE")
+        print("usage: agent_job.py start --title TITLE [--name NAME] [--parent ID] [--continue-of ID] [--worktree] [--task ID ...] [--timeout-h N] - (brief on stdin) | FILE")
         return 2
     if name and not NAME_RE.match(name + ": "):
         print("--name: one word with a capital letter first, 2 to 12 letters, optionally a capital letter after a space (\"Alma\", \"Alma B\")")
@@ -479,6 +485,12 @@ def cmd_start(argv):
         body["user_id"] = int(uid)
     if task:
         body["task_id"] = task
+    if len(tasks) > 1:  # 2.392.2 (#3366): a job of several tasks
+        body["task_ids"] = tasks
+    if parent:  # 2.392.2 (#3366): Kalmido shows the chain (a Kalmido job id)
+        body["parent_id"] = parent
+    if cont:
+        body["continue_of"] = cont
     if name.strip():
         body["name"] = " ".join(name.split())[:24]
     try:
@@ -492,6 +504,7 @@ def cmd_start(argv):
     with open(os.path.join(d, "brief.txt"), "w", encoding="utf-8") as f:
         f.write(brief)
     j = {"id": jid, "kalmido_job": jid, "title": title.strip(), "name": name, "parent": parent, "state": "starting", "cmd": cmd, "task": task,
+         "tasks": tasks, "continue_of": cont,
          "chat_user": int(uid) if uid.isdigit() else None, "timeout_s": int(timeout_h * 3600), "resumes": 0,
          "created": time.time(), "cwd": os.getcwd(), "worktree": None, "session": ""}
     if worktree:
@@ -532,7 +545,9 @@ def cmd_status(argv):
     except OSError:
         pass
     print(json.dumps({"id": j["id"], "title": j["title"], "state": j["state"], "resumes": j.get("resumes", 0),
-                      "worktree": j.get("worktree"), "last_progress": last}, ensure_ascii=False))
+                      "worktree": j.get("worktree"), "last_progress": last,
+                      "parent_id": j.get("parent"), "continue_of": j.get("continue_of"), "task_ids": j.get("tasks") or ([j["task"]] if j.get("task") else [])},
+                     ensure_ascii=False))  # 2.392.2 (#3366)
     return 0
 
 

@@ -32,11 +32,11 @@ def dv_view(r):
 
 
 def dv_job_of_task(c, tid, jid=None):
-    """The open job jid of task tid, or without jid the newest one; None = none."""
-    q = f"SELECT * FROM agent_jobs WHERE {DV_OPEN_JOB} AND task_id=?"
+    """The open job jid of task tid (its first task or, 2.392.2 #3366, one of its tasks), or without jid the newest one; None = none."""
+    q = f"""SELECT * FROM agent_jobs WHERE {DV_OPEN_JOB} AND (task_id=? OR id IN (SELECT job_id FROM agent_job_tasks WHERE task_id=?))"""
     if jid:
-        return c.execute(q + " AND id=?", (tid, jid)).fetchone()
-    return c.execute(q + " ORDER BY updated_at DESC, id DESC LIMIT 1", (tid,)).fetchone()
+        return c.execute(q + " AND id=?", (tid, tid, jid)).fetchone()
+    return c.execute(q + " ORDER BY updated_at DESC, id DESC LIMIT 1", (tid, tid)).fetchone()
 
 
 def dv_parse(c, tid, v, u):

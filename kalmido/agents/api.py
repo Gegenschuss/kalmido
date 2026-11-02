@@ -22,7 +22,7 @@ from ..agents.core import (
     _AGENT_COND, _AGENT_GEN, _AGENT_WAITERS, agent_active, AGENT_EVENTS, AGENT_EVENTS_STALE_H, agent_ids, AGENT_JOBS_KEEP, AGENT_OFFLINE_S,
     AGENT_POLL_WRITE_S, agent_public, agent_row, agent_runtime, agent_shares, agent_usable, AGENT_STATUSES, AGENT_WAIT_MAX,
     AGENT_WAITERS_ALL, AGENT_WAITERS_PER, job_dict, JOB_LOG_MAX, JOB_STATES, JOB_TITLE_MAX, job_visible, need_agent,
-    STATUS_TEXT_MAX, f8f_job_name_in,
+    STATUS_TEXT_MAX, f8f_job_name_in, job_task_ids,
 )
 from ..agents.chat import chat_delivered, chat_event_mids
 from ..agents.core import perm_user_of
@@ -286,8 +286,42 @@ def v1_agent_events():
     return resp
 
 
+JOB_TASKS_MAX = 50  # 2.392.2 (#3366): tasks of one job
+
+
+def v1_job_rel(c, aid, b, k):
+    """2.392.2 (#3366): parent_id / continue_of: another job of the same agent (None = none)."""
+    if b.get(k) in (None, ""):
+        return None
+    jid = as_int(b[k], k, 1)
+    if not c.execute("SELECT 1 FROM agent_jobs WHERE id=? AND agent_id=?", (jid, aid)).fetchone():
+        raise BadInput(tr("Invalid value: {0}", k))
+    return jid
+
+
+def v1_job_tasks(c, aid, b):
+    """2.392.2 (#3366): task_ids (several tasks, each with the check of task_id) and task_id -> the ordered ids, the first
+    one is task_id (for older clients)."""
+    raw = b.get("task_ids")
+    if raw in (None, []):
+        raw = []
+    if not isinstance(raw, list) or len(raw) > JOB_TASKS_MAX:
+        raise BadInput(tr("Invalid value: {0}", "task_ids"))
+    out = []
+    for x in ([b["task_id"]] if b.get("task_id") not in (None, "") else []) + raw:
+        tid = as_int(x, "task_ids", 1)
+        if tid not in out:
+            if not task_visible(c, tid, aid, full=True):
+                raise Denied(404)
+            out.append(tid)
+    if len(out) > JOB_TASKS_MAX:
+        raise BadInput(tr("Invalid value: {0}", "task_ids"))
+    return out
+
+
 def v1_job_in(c, aid, b, create):
     allowed = ("title", "task_id", "state", "log", "append_log", "user_id", "name")  # 2.58.0 (#1803): name (create only)
+    allowed += ("task_ids", "parent_id", "continue_of")  # 2.392.2 (#3366): create only
     unknown = sorted(k for k in b if k not in allowed)
     if unknown:
         raise UnknownFields(unknown)
@@ -304,27 +338,26 @@ def v1_job_in(c, aid, b, create):
         if k in b and not isinstance(b[k], str):
             raise BadInput(tr("Invalid value: {0}", k))
     if create:
-        if b.get("task_id") not in (None, ""):
-            tid = as_int(b["task_id"], "task_id", 1)
-            if not task_visible(c, tid, aid, full=True):
-                raise Denied(404)
-            f["task_id"] = tid
+        f["task_ids"] = v1_job_tasks(c, aid, b)  # 2.392.2 (#3366): task_id = the first of them
+        if f["task_ids"]:
+            f["task_id"] = f["task_ids"][0]
+        f["parent_id"], f["continue_of"] = v1_job_rel(c, aid, b, "parent_id"), v1_job_rel(c, aid, b, "continue_of")
         if b.get("user_id") not in (None, ""):
             uid = as_int(b["user_id"], "user_id", 1)
             u = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
             if not u or u["kind"] == "agent" or not agent_shares(c, aid, uid):
                 raise BadInput(tr("Invalid value: {0}", "user_id"))
-            if f.get("task_id"):  # 2.306.0 D3 (#2875): for a task, the person must reach the agent in its list (agent_usable)
-                lid = c.execute("SELECT list_id FROM tasks WHERE id=?", (f["task_id"],)).fetchone()[0]
-                if not task_visible(c, f["task_id"], uid, full=True) or not agent_usable(c, aid, uid, lid):
+            for tid in f["task_ids"]:  # 2.306.0 D3 (#2875): for a task, the person must reach the agent in its list (2.392.2: each task)
+                lid = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()[0]
+                if not task_visible(c, tid, uid, full=True) or not agent_usable(c, aid, uid, lid):
                     raise BadInput(tr("Invalid value: {0}", "user_id"))
             f["user_id"] = uid
         try:
             f["name"] = f8f_job_name_in(b.get("name"))  # 2.58.0 (#1803)
         except ValueError:
             raise BadInput(tr("Invalid value: {0}", "name"))
-    elif "task_id" in b or "user_id" in b or "name" in b:
-        raise UnknownFields([k for k in ("task_id", "user_id", "name") if k in b])
+    elif any(k in b for k in ("task_id", "user_id", "name", "task_ids", "parent_id", "continue_of")):
+        raise UnknownFields([k for k in ("task_id", "user_id", "name", "task_ids", "parent_id", "continue_of") if k in b])
     return f
 
 
@@ -382,11 +415,12 @@ def sl_check_wip(c, tid):
 
 
 def sl_check_new(c, aid, tid, state):
-    """A job that starts running (POST, or the working mark of a task) must fit the places and the task's column."""
+    """A job that starts running (POST, or the working mark of a task) must fit the places and the task's column (2.392.2,
+    #3366: tid may be a list of tasks: each one's column)."""
     if state == "running":
         sl_check_slots(c, aid)
-        if tid:
-            sl_check_wip(c, tid)
+        for x in tid if isinstance(tid, list) else [tid] if tid else []:
+            sl_check_wip(c, x)
 
 
 @app.post("/api/v1/agent/jobs")
@@ -398,15 +432,20 @@ def v1_agent_job_create():
     c = db()
     b = v1_json()
     f = v1_job_in(c, aid, b, True)
-    sl_check_new(c, aid, f.get("task_id"), f.get("state", "running"))  # 2.392.0 A (#3367)
+    sl_check_new(c, aid, f["task_ids"], f.get("state", "running"))  # 2.392.0 A (#3367); 2.392.2 (#3366): every task
     ts = iso(now_utc())
     log = (b.get("log") or b.get("append_log") or "")[-JOB_LOG_MAX:]
-    jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,name) VALUES(?,?,?,?,?,?,?,?,?)""",
-                    (aid, f.get("task_id"), f.get("user_id"), f["title"], f.get("state", "running"), log, ts, ts, f.get("name")))
+    jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,name,parent_id,continue_of)
+                          VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                    (aid, f.get("task_id"), f.get("user_id"), f["title"], f.get("state", "running"), log, ts, ts, f.get("name"),
+                     f["parent_id"], f["continue_of"]))
+    if len(f["task_ids"]) > 1:  # 2.392.2 (#3366): the tasks of the job (a job of one task keeps only task_id)
+        for i, tid in enumerate(f["task_ids"]):
+            c.execute("INSERT INTO agent_job_tasks(job_id,task_id,pos) VALUES(?,?,?) ON CONFLICT DO NOTHING", (jid, tid, i))
     c.execute("""DELETE FROM agent_jobs WHERE agent_id=? AND state NOT IN ('running','waiting') AND id<=(SELECT id FROM agent_jobs
                  WHERE agent_id=? ORDER BY id DESC LIMIT 1 OFFSET ?)""", (aid, aid, AGENT_JOBS_KEEP))
     job_notify(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), None)
-    dv_job_started(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), [f["task_id"]] if f.get("task_id") else [])  # 2.392.2 (#3365)
+    dv_job_started(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), f["task_ids"])  # 2.392.2 (#3365, #3366)
     jcs_start_notice(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone())  # 2.153.0 (#1962): its start line
     if log:
         steps_job_log(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), log)  # 2.32.0 (#1081)
@@ -477,7 +516,7 @@ def v1_agent_job_update(jid):
     if j2["state"] != j["state"] and j2["state"] not in ("running", "waiting"):
         dv_job_ended(c, jid)  # 2.392.2 (#3365): its in_progress marks go (or move to another open job of the task)
     elif j2["state"] == "running" and j["state"] != "running":
-        dv_job_started(c, j2, [j2["task_id"]] if j2["task_id"] else [])  # running again: back where the task is free
+        dv_job_started(c, j2, job_task_ids(c, j2))  # running again: back where the task is free
     if (j2["state"], j2["title"]) != (j["state"], j["title"]):
         bump(c)  # a log line alone does not make every client reload
     c.commit()

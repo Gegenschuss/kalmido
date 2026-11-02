@@ -512,6 +512,18 @@ document.addEventListener('scroll', e => {
   const pre = e.target instanceof Element && e.target.matches?.('details.joblog > pre') ? e.target : null; if (!pre) return;
   S.jobLogPos[pre.parentNode.dataset.jid] = {top: pre.scrollTop, bottom: pre.scrollHeight - pre.scrollTop - pre.clientHeight < 4};
 }, true);
+// 2.392.2 (#3366): a job of several tasks (task_ids, the first is task_id), the job it continues / that continues it, its
+// leading job and its part jobs, each a link to #job/<id>
+const jobLink = id => `<a class="jlink" href="#job/${+id}">${esc(tr('Job {0}', id))}</a>`;
+function jobMoreTasks(j) {
+  const more = (j.task_ids || []).filter(x => x !== j.task_id); if (!more.length) return '';
+  return `<div class="jtasks">${more.map(x => `<button class="runtask" data-act="open-id" data-id="${x}">${ic('arrow', 's')}<span>${esc(taskById(x)?.title || '#' + x)}</span></button>`).join('')}</div>`;
+}
+function jobChain(j) {
+  const bits = [j.continue_of && `${esc(tr('Continues'))} ${jobLink(j.continue_of)}`, j.continued_by && `${esc(tr('Continued in'))} ${jobLink(j.continued_by)}`,
+    j.parent_id && `${esc(tr('Part of'))} ${jobLink(j.parent_id)}`, (j.parts || []).length && `${esc(tr('Part jobs'))}: ${j.parts.map(jobLink).join(', ')}`].filter(Boolean);
+  return bits.length ? `<div class="muted jchain">${bits.join(' · ')}</div>` : '';
+}
 function jobHtml(j) {
   const mine = j.kind && S.me && j.user_id === S.me.id;  // 2.3.0: a proposal I asked for: reviewed in its dialog
   // 2.75.0 (#1411): a proposal of the built-in assistant has the person as its "agent" (agent_id = user_id): named Assistant
@@ -525,6 +537,7 @@ function jobHtml(j) {
   const fo = S.jobFocus === j.id;  // 2.36.2 (#1141): opened by a "Job #id" link: highlighted, log + history unfolded
   return `<div class="job st-${esc(j.state)}${fo ? ' jfocus' : ''}" id="job-${j.id}"${fo ? ' tabindex="-1"' : ''}><div class="jobh">${j.state === 'running' || j.state === 'waiting' ? botFig(j.state === 'running' ? 'arbeitet' : 'wartet', 'bjob') : ''}<span class="jst">${esc(tr(JOB_ST[j.state] || j.state))}</span><b>${esc(j.title)}</b><span class="spacer"></span><span class="muted">${ac_mk(j.agent_id) ? `<i class="acjob"${ac_mk(j.agent_id)} aria-hidden="true"></i>` : ''}${esc(j.kind && j.agent_id === j.user_id ? tr('Assistant') : j.agent_name)} · ${esc(relTime(j.updated_at))}</span></div>
     ${j.task_id ? `<button class="runtask" data-act="open-id" data-id="${j.task_id}">${ic('arrow', 's')}<span>${esc(j.task_title || '')}</span></button>` : ''}
+    ${jobMoreTasks(j)}${jobChain(j)}${''/* 2.392.2 (#3366): its other tasks, continuation and part jobs */}
     ${j.log ? `<details class="joblog" data-jid="${j.id}"${S.jobLogOpen[j.id] ?? fo ? ' open' : ''}><summary>${esc(last.slice(0, 140))}</summary><pre>${esc(j.log)}</pre></details>` : ''}
     ${jth_html(j)}
     ${j.steps ? jobStepsHtml(j.id, j.steps) : ''}

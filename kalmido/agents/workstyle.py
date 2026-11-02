@@ -37,6 +37,9 @@ WS_DEFAULTS = {
     "priority_rule": "",
     # #2908 report style
     "report_length": "short", "report_lang": "", "report_tables": True, "report_jargon": False,
+    # 2.392.2 (#3366): the watchdog tells the job's owner once when a running job had no progress for this many minutes
+    # (agents/watch.py; 0 = never)
+    "stall_min": 60,
     # #2909 when the agent may disturb (push): limits | results | never
     "push": "limits",
     # #2910 where results go: comment | chat | both (comment on the task + one line in the chat)
@@ -53,6 +56,7 @@ WS_LEGACY = {"push": "results"}  # an agent made before 2.236.0 keeps the pushes
 WS_NEW = {"push": "limits"}  # what a new agent stores at creation
 WS_RULE_MAX = 500
 WS_PARALLEL_MAX = 20
+WS_STALL_MAX = 1440  # 2.392.2 (#3366): a day
 WS_LANG_RE = re.compile(r"^[a-z]{2}$")
 
 
@@ -130,6 +134,10 @@ def ws_value(k, v):
         return sorted(set(v))
     if k == "max_parallel":
         if isinstance(v, bool) or not isinstance(v, int) or not 0 <= v <= WS_PARALLEL_MAX:
+            raise bad
+        return v
+    if k == "stall_min":  # 2.392.2 (#3366): 0 = off, else 15 minutes to a day
+        if isinstance(v, bool) or not isinstance(v, int) or not (v == 0 or 15 <= v <= WS_STALL_MAX):
             raise bad
         return v
     if k == "priority_rule":

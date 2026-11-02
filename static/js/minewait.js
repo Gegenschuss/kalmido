@@ -3,7 +3,8 @@
    /api/inbox (agents/waiting.py). Each row leads to its target; waiting jobs keep their buttons. The sidebar row counts all of
    it, the card in Today (agents.js, waitCard) links here instead of repeating it. */
 const MW_GROUPS = [['job', N_('Jobs')], ['approval', N_('Approvals')], ['gate', N_('Merge and deploy requests')], ['review', N_('Reviews')],
-  ['blocked', N_('Blocked')], ['irreversible', N_('One-way steps without a yes')], ['parked', N_('Parked')]];  // 2.392.2 (#3365): parked
+  ['blocked', N_('Blocked')], ['irreversible', N_('One-way steps without a yes')], ['parked', N_('Parked')],
+  ['watch', N_('Stalled jobs and stranded branches')]];  // 2.392.2 (#3365): parked; (#3366): the watchdog's findings
 S.mw = {items: null, counts: {}, total: 0, at: 0};
 async function mwLoad(force = false) {
   if (!force && Date.now() - S.mw.at < 60000) return;
@@ -25,10 +26,11 @@ function mwTitle(x) {
   if (t?.title && !le2u_locked(t)) return t.title;
   return x.task_title && !le2eIs(x.task_title) ? x.task_title : tr('Encrypted task');
 }
-const mwHref = x => x.kind === 'job' && !x.task_id ? '#agents' : x.task_id ? `#t/${x.task_id}` : '';
+const mwHref = x => x.kind === 'watch' && x.job_id ? `#job/${+x.job_id}` : x.kind === 'job' && !x.task_id ? '#agents' : x.task_id ? `#t/${x.task_id}` : '';
 function mwRow(x) {
   const tt = x.task_title && !le2eIs(x.task_title) ? x.task_title : '', title = mwTitle(x);
-  const sub = [x.agent_name, x.list_name, x.task_id && tt !== title ? `#${x.task_id} ${tt}` : '', x.kind === 'parked' ? x.why : ''].filter(Boolean).join(' · ');
+  const sub = [x.agent_name, x.list_name, x.task_id && tt !== title ? `#${x.task_id} ${tt}` : '', x.kind === 'parked' ? x.why : '',
+    x.kind === 'watch' ? (x.finding === 'branch_stranded' ? tr('Branch without a merge: {0}', x.branch || '') : tr('No progress')) : ''].filter(Boolean).join(' · ');
   const body = `<span class="wci"><b>${esc(title)}</b><span class="muted">${esc(sub)}</span></span>`;
   if (x.kind === 'job') return `<div class="wcrow"><a class="mwa" href="${esc(mwHref(x))}">${body}</a><div class="wcb">${waitJobBtns({id: x.id, kind: x.proposal})}</div></div>`;
   if (x.source === 'chat') return `<button type="button" class="wcrow mwa" data-act="chat-open" data-aid="${x.agent_id}">${body}</button>`;

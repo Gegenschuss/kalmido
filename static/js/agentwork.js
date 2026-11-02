@@ -62,6 +62,8 @@ function aw_html(ws, st) {
     <div class="row"><label for="aw-max_parallel">${tr('At most')}</label><span class="agpct"><input id="aw-max_parallel" data-aw="max_parallel" type="number" min="0" max="20" step="1" inputmode="numeric" value="${esc(ws.max_parallel)}"><span class="muted" id="aw-nolimit">${ws.max_parallel ? '' : esc(tr('no limit'))}</span></span></div>
     <div class="shint">${tr('0 = no limit. With a number, the agent cannot start more running jobs than that; the rest waits in the queue.')}</div>
     <div id="aw-queue"></div>
+    <div class="row"><label for="aw-stall_min">${tr('No progress for')}</label><span class="agpct"><input id="aw-stall_min" data-aw="stall_min" type="number" min="0" max="1440" step="5" inputmode="numeric" value="${esc(ws.stall_min ?? 60)}"><span class="muted">${esc(tr('minutes'))}</span></span></div>
+    <div class="shint">${tr('A running job without progress for that long is reported once to you and to the agent (0 = never). The job keeps running.')}</div>${''/* 2.392.2 (#3366) */}
     <h4 id="aw-h-prio">${tr('Priority rule')}</h4>
     <textarea id="aw-priority_rule" data-aw="priority_rule" rows="3" maxlength="500" placeholder="${esc(tr('e.g. bugs first, then office, then new things'))}" aria-labelledby="aw-h-prio">${esc(ws.priority_rule)}</textarea>
     <div class="shint">${tr('In your words; the agent reads it with every choice of the next task.')}</div>
@@ -79,7 +81,7 @@ function aw_html(ws, st) {
 // parses the field of key k into the value the server wants (null = invalid, shown under the field)
 function aw_read(k, el) {
   if (k === 'budget_limit') { const s = el.value.trim(); if (!s) return null; const n = parseNum(s); return n != null && n > 0 ? n : undefined; }
-  if (k === 'budget_warn_pct' || k === 'max_parallel') { const s = el.value.trim(); return /^\d+$/.test(s) ? +s : undefined; }
+  if (k === 'budget_warn_pct' || k === 'max_parallel' || k === 'stall_min') { const s = el.value.trim(); return /^\d+$/.test(s) ? +s : undefined; }
   if (el.type === 'checkbox') return el.checked;
   return el.value;
 }

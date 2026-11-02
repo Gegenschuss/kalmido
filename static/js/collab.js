@@ -261,7 +261,8 @@ function newsText(it, U) {
     case 'leavereq': return tr('{0} asks for holiday ({1})', who, d.start ? esc(fmtDayAbs(d.start) + (d.end && d.end !== d.start ? ' – ' + fmtDayAbs(d.end) : '')) : '');  // 2.125.0 A (#2117)
     case 'leavedecide': return (d.state === 'approved' ? tr('{0} approved your holiday ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : '') : tr('{0} rejected your holiday ({1})', who, d.start ? esc(fmtDayAbs(d.start)) : ''));
     case 'errreport': return d.title ? tr('New error reported: {0}', q(d.title)) : tr('A new error was reported');  // 2.18.0
-    case 'approval': return d.title ? tr('{0} is waiting for your approval: {1}', who, q(d.title)) : tr('{0} is waiting for your approval', who);  // 2.367.2 (#2968): a list-wide one has no task title
+    case 'approval': return d.title ? tr('{0} is waiting for your approval: {1}', who, q(d.title)) : tr('{0} is waiting for your approval', who);
+    case 'job_watch': return d.kind === 'branch_stranded' ? tr('{0}: work lies on a branch without a merge ({1})', who, q(d.title || '')) : tr('{0}: a job makes no progress ({1})', who, q(d.title || ''));  // 2.392.2 (#3366): the watchdog  // 2.367.2 (#2968): a list-wide one has no task title
     case 'aprequest': return tr('Approval needed: {0} (from {1})', q(it.task_title || ''), who) + (d.note ? ': ' + q(d.note) : '');  // 2.367.2 (#2968)
     case 'signoff': return d.state === 'accepted' ? (d.sk === 'document' ? tr('{0} signed {1}', q(d.name || ''), q(d.title || '')) : tr('{0} approved {1}', q(d.name || ''), q(d.title || '')))
       : d.sk === 'video' ? tr('{0} asks for changes to {1}', q(d.name || ''), q(d.title || '')) : tr('{0} rejected {1}', q(d.name || ''), q(d.title || ''));  // 2.266.0 (#2965): a customer through a link
@@ -298,7 +299,7 @@ function newsText(it, U) {
   }
   return tr('{0} changed something', who);
 }
-const NEWS_ICON = {playbook_proposal: 'book', orglist: 'archive', mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user', agentjoin: 'bot', e2e_key: 'key', wiki_e2e_key: 'key', orgkey: 'key'};  // 2.64.1 / 2.64.3 B (#1817)
+const NEWS_ICON = {job_watch: 'clock', playbook_proposal: 'book', orglist: 'archive', mention: 'at', comment: 'comment', assign: 'user', unassign: 'user', take: 'check', complete: 'check', share: 'users', role: 'users', unshare: 'users', unblock: 'deps', status: 'pulse', newtask: 'plus', approval: 'bot', followup: 'hourglass', usage: 'chart', proposal: 'bot', errreport: 'bug', apdecide: 'eye', signup: 'user', agentjoin: 'bot', e2e_key: 'key', wiki_e2e_key: 'key', orgkey: 'key'};  // 2.64.1 / 2.64.3 B (#1817)
 /** @type {any} */ (NEWS_ICON).wiki_shared = 'book';  // 2.126.2 B (#2355)
 /** @type {any} */ (NEWS_ICON).orgdelnotice = /** @type {any} */ (NEWS_ICON).orggone = 'alert';  // 2.361.0 (#2920)
 /** @type {any} */ (NEWS_ICON).whorgcut = 'alert';  // 2.380 G (#3391)

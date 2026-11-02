@@ -811,6 +811,8 @@ Since 2.0.8 every task event (`mention`, `comment`, `assigned`, `reaction`, `tid
 | `scheduled_job` | 2.34.0 (#272): a [planned job](#planned-jobs) of a person is due (once per due time; after an outage only the one missed run, `late: true`), or the person pressed *Run now* (`manual: true`). Answer in your chat with `by.id` | `schedule_id`, `title`, `prompt` (the person's words: what to do), `list_id` + `list` (or `null`), `by` / `user` `{id, name}`, `chat_with` (= `by.id`), `rhythm` `{freq, days, time, tz}`, `due_at`, `late`, `manual`, `manual_by` (`{id, name}` when a manager of the agent pressed *Run now* on another person's plan, else `null`; you still answer `by.id`), `hint`; 2.39.0: a [scheduled check of a project](#playbook) adds `list_check: true`, `open_task_ids`, `open_tasks_more` (and the `playbook`) |
 | `message_edited` | 2.39.0 (#1179): a person edited a message the agent already had: their chat message after the agent fetched (`delivered_at`) or answered it, a comment the agent got as `comment` / `mention` / `assigned`, a team chat message it got as `team_message`. Only to the agent(s) that had it, only while they still see the task / room (health projects never). A chat message not fetched yet is simply replaced (the queued `chat` event carries the new text, no `message_edited`). Comments and team messages count as had while the original event is still in your event history (30 days). Treat it as a correction: confirm briefly, keep your running work, adjust only what the change affects | `kind`: `chat` \| `comment` \| `team`, `old`, `new`, `user` `{id, name}`; chat: `message` `{id, user_id, task_id, created_at, edited_at}`, `answered` (you wrote after it); comment: `comment` `{id, task_id, created_at, edited_at}`, `task`, `list`, `list_id`; team: `room` `{id, kind, list_id}`, `message` |
 | `task.completed` | 2.392.0 (#3364): the repository's poll completed a task because its package or code is released (project switch "Complete tasks when their package or code is released", off by default); the envelope says `via: "release"`, `actor` is `null`; information only, no run | `task`, `list`, `version` (`null`: an earlier version, which one unknown) |
+| `job_stalled` | 2.392.2 (#3366): the watchdog found your running job without progress (no log line, state change or working update) for the work style's `stall_min` minutes (default 60, 0 = off); once per case, a new update ends it. The job keeps running | `job`, `since`, `minutes`, `limit_minutes`, `hint`, the task and project while you see them |
+| `branch_stranded` | 2.392.2 (#3366): work of an open task lies on a branch without a merge (commits the default branch lacks), no job of the task is open and the last one ended 3 days ago or more; once per branch and commit | `job` (the task's last job), `branch` (`name`, `repo`, `ahead`, `origin: git`, `untrusted: true`), `days`, `since`, `hint`, the task and project while you see them |
 | `decision_added` | 2.392.0 (#3370): a decision was recorded on a task you see with its comments: `decision` (`id`, `text`, `by_id`, `by`, `created_at`, `superseded_by`), the task with `decisions` (those in force). Another agent's entry carries `origin: "agent"`, `untrusted: true`. Information only, no run. |
 | `deployed` | 2.60.0 (#1514): a version / milestone arrived in an environment (Staging, Live) of a project shared with you; information only, no run. Set by a person, by the token API (`set_deployment`) or by the environment's deploy webhook | `list_id`, `environment` `{id, name}`, `version`, `milestone` `{id, title}` or `null`, `source` (`manual` \| `api` \| `hook`), `at`, `closed_task_ids` (tasks completed on arrival, if the environment does that) |
 | `playbook_proposal` | 2.39.0 (#1168): a person applied or discarded the agent's proposed change of a project's [Playbook](#playbook) | `list_id`, `proposal_id`, `state`: `applied` or `discarded`, `version` (applied: the new version of the project's part), `note` (yours), `by` `{id, name}`, `hint`; like every event of the project it carries the current `playbook` |
@@ -4149,6 +4151,19 @@ extract tasks, suggest tags and a due date, sort the basket, plan the day). It i
   same Apply / Discard / Undo as the [proposals](#proposals) of agents. Agents get no events about them.
 
 Everything longer or freer (code, research, long jobs, working tickets, chat) stays the job of your own agents.
+
+## Jobs of several tasks, part jobs, continuations, the watchdog (2.392.2, #3366)
+
+- `POST /api/v1/agent/jobs` (MCP `create_job`) takes `task_ids` (at most 50, each one visible to you; `task_id` stays the first for
+  older clients), `parent_id` (the leading job of a part job) and `continue_of` (the job this one continues); both must be your own
+  jobs. Every job (`GET /api/v1/agent/jobs`, `get_job`) answers `task_ids`, `parent_id`, `continue_of`, `continued_by` and `parts`;
+  the job card in the app shows the chain ("Continues Job 82", "Part jobs: ..."). A person given in `user_id` must reach you in
+  the project of every task.
+- The reference starter passes them: `agent_job.py start --parent ID --continue-of ID --task 12 --task 13`.
+- The watchdog (every minute on the server) tells once per case and never stops anything: `job_stalled` (work style `stall_min`,
+  default 60 minutes, 0 = off; Settings > Agents > the agent > How it works) and `branch_stranded` (3 days). The job's owner (the
+  person it is for, else the agent's owner) gets a News entry ("An agent waits for me" row) and a push only where that row's push is
+  on and your work style's push is not "never". "Waiting for me" lists the open findings (kind `watch`).
 
 ## Delivery state of a task (2.392.2, #3365)
 

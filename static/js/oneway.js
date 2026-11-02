@@ -97,7 +97,8 @@ function dv_text(t) {  // "Parked: reason", "Waiting for #12 Title", "In progres
 function dv_barHtml(t, ro) {
   const st = dv_state(t); if (!st) return '';
   const tx = dv_text(t), since = t.delivery_at ? tr('since {0}', fmtWhen(t.delivery_at)) : '';
-  return `<section class="owbar dvbar" aria-label="${esc(tr('Delivery state'))}">${ic(DV_ICON[st], 's')}<div class="owt"><b>${esc(tr(DV_NAMES[st]))}</b>${tx ? `<span>${esc(tx)}</span>` : ''}${since ? `<span class="muted">${esc(since)}</span>` : ''}</div>
+  const job = st === 'in_progress' && t.delivery_job_id ? ` <a class="jlink" href="#job/${+t.delivery_job_id}">${esc(tr('Open the job'))}</a>` : '';  // 2.392.2 (#3366): its chain on the job card
+  return `<section class="owbar dvbar" aria-label="${esc(tr('Delivery state'))}">${ic(DV_ICON[st], 's')}<div class="owt"><b>${esc(tr(DV_NAMES[st]))}</b>${tx ? `<span>${esc(tx)}${job}</span>` : job}${since ? `<span class="muted">${esc(since)}</span>` : ''}</div>
     ${ro ? '' : `<div class="owb"><button type="button" class="btn sm" data-dv="${st === 'waiting' ? 'wait' : 'park'}">${esc(tr('Change'))}</button><button type="button" class="btn sm" data-dv="clear">${esc(tr('Clear'))}</button></div>`}</section>`;
 }
 function dv_draw() { const t = taskById(S.sel), b = $('#d-dv'); if (t && b) b.innerHTML = dv_barHtml(t, ow_ro(t)); }

@@ -59,6 +59,7 @@ NEWS_KINDS += ("aprequest",)  # 2.367.2 (#2968): someone asks ME for an approval
 NEWS_KINDS += ("docpaid", "docoverdue")  # 2.367.4 (#2972): a payment on an invoice / invoices past their due date (row "office", office/dunning.py)
 NEWS_KINDS += ("orglogin", "orgjoinres", "orgrole")  # 2.367.4 (#2974): an organisation admin signed in from a new address (row "usage"); the answer to my invitation; my role changed (row "share")
 NEWS_KINDS += ("integfail",)  # 2.367.3 (#2971): a channel, webhook, mailbox, git connection or inbox of mine stopped (row "integration", collab/integfail.py)
+NEWS_KINDS += ("job_watch",)  # 2.392.2 (#3366): the watchdog found a job of an agent stalled / its branch stranded (row "approval", agents/watch.py)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evchange", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
 # 1.9.0: per user (setting news_kinds) which groups of events create a News item; pushes are not affected
@@ -251,6 +252,7 @@ KIND_ROW["signoff"] = "signoff"  # 2.266.0 (#2965)
 KIND_ROW["fetcherr"] = "fetcher"  # 2.425.0 C (#3453)
 KIND_ROW["ptlimit"] = KIND_ROW["apblimit"] = "limits"  # 2.453.0 (#3781): one row for both
 KIND_ROW["integfail"] = "integration"  # 2.367.3 (#2971)
+KIND_ROW["job_watch"] = "approval"  # 2.392.2 (#3366): the watchdog's finding about an agent's job ("An agent waits for me")
 KIND_ROW["wiki_shared"] = "share"  # 2.126.2 B (#2355): switched with the sharing row (News on, no push by default)
 
 

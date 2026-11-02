@@ -5,7 +5,7 @@ waiting_for(c, uid) gathers, only from what uid sees and only what uid can settl
 theirs that is ready), open approval cards from the chat and from comments, open merge / integrate / deploy requests, reviews
 with uid as the reviewer, their own blocked tasks, and tasks marked irreversible without a yes where the list asks for one.
 With agent_id only the lists shared with that agent count (as the briefing). 2.392.2 (#3365): their own parked tasks
-(kind parked, the same "mine" as blocked). Watchdog findings (#3366) join as a kind of their own here.
+(kind parked, the same "mine" as blocked) and the watchdog's open findings told to them (kind watch, agents/watch.py, #3366).
 
 Each kind holds at most WAIT_MAX items (counts stop there as well), newest first; a kind reads at most WAIT_SCAN rows. Nothing
 here writes or formulates. The texts of a list with the lock stay ciphertexts for the web app; le2b_v1_mask empties them in
@@ -28,6 +28,7 @@ from ..integrations.delivery import GATE_ALL, WAIT_KINDS, WAIT_MAX
 from ..tasks.briefing import brief_blocked, brief_lists
 from .chat import chat_approvals_of
 from .core import agent_shares, is_agent, is_approver, job_may_act, need_person
+from .watch import watch_open
 
 WAIT_SCAN = 500
 
@@ -185,11 +186,26 @@ def _parked(s):
     return [_item("parked", r["id"], r["title"], r["delivery_at"], r, why=r["delivery_note"] or "") for r in rows]
 
 
+def _watch(s):
+    """2.392.2 (#3366): the watchdog's open findings told to me (agents/watch.py), only where I still see the task and, for an
+    agent or a limited token, only inside its lists."""
+    rows = watch_open(s.c, s.uid)
+    tasks, names = s.tasks([r["task_id"] for r in rows]), user_names(s.c, list({r["agent_id"] for r in rows}))
+    out = []
+    for r in rows:
+        t = tasks.get(r["task_id"])
+        if (r["task_id"] and not t) or s.hidden(r["task_id"], tasks):
+            continue
+        out.append(_item("watch", r["job_id"] or r["id"], r["job_title"] or "", r["created_at"], t, finding=r["kind"], job_id=r["job_id"],
+                         agent_id=r["agent_id"], agent_name=names.get(r["agent_id"], ""), **({"branch": r["detail"]} if r["detail"] else {})))
+    return out[:WAIT_MAX]
+
+
 def _no_request_texts(c, items):
     """A list with the lock: what an agent wrote into its request stays out; the task's own title is the cipher the app opens."""
     locked = le2b_locked_lists(c, {x["list_id"] for x in items if x["list_id"]})
     for x in items:
-        if x["list_id"] in locked and x["kind"] in ("approval", "gate", "job", "irreversible"):
+        if x["list_id"] in locked and x["kind"] in ("approval", "gate", "job", "irreversible", "watch"):
             x["title"] = ""
             for k in ("branch", "target", "why"):
                 x.pop(k, None)
@@ -200,7 +216,8 @@ def waiting_for(c, uid, *, agent_id=None):
     """-> {total, counts: {kind: n}, items: [...]} for person uid, the kinds in the order of WAIT_KINDS."""
     s = _Scope(c, uid, agent_id)
     by = {"job": _jobs(s), "approval": sorted(_chat_cards(s) + _comment_cards(s), key=lambda x: x["at"] or "", reverse=True)[:WAIT_MAX],
-          "gate": _gates(s), "review": _reviews(s), "blocked": _blocked(s), "irreversible": _irreversible(s), "parked": _parked(s)}
+          "gate": _gates(s), "review": _reviews(s), "blocked": _blocked(s), "irreversible": _irreversible(s), "parked": _parked(s),
+          "watch": _watch(s)}
     items = _no_request_texts(c, [x for k in WAIT_KINDS for x in by[k]])
     return {"total": len(items), "counts": {k: len(by[k]) for k in WAIT_KINDS}, "items": items}
 

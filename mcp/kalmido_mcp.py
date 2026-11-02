@@ -879,9 +879,14 @@ TOOLS = [
     ("create_job", "Report a job (shown in the Agents tab with Approve / Reject / Stop). state defaults to running. name (optional): "
      "a short first name for the job (letters, up to 24), shown on its badge; people address it with \"Name: ...\". "
      "2.392.0 (#3367): a running job can be refused with 409 slots_full (all max_parallel places taken) or wip_full (the task's column is over "
-     "its hard WIP limit); nothing is stored, finish a job or wait.",
+     "its hard WIP limit); nothing is stored, finish a job or wait. 2.392.2 (#3366): task_ids = a job for several tasks (at most 50, "
+     "the first is its task_id; each one must be visible to you); parent_id = the leading job of this part job, continue_of = the "
+     "job this one continues (both your own jobs); the job card shows the chain. A running job marks its tasks in_progress "
+     "(delivery) and ending it clears that. The watchdog sends job_stalled when a running job reports no progress for the work "
+     "style's stall_min minutes (default 60): report progress or end it.",
      _obj({"title": {"type": "string", "minLength": 1}, "task_id": S_ID, "user_id": S_ID, "name": {"type": "string", "maxLength": 24},
-           "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}, "log": {"type": "string"}}, ["title"]),
+           "state": {"type": "string", "enum": ["running", "waiting", "done", "failed", "stopped"]}, "log": {"type": "string"},
+           "task_ids": {"type": "array", "items": S_ID, "maxItems": 50}, "parent_id": S_ID, "continue_of": S_ID}, ["title"]),
      lambda api, a: api.call("POST", "/agent/jobs", body=a)),
     ("get_job", "One of the agent's jobs. A proposal job (event job_request) also carries kind (project | subtasks | triage | "
                 "extract | dayplan | cleanup | inquiry | setup | merge | office_text | doc_summary | report | ideas | receipt_read | card_statement_read), input (exactly what the person sent: never ask for more), proposal (what you submitted) and limits.",

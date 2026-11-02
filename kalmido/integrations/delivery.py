@@ -24,6 +24,7 @@ from .gitbuild import gb_key, gb_untrusted, git_build_for
 WAIT_MAX = 100  # 2.392.0 D (#3369): agents/waiting.py, its OpenAPI text stands below (api.openapi reads no module of the agents layer)
 WAIT_KINDS = ("job", "approval", "gate", "review", "blocked", "irreversible")
 WAIT_KINDS += ("parked",)  # 2.392.2 (#3365): my own parked tasks (why = the reason)
+WAIT_KINDS += ("watch",)  # 2.392.2 (#3366): the watchdog's open findings told to me (job_stalled / branch_stranded)
 GATE_ALL = ("merge_request", "integrate", "deploy")
 DELIVERY_MAX = 100  # rows per section (the counts are complete)
 DL_SECTIONS = ("released", "in_main", "in_progress", "stuck", "completed")
@@ -182,7 +183,8 @@ def delivery_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "agent_id": i, "agent_name": s, "proposal": {"type": "boolean", "description": "job: a proposal of this person that is ready"},
         "source": {"type": "string", "enum": ["chat", "comment"], "description": "approval: where the card stands"},
         "gate": {"type": "string", "enum": list(GATE_ALL)}, "branch": nul("string"), "target": nul("string"),
-        "reason": {"type": "string", "enum": ["waiting", "blocked"]}, "open_blockers": i, "why": {**s, "description": "irreversible: the reason of the mark; parked: the reason of parking (2.392.2)"}}}
+        "reason": {"type": "string", "enum": ["waiting", "blocked"]}, "open_blockers": i, "why": {**s, "description": "irreversible: the reason of the mark; parked: the reason of parking (2.392.2)"}, "finding": {"type": "string", "enum": ["job_stalled", "branch_stranded"], "description": "watch (2.392.2): the watchdog's finding"},
+        "job_id": {**i, "description": "watch: the job (also the id)"}}}
     schemas["Waiting"] = {"type": "object", "properties": {
         "total": i, "counts": {"type": "object", "properties": {k: i for k in WAIT_KINDS}, "description": f"At most {WAIT_MAX} per kind"},
         "items": {"type": "array", "items": ref("WaitingItem")}}}

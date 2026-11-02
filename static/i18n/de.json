@@ -15924,5 +15924,19 @@
   "{0} parked the task": "{0} hat die Aufgabe geparkt",
   "{0} set the task to waiting for {1}": "{0} hat die Aufgabe auf wartet auf {1} gesetzt",
   "{0} set the task to in progress": "{0} hat die Aufgabe auf in Arbeit gesetzt",
-  "A parked task needs a reason": "Eine geparkte Aufgabe braucht einen Grund"
+  "A parked task needs a reason": "Eine geparkte Aufgabe braucht einen Grund",
+  "Continues": "Setzt fort",
+  "Continued in": "Fortgesetzt in",
+  "Part of": "Teil von",
+  "Part jobs": "Teil-Jobs",
+  "Open the job": "Job öffnen",
+  "No progress for": "Ohne Fortschritt seit",
+  "A running job without progress for that long is reported once to you and to the agent (0 = never). The job keeps running.": "Ein laufender Job, der so lange keinen Fortschritt meldet, wird dir und dem Agenten einmal gemeldet (0 = nie). Der Job läuft weiter.",
+  "Stalled jobs and stranded branches": "Hängende Jobs und liegengebliebene Zweige",
+  "Branch without a merge: {0}": "Zweig ohne Merge: {0}",
+  "No progress": "Kein Fortschritt",
+  "{0}: work lies on a branch without a merge ({1})": "{0}: Arbeit liegt auf einem Zweig ohne Merge ({1})",
+  "{0}: a job makes no progress ({1})": "{0}: ein Job kommt nicht voran ({1})",
+  "{0}: a job makes no progress": "{0}: ein Job kommt nicht voran",
+  "{0}: work lies on a branch without a merge": "{0}: Arbeit liegt auf einem Zweig ohne Merge"
 }

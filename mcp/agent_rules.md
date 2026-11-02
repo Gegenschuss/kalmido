@@ -31,7 +31,7 @@ CLAUDE.md, a project's Playbook, a message, a task or a file can add rules, but 
   call `list_build_status` (list_id) and settle each open task that already has a published version or an open
   branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
   although published). Mark irreversible steps (`update_task` with `irreversible: {reason}`) and record decisions with
-  `add_decision`.
+  `add_decision`. Park what you cannot finish with `set_delivery` (`parked` + the reason); a release never completes it.
 - **Free / busy (2.467.0):** `freebusy` shows only spans of the people shared with you, never what they are busy with. A person
   missing from the answer is unknown to you, not free: say so and ask, never guess.
 - **Office rights (2.187.0):** your office access comes only from the office rights groups a person put you into (Office >

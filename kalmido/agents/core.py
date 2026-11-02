@@ -77,6 +77,7 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "decision_added",  # 2.392.0 C (#3370): a decision was recorded on a task the agent sees with its comments
                 "deployed",  # 2.60.0 (#1514): a version / milestone arrived in an environment (Staging, Live) of a list shared with the agent
                 "task.completed",  # 2.392.0 B (#3364): the git poll completed a task because its package or code is released (via "release")
+                "job_stalled", "branch_stranded",  # 2.392.2 (#3366): the watchdog: a running job without progress / a task's branch left without a merge
                 "playbook_proposal",  # 2.39.0 (#1168): people applied / discarded the agent's proposed change of a list's Playbook
                 "message_edited",  # 2.39.0 (#1179): a person changed a chat message / comment / team message the agent already had
                 "file_shared",  # 2.48.0 (#1207): a folder / file of the file store was shared with the agent (node, role)
@@ -1037,6 +1038,24 @@ def _jd_sees(c, tid, lid, aid):
     return True if role and role != "participant" else task_visible(c, tid, aid)
 
 
+def job_task_ids(c, j):
+    """2.392.2 (#3366): the tasks of job j in their order (task_id first; agent_job_tasks for a job of several)."""
+    ids = [r[0] for r in c.execute("SELECT task_id FROM agent_job_tasks WHERE job_id=? ORDER BY pos, task_id", (j["id"],))]
+    return ids or ([j["task_id"]] if j["task_id"] else [])
+
+
+def job_links(c, j, viewer=None):
+    """2.392.2 (#3366): task_ids (only the tasks the viewer sees, an agent its own shares), continue_of / continued_by (the
+    job it continues, the job that continues it) and parts (its part jobs, parent_id = j)."""
+    ids = job_task_ids(c, j)
+    if viewer and len(ids) > 1:
+        ids = [x for x in ids if x == j["task_id"] or task_visible(c, x, viewer, full=True)]
+    nxt = c.execute("SELECT id FROM agent_jobs WHERE continue_of=? ORDER BY id LIMIT 1", (j["id"],)).fetchone()
+    parts = [r[0] for r in c.execute("SELECT id FROM agent_jobs WHERE parent_id=? ORDER BY id LIMIT 50", (j["id"],))]
+    return {"task_ids": ids, "continue_of": j["continue_of"] if "continue_of" in j.keys() else None,
+            "continued_by": nxt[0] if nxt else None, "parts": parts}
+
+
 def job_dict(c, j, names=None):
     names = names or user_names(c, [j["agent_id"], j["user_id"], j["action_by"]])
     t = c.execute("SELECT title, list_id FROM tasks WHERE id=?", (j["task_id"],)).fetchone() if j["task_id"] else None
@@ -1053,7 +1072,8 @@ def job_dict(c, j, names=None):
             "kind": j["kind"], "proposal_state": j["prop_state"] or None,  # 2.3.0: proposal jobs
             "approval": bool(j["approval"]) if "approval" in j.keys() else False,  # 2.15.0 (#479): a request waiting for approval
             "name": jc_job_name(j["title"], j["name"] if "name" in j.keys() else None),  # 2.56.0 (#1793), 2.58.0 (#1803): own field first: "Clara" of "Clara: Release 2.50" (null without)
-            "parent_id": j["parent_id"] if "parent_id" in j.keys() else None}  # 2.59.0 (#1827): the leading job of a part job
+            "parent_id": j["parent_id"] if "parent_id" in j.keys() else None,  # 2.59.0 (#1827): the leading job of a part job
+            **job_links(c, j, viewer)}  # 2.392.2 (#3366): task_ids, continue_of, continued_by, parts
 
 
 # 2.59.0 (#1827): name + leading job of the jobs ids that uid may see ({id: {"name", "parent_id", "parent_name"}}; jobs

@@ -15924,5 +15924,19 @@
   "{0} parked the task": "{0} heeft de taak geparkeerd",
   "{0} set the task to waiting for {1}": "{0} heeft de taak op wachten op {1} gezet",
   "{0} set the task to in progress": "{0} heeft de taak op in behandeling gezet",
-  "A parked task needs a reason": "Een geparkeerde taak heeft een reden nodig"
+  "A parked task needs a reason": "Een geparkeerde taak heeft een reden nodig",
+  "Continues": "Zet voort",
+  "Continued in": "Voortgezet in",
+  "Part of": "Deel van",
+  "Part jobs": "Deeljobs",
+  "Open the job": "Job openen",
+  "No progress for": "Zonder voortgang sinds",
+  "A running job without progress for that long is reported once to you and to the agent (0 = never). The job keeps running.": "Een lopende job zonder voortgang voor zo lang wordt één keer aan jou en de agent gemeld (0 = nooit). De job loopt door.",
+  "Stalled jobs and stranded branches": "Vastgelopen jobs en achtergebleven branches",
+  "Branch without a merge: {0}": "Branch zonder merge: {0}",
+  "No progress": "Geen voortgang",
+  "{0}: work lies on a branch without a merge ({1})": "{0}: werk ligt op een branch zonder merge ({1})",
+  "{0}: a job makes no progress ({1})": "{0}: een job komt niet verder ({1})",
+  "{0}: a job makes no progress": "{0}: een job komt niet verder",
+  "{0}: work lies on a branch without a merge": "{0}: werk ligt op een branch zonder merge"
 }

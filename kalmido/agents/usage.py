@@ -915,7 +915,12 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         "log": {"type": "string"}, "action": nul("string", enum=[*JOB_ACTIONS, None]), "created_at": {"type": "string"}, "updated_at": {"type": "string"},
         "kind": nul("string", enum=[*PROP_KINDS, None]), "proposal_state": nul("string", enum=[*PROP_STATES, None]),
         "name": nul("string", description="2.58.0 (#1803): the job's name (own field, else the \"Name: \" start of the title)"),
-        "parent_id": nul("integer", description="2.59.0 (#1827): the leading job of a part job (set by a chat answer with job_parent)")}}
+        "parent_id": nul("integer", description="2.59.0 (#1827): the leading job of a part job (set by a chat answer with job_parent; 2.392.2: or at creation)"),
+        # 2.392.2 (#3366): a job of several tasks and its chain
+        "task_ids": {"type": "array", "items": {"type": "integer"}, "description": "2.392.2 (#3366): its tasks (task_id first; for a person only the ones they see)"},
+        "continue_of": nul("integer", description="2.392.2 (#3366): the job this one continues"),
+        "continued_by": nul("integer", description="2.392.2 (#3366): the job that continues this one"),
+        "parts": {"type": "array", "items": {"type": "integer"}, "description": "2.392.2 (#3366): its part jobs (parent_id = this job)"}}}
     agent = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "status": {"type": "string", "enum": list(AGENT_STATUSES)},
                                               "status_text": {"type": "string"}, "status_task": nul("integer"),
                                               "status_key": {"type": "string", "description": "2.450.0 (#3769): the key of a known status text, for the app to translate; \"\" = none"},
@@ -1091,7 +1096,12 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                             "type": "object", "required": ["title"], "properties": {"title": {"type": "string"}, "task_id": {"type": "integer"},
                                                                                     "state": {"type": "string", "enum": list(JOB_STATES)}, "log": {"type": "string"},
                                                                                     "user_id": {"type": "integer"},
-                                                                                    "name": {"type": "string", "description": "2.58.0 (#1803): short job name (letters, up to 24), shown on the job badge"}}})},
+                                                                                    "name": {"type": "string", "description": "2.58.0 (#1803): short job name (letters, up to 24), shown on the job badge"},
+                                                                                    # 2.392.2 (#3366)
+                                                                                    "task_ids": {"type": "array", "items": {"type": "integer"}, "maxItems": 50,
+                                                                                                 "description": "2.392.2 (#3366): the tasks of the job (each visible to you; task_id = the first)"},
+                                                                                    "parent_id": {"type": "integer", "description": "2.392.2 (#3366): the leading job (your own)"},
+                                                                                    "continue_of": {"type": "integer", "description": "2.392.2 (#3366): the job this one continues (your own)"}}})},
         "/agent/jobs/{id}": {"patch": op("Update a job (state, log)", AG, ok(ref("Job")) | errs("400", "403", "404"), [pid("id", "Job id")], scope=W, body={
             "type": "object", "properties": {"title": {"type": "string"}, "state": {"type": "string", "enum": list(JOB_STATES)},
                                              "log": {"type": "string"}, "append_log": {"type": "string"}}}),
