@@ -126,7 +126,7 @@ UMZ_SETTINGS_MORE = ("detail_split", "detail_cm_fold", "detail_fold", "agent_ste
                      "chat_read_receipts", "chat_kbd_agent", "chat_kbd_team", "today_inbox", "pomo_focus", "pomo_short", "pomo_long",
                      "pomo_long_every", "time_autostop_h", "time_focus", "time_target", "time_split_midnight", "tz", "hide_blocked_today",
                      "fav_only", "fav_suggest", "mine_view", "mine_board", "mine_board_by", "date_confirm", "start_page", "person_colors",
-                     "list_color_dot", "side_progress", "row_icons", "row_icons_custom", "side_count", "side_dots", "side_share",
+                     "list_color_dot", "ws_accent", "side_progress", "row_icons", "row_icons_custom", "side_count", "side_dots", "side_share",
                      "cal_today", "cal_tasks", "cal_holidays", "cal_abs", "cal_abs_team", "holiday_state", "tours_more", "features",
                      "nav_order", "mods_all", "folders_closed", "folder_colors", "photo_meta_strip", "week_start", "time_format",
                      "date_order", "mail_trim_fwd", "mail_trim_eml")

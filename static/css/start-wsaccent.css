@@ -1,0 +1,6 @@
+/* 2.490.0 B (#4026): the accent follows the shown workspace (wscolor.js wac_sync: --wad / --waid dark, --wal / --wail light, each
+   fitted to 4.5:1 for its ink); set on :root so everything derived from the accent follows, an open list's colour (#main.lp-acc)
+   still wins inside the list view; backgrounds stay untinted */
+:root.wac-on{--accent:var(--wad);--accent-ink:var(--waid)}
+:root.wac-on[data-theme="light"]{--accent:var(--wal);--accent-ink:var(--wail)}
+@media (prefers-color-scheme: light){ :root.wac-on[data-theme="auto"]{--accent:var(--wal);--accent-ink:var(--wail)} }

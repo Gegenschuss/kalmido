@@ -15962,5 +15962,7 @@
   "Which team?": "Welk team?",
   "Read later in team…": "Later lezen in team…",
   "Bookmark in team…": "Bladwijzer in team…",
-  "Saved in “{0}”: {1}": "Opgeslagen in ‘{0}’: {1}"
+  "Saved in “{0}”: {1}": "Opgeslagen in ‘{0}’: {1}",
+  "Interface in the colour of the workspace": "Interface in de kleur van de werkruimte",
+  "Main buttons, the active navigation, ticks, progress and focus take the colour of the workspace shown; Private keeps the accent colour, “All workspaces” a neutral grey. Off: always the accent colour.": "Hoofdknoppen, de actieve navigatie, vinkjes, voortgang en focus krijgen de kleur van de getoonde werkruimte; Privé houdt de accentkleur, „Alle werkruimtes” een neutraal grijs. Uit: altijd de accentkleur."
 }

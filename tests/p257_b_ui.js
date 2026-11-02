@@ -112,7 +112,7 @@ const mix = (tone, p, base) => rgb(tone).map((v, i) => Math.round(v * p + rgb(ba
   const vars = sel => { const m = css.match(new RegExp(sel.replace(/[[\]()"=]/g, '\\$&') + '\\{([^}]*)\\}')); const o = {}; if (m) for (const [, k, v] of m[1].matchAll(/--([\w-]+):([^;]+)/g)) o[k] = v.trim(); return o; };
   const dark = vars(':root'), light = vars(':root[data-theme="light"]');
   // 2.138.2 (#2389): the tint is gone -- the sidebar keeps bg2 in every workspace, so its text contrast is the theme's own
-  check(!/#side\.wsp-on\{--wsc/.test(css) && /#side\{border-top:\.25rem solid var\(--wbc\)\}/.test(css), '#1807 / #2389: no tint rule any more, a 4 px stripe instead');
+  check(!/#side\.wsp-on\{--wsc/.test(css) && /#side\{border-top:\.375rem solid var\(--wbc\)\}/.test(css), '#1807 / #2389: no tint rule any more, a 6 px stripe instead (2.490.0 (#4026): 4 px before)');
   check(/#side\{background:var\(--sbbg,var\(--bg2\)\)\}/.test(css), '#1807: #side takes --sbbg (the fixed head shares it)');
 
   // ---- the real browser: the computed background of #side differs from bg2 (desktop dark + light, the phone drawer)

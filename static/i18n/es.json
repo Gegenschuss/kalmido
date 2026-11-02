@@ -15962,5 +15962,7 @@
   "Which team?": "¿Qué equipo?",
   "Read later in team…": "Leer más tarde en equipo…",
   "Bookmark in team…": "Marcador en equipo…",
-  "Saved in “{0}”: {1}": "Guardado en «{0}»: {1}"
+  "Saved in “{0}”: {1}": "Guardado en «{0}»: {1}",
+  "Interface in the colour of the workspace": "Interfaz en el color del espacio de trabajo",
+  "Main buttons, the active navigation, ticks, progress and focus take the colour of the workspace shown; Private keeps the accent colour, “All workspaces” a neutral grey. Off: always the accent colour.": "Los botones principales, la navegación activa, las marcas, el progreso y el foco toman el color del espacio de trabajo mostrado; Privado mantiene el color de acento, «Todos los espacios de trabajo» un gris neutro. Desactivado: siempre el color de acento."
 }

@@ -45,9 +45,49 @@ const wsp_dot = ws => { const v = wsp_barVars(ws); return `<span class="wsp-dot"
 // 4 px stripe on top of the sidebar and the 3 px stripe on top of the header while the sidebar is closed (phone, rail)
 const WSB_VARS = ['--wbd', '--wbl'];
 function wsp_side() {
-  const t = wsp_barTone(wsOn() ? wsCur() : 'private');
+  const ws = wsOn() ? wsCur() : 'private', t = wsp_barTone(ws);
   lp_put($('#app'), 'wsb-on', t ? `--wbd:${t[0]};--wbl:${t[1]}` : '', WSB_VARS);
+  wac_sync(ws);  // 2.490.0 B (#4026)
 }
+// ---- 2.490.0 B (#4026): the whole interface in the shown workspace's colour (main buttons, active navigation, ticks, progress,
+// focus): --accent / --accent-ink are set on :root (class wac-on, the variables --wad / --waid / --wal / --wail per theme, app.css),
+// so every colour derived from the accent at :root follows; backgrounds stay untinted (#2389), an open list's colour (#main.lp-acc)
+// stays its own signal. The colour = the stripe's (wsp_barTone: my choice, else the organisation's); Private without a choice
+// keeps Kalmido's accent (the device's accent), "All" and "No colour" a neutral grey. Setting ws_accent ('0' = off, the old look).
+// Each tone is darkened (light theme, white ink) or lightened (dark theme, dark ink) until text on a button reaches 4.5:1.
+const WAC_VARS = ['--wad', '--waid', '--wal', '--wail'];
+const WAC_GREY = ['#a3a6ad', '#5d6068'];  // "All" / "No colour": neutral, [dark, light]
+const WAC_INK = ['#0b0c0e', '#ffffff'];  // ink on a button: dark in the dark theme, white in the light one
+const wac_on = () => S.settings?.ws_accent !== '0';
+const wac_lum = c => { const l = c.map(v => v / 255).map(x => x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4); return .2126 * l[0] + .7152 * l[1] + .0722 * l[2]; };
+const wac_ratio = (a, b) => { const x = wac_lum(a), y = wac_lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+const wac_hex = c => '#' + c.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+// a tone moved toward white (dark theme) or black (light theme) in small steps until its ink reaches 4.5:1 (null = not a colour)
+function wac_fit(hex, light) {
+  let c = lp_rgb(hex); if (!c) return null;
+  const ink = lp_rgb(WAC_INK[light ? 1 : 0]), to = light ? 0 : 255;
+  for (let i = 0; i < 40 && wac_ratio(c, ink) < 4.5; i++) c = c.map(v => v + (to - v) * .06);
+  return wac_hex(c);
+}
+// the accent of a workspace: [dark, dark ink, light, light ink] or null (= Kalmido's accent stays)
+function wac_tone(ws) {
+  if (!wac_on()) return null;
+  const t = ws === 'all' ? null : wsp_barTone(ws);
+  if (t && t[0] === 'var(--accent)') return null;  // Private without a choice
+  const [d, l] = t || WAC_GREY, fd = wac_fit(d, false), fl = wac_fit(l, true);
+  return fd && fl ? [fd, WAC_INK[0], fl, WAC_INK[1]] : null;
+}
+// put the tone onto :root and remember it for the next start (set before the first paint, see the end of this file)
+function wac_put(t) {
+  lp_put(document.documentElement, 'wac-on', t ? WAC_VARS.map((n, i) => `${n}:${t[i]}`).join(';') : '', WAC_VARS);
+}
+function wac_sync(ws) {
+  const t = wac_tone(ws); wac_put(t);
+  const k = t ? t.join() : '';
+  if ((LS.get('wsAccent', '') || '') !== k) { if (k) LS.set('wsAccent', k); else LS.del('wsAccent'); }
+}
+// 2.490.0 B (#4026): no flicker on a start -- the last shown workspace's accent before the app draws (like the theme, icons.js)
+try { const v = String(LS.get('wsAccent', '') || '').split(','); if (v.length === 4 && v.every(x => /^#[0-9a-f]{6}$/i.test(x))) wac_put(v); } catch { /* no storage */ }
 async function wsp_set(ws, v) {
   const before = S.settings.ws_colors || '{}', o = wsp_cols();
   if ((o[ws] || '') === v) return;

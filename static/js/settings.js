@@ -83,6 +83,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-prbg': ['prio_bg', N_('Priority as background'), 'sel'],  // 2.40.0 (#1416)
   's-pcol': ['person_colors', N_('Show colours for people'), 'chk'],  // 2.47.1 (#1721)
   's-lpdot': ['list_color_dot', N_('Project colours only as a dot'), 'chk'],  // 2.53.0 (#1426)
+  's-wacc': ['ws_accent', N_('Interface in the colour of the workspace'), 'chk'],  // 2.490.0 B (#4026): wscolor.js wac_sync
   's-sideic': ['side_icons', N_('Project icons'), 'sel'], 's-sideprog': ['side_progress', N_('Progress in the sidebar'), 'chk'],  // 2.36.0 (#1117)
   's-sidecnt': ['side_count', N_('Task counts in the sidebar'), 'chk'], 's-sidedot': ['side_dots', N_('Status dots of projects'), 'chk'], 's-sideshr': ['side_share', N_('Share marks (person / robot)'), 'chk'],  // 2.56.1 (#1799)
   's-sdd': ['show_done_default', N_('Completed tasks'), 'sel'],  // 2.39.1 (#1214)
@@ -100,7 +101,7 @@ const SETS = {  // control id -> [setting key, label, kind]
 // 2.62.0 (#1854): comments by agents: all | only replies to me (people's comments stay as the matrix says)
 const bl9SetHtml = (s, hint) => collab() && feat('agents') ? `<div class="row"><label for="s-bl9ac">${tr('Comments by agents')}</label><select id="s-bl9ac">${[['all', N_('All')], ['replies', N_('Only replies to me')]].map(([v, n]) => `<option value="${v}" ${(s.agent_comments || 'all') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
       ${hint(tr('Only replies to me: a comment by an agent reaches you (News and push) only when it answers your comment, follows right after your comment or mentions you. Comments by people are not affected.'))}` : '';
-const SET_RENDER = ['sidebar', 'row_icons', 'row_icons_custom', 'side_count', 'side_dots', 'side_share', 'prio_bg', 'person_colors', 'list_color_dot', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'week_start', 'time_format', 'date_order', 'agents_hidden', 'side_people', 'side_agents'];
+const SET_RENDER = ['sidebar', 'row_icons', 'row_icons_custom', 'side_count', 'side_dots', 'side_share', 'prio_bg', 'person_colors', 'list_color_dot', 'ws_accent', 'side_icons', 'side_progress', 'features', 'nav_order', 'show_done_views', 'show_done_default', 'hide_blocked_today', 'today_inbox', 'progress_subtasks', 'cal_today', 'time_target', 'lang', 'week_start', 'time_format', 'date_order', 'agents_hidden', 'side_people', 'side_agents'];
 const SET_SLOW = ['lang', 'features', 'nav_order'];  // 2.41.2 (#1501): drawn once their language file / state is there
 function setVal(el, kind) {  // the value a control stands for; undefined = not valid (nothing is saved)
   const v = el.value;
@@ -664,6 +665,8 @@ function settingsModal(focus) {
     // 2.418.0 (#3560): the editor of every area's menu and the tab bar (navmenu.js nav_pageDraw)
     nav: S.me?.kid ? '' : `<h4 id="s-nav-h">${tr('Menus')}</h4>${hint(tr('The order and the points of each menu, for you on every device. Minus hides a point (the search still finds it), Plus brings it back, drag by the grip.'))}<div id="s-navmenus"><div class="muted mhint">${tr('Loading…')}</div></div>`,
     look: `<div id="s-lookin">${lookHtml()}</div>
+      <h4 id="s-wacc-h">${tr('Colour of the workspace')}</h4><div class="row">${chk('s-wacc', s.ws_accent !== '0', tr('Interface in the colour of the workspace'))}</div>
+      ${hint(tr('Main buttons, the active navigation, ticks, progress and focus take the colour of the workspace shown; Private keeps the accent colour, “All workspaces” a neutral grey. Off: always the accent colour.')) /* 2.490.0 B (#4026) */}
       <h4 id="s-lemo-h">${tr('New projects')}</h4><div class="row">${chk('s-lemo', s.list_emoji !== '0', tr('Suggest icons for new projects'))}</div>
       <div class="row">${chk('s-sdn', s.show_done_new !== '0', tr('Hide completed tasks in new projects'))}</div>
       ${hint(tr('A new project hides its completed tasks; its “…” menu shows them again. A folder default goes first.'))}

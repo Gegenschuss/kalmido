@@ -4623,6 +4623,7 @@ USER_DEFAULTS = {
     "prio_bg": "",              # 2.40.0 (#1416): tasks with a priority tinted in its colour: '' (off) | soft | strong
     "person_colors": "1",       # 2.47.1 (#1721): people in their account colour ('0' = only agents coloured)
     "list_color_dot": "0",      # 2.53.0 (#1426): 1 = list colours only as the dot in the sidebar (no accent, no card edge)
+    "ws_accent": "1",           # 2.490.0 B (#4026): the accent follows the shown workspace (static/js/wscolor.js wac_sync; 0 = off)
     "folder_colors": "{}",      # 2.53.0 (#1426): json {folder path: colour} of my folders; a new list in it takes the colour
     "side_progress": "1",       # 2.36.0 (#1117): progress bars of projects in the sidebar (0 = hidden)
     # 2.56.1 (#1799): symbols in the task row: all | key (default for everyone) | calm | custom; custom = row_icons_custom

@@ -93,7 +93,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   // CSS: no stripe in the list header, no tint, 4 px / 3 px
   const css = await (await fetch(B + 'static/app.css')).text();
   check(!/#main\.wsc-on #top\{box-shadow/.test(css) && !/#side\.wsp-on\{--wsc/.test(css), '#2389: the list header stripe and the tint are gone (CSS)');
-  check(/#side\{border-top:\.25rem solid var\(--wbc\)\}/.test(css) && /#app\.side-rail #top\{box-shadow:inset 0 \.1875rem 0 var\(--wbc\)\}/.test(css), '#2389: 4 px stripe in the sidebar, 3 px on top of the header (rail / phone)');
+  // 2.490.0 (#4026): a wider stripe -- 6 px in the sidebar, 4 px on top of the header (4 px / 3 px before)
+  check(/#side\{border-top:\.375rem solid var\(--wbc\)\}/.test(css) && /#app\.side-rail #top\{box-shadow:inset 0 \.25rem 0 var\(--wbc\)\}/.test(css), '#2389 / #4026: 6 px stripe in the sidebar, 4 px on top of the header (rail / phone)');
   check(/@media \(hover:none\)\{ #side \.sbhead \.sbtools\{opacity:1\} \}/.test(css) && /#side \.sbhead:hover \.sbtools,#side \.sbhead:focus-within \.sbtools\{opacity:1\}/.test(css), '#2392: the tools on hover, keyboard focus and touch screens');
   w.close();
 
@@ -137,7 +138,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
       await o.nav(B + '#inbox'); await ready(ev);
       await ev(`(() => { document.querySelectorAll('.authscreen').forEach(e => e.remove()); document.querySelector('#app')?.removeAttribute('inert'); return 1; })()`);
       let g = await ev(GEO);
-      check(g.sth === 4 && g.stc === g.acc, `1280 ${theme}: #2389 a 4 px stripe in purple across the top of the sidebar ` + JSON.stringify(g));
+      check(g.sth === 6 && g.stc === g.acc, `1280 ${theme}: #2389 a 6 px stripe (2.490.0 (#4026): 4 px before) in the accent across the top of the sidebar ` + JSON.stringify(g));
       check(g.wy < g.sdt && g.ay < g.sdt && Math.abs(g.ay - g.wy) < 20 && Math.abs(g.sy - g.wy) < 20 && !g.ndw && g.over <= 0, `1280 ${theme}: #2392 workspace, search and avatar in the head bar over the panel, no connection dot online ` + JSON.stringify(g));  // 2.152.3 (#2619): workspace, search and account moved into the head bar
       check(g.top === 'none' && +g.tools === 1, `1280 ${theme}: no header stripe while the sidebar is open; the panel head's tools always visible ` + JSON.stringify(g));  // 2.152.3 (#2619): the panel head's tools (fold all, hide) always show in sidebar B
       await ev(`(() => { document.querySelector('#side .sbbfa').focus(); return 1; })()`); await sleep(350);  // 2.152.3 (#2619): fold all = .sbbfa
@@ -149,14 +150,15 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
       // an organisation: its colour
       await ev(`(() => { wsSet('org:' + S.me.workspaces[0].id); return 1; })()`); await sleep(700);
       g = await ev(GEO);
-      check(g.stc !== g.acc && g.stc !== 'rgba(0, 0, 0, 0)', `1280 ${theme}: #2389 the organisation's colour ` + g.stc);
+      // 2.490.0 (#4026): the accent follows the organisation now, so the stripe is compared with Kalmido's petrol instead
+      check(!['rgb(79, 179, 193)', 'rgb(24, 115, 129)', 'rgba(0, 0, 0, 0)'].includes(g.stc), `1280 ${theme}: #2389 the organisation's colour ` + g.stc);
       await shot(`p21381c-1280-${theme}-org.png`);
       await ev(`(() => { wsSet('private'); return 1; })()`); await sleep(500);
       // the rail (folded away below 1100 px): 3 px on top of the header
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1000, height: 800}});
       await ev(`(() => { sideFold(true); return 1; })()`); await sleep(700);
       g = await ev(GEO);
-      check(await ev(`document.querySelector('#app').classList.contains('side-rail')`) && /inset/.test(g.top) && /0px 3px 0px/.test(g.top), `1000 ${theme}: #2389 folded away: a 3 px stripe on top of the header ` + g.top);
+      check(await ev(`document.querySelector('#app').classList.contains('side-rail')`) && /inset/.test(g.top) && /0px 4px 0px/.test(g.top), `1000 ${theme}: #2389 folded away: a 4 px stripe (2.490.0 (#4026): 3 px before) on top of the header ` + g.top);
       await ev(`(() => { sideFold(false); return 1; })()`); await sleep(300);
     }, false);
     await firefox(async o => {
@@ -166,11 +168,11 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
       await o.nav(B + '#inbox'); await ready(ev);
       await ev(`(() => { document.querySelectorAll('.authscreen').forEach(e => e.remove()); document.querySelector('#app')?.removeAttribute('inert'); return 1; })()`);
       let g = await ev(GEO);
-      check(/inset/.test(g.top) && /0px 3px 0px/.test(g.top) && g.top.includes(g.acc), `390 ${theme}: #2389 a 3 px purple stripe on top of the header ` + g.top);
+      check(/inset/.test(g.top) && /0px 4px 0px/.test(g.top) && g.top.includes(g.acc), `390 ${theme}: #2389 a 4 px (2.490.0 (#4026): 3 px before) accent stripe on top of the header ` + g.top);
       await shot(`p21381c-390-${theme}-list.png`);
       await ev(`(() => { document.querySelector('#top [data-act="side"]').click(); return 1; })()`); await sleep(800);
       g = await ev(GEO);
-      check(g.sth === 4 && g.stc === g.acc && g.over <= 0, `390 ${theme}: the drawer has the 4 px stripe ` + JSON.stringify(g));
+      check(g.sth === 6 && g.stc === g.acc && g.over <= 0, `390 ${theme}: the drawer has the 6 px stripe (2.490.0 (#4026)) ` + JSON.stringify(g));
       check(+g.tools === 1 && g.ay > g.wy, `390 ${theme}: #2392 touch screen: the tools stay visible; the avatar at the bottom ` + JSON.stringify(g));
       await shot(`p21381c-390-${theme}-drawer.png`);
     }, true);
