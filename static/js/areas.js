@@ -358,6 +358,18 @@ const o3a_privOnly = mod => O3A_PRIV.includes(mod) || (mod === 'life' && !o3a_li
 // offers the other spaces in its own picker, rd_pick), never a mixed view
 const rd_space = (own = '') => { const w = typeof wsCur === 'function' ? wsCur() : 'all'; return w !== 'all' ? w : own && wsOptions().includes(own) && own !== 'all' ? own : 'private'; };
 const rd_pick = (cur, attr) => typeof wsCur === 'function' && wsCur() === 'all' && wsOn() && wsOptions().length > 2 ? `<select ${attr} aria-label="${esc(tr('Workspace'))}">${wsOptions().filter(w => w !== 'all').map(w => `<option value="${w}" ${w === cur ? 'selected' : ''}>${esc(wsName(w))}</option>`).join('')}</select>` : '';
+// 2.490.0 C (#4025): where a link is saved to (Read later / a bookmark) is picked, not the shown workspace: Private, then
+// every organisation the person may add to (member or admin, Reading on there for the person). "(Team)" says that all its
+// members see it. Used by the share question (agentchat.js shareDest) and the bookmark button (bookmarks.js
+// bm_confirmSave); the server checks the space again (life/rss.py rss_space, life/bookmarks.py bm_space).
+const rd_targets = () => ['private', ...(wsOn() ? (S.me?.workspaces || []).filter(w => (w.role === 'admin' || w.role === 'member') && wsa_wsOn('org:' + w.id, 'reading')).map(w => 'org:' + w.id) : [])];
+const rd_tgtName = sp => sp === 'private' ? tr('Private|workspace') : tr('{0} (Team)', wsName(sp));
+// kind 'later' | 'bookmark': the label "Read later · Private" / "Bookmark · Alpha (Team)"
+const rd_tgtLabel = (kind, sp) => `${kind === 'later' ? tr('Read later') : tr('Bookmark')} · ${rd_tgtName(sp)}`;
+// a select of the targets for a form ('' with Private only); Private is preselected
+const rd_tgtSel = (kind, id) => { const ts = rd_targets(); return ts.length < 2 ? '' : `<div class="row"><label for="${id}">${tr('Save in')}</label><select id="${id}">${ts.map(sp => `<option value="${sp}">${esc(rd_tgtLabel(kind, sp))}</option>`).join('')}</select></div>`; };
+// the answer of the share question 'later' | 'later:org:5' | 'bookmark' | 'bookmark:org:5' -> [kind, space] (others stay as they are)
+const rd_destSplit = v => typeof v === 'string' && /^(bookmark|later):/.test(v) ? [v.slice(0, v.indexOf(':')), v.slice(v.indexOf(':') + 1)] : [v, 'private'];
 const o3a_orgView = () => typeof wsCur === 'function' && wsCur().startsWith('org:');
 // 2.173.0 A (#2680): the parts of an area shown in the current view (an organisation's: without the private ones) and the
 // name of Home there (only travel and staying in touch: not "Home")

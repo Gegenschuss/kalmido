@@ -15956,5 +15956,11 @@
   "Turn on time tracking for this project?": "¿Activar el registro de tiempo en este proyecto?",
   "“{0}” does not track time yet. Turn it on and start the timer for “{1}”?": "«{0}» aún no registra tiempo. ¿Activarlo e iniciar el temporizador para «{1}»?",
   "This project does not track time; only its owner can turn it on.": "Este proyecto no registra tiempo; solo su propietario puede activarlo.",
-  "{0} past": ["{0} terminado", "{0} terminados"]
+  "{0} past": ["{0} terminado", "{0} terminados"],
+  "{0} (Team)": "{0} (equipo)",
+  "Save in": "Guardar en",
+  "Which team?": "¿Qué equipo?",
+  "Read later in team…": "Leer más tarde en equipo…",
+  "Bookmark in team…": "Marcador en equipo…",
+  "Saved in “{0}”: {1}": "Guardado en «{0}»: {1}"
 }

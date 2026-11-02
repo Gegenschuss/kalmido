@@ -69,14 +69,14 @@ function bootDone() {
     // 2.143.0 C (#2154): shared contact cards (.vcf) / calendar files (.ics) can go through the existing imports
     const allOf = re => files.length > 0 && files.every(f => re.test(f.name || '') || re.test(f.type || ''));
     const imp = {contacts: feat('contacts') && allOf(/\.vcf$|^text\/(x-)?vcard\b/i), calendar: feat('events') && (S.evcals || []).some(evWrite) && allOf(/\.ics$|^text\/calendar\b/i)};
-    const dest = (ags.length || docs || bmU || imp.contacts || imp.calendar) && (files.length || meta.text || meta.url || meta.title) ? await shareDest(ags, docs, !!bmU, imp) : 'task';
+    const [dest, dsp] = rd_destSplit((ags.length || docs || bmU || imp.contacts || imp.calendar) && (files.length || meta.text || meta.url || meta.title) ? await shareDest(ags, docs, !!bmU, imp) : 'task');  // 2.490.0 C (#4025): + the picked space
     const ext = (f, e) => new RegExp(`\\.${e}$`, 'i').test(f.name || '') ? f : new File([f], (f.name || 'shared') + '.' + e, {type: f.type});  // the imports go by the ending
     // 2.143.0 C2 (#2154): one question per share: the contact cards go in as one file, the calendar files one after another
     if (dest === 'contacts') { await loadModule('contacts'); ctImport(null, 'vcf', files.length > 1 ? new File([(await Promise.all(files.map(f => f.text()))).join('\r\n')], 'shared.vcf', {type: 'text/vcard'}) : ext(files[0], 'vcf')); }
     else if (dest === 'calendar') { const own = (S.evcals || []).find(x => !x.org_id && x.role === 'owner'), c = own || (S.evcals || []).find(evWrite); for (const f of files) await evImport(c, () => load().then(render).catch(() => {}), ext(f, 'ics')); }
     else if (dest === 'doc') await dc_shareFiles(files);
-    else if (dest === 'bookmark') await bm_shareSave(bmU, meta.title);
-    else if (dest === 'later') await rdl_shareSave(bmU, meta.title);  // 2.172.0 B (#2679): into the shown workspace
+    else if (dest === 'bookmark') await bm_shareSave(bmU, meta.title, dsp);
+    else if (dest === 'later') await rdl_shareSave(bmU, meta.title, dsp);  // 2.490.0 C (#4025): into the picked space (Private unless an organisation is picked)
     else if (dest !== 'task') {
       const txt = [meta.title, meta.text, meta.url && !(meta.text || '').includes(meta.url) ? meta.url : ''].map(x => (x || '').trim()).filter(Boolean).join('\n');
       if (txt) S.drafts['chat:' + dest] = txt;
@@ -96,10 +96,10 @@ function bootDone() {
     const [u, rest] = shareLink(text, (q.get('url') || '').trim());
     // 2.97.0 A (#1950): the bookmark button of the browser (?bm=1) saves a bookmark; a shared link offers "Save as bookmark"
     const bmU = /^https?:\/\//i.test(u) ? u.slice(0, 2000) : '';
-    const sd = bmU && q.get('bm') !== '1' && feat('reading') ? await shareDest([], false, true) : '';  // 2.172.0 B (#2679): + read later
+    const [sd, sdSp] = rd_destSplit(bmU && q.get('bm') !== '1' && feat('reading') ? await shareDest([], false, true) : '');  // 2.172.0 B (#2679): + read later; 2.490.0 C (#4025): + the space
     if (bmU && q.get('bm') === '1') bm_confirmSave(bmU, (q.get('title') || '').trim().slice(0, 300));
-    else if (sd === 'bookmark') await bm_shareSave(bmU, (q.get('title') || '').trim());
-    else if (sd === 'later') await rdl_shareSave(bmU, (q.get('title') || '').trim());
+    else if (sd === 'bookmark') await bm_shareSave(bmU, (q.get('title') || '').trim(), sdSp);
+    else if (sd === 'later') await rdl_shareSave(bmU, (q.get('title') || '').trim(), sdSp);
     else openQuickSheet((q.get('title') || '').trim() || rest || (u ? urlTitle(u) : ''), {url: u, list_id: inbox().id, ...(S.me ? {assignee_id: S.me.id} : {})});  // 2.27.0 (#1001): yours
   } else if (new URLSearchParams(location.search).get('action') === 'new') {  // app shortcut "New task"
     history.replaceState(null, '', '/' + (location.hash || ''));

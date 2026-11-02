@@ -15956,5 +15956,11 @@
   "Turn on time tracking for this project?": "Tijdregistratie voor dit project inschakelen?",
   "“{0}” does not track time yet. Turn it on and start the timer for “{1}”?": "„{0}” registreert nog geen tijd. Inschakelen en de timer voor „{1}” starten?",
   "This project does not track time; only its owner can turn it on.": "Dit project registreert geen tijd; alleen de eigenaar kan dat inschakelen.",
-  "{0} past": ["{0} voorbij", "{0} voorbij"]
+  "{0} past": ["{0} voorbij", "{0} voorbij"],
+  "{0} (Team)": "{0} (team)",
+  "Save in": "Opslaan in",
+  "Which team?": "Welk team?",
+  "Read later in team…": "Later lezen in team…",
+  "Bookmark in team…": "Bladwijzer in team…",
+  "Saved in “{0}”: {1}": "Opgeslagen in ‘{0}’: {1}"
 }

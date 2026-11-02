@@ -94,14 +94,15 @@ function bm_row(x) {
 
 // ---- actions (each one undo step)
 const bm_item = id => BM.items.find(x => x.id === id);
-async function bm_add(url, extra = {}) {
+// 2.490.0 C (#4025): extra.space = the space picked when sharing (else the shown one); where = its name for the message
+async function bm_add(url, extra = {}, where = '') {
   BM.busy = true; bm_draw();
   try {
     const j = await api('POST', '/api/bookmarks', {url, space: bm_addSp(), ...extra});
     const b = j.bookmark;
     BM.busy = false;
     if (j.existed) toast(tr('Already saved: {0}', b.title), () => bm_detail(b.id), 6000, tr('Open'));
-    else offerUndo(tr('Saved: {0}', b.title), histAdd({label: tr('Save bookmark {0}', qn(b.title)),
+    else offerUndo(where ? tr('Saved in “{0}”: {1}', where, b.title) : tr('Saved: {0}', b.title), histAdd({label: tr('Save bookmark {0}', qn(b.title)),
       undo: async () => { await api('DELETE', `/api/bookmarks/${b.id}`); await bm_reload(); },
       redo: async () => { await api('POST', `/api/bookmarks/${b.id}/restore`, {}); await bm_reload(); }}));
     BM.polls = 0; await bm_reload();
@@ -201,11 +202,14 @@ async function bm_detail(id) {
 function bm_bookmarkletHelp() { settingsModal('bookmarklet'); }
 
 // ---- from the share sheet / the bookmarklet (main.js): save, then open the bookmark for tags and a note
-async function bm_shareSave(url, title) {
+// 2.490.0 C (#4025): into the picked space (Private unless an organisation is picked; the server checks the organisation)
+async function bm_shareSave(url, title, space = 'private') {
   if (!feat('reading')) { toast(tr('Bookmarks are part of the module “Read later” (Settings > Modules)')); return; }
+  space = space || 'private';
+  BM.space = space;  // under "All workspaces" the view shows where it went
   go('bookmarks');
   const t = (title || '').trim();
-  const b = await bm_add(url, t && t !== url ? {title: t.slice(0, 300)} : {});
+  const b = await bm_add(url, {space, ...(t && t !== url ? {title: t.slice(0, 300)} : {})}, wsOn() ? wsName(space) : '');
   if (b) bm_detail(b.id);
 }
 
@@ -215,12 +219,12 @@ function bm_confirmSave(url, title) {
   if (!feat('reading')) { toast(tr('Bookmarks are part of the module “Read later” (Settings > Modules)')); return; }
   const u = bm_href(url); if (!u) return;
   const md = modal(`<form class="bmconf" novalidate><h3 id="bmc-t">${ic('bookmark', 's')} ${tr('Save as bookmark')}</h3>
-    <p class="bmctitle"><b>${esc(title || u)}</b></p><p class="muted bmcurl">${esc(u)}</p>
+    <p class="bmctitle"><b>${esc(title || u)}</b></p><p class="muted bmcurl">${esc(u)}</p>${rd_tgtSel('bookmark', 'bmc-sp')}
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button type="submit" class="btn pri" data-m="save">${tr('Save')}</button></div></form>`);
   md.classList.add('bmdlg', 'bmconfdlg');
   md.setAttribute('role', 'dialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'bmc-t');
   md.addEventListener('click', e => { if (e.target.closest('[data-m="close"]')) md.remove(); });
-  $('form', md).addEventListener('submit', e => { e.preventDefault(); md.remove(); bm_shareSave(u, title); });
+  $('form', md).addEventListener('submit', e => { e.preventDefault(); const sp = $('#bmc-sp', md)?.value || 'private'; md.remove(); bm_shareSave(u, title, sp); });  // 2.490.0 C (#4025): the picked space
   setTimeout(() => $('[data-m="save"]', md)?.focus(), 30);
 }
 

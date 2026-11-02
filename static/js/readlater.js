@@ -60,8 +60,9 @@ function viewReading() {
 
 // ---- actions (each one undo step)
 // share: from the share sheet -- the toast names the workspace it went to (2.172.1 A, #2690)
-async function rdl_save(url, title, share = false) {
-  const space = rdl_sp();
+// 2.490.0 C (#4025): to = the space picked in the share question (else the shown one)
+async function rdl_save(url, title, share = false, to = '') {
+  const space = to || rdl_sp();
   const j = await api('POST', '/api/reading', {url, space, ...(title ? {title: title.slice(0, 300)} : {})});
   const where = share ? wsName(j.space || space) : '';
   if (!j.created) { toast(where ? tr('Already in “Read later” in “{0}”', where) : tr('Already in your reading list')); return j; }
@@ -87,13 +88,14 @@ async function rdl_tick(id) {
     undo: async () => { await api('POST', back(id)); await rdl_reload(); },
     redo: async () => { await api('POST', path(id)); await rdl_reload(); }}));
 }
-// the share sheet of the phone: a shared link goes to read later in the shown space
-async function rdl_shareSave(url, title) {
+// the share sheet of the phone: a shared link goes to read later in the picked space (2.490.0 C, #4025: Private unless an
+// organisation is picked; the server refuses an organisation the person may not add to)
+async function rdl_shareSave(url, title, space = 'private') {
   if (!feat('reading')) { toast(tr('Read later is turned off in your settings')); return; }
   const u = rdl_href(url); if (!u) return;
   const t = (title || '').trim();
-  try { await rdl_save(u, t && t !== u ? t : '', true); } catch { return; }  // api() showed the reason
-  RDL.done = false;
+  let j; try { j = await rdl_save(u, t && t !== u ? t : '', true, space || 'private'); } catch { return; }  // api() showed the reason
+  RDL.space = j?.space || space || ''; RDL.done = false;  // under "All workspaces" the view shows where it went
   go('reading');
 }
 
