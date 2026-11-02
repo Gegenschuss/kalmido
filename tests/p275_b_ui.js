@@ -42,7 +42,8 @@ const menuItem = (d, re) => [...d.querySelectorAll('#pop [role="menuitem"]')].fi
   const topMenu = async () => { click(w, await until(() => d.querySelector('#top [data-act="top-more"]'))); await sleep(150); const r = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim()); w.eval('closePop()'); return r; };
   check(!d.querySelector('[data-asst]') && !(await topMenu()).some(x => /Assistant plan/.test(x)), 'off: Today has no assistant entry');
   w.eval(`settingsModal()`); await sleep(400);
-  check(d.querySelector('.smodal') && !d.querySelector('.smodal .snav [data-sec="assistant"]'), 'off: no settings section');
+  // 2.489.0 (#2664): the assistant is a sub-tab of Settings > Agents (decision #2654), no section of its own
+  check(d.querySelector('.smodal') && !d.querySelector('.smodal .snav [data-sec="assistant"]') && !d.querySelector('.smodal [data-aisub="assistant"]') && !d.querySelector('.smodal #s-asst-on'), 'off: no assistant in the settings');
   w.close();
 
   // ================= with a configuration
@@ -64,8 +65,13 @@ const menuItem = (d, re) => [...d.querySelectorAll('#pop [role="menuitem"]')].fi
   await sleep(600);
   check(!d.querySelector('[data-asst]') && !(await topMenu()).some(x => /Assistant plan/.test(x)), 'configured but not switched on: no entry point');
   w.eval(`settingsModal('assistant')`);
-  const pane = await until(() => d.querySelector('.smodal [data-pane="assistant"]'));
-  check(pane && !pane.classList.contains('hidden'), "settingsModal('assistant') opens the section");
+  // 2.489.0 (#2664): Settings > Agents, its tab Built-in assistant (alone without tabs while the agents are off)
+  const aiPane = await until(() => d.querySelector('.smodal [data-pane="ai"]'));
+  check(!d.querySelector('.smodal .snav [data-sec="assistant"]'), 'no section Assistant of its own any more');
+  const pane = await until(() => d.querySelector('.smodal [data-aisp="assistant"]') || (aiPane && !aiPane.querySelector('[data-aisp]') ? aiPane : null));
+  check(aiPane && !aiPane.classList.contains('hidden') && pane && !pane.hidden && !!pane.querySelector('#s-asst-on'), "settingsModal('assistant') opens Agents on the built-in assistant");
+  const tab = d.querySelector('.smodal [data-aisub="assistant"]');
+  check(!tab || (tab.getAttribute('aria-selected') === 'true' && /Assistant|Assistent/.test(tab.textContent)), 'its tab is the selected one ' + (tab?.textContent || '(no tabs)'));
   check(/Fake-AI/.test(pane?.querySelector('.asstprov')?.textContent || ''), 'the hint names the provider ' + (pane?.querySelector('.asstprov')?.textContent || ''));
   check(pane?.querySelector(`[data-asstl="${W}"]`) && pane?.querySelector(`[data-asstl="${P}"]`) && !pane?.querySelector(`[data-asstl="${st.lists.find(l => l.is_inbox)?.id}"]`), 'the list choice has the lists, not the basket');
   tick(w, pane?.querySelector('#s-asst-on'));
