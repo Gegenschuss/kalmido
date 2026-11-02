@@ -1,0 +1,11 @@
+/* 2.489.0 (#4014): without a head bar (the phone) the favourites are entries of the sidebar (favtiles.js fv2_sideHtml) */
+.fv2side .fv2-row{-webkit-touch-callout:none}
+.fv2side .fv2-ri{position:relative;display:flex;flex:none;align-items:center;justify-content:center;width:1.25rem;color:var(--fvc,inherit)}
+.fv2side .fv2-ri .sic,.fv2side .fv2-ri .lic{display:flex;margin:0}
+.fv2side .fv2-ri .fv2-av{width:1.25rem;height:1.25rem;font-size:var(--fs-xs)}
+.fv2side .fv2-ri .fv2-st{position:absolute;right:-.25rem;bottom:-.125rem;display:flex}
+.fv2side .fv2-ri .fv2-st .hdot{width:.4375rem;height:.4375rem}
+.fv2side .fv2-row .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fv2side .fv2-wsd{display:flex;flex:none}
+.fv2side .fv2-wsd .wsp-dot{width:.5rem;height:.5rem}
+.fv2side .fv2-row[style] .fv2-ri svg{color:var(--fvc)}
