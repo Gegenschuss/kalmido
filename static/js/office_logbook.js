@@ -134,7 +134,7 @@ function lbDriveModal(d, fix) {
     <p class="lgb-warn" id="lgb-w" aria-live="polite">${d?.warn ? `${ic('alert', 's')} ${esc(lbWarn(d.warn))}` : ''}</p>
     ${ofcRowF('lgb-kind', tr('Kind'), ofcSel('lgb-kind', src?.kind || 'business', base.kinds.map(k => [k.key, k.label])))}
     ${ofcRowF('lgb-client', tr('Client'), ofcSel('lgb-client', src?.client_id || '', base.clients.map(c => [c.id, cdn_label(c)]), tr('none')))}
-    ${ofcRowF('lgb-project', tr('Project'), ofcIn('lgb-project', src?.project, {list: 'lgb-projs'}))}<datalist id="lgb-projs">${base.projects.map(p => `<option value="${esc(p)}">`).join('')}</datalist>
+    ${ofcProjSel('lgb-project', tr('Project'), src?.project, base.real_projects, base.projects)}
     ${ofcRowF('lgb-driver', tr('Driver'), ofcSel('lgb-driver', src?.user_id || base.me, base.people.map(p => [p.id, p.name])))}
     ${fix ? ofcRowF('lgb-fixnote', tr('Reason for the correction'), ofcIn('lgb-fixnote', '', {max: 500})) : ''}
     ${d ? `<details class="lgb-hist" open><summary>${ic('clock', 's')}<span>${tr('History')}</span></summary><ol class="lgb-hlist"><li class="muted">${tr('Loading…')}</li></ol></details>` : ''}
@@ -179,7 +179,7 @@ function lbDriveModal(d, fix) {
       const km = val('#lgb-km').trim();
       const body = {day: val('#lgb-day'), vehicle_id: +val('#lgb-veh2') || null, start_place: val('#lgb-start'), dest: val('#lgb-dest'), purpose: val('#lgb-purpose'),
         odo_start: ofcNum(val('#lgb-o0')), odo_end: ofcNum(val('#lgb-o1')), km: km === '' ? null : ofcNum(km), kind: val('#lgb-kind'),
-        client_id: +val('#lgb-client') || null, project: val('#lgb-project'), user_id: +val('#lgb-driver') || null};
+        client_id: +val('#lgb-client') || null, project: ofcProjVal(md, 'lgb-project'), user_id: +val('#lgb-driver') || null};
       if (d) {
         const old = {day: d.day, vehicle_id: d.vehicle_id, start_place: d.start_place, dest: d.dest, purpose: d.purpose, odo_start: d.odo_start, odo_end: d.odo_end,
           km: d.km, kind: d.kind, client_id: d.client_id, project: d.project, user_id: d.user_id};

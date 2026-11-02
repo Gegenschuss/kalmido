@@ -53,7 +53,7 @@ from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): wa
 from .homecur import hc_home  # noqa: E402  2.189.0 B (#2475)
 from .books import _year as bk_year, bk_csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_diff, ofx_log, _log_public, ofx_company  # 2.369.5 (#2517): pulled up from functions
-from .travel import rk_cl_where, rk_home_cur, rk_people, _client_ok, _one as rk_one, rk_trip_clean  # 2.369.5 (#2517): pulled up from functions
+from .travel import rk_cl_where, rk_home_cur, rk_people, rk_real_projects, _client_ok, _one as rk_one, rk_trip_clean  # 2.369.5 (#2517): pulled up from functions
 
 
 def _body():
@@ -207,7 +207,8 @@ def lb_vehicles_get():
     if ofr_own_uid("logbook") is not None:  # 2.187.0 B (#2476): the invoices' project names are not part of "own"
         projects = sorted({d["project"] for d in lb_drives(c, oid, uid) if d.get("project")})
     return jsonify(vehicles=lb_vehicles(c, oid), people=rk_people(c, oid, uid), clients=clients, projects=projects, km_rate=lb_rate(c, oid, _year(None)),
-                   currency=rk_home_cur(c, oid), me=uid, kinds=[{"key": k, "label": tr(n)} for k, n in LB_KINDS], note=tr(LB_NOTE))
+                   currency=rk_home_cur(c, oid), me=uid, kinds=[{"key": k, "label": tr(n)} for k, n in LB_KINDS], note=tr(LB_NOTE),
+                   real_projects=rk_real_projects(c, oid, uid))  # 2.489.0 (#2652)
 
 
 @app.post("/api/office/vehicles")

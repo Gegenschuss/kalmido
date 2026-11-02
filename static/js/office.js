@@ -287,6 +287,19 @@ const ofcIn = (id, v, o = {}) => `<input id="${id}" value="${esc(v ?? '')}" maxl
 const ofcHint = (hint, o) => hint ? `<div class="shint${o?.keep ? ' keep' : ''}">${esc(hint)}</div>` : '';
 const ofcRowF = (id, label, field, hint, o) => `<div class="row"><label for="${id}">${esc(label)}</label>${field}${ofcHint(hint, o)}</div>`;
 const imr_cur = () => `<span class="muted imrcur">${esc(ofcCur())}</span>`;  // 2.138.0 E (#2237)
+// 2.489.0 (#2652): the project of a trip / drive: a choice of the real projects the person may see (server: travel.py
+// rk_real_projects) and "Free text" as the fallback (the suggestions of the datalist sugg); the value stays
+// the project's name as text. An old text that is no project's name shows as "Free text" with that text.
+function ofcProjSel(id, label, val, projs, sugg) {
+  const ns = (projs || []).map(p => p.name), cur = val || '', other = !!cur && !ns.includes(cur);
+  return `<div class="row"><label for="${id}">${esc(label)}</label><select id="${id}" data-ofcproj="${id}"><option value="">${esc(tr('none'))}</option>${ns.map(n => `<option value="${esc(n)}" ${n === cur ? 'selected' : ''}>${esc(n)}</option>`).join('')}<option value="__other" ${other ? 'selected' : ''}>${esc(tr('Free text'))}</option></select></div>
+    <div class="row ${other ? '' : 'hidden'}" id="${id}-r"><label for="${id}-t">${esc(tr('Free text'))}</label>${ofcIn(id + '-t', other ? cur : '', {list: id + '-l'})}<datalist id="${id}-l">${(sugg || []).map(p => `<option value="${esc(p)}">`).join('')}</datalist></div>`;
+}
+const ofcProjVal = (md, id) => { const v = $('#' + id, md)?.value || ''; return v === '__other' ? ($('#' + id + '-t', md)?.value || '').trim() : v; };
+document.addEventListener('change', e => {
+  const s = /** @type {any} */ (e.target).closest?.('[data-ofcproj]'); if (!s) return;
+  const r = document.getElementById(s.id + '-r'), on = s.value === '__other'; r?.classList.toggle('hidden', !on); if (on) document.getElementById(s.id + '-t')?.focus();
+});
 const ofcChk = (id, label, on) => `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${esc(label)}</label></div>`;
 // 2.40.0 (#1381): the choice shows the text in the field's language (lg); a block without English text says so
 const ofcTextOpts = (kind, lg = 'de') => ofcRows('texts').filter(t => t.kind === kind && !t.archived).map(t => { const gap = ofcOwnGap(t, 'text', lg); return [t.id, (t.key ? t.key + ': ' : '') + (gap ? (lg === 'en' ? tr('(no English text)') : tr('(no text in this language)')) + ' ' : '') + ofcOwn(t, 'text', lg).slice(0, gap ? 50 : 70)]; });

@@ -230,7 +230,7 @@ function rk_tripModal(t) {
     ${ofcRowF('rk-free', tr('Other people'), ofcIn('rk-free', free, {max: 600, ph: tr('Names, separated by commas')}))}
     ${ofcRowF('rk-purpose', tr('Purpose'), ofcSel('rk-purpose', t?.purpose || 'job', rk_purposeOpts(t?.purpose)))}${rk_purposeNewHtml()}
     ${ofcRowF('rk-client', tr('Client'), ofcSel('rk-client', t?.client_id || '', (d.clients || []).map(c => [c.id, cdn_label(c)]), tr('none')))}
-    ${ofcRowF('rk-project', tr('Project'), ofcIn('rk-project', t?.project, {list: 'rk-projs'}))}<datalist id="rk-projs">${(d.projects || []).map(p => `<option value="${esc(p)}">`).join('')}</datalist>
+    ${ofcProjSel('rk-project', tr('Project'), t?.project, d.real_projects, d.projects)}
     ${ofcRowF('rk-km', tr('Kilometres'), ofcIn('rk-km', t?.km != null ? fmtNum(+t.km, 0) : '', {num: true, ph: tr('optional')}))}
     <div class="row"><label for="rk-note">${tr('Note')}</label><textarea id="rk-note" rows="2" maxlength="2000">${esc(t?.note || '')}</textarea></div>
     <div class="aerr" role="alert"></div>
@@ -258,7 +258,7 @@ function rk_tripModal(t) {
       const v = id => $(id, md)?.value ?? '';
       const people = [...$$('[data-pid]', md).filter(x => x.checked).map(x => ({id: +x.dataset.pid})), ...v('#rk-free').split(',').map(s => s.trim()).filter(Boolean).map(name => ({name}))];
       const body = {date_from: v('#rk-from'), date_to: v('#rk-to'), dest: v('#rk-dest'), overnight: $('#rk-over', md).checked ? 1 : 0, people, purpose: await rk_purposeVal(md),
-        client_id: +v('#rk-client') || null, project: v('#rk-project'), km: ofcNum(v('#rk-km')), note: v('#rk-note'), ...rk_vmaDlgBody(md)};
+        client_id: +v('#rk-client') || null, project: ofcProjVal(md, 'rk-project'), km: ofcNum(v('#rk-km')), note: v('#rk-note'), ...rk_vmaDlgBody(md)};
       if (t) {
         const old = {date_from: t.date_from, date_to: t.date_to, dest: t.dest, overnight: t.overnight, people: t.people, purpose: t.purpose, client_id: t.client_id, project: t.project, km: t.km, note: t.note,
           country: t.country, place: t.place, t_start: t.t_start, t_end: t.t_end, vma_days: t.vma_days, vma_off: t.vma_off};  // 2.95.0 A (#1932)

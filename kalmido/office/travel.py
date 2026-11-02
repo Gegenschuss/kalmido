@@ -21,11 +21,11 @@ from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_col, oc_dec_fields, oc_enc_fields, oc_item_store
 from ..core.i18n import N_, csv_dialect, tr
 from ..core.db import body, bump, db, iso, now_utc
-from ..core.access import Denied
+from ..core.access import Denied, vis_sql
 from ..core.errors import BadInput
 from .pdf import pdf_date
 from .calc import dec, dstr, money
-from .model import office_gate, office_org, office_settings, pb_cl_live
+from .model import office_gate, office_org, office_settings, pb_cl_live, pb_owner
 from .ledger import ofx_items_brief, ofx_log, ofx_need_editable
 from .olock import olk_need_trip_items, olk_trip_item_reason
 from .vma import vma_trip
@@ -426,6 +426,18 @@ def _insert_item(c, oid, tid, row, sort=0):
     return insert_id(c, f"INSERT INTO office_trip_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
 
 
+def rk_real_projects(c, oid, uid):
+    """2.489.0 (#2652): the real projects (lists) the travel expenses and the logbook offer to choose: the ones uid may see
+    in this office's workspace only (an organisation's office: its lists; a personal office: the private ones), never the
+    basket, archived, end-to-end encrypted (no readable name) or health / budget lists. [{id, name}]; the trip / drive keeps
+    the chosen name as its text "project" (the free text stays the fallback, nothing new is stored)."""
+    org = None if pb_owner(c, oid) is not None else oid
+    rows = c.execute(f"SELECT id, name FROM lists WHERE is_inbox=0 AND archived=0 AND e2e IS NULL AND COALESCE(life, '') NOT IN ('health', 'budget') "
+                     f"AND {'org_id IS NULL' if org is None else 'org_id=?'} AND id IN {vis_sql()} ORDER BY lower(name), id LIMIT 500",
+                     ((uid, uid) if org is None else (org, uid, uid))).fetchall()
+    return [{"id": r["id"], "name": r["name"]} for r in rows if (r["name"] or "").strip()]
+
+
 # ---------------------------------------------------------------- routes: trips and receipts
 @app.get("/api/office/trips")
 def rk_trips_get():
@@ -448,7 +460,7 @@ def rk_trips_get():
         projects = sorted({t["project"] for t in trips if t.get("project")})
     return jsonify(trips=trips, people=rk_people(c, oid, uid), clients=clients, projects=projects, currency=rk_home_cur(c, oid),
                    categories=[{"key": k, "label": tr(n)} for k, n in RK_CATS], missing=missing,
-                   purposes=rka_purposes(c, oid))  # 2.117.0 A (#2292)
+                   purposes=rka_purposes(c, oid), real_projects=rk_real_projects(c, oid, uid))  # 2.117.0 A (#2292); 2.489.0 (#2652)
 
 
 @app.post("/api/office/trips")
