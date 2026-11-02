@@ -163,10 +163,11 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
     check(st === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await nav(B + '#today');
-    for (let i = 0; i < 100 && !(await ev(`!!document.querySelector('.fv2bar .fv2-tile') && document.querySelectorAll('#side .srow[data-list]').length > 25 && document.querySelector('#side').scrollHeight - document.querySelector('#side').clientHeight > 300`).catch(() => false)); i++) await sleep(300);  // the extra lists drawn and the sidebar really scrolls
+    const TILE = touch ? '#side .fv2side .fv2-row' : '.fv2bar .fv2-tile';  // 2.489.0 (#4014): a phone shows the favourites as entries of the sidebar
+    for (let i = 0; i < 100 && !(await ev(`!!document.querySelector('${TILE}') && document.querySelectorAll('#side .srow[data-list]').length > 25 && document.querySelector('#side').scrollHeight - document.querySelector('#side').clientHeight > 300`).catch(() => false)); i++) await sleep(300);  // the extra lists drawn and the sidebar really scrolls
     await sleep(600);
     if (touch) { await ev(`(() => { sideOpenDrawer(); return 1; })()`); await sleep(600); }
-    const m = await ev(`(() => { const s = document.querySelector('#side'), f = document.querySelector('#side .sbfix-m .sbhead') || document.querySelector('#side .sbfix') /* 2.442.0 (#3739): on a phone .sbfix has no box of its own */, t = document.querySelector('.fv2bar .fv2-tile'); if (!f || !t) return null;
+    const m = await ev(`(() => { const s = document.querySelector('#side'), f = document.querySelector('#side .sbfix-m .sbhead') || document.querySelector('#side .sbfix') /* 2.442.0 (#3739): on a phone .sbfix has no box of its own */, t = document.querySelector('${TILE}'); if (!f || !t) return null;
       const top0 = f.getBoundingClientRect().top, r = t.getBoundingClientRect(); s.scrollTop = 600;
       return new Promise(res => requestAnimationFrame(() => { const top1 = f.getBoundingClientRect().top, fr = f.getBoundingClientRect(), ft = document.elementFromPoint(fr.left + fr.width / 2, fr.top + 8);
         res({scroll: s.scrollTop, sh: s.scrollHeight, ch: s.clientHeight, rows: document.querySelectorAll('#side .srow').length, top0, top1, h: f.getBoundingClientRect().height, vh: innerHeight, w: r.width, th: r.height, rem: parseFloat(getComputedStyle(document.documentElement).fontSize), front: !!ft && !!ft.closest('.sbfix'), flow: !!f.closest('.sbfix-flow')}); })); })()`);
@@ -175,7 +176,8 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
       check(m.scroll > 100, tag + ': the sidebar scrolls ' + JSON.stringify({...m, extra}));
       if (m.flow) check(Math.abs(m.top1 - (m.top0 - m.scroll)) < 2, tag + ': sidebar B: the head scrolls along (#3303) ' + JSON.stringify(m));  // 2.331.0 A (#3303): in sidebar B the head is no longer fixed
       else check(Math.abs(m.top1 - m.top0) < 2 && m.top1 >= -1 && m.front, tag + ': the head stays in place while the sidebar scrolls ' + JSON.stringify(m));
-      check(Math.abs(m.w - m.th) < 2 && m.w >= 1.875 * m.rem - 1, tag + ': tiles square, at least 1.875 rem '  /* 2.441.0 (#3592): the row of the head bar */ + JSON.stringify(m));
+      if (touch) check(m.th >= 1.75 * m.rem - 1 && m.w > m.th * 3, tag + ': a favourite is a full row of the sidebar ' + JSON.stringify(m));  // 2.489.0 (#4014)
+      else check(Math.abs(m.w - m.th) < 2 && m.w >= 1.875 * m.rem - 1, tag + ': tiles square, at least 1.875 rem '  /* 2.441.0 (#3592): the row of the head bar */ + JSON.stringify(m));
       check(m.h < m.vh * 0.6, tag + ': the head stays below 60 % of the height ' + JSON.stringify(m));
     }
     await ev(`(() => { document.querySelector('#side').scrollTop = 0; return 1; })()`);

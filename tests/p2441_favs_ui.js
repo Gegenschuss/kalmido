@@ -6,7 +6,7 @@
 // Firefox: the row between the workspace switch and the search, the others keep place and size with and without favourites;
 // too many = +N; the star in a page header; "Add to favourites" second in a row's menu; a sidebar row dragged in; a divider, an
 // own colour; a favourite of another workspace keeps its dot and switches the workspace; Settings count what is gone.
-// A phone: the row to swipe under the header, the page with the pinned tab.
+// A phone: the entries in the sidebar (2.489.0 #4014, before: a row under the header), the page with the pinned tab.
 // P4: frida has no organisation: her own office, pages, tables, contacts and files as favourites (freelancer-matrix: tasks)
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -174,18 +174,38 @@ const items = async ck => JSON.parse((await call(ck, 'GET', '/api/state')).setti
     check(/no longer available/.test(html), 'Settings count them ' + html);
   }, false);
   // a phone
-  await call(CF, 'PATCH', '/api/settings', {fav_items: ['v:today', `r:office_doc:${OF}`, `file:${FD}`]});
+  // 2.489.0 (#4014): a phone has no head bar: no row of its own over the header any more, the favourites are entries of the
+  // sidebar's section "Favourites" (symbol, name, number); a computer keeps the row; turning between the two draws again
+  const FL = (await call(CF, 'POST', '/api/lists', {name: 'Shoot prep'})).id;
+  for (const t of ['Book the van', 'Call the gaffer']) await call(CF, 'POST', '/api/tasks', {list_id: FL, title: t});
+  await call(CF, 'PUT', `/api/lists/${FL}/favorite`, {on: true});
+  await call(CF, 'PATCH', '/api/settings', {fav_items: ['v:today', `r:office_doc:${OF}`, `file:${FD}`, `l:${FL}`]});
   await firefox(async o => {
     const {ev, cmd, ctx, shot} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 760}});
     await signIn(o, 'frida', '#today');
-    check(await ready(ev, `document.querySelectorAll('#favrow .fv2-tile').length === 3`), 'phone: the row under the header');
-    const p = JSON.parse(await ev(`(() => { const r = document.querySelector('#favrow').getBoundingClientRect(), t = document.querySelector('#top').getBoundingClientRect(), a = document.querySelector('#favrow .fv2-tile').getBoundingClientRect(); return JSON.stringify({under: r.top >= t.bottom - 1, h: a.height}); })()`));
-    check(p.under && p.h >= 44, 'phone: below the header, a big enough target ' + JSON.stringify(p));
+    const SIDE = `[...document.querySelectorAll('#side .sg-favs .fv2side .fv2-row')]`;
+    check(await ready(ev, `${SIDE}.length === 4`), 'phone: four entries under "Favourites" in the sidebar ' + await ev(`${SIDE}.map(x => x.dataset.fv2).join()`));
+    check(!(await ev(`!!document.querySelector('#favrow, .fv2bar:not(.fv2-page) .fv2-tile')`)), 'phone: no row of tiles over the page');
+    const e = JSON.parse(await ev(`(() => { const r = k => document.querySelector('#side .fv2side .fv2-row[data-fv2="' + k + '"]'); return JSON.stringify({names: ${SIDE}.map(x => x.querySelector('.n')?.textContent).join('|'), icon: !!r('v:today')?.querySelector('.fv2-ri svg'), n: r('l:${FL}')?.querySelector('.c')?.textContent, on: r('v:today')?.classList.contains('on')}); })()`));
+    check(/Today/.test(e.names) && /Image film|Quotation/.test(e.names) && /Shoot prep/.test(e.names) && e.icon, 'phone: symbol and name ' + JSON.stringify(e));
+    check(e.n === '2', 'phone: the list counts its open tasks ' + JSON.stringify(e));
+    check(e.on, 'phone: the open view is marked');
+    check(/nunread[^>]*>2</.test(await ev(`(() => { const a = S.agents; S.agents = [{id: 991, waiting: 1, chat_unread: 1}]; const h = fv2_sideN('a:991'); S.agents = a; return h; })()`)), 'phone: what is unread keeps its marked number');
+    await ev(`(() => { sideOpenDrawer(); return 1; })()`);
+    await ready(ev, `!!document.querySelector('#side.open')`);
+    await shot('p2441-phone.png');
+    await ev(`(() => { document.querySelector('#side .fv2side .fv2-row[data-fv2="l:${FL}"]').click(); return 1; })()`);
+    check(await ready(ev, `S.route.key === 'l:${FL}' && !document.querySelector('#side.open')`), 'phone: an entry opens its target and closes the drawer');
+    // turning: wide = the row in the head bar, no entries; narrow again = the entries
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1024, height: 760}});
+    check(await ready(ev, `document.querySelectorAll('#kbar .fv2bar .fv2-tile').length === 4 && !document.querySelector('#side .fv2side')`), 'wide: the row in the head bar, no entries in the sidebar');
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 760}});
+    check(await ready(ev, `${SIDE}.length === 4 && !document.querySelector('#kbar .fv2bar .fv2-tile')`), 'narrow again: the entries are back');
     check(await ev(`topMoreItems().some(x => /favourites/.test(x.label || ''))`), 'phone: the star of a page is in "…"');
     await shot('p2441-phone.png');
     await ev(`(() => { nav_pref('tabbar').order.push('favs'); S.settings.nav_menus = S.settings.nav_menus || '{}'; LS.set('tabbar', [...tabIds(), 'favs']); render(); go('favorites'); return 1; })()`);
-    check(await ready(ev, `S.route.key === 'favorites' && document.querySelectorAll('#view .fv2-page .fv2-tile').length === 3`), 'phone: the page lists them');
+    check(await ready(ev, `S.route.key === 'favorites' && document.querySelectorAll('#view .fv2-page .fv2-tile').length === 4`), 'phone: the page lists them');
     check(/Image film|Quotation/.test(await ev(`document.querySelector('#view .fv2-page').textContent`)), 'phone: names on the page');
     await shot('p2441-page.png');
   }, true);

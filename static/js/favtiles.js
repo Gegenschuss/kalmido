@@ -11,8 +11,8 @@
    - 2.441.0 (#3592): everything with an address of its own (a quotation, a page, a table, a contact, a file, a saved view):
      fv2_hashKey turns an address into a key, GET /api/favorites/targets checks those on the server each time (names, routes,
      workspaces of what the person may read). ONE row for all workspaces, a dot shows the workspace; a computer: in the free
-     room of the head bar (#kbar), what does not fit under "+N"; a phone: a row to swipe under the header (#favrow) or, with
-     the tab "Favourites" pinned, a page (#favorites). Dividers are keys too (sep:), the own look is the setting fav_meta. */
+     room of the head bar (#kbar), what does not fit under "+N"; without a head bar (a phone, 2.489.0 #4014) entries in the sidebar's
+     section "Favourites" or, with the tab "Favourites" pinned, a page (#favorites). Dividers are keys too (sep:), the own look is the setting fav_meta. */
 'use strict';
 
 // [icon, name] of the Plan views and the rows of "More"
@@ -136,22 +136,17 @@ function fv2_tileHtml(t, page) {
   const m = fv2_meta()[t.key] || {}, dot = t.ws && wsOn() ? `<span class="fv2-wsd">${wsp_dot(t.ws)}</span>` : '';
   return `<button type="button" class="fv2-tile ${t.on ? 'on' : ''}" data-fv2="${esc(t.key)}" ${t.attrs} title="${esc(fv2_hint(t))}" aria-label="${esc(fv2_hint(t))}"${t.on ? ' aria-current="page"' : ''}${m.c ? ` style="--fvc:${esc(m.c)}"` : ''}${drag}>${m.i ? ic(m.i) : t.icon}${dot}${page ? `<span class="fv2-pn">${esc(t.name)}</span>${t.place ? `<span class="fv2-pp">${esc(t.place)}</span>` : ''}` : ''}</button>`;
 }
-// the row: a computer in the head bar (left empty by sbb_barHtml), else under the header; hidden while the page is pinned
+// the row: in the head bar (left empty by sbb_barHtml); 2.489.0 (#4014): without one the sidebar shows them (fv2_sideHtml)
 const fv2_pagePinned = () => { try { return isMobile() && tabIds().includes('favs'); } catch { return false; } };
 function fv2_barDraw() {
-  const kb = $('#kbar .fv2bar'), row = $('#favrow'), mini = document.documentElement.classList.contains('mini') || document.documentElement.classList.contains('mini-task');
-  const on = kb || (row && !mini && !fv2_pagePinned() ? row : null);
-  if (row && row !== on && row.firstChild) { row.innerHTML = ''; row.classList.add('hidden'); FV2.last.delete(row); }
-  if (!on) return;
+  const on = $('#kbar .fv2bar'); if (!on) return;
   fv2_fetch();
-  const ts = fv2_tiles(), body = ts.map(t => fv2_tileHtml(t)).join('');
-  const html = on === kb ? `${body}<button type="button" class="fv2-more" data-fv2-more hidden aria-haspopup="menu"></button>` : body;
-  if (on === row) row.classList.toggle('hidden', !ts.length);
-  if (FV2.last.get(on) === html && on.firstChild) { if (on === kb) fv2_fit(); return; }
+  const html = `${fv2_tiles().map(t => fv2_tileHtml(t)).join('')}<button type="button" class="fv2-more" data-fv2-more hidden aria-haspopup="menu"></button>`;
+  if (FV2.last.get(on) === html && on.firstChild) { fv2_fit(); return; }
   FV2.last.set(on, html);
   on.setAttribute('aria-label', tr('Favourites'));
   keepFocus(on, () => { on.innerHTML = html; });
-  if (on === kb) fv2_fit();
+  fv2_fit();
 }
 // "+N": what does not fit stays hidden in the row and is offered by the button at its end; the bar never takes room from the others
 function fv2_fit() {
@@ -190,6 +185,7 @@ async function fv2_fetch(force) {
   FV2.busy = false;
   if (FV2.again) { FV2.again = false; fv2_fetch(true); return; }
   fv2_barDraw();
+  if (fv2_sideOn()) renderSide();  // 2.489.0 (#4014)
   if (S.route.key === 'favorites') render();
 }
 // 2.441.0 (#3592): the favourites that show nothing now: the target is gone or the access is (Settings); they stay stored
@@ -203,12 +199,37 @@ async function fv2_open(b) {
   if (ws && wsOn() && ws !== cur && wsOptions().includes(ws) && (cur !== 'all' || b.dataset.fv2.startsWith('r:office'))) await wsSet(ws);
   go(b.dataset.fv2Go);
 }
-// the section "Favourites" (renderSide via favSideHtml): the heading with "Only favourites" (lists only), the tiles below
+// the section "Favourites" (renderSide via favSideHtml): the heading with "Only favourites" (lists only), the entries below
+// 2.489.0 (#4014): with a head bar (a computer, a tablet held across) the favourites are its row; without one (the phone's narrow
+// layout) they stand here again as entries (symbol, name, number / unread) instead of a row of their own over the page's header
 function fv2_sideHtml(lists, head) {
-  const sv = sv_tilesHtml(); if (!favAny()) return sv ? `<div class="sgroup sg-favs sg-svonly">${sv}</div>` : '';  // 2.156.0 D (#2186): + the view tiles
+  const side = fv2_sideOn(), sv = sv_tilesHtml(), ts = side ? fv2_tiles().filter(t => !t.sep) : [];
+  if (side) fv2_fetch();  // the names of the objects (quotations, pages, files) come from the server
+  if (!favAny() && !ts.length) return sv ? `<div class="sgroup sg-favs sg-svonly">${sv}</div>` : '';  // 2.156.0 D (#2186): + the view tiles
   const only = favOnly(), lab = tr('Only favourites');  // 2.441.0 (#3592): the tiles moved into the head bar
   const acts = favAny() ? `<button type="button" data-fav-only class="${only ? 'on' : ''}" aria-pressed="${only}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('filter', 's')}</button>` : '';
-  return `<div class="sgroup sg-favs">${head('favs', tr('Favourites'), acts)}${sv}</div>`;
+  const rows = ts.length && sideOpen('favs') ? `<div class="fv2side" role="group" aria-label="${esc(tr('Favourites'))}">${ts.map(fv2_rowHtml).join('')}</div>` : '';
+  return `<div class="sgroup sg-favs">${head('favs', tr('Favourites'), acts)}${sv}${rows}</div>`;
+}
+// 2.489.0 (#4014): no head bar = the favourites are entries of the sidebar (the page "Favourites" pinned as a tab keeps them there)
+const fv2_sideOn = () => { try { return !sbb_on() && !S.me?.kid && !fv2_pagePinned(); } catch { return false; } };
+// the number of an entry: open tasks as the sidebar's rows count them, what is unread as a marked number
+function fv2_sideN(key) {
+  const i = key.indexOf(':'), p = key.slice(0, i), v = key.slice(i + 1), c = counts();
+  const plain = n => n && rsy_sideCnt() ? `<span class="c">${n}</span>` : '', unread = n => n ? `<span class="c nunread">${n > 99 ? '99+' : n}</span>` : '';
+  if (p === 'l') return plain(c.lists[v]);
+  if (p === 'v') return v === 'today' && c.over ? `<span class="c over">${c.today || ''}</span>` : plain(typeof c[v] === 'number' ? c[v] : 0);
+  if (p === 'f') return plain(c.filters[v]);
+  if (p === 'tag') return plain(c.tags[v]);
+  if (p === 'a') { const a = (S.agents || []).find(x => x.id === +v); return unread(a ? (a.waiting || 0) + (a.chat_unread || 0) : 0); }
+  if (key === 'm:news') return unread(S.news?.unread ? bellCount() : 0);
+  if (key === 'm:team') return unread(S.team?.unread || 0);
+  if (key === 'm:agents') return unread((S.agents || []).reduce((n, x) => n + (x.waiting || 0) + (x.chat_unread || 0) + (x.approvals_open || 0), 0));
+  return '';
+}
+function fv2_rowHtml(t) {
+  const m = fv2_meta()[t.key] || {}, dot = t.ws && wsOn() ? `<span class="fv2-wsd">${wsp_dot(t.ws)}</span>` : '';
+  return `<button type="button" class="srow fv2-row ${t.on ? 'on' : ''}" data-fv2="${esc(t.key)}" ${t.attrs} title="${esc(fv2_hint(t))}"${t.on ? ' aria-current="page"' : ''}${m.c ? ` style="--fvc:${esc(m.c)}"` : ''}><span class="fv2-ri" aria-hidden="true">${m.i ? ic(m.i) : t.icon}</span><span class="n">${esc(t.name)}</span>${dot}${fv2_sideN(t.key)}</button>`;
 }
 
 // ---- saving: one PATCH per change, shown at once; a failure loads the server's state again
@@ -265,14 +286,14 @@ const fv2_menuRow = key => !key ? [] : fv2_is(key) ? [{label: tr('Remove from fa
   : [{label: tr('Add to favourites'), icon: 'star', fn: () => fv2_set(key, true)}];
 // a tile's menu: open, move (WCAG 2.5.7: arranging without dragging), remove
 function fv2_tileMenu(b) {
-  const key = b.dataset.fv2, sh = $$('[data-fv2]', b.closest('.fv2bar')).map(x => x.dataset.fv2), i = sh.indexOf(key); if (i < 0) return;
+  const key = b.dataset.fv2, box = b.closest('.fv2bar, .fv2side'), sh = box ? $$('[data-fv2]', box).map(x => x.dataset.fv2) : [], i = sh.indexOf(key), col = !!box?.classList.contains('fv2side'); if (i < 0) return;
   if (key.startsWith('sep:')) { menu(b, [{label: tr('Remove the divider'), icon: 'x', fn: () => fv2_set(key, false)}]); return; }
-  const name = b.getAttribute('aria-label') || '', m = fv2_meta()[key] || {};
+  const name = b.getAttribute('aria-label') || b.querySelector('.n')?.textContent || '', m = fv2_meta()[key] || {};
   menu(b, [{label: name, dis: true, cls: 'mhead'}, '-',
     {label: tr('Open'), icon: 'right', fn: () => b.click()},
-    {label: tr('Move left'), icon: 'left', dis: i === 0, fn: () => fv2_move(key, sh[i - 1], false)},
-    {label: tr('Move right'), icon: 'right', dis: i === sh.length - 1, fn: () => fv2_move(key, sh[i + 1], true)},
-    {label: tr('Add a divider'), icon: 'minus', fn: () => fv2_sepAdd(key)}, '-',
+    {label: col ? tr('Move up') : tr('Move left'), icon: col ? 'up' : 'left', dis: i === 0, fn: () => fv2_move(key, sh[i - 1], false)},
+    {label: col ? tr('Move down') : tr('Move right'), icon: col ? 'down' : 'right', dis: i === sh.length - 1, fn: () => fv2_move(key, sh[i + 1], true)},
+    ...(col ? [] : [{label: tr('Add a divider'), icon: 'minus', fn: () => fv2_sepAdd(key)}]), '-',  // 2.489.0 (#4014): the sidebar's entries show no dividers
     lp_menuRow(m.c || '', c => fv2_metaSet(key, {c})),
     {label: tr('Symbol…'), icon: m.i || 'star', more: [{label: tr('Default'), on: !m.i, fn: () => fv2_metaSet(key, {i: ''})}, ...FV2_ICONS.map(x => ({label: tr(x[1]), icon: x[0], on: m.i === x[0], fn: () => fv2_metaSet(key, {i: x[0]})}))]},
     '-', {label: tr('Remove from favourites'), icon: 'star', fn: () => fv2_set(key, false)}]);
@@ -285,13 +306,14 @@ function fv2_rowMenu(r) {
   menu(r, [...(name ? [{label: name, dis: true, cls: 'mhead'}, '-'] : []), ...fv2_menuRow(key), ...sbp_menuRow(r)]);  // 2.99.0 E (#2187): + pin a person
   return true;
 }
-const FV2_ROWS = '#side .srow:not([data-list]):not(.reorder):not(.smore):not(.sfavmore):not(.sset)';
+const FV2_ROWS = '#side .srow:not([data-list]):not(.reorder):not(.smore):not(.sfavmore):not(.sset):not(.fv2-row)';
+const FV2_TILES = '.fv2bar .fv2-tile, .fv2bar .fv2-sep, .fv2side .fv2-row';  // 2.489.0 (#4014): + the sidebar's entries (menu only, no dragging)
 
 // (capture: a tile's menu is the only one; an agent row that opens a chat and a tag keep their own menus with the star in them:
 // chatwins.js, render.js tagMenu)
 document.addEventListener('contextmenu', e => {
   if (e.shiftKey) return;
-  const t = e.target.closest?.('.fv2bar .fv2-tile, .fv2bar .fv2-sep'), r = !t && e.target.closest?.(FV2_ROWS);
+  const t = e.target.closest?.(FV2_TILES), r = !t && e.target.closest?.(FV2_ROWS);
   if (!t && !(r && fv2_rowKey(r) && !cw_target(r) && !r.matches('[data-drop^="tag:"]'))) return;
   if (t) e.stopImmediatePropagation();
   if (e.pointerType === 'touch') { e.preventDefault(); return; }  // the long press below is the app's, no browser menu
@@ -301,7 +323,7 @@ document.addEventListener('contextmenu', e => {
 }, true);
 // a click right after a long press is not a click
 document.addEventListener('click', e => {
-  if (Date.now() - FV2.held < 600 && e.target.closest?.('.fv2bar .fv2-tile, ' + FV2_ROWS)) { e.preventDefault(); e.stopImmediatePropagation(); }
+  if (Date.now() - FV2.held < 600 && e.target.closest?.(FV2_TILES + ', ' + FV2_ROWS)) { e.preventDefault(); e.stopImmediatePropagation(); }
 }, true);
 
 // ---- dragging a tile with the mouse (desktop, Fold): drop on another tile = in front of it / behind it (right half)
@@ -375,7 +397,7 @@ document.addEventListener('click', e => {
 
 // ---- touch: hold a tile = its menu (let go) or drag it (move after the hold); hold another row = its menu with the star
 document.addEventListener('touchstart', e => {
-  const t = e.target.closest?.('.fv2bar .fv2-tile, .fv2bar .fv2-sep'), r = !t && !S.listReorder && e.target.closest?.(FV2_ROWS);
+  const t = e.target.closest?.(FV2_TILES), r = !t && !S.listReorder && e.target.closest?.(FV2_ROWS);
   if (!t && !(r && fv2_rowKey(r))) { FV2.lp = null; return; }
   const p = e.touches[0];
   FV2.lp = {el: t || r, tile: !!t, x: p.clientX, y: p.clientY, active: false};
@@ -384,7 +406,7 @@ document.addEventListener('touchstart', e => {
     lp.active = true; FV2.held = Date.now();
     if (navigator.vibrate) navigator.vibrate(12);
     if (!lp.tile) { FV2.lp = null; fv2_rowMenu(lp.el); return; }
-    if (lp.el.closest('.fv2-page')) { FV2.lp = null; fv2_tileMenu(lp.el); return; }  // the page's rows have only the menu
+    if (lp.el.closest('.fv2-page, .fv2side')) { FV2.lp = null; fv2_tileMenu(lp.el); return; }  // the page's and the sidebar's rows have only the menu
     FV2.drag = lp.el.dataset.fv2; lp.el.classList.add('dragging');
   }, 420);
 }, {passive: true});

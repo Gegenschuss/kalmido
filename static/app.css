@@ -7458,9 +7458,16 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
    switch and the search (grows from nothing, takes no room: the bar's gap on its right is given back), on a phone a row to swipe */
 .fv2bar{display:flex;align-items:center;gap:.25rem;min-width:0}
 #kbar .fv2bar{flex:1 1 0;width:0;height:100%;overflow:hidden;margin-right:-.5rem;padding:0 .5rem 0 .25rem}
-#favrow{flex:none;padding:0 .5rem .375rem;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
-#favrow::-webkit-scrollbar{display:none}
-#favrow.hidden{display:none}
+/* 2.489.0 (#4014): without a head bar (the phone) the favourites are entries of the sidebar */
+.fv2side .fv2-row{-webkit-touch-callout:none}
+.fv2side .fv2-ri{position:relative;display:flex;flex:none;align-items:center;justify-content:center;width:1.25rem;color:var(--fvc,inherit)}
+.fv2side .fv2-ri .sic,.fv2side .fv2-ri .lic{display:flex;margin:0}
+.fv2side .fv2-ri .fv2-av{width:1.25rem;height:1.25rem;font-size:var(--fs-xs)}
+.fv2side .fv2-ri .fv2-st{position:absolute;right:-.25rem;bottom:-.125rem;display:flex}
+.fv2side .fv2-ri .fv2-st .hdot{width:.4375rem;height:.4375rem}
+.fv2side .fv2-row .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fv2side .fv2-wsd{display:flex;flex:none}
+.fv2side .fv2-wsd .wsp-dot{width:.5rem;height:.5rem}
 .fv2bar [hidden]{display:none}
 .fv2bar .fv2-tile{position:relative;display:flex;align-items:center;justify-content:center;flex:none;width:1.875rem;height:1.875rem;padding:0;border:0;border-radius:.5rem;background:none;color:var(--fvc,var(--text2));cursor:pointer}
 .fv2bar .fv2-tile:hover{background:var(--bg3);color:var(--fvc,var(--text))}
@@ -7485,7 +7492,6 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .fv2-page .fv2-tile{width:auto;height:auto;min-height:2.75rem;justify-content:flex-start;gap:.75rem;padding:.25rem .75rem;text-align:left}
 .fv2-page .fv2-pn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
 .fv2-page .fv2-pp{margin-left:auto;flex:none;color:var(--muted);font-size:var(--fs-s)}
-@media (pointer:coarse){ #favrow .fv2-tile{width:2.75rem;height:2.75rem} }
 
 /* 2.56.0 C (#1797) share symbols in two fixed columns at the right edge (agent | person) on every sidebar row: a missing
    symbol keeps its empty column, the count / dots / marks stay left of them, nesting only moves the name */
