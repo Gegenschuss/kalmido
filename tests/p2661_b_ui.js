@@ -51,7 +51,7 @@ const WS_VIEWS = {
   'static/js/agentview.js': 'helper',         // 2.361.4 (#2928): av_ownArea - whether the shown workspace is one's own area (texts and offers while drawing, no view keeping data)
   'static/js/clients.js': 'helper',           // 2.361 (#2938): wsCur only picks the empty-state text for Private (no view keeping data)
   'static/js/dispo.js': 'helper',             // 2.361 (#2938): wsCur only picks the empty-row text for Private (no view keeping data)
-  'static/js/acctset.js': 'helper',           // 2.365.2 C (#2789): wsCur only preselects the organisation of Settings > Absences and vacation (the dialog has its own picker, no view keeping data)
+  'static/js/acctset.js': 'helper',           // 2.365.2 C (#2789): wsCur only preselects the organisation of Settings > Absences and holiday (the dialog has its own picker, no view keeping data)
   'static/js/polls.js': 'helper',            // 2.98.1: the default workspace of a new poll (the dialog shows all polls, with their workspace)
   'static/js/palette.js': 'draw',
   'static/js/areas.js': 'draw',               // 2.87.0: private areas hidden in an organisation's view (o3a_hid while drawing, #1845)
@@ -63,6 +63,7 @@ const WS_VIEWS = {
   'static/js/newsletter.js': 'helper',        // a dialog with its own workspace choice
   'static/js/workspace.js': 'helper',         // the switch itself
   'static/js/wscolor.js': 'helper',
+  'static/js/viewmem.js': 'helper',           // 2.413.0 (#3439): the shown workspace is part of the key of a view's kept place (a switch starts its views from the top, no data kept)
   // 2.380.2 (#3407): the views under Projects read the shown workspace too (they did not, so this guard missed them)
   'static/js/roadmap.js': 'check:projects',   // the roadmap's lists and people (inWs while drawing)
   'static/js/projects.js': 'check:projects',  // project status: the projects, the risk counter (inWs while drawing)

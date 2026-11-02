@@ -8,6 +8,8 @@ freelancer-matrix: office
    margins, fold marks on the thirds and no punch mark; the EUeR list in Letter too; back to A4: A4 again (the default)
  - a finalised invoice keeps the size it was finalised with (frozen with the sender data) when the setting changes later
  - letterhead upload: in Letter an A4 letterhead is refused with a plain sentence, a Letter one is taken
+ - 2.469.0 (#3352): the letterhead reports its format (paper) and paper_mismatch when the paper size is switched afterwards
+   (hint on, off again by switching back / a matching one by restore, empty after delete); no blocking
  - a person without organisation (personal office): the same setting and the same Letter PDFs
 usage: p2357_a_paper_test.py <datadir>      (P2357A_NOSTART=1: a running server on KALMIDO_TEST_PORT)"""
 import importlib.util
@@ -153,6 +155,20 @@ for who, s, name in (("org", A, "Beispielstudio GmbH"), ("freelancer", Fr, "Frid
     check(r.ok and r.json()["letterhead"]["on"], f"#3156 {who}: a Letter letterhead is taken {r.status_code} {r.text[:200]}")
     d = get_pdf(s, f"{D}/{big}/pdf", f"{who} invoice on the letterhead")
     check(boxes(d) == {LETTER}, f"#3156 {who}: the invoice on the Letter letterhead stays Letter {boxes(d)}")
+    # 2.469.0 (#3352): the hint when the letterhead's format is not the paper size
+    lh = r.json()["letterhead"]
+    check(lh["paper"] == "letter" and lh["paper_mismatch"] is False, f"#3352 {who}: a Letter letterhead on Letter paper: no hint {lh.get('paper')} {lh.get('paper_mismatch')}")
+    check(s.put(B + O + "/settings", json={"paper": "a4"}).ok, f"#3352 {who}: paper to A4 (the letterhead stays)")
+    lh = s.get(B + O + "/letterhead").json()["letterhead"]
+    check(lh["on"] and lh["paper"] == "letter" and lh["paper_mismatch"] is True, f"#3352 {who}: Letter letterhead on A4 paper: hint {lh.get('paper')} {lh.get('paper_mismatch')}")
+    check(s.put(B + O + "/settings", json={"paper": "letter"}).ok and s.get(B + O + "/letterhead").json()["letterhead"]["paper_mismatch"] is False, f"#3352 {who}: back to Letter: hint off")
+    lh = s.delete(B + O + "/letterhead").json()["letterhead"]
+    check(lh["paper"] == "" and lh["paper_mismatch"] is False, f"#3352 {who}: removed: no format, no hint {lh.get('paper')!r}")
+    s.put(B + O + "/settings", json={"paper": "a4"})
+    r = s.post(B + O + "/letterhead/restore", json={"file": prev_file}) if (prev_file := lh.get("prev")) else None
+    lh = r.json()["letterhead"] if r is not None and r.ok else {}
+    check(lh.get("on") and lh.get("paper") == "letter" and lh.get("paper_mismatch") is True, f"#3352 {who}: restore sets the format again, A4 paper: hint {lh.get('paper')} {lh.get('paper_mismatch')}")
+    s.put(B + O + "/settings", json={"paper": "letter"})
     s.delete(B + O + "/letterhead")
     s.put(B + O + "/settings", json={"paper": "a4"})
     check(boxes(get_pdf(s, f"{D}/{big}/pdf", f"{who} back to A4")) == {A4}, f"#3156 {who}: back to A4")

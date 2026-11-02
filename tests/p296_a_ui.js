@@ -61,7 +61,7 @@ const confirmMove = async w => {
   check(await until(async () => (await call('GET', `/api/files/nodes/${KISTE}`)).org_id === ORG, 60), 'the folder is in Alpha now');
   check(await until(() => w.eval(`!!HIST.undo.length && /workspace/.test(HIST.undo[HIST.undo.length - 1].label)`)), 'one undo step');
   await w.eval(`histStep('undo')`);
-  check(await until(async () => (await call('GET', `/api/files/nodes/${KISTE}`)).org_id === null, 60), 'Undo brings it back into the private space');
+  check(await until(async () => (await call('GET', `/api/files/nodes/${KISTE}`)).org_id === null, 60), 'Undo brings it back into the private workspace');
 
   // ================= several rows: Select, checkboxes, the bar
   w.eval('ab_reload()');

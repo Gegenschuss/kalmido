@@ -55,8 +55,10 @@ check(not ar.work_window_open({**OFFICE, "state": {"timezone": "No/Such_Zone", "
 calls = []
 ws_closed = {**OFFICE, "work_days": [], "state": {"timezone": "Europe/Berlin", "working": False,
                                                   "work_resumes_at": "2026-10-26T07:00:00+00:00"}}
-fake = SimpleNamespace(agent={"work_style": ws_closed}, api=SimpleNamespace(status=lambda *a: calls.append(a)),
+fake = SimpleNamespace(agent={"work_style": ws_closed}, api=SimpleNamespace(status=lambda *a, **k: calls.append(a)),
                        refresh_agent=lambda: calls.append(("refresh",)))
+fake.say = lambda *a: ar.Runner.say(fake, *a)
+fake.status_say = lambda *a, **k: ar.Runner.status_say(fake, *a, **k)
 check(ar.Runner.work_closed(fake) is True, "closed: the runner holds the queue")
 check(("refresh",) in calls and any(c[0] == "paused" and "Outside working hours, back Mon 08:00" in c[1] for c in calls if len(c) > 1),
       f"closed: status paused with the local time it goes on: {calls}")

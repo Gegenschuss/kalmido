@@ -48,6 +48,7 @@ ROUTES = {
     "POST /api/v1/tasks/{}/complete": "routine", "POST /api/v1/tasks/{}/reopen": "routine",
     "POST /api/v1/tasks/{}/skip": "routine", "POST /api/v1/tasks/{}/subtasks": "routine",
     "POST /api/v1/team/messages/{}/reactions": "routine", "POST /api/v1/team/rooms/{}/messages": "routine",
+    "DELETE /api/v1/tasks/{}/watchers/{}": "routine", "POST /api/v1/tasks/{}/watchers": "routine",
     "POST /api/v1/videos/{}/comments": "routine",
     # ---- one_way
     "DELETE /api/v1/address-books/{}": "one_way", "DELETE /api/v1/address-books/{}/members/{}": "one_way",
@@ -129,6 +130,8 @@ ROUTES = {
     "POST /api/v1/tasks/{}/working": "meta", "PATCH /api/v1/tasks/{}/working": "meta", "DELETE /api/v1/tasks/{}/working": "meta",
     # 2.425.0 (#3453): only a receipt fetcher's own key reaches these (an agent token gets 403); the default class stays
     "POST /api/v1/fetcher/documents": "change", "PUT /api/v1/fetcher/status": "change",
+    # 2.392.0 (#3364 #3370): a part delivery moves the task and makes the rest, a recorded decision stands for everyone: the default class stays
+    "POST /api/v1/tasks/{}/partial": "change", "POST /api/v1/tasks/{}/decisions": "change",
 }
 
 FOUND, PROBLEMS = app_routes(ROOT)

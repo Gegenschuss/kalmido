@@ -1,7 +1,7 @@
 // 2.352.0 D UI test (#2754), own container (start.sh with the stub mailbox): the reading view of a filed mail is shortened by default
-// - a forwarded mail opens SHORT: the frame asks with ?short=1, the switch "Whole mail" is there and off; Text shows the one-line
-//   header + content only (no signature); "Whole mail" on = the frame without ?short and the whole text; off again = short
-// - a plain mail: no "Whole mail" switch (nothing to shorten), the frame without ?short
+// - a forwarded mail opens SHORT: the frame asks with ?short=1, the switch "Whole e-mail" is there and off; Text shows the one-line
+//   header + content only (no signature); "Whole e-mail" on = the frame without ?short and the whole text; off again = short
+// - a plain mail: no "Whole e-mail" switch (nothing to shorten), the frame without ?short
 // - the window is large: the stylesheet gives the card min(56rem, 80vw) of the full height (jsdom has no layout, so the rule is read)
 const fs = require('fs');
 const path = require('path');
@@ -58,16 +58,16 @@ const FEAT = 'cal,collab,comments,clients,contacts,events';
   const fr = md && md.querySelector('iframe.hbmframe');
   check(fr && fr.getAttribute('src') === `/api/hubmail/mails/${FW}/html?short=1`, 'forwarded mail: the frame asks short ' + (fr && fr.getAttribute('src')));
   const wh = md && md.querySelector('input[data-hbmv="whole"]');
-  check(wh && !wh.checked && /Whole mail/.test(md.querySelector('.hbmwhole')?.textContent || ''), 'the switch Whole mail, off');
+  check(wh && !wh.checked && /Whole e-mail/.test(md.querySelector('.hbmwhole')?.textContent || ''), 'the switch Whole e-mail, off');
   click(w, md.querySelector('[data-hbmv="text"]')); await sleep(150);
   const tx = md.querySelector('.hbmtext')?.textContent || '';
   check(/From Erika Muster, 12 October 2026/.test(tx) && /The real content of the offer\./.test(tx) && !/Kind regards/.test(tx) && !/Begin forwarded/.test(tx), 'short text: one line + content only ' + tx.slice(0, 80));
   click(w, md.querySelector('input[data-hbmv="whole"]')); await sleep(150);
-  check(/Kind regards/.test(md.querySelector('.hbmtext')?.textContent || '') && md.querySelector('input[data-hbmv="whole"]')?.checked, 'Whole mail on: the whole text');
+  check(/Kind regards/.test(md.querySelector('.hbmtext')?.textContent || '') && md.querySelector('input[data-hbmv="whole"]')?.checked, 'Whole e-mail on: the whole text');
   click(w, md.querySelector('[data-hbmv="html"]')); await sleep(150);
-  check(md.querySelector('iframe.hbmframe')?.getAttribute('src') === `/api/hubmail/mails/${FW}/html`, 'Whole mail on: the frame without ?short');
+  check(md.querySelector('iframe.hbmframe')?.getAttribute('src') === `/api/hubmail/mails/${FW}/html`, 'Whole e-mail on: the frame without ?short');
   click(w, md.querySelector('input[data-hbmv="whole"]')); await sleep(150);
-  check(md.querySelector('iframe.hbmframe')?.getAttribute('src') === `/api/hubmail/mails/${FW}/html?short=1`, 'Whole mail off: short again');
+  check(md.querySelector('iframe.hbmframe')?.getAttribute('src') === `/api/hubmail/mails/${FW}/html?short=1`, 'Whole e-mail off: short again');
   click(w, md.querySelector('[data-m="close"]')); await sleep(300);
   md = await openMail(PL);
   check(md && !md.querySelector('input[data-hbmv="whole"]') && md.querySelector('iframe.hbmframe')?.getAttribute('src') === `/api/hubmail/mails/${PL}/html`, 'a plain mail: no switch, nothing shortened');

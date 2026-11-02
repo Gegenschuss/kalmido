@@ -6,6 +6,7 @@ gzip level 6, count) and every <link rel="stylesheet"> (raw and gzip). For compa
 (LAZY / LAZY_CSS in static/sw.js). The limits live in tools/perf_budget.json; going over one makes this tool exit 1.
 The load time limit `start_ms` is not measured here; tests/perf_ui.js checks it in the browser.
 2.191.0 B (#1824): measures the bytes as the server sends them (.js / .css without comments, kalmido/core/strip.py).
+2.476.0 (#3487): app.css counts with the start style files static/css/start-*.css the server sends behind it.
 
 usage: python3 tools/perf_budget.py [--json] [--budget FILE] [--root DIR]
 """
@@ -41,6 +42,8 @@ def pbg_served(root, path):
     """2.191.0 B (#1824): the bytes of a static file as they go out."""
     data = pbg_read(path)
     rel = os.path.relpath(path, os.path.join(root, "static")).replace(os.sep, "/")
+    if rel == "app.css":  # 2.476.0 (#3487): the start style files go out behind app.css (one file for the browser)
+        data = pbg_strip.with_start_css(os.path.join(root, "static"), data)
     out = pbg_strip.strip_asset(rel, data)
     return data if out is None else out
 

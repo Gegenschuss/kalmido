@@ -42,7 +42,7 @@ const report = (key, portals) => fetch(B + 'api/v1/fetcher/status', {method: 'PU
   check(!!await until(() => d.querySelector('#s-fetch .fx-new')), 'Integrations: the section is drawn with "Connect a receipt fetcher"');
   const hs = [...d.querySelectorAll('h4')].map(h => h.id);
   check(hs.indexOf('s-fetch-h') === hs.indexOf('s-scan-h') + 1, 'right below "Scans from your computer" ' + JSON.stringify(hs));
-  check(/never stores passwords, cookies or logins/.test(d.querySelector('#s-fetch').textContent), 'it says that Kalmido stores no logins');
+  check(/never stores passwords, cookies or sign-ins/.test(d.querySelector('#s-fetch').textContent), 'it says that Kalmido stores no logins');
   d.querySelector('#fx-name').value = 'Mac Studio';
   click(w, d.querySelector('#s-fetch [data-fx="new"]'));
   const codeEl = await until(() => d.querySelector('#fx-code'));

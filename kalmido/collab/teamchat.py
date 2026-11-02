@@ -2,10 +2,10 @@
 import re
 from flask import g, has_request_context, jsonify, request, Response
 
-from ..core.config import app, PUBLIC_URL
+from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.pg import insert_id, system_ctx, write_lock
-from ..core.i18n import tr
-from ..core.db import body, db, err, iso, iso_ms, now_utc, usettings
+from ..core.i18n import tr, trn
+from ..core.db import body, db, err, iso, iso_ms, now_utc, usettings, usettings_many
 from ..accounts.session import me
 from ..accounts.pictures import avatar_map
 from ..accounts.orgs import may_see
@@ -14,10 +14,10 @@ from ..core.access import access_note, health_hidden, org_trips_hidden, otr_live
 from ..accounts.orgroles import FULL_READ, role_known
 from ..accounts.orgs import INSTANCE_ENV
 from ..tasks.validation import as_int
-from ..collab.comments import collab_on, collab_user, comment_plain, lang_of, MENTION_RE, user_names
-from ..collab.news import list_bell, notif_ok
+from ..collab.comments import collab_on, comment_plain, lang_of, MENTION_RE, push_gate, push_gate_due, push_gate_reset, user_names
+from ..collab.news import list_bells, notif_ok
 from ..core.errors import reject_unknown, BadInput
-from ..notify.push import push_handled, push_prio, push_reachable
+from ..notify.push import notify, push_handled, push_prio, push_reachable_many, WD_TICKS
 from ..api.common import hit_limit, v1_args, v1_call, v1_json, v1_view
 from ..agents.core import agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_ids, is_agent, listen_agents_of
 from ..collab.reactions import clean_emoji
@@ -643,9 +643,10 @@ def tchat_e2e_check(r, b):
     return enc or err(tr("Invalid value: {0}", "enc"))
 
 
-def tchat_notify(c, r, m, mentions, replied=None):
+def tchat_notify(c, r, m, mentions, replied=None, only=None):
     """Pushes (DM: always; channel: @mentions, and every message for whoever set the list bell to "all") + agent events.
-    2.33.0 (#1076): replied = the author of the answered message: it counts as a mention ("replied to your message")."""
+    2.33.0 (#1076): replied = the author of the answered message: it counts as a mention ("replied to your message").
+    2.367.5 (#2980): only = just these people (the newly @mentioned of an edited message)."""
     sender = m["user_id"]
     if replied and replied not in mentions and replied in tchat_room_members(c, r):
         mentions = [*mentions, replied]
@@ -661,7 +662,12 @@ def tchat_notify(c, r, m, mentions, replied=None):
     listen = set(listen_agents_of(c, r["list_id"])) if r["kind"] == "list" and sender not in ags else set()
     root = m["thread_of"] if "thread_of" in m.keys() else None  # 2.139.0 A (#2127): an answer in a thread notifies its people only
     follow = {x[0] for x in c.execute("SELECT user_id FROM tchat_thread_reads WHERE root_id=? AND follow=1", (root,))} if root else set()
-    for uid in sorted(members - {sender}):
+    rcpt = sorted((members if only is None else members & set(only)) - {sender})
+    # 2.369.3 (#3199): what the push rules need of every person of the room, in one query each before the loop (was five to
+    # eight per person): account state + settings (collab_user), read mark / mute, the list bell, the list's name; the
+    # rest (list role, owner's template, devices / channels) only for whoever is still in after those
+    pre = tchat_notify_pre(c, r, [u for u in rcpt if u not in ags])
+    for uid in rcpt:
         if uid in ags:
             if r["kind"] == "channel":  # 2.113.1 (#2059): a personal agent in a channel is addressed by its owner only (like agent_usable)
                 from .teamchan import tcx_agent_org
@@ -680,37 +686,103 @@ def tchat_notify(c, r, m, mentions, replied=None):
                                                                  "thread_of": root},  # 2.139.0 A (#2127)
                                                      "user": {"id": sender, "name": who}})
             continue
-        s = collab_user(c, uid, r["list_id"])
+        s = pre["s"].get(uid)  # collab_user without the list role (that one below, for the few still in)
         if not s:
             continue
-        _lr, muted = tchat_last_read(c, r["id"], uid)
+        _lr, muted = pre["reads"].get(uid, (0, False))
+        bell = pre["bells"].get(uid, ("default", {}))
         dm, ment = r["kind"] in ("dm", "group"), uid in mentions  # 2.113.1 (#2059): a group pushes like a DM
         if root:  # 2.139.0 A (#2127): a thread answer: only its people (the room's mute / the chat row still apply)
             if uid not in follow and not ment:
                 continue
-        elif r["kind"] == "list" and not ment and not (list_bell(c, uid, r["list_id"])[0] == "all"):
+        elif r["kind"] == "list" and not ment and not (bell[0] == "all"):
             continue
         elif r["kind"] == "channel" and not ment:  # 2.113.1 (#2059): a channel pushes @mentions and answers only
             continue
         if muted and not ment:
             continue
-        if not notif_ok(c, uid, s, "mention" if ment else "chat", "push", r["list_id"]) or not push_reachable(c, uid, s):
+        if r["list_id"] is not None and not list_role(c, r["list_id"], uid):  # the rest of collab_user
+            continue
+        if not notif_ok(c, uid, s, "mention" if ment else "chat", "push", r["list_id"], bell=bell) or uid not in pre["reach"]:
+            continue
+        if not ment and not push_gate(c, uid, f"r{r['id']}", 1, actor=sender):  # 2.367 (#2967): one per room and minute, then a summary
             continue
         lg = lang_of(s)
-        if r["kind"] in TCX_KINDS:  # 2.113.1 (#2059)
-            from .teamchan import tcx_group_name
-            title = tr("{0} in {1}", who, tcx_group_name(c, r, uid) if r["kind"] == "group" else r["name"], lg=lg)
-        elif dm:
-            title = who
-        else:
-            ln = c.execute("SELECT name FROM lists WHERE id=?", (r["list_id"],)).fetchone()
-            title = tr("{0} in {1}", who, ln["name"] if ln else "?", lg=lg)
+        title = tchat_push_title(c, r, uid, who, lg, pre["lname"])
         msg = tr("New message from {0}", who, lg=lg) if sealed else \
             tr("{0} replied to your message: {1}", who, text, lg=lg) if uid == replied and r["kind"] != "dm" else \
             tr("Replied to your message: {0}", text, lg=lg) if uid == replied else (text or tr("Sent a file", lg=lg))  # 2.113.1 (#2059): only files
         g.pushes.append((uid, title, msg[:300], f"{PUBLIC_URL}/#msg/t/{r['id']}/{m['id']}" if root else f"{PUBLIC_URL}/#team/{r['id']}",
                          push_prio(s),  # 2.139.0 A (#2127): a thread answer opens its thread
-                         {"scope": f"l:{r['list_id']}" if r["list_id"] else f"o:{r['org_id']}" if r["org_id"] else f"dm:{sender}"}))  # 2.240.0 B2 (#2867)
+                         {"scope": tchat_push_scope(r, sender)}))  # 2.240.0 B2 (#2867)
+
+
+def tchat_notify_pre(c, r, uids):
+    """2.369.3 (#3199): the per-person reads of tchat_notify for every person of the room at once (fixed count, not per
+    person). s = collab_user's settings (enabled account, module on; the list role is checked later, per person still in);
+    reads = (last read id, muted); bells = list_bell; reach = push_reachable (only of those with s); lname = the list's name."""
+    out = {"s": {}, "reads": {}, "bells": {}, "reach": set(), "lname": None}
+    if not uids:
+        return out
+    q = sorted(uids)
+    on = {x[0] for x in c.execute("SELECT id FROM users WHERE id = ANY(CAST(? AS BIGINT[])) AND COALESCE(disabled,0)=0", (q,))}
+    if not on:
+        return out
+    S = usettings_many(c, on)
+    out["s"] = {u: s for u, s in S.items() if collab_on(s)}
+    if not out["s"]:
+        return out
+    q = sorted(out["s"])
+    out["reads"] = {x[0]: (x[1], bool(x[2])) for x in c.execute(
+        "SELECT user_id, last_id, muted FROM tchat_reads WHERE room_id=? AND user_id = ANY(CAST(? AS BIGINT[]))", (r["id"], q))}
+    if r["list_id"]:
+        out["bells"] = list_bells(c, q, r["list_id"])
+    out["reach"] = push_reachable_many(c, out["s"])
+    if r["kind"] == "list":
+        ln = c.execute("SELECT name FROM lists WHERE id=?", (r["list_id"],)).fetchone()
+        out["lname"] = ln["name"] if ln else "?"
+    return out
+
+
+def tchat_push_scope(r, sender):
+    return f"l:{r['list_id']}" if r["list_id"] else f"o:{r['org_id']}" if r["org_id"] else f"dm:{sender}"
+
+
+def tchat_push_title(c, r, uid, who, lg, lname=None):
+    """The title of a chat push; who None (several people wrote, the summary) = the room alone. lname (2.369.3, #3199): the
+    list's name, when the caller read it already."""
+    if r["kind"] in TCX_KINDS:  # 2.113.1 (#2059)
+        from .teamchan import tcx_group_name
+        name = tcx_group_name(c, r, uid) if r["kind"] == "group" else r["name"]
+    elif r["kind"] == "dm":
+        return who or APP_NAME
+    else:
+        if lname is None:
+            ln = c.execute("SELECT name FROM lists WHERE id=?", (r["list_id"],)).fetchone()
+            lname = ln["name"] if ln else "?"
+        name = lname
+    return tr("{0} in {1}", who, name, lg=lg) if who else name
+
+
+def tchat_push_tick(c, users, S, LG):
+    """2.367 (#2967) watchdog: "3 new messages" for what the room's gate held back, unless the person has read them; opens the
+    room, its tag replaces the push before it (a count only, so also for encrypted messages)."""
+    for p in push_gate_due(c, "r"):
+        push_gate_reset(c, p)
+        uid, r = p["user_id"], c.execute("SELECT * FROM tchat_rooms WHERE id=?", (int(p["scope"][1:]),)).fetchone()
+        if uid not in users or not r or uid not in tchat_room_members(c, r):
+            continue
+        last, muted = tchat_last_read(c, r["id"], uid)
+        newest = c.execute("SELECT MAX(id) FROM tchat_msgs WHERE room_id=? AND user_id<>?", (r["id"], uid)).fetchone()[0]
+        if muted or not newest or last >= newest:
+            continue
+        lg = LG[uid]
+        who = user_names(c, [p["actor"]]).get(p["actor"]) if p["actor"] else None
+        notify(uid, tchat_push_title(c, r, uid, who, lg), trn("{0} new message", "{0} new messages", p["held"], lg=lg), push_prio(S[uid]),
+               f"{PUBLIC_URL}/#team/{r['id']}", s=S[uid], kind="other", scope=tchat_push_scope(r, p["actor"]))
+
+
+WD_TICKS.append(("chat pushes", tchat_push_tick))
 
 
 def need_tmsg(c, mid, edit=False):
@@ -766,10 +838,14 @@ def tchat_edit(mid):
         return err(tr("The message is empty"))
     if len(text) > TCHAT_MAX:
         return err(tr("The message is too long (max. {0} characters)", TCHAT_MAX))
-    text, _ = tchat_clean_mentions(c, r, text.strip())
+    text, mentions = tchat_clean_mentions(c, r, text.strip())
+    known = {int(x) for x in MENTION_RE.findall(m["body"] or "")}
     c.execute("UPDATE tchat_msgs SET body=?, edited_at=? WHERE id=?", (text, iso_ms(now_utc()), mid))
     from ..agents.chat import med_team_edited  # 2.39.0 (#1179): agents that got it as team_message learn the change
     med_team_edited(c, r, c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone(), m["body"])
+    new_m = [x for x in mentions if x not in known]
+    if new_m:  # 2.367.5 (#2980): a mention added later is heard, like in a comment (comment_edit)
+        tchat_notify(c, r, c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone(), new_m, only=new_m)
     c.commit()
     m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
     return jsonify(tchat_msg_dict(c, m, tchat_rx(c, [mid])))

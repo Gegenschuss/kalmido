@@ -6,7 +6,7 @@ take a locked folder (files/fslock.py) -- invented names only.
  - an inbox made for a folder that is locked later: the upload 409 with the same message (the watcher shows it and tries
    later), upload-target too; nothing is stored
  - the documents upload with parent_id into a locked folder: 409 (the same guard as the mail address and imports)
- - a person without an organisation (her private space)
+ - a person without an organisation (her private workspace)
 usage: p2353_a_scanlock_test.py <datadir>      (a fresh container; P2353S_NOSTART=1 / KMT_NOSTART=1: it runs already)
 freelancer-matrix: files"""
 import base64

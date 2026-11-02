@@ -36,7 +36,7 @@ function daysWord(n) { return n === 0 ? tr('today') : n === 1 ? tr('tomorrow') :
 function rotOrder(t) { const r = t.rotation, n = r.who.length, i = (r.i || 0) % n; return r.who.map((_, j) => personName(t.list_id, r.who[(i + j) % n]) || '?').join(' → '); }
 function famData() {
   const open = [...S.tasks.values()].filter(t => t.status === 0 && !t.deleted_at && !t.context);
-  const occ = open.filter(t => isOcc(t) && t.due).sort((a, b) => a.due.localeCompare(b.due) || a.title.localeCompare(b.title));
+  const occ = open.filter(t => isOcc(t) && t.due).sort((a, b) => a.due.localeCompare(b.due) || cmpText(a.title, b.title));
   const dls = open.filter(t => isDl(t) && t.due).sort((a, b) => a.due.localeCompare(b.due));
   const rots = open.filter(t => t.rotation?.who?.length > 1);
   const mon = S.famWeek || today(), sun = addDays(mon, 6);  // 2.19.0: the next seven days from today (a Sunday showed only the past week)
@@ -59,7 +59,8 @@ function qtyParse(v) {
   const x = String(v ?? '').trim(); let m;
   if ((m = x.match(/^(\d{1,6})?\s*([½¼¾⅓⅔])$/))) return (+(m[1] || 0)) + SHOP_FRAC[m[2]];
   if ((m = x.match(/^(\d{1,6})\s*\/\s*(\d{1,4})$/))) return +m[2] ? +m[1] / +m[2] : null;
-  return /^\d{1,6}([.,]\d{1,3})?$/.test(x) ? +x.replace(',', '.') : null;
+  const n = parseNum(x);  // 2.450.0 (#3770): the field shows 1500 as "1.500" in German, which was 1.5 when saved again
+  return n != null && n >= 0 && n < 1e6 && Math.abs(Math.round(n * 1000) - n * 1000) < 1e-6 ? n : null;
 }
 function shopSplit(title) {
   const s0 = String(title || '').trim(), m = s0.match(SHOP_SPLIT);
@@ -76,12 +77,13 @@ function shopFamWith(t, ch) {
   for (const k of ['qty', 'unit', 'price']) if (f[k] == null || f[k] === '') delete f[k];
   return Object.keys(f).length > 1 ? f : null;
 }
-const moneyParse = v => { const x = String(v ?? '').trim().replace(/\s|€/g, '').replace(',', '.'); return x === '' ? null : /^\d{1,7}(\.\d{1,2})?$/.test(x) ? +x : NaN; };
+// 2.450.0 (#3770): through parseNum: "1.234,56" / "1,234.50" / "1234,5" keep their value, a wrong order is no amount (NaN), never another one
+const moneyParse = v => { const x = String(v ?? '').replace(/€/g, '').trim(); if (x === '') return null; const n = parseNum(x); return n != null && n >= 0 && n < 1e7 && Math.abs(Math.round(n * 100) - n * 100) < 1e-6 ? n : NaN; };
 
 // ---- 2.140.0 A (#2132): recipes = tasks of a list of family "recipes" (or fam kind recipe); a meal may point to one
 const isRecipe = t => !!t && !t.parent_id && t.fam?.kind !== 'meal' && (t.fam?.kind === 'recipe' || famKindOf(t.list_id) === 'recipes');
 const famRecipes = () => [...S.tasks.values()].filter(t => isRecipe(t) && t.status === 0 && !t.deleted_at && !t.context && !listById(t.list_id)?.archived)
-  .sort((a, b) => a.title.localeCompare(b.title));
+  .sort((a, b) => cmpText(a.title, b.title));
 
 function viewFamily() {
   if (kidMe()) return viewKid();
@@ -160,7 +162,7 @@ function viewKid() {
       : `<p class="muted">${tr('No rewards yet: ask your parents.')}</p>`}</div>`;
 }
 // 2.49.0 (#1537): the lists others shared with the kid (not its own Basket / lists), by name
-const kd_sharedLists = () => S.lists.filter(l => !l.archived && !l.is_inbox && !l.context && l.owner_id !== S.me?.id).sort((a, b) => lname(a).localeCompare(lname(b)));
+const kd_sharedLists = () => S.lists.filter(l => !l.archived && !l.is_inbox && !l.context && l.owner_id !== S.me?.id).sort((a, b) => cmpText(lname(a), lname(b)));
 
 // ---- dialogs
 function occModal(o = {}) {
@@ -367,7 +369,7 @@ function shopQtyEdit(id) {
   const f = t.fam?.kind === 'shop' ? t.fam : {};
   const md = modal(`<h3>${esc(t.title)}</h3>
     <div class="row"><label for="sq-qty">${tr('Quantity')}</label><span class="lcost"><input id="sq-qty" class="numin" inputmode="decimal" autocomplete="off" value="${f.qty != null ? esc(fmtNum(f.qty, 3)) : ''}" placeholder="1"><input id="sq-unit" class="numin" autocomplete="off" maxlength="16" value="${esc(f.unit || '')}" placeholder="${esc(tr('Unit'))}" aria-label="${esc(tr('Unit'))}"></span></div>
-    <div class="row"><label for="sq-price">${tr('Price')}</label><input id="sq-price" class="numin" inputmode="decimal" autocomplete="off" value="${f.price != null ? esc(fmtNum(f.price, 2)) : ''}" placeholder="0,00"></div>
+    <div class="row"><label for="sq-price">${tr('Price')}</label><input id="sq-price" class="numin" inputmode="decimal" autocomplete="off" value="${f.price != null ? esc(fmtNum(f.price, 2)) : ''}" placeholder="${esc(fmtNum(0, 2, 2))}"></div>
     <div class="aerr" role="alert" id="sq-err"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.classList.add('famdlg', 'shopqdlg');
@@ -517,7 +519,7 @@ function famDetailHtml(t, l, ro) {
   if (isShopItem(t)) {  // 2.140.0 A (#2131): amount (number + unit) and price of the line
     const f = t.fam?.kind === 'shop' ? t.fam : {}, sp = f.qty == null ? shopSplit(t.title) : null;
     out.push(`<div class="row"><label for="d-fqty">${tr('Quantity')}</label><input id="d-fqty" class="numin" inputmode="decimal" autocomplete="off" value="${f.qty != null ? esc(fmtNum(f.qty, 3)) : ''}" placeholder="1" ${rw ? '' : 'readonly'}><input id="d-funit" class="numin" autocomplete="off" maxlength="16" value="${esc(f.unit || '')}" placeholder="${esc(tr('Unit'))}" aria-label="${esc(tr('Unit'))}" ${rw ? '' : 'readonly'}>${sp?.qty != null && rw ? `<button type="button" class="btn sm" data-act="fam-qtytitle" data-id="${t.id}">${esc(tr('Take “{0}” from the title', fmtNum(sp.qty, 3) + (sp.unit ? ' ' + sp.unit : '')))}</button>` : ''}</div>
-      <div class="row"><label for="d-fprice">${tr('Price')}</label><input id="d-fprice" class="numin" inputmode="decimal" autocomplete="off" value="${f.price != null ? esc(fmtNum(f.price, 2)) : ''}" placeholder="0,00" ${rw ? '' : 'readonly'}></div>`);
+      <div class="row"><label for="d-fprice">${tr('Price')}</label><input id="d-fprice" class="numin" inputmode="decimal" autocomplete="off" value="${f.price != null ? esc(fmtNum(f.price, 2)) : ''}" placeholder="${esc(fmtNum(0, 2, 2))}" ${rw ? '' : 'readonly'}></div>`);
   }
   if (isRecipe(t)) {  // 2.140.0 A (#2132): a recipe: for how many, its ingredients to a shopping list, onto a day of the meal plan
     out.push(`<div class="row"><label for="d-fserves">${tr('Servings')}</label><input id="d-fserves" class="numin" type="number" inputmode="numeric" min="1" max="100" value="${esc(t.fam?.serves ?? '')}" placeholder="4" ${rw ? '' : 'readonly'}></div>
@@ -620,7 +622,7 @@ async function shopPoll() {
   if (S.shop.sig !== shopSig() && !imeOn) shopDraw();
   if (document.hidden || OUT.q.length || imeOn) return;  // the add field keeps its text and focus through a redraw
   if (!OUT.online && (S.shop.n = (S.shop.n || 0) + 1) % 5) return;
-  try { const {v} = await api('GET', '/api/version'); if (v !== S.v) { await load(); shopDraw(); } } catch { /* offline: the ticks wait in the queue */ }
+  try { const {v, vs} = await api('GET', '/api/version'); if (v !== S.v && !lpSkip(v, vs)) { await load(); shopDraw(); } } catch { /* offline: the ticks wait in the queue */ }
 }
 function shopDraw() {
   const ov = $('.shopmode'); if (!ov || !S.shop) return;

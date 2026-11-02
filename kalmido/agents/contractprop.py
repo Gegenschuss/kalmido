@@ -204,10 +204,10 @@ def ctr_agent_proposal(aid, b):
         c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind='proposal' AND read_at IS NULL AND data->>'job' = ?",
                   (ts, pid, str(r[0])))
     title = tr("Notice deadline: {0}", d["name"], lg=d["lang"])  # never the cost: the title shows in pushes and lists
-    jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id,proposal)
-                       VALUES(?,?,?,?,'waiting','',?,?,?,?,'ready',?,?)""",
+    jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id,proposal,title_key)
+                       VALUES(?,?,?,?,'waiting','',?,?,?,?,'ready',?,?,?)""",
                     (aid, tid, pid, title[:JOB_TITLE_MAX], ts, ts, CTR_KIND, json.dumps(inp, ensure_ascii=False), t["list_id"],
-                     json.dumps(p, ensure_ascii=False)))
+                     json.dumps(p, ensure_ascii=False), json.dumps(["Notice deadline: {0}", d["name"]], ensure_ascii=False)))  # 2.454.0 (#3808)
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
     prop_ready_notify(c, j)
     bump(c)

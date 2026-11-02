@@ -3,7 +3,7 @@
 // the read-only collection "From Knowledge" after the folders (lock badge, no menu, not draggable); opened (#ablage/aus-wiki)
 // it lists the page's file under the page's title (a link to the page), with a download link and no delete. The space's
 // name in the path goes back to the top. Own container (start.sh), jsdom.
-// freelancer-matrix: files - frida has no organisation: everything in her private space.
+// freelancer-matrix: files - frida has no organisation: everything in her private workspace.
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');

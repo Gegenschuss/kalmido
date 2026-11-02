@@ -19,9 +19,11 @@ const ains_folderHint = os => os === 'windows' ? '~\\projects\\website' : '~/pro
 const ains_osName = os => tr((AINS_OS.find(x => x[0] === os) || ['', ''])[1]) || '';
 // 2.58.0 (#1527): a token without any computer data (made by hand or before 2.44) is shown as "API token" with its dates
 const f8c_plainTok = m => !m.host && !m.os && !m.folder;
+// 2.366.0 (#2999): a computer without a name is called after its system and the day it was set up (was "API token")
+const ains_machineName = m => m.host || [m.os ? ains_osName(m.os) : f8c_plainTok(m) ? tr('Set up by hand') : tr('Unknown computer'), m.created_at && fmtDateLoc(m.created_at.slice(0, 10))].filter(Boolean).join(' · ');
 function ains_machinesHtml(ms) {
   if (!ms.length) return `<div class="muted mhint">${tr('No computer yet. Create a command above.')}</div>`;
-  return ms.map(m => `<div class="mrow ainsm" data-ainsm="${m.id}">${hdot(m.connected ? 'ready' : 'offline')}<span class="n"><b>${esc(m.host || (f8c_plainTok(m) ? tr('API token') : tr('Unknown computer')))}</b>
+  return ms.map(m => `<div class="mrow ainsm" data-ainsm="${m.id}">${hdot(m.connected ? 'ready' : 'offline')}<span class="n"><b>${esc(ains_machineName(m))}</b>
       <small class="muted">${esc((f8c_plainTok(m) ? [m.created_at && tr('created {0}', fmtWhen(m.created_at)), m.connected ? tr('connected') : m.last_used_at ? tr('last used {0}', relTime(m.last_used_at)) : tr('never used')]
         : [m.connected ? tr('connected') : m.last_used_at ? tr('last contact {0}', relTime(m.last_used_at)) : tr('never connected'), ains_osName(m.os), m.folder]).filter(Boolean).join(' · '))}</small></span>
       <button class="btn sm danger" data-m="ains-del" aria-label="${esc(tr('Remove computer {0}', m.host || m.prefix))}">${ic('trash', 's')} ${tr('Remove computer')}</button></div>`).join('');
@@ -58,7 +60,8 @@ function ains_setupModal(a, base) {
   const md = modal(`<h3>${esc(tr('Set up {0} on a computer', a.name))}</h3>
     <div class="shint keep">${tr('One command installs and starts the agent. Needed: Python 3.9+ and Claude Code.')}</div>
     <div class="row"><label>${tr('Computer')}</label><div class="seg" role="tablist" id="ains-os">${AINS_OS.map(([v, n]) => `<button type="button" role="tab" data-ainsos="${v}" aria-selected="${v === os}" class="${v === os ? 'on' : ''}">${tr(n)}</button>`).join('')}</div></div>
-    <div class="row"><label for="ains-dir">${tr('Project folder')}</label><input id="ains-dir" maxlength="300" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="${esc(ains_folderHint(os))}"></div>
+    <div class="row"><label for="ains-dir">${tr('Project folder')}</label><input id="ains-dir" maxlength="300" autocapitalize="off" autocomplete="off" spellcheck="false" aria-describedby="ains-dirhint"></div>
+    <div class="shint keep" id="ains-dirhint">${esc(tr('The folder the agent works in, e.g. {0}', ains_folderHint(os)))}</div>${''/* 2.366.0 (#3001): an example under the field, a placeholder looked like a filled-in value */}
     <div class="row"><label></label><button class="btn pri" data-m="ains-make">${ic('key', 's')} ${tr('Create command')}</button></div>
     <div id="ains-out" hidden>
       <div class="shint keep" id="ains-how"></div>
@@ -86,7 +89,7 @@ function ains_setupModal(a, base) {
     if (o) {
       os = o.dataset.ainsos; LS.set('ainsOs', os);
       $$('[data-ainsos]', md).forEach(b => { const on = b === o; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
-      $('#ains-dir', md).placeholder = ains_folderHint(os); $('#ains-out', md).hidden = true;
+      $('#ains-dirhint', md).textContent = tr('The folder the agent works in, e.g. {0}', ains_folderHint(os)); $('#ains-out', md).hidden = true;
       return;
     }
     const b = e.target.closest('button[data-m]'); if (!b) return;

@@ -4,6 +4,7 @@ import hashlib
 import ipaddress
 import os
 import random
+import re
 import secrets
 import threading
 import time
@@ -49,10 +50,12 @@ def proxy_login_value():
     return v if v and _peer_trusted() else ""
 
 
-PT_PREFIXES = ("/p/", "/portal/")  # 2.63.0 B (#1513): a customer report's status link, the portal's sign-in / sign-out
+PT_PREFIXES = ("/p/", "/portal/", "/mail/off/")  # 2.63.0 B (#1513): a customer report's status link, the portal's sign-in / sign-out; 2.367.5 (#2975): the off link of a notification mail
 
 
-OPERATOR_PATHS = frozenset(("/api/operator/status", "/api/operator/setup-code", "/api/operator/notice"))  # 2.144.0 D2 (#797)
+OPERATOR_PATHS = frozenset(("/api/operator/status", "/api/operator/setup-code", "/api/operator/notice",  # 2.144.0 D2 (#797)
+                            "/api/operator/accounts/find", "/api/operator/quota-default"))  # #3939
+OPERATOR_ACCOUNT_RE = re.compile(r"/api/operator/accounts/[1-9][0-9]{0,17}")  # #3939: one account by number (fullmatch)
 
 
 def _token_hash(t):
@@ -184,20 +187,33 @@ class _Gate:
         self.cond = threading.Condition()
         self.active = 0
         self.maint = False
+        self.held = threading.local()  # 2.370.2 (#2779): how often this thread is inside (going in again never waits for itself)
 
     def enter(self, block):
         with self.cond:
-            if self.maint:
+            if self.maint and getattr(self.held, "n", 0) <= 0:
                 if not block:
                     return False
                 self.cond.wait_for(lambda: not self.maint)
             self.active += 1
+            self.held.n = getattr(self.held, "n", 0) + 1
             return True
 
     def leave(self):
         with self.cond:
             self.active -= 1
+            self.held.n = max(0, getattr(self.held, "n", 0) - 1)
             self.cond.notify_all()
+
+    @contextlib.contextmanager
+    def work(self):
+        """2.370.2 (#2779): work outside a request (a queue row, the pushes after a request): waits while a restore runs, and
+        a restore waits for it (bk_restore: GATE.begin). Unlike bg() it never waits for a loop's turn or a key rotation."""
+        self.enter(True)
+        try:
+            yield
+        finally:
+            self.leave()
 
     @contextlib.contextmanager
     def bg(self):
@@ -230,6 +246,14 @@ class _Gate:
 
 
 GATE = _Gate()
+
+
+def gated_thread(fn):
+    """2.370.2 (#2779): the pushes after a request in a thread of their own, through the maintenance gate."""
+    def run():
+        with GATE.work():
+            fn()
+    threading.Thread(target=run, daemon=True).start()
 
 
 def _accept_lang(default="en"):
@@ -275,12 +299,13 @@ def authenticate():
         return api_authenticate()  # bearer token only (package B)
     if request.path.startswith(("/dav/", "/.well-known/")) or request.path == "/dav":
         return None  # 2.9.0 (#435): CalDAV: HTTP Basic with an app password (dav_login), never a cookie or the proxy header
-    if (request.path.startswith(("/api/hooks/git/", "/api/hooks/issues/", "/api/hooks/deploy/", "/api/hooks/in/"))
+    if (request.path.startswith(("/api/hooks/git/", "/api/hooks/issues/", "/api/hooks/deploy/", "/api/hooks/in/", "/api/hooks/pay/"))
             or request.path == "/api/hooks/in") and request.method == "POST":  # 2.380 G (#2289): token in the header
         return None  # 2.2.0: inbound Git webhook: no user, no proxy header, the HMAC signature is the credential
         # (2.18.0: also the error-report webhook: the secret token in its URL is the credential; 2.60.0: and the deploy hook)
         # (2.115.0 A (#2061): and the inbound webhook of a list)
-    if request.path in OPERATOR_PATHS:  # 2.144.0 D2 (#797): exact paths, a later route under /api/operator/ is not let through
+        # (2.469.0, #3459: and the payment provider's webhook of an office)
+    if request.path in OPERATOR_PATHS or OPERATOR_ACCOUNT_RE.fullmatch(request.path):  # 2.144.0 D2 (#797): exact paths, a later route under /api/operator/ is not let through
         return None  # 2.144.0 D (#797): the hosting operator's interface: its own token (admin/operator.py), never a person
     if request.path.startswith(PUB_PREFIX):
         return None  # public list link: no user; the token in the path is the credential (see "public links")
@@ -290,6 +315,9 @@ def authenticate():
         u = c.execute("SELECT * FROM users WHERE lower(proxy_login)=lower(?)", (val,)).fetchone()
         if u and not u["disabled"] and not is_agent(u):
             g.user, g.auth_via = u, "proxy"
+            if u["op_made_by"]:  # 2.480.0 review (#3944, F8): a proxy sign-in is the first sign-in too (no start_session here)
+                c.execute("UPDATE users SET op_made_by=NULL WHERE id=?", (u["id"],))
+                c.commit()
             if u["email"] and time.monotonic() > _PROXY_SHS.get(u["id"], 0):  # 2.360.2 M (#2561): no sign-in step with a proxy
                 _PROXY_SHS[u["id"]] = time.monotonic() + 3600
                 _shs_signin(c, u)
@@ -322,7 +350,7 @@ def authenticate():
         if path.startswith("/api/office/") and (request.headers.get("Authorization") or "").lower().startswith("bearer "):
             return err(tr("Tokens cannot use this endpoint"), 403)  # 2.36.2 E (#1146): agent tokens never reach office & finance
         setup = not c.execute("SELECT 1 FROM users").fetchone()
-        return jsonify(error=tr("Please log in"), auth="setup" if setup else "login"), 401
+        return jsonify(error=tr("Please sign in"), auth="setup" if setup else "login"), 401
     return redirect("/", 303)
 
 
@@ -467,7 +495,7 @@ def login_wait(keys, username, pre=""):
     if gate == "ok":
         return None
     if gate == "blocked":
-        return jsonify(error=tr("Too many failed logins, please wait a few minutes")), 429
+        return jsonify(error=tr("Too many failed sign-ins, please wait a few minutes")), 429
     ip = rate_ip()
     with _slow_lock:
         busy = _slow.get(ip, 0) >= LOGIN_SLOW_PER_IP or sum(_slow.values()) >= LOGIN_SLOW_MAX
@@ -531,6 +559,10 @@ def start_session(c, uid, remember, via="password"):
     c.execute("INSERT INTO sessions(token_hash,user_id,created_at,expires_at,via,last_seen_at,user_agent) VALUES(?,?,?,?,?,?,?)",
               (_token_hash(tok), uid, iso(now_utc()), iso(now_utc() + timedelta(days=days)), via, iso(now_utc()),
                ses_ua() if has_request_context() else ""))
+    c.execute("UPDATE users SET op_made_by=NULL WHERE id=? AND op_made_by IS NOT NULL", (uid,))  # 2.480.0 (#3944, F8): signed in = the client's own
+    if via == "link":  # 2.485.0 (#3939): a sign-in link the operator made through support access: no longer than that access
+        from .supportgrant import sga_session_cap
+        sga_session_cap(c, uid, _token_hash(tok))
     from ..admin.clientip import login_seen
     login_seen(c, uid)  # 2.33.0 (#834): many accounts from one private address = the proxy hides the client addresses
     _shs_signin(c, c.execute("SELECT id, email, email_proved, kind FROM users WHERE id=?", (uid,)).fetchone())

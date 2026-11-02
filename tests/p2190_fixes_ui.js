@@ -12,7 +12,7 @@ const {execFileSync} = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const {boot, sleep, B, login, errs} = require('./boot');
+const {boot, B, login, errs, idle} = require('./boot');
 const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -42,7 +42,7 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   const nz = () => d.querySelector('#view .sdrop.snew[data-newsec]');
   check(nz() && /New section/.test(nz().textContent) && !d.querySelector(`#view .sdrop[data-section="${C}"]`) && d.querySelector(`#view .ghead[data-section="${C}"]`), 'drop zones: "+ New section" at the end, no drop field under the empty section (2.46.2 #1662)');
   w.prompt = () => 'Phase 2';
-  dnd(w, d.querySelector(`#view .trow[data-id="${T2}"]`), 'dragstart'); await sleep(20);
+  dnd(w, d.querySelector(`#view .trow[data-id="${T2}"]`), 'dragstart'); await until(() => d.body.classList.contains('tdrag'));
   check(d.body.classList.contains('tdrag'), 'while dragging the zones show (set right after dragstart)');
   check(dnd(w, nz(), 'dragover').defaultPrevented && nz().classList.contains('drop'), '"+ New section" takes a task, highlighted while over it');
   dnd(w, nz(), 'drop');
@@ -55,7 +55,7 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   await until(() => w.eval(`taskById(${T2})?.section_id === ${A} && !S.sections.some(s => s.name === 'Phase 2')`));
   // the empty section's zone (jsdom)
   // CI of 2.307.4: wait for the undo's reload (the row back under "Doing"), a drag of the stale row sends the old section as _prev (#3028) = conflict
-  await until(() => d.querySelector(`#view .trow[data-id="${T2}"]`)?.closest('.group')?.querySelector('.ghead')?.dataset.section === String(A)); await sleep(100);
+  await until(() => d.querySelector(`#view .trow[data-id="${T2}"]`)?.closest('.group')?.querySelector('.ghead')?.dataset.section === String(A)); await idle(w);
   dnd(w, d.querySelector(`#view .trow[data-id="${T2}"]`), 'dragstart');
   const ez = d.querySelector(`#view .ghead[data-section="${C}"]`);  // 2.46.2 (#1662): the section name takes the drop
   check(dnd(w, ez, 'dragover').defaultPrevented, 'the empty section\'s name takes a task');
@@ -63,12 +63,12 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   check(await until(async () => (await call('GET', `/api/tasks/${T2}`)).section_id === C), 'dropped into the empty section ' + JSON.stringify({srv: (await call('GET', `/api/tasks/${T2}`)).section_id, A, C, cli: w.eval(`taskById(${T2})?.section_id`), toast: d.querySelector('#toast')?.textContent || '', ez: ez.isConnected}));
   // a plain drop on another task still reorders (the new zone's check once threw over a row)
   { const s0 = (await call('GET', `/api/tasks/${T1}`)).sort, rows = [...d.querySelectorAll('#view .trow')];
-    await w.eval('load().then(() => render())'); await sleep(200);
+    await w.eval('load().then(() => render())'); await until(() => d.querySelector(`#view .trow[data-id="${T2}"]`)?.closest('.group')?.querySelector('.ghead')?.dataset.section === String(C));
     const tgt = d.querySelector(`#view .trow[data-id="${T2}"]`);
-    dnd(w, d.querySelector(`#view .trow[data-id="${T1}"]`), 'dragstart'); await sleep(20); dnd(w, tgt, 'dragover'); dnd(w, tgt, 'drop'); dnd(w, tgt, 'dragend');
+    dnd(w, d.querySelector(`#view .trow[data-id="${T1}"]`), 'dragstart'); await until(() => d.body.classList.contains('tdrag')); dnd(w, tgt, 'dragover'); dnd(w, tgt, 'drop'); dnd(w, tgt, 'dragend');
     check(await until(async () => { const t = await call('GET', `/api/tasks/${T1}`); return t.section_id === C; }) && rows.length, 'a task dropped on a task of another section: moved there (no error)'); void s0; }
   // keyboard: "Move to section…" -> "New section…"
-  w.eval(`sectionPicker(document.querySelector('#view .trow[data-id="${T1}"]'), ${T1})`); await sleep(100);
+  w.eval(`sectionPicker(document.querySelector('#view .trow[data-id="${T1}"]'), ${T1})`); await until(() => [...d.querySelectorAll('#pop [role="menuitem"]')].some(x => /New section…/.test(x.textContent)));
   const items = [...d.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim());
   check(items.some(x => /New section…/.test(x)) && items.some(x => /Later/.test(x)), '"Move to section…" offers "New section…" ' + items.join('|'));
   w.prompt = () => 'Next week';
@@ -77,7 +77,7 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
   // a list without sections: the menu still offers it
   const L2 = (await call('POST', '/api/lists', {name: 'Plain'})).id, T3 = (await call('POST', '/api/tasks', {title: 'Loose', list_id: L2})).id;
   await w.eval('load()');
-  w.eval(`closePop(); sectionPicker(document.body, ${T3})`); await sleep(100);
+  w.eval(`closePop(); sectionPicker(document.body, ${T3})`); await until(() => [...d.querySelectorAll('#pop [role="menuitem"]')].some(x => /New section…/.test(x.textContent)));
   check([...d.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim()).join('|') === 'New section…', 'a list without sections: only "New section…"');
   w.eval('closePop()');
 
@@ -136,23 +136,27 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
     await cmd('input.releaseActions', {context: ctx});
   };
   const ffLogin = async ({ev, nav}) => { await nav(B + 'static/icon.svg'); return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`); };
+  // the layout holds still: the same value on two polls in a row (a scroll / resize the app answers in its own handlers)
+  const steady = (o, expr) => { let last; return o.until(async () => { const v = JSON.stringify(await o.ev(expr)); const same = v === last; last = v; return same; }); };
   await firefox(async o => {
     const {cmd, ev, ctx, nav} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 1200}});  // the whole list fits: no edge scrolling
     await ffLogin(o);
-    await nav(B + '#l/' + L); await sleep(2500);
+    await nav(B + '#l/' + L); await o.until(`!!document.querySelector('#view .trow[data-id="${T2}"] .ttl') && !!document.querySelector('#view .ghead[data-section="${C}"]')`); await o.idle();
     const pos = sel => ev(`(() => { document.body.classList.add('tdrag'); const e = document.querySelector('${sel}'); const b = e.getBoundingClientRect(); document.body.classList.remove('tdrag'); return {x: b.left + Math.min(60, b.width / 2), y: b.top + b.height / 2}; })()`);
     const to1 = await pos(`#view .ghead[data-section="${C}"]`);  // 2.46.2 (#1662): the section name
     const from = await ev(`(() => { const b = document.querySelector('#view .trow[data-id="${T2}"] .ttl').getBoundingClientRect(); return {x: b.left + 30, y: b.top + b.height / 2}; })()`);
     await tapDrag(o, from, to1);
     check(await until(async () => (await call('GET', `/api/tasks/${T2}`)).section_id === C), 'touch: dropped on the name of an empty section: moved (#667)');
-    await sleep(2500);
+    // the page knows the move (its reload), the drag is over and the Undo toast is up (hidden below)
+    await o.until(`taskById(${T2})?.section_id === ${C} && document.querySelector('#view .trow[data-id="${T2}"]')?.closest('.group')?.querySelector('.ghead')?.dataset.section === '${C}' && !document.body.classList.contains('tdrag') && !!document.querySelector('#toast:not(.hidden)')`); await o.idle();
     await ev(`(() => { document.querySelector('#toast')?.classList.add('hidden'); return 1; })()`);  // the Undo toast sits right over the zone
-    await ev(`(() => { document.body.classList.add('tdrag'); const v = document.getElementById('view'); v.scrollTop = v.scrollHeight; document.body.classList.remove('tdrag'); return 1; })()`); await sleep(300);
+    await ev(`(() => { document.body.classList.add('tdrag'); const v = document.getElementById('view'); v.scrollTop = v.scrollHeight; document.body.classList.remove('tdrag'); return 1; })()`);
+    await steady(o, `[document.getElementById('view').scrollTop, document.querySelector('#view .trow[data-id="${T2}"] .ttl').getBoundingClientRect().top]`);
     const from2 = await ev(`(() => { const e = document.querySelector('#view .trow[data-id="${T2}"] .ttl'); const b = e.getBoundingClientRect(); return {x: b.left + 30, y: b.top + b.height / 2}; })()`);
     const to2 = await pos('#view .sdrop.snew');
     await tapDrag(o, from2, to2);
-    await sleep(600);
+    await o.until(`!!document.querySelector('#cdlg-in')`);
     // the app's own prompt dialog: the name is prefilled ("New section"), typed over, saved
     const pre = await ev(`document.querySelector('#cdlg-in')?.value || ''`);
     check(pre === 'New section', 'touch: "+ New section" asks for the name, prefilled ' + JSON.stringify(pre));
@@ -167,25 +171,30 @@ const dnd = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cance
     const {cmd, ev, ctx, nav} = o, tag = `${what} ${vw}x${vh}`;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await ffLogin(o);
-    await nav(B + '#l/' + L3); await sleep(2500);
-    await ev(`(() => { document.getElementById('view').scrollTop = 300; return 1; })()`); await sleep(200);
+    await nav(B + '#l/' + L3); await o.until(`document.querySelectorAll('#view .trow').length >= 40 && !!document.querySelector('#qinput')`); await o.idle();
+    await ev(`(() => { document.getElementById('view').scrollTop = 300; return 1; })()`);
+    await steady(o, `(() => { const q = document.querySelector('#qinput'); return [document.getElementById('view').scrollTop, !!q?.offsetParent, q?.getBoundingClientRect().top]; })()`);
     const q = await ev(`(() => { const q = document.querySelector('#qinput'); if (!q || !q.offsetParent) return null; const r = q.getBoundingClientRect(); return {x: r.left + 40, y: r.top + r.height / 2}; })()`);
     check(q, `${tag}: the docked "Add task" bar is there`);
     if (!q) return;
     await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 't', parameters: {pointerType: 'touch'}, actions: [{type: 'pointerMove', x: Math.round(q.x), y: Math.round(q.y)}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]});
-    await sleep(300);
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: Math.round(vh * 0.55)}}); await sleep(700);  // the keyboard: resizes-content
+    await o.until(`document.activeElement?.id === 'qinput'`);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: Math.round(vh * 0.55)}});  // the keyboard: resizes-content
+    await o.until(`innerHeight === ${Math.round(vh * 0.55)}`);
+    await steady(o, `[document.activeElement?.id, document.getElementById('view').scrollTop, !!document.querySelector('#qinput')?.offsetParent]`);
     const st0 = await ev(`({a: document.activeElement?.id, s: document.getElementById('view').scrollTop, dock: !!document.querySelector('#qinput')?.offsetParent})`);
     check(st0.a === 'qinput' && st0.dock, `${tag}: keyboard up: the bar stays, the focus (and so the keyboard) too ${JSON.stringify(st0)}`);
+    let typed = '';
     for (const ch of 'Dentist 3p') {
       await cmd('input.performActions', {context: ctx, actions: [{type: 'key', id: 'k', actions: [{type: 'keyDown', value: ch}, {type: 'keyUp', value: ch}]}]});
       await ev(`(() => { document.getElementById('view').scrollTop += 30; return 1; })()`);  // what Chrome's caret reveal does to a sticky field
-      await sleep(120);
+      typed += ch;  // the key is in and the app put the list back (core.js: within 400 ms of the key) before the next one
+      await o.until(`document.querySelector('#qinput').value === ${JSON.stringify(typed)} && Math.abs(document.getElementById('view').scrollTop - ${st0.s}) <= 1`, {timeout: 3000});
     }
-    await sleep(300);
     const st1 = await ev(`({a: document.activeElement?.id, s: document.getElementById('view').scrollTop, v: document.querySelector('#qinput').value})`);
     check(st1.a === 'qinput' && Math.abs(st1.s - st0.s) <= 1 && st1.v === 'Dentist 3p', `${tag}: ten keys: the list did not move, still typing ${JSON.stringify({st0, st1})}`);
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}}); await sleep(400);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}}); await o.until(`innerHeight === ${vh} && !!document.querySelector('#qinput')?.offsetParent`);
+
     check(await ev(`!!document.querySelector('#qinput')?.offsetParent && document.querySelector('#qinput').value === 'Dentist 3p'`), `${tag}: keyboard down: the bar and the text are still there`);
   }, true);
 

@@ -43,10 +43,11 @@ KINDS = {
     "lytpl": ("matrix", "p255_a_api_test.py: arrangement templates only to people of the own organisations, never to agents, a project page only with access (#1068)"),
     "team": ("matrix", "p2280_api_test.py: team chat rooms and direct messages"),
     "agent": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: agents, their chat, events and jobs"),
+    "support": ("matrix", "p2485_a_support_test.py: support access (2.485.0, #3939): an organisation only by its admins, a member / a stranger 403, somebody else's grant 404, the log only to the client"),
     "people": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: the user list, user changes, invitations / sign-in links by id"),
     "org": ("matrix", "p2280_api_test.py: organisations, their members and admins; p2115_b_api_test.py: invitations by e-mail (2.115.0); "
                    "p2146_d_api_test.py: the retention export of another organisation 404 (2.146.0); "
-                   "p2422_orgself_test.py: a company of one's own - its admin sets no e-mail domains (2.422.0)"),
+                   "p2422_orgself_test.py: a company of one's own - its admin sets no e-mail domains (2.422.0), an organisation admin neither (2.467.0)"),
     "calendar": ("matrix", "p2300_tenant_test.py: calendars by id, sharing (B2), workspace (B3); p294_b_api_test.py (the booking page: types / bookings of another person 404, the public pages); "
                  "p2111_b_api_test.py (invitation marks and subscription links of another person's calendar 404, a link ends with the sharing)"),
     "event": ("matrix", "p2300_tenant_test.py: events by id, ranges, invitations"),
@@ -139,7 +140,8 @@ KINDS = {
     "sectpl": ("matrix", "p2156_c_api_test.py: a section template of another organisation / person: 404 (list, use, change, delete, save into it)"),
     # 2.98.0 A (#1953): scheduling polls belong to one organisation (every member reads, the owner / its admins change) or one person
     "poll": ("matrix", "p298_a_api_test.py: a poll of another organisation / person: 404 (read, change, delete, choose, move, list); "
-                       "the public link reads inside the poll's organisation only"),
+                       "the public link reads inside the poll's organisation only; p2484_a_polls_v1_test.py (2.484.0): REST v1 of another "
+                       "organisation's person / agent: 404"),
     # ---- not relevant for the boundary between organisations (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account (before a session or about the session's own person)"),
     "own": ("n/a", "the person's own rows only (settings, devices, tokens, habits, time, filters, imports, Home & life, their own "
@@ -152,13 +154,16 @@ KINDS = {
                      "is trusted with the whole server (architecture review 2.1 / B4); people in it are filtered by visible_people"),
     # 2.144.0 D (#797)
     "operator": ("n/a", "the hosting operator's interface (a token from a file, off by default, never a person or a session): "
-                        "instance-wide numbers and operating actions only, no content of any person or organisation (p2144_d_api_test.py)"),
+                        "instance-wide numbers and operating actions only, no content of any person or organisation (p2144_d_api_test.py; accounts by number: p2485_b_api_test.py)"),
     "public": ("n/a", "pages and facts without data of a person (app shell, health, version, robots, manifest, QR code of a given text)"),
     "test": ("n/a", "test containers only (KALMIDO_TEST=1): an uncaught error on purpose (2.359.0 #3023), not in the product"),  # 2.359.0 (#3023)
     "family": ("n/a", "the household of the Family module: private by definition (kid_parents), never an organisation's object"),
     "pure": ("n/a", "a pure transformation of the request body (an outline file into a tree): no stored data is read or written"),
     "token": ("n/a", "an inbound hook addressed by the unguessable secret of one list (sealed, looked up by its hash): nothing to "
                      "guess by id"),
+    "mailoff": ("n/a", "the one-click off link of a notification mail (2.367.5 #2975): addressed by a signature over one person and "
+                       "what to turn off, it changes only that person's own mail settings and shows no data; a wrong link is the same "
+                       "404 (p23675_notify_test.py)"),
     # 2.49.0 (#1106): finding people by e-mail (accounts/discover.py) -- its own kind (a second "people" key here silently
     # replaced the matrix kind of the user list above)
     "discover": ("n/a", "finding people by e-mail and connection requests: person to person, outside every workspace; the "
@@ -209,6 +214,10 @@ ROUTES = {
     "PUT /api/admin/announcement": "admin",
     # 2.144.0 D (#797): the hosting operator's interface (a token from a file, off by default)
     "GET /api/operator/status": "operator", "POST /api/operator/setup-code": "operator", "PUT /api/operator/notice": "operator",
+    # 2.485.0 (#3939): one customer's account by number (lock, unlock, quota, delete) and the default quota
+    "POST /api/operator/accounts/find": "operator", "GET /api/operator/accounts/{}": "operator",
+    "PUT /api/operator/accounts/{}": "operator", "DELETE /api/operator/accounts/{}": "operator",
+    "PUT /api/operator/quota-default": "operator",
     "PUT /api/v1/admin/announcement": "admin", "GET /api/admin/agents": "admin", "POST /api/admin/agents": "admin",
     "PATCH /api/admin/agents/{}": "admin", "POST /api/admin/agents/{}/reset": "admin",
     "POST /api/admin/agents/{}/avatar": "admin", "POST /api/admin/agents/{}/token": "admin",
@@ -229,6 +238,7 @@ ROUTES = {
     "POST /api/v1/agent/jobs": "agent", "PATCH /api/v1/agent/jobs/{}": "agent", "GET /api/agents": "agent",
     "GET /api/agents/jobs": "agent", "POST /api/agents/jobs/{}/action": "agent",
     "POST /api/agents/{}/chat/{}/choice": "agent", "PUT /api/agents/{}/permission-mode": "agent",
+    "GET /mail/off/{}": "own", "POST /mail/off/{}": "own",  # #2975: a person's own notification mail, by its token
     "GET /api/agents/{}/perm-users": "agent",  # 2.312.0 D (#3266): p2312_d_perm_user_test.py
     "GET /api/agents/{}/chat-prefs": "agent", "PUT /api/agents/{}/chat-prefs": "agent", "POST /api/agents/{}/chat/{}/dismiss": "agent",  # 2.233.0 A (#2848)
     "GET /api/agents/{}/chat": "agent", "POST /api/agents/{}/chat": "agent",
@@ -236,6 +246,7 @@ ROUTES = {
     "GET /api/polls": "poll", "POST /api/polls": "poll", "GET /api/polls/{}": "poll", "PATCH /api/polls/{}": "poll",
     "DELETE /api/polls/{}": "poll", "POST /api/polls/{}/restore": "poll", "POST /api/polls/{}/decide": "poll",
     "POST /api/polls/{}/reopen": "poll", "POST /api/polls/{}/move-space": "poll", "GET /s/v/{}": "poll", "POST /s/v/{}": "poll",
+    "GET /api/v1/polls": "poll", "POST /api/v1/polls": "poll", "GET /api/v1/polls/{}": "poll",  # 2.484.0 (#2200)
     "GET /s/v/time.js": "public",
     # (2.98.0 spacer A)
     # 2.98.0 B (#1954): questionnaires (p298_b_api_test.py) - routes below this line
@@ -268,6 +279,7 @@ ROUTES = {
     "POST /api/office/letters/doc/{}/deadline-task": "office",
     # 2.153.0 (#2029 #2030): letter mail, text blocks (p2106_c_api_test.py) - routes below this line
     "GET /api/office/receipt-mail": "office", "POST /api/office/receipt-mail": "office",  # 2.424.0 B (#3450)
+    "GET /api/office/mail-profile": "office", "PUT /api/office/mail-profile": "office",  # 2.439.0 (#3617): p2439_a_mailsig_test.py
     "GET /api/office/letters/mail-info": "office", "GET /api/office/letters/{}/mail-draft": "office", "POST /api/office/letters/{}/send-mail": "office",
     "GET /api/office/letter-blocks": "office", "GET /api/office/letter-blocks/starters": "office", "POST /api/office/letter-blocks": "office",
     "PATCH /api/office/letter-blocks/{}": "office", "DELETE /api/office/letter-blocks/{}": "office", "POST /api/office/letter-blocks/{}/restore": "office",
@@ -335,6 +347,7 @@ ROUTES = {
     "PATCH /api/me/passkeys/{}": "auth", "DELETE /api/me/passkeys/{}": "auth", "GET /api/auth/oidc/start": "auth",
     # 2.115.0 B (#2062): the own sessions (user_id = me; p2115_b_api_test.py: a foreign session id is 404)
     "GET /api/me/sessions": "auth", "DELETE /api/me/sessions/{}": "auth", "POST /api/me/sessions/others": "auth",
+    "GET /api/support-access": "support", "POST /api/support-access": "support", "DELETE /api/support-access/{}": "support",  # 2.485.0 (#3939)
     "GET /api/auth/oidc/callback": "auth", "POST /api/auth/signup": "auth", "POST /api/auth/link": "auth",
     # ---- book (16)
     "GET /api/v1/address-books": "book", "POST /api/v1/address-books": "book", "PATCH /api/v1/address-books/{}": "book",
@@ -357,6 +370,7 @@ ROUTES = {
     "DELETE /api/evcals/{}/members/{}": "calendar", "GET /api/evcals/{}/export.ics": "calendar",
     "GET /api/evinvite": "calendar", "GET /api/evcals/{}/feed": "calendar", "POST /api/evcals/{}/feed": "calendar",  # 2.111.0 B (#2056)
     "GET /api/events/freebusy": "calendar",  # 2.155.0 B (#2077): spans only, colleagues of the same organisation
+    "GET /api/v1/events/freebusy": "calendar",  # 2.467.0 (#2586): the same; an agent only about the people shared with it
     # ---- chatfile (4)
     "GET /api/chat-files/{}": "chatfile", "DELETE /api/chat-files/{}": "chatfile",
     "POST /api/chat-save": "chatsave",  # 2.37.0 (#1159)
@@ -499,6 +513,9 @@ ROUTES = {
     "POST /api/office/datev/suppliers/{}/restore": "office", "GET /api/office/datev/opening": "office",
     # 2.90.0 A (#1921): bookkeeping light, office admins (p290_a_api_test.py)
     "GET /api/office/books": "office", "GET /api/office/books/euer": "office", "GET /api/office/books/ustva": "office",
+    "GET /api/office/books/taxform/euer": "office", "GET /api/office/books/taxform/euer.csv": "office", "GET /api/office/books/taxform/euer.pdf": "office",  # 2.467.0 (#3456): p2467_c_api_test.py
+    "GET /api/office/books/taxform/ust": "office", "GET /api/office/books/taxform/ust.csv": "office", "GET /api/office/books/taxform/ust.pdf": "office",
+    "PUT /api/office/books/taxform/vat": "office",
     "GET /api/office/books/euer.csv": "office", "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/export": "office",  # 2.147.0 (#2461): neutral export, admin only (p2147_a_api_test.py)
     "GET /api/office/books/receipts": "office", "GET /api/office/books/receipts.csv": "office", "GET /api/office/books/receipts.zip": "office",  # 2.153.0 (#2055)
     "POST /api/office/books/receipts/checked": "office",  # 2.420.0 C (#3448): p24200_c_api_test.py
@@ -530,8 +547,12 @@ ROUTES = {
     "GET /api/office/mail-status": "office", "GET /api/office/docs/{}/xml": "office",  # F2: the e-invoice XML of a finalised document
     # 2.154.0 B (#1960): e-invoices over Peppol (p2154_b_peppol_test.py: another organisation 404, a member cannot set up)
     "GET /api/office/peppol": "office", "PUT /api/office/peppol": "office", "POST /api/office/peppol/check": "office",
+    "GET /api/office/payonline": "office", "PUT /api/office/payonline": "office", "POST /api/office/payonline/check": "office",  # 2.469.0 (#3459)
+    "POST /api/office/payonline/rotate": "office", "POST /api/office/payonline/events/{}/retry": "office", "POST /api/office/payonline/events/{}/done": "office",
+    "PUT /api/office/docs/{}/pay-online": "office",
     "GET /api/office/docs/{}/ubl": "office", "GET /api/office/docs/{}/peppol": "office", "POST /api/office/docs/{}/peppol": "office",
     "POST /api/office/docs/{}/peppol/lookup": "office",
+    "POST /api/office/docs/{}/peppol/undelivered": "office",  # 2.370.0 (#2778)
     "POST /api/office/docs/{}/peppol/refresh": "office",  # 2.306.0 D2 (#2875): the status fetch moved off the GET
     # 2.47.0 (#1215): the parts of a quotation
     "POST /api/office/docs/{}/parts": "office", "PATCH /api/office/docs/{}/parts/{}": "office", "DELETE /api/office/docs/{}/parts/{}": "office",
@@ -667,11 +688,13 @@ ROUTES = {
     "PATCH /api/notes/{}": "list", "DELETE /api/notes/{}": "list", "GET /api/v1/lists/{}/notes": "list",
     "POST /api/v1/lists/{}/notes": "list", "GET /api/v1/notes/{}": "list", "PATCH /api/v1/notes/{}": "list",
     "DELETE /api/v1/notes/{}": "list", "POST /api/notes/{}/restore": "list", "POST /api/v1/notes/{}/restore": "list",  # 2.272.0 E1 (#3038)
+    "POST /api/notes/quick-list": "own",  # 2.477.0 (#3881): the person's own private list Notes
     "POST /api/lists/{}/tags": "list", "PATCH /api/list-tags/{}": "list",
     "DELETE /api/list-tags/{}": "list", "POST /api/lists/{}/tags/promote": "list", "GET /api/lists/{}/error-hook": "list",
     "PATCH /api/lists/{}/error-hook": "list", "GET /api/v1/lists/{}/error-hook": "list",
     "PATCH /api/v1/lists/{}/error-hook": "list", "GET /api/v1/lists/{}/repos": "list", "GET /api/lists/{}/repos": "list",
     "GET /api/lists/{}/build-status": "list", "GET /api/v1/lists/{}/build-status": "list", "PUT /api/lists/{}/repos/version-field": "list",  # 2.151.0 A (#2558)
+    "PUT /api/lists/{}/repos/close-release": "list", "POST /api/tasks/{}/partial": "task", "POST /api/v1/tasks/{}/partial": "task",  # 2.392.0 B (#3364)
    
     "POST /api/lists/{}/repos": "list", "PATCH /api/repos/{}": "list", "DELETE /api/repos/{}": "list",
     "POST /api/repos/{}/refresh": "list", "POST /api/lists/{}/fields": "list", "PATCH /api/fields/{}": "list",
@@ -764,7 +787,7 @@ ROUTES = {
     "POST /api/calendars/{}/refresh": "own",
     # 2.52.0 (#1128): writing into the person's own CalDAV subscription (need_calsub: the subscription's owner only)
     "POST /api/calendars/{}/events": "own", "PATCH /api/calendars/{}/events": "own", "DELETE /api/calendars/{}/events": "own",
-    "POST /api/calendars/{}/events/restore": "own", "POST /api/calendars/{}/write": "own", "POST /api/import/ticktick": "own", "POST /api/import/{}": "own",
+    "POST /api/calendars/{}/events/restore": "own", "POST /api/calendars/{}/write": "own", "POST /api/import/{}": "own",
     "POST /api/imports/{}/undo": "own", "GET /api/imports": "own", "GET /api/me/mail": "own",
     # 2.73.0 B (#1473): the account export / import: the person's own files (a folder per person, another person's id = 404);
     # the import's target organisation needs its admin (p273_b_api_test.py)
@@ -772,7 +795,7 @@ ROUTES = {
     "GET /api/account/export/file": "own", "POST /api/account/export/file": "own", "GET /api/account/import": "own", "POST /api/account/import": "own",
     "GET /api/account/import/{}": "own", "PUT /api/account/import/{}": "own", "DELETE /api/account/import/{}": "own",
     "POST /api/account/import/{}/run": "own", "POST /api/account/import/{}/key": "own",
-    # 2.96.0 D (#1941 / #1918): an organisation export into the private space (p296_d_api_test.py)
+    # 2.96.0 D (#1941 / #1918): an organisation export into the private workspace (p296_d_api_test.py)
     "POST /api/me/mail/token": "own", "DELETE /api/me/mail/token": "own", "POST /api/me/mail/test": "own",
     "GET /api/v1/life": "own", "GET /api/v1/life/upkeep-presets": "own",
     "POST /api/v1/life/contracts": "own", "POST /api/v1/life/devices": "own", "POST /api/v1/life/upkeep": "own",
@@ -802,6 +825,7 @@ ROUTES = {
     "GET /api/v1/announcement": "public", "GET /api/v1/openapi.json": "public", "GET /api/about": "public", "POST /api/client-errors": "clienterr",
     "GET /": "public", "GET /capture": "public", "GET /share": "public", "POST /share": "public", "POST /drop": "public",
     "POST /drop/drop": "public", "GET /robots.txt": "public", "GET /manifest.json": "public", "GET /sw.js": "public",
+    "GET /mail/off/{}": "mailoff", "POST /mail/off/{}": "mailoff",  # 2.367.5 (#2975): no sign-in, the link's signature names the person
     "GET /sw-manifest.json": "public",  # 2.149.0 B (#2506): the service worker's file hashes (no user data)
     "GET /static/i18n/{}.core.json": "public", "GET /static/i18n/{}.mod-{}.json": "public",  # 2.191.0 A (#2518): the split language files (no user data)
     "GET /api/health": "public", "GET /api/version": "public", "POST /api/qr": "public",
@@ -810,7 +834,7 @@ ROUTES = {
     "GET /api/lists/{}/public-link": "publiclink", "PUT /api/lists/{}/public-link": "publiclink",
     "POST /api/lists/{}/public-link/regenerate": "publiclink", "DELETE /api/lists/{}/public-link": "publiclink",
     # 2.50.0 (#329, #1200)
-    "GET /s/{}/file/{}": "signoff", "GET /s/{}/logo": "signoff", "POST /s/{}/feedback": "signoff", "GET /s/q/{}": "signoff", "GET /s/q/{}/pdf": "signoff", "POST /s/q/{}": "signoff",
+    "GET /s/{}/file/{}": "signoff", "GET /s/{}/logo": "signoff", "POST /s/{}/feedback": "signoff", "GET /s/pay/{}": "signoff", "POST /s/pay/{}/go": "signoff", "GET /s/q/{}": "signoff", "GET /s/q/{}/pdf": "signoff", "POST /s/q/{}": "signoff",
     "POST /s/q/{}/comments": "signoff",  # 2.99.1 A (#1959): a customer's comment on a video sign-off
     "GET /s/q/{}/terms": "signoff",  # 2.113.2 (#2253): the terms frozen with the quotation of the link
     # 2.99.1 A (#1959): video sign-offs (videos/review.py; p2991_a_api_test.py)
@@ -845,6 +869,7 @@ ROUTES = {
     "POST /api/v1/tasks/{}/comments": "task", "POST /api/v1/tasks/{}/take": "task", "GET /api/tasks/{}/timeline": "task",
     "POST /api/tasks/{}/seen": "task", "POST /api/tasks/{}/comments": "task", "GET /api/tasks/{}": "task",
     "POST /api/tasks/{}/git-undo": "task", "POST /api/tasks/{}/take": "task",
+    "POST /api/tasks/{}/duplicate": "task",  # 2.363.3 (#3134): also p2363_3_b_api_test
     "GET /api/tasks/{}/milestone": "task", "POST /api/tasks/reorder": "task", "POST /api/tasks/batch": "task",
     "GET /api/tasks/{}/deps": "task", "DELETE /api/deps/{}/{}": "task", "POST /api/tasks/{}/complete": "task",
     "POST /api/tasks/{}/undo": "task", "POST /api/tasks/{}/skip": "task", "POST /api/tasks/{}/reopen": "task",
@@ -863,6 +888,8 @@ ROUTES = {
     "POST /api/team/rooms/{}/e2e": "team", "GET /api/tasks/{}/enc-note": "task", "PUT /api/tasks/{}/enc-note": "task",
     "DELETE /api/tasks/{}/enc-note": "task", "POST /api/tasks/{}/enc-attachments": "attachment",
     # 2.48.0 (#1642): the locked note of a task (need_task; only the person who locked it)
+    "GET /api/tasks/{}/watchers": "task", "POST /api/tasks/{}/watchers": "task", "DELETE /api/tasks/{}/watchers/{}": "task",  # 2.473.0 (#3357): need_task, others only owner / admins (pr2473_a_api)
+    "GET /api/v1/tasks/{}/watchers": "task", "POST /api/v1/tasks/{}/watchers": "task", "DELETE /api/v1/tasks/{}/watchers/{}": "task",
     "GET /api/tasks/{}/bell": "task", "PUT /api/tasks/{}/bell": "task", "POST /api/tasks/{}/bell/undo": "task",  # 2.53.0 C (#1424): need_task + people of the list (p253_c_api_test.py)
     # 2.64.1 A (#1817): the lock per list -- need_list + people only (p264a_a_api_test.py: outside the list 404, agents / tokens 403)
     "GET /api/lists/{}/e2e": "list", "POST /api/lists/{}/e2e/start": "list", "GET /api/lists/{}/e2e/todo": "list",
@@ -913,6 +940,7 @@ ROUTES = {
     "DELETE /api/me/channels/{}": "channel", "POST /api/me/channels/{}/test": "channel",
     "GET /api/orgs/{}/channels": "channel", "POST /api/orgs/{}/channels": "channel", "PATCH /api/orgs/{}/channels/{}": "channel",
     "DELETE /api/orgs/{}/channels/{}": "channel", "POST /api/orgs/{}/channels/{}/test": "channel",
+    "POST /api/hooks/pay/{}": "token",  # 2.469.0 (#3459)
     "POST /api/hooks/in/{}": "token", "POST /api/hooks/in": "token", "GET /api/lists/{}/hooks-in": "list",  # 2.380 G (#2289): header variant
     "POST /api/lists/{}/hooks-in": "list",
     "PATCH /api/hooks-in/{}": "list", "DELETE /api/hooks-in/{}": "list", "POST /api/hooks-in/{}/rotate": "list",
@@ -921,6 +949,8 @@ ROUTES = {
     # the status report of a list (p2340_a_api_test.py has the cross-tenant cases)
     "GET /api/briefing": "aggregate", "POST /api/briefing/read": "own", "GET /api/v1/briefing": "aggregate",
     "GET /api/lists/{}/status-report": "list", "GET /api/v1/lists/{}/status-report": "list",
+    # 2.392.0 D (#3369): p2392_d_api_test.py has the stranger and the shared-only cases
+    "GET /api/inbox": "aggregate", "GET /api/v1/me/waiting": "aggregate", "GET /api/v1/lists/{}/delivery-report": "list",
     # ---- 2.34.0 (#266 #269 #272 #368): stale tasks, time gaps, planned agent jobs, a file's text (p2300_tenant_test.py has the
     # cross-tenant cases: the other organisation's people and agent get 404 / nothing of the first one); the briefing field's
     # PDF reader reads only the uploaded file of the signed-in person and stores nothing (own)
@@ -1025,7 +1055,7 @@ ROUTES = {
     "POST /api/disc/connections/{}/restore": "discover", "POST /api/disc/blocks/{}": "discover", "DELETE /api/disc/blocks/{}": "discover",
     # 2.48.0 (#1111): documents
     "GET /api/docs": "document", "POST /api/docs": "document", "GET /api/docs/{}": "document", "PATCH /api/docs/{}": "document",
-    "POST /api/docs/{}/accept": "document", "POST /api/docs/{}/review": "document", "POST /api/docs/{}/redo": "document",
+    "POST /api/docs/{}/accept": "document", "POST /api/docs/{}/review": "document", "POST /api/docs/{}/redo": "document", "POST /api/docs/{}/redo/undo": "document",
     "GET /api/docs/{}/thumb": "document", "GET /api/docs/{}/file": "document", "POST /api/docs/{}/task": "document",
     "DELETE /api/docs/{}/task": "document", "GET /api/docs/settings": "document", "PUT /api/docs/settings": "document",
     "POST /api/docs/rules": "document", "PATCH /api/docs/rules/{}": "document", "DELETE /api/docs/rules/{}": "document",
@@ -1060,6 +1090,7 @@ ROUTES = {
     "GET /api/files/collections/{}": "file",  # 2.429.0 (#3580): "From <area>", the boundary tested in p2429_a_ablage_view_test.py (another space 404, another person's files none)
     "GET /api/files/search": "file", "GET /api/v1/files/search": "file",  # 2.61.0 (#1820): names + recognised text, the boundary tested in p261_c_api_test.py
     "GET /api/files/nodes/{}": "file", "GET /api/files/nodes/{}/content": "file",
+    "GET /api/files/nodes/{}/thumb": "file",  # 2.477.0 (#3936): p2477_ablagethumb_test.py: another person 404
     "GET /api/files/nodes/{}/share-targets": "file", "GET /api/paperless": "paperless",
     "GET /api/paperless/preview": "paperless", "GET /api/v1/files": "file", "GET /api/v1/files/{}": "file",
     "GET /api/v1/files/{}/content": "file", "GET /api/v1/files/{}/text": "file", "GET /api/v1/receipt-suggestions": "receipt",
@@ -1109,6 +1140,8 @@ ROUTES = {
     "GET /api/lists/{}/velocity": "list", "GET /api/v1/lists/{}/velocity": "list",
     # 2.60.0 C (#1512): the review step (need_task / need_list of the task's list; p260_c_api_test.py: a stranger 404, a viewer 403)
     "POST /api/tasks/{}/review": "task", "POST /api/v1/tasks/{}/review": "task",
+    "PUT /api/tasks/{}/irreversible": "task", "DELETE /api/tasks/{}/irreversible": "task", "POST /api/tasks/{}/irreversible-yes": "task",  # 2.392.0 C (#3370)
+    "GET /api/tasks/{}/decisions": "task", "POST /api/tasks/{}/decisions": "task", "GET /api/v1/tasks/{}/decisions": "task", "POST /api/v1/tasks/{}/decisions": "task",
     "PUT /api/lists/{}/review": "list", "PUT /api/v1/lists/{}/review": "list",
     # 2.61.0 (#1818): the virus scanner's state + counts for the server admin (no file, no content; p261_a_api_test.py: 403 for others)
     "GET /api/admin/upload-scan": "admin",
@@ -1168,7 +1201,7 @@ ROUTES = {
     # 2.141.0 B (#2140, #2139): the HTML view, a task / an event from a mail (only into lists / calendars of the mail's workspace), the mail of a task / event
     "GET /api/hubmail/mails/{}/html": "hubmail", "GET /api/hubmail/mails/{}/make": "hubmail", "POST /api/hubmail/mails/{}/task": "hubmail",
     "POST /api/hubmail/mails/{}/event": "hubmail", "GET /api/hubmail/links": "hubmail",
-    # 2.141.0 A (#2141, #2138): the mailbox of a workspace (its admins / the own private space), compose + send (hbm_can write)
+    # 2.141.0 A (#2141, #2138): the mailbox of a workspace (its admins / the own private workspace), compose + send (hbm_can write)
     "GET /api/hubmail/mailboxes": "hubmail", "GET /api/hubmail/mailbox": "hubmail", "PUT /api/hubmail/mailbox": "hubmail", "DELETE /api/hubmail/mailbox": "hubmail",
     "POST /api/hubmail/mailbox/check": "hubmail", "POST /api/hubmail/mailbox/poll": "hubmail", "GET /api/hubmail/compose": "hubmail", "POST /api/hubmail/send": "hubmail",
     # 2.85.0 B (#1162): feeds; 2.172.0 B (#2677): private or per organisation (p2172_b_reading_scope_test.py), was "own"

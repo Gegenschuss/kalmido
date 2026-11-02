@@ -20,19 +20,19 @@ import hmac
 import html
 import io
 import re
-import threading
 from urllib.parse import parse_qs, quote, urlencode, urlsplit, urlunsplit
 
 from flask import Response, jsonify, redirect, request
 
 from ..core.config import app, PUBLIC_URL
+from ..collab.comments import lang_of  # 2.367.5 (#2980)
 from ..core.access import Denied, FULL_ROLES, WRITE_ROLES, acx_org_ok, list_role, task_visible
 from ..office.signoff import sig_people  # 2.266.0 (#2965)
 from ..core.db import body, db, err, iso, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, csv_dialect, tr
 from ..core.pg import insert_id, write_lock
-from ..accounts.session import me, rate_ip
+from ..accounts.session import gated_thread, me, rate_ip
 from ..accounts.login import auth_key
 from ..core.errors import BadInput
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
@@ -492,7 +492,7 @@ def vdr_comment_new(vid):
     if isinstance(par, int) and not isinstance(par, bool):  # 2.360.0 D (#2496): as in v1 -- the customer page shows this answer
         p = c.execute("SELECT ext_name FROM video_comments WHERE id=? AND review_id=? AND deleted_at IS NULL", (par, vid)).fetchone()
         if p and p["ext_name"] and not vdr_may(c, uid, r, write=True):
-            raise Denied(403, tr("Only people who may change the review answer the customer"))
+            raise Denied(403, tr("Only people who may change the review answer the client"))
     cid = vdr_comment_add(c, r, uid, b)
     c.commit()
     return jsonify(dict(vdr_dict(c, vdr_reload(c, vid), uid, full=True), comment_id=cid))
@@ -588,7 +588,7 @@ def vdr_export(vid):
             lines.append(("    > " if ans else f"[{'x' if done else ' '}] {v} {tc or '--:--'} ") + f"{name}: {' '.join(text.split())}")
         return jsonify(text="\n".join(lines))
     buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";")
+    w = csv.writer(buf, delimiter=csv_dialect()[0])  # 2.368.2 (#2984)
     w.writerow([tr("Version"), tr("Timecode"), tr("Name"), tr("Comment"), tr("Done"), tr("Answer")])
     for v, tc, name, text, done, ans in rows:
         w.writerow([v, tc, vdr_csv_cell(name), vdr_csv_cell(text), tr("Yes") if done else "", tr("Yes") if ans else ""])
@@ -774,7 +774,7 @@ def vdr_pub_comment(token):
     c.commit()
     print("video review customer comment", r["id"], flush=True)
     if push:
-        threading.Thread(target=push, daemon=True).start()
+        gated_thread(push)  # 2.370.2 (#2779)
     return pub_headers(redirect(f"{SIG_PREFIX}{token}?sent=1#vdr-f", 303))
 
 
@@ -804,7 +804,7 @@ def vdr_pub_notify(c, s, r, name, text):
     click = vdr_click(r)
     click = click if click.startswith("http") else f"{PUBLIC_URL}/{click}"  # 2.266.0 (#2965): ntfy needs an absolute link
     sc = f"l:{lid}" if lid else f"o:{s['org_id']}"  # 2.240.0 B2 (#2867): the channels follow the list / the office
-    return lambda: [notify(uid, tr("Comment from the customer", lg=st.get("lang") or "en"), f"{name}: {text[:200]}", prio="4", click=click, s=st,
+    return lambda: [notify(uid, tr("Comment from the client", lg=lang_of(st)), f"{name}: {text[:200]}", prio="4", click=click, s=st,
                            scope=sc) for uid, st in sends]
 
 
@@ -859,8 +859,8 @@ def vdr_move_space(vid):
     notes = [{"task_id": tr("The video sign-off is no longer attached to its task"), "list_id": tr("The video sign-off is no longer attached to its project"),
               "client_id": tr("The video sign-off is no longer attached to its client")}.get(place, ""),
              tr("Every member of the organisation can then open it") if to else "",
-             tr("The customer link stops; its record stays in the old workspace") if live else
-             (tr("The customer's decision stays recorded in the old workspace") if sigs else ""),
+             tr("The client link stops; its record stays in the old workspace") if live else
+             (tr("The client's decision stays recorded in the old workspace") if sigs else ""),
              oo_into_note(c, r["org_id"], to)]  # 2.361.2 B (#2923): the way back
     dest = None
     if b.get("place") not in (None, "", 0):
@@ -899,8 +899,8 @@ def vdr_move_space(vid):
     if not any(new.values()):  # 2.99.1 review L2: the old place no longer fits -> a project in the target, no review at nothing
         return jsonify(smv_answer(notes, tr("Choose a project in the target workspace"), count=1))
     org_out(c, r["org_id"], to, "video", r["title"], obj=vid)  # 2.361.2 B (#2923): logged, admins told, release used
-    c.execute("UPDATE video_reviews SET org_id=?, owner_id=?, task_id=?, list_id=?, client_id=?, updated_at=? WHERE id=?",
-              (to, None if to else uid, new["task_id"], new["list_id"], new["client_id"], ts, vid))
+    c.execute("UPDATE video_reviews SET org_id=?, owner_id=?, task_id=?, list_id=?, client_id=?, updated_at=?, brought_by=? WHERE id=?",
+              (to, None if to else uid, new["task_id"], new["list_id"], new["client_id"], ts, uid if to and not r["org_id"] else None, vid))  # 2.365.1 (#3395): accounts/orgback.py
     c.execute("UPDATE video_versions SET org_id=? WHERE review_id=?", (to, vid))
     c.execute("UPDATE video_comments SET org_id=? WHERE review_id=?", (to, vid))
     if live:
@@ -918,6 +918,36 @@ def vdr_move_space(vid):
     c.commit()
     return jsonify(smv_answer(notes, None, ok=True, move_id=mid, from_space=vdr_space_key(r["org_id"]), space=vdr_space_key(to),
                               review=vdr_dict(c, vdr_reload(c, vid), uid, full=True), revived=revived))
+
+
+def vdr_home(c, r, uid):
+    """2.365.1 (#3395): review r goes back into uid's private space with their leaving (accounts/orgback.py): what
+    vdr_move_space does without the dialog. Its place: its task / project when that went back too, else the person's inbox
+    (a review always has a place; False without one: it stays). The caller commits."""
+    import json
+    write_lock(c, f"video_review_{int(r['id'])}")  # as the route: a customer decision does not land in the old workspace mid-move
+    place = "task_id" if r["task_id"] else "list_id" if r["list_id"] else "client_id" if r["client_id"] else None
+    new = {"task_id": None, "list_id": None, "client_id": None}
+    q = "SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=? AND l.org_id IS NULL AND l.owner_id=?" if place == "task_id" else \
+        "SELECT 1 FROM lists WHERE id=? AND org_id IS NULL AND owner_id=?" if place == "list_id" else None
+    if q and c.execute(q, (r[place], uid)).fetchone():
+        new[place] = r[place]
+    else:
+        new["list_id"] = (c.execute("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1 AND org_id IS NULL ORDER BY id LIMIT 1", (uid,)).fetchone() or [None])[0]
+        if not new["list_id"]:
+            return False
+    vid, ts = r["id"], iso(now_utc())
+    sigs = c.execute("SELECT id, state, revoked_at FROM office_signoffs WHERE video_id=?", (vid,)).fetchall()
+    live = [s["id"] for s in sigs if s["state"] == "open" and not s["revoked_at"]]
+    c.execute("UPDATE video_reviews SET org_id=NULL, owner_id=?, task_id=?, list_id=?, client_id=?, updated_at=?, brought_by=NULL WHERE id=?",
+              (uid, new["task_id"], new["list_id"], new["client_id"], ts, vid))
+    c.execute("UPDATE video_versions SET org_id=NULL WHERE review_id=?", (vid,))
+    c.execute("UPDATE video_comments SET org_id=NULL WHERE review_id=?", (vid,))
+    if live:
+        c.execute(f"UPDATE office_signoffs SET revoked_at=? WHERE id IN ({','.join('?' * len(live))})", [ts, *live])
+    c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('video',?,?,NULL,?,?,?)",
+              (vid, r["org_id"], uid, ts, json.dumps({"place": place, "place_id": r[place] if place else None, "sigs": [s["id"] for s in sigs]})))
+    return True
 
 
 VDR_TRASH_DAYS = 30

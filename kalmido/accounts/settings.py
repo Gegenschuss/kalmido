@@ -8,7 +8,7 @@ import urllib.request
 from cryptography.hazmat.primitives.asymmetric import ec
 from flask import g, jsonify, Response
 
-from ..core.config import app, PUBLIC_URL
+from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.schema import USER_DEFAULTS
 from ..core.i18n import LANGS, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, uset, usettings
@@ -19,20 +19,23 @@ from ..tasks.validation import clean_reminders, valid_hm
 from ..collab.news import NEWS_GROUPS, notif_update
 from ..core.errors import BadInput
 from ..core.numtext import user_num  # 2.263.0 (#2976)
+from ..api.common import hit_limit  # 2.367.5 (#2980)
 from .layouts import LAYOUT_KEYS
 
 
 # ---------------------------------------------------------------- settings / export (per user)
 
-SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "purpose_ask", "agent_share",
+SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "digest_mail_try", "review_sent", "ntfy_topic", "features_rev", "onboard", "sample_ask", "purpose_ask", "agent_share",
                         "purpose", "evcals_hidden", "care_sent",
                         "brief_sent", "brief_read",  # 2.34.0 (#264)
                         "fav_asked",  # 2.46.1 (#1361): lists already offered as a favourite
                         "evmail_at", "evmail_day")  # 2.142.0 A (#2146): the bundled event mails sent
 SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "areas", "team")  # 2.25.0 (UX-03); 2.39.1 (#1185): areas
+PUSH_TEST_LIMIT = 40  # 2.367.5 (#2980): test pushes (ntfy and device) per person and hour
 SIDE_PEOPLE_MAX = 5  # 2.99.0 E (#2187): people pinned to the sidebar (static/js/sbnav.js SB_PINS)
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family", "kpi")  # 2.17.0 (#475), 2.19.0; 2.55.1: kpi (2.50.0 #1197, office admins)
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "celebrate", "cal_today",
+                  "push_title_only",  # 2.367.5 (#2980)
                   "date_confirm", "digest_mail", "mail_from_me", "mail_trim_fwd", "mail_trim_eml",  # 2.49.0 (#971)
                   "today_inbox", "agent_push",  # 2.28.0 (#987): agent_push
                   "detail_cm_fold",  # 2.31.0 (#344)
@@ -41,6 +44,7 @@ SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "tim
                   "cal_tasks",  # 2.36.1 (#1127)
                   "agent_steps_live", "agent_steps_always",  # 2.32.0 (#1081)
                   "show_done_default",  # 2.39.1 (#1214): "Hide completed" as the default of every view (0 = hide)
+                  "tours_more",  # 2.466.0 (#3314)
                   "show_done_new",  # 2.49.0 (#1535): new lists hide completed tasks
                   "fav_only",  # 2.40.0 (#1361): the sidebar shows only the favourites
                   "fav_quiet", "fav_suggest",  # 2.46.1 (#1361): quieter pushes from lists without a star; favourite suggestions
@@ -222,6 +226,10 @@ def clean_setting(k, v):
         return sv.replace(",", ".")
     if k == "tour":  # the client can only finish the tour (restarting it is local)
         if sv != "done":
+            raise bad
+        return sv
+    if k == "tours_seen":  # 2.466.0 (#3314): a comma list of area ids
+        if len(sv) > 200 or not re.fullmatch(r"([a-z]+(,[a-z]+)*)?", sv):
             raise bad
         return sv
     if k == "ical_scope":
@@ -653,7 +661,9 @@ def settings_update():
 def ntfy_test():
     from ..notify.push import ntfy, push_prio
     s = usettings(db(), me())
-    ok = ntfy("Kalmido: Test", tr("Notifications are arriving."), push_prio(s), PUBLIC_URL, topic=s["ntfy_topic"])
+    if hit_limit(f"pushtest:{me()}", PUSH_TEST_LIMIT, 3600):  # 2.367.5 (#2980): like the channel and mail tests
+        return err(tr("Too many tests, please wait a few minutes"), 429)
+    ok = ntfy(tr("{0}: test", APP_NAME), tr("Notifications are arriving."), push_prio(s), PUBLIC_URL, topic=s["ntfy_topic"])
     return jsonify(ok=ok)
 
 
@@ -763,14 +773,17 @@ def push_test():
     from ..notify.push import notify, push_channel, push_prio, webpush_count, webpush_payload, webpush_user
     c = db()
     s = usettings(c, me())
+    if hit_limit(f"pushtest:{me()}", PUSH_TEST_LIMIT, 3600):  # 2.367.5 (#2980): like the channel and mail tests
+        return err(tr("Too many tests, please wait a few minutes"), 429)
     sid = body().get("id")
+    title = tr("{0}: test", APP_NAME)
     if sid is not None:
         if not isinstance(sid, int) or not c.execute("SELECT 1 FROM push_subs WHERE id=? AND user_id=?", (sid, me())).fetchone():
             return err(tr("Not found"), 404)
-        n = webpush_user(me(), webpush_payload("Kalmido: Test", tr("Notifications are arriving."), push_prio(s), tag="test"),
+        n = webpush_user(me(), webpush_payload(title, tr("Notifications are arriving."), push_prio(s), tag="test", lang=s.get("lang") if s.get("lang") in LANGS else "en"),
                          push_prio(s), ttl=600, topic="test", only=sid)
         return jsonify(ok=n > 0, webpush=n)
-    ok = notify(me(), "Kalmido: Test", tr("Notifications are arriving."), push_prio(s), PUBLIC_URL, s=s, tag="test")
+    ok = notify(me(), title, tr("Notifications are arriving."), push_prio(s), PUBLIC_URL, s=s, tag="test")
     return jsonify(ok=ok, channel=push_channel(s), devices=webpush_count(c, me()))
 
 
@@ -793,6 +806,7 @@ def umz_export_queries(uid):
         "filters": ("SELECT * FROM filters WHERE user_id=?", (uid,)),
         "attachments": (f"SELECT * FROM attachments WHERE task_id IN {task_ids}", (uid,)),
         "comments": (f"SELECT * FROM comments WHERE task_id IN {task_ids} AND deleted_at IS NULL", (uid,)),
+        "task_decisions": (f"SELECT * FROM task_decisions WHERE task_id IN {task_ids} ORDER BY id", (uid,)),  # 2.392.0 C (#3370)
         # 2.71.0 (#1459, review N5): "also in list X" lines without the id of a list the person may not see
         "activity": (f"SELECT id, task_id, user_id, kind, CASE WHEN kind IN ('ml_add', 'ml_rm') THEN '{{}}'::jsonb ELSE data END AS data, "
                      f"created_at FROM activity WHERE task_id IN {task_ids}", (uid,)),
@@ -802,7 +816,7 @@ def umz_export_queries(uid):
         "task_enc_notes": ("SELECT * FROM task_enc_notes WHERE user_id=?", (uid,)),
         "notes": (f"SELECT * FROM notes WHERE list_id IN {own} AND deleted_at IS NULL", (uid,)),
         "settings": ("SELECT key, value FROM user_settings WHERE user_id=? AND key NOT ILIKE 'sup_key%'", (uid,)),  # 2.74.0 (#338): never the licence key
-        "templates": ("SELECT id, kind, name, data, created_at, updated_at FROM templates WHERE user_id=?", (uid,)),
+        "templates": ("SELECT id, kind, name, data, extra, created_at, updated_at FROM templates WHERE user_id=?", (uid,)),  # 2.463.0 (#3860): extra through tx_export
         "time_entries": ("SELECT * FROM time_entries WHERE user_id=? ORDER BY start", (uid,)),
         "list_fields": (f"SELECT * FROM list_fields WHERE list_id IN {own}", (uid,)),
         "task_field_values": (f"SELECT * FROM task_field_values WHERE task_id IN {task_ids}", (uid,)),
@@ -820,6 +834,7 @@ def umz_export_queries(uid):
         "list_notif": (f"SELECT * FROM list_notif WHERE list_id IN {own}", (uid,)),  # 2.33.0 (#927): my notification templates
         "folder_notif": ("SELECT * FROM folder_notif WHERE owner_id=?", (uid,)),
         "task_bell": ("SELECT task_id, level, until, set_by, created_at, updated_at FROM task_bell WHERE user_id=?", (uid,)),  # 2.53.0 C (#1424)
+        "task_watchers": ("SELECT task_id, created_at FROM task_watchers WHERE user_id=?", (uid,)),  # 2.473.0 (#3357)
         "agent_steps": ("SELECT id, agent_id, job_id, message_id, text, created_at FROM agent_steps WHERE user_id=?", (uid,)),  # 2.32.0 (#1081)  # 2.32.0 (#1063): my own project page arrangements
         "agent_schedules": ("SELECT * FROM agent_schedules WHERE user_id=?", (uid,)),  # 2.34.0 (#272): my planned agent jobs
         # 2.39.0 (#1168): the Playbooks of my lists and folders (every version) and the agents' proposals for my lists
@@ -906,10 +921,10 @@ def export_json():
 # that); their "l:<id>" here only holds the place. A key the person cannot see (any more) is kept but never shown.
 FV2_MAX = 200
 FV2_VIEWS = ("inbox", "assigned", "today", "tomorrow", "week", "doable", "pinned", "waiting", "stale", "byme", "all", "done",
-             "trash", "archived")
+             "trash", "archived", "mine_wait")
 # 2.441.0 (#3592): anything with an address of its own: r:<reference kind>:<id> (lists/favorites.py FV2_REF_KINDS), file: (a file
 # or folder of the file store), doc: (a document), sv: (a saved view of the sidebar), sep: (a divider between the favourites)
-FV2_KEY_RE = re.compile(r"(?:[lafpg]:\d{1,11}|m:[a-z]{2,16}|v:[a-z]{2,12}|(?:file|doc|sep):\d{1,11}|sv:[a-z0-9]{1,16}"
+FV2_KEY_RE = re.compile(r"(?:[lafpg]:\d{1,11}|m:[a-z]{2,16}|v:[a-z_]{2,12}|(?:file|doc|sep):\d{1,11}|sv:[a-z0-9]{1,16}"
                         r"|r:(?:office_doc|office_letter|office_gendoc|office_receipt|wiki|sheet|contact|address_book):\d{1,11})")
 FV2_META_MAX = 200
 FV2_META_RE = re.compile(r"(?:#[0-9a-fA-F]{6})?")

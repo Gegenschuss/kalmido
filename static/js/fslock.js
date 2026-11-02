@@ -5,7 +5,7 @@
 
 // lock id = the id of the locked folder. info: GET /api/files/lock/<id>; keys: {gen: CryptoKey} once the encryption is unlocked
 const FSL = {info: {}, keys: {}, tried: {}, memo: new Map(), busy: {}, auto: {}, q: '', wait: {}};  // wait: {lock id: [{user_id, name}]} (2.353.0 F)
-const FSL_HEAD = 9, FSL_MAX = 50 * 1024 * 1024;
+const FSL_HEAD = 9;
 const fslIs = v => typeof v === 'string' && v.startsWith('e2e1:');
 const fslNameAad = (lid, g) => `kalmido-fsname:v1:${lid}:${g}`;
 const fslFileAad = (lid, g) => `kalmido-fsfile:v1:${lid}:${g}`;
@@ -177,7 +177,7 @@ async function fsl_open(n, dl, v) {
 }
 async function fsl_upload(files, target, lid0) {
   const lid = lid0 || fslLockOf(target); files = [...(files || [])].filter(f => f.size > 0); if (!lid || !files.length) return;
-  const big = files.find(f => f.size > FSL_MAX); if (big) { toast(tr('{0} is larger than 50 MB', big.name)); return; }
+  const lim = upLimit(files); if (lim) { toast(lim); return; }  // 2.363.3 (#3134)
   const fd = new FormData();
   try {
     await fslKeys(lid, true); const g = (await fslInfo(lid, true)).gen;
@@ -257,11 +257,16 @@ async function fslPubFor(lid, uid) {
   if (!le2eSeenOk(uid, pub)) throw fslErr(tr('The key of {0} has changed. Compare the safety number before you continue.', fslName(lid, uid)), 'fs_lock_keychanged');
   return pub;
 }
+// 2.456.0 (#3851): a 409 without a code = the switch is over: another tab or browser finished it meanwhile
+const fslDone = x => x.status === 409 && !x.data?.code;
 // the switch: the todo of the server, converted here, until nothing is left; then finish. onProg(done, total)
 async function fslMigrate(lid, onProg) {
   let total = null, last = -1, spins = 0;
   for (;;) {
-    const t = await rawFetch('GET', `/api/files/lock/${lid}/todo`), left = +t.left || 0, dec = t.mode === 'decrypting';
+    let t;
+    try { t = await rawFetch('GET', `/api/files/lock/${lid}/todo`); }
+    catch (x) { if (!fslDone(x)) throw x; delete FSL.info[lid]; return; }
+    const left = +t.left || 0, dec = t.mode === 'decrypting';
     if (total === null) total = left;
     onProg?.(Math.max(0, total - left), total);
     if (!left) break;
@@ -280,10 +285,11 @@ async function fslMigrate(lid, onProg) {
         } else fd.append('file', new Blob([await fslFileEnc(lid, {name: r.name, type: r.mime, data: new Uint8Array(buf)}, t.gen)]), 'encrypted.kenc');
       }
       try { await rawFetch('POST', `/api/files/lock/${lid}/convert/${r.id}`, fd); }
-      catch (x) { if (x.status !== 409 || x.data?.code) throw x; }  // converted meanwhile by another browser
+      catch (x) { if (!fslDone(x)) throw x; }  // converted meanwhile by another browser
     }
   }
-  await rawFetch('POST', `/api/files/lock/${lid}/finish`, {});
+  try { await rawFetch('POST', `/api/files/lock/${lid}/finish`, {}); }
+  catch (x) { if (!fslDone(x)) throw x; }
   delete FSL.info[lid];
 }
 async function fslStart(lid, onProg) {
@@ -317,9 +323,12 @@ async function fslResume(lid, onProg) {
 async function fslStop(lid, password, onProg) {
   if (!await e2eEnsure()) return false;
   await fslKeys(lid, true);
-  await rawFetch('POST', `/api/files/lock/${lid}/stop`, {password});
-  delete FSL.info[lid];
-  await fslMigrate(lid, onProg);
+  FSL.busy[lid] = 1;  // 2.456.0 (#3851): the reload after the stop must not start a second run beside this one (fsl_auto)
+  try {
+    await rawFetch('POST', `/api/files/lock/${lid}/stop`, {password});
+    delete FSL.info[lid];
+    await fslMigrate(lid, onProg);
+  } finally { delete FSL.busy[lid]; }
   delete FSL.keys[lid];
   return true;
 }

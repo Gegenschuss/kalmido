@@ -17,7 +17,7 @@ import json
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.i18n import tr
+from ..core.i18n import lang, tr
 from ..core.db import db, err
 from ..core.access import Denied, list_people, need_collab, need_list
 from ..accounts.session import me
@@ -74,7 +74,7 @@ def mtg_input(c, uid, b):
            "text": text}
     if imgs:
         inp["images"] = imgs
-    return inp, tr(PROP_TITLES["extract"], inp["list"]["name"][:80]), None, lid
+    return inp, tr(PROP_TITLES["extract"], inp["list"]["name"][:80], lg=lang(c, uid)), None, lid
 
 
 def mtg_agent(c, aid):

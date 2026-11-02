@@ -1,0 +1,20 @@
+{
+ "code": "IT",
+ "name": "Italy",
+ "version": 1,
+ "holidays": [
+  {"date": "01-01", "name": "New Year's Day"},
+  {"date": "01-06", "name": "Epiphany"},
+  {"date": "04-25", "name": "Liberation Day|Italy"},
+  {"date": "05-01", "name": "Labour Day"},
+  {"date": "06-02", "name": "Republic Day"},
+  {"date": "08-15", "name": "Assumption Day"},
+  {"date": "10-04", "name": "St Francis' Day", "since": 2026},
+  {"date": "11-01", "name": "All Saints' Day"},
+  {"date": "12-08", "name": "Immaculate Conception"},
+  {"date": "12-25", "name": "Christmas Day"},
+  {"date": "12-26", "name": "St Stephen's Day"},
+  {"easter": 0, "name": "Easter Sunday"},
+  {"easter": 1, "name": "Easter Monday"}
+ ]
+}

@@ -6,6 +6,7 @@ odoc_render(c, doc_id) builds the print model (see docs/OFFICE.md) that the PDF 
 import json
 import os
 import re
+import unicodedata
 from datetime import date, timedelta
 
 from flask import g, jsonify, request
@@ -16,11 +17,11 @@ from ..core.orgcrypt import oc_dec_fields, oc_item_store, oc_json_store
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied
-from ..core.errors import BadInput
+from ..core.errors import BadInput, BadKey, DeniedKey
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
 from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES, TAX_KEYS, dec, fmt_money, fmt_rate, inv_calc, office_calc
 from .packs import office_pack_for
-from .doclang import DOC_LANGS, doc_lg, doc_pack, doc_word  # 2.185.0 C (#2520)
+from .doclang import DOC_LANGS, doc_client_lang, doc_lg, doc_own, doc_pack, fd_lang_gaps  # 2.185.0 C (#2520); 2.460.0 (#3767)
 from .sheet import dk_pack, dk_packs_on
 from .undo import oun_post, oun_pre
 from .otrash import otb_put  # 2.272.0 E2 (#3038)
@@ -170,10 +171,10 @@ def _iid(v):
 def _text_of(c, oid, tid, lang):
     if not tid:
         return None
-    r = c.execute("SELECT text_de, text_en FROM office_texts WHERE id=? AND org_id=?", (_iid(tid), oid)).fetchone()
+    r = c.execute("SELECT text_de, text_en, trans FROM office_texts WHERE id=? AND org_id=?", (_iid(tid), oid)).fetchone()
     if not r:
         return None
-    return (doc_word(r["text_en"], lang) if doc_lg(lang) != "de" else r["text_de"]) or r["text_de"] or r["text_en"] or ""  # 2.185.0 C: nl / fr / es / it English (doc_word)
+    return doc_own(r, lang, "text")[0] or r["text_de"] or r["text_en"] or ""  # 2.460.0 (#3767): its own language, else English (doc_own)
 
 
 def _contract(c, oid, cid):
@@ -316,6 +317,13 @@ def _offer_title(s, L, lang):
         if isinstance(t, str) and t:
             return t
     return L.get("offer", tr("Quotation|pack", lg=doc_lg(lang)))  # 2.185.0 C (#2520)
+
+
+def _offer_title_frozen(pack, L, lang):
+    """2.453.0 (#3816): the heading of a finalised quotation: the one frozen with it (ledger.ofx_finalize), never today's
+    industry packs; a document finalised before that keeps the word of its country pack snapshot."""
+    t = pack.get("offer_title")
+    return t if isinstance(t, str) and t else L.get("offer", tr("Quotation|pack", lg=doc_lg(lang)))
 
 
 def prd_new_doc(c, oid, s):
@@ -479,6 +487,8 @@ def doc_public(c, oid, r, admin, items=True):
     for k in ("sender", "recipient_snapshot", "tax_snapshot"):
         d.pop(k, None)  # the frozen copies stay on the server (the print model shows them)
     d["locked"] = locked
+    if items and not locked:  # 2.460.0 (#3767): own texts missing in the document's language
+        d["lang_gaps"] = fd_lang_gaps(c, oid, r, d.get("items") or [])
     d["locked_by_name"] = ""
     if locked and r["locked_by"]:
         u = c.execute("SELECT display_name, username FROM users WHERE id=?", (r["locked_by"],)).fetchone()
@@ -503,6 +513,9 @@ def doc_public(c, oid, r, admin, items=True):
         d["cf_chain"] = cf8_chain(c, oid, r)  # 2.88.0 (#1915): which version of the chain counts in the cash flow
     from .peppol import pep_doc_extra
     pep_doc_extra(c, oid, d)  # 2.154.0 B (#1960): the newest Peppol send of an invoice / credit note
+    if items:
+        from .payonline import pol_doc_extra
+        pol_doc_extra(c, oid, d, admin)  # 2.469.0 (#3459): the invoice's online payment switch, link (admins)
     return d
 
 
@@ -603,7 +616,7 @@ def _rights_from_contract(c, oid, ct, lang):
     for dim, col in (("time", "rights_time_id"), ("territory", "rights_territory_id"), ("media", "rights_media_id")):
         tid = ct.get(col)
         out[dim] = {"id": tid, "text": _text_of(c, oid, tid, lang) or ""} if tid else {"id": None, "text": ""}
-    out["note"] = (ct.get("rights_note_en") if doc_lg(lang) != "de" else ct.get("rights_note_de")) or ct.get("rights_note_de") or ""
+    out["note"] = doc_own(ct, lang, "rights_note")[0] or ""
     return out
 
 
@@ -616,7 +629,7 @@ def _default_text(c, oid, s, kind, lang):
     if t is None:
         rows = _texts(c, oid, kind)
         if rows:
-            t = (doc_word(rows[0]["text_en"], lang) if plg == "en" else rows[0]["text_de"]) or rows[0]["text_de"]
+            t = doc_own(rows[0], lang, "text")[0] or rows[0]["text_de"]
     if t is None:
         pack = doc_pack(office_pack_for(s) or {}, lang)
         pt = (pack.get("texts") or {}).get(kind) or {}
@@ -635,8 +648,8 @@ def _apply_contract(c, oid, f, ct, lang, cur_rights):
     rights = dict(cur_rights or {})
     rights.update(_rights_from_contract(c, oid, ct, lang))
     f["rights"] = json.dumps(rights, ensure_ascii=False)
-    closing = (ct.get("closing_en") if doc_lg(lang) != "de" else ct.get("closing_de")) or ""
-    if closing:
+    closing, miss = doc_own(ct, lang, "closing")
+    if closing and miss != "de":
         f["closing"] = closing
 
 
@@ -656,6 +669,11 @@ def clean_doc(c, oid, b, cur, admin):
     lang = cur["lang"]
     if "lang" in b:
         f["lang"] = lang = _choice(b.get("lang"), "lang", DOC_LANGS)  # 2.185.0 C (#2520): every app language
+    elif b.get("client_id") and _iid(b["client_id"]) != _cur_val(cur, "client_id") and cur["kind"] not in ("credit", "reminder"):
+        # 2.460.0 (#3767): a newly chosen client brings its language (credit notes and reminders keep their invoice's)
+        lg_ = doc_client_lang(c, oid, b["client_id"])
+        if lg_ and lg_ != lang:
+            f["lang"] = lang = lg_
     if "currency" in b:  # 2.189.0 (#2475): every currency of homecur.HC_CODES (was EUR / USD)
         f["currency"] = _choice(str(b.get("currency") or "").upper(), "currency", HC_CODES)
     if "fx_rate" in b:
@@ -813,7 +831,7 @@ def clean_items(c, oid, r, items, admin, part=None):
                 row["service_id"] = sv["id"]
                 unit = it.get("unit") or sv["unit"] or "day"
                 if not row["title"]:
-                    row["title"] = (sv["name_en"] if doc_lg(lang) != "de" else sv["name_de"]) or sv["name_de"]
+                    row["title"] = doc_own(sv, lang, "name")[0] or sv["name_de"]
                 rate = it.get("rate")
                 if rate in (None, ""):
                     if ct and str(sv["id"]) in (ct.get("rates") or {}):
@@ -857,7 +875,8 @@ def doc_create(c, oid, uid, b, admin, number=True):
     reserved at once. 2.51.0 A (#1348): number=False (an agent's draft) reserves none (a person does, or finalising)."""
     s = office_settings(c, oid)
     kind = _choice(b.get("kind") or "offer", "kind", DOC_KINDS)
-    lang = _choice(b.get("lang") or s.get("lang") or "de", "lang", DOC_LANGS)  # 2.185.0 C (#2520)
+    # 2.185.0 C (#2520); 2.460.0 (#3767): the client's language comes before the office's
+    lang = _choice(b.get("lang") or doc_client_lang(c, oid, b.get("client_id")) or s.get("lang") or "de", "lang", DOC_LANGS)
     today = local_now().date()
     if kind == "credit":  # 2.354.0 D (#2838): a credit note only from a finalised invoice (POST /docs/<id>/credit)
         raise Denied(409, tr("A credit note needs a finalised invoice"))
@@ -888,7 +907,7 @@ def doc_create(c, oid, uid, b, admin, number=True):
             rights[dim] = {"id": rd[key], "text": _text_of(c, oid, rd[key], lang) or ""}
     notes = _texts(c, oid, "note")
     if notes:
-        rights["note"] = (doc_word(notes[0]["text_en"], lang) if doc_lg(lang) != "de" else notes[0]["text_de"]) or notes[0]["text_de"]
+        rights["note"] = doc_own(notes[0], lang, "text")[0] or notes[0]["text_de"]
     ts = iso(now_utc())
     row = {"org_id": oid, "kind": kind, "number": "", "status": "draft", "lang": lang, "currency": (s.get("currency") or "EUR").upper(),
            "fx_rate": s.get("fx_usd") or 1.09, "vat_mode": "novat" if s.get("small_business") else "vat", "client_id": None, "recipient": json.dumps({"name": "", "lines": []}),
@@ -927,7 +946,7 @@ def _assign_number(c, oid, did, s=None, manual=None, reason=""):
     write_lock(c, f"office_num_{int(oid)}")  # 2.39.1 (#1210 N2): check and write of a number (manual or next) in one go
     r = doc_row(c, oid, did)
     if ofx_locked(r):  # 2.355.0 A (#2839): read again under the lock -- a document finalised meanwhile keeps its number
-        raise Denied(409, tr(OFX_LOCKED))
+        raise DeniedKey(409, OFX_LOCKED)
     if r["trial"]:  # 2.144.10 A (#2576): a trial document only ever carries a TEST number (no hand-set one, no real counter)
         if manual is not None:
             raise BadInput(tr("A trial document keeps its TEST number"))
@@ -948,7 +967,7 @@ def _assign_number(c, oid, did, s=None, manual=None, reason=""):
     else:
         num = doc_next_number(c, oid, r, s)
     if c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=? AND id!=?", (oid, num, did)).fetchone() or fi_number_taken(c, oid, num):
-        raise BadInput(tr("The number {0} is already used", num))
+        raise BadKey(N_("The number {0} is already used"), num)
     c.execute("UPDATE office_docs SET number=?, updated_at=? WHERE id=? AND org_id=?", (num, iso_ms(now_utc()), did, oid))
     from .docref import ofd_renamed
     ofd_renamed(c, did)  # 2.199.0 B (#2742)
@@ -995,7 +1014,8 @@ def _put_items(c, oid, r, items, admin, flags=None, keep=False):
     unchanged position and drops it on a changed or confirmed one (item.confirm).
     2.269.0 A (#3012): a position sent with its id keeps it (UPDATE, so purchase price, list and marks are found again), one
     without a known id is new (INSERT), only the saved ones left out are deleted. keep = the save came without a version
-    (expect_updated_at): positions billed from receipts (and, for a person, an agent's marked ones) it left out stay at the end."""
+    (expect_updated_at): positions billed from receipts (and, for a person, an agent's marked ones) it left out stay at the end.
+    2.370.2 (#3088): -> the ids of those positions, the answer names them (kept_ids)."""
     rows = clean_items(c, oid, r, items, admin)
     if flags is None:
         from .agentdocs import ofa_keep_flags
@@ -1018,6 +1038,7 @@ def _put_items(c, oid, r, items, admin, flags=None, keep=False):
         row["org_id"] = oid
         c.execute(f"INSERT INTO office_doc_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
     gone = [x for x in old if x not in seen]
+    stay = set()
     if keep and gone:
         stay = ofd_billed_items(c, oid, did, gone) | ({x for x in gone if old[x]["agent_flag"]} if keep == "person" else set())
         for k, x in enumerate(sorted(stay)):
@@ -1026,6 +1047,7 @@ def _put_items(c, oid, r, items, admin, flags=None, keep=False):
     if gone:  # 2.47.0 (#1215): never the parts' positions (part_id IS NULL above)
         c.execute(f"DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND part_id IS NULL AND id IN ({','.join('?' * len(gone))})", [did, oid, *gone])
         ofd_free_receipts(c, oid, did)
+    return sorted(stay)
 
 
 # 2.269.0 A (#3012): the columns a kept position gets back to their default unless the save sets them (as a new row would)
@@ -1034,13 +1056,14 @@ OFD_ITEM_RESET = {"service_id": None, "ref_part_id": None, "list_id": None, "age
 
 
 def ofd_billed_items(c, oid, did, ids):
-    """2.269.0 A (#3012): those of the positions ids that receipts (travel / outlays) were billed as."""
+    """2.269.0 A (#3012): those of the positions ids that receipts (travel / outlays) or time entries were billed as."""
     if not ids:
         return set()
     q = ",".join("?" * len(ids))
     out = {x[0] for x in c.execute(f"SELECT billed_item_id FROM office_trip_items WHERE org_id=? AND billed_doc_id=? AND billed_item_id IN ({q})", [oid, did, *ids])}
     from .books import bk_ws
     out |= {x[0] for x in c.execute(f"SELECT billed_item_id FROM rc_receipts WHERE ws=? AND billed_doc_id=? AND billed_item_id IN ({q})", [bk_ws(c, oid), did, *ids])}
+    out |= {x[0] for x in c.execute(f"SELECT billed_item_id FROM time_entries WHERE billed_doc_id=? AND billed_item_id IN ({q})", [did, *ids])}  # 2.370.2 (#3088)
     return out
 
 
@@ -1052,6 +1075,7 @@ def ofd_free_receipts(c, oid, did):
               (iso(now_utc()), oid, did))
     from .books import bk_ws
     c.execute("UPDATE rc_receipts SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL WHERE ws=? AND " + gone.format("rc_receipts"), (bk_ws(c, oid), did))
+    c.execute("UPDATE time_entries SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL, updated_at=? WHERE " + gone.format("time_entries"), (iso(now_utc()), did))  # 2.370.2 (#3088)
 
 
 class OfdConflict(Exception):
@@ -1152,7 +1176,7 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
     else:
         cno = ""
     if cno:
-        meta.append([L.get("customer_no", tr("Customer no.|document", lg=lang)), cno])
+        meta.append([L.get("customer_no", tr("Client no.|document", lg=lang)), cno])
     if r["project_ref"]:
         # 2.357.0 B (#3180): a quotation asks for the client's reference ("Ihre Referenz"); the invoice keeps "Bestellnr. / Referenz"
         meta.append([L.get("offer_ref") or tr("Your reference|pdf", lg=lang), r["project_ref"]])
@@ -1187,7 +1211,7 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         "pack_version": (r["pack_version"] or "") if locked else str(pack.get("version") or ""),
         "service_from": r["service_from"] or "", "service_to": r["service_to"] or "", "currency": cur, "fx_rate": t.get("fx_rate"), "fx_note": t.get("fx_note") or "", "vat_mode": t["vat_mode"],
         "raw_mode": t["raw_mode"], "status": r["status"], "number": r["number"], "date": r["date"], "date_text": _fd(r["date"]),
-        "valid_until": r["valid_until"], "valid_until_text": valid_text, "title": _offer_title(s, L, lang),
+        "valid_until": r["valid_until"], "valid_until_text": valid_text, "title": _offer_title_frozen(pack, L, lang) if locked else _offer_title(s, L, lang),  # 2.453.0 (#3816)
         "project_title": r["project_title"], "project_ref": r["project_ref"],
         "company": {"name": co.get("name") or "", "name_lines": co.get("name_lines") or [], "lines": co.get("lines") or [], "contact_lines": co.get("contact_lines") or [],
                     "register_lines": co.get("register_lines") or [], "bank_lines": co.get("bank_lines") or [],
@@ -1241,9 +1265,40 @@ def odoc_groups():
     return jsonify(clients=clients[:300], projects=projects, years=years)
 
 
+def _odoc_text_key(s):
+    """Like the list's localeCompare (numeric, base): no case, no accents, "RE-9" before "RE-10"."""
+    s = unicodedata.normalize("NFKD", str(s)).casefold()
+    return [int(x) if i % 2 else x for i, x in enumerate(re.split(r"(\d+)", "".join(ch for ch in s if not unicodedata.combining(ch))))]
+
+
+def odoc_sorted(rows, k, d):
+    """2.458.0 (#3839): rows as office_docs.js lst_sorted shows them: the same value per kind, rows without one last in both directions."""
+    def val(r):
+        if k == "date":
+            return r["date"] or None
+        if k == "name":
+            s = r["project_title"] or r["number"]
+            return _odoc_text_key(s) if s else None
+        if k == "client":
+            s = _j(r["recipient"], {}).get("name")
+            return _odoc_text_key(s) if s else None
+        if r["kind"] == "delivery":
+            return None
+        return dec(_j(r["totals"], {}).get("gross" if r["kind"] in ("invoice", "credit") else "net") or 0)
+    vals = [(val(r), r) for r in rows]
+    full = [x for x in vals if x[0] is not None]
+    full.sort(key=lambda x: x[0], reverse=(d or ("asc" if k in ("client", "name") else "desc")) != "asc")
+    return [x[1] for x in full] + [x[1] for x in vals if x[0] is None]
+
+
+ODOC_PAGE_MAX = 500
+
+
 @app.get("/api/office/docs")
 def odoc_list():
-    """?kind=offer&status=&q= -> the organisation's documents, newest first (brief rows)."""
+    """?kind=offer&status=&q=&limit=&before= -> the organisation's documents, newest first (brief rows); 2.369.0 A (#3200):
+    a page of limit rows (1-500, default 500), next_cursor (null = the last page) is the before= of the next one; &sort=&dir=
+    (#3839): the whole list sorted, the pages cut from it."""
     c, uid, oid = _ctx()
     kind = request.args.get("kind") or "offer"
     if kind not in DOC_KINDS:
@@ -1269,8 +1324,25 @@ def odoc_list():
     q = (request.args.get("q") or "").strip()
     if q:
         like = f"%{like_escape(q)}%"
-        sql += " AND (number ILIKE ? ESCAPE '\\' OR project_title ILIKE ? ESCAPE '\\' OR project_ref ILIKE ? ESCAPE '\\' OR recipient ILIKE ? ESCAPE '\\')"
-        args += [like, like, like, like]
+        # 2.369.0 A (#3200): the search of a paged list runs here; some recipients are stored with \\uXXXX escapes
+        like_esc = f"%{like_escape(json.dumps(q)[1:-1])}%"
+        sql += " AND (number ILIKE ? ESCAPE '\\' OR project_title ILIKE ? ESCAPE '\\' OR project_ref ILIKE ? ESCAPE '\\' OR recipient ILIKE ? ESCAPE '\\' OR recipient ILIKE ? ESCAPE '\\')"
+        args += [like, like, like, like, like_esc]
+    # 2.369.0 A (#3200): a page by (date, id), the order of the list: date is NOT NULL, ties and empty dates stay stable
+    n = request.args.get("limit") or ""
+    n = max(1, min(int(n), ODOC_PAGE_MAX)) if re.fullmatch(r"\d{1,6}", n) else ODOC_PAGE_MAX
+    srt = request.args.get("sort")  # 2.458.0 (#3839): the sort chosen in the list, decided before the page is cut
+    srt = srt if srt in ("date", "client", "amount", "name") else None
+    off = 0
+    if request.args.get("before"):
+        cur = re.fullmatch(r"@(\d{1,9})" if srt else r"([^\x00]{0,40}),(\d{1,18})", request.args["before"])
+        if not cur:
+            raise BadInput(tr("Invalid value: {0}", "before"))
+        if srt:
+            off = int(cur[1])
+        else:
+            sql += " AND (date, id) < (?, ?)"
+            args += [cur[1], int(cur[2])]
     # 2.281.0 C (#3115): the derived states are narrowed in SQL and decided before the 500 (an old overdue invoice was
     # missing behind the 500 newest); payments only of the rows shown; the language once
     derived = st in ("partial", "overdue", "open")  # 2.356.0 D (#3007): open = the open items (open + overdue, as kpi.py kpi_open)
@@ -1283,10 +1355,17 @@ def odoc_list():
             args.append(local_now().date().isoformat())
         elif st == "partial":  # 2.356.0 D (#3007): not for the open items
             sql += " AND EXISTS (SELECT 1 FROM office_payments p WHERE p.doc_id=office_docs.id AND p.org_id=office_docs.org_id)"
-    raw = c.execute(sql + " ORDER BY date DESC, id DESC" + ("" if derived else " LIMIT 500"), args).fetchall()
-    pm = inv_paid_map(c, oid, [r["id"] for r in raw]) if kind in ("invoice", "credit") else {}
+    raw = c.execute(sql + " ORDER BY date DESC, id DESC" + ("" if derived or srt else f" LIMIT {n + 1}"), args).fetchall()
+    paid = kind in ("invoice", "credit")
+    pm = inv_paid_map(c, oid, [r["id"] for r in raw]) if paid and derived else {}
     if derived:
-        raw = [r for r in raw if (dec(inv_money_fields(r, pm)["open"]) > 0 if st == "open" else inv_state(r, pm) == st)][:500]
+        raw = [r for r in raw if (dec(inv_money_fields(r, pm)["open"]) > 0 if st == "open" else inv_state(r, pm) == st)]
+    if srt:  # 2.369.0 (#3200 + #3839): sorted rows go on by position, the cursor is @<rows shown>
+        raw = odoc_sorted(raw, srt, request.args.get("dir"))[off:]
+    next_cursor = (f"@{off + n}" if srt else f"{raw[n - 1]['date']},{raw[n - 1]['id']}") if len(raw) > n else None
+    raw = raw[:n]
+    if paid and not derived:
+        pm = inv_paid_map(c, oid, [r["id"] for r in raw])
     lg = lang()
     rows = [doc_brief(r, pm, lg) for r in raw]
     if kind == "offer":
@@ -1294,9 +1373,10 @@ def odoc_list():
         oil_list_marks(c, oid, rows)  # 2.356.0 C (#3005)
     role = office_role(c, uid, oid)
     if kind == "offer" and role == "admin":  # 2.114.2 A (#2263): which finalised quotations the row menu may delete
+        blocks = bga_offer_blocks(c, oid, [r for b, r in zip(rows, raw) if b["locked"] and r["status"] == "draft"])  # 2.369.0 A (#3200)
         for b, r in zip(rows, raw):
             if b["locked"] and r["status"] == "draft":
-                b["can_delete"] = b["can_unlock"] = not bga_offer_block(c, oid, r)
+                b["can_delete"] = b["can_unlock"] = not blocks[r["id"]]
             elif not b["locked"]:  # 2.417.0 C (#2604, #2574): an open quotation past draft or mailed stays (a signed draft: the server's 409)
                 b["can_delete"] = r["status"] == "draft" and not r["sent_at"]
         used = {b["id"] for b, r in zip(rows, raw) if b.get("can_delete") and not b["locked"]}
@@ -1318,7 +1398,7 @@ def odoc_list():
     dun = dun_list_extra(c, oid, kind, rows)  # 2.147.1 B (#2054): suggested reminder drafts (count + mark)
     if st in ("partial", "overdue"):  # derived states: filtered after the fact
         rows = [x for x in rows if x["state"] == st]
-    return jsonify(docs=rows, role=role, org_id=oid, **trial_summary(c, oid), **({"dunning": dun} if dun else {}))
+    return jsonify(docs=rows, next_cursor=next_cursor, role=role, org_id=oid, **trial_summary(c, oid), **({"dunning": dun} if dun else {}))
 
 
 def trial_summary(c, oid):
@@ -1426,7 +1506,7 @@ def odoc_items_put(did):
     items = b.get("items") if isinstance(b, dict) else b
     rows_before = doc_items(c, did, oid)
     before = ofx_items_brief(rows_before)
-    _put_items(c, oid, r, items, admin, keep=False if isinstance(b, dict) and b.get("expect_updated_at") else "person")
+    kept = _put_items(c, oid, r, items, admin, keep=False if isinstance(b, dict) and b.get("expect_updated_at") else "person")
     if isinstance(b, dict) and "parts_known" in b:  # 2.138.0 A (#2239): a list built before a part was added keeps its line
         from .parts import kva_keep_unseen_parts
         kva_keep_unseen_parts(c, oid, r, rows_before, b.get("parts_known"))
@@ -1437,7 +1517,7 @@ def odoc_items_put(did):
     bump(c)
     oun_post(c)
     c.commit()
-    return jsonify(doc_public(c, oid, doc_row(c, oid, did), admin))
+    return jsonify({**doc_public(c, oid, doc_row(c, oid, did), admin), "kept_ids": kept})  # 2.370.2 (#3088): positions left out that stayed
 
 
 @app.post("/api/office/docs/<int:did>/number")
@@ -1642,20 +1722,33 @@ def bga_offer_block(c, oid, r):
     """2.114.2 A (#2263): why finalised document r cannot be deleted (None = it can): only a quotation still in draft that
     was never sent (sent_at, a logged mail), never answered by the client (signoffs) and that nothing was made from (an
     invoice's source_doc_id, an order confirmation in office_gen_docs). Open signoff links go with it (ON DELETE CASCADE)."""
-    if r["kind"] in ODOC_SEQ_KINDS:
-        return ODOC_INV_KEPT
-    if r["kind"] != "offer":
-        return OFX_LOCKED
-    if r["status"] != "draft":  # 2.417.0 (#2604 review F2): an open quotation past draft is kept as sent, not "finalised"
-        return OFX_LOCKED if ofx_locked(r) else BGA_SENT
-    if r["sent_at"] or c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? AND doc_id=? AND action='send' LIMIT 1",
-                                 (oid, r["id"])).fetchone():
-        return BGA_SENT
-    if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (r["id"], oid)).fetchone():
-        return N_("The customer has signed this quotation; the record is kept")
-    if bga_offer_used(c, oid, r):
-        return BGA_USED
-    return None
+    return bga_offer_blocks(c, oid, [r])[r["id"]]
+
+
+def bga_offer_blocks(c, oid, rs):
+    """2.369.0 A (#3200): bga_offer_block for a whole list, {id: reason or None}, in one query per check (not per row)."""
+    open_ids = [r["id"] for r in rs if r["kind"] == "offer" and r["status"] == "draft" and not r["sent_at"]]
+    sent, signed, used = set(), set(), set()
+    if open_ids:
+        q, a = ",".join("?" * len(open_ids)), (oid, *open_ids)
+        sent = {x[0] for x in c.execute(f"SELECT doc_id FROM office_doc_log WHERE org_id=? AND action='send' AND doc_id IN ({q})", a)}
+        signed = {x[0] for x in c.execute(f"SELECT doc_id FROM office_signoffs WHERE org_id=? AND state <> 'open' AND doc_id IN ({q})", a)}
+        used = {x[0] for x in c.execute(f"SELECT source_doc_id FROM office_docs WHERE org_id=? AND source_doc_id IN ({q}) "
+                                        f"UNION SELECT doc_id FROM office_gen_docs WHERE org_id=? AND doc_id IN ({q})", a + a)}
+
+    def why(r):
+        if r["kind"] in ODOC_SEQ_KINDS:
+            return ODOC_INV_KEPT
+        if r["kind"] != "offer":
+            return OFX_LOCKED
+        if r["status"] != "draft":  # 2.417.0 (#2604 review F2): an open quotation past draft is kept as sent, not "finalised"
+            return OFX_LOCKED if ofx_locked(r) else BGA_SENT
+        if r["sent_at"] or r["id"] in sent:
+            return BGA_SENT
+        if r["id"] in signed:
+            return N_("The client has signed this quotation; the record is kept")
+        return BGA_USED if r["id"] in used else None
+    return {r["id"]: why(r) for r in rs}
 
 
 def bga_offer_used(c, oid, r):
@@ -1708,7 +1801,7 @@ def odoc_delete(did):
         if odoc_seq_numbered(r):  # 2.126.0 A (#1966)
             raise Denied(409, tr(ODOC_SEQ_KEPT))
     if c.execute("SELECT 1 FROM office_signoffs WHERE doc_id=? AND org_id=? AND state <> 'open' LIMIT 1", (did, oid)).fetchone():
-        raise Denied(409, tr("The customer has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
+        raise Denied(409, tr("The client has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net"),
                                                   **({"locked": True} if locked else {})})  # 2.114.2 A (#2263): the number gap stays traceable
     if not locked and r["status"] == "draft":  # 2.272.0 E2 (#3038): a draft goes to the office trash (restore), with the

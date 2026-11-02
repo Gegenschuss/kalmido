@@ -5,7 +5,7 @@
  - #2378: moving a contact OUT of an imported (mirrored) address book copies it (single PATCH: copied true, the mirror keeps
    its contact; bulk move: copied counts them, normal contacts still move)
  - #2380: the customer portal's sign-in mail budget of a space (KALMIDO_PORTAL_LOGIN_SPACE, small here): once it is used
-   up the space's admin gets exactly one News item "ptlimit" (an organisation) / the person herself (private space)
+   up the space's admin gets exactly one News item "ptlimit" (an organisation) / the person herself (private workspace)
  - #2381: the error-report webhook takes its token in a header (Authorization: Bearer / X-Kalmido-Token) at
    /api/hooks/issues/<list id>; the path form keeps working; the app's log masks the token part of hook paths
  - #2382: after a new server key (+ rewrap-accounts): status counts the Paperless token that no longer opens, the settings

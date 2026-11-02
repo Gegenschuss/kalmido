@@ -61,7 +61,7 @@ OFM_ADMIN = ("travel", "templates", "meals")  # their routes are for the office'
 OFM_MAX = 200  # objects named in one move (a client's drafts and contact persons come on top, SMV_MAX in all)
 OFM_RO = N_("This is a read-only copy of an issued document")
 # rows that keep a document in its office (it is no longer only a draft there)
-OFM_DOC_HOLD = ("office_payments", "office_purchases", "office_signoffs", "office_pay_props")
+OFM_DOC_HOLD = ("office_payments", "office_purchases", "office_signoffs", "office_pay_props", "office_pay_sessions")  # 2.469.0 (#3459): + online checkouts
 OFM_DOC_KIDS = ("office_doc_items", "office_doc_parts")  # move with their document
 # the undo puts a link back only while what it points at still exists
 OFM_FK = {"office_docs": {"client_id": "clients", "contract_id": "office_contracts", "list_id": "lists"},

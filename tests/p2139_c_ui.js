@@ -2,7 +2,7 @@
 // - a page whose text cannot be read (409 wiki_unreadable) shows the server's message with its way out and a "Delete page"
 //   button instead of a bare error; the button deletes the page; another error keeps the plain hint without the button
 // - the browser lock names the pages it skipped (wkeLostNames: the base name, a name that does not open = its number)
-// freelancer-matrix: wiki (the pages are in the private space of a person without an organisation)
+// freelancer-matrix: wiki (the pages are in the private workspace of a person without an organisation)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');

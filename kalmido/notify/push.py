@@ -20,16 +20,17 @@ from ..core.config import _origin, APP_NAME, NTFY_TOKEN, NTFY_URL, PUBLIC_URL, s
 from ..core.schema import USER_DEFAULTS
 from ..core.i18n import LANGS, md_plain, short_day, tr, trn
 from ..core.pg import system_ctx
+from ..core.usertz import hm_text, tz_gap, tz_of_s, user_now
 from ..core.db import bump, connect, DbError, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
 from ..accounts.session import GATE
-from ..core.access import list_role, task_visible, vis_sql
+from ..core.access import list_role, pvis, task_visible, vis_sql
 from ..tasks.validation import NAG_HOUR_CAP, NAG_MINUTES, valid_hm
 from ..tasks.tasks import _wd_followups
-from ..collab.comments import collab_on, task_push_tick
-from ..collab.news import news_cleanup, news_unread, notif_ok
+from ..collab.comments import collab_on, push_gate_tick, task_push_tick
+from ..collab.news import news_cleanup, news_unread_me, notif_ok
 from ..personal.habits import habit_times, pomo_close, pomo_elapsed, pomo_planned_end
 from ..personal.timetrack import _num, time_watchdog
-from ..core.env import env_bool
+from ..core.env import env_bool, env_int
 from ..core.merges import mg_prune  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.lffolder import lf_expire_tick  # 2.352.0 A (#2748)
 
@@ -102,6 +103,7 @@ for _e in (x.strip().lower() for x in os.environ.get("KALMIDO_WEBPUSH_HOSTS", ""
 VAPID_SUBJECT = os.environ.get("KALMIDO_VAPID_SUBJECT", "").strip() or \
     (PUBLIC_URL if PUBLIC_URL.startswith("https://") else "mailto:admin@example.com")
 WEBPUSH_MAX_SUBS = 20       # devices per user
+WEBPUSH_SHORT_BODY = 200  # 2.367.5 (#2980): characters of the second try after a 413
 WEBPUSH_MAX_PAYLOAD = 3000  # bytes of JSON (one aes128gcm record, the push services accept 4096 bytes in total)
 PUSH_CHANNELS = ("ntfy", "webpush", "both")
 _VAPID = {}
@@ -240,6 +242,8 @@ def webpush_user(uid, payload, prio="4", ttl=86400, topic=None, only=None, stats
             continue
         drop = drops[sub["id"]]
         st, retry = webpush_send(sub, {**payload, "dismiss": drop} if drop else payload, prio, ttl, topic)
+        if st == 413:  # 2.367.5 (#2980): this push service takes less: once more with a short text
+            st, retry = webpush_send(sub, {**payload, "body": (payload.get("body") or "")[:WEBPUSH_SHORT_BODY]}, prio, ttl, topic)
         host = urllib.parse.urlsplit(sub["endpoint"]).hostname
         if (st == 0 and webpush_endpoint_ok(sub["endpoint"])) or st >= 500:
             aa_fail("webpush:" + (host or "?"), f"HTTP {st}" if st else "network")
@@ -266,6 +270,13 @@ def webpush_user(uid, payload, prio="4", ttl=86400, topic=None, only=None, stats
     return ok
 
 
+def _webpush_rejected(c, uid, sub, st, aa_count):
+    """A push service refused the subscription: the fifth time in a row it goes."""
+    c.execute("UPDATE push_subs SET fails=fails+1 WHERE id=?", (sub["id"],))
+    if c.execute("DELETE FROM push_subs WHERE id=? AND fails>=5", (sub["id"],)).rowcount:
+        aa_count("webpush", "removed", f"{uid}|{sub['label'][:60]}|{st}")
+
+
 def _webpush_result(c, uid, sub, drop, st, retry, host, payload, now, aa_count):
     if 200 <= st < 300:
         c.execute("UPDATE push_subs SET last_ok=?, fails=0 WHERE id=?", (iso(now_utc()), sub["id"]))
@@ -283,9 +294,7 @@ def _webpush_result(c, uid, sub, drop, st, retry, host, payload, now, aa_count):
         c.execute("UPDATE push_subs SET backoff_until=? WHERE id=?", (now + wait, sub["id"]))
         print(f"webpush: rate limited by {host}, pausing subscription {sub['id']} for {wait} s", flush=True)
     elif st in (400, 401, 403):
-        c.execute("UPDATE push_subs SET fails=fails+1 WHERE id=?", (sub["id"],))
-        if c.execute("DELETE FROM push_subs WHERE id=? AND fails>=5", (sub["id"],)).rowcount:
-            aa_count("webpush", "removed", f"{uid}|{sub['label'][:60]}|{st}")
+        _webpush_rejected(c, uid, sub, st, aa_count)
         print(f"webpush: {host} rejected the push for subscription {sub['id']} ({st})", flush=True)
     else:
         print(f"webpush: {host} answered {st} for subscription {sub['id']}" +
@@ -382,16 +391,22 @@ def push_dismiss_tick(c):
         if st in (404, 410):
             c.execute("DELETE FROM push_subs WHERE id=?", (s["id"],))
             c.commit()
+        elif st in (400, 401, 403):  # 2.367.5 (#2980): counts like a real push
+            from ..notify.alerts import aa_count
+            _webpush_rejected(c, s["user_id"], s, st, aa_count)
+            c.commit()
 
 
 def badge_count(uid):
-    """2.19.0 (#668): the number on the app icon (Badging API): unread News + unread team chat messages."""
-    from ..collab.teamchat import tchat_unread
+    """2.19.0 (#668): the number on the app icon (Badging API). 2.367.5 (#2980): the same number as the app (setcore.js
+    badgeSync, workspace.js bellCount): News for me + unread direct messages, without collaboration all unread chat."""
+    from ..collab.teamchat import tchat_unread_both
     c = connect()
     try:
         with system_ctx(c):  # 2.37.0 (#1150): the recipient's counts, whoever's request sends the push
             s = usettings(c, uid)
-            return (news_unread(c, uid, s) if collab_on(s) else 0) + tchat_unread(c, uid)
+            chat, dm = tchat_unread_both(c, uid)
+            return news_unread_me(c, uid, s) + dm if collab_on(s) else chat
     except Exception:  # noqa: BLE001 - a badge never stops a push
         return 0
     finally:
@@ -414,7 +429,21 @@ def push_reachable(c, uid, s):
     return bool(s.get("ntfy_topic")) or webpush_count(c, uid) > 0 or chn_reachable(c, uid)
 
 
-def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=None, due=None):
+def push_reachable_many(c, S):
+    """2.369.3 (#3199): push_reachable for several accounts at once ({uid: settings} -> the set of reachable ones): the
+    devices and the channels of everyone without an ntfy topic in one query each (was one or two per person)."""
+    out = {u for u, s in S.items() if s.get("ntfy_topic")}
+    rest = sorted(set(S) - out)
+    if rest and WEBPUSH_ON:
+        out |= {r[0] for r in c.execute("SELECT DISTINCT user_id FROM push_subs WHERE user_id = ANY(CAST(? AS BIGINT[]))", (rest,))}
+        rest = sorted(set(rest) - out)
+    if rest:
+        from .channels import chn_reachable_many
+        out |= chn_reachable_many(c, rest)
+    return out
+
+
+def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=None, due=None, lang=None):
     """What the notification shows, nothing more: title, text, the in-app link (hash only), buttons."""
     hash_ = urllib.parse.urlsplit(click).fragment if click else ""
     from ..collab.liste2eguard import le2b_net
@@ -422,6 +451,8 @@ def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=N
     title, msg = md_plain(title), md_plain(msg)  # 2.40.0 (#1409): no Markdown marks in the push
     p = {"title": (title or APP_NAME)[:200], "body": (msg or "")[:1000], "url": "/#" + hash_ if hash_ else "/",
          "prio": int(prio) if str(prio).isdigit() else 4, "ts": int(time.time() * 1000)}
+    if lang:  # 2.367.5 (#2980): the notification's language (sw.js pushOptions)
+        p["lang"] = lang
     if tag:
         p["tag"] = tag[:64]
     if task:
@@ -439,14 +470,55 @@ def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=N
     return p
 
 
+# 2.367 (#2966): the quiet hours hold every push (they only held nags and the channels). Not held: priority 5 (a task's
+# "Urgent"), and what the person set to their own time or started themselves: the push test, digest, briefing, daily
+# review (a time inside the quiet hours is their choice; a later delivery would report the wrong day) and focus timers
+# (quiet=False). A held push is only counted, the bell keeps its entry; one summary when the quiet hours end.
+QUIET_ON = env_bool("KALMIDO_QUIET_PUSH", True)  # the test containers switch it off (start.sh): the suites also run at night
+QUIET_FREE_TAGS = ("test", "digest", "briefing", "review")
+
+
+def quiet_hold(uid, prio, tag, s):
+    """True = uid is in their quiet hours: this push is counted instead of sent."""
+    if not QUIET_ON or str(prio) == "5" or tag in QUIET_FREE_TAGS or not in_quiet(s, local_now()):
+        return False
+    try:
+        c = connect()
+        try:
+            with system_ctx(c):  # the recipient's own row (a push thread has no request context)
+                ts = iso(now_utc())
+                c.execute("""INSERT INTO quiet_push_held(user_id,n,first_at,last_at) VALUES(?,1,?,?)
+                             ON CONFLICT(user_id) DO UPDATE SET n=quiet_push_held.n+1, last_at=excluded.last_at""", (uid, ts, ts))
+            c.commit()
+        finally:
+            c.close()
+    except Exception as e:  # noqa: BLE001  (the count never breaks the caller; the push stays held)
+        print("quiet hours: counting failed:", type(e).__name__, e, flush=True)
+    return True
+
+
+def quiet_held_tick(c, users, S, LG, now):
+    """Watchdog: once a person's quiet hours have ended, ONE push "N notifications during the quiet hours"; the count goes."""
+    for h in c.execute("SELECT * FROM quiet_push_held ORDER BY user_id").fetchall():
+        uid = h["user_id"]
+        if uid in users and in_quiet(S[uid], now):
+            continue
+        c.execute("DELETE FROM quiet_push_held WHERE user_id=? AND last_at<=?", (uid, h["last_at"]))  # newer counts wait for the next tick
+        c.commit()  # before sending: never twice
+        if uid in users and h["n"]:
+            notify(uid, APP_NAME, trn("{0} notification during the quiet hours", "{0} notifications during the quiet hours", h["n"], lg=LG[uid]),
+                   push_prio(S[uid]), f"{PUBLIC_URL}/#today", s=S[uid], tag="quiet", kind="other", quiet=False)
+
+
 def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None, task=None, due=None, ttl=86400, kind=None,
-           scope=None, chn_msg=None):
+           scope=None, chn_msg=None, quiet=True):
     """One push to one user over the channel of their settings (push_channel):
     ntfy = the ntfy topic; webpush = every subscribed device, and the ntfy topic instead while no device is
     subscribed or none accepted it; both = both. Returns True when at least one channel accepted it.
     2.142.0 A (#2145): kind (reminder | assign | comment | digest | other) also goes to the person's notification channels
     that want it (Slack, Matrix, Telegram, Signal; notify/channels.py); without kind it is guessed from tag / origin.
-    2.240.0 B2 (#2867): scope / chn_msg = what the push belongs to / the channels' text (chn_scope, chn_push); web push and ntfy unchanged."""
+    2.240.0 B2 (#2867): scope / chn_msg = what the push belongs to / the channels' text (chn_scope, chn_push); web push and ntfy unchanged.
+    2.367 (#2966): quiet=False = not held in the person's quiet hours (quiet_hold)."""
     from ..notify.alerts import aa_count
     if s is None:
         c = connect()
@@ -455,26 +527,31 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
                 s = usettings(c, uid)
         finally:
             c.close()
+    if quiet and quiet_hold(uid, prio, tag, s):
+        return False
     from ..collab.liste2eguard import le2b_net
     lg = s.get("lang") if s.get("lang") in LANGS else "en"
     title, msg = le2b_net(title, lg), le2b_net(msg, lg)  # 2.64.2 D (#1817): the neutral word in the recipient's language
     from .channels import chn_kind, chn_push
     queued = chn_push(uid, title, msg, prio, click, chn_kind(kind, tag), s, task, scope, chn_msg)  # 2.142.0 A (#2145): queued, sent in the background (2.240.0 B: + task, B2: + scope)
+    if s.get("push_title_only") == "1":  # 2.367.5 (#2980): the lock screen shows no excerpt; the channels stay as they are (they are no lock screen)
+        msg = ""
+    nmsg = msg or tr("New notification in {0}", APP_NAME, lg=lg)  # ntfy shows a placeholder for an empty message
     ch = push_channel(s)
     sent = 0
     if WEBPUSH_ON and ch in ("webpush", "both"):
         tag = tag or (urllib.parse.urlsplit(click).fragment.replace("/", "-") if click else None) or None
         st = {}
-        sent = webpush_user(uid, {**webpush_payload(title, msg, prio, click, actions, tag, task, due), "badge": badge_count},  # 2.281.0 B
+        sent = webpush_user(uid, {**webpush_payload(title, msg, prio, click, actions, tag, task, due, lang=lg), "badge": badge_count},  # 2.281.0 B
                             prio, ttl, topic=tag, stats=st)
         if not sent and st.get("subs"):  # devices exist but none accepted it (admin alert, counted per window)
             aa_count("webpush", "fallback", uid)
     if ch in ("ntfy", "both"):
-        return ntfy(title, msg, prio, click, topic=s.get("ntfy_topic"), actions=actions) or sent > 0 or queued
+        return ntfy(title, nmsg, prio, click, topic=s.get("ntfy_topic"), actions=actions) or sent > 0 or queued
     if not sent:
         if ntfy_public():  # 2.148.1 C (#2494): the fallback to the public ntfy.sh carries no content (the person did not choose ntfy)
             return ntfy(APP_NAME, tr("New notification in {0}", APP_NAME, lg=lg), prio, ntfy_plain_click(click), topic=s.get("ntfy_topic")) or queued
-        return ntfy(title, msg, prio, click, topic=s.get("ntfy_topic"), actions=actions) or queued
+        return ntfy(title, nmsg, prio, click, topic=s.get("ntfy_topic"), actions=actions) or queued
     return True
 
 
@@ -498,14 +575,64 @@ def reminder_recipient(c, t, users, memo=None):
     return None
 
 
-def _wd_sees(c, t, uid, memo):
-    """task_visible(c, t["id"], uid, full=True) with the list role of the tick's memo."""
+def _wd_sees(c, t, uid, memo, full=True):
+    """task_visible(c, t["id"], uid, full=full) with the list role of the tick's memo.
+    2.369.4 (#2516): a participant's visible tasks of a list (pvis) and whether the account has a data lock are read once
+    per tick too (was task_visible per task: list role, data lock, two task-set queries each time)."""
     if memo is None:
-        return task_visible(c, t["id"], uid, full=True)
+        return task_visible(c, t["id"], uid, full=full)
     k = ("role", t["list_id"], uid)
     if k not in memo:
         memo[k] = list_role(c, t["list_id"], uid)
-    return task_visible(c, t["id"], uid, full=True) if memo[k] == "participant" else bool(memo[k])
+    if not memo[k]:
+        return False
+    from ..core.dlock import dl_of, dl_task_hidden
+    dk = ("dl", uid)
+    if dk not in memo:
+        memo[dk] = bool(dl_of(c, uid))
+    if memo[dk] and dl_task_hidden(c, t["id"], uid):
+        return False  # as task_visible: a task the agent's data lock leaves out
+    if memo[k] != "participant":
+        return True
+    pk = ("pvis", t["list_id"], uid)
+    if pk not in memo:
+        memo[pk] = pvis(c, uid, t["list_id"])
+    return t["id"] in memo[pk][1 if full else 0]
+
+
+def _wd_prefetch(c, rows, users, memo):
+    """2.369.4 (#2516): the recipients' list roles and the people who come along for the due tasks rows of one tick, as
+    queries over all of them (the list rows, the memberships of every candidate, task_people) instead of per task and
+    person; the roles themselves come from the same rule as list_role (_list_role with the rows read here)."""
+    if not rows:
+        return
+    from ..core.access import _list_role
+    tids = sorted({int(t["id"]) for t in rows})
+    ppl = memo.setdefault("people", {})
+    for tid in tids:
+        ppl[tid] = []
+    for r in c.execute("SELECT task_id, user_id FROM task_people WHERE task_id = ANY(CAST(? AS BIGINT[])) ORDER BY task_id, user_id", (tids,)):
+        ppl[r[0]].append(r[1])
+    pairs = {(int(t["list_id"]), int(u)) for t in rows for u in (t["assignee_id"], t["created_by"], *ppl[int(t["id"])])
+             if u and u in users and u != t["list_owner"]}
+    if not pairs:
+        return
+    lids, uids = sorted({p[0] for p in pairs}), sorted({p[1] for p in pairs})
+    lr = {r[7]: r for r in c.execute("SELECT owner_id, life, org_id, family, org_visibility, org_edit, deleted_at, id FROM lists "
+                                     "WHERE id = ANY(CAST(? AS BIGINT[]))", (lids,))}
+    lm = {(r[1], r[2]): r for r in c.execute("SELECT role, list_id, user_id FROM list_members WHERE list_id = ANY(CAST(? AS BIGINT[])) "
+                                             "AND user_id = ANY(CAST(? AS BIGINT[]))", (lids, uids))}
+    for lid, u in sorted(pairs):
+        if ("role", lid, u) not in memo:
+            memo[("role", lid, u)] = _list_role(c, lid, u, lr.get(lid), lm.get((lid, u)))
+
+
+def _wd_people(c, t, users, rcpt, memo):
+    """reminder_people (everyone who comes along and can still see the task) from the tick's memo (_wd_prefetch)."""
+    from ..family.v1 import reminder_people
+    if memo is None or int(t["id"]) not in memo.get("people", {}):
+        return reminder_people(c, t, users, rcpt)
+    return [u for u in memo["people"][int(t["id"])] if u != rcpt and u in users and _wd_sees(c, t, u, memo, full=False)]
 
 
 def _wd_notif_ok(c, uid, s, lid, memo, own=False):
@@ -531,7 +658,35 @@ WD_TICKS = []  # 2.235.0 A (#2901): (name, fn(c, users, S, LG)) of higher layers
 WD_SLOW_MS = 200  # 2.149.0 C (#2516): a watchdog section that takes longer leaves a log line (name + duration only)
 
 
+# 2.369.4 (#2516): the clean-up / prune / GC sections run at most every KALMIDO_WD_SLOW_S seconds (default 600 = 10 min;
+# the tests' containers set 0 = every tick as before); reminders, nags, events, time and pushes keep every tick. The last
+# start is kept in the worker's memory: after a restart every section runs once at the first tick. A stored "next due" per
+# section is not built (every write would have to keep it).
+WD_SLOW_S = env_int("KALMIDO_WD_SLOW_S", 600, lo=0, hi=86400)
+WD_SLOW = frozenset((
+    "news cleanup", "office log prune", "usage cleanup", "audit cleanup", "proposal cleanup", "chat files cleanup",
+    "team chat files cleanup", "org export cleanup", "merge snapshots", "office undo copies", "video trash", "list trash",
+    "task trash", "old logs", "orphan files", "agent chat days", "trash periods", "booking archive", "retired organisations",
+    "account export cleanup", "server link tokens", "files cleanup", "contract files trash", "terms files",
+    "entertainment receipts trash", "wiki files", "wiki trash", "table files"))
+_WD_LAST = {}  # section name -> time.monotonic() of its last start (this process)
+
+
+def _wd_due(name, now=None):
+    """2.369.4 (#2516): may section name run in this tick? (and notes the start when yes)"""
+    if name not in WD_SLOW or WD_SLOW_S <= 0:
+        return True
+    now = time.monotonic() if now is None else now
+    last = _WD_LAST.get(name)
+    if last is not None and now - last < WD_SLOW_S:
+        return False
+    _WD_LAST[name] = now
+    return True
+
+
 def _wd_section(c, name, fn, *a):
+    if not _wd_due(name):
+        return
     t0 = time.monotonic()
     try:
         fn(c, *a)
@@ -605,6 +760,7 @@ def _watchdog_tick(c):
     for uid in users:
         LG[uid] = S[uid].get("lang") if S[uid].get("lang") in LANGS else "en"
     _wd_section(c, "collab pushes", task_push_tick, users, S, LG)
+    _wd_section(c, "bundled pushes", push_gate_tick, users, S, LG)  # 2.367 (#2967): one summary per person who triggered many
     _wd_section(c, "dismiss pushes", push_dismiss_tick)
     _wd_section(c, "news cleanup", news_cleanup)
     _wd_section(c, "office log prune", fx2_office_log_prune)  # 2.38.0 (#1155)
@@ -654,6 +810,7 @@ def _watchdog_tick(c):
     _wd_section(c, "portal mails", pt_mail_tick)  # 2.63.0 B (#1513): answers / "done" to the reporters of customer reports
     _wd_section(c, "time", time_watchdog, users, S, LG)
     now = local_now()
+    _wd_section(c, "quiet hours summary", quiet_held_tick, users, S, LG, now)  # 2.367 (#2966)
     _wd_section(c, "reminders", _wd_reminders, users, S, LG, now)
     from ..tasks.remindat import rat_tick
     _wd_section(c, "fixed reminders", rat_tick, users, S, LG, now)  # 2.111.0 C (#2057): "remind me Tue 9:00"
@@ -727,15 +884,39 @@ def _wd_reminders(c, users, S, LG, now):
                         FROM tasks t JOIN lists l ON l.id=t.list_id
                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL
                           AND t.reminders!='' AND l.archived=0""").fetchall()  # 1.5.1: none for archived lists
-    early = wd_early_allday(S)
-    memo = {}  # 2.281.0 B (#3117): list roles / push settings per person, once per tick (a wave of 100 reminders)
+    early, margin = wd_early_allday(S), WD_EARLY_MARGIN + tz_gap(S, now)  # 2.368.3 (#2985): + the distance to the people's clocks
+    # 2.281.0 B (#3117): list roles / push settings per person, once per tick (a wave of 100 reminders)
+    memo = {"bundle": {}}  # 2.367 (#2967): + the all-day reminders of this tick per person
+    # 2.191.0 C (#2516): nothing of a task the check skips can be due yet -- _wd_reminder would only read
+    rows = [t for t in rows if wd_rem_maybe(t, early, now, margin)]
+    try:
+        _wd_prefetch(c, rows, users, memo)  # 2.369.4 (#2516): roles + who comes along for all of them at once
+    except Exception as e:  # noqa: BLE001
+        _wd_fail(c, "reminder recipients", "all", e)  # the old way, one by one
+        memo = {"bundle": {}}
     for t in rows:
-        if not wd_rem_maybe(t, early, now):
-            continue  # 2.191.0 C (#2516): nothing of this task can be due yet -- _wd_reminder would only read
         try:
             _wd_reminder(c, t, users, S, LG, now, memo)
         except Exception as e:  # noqa: BLE001
             _wd_fail(c, "reminder of task", t["id"], e)
+    for who, items in memo["bundle"].items():
+        try:
+            _wd_rem_flush(who, items, S.get(who, USER_DEFAULTS), LG.get(who, "en"), now)
+        except Exception as e:  # noqa: BLE001
+            _wd_fail(c, "reminders of user", who, e)
+
+
+def _wd_rem_flush(who, items, s, lg, now):
+    """2.367 (#2967): all-day reminders fire together at the person's all-day time: one alone stays its usual push (buttons),
+    more become one message like the digest. A reminder with a time of day stays a push of its own."""
+    if len(items) == 1:
+        return notify(*items[0][1], **items[0][2])
+    today = user_now(s, now).date().isoformat()
+    head = trn("{0} task today", "{0} tasks today", len(items), lg=lg) if all(t["due"] == today for t, _a, _k in items) else \
+        trn("{0} reminder", "{0} reminders", len(items), lg=lg)
+    lines = [f"- {t['title']}" for t, _a, _k in items[:15]]
+    return notify(who, tr("Reminders", lg=lg), head + "\n" + "\n".join(lines), push_prio(s, 4 if any(t["priority"] == 5 for t, _a, _k in items) else None),
+                  f"{PUBLIC_URL}/#today", s=s, tag="reminders", kind="reminder", scope="private", chn_msg=head)  # like the digest: the channels get the number
 
 
 # 2.191.0 C (#2516): the reminder / nag sections looked up the recipient of EVERY open task with reminders (task_visible:
@@ -751,10 +932,10 @@ def wd_early_allday(S):
     return min([s.get("allday_time") if valid_hm(s.get("allday_time")) else "09:00" for s in (*S.values(), USER_DEFAULTS)])
 
 
-def wd_rem_maybe(t, early, now):
+def wd_rem_maybe(t, early, now, margin=WD_EARLY_MARGIN):
     """False only when _wd_reminder(t) surely does nothing now: every offset is fired already or still in the future."""
     try:
-        base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or early}").replace(tzinfo=TZ) - WD_EARLY_MARGIN
+        base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or early}").replace(tzinfo=TZ) - margin
         fired = json.loads(t["reminded"] or "[]")
         for off in t["reminders"].split(","):
             if off.strip() and f"{t['due']} {t['due_time'] or ''}|{off}" not in fired and base - timedelta(minutes=int(off)) <= now:
@@ -764,14 +945,14 @@ def wd_rem_maybe(t, early, now):
         return True
 
 
-def wd_nag_maybe(t, early, now):
+def wd_nag_maybe(t, early, now, margin=WD_EARLY_MARGIN):
     """False only when _wd_nag(t) surely returns before doing anything: no interval, the nags have not begun yet, or the
     last nag is younger than the interval."""
     try:
         mins = nag_minutes(t["nag"], t["list_nag"])
         if not mins:
             return False
-        if now < nag_start(t, {"allday_time": early}) - WD_EARLY_MARGIN:
+        if now < nag_start(t, {"allday_time": early}) - margin:
             return False
         last = nag_last(t["nag_at"], nag_key(t))
         return not (last and now < last + timedelta(minutes=mins) - timedelta(seconds=20))
@@ -780,12 +961,11 @@ def wd_nag_maybe(t, early, now):
 
 
 def _wd_reminder(c, t, users, S, LG, now, memo=None):
-    from ..family.v1 import reminder_people
     memo = {} if memo is None else memo
     rcpt = reminder_recipient(c, t, users, memo)
     s = S.get(rcpt, USER_DEFAULTS)
     allday = s.get("allday_time") if valid_hm(s.get("allday_time")) else "09:00"
-    base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or allday}").replace(tzinfo=TZ)
+    base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or allday}").replace(tzinfo=tz_of_s(s))  # 2.368.3 (#2985)
     fired = json.loads(t["reminded"] or "[]")
     changed = False
     for off in t["reminders"].split(","):
@@ -800,19 +980,23 @@ def _wd_reminder(c, t, users, S, LG, now, memo=None):
         if now - at > timedelta(hours=6):
             continue
         # 2.19.0 (#653): everyone who comes along gets it too (in their language, with their settings)
-        for who in ([rcpt] if rcpt else []) + reminder_people(c, t, users, rcpt):
+        for who in ([rcpt] if rcpt else []) + _wd_people(c, t, users, rcpt, memo):  # 2.369.4 (#2516): from the tick's memo
             sw, lgw = S.get(who, USER_DEFAULTS), LG.get(who, "en")
             if not _wd_notif_ok(c, who, sw, t["list_id"], memo, own=who == rcpt):  # 2.33.0 (#927): + the list (owner's template); 2.266.0 (#2962): not for rcpt's own
                 continue  # 2.1.0 (#317): reminders can be switched off in the notification settings
-            when = tr("all day", lg=lgw) if not t["due_time"] else tr("at {0}", t["due_time"], lg=lgw)
-            day = tr("today", lg=lgw) if t["due"] == now.date().isoformat() else \
+            when = tr("all day", lg=lgw) if not t["due_time"] else tr("at {0}", hm_text(t["due_time"], sw), lg=lgw)
+            day = tr("today", lg=lgw) if t["due"] == user_now(sw, now).date().isoformat() else \
                 short_day(date.fromisoformat(t["due"]), lgw)
             lname = tr("Basket", lg=lgw) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
-            notify(who, t["title"], tr("Due {0} {1} · {2}", day, when, lname, lg=lgw),
-                   push_prio(sw, 4 if t["priority"] == 5 else None), f"{PUBLIC_URL}/#t/{t['id']}", s=sw,
-                   actions=[(tr("Snooze", lg=lgw), f"{PUBLIC_URL}/#snooze/{t['id']}"),
-                            (tr("Done|action", lg=lgw), f"{PUBLIC_URL}/#done/{t['id']}")],
-                   task=t["id"], due=t["due"] if t["repeat"] else None)
+            push = ((who, t["title"], tr("Due {0} {1} · {2}", day, when, lname, lg=lgw),
+                     push_prio(sw, 4 if t["priority"] == 5 else None), f"{PUBLIC_URL}/#t/{t['id']}"),
+                    {"s": sw, "actions": [(tr("Snooze", lg=lgw), f"{PUBLIC_URL}/#snooze/{t['id']}"),
+                                          (tr("Done|action", lg=lgw), f"{PUBLIC_URL}/#done/{t['id']}")],
+                     "task": t["id"], "due": t["due"] if t["repeat"] else None})
+            if t["due_time"] or "bundle" not in memo:
+                notify(*push[0], **push[1])
+            else:
+                memo["bundle"].setdefault(who, []).append((t, *push))  # 2.367 (#2967): sent after the loop (_wd_rem_flush)
         if not rcpt or not _wd_notif_ok(c, rcpt, s, None, memo):
             continue
         if nag_minutes(t["nag"], t["list_nag"]):  # 2.7.0 (#413): this reminder counts as a nag (the next one an interval later)
@@ -829,7 +1013,6 @@ def _wd_reminder(c, t, users, S, LG, now, memo=None):
 # the due date + the time of the last nag (a reminder that fires counts as one), so a tick, a restart or a second worker
 # never sends one twice; a new date (snooze, repeat, edit) starts over. Completed, deleted, archived and undated tasks
 # are not looked at, so the nags stop with them. At most NAG_HOUR_CAP nag pushes per person and hour.
-_NAG_SENT = {}
 
 
 def nag_minutes(task_nag, list_nag):
@@ -857,18 +1040,18 @@ def nag_last(raw, key):
 
 
 def in_quiet(s, now):
-    """True during the person's quiet hours (local HH:MM range, may span midnight)."""
+    """True during the person's quiet hours (HH:MM range on their clock, may span midnight; 2.367 (#2966): their time zone)."""
     a, b = s.get("quiet_from") or "", s.get("quiet_to") or ""
     if not (valid_hm(a) and valid_hm(b)) or a == b:
         return False
-    hm = now.strftime("%H:%M")
+    hm = user_now(s, now).strftime("%H:%M")  # 2.368.3 (#2985)
     return a <= hm < b if a < b else hm >= a or hm < b
 
 
 def nag_start(t, s):
     """When the nags begin: the first reminder (the largest offset), else the due time."""
     allday = s.get("allday_time") if valid_hm(s.get("allday_time")) else "09:00"
-    base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or allday}").replace(tzinfo=TZ)
+    base = datetime.fromisoformat(f"{t['due']}T{t['due_time'] or allday}").replace(tzinfo=tz_of_s(s))  # 2.368.3 (#2985)
     offs = [int(x) for x in str(t["reminders"] or "").split(",") if re.fullmatch(r"-?\d{1,7}", x.strip())]
     return base - timedelta(minutes=max(offs)) if offs else base
 
@@ -878,9 +1061,9 @@ def _wd_nags(c, users, S, LG, now):
                         FROM tasks t JOIN lists l ON l.id=t.list_id
                         WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND l.archived=0
                           AND ((t.nag NOT IN ('', 'off')) OR (t.nag='' AND l.nag!=''))""").fetchall()
-    early = wd_early_allday(S)
+    early, margin = wd_early_allday(S), WD_EARLY_MARGIN + tz_gap(S, now)  # 2.368.3 (#2985): + the distance to the people's clocks
     for t in rows:
-        if not wd_nag_maybe(t, early, now):
+        if not wd_nag_maybe(t, early, now, margin):
             continue  # 2.191.0 C (#2516): see wd_rem_maybe
         try:
             _wd_nag(c, t, users, S, LG, now)
@@ -901,15 +1084,13 @@ def _wd_nag(c, t, users, S, LG, now):
         return
     if in_quiet(s, now) or not notif_ok(c, rcpt, s, "nag", "push", t["list_id"], own=True):
         return
-    sent = [x for x in _NAG_SENT.get(rcpt, []) if x > time.time() - 3600]
     c.execute("UPDATE tasks SET nag_at=? WHERE id=?", (f"{key}|{now.isoformat()}", t["id"]))  # before sending: never twice
     c.commit()
-    if len(sent) >= NAG_HOUR_CAP:
-        _NAG_SENT[rcpt] = sent
+    from ..api.common import hit_limit
+    if hit_limit(f"nag:{rcpt}", NAG_HOUR_CAP, 3600):  # 2.367.5 (#2980): counted in the database, a restart does not forget it
         return
-    _NAG_SENT[rcpt] = sent + [time.time()]
-    when = tr("all day", lg=lg) if not t["due_time"] else tr("at {0}", t["due_time"], lg=lg)
-    day = tr("today", lg=lg) if t["due"] == now.date().isoformat() else \
+    when = tr("all day", lg=lg) if not t["due_time"] else tr("at {0}", hm_text(t["due_time"], s), lg=lg)
+    day = tr("today", lg=lg) if t["due"] == user_now(s, now).date().isoformat() else \
         short_day(date.fromisoformat(t["due"]), lg)
     lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
     head = tr("Deadline", lg=lg) if t["deadline"] else tr("Still open", lg=lg)
@@ -950,9 +1131,9 @@ def _wd_pomo(c, p, users, S, LG):
         s, lg = S[p["user_id"]], LG[p["user_id"]]
         if p["kind"] == "focus":
             notify(p["user_id"], tr("Focus done", lg=lg), tr("{0} min{1}. Time for a break.", p["minutes"], " · " + p["title"] if p["title"] else "", lg=lg),
-                   push_prio(s), f"{PUBLIC_URL}/#pomo", s=s, scope=f"t:{p['task_id']}" if p["task_id"] else "private")  # 2.240.0 B2 (#2867)
+                   push_prio(s), f"{PUBLIC_URL}/#pomo", s=s, scope=f"t:{p['task_id']}" if p["task_id"] else "private", quiet=False)  # 2.240.0 B2 (#2867)
         else:
-            notify(p["user_id"], tr("Break is over", lg=lg), tr("Back to it.", lg=lg), push_prio(s), f"{PUBLIC_URL}/#pomo", s=s, scope="private")
+            notify(p["user_id"], tr("Break is over", lg=lg), tr("Back to it.", lg=lg), push_prio(s), f"{PUBLIC_URL}/#pomo", s=s, scope="private", quiet=False)
 
 
 def _wd_habits(c, users, S, LG, now):
@@ -967,6 +1148,7 @@ def _wd_habits(c, users, S, LG, now):
 
 
 def _wd_habit(c, h, users, S, LG, now):
+    now = user_now(S.get(h["user_id"]), now)  # 2.368.3 (#2985): the owner's day and time
     today = now.date().isoformat()
     wd = str(now.isoweekday())
     # 2.140.0 C (#2135): several times a day; the latest slot that is due and not yet reminded today fires once
@@ -1003,8 +1185,9 @@ def _wd_digest(c, users, S, LG, now):
 
 def _wd_digest_user(c, uid, S, LG, now):
     from ..integrations.mail import digest_mail_user
-    today = now.date().isoformat()
     s, lg = S[uid], LG[uid]
+    now = user_now(s, now)  # 2.368.3 (#2985): the person's digest time and "today"
+    today = now.date().isoformat()
     dt = s.get("digest_time") or ""
     if valid_hm(dt) and now.strftime("%H:%M") >= dt:  # 2.17.0 (#443): the summary by e-mail too (its own "sent" day)
         digest_mail_user(c, uid, s, today)

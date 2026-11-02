@@ -24,7 +24,7 @@ async function oa_switchLoad(md) {
 function oa_switchDraw(box, j) {
   box.hidden = false;
   box.innerHTML = `<div class="row"><label>${tr('Office & finance')}</label><label class="chkl"><input type="checkbox" id="oa-sw" ${j.office_drafts ? 'checked' : ''} ${j.can_set ? '' : 'disabled'}> ${tr('May draft office documents')}</label></div>
-    <div class="shint keep">${tr('Quotations, invoices and reminders as drafts and payment suggestions; never finalise, send, delete or book. Also needs the permission “Office drafts”.')}${j.can_set ? '' : ' ' + tr('Only an admin of its office can switch this.')}</div>
+    <div class="shint keep">${tr('Quotations, invoices and payment reminders as drafts and payment suggestions; never finalise, send, delete or book. Also needs the permission “Office drafts”.')}${j.can_set ? '' : ' ' + tr('Only an admin of its office can switch this.')}</div>
     ${j.office_drafts && !j.agents_read ? `<div class="shint keep warn">${tr('Off in the office settings: “Agents may read office data”.')}</div>` : ''}
     <div class="shint keep">${esc(j.agents_read ? tr('The office lets agents read its data.') : tr('The office does not let agents read its data yet.'))} <button type="button" class="linkbtn" data-setgo="biz-agents">${esc(tr('Settings › Company & office › {0}', tr('Access')))}</button></div>`;  // 2.365.2 D (#2789): both halves know each other
 }
@@ -38,7 +38,7 @@ const oa_settingsBody = form => ($('#os-agents-read', form) ? {agents_read: $('#
 
 // ---- the access log (office.js ofcLogHtml): the filter "Agents" and the names of what an agent did
 const OA_LOG_TG = {office: N_('Office'), clients: N_('Clients'), docs: N_('Documents'), pdf: N_('PDF preview'), offer: N_('Quotation draft'),
-  invoice: N_('Invoice draft'), reminder: N_('Reminder draft'), payment: N_('Payment suggestion'), agent: N_('Agent'), pay_prop: N_('Payment suggestion')};
+  invoice: N_('Invoice draft'), reminder: N_('Payment reminder draft'), payment: N_('Payment suggestion'), agent: N_('Agent'), pay_prop: N_('Payment suggestion')};
 const oa_logFilter = () => OFC.log.some(x => /^agent_/.test(x.action)) ? `<div class="seg oa_logf" role="group" aria-label="${esc(tr('Show'))}">${[['log-all', N_('All|entries'), !OFC.logAg], ['log-ag', N_('Agents'), !!OFC.logAg]].map(([k, n, on]) => `<button type="button" data-ofc="${k}" class="${on ? 'on' : ''}" aria-pressed="${on}">${tr(n)}</button>`).join('')}</div>` : '';
 
 // ---- the marks of an agent's positions (office_docs.js editor)

@@ -80,7 +80,8 @@ def v1_view(fn):
         try:
             return v1_out(fn(*a, **k))
         except Denied as e:  # 2.125.0 B (#2119): v1_name = an own error code (month_closed)
-            return v1_err(e.code, e.text() if e.code != 404 else tr("Not found"), name=getattr(e, "v1_name", None))
+            return v1_err(e.code, e.text() if e.code != 404 else tr("Not found"), name=getattr(e, "v1_name", None),
+                          **getattr(e, "v1_extra", {}))  # 2.392.0 A (#3367): more fields (slots_full: running, max)
         except UnknownFields as e:  # 2.2.1 (#359): the client can see which of its fields the API does not know
             return v1_err(400, str(e), name="unknown_field", fields=e.fields)
         except BadInput as e:

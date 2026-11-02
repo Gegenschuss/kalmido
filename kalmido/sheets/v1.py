@@ -256,7 +256,8 @@ def sheets_spec(paths, schemas, op, ok, errs, ref, pid, q):
                              "SUMMEWENN/SUMIF, ZÄHLENWENN/COUNTIF, SVERWEIS/VLOOKUP, XVERWEIS/XLOOKUP, LINKS/LEFT, RECHTS/RIGHT, "
                              "TEIL/MID, LÄNGE/LEN, VERKETTEN/CONCAT, GLÄTTEN/TRIM, GROSS/UPPER, KLEIN/LOWER, DATUM/DATE, "
                              "JAHR/YEAR, MONAT/MONTH, TAG/DAY, EDATUM/EDATE, "
-                             "projekt.<name>.<field>, liste.<name>.<field>, kunde.<name>.<field>, hier.<field>; arguments with ;)"}
+                             "project.<name>.<field> or projekt., list. or liste., client. or kunde., here.<field> or hier.; arguments with ;. "
+                             "2.368.3 (#2988): both languages are understood, a formula reads in the language of the person)"}
     schemas["SheetBrief"] = {"type": "object", "properties": {
         "id": {"type": "integer"}, "title": {"type": "string"}, "space": {"type": "string", "description": "private | org:<id>"},
         "list_id": {"type": ["integer", "null"]}, "list_title": {"type": ["string", "null"]}, "updated_at": {"type": "string"},

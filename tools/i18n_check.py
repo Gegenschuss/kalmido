@@ -8,6 +8,7 @@ this reports
   - placeholder mismatches  ({0} in the key but not in the translation) -> error
   - plural shape errors     (trn key needs [one, other], tr key a string) -> error
   - _meta / name / date format problems                                  -> error
+  - a key with a word the glossary of TRANSLATING.md replaces            -> error
   - unused keys             (in the file, no longer used by the code)   -> warning
 Non-literal calls such as tr(name) are listed as info: their argument must be a key that is marked
 with N_("...") somewhere (tables), otherwise the checker cannot see it.
@@ -35,6 +36,31 @@ DATE_TOKENS = {"wd", "wdl", "d", "dd", "mm", "mon", "month", "y"}
 DATE_KINDS = {"near", "short", "year", "long"}
 ARRAYS = {"_weekdays": 7, "_weekdays_short": 7, "_months": 12, "_months_short": 12}
 read_string, skip_ws, comment_line = KEYS.key_literal, KEYS.skip_ws, KEYS.comment_line
+# 2.368.4 (#2990): the glossary of TRANSLATING.md: one English word for one thing (en-GB). A variant in a key of the code is an
+# error, the part after | is a context, not text. |pack keys are the wording of the office packs (kalmido/office/packs/).
+GLOSSARY = ((r"\b[Cc]ustomers?\b", "client"), (r"\b[Ll]ogins?\b", "sign-in"), (r"\b[Ll]og(?:ged|ging|s)? in\b", "sign in"),
+            (r"\b[Ll]og(?:ged|s)? out\b|\b[Ll]ogout\b", "sign out"), (r"\b[Cc]olor", "colour"),
+            (r"\b(?:[Cc]ustom|[Oo]rgan|[Rr]ecogn|[Ss]ummar)iz", "-ise"), (r"\b[Ii]nquir", "enquiry"), (r"\b[Vv]acations?\b", "holiday"),
+            (r"(?<![-@\w.])[Mm]ails?\b(?!-)", "e-mail"), (r"\b[Ee]mails?\b", "e-mail"), (r"\b[Qq]uotes?\b", "quotation"),
+            (r"\bNobody assigned\b", "unassigned"))
+GLOSSARY_KEEP = frozenset((
+    "holiday vacation sick leave day off away absence",  # search words
+    "Registered mail",  # the postal service
+))
+
+
+def glossary_errors(keys):
+    """(#2990) "key: <word> instead of <glossary word>" for every key of the code that uses a variant."""
+    out = []
+    for k in keys:
+        text = k.split("|")[0] if not k.startswith("|") else k
+        if k in GLOSSARY_KEEP or k.endswith("|pack") or "Login with URL" in k:
+            continue
+        for rx, want in GLOSSARY:
+            m = re.search(rx, text)
+            if m:
+                out.append(f"{k!r}: “{m.group(0)}”, the glossary says “{want}” (TRANSLATING.md)")
+    return out
 
 
 def extract():
@@ -67,6 +93,10 @@ def extract():
             elif prev and kind == "p" and prev[1] != other:
                 errors.append(f"{where}: plural key {key!r} has two different 'other' forms (see {prev[2]})")
             keys.setdefault(key, (kind, other, where))
+    for key, where in KEYS.reason_keys(ROOT).items():  # 2.464.0 (#3841)
+        keys.setdefault(key, ("s", None, where))
+    for key in sorted(KEYS.data_keys(ROOT)):  # 2.461 (#3773): the holiday files
+        keys.setdefault(key, ("s", None, "kalmido/office/packs/holidays/"))
     return keys, dynamic, errors
 
 
@@ -136,6 +166,9 @@ def main(argv):
     for e in split_errs:
         print("  ERROR", e)
     ok = ok and not split_errs
+    for e in glossary_errors(keys):
+        print("  ERROR", e)
+        ok = False
     files = sorted(glob.glob(os.path.join(I18N_DIR, "*.json")))
     if argv:
         files = [f for f in files if os.path.basename(f)[:-5] in argv]

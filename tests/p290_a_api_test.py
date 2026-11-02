@@ -8,7 +8,7 @@ tenant-matrix: office
    without VAT rate, the tax reserve of the year; paid_at moves a receipt into its payment year
  - VAT return figures (UStVA) of a month / quarter: fields 81, 86, 21, 45, 66, 83 on cash basis ("ist") and accrual basis
    ("soll": finalised documents by date, the credit note negative); a refund (83 negative); small business -> no return
- - CSV (semicolon, decimal comma, formula injection made harmless) and PDF (content type) of the EUeR, one log entry each
+ - CSV (comma and decimal point in English, #2984; formula injection made harmless) and PDF (content type) of the EUeR, one log entry each
  - the tax reserve in the cash flow (reserve + freely available per month; no rows at 0 %)
  - rights: an organisation member 403, an agent 403, another organisation / another person sees nothing and reaches no
    receipt of it (404); a person without organisation (personal office) uses it fully
@@ -239,10 +239,10 @@ check(any(x["label"] == "Software" for x in e["expenses"]), f"paid_at removed: b
 log0 = dbx("SELECT COUNT(*) FROM office_doc_log WHERE org_id=? AND action='export' AND target='books'", (ORG,))[0][0]
 r = A.get(B + BK + "/euer.csv?year=2025")
 check(r.ok and r.headers.get("Content-Type", "").startswith("text/csv") and "euer-2025.csv" in r.headers.get("Content-Disposition", ""), "CSV: download " + r.headers.get("Content-Type", ""))
-rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=";"))
+rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=","))
 check(rows[0] == ["Group", "Net", "VAT", "Gross"], f"CSV: header {rows[0]}")
 check(any(x[0] == "'=cmd|calc" for x in rows) and not any(x[0].startswith("=") for x in rows), f"CSV: formula injection made harmless {rows}")
-check(any(x[0] == "Profit" for x in rows) and any("," in c for x in rows for c in x[1:]), "CSV: profit row, decimal comma")
+check(any(x[0] == "Profit" for x in rows) and any("." in c for x in rows for c in x[1:]), "CSV: profit row, decimal point (English, #2984)")
 r = A.get(B + BK + "/euer.pdf?year=2026")
 check(r.ok and r.headers.get("Content-Type") == "application/pdf" and r.content[:5] == b"%PDF-", "PDF: content type + PDF bytes " + r.headers.get("Content-Type", ""))
 log1 = dbx("SELECT COUNT(*) FROM office_doc_log WHERE org_id=? AND action='export' AND target='books'", (ORG,))[0][0]

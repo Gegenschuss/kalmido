@@ -1,4 +1,6 @@
 """Creating and changing tasks: milestones, moving subtrees, tags, assignees, waiting on external."""
+from datetime import timedelta
+
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app, PUBLIC_URL
@@ -6,6 +8,7 @@ from ..core.pg import insert_id, st_ids, write_lock
 from ..core.schema import MAX_DEPTH, USER_DEFAULTS
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, inbox_default, iso, now_utc
+from ..core.usertz import user_now
 from ..accounts.session import me
 from ..core.access import (
     Denied, list_people, list_role, my_inbox, need_collab, need_list, need_task, ov_open, ov_role, task_visible,
@@ -98,6 +101,8 @@ def move_subtree(c, tid, lid):
             nxt.append(k["id"])
             moved.append(k["id"])
         level, n = nxt, n + 1
+    from ..tasks.watchers import wat_moved
+    wat_moved(c, moved, lid, people)  # 2.473.0 (#3357): delegated agent and watchers stay only when they reach the target list
     # 2.126.0 D (#1992 A5): who comes along stays only when they share the target list
     c.execute("DELETE FROM task_people WHERE task_id = ANY(CAST(? AS BIGINT[])) AND NOT (user_id = ANY(CAST(? AS BIGINT[])))",
               (st_ids(moved), st_ids(people)))
@@ -152,6 +157,8 @@ def participant_assignee(c, cur, f):
     from ..tasks.lifecycle import _norm
     if "assignee_group_id" in f and f["assignee_group_id"] != (cur["assignee_group_id"] if cur is not None else None):
         return tr("Participants cannot change who a task is assigned to")  # 2.10.0 (#441): "Take it" is POST .../take
+    if "delegate_agent_id" in f and _norm(f["delegate_agent_id"]) != _norm(cur["delegate_agent_id"] if cur is not None else None):
+        return tr("Participants cannot change who a task is assigned to")  # 2.473.0 (#3357)
     if "assignee_id" not in f:
         return None
     new = f["assignee_id"]
@@ -170,7 +177,7 @@ def check_assignee(c, lid, aid):
     try:
         aid = int(aid)
     except (TypeError, ValueError):
-        return tr("unknown user")
+        return tr("unknown person")
     # 2.83.0 (#1725): + a member of the organisation who may edit the list without joining (org_edit; ov_role: people only,
     # current members of the list's organisation) -- a read-only reader could not tick the task off
     if aid not in list_people(c, lid) and ov_role(c, lid, aid) != "edit":
@@ -188,14 +195,21 @@ WEB_TASK_NEW = frozenset(TASK_FIELDS) | {"tags", "ltags", "fields", "people"}
 WEB_TASK_EDIT = WEB_TASK_NEW | {"add_tags", "_prev", "_act", "le2e_move"}  # 2.64.1 (#1817): le2e_move
 WEB_TASK_EDIT |= {"shift_chain"}  # 2.67.0 B (#1865): shift_chain
 WEB_TASK_NEW |= {"client_ref"}  # 2.126.0 D (#1990): the device's id of a new task (a repeated POST = the same task)
-WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype", "family", "sections", "org_id", "time_tracking"})  # 2.28.0 (#935): org_id; 2.41.0 (#1471): time_tracking
+WEB_LIST_NEW = frozenset({"name", "color", "folder", "view", "kind", "checklist", "done_at_bottom", "dep_shift", "tickets", "ptype", "family", "sections", "org_id", "time_tracking", "bug_inbox"})  # 2.28.0 (#935): org_id; 2.41.0 (#1471): time_tracking; 2.473.0 (#3378): bug_inbox
 WEB_LIST_EDIT = frozenset(LIST_FIELDS) | {"col_sums", "kpis", "client_id", "rate", "agent_tidy", "tidy_agent_id", "listen_agent_ids", "agent_members", "agent_peers", "_prev", "ticket_tpl", "day_hours", "done_at_bottom", "columns", "ptype", "sort_mode", "org_id", "stale_days", "agent_followup", "done_in_section", "folder_adopt", "org_visibility", "org_edit"}  # 2.36.2 (#1136): done_in_section; 2.46.0 (#1603)
 WEB_LIST_EDIT |= {"group_field"}  # 2.144.0 C (#2414)
 WEB_LIST_EDIT |= {"tap_done"}  # 2.46.4 (#1751): "Tap does not open details" (owner / list admins)
 WEB_LIST_EDIT |= {"ticket_key"}  # 2.390.0 (#3353): the project's ticket key (owner / list admins)
 WEB_LIST_EDIT |= {"props"}  # 2.412.0 (#3552): properties against the project type (owner / project admins)
-WEB_COMMENT = frozenset({"body", "suggestion", "reply_to", "choices", "multi", "approval", "expires_in", "mentions"})  # 2.64.1 (#1817): mentions  # 2.33.0 (#1076): reply_to; 2.41.0 (#1383): choices
+WEB_COMMENT = frozenset({"body", "suggestion", "reply_to", "choices", "multi", "approval", "expires_in", "mentions", "client_ref"})  # 2.64.1 (#1817): mentions  # 2.33.0 (#1076): reply_to; 2.41.0 (#1383): choices
 WEB_COMMENT |= {"portal"}  # 2.63.0 B (#1513): an answer the customer sees
+
+
+def task_inherit(c, tid, src):
+    """Tags of everyone, list tags and the people of task src: what decides who sees a task (participants, an agent's data lock)."""
+    c.execute("INSERT INTO task_tags(task_id,user_id,tag) SELECT ?, user_id, tag FROM task_tags WHERE task_id=? ON CONFLICT DO NOTHING", (tid, src))
+    c.execute("INSERT INTO task_list_tags(task_id,tag_id) SELECT ?, tag_id FROM task_list_tags WHERE task_id=? ON CONFLICT DO NOTHING", (tid, src))
+    c.execute("INSERT INTO task_people(task_id,user_id) SELECT ?, user_id FROM task_people WHERE task_id=? ON CONFLICT DO NOTHING", (tid, src))
 
 
 @app.post("/api/tasks")
@@ -272,7 +286,9 @@ def task_create():
         e = spr_apply(c, f, {"sprint_id": None, "list_id": f["list_id"]}, f["list_id"])
         if e:
             return err(e)
+    from ..tasks.watchers import check_delegate, dlg_events
     e = check_assignee(c, f["list_id"], f.get("assignee_id")) or check_group_assignee(c, f["list_id"], f.get("assignee_group_id")) \
+        or check_delegate(c, f["list_id"], f.get("delegate_agent_id")) \
         or check_url(f) or repeat_problem(f.get("repeat"), f.get("due"))
     if e:
         return err(e)
@@ -314,6 +330,8 @@ def task_create():
         if e:
             c.rollback()
             return err(e)
+    if g.get("task_like"):  # 2.392.0 B (#3364): the rest of a task: seen by the same people and agents, before any event goes out
+        task_inherit(c, cur_id, g.pop("task_like"))
     log_act(c, cur_id, "created")
     agent_task_mentions(c, cur_id)
     agent_tidy_events(c, cur_id)
@@ -322,6 +340,7 @@ def task_create():
         task_event(c, cur_id, "assign")
     if f.get("assignee_group_id"):
         grp_assign_events(c, cur_id, f["assignee_group_id"])
+    dlg_events(c, cur_id, None, f.get("delegate_agent_id"))  # 2.473.0 (#3357)
     newtask_events(c, cur_id)
     if f.get("parent_id"):
         log_act(c, f["parent_id"], "subtask", {"id": cur_id, "title": f["title"][:200]})
@@ -446,7 +465,7 @@ def mt_wait_suggestions_hide():
 def _wd_followups(c, users, S, LG, now):
     """The follow-up day of waiting tasks: push + News to the person it is for, followup_due to the following agents."""
     from ..notify.push import _wd_fail
-    today = now.date().isoformat()
+    today = (now + timedelta(days=1)).date().isoformat()  # 2.368.3 (#2985): a clock ahead of the server's; _wd_followup decides
     rows = c.execute("""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox, l.owner_id AS list_owner FROM tasks t
                         JOIN lists l ON l.id=t.list_id WHERE t.waiting_at IS NOT NULL AND t.wait_until IS NOT NULL
                         AND t.wait_until<=? AND t.wait_fired!=t.wait_until AND t.status=0 AND t.deleted_at IS NULL
@@ -469,8 +488,10 @@ def _wd_followup(c, t, users, S, LG, now):
                  if u and u in users and u not in ag and (u == t["list_owner"] or task_visible(c, t["id"], u, full=True))), None)
     s, lg = S.get(rcpt, USER_DEFAULTS), LG.get(rcpt, "en")
     allday = s.get("allday_time") if valid_hm(s.get("allday_time")) else "09:00"
-    if t["wait_until"] == now.date().isoformat() and now.strftime("%H:%M") < allday:
-        return  # today, but not yet the time of day
+    pn = user_now(s, now)  # 2.368.3 (#2985)
+    day = pn.date().isoformat()
+    if t["wait_until"] > day or (t["wait_until"] == day and pn.strftime("%H:%M") < allday):
+        return  # not yet the day, or today but not yet the time of day
     c.execute("UPDATE tasks SET wait_fired=? WHERE id=?", (t["wait_until"], t["id"]))
     push = None
     if rcpt and task_visible(c, t["id"], rcpt, full=True):
@@ -481,8 +502,9 @@ def _wd_followup(c, t, users, S, LG, now):
             lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
             push = (tr("Follow up: {0}", t["title"], lg=lg),
                     (tr("Waiting on: {0}", t["wait_note"], lg=lg) + " · " if t["wait_note"] else "") + lname)
-    follow = {t["assignee_id"], t["created_by"]} | {r[0] for r in c.execute(
-        "SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL", (t["id"],))}
+    from ..tasks.watchers import wat_users
+    follow = {t["assignee_id"], t["created_by"], t["delegate_agent_id"]} | wat_users(c, t["id"]) | {r[0] for r in c.execute(
+        "SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL", (t["id"],))}  # 2.473.0 (#3357): + delegated, watchers
     for aid in sorted(agent_ids(c) & follow):
         if task_visible(c, t["id"], aid, full=True):
             agent_emit(c, aid, "followup_due", agent_task_data(c, t["id"], aid, waiting=waiting_of(t)), actor=None)

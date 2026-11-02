@@ -10,7 +10,8 @@ function viewKanban() {
   const tasks = sortTasks(openTasks().filter(t => (t.list_id === lid || ml_in(t, lid)) && !t.parent_id && sprKeep(t, k)));  // 2.60.0 (#343): the sprint filter; 2.71.0 B (#1459): + linked tasks
   const cols = [], sc = t => ml_sec(t, lid);  // (a linked task in the column of its link)
   const loose = tasks.filter(t => !sc(t) || !secs.some(s => s.id === sc(t)));
-  if (loose.length || !secs.length) cols.push({id: null, name: secs.length ? tr('Unassigned') : tr('Tasks'), tasks: loose});
+  // 2.445.0 (#3011): the first column is always "Tasks" (it was "Unassigned" next to sections)
+  if (loose.length || !secs.length) cols.push({id: null, name: tr('Tasks'), tasks: loose});
   for (const s of secs) cols.push({id: s.id, name: s.name, tasks: tasks.filter(t => sc(t) === s.id)});
   // 2.138.0 D (#2060): the column parts are shared with the board in swimlanes (swimlanes.js); a lane's "+ Task" carries its key
   const head = c => `<div class="khead" ${c.id ? `data-ksec="${c.id}"` : ''}>${c.id && !ro ? secHandle(c.id) : ''}${esc(c.name)} ${wip_kHead(c)}${spt_kSum(c, lid)}${c.id && !ro ? `<button class="iconbtn" data-act="section-menu" data-id="${c.id}" title="${esc(tr('More') + ': ' + c.name)}" aria-label="${esc(tr('More') + ': ' + c.name)}">${ic('dots', 's')}</button>` : ''}</div>`;
@@ -140,7 +141,7 @@ function calInvalidate() { S.cal.key = ''; S.cal.loading = ''; S.cal.seq = (S.ca
 // 2.30.0 (#1036): an own event of a calendar outside the shown workspace is left out (subscriptions and invitations stay)
 const cevWs = e => !e.own || e.cal == null || wsObjIn(evCal(e.cal));
 const cevOn = d => S.cal.items.filter(e => e.d0 <= d && e.d1 >= d && cevWs(e));
-const cevSort = (a, b) => (b.all_day - a.all_day) || a.start.localeCompare(b.start) || a.title.localeCompare(b.title);
+const cevSort = (a, b) => (b.all_day - a.all_day) || a.start.localeCompare(b.start) || cmpText(a.title, b.title);
 const cevColor = e => e.booking ? 'var(--accent)' : abcX(e) ? 'var(--muted)' : e.own ? evCalColor(e) : cssColor(S.cal.subs[e.sub]?.color) || '#94a3b8';  // 2.50.0 (#1194): bookings
 const cevCal = e => e.booking ? tr('Disposition') : e.holiday ? tr('Public holidays') : e.absence ? (e.absence === 'team' ? tr('Team absences') : tr('Absences')) : e.own ? evCalName(e) : S.cal.subs[e.sub]?.name || tr('Calendar');
 const cevTitle = e => e.title || tr('(no title)');

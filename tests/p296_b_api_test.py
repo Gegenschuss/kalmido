@@ -111,11 +111,11 @@ check(r.ok and d.get("space") == SP and sorted(m["to"] for m in d.get("moved", [
       "private -> organisation into Moved/ " + r.text[:300])
 op = paths(A, SP)
 check(op.get("Moved/Plan/One") == ONE and op.get("Moved/Plan/Two") == TWO, "a member of the organisation sees the pages " + str(op))
-check("Plan/One" not in paths(Bo, "private") and "Other" in paths(Bo, "private"), "gone from the private space, Other stays")
+check("Plan/One" not in paths(Bo, "private") and "Other" in paths(Bo, "private"), "gone from the private workspace, Other stays")
 g = A.get(B + f"/api/wiki/pages/{ONE}").json()
 check(g["body"] == "See [[Moved/Plan/Two]] and [[Other]]", "the link between the moved pages follows, the other stays as text: " + g["body"])
-# 2.97.0 (#2051): alice reads it -- bob's private space shows without key or person, her organisation by name
-check(g.get("moved") and g["moved"]["from"] is None and g["moved"]["from_name"] == "private space" and g["moved"]["to"] == SP
+# 2.97.0 (#2051): alice reads it -- bob's private workspace shows without key or person, her organisation by name
+check(g.get("moved") and g["moved"]["from"] is None and g["moved"]["from_name"] == "private workspace" and g["moved"]["to"] == SP
       and g["moved"]["to_name"] == "Alpha" and g["moved"]["by_name"] == "Bob", "the page shows its last move " + str(g.get("moved")))
 check(Ca.get(B + f"/api/wiki/pages/{ONE}").ok, "another member reads it")
 check(Fr.get(B + f"/api/wiki/pages/{ONE}").status_code == 404, "another organisation: 404")
@@ -159,7 +159,7 @@ check(paths(Bo, "private").get("Other") == OTHER, "after all refusals Other is s
 SEC = page(Ca, "Secret", "")
 assert Ca.put(B + "/api/e2e/keys", json=e2e_keys()).ok
 r = Ca.post(B + "/api/wiki/e2e/start", json={"space": "private", "keys": [{"user_id": uid["carol"], "wrapped": {"v": 1, "iv": b64(12), "ct": b64(48)}}]})
-check(r.ok, "carol locks her private space " + r.text[:200])
+check(r.ok, "carol locks her private workspace " + r.text[:200])
 r = mv(Ca, pages=[SEC], space="private", to=SP, dry=1)
 check(r.ok and "being encrypted" in (r.json().get("block") or ""), "the lock: the dry run blocks with a clear message " + r.text[:200])
 r = mv(Ca, pages=[SEC], space="private", to=SP)
@@ -189,8 +189,8 @@ d = r.json() if r.ok else {}
 check(r.ok and d.get("space") == SP and d["sheet"]["list_id"] is None and d.get("move_id"), "private -> organisation, detached " + r.text[:300])
 g = A.get(B + f"/api/sheets/{SID}")
 check(g.ok and g.json()["space"] == SP, "a member of the organisation reads the table")
-# 2.97.0 (#2051): alice did not move it -- bob's private space shows without its key or person
-check(g.ok and (g.json().get("moved") or {}).get("from") is None and g.json()["moved"].get("from_name") == "private space",
+# 2.97.0 (#2051): alice did not move it -- bob's private workspace shows without its key or person
+check(g.ok and (g.json().get("moved") or {}).get("from") is None and g.json()["moved"].get("from_name") == "private workspace",
       "the table shows its last move " + str(g.json().get("moved") if g.ok else ""))
 check(Fr.get(B + f"/api/sheets/{SID}").status_code == 404, "another organisation: 404")
 check(smv(Ca, SID, to="private").status_code == 403, "a plain member may not take bob's table out of the organisation")
@@ -225,7 +225,7 @@ check(Bo.get(B + f"/api/sheets/{TS}").status_code == 404, "... then it is hers a
 FID, Fl = freelancer(B, A, features=FEATURES + ",sheets")
 FP = page(Fl, "Notes/Idea", "an idea")
 check(mv(Fl, pages=[FP], space="private", to=SP).status_code == 409, "freelancer: no organisation to move a page to (409)")
-check(mv(Fl, folder="Notes", space="private", to="private").status_code == 409, "freelancer: the private space is the only one (409)")
+check(mv(Fl, folder="Notes", space="private", to="private").status_code == 409, "freelancer: the private workspace is the only one (409)")
 r = mv(Fl, pages=[FP], space="private", to=SP, dry=1)
 check(r.status_code == 409, "freelancer: also the dry run 409")
 FS = Fl.post(B + "/api/sheets", json={"title": "Mine", "space": "private"}).json()["id"]

@@ -14,7 +14,7 @@ from flask import g, jsonify, redirect, request, Response, send_from_directory
 
 from ..core.config import app, APP_VERSION, ATT_DIR, ICAL_PREFIX, PUB_PREFIX, SEARCH_INDEX, MAX_FILE_MB, ntfy_attachment_url, NTFY_IN, PUBLIC_URL, safe_urlopen
 from .pg import insert_id
-from ..core.i18n import lang, N_, tr, trn
+from ..core.i18n import browser_lang, lang, N_, tr, trn
 from ..core.db import bump, connect, db, default_uid, err, gset, gsetting, iso, now_utc, usettings
 from ..accounts.session import client_ip, GATE, me
 from ..core.access import Denied, my_inbox, time_all, acx_token_bind, collab_all
@@ -22,7 +22,7 @@ from ..core.orgcrypt import oc_task_org  # 2.149.0 G (#2517): pulled up from fun
 from ..core.tokenhash import tkh_hash, tkh_match  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.db import GLOBAL_DEFAULTS, lv_versions_fmt, lv_versions_q  # 2.149.0 G (#2517): pulled up from functions
-from ..core.strip import strip_asset  # 2.191.0 B (#1824)
+from ..core.strip import strip_asset, start_css_files, with_start_css  # 2.191.0 B (#1824), 2.476.0 (#3487)
 
 
 # ---------------------------------------------------------------- pages
@@ -59,7 +59,10 @@ def headers(resp):
     # 2.29.0 (#1026): never indexed unless the operator allows it; public list links, forms and feeds never
     if not SEARCH_INDEX or request.path.startswith((PUB_PREFIX, ICAL_PREFIX, "/f/", "/api/", "/dav")):
         resp.headers["X-Robots-Tag"] = "noindex, nofollow"
-    if request.path.startswith("/api/") and not request.path.startswith(("/api/attachments/", "/api/chat-files/", "/api/avatar/", "/api/group-avatar/", "/api/list-icon/", "/api/list-files/", "/api/list-header/")):
+    if request.path.startswith("/api/") and not request.path.startswith(("/api/attachments/", "/api/chat-files/", "/api/avatar/", "/api/group-avatar/", "/api/list-icon/", "/api/list-files/", "/api/list-header/")) \
+            and not (request.path.endswith("/thumb") and request.args.get("v")
+                     and resp.headers.get("Cache-Control", "").startswith("private, max-age")):
+        # 2.477.0 (#3936): the small previews of the cards (files / documents ?v=<version>) stay in the browser's cache
         resp.headers["Cache-Control"] = "no-store"
     # 2.149.0 B (#2505): a static file asked for with ?v=<its content hash> never changes: the browser keeps it a year without
     # asking again. Any other ?v= (the version of the code, an old hash after an update) and no ?v= stay as before.
@@ -98,18 +101,33 @@ def st_asset(rel):
     except (OSError, ValueError):
         return None
     key = (st.st_mtime_ns, st.st_size)
+    rel = os.path.relpath(path, root).replace(os.sep, "/")
+    # 2.476.0 (#3487): app.css goes out with the start style files behind it (core/strip.py with_start_css): a new, changed
+    # or removed file is a new version of app.css
+    starts = start_css_files(root) if rel == "app.css" else []
+    mtime = st.st_mtime
+    for sp in starts:
+        try:
+            s2 = os.stat(sp)
+        except OSError:
+            continue
+        key += (sp, s2.st_mtime_ns, s2.st_size)
+        mtime = max(mtime, s2.st_mtime)
     hit = _SHASH.get(path)
     if hit and hit[0] == key:
         return hit[1]
-    rel = os.path.relpath(path, root).replace(os.sep, "/")
     h, served = hashlib.sha256(), None
     try:
         if rel.endswith((".js", ".css")) and not rel.startswith("vendor/"):
             with open(path, "rb") as f:
                 data = f.read()
+            if starts:
+                data = with_start_css(root, data, starts)
             served = strip_asset(rel, data)
             if served is None:
                 app.logger.warning("static %s goes out with its comments (strip unsure)", rel)
+                if starts:
+                    served = data  # never the file alone: the start styles belong to it
             h.update(data if served is None else served)
         else:
             with open(path, "rb") as f:
@@ -118,7 +136,7 @@ def st_asset(rel):
     except OSError:
         return None
     with _SHASH_LOCK:
-        _SHASH[path] = (key, (served, h.hexdigest()[:12], st.st_mtime))
+        _SHASH[path] = (key, (served, h.hexdigest()[:12], mtime))
     return _SHASH[path][1]
 
 
@@ -508,7 +526,7 @@ def drop_post():
         aa_count("security", "drop", client_ip())
         print("drop: 403, auth header", "missing" if not auth else
               f"len {len(auth)} starts {auth[:7]!r} ends-with-space {auth != auth.rstrip()}", flush=True)
-        return Response(tr("not allowed") + "\n", 403, mimetype="text/plain")
+        return Response(tr("not allowed", lg=browser_lang() or "en") + "\n", 403, mimetype="text/plain")  # 2.368.4 (#2989)
     acx_token_bind(u["id"])  # 2.37.0 (#1150): reads and writes with the token owner's context (row-level security)
     lg = lang(c, u["id"])
     files = [f for key in request.files for f in request.files.getlist(key) if f and f.filename]
@@ -644,8 +662,8 @@ def health():
 def version():
     from ..agents.chat import task_typing_for
     c = db()
-    v, n, cs, t, sp, a = version_sigs(c, me())  # 2.149.0 C (#2507): one statement instead of ten (same values)
-    return jsonify(v=v, app=APP_VERSION, n=n, c=cs, t=t,  # app: 2.27.0 (#968), t: 2.17.0 (#419)
+    v, n, cs, t, sp, a, vs = version_sigs(c, me())  # 2.149.0 C (#2507): one statement instead of ten (same values)
+    return jsonify(v=v, vs=vs, app=APP_VERSION, n=n, c=cs, t=t,  # app: 2.27.0 (#968), t: 2.17.0 (#419); vs: 2.369.4 (#2507)
                    ty=task_typing_for(c, me()),  # ty: 2.22.0 (#693) who is writing a comment where
                    sp=sp,  # sp: 2.32.0 (#1081) a new step of an agent for me (the open chat fetches)
                    a=a)  # a: 2.41.0 (#1376) a change counter per area (tasks, comments, agentchat, team, office, ...)
@@ -659,7 +677,11 @@ def version_sigs(c, uid):
     from ..calendars.subscriptions import cal_sig_fmt, cal_sig_q
     from ..collab.teamchat import TCHAT_SIG_COLS, tchat_sig_fmt, tchat_sig_q
     from ..agents.steps import steps_sig_fmt, steps_sig_q
-    parts = [("SELECT (SELECT value FROM settings WHERE key='version')", (), 1), (*news_sig_q(uid), 2), (*cal_sig_q(uid), 3),
+    # 2.369.4 (#2507): + vs, the newest version meant for this person (the maximum of "version:all", the own key and the keys
+    # of the own organisations, set by bump): a v that moved while vs stayed = only changes elsewhere (the client skips them)
+    parts = [("SELECT (SELECT value FROM settings WHERE key='version'), (SELECT MAX(CAST(value AS BIGINT)) FROM settings "
+              "WHERE key IN ('version:all', 'version:u:' || CAST(? AS TEXT)) OR key IN (SELECT 'version:org:' || CAST(org_id AS TEXT) "
+              "FROM org_members WHERE user_id=?))", (int(uid or 0), int(uid or 0)), 2), (*news_sig_q(uid), 2), (*cal_sig_q(uid), 3),
              (*steps_sig_q(uid), 1), (*lv_versions_q(), 2)]
     chat = collab_all()
     if chat:
@@ -670,6 +692,7 @@ def version_sigs(c, uid):
     for _, _, k in parts:
         cols.append(tuple(row[i:i + k]))
         i += k
-    v = cols[0][0] if cols[0][0] is not None else GLOBAL_DEFAULTS.get("version", "")
-    return (int(v), news_sig_fmt(cols[1]), cal_sig_fmt(cols[2]), tchat_sig_fmt(cols[5]) if chat else "",
-            steps_sig_fmt(cols[3]), lv_versions_fmt(cols[4]))
+    v = int(cols[0][0] if cols[0][0] is not None else GLOBAL_DEFAULTS.get("version", ""))
+    vs = min(int(cols[0][1]), v) if cols[0][1] is not None else v  # no key yet: nothing to skip (dl_setup sets version:all)
+    return (v, news_sig_fmt(cols[1]), cal_sig_fmt(cols[2]), tchat_sig_fmt(cols[5]) if chat else "",
+            steps_sig_fmt(cols[3]), lv_versions_fmt(cols[4]), vs)

@@ -123,12 +123,13 @@ w = pdf.pdf_wrap("DE02120300000000202051", 9.6, 50)
 check(len(w) >= 2 and not any(x.endswith("-") for x in w) and "".join(w) == "DE02120300000000202051", f"#3180: digits are cut without a hyphen {w}")
 w = pdf.pdf_wrap("Kamera", 9.6, 1)
 check(w and "".join(x.rstrip("-") for x in w) == "Kamera", f"#3180: a very narrow column still keeps every letter {w}")
-LONGREF = "Bestellung 2026-10-4711 der Einkauf Nord, Kostenstelle 4711"  # 2.390.0 A (#3350): the info block is 65 mm wide now (was 72), a shorter text  # beside the label: three lines
+LONGREF = "Bestellung 2026-10-4711 der Einkaufsabteilung Nord, Kostenstelle 4711"  # 2.390.0 A (#3350): the info block is 65 mm wide now (was 72), a shorter text; 2.413.0 (#3500): the key data in 8 pt, a longer one again  # beside the label: three lines
 # 2.434.0 (#3603): measured on a delivery note (an invoice prints 2 pt smaller in look A now, the info block is the same)
 data = pdf.office_pdf(model(kind="delivery", meta=[["Rechnung Nr.", "RE-2026-357"], ["Datum", "26.10.2026"], ["Ihre Referenz", LONGREF]]))
 p1 = pdfcheck.layout(data)[0]
 lab = next((t for t in p1["texts"] if t["s"] == "Ihre Referenz"), None)
-vals = sorted((t for t in p1["texts"] if t["bold"] and abs(t["size"] - 8.6) < 0.01 and t["s"] and t["s"].split(" ")[0] in LONGREF
+# 2.413.0 (#3500): the key data in the scale step FS_SMALL (was 8.6 pt)
+vals = sorted((t for t in p1["texts"] if t["bold"] and abs(t["size"] - pdf.FS_SMALL) < 0.01 and t["s"] and t["s"].split(" ")[0] in LONGREF
                and t["y"] < 100 * MM and t["s"] not in ("RE-2026-357", "26.10.2026")), key=lambda t: t["y"])
 check(lab and vals and vals[0]["y"] > lab["y"] + 4 and len(vals) <= 2, f"#3180: a long reference below its label in at most two lines "
       f"{[v['s'] for v in vals]}")

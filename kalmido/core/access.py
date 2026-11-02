@@ -9,7 +9,7 @@ from flask import g, has_request_context, jsonify
 from ..core.config import app
 from ..core.schema import MAX_DEPTH
 from ..core.i18n import N_, tr
-from ..core.db import db, ensure_inbox, err, usettings
+from ..core.db import db, ensure_inbox, err, trigger_ensure, usettings
 from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
 from ..core.errors import Denied  # noqa: F401  2.149.0 G (#2517): moved to core/errors.py, re-exported here
 from .pg import set_ctx_hook, st_ids, system_ctx as pg_system  # 2.149.0 G (#2517): pulled up from functions
@@ -142,6 +142,13 @@ def _members_on():
 #   role         "user" | "agent" | "system" | "anon"
 #   agent_org_id the agent's workspace (None: private agent or not an agent)
 #   list_allow   frozenset of the list ids an API token is limited to (None: no limit)
+def org_admin_people(c, oid):
+    """2.367.4 (#2974): the ids of the active people who are admins of organisation oid: they hear of its events, not the operator."""
+    with pg_system(c):  # structure; the caller may be an agent or a sign-in without a context
+        return [r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' "
+                                        "AND u.disabled=0 AND COALESCE(u.kind,'')!='agent' ORDER BY m.user_id", (oid,))]
+
+
 # Background threads, the watchdog and migrations use system_ctx() (greppable). In 2.37 (Postgres) exactly these values are
 # set per transaction for the row-level policies -- see acx_session_vars(), the one place that will add
 # SET LOCAL app.user_id / app.org_ids / app.role.
@@ -226,7 +233,7 @@ def acx_gen_setup(c):
     """2.149.0 C (#2508), init_db (every start): the triggers that renew 'acx_gen' (idempotent; one per statement)."""
     c.execute(ACX_GEN_FN)
     for t, ev in ACX_GEN_TRIGGERS.items():
-        c.execute(f"CREATE OR REPLACE TRIGGER kalmido_acx_{t} AFTER {ev} ON {t} FOR EACH STATEMENT EXECUTE FUNCTION kalmido_acx_bump()")
+        trigger_ensure(c, f"kalmido_acx_{t}", t, f"CREATE OR REPLACE TRIGGER kalmido_acx_{t} AFTER {ev} ON {t} FOR EACH STATEMENT EXECUTE FUNCTION kalmido_acx_bump()")
     # 2.149.0 review: a new generation on every start / after a restore (the dump brings an old value along)
     c.execute("INSERT INTO kalmido_meta(key, value) VALUES ('acx_gen', md5(random()::text || clock_timestamp()::text)) "
               "ON CONFLICT (key) DO UPDATE SET value = excluded.value")
@@ -530,7 +537,7 @@ def _pset_sql(uid, pl, write=False):
     """SELECT of the task ids uid sees (write: may change) in the participant lists pl (ints, inlined; no ? params):
     assigned to uid + all their subtasks; for reading also the parent chain of those (context)."""
     q, u, depth_cap = ",".join(str(int(x)) for x in pl), int(uid), MAX_DEPTH + 7
-    base = f"""WITH RECURSIVE pa(id) AS (SELECT id FROM tasks WHERE (assignee_id={u} OR assignee_group_id IN
+    base = f"""WITH RECURSIVE pa(id) AS (SELECT id FROM tasks WHERE (assignee_id={u} OR delegate_agent_id={u} OR assignee_group_id IN
                                             (SELECT group_id FROM group_members WHERE user_id={u})
                                             OR id IN (SELECT task_id FROM task_people WHERE user_id={u})) AND list_id IN ({q})),
                dn(id, lvl) AS (SELECT id, 0 FROM pa UNION
@@ -766,6 +773,32 @@ def list_other_agent(c, lid, uid):
                      OR id IN (SELECT user_id FROM list_members WHERE list_id=? AND NOT (frole IS NOT NULL AND own_role IS NULL)))
                      ORDER BY id LIMIT 1""", (uid, lid, lid)).fetchone()
     return r[0] if r else None
+
+
+def dlg_gone(c, lid, uid):
+    """2.473.0 (#3357): uid left list lid: tasks delegated to them there go back to the assignee alone, their watching ends
+    (caller commits)."""
+    c.execute("UPDATE tasks SET delegate_agent_id=NULL WHERE list_id=? AND delegate_agent_id=?", (lid, uid))
+    c.execute("DELETE FROM task_watchers WHERE user_id=? AND task_id IN (SELECT id FROM tasks WHERE list_id=?)", (uid, lid))
+
+
+# 2.477.0 (#3881): the private list "Notes" of the quick note (lists.quicknote = 1) is never shared: every way a list gets
+# other people or agents (members, groups, public link, workspace, owner, agent switches) asks here first and refuses with
+# one text; the trigger QUICKNOTE_TRIGGER (core/schema.py) leaves out member rows of every other path. The mark is set only by
+# POST /api/notes/quick-list (collab/notes.py); renaming or deleting the list never clears it.
+QN_PRIVATE_MSG = N_("The list Notes stays private: it cannot be shared, not with people and not with agents.")
+
+
+def qn_is(c, lid):
+    """2.477.0 (#3881): True for the private list "Notes" of the quick note."""
+    r = c.execute("SELECT quicknote FROM lists WHERE id=?", (lid,)).fetchone() if lid else None
+    return bool(r and r[0])
+
+
+def qn_private(c, lid):
+    """2.477.0 (#3881): Denied 409 (code quicknote_private) for the private list "Notes"."""
+    if qn_is(c, lid):
+        raise Denied(409, tr(QN_PRIVATE_MSG), {"code": "quicknote_private"})
 
 
 def list_people(c, lid):

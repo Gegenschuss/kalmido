@@ -1,7 +1,7 @@
 {
   "name": "Kalmido",
   "short_name": "Kalmido",
-  "description": "Tasks, lists, calendar, habits, focus",
+  "description": "Tasks, projects, calendar, habits, focus",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -11,7 +11,7 @@
  - A7 a drag into another list of a task that waits behind the review gate: 409, the list stays
  - A8 a batch with more than 1000 ids: 400; a batch change that fails for one task leaves that task as it was
  - O4 logging out answers Clear-Site-Data "cache"
- - a person without an organisation (the own private space, its own admin): the same -- freelancer-matrix: tasks, lists
+ - a person without an organisation (the own private workspace, its own admin): the same -- freelancer-matrix: tasks, lists
 usage: p2126_d_api_test.py <datadir>      (P2126D_NOSTART=1: use a running server)"""
 import os
 import subprocess

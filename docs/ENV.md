@@ -38,7 +38,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `TASKS_MAX_FILE_MB` | `50` | Largest upload in MB. |
 | `TASKS_OFFICE_DIR` | `<data dir>/office` | Folder of the office files (logos, documents); part of the backups. |
 | `TASKS_TEXT_CACHE` | `<data dir>/textcache` | Folder of the extracted text of attachments (search, previews). |
-| `TZ` | `Europe/Berlin` | Time zone of the server (due dates, daily jobs, reminders). |
+| `TZ` | `Europe/Berlin` | Time zone of the server (due dates, daily jobs; people without their own time zone follow it). |
 
 ## Login, accounts and proxy
 
@@ -100,13 +100,17 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_ADMIN_TOPIC` | `(empty)` | ntfy topic for the admin alerts (empty = the admins' own topics). |
 | `KALMIDO_CHANNELS` | `1` | Switch: notification channels (Slack, Matrix, Telegram, Signal). |
 | `KALMIDO_CHANNEL_FAILS` | `5` | Failed deliveries in a row after which a channel is switched off. |
+| `KALMIDO_CHANNEL_RETRY` | `60` | Seconds until a failed channel message gets its one more try. |
 | `KALMIDO_CHANNEL_TICK` | `5` | Seconds between two deliveries rounds of the channels. |
 | `KALMIDO_DISMISS_DAY` | `30` | Removals per person and day. |
 | `KALMIDO_DISMISS_GAP` | `60` | Seconds between two such removals per person. |
 | `KALMIDO_DISMISS_WAIT` | `30` | Seconds before a read notification is removed from the other devices. |
 | `KALMIDO_EVENT_MAIL_DELAY` | `600` | Seconds after the first event before a summary mail goes out. |
 | `KALMIDO_EVENT_MAIL_GAP` | `600` | Least seconds between two summary mails to one person. |
+| `KALMIDO_INTEG_FAILS` | `5` | Failed polls in a row of a mailbox, git connection or ntfy inbox after which its people get a notice. |
 | `KALMIDO_NOTIF_TEMPLATE` | `read` | Notification template of a share without one: read, work or all. |
+| `KALMIDO_PUSH_BUNDLE` | `1` | `0` = no summary pushes per person and chat room (one push per event). |
+| `KALMIDO_QUIET_PUSH` | `1` | `0` = quiet hours hold only repeated reminders and notification channels, as before 2.367. |
 | `KALMIDO_TELEGRAM_API` | `https://api.telegram.org` | Address of the Telegram bot API. |
 | `KALMIDO_VAPID_SUBJECT` | `(empty)` | Contact of the push keys (empty = PUBLIC_URL if https, else mailto:admin@example.com). |
 | `KALMIDO_WEBPUSH` | `1` | Switch: browser push notifications. |
@@ -246,6 +250,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_IMPORT_MAX_TASKS` | `20000` | Tasks per import at most. |
 | `KALMIDO_IMPORT_RATE` | `30` | Imports and previews per person in 10 minutes. |
 | `KALMIDO_NTFYIN_TICK` | `20` | Seconds between two rounds of the personal share inboxes. |
+| `KALMIDO_PAYONLINE_GO_RATE` | `10` | Checkouts one address may start per minute on the public pay page (2.469.0). |
 | `KALMIDO_PEPPOL_ALLOW_HOSTS` | `(empty)` | Internal hosts the own Peppol endpoint of any office area may reach (the calendar allow list counts only when an instance admin sets the endpoint, 2.306.0). |
 | `KALMIDO_PUBLIC_LINKS` | `1` | Switch: public read-only links of lists. |
 | `KALMIDO_WEBHOOKS` | `1` | Switch: outgoing webhooks. |
@@ -295,6 +300,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_ACCOUNT_IMPORT_PARALLEL` | `2` | At most this many account checks / imports run at once on the whole server (2.148.1). |
 | `KALMIDO_LOOP_LOCKS` | `1` | Each background loop runs in one process of the instance; 0 = every process runs its loops. |
 | `KALMIDO_STALE_HOUR` | `09:00` | Local time from which the daily event about stale tasks goes out. |
+| `KALMIDO_WD_SLOW_S` | `600` | Seconds between two runs of the watchdog's clean-up sections (trashes, old logs, exports, file clean-ups); reminders, nags, events and pushes keep every round. 0 = every round (2.369.4, #2516). |
 | `KALMIDO_WORKER_HEARTBEAT` | `30` | Seconds between two heartbeats of a background loop. |
 | `TASKS_WATCHDOG` | `1` | Switch: the background work of this process (reminders, backups, calendars, encryption pass). Helper processes set 0. |
 | `TASKS_WATCHDOG_INTERVAL` | `30` | Seconds between two watchdog rounds (reminders, schedules). |
@@ -303,7 +309,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `KALMIDO_HOSTED` | `0` | Switch: a server run as a service for others; integrations may only reach public HTTPS addresses. |
+| `KALMIDO_HOSTED` | `0` | Switch: a server run as a service for others; integrations may only reach public HTTPS addresses, the instance admin stays out of the customers' organisations and accounts (2.399). |
 | `KALMIDO_IMPRINT_URL` | `(empty)` | Address (http/https) of the operator's imprint (legal notice), linked like the privacy statement. |
 | `KALMIDO_OPERATOR_TOKEN_FILE` | `(empty)` | File with the token of the hosting operator interface (empty = off). |
 | `KALMIDO_PRIVACY_EMAIL` | `(empty)` | Address of the operator's privacy contact, shown on public pages (forms, portal, approvals, bookings) next to the privacy link. Administration > Server overrides it. |
@@ -320,18 +326,22 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `KALMIDO_PAYONLINE_ALLOW_HOSTS` | `(empty)` | Tests: internal hosts the online payment connection may reach (2.469.0). |
+| `KALMIDO_PAYONLINE_STRIPE_URL` | `(empty)` | Tests: the address of a stand-in for the Stripe API (empty = the real one, 2.469.0). |
 | `KALMIDO_PEPPOL_STORECOVE_URL` | `(empty)` | Tests: the address of a stand-in for the Storecove Peppol API (empty = the real one, 2.154.0). |
 | `KALMIDO_SHEET_CELLS_MAX` | `1000000` | Tests: stored cells over all sheets of one table (2.148.1). |
 | `KALMIDO_SHEET_MB_MAX` | `200` | Tests: size in MB of the inputs over all sheets of one table (2.360.2). |
 | `KALMIDO_SHEET_RANGE_BUDGET` | `15000000` | Tests: range cells one evaluation of a table may read (2.148.1). |
 | `KALMIDO_TEST` | `0` | Switch: marks a test container (set by tests/start.sh); only then KALMIDO_TEST_NOW and KALMIDO_TEST_RATE_WINDOW_S work. Never on a real server. |
 | `KALMIDO_TEST_BK_IDLE_TX_MS` | `(empty)` | Test containers only (with KALMIDO_TEST=1): idle-in-transaction limit of the backup's connection (2.281.0, #3118). |
+| `KALMIDO_TEST_BK_OWN_MOUNT` | `(empty)` | Test containers only (with KALMIDO_TEST=1): a restore treats the attachments folder as a mount of its own (2.370.2, #2779). |
 | `KALMIDO_TEST_BK_ZIP_DELAY` | `(empty)` | Test containers only (with KALMIDO_TEST=1): seconds the backup waits after its ZIP (2.281.0, #3118). |
 | `KALMIDO_TEST_DUN_TICKS` | `10` | Test containers only (with KALMIDO_TEST=1): watchdog intervals between two runs of the payment reminder suggestions (2.192.0). |
 | `KALMIDO_TEST_FSREF` | `0` | Test containers only (with KALMIDO_TEST=1): registers the test kind 'probe' of the folder references (2.199.0, files/fsref.py). |
 | `KALMIDO_TEST_MODE` | `0` | Test containers only: allows the test switches of the organisation key tool (1); left alone in a server's .env it is ignored. |
 | `KALMIDO_TEST_NOW` | `(empty)` | Test containers only (with KALMIDO_TEST=1): the server clock starts at this ISO time and runs on from there. |
 | `KALMIDO_TEST_NOW_AT` | `(empty)` | Test containers only: the real Unix second KALMIDO_TEST_NOW belongs to (app and worker share one shifted clock). |
+| `KALMIDO_TEST_PG_DUMP_VERSION` | `(empty)` | Test containers only (with KALMIDO_TEST=1): plays the output of pg_dump --version in the check before a backup (2.359.3, #2945). |
 | `KALMIDO_TEST_ROT_ABORT` | `(empty)` | Tests: stop the key rotation right after the switch (1). |
 | `KALMIDO_TEST_TIMING_ALL` | `(empty)` | Tests: Server-Timing for every account, not only instance admins (1). |
-| `KALMIDO_TEST_UMZ_END_DELAY` | `(empty)` | Test containers only (with KALMIDO_TEST=1): seconds an account import's worker waits before it ends (2.308.0, #3261). |
+| `KALMIDO_TEST_UMZ_END_DELAY` | `(empty)` | Test containers only (with KALMIDO_TEST=1): seconds an account or wiki import's worker waits before it ends (2.308.0, #3261; 2.363.0, #3280). |

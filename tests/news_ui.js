@@ -99,8 +99,13 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   // 2.183.0 A (#2623): the summary line of a News group never shows a raw kind ("orgjoin"); unknown kinds say nothing
   const sl = k => w.eval(`newsSummaryLine({items: [[{kind: '${k}', count: 1}, 0]]})`);
   check(/^(Invitation|Einladung)$/.test(sl('orgjoin')), 'an organisation invitation reads "Invitation", not "orgjoin": ' + sl('orgjoin'));
-  for (const k of ['evinvite', 'connreq', 'leavereq', 'tsheet', 'signup', 'wiki_shared', 'ptlimit', 'apblimit', 'zzunknown']) check(!sl(k).includes(k), `kind ${k} is not shown raw: ${sl(k)}`);
+  for (const k of ['evinvite', 'connreq', 'leavereq', 'tsheet', 'signup', 'wiki_shared', 'ptlimit', 'apblimit', 'docpaid', 'docoverdue', 'orglogin', 'orgjoinres', 'orgrole', 'zzunknown']) check(!sl(k).includes(k), `kind ${k} is not shown raw: ${sl(k)}`);
   check(sl('zzunknown') === '', 'an unknown kind leaves the summary empty');
+  // 2.367.4 (#2972, #2974): the new items read as text
+  const nt = (k, d) => w.eval(`newsText({kind: '${k}', data: ${JSON.stringify(d)}, actors: []}, {})`);
+  check(nt('docpaid', {number: 'RE-1', client: 'Muster AG'}).includes('RE-1, Muster AG'), 'a payment names the invoice');
+  check(nt('docoverdue', {n: 3}).includes('3'), 'several overdue invoices: the count');
+  check(nt('orgrole', {name: 'Nordwind', role: 'accounting'}).includes('Accounting') || nt('orgrole', {name: 'Nordwind', role: 'accounting'}).includes('Buchhaltung'), 'a new role by its name');
   w.close();
   console.log(`\n${ok} ok, ${F.length} failed`);
   if (errs.length) console.log('JS ERRORS', [...new Set(errs)]);

@@ -1,0 +1,44 @@
+// 2.467.0 (#3456) UI tests: Anlage EUeR and annual VAT return. Own container (start.sh), jsdom, invented data.
+// The bookkeeping links the tax forms, the page shows the lines of the year, switches to the annual return, a year without a form shows
+// the note, the VAT paid is saved, CSV and PDF are offered.
+const {execFileSync} = require('child_process');
+const path = require('path');
+const {boot, sleep, B, login} = require('./boot');
+const F = []; let ok = 0;
+const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
+const DATA = process.argv[2] || path.join(__dirname, '.data');
+if (!process.env.P2467C_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
+let CK;
+const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); j.http = r.status; return j; };
+const until = fn => require('./boot').until(fn, {timeout: 15000, step: 150});
+
+(async () => {
+  await sleep(600);
+  const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
+  check(r.ok, 'setup');
+  CK = await login('alice');
+  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal', 'comments']});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,collab,office,clients,docs'});
+  check((await call('PUT', '/api/office/settings', {small_business: 0})).http === 200, 'no small business');
+
+  const w = await boot({hash: 'office/books'}); const d = w.document;
+  check(await until(() => d.querySelector('[data-bk-taxforms]')), 'the bookkeeping links the tax forms');
+  w.location.hash = 'office/books/taxforms/euer';
+  check(await until(() => d.querySelector('#tf-year') && d.querySelector('.bk-tab')), 'the page with the lines');
+  w.eval("TF.year = 2026; TF.d = null; ofcDraw()");
+  check(await until(() => /Summe Betriebsausgaben/.test(d.querySelector('.bk-tab')?.textContent || '')), 'the wording of the form');
+  check(await until(() => [...d.querySelectorAll('.bk-tab tr')].some(t => /^76/.test(t.textContent.trim()))), '2026: line 76');
+  check(!!d.querySelector('a[href*="taxform/euer.csv?year=2026"]') && !!d.querySelector('a[href*="taxform/euer.pdf?year=2026"]'), 'CSV and PDF');
+  check(/No tax advice/.test(d.querySelector('#view').textContent), 'the note');
+  const inp = d.querySelector('#tf-paid'); inp.value = '12.50';
+  inp.dispatchEvent(new w.Event('change', {bubbles: true}));
+  check(await until(async () => (await call('GET', '/api/office/books/taxform/euer?year=2026')).vat_paid === '12.50'), 'VAT paid saved');
+  w.location.hash = 'office/books/taxforms/ust';
+  check(await until(() => /Vorauszahlungssoll/.test(d.querySelector('.bk-tab')?.textContent || '')), 'the annual return');
+  w.eval("TF.year = new Date().getFullYear() - 6; TF.d = null; ofcDraw()");
+  check(await until(() => /no line assignment/.test(d.querySelector('#view').textContent) && !d.querySelector('.bk-tab')), 'a year without a form: the note, no lines');
+  w.close();
+  console.log(`${ok} ok, ${F.length} failed`);
+  process.exit(F.length ? 1 : 0);
+})().catch(e => { console.error(e); process.exit(1); });

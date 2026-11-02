@@ -1,9 +1,9 @@
-// 2.32.0 UI tests, part A ("Customize" for views, #1063 / #983 / #1061), own container (start.sh). jsdom:
+// 2.32.0 UI tests, part A ("Customise" for views, #1063 / #983 / #1061), own container (start.sh). jsdom:
 // - the project page: empty blocks are one line (title + button, #1061), an image file shows as a preview and opens large
 //   (#983), "×" hides a block for me, "+ Block" brings it back; Customize: the owner chooses "Only for me" / "Standard for
 //   everyone", ↑ ↓, width Half / Full, a switch per block, "Different on the phone" (a phone shows its own arrangement);
-//   a member sees the standard, has no "Standard for everyone", overrides for themselves, "Reset to the standard"
-// - Today: "Customize Today…" in "…", the tasks block cannot be hidden, Alt + ↓ moves a block, stored in view_today
+//   a member sees the standard, has no "Default for everyone", overrides for themselves, "Reset to the default"
+// - Today: "Customise Today…" in "…", the tasks block cannot be hidden, Alt + ↓ moves a block, stored in view_today
 // - Time tracking: Customize, a hidden block stays away, the chosen period is saved with the view (all devices)
 // - the start page on the same builder (width switch per card)
 // Firefox (390 touch, 1440 mouse): the project page with one-line empty blocks and the image preview, the editor; screenshots
@@ -84,7 +84,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
   await until(() => d.querySelector('.lyed[data-lyed="project"]'));
   const ed = d.querySelector('.lyed');
   // 2.43.0 (#1328): + the block "Key figures" (10 blocks; it shows on the page only once key figures are set up)
-  check(ed.querySelectorAll('.dcust li').length === 10 && ed.querySelector('[data-act="ly-scope"][data-k="std"]') && ed.querySelector('[data-lyphone="project"]'), '#1063: the editor: every block, "Standard for everyone", "Different on the phone"');
+  check(ed.querySelectorAll('.dcust li').length === 10 && ed.querySelector('[data-act="ly-scope"][data-k="std"]') && ed.querySelector('[data-lyphone="project"]'), '#1063: the editor: every block, "Default for everyone", "Different on the phone"');
   await sleep(150);
   check(d.activeElement?.closest('.dcust'), '#1063: the focus lands in the list');
   click(w, ed.querySelector('[data-act="ly-scope"][data-k="std"]')); await sleep(100);
@@ -102,7 +102,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
   click(w, d.querySelector('[data-act="ly-scope"][data-k="mine"]')); await sleep(100);
   click(w, d.querySelector('.lyed [data-act="ly-reset"]'));
   y = await until(async () => { const x = await lay(); return x.mine === '' ? x : null; });
-  check(y, '#1063: "Reset to the standard" drops my own arrangement');
+  check(y, '#1063: "Reset to the default" drops my own arrangement');
   click(w, d.querySelector('[data-act="ly-done"]'));
   await until(() => d.querySelector('#view .lygrid[data-ly="project"]'));
   check(blocks().slice(0, 2).join() === 'desc,ms' && d.querySelector('.lyb[data-lyk="ms"]').classList.contains('ly-full') && !d.querySelector('#pov-time'), '#983: the page follows the standard ' + blocks());
@@ -122,12 +122,12 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
   await until(() => d.querySelector('#view .pov .lygrid .povs'));
   check(!d.querySelector('#pov-desc') && d.querySelector('#pov-ms'), '#1063: the phone shows its own arrangement');
   w.close();
-  // a member: the standard, no "Standard for everyone", an own arrangement
+  // a member: the standard, no "Default for everyone", an own arrangement
   w = await boot({user: 'bob', hash: 'l/' + P, ls: pov}); d = w.document;
   await until(() => d.querySelector('#view .pov .lygrid .povs'));
   check(blocks().slice(0, 2).join() === 'desc,ms' && !d.querySelector('#pov-time'), '#983: a member sees the standard ' + blocks());
   click(w, d.querySelector('[data-act="ly-custom"][data-lyv="project"]')); await until(() => d.querySelector('.lyed'));
-  check(!d.querySelector('[data-act="ly-scope"]'), '#983: no "Standard for everyone" for a member');
+  check(!d.querySelector('[data-act="ly-scope"]'), '#983: no "Default for everyone" for a member');
   click(w, d.querySelector('.dcust [data-act="ly-mv"][data-k="files"][data-d="-1"]'));
   y = await until(async () => { const x = await lay(BCK); return x.mine ? x : null; });
   check(y && JSON.parse(y.mine).order.indexOf('files') < JSON.parse(y.std).order.indexOf('files'), '#1063: the member overrides for themselves');
@@ -140,7 +140,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
   await until(() => d.querySelector('#view .lygrid[data-ly="today"] .lyb[data-lyk="tasks"] .trow'));
   check(d.querySelector(`.lyb[data-lyk="tasks"] .trow[data-id="${T0}"]`), '#1063: Today: the tasks are a block');
-  check(w.eval(`topMoreItems().some(x => x.label === 'Customize Today…')`), '#1063: "Customize Today…" in "…"');
+  check(w.eval(`topMoreItems().some(x => x.label === 'Customise Today…')`), '#1063: "Customise Today…" in "…"');
   w.eval(`lyOpen('today', true)`); await until(() => d.querySelector('.lyed[data-lyed="today"]'));
   check(d.querySelector('.dcust [data-dshow="tasks"]').disabled, '#1063: the tasks block cannot be hidden');
   const first = d.querySelector('.dcust li').dataset.k;
@@ -162,7 +162,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
   check(r.status === 200 || r.status === 201, 'a time entry ' + JSON.stringify(r).slice(0, 120));
   w = await boot({user: 'alice', hash: 'time'}); d = w.document;
   await until(() => d.querySelector('#view .lygrid[data-ly="time"] .lyb'));
-  check(d.querySelector('[data-act="ly-custom"][data-lyv="time"]'), '#1063: Time tracking has "Customize"');
+  check(d.querySelector('[data-act="ly-custom"][data-lyv="time"]'), '#1063: Time tracking has "Customise"');
   const tb = () => [...d.querySelectorAll('#view .lygrid[data-ly="time"] > .lyb')].map(b => b.dataset.lyk);
   check(tb().includes('lists') && tb().includes('entries'), '#1063: the report as blocks ' + tb());
   click(w, d.querySelector('[data-act="ly-custom"][data-lyv="time"]')); await until(() => d.querySelector('.lyed[data-lyed="time"]'));

@@ -4,7 +4,7 @@
 //   rule and marks the third booking at once; "Matched" shows it with "by rule <name>"; "No" is not asked again
 // - the office settings, area Data: the section "Bank rules" lists the rule with its hits, the switch turns it off, "New rule"
 //   makes one in the dialog (applied to the open bookings), delete takes it out of the list
-// - on a phone the section stays inside the screen and its buttons are 44 px high
+// - on a phone the section stays inside the screen, the rows have no buttons, targets are 44 px high
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -100,7 +100,8 @@ const camt = rows => `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn
     await sleep(300);
     check(await ev(`(() => { const W = document.documentElement.clientWidth; return [...document.querySelectorAll('.brlset *')].filter(e => e.getClientRects().length).every(e => e.getBoundingClientRect().right <= W + 1); })()`),
       'on a phone the section stays inside the screen');
-    check(await ev(`[...document.querySelectorAll('.brlrow .btn')].every(b => b.getBoundingClientRect().height >= 43)`), 'on a phone its buttons are 44 px high');
+    // 2.452.0 (#3836): on a phone the row has no buttons, a long press opens them
+    check(await ev(`[...document.querySelectorAll('.brlrow>.btn')].every(b => b.getBoundingClientRect().height <= 1) && document.querySelector('.brlrow').getBoundingClientRect().height >= 43`), 'on a phone the row has no buttons and is 44 px high');
     await shot('p2299-b-settings-phone.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await ev(click(`[...document.querySelectorAll('.brlrow')].find(e => /Bank Beispiel/.test(e.textContent))?.querySelector('[data-brl="del"]')`));

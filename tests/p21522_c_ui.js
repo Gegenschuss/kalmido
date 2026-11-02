@@ -47,7 +47,7 @@ const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + u
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = async (o, u, theme) => {
     await o.nav(B + 'static/icon.svg');
-    await o.ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    await o.ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     return o.ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
   };
   // the header's buttons without avatar, back / close / window buttons and the mode chip
@@ -83,11 +83,13 @@ const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + u
     check(it.some(x => /^Filter: Jobs/.test(x)), label + ': the entry shows which filter holds ' + JSON.stringify(it));
     // steps: the entry switches, with its state
     await pickItem(ev, '/^Always show steps/');
-    check(await ready(ev, `S.settings && S.settings.agent_steps_always === '1'`), label + ': "Always show steps" switches on');
+    // 2.456.0 (#3850): the server's value, not the local one: the next window starts from it, and the switch back must not overtake this one
+    const onServer = want => `fetch('/api/state').then(r => r.json()).then(j => (j.settings.agent_steps_always === '1') === ${want})`;
+    check(await ready(ev, `S.settings && S.settings.agent_steps_always === '1'`) && await ready(ev, onServer(true)), label + ': "Always show steps" switches on');
     await openMenu(ev); it = await ev(items);
     check(it.some(x => /^Always show steps.*\[on\]/.test(x)), label + ': ... and the entry is marked ' + JSON.stringify(it));
     await pickItem(ev, '/^Always show steps/');
-    check(await ready(ev, `S.settings.agent_steps_always !== '1'`), label + ': switches off again');
+    check(await ready(ev, `S.settings.agent_steps_always !== '1'`) && await ready(ev, onServer(false)), label + ': switches off again');
     // back to All
     await openMenu(ev); await pickItem(ev, '/^Filter/');
     await ready(ev, `[...document.querySelectorAll('#pop:not(.hidden) [role=menuitem]')].some(x => x.textContent.trim() === 'All')`);

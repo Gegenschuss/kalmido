@@ -107,6 +107,21 @@ Agents (AI agents people connect themselves) run on the computer and with the pr
 them; they see only the projects shared with them. Say in your statement that the person who connects an agent is
 responsible for what that provider receives.
 
+### AI functions (EU AI Act)
+
+Template paragraph, adapt it (EU AI Act Art. 50; the operator of the server is the *deployer*, not the provider of the AI
+models):
+
+> **AI functions.** `<name of the operator>` uses AI models of third parties as a deployer: agents that people connect to
+> their projects, and the optional assistant if it is switched on. Kalmido itself does not run an AI model. Texts and
+> answers written by an agent are marked "AI agent" in the app and in the customer portal (also in its e-mails). Before a
+> text written by an agent goes out (a letter, a public link to a wiki page), the app offers to add the line "Created with
+> AI support". Whoever publishes or sends such a text is responsible for its content and for labelling it, unless a person
+> has checked it and takes editorial responsibility for it.
+
+Use the same paragraph, as a section "AI functions", in your terms of use or service terms for the people and customers
+of your server. An agent that is a bot without AI can be marked as such in its settings (it then shows as "Agent").
+
 ## 5. Cookies and storage in the browser
 
 The app sets only cookies it needs to work (no consent banner needed for them, § 25 (2) TDDDG):

@@ -22,7 +22,7 @@ from ..core.pg import (  # noqa: F401  (re-exported: the app imports the databas
     connect_pooled, insert_id, like_escape, table_columns, table_exists, wait_ready, write_lock,
 )
 from ..core.schema import (
-    GLOBAL_DEFAULTS, INDEXES, LIST_E2E_TRIGGER, PURGED_TRIGGER, REVOKED_TRIGGER, TICKET_NO_TRIGGER, WIKI_E2E_TRIGGER, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
+    GLOBAL_DEFAULTS, INDEXES, LIST_E2E_TRIGGER, PURGED_TRIGGER, QUICKNOTE_TRIGGER, REVOKED_TRIGGER, TICKET_NO_TRIGGER, WIKI_E2E_TRIGGER, MIGRATIONS, SCHEMA, SCHEMA_VERSION, TIME_TITLE_TRIGGER, USER_DEFAULTS,
     SEC_AT_TRIGGER,  # 2.410.0 B (#3515)
 )
 from ..core.i18n import LANGS, tr
@@ -112,6 +112,18 @@ def local_day(ts):
         return None
 
 
+def local_stamp(ts, tz=None):
+    """2.368.2 (#2984): a stored UTC timestamp as local time "2026-10-09 14:05:33" in zone tz (default: the server's), for exports
+    and logs; an unreadable one stays as it is."""
+    if not ts:
+        return ""
+    try:
+        d = parse_iso(ts)
+        return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).astimezone(tz or TZ).strftime("%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError, OverflowError):
+        return str(ts)
+
+
 def db():
     """The request's connection (from the pool; context "system" until authenticate() sets the person, see set_ctx)."""
     if "db" not in g:
@@ -151,7 +163,7 @@ _FLASK_LOG_EXC = app.log_exception
 # 2.360.0 A (#2496): the secret part of a path in the log: hook tokens (2.126.0 B #1979 I8, 2.138.4 #2381, 2.148.1 E) and the
 # tokens of the public pages (shared lists / folders / quotations / videos / wiki, forms, action links, status pages,
 # calendar feeds, portal sign-in links, document ZIPs)
-_LOG_PATH_RE = re.compile(r"^(/api/hooks/(?:issues|deploy)/[0-9]+/|/api/hooks/in/|/s/[bfqvw]/|/s/|/f/|/u/|/p/|/ical/(?:abs/|ev/)?"
+_LOG_PATH_RE = re.compile(r"^(/api/hooks/(?:issues|deploy)/[0-9]+/|/api/hooks/in/|/api/hooks/pay/|/s/pay/|/s/[bfqvw]/|/s/|/f/|/u/|/p/|/ical/(?:abs/|ev/)?"
                           r"|/portal/login/|/api/docs/zip/)[^/]+")
 
 
@@ -230,7 +242,7 @@ def topic_prefix():
 
 
 def random_topic():
-    # 2.306.0 C (#2889): was "kalmido-" + secrets ...; the export table (kalmido-export.sh) still lists that line
+    # 2.306.0 C (#2889): the prefix comes from PUBLIC_URL
     return topic_prefix() + "-tasks-" + secrets.token_urlsafe(9).replace("_", "").replace("-", "").lower()
 
 
@@ -309,6 +321,8 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
         # admin's id (preselected: the purpose they picked for themselves) or 0 ("For me"); None = no question
         if ask_purpose is not None:
             vals["purpose_ask"] = (usettings(c, ask_purpose).get("purpose") if ask_purpose else "") or "me"
+    if not ONBOARDING_ENV:  # 2.466.0 (#3314): the switch turns the areas' introductions off too (they are on by default)
+        vals["tours_more"] = "0"
     # 2.250.0 C (#2995): no lean sidebar for added accounts any more (2.25.0 UX-26 hid Tomorrow / Next 7 days / Now doable):
     # a new account starts like the self-set-up one. Existing accounts keep their choice.
     if not vals["ntfy_topic"]:
@@ -373,7 +387,7 @@ def startup_guard():
         try:
             has_tables = table_exists(c, "users")
             meta = dict(c.execute("SELECT key, value FROM kalmido_meta WHERE key IN ('schema_version','app_version',"
-                                  "'app_version_prev')").fetchall()) if has_tables and table_exists(c, "kalmido_meta") else {}
+                                  "'app_version_prev','back_floor','back_floor_how')").fetchall()) if has_tables and table_exists(c, "kalmido_meta") else {}
             r = (meta["schema_version"],) if "schema_version" in meta else None
         finally:
             c.close()
@@ -389,7 +403,7 @@ def startup_guard():
         print(f"FATAL: database schema {have} is newer than this version ({SCHEMA_VERSION}); start the matching or a newer "
               "image.", flush=True)
         raise DataDirError(3)
-    appver_guard(meta.get("app_version"), meta.get("app_version_prev"))
+    appver_guard(meta.get("app_version"), meta.get("app_version_prev"), meta.get("back_floor"), meta.get("back_floor_how"))
     if has_tables:
         secret_new_guard()
     from ..admin.migrate import mig_startup
@@ -426,21 +440,41 @@ def appver_newer_minor(other, mine=None):
     return bool(o and m and o[:2] > m[:2])
 
 
-def appver_check(stored, prev, mine=None):
+# 2.359.3 (#2896): format limits: (version, what to run on a newer version before going back below it). From a limit on data
+# has a form older versions cannot read. A database keeps the highest one in kalmido_meta (back_floor, back_floor_how; only ever
+# raised), so an image of the future, which does not know the limit yet, refuses to start and can still name the step. A
+# release that adds a limit adds a line here and in docs/UPGRADING.md. Limits below 2.149 stand only there: those images
+# have no start check at all.
+BACK_LIMITS = (("2.149.0", "going back below 2.149 is not supported: those versions have no start check, see docs/UPGRADING.md"),)
+
+
+def appver_check(stored, prev, mine=None, floor=None):
     """2.149.0 D (#2509): may this image start on a database stamped with app_version stored (the newest version that
     ran on it) and app_version_prev prev (the version that ran before the last upgrade)? "ok", "back" (the one step
     back to the previous version: the automatic rollback of an update, an operator who keeps the previous image) or
     "newer" (an older image on a database a newer minor already ran on: refused unless KALMIDO_ALLOW_DOWNGRADE).
-    Patches of one minor never block each other."""
+    Patches of one minor never block each other. 2.359.3 (#2896): "format": this image is older than the database's format
+    limit floor; that comes first, the one step back does not pass it."""
+    p, m, f = appver_parse(prev), appver_parse(APP_VERSION if mine is None else mine), appver_parse(floor)
+    if f and m and m < f:
+        return "format"
     if not appver_newer_minor(stored, mine):
         return "ok"
-    p, m = appver_parse(prev), appver_parse(APP_VERSION if mine is None else mine)
     return "back" if p and m and m[:2] >= p[:2] else "newer"  # any patch of the previous minor
 
 
-def appver_guard(stored, prev):
-    """2.149.0 D (#2509): the start check (startup_guard). Raises DataDirError (exit code 3) for "newer"."""
-    v = appver_check(stored, prev)
+def appver_guard(stored, prev, floor=None, how=None):
+    """2.149.0 D (#2509): the start check (startup_guard). Raises DataDirError (exit code 3) for "newer" and "format"."""
+    v = appver_check(stored, prev, floor=floor)
+    if v == "format":
+        if env_bool("KALMIDO_ALLOW_DOWNGRADE", False):
+            print(f"WARNING: this database has a format limit at Kalmido {floor}, this image is {APP_VERSION}; starting anyway "
+                  "(KALMIDO_ALLOW_DOWNGRADE). Older code may not read its data: go back to a newer image soon.", flush=True)
+            return
+        print(f"FATAL: this database has a format limit at Kalmido {floor}; this image ({APP_VERSION}) is older and cannot read "
+              f"all of its data. Before going back: {how or 'see docs/UPGRADING.md'}. Start the image of {floor} or newer. "
+              "Emergency only: KALMIDO_ALLOW_DOWNGRADE=1.", flush=True)
+        raise DataDirError(3)
     if v == "back":
         print(f"note: this database last ran Kalmido {stored}; starting {APP_VERSION} (the version before it) as a step back. "
               "Its newer columns and tables stay untouched.", flush=True)
@@ -506,11 +540,21 @@ def _skfp_kek_check(kek, sid):
     return hmac.new(kek, b"kalmido-orgkey-check-v1|%d" % sid, hashlib.sha256).hexdigest()[:32]
 
 
-def skfp_keys_match(c, key):
-    """None = no sealed organisation / account key in the database; True = at least one opens with key; False = none."""
+def skfp_kek(key):
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-    kek = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"kalmido-orgkey-kek-v1").derive(key)  # = orgcrypt._kek
+    return HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"kalmido-orgkey-kek-v1").derive(key)  # = orgcrypt._kek
+
+
+def skfp_row_opens(kek, sid, checks):
+    """One row of org_keys (sid = org id) / user_keys (sid = -user id): does one of its kek_check values fit kek?
+    2.359.3 (#2893): also used on the rows of a backup."""
+    return any(v and _skfp_eq(str(v), _skfp_kek_check(kek, sid)) for v in checks)
+
+
+def skfp_keys_match(c, key):
+    """None = no sealed organisation / account key in the database; True = at least one opens with key; False = none."""
+    kek = skfp_kek(key)
     seen = False
     with pg_system_ctx(c):
         for t, idc, cols in (("org_keys", "org_id", ("kek_check", "kek_check_rot")), ("user_keys", "user_id", ("kek_check",))):
@@ -519,7 +563,7 @@ def skfp_keys_match(c, key):
             for r in c.execute(f"SELECT {idc}, {', '.join(cols)} FROM {t}").fetchall():  # (init_db: the columns exist)
                 seen = True
                 sid = int(r[0]) if t == "org_keys" else -int(r[0])
-                if any(v and _skfp_eq(str(v), _skfp_kek_check(kek, sid)) for v in tuple(r)[1:]):
+                if skfp_row_opens(kek, sid, tuple(r)[1:]):
                     return True
     return False if seen else None
 
@@ -601,6 +645,18 @@ def secret_need_guard(new):
     raise DataDirError(3)
 
 
+def back_floor_stamp(c):
+    """2.359.3 (#2896): after a successful start (inside the init transaction): the highest format limit into kalmido_meta.
+    Only ever raised, also after a restore of an older backup."""
+    v, how = max(BACK_LIMITS, key=lambda x: appver_parse(x[0]))
+    r = c.execute("SELECT value FROM kalmido_meta WHERE key='back_floor'").fetchone()
+    have = appver_parse(r[0]) if r else None
+    if have and have >= appver_parse(v):
+        return
+    for k, x in (("back_floor", v), ("back_floor_how", how)):
+        c.execute("INSERT INTO kalmido_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (k, x))
+
+
 def data_dir_check():
     """2.149.0 D (#2510): the data dir must exist and be writable (a bind mount Docker created as root is not): a clear
     message instead of a traceback."""
@@ -656,11 +712,35 @@ def appver_stamp(c):
               (APP_VERSION,))
 
 
+# 2.475.0 (#3478): a package's new tables, columns and indexes come as one file kalmido/core/migrations.d/<task id>.py instead of
+# one more line at the end of schema.py (the same spot for every package: conflicts). Plain data, three optional names: SCHEMA
+# (idempotent CREATE TABLE / INDEX, run right after schema.py's), MIGRATIONS (steps as in schema.py), AFTER (a list of idempotent
+# statements, run on every start after INDEXES). Sorted by file name; here and not in schema.py, so that the loader collides with nothing.
+MIG_D = os.path.join(os.path.dirname(os.path.abspath(__file__)), "migrations.d")
+
+
+def frag_load(d=MIG_D):
+    """2.475.0 (#3478): (SCHEMA text, MIGRATIONS list, AFTER list) of all fragments in d. tools/check_migrations.py holds them to data."""
+    schema, steps, after = [], [], []
+    for n in sorted(os.listdir(d)) if os.path.isdir(d) else ():
+        if n.endswith(".py"):
+            ns, path = {}, os.path.join(d, n)
+            with open(path, encoding="utf-8") as f:
+                exec(compile(f.read(), path, "exec"), ns)  # nosec: a file of this package
+            schema.append(ns.get("SCHEMA", ""))
+            steps += ns.get("MIGRATIONS", [])
+            after += ns.get("AFTER", [])
+    return "\n".join(schema), steps, after
+
+
+FRAG_SCHEMA, FRAG_MIGRATIONS, FRAG_AFTER = frag_load()
+
+
 def mig_ids():
     """2.102.0 D (#1996): (id, table, column, ddl) per MIGRATIONS step; id = "table.column", the n-th step of the same column
-    "table.column#n" -- stable wherever a release inserts its steps."""
+    "table.column#n" -- stable wherever a release inserts its steps. 2.475.0 (#3478): the fragments' steps behind schema.py's."""
     seen, out = {}, []
-    for table, col, ddl in MIGRATIONS:
+    for table, col, ddl in MIGRATIONS + FRAG_MIGRATIONS:
         k = f"{table}.{col}"
         seen[k] = seen.get(k, 0) + 1
         out.append((k if seen[k] == 1 else f"{k}#{seen[k]}", table, col, ddl))
@@ -680,6 +760,76 @@ def ix_have(c):
 def ix_skip_present(script, have):
     """2.183.0 B (#2666): the script without the one-line CREATE INDEX IF NOT EXISTS whose name exists (the same no-op)."""
     return _IX_LINE.sub(lambda m: "" if m.group(1).lower() in have else m.group(0), script)
+
+
+# 2.369.0 B (#2731): ALTER TABLE takes its ACCESS EXCLUSIVE lock (until the start's COMMIT) before it finds the column
+_ADD_LINE = re.compile(r"^[ \t]*ALTER[ \t]+TABLE[ \t]+(\w+)[ \t]+ADD[ \t]+COLUMN[ \t]+IF[ \t]+NOT[ \t]+EXISTS[ \t]+(\w+)[ \t]", re.M)
+
+
+def col_present(c, stmt):
+    """2.369.0 B (#2731): is stmt an ALTER TABLE .. ADD COLUMN IF NOT EXISTS whose column exists (the same no-op)?"""
+    m = _ADD_LINE.search(stmt) if stmt.upper().count("ADD COLUMN") == 1 else None  # review: several columns = run it
+    return bool(m and c.execute("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() "
+                                "AND table_name=? AND column_name=?", m.groups()).fetchone())
+
+
+def ix_ensure(c, sql, have=None):
+    """2.369.0 B (#2731): one CREATE INDEX IF NOT EXISTS (without its ";") through ix_skip_present; have = ix_have(c) of the
+    caller for a series."""
+    if ix_skip_present(sql + ";", ix_have(c) if have is None else have):
+        c.execute(sql)
+
+
+# 2.369.0 B (#2731): CREATE OR REPLACE TRIGGER locks its table (SHARE ROW EXCLUSIVE, until the start's COMMIT) and replaces the
+# trigger even when nothing differs. The wanted statement is compared with pg_get_triggerdef: a false match would keep a changed
+# trigger, so what cannot be read counts as different (a needless replace is only the lock of before)
+_TG_STR = re.compile(r"('(?:[^']|'')*')")
+_TG_DEF = re.compile(r"^create (?:or replace )?trigger (\S+) (before|after|instead of) (.+?) on (\S+) (.+)$", re.S)
+_TG_LINE = re.compile(r"^[ \t]*CREATE[ \t]+OR[ \t]+REPLACE[ \t]+TRIGGER[ \t]+(\w+)\b[^;]*?\bON[ \t]+(\w+)\b[^;]*(?:;|\Z)", re.M)
+
+
+def tg_norm(sql, schema="public"):
+    """A trigger statement in one form, so that the wanted text and the pretty pg_get_triggerdef compare: words in lower case
+    and spaces evened out (string literals, the trigger's arguments, stay as they are), the events and the columns of UPDATE OF
+    sorted, the schema off the table and the function, EXECUTE PROCEDURE = FUNCTION. WHEN stays as written apart from that
+    (only the pretty form drops its redundant brackets). None when it cannot be read."""
+    parts = _TG_STR.split(sql.strip().rstrip(";").rstrip())
+    parts[::2] = [re.sub(r"\s*([(),])\s*", r"\1", re.sub(r"\s+", " ", p)).lower() for p in parts[::2]]
+    m = _TG_DEF.match("".join(parts))
+    if not m:
+        return None
+    name, when, events, table, rest = m.groups()
+    ev = sorted("update of " + ",".join(sorted(e[10:].split(","))) if e.startswith("update of ") else e for e in events.split(" or "))
+    pre = schema.lower() + "."
+    table = table[len(pre):] if table.startswith(pre) else table
+    rest = re.sub(r"\bexecute (?:procedure|function) ", "execute function ", rest)
+    return " ".join((name, when, " or ".join(ev), "on", table, rest.replace("execute function " + pre, "execute function ")))
+
+
+def tg_same(c, name, table, sql):
+    """Is trigger name of table in place as sql says, and switched on (a replace would switch it on again)?"""
+    r = c.execute("SELECT pg_get_triggerdef(t.oid, true), t.tgenabled='O', current_schema() FROM pg_trigger t "  # pg-ok: pg_catalog oid
+                  "JOIN pg_class k ON k.oid=t.tgrelid WHERE t.tgname=? AND k.relname=? "  # pg-ok: pg_catalog oid
+                  "AND k.relnamespace=current_schema()::regnamespace AND NOT t.tgisinternal", (name, table)).fetchone()
+    if not r or not r[1]:
+        return False
+    want = tg_norm(sql, r[2])
+    return want is not None and want == tg_norm(r[0], r[2])
+
+
+def trigger_ensure(c, name, table, sql):
+    """2.369.0 B (#2731): creates a start trigger only when it is missing or differs. The function behind it stays a
+    CREATE OR REPLACE FUNCTION on every start (no table lock). True = sql ran."""
+    if tg_same(c, name, table, sql):
+        return False
+    c.execute(sql)
+    return True
+
+
+def trigger_skip_present(c, script):
+    """2.369.0 B (#2731): trigger_ensure for a script of functions and triggers: the script without the CREATE OR REPLACE
+    TRIGGER statements in place, the others run where they stand (after their function)."""
+    return _TG_LINE.sub(lambda m: "" if tg_same(c, m.group(1), m.group(2), m.group(0)) else m.group(0), script)
 
 
 def mig_apply(c):
@@ -782,7 +932,7 @@ def init_db(guard=True, load=None):
         write_lock(c, "kalmido-init")
         for ext in ("unaccent", "pg_trgm"):  # message search (collab/msgsearch.py); both ship with the postgres image
             c.execute(f"CREATE EXTENSION IF NOT EXISTS {ext}")
-        c.executescript(ix_skip_present(SCHEMA, ix_have(c)))  # 2.183.0 B (#2666): only the missing indexes
+        c.executescript(trigger_skip_present(c, ix_skip_present(SCHEMA + FRAG_SCHEMA, ix_have(c))))  # 2.183.0 B (#2666): only the missing indexes; 2.369.0 B (#2731): and triggers; 2.475.0 (#3478): + the fragments
         clk("schema")
         flags0 = mig_flags_sync(c)  # 2.102.0 D (#1996): the one-shots done before this start (recorded if not yet)
         mig_apply(c)  # 2.102.0 D (#1996): only the MIGRATIONS steps not yet recorded in kalmido_migrations
@@ -797,14 +947,15 @@ def init_db(guard=True, load=None):
         # 2.352.0 A (#2748): not a row only a folder's share gives (frole)
         c.execute("UPDATE list_members SET own_role=role WHERE own_role IS NULL AND grole IS NULL AND frole IS NULL")
         clk("list_members_own_role")
-        c.execute("CREATE INDEX IF NOT EXISTS tasks_agroup ON tasks(assignee_group_id) WHERE assignee_group_id IS NOT NULL")
+        ix_ensure(c, "CREATE INDEX IF NOT EXISTS tasks_agroup ON tasks(assignee_group_id) WHERE assignee_group_id IS NOT NULL")
         c.execute("DROP INDEX IF EXISTS tasks_tt")  # tt_id is unique per user now (tasks_tt_user)
-        c.executescript(TIME_TITLE_TRIGGER)
-        c.executescript(LIST_E2E_TRIGGER)  # 2.64.1 (#1817): members of lists with the lock
-        c.executescript(WIKI_E2E_TRIGGER)  # 2.64.3 (#1817): members of organisations whose knowledge space has the lock
-        c.executescript(REVOKED_TRIGGER)  # 2.360.0 R (#2496): what was revoked stays revoked after a restore
-        c.executescript(PURGED_TRIGGER)  # 2.360.4 (#3243): what was deleted for good stays deleted after a restore
-        c.executescript(TICKET_NO_TRIGGER)  # 2.390.0 (#3353): running ticket numbers of projects with a key
+        c.executescript(trigger_skip_present(c, TIME_TITLE_TRIGGER))
+        c.executescript(trigger_skip_present(c, LIST_E2E_TRIGGER))  # 2.64.1 (#1817): members of lists with the lock
+        c.executescript(trigger_skip_present(c, QUICKNOTE_TRIGGER))  # 2.477.0 (#3881): the private list "Notes" stays without members
+        c.executescript(trigger_skip_present(c, WIKI_E2E_TRIGGER))  # 2.64.3 (#1817): members of organisations whose knowledge space has the lock
+        c.executescript(trigger_skip_present(c, REVOKED_TRIGGER))  # 2.360.0 R (#2496): what was revoked stays revoked after a restore
+        c.executescript(trigger_skip_present(c, PURGED_TRIGGER))  # 2.360.4 (#3243): what was deleted for good stays deleted after a restore
+        c.executescript(trigger_skip_present(c, TICKET_NO_TRIGGER))  # 2.390.0 (#3353): running ticket numbers of projects with a key
         clk("triggers")
         from ..tasks.delta import dl_setup
         dl_setup(c)  # 2.42.0 (#1376): the change triggers of the delta state
@@ -816,12 +967,12 @@ def init_db(guard=True, load=None):
         ml_setup(c)  # 2.71.0 B (#1459): links never cross a workspace boundary
         clk("ml_setup")
         # 2.410.0 B (#3515): when a task came into its board column (a test server: on its test clock)
-        c.executescript(SEC_AT_TRIGGER.replace("{off}", str(round(_TEST_OFFSET.total_seconds()) if _TEST_OFFSET is not None else 0)))
+        c.executescript(trigger_skip_present(c, SEC_AT_TRIGGER.replace("{off}", str(round(_TEST_OFFSET.total_seconds()) if _TEST_OFFSET is not None else 0))))
         clk("sec_at_trigger")
         have_ix = ix_have(c)  # 2.183.0 B (#2666): only the missing indexes
-        for stmt in INDEXES.strip().split(";"):
+        for stmt in INDEXES.strip().split(";") + FRAG_AFTER:  # 2.475.0 (#3478): + the fragments' AFTER
             m = _IX_LINE.search(stmt + ";")
-            if stmt.strip() and not (m and m.group(1).lower() in have_ix):
+            if stmt.strip() and not (m and m.group(1).lower() in have_ix) and not col_present(c, stmt):
                 c.execute(stmt)
         clk("indexes")
         from ..life.rss import p2172b_feed_unique
@@ -1102,7 +1253,7 @@ def init_db(guard=True, load=None):
                 print("tidy: assigned the tidy agent of", n, "list(s)", flush=True)
         # 2.18.0 (#430): the milestones of the project overview (list_milestones, 2.7.1) become milestone tasks. Runs whenever
         # rows exist (no flag): a restored backup from before 2.18.0 brings them back and is migrated again
-        c.execute("CREATE INDEX IF NOT EXISTS tasks_msid ON tasks(milestone_id) WHERE milestone_id IS NOT NULL")
+        ix_ensure(c, "CREATE INDEX IF NOT EXISTS tasks_msid ON tasks(milestone_id) WHERE milestone_id IS NOT NULL")
         n = ms_migrate(c)
         clk("ms_migrate")
         if n:
@@ -1125,6 +1276,10 @@ def init_db(guard=True, load=None):
         clk("cdn_backfill")
         if n:
             print("clients: address fields filled from the free address for", n, "client(s)", flush=True)
+        if gsetting(c, "migr_brought2365") != "1":  # 2.365.1 (#3395): who brought what in, from the history of the moves
+            n = brought_backfill(c)
+            gset(c, "migr_brought2365", "1")
+            print("organisations: noted who brought in", n, "item(s)", flush=True)
         if gsetting(c, "migr_upg2103") != "1":  # 2.152.0 A (#2164): time entries / direct messages outlive an account
             from ..accounts.orgretain import upg_fk_once
             upg_fk_once(c)
@@ -1147,10 +1302,17 @@ def init_db(guard=True, load=None):
             gset(c, "migr_kind2352", "1")  # once: a status cleared later (= not tracked) stays cleared
             if n:
                 print("list types:", n, "projects without a status became 'on track'", flush=True)
-        if gsetting(c, "migr_allow2380") != "1":  # 2.380 G (#3389): the one list of internal hosts -> a copy per purpose
-            old = gsetting(c, "cal_allow_hosts")
+        # 2.380 G (#3389): the one list of internal hosts -> a copy per purpose. 2.473.0 (#3569): allow_hosts_copied_from = the
+        # old list as last copied; it differs after a fallback to an older version changed the old list -> copy again, a host
+        # removed there must not stay allowed. A server without the mark only gets it: nothing says the old list changed (so the
+        # mark is no entry of GLOBAL_DEFAULTS, those are stored before this runs).
+        old = gsetting(c, "cal_allow_hosts")
+        was = c.execute("SELECT value FROM settings WHERE key='allow_hosts_copied_from'").fetchone()
+        if gsetting(c, "migr_allow2380") != "1" or (was and was[0] != old):
             gset(c, "allow_hosts_by_purpose", json.dumps({p: old for p in ALLOW_PURPOSES}, sort_keys=True))
             gset(c, "migr_allow2380", "1")
+        if not was or was[0] != old:
+            gset(c, "allow_hosts_copied_from", old)
         if gsetting(c, "migr_agcl2380") != "1":  # 2.380 F (#3438): one way -- the agency projects' "Client" text fields go
             # when no task has a value in them (the client is the project's, lists.client_id); a field with a value stays
             names = sorted({tr("Client", lg=x).strip().lower() for x in LANGS} | {"client"})
@@ -1165,6 +1327,22 @@ def init_db(guard=True, load=None):
             gset(c, "migr_agcl2380", "1")
             if ids:
                 print("agency projects:", len(ids), "empty field(s) \"Client\" removed", flush=True)
+        if gsetting(c, "migr_tours2466") != "1":  # 2.466.0 (#3314): an area an existing account has content in counts as
+            # opened: its introduction shows only for areas never used. Nothing is lost: a later start skips this, an older
+            # version ignores the setting
+            seen = {}
+            for area, sql in (("cal", "SELECT DISTINCT created_by FROM events"), ("office", "SELECT DISTINCT created_by FROM clients"),
+                              ("time", "SELECT DISTINCT user_id FROM time_entries"), ("review", "SELECT DISTINCT user_id FROM journal"),
+                              ("wiki", "SELECT DISTINCT owner_id FROM wiki_pages"), ("sheets", "SELECT DISTINCT owner_id FROM sheets"),
+                              ("habits", "SELECT DISTINCT user_id FROM habits")):
+                for r in c.execute(sql).fetchall():
+                    if r[0] is not None:
+                        seen.setdefault(r[0], []).append(area)
+            for uid, areas in seen.items():
+                c.execute("INSERT INTO user_settings(user_id,key,value) SELECT id,'tours_seen',? FROM users WHERE id=? "
+                          "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value WHERE user_settings.value=''",  # the start fills in defaults first
+                          (",".join(areas), uid))
+            gset(c, "migr_tours2466", "1")
         from .fkeys import fk_ensure
         fk_ensure(c)  # 2.152.0 C (#2174): the missing foreign keys (orphans cleaned first), every start, idempotent
         clk("fk_ensure")
@@ -1189,6 +1367,7 @@ def init_db(guard=True, load=None):
                   "CASE WHEN CAST(kalmido_meta.value AS BIGINT) < CAST(excluded.value AS BIGINT) THEN excluded.value "
                   "ELSE kalmido_meta.value END", (str(int(SCHEMA_VERSION)),))
         appver_stamp(c)  # 2.149.0 D (#2509): which version ran on this database (start check of the next start, restore)
+        back_floor_stamp(c)  # 2.359.3 (#2896)
         if guard or load is None:
             skfp_check(c, restore=not guard)  # 2.190.0 B (#2592): the server key is the one of this database
         clk("stamps")
@@ -1326,6 +1505,19 @@ ALLOW_PURPOSES = ("calendar", "carddav", "webhooks", "mail", "git", "newsletter"
                   "paperless", "karakeep", "servers")
 
 
+def brought_backfill(c):
+    """2.365.1 (#3395): once at the start: the mark brought_by (accounts/orgback.py) of what came in before it existed, from the
+    last move of each thing (space_moves): private -> today's organisation = by_id brought it in. Files have no reliable rows."""
+    n = 0
+    with pg_system_ctx(c):
+        for table, kind in (("sheets", "sheet"), ("wiki_pages", "wiki"), ("video_reviews", "video"), ("sched_polls", "poll"), ("bookmarks", "bookmark")):
+            n += c.execute(f"""UPDATE {table} t SET brought_by=m.by_id FROM
+                               (SELECT DISTINCT ON (obj_id) obj_id, from_org, to_org, by_id FROM space_moves WHERE kind=? ORDER BY obj_id, id DESC) m
+                               WHERE m.obj_id=t.id AND m.from_org IS NULL AND m.to_org=t.org_id AND m.by_id IS NOT NULL AND t.brought_by IS NULL""",
+                           (kind,)).rowcount
+    return n
+
+
 def gsetting(c, key):
     r = c.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
     return r[0] if r else GLOBAL_DEFAULTS.get(key, "")
@@ -1344,17 +1536,32 @@ def usettings(c, uid):
     return s
 
 
+def usettings_many(c, uids):
+    """2.369.3 (#3199): usettings() of several accounts in one query: {uid: settings} (same answers as one by one)."""
+    S = {int(u): dict(USER_DEFAULTS) for u in uids}
+    if S:
+        for r in c.execute("SELECT user_id, key, value FROM user_settings WHERE user_id = ANY(CAST(? AS BIGINT[]))", (sorted(S),)):
+            S[r[0]][r[1]] = r[2]
+    return S
+
+
 def uset(c, uid, key, value):
     c.execute("INSERT INTO user_settings(user_id,key,value) VALUES(?,?,?) "
               "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value", (uid, key, str(value)))
 
 
 def bump(c):
+    area = lv_area()
     r = c.execute("UPDATE settings SET value=CAST(CAST(value AS BIGINT)+1 AS TEXT) WHERE key='version' RETURNING value").fetchone()
     if r:  # 2.42.0 (#1376): the task changes of this transaction belong to the new version (GET /api/state/delta)
-        from ..tasks.delta import dl_stamp
-        dl_stamp(c, int(r[0]))
+        from ..tasks.delta import dl_scope, dl_stamp
         u = getattr(g, "user", None) if has_request_context() else None
+        # 2.369.4 (#2507): who the change is for -- the organisations / people of the changed lists get the new version as
+        # their key (None: everyone, "version:all"); read before dl_stamp (it works on the rows not stamped yet)
+        sk = dl_scope(c, area, u["id"] if u is not None else None) or ["version:all"]
+        dl_stamp(c, int(r[0]))
+        c.execute("INSERT INTO settings(key,value) VALUES" + ",".join("(?, ?)" for _ in sk)
+                  + " ON CONFLICT(key) DO UPDATE SET value=excluded.value", tuple(x for k in sk for x in (k, r[0])))
         # 2.191.0 C (#2507): the last version this account wrote (GET /api/state/delta?lean=1); F1: a write without a real
         # account (watchdog, hooks, g.user = {"id": None}) is noted as version:bg, which ends the lean answer for everyone
         key = f"version:by:{int(u['id'])}" if u is not None and u["id"] is not None else "version:bg"
@@ -1364,7 +1571,7 @@ def bump(c):
     # it is "other" (= everything, as before)
     # 2.280.0 A (#3109): "self" (a change only the writer's own state shows: their settings, habits, layouts) counts per
     # account: other people's clients see no area move (a lean delta instead of the full state)
-    a = lv_area()
+    a = area
     u = getattr(g, "user", None) if has_request_context() else None
     if a == "self":
         a = f"self:{int(u['id'])}" if u is not None and u["id"] is not None else "other"

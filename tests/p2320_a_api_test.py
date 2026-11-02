@@ -108,7 +108,7 @@ check(A.get(B + f"/api/lists/{P}/layout").json()["mine"] == "", "#1063: ... only
 check(json.loads(A.get(B + f"/api/lists/{P}/layout").json()["std"])["order"] == ["desc", "files"], "#1063: ... the standard stays")
 r = Ca.put(B + f"/api/lists/{P}/layout", json={"layout": "", "scope": "mine"})
 check(r.ok and r.json()["mine"] == "" and dbx("SELECT COUNT(*) FROM list_layouts WHERE list_id=? AND user_id=?", (P, CAROL))[0][0] == 0,
-      "#1063: Reset to the standard removes the own arrangement")
+      "#1063: Reset to the default removes the own arrangement")
 r = A.put(B + f"/api/lists/{P}/layout", json={"layout": None, "scope": "standard"})
 check(r.ok and r.json()["std"] == "", "#983: '' / null = the built-in default again")
 check(A.put(B + f"/api/lists/{P}/layout", json={"layout": json.dumps({"order": ["Bad"]})}).status_code == 400, "#983: a bad layout 400")

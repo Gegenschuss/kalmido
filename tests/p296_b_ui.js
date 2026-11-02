@@ -49,7 +49,7 @@ const items = d => [...d.querySelectorAll('#pop [role="menuitem"], .menu-list [r
   check(await until(() => /Moved out of/.test(d.querySelector('#view .wksmv')?.textContent || '')), 'the page shows its last move');  // 2.97.0 (#2051): "Moved out of <name>"
   await w.eval(`histStep('undo')`);
   const back = await until(async () => { const g = await call('GET', '/api/wiki/pages/' + P.id); return g.space === 'private' && g; });
-  check(back && back.path === 'Plan/Idea', 'Undo: back in the private space at the old path ' + JSON.stringify(back).slice(0, 200));
+  check(back && back.path === 'Plan/Idea', 'Undo: back in the private workspace at the old path ' + JSON.stringify(back).slice(0, 200));
   w.close();
 
   // ================= tables: the item, the dialog, Undo

@@ -18,11 +18,12 @@ from flask import jsonify, request, Response
 
 from ..core.config import app
 from ..core.pg import insert_id, write_lock
-from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store
-from ..core.i18n import N_, tr
+from ..core.orgcrypt import oc_dec_col, oc_dec_fields, oc_enc_fields, oc_item_store
+from ..core.i18n import N_, csv_dialect, tr
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
+from .pdf import pdf_date
 from .calc import dec, dstr, money
 from .model import office_gate, office_org, office_settings
 from .ledger import ofx_items_brief, ofx_log, ofx_need_editable
@@ -356,7 +357,7 @@ def rk_trips(c, oid, year=None, trip_id=None):
         args += [str(year), str(year)]
     trips = c.execute(sql + " ORDER BY date_from DESC, id DESC", args).fetchall()
     if own is not None:  # 2.187.1 B (#2735): own = entered by the person or the person travelled (people may be encrypted)
-        trips = [t for t in trips if rk_own_sees(c, oid, t, own)]
+        trips = rk_own_rows(c, oid, trips, own)  # 2.360.5 (#2753)
     if not trips:
         return []
     ids = [t["id"] for t in trips]
@@ -373,13 +374,24 @@ def rk_trips(c, oid, year=None, trip_id=None):
 
 def rk_own_sees(c, oid, t, own):
     """2.187.1 B (#2735): trip row t belongs to person own: entered by them or they are one of its people."""
-    if t["created_by"] == own:
-        return True
+    return t["created_by"] == own or _travelled(oc_dec_col(c, oid, "office_trips", "people", [t["people"]])[0], own)
+
+
+def _travelled(v, own):
     try:
-        people = json.loads(oc_dec_fields(c, oid, "office_trips", t).get("people") or "[]")
-    except ValueError:
+        people = json.loads(v or "[]")
+    except (ValueError, TypeError):
         return False
     return isinstance(people, list) and any(isinstance(p, dict) and p.get("id") == own for p in people)
+
+
+def rk_own_rows(c, oid, trips, own):
+    """2.360.5 (#2753): the trips of person own (rk_own_sees for a whole list): the people column decrypted only for the
+    trips somebody else entered, the key read once."""
+    other = [t for t in trips if t["created_by"] != own]
+    people = oc_dec_col(c, oid, "office_trips", "people", [t["people"] for t in other])
+    keep = {t["id"] for t, v in zip(other, people) if _travelled(v, own)}
+    return [t for t in trips if t["created_by"] == own or t["id"] in keep]
 
 
 def _trip_need_open(c, oid, t, *days, items=True):
@@ -770,12 +782,13 @@ def rk_report_get():
         if not ofr_allows(c, uid, oid, "travel", "own", "export"):  # 2.237.0 A (#2861): the file needs the special export
             raise Denied(403, tr(NO_SPECIAL))
         buf = io.StringIO()
-        w = csv.writer(buf, delimiter=";")
+        sep, num = csv_dialect()  # 2.368.2 (#2984): separator and decimal sign of the language
+        w = csv.writer(buf, delimiter=sep)
         head = {"month": tr("Month"), "year": tr("Year"), "person": tr("Person"), "project": tr("Project"), "client": tr("Client"), "category": tr("Category"), "purpose": tr("Purpose")}[by]
         w.writerow([head, tr("Receipts"), tr("Amount") + f" ({cur})"])
         for g in rep["rows"]:
-            w.writerow([_csv_safe(g["label"]), g["count"], g["amount"].replace(".", ",")])
-        w.writerow([tr("Total"), rep["count"], rep["total"].replace(".", ",")])
+            w.writerow([_csv_safe(g["label"]), g["count"], num(g["amount"])])
+        w.writerow([tr("Total"), rep["count"], num(rep["total"])])
         name = f"travel-{by}-{df or 'all'}-{dt or 'all'}{'-' + re.sub(r'[^a-z0-9]+', '-', person.lower()).strip('-') if person else ''}.csv"
         return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{name}"',
                                                                                                "Cache-Control": "no-store"})  # 2.190.0 D (#2496)
@@ -859,10 +872,8 @@ def rk_bill_post():
 
 
 def _fmt_day(s, lg):
-    if not s or not DATE_RE.match(s):
-        return s or ""
-    y, m, d = s.split("-")
-    return f"{d}.{m}.{y}" if lg == "de" else s
+    """2.368.2 (#2986): the date of an invoice line as on the rest of the document (was ISO in every language but German)."""
+    return pdf_date(s, str(lg).split("-")[0]) if s and DATE_RE.match(s) else s or ""
 
 
 @app.post("/api/office/trips/unbill")

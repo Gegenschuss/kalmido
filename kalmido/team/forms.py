@@ -286,8 +286,8 @@ def _may_use(c, f):
         return None if public_links_on(c) else _gone()
     lg = _lang(c, f)
     if not g.user:
-        return _msg(tr("Please log in", lg=lg), tr("This form is for the people of {0}. Log in and open the link again.", APP_NAME, lg=lg),
-                    lg, 401, ("/", tr("To the login", lg=lg)))
+        return _msg(tr("Please sign in", lg=lg), tr("This form is for the people of {0}. Sign in and open the link again.", APP_NAME, lg=lg),
+                    lg, 401, ("/", tr("To the sign-in", lg=lg)))
     from ..accounts.orgs import instance_mode, may_see, user_orgs
     if g.user["kid"]:
         return _gone(lg)
@@ -406,7 +406,8 @@ def _page(c, f, token, lg, vals=None, error="", qvals=None, cur=None):
 def form_page(token):
     c = db()
     if hit_limit("formv:" + rate_ip(), FORM_VIEW_RATE):
-        return _msg(tr("Too many requests"), tr("Please wait a minute and try again."), _accept_lang(), 429)
+        lg = _accept_lang()  # 2.368.4 (#2989): the visitor's language, also on the block page
+        return _msg(tr("Too many requests", lg=lg), tr("Please wait a minute and try again.", lg=lg), lg, 429)
     f = _find(c, token)
     if not f:
         return _gone()
@@ -588,7 +589,7 @@ def frm_mail_text(form_title, subject, url, lg):
     text = "\n\n".join((tr("Thank you for your report “{0}”.", subject, lg=lg),
                          tr("You can see its status and our answers at any time with this link:", lg=lg) + "\n" + url,
                          tr("Keep this link to yourself: anyone who has it can see this report.", lg=lg),
-                         tr("You get this mail because this address was entered in the form “{0}”. If that was not you, you can ignore it.", form_title, lg=lg)))
+                         tr("You get this e-mail because this address was entered in the form “{0}”. If that was not you, you can ignore it.", form_title, lg=lg)))
     return tr("Your report: {0}", subject, lg=lg), text
 
 

@@ -42,7 +42,7 @@ T = {}
 for node in RTREE.body:
     if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
         name = node.targets[0].id
-        if name in ("OFFICE_AREAS", "MANAGE_ROUTES", "SPECIAL_ROUTES", "OWN_ROUTES", "ANY_READ", "LEVELS", "SPECIALS"):
+        if name in ("OFFICE_AREAS", "MANAGE_ROUTES", "SPECIAL_ROUTES", "OWN_ROUTES", "ANY_READ", "ANY_OWN", "LEVELS", "SPECIALS"):
             T[name] = ast.literal_eval(_Plain().visit(node.value))
 check(all(k in T for k in ("OFFICE_AREAS", "MANAGE_ROUTES", "SPECIAL_ROUTES", "OWN_ROUTES", "ANY_READ", "LEVELS", "SPECIALS")),
       f"rights.py: the tables read as literals {sorted(T)}")
@@ -83,7 +83,7 @@ for r in OFFICE:
         miss = [k for k in KINDS if area_of(path.replace("/api/office/{}", "/api/office/" + k, 1)) is None]
         check(not miss, f"{r}: kinds without an area {miss}")
         continue
-    check(area_of(path) is not None, f"{r}: no office area (rights.py OFFICE_AREAS)")
+    check(area_of(path) is not None or path in T.get("ANY_OWN", ()), f"{r}: no office area (rights.py OFFICE_AREAS)")  # 2.439.0 (#3617): ANY_OWN = the person's own row
 check(area_of("/api/office/books/receipts") == "receipts" and area_of("/api/office/books") == "books", "longest segment wins")
 check(area_of("/api/office/trips/vma.csv") == "travel" and area_of("/api/office/logbook.csv") == "logbook", "a file suffix keeps the area")
 check(area_of("/api/office/docsx") is None and area_of("/api/officex/docs") is None, "no prefix match")
@@ -102,7 +102,7 @@ for x in T.get("OWN_ROUTES", ()):
     check(meth == "GET" or rule not in T.get("MANAGE_ROUTES", ()), f"OWN_ROUTES: {x} writes a manage route")
     check(x not in T.get("SPECIAL_ROUTES", {}), f"OWN_ROUTES: {x} needs a special (staff never has one)")
 RULES = {r.split(" ", 1)[1] for r in FOUND}
-for rule in list(T.get("MANAGE_ROUTES", ())) + list(T.get("ANY_READ", ())):
+for rule in list(T.get("MANAGE_ROUTES", ())) + list(T.get("ANY_READ", ())) + list(T.get("ANY_OWN", ())):  # 2.439.0 (#3617): + a person's own settings
     check(norm(rule) in RULES, f"MANAGE_ROUTES / ANY_READ: {rule} is no route")
 # exports, billing are never "own"
 # 2.187.1 (#2735): the person's own reports (filtered like the lists) are "own" -- exactly these four

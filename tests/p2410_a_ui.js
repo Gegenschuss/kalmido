@@ -114,9 +114,11 @@ const FEAT = 'comments,collab,agents';
     check(linkRow() && !d.querySelector('#detail .linkadd'), '#1475: with a link the row stays' + tag);
     // the task menu offers "Add link" only without a link
     w.eval(`taskMenu(document.querySelector('#detail .dtop') || document.body, ${t0})`); await sleep(100);
+    d.querySelector('#pop .mtmore')?.click(); await sleep(100);  // 2.445.0 (#3008): under "More…"
     check([...d.querySelectorAll('#pop [role="menuitem"]')].some(b => /Add link/.test(b.textContent)), '#1475: the task menu offers Add link' + tag);
     w.eval('closePop()');
     w.eval(`taskMenu(document.querySelector('#detail .dtop') || document.body, ${t1})`); await sleep(100);
+    d.querySelector('#pop .mtmore')?.click(); await sleep(100);  // 2.445.0 (#3008): under "More…"
     check(![...d.querySelectorAll('#pop [role="menuitem"]')].some(b => /Add link/.test(b.textContent)), '#1475: no Add link when there is one' + tag);
     w.close();
   }

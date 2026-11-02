@@ -151,7 +151,7 @@ def _confirm_mail(c, u, email, tok):
     t = lambda s, *a: tr(s, *a, lg=lg)  # noqa: E731
     link = f"{PUBLIC_URL}/#dsc-confirm/{tok}"
     subject = t(N_("Confirm your address to be findable at {0}"), APP_NAME)
-    intro = t(N_("You switched on that people at {0} can find you by this e-mail address. Confirm it with the button; the link works for {1} days. Not you? Ignore this mail and nothing changes."), APP_NAME, DISC_TOKEN_DAYS)
+    intro = t(N_("You switched on that people at {0} can find you by this e-mail address. Confirm it with the button; the link works for {1} days. Not you? Ignore this e-mail and nothing changes."), APP_NAME, DISC_TOKEN_DAYS)
     button = t(N_("Confirm my address"))
     text = f"{t(N_('Hello {0},'), u['display_name'] or u['username'])}\n\n{intro}\n\n{button}: {link}\n"
     # 2.420.0 B (#3499): the shared mail frame (was its own 520 px card)
@@ -543,6 +543,11 @@ def conn_unblock(other):
     if not n:
         raise Denied(404)
     return jsonify(ok=True)
+
+
+def disc_connected(c, uid, other):
+    """2.367.5 (#2980): News: an accepted request stays while the two are connected."""
+    return bool(other) and _state(c, uid, other) == "connected"
 
 
 def disc_request_open(c, uid, actor):

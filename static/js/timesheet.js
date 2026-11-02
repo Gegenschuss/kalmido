@@ -96,15 +96,18 @@ document.addEventListener('click', e => {
   if (b.dataset.tsl === 'tzdev') { tsl_tzDevice(b); return; }
   tsl_act(b.dataset.tsl, b.closest('[data-uid]'));
 });
-// ---- 2.125.0 B (#2120): settings rows (Settings > Modules > Time tracking)
+// ---- 2.125.0 B (#2120): settings rows; 2.368.3 (#2985): the zone moved to Region and formats (it decides reminders too, without the time module)
 const tsl_deviceTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } };
-function tsl_setRows(s, hint) {
+function tsl_tzRows(s, hint) {
   const cur = s.tz || '', dev = tsl_deviceTz();
   let zones = []; try { zones = /** @type {any} */ (Intl).supportedValuesOf('timeZone'); } catch { zones = []; }
   if (cur && !zones.includes(cur)) zones = [cur, ...zones];
   return `<div class="row"><label for="s-ttz">${tr('Time zone')}</label><select id="s-ttz"><option value="">${tr('Time zone of the server')}</option>${zones.map(z => `<option value="${esc(z)}" ${z === cur ? 'selected' : ''}>${esc(z.replace(/_/g, ' '))}</option>`).join('')}</select>${dev && dev !== cur ? `<button type="button" class="linkbtn" data-tsl="tzdev" data-tz="${esc(dev)}">${esc(tr('Use this device: {0}', dev.replace(/_/g, ' ')))}</button>` : ''}</div>
-      ${hint(tr('Decides on which day an entry counts and the periods of the report, the CSV and the timesheet.'))}
-      <div class="row"><label>${tr('Entries over midnight')}</label><label class="chkl"><input type="checkbox" id="s-tsplit" ${s.time_split_midnight !== '0' ? 'checked' : ''}> ${tr('count on each day with their share')}</label></div>`;
+      ${cur && dev && dev !== cur ? hint(tr('This device is in {0}, your setting says {1}.', dev.replace(/_/g, ' '), cur.replace(/_/g, ' '))) : ''}
+      ${hint(tr('Reminders, the daily summary and the briefing come at this time zone\'s hours; time tracking counts its days by it.'))}`;
+}
+function tsl_setRows(s) {
+  return `<div class="row"><label>${tr('Entries over midnight')}</label><label class="chkl"><input type="checkbox" id="s-tsplit" ${s.time_split_midnight !== '0' ? 'checked' : ''}> ${tr('count on each day with their share')}</label></div>`;
 }
 function tsl_tzDevice(b) {
   const sel = /** @type {any} */ (document.getElementById('s-ttz')); if (!sel) return;

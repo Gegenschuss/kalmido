@@ -119,7 +119,8 @@ const shift = card => card.style.transform;
   tb?.click();
   wo = w.eval('window._wo');
   check(wo.length === 3 && wo[2][0] === `/?mini=1#team/${RID}` && wo[2][1] === `kalmido-chat-t-${RID}`, '#1719: the team room opens in its window ' + JSON.stringify(wo[2]));
-  const row = d.querySelector(`.tcrow[data-rid="${RID}"]`);
+  // 2.479.0 (#2814, intended change): with the room open on a computer its row is in the area Chat's panel (no list beside it)
+  const row = await until(() => d.querySelector(`#side .tcpanel .sbconv[data-go="team/${RID}"]`));
   row?.dispatchEvent(new w.MouseEvent('auxclick', {bubbles: true, cancelable: true, button: 1}));
   wo = w.eval('window._wo');
   check(wo.length === 4 && wo[3][1] === `kalmido-chat-t-${RID}`, '#1719: a middle click on the conversation opens its window');

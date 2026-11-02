@@ -54,7 +54,7 @@ const FEAT = 'cal,comments,collab,office,clients';
   // 2.269.0 A (#3012): a save from elsewhere = a newer version; the editor loads it (else its next save shows the conflict bar)
   await w.eval(`ofdLoadDoc(${doc.id}, true)`); await until(() => w.eval('OFD.doc && OFD.doc.producing_on === 1'), 40);
   check(!!d.querySelector('#ofd-lang') && d.querySelector('#ofd-lang').value === 'de' && !!d.querySelector('#ofd-project_title') && !!d.querySelector('#ofd-date[data-dp="date"]') && !d.querySelector('input[type="date"]'), 'head fields: language de (organisation default), project title, date picker (no native date input)');
-  check(!!d.querySelector('#ofd-totals') && /0,00 €/.test(d.querySelector('#ofd-totals .tr-net dd')?.textContent || ''), 'the totals block shows 0,00 € in the document language');
+  check(!!d.querySelector('#ofd-totals') && /0,00\s€/.test(d.querySelector('#ofd-totals .tr-net dd')?.textContent || ''), 'the totals block shows 0,00 € in the document language');
   check(d.querySelectorAll('.ofdits .ofdit').length === 0 && !!d.querySelector('[data-ofd="it-svc"]'), 'no positions yet, Add service is there');
 
   // ================= the service picker
@@ -67,27 +67,27 @@ const FEAT = 'cal,comments,collab,office,clients';
   const add = async sid => { d.querySelector('[data-ofd="it-svc"]').click(); await until(() => d.querySelector('.modal.ofdpick [data-sid]')); const n = d.querySelectorAll('.ofdits .ofdit').length; d.querySelector(`.modal.ofdpick [data-sid="${sid}"]`).click(); await until(() => d.querySelectorAll('.ofdits .ofdit').length === n + 1, 60); };
   await add(S2); await add(S3);
   // 2.308.0 (#3255): wait for the settled rows (server answer drawn, flags present) instead of reading the DOM right after the count
-  await until(() => d.querySelectorAll('.ofdits .ofdit').length === 3 && [...d.querySelectorAll('.ofdits .ofdit')].every(r => r.querySelector('[data-k="raw_fee"]') && r.querySelector('[data-k="producing"]')) && /2\.335,00 €/.test(d.querySelector('#ofd-totals .tr-net dd')?.textContent || ''), 60);
+  await until(() => d.querySelectorAll('.ofdits .ofdit').length === 3 && [...d.querySelectorAll('.ofdits .ofdit')].every(r => r.querySelector('[data-k="raw_fee"]') && r.querySelector('[data-k="producing"]')) && /2\.335,00\s€/.test(d.querySelector('#ofd-totals .tr-net dd')?.textContent || ''), 60);
   let its = [...d.querySelectorAll('.ofdits .ofdit')];
   check(its.length === 3 && its[0].querySelector('[data-k="title"]').value === 'Storyboard-Erstellung' && its[1].querySelector('[data-k="rate"]').value.replace(',', '.') === '980' && its[2].querySelector('[data-k="unit"]').value === 'piece', 'three positions with name, rate and unit from the catalogue');
   check(its[1].querySelector('[data-k="raw_fee"]').checked && its[1].querySelector('[data-k="producing"]').checked && !its[0].querySelector('[data-k="raw_fee"]').checked, 'flags from the catalogue');
   doc = await call('GET', `/api/office/docs/${doc.id}`);
   check(doc.totals.net === 980 + 980 + 75 + 300 && doc.totals.producing_days === 0.5, 'server: 3 positions (qty 1) + producing 0.5 day x 600 = 2335: ' + doc.totals.net);
-  check(/2\.335,00 €/.test(d.querySelector('#ofd-totals .tr-net dd')?.textContent || ''), 'the totals block shows the net sum 2.335,00 €: ' + d.querySelector('#ofd-totals .tr-net dd')?.textContent);
+  check(/2\.335,00\s€/.test(d.querySelector('#ofd-totals .tr-net dd')?.textContent || ''), 'the totals block shows the net sum 2.335,00 €: ' + d.querySelector('#ofd-totals .tr-net dd')?.textContent);
   // 2.114.4 (#2275): the option total reads "Summe netto mit Option Rohdaten"
-  check(/Summe netto mit Option Rohdaten/.test(d.querySelector('#ofd-totals')?.textContent || '') && /2\.580,00 €/.test(d.querySelector('#ofd-totals')?.textContent || ''), 'including raw data 2.580,00 € (980 x 0,25 on top)');
+  check(/Summe netto mit Option Rohdaten/.test(d.querySelector('#ofd-totals')?.textContent || '') && /2\.580,00\s€/.test(d.querySelector('#ofd-totals')?.textContent || ''), 'including raw data 2.580,00 € (980 x 0,25 on top)');
   const prod = d.querySelector('.ofdautos .ofdauto');
   // 2.114.4 (#2276): singular for one production day
-  check(!!prod && /Producing/.test(prod.textContent) && /0,5 Tage = 1 Produktionstag \/ 3/.test(prod.textContent) && /300,00 €/.test(prod.textContent), 'the producing line with its explanation: ' + prod?.textContent);
+  check(!!prod && /Producing/.test(prod.textContent) && /0,5 Tage = 1 Produktionstag \/ 3/.test(prod.textContent) && /300,00\s€/.test(prod.textContent), 'the producing line with its explanation: ' + prod?.textContent);
   // a changed quantity with a comma
   const qty = its[1].querySelector('[data-k="qty"]');
   qty.value = '4,5'; qty.dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', `/api/office/docs/${doc.id}`)).items[1].qty === 4.5, 60);
   doc = await call('GET', `/api/office/docs/${doc.id}`);
   check(doc.items[1].qty === 4.5 && doc.totals.producing_days === 1.5 && doc.totals.net === 980 + 4410 + 75 + 900, 'qty 4,5 saved: producing 1.5 days, net 6365: ' + doc.totals.net);
-  await until(() => /6\.365,00 €/.test(d.querySelector('#ofd-totals .tr-net dd')?.textContent || ''));
-  check(/6\.365,00 €/.test(d.querySelector('#ofd-totals .tr-net dd')?.textContent || ''), 'the totals follow the change: ' + d.querySelector('#ofd-totals .tr-net dd')?.textContent);
-  check([...d.querySelectorAll('.ofdits .ofdit .ofdlt')].some(x => /4\.410,00 €/.test(x.textContent)), 'the line total 4.410,00 € shows on the position');
+  await until(() => /6\.365,00\s€/.test(d.querySelector('#ofd-totals .tr-net dd')?.textContent || ''));
+  check(/6\.365,00\s€/.test(d.querySelector('#ofd-totals .tr-net dd')?.textContent || ''), 'the totals follow the change: ' + d.querySelector('#ofd-totals .tr-net dd')?.textContent);
+  check([...d.querySelectorAll('.ofdits .ofdit .ofdlt')].some(x => /4\.410,00\s€/.test(x.textContent)), 'the line total 4.410,00 € shows on the position');
   // a heading, a removed position
   d.querySelector('[data-ofd="it-head"]').click();
   await until(() => d.querySelectorAll('.ofdits .ofdit').length === 4, 60);
@@ -120,7 +120,7 @@ const FEAT = 'cal,comments,collab,office,clients';
   d.querySelector('[data-ofd="back"]').click();
   await until(() => d.querySelector('.ofdlist .ofdrow'), 60);
   const row = d.querySelector('.ofdlist .ofdrow');
-  check(!!row && /KVA-\d{4}-001/.test(row.textContent) && /6\.290,00 €/.test(row.textContent) && /Sent/.test(row.textContent), 'the list row: number, net, status: ' + row?.textContent);
+  check(!!row && /KVA-\d{4}-001/.test(row.textContent) && /6\.290,00\s€/.test(row.textContent) && /Sent/.test(row.textContent), 'the list row: number, net, status: ' + row?.textContent);
   const q = d.querySelector('#ofd-q'); q.value = 'nirgends'; q.dispatchEvent(new w.Event('input', {bubbles: true}));
   await sleep(100);
   check(!d.querySelector('.ofdlist .ofdrow') && /Nothing matches/.test(d.querySelector('.office .ofcbody')?.textContent || ''), 'search filters the list');
@@ -139,7 +139,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await o.nav(B + '#office/offers/' + doc.id); await ready(ev); await sleep(1200);
     const g = await ev(`(() => { const r = [...document.querySelectorAll('.ofdeditor button, .ofdeditor select, .ofdeditor input:not([type=hidden]):not([type=checkbox]), .ofdhead button, .ofdhead select, .ofdhead a')].map(b => b.getBoundingClientRect()).filter(r => r.width && r.height); return {n: r.length, small: r.filter(r => r.width < 24 || r.height < 24).length, wide: document.documentElement.scrollWidth > window.innerWidth + 1, out: [...document.querySelectorAll('.ofdeditor input, .ofdeditor select, .ofdeditor textarea')].filter(e => { const b = e.getBoundingClientRect(); return b.width && b.right > window.innerWidth + 1; }).map(e => (e.id || e.dataset.k || e.tagName) + ':' + Math.round(e.getBoundingClientRect().right)), net: document.querySelector('#ofd-totals .tr-net dd')?.textContent, items: document.querySelectorAll('.ofdits .ofdit').length}; })()`);
-    check(g && g.n > 10 && g.small === 0 && !g.wide && g.out.length === 0 && g.items === 3 && /6\.290,00 €/.test(g.net || ''), '390: every control >= 24 px, no horizontal overflow, no field cut off at the right edge, 3 positions, net visible ' + JSON.stringify(g));
+    check(g && g.n > 10 && g.small === 0 && !g.wide && g.out.length === 0 && g.items === 3 && /6\.290,00\s€/.test(g.net || ''), '390: every control >= 24 px, no horizontal overflow, no field cut off at the right edge, 3 positions, net visible ' + JSON.stringify(g));
     await shot('p2361c-390-editor.png');
     await ev(`(() => { document.querySelector('#ofd-totals').scrollIntoView(); return 1; })()`); await sleep(400);
     await shot('p2361c-390-totals.png');

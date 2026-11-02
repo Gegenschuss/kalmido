@@ -13,7 +13,7 @@ from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from function
 
 # ---------------------------------------------------------------- 2.23.0 (#463): approval as a task type
 # A task can wait for an approval: "Ask for approval" picks a person of the list (the approver). The task is then
-# assigned to them (the usual assignment push) and shows "Approval pending". Only the approver decides:
+# assigned to them (2.367.2, #2968: News + push + mail "Approval needed") and shows "Approval pending". Only the approver decides:
 #   approve  -> approval 'approved', the task is completed
 #   changes  -> approval 'changes', the task goes back to whoever asked (assigned to them), with the note
 #   reject   -> approval 'rejected', the task is closed as "won't do"
@@ -31,10 +31,36 @@ def _is_agent(uid, c):
     return bool(r and r[0] == "agent")
 
 
-def approval_notify(c, t, state, note, rcpt):
-    """News + push to the person who asked for the approval (rcpt) about the decision."""
+def approval_request_notify(c, t, ap, note):
+    """2.367.2 (#2968): News + push + mail "Approval needed: <title> (from Ben)" to the approver: one event of its own instead of
+    the plain assignment, past the burst gate (it waits for the person, row "assign" switches it off)."""
     from ..collab.news import KIND_ROW, news_add, notif_ok
-    from ..collab.comments import burst_gate, collab_user, lang_of, user_names
+    from ..collab.comments import collab_user, lang_of, user_names
+    from ..notify.channels import evm_note
+    from ..notify.push import push_prio, push_reachable
+    from ..notify.taskbell import tbl_level
+    actor = me()
+    s = collab_user(c, ap, t["list_id"])
+    if not s or not task_visible(c, t["id"], ap, full=True):
+        return
+    news_add(c, ap, "aprequest", task_id=t["id"], actor=actor, data={"note": note[:300]} if note else None, s=s)
+    if tbl_level(c, ap, t["id"], s) == "mute" or not notif_ok(c, ap, s, KIND_ROW["aprequest"], "push", t["list_id"]):
+        return
+    evm_note(c, ap, "aprequest", t["id"], actor, s)
+    if not push_reachable(c, ap, s):
+        return
+    lg = lang_of(s)
+    who = user_names(c, [actor]).get(actor, "?")
+    g.pushes.append((ap, tr("Approval needed: {0}", t["title"], lg=lg), (note[:200] + " · " if note else "") + tr("Requested by {0}", who, lg=lg),
+                     f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), {"kind": "assign", "ws": "limit"}))
+
+
+def approval_notify(c, t, state, note, rcpt):
+    """News + push to the person who asked for the approval (rcpt) about the decision. 2.367.2 (#2968): past the burst gate (it
+    used to end up as "1 more change"); this is THE event of the decision: the asker gets no "completed" / "assigned" besides."""
+    from ..collab.news import KIND_ROW, news_add, notif_ok
+    from ..collab.comments import collab_user, lang_of, user_names
+    from ..notify.channels import evm_note
     from ..notify.push import push_prio, push_reachable
     actor = me()
     if not rcpt or rcpt == actor or _is_agent(rcpt, c):
@@ -43,8 +69,10 @@ def approval_notify(c, t, state, note, rcpt):
     if not s or not task_visible(c, t["id"], rcpt, full=True):
         return
     news_add(c, rcpt, "apdecide", task_id=t["id"], actor=actor, data={"state": state, "note": note[:300]}, s=s)
-    if not notif_ok(c, rcpt, s, KIND_ROW["apdecide"], "push", t["list_id"]) or not push_reachable(c, rcpt, s) or \
-            not burst_gate(c, rcpt, t["id"], event=True):
+    if not notif_ok(c, rcpt, s, KIND_ROW["apdecide"], "push", t["list_id"]):
+        return
+    evm_note(c, rcpt, "apdecide", t["id"], actor, s)
+    if not push_reachable(c, rcpt, s):
         return
     lg = lang_of(s)
     who = user_names(c, [actor]).get(actor, "?")
@@ -52,12 +80,12 @@ def approval_notify(c, t, state, note, rcpt):
              "rejected": tr("{0} rejected: {1}", who, t["title"], lg=lg)}[state]
     ln = c.execute("SELECT name, is_inbox FROM lists WHERE id=?", (t["list_id"],)).fetchone()
     lname = tr("Basket", lg=lg) if ln["is_inbox"] and inbox_default(ln["name"]) else ln["name"]
-    g.pushes.append((rcpt, title, (note[:200] + " · " if note else "") + lname, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s)))
+    g.pushes.append((rcpt, title, (note[:200] + " · " if note else "") + lname, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), {"kind": "assign"}))
 
 
 def approval_apply(c, tid, b):
     """The step of body b on task tid (see above); returns the task dict. Denied / BadInput on errors."""
-    from ..collab.comments import task_event, assignment_events
+    from ..collab.comments import task_event
     from ..tasks.lifecycle import do_complete
     from ..tasks.dependencies import completed_ids, unblock_events
     need_collab()
@@ -92,8 +120,9 @@ def approval_apply(c, tid, b):
         c.execute("""UPDATE tasks SET approval='pending', approver_id=?, assignee_id=?, assignee_group_id=NULL, assigned_by=?,
                      reminded='[]', updated_at=? WHERE id=?""", (ap, ap, uid, ts, tid))
         log_act(c, tid, "apstate", {"state": "pending", "approver": ap, **({"note": note} if note else {})})
-        if old != ap:
-            assignment_events(c, tid, old, ap)
+        if old and old != ap:
+            task_event(c, tid, "unassign", prev_assignee=old)
+        approval_request_notify(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), ap, note)
         return one_task(c, tid)
     if act == "cancel":
         # 2.36.2 (#1142): former members cannot withdraw (404); 2.360.0 D (#2496): nor who only reads the project now (403)
@@ -123,7 +152,7 @@ def approval_apply(c, tid, b):
     if state == "approved":
         do_complete(c, tid, 2)
         log_act(c, tid, "complete")
-        task_event(c, tid, "complete")
+        task_event(c, tid, "complete", skip=asker)  # 2.367.2 (#2968): the asker hears of the decision, not of both
         unblock_events(c, completed_ids(c, tid))
     elif state == "rejected":
         do_complete(c, tid, -1)
@@ -132,7 +161,8 @@ def approval_apply(c, tid, b):
     elif asker and asker in list_people(c, t["list_id"]) and not _is_agent(asker, c):
         # 2.144.6 B (#2400 F3): back to the asker is part of the approval, no "assigned" for the list rules either
         c.execute("UPDATE tasks SET assignee_id=?, assigned_by=? WHERE id=?", (asker, uid, tid))
-        assignment_events(c, tid, t["assignee_id"], asker)
+        if t["assignee_id"] and t["assignee_id"] != asker:  # 2.367.2 (#2968): the asker hears of the decision, not of an assignment
+            task_event(c, tid, "unassign", prev_assignee=t["assignee_id"])
     approval_notify(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), state, note, asker)
     return one_task(c, tid)
 

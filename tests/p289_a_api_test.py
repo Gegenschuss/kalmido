@@ -10,7 +10,7 @@
    does not see the project gets "denied" without its name or value; a source of another space cannot be chosen; a deleted
    project shows "deleted" with the last value only for whoever saw it; freezing keeps a copy
  - select column (option ids, labels as values), currency display, column / row / table trash + restore, presence, completion
- - a person without an organisation ("dave") does everything in the private space
+ - a person without an organisation ("dave") does everything in the private workspace
 usage: p289_a_api_test.py <datadir>      (a fresh container; P289A_NOSTART=1 = the server already runs)"""
 import json
 import os
@@ -90,7 +90,7 @@ r = put(A, SID, [{"row_id": ROW[0], "col_id": COL[0], "raw": "10"}, {"row_id": R
                  {"row_id": ROW[2], "col_id": COL[0], "raw": "=SUMME(A1:A2)"}])
 check(r.ok and r.json()["rev"] > S["rev"], "cells saved, rev moves " + r.text[:300])
 c3 = next((x for x in r.json()["cells"] if x["addr"] == "A3"), {}) if r.ok else {}
-check(c3.get("value") == 30 and c3.get("origin") == "formula" and c3.get("raw") == "=SUMME(A1:A2)", "SUMME over a range = 30 " + json.dumps(c3)[:300])
+check(c3.get("value") == 30 and c3.get("origin") == "formula" and c3.get("raw") == "=SUM(A1:A2)", "SUMME over a range = 30 " + json.dumps(c3)[:300])
 check(sorted(c3.get("refs") or []) == sorted(x["id"] for x in get(A, SID)["cells"] if x["addr"] in ("A1", "A2")), "refs = the cells read")
 # a change answers the dependants
 r = setv(A, SID, "A1", "15")
@@ -223,7 +223,7 @@ r = setv(A, SID, "H4", "=kunde.acme_films.satz*2")
 check(r.ok, "a client variable " + r.text[:200])
 d = get(A, SID)
 f1 = cell(d, "H1")
-check(f1["value"] == 1.5 and f1["origin"] == "kalmido" and f1["raw"] == "=projekt.shoot_berlin.zeit_gesamt", "project hours = 1.5 " + json.dumps(f1)[:300])
+check(f1["value"] == 1.5 and f1["origin"] == "kalmido" and f1["raw"] == "=project.shoot_berlin.total_time", "project hours = 1.5 " + json.dumps(f1)[:300])
 check(f1["sources"] and f1["sources"][0]["type"] == "p" and f1["sources"][0]["id"] == P and f1["sources"][0]["label"] == "Shoot Berlin", "sources of the cell")
 check(cell(d, "H2")["value"] == 2 and cell(d, "H3")["value"] == 2, "open 2, tasks - done = 2")
 check(cell(d, "H4")["value"] == 160, "client rate * 2 = 160")
@@ -231,7 +231,7 @@ check(any(s["type"] == "p" and s["id"] == P for s in d["sources"]), "the sheet's
 # renaming the project: the formula shows the new name, same value
 A.patch(B + f"/api/lists/{P}", json={"name": "Shoot Hamburg"})
 d = get(A, SID)
-check(cell(d, "H1")["raw"] == "=projekt.shoot_hamburg.zeit_gesamt" and cell(d, "H1")["value"] == 1.5, "project renamed: new name in the formula")
+check(cell(d, "H1")["raw"] == "=project.shoot_hamburg.total_time" and cell(d, "H1")["value"] == 1.5, "project renamed: new name in the formula")
 # bob does not see the project: "denied", no name, no value
 db_ = Bo.get(B + f"/api/sheets/{SID}")
 bf = cell(db_.json(), "H1")
@@ -246,7 +246,7 @@ check(r.ok, "bob may edit a formula that keeps a source chosen before " + r.text
 check(cell(get(A, SID), "H1")["value"] == 1.5, "... and it still counts for alice")
 check(all("hamburg" not in v["token"] for v in Bo.get(B + f"/api/sheets/{SID}/vars?q=shoot").json()["vars"]), "bob's completion has no project he does not see")
 vs = A.get(B + f"/api/sheets/{SID}/vars?q=shoot").json()["vars"]
-check(any(v["token"] == "projekt.shoot_hamburg.zeit_gesamt" and v["kind"] == "project" for v in vs), "alice's completion offers the project")
+check(any(v["token"] == "project.shoot_hamburg.total_time" and v["kind"] == "project" for v in vs), "alice's completion offers the project")
 check(any(v["kind"] == "function" for v in A.get(B + f"/api/sheets/{SID}/vars").json()["vars"]), "completion offers the functions")
 # a private project cannot go into the organisation's table
 PP = A.post(B + "/api/lists", json={"name": "Own Stuff", "kind": "project", "org_id": None}).json()["id"]
@@ -333,7 +333,7 @@ check(Fr.post(B + f"/api/sheets/{SID}/restore").status_code == 404, "another org
 check(A.post(B + f"/api/sheets/{SID}/restore").ok and A.get(B + f"/api/sheets/{SID}").status_code == 200, "restored")
 check(A.patch(B + f"/api/sheets/{SID}", json={"title": "Budget 2027"}).json()["title"] == "Budget 2027", "renamed")
 
-# ---- a person without an organisation: everything in the private space
+# ---- a person without an organisation: everything in the private workspace
 r = Da.post(B + "/api/sheets", json={"title": "Freelance", "space": "private"})
 check(r.status_code == 201, "dave creates a private table " + r.text[:200])
 DS = r.json()["id"]

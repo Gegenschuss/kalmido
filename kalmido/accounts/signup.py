@@ -16,6 +16,8 @@ from ..api.common import hit_limit
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
+from .orgs import op_apart_deny, op_foreign_account  # 2.399.0 (#2687)
+from .supportgrant import sga_link_support  # 2.485.0 (#3939)
 
 
 # ---------------------------------------------------------------- 2.23.0 (#711): self-registration
@@ -124,16 +126,24 @@ def _cleanup(c):
 
 
 def _notify_admins(c, uid):
-    """News + push to every admin: a registration waits for approval."""
-    from ..collab.news import news_add
+    """News + push to every admin: a registration waits for approval. 2.367.4 (#2974): a person who joined an organisation by the
+    address's domain tells its admins too (data.org_id); 2.464.0 (#3882): they approve as well (Settings > Organisation, the
+    person's row). The push follows the row "usage", like the News."""
+    from ..collab.news import news_add, notif_ok
+    from ..core.access import org_admin_people
+    from ..core.pg import system_ctx
     from ..notify.push import push_prio, push_reachable
     from ..collab.comments import lang_of
     u = c.execute("SELECT username, display_name, email FROM users WHERE id=?", (uid,)).fetchone()
-    for (aid,) in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0").fetchall():
+    data = {"user_id": uid, "name": u["display_name"], "username": u["username"], "email": u["email"] or ""}
+    with system_ctx(c):  # the new account joined by its domain; nobody is signed in
+        oids = [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=?", (uid,)).fetchall()]
+        ops = [r[0] for r in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0").fetchall()]
+        org = {x: oid for oid in oids for x in org_admin_people(c, oid) if x not in ops}
+    for aid in ops + list(org):
         s = usettings(c, aid)
-        news_add(c, aid, "signup", data={"user_id": uid, "name": u["display_name"], "username": u["username"], "email": u["email"] or ""},
-                 actor=uid, s=s)
-        if push_reachable(c, aid, s):
+        news_add(c, aid, "signup", data={**data, **({"org_id": org[aid]} if aid in org else {})}, actor=uid, s=s)
+        if notif_ok(c, aid, s, "usage", "push") and push_reachable(c, aid, s):
             lg = lang_of(s)
             g.pushes.append((aid, tr("Registration waits for approval: {0}", u["display_name"] or u["username"], lg=lg),
                              tr("Settings > Organisation > People", lg=lg), f"{PUBLIC_URL}/#settings/users", push_prio(s)))
@@ -212,13 +222,13 @@ def auth_signup():
 
 @app.post("/api/users/<int:uid>/approve")
 def user_approve(uid):
-    """Admins: a registration that waits for approval becomes an active account (declining = deleting it)."""
-    from ..accounts.users import om_admin_all as admin_sees, need_admin, user_admin_dict  # 2.46.0 (#1592)
-    need_admin()
+    """Admins: a registration that waits for approval becomes an active account (declining = deleting it). 2.464.0 (#3882): or an
+    admin of the person's organisation (useradmin.ua8_may_approve); their answer has no account details."""
+    from ..accounts.useradmin import ua8_may_approve
+    from ..accounts.users import user_admin_dict  # 2.46.0 (#1592)
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    if not u or not admin_sees(c, uid):  # 2.28.0 (#935)
-        raise Denied(404)
+    inst = ua8_may_approve(c, u, uid)  # 2.28.0 (#935)
     if u["signup"] != "pending":
         return err(tr("This account does not wait for an approval"), 409)
     c.execute("UPDATE users SET signup='', disabled=0 WHERE id=?", (uid,))
@@ -226,7 +236,7 @@ def user_approve(uid):
     c.commit()
     from .secmail import sec_mail
     sec_mail(c, uid, "approved")  # 2.266.0 (#2963): the person learns it without trying
-    return jsonify(user_admin_dict(c, c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()))
+    return jsonify(user_admin_dict(c, c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone())) if inst else jsonify(ok=True)
 
 
 def signup_settings(c, b):
@@ -279,6 +289,8 @@ def _may_link(c, uid):
         raise Denied(404)
     if not (g.user["is_admin"] or parent_of(c, me(), uid)):
         raise Denied(403)
+    if not parent_of(c, me(), uid) and op_foreign_account(c, uid):  # 2.399.0 (#2687): hosted: no sign-in as a client by the operator
+        op_apart_deny()
     if t["is_admin"]:
         raise Denied(409, tr("Admins sign in with their password"))
     if t["disabled"]:
@@ -325,6 +337,10 @@ def auth_link():
         # 2.86.0 (N4): checked again on use: the account may have become an admin after the link was made (the link is used up)
         return err(tr("Admins sign in with their password"), 409)
     print("signed in with a sign-in link:", login_log_who(u), "from", login_log_ip(client_ip()), flush=True)
+    if (twofa_methods(c, u) or gsetting(c, "twofa_required") == "1") and sga_link_support(c, u["id"]):
+        # 2.485.0 (#3939, review F2): the operator's link through support access never passes a second factor or enrols one
+        # (that session would be no support session: uncapped, and the factor would outlive the access)
+        return err(tr("A support sign-in link does not work for an account with two-factor sign-in"), 409)
     if twofa_methods(c, u):
         tok = pend_new("2fa", u["id"], remember=True)
         return pend_cookie(jsonify(ok=False, twofa=True, methods=twofa_methods(c, u)), tok)

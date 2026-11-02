@@ -19,18 +19,20 @@ import zipfile
 import zlib
 from collections import Counter
 from datetime import date, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from xml.etree import ElementTree as ET
 
 from flask import jsonify
 
 from ..core.config import app
+from ..core.csvimport import amount_text
 from ..core.db import body, bump, iso, now_utc
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_enc_fields
 from ..core.pg import insert_id, write_lock
 from ..core.errors import BadInput
 from .calc import dstr, money
+from .legacyimport import fx_run, fx_settle  # 2.363.2 (#3104)
 from .vma import VMA_HOME, VMA_NAMES, vma_dates, vma_places, vma_rate, vma_table_year, vma_trip
 
 VMI_FILE_MAX = 2 * 1024 * 1024
@@ -122,6 +124,7 @@ def vmi_xlsx(raw):
         wb = _xml(z, "xl/workbook.xml", budget)
         wrels = _rels(z, "xl/workbook.xml", budget)
         sheets = [sh for sh in wb.iter() if _local(sh.tag) == "sheet"]
+        d1904 = any(_local(x.tag) == "workbookPr" and (x.get("date1904") or "").lower() in ("1", "true") for x in wb.iter())  # 2.363.0 (#3103): Mac Excel
         if len(sheets) > VMI_SHEETS_MAX:
             raise BadInput(tr("Too many sheets (at most {0})", VMI_SHEETS_MAX))
         out = []
@@ -131,7 +134,7 @@ def vmi_xlsx(raw):
             if not path or path not in names:
                 continue
             out.append({"name": (sh.get("name") or "").strip(), "grid": _sheet(z, path, strings, budget),
-                        "comments": vmi_comments(z, path, names, budget)})
+                        "comments": vmi_comments(z, path, names, budget), "d1904": d1904})
         return out
     # 2.95.0 (review): an encrypted / exotically packed zip (RuntimeError, NotImplementedError, OSError, LZMAError) -> 400 too
     except (ET.ParseError, KeyError, ValueError, zipfile.BadZipFile, zlib.error, EOFError, RuntimeError, NotImplementedError, OSError,
@@ -144,8 +147,9 @@ def vmi_norm(s):
     return re.sub(r"[^0-9a-zäöüß]", "", str(s or "").lower())
 
 
-def vmi_date(v):
-    """An Excel date number ('45714', also with a time fraction), DD.MM.YYYY / DD.MM.YY or YYYY-MM-DD -> 'YYYY-MM-DD' or None."""
+def vmi_date(v, d1904=False):
+    """An Excel date number ('45714', also with a time fraction; d1904: of a workbook with the 1904 date system), DD.MM.YYYY /
+    DD.MM.YY or YYYY-MM-DD -> 'YYYY-MM-DD' or None."""
     s = str(v or "").strip()
     if not s:
         return None
@@ -153,7 +157,7 @@ def vmi_date(v):
         if re.fullmatch(r"\d{4,6}(\.\d+)?", s):
             f = float(s)
             if 1 <= f < 2958466:
-                return (date(1899, 12, 30) + timedelta(days=int(f))).isoformat()
+                return ((date(1904, 1, 1) if d1904 else date(1899, 12, 30)) + timedelta(days=int(f))).isoformat()
             return None
         m = re.fullmatch(r"(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})", s)
         if m:
@@ -189,15 +193,9 @@ def vmi_time(v):
 
 
 def vmi_num(v):
-    """The per diem cell -> Decimal or None ('372', '372.5', '372,50 €')."""
-    s = re.sub(r"[\s  €]|EUR", "", str(v or ""))
-    if not s:
-        return None
-    if "," in s:
-        s = s.replace(".", "").replace(",", ".")
-    try:
-        d = Decimal(s)
-    except InvalidOperation:
+    """The per diem cell -> Decimal or None ('372', '372.5', '372,50 €', '1.234,50')."""
+    d = amount_text(v)  # 2.363.0 (#3103): the shared reader ("1.234" = 1234, was 1,234)
+    if d is None:
         return None
     return d if d.is_finite() and abs(d) < 10 ** 7 else None
 
@@ -338,7 +336,7 @@ def vmi_trip_key(pk, df, dt, dest):
 
 def vmi_sheet(sh, known, seen):
     """One sheet -> {sheet, person, rows, sum_excel, sum_calc, counts} or None (no header row: not a trip list)."""
-    grid, com = sh["grid"], sh["comments"]
+    grid, com, d1904 = sh["grid"], sh["comments"], sh.get("d1904")
     cols, hi = None, 0
     for i, row in enumerate(grid[:20]):
         m = {}
@@ -384,7 +382,7 @@ def vmi_sheet(sh, known, seen):
                "note": _clean("\n\n".join(notes), 2000), "country": "", "place": "", "vma_days": [],
                "excel": dstr(money(excel)) if excel is not None else None, "amount": None, "lines": [],
                "status": "error", "reasons": [], "sel": False}
-        df, dt = vmi_date(df_s), vmi_date(cell(r, "date_to")) if cell(r, "date_to") else None
+        df, dt = vmi_date(df_s, d1904), vmi_date(cell(r, "date_to"), d1904) if cell(r, "date_to") else None
         if df and not dt and not cell(r, "date_to"):
             dt = df
         if not df or not dt:
@@ -515,7 +513,8 @@ def vmi_import_post():
         try:
             rows.append(rk_trip_clean(c, oid, uid, {k: t.get(k) for k in VMI_FIELDS}))
         except BadInput as x:
-            raise BadInput(tr("Row {0}: {1}", i + 1, str(x.args[0] if x.args else x))) from None
+            # 2.363.2 (#3106): the row of the sheet (the preview's row), not the position among the ticked trips
+            raise BadInput(tr("Row {0}: {1}", t["row"] if isinstance(t.get("row"), int) else i + 1, str(x.args[0] if x.args else x))) from None
     from .periodlock import period_need_open
     period_need_open(c, oid, *[d for r in rows for d in (r.get("date_from"), r.get("date_to"))])  # 2.148.0 A (#2471)
     write_lock(c, f"office_trips_import_{int(oid)}")  # 2.269.0 D (#3046): check and write in one go (two tabs)
@@ -531,26 +530,20 @@ def vmi_import_post():
         row = oc_enc_fields(c, oid, "office_trips", row)
         ids.append(insert_id(c, f"INSERT INTO office_trips({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())))
     ofx_log(c, oid, "import", target="trips", detail={"count": len(ids)})
+    fx_run(c, oid, uid, "trips", ids)  # 2.363.2 (#3104)
     bump(c)
     c.commit()
     return jsonify(created=len(ids), ids=ids, skipped=len(trips) - len(ids)), 201
 
 
-@app.post("/api/office/trips/delete")
-def vmi_delete_many():
-    """Office admin. {ids: [...]} -> deletes these trips of the office (the undo of an import: one step) with their
-    receipts; a trip with a receipt billed on to a client or locked (olk_trip_item_reason) stays (skipped). Answers the deleted trips as they were.
-    2.272.0 C (#3027): only trips unchanged since they were made (updated_at = created_at, no receipts, no drive or trip project
-    pointing at them) go; the others stay (kept) -- an undo takes back the import, never what was added since."""
-    from .travel import _ctx, rk_trips
-    c, uid, oid = _ctx()
-    b = body()
-    ids = b.get("ids") if isinstance(b, dict) else None
-    if not isinstance(ids, list) or len(ids) > VMI_IMPORT_MAX or not all(isinstance(x, int) and not isinstance(x, bool) for x in ids):
-        raise BadInput(tr("Invalid data"))
-    ids = sorted(set(ids))
+def vmi_remove(c, oid, ids):
+    """Deletes these trips of the office with their receipts; a trip with a receipt billed on to a client or locked
+    (olk_trip_item_reason) stays (skipped). 2.272.0 C (#3027): only trips unchanged since they were made (updated_at =
+    created_at, no receipts, no drive or trip project pointing at them) go; the others stay (kept) -- an undo takes back the
+    import, never what was added since. -> {deleted, trips (as they were), skipped, kept}. No commit."""
+    from .travel import rk_trips
     if not ids:
-        return jsonify(ok=True, deleted=0, trips=[], skipped=[])
+        return {"deleted": 0, "trips": [], "skipped": [], "kept": []}
     q = ",".join("?" * len(ids))
     mine = {r[0] for r in c.execute(f"SELECT id FROM office_trips WHERE org_id=? AND id IN ({q})", [oid] + ids)}
     billed = {r[0] for r in c.execute(f"SELECT DISTINCT trip_id FROM office_trip_items WHERE org_id=? AND billed_doc_id IS NOT NULL "
@@ -571,6 +564,20 @@ def vmi_delete_many():
     if gone:
         c.execute(f"DELETE FROM office_trip_items WHERE org_id=? AND trip_id IN ({','.join('?' * len(gone))})", [oid] + gone)
         c.execute(f"DELETE FROM office_trips WHERE org_id=? AND id IN ({','.join('?' * len(gone))})", [oid] + gone)
+    return {"deleted": len(gone), "trips": old, "skipped": sorted(mine & billed), "kept": sorted(kept)}
+
+
+@app.post("/api/office/trips/delete")
+def vmi_delete_many():
+    """Office admin. {ids: [...]} -> vmi_remove (the undo of an import: one step)."""
+    from .travel import _ctx
+    c, uid, oid = _ctx()
+    b = body()
+    ids = b.get("ids") if isinstance(b, dict) else None
+    if not isinstance(ids, list) or len(ids) > VMI_IMPORT_MAX or not all(isinstance(x, int) and not isinstance(x, bool) for x in ids):
+        raise BadInput(tr("Invalid data"))
+    out = vmi_remove(c, oid, sorted(set(ids)))
+    fx_settle(c, oid, uid, "trips")  # 2.363.2 (#3104)
     bump(c)
     c.commit()
-    return jsonify(ok=True, deleted=len(gone), trips=old, skipped=sorted(mine & billed), kept=sorted(kept))
+    return jsonify(ok=True, **out)

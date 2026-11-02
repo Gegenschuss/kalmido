@@ -71,10 +71,10 @@ async function lp_folderSet(f, c) {
   offerUndo(tr('Colour of {0}', qn(fName(f))), histAdd({label: tr('Colour of {0}', qn(fName(f))), undo: put(before), redo: put(after)}));
 }
 // the swatch row of a menu (list / folder): none + the 12 tones
-const lp_menuRow = (cur, fn) => ({rcls: 'mcols', rlab: tr('Color'), row: ['', ...LP_TONES.map(t => t[2])].map((c, i) => ({label: c ? tr(LP_TONES[i - 1][1]) : tr('No color'), cls: 'mcol', swc: c, on: (cur || '') === c, fn: () => fn(c)}))});
+const lp_menuRow = (cur, fn) => ({rcls: 'mcols', rlab: tr('Colour'), row: ['', ...LP_TONES.map(t => t[2])].map((c, i) => ({label: c ? tr(LP_TONES[i - 1][1]) : tr('No colour'), cls: 'mcol', swc: c, on: (cur || '') === c, fn: () => fn(c)}))});
 const lp_folderMenuRow = f => [lp_menuRow(lp_near(lp_folderCols()[f])?.[2] || '', c => lp_folderSet(f, c)), '-'];
 // the swatches of the list dialog (#l-col): none + the 12 tones, the shown tone pressed
-const lp_dlgBtns = (cur, dis = '') => ['', ...LP_TONES.map(t => t[2])].map((c, i) => `<button type="button" style="background:${c || 'var(--bg4)'}" class="${(cur || '') === c ? 'on' : ''}" aria-pressed="${(cur || '') === c}" aria-label="${esc(c ? tr(LP_TONES[i - 1][1]) : tr('No color'))}" title="${esc(c ? tr(LP_TONES[i - 1][1]) : tr('No color'))}" data-c="${c}" ${dis}></button>`).join('');
+const lp_dlgBtns = (cur, dis = '') => ['', ...LP_TONES.map(t => t[2])].map((c, i) => `<button type="button" style="background:${c || 'var(--bg4)'}" class="${(cur || '') === c ? 'on' : ''}" aria-pressed="${(cur || '') === c}" aria-label="${esc(c ? tr(LP_TONES[i - 1][1]) : tr('No colour'))}" title="${esc(c ? tr(LP_TONES[i - 1][1]) : tr('No colour'))}" data-c="${c}" ${dis}></button>`).join('');
 // a new list: the folder's colour follows the folder field until a colour is picked by hand
 document.addEventListener('click', e => { const b = e.target.closest?.('#l-col button'); if (b) b.closest('.modal')?.setAttribute('data-lptouch', '1'); });
 document.addEventListener('input', e => {

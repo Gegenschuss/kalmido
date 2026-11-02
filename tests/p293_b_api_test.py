@@ -194,8 +194,8 @@ check(len(km) == 1 and km[0]["gross"] == "45.50" and km[0]["net"] == "45.50" and
       f"EUeR: the mileage allowance once (130 km x 0.35; company car, private, deleted, without vehicle not) {e['expenses']}")
 check(any("logbook" in n for n in e["notes"]) and e["expense_total"]["gross"] == "45.50", f"EUeR: the note, the total {e['notes']} {e['expense_total']}")
 check(not any(x["key"] == "km" for x in A.get(B + "/api/office/books/euer?year=2025").json()["expenses"]), "EUeR 2025: no line")
-rows = list(csv.reader(io.StringIO(A.get(B + "/api/office/books/euer.csv?year=2026").content.decode("utf-8-sig")), delimiter=";"))
-check(any(r_[:4] == ["Mileage allowance", "45,50", "0,00", "45,50"] for r_ in rows), f"EUeR CSV: the line {rows}")
+rows = list(csv.reader(io.StringIO(A.get(B + "/api/office/books/euer.csv?year=2026").content.decode("utf-8-sig")), delimiter=","))  # 2.368.2 (#2984): English file
+check(any(r_[:4] == ["Mileage allowance", "45.50", "0.00", "45.50"] for r_ in rows), f"EUeR CSV: the line {rows}")
 
 # ---------------------------------------------------------------- CSV / PDF
 A.patch(B + f"{DR}/{D2}", json={"purpose": "=HYPERLINK(1)"})
@@ -206,9 +206,9 @@ check([x["action"] for x in vl] == ["update", "create"] and vl[0]["detail"]["bef
       f"the office log: the vehicle created and its kind changed {[x['detail'] for x in vl]}")
 r = A.get(B + LB + ".csv?year=2026")
 check(r.ok and r.headers.get("Content-Type", "").startswith("text/csv") and "logbook-2026.csv" in r.headers.get("Content-Disposition", ""), "CSV: download")
-rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=";"))
+rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=","))  # 2.368.2 (#2984): English file
 # 2.152.0 (#2169): fixed columns after km (ID, corrects, corrected by, reason, closed)
-check(rows[0][0] == "Date" and rows[0][12] == "km" and rows[0][13:] == ["ID", "Corrects", "Corrected by", "Reason", "Closed"] and rows[1][0] == "2026-03-02" and rows[1][10:13] == ["10000,0", "10130,0", "130,0"], f"CSV: oldest first with odometer {rows[:2]}")
+check(rows[0][0] == "Date" and rows[0][12] == "km" and rows[0][13:] == ["ID", "Corrects", "Corrected by", "Reason", "Closed"] and rows[1][0] == "2026-03-02" and rows[1][10:13] == ["10000.0", "10130.0", "130.0"], f"CSV: oldest first with odometer {rows[:2]}")
 check(any(r_[6] == "'=HYPERLINK(1)" for r_ in rows if len(r_) > 6), "CSV: formula injection made harmless")
 check(sum(1 for r_ in rows if len(r_) > 2 and r_[0] == "2026-03-09") == 1, "CSV: the drive without vehicle is listed")
 check(not any(r_[:1] == ["2026-03-07"] for r_ in rows), "CSV: the deleted drive is not among the drives")
@@ -216,7 +216,7 @@ i = next(n for n, r_ in enumerate(rows) if r_[:1] == ["Change log"])
 lg = [r_ for r_ in rows[i + 2:] if len(r_) == 6]  # 2.152.0 (#2169): + the drive's ID as the sixth column
 check(any(r_[2] == "Deleted" for r_ in lg) and any(r_[2] == "Changed" and "Purpose" in r_[4] for r_ in lg), f"CSV: the change log with the deleted drive {rows[i:i + 4]}")
 check(any(r_[2] == "Changed" and r_[4] == "Vehicle Kombi: Kind: Private car used for business -> Company car" for r_ in lg)
-      and any(r_[4] == "Mileage allowance per business km 2026: 0,30 -> 0,35" for r_ in lg) and not any("2025" in r_[4] for r_ in lg)
+      and any(r_[4] == "Mileage allowance per business km 2026: 0.30 -> 0.35" for r_ in lg) and not any("2025" in r_[4] for r_ in lg)
       and any(r_[2] == "Created" and r_[4].startswith("Vehicle Kombi: Name: Kombi") for r_ in lg), f"CSV: the vehicle and rate changes of the year in the log {lg}")
 check(A.patch(B + f"{V}/{VP}", json={"kind": "private"}).ok, "the kind back")
 r = A.get(B + LB + ".pdf?year=2026")

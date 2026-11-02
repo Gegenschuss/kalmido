@@ -519,9 +519,14 @@ def docs_split(nid):
         with c.savepoint():
             c.execute("UPDATE doc_meta SET asn=NULL WHERE node_id=?", (nid,))  # the stack's number goes to its part (2.154.0 E: undone on a failure)
             for i, (ps, pdf) in enumerate(zip(parts, pdfs), 1):
-                a = asn_of(ps)
                 pid = docs_ingest(c, uid, n["org_id"], f"{stem} ({i}).pdf", pdf, "application/pdf", m["source"], parent_id=n["parent_id"])
                 fs_log_add(c, pid, "upload", "split")
+                c.execute("INSERT INTO fs_shares(node_id, user_id, group_id, agent_id, role, expires_at, created_by, created_at) "
+                          "SELECT ?, user_id, group_id, agent_id, role, expires_at, created_by, created_at FROM fs_shares WHERE node_id=?", (pid, nid))
+                ids.append(pid)
+            S.asn_lock(c, m["ws"], nid)  # 2.363.3 (#3133): only around the numbers, after the parts are stored: a save with "next" waits
+            for ps, pid in zip(parts, ids):
+                a = asn_of(ps)
                 extra = {"from": nid}
                 if a is not None and not S.asn_taken(c, m["ws"], a, pid):
                     c.execute("UPDATE doc_meta SET asn=?, auto=? WHERE node_id=?", (a, json.dumps({"asn": "code"}), pid))
@@ -530,9 +535,6 @@ def docs_split(nid):
                     extra["no_asn"] = True  # the pages before the first code
                     c.execute("UPDATE doc_meta SET review=1 WHERE node_id=?", (pid,))
                 _put(c, pid, extra)
-                c.execute("INSERT INTO fs_shares(node_id, user_id, group_id, agent_id, role, expires_at, created_by, created_at) "
-                          "SELECT ?, user_id, group_id, agent_id, role, expires_at, created_by, created_at FROM fs_shares WHERE node_id=?", (pid, nid))
-                ids.append(pid)
     except QuotaExceeded:
         c.rollback()
         return err(tr("Your storage is full"), 413)
@@ -588,8 +590,10 @@ def docs_unsplit(nid):
     c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, nid))
     fs_log_add(c, nid, "restore", "unsplit")
     a = v.get("asn")
-    if isinstance(a, int) and not S.asn_taken(c, m["ws"], a, nid):
-        c.execute("UPDATE doc_meta SET asn=? WHERE node_id=?", (a, nid))
+    if isinstance(a, int):
+        S.asn_lock(c, m["ws"], nid)  # 2.363.3 (#3133): as in the split
+        if not S.asn_taken(c, m["ws"], a, nid):
+            c.execute("UPDATE doc_meta SET asn=? WHERE node_id=?", (a, nid))
     rest = {k: x for k, x in v.items() if k not in ("parts", "asn")}
     _put(c, nid, {**rest, "state": "open"})
     c.execute("UPDATE doc_meta SET review=1 WHERE node_id=?", (nid,))

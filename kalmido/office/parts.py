@@ -22,7 +22,8 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store, oc_json
 from ..core.errors import BadInput
 from .calc import RAW_MODES, TAX_KEYS, calc_cur, calc_lang, dec, fmt_money, fmt_qty, fmt_rate, label, money, office_calc, pack_tax, unit_text, _num
 from .homecur import hc_home  # 2.189.0 (#2475)
-from .model import UNITS, office_role, office_settings
+from .doclang import doc_txt
+from .model import PARTS_TITLE_FILM, UNITS, office_role, office_settings
 from .packs import office_pack_for
 
 try:  # the shoot calculation (part C, office/sheet.py); until it is there a shoot part counts nothing
@@ -596,11 +597,20 @@ def tp_render(c, oid, r, m, pack, lang, locked):
 
 
 # ---------------------------------------------------------------- invoices from a quotation with parts
+def tp_sum_title(s, lang):
+    """2.449.0 (#3766): the default title of a summary position: the office's own title (doc_txt: English for nl / fr / es / it,
+    never the former English app default there), else a neutral word in the document's language."""
+    own = doc_txt(s.get("parts_summary_title_de"), s.get("parts_summary_title_en"), lang)
+    if lang not in ("de", "en") and own in PARTS_TITLE_FILM.values():
+        own = ""
+    return own or tr("Services|document", lg=lang)
+
+
 def tp_inv_items(c, oid, r, mode=None, title=None):
     """The positions of an invoice from quotation r with parts (None: it has none). mode (else the office setting
     parts_invoice_mode, app default "full"): "title" = the title page with its positions, a part line becomes a position
     with its amount (one per tax rate when the part mixes rates); "summary" = one position per tax rate titled title (default
-    from the settings: "Filmherstellung" / "Film production"); "full" = the title page's direct positions plus, per printed
+    from the settings, else the word "Services" in the document's language: tp_sum_title); "full" = the title page's direct positions plus, per printed
     part, a heading and its positions (qty x part qty, producing / raw data / discount as positions); a part that is not
     printed stays one line. Net and gross equal the quotation's in every mode. Rates in EUR like inv_items_from_offer."""
     if not tp_has_parts(c, oid, r["id"]):
@@ -626,7 +636,7 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
         return label(pack, lang, "tax_" + k, pct=fmt_qty(pct[k], lang))
 
     if mode == "summary":
-        ttl = (title or "").strip()[:500] or s.get("parts_summary_title_" + ("de" if lang == "de" else "en")) or tr("Film production|document", lg=lang)  # 2.149.0 A (#2520)
+        ttl = (title or "").strip()[:500] or tp_sum_title(s, lang)
         out = []
         bases = {tl["rate_key"]: tl["base"] for tl in t["tax_lines"]} if t["vat_mode"] != "novat" else {"standard": t["net"]}
         for n, (k, b) in enumerate((k, bases[k]) for k in TAX_KEYS if k in bases and dec(bases[k])):

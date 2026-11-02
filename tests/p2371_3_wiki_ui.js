@@ -2,7 +2,7 @@
 // tablet 820x1180 (frida, a person WITHOUT an organisation: freelancer-matrix: wiki):
 // - #3333: "/" -> "Task (#)" puts "#" and lists the tasks the person sees; typing a title word filters the loaded tasks, a word
 //   only in a comment comes from the server's search (GET /api/search); Enter puts "#id " (saved page read back over the API)
-// - #3152: PUT /api/wiki/style: a fixed choice only (400 for anything else), the private space's person sets it (frida), in an
+// - #3152: PUT /api/wiki/style: a fixed choice only (400 for anything else), the private workspace's person sets it (frida), in an
 //   organisation only its admins (bob, a member: 403); the index answers style + may_style; the page carries the class of
 //   the space's style, "Reading style…" in the page's "…" overrides it for the person (account setting look.wkSt), light
 //   and dark keep the theme's colours
@@ -42,20 +42,20 @@ const K = {Enter: '', Escape: ''};
     check(r.http === 400, `#3152: style ${JSON.stringify(bad)} is refused (${r.http})`);
   }
   let r = await call(CF, 'PUT', '/api/wiki/style', {space: 'private', style: 'book'});
-  check(r.http === 200 && r.style === 'book' && r.space === 'private', `#3152: frida (no organisation) sets her private space's style ${JSON.stringify(r)}`);
+  check(r.http === 200 && r.style === 'book' && r.space === 'private', `#3152: frida (no organisation) sets her private workspace's style ${JSON.stringify(r)}`);
   let ix = await call(CF, 'GET', '/api/wiki?space=private');
   check(ix.style === 'book' && ix.may_style === true, `#3152: frida's index: style book, may_style ${JSON.stringify([ix.style, ix.may_style])}`);
   r = await call(CB, 'PUT', '/api/wiki/style', {space: OS, style: 'compact'});
   check(r.http === 403, `#3152: bob (a member) may not set the organisation's style (${r.http})`);
   r = await call(CB, 'PUT', '/api/wiki/style', {space: 'private', style: 'notepad'});
-  check(r.http === 200, `#3152: bob sets his own private space (${r.http})`);
+  check(r.http === 200, `#3152: bob sets his own private workspace (${r.http})`);
   r = await call(CF, 'PUT', '/api/wiki/style', {space: OS, style: 'compact'});
   check(r.http === 404, `#3152: frida cannot reach Alpha's space (${r.http})`);
   r = await call(CA, 'PUT', '/api/wiki/style', {space: OS, style: 'notepad'});
   check(r.http === 200 && r.style === 'notepad', `#3152: alice (admin) sets Alpha's style (${r.http})`);
   ix = await call(CB, 'GET', `/api/wiki?space=${OS}`);
   check(ix.style === 'notepad' && ix.may_style === false, `#3152: bob's index of Alpha: notepad, may_style false ${JSON.stringify([ix.style, ix.may_style])}`);
-  check((await call(CA, 'GET', '/api/wiki?space=private')).style === '', '#3152: alice\'s private space stays Clear (the styles are per space)');
+  check((await call(CA, 'GET', '/api/wiki?space=private')).style === '', '#3152: alice\'s private workspace stays Clear (the styles are per space)');
   await call(CB, 'PATCH', '/api/settings', {look: JSON.stringify({wkSt: 'body{display:none}', theme: 'dark'})});
   let lk0 = (await call(CB, 'GET', '/api/state')).settings?.look || '';
   check(!/wkSt/.test(lk0) && /"theme":"dark"/.test(lk0), `#3152: the own style keeps only a known value (${lk0})`);
@@ -104,9 +104,9 @@ const K = {Enter: '', Escape: ''};
     const sub = await ev(`(() => { const b = [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => /Reading style/.test(x.textContent)); if (!b) return null; b.click(); return 1; })()`);
     check(sub, `${tag}: the page's "…" has "Reading style…"`);
     const items = await until(`(() => { const t = [...document.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim()); return t.some(x => /^Compact/.test(x)) ? t : null; })()`);
-    check(items && items.some(x => /^Like the space \((Book|Notepad)\)$/.test(x)) && items.filter(x => x === 'Compact').length === 2, `${tag}: the choices: mine and the space's (both may set it) ${JSON.stringify(items)}`);
+    check(items && items.some(x => /^Like the workspace \((Book|Notepad)\)$/.test(x)) && items.filter(x => x === 'Compact').length === 2, `${tag}: the choices: mine and the space's (both may set it) ${JSON.stringify(items)}`);
     const heads = await ev(`[...document.querySelectorAll('#pop .mgh')].map(x => x.textContent.trim())`);
-    check(heads.includes('For me') && heads.includes('Default of the space'), `${tag}: "For me" and (admin / own space) "Default of the space" ${JSON.stringify(heads)}`);
+    check(heads.includes('For me') && heads.includes('Default of the workspace'), `${tag}: "For me" and (admin / own space) "Default of the workspace" ${JSON.stringify(heads)}`);
     await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => x.textContent.trim() === 'Compact').click(); return 1; })()`);
     check(await until(`!!document.querySelector('article.wkpage.wkst-compact') && !document.querySelector('article.wkpage.wkst-${want}')`), `${tag}: the own choice Compact replaces the space's style`);
     let lk = '';

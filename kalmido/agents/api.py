@@ -1,5 +1,6 @@
 """The REST API of an agent itself (token of an agent account)."""
 import json
+import re
 import time
 from datetime import timedelta
 from flask import g, jsonify
@@ -26,7 +27,7 @@ from ..agents.chat import chat_delivered, chat_event_mids
 from ..agents.core import perm_user_of
 from ..agents.steps import redact, step_clean, steps_job_log  # 2.407.0 A (#3513)
 from ..core.serializers import wk_for  # 2.407.0 A (#3513)
-from ..agents.workstyle import ws_public
+from ..agents.workstyle import ws_get, ws_public
 from ..agents.control import ctl_public  # 2.235.0 A (#2891)
 from ..agents.datalock import dl_public  # 2.235.0 B (#2902)
 from ..agents.agentrules import ar_public  # 2.235.0 C (#2903)
@@ -64,16 +65,20 @@ def v1_agent():
     return jsonify(agent_self(db(), aid))
 
 
+STATUS_KEY_RE = re.compile(r"[a-z0-9_]{1,40}")
+STATUS_AT_RE = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d+)?)?(?:Z|[+-]\d\d:\d\d)?")
+
+
 @app.put("/api/v1/agent/status")
 @v1_view
 def v1_agent_status():
-    """{status: idle|working|waiting|error, text?, task_id?, model?, permission_mode?, host_permission_mode?, permission_fixed? (2.437.0), host? (2.44.0)} -- shown as the dot on the agent's avatar and in the header chip;
+    """{status: idle|working|waiting|error, text?, task_id?, model?, permission_mode?, host_permission_mode?, permission_fixed? (2.437.0), host? (2.44.0), text_key?, text_at? (2.450.0)} -- shown as the dot on the agent's avatar and in the header chip;
     while "working", the task_id's panel (else every task of its lists) shows "<agent> is working on it" (2.0.2; "is writing
     ..." only with a typing signal since 2.13.2)."""
     v1_args(())
     aid = need_agent()
     b = v1_json()
-    unknown = sorted(k for k in b if k not in ("status", "text", "task_id", "model", "permission_mode", "host_permission_mode", "permission_fixed", "host"))
+    unknown = sorted(k for k in b if k not in ("status", "text", "task_id", "model", "permission_mode", "host_permission_mode", "permission_fixed", "host", "text_key", "text_at"))
     if unknown:
         raise UnknownFields(unknown)
     from ..agents.steps import host_info_in, host_info_set, steps_end
@@ -83,6 +88,12 @@ def v1_agent_status():
     text = b.get("text") or ""
     if not isinstance(text, str) or (b["status"] == "paused" and not text.strip()):  # 2.26.0 (#949): a pause needs its reason
         raise BadInput(tr("Invalid value: {0}", "text"))
+    # 2.450.0 (#3769): a known status text as a key the app translates, with the time in it; text stays the fallback
+    tkey, tat = b.get("text_key") or "", b.get("text_at") or ""
+    if not isinstance(tkey, str) or (tkey and not STATUS_KEY_RE.fullmatch(tkey)):
+        raise BadInput(tr("Invalid value: {0}", "text_key"))
+    if not isinstance(tat, str) or (tat and not STATUS_AT_RE.fullmatch(tat)):
+        raise BadInput(tr("Invalid value: {0}", "text_at"))
     c = db()
     tid = b.get("task_id")
     if tid is not None:
@@ -90,15 +101,15 @@ def v1_agent_status():
             raise BadInput(tr("Invalid value: {0}", "task_id"))
     tid = tid if b["status"] in ("working", "waiting") else None
     old = agent_row(c, aid)
-    c.execute("UPDATE agents SET status=?, status_text=?, status_at=?, status_task=? WHERE user_id=?",
-              (b["status"], text.strip()[:STATUS_TEXT_MAX], iso(now_utc()), tid, aid))
+    c.execute("UPDATE agents SET status=?, status_text=?, status_at=?, status_task=?, status_key=?, status_key_at=? WHERE user_id=?",
+              (b["status"], text.strip()[:STATUS_TEXT_MAX], iso(now_utc()), tid, tkey, tat, aid))
     hchg = host_info_set(c, old, hinfo)
     if "host" in b:  # 2.44.0 (#1517): the computer name the starter reports, kept on the token it uses
         from ..agents.setup import ains_host_set
         hchg = ains_host_set(c, g.get("token"), b["host"]) or hchg
     if b["status"] in ("idle", "error", "paused"):
         steps_end(c, aid)  # 2.32.0 (#1081): a run without a chat answer leaves no live steps behind
-    if hchg or (old["status"], old["status_text"], old["status_task"]) != (b["status"], text.strip()[:STATUS_TEXT_MAX], tid):
+    if hchg or (old["status"], old["status_text"], old["status_task"], old["status_key"], old["status_key_at"]) != (b["status"], text.strip()[:STATUS_TEXT_MAX], tid, tkey, tat):
         bump(c)  # clients reload only when something visible changed (agents may report often)
     c.commit()
     return jsonify(agent_self(c, aid))
@@ -329,6 +340,52 @@ def v1_agent_jobs():
     return jsonify(data=[job_dict(c, j) for j in rows], next_cursor=None)
 
 
+# ---------------------------------------------------------------- 2.392.0 A (#3367): the hard limits of starting work
+# slots_full: the agent's work style max_parallel (> 0) is a hard limit on its running jobs (waiting ones hold no place; a
+# request waiting for approval and a person's request job (kind) are not work in progress and do not count). wip_full: the
+# task's column has wip_hard on and holds more open tasks than its wip_limit. Both are 409 without storing anything; a job
+# that is only reported as waiting / done and every other update stay open.
+def sl_denied(name, msg, **extra):
+    e = Denied(409, msg)
+    e.v1_name, e.v1_extra = name, extra
+    return e
+
+
+def sl_running(c, aid, skip=None):
+    return c.execute("""SELECT COUNT(*) FROM agent_jobs WHERE agent_id=? AND state='running' AND kind IS NULL AND COALESCE(approval, '')=''
+                        AND id<>?""", (aid, skip or 0)).fetchone()[0]
+
+
+def sl_check_slots(c, aid, skip=None):
+    a = c.execute("SELECT work_style FROM agents WHERE user_id=?", (aid,)).fetchone()
+    mx = ws_get(a)["max_parallel"] if a else 0
+    n = sl_running(c, aid, skip) if mx else 0
+    if mx and n >= mx:
+        raise sl_denied("slots_full", tr("All {0} places are taken ({1} jobs running). Finish a job before you start the next one.", mx, n),
+                        running=n, max=mx)
+
+
+def sl_check_wip(c, tid):
+    s = c.execute("""SELECT s.id, s.name, s.wip_limit FROM tasks t JOIN sections s ON s.id=t.section_id
+                     WHERE t.id=? AND s.wip_hard=1 AND s.wip_limit IS NOT NULL""", (tid,)).fetchone()
+    if not s:
+        return
+    n = c.execute("""SELECT COUNT(*) FROM tasks WHERE section_id=? AND parent_id IS NULL AND status=0 AND deleted_at IS NULL""",
+                  (s["id"],)).fetchone()[0]
+    if n > s["wip_limit"]:  # like the column head (static/js/wip.js): above the limit, not at it
+        raise sl_denied("wip_full", tr("The column {0} holds {1} open tasks, the limit is {2}. No new jobs until it is back under.",
+                                       s["name"], n, s["wip_limit"]),
+                        section_id=s["id"], section=s["name"], count=n, limit=s["wip_limit"])
+
+
+def sl_check_new(c, aid, tid, state):
+    """A job that starts running (POST, or the working mark of a task) must fit the places and the task's column."""
+    if state == "running":
+        sl_check_slots(c, aid)
+        if tid:
+            sl_check_wip(c, tid)
+
+
 @app.post("/api/v1/agent/jobs")
 @v1_view
 def v1_agent_job_create():
@@ -338,6 +395,7 @@ def v1_agent_job_create():
     c = db()
     b = v1_json()
     f = v1_job_in(c, aid, b, True)
+    sl_check_new(c, aid, f.get("task_id"), f.get("state", "running"))  # 2.392.0 A (#3367)
     ts = iso(now_utc())
     log = (b.get("log") or b.get("append_log") or "")[-JOB_LOG_MAX:]
     jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,name) VALUES(?,?,?,?,?,?,?,?,?)""",
@@ -371,7 +429,7 @@ def job_notify(c, j, old_state):
     if not s or not job_visible(c, j, uid):
         return
     lid = None
-    if j["task_id"]:  # 2.1.0 (#317): "agent waits for me" as News (off by default) + the push per the settings
+    if j["task_id"]:  # 2.1.0 (#317): "agent waits for me" as News (2.367.2, #2968: on by default) + the push per the settings
         lr = c.execute("SELECT list_id FROM tasks WHERE id=?", (j["task_id"],)).fetchone()
         lid = lr[0] if lr else None
         news_add(c, uid, "approval", task_id=j["task_id"], data={"title": (j["title"] or "")[:200], "job": j["id"]}, actor=j["agent_id"], s=s)
@@ -401,6 +459,8 @@ def v1_agent_job_update(jid):
         raise Denied(409, tr("A request waiting for approval cannot be changed"))
     b = v1_json()
     f = v1_job_in(c, aid, b, False)
+    if f.get("state") == "running" and j["state"] != "running" and j["kind"] is None:  # 2.392.0 A (#3367): back to work over the limit
+        sl_check_slots(c, aid, skip=jid)
     log = j["log"] or ""
     if "log" in b:
         log = redact(b["log"])[0] if isinstance(b["log"], str) else b["log"]  # 2.407.0 (#3513): the last line shows on the task
@@ -485,6 +545,7 @@ def wk_set(c, aid, tid, b, j):
             steps_job_log(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (j["id"],)).fetchone(), text)
         jid, code = j["id"], 200
     else:
+        sl_check_new(c, aid, tid, "running")  # 2.392.0 A (#3367): the mark starts a running job
         try:
             name = f8f_job_name_in(b.get("name"))
         except ValueError:

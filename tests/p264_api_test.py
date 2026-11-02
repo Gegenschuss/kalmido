@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.64.0 API tests: #1864 the files of private spaces encrypted at rest with an account key per person.
  - without KALMIDO_SECRET_KEY: private files plain, no account keys (user_keys empty)
- - restart with a server key: the start-up pass seals every plain file of a private space (attachments, project files,
+ - restart with a server key: the start-up pass seals every plain file of a private workspace (attachments, project files,
    the file store, chat files with agents) with its owner's account key (header = -owner id); the log line
    "encrypted at rest:" holds counts only (no key, no content)
  - new uploads of a person without an organisation (task and comment attachments, project files, the file store,
@@ -244,7 +244,7 @@ check(not st0["problems"], f"without a server key: storage check clean {st0['pro
 # ================================================================ (d) restart with a server key: the start-up pass seals
 start(key=KEY, keep=True)
 A, Bo, Ca, Da, Er = sess("alice"), sess("bob"), sess("carol"), sess("dave"), sess("erin")  # a new server key: log in again
-check(wait_private_sealed(), f"start-up pass: no plain file of a private space left {[x[:2] + x[3:] for x in private_left_plain()]}")
+check(wait_private_sealed(), f"start-up pass: no plain file of a private workspace left {[x[:2] + x[3:] for x in private_left_plain()]}")
 sw = sweep()
 check(sw and all(x[4] == x[3] for x in sw if x[3] < 0), "start-up pass: every private file carries its owner's account key in the header")
 check(space(att_path(CA0)) == -CAROL and space(chat_path(CCH0)) == -CAROL, "start-up pass: carol's attachment and chat file -> -carol")

@@ -44,17 +44,17 @@ function apbDraw() {
   const offs = D.offices.map(o => `<option value="${o.personal ? 'personal' : o.id}" ${p.office_org_id && (o.id === p.office_org_id) ? 'selected' : ''}>${esc(o.name)}</option>`).join('');
   const types = APB.types.length ? `<ul class="apb-list">${APB.types.map(t => `<li class="${t.active ? '' : 'off'}"><button class="apb-main" data-apbtype="${t.id}"><b>${esc(t.name)}</b><span class="muted">${esc(apbTypeSub(t))}</span></button>
       <button class="iconbtn" data-apbdel="${t.id}" aria-label="${esc(tr('Delete {0}', t.name))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>`
-    : `<p class="muted">${tr('No appointment type yet. Customers choose one of them first.')}</p>`;
+    : `<p class="muted">${tr('No appointment type yet. Clients choose one of them first.')}</p>`;
   const now = Date.now();
   const bk = APB.bookings.filter(b => new Date(b.end).getTime() >= now).slice(0, 100);
   const books = bk.length ? `<ul class="apb-list apb-books">${bk.map(b => `<li class="${b.status}"><div class="apb-main"><b>${esc(apbWhen(b.start))}</b>
       <span>${esc(b.type_name || '')} · ${esc(b.name)}</span><span class="muted">${esc(b.email)}${b.phone ? ' · ' + esc(b.phone) : ''}</span>
-      ${b.status !== 'confirmed' ? `<span class="apb-st">${esc(b.status === 'pending' ? tr('Waiting for the customer to confirm') : b.cancelled_by === 'guest' ? tr('Cancelled by the customer') : tr('Cancelled'))}</span>` : ''}</div>
+      ${b.status !== 'confirmed' ? `<span class="apb-st">${esc(b.status === 'pending' ? tr('Waiting for the client to confirm') : b.cancelled_by === 'guest' ? tr('Cancelled by the client') : tr('Cancelled'))}</span>` : ''}</div>
       ${b.status === 'confirmed' || b.status === 'pending' ? `<button class="btn sm" data-apbcancel="${b.id}">${tr('Call off…')}</button>` : ''}</li>`).join('')}</ul>`
     : `<p class="muted">${tr('No bookings yet.')}</p>`;
   el.innerHTML = `${warn ? `<p class="apb-warn" role="note">${esc(warn)}</p>` : ''}
     <label class="mmain apb-onrow"><span class="swc"><input type="checkbox" id="apb-on" ${p.enabled ? 'checked' : ''} ${warn && !p.enabled ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span></span>
-      <span><b>${tr('Customers can book appointments')}</b>${APB.types.length ? '' : `<small class="muted">${tr('A public page without login: free times come from your calendars, every booking is confirmed by e-mail.')}</small>`}</span></label>
+      <span><b>${tr('Clients can book appointments')}</b>${APB.types.length ? '' : `<small class="muted">${tr('A public page without sign-in: free times come from your calendars, every booking is confirmed by e-mail.')}</small>`}</span></label>
     ${link}
     <h4>${tr('Page')}</h4>
     <div class="row"><label for="apb-slug">${tr('Address')}</label><span class="apb-slug"><span class="muted">/s/b/</span><input id="apb-slug" maxlength="40" autocomplete="off" spellcheck="false" value="${esc(p.slug)}"></span></div>
@@ -146,7 +146,7 @@ function apbTypeDlg(t) {
     ${num('apt-days', tr('Bookable up to'), t?.days_ahead ?? 30, 1, 365, tr('days ahead'))}
     <div class="row"><label for="apt-loc">${tr('Location')}</label><input id="apt-loc" maxlength="200" value="${esc(t?.location || '')}" placeholder="${esc(tr('e.g. phone, video call or an address'))}"></div>
     <div class="row"><label for="apt-note">${tr('Note')}</label><textarea id="apt-note" rows="2" maxlength="1000">${esc(t?.note || '')}</textarea></div>
-    <label class="chkl"><input type="checkbox" id="apt-active" ${!t || t.active ? 'checked' : ''}><span>${tr('Customers can book it')}</span></label>
+    <label class="chkl"><input type="checkbox" id="apt-active" ${!t || t.active ? 'checked' : ''}><span>${tr('Clients can book it')}</span></label>
     <div class="aerr" role="alert"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${t ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('apb-tdlg');
@@ -184,8 +184,8 @@ async function apbTypeDelete(t) {
 // ---- bookings: the person cancels (the customer gets a mail; cannot be undone, so it asks first)
 async function apbCancel(b) {
   if (!b) return;
-  const reason = await askPrompt(tr('Cancel the appointment with {0}?', b.name), '', {input: {max: 1000, placeholder: tr('Reason for the customer (optional)')}, ok: tr('Cancel the appointment'), cancel: tr('Back'), danger: true,
-    body: b.status === 'confirmed' ? tr('The event is removed from your calendar and the customer gets an e-mail. This cannot be undone.') : tr('The customer has not confirmed yet; the time becomes free again.')});
+  const reason = await askPrompt(tr('Cancel the appointment with {0}?', b.name), '', {input: {max: 1000, placeholder: tr('Reason for the client (optional)')}, ok: tr('Cancel the appointment'), cancel: tr('Back'), danger: true,
+    body: b.status === 'confirmed' ? tr('The event is removed from your calendar and the client gets an e-mail. This cannot be undone.') : tr('The client has not confirmed yet; the time becomes free again.')});
   if (reason === null || reason === undefined) return;
   try { await api('POST', `/api/appt/bookings/${b.id}/cancel`, {reason: reason || ''}); } catch { return; }
   toast(tr('Appointment cancelled'));

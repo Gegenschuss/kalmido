@@ -9,7 +9,7 @@ Invented names only, generated file contents (pictures drawn here as PNG, no lib
    shared folder, someone of another organisation 404)
  - POST /api/files/scan: two pictures (one turned) -> ONE PDF with two pages in the chosen folder; out=pdf only answers
    the PDF (the documents file it themselves); too many pages / not a picture / a folder with "view" only -> refused
- - a person without an organisation (freelancer fixture): the same in the private space
+ - a person without an organisation (freelancer fixture): the same in the private workspace
 tenant-matrix: file
 freelancer-matrix: files
 usage: p21121_a_api_test.py <datadir>      (a fresh container; P21121A_NOSTART=1: the container runs already)"""
@@ -224,7 +224,7 @@ r = scan(Da, [IMG1], [("parent_id", str(PROJ))])
 check(r.status_code == 404, f"dave cannot scan into carol's folder ({r.status_code})")
 check(Ca.post(B + "/api/files/scan", data={"space": "private"}).status_code == 400, "no page: 400")
 
-# ---- a person without an organisation: the same in the private space
+# ---- a person without an organisation: the same in the private workspace
 # freelancer-matrix: files
 FID, Fr = freelancer(B, A)
 FF = folder(Fr, "Kunde")

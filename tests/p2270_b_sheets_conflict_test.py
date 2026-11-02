@@ -9,7 +9,7 @@
    a rename over a newer rename is reported, remove; added ids come back
  - v1 with a token: cells by row_id / col_id + prev, conflicts; "B4" still works
  - step2 undo "table -> quotation": a draft edited in the office since stays (edited), an untouched one is deleted
- - a person without an organisation (P4): the same in the private space
+ - a person without an organisation (P4): the same in the private workspace
 freelancer-matrix: sheet
 usage: p2270_b_sheets_conflict_test.py <datadir>"""
 import sys

@@ -13,7 +13,6 @@ Invented accounts only (example.com).
    a process with the role all a second process waits for every loop (no double pushes / mails / backups)
 usage: p2102_d_api_test.py <datadir>      (P2102D_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh -- then only
        the checks without a restart run)"""
-import ast
 import os
 import subprocess
 import sys
@@ -86,17 +85,10 @@ def wait_for(fn, seconds=30):
 
 
 def migration_ids():
-    """The ids the server gives the MIGRATIONS steps (core/db.py mig_ids), from the exported schema."""
-    src = open(os.path.join(N, "..", "kalmido", "core", "schema.py"), encoding="utf-8").read()
-    for node in ast.parse(src).body:
-        if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == "MIGRATIONS":
-            seen, out = {}, []
-            for e in node.value.elts:
-                k = f"{e.elts[0].value}.{e.elts[1].value}"
-                seen[k] = seen.get(k, 0) + 1
-                out.append(k if seen[k] == 1 else f"{k}#{seen[k]}")
-            return out
-    return []
+    """The ids the server gives the MIGRATIONS steps (core/db.py mig_ids), from the exported schema + migrations.d (2.475.0, #3478)."""
+    sys.path.insert(0, os.path.join(N, "..", "tools"))
+    from check_migrations import schema_src, step_ids
+    return step_ids(schema_src(os.path.join(N, "..")))
 
 
 def setup():

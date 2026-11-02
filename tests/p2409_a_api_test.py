@@ -4,7 +4,7 @@
  - an organisation's admins switch areas off for all its members (PATCH /api/orgs/<id> {areas_off}); GET /api/orgs and
    /api/state (me.workspaces) carry it; members cannot change it; unknown areas and "review" (private only) are 400
  - while the organisation is the workspace, the server refuses the area's routes (403): the office (its own area), the
-   knowledge pages (also with the explicit space); the person's private space and personal office stay open
+   knowledge pages (also with the explicit space); the person's private workspace and personal office stay open
  - switching off deletes nothing: switched on again the page is there as before
  - every person switches areas off per workspace for themselves (setting ws_areas_off): stored normalised, strict, and it
    never locks a route (only hides in the app); a person without an organisation does the same for Private

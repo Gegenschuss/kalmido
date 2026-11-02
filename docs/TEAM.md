@@ -17,8 +17,10 @@ Kalmido's team views live in **Workload** (sidebar, module "Workload"). Since 2.
 - **Who sees what:** the team sees *that* somebody is away and when. The kind (above all sick leave) and the note
   only the person and the organisation's admins see. Kind and note are stored encrypted when the server's
   encryption at rest is on.
-- **Public holidays:** an organisation's admins pick a German state at the bottom of the tab; Kalmido computes the
-  statutory holidays itself (no external service). People without an organisation set their own.
+- **Public holidays:** an organisation's admins pick first the country, then the region where it has any (Settings >
+  Organisation); Germany by state, or only the nationwide holidays; Austria, Switzerland, France, Spain, Italy and the
+  Netherlands with their nationwide holidays. Kalmido computes them itself (no external service), one data file per country
+  under `kalmido/office/packs/holidays/`, the names follow your language. People without an organisation set their own.
 - **Effect:** in the workload a week's capacity shrinks by the absent workdays and holidays (a week away = no
   capacity). *Plan my day* shows a hint instead of a proposal on a day away. Assigning a task to somebody who is
   away on its day shows a warning - the assignment still happens.
@@ -46,7 +48,7 @@ Kalmido's team views live in **Workload** (sidebar, module "Workload"). Since 2.
 - **Vacation account:** per person and year an entitlement in days (half days allowed) and an optional carry-over from
   the year before. The admins of an organisation set it for its members in **Absences > Vacation accounts**; people
   without an organisation set their own there. The tab shows *entitlement*, *taken* (approved vacation working days of
-  the year; half days count 0.5, public holidays of the state and days you do not work do not count), *requested* (open
+  the year; half days count 0.5, public holidays of the chosen region and days you do not work do not count), *requested* (open
   requests) and *left*. No entitlement = no account, nothing changes.
 - **Vacation requests:** off by default. An organisation's admins switch on **Vacation of members needs an approval** in
   **Absences > Vacation accounts**. Then vacation a member enters for themselves is a request: the person and the admins
@@ -262,7 +264,7 @@ questions stays the classic form.
 
 - **Your own time zone** (Settings > Modules > Time tracking > *Time zone*; empty = the server's, the device's zone is offered
   as a suggestion) decides on which day an entry counts, the periods of the report, the CSV and the timesheet, "today" and
-  the month of the lock above. The calendar, reminders, workload and absences keep the server's time zone. With *All members*
+  the month of the lock above. Reminders, the digest, the briefing and the review follow it too (Settings > General > Region and formats, set from the browser at the first login); the calendar, workload and absences keep the server's time zone. With *All members*
   the report uses your time zone for everyone's entries.
 - **Entries over midnight** (on by default): an entry from 23:30 to 00:30 counts with 30 minutes on each day in the days of
   the report and the timesheet, and the CSV has one row per day. The entry itself stays one entry, the totals stay the same.
@@ -670,7 +672,9 @@ workspace).
 
 - *A task is created* (also by an agent, the API or an import step), *A task is assigned* (to a chosen person or to anyone;
   only when the person is new on the task) and *A custom field changes* (any change, or for selection and checkbox fields
-  only a chosen value: an option, checked, unchecked). Formula fields are calculated and never start a rule.
+  only a chosen value: an option, checked, unchecked; every field but a checkbox also *Filled*: it has a value, clearing it
+  starts nothing). Formula fields are calculated and never start a rule. A rule that moves a task to another project keeps the
+  values of text, number, amount, rating, date and checkbox fields where the target has a field of the same name and type.
 - *Set the priority* (none, low, medium, high), *Add a project tag* (only tags of this project: the rule belongs to everyone in
   the project, personal tags stay personal) and *Set a custom field* (a fixed value, checked like a value you type; empty
   clears the field).
@@ -773,16 +777,19 @@ noted in the server log).
 
 ## Joining an organisation needs your yes
 
-*Since 2.148.1.*
+*Since 2.148.1, for new addresses too since 2.453.*
 
 An organisation admin who adds an existing account (by e-mail address under *Settings > Workspaces*, or with *Invite by
 e-mail*) no longer makes the person a member at once: the person gets an invitation in their News (*X invites you to join
 the organisation Y*, no push) and chooses *Join*, *Later* or *Decline the invitation*. Only after *Join* are they a member
 in the chosen role. An open invitation ends after two weeks; inviting again renews it. The answer to the admin is the same
 for every address (with or without an account), so nobody learns through it who has an account. The instance admin still
-adds people directly. A new address (without an account) works as before: a new account in the organisation and the
-invitation mail; the link to choose a password goes only by e-mail, an organisation admin never sees it (also not when the
-mail failed); *Resend* works three times a day per invitation.
+adds people directly (on a hosted instance the operator invites, too). A new address (without an account) gets a new account
+and the invitation mail; the link to choose a password goes only by e-mail, an organisation admin never sees it (also not when
+the mail failed); *Resend* works three times a day per invitation. Since 2.453 such a person also joins only with *Join*
+(the invitation is in their News after they chose a password), so the member list looks the same for both. The link lasts
+as long as the invitation, two weeks, and *Resend* renews both; whoever sets the password late still has two weeks to answer.
+Accounts invited before stay members.
 
 Related changes in the same release:
 
@@ -913,8 +920,12 @@ Notifications can also go to a chat service, as a short text with the link to th
   admin who switches it on again owns it.
 - **The address is a secret:** stored encrypted, never shown again (only the service, the name and the last characters).
   Editing leaves it unchanged unless you type a new one.
-- **Delivery:** in the background, one try per message with a short time limit. After 5 failed sends in a row the channel
-  turns itself off and the settings say why; switching it on again starts the count anew. Quiet hours hold back your own
+- **Your own changes:** *Changes in my own projects* leaves out what you did yourself; tick *Including my own changes* to get
+  those too. An inbound webhook and a rule count as news, even though they act in your name. An organisation's channel is a
+  team feed and always reports everybody.
+- **Delivery:** in the background with a short time limit; a failed message gets one more try after a minute. After 5 failed
+  messages in a row the channel turns itself off: the settings say why, and you (for an organisation's channel: its admins)
+  get a News item and a push (event *Integrations* in the notification settings). Switching it on again starts the count anew. Quiet hours hold back your own
   channel messages (urgent ones excepted).
 - **Addresses:** `https://` only. Addresses in your own network and plain `http://` only for hosts an admin allowed
   (*Settings > Administration > Advanced* or `KALMIDO_WEBHOOK_ALLOW_HOSTS`), the same guard as for webhooks.

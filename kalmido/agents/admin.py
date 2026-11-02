@@ -3,7 +3,7 @@ import json
 import re
 import secrets
 from datetime import timedelta
-from flask import g, jsonify
+from flask import g, has_request_context, jsonify
 
 from ..core.config import app, TZ, USERNAME_RE
 from ..core.pg import insert_id, system_ctx
@@ -26,6 +26,7 @@ from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..accounts.users import admin_sees, avatar_upload, need_admin, user_purge
 from ..accounts.orgs import may_see
+from ..accounts.orgs import _operator_apart, op_apart_deny, op_foreign_account, op_foreign_org, op_support_deny, op_support_only  # 2.399.0 (#2687), 2.485.0 (#3939)
 from ..agents.workstyle import WS_NEW
 from ..agents.control import ctl_new  # 2.235.0 A (#2891): a new agent asks before every change
 from ..api.v1 import API_ON, need_api, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, token_public, WH_ON
@@ -66,11 +67,19 @@ def _agent_name(v):
     return re.sub(r"[\x00-\x1f\x7f]", " ", str(v or "")).strip()[:60]
 
 
-def need_agent_admin(c, aid):
+def need_agent_admin(c, aid, kill=False, cred=False):
+    """An instance admin and agent aid (404 without it). 2.399.0 (#2687): hosted, an agent of a client (its organisation's, or a
+    client's personal one) only for the kill switch (kill=True: PATCH {enabled}); everything else 403. 2.485.0 (#3939, review
+    F1): cred=True (a token, secret or setup code) never through the client's support access."""
     need_admin()
     a = agent_row(c, aid)
     if not a:
         raise Denied(404)
+    if not kill and op_foreign_account(c, aid):
+        op_apart_deny()
+    if cred:
+        if op_support_only(c, uid=aid):
+            op_support_deny()
     return a
 
 
@@ -182,6 +191,9 @@ def admin_agent_create():
     need_admin()
     need_api()
     b, c = body(), db()
+    if _operator_apart() and ((b.get("owner_id") and b.get("owner_id") != me())
+                              or (isinstance(b.get("org_id"), int) and op_foreign_org(c, b["org_id"], grant=False))):
+        op_apart_deny()  # 2.399.0 (#2687): hosted: no agent for a client or in a client's organisation by the operator (its token); 2.485.0 (#3939): not even through support access
     with system_ctx(c):  # 2.37.0 (#1150): the instance admin creates an account (structure); a team agent may land in an organisation he is not in
         username = (b.get("username") or "").strip().lower()
         if not USERNAME_RE.fullmatch(username):
@@ -193,7 +205,7 @@ def admin_agent_create():
         c.execute("UPDATE agents SET note=?, provider=? WHERE user_id=?", (str(b.get("note") or "")[:AGENT_NOTE_MAX], str(b.get("provider") or "").strip()[:80], uid))
         try:  # 2.28.0 (#965 / #970 / #935): owner_id = a personal agent of that person (default: a team agent), org_id = its workspace
             agent_owner_set(c, uid, b.get("owner_id"), bool(b.get("owner_id")))
-            agent_org_set(c, uid, b["org_id"] if "org_id" in b else "auto")
+            agent_org_set(c, uid, b["org_id"] if "org_id" in b else "private" if _operator_apart() else "auto")  # 2.399.0 (#2687): hosted: never a client's
         except BadInput:
             c.rollback()
             raise
@@ -257,8 +269,8 @@ def admin_agent_update(aid):
     from ..api.scopes import agent_scopes_set
     c = db()
     with system_ctx(c):  # 2.37.0 (#1150): the instance admin manages agent accounts (any organisation; structure, no content)
-        a0 = need_agent_admin(c, aid)
         b = body()
+        a0 = need_agent_admin(c, aid, kill=isinstance(b, dict) and set(b) <= {"enabled"})  # 2.399.0 (#2687): hosted, a client's agent: pause only
         secret = None
         if "username" in b:
             username = str(b["username"] or "").strip().lower()
@@ -293,7 +305,16 @@ def admin_agent_update(aid):
             c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b["note"] or "")[:AGENT_NOTE_MAX], aid))
         if "provider" in b:  # 2.24.0 (#896)
             c.execute("UPDATE agents SET provider=? WHERE user_id=?", (str(b["provider"] or "").strip()[:80], aid))
+        if "ai" in b:  # 2.482.0 (#3530): AI agent (true) or a bot without AI (false)
+            if not isinstance(b["ai"], bool):
+                c.rollback()
+                return err(tr("Invalid value: {0}", "ai"))
+            c.execute("UPDATE agents SET ai=? WHERE user_id=?", (1 if b["ai"] else 0, aid))
         if "owner_id" in b or "org_id" in b:  # 2.28.0 (#965 / #935): "Belongs to" (team | a person) and the workspace
+            if _operator_apart() and ((b.get("owner_id") and b.get("owner_id") != me())
+                                      or (isinstance(b.get("org_id"), int) and op_foreign_org(c, b["org_id"], grant=False))):
+                c.rollback()
+                op_apart_deny()  # 2.399.0 (#2687): hosted: the operator hands no agent to a client or into a client's organisation
             try:
                 if "owner_id" in b:
                     agent_owner_set(c, aid, b["owner_id"], True)
@@ -311,7 +332,7 @@ def admin_agent_update(aid):
             pr = (pr or "").strip()[:200]
             cur = agent_row(c, aid)
             if pr:
-                c.execute("UPDATE agents SET status='paused', status_text=?, status_at=?, status_task=NULL WHERE user_id=?", (pr, iso(now_utc()), aid))
+                c.execute("UPDATE agents SET status='paused', status_text=?, status_key='', status_key_at='', status_at=?, status_task=NULL WHERE user_id=?", (pr, iso(now_utc()), aid))
             elif cur["status"] == "paused":
                 c.execute("UPDATE agents SET status='idle', status_text='', status_at=? WHERE user_id=?", (iso(now_utc()), aid))
         if "proposals" in b:  # 2.3.0: who may ask it for proposals
@@ -392,7 +413,7 @@ def admin_agent_token(aid):
     need_api()
     c = db()
     with system_ctx(c):  # 2.37.0 (#1150): the instance admin manages agent accounts (any organisation; structure, no content)
-        need_agent_admin(c, aid)
+        need_agent_admin(c, aid, cred=True)  # 2.485.0 (#3939)
         c.execute("DELETE FROM api_tokens WHERE user_id=?", (aid,))
         tok = agent_token_new(c, aid, body().get("expires_days"))
         c.commit()
@@ -403,7 +424,7 @@ def admin_agent_token(aid):
 def admin_agent_secret(aid):
     c = db()
     with system_ctx(c):  # 2.37.0 (#1150): the instance admin manages agent accounts (any organisation; structure, no content)
-        a = need_agent_admin(c, aid)
+        a = need_agent_admin(c, aid, cred=True)  # 2.485.0 (#3939)
         if not a["webhook_id"]:
             raise Denied(404)
         secret = "whsec_" + secrets.token_urlsafe(32)
@@ -538,7 +559,9 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
         oids = user_orgs_full(c, a["owner_id"], write=True) if a["owner_id"] else []  # 2.143.0 A (#2151)
         if a["owner_id"]:  # 2.361.4 (#2928): the first organisation that lets it have an agent, else its private area
             oids = [o for o in oids if agent_ws_allowed(c, a["owner_id"], o)]
-        v = oids[0] if oids else (None if a["owner_id"] else main_org(c))
+        v = oids[0] if oids else (None if a["owner_id"] or _operator_apart() else main_org(c))  # 2.399.0 (#2687, review F2): hosted: private
+    if not a["owner_id"] and isinstance(v, int) and not isinstance(v, bool) and has_request_context() and op_foreign_org(c, v, grant=False):  # 2.485.0 (#3939): not even through support access
+        op_apart_deny()  # 2.399.0 (#2687, review F2): hosted: a team agent of the operator never joins a client's organisation
     if v in (None, "", 0, "0", "private"):
         if a["org_id"]:  # 2.361.4 (#2935): out of an organisation only when none of its projects / calendars / books holds it
             _agent_ws_check(c, aid, None)
@@ -725,7 +748,7 @@ def my_agent_update(aid):
     a = need_own_agent(c, aid)
     b = body()
     unknown = sorted(k for k in b if k not in ("display_name", "note", "enabled", "scopes", "allowed_ips", "provider", "pause_reason", "org_id",
-                                               "runtime", "list_ids", "bridge_ok", "limits"))
+                                               "runtime", "list_ids", "bridge_ok", "limits", "ai"))
     if unknown:
         return err(tr("Invalid value: {0}", ", ".join(unknown)))
     if "org_id" in b:  # 2.28.0 (#935): the owner moves the agent into another workspace (its lists must fit: none of another one)
@@ -770,6 +793,11 @@ def my_agent_update(aid):
         c.execute("UPDATE agents SET note=? WHERE user_id=?", (str(b["note"] or "")[:AGENT_NOTE_MAX], aid))
     if "provider" in b:  # 2.24.0 (#896)
         c.execute("UPDATE agents SET provider=? WHERE user_id=?", (str(b["provider"] or "").strip()[:80], aid))
+    if "ai" in b:  # 2.482.0 (#3530): AI agent (true) or a bot without AI (false)
+        if not isinstance(b["ai"], bool):
+            c.rollback()
+            return err(tr("Invalid value: {0}", "ai"))
+        c.execute("UPDATE agents SET ai=? WHERE user_id=?", (1 if b["ai"] else 0, aid))
     if "pause_reason" in b:  # 2.26.0 (#949): pause with a reason (text) / resume (null or ""): status paused <-> idle
         pr = b["pause_reason"]
         if pr is not None and not isinstance(pr, str):
@@ -778,7 +806,7 @@ def my_agent_update(aid):
         pr = (pr or "").strip()[:200]
         cur = agent_row(c, aid)
         if pr:
-            c.execute("UPDATE agents SET status='paused', status_text=?, status_at=?, status_task=NULL WHERE user_id=?", (pr, iso(now_utc()), aid))
+            c.execute("UPDATE agents SET status='paused', status_text=?, status_key='', status_key_at='', status_at=?, status_task=NULL WHERE user_id=?", (pr, iso(now_utc()), aid))
         elif cur["status"] == "paused":
             c.execute("UPDATE agents SET status='idle', status_text='', status_at=? WHERE user_id=?", (iso(now_utc()), aid))
     if "enabled" in b:

@@ -174,7 +174,7 @@ function lyo_tvReport(j, k) {
   }
   const us = o => Object.entries(o).sort((a, b) => b[1] - a[1]);
   const lists = [...L.values()].map(g => ({...g, amount: Math.round(g.amount * 100) / 100, users: us(g.users),
-    tasks: [...g.tasks.values()].map(x => ({...x, users: us(x.users)})).sort((a, b) => b.seconds - a.seconds || String(a.title).localeCompare(String(b.title)))}))
+    tasks: [...g.tasks.values()].map(x => ({...x, users: us(x.users)})).sort((a, b) => b.seconds - a.seconds || cmpText(a.title, b.title))}))
     .sort((a, b) => b.seconds - a.seconds);
   tot.amount = Math.round(tot.amount * 100) / 100;
   const mine = es.filter(e => e.user_id === S.me?.id && e.day === t0).reduce((n, e) => n + e.seconds, 0);

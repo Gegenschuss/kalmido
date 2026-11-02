@@ -3,7 +3,7 @@
 //   touch screen, still with reduced motion), a calm card (round corners, centred, the logo only, no heron), a greeting
 //   by the time of day above the fields, the line under the card, light and dark, a phone width without side scrolling;
 //   the page "Set a new password" (an admin's reset link) looks the same
-// - #1531 "Forgot your password?" next to "Stay logged in": opens the address field in the same card (the user name typed
+// - #1531 "Forgot your password?" next to "Stay signed in": opens the address field in the same card (the user name typed
 //   so far comes along), Back returns, sending shows the same neutral answer
 // Screenshots (P249A_SHOTS): login desktop dark / light, phone dark / light.
 const path = require('path');
@@ -31,7 +31,7 @@ const GREET = ['Good morning, nice to have you here.', 'Welcome back, nice to ha
     const {ev, nav, cmd, ctx} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: w, height: h}});
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     await nav(B);
     for (let i = 0; i < 40 && !await ev(`!!document.querySelector('.authscreen #auth-form')`).catch(() => false); i++) await sleep(250);
   };
@@ -57,7 +57,7 @@ const GREET = ['Good morning, nice to have you here.', 'Welcome back, nice to ha
     check(Math.abs(L.cl - L.cr) < 4 && L.cw >= 380 && L.cw <= 410, `#1553: the card is centred, 25rem wide (${L.cl}/${L.cr}/${L.cw})`);
     check(L.rad >= 20 && /rgba?\(/.test(L.shadow), '#1553: round corners and a soft shadow: ' + L.rad);
     check(/linear-gradient/.test(L.btn), '#1553: the login button has a light gradient');
-    check(L.row < 6, '#1531: "Forgot your password?" sits in the row of "Stay logged in"');
+    check(L.row < 6, '#1531: "Forgot your password?" sits in the row of "Stay signed in"');
     check(L.bg[0] < 60, '#1553: dark: a dark card ' + L.bg);
     await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: 200, y: 300}, {type: 'pointerMove', x: 240, y: 320, duration: 100}]}]});
     await sleep(300);

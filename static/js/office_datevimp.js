@@ -34,6 +34,8 @@ function dimp_supHtml() {
     <small class="muted">${esc([x.zip, x.city].filter(Boolean).join(' '))}</small>
     <button type="button" class="ib" data-dimp="del" data-id="${x.id}" aria-label="${esc(tr('Delete supplier'))}" title="${esc(tr('Delete supplier'))}">${ic('trash', 's')}</button></span></li>`).join('')}</ul>`;
 }
+// 2.452.0 (#3836): on a phone the row has no symbols (office.css), a long press opens what they did
+ms_rowMenu('.dimpsup li[data-id]', r => menu(r, [{label: tr('Delete supplier'), icon: 'trash', cls: 'danger', fn: () => $('[data-dimp="del"]', r).click()}]));
 async function dimp_rename(el) {
   const id = +el.dataset.dimpName, x = (DIMP.sup || []).find(s => s.id === id), name = el.value.trim();
   if (!x || !name || name === x.name) { if (x && !name) el.value = x.name; return; }

@@ -14,9 +14,9 @@ from flask import Response, g as fl_g, jsonify, request
 
 from ..core.config import app
 from ..core.db import local_now
-from ..core.i18n import lang, tr, trn
+from ..core.i18n import csv_dialect, lang, tr, trn
 from ..core.errors import BadInput
-from .calc import dstr, money
+from .calc import calc_lang, dstr, fmt_point, money
 from .ledger import ofx_log
 from .model import office_settings
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
@@ -143,7 +143,7 @@ def vmr_report(c, oid, year, person=None, lg="de"):
 def vmr_num(v, lg):
     d = Decimal(v)
     t = format(d.quantize(Decimal(1)) if d == d.to_integral() else d.quantize(Decimal("0.01")), "f")
-    return t.replace(".", ",") if lg == "de" else t
+    return fmt_point(t, lg)  # 2.449.0 (#3766): every comma language (was de alone)
 
 
 def vmr_args():
@@ -155,12 +155,12 @@ def vmr_args():
     own = ofr_own_uid("travel")
     if own is not None:  # 2.187.1 B (#2735): level "own": only the person's own per diem (rk_trips: their trips)
         person = "u%s" % own
-    lg = "de" if lang(c, uid) == "de" else "en"
+    lg = calc_lang(lang(c, uid))  # 2.449.0 (#3766): every app language (was de, else en)
     return c, uid, oid, year, person, lg
 
 
 def vmr_fname(year, person, ext):
-    return f"per-diem-{year}{'-' + re.sub(r'[^a-z0-9]+', '-', person.lower()).strip('-') if person else ''}.{ext}"
+    return f"{tr('per-diem|file name')}-{year}{'-' + re.sub(r'[^a-z0-9]+', '-', person.lower()).strip('-') if person else ''}.{ext}"
 
 
 def vmr_send(raw, mime, name):
@@ -207,18 +207,19 @@ def vmr_row_note(r):
 
 @app.get("/api/office/trips/vma.csv")
 def vmr_csv():
-    """The report as CSV (semicolon, decimal comma, one row per person and trip, a total per person and overall)."""
+    """The report as CSV (separator and decimal sign of the language, one row per person and trip, a total per person and overall)."""
     c, uid, oid, year, person, lg = vmr_args()
     rep = vmr_report(c, oid, year, person, lg)
     buf = io.StringIO()
-    w = csv.writer(buf, delimiter=";")
+    sep, num = csv_dialect(lg)  # 2.368.2 (#2984)
+    w = csv.writer(buf, delimiter=sep)
     w.writerow([tr("Person")] + vmr_head()[:6] + [tr("Per diem") + f" ({VMR_CUR})", tr("Breakdown")])
     for g in rep["people"]:
         for r in g["trips"]:
             w.writerow([_csv_safe(g["label"]), r["date_from"], r["date_to"], r["t_start"], r["t_end"], _csv_safe(r["dest"]), _csv_safe(r["purpose"]),
-                        r["amount"].replace(".", ",") if r["amount"] is not None else "", _csv_safe(" | ".join(vmr_row_note(r).split("\n")))])
-        w.writerow([_csv_safe(g["label"]), "", "", "", "", "", tr("Total"), g["total"].replace(".", ","), ""])
-    w.writerow([tr("Total"), "", "", "", "", "", "", rep["total"].replace(".", ","), "; ".join(rep["source"])])
+                        num(r["amount"]), _csv_safe(" | ".join(vmr_row_note(r).split("\n")))])
+        w.writerow([_csv_safe(g["label"]), "", "", "", "", "", tr("Total"), num(g["total"]), ""])
+    w.writerow([tr("Total"), "", "", "", "", "", "", num(rep["total"]), "; ".join(rep["source"])])
     ofx_log(c, oid, "export", target="travel", detail={"what": "vma.csv", "year": year})
     c.commit()
     return vmr_send("﻿" + buf.getvalue(), "text/csv; charset=utf-8", vmr_fname(year, person, "csv"))

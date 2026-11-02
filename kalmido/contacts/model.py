@@ -212,7 +212,7 @@ def book_fields(b, create=False):
     if "color" in b:
         v = b["color"]
         if not isinstance(v, str) or not (v == "" or re.fullmatch(r"#[0-9a-fA-F]{6}", v)):
-            raise BadInput(tr("Invalid value: {0}", tr("Color")))
+            raise BadInput(tr("Invalid value: {0}", tr("Colour")))
         out["color"] = v.lower()
     return out
 
@@ -254,9 +254,9 @@ def book_member_set(c, bid, uid, role):
     b = c.execute("SELECT * FROM books WHERE id=?", (bid,)).fetchone()
     u = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
     if not u or (uid == b["owner_id"] and not obk_org(b)) or personal_agent_foreign(c, uid, me()):  # 2.52.0 C (#1438): an org book's manager may be shared with
-        raise Denied(404, tr("unknown user"))
+        raise Denied(404, tr("unknown person"))
     if is_agent(u) and not has_request_context():
-        raise Denied(404, tr("unknown user"))
+        raise Denied(404, tr("unknown person"))
     if not c.execute("SELECT 1 FROM book_members WHERE book_id=? AND user_id=?", (bid, uid)).fetchone():  # a new member
         from ..accounts.orgs import need_visible, ws_fit_problem
         need_visible(c, uid)  # 2.30.0 (#1036, B2): only people one may see (404 as for an unknown id)
@@ -401,10 +401,10 @@ def vc_is_qp(ln):
 
 
 def vc_qp_decode(val, params):
-    """2.45.1 (#1555): a quoted-printable value (vCard 2.1) -> text in its CHARSET (UTF-8 by default, else Latin-1)."""
+    """2.45.1 (#1555): a quoted-printable value (vCard 2.1) -> text in its CHARSET (UTF-8 by default, else Windows-1252)."""
     raw = quopri.decodestring(val.encode("utf-8"))
     cs = (params.get("CHARSET") or ["utf-8"])[0].strip() or "utf-8"
-    for enc in (cs, "utf-8", "latin-1"):
+    for enc in (cs, "utf-8", "cp1252", "latin-1"):  # 2.363.2 (#3106): cp1252 first (umlauts, Euro sign); latin-1 for its undefined bytes
         try:
             return raw.decode(enc).replace("\r\n", "\n")
         except (LookupError, UnicodeError, ValueError):  # e.g. CHARSET=undefined raises a bare UnicodeError
@@ -1107,6 +1107,17 @@ def split_vcards(text):
 
 
 IMPORT_BATCH = 200
+VC_BAD_MAX = 20                              # 2.363.2 (#3106): unreadable cards named in the import's answer
+
+
+def _imp_bad(res, card, reason):
+    """2.363.2 (#3106): an unreadable card: counted, the first VC_BAD_MAX by name and reason (bad [{name, reason}])."""
+    res["errors"] += 1
+    bad = res.setdefault("bad", [])
+    if len(bad) < VC_BAD_MAX:
+        m = re.search(r"^(?:[\w-]+\.)?(?:FN|N)(?:;[^:\n]*)?:([^\n]*)", card, re.I | re.M)
+        name = re.sub(r"[;\s]+", " ", m.group(1)).strip() if m else ""
+        bad.append({"name": name[:100], "reason": reason})
 
 
 def _imp_differs(k, new, old):
@@ -1130,13 +1141,15 @@ def _imp_newer_here(rev, old):
     return upd > old["imp_at"] and rev < upd[:19]
 
 
-def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=None, cards=None, photos=0):
+def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=None, cards=None, photos=0, before=0):
     """Every vCard of text into the book: the same UID is updated (importing twice changes nothing). -> counts.
     2.41.0 (#1437): the book is counted once, birthdays are synced only where the book keeps them, the book is touched and
     the version bumped once per batch; batch=N commits every N cards (a large import keeps what it did and never holds the
     instance-wide version row for long); progress(done, total, res) after each batch.
     2.47.3 (#1738): photos=N (seconds of budget; only the file import) fetches PHOTO links of Google's image server; an existing
-    contact that already has a picture keeps it, so importing the same file again only adds the missing ones."""
+    contact that already has a picture keeps it, so importing the same file again only adds the missing ones.
+    2.363.2 (#3106): + bad (the first unreadable cards) and over_limit (cards beyond CONTACTS_PER_BOOK), only when there are
+    any; before = cards of this file stored by earlier calls (the limit's message counts them)."""
     res = {"created": 0, "updated": 0, "unchanged": 0, "errors": 0}
     kept = 0                                 # 2.273.0 C (#3048): contacts changed here after the card's REV (not overwritten)
     cards = split_vcards(text) if cards is None else cards
@@ -1165,11 +1178,11 @@ def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=
         dig = hashlib.sha1(card.encode("utf-8"), usedforsecurity=False).hexdigest()[:20]
         try:
             v = parse_vcard(card)
-        except BadInput:
-            res["errors"] += 1
+        except BadInput as e:
+            _imp_bad(res, card, str(e))
             continue
         if not v["fn"]:  # no name, no company, no address: nothing to show
-            res["errors"] += 1
+            _imp_bad(res, card, tr("Name missing"))
             continue
         if not v["uid"]:
             v["uid"] = "import-" + hashlib.sha1((v["fn"] + "|" + json.dumps(v["emails"])).encode("utf-8"), usedforsecurity=False).hexdigest()[:20]
@@ -1190,6 +1203,9 @@ def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=
             f["deleted_at"] = None
         if (not old or back) and have >= CONTACTS_PER_BOOK:
             flush(i)  # what is stored so far stays (batch) / is committed by the caller
+            if batch:  # 2.363.2 (#3106): the file is stored up to here: say how far
+                raise Denied(409, tr("At most {0} contacts per address book. Already stored from this file: {1}", CONTACTS_PER_BOOK,
+                                     before + res["created"] + res["updated"]))
             raise Denied(409, tr("At most {0} contacts per address book", CONTACTS_PER_BOOK))
         ext = v["extra"]
         if old and not back and not src_digest:  # 2.272.0 E1: a contact back from the trash is written whole (as a new one)
@@ -1214,6 +1230,8 @@ def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=
     flush(min(len(cards), CONTACTS_PER_BOOK))
     if kept:
         res["kept_newer"] = kept
+    if len(cards) > CONTACTS_PER_BOOK:       # 2.363.2 (#3106): not silently
+        res["over_limit"] = len(cards) - CONTACTS_PER_BOOK
     return res
 
 

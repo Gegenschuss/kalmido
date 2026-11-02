@@ -8,7 +8,7 @@ Invented names only.
    rows of bob come along, dora's are left out with a warning; forms and customer reports get new links (the address
    keeps its keyed hash), the newsletter connection comes without access data, a rule assigning dora is paused,
    harmless settings of the organisation come along; undo removes everything again
- - into the private space: only the importing person's own rows, no settings of the organisation
+ - into the private workspace: only the importing person's own rows, no settings of the organisation
  - a person without organisation (freelancer) imports it privately: project notes, forms, chat come along, no rows of others
  - ROUND TRIP: export -> import into an empty organisation -> export again -> both archives compared per entry (row count,
    contents without ids / time stamps / organisation and person columns) and files (SHA-256). Differences are listed;
@@ -382,7 +382,7 @@ dbx("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,
 OX1, RK1 = export(A, ORG)
 iid, pv = opened(A, OX1, RK1)
 taken = {x.get("what") for x in pv.get("taken_areas", [])}
-check({"Team chat", "Absences and bookings", "Forms", "Time entries", "Newsletter", "Customer reports"} <= taken,
+check({"Team chat", "Absences and bookings", "Forms", "Time entries", "Newsletter", "Client reports"} <= taken,
       f"the preview names the team areas as taken over {sorted(taken)}")
 notk = " ".join(str(x) for x in pv.get("not_taken", []))
 check("Team chat" not in notk and "Forms" not in notk and "Time entries" not in notk, f"... and not as left out {notk[:200]}")
@@ -510,7 +510,7 @@ print(f"round trip: {len(diffs)} differences, {len(bad)} counted", flush=True)
 r = A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
 check(r.ok and not dbx("SELECT 1 FROM lists WHERE org_id=? AND deleted_at IS NULL", (ORG4,)), f"undo of the round trip import (lists into the trash, #3027) {r.text[:160]}")
 
-# ---------------------------------------------------------------- into the private space: only alice's own rows
+# ---------------------------------------------------------------- into the private workspace: only alice's own rows
 iid, _pv = opened(A, OX1, RK1)
 j = run(A, iid, "private", people={EH("bob@example.com"): {"share": True}})
 check(j.get("state") == "done", f"private import done {j.get('error')}")

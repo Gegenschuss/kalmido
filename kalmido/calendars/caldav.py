@@ -385,7 +385,7 @@ def dav_login():
     # 2.282.0 (#3111): the address counter ("dav:ip:") only raises an alert too: DAV takes app passwords only (20 characters,
     # guessing is hopeless) and one old phone behind an office address locked out every colleague there
     if _rate_blocked([k for k in keys if k[0].startswith("dav:u:")]):
-        raise DavError(429, "Too many failed logins, please wait a few minutes")
+        raise DavError(429, "Too many failed sign-ins, please wait a few minutes")
     c = db()
     u = c.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
     rows = c.execute("SELECT * FROM app_passwords WHERE user_id=? ORDER BY id DESC", (u["id"],)).fetchall() \
@@ -407,17 +407,17 @@ def dav_login():
     if not hit:
         for k in _rate_fail(keys):
             if k.startswith("dav:uall:"):
-                aa_now("security", "ratelimit:" + k, N_("Many failed CalDAV/CardDAV logins for user {0} from different addresses."),
+                aa_now("security", "ratelimit:" + k, N_("Many failed CalDAV/CardDAV sign-ins for user {0} from different addresses."),
                        [username])
             elif k.startswith("dav:ip:"):  # 2.282.0 (#3111): nothing refused per address any more
-                aa_now("security", "ratelimit:" + k, N_("Many failed CalDAV/CardDAV logins from IP {0}. Only the accounts with the wrong app password are refused there; behind a shared address (office, NAT) look for an old device."),
+                aa_now("security", "ratelimit:" + k, N_("Many failed CalDAV/CardDAV sign-ins from IP {0}. Only the accounts with the wrong app password are refused there; behind a shared address (office, NAT) look for an old device."),
                        [fx2_mask_ip(client_ip())])
             elif u:
-                aa_now("security", "ratelimit:" + k, N_("Login rate limit reached for user {0} (logins refused for {1} min)."),
+                aa_now("security", "ratelimit:" + k, N_("Sign-in rate limit reached for user {0} (sign-ins refused for {1} min)."),
                        [username, FAIL_WINDOW // 60])
             else:
                 aa_now("security", "ratelimit:dav:u:?",
-                       N_("Login rate limit reached for an unknown user name (logins refused for {0} min)."), [FAIL_WINDOW // 60])
+                       N_("Sign-in rate limit reached for an unknown user name (sign-ins refused for {0} min)."), [FAIL_WINDOW // 60])
         aa_count("security", "logins", client_ip(), user=("caldav:" + username) if u else "caldav:?")
         print("caldav login failed for", login_log_name(username, c), "from", login_log_ip(client_ip()), flush=True)  # 2.148.1 C (#2494)
         return None

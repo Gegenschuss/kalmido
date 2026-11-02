@@ -33,7 +33,7 @@ function newsSummaryLine(g) {
     share: () => tr('shared with you'), approval: n => trn('{0} approval waits', '{0} approvals wait', n), proposal: () => tr('a proposal is ready'),
     followup: () => tr('follow up today'), unblock: () => tr('unblocked'), take: () => tr('taken'), role: () => tr('your role changed'), owner: () => tr('you own it now'),
     unshare: () => tr('removed'), usage: () => tr('usage limit'), errreport: () => tr('new error'), agentjoin: () => tr('an agent joined'), review: () => tr('review'), wiki_shared: () => tr('shared with you'),
-    orgjoin: () => tr('Invitation'), evinvite: () => tr('Invitation'), connreq: () => tr('Request'), leavereq: () => tr('Request'), filereq: () => tr('Request'), signoff: () => tr('Customer decisions'), orgdelnotice: () => tr('Organisation'), orggone: () => tr('Organisation'), whorgcut: () => tr('Organisation'), fetcherr: () => tr('Receipt fetcher')};  // 2.361.0 (#2920)  // 2.266.0 (#2965): signoff  // 2.60.0 C (#1512): review; 2.126.2 B (#2355): wiki_shared; 2.183.0 A (#2623): never the raw kind
+    orgjoin: () => tr('Invitation'), evinvite: () => tr('Invitation'), evchange: () => tr('Calendar'), apbooking: () => tr('Calendar'), calsub: () => tr('Calendar'), orglogin: () => tr('Security events'), orgjoinres: () => tr('Invitation'), orgrole: () => tr('your role changed'), docpaid: () => tr('Payments'), docoverdue: () => tr('overdue'), connreq: () => tr('Request'), leavereq: () => tr('Request'), filereq: () => tr('Request'), signoff: () => tr('Client decisions'), orgdelnotice: () => tr('Organisation'), orggone: () => tr('Organisation'), whorgcut: () => tr('Organisation'), fetcherr: () => tr('Receipt fetcher')};  // 2.361.0 (#2920)  // 2.266.0 (#2965): signoff  // 2.60.0 C (#1512): review; 2.126.2 B (#2355): wiki_shared; 2.183.0 A (#2623): never the raw kind
   return Object.entries(c).map(([k, n]) => (L[k] || (() => ''))(n)).filter((t, i, a) => t && a.indexOf(t) === i).join(' · ');  // 2.183.0 A (#2623): unknown kinds say nothing
 }
 function newsGroupHtml(g, pop) {
@@ -74,7 +74,7 @@ function newsSummarize(anchor) {
   const send = async a => {
     const U = S.nf.users;
     const lines = items.slice(0, 120).map(it => '- ' + newsText(it, U).replace(/<[^>]+>/g, '') + (it.task_title ? ` (${it.task_title})` : '') + (it.excerpt ? `: ${String(it.excerpt).replace(/<@(\d+)>/g, (_, id) => '@' + uname(+id, U)).slice(0, 160)}` : ''));
-    const text = tr('Please summarize my {0} unread news items in at most 5 short lines: what needs me first, then the rest.', items.length) + '\n\n' + lines.join('\n');
+    const text = tr('Please summarise my {0} unread news items in at most 5 short lines: what needs me first, then the rest.', items.length) + '\n\n' + lines.join('\n');
     try { await rawFetch('POST', `/api/agents/${a.id}/chat`, {body: text.slice(0, 7900)}); } catch (e) { toast(e.message); return; }
     closePop(); chatOpen(a.id); toast(tr('Sent to {0}', a.name));
   };
@@ -205,20 +205,20 @@ function lyHtml(v, parts, o = {}) {
 }
 function lyEditor(v, o = {}) {
   const d = LY[v], pr = lyPref(v, {std: S.ly.std}), {order, hidden, size, fixed} = pr, bs = lyBlocks(v), A = lyAct(v), n = order.length;
-  const desk = !isMobile();
+  const desk = !isMobile(), nat = desk && !rowd_touch();  // 2.456.0 (#3837): nat = the browser's row drag, else the grip (rowd_attach)
   const rows = order.map((k, i) => { const [_, nm, icon] = bs.find(b => b[0] === k), sz = size(k);
-    return `<li data-k="${k}" ${desk ? 'draggable="true"' : ''} tabindex="-1">${desk ? `<span class="lyg" aria-hidden="true">${ic('grip', 's')}</span>` : ''}${ic(icon, 's')}<span class="dcl">${esc(tr(nm))}</span>
+    return `<li data-k="${k}" ${nat ? 'draggable="true"' : ''} tabindex="-1">${nat ? `<span class="lyg" aria-hidden="true">${ic('grip', 's')}</span>` : rowd_grip('ly')}${ic(icon, 's')}<span class="dcl">${esc(tr(nm))}</span>
       ${d.nosize || !desk ? '' : `<button type="button" class="btn sm lysz" data-act="ly-size" data-lyv="${v}" data-k="${k}" aria-pressed="${sz === 'full'}" title="${esc(tr('Width'))}" aria-label="${esc(tr('Width') + ': ' + tr(nm) + ', ' + (sz === 'full' ? tr('full width') : tr('half width')))}">${sz === 'full' ? tr('Full') : tr('Half')}</button>`}
-      <button type="button" class="iconbtn" data-act="${A}-mv" data-lyv="${v}" data-k="${k}" data-d="-1" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + tr(nm))}">${ic('up', 's')}</button>
-      <button type="button" class="iconbtn" data-act="${A}-mv" data-lyv="${v}" data-k="${k}" data-d="1" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + tr(nm))}">${ic('down', 's')}</button>
+      ${rowd_arrows(`<button type="button" class="iconbtn" data-act="${A}-mv" data-lyv="${v}" data-k="${k}" data-d="-1" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + tr(nm))}">${ic('up', 's')}</button>
+      <button type="button" class="iconbtn" data-act="${A}-mv" data-lyv="${v}" data-k="${k}" data-d="1" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + tr(nm))}">${ic('down', 's')}</button>`)}
       <label class="swc"><input type="checkbox" data-dshow="${k}" data-lyv="${v}" ${hidden.has(k) ? '' : 'checked'} ${fixed.has(k) ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show {0}', tr(nm)))}</span></label></li>`; }).join('');
-  const scope = o.canStd ? `<div class="seg lyscope" role="group" aria-label="${esc(tr('Arrangement for'))}"><button type="button" class="${S.ly.std ? '' : 'on'}" aria-pressed="${!S.ly.std}" data-act="ly-scope" data-lyv="${v}" data-k="mine">${tr('Only for me')}</button><button type="button" class="${S.ly.std ? 'on' : ''}" aria-pressed="${S.ly.std}" data-act="ly-scope" data-lyv="${v}" data-k="std">${tr('Standard for everyone')}</button></div>` : '';
+  const scope = o.canStd ? `<div class="seg lyscope" role="group" aria-label="${esc(tr('Arrangement for'))}"><button type="button" class="${S.ly.std ? '' : 'on'}" aria-pressed="${!S.ly.std}" data-act="ly-scope" data-lyv="${v}" data-k="mine">${tr('Only for me')}</button><button type="button" class="${S.ly.std ? 'on' : ''}" aria-pressed="${S.ly.std}" data-act="ly-scope" data-lyv="${v}" data-k="std">${tr('Default for everyone')}</button></div>` : '';
   const ph = `<label class="chkl lyph"><input type="checkbox" data-lyphone="${v}" ${pr.mobile ? 'checked' : ''}> ${tr('Different on the phone')}</label>${pr.mobile ? `<div class="seg" role="group" aria-label="${esc(tr('Arrangement for'))}"><button type="button" class="${S.ly.phone ? '' : 'on'}" aria-pressed="${!S.ly.phone}" data-act="ly-dev" data-lyv="${v}" data-k="0">${tr('Computer')}</button><button type="button" class="${S.ly.phone ? 'on' : ''}" aria-pressed="${S.ly.phone}" data-act="ly-dev" data-lyv="${v}" data-k="1">${tr('Phone|device')}</button></div>` : ''}`;
-  const reset = o.override ? `<button type="button" class="linkbtn" data-act="${A}-reset" data-lyv="${v}">${S.ly.std ? tr('Reset to defaults') : tr('Reset to the standard')}</button>` : `<button type="button" class="linkbtn" data-act="${A}-reset" data-lyv="${v}">${tr('Reset to defaults')}</button>`;
+  const reset = o.override ? `<button type="button" class="linkbtn" data-act="${A}-reset" data-lyv="${v}">${S.ly.std ? tr('Reset to defaults') : tr('Reset to the default')}</button>` : `<button type="button" class="linkbtn" data-act="${A}-reset" data-lyv="${v}">${tr('Reset to defaults')}</button>`;
   // 2.35.0 (#1097): the blocks right in the view (drag them by the handle, on a phone hold a block; hide, width at the
   // block; hidden ones at the bottom), the list with the arrows stays below for the keyboard and screen readers
   const list = `<details class="lylist" ${LS.get('lyList', true) ? 'open' : ''}><summary>${ic('chev', 's fcar')}<span>${tr('Order as a list')}</span></summary>
-    <ol class="dcust" aria-label="${esc(v === 'home' ? tr('Cards') : tr('Blocks'))}" aria-describedby="lyhint-${v}">${rows}</ol><p class="muted lyhint" id="lyhint-${v}"${desk ? ` title="${esc(tr('Alt + arrow keys move the focused row.'))}"` : ''}>${desk ? tr('Drag a row or use the arrows.') : tr('Use the arrows to change the order.')}</p></details>`;
+    <ol class="dcust" aria-label="${esc(v === 'home' ? tr('Cards') : tr('Blocks'))}" aria-describedby="lyhint-${v}">${rows}</ol><p class="muted lyhint" id="lyhint-${v}"${nat ? ` title="${esc(tr('Alt + arrow keys move the focused row.'))}"` : ''}>${nat ? tr('Drag a row or use the arrows.') : tr('Hold the handle, then drag it.')}</p></details>`;
   return `<div class="lyed" data-lyed="${v}"><div class="dashhead"><h2>${esc(d.title())}</h2><span class="spacer"></span><button type="button" class="btn sm pri" data-act="${A}-done" data-lyv="${v}">${tr('Done')}</button></div>
     <div class="lyopts">${scope}${ph}</div>${typeof lyv_edBar === 'function' ? lyv_edBar(v) : ''}
     ${lydragCanvas(v, pr, o.parts || {})}
@@ -291,20 +291,25 @@ document.addEventListener('drop', e => {
   const v = li.closest('.lyed').dataset.lyed, k = lyDrag, to = li.dataset.k; lyDrag = null;
   if (k !== to) lydragDo(v, st => { const i = st.order.indexOf(k), j = st.order.indexOf(to); st.order.splice(i, 1); st.order.splice(j, 0, k); }, tr('Moved'));  // 2.35.0: undoable
 });
+// 2.456.0 (#3837): a phone: hold the grip, then drag
+rowd_attach(document, {kind: 'ly', row: 'li', move: (from, to, li, ol) => {
+  const k = li.dataset.k;
+  lydragDo(ol.closest('.lyed').dataset.lyed, st => { st.order.splice(st.order.indexOf(k), 1); st.order.splice(to, 0, k); }, tr('Moved'));
+}});
 
 // Today and Time tracking (2.32.0): the first views on the builder; the blocks a view does not show right now simply stay out
-LY.today = {key: 'view_today', empty: '', title: () => tr('Customize Today'), blocks: () => [['brief', N_('Briefing'), 'sunrise', 'full'], ['wait', N_('Waiting for you'), 'hourglass', 'full'], ['review', N_('Daily review'), 'journal', 'full'],
+LY.today = {key: 'view_today', empty: '', title: () => tr('Customise Today'), blocks: () => [['brief', N_('Briefing'), 'sunrise', 'full'], ['wait', N_('Waiting for you'), 'hourglass', 'full'], ['review', N_('Daily review'), 'journal', 'full'],
   ['overdue', N_('Overdue'), 'alert', 'full'], ['events', N_('Events today'), 'cal', 'full'], ['tasks', N_('Tasks'), 'list', 'full', true], ['inbox', N_('Basket'), 'inbox', 'full']],
   blockItems: k => { const c = k === 'events' ? cvxTodayItems() : []; return c.length ? [{head: tr('Calendars on Today')}, ...c] : []; }};  // 2.443.0 (#3740): the block's "…" is the one the phone shows
-LY.time = {key: 'view_time', empty: '', title: () => tr('Customize time tracking'), blocks: () => [['tiles', N_('Totals'), 'clock', 'full'],
+LY.time = {key: 'view_time', empty: '', title: () => tr('Customise time tracking'), blocks: () => [['tiles', N_('Totals'), 'clock', 'full'],
   ['chart', N_('Per day'), 'chart', 'full'], ['lists', N_('By project and task'), 'list', 'full'], ['entries', N_('Entries'), 'rows', 'full']]};
 // the Agents overview (status, usage, jobs; not the settings) and the projects overview ("Where is it stuck?")
-LY.agents = {key: 'view_agents', empty: '', title: () => tr('Customize the agents overview'), blocks: () => [['agents', N_('Agents'), 'bot', 'full'], ['usage', N_('Usage'), 'chart', 'full'],
+LY.agents = {key: 'view_agents', empty: '', title: () => tr('Customise the agents overview'), blocks: () => [['agents', N_('Agents'), 'bot', 'full'], ['usage', N_('Usage'), 'chart', 'full'],
   ['jobs', N_('Jobs'), 'list', 'full', true], ['hint', N_('Explanation'), 'info', 'full']]};
-LY.projects = {key: 'view_projects', empty: '', title: () => tr('Customize the projects overview'), blocks: () => [['tiles', N_('Totals'), 'chart', 'full'], ['projects', N_('Projects'), 'brief', 'full', true],
+LY.projects = {key: 'view_projects', empty: '', title: () => tr('Customise the projects overview'), blocks: () => [['tiles', N_('Totals'), 'chart', 'full'], ['projects', N_('Projects'), 'brief', 'full', true],
   ['note', N_('Explanation'), 'info', 'full']]};
 // the project page (#983; its blocks: POV_BLOCKS in projects.js)
-LY.project = {quick: true, title: () => tr('Customize the project page'), blocks: () => [...POV_BLOCKS, ...wgPadBlocks()],  // 2.43.0 (#1346): + notepads
+LY.project = {quick: true, title: () => tr('Customise the project page'), blocks: () => [...POV_BLOCKS, ...wgPadBlocks()],  // 2.43.0 (#1346): + notepads
   addItems: () => wgPadAddItems(), color: k => wgPadColor(k),
   src: std => { const y = S.povD[routeList()?.id]?.j?.layout || {}; return std ? y.std : (y.mine || y.std); },
   save: (v, std) => {
@@ -316,25 +321,25 @@ LY.project = {quick: true, title: () => tr('Customize the project page'), blocks
     });
   }};
 // the start page (#475) on the view builder
-LY.home = {key: 'dashboard', grid: 'dgrid', title: () => tr('Customize the start page'), blocks: () => DASH.filter(d => (d[0] !== 'family' || famOn()) && (d[0] !== 'kpi' || (typeof officeOn === 'function' && officeOn()))).map(d => [d[0], d[1], d[2], 'half', false, 2]),  // 2.43.0 (#1452): a third wide
+LY.home = {key: 'dashboard', grid: 'dgrid', title: () => tr('Customise the start page'), blocks: () => DASH.filter(d => (d[0] !== 'family' || famOn()) && (d[0] !== 'kpi' || (typeof officeOn === 'function' && officeOn()))).map(d => [d[0], d[1], d[2], 'half', false, 2]),  // 2.43.0 (#1452): a third wide
   // 2.45.0 (#1504): the default for accounts without an own arrangement (and no standard set by an admin): Today and News
   // two thirds wide on the left, the rest a third on the right, the phone in this order; Search hidden
   def: () => ({order: ['today', 'agents', 'news', 'projects', 'wait', 'pinned', 'chat', 'notes', 'stats', 'family', 'search'], hidden: ['search'], opts: {today: {lw: 4}, news: {lw: 4}}})};
 // 2.43.0 (#1452): the review (day / week) and its journal on the builder
-LY.review = {key: 'view_review', grid: 'dgrid', title: () => tr('Customize the review'), blocks: () => [['done', N_('Done'), 'done', 'half', false, 3], ['open', N_('Still open'), 'alert', 'half', false, 3],
+LY.review = {key: 'view_review', grid: 'dgrid', title: () => tr('Customise the review'), blocks: () => [['done', N_('Done'), 'done', 'half', false, 3], ['open', N_('Still open'), 'alert', 'half', false, 3],
   ['moved', N_('Moved'), 'skip', 'half', false, 3], ['next', N_('Coming up'), 'cal', 'half', false, 3], ['journal', N_('Journal'), 'journal', 'half', false, 3]]};
 // 2.55.0 (#1067): statistics, the client card and family on the builder (same order and widths as before: the default shows what it did)
-LY.stats = {key: 'view_stats', title: () => tr('Customize statistics'), blocks: () => [['tiles', N_('Totals'), 'chart', 'full'], ['done', N_('Completed tasks'), 'done', 'full'],
+LY.stats = {key: 'view_stats', title: () => tr('Customise statistics'), blocks: () => [['tiles', N_('Totals'), 'chart', 'full'], ['done', N_('Completed tasks'), 'done', 'full'],
   ['bylist', N_('By project'), 'list', 'full'], ['overdue', N_('Overdue'), 'alert', 'full'], ['focus', N_('Focus time'), 'timer', 'full'], ['time', N_('Tracked time'), 'clock', 'full'],
   ['habits', N_('Habits'), 'repeat', 'full']]};
 // 2.435.0 A (#3600): month = "Time tracking", gendocs = "Documents", letters a block of their own; the blocks the client's
 // office switched off (office/model.py CLIENT_BLOCKS, clientpage.js ms_clOff) are no blocks of the card
 const LY_CL_BLOCKS = [['details', N_('Details'), 'brief', 'full'], ['persons', N_('Contact persons'), 'users', 'full'],
   ['invoices', N_('Open invoices'), 'receipt', 'full'], ['month', N_('Time tracking'), 'clock', 'full'], ['lists', N_('Projects'), 'list', 'full'], ['note', N_('Note'), 'edit', 'full'],
-  ['tickets', N_('Customer reports'), 'megaphone', 'full'], ['gendocs', N_('Documents'), 'file', 'full'], ['letters', N_('Letters'), 'mail', 'full'],
+  ['tickets', N_('Client reports'), 'megaphone', 'full'], ['gendocs', N_('Documents'), 'file', 'full'], ['letters', N_('Letters'), 'mail', 'full'],
   ['privacy', N_('Data protection'), 'shield', 'full']];  // 2.63.0 B (#1513); 2.93.0 A (#1927): gendocs; 2.154.0 C (#2192): privacy
-LY.clients = {key: 'view_clients', title: () => tr('Customize the client card'), blocks: () => LY_CL_BLOCKS.filter(b => !(typeof ms_clOff === 'function' && ms_clOff().has(b[0])))};
-LY.family = {key: 'view_family', grid: 'dgrid', title: () => tr('Customize Family'), blocks: () => [['occ', N_('Birthdays & anniversaries'), 'cake', 'half', false, 3], ['rot', N_('Whose turn'), 'turns', 'half', false, 3],
+LY.clients = {key: 'view_clients', title: () => tr('Customise the client card'), blocks: () => LY_CL_BLOCKS.filter(b => !(typeof ms_clOff === 'function' && ms_clOff().has(b[0])))};
+LY.family = {key: 'view_family', grid: 'dgrid', title: () => tr('Customise Family'), blocks: () => [['occ', N_('Birthdays & anniversaries'), 'cake', 'half', false, 3], ['rot', N_('Whose turn'), 'turns', 'half', false, 3],
   ['meals', N_('Meal plan'), 'meal', 'half', false, 3], ['shop', N_('Shopping'), 'cart', 'half', false, 3], ['dl', N_('Deadlines'), 'hourglass', 'half', false, 3],
   ['kids', N_('Kids'), 'star', 'half', false, 3], ['pack', N_('Packing lists'), 'bag', 'half', false, 3]]};
 function dashCard(k) {
@@ -408,7 +413,8 @@ function dashCard(k) {
     // 2.45.0 (#1504): every running job with "since HH:MM"; an agent only as a line while it needs a look (error, waits, paused)
     const rows = ags.flatMap(a => [...(['error', 'waiting', 'paused'].includes(agentHst(a)) ? [`<li><a href="#agents/${a.id}">${hdot(agentHst(a))}<span class="dwt">${esc(agentHstLine(a))}</span></a></li>`] : []),
       ...jobs(a).map(j => `<li class="djob"><a href="#agents/${a.id}">${hdot('working')}<span class="dwt">${esc(j.title)}</span>${j.created_at ? `<span class="hpt">${esc(hpSince(j.created_at))}</span>` : ''}</a></li>`)]);
-    return !ags.length ? '' : rows.length ? card(`<ul class="dwl">${rows.join('')}</ul>`) : slim(tr('Agents: all quiet'));
+    const nc = ags.filter(agentOffline).length;  // 2.366.0 (#3000): "all quiet" only when none is cut off (the same "not connected" as at the agent)
+    return !ags.length ? '' : rows.length ? card(`<ul class="dwl">${rows.join('')}</ul>`) : slim(nc ? trn('Agents: {0} not connected', 'Agents: {0} not connected', nc) : tr('Agents: all quiet'));
   }
   if (k === 'stats') {
     const done7 = [...S.tasks.values()].filter(t => t.status === 2 && t.completed_at && t.completed_at.slice(0, 10) >= addDays(t0, -6)).length;
@@ -511,11 +517,11 @@ function mailHtml(j) {
     ${own.length ? `<div class="row"><label for="mail-list">${tr('For a project')}</label><select id="mail-list" data-native>${own.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select><button type="button" class="btn sm" data-mail="newlist">${ic('plus', 's')} ${tr('Create')}</button></div>` : ''}
     <div class="shint keep">${tr('Keep the address secret: whoever knows it can add tasks.')}</div>
     <div class="shint">${tr('Subject = title, text = description, attachments become files.')}</div>
-    <div class="row"><label></label>${mchk('s-mailme', j.from_me, tr('Mails from my own address ({0}) to {1} go to my basket', j.email || tr('none set'), j.plain))}</div>
-    <div class="row"><label></label>${mchk('s-mailtrim', j.trim_fwd, tr('Shorten forwarded mails'))}</div>
-    <div class="row"><label></label>${mchk('s-mailtrimeml', j.trim_eml, tr('Keep the original mail as an attachment'))}</div>
-    <div class="shint">${tr('A forwarded mail becomes the title (without Fwd:) and one line “From … , date” above the message; signatures, legal notices and older quoted replies are cut. Your own words above the forwarding stay.')}</div>
-    ${S.me?.is_admin ? `<div class="row"><label>${tr('Mailbox')}</label><button type="button" class="btn sm" data-mail="poll" id="s-mailpoll">${ic('sync', 's')} ${tr('Fetch mails now')}</button><span class="muted" id="s-mailpoll-r" role="status" aria-live="polite"></span></div>` : ''}`
+    <div class="row"><label></label>${mchk('s-mailme', j.from_me, tr('E-mails from my own address ({0}) to {1} go to my basket', j.email || tr('none set'), j.plain))}</div>
+    <div class="row"><label></label>${mchk('s-mailtrim', j.trim_fwd, tr('Shorten forwarded e-mails'))}</div>
+    <div class="row"><label></label>${mchk('s-mailtrimeml', j.trim_eml, tr('Keep the original e-mail as an attachment'))}</div>
+    <div class="shint">${tr('A forwarded e-mail becomes the title (without Fwd:) and one line “From … , date” above the message; signatures, legal notices and older quoted replies are cut. Your own words above the forwarding stay.')}</div>
+    ${S.me?.is_admin ? `<div class="row"><label>${tr('Mailbox')}</label><button type="button" class="btn sm" data-mail="poll" id="s-mailpoll">${ic('sync', 's')} ${tr('Fetch e-mails now')}</button><span class="muted" id="s-mailpoll-r" role="status" aria-live="polite"></span></div>` : ''}`
     : `<div class="shint">${S.me?.is_admin ? tr('Not set up on this server: an admin sets KALMIDO_MAIL_ADDRESS and KALMIDO_IMAP_* (see the README).') : tr('Not set up on this server yet. The operator of this server can set it up.')}</div>`;  // 2.25.0 (UX-20): server details only for admins
 }
 function mailDigestHtml(j) {
@@ -536,14 +542,14 @@ async function mailWire(md) {
       try { await api('POST', '/api/me/mail/token', {list_id: k === 'newlist' ? +$('#mail-list', md).value : lid}); } catch { return; }
       await reload(); announce(tr('New address created')); return;
     }
-    if (k === 'del') { if (!await askConfirm(tr('Remove this address?'), tr('Mails to it are no longer imported.'), {ok: tr('Remove'), danger: true})) return; try { await api('DELETE', '/api/me/mail/token' + (lid ? `?list_id=${lid}` : '')); } catch { return; } await reload(); return; }
+    if (k === 'del') { if (!await askConfirm(tr('Remove this address?'), tr('E-mails to it are no longer imported.'), {ok: tr('Remove'), danger: true})) return; try { await api('DELETE', '/api/me/mail/token' + (lid ? `?list_id=${lid}` : '')); } catch { return; } await reload(); return; }
     if (k === 'test') { try { const r = await api('POST', '/api/me/mail/test'); toast(tr('Sent to {0}', r.to)); } catch { /* api() said it */ } }
     if (k === 'poll') {  // 2.142.0 C (#2149): admins: look into the mailbox now; locked while it runs
       const out = $('#s-mailpoll-r', md); b.disabled = true; if (out) out.textContent = tr('Fetching…');
       try {
         const r = await api('POST', '/api/admin/mail/poll');
         const n = typeof r?.imported === 'number' ? r.imported : typeof r?.count === 'number' ? r.count : null;
-        if (out) out.textContent = n === null ? tr('Started: new mails appear in a few seconds.') : trn('{0} mail fetched', '{0} mails fetched', n);
+        if (out) out.textContent = n === null ? tr('Started: new e-mails appear in a few seconds.') : trn('{0} e-mail fetched', '{0} e-mails fetched', n);
       } catch { if (out) out.textContent = tr('Fetching failed'); } finally { b.disabled = false; }
     }
   });

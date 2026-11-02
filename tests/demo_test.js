@@ -199,7 +199,7 @@ const srv = http.createServer((req, res) => {
     await firefox(async ({cmd, ev, nav, ctx, shot}) => {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
       for (const theme of ['light', 'dark']) {
-        await nav(B); await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+        await nav(B); await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
         await nav(B); await sleep(2500);
         await ev(`(async () => { const b = document.querySelector('.authscreen [data-su="go"]'); if (b) { b.click(); await new Promise(r => setTimeout(r, 800)); } return 1; })()`); await nav(B); await sleep(2500);  // 2.125.0 D (#1653): the intro first
         // 2.74.0 (#1653): a new account: close the tour, the sample on request

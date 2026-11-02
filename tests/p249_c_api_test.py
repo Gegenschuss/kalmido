@@ -102,9 +102,9 @@ r = Ca.post(B + "/api/wiki/pages", json={"space": "private", "path": "Diary", "b
 check(r.status_code == 201 and r.json()["space"] == "private", "carol creates a private page")
 PP = r.json()["id"]
 check(Bo.get(B + f"/api/wiki/pages/{PP}").status_code == 404, "bob (same organisation) does not see carol's private page")
-check(all(p["id"] != PP for p in Bo.get(B + "/api/wiki", params={"space": "private"}).json()["pages"]), "bob's private space: not carol's page")
+check(all(p["id"] != PP for p in Bo.get(B + "/api/wiki", params={"space": "private"}).json()["pages"]), "bob's private workspace: not carol's page")
 check(not Bo.get(B + "/api/wiki/search", params={"q": "secret"}).json()["pages"], "search: not another person's private page")
-check(Bo.post(B + "/api/wiki/pages", json={"space": "private", "path": "Diary"}).status_code == 201, "the same name in another private space is fine")
+check(Bo.post(B + "/api/wiki/pages", json={"space": "private", "path": "Diary"}).status_code == 201, "the same name in another private workspace is fine")
 
 # ---- links, backlinks, rename
 r = Bo.post(B + "/api/wiki/pages", json={"space": SP, "path": "Home", "body": "See [[Processes/Shoot day/Checklist]] and [[processes/shoot day/checklist|the list]]."})

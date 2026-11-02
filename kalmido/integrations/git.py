@@ -30,10 +30,12 @@ from ..tasks.lifecycle import do_complete, signed, undo_status
 from ..core.errors import BadInput, UnknownFields
 from ..notify.push import _b64u, _b64u_dec
 from ..notify.alerts import _env_int, aa_count
+from ..collab.integfail import INTEG_FAILS, integ_tell
 from ..calendars.subscriptions import _cal_opener, cal_allow, cal_err_text, cal_host_allowed, cal_rate, CAL_TIMEOUT, CalError
-from ..agents.core import agent_row, agent_runtime, git_author_clean, git_author_str, is_agent
+from ..agents.core import agent_emit, agent_notify, agent_row, agent_runtime, agent_task_data, git_author_clean, git_author_str, is_agent, list_agents
 from ..tasks.ticketkey import tk_find, tk_has_key, tk_prefixes, tk_text_pairs, tk_text_re  # 2.390.0 (#3353)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
+from .webhooks import wh_enqueue, wh_note  # 2.392.0 B (#3364)
 
 
 # ---------------------------------------------------------------- 2.2.0 (#271): Git integration, (#339) tickets for agents
@@ -498,6 +500,7 @@ def git_tag_url(r, name):
     return {"gitlab": f"{web}/-/tags/{q}", "bitbucket": f"{web}/src/{q}"}.get(r["provider"]) or f"{web}/releases/tag/{q}"
 
 
+GIT_COMMENT_CMD = []  # 2.392.0 B (#3364): gitbuild.gb_partial_cmd
 GIT_TOK_RE = re.compile(r"[^\s,;:()\[\]{}\"'“”„«»<>]+")
 
 
@@ -548,11 +551,14 @@ def _git_after(ts, since):
         return False
 
 
-def git_close(c, r, tid, kind, ref, title, url, lids=None):
-    """A keyword in a merged pull request / a default-branch commit: completes task tid once (git_closes)."""
+def git_close(c, r, tid, kind, ref, title, url, lids=None, vers=()):
+    """A keyword in a merged pull request / a default-branch commit: completes task tid once (git_closes). 2.392.0 B (#3364):
+    kind "release" (vers = its canonical versions): once per task and version, a later version may complete it again."""
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+    old = c.execute("SELECT versions FROM git_closes WHERE task_id=?", (tid,)).fetchone()
+    done = old["versions"].split() if old else []
     if not t or t["deleted_at"] or t["status"] != 0 or t["list_id"] not in (lids if lids is not None else {r["list_id"]}) or \
-            c.execute("SELECT 1 FROM git_closes WHERE task_id=?", (tid,)).fetchone():
+            (old and (kind != "release" or set(vers) <= set(done))):
         return False
     from ..tasks.review import rvw_gate
     if rvw_gate(c, tid):  # 2.60.0 C (#1512): waits for its review approval; a later poll completes it once approved
@@ -561,11 +567,29 @@ def git_close(c, r, tid, kind, ref, title, url, lids=None):
     with app.app_context():
         g.user = {"id": None}
         nxt = do_complete(c, tid, 2, undo)
-    c.execute("INSERT INTO git_closes(task_id,conn_id,kind,ref,undo,created_at) VALUES(?,?,?,?,?,?)",
-              (tid, r["id"], kind, ref, json.dumps(undo), iso(now_utc())))
+    c.execute("""INSERT INTO git_closes(task_id,conn_id,kind,ref,undo,created_at,versions) VALUES(?,?,?,?,?,?,?)
+                 ON CONFLICT(task_id) DO UPDATE SET conn_id=excluded.conn_id, kind=excluded.kind, ref=excluded.ref, undo=excluded.undo,
+                 created_at=excluded.created_at, versions=excluded.versions, undone_at=NULL""",
+              (tid, r["id"], kind, ref, json.dumps(undo), iso(now_utc()), " ".join(dict.fromkeys([*done, *vers]))))
     log_act(c, tid, "git_done", {"repo": f"{r['owner']}/{r['repo']}", "kind": kind, "ref": ref, "title": title[:200], "url": url,
                                  **({"next": nxt} if nxt else {})}, uid=None)
     return True
+
+
+def git_release_events(c, done):
+    """2.392.0 B (#3364): done = [(task id, version text)]: webhooks and agents hear task.completed with via "release" (the poll has no request)."""
+    with app.test_request_context(method="POST"):
+        g.user = {"id": None, "display_name": "", "username": "", "kind": "person"}  # nobody's completion
+        for tid, _ in done:
+            wh_note(c, tid, "complete")
+        n = g.pop("wh", None)
+        if n:
+            wh_enqueue(c, n, by=(None, "release"))
+        for tid, v in done:
+            lid = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()[0]
+            for aid in list_agents(c, lid):
+                agent_emit(c, aid, "task.completed", agent_task_data(c, tid, aid, version=v or None), actor=None, via="release")
+    agent_notify()
 
 
 def git_take_prs(c, r, items, baseline):
@@ -675,7 +699,7 @@ def git_ci_of(k, sha, gh):
 def git_poll(c, cid):
     """One poll of connection cid (the background thread). Never raises for provider problems (stored in last_error)."""
     from ..integrations.gitfolder import gf_rehome
-    from ..integrations.gitbuild import gb_branches, gb_main, gb_released, gb_tags
+    from ..integrations.gitbuild import gb_branches, gb_close_released, gb_main, gb_released, gb_tags
     gf_rehome(c, cid)  # 2.33.0 (#934): a folder repository hangs on a list that is still in its folder
     r = c.execute("SELECT k.*, l.archived FROM git_conns k JOIN lists l ON l.id=k.list_id WHERE k.id=?", (cid,)).fetchone()
     if not r:
@@ -762,9 +786,21 @@ def git_poll(c, cid):
         fails = (r["fails"] or 0) + 1
         c.execute(f"UPDATE git_conns SET etags=?, fails=?, last_error=?, next_at=? WHERE {same}",
                   (json.dumps(keep), fails, e.stored(), time.time() + min(GIT_POLL_S * 2 ** min(fails, 5), GIT_BACKOFF_MAX), *same_args))
+        if fails == INTEG_FAILS:  # 2.367.3 (#2971): the person who connected it and the project's owner
+            lo = c.execute("SELECT owner_id FROM lists WHERE id=?", (r["list_id"],)).fetchone()
+            integ_tell(c, [r["created_by"], lo["owner_id"] if lo else None], "git", f"{r['owner']}/{r['repo']}",
+                       (r["polled_at"] or r["created_at"] or "")[:10], click=f"l/{r['list_id']}", list=r["list_id"])
     if changed:
         bump(c)
     c.commit()
+    if r["tags_at"]:  # 2.392.0 B (#3364): no request of its own; after the commit, so an error here does not cost the round
+        try:
+            if gb_close_released(c, r):
+                bump(c)
+            c.commit()
+        except Exception as e:  # noqa: BLE001
+            c.rollback()
+            aa_count("watchdog", f"git|release|{type(e).__name__}", "git")
 
 
 def git_loop():
@@ -928,9 +964,10 @@ def git_list(lid):
     from ..integrations.gitfolder import gf_conns_for_list, gf_own_conns, gf_list_state
     rows = gf_own_conns(c, lid)
     # 2.33.0 (#934): the folder's repositories this list uses (or would use: switched off / an own repository), read-only here
-    from ..integrations.gitbuild import gb_ver_info
+    from ..integrations.gitbuild import gb_close_on, gb_ver_info
     return jsonify(repos=[git_public(c, r, manage) for r in rows], may=manage, key=bool(SECRET_KEY),
                    version_field=gb_ver_info(c, lid),  # 2.151.0 A (#2558): the field with the package / target version
+                   close_release=gb_close_on(c, lid),  # 2.392.0 B (#3364)
                    project=is_project(c, lid), max=GIT_MAX_CONNS, errors=errhook_public(c, lid, manage),  # 2.18.0: error reports
                    folder=gf_list_state(c, lid), folder_repos=[git_public(c, r) for r in gf_conns_for_list(c, lid, ignore_own=True, ignore_off=True)])
 

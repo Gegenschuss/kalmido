@@ -64,7 +64,7 @@ def ast2_list_ok(c, aid, sheet, lid):
     if a["list_ids"] and lid not in ids_parse(a["list_ids"]):
         raise Denied(404)
     if (a["org_id"] and l["org_id"] and l["org_id"] != a["org_id"]) or l["org_id"] != sheet["org_id"]:
-        raise Denied(409, tr("The project must be in the same space as the table"))
+        raise Denied(409, tr("The project must be in the same workspace as the table"))
     if l["archived"]:
         raise Denied(409, tr("This project is archived"))
     return l

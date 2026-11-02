@@ -4,7 +4,7 @@
 //   colour, next step and source on the card; no sum in the column; the toolbar counts the leads to follow up
 // - "New lead": the dialog shows the lead's fields (company, e-mail, source, next step, follow-up) instead of client /
 //   probability / expected date; saved as a lead with 10 %
-// - "Convert into a client": the card moves to "Inquiry" with a new client; the undo brings the lead back and removes the
+// - "Convert into a client": the card moves to "Enquiry" with a new client; the undo brings the lead back and removes the
 //   client; a lead with the e-mail of an existing client offers that client
 // - the CSV import preview (duplicates marked) and the take over (one undo step)
 // - phone: the switcher reaches the leads, nothing sticks out, large tap targets
@@ -66,7 +66,7 @@ const day = n => TC.day(n);
     await shot('p294-a-leads.png');
 
     // new lead
-    await ev(`(() => { document.querySelector('[data-pp="new"]').click(); const st = document.querySelector('.modal #pp-stage'); st.value = 'lead'; st.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);  // 2.224.0 B (#2816): the one "New inquiry" button, the stage chosen in the dialog
+    await ev(`(() => { document.querySelector('[data-pp="new"]').click(); const st = document.querySelector('.modal #pp-stage'); st.value = 'lead'; st.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);  // 2.224.0 B (#2816): the one "New enquiry" button, the stage chosen in the dialog
     check(await ready(ev, `!!document.querySelector('.modal #lead-company')`), '#1930: the lead dialog');
     check(await ev(`(() => { const m = document.querySelector('.modal'); return !m.querySelector('.leadf').hidden && m.querySelector('.ppnolead #pp-prob').closest('.ppnolead').hidden && m.querySelector('#pp-stage').value === 'lead' ; })()`),
       '#1930: the lead fields instead of probability / date');
@@ -82,7 +82,7 @@ const day = n => TC.day(n);
     check(await ready(ev, `!!document.querySelector('.modal [data-m="convert"]') && !document.querySelector('.modal [data-m="offer"]')`), '#1930: the lead offers "Convert into a client", no quotation');
     await ev(`(() => { document.querySelector('.modal [data-m="convert"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal') && [...document.querySelectorAll('[data-pipcol="inquiry"] .ppcard')].some(c => /Neue Agentur/.test(c.textContent) && /Neue Agentur GmbH/.test(c.textContent))`, 60),
-      '#1930: converted: in "Inquiry" with the new client');
+      '#1930: converted: in "Enquiry" with the new client');
     check(await ev(`${deals}.then(j => j.items.some(x => x.title === 'Neue Agentur' && x.stage === 'inquiry' && x.client_name === 'Neue Agentur GmbH'))`), '#1930: saved as an inquiry with a client');
     check(await ready(ev, `/Converted into a client/.test(document.querySelector('#toast')?.textContent || '')`), '#1930: the toast with undo');
     await ev(`(() => { document.querySelector('#toast button').click(); return 1; })()`);

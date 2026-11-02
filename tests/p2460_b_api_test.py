@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """2.46.0 API tests, part B (#1603): who sees an organisation list -- "Only invited people" (the default) or "Everyone in
-the organisation" (lists.org_visibility 'org'). Invented names only. Mode workspaces (organisations + private space):
+the organisation" (lists.org_visibility 'org'). Invented names only. Mode workspaces (organisations + private workspace):
  - default: a member of the organisation who is not invited does not see the list
  - 'org': every member sees it read-only (role view, org_reader), may not change it or add tasks; org_edit: role edit
  - join (POST /api/lists/<id>/join) = a member with the role edit, undo = leaving (back to reader); explicit roles stay
@@ -228,7 +228,7 @@ check(lst(Er, L2) is None, "Home & life: the organisation does not see it")
 L3 = Bo.post(B + "/api/lists", json={"name": "Third", "org_id": ORG}).json()["id"]
 Bo.patch(B + f"/api/lists/{L3}", json={"org_visibility": "org"})
 r = Bo.patch(B + f"/api/lists/{L3}", json={"org_id": None})
-check(r.ok and dbx("SELECT org_visibility FROM lists WHERE id=?", (L3,))[0][0] == "", f"moved to the private space: reset ({r.status_code} {r.text[:120]})")
+check(r.ok and dbx("SELECT org_visibility FROM lists WHERE id=?", (L3,))[0][0] == "", f"moved to the private workspace: reset ({r.status_code} {r.text[:120]})")
 # 2.46.0 (#1603, review): a list that moves to another organisation is shared again only with its members
 r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": BOB})
 check(r.status_code == 201, f"setup: a second organisation ({r.text[:120]})")

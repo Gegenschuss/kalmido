@@ -341,9 +341,9 @@ check(ex(Ca, D4, {"do": "apply"}).status_code == 404 and Ca.get(B + f"/api/docs/
 # 2.186.0 (#2600): a booked receipt (VAT rate set) stays in its workspace: the move below takes a document without the rate
 r = ex(A, D4, {"do": "apply", "fields": ["amount", "sender"]})
 check(r.ok and rc(A, D4)["vat_pct"] is None and (r.json()["doc"].get("sender") or {}).get("name") == "Muster Druck GmbH", "org admin takes over")
-# the document into the private space: the values move along (sealed for the new workspace)
+# the document into the private workspace: the values move along (sealed for the new workspace)
 r = A.post(B + "/api/files/move-space", json={"ids": [D4], "to": "private", "parent": None})
-check(r.ok, f"move into the private space {r.status_code} {r.text[:200]}")
+check(r.ok, f"move into the private workspace {r.status_code} {r.text[:200]}")
 A.patch(B + "/api/settings", json={"workspace": "private"})
 d4 = A.get(B + f"/api/docs/{D4}").json()
 raw2 = dbx("SELECT extracted FROM doc_meta WHERE node_id=?", (D4,))[0][0]

@@ -7,7 +7,7 @@
 // (P21445C_NOSTART=1: a running server, no start.sh)
 const path = require('path');
 const {execFileSync} = require('child_process');
-const {sleep, B, login} = require('./boot');
+const {until, B, login} = require('./boot');
 const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -22,7 +22,7 @@ const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDa
 const yearBack = iso => `${+iso.slice(0, 4) - 1}${iso.slice(4, 8)}${iso.slice(5) === '02-29' ? '28' : iso.slice(8)}`;
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   const CA = await login('alice');
@@ -45,7 +45,7 @@ const yearBack = iso => `${+iso.slice(0, 4) - 1}${iso.slice(4, 8)}${iso.slice(5)
   check(m.http === 201 && m.cancel_missed === 1 && m.cancel_next, 'a subscription with a missed notice ' + JSON.stringify([m.http, m.cancel_missed, m.cancel_next]));
   await fx({label: 'Tool Reachable', amount: 10, start: yearBack(addDays(today, 60)), notice_days: 30});
 
-  const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
+  const ready = async (ev, expr, n = 40) => !!(await until(() => ev(expr).catch(() => false), {timeout: n * 250, step: 250}));
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
   const noSide = `(() => { const W = document.documentElement.clientWidth; return [...document.querySelectorAll('.office .ofcbody *')].filter(e => e.getClientRects().length && !e.closest('.seg')).every(e => e.getBoundingClientRect().right <= W + 1); })()`;
   const rowText = label => `([...document.querySelectorAll('.abo-list .abo-row')].find(r => /${label}/.test(r.textContent))?.textContent || '').replace(/\\s+/g, ' ')`;
@@ -69,6 +69,7 @@ const yearBack = iso => `${+iso.slice(0, 4) - 1}${iso.slice(4, 8)}${iso.slice(5)
     await ev(`(() => { document.querySelector('[data-ofd="kind"][data-kind="invoice"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.rin-sec .rin-it')`, 60), 'the invoice list shows the series');
     await ev(`(() => { const d = document.querySelector('.rin-sec'); if (d) d.open = true; return 1; })()`);
+    await ready(ev, `!!document.querySelector('.rin-sec .rin-it b')?.textContent`, 40);  // #3927 (Mac red 20261101-211024): the row before its name
     const t = await ev(`document.querySelector('.rin-sec .rin-it b')?.textContent || ''`);
     check(/^Wartung\b/.test(t) && !/\{month\}/.test(t), 'the series row is named without the placeholder ' + JSON.stringify(t));
     // ================= #2021 (b) a missed notice period

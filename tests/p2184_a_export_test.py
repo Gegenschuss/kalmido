@@ -8,7 +8,7 @@ fields; sent letters count as records to keep. Invented names only.
  - #2628: the sent letter (not the draft) counts in the retention info, the retention ZIP has letters/letters.csv and the
    PDF; the organisation's delete info keeps it by law
  - undo removes the letters, the made field and the values (the target's own field stays)
- - a person without any organisation imports the same export into the private space: letters in the personal office,
+ - a person without any organisation imports the same export into the private workspace: letters in the personal office,
    fields in the private documents; the retention info of the person counts the sent letter
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY (P2184A_NOSTART=1 = the server already runs like that).
 usage: p2184_a_export_test.py <datadir>"""
@@ -18,6 +18,7 @@ usage: p2184_a_export_test.py <datadir>"""
 import base64
 import hashlib
 import io
+import json
 import os
 import subprocess
 import sys
@@ -50,6 +51,15 @@ def sql(q, args=()):
     c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
         return c.execute(q, args).fetchall()
+    finally:
+        c.close()
+
+
+def wr(q, args=()):
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    try:
+        c.execute(q, args)
+        c.commit()
     finally:
         c.close()
 
@@ -172,6 +182,13 @@ OPT = {o["name"]: o["id"] for o in next(f for f in r.json()["fields"] if f["id"]
 r = A.patch(B + f"/api/docs/{D1}", json={"custom_fields": {str(FT): "AZ-77", str(FS): OPT["Erledigt"]}})
 check(r.ok, "setup: the field values " + r.text[:200])
 check(fields(A, D1).get("Stand", {}).get("label") == "Erledigt", "setup: the select value reads")
+# 2.369.0 (#2734): a value set automatically; a select value whose option is gone in the source (not taken over: one warning)
+r = A.post(B + "/api/docs/fields", json={"ws": SP, "name": "Phase", "type": "select", "options": "Eins, Zwei"})
+FP = r.json()["id"]
+POPT = next(f for f in r.json()["fields"] if f["id"] == FP)["options"]
+check(A.patch(B + f"/api/docs/{D1}", json={"custom_fields": {str(FP): POPT[1]["id"]}}).ok, "setup: the third value")
+wr("UPDATE doc_meta SET auto=? WHERE node_id=?", (json.dumps({f"cf{FT}": "rule", "asn": "code"}), D1))
+wr("UPDATE doc_fields SET options=? WHERE id=?", (json.dumps({"options": POPT[:1]}), FP))
 
 # ---------------------------------------------------------------- #2628: the retention info and ZIP of the organisation
 ri = A.get(B + f"/api/retention/org/{ORG}").json()
@@ -231,6 +248,15 @@ check(fv.get("Stand", {}).get("id") == GFS and fv.get("Stand", {}).get("label") 
       f"the select value is on the target's own field, its missing option added {fv.get('Stand')}")
 check(sorted(o["name"] for o in fv.get("Stand", {}).get("options") or []) == ["Erledigt", "Offen"], "the target's field has both options once")
 check(all(v[0].startswith("kenc1:") for v in sql("SELECT value FROM doc_field_values WHERE node_id=?", (GD,))), "the values are sealed at rest")
+# 2.369.0 (#2734): the mark "automatic" follows the field to its new id; other keys stay
+GFT = one("SELECT id FROM doc_fields WHERE ws=? AND name='Aktenzeichen'", (f"o{GAM}",))[0]
+auto = json.loads(one("SELECT auto FROM doc_meta WHERE node_id=?", (GD,))[0] or "{}")
+check(GFT != FT and auto == {f"cf{GFT}": "rule", "asn": "code"}, f"the mark 'automatic' moved to the new field {auto} {GFT}")
+wn = [w for w in (j.get("result") or {}).get("warnings") or [] if "Field values" in str(w) or "Feldwerte" in str(w)]
+check(len(wn) == 1, f"one warning for the value not taken over {(j.get('result') or {}).get('warnings')}")
+# 2.369.0 (#2734): an option made after the import survives its undo
+r = A.patch(B + f"/api/docs/fields/{GFS}", json={"options": [*fv["Stand"]["options"], {"name": "Später"}]})
+check(r.ok, "the target adds an option of its own " + r.text[:160])
 check(sql("SELECT COUNT(*) FROM office_letters WHERE org_id=?", (ORG,))[0][0] == 2, "the source keeps its letters")
 r = A.post(B + f"/api/imports/{IMP}/undo")
 check(r.ok, "undo " + r.text[:160])
@@ -238,6 +264,17 @@ check(not sql("SELECT 1 FROM office_letters WHERE org_id=?", (GAM,)) and not sql
       "undo removes the letters and text blocks")
 gf = [x[0] for x in sql("SELECT name FROM doc_fields WHERE ws=?", (f"o{GAM}",))]
 check(gf == ["Stand"], f"undo removes the field it made, the target's own stays {gf}")
+# 2.369.0 (#2734): the option the import added goes again, the target's stay
+go = [o["name"] for o in json.loads(one("SELECT options FROM doc_fields WHERE id=?", (GFS,))[0])["options"]]
+check(go == ["Offen", "Später"], f"undo takes back the option the import added {go}")
+# 2.369.0 (review): only added options in a run: the undo still asks for an admin of the target; a several-column ALTER is never skipped
+code = (f"from kalmido.core.db import connect, col_present\nfrom kalmido.core.access import Denied\nfrom kalmido.admin.orgimport import oi_undo_check\n"
+        f"c = connect()\ncr = {{'oi': [['doc_fields', {GFS}, 'o{GAM}', ['x']]]}}\n"
+        "try:\n    oi_undo_check(c, 999999, cr, '')\n    print('allowed')\nexcept Denied:\n    print('denied')\n"
+        "print(col_present(c, 'ALTER TABLE users ADD COLUMN IF NOT EXISTS id INT'), "
+        "col_present(c, 'ALTER TABLE users ADD COLUMN IF NOT EXISTS id INT, ADD COLUMN IF NOT EXISTS zz INT'))\nc.close()")
+ct = subprocess.run(["docker", "exec", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test"), "python3", "-c", code], capture_output=True, text=True)
+check(ct.stdout.split() == ["denied", "True", "False"], f"undo right + col_present {ct.stdout} {ct.stderr[-300:]}")
 check(not sql("SELECT 1 FROM doc_field_values WHERE ws=?", (f"o{GAM}",)), "undo removes the values")
 A.delete(B + f"/api/account/import/{iid}")
 

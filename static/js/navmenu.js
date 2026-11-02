@@ -41,7 +41,7 @@ function nav_setHid(area, key, hide, name) {
 /** @param {Element} b */
 function nav_rowMenu(b) {
   const [area, key] = (b.dataset.navk || '').split(':'), name = b.querySelector('.n')?.textContent || key;
-  menu(b, [{label: tr('Hide from menu'), icon: 'eyeoff', fn: () => nav_setHid(area, key, true, name)}, {label: tr('Customize'), icon: 'edit', fn: () => nav_edit(area)}]);
+  menu(b, [{label: tr('Hide from menu'), icon: 'eyeoff', fn: () => nav_setHid(area, key, true, name)}, {label: tr('Customise'), icon: 'edit', fn: () => nav_edit(area)}]);
 }
 // the names of the menus (the areas' names; the tab bar)
 const nav_title = id => id === 'tabbar' ? tr('Tab bar') : tr(mg_nameKey(nav_area(id)));
@@ -53,7 +53,7 @@ function nav_list(id) {
     const ids = tabIds(), pin = /** @type {any[]} */ (ids.map(tabItem).filter(t => t && !o3a_hidT(t)));
     // what can be pinned with a Plus: the areas, the usual places, the conversations, search and settings (lists, filters
     // and tags: "+ Add tab …" under Settings > Appearance)
-    const more = [...tabDefault(), ...tabAreaItems().map(t => t.id), 's:inbox', 's:today', 's:week', 'home', 'cal', 'news', 'team', 'agents', 'wiki', 'sheets', 'habits', 'favs', 'settings']
+    const more = [...tabDefault(), ...tabAreaItems().map(t => t.id), 's:inbox', 's:today', 's:week', 'home', 'cal', 'news', 'team', 'agents', 'wiki', 'sheets', 'habits', 'favs', 'qnotes', 'settings']  // 2.477.0 (#3881): qnotes
       .filter((x, i, a) => a.indexOf(x) === i && !ids.includes(x)).map(x => /** @type {any} */ (tabItem(x))).filter(t => t && !o3a_hidT(t) && !pin.some(p => p.id === t.id));
     return [...pin.map(t => ({key: t.id, icon: t.ico || '', iconHtml: t.icon, name: t.label, hid: false})), ...more.map(t => ({key: t.id, icon: t.ico || '', iconHtml: t.icon, name: t.label, hid: true}))];
   }
@@ -72,7 +72,7 @@ function nav_edHtml(id, o = {}) {
   const xs = nav_list(id), on = xs.filter(x => !x.hid), off = xs.filter(x => x.hid);
   const ul = (rows, g) => `<ul class="navl" role="list" data-navg="${g || ''}">${rows.map((x, i) => nav_row(id, x, i, rows.length)).join('')}</ul>`;
   const body = id === 'office' ? OFM_GROUPS.map(g => { const r = on.filter(x => x.group === g[0]); return r.length ? `<h5 class="navgh">${esc(tr(g[2]))}</h5>${ul(r, g[0])}` : ''; }).join('') : ul(on);
-  const tip = id === 'tabbar' ? tr('A phone fits {0} tabs, the rest goes under “More”.', TAB_MAX) : tr('Hidden points stay where they are: the search still finds them, nothing is deleted.');
+  const tip = id === 'tabbar' ? tr('This device fits {0} tabs, the rest goes under “More”.', tabMax()) : tr('Hidden points stay where they are: the search still finds them, nothing is deleted.');
   const head = o.page ? '' : `<div class="navedh"><b>${esc(tr('Edit menu'))}</b><span class="muted">${esc(nav_title(id))}</span><span class="spacer"></span><button type="button" class="btn sm pri" data-act="nav-done">${esc(tr('Done'))}</button></div>`;
   return `<div class="naved${isMobile() ? ' navtouch' : ''}" data-naved="${id}" role="group" aria-label="${esc(tr('Edit menu') + ': ' + nav_title(id))}">${head}${on.length ? body : `<p class="muted">${esc(tr('Nothing in the menu'))}</p>`}`
     + `<h5 class="navgh navhh">${esc(tr('Hidden'))}</h5>${off.length ? `<ul class="navl navoffl" role="list">${off.map(nav_hidRow).join('')}</ul>` : `<p class="muted navnone">${esc(tr('Nothing hidden'))}</p>`}`

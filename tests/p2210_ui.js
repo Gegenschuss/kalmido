@@ -135,9 +135,11 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
   click(w, [...d.querySelectorAll('#view .wcev')].find(x => /Standup/.test(x.textContent)));
   await until(() => d.querySelector('#pop [data-evp="del"]'));
   click(w, d.querySelector('#pop [data-evp="del"]'));
-  await until(() => d.querySelector('.modal [data-sc="one"]'));
-  click(w, d.querySelector('.modal [data-sc="one"]'));
-  check(await until(async () => (await call('GET', `/api/events/${SU.id}`)).exdates.length === 1), '"Only this date" deleted: left out');
+  // 2.484.0 (#3945): this date has its own change now (above): it is a single event, deleting asks the plain question
+  await until(() => d.querySelector('.modal [data-cd="yes"]'));
+  check(!d.querySelector('.modal [data-sc]'), 'the changed date: no "Only this date / All dates" when deleting');
+  click(w, d.querySelector('.modal [data-cd="yes"]'));
+  check(await until(async () => (await call('GET', `/api/events/${SU.id}`)).exdates.length === 1), 'the changed date deleted: left out');
   // the quick sheet from a free slot: "Event"
   w.eval(`S.calMode = 'week'; S.calSel = '${t1}'; renderView()`); await sleep(100);
   const col = d.querySelector(`#view .wcol[data-day="${t1}"]`);
@@ -289,7 +291,7 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
   // ================= Firefox
   const ffLogin = async ({ev, nav}, user, theme) => {
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.ofmAll', 'true'); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); /* 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js) */ localStorage.setItem('tasks.theme', '"${theme}"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.ofmAll', 'true'); localStorage.setItem('tasks.sbbUnfold', '["office:money"]'); /* 2.276.0 (#3039): every office point shown, Money open by hand (the first-day menu: p2276_a_ui.js) */ localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${user}', password: 'password123'})}).then(r => r.status)`);
   };
   const ready = async (ev, sel = '#top h1', n = 40) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('${sel}')`).catch(() => false)); i++) await sleep(250); await sleep(700); };

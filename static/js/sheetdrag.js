@@ -27,6 +27,7 @@ function sd_start(t, x, y, touch) {
   const el = sd_sheet(t); if (!el) return false;
   if (t.closest('input,textarea,select,[contenteditable="true"],.qhcs')) return false;  // typing / horizontal chip rows stay theirs
   if (t.closest('[data-bpgrab],[data-bpgrip]')) return false;  // the bell's own handle keeps its own drag (up to the full height, stored)
+  if (t.closest('[data-rowd]')) return false;  // 2.456.0 (#3837): the grip of a row drags the row (drag.js rowd_attach), not the sheet
   const r = el.getBoundingClientRect(), head = y - r.top <= 44;
   if (!head && !touch) return false;  // a mouse drags only at the head (text selection in the content stays)
   const b = getComputedStyle(el).transform;  // the sheet's own transform (quick add on a tablet is centred with translateX)

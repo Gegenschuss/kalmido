@@ -13,7 +13,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path[:0] = [HERE, os.path.join(HERE, "..", "kalmido", "core")]
-from strip import strip_asset  # noqa: E402  (a file of its own without imports from the app)
+from strip import strip_asset, with_start_css  # noqa: E402  (a file of its own without imports from the app)
 
 try:
     import brotli
@@ -32,7 +32,10 @@ def pack(root, out):
             path = os.path.join(base, name)
             with open(path, "rb") as f:
                 data = f.read()
-            served = strip_asset(os.path.relpath(path, root).replace(os.sep, "/"), data)
+            rel = os.path.relpath(path, root).replace(os.sep, "/")
+            if rel == "app.css":  # 2.476.0 (#3487): as the server sends it, with the start style files behind it
+                data = with_start_css(root, data)
+            served = strip_asset(rel, data)
             data = data if served is None else served
             if len(data) < PACK_MIN:
                 continue

@@ -90,6 +90,7 @@ def about_info(c, u):
                  public_links=gsetting(c, "public_links") != "0", public_links_env=PUB_ENV)
         from ..core.config import SECRET_KEY, SECRET_KEY_PROBLEM, SECRET_KEY_SRC
         d.update(secret_key=bool(SECRET_KEY), secret_key_problem=SECRET_KEY_PROBLEM, secret_key_src=SECRET_KEY_SRC)  # 2.45.0 (#1515)
+        d.update(backup_tools_problem=gsetting(c, "bk_tools_problem"))  # 2.359.3 (#2945): "<pg_dump>|<server>", else empty
         from ..accounts.signup import signup_admin
         d.update(signup_admin(c))  # 2.23.0 (#711)
         from ..admin.hosting import hosting_admin
@@ -210,6 +211,7 @@ def admin_settings():
             return e
         if v != gsetting(c, "cal_allow_hosts"):
             gset(c, "cal_allow_hosts", v)
+            gset(c, "allow_hosts_copied_from", v)  # 2.473.0 (#3569): changed here, already in every purpose: no copy at the next start
             new_by = {p: v for p in ALLOW_PURPOSES}  # 2.380 G (#3389): the old field (an older client) = one list for every purpose
     if "allow_hosts_by_purpose" in b:  # 2.380 G (#3389): {purpose: hosts} -- only the purposes named change
         v = b["allow_hosts_by_purpose"]

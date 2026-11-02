@@ -6,7 +6,7 @@
  (b) tracked = has a status: setting one works on kind "list", clearing it ("") = not tracked any more
  (c) the inbox stays outside: no status, no project page, no dependencies (409)
  (d) a list template keeps its dates relative to the project start, also without "relative" (the flag is ignored)
- (e) a person without an organisation: the same in her private space
+ (e) a person without an organisation: the same in her private workspace
  (f) the start step: an old kind=project without a status becomes "on track" once; kind list, the inbox and a status
      cleared afterwards stay as they are (only with an own container, not under KMT_NOSTART)
 usage: p2352_b_project_unify_test.py <datadir>

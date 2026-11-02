@@ -85,7 +85,7 @@ function pep_viewHtml(d, v) {
   return `<p class="muted ofchint">${esc(tr('Through your own Peppol access point provider (own account).'))}${v.provider_name ? ` ${esc(v.provider_name)}` : ''}${v.sandbox ? ` <span class="rotag">${tr('Test mode')}</span>` : ''}</p>
     ${fix ? `<div class="pepmiss"><h4>${tr('Still missing')}</h4><ul>${fix}</ul></div>` : ''}
     ${v.receiver_id ? `<div class="row"><label>${tr('Recipient')}</label><span class="lacts"><code>${esc(v.receiver_id)}</code><button type="button" class="btn sm" data-pepd="lookup">${tr('Check reachability')}</button><span id="pep-reach" aria-live="polite"></span></span></div>` : ''}
-    ${sends ? `<h4>${tr('Sends')}</h4><ul class="peplist" role="list">${sends}</ul>` : ''}${v.note ? `<p class="muted ofchint">${esc(v.note)}</p>` : ''}`;
+    ${sends ? `<h4>${tr('Sends')}</h4><ul class="peplist" role="list">${sends}</ul>` : ''}${v.note ? `<p class="muted ofchint">${esc(v.note)}</p>` : ''}${v.can_mark_undelivered ? `<button type="button" class="btn sm" data-pepd="undelivered">${tr('Mark as not delivered')}</button>` : ''}`;
 }
 async function pep_dialog(d) {
   const md = modal(`<h3>${esc(tr('Send e-invoice over the Peppol network'))}</h3><div class="ofddlg" id="pep-dlg"><p class="muted">${tr('Loading…')}</p></div>
@@ -109,6 +109,11 @@ async function pep_dialog(d) {
       if (a === 'refresh') await load(true);
       else if (a === 'take') { await api('PATCH', `/api/clients/${v.client_id}`, {peppol_id: b.dataset.v}); toast(tr('Saved at the client')); await load(false); }
       else if (a === 'lookup') { const j = await api('POST', `/api/office/docs/${d.id}/peppol/lookup`); const r = md.querySelector('#pep-reach'); if (r) r.innerHTML = j.reachable ? `<span class="pep-ok">${ic('check', 's')} ${tr('reachable')}</span>` : `<span class="pep-bad">${tr('not reachable over Peppol')}</span>`; }
+      else if (a === 'undelivered') {  // 2.370.0 (#2778): the provider reports no rejections: "Send again" is free afterwards
+        if (!await askConfirm(tr('Mark as not delivered?'), tr('Do this only after checking with the recipient or your provider that the invoice did not arrive. You can then send it again.'), {ok: tr('Mark as not delivered')})) return;
+        v = await api('POST', `/api/office/docs/${d.id}/peppol/undelivered`); draw();
+        OFD.log = null;
+      }
       else if (a === 'send') {
         if (v.can_retry && !await askConfirm(tr('Send again?'), tr('The last attempt failed or was rejected. Check with your provider that it did not arrive, then send it again.'), {ok: tr('Send again')})) return;
         v = await api('POST', `/api/office/docs/${d.id}/peppol`, v.can_retry ? {again: 1} : {}); draw();

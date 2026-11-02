@@ -77,6 +77,7 @@ async function wsv_restore(v, ws) {
   for (const f of wsv_folders(ws)) if (foldClosed(f) !== shut.has(f)) foldSet(f, shut.has(f));
   let h = String(v.hash || '');
   if (h.startsWith('l/') && !(l => l && !l.archived && inWs(l, ws))(listById(+h.slice(2)))) h = keyToHash(START_KEY);  // a list gone or moved meanwhile
+  if (o3a_hid(h.split('/')[0].split('?')[0])) h = keyToHash(START_KEY);  // 2.484.0 (#3950): the kept view is itself a private module
   if (S.sel && !(v.sel === S.sel && wsv_taskIn(S.sel, ws))) wsv_close();
   history.replaceState(history.state, '', '#' + h);
   await route();
@@ -90,18 +91,21 @@ async function wsSet(ws, o = {}) {
   const from = wsCur();
   if (WSV.ws === from) wsv_save(from, wsv_hashNow());  // 2.397.0 (#3404)
   S.settings.workspace = ws; LS.set('ws', ws);
-  closeSide?.();
+  // 2.455.0 (#3847): the phone's open drawer stays and shows the new workspace; route() (a kept view / go) must not close it either
+  const hold = !!$('#side.open') && typeof SBM !== 'undefined';
+  if (hold) SBM.keep = true; else closeSide?.();
   if (typeof pb_wsChanged === 'function') pb_wsChanged(true);  // 2.47.3 (#1360): the office follows once the server knows it
   p61b_wsRun(false);  // 2.66.1 (#1945)
   const to = wsCur(), kept = !o.keep && to !== 'all' ? (LS.get('wsView', {}) || {})[to] : null;
   WSV.ws = '';  // the page shown now belongs to the old workspace: route() must not keep it for the new one
-  if (kept) await wsv_restore(kept, to);  // 2.397.0 (#3404): the workspace as it was left
+  if (kept) { await wsv_restore(kept, to); if (hold) SBM.keep = false; }  // 2.397.0 (#3404): the workspace as it was left
   else {
     if (S.sel && !wsv_taskIn(S.sel, to)) wsv_close();
     // 2.49.0 (#1770): the open list does not stay when it is not part of the new workspace -> that workspace's inbox
     // 2.397.0 (#3404): the first visit without a kept view: the same page when the workspace has it, else the start
     const ol = S.route?.mod === 'tasks' && String(S.route.key || '').startsWith('l:') ? listById(+S.route.key.slice(2)) : null;
-    if (ol && !inWs(ol, to)) go(keyToHash(START_KEY)); else { render(); WSV.ws = to; WSV.hash = wsv_hashNow(); }
+    // 2.484.0 (#3950): a page of a private module (Habits, Budget, ...) does not exist in an organisation: its start page, no quiet way back
+    if ((ol && !inWs(ol, to)) || o3a_hid(S.route?.mod)) go(keyToHash(START_KEY)); else { if (hold) SBM.keep = false; render(); WSV.ws = to; WSV.hash = wsv_hashNow(); }  // no route follows: the next tap on an entry closes the drawer
   }
   try { await api('PATCH', '/api/settings', {workspace: ws}); } catch { /* api() said it */ }
   if (typeof AB2 !== 'undefined') { AB2.org = null; ab2_reload(); }  // 2.96.0 D (#1941): absences follow the switch (server reads it)
@@ -116,8 +120,17 @@ function wsFollow(key) {
   if (!l || inWs(l)) return;
   const ws = wsOf(l);
   if (!wsOptions().includes(ws)) return;  // an organisation the person is not in (a list shared from outside): leave the filter
+  const from = wsCur();
   S.settings.workspace = ws; LS.set('ws', ws);
   api('PATCH', '/api/settings', {workspace: ws}).catch(() => {});
+  ws_autoNote(from);
+}
+// 2.484.0 (#3950): Kalmido switched the workspace by itself (a link to a private module or to a list of another workspace): a short
+// note with "Back" (the workspace before, on its start page when the page does not exist there). A deliberate switch says nothing
+function ws_autoNote(from) {
+  const to = wsCur();
+  if (!S.booted || !from || from === to) return;
+  setTimeout(() => toast(tr('Switched to {0}', wsName(to)), () => { wsSet(from); }, undefined, tr('Back')), 0);
 }
 // 2.49.0 (#1770): the fixed sign in a list's header: Private or the organisation, from the list's OWN org_id (not the
 // filter), under "All" too; a click opens the workspace switch like the chip
@@ -226,8 +239,8 @@ function importTargetConfirm({what, ws = 'private', place = '', privOk = false, 
   const body = org
     ? (place ? tr('Import {0} into “{1}” of the organisation {2}. Members of the organisation with access to it can see them.', what, place, name)
       : tr('Import {0} into the organisation {1}. Members of the organisation with access to it can see them.', what, name))
-    : (place ? tr('Import {0} into “{1}” in your private space.', what, place) : tr('Import {0} into your private space.', what));
-  return askDialog({title: org ? tr('Import into the organisation {0}?', name) : tr('Import into your private space?'), body, ok: tr('Import'),
+    : (place ? tr('Import {0} into “{1}” in your private workspace.', what, place) : tr('Import {0} into your private workspace.', what));
+  return askDialog({title: org ? tr('Import into the organisation {0}?', name) : tr('Import into your private workspace?'), body, ok: tr('Import'),
     after: md => {
       md.classList.add('itc-dlg');
       if (check) {

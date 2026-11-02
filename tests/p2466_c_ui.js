@@ -57,7 +57,7 @@ const FEAT = 'cal,comments,collab,time,agents';
   // the policy switch still saves from here
   const uag = ap.querySelector('#s-uag'); uag.checked = true; uag.dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', '/api/admin/agent-policy')).user_agents);
-  check((await call('GET', '/api/admin/agent-policy')).user_agents === true, 'the switch "Users may create their own agents" saves from Administration > Agents');
+  check((await call('GET', '/api/admin/agent-policy')).user_agents === true, 'the switch "People may create their own agents" saves from Administration > Agents');
   // the other areas: only the own settings
   const ai = md.querySelector('[data-pane="ai"]');
   check(ai && ![...ai.querySelectorAll('[data-aisub]')].some(b => ['log', 'admin'].includes(b.dataset.aisub)) && !ai.querySelector('#s-uag, #s-sclim, #s-aud'), 'Agents area: no Log / Administration sub-tab, no admin parts: ' + [...(ai?.querySelectorAll('[data-aisub]') || [])].map(b => b.dataset.aisub).join());

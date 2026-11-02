@@ -16,6 +16,7 @@ from flask import jsonify
 from ..core.config import app, MAX_FILE_MB, NTFY_URL, ntfy_inbox_allowed, _origin
 from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, iso, now_utc
+from ..collab.integfail import INTEG_FAILS, integ_tell
 from ..accounts.session import GATE, me
 from ..accounts.login import seal, unseal
 from ..calendars.subscriptions import cal_allow, cal_host_allowed, cal_http, CalError, cal_norm_url
@@ -196,6 +197,9 @@ def ni_person(uid):
             c.execute("UPDATE ntfy_inboxes SET fails=?, last_error=? WHERE user_id=?", (fails, str(code)[:40], uid))
             _NEXT[uid] = time.time() + min(NI_BACKOFF_MAX, NI_ROUND_S * 2 ** min(fails, 5))
             print("ntfy inbox (person", uid, "):", code, flush=True)
+            if fails == INTEG_FAILS:  # 2.367.3 (#2971)
+                integ_tell(c, [uid], "ntfy", r["topic"] or "ntfy", (r["last_ok"] or r["updated_at"] or "")[:10],
+                           click="settings/newskinds", focus="newskinds")
         c.commit()
     finally:
         c.close()

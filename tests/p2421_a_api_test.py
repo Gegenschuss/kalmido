@@ -45,7 +45,7 @@ FID, F = freelancer(B, A, "hanna")
 st = F.get(B + "/api/state").json()
 check(st["me"].get("workspaces") == [], "hosted: the person is in no organisation")
 
-# ---- tasks: a private list, a task, a subtask, done (collaboration is not needed in the own private space)
+# ---- tasks: a private list, a task, a subtask, done (collaboration is not needed in the own private workspace)
 L = ok(F.post(B + "/api/lists", json={"name": "Clients", "kind": "project", "time_tracking": True}), "tasks: a private list", (200, 201))
 check(L.get("org_id") in (None, 0), f"tasks: the list is private {L.get('org_id')}")
 T = ok(F.post(B + "/api/tasks", json={"list_id": L.get("id"), "title": "Edit the reel"}), "tasks: a task", (200, 201))

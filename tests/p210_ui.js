@@ -5,7 +5,7 @@
 //      the smart view "Waiting on external", clearing with one click (+ undo), the News / history texts; SW v60
 const {execFileSync} = require('child_process');
 const fs = require('fs'), path = require('path');
-const {boot, errs, sleep, B, login} = require('./boot');
+const {boot, errs, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -18,10 +18,11 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const change = (w, el) => el && el.dispatchEvent(new w.Event('change', {bubbles: true}));
+const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 20000, step: 100});  // #3927: wait for a state instead of fixed sleeps
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields,comments,agents';
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   const SW = await (await fetch(B + 'sw.js')).text();
   check(/const CACHE = 'tasks-shell-v(?:(6[0-9]|7[0-9])|8[0-9]|9[0-9]|[1-9][0-9]{2})'/.test(SW), 'service worker cache v60 (2.1.1: v61, 2.1.2: v62, 2.2.0: v63, 2.2.1: v64, 2.3.0: v65, 2.4.0: v66, 2.4.1: v67, 2.4.2: v68, 2.5.0: v69, 2.5.1: v70, 2.5.2: v71, 2.6.0: v72, 2.6.1: v73, 2.7.0: v74, 2.7.1: v75, 2.7.2: v76, 2.8.0: v77, 2.9.0: v78, 2.10.0: v79, 2.11.0: v80)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
@@ -38,7 +39,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   // ================= #317 the matrix
   for (const [mobile, lab] of [[false, 'desktop'], [true, 'phone']]) {
     const w = await boot({user: 'bob', mobile, hash: 'today'}), d = w.document;
-    w.eval(`settingsModal('notify')`); await sleep(700);
+    w.eval(`settingsModal('notify')`); await until(() => d.querySelector('#sp-notify .nmx .nmr [data-nm="reply"][data-ch="push"]')); await idle(w);
     const mx = d.querySelector('#sp-notify .nmx');
     const rows = [...(mx?.querySelectorAll('.nmr') || [])];
     check(mx && rows.length >= 21 &&  /* 2.367.2 (#2969): + calsub; 2.367.3 (#2971): + integration; 2.367.4 (#2974): + notice; 2.453.0 (#3781): + limits; 2.266.0 (#2965): + signoff; 2.18.0: + errreport; 2.60.0 (#1512): + review; 2.122.0 (#2097): + filereq; 2.125.0 (#2117 #2119): + leave, timesheet */  /Event.*News.*Push/.test(mx.querySelector('.nmh').textContent), `${lab}: matrix with every event (${rows.length}: ${rows.map(r => r.querySelector('[data-nm]')?.dataset.nm || '-').join(',')})`);
@@ -48,12 +49,13 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
       && !d.querySelector('[data-nm="status"][data-ch="push"]').checked && d.querySelector('[data-nm="status"][data-ch="news"]').checked, `${lab}: defaults`);
     check(!d.querySelector('#sp-notify [data-nk]'), `${lab}: the old News checkboxes are gone`);
     if (!mobile) {
-      const cb = d.querySelector('[data-nm="newtask"][data-ch="push"]'); cb.checked = true; change(w, cb); await sleep(700);
-      let st = await call('GET', '/api/state', null, CKB);
-      check(st.notify.newtask.push === true && JSON.parse(st.settings.notify).newtask.push === 1, 'toggle: saved (notify)');
-      const cm = d.querySelector('[data-nm="complete"][data-ch="news"]'); check(cm.checked, 'complete: News on by default (2.367.5, #2980)'); cm.checked = false; change(w, cm); await sleep(700);  // on by default, so the change here is switching it off
-      st = await call('GET', '/api/state', null, CKB);
-      check(st.notify.complete.news === false && !st.settings.news_kinds.split(',').includes('complete'), 'toggle a News of an old event: news_kinds');
+      const cb = d.querySelector('[data-nm="newtask"][data-ch="push"]'); cb.checked = true; change(w, cb);
+      let st;
+      check(await until(async () => { st = await call('GET', '/api/state', null, CKB); return st.notify.newtask.push === true && JSON.parse(st.settings.notify).newtask.push === 1; }), 'toggle: saved (notify)');
+      await idle(w);  // the save's answer is in before the next change
+      const cm = d.querySelector('[data-nm="complete"][data-ch="news"]'); check(cm.checked, 'complete: News on by default (2.367.5, #2980)'); cm.checked = false; change(w, cm);  // on by default, so the change here is switching it off
+      check(await until(async () => { st = await call('GET', '/api/state', null, CKB); return st.notify.complete.news === false && !st.settings.news_kinds.split(',').includes('complete'); }), 'toggle a News of an old event: news_kinds');
+      await idle(w);
       // 2.9.0: on a slow CI runner the second save could still be settling in the undo history when Undo was clicked
       // (Undo then took back the first change): wait until the saved note names the second change
       // 2.12.2: wait for the note to hold the newest undo entry, then click at once (the note drops its Undo after 6 s; the
@@ -65,10 +67,9 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
       // server's order of news_kinds and the undo skipped it; here the reload comes on purpose (red without the fix)
       await w.eval(`load()`);
       check(w.eval(`S.settings.news_kinds`) === st.settings.news_kinds, 'reload: the page holds the server\'s value ' + w.eval(`S.settings.news_kinds`));
-      for (let i = 0; i < 50 && !top(); i++) await sleep(100);
-      check(top(), 'the note holds the newest undo step');
-      click(w, d.querySelector('.smodal .ssaved [data-m="s-undo"]')); await sleep(900);
-      for (let i = 0; i < 40 && (await call('GET', '/api/state', null, CKB)).notify.complete.news !== true; i++) await sleep(300);  // 2.7.2: slow CI runner
+      check(await until(() => top(), 5000), 'the note holds the newest undo step');
+      click(w, d.querySelector('.smodal .ssaved [data-m="s-undo"]'));
+      await until(async () => (await call('GET', '/api/state', null, CKB)).notify.complete.news === true);  // 2.7.2: slow CI runner
       st = await call('GET', '/api/state', null, CKB);
       check(st.notify.complete.news === true && st.notify.newtask.push === true, `undo takes back the last change (complete.news ${st.notify.complete.news}, newtask.push ${st.notify.newtask.push}, undo ${w.eval('HIST.undo.length')}, redo ${w.eval('HIST.redo.length')}, local ${w.eval('S.settings.news_kinds')}, toast ${d.querySelector('#toast')?.textContent || ''})`);  // 2.358.0 B (#3302): #toast, redo, local value
     }
@@ -76,7 +77,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   }
   await call('PATCH', '/api/settings', {lang: 'de'}, CKB);
   let w = await boot({user: 'bob', hash: 'today'}), d = w.document;
-  w.eval(`settingsModal('notify')`); await sleep(700);
+  w.eval(`settingsModal('notify')`); await until(() => d.querySelector('#s-news-h') && d.querySelector('#sp-notify .nmx'));
   check(/Was dich benachrichtigt/.test(d.querySelector('#s-news-h')?.textContent || '') && /Antworten auf meinen Kommentar/.test(d.querySelector('#sp-notify .nmx').textContent), 'German');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'}, CKB);
@@ -85,19 +86,20 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   w = await boot({user: 'bob', hash: 'l/' + TEAM}); d = w.document;
   let items = w.eval(`listMenuItems(${TEAM}, document.querySelector('#top h1')).flatMap(x => x.more || [x]).filter(x => x !== '-').map(x => x.label)`);
   check(items.includes('Notifications: Default'), 'list menu: Notifications: Default ' + items);
-  w.eval(`bellMenu(document.querySelector('#top h1'), ${TEAM})`); await sleep(200);
+  w.eval(`bellMenu(document.querySelector('#top h1'), ${TEAM})`); await until(() => d.querySelectorAll('#pop .menu-list button').length >= 4);
   const bells = [...d.querySelectorAll('#pop .menu-list button')];
   check(bells.map(b => b.textContent.trim()).join('|') === 'All activity|Default|Mute|Custom selection…' && bells[1].classList.contains('on'), 'bell menu: All / Default (on) / Mute (2.6.1: + Custom selection…)');
-  click(w, bells[2]); await sleep(700);
-  check((await call('GET', '/api/state', null, CKB)).lists.find(l => l.id === TEAM).bell === 'mute', 'muted (server)');
+  click(w, bells[2]);
+  check(await until(async () => (await call('GET', '/api/state', null, CKB)).lists.find(l => l.id === TEAM).bell === 'mute'), 'muted (server)');
+  await until(() => d.querySelector(`#side .srow[data-list="${TEAM}"] .bellm`) && /Notifications for Team: Mute/.test(d.querySelector('#toast').textContent));
   check(d.querySelector(`#side .srow[data-list="${TEAM}"] .bellm`), 'sidebar: the muted icon');
   check(/Notifications for Team: Mute/.test(d.querySelector('#toast').textContent), 'toast names it');
   check((await call('GET', '/api/state')).lists.find(l => l.id === TEAM).bell === 'default', 'only for bob');
-  w.eval(`listModal(${TEAM})`); await sleep(500);
+  w.eval(`listModal(${TEAM})`); await until(() => d.querySelector('.lmodal #l-bell') && d.querySelector('#l-bellhint')); await idle(w);
   const sel = d.querySelector('.lmodal #l-bell');
   check(sel && sel.value === 'mute' && /only mentions/.test(d.querySelector('#l-bellhint').textContent), 'list dialog: the bell');
-  sel.value = 'all'; change(w, sel); await sleep(700);
-  check((await call('GET', '/api/state', null, CKB)).lists.find(l => l.id === TEAM).bell === 'all' && /every comment/.test(d.querySelector('#l-bellhint').textContent), 'list dialog: All');
+  sel.value = 'all'; change(w, sel);
+  check(await until(async () => (await call('GET', '/api/state', null, CKB)).lists.find(l => l.id === TEAM).bell === 'all' && /every comment/.test(d.querySelector('#l-bellhint').textContent)), 'list dialog: All');
   w.close();
   await call('PUT', `/api/lists/${TEAM}/bell`, {mode: 'default'}, CKB);
 
@@ -105,14 +107,16 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   for (const [mobile, lab] of [[false, 'desktop'], [true, 'phone']]) {
     if (mobile) await call('DELETE', `/api/tasks/${T1}/waiting`, null, CKB);
     w = await boot({user: 'bob', mobile, hash: 'l/' + TEAM}); d = w.document;
-    w.eval(`taskMenu(document.querySelector('#top h1'), ${T1})`); await sleep(200);
+    const waitItem = () => [...d.querySelectorAll('#pop .menu-list button')].find(b => b.textContent.trim() === 'Waiting on someone…');
+    w.eval(`taskMenu(document.querySelector('#top h1'), ${T1})`); await until(() => waitItem());
     const it = [...d.querySelectorAll('#pop .menu-list button')].find(b => b.textContent.trim() === 'Waiting on someone…');
     check(it, `${lab}: task menu entry`);
-    click(w, it); await sleep(300);
+    click(w, it); await until(() => d.querySelector('.modal.waitmodal #w-until'));
     const md = d.querySelector('.modal.waitmodal');
     check(md && md.querySelector('#w-note') && md.querySelector('#w-until'), `${lab}: dialog with note + follow-up day`);
     md.querySelector('#w-note').value = 'carpenter Meier';
-    click(w, md.querySelector('[data-m="ok"]')); await sleep(800);
+    click(w, md.querySelector('[data-m="ok"]'));
+    await until(async () => (await call('GET', '/api/state', null, CKB)).tasks.find(x => x.id === T1).waiting_at && d.querySelector(`#view .trow[data-id="${T1}"] .waitm`) && d.querySelector('#side .srow[data-go="waiting"]'));
     const t = (await call('GET', '/api/state', null, CKB)).tasks.find(x => x.id === T1);
     check(t.waiting_at && t.wait_note === 'carpenter Meier' && t.wait_until, `${lab}: saved (default follow-up in a week): ${t.wait_until}`);
     const chip = d.querySelector(`#view .trow[data-id="${T1}"] .waitm`);
@@ -122,13 +126,14 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
   }
   w = await boot({user: 'bob', hash: 'waiting'}); d = w.document;
   check([...d.querySelectorAll('#view .trow')].map(r => +r.dataset.id).join() === String(T1) && /Waiting on someone/.test(d.querySelector('#top h1').textContent), 'the smart view');
-  w.eval(`openDetail(${T1})`); await sleep(500);
+  w.eval(`openDetail(${T1})`); await until(() => d.querySelector('#detail .waitbar [data-act="wait-clear"]'));
   const bar = d.querySelector('#detail .waitbar');
   check(bar && /carpenter Meier/.test(bar.textContent) && /follow up/.test(bar.textContent), 'the bar in the task panel');
-  click(w, bar.querySelector('[data-act="wait-clear"]')); await sleep(800);
-  check(!(await call('GET', '/api/state', null, CKB)).tasks.find(x => x.id === T1).waiting_at && !d.querySelector('#detail .waitbar'), 'one click clears it');
-  click(w, d.querySelector('#toast button')); await sleep(800);
-  check((await call('GET', '/api/state', null, CKB)).tasks.find(x => x.id === T1).wait_note === 'carpenter Meier', 'undo puts it back');
+  click(w, bar.querySelector('[data-act="wait-clear"]'));
+  check(await until(async () => !(await call('GET', '/api/state', null, CKB)).tasks.find(x => x.id === T1).waiting_at && !d.querySelector('#detail .waitbar')), 'one click clears it');
+  await until(() => { const t = d.querySelector('#toast'); return t && !t.classList.contains('hidden') && t.querySelector('button'); });
+  click(w, d.querySelector('#toast button'));
+  check(await until(async () => (await call('GET', '/api/state', null, CKB)).tasks.find(x => x.id === T1).wait_note === 'carpenter Meier'), 'undo puts it back');
   check(/Follow up today: waiting on/.test(w.eval(`newsText({kind: 'followup', data: {note: 'x'}}, {})`)) && /added a task/.test(w.eval(`newsText({kind: 'newtask', actor_id: 1, data: {}}, {})`)),
     'News texts: follow-up, new task');
   w.close();

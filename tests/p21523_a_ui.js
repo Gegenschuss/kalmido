@@ -159,7 +159,7 @@ const ORG = 'Lindenhof Filmproduktion und Postproduktion GbR';
     check(await ready(ev, `!document.querySelector('#app').classList.contains('side-rail') && !!document.querySelector('#side .sbbhide')?.getClientRects().length`, 20), 'the button brings the panel back');
 
     // dark
-    await ev(`(() => { localStorage.setItem('tasks.theme', '"dark"'); return 1; })()`);
+    await ev(`(() => { localStorage.setItem('tasks.theme', '"dark"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     await nav(B + 'static/icon.svg'); await nav(B + `#l/${L}`);
     await ready(ev, `!!document.querySelector('#kbar .kbsw')`, 60); await sleep(500);
     await ev(`(() => { document.documentElement.dataset.theme = 'dark'; return 1; })()`); await sleep(200);  // the account's theme can win over the device's at loading

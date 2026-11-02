@@ -34,7 +34,8 @@ from ..accounts.login import seal, unseal
 from ..personal.timetrack import BadInput
 from .doctpl import (DT_NOTE, _ctx, _iid, dt_client, dt_doc, dt_fill, dt_file, dt_hash, dt_kick, dt_lang, dt_pdf, dt_signed_sync,
                      dt_tpl, dt_values)
-from .doctpl_samples import DMA_SAMPLES
+from .doclang import doc_lg
+from .doctpl_samples import DMA_SAMPLES, sample_text
 from .model import pb_owner
 
 # kind -> (label, sample key in DMA_SAMPLES, needs a signature)
@@ -43,7 +44,7 @@ DSB_KINDS = {"dpa": (N_("Data processing agreement"), "privacy_dpa", True),
              "consent": (N_("Consent"), "privacy_consent", True)}
 DSB_STATUS = {"open": N_("Open"), "sent": N_("Sent"), "handed": N_("Handed over"), "signed": N_("Signed"), "declined": N_("Declined")}
 DSB_HINT_DPA = N_("Only needed when you process personal data on behalf of the client (Art. 28 GDPR).")
-DSB_REVIEW = N_("Signed (by mail, please check)")
+DSB_REVIEW = N_("Signed (by e-mail, please check)")
 DSB_REPLY = N_("Reply received (please check)")  # 2.154.0 E (#2192): review=2, a reply that was not filed
 DSB_CODE_ABC = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0 / O / 1 / I
 DSB_CODE_LEN = 12
@@ -235,7 +236,7 @@ def dsb_post():
         title, text = t["name"], t["body"]
     else:
         lang = dt_lang(c, oid, b.get("lang") or None)
-        title, text = DMA_SAMPLES[skey][lang]
+        title, text = sample_text(DMA_SAMPLES[skey], lang)  # 2.449.0 (#3766, #3768): every language of the samples, English for the rest (was a 500)
     ts = iso(now_utc())
     row = {"org_id": oid, "template_id": tid, "kind": "other",
            "title": title[:300], "body": text, "client_id": cl["id"], "lang": lang, "sign": int(sign), "status": "draft",
@@ -321,7 +322,7 @@ def dsb_mail_parts(c, oid, r, d, link):
     k = fk_contact(c, cl["id"])
     to = (k or {}).get("email") or cl.get("email_invoice") or cl.get("email") or ""
     sign = DSB_KINDS.get(r["kind"], DSB_KINDS["info"])[2]
-    lg = "en" if d.get("lang") == "en" else "de"
+    lg = doc_lg(d.get("lang"))  # 2.449.0 (#3766): every document language (was en, else de)
     co = ofx_company(c, oid).get("name") or ""
     title = d.get("title") or tr(DSB_KINDS[r["kind"]][0], lg=lg)
     rin = sign and MAIL_IN_ON
@@ -332,7 +333,7 @@ def dsb_mail_parts(c, oid, r, d, link):
     if sign and link:
         parts.append(tr("You can sign it online here: {0}", DSB_LINK, lg=lg))
     if sign and rin:
-        parts.append(tr("Or reply to this mail with the signed document as a PDF attached; please keep the subject as it is.", lg=lg))
+        parts.append(tr("Or reply to this e-mail with the signed document as a PDF attached; please keep the subject as it is.", lg=lg))
     parts.append(tr("Kind regards", lg=lg) + ("\n" + co if co else ""))
     return to, subject, "\n\n".join(parts), reply, code
 
@@ -463,7 +464,7 @@ def dsb_file(c, r, uid, name, data, mime, ext):
 
 
 def dsb_signed_name(r, d, ext):
-    lg = "en" if (d or {}).get("lang") == "en" else "de"  # the sheet's language (also from the mail poller, no request)
+    lg = doc_lg((d or {}).get("lang"))  # the sheet's language (also from the mail poller, no request)
     base = re.sub(r'[\\/:*?"<>|\x00-\x1f\x7f]+', "-", (d or {}).get("title") or tr(DSB_KINDS[r["kind"]][0], lg=lg))[:120]
     return f"{base} ({tr('signed', lg=lg)}){ext}"
 

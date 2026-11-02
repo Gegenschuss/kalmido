@@ -8,7 +8,8 @@ import urllib.parse
 import urllib.request
 
 from ..core.i18n import N_, tr
-from ..core.db import connect, iso, now_utc, parse_iso
+from ..core.db import bump, connect, iso, now_utc, parse_iso
+from ..core.pg import write_lock
 from ..core.access import Denied, list_role, WRITE_ROLES
 from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..accounts.login import seal, unseal
@@ -54,7 +55,8 @@ def kk_public(c, uid):
     if not r:
         return {"connected": False}
     return {"connected": True, "url": r["url"], "token_set": bool(r["token"]), "list_id": r["list_id"], "source": r["source"],
-            "archive": bool(r["archive"]), "synced_at": r["synced_at"], "error": r["error"]}
+            "archive": bool(r["archive"]), "synced_at": r["synced_at"], "error": r["error"],
+            "error_text": kk_err_text(r["error"]) if r["error"] else ""}  # 2.453.0 (#3781): the fetch's error comes from here now
 
 
 def _no_agent(c, uid):
@@ -301,7 +303,10 @@ def kk_lists(c, uid):
 def _bgj_kk(uid):
     c = connect()
     try:
-        kk_sync(c, uid)
+        write_lock(c, f"kk_sync_{int(uid)}")  # 2.453.0 (#3781): a job running beside the next one waits for it (no bookmark twice)
+        out = kk_sync(c, uid)
+        if out["added"] or out["archived"]:
+            bump(c)  # 2.453.0 (#3781): open views reload the new bookmarks
         c.commit()
     except BadInput:
         pass  # stored in the connection

@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from flask import g, jsonify, request, Response
 
 from ..core.config import API_PREFIX, app, MAX_FILE_MB, PUBLIC_URL, TZ
-from ..core.pg import insert_id
+from ..core.pg import insert_id, system_ctx
 from ..core.i18n import dec_comma, fmt_int, lang, tr
 from ..core.db import bump, connect, db, inbox_default, iso, iso_ms, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import GATE, me
@@ -18,6 +18,8 @@ from ..core.access import Denied, list_role, need_collab, need_list, task_visibl
 from ..tasks.validation import as_int, valid_date
 from ..collab.comments import att_dicts, collab_on, comment_dict, lang_of, need_live_comment, user_names
 from ..collab.news import news_add, notif_ok
+from ..core.access import org_admin_people  # 2.367.4 (#2974)
+from ..notify.alerts import aa_org_event  # 2.367.4 (#2974)
 from ..personal.timetrack import _csv_cell
 from ..core.errors import BadInput, reject_unknown, UnknownFields
 from ..accounts.users import need_admin
@@ -38,6 +40,7 @@ from ..agents.workstyle import ws_get
 from ..agents.workqueue import wq_spec
 from ..agents.agentrules import ar_spec  # 2.235.0 C (#2903)
 from ..agents.proposals import PROP_KINDS, PROP_MAX_BYTES, PROP_MAX_ITEMS, PROP_STATES, PROP_SUMMARY_MAX
+from ..accounts.orgs import _operator_apart, op_foreign_account  # 2.399.0 (#2687)
 
 
 # ---------------------------------------------------------------- 2.1.1 (#326): model usage of agents + limits
@@ -244,8 +247,17 @@ def usage_refused(c, aid):
     return v1_err(429, msg, {"Retry-After": str(wait)})
 
 
+def usage_people(c, a):
+    """2.367.4 (#2974): who hears of agent row a: the owner and the admins of its organisation; the instance admins only for an
+    agent that has neither (or no such person left). They get a number of the others (aa_org_event)."""
+    rcpt = org_admin_people(c, a["org_id"]) if a["org_id"] else []
+    if a["owner_id"] and a["owner_id"] not in rcpt:
+        rcpt = rcpt + [a["owner_id"]]
+    return rcpt or [r["id"] for r in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent'").fetchall()]
+
+
 def usage_alerts(c, aid):
-    """After a report: News + push to the admins (and the owner of a personal agent) when the agent crosses 80 % / 100 % of its soft limit or its hard limit
+    """After a report: News + push to the people of usage_people when the agent crosses 80 % / 100 % of its soft limit or its hard limit
     (the highest new level only, each level once per period)."""
     a = c.execute("SELECT a.*, u.username, u.display_name FROM agents a JOIN users u ON u.id=a.user_id WHERE a.user_id=?",
                   (aid,)).fetchone()
@@ -274,9 +286,9 @@ def usage_alerts(c, aid):
     data = {"agent_id": aid, "name": name, "level": level, "used": st["used"], "limit": lim, "metric": st["metric"],
             "period": st["period"]}
     print("agent", aid, "usage", level, st["used"], "/", lim, st["metric"], st["period"], flush=True)
-    rcpt = [r["id"] for r in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent'").fetchall()]
-    if a["owner_id"] and a["owner_id"] not in rcpt:  # 2.361.4 (#2928): the owner of a personal agent sets its limits and hears of them
-        rcpt.append(a["owner_id"])
+    rcpt = usage_people(c, a)  # 2.361.4 (#2928): the owner of a personal agent sets its limits and hears of them
+    if a["org_id"]:
+        aa_org_event(c, "org_usage", rcpt)
     for uid in rcpt:
         s = usettings(c, uid)
         news_add(c, uid, "usage", data=data, actor=aid, row="usage", s=s if collab_on(s) else None)
@@ -292,8 +304,8 @@ def usage_alerts(c, aid):
 
 
 def budget_alerts(c, aid):
-    """2.236.0 B (#2904): after a report: News + push to the owner of a personal agent (the instance admins for a team
-    agent) once its budget reaches budget_warn_pct and once it is used up -- each once per period (agents.usage_alerted
+    """2.236.0 B (#2904): after a report: News + push to the owner of a personal agent (2.367.4, #2974: the admins of a team
+    agent's organisation, see usage_people) once its budget reaches budget_warn_pct and once it is used up -- each once per period (agents.usage_alerted
     key "budget": {key, levels})."""
     a = c.execute("SELECT a.*, u.username, u.display_name FROM agents a JOIN users u ON u.id=a.user_id WHERE a.user_id=?",
                   (aid,)).fetchone()
@@ -318,8 +330,9 @@ def budget_alerts(c, aid):
     data = {"agent_id": aid, "name": name, "level": level, "used": bs["used"], "limit": bs["limit"], "metric": bs["metric"],
             "period": bs["period"], "budget": True, "warn_pct": ws_get(a)["budget_warn_pct"]}
     print("agent", aid, "budget", level, bs["used"], "/", bs["limit"], bs["metric"], bs["period"], flush=True)
-    rcpt = [a["owner_id"]] if a["owner_id"] else [r["id"] for r in c.execute(
-        "SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent'").fetchall()]
+    rcpt = [a["owner_id"]] if a["owner_id"] else usage_people(c, a)
+    if a["org_id"] and not a["owner_id"]:
+        aa_org_event(c, "org_usage", rcpt)
     for uid in rcpt:
         s = usettings(c, uid)
         news_add(c, uid, "usage", data=data, actor=aid, row="usage", s=s if collab_on(s) else None)
@@ -544,9 +557,13 @@ def audit_cleanup(c, force=False):
     return n
 
 
-def audit_query(c, a, aid=None, csv_out=False):
-    """Rows of the log for the filters in a (agent_id, status, day, cursor / before, limit). aid fixes the agent."""
+def audit_query(c, a, aid=None, csv_out=False, only=None):
+    """Rows of the log for the filters in a (agent_id, status, day, cursor / before, limit). aid fixes the agent. 2.399.0 (#2687):
+    only = the agent ids the viewer may read (None = every one)."""
     where, args = [], []
+    if only is not None:
+        where.append(f"agent_id IN ({','.join('?' * len(only)) or 'NULL'})")
+        args += sorted(only)
     if aid is None and a.get("agent_id"):
         aid = as_int(a.get("agent_id"), "agent_id", 1)
     if aid is not None:
@@ -618,17 +635,29 @@ def admin_agents_audit(aid=None):
         need_agent_admin(c, aid)
     else:
         need_admin()
-    return _audit_answer(aid)
+    return _audit_answer(aid, only=op_own_agents(c))
 
 
-def _audit_answer(aid, own=False):
+def op_own_agents(c):
+    """2.399.0 (#2687): hosted -> the ids of the agents the operator itself runs (not a client's: accounts.orgs.op_foreign_account);
+    self-hosted None (every agent, as before)."""
+    if not _operator_apart():
+        return None
+    with system_ctx(c):
+        ids = [r[0] for r in c.execute("SELECT user_id FROM agents")]
+    return {x for x in ids if not op_foreign_account(c, x, note=False)}  # 2.485.0 (#3939): a listing is no use of support access
+
+
+def _audit_answer(aid, own=False, only=None):
     """own: the owner's view of one personal agent -- only that agent's name (review 2.361.4: never the server's agent list)."""
     c = db()
     csv_out = request.args.get("format") == "csv"
-    rows, more = audit_query(c, request.args, aid, csv_out)
+    rows, more = audit_query(c, request.args, aid, csv_out, only=only)
     names = audit_names(c)
     if own:
         names = {aid: names.get(aid, f"#{aid}")}
+    if only is not None:  # 2.399.0 (#2687): hosted: no names of a client's agents
+        names = {k: v for k, v in names.items() if k in only}
     if csv_out:
         return audit_csv(rows, names, aid or request.args.get("agent_id"))
     data = [audit_dict(r, names) for r in rows]
@@ -655,6 +684,9 @@ def _audit_answer(aid, own=False):
         if sel is not None:
             w += " AND agent_id=?"
             wa.append(sel)
+        if only is not None:  # 2.399.0 (#2687)
+            w += f" AND agent_id IN ({','.join('?' * len(only)) or 'NULL'})"
+            wa += sorted(only)
         r = c.execute(f"""SELECT COUNT(*) n, COUNT(*) FILTER (WHERE status IN ({','.join(map(str, AUDIT_DENIED))})) den,
                                  COUNT(*) FILTER (WHERE method=? AND route=?) poll FROM agent_audit WHERE {w}""", (*AUDIT_POLL, *wa)).fetchone()
         out["today"] = {"requests": r["n"], "denied": r["den"], "polls": r["poll"]}
@@ -887,6 +919,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         "parent_id": nul("integer", description="2.59.0 (#1827): the leading job of a part job (set by a chat answer with job_parent)")}}
     agent = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "status": {"type": "string", "enum": list(AGENT_STATUSES)},
                                               "status_text": {"type": "string"}, "status_task": nul("integer"),
+                                              "status_key": {"type": "string", "description": "2.450.0 (#3769): the key of a known status text, for the app to translate; \"\" = none"},
+                                              "status_key_at": {"type": "string", "description": "2.450.0 (#3769): the time in that text (ISO), \"\" = none"},
                                               "job_tasks": {"type": "array", "items": {"type": "integer"}}, "running": {"type": "integer"}, "waiting": {"type": "integer"},
                                               "enabled": {"type": "boolean"}}}
     msg = {"type": "object", "properties": {"id": {"type": "integer"}, "user_id": {"type": "integer"}, "from": {"type": "string", "enum": ["user", "agent"]},
@@ -1000,6 +1034,8 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
         "/agent": {"get": op("The agent itself: status, jobs, event cursor (agent tokens only)", AG, ok(ref("Agent")) | errs("403"))},
         "/agent/status": {"put": op("Report the agent's status", AG, ok(ref("Agent")) | errs("400", "403"), scope=W, body={
             "type": "object", "required": ["status"], "properties": {"status": {"type": "string", "enum": list(AGENT_STATUSES)}, "text": {"type": "string"},
+                                                                  "text_key": {"type": "string", "maxLength": 40, "description": "2.450.0 (#3769): the key of a known status text; text stays the fallback"},
+                                                                  "text_at": {"type": "string", "description": "2.450.0 (#3769): the time in that text (ISO)"},
                                                                   "task_id": nul("integer"),
                                                                   # 2.32.0 (#1079)
                                                                   "model": {"type": "string", "maxLength": 80, "description": "2.32.0: the model the host really runs, "
@@ -1049,7 +1085,10 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                      q("limit", "At most 500", {"type": "integer"}),
                                      q("wait", f"0-{AGENT_WAIT_MAX} s: wait for the next event when there is none", {"type": "integer"})])},
         "/agent/jobs": {"get": op("The agent's jobs", AG, ok(ref("JobPage")) | errs("403"), [q("state", "all, open or a state")]),
-                        "post": op("Report a new job", AG, ok(ref("Job"), "Created", "201") | errs("400", "403", "404"), scope=W, body={
+                        "post": op("Report a new job", AG, ok(ref("Job"), "Created", "201") | errs("400", "403", "404", "409"), scope=W,
+                                   desc="2.392.0 (#3367): 409 slots_full {running, max} when your work style max_parallel (> 0) is reached by running jobs "
+                                        "(waiting jobs hold no place); 409 wip_full {section_id, section, count, limit} when the task's column is over its "
+                                        "WIP limit and has the hard switch (wip_hard). Nothing is stored; finish a job or wait.", body={
                             "type": "object", "required": ["title"], "properties": {"title": {"type": "string"}, "task_id": {"type": "integer"},
                                                                                     "state": {"type": "string", "enum": list(JOB_STATES)}, "log": {"type": "string"},
                                                                                     "user_id": {"type": "integer"},
@@ -1070,7 +1109,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                        "mark fades on its own. Needs write access to the task's list. It is your running job of the task (GET /agent/jobs); "
                        "prose only, no secrets (the server folds the text into one line and replaces recognisable secrets).", AG,
                        ok(wkr, "Updated") | ok(wkr, "Started", "201")
-                       | errs("400", "403", "404"), [pid()], scope=W, body={
+                       | errs("400", "403", "404", "409"), [pid()], scope=W, body={
                            "type": "object", "additionalProperties": False, "properties": {
                                "text": {"type": "string", "description": "The progress line (one line, cut to 500 characters; shown up to 200)"},
                                "title": {"type": "string", "description": "Title of the job when it starts (default: the task's title)"},
@@ -1122,7 +1161,10 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                  f"report: {{text}} (Markdown). "
                                  # 2.299.0 E (#3194): the values read off a receipt (the agent opens the file itself), only what is on it
                                  f"receipt_read (2.299.0): {{supplier?, vat_id?, tax_no?, invoice_no?, date?, net?, vat?, gross?, vat_pct?, vat_rates?[{{pct, net, vat}}], "
-                                 f"currency?, positions?[{{text, qty?, net?, vat_pct?}}] (at most 100), category?, account?, bank_tx? (an id of input.bank)}}. "
+                                 f"currency?, positions?[{{text, qty?, net?, vat_pct?}}] (at most 100), category?, account?, bank_tx? (an id of input.bank)}}; "
+                                 # 2.469.0 (#3749): the positions read off a credit card statement (the agent opens the PDF itself)
+                                 f"card_statement_read (2.469.0): {{total?, lines[{{day, booked?, merchant, amount (+ charged, - money back), orig_amount?, orig_currency?, "
+                                 f"kind? (purchase | fee | credit)}}]}}. "
                                  f"At most {PROP_MAX_ITEMS} entries, {PROP_MAX_BYTES // 1024} KB."})},
         "/agent/chats": {"get": op("Chat messages after a cursor", AG, ok(ref("ChatPage")) | errs("400", "403"),
                                    [q("since", "Message id", {"type": "integer"}), q("user_id", "One person", {"type": "integer"}), q("limit", "At most 500", {"type": "integer"})])},
@@ -1162,6 +1204,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                  "offer_save": {"type": "boolean", "description": "2.37.0 (#1159): the button \"Save as task\" under the message (the person saves it, never the agent)"},
                                                  "kind": {"type": "string", "enum": ["message", "notice"], "description": "2.41.0 (#1206): notice = one grey line (body up to 200 characters, no buttons, at most one file)"},
                                                  "job_msg": {"type": "string", "enum": ["say", "question", "result", "error"], "description": "2.306.0 F (#2942): with job_id, the kind of this job message (2.96.0 C, #2015)"},
+                                                 "source": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,23}$", "description": "2.388.0 (#3341): what produced this "
+                                                            "message, when it is not you answering (e.g. dispatcher: a helper of yours); comes back as source, "
+                                                            "the person can hide the source dispatcher in the chat's filter menu"},
                                                  "limit": {"type": "boolean", "description": "2.236.0 B (#2909): this message reports a limit (a one-way "
                                                            "step, a refusal, a stop, an error): with the work style push \"limits\" only such messages, "
                                                            "approval requests and permission questions push"},
@@ -1188,6 +1233,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                  "job_id": {"type": "integer"}, "job_parent": {"type": "integer"},  # 2.59.0 (#1827)
                                                  "approval": {"type": "string", "description": "2.35.0 (#1103): the approval object as a JSON string"},
                                                  "limit": {"type": "string", "description": "2.236.0 B (#2909): true / false"}, "next_step": {"type": "string", "maxLength": 80},
+                                                 "source": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,23}$"},  # 2.388.0 (#3341)
                                                  "file": {"type": "array", "items": {"type": "string", "format": "binary"}}}}}}}}},
         "/agent/usage": {  # 2.1.1 (#326)
             "post": op("Report model usage (numbers and ids only; allowed also over the hard limit)", AG,

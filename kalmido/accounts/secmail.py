@@ -8,6 +8,7 @@ unsubscribe (like the password reset), with a link to Settings > Account (passwo
   passkey         a passkey was removed                          codes           new recovery codes were made
   code_used       a recovery code was used to sign in            login           a sign-in from a new device / browser
   disabled        an admin deactivated the account               approved        an admin approved the registration
+  orgjoin         2.367.4 (#2974): an organisation invites the account (no warning line, the link opens the app)
 Nothing without outgoing e-mail (MAIL_OUT_ON), for agents or without an address. The mail goes out in the background
 (bgjobs kind "mail:security", one try: never twice; integrations/mail.py registers it) after the request. A new device = a browser (User-Agent) that is not among the last
 SEC_DEVICES of the account (setting sec_devices, hashes only); the first sign-in after the update only stores it."""
@@ -36,6 +37,7 @@ SEC_EVENTS = {
     "login": (N_("New sign-in to your account"), N_("Your account {0} was signed in from a new device: {1}, address {2}.")),
     "disabled": (N_("Your account was deactivated"), N_("An admin deactivated your account {0}. You can no longer sign in.")),
     "approved": (N_("Your account is approved"), N_("An admin approved your registration: you can sign in with your account {0} now.")),
+    "orgjoin": (N_("Invitation to an organisation"), N_("{1} invites your account {0} to join the organisation {2}. Open the app to accept or decline.")),
 }
 SEC_NOT_ME = N_("If that was not you: change your password right away and tell an admin.")
 
@@ -56,11 +58,12 @@ def sec_content(c, uid, ev, args, lg):
     subj, msg = SEC_EVENTS[ev]
     u = c.execute("SELECT username FROM users WHERE id=?", (uid,)).fetchone()
     line = t(msg, (u["username"] if u else "?"), *args)
-    link = f"{PUBLIC_URL}/" if ev == "approved" else f"{PUBLIC_URL}/#settings/account"
-    lines = [line] + ([] if ev == "approved" else [t(SEC_NOT_ME)])
+    plain = ev in ("approved", "orgjoin")
+    link = f"{PUBLIC_URL}/" if plain else f"{PUBLIC_URL}/#settings/account"
+    lines = [line] + ([] if plain else [t(SEC_NOT_ME)])
     subject = f"{APP_NAME}: {t(subj)}"
     text = "\n\n".join(lines) + f"\n\n{link}\n"
-    button = t(N_("Open {0}"), APP_NAME) if ev == "approved" else t(N_("Security settings"))
+    button = t(N_("Open {0}"), APP_NAME) if plain else t(N_("Security settings"))
     return subject, text, mail_html(subject, lines, button, link, lang=lg)  # 2.420.0 B (#3499): the shared mail frame
 
 

@@ -56,7 +56,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     const te = await call(CB, 'POST', '/api/time/entries', {task_id: TB, start: '2026-01-05T09:00', minutes: 30});
     check(te.http === 200 || te.http === 201, 'bob books time ' + te.http);
     check(await caught(), 'the poll saw bob\'s time entry');
-    check(await st() === st0 && await ev('S.lpN.delta') > dl0, `#3109 bob's time entry: a delta, no state load (was the whole state) ${await st()} vs ${st0}`);
+    // 2.369.4 (#2507): bob's own list is not alice's: her poll skips the change (vs stayed), not even a delta
+    check(await st() === st0 && await ev('S.lpN.delta') === dl0 && await ev('S.lpN.skip || 0') > 0, `#3109 #2507 bob's time entry in his own list: skipped, no delta, no state load (was the whole state) ${await st()} vs ${st0}`);
 
     const wp = await call(CB, 'POST', '/api/wiki/pages', {space: 'private', path: 'Invented note', body: 'Invented text'});
     check(wp.http === 200 || wp.http === 201, 'bob writes a knowledge page ' + wp.http);
@@ -70,9 +71,9 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
 
     await call(CB, 'POST', `/api/tasks/${TB}/comments`, {body: 'Note on my own task'});
     check(await caught(), 'the poll saw bob\'s comment');
-    check(await ev('lpT !== 0'), '#3109 a comment: the bundled follow-up is planned');
-    check(await follow(), 'the follow-up ran');
-    check(await st() === st0, `#3109 bob's comment on his own task: the follow-up takes a delta, no state load ${await st()} vs ${st0}`);
+    // 2.369.4 (#2507): a comment on bob's own task (his own list) is skipped by alice's poll: no follow-up planned at all
+    check(await ev('lpT === 0'), '#3109 #2507 a comment on a task alice does not see: no follow-up planned');
+    check(await st() === st0, `#3109 bob's comment on his own task: no state load ${await st()} vs ${st0}`);
 
     await call(CB, 'POST', `/api/tasks/${TS}/comments`, {body: 'Note on the shared task'});
     check(await caught(), 'the poll saw the comment on the shared task');

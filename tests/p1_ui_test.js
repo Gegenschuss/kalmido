@@ -1,6 +1,6 @@
 // Package 1 UI tests (jsdom): undo (online, offline queue, Ctrl+Z, batch), templates, statistics view,
 // calendar subscription settings, app shortcut start URLs. Fresh DB on the test container.
-const {boot, errs, sleep, B, login} = require('./boot');
+const {boot, errs, sleep, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -30,26 +30,26 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   const toastBtn = () => d.querySelector('#toast:not(.hidden) button');
   // the toast can show up a moment later on a slow runner (CI): wait for its button before clicking
   const toastClick = async () => { await until(() => toastBtn(), 8000); const b = toastBtn(); if (b) b.click(); else check(false, 'undo toast did not show up'); };
-  await w.eval(`toggleTask(${t1.id})`); await sleep(300);
+  await w.eval(`toggleTask(${t1.id})`); await until(() => toastBtn() && /completed/i.test(d.querySelector('#toast').textContent));
   check(toastBtn() && /completed/i.test(d.querySelector('#toast').textContent), 'complete shows an undo toast');
   check((await get(t1.id)).status === 2, 'task completed on the server');
   await toastClick();
   check(await until(async () => (await get(t1.id)).status === 0), 'Undo button reopens it on the server');
-  await sleep(300);
+  await until(() => /Undone/.test(d.querySelector('#toast').textContent));
   check(/Undone/.test(d.querySelector('#toast').textContent), '"Undone" message');
   // Ctrl+Z
-  await w.eval(`toggleTask(${t1.id})`); await sleep(300);
+  await w.eval(`toggleTask(${t1.id})`); await until(() => toastBtn() && /completed/i.test(d.querySelector('#toast').textContent));
   d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'z', ctrlKey: true, bubbles: true}));
   check(await until(async () => (await get(t1.id)).status === 0), 'Ctrl+Z undoes while the toast is visible');
   // Ctrl+Z in a text field does nothing
   // CI 2.376.2: the undo's reload must be done first, else toggleTask reads the old local 'completed' and reopens
   await until(() => !w.eval('HIST.busy') && w.eval(`taskById(${t1.id})?.status`) === 0 && !w.eval(`UI.pend.has(${t1.id})`), 8000);
-  await w.eval(`toggleTask(${t1.id})`); await sleep(300);
+  await w.eval(`toggleTask(${t1.id})`); await until(() => w.eval(`taskById(${t1.id})?.status`) === 2);
   // 2.18.0: the precondition gets more time (the full run on a loaded host was slower than 4 s; the check below failed then)
   check(await until(async () => (await get(t1.id)).status === 2 && !w.eval('HIST.busy'), 12000), 'completed again before the Ctrl+Z check');
   const inp = d.querySelector('#qinput'); inp.focus();
   inp.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'z', ctrlKey: true, bubbles: true}));
-  await sleep(400);
+  await sleep(400);  // wanted: time passes so a wrongly handled Ctrl+Z would have reached the server ("nothing happens")
   check((await get(t1.id)).status === 2, 'Ctrl+Z inside an input is left to the browser');
   inp.blur();
   // a new message ends the toast's shortcut; the step stays in the history (D4)
@@ -58,81 +58,85 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await w.eval('histStep("undo")');
   await call('POST', `/api/tasks/${t1.id}/reopen`);
   // recurring
-  await w.eval('load().then(render)'); await sleep(200);
-  await w.eval(`toggleTask(${t2.id})`); await sleep(300);
-  check((await get(t2.id)).due === addD(today(), 7), 'recurring advanced');
+  await w.eval('load().then(render)'); await idle(w);
+  await w.eval(`toggleTask(${t2.id})`);
+  check(await until(async () => (await get(t2.id)).due === addD(today(), 7)), 'recurring advanced');
+  await until(() => /next occurrence/i.test(d.querySelector('#toast').textContent) && toastBtn());
   check(/next occurrence/i.test(d.querySelector('#toast').textContent) && toastBtn(), 'recurring: undo offered');
   await toastClick();
   check(await until(async () => (await get(t2.id)).due === today()), 'undo recurring: back to today');
   check(!(await call('GET', '/api/tasks?scope=done')).tasks.some(t => t.title === 'Weekly review'), 'undo recurring: no done copy left');
   // delete
-  await w.eval(`deleteTask(${t3.id})`); await sleep(300);
+  await w.eval(`deleteTask(${t3.id})`); await until(() => /deleted/.test(d.querySelector('#toast').textContent));
   check(/deleted/.test(d.querySelector('#toast').textContent), 'delete toast');
   await toastClick();
   check(await until(async () => !(await get(t3.id)).error && (await get(t3.id)).deleted_at === null), 'undo delete restores');
   // move to another list (2.25.0, UX-44: the path on top of the task panel: list > "Move to list…" > the list)
-  w.eval(`openDetail(${t4.id})`); await sleep(500);
-  d.querySelector('#detail [data-act="crumb-menu"][data-k="list"]').click(); await sleep(100);
   const mi = re => [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => re.test(b.textContent));
+  w.eval(`openDetail(${t4.id})`); await until(() => d.querySelector('#detail [data-act="crumb-menu"][data-k="list"]'));
+  d.querySelector('#detail [data-act="crumb-menu"][data-k="list"]').click(); await until(() => mi(/Move to project/));
   // 2.152.2 (#2624): project instead of list
-  mi(/Move to project/).click(); await sleep(100); mi(/^\s*Home\s*$/).click();
+  mi(/Move to project/).click(); await until(() => mi(/^\s*Home\s*$/)); mi(/^\s*Home\s*$/).click();
   check(await until(async () => (await get(t4.id)).list_id === HOME), 'moved via the path of the task panel');
-  await sleep(200);
+  await until(() => /Moved to Home/.test(d.querySelector('#toast').textContent));
   check(/Moved to Home/.test(d.querySelector('#toast').textContent), 'move toast names the list');
   await toastClick();
   check(await until(async () => (await get(t4.id)).list_id === WORK), 'undo move');
   await until(() => !w.eval('HIST.busy'));  // its "Undone" toast comes after the reload
   w.eval('closeDetail()');
   // snooze
-  await w.eval(`patchUndoable(${t4.id}, {due: '${addD(today(), 1)}', due_time: '09:00'}, tr('Snoozed: {0}', 'x'))`); await sleep(200);
-  check((await get(t4.id)).due_time === '09:00', 'snoozed');
+  await w.eval(`patchUndoable(${t4.id}, {due: '${addD(today(), 1)}', due_time: '09:00'}, tr('Snoozed: {0}', 'x'))`);
+  check(await until(async () => (await get(t4.id)).due_time === '09:00'), 'snoozed');
   await toastClick();
   check(await until(async () => { const t = await get(t4.id); return t.due === today() && t.due_time === null; }), 'undo snooze restores date + time');
-  await until(() => !w.eval('HIST.busy')); await sleep(100);
+  await until(() => !w.eval('HIST.busy'));
   // undo that meets a change made elsewhere: the other version stays
-  await w.eval(`patchUndoable(${t4.id}, {due: '${addD(today(), 2)}'}, 'x')`); await sleep(200);
+  await w.eval(`patchUndoable(${t4.id}, {due: '${addD(today(), 2)}'}, 'x')`);
+  await until(async () => (await get(t4.id)).due === addD(today(), 2));
   await call('PATCH', `/api/tasks/${t4.id}`, {due: addD(today(), 5)});
   await until(() => toastBtn());
-  await toastClick(); await sleep(800);
+  await toastClick(); await until(() => /Changed elsewhere/.test(d.querySelector('#toast').textContent));
   check((await get(t4.id)).due === addD(today(), 5), 'undo does not overwrite a newer change elsewhere');
   check(/Changed elsewhere/.test(d.querySelector('#toast').textContent), 'conflict message');
   // batch
-  await w.eval('go("l/' + HOME + '")'); await sleep(400);
+  await w.eval('go("l/' + HOME + '")'); await until(() => d.querySelector(`.trow[data-id="${b1.id}"]`));
   w.eval(`S.multi = new Set([${b1.id}, ${b2.id}])`);
-  await w.eval(`batch('complete', {}, true)`); await sleep(300);
-  check((await get(b1.id)).status === 2 && (await get(b2.id)).status === 2, 'batch complete');
+  await w.eval(`batch('complete', {}, true)`);
+  check(await until(async () => (await get(b1.id)).status === 2 && (await get(b2.id)).status === 2), 'batch complete');
   await toastClick();
   check(await until(async () => (await get(b1.id)).status === 0 && (await get(b2.id)).status === 0), 'batch undo complete');
+  await until(() => !w.eval('HIST.busy'));  // the undo's reload + "Undone" toast first
   w.eval(`S.multi = new Set([${b1.id}, ${b2.id}])`);
-  await w.eval(`batch('patch', {priority: 5, add_tags: ['x']})`); await sleep(300);
+  await w.eval(`batch('patch', {priority: 5, add_tags: ['x']})`); await until(() => toastBtn());
   await toastClick();
   check(await until(async () => { const a = await get(b1.id); return a.priority === 0 && a.tags.length === 0; }), 'batch undo edit (priority + tag)');
+  await until(() => !w.eval('HIST.busy'));
   w.eval(`S.multi = new Set([${b1.id}, ${b2.id}])`);
-  await w.eval(`batch('delete', {}, true)`); await sleep(300);
+  await w.eval(`batch('delete', {}, true)`); await until(() => toastBtn());
   await toastClick();
   check(await until(async () => (await get(b2.id)).deleted_at === null), 'batch undo delete');
 
   // ================= undo offline (queued op cancelled, never sent)
-  await until(() => !w.eval('HIST.busy'), 8000); await sleep(300);  // the batch undo's reload + "Undone" toast come first (slow CI runners)
+  await until(() => !w.eval('HIST.busy'), 8000);  // the batch undo's reload + "Undone" toast come first (slow CI runners)
   w.__offline = true;
-  await w.eval(`toggleTask(${t1.id})`); await sleep(200);
+  await w.eval(`toggleTask(${t1.id})`); await until(() => w.eval('OUT.q.length') === 1);
   check(w.eval('OUT.q.length') === 1, 'offline: completion queued');
   check(w.eval(`S.tasks.get(${t1.id}).status`) === 2, 'offline: applied locally');
-  await toastClick(); await sleep(300);
+  await toastClick(); await until(() => w.eval('OUT.q.length') === 0 && w.eval(`S.tasks.get(${t1.id}).status`) === 0);
   check(w.eval('OUT.q.length') === 0 && w.eval(`S.tasks.get(${t1.id}).status`) === 0, 'undo before sync: taken out of the queue, local state back');
-  w.__offline = false; await w.eval('flush()'); await sleep(500);
+  w.__offline = false; await w.eval('flush()'); await idle(w);  // wanted: quiet time, so a wrongly sent request would have arrived
   check((await get(t1.id)).status === 0, 'nothing was sent');
   // offline delete + undo
   w.__offline = true;
-  await w.eval(`deleteTask(${t3.id})`); await sleep(200);
+  await w.eval(`deleteTask(${t3.id})`); await until(() => !w.eval(`S.tasks.has(${t3.id})`));
   check(!w.eval(`S.tasks.has(${t3.id})`), 'offline delete applied locally');
-  await toastClick(); await sleep(300);
+  await toastClick(); await until(() => w.eval(`S.tasks.has(${t3.id})`) && w.eval('OUT.q.length') === 0);
   check(w.eval(`S.tasks.has(${t3.id})`) && w.eval('OUT.q.length') === 0, 'offline delete undone locally');
-  w.__offline = false; await sleep(300);
+  w.__offline = false; await idle(w);  // wanted: quiet time, nothing may reach the server
   check((await get(t3.id)).deleted_at === null, 'delete never reached the server');
   // queued, then synced, then undone: reversed on the server
   w.__offline = true;
-  await w.eval(`toggleTask(${t1.id})`); await sleep(200);
+  await w.eval(`toggleTask(${t1.id})`); await until(() => w.eval('OUT.q.length') === 1);
   w.__offline = false; await w.eval('flush()');
   check(await until(async () => (await get(t1.id)).status === 2), 'queued completion synced');
   await toastClick();
@@ -146,18 +150,19 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await toastClick();
   await until(() => w.eval('OUT.q.length') === 0 && w.eval(`S.tasks.get(${t4.id}).list_id`) === WORK && !w.eval('HIST.busy'), 10000);  // 2.18.0: 3 s were too short on a loaded host
   check(w.eval('OUT.q.length') === 0 && w.eval(`S.tasks.get(${t4.id}).list_id`) === WORK, 'queued move cancelled');
-  w.__offline = false; await sleep(200);
+  w.__offline = false; await idle(w);
 
   // ================= templates
   w.prompt = () => 'Report kit';
   await call('POST', `/api/tasks`, {title: 'Charts', parent_id: t1.id, due: addD(today(), 1)});
-  await w.eval('load().then(render)'); await sleep(200);
-  await w.eval(`saveTemplate({task_id: ${t1.id}}, 'x')`); await sleep(300);
+  await w.eval('load().then(render)'); await idle(w);
+  await w.eval(`saveTemplate({task_id: ${t1.id}}, 'x')`); await until(() => w.eval('S.templates').some(x => x.name === 'Report kit' && x.kind === 'task'));
   check(w.eval('S.templates').some(x => x.name === 'Report kit' && x.kind === 'task'), 'task template saved (state)');
-  await w.eval(`go('l/${HOME}')`); await sleep(400);
+  await w.eval(`go('l/${HOME}')`); await until(() => d.querySelector('#qinput') && d.querySelector('.qadd .qtpl'));
   check(d.querySelector('#qinput') && d.querySelector('.qadd .qtpl'), 'template button in the add bar');
   const tp = (await call('GET', '/api/templates')).templates[0];
-  await w.eval(`useTemplate(${JSON.stringify(tp)})`); await sleep(500);
+  await w.eval(`useTemplate(${JSON.stringify(tp)})`);
+  await until(async () => { const s2 = (await call('GET', '/api/state')).tasks; return s2.some(t => t.title === 'Charts' && s2.some(p => p.id === t.parent_id && p.list_id === HOME)); });
   const st = await call('GET', '/api/state');
   const made = st.tasks.filter(t => t.title === 'Write report' && t.list_id === HOME);
   check(made.length === 1 && made[0].due === today() && st.tasks.some(t => t.parent_id === made[0].id && t.title === 'Charts' && t.due === addD(today(), 1)), 'template used in the current list with relative dates');
@@ -165,22 +170,24 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(await until(async () => (await get(made[0].id)).deleted_at !== null || (await get(made[0].id)).error), 'undo removes the task made from the template');
   // list template
   w.prompt = () => 'Work kit';
-  await w.eval(`saveTemplate({list_id: ${WORK}}, 'x')`); await sleep(300);
+  await w.eval(`saveTemplate({list_id: ${WORK}}, 'x')`);
+  await until(async () => (await call('GET', '/api/templates')).templates.some(x => x.kind === 'list'));
   const lt = (await call('GET', '/api/templates')).templates.find(x => x.kind === 'list');
   check(lt && lt.name === 'Work kit', 'list template saved');
   // template editor: outline with sections, kept attributes
-  w.eval(`templateModal(${JSON.stringify(lt)})`); await sleep(100);
+  w.eval(`templateModal(${JSON.stringify(lt)})`); await until(() => d.querySelector('#tp-outline'));
   const ta = d.querySelector('#tp-outline');
   check(ta && /Weekly review/.test(ta.value), 'outline editor lists the tasks');
   ta.value = ta.value + '# Later\nNew idea\n  step one\n';
-  d.querySelector('.tpmodal [data-m="save"]').click(); await sleep(500);
+  d.querySelector('.tpmodal [data-m="save"]').click();
+  await until(async () => (await call('GET', '/api/templates')).templates.find(x => x.id === lt.id)?.data.sections.join() === 'Later');
   const lt2 = (await call('GET', '/api/templates')).templates.find(x => x.id === lt.id);
   check(lt2.data.sections.join() === 'Later' && lt2.data.tasks.some(n => n.title === 'New idea' && n.section === 0 && n.children[0].title === 'step one'), 'outline edit: section + subtask');
   check(lt2.data.tasks.find(n => n.title === 'Weekly review')?.repeat === 'FREQ=WEEKLY', 'outline edit keeps attributes of unchanged lines');
   // 2.352.0 B (#2752): every list template is relative - using it opens the project dialog (name, start)
-  await w.eval(`useTemplate(${JSON.stringify(lt2)})`); await sleep(400);
+  await w.eval(`useTemplate(${JSON.stringify(lt2)})`); await until(() => d.querySelector('.tumodal'));
   const tum = d.querySelector('.tumodal');
-  if (tum) { tum.querySelector('#tu-name').value = 'From kit'; tum.querySelector('[data-m="ok"]').click(); await sleep(700); }
+  if (tum) { tum.querySelector('#tu-name').value = 'From kit'; tum.querySelector('[data-m="ok"]').click(); await until(() => w.eval('routeList()?.name') === 'From kit'); }
   check(/^#l\/\d+/.test(w.location.hash) && w.eval('routeList()?.name') === 'From kit', 'new list from template opened');
   // settings > data lists templates
   w.eval(`settingsModal('templates')`);  // CI 2.376.2: the list comes from GET /api/templates - wait for it, not a fixed 500 ms
@@ -190,7 +197,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
 
   // ================= statistics
   await call('POST', `/api/tasks/${b1.id}/complete`);
-  await w.eval(`go('stats')`); await sleep(900);
+  await w.eval(`go('stats')`);
+  await until(() => d.querySelector('#top h1')?.textContent === 'Statistics' && d.querySelectorAll('#view svg.chart').length >= 4 && d.querySelector('.sthabits') && d.querySelectorAll('.sttiles > div').length === 5);
   check(d.querySelector('#top h1').textContent === 'Statistics', 'stats title');
   check(d.querySelectorAll('#view svg.chart').length >= 4, 'stats charts rendered: ' + d.querySelectorAll('#view svg.chart').length);
   check(d.querySelectorAll('.sttiles > div').length === 5, 'five tiles (incl. tracked time)');
@@ -198,12 +206,12 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(d.querySelector('#fab').classList.contains('gone'), 'no + button on the stats view');
   check(d.querySelector('#srail [data-sbb="review"][aria-current="page"]') && (!d.querySelector('#view .mgtabs') || d.querySelector('#view .mgtabs [data-go="stats"][aria-selected="true"]')) && !d.querySelector('#side [data-sbbpart]'), 'reachable from the sidebar');  // 2.224.0 (#2817): Review has no panel; with Review & journal on, Statistics is a tab on top  // 2.152.2 (#2622): the area Review in the bar, Statistics in its panel (no group Areas any more)
   check(d.querySelector('.ch-hit title'), 'bars have tooltips');
-  d.querySelector('[data-act="stats-mode"][data-k="day"]').click(); await sleep(100);
+  d.querySelector('[data-act="stats-mode"][data-k="day"]').click(); await until(() => d.querySelectorAll('#view rect.hm').length >= 7);
   check(d.querySelectorAll('#view rect.hm').length >= 7, 'day heatmap');
   // German
   await call('PATCH', '/api/settings', {lang: 'de'});
   w.close();
-  w = await boot({user: 'alice', hash: 'stats', ls: {'tasks.tabbar': JSON.stringify(['m:tasks', 'stats'])}}); d = w.document; await sleep(800);
+  w = await boot({user: 'alice', hash: 'stats', ls: {'tasks.tabbar': JSON.stringify(['m:tasks', 'stats'])}}); d = w.document; await until(() => d.querySelector('#top h1')?.textContent === 'Statistik' && /Erledigte Aufgaben|Erledigt/.test(d.querySelector('#view').textContent));
   check(d.querySelector('#top h1').textContent === 'Statistik' && /Erledigte Aufgaben|Erledigt/.test(d.querySelector('#view').textContent), 'stats in German');
   check(d.querySelector('#tabs [data-go="stats"]') && d.querySelector('#tabs [data-go="stats"]').classList.contains('on'), 'stats pinnable as a tab (active)');
   await call('PATCH', '/api/settings', {lang: 'en'});
@@ -211,36 +219,36 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   const feats = (await call('GET', '/api/state')).settings.features;
   await call('PATCH', '/api/settings', {features: feats.split(',').filter(x => x !== 'stats' && x !== 'collab').join(',')});
   w.close();
-  w = await boot({user: 'alice', hash: 'stats'}); d = w.document; await sleep(500);
+  w = await boot({user: 'alice', hash: 'stats'}); d = w.document; await until(() => w.eval('S.route.mod') === 'tasks' && d.querySelector('#side'));
   check(w.eval('S.route.mod') === 'tasks' && !d.querySelector('#side [data-go="stats"]'), 'stats off: #stats falls back to tasks, no sidebar row');
   w.close();
-  w = await boot({user: 'alice', hash: 'news'}); d = w.document; await sleep(300);
+  w = await boot({user: 'alice', hash: 'news'}); d = w.document; await until(() => /part of collaboration/.test(d.querySelector('#toast').textContent));
   check(w.eval('S.route.mod') === 'tasks' && /part of collaboration/.test(d.querySelector('#toast').textContent), '#news with collaboration off: graceful fallback + hint');
   await call('PATCH', '/api/settings', {features: feats});
   w.close();
 
   // ================= app shortcuts
-  w = await boot({user: 'alice', path: '?action=new'}); d = w.document; await sleep(300);
+  w = await boot({user: 'alice', path: '?action=new'}); d = w.document; await until(() => d.querySelector('.qadd.sheet #qsheet') && w.location.search === '');
   check(d.querySelector('.qadd.sheet #qsheet') && w.location.search === '', '?action=new opens the quick-add sheet, URL cleaned');
   w.close();
-  w = await boot({user: 'alice', hash: 'search'}); await sleep(200);
+  w = await boot({user: 'alice', hash: 'search'}); await until(() => w.eval('S.route.key') === 'search');
   check(w.eval('S.route.key') === 'search', '#search start URL');
   w.close();
 
   // ================= calendar subscription settings
   w = await boot({user: 'alice'}); d = w.document;
-  w.eval(`settingsModal('ical')`); await sleep(500);
+  w.eval(`settingsModal('ical')`); await until(() => d.querySelector('#sp-integr:not(.hidden) [data-m="ical-create"]'));
   check(d.querySelector('#sp-integr:not(.hidden) [data-m="ical-create"]'), 'Integrations: create link button');
-  d.querySelector('[data-m="ical-create"]').click(); await sleep(500);
+  d.querySelector('[data-m="ical-create"]').click(); await until(() => d.querySelector('#s-icalurl')?.value);
   const url = d.querySelector('#s-icalurl')?.value || '';
   check(/^https:\/\/kalmido\.example\/ical\/1\.[\w-]{40,}\.ics$/.test(url), 'link shown: ' + url.slice(0, 40));
   check(d.querySelector('a[href^="webcal://kalmido.example/ical/"]'), 'webcal link for calendar apps');
-  d.querySelector('[data-m="ical-copy"]').click(); await sleep(100);
+  d.querySelector('[data-m="ical-copy"]').click(); await until(() => /Copy the selected link|Link copied/.test(d.querySelector('#toast').textContent));
   check(/Copy the selected link|Link copied/.test(d.querySelector('#toast').textContent), 'copy feedback');
-  d.querySelector('[data-m="ical-rotate"]').click(); await sleep(500);
+  d.querySelector('[data-m="ical-rotate"]').click(); await until(() => d.querySelector('#s-icalurl').value !== url);
   check(d.querySelector('#s-icalurl').value !== url, 'new link replaces the old one');
   const scope = d.querySelector('#s-icalscope'); scope.value = 'mine'; scope.dispatchEvent(new w.Event('change', {bubbles: true}));
-  await sleep(700);
+  await until(async () => (await call('GET', '/api/state')).settings.ical_scope === 'mine');
   check((await call('GET', '/api/state')).settings.ical_scope === 'mine', 'scope saved at once (1.5)');
   check(/How to subscribe/.test(d.body.textContent) || true, 'instructions present');
   w.close();

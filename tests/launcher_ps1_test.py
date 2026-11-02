@@ -170,6 +170,25 @@ script = "foreach ($i in @(" + ",".join(f"'{i}'" for i in ids) + ")) { try { [vo
 r = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-Command", script], capture_output=True, text=True, timeout=60)
 check(r.returncode == 0 and "BAD" not in r.stdout, f"every Windows zone id exists: {r.stdout[-300:]} {r.stderr[-200:]}")
 
+# 2.445.0 (#3748): agent_run.py keeps its own agent_run.log (on Windows by default; here via KALMIDO_RUN_LOG): a restart appends
+# instead of overwriting, and a file over 1 MiB moves to .1 so it cannot grow without end
+rl = os.path.join(tmp, "agent_run.log")
+runner = os.path.join(HERE, "..", "mcp", "agent_run.py")
+snippet = "import importlib.util,sys; sp=importlib.util.spec_from_file_location('ar', sys.argv[1]); m=importlib.util.module_from_spec(sp); sp.loader.exec_module(m); m.log(sys.argv[2])"
+def run_log(line, path=rl):
+    return subprocess.run([sys.executable, "-I", "-c", snippet, runner, line], env={**os.environ, "KALMIDO_RUN_LOG": path}, capture_output=True, text=True, timeout=60)
+run_log("first run"); run_log("second run")
+body = open(rl).read() if os.path.exists(rl) else ""
+check("first run" in body and "second run" in body, "agent_run.log: a second start appends, the first run stays: " + body[-200:])
+with open(rl, "a") as f:
+    f.write("x" * (1024 * 1024 + 10) + "\n")
+run_log("third run")
+check(os.path.exists(rl + ".1") and "first run" in open(rl + ".1").read(), "agent_run.log over 1 MiB: the old content moves to .1")
+check(open(rl).read().count("agent_run:") == 1 and "third run" in open(rl).read(), "agent_run.log: a fresh small file after the move")
+os.chdir(tmp)
+run_log("nothing", "0")
+check(not os.path.exists(os.path.join(tmp, "0")), "KALMIDO_RUN_LOG=0 writes no file")
+
 check(TOKEN not in (err or ""), "the token is never in the log")
 check("restart: reset now (0 -> 1)" in (err or "") and "restart: runtime settings changed" in (err or "") and "paused in Kalmido: stopping" in (err or ""),
       "the log names every restart: " + (err or "")[-400:])

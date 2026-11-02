@@ -280,7 +280,7 @@ def logbook(s, who):
     if DAY(1)[:4] == DAY(10)[:4]:
         check(rep and rep[0]["km_business"] == "75.0", f"{who}: the sums count the correction, not the corrected drive {rep}")
     r = s.get(B + LB + f".csv?year={DAY(10)[:4]}&vehicle_id={vid}")
-    rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=";"))
+    rows = list(csv.reader(io.StringIO(r.content.decode("utf-8-sig")), delimiter=","))  # 2.462.0 (#2984): English CSV = commas
     head = rows[0]
     by = {x[13]: x for x in rows[1:] if len(x) > 17 and x[13].isdigit()}
     check(head[13:18] == ["ID", "Corrects", "Corrected by", "Reason", "Closed"] and by.get(str(old), [""] * 18)[15] == str(fix)
@@ -396,9 +396,11 @@ except Exception:  # noqa: BLE001 -- the foreign key violation
 # list p2103_c_fk_legacy.txt: it may only shrink)
 SCHEMA_PY = os.path.join(N, "..", "kalmido", "core", "schema.py")
 if os.path.exists(SCHEMA_PY):
-    src = open(SCHEMA_PY, encoding="utf-8").read()
+    sys.path.insert(0, os.path.join(N, "..", "tools"))
+    from check_migrations import schema_src
+    src = schema_src(os.path.join(N, ".."))  # 2.475.0 (#3478): + migrations.d
     legacy = {ln.strip() for ln in open(os.path.join(N, "p2103_c_fk_legacy.txt"), encoding="utf-8") if ln.strip() and not ln.startswith("#")}
-    sch = re.search(r'SCHEMA = """(.*?)"""', src, re.S).group(1)
+    sch = "\n".join(re.findall(r'SCHEMA = """(.*?)"""', src, re.S))
     bad = []
     for t in re.finditer(r"((?:--[^\n]*\n)*)CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\);", sch, re.S):
         if "no FK" in t.group(1):

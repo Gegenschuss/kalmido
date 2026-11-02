@@ -48,7 +48,10 @@ const FEAT = 'cal,comments,collab,time';
   const labels = async (w, d, id) => {
     w.eval(`closePop(); taskMenu(document.querySelector('#top h1') || document.body, ${id})`);
     await until(() => d.querySelector('#pop [role="menuitem"]'));
-    return [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim());
+    const first = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim());
+    // 2.445.0 (#3008): both levels (Lock, Duplicate, … are under "More…")
+    d.querySelector('#pop .mtmore')?.click();
+    return first.concat([...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim()));
   };
 
   // (1) frida alone

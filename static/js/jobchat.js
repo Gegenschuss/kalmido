@@ -245,11 +245,18 @@ function jcd_setOpen(no, on) {
   const ks = Object.keys(o); if (ks.length > 200) ks.sort((a, b) => a - b).slice(0, ks.length - 200).forEach(k => delete o[k]);
   LS.set('jcdOpen', o);
 }
+// 2.388.0 (#3341): the dispatcher's lines can be hidden (kept per device, default shown; the filter of the ⋯ menu): source
+// dispatcher, older lines by their text. A job's message or one with buttons always stays
+const jcd_isDisp = m => m.from === 'agent' && !m.job_id && !m.choices && (m.source ? m.source === 'dispatcher' : /^Dispatcher[: ]/.test(m.body || ''));
+const jcd_srcOff = () => !S.chat.job && LS.get('chatSrcHide', '') === '1';
+const jcd_hidden = m => jcd_srcOff() && jcd_isDisp(m);
+const jcd_srcSeen = () => !S.chat.job && (jcd_srcOff() || S.chat.msgs.some(jcd_isDisp));  // the switch only where such lines exist
+function jcd_setSrc(show) { LS.set('chatSrcHide', show ? '' : '1'); chatPatch({bottom: true}); jcd_patch(); }
 // chatMsgs(): the rows (row = the html of one message) with the job messages gathered into cards and the filter applied
 function jcd_rows(a, row) {
-  const ms = S.chat.msgs;
-  if (S.chat.job) { S.jcd.map = new Map(); return jcs_rows(ms, row); }  // 2.153.0 (#1962): + its progress lines
-  const byId = new Map(ms.map(m => [m.id, m])), of = new Map(), per = new Map(), last = new Map(), jn = new Map();
+  if (S.chat.job) { S.jcd.map = new Map(); return jcs_rows(S.chat.msgs, row); }  // 2.153.0 (#1962): + its progress lines
+  const ms = S.chat.msgs.filter(m => !jcd_hidden(m));  // 2.388.0 (#3341)
+  const byId = new Map(S.chat.msgs.map(m => [m.id, m])), of = new Map(), per = new Map(), last = new Map(), jn = new Map();
   ms.forEach((m, i) => {
     const no = jcd_jobNo(m, byId); if (!no) return;
     jn.set(m.id, no); if (m.choices) return;  // 2.144.0 A (#2416): a row of its own, but still a job's
@@ -358,7 +365,9 @@ function jcd_filtHtml() { return ''; }
 // (2.117.0 C #2260 / 2.144.0 A #2419 had the filter as an own icon.)
 function jcd_fbtnHtml() {
   // 2.350.0 A (#3317): no second dot in the header any more; a filter other than "All" is named in the button's title / label
-  const dot = !S.chat.job && S.jcd.n && jcd_filter() !== 'all', t0 = dot ? tr('More') + ' · ' + tr('Filter: {0}', jcd_filterName()) : tr('More');
+  // 2.388.0 (#3341): the same while the dispatcher's lines are hidden
+  const flt = !S.chat.job && S.jcd.n && jcd_filter() !== 'all', off = jcd_srcOff(), dot = flt || off;
+  const t0 = [tr('More'), flt && tr('Filter: {0}', jcd_filterName()), off && tr('Dispatcher messages hidden')].filter(Boolean).join(' · ');
   // 2.411.0 (#3446): while the answer runs a red dot: Stop sits in this menu
   const busy = typeof chatBusy === 'function' && chatBusy(agentById(S.chat.aid)), t = busy ? t0 + ' · ' + tr('Stop the answer') : t0;
   return `<button type="button" class="iconbtn jcdfbtn${dot ? ' jcdfon' : ''}${busy ? ' chbusy' : ''}" id="jcd-fbtn" data-act="chat-head-menu" aria-haspopup="menu" title="${esc(t)}" aria-label="${esc(t)}">${ic('dots', 's')}</button>`;
@@ -367,7 +376,9 @@ const jcd_filterName = () => ({all: tr('All'), me: tr('Only me and {0}', agentBy
 // the three choices as the submenu of the menu entry "Filter: …"
 function jcd_choices() {
   const f = jcd_filter(), a = agentById(S.chat.aid);
-  return [['all', tr('All')], ['me', tr('Only me and {0}', a?.name || '')], ['res', tr('Me, {0} and job results', a?.name || '')], ['jobs', tr('Jobs')]].map(([k, l]) => ({label: l, on: f === k, fn: () => jcd_setFilter(k)}));
+  const all = !S.jcd.n ? [] : [['all', tr('All')], ['me', tr('Only me and {0}', a?.name || '')], ['res', tr('Me, {0} and job results', a?.name || '')], ['jobs', tr('Jobs')]].map(([k, l]) => ({label: l, on: f === k, fn: () => jcd_setFilter(k)}));
+  // 2.388.0 (#3341): a switch below the choices (a chat without jobs has only this one)
+  return jcd_srcSeen() ? [...all, '-', {label: tr('Show dispatcher messages'), on: !jcd_srcOff(), fn: () => jcd_setSrc(jcd_srcOff())}] : all;
 }
 // after every chat patch (agentchat.js chatPatch): the filter icon follows (shown once a job is in the chat)
 function jcd_patch() {
@@ -381,6 +392,7 @@ function jcd_setFilter(f) {
 function jcd_reveal(id) {
   const no = S.jcd.map.get(+id), m = S.chat.msgs.find(x => x.id === +id);
   let ch = false;
+  if (m && jcd_hidden(m)) { LS.set('chatSrcHide', ''); chatPatch({keep: true}); ch = true; }  // 2.388.0 (#3341)
   if (jcd_filter() !== 'all' && m) { const r = document.querySelector(`#chat-msgs [data-mid="a:${+id}"]`); if (!r) { LS.set('jcdFilt', 'all'); ch = true; } }
   if (no && m && !S.jcd.under.has(m.id) && !jcd_open(no)) { jcd_setOpen(no, true); ch = true; }
   if (m && jcf_long(m) && (jcf_on() || (no && S.jcd.under.has(m.id))) && !S.jcd.more.has(m.id)) { S.jcd.more.add(m.id); jcf_save(); ch = true; }  // 2.144.0 B (#2417): the target is unfolded

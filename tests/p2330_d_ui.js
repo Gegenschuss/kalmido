@@ -168,7 +168,7 @@ const V = B + 'api/v1';
     await shot('p2330d-390-usage-ring.png');
     // 2.350.0 (#3317): close the pinned ring tip like a user does (Esc) before leaving; the moved ring put it over "Done" below
     await ev(`(() => { document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 1; })()`);
-    // #1086: Customize Today, scrolled: "Done" stays reachable under the page header
+    // #1086: Customise Today, scrolled: "Done" stays reachable under the page header
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 520}});
     await o.nav(B + '#today'); await ready(ev);
     await ev(`(() => { lyOpen('today', true); return 1; })()`); await sleep(600);

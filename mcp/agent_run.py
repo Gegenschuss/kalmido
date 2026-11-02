@@ -49,6 +49,8 @@ usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [AR
   KALMIDO_PERMISSION_MODE       the permission mode of a Claude Code COMMAND without --permission-mode; set, the mode counts as
                                 fixed by this computer: the switch in the chat header (runtime permission_mode) is not applied
   KALMIDO_APPROVAL_CHECK        0 = no approval check of chat answers (default 1)
+  KALMIDO_RUN_LOG               the runner's own log file (default on Windows: agent_run.log next to agent_run.py; "0" = none;
+                                one old generation .1 after 1 MiB) -- stderr of Start-Process never reaches agent.log there
   --once-event FILE             handle the events of FILE (one JSON object per line) and exit (for tests)
 Never prints the token or message contents; the log has event types, ids and lengths only.
 """
@@ -126,9 +128,48 @@ SECRET_RES = [
 APPROVAL_RE = re.compile(r"(?:\A|\n)[ \t]*\n*```(?:approval|freigabe)(?![\w-])[^\n]*\n(.*?)\n?```\s*$", re.S)
 
 
+# 2.445.0 (#3748): on Windows the launcher starts this runner with Start-Process, whose stderr never reaches the agent.log
+# of the scheduled task (*>> locks that file). So the runner keeps its own agent_run.log next to the starter files (or the
+# file named by KALMIDO_RUN_LOG; "0" = none). Like nothing else rotates agent.log, the size is capped here: one old
+# generation (agent_run.log.1), checked once at start and then every RUN_LOG_CHECK lines.
+RUN_LOG_MAX = 1024 * 1024
+RUN_LOG_CHECK = 200
+_run_log = {"path": None, "n": 0, "ready": False}
+
+
+def run_log_path():
+    p = os.environ.get("KALMIDO_RUN_LOG")
+    if p is not None:
+        return None if p in ("", "0") else p
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent_run.log") if os.name == "nt" else None
+
+
+def _run_log_rotate(path):
+    try:
+        if os.path.getsize(path) > RUN_LOG_MAX:
+            os.replace(path, path + ".1")
+    except OSError:
+        pass
+
+
 def log(msg):
-    sys.stderr.write(time.strftime("%Y-%m-%d %H:%M:%S") + " agent_run: " + msg + "\n")
+    line = time.strftime("%Y-%m-%d %H:%M:%S") + " agent_run: " + msg + "\n"
+    sys.stderr.write(line)
     sys.stderr.flush()
+    try:
+        if not _run_log["ready"]:
+            _run_log["ready"] = True
+            _run_log["path"] = run_log_path()
+            if _run_log["path"]:
+                _run_log_rotate(_run_log["path"])
+        if _run_log["path"]:
+            _run_log["n"] += 1
+            if _run_log["n"] % RUN_LOG_CHECK == 0:
+                _run_log_rotate(_run_log["path"])
+            with open(_run_log["path"], "a", encoding="utf-8") as f:
+                f.write(line)
+    except Exception:
+        pass  # a log that cannot be written never stops a run
 
 
 def redact(text):
@@ -159,6 +200,8 @@ class Api:
         self.base = url.rstrip("/") + "/api/v1"
         self.token = token
         self.no_fixed = False  # 2.437.0 (#2931): this server takes no permission_fixed in the status
+        self.lang = ""  # 2.450.0 (#3769): the agent's language (the runner sets it from GET /agent)
+        self.key_ok = None  # 2.450.0 (#3769): False = this server takes no text_key in the status
         self.progress_ok = self.host_ok = self.quota_ok = self.approval_ok = self.choices_ok = self.notice_ok = None
 
     def req(self, method, path, body=None, query=None, timeout=30, retry=True):
@@ -197,24 +240,43 @@ class Api:
             return 0
 
     # kalmido-capability: status_typing / model / permission_mode / old_server
-    def status(self, status, text="", task_id=None, host=None):
+    def status(self, status, text="", task_id=None, host=None, key="", at=""):
         b = {"status": status, "text": (text or "")[:200]}
         if task_id and status in ("working", "waiting"):
             b["task_id"] = task_id
+        if key and self.key_ok is not False:  # kalmido-capability: lang_texts (2.450.0, #3769): the app translates by key, text = fallback
+            b["text_key"] = key
+            if at:
+                b["text_at"] = at
         if host and self.host_ok is not False:
             h = {k: v for k, v in host.items() if v or (k == "permission_fixed" and not self.no_fixed)}
-            st = self.soft("PUT", "/agent/status", {**b, **h})
+            st = self.put_status({**b, **h})
             if st == 400 and h.pop("permission_fixed", None) is not None:  # 2.437.0 (#2931): a server before it
                 self.no_fixed = True
-                st = self.soft("PUT", "/agent/status", {**b, **h})
+                st = self.put_status({**b, **h})
             if st != 400:
                 self.host_ok = self.host_ok or st == 200
                 return
             self.host_ok = False
             log("the server takes no model / permission mode in the status (before 2.32)")
-        if self.soft("PUT", "/agent/status", b) == 400 and "task_id" in b:
+        if self.put_status(b) == 400 and "task_id" in b:
             b.pop("task_id")
-            self.soft("PUT", "/agent/status", b)
+            self.put_status(b)
+
+    def put_status(self, b):
+        """2.450.0 (#3769): one status report; a server before text_key (400 "Unknown field") gets it again without the key.
+        Only a retry that then passes switches the key off: any other 400 is left to the caller."""
+        st = self.soft("PUT", "/agent/status", b)
+        if "text_key" not in b:
+            return st
+        if st == 200:
+            self.key_ok = True
+        elif st == 400:
+            st = self.soft("PUT", "/agent/status", {k: v for k, v in b.items() if k not in ("text_key", "text_at")})
+            if st == 200 and not self.key_ok:
+                self.key_ok = False
+                log("the server takes no text key in the status (before 2.450)")
+        return st
 
     def typing(self, uid):
         self.soft("POST", "/agent/typing", {"chat_user_id": uid}, timeout=10)
@@ -293,15 +355,15 @@ class Api:
                 self.approval_ok = False
                 log("the server has no approval cards (before 2.35): Yes / No buttons instead")
         if approval and self.choices_ok is not False:
-            ch = [{"id": "yes", "label": approval.get("yes_label") or "Yes", "style": "primary"},
-                  {"id": "no", "label": approval.get("no_label") or "No"}]
+            ch = [{"id": "yes", "label": approval.get("yes_label") or say("yes", self.lang), "style": "primary"},
+                  {"id": "no", "label": approval.get("no_label") or say("no", self.lang)}]
             try:
                 return self._post_chat(uid, {**b, "choices": ch})
             except ApiError as e:
                 if e.status != 400:
                     raise
                 self.choices_ok = False
-                body = body + "\n\n**Approval needed:** " + approval["title"] + " (answer yes or no)"
+                body = body + f"\n\n**{say('approval_needed', self.lang)}** " + approval["title"] + " " + say("answer_yes_no", self.lang)
                 b["body"] = body
         if suggest and not approval:  # 2.40.0 (#1100 suggest_buttons): the suggestions as answer buttons (2.28+)
             if self.choices_ok is not False:
@@ -311,7 +373,7 @@ class Api:
                     if e.status != 400:
                         raise
                     self.choices_ok = False
-            b["body"] = (body + "\n\n" if body else "") + suggest_line(suggest)  # no buttons: a numbered line
+            b["body"] = (body + "\n\n" if body else "") + suggest_line(suggest, self.lang)  # no buttons: a numbered line
         return self._post_chat(uid, b)
 
 
@@ -339,7 +401,7 @@ class Api:
         except ApiError as e:
             if e.status != 400:
                 raise
-        return self._post_chat(uid, {"body": body + "\n\n(answer yes or no)"})
+        return self._post_chat(uid, {"body": body + "\n\n" + say("answer_yes_no", self.lang)})
 
     # kalmido-capability: comment_blocks (2.42.0, #1383)
     def comment(self, tid, body, approval=None, suggest=None):
@@ -358,7 +420,7 @@ class Api:
             if not x or e.status != 400:
                 raise
             log("the server has no answer buttons in comments (before 2.41): a plain comment instead")
-        tail = ("**Approval needed:** " + approval["title"] + " (answer with a thumbs up or down)") if approval else suggest_line(suggest)
+        tail = (f"**{say('approval_needed', self.lang)}** " + approval["title"] + " " + say("answer_thumbs", self.lang)) if approval else suggest_line(suggest, self.lang)
         return self.req("POST", f"/tasks/{int(tid)}/comments", {"body": (b["body"] + "\n\n" if b["body"] else "") + tail}, timeout=60)
 
 
@@ -570,6 +632,148 @@ WORKFLOW_ASK = ("(Launcher, once: there is no WORKFLOW-KALMIDO.md in the project
                 "in their language, e.g. \"I explain my routine: orders, inbox, results, status\". When they explain it, write it "
                 "into WORKFLOW-KALMIDO.md and confirm in one line.)")
 LANG_NAMES = {"de": "German", "en": "English", "es": "Spanish", "fr": "French", "it": "Italian", "nl": "Dutch"}
+# kalmido-capability: lang_texts (2.450.0, #3769): everything the starter itself says to a person, by the agent's language
+# (GET /api/v1/agent lang); a language or text that is missing falls back to English. The KALMIDO_* variables in TEXT_ENV
+# override a text in every language. The status_* texts also go out as the key text_key (PUT /agent/status): the app shows
+# them in the language of whoever looks; these texts remain for an older app. Prompts to the agent stay English.
+TEXTS = {
+    "yes": {"en": "Yes", "de": "Ja", "fr": "Oui", "es": "Sí", "it": "Sì", "nl": "Ja"},
+    "no": {"en": "No", "de": "Nein", "fr": "Non", "es": "No", "it": "No", "nl": "Nee"},
+    "answer_yes_no": {"en": "(answer yes or no)", "de": "(antworte mit ja oder nein)", "fr": "(réponds par oui ou non)",
+                      "es": "(responde sí o no)", "it": "(rispondi sì o no)", "nl": "(antwoord met ja of nee)"},
+    "answer_thumbs": {"en": "(answer with a thumbs up or down)", "de": "(antworte mit Daumen hoch oder runter)",
+                      "fr": "(réponds avec un pouce levé ou baissé)", "es": "(responde con el pulgar arriba o abajo)",
+                      "it": "(rispondi con il pollice in su o in giù)", "nl": "(antwoord met duim omhoog of omlaag)"},
+    "approval_needed": {"en": "Approval needed:", "de": "Freigabe nötig:", "fr": "Validation requise :", "es": "Se necesita aprobación:",
+                        "it": "Approvazione necessaria:", "nl": "Goedkeuring nodig:"},
+    "next": {"en": "Next:", "de": "Weiter:", "fr": "Ensuite :", "es": "Siguiente:", "it": "Avanti:", "nl": "Verder:"},
+    "notice_compacted": {"en": "Conversation compacted ({0})", "de": "Unterhaltung verdichtet ({0})", "fr": "Conversation condensée ({0})",
+                         "es": "Conversación resumida ({0})", "it": "Conversazione compattata ({0})", "nl": "Gesprek samengevat ({0})"},
+    "notice_session": {"en": "New conversation ({0})", "de": "Neue Unterhaltung ({0})", "fr": "Nouvelle conversation ({0})",
+                       "es": "Nueva conversación ({0})", "it": "Nuova conversazione ({0})", "nl": "Nieuw gesprek ({0})"},
+    "why_reset": {"en": "reset", "de": "zurückgesetzt", "fr": "réinitialisée", "es": "reiniciada", "it": "azzerata", "nl": "gereset"},
+    "why_model changed": {"en": "model changed", "de": "Modell gewechselt", "fr": "modèle changé", "es": "modelo cambiado",
+                          "it": "modello cambiato", "nl": "model gewijzigd"},
+    "why_a new day": {"en": "a new day", "de": "ein neuer Tag", "fr": "un nouveau jour", "es": "un nuevo día", "it": "un nuovo giorno",
+                      "nl": "een nieuwe dag"},
+    "why_size": {"en": "size", "de": "Größe", "fr": "taille", "es": "tamaño", "it": "dimensione", "nl": "omvang"},
+    "why_number of runs": {"en": "number of runs", "de": "Anzahl der Läufe", "fr": "nombre d'exécutions", "es": "número de ejecuciones",
+                           "it": "numero di esecuzioni", "nl": "aantal runs"},
+    "why_long pause": {"en": "long pause", "de": "lange Pause", "fr": "longue pause", "es": "pausa larga", "it": "lunga pausa",
+                       "nl": "lange pauze"},
+    "card_hint": {
+        "en": "\n\n_Note from the launcher: this answer makes a proposal or asks you to decide, but has no approval card. "
+              "Nothing of it happens without your explicit yes._",
+        "de": "\n\n_Hinweis vom Starter: Diese Antwort enthält einen Vorschlag oder eine Frage an dich, aber keine Freigabe-Karte. "
+              "Nichts davon passiert ohne dein ausdrückliches Ja._",
+        "fr": "\n\n_Note du lanceur : cette réponse fait une proposition ou te demande de décider, mais sans carte de validation. "
+              "Rien de cela ne se fait sans ton oui explicite._",
+        "es": "\n\n_Nota del iniciador: esta respuesta hace una propuesta o te pide decidir, pero no tiene tarjeta de aprobación. "
+              "Nada de esto ocurre sin tu sí expreso._",
+        "it": "\n\n_Nota dell'avviatore: questa risposta fa una proposta o ti chiede di decidere, ma non ha una scheda di approvazione. "
+              "Non succede nulla senza il tuo sì esplicito._",
+        "nl": "\n\n_Opmerking van de starter: dit antwoord doet een voorstel of vraagt je te beslissen, maar heeft geen goedkeuringskaart. "
+              "Er gebeurt niets zonder jouw uitdrukkelijke ja._"},
+    "perm_text": {"en": "**May I run this?** ({0})", "de": "**Darf ich das ausführen?** ({0})", "fr": "**Puis-je exécuter ceci ?** ({0})",
+                  "es": "**¿Puedo ejecutar esto?** ({0})", "it": "**Posso eseguire questo?** ({0})", "nl": "**Mag ik dit uitvoeren?** ({0})"},
+    "perm_late": {"en": "This answer came too late: the command was denied already. Please give the order again.",
+                  "de": "Diese Antwort kam zu spät: Der Befehl wurde schon abgelehnt. Bitte gib den Auftrag noch einmal.",
+                  "fr": "Cette réponse arrive trop tard : la commande a déjà été refusée. Redonne la consigne, s'il te plaît.",
+                  "es": "Esta respuesta llegó tarde: el comando ya se rechazó. Vuelve a dar la orden, por favor.",
+                  "it": "Questa risposta è arrivata tardi: il comando è già stato rifiutato. Dai di nuovo l'ordine, per favore.",
+                  "nl": "Dit antwoord kwam te laat: de opdracht is al geweigerd. Geef de opdracht alsjeblieft opnieuw."},
+    "perm_operator_only": {"en": "This step needs a permission that only the operator of this agent can give, so it was not run.",
+                           "de": "Dieser Schritt braucht eine Erlaubnis, die nur die Betreuung dieses Agenten geben kann. Er wurde deshalb nicht ausgeführt.",
+                           "fr": "Cette étape demande une autorisation que seul le responsable de cet agent peut donner : elle n'a donc pas été exécutée.",
+                           "es": "Este paso necesita un permiso que solo puede dar quien opera este agente, así que no se ejecutó.",
+                           "it": "Questo passaggio richiede un permesso che solo chi gestisce questo agente può dare, quindi non è stato eseguito.",
+                           "nl": "Deze stap vraagt een toestemming die alleen de beheerder van deze agent kan geven, dus is hij niet uitgevoerd."},
+    "approval_expired": {"en": "This approval has expired. Please ask again if it is still needed.",
+                         "de": "Diese Freigabe ist abgelaufen. Bitte frag noch einmal, falls sie noch nötig ist.",
+                         "fr": "Cette validation a expiré. Redemande-la si elle est encore nécessaire.",
+                         "es": "Esta aprobación ha caducado. Vuelve a pedirla si todavía hace falta.",
+                         "it": "Questa approvazione è scaduta. Chiedila di nuovo se serve ancora.",
+                         "nl": "Deze goedkeuring is verlopen. Vraag het opnieuw als het nog nodig is."},
+    "approval_reminder": {"en": "Reminder: an approval is still open - {0}. Nothing happens without your yes (the card above).",
+                          "de": "Erinnerung: Eine Freigabe ist noch offen - {0}. Ohne dein Ja passiert nichts (die Karte oben).",
+                          "fr": "Rappel : une validation est encore ouverte - {0}. Rien ne se fait sans ton oui (la carte ci-dessus).",
+                          "es": "Recordatorio: sigue abierta una aprobación - {0}. No pasa nada sin tu sí (la tarjeta de arriba).",
+                          "it": "Promemoria: un'approvazione è ancora aperta - {0}. Non succede nulla senza il tuo sì (la scheda qui sopra).",
+                          "nl": "Herinnering: er staat nog een goedkeuring open - {0}. Er gebeurt niets zonder jouw ja (de kaart hierboven)."},
+    "run_failed": {"en": "Sorry, this run failed twice ({0}). Please try again later.",
+                   "de": "Dieser Lauf ist leider zweimal fehlgeschlagen ({0}). Bitte versuch es später noch einmal.",
+                   "fr": "Désolé, cette exécution a échoué deux fois ({0}). Réessaie plus tard.",
+                   "es": "Lo siento, esta ejecución falló dos veces ({0}). Inténtalo más tarde.",
+                   "it": "Purtroppo questa esecuzione non è riuscita per due volte ({0}). Riprova più tardi.",
+                   "nl": "Sorry, deze run is twee keer mislukt ({0}). Probeer het later opnieuw."},
+    "run_no_answer": {"en": "Sorry, this run ended without an answer. Please try again.",
+                      "de": "Dieser Lauf endete leider ohne Antwort. Bitte versuch es noch einmal.",
+                      "fr": "Désolé, cette exécution s'est terminée sans réponse. Réessaie.",
+                      "es": "Lo siento, esta ejecución terminó sin respuesta. Inténtalo de nuevo.",
+                      "it": "Purtroppo questa esecuzione è terminata senza risposta. Riprova.",
+                      "nl": "Sorry, deze run eindigde zonder antwoord. Probeer het opnieuw."},
+    "aborted": {"en": "Stopped as asked ({0} tool steps done until then). Tell me how to go on.",
+                "de": "Wie gewünscht gestoppt ({0} Werkzeugschritte bis dahin erledigt). Sag mir, wie es weitergehen soll.",
+                "fr": "Arrêté comme demandé ({0} étapes d'outil faites jusque-là). Dis-moi comment continuer.",
+                "es": "Detenido como pediste ({0} pasos de herramienta hechos hasta entonces). Dime cómo seguir.",
+                "it": "Fermato come richiesto ({0} passaggi di strumenti fatti fin qui). Dimmi come proseguire.",
+                "nl": "Gestopt zoals gevraagd ({0} gereedschapsstappen tot dan gedaan). Laat weten hoe ik verder moet."},
+    "abort_job": {"en": "This launcher cannot stop a single step of a job: use Stop on the job's card to end the job.",
+                  "de": "Dieser Starter kann keinen einzelnen Schritt eines Jobs stoppen: Beende den Job mit Stopp auf seiner Karte.",
+                  "fr": "Ce lanceur ne peut pas arrêter une seule étape d'une tâche de fond : utilise Arrêter sur sa carte pour y mettre fin.",
+                  "es": "Este iniciador no puede detener un solo paso de un trabajo: usa Detener en su tarjeta para terminarlo.",
+                  "it": "Questo avviatore non può fermare un singolo passaggio di un lavoro: usa Ferma sulla sua scheda per terminarlo.",
+                  "nl": "Deze starter kan geen losse stap van een taak stoppen: gebruik Stoppen op de kaart van de taak om hem te beëindigen."},
+    "status_chat": {"en": "Answering in the chat", "de": "Antwortet im Chat", "fr": "Répond dans le chat", "es": "Responde en el chat",
+                    "it": "Risponde nella chat", "nl": "Antwoordt in de chat"},
+    "status_event": {"en": "Working on an event", "de": "Bearbeitet ein Ereignis", "fr": "Traite un événement", "es": "Trabaja en un evento",
+                     "it": "Lavora a un evento", "nl": "Werkt aan een gebeurtenis"},
+    "status_no_command": {"en": "The agent command cannot be started", "de": "Der Agentenbefehl lässt sich nicht starten",
+                          "fr": "La commande de l'agent ne peut pas démarrer", "es": "No se puede iniciar el comando del agente",
+                          "it": "Il comando dell'agente non si avvia", "nl": "De agentopdracht kan niet worden gestart"},
+    "status_run_failed": {"en": "The last run failed", "de": "Der letzte Lauf ist fehlgeschlagen", "fr": "La dernière exécution a échoué",
+                          "es": "La última ejecución falló", "it": "L'ultima esecuzione non è riuscita", "nl": "De laatste run is mislukt"},
+    "status_outside_hours": {"en": "Outside working hours", "de": "Außerhalb der Arbeitszeit", "fr": "En dehors des heures de travail",
+                             "es": "Fuera del horario de trabajo", "it": "Fuori dall'orario di lavoro", "nl": "Buiten werktijd"},
+    "status_outside_hours_at": {"en": "Outside working hours, back {0}", "de": "Außerhalb der Arbeitszeit, zurück {0}",
+                                "fr": "En dehors des heures de travail, de retour {0}", "es": "Fuera del horario de trabajo, vuelve {0}",
+                                "it": "Fuori dall'orario di lavoro, di ritorno {0}", "nl": "Buiten werktijd, terug {0}"},
+    # 2.481.0 (#3662): what the dispatcher (agent_dispatch.py) says in the person's chat and on a closed task
+    "dispatch_closed": {"en": "Built in commit {0} ({1}) - closed by the dispatcher.", "de": "Gebaut in Commit {0} ({1}) - vom Dispatcher abgehakt.", "fr": "Réalisé dans le commit {0} ({1}) - clôturé par le répartiteur.", "es": "Hecho en el commit {0} ({1}) - cerrado por el despachador.", "it": "Fatto nel commit {0} ({1}) - chiuso dal dispatcher.", "nl": "Gebouwd in commit {0} ({1}) - afgesloten door de dispatcher."},
+    "dispatch_on_branch": {"en": "{0} is built on branch {1} but not landed yet", "de": "{0} ist auf Zweig {1} gebaut, aber noch nicht übernommen", "fr": "{0} est réalisé sur la branche {1} mais pas encore intégré", "es": "{0} está hecho en la rama {1} pero aún no integrado", "it": "{0} è fatto sul ramo {1} ma non ancora integrato", "nl": "{0} is gebouwd op branch {1} maar nog niet samengevoegd"},
+    "dispatch_needs_yes": {"en": "{0} has a step without a way back: it starts once a person gives it the tag \"{1}\"", "de": "{0} hat einen Schritt ohne Rückweg: er startet, sobald eine Person die Markierung \"{1}\" setzt", "fr": "{0} contient une étape sans retour : elle démarre dès qu'une personne ajoute l'étiquette « {1} »", "es": "{0} tiene un paso sin vuelta atrás: empieza cuando una persona le pone la etiqueta \"{1}\"", "it": "{0} ha un passo senza ritorno: parte quando una persona aggiunge l'etichetta \"{1}\"", "nl": "{0} heeft een stap zonder weg terug: hij start zodra iemand het label \"{1}\" zet"},
+    "dispatch_stuck": {"en": "{0} stayed open after {1} jobs: it needs you", "de": "{0} blieb nach {1} Jobs offen: braucht dich", "fr": "{0} est resté ouvert après {1} tâches : il a besoin de toi", "es": "{0} sigue abierto tras {1} trabajos: te necesita", "it": "{0} è rimasto aperto dopo {1} job: serve il tuo aiuto", "nl": "{0} bleef open na {1} jobs: heeft jou nodig"},
+    "dispatch_stale": {"en": "Job {0} has reported nothing for {1} h", "de": "Job {0} meldet seit {1} h nichts", "fr": "La tâche {0} ne signale rien depuis {1} h", "es": "El trabajo {0} no informa nada desde hace {1} h", "it": "Il job {0} non segnala nulla da {1} h", "nl": "Job {0} meldt al {1} u niets"},
+    "dispatch_findings": {"en": "Dispatcher:", "de": "Dispatcher:", "fr": "Répartiteur :", "es": "Despachador:", "it": "Dispatcher:", "nl": "Dispatcher:"},
+    "dispatch_report": {"en": "Dispatcher, day report {0}:", "de": "Dispatcher, Tagesbericht {0}:", "fr": "Répartiteur, rapport du jour {0} :", "es": "Despachador, informe del día {0}:", "it": "Dispatcher, rapporto del giorno {0}:", "nl": "Dispatcher, dagrapport {0}:"},
+    "dispatch_report_dry": {"en": "Dispatcher (dry run, nothing changed), day report {0}:", "de": "Dispatcher (Trockenlauf, nichts geändert), Tagesbericht {0}:", "fr": "Répartiteur (essai à blanc, rien modifié), rapport du jour {0} :", "es": "Despachador (simulación, nada cambiado), informe del día {0}:", "it": "Dispatcher (prova a secco, nulla cambiato), rapporto del giorno {0}:", "nl": "Dispatcher (proefrun, niets gewijzigd), dagrapport {0}:"},
+    "dispatch_nothing": {"en": "no open tasks", "de": "keine offenen Aufgaben", "fr": "aucune tâche ouverte", "es": "ninguna tarea abierta", "it": "nessuna attività aperta", "nl": "geen open taken"},
+    "dispatch_brakes": {"en": "Held: {0}", "de": "Angehalten: {0}", "fr": "En pause : {0}", "es": "En pausa: {0}", "it": "In pausa: {0}", "nl": "Gepauzeerd: {0}"},
+    "dispatch_state_done": {"en": "built", "de": "gebaut", "fr": "réalisées", "es": "hechas", "it": "fatte", "nl": "gebouwd"},
+    "dispatch_state_building": {"en": "in a job", "de": "im Job", "fr": "en cours", "es": "en curso", "it": "in corso", "nl": "in een job"},
+    "dispatch_state_on_branch": {"en": "on a branch", "de": "auf einem Zweig", "fr": "sur une branche", "es": "en una rama", "it": "su un ramo", "nl": "op een branch"},
+    "dispatch_state_held": {"en": "held", "de": "zurückgehalten", "fr": "retenues", "es": "retenidas", "it": "trattenute", "nl": "aangehouden"},
+    "dispatch_state_needs_yes": {"en": "waiting for a yes", "de": "warten auf ein Ja", "fr": "attendent un oui", "es": "esperan un sí", "it": "attendono un sì", "nl": "wachten op een ja"},
+    "dispatch_state_stuck": {"en": "need you", "de": "brauchen dich", "fr": "ont besoin de toi", "es": "te necesitan", "it": "serve il tuo aiuto", "nl": "hebben jou nodig"},
+    "dispatch_state_ready": {"en": "ready", "de": "bereit", "fr": "prêtes", "es": "listas", "it": "pronte", "nl": "klaar"},
+    "status_plan_limit": {"en": "Plan limit reached", "de": "Tarifgrenze erreicht", "fr": "Limite de l'abonnement atteinte",
+                          "es": "Límite del plan alcanzado", "it": "Limite del piano raggiunto", "nl": "Limiet van het abonnement bereikt"},
+    "status_plan_limit_at": {"en": "Plan limit reached, back at {0}", "de": "Tarifgrenze erreicht, zurück um {0}",
+                             "fr": "Limite de l'abonnement atteinte, de retour à {0}", "es": "Límite del plan alcanzado, vuelve a las {0}",
+                             "it": "Limite del piano raggiunto, di ritorno alle {0}", "nl": "Limiet van het abonnement bereikt, terug om {0}"}}
+TEXT_ENV = {"notice_compacted": "KALMIDO_NOTICE_COMPACTED", "notice_session": "KALMIDO_NOTICE_SESSION", "perm_text": "KALMIDO_PERM_TEXT",
+            "perm_late": "KALMIDO_PERM_LATE", "perm_operator_only": "KALMIDO_PERM_OPERATOR_ONLY", "approval_expired": "KALMIDO_APPROVAL_EXPIRED",
+            "approval_reminder": "KALMIDO_APPROVAL_REMINDER", "run_failed": "KALMIDO_RUN_FAILED", "aborted": "KALMIDO_ABORTED",
+            "abort_job": "KALMIDO_ABORT_JOB"}
+
+
+def say(key, lang="", *args):
+    """A text of the starter in that language (English when it is missing); {0}, {1}.. = args. An unknown key is returned as it is."""
+    forms = TEXTS.get(key) or {}
+    s = os.environ.get(TEXT_ENV.get(key) or "") or forms.get(str(lang or "")[:2]) or forms.get("en") or key
+    for i, a in enumerate(args):
+        s = s.replace("{%d}" % i, str(a))
+    return s
 
 
 RULES_CACHE_DIR = None  # set by the runner when its --state differs from the environment
@@ -777,6 +981,8 @@ def build_prompt(evs, chat_uid, extra=None):
                 out += ideas_hint(x)
             if (x.get("kind") or j.get("kind")) == "receipt_read":  # kalmido-capability: receipt_read (2.299.0, #3194)
                 out += receipt_hint(x)
+            if (x.get("kind") or j.get("kind")) == "card_statement_read":  # kalmido-capability: card_statement_read (2.469.0, #3749)
+                out += card_statement_hint(x)
         elif kind == "message_edited":  # kalmido-capability: message_edited (2.39.0, #1179)
             out += edit_hint(x)
         elif kind == "chat_choice":
@@ -830,6 +1036,17 @@ def receipt_hint(x):
             "(\"12.34\"), vat_pct? (19 | 7 | 0 ...), vat_rates? [{pct, net, vat}], currency? (EUR), positions? [{text, qty?, net?, "
             "vat_pct?}] (at most 100), category? (one of input.categories when one fits), account?} with submit_proposal;" + bank +
             " unknown fields are refused. The person checks the values and takes them over; you never change the receipt."]
+
+
+def card_statement_hint(x):
+    """2.469.0 (#3749): a person asks the agent to read a credit card statement no reader of Kalmido could read. The agent reads
+    the PDF itself where it runs; Kalmido calls no model and sends nothing out."""
+    return ["Read a credit card statement (kind card_statement_read): open the PDF itself (read_file with file_id = "
+            "input.document.id and as \"base64\", or the text of input.document) and read only what is printed -- nothing invented, "
+            "no balance, carried amount or payment of the last statement as a position. Answer {total? (\"12.34\"), lines: [{day "
+            "(YYYY-MM-DD), booked?, merchant, amount (\"12.34\", + charged, - money back), orig_amount?, orig_currency? (both or "
+            "neither), kind? (purchase | fee | credit)}]} with submit_proposal; unknown fields are refused. The person checks the "
+            "positions, takes them over and confirms the statement; you never change it."]
 
 
 def ideas_hint(x):
@@ -1099,10 +1316,6 @@ def split_tail_blocks(text):
     return "\n".join(lines).rstrip(), appr, [s for s in sugg if s], done
 
 
-# kalmido-capability: notice (2.41.0, #1206): the line a chat shows when the agent's conversation was compacted mid-run
-NOTICE_COMPACTED = os.environ.get("KALMIDO_NOTICE_COMPACTED", "Conversation compacted ({0})")
-
-
 LABEL_MAX = 80  # the server keeps 80 characters of a button label
 
 
@@ -1115,9 +1328,9 @@ def label_cut(s, n=LABEL_MAX):
     return cut.rstrip(" ,;:.-") + "…"
 
 
-def suggest_line(sugg):
+def suggest_line(sugg, lang=""):
     """Suggestions as one numbered line under the answer (a typed number picks one)."""
-    return "Next: " + "  ".join(f"{i + 1}) {s}" for i, s in enumerate(sugg)) if sugg else ""
+    return say("next", lang) + " " + "  ".join(f"{i + 1}) {s}" for i, s in enumerate(sugg)) if sugg else ""
 
 
 # kalmido-capability: approval_check (2.40.0, #1347): a chat answer that asks the person to decide or makes a proposal,
@@ -1142,28 +1355,50 @@ ASKS_EN = re.compile(
     r"|\bmy (?:suggestion|proposal|recommendation)\b|\b(?:small|worth|easy) enough to (?:include|take|add|fit)\b|\bworth (?:including|adding|taking)\b"
     r"|\bfits (?:in|into) (?:release |version )?\d+\.\d+"
     r"|^[ \t>*_-]*(?:proposal|suggestion|fix|recommendation)\b[^\n:]{0,30}:")
-CARD_HINT = {
-    "de": "\n\n_Hinweis vom Starter: Diese Antwort enthält einen Vorschlag oder eine Frage an dich, aber keine Freigabe-Karte. "
-          "Nichts davon passiert ohne dein ausdrückliches Ja._",
-    "en": "\n\n_Note from the launcher: this answer makes a proposal or asks you to decide, but has no approval card. "
-          "Nothing of it happens without your explicit yes._"}
+# 2.450.0 (#3769): the same check for the other languages of the app
+ASKS_FR = re.compile(
+    r"(?im)^[^\n]*(?:\b(?:dois|puis|devrais)-je\b|\b(?:veux|souhaites|préfères)-tu\b|\b(?:voulez|souhaitez|préférez)-vous\b|\best-ce que (?:je|tu veux)\b"
+    r"|\bquelle (?:variante|option)\b|\b(?:variante|option) [0-9a-z]\b|\bou plutôt\b|\bça (?:te|vous) va\b|\bon (?:continue|y va|le fait)\b)[^\n]*\?[ \t*_)]*$"
+    r"|\bj['’]attends (?:ta|votre) (?:réponse|décision|validation)\b"
+    r"|\bje (?:te |vous )?(?:propose|suggère|recommande|conseille)\b|\bj['’](?:ai une proposition|aurais tendance)\b|\bma (?:proposition|suggestion|recommandation)\b"
+    r"|^[ \t>*_-]*(?:proposition|suggestion|recommandation)\b[^\n:]{0,30}:")
+ASKS_ES = re.compile(
+    r"(?im)^[^\n]*(?:\b(?:debo|debería|deberíamos)\b|\b(?:quieres|prefieres|deseas)\b|\bquiere usted\b|\bqué (?:variante|opción)\b|\bcuál prefieres\b"
+    r"|\b(?:variante|opción) [0-9a-z]\b|\bo mejor\b|\bte parece\b|\blo hago\b)[^\n]*\?[ \t*_)]*$"
+    r"|\bespero tu (?:respuesta|decisión|aprobación)\b"
+    r"|\b(?:te |les? )?(?:propongo|sugiero|recomiendo)\b|\bmi (?:propuesta|sugerencia|recomendación)\b"
+    r"|^[ \t>*_-]*(?:propuesta|sugerencia|recomendación)\b[^\n:]{0,30}:")
+ASKS_IT = re.compile(
+    r"(?im)^[^\n]*(?:\b(?:devo|dovrei|dobbiamo)\b|\b(?:vuoi|preferisci|desideri)\b|\bquale (?:variante|opzione)\b|\b(?:variante|opzione) [0-9a-z]\b"
+    r"|\bo meglio\b|\bti va\b|\bprocedo\b)[^\n]*\?[ \t*_)]*$"
+    r"|\baspetto la tua (?:risposta|decisione|approvazione)\b"
+    r"|\b(?:ti )?(?:propongo|suggerisco|raccomando)\b|\bti consiglio\b|\bla mia (?:proposta|raccomandazione)\b|\bil mio (?:suggerimento|consiglio)\b"
+    r"|^[ \t>*_-]*(?:proposta|suggerimento|raccomandazione)\b[^\n:]{0,30}:")
+ASKS_NL = re.compile(
+    r"(?im)^[^\n]*(?:\bzal ik\b|\bzullen we\b|\bmoet ik\b|\bwil je\b|\bwilt u\b|\bwelke (?:variant|optie)\b|\b(?:variant|optie) [0-9a-z]\b|\bof liever\b"
+    r"|\bis dat (?:goed|oké|ok)\b)[^\n]*\?[ \t*_)]*$"
+    r"|\b(?:ik )?wacht op (?:je|jouw|uw) (?:antwoord|beslissing|goedkeuring)\b"
+    r"|\bik stel voor\b|\bik raad (?:je |u )?aan\b|\bik zou\b|\bik beveel\b|\bmijn (?:voorstel|advies|aanbeveling)\b"
+    r"|^[ \t>*_-]*(?:voorstel|advies|aanbeveling)\b[^\n:]{0,30}:")
 CARD_FIX = ("(Launcher check: your answer seems to ask the person to decide or to make a proposal (\"{line}\"), but it has no "
             "```approval block. Write your COMPLETE answer once more, this time with the block at the end (first line: what "
             "happens on yes). If no decision is needed at all, put that place as a statement instead of a question or "
             "proposal. Do not run any tools again.)")
 
 
-def asks_without_card(text):
-    """The first line that asks the person to decide or makes a proposal -> (line, "de" / "en"); ("", "") = none. Code
-    blocks, inline code, quotes and lines about cards already posted do not count."""
+def asks_without_card(text, prefer=""):
+    """The first line that asks the person to decide or makes a proposal -> (line, its language); ("", "") = none. Code
+    blocks, inline code, quotes and lines about cards already posted do not count. prefer: the language that wins when one
+    word fits several (Spanish and Italian "propongo")."""
     plain = re.sub(r"```.*?(?:```|\Z)", "", text or "", flags=re.S)
     plain = re.sub(r"`[^`\n]*`", "", plain)
     plain = "\n".join(x for x in plain.splitlines()
-                      if not x.lstrip().startswith(">") and not re.search(r"(?i)\b(?:karte|cards?)\b", x))
-    hits = [(m.start(), m.group(0), lang) for lang, rx in (("de", ASKS_DE), ("en", ASKS_EN)) for m in [rx.search(plain)] if m]
+                      if not x.lstrip().startswith(">") and not re.search(r"(?i)\b(?:karten?|cards?|cartes?|tarjetas?|schede|scheda|kaarten?)\b", x))
+    hits = [(m.start(), m.group(0), lang) for lang, rx in (("de", ASKS_DE), ("en", ASKS_EN), ("fr", ASKS_FR), ("es", ASKS_ES), ("it", ASKS_IT), ("nl", ASKS_NL))
+            for m in [rx.search(plain)] if m]
     if not hits:
         return "", ""
-    pos, _, lang = min(hits)
+    pos, _, lang = min(hits, key=lambda h: (h[0], h[2] != prefer))
     end = plain.find("\n", pos)
     line = plain[plain.rfind("\n", 0, pos) + 1:end if end >= 0 else len(plain)]  # the whole line, not just the words
     return " ".join(line.split())[:160], lang
@@ -1334,25 +1569,12 @@ class RunLock:
         return True
 
 
-YES_WORDS = ("yes", "y", "ok", "okay", "allow", "ja", "jo", "jep", "klar", "erlauben", "\U0001f44d")
-NO_WORDS = ("no", "n", "nope", "deny", "nein", "ne", "nee", "ablehnen", "\U0001f44e")
-# kalmido-capability: perm_relay -- the texts of a permission question (KALMIDO_PERM_TEXT / _LATE override them)
-PERM_TEXT = os.environ.get("KALMIDO_PERM_TEXT", "**May I run this?** ({0})")
-PERM_LATE = os.environ.get("KALMIDO_PERM_LATE", "This answer came too late: the command was denied already. Please give the order again.")
-# 2.126.0 B (#1973): a permission question of someone who is not the agent's operator is denied, with this note to them
-PERM_OPERATOR_ONLY = os.environ.get("KALMIDO_PERM_OPERATOR_ONLY", "This step needs a permission that only the operator of "
-                                    "this agent can give, so it was not run.")
-APPROVAL_EXPIRED_PRESS = os.environ.get("KALMIDO_APPROVAL_EXPIRED", "This approval has expired. Please ask again if it is still needed.")
-APPROVAL_REMINDER = os.environ.get("KALMIDO_APPROVAL_REMINDER", "Reminder: an approval is still open - {0}. Nothing happens without your yes (the card above).")
-# kalmido-capability: session_resume, notice -- the line a chat shows when the runner starts a new conversation
-NOTICE_SESSION = os.environ.get("KALMIDO_NOTICE_SESSION", "New conversation ({0})")
+YES_WORDS = ("yes", "y", "ok", "okay", "allow", "ja", "jo", "jep", "klar", "erlauben", "\U0001f44d",
+             "oui", "si", "sí", "sì", "vale", "certo", "oké")  # 2.450.0 (#3769): the question says "yes or no" in six languages
+NO_WORDS = ("no", "n", "nope", "deny", "nein", "ne", "nee", "ablehnen", "\U0001f44e", "non")
 SUMMARY_PROMPT = ("(Launcher: this conversation ends now ({why}) and a new one starts with your next order. Write a short "
                   "summary for it: open work, decisions, what the person expects next, in at most 15 short lines. Facts only, "
                   "no greeting, no tools.)")
-RUN_FAILED = os.environ.get("KALMIDO_RUN_FAILED", "Sorry, this run failed twice ({0}). Please try again later.")
-# 2.144.0 (#2412): Stop in the chat ({0} = the tool calls done until then)
-ABORTED = os.environ.get("KALMIDO_ABORTED", "Stopped as asked ({0} tool steps done until then). Tell me how to go on.")
-ABORT_JOB = os.environ.get("KALMIDO_ABORT_JOB", "This launcher cannot stop a single step of a job: use Stop on the job's card to end the job.")
 
 
 def perm_hook(argv):
@@ -1584,7 +1806,7 @@ class Runner:
             uid = self.chat_uid(ev)
             if uid and (x.get("approval") in ("approved", "rejected") or x.get("choice_ids")):
                 try:
-                    self.api.chat(uid, APPROVAL_EXPIRED_PRESS)
+                    self.api.chat(uid, self.say("approval_expired"))
                 except Exception as e:
                     log(f"expired approval {mid}: answer not posted ({type(e).__name__})")
             return
@@ -1680,12 +1902,12 @@ class Runner:
             log(f"run: {'+'.join(str(e.get('event')) for e in evs)} ({'chat ' + str(uid) if uid else 'task event'}), prompt {len(prompt)} chars")
             print(json.dumps({"args": args, "chat_user_id": uid, "prompt": prompt}, ensure_ascii=False))
             return
-        what = "Answering in the chat" if uid else "Working on an event"
+        what = "status_chat" if uid else "status_event"  # 2.450.0 (#3769): a key of TEXTS
         if self.extras:  # 2.44.0 B (#1443): a fresh outbox folder for a chat run
             self.extras.begin_run(uid, not uid)
         tid = None if uid else task.get("id")
         self.mode_args([])  # 2.437.0 (#2931): the status names the mode of this run
-        self.api.status("working", what, task_id=tid, host=self.host())
+        self.status_say("working", what, task_id=tid, host=self.host())
         key = self.session_start(uid, args, what)  # 2.44.0 (#1446): the conversation of this chat goes on
         if not self.agent:  # 2.46.6 (#1715): the rules block names the owner and the language (--once-event: not read yet)
             self.refresh_agent()
@@ -1699,7 +1921,7 @@ class Runner:
             self.aborted_note(uid, st)
             return
         if st is None:
-            self.api.status("error", "The agent command cannot be started")
+            self.status_say("error", "status_no_command")
             self.run_failed(uid, why)
             return
         text = result_text(st)
@@ -1742,14 +1964,14 @@ class Runner:
                 self.run_failed(uid, why)
             else:
                 try:
-                    self.api.chat(uid, "Sorry, this run ended without an answer. Please try again.")
+                    self.api.chat(uid, self.say("run_no_answer"))
                 except Exception:
                     pass
         elif text and tid:  # kalmido-capability: comment_blocks (2.42.0, #1383): a task answer with a closing block
             self.task_blocks(tid, text)
         if rc != 0 and not text:
             log(f"the command ended with {rc}")
-            self.api.status("error", "The last run failed")
+            self.status_say("error", "status_run_failed")
         else:
             self.api.status("idle", host=self.host())
 
@@ -1786,7 +2008,7 @@ class Runner:
         if not uid:
             return
         try:
-            self.api.chat(uid, RUN_FAILED.replace("{0}", redact(why or "unknown")))
+            self.api.chat(uid, self.say("run_failed", redact(why or "unknown")))
         except Exception as e:
             log(f"failure note not posted: {type(e).__name__}")
 
@@ -1815,7 +2037,7 @@ class Runner:
             with self.state.lock:
                 self.state.data["sessions"].pop(key, None)
                 self.state.save()
-            self.api.notice(uid, NOTICE_SESSION.replace("{0}", why))
+            self.api.notice(uid, self.say("notice_session", self.say("why_" + why)))
         return key
 
     def rotate_reason(self, s):
@@ -1860,19 +2082,30 @@ class Runner:
                 try:  # the instance's local time
                     from datetime import datetime
                     from zoneinfo import ZoneInfo
-                    at = datetime.fromisoformat(at.replace("Z", "+00:00")).astimezone(ZoneInfo(st.get("timezone") or "UTC")).strftime("%a %H:%M")
+                    show = datetime.fromisoformat(at.replace("Z", "+00:00")).astimezone(ZoneInfo(st.get("timezone") or "UTC")).strftime("%a %H:%M")
                 except Exception:
-                    at = at[:16].replace("T", " ")
-                log(f"outside the work window: events wait{' until ' + at if at else ''}")
-                self.api.status("paused", "Outside working hours" + (f", back {at}" if at else ""))
+                    show = at[:16].replace("T", " ")
+                log(f"outside the work window: events wait{' until ' + show if show else ''}")
+                self.status_say("paused", "status_outside_hours", at=at, show=show)
             else:
                 log("work window open: working through the queue")
                 self.api.status("idle")
         return closed
 
+    def say(self, key, *args):
+        """2.450.0 (#3769): a text of the starter in the agent's language."""
+        return say(key, (self.agent or {}).get("lang"), *args)
+
+    def status_say(self, status, key, at="", show="", **kw):
+        """2.450.0 (#3769): a status by key: the app translates it, the text in the agent's language stays as the fallback.
+        at: the time in it as ISO for the app, show: the same time as this starter's fallback text prints it."""
+        text = self.say(key + "_at", show) if show else self.say(key)
+        self.api.status(status, text, key=key, at=at, **kw)
+
     def refresh_agent(self):
         try:
             self.agent = self.api.req("GET", "/agent") or {}
+            self.api.lang = self.agent.get("lang") or ""
             self.refresh_due = False
         except Exception as e:
             log(f"agent settings: {type(e).__name__}")
@@ -1937,6 +2170,25 @@ class Runner:
             self.queue_add(evs)
         return len(evs)
 
+    # kalmido-capability: dispatcher (2.481.0, #3662)
+    def dispatch_watch(self):
+        """2.481.0 (#3662): the mechanical dispatcher (agent_dispatch.py) -- switched on in Kalmido (runtime.dispatch dry | on)
+        or with KALMIDO_DISPATCH, it works the lists of KALMIDO-DISPATCH.json off: one tick every interval_min, closes built
+        tasks, starts the next job on a free place, guards the jobs, one day report. Off: nothing happens, no API call."""
+        if self.dry:
+            return None
+        try:
+            import agent_dispatch
+        except ImportError:
+            return None
+        if self.refresh_due:  # runtime_changed: the switch may have changed
+            self.refresh_agent()
+        if agent_dispatch.mode_of(self.agent) == "off":
+            return None
+        if getattr(self, "dispatcher", None) is None:
+            self.dispatcher = agent_dispatch.Dispatcher(self)
+        return self.dispatcher.tick()
+
     # kalmido-capability: approval_closed (2.44.0, #1441)
     def close_decided(self, uid, lines):
         """Lines of an ```approval-done block -> close (withdraw) exactly those open cards of this chat; never as a yes (only
@@ -1982,7 +2234,7 @@ class Runner:
             elif age > APPROVAL_REMIND_S and not ap.get("reminded"):
                 ap["reminded"], changed = True, True
                 try:
-                    self.api.chat(ap.get("uid"), APPROVAL_REMINDER.replace("{0}", str(ap.get("title") or "")))
+                    self.api.chat(ap.get("uid"), self.say("approval_reminder", ap.get("title") or ""))
                 except Exception as e:
                     log(f"approval reminder not posted: {type(e).__name__}")
         return changed
@@ -2007,7 +2259,8 @@ class Runner:
         the agent once (same session, the complete answer again with the block, no tools); still none -> a visible hint."""
         if appr or not APPROVAL_CHECK:
             return body, appr, sugg
-        line, lang = asks_without_card(body)
+        mine = (self.agent or {}).get("lang") or ""
+        line, lang = asks_without_card(body, mine)
         if not line:
             return body, appr, sugg
         log("the answer asks for a decision without an approval block: asking the agent once for the block")
@@ -2021,9 +2274,9 @@ class Runner:
                 body, appr, sugg, _ = split_tail_blocks(redact(t2))
                 self.usage.report(force=True)
         if not appr:
-            line2, lang2 = asks_without_card(body)
+            line2, lang2 = asks_without_card(body, mine)
             if line2:
-                body = body.rstrip() + CARD_HINT[lang2 or lang or "en"]
+                body = body.rstrip() + say("card_hint", lang2 or lang)
         return body, appr, sugg
 
     # kalmido-capability: perm_relay (2.44.0, #1442)
@@ -2072,7 +2325,7 @@ class Runner:
             log(f"stop pressed for job {jid}: not supported here, noted")
             self.api.soft("PATCH", f"/agent/jobs/{int(jid)}", {"append_log": f"{time.strftime('%H:%M')} Stop pressed in the chat (a single step cannot be stopped here)"})
             if uid:
-                self.api.soft("POST", f"/agent/chats/{uid}", {"body": ABORT_JOB})
+                self.api.soft("POST", f"/agent/chats/{uid}", {"body": self.say("abort_job")})
             self.confirm_abort(ev, job_id=int(jid))
             return
         p, st = self.proc, self.cur_st
@@ -2102,7 +2355,7 @@ class Runner:
         to = int(((ev.get("data") or {}).get("user") or {}).get("id") or 0) or uid
         if to:
             try:
-                self.api.chat(int(to), ABORTED.replace("{0}", str(st.tools)))
+                self.api.chat(int(to), self.say("aborted", st.tools))
             except Exception as e:
                 log(f"stop note not posted: {type(e).__name__}")
         self.confirm_abort(ev)
@@ -2117,7 +2370,7 @@ class Runner:
                 self.state.remember("perm_done", mid)
                 self.state.save()
                 try:
-                    self.api.chat(int(q["uid"]), PERM_LATE)
+                    self.api.chat(int(q["uid"]), self.say("perm_late"))
                 except Exception:
                     pass
                 return
@@ -2172,7 +2425,7 @@ class Runner:
                 uid = int(rq["uid"]) if str(rq.get("uid") or "").isdigit() else self.perm_uid()
                 if uid and uid not in self.perm_operators():  # 2.126.0 B (#1973): only the operator answers
                     try:
-                        self.api.chat(uid, PERM_OPERATOR_ONLY)
+                        self.api.chat(uid, self.say("perm_operator_only"))
                     except Exception:
                         pass
                     log("permission question of a person who is not the operator: denied")
@@ -2181,7 +2434,7 @@ class Runner:
                     continue
                 tin = rq.get("tool_input") if isinstance(rq.get("tool_input"), dict) else {}
                 detail = tin.get("command") or tin.get("file_path") or tin.get("url") or json.dumps(tin, ensure_ascii=False)
-                body = (PERM_TEXT.replace("{0}", f"{rq.get('label') or 'run'}, {rq.get('tool_name') or '?'}")
+                body = (self.say("perm_text", f"{rq.get('label') or 'run'}, {rq.get('tool_name') or '?'}")
                         + "\n\n```\n" + redact(str(detail))[:1500].replace("```", "` ` `") + "\n```")
                 m = self.api.perm_question(uid, body, PERM_TIMEOUT_S) if uid else None
                 mid = str((m or {}).get("id") or "")
@@ -2223,7 +2476,7 @@ class Runner:
         def on_model(m):
             if m and m != self.model:
                 self.model = m
-                self.api.status("working", what, task_id=tid, host=self.host())
+                self.status_say("working", what, task_id=tid, host=self.host())
 
         def typing():
             if uid and time.time() - last_typing[0] >= TYPING_EVERY_S:
@@ -2237,7 +2490,7 @@ class Runner:
         def on_compact():  # 2.41.0 (#1206): a chat run whose conversation was compacted says so in the chat (a notice)
             if uid:
                 # a free text from the environment ({x}, a lone brace) never stops the run: only {0} is replaced
-                self.api.notice(uid, NOTICE_COMPACTED.replace("{0}", time.strftime("%H:%M")))
+                self.api.notice(uid, self.say("notice_compacted", time.strftime("%H:%M")))
 
         st = Stream((lambda t: self.api.progress(t, uid)) if uid and steps else (lambda t: False), on_model, on_usage, on_compact)
         st.on_event = self.extras.watch if self.extras else None  # 2.44.0 B (#1443)
@@ -2301,14 +2554,14 @@ class Runner:
             until = self.usage.paused_until()
             if until:
                 when = time.strftime("%Y-%m-%d %H:%M", time.localtime(until))
-                self.api.status("paused", f"Plan limit reached, back at {when}")
+                self.status_say("paused", "status_plan_limit", at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(until)), show=when)
                 log(f"plan limit reached: waiting until {when}")
                 time.sleep(max(0.0, until - time.time()) + 30)
             try:
                 self.run(uid, group)
             except Exception as e:
                 log(f"run failed: {type(e).__name__}")
-                self.api.status("error", "The last run failed")
+                self.status_say("error", "status_run_failed")
             if save:  # a restart in the middle of a batch never answers the done groups again
                 seqs = [int(e["seq"]) for e in group if str(e.get("seq") or "").isdigit()]
                 if seqs and max(seqs) > self.cur:
@@ -2400,6 +2653,10 @@ class Runner:
                     self.job_watch()  # 2.46.6 (#1445): also right at the start (last_hk = 0): jobs lost by a restart
                 except Exception as e:
                     log(f"jobs: {type(e).__name__}")
+                try:
+                    self.dispatch_watch()  # 2.481.0 (#3662): the list worked off, when switched on (it keeps its own pace)
+                except Exception as e:
+                    log(f"dispatcher: {type(e).__name__}")
             ex = getattr(self, "extras", None)  # part B: a bundle of task events that is due runs without a new event
             due = bool(ex and ex.due())
             if not self.state.data["queue"] and not due:

@@ -15,12 +15,12 @@ import hmac
 import html
 import json
 import secrets
-import threading
 from datetime import date, datetime, timedelta
 
 from flask import g, jsonify, redirect, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
+from ..collab.comments import lang_of  # 2.367.5 (#2980)
 from ..core.i18n import browser_lang, lang, LANGS, N_, tr
 from ..core.db import body, db, err, iso, local_now, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
@@ -30,7 +30,7 @@ from .model import office_role, pb_owner
 from .rights import NO_RIGHT, ofr_admin_or, ofr_allows
 from ..accounts.orgroles import OFFICE_READ
 from ..accounts.orgs import user_orgs
-from ..accounts.session import _accept_lang, me, _rate_blocked, _rate_fail, _token_hash, rate_ip
+from ..accounts.session import _accept_lang, gated_thread, me, _rate_blocked, _rate_fail, _token_hash, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..api.common import hit_budget, hit_limit
 from ..notify.alerts import aa_count
@@ -272,12 +272,12 @@ def sig_notify(c, r, st, name):
         except Exception as e:  # noqa: BLE001 - a broken setting never blocks the customer's answer
             print("signoff notify failed:", type(e).__name__, e, flush=True)
             continue
-        lg = s.get("lang") or "en"
-        title = tr("Approved by the customer", lg=lg) if st == "accepted" else tr("Declined by the customer", lg=lg)
+        lg = lang_of(s)
+        title = tr("Approved by the client", lg=lg) if st == "accepted" else tr("Declined by the client", lg=lg)
         if r["kind"] == "document" and st == "accepted":  # 2.93.0 A (#1927)
-            title = tr("Signed by the customer", lg=lg)
+            title = tr("Signed by the client", lg=lg)
         if r["kind"] == "video":  # 2.99.1 A (#1959)
-            title = tr("Video approved by the customer", lg=lg) if st == "accepted" else tr("Changes requested by the customer", lg=lg)
+            title = tr("Video approved by the client", lg=lg) if st == "accepted" else tr("Changes requested by the client", lg=lg)
         sends.append((uid, title, s))
     msg, url = f"{name}: {r['title'] or ''}", f"{PUBLIC_URL}/{click}"
     if not sends:
@@ -861,5 +861,5 @@ def sig_decide(token):
     if r["kind"] == "offer" and st == "accepted":
         qac_file(c, r)
     if push:
-        threading.Thread(target=push, daemon=True).start()
+        gated_thread(push)  # 2.370.2 (#2779)
     return redirect(SIG_PREFIX + token, 303)

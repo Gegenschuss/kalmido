@@ -199,8 +199,10 @@ NU = uid_of("Nina.New@example.com")
 u = DB.execute("SELECT username, password_hash, email, disabled FROM users WHERE id=?", (NU,)).fetchone()
 check(u and u["username"] == "nina.new" and not u["password_hash"] and u["email"] == "Nina.New@example.com" and not u["disabled"],
       f"the account: user name from the address, no password: {dict(u) if u else None}")
-m = DB.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (ORG, NU)).fetchone()
-check(m and m["role"] == "admin", "member of the organisation in the chosen role")
+# 2.453.0 (#3780): no member yet: the same way as an existing account (org_joins), so the member list shows no difference
+m = DB.execute("SELECT role FROM org_joins WHERE org_id=? AND user_id=?", (ORG, NU)).fetchone()
+check(m and m["role"] == "admin", "invited into the organisation in the chosen role")
+check(not DB.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (ORG, NU)).fetchone(), "no member before accepting")
 check(not DB.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (ORG2, NU)).fetchone(), "not in the other organisation")
 ml = until(lambda: [x for x in mails() if any(a.lower() == "nina.new@example.com" for a in x["to"])], 10)  # "to" is a list
 msg = email.message_from_string(ml[0]["raw"]) if ml else None
@@ -208,6 +210,9 @@ txt = "".join(p.get_payload(decode=True).decode() for p in msg.walk() if p.get_c
 LINK_RE = re.compile(r"https://kalmido\.example/#invite/[A-Za-z0-9_-]+")
 mlink = LINK_RE.search(txt)
 check(mlink, f"the invitation mail with the link ({len(ml)} mail(s))")
+check(re.search(r"\b14\b", txt), "#3780: the link lives as long as the invitation " + txt[:400])
+html_part = "".join(p.get_payload(decode=True).decode() for p in msg.walk() if p.get_content_type() == "text/html") if msg else ""
+check("Alpha" in html_part, "#3780: the mail still names the organisation")
 inv["link"] = mlink.group(0) if mlink else ""
 r = Bo.get(B + f"/api/orgs/{ORG}/invites")
 iv = r.json()["invites"] if r.ok else []
@@ -240,6 +245,15 @@ N1 = requests.Session()
 N1.headers.update(H)
 r = N1.post(B + "/api/auth/invite/accept", json={"token": new_link.split("#invite/")[1], "password": "password123"})
 check(r.ok and r.json().get("ok"), "accepting sets the password and signs in " + r.text[:200])
+# 2.453.0 (#3780): the person sees the invitation and joins by accepting it, no dead end without an organisation
+nws = N1.get(B + "/api/news?limit=50").json().get("items", [])
+check(any(x["kind"] == "orgjoin" for x in nws), "#3780: the invitation is in the News after the first sign-in")
+check(any(o.get("org_id") == ORG for o in N1.get(B + "/api/orgs").json().get("joins", [])), "#3780: and in the open invitations of the person")
+iv = Bo.get(B + f"/api/orgs/{ORG}/invites").json()["invites"]
+check([x["email"].lower() for x in iv if "nina" in x["email"].lower()] == ["nina.new@example.com"], f"#3780: signed in, not accepted yet: still one row {iv}")
+check(Bo.delete(B + f"/api/orgs/{ORG}/invites/{NU}").status_code == 404, "#3780: the account is in use now: not deleted by the old way")
+r = N1.post(B + f"/api/orgs/{ORG}/join")
+check(r.ok and r.json().get("role") == "admin", "#3780: accepted in the invited role " + r.text[:200])
 st = N1.get(B + "/api/state").json() if r.ok else {}
 check(any(w.get("id") == ORG for w in (st.get("me") or {}).get("workspaces", [])), "the new person is in the organisation")
 check(Bo.delete(B + f"/api/orgs/{ORG}/invites/{NU}").status_code == 404, "withdraw after the first sign-in: 404 (the account stays)")
@@ -263,6 +277,10 @@ r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "otto@example.com"})
 check(r.ok and uid_of("otto@example.com"), "the undo: the same address invited again")  # 2.148.1 (#2480)
 r = Bo.post(B + f"/api/orgs/{ORG}/invites", json={"email": "rita@example.com"})
 RU = uid_of("rita@example.com") if r.ok else None
+# 2.453.0 (#3780): an account made before stays a member: listed and withdrawn as ever, also without an org_joins row
+DB.execute("DELETE FROM org_joins WHERE org_id=? AND user_id=?", (ORG, RU))
+DB.execute("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'member')", (ORG, RU))
+check("rita@example.com" in [x["email"] for x in Bo.get(B + f"/api/orgs/{ORG}/invites").json()["invites"]], "#3780: an account from before the change stays listed")
 check(RU and Bo.delete(B + f"/api/orgs/{ORG}/members/{RU}").ok, "an invited person removed from the organisation")
 check(Bo.delete(B + f"/api/orgs/{ORG}/invites/{RU}").status_code == 404 and DB.execute("SELECT 1 FROM users WHERE id=?", (RU,)).fetchone()
       and len(A.get(B + f"/api/orgs/{ORG}/invites").json()["invites"]) == sum(v["user_id"] != RU for v in A.get(B + f"/api/orgs/{ORG}/invites").json()["invites"]),
@@ -284,7 +302,8 @@ check(Fk.post(B + f"/api/orgs/{ORG2}/invites", json={"email": "limit2@example.co
 r = A.patch(B + "/api/admin/settings", json={"org_invites": False})
 check(r.ok and r.json().get("org_invites") is False, "switch off " + r.text[:200])
 check(Fk.post(B + f"/api/orgs/{ORG2}/invites", json={"email": "off@example.com"}).status_code == 403, "off: 403")
-check(Fk.get(B + f"/api/orgs/{ORG2}/invites").json() == {"invites": [], "enabled": False}, "off: the client hides it")
+r = Fk.get(B + f"/api/orgs/{ORG2}/invites").json()  # 2.453.0 (#3780): what is open stays visible, as for an existing account (#2561)
+check(r["enabled"] is False and "petra@example.com" in [x["email"] for x in r["invites"]], "off: the client offers nothing new, what is open stays " + str(r)[:200])
 check(Fk.put(B + f"/api/orgs/{ORG2}/members", json={"email": "bob@example.com"}).ok, "off: adding an existing account still works")
 check(A.patch(B + "/api/admin/settings", json={"org_invites": "yes"}).status_code == 400, "a wrong value: 400")
 A.patch(B + "/api/admin/settings", json={"org_invites": True})

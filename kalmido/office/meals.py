@@ -35,10 +35,11 @@ from flask import Response, jsonify, request
 
 from ..core.access import Denied
 from ..core.config import MAX_FILE_MB, OFFICE_DIR, app
-from ..core.db import body, bump, iso, local_now, now_utc
+from ..core.db import body, bump, iso, local_now, local_stamp, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
-from ..core.i18n import N_, tr
-from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_read_file, oc_write_file
+from ..core.i18n import N_, csv_dialect, tr
+from ..personal.timesheet import tz_of
+from ..core.orgcrypt import oc_dec_col, oc_dec_fields, oc_enc_fields, oc_read_file, oc_write_file
 from ..core.pg import insert_id, write_lock, system_ctx
 from ..core.errors import BadInput
 from ..files.scan import sc_after_store, sc_guard, sc_scan  # 2.190.0 D (#2561): pulled up, the later scan
@@ -284,7 +285,7 @@ def bw_rows(c, oid, year=None, mid=None, deleted=False):
         args.append(str(year))
     rows = c.execute(sql + " ORDER BY date DESC, id DESC", args).fetchall()
     if own is not None:  # 2.187.1 B (#2735): own = entered by the person or with the person as host (the host may be encrypted)
-        rows = [r for r in rows if bw_own_sees(c, oid, r, own)]
+        rows = bw_own_rows(c, oid, rows, own)  # 2.360.5 (#2753)
     ids = [r["id"] for r in rows]
     logs, files = bw_logs(c, oid, ids), bw_files(c, oid, ids)
     years = bw_years(c, oid)
@@ -298,8 +299,21 @@ def bw_rows(c, oid, year=None, mid=None, deleted=False):
 
 def bw_host_id(c, oid, r):
     """2.187.1 B (#2735): the account id of the meal row's host (None: a free name / none)."""
-    h = _j(oc_dec_fields(c, oid, "office_meals", r).get("host"), {})
+    return _host_id(oc_dec_col(c, oid, "office_meals", "host", [r["host"]])[0])
+
+
+def _host_id(v):
+    h = _j(v, {})
     return h.get("id") if isinstance(h, dict) and isinstance(h.get("id"), int) else None
+
+
+def bw_own_rows(c, oid, rows, own):
+    """2.360.5 (#2753): the rows of person own (bw_own_sees for a whole list): the host column decrypted only for the rows
+    somebody else entered, the key read once."""
+    other = [r for r in rows if r["created_by"] != own]
+    hosts = oc_dec_col(c, oid, "office_meals", "host", [r["host"] for r in other])
+    keep = {r["id"] for r, h in zip(other, hosts) if _host_id(h) == own}
+    return [r for r in rows if r["created_by"] == own or r["id"] in keep]
 
 
 def bw_own_sees(c, oid, r, own):
@@ -907,8 +921,9 @@ def bw_report_get():
     if fmt == "csv":
         co = bw_company(c, oid)
         buf = io.StringIO()
-        w = csv.writer(buf, delimiter=";")
-        num = lambda v: str(v).replace(".", ",")  # noqa: E731
+        sep, num = csv_dialect()  # 2.368.2 (#2984): separator and decimal sign of the language, times local
+        zone = tz_of(c, uid)
+        w = csv.writer(buf, delimiter=sep)
         w.writerow([tr("Date"), tr("Place"), tr("Address"), tr("Occasion"), tr("Host"), tr("Guests"), tr("Food") + f" ({cur})", tr("Drinks") + f" ({cur})",
                     tr("Tip") + f" ({cur})", tr("Gross") + f" ({cur})", tr("Input VAT") + f" ({cur})", tr("Net") + f" ({cur})",
                     tr("Deductible 70 %") + f" ({cur})", tr("Not deductible 30 %") + f" ({cur})", tr("Approved by"), tr("Approved at")])
@@ -917,7 +932,7 @@ def bw_report_get():
             w.writerow([m["date"], _csv_safe(m["place_name"]), _csv_safe(m["place_address"].replace("\n", ", ")), _csv_safe(m["occasion"]),
                         _csv_safe(bw_pname(m["host"] or {"name": ""}, co)), _csv_safe(", ".join(bw_pname(p, co) for p in m["guests"])),
                         num(k["food"]), num(k["drinks"]), num(k["tip"]), num(k["gross"]), num(k["vat"]), num(k["net"]), num(k["deductible"]),
-                        num(k["not_deductible"]), _csv_safe(m["approved_name"]), (m["approved_at"] or "")[:16].replace("T", " ")])
+                        num(k["not_deductible"]), _csv_safe(m["approved_name"]), local_stamp(m["approved_at"], zone)[:16]])
         t = rep["total"]
         w.writerow([tr("Total"), rep["count"], "", "", "", "", num(t["food"]), num(t["drinks"]), num(t["tip"]), num(t["gross"]), num(t["vat"]), num(t["net"]),
                     num(t["deductible"]), num(t["not_deductible"]), "", ""])

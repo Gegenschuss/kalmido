@@ -2,7 +2,7 @@
 // 2.368.0 C (#2983): one money format in the web client, no browser and no server: the helper curMoney of static/i18n.js and
 // the money lines of the modules (taken from the source files as they are) run in node with an English and a German locale:
 // - curMoney: "€1,234.50" / "1.234,50 €", USD "$1,234.50" (not "US$"), a typed sign ("€", "$") as its code, other text
-//   behind the number, empty = the bare number, nothing for no amount; no break inside the number, plain spaces
+//   behind the number, empty = the bare number, nothing for no amount; no break inside the number or before the sign (2.458.0 #3855)
 // - time tracking (time.js money): "€1,234.50", was "1,234.50 EUR"; the office (ofcMoney: home currency), the per diem
 //   (rk_vmaEur, rk_vmaN "€28"), documents (dc_money), custom currency fields (cfk_money), the time-tracking amount of the
 //   settings (fmtMoney) and a quotation's money in the DOCUMENT's language and currency (ofdMoney)
@@ -32,36 +32,36 @@ const eq = (loc, expr, want, ctx) => { const got = run(loc, expr, ctx); check(go
 
 // ---- the helper
 eq('en-GB', 'curMoney(1234.5, "EUR")', '€1,234.50');
-eq('de-DE', 'curMoney(1234.5, "EUR")', '1.234,50 €');
+eq('de-DE', 'curMoney(1234.5, "EUR")', '1.234,50\u00a0€');
 eq('en-GB', 'curMoney(1234.5, "USD")', '$1,234.50');
-eq('de-DE', 'curMoney(-5, "$")', '-5,00 $');
+eq('de-DE', 'curMoney(-5, "$")', '-5,00\u00a0$');
 eq('en-GB', 'curMoney(1234.5, "€")', '€1,234.50');
 eq('en-GB', 'curMoney(12, "gbp")', '£12.00');
-eq('de-DE', 'curMoney(1234.5, "Fr.")', '1.234,50 Fr.');
+eq('de-DE', 'curMoney(1234.5, "Fr.")', '1.234,50\u00a0Fr.');
 eq('de-DE', 'curMoney(1234.5, "")', '1.234,50');
 eq('de-DE', 'curMoney(null, "EUR") + curMoney("", "EUR") + curMoney("x", "EUR")', '');
-eq('fr-FR', 'curMoney(1234.5, "EUR")', '1 234,50 €');  // no break inside the number, a plain space before the sign
-eq('nl-NL', 'curMoney(1234.5, "EUR")', '€ 1.234,50');
+eq('fr-FR', 'curMoney(1234.5, "EUR")', '1 234,50\u00a0€');  // 2.458.0 (#3855): no break inside the number, none before the sign
+eq('nl-NL', 'curMoney(1234.5, "EUR")', '€\u00a01.234,50');
 
 // ---- the modules: English places the sign in front, German behind (as before)
 eq('en-GB', 'money(1234.5, "EUR")', '€1,234.50');
-eq('de-DE', 'money(1234.5, "EUR")', '1.234,50 €');
+eq('de-DE', 'money(1234.5, "EUR")', '1.234,50\u00a0€');
 eq('en-GB', 'money(80, "")', '80.00');
 eq('en-GB', 'ofcMoney(1234.5)', '€1,234.50');
 eq('en-GB', 'ofcMoney(1234.5)', '$1,234.50', {OFC: {info: {settings: {home_currency: 'USD'}}}});
-eq('de-DE', 'ofcMoney(1234.5)', '1.234,50 €');
+eq('de-DE', 'ofcMoney(1234.5)', '1.234,50\u00a0€');
 eq('en-GB', 'ofcMoney(null) + ofcMoney("")', '');
 eq('en-GB', 'rk_vmaEur(56) + " " + rk_vmaN(28) + " " + rk_vmaN(5.6)', '€56.00 €28 €5.60');
-eq('de-DE', 'rk_vmaEur(56) + " " + rk_vmaN(28)', '56,00 € 28 €');
+eq('de-DE', 'rk_vmaEur(56) + " " + rk_vmaN(28)', '56,00\u00a0€ 28\u00a0€');
 eq('en-GB', 'dc_money(1234.5, "GBP") + " " + dc_money("", "EUR")', '£1,234.50 ');
 eq('en-GB', 'cfk_money("1234.5", "USD") + " " + cfk_money("x", "USD")', '$1,234.50 x');
 eq('en-GB', 'fmtMoney(1234.5)', '€1,234.50', {S: {settings: {time_currency: '€'}}});
-eq('en-GB', 'fmtMoney(1234.5)', '1,234.50 CHF.', {S: {settings: {time_currency: 'CHF.'}}});
+eq('en-GB', 'fmtMoney(1234.5)', '1,234.50\u00a0CHF.', {S: {settings: {time_currency: 'CHF.'}}});
 // a quotation: the document's language and currency, not the person's (like calc.fmt_money on its PDF)
 eq('de-DE', 'ofdMoney(1234.5, {lang: "en", currency: "USD"})', '$1,234.50');
-eq('en-GB', 'ofdMoney(1234.5, {lang: "de", currency: "EUR"})', '1.234,50 €');
-eq('en-GB', 'ofdMoney(1234.5, {lang: "fr", currency: "EUR"})', '1 234,50 €');
-eq('en-GB', 'ofdMoney(1234.5, {lang: "", currency: ""})', '1.234,50 €');
+eq('en-GB', 'ofdMoney(1234.5, {lang: "de", currency: "EUR"})', '1.234,50\u00a0€');
+eq('en-GB', 'ofdMoney(1234.5, {lang: "fr", currency: "EUR"})', '1 234,50\u00a0€');
+eq('en-GB', 'ofdMoney(1234.5, {lang: "", currency: ""})', '1.234,50\u00a0€');
 
 console.log(`p2368_c_money: ${ok} ok, ${F.length} failed`);
 process.exit(F.length ? 1 : 0);

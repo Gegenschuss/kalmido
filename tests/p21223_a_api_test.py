@@ -39,6 +39,8 @@ def imports(s, who):
     r = s.post(B + F + "/import/preview", files={"file": ("template.xlsx", t.content)})
     check(r.ok and len(r.json().get("rows") or []) == 2, f"{who}: the preview reads the template's two rows {r.status_code} {r.text[:200]}")
     check(fixed_count(s) == n0, f"{who}: the preview stores nothing")
+    r = s.post(B + L, json={"text": "Name;Wert\nTausend Punkt;1.500\n"})  # 2.363.0 (#3103): 1500, was 1.50
+    check(r.ok and (r.json().get("rows") or [{}])[0].get("value") == "1500.00", f"{who}: a thousand dot in the value {r.text[:200]}")
     r = s.post(B + L, json={"text": CSV})
     check(r.ok and r.json().get("count") == 2, f"{who}: the leads preview {r.status_code} {r.text[:200]}")
     r = s.post(B + L, json={"text": CSV, "commit": True})

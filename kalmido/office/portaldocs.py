@@ -22,7 +22,7 @@ from flask import g, jsonify
 from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.db import body, db, err, iso, now_utc, parse_iso
 from ..core.i18n import N_, tr
-from .doclang import doc_lg  # 2.185.0 C (#2520)
+from .doclang import doc_client_lang, doc_lg  # 2.185.0 C (#2520)
 from ..core.pg import system_ctx
 from ..core.access import acx_anon_bind, Denied
 from ..accounts.session import _accept_lang, _token_hash, rate_ip
@@ -120,6 +120,7 @@ def kp_items(c, oid, rows, lg):
     from .calc import fmt_money
     from .docs import _j
     from .invoices import inv_money_fields, inv_paid_map, inv_state
+    from .payonline import pol_active_url
     pm = inv_paid_map(c, oid, [r["id"] for r in rows if r["kind"] in ("invoice", "credit")])
     out, signs = [], 0
     for r in rows:
@@ -139,8 +140,9 @@ def kp_items(c, oid, rows, lg):
         if r["kind"] == "offer" and st == "sent" and signs < KP_SIGN_MAX:
             signs += 1
             url = kp_sign_url(c, oid, r)
+        pay = pol_active_url(c, oid, r) if r["kind"] == "invoice" and st in ("sent", "issued", "partial", "overdue") else None  # 2.469.0 (#3459)
         out.append({"id": r["id"], "kind": r["kind"], "title": f'{tr(KP_KIND_TXT[r["kind"]], lg=lg)} {r["number"] or ""}'.strip(),
-                    "sub": " · ".join(x for x in sub if x), "state": st, "state_text": tr(KP_STATE_TXT.get(st, "Open|payment state"), lg=lg), "sign_url": url})
+                    "sub": " · ".join(x for x in sub if x), "state": st, "state_text": tr(KP_STATE_TXT.get(st, "Open|payment state"), lg=lg), "sign_url": url, "pay_url": pay})
     return out
 
 
@@ -151,11 +153,13 @@ def kp_portal_html(c, who, lg):
         return None
     e = html.escape
     items = kp_items(c, oid, kp_docs(c, oid, cids), lg)
+    c.commit()  # 2.469.0 (#3459): a pay link made on the way
     li = []
     for x in items:
         cls = {"paid": "done", "accepted": "done", "partial": "progress", "overdue": "late"}.get(x["state"], "open")
         li.append(f'<li><a href="/portal/docs/{x["id"]}/pdf"><b>{e(x["title"])}</b><span class="sub">{e(x["sub"])}</span></a>'
                   + (f'<a class="kpgo" href="{e(x["sign_url"])}">{e(tr("Review and approve", lg=lg))}</a>' if x["sign_url"] else "")
+                  + (f'<a class="kpgo" href="{e(x["pay_url"])}">{e(tr("Pay now", lg=lg))}</a>' if x["pay_url"] else "")  # 2.469.0 (#3459)
                   + f'<span class="ptst ptst-{cls}">{e(x["state_text"])}</span></li>')
     return (f'<h2>{e(tr("Documents", lg=lg))}</h2>'
             + (f'<ul class="ptall kpdocs">{"".join(li)}</ul>' if li else f'<p class="empty">{e(tr("No documents for this address.", lg=lg))}</p>'))
@@ -209,7 +213,7 @@ def kp_link_send(cid):
     b = body()
     b = b if isinstance(b, dict) else {}
     if not public_links_on(c) or not office_settings(c, oid).get("portal_docs"):
-        raise Denied(409, tr("Documents in the customer portal are switched off in the office settings"))
+        raise Denied(409, tr("Documents in the client portal are switched off in the office settings"))
     if not MAIL_OUT_ON:
         raise Denied(409, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
     inv, main = pt_email_norm(cl["email_invoice"]), pt_email_norm(cl["email"])
@@ -233,10 +237,13 @@ def kp_link_send(cid):
               (eh, org_id, owner_id, _token_hash(tok), iso(now), iso(now + timedelta(seconds=PT_LOGIN_TTL))))
     co = ofx_company(c, oid)
     name = (co.get("name") or "").split("\n")[0].strip() or (office_settings(c, oid).get("company") or {}).get("name") or APP_NAME
-    lg = doc_lg(office_settings(c, oid).get("lang"))  # 2.185.0 C (#2520): every app language
+    # 2.367.4 (#2972): the language of the client's newest document, the office's without one
+    dl = c.execute("SELECT lang FROM office_docs WHERE org_id=? AND client_id=? AND COALESCE(lang, '')<>'' ORDER BY id DESC LIMIT 1", (oid, cid)).fetchone()
+    # 2.460.0 (#3767): a language set on the client comes first
+    lg = doc_client_lang(c, oid, cid) or doc_lg(dl["lang"] if dl else office_settings(c, oid).get("lang"))  # 2.185.0 C (#2520): every app language
     url = f"{PUBLIC_URL}/portal/login/{tok}"
     lines = [tr("Hello,", lg=lg), tr("{0} sends you the link to your quotations, invoices and their payment status. It is valid for 30 minutes and can be used once.", name, lg=lg),
-             tr("If you did not expect it, you can ignore this mail.", lg=lg)]
+             tr("If you did not expect it, you can ignore this e-mail.", lg=lg)]
     rt = co.get("email") or ""
     rt = rt if re.fullmatch(r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+", rt) else None
     ofx_log(c, oid, "portal_link", target="client", detail={"client": cid, "to": em})

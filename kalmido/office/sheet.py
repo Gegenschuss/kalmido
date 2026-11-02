@@ -4,7 +4,8 @@ Three layers, no code plugin:
  1. this core: head values + rows with fixed rules (kinds staff, share, km, meals, hotel, set, free);
  2. the crew master data (office_roles kind 'crew': name, day rate = the client's price, intern | extern, markup_pct);
  3. an industry pack (kalmido/office/packs/industry/<code>.json): data only -- labels DE/EN, print order of the blocks,
-    default values (meal rates, weekend surcharges, producing share, km rate), suggested crew functions. Switched on per
+    default values (meal rates, weekend surcharges, producing share, km rate), suggested crew functions (2.449.0 (#3768): a
+    pack may carry more languages, each with all the words; a language it lacks takes English). Switched on per
     organisation in the office settings (industry_packs); without a pack there is no shoot calculation.
 
 Rules (the spreadsheet the module replaces):
@@ -27,6 +28,7 @@ import stat
 from decimal import Decimal, ROUND_HALF_UP
 
 from .calc import calc_code, calc_lang, dec, money, fmt_money, fmt_qty
+from .doclang import doc_trans
 
 IND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "packs", "industry")
 DK_BLOCKS = ("staff", "share", "km", "meals", "hotel", "set", "free")
@@ -302,12 +304,17 @@ def _row_by_uid(rows):
     return {r.get("uid"): r for r in rows or [] if isinstance(r, dict) and r.get("uid")}
 
 
+def _tr_names(r):
+    """2.460.0 (#3767): {lang: name} of the master row (kept with a sheet row, like its name and name_en)."""
+    return {lg: x["name"] for lg, x in doc_trans(r).items() if isinstance(x, dict) and x.get("name")}
+
+
 def _role(c, oid, rid):
     try:
         rid = int(rid)
     except (TypeError, ValueError):
         return None
-    r = c.execute("SELECT id, name_de, name_en, rate_day, intext, markup_pct FROM office_roles WHERE id=? AND org_id=? AND kind='crew'",
+    r = c.execute("SELECT id, name_de, name_en, trans, rate_day, intext, markup_pct FROM office_roles WHERE id=? AND org_id=? AND kind='crew'",
                   (rid, oid)).fetchone()
     return dict(r) if r else None
 
@@ -317,7 +324,7 @@ def _service(c, oid, sid):
         sid = int(sid)
     except (TypeError, ValueError):
         return None
-    r = c.execute("SELECT id, name_de, name_en, daily_rate FROM office_services WHERE id=? AND org_id=? AND intext='shooting'",
+    r = c.execute("SELECT id, name_de, name_en, trans, daily_rate FROM office_services WHERE id=? AND org_id=? AND intext='shooting'",
                   (sid, oid)).fetchone()
     return dict(r) if r else None
 
@@ -349,10 +356,10 @@ def _equipment(c, oid, eid):
         eid = int(eid)
     except (TypeError, ValueError):
         return None
-    e = c.execute("SELECT id, name, name_en, daily_rate FROM office_equipment WHERE id=? AND org_id=?", (eid, oid)).fetchone()
+    e = c.execute("SELECT id, name, name_en, trans, daily_rate FROM office_equipment WHERE id=? AND org_id=?", (eid, oid)).fetchone()
     if not e:
         return None
-    return {"equipment_id": e["id"], "name": e["name"], "name_en": e["name_en"] or "", "qty": 1, "rate": _n(e["daily_rate"], 0)}
+    return {"equipment_id": e["id"], "name": e["name"], "name_en": e["name_en"] or "", "name_tr": _tr_names(e), "qty": 1, "rate": _n(e["daily_rate"], 0)}
 
 
 def dk_sheet_new(pack):
@@ -390,7 +397,7 @@ def dk_sheet_clean(c, oid, sheet_in, cur_sheet, admin):
         else:
             role = _role(c, oid, r.get("role_id"))
             if role:
-                row = {"uid": _uid(None), "role_id": role["id"], "name": role["name_de"], "name_en": role["name_en"] or "",
+                row = {"uid": _uid(None), "role_id": role["id"], "name": role["name_de"], "name_en": role["name_en"] or "", "name_tr": _tr_names(role),
                        "rate": _n(role["rate_day"], 0), "intext": _ie(role["intext"], "extern"),
                        "markup_pct": _n(role["markup_pct"], 0, hi=Decimal(1000))}
             elif admin and _txt(r.get("name")):  # a row without a role (admin only: it sets a price)
@@ -429,7 +436,7 @@ def dk_sheet_clean(c, oid, sheet_in, cur_sheet, admin):
         else:
             sv = _service(c, oid, r.get("service_id")) if r.get("service_id") else None
             if sv:
-                row = {"uid": _uid(None), "service_id": sv["id"], "name": sv["name_de"], "name_en": sv["name_en"] or "",
+                row = {"uid": _uid(None), "service_id": sv["id"], "name": sv["name_de"], "name_en": sv["name_en"] or "", "name_tr": _tr_names(sv),
                        "rate": _n(sv["daily_rate"], 0), "intext": "extern", "markup_pct": 0}
             else:
                 row = {"uid": _uid(None), "service_id": None, "name": "", "name_en": "", "rate": 0, "intext": "extern", "markup_pct": 0}
@@ -508,8 +515,19 @@ def dk_sheet_public(sheet, admin):
 
 
 # ---------------------------------------------------------------- calc
+def dk_lg(pack, lang):
+    """2.449.0 (#3768): the language of a pack's words for a document in lang: lang when the pack has it, else English."""
+    lg = calc_lang(lang)
+    return lg if lg in ("de", "en") or isinstance(((pack or {}).get("labels") or {}).get(lg), dict) else "en"
+
+
+def _roles_in(pack, lg):
+    """2.449.0 (#3768): {the pack's de / en name of a role, lower case: its name in lg}, for rows of the crew master data."""
+    return {str(r.get(k) or "").strip().lower(): r[lg] for r in (pack or {}).get("roles") or [] if r.get(lg) for k in ("de", "en")}
+
+
 def _lab(pack, lang, key, **kw):
-    lg = "de" if calc_lang(lang) == "de" else "en"  # 2.185.0 C (#2520): the pack's words are de / en; other languages take English
+    lg = dk_lg(pack, lang)  # 2.449.0 (#3768)
     L = (((pack or {}).get("labels") or {}).get(lg) or {})
     s = L.get(key) or (((pack or {}).get("labels") or {}).get("de") or {}).get(key) or key
     if kw:
@@ -534,8 +552,9 @@ def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1, home="EUR")
     sheet = sheet if isinstance(sheet, dict) else {}
     if not (isinstance(pack, dict) and pack.get("blocks")):
         pack = dk_pack(sheet.get("pack") or "film") or {}
-    lg = calc_lang(lang)  # 2.185.0 C (#2520): every app language (numbers); names / words of the pack: de, else English (plg)
-    plg = "de" if lg == "de" else "en"
+    lg = calc_lang(lang)  # 2.185.0 C (#2520): every app language (numbers); 2.449.0 (#3768): names / words of the pack: plg
+    plg = dk_lg(pack, lg)
+    roles = _roles_in(pack, plg) if plg not in ("de", "en") else {}
     home = calc_code(home)
     cur = calc_code(currency, home)
     usd = cur != home  # 2.189.0 (#2475): "foreign", was USD
@@ -554,7 +573,12 @@ def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1, home="EUR")
     lines = {b: [] for b in DK_BLOCKS}
 
     def name(r):
-        return (r.get("name_en") or r.get("name") or "") if plg == "en" else (r.get("name") or "")
+        if plg == "de":
+            return r.get("name") or ""
+        if (r.get("name_tr") or {}).get(lg):  # 2.460.0 (#3767)
+            return r["name_tr"][lg]
+        s = r.get("name_en") or r.get("name") or ""
+        return roles.get(s.strip().lower()) or roles.get(str(r.get("name") or "").strip().lower()) or s
 
     # staff
     people = Decimal(0)

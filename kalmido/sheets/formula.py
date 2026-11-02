@@ -1,15 +1,18 @@
 """2.89.0 (#1916): the formula engine of tables ("Excel in simple") -- tokenizer, parser, evaluation, value formats.
 
 An input starting with "=" is a formula: + - * /, brackets, comparisons (= <> < > <= >=, for IF), text in "..." joined with &,
-19% = 0.19, arguments split by ";" (German Excel) or "," (accepted too). Functions (German names, English aliases): SUMME/SUM,
+19% = 0.19, arguments split by ";" (German Excel) or "," (accepted too). Functions (German and English names): SUMME/SUM,
 MITTELWERT/AVERAGE, MIN, MAX, ANZAHL/COUNT, WENN/IF, RUNDEN/ROUND, HEUTE/TODAY, TAGE/DAYS. A date plus a number is a date.
 2.124.0 A (#2109): more in sheets/shfuncs.py (SUMMEWENN, ZÄHLENWENN, SVERWEIS, XVERWEIS, text and date functions).
 References: A1, A1:B5, a cell's own name, a column's name (= every cell of the column but the formula's own), Kalmido variables
-projekt.<name>.<field>, liste.<name>.<field>, kunde.<name>.<field>, hier.<field> (sheets/vars.py).
+projekt.<name>.<field>, liste.<name>.<field>, kunde.<name>.<field>, hier.<field>, also project. list. client. task. here. with
+English fields (sheets/vars.py).
 
 Stored with ids, never names: {c:991} a cell (by address or name), {col:5} a column, {p:12}.field / {l:7}.field / {k:3}.field a
-project / list / client. Everything else of the input stays as typed, so renaming or sorting changes no formula. The display
-form swaps the ids for the current names / addresses (sheets/core.py sh_to_display). Never eval: a tokenizer and a recursive
+project / list / client. Everything else of the input stays as typed, so renaming or sorting changes no formula. 2.368.3 (#2988):
+function names and TRUE / FALSE are stored in one form too (English), hier.<field> and the field after an id keep their stored key;
+older cells may still hold a German name, which reads the same. The display form swaps the ids for the current names / addresses
+and all words for the viewer's language (sheets/core.py sh_to_display). Never eval: a tokenizer and a recursive
 descent parser build a small tree, evaluated per cell with a cycle check; errors are kinds (ShErr), translated by the caller.
 """
 import json
@@ -25,7 +28,11 @@ SH_ERR_KINDS = ("deleted", "denied", "cycle", "syntax", "div0", "ref", "type", "
 SH_FUNCS = {"summe": "sum", "sum": "sum", "mittelwert": "avg", "average": "avg", "min": "min", "max": "max",
             "anzahl": "count", "count": "count", "wenn": "if", "if": "if", "runden": "round", "round": "round",
             "heute": "today", "today": "today", "tage": "days", "days": "days"}
-SH_FUNC_NAMES = ("SUMME", "MITTELWERT", "MIN", "MAX", "ANZAHL", "WENN", "RUNDEN", "HEUTE", "TAGE")  # what the completion offers
+# 2.368.3 (#2988): the names a person reads, by language (German in German, English everywhere else); stored is the English one
+SH_FN_DE = {"sum": "SUMME", "avg": "MITTELWERT", "min": "MIN", "max": "MAX", "count": "ANZAHL", "if": "WENN", "round": "RUNDEN",
+            "today": "HEUTE", "days": "TAGE"}
+SH_FN_EN = {"sum": "SUM", "avg": "AVERAGE", "min": "MIN", "max": "MAX", "count": "COUNT", "if": "IF", "round": "ROUND",
+            "today": "TODAY", "days": "DAYS"}
 SH_BOOLS = {"wahr": True, "true": True, "falsch": False, "false": False}
 SH_VAR_PREFIX = {"projekt": "p", "liste": "l", "kunde": "k"}
 SH_RESERVED = set(SH_FUNCS) | set(SH_BOOLS) | set(SH_VAR_PREFIX) | {"hier", "aufgabe"}  # 2.89.0 (#1916, D): + aufgabe.<id>.<field>
@@ -39,7 +46,7 @@ _IDREF = re.compile(r"\{(c|col|p|l|k|t|x):(\d{1,18})\}((?:\.\w+)?)")  # 2.124.0 
 _XREF = re.compile(r"(?:'((?:[^']|''){1,100})'|([^\W\d][\w.]{0,99}))!\$?([A-Za-z]{1,3})\$?(\d{1,6})(?::\$?([A-Za-z]{1,3})\$?(\d{1,6}))?(?![\w.$(])")
 _IDENT = re.compile(r"[^\W\d]\w*(?:\.\w+)*")
 _NUM = re.compile(r"\d+(?:[.,]\d+)?(?:[eE][+-]?\d+)?|[.,]\d+")
-_DATE_DE = re.compile(r"(\d{1,2})\.(\d{1,2})\.(\d{4})")
+_DATE_DE = re.compile(r"(\d{1,2})([.-])(\d{1,2})\2(\d{4})")  # 2.450.0 (#3770): + the Dutch 15-10-2026
 _DATE_ISO = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
 
 
@@ -341,7 +348,7 @@ def sh_parse_date(s):
     m = _DATE_DE.fullmatch(t)
     try:
         if m:
-            return date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+            return date(int(m.group(4)), int(m.group(3)), int(m.group(1)))
         m = _DATE_ISO.fullmatch(t[:10]) if len(t) in (10, 19, 20, 24, 25) else None
         if m:
             return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
@@ -743,6 +750,18 @@ def sh_fn_key(name):
         from .shfuncs import SHF_NAMES
         key = SHF_NAMES.get(low)
     return key
+
+
+def sh_is_de(lg):
+    return (lg or "").split("-")[0].lower() == "de"
+
+
+def sh_fn_name(key, lg=""):
+    """2.368.3 (#2988): a function's name for language lg; without one the stored, language-neutral (English) name."""
+    from .shfuncs import SHF_DE, SHF_EXCEL
+    if sh_is_de(lg):
+        return SH_FN_DE.get(key) or SHF_DE[key]
+    return SH_FN_EN.get(key) or SHF_EXCEL[key].replace("_xlfn.", "")
 
 
 def sh_today():

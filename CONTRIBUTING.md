@@ -96,8 +96,11 @@ and issues are the way.
 - Python: standard library style, 120 columns, parameters for every SQL value, `tr()` for messages.
 - JavaScript: plain ES2020, `esc()` for everything that goes into HTML, no inline event handlers (the CSP
   forbids them).
-- Migrations are additive and run on start (see `MIGRATIONS` in `kalmido/core/schema.py`, `init_db` in `kalmido/core/db.py`); never break an
+- Migrations are additive and run on start (one file per task in `kalmido/core/migrations.d/`, see docs/ARCHITECTURE.md; `init_db` in `kalmido/core/db.py`); never break an
   existing database.
+- New styles never go at the end of `static/app.css` (it does not grow): a module's rules into `static/css/<module>.css`,
+  rules needed at start into `static/css/start-<topic>.css`; a new start script below the sorted mark in
+  `static/index.html` (docs/ARCHITECTURE.md, "Styles and start scripts").
 - Comments explain *why*; the user-facing behaviour belongs in the README.
 
 ## AI-assisted development

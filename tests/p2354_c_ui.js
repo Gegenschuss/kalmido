@@ -1,5 +1,5 @@
 // 2.354.0 C (#3326 #3009 #3013) UI tests. Own container (start.sh). jsdom + Firefox (layout).
-// freelancer-matrix: tasks / quick dates -- alice has no organisation: everything below runs in her private space
+// freelancer-matrix: tasks / quick dates -- alice has no organisation: everything below runs in her private workspace
 // - #3326: a task due tomorrow or later: "+1 day" (tooltip: the target day) and "-1 day" (never before today); due today / no date: "Tomorrow", no "-1 day"
 // - #3009: Today > Overdue: "All to today" / "Another day…" never overlap the block's "…" at 690 / 820 / 1100 / 1440 px
 // - #3013: "Name missing" for a new project without a name, "under 1 minute", no hyphenation in the icon bar, "Ctrl K" only with a mouse

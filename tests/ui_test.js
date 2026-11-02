@@ -12,7 +12,7 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   let w = await boot({user: 'alice', hash: 'l/' + ids.L});
   let d = w.document;
   await api(w, 'PATCH', '/api/tasks/' + ids.ST, {url: 'https://github.com/kalmido/demo'});
-  await w.eval('load().then(render)'); await sleep(400);
+  await w.eval('load().then(render)'); await idle(w); await until(() => d.querySelector(`#view .trow[data-id="${ids.ST}"] a.lnk`));
   const row = d.querySelector(`#view .trow[data-id="${ids.ST}"]`);
   check(row, 'shared task row rendered');
   const lnk = row?.querySelector('a.lnk');
@@ -22,12 +22,12 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(d.querySelector('#side .srow[data-go="assigned"]'), 'sidebar has "Assigned to me" (collab on)');
   // clicking the link chip does not open the detail
   lnk?.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
-  await sleep(100);
+  await sleep(100);  // wanted: time for a detail that must not open
   check(!w.eval('S.sel'), 'clicking the link chip does not open the task');
   // ---------------- detail with timeline
-  w.eval(`openDetail(${ids.ST})`); await sleep(900);
-  // CI of 2.223.1: the timeline arrives after its own fetch (slower on CI): wait for it up to 8 s
-  for (let i = 0; i < 40 && d.querySelectorAll('#d-tl .cm').length < 3; i++) await sleep(200);
+  w.eval(`openDetail(${ids.ST})`);
+  // CI of 2.223.1: the timeline arrives after its own fetch (slower on CI): wait for it
+  await until(() => d.querySelectorAll('#d-tl .cm').length >= 3 && /Alice set the link to github\.com/.test(d.querySelector('#d-tl')?.textContent || '')); await idle(w);
   const tl = d.querySelector('#d-tl');
   check(tl, 'detail has the comments section');
   check(d.querySelectorAll('#d-tl .cm').length >= 3, 'comments rendered: ' + d.querySelectorAll('#d-tl .cm').length);
@@ -38,10 +38,10 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(d.querySelector('.linkchip')?.textContent.trim() === 'github.com' && d.querySelector('.linkchip').rel === 'noopener noreferrer', 'detail link chip');
   check(d.querySelector('#detail .dmeta .dwho'), 'assignee chip present (collab on; 2.31.0: the only assignee control)');
   // activity toggle, remembered per device (2.31.0 #1054: in the "…" of the comment head)
-  const tlAct = async () => { d.querySelector('#d-tl [data-act="tl-menu"]').click(); await sleep(50); d.querySelector('#pop .mtlact').click(); await sleep(100); };
-  await tlAct();
+  const tlAct = async done => { d.querySelector('#d-tl [data-act="tl-menu"]').click(); (await until(() => d.querySelector('#pop .mtlact')))?.click(); await until(done); };
+  await tlAct(() => d.querySelectorAll('#d-tl .actl').length === 0);
   check(d.querySelectorAll('#d-tl .actl').length === 0 && w.__store['tasks.showActivity'] === 'false' && /Comments only/.test(d.querySelector('#d-tl .cmhead').textContent), 'toggle hides activity and remembers it');
-  await tlAct();
+  await tlAct(() => d.querySelectorAll('#d-tl .actl').length >= 1);
   check(d.querySelectorAll('#d-tl .actl').length >= 1, 'toggle shows activity again');
   // moderation: alice owns the list -> delete buttons on others' comments, edit only on hers
   const others = [...d.querySelectorAll('#d-tl .cm')].filter(c => !/^Alice/.test(c.querySelector('.chead b').textContent));
@@ -62,21 +62,22 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   ta.value += 'please check'; ta.dispatchEvent(new w.Event('input', {bubbles: true}));
   // offline: nothing lost, clear notice
   w.__offline = true;
-  await w.eval('sendComment()'); await sleep(200);
+  await w.eval('sendComment()'); await until(() => /offline/i.test(d.querySelector('#toast').textContent));
   check(/offline/i.test(d.querySelector('#toast').textContent) && d.querySelector('#c-input').value === 'Ping @Bob please check', 'offline: notice + text stays: ' + d.querySelector('#toast').textContent);
   check(w.eval('OUT.q.length') === 0, 'offline comment is not queued in the outbox');
   w.__offline = false;
   const n0 = d.querySelectorAll('#d-tl .cm').length;
-  await w.eval('sendComment()'); await sleep(600);
+  await w.eval('sendComment()'); await until(() => d.querySelectorAll('#d-tl .cm').length === n0 + 1 && d.querySelector('#c-input').value === '');
   check(d.querySelectorAll('#d-tl .cm').length === n0 + 1 && d.querySelector('#c-input').value === '', 'online: comment sent, box cleared');
   const tlj = await api(w, 'GET', `/api/tasks/${ids.ST}/timeline`);
   const last = tlj.comments[tlj.comments.length - 1];
   check(last.body === `Ping <@${ids.ids.bob}> please check` && last.mentions[0] === ids.ids.bob, 'mention stored as user id: ' + last.body);
   // edit own comment
-  w.eval(`S.cedit = ${last.id}; drawTimeline()`); await sleep(50);
+  w.eval(`S.cedit = ${last.id}; drawTimeline()`); await until(() => d.querySelector(`.c-edit-input[data-cid="${last.id}"]`));
   const et = d.querySelector(`.c-edit-input[data-cid="${last.id}"]`);
   check(et && et.value === 'Ping @Bob please check', 'edit box shows names instead of tokens');
-  et.value = 'Ping @Bob and @Carol'; d.querySelector(`[data-act="c-edit-save"][data-cid="${last.id}"]`).click(); await sleep(700);
+  et.value = 'Ping @Bob and @Carol'; d.querySelector(`[data-act="c-edit-save"][data-cid="${last.id}"]`).click();
+  await until(async () => (await api(w, 'GET', `/api/tasks/${ids.ST}/timeline`)).comments.find(c => c.id === last.id)?.edited_at && [...d.querySelectorAll('#d-tl .cm')].some(c => /edited/.test(c.textContent)));
   const tlj2 = await api(w, 'GET', `/api/tasks/${ids.ST}/timeline`);
   const e2 = tlj2.comments.find(c => c.id === last.id);
   check(e2.body === `Ping <@${ids.ids.bob}> and <@${ids.ids.carol}>` && e2.edited_at, 'edit saved with mentions');
@@ -84,11 +85,11 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   // delete own comment -> disappears
   const before = d.querySelectorAll('#d-tl .cm').length;
   d.querySelector(`[data-act="c-del"][data-cid="${last.id}"]`).click();
-  // 2.142.2: CI red once with the fixed 700 ms (slow runner) - wait up to 6 s for the timeline to redraw
-  for (let i = 0; i < 40 && d.querySelectorAll('#d-tl .cm').length !== before - 1; i++) await sleep(150);
+  // 2.142.2: CI red once with the fixed 700 ms (slow runner) - wait for the timeline to redraw
+  await until(() => d.querySelectorAll('#d-tl .cm').length === before - 1);
   check(d.querySelectorAll('#d-tl .cm').length === before - 1, 'deleted comment disappears');
   // link field: edit + invalid
-  w.eval('closeDetail()'); await sleep(50);
+  w.eval('closeDetail()'); await until(() => !w.eval('S.sel'));
   // 2.284.0 A (#3120): CI red twice at night - the panel's late redraw (openDetail's load after the fixed 700 ms) replaced
   // #d-url, the change went to the old input; and the save is a server round trip. Wait for the states, re-find the input.
   w.eval(`openDetail(${ids.PT})`); await idle(w);
@@ -121,17 +122,17 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(r4.title === 'Read https://github.com/x/y' && !r4.url, 'link chip can be switched off');
   w.eval(`S.quick.ignore = new Set()`);
   // quick add creates the task with the link, title = domain+path when only a URL
-  w.eval(`go('inbox')`); await sleep(400);
+  w.eval(`go('inbox')`); await until(() => d.querySelector('#qinput')); await idle(w);
   const qi = d.querySelector('#qinput'); qi.value = 'https://www.example.com/docs/page/';
-  await w.eval(`submitQuick(document.querySelector('#qinput'))`); await sleep(500);
+  await w.eval(`submitQuick(document.querySelector('#qinput'))`); await until(() => [...w.eval('S.tasks').values()].find(t => t.url === 'https://www.example.com/docs/page/'));
   const nt = [...w.eval('S.tasks').values()].find(t => t.url === 'https://www.example.com/docs/page/');
   check(nt && nt.title === 'example.com/docs/page', 'quick add only URL: title domain + path');
   // share target (GET /share?text=...) with links on
   const sl = w.eval(`shareLink('Great read https://blog.example.org/post-1.', '')`);
   check(sl[0] === 'https://blog.example.org/post-1' && sl[1] === 'Great read', 'share: link split off: ' + JSON.stringify(sl));
   // search matches the link
-  w.eval(`go('search')`); await sleep(200);
-  await w.eval(`doSearch('blog.example')`); await sleep(500);
+  w.eval(`go('search')`); await idle(w);
+  await w.eval(`doSearch('blog.example')`); await idle(w);
   // unread chip for bob
   w.close();
 
@@ -140,7 +141,7 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   w = await boot({user: 'bob', hash: 'l/' + ids.L}); d = w.document;
   let brow = d.querySelector(`#view .trow[data-id="${ids.ST}"] .cmc`);
   check(brow && brow.classList.contains('unread'), 'bob: unread dot on the row');
-  w.eval(`openDetail(${ids.ST})`); await sleep(900);
+  w.eval(`openDetail(${ids.ST})`); await until(() => /Alice hat die Aufgabe erstellt/.test(d.querySelector('#d-tl')?.textContent || '') && d.querySelector('#d-tl .cm.new')); await idle(w);
   check(/Alice hat die Aufgabe erstellt/.test(d.querySelector('#d-tl').textContent), 'German activity text');
   check(d.querySelector('#d-tl .cm.new'), 'new comments highlighted');
   check(/Kommentare/.test(d.querySelector('#d-tl h5').textContent) && d.querySelector('#c-input').placeholder.startsWith('Kommentar schreiben'), 'German section + placeholder');
@@ -148,13 +149,11 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(!leftovers.length, 'no English leftovers in the German timeline: ' + leftovers);
   brow = d.querySelector(`#view .trow[data-id="${ids.ST}"] .cmc`);
   check(brow && !brow.classList.contains('unread'), 'opening marks it seen (dot gone)');
-  await sleep(300);
-  const bst = await api(w, 'GET', '/api/state');
-  check(bst.tasks.find(t => t.id === ids.ST).unread === 0, 'server: seen stored');
+  check(await until(async () => (await api(w, 'GET', '/api/state')).tasks.find(t => t.id === ids.ST).unread === 0), 'server: seen stored');
   // view-only hint + comments allowed for carol
   w.close();
   w = await boot({user: 'carol', hash: 'l/' + ids.L}); d = w.document;
-  w.eval(`openDetail(${ids.ST})`); await sleep(900);
+  w.eval(`openDetail(${ids.ST})`); await until(() => d.querySelector('#c-input') && d.querySelector('.rotag')); await idle(w);
   check(d.querySelector('#c-input') && d.querySelector('.rotag'), 'view-only member: read-only task but comment box');
   check(!d.querySelector('#d-url') && !d.querySelector('[data-act="link-edit"]'), 'view-only: no link editing');
   w.close();
@@ -165,18 +164,18 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(!d.querySelector('#view .who'), 'collab off: no assignee chips');  // 2.0.6 (#315): comment chips stay (Comments module)
   check(!d.querySelector('#side .shr'), 'collab off: no shared icon');
   check(d.querySelector('#side .srow[data-go="assigned"]'), 'collab off: "My tasks" stays (2.40.0, #1344: always shown)');
-  w.eval(`openDetail(${ids.ST})`); await sleep(600);
+  w.eval(`openDetail(${ids.ST})`); await until(() => d.querySelector('#d-tl [data-act="tl-menu"]') && d.querySelector('.linkchip')); await idle(w);
   check(!d.querySelector('#detail .dwho'), 'collab off: no assignee chip');
-  d.querySelector('#d-tl [data-act="tl-menu"]')?.click(); await sleep(50);
+  d.querySelector('#d-tl [data-act="tl-menu"]')?.click(); await until(() => d.querySelector('#pop [role="menuitem"]'));
   const noAct = d.querySelector('#pop [role="menuitem"]') && !d.querySelector('#pop .mtlact'); w.eval('closePop()');
   check(noAct && !d.querySelector('#d-tl .actl') && !d.querySelector('#d-tl .rx'), '2.0.6 (#315) collab off: comments as notes only (no activity, no reactions)');
   check(d.querySelector('.linkchip'), 'collab off, links on: link chip still shown');
   check(!/only visible to you/.test(d.querySelector('#detail').textContent), 'collab off: no sharing hint at tags');
   w.eval('closeDetail()');
-  w.eval(`listModal(${ids.L})`); await sleep(200);
+  w.eval(`listModal(${ids.L})`); await until(() => d.querySelector('.modal')); await idle(w);
   check(!d.querySelector('#l-members') && !/Sharing/.test(d.querySelector('.modal').textContent), 'collab off: no sharing section in the list dialog');
   d.querySelector('.modal').remove();
-  w.eval('settingsModal()'); await sleep(200);
+  w.eval('settingsModal()'); await until(() => d.querySelector('[data-feat="collab"]')); await idle(w);
   const tabopts = w.eval(`tabAddGroups().flatMap(g => g.items).map(x => x.id)`);  // 2.122.2 (#2329): a sheet instead of the select
   check(!tabopts.includes('s:assigned'), 'collab off: tab bar cannot pin "Assigned to me"');
   const cb = d.querySelector('[data-feat="collab"]');
@@ -189,13 +188,13 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   // link field always on, even with a legacy features string without "links"
   await api(w, 'PATCH', '/api/settings', {features: 'cal,timeline,matrix,habits,pomo,kanban,paperless'});
   d.querySelector('.modal')?.remove();
-  await w.eval('load().then(render)'); await sleep(500);
+  await w.eval('load().then(render)'); await until(() => d.querySelector('#view a.lnk'));
   check(d.querySelector('#view a.lnk'), 'links always: chip shown without the flag');
   const r5 = w.eval(`parseQuick('Read https://github.com/x/y ')`);
   check(r5.title === 'Read' && r5.url === 'https://github.com/x/y', 'links always: parser extracts the URL without the flag ' + JSON.stringify(r5));
-  w.eval(`openDetail(${ids.ST})`); await sleep(500);
+  w.eval(`openDetail(${ids.ST})`); await until(() => d.querySelector('.linkchip') || d.querySelector('#d-url') || d.querySelector('[data-act="link-edit"]'));
   check(d.querySelector('.linkchip') || d.querySelector('#d-url') || d.querySelector('[data-act="link-edit"]'), 'links always: link field in the detail');
-  w.eval(`go('news')`); await sleep(300);
+  w.eval(`go('news')`); await idle(w);
   check(w.eval('S.route.mod') === 'tasks', 'collab off: #news falls back to tasks');
   await api(w, 'PATCH', '/api/settings', {features: eveFeatures});  // restore eve's features for later
   w.close();

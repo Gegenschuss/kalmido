@@ -4,7 +4,10 @@ the winning time becomes an event with one click. Built by part A.
 A poll belongs to one person (sched_polls.user_id) in the private space (org_id NULL) or in one of their organisations:
 every member of that organisation reads it, only its owner or an admin of the organisation changes it (like bookmarks);
 the voters' e-mail addresses only those who may change it. People only (module "events"): agents and API tokens get 403
-(no agent API in 2.98, parity_test SESSION_ONLY). The link /s/v/<token> (below the public links' prefix /s/, so a login
+(no agent API in 2.98, parity_test SESSION_ONLY). 2.484.0 (#2200): agents read the polls they may see (their own, those of
+their organisations by the same role rules) and create new ones over REST v1 / MCP (calendars/pollsv1.py, scope "calendar");
+a private poll of a personal agent is also its owner's; the link of a poll an (enabled) agent created works for people. Agents
+never vote: tpo_find answers a bearer token with the 404 page. The link /s/v/<token> (below the public links' prefix /s/, so a login
 proxy that lets the public links through lets it through; 144 random bits, stored sealed so it can be copied again, looked
 up by its SHA-256 like forms) works without an account: a name, yes / maybe / no per time, optionally an
 address; the own vote can be changed with the edit key (a cookie on the device + the link on the thank-you page, stored as
@@ -68,16 +71,42 @@ def tpo_gate():
 
 
 def tpo_may(c, uid, r, write=False):
-    """May uid read (write: change) poll r? Private: its owner; an organisation's: members read, owner / admins change."""
+    """May uid read (write: change) poll r? Private: its owner (2.484.0 #2200: or the owner of the personal agent that made it);
+    an organisation's: members read, owner / admins (and the owner of the personal agent that made it) change. An agent reads
+    someone else's poll only when it hangs on a task / project / client the agent may see (tpo_agent_ref)."""
     if r["org_id"] is None:
-        return r["user_id"] == uid
+        return r["user_id"] == uid or tpo_agent_owner(c, r["user_id"]) == uid
+    if r["user_id"] != uid and tpo_is_agent(c, uid) and (write or not tpo_agent_ref(c, uid, r)):
+        return False
     from ..accounts.orgs import is_org_admin, user_orgs
     if r["org_id"] not in user_orgs(c, uid) or not acx_org_ok(c, uid, r["org_id"]):
         return False
     from ..accounts.orgroles import org_sees_all, org_writes
     if not org_sees_all(c, uid, r["org_id"]) or (write and not org_writes(c, uid, r["org_id"])):
         return False  # 2.143.0 A (#2151): guests / accounting do not see it, read-only changes nothing
-    return not write or r["user_id"] == uid or is_org_admin(c, uid, r["org_id"])
+    return not write or r["user_id"] == uid or is_org_admin(c, uid, r["org_id"]) or tpo_agent_owner(c, r["user_id"]) == uid
+
+
+def tpo_is_agent(c, uid):
+    """2.484.0 (#2200): is uid an agent account (the request's user from g, anyone else from users)?"""
+    u = getattr(g, "user", None) if has_request_context() else None
+    if u is not None and u["id"] == uid:  # (the kind read here: agents.core.is_agent would be an import upward, check_layers)
+        return (dict(u).get("kind") or "user") == "agent"
+    x = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
+    return bool(x) and (x[0] or "user") == "agent"
+
+
+def tpo_agent_ref(c, uid, r):
+    """2.484.0 (#2200): does someone else's poll r of an organisation hang on a task / project / client agent uid may see
+    (the agent's own checks: shared projects, data lock; the same workspace)? A poll without such a link: no."""
+    refs = [(k, r[k + "_id"]) for k in ("task", "list", "client") if r[k + "_id"]]
+    return bool(refs) and all(tpo_ref_ok(c, uid, k, v, r["org_id"]) for k, v in refs)
+
+
+def tpo_agent_owner(c, uid):
+    """2.484.0 (#2200): the owner of uid when uid is a personal agent (its private polls are the owner's too), else None."""
+    r = c.execute("SELECT a.owner_id FROM agents a JOIN users u ON u.id=a.user_id WHERE a.user_id=? AND u.kind='agent'", (uid,)).fetchone()
+    return r[0] if r and r[0] else None
 
 
 def tpo_need(c, pid, write=False, deleted=False):
@@ -286,7 +315,8 @@ def tpo_event_cal(c, r):
     return x[0] if x else None
 
 
-def tpo_dict(c, r, uid, full=True):
+def tpo_dict(c, r, uid, full=True, emails=True):
+    """emails=False (2.484.0 #2200, REST v1 / MCP): the voters' addresses never go to an agent or a token."""
     can = tpo_may(c, uid, r, write=True)
     opts = tpo_options(c, r["id"])
     votes = tpo_votes(c, r["id"])
@@ -301,7 +331,7 @@ def tpo_dict(c, r, uid, full=True):
          "options": [{"id": o["id"], "start": o["start"], "end": o["end"], **tally[o["id"]]} for o in opts]}
     if full:
         d["votes"] = [{"id": v["id"], "name": v["name"], "answers": _answers(v), "at": v["updated_at"],
-                       **({"email": v["email"]} if can else {})} for v in votes]
+                       **({"email": v["email"]} if can and emails else {})} for v in votes]
     return d
 
 
@@ -310,7 +340,14 @@ def tpo_dict(c, r, uid, full=True):
 def tpo_list():
     """?space=private|org:N|all (default all), ?task_id / client_id / list_id, ?deleted=1 (the trash) -> {items}."""
     tpo_gate()
-    c, uid, a = db(), me(), request.args
+    c, uid = db(), me()
+    rows = tpo_rows(c, uid, request.args)
+    return jsonify(items=[tpo_dict(c, r, uid, full=False) for r in rows], public_links=public_links_on(c))
+
+
+def tpo_rows(c, uid, a):
+    """The polls uid sees (app list + REST v1, 2.484.0 #2200): a = the query arguments space / task_id / client_id / list_id /
+    deleted; private = uid's own and those of uid's personal agents."""
     from ..accounts.orgs import user_orgs
     from ..accounts.orgroles import user_orgs_full
     orgs = [o for o in user_orgs(c, uid) if acx_org_ok(c, uid, o) and o in user_orgs_full(c, uid)]  # 2.143.0 A (#2151)
@@ -320,18 +357,21 @@ def tpo_list():
     elif sp != "all":
         orgs = [tpo_space(c, uid, sp)]
     q = ("SELECT * FROM sched_polls WHERE deleted_at IS " + ("NOT NULL" if a.get("deleted") == "1" else "NULL")
-         + " AND ((org_id IS NULL AND user_id=?)" + (f" OR org_id IN ({','.join('?' * len(orgs))})" if orgs else "") + ")")
-    args = [uid if sp in ("all", "private") else 0, *orgs]
+         + " AND ((org_id IS NULL AND (user_id=? OR user_id IN (SELECT a.user_id FROM agents a WHERE a.owner_id=?)))"
+         + (f" OR org_id IN ({','.join('?' * len(orgs))})" if orgs else "") + ")")
+    own = uid if sp in ("all", "private") else 0
+    args = [own, own, *orgs]
     for k in ("task_id", "client_id", "list_id"):
         if a.get(k):
             try:
                 v = int(a[k])
             except ValueError:
-                return err(tr("Invalid value: {0}", k))
+                raise BadInput(tr("Invalid value: {0}", k)) from None
             q += f" AND {k}=?"
             args.append(v)
-    rows = c.execute(q + " ORDER BY closed_at IS NOT NULL, updated_at DESC, id DESC LIMIT 500", args).fetchall()
-    return jsonify(items=[tpo_dict(c, r, uid, full=False) for r in rows if tpo_may(c, uid, r)], public_links=public_links_on(c))
+    # 2.484.0 (#2200, review): the 500 after the visibility check (an agent's own polls were cut by rows it may not see)
+    rows = c.execute(q + " ORDER BY closed_at IS NOT NULL, updated_at DESC, id DESC LIMIT 5000", args).fetchall()
+    return [r for r in rows if tpo_may(c, uid, r)][:500]
 
 
 def _store_options(c, pid, opts):
@@ -354,12 +394,17 @@ def tpo_create():
     """{title, description?, duration (min), location?, tz?, options: [{start, end?}] (2-20), space?, task_id? | client_id? |
     list_id?, expires_at?, show_votes?} -> 201 {poll}."""
     tpo_gate()
-    c, uid, b = db(), me(), body()
+    c, uid = db(), me()
+    return jsonify(poll=tpo_dict(c, tpo_need(c, tpo_new(c, uid, body())), uid)), 201
+
+
+def tpo_new(c, uid, b):
+    """Creates a poll of uid from body b (app + REST v1, 2.484.0 #2200) -> its id; 409 over the limit."""
     org = tpo_space(c, uid, b.get("space") if isinstance(b, dict) else None)
     f = tpo_fields(c, uid, b, org=org)
     opts = tpo_options_clean(b.get("options"), f["duration"])
     if c.execute("SELECT COUNT(*) FROM sched_polls WHERE user_id=? AND deleted_at IS NULL", (uid,)).fetchone()[0] >= TPO_PER_USER:
-        return err(tr("At most {0} polls per person", TPO_PER_USER), 409)
+        raise Denied(409, tr("At most {0} polls per person", TPO_PER_USER))
     tok, ts = secrets.token_urlsafe(18), iso_ms(now_utc())
     f.update(user_id=uid, org_id=org, token="", token_hash=_token_hash(tok), created_at=ts, updated_at=ts)
     pid = insert_id(c, f"INSERT INTO sched_polls({','.join(f)}) VALUES({','.join('?' * len(f))})", list(f.values()))
@@ -367,7 +412,7 @@ def tpo_create():
     _store_options(c, pid, [(None, s, e) for _i, s, e in opts])
     bump(c)
     c.commit()
-    return jsonify(poll=tpo_dict(c, tpo_need(c, pid), uid)), 201
+    return pid
 
 
 @app.get("/api/polls/<int:pid>")
@@ -450,7 +495,7 @@ def tpo_mail_rcpts(c, r, opt_id):
         e = (v["email"] or "").strip()
         if e and e.lower() not in seen and _answers(v).get(str(opt_id)) in ("y", "m"):
             seen.add(e.lower())
-            out.append((v["name"], e))
+            out.append((v["name"], e, v["lang"]))  # 2.448.0 (#3765): + the language the voter saw
     return out[:TPO_MAIL_MAX]
 
 
@@ -508,7 +553,7 @@ def tpo_decide(pid):
     c.commit()
     if sent:
         from .apptbook import apb_owner_name
-        who = apb_owner_name(c, uid) or tr("Someone", lg=olg)  # 2.190.0 R (#2496): never the login name, like the public pages
+        who = apb_owner_name(c, uid) or ""  # 2.190.0 R (#2496): never the login name, like the public pages; none = "Someone" in the mail's language
         bgj_add("mail:polls", sent, {k: r[k] for k in r.keys()}, {k: o[k] for k in o.keys()}, who, olg, user_id=uid)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
     return jsonify(poll=tpo_dict(c, tpo_need(c, pid), uid), event_id=eid, event_ref=ref, mailed=len(sent))
 
@@ -577,13 +622,15 @@ def tpo_mail(rcpts, r, o, who, lg):
     f = {"title": r["title"], "location": r["location"], "description": r["description"], "all_day": False,
          "start": wall(o["start"]).replace(tzinfo=z), "end": wall(o["end"]).replace(tzinfo=z), "tz": r["tz"] or getattr(TZ, "key", "UTC")}
     ics = cdw_new_ics(f, f"poll-{r['id']}-{o['id']}@kalmido").encode()
-    when = tpo_when(o["start"], o["end"], r["tz"], lg) + f" ({f['tz']})"
-    for name, addr in rcpts:
+    olg = lg
+    for name, addr, *voter in rcpts:  # 2.448.0 (#3765): the reader's language; a vote without one (older, or a queued pair) the owner's
+        lg = voter[0] if voter and voter[0] in LANGS else olg
+        when = tpo_when(o["start"], o["end"], r["tz"], lg) + f" ({f['tz']})"
         text = "\n\n".join(x for x in (tr("Hello {0},", name, lg=lg),
-                                       tr("{0} has chosen a time for “{1}”:", who, r["title"], lg=lg) + "\n" + when
+                                       tr("{0} has chosen a time for “{1}”:", who or tr("Someone", lg=lg), r["title"], lg=lg) + "\n" + when
                                        + (("\n" + r["location"]) if r["location"] else ""),
                                        tr("The event is attached: open it to add it to your calendar.", lg=lg),
-                                       tr("You get this mail because you entered this address when you voted. If that was not you, you can ignore it.", lg=lg)) if x)
+                                       tr("You get this e-mail because you entered this address when you voted. If that was not you, you can ignore it.", lg=lg)) if x)
         try:
             mail_send(addr, tr("Date set: {0}", r["title"], lg=lg), text, from_name=APP_NAME,
                       attachments=[("invite.ics", ics, "text/calendar")])
@@ -643,7 +690,7 @@ def tpo_move_space(pid):
         return jsonify(smv_answer(notes, deny.text() if deny else None, count=1, **((deny and deny.data) or {})))
     org_out(c, r["org_id"], to, "poll", r["title"], obj=pid)  # 2.361.2 B (#2923): logged, admins told, release used
     ts = iso_ms(now_utc())
-    sets = {"org_id": to, "updated_at": ts, **{k: None for k in drop}}
+    sets = {"org_id": to, "updated_at": ts, "brought_by": uid if to and not r["org_id"] else None, **{k: None for k in drop}}  # 2.365.1 (#3395): accounts/orgback.py
     c.execute(f"UPDATE sched_polls SET {','.join(k + '=?' for k in sets)} WHERE id=?", [*sets.values(), pid])
     mid = insert_id(c, "INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('poll',?,?,?,?,?,?)",
                     (pid, r["org_id"], to, uid, ts, json.dumps({k: r[k] for k in drop})))
@@ -653,6 +700,19 @@ def tpo_move_space(pid):
                               poll=tpo_dict(c, tpo_need(c, pid), uid)))
 
 
+def tpo_home(c, r, uid):
+    """2.365.1 (#3395): poll r goes back into uid's private space with their leaving (accounts/orgback.py): its task / project
+    only when that went back too, its client of the organisation stays there. The caller commits."""
+    q = {"task_id": "SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=? AND l.org_id IS NULL AND l.owner_id=?",
+         "list_id": "SELECT 1 FROM lists WHERE id=? AND org_id IS NULL AND owner_id=?"}
+    drop = [k for k in ("task_id", "client_id", "list_id") if r[k] and not (k in q and c.execute(q[k], (r[k], uid)).fetchone())]
+    ts = iso_ms(now_utc())
+    sets = {"org_id": None, "updated_at": ts, "brought_by": None, **{k: None for k in drop}}
+    c.execute(f"UPDATE sched_polls SET {','.join(k + '=?' for k in sets)} WHERE id=?", [*sets.values(), r["id"]])
+    c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('poll',?,?,NULL,?,?,?)",
+              (r["id"], r["org_id"], uid, ts, json.dumps({k: r[k] for k in drop})))
+
+
 # ---------------------------------------------------------------- the public page /s/v/<token>
 def tpo_find(c, token):
     """The open poll of a link (its owner enabled, the link on, not deleted, not expired, public links on) or None."""
@@ -660,12 +720,14 @@ def tpo_find(c, token):
         return None
     with system_ctx(c):  # resolve the token (one row) across organisations ...
         r = c.execute("""SELECT p.*, u.display_name AS u_name, u.username AS u_login FROM sched_polls p JOIN users u ON u.id=p.user_id
-                         WHERE p.token_hash=? AND p.link_on=1 AND p.deleted_at IS NULL AND u.disabled=0 AND COALESCE(u.kind, 'user')!='agent'""",
+                         WHERE p.token_hash=? AND p.link_on=1 AND p.deleted_at IS NULL AND u.disabled=0
+                         AND (COALESCE(u.kind, 'user')!='agent' OR EXISTS (SELECT 1 FROM agents a WHERE a.user_id=u.id AND a.enabled=1
+                              AND NOT EXISTS (SELECT 1 FROM users o WHERE o.id=a.owner_id AND o.disabled=1)))""",
                       (_token_hash(token),)).fetchone()
     from ..agents.core import is_agent
     if r is None or (r["expires_at"] and r["expires_at"] <= iso(now_utc())) or is_agent(getattr(g, "user", None)) \
             or request.headers.get("Authorization", "").lower().startswith("bearer "):
-        return None  # agents (and API tokens) never vote through the link
+        return None  # agents (and API tokens) never open or vote through the link (2.484.0 #2200: a poll an agent created is open to people)
     g.user = None  # everyone votes as a visitor here (a signed-in person of another organisation too)
     acx_anon_bind(c, r["org_id"])  # ... and the page reads inside exactly the poll's organisation
     return r
@@ -817,7 +879,8 @@ def _ip_hash(c):
 def tpo_page_get(token):
     c = db()
     if hit_limit("tpov:" + rate_ip(), TPO_VIEW_RATE):
-        return tpo_msg(tr("Too many requests"), tr("Please wait a minute and try again."), _accept_lang(), 429)
+        lg = _accept_lang()  # 2.368.4 (#2989): the visitor's language, also on the block page
+        return tpo_msg(tr("Too many requests", lg=lg), tr("Please wait a minute and try again.", lg=lg), lg, 429)
     r = tpo_find(c, token)
     if not r:
         return tpo_gone()
@@ -876,8 +939,8 @@ def tpo_vote(token):
         return tpo_page(c, r, token, lg, mine, vals, tr("Please answer at least one time.", lg=lg))
     ts, iph = iso_ms(now_utc()), _ip_hash(c)
     if mine is not None:
-        c.execute("UPDATE sched_poll_votes SET name=?, email=?, answers=?, updated_at=? WHERE id=?",
-                  (name, email, json.dumps(answers), ts, mine["id"]))
+        c.execute("UPDATE sched_poll_votes SET name=?, email=?, answers=?, lang=?, updated_at=? WHERE id=?",
+                  (name, email, json.dumps(answers), lg, ts, mine["id"]))
         vid, key_out = mine["id"], key
     else:
         n_all = c.execute("SELECT COUNT(*) FROM sched_poll_votes WHERE poll_id=?", (r["id"],)).fetchone()[0]
@@ -886,8 +949,8 @@ def tpo_vote(token):
             c.commit()
             return tpo_msg(tr("Too many requests", lg=lg), tr("This poll takes no more votes.", lg=lg), lg, 429)
         sec = secrets.token_urlsafe(18)
-        vid = insert_id(c, "INSERT INTO sched_poll_votes(poll_id,name,email,answers,edit_hash,ip_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                        (r["id"], name, email, json.dumps(answers), _token_hash(sec), iph, ts, ts))
+        vid = insert_id(c, "INSERT INTO sched_poll_votes(poll_id,name,email,answers,lang,edit_hash,ip_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                        (r["id"], name, email, json.dumps(answers), lg, _token_hash(sec), iph, ts, ts))
         key_out = f"{vid}.{sec}"
     c.execute("UPDATE sched_polls SET updated_at=? WHERE id=?", (ts, r["id"]))  # the owner's app reloads it
     bump(c)

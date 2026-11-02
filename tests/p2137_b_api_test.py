@@ -7,7 +7,7 @@ sign-offs of an organisation export. Invented names only.
    the versions, the share (ticked member only), the document's labels and the word index, the page with its picture and
    the rewritten links, the table's formula (same value), its person and file cells, the sign-off on the new list
  - the source organisation is not touched; undo removes every taken-over row of these areas again
- - a person without any organisation imports the same export into the private space: everything in their own space, readable
+ - a person without any organisation imports the same export into the private workspace: everything in their own space, readable
    for them, not for the organisation's admin
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY (P2137B_NOSTART=1 = the server already runs like that).
 usage: p2137_b_api_test.py <datadir>"""

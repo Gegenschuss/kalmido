@@ -5,6 +5,7 @@ The [README](../README.md) is the overview of all features. The pages here go in
 ## Running a server
 
 - [SELF-HOSTING.md](SELF-HOSTING.md) - requirements, first setup, reverse proxy, database, backups, encryption, updates
+- [UPGRADING.md](UPGRADING.md) - what each version needs from you, how far back you can go
 - [ENV.md](ENV.md) - every environment variable with its default
 - [OIDC.md](OIDC.md) - single sign-on with OpenID Connect
 - [CALDAV.md](CALDAV.md) - calendar and contacts apps (CalDAV, CardDAV) and invitations by e-mail

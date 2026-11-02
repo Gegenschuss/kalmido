@@ -207,6 +207,15 @@ def _sec_sort(v):
     return v
 
 
+def wip_hard_clean(v):
+    """2.392.0 A (#3367): the "no new agent jobs while over the limit" switch from a client value: 0 / 1."""
+    if v in (None, "", 0, "0", False):
+        return 0
+    if v in (1, "1", True):
+        return 1
+    raise BadInput(tr("Invalid value: {0}", "wip_hard"))
+
+
 def wip_clean(v):
     """2.60.0 (#1510): a section's WIP limit from a client value: None / '' / 0 = no limit, else 1..999."""
     if v in (None, "", 0, "0"):
@@ -258,8 +267,9 @@ def section_create():
     wip = wip_clean(b.get("wip_limit"))  # 2.60.0 (#1510): also the undo of a deleted section brings its limit back
     dw = [dw_clean(b.get(k), k) for k in DW_KEYS]  # 2.410.0 B (#3515): the same for its time limits
     dw_check(*dw)
-    cur_id = insert_id(c, "INSERT INTO sections(list_id,name,sort,wip_limit,dwell_warn_h,dwell_alert_h) VALUES(?,?,?,?,?,?)",
-                       (lid, name if le2e_is_cipher(name) else name[:200], srt, wip, *dw))
+    hard = wip_hard_clean(b.get("wip_hard")) if wip else 0  # 2.392.0 A (#3367): only with a limit
+    cur_id = insert_id(c, "INSERT INTO sections(list_id,name,sort,wip_limit,dwell_warn_h,dwell_alert_h,wip_hard) VALUES(?,?,?,?,?,?,?)",
+                       (lid, name if le2e_is_cipher(name) else name[:200], srt, wip, *dw, hard))
     sid, moved, skipped = cur_id, [], []
     for tid in tids:
         r = c.execute("SELECT list_id, section_id, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
@@ -286,7 +296,7 @@ def section_update(sid):
     need_section(c, sid)
     conflicts = []
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else {}
-    cur = c.execute("SELECT name, wip_limit, dwell_warn_h, dwell_alert_h FROM sections WHERE id=?", (sid,)).fetchone()
+    cur = c.execute("SELECT name, wip_limit, wip_hard, dwell_warn_h, dwell_alert_h FROM sections WHERE id=?", (sid,)).fetchone()
     if "name" in b:
         from ..collab.liste2e import le2a_clean_cipher, le2e_guard, le2e_is_cipher
         name = str(b["name"] or "").strip()
@@ -306,6 +316,12 @@ def section_update(sid):
             conflicts.append({"field": "wip_limit", "server": cur["wip_limit"], "mine": wip})
         else:
             c.execute("UPDATE sections SET wip_limit=? WHERE id=?", (wip, sid))
+    if "wip_hard" in b:  # 2.392.0 A (#3367): the limit stops new agent jobs (same rights and undo as wip_limit)
+        hard = wip_hard_clean(b["wip_hard"])
+        if "wip_hard" in prev and cur["wip_hard"] != wip_hard_clean(prev["wip_hard"]) and cur["wip_hard"] != hard:
+            conflicts.append({"field": "wip_hard", "server": cur["wip_hard"], "mine": hard})
+        else:
+            c.execute("UPDATE sections SET wip_hard=? WHERE id=?", (hard, sid))
     if any(k in b for k in DW_KEYS):  # 2.410.0 B (#3515): both limits as one value (red stays above yellow)
         want = {k: dw_clean(b[k], k) if k in b else cur[k] for k in DW_KEYS}
         dw_check(*want.values())
@@ -349,7 +365,7 @@ def section_delete(sid):
     c = db()
     write_lock(c, f"section-{int(sid)}")  # 2.269.0 B (#3034)
     need_section(c, sid)
-    sec = dict(c.execute("SELECT id, list_id, name, sort, wip_limit, dwell_warn_h, dwell_alert_h FROM sections WHERE id=?",
+    sec = dict(c.execute("SELECT id, list_id, name, sort, wip_limit, wip_hard, dwell_warn_h, dwell_alert_h FROM sections WHERE id=?",
                          (sid,)).fetchone())  # 2.60.0 (#1510): + limit; 2.410.0 B (#3515): + time limits
     tids = _sec_tasks(c, sid)
     prev = body().get("_prev")

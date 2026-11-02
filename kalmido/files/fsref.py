@@ -281,7 +281,7 @@ def fs_ref_place(c, uid, ref_kind, ref_id, parent_id, name=None):
     pchain = _folder_ok(c, uid, int(parent_id))
     p = pchain[0]
     if not _same_space(sp, p):
-        raise Denied(409, tr("Files can only be moved within the same space"))  # the organisation boundary
+        raise Denied(409, tr("Files can only be moved within the same workspace"))  # the organisation boundary
     if reg["title"]:  # 2.199.0 F (#2742, review): the name is the area's (its title), never one of the caller's
         name = reg["title"](c, ref_id) if n is None else None
     nm = safe_fs_name(str(name or (n["name"] if n is not None else "") or tr(reg["label"])).strip() or tr(reg["label"]))

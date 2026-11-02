@@ -126,7 +126,7 @@ r = A.get(B + "/api/wiki/shares", params={"page": op})
 check(r.ok and {x["id"]: x["ended"] for x in r.json()["shares"]}.get(blink["id"]) is True and anon(f"/s/w/{btok}").status_code == 404,
       "#2358: a disabled maker ends the link too")
 sql("UPDATE users SET disabled=0 WHERE id=?", (BOB,), write=True)
-# private space: unchanged (the owner's own links never end this way)
+# private workspace: unchanged (the owner's own links never end this way)
 pp = page(A, "private", "Notes", "private")
 r = share(A, page_id=pp, kind="link")
 check(r.status_code == 201 and r.json().get("ended") is False and anon("/s/w/" + r.json()["url"].rsplit("/", 1)[-1]).status_code == 200,

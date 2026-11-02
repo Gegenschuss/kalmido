@@ -31,7 +31,7 @@ import urllib.parse
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from ..core.config import APP_VERSION, DATABASE_URL, DB
-from ..core.db import DataDirError, DbError, connect_direct, init_db, iso, now_utc
+from ..core.db import DataDirError, DbError, FRAG_MIGRATIONS, FRAG_SCHEMA, connect_direct, init_db, iso, now_utc
 from ..core.schema import MIGRATIONS, SCHEMA
 from ..core.i18n import N_  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import pool_refresh  # 2.149.0 G (#2517): pulled up from functions
@@ -518,11 +518,11 @@ class Mig:
                             c.execute(f"CREATE EXTENSION IF NOT EXISTS {ext}")
                         except DbError:
                             pass
-                c.executescript(SCHEMA)
+                c.executescript(SCHEMA + FRAG_SCHEMA)  # 2.475.0 (#3478): + migrations.d
                 have = {}
                 for t, col in c.execute("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema=current_schema()").fetchall():
                     have.setdefault(t, set()).add(col)
-                for table, col, ddl in MIGRATIONS:
+                for table, col, ddl in MIGRATIONS + FRAG_MIGRATIONS:
                     if col not in have.get(table, ()):
                         c.execute(ddl)
             self.pg_meta(c)

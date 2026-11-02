@@ -18,6 +18,8 @@ from ..tasks.validation import (
 )
 from ..tasks.tasks import ms_target, one_task, set_tags
 from ..core.errors import BadInput
+from ..core.serializers import unlink_files
+from .tplextra import tx_apply, tx_collect, tx_keys, tx_of_template, tx_paths, tx_prune, tx_same_list, tx_state, tx_store
 
 
 # ---------------------------------------------------------------- templates (private per user)
@@ -25,7 +27,8 @@ from ..core.errors import BadInput
 # "tasks": [node + "section": index into sections | null]}. node = {title, content, priority, tags, url,
 # due_offset, start_offset, due_time, duration, reminders, repeat, repeat_from, children: [node, ...]}.
 # Offsets are days relative to the day the template was saved (never negative); a template used
-# today puts the dates relative to today. Subtasks up to MAX_DEPTH levels; assignees are not kept.
+# today puts the dates relative to today. Subtasks up to MAX_DEPTH levels; 2.363.3 (#3134): assignees, files, the tags of others and
+# whatever else names people or stored files stay on the server (templates.extra, template_files; lists/tplextra.py).
 TPL_MAX_NODES = 500
 TPL_MAX_PER_USER = 200
 HHMM_RE = re.compile(r"(?:[01]\d|2[0-3]):[0-5]\d")
@@ -277,6 +280,36 @@ def tpl_count(d):
     return n(d["task"]) if "task" in d else sum(n(x) for x in d.get("tasks") or [])
 
 
+def tpl_merge(kind, old, new):
+    """2.363.3 (#3134): a template edit is a partial update: what the request does not name stays - top-level keys, and within a
+    node with a known key (k; a task template's root always) its fields and subtasks."""
+    byk = {}
+
+    def index(n):
+        if n.get("k"):
+            byk[n["k"]] = n
+        for k in n.get("children") or []:
+            index(k)
+    for n in (old.get("tasks") or []) + ([old["task"]] if old.get("task") else []):
+        index(n)
+
+    def merged(n, base=None):
+        if not isinstance(n, dict):
+            return n
+        o = base or byk.get(n.get("k")) or {}
+        out = {**o, **n}
+        if isinstance(out.get("children"), list):
+            out["children"] = [merged(k) for k in out["children"]]
+        return out
+    out = {**old, **new}
+    if kind == "task":
+        if isinstance(new.get("task"), dict):
+            out["task"] = merged(new["task"], old.get("task"))
+    elif isinstance(new.get("tasks"), list):
+        out["tasks"] = [merged(n) for n in new["tasks"]]
+    return out
+
+
 def tpl_dict(r):
     d = json.loads(r["data"] or "{}")
     return {"id": r["id"], "kind": r["kind"], "name": r["name"], "data": d, "count": tpl_count(d),
@@ -296,11 +329,11 @@ def templates_list():
         "SELECT * FROM templates WHERE user_id=? ORDER BY kind DESC, lower(name), id", (me(),))])
 
 
-def tpl_list_data(c, lid, uid, base, rel=False, dup=None):
+def tpl_list_data(c, lid, uid, base, rel=False, dup=None, extra=None):
     """The list template of list lid as uid sees it (sections, open tasks with subtasks, fields, dependencies, Playbook, page).
     rel (2.4.0, #328): the dates relative to the project start instead of base. dup (2.78.0, #1881, "Duplicate list"):
     {"done": bool} = exact dates (also past ones), the task states kept, completed tasks only with done (else not even as
-    subtasks); the caller uses the data at once without tpl_clean."""
+    subtasks); the caller uses the data at once without tpl_clean. extra (2.363.3, #3134): dict, gets what stays on the server."""
     from ..lists.fields import tpl_fields_of
     lst = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
     secs = c.execute("SELECT id, name FROM sections WHERE list_id=? ORDER BY sort, id", (lid,)).fetchall()
@@ -325,6 +358,8 @@ def tpl_list_data(c, lid, uid, base, rel=False, dup=None):
                 x["mk"] = keys[mid]
             mkeys(x.get("children") or [])
     mkeys(tasks)
+    if extra is not None:
+        tx_collect(c, uid, lid, order, base, extra, dup=dup is not None, fidx=fidx, ftypes=ftypes)
     deps = [[keys[r[0]], keys[r[1]]] for r in c.execute("""SELECT d.task_id, d.blocker_id FROM task_deps d JOIN tasks t ON t.id=d.task_id
                                                                    WHERE t.list_id=? ORDER BY d.created_at, d.task_id, d.blocker_id""", (lid,)).fetchall()
             if r[0] in keys and r[1] in keys] if keys else []
@@ -360,6 +395,7 @@ def template_create():
     if c.execute("SELECT COUNT(*) FROM templates WHERE user_id=?", (uid,)).fetchone()[0] >= TPL_MAX_PER_USER:
         return err(tr("At most {0} templates", TPL_MAX_PER_USER))
     base = local_now().date()
+    extra = {}  # 2.363.3 (#3134): what stays on the server (tplextra)
     try:
         if b.get("task_id"):
             tid = int(b["task_id"])
@@ -371,7 +407,9 @@ def template_create():
             if not t:
                 raise Denied(404)
             _tpl_org_out(c, t["list_id"], t["title"])  # 2.148.1 H (#2483)
-            kind, data, name = "task", {"task": tpl_node_from_task(c, t, base, uid)}, t["title"]
+            order = []
+            kind, data, name = "task", {"task": tpl_node_from_task(c, t, base, uid, order=order)}, t["title"]
+            tx_collect(c, uid, t["list_id"], order, base, extra)
         elif b.get("list_id"):
             lid = int(b["list_id"])
             from ..collab.liste2eguard import le2b_list_locked, le2b_off
@@ -383,7 +421,7 @@ def template_create():
             if role not in WRITE_ROLES:  # 2.126.0 D (#1992 A6): view only
                 raise Denied(403, tr("View only: the project cannot be saved as a template"))
             _tpl_org_out(c, lid, None)  # 2.148.1 H (#2483)
-            kind, data = "list", tpl_list_data(c, lid, uid, base, rel=True)  # 2.352.0 B (#2752): dates always relative
+            kind, data = "list", tpl_list_data(c, lid, uid, base, rel=True, extra=extra)  # 2.352.0 B (#2752): dates always relative
             name = data["name"]
         else:
             kind = b.get("kind") if b.get("kind") in ("task", "list") else None
@@ -400,9 +438,16 @@ def template_create():
     ts = iso(now_utc())
     cur_id = insert_id(c, "INSERT INTO templates(user_id,kind,name,data,created_at,updated_at) VALUES(?,?,?,?,?,?)",
                     (uid, kind, name, json.dumps(data, ensure_ascii=False), ts, ts))
-    bump(c)
-    c.commit()
-    return jsonify(tpl_dict(c.execute("SELECT * FROM templates WHERE id=?", (cur_id,)).fetchone()))
+    st = tx_state()
+    try:
+        tx_store(c, uid, cur_id, extra, st)
+        bump(c)
+        c.commit()
+    except Exception:
+        c.rollback()
+        unlink_files(st["saved"])
+        raise
+    return jsonify({**tpl_dict(c.execute("SELECT * FROM templates WHERE id=?", (cur_id,)).fetchone()), "skipped_files": st["skipped"]})
 
 
 @app.patch("/api/templates/<int:tid>")
@@ -410,6 +455,7 @@ def template_update(tid):
     b = body()
     c = db()
     r = need_template(c, tid)
+    gone = []
     if "name" in b:
         name = str(b["name"] or "").strip()[:200]
         if not name:
@@ -417,13 +463,16 @@ def template_update(tid):
         c.execute("UPDATE templates SET name=? WHERE id=?", (name, tid))
     if "data" in b:
         try:
-            data = tpl_clean(r["kind"], b["data"])
+            # 2.363.3 (#3134): a partial update, not a replacement
+            data = tpl_clean(r["kind"], tpl_merge(r["kind"], json.loads(r["data"] or "{}"), b["data"]) if isinstance(b["data"], dict) else b["data"])
         except (ValueError, TypeError) as e:
             return err(str(e) or tr("Invalid template"))
         c.execute("UPDATE templates SET data=? WHERE id=?", (json.dumps(data, ensure_ascii=False), tid))
+        gone = tx_prune(c, tid, r["extra"], tx_keys(data))
     c.execute("UPDATE templates SET updated_at=? WHERE id=?", (iso(now_utc()), tid))
     bump(c)
     c.commit()
+    unlink_files(gone)
     return jsonify(tpl_dict(c.execute("SELECT * FROM templates WHERE id=?", (tid,)).fetchone()))
 
 
@@ -431,9 +480,11 @@ def template_update(tid):
 def template_delete(tid):
     c = db()
     need_template(c, tid)
+    files = tx_paths(c, tid)  # 2.363.3 (#3134): its own copies
     c.execute("DELETE FROM templates WHERE id=?", (tid,))
     bump(c)
     c.commit()
+    unlink_files(files)
     return jsonify(ok=True)
 
 
@@ -514,22 +565,36 @@ def template_apply(tid):
         if sec and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (sec, lid)).fetchone():
             sec = None
         srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
-        new = tpl_insert(c, d["task"], lid, sec or None, None, base, srt, uid)
-        bump(c)
-        c.commit()
-        return jsonify(task=one_task(c, new))
+        made, st = {}, tx_state()
+        try:
+            new = tpl_insert(c, d["task"], lid, sec or None, None, base, srt, uid, made=made)
+            tx_apply(c, uid, lid, tx_of_template(c, r), made, st)
+            bump(c)
+            c.commit()
+        except Exception:
+            c.rollback()
+            unlink_files(st["saved"])
+            raise
+        return jsonify(task=one_task(c, new), skipped_files=st["skipped"])
     name = str(b.get("name") or "").strip()[:200] or d.get("name") or r["name"]
     start, end = tpl_dates(b, base)
-    lid = tpl_apply_list(c, uid, d, name, clean_folder(b.get("folder") or ""), start, end, org_id="auto",
-                         color=clean_color(b["color"]) if b.get("color") else None)
-    bump(c)
-    c.commit()
-    return jsonify(list_id=lid)
+    st = tx_state()
+    try:
+        lid = tpl_apply_list(c, uid, d, name, clean_folder(b.get("folder") or ""), start, end, org_id="auto",
+                             color=clean_color(b["color"]) if b.get("color") else None, extra=tx_of_template(c, r), st=st)
+        bump(c)
+        c.commit()
+    except Exception:
+        c.rollback()
+        unlink_files(st["saved"])
+        raise
+    return jsonify(list_id=lid, skipped_files=st["skipped"])
 
 
 # 2.78.0 (#1881): "Duplicate list" = a list template used at once, with the exact dates and (optionally) the completed tasks.
 # Sections, tasks with subtasks, fields, dependencies, milestones, Playbook, notepads, page arrangement and colours like a
-# template (2.63.0); the copy is mine, in my folder of the list, without members, shares, assignees or public link.
+# template (2.63.0); the copy is mine, in my folder of the list, without members, shares or public link. 2.363.3 (#3134): everything
+# except comments and times comes along (lists/tplextra.py); assignees stay where they may be assigned in the copy.
 DUP_MAX_NODES = 2000
 
 
@@ -552,7 +617,8 @@ def list_duplicate(lid):
                  (lid,)).fetchone()[0] > DUP_MAX_NODES:  # N35: refuse before building the whole copy in memory
         return err(tr("Project too large to duplicate (at most {0} tasks)", DUP_MAX_NODES))
     base = local_now().date()
-    d = tpl_list_data(c, lid, uid, base, dup={"done": bool(b.get("done"))})
+    extra = {}
+    d = tpl_list_data(c, lid, uid, base, dup={"done": bool(b.get("done"))}, extra=extra)
     if tpl_count(d) > DUP_MAX_NODES:
         return err(tr("Project too large to duplicate (at most {0} tasks)", DUP_MAX_NODES))
     try:
@@ -575,10 +641,50 @@ def list_duplicate(lid):
     elif src["org_id"]:  # 2.148.1 B (#2483): a copy of an organisation's list outside it only by its admin (logged)
         from ..accounts.orgout import org_out
         org_out(c, src["org_id"], None, "list", d["name"], list_id=lid)
-    new = tpl_apply_list(c, uid, d, name, folder, base, org_id=org)
-    bump(c)
-    c.commit()
-    return jsonify(list_id=new)
+    st = tx_state()
+    try:
+        new = tpl_apply_list(c, uid, d, name, folder, base, org_id=org, extra=extra, st=st)
+        bump(c)
+        c.commit()
+    except Exception:
+        c.rollback()
+        unlink_files(st["saved"])
+        raise
+    return jsonify(list_id=new, skipped_files=st["skipped"])
+
+
+@app.post("/api/tasks/<int:tid>/duplicate")
+def task_duplicate(tid):
+    """2.363.3 (#3134): a copy of the task with its subtasks right below it: open, everything else as it is except comments and
+    times. Who may change the task may duplicate it -> {task, skipped_files}."""
+    c = db()
+    uid = me()
+    role = need_task(c, tid)
+    from ..collab.liste2eguard import le2b_task_locked, le2b_off
+    if le2b_task_locked(c, tid):  # the server would write plain texts next to the locked ones
+        return jsonify(error=le2b_off(), code="list_e2e"), 409
+    t = c.execute("SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL", (tid,)).fetchone()
+    if not t:
+        raise Denied(404)
+    base, order, x = local_now().date(), [], {}
+    n = tpl_node_from_task(c, t, base, uid, order=order, dup={"done": True})
+    n.pop("st", None)
+    n.pop("done_at", None)
+    if len(order) > DUP_MAX_NODES:
+        return err(tr("Project too large to duplicate (at most {0} tasks)", DUP_MAX_NODES))
+    tx_collect(c, uid, t["list_id"], order, base, x, dup=True)
+    made, st = {}, tx_state()
+    try:
+        new = tpl_insert(c, n, t["list_id"], t["section_id"], t["parent_id"], base, (t["sort"] or 0) + 0.5, uid, made=made)
+        tx_apply(c, uid, t["list_id"], x, made, st)
+        tx_same_list(c, uid, role, t["list_id"], order, made)
+        bump(c)
+        c.commit()
+    except Exception:
+        c.rollback()
+        unlink_files(st["saved"])
+        raise
+    return jsonify(task=one_task(c, new), skipped_files=st["skipped"])
 
 
 def tpl_dates(b, today_):
@@ -601,7 +707,7 @@ def _tpl_list_playbook(c, lid):
     return r["body"] if r else ""
 
 
-def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=None):
+def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=None, extra=None, st=None):
     """A new list of uid from a list template d (2.4.0: also the built-in project types). Dates relative to start;
     with end and a template span of at least one day, every offset is stretched / squeezed to fit (start .. end).
     Sections, custom fields, dependencies, ticket types. The caller commits; returns the list id."""
@@ -654,6 +760,8 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=
         pb_save(c, _tpl_playbook(d["playbook"]), "template", uid, lid=lid)
     n43_page_apply(c, lid, d, uid)  # 2.63.0 (#1523): notepads + the page's arrangement and colours with the new notepad ids
     list_created(c, uid, lid)  # 2.4.2 (#391): project types + templates are new lists too; 2.25.0 (#931): + a shared folder's people
+    if extra:  # 2.363.3 (#3134): after list_created: who may be assigned in the copy depends on its people
+        tx_apply(c, uid, lid, extra, made, st, start, scale, fmap)
     return lid
 
 
@@ -665,8 +773,9 @@ PTYPES = {
     "agency": {"view": "list", "tickets": 0, "dep_shift": 0, "modules": ("time", "fields"),
                "sections": (N_("Request"), N_("Concept"), N_("Production"), N_("Approval"), N_("Billing")),
                "fields": ((N_("Budget h"), "number"),)},  # 2.380 F (#3438): no "Client" text field, the client is the project's (lists.client_id)
-    "software": {"view": "list", "tickets": 1, "dep_shift": 1, "modules": ("kanban", "deps"),
-                 "sections": (N_("Backlog"), N_("Next|section"), N_("In progress"), N_("Review"), N_("Done|section")), "fields": ()},
+    "software": {"view": "list", "tickets": 1, "dep_shift": 1, "modules": ("kanban", "deps", "fields"),  # 2.473.0 (#3378): + fields, Size and Release
+                 "sections": (N_("Backlog"), N_("Next|section"), N_("In progress"), N_("Review"), N_("Done|section")),
+                 "fields": ((N_("Size|field"), "select"), (N_("Release|field"), "text"))},
     "private": {"view": "list", "tickets": 0, "dep_shift": 0, "modules": (),
                 "sections": (N_("Ideas"), N_("Planning"), N_("To do|section")), "fields": ()},
 }
@@ -712,19 +821,45 @@ PTYPE_WIP = {"software": {"In progress": 3, "Review": 3}}
 
 
 PTYPE_NAMES = {"agency": N_("Agency"), "software": N_("Software / AI dev"), "private": N_("Personal|project type")}
+# 2.473.0 (#3378): field name -> its options (the choices of a selection field) / the fields of a type that are not pinned
+PTYPE_FIELD_OPTS = {"Size|field": {"options": [{"id": x.lower(), "name": x, "color": ""} for x in ("S", "M", "L")]}}
+PTYPE_FIELD_UNPINNED = ("Release|field",)
+BUG_INBOX_FIELD = "Release|field"
 
 
 def ptype_template(k, lg, sections=False):
     p = PTYPES[k]
     return {"kind": "project", "view": p["view"], "sections": [tr(x, lg=lg) for x in p["sections"]] if sections else [],
-            "fields": [{"name": tr(n, lg=lg), "type": t, "options": {}, "pinned": 1} for n, t in p["fields"]],
+            "fields": [{"name": tr(n, lg=lg), "type": t, "options": PTYPE_FIELD_OPTS.get(n, {}), "pinned": 0 if n in PTYPE_FIELD_UNPINNED else 1}
+                       for n, t in p["fields"]],
             "tasks": [], "deps": [], "rel": True, "span": 0, "tickets": p["tickets"], "ticket_tpl": {}, "dep_shift": p["dep_shift"]}
 
 
-def ptype_create(c, uid, k, name, folder="", color="", start=None, sections=False, org_id="auto"):
+def ptype_bug_inbox(c, uid, build, name, folder, color, org_id, start):
+    """2.473.0 (#3378): the second list of a software project: "<name> – Bugs" next to the build list, with the field Release and
+    a rule (it runs as uid, checked again each time, lists/rules.py): as soon as Release is filled, the task moves to the build
+    list, into its first section when it has sections. The caller commits, both lists land together. Returns the new list id."""
+    from .rules import RUL_FILLED, rul_clean, rul_insert
+    from ..agents.safety import token_list_add
+    lg = lang(c, uid)
+    d = ptype_template("software", lg)
+    d["fields"] = [f for f in d["fields"] if f["name"] == tr(BUG_INBOX_FIELD, lg=lg)]
+    lid = tpl_apply_list(c, uid, d, tr("{0} – Bugs", name, lg=lg)[:200], folder, start, color=color, org_id=org_id)
+    c.execute("UPDATE lists SET ptype='software' WHERE id=?", (lid,))
+    token_list_add(c, build)  # a token limited to selected lists keeps both, and the rule's checks below see them
+    token_list_add(c, lid)
+    sec = c.execute("SELECT id FROM sections WHERE list_id=? ORDER BY sort, id LIMIT 1", (build,)).fetchone()
+    fid = c.execute("SELECT id FROM list_fields WHERE list_id=?", (lid,)).fetchone()[0]
+    rul_insert(c, lid, rul_clean(c, lid, {"name": tr("Bugs with a release go to {0}", name, lg=lg), "trigger": {"kind": "field", "field_id": fid, "value": RUL_FILLED},
+                                          "action": {"kind": "move", "list_id": build, "section_id": sec[0] if sec else None}}), uid)
+    return lid
+
+
+def ptype_create(c, uid, k, name, folder="", color="", start=None, sections=False, org_id="auto", bug_inbox=False, made=None):
     """A new project list of type k for uid; returns (list id, [modules switched on]). 2.27.0 (#972): the type's standard
-    sections only when asked for (sections=True: the box "With the standard sections" / API sections: true); without them
-    the project starts empty (modules, ticket types, fields and the view still come with the type)."""
+    sections only when asked for (sections=True: the box "With the default sections" / API sections: true); without them
+    the project starts empty (modules, ticket types, fields and the view still come with the type). 2.473.0 (#3378): bug_inbox
+    (type software, no effect on another type): + the list "<name> – Bugs", its id in made["bug_list_id"]."""
     if k not in PTYPES:
         raise BadInput(tr("Invalid value: {0}", tr("Project type")))
     lid = tpl_apply_list(c, uid, ptype_template(k, lang(c, uid), sections), name, folder, start or local_now().date(), color=color, org_id=org_id)
@@ -737,6 +872,10 @@ def ptype_create(c, uid, k, name, folder="", color="", start=None, sections=Fals
     on = [m for m in PTYPES[k]["modules"] if m not in fs]
     if on:
         uset(c, uid, "features", ",".join(fs + on))
+    if bug_inbox and k == "software":
+        bug = ptype_bug_inbox(c, uid, lid, name, folder, color, org_id, start or local_now().date())
+        if made is not None:
+            made["bug_list_id"] = bug
     return lid, on
 
 
@@ -751,7 +890,8 @@ def ptype_missing(c, lid, k, lg):
     def lacks(x, have):
         return tr(x, lg=lg).strip().casefold() not in have and x.split("|")[0].strip().casefold() not in have
     return {"sections": [tr(x, lg=lg) for x in PTYPES[k]["sections"] if lacks(x, have_s)],
-            "fields": [{"name": tr(n, lg=lg), "type": t} for n, t in PTYPES[k]["fields"] if lacks(n, have_f)]}
+            "fields": [{"name": tr(n, lg=lg), "type": t, **({"options": PTYPE_FIELD_OPTS[n]} if n in PTYPE_FIELD_OPTS else {})}
+                       for n, t in PTYPES[k]["fields"] if lacks(n, have_f)]}
 
 
 def list_ptype_set(c, lid, role, k, skip=()):

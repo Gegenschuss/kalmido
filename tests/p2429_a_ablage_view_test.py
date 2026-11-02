@@ -7,7 +7,7 @@
  - the collections "From <area>" at the top of the space (only when they hold something): the files of knowledge pages per
    page, the project files per project, files lying in an area's folders per folder; read-only, through their own routes
  - a page in the trash takes its files out of the collection; a space of another person / organisation is 404, an unknown key 404
- - a person without an organisation (the fixture): everything in the private space
+ - a person without an organisation (the fixture): everything in the private workspace
 usage: p2429_a_ablage_view_test.py <datadir>      (KMT_NOSTART=1 / P2429A_NOSTART=1: a running server)"""
 import base64
 
@@ -53,7 +53,7 @@ def upload(s, name, parent=None, space=None, data=None, mime="text/plain"):
     return r.json()["items"][0]["id"]
 
 
-# ================================================================== a person without an organisation: the private space
+# ================================================================== a person without an organisation: the private workspace
 OWN = Fr.post(B + "/api/files/folders", json={"space": "private", "name": "Receipts 2026"}).json()["id"]
 r = Fr.post(B + "/api/wiki/folders", json={"space": "private", "name": "Handbook"})
 check(r.status_code == 201, f"setup: a knowledge folder (makes the area's root) {r.status_code} {r.text[:160]}")
@@ -127,7 +127,7 @@ check(coll(Fr, "wiki").json().get("groups") == [], "#3580: the collection is emp
 # boundaries
 check(coll(Fr, "nope").status_code == 404, "#3580: an unknown collection 404")
 check(coll(Fr, "wiki", f"org:{ORG}").status_code == 404, "#3580: an organisation the person is not in 404")
-check(coll(Bo, "sheets").json().get("groups") == [], "#3580: bob's private space shows nothing of hers")
+check(coll(Bo, "sheets").json().get("groups") == [], "#3580: bob's private workspace shows nothing of hers")
 
 # ================================================================== an organisation: shared folders of an area
 r = A.post(B + "/api/sheets/folders", json={"space": f"org:{ORG}", "name": "Team tables"})

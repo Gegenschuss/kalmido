@@ -11,10 +11,12 @@ through the bank's own route (office/bank.py kind "card": the sum is checked, th
 Rights: the people of the bookkeeping like the bank (area "cards"); the holder with an account in addition sees only their
 own cards and works on them (level "own", or a member without office groups), never the cards themselves or the bank.
 Agents and kids 403 (office_gate). Holder name, digits, account, amounts and merchants encrypted at rest (orgcrypt)."""
+import json
 import re
 
 from flask import Response, jsonify, request
 
+from ..collab.comments import user_names
 from ..core.access import Denied
 from ..core.config import app
 from ..core.db import body, bump, iso, local_now, now_utc
@@ -41,6 +43,7 @@ CC_STATES = ("open", "matched", "noreceipt", "private")
 CC_FILE_MAX = 20 * 1024 * 1024
 CC_NAME_MAX = 120
 CC_AMOUNT_MAX = 100000000
+CC_AGENT_SCAN = 20  # newest card_statement_read jobs of a person looked at for one statement
 MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 CC_DRAFT_ONLY = N_("Confirm the positions first")
@@ -279,7 +282,7 @@ def _line_insert(c, oid, sid, n, x, state=None):
 def cc_upload(cid):
     """Multipart file (the statement as PDF), month? (YYYY-MM, default the statement's) -> 201 {statement, read: true | false,
     digits_differ}. The file becomes a document of the office's documents space, its positions wait for a person's
-    confirmation (read false: nothing could be read, the positions are typed in). One statement per card and month (409)."""
+    confirmation (read false: nothing could be read, the positions are typed in or an agent reads them, agents/ccsread.py). One statement per card and month (409)."""
     c, uid, oid, every = cc_ctx()
     card = cc_card(c, oid, cid, uid, every)
     f = request.files.get("file")
@@ -313,15 +316,28 @@ def cc_upload(cid):
     return jsonify(statement=_stmt_public(c, oid, cc_stmt_row(c, oid, sid)), read=bool(r["lines"]), total_found=total is not None, digits_differ=bool(r["last4"] and r["last4"] != card["last4"])), 201
 
 
+def cc_agent_read(c, uid, sid):
+    """2.469.0 (#3749): the newest open request of uid for this statement -- {job, state: requested | ready, agent, lines} -- or None."""
+    rows = c.execute("SELECT * FROM agent_jobs WHERE user_id=? AND kind='card_statement_read' AND prop_state IN ('requested','ready') "
+                     f"AND state IN ('running','waiting') ORDER BY id DESC LIMIT {CC_AGENT_SCAN}", (uid,)).fetchall()
+    for j in rows:
+        if (json.loads(j["input"] or "{}").get("statement") or {}).get("id") == sid:
+            p = json.loads(j["proposal"] or "null") or {}
+            return {"job": j["id"], "state": j["prop_state"], "lines": len(p.get("lines") or []),
+                    "agent": {"id": j["agent_id"], "name": user_names(c, [j["agent_id"]]).get(j["agent_id"], "")}}
+    return None
+
+
 @app.get("/api/office/cards/statements/<int:sid>")
 def cc_stmt_get(sid):
-    """{statement, lines: [...], card}: the positions, for open ones the best receipt found (cardlines.cl_public)."""
+    """{statement, lines: [...], card, agent_read}: the positions, for open ones the best receipt found (cardlines.cl_public);
+    2.469.0 (#3749): agent_read = the open request of this person (agents/ccsread.py) or None."""
     from .cardlines import cl_view
     c, uid, oid, every = cc_ctx()
     s = cc_stmt(c, oid, sid, uid, every)
     lines = cc_lines(c, oid, sid)
     card = oc_dec_fields(c, oid, "office_cc_cards", c.execute("SELECT * FROM office_cc_cards WHERE id=?", (s["card_id"],)).fetchone())
-    return jsonify(statement=_stmt_public(c, oid, s, lines), lines=cl_view(c, oid, uid, s, lines), card=_card_public(c, oid, card), manage=every)
+    return jsonify(statement=_stmt_public(c, oid, s, lines), lines=cl_view(c, oid, uid, s, lines), card=_card_public(c, oid, card), manage=every, agent_read=cc_agent_read(c, uid, sid))
 
 
 @app.get("/api/office/cards/statements/<int:sid>/file")

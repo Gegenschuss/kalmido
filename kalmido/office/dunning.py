@@ -2,7 +2,7 @@
 
 The watchdog (dun_tick, every DUN_EVERY_TICKS intervals) looks at every office area -- organisations AND the personal
 office of a person without one -- that has finalised, open invoices (issued / sent, an open amount, not cancelled) and
-makes ONE reminder draft per client + currency + level with the same steps as "Create reminder"
+makes ONE reminder draft per client + currency + level with the same steps as "Create payment reminder"
 (invoices.inv_make_reminder, recalc, the office log "create" with auto 1) when, with the setting "dunning_suggest" on:
   - level 1: the due date lies more than "dunning_grace_days" days back (default 7),
   - level n+1 (max 3): the last finalised reminder of the invoice has passed its deadline (its date + deadline days) by
@@ -12,7 +12,10 @@ makes ONE reminder draft per client + currency + level with the same steps as "C
 The people of the area (fixedimport.fci_people: its admins with the office on; a personal office: its owner) get one task
 in their inbox per run with new drafts (recurring.rin_task: link, no amounts). Sending stays the person's (the send
 dialog). GET /api/office/docs answers "dunning" {suggested: open suggested drafts} for the invoice + reminder lists and
-marks those drafts "suggested". No agent reaches any of this (like invoices.py)."""
+marks those drafts "suggested". No agent reaches any of this (like invoices.py).
+2.367.4 (#2972): the bell, row "office" of the notification settings. A payment booked on an invoice tells the area's other
+people (docpaid: number and client, never an amount; News + push). With the setting "overdue_notice" on (the default, whatever
+"dunning_suggest" says) an invoice past its due date tells them once (docoverdue, one item per run, News only; a mark on level 0)."""
 import json
 import time
 from datetime import date, timedelta
@@ -20,7 +23,7 @@ from datetime import date, timedelta
 from flask import g
 
 from ..core.config import app, WATCHDOG_INTERVAL
-from ..core.db import iso, local_now, now_utc, test_seconds
+from ..core.db import iso, local_now, now_utc, test_seconds, usettings
 from ..core.i18n import N_, lang, tr
 from ..core.pg import system_ctx, write_lock
 from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
@@ -32,6 +35,7 @@ _DUN_LAST = {"at": 0.0}
 DUN_MAX_LEVEL = 3
 DUN_MAX_IDS = 50              # inv_make_reminder takes at most 50 invoices
 DUN_TASK = N_("Payment reminders suggested: {0}")
+DUN_NOTICE = 0                # 2.367.4 (#2972): office_dunning_marks.level of "the bell told about this overdue invoice"
 
 
 def _j(s, default):
@@ -84,9 +88,15 @@ def _dun_as(c, oid, today, people):
         if g.user is None or office_role(c, actor, oid) != "admin" or not office_on(c, actor):
             return []
         s = office_settings(c, oid)
-        if not int(s.get("dunning_suggest", 1) or 0):
+        notice, suggest = int(s.get("overdue_notice", 1) or 0), int(s.get("dunning_suggest", 1) or 0)
+        if not notice and not suggest:
             return []
         write_lock(c, f"office_dunning_{int(oid)}")  # two app processes never suggest the same reminder twice
+        if notice:
+            dun_overdue(c, oid, today, people)  # 2.367.4 (#2972)
+        if not suggest:
+            c.commit()
+            return []
         groups = dun_due(c, oid, today, int(s.get("dunning_grace_days", 7) or 0))
         made = []
         for (_who, _cur, level), ids in sorted(groups.items(), key=lambda x: (x[0][2], x[1][0])):
@@ -104,6 +114,64 @@ def _dun_as(c, oid, today, people):
             bump(c)
         c.commit()
         return made
+
+
+def _dun_client(r):
+    return str(_j(r["recipient"], {}).get("name") or "")[:200]
+
+
+def dun_paid_news(c, oid, r, uid):
+    """2.367.4 (#2972): a payment on invoice row r of area oid (by person uid): News + push for the area's other people. No
+    amount, the push shows on a locked screen too. The caller commits; the pushes go after the request (g.pushes)."""
+    from .fixedimport import fci_people
+    from ..collab.news import news_add, notif_ok
+    from ..core.config import PUBLIC_URL
+    from ..notify.push import push_prio, push_reachable
+    if r["trial"]:
+        return
+    with system_ctx(c):  # who else is in this office
+        people = [p["id"] for p in fci_people(c, oid) if p["id"] != uid]
+    number, client, click = r["number"] or "", _dun_client(r), f"#office/invoices/{int(r['id'])}"
+    for p in people:
+        s = usettings(c, p)
+        news_add(c, p, "docpaid", actor=uid or 0, row="office", data={"org_id": oid, "number": number, "client": client, "click": click})  # 2.469.0 (#3459): 0 = no person (the provider's webhook)
+        if g.get("pushes") is not None and notif_ok(c, p, s, "office", "push") and push_reachable(c, p, s):
+            g.pushes.append((p, tr("Payment received: {0}", ", ".join(x for x in (number, client) if x), lg=lang(c, p)), "",
+                             f"{PUBLIC_URL.rstrip('/')}/{click}", push_prio(s)))
+
+
+def dun_overdue(c, oid, today, people):
+    """2.367.4 (#2972): the bell for the invoices of area oid past their due date that it did not tell about yet: one News item
+    per person for the whole run. The caller commits."""
+    from .invoices import inv_money_fields, inv_paid_map, inv_state
+    from ..collab.news import news_add
+    invs = c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind='invoice' AND locked_at IS NOT NULL AND status IN ('issued','sent') AND trial=0 "
+                     "AND COALESCE(due_date, '')<>'' AND due_date<? AND id NOT IN (SELECT doc_id FROM office_dunning_marks WHERE org_id=? AND level=?) "
+                     "ORDER BY due_date, id LIMIT 2000", (oid, today, oid, DUN_NOTICE)).fetchall()
+    pm = inv_paid_map(c, oid, [r["id"] for r in invs]) if invs else {}
+    new = [r for r in invs if inv_state(r, pm, today) not in ("paid", "cancelled") and float(inv_money_fields(r, pm)["open"]) > 0]
+    if not new:
+        return
+    ts = iso(now_utc())
+    for r in new:
+        c.execute("INSERT INTO office_dunning_marks(org_id, doc_id, level, created_at) VALUES(?,?,?,?) ON CONFLICT(doc_id, level) DO NOTHING",
+                  (oid, r["id"], DUN_NOTICE, ts))
+    one = new[0] if len(new) == 1 else None
+    data = {"org_id": oid, "n": len(new), "click": f"#office/invoices/{int(one['id'])}" if one else "#office/invoices"}
+    if one:
+        data.update(number=one["number"] or "", client=_dun_client(one))
+    for p in people:
+        news_add(c, p, "docoverdue", actor=0, row="office", data=data)
+
+
+def dun_news_live(c, uid, data):
+    """2.367.4 (#2972): a docpaid / docoverdue item shows while uid is still in that office."""
+    from .fixedimport import fci_people
+    d = _j(data, {})
+    if not str(d.get("org_id") or "").isdigit():
+        return False
+    with system_ctx(c):
+        return any(p["id"] == uid for p in fci_people(c, int(d["org_id"])))
 
 
 def dun_due(c, oid, today, grace):

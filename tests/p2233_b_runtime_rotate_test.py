@@ -7,6 +7,7 @@
  - a team agent: the instance admin saves it, a member gets 403; event runtime_changed carries the values
  - a personal agent: its owner saves it (PATCH /api/my/agents/<id>), another person does not find it
  - a person without an organisation with an own agent (freelancer-matrix: agents)
+ - 2.481.0 (#3662): runtime dispatch ("" / dry / on), the switch of the starter's mechanical dispatcher
  - the client file is in the agent bundle and the service worker list (static)
 usage: p2233_b_runtime_rotate_test.py <datadir>      (KMT_NOSTART=1 / P2233B_NOSTART=1: a running server)"""
 import os
@@ -73,6 +74,15 @@ rt = requests.get(V + "/agent", headers=CLH).json()["runtime"]
 check(rt["rotate_size"] == "small" and rt["rotate_runs"] == 120 and rt["rotate_idle_min"] == 0, f"a refused change changed nothing: {rt}")
 check(Bo.patch(B + f"/api/admin/agents/{CL}", json={"runtime": {"rotate_runs": 10}}).status_code == 403, "a member: 403")
 check(requests.patch(V + "/agent", headers=CLH, json={"runtime": {"rotate_runs": 10}}).status_code in (403, 404, 405), "the agent cannot change it itself")
+# 2.481.0 (#3662): the switch of the starter's dispatcher ("" off, dry, on), default off; anything else 400
+check(requests.get(V + "/agent", headers=CLH).json()["runtime"]["dispatch"] == "", "dispatcher off by default")
+r = A.patch(B + f"/api/admin/agents/{CL}", json={"runtime": {"dispatch": "dry"}})
+check(r.ok and requests.get(V + "/agent", headers=CLH).json()["runtime"]["dispatch"] == "dry", "the admin switches the dry run on " + r.text[:120])
+for bad in ("yes", True, 1, "ON"):
+    check(A.patch(B + f"/api/admin/agents/{CL}", json={"runtime": {"dispatch": bad}}).status_code == 400, f"dispatch {bad!r}: 400")
+check(A.patch(B + f"/api/admin/agents/{CL}", json={"runtime": {"dispatch": None}}).ok
+      and requests.get(V + "/agent", headers=CLH).json()["runtime"]["dispatch"] == "", "null = off")
+check("function agd_html" in open(os.path.join(ST, "js", "agentrotate.js"), encoding="utf-8").read(), "the switch is in the runtime section")
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read"], "username": "robo", "runtime": {"rotate_idle_min": 90}})
 check(r.ok and rot(r.json()["runtime"])["rotate_idle_min"] == 90, "created with an interim-summary value " + r.text[:120])
 
@@ -90,6 +100,9 @@ rt = requests.get(V + "/agent", headers=FBH).json()["runtime"]
 check(rt["rotate_size"] == "large" and rt["rotate_idle_min"] == 30 and rt["rotate_runs"] == 10 and rt["rotate_tokens"] == 250000,
       f"the freelancer's agent reads them: {rt}")
 check(F.patch(B + f"/api/my/agents/{FB}", json={"runtime": {"rotate_runs": 1000}}).status_code == 400, "owner: out of range 400")
+# 2.481.0 (#3662): a person without an organisation switches the dispatcher of the own agent on
+check(F.patch(B + f"/api/my/agents/{FB}", json={"runtime": {"dispatch": "on"}}).ok
+      and requests.get(V + "/agent", headers=FBH).json()["runtime"]["dispatch"] == "on", "the freelancer switches the own dispatcher on")
 _, G = freelancer(B, A, name="gero")
 check(G.patch(B + f"/api/my/agents/{FB}", json={"runtime": {"rotate_runs": 20}}).status_code in (403, 404), "another person: not theirs")
 check(Bo.patch(B + f"/api/my/agents/{FB}", json={"runtime": {"rotate_runs": 20}}).status_code in (403, 404), "a member: not theirs")

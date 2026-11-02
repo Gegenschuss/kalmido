@@ -33,7 +33,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
 
   // ================= the services tab: the two masters below the services
   let w = await boot({hash: 'office/services'}); let d = w.document;
-  await until(() => d.querySelectorAll('.office .srhead').length === 2 && d.querySelector('[data-ofc="open"][data-kind="crew"]'), 60);
+  // 2.449.0 (#3807): roles and crew load on their own, the crew row alone said nothing about the roles (night run 31.10.2026)
+  await until(() => d.querySelectorAll('.office .srhead').length === 2 && d.querySelector('[data-ofc="open"][data-kind="crew"]') && d.querySelector('[data-ofc="open"][data-kind="roles"]'), 60);
   const heads = [...d.querySelectorAll('.office .srhead')].map(h => h.textContent);
   check(heads.length === 2 && /Freelancer roles/.test(heads[0]) && /Crew/.test(heads[1]), 'services tab: sections Freelancer roles and Crew ' + JSON.stringify(heads));
   const role = d.querySelector('[data-ofc="open"][data-kind="roles"]');
@@ -47,6 +48,23 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   check(!!d.querySelector('.ofcdlg #of-unit option[value="percent"]') && !!d.querySelector('.ofcdlg #of-intext option[value="shooting"]'), 'service dialog: unit percent, kind shoot');
   check(!d.querySelector('.ofcdlg #of-role:not([type="hidden"])'), 'service dialog: the old text role stays hidden while it is empty');
   d.querySelector('.ofcdlg [data-m="close"]').click();
+  // 2.451.0 (#3809): opened before the roles are there: the dialog waits for them, the role stays chosen
+  await until(() => !d.querySelector('.ofcdlg'), 30);
+  w.eval(`delete OFC.data.roles; OFC.loading.roles = false`);
+  d.querySelector('[data-ofc="open"][data-kind="services"]').click();
+  check(await until(() => d.querySelector('.ofcdlg #of-role_id'), 30) && d.querySelector('.ofcdlg #of-role_id').value === String(ro.id), 'service dialog before the roles: the role is chosen: ' + d.querySelector('.ofcdlg #of-role_id')?.value);
+  d.querySelector('.ofcdlg [data-m="close"]').click();
+  await until(() => !d.querySelector('.ofcdlg'), 30);
+  // the roles could not be read: Save leaves the stored role alone
+  w.eval(`OFC.data.roles = {error: 'x'}`);
+  d.querySelector('[data-ofc="open"][data-kind="services"]').click();
+  await until(() => d.querySelector('.ofcdlg #of-role_id'), 30);
+  d.querySelector('.ofcdlg [data-m="save"]').click();
+  await until(() => !d.querySelector('.ofcdlg'), 30);
+  const sv = ((await call('GET', '/api/office/services')).items || []).find(x => x.name_de === 'Kamera');
+  check(sv?.role_id === ro.id, 'saved without readable roles: the role stays: ' + sv?.role_id);
+  w.eval(`delete OFC.data.roles`); await until(() => w.eval(`Array.isArray(OFC.data.roles)`) || !w.eval(`OFC.loading.roles`), 30); w.eval(`ofcLoad('roles', true)`);
+  await until(() => d.querySelector('[data-ofc="open"][data-kind="roles"]'), 60);
   d.querySelector('[data-ofc="open"][data-kind="roles"]').click();
   await until(() => d.querySelector('.ofcdlg #of-cost_day'), 30);
   check(/^500([.,]0+)?$/.test(d.querySelector('.ofcdlg #of-cost_day')?.value || ''), 'role dialog: the purchase per day for the admin: ' + d.querySelector('.ofcdlg #of-cost_day')?.value);

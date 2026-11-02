@@ -16,6 +16,8 @@ import os
 import re
 import sys
 
+from check_migrations import schema_src as all_schema
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ERR = []
 
@@ -47,7 +49,9 @@ if sorted(tags + lazy) != files:
 lazy_css = re.findall(r"'/static/css/([\w-]+\.css)'", (re.search(r"LAZY_CSS = \[(.*?)\];", sw, re.S) or [None, ""])[1])
 _lc = re.search(r"const LD_CSS = \{(.*?)\};", read("static", "js", "lazyload.js"), re.S)
 ld_css = [f + ".css" for f in re.findall(r"'([\w-]+)'", re.sub(r"^\s*\w+:", "", _lc.group(1), flags=re.M))] if _lc else []
-css_files = sorted(os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "static", "css", "*.css")))
+# 2.476.0 (#3487): static/css/start-*.css are no module stylesheets: the server sends them behind app.css (tools/check_appcss.py)
+css_files = sorted(os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "static", "css", "*.css"))
+                   if not os.path.basename(p).startswith("start-"))
 if lazy_css != ld_css:
     ERR.append(f"sw.js LAZY_CSS differs from LD_CSS in static/js/lazyload.js (same files, same order): {lazy_css} vs {ld_css}")
 if sorted(lazy_css) != css_files or len(set(lazy_css)) != len(lazy_css):
@@ -56,6 +60,25 @@ if len(set(tags)) != len(tags):
     ERR.append("index.html loads a module twice")
 if tags and tags[-1] != "main.js":
     ERR.append("index.html: main.js (the start-up) must be the last script")
+# 2.476.0 (#3487): new start scripts no longer pile up right before main.js (the most frequent conflict in index.html after
+# app.css): they go into the part below the mark, sorted by name, so two packages land on different lines. The scripts above
+# the mark keep their order (defer runs them in it; some depend on it) and their number only goes down.
+LAYOUT_TOP_MAX = 138  # 01.11.2026: 136 start scripts above the mark when the rule came in, +2 margin for packages landing during its check; lower it when one moves or goes
+_ih = read("static", "index.html")
+_mk = re.search(r"<!-- [^\n]*new start scripts go below this line[^\n]*-->\n", _ih)
+if not _mk:
+    ERR.append("index.html: the mark of the sorted start scripts (before main.js) is missing")
+else:
+    _top = re.findall(r'<script src="/static/js/([\w-]+\.js)"', _ih[:_mk.start()])
+    _low = _ih[_mk.end():_ih.find('<script src="/static/js/main.js"')]
+    _new = re.findall(r'<script src="/static/js/([\w-]+\.js)" defer></script>\n', _low)
+    if "".join(f'<script src="/static/js/{n}" defer></script>\n' for n in _new) != _low:
+        ERR.append("index.html: between the mark and main.js only start scripts, one per line (<script src=\"/static/js/x.js\" defer></script>)")
+    if _new != sorted(_new):
+        ERR.append(f"index.html: the start scripts below the mark are sorted by name: {_new} -> {sorted(_new)}")
+    if len(_top) > LAYOUT_TOP_MAX:
+        ERR.append(f"index.html: {len(_top)} start scripts above the mark (limit {LAYOUT_TOP_MAX}): a new start script goes below "
+                   "the mark, sorted by name -- better still, load it on demand (LD_MODS in static/js/lazyload.js)")
 # 2.312.0 (#3285): render() (render.js) draws only once main.js declared bootDone(); renamed or moved = a blank app
 if not re.search(r"^function bootDone\(", read("static", "js", "main.js"), re.M):
     ERR.append("static/js/main.js: function bootDone() must stay declared there (render.js waits for it)")
@@ -78,7 +101,7 @@ m = re.search(r"ORDER = \((.*?)\n\)", init, re.S)
 order = re.findall(r'"([\w.]+)"', m.group(1)) if m else []
 mods = sorted(os.path.relpath(p, os.path.join(ROOT, "kalmido"))[:-3].replace(os.sep, ".")
               for p in glob.glob(os.path.join(ROOT, "kalmido", "**", "*.py"), recursive=True)
-              if not p.endswith("__init__.py"))
+              if not p.endswith("__init__.py") and "migrations.d" not in p)  # 2.485.0 (#3939): fragments are data, not modules
 if sorted(order) != mods or len(set(order)) != len(order):
     ERR.append(f"kalmido/__init__.py ORDER vs the package: missing {sorted(set(mods) - set(order))}, unknown {sorted(set(order) - set(mods))}")
 for p in glob.glob(os.path.join(ROOT, "kalmido", "*", "__init__.py")):
@@ -103,7 +126,7 @@ TENANT_EXEMPT = {
     "orgs": "2.47.3 (#1360): personal_of = the owner of a personal office (a hidden orgs row; its own policy: only the owner's app.org_ids reach it)",
     "agent_setup_codes": "2.44.0 (#1517): a one-time setup code of one agent, issued by its owner / an instance admin and redeemed without an account (the agent row carries the workspace)",
     "task_tags": _TASK, "attachments": _TASK, "comments": _TASK, "activity": _TASK, "task_seen": _TASK, "task_push": _TASK,
-    "task_deps": _TASK, "pomos": _TASK, "tidy_pending": _TASK, "task_people": _TASK, "comment_reactions": "per comment -> its task",
+    "task_decisions": _TASK, "task_deps": _TASK, "pomos": _TASK, "tidy_pending": _TASK, "task_people": _TASK, "task_watchers": _TASK, "comment_reactions": "per comment -> its task",
     "habits": _OWN, "pl_conns": _OWN + " (Paperless connection, unused since 2.36.0, kept)",
     "pl_conn_users": "who could use a shared Paperless connection (unused since 2.36.0, kept)", "pl_tokens": _OWN,
     "user_task_order": _OWN + " (2.40.0 #1344: the own order of My tasks; rows only for tasks the person sees)",
@@ -117,7 +140,7 @@ TENANT_EXEMPT = {
     "fs_versions": "2.48.0 (#1207): the versions of a file store node, bound through the node (need_node)",
     "fs_shares": "2.48.0 (#1207): shares of a file store node, bound through the node; share targets are checked against its workspace (tenancy CHECKS)",
     "fs_log": "2.48.0 (#1207): the access history of a file store node, bound through the node (shown to its owners and editors)",
-    "filters": _OWN, "user_settings": _OWN, "sessions": _OWN, "push_subs": _OWN, "ntfy_inboxes": _OWN, "templates": _OWN, "cal_subs": _OWN,
+    "filters": _OWN, "user_settings": _OWN, "sessions": _OWN, "push_subs": _OWN, "ntfy_inboxes": _OWN, "templates": _OWN, "template_files": _OWN, "cal_subs": _OWN,
     "recovery_codes": _OWN, "webauthn_creds": _OWN, "api_tokens": _OWN,
     "imports": _OWN, "sample_items": _OWN, "app_passwords": _OWN, "dav_sync2": _OWN, "journal": _OWN, "contact_care": _OWN,
     "life_device_links": _OWN + " (2.140.0 B #2136: the link of a private device with office equipment; each side is checked on reading)",
@@ -148,6 +171,8 @@ TENANT_EXEMPT = {
     "agent_chat": "a person's chat with an agent (agent_id + user_id; the agent's workspace decides what it sees)",
     "agent_chat_prefs": "2.233.0 A (#2848): a person's own settings for one agent chat (agent_id + user_id, like agent_chat)",
     "agent_push_held": "2.236.0 B (#2905): a count of pushes an agent held back for one person in its quiet window (no content; like agent_chat)",
+    "quiet_push_held": "2.367 (#2966): a count of a person's pushes held back in their own quiet hours (no content; only that person)",
+    "push_gate": "2.367 (#2967): counts of a person's bundled pushes (no content; only that person, the summary checks access again)",
     "agent_rules": _AGENT + " (2.235.0 C #2903: its standing rules; the source is checked against what the agent sees)",
     "chat_reactions": "per agent chat message",
     "agent_steps": "2.32.0 (#1081): an agent's steps for ONE person (its chat answer / its job for that person); only that person reads them",
@@ -171,7 +196,7 @@ TENANT_EXEMPT = {
     "abs_cal_feeds": _OWN + " (2.155.0 B #2076: the person's subscription link of their own absences + holidays; never data of others)",
     "idem_keys": _OWN + " (2.270.0 C #3022: the person's idempotency keys and the stored answer of their own write request; read only for the same person, method and path)",
 }
-schema_src = re.sub(r"--[^\n]*", "", read("kalmido", "core", "schema.py"))
+schema_src = re.sub(r"--[^\n]*", "", all_schema(ROOT))  # 2.475.0 (#3478): + migrations.d
 tables = {m.group(1): m.group(2) for m in re.finditer(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\((.*?)\);", schema_src, re.S)}
 for m in re.finditer(r'ALTER TABLE (\w+) ADD COLUMN (\w+) ([^"]*)"', schema_src):
     tables[m.group(1)] = tables.get(m.group(1), "") + f", {m.group(2)} {m.group(3)}"
@@ -218,20 +243,12 @@ for f in sorted(glob.glob(os.path.join(ROOT, "static", "js", "*.js"))):
 
 # 2.48.0: the stylesheet's braces balance -- a lost "}" after a merge nests every later rule into the block before it
 # (the end of an @media print block made the rules of three parts apply only when printing)
-_css, _depth, _open = re.sub(r"/\*.*?\*/", lambda m: re.sub(r"[^\n]", " ", m.group()), read("static", "app.css"), flags=re.S), 0, 0
-for _no, _line in enumerate(_css.split("\n"), 1):
-    for ch in _line:
-        _depth += (ch == "{") - (ch == "}")
-        if _depth < 0:
-            ERR.append(f"app.css line {_no}: a closing brace too many")
-            _depth = 0
-    if _depth == 0:
-        _open = _no
-if _depth:
-    ERR.append(f"app.css: {_depth} block(s) not closed -- the first after line {_open}")
+# 2.476.0 (#3487): the same per start style file, and app.css does not grow (tools/check_appcss.py)
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+import check_appcss  # noqa: E402
+ERR += check_appcss.braces("app.css", read("static", "app.css")) + check_appcss.errors(ROOT)
 
 # 2.192.0 C (#2514): new Python suites import check/sess/until from tests/kt.py (tools/check_kt.py, list tools/kt_legacy.txt)
-sys.path.insert(0, os.path.join(ROOT, "tools"))
 import check_kt  # noqa: E402
 _kt_err, _kt_warn = check_kt.errors()
 ERR += [e.removeprefix("ERROR: ") for e in _kt_err]

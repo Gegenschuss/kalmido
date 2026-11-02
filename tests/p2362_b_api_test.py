@@ -24,7 +24,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 SECRET = "Geheimprojekt Nordlicht 4711"  # a list name: must never show up in an alert
 
 
@@ -198,8 +198,9 @@ check(not msgs("bob signed in"), "regular users are not watched")
 check(not dbx("SELECT * FROM admin_login_ips WHERE user_id=?", (BOB,)), "... and nothing is stored for them")
 sess("dave", ip="203.0.113.50")
 sess("dave", ip="203.0.113.51")
-m = wait_for(lambda: msgs("Admin dave signed in"))
-check(len(m) == 1, f"organisation admins are watched too: {m}")
+# 2.367.4 (#2974): an organisation admin stays with the organisation: News there, no name in the instance admins' alert
+sevn = until(lambda: dbx("SELECT user_id FROM notifications WHERE kind='orglogin'"), 8)
+check(sevn and not msgs("Admin dave signed in"), f"organisation admins are watched too, by their organisation: {sevn}")
 for i in range(12):
     dbx("INSERT INTO admin_login_ips(user_id,ip_hash,first_at,last_at) VALUES(1,?,?,?)", (f"{i:064x}", "2020-01-01T00:00:00Z", f"2020-01-01T00:00:{i:02d}Z"), write=True)
 sess("alice", ip="203.0.113.200")

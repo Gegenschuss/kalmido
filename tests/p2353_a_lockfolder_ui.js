@@ -1,6 +1,6 @@
 // kalmido-suite: fresh
 // 2.353.0 A (#2758): locked folders of the file store -- the browser side (static/js/fslock.js + hooks in ablage.js), own
-// container (start.sh), Firefox (real WebCrypto). A person without an organisation (her private space, freelancer-matrix: files):
+// container (start.sh), Firefox (real WebCrypto). A person without an organisation (her private workspace, freelancer-matrix: files):
 // - locks a folder holding a plain file: the server keeps cipher names and KENC files only, the folder view shows the plain
 //   names and the bar of the locked folder, the menu offers "Locked folder…"
 // - uploads a picture: encrypted here, opened here (the viewer shows it from memory, a data: URL)
@@ -98,7 +98,12 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwA
     await ev(`(() => { fslInfo = window.__keep.info; fslRelease = window.__keep.rel; FSL.wait = {}; return 1; })()`);
 
     // ---- unlock with the password
-    const s = await ev(`fslStop(${BOX}, 'password123').then(x => ({x}), e => ({err: e.message}))`);
+    // 2.456.0 (#3851): a second run ends the switch first (here: the finish goes out twice): that is no error of the unlock
+    const s = await ev(`(() => {
+      const keep = rawFetch;
+      rawFetch = async (m, u, b, k) => { if (/\\/finish$/.test(u)) await keep(m, u, b, k); return keep(m, u, b, k); };
+      return fslStop(${BOX}, 'password123').then(x => ({x}), e => ({err: e.message})).finally(() => { rawFetch = keep; });
+    })()`);
     check(s && s.x === true, 'fslStop: unlocked ' + JSON.stringify(s));
     const n2 = await names();
     check(n2.sort().join(',') === 'hello.txt,pic.png', 'plain names on the server again ' + n2.join(','));

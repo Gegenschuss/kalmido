@@ -13,14 +13,15 @@ from datetime import date, datetime, timedelta, timezone
 
 from flask import g, jsonify, request
 
-from ..core.config import app, TZ
+from ..core.config import app
 from ..core.pg import insert_id
 from ..core.i18n import tr
-from ..core.db import bump, db, iso, local_day, local_now, now_utc, parse_iso
+from ..core.db import bump, db, iso, local_now, now_utc, parse_iso, usettings
 from ..core.access import Denied, list_role, need_feat, need_time, task_visible
 from ..accounts.session import me
 from ..personal.timetrack import local_bounds, mt_time_on, time_target
 from ..core.errors import BadInput
+from ..core.usertz import tz_of_s
 from ..api.common import v1_args, v1_err, v1_feature, v1_json, v1_view
 
 ATM_DAY_MAX_H = 12            # tracked hours of one day above this: implausible
@@ -75,10 +76,16 @@ def _both_lists(c, pid, viewer, lid):
     return bool(lid) and bool(list_role(c, lid, pid)) and (viewer == pid or bool(list_role(c, lid, viewer)))
 
 
+def _zone(c, pid):
+    """2.368.3 (#2985): days and times of the check on the clock of the person it is about."""
+    return tz_of_s(usettings(c, pid))
+
+
 def _entries(c, pid, viewer, frm, to):
     """The person's finished entries in [frm, to] that the viewer may see (lists both see; list-less ones only for the person)."""
     from ..personal.timetrack import evis
-    lo, hi = local_bounds(frm, to)
+    zone = _zone(c, pid)
+    lo, hi = local_bounds(frm, to, zone)
     # 2.51.0 (#1353): evis as in the time views -- a viewer that is a participant somewhere sees there only its own tasks' entries
     rows = c.execute(f"""SELECT e.id, e.task_id, e.list_id, e.task_title, e.start, e."end", e.seconds, e.note FROM time_entries e
                         WHERE e.user_id=? AND e.start>=? AND e.start<? AND e."end" IS NOT NULL AND {evis(c, viewer)}
@@ -99,7 +106,7 @@ def _entries(c, pid, viewer, frm, to):
                 continue  # a participant list: only the tasks the viewer may see
         s, e = parse_iso(r["start"]), parse_iso(r["end"])
         out.append({"id": r["id"], "task_id": r["task_id"], "list_id": lid, "title": r["task_title"] or "", "note": r["note"] or "",
-                    "start": r["start"], "end": r["end"], "seconds": r["seconds"], "s": s, "e": e, "day": local_day(r["start"])})
+                    "start": r["start"], "end": r["end"], "seconds": r["seconds"], "s": s, "e": e, "day": s.astimezone(zone).date()})
     return out
 
 
@@ -109,20 +116,20 @@ def _events(c, pid, viewer, frm, to):
     if not c.execute("SELECT 1 FROM ev_cals LIMIT 1").fetchone():
         return []
     mine = set(my_cal_ids(c, viewer)) if viewer != pid else None
-    now = now_utc()
+    now, zone = now_utc(), _zone(c, pid)
     out = []
     for o in ev_range(c, pid, frm, to):
         if o["status"] == "cancelled" or o["cal"] is None or (mine is not None and o["cal"] not in mine):
             continue
         if o["all_day"]:
             d0, d1 = date.fromisoformat(o["start"]), date.fromisoformat(o["end"]) - timedelta(days=1)
-            s = datetime(d0.year, d0.month, d0.day, tzinfo=TZ).astimezone(timezone.utc)
+            s = datetime(d0.year, d0.month, d0.day, tzinfo=zone).astimezone(timezone.utc)
             d2 = d1 + timedelta(days=1)  # 2.206.0 (#2780): the next local midnight, not 24 h (clock change)
-            e = datetime(d2.year, d2.month, d2.day, tzinfo=TZ).astimezone(timezone.utc)
+            e = datetime(d2.year, d2.month, d2.day, tzinfo=zone).astimezone(timezone.utc)
         else:
             s = datetime.fromisoformat(o["start"].replace("Z", "+00:00"))
             e = datetime.fromisoformat(o["end"].replace("Z", "+00:00"))
-        if e > now or s.astimezone(TZ).date() < frm or s.astimezone(TZ).date() > to:
+        if e > now or s.astimezone(zone).date() < frm or s.astimezone(zone).date() > to:
             continue
         out.append({**o, "s": s, "e": e})
     return out
@@ -160,14 +167,14 @@ def _covered(entries, s, e):
     return any(x["s"] < e and x["e"] > s for x in entries)
 
 
-def _hm(dt):
-    return dt.astimezone(TZ).strftime("%H:%M")
+def _hm(dt, zone):
+    return dt.astimezone(zone).strftime("%H:%M")
 
 
 # ---------------------------------------------------------------- the check
 def atm_check(c, pid, viewer, frm, to, events=True):
     """{user_id, from, to, limits, issues: [...], events_checked} -- see the module docstring."""
-    ents = _entries(c, pid, viewer, frm, to)
+    ents, zone = _entries(c, pid, viewer, frm, to), _zone(c, pid)
     issues = []
     per_day = {}
     for x in ents:
@@ -189,14 +196,14 @@ def atm_check(c, pid, viewer, frm, to, events=True):
                                "title": f"{a['title']} / {b['title']}"})
     evs = _events(c, pid, viewer, frm, to) if events else []
     bks = _bookings(c, pid, viewer, frm, to) if events else []  # 2.51.0 (#1353): bookings, like events, need the calendar scope
-    busy_days = {e["s"].astimezone(TZ).date() for e in evs} | {b["date"] for b in bks}
+    busy_days = {e["s"].astimezone(zone).date() for e in evs} | {b["date"] for b in bks}
     for d, xs in sorted(per_day.items()):
         if d.weekday() in ATM_WEEKEND and d not in busy_days:
             issues.append({"kind": "weekend", "date": d.isoformat(), "hours": round(sum(x["seconds"] for x in xs) / 3600, 2),
                            "entry_ids": [x["id"] for x in xs]})
     for e in evs:
         if not _covered(ents, e["s"], e["e"]):
-            issues.append({"kind": "event_no_time", "date": e["s"].astimezone(TZ).date().isoformat(), "event_id": e["eid"],
+            issues.append({"kind": "event_no_time", "date": e["s"].astimezone(zone).date().isoformat(), "event_id": e["eid"],
                            "title": e["title"], "all_day": e["all_day"], "task_id": e["task_id"]})
     for b in bks:
         if b["date"] not in per_day:
@@ -210,7 +217,7 @@ def atm_check(c, pid, viewer, frm, to, events=True):
 
 def atm_from_events(c, pid, viewer, frm, to):
     """Past events without a matching entry -> rows ready for a time proposal (task / list where the person tracks time)."""
-    ents = _entries(c, pid, viewer, frm, to)
+    ents, zone = _entries(c, pid, viewer, frm, to), _zone(c, pid)
     out = []
     for e in _events(c, pid, viewer, frm, to):
         if _covered(ents, e["s"], e["e"]):
@@ -221,9 +228,9 @@ def atm_from_events(c, pid, viewer, frm, to):
             lid = t["list_id"] if t else None
             if not lid or not mt_time_on(c, lid) or not task_visible(c, tid, pid) or (viewer != pid and not task_visible(c, tid, viewer)):
                 tid, lid = None, None
-        d = e["s"].astimezone(TZ).date().isoformat()
+        d = e["s"].astimezone(zone).date().isoformat()
         out.append({"event_id": e["eid"], "date": d, "title": e["title"], "location": e["location"], "all_day": e["all_day"],
-                    "start": None if e["all_day"] else _hm(e["s"]), "end": None if e["all_day"] else _hm(e["e"]),
+                    "start": None if e["all_day"] else _hm(e["s"], zone), "end": None if e["all_day"] else _hm(e["e"], zone),
                     "task_id": tid, "list_id": lid})
         if len(out) >= ATM_ITEMS:
             break
@@ -266,7 +273,7 @@ def _hm_ok(v):
     return int(v[:2]) < 24 and int(v[3:]) < 60
 
 
-def atm_when(d, s, e):
+def atm_when(d, s, e, zone=None):
     """local day + HH:MM start / end -> (UTC start, UTC end); BadInput when invalid or in the future."""
     try:
         day = date.fromisoformat(d)
@@ -274,8 +281,9 @@ def atm_when(d, s, e):
         raise BadInput(tr("Invalid value: {0}", "date")) from None
     if not _hm_ok(s) or not _hm_ok(e):
         raise BadInput(tr("Invalid date or time"))
-    a = datetime(day.year, day.month, day.day, int(s[:2]), int(s[3:]), tzinfo=TZ).astimezone(timezone.utc)
-    b = datetime(day.year, day.month, day.day, int(e[:2]), int(e[3:]), tzinfo=TZ).astimezone(timezone.utc)
+    zone = zone or tz_of_s({})
+    a = datetime(day.year, day.month, day.day, int(s[:2]), int(s[3:]), tzinfo=zone).astimezone(timezone.utc)
+    b = datetime(day.year, day.month, day.day, int(e[:2]), int(e[3:]), tzinfo=zone).astimezone(timezone.utc)
     if b <= a:
         raise BadInput(tr("The end is before the start"))
     if b > now_utc():
@@ -346,7 +354,7 @@ def atm_prop_run(c, j, sel, ed, rec):
                 x[f] = e[f]
         if "note" in e:
             x["note"] = _p_str(e["note"], "note", ATM_NOTE_MAX)
-        a, b = atm_when(x["date"], x["start"], x["end"])
+        a, b = atm_when(x["date"], x["start"], x["end"], _zone(c, me()))
         from ..personal.timesheet import tsl_check
         tsl_check(c, me(), a)  # 2.125.0 B (#2119): no entry into a closed month (409 month_closed)
         tid, lid, title = time_target(c, {"task_id": x["task_id"]} if x["task_id"] else {"list_id": x["list_id"]})

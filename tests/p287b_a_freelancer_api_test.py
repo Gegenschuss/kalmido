@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.87.9 API tests, part A (#1919 / #1918): every area as a person WITHOUT an organisation (fixture "Selbstständige",
 tests/freelancer_fixture.py) on a server that has an organisation. Invented names only.
- - the freelancer works in the own private space and the own personal office (its own admin there): lists, tasks,
+ - the freelancer works in the own private workspace and the own personal office (its own admin there): lists, tasks,
    comments, attachments, office documents, knowledge pages, files, calendars, contacts, time, the own agent, absences,
    budget, settings -- every write of a scenario answers 2xx
  - the sweep: EVERY GET route of the matrix areas of tests/freelancer_coverage_test.py, called as the freelancer (the web
@@ -9,7 +9,7 @@ tests/freelancer_fixture.py) on a server that has an organisation. Invented name
    placeholders get the ids of the freelancer's own objects. No 401 / 403 / 5xx, except the few in ALLOW with the reason;
    2.421.0 A (#2936): no other 4xx either, except EXPECT_4XX (status + reason, stale = red); at most MAX_SKIPPED routes
    without an id of an own object (QUERY gives the GETs that need one their query)
- - nothing of the organisation leaks into the private space (state, people list, office)
+ - nothing of the organisation leaks into the private workspace (state, people list, office)
 usage: p287b_a_freelancer_api_test.py <datadir>      (a fresh container; KMT_NOSTART=1 = the server already runs)"""
 import os
 import re
@@ -45,6 +45,7 @@ EXPECT_4XX = {
     "GET /api/assistant/log": (404, "the assistant is off on the test server (the operator's switch, the same for every person)"),
     "GET /api/attachments/{}/preview": (415, "the own attachment is a text file: no preview (the same for every person)"),
     "GET /api/files/nodes/{}/preview": (415, "the own file is a text file: no server preview (the same for every person)"),
+    "GET /api/files/nodes/{}/thumb": (404, "the own file is a text file: no small picture preview (#3936, the same for every person)"),
     "GET /api/bookmarks/{}/image": (404, "the test server fetches no preview picture of the bookmarked page"),
     "GET /api/docs/{}/einvoice": (404, "the own document is a plain text receipt, no e-invoice"),
     "GET /api/docs/{}/split": (409, "the own document is no PDF with two pages or more"),
@@ -55,7 +56,7 @@ EXPECT_4XX = {
     "GET /api/paperless/preview": (404, "no Paperless connection (an outside service)"),
     "GET /api/paperless/zip/preview": (404, "no Paperless ZIP uploaded"),
     "GET /api/lists/{}/e2e/todo": (409, "no encryption change is running for the private list"),
-    "GET /api/wiki/e2e/todo": (409, "no encryption change is running for the private space"),
+    "GET /api/wiki/e2e/todo": (409, "no encryption change is running for the private workspace"),
     "GET /api/office/docs/{}/timesheet.pdf": (400, "no time entries of the client in the period (the own entries are on a list without a client)"),
     "GET /api/office/logo": (404, "no logo uploaded in the personal office"),
     "GET /api/office/books/archive/files/{}": (404, "no past DATEV year imported into the personal office, the id is a file of the file store"),
@@ -95,7 +96,7 @@ A.put(B + "/api/admin/agent-policy", json={"user_agents": True})  # the server's
 FID, F = freelancer(B, A)
 IDS = {}
 
-# ================================================================== tasks + lists in the private space
+# ================================================================== tasks + lists in the private workspace
 # freelancer-matrix: tasks, lists
 L = ok(F.post(B + "/api/lists", json={"name": "Client projects", "kind": "project", "time_tracking": True}), "lists: a private project", (200, 201))
 IDS["list"] = L.get("id")
@@ -151,8 +152,8 @@ so = ok(F.post(B + f"/api/office/docs/{q2.get('id')}/signoff", json={}), "office
 check(bool(so.get("url")), "office: the approval link has its address")
 r = requests.get(B + "/s/q/" + (so.get("url") or "/s/q/x").split("/s/q/")[-1])
 check(r.status_code == 200, f"office: the customer opens the approval page {r.status_code}")
-ok(F.get(B + "/api/newsletter", params={"ws": "private"}), "office: the newsletter connection of the private space")
-ok(F.get(B + "/api/paperless", params={"ws": "private"}), "office: the Paperless connection of the private space")
+ok(F.get(B + "/api/newsletter", params={"ws": "private"}), "office: the newsletter connection of the private workspace")
+ok(F.get(B + "/api/paperless", params={"ws": "private"}), "office: the Paperless connection of the private workspace")
 
 # ================================================================== knowledge pages
 # freelancer-matrix: wiki
@@ -171,7 +172,7 @@ IDS["node"] = ((fu.get("items") or [{}])[0]).get("id")
 du = ok(F.post(B + "/api/docs", data={"ws": "private"}, files=[("files", ("receipt.txt", b"Receipt 12,00 EUR", "text/plain"))]),
         "files: a document", (200, 201))
 IDS["docnode"] = (du.get("ids") or [None])[0]
-ok(F.put(B + "/api/docs/settings", json={"ws": "private", "inbox": True}), "files: document settings of the private space (its own admin)")
+ok(F.put(B + "/api/docs/settings", json={"ws": "private", "inbox": True}), "files: document settings of the private workspace (its own admin)")
 
 # ================================================================== calendars, contacts, CalDAV / CardDAV
 # freelancer-matrix: pim
@@ -220,7 +221,7 @@ check("bob" not in names, f"team: nobody of the organisation in the freelancer's
 ab = ok(F.post(B + "/api/team/absences", json={"kind": "vacation", "start_date": D, "end_date": "2030-03-08"}), "hub: an own absence", (200, 201))
 IDS["absence"] = ab.get("id")
 # 409 = mail to tasks is not set up on the test server (the same answer for an organisation member); never 403 / 404
-ok(F.post(B + "/api/hubmail/address", json={"ws": "private"}), "hub: an own mail address of the private space", (200, 201, 409))
+ok(F.post(B + "/api/hubmail/address", json={"ws": "private"}), "hub: an own mail address of the private workspace", (200, 201, 409))
 ok(F.put(B + "/api/team/absences/holidays", json={"state": "HH"}), "hub: the public holidays of the personal area (its own admin)")
 # freelancer-matrix: personal
 bu = ok(F.post(B + "/api/budget/lists", json={"name": "Money"}), "personal: a budget", (200, 201))
@@ -305,7 +306,7 @@ USE = {"GET /api/files/nodes/{}/requests": {"node": "folder"}, "GET /api/office/
 FROM_TO = {"from": "2030-03-01", "to": "2030-03-31"}
 QUERY = {
     "GET /api/calendars/events": FROM_TO, "GET /api/events": FROM_TO, "GET /api/occurrences": FROM_TO, "GET /api/v1/events": FROM_TO,
-    "GET /api/events/freebusy": {"day": D, "users": "{me}"}, "GET /api/clients/usage": {"ids": "{client}"},
+    "GET /api/events/freebusy": {"day": D, "users": "{me}"}, "GET /api/v1/events/freebusy": {"day": D, "users": "{me}"}, "GET /api/clients/usage": {"ids": "{client}"},
     "GET /api/files/search": {"q": "plan"}, "GET /api/v1/files/search": {"q": "plan"}, "GET /api/files/tagged": {"tag": "1"},
     "GET /api/files/zip": {"ids": "{node}"}, "GET /api/folders/agents": {"folder": "Work"},
     "GET /api/folders/notify-template": {"folder": "Work"}, "GET /api/folders/people/diff": {"folder": "Work", "role": "edit", "user_id": "{agent}"},

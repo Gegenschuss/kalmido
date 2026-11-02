@@ -14,7 +14,7 @@ fake server fake_carddav_wb.py (writable book, a read-only mirror, a book that a
  - a read-only mirror (privilege set without write): writeback_avail "no", switching on = 409; a book that answers 403:
    marked read only after the first try; the password never in the server's log
  - only the owner of the source writes: a change by another list member stays in Kalmido
- - a person without an organisation (freelancer-matrix: personal) does all of the above in the own private space
+ - a person without an organisation (freelancer-matrix: personal) does all of the above in the own private workspace
 usage: p2140_d_api_test.py <datadir>      (P2140D_NOSTART=1: a running server on KALMIDO_TEST_PORT with the fake server)"""
 import json
 import os

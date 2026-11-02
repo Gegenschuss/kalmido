@@ -5,7 +5,7 @@
    events of its calendars: the event is gone from GET /api/events/<id> (404), the range, the RSVP (404) and the CalDAV
    invitations collection; an invitation to a private calendar's event stays; a stale invitation row of a former member is
    ignored by the read layer, counted by the boundary check (att_person) and taken out by "Clean up"; a new invitation of
-   someone outside the calendar's organisation is refused (409 naming the rule, an invisible one is an unknown user); an
+   someone outside the calendar's organisation is refused (409 naming the rule, an invisible one is an unknown person); an
    event with such a person does not move into an organisation's calendar; a calendar moves into an organisation only while every
    invited person fits it (409)
  - #1984: a list goes only to a person the owner may see (or a member of the list): an id of another organisation answers
@@ -160,7 +160,7 @@ check(r.status_code == 409 and "Gina" in r.text and "not a member" in r.text, f"
 r = A.patch(B + f"/api/events/{E1}", json={"attendees": [{"user_id": uid["carol"]}, {"user_id": uid["gina"]}]})
 check(r.status_code == 409 and "Gina" in r.text, f"#1983: ... also when editing ({r.status_code})")
 r = A.post(B + "/api/events", json={"cal_id": TEAM, "title": "Lunch", "start": f"{DAY}T12:00", "attendees": [{"user_id": uid["dave"]}]})
-check(r.status_code == 400 and "unknown user" in r.text, f"#1983: ... someone one may not see stays an unknown user {r.status_code} {r.text[:160]}")
+check(r.status_code == 400 and "unknown person" in r.text, f"#1983: ... someone one may not see stays an unknown person {r.status_code} {r.text[:160]}")
 r = A.post(B + "/api/events", json={"cal_id": HOME, "title": "Tea", "start": f"{DAY}T17:00", "attendees": [{"user_id": uid["gina"]}]})
 check(r.status_code == 201 and S["gina"].get(B + f"/api/events/{r.json().get('id')}").ok if r.status_code == 201 else False,
       f"#1983: a private calendar still invites a contact outside the organisation {r.status_code} {r.text[:160]}")
@@ -197,7 +197,7 @@ check(r.ok and dbx("SELECT owner_id FROM lists WHERE id=?", (L,)) == [(uid["caro
 Fr = S["fred"]
 FL = Fr.post(B + "/api/lists", json={"name": "Workshop"}).json()["id"]
 r = Fr.post(B + f"/api/lists/{FL}/owner", json={"user_id": uid["gina"]})
-check(r.status_code == 404 and "unknown user" in r.text, f"#1984: a freelancer cannot hand a list to someone they are not connected with ({r.status_code})")
+check(r.status_code == 404 and "unknown person" in r.text, f"#1984: a freelancer cannot hand a list to someone they are not connected with ({r.status_code})")
 lo, hi = sorted((uid["fred"], uid["gina"]))
 dbx("INSERT INTO conn_links(a_id, b_id, created_at) VALUES(?, ?, '2026-10-18T10:00:00.000Z')", (lo, hi))
 r = Fr.post(B + f"/api/lists/{FL}/owner", json={"user_id": uid["gina"]})

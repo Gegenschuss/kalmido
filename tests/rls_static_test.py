@@ -12,6 +12,10 @@ import ast
 import glob
 import os
 import re
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+from check_migrations import schema_src  # noqa: E402
 
 N = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(N, "..")
@@ -23,7 +27,7 @@ def read(p):
         return f.read()
 
 
-schema = read("kalmido/core/schema.py")
+schema = schema_src(ROOT)  # 2.475.0 (#3478): + migrations.d
 sql = "\n".join(re.sub(r"--.*", "", ln) for ln in schema.split("\n"))
 tables, i = {}, 0
 for m in re.finditer(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\(", sql):

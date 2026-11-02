@@ -11,7 +11,7 @@ Invented services and amounts only.
  - duplicate copies the parts with their positions and points the title page lines to the copies
  - PDF: one page more per printed part that stands on the title page; a part not printed is left out
  - invoice from the quotation: modes full / title / summary give the quotation's net and gross; summary = one position
-   per tax rate with the title of the settings (default "Film production" in English)
+   per tax rate with the title of the settings (2.449.0 #3766: default "Services" in English)
 usage: p2470_b_parts_api_test.py <datadir>"""
 import io
 import os
@@ -196,7 +196,7 @@ for mode in ("full", "title", "summary"):
           f"invoice {mode}: net / gross = the quotation's ({it['totals'].get('net')} / {it['totals'].get('gross')} vs {off['net']} / {off['gross']})")
     kinds = [x["kind"] for x in it["items"]]
     if mode == "summary":
-        check([(x["title"], x["tax"]) for x in it["items"]] == [("Film production", "standard"), ("Film production", "reduced")],
+        check([(x["title"], x["tax"]) for x in it["items"]] == [("Services", "standard"), ("Services", "reduced")],
               f"summary: one position per tax rate {[(x['title'], x['tax']) for x in it['items']]}")
     if mode == "full":
         check("heading" in kinds and any(x["title"] == "Animation" and float(x["qty"]) == 10 for x in it["items"]),

@@ -138,10 +138,8 @@ const ofm_ok = i => { if (MV_OFM.includes(i.key) && mvOfc()) return false; const
 // 2.276.0 A (#3039): what the office already holds (GET /api/office/settings used: invoice, receipt, inquiry, meal, travel,
 // sub, fixed), per person and workspace like the role (LS ofmUsed); null = not known yet (everything as before)
 function ofm_used() { return typeof OFC !== 'undefined' && OFC.info ? OFC.info.used || null : (LS.get('ofmUsed', {}) || {})[ofm_ws()] || null; }
-// points of Money not used yet (2.276.0 A, #3039: they waited behind "More"); 2.418.0 (#3560): they start under "Hidden" of
-// the menu's editor instead (nav_defHid), until used or brought back by hand
-// 2.380 F (#3411): a point of Money nobody needs is switched off under Settings > Functions (need: money.*, office_packs.js OCF_FEATS)
-const OFM_LATER = {cashflow: u => u.invoice || u.receipt || u.fixed, kpi: u => u.invoice, travel: u => u.travel, meals: u => u.meal, subs: u => u.sub};
+// 2.380 F (#3411): every point of Money shows at once; 2.448.0 (#3784): also before its first use, a point nobody needs is
+// switched off under Settings > Functions (need: money.*, office_packs.js OCF_FEATS) or hidden in the menu's editor
 // ---- 2.418.0 (#3560): each person arranges the menus of the areas (navmenu.js draws the editor): the order, the points
 // hidden (only not in the menu: data, function and rights stay, the search finds them) and the points that start hidden but
 // were brought back. User setting nav_menus, json {area: {order, hidden, shown}} (accounts/navmenus.py), the same on phone
@@ -155,16 +153,15 @@ function nav_pref(area) {
   return {order: Array.isArray(m.order) ? m.order : [], hidden: new Set(m.hidden || []), shown: new Set(m.shown || [])};
 }
 const nav_orgOff = (area, key) => { const w = typeof wsCur === 'function' ? wsCur() : ''; return w.startsWith('org:') && (wsOrg(w.slice(4))?.nav_off || []).includes(area + ':' + key); };
-const nav_defHid = (area, key) => { if (area !== 'office' || !OFM_LATER[key]) return false; const u = ofm_used(); return !!u && !OFM_LATER[key](u); };
-// hidden by the person: by hand, or starting hidden and not brought back; the parts hidden in the old sidebar settings
+// hidden by the person: by hand; the parts hidden in the old sidebar settings
 // (sidebar "e:<part>", before 2.418.0) count as hidden too until shown again
-const nav_hid = (area, key) => { const p = nav_pref(area); return p.hidden.has(key) || !p.shown.has(key) && (nav_defHid(area, key) || area !== 'office' && sideHidden('e:' + key)); };
+const nav_hid = (area, key) => { const p = nav_pref(area); return p.hidden.has(key) || !p.shown.has(key) && area !== 'office' && sideHidden('e:' + key); };
 const nav_open = (area, key) => area === 'office' ? S.route?.mod === 'office' && S.route.tab === key || S.route?.mod === key && key !== 'office' : S.route?.mod === key;
 // the menus that can be arranged (the editor: navmenu.js, loaded on the first use)
 const NAV_AREAS = ['office', 'life', 'reading', 'time', 'review', 'ablage'];
 const nav_canEdit = id => NAV_AREAS.includes(id) && !S.me?.kid && !!S.settings;
 // a computer: "Customize" as the last row of the area's panel; a phone: a pen on top of the area's menu
-const nav_editBtn = (id, cls = 'srow smod sbbi navedb') => nav_canEdit(id) && !isMobile() && NAV.edit !== id ? `<button type="button" class="${cls}" data-act="nav-edit" data-area="${id}">${ic('edit')}<span class="n">${esc(tr('Customize'))}</span></button>` : '';
+const nav_editBtn = (id, cls = 'srow smod sbbi navedb') => nav_canEdit(id) && !isMobile() && NAV.edit !== id ? `<button type="button" class="${cls}" data-act="nav-edit" data-area="${id}">${ic('edit')}<span class="n">${esc(tr('Customise'))}</span></button>` : '';
 const nav_penHtml = id => nav_canEdit(id) && isMobile() && NAV.edit !== id ? `<div class="navpen"><button type="button" class="iconbtn" data-act="nav-edit" data-area="${id}" title="${esc(tr('Edit menu'))}" aria-label="${esc(tr('Edit menu'))}">${ic('edit', 's')}</button></div>` : '';
 // the editor in place of the menu (its script first loads, then the panel / page draws again)
 const nav_editSlot = id => typeof nav_edHtml === 'function' ? nav_edHtml(id) : (loadModule('navmenu').then(() => { renderSide(); if (id === 'office' && S.route.mod === 'office') renderView(); }, () => {}), `<p class="muted navedl0">${esc(tr('Loading…'))}</p>`);
@@ -173,6 +170,16 @@ function nav_edit(id, on = true) {
   const go = () => { renderSide(); if (S.route.mod === 'office' && id === 'office') renderView(); setTimeout(() => $(on ? '.naved [data-act="nav-done"]' : `[data-act="nav-edit"][data-area="${id}"]`)?.focus({preventScroll: true}), 0); };
   if (on && typeof nav_edHtml !== 'function') loadModule('navmenu').then(go, () => {}); else go();
 }
+// 2.484.0 (#3949): the Projects page (render.js viewProjStart): a long press (phone) or a right click (computer) on a project row opens
+// the sidebar's project menu, on a folder row the sidebar's folder menu; the click ending the press opens nothing (ms_rowMenu, #3836)
+const PS_MENU = '.pstart .psrow[data-pl], .pstart .psfold[data-pf]';
+const ps_menu = r => r.dataset.pl ? listMenu(r, +r.dataset.pl) : folderMenu(r, r.dataset.pf);
+ms_rowMenu(PS_MENU, ps_menu);
+document.addEventListener('contextmenu', e => {
+  if (S.listReorder || e.shiftKey || e.pointerType === 'touch' || isTouch()) return;  // touch: the long press above
+  const r = e.target.closest?.(PS_MENU); if (!r) return;
+  e.preventDefault(); ps_menu(r);
+});
 // a computer: right-click on a point of a panel = "Hide from menu" / "Customize" (navmenu.js nav_rowMenu)
 document.addEventListener('contextmenu', e => {
   const b = e.target.closest?.('#side [data-navk]'); if (!b || isMobile() || !nav_canEdit(b.dataset.navk.split(':')[0])) return;
@@ -183,13 +190,8 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act="nav-edit"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation(); nav_edit(b.dataset.area);
 }, true);
-// the choices of the "More" of the office (LS ofmAll / ofmSeen, one device, before 2.418.0) move once into the setting
-function nav_legacy() {
-  const all = LS.get('ofmAll', false), seen = LS.get('ofmSeen', null); if (!all && !seen || !S.settings) return;
-  LS.del('ofmAll'); LS.del('ofmSeen');
-  const ks = Object.keys(OFM_LATER).filter(k => all || (seen || []).includes(k)), p = nav_pref('office');
-  if (ks.length && !p.shown.size && !p.hidden.size) { NAV.o.office = {...(NAV.o.office || {}), shown: ks}; const v = JSON.stringify(NAV.o); S.settings.nav_menus = v; api('PATCH', '/api/settings', {nav_menus: v}).catch(() => {}); }
-}
+// the choices of the "More" of the office (LS ofmAll / ofmSeen, one device, before 2.418.0): 2.448.0 (#3784) nothing starts hidden any more
+function nav_legacy() { LS.del('ofmAll'); LS.del('ofmSeen'); }
 // the person's order: named keys first in that order, the others after them in their usual order (rank)
 const nav_sort = (area, xs, key = x => x.key, rank = () => 0) => { const o = nav_pref(area).order, r = x => { const n = o.indexOf(key(x)); return n < 0 ? o.length + rank(x) : n; }; return xs.map((x, i) => [x, i]).sort((a, b) => r(a[0]) - r(b[0]) || a[1] - b[1]).map(a => a[0]); };
 // a tab of the office (OFC_TABS: [key, icon, name, admins only, html, group]) without an entry here joins its group
@@ -383,8 +385,10 @@ const o3a_hidRow = h => { const m = /data-go="(\w+)/.exec(h); return !!m && o3a_
 // the router: a private module opened in an organisation's view switches quietly to Private (like wsFollow), then opens it
 function o3a_toPrivate(mod) {
   if (!o3a_hid(mod)) return;
+  const from = wsCur();
   S.settings.workspace = 'private'; LS.set('ws', 'private');
   api('PATCH', '/api/settings', {workspace: 'private'}).catch(() => {});
+  ws_autoNote(from);  // 2.484.0 (#3950): a short note with "Back"
 }
 // ---- 2.152.2 (#2622): sidebar B on a computer. Left a narrow bar of the areas (icon, small word below), next to it ONE
 // panel with the chosen area's content (#side), the page on the right. A click on an icon changes panel and page together:
@@ -395,7 +399,9 @@ function o3a_toPrivate(mod) {
 // 2.364.0 B (#3031): Start (the overview, route home) is the first icon, on the computer's bar and in the phone's drawer
 const SBB_RAIL = [['home', 'start', N_('Start|home'), () => true, ['home']], ['tasks', 'proj', N_('Projects')], ['cal', 'cal', N_('Calendar'), () => feat('cal'), ['cal']], ['office'], ['time'], ['review'], ['life'], ['reading'], ['ablage'],
   ['wiki', 'book', N_('Knowledge|area'), () => feat('wiki'), ['wiki']], ['sheets', 'sheet', N_('Tables'), () => feat('sheets'), ['sheets']],
-  ['habits', 'habit', N_('Habits'), () => feat('habits'), ['habits']], ['agents', 'bot', N_('Agents'), () => agentsTab(), ['agents']]];
+  ['habits', 'habit', N_('Habits'), () => feat('habits'), ['habits']],
+  ['team', 'comment', N_('Chat'), () => teamOn(), ['team']],  // 2.479.0 (#2814): the team chat is an area of its own (was in Projects, its list a second column)
+  ['agents', 'bot', N_('Agents'), () => agentsTab(), ['agents']]];
 const sbb_def = id => { const r = SBB_RAIL.find(x => x[0] === id); if (!r) return null; const a = mg_area(id); return a ? [id, mg_icon(a), mg_nameKey(a), () => mg_on(id), a[3].map(p => p[0])] : r; };  // 2.173.0 A (#2680): mg_nameKey
 const sbb_on = () => !isMobile() && !S.me?.kid && !document.documentElement.classList.contains('mini') && !document.documentElement.classList.contains('mini-task') && !!$('#srail');
 // 2.224.0 A (#2817): areas whose panel only repeated the page's head (the calendar: its views are the head's tabs, its
@@ -450,7 +456,7 @@ document.addEventListener('change', e => {
 function sbb_btnHtml(id, cur, hid, aw) {
   const d = sbb_def(id), on = id === cur;
   if (!sbb_shown(id) || (!on && id !== 'tasks' && (a => a ? mg_sideHidden(id, hid) : hid('e:' + id))(mg_area(id)))) return '';  // Settings > Appearance > Sidebar per part
-  const req = id === 'life' && famOn() ? (S.kids || []).reduce((n, k) => n + (k.requests || 0), 0) : 0, n = id === 'agents' ? aw : req;
+  const req = id === 'life' && famOn() ? (S.kids || []).reduce((n, k) => n + (k.requests || 0), 0) : 0, n = id === 'agents' ? aw : id === 'team' ? S.team?.unread || 0 : req;  // 2.479.0 (#2814)
   const dot = id === 'time' && (S.timer || S.pomo) ? '<span class="srbd recdot"></span>' : n ? `<span class="srbd nunread">${n}</span>` : id === 'wiki' && typeof wki_dotHtml === 'function' ? wki_dotHtml() : '';  // 2.350.0 C (#2744): a running import
   return `<button type="button" class="srb ${on ? 'on' : ''}" data-go="${esc(on ? sbb_home(id) : sbb_target(id))}" data-sbb="${id}"${on ? ' aria-current="page"' : ''}${sbb_nameAttr(tr(d[2]))}>${ic(d[1])}<span class="srbn">${esc(tr(d[2]))}</span>${dot}</button>`;
 }
@@ -472,7 +478,23 @@ function sbb_render(hid) {
   r.setAttribute('aria-label', tr('Areas|nav'));
   r.innerHTML = sbb_railHtml(hid);
   sbb_rove();
+  requestAnimationFrame(sbb_fit);
 }
+// 2.458.0 (#3880): an area's name never breaks inside a word (app.css .srbn): a word too wide for its icon takes a smaller
+// type, down to 9 px; wider still it ends in "…" with the whole name as title. Measured in the page, the width of a word is not in CSS
+function sbb_fit() {
+  for (const n of $$('#srail .srbn, #side .sbmr .srbn')) {
+    n.classList.remove('srcut'); n.style.fontSize = '';
+    const box = n.clientWidth, rg = document.createRange(); rg.selectNodeContents(n);
+    const need = box ? rg.getBoundingClientRect?.().width : 0;
+    if (!(need > box + .5)) continue;
+    const px = parseFloat(getComputedStyle(n).fontSize) * box / need;
+    if (px >= 9) n.style.fontSize = `${Math.floor(px * 10) / 10}px`;
+    else { n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent; }
+  }
+}
+window.addEventListener('resize', () => requestAnimationFrame(sbb_fit));
+document.fonts?.addEventListener('loadingdone', sbb_fit);
 // ---- 2.196.0 A (#2737): the phone's drawer like sidebar B. On top (fixed) search, Today, Inbox and ONE row of the area icons
 // (the bar's icons, order and rights; it scrolls sideways, never wraps), below the chosen area's panel, at the bottom Settings
 // and the account. An icon opens the page its area kept and the drawer stays open; the first change in an open drawer adds
@@ -499,6 +521,7 @@ document.addEventListener('click', e => {
 // after renderSide: the row keeps its sideways position, the open area's icon in sight; the tapped icon keeps the focus
 function sbm_after(x) {
   const r = $('#side .sbmr'); if (!r) return;
+  requestAnimationFrame(sbb_fit);
   if (x != null) r.scrollLeft = x;
   const b = $('.srb.on', r);
   const rr = r.getBoundingClientRect(), br = b?.getBoundingClientRect();
@@ -582,7 +605,7 @@ function sbb_headHtml(id, pan = '') {
   const open = groups && sbb_foldOpen(id, pan), lab = open ? tr('Fold all') : tr('Unfold all');
   const fold = groups ? `<button type="button" class="iconbtn sbbfa" data-act="sbb-foldall" aria-pressed="${!open}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic(open ? 'collapse' : 'expand', 's')}</button>` : '';
   const hide = `<button type="button" class="iconbtn sbbhide" data-act="sbb-panel" title="${esc(tr('Hide the panel'))}" aria-label="${esc(tr('Hide the panel'))}">${ic('panelhide', 's')}</button>`;
-  return `<h2 class="sbbpt">${esc(tr(d ? d[2] : 'Projects'))}</h2><span class="spacer"></span><span class="sbtools">${fold}${id === 'tasks' ? fv2_svToolBtn() /* 2.156.0 D (#2186) */ : ''}${hide}</span>`;
+  return `<h2 class="sbbpt">${esc(tr(d ? d[2] : 'Projects'))}</h2><span class="spacer"></span><span class="sbtools">${fold}${id === 'tasks' ? fv2_svToolBtn() /* 2.156.0 D (#2186) */ : ''}${id === 'team' ? tc_newBtnHtml() /* 2.479.0 (#2814) */ : ''}${hide}</span>`;
 }
 function sbb_foldAll() {
   const id = sbb_area(), close = sbb_foldOpen(id);
@@ -855,6 +878,7 @@ function sbb_panelHtml0(id) {
       : p[0] === 'family' ? (n => n ? `<span class="c nunread">${n}</span>` : '')((S.kids || []).reduce((n, k) => n + (k.requests || 0), 0)) : '';
     return sbb_row(p[0], p[1], tr(mg_partName(p[0], p[2])), p[0] === S.route.mod, `data-sbbpart="${p[0]}" data-navk="${id}:${p[0]}"`, after);
   }).join('')}</div>`;
+  if (id === 'team') return title + tc_panelHtml();  // 2.479.0 (#2814): channels and direct messages (chat.js)
   // the agents: their overview, then each agent (its page; the status dot as in the sidebar's conversations)
   if (id === 'agents') return title + `<div class="sgroup sbbp">${sbb_row('agents', 'bot', tr('Agents'), S.route.mod === 'agents' && !S.route.agent)}${(S.agents || []).map(x => `<button type="button" class="srow steam sbbi ${S.route.agent === x.id ? 'on' : ''}" data-go="agents/${x.id}"${S.route.agent === x.id ? ' aria-current="page"' : ''}><span class="sdot">${hdot(agentHst(x))}</span><span class="n">${esc(x.name)}</span>${x.waiting || x.chat_unread ? `<span class="c nunread">${x.waiting + x.chat_unread}</span>` : ''}</button>`).join('')}</div>`;
   return title + `<div class="sgroup sbbp">${sbb_row(sbb_target(id), d[1], tr(d[2]), true)}</div>`;

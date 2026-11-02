@@ -86,7 +86,8 @@ const ALL = 'cal,events,comments';
     await o.nav(B + '#cal'); await ready(e, '#view .calbar');
     await week(e, W1); await blocks(e); await sleep(1000);  // the events and the repeats of tasks arrive: the grid is drawn again
     // 1. a drag over free time: the block "New event", Enter saves
-    let p = await at(e, W2, 16 * 60 + 7);
+    // 2.452.0 (#3822): 16:02 and not 16:07: the snap (cg_snap, 15 min) turns at 16:07.5, one pixel off gave 16:15
+    let p = await at(e, W2, 16 * 60 + 2);
     await drag(p.x, p.y, 0, p.H);
     await sleep(300);
     const nb = await e(`(() => { const b = document.querySelector('#view .wcol[data-day="${W2}"] .cgnew'); return b ? [document.activeElement === b.querySelector('.cgin'), b.textContent, !document.querySelector('.modal.evmodal'), fmtTimeLoc('16:00') + '–' + fmtTimeLoc('17:00')] : null; })()`);
@@ -102,7 +103,7 @@ const ALL = 'cal,events,comments';
     await e(`histStep('undo').then(() => 1)`);
     check(await until(async () => !(await find('Planning'))), 'desktop: Undo removes the new event');
     // 2. Esc during a drag: nothing; an empty block goes with Esc
-    p = await at(e, W3, 18 * 60 + 7);
+    p = await at(e, W3, 18 * 60 + 2);
     await cmd('input.performActions', {context: ctx, actions: [
       {type: 'pointer', id: 'p1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(p.x), y: Math.round(p.y)}, {type: 'pointerDown', button: 0},
         {type: 'pointerMove', x: Math.round(p.x), y: Math.round(p.y + p.H / 2), duration: 100}, {type: 'pointerMove', x: Math.round(p.x), y: Math.round(p.y + p.H), duration: 100}, {type: 'pause'}, {type: 'pause'}, {type: 'pointerUp', button: 0}]},
@@ -200,12 +201,12 @@ const ALL = 'cal,events,comments';
       {type: 'pointerMove', x: Math.round(x), y: Math.round(y + dy / 2), duration: 150}, {type: 'pointerMove', x: Math.round(x), y: Math.round(y + dy), duration: 150}, {type: 'pointerUp', button: 0}]}]})
       .then(() => cmd('input.releaseActions', {context: ctx}));
     // a quick swipe: no block
-    let p = await at(e, W3, 13 * 60 + 7);
+    let p = await at(e, W3, 13 * 60 + 2);
     await touch(p.x, p.y, 0, -p.H * 2); await sleep(400);
     check(await e(`!document.querySelector('#view .cgnew, #view .evghost')`), 'phone: a quick swipe makes nothing');
     await e(`(() => { closePop(); return 1; })()`);
     // hold 0.4 s, then drag: the block
-    p = await at(e, W3, 13 * 60 + 7);
+    p = await at(e, W3, 13 * 60 + 2);
     await touch(p.x, p.y, 600, p.H * 1.5); await sleep(400);
     check(await e(`(() => { const b = document.querySelector('#view .wcol .cgnew'); return !!b && b.textContent.includes(fmtTimeLoc('13:00') + '–' + fmtTimeLoc('14:30')); })()`), 'phone: hold and drag: a block "New event" 13:00-14:30');
     check(await e(`(() => { const b = document.querySelector('#view .cgnew'); if (!b) return false; const r = b.getBoundingClientRect(), d = b.querySelector('.cgdet').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + .5 && d.height >= 43.5; })()`), 'phone: the block fits, "Details" is a 44 px target');

@@ -13,7 +13,7 @@ from ..tasks.validation import as_int, valid_date
 from ..core.errors import BadInput
 from ..events.model import (
     att_clean, cal_create, cal_fields, cal_member_set, cal_public, cal_touch, cals_for, default_cal, ev_delete, ev_dict,
-    ev_fields, ev_occ_change, ev_ov_tidy, ev_range, ev_store, EV_KEYS, EV_PARTSTAT, EV_RANGE_DAYS, EV_TITLE_MAX, need_event, need_evcal,
+    ev_fields, ev_occ_change, ev_ov_tidy, ev_range, ev_store, ev_tell, EV_KEYS, EV_PARTSTAT, EV_RANGE_DAYS, EV_TITLE_MAX, need_event, need_evcal,
     wall,
 )
 from ..events.ics import ics_export
@@ -70,6 +70,8 @@ def op_cal_edit(c, uid, cid, b):
 def op_cal_delete(c, uid, cid):
     need_evcal(c, cid, manage=True)
     mails = evi_cal_cancel(c, uid, cid)  # 2.111.0 B (#2056): its invited external attendees learn the events are gone
+    for r in c.execute("SELECT * FROM events WHERE cal_id=? AND deleted_at IS NULL", (cid,)).fetchall():
+        ev_tell(c, r, "cancelled")  # 2.367.2 (#2969): the people of the server too
     c.execute("DELETE FROM ev_cals WHERE id=?", (cid,))
     bump(c)
     c.commit()

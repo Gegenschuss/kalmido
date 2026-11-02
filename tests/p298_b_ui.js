@@ -55,7 +55,7 @@ const FEAT = 'cal,comments,collab,agents,clients,workload,forms';
   rows()[2].querySelector('.fqe-help').value = 'Our terms';
   // drag the last question by its grip to the top (jsdom has no layout: every row is at 0, a pointer above it = the top)
   const grip = rows()[2].querySelector('.fqe-grip');
-  ptr(w, grip, 'pointerdown', 10); ptr(w, grip, 'pointermove', -5); ptr(w, grip, 'pointerup', -5);
+  ptr(w, grip, 'pointerdown', 10); ptr(w, grip, 'pointermove', -5); ptr(w, grip, 'pointerup', -5); click(w, d.body);  // 2.456.0 (#3837): the browser's click after a drag, swallowed
   check(labels() === 'Agree?|Company|Budget' && !ed.querySelector('.fqe.dragging'), 'dragged by the grip: the last question at the top ' + labels());
   click(w, rows()[2].querySelector('[data-fq="up"]'));
   check(labels() === 'Agree?|Budget|Company', 'the up button moves a question one up (keyboard way) ' + labels());
@@ -116,9 +116,9 @@ const FEAT = 'cal,comments,collab,agents,clients,workload,forms';
       [...document.querySelectorAll('.modal')].pop().querySelector('[data-fm="edit"]').click(); await new Promise(r => setTimeout(r, 400)); return 1; })()`);
     const g = await ev(`(() => { const rs = [...document.querySelectorAll('#fq-list .fqe')]; rs[1].scrollIntoView({block: 'center'}); const a = rs[2].querySelector('.fqe-grip').getBoundingClientRect(), b = rs[0].getBoundingClientRect();
       return {x: a.x + a.width / 2, y: a.y + a.height / 2, top: b.y + 4, h: innerHeight}; })()`);
-    await drag(g.x, g.y, 0, Math.max(4, g.top) - g.y, 'touch'); await sleep(300);
+    await drag(g.x, g.y, 0, Math.max(4, g.top) - g.y, 'touch', 500); await sleep(300);  // 2.456.0 (#3837): hold, then drag
     const order = await ev(`[...document.querySelectorAll('#fq-list .fqe-label')].map(x => x.value).join('|')`);
-    check(order === 'Company|Agree?|Budget', 'phone: a finger on the grip drags the question to the top ' + order + ' ' + JSON.stringify(g));
+    check(order === 'Company|Agree?|Budget', 'phone: a finger held on the grip drags the question to the top ' + order + ' ' + JSON.stringify(g));
     await shot('p298b-380-drag.png');
   }, true);
 

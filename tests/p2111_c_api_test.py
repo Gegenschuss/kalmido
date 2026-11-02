@@ -10,7 +10,7 @@ freelancer-matrix: tasks
  - REST API v1 (a person's token): read, set, clear, 400; OpenAPI names the field
  - CalDAV: the VTODO carries an absolute VALARM (X-KALMIDO-AT), a round trip keeps remind_at, a new VTODO without a due
    date and an absolute alarm becomes remind_at
- - a person without an organisation: the same in the private space (app + own token + the push)
+ - a person without an organisation: the same in the private workspace (app + own token + the push)
 usage: p2111_c_api_test.py <datadir>      (P2111C_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import json
 import os
@@ -220,7 +220,7 @@ A.patch(B + f"/api/users/{FID}", json={"ntfy_topic": "t-frida"})
 Fr.patch(B + "/api/settings", json={"push_channel": "ntfy"})
 FL = Fr.post(B + "/api/lists", json={"name": "Studio", "org_id": None}).json()["id"]
 r = Fr.post(B + "/api/tasks", json={"title": "Invoice the client 2111", "list_id": FL, "remind_at": hm(testclock.now().replace(tzinfo=None) - timedelta(minutes=1))})
-check(r.ok and r.json().get("remind_at"), f"freelancer: remind_at in the private space {r.text[:200]}")
+check(r.ok and r.json().get("remind_at"), f"freelancer: remind_at in the private workspace {r.text[:200]}")
 check(until(lambda: pushes("Invoice the client 2111", "t-frida"), 20), "freelancer: the fixed reminder arrives")
 ftok = Fr.post(B + "/api/me/tokens", json={"name": "own", "scopes": ["read", "write"]}).json().get("token")
 fr = bearer(ftok)

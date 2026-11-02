@@ -208,7 +208,7 @@ r = up(A, [("papier.pdf", P1, "application/pdf")], ws=f"org:{ORG}")
 check(r.status_code == 201 and r.json()["ids"] and r.json()["ids"][0] != D1, "another workspace (an organisation): a document of its own")
 DORG = r.json()["ids"][0]
 r = up(Ca, [("papier.pdf", P1, "application/pdf")], ws="private")
-check(r.status_code == 201 and r.json()["ids"][0] not in (D1, DORG), "another person's private space: a document of its own (nothing of frida's named)")
+check(r.status_code == 201 and r.json()["ids"][0] not in (D1, DORG), "another person's private workspace: a document of its own (nothing of frida's named)")
 dbx("UPDATE doc_meta SET raw_sha='' WHERE node_id=?", (D1,), write=True)  # a document from before 2.146
 r = up(Fr, [("alt.pdf", P1, "application/pdf")])
 check(r.status_code == 200 and [d["id"] for d in r.json().get("dups", [])] == [D1], "a document from before 2.146: found by its stored version " + r.text[:160])

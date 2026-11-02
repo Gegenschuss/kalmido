@@ -2,8 +2,8 @@
 // - #2626: unread Activity only (For you 0): the bell count is 0, the "More" menu and the sidebar row show no number,
 //   the app badge number is the bell's; with something for me every place shows the same number
 // - #2615: a short dialog (password) is not "growing" (no grip, a kept size is dropped), one with a text field is
-// - #2616: Documents come right after Quotes & invoices; the office opens on the point used last (Pipeline for an admin
-//   if nothing is kept; Quotes & invoices for a member; a person without an organisation is an admin)
+// - #2616: Documents come right after Quotations & invoices; the office opens on the point used last (Pipeline for an admin
+//   if nothing is kept; Quotations & invoices for a member; a person without an organisation is an admin)
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');
@@ -35,13 +35,13 @@ const ALL = 'office,cal,timeline,matrix,habits,pomo,collab,stats,time,progress,a
   const order = w.eval(`OFR_ORDER.join()`);
   check(/offers,invoices,gendocs,clients/.test(order), '#2616: Documents after Quotations and Invoices (2.380.0 #3409) ' + order);
   w.eval(`LS.set('ofmLast', null); ofm_adm = () => true`);
-  // 2.276.0 (#3039): an admin without a kept point opens Quotes & invoices; the Pipeline only once the office has an inquiry
-  check(w.eval('ofm_entry().key') === 'offers', '#3039: an admin without a kept point and without inquiries: Quotes & invoices ' + w.eval('ofm_entry().key'));
+  // 2.276.0 (#3039): an admin without a kept point opens Quotations & invoices; the Pipeline only once the office has an inquiry
+  check(w.eval('ofm_entry().key') === 'offers', '#3039: an admin without a kept point and without inquiries: Quotations & invoices ' + w.eval('ofm_entry().key'));
   w.eval(`ofm_used = () => ({inquiry: true})`);
   check(w.eval('ofm_entry().key') === 'pipeline', '#2616 / #3039: an admin with an inquiry: Pipeline ' + w.eval('ofm_entry().key'));
   w.eval(`ofm_used = () => null`);
   w.eval(`ofm_adm = () => false`);
-  check(w.eval('ofm_entry().key') === 'offers', '#2616: a member: Quotes & invoices');
+  check(w.eval('ofm_entry().key') === 'offers', '#2616: a member: Quotations & invoices');
   w.eval(`ofm_remember('clients')`);
   check(w.eval('ofm_entry().key') === 'clients', '#2616: the point used last');
   w.eval(`ofm_remember('nonsense')`);

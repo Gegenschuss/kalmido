@@ -44,7 +44,8 @@ const bobTasks = async () => { const j = await call('GET', '/api/state', null, C
   // 2.308.0 (#3276): a page state instead of a fixed time (the move dialog needs the other server's link and lists)
   const readyIf = async (ev, expr, n = 60) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const msvvReady = `typeof S === 'object' && !!S.msvv?.links?.some(l => l.id === ${SID}) && !!S.msvv.data?.[${SID}]?.lists`;
-  const moveItem = `[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Move to another server/.test(b.textContent))`;
+  // 2.445.0 (#3008): "Move to another server…" is under "More…": the first read opens the second level
+  const moveItem = `(document.querySelector('#pop .mtmore')?.click(), [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Move to another server/.test(b.textContent)))`;
   const ready = async (ev, sel, n = 60) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('${sel}')`).catch(() => false)); i++) await sleep(250); await sleep(400); };
   const desk = async o => {
     const {cmd, ev, nav, shot} = o;

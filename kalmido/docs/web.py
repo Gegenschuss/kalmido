@@ -12,6 +12,7 @@ from flask import g, jsonify, request
 from ..core.config import app, ATT_DIR
 from ..core.db import body, bump, db, err, iso, now_utc, insert_id
 from ..core.i18n import tr
+from ..core.numtext import server_num
 from ..core.access import Denied, acx_of
 from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
@@ -395,6 +396,18 @@ def _feature_value(c, ws, node, f, v, uid):
     return None
 
 
+def doc_amount(raw):
+    """An amount as sent or typed -> its plain text ("1234.56", "" = none), None when it is no amount: 2.450.0 (#3770):
+    "1.234,56" / "1,234.56" keep their value (core/numtext.py), more than two decimals are no amount, nothing is cut."""
+    v = str(raw or "").strip()[:20]
+    if not v or re.fullmatch(r"-?\d{1,12}(\.\d{1,2})?", v):
+        return v
+    x = server_num(v)
+    if x is None or abs(x) >= 1e12 or abs(round(x, 2) - x) > 1e-9:
+        return None
+    return f"{x:.2f}"
+
+
 def doc_update(c, nid, d, uid, by=None):
     """Apply a change {name, date, due, amount, currency, sender, type, tags, folder} to document nid (rights checked by the
     caller). by=None: a person -- the changed features lose "automatic" and the models learn them; by="agent": the
@@ -410,8 +423,8 @@ def doc_update(c, nid, d, uid, by=None):
                 return err(tr("Invalid value: {0}", k))
             sets[col] = v or None
     if "amount" in d:
-        v = str(d["amount"] or "").strip().replace(",", ".")[:20]
-        if v and not re.fullmatch(r"-?\d{1,12}(\.\d{1,2})?", v):
+        v = doc_amount(d["amount"])
+        if v is None:
             return err(tr("Invalid value: {0}", "amount"))
         sets["amount"] = S.doc_seal(c, ws, "doc_meta.amount", v)
     if "asn" in d and by is None:
@@ -439,7 +452,7 @@ def doc_update(c, nid, d, uid, by=None):
             c.execute("UPDATE fs_nodes SET name=?, updated_at=? WHERE id=?",
                       (_free_name(c, node["parent_id"], node["owner_id"], node["org_id"], safe_fs_name(name), skip=nid), _now(), nid))
     if any(k in sets for k in ("doc_date", "amount", "currency")):  # 2.148.0 A (#2471): a receipt of a locked month stays as it is
-        new_amt = str(d.get("amount") or "").strip().replace(",", ".")[:20] if "amount" in d else None
+        new_amt = doc_amount(d["amount"]) if "amount" in d else None
         if (("doc_date" in sets and (sets["doc_date"] or None) != (m["doc_date"] or None))
                 or ("currency" in sets and sets["currency"] != (m["currency"] or ""))
                 or (new_amt is not None and new_amt != (S.doc_open(c, ws, "doc_meta.amount", m["amount"]) or ""))):
@@ -614,9 +627,10 @@ def docs_redo(nid):
     """Recognise again (text, date, amount; the sorting keeps what is set)."""
     c = db()
     _no_agent()
-    _doc(c, nid, write=True)
+    m, _n = _doc(c, nid, write=True)
     from ..office.periodlock import pl_receipt_need_open
     pl_receipt_need_open(c, nid)  # 2.148.0 A (#2471): a new recognition could change a locked receipt's amount
+    S.redo_save(c, m, nid)  # 2.363.3 (#3134): for "Undo"
     c.execute("UPDATE doc_meta SET state='wait', tries=0, error='', updated_at=? WHERE node_id=?", (_now(), nid))
     c.commit()
     docs_kick()
@@ -624,6 +638,22 @@ def docs_redo(nid):
     out = doc_json(c, m, n, role=n["role"])
     out["kept"] = out["hand"]  # 2.273.0 C (#3047): the values set by hand the new run does not replace
     return jsonify(out)
+
+
+@app.post("/api/docs/<int:nid>/redo/undo")
+def docs_redo_undo(nid):
+    """2.363.3 (#3134): takes the last "Recognise again" back (within 24 h): the values, the text and the tags from before;
+    values set by hand since then stay. 400 when it is too late or the run is still busy."""
+    c = db()
+    _no_agent()
+    _doc(c, nid, write=True)
+    from ..office.periodlock import pl_receipt_need_open
+    pl_receipt_need_open(c, nid)  # like the recognition itself: it could change a locked receipt's amount
+    S.redo_back(c, nid)
+    bump(c)
+    c.commit()
+    m, n = _doc(c, nid)
+    return jsonify(doc_json(c, m, n, role=n["role"]))
 
 
 @app.get("/api/docs/<int:nid>/thumb")

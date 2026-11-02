@@ -4,7 +4,7 @@
 'use strict';
 
 const ctOn = () => feat('contacts');
-const CT_LINK = [['waiting', N_('Waiting on')], ['responsible', N_('Responsible')], ['about', N_('About')]];
+const CT_LINK = [['waiting', N_('Waiting on')], ['responsible', N_('Assignee')], ['about', N_('About')]];
 function ctAv(c, cls = 'avatar ctav') {
   return c.photo && typeof c.photo === 'string' && c.photo.startsWith('data:image/') ? `<span class="${cls} pic"><img src="${esc(c.photo)}" alt="" loading="lazy" decoding="async"></span>`
     : `<span class="${cls}">${esc(initials(c.fn || c.org || '?'))}</span>`;

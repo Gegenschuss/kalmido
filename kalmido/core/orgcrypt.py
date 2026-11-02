@@ -89,6 +89,7 @@ FIELDS = {
     "office_bank_vendors": ("match", "name", "portal"),  # 2.425.0 B (#3451): recurring providers of the bank bookings
     "office_cc_cards": ("holder_name", "last4", "account"), "office_cc_statements": ("total",),  # 2.444.0 (#3447): credit card statements
     "office_cc_lines": ("merchant", "amount", "orig_amount"),
+    "office_payonline": ("secret_key", "webhook_secret", "hook_token"), "office_pay_links": ("token",),  # 2.469.0 (#3459): the provider key, the webhook secret, the public tokens
     "office_doc_templates": ("body",), "office_gen_docs": ("body",),  # 2.93.0 A (#1927): document templates, documents
     "office_vehicles": ("plate",), "office_drives": ("start_place", "dest", "purpose", "correct_note"),  # 2.93.0 B (#1928): the logbook; 2.152.0 C (#2169): + reason
     "office_drive_log": ("prev",),  # 2.93.0 B (#1928): the change log of the logbook
@@ -98,7 +99,7 @@ FIELDS = {
     "office_bookarch": ("doc1", "doc2", "text", "raw"), "office_bookarch_accts": ("label",),  # 2.414.0 (#3502): the booking archive
     "office_bookarch_docs": ("file_name",), "office_bookarch_files": ("file_name",),  # 2.414.0 review F8: names may carry a client's
     "office_letters": ("rcpt_name", "rcpt_address", "rcpt_email", "subject", "body", "ref_line"),  # 2.153.0 (#2028): letters
-    "office_letter_blocks": ("body",), "office_letter_profiles": ("image",),  # 2.153.0 (#2030, #2028): text blocks, signature picture
+    "office_letter_blocks": ("body",), "office_letter_profiles": ("image", "mail_sig", "mail_from_name", "mail_reply_to"),  # 2.153.0 (#2030, #2028): text blocks, signature picture; 2.439.0 (#3617): the mail signature, sender name, answer address
     "office_deals": ("value", "contact", "note", "lost_reason",
                      "next_step", "email", "phone", "company"),  # 2.50.0 (#1196): the sales pipeline; 2.94.0 A (#1930): leads
     "time_sheets": ("note",),  # 2.125.0 R (#2119): the note of a timesheet decision
@@ -123,8 +124,8 @@ JSON_KEYS = {("office_settings", "data"): ("company",), ("office_docs", "totals"
 PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("office_settings", "data"): N_("Bank and tax data of the company"),
                  ("office_docs", "totals"): N_("Purchase prices and margins"), "office_contracts": N_("Framework contract rates"),
                  "office_docs": N_("Senders of finished documents"), "office_doc_log": N_("The log of the documents"),
-                 "office_signoffs": N_("Signatures of customers (name, address, device)"),  # 2.50.0 (#1200)
-                 "files": N_("Files of organisations"), "private_files": N_("Files in the private space"),  # 2.64.0 (#1864)
+                 "office_signoffs": N_("Signatures of clients (name, address, device)"),  # 2.50.0 (#1200)
+                 "files": N_("Files of organisations"), "private_files": N_("Files in the private workspace"),  # 2.64.0 (#1864)
                  "tokens": N_("Stored access tokens (Git, client secret of the single sign-on)"),
                  # 2.47.0 (#1649, #1215, #1216): roles' purchase prices, purchases of accepted quotations, parts and shoot sheets
                  "office_roles": N_("Purchase prices and margins"), "office_purchases": N_("Purchase prices and margins"),
@@ -139,6 +140,7 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_bank_balances": N_("Bank statements"),  # 2.124.0 D (#2342)
                  "office_bank_rules": N_("Bank statements"),  # 2.299.0 B (#3191)
                  "office_bank_vendors": N_("Bank statements"),  # 2.425.0 B (#3451)
+                 "office_payonline": N_("Stored access tokens (online payment)"), "office_pay_links": N_("Stored access tokens (online payment)"),  # 2.469.0 (#3459)
                  "office_cc_cards": N_("Credit cards"), "office_cc_statements": N_("Credit cards"), "office_cc_lines": N_("Credit cards"),  # 2.444.0 (#3447)
                  "office_doc_templates": N_("Document templates and documents"), "office_gen_docs": N_("Document templates and documents"),  # 2.93.0 A (#1927)
                  "office_vehicles": N_("Logbook"), "office_drives": N_("Logbook"), "office_drive_log": N_("Logbook"),  # 2.93.0 B (#1928)
@@ -162,7 +164,7 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
 PM_CRYPT_PLAIN = (N_("Tasks"), N_("Notes"), N_("Descriptions"), N_("Comments"), N_("Contacts"), N_("Chats"))
 # 2.64.1 (#1817): what the browser encrypts in lists with a lock (collab/liste2e.py LE2E_FIELDS); the plain list holds them apart
 PM_CRYPT_BROWSER = (N_("Titles, descriptions, subtasks, comments, notes, section names, free-text fields, links and code snippets of projects with a lock"),)
-PM_CRYPT_BROWSER += (N_("Names and texts of knowledge pages in spaces with a lock"),)  # 2.64.3 A (#1817): the lock per knowledge space
+PM_CRYPT_BROWSER += (N_("Names and texts of knowledge pages in workspaces with a lock"),)  # 2.64.3 A (#1817): the lock per knowledge space
 PM_CRYPT_PLAIN_NOTE = N_("Tasks, descriptions, notes and comments: except in projects with a lock")
 
 
@@ -481,6 +483,18 @@ def oc_dec_fields(c, org_id, table, row):
 
 
 oc_dec_row = oc_dec_fields  # the name agent C asked for (#833)
+
+
+def oc_dec_col(c, org_id, table, col, values):
+    """2.360.5 (#2753): the plain values of ONE protected whole column for many rows of one organisation, the key read once
+    (the "own" filters of meals / travel need only the host / the people, not every column of every row)."""
+    key, out = None, []
+    for v in values:
+        if oc_is_enc(v):
+            key = key or oc_key(c, org_id, create=False)
+            v = oc_dec_k(key, org_id, f"{table}.{col}", v)
+        out.append(v)
+    return out
 
 
 def oc_enc_fields(c, org_id, table, values):
@@ -1219,13 +1233,13 @@ def rck_stepup(c, u, b, want=""):
     from ..accounts.session import _rate_fail, _rate_keys
     step = rck_step(c, u)
     if step == "proxy":
-        return jsonify(error=tr("You are signed in through the server’s login proxy. Ask the server admin for the recovery key (command line, SELF-HOSTING.md)."),
+        return jsonify(error=tr("You are signed in through the server’s sign-in proxy. Ask the server admin for the recovery key (command line, SELF-HOSTING.md)."),
                        need="proxy"), 403
     if step == "fresh":
         if _rck_fresh(c, want):
             return None
         if rck_stepup_via(c, u):  # 2.144.5 A (#2387)
-            return jsonify(error=tr("Sign in again with your login provider, then try again."), need="fresh", stepup="oidc"), 403
+            return jsonify(error=tr("Sign in again with your sign-in provider, then try again."), need="fresh", stepup="oidc"), 403
         return jsonify(error=tr("Please sign in again, then try again."), need="fresh"), 403
     e = _reauth(u, b)
     if e is not None:

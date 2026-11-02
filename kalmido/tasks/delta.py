@@ -20,7 +20,7 @@ from datetime import timedelta
 from flask import jsonify, request
 
 from ..core.config import app, APP_VERSION
-from ..core.db import appver_parse, db, gset, gsetting, iso, now_utc, usettings
+from ..core.db import appver_parse, db, gset, gsetting, iso, now_utc, trigger_ensure, usettings
 from ..accounts.session import me
 from ..core.access import plists, time_all, token_lists, tvis, vis_sql, wr_sql  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
@@ -36,7 +36,7 @@ DL_TABLES = {
     "tasks": ("id",), "task_tags": ("task_id",), "task_list_tags": ("task_id",), "attachments": ("task_id",),
     "comments": ("task_id",), "task_seen": ("task_id",), "task_field_values": ("task_id",),
     "task_deps": ("task_id", "blocker_id"), "agent_usage": ("task_id",), "git_links": ("task_id",), "git_closes": ("task_id",),
-    "task_people": ("task_id",), "events": ("task_id",), "contact_tasks": ("task_id",), "time_entries": ("task_id",),
+    "task_people": ("task_id",), "task_watchers": ("task_id",), "events": ("task_id",), "contact_tasks": ("task_id",), "time_entries": ("task_id",),
     "task_enc_notes": ("task_id",),  # 2.42.0 (#828): the encrypted note marker of a task
     "task_note_locks": ("task_id",),  # 2.48.0 (#1642): the locked note marker of a task
     "task_links": ("task_id",),  # 2.71.0 B (#1459): the further lists a task is shown in (its "also")
@@ -136,12 +136,16 @@ def dl_setup(c):
     for t, cols in DL_TABLES.items():
         if cols == "full":  # per row (a statement that changes nothing, e.g. a start-up repair, is no change)
             sc = ", ".join(f"'{x}'" for x in DL_SCOPE[t]) if t in DL_SCOPE else ""
-            c.execute(f"CREATE OR REPLACE TRIGGER kalmido_dl_{t} AFTER INSERT OR UPDATE OR DELETE ON {t} "
-                      f"FOR EACH ROW EXECUTE FUNCTION kalmido_dl_touch('full'{', ' + sc if sc else ''})")
+            trigger_ensure(c, f"kalmido_dl_{t}", t, f"CREATE OR REPLACE TRIGGER kalmido_dl_{t} AFTER INSERT OR UPDATE OR DELETE ON {t} "
+                           f"FOR EACH ROW EXECUTE FUNCTION kalmido_dl_touch('full'{', ' + sc if sc else ''})")
         else:
             args = ", ".join(f"'{x}'" for x in cols)
-            c.execute(f"CREATE OR REPLACE TRIGGER kalmido_dl_{t} AFTER INSERT OR UPDATE OR DELETE ON {t} "
-                      f"FOR EACH ROW EXECUTE FUNCTION kalmido_dl_touch({args})")
+            trigger_ensure(c, f"kalmido_dl_{t}", t, f"CREATE OR REPLACE TRIGGER kalmido_dl_{t} AFTER INSERT OR UPDATE OR DELETE ON {t} "
+                           f"FOR EACH ROW EXECUTE FUNCTION kalmido_dl_touch({args})")
+    # 2.369.4 (#2507): every start is a barrier for the scoped keys (bump, version_sigs): writes of a version without them
+    # (a step back and forward again) are never skipped by a client whose state is older than this start
+    c.execute("INSERT INTO settings(key,value) SELECT 'version:all', value FROM settings WHERE key='version' ON CONFLICT(key) DO UPDATE "
+              "SET value=CAST(GREATEST(CAST(settings.value AS BIGINT), CAST(excluded.value AS BIGINT)) AS TEXT)")
     dl_floor_check(c, hashlib.sha256(json.dumps([DL_FN, DL_TABLES, DL_SCOPE], sort_keys=True).encode()).hexdigest()[:16])
 
 
@@ -176,6 +180,54 @@ def dl_stamp(c, v):
         c.execute("DELETE FROM dl_changes WHERE ver <= ?", (cut,))
         if cut > int(gsetting(c, "dl_floor") or 0):
             gset(c, "dl_floor", cut)
+
+
+DL_SCOPE_ROWS = 500  # 2.369.4 (#2507): more unstamped rows than this at a bump: counted for everyone (no scope worked out)
+
+
+def dl_scope(c, area, uid):
+    """2.369.4 (#2507): the version keys a bump moves besides the total ("version:org:<id>", "version:u:<id>"), worked out
+    from the rows of dl_changes this transaction wrote (not stamped yet): the lists the changed tasks were / are in (+ the
+    further lists of a task, task_links), their owners, members and organisations, and the people of person-only rows.
+    None = for everyone ("version:all", as before): outside a request or another area than tasks / comments / time / self,
+    no rows (what changed is not known), a row for everyone (who sees a list changed), a task no list can be found for,
+    too many rows. "self" = the writer's own account. /api/version takes the maximum of the own keys (version_sigs), so a
+    change in organisation A no longer makes the members of B fetch a delta (the client skips it, liveparts.js lpSkip)."""
+    if area == "self":
+        return [f"version:u:{int(uid)}"] if uid else None
+    if not uid or area not in ("tasks", "comments", "time"):
+        return None
+    from ..core.pg import system_ctx
+    with system_ctx(c):  # who sees a list = structure (other people's memberships too); only ids, nothing goes to a person
+        rows = c.execute("SELECT d.task_id, d.list_id, d.user_id, t.list_id FROM dl_changes d LEFT JOIN tasks t ON t.id=d.task_id "
+                         "WHERE d.ver IS NULL LIMIT ?", (DL_SCOPE_ROWS + 1,)).fetchall()
+        if not rows or len(rows) > DL_SCOPE_ROWS:
+            return None
+        lids, people, tids = set(), set(), set()
+        for tid, lid, pid, tl in rows:
+            if tid is None and lid is None and pid is None:
+                return None
+            if pid is not None and (tid is not None or lid is None):  # a read mark / a person's own order: theirs alone
+                people.add(int(pid))
+                continue
+            if lid is None and tl is None:
+                return None  # a task gone without its list (another table's row of a deleted task)
+            lids.update(int(x) for x in (lid, tl) if x is not None)
+            if tid is not None:
+                tids.add(int(tid))
+        if tids:
+            q = ",".join("?" * len(tids))
+            lids.update(r[0] for r in c.execute(f"SELECT list_id FROM task_links WHERE task_id IN ({q})", sorted(tids)))
+        orgs = set()
+        if lids:
+            q = ",".join("?" * len(lids))
+            for k, x in c.execute(f"SELECT 'u', owner_id FROM lists WHERE id IN ({q}) UNION SELECT 'o', org_id FROM lists "
+                                  f"WHERE id IN ({q}) AND org_id IS NOT NULL UNION SELECT 'u', user_id FROM list_members "
+                                  f"WHERE list_id IN ({q})", sorted(lids) * 3):
+                if x is not None:
+                    (orgs if k == "o" else people).add(int(x))
+    people.add(int(uid))  # the writer's other devices
+    return [f"version:org:{o}" for o in sorted(orgs)] + [f"version:u:{p}" for p in sorted(people)]
 
 
 def dl_changed(c, since, uid=None):

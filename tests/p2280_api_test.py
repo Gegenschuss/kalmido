@@ -130,7 +130,7 @@ A.delete(B + f"/api/lists/{W['id']}/members/{CL}")
 check(A.patch(B + f"/api/lists/{W['id']}", json={"org_id": None}).ok and lists_of(A)[W["id"]]["org_id"] is None, "#935: without it the list goes private")
 check(A.patch(B + f"/api/lists/{W['id']}", json={"org_id": ORG}).ok, "#935: and back")
 check(Bo.patch(B + f"/api/lists/{W['id']}", json={"org_id": None}).status_code in (403, 404), "#935: a member cannot change the workspace")
-# a personal agent in the private space; moving it with lists in another workspace is refused
+# a personal agent in the private workspace; moving it with lists in another workspace is refused
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "mybot", "display_name": "My bot", "owner_id": 1})
 MB, MBH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
 check(r.json()["owner"]["id"] == 1 and r.json()["org_id"] == ORG, "#965/#970: created as Alice's personal agent (owner_id), in her organisation by default")

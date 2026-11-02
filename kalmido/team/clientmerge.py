@@ -138,8 +138,8 @@ def clm_lines(counts, target_name):
         lines.append(trn("{0} draft or open quotation shows the address of {1} afterwards", "{0} drafts or open quotations show the address of {1} afterwards",
                          counts["docs_open"], target_name))
     if counts.get("datev"):
-        lines.append(trn("{0} issued invoice is exported to DATEV under the customer number of {1} afterwards",
-                         "{0} issued invoices are exported to DATEV under the customer number of {1} afterwards", counts["datev"], target_name))
+        lines.append(trn("{0} issued invoice is exported to DATEV under the client number of {1} afterwards",
+                         "{0} issued invoices are exported to DATEV under the client number of {1} afterwards", counts["datev"], target_name))
     if counts.get("lists"):
         lines.append(trn("{0} project", "{0} projects", counts["lists"]))
     for t, (one, other) in CLM_LINES.items():

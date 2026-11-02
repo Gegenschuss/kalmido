@@ -169,7 +169,7 @@ function bnr_settingsHtml(dis) {
   const ppl = d.people || [], opt = (v, t) => `<option value="${v}" ${d.every === v ? 'selected' : ''}>${esc(t)}</option>`;
   return `<h3>${tr('Bank bookings without a receipt')}</h3>
     ${ofcRowF('bnr-every', tr('Reminder'), `<select id="bnr-every" data-bnr-rem="every" ${dis}>${opt('off', tr('Off'))}${opt('week', tr('Weekly'))}${opt('month', tr('Monthly'))}</select>`, tr('a task while bookings without a receipt are there; done by itself once the list is empty'))}
-    ${ppl.length > 1 && d.every !== 'off' ? ofcRowF('bnr-user', tr('Responsible person'), `<select id="bnr-user" data-bnr-rem="user" ${dis}>${ppl.map(p => `<option value="${p.id}" ${p.id === (d.user || S.me?.id) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>`) : ''}
+    ${ppl.length > 1 && d.every !== 'off' ? ofcRowF('bnr-user', tr('Assignee|person'), `<select id="bnr-user" data-bnr-rem="user" ${dis}>${ppl.map(p => `<option value="${p.id}" ${p.id === (d.user || S.me?.id) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>`) : ''}
     ${d.lost ? `<p class="aerr" role="alert">${tr('The person responsible is no longer an administrator. Please choose someone else.')}</p>` : ''}`;
 }
 document.addEventListener('change', async e => {
@@ -197,7 +197,7 @@ function bnv_missHtml(hs) {
   const acc = esc(typeof BK_ACCEPT === 'string' ? BK_ACCEPT : 'application/pdf,image/*');
   return `<section class="bnvmiss" aria-label="${esc(tr('Missing invoices of recurring providers'))}"><h3 class="ofcgrp">${tr('Missing invoices of recurring providers')}</h3>
     <ul class="bnklist" role="list">${hs.map(h => `<li class="bnkrow bnvhint" data-bnr-drop="${h.id}" data-bnv-hint="${h.id}"><div class="bnkhead"><span class="bnkn"><b>${esc(h.text)}</b><small class="muted">${esc(fmtDateLoc(h.day))}</small></span><span class="bnkamt out">${esc(bnkAmt(-h.amount))}</span></div>
-      <div class="bnkacts">${h.portal ? `<a class="btn sm" href="${esc(h.portal)}" target="_blank" rel="noopener noreferrer">${ic('link', 's')}<span>${tr('Customer portal')}</span></a>` : ''}<label class="btn sm">${ic('upload', 's')}<span>${tr('Upload receipt')}</span><input type="file" data-bnr-up="${h.id}" accept="${acc}" hidden></label></div></li>`).join('')}</ul>
+      <div class="bnkacts">${h.portal ? `<a class="btn sm" href="${esc(h.portal)}" target="_blank" rel="noopener noreferrer">${ic('link', 's')}<span>${tr('Client portal')}</span></a>` : ''}<label class="btn sm">${ic('upload', 's')}<span>${tr('Upload receipt')}</span><input type="file" data-bnr-up="${h.id}" accept="${acc}" hidden></label></div></li>`).join('')}</ul>
     ${more > 0 ? `<button type="button" class="btn sm ghost bnvmore" data-bnv-all>${esc(tr('Show all ({0})', hs.length + more))}</button>` : ''}</section>`;
 }
 async function bnv_load() {
@@ -216,7 +216,7 @@ function bnv_html() {
     const k = esc(JSON.stringify([v.kind, v.match]));
     const sub = [v.every ? tr(BNV_EVERY[v.every]) : '', v.last_day ? fmtDateLoc(v.last_day) : '', v.amount ? ofcMoney(v.amount) : ''].filter(Boolean).join(' · ');
     return `<li class="bnkrow bnvrow ${v.active && !v.noreceipt ? '' : 'done'}" data-bnv-k="${k}"><div class="bnkhead"><span class="bnkn"><b>${esc(v.name)}</b><small class="muted">${esc(sub)}</small></span></div>
-      <label class="bnvportal"><span class="muted">${tr('Customer portal')}</span><input type="url" inputmode="url" data-bnv-portal value="${esc(v.portal)}" placeholder="https://" aria-label="${esc(tr('Customer portal'))}: ${esc(v.name)}"${v.portal_suggested ? ` title="${esc(tr('Suggestion'))}"` : ''}></label>
+      <label class="bnvportal"><span class="muted">${tr('Client portal')}</span><input type="url" inputmode="url" data-bnv-portal value="${esc(v.portal)}" placeholder="https://" aria-label="${esc(tr('Client portal'))}: ${esc(v.name)}"${v.portal_suggested ? ` title="${esc(tr('Suggestion'))}"` : ''}></label>
       <div class="bnkacts"><label class="chkl"><input type="checkbox" data-bnv="active" ${v.active ? 'checked' : ''}><span>${tr('Remind me of missing invoices')}</span></label>
       <label class="chkl"><input type="checkbox" data-bnv="noreceipt" ${v.noreceipt ? 'checked' : ''}><span>${tr('No receipt needed')}</span></label></div></li>`;
   }).join('')}</ul>` : `<p class="muted">${tr('No recurring providers found yet. A counterpart that takes money out regularly (monthly, yearly) shows up here.')}</p>`;

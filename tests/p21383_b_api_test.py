@@ -6,7 +6,7 @@ Invented names only. freelancer-matrix: sheets
    other spreadsheets), "<>WAHR"
  - other figures stay: WAHR does not hit 5 / 10 / 3 / 7, a 1 counts for the criterion 1 as before, real truth values
    (=1>0) still hit WAHR
- - the same in the own table of a person without an organisation (private space)
+ - the same in the own table of a person without an organisation (private workspace)
 usage: p21383_b_api_test.py <datadir>"""
 import json
 import os
@@ -100,7 +100,7 @@ A.patch(B + "/api/settings", json={"features": FEAT, "lang": "en", "tour": "done
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
 run(A, f"org:{ORG}", "org")
 
-FID, Fr = freelancer(B, A, features=FEATURES + ",sheets")  # freelancer-matrix: sheets (the own table in the private space)
+FID, Fr = freelancer(B, A, features=FEATURES + ",sheets")  # freelancer-matrix: sheets (the own table in the private workspace)
 FS = run(Fr, "private", "freelancer")
 check(A.get(B + f"/api/sheets/{FS}").status_code in (403, 404), "someone else: the freelancer's table 404")
 

@@ -5,7 +5,9 @@
    admin's agent dialog (agentchat.js, below "Runtime") and in the permissions dialog of a personal agent (settings.js).
    base = /api/admin/agents/<id> or /api/my/agents/<id>.
    2.396.0 A (#3386): below it the block "Git author": name + mail the host sets for the agent's commits (empty = the neutral
-   default) and whether it appends a Co-Authored-By line; saved at once like the fields above. */
+   default) and whether it appends a Co-Authored-By line; saved at once like the fields above.
+   2.481.0 (#3662): below it "Work the list off": the starter's mechanical dispatcher (mcp/agent_dispatch.py) off, as a dry
+   run or on (runtime.dispatch); which lists and how is the project's KALMIDO-DISPATCH.json on the agent's computer. */
 'use strict';
 
 const AGZ_SIZES = [['small', N_('Small'), '0.4 MB'], ['medium', N_('Medium'), '0.8 MB'], ['large', N_('Large'), '1.5 MB']];
@@ -20,7 +22,7 @@ function agz_html(a, own) {
     <div class="row"><label for="agz-runs">${tr('After messages')}</label><input id="agz-runs" class="numin" data-agzk="rotate_runs" type="number" min="10" max="500" step="1" inputmode="numeric" value="${rt.rotate_runs ?? 60}"></div>
     <div class="row"><label for="agz-idle">${tr('After a pause of')}</label><span class="agpct"><input id="agz-idle" class="numin" data-agzk="rotate_idle_min" type="number" min="0" max="1440" step="1" inputmode="numeric" value="${idle}"><span class="muted">${tr('min')}</span></span></div>
     <div class="shint">${tr('Pause: 0 = never; it counts only from the small size on.')}</div>
-    ${own ? `<div class="row agznr"><label>${tr('Daily summary')}</label>${timeIn('agz-nr', rt.nightly_reset || '', {label: tr('Daily summary'), empty: tr('Agent default')})}</div>` : '<div class="agznr-slot"></div>'}</div>${agg_html(a)}`;
+    ${own ? `<div class="row agznr"><label>${tr('Daily summary')}</label>${timeIn('agz-nr', rt.nightly_reset || '', {label: tr('Daily summary'), empty: tr('Agent default')})}</div>` : '<div class="agznr-slot"></div>'}</div>${agg_html(a)}${agd_html(a)}`;
 }
 // 2.396.0 A (#3386): the git author block (same section style, same autosave in agz_wire)
 const AGG_DEFAULT = ['Kalmido', 'noreply@kalmido.com'];
@@ -36,6 +38,15 @@ function agg_html(a) {
     <label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="agg-co" data-agzk="git_coauthor" ${rt.git_coauthor ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Append Co-Authored-By')}</span></label>
     <div class="shint">${tr('Empty = {0}. A project with a repository can set its own author.', esc(AGG_DEFAULT[0] + ' <' + AGG_DEFAULT[1] + '>'))}</div></div>`;
 }
+// 2.481.0 (#3662): the dispatcher switch (same section style, saved at once)
+const AGD_MODES = [['', N_('Off')], ['dry', N_('Dry run')], ['on', N_('Active')]];
+/** @param {any} a */
+function agd_html(a) {
+  const v = (a.runtime || {}).dispatch || '';
+  return `<div class="agzsec agzdisp" data-agz="${a.id}"><h4 id="agd-h">${tr('Work the list off')}</h4>
+    <div class="shint">${tr('The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.')}</div>
+    <div class="row"><label for="agd-mode">${tr('Mode')}</label><select id="agd-mode" data-agzk="dispatch">${AGD_MODES.map(([k, n]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select></div></div>`;
+}
 /** @type {Record<string, number[]>} */
 const AGZ_RANGE = {rotate_runs: [10, 500], rotate_idle_min: [5, 1440]};
 // autosave of the section's fields; in the admin dialog the existing "Nightly fresh restart" row moves in as "Daily summary"
@@ -44,6 +55,15 @@ function agz_wire(md, a, base) {
   const sec = a && $(`.agzsec[data-agz="${a.id}"]`, md); if (!sec) return;
   const git = $(`.agzgit[data-agz="${a.id}"]`, md);  // 2.396.0 A (#3386): its own section element, the same autosave
   if (git) git.addEventListener('change', (/** @type {any} */ e) => agg_save(md, a, base, e.target));
+  const disp = $(`.agzdisp[data-agz="${a.id}"]`, md);  // 2.481.0 (#3662)
+  if (disp) disp.addEventListener('change', async (/** @type {any} */ e) => {
+    const el = e.target; if (el.dataset.agzk !== 'dispatch') return;
+    try {
+      const r = await api('PATCH', base, {runtime: {dispatch: el.value}});
+      if (r?.runtime) a.runtime = r.runtime;
+      savedTick(el);
+    } catch { el.value = (a.runtime || {}).dispatch || ''; /* api() said it */ }
+  });
   const slot = $('.agznr-slot', sec), nr = slot && $('#ag-nr', md)?.closest('.row');
   if (nr) { const l = $('label', nr); if (l) l.textContent = tr('Daily summary'); slot.replaceWith(nr); nr.classList.add('agznr'); }
   sec.addEventListener('change', async (/** @type {any} */ e) => {
@@ -73,7 +93,7 @@ async function agg_save(md, a, base, el) {
   const k = el.dataset.agzk; if (!k) return;
   const rt = a.runtime || (a.runtime = {}), err = $('#agg-err', md);
   const v = k === 'git_coauthor' ? !!el.checked : String(el.value).trim();
-  const bad = k === 'git_author_email' && v && !AGG_MAIL.test(String(v)) ? tr('Git author: please enter a valid email address')
+  const bad = k === 'git_author_email' && v && !AGG_MAIL.test(String(v)) ? tr('Git author: please enter a valid e-mail address')
     : k === 'git_author_name' && /[<>]/.test(String(v)) ? tr('Invalid value: {0}', tr('Name')) : '';
   if (err) { err.textContent = bad; err.hidden = !bad; }
   el.setAttribute('aria-invalid', bad ? 'true' : 'false');

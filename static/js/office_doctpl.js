@@ -102,7 +102,7 @@ function dtDocHtml(d) {
     return head + `<div class="dtp-edit">
       <div class="dtp-form">${ofcRowF('dt-title', tr('Title'), ofcIn('dt-title', d.title, {max: 300}))}
         ${dtRefsHtml(d.client_id, d.list_id, d.doc_id)}
-        ${ofcChk('dt-sign', tr('The customer can sign it through a link'), d.sign)}
+        ${ofcChk('dt-sign', tr('The client can sign it through a link'), d.sign)}
         ${ofcChk('dt-sign_image', tr('With my signature'), d.sign_mine)}
         <label for="dt-body" class="dtp-lab">${tr('Text')}</label>${dtVarBar('dt-body')}<textarea id="dt-body" class="dtp-ta" rows="16" maxlength="60000" spellcheck="true">${esc(d.body || '')}</textarea>${dtHint()}
         <div class="aerr" role="alert" id="dt-err"></div>
@@ -152,13 +152,13 @@ async function dtSignImage(x) {
 }
 // ---- signature by the customer (link)
 function dtSigHtml(d) {
-  if (!DT.sg || DT.sg.id !== d.id) { setTimeout(() => dtSigLoad(d.id), 0); return `<section class="ofdsec dtp-sg"><h3>${tr('Signature by the customer')}</h3><p class="muted">${tr('Loading…')}</p></section>`; }
+  if (!DT.sg || DT.sg.id !== d.id) { setTimeout(() => dtSigLoad(d.id), 0); return `<section class="ofdsec dtp-sg"><h3>${tr('Signature by the client')}</h3><p class="muted">${tr('Loading…')}</p></section>`; }
   const rows = DT.sg.rows, live = rows.some(x => x.live), can = d.status === 'final' && !d.archived;
-  const st = x => x.revoked_at && x.state === 'open' ? tr('Turned off') : !x.live && x.state === 'open' ? tr('Expired') : x.state === 'accepted' ? tr('Signed') : x.state === 'declined' ? tr('Declined') : tr('Waiting for the customer');
+  const st = x => x.revoked_at && x.state === 'open' ? tr('Turned off') : !x.live && x.state === 'open' ? tr('Expired') : x.state === 'accepted' ? tr('Signed') : x.state === 'declined' ? tr('Declined') : tr('Waiting for the client');
   const row = x => `<li class="sgrow st-${esc(x.state)}"><div class="sghead"><b>${esc(st(x))}</b><small class="muted"> · ${esc(fmtWhen(x.created_at))}</small></div>
     ${x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Signature link'))}" data-dturl="${x.id}"><button type="button" class="btn sm pri" data-dt="sgcopy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-dt="sgstop" data-id="${x.id}">${tr('Turn off')}</button></div>` : ''}
     ${x.state !== 'open' ? `<div class="sgproto">${esc([x.signer_name, x.signer_email].filter(Boolean).join(' · '))}<br>${esc(fmtWhen(x.signed_at))} · ${esc(tr('IP address {0}', x.ip || '?'))}${x.reason ? `<br>${esc(tr('Reason: {0}', x.reason))}` : ''}<details class="sgproof"><summary>${tr('Proof')}</summary><small class="muted">SHA-256 ${esc(x.doc_hash || '')}</small></details></div>` : ''}</li>`;  // 2.298.0 A2 (#3186): like signoff.js
-  return `<section class="ofdsec dtp-sg"><h3>${tr('Signature by the customer')}</h3>${rows.length ? `<ul class="sglist" role="list">${rows.map(row).join('')}</ul>` : ''}
+  return `<section class="ofdsec dtp-sg"><h3>${tr('Signature by the client')}</h3>${rows.length ? `<ul class="sglist" role="list">${rows.map(row).join('')}</ul>` : ''}
     ${can ? `<div class="row"><label for="dt-exp">${tr('Valid until')}</label>${dateIn('dt-exp', '', {min: today(), label: tr('Valid until'), empty: tr('no expiry')})}</div>
     <div class="row"><button type="button" class="btn sm ${live ? '' : 'pri'}" data-dt="sgnew" data-id="${d.id}">${ic('link', 's')} ${live ? tr('New signature link') : tr('Create signature link')}</button></div>` : ''}
     <div class="shint">${esc(typeof sg_note === 'function' ? sg_note() : '')}</div><div class="aerr" role="alert" id="dt-sgerr"></div></section>`;
@@ -206,7 +206,7 @@ function dtTplModal(t) {
     ${ofcRowF('dt-tname', tr('Name'), ofcIn('dt-tname', t?.name, {max: 200}))}
     ${ofcRowF('dt-tkind', tr('Kind'), ofcSel('dt-tkind', t?.kind || 'contract', (d.kinds || []).map(k => [k.key, k.label])))}
     ${ofcRowF('dt-tlang', tr('Language'), ofcSel('dt-tlang', t?.lang || d.lang || 'de', (S.languages || []).map(L => [L.code, L.name])))}
-    ${ofcChk('dt-tsign', tr('Documents from it can be signed by the customer'), t ? t.sign : 1)}
+    ${ofcChk('dt-tsign', tr('Documents from it can be signed by the client'), t ? t.sign : 1)}
     <label for="dt-tbody" class="dtp-lab">${tr('Text')}</label>${dtVarBar('dt-tbody')}<textarea id="dt-tbody" class="dtp-ta" rows="14" maxlength="60000">${esc(t?.body || '')}</textarea>${dtHint()}
     <p class="muted ofchint">${esc(d.note || tr('Sample text, no legal advice.'))}</p>
     <div class="aerr" role="alert"></div>
@@ -245,7 +245,7 @@ async function dtStartersModal() {
   try { j = await api('GET', '/api/office/doc-templates/starters'); } catch (x) { toast(x.message || ''); return; }
   const md = modal(`<h3>${tr('Use sample')}</h3><p class="muted">${esc(j.note || '')}</p>
     ${ofcRowF('dt-slang', tr('Language'), ofcSel('dt-slang', j.lang, (S.languages || []).map(L => [L.code, L.name])))}
-    <ul class="ofclist dtp-starters" role="list">${j.starters.map(s => `<li><div class="ofcrow dtp-srow"><span class="ofcn"><b>${esc(s.name)}</b><small class="muted">${esc([s.kind !== 'other' ? s.kind_label : '', s.legal ? tr('Legal text: please have it checked') : ''].filter(Boolean).join(' · '))}</small></span><button type="button" class="btn sm pri" data-m="take" data-k="${esc(s.key)}">${tr('Take over')}</button></div></li>`).join('')}</ul>
+    <ul class="ofclist dtp-starters" role="list">${j.starters.map(s => `<li><div class="ofcrow dtp-srow"><span class="ofcn"><b>${esc(s.name)}</b><small class="muted">${esc([s.kind !== 'other' ? s.kind_label : '', s.legal ? tr('Legal text: please have it checked') : '', s.machine ? tr('Machine translated, check before use') : ''].filter(Boolean).join(' · '))}</small></span><button type="button" class="btn sm pri" data-m="take" data-k="${esc(s.key)}">${tr('Take over')}</button></div></li>`).join('')}</ul>
     <div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('ofcdlg');
   const close = fgModal(md);

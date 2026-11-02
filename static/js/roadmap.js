@@ -102,7 +102,10 @@ function rmModel() {
     for (const l of fl) { const sp = addList(l, fr.open ? null : fr); if (sp) { if (!s || sp.s < s) s = sp.s; if (!e || sp.e > e) e = sp.e; } }
     fr.span = s ? {s, e} : null;
   }
-  return {rows, lists, taskRow, listNode, groupOf, nGroups, po, def};
+  // 2.445.0 (#3011): "Projects only" hides the Inbox; say how many dated open tasks that takes away
+  let hiddenPO = 0;
+  if (po && !sel) for (const t of S.tasks.values()) if (t.list_id === inbox()?.id && !t.deleted_at && t.due && t.status === 0 && rmWhoOk(t)) hiddenPO++;
+  return {rows, lists, taskRow, listNode, groupOf, nGroups, po, def, hiddenPO};
 }
 function rmHead(G) {
   const t0 = today();
@@ -186,6 +189,7 @@ function rmChips(M) {
   const whoLbl = !who ? tr('Everyone') : who === 'me' ? tr('Me') : who === 'none' ? tr('Unassigned|assignee') : (rmPeople().find(p => p.user_id === +who)?.name || '?');
   return `<div class="rm-chips fchips" role="toolbar" aria-label="${esc(tr('Filters'))}">
     <button class="${M.po ? 'on' : ''}" data-act="rm-po" aria-pressed="${M.po}" >${tr('Projects only')}</button>
+    ${M.hiddenPO ? `<span class="muted rm-hidn">${esc(trn('{0} dated task hidden', '{0} dated tasks hidden', M.hiddenPO))}</span>` : ''}
     <button class="${rmHD() ? 'on' : ''}" data-act="rm-hd" aria-pressed="${rmHD()}">${tr('Hide done')}</button>
     <button class="${rmNdOn() ? 'on' : ''}" data-act="rm-nd" aria-pressed="${rmNdOn()}" title="${esc(tr('Show tasks without a date as rows to draw into'))}">${ic('cal', 's')}${tr('No date')}</button>
     ${collab() ? `<button class="${who ? 'on' : ''}" data-act="rm-who" aria-haspopup="menu">${ic('user', 's')}${esc(whoLbl)}</button>` : ''}
@@ -195,7 +199,7 @@ function rmChips(M) {
 function rmPeople() {
   const m = new Map();
   for (const l of S.lists) if (l.shared && !l.archived && inWs(l)) for (const p of listPeople(l)) if (p.user_id && !m.has(p.user_id)) m.set(p.user_id, p);
-  return [...m.values()].filter(p => !S.me || p.user_id !== S.me.id).sort((a, b) => a.name.localeCompare(b.name));
+  return [...m.values()].filter(p => !S.me || p.user_id !== S.me.id).sort((a, b) => cmpText(a.name, b.name));
 }
 function viewRoadmap() {
   const G = rmGeo(), M = rmModel(), t0 = today();

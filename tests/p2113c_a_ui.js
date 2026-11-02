@@ -43,7 +43,8 @@ const FEAT = 'cal,comments,collab,office,clients';
   let w = await boot({hash: 'office/settings'}); let d = w.document;
   await until(() => d.querySelector('#agb-box .agbrow'), 60);
   const rows = [...d.querySelectorAll('#agb-box .agbrow')];
-  check(rows.length === 2 && /Terms and conditions \(PDF\)/.test(d.querySelector('#agb-box label')?.textContent || ''), 'settings: the block with two language rows');
+  // 2.460.0 (#3767): one row per document language (was de / en)
+  check(rows.length === 6 && /Terms and conditions \(PDF\)/.test(d.querySelector('#agb-box label')?.textContent || ''), 'settings: the block with one row per language');
   const de = rows.find(x => x.dataset.lg === 'de'), en = rows.find(x => x.dataset.lg === 'en');
   check(de && /AGB Nordlicht\.pdf/.test(de.textContent) && /as of/.test(de.textContent), 'the German row: name and date: ' + (de?.textContent || '').slice(0, 100));
   check(de && /\/api\/office\/terms\/de\/file/.test(de.querySelector('a.btn')?.getAttribute('href') || '') && !!de.querySelector('[data-agb="up"]') && !!de.querySelector('[data-agb="del"]'),

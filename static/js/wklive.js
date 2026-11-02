@@ -81,17 +81,19 @@ function wklv_inner(p) {
     ? `<textarea id="wk-blk" class="wkblk" rows="1" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Write … ([[Page]], #123, / for commands)'))}">${esc(b.txt)}</textarea>`
     : `<div class="wklb wklb-${b.t}${b.t === 'gap' ? ' wkgap' + Math.min(b.n, 4) : ''}" data-lb="${i}">${wklv_blockHtml(p, b)}</div>`).join('');
 }
-function wklv_fit(ta) { if (!ta) return; ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }
+// 2.459.0 (#3883): the page keeps its height while the field is measured or the blocks are drawn again: for that moment it
+// was shorter by the field, #view stopped at its end and its scroll anchoring stayed there (a phone: the text gone while writing)
+function wklv_hold(box, fn) { if (!box) { fn(); return; } box.style.transition = 'none'; box.style.minHeight = box.offsetHeight + 'px'; fn(); box.style.minHeight = box.style.transition = ''; }
+function wklv_fit(ta) { if (!ta) return; wklv_hold(ta.parentElement, () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }); }
 // draw again with the block that holds offset caret open (null = everything drawn)
 function wklv_draw(caret, focus) {
   const box = $('#wk-live'), p = WK.pg; if (!box || !p || WKLV.pid !== p.id) return;
   WKLV.body = wklv_cur();
   if (caret == null) WKLV.k = -1;
   else { const bl = wklv_blocks(WKLV.body), k = bl.findIndex(x => caret <= x.e); WKLV.k = k < 0 ? bl.length - 1 : k; }
-  box.innerHTML = wklv_inner(p);
   WK.ac = null; $('#wk-ac')?.classList.add('hidden');
+  wklv_hold(box, () => { box.innerHTML = wklv_inner(p); wklv_fit(wklv_ta()); });
   const ta = wklv_ta(); if (!ta) return;
-  wklv_fit(ta);
   if (focus) { const c = Math.max(0, Math.min((caret ?? 0) - WKLV.pre.length, ta.value.length)); ta.focus({preventScroll: true}); ta.setSelectionRange(c, c); }
 }
 const wklv_open = (off, focus = true) => wklv_draw(off, focus);
@@ -101,8 +103,9 @@ function wklv_set(body, caret) { WKLV.body = body; WKLV.k = -1; wklv_draw(caret,
 // after the file / link answers came (wkembed.js wem_ask): the drawn blocks again, the open one stays
 function wklv_redraw() {
   const box = $('#wk-live'); if (!box || !WK.pg) return;
-  WKLV.cache.clear();
-  for (const el of box.querySelectorAll('.wklb[data-lb]')) { const x = WKLV.bl[+el.dataset.lb]; if (x) el.innerHTML = wklv_blockHtml(WK.pg, x); }
+  const was = WKLV.cache; WKLV.cache = new Map();
+  // 2.459.0 (#3883): only what changed: a picture drawn anew has no height until it loaded again
+  wklv_hold(box, () => { for (const el of box.querySelectorAll('.wklb[data-lb]')) { const x = WKLV.bl[+el.dataset.lb], h = x && wklv_blockHtml(WK.pg, x); if (x && h !== was.get(x.txt)) el.innerHTML = h; } });
 }
 // the place in the raw text of a click into a drawn block: its visible text before the click, matched letter by letter
 function wklv_clickOff(el, e, raw) {
@@ -321,9 +324,9 @@ function wkst_items(p) {
 function wkst_menu(sp) {
   const own = LS.get('wkSt', ''), d = WK.idx[sp]?.style || '', clear = tr('Clear|reading style'), name = k => k ? tr(WKST[k]) : clear;
   const mine = (k, label) => ({label, on: own === k, fn: () => { if (k) LS.set('wkSt', k); else LS.del('wkSt'); renderView(); }});
-  const items = [{head: tr('For me')}, mine('', tr('Like the space ({0})', name(d))), mine('clear', name('')), ...Object.keys(WKST).map(k => mine(k, name(k)))];
+  const items = [{head: tr('For me')}, mine('', tr('Like the workspace ({0})', name(d))), mine('clear', name('')), ...Object.keys(WKST).map(k => mine(k, name(k)))];
   if (WK.idx[sp]?.may_style) {
-    items.push({head: tr('Default of the space')}, ...['', ...Object.keys(WKST)].map(k => ({label: name(k), on: d === k, fn: async () => {
+    items.push({head: tr('Default of the workspace')}, ...['', ...Object.keys(WKST)].map(k => ({label: name(k), on: d === k, fn: async () => {
       try { await api('PUT', '/api/wiki/style', {space: sp, style: k}); } catch (e) { toast(e.message); return; }
       if (WK.idx[sp]) WK.idx[sp].style = k;
       renderView();

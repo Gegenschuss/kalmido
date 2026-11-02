@@ -42,7 +42,7 @@ const PASS = 'correct horse battery staple';
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await boot('#t/' + TS);
     // 2.364.0 (#3036): "Lock note" is an entry of the task's "…" menu (no longer a link under the note)
-    const lnMenu = id => `(() => { taskMenu(document.querySelector('#detail [data-act="task-menu"]'), ${id}); return 1; })()`;
+    const lnMenu = id => `(() => { taskMenu(document.querySelector('#detail [data-act="task-menu"]'), ${id}); document.querySelector('#pop .mtmore')?.click(); return 1; })()`;  // 2.445.0 (#3008): the entry is under "More…"
     const lnItem = `[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => b.textContent.trim() === 'Lock note')`;
     check(await waitFor(`!!document.querySelector('#d-content')`) && await ev(lnMenu(TS)) && await waitFor(`!!document.querySelector('#pop [role="menuitem"]')`) && !(await ev(`!!${lnItem}`)), '#1642: no "Lock note" in a shared list');
     await ev(`(closePop(), 1)`);

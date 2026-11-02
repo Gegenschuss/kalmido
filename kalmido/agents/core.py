@@ -11,13 +11,15 @@ from flask import g, has_request_context
 from ..core.config import app, EMAIL_RE
 from ..core.pg import insert_id
 from ..core.i18n import tr
-from ..core.db import inbox_default, iso, now_utc, parse_iso
+from ..core.db import inbox_default, iso, iso_ms, now_utc, parse_iso
 from ..accounts.session import me
 from ..accounts.pictures import avatar_url
 from ..core.dlock import dl_list_locked
 from ..core.access import acx_task_ok, Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, org_trip_sql, reading_sql, task_visible, vis_sql, WRITE_ROLES
 from ..core.state import visible_sections
+from ..tasks.oneway import dec_list
 from ..tasks.validation import valid_hm
+from ..tasks.watchers import wat_users  # 2.473.0 (#3357)
 from ..collab.comments import comment_plain, user_names
 from ..core.errors import BadInput
 from ..notify.alerts import _env_int
@@ -70,10 +72,13 @@ AGENT_EVENTS = ("mention", "comment", "assigned", "unassigned", "chat", "reactio
                 "missed",  # 2.29.0 (#1031): events older than AGENT_EVENTS_STALE_H, folded into one summary at the next poll
                 "stale_tasks",  # 2.34.0 (#266): once a day, the stale tasks of lists with "Agent follows up" on (bundled)
                 "scheduled_job",  # 2.34.0 (#272): a planned job of a person is due (agents/schedules.py); answer in their chat
+                "decision_added",  # 2.392.0 C (#3370): a decision was recorded on a task the agent sees with its comments
                 "deployed",  # 2.60.0 (#1514): a version / milestone arrived in an environment (Staging, Live) of a list shared with the agent
+                "task.completed",  # 2.392.0 B (#3364): the git poll completed a task because its package or code is released (via "release")
                 "playbook_proposal",  # 2.39.0 (#1168): people applied / discarded the agent's proposed change of a list's Playbook
                 "message_edited",  # 2.39.0 (#1179): a person changed a chat message / comment / team message the agent already had
                 "file_shared",  # 2.48.0 (#1207): a folder / file of the file store was shared with the agent (node, role)
+                "sheet_shared", "sheet_unshared",  # 2.465.0 (#2361): a table was shared with the agent (sheet, role) / that share ended (sheet id)
                 "document_added",  # 2.48.0 (#1356): a new document was recognised in a folder / file shared with the agent
                 "offer_accepted",  # 2.51.0 A (#1348): a quotation of its office area was accepted (agents with the office switch)
                 "review_requested",  # 2.60.0 C (#1512): the agent is the reviewer of a task that went into review
@@ -185,7 +190,7 @@ def wh_queue_raw(c, w, env):
               (w["id"], env["id"], env["event"], json.dumps({**env, "webhook_id": w["id"]}, ensure_ascii=False), time.time(), iso(now_utc())))
 
 
-def agent_emit(c, aid, event, data, actor="auto"):
+def agent_emit(c, aid, event, data, actor="auto", via=None):
     """Records an event for agent aid (the polling queue) and queues its webhook delivery; the caller commits. Nothing for a
     paused / disabled agent or for the agent's own actions. Returns the event's seq or None."""
     a = agent_row(c, aid)
@@ -225,7 +230,7 @@ def agent_emit(c, aid, event, data, actor="auto"):
         if pb:
             data = {**data, "playbook": pb_for_agent(c, pb, aid)}  # 2.126.0 B (#1978): with its authors
     ev, ts = str(uuid.uuid4()), iso(now_utc())
-    via = (act_via() or "web") if has_request_context() else "web"
+    via = via or ((act_via() or "web") if has_request_context() else "web")  # 2.392.0 B (#3364): via "release"
     seq = insert_id(c, "INSERT INTO agent_events(agent_id,uuid,event,payload,created_at) VALUES(?,?,?,'{}',?)", (aid, ev, event, ts))
     env = {"id": ev, "seq": seq, "event": event, "created_at": ts, "agent_id": aid, "actor": actor, "via": via, "data": data}
     c.execute("UPDATE agent_events SET payload=? WHERE id=?", (json.dumps(env, ensure_ascii=False), seq))
@@ -296,6 +301,7 @@ def agent_task_data(c, tid, aid, full=None, **extra):
     if full:
         task["comments"] = agent_event_comments(c, tid)
         task["comments_total"] = c.execute("SELECT COUNT(*) FROM comments WHERE task_id=? AND deleted_at IS NULL", (tid,)).fetchone()[0]
+        task["decisions"] = dec_list(c, tid, current=True)  # 2.392.0 C (#3370): those in force
         lst["sections"] = list_sections(c, aid, row["list_id"])
         rp = git_repo_for_task(c, row, aid)  # 2.2.0 (#339): the repository to work in, a branch name, the linked code (2.396.0 A #3386: its git author)
         if rp:
@@ -322,14 +328,14 @@ def _lv_comment_choices(k):
 
 
 def agent_comment_events(c, t, cid, mentions, new_mentions, created=True):
-    """Comment on task t: 'mention' to newly mentioned agents, 'comment' to agents that follow the task (assignee, creator,
-    earlier commenters). Only agents that see the task with its comments."""
+    """Comment on task t: 'mention' to newly mentioned agents, 'comment' to agents that follow the task (assignee, delegated
+    agent, creator, watchers, earlier commenters). Only agents that see the task with its comments."""
     ag = agent_ids(c)
     if not ag:
         return
     k = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
-    follow = {t["assignee_id"], t["created_by"]} | {r[0] for r in c.execute(
-        "SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id!=?", (t["id"], cid))}
+    follow = {t["assignee_id"], t["created_by"], t["delegate_agent_id"]} | wat_users(c, t["id"]) | {r[0] for r in c.execute(
+        "SELECT DISTINCT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id!=?", (t["id"], cid))}  # 2.473.0 (#3357): + delegated, watchers
     # 2.13.1 (#471): agents set to read every comment of a person in this list ("Agent reads every comment")
     listen = set(listen_agents_of(c, t["list_id"])) if created and k["user_id"] not in ag else set()
     for aid in sorted(ag):
@@ -371,19 +377,20 @@ def agent_task_mentions(c, tid, old_text=""):
             agent_emit(c, aid, "mention", agent_task_data(c, tid, aid, comment=None, where="task"))
 
 
-def agent_assign_event(c, tid, kind, uid):
+def agent_assign_event(c, tid, kind, uid, delegated=False):
+    """2.473.0 (#3357): delegated = the task is delegated to the agent (tasks.delegate_agent_id), the person stays assignee."""
     if not uid or uid not in agent_ids(c):
         return
     if task_visible(c, tid, uid, full=True):
-        extra = {}
+        extra = {"delegated": True} if delegated else {}
         if kind == "assigned":  # 2.236.0 C (#2906 #2907): its place in the queue + the priority rule for choosing the next task
             from .workqueue import wq_event_extra
-            extra = wq_event_extra(c, uid, tid)
+            extra.update(wq_event_extra(c, uid, tid))
         agent_emit(c, uid, kind, agent_task_data(c, tid, uid, **extra))
     elif kind == "unassigned":  # 2.36.2 (#1142): out of sight -> only the ids (the agent can drop the task), no content
         r = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
         if r:
-            agent_emit(c, uid, kind, {"task": {"id": tid, "list_id": r[0]}, "list": {"id": r[0]}, "visible": False})
+            agent_emit(c, uid, kind, {"task": {"id": tid, "list_id": r[0]}, "list": {"id": r[0]}, "visible": False, **({"delegated": True} if delegated else {})})
 
 
 # 2.30.0 (#1034): an agent of a list either LISTENS IN (it gets every task created in or moved into the list -- task_added /
@@ -498,7 +505,7 @@ def tidy_agent_of(c, lid, cands=None):
     return cands[0] if cands else None
 
 
-_BURST, _BURST_HELD, _BURST_LOCK = {}, {}, threading.Lock()
+_BURST, _BURST_LOCK = {}, threading.Lock()
 
 
 def _burst_actor():
@@ -522,32 +529,33 @@ def burst_hit(kind, lid):
         return len(ts) > AGENT_BURST
 
 
-def _burst_hold(lid, tid, how, from_lid, source):
+def _burst_hold(c, lid, tid, how, from_lid, source):
+    """2.465.0 (#3892): one row per task in the table, the caller commits it with the task: with KALMIDO_ROLE=web the watchdog
+    (burst_tick) is another process, a burst held in this process's memory never reached it."""
     a = _burst_actor()
-    with _BURST_LOCK:
-        h = _BURST_HELD.setdefault((a["id"], lid), {"actor": a, "ids": [], "how": set(), "from": set(), "source": set()})
-        if len(h["ids"]) < AGENT_BURST_IDS:
-            h["ids"].append(tid)
-        h["n"] = h.get("n", 0) + 1
-        h["how"].add(how)
-        if from_lid:
-            h["from"].add(from_lid)
-        if source:
-            h["source"].add(source)
-        h["last"] = time.monotonic()
+    c.execute("INSERT INTO agent_burst_held(actor_id,list_id,task_id,how,from_list,source,held_at) VALUES(?,?,?,?,?,?,?)",
+              (a["id"], lid, tid, how, from_lid, source or "", iso_ms(now_utc())))
 
 
 def burst_tick(c):
-    """Watchdog: one 'tasks_added' per agent of the list for every burst that has been quiet for AGENT_BURST_QUIET_S."""
-    now = time.monotonic()
-    with _BURST_LOCK:
-        ready = [(k, _BURST_HELD.pop(k)) for k, h in list(_BURST_HELD.items()) if now - h["last"] >= AGENT_BURST_QUIET_S]
+    """Watchdog: one 'tasks_added' per agent of the list for every burst that has been quiet for AGENT_BURST_QUIET_S.
+    2.465.0 (#3892): DELETE ... RETURNING takes a burst once; a failure before the commit leaves it held for the next tick."""
+    cut = iso_ms(now_utc() - timedelta(seconds=AGENT_BURST_QUIET_S))
+    ready = c.execute("SELECT actor_id, list_id FROM agent_burst_held GROUP BY actor_id, list_id HAVING MAX(held_at)<=?", (cut,)).fetchall()
     sent = 0
-    for (_, lid), h in ready:
-        if not c.execute("SELECT 1 FROM lists WHERE id=?", (lid,)).fetchone():
-            continue
-        ids = [r[0] for r in c.execute(f"SELECT id FROM tasks WHERE list_id=? AND deleted_at IS NULL AND id IN ({','.join('?' * len(h['ids']))})",
-                                       (lid, *h["ids"]))] if h["ids"] else []
+    for actor_id, lid in ready:
+        held = c.execute("DELETE FROM agent_burst_held WHERE actor_id=? AND list_id=? RETURNING id, task_id, how, from_list, source",
+                         (actor_id, lid)).fetchall()
+        held.sort(key=lambda r: r["id"])
+        tids = list(dict.fromkeys(r["task_id"] for r in held))
+        how = {r["how"] for r in held}
+        sources = sorted({r["source"] for r in held if r["source"]})
+        froms = sorted({r["from_list"] for r in held if r["from_list"]})
+        kept = tids[:AGENT_BURST_IDS]
+        ids = [r[0] for r in c.execute(f"SELECT id FROM tasks WHERE list_id=? AND deleted_at IS NULL AND id IN ({','.join('?' * len(kept))})",
+                                       (lid, *kept))] if kept else []
+        u = c.execute("SELECT id, display_name, username, kind FROM users WHERE id=?", (actor_id,)).fetchone()
+        actor = {"id": u["id"], "name": u["display_name"] or u["username"], "kind": "agent" if u["kind"] == "agent" else "person"}
         listen = set(listen_agents_of(c, lid))  # 2.30.0 (#1034): only agents that listen in
         for aid in list_agents(c, lid):
             if aid not in listen:
@@ -556,14 +564,14 @@ def burst_tick(c):
             if not mine:
                 continue
             data = {"list": lst_brief(c, lid), "list_id": lid, "task_ids": mine, "count": len(mine),
-                    "how": "moved" if h["how"] == {"moved"} else ("created" if h["how"] == {"created"} else "mixed"),
-                    "truncated": h.get("n", 0) > len(h["ids"])}
-            if h["source"]:
-                data["source"] = sorted(h["source"])[0]
-            moved_from = [{"id": f, "name": lst_brief(c, f)["name"]} for f in sorted(h["from"]) if list_role(c, f, aid)]
+                    "how": "moved" if how == {"moved"} else ("created" if how == {"created"} else "mixed"),
+                    "truncated": len(tids) > len(kept)}
+            if sources:
+                data["source"] = sources[0]
+            moved_from = [{"id": f, "name": lst_brief(c, f)["name"]} for f in froms if list_role(c, f, aid)]
             if moved_from:
                 data["moved_from"] = moved_from
-            if agent_emit(c, aid, "tasks_added", data, actor=h["actor"]):
+            if agent_emit(c, aid, "tasks_added", data, actor=actor):
                 sent += 1
     c.commit()
     return sent
@@ -589,7 +597,7 @@ def agent_added_events(c, tid, from_lid=None, source=None, info=None):
     if not listen:
         return
     if burst_hit("added", t["list_id"]):  # 2.29.0 (#1031): a bulk move / script -> one 'tasks_added' later (burst_tick)
-        _burst_hold(t["list_id"], tid, "moved" if from_lid else "created", from_lid, source)
+        _burst_hold(c, t["list_id"], tid, "moved" if from_lid else "created", from_lid, source)
         return
     for aid in list_agents(c, t["list_id"]):
         if aid not in listen or not task_visible(c, tid, aid, full=True):
@@ -697,7 +705,9 @@ def tidy_tick(c):
 RUNTIME_DEFAULTS = {"model": "", "autocompact": True, "autocompact_pct": None, "nightly_reset": "", "permission_mode": "",
                     "rotate_size": "medium", "rotate_runs": 60, "rotate_idle_min": 45,
                     "perm_user": None,  # 2.312.0 D (#3266): who answers a team agent's permission questions (None = as set up)
-                    "git_author_name": "", "git_author_email": "", "git_coauthor": False}  # 2.396.0 A (#3386)
+                    "git_author_name": "", "git_author_email": "", "git_coauthor": False,  # 2.396.0 A (#3386)
+                    "dispatch": ""}  # 2.481.0 (#3662): the starter's mechanical dispatcher: "" off, "dry" dry run, "on"
+DISPATCH_MODES = ("", "dry", "on")
 # 2.396.0 A (#3386): the git author the agent's host sets for its commits (public in GitHub). '' = the neutral default;
 # git_coauthor: whether the AI appends a Co-Authored-By line. A project with a repo may override name / mail (git_author_of).
 GIT_AUTHOR_DEFAULT = ("Kalmido", "noreply@kalmido.com")
@@ -748,7 +758,7 @@ def git_author_clean(name, email):
         raise BadInput(tr("Invalid value: {0}", "git_author_email"))
     email = email.strip()
     if email and (len(email) > 200 or any(ch in "<>,\x7f" or ord(ch) < 32 for ch in email) or not EMAIL_RE.fullmatch(email)):
-        raise BadInput(tr("Git author: please enter a valid email address"))
+        raise BadInput(tr("Git author: please enter a valid e-mail address"))
     return name.strip(), email
 
 
@@ -811,6 +821,11 @@ def runtime_clean(cur, b):
         if not isinstance(b["git_coauthor"], bool):
             raise BadInput(tr("Invalid value: {0}", "git_coauthor"))
         out["git_coauthor"] = b["git_coauthor"]
+    if "dispatch" in b:  # 2.481.0 (#3662)
+        v = b["dispatch"] if b["dispatch"] is not None else ""
+        if v not in DISPATCH_MODES:
+            raise BadInput(tr("Invalid value: {0}", "dispatch"))
+        out["dispatch"] = v
     return out
 
 
@@ -1083,6 +1098,11 @@ def job_may_act(c, j, uid, action):
     return is_approver(c, t, uid) or (action == "stop" and task_visible(c, t["id"], uid, write=True))
 
 
+def agent_is_ai(a):
+    """2.482.0 (#3530): an agent counts as AI unless it is marked as a bot without AI (agents.ai = 0)."""
+    return not (a is not None and "ai" in a.keys() and a["ai"] is not None and int(a["ai"]) == 0)
+
+
 def agent_public(c, a, uid=None):
     """An agent as the people who share lists with it see it: status + their visible running / waiting jobs + unread chat."""
     from ..agents.usage import usage_block, usage_cost_public
@@ -1094,10 +1114,12 @@ def agent_public(c, a, uid=None):
                        (a["user_id"], uid)).fetchone()[0] if uid else 0
     return {"id": a["user_id"], "username": a["username"], "name": a["display_name"] or a["username"],
             "display_name": a["display_name"] or a["username"],
+            "ai": agent_is_ai(a),  # 2.482.0 (#3530): labelled "AI agent" (EU AI Act Art. 50); 0 = a bot without AI
             # 2.28.0 (#935 / #965): the workspace it works in (null = private) and whose personal agent it is (null = team)
             "org_id": a["org_id"] if "org_id" in a.keys() else None, "owner_id": a["owner_id"] if "owner_id" in a.keys() else None,
             "avatar": avatar_url(c.execute("SELECT * FROM users WHERE id=?", (a["user_id"],)).fetchone()),
             "enabled": agent_active(a), "status": a["status"] or "idle", "status_text": a["status_text"] or "", "status_at": a["status_at"],
+            "status_key": (a["status_key"] or "") if a["status_text"] else "", "status_key_at": (a["status_key_at"] or "") if a["status_text"] else "",  # 2.450.0 (#3769)
             # 2.26.0 (#949): paused with a reason (the agent itself, its owner or an admin)
             "paused": a["status"] == "paused", "pause_reason": (a["status_text"] or "") if a["status"] == "paused" else "",
             # 2.0.2: the task it says it works on (only when the viewer may see it) + the tasks of its running jobs

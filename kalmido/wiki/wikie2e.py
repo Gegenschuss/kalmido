@@ -32,9 +32,9 @@ WKE_KEYS_MAX = 500     # entries per start / keys / rotate call (an organisation
 WKE_WRAP_MAX = 200     # characters of a wrapped space key
 WKE_PATH_MAX = 4000    # characters of an encrypted path (finding L3; a plain path has at most WIKI_PATH_MAX)
 WKE_MSG = {
-    "wiki_e2e": N_("This space is encrypted in the browser. Pages can only be changed in the app."),
-    "wiki_e2e_busy": N_("This space is being encrypted. Try again in a moment."),
-    "wiki_e2e_open": N_("Encrypted texts belong only in spaces encrypted in the browser."),
+    "wiki_e2e": N_("This workspace is encrypted in the browser. Pages can only be changed in the app."),
+    "wiki_e2e_busy": N_("This workspace is being encrypted. Try again in a moment."),
+    "wiki_e2e_open": N_("Encrypted texts belong only in workspaces encrypted in the browser."),
 }
 
 
@@ -305,7 +305,7 @@ def _wke_switch(c, v, on_ok=True):
     uid, oid = _wke_space(c, v)
     sp = wke_row(c, oid, uid)
     if not sp or sp["e2e"] not in (("encrypting", "decrypting", "on") if on_ok else ("encrypting", "decrypting")):
-        return uid, oid, sp, err(tr("No encryption change is running for this space."), 409)
+        return uid, oid, sp, err(tr("No encryption change is running for this workspace."), 409)
     if not wke_can_manage(c, oid, uid):
         raise Denied(403, tr("Only organisation admins can change this setting"))
     return uid, oid, sp, None
@@ -365,10 +365,10 @@ def wke_start():
             c.commit()
         return jsonify(wke_info(c, oid, uid))
     if sp and sp["e2e"]:
-        return err(tr("The space is already encrypted in the browser."), 409)
+        return err(tr("The workspace is already encrypted in the browser."), 409)
     from .wikiatt import wka_space_has_files  # 2.99.0 A (#2182): page files cannot be encrypted in the browser yet
     if wka_space_has_files(c, oid, uid):
-        return err(tr("The pages of this space have files. Files cannot be encrypted in the browser yet: delete them first."), 409)
+        return err(tr("The pages of this workspace have files. Files cannot be encrypted in the browser yet: delete them first."), 409)
     mine = e2e_keys_of(c, uid)
     if not mine:
         return err(tr("Set up end-to-end encryption first (Settings > Account)."), 409)
@@ -397,7 +397,7 @@ def wke_start():
     if not c.execute("UPDATE wiki_spaces SET e2e='encrypting', e2e_gen=?, e2e_rotate=0, e2e_reenc=0, e2e_by=?, e2e_at=? "
                      "WHERE id=? AND e2e IS NULL AND e2e_gen=?", (gen, uid, ts, sp["id"], gen - 1)).rowcount:
         c.rollback()
-        return err(tr("The space is already encrypted in the browser."), 409)
+        return err(tr("The workspace is already encrypted in the browser."), 409)
     c.execute("DELETE FROM wiki_keys WHERE space_id=?", (sp["id"],))
     c.execute("DELETE FROM wiki_key_pending WHERE space_id=?", (sp["id"],))
     for u, w in given.items():
@@ -543,7 +543,7 @@ def wke_finish():
         return e
     mode, gen, reenc = sp["e2e"], int(sp["e2e_gen"] or 0), int(sp["e2e_reenc"] or 0)
     if mode == "on" and not reenc:
-        return err(tr("No encryption change is running for this space."), 409)
+        return err(tr("No encryption change is running for this workspace."), 409)
     left = wke_left(c, sp)[1]
     if left["pages"]:
         return jsonify(error=tr("Not all pages are converted yet."), code="wiki_e2e_left", left=left), 409
@@ -552,14 +552,14 @@ def wke_finish():
         if not c.execute("UPDATE wiki_spaces SET e2e_reenc=0 WHERE id=? AND e2e='on' AND e2e_gen=? AND e2e_reenc=?",
                          (sp["id"], gen, reenc)).rowcount:
             c.rollback()
-            return err(tr("No encryption change is running for this space."), 409)
+            return err(tr("No encryption change is running for this workspace."), 409)
         bump(c)
         c.commit()
         return jsonify(ok=True, mode="on")
     if not c.execute("UPDATE wiki_spaces SET e2e=?, e2e_at=? WHERE id=? AND e2e=? AND e2e_gen=?",
                      ("on" if mode == "encrypting" else None, ts, sp["id"], mode, gen)).rowcount:
         c.rollback()
-        return err(tr("No encryption change is running for this space."), 409)
+        return err(tr("No encryption change is running for this workspace."), 409)
     w, a = wke_space_sql(sp["org_id"], sp["owner_id"])
     if mode == "encrypting":  # copies of the plain texts: links (backlinks, mentions) and the frontmatter cache
         c.execute(f"DELETE FROM wiki_links WHERE from_id IN (SELECT id FROM wiki_pages WHERE {w})", a)
@@ -583,16 +583,16 @@ def wke_stop():
     uid, oid = _wke_manage(c, b.get("space"))
     sp = wke_row(c, oid, uid)
     if not sp or sp["e2e"] not in ("on", "encrypting"):
-        return err(tr("The space is not encrypted in the browser."), 409)
+        return err(tr("The workspace is not encrypted in the browser."), 409)
     if not c.execute("SELECT 1 FROM wiki_keys WHERE space_id=? AND user_id=? AND gen=?", (sp["id"], uid, sp["e2e_gen"])).fetchone():
-        return err(tr("You have no key for this space yet."), 409)
+        return err(tr("You have no key for this workspace yet."), 409)
     e = e2e_reauth(c, uid, b)
     if e is not None:
         return e
     if not c.execute("UPDATE wiki_spaces SET e2e='decrypting', e2e_by=?, e2e_at=? WHERE id=? AND e2e IN ('on', 'encrypting')",
                      (uid, iso(now_utc()), sp["id"])).rowcount:
         c.rollback()
-        return err(tr("The space is not encrypted in the browser."), 409)
+        return err(tr("The workspace is not encrypted in the browser."), 409)
     bump(c)
     c.commit()
     return jsonify(wke_info(c, oid, uid))
@@ -610,7 +610,7 @@ def wke_keys():
     uid, oid = _wke_manage(c, b.get("space"))
     sp = wke_row(c, oid, uid)
     if not sp or not sp["e2e"]:
-        return err(tr("The space is not encrypted in the browser."), 409)
+        return err(tr("The workspace is not encrypted in the browser."), 409)
     mine = e2e_keys_of(c, uid)
     keys = b.get("keys")
     if not mine or not isinstance(keys, list) or not keys or len(keys) > WKE_KEYS_MAX:
@@ -628,7 +628,7 @@ def wke_keys():
         if u not in people or not people[u]["has_keys"]:
             return err(tr("{0} cannot receive the key (not a member or encryption not set up).", people[u]["name"] if u in people else "?"), 409)  # review L3: no names outside
         if gn not in have or gn > gen:
-            return err(tr("You have no key for this space yet."), 409)
+            return err(tr("You have no key for this workspace yet."), 409)
         rows.append((u, gn, w))
     ts = iso(now_utc())
     got, skipped = set(), set()
@@ -671,16 +671,16 @@ def wke_rotate():
     uid, oid = _wke_manage(c, b.get("space"))
     sp = wke_row(c, oid, uid)
     if not sp or sp["e2e"] != "on":
-        return err(tr("The space is not encrypted in the browser."), 409)
+        return err(tr("The workspace is not encrypted in the browser."), 409)
     cur = int(sp["e2e_gen"] or 0)
     mine = e2e_keys_of(c, uid)
     if not mine or not c.execute("SELECT 1 FROM wiki_keys WHERE space_id=? AND user_id=? AND gen=?", (sp["id"], uid, cur)).fetchone():
-        return err(tr("You have no key for this space yet."), 409)
+        return err(tr("You have no key for this workspace yet."), 409)
     gen, keys = b.get("gen"), b.get("keys")
     if isinstance(gen, bool) or not isinstance(gen, int):
         return err(tr("Invalid value: {0}", "gen"))
     if gen != cur + 1:
-        return jsonify(error=tr("The key of this space was changed meanwhile."), code="wiki_e2e_gen", gen=cur), 409
+        return jsonify(error=tr("The key of this workspace was changed meanwhile."), code="wiki_e2e_gen", gen=cur), 409
     people = wke_people(c, sp, oid, uid)
     given = _wke_given(keys, {p["user_id"] for p in people if p["has_keys"]})
     if not given or uid not in given:
@@ -690,12 +690,12 @@ def wke_rotate():
     if not c.execute("UPDATE wiki_spaces SET e2e_gen=?, e2e_rotate=0, e2e_reenc=?, e2e_by=?, e2e_at=? WHERE id=? AND e2e='on' AND e2e_gen=?",
                      (gen, gen, uid, ts, sp["id"], cur)).rowcount:
         c.rollback()
-        return jsonify(error=tr("The key of this space was changed meanwhile."), code="wiki_e2e_gen", gen=cur), 409
+        return jsonify(error=tr("The key of this workspace was changed meanwhile."), code="wiki_e2e_gen", gen=cur), 409
     # the space row is locked now: a member who left in the meantime must not get the new key (the browser asks again)
     now = {u for u, _ in wke_member_ids(c, oid, uid)}
     if set(given) - now:
         c.rollback()
-        return jsonify(error=tr("The members of this space changed meanwhile. Try again."), code="wiki_e2e_members"), 409
+        return jsonify(error=tr("The members of this workspace changed meanwhile. Try again."), code="wiki_e2e_members"), 409
     for u, w in given.items():
         c.execute("INSERT INTO wiki_keys(space_id,gen,user_id,wrapped,wrapped_by,wrapper_pub,created_at) VALUES(?,?,?,?,?,?,?)",
                   (sp["id"], gen, u, w, uid, mine["pub"], ts))

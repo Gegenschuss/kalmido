@@ -104,7 +104,7 @@ check(Ri.patch(B + f"/api/tasks/{T2}", json={"title": "x"}).status_code == 403, 
 check(Ri.post(B + "/api/tasks", json={"list_id": L2, "title": "x"}).status_code == 403, "read-only: no new task")
 check(Ri.post(B + "/api/lists", json={"name": "Mine", "org_id": ORG}).status_code == 403, "read-only: no list in the organisation")
 r = Ri.post(B + "/api/lists", json={"name": "Private notes", "org_id": None})
-check(r.ok and Ri.patch(B + f"/api/lists/{r.json()['id']}", json={"name": "Private notes 2"}).ok, "read-only: the own private space works")
+check(r.ok and Ri.patch(B + f"/api/lists/{r.json()['id']}", json={"name": "Private notes 2"}).ok, "read-only: the own private workspace works")
 
 for nm, s in (("guest", Gi), ("accounting", Ax)):
     sl = state_lists(s)

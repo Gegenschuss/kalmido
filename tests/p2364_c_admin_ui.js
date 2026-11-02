@@ -6,9 +6,10 @@
 //   the chosen role, the link to copy. An organisation admin who is no server admin gets no link choice.
 // - The recovery key / export of an organisation once (Organisation > Data), not again under People or the server switch.
 // - One role word: the project role "view" reads "Read-only" (German "Nur lesen"), the server admin box "Manage the server".
+// - #3882: an organisation admin approves a waiting registration in the person's row.
 // - A member sees no sub-tabs and no invitation; a person without an organisation keeps their own settings (P4).
 // - #3044: Settings > Access is listed only with an own API token / webhook, else it waits under Integrations > "For advanced
-//   users"; "New user" folds SSO login, ntfy topic, child account and the OIDC note under "Advanced"; everyday German words.
+//   users"; "New person" folds SSO sign-in, ntfy topic, child account and the OIDC note under "Advanced"; everyday German words.
 // freelancer-matrix: settings
 // kalmido-suite: fresh
 const {execFileSync} = require('child_process');
@@ -87,19 +88,19 @@ const subs = (md, sec) => [...md.querySelectorAll(`[data-pane="${sec}"] [data-ad
   check(secOn(md) === 'users' && !md.querySelector('#admp-server').hidden, "settingsModal('server'): Server > Server");
   click(w, md.querySelector('[data-admsub="agents"]'));
   check(await until(() => secOn(md) === 'org' && !md.querySelector('#admp-agents').hidden), 'a sub-tab of Organisation opens Organisation: ' + secOn(md));
-  // the server admin box in "Edit user"
+  // the server admin box in "Edit person"
   click(w, md.querySelector('[data-admsub="users"]'));
   const eb = await until(() => md.querySelector(`#a-users [data-acc="user-edit"][data-uid="${uid.bob}"]`));
   click(w, eb);
   const um = await until(() => d.querySelector('#u-admin')?.closest('.modal'));
-  check(um && /Manage the server/.test(um.querySelector('#u-admin').closest('label').textContent), 'Edit user: "Manage the server" instead of "Admin"');
+  check(um && /Manage the server/.test(um.querySelector('#u-admin').closest('label').textContent), 'Edit person: "Manage the server" instead of "Admin"');
   w.eval(`document.querySelectorAll('.modal').forEach(m => m.remove())`);
-  // #3044: "New user": the special fields under a closed "Advanced"
+  // #3044: "New person": the special fields under a closed "Advanced"
   w.eval(`userModal(null)`);
   const nu = await until(() => d.querySelector('#u-proxy')?.closest('.modal'));
   const adv = nu?.querySelector('details.uadv');
-  check(adv && !adv.open && ['#u-proxy', '#u-topic', '#u-kid'].every(q => adv.querySelector(q)) && /OIDC/.test(adv.textContent), 'New user: SSO, ntfy, child account and OIDC folded under "Advanced"');
-  check(nu && !nu.querySelector('#u-name').closest('details') && !nu.querySelector('#u-email').closest('details') && !/OIDC/.test(nu.querySelector('#u-email').placeholder), 'New user: name and e-mail stay in view, no OIDC word at the e-mail');
+  check(adv && !adv.open && ['#u-proxy', '#u-topic', '#u-kid'].every(q => adv.querySelector(q)) && /OIDC/.test(adv.textContent), 'New person: SSO, ntfy, child account and OIDC folded under "Advanced"');
+  check(nu && !nu.querySelector('#u-name').closest('details') && !nu.querySelector('#u-email').closest('details') && !/OIDC/.test(nu.querySelector('#u-email').placeholder), 'New person: name and e-mail stay in view, no OIDC word at the e-mail');
   w.eval(`document.querySelectorAll('.modal').forEach(m => m.remove())`);
   // one role word in projects
   check(w.eval(`tr(ROLES.find(r => r[0] === 'view')[1])`) === 'Read-only' && w.eval(`tr(FP_ROLES.find(r => r[0] === 'view')[1])`) === 'Read-only', 'project role "view" reads "Read-only"');
@@ -125,11 +126,18 @@ const subs = (md, sec) => [...md.querySelectorAll(`[data-pane="${sec}"] [data-ad
   await call('PATCH', '/api/settings', {lang: 'en'});
 
   // ================= the organisation's admin (no server admin)
+  // 2.464.0 (#3882): a registration by the organisation's domain waits: its admin decides it in the person's row
+  uid.pia = (await call('POST', '/api/users', {username: 'pia', display_name: 'Pia', password: 'password123', email: 'pia@example.com', orgs: [{id: ORG, role: 'member'}]})).id;
+  execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, "UPDATE users SET signup='pending', disabled=1 WHERE id=?", JSON.stringify([uid.pia])]);
   w = await boot({user: 'olga'}); d = w.document;
   w.eval(`settingsModal('org')`);
   md = await until(() => d.querySelector('.smodal'));
   check(secOn(md) === 'org' && subs(md, 'org') === 'users,odata', 'organisation admin: People and Data, no Agents: ' + subs(md, 'org'));
   check(!md.querySelector('.snav [data-sec="users"]') && !md.querySelector('#a-users'), 'organisation admin: no Server, no server users');
+  const pb = await until(() => d.querySelector(`#s-ws [data-wsok="${uid.pia}"]`));
+  check(pb && /Pia/.test(pb.closest('.mrow').textContent) && /waits for approval/.test(pb.closest('.mrow').textContent), 'organisation admin: Approve in the row of the person who waits');
+  click(w, pb);
+  check(await until(() => /Approved/.test(d.querySelector('#toast')?.textContent || '') && !d.querySelector(`#s-ws [data-wsok="${uid.pia}"]`)), 'organisation admin: approved, the button is gone');
   click(w, await until(() => d.querySelector(`.wsorg[data-oid="${ORG}"] [data-oinv="new"]`)));
   dlg = await until(() => d.querySelector('#oinv-mail')?.closest('.modal'));
   check(dlg && !dlg.querySelector('[data-oinvhow]'), 'organisation admin: invitation by e-mail only (the link stays with the server admins)');

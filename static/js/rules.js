@@ -49,6 +49,7 @@ function rul_actText(r) {
 function rxTrigField(t, n) {
   const f = rul_q(n.field || rul_gone());
   if (t.value == null) return tr('the field {0} changes', f);
+  if (t.value === '*') return tr('the field {0} is filled', f);  // 2.473.0 (#3378)
   if (fieldById(t.field_id)?.type === 'checkbox' || t.value === '0') return t.value === '1' ? tr('the field {0} is checked', f) : tr('the field {0} is unchecked', f);
   return tr('the field {0} is set to {1}', f, rul_q(n.value || t.value));
 }
@@ -60,9 +61,9 @@ function rxActField(a, n) {
 }
 const rxFields = lid => fieldsAll(lid).filter(f => !['formula', 'multiselect', 'task'].includes(f.type));  // 2.156.0 B (#2069): no rule sets a multiple choice / task link
 const rxOpt = (v, n, cur) => `<option value="${esc(String(v))}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`;
-function rxTrigValHtml(lid, fid, cur) {  // "set to" of a selection / checkbox field (else: any change)
-  const f = fieldById(+fid); if (!f || !['select', 'checkbox'].includes(f.type)) return '';
-  const os = f.type === 'checkbox' ? [['1', tr('Checked|checkbox')], ['0', tr('Unchecked|checkbox')]] : (f.options?.options || []).map(o => [o.id, o.name]);
+function rxTrigValHtml(lid, fid, cur) {  // "set to" of a selection / checkbox field; 2.473.0 (#3378): every field but a checkbox: "is filled"
+  const f = fieldById(+fid); if (!f) return '';
+  const os = f.type === 'checkbox' ? [['1', tr('Checked|checkbox')], ['0', tr('Unchecked|checkbox')]] : [['*', tr('Filled|value')], ...(f.options?.options || []).map(o => [o.id, o.name])];
   return `<label for="rul-tfv">${tr('Value')}</label><select id="rul-tfv">${rxOpt('', tr('Any change'), cur)}${os.map(([v, nm]) => rxOpt(v, nm, cur)).join('')}</select>`;
 }
 function rxActValHtml(l, fid, cur) {  // the fixed value, as the field type asks

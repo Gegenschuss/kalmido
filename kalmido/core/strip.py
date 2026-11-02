@@ -13,6 +13,7 @@ strip_js(text) / strip_css(text) return the text without comments or None (= uns
 character after a backslash; strip_asset checks its own result (same line ends, a second pass changes nothing) and sends
 the original when that fails."""
 import logging
+import os
 import re
 
 # a "/" after one of these is the start of a regex literal, after anything else (a name, a number, ")" or "]") a division
@@ -297,3 +298,31 @@ def strip_asset(rel, data):
         _LOG.warning("strip: static/%s failed the self-check, it goes out with its comments", rel)
         return None
     return res.encode("utf-8")
+
+
+# 2.476.0 (#3487): start styles without a growing app.css. Rules needed before any module loads go into a file of their own,
+# static/css/start-<topic>.css (one per package / topic, so parallel packages never write the same lines); the server sends
+# /static/app.css as app.css followed by these files in name order (one URL, one content hash, one ETag, stripped together).
+# tools/perf_budget.py, tools/pack_static.py and tools/build_demo.py use the same two helpers. tools/check_appcss.py keeps
+# app.css from growing. They are no module stylesheets: LD_CSS / LAZY_CSS never name them (tools/check_layout.py).
+START_CSS_PREFIX = "start-"
+
+
+def start_css_files(static_dir):
+    """The start style files (absolute paths) in the order they follow app.css: static/css/start-*.css sorted by name."""
+    d = os.path.join(static_dir, "css")
+    try:
+        names = os.listdir(d)
+    except OSError:
+        return []
+    return [os.path.join(d, n) for n in sorted(names) if n.startswith(START_CSS_PREFIX) and n.endswith(".css")]
+
+
+def with_start_css(static_dir, data, files=None):
+    """app.css (bytes) followed by the start style files: each begins on a new line, after a comment naming it."""
+    parts = [data]
+    for p in start_css_files(static_dir) if files is None else files:
+        with open(p, "rb") as f:
+            part = f.read()
+        parts.append(b"\n/* css/" + os.path.basename(p).encode("utf-8") + b" */\n" + part)
+    return b"".join(parts)

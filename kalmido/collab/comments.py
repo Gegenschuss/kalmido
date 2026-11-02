@@ -2,20 +2,21 @@
 import json
 import os
 import re
-import threading
 import time
 from datetime import date
 from flask import g, has_request_context, jsonify, request
 
-from ..core.config import app, PUBLIC_URL
-from ..core.pg import insert_id
+from ..core.config import app, APP_NAME, PUBLIC_URL
+from ..core.env import env_bool
+from ..core.pg import insert_id, write_lock
 from ..core.i18n import LANGS, short_day, tr, trn
 from ..core.db import body, bump, db, err, inbox_default, iso, iso_ms, local_now, now_utc, usettings
-from ..accounts.session import me
+from ..accounts.session import gated_thread, me
 from ..core.access import collab_all, Denied, list_people, list_role, MANAGE_ROLES, need_feat, need_task, task_visible, pvis
 from ..core.serializers import unlink_files
 from ..tasks.tasks import WEB_COMMENT
 from ..tasks.attachments import save_attachments
+from ..tasks.oneway import dec_list, gate_irreversible
 from .replies import reply_check, with_replies
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
 
@@ -185,6 +186,8 @@ def timeline(tid):
         if sk in ("merge_request", "integrate", "deploy") and x["user_id"] in ag:  # 2.190.0 C (#2561): who may decide this request
             trow = trow or c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
             x["may_decide"] = is_approver(c, trow, me(), agent=x["user_id"], assignee=sk == "merge_request")
+            if sk != "merge_request" and x["suggestion"].get("state") == "open":  # 2.392.0 C (#3370): what blocks NOW, for this reader
+                x["suggestion"]["irreversible"] = gate_irreversible(c, trow, sk, me())
     ppl = task_people(c, t["list_id"], tid) if collab_all() else []  # 2.86.0 (N20)
     for p in ppl:
         if p["id"] in ag:
@@ -194,7 +197,9 @@ def timeline(tid):
                    agents=sorted(i for i in ids | {p["id"] for p in ppl} if i in ag),
                    can_write=task_visible(c, tid, me(), write=True),
                    approver=is_approver(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), me()),  # 2.2.0 (#339)
-                   ticket=pt_ticket_info(c, tid, me()))  # 2.63.0 B (#1513): a customer's report (box in the task panel)
+                   ticket=pt_ticket_info(c, tid, me()),  # 2.63.0 B (#1513): a customer's report (box in the task panel)
+                   decisions=dec_list(c, tid),  # 2.392.0 C (#3370): the section at the top of the task panel
+                   may_yes=is_approver(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), me(), assignee=False))  # who gives the yes to a one-way task
 
 
 @app.post("/api/tasks/<int:tid>/seen")
@@ -215,7 +220,7 @@ def timeline_seen(tid):
 def comment_input():
     """(text, files) from a JSON body or a multipart form (comment with files)."""
     if request.files or request.form:
-        web_fields({k: 1 for k in [*request.form, *request.files]}, {"body", "file", "reply_to", "portal"}, "POST /api/tasks/{tid}/comments (form)")
+        web_fields({k: 1 for k in [*request.form, *request.files]}, {"body", "file", "reply_to", "portal", "client_ref"}, "POST /api/tasks/{tid}/comments (form)")
         return (request.form.get("body") or "").strip(), [f for f in request.files.getlist("file") if f and f.filename]
     web_fields(body(), WEB_COMMENT, "POST /api/tasks/{tid}/comments")
     return (body().get("body") or "").strip(), []
@@ -226,6 +231,27 @@ def comment_reply_in():
     return request.form.get("reply_to") if (request.files or request.form) else body().get("reply_to")
 
 
+def comment_ref(c, tid):
+    """2.370.2 (#3088): (client_ref of the request or None, the person's comment already made with it or None): sent again
+    (the answer got lost) = that comment. One deleted since gives its ref free: the same text may come anew."""
+    v = request.form.get("client_ref") if (request.files or request.form) else body().get("client_ref")
+    ref = v.strip()[:64] or None if isinstance(v, str) else None
+    if not ref:
+        return None, None
+    write_lock(c, f"comment-ref-{me()}")
+    r = c.execute("SELECT * FROM comments WHERE task_id=? AND user_id=? AND client_ref=?", (tid, me(), ref)).fetchone()
+    if r and r["deleted_at"]:
+        c.execute("UPDATE comments SET client_ref=NULL WHERE id=?", (r["id"],))
+        r = None
+    return ref, r
+
+
+def comment_answer(c, tid, r):
+    from ..collab.reactions import with_reactions
+    from .cchoice import lv_with_choices
+    return jsonify(lv_with_choices(c, tid, [r], with_replies(c, "c", with_reactions(c, [comment_dict(r, att_dicts(c, "comment_id=?", (r["id"],)))])))[0])
+
+
 @app.post("/api/tasks/<int:tid>/comments")
 def comment_create(tid):
     """2.0.6 (#315): also without collaboration (a personal note). Only with collaboration on (instance switch):
@@ -233,7 +259,7 @@ def comment_create(tid):
     from ..integrations.webhooks import wh_note
     from ..agents.core import agent_comment_events, is_agent, tidy_agent_of
     from ..collab.reactions import clean_suggestion, with_reactions
-    from ..integrations.git import git_merge_link, git_merge_request
+    from ..integrations.git import GIT_COMMENT_CMD, git_merge_link, git_merge_request
     c = db()
     if not is_agent(g.user):
         need_feat("comments")
@@ -242,6 +268,9 @@ def comment_create(tid):
     if t["deleted_at"]:
         return err(tr("The task is in the trash"), 409)
     text, files = comment_input()
+    ref, hit = comment_ref(c, tid)  # 2.370.2 (#3088)
+    if hit:
+        return comment_answer(c, tid, hit)
     from .liste2e import le2a_comment_in, le2a_text_max, le2e_mode
     if len(text) > le2a_text_max(text, MAX_COMMENT):  # 2.64.1 (#1817): a ciphertext is longer than its text
         return err(tr("The comment is too long (max. {0} characters)", MAX_COMMENT))
@@ -299,10 +328,10 @@ def comment_create(tid):
     except BadInput as e:
         return err(str(e))
     if portal and (sug or chs):  # 2.63.0 B (#1513): the customer sees text (and the files are not shown to them)
-        return err(tr("Suggestions and answer buttons cannot go to a customer"))
-    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to,choices,portal) VALUES(?,?,?,?,?,?,?,?,?)",
+        return err(tr("Suggestions and answer buttons cannot go to a client"))
+    cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to,choices,portal,client_ref) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (tid, me(), text, ",".join(map(str, mentions)), iso_ms(now_utc()),
-                     json.dumps(sug, ensure_ascii=False) if sug else None, orig["id"] if orig else None, chs, portal))
+                     json.dumps(sug, ensure_ascii=False) if sug else None, orig["id"] if orig else None, chs, portal, ref))
     replied = orig["user_id"] if orig and orig["user_id"] != me() else None
     if sug and sug.get("kind") == "merge_request":
         git_merge_link(c, t, sug)
@@ -330,8 +359,9 @@ def comment_create(tid):
     bump(c)
     c.commit()
     send_pushes(pushes)
-    r = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
-    return jsonify(lv_with_choices(c, tid, [r], with_replies(c, "c", with_reactions(c, [comment_dict(r, att_dicts(c, "comment_id=?", (cid,)))])))[0])
+    hint = GIT_COMMENT_CMD[0](c, t, text) if not portal else None  # 2.392.0 B (#3364): "partly: rest in Y" in the first line
+    r = comment_answer(c, tid, c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone())
+    return jsonify({**r.get_json(), "partial": hint}) if hint else r
 
 
 @app.patch("/api/comments/<int:cid>")
@@ -395,7 +425,7 @@ def comment_delete(cid):
 
 # ---- collaboration pushes (module "collab" of the recipient must be on; never to the person who acted;
 # only users who still see the task; each via their own ntfy topic, in their own language; click opens it)
-#  - comment: assignee, creator, everyone who commented before + mentioned people (even non-participants)
+#  - comment: assignee, creator, watchers, everyone who commented before + mentioned people (even non-participants)
 #  - assign / unassign: the new assignee / the previous one when someone else (re)assigns the task
 #  - complete: creator + whoever assigned it, when someone else completes a task in a shared list
 # Burst rule, shared by all of them (per recipient and task): the first push goes out right away; anything
@@ -419,8 +449,74 @@ def collab_user(c, uid, lid=None):
     return s if collab_on(s) else None
 
 
-def burst_gate(c, uid, tid, mentioned=False, event=False):
-    """True = push now (time remembered); False = counted for the watchdog's summary."""
+# 2.367 (#2967): the gate above is per task, so 10 tasks assigned at once were 10 pushes. push_gate counts per person and
+# scope: a<actor> = from the third push of one actor inside the gap only counted (PERSON_PUSH_FREE; an @mention always
+# comes), r<room> = one chat push per room and gap. The watchdog then sends one summary with the count (never a text).
+PUSH_BUNDLE_ON = env_bool("KALMIDO_PUSH_BUNDLE", True)  # the test containers switch it off (start.sh), the suites count single pushes
+PERSON_PUSH_FREE = 2
+
+
+def push_gate(c, uid, scope, free, kind="", ref=0, actor=0):
+    """True = push now; False = counted for the summary. The caller commits."""
+    if not PUSH_BUNDLE_ON:
+        return True
+    now = time.time()
+    r = c.execute("SELECT * FROM push_gate WHERE user_id=? AND scope=?", (uid, scope)).fetchone()
+    if r and (r["held"] or now - r["started_at"] < TASK_PUSH_GAP):  # (held: the watchdog has not sent the summary yet)
+        hold = r["n"] >= free
+        c.execute("UPDATE push_gate SET n=n+1, held=held+?, kind=?, ref=?, actor=? WHERE user_id=? AND scope=?",
+                  (1 if hold else 0, kind if r["kind"] == kind else "", ref if r["ref"] == ref else 0,
+                   actor if r["actor"] == actor else 0, uid, scope))
+        return not hold
+    c.execute("""INSERT INTO push_gate(user_id,scope,started_at,n,held,kind,ref,actor) VALUES(?,?,?,1,0,?,?,?)
+                 ON CONFLICT(user_id,scope) DO UPDATE SET started_at=excluded.started_at, n=1, held=0, kind=excluded.kind,
+                 ref=excluded.ref, actor=excluded.actor""", (uid, scope, now, kind, ref, actor))
+    return True
+
+
+def push_gate_due(c, prefix):
+    """The gates of one scope type whose window is over and that hold something."""
+    return c.execute("SELECT * FROM push_gate WHERE held>0 AND started_at<=? AND substr(scope,1,1)=?",
+                     (time.time() - TASK_PUSH_GAP, prefix)).fetchall()
+
+
+def push_gate_reset(c, p):
+    """The summary of gate row p goes out now: a new window starts with it (so the room's "one per gap" holds), before sending: never twice."""
+    c.execute("UPDATE push_gate SET started_at=?, n=?, held=0, kind='', ref=0, actor=0 WHERE user_id=? AND scope=?",
+              (time.time(), PERSON_PUSH_FREE, p["user_id"], p["scope"]))
+    c.commit()
+
+
+def push_gate_tick(c, users, S, LG):
+    """Watchdog: one summary per person and actor ("Anna assigned you 10 tasks", opens the list when it was one list)."""
+    from ..notify.push import _wd_fail
+    for p in push_gate_due(c, "a"):
+        try:
+            _push_gate_one(c, p, users, S, LG)
+        except Exception as e:  # noqa: BLE001
+            _wd_fail(c, "bundled push", (p["user_id"], p["scope"]), e)
+    c.execute("DELETE FROM push_gate WHERE held=0 AND started_at<?", (time.time() - 86400,))
+    c.commit()
+
+
+def _push_gate_one(c, p, users, S, LG):
+    from ..notify.push import notify, push_prio
+    push_gate_reset(c, p)
+    uid = p["user_id"]
+    if uid not in users:
+        return
+    lg, click = LG[uid], f"{PUBLIC_URL}/#today"
+    if p["ref"] and list_role(c, p["ref"], uid):  # the person can still open that list
+        click = f"{PUBLIC_URL}/#l/{p['ref']}"
+    who = user_names(c, [p["actor"]]).get(p["actor"]) if p["actor"] else None
+    msg = trn("assigned you {0} task", "assigned you {0} tasks", p["n"], lg=lg) if p["kind"] == "assign" else \
+        trn("{0} notification", "{0} notifications", p["n"], lg=lg)
+    notify(uid, who or APP_NAME, msg, push_prio(S[uid]), click, s=S[uid], tag=f"gate-{p['actor']}", kind="assign" if p["kind"] == "assign" else "other")
+
+
+def burst_gate(c, uid, tid, mentioned=False, event=False, kind=""):
+    """True = push now (time remembered); False = counted for the watchdog's summary.
+    2.367 (#2967): kind = what the second gate's summary says (push_gate); an @mention passes it."""
     if any(f(c, uid) for f in PUSH_BURST_SKIP):  # 2.236.0 (#2909 #2905): an agent's work style drops / holds it
         return False
     now = time.time()
@@ -429,6 +525,11 @@ def burst_gate(c, uid, tid, mentioned=False, event=False):
         c.execute("""UPDATE task_push SET pending=pending+?, events=events+?, mentioned=GREATEST(mentioned,?)
                      WHERE user_id=? AND task_id=?""", (0 if event else 1, 1 if event else 0, 1 if mentioned else 0, uid, tid))
         return False
+    if not mentioned:
+        actor = g.get("user") if has_request_context() else None
+        tl = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
+        if not push_gate(c, uid, f"a{actor['id'] if actor else 0}", PERSON_PUSH_FREE, kind, tl[0] if tl else 0, actor["id"] if actor else 0):
+            return False
     # 2.421.0 (#3512): the counters of the last window stay - the watchdog sends them (also "you were mentioned") one gap later
     c.execute("INSERT INTO task_push(user_id,task_id,sent_at) VALUES(?,?,?) ON CONFLICT(user_id,task_id) "
               "DO UPDATE SET sent_at=excluded.sent_at", (uid, tid, now))
@@ -454,6 +555,8 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
     ids |= bell_all_users(c, t["list_id"], "comment")  # 2.1.0 (#317): the bell "All" of a list: every comment (2.6.1: or "custom")
     from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO
     ids |= tbl_urgent_users(c, t["id"])  # 2.53.0 C (#1424): "Urgent" on the task: every comment
+    from ..tasks.watchers import wat_users
+    ids |= wat_users(c, t["id"])  # 2.473.0 (#3357): watchers like someone who commented (row "follow"); rights checked per person below
     if only is not None:
         ids = set(only)
     prev = c.execute("SELECT user_id FROM comments WHERE task_id=? AND deleted_at IS NULL AND id<? ORDER BY id DESC LIMIT 1",
@@ -472,8 +575,9 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
     out = []
     ag = agent_ids(c)
     # 2.62.0 (#1854): approval cards / questions with buttons / suggestions of an agent always arrive (they wait for the person)
-    asks = author in ag and bool(c.execute("SELECT choices IS NOT NULL OR suggestion IS NOT NULL FROM comments WHERE id=?",
-                                           (cid,)).fetchone()[0])
+    ask = c.execute("SELECT choices, suggestion FROM comments WHERE id=?", (cid,)).fetchone()
+    asks = author in ag and (ask["choices"] is not None or ask["suggestion"] is not None)
+    card = cmt_card_title(ask["choices"]) if asks else None  # 2.367.2 (#2968): an approval card names what it is about
     for uid in sorted(ids):
         s = collab_user(c, uid, t["list_id"]) if uid not in ag else None  # 2.0.0: agents get events (agent_comment_events)
         if not s or not task_visible(c, t["id"], uid, full=True):  # 1.10.0: participants only about their tasks
@@ -511,24 +615,43 @@ def comment_pushes(c, t, cid, text, mentions, notify_mentions, nfiles, only=None
                 out.append((uid, tr("Urgent: {0}", t["title"], lg=lg), tr("{0} commented: {1}", names.get(author, "?"), snippet or
                             trn("{0} file", "{0} files", nfiles, lg=lg), lg=lg), f"{PUBLIC_URL}/#t/{t['id']}", TBL_PRIO, comment_push_extra(t, lg)))
             continue
-        if not notif_ok(c, uid, s, row, "push", t["list_id"]) or not push_reachable(c, uid, s) or \
-                not burst_gate(c, uid, t["id"], mentioned=mentioned):
+        if not notif_ok(c, uid, s, row, "push", t["list_id"]) or not push_reachable(c, uid, s):
             continue
-        if not mentioned and not agent_push_ok(c, uid, s, author) and \
-                not (s.get("agent_comments") == "replies" and uid == prev):  # 2.28.0 (#987): an agent's comments push only when wanted
+        # 2.28.0 (#987): an agent's comments push only when wanted; 2.367.2 (#2968): that goes first (it used to leave a "1 more
+        # comment" for the summary); an agent's question / approval card goes past agent_push and the burst gate, like a mention
+        if not asks and not mentioned and not agent_push_ok(c, uid, s, author) and \
+                not (s.get("agent_comments") == "replies" and uid == prev):
             continue  # 2.62.0 (#1854): with "only replies to me" a reply right after my comment pushes like one with reply_to
+        if not asks and not burst_gate(c, uid, t["id"], mentioned=mentioned):
+            continue
         lg = lang_of(s)
         what = snippet or trn("{0} file", "{0} files", nfiles, lg=lg)
         who = names.get(author, "?")
         if lk:
             msg = tr("{0} mentioned you in {1}", who, lname, lg=lg) if uid in notify_mentions else \
                 tr("{0} replied to your message in {1}", who, lname, lg=lg) if uid == replied else tr("{0} commented in {1}", who, lname, lg=lg)
-            out.append((uid, le2e_neutral(lg), msg, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), comment_push_extra(t, lg)))
+            out.append((uid, le2e_neutral(lg), msg, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s),
+                        {**comment_push_extra(t, lg), **({"ws": "limit"} if asks else {})}))
             continue
         msg = tr("{0} mentioned you: {1}", who, what, lg=lg) if uid in notify_mentions else \
             tr("{0} replied to your message: {1}", who, what, lg=lg) if uid == replied else tr("{0} commented: {1}", who, what, lg=lg)
+        if card is not None:  # 2.367.2 (#2968): the card's own words; a question waits for the person like the chat's approval (mark "limit")
+            out.append((uid, tr("Approval needed: {0}", card or t["title"], lg=lg), tr("{0} asks in {1}", who, t["title"], lg=lg),
+                        f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), {**comment_push_extra(t, lg), "ws": "limit"}))
+            continue
+        if asks:
+            out.append((uid, t["title"], tr("{0} asks: {1}", who, what, lg=lg), f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s),
+                        {**comment_push_extra(t, lg), "ws": "limit"}))
+            continue
         out.append((uid, t["title"], msg, f"{PUBLIC_URL}/#t/{t['id']}", push_prio(s), comment_push_extra(t, lg)))
     return out
+
+
+def cmt_card_title(choices):
+    """2.367.2 (#2968): the title of an approval card in a comment's choices ("" = a card without one), None = no card."""
+    ch = (json.loads(choices) if isinstance(choices, str) else choices) if choices else None
+    ap = ch.get("approval") if isinstance(ch, dict) else None
+    return (ap.get("title") or "") if isinstance(ap, dict) else None
 
 
 def comment_push_extra(t, lg):
@@ -546,8 +669,9 @@ def push_day(due, due_time, lg):
     return day + (" " + due_time if due_time else "")
 
 
-def task_event(c, tid, kind, prev_assignee=None):
-    """assign / unassign / complete pushes; queued in g.pushes and sent once the request succeeded."""
+def task_event(c, tid, kind, prev_assignee=None, skip=None):
+    """assign / unassign / complete pushes; queued in g.pushes and sent once the request succeeded.
+    2.367.2 (#2968): skip = a person who hears of this through an event of its own."""
     from ..collab.news import agent_push_ok, bell_all_users, KIND_ROW, news_add, notif_ok
     from ..notify.push import push_prio, push_reachable
     from ..agents.core import agent_assign_event, agent_ids
@@ -571,6 +695,7 @@ def task_event(c, tid, kind, prev_assignee=None):
         rcpt |= tbl_urgent_users(c, tid)  # 2.53.0 C (#1424): "Urgent" on the task (the push itself: tbl_note of the history line)
     rcpt.discard(None)
     rcpt.discard(actor)
+    rcpt.discard(skip)
     rcpt -= agent_ids(c)  # 2.0.0: agents get events (agent_assign_event), no pushes / News
     name = user_names(c, [actor]).get(actor, "?")
     for uid in sorted(rcpt):
@@ -588,7 +713,7 @@ def task_event(c, tid, kind, prev_assignee=None):
             from ..notify.channels import evm_note
             evm_note(c, uid, "assign", tid, actor, s)
         if not notif_ok(c, uid, s, KIND_ROW[kind], "push", t["list_id"]) or not push_reachable(c, uid, s) or \
-                not burst_gate(c, uid, tid, event=True):
+                not burst_gate(c, uid, tid, event=True, kind=kind):
             continue
         if kind == "complete" and not agent_push_ok(c, uid, s, actor):  # 2.28.0 (#987)
             continue
@@ -637,8 +762,8 @@ def send_pushes(pushes):
     if pushes:
         # (uid, title, msg, click, prio[, extra]): extra = notify() keywords (2.0.8: actions + task of comment pushes)
         # 2.142.0 A (#2145): kind "other" for the notification channels unless the push names its own
-        threading.Thread(target=lambda: [notify(x[0], x[1], x[2], x[4], x[3], **{"kind": "other", **(x[5] if len(x) > 5 else {})})
-                                         for x in pushes], daemon=True).start()
+        gated_thread(lambda: [notify(x[0], x[1], x[2], x[4], x[3], **{"kind": "other", **(x[5] if len(x) > 5 else {})})
+                              for x in pushes])  # 2.370.2 (#2779): through the maintenance gate
 
 
 PUSH_BURST_SKIP = []  # 2.236.0 (#2909): f(c, uid) -> True = no push and no burst count (agents/workstyle.py ws_burst_skip)

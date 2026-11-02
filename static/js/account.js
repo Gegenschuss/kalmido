@@ -135,28 +135,33 @@ const NOTIF_ROWS = [
   ['share', N_('Projects shared with me')],
   ['unblock', N_('A task blocking mine was completed'), '', 'deps'],
   ['approval', N_('An agent waits for my approval'), '', 'agents'],
-  ['signoff', N_('Customer decisions'), N_('a customer approved or declined through a link (quotation, document, video)')],  // 2.266.0 (#2965)
+  ['signoff', N_('Client decisions'), N_('a client approved or declined through a link (quotation, document, video)')],  // 2.266.0 (#2965)
   ['followup', N_('Follow-up day of a task waiting on someone')],
   ['reminder', N_('Reminders'), N_('due dates of my tasks')],
   ['nag', N_('Repeated reminders'), N_('until the task is done; not during your quiet hours')],  // 2.7.0 (#413)
-  ['usage', N_('An agent reached a usage limit'), N_('admins: 80 % and 100 % of a limit'), 'admin'],  // 2.1.1 (#326)
+  ['usage', N_('An agent reached a usage limit'), N_('admins: 80 % and 100 % of a limit, sign-ins of organisation admins from a new address, registrations'), 'admin'],  // 2.1.1 (#326)
   ['proposal', N_('A proposal I asked an agent for is ready'), '', 'propose'],  // 2.3.0: only with an agent I may ask
   ['chat', N_('Team chat'), N_('direct messages; in channels only when you are mentioned (or the project bell is “All”)')],  // 2.17.0 (#419)
   ['errreport', N_('New error reports'), N_('a new error from a project’s error-report webhook became a ticket (repeats stay quiet)')]];  // 2.18.0
 // 2.425.0 (#3453 review): the receipt fetcher's row lives here (docfetch.js comes lazily with the documents: the row was missing until then)
 NOTIF_ROWS.push(['fetcher', N_('Receipt fetcher'), N_('a portal of your receipt fetcher reports an error, for example a sign-in that ran out'), 'office']);
+NOTIF_ROWS.push(['integration', N_('Integrations'), N_('a forwarding, webhook, mailbox or git connection of yours stopped working')]);  // 2.367.3 (#2971)
+NOTIF_ROWS.push(['limits', N_('E-mail limits of public pages'), N_('your client portal or booking page used up its sign-in or confirmation e-mails')]);  // 2.453.0 (#3781): News only
+NOTIF_ROWS.push(['notice', N_('Notices from the server'), N_('a maintenance notice sent as a push')]);  // 2.367.4 (#2974): push only
+NOTIF_ROWS.push(['office', N_('Payments and overdue invoices'), N_('a payment was booked on an invoice of your office, an invoice is past its due date (no push for that)'), 'office']);  // 2.367.4 (#2972)
+NOTIF_ROWS.push(['calsub', N_('Calendar subscriptions'), N_('a calendar you subscribed to failed three times in a row')]);  // 2.367.2 (#2969): News only
 const NM_GROUP = {comment: 'comment', reply: 'comment', follow: 'comment', mention: 'mention', assign: 'assign', complete: 'complete', status: 'status', share: 'share', unblock: 'unblock'};
 const NM_PRIMARY = ['comment', 'mention', 'assign', 'complete', 'status', 'share', 'unblock'];
-const NM_NEWS_NEW = {newtask: 0, approval: 0, followup: 1, usage: 1, proposal: 1, errreport: 1, signoff: 1};  // 2.266.0 (#2965): signoff
-const NM_PUSH = {comment: 1, reply: 1, follow: 1, mention: 1, assign: 1, newtask: 0, complete: 1, status: 0, share: 0, unblock: 1, approval: 1, followup: 1, reminder: 1, usage: 1, proposal: 1, nag: 1, chat: 1, errreport: 1, signoff: 1};
+const NM_NEWS_NEW = {newtask: 0, approval: 1, followup: 1, usage: 1, proposal: 1, errreport: 1, signoff: 1, limits: 1, calsub: 1, office: 1};  // 2.266.0 (#2965): signoff
+const NM_PUSH = {comment: 1, reply: 1, follow: 1, mention: 1, assign: 1, newtask: 0, complete: 1, status: 0, share: 0, unblock: 1, approval: 1, followup: 1, reminder: 1, usage: 1, proposal: 1, nag: 1, chat: 1, errreport: 1, signoff: 1, office: 1, notice: 1};
 const NM_SOCIAL = ['comment', 'reply', 'follow', 'mention', 'assign', 'newtask', 'complete', 'status', 'share', 'unblock', 'approval', 'proposal', 'chat', 'errreport'];
 const nmStored = s => { try { const o = JSON.parse(s.notify || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
 function notifMatrix(s) {
   const nk = new Set(String(s.news_kinds ?? 'mention,assign,comment,complete,unblock,share,status').split(',')), o = nmStored(s), out = {};
   for (const [r] of NOTIF_ROWS) {
     const x = o[r] && typeof o[r] === 'object' ? o[r] : {};
-    const news = r === 'reminder' || r === 'nag' || r === 'chat' ? null : NM_PRIMARY.includes(r) ? nk.has(NM_GROUP[r]) : 'news' in x ? !!x.news : r in NM_GROUP ? nk.has(NM_GROUP[r]) : !!NM_NEWS_NEW[r];
-    out[r] = {news, push: 'push' in x ? !!x.push : !!NM_PUSH[r]};
+    const news = r === 'reminder' || r === 'nag' || r === 'chat' || r === 'notice' ? null : NM_PRIMARY.includes(r) ? nk.has(NM_GROUP[r]) : 'news' in x ? !!x.news : r in NM_GROUP ? nk.has(NM_GROUP[r]) : !!NM_NEWS_NEW[r];
+    out[r] = {news, push: r === 'limits' || r === 'calsub' ? null : 'push' in x ? !!x.push : !!NM_PUSH[r]};
   }
   return out;
 }
@@ -190,7 +195,7 @@ async function orgsDraw(md) {
   const box = $('#a-orgs', md); if (!box) return;
   let j; try { j = await api('GET', '/api/admin/orgs'); } catch { return; }
   S.orgs = j.orgs;
-  box.innerHTML = j.orgs.length ? j.orgs.map(o => `<div class="mrow">${o.icon_url ? orgIconHtml(o) : `<span class="fem" aria-hidden="true">${o.icon ? esc(o.icon) : ic('building')}</span>`}<span class="n">${esc(o.name)} <span class="muted">${o.retired_at ? odlRetiredLabel(o) : esc(trn('{0} member', '{0} members', o.people ?? o.members.length))}${(o.admins || []).length ? ' · ' + esc(trn('{0} admin', '{0} admins', o.admins.length)) : ''}${o.domains ? ' · ' + esc(o.domains) : ''}</span></span>${j.editable && !o.retired_at ? `<button class="iconbtn" data-acc="org-edit" data-oid="${o.id}" title="${esc(tr('Edit organisation'))}" aria-label="${esc(tr('Edit {0}', o.name))}">${ic('edit', 's')}</button>` : ''}${j.creatable ? `<button class="iconbtn danger" data-acc="org-del" data-oid="${o.id}" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete {0}', o.name))}">${ic('trash', 's')}</button>` : ''}</div>`).join('') : `<div class="muted mhint">${tr('No organisation yet.')}</div>`;
+  box.innerHTML = j.orgs.length ? j.orgs.map(o => `<div class="mrow">${o.icon_url ? orgIconHtml(o) : `<span class="fem" aria-hidden="true">${o.icon ? esc(o.icon) : ic('building')}</span>`}<span class="n">${esc(o.name)} <span class="muted">${o.retired_at ? odlRetiredLabel(o) : esc(trn('{0} member', '{0} members', o.people ?? o.members.length))}${(o.admins || []).length ? ' · ' + esc(trn('{0} admin', '{0} admins', o.admins.length)) : ''}${o.domains ? ' · ' + esc(o.domains) : ''}</span></span>${j.editable && !o.retired_at && !o.apart ? `<button class="iconbtn" data-acc="org-edit" data-oid="${o.id}" title="${esc(tr('Edit organisation'))}" aria-label="${esc(tr('Edit {0}', o.name))}">${ic('edit', 's')}</button>` : ''}${j.creatable ? `<button class="iconbtn danger" data-acc="org-del" data-oid="${o.id}" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete {0}', o.name))}">${ic('trash', 's')}</button>` : ''}</div>`).join('') : `<div class="muted mhint">${tr('No organisation yet.')}</div>`;
   // 2.30.0 (#1036): the nightly boundary check's count (memberships across the boundary between workspaces)
   const bd = j.boundary;
   if (bd && j.orgs.length) box.insertAdjacentHTML('beforeend', oa_boundaryHtml(bd));  // 2.46.0 (#1563): unfoldable, with "Clean up"
@@ -207,7 +212,7 @@ async function actDraw(md) {
     j.orgs.map(o => row(o.name, o)).join('')}${row(tr('Without organisation'), j.private)}</tbody></table>`;
 }
 // ---- 2.28.0 (#935): Settings > Workspaces -- my organisations; an organisation's admin adds / removes members and sets their
-// role (also when not an admin of the server), renames it, sets its e-mail domains
+// role (also when not an admin of the server), renames it; its e-mail domains only an admin of the server (2.467.0, #3898)
 const wsPaneOn = () => wsOn() && !S.me?.kid;
 async function wsPaneDraw(md) {
   const box = $('#s-ws', md); if (!box) return;
@@ -217,10 +222,10 @@ async function wsPaneDraw(md) {
   // 2.364.0 C (#3041): with Organisation > Data in the dialog the data boxes of each organisation go there (one place)
   const dbox = $('#s-wsdata', md), inl = !dbox, dataBoxes = o => ocBoxHtml(o) + oxBoxHtml(o) + (typeof rxBoxHtml === 'function' ? rxBoxHtml('org', o.id) : '');
   const org = o => `<details class="sdet wsorg" data-oid="${o.id}" ${j.orgs.length === 1 ? 'open' : ''}><summary>${o.icon_url ? orgIconHtml(o) : `<span class="fem" aria-hidden="true">${o.icon ? esc(o.icon) : ic('building')}</span>`}<b>${esc(o.name)}</b> <span class="muted">${esc(trn('{0} member', '{0} members', o.members.filter(m => !m.agent).length))} · ${esc(trn('{0} project', '{0} projects', o.lists))}${o.role === 'admin' ? ' · ' + esc(tr('you are an admin')) : o.role && o.role !== 'member' ? ' · ' + esc(tr('your role: {0}', oinvRoleSel.label(o.role))) : ''}</span></summary>
-    ${o.members.map(m => `<div class="mrow ${m.disabled ? 'off' : ''}">${av(m.id, m.name)}<span class="n">${esc(m.name)}${m.agent ? ' ' + agentBadge() : ''}${m.id === S.me?.id ? ' ' + tr('(me)') : ''}</span>${o.role === 'admin' && j.manage && !m.agent ? `${oinvRoleSel('', m.role, o.roles || [], `data-wsrole="${m.id}" aria-label="${esc(tr('Role of {0}', m.name))}"`)}${''/* 2.143.0 A (#2151) */}<button class="iconbtn" data-wsrm="${m.id}" title="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove from the organisation'))}" aria-label="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove {0} from the organisation', m.name))}">${ic('x', 's')}</button>${m.id !== S.me?.id ? `<button class="iconbtn danger" data-wsdel="${m.id}" title="${esc(tr('Delete account'))}" aria-label="${esc(tr('Delete the account of {0}', m.name))}">${ic('trash', 's')}</button>` : ''/* 2.88.0 (#1980) */}` : `<span class="muted">${m.agent ? tr('Agent') : esc(oinvRoleSel.label(m.role))}</span>`}</div>`).join('')}
+    ${o.members.map(m => `<div class="mrow ${m.disabled ? 'off' : ''}">${av(m.id, m.name)}<span class="n">${esc(m.name)}${m.agent ? ' ' + agentBadge(m.id) : ''}${m.id === S.me?.id ? ' ' + tr('(me)') : ''}${m.pending ? ` <span class="muted">· ${tr('waits for approval')}</span>` : ''}</span>${o.role === 'admin' && m.pending ? `<button class="btn sm pri" data-wsok="${m.id}">${ic('check', 's')} ${tr('Approve')}</button>${''/* 2.464.0 (#3882) */}` : ''}${o.role === 'admin' && j.manage && !m.agent ? `${oinvRoleSel('', m.role, o.roles || [], `data-wsrole="${m.id}" aria-label="${esc(tr('Role of {0}', m.name))}"`)}${''/* 2.143.0 A (#2151) */}<button class="iconbtn" data-wsrm="${m.id}" title="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove from the organisation'))}" aria-label="${esc(m.id === S.me?.id ? tr('Leave the organisation') : tr('Remove {0} from the organisation', m.name))}">${ic('x', 's')}</button>${m.id !== S.me?.id ? `<button class="iconbtn danger" data-wsdel="${m.id}" title="${esc(tr('Delete account'))}" aria-label="${esc(tr('Delete the account of {0}', m.name))}">${ic('trash', 's')}</button>` : ''/* 2.88.0 (#1980) */}` : `<span class="muted">${m.agent ? tr('Agent') : esc(oinvRoleSel.label(m.role))}</span>`}</div>`).join('')}
     ${o.role === 'admin' && j.manage ? oinvRoleSel.help(o.roles || []) : ''}
     ${o.role === 'admin' && j.manage ? `<div class="row wsadd"><button type="button" class="btn sm" data-oinv="new">${ic('send', 's')} ${tr('Invite people')}</button></div>${''/* 2.364.0 C (#3041): one dialog (e-mail or link) instead of the field + Add */}
-    <div class="row"><label for="ws-name-${o.id}">${tr('Name')}</label><input id="ws-name-${o.id}" value="${esc(o.name)}" maxlength="60" data-wsf="name"><label for="ws-dom-${o.id}">${tr('E-mail domains')}</label><input id="ws-dom-${o.id}" value="${esc(o.domains || '')}" placeholder="example.com" data-wsf="domains"></div>` : ''}${''/* 2.166.0 (#2633): name and domains save themselves (no Save button) */}
+    <div class="row"><label for="ws-name-${o.id}">${tr('Name')}</label><input id="ws-name-${o.id}" value="${esc(o.name)}" maxlength="60" data-wsf="name"><label for="ws-dom-${o.id}">${tr('E-mail domains')}</label><input id="ws-dom-${o.id}" value="${esc(o.domains || '')}" ${S.me?.is_admin ? 'placeholder="example.com" data-wsf="domains"' : 'readonly'}></div>${S.me?.is_admin ? '' : `<div class="muted mhint" id="ws-dom-hint-${o.id}">${tr('Only an admin of this server sets the e-mail domains of an organisation')}</div>`}` : ''}${''/* 2.166.0 (#2633): name and domains save themselves (no Save button); 2.467.0 (#3898): domains read only unless an admin of the server */}
     ${o.role === 'admin' && j.manage ? `<div class="row wsic"><label>${tr('Symbol')}</label><span class="wsicprev">${orgIconHtml(o)}</span><button type="button" class="btn sm" data-wsic="up">${ic('picture', 's')} ${tr('Upload a picture…')}</button>${o.icon_url ? `<button type="button" class="btn sm" data-wsic="rm">${tr('Remove the picture')}</button>` : ''}</div>` : ''}${''/* 2.87.9 (#1913) */}
     ${o.role === 'admin' ? `<div class="row"><button type="button" class="btn sm" data-oadm="${o.id}">${ic('list', 's')} ${tr('Projects of the organisation')}</button></div>` : ''}
     ${o.role === 'admin' && inl ? dataBoxes(o) : ''}${''/* 2.42.0 (#828): encryption + recovery key, export; 2.146.0 D (#2468): the retention export */}
@@ -271,6 +276,8 @@ function wsPaneWire(md) {
     if (oa) { const o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === +oa.dataset.oadm); oadmOpen(+oa.dataset.oadm, o?.name || ''); return; }  // 2.35.0 (#1101)
     const wi = e.target.closest('[data-wsic]');
     if (wi) { wsIconPick(md, +wi.closest('[data-oid]').dataset.oid, wi.dataset.wsic); return; }  // 2.87.9 (#1913)
+    const ok = e.target.closest('[data-wsok]');
+    if (ok) { try { await api('POST', `/api/users/${ok.dataset.wsok}/approve`, {}); toast(tr('Approved: the person can sign in now')); } catch { /* shown */ } wsPaneDraw(md); return; }  // 2.464.0 (#3882)
     const wd = e.target.closest('[data-wsdel]');
     if (wd) {  // 2.88.0 (#1980): an organisation admin deletes an account of only this organisation (else: remove, lists to a member)
       const o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === +wd.closest('[data-oid]').dataset.oid), m = o?.members.find(x => x.id === +wd.dataset.wsdel);
@@ -285,7 +292,7 @@ function wsPaneWire(md) {
       else if (b.dataset.wsrm) {
         const uid = +b.dataset.wsrm, self = uid === S.me?.id, o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === oid), m = o?.members.find(x => x.id === uid);
         const li = await api('GET', `/api/orgs/${oid}/leave-info${self ? '' : '?uid=' + uid}`).catch(() => null);  // 2.361.0 (#2922): what goes where
-        if (!await askConfirm(self ? tr('Leave the organisation “{0}”?', o?.name || '') : tr('Remove {0} from the organisation?', m?.name || ''), li ? '' : (self ? tr('Your projects of this workspace go to one of its admins and you leave every project of the organisation.') : tr('The person’s projects of this workspace come to you and the person leaves every project of the organisation.')) + ' ' + tr('Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again does not bring that back.'), {ok: self ? tr('Leave') : tr('Remove'), danger: true, ...(li ? {html: olvLeaveHtml(li, self)} : {})})) return;  // 2.273.0 B (#3042): + what ends
+        if (!await askConfirm(self ? tr('Leave the organisation “{0}”?', o?.name || '') : tr('Remove {0} from the organisation?', m?.name || ''), li ? '' : (self ? tr('Your projects of this workspace go to one of its admins and you leave every project of the organisation.') : tr('The person’s projects of this workspace come to you and the person leaves every project of the organisation.')) + ' ' + tr('Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.'), {ok: self ? tr('Leave') : tr('Remove'), danger: true, ...(li ? {html: olvLeaveHtml(li, self)} : {})})) return;  // 2.273.0 B (#3042): + what ends
         await api('DELETE', `/api/orgs/${oid}/members/${uid}`); toast(self ? tr('You left the organisation') : tr('Removed'));
       }
       await load(); render();
@@ -296,7 +303,9 @@ function wsPaneWire(md) {
 // 2.361.0 (#2922): the leave / remove dialog lists every area: back to the private space, to an admin, stays, ends
 function olvLeaveHtml(j, self) {
   const rows = [], th = j.to_heir || {};
-  if ((j.back || []).length) rows.push([false, (self ? tr('Back to your private space (you brought them in): {0}', j.back.join(', ')) : tr('Back to the person’s private space (brought in by them): {0}', j.back.join(', ')))]);
+  if ((j.back || []).length) rows.push([false, (self ? tr('Back to your private workspace (you brought them in): {0}', j.back.join(', ')) : tr('Back to the person’s private workspace (brought in by them): {0}', j.back.join(', ')))]);
+  if (j.back_text) rows.push([false, (self ? tr('Back to your private workspace too: {0}', j.back_text) : tr('Back to the person’s private workspace too: {0}', j.back_text))]);  // 2.365.1 (#3395)
+  if (j.kept) rows.push([true, (self ? trn('{0} item you brought in cannot go back by itself and stays. Ask an admin to release it before you leave.', '{0} items you brought in cannot go back by themselves and stay. Ask an admin to release them before you leave.', j.kept) : trn('{0} item the person brought in cannot go back by itself and stays.', '{0} items the person brought in cannot go back by themselves and stay.', j.kept))]);
   const given = [th.lists ? trn('{0} project', '{0} projects', th.lists) : '', th.calendars ? trn('{0} calendar', '{0} calendars', th.calendars) : '', th.books ? trn('{0} address book', '{0} address books', th.books) : ''].filter(Boolean).join(', ');
   if (given) rows.push([false, tr('Goes to {0}: {1}', j.heir || tr('an admin'), given)]);
   if (j.stays_text) rows.push([true, (self ? tr('Stays in the organisation, you no longer see it: {0}', j.stays_text) : tr('Stays in the organisation, the person no longer sees it: {0}', j.stays_text))]);
@@ -342,7 +351,7 @@ function oorHtml(rs) {
   const open = (rs || []).filter(r => r.state === 'open');
   if (!open.length) return '';
   return `<h4 class="oadmh">${esc(tr('Asked back'))} <span class="muted">${open.length}</span></h4>
-    <div class="shint keep">${esc(tr('These members brought something into the organisation or made it there and ask to take it back into their private space. Release it and they can move it themselves; nobody else in the organisation sees it there afterwards.'))}</div>
+    <div class="shint keep">${esc(tr('These members brought something into the organisation or made it there and ask to take it back into their private workspace. Release it and they can move it themselves; nobody else in the organisation sees it there afterwards.'))}</div>
     ${open.map(r => `<div class="mrow oorrow" data-oor="${r.id}"><span class="n"><b>${esc(r.name || '–')}</b><small class="muted">${esc([oor_kind(r.kind), tr('asked by {0}', r.by), fmtWhen(r.created_at)].join(' · '))}</small></span>
       <span class="oadmb"><button type="button" class="btn sm pri" data-oord="approve">${esc(tr('Release'))}</button><button type="button" class="btn sm" data-oord="decline">${esc(tr('Decline'))}</button></span></div>`).join('')}`;
 }
@@ -431,7 +440,7 @@ function ole_edit(om, oid, x) {
     <div class="row"><label for="ole-name">${tr('Name')}</label><button type="button" class="emobtn" id="ole-emo" title="${tr('Choose icon')}" aria-label="${tr('Choose icon')}">${emoBtn()}</button><input id="ole-name" value="${esc(nm0)}" maxlength="200"></div>
     <div class="emogrid hidden" id="ole-emogrid"><button type="button" data-emo="" class="none" title="${tr('No icon')}">${ic('ban', 's')}</button>${sbiGrid().map(e => `<button type="button" data-emo="${e}" class="${e === emo && !x.icon ? 'on' : ''}">${sbiEmo(e)}</button>`).join('')}
       <div class="lipickw">${pick()}</div></div>
-    <div class="row"><label>${tr('Color')}</label><div class="colors" id="ole-col" role="group" aria-label="${esc(tr('Color'))}">${lp_dlgBtns(col0)}</div></div>
+    <div class="row"><label>${tr('Colour')}</label><div class="colors" id="ole-col" role="group" aria-label="${esc(tr('Colour'))}">${lp_dlgBtns(col0)}</div></div>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="cancel">${tr('Cancel')}</button><button type="button" class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.classList.add('olemd');
   const redraw = j => { if (j && om.isConnected) oadmDraw(om, j); };
@@ -516,7 +525,7 @@ async function inviteScreen(tok) {
   lg_decor(el);  // 2.49.0 (#1553)
   const logo = `<div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b></div>`;
   if (info.error) {
-    el.innerHTML = `<div class="card">${logo}<p role="alert">${esc(info.error)}</p><button class="btn pri" type="button" data-au="login">${tr('To the login')}</button></div>`;
+    el.innerHTML = `<div class="card">${logo}<p role="alert">${esc(info.error)}</p><button class="btn pri" type="button" data-au="login">${tr('To the sign-in')}</button></div>`;
   } else {
     el.innerHTML = `<div class="card">${logo}
       <h2 class="invh">${esc(info.kind === 'reset' ? tr('Set a new password') : info.kind === 'signup' ? tr('Confirm your registration') : tr('Welcome, {0}!', info.display_name))}</h2>
@@ -528,7 +537,7 @@ async function inviteScreen(tok) {
         <label class="aulab" for="inv-pw2">${tr('Repeat the password')}</label><input id="inv-pw2" type="password" autocomplete="new-password" required>
         <label class="chkl"><input type="checkbox" id="inv-2fa"> ${tr('Set up two-factor sign-in right after (recommended)')}</label>
         <div class="aerr" role="alert" id="inv-err"></div>
-        <button class="btn pri" type="submit">${info.kind === 'reset' ? tr('Save and log in') : tr('Set up my account')}</button>
+        <button class="btn pri" type="submit">${info.kind === 'reset' ? tr('Save and sign in') : tr('Set up my account')}</button>
         ${info.kind === 'reset' ? `<p class="muted">${esc(tr('The new password revokes your app passwords (CalDAV) and your own API tokens; create new ones afterwards if you need them under Settings > Account (API tokens: Advanced · for developers). Agents keep their tokens.'))}</p>` : ''}${''/* 2.58.0 (#1792): L3; 2.360.0 (#2496): the reset revokes them */}
       </form></div>`;
     el.querySelector('#inv-form').addEventListener('submit', async e => {
@@ -542,7 +551,7 @@ async function inviteScreen(tok) {
         if (!r.ok) { errEl.textContent = res.error || httpErrText(r.status); return; }
         if (res.twofa) { await authTwofa(el, logo, res.methods || ['totp']); return; }  // 2.49.0 (#1531): two-factor stays required after a reset
         if (res.enrol) { await authEnrol(el, logo); return; }
-        if (res.pending) { $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Thank you!')}</h2><p role="status">${tr('Your account waits for an admin to approve it. You can log in once it is approved.')}</p><button class="btn pri" type="button" data-au="login">${tr('To the login')}</button>`; return; }  // 2.23.0 (#711)
+        if (res.pending) { $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Thank you!')}</h2><p role="status">${tr('Your account waits for an admin to approve it. You can sign in once it is approved.')}</p><button class="btn pri" type="button" data-au="login">${tr('To the sign-in')}</button>`; return; }  // 2.23.0 (#711)
         if ($('#inv-2fa', el).checked) LS.set('after2fa', true);
         location.replace('/');
       } catch { errEl.textContent = tr('Server not reachable.'); }
@@ -555,7 +564,7 @@ async function inviteScreen(tok) {
 }
 async function logout() {
   if (kd_pinNeed()) return kd_pinAsk(logout);  // 2.49.0 (#1551): a child with the parents' PIN
-  if (OUT.q.length && !await askConfirm(trn('{0} change is not synced yet and will be lost. Log out anyway?', '{0} changes are not synced yet and will be lost. Log out anyway?', OUT.q.length), '', {ok: tr('Log out'), danger: true})) return;
+  if (OUT.q.length && !await askConfirm(trn('{0} change is not synced yet and will be lost. Sign out anyway?', '{0} changes are not synced yet and will be lost. Sign out anyway?', OUT.q.length), '', {ok: tr('Sign out'), danger: true})) return;
   await wpDisable().catch(() => {});  // this device stops getting the pushes of the account that logs out
   await e2eForget();  // 2.42.0 (#828): keys remembered on this device go
   try { await fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}); } catch { /* offline */ }
@@ -584,22 +593,22 @@ async function authScreen(j) {
     const setup = kind === 'setup';
     el.innerHTML = `<div class="card">${logo}
       ${setup ? '' : `<p class="lghello">${esc(lg_hello())}</p>`}${''/* 2.49.0 (#1553) */}
-      ${setup ? `<p>${tr('Welcome! Create the first account, it becomes the admin.')}</p>${info.login ? `<p class="muted">${esc(tr('Signed in at the login proxy as “{0}”: the account is linked to it, a password is optional.', info.login))}</p>` : ''}` : ''}
+      ${setup ? `<p>${tr('Welcome! Create the first account, it becomes the admin.')}</p>${info.login ? `<p class="muted">${esc(tr('Signed in at the sign-in proxy as “{0}”: the account is linked to it, a password is optional.', info.login))}</p>` : ''}` : ''}
       <form id="auth-form" autocomplete="on">
         ${setup && info.setup_code ? `<label class="aulab" for="au-code">${tr('Setup code')}</label><input id="au-code" autocapitalize="off" autocomplete="one-time-code" spellcheck="false" required aria-describedby="au-code-h"><div class="shint shcode" id="au-code-h">${tr('The server prints it into its log at start: {0}', '<code>docker compose logs kalmido</code>')}</div>` : ''}${''/* 2.45.0 (#1515) */}
         <label class="aulab" for="au-user">${tr('Username')}</label><input id="au-user" name="username" autocapitalize="off" autocomplete="username" required value="${setup && info.login ? esc(String(info.login).toLowerCase()) : ''}">
         ${setup ? `<label class="aulab" for="au-name">${tr('Display name')}</label><input id="au-name" maxlength="60" autocomplete="name" placeholder="${tr('optional')}">` : ''}
         <label class="aulab" for="au-pw">${tr('Password')}</label><span class="pwwrap"><input id="au-pw" name="password" type="password" autocomplete="${setup ? 'new-password' : 'current-password'}" ${setup && info.login ? '' : 'required'} ${setup ? `placeholder="${tr('at least {0} characters', 8)}"` : ''}><button type="button" class="iconbtn pweye" data-au="pwshow" aria-pressed="false" aria-label="${esc(tr('Show password'))}" title="${esc(tr('Show password'))}">${ic('eye', 's')}</button></span>
-        ${setup ? '' : `<div class="lgopts"><label class="chkl"><input type="checkbox" id="au-rem" checked> ${tr('Stay logged in')}</label>${info.forgot ? `<button type="button" class="linkbtn lgforgot" data-au="forgot">${tr('Forgot your password?')}</button>` : ''}</div>`}${''/* 2.49.0 (#1531, #1553): one row */}
+        ${setup ? '' : `<div class="lgopts"><label class="chkl"><input type="checkbox" id="au-rem" checked> ${tr('Stay signed in')}</label>${info.forgot ? `<button type="button" class="linkbtn lgforgot" data-au="forgot">${tr('Forgot your password?')}</button>` : ''}</div>`}${''/* 2.49.0 (#1531, #1553): one row */}
         <div class="aerr" role="alert" id="au-err"></div>
-        <button class="btn pri" type="submit">${setup ? tr('Create account') : tr('Log in')}</button>
+        <button class="btn pri" type="submit">${setup ? tr('Create account') : tr('Sign in')}</button>
         ${!setup && (info.oidc || (info.passkey_login && pkSupported())) ? `<div class="aor"><span>${tr('or')}</span></div>` : ''}
-        ${!setup && info.oidc ? `<button type="button" class="btn" data-au="oidc">${ic('link', 's')} ${esc(tr('Log in with {0}', info.oidc.label))}</button>` : ''}
-        ${!setup && info.passkey_login && pkSupported() ? `<button type="button" class="btn" data-au="passkey">${ic('key', 's')} ${tr('Log in with a passkey')}</button>` : ''}
+        ${!setup && info.oidc ? `<button type="button" class="btn" data-au="oidc">${ic('link', 's')} ${esc(tr('Sign in with {0}', info.oidc.label))}</button>` : ''}
+        ${!setup && info.passkey_login && pkSupported() ? `<button type="button" class="btn" data-au="passkey">${ic('key', 's')} ${tr('Sign in with a passkey')}</button>` : ''}
         ${!setup && info.signup ? `<p class="aulink">${tr('New here?')} <button type="button" class="linkbtn" data-au="signup">${tr('Create account')}</button></p>` : ''}
       </form>${legalLinks(info.legal, 'linkbtn') ? `<p class="aulegal">${legalLinks(info.legal, 'linkbtn')}</p>` : ''}</div>`;
     const le = (location.hash.match(/login-error=([a-z_]+)/) || [])[1];
-    if (le) { $('#au-err', el).textContent = (info.login_errors || {})[le] || (info.login_errors || {}).failed || tr('Login failed. Please try again.'); history.replaceState(null, '', location.pathname); }
+    if (le) { $('#au-err', el).textContent = (info.login_errors || {})[le] || (info.login_errors || {}).failed || tr('Sign-in failed. Please try again.'); history.replaceState(null, '', location.pathname); }
     el.addEventListener('click', e => {
       const b = e.target.closest('[data-au]'); if (!b) return;
       const rem = $('#au-rem', el)?.checked !== false;
@@ -613,8 +622,9 @@ async function authScreen(j) {
     el.querySelector('#auth-form').addEventListener('submit', async e => {
       e.preventDefault();
       const errEl = $('#au-err', el);
-      const body = setup ? {username: $('#au-user', el).value.trim(), display_name: $('#au-name', el).value.trim(), password: $('#au-pw', el).value, wizard: true, lang: I18N.code || 'en', ...($('#au-code', el) ? {setup_code: $('#au-code', el).value.trim()} : {})}  // 2.24.0 (UX-22): the language seen here sticks
-        : {username: $('#au-user', el).value.trim(), password: $('#au-pw', el).value, remember: $('#au-rem', el).checked};
+      let tz = ''; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { /* no zone: the server's stays */ }  // 2.368.3 (#2985): kept at the first login only
+      const body = setup ? {username: $('#au-user', el).value.trim(), display_name: $('#au-name', el).value.trim(), password: $('#au-pw', el).value, wizard: true, lang: I18N.code || 'en', tz, ...($('#au-code', el) ? {setup_code: $('#au-code', el).value.trim()} : {})}  // 2.24.0 (UX-22): the language seen here sticks
+        : {username: $('#au-user', el).value.trim(), password: $('#au-pw', el).value, remember: $('#au-rem', el).checked, tz};
       try {
         const r = await fetch(setup ? '/api/auth/setup' : '/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)});
         const res = await r.json().catch(() => ({}));
@@ -709,13 +719,13 @@ async function authTwofa(el, logo, methods) {
   const card = el.querySelector('.card');
   let recovery = !methods.includes('totp') && !methods.includes('passkey');
   const draw = () => {
-    card.innerHTML = `${logo}<p>${recovery ? tr('Enter one of your recovery codes.') : methods.includes('totp') ? tr('Enter the code from your authenticator app.') : tr('Confirm the login with your passkey.')}</p>
+    card.innerHTML = `${logo}<p>${recovery ? tr('Enter one of your recovery codes.') : methods.includes('totp') ? tr('Enter the code from your authenticator app.') : tr('Confirm the sign-in with your passkey.')}</p>
       <form id="tfa-form" autocomplete="off">
         ${recovery || methods.includes('totp') ? `<input id="tfa-code" ${recovery ? 'autocapitalize="off" placeholder="xxxxx-xxxxx"' : `inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="${tr('6-digit code')}"`} aria-label="${recovery ? tr('Recovery code') : tr('6-digit code')}" required>
         <button class="btn pri" type="submit">${tr('Verify')}</button>` : ''}
         ${methods.includes('passkey') && !recovery ? `<button type="button" class="btn ${methods.includes('totp') ? '' : 'pri'}" data-tfa="pk" ${pkSupported() ? '' : 'disabled'}>${ic('key', 's')} ${tr('Use a passkey')}</button>` : ''}
         <div class="aerr" role="alert" id="tfa-err"></div>
-        <div class="alinks">${methods.includes('recovery') && !recovery ? `<button type="button" class="linkbtn" data-tfa="rc">${tr('Use a recovery code')}</button>` : ''}${recovery && (methods.includes('totp') || methods.includes('passkey')) ? `<button type="button" class="linkbtn" data-tfa="back2">${tr('Back')}</button>` : ''}<button type="button" class="linkbtn" data-tfa="restart">${tr('Log in again')}</button></div>
+        <div class="alinks">${methods.includes('recovery') && !recovery ? `<button type="button" class="linkbtn" data-tfa="rc">${tr('Use a recovery code')}</button>` : ''}${recovery && (methods.includes('totp') || methods.includes('passkey')) ? `<button type="button" class="linkbtn" data-tfa="back2">${tr('Back')}</button>` : ''}<button type="button" class="linkbtn" data-tfa="restart">${tr('Sign in again')}</button></div>
       </form>`;
     setTimeout(() => $('#tfa-code', card)?.focus(), 50);
   };
@@ -742,11 +752,11 @@ async function authEnrol(el, logo) {
   const card = el.querySelector('.card');
   const codes = async res => { card.innerHTML = `${logo}<h3>${tr('Recovery codes')}</h3>${rcHtml(res.recovery_codes || [])}<div class="sufoot"><button type="button" class="btn pri" data-en="go">${tr('I have saved them')}</button></div>`; rcWire(card, res.recovery_codes || []); };
   const start = () => {
-    card.innerHTML = `${logo}<p>${tr('Two-factor authentication is required on this server. Set it up now, then you are logged in.')}</p>
+    card.innerHTML = `${logo}<p>${tr('Two-factor authentication is required on this server. Set it up now, then you are signed in.')}</p>
       <div class="enrolopts"><button type="button" class="btn pri" data-en="totp">${ic('lock', 's')} ${tr('Use an authenticator app')}</button>
       <button type="button" class="btn" data-en="pk" ${pkSupported() ? '' : 'disabled'}>${ic('key', 's')} ${tr('Use a passkey')}</button></div>
       ${pkSupported() ? '' : `<p class="muted">${tr('Passkeys need HTTPS (or localhost), a host name instead of an IP address and a current browser.')}</p>`}
-      <div class="aerr" role="alert" id="en-err"></div><div class="alinks"><button type="button" class="linkbtn" data-en="restart">${tr('Log in again')}</button></div>`;
+      <div class="aerr" role="alert" id="en-err"></div><div class="alinks"><button type="button" class="linkbtn" data-en="restart">${tr('Sign in again')}</button></div>`;
   };
   const fail = x => { if (x.j?.expired) { location.replace('/'); return; } const e = $('#en-err', card) || $('#totp-err', card); if (e) e.textContent = x.message || pkErr(x); };
   start();
@@ -787,7 +797,7 @@ function signupAdminHtml(a) {
   const mode = a.signup_mode || 'off', org = !!a.has_orgs;  // 2.46.0 (#1592): any server with an organisation
   const priv = !!a.signup_private;  // 2.422.0 (#2937): private accounts register without an invitation (a server with an organisation)
   const dis = k => (k === 'domain' || k === 'open') && !a.mail_out ? 'disabled' : k === 'open' && org && !priv ? 'disabled' : '';
-  return `<h4 id="s-signup-h">${tr('Registration on the login page')}</h4>
+  return `<h4 id="s-signup-h">${tr('Registration on the sign-in page')}</h4>
     <div class="row"><label for="s-signup">${tr('Who can register')}</label><select id="s-signup">${SIGNUP_UI.map(([k, n]) => `<option value="${k}" ${k === mode ? 'selected' : ''} ${dis(k)}>${esc(tr(n))}</option>`).join('')}</select></div>
     <div class="row" id="s-sdomrow" ${mode === 'domain' ? '' : 'hidden'}><label for="s-sdom">${tr('E-mail domains')}</label><input id="s-sdom" value="${esc(a.signup_domains || '')}" placeholder="example.com, example.org" autocapitalize="off"></div>
     <div class="shint">${esc([tr('New people confirm their address with a link (or wait for an admin), choose their password and start without access to projects: share projects with them. Never an admin or a child account.'),
@@ -825,7 +835,7 @@ function lg_forgotScreen(el, logo, pre = '') {
       <label class="aulab" for="fg-login">${tr('E-mail or user name')}</label><input id="fg-login" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="200" required value="${esc(pre)}">
       <div class="aerr" role="alert" id="fg-err"></div>
       <button class="btn pri" type="submit">${tr('Send the link')}</button>
-      <button class="linkbtn" type="button" data-au="back">${tr('Back to the login')}</button>
+      <button class="linkbtn" type="button" data-au="back">${tr('Back to the sign-in')}</button>
     </form></div>`;
   el.querySelector('#fg-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -835,7 +845,7 @@ function lg_forgotScreen(el, logo, pre = '') {
       const r = await fetch('/api/auth/forgot', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({login: $('#fg-login', el).value.trim()})});
       const res = await r.json().catch(() => ({}));
       if (!r.ok) { errEl.textContent = res.error || httpErrText(r.status); btn.disabled = false; return; }
-      $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Check your e-mail')}</h2><p role="status" class="lgsent">${tr('If an account with a stored e-mail address matches, a link to set a new password is on its way.')}</p><p class="muted">${tr('No mail after a few minutes? Look in the spam folder or ask an admin.')}</p><button class="btn" type="button" data-au="back">${tr('Back to the login')}</button>`;
+      $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Check your e-mail')}</h2><p role="status" class="lgsent">${tr('If an account with a stored e-mail address matches, a link to set a new password is on its way.')}</p><p class="muted">${tr('No e-mail after a few minutes? Look in the spam folder or ask an admin.')}</p><button class="btn" type="button" data-au="back">${tr('Back to the sign-in')}</button>`;
     } catch { errEl.textContent = tr('Server not reachable.'); btn.disabled = false; }
   });
   setTimeout(() => $('#fg-login', el)?.focus(), 50);
@@ -844,14 +854,14 @@ function signupScreen(el, logo, info) {
   const pw = !!info.signup?.password;
   el.innerHTML = `<div class="card">${logo}
     <h2 class="invh">${tr('Create account')}</h2>
-    <p class="muted">${esc(info.signup?.mode === 'approval' ? tr('An admin approves new accounts before the first login.') : tr('You get an e-mail with a link to confirm your address and choose your password.'))}</p>
+    <p class="muted">${esc(info.signup?.mode === 'approval' ? tr('An admin approves new accounts before the first sign-in.') : tr('You get an e-mail with a link to confirm your address and choose your password.'))}</p>
     <form id="su-form" autocomplete="on">
       <label class="aulab" for="su-name">${tr('Your name')}</label><input id="su-name" name="name" autocomplete="name" maxlength="60" required>
       <label class="aulab" for="su-mail">${tr('E-mail')}</label><input id="su-mail" name="email" type="email" autocomplete="email" autocapitalize="off" required>
       ${pw ? `<label class="aulab" for="su-pw">${tr('Password')}</label><input id="su-pw" type="password" autocomplete="new-password" minlength="${info.signup.min_password || 8}" required placeholder="${esc(tr('at least {0} characters', info.signup.min_password || 8))}">` : ''}
       <div class="aerr" role="alert" id="su-err"></div>
       <button class="btn pri" type="submit">${tr('Create account')}</button>
-      <button class="linkbtn" type="button" data-au="back">${tr('Back to the login')}</button>
+      <button class="linkbtn" type="button" data-au="back">${tr('Back to the sign-in')}</button>
     </form></div>`;
   el.querySelector('#su-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -861,7 +871,7 @@ function signupScreen(el, logo, info) {
         body: JSON.stringify({name: $('#su-name', el).value.trim(), email: $('#su-mail', el).value.trim(), lang: I18N.code || 'en', ...(pw ? {password: $('#su-pw', el).value} : {})})});
       const res = await r.json().catch(() => ({}));
       if (!r.ok) { errEl.textContent = res.error || httpErrText(r.status); return; }
-      $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Almost done')}</h2><p role="status">${esc(res.mail ? tr('If the address can be used, an e-mail with a link is on its way. Open it to choose your password.') : tr('Your account waits for an admin to approve it. You can log in once it is approved.'))}</p><button class="btn" type="button" data-au="back">${tr('Back to the login')}</button>`;
+      $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Almost done')}</h2><p role="status">${esc(res.mail ? tr('If the address can be used, an e-mail with a link is on its way. Open it to choose your password.') : tr('Your account waits for an admin to approve it. You can sign in once it is approved.'))}</p><button class="btn" type="button" data-au="back">${tr('Back to the sign-in')}</button>`;
     } catch { errEl.textContent = tr('Server not reachable.'); }
   });
   setTimeout(() => $('#su-name', el)?.focus(), 50);
@@ -871,20 +881,20 @@ function signinHtml(hint) {
   const a = S.about || {}, o = a.oidc || {};
   let h = `<h4 id="s-signin-h">${tr('Sign-in')}</h4>
     <div class="featgrid">
-      <label class="wide"><input type="checkbox" id="s-2fareq" ${a.twofa_required ? 'checked' : ''}><span>${tr('Require two-factor authentication for built-in logins')}<small class="muted">${tr('Everyone who logs in with a password must set up an authenticator app or a passkey at the next login. Single sign-on logins (login proxy, OIDC) are not affected: there the login provider is responsible.')}</small></span></label>
-      <label class="wide"><input type="checkbox" id="s-pklogin" ${a.passkey_login !== false ? 'checked' : ''}><span>${tr('Allow logging in with a passkey without the password')}<small class="muted">${tr('A passkey someone added in Settings > Account then also works on its own (the device asks for the fingerprint, face or PIN).')}</small></span></label>
+      <label class="wide"><input type="checkbox" id="s-2fareq" ${a.twofa_required ? 'checked' : ''}><span>${tr('Require two-factor authentication for built-in sign-ins')}<small class="muted">${tr('Everyone who signs in with a password must set up an authenticator app or a passkey at the next sign-in. Single sign-on sign-ins (sign-in proxy, OIDC) are not affected: there the sign-in provider is responsible.')}</small></span></label>
+      <label class="wide"><input type="checkbox" id="s-pklogin" ${a.passkey_login !== false ? 'checked' : ''}><span>${tr('Allow signing in with a passkey without the password')}<small class="muted">${tr('A passkey someone added in Settings > Account then also works on its own (the device asks for the fingerprint, face or PIN).')}</small></span></label>
     </div>
     ${signupAdminHtml(a)}
-    <h4 id="s-oidc-h">${tr('Login with an OIDC provider')}</h4>`;
-  if (!o.configured) return h + hint(tr('Not configured yet. Log in with Authentik, Keycloak, Authelia, PocketID, Google, Microsoft Entra or any other OpenID Connect provider: fill in the provider below (or set the KALMIDO_OIDC_* variables) and register this redirect URI at the provider: {0}', `<code class="topic">${esc(o.redirect_uri || '')}</code>`)) + oidcForm(o, hint);
+    <h4 id="s-oidc-h">${tr('Sign-in with an OIDC provider')}</h4>`;
+  if (!o.configured) return h + hint(tr('Not configured yet. Sign in with Authentik, Keycloak, Authelia, PocketID, Google, Microsoft Entra or any other OpenID Connect provider: fill in the provider below (or set the KALMIDO_OIDC_* variables) and register this redirect URI at the provider: {0}', `<code class="topic">${esc(o.redirect_uri || '')}</code>`)) + oidcForm(o, hint);
   const row = (l, v) => v ? `<div class="row"><label>${l}</label><code class="topic">${esc(v)}</code></div>` : '';
   h += row(tr('Provider'), o.issuer) + row(tr('Client ID'), o.client_id) +
     `<div class="row"><label>${tr('Redirect URI')}</label><code class="topic" id="s-oidcredir">${esc(o.redirect_uri)}</code><button class="btn sm" data-m="oidc-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>` +
     row(tr('Scopes'), o.scopes) + row(tr('User name claim'), o.username_claim) + row(tr('Required group'), o.required_group) + row(tr('Admin group'), o.admin_group) +
     row(tr('Admin e-mail domains'), o.admin_domains) +
     hint(tr('The client secret is {0}.', o.secret_set ? tr('set') : tr('not set (public client with PKCE)')) + ' ' +
-      trn('{0} user is linked to the provider.', '{0} users are linked to the provider.', o.linked || 0)) +
-    `<div class="featgrid"><label class="wide"><input type="checkbox" id="s-oidcauto" ${o.autocreate ? 'checked' : ''}><span>${tr('Create accounts on the first OIDC login')}<small class="muted">${tr('Off: only users an admin created can log in; the first login links them by user name or verified e-mail. On: anyone the provider lets through gets an account.')}</small></span></label></div>`;
+      trn('{0} person is linked to the provider.', '{0} people are linked to the provider.', o.linked || 0)) +
+    `<div class="featgrid"><label class="wide"><input type="checkbox" id="s-oidcauto" ${o.autocreate ? 'checked' : ''}><span>${tr('Create accounts on the first OIDC sign-in')}<small class="muted">${tr('Off: only users an admin created can sign in; the first sign-in links them by user name or verified e-mail. On: anyone the provider lets through gets an account.')}</small></span></label></div>`;
   if (o.error) h += `<div class="shint cnote">${tr('Last problem with the provider: {0}', esc(o.error))}</div>`;
   return h + oidcForm(o, hint);
 }
@@ -905,7 +915,7 @@ function oidcForm(o, hint) {
   return `<details class="shelp sdet oidcform" ${o.configured && !o.draft ? '' : 'open'}><summary>${o.configured ? tr('Change the provider settings') : tr('Set up the provider')}</summary>
     ${hint(tr('Each field is saved as a draft: the sign-in keeps its current settings until the draft passed “Check connection” and you switch it on.'))}
     ${f}
-    ${hint(tr('Admin e-mail domains: comma-separated. Whoever logs in with a verified e-mail of one of them becomes an admin, like the admin group (and no longer is one otherwise; the last admin always stays).'))}
+    ${hint(tr('Admin e-mail domains: comma-separated. Whoever signs in with a verified e-mail of one of them becomes an admin, like the admin group (and no longer is one otherwise; the last admin always stays).'))}
     ${env.size ? hint(tr('Fields set with KALMIDO_OIDC_* environment variables are locked here: the environment always wins.')) : ''}
     ${o.secret_lost ? `<div class="shint cnote">${tr('The stored client secret cannot be read with the current KALMIDO_SECRET_KEY: enter it again.')}</div>` : ''}
     ${!o.secret_key && !env.has('client_secret') ? `<div class="shint iiok">${tr('Without KALMIDO_SECRET_KEY on the server the client secret can only be set as an environment variable.')}</div>` : ''}
@@ -1008,7 +1018,7 @@ async function stoCheck(md) {
 }
 const bkHtml = () => `<h4 id="s-bk-h">${tr('Backups')}</h4><div class="shint">${tr('The server key KALMIDO_SECRET_KEY is not part of a backup: keep it separately. A backup restores the encrypted organisation data only with that key (or with the organisations’ recovery keys).')}</div><div id="s-bk"><div class="muted mhint">${tr('Loading…')}</div></div><h4 id="s-bko-h">${tr('Off-site backup')}</h4><div id="s-bko"></div>`;  // 2.143.0 B (#2152): + the off-site target
 const BK_KIND = {auto: N_('automatic'), manual: N_('manual'), safety: N_('before a restore')};
-const fmtBytes = n => n >= 1e9 ? (n / 1e9).toFixed(1) + ' GB' : n >= 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round((n || 0) / 1e3)) + ' kB';
+const fmtBytes = n => fmtSize(Math.max(n || 0, 1024));  // 2.450.0 (#3770): fmtSize, at least "1 KB"
 async function bkDraw(md, j) {
   const box = $('#s-bk', md); if (!box) return;
   scnStatus(md);  // 2.61.0 (#1818): the virus scanner's line (once)
@@ -1032,8 +1042,9 @@ async function bkDraw(md, j) {
   const each = j.items.length ? j.items[0].size + (j.items[0].store_new_bytes || 0) : 0;  // 2.432.0 (#3584): + its new shared files
   if (j.free_bytes && j.items.length && j.free_bytes < 3 * each) h += `<div class="shint cnote bkspace">${tr('Little space left on the disk for further backups (each one about {0}). Keep fewer backups or give the backup folder a bigger disk.', fmtBytes(each))}</div>`;
   if (j.last_error) h += `<div class="shint cnote">${tr('The last backup failed ({0}): {1}', esc(aaWhen(j.last_error_at)), esc(j.last_error))}</div>`;
+  if ((j.leftovers || []).length) h += `<div class="shint cnote" id="bk-leftovers">${tr('Folders from a restore are lying next to the data folder ({0}). After a hard stop the database and the files may not match: check them, a successful restore removes them.', esc(j.leftovers.join(', ')))}</div>`;  // 2.370.2 (#2779)
   h += j.items.length ? `<div class="members bklist">${j.items.map(x => `<div class="mrow bkrow" data-bkn="${esc(x.name)}"><span class="n"><b>${esc(aaWhen(x.created_at))}</b> · ${tr(BK_KIND[x.kind] || x.kind)} · ${fmtBytes(x.size)}${x.encrypted ? ` · ${ic('lock', 's')} ${tr('encrypted')}` : ''}${x.legacy ? ` · ${tr('old (SQLite), moved over when restored')}` : ''}
-      <small class="muted" style="display:block">${x.unreadable ? tr('unreadable') : `${trn('{0} task', '{0} tasks', x.counts.tasks || 0)}, ${trn('{0} file', '{0} files', x.attachment_files || 0)}${x.shared_files ? ` (${esc(trn('{0} shared', '{0} shared', x.shared_files))}${x.store_new_bytes ? ', ' + esc(tr('{0} newly stored', fmtBytes(x.store_new_bytes))) : ''})` : ''}, ${trn('{0} user', '{0} users', x.counts.users || 0)} · v${esc(x.app_version)}${x.missing_files ? ' · ' + esc(trn('{0} file missing', '{0} files missing', x.missing_files)) : ''}`}</small></span>
+      <small class="muted" style="display:block">${x.unreadable ? tr('unreadable') : `${trn('{0} task', '{0} tasks', x.counts.tasks || 0)}, ${trn('{0} file', '{0} files', x.attachment_files || 0)}${x.shared_files ? ` (${esc(trn('{0} shared', '{0} shared', x.shared_files))}${x.store_new_bytes ? ', ' + esc(tr('{0} newly stored', fmtBytes(x.store_new_bytes))) : ''})` : ''}, ${trn('{0} person', '{0} people', x.counts.users || 0)} · v${esc(x.app_version)}${x.missing_files ? ' · ' + esc(trn('{0} file missing', '{0} files missing', x.missing_files)) : ''}`}</small></span>
       <a class="iconbtn" href="/api/admin/backups/${encodeURIComponent(x.name)}/download" download="${esc(x.name)}" data-sudl title="${tr('Download')}">${ic('download', 's')}</a>
       <button class="iconbtn" data-bk="verify" title="${tr('Check')}">${ic('check', 's')}</button><button class="iconbtn" data-bk="restore" title="${tr('Restore')}">${ic('undo', 's')}</button><button class="iconbtn" data-bk="del" title="${tr('Delete')}">${ic('trash', 's')}</button></div>`).join('')}</div>` : `<div class="muted mhint">${tr('No backups yet.')}</div>`;
   h += `<div class="row"><label for="bk-file">${tr('Restore from a file')}</label>${fileBtn('bk-file', '.zip,.enc,application/zip')}${''/* lazy-ok: 2.149.0 F (#2519): settings dialog only */}</div>
@@ -1187,7 +1198,7 @@ async function setupChoices(el, logo) {
       <div class="supriv" id="su-priv">${suPriv()}</div>
       ${pm_allHtml('su-modsall', modsAll ?? SETUP_MODS.every(([k]) => picked.has(k)))}
       ${askOrg && ['team', 'software', 'office'].includes(preset) ? `<h3><label for="su-org">${tr('Name of your team or company')} <span class="muted">${tr('(optional)')}</span></label></h3><input id="su-org" class="suorg" maxlength="60" value="${esc(orgName)}" placeholder="${esc(tr('e.g. your company'))}"><p class="muted">${tr('Shown next to the app name and in invitations.')}</p>` : ''}
-      <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customize…')} <span class="muted">${esc(suCount())}</span></summary>
+      <details class="sucust" ${custOpen ? 'open' : ''}><summary>${tr('Customise…')} <span class="muted">${esc(suCount())}</span></summary>
       <div class="suse-main">${SETUP_MAIN.map(row).join('')}</div>
       <div class="suse-list">${SETUP_MODS.map(row).join('')}</div></details>
       <h3 id="su-start-h">${tr('Start with')}</h3>

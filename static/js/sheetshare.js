@@ -32,7 +32,7 @@ async function shsOpen(sh) {
   let shares = d.shares || [];
   const draw = () => {
     const box = shs$('#shs-list', md); if (!box) return;
-    box.innerHTML = shares.map(s => `<div class="mrow" data-sid="${s.id}">${s.email ? `<span class="avatar">${ic('mail', 's')}</span>` : av(s.user_id, s.name)}<span class="n">${esc(s.name)}${s.agent ? agentBadge() : ''}${s.state === 'invited' ? `<small class="muted">${tr('Invited')}</small>` : ''}</span>${roleSel(`data-shsr="${s.id}"`, s.role)}<button class="iconbtn" data-shsx="${s.id}" title="${esc(tr('Stop sharing'))}" aria-label="${esc(tr('Stop sharing with {0}', s.name))}">${ic('x', 's')}</button></div>`).join('')
+    box.innerHTML = shares.map(s => `<div class="mrow" data-sid="${s.id}">${s.email ? `<span class="avatar">${ic('mail', 's')}</span>` : av(s.user_id, s.name)}<span class="n">${esc(s.name)}${s.agent ? agentBadge(s.user_id) : ''}${s.state === 'invited' ? `<small class="muted">${tr('Invited')}</small>` : ''}</span>${roleSel(`data-shsr="${s.id}"`, s.role)}<button class="iconbtn" data-shsx="${s.id}" title="${esc(tr('Stop sharing'))}" aria-label="${esc(tr('Stop sharing with {0}', s.name))}">${ic('x', 's')}</button></div>`).join('')
       || `<div class="muted mhint">${tr('Not shared yet')}</div>`;
   };
   draw();

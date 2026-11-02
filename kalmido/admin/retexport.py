@@ -25,6 +25,8 @@ import zipfile
 
 from flask import Response, g, jsonify, request, stream_with_context
 
+from .exportleft import RX_LEFT_TABLES, left_lines  # 2.362.4 (#3107)
+from .orgexport import _ox_locked  # 2.370.0 (#2781)
 from ..core.access import Denied
 from ..core.config import app, APP_VERSION, ATT_DIR, OFFICE_DIR
 from ..core.db import connect, db, iso, now_utc
@@ -51,30 +53,78 @@ RX_TABLES = (
     ("invoices/payments.csv", "office_payments"),
     ("invoices/clients.csv", "clients"),
     ("invoices/company.csv", "office_company"),
+    # 2.362.2 (#3105): every other record of the office the books and the tax office ask for; RX_LEFT names the rest with its reason
+    ("invoices/client-contacts.csv", "office_client_contacts"),
+    ("invoices/document-parts.csv", "office_doc_parts"),
+    ("invoices/dunning.csv", "office_dunning_marks"),
+    ("invoices/purchases.csv", "office_purchases"),
+    ("invoices/suppliers.csv", "office_suppliers"),
+    ("invoices/peppol-sends.csv", "office_peppol_sends"),
+    ("invoices/signoffs.csv", "office_signoffs"),
+    ("invoices/generated-documents.csv", "office_gen_docs"),
+    ("invoices/privacy-sheets.csv", "office_privacy_sheets"),
+    ("contracts/contracts.csv", "office_contracts"),
+    ("contracts/contract-files.csv", "office_contract_files"),
+    ("contracts/agreements.csv", "office_agreements"),
+    ("books/procedure-documentation.csv", "office_procdocs"),
+    ("books/number-ranges.csv", "office_numbers"),
+    ("books/opening-balances.csv", "office_opening_balances"),
+    ("books/period-locks.csv", "office_period_locks"),
+    ("books/equipment.csv", "office_equipment"),
     ("archive/archive.csv", "office_archive"),
     ("archive/bookarch.csv", "office_bookarch"),  # 2.414.0 (#3502): the booking archive of past DATEV years (books, 10 years)
     ("archive/bookarch-accounts.csv", "office_bookarch_accts"),
+    ("archive/bookarch-files.csv", "office_bookarch_files"),  # 2.362.2 (#3105)
+    ("archive/bookarch-documents.csv", "office_bookarch_docs"),
+    ("archive/datev-guids.csv", "office_datev_guids"),
     ("cashbook/cashbooks.csv", "office_cashbooks"),
     ("cashbook/entries.csv", "office_cash_entries"),
     ("cashbook/closings.csv", "office_cash_closings"),
     ("bank/imports.csv", "office_bank_imports"),
     ("bank/transactions.csv", "office_bank_tx"),
+    ("bank/balances.csv", "office_bank_balances"),  # 2.362.2 (#3105)
     ("bank/card-cards.csv", "office_cc_cards"),  # 2.444.0 (#3447): credit card statements
     ("bank/card-statements.csv", "office_cc_statements"),
     ("bank/card-positions.csv", "office_cc_lines"),
     ("expenses/meals.csv", "office_meals"),
+    ("expenses/meal-files.csv", "office_meal_files"),  # 2.362.2 (#3105)
     ("expenses/trips.csv", "office_trips"),
     ("expenses/trip-items.csv", "office_trip_items"),
     ("expenses/drives.csv", "office_drives"),
+    ("expenses/vehicles.csv", "office_vehicles"),  # 2.362.2 (#3105): the logbook names them
     ("logs/office-log.csv", "office_doc_log"),
     ("logs/cashbook-log.csv", "office_cash_log"),
     ("logs/archive-log.csv", "office_archive_log"),
     ("logs/meal-log.csv", "office_meal_log"),
     ("logs/drive-log.csv", "office_drive_log"),
     ("logs/drive-closed.csv", "office_drive_closed"),  # 2.362.0 (#3096): the closed months of the logbook
+    ("logs/rights-log.csv", "office_rights_log"),  # 2.362.2 (#3105)
+    ("logs/import-runs.csv", "office_import_runs"),
     ("letters/letters.csv", "office_letters"),  # 2.184.0 A (#2628): sent letters (business letters, 6 years; RX_WHERE)
+    ("letters/letter-links.csv", "office_letter_links"),  # 2.362.2 (#3105)
 )
-RX_WHERE = {"office_letters": "org_id=? AND status<>'draft'"}  # 2.184.0 A (#2628): a table's own rows instead of OX_AREAS'
+RX_WHERE = {"office_letters": "org_id=? AND status<>'draft'",  # 2.184.0 A (#2628): a table's own rows instead of OX_AREAS'
+            # 2.362.2 (#3105): the links of a draft stay out with the draft
+            "office_letter_links": "org_id=? AND letter_id IN (SELECT id FROM office_letters WHERE org_id=? AND status<>'draft')"}
+RX_DROP = {"office_signoffs": ("ip", "user_agent")}  # 2.362.2 (#3105, review): a signer's network address is no business record
+# 2.362.2 (#3105): every office table that is NOT in RX_TABLES, with the reason (the static guard tests/export_coverage_test.py
+# fails on a new office_* table until it is in RX_TABLES or here -- so no record goes missing silently)
+_RX_SETUP = "settings and working data of the office, no record to keep (in the organisation export)"
+RX_LEFT = {
+    "office_settings": _RX_SETUP, "office_services": _RX_SETUP, "office_roles": _RX_SETUP, "office_sets": _RX_SETUP, "office_texts": _RX_SETUP,
+    "office_doc_templates": _RX_SETUP, "office_letter_blocks": _RX_SETUP, "office_letter_profiles": _RX_SETUP, "office_inv_series": _RX_SETUP,
+    "office_fixed_costs": _RX_SETUP, "office_cf_actual": _RX_SETUP, "office_cf_adjust": _RX_SETUP, "office_cf_start": _RX_SETUP,
+    "office_bank_rules": _RX_SETUP, "office_bank_rule_nos": _RX_SETUP, "office_bank_vendors": _RX_SETUP, "office_deals": _RX_SETUP,
+    "office_sub_reminders": _RX_SETUP, "office_trip_purposes": _RX_SETUP, "office_pack_installs": _RX_SETUP, "office_rgroups": _RX_SETUP,
+    "office_rgroup_members": _RX_SETUP, "office_meal_choices": _RX_SETUP, "office_pay_props": "agents' suggestions, not the booked payments",
+    "office_peppol": "the Peppol connection and its key (a secret; the sends are in the export)",
+    "office_payonline": "the online payment connection and its keys (a secret; the payments are in the export)",
+    "office_pay_links": "the public pay links (secrets; the payments are in the export)",
+    "office_pay_sessions": "the online provider's working data (the payments are in the export)",
+    "office_pay_events": "the online provider's working data (the payments are in the export)",
+    "office_pay_payouts": "the online provider's working data (the payments are in the export)",
+    "office_trash": "the trash (deleted items are not in the export)", "office_undo": "undo steps of one day",
+}
 
 
 # ---------------------------------------------------------------- the subject: whose records, who may download them
@@ -199,10 +249,12 @@ def rx_lists_how():
     return how if hosted() and how in ("exported", "waived") else None
 
 
-def rx_gate(c, sub, along=True):
+def rx_gate(c, sub, along=True, how=None):
     """Before the deletion of sub: None = it may go (no records, a fresh export, or ?retention=waived -- noted), else the 409
     answer. The caller deletes in the same transaction (a waiver row goes away with a failed deletion). 2.186.0 A (#2599):
-    records that are retired need neither (no waiver is noted); after the period of a retired organisation it goes as such."""
+    records that are retired need neither (no waiver is noted); after the period of a retired organisation it goes as such.
+    #3939: how = the caller's choice instead of the request's ?retention= ("" = neither export nor waiver: the hosting
+    operator's console, which never waives)."""
     counts = rx_counts(c, sub, along)
     if not counts:
         return None, None
@@ -212,7 +264,8 @@ def rx_gate(c, sub, along=True):
     if st == "expired":
         rx_log(c, sub, "expired", {"counts": counts})
         return None, (N_("{0} deleted {1}: its legal retention period was over."), "expired")
-    how = request.args.get("retention") or ""
+    if how is None:
+        how = request.args.get("retention") or ""
     if how == "waived":
         rx_log(c, sub, "waiver", {"counts": counts})
         return None, (N_("{0} deleted {1} without the retention export (waived explicitly)."), "waiver")
@@ -275,6 +328,7 @@ class _Zip:
         self.pipe = _Pipe()
         self.zf = zipfile.ZipFile(self.pipe, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6)
         self.files, self.sections, self.missing, self.names = {}, {}, [], set()
+        self.locked, self.lk = [], None  # 2.370.0 (#2781): files the virus scanner locked: left out, listed (orgexport._ox_locked)
 
     def put(self, name, data, section=None):
         if isinstance(data, str):
@@ -322,6 +376,7 @@ def _tables(c, z, sub):
         else:  # 2.223.3 B (#2879): without the trash and undone entries (ox_live; removed drives stay for the change log)
             w = ox_live(c, table, RX_WHERE.get(table) or where[table])
             rows = _rows(c, oid, table, w, (oid,) * w.count("?"))
+        rows = [{k: v for k, v in r.items() if k not in RX_DROP.get(table, ())} for r in rows]
         rows = [dict(r, user_name=name(r.get("user_id") or r.get("by_user"))) if ("user_id" in r or "by_user" in r) else r for r in rows]
         if not rows:
             continue
@@ -338,6 +393,12 @@ def _checked(c, oid, z, r, ext, data, stem):
         z.missing.append(f"{stem}.{ext} (checksum mismatch)")
         ofx_log(c, oid, "store_mismatch", doc_id=r["id"], detail={"file": ext, "sha256": sha, "found": got, "at": "retention export"})
     return data
+
+
+def _fs_locked(c, z, nid, name):
+    """2.370.0 (#2781): the current version of file nid is locked by the virus scanner -> True (listed in z.locked)."""
+    r = c.execute("SELECT cur_version FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+    return bool(r) and z.lk("fs", {"id": nid}, name, r[0])
 
 
 def _invoices(c, z, sub, done):
@@ -379,7 +440,10 @@ def _receipts(c, z, sub):
     for r in rows:
         fn = f"receipts/{int(r['node_id'])}-{_safe_part(r['name'], 100)}"
         try:
-            data = fs_read(c, r["node_id"])
+            if _fs_locked(c, z, r["node_id"], r["name"]):
+                data, fn = None, ""
+            else:
+                data = fs_read(c, r["node_id"])
         except Exception as e:  # noqa: BLE001 -- a file without content (or held by the scan guard): named in the index
             print("retention export: receipt", r["node_id"], "not readable:", type(e).__name__, flush=True)
             z.missing.append(fn)
@@ -403,15 +467,18 @@ def _project_receipts(c, z, sub):
     for r in rows:
         fn = f"project-receipts/{int(r['list_id'])}-{_safe_part(r['list_name'], 40)}/{int(r['id'])}-{_safe_part(r['name'], 100)}"
         full = _under(ATT_DIR, r["path"])
-        try:
-            data = oc_read_file(c, full) if full else None
-        except Exception as e:  # noqa: BLE001 -- named in the index
-            print("retention export: project receipt", r["id"], "not readable:", type(e).__name__, flush=True)
-            data = None
-        if data is None:
-            z.missing.append(fn)
+        data = None
+        if z.lk("budget", {"id": r["id"]}, r["name"]):  # 2.370.0 (#2781)
             fn = ""
         else:
+            try:
+                data = oc_read_file(c, full) if full else None
+            except Exception as e:  # noqa: BLE001 -- named in the index
+                print("retention export: project receipt", r["id"], "not readable:", type(e).__name__, flush=True)
+            if data is None:
+                z.missing.append(fn)
+                fn = ""
+        if data is not None:
             yield z.put(fn, data, "project-receipts")
         out.append({"id": r["id"], "file": fn, "list_id": r["list_id"], "list": r["list_name"], "entry_id": r["entry_id"], "name": r["name"],
                     "size": r["size"], "created_at": r["created_at"]})
@@ -441,6 +508,8 @@ def _letters(c, z, sub):
                        (sub["office"],)).fetchall():
         day = "".join(ch for ch in str(r["letter_date"] or "")[:10] if ch.isdigit() or ch == "-")
         fn = f"letters/{int(r['id'])}-{day or 'letter'}.pdf"
+        if r["node_id"] and _fs_locked(c, z, r["node_id"], fn):  # 2.370.0 (#2781)
+            continue
         try:
             data = fs_read(c, r["node_id"]) if r["node_id"] else None
         except Exception as e:  # noqa: BLE001 -- named in the index
@@ -483,6 +552,9 @@ def _office_files(c, z, sub, done):
             full = os.path.join(root, fn)
             if os.path.islink(full) or not os.path.isfile(full) or os.path.realpath(full) in done or fn.endswith(".tmp"):
                 continue
+            if root == base and fn in z.lk.office:  # 2.370.0 (#2781): as orgexport, the office's uploads lie directly in its folder
+                z.lk(*z.lk.office[fn][:2], fn)
+                continue
             rel = os.path.relpath(full, base).split(os.sep)
             try:
                 data = oc_read_file(c, full)
@@ -498,6 +570,8 @@ RX_SECTIONS = (
     ("receipts", N_("Receipts with their files and receipts.csv")),
     ("project-receipts", N_("Receipts of projects")),
     ("project-bookings", N_("Bookings of projects (CSV)")),  # 2.186.1 (#2732): a kept project's export (rx_list_download)
+    ("books", N_("Procedure documentation, number ranges, opening balances, locked periods, equipment (CSV)")),  # 2.362.2 (#3105)
+    ("contracts", N_("Contracts and agreements (CSV; the files are under office-files)")),  # 2.362.2 (#3105)
     ("cashbook", N_("Cash books (PDF and CSV with day closings and change log)")),
     ("bank", N_("Imported bank statements (CSV)")),
     ("expenses", N_("Entertainment receipts, travel expenses, logbook (CSV)")),
@@ -519,6 +593,8 @@ def _index(z, sub, title, by, when):
         lines.append(tr("No records found."))
     if z.missing:
         lines += ["", tr("Could not be read (please check in Kalmido before the deletion):")] + [f"  {m}" for m in z.missing]
+    if z.locked:  # 2.370.0 (#2781)
+        lines += ["", tr("Left out, locked by the virus scanner:")] + [f"  {m['name']} ({m['signature']})" for m in z.locked]
     lines += ["", tr("manifest.json lists every file with its SHA-256 checksum."), ""]
     return "\r\n".join(lines)
 
@@ -531,6 +607,7 @@ def rx_stream(sub, uid, by, title, lg):
     ok = False
     try:
         with system_ctx(c):  # the subject's records only (every query names its office / documents space / lists); checked by rx_may_export
+            z.lk = _ox_locked(c, sub["office"], z)  # 2.370.0 (#2781): files the virus scanner locked stay out, listed in the manifest
             if sub["office"]:
                 yield from _invoices(c, z, sub, done)
             if sub["kind"] != "list":  # 2.186.1 (#2732): a kept project has no documents space of its own
@@ -546,7 +623,8 @@ def rx_stream(sub, uid, by, title, lg):
             when = iso(now_utc())
             idx = _index(z, sub, title, by, when)
             man = {"format": "kalmido-retention-export", "format_version": 1, "kalmido_version": APP_VERSION, "subject": sub["key"],
-                   "created_at": when, "created_by": by, "files": dict(z.files), "missing": z.missing}
+                   "created_at": when, "created_by": by, "files": dict(z.files), "missing": z.missing, "locked_files": z.locked,
+                   "not_included": left_lines(RX_LEFT_TABLES, lg)}  # 2.362.4 (#3107), 2.464.0 (#3841)
             yield z.put("00-index.txt", idx)
             yield z.put("manifest.json", json.dumps(man, ensure_ascii=False, indent=1))
             z.zf.close()
@@ -557,7 +635,7 @@ def rx_stream(sub, uid, by, title, lg):
             try:
                 with system_ctx(c):  # the subject's log row + the office log
                     c.execute("INSERT INTO retention_log(subject, kind, by_user, at, detail) VALUES(?,?,?,?,?)",
-                              (sub["key"], "export", uid, iso(now_utc()), json.dumps({"files": len(z.files), "missing": len(z.missing)})))
+                              (sub["key"], "export", uid, iso(now_utc()), json.dumps({"files": len(z.files), "missing": len(z.missing), "locked": len(z.locked)})))
                     if sub["office"]:
                         from ..office.ledger import ofx_log
                         ofx_log(c, sub["office"], "export", target="retention", detail={"files": len(z.files), "missing": len(z.missing)})

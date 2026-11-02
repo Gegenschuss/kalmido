@@ -164,3 +164,49 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-tblb]'); if (!b) return;
   e.preventDefault(); e.stopPropagation(); tbl_menu(b, +b.dataset.tblb);
 }, true);
+// ---- 2.473.0 (#3357): delegated to an agent and the watchers of a task, in the detail under the assignee. The server decides
+// who may do what (tasks/watchers.py); here only what the person can use is offered.
+const dlg_agents = t => { const l = listById(t.list_id); return l?.agents_open === false ? [] : listPeople(l).filter(p => p.agent || agentById(p.user_id)); };
+const dlg_name = t => personName(t.list_id, t.delegate_agent_id) || personNameAny(t.delegate_agent_id) || '?';
+function dlg_rowHtml(t, ck, ro, shared) {
+  if (ck || !(t?.id > 0) || t.context || !collab()) return '';
+  const lock = ro || !canAssign(t), id = t.delegate_agent_id;
+  const lab = id ? tr('Delegated to {0}', dlg_name(t)) : tr('Delegate to an agent');
+  const chip = (id || (!lock && dlg_agents(t).length)) && pz_show(t, 'who', id) ? `<button type="button" class="dchip dwho dlg-c ${id ? 'set' : ''} ${lock ? 'ro' : ''}" data-act="delegate" data-id="${t.id}" aria-haspopup="menu" ${lock ? 'aria-disabled="true"' : ''} title="${esc(lab)}" aria-label="${esc(lab)}">${id ? av(id, dlg_name(t), 'avatar who') : ic('bot', 's')}<span class="dct">${esc(id ? dlg_name(t) : tr('Delegate'))}</span></button>` : '';
+  const w = t.watchers || [], mine = w.includes(S.me?.id);
+  const on = shared || w.length, tip = mine ? tr('Stop watching') : tr('Watch: comments and status changes reach you');
+  const btn = on ? `<button type="button" class="btn sm dlg-w ${mine ? 'on' : ''}" data-act="watch" data-id="${t.id}" aria-pressed="${mine}" title="${esc(tip)}">${ic('eye', 's')} ${mine ? tr('Watching') : tr('Watch')}</button>` : '';
+  const all = on ? `<button type="button" class="linkbtn dlg-l" data-act="watchers" data-id="${t.id}" aria-haspopup="menu">${esc(trn('{0} watcher', '{0} watchers', w.length))}</button>` : '';
+  return chip || btn ? `<div class="dmeta dlgrow" data-watrow="${t.id}">${chip}${btn}${all}</div>` : '';
+}
+function dlg_menu(anchor, id) {
+  const t = taskById(id); if (!t) return;
+  if (!canAssign(t)) { roToast(); return; }
+  if (tlkStop(t)) return;
+  const set = uid => { if ((t.delegate_agent_id || null) !== uid) patchTask(id, {delegate_agent_id: uid}); };
+  menu(anchor, [{label: tr('Nobody'), icon: 'x', on: !t.delegate_agent_id, fn: () => set(null)}, '-',
+    ...dlg_agents(t).map(p => ({label: p.name, icon: 'bot', on: p.user_id === t.delegate_agent_id, fn: () => set(p.user_id)}))], null, null, tr('Delegate to an agent'));
+}
+function wat_paint(tid) {
+  const t = taskById(tid); if (!t) return;
+  for (const r of $$(`[data-watrow="${tid}"]`)) {
+    const w = document.createElement('div'); w.innerHTML = dlg_rowHtml(t, false, !canEdit(t), true);
+    if (w.firstElementChild) r.replaceWith(w.firstElementChild);
+  }
+}
+async function wat_set(tid, uid, on) {
+  let j;
+  try { j = await tbl_req(on ? 'POST' : 'DELETE', `/api/tasks/${tid}/watchers${on ? '' : '/' + uid}`, on ? {user_id: uid} : undefined); } catch { return; }
+  const t = taskById(tid); if (t) t.watchers = j.watchers.map(x => x.id);
+  wat_paint(tid);
+}
+const wat_toggle = tid => { const t = taskById(tid); if (t) wat_set(tid, S.me?.id, !(t.watchers || []).includes(S.me?.id)); };
+async function wat_menu(anchor, tid) {
+  let j;
+  try { j = await tbl_req('GET', `/api/tasks/${tid}/watchers`); } catch { return; }
+  const has = new Set(j.watchers.map(x => x.id));
+  const items = j.watchers.map(x => j.can_others || x.id === S.me?.id ? {label: tr('Remove {0} from the watchers', x.name), icon: 'x', fn: () => wat_set(tid, x.id, false)} : {label: x.name, icon: 'eye', dis: true});
+  const add = (j.people || []).filter(p => !has.has(p.id)).map(p => ({label: tr('Add {0} to the watchers', p.name), icon: 'plus', fn: () => wat_set(tid, p.id, true)}));
+  const all = [...items, ...(items.length && add.length ? ['-'] : []), ...add];
+  menu(anchor, all.length ? all : [{label: tr('Nobody watches this task yet'), dis: true}], null, null, tr('Watchers'));
+}
