@@ -35,6 +35,7 @@ const WS_VIEWS = {
   'static/js/contacts.js': 'check:contacts',  // contacts: address books filtered by wsObjIn while drawing
   'static/js/render.js': 'draw',              // lists, tasks, News (checked in p2280_ui)
   'static/js/sidebar.js': 'draw',             // the sidebar's lists and folders (p2280_ui)
+  'static/js/liveparts.js': 'draw',           // 2.369.2 (#3136): lzCounts adds the server counts of lists not loaded only for lists of the shown workspace (wsHidden, like counts())
   'static/js/sbnav.js': 'draw',
   'static/js/core.js': 'draw',                // also: the new state reloads the workload tabs (absences, disposition)
   'static/js/chat.js': 'draw',                // team chats of the workspace
