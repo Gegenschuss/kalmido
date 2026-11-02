@@ -1423,7 +1423,7 @@ TASK_PLACE = {"list_id": S_ID, "section_id": {"type": ["integer", "null"]}, "par
 LIST_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "folder": {"type": "string", "description": "path, e.g. Clients/Acme"},
               "view": {"type": "string", "enum": ["list", "kanban", "timeline", "mindmap", "calendar"]}, "kind": {"type": "string", "enum": ["list", "project"]},
               "done_at_bottom": {"type": "boolean"}, "nag": {"type": "string"}, "day_hours": {"type": ["number", "null"]},
-              "time_tracking": {"type": "boolean", "description": "2.41.0: time tracking on for this project (any type, default off)"}}
+              "time_tracking": {"type": "boolean", "description": "2.41.0: time tracking on for this project (any type; 2.489.0: default on when the module Time is on for you, else off)"}}
 LIST_PROPS["points_on"] = {"type": "boolean", "description": "2.60.0: story points shown in the app (owner; default off)"}  # 2.60.0 (#1511)
 HABIT_PROPS = {"name": {"type": "string"}, "color": {"type": "string"}, "goal": {"type": "integer", "minimum": 1},
                "days": {"type": "string", "description": "weekdays 1-7 (1 = Monday), e.g. 12345"}, "per_week": {"type": "integer", "minimum": 0},
