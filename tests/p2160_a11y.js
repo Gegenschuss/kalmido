@@ -113,7 +113,7 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
   w.eval(`toast('Deleted', () => {})`); await sleep(150);
   check(/^Deleted · Undo/.test(d.getElementById('srlive').textContent), 'with its Undo');
   // dialogs: role, name, focus inside, Tab kept inside, focus back
-  const opener = d.querySelector('#top button'); opener.focus();
+  const opener = d.querySelector('#top button:not(:disabled):not(.bnback)'); opener.focus();  // 2.488.0 (#3988): the Back arrow is greyed out here (not focusable)
   w.eval(`listModal(${L})`); await sleep(250);
   let md = [...d.querySelectorAll('.modal')].pop();
   // 2.152.2 (#2624): project instead of list

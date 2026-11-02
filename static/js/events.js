@@ -692,6 +692,7 @@ document.addEventListener('click', async e => {
       await sectionCreate(lid, n.trim()); break;
     }
     case 'section-menu': e.stopPropagation(); sectionMenu(a, id); break;
+    case 'nav-back': bnBack(); break;
     case 'hist-undo': case 'hist-redo': if (!histHeld()) histStep(act.slice(5)); break;
     case 'date': datePop(a, id); break;
     case 'due-q': quickDue(id, +a.dataset.d); break;

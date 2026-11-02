@@ -2807,6 +2807,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 #top:is(.tl2,.tl3,.tl4):not(:has(.stchip)) .tmini.run{display:flex;flex:none;min-width:0}
 #top:is(.tl3,.tl4) .tf{display:none}
 #top.tl4 .tf4,#top.tl4 h1 .hn{display:none}
+#top.tl4 .bnback{display:none}  /* 2.488.0 (#3988): the Back arrow gives way last (the keys and the mouse button stay) */
 #top.tl4 .stchip .str [data-timer-mini],#top.tl4 .stchip .str [data-pomo-mini]{display:none}
 #top.tl4:not(:has(.stchip)) .tmini.run .rk{display:none}
 @media (pointer:coarse){ #top .stchip,#top .achip{min-width:2.75rem;min-height:2.75rem;justify-content:center} }

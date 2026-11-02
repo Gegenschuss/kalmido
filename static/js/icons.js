@@ -75,6 +75,7 @@ const P = {
   upload: icPath('M3 13V16H17V13M10 3.5V12M6 7.5L10 3.5L14 7.5'),
   download: icPath('M3 13V16H17V13M10 3.5V12M6 8L10 12L14 8'),
   arrow: icPath('M4 10H16M11 5L16 10L11 15'),
+  arrowl: icPath('M16 10H4M9 5L4 10L9 15'),
   // 2.119.0 B (#2301): pinf = the pinned state, a closed head the CSS can fill (pin stays the open outline)
   pinf: icPath('M7 3H13V8L14.5 13.5H5.5L7 8ZM10 13.5V18'),
   pin: icPath('M10 13.5V18M5.5 13.5H14.5M7 3H13M8 3V8L5.5 13.5M12 3V8L14.5 13.5'),
