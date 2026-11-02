@@ -89,10 +89,9 @@ def tpo_may(c, uid, r, write=False):
 
 def tpo_is_agent(c, uid):
     """2.484.0 (#2200): is uid an agent account (the request's user from g, anyone else from users)?"""
-    from ..agents.core import is_agent
     u = getattr(g, "user", None) if has_request_context() else None
-    if u is not None and u["id"] == uid:
-        return is_agent(u)
+    if u is not None and u["id"] == uid:  # (the kind read here: agents.core.is_agent would be an import upward, check_layers)
+        return (dict(u).get("kind") or "user") == "agent"
     x = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
     return bool(x) and (x[0] or "user") == "agent"
 
