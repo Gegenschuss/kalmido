@@ -988,7 +988,7 @@ async function ltSigSettings() {
     if (typeof ltProfileModal !== 'function') await loadModule('office');
     let profile, url;
     try { profile = await api('GET', '/api/office/letters/profile'); } catch (x) {
-      if (x.status !== 403) throw x;
+      if (x.status !== 403 && x.status !== 404) throw x;  // 404: the correspondence switched off
       url = '/api/office/meals/signature'; profile = await api('GET', url);  // 2.372.0 (#3316): without the correspondence: the picture for the entertainment receipts
     }
     ltProfileModal({profile, url, done: () => toast(tr('Saved'))});

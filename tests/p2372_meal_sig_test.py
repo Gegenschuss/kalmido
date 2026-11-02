@@ -7,7 +7,7 @@ freelancer-matrix: office
  - a staff member (office group "Staff": entertainment receipts on the level "own", no correspondence): the letters profile
    stays 403, GET / PUT / DELETE /api/office/meals/signature work on the person's OWN picture; my_sig follows it
  - another person never reaches it: a user_id in the body is ignored, Bob's GET shows Bob's (empty) picture
- - a member on "Previous access" (no entertainment receipts at all): 403
+ - a member on "Previous access" (no entertainment receipts at all): 403; the group "Read only" (view): reads, PUT / DELETE 403
  - the staff member approves as host with the picture: on the PDF
  - snapshot: removing or replacing the profile picture later leaves the approved receipt's picture as it was; undoing the
    approval drops the snapshot (approved again without a picture: none)
@@ -59,7 +59,7 @@ A = setup("alice", "Alice Admin", lang="en")
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
 ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE}).json()["id"]
 ids, S = {}, {}
-for u, n in (("sam", "Sam Staff"), ("bob", "Bob Other"), ("carl", "Carl Member")):
+for u, n in (("sam", "Sam Staff"), ("bob", "Bob Other"), ("carl", "Carl Member"), ("dora", "Dora Reader")):
     r = A.post(B + "/api/users", json={"username": u, "display_name": n, "password": "password123", "email": f"{u}@example.com"})
     check(r.ok, f"{u} created {r.text[:200]}")
     ids[u] = r.json()["id"]
@@ -67,11 +67,13 @@ for u, n in (("sam", "Sam Staff"), ("bob", "Bob Other"), ("carl", "Carl Member")
     S[u] = sess(u)
 for s in (A, *S.values()):
     s.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done", "workspace": f"org:{ORG}"})
-Sa, Bo, Ca = S["sam"], S["bob"], S["carl"]
+Sa, Bo, Ca, Do = S["sam"], S["bob"], S["carl"], S["dora"]
 SAM, BOB = ids["sam"], ids["bob"]
 for u in ("sam", "bob"):
     r = A.put(B + f"{O}/rights/people/{ids[u]}", json={"groups": ["tpl:staff"]})
     check(r.ok, f"{u} in the group Staff {r.status_code} {r.text[:200]}")
+r = A.put(B + f"{O}/rights/people/{ids['dora']}", json={"groups": ["tpl:readonly"]})
+check(r.ok, f"dora in the group Read only {r.status_code} {r.text[:200]}")
 TD = testclock.today().isoformat()
 FID, Fr = freelancer(B, A)  # freelancer-matrix: office
 
@@ -118,6 +120,8 @@ check(Sa.put(B + SIG, json={"image": "data:image/png;base64," + base64.b64encode
 for meth in ("get", "put", "delete"):
     rr = getattr(Ca, meth)(B + SIG, **({"json": {"image": PIC1}} if meth == "put" else {}))
     check(rr.status_code == 403, f"a member without entertainment receipts: {meth.upper()} 403 ({rr.status_code})")
+check(Do.get(B + SIG).ok, "Read only: reads the own (empty) picture")
+check(Do.put(B + SIG, json={"image": PIC1}).status_code == 403 and Do.delete(B + SIG).status_code == 403, "Read only: PUT / DELETE 403")
 check(Sa.get(B + SIG).json().get("has_image"), "Sam's picture is still there")
 
 # ---------------------------------------------------------------- the staff member approves as host; the snapshot

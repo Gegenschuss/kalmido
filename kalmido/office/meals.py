@@ -40,7 +40,7 @@ from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#30
 from ..core.i18n import N_, csv_dialect, tr
 from ..personal.timesheet import tz_of
 from ..core.orgcrypt import oc_dec_col, oc_dec_fields, oc_enc_fields, oc_read_file, oc_write_file
-from ..core.pg import insert_id, write_lock, system_ctx
+from ..core.pg import insert_id, table_columns, write_lock, system_ctx
 from ..core.errors import BadInput
 from ..files.scan import sc_after_store, sc_guard, sc_scan  # 2.190.0 D (#2561): pulled up, the later scan
 from .calc import dec, dstr, money
@@ -272,8 +272,19 @@ def bw_public(c, oid, r, logs=None, files=None, years=None):
             "deleted": 1 if d.get("deleted_at") else 0, "created_at": d["created_at"], "updated_at": d["updated_at"]}
 
 
+_BW_COLS = []
+
+
+def bw_cols(c):
+    """2.372.0 (#3316, review): the columns of office_meals for lists and checks -- all but the signature snapshot sign_pic
+    (up to 400 KB, read and decrypted only by mealpdf.bw_sig_image). Cached: the columns do not change while running."""
+    if not _BW_COLS:
+        _BW_COLS.append(", ".join(sorted(table_columns(c, "office_meals") - {"sign_pic"})))
+    return _BW_COLS[0]
+
+
 def bw_rows(c, oid, year=None, mid=None, deleted=False):
-    sql, args = "SELECT * FROM office_meals WHERE org_id=?", [oid]
+    sql, args = f"SELECT {bw_cols(c)} FROM office_meals WHERE org_id=?", [oid]
     own = ofr_own_uid("meals")  # 2.187.0 B (#2476): office groups, level "own": only the person's own receipts
     if mid is not None:
         sql += " AND id=?"
@@ -329,7 +340,7 @@ def bw_people(c, oid, uid):
 def _meal(c, oid, mid, deleted=False, mode="write"):
     """The meal row (404: none / not the person's on the level "own"). 2.187.1 B (#2735), level "own": mode "read" = entered by
     the person or the person is the host; "write" = entered by the person; "approve" = the person is the host (403 else)."""
-    r = c.execute("SELECT * FROM office_meals WHERE id=? AND org_id=?" + ("" if deleted else " AND deleted_at IS NULL"), (mid, oid)).fetchone()
+    r = c.execute(f"SELECT {bw_cols(c)} FROM office_meals WHERE id=? AND org_id=?" + ("" if deleted else " AND deleted_at IS NULL"), (mid, oid)).fetchone()
     own = ofr_own_uid("meals")
     if not r or (own is not None and not bw_own_sees(c, oid, r, own)):  # 2.187.0 B (#2476): level "own": somebody else's = 404
         raise Denied(404)
@@ -677,7 +688,8 @@ def bw_meal_approve(mid):
     sig = 1 if raw else 0  # 2.332.0 C (#3301): only with a picture
     # 2.372.0 (#3316): a snapshot of the picture stays with the receipt (encrypted), so a later new / removed profile picture
     # never changes an approved receipt; undoing the approval removes it
-    pic = oc_enc_fields(c, oid, "office_meals", {"sign_pic": base64.b64encode(raw).decode() if raw else ""})["sign_pic"]
+    # (review: "<approver id>:<base64>", so a snapshot left by an older version is never shown under another approver)
+    pic = oc_enc_fields(c, oid, "office_meals", {"sign_pic": f"{uid}:{base64.b64encode(raw).decode()}" if raw else ""})["sign_pic"]
     c.execute("UPDATE office_meals SET status='approved', approved_at=?, approved_by=?, approved_name=?, sign_image=?, sign_pic=?, updated_at=? WHERE id=? AND org_id=?",
               (ts, uid, row["approved_name"], sig, pic, ts, mid, oid))
     bw_log(c, oid, mid, uid, name, "approve", "", ts)

@@ -106,7 +106,8 @@ RX_TABLES = (
 RX_WHERE = {"office_letters": "org_id=? AND status<>'draft'",  # 2.184.0 A (#2628): a table's own rows instead of OX_AREAS'
             # 2.362.2 (#3105): the links of a draft stay out with the draft
             "office_letter_links": "org_id=? AND letter_id IN (SELECT id FROM office_letters WHERE org_id=? AND status<>'draft')"}
-RX_DROP = {"office_signoffs": ("ip", "user_agent")}  # 2.362.2 (#3105, review): a signer's network address is no business record
+# 2.372.0 (#3316): the signature snapshot of a receipt stays on its PDF, not in the CSV
+RX_DROP = {"office_signoffs": ("ip", "user_agent"), "office_meals": ("sign_pic",)}  # 2.362.2 (#3105, review): a signer's network address is no business record
 # 2.362.2 (#3105): every office table that is NOT in RX_TABLES, with the reason (the static guard tests/export_coverage_test.py
 # fails on a new office_* table until it is in RX_TABLES or here -- so no record goes missing silently)
 _RX_SETUP = "settings and working data of the office, no record to keep (in the organisation export)"

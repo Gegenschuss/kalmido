@@ -86,9 +86,11 @@ def bw_sig_image(c, oid, m):
     r = c.execute("SELECT sign_pic FROM office_meals WHERE id=? AND org_id=?", (m["id"], oid)).fetchone() if m.get("id") else None
     pic = oc_dec_fields(c, oid, "office_meals", r).get("sign_pic") if r else ""
     if pic:
-        from .pdf import pdf_image_object
+        who, _sep, data = pic.partition(":")
+        if who != str(m["approved_by"]):  # review: the snapshot belongs to the person who approved, else no picture
+            return None
         try:
-            return pdf_image_object(base64.b64decode(pic))
+            return pdf_image_object(base64.b64decode(data))
         except (binascii.Error, ValueError):
             return None
     return lt_sig_pic(c, oid, m["approved_by"])  # the same picture as letters / documents (2.357.0 C, #3158)
