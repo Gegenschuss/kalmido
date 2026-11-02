@@ -11,7 +11,8 @@ mail went to, so the token is no bare task id and works only for mails from that
 counts as none). The same checks as the import today: a reply by In-Reply-To alone counts only when the mail went to an address
 the import takes (a personal / list token), a reply address only with a valid signature. Then only the reporter's address or a
 person (no agent, not disabled) who sees the task and its comments by the account's e-mail address; a list with the lock takes
-nothing. Everything else goes on as today (a new task where the address leads), with the note "Reply to #N, sender not allowed".
+nothing. The comment is in the person's name only when it came through the signed reply address (a notification mail of theirs);
+by In-Reply-To alone it carries the sender's address like the reporter's. Everything else goes on as today (a new task where the address leads), with the note "Reply to #N, sender not allowed".
 The comment shows the sender ("By e-mail from ..."), the quoted part below the usual separator lines is cut off, files become files
 of the comment. Sender addresses can be forged: the signed reply address and the membership check are the two locks; an outsider
 who knows a Message-ID and forges a member's address is the case mail_from_me accepts today too.
@@ -138,8 +139,8 @@ def tmr_take(c, msg, mid, uid):
     if not tid:
         return None, ""
     ok, who = tmr_who(c, tid, sender)
-    if ok and (signed or uid):
-        return "comment", tmr_comment(c, msg, mid, tid, sender, who)
+    if ok and (signed or uid):  # in a person's name only through the signed address: a forged sender stays a sender with an address
+        return "comment", tmr_comment(c, msg, mid, tid, sender, who if signed else None)
     lg = lang(c, uid) if uid else "en"
     return "note", tr("Reply to #{0}, sender not allowed", tid, lg=lg)
 
@@ -219,7 +220,7 @@ def tmr_send(c, tid, uid, cid):
         if not mail_budget(c, uid, rep):
             c.commit()
             return "limit"
-    title = M.MAIL_PREFIX_RE.sub("", t["title"] or "").strip() or APP_NAME
+    title = M.MAIL_PREFIX_RE.sub("", re.sub(r"\s+", " ", t["title"] or "")).strip() or APP_NAME
     text = comment_plain(c, k["body"])
     m = M.mail_message(rep, "Re: " + title[:250], text, from_name=name or APP_NAME, reply_to=tmr_reply_to(c, tid, rep) or None, smtp=smtp)
     ids = tmr_ids(c, tid)

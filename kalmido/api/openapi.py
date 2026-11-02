@@ -464,6 +464,9 @@ def openapi_spec():
                          "reply_to": {"type": "integer", "description": "2.33.0 (#1076): answer this comment of the same task (else 400); its author is notified like a mention"},
                          "portal": {"type": "boolean", "description": "2.63.0 (#1513): a public answer the customer sees on the status page and by mail "
                                     "(only on a task with a customer report and with write access; default false = internal)"},
+                         "mail_reporter": {"type": "boolean", "description": "2.393.2 (#3375): the comment also goes by e-mail to the reporter of a task "
+                                           "that came in by e-mail (only with write access, never in a list with end-to-end encryption: else 400; "
+                                           "from an agent it waits for a person's approval). Default false"},
                          # 2.41.0 (#1383): answer buttons / an approval card like in the agent chat (agents only)
                          "choices": {"type": "array", "description": "2.41.0 (#1383, agents): answer buttons [{id, label, style?}] (or strings); only the newest "
                                      "comment's buttons stay live", "items": {"anyOf": [{"type": "string"}, {"type": "object"}]}},

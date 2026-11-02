@@ -10,7 +10,8 @@ freelancer-matrix: mail
    "Reply to #N, sender not allowed", no comment
  - the signed reply address of the task (+r<id>x<signature>): the reporter's mail to it becomes a comment (also without
    In-Reply-To); another sender to the same address is no comment and no task (the token is bound to the address)
- - a person who sees the task answers by mail from the account's address: a comment in their name
+ - a person who sees the task answers by mail from the account's address: by In-Reply-To a comment with the address (no
+   account name: the sender can be forged), through the person's signed reply address a comment in their name
  - the comment field's switch: timeline mail_reporter {address, may}; POST comments mail_reporter true -> the SMTP stub gets
    "Re: <title>" to the reporter with Reply-To = the task's reply address, In-Reply-To / References = the task's Message-IDs,
    its Message-ID stored as 'out'; the reporter's reply to it becomes a comment again
@@ -170,11 +171,17 @@ M5b = mail(REP, bad, "Printer", "Bad signature", "<p23932b-5b@example.org>")
 poll(seen_all)
 check(len(comments(T1)) == 2, f"a wrong signature counts as no address {comments(T1)}")
 
-# ---- 5. a person who sees the task answers by mail from her account's address: a comment in her name
+# ---- 5. a person who sees the task answers by mail from her account's address: by In-Reply-To a comment with her address
+# (a sender address can be forged), through her signed reply address (a notification of hers) a comment in her name
 M6 = mail("Bea <bea@example.com>", BA, "Re: Printer is broken", "I ordered new toner.\n-- \nBea, office", "<p23932b-6@example.org>", reply=M1)
 poll(lambda: len(comments(T1)) == 3)
 cm = comments(T1)
-check(len(cm) == 3 and cm[-1][1] == BU and "Bea, office" not in cm[-1][2], f"a member's mail: her comment, signature cut off {cm[-1:]}")
+check(len(cm) == 3 and cm[-1][1] is None and "By e-mail from bea@example.com" in cm[-1][2] and "Bea, office" not in cm[-1][2],
+      f"a member's mail by In-Reply-To: a comment with her address, signature cut off {cm[-1:]}")
+M6b = mail("Bea <bea@example.com>", reply_addr(T1, "bea@example.com"), "Re: Printer", "Toner arrives Friday.", "<p23932b-6b@example.org>")
+poll(lambda: len(comments(T1)) == 4)
+cm = comments(T1)
+check(len(cm) == 4 and cm[-1][1] == BU and "Toner arrives Friday." in cm[-1][2], f"a member's mail to her signed address: her comment {cm[-1:]}")
 
 # ---- 6. the switch: answer to the reporter
 tl = Bo.get(B + f"/api/tasks/{T1}/timeline").json()
@@ -191,8 +198,8 @@ check(bool(out) and "We replaced the toner." in m.get_body(("plain",)).get_conte
 OUT = str(m["Message-ID"]) if out else ""
 check(bool(OUT) and dbx("SELECT kind, sender FROM task_mail WHERE task_id=? AND msg_id=?", (T1, OUT)) == [("out", "rita@example.com")], f"its Message-ID stored as out {OUT}")
 M7 = mail(REP, BA, "Re: Printer is broken", "Great, thank you!", "<p23932b-7@example.org>", reply=OUT)
-poll(lambda: len(comments(T1)) == 5)
-check(len(comments(T1)) == 5 and "Great, thank you!" in comments(T1)[-1][2], f"the reply to our mail is a comment again {comments(T1)[-1:]}")
+poll(lambda: len(comments(T1)) == 6)
+check(len(comments(T1)) == 6 and "Great, thank you!" in comments(T1)[-1][2], f"the reply to our mail is a comment again {comments(T1)[-1:]}")
 
 # ---- 7. refused
 Lb = Bo.post(B + "/api/lists", json={"name": "Desk"}).json()["id"]
@@ -217,7 +224,7 @@ check(r.status_code == 400 and "end-to-end" in r.text, f"a list with the lock: 4
 check(Bo.get(B + f"/api/tasks/{T1}/timeline").json().get("mail_reporter", {}).get("may") is False, "a list with the lock: the switch is off")
 M8 = mail(REP, BA, "Re: Printer is broken", "Locked?", "<p23932b-8@example.org>", reply=M1)
 poll(seen_all)
-check(len(comments(T1)) == 5, f"a list with the lock takes no mail comment {len(comments(T1))}")
+check(len(comments(T1)) == 6, f"a list with the lock takes no mail comment {len(comments(T1))}")
 check(len(sent()) == n0, "a list with the lock: no mail")
 wr("UPDATE lists SET e2e=NULL WHERE id=?", (L1,))
 
