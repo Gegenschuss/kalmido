@@ -176,7 +176,18 @@ def zugferd_pdf(lines, xml, name="factur-x.xml"):
 
 
 # ---- unit: the reader -----------------------------------------------------------------------------------------------------
-spec = importlib.util.spec_from_file_location("p2146a_einv", os.path.join(SRC, "kalmido", "office", "einvoice_in.py"))
+# 2.393.2 (#4027): since 2.369.5 (#2517) einvoice_in imports from ..tasks.attachtext and .model at module level; the
+# unit part loads the file alone, so stand-ins for those two (the PDF worker limits as in attachtext) under a package name.
+import threading  # noqa: E402
+import types  # noqa: E402
+for _n in ("kalmido", "kalmido.tasks", "kalmido.office"):
+    sys.modules.setdefault(_n, types.ModuleType(_n)).__path__ = []
+_at = types.ModuleType("kalmido.tasks.attachtext")
+_at.PDF_MEM, _at.PDF_SECONDS, _at.PDF_WAIT, _at._SEM = 512 * 1024 * 1024, 20, 2, threading.BoundedSemaphore(2)
+_om = types.ModuleType("kalmido.office.model")
+_om.office_on = _om.pb_personal = lambda *a, **k: None
+sys.modules["kalmido.tasks.attachtext"], sys.modules["kalmido.office.model"] = _at, _om
+spec = importlib.util.spec_from_file_location("kalmido.office.einvoice_in", os.path.join(SRC, "kalmido", "office", "einvoice_in.py"))
 E = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(E)
 
