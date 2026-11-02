@@ -25,6 +25,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
 const change = (w, el, v) => { if (v !== undefined) el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
 const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+// 2.490.0 (#4021): events whose end has passed sit folded under "N past" (the test data are at fixed hours, so it depends on the time of day of the run): unfold them
+const unf = async (w) => { const d = w.document; if (d.querySelector('.cevpastl:not(.open)')) { click(w, d.querySelector('.cevpastl')); await until(() => d.querySelector('.cevpastl.open')); } };
 const settings = async () => (await call('GET', '/api/state')).settings;
 const FEAT = 'cal,timeline,events,comments';
 // a synced subscription with its events, written like the sync does (sqlite inside the container)
@@ -181,22 +183,22 @@ const utc = (d, h) => { const x = new Date(`${d}T${String(h).padStart(2, '0')}:0
 
   // ================= Today: "Events today" with its menu (a calendar off there only)
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  await until(() => d.querySelector('.cevtoday .cevrow'));
+  await until(() => d.querySelector('.cevtoday .cevrow, .cevtoday .cevpastl')); await unf(w);
   let rowsT = [...d.querySelectorAll('.cevtoday .cevrow')].map(r => r.querySelector('.cevn').textContent);
   check(rowsT.includes('Standup today') && rowsT.includes('Grandma visits') && !rowsT.includes('Lunch today'), 'Today: the events of the day, Private (switched off for Today) left out ' + JSON.stringify(rowsT));
-  check(d.querySelector('.cevtoday .ghead .c')?.textContent === '2' && d.querySelector('.cevtoday [data-act="cvx-today-menu"]'), 'Today: the count follows, the head has "…"');
+  check(d.querySelector('.cevtoday .ghead .c')?.textContent === String([...d.querySelectorAll('.cevtoday .cevrow:not(.cevpast)')].length) && rowsT.length === 2 && d.querySelector('.cevtoday [data-act="cvx-today-menu"]'), 'Today: the count follows, the head has "…"');
   click(w, d.querySelector('.cevtoday [data-act="cvx-today-menu"]')); await sleep(150);
   const mi = [...d.querySelectorAll('#pop [role="menuitem"]')];
   check(mi.length >= 5 && mi.filter(b => b.classList.contains('on')).map(b => b.textContent.trim()).sort().join() === ['Family feed', 'Mine', 'My absences', 'Public holidays', 'Team feed'].join() && mi.some(b => /Private/.test(b.textContent) && !b.classList.contains('on')),
     'Today menu: every calendar with a check where it shows ' + JSON.stringify(mi.map(b => [b.textContent.trim(), b.classList.contains('on')])));
-  click(w, mi.find(b => /Team feed/.test(b.textContent))); await sleep(500);
+  click(w, mi.find(b => /Team feed/.test(b.textContent))); await sleep(500); await unf(w);
   rowsT = [...d.querySelectorAll('.cevtoday .cevrow')].map(r => r.querySelector('.cevn').textContent);
   check(!rowsT.includes('Standup today') && rowsT.includes('Grandma visits'), 'Today menu: the team feed is off here ' + JSON.stringify(rowsT));
   s = await settings();
   check(JSON.parse(s.today_cals_hidden).sort().join() === [`e:${P.id}`, `s:${TEAM}`].sort().join(), 'Today menu: stored (today_cals_hidden)');
   check((await call('GET', `/api/calendars`)).subs.find(x => x.id === TEAM).visible === true, 'Today menu: the calendar itself stays visible (Today only)');
   click(w, d.querySelector('.cevtoday [data-act="cvx-today-menu"]')); await sleep(150);
-  click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Show all calendars/.test(b.textContent))); await sleep(500);
+  click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Show all calendars/.test(b.textContent))); await sleep(500); await unf(w);
   rowsT = [...d.querySelectorAll('.cevtoday .cevrow')].map(r => r.querySelector('.cevn').textContent);
   check(rowsT.length === 3 && (await settings()).today_cals_hidden === '[]', 'Today menu: "Show all" ' + JSON.stringify(rowsT));
 

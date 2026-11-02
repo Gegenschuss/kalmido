@@ -77,6 +77,8 @@ const STUB = 'http://127.0.0.1:8095';
   // ---- Today
   w.location.hash = 'today'; await sleep(300);
   await until(() => d.querySelector('.cevtoday'));
+  // 2.490.0 (#4021): events whose end has passed sit folded under "N past" (depends on the time of day of the run): unfold them
+  if (d.querySelector('.cevpastl:not(.open)')) { click(w, d.querySelector('.cevpastl')); await until(() => d.querySelector('.cevpastl.open')); }
   const rows = [...d.querySelectorAll('.cevtoday .cevrow')];
   check(rows.length >= 4 && /Events today/.test(d.querySelector('.cevtoday .ghead').textContent), 'Today: "Events today" block ' + rows.length);
   check(/all day/.test(rows[0].textContent) && rows.some(r => r.textContent.includes(w.eval(`fmtTimeLoc('13:00') + '–' + fmtTimeLoc('14:00')`)) && /Lunch with Sam.*Cafe Central/.test(r.textContent)), 'Today: all-day first, then by time, with place');
