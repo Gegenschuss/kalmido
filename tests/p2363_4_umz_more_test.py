@@ -94,7 +94,7 @@ FILE = mkzip({
               {"id": 82, "task_id": 11, "kind": "focus", "minutes": 25, "start": "2026-10-19T09:00:00Z", "done": 0}],
     "contact_care": [{"contact_id": 22, "every_days": 30, "last": "2026-10-01", "note": "anrufen", "updated_at": TS}],
     "view_layouts": [{"id": 91, "view_key": "list:1", "name": "Fokus", "layout": "", "pos": 1, "created_at": TS, "updated_at": TS}],
-    "list_layouts": [{"list_id": 1, "layout": "", "updated_at": TS}],
+    "list_layouts": [{"list_id": 1, "layout": "{\"hidden\": [\"links\"]}", "updated_at": TS}],  # review: an empty one would not be taken
     "task_bell": [{"task_id": 11, "level": "urgent", "set_by": ME, "created_at": TS, "updated_at": TS},
                   {"task_id": 12, "level": "urgent", "set_by": 2000, "created_at": TS, "updated_at": TS}],
     "task_watchers": [{"task_id": 11, "created_at": TS}],

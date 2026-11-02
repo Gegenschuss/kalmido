@@ -151,7 +151,6 @@ def _bells(c, run, uid, me_old, data, ts):
 def umz_more_write(c, run, uid, me_old, data):
     """Inside the run's transaction (the caller commits)."""
     ts = iso(now_utc())
-    run.created["more_at"] = ts  # review: a bookmark changed after the import stays with the undo
     _bookmarks(c, run, uid, data, ts)
     _pomos(c, run, uid, data, ts)
     _care(c, run, uid, data, ts)
@@ -165,7 +164,7 @@ _UNDO = {"bookmarks": "id", "pomos": "id", "view_layouts": "id", "contact_care":
 
 
 def umz_more_undo(c, uid, cr):
-    """The rows umz_more_write recorded (an arrangement or bookmark changed since stays: it is the person's own work now)."""
+    """The rows umz_more_write recorded (a saved arrangement changed since stays: it is the person's own work now; a bookmark goes, its preview fetch changes it too)."""
     n = 0
     for item in reversed(cr.get("more") or []):
         if not (isinstance(item, list) and len(item) == 2 and item[0] in _UNDO):
@@ -175,7 +174,7 @@ def umz_more_undo(c, uid, cr):
         v = key.get(col) if isinstance(key, dict) else key
         if not isinstance(v, int):
             continue
-        extra = " AND updated_at<=?" if table == "bookmarks" else " AND updated_at<=created_at" if table == "view_layouts" else ""
-        n += c.execute(f"DELETE FROM {table} WHERE {col}=? AND user_id=?{extra}", (v, uid, *((cr.get("more_at") or "9999",) if table == "bookmarks" else ()))).rowcount
+        extra = " AND updated_at<=created_at" if table == "view_layouts" else ""
+        n += c.execute(f"DELETE FROM {table} WHERE {col}=? AND user_id=?{extra}", (v, uid)).rowcount
     return n
 
