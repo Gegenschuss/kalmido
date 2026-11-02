@@ -18,7 +18,7 @@ from ..tasks.validation import as_int
 from ..core.errors import BadInput, UnknownFields
 from ..contacts.model import (
     book_create, book_fields, book_member_set, book_public, book_role, book_touch, books_for, contact_brief, contact_dict, contact_fields,
-    contact_copy, contact_store, contacts_query, CT_KEYS, default_book, import_vcards, link_remove, link_set, my_book_ids, need_book, need_contact,
+    bk_max_check, contact_copy, contact_store, contacts_query, ct_room, CT_KEYS, default_book, import_vcards, link_remove, link_set, my_book_ids, need_book, need_contact,
     occ_sync, render_vcard, split_vcards, CONTACTS_PER_BOOK, IMPORT_BATCH, VC_BAD_MAX,
 )
 from ..core.retention import ret_days
@@ -143,6 +143,8 @@ def op_book_restore(c, uid, bid):
     """2.272.0 E1 (#3038): the address book comes back out of the trash with its contacts (and their birthday tasks)."""
     b, _ = need_book(c, bid, manage=True, trash=True)
     if b["deleted_at"]:
+        if not b["owner_org_id"]:  # 2.370.4 (#3089, review N4): the trash does not count against BOOKS_MAX, a restore does
+            bk_max_check(c, b["owner_id"])
         c.execute("UPDATE books SET deleted_at=NULL WHERE id=?", (bid,))
         ctt_relink(c, [r[0] for r in c.execute("SELECT id FROM contacts WHERE book_id=? AND deleted_at IS NULL", (bid,)).fetchall()])  # 2.272.0 F (M8)
         for (cid,) in c.execute("SELECT id FROM contacts WHERE book_id=? AND deleted_at IS NULL AND (bday!='' OR anniversary!='')",
@@ -249,8 +251,10 @@ def op_contact_edit(c, uid, cid, b):
         need_contact(c, cid, write=True, own=True)  # 2.351.0 B (#2749): moving it out of its book: never through its own folder alone
         if need_book(c, nb, write=True)[0]["src_id"]:  # 2.58.0 (#1656): as the bulk move
             raise Denied(409, tr("An imported address book is updated from its source; contacts cannot be moved into it"))
-        if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND (uid=? OR href=?)", (nb, r["uid"], r["href"])).fetchone():
+        # 2.370.4 (#3089, review N9): a contact in the trash of the target book does not block the move
+        if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND (uid=? OR href=?) AND deleted_at IS NULL", (nb, r["uid"], r["href"])).fetchone():
             raise Denied(409, tr("The address book has this contact already"))
+        ct_room(c, nb)
         so, to = (c.execute("SELECT org_id FROM books WHERE id=?", (x,)).fetchone()[0] for x in (r["book_id"], nb))
         org_out(c, so, to, "contacts", trn("{0} contact", "{0} contacts", 1))
         if c.execute("SELECT src_id FROM books WHERE id=?", (r["book_id"],)).fetchone()[0]:  # 2.138.4 C (#2378): out of a mirror = a copy

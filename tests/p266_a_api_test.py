@@ -246,6 +246,10 @@ check(Bo.get(B + f"/api/contacts/{C1}").json()["merges"][0]["undo"] == "expired"
 r = merge(Bo, C2, [C1])
 R3 = r.json().get("run_id")
 check(r.ok and Bo.delete(B + f"/api/contacts/{C2}").ok, "setup: merged into C2, then C2 deleted")
+# 2.370.4 (#3089): C2 is in the trash now: the undo says 409 (restore it first); deleted for good, the others come back as before
+r = Bo.post(B + f"/api/contacts/merges/{R3}/undo")
+check(r.status_code == 409 and "trash" in r.text, "#3089: undo with the target in the trash: 409 " + r.text[:160])
+check(Bo.post(B + "/api/contacts/bulk", json={"action": "purge", "ids": [C2]}).ok, "setup: C2 deleted for good")
 r = Bo.post(B + f"/api/contacts/merges/{R3}/undo")
 j = r.json() if r.ok else {}
 check(r.ok and j.get("target") is None and j.get("restored") == [C1] and j.get("note"), "#1835: undo without the target " + r.text[:200])

@@ -17,7 +17,7 @@ from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
 from ..tasks.validation import as_int
 from ..core.errors import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
-from ..contacts.model import book_touch, contact_copy, contacts_on, my_book_ids, need_book, occ_sync, search_text, CONTACTS_PER_BOOK, FIELD_MAX, ITEMS_MAX, NOTE_MAX
+from ..contacts.model import book_touch, contact_copy, contacts_on, ct_room, my_book_ids, need_book, occ_sync, search_text, FIELD_MAX, ITEMS_MAX, NOTE_MAX
 from ..tasks.lifecycle import trash_task  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functions
 
@@ -92,6 +92,8 @@ def ctt_restore(c, uid, rows):
         if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND (uid=? OR href=?) AND id!=? AND deleted_at IS NULL",
                      (r["book_id"], r["uid"], r["href"], r["id"])).fetchone():
             raise Denied(409, tr("The address book has this contact already"))
+    for bid in sorted({r["book_id"] for r in rows}):  # 2.370.4 (#3089, review N4): the limit as when one is made
+        ct_room(c, bid, sum(1 for r in rows if r["book_id"] == bid))
     ts = iso_ms(now_utc())
     for blk in bk_blocks([r["id"] for r in rows], 500):
         c.execute(f"UPDATE contacts SET deleted_at=NULL, updated_at=? WHERE id IN ({bk_in(blk)})", [ts, *blk])
@@ -379,8 +381,9 @@ def op_contacts_bulk(c, uid, b):
     if bk["src_id"]:  # 2.58.0 (#1656): an imported (mirrored) address book is written by its source only
         raise Denied(409, tr("An imported address book is updated from its source; contacts cannot be moved into it"))
     bk_gate(c, N_("Move {0} contacts at once"), len(ids))
-    seen = {(r["uid"], "u") for r in c.execute("SELECT uid FROM contacts WHERE book_id=?", (nb,)).fetchall()}
-    seen |= {(r["href"], "h") for r in c.execute("SELECT href FROM contacts WHERE book_id=?", (nb,)).fetchall()}
+    # 2.370.4 (#3089, review N9): a contact in the trash of the target book does not block the move (its restore then says 409)
+    seen = {(r["uid"], "u") for r in c.execute("SELECT uid FROM contacts WHERE book_id=? AND deleted_at IS NULL", (nb,)).fetchall()}
+    seen |= {(r["href"], "h") for r in c.execute("SELECT href FROM contacts WHERE book_id=? AND deleted_at IS NULL", (nb,)).fetchall()}
     mv, conflicts, same = [], [], 0
     for i in ids:
         r = rows[i]
@@ -391,9 +394,8 @@ def op_contacts_bulk(c, uid, b):
         else:
             mv.append(i)
             seen |= {(r["uid"], "u"), (r["href"], "h")}
-    have = c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=? AND deleted_at IS NULL", (nb,)).fetchone()[0]
-    if mv and have + len(mv) > CONTACTS_PER_BOOK:
-        raise Denied(409, tr("At most {0} contacts per address book", CONTACTS_PER_BOOK))
+    if mv:
+        ct_room(c, nb, len(mv))
     occ = {r[0]: r[1] for r in c.execute(f"SELECT id, occ_list_id FROM books WHERE id IN ({bk_in(list(books))})", list(books)).fetchall()}
     # 2.138.4 C (#2378): out of an imported (mirrored) address book = a copy, the mirror stays (its source would bring it back)
     mir = {r[0] for r in c.execute(f"SELECT id FROM books WHERE src_id IS NOT NULL AND id IN ({bk_in(list(books))})", list(books)).fetchall()}

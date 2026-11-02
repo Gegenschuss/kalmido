@@ -15938,5 +15938,7 @@
   "{0}: work lies on a branch without a merge ({1})": "{0} : du travail reste sur une branche sans merge ({1})",
   "{0}: a job makes no progress ({1})": "{0} : une tâche n'avance pas ({1})",
   "{0}: a job makes no progress": "{0} : une tâche n'avance pas",
-  "{0}: work lies on a branch without a merge": "{0} : du travail reste sur une branche sans merge"
+  "{0}: work lies on a branch without a merge": "{0} : du travail reste sur une branche sans merge",
+  "The contact the others were merged into is in the trash; restore it first, then undo the merge": "Le contact dans lequel les autres ont été fusionnés est dans la corbeille ; restaurez-le d'abord, puis annulez la fusion",
+  "The address book is in the trash; restore it first, then undo the merge": "Le carnet d'adresses est dans la corbeille ; restaurez-le d'abord, puis annulez la fusion"
 }

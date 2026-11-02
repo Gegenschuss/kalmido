@@ -21,7 +21,7 @@ from ..calendars.caldav import (
 from ..core.errors import BadInput
 from ..core.i18n import tr
 from ..contacts.model import (
-    contact_store, contacts_on, my_book_ids, parse_vcard, render_vcard,
+    contact_store, contacts_on, ct_room, my_book_ids, parse_vcard, render_vcard,
 )
 from ..events.dav import sync_save as _save, sync_load  # 2.369.5 (#2517): pulled up from functions
 from ..contacts.model import book_touch  # 2.369.5 (#2517): pulled up from functions
@@ -334,7 +334,8 @@ def ab_put(c, u, book, name):
           "addresses", "urls", "bday", "anniversary", "note", "groups", "photo")}
     if have:
         if v["uid"] != have[0]["uid"]:
-            if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND uid=? AND id!=?", (book["id"], v["uid"], have[0]["id"])).fetchone():
+            # 2.370.4 (#3089, review N9): only against live contacts (a card in the trash with this UID does not block)
+            if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND uid=? AND id!=? AND deleted_at IS NULL", (book["id"], v["uid"], have[0]["id"])).fetchone():
                 raise DavError(403, "This UID exists already", "<CR:no-uid-conflict/>")
             f["uid"] = v["uid"]
         contact_store(c, u["id"], book["id"], f, cid=have[0]["id"], extra=v["extra"], version=v["version"])
@@ -348,8 +349,11 @@ def ab_put(c, u, book, name):
     old = c.execute("SELECT id FROM contacts WHERE book_id=? AND deleted_at IS NOT NULL AND (href=? OR uid=?) ORDER BY href=? DESC, id DESC "
                     "LIMIT 1", (book["id"], name, v["uid"], name)).fetchone()
     if old:
+        ct_room(c, book["id"])  # 2.370.4 (#3089, review N4): the limit as for a new card
         contact_store(c, u["id"], book["id"], {**f, "uid": v["uid"], "href": name, "deleted_at": None}, cid=old[0], extra=v["extra"],
                       version=v["version"])
+        from ..contacts.bulk import ctt_relink
+        ctt_relink(c, [old[0]])  # 2.370.4 (#3089): the clients' contact persons come back, as with the restore in the app
     else:
         contact_store(c, u["id"], book["id"], f, uid_=v["uid"], href=name, extra=v["extra"], version=v["version"])
     c.commit()

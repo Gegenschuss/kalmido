@@ -224,8 +224,7 @@ def book_create(c, uid, b, src_id=None):
     mirrored from an outside account (src_id) is private, else the default of a new object (ws_obj_default)."""
     f = book_fields(b, True)
     oid = clean_org_id(c, b["org_id"], uid) if "org_id" in b else (None if src_id else ws_obj_default(c, uid))
-    if c.execute("SELECT COUNT(*) FROM books WHERE owner_id=? AND owner_org_id IS NULL", (uid,)).fetchone()[0] >= BOOKS_MAX:  # 2.52.0 C (#1438): own books
-        raise Denied(409, tr("At most {0} address books", BOOKS_MAX))
+    bk_max_check(c, uid)
     used = [r[0] for r in c.execute("SELECT color FROM books WHERE owner_id=?", (uid,))]
     col = f.get("color") or next((x for x in BOOK_COLORS if x not in used), BOOK_COLORS[0])
     ts = iso_ms(now_utc())
@@ -233,7 +232,17 @@ def book_create(c, uid, b, src_id=None):
                      (uid, f["name"], col, src_id, ts, ts, oid))
 
 
+def bk_max_check(c, uid):
+    """2.52.0 C (#1438): at most BOOKS_MAX own address books. 2.370.4 (#3089, review N4): the ones in the trash do not count
+    (a book restored from the trash is checked here as well)."""
+    if c.execute("SELECT COUNT(*) FROM books WHERE owner_id=? AND owner_org_id IS NULL AND deleted_at IS NULL", (uid,)).fetchone()[0] >= BOOKS_MAX:
+        raise Denied(409, tr("At most {0} address books", BOOKS_MAX))
+
+
 def default_book(c, uid, create=True):
+    """The person's first own address book (the default). 2.370.4 (#3089, review N4): with the default one in the trash a new
+    one is made (restoring the old book would bring back the contacts deleted with it); the default is always the oldest live
+    own book, so the old one restored later is the default again and there are never two."""
     r = c.execute("SELECT id FROM books WHERE owner_id=? AND src_id IS NULL AND owner_org_id IS NULL AND deleted_at IS NULL ORDER BY id LIMIT 1", (uid,)).fetchone()
     if r:
         return r[0]
@@ -861,6 +870,13 @@ def contact_fields(b, old=None):
     return out
 
 
+def ct_room(c, book_id, n=1):
+    """409 unless address book book_id has room for n more live contacts (CONTACTS_PER_BOOK; the trash does not count).
+    2.370.4 (#3089, review N4): also for contacts coming back out of the trash (app, CardDAV) and for a move."""
+    if c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=? AND deleted_at IS NULL", (book_id,)).fetchone()[0] + n > CONTACTS_PER_BOOK:
+        raise Denied(409, tr("At most {0} contacts per address book", CONTACTS_PER_BOOK))
+
+
 def new_uid():
     return f"kalmido-ct-{secrets.token_hex(10)}"
 
@@ -871,8 +887,8 @@ def contact_store(c, uid, book_id, f, cid=None, uid_=None, href=None, extra=None
     once per batch (each per card held the instance-wide version row locked until the end of a large import)."""
     ts = iso_ms(now_utc())  # ms: two changes in one second still differ (expect)
     if cid is None:
-        if bulk is None and c.execute("SELECT COUNT(*) FROM contacts WHERE book_id=? AND deleted_at IS NULL", (book_id,)).fetchone()[0] >= CONTACTS_PER_BOOK:
-            raise Denied(409, tr("At most {0} contacts per address book", CONTACTS_PER_BOOK))
+        if bulk is None:
+            ct_room(c, book_id)
         uid_ = uid_ or new_uid()
         cols = {k: f.get(k, "" if k not in ("emails", "phones", "addresses", "urls", "groups") else "[]") for k in
                 ("kind", "fn", "given", "family", "middle", "prefix", "suffix", "nickname", "org", "dept", "title", "emails", "phones",
@@ -1048,6 +1064,10 @@ def occ_sync(c, cid):
         name = r["fn"][:100]
         dig = f"{name}|{mo}|{dy}|{y}"
         t = c.execute("SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL", (ln["task_id"],)).fetchone() if ln and ln["task_id"] else None
+        if not ln:  # 2.370.4 (#3089, review N5): the task from before (trash of the contact / book) comes back, never a second one
+            t = occ_revive(c, cid, kind, r["occ_list_id"])
+            if t:
+                ln = {"digest": ""}
         if t:
             if ln["digest"] == dig:
                 continue
@@ -1078,6 +1098,30 @@ def occ_sync(c, cid):
         f["card"] = r["uid"][:200]
         c.execute("UPDATE tasks SET fam=? WHERE id=?", (json.dumps(f, ensure_ascii=False, separators=(",", ":")), tid))
         c.execute("INSERT INTO contact_occ(contact_id,kind,task_id,digest) VALUES(?,?,?,?) ON CONFLICT (contact_id,kind) DO UPDATE SET task_id=excluded.task_id, digest=excluded.digest", (cid, kind, tid, dig))
+
+
+def occ_revive(c, cid, kind, lid):
+    """2.370.4 (#3089, review N5): the birthday / anniversary task contact cid had in list lid before its link went (the contact
+    or its address book went to the trash, bk_occ_drop): a live one without a link (restored from the tasks' trash meanwhile)
+    or the newest one in the tasks' trash, taken out of it. It gets its link again (the caller updates name and date);
+    None = nothing there (occ_sync makes a new task)."""
+    from ..family.family import _jparse, occ_next, occ_rule
+    from ..tasks.lifecycle import restore_task
+    src = f"contact:{cid}"
+    rows = c.execute("SELECT * FROM tasks WHERE list_id=? AND fam LIKE ? AND id NOT IN (SELECT task_id FROM contact_occ WHERE task_id IS NOT NULL) "
+                     "ORDER BY deleted_at IS NOT NULL, deleted_at DESC, id DESC", (lid, f'%"{src}"%')).fetchall()
+    t = next((x for x in rows if (_jparse(x["fam"]) or {}).get("src") == src and (_jparse(x["fam"]) or {}).get("kind") == kind), None)
+    if not t:
+        return None
+    if t["deleted_at"]:
+        restore_task(c, t["id"])
+        if t["due"] and date.fromisoformat(t["due"]) < local_now().date():  # its day passed while it was in the trash
+            mo, dy = int(t["due"][5:7]), int(t["due"][8:10])
+            c.execute("UPDATE tasks SET due=?, repeat=?, reminded='[]' WHERE id=?", (occ_next(mo, dy).isoformat(), occ_rule(mo, dy), t["id"]))
+        t = c.execute("SELECT * FROM tasks WHERE id=?", (t["id"],)).fetchone()
+    c.execute("INSERT INTO contact_occ(contact_id,kind,task_id,digest) VALUES(?,?,?,'') ON CONFLICT (contact_id,kind) DO UPDATE SET "
+              "task_id=excluded.task_id, digest=excluded.digest", (cid, kind, t["id"]))
+    return t
 
 
 # ---- import: vCard files and the external CardDAV accounts of the Family module

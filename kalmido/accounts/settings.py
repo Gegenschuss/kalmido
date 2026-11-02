@@ -850,8 +850,9 @@ def umz_export_queries(uid):
         "events": ("SELECT * FROM events WHERE cal_id IN (SELECT id FROM ev_cals WHERE owner_id=?)", (uid,)),
         "event_attendees": ("SELECT * FROM event_attendees WHERE event_id IN (SELECT e.id FROM events e JOIN ev_cals k ON k.id=e.cal_id "
                             "WHERE k.owner_id=?)", (uid,)),
-        "address_books": ("SELECT id, name, color, created_at FROM books WHERE owner_id=? AND owner_org_id IS NULL", (uid,)),  # 2.52.0 C (#1438): own books
-        "contacts": ("SELECT * FROM contacts WHERE book_id IN (SELECT id FROM books WHERE owner_id=? AND owner_org_id IS NULL)", (uid,)),
+        # 2.370.4 (#3089, review N8): an address book in the trash stays out (the import would make it live again)
+        "address_books": ("SELECT id, name, color, created_at FROM books WHERE owner_id=? AND owner_org_id IS NULL AND deleted_at IS NULL", (uid,)),  # 2.52.0 C (#1438): own books
+        "contacts": ("SELECT * FROM contacts WHERE book_id IN (SELECT id FROM books WHERE owner_id=? AND owner_org_id IS NULL AND deleted_at IS NULL)", (uid,)),
         # 2.55.0 (#1455): my own newsletter connection (never the access data), its segments and log
         "newsletter_connection": ("SELECT id, kind, url, mode, auto, synced_at, created_at, updated_at FROM nl_conns WHERE owner_id=? "
                                   "AND org_id IS NULL", (uid,)),

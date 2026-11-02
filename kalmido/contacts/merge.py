@@ -310,8 +310,13 @@ def ctm_undo(c, uid, rid):
     if not d:
         raise Denied(404)
     snap = d["snapshot"] or {}
-    # 2.272.0 E1 (#3038): a target in the trash counts as gone (it stays there; the merged contacts come back)
-    t = c.execute("SELECT * FROM contacts WHERE id=? AND deleted_at IS NULL", (d["target_id"],)).fetchone()
+    t = c.execute("SELECT * FROM contacts WHERE id=?", (d["target_id"],)).fetchone()
+    if t is not None and t["deleted_at"]:  # 2.370.4 (#3089, review N6): its columns could not go back -> restore it first
+        need_contact(c, t["id"], write=True, uid=uid, trash=True)
+        raise Denied(409, tr("The contact the others were merged into is in the trash; restore it first, then undo the merge"))
+    if t is not None and c.execute("SELECT deleted_at FROM books WHERE id=?", (t["book_id"],)).fetchone()[0]:
+        need_book(c, t["book_id"], write=True, uid=uid, trash=True)
+        raise Denied(409, tr("The address book is in the trash; restore it first, then undo the merge"))
     # rights: the target while it exists + every address book the merged contacts come back to; nothing checked = 404
     # (a run of someone else's address book looks like an unknown one)
     rbids = sorted({r["book_id"] for r in snap.get("rows") or []})
@@ -320,9 +325,13 @@ def ctm_undo(c, uid, rid):
         need_contact(c, t["id"], write=True, uid=uid)
         checked = True
     for bid in rbids + ([d["book_id"]] if d["book_id"] and t is None and d["book_id"] not in rbids else []):
-        if not c.execute("SELECT 1 FROM books WHERE id=?", (bid,)).fetchone():
+        bk = c.execute("SELECT deleted_at FROM books WHERE id=?", (bid,)).fetchone()
+        if not bk:
             missing = missing or bid in rbids
             continue
+        if bk["deleted_at"]:  # 2.370.4 (#3089, review N6): 409 with what to do, not an unknown book
+            need_book(c, bid, write=True, uid=uid, trash=True)
+            raise Denied(409, tr("The address book is in the trash; restore it first, then undo the merge"))
         need_book(c, bid, write=True, uid=uid)
         bids.append(bid)
         checked = True

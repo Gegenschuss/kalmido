@@ -182,7 +182,7 @@ def lt_book_ids(c, oid, uid):
 def lt_contact_ok(c, oid, cid):
     """True when address book contact cid may be used as a recipient in office area oid: its address book is one the
     current person sees in the office's space (lt_book_ids)."""
-    r = c.execute("SELECT book_id FROM contacts WHERE id=?", (cid,)).fetchone()
+    r = c.execute("SELECT book_id FROM contacts WHERE id=? AND deleted_at IS NULL", (cid,)).fetchone()  # 2.370.4 (#3089, review N9): not from the trash
     return bool(r) and r[0] in lt_book_ids(c, oid, lt_uid())
 
 
