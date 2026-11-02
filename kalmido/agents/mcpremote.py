@@ -24,6 +24,11 @@ Who may connect: OAuth 2.1 with this server as the authorization server.
    changes at every use (the previous one used again revokes the access). Both only as SHA-256 in the database.
  - /oauth/revoke (RFC 7009) and Settings > Agents (GET / DELETE /api/my/mcp-grants): revoking ends the access token and the
    refresh token at once.
+Limits (2.488.0 review): /mcp never waits in the web process (a 429 / 503 of /api/v1 goes back to the client at once), a
+batch has at most MCPR_BATCH_MAX messages, one access runs at most MCPR_PER_GRANT requests at once (of MCPR_CONCURRENT), a
+request stops making calls after MCPR_RUN_S, file answers are read in pieces up to max_bytes. A new token of the agent (or
+deleting its token) ends the access at the next refresh; a support access opened by a client never lets the operator hand
+out the client's agents.
 The admin switch "Hosted MCP access" (instance setting mcp_remote, default off; core/instance.py AUTH_SWITCHES, asks for
 the password when switched on): off = every /oauth/* route and /mcp answer 404. Tables: core/migrations.d/3363.py."""
 import base64
@@ -37,6 +42,7 @@ import re
 import secrets
 import threading
 import time
+import unicodedata
 import urllib.parse
 from datetime import timedelta
 from flask import g, jsonify, redirect, request, Response
@@ -64,15 +70,21 @@ MCPR_REG_KEEP_DAYS = 7               # a registered client without any access is
 MCPR_BAD_LIMIT = 30                  # failed token / code attempts per address within the fail window (accounts/session.py)
 MCPR_MAX_BODY = 1_000_000            # bytes of one /mcp request (as kalmido_mcp.py --http)
 MCPR_CONCURRENT = 16                 # /mcp requests running at once on this process (each holds a thread)
+MCPR_PER_GRANT = 4                   # review F3: /mcp requests of one access at once (the rest 429)
+MCPR_BATCH_MAX = 20                  # review F3: JSON-RPC messages in one /mcp batch (more: 400)
+MCPR_RUN_S = 90                      # review F3: an /mcp request answers 504 after this (the work goes on; its places stay taken)
+MCPR_REVOKE_LIMIT = 60               # review F9: /oauth/revoke requests per address within 15 min
 MCPR_USED_EVERY = 60                 # s between two last_used_at updates of an access
 MCPR_SCOPE = "mcp"                   # the one scope name offered: the rights are the agent's, not the scope's
 CLIENT_NAME_MAX, REDIRECTS_MAX, REDIRECT_LEN_MAX = 100, 5, 500
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")      # urlsplit().hostname of http redirect URIs allowed
+HOST_RE = re.compile(r"[a-z0-9.-]+")                      # urlsplit().hostname (lower case) of a redirect URI
 CHALLENGE_RE = re.compile(r"[A-Za-z0-9_-]{43}")          # base64url of a SHA-256, unpadded
 VERIFIER_RE = re.compile(r"[A-Za-z0-9._~-]{43,128}")     # RFC 7636
 MCPR_FILES = (os.path.join(APP_DIR, "kalmido_mcp.py"), os.path.join(APP_DIR, "mcp", "kalmido_mcp.py"))  # image, checkout
 _MOD, _MOD_LOCK = {}, threading.Lock()
 _SEM = threading.BoundedSemaphore(MCPR_CONCURRENT)
+_RUNNING, _RUN_LOCK = {}, threading.Lock()   # review F3: grant id -> /mcp requests of that access still running
 
 
 # ---------------------------------------------------------------- helpers
@@ -127,6 +139,10 @@ def redirect_ok(u):
         return False
     if p.fragment or "#" in u or p.username or p.password or not host:
         return False
+    # review F8: a plain ASCII host name (IDN only as punycode), no backslash / control / bidi characters that a browser and
+    # this check read differently, or that make the host shown on the consent page look like another one
+    if not (HOST_RE.fullmatch(host) or host == "::1"):
+        return False
     return p.scheme == "https" or (p.scheme == "http" and host.lower() in LOCAL_HOSTS)
 
 
@@ -164,7 +180,14 @@ def _uris(cl):
 
 
 def _bad(ip):
+    """The failed-attempt counter of /oauth/token (codes, refresh tokens, unknown clients)."""
     return [("oauthbad:" + ip, MCPR_BAD_LIMIT)]
+
+
+def _mcp_bad(ip):
+    """Review F4: unknown tokens on /mcp count apart, so a connector that keeps sending a revoked token cannot lock the token
+    endpoint (the refresh) for everybody behind the same address."""
+    return [("mcpbad:" + ip, MCPR_BAD_LIMIT)]
 
 
 class _AsUser:
@@ -195,14 +218,17 @@ def mcpr_agents(c, u):
             team = c.execute("""SELECT a.user_id, u.display_name, u.username FROM agents a JOIN users u ON u.id=a.user_id
                                 WHERE u.kind='agent' AND u.disabled=0 AND a.owner_id IS NULL ORDER BY u.id""").fetchall()
         with _AsUser(u):
+            # review F6: a support access the client opened is not enough to hand its agents out (grant=False)
             out += [(r["user_id"], r["display_name"] or r["username"], r["username"], True) for r in team
-                    if not op_foreign_account(c, r["user_id"], note=False)]
+                    if not op_foreign_account(c, r["user_id"], note=False, grant=False)]
     return out
 
 
-def mcpr_may(c, uid, aid):
+def mcpr_may(c, uid, aid, support=False):
     """The person uid (still) may hand out agent aid: active, a person, and the agent is theirs or a team agent and they an
-    instance admin (not a client's agent on a hosted server)."""
+    instance admin (not a client's agent on a hosted server). Review F6: giving an access (consent, code) needs the person's own
+    right - a support access the client opened (accounts/supportgrant.py) does not count; support=True (the refresh of an
+    access given before) lets it count, unlogged."""
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not _person_ok(u):
         return False
@@ -215,7 +241,7 @@ def mcpr_may(c, uid, aid):
     if not u["is_admin"]:
         return False
     with _AsUser(u):
-        return not op_foreign_account(c, aid, note=False)
+        return not op_foreign_account(c, aid, note=False, grant=support)
 
 
 def _issue(c, grant_id, aid, cname):
@@ -294,7 +320,9 @@ def mcpr_register():
     if rt is not None and (not isinstance(rt, list) or not set(rt) <= {"code"}):
         return _oerr("invalid_client_metadata", "response_types: code only")
     name = b.get("client_name")
-    name = re.sub(r"[\x00-\x1f\x7f]", "", name).strip()[:CLIENT_NAME_MAX] if isinstance(name, str) else ""
+    # review F8: control and format characters (bidi overrides like U+202E) out, so the name cannot look like another one
+    name = "".join(ch for ch in name if unicodedata.category(ch) not in ("Cc", "Cf", "Co", "Cs")).strip()[:CLIENT_NAME_MAX] \
+        if isinstance(name, str) else ""
     name = name or "MCP client"
     cid = "kmc_" + secrets.token_urlsafe(24)
     now = now_utc()
@@ -353,15 +381,16 @@ def mcpr_authorize():
     ruri = p["redirect_uri"] or (uris[0] if len(uris) == 1 else "")
     if ruri not in uris:  # exact match; never redirected anywhere else
         return _msg_page(tr("Connection not possible"), tr("The return address of this app does not match its registration."))
+    # review F5: anybody can register a client with any https return address, so a wrong request is shown here as a page and
+    # never sent on (RFC 9700 4.11.2: no open redirector); these are always mistakes of the client's program
     if len(p["state"]) > 500:
-        return redirect(_with_query(ruri, {"error": "invalid_request", "error_description": "state too long"}), 302)
+        return _msg_page(tr("Connection not possible"), tr("The app sent an invalid request. Start the connection in the app again."))
     if p["response_type"] != "code":
-        return redirect(_with_query(ruri, {"error": "unsupported_response_type", "state": p["state"]}), 302)
+        return _msg_page(tr("Connection not possible"), tr("The app sent an invalid request. Start the connection in the app again."))
     if p["code_challenge_method"] != "S256" or not CHALLENGE_RE.fullmatch(p["code_challenge"]):
-        return redirect(_with_query(ruri, {"error": "invalid_request", "error_description": "PKCE with S256 is required",
-                                           "state": p["state"]}), 302)
+        return _msg_page(tr("Connection not possible"), tr("The app sent an invalid request. Start the connection in the app again."))
     if not _resource_ok(p["resource"]):
-        return redirect(_with_query(ruri, {"error": "invalid_target", "state": p["state"]}), 302)
+        return _msg_page(tr("Connection not possible"), tr("The app sent an invalid request. Start the connection in the app again."))
     u = g.get("user")
     if not u or g.get("auth_via") not in ("session", "proxy"):
         return redirect("/?oauth=" + urllib.parse.quote("?" + request.query_string.decode("latin-1"), safe=""), 303)
@@ -469,11 +498,14 @@ def mcpr_token():
     if not mcpr_on(c):
         return _gone()
     ip = rate_ip()
-    if _rate_blocked(_bad(ip)):
-        return _oerr("slow_down", "too many failed attempts, wait a few minutes", 429, {"Retry-After": "900"})
     f = _form()
 
     def fail(error="invalid_grant", desc="the code or token is not valid", code=400):
+        # review F4: the lock answers failed attempts only; a valid code / refresh token (32 random bytes) still works behind an
+        # address that others (a chat app's shared exit) used for failures
+        c.commit()  # what the failure changed (a revoked access) stays, also when the lock answers
+        if _rate_blocked(_bad(ip)):
+            return _oerr("slow_down", "too many failed attempts, wait a few minutes", 429, {"Retry-After": "900"})
         _rate_fail(_bad(ip))
         c.commit()
         return _oerr(error, desc, code)
@@ -529,9 +561,15 @@ def _token_refresh(c, cl, f, fail):
         return fail()
     if gr["client_id"] != cl["client_id"]:
         return fail()
+    if not gr["token_id"]:
+        # review F1: the access token went outside the refresh ("New token" / deleting the token of the agent, a restore
+        # that keeps it revoked): that ends the access, no new token (the refresh itself removes and sets it in one step)
+        mcpr_revoke(c, gr["id"])
+        print("hosted MCP: the access token of access", gr["id"], "was removed, access revoked", flush=True)
+        return fail(desc="the access was ended")
     if not gr["refresh_expires_at"] or parse_iso(gr["refresh_expires_at"]) <= now_utc():
         return fail(desc="the refresh token has expired")
-    if not mcpr_may(c, gr["user_id"], gr["agent_id"]):
+    if not mcpr_may(c, gr["user_id"], gr["agent_id"], support=True):
         mcpr_revoke(c, gr["id"])
         return fail(desc="the agent cannot be connected any more")
     if not c.execute("UPDATE oauth_grants SET prev_refresh_hash=refresh_hash, refresh_hash=NULL WHERE id=? AND refresh_hash=? RETURNING id",
@@ -550,6 +588,8 @@ def mcpr_revoke_route():
     c = db()
     if not mcpr_on(c):
         return _gone()
+    if hit_limit("oauthrev:" + rate_ip(), MCPR_REVOKE_LIMIT, 900):  # review F9
+        return _oerr("slow_down", "too many requests from this address, try again later", 429, {"Retry-After": "900"})
     f = _form()
     cl = _client(c, f.get("client_id", ""))
     h = _token_hash(f.get("token", "") or "-")
@@ -589,11 +629,39 @@ def _inproc_cls(mod):
     if mod in _CLS:
         return _CLS[mod]
 
+    class _Now(Exception):
+        """review F3: an ApiError that Kalmido.call must not wait for and try again (it catches ApiError only)."""
+        def __init__(self, e):
+            super().__init__(e.message)
+            self.e = e
+
     class InProc(mod.Kalmido):
-        def __init__(self, token, ip, base_url):
+        def __init__(self, token, ip, base_url, deadline=None):
             super().__init__("http://kalmido.invalid", token, timeout=mod.WAIT_MAX + 30)
             self.me_cache = {"at": 0.0, "v": None}  # per call of /mcp, never shared between tokens
             self.ip, self.base_url = ip, base_url
+            self.deadline = deadline or (time.time() + MCPR_RUN_S)
+
+        def call(self, method, path, query=None, body=None, timeout=None, multipart=None, binary_cap=None):
+            # review F3: in the web process nothing waits: no sleeping before a call (rate limit) or between tries (429 / 503
+            # go back to the client at once with their Retry-After), no call after the request's time is up, and the long poll
+            # waits at most until shortly before it
+            left = self.deadline - time.time()
+            if left <= 1:
+                raise mod.ApiError(504, f"HTTP 504: the time of this /mcp request ({MCPR_RUN_S} s) is used up; "
+                                        "send the remaining calls in a new request")
+            if path.startswith("/agent/events") and query and query.get("wait") is not None:
+                try:
+                    query = {**query, "wait": max(0, min(int(query["wait"]), int(left) - 5))}
+                except (TypeError, ValueError):
+                    pass
+            try:
+                return super().call(method, path, query, body, timeout, multipart, binary_cap)
+            except _Now as n:
+                raise n.e from None
+
+        def _note_limit(self, headers):  # review F3: no waiting for an exhausted limit; the API answers 429 itself
+            self.rl_until = 0.0
 
         def _send(self, req, timeout, binary_cap):
             u = urllib.parse.urlsplit(req.full_url)
@@ -601,7 +669,8 @@ def _inproc_cls(mod):
             r = app.test_client().open(u.path, query_string=u.query, method=req.get_method(), headers=hdrs, data=req.data,
                                        base_url=self.base_url, environ_base={"REMOTE_ADDR": self.ip})
             try:
-                self._note_limit(r.headers)
+                if binary_cap and r.status_code < 400:
+                    return self._file(r, binary_cap)
                 raw = r.get_data()
                 if r.status_code >= 400:
                     msg = f"HTTP {r.status_code}"
@@ -610,15 +679,33 @@ def _inproc_cls(mod):
                         msg = f"HTTP {r.status_code}: " + ((er.get("message") if isinstance(er, dict) else er) or msg)
                     except (ValueError, AttributeError):
                         pass
-                    raise mod.ApiError(r.status_code, msg, mod._retry_after(r.headers, None) if r.status_code in (429, 503) else None)
-                if binary_cap:
-                    if len(raw) > binary_cap:
-                        raise mod.ApiError(413, f"the file has {len(raw)} bytes, more than max_bytes={binary_cap}")
-                    return {"bytes": raw, "mime": (r.headers.get("Content-Type") or "application/octet-stream").split(";")[0].strip(),
-                            "name": mod._cd_name(r.headers.get("Content-Disposition") or "")}
+                    if r.status_code in (429, 503):
+                        ra = mod._retry_after(r.headers, None)
+                        raise _Now(mod.ApiError(r.status_code, msg + (f" (try again in {int(ra)} s)" if ra is not None else ""), ra))
+                    raise mod.ApiError(r.status_code, msg)
                 return json.loads(raw) if raw else {"ok": True}
             finally:
                 r.close()
+
+        def _file(self, r, cap):
+            """review F7: a file answer read piece by piece and given up after cap bytes (as kalmido_mcp.py over the network):
+            never the whole file in the memory of the web process before the limit."""
+            try:
+                n = int(r.headers.get("Content-Length") or 0)
+            except ValueError:
+                n = 0
+            if n > cap:
+                raise mod.ApiError(413, f"the file has {n} bytes, more than max_bytes={cap}")
+            buf, size = [], 0
+            for chunk in r.response:
+                if isinstance(chunk, str):
+                    chunk = chunk.encode()
+                size += len(chunk)
+                if size > cap:
+                    raise mod.ApiError(413, f"the file is larger than max_bytes={cap}")
+                buf.append(chunk)
+            return {"bytes": b"".join(buf), "mime": (r.headers.get("Content-Type") or "application/octet-stream").split(";")[0].strip(),
+                    "name": mod._cd_name(r.headers.get("Content-Disposition") or "")}
     _CLS[mod] = InProc
     return InProc
 
@@ -655,9 +742,9 @@ def mcpr_mcp():
                       WHERE t.token_hash=? AND g.revoked_at IS NULL""", (_token_hash(tok),)).fetchone()
     if not gr or not gr["expires_at"] or parse_iso(gr["expires_at"]) <= now_utc():
         if not gr:  # as /api/v1: only an unknown token counts (and is limited), an expired one asks for the refresh
-            if _rate_blocked(_bad(ip)):
+            if _rate_blocked(_mcp_bad(ip)):
                 return jsonify(error="too many invalid tokens"), 429, {"Retry-After": "900"}
-            _rate_fail(_bad(ip))
+            _rate_fail(_mcp_bad(ip))
             c.commit()
         return _unauth("invalid_token")
     if request.method != "POST":  # no server-initiated stream, no sessions
@@ -670,25 +757,43 @@ def mcpr_mcp():
     if not gr["last_used_at"] or (now_utc() - parse_iso(gr["last_used_at"])).total_seconds() >= MCPR_USED_EVERY:
         c.execute("UPDATE oauth_grants SET last_used_at=? WHERE id=?", (iso(now_utc()), gr["id"]))
     c.commit()  # nothing of this request stays open while the tools run
-    if not _SEM.acquire(blocking=False):
-        return jsonify(error="busy, try again"), 503, {"Retry-After": "5"}
-    api = _inproc_cls(mod)(tok, client_ip(), request.host_url)
+    text = raw.decode("utf-8", "replace")
+    if text.lstrip()[:1] == "[":  # review F3: a batch runs one call after the other in one place: a few only
+        try:
+            n = len(json.loads(text))
+        except (ValueError, TypeError):
+            n = 0
+        if n > MCPR_BATCH_MAX:
+            return jsonify(jsonrpc="2.0", id=None, error={"code": -32600, "message": f"at most {MCPR_BATCH_MAX} messages in one batch"}), 400
+    gid = gr["id"]
+    with _RUN_LOCK:  # review F3: one access never takes more than MCPR_PER_GRANT of the places
+        if _RUNNING.get(gid, 0) >= MCPR_PER_GRANT:
+            return jsonify(error=f"at most {MCPR_PER_GRANT} requests of one access at once, try again"), 429, {"Retry-After": "5"}
+        if not _SEM.acquire(blocking=False):
+            return jsonify(error="busy, try again"), 503, {"Retry-After": "5"}
+        _RUNNING[gid] = _RUNNING.get(gid, 0) + 1
+    api = _inproc_cls(mod)(tok, client_ip(), request.host_url, time.time() + MCPR_RUN_S)
     box = {}
 
     def run():
         try:
-            box["r"] = mod.handle_raw(api, raw.decode("utf-8", "replace"))
+            box["r"] = mod.handle_raw(api, text)
         except Exception as ex:  # noqa: BLE001  (an answer, never a hanging client)
             box["e"] = ex
         finally:
+            with _RUN_LOCK:  # the places go back when the work really ended (a thread cannot be stopped from outside)
+                _RUNNING[gid] -= 1
+                if not _RUNNING[gid]:
+                    del _RUNNING[gid]
             _SEM.release()
     th = threading.Thread(target=run, name="mcp-remote", daemon=True)  # its own thread: the calls are requests of their own
     th.start()
-    th.join(mod.WAIT_MAX + 60)
+    th.join(MCPR_RUN_S + 15)  # the calls stop at MCPR_RUN_S (InProc.call); one running call may still finish
     if th.is_alive() or "e" in box:
         if "e" in box:
             print("hosted MCP: error", type(box["e"]).__name__, box["e"], flush=True)
-        return jsonify(error="the tool call did not finish"), 504 if th.is_alive() else 500
+        return jsonify(error="the tool call did not finish in time; a write may still have been made, check before sending it again"
+                       if th.is_alive() else "the tool call failed"), 504 if th.is_alive() else 500
     if box.get("r") is None:
         return "", 202
     r = jsonify(box["r"])

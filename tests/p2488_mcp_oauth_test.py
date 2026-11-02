@@ -6,31 +6,55 @@ tenant-matrix: agent (another person neither sees nor revokes her access, nor pi
  - admin switch "Hosted MCP access" off (default): /mcp, /oauth/* and the metadata answer 404; switching on asks for the password
  - metadata (RFC 9728 / 8414), /mcp without a token: 401 with WWW-Authenticate resource_metadata
  - dynamic client registration: only https or http on localhost / 127.0.0.1, no fragment; a limit per address
- - authorize: unknown client / redirect URI never redirected; PKCE S256 required (plain, missing -> error to the client with
-   state); not signed in -> the sign-in with the way back; the consent page: client, host, only the person's own agents
+ - authorize: unknown client / redirect URI never redirected; PKCE S256 required (plain, missing -> refused with
+   state; 2.488.0 F5: an error page, no redirect); not signed in -> the sign-in with the way back; the consent page: client, host, only the person's own agents
    (an instance admin also team agents), sealed form bound to the person, cross-site refused, frame-ancestors 'none'
  - token: wrong verifier, other client, other redirect URI, a code twice (revokes the access made with it); hashes only
  - /mcp: initialize, tools/list after the agent's scopes, tools/call with the agent's rights (a project not shared with it
    stays invisible), GET / DELETE 405, a foreign Origin 403, a notification 202
  - refresh rotation (old access + old refresh dead; the old refresh again revokes the access), Settings > Agents lists and
    revokes, /oauth/revoke, a new personal agent from the consent page
+ - 2.488.0 (#3363) review fixes: F1 "New token" of the agent ends the access (no refresh), F2 a restore keeps a revoked access
+   revoked, F3 batch limit / no waiting in the web process / places per access / time limit, F4 unknown /mcp tokens count
+   apart and the lock answers failures only, F5 wrong authorize requests are a page (no redirect), F6 (hosted restart) a
+   support access does not let the operator hand out a client's agent, F7 file answers read in pieces up to max_bytes,
+   F8 redirect hosts ASCII / punycode only and no format characters in the client name, F9 /oauth/revoke limited
 usage: p2488_mcp_oauth_test.py <datadir>      (KMT_NOSTART=1 / P2488MO_NOSTART=1: a running server)"""
 import base64
 import hashlib
 import html
+import json
 import re
 import secrets
+import subprocess
 import sys
+import threading
 import urllib.parse
 
 import requests
-from kt import B, PASSWORD, check, dbx, done, fresh, setup
-from freelancer_fixture import freelancer
+from kt import B, CT, PASSWORD, check, dbx, done, fresh, sess, setup
+from freelancer_fixture import freelancer, login
 
-fresh(prefix="P2488MO")
+KEY = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA="  # 2.488.0 (#3363): a test server key (32 bytes, base64): restart with hosted keeps it
+STARTED = fresh(env={"KALMIDO_SECRET_KEY": KEY}, prefix="P2488MO")
 A = setup()
 CB = "http://127.0.0.1:9/cb"
 CB2 = "https://app.example/cb"
+
+
+def in_app(code):
+    """2.488.0 (#3363, review F3 / F7): a few lines inside the container with the server's modules -> the last JSON line."""
+    r = subprocess.run(["docker", "exec", "-w", "/app", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c", "import app, json\n" + code],
+                       capture_output=True, text=True, timeout=300)
+    for line in reversed((r.stdout or "").strip().splitlines()):
+        if line.startswith("{"):
+            return json.loads(line)
+    print("container python:", r.returncode, (r.stdout or "")[-800:], (r.stderr or "")[-1500:], flush=True)
+    return {}
+
+
+def sha(v):
+    return hashlib.sha256(v.encode()).hexdigest()
 
 
 def j(r):
@@ -90,6 +114,12 @@ r = requests.post(B + "/oauth/register", json={"redirect_uris": [CB, CB2], "clie
 check(r.status_code == 201 and r.json()["client_id"].startswith("kmc_") and r.json()["token_endpoint_auth_method"] == "none"
       and r.headers.get("Cache-Control") == "no-store", f"registered {r.status_code} {r.text[:200]}")
 CID = r.json()["client_id"]
+# 2.488.0 (#3363): review F8 - a host a browser reads otherwise (backslash), an IDN host not as punycode, a bidi override in the name
+for bad in (["https://evil.example\\.trusted.example/cb"], ["https://b\u00fccher.example/cb"], ["https://evil.example\u202e/cb"]):
+    r = requests.post(B + "/oauth/register", json={"redirect_uris": bad, "client_name": "Bad"})
+    check(r.status_code == 400 and j(r).get("error") == "invalid_redirect_uri", f"review F8: register refuses {bad!r} ({r.status_code})")
+r = requests.post(B + "/oauth/register", json={"redirect_uris": ["https://xn--bcher-kva.example/cb"], "client_name": "Good\u202eevil\u200fx"})
+check(r.status_code == 201 and j(r).get("client_name") == "Goodevilx", f"review F8: punycode host fine, format characters out of the name {r.text[:160]}")
 CID2 = requests.post(B + "/oauth/register", json={"redirect_uris": [CB], "client_name": "Other"}).json()["client_id"]
 
 # ---------------------------------------------------------------- the person without an organisation and her agent
@@ -153,13 +183,17 @@ r = Fr.get(authz_url(redirect="https://evil.example/cb"), allow_redirects=False)
 check(r.status_code == 400 and "Location" not in r.headers, "a redirect URI that is not registered: an error page, no redirect")
 r = Fr.get(authz_url(redirect=CB + "/x"), allow_redirects=False)
 check(r.status_code == 400 and "Location" not in r.headers, "redirect URIs are compared exactly")
+# 2.488.0 (#3363): review F5 - a wrong request is an error page, never a redirect (before: 302 to the client with the error)
 for meth, ch in (("plain", "a" * 43), ("", None), ("S256", "short")):
     r = Fr.get(authz_url(method=meth or None, ch=ch if ch else ("" if meth == "" else None)), allow_redirects=False)
-    loc = r.headers.get("Location", "")
-    check(r.status_code == 302 and loc.startswith(CB) and "error=invalid_request" in loc and "state=st-123" in loc,
-          f"PKCE {meth or 'missing'} refused to the client with state ({r.status_code} {loc})")
+    check(r.status_code == 400 and "Location" not in r.headers and "invalid request" in r.text,
+          f"PKCE {meth or 'missing'} refused with an error page, no redirect ({r.status_code} {r.headers.get('Location', '')})")
 r = Fr.get(authz_url(response_type="token"), allow_redirects=False)
-check("error=unsupported_response_type" in r.headers.get("Location", ""), "response_type token refused")
+check(r.status_code == 400 and "Location" not in r.headers, "response_type token refused with an error page")
+for bad in ({"response_type": "token"}, {"method": "plain"}, {"state": "s" * 501}, {"resource": "https://other.example/mcp"}):
+    r = requests.get(authz_url(**bad), allow_redirects=False)
+    check(r.status_code == 400 and "Location" not in r.headers,
+          f"review F5: not signed in, {list(bad)[0]} wrong: an error page, never on to the registered address ({r.status_code})")
 r = requests.get(authz_url(), allow_redirects=False)
 loc = r.headers.get("Location", "")
 check(r.status_code == 303 and loc.startswith("/?oauth=") and urllib.parse.unquote(loc[len("/?oauth="):]).startswith("?response_type=code"),
@@ -302,6 +336,119 @@ r = requests.post(B + "/oauth/revoke", data={"token": tk.get("refresh_token", ""
 check(r.status_code == 200, "RFC 7009 revoke: 200")
 check(mcp(tk.get("access_token", ""), {"jsonrpc": "2.0", "id": 1, "method": "ping"}).status_code == 401, "revoked by the client: access token dead")
 
+# ---------------------------------------------------------------- review F1: "New token" of the agent ends the connected apps
+tk = full()
+g1 = dbx("SELECT id FROM oauth_grants WHERE refresh_hash=?", (sha(tk.get("refresh_token", "-")),))
+check(g1 and mcp(tk.get("access_token", ""), {"jsonrpc": "2.0", "id": 1, "method": "ping"}).ok, "F1: an access")
+r = Fr.post(B + f"/api/my/agents/{AID}/token", json={})
+check(r.ok and r.json().get("token"), f"F1: she makes a new token for her agent ({r.status_code})")
+check(mcp(tk.get("access_token", ""), {"jsonrpc": "2.0", "id": 1, "method": "ping"}).status_code == 401, "F1: the access token stopped with it")
+r = token(grant_type="refresh_token", refresh_token=tk.get("refresh_token", ""), client_id=CID)
+check(r.status_code == 400 and j(r).get("error") == "invalid_grant" and "access_token" not in j(r),
+      f"review F1: the refresh token gives no new token afterwards ({r.status_code} {r.text[:120]})")
+check(g1 and dbx("SELECT revoked_at FROM oauth_grants WHERE id=?", (g1[0][0],))[0][0], "review F1: the access is revoked")
+check(not [x for x in Fr.get(B + "/api/my/mcp-grants").json()["grants"] if g1 and x["id"] == g1[0][0]], "... and gone from Settings > Agents")
+
+# ---------------------------------------------------------------- review F3: a batch has a limit
+tk = full()
+AT3 = tk.get("access_token", "")
+r = mcp(AT3, [{"jsonrpc": "2.0", "id": i, "method": "ping"} for i in range(21)])
+check(r.status_code == 400 and j(r).get("error", {}).get("code") == -32600, f"review F3: a batch of 21 messages: 400 ({r.status_code} {r.text[:120]})")
+r = mcp(AT3, [{"jsonrpc": "2.0", "id": i, "method": "ping"} for i in range(20)])
+check(r.ok and isinstance(j(r), list) and len(j(r)) == 20, f"... 20 are fine ({r.status_code})")
+
+# ---------------------------------------------------------------- review F3 / F7 inside the server's modules (no waiting, places, file size)
+G3 = dbx("SELECT id FROM oauth_grants WHERE refresh_hash=?", (sha(tk.get("refresh_token", "-")),))
+PROBE = r"""
+import time
+from werkzeug.wrappers import Response as WR
+from kalmido.agents import mcpremote as mr
+mod = mr.mcpr_module()
+IP = mr._inproc_cls(mod)
+real = mr.app
+slept = []
+mod._sleep = lambda s: slept.append(s)
+out = {}
+class Fake:
+    def __init__(self, resp):
+        self.resp, self.n, self.qs = resp, 0, []
+    def test_client(self):
+        fk = self
+        class C:
+            def open(self, path, **k):
+                fk.n += 1
+                fk.qs.append(k.get("query_string") or "")
+                return fk.resp()
+        return C()
+# (a) 429 with Retry-After: back at once, no sleep, no second try, no wait before the next call
+mr.app = fk = Fake(lambda: WR('{"error":"slow down"}', status=429, mimetype="application/json",
+                               headers={"Retry-After": "30", "RateLimit-Remaining": "0", "RateLimit-Reset": "30"}))
+api = IP("abk_x", "127.0.0.1", "http://localhost/")
+for _ in range(2):
+    try:
+        api.call("GET", "/me")
+    except mod.ApiError as e:
+        out["a"] = [e.status, e.retry_after, "30 s" in e.message]
+out["a_n"], out["a_slept"] = fk.n, list(slept)
+# (b) 503 without Retry-After: no retry either
+mr.app = fk = Fake(lambda: WR('{"error":"busy"}', status=503, mimetype="application/json"))
+try:
+    api.call("POST", "/tasks", body={"title": "x"})
+except mod.ApiError as e:
+    out["b"] = e.status
+out["b_n"], out["b_slept"] = fk.n, list(slept)
+# (c) the request's time used up: no call any more; the long poll waits only until shortly before the end
+mr.app = fk = Fake(lambda: WR('{"events":[]}', status=200, mimetype="application/json"))
+try:
+    IP("abk_x", "127.0.0.1", "http://localhost/", time.time()).call("GET", "/me")
+except mod.ApiError as e:
+    out["c"] = e.status
+out["c_n"] = fk.n
+IP("abk_x", "127.0.0.1", "http://localhost/", time.time() + 20).call("GET", "/agent/events", {"since": 1, "wait": 60})
+out["c_q"] = fk.qs[-1]
+# (d) a file answer: Content-Length over the cap -> 413 without reading; without a length read in pieces up to the cap only
+pulled = [0]
+def gen():
+    for _ in range(400):
+        pulled[0] += 1
+        yield b"x" * 65536
+mr.app = Fake(lambda: WR(gen(), status=200, mimetype="application/octet-stream", headers={"Content-Length": str(400 * 65536)}))
+try:
+    api.call("GET", "/wiki/files/1", binary_cap=100000)
+except mod.ApiError as e:
+    out["d1"] = [e.status, pulled[0]]
+pulled[0] = 0
+mr.app = Fake(lambda: WR(gen(), status=200, mimetype="application/octet-stream"))
+try:
+    api.call("GET", "/wiki/files/1", binary_cap=100000)
+except mod.ApiError as e:
+    out["d2"] = [e.status, pulled[0]]
+mr.app = Fake(lambda: WR(b"small file", status=200, mimetype="text/plain"))
+out["d3"] = api.call("GET", "/wiki/files/1", binary_cap=100000)["bytes"].decode()
+# (e) one access holds at most MCPR_PER_GRANT places: the next request of it 429, another access still runs
+mr.app = real
+cl = real.test_client()
+ping = {"jsonrpc": "2.0", "id": 1, "method": "ping"}
+mr._RUNNING[GID] = mr.MCPR_PER_GRANT
+r = cl.post("/mcp", json=ping, headers={"Authorization": "Bearer " + TOK})
+out["e1"] = [r.status_code, r.headers.get("Retry-After")]
+mr._RUNNING[GID] = mr.MCPR_PER_GRANT - 1
+r = cl.post("/mcp", json=ping, headers={"Authorization": "Bearer " + TOK})
+out["e2"] = [r.status_code, mr._RUNNING.get(GID)]
+print(json.dumps(out))
+"""
+pr = in_app(f"GID = {G3[0][0] if G3 else 0}\nTOK = {AT3!r}\n" + PROBE)
+check(pr.get("a") == [429, 30.0, True] and pr.get("a_n") == 2 and pr.get("a_slept") == [],
+      f"review F3: a 429 goes back at once with its Retry-After, never slept on, nothing waits before the next call {pr}")
+check(pr.get("b") == 503 and pr.get("b_n") == 1 and pr.get("b_slept") == [], "review F3: a 503 is not tried again in the web process")
+check(pr.get("c") == 504 and pr.get("c_n") == 0, "review F3: after the request's time no call is made any more")
+check(10 <= int((re.search(r"wait=(\d+)", pr.get("c_q", "")) or [0, 99])[1]) <= 15, f"review F3: the long poll waits only until shortly before the end ({pr.get('c_q')})")
+check(pr.get("d1") == [413, 0], f"review F7: Content-Length over max_bytes: 413 without reading the file ({pr.get('d1')})")
+check(pr.get("d2", [0, 99])[0] == 413 and pr.get("d2", [0, 99])[1] <= 3, f"review F7: without a length read in pieces, given up after max_bytes ({pr.get('d2')})")
+check(pr.get("d3") == "small file", "review F7: a small file comes through")
+check(pr.get("e1") == [429, "5"], f"review F3: an access with all its places taken: 429 ({pr.get('e1')})")
+check(pr.get("e2") == [200, 3], f"review F3: one place free: the call runs and gives its place back ({pr.get('e2')})")
+
 # ---------------------------------------------------------------- a new personal agent from the consent page
 v7, ch7 = pkce()
 r = consent(Fr, "new", ch7, username="frida-conn", display_name="Frida Conn")
@@ -316,6 +463,64 @@ check(r.status_code == 400 and "Location" not in r.headers, "a taken user name: 
 # ---------------------------------------------------------------- the instance admin connects a team agent
 tk = full(TEAM, A)
 check(tk.get("access_token") and mcp(tk["access_token"], {"jsonrpc": "2.0", "id": 1, "method": "ping"}).ok, "the admin connects a team agent")
+
+# ---------------------------------------------------------------- review F2: a restore does not bring a revoked access back
+tk = full()
+g2 = dbx("SELECT id FROM oauth_grants WHERE refresh_hash=?", (sha(tk.get("refresh_token", "-")),))
+BK = in_app("from kalmido.admin import backup as bk\nprint(json.dumps({'name': bk.bk_create('manual')}))").get("name")
+check(g2 and BK, f"F2: an access and a backup {BK}")
+check(g2 and Fr.delete(B + f"/api/my/mcp-grants/{g2[0][0]}").ok, "F2: she revokes the access after the backup")
+r = A.post(B + "/api/admin/backups/restore", json={"name": BK, "confirm": "RESTORE", "password": PASSWORD})
+check(r.ok, f"F2: the backup restored {r.status_code} {r.text[:160]}")
+A, Fr = sess("alice"), login(B, "frida")  # the restore ended every session
+check(g2 and dbx("SELECT revoked_at FROM oauth_grants WHERE id=?", (g2[0][0],))[0][0] is not None,
+      "review F2: after the restore the access revoked since the backup stays revoked")
+r = token(grant_type="refresh_token", refresh_token=tk.get("refresh_token", ""), client_id=CID)
+check(r.status_code == 400 and "access_token" not in j(r), f"review F2: its refresh token gives no token ({r.status_code})")
+
+# ---------------------------------------------------------------- review F4: unknown tokens on /mcp do not lock the refresh
+tk = full()
+for i in range(31):
+    last = mcp("abk_unknown" + str(i), {"jsonrpc": "2.0", "id": 1, "method": "ping"})
+check(last.status_code == 429, f"F4: unknown tokens on /mcp are limited ({last.status_code})")
+r = token(grant_type="refresh_token", refresh_token=tk.get("refresh_token", ""), client_id=CID)
+check(r.ok and j(r).get("access_token"), f"review F4: a valid refresh still works behind that address ({r.status_code} {r.text[:120]})")
+tk = j(r)
+for i in range(31):
+    last = token(grant_type="refresh_token", refresh_token="kmr_wrong" + str(i), client_id=CID)
+check(last.status_code == 429, f"F4: failed refreshes are limited ({last.status_code})")
+r = token(grant_type="refresh_token", refresh_token=tk.get("refresh_token", ""), client_id=CID)
+check(r.ok and j(r).get("access_token"), f"review F4: the lock answers failures only, a valid refresh token still works ({r.status_code})")
+
+# ---------------------------------------------------------------- review F9: /oauth/revoke is limited
+codes = [requests.post(B + "/oauth/revoke", data={"token": "kmr_x" + str(i), "client_id": CID}).status_code for i in range(62)]
+check(codes[0] == 200 and codes[-1] == 429, f"review F9: /oauth/revoke per address limited ({codes[0]} .. {codes[-1]})")
+
+# ---------------------------------------------------------------- review F6: a support access is not enough to hand out an agent
+if fresh(env={"KALMIDO_SECRET_KEY": KEY, "KALMIDO_HOSTED": "1"}, prefix="P2488MO", keep=True):
+    A = sess("alice")
+    check(A.post(B + "/api/users", json={"username": "carl", "display_name": "Carl", "password": PASSWORD, "email": "carl@example.com"}).ok,
+          "F6 (hosted): a client account")
+    Ca = login(B, "carl")
+    co = Ca.post(B + "/api/orgs", json={"name": "Client Studio"})
+    check(co.status_code == 201, f"F6: the client's organisation {co.status_code} {co.text[:120]}")
+    CO = co.json().get("id")
+    cb = A.post(B + "/api/admin/agents", json={"username": "clientbot", "display_name": "Client Bot"})
+    CB_ID = cb.json().get("id")
+    dbx("UPDATE agents SET owner_id=NULL, org_id=? WHERE user_id=?", (CO, CB_ID))  # a team agent of the client's organisation
+    ra, _ = page(A, authz_url())
+    check(ra.status_code == 200 and "Team Bot" in ra.text and "Client Bot" not in ra.text, "F6: without support access the client's agent is not offered")
+    r = Ca.post(B + "/api/support-access", json={"hours": 1, "org_id": CO})
+    check(r.ok, f"F6: the client opens support access for its organisation ({r.status_code} {r.text[:120]})")
+    ra, t6 = page(A, authz_url())
+    check(ra.status_code == 200 and "Team Bot" in ra.text and "Client Bot" not in ra.text,
+          "review F6: with support access the operator is still not offered the client's agent")
+    r = A.post(B + "/oauth/authorize", data={"t": t6, "decision": "allow", "agent": str(CB_ID)}, allow_redirects=False)
+    check(r.status_code == 400 and "Location" not in r.headers, f"review F6: ... nor can it hand it out ({r.status_code})")
+    r = A.post(B + "/oauth/authorize", data={"t": t6, "decision": "allow", "agent": str(TEAM)}, allow_redirects=False)
+    check(r.status_code == 303 and "code=" in r.headers.get("Location", ""), "F6: its own team agent it still can")
+else:
+    print("F6: skipped (a running server, no restart with KALMIDO_HOSTED=1)", flush=True)
 
 # ---------------------------------------------------------------- the registration limit, switched off again
 n429 = 0

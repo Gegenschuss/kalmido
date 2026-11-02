@@ -1603,6 +1603,14 @@ def bkr_creds_after(c, creds):
         n = c.execute(q).rowcount  # plain statements: pg_prepare checks them
         if n:
             print(f"restore: {n} {t} revoked after the backup stay revoked", flush=True)
+    # 2.488.0 (#3363, review F2): a hosted MCP access whose access token went above (revoked or rotated after the backup) ends
+    # too: its refresh token of the backup's time must not hand out new tokens (agents/mcpremote.py; the table may be missing
+    # in a database from before 2.488.0 only before init_db, which ran)
+    n = c.execute("UPDATE oauth_grants SET revoked_at=COALESCE(revoked_at, ?), refresh_hash=NULL, prev_refresh_hash=NULL "
+                  "WHERE revoked_at IS NULL AND (token_id IS NULL OR token_id NOT IN (SELECT id FROM api_tokens))",
+                  (iso(now_utc()),)).rowcount
+    if n:
+        print(f"restore: {n} hosted MCP accesses ended (their token was revoked after the backup)", flush=True)
 
 
 BKR_RECENT_DAYS = 7

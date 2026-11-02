@@ -16044,5 +16044,6 @@
   "It gets exactly the permissions of the agent you choose: only the projects shared with it. You can disconnect it at any time under Settings > Agents.": "Recibe exactamente los permisos del agente que elijas: solo los proyectos compartidos con él. Puedes desconectarla en cualquier momento en Ajustes > Agentes.",
   "Request blocked": "Solicitud bloqueada",
   "The page was open too long. Start the connection in the app again.": "La página estuvo abierta demasiado tiempo. Vuelve a iniciar la conexión en la aplicación.",
-  "Please choose an agent.": "Elige un agente."
+  "Please choose an agent.": "Elige un agente.",
+  "The app sent an invalid request. Start the connection in the app again.": "La aplicación envió una solicitud no válida. Vuelve a iniciar la conexión en la aplicación."
 }

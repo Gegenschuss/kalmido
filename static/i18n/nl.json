@@ -16044,5 +16044,6 @@
   "It gets exactly the permissions of the agent you choose: only the projects shared with it. You can disconnect it at any time under Settings > Agents.": "Hij krijgt precies de rechten van de gekozen agent: alleen de projecten die met hem gedeeld zijn. Je kunt hem altijd loskoppelen onder Instellingen > Agents.",
   "Request blocked": "Verzoek geblokkeerd",
   "The page was open too long. Start the connection in the app again.": "De pagina stond te lang open. Start de verbinding opnieuw in de app.",
-  "Please choose an agent.": "Kies een agent."
+  "Please choose an agent.": "Kies een agent.",
+  "The app sent an invalid request. Start the connection in the app again.": "De app heeft een ongeldig verzoek gestuurd. Start de verbinding opnieuw in de app."
 }
