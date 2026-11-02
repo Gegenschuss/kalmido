@@ -282,6 +282,11 @@ def comment_create(tid):
         return err(tr("The comment is too long (max. {0} characters)", MAX_COMMENT))
     if not text and not files:
         return err(tr("The comment is empty"))
+    mrep = request.form.get("mail_reporter") if (request.files or request.form) else body().get("mail_reporter")
+    try:  # 2.393.2 B (#3375): "also by e-mail to the reporter" (people who may change the task, never a list with the lock)
+        mrep = MAIL_REPLY["check"](c, tid, me(), mrep) if MAIL_REPLY else False
+    except ValueError as e:
+        return err(str(e))
     if le2e_mode(c, t["list_id"]) or text.startswith("e2e1:"):  # 2.64.1 (#1817): ciphertext + mentions from the browser
         text, mentions = le2a_comment_in(c, t["list_id"], text, t["id"])  # 2.86.0 (N20 review): + task
     else:
@@ -335,11 +340,6 @@ def comment_create(tid):
         return err(str(e))
     if portal and (sug or chs):  # 2.63.0 B (#1513): the customer sees text (and the files are not shown to them)
         return err(tr("Suggestions and answer buttons cannot go to a client"))
-    mrep = request.form.get("mail_reporter") if (request.files or request.form) else body().get("mail_reporter")
-    try:  # 2.393.2 B (#3375): "also by e-mail to the reporter" (people who may change the task, never a list with the lock)
-        mrep = MAIL_REPLY["check"](c, tid, me(), mrep) if MAIL_REPLY else False
-    except ValueError as e:
-        return err(str(e))
     if mrep and (sug or chs):  # the files of the comment stay in Kalmido (the mail carries the text)
         return err(tr("Only a text goes to the reporter by e-mail"))
     cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to,choices,portal,client_ref) VALUES(?,?,?,?,?,?,?,?,?,?)",
