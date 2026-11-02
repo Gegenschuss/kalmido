@@ -254,7 +254,7 @@ document.addEventListener('click', e => {
 // ---- 2.123.0 D (#2341): the account balance -- start balance (office settings), corrections by hand per month, the real
 // balance at the end of a month against the computed one. Server: kalmido/office/cfstart.py. Without a start balance and
 // without corrections the cards stay as before. Every change = one undo step.
-const CFS = {st: undefined, oid: null};
+const CFS = {st: undefined, oid: null, day: ''};  // day: a reference date picked before the amount (job/2299: a redraw kept it)
 const CFS_DIRS = [['in', N_('Other money in|cashflow')], ['out', N_('Other money out|cashflow')]];
 const cfs_amt = v => { const n = ofcNum(v); return n == null ? null : n; };
 // the account rows of a month card: computed balance at the month's end, the real one (by hand, optional) and the difference
@@ -336,23 +336,23 @@ async function cfs_load() {
 }
 function cfs_settingsHtml() {
   if (!ofcAdmin()) return '';
-  if (CFS.oid !== OFC.info?.org_id) { CFS.oid = OFC.info?.org_id; CFS.st = undefined; setTimeout(cfs_load, 0); }
+  if (CFS.oid !== OFC.info?.org_id) { CFS.oid = OFC.info?.org_id; CFS.st = undefined; CFS.day = ''; setTimeout(cfs_load, 0); }
   const st = CFS.st;
   return `<section class="cfsset" data-fg-skip aria-labelledby="cfs-h"><h3 id="cfs-h">${tr('Cash flow')}</h3>
     <p class="muted ofchint">${tr('From this day the cash flow shows the account balance at the end of every month. Empty = off.')}</p>
     ${st === undefined ? `<p class="muted">${tr('Loading…')}</p>` : `${ofcRowF('cfs-amount-set', tr('Starting balance'), `<span class="lacts">${ofcIn('cfs-amount-set', st ? fmtNum(+st.amount, 2) : '', {num: true, ph: tr('optional')})}<span class="muted">${ofcSym(ofcHome())}</span></span>`)}
-    <div class="row"><label id="cfs-dayl">${tr('Reference date')}</label>${dateIn('cfs-day', st?.day || today(), {label: tr('Reference date'), clear: false})}</div>`}</section>`;
+    <div class="row"><label id="cfs-dayl">${tr('Reference date')}</label>${dateIn('cfs-day', st?.day || CFS.day || today(), {label: tr('Reference date'), clear: false})}</div>`}</section>`;
 }
 async function cfs_startSet(v) {
   CFS.st = v ? (await api('PUT', '/api/office/cashflow/start', {amount: v.amount, day: v.day})).start : (await api('DELETE', '/api/office/cashflow/start'), null);
-  RKF.data = null; const sec = $('.cfsset'); if (sec) sec.outerHTML = cfs_settingsHtml();
+  CFS.day = ''; RKF.data = null; const sec = $('.cfsset'); if (sec) sec.outerHTML = cfs_settingsHtml();
 }
 document.addEventListener('change', async e => {
   const t = e.target; if (!(t.id === 'cfs-amount-set' || t.id === 'cfs-day') || !t.closest?.('.cfsset')) return;
   const raw = $('#cfs-amount-set')?.value.trim() || '', amount = raw ? cfs_amt(raw) : null, day = $('#cfs-day')?.value || '';
   if (raw && amount == null) { toast(tr('Invalid value: {0}', tr('Starting balance'))); return; }
   const was = CFS.st ? {amount: CFS.st.amount, day: CFS.st.day} : null, now = amount == null ? null : {amount: String(amount), day};
-  if (!was && !now) return;
+  if (!was && !now) { CFS.day = day; return; }  // nothing saved yet: the office settings redraw when a part finished loading, the picked day stays
   if (was && now && +was.amount === +now.amount && was.day === now.day) return;
   try { await cfs_startSet(now); } catch (x) { toast(x.message || tr('unknown')); return; }
   offerUndo(tr('Saved'), histAdd({label: tr('Starting balance changed'), undo: () => cfs_startSet(was), redo: () => cfs_startSet(now)}));

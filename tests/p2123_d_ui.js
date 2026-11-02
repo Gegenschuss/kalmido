@@ -56,6 +56,10 @@ const MONTH = TC.today().slice(0, 7);
     check(await ev(`/^\\d{4}-\\d{2}-\\d{2}$/.test(document.querySelector('#cfs-day').value)`), 'the reference date is filled in (today)');
     await ev(setVal('#cfs-day', `${MONTH}-01`));  // without an amount nothing is saved yet
     check(await ev(`fetch('/api/office/cashflow/start', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.start === null)`), 'a date alone saves nothing');
+    // job/2299 (CI of 2.487.3): a part of the settings that finishes loading redraws them all - the picked day stays (it fell
+    // back to today, the start balance was saved for today and the fixed cost of the 1st no longer counted)
+    await ev(`(() => { ofcDraw(); return 1; })()`);
+    check(await ready(ev, `document.querySelector('#cfs-day')?.value === '${MONTH}-01'`), 'a redraw keeps the picked reference date');
     await ev(setVal('#cfs-amount-set', '1000'));
     check(await ready(ev, `fetch('/api/office/cashflow/start', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.start && j.start.amount === '1000.00' && j.start.day === '${MONTH}-01')`),
       'saved on change with its reference date');
