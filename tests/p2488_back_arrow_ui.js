@@ -76,7 +76,7 @@ if (!process.env.P2488A_NOSTART) execFileSync('bash', [path.join(__dirname, 'sta
     // (before, every view after the 50th looked like a step back and the arrow greyed out)
     await nav(B + '#today');
     await route('today');
-    await ev(`Object.defineProperty(history, 'length', {configurable: true, get: () => 50})`);
+    await ev(`(Object.defineProperty(history, 'length', {configurable: true, get: () => 50}), true)`);
     await ev(`location.hash = '#l/${lid}'`);
     await route(`l:${lid}`);
     await ev(`location.hash = '#l/${lid2}'`);
