@@ -74,6 +74,7 @@ CTL_ROUTES = (
     (("POST",), r"^/comments/\{\}/withdraw$", "meta"),
     (("POST",), r"^/(layouts/proposals|lists/\{\}/(playbook|rules)/proposals)$", "meta"),  # proposals a person takes or not
     (("POST",), r"^/(documents/\{\}/receipt-suggestion|office/payment-suggestions)$", "meta"),
+    (("POST",), r"^/tasks/brief$", "meta"),  # 2.392.3 (#3368): the work package export reads only (a POST for its list of ids)
     (CTL_WRITE, r"^/agents/\{\}/chat/", "meta"),
     (("POST",), r"^/tasks$", "routine"),
     (("POST",), r"^/tasks/\{\}/(subtasks|comments|complete|reopen|skip)$", "routine"),

@@ -132,6 +132,7 @@ ROUTES = {
     "POST /api/v1/fetcher/documents": "change", "PUT /api/v1/fetcher/status": "change",
     # 2.392.0 (#3364 #3370): a part delivery moves the task and makes the rest, a recorded decision stands for everyone: the default class stays
     "POST /api/v1/tasks/{}/partial": "change", "POST /api/v1/tasks/{}/decisions": "change",
+    "POST /api/v1/tasks/brief": "meta",  # 2.392.3 (#3368): reads only
     # 2.484.0 (#2200): an agent creates a scheduling poll (read + create only, never a vote): like POST /events, the default class
     "POST /api/v1/polls": "change",
     # 2.391.0 C (#3362): setting up integrations (scope integrations: never an agent's, it gets 403): the default classes stay
