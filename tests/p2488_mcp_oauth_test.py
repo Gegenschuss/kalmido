@@ -479,7 +479,8 @@ r = token(grant_type="refresh_token", refresh_token=tk.get("refresh_token", ""),
 check(r.status_code == 400 and "access_token" not in j(r), f"review F2: its refresh token gives no token ({r.status_code})")
 
 # ---------------------------------------------------------------- review F4: unknown tokens on /mcp do not lock the refresh
-tk = full()
+tk = full(AID, Fr)  # her new session (the default argument is the one the restore ended)
+check(bool(tk.get("refresh_token")), "F4: an access")
 for i in range(31):
     last = mcp("abk_unknown" + str(i), {"jsonrpc": "2.0", "id": 1, "method": "ping"})
 check(last.status_code == 429, f"F4: unknown tokens on /mcp are limited ({last.status_code})")
