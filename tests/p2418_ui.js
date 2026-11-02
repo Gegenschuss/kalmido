@@ -46,7 +46,7 @@ const menus = async ck => JSON.parse((await call('GET', '/api/state', null, ck))
   check(await until(() => ev(`typeof OFC === 'object' && !!OFC.info`) && d.querySelector('#side [data-ofm="offers"]')), 'computer: the office panel');
   const side = () => [...d.querySelectorAll('#side [data-ofm]')].map(b => b.dataset.ofm);
   // 2.448.0 (#3784): points of Money not used yet show at once, nothing starts hidden
-  check(['cashflow', 'kpi', 'travel', 'meals', 'subs', 'receipts'].every(k => side().includes(k)), '#3784: the unused points are in the menu ' + side());
+  check(['cashflow', 'kpi', 'travel', 'meals', 'agreements', 'receipts'].every(k => side().includes(k)) && !side().includes('subs'), '#3784: the unused points are in the menu ' + side());  // 2.489.0 (#2648): the subscriptions live in the point "Contracts & subscriptions" (agreements)
   check(!d.querySelector('#side [data-act="ofm-more"]'), '#3560: no "Show more" any more');
   const cust = d.querySelector('#side [data-act="nav-edit"][data-area="office"]');
   check(cust && /Customise/.test(cust.textContent), '#3560: "Customise" ends the panel');

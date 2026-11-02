@@ -4,7 +4,7 @@
 // change goes through /api/office/fixed-costs (the cash flow counts them once). Server: kalmido/office/subs.py.
 const ABO = {data: null, err: null, oid: null, low: false, loading: false, basis: LS.get('cfBasis', 'gross') === 'net' ? 'net' : 'gross'};
 const ABO_SOON = 14;  // "cancel by" in red below this many days
-OFC_TABS.splice(Math.max(0, OFC_TABS.findIndex(t => t[0] === 'cashflow' || t[0] === 'settings')), 0, ['subs', 'repeat', N_('Subscriptions & tools'), 1, () => aboHtml(), 'money', 'money.subs']);  // admins only; 2.92.1 (#1917): in the menu group Money
+OFC_TABS.splice(Math.max(0, OFC_TABS.findIndex(t => t[0] === 'cashflow' || t[0] === 'settings')), 0, ['subs', 'repeat', N_('Subscriptions & tools'), 1, () => (typeof agr_filterHtml === 'function' && agr_subsOk() && ofm_avail().some(i => i.key === 'agreements') ? `<div class="ofcbar agr-bar"><h3 class="ofcgrp">${tr('Contracts & subscriptions')}</h3></div>${agr_filterHtml('sub')}` : '') + aboHtml(), 'money', 'money.subs']);  // 2.489.0 (#2648): the filter "Subscriptions" of Contracts & subscriptions  // admins only; 2.92.1 (#1917): in the menu group Money
 
 // the subscription fields of a fixed cost as the routes take them (the undo of a delete posts them again)
 const aboFields = o => ({sub: o.sub || 0, notice_days: o.notice_days || 0, seats: o.seats || [], low_use: o.low_use || 0, remind_days: o.remind_days || 0, remind_user: o.remind_user || null, url: o.url || ''});
@@ -31,7 +31,7 @@ function aboHtml() {
   if (ABO.err) return `<div class="empty">${esc(ABO.err)}</div>`;
   if (!ABO.data) { setTimeout(aboLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const d = ABO.data, t = d.totals, net = aboNet();
-  const bar = `<div class="ofcbar abo-bar"><h3 class="ofcgrp">${tr('Subscriptions & tools')}</h3><span class="spacer"></span>
+  const bar = `<div class="ofcbar abo-bar"><h3 class="ofcgrp">${tr('Subscriptions|office')}</h3><span class="spacer"></span>
     <div class="seg fcibasis" role="group" aria-label="${esc(tr('Amounts'))}">${[['net', tr('Net')], ['gross', tr('Gross')]].map(([k, n]) => `<button type="button" data-abo="basis" data-v="${k}" class="${ABO.basis === k ? 'on' : ''}" aria-pressed="${ABO.basis === k}">${esc(n)}</button>`).join('')}</div>
     ${d.items.length ? `<a class="btn sm ghost" href="/api/office/subs.csv" download>${ic('download', 's')}<span>CSV</span></a>` : ''}
     <button class="btn sm pri" data-abo="new">${ic('plus', 's')}<span>${tr('Subscription')}</span></button></div>`;

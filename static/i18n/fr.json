@@ -15941,5 +15941,6 @@
   "The address book is in the trash; restore it first, then undo the merge": "Le carnet d'adresses est dans la corbeille ; restaurez-le d'abord, puis annulez la fusion",
   "The client is in the trash": "Le client est dans la corbeille",
   "Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.": "Les calendriers ne sont supprimés que si rien n’y a changé ; les carnets d’adresses inchangés vont dans la corbeille.",
-  "The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "Les clients importés vont dans la corbeille des clients ; les autres données de bureau, temps, habitudes et entrées de journal importés sont supprimés définitivement ; les temps facturés depuis restent."
+  "The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "Les clients importés vont dans la corbeille des clients ; les autres données de bureau, temps, habitudes et entrées de journal importés sont supprimés définitivement ; les temps facturés depuis restent.",
+  "Subscriptions|office": "Abonnements"
 }

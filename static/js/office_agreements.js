@@ -1,16 +1,38 @@
-// 2.92.0 A (#1925): business contracts and insurances in the office (tab "Contracts & insurance", admins of the office area
+// 2.92.0 A (#1925): business contracts and insurances in the office (tab "Contracts & subscriptions" since 2.489.0, admins of the office area
 // only): grouped by kind, per row the contribution per month (and as entered), the next last day to cancel (red from the
 // lead time on) and the contract document. The editor holds every field, the document of the office's documents space
 // (choose or upload), "Deadline as a task" (one task in a list the admin picks, the agent "contracts in view" reminds of it)
 // and "In the cash flow" (the contribution is an outflow like a fixed cost). Every action is one undo step; deleting is
 // soft (the undo restores). Server: kalmido/office/agreements.py.
-const AGR = {data: null, err: null, oid: null, arch: false, seq: 0, opened: null};
+const AGR = {data: null, err: null, oid: null, arch: false, seq: 0, opened: null, kind: 'all'};
 const AGR_KINDS = [['insurance', N_('Insurances')], ['rent', N_('Rent|office')], ['leasing', N_('Leasing')], ['service', N_('Service providers')], ['other', N_('Other')]];
 const AGR_KIND1 = {insurance: N_('Insurance'), rent: N_('Rent|office'), leasing: N_('Leasing'), service: N_('Service provider'), other: N_('Other')};
 const AGR_PERS = [['month', N_('per month')], ['quarter', N_('per quarter')], ['year', N_('per year')]];
 const AGR_UNITS = [['d', N_('days')], ['w', N_('weeks')], ['m', N_('months')]];
 const AGR_RENEW = [0, 1, 3, 6, 12, 24, 36, 60];
-OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['agreements', 'shield', N_('Contracts & insurance'), 1, () => agrHtml(), 'admin']);  // admins only; 2.92.1 (#1917): in the menu group Administration
+OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['agreements', 'shield', N_('Contracts & subscriptions'), 1, () => agrHtml(), 'admin']);  // admins only; 2.92.1 (#1917): in the menu group Administration
+
+// 2.489.0 (#2648): "Contracts & subscriptions" is one menu point (areas.js ofm_merged), the kind a filter: All / Contracts /
+// Insurances / Subscriptions. The data stays where it is: contracts and insurances here (office_agreements), the subscriptions
+// are fixed costs marked as one (office_subs.js, the page #office/subs with its own rights); "All" shows both lists.
+const AGR_FILTER = [['all', N_('All')], ['contract', N_('Contracts')], ['insurance', N_('Insurances')], ['sub', N_('Subscriptions|office')]];
+function agr_subsOk() {
+  const i = typeof aboHtml === 'function' && typeof ofm_all === 'function' && ofm_all().find(x => x.key === 'subs');
+  return !!i && i.on() && ofm_need(i) && ofm_ok(i) && !ofm_menuOff('subs');
+}
+function agr_filterHtml(cur) {
+  const opts = AGR_FILTER.filter(([k]) => k !== 'sub' || agr_subsOk());
+  return `<div class="seg agr-kindf" role="group" aria-label="${esc(tr('Kind'))}">${opts.map(([k, n]) => `<button type="button" data-agrk="${k}" class="${cur === k ? 'on' : ''}" aria-pressed="${cur === k}">${esc(tr(n))}</button>`).join('')}</div>`;
+}
+const agr_kindOf = a => a.kind === 'insurance' ? 'insurance' : 'contract';
+document.addEventListener('click', e => {
+  const b = /** @type {any} */ (e.target).closest?.('[data-agrk]'); if (!b) return;
+  e.preventDefault();
+  const k = b.dataset.agrk;
+  if (k === 'sub') { go('office/subs'); return; }
+  AGR.kind = k;
+  if (S.route.tab !== 'agreements') go('office/agreements'); else ofcDraw();
+});
 
 async function agrLoad() {
   const seq = ++AGR.seq;
@@ -48,20 +70,21 @@ function agrHtml() {
   if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (AGR.err) return `<div class="empty">${esc(AGR.err)}</div>`;
   if (!AGR.data) { setTimeout(() => { if (!AGR.data) agrLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
-  const items = AGR.data.items || [];
+  const all = AGR.data.items || [], kind = AGR.kind, items = kind === 'all' ? all : all.filter(a => agr_kindOf(a) === kind);
   const id = +S.route.id || 0;
-  if (id && AGR.opened !== id) { AGR.opened = id; const a = items.find(x => x.id === id); if (a) setTimeout(() => agrModal(a), 0); }
-  const bar = `${items.length ? hintOnce('ofclp', tr('Hold a row to see what you can do with it.')) : ''}<div class="ofcbar agr-bar"><h3 class="ofcgrp">${tr('Contracts & insurance')}</h3><span class="spacer"></span>
+  if (id && AGR.opened !== id) { AGR.opened = id; const a = all.find(x => x.id === id); if (a) setTimeout(() => agrModal(a), 0); }
+  const subs = kind === 'all' && agr_subsOk() ? `<div class="agr-subs">${aboHtml()}</div>` : '';  // 2.489.0 (#2648): "All" = the subscriptions below
+  const bar = `${items.length ? hintOnce('ofclp', tr('Hold a row to see what you can do with it.')) : ''}<div class="ofcbar agr-bar"><h3 class="ofcgrp">${tr('Contracts & subscriptions')}</h3><span class="spacer"></span>
     <label class="chkl"><input type="checkbox" data-agr="arch" ${AGR.arch ? 'checked' : ''}><span>${tr('Show archived')}</span></label>
-    <button class="btn sm pri" data-agr="new">${ic('plus', 's')}<span>${tr('New contract')}</span></button></div>`;
-  if (!items.length) return bar + `<p class="muted lempty">${tr('No contracts yet, e.g. business liability insurance, office rent or a leasing contract.')}</p>`;
+    <button class="btn sm pri" data-agr="new">${ic('plus', 's')}<span>${tr('New contract')}</span></button></div>${agr_filterHtml(kind)}`;
+  if (!items.length) return bar + `<p class="muted lempty">${tr('No contracts yet, e.g. business liability insurance, office rent or a leasing contract.')}</p>` + subs;
   const sumM = items.filter(a => !a.archived && a.monthly != null).reduce((s, a) => s + +a.monthly, 0);
   const groups = AGR_KINDS.map(([k, n]) => {
     const rows = items.filter(a => a.kind === k); if (!rows.length) return '';
     return `<h4 class="fcicat">${esc(tr(n))}</h4><ul class="ofclist" role="list">${rows.map(agrRow).join('')}</ul>`;
   }).join('');
   // 2.298.0 A2 (#3186): the rule of the last day to cancel behind (i) (here and at the notice period of the editor)
-  return bar + groups + `<div class="muted ofchint">${esc(tr('Together {0} per month.', ofcMoney(sumM)))}<div class="shint">${esc(tr('The last day to cancel is the end of the term minus the notice period; a contract that renews rolls on to its next term.'))}</div></div>`;
+  return bar + groups + `<div class="muted ofchint">${esc(tr('Together {0} per month.', ofcMoney(sumM)))}<div class="shint">${esc(tr('The last day to cancel is the end of the term minus the notice period; a contract that renews rolls on to its next term.'))}</div></div>` + subs;
 }
 
 // ---- the editor

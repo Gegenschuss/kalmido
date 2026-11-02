@@ -54,8 +54,8 @@ const yearBack = iso => `${+iso.slice(0, 4) - 1}${iso.slice(4, 8)}${iso.slice(5)
     await signIn(ev, 'alice');
     await nav(B + '#office/subs');
     check(await ready(ev, `document.querySelectorAll('.abo-list .abo-row').length === 2`, 80), 'the tab lists both subscriptions');
-    check(await ev(`!!document.querySelector('#side [data-ofm="subs"]')`), 'the tab "Subscriptions & tools" for the admin');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
-    check(await ev(`!!document.querySelector('#side [data-ofmg="money"] [data-ofm="subs"]')`), 'the point sits in the menu group Money beside the cash flow (2.92.1, #1917)');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
+    check(await ev(`!document.querySelector('#side [data-ofm="subs"]') && !!document.querySelector('#side [data-ofm="agreements"].on')`), 'the subscriptions are the filter of "Contracts & subscriptions" for the admin, that point is lit');  // 2.489.0 (#2648): the subscriptions live in the point "Contracts & subscriptions" (agreements)  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
+    check(await ev(`document.querySelector('.agr-kindf [data-agrk="sub"]')?.getAttribute('aria-pressed') === 'true' && document.querySelectorAll('.agr-kindf [data-agrk]').length === 4`), 'the filter row All / Contracts / Insurances / Subscriptions, Subscriptions pressed');  // 2.489.0 (#2648): the subscriptions live in the point "Contracts & subscriptions" (agreements)  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
     const sums = await ev(`[...document.querySelectorAll('.abo-sum b')].map(b => b.textContent)`);
     check(sums.length === 2 && /60\.00/.test(sums[0]) && /720\.00/.test(sums[1]), 'the sums per month / per year (net) ' + JSON.stringify(sums));
     check(await ev(`/Domain/.test(document.querySelector('.abo-list .abo-cancel.soon')?.closest('.abo-row').textContent || '')`), 'the near last day to cancel in red');
@@ -90,12 +90,21 @@ const yearBack = iso => `${+iso.slice(0, 4) - 1}${iso.slice(4, 8)}${iso.slice(5)
     // the fixed costs list marks it and links to the view
     await nav(B + '#office/cashflow');
     check(await ready(ev, `document.querySelectorAll('.abo-tag').length === 4 && !!document.querySelector('a[href="#office/subs"]')`, 80), 'the fixed costs list marks the subscriptions and links to the view');
+    // 2.489.0 (#2648): "Contracts & subscriptions" - All shows the subscriptions below the contracts, Insurances not; the data stays a fixed cost
+    await nav(B + '#office/agreements');
+    check(await ready(ev, `document.querySelector('.agr-kindf [data-agrk="all"]')?.getAttribute('aria-pressed') === 'true' && document.querySelectorAll('.agr-subs .abo-list .abo-row').length === 4`, 80), '#2648: All lists the four subscriptions below the contracts');
+    await ev(`(() => { document.querySelector('.agr-kindf [data-agrk="insurance"]').click(); return 1; })()`);
+    check(await ready(ev, `location.hash === '#office/agreements' && document.querySelector('.agr-kindf [data-agrk="insurance"]')?.getAttribute('aria-pressed') === 'true' && !document.querySelector('.agr-subs')`), '#2648: Insurances hides the subscriptions');
+    await ev(`(() => { document.querySelector('.agr-kindf [data-agrk="sub"]').click(); return 1; })()`);
+    check(await ready(ev, `location.hash === '#office/subs' && document.querySelectorAll('.abo-list .abo-row').length === 4 && !!document.querySelector('#side [data-ofm="agreements"].on')`, 80), '#2648: Subscriptions opens their page, the point stays lit');
+    await ev(`(() => { document.querySelector('.agr-kindf [data-agrk="all"]').click(); return 1; })()`);
+    check(await ready(ev, `location.hash === '#office/agreements' && !!document.querySelector('.agr-subs')`, 80), '#2648: All leads back');
     // member
     await signIn(ev, 'bob');
     await nav(B + 'static/icon.svg');
     await nav(B + '#office/offers');
     check(await ready(ev, `!!document.querySelector('#side [data-ofm="offers"]')`, 80), 'the office (member)');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
-    check(await ev(`!document.querySelector('#side [data-ofm="subs"]')`), 'a member sees no tab');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
+    check(await ev(`!document.querySelector('#side [data-ofm="subs"]') && !document.querySelector('#side [data-ofm="agreements"]')`), 'a member sees no tab');  // 2.489.0 (#2648): the subscriptions live in the point "Contracts & subscriptions" (agreements)  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
   }, false);
 
   console.log(`p291_b_ui: ${ok} ok, ${F.length} failed`);

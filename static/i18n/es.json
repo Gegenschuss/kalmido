@@ -15941,5 +15941,6 @@
   "The address book is in the trash; restore it first, then undo the merge": "La libreta de direcciones está en la papelera; restáurala primero y luego deshaz la fusión",
   "The client is in the trash": "El cliente está en la papelera",
   "Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.": "Los calendarios solo se eliminan si no ha cambiado nada en ellos; las libretas de direcciones sin cambios van a la papelera.",
-  "The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "Los clientes importados van a la papelera de clientes; los demás datos de oficina, tiempos, hábitos y entradas del diario importados se eliminan definitivamente; los tiempos facturados desde entonces se conservan."
+  "The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "Los clientes importados van a la papelera de clientes; los demás datos de oficina, tiempos, hábitos y entradas del diario importados se eliminan definitivamente; los tiempos facturados desde entonces se conservan.",
+  "Subscriptions|office": "Suscripciones"
 }

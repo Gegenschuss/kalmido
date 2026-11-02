@@ -95,7 +95,7 @@ const OFM_ITEMS = [
   {key: 'subs', go: 'office/subs', need: 'money.subs', icon: 'repeat', name: N_('Subscriptions & tools'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'meals', go: 'office/meals', need: 'money.meals', icon: 'meal', name: N_('Entertainment receipts'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'cashbook', go: 'office/cashbook', icon: 'wallet', name: N_('Cash book'), group: 'money', on: ofm_ofc, adm: 1},
-  {key: 'agreements', go: 'office/agreements', icon: 'shield', name: N_('Contracts & insurance'), group: 'admin', on: ofm_ofc, adm: 1},
+  {key: 'agreements', go: 'office/agreements', icon: 'shield', name: N_('Contracts & subscriptions'), group: 'admin', on: ofm_ofc, adm: 1},
   // 2.187.1 B (#2735): the own times to bill -- only a person ruled by office groups (the others bill from the quotations)
   {key: 'time', go: 'office/time', icon: 'clock', name: N_('Times to bill'), group: 'sell', on: () => ofm_ofc() && !!ofm_lv()}];
 // admin of the office shown: from the office's settings once loaded, before that the last answer for this workspace (LS),
@@ -210,13 +210,16 @@ const ofm_offList = () => (typeof OFC !== 'undefined' && OFC.info ? OFC.info.set
 const ofm_menuOff = k => ofm_offList().includes(k);
 // 2.418.0 (#3560): every point that may show (switched on, the country pack, the rights, not off in the organisation), in
 // the person's order; ofm_items = those in the menu, ofm_hidden = those under "Hidden" of the editor
-const ofm_avail = () => (nav_legacy(), nav_sort('office', ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i) && !nav_orgOff('office', i.key) && !ofm_menuOff(i.key)).sort((a, b) => ofr_rank(a) - ofr_rank(b))));
+// 2.489.0 (#2648): the subscriptions live in "Contracts & subscriptions" (one point, the kind as a filter, office_agreements.js
+// agr_filterHtml): the point subs leaves the menu while the contracts' point may show; its page #office/subs stays (the filter)
+const ofm_merged = its => its.some(i => i.key === 'agreements') ? its.filter(i => i.key !== 'subs') : its;
+const ofm_avail = () => (nav_legacy(), nav_sort('office', ofm_merged(ofm_all().filter(i => !i.tpl && i.on() && ofm_need(i) && ofm_ok(i) && !nav_orgOff('office', i.key) && !ofm_menuOff(i.key))).sort((a, b) => ofr_rank(a) - ofr_rank(b))));
 const ofm_items = () => ofm_avail().filter(i => !nav_hid('office', i.key) || nav_open('office', i.key));
 const ofm_hidden = () => ofm_avail().filter(i => nav_hid('office', i.key) && !nav_open('office', i.key));
 // the point shown: the office's tab (import sits under Settings; no tab = the start page on a phone, quotations on a computer)
 function ofm_cur(mod) {
   if (mod !== 'office') return mod;
-  const t = ['import', 'services', 'texts', 'rights'].includes(S.route.tab) ? 'settings' : S.route.tab;  // 2.98.0 C (#2180): + the templates; 2.187.0 A (#2476): + the rights
+  const t = ['import', 'services', 'texts', 'rights'].includes(S.route.tab) ? 'settings' : S.route.tab === 'subs' && ofm_avail().some(i => i.key === 'agreements') ? 'agreements' : S.route.tab;  // 2.489.0 (#2648)  // 2.98.0 C (#2180): + the templates; 2.187.0 A (#2476): + the rights
   if (mod === S.route.mod && t && t !== 'start') ofm_remember(t);
   return t === 'start' || ofm_all().some(i => i.key === t && i.go.startsWith('office/')) ? t : isMobile() ? 'start' : (ofm_entry().key);
 }
@@ -419,7 +422,7 @@ function sbb_seen(r) {
 function sbb_target(id) {
   const h = (LS.get('sbbLast', {}) || {})[id], mod = h && sbb_hashMod(h), a = mg_area(id);
   const ok = !!h && (id === 'tasks' ? sbb_areaOfMod(mod) === 'tasks' : (sbb_def(id)[4] || []).includes(mod) && (!a || !!mg_parts(a).find(p => p[0] === mod)))
-    && (mod !== 'office' || (t => !t || ['import', 'services', 'texts', 'settings'].includes(t) || ofm_items().some(i => i.go === 'office/' + t))(h.split('/')[1]));  // an office point no longer shown (role, pack): not kept
+    && (mod !== 'office' || (t => !t || ['import', 'services', 'texts', 'settings'].includes(t) || ofm_items().some(i => i.go === 'office/' + t || t === 'subs' && i.key === 'agreements'))(h.split('/')[1]));  // an office point no longer shown (role, pack): not kept
   if (ok) return h;
   return id === 'tasks' ? keyToHash(LS.get('lastKey', START_KEY)) : a ? mg_target(id) : id;
 }

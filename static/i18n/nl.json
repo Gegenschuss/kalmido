@@ -15941,5 +15941,6 @@
   "The address book is in the trash; restore it first, then undo the merge": "Het adresboek staat in de prullenbak; herstel het eerst en maak dan het samenvoegen ongedaan",
   "The client is in the trash": "De klant staat in de prullenbak",
   "Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.": "Agenda’s worden alleen verwijderd als er niets in is veranderd; ongewijzigde adresboeken gaan naar de prullenbak.",
-  "The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "De geïmporteerde klanten gaan naar de prullenbak van de klanten; de overige geïmporteerde kantoorgegevens, tijden, gewoontes en dagboekitems worden definitief verwijderd; sindsdien gefactureerde tijden blijven."
+  "The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "De geïmporteerde klanten gaan naar de prullenbak van de klanten; de overige geïmporteerde kantoorgegevens, tijden, gewoontes en dagboekitems worden definitief verwijderd; sindsdien gefactureerde tijden blijven.",
+  "Subscriptions|office": "Abonnementen"
 }

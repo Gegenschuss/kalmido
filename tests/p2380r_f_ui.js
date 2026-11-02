@@ -85,8 +85,8 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,docs,agents,fields,dep
     const pts = await ev(`[${side}, ofm_hidden().map(i => i.key)].join()`);  // #3560 on the live train: not used yet = under "Hidden"; 2.448.0 (#3784, in main) nothing starts hidden
     // 2.448.0 (#3784): back to #3411: every point shows although nothing is used yet, no "Show more"
     const may = `ofm_avail().map(i => i.key)`;
-    check(['cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => pts.split(',').includes(k)) && (await ev(`['cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => ${may}.includes(k))`)) && await ev(`!document.querySelector('[data-act="ofm-more"]')`),
-      '#3784: every point of Money shows, no "Show more", although nothing is used yet ' + pts);
+    check(['cashflow', 'kpi', 'travel', 'meals'].every(k => pts.split(',').includes(k)) && (await ev(`['cashflow', 'kpi', 'travel', 'meals'].every(k => ${may}.includes(k))`)) && await ev(`!document.querySelector('[data-act="ofm-more"]')`),
+      '#3784: every point of Money shows, no "Show more", although nothing is used yet ' + pts);  // 2.489.0 (#2648): the subscriptions live in the point "Contracts & subscriptions" (agreements)
     await shot('p2380rf-money.png');
     // the switches under Settings > Functions
     await nav(B + '#office/settings');

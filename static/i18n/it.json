@@ -15941,5 +15941,6 @@
   "The address book is in the trash; restore it first, then undo the merge": "La rubrica è nel cestino; ripristinala prima, poi annulla l'unione",
   "The client is in the trash": "Il cliente è nel cestino",
   "Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.": "I calendari vengono rimossi solo se in essi non è cambiato nulla; le rubriche invariate finiscono nel cestino.",
-  "The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "I clienti importati finiscono nel cestino dei clienti; gli altri dati d’ufficio, tempi, abitudini e voci del diario importati vengono eliminati definitivamente; i tempi fatturati nel frattempo restano."
+  "The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "I clienti importati finiscono nel cestino dei clienti; gli altri dati d’ufficio, tempi, abitudini e voci del diario importati vengono eliminati definitivamente; i tempi fatturati nel frattempo restano.",
+  "Subscriptions|office": "Abbonamenti"
 }

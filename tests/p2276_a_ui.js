@@ -89,7 +89,7 @@ const today = TC.today();
     await click(ev, '#side [data-act="sbb-group"][data-g="office:money"]');
     check(await ready(ev, `${money} === 'true'`, 20), 'Money opens by hand');
     const pts = await ev(side);
-    check(pts.startsWith('receipts,') && ['bank', 'cards', 'books', 'cashbook', 'cashflow', 'kpi', 'travel', 'meals', 'subs'].every(k => pts.split(',').includes(k)) && await ev(`!document.querySelector('#side [data-act="ofm-more"]') && !!document.querySelector('#side [data-act="nav-edit"][data-area="office"]')`), '#3784: Receipts first, every point shows, nothing under Hidden (2.418.0 #3560: no "Show more", Customize at the end) ' + pts);
+    check(pts.startsWith('receipts,') && ['bank', 'cards', 'books', 'cashbook', 'cashflow', 'kpi', 'travel', 'meals'].every(k => pts.split(',').includes(k)) && await ev(`!document.querySelector('#side [data-act="ofm-more"]') && !!document.querySelector('#side [data-act="nav-edit"][data-area="office"]')`), '#3784: Receipts first, every point shows, nothing under Hidden (2.418.0 #3560: no "Show more", Customize at the end) ' + pts);  // 2.489.0 (#2648): the subscriptions live in the point "Contracts & subscriptions" (agreements)
     await nav(B + 'static/icon.svg'); await nav(B + '#office/offers');
     check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && ${money} === 'true'`, 80), '#3039: the hand\'s choice stays after reloading');
     await ev(`(() => { localStorage.removeItem('tasks.sbbUnfold'); return 1; })()`);

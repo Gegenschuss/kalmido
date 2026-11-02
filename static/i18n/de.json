@@ -15941,5 +15941,6 @@
   "The address book is in the trash; restore it first, then undo the merge": "Das Adressbuch liegt im Papierkorb; erst wiederherstellen, dann die Zusammenführung rückgängig machen",
   "The client is in the trash": "Kunde liegt im Papierkorb",
   "Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.": "Kalender werden nur entfernt, wenn sich in ihnen nichts geändert hat; unveränderte Adressbücher kommen in den Papierkorb.",
-  "The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "Die importierten Kunden kommen in den Papierkorb der Kunden; die übrigen importierten Bürodaten, Zeiten, Gewohnheiten und Tagebucheinträge werden endgültig gelöscht; seither abgerechnete Zeiten bleiben."
+  "The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.": "Die importierten Kunden kommen in den Papierkorb der Kunden; die übrigen importierten Bürodaten, Zeiten, Gewohnheiten und Tagebucheinträge werden endgültig gelöscht; seither abgerechnete Zeiten bleiben.",
+  "Subscriptions|office": "Abos"
 }
