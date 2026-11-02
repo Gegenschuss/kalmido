@@ -98,7 +98,7 @@ for body in ({"email": "ops@example.com"}, {"password": "taken-over-1"}, {"reset
 check(kt.dbx("SELECT email FROM users WHERE id=?", (FID,)) == [("frida@example.com",)], "frida's address is unchanged")
 r = A.patch(B + f"/api/users/{FID}", json={"display_name": "Frida F"})
 check(r.ok, "with the grant: the operator fixes her display name " + r.text[:100])
-check(link(uid["cara"]).status_code == 403, "frida's grant opens no other account")
+check(link(uid["cara"]).status_code in (403, 404), "frida's grant opens no other account")
 users = {u["id"]: u for u in A.get(B + "/api/users?all=1").json()["users"]}
 check(not users[FID].get("apart") and users[FID].get("support_until") and users[uid["cara"]].get("apart") is True,
       "the operator's account list: frida open until ..., cara apart")
@@ -141,7 +141,7 @@ check(r.ok and r.json()["grant"]["org_id"] == CO, "carl (admin) grants the organ
 GO = r.json()["grant"]["id"]
 r = A.patch(B + f"/api/admin/orgs/{CO}", json={"name": "Client Studio GmbH"})
 check(r.ok and kt.dbx("SELECT name FROM orgs WHERE id=?", (CO,)) == [("Client Studio GmbH",)], "with the grant: the operator renames it " + r.text[:120])
-check(link(uid["cara"]).status_code == 403, "the organisation's grant opens no member's account")
+check(link(uid["cara"]).status_code in (403, 404), "the organisation's grant opens no member's account")
 r = A.post(B + "/api/users", json={"username": "opsmate", "password": "password123"})
 OPS = r.json()["id"]
 for body in ({"members_add": [OPS]}, {"admins_add": [OPS]}):

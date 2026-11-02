@@ -188,24 +188,25 @@ def sga_flush(resp):
         e = {"at": iso(now), "by": int(g.user["id"]), "m": request.method[:8], "r": _route(), "s": int(resp.status_code)}
         c = connect()
         try:
-            c.execute("SET LOCAL lock_timeout = '2s'")  # review F7: never stall a response behind the request's own locks
-            for gid in sorted(used):
-                row = c.execute("SELECT uses FROM support_grants WHERE id=? FOR UPDATE", (gid,)).fetchone()
-                if not row:
-                    continue
-                try:
-                    uses = json.loads(row[0] or "[]")
-                except ValueError:
-                    uses = []
-                last = uses[-1] if uses and isinstance(uses[-1], dict) else None
-                if (last and e["m"] in ("GET", "HEAD") and (last.get("m"), last.get("r"), last.get("by"), last.get("s")) == (e["m"], e["r"], e["by"], e["s"])
-                        and (parse_iso(last.get("at") or "") or now) > now - timedelta(seconds=SGA_GET_GAP_S)):
-                    continue  # the same reading again: one entry
-                uses.append(e)
-                while len(uses) > SGA_USES_MAX:  # review F4: readings go first, a change is never pushed out
-                    i = next((k for k, u in enumerate(uses) if not isinstance(u, dict) or u.get("m") in ("GET", "HEAD")), 0)
-                    uses.pop(i)
-                c.execute("UPDATE support_grants SET uses=? WHERE id=?", (json.dumps(uses, separators=(",", ":")), gid))
+            with system_ctx(c):  # an organisation's grant is behind row-level security; this connection runs inside a request
+                c.execute("SET LOCAL lock_timeout = '2s'")  # review F7: never stall a response behind the request's own locks
+                for gid in sorted(used):
+                    row = c.execute("SELECT uses FROM support_grants WHERE id=? FOR UPDATE", (gid,)).fetchone()
+                    if not row:
+                        continue
+                    try:
+                        uses = json.loads(row[0] or "[]")
+                    except ValueError:
+                        uses = []
+                    last = uses[-1] if uses and isinstance(uses[-1], dict) else None
+                    if (last and e["m"] in ("GET", "HEAD") and (last.get("m"), last.get("r"), last.get("by"), last.get("s")) == (e["m"], e["r"], e["by"], e["s"])
+                            and (parse_iso(last.get("at") or "") or now) > now - timedelta(seconds=SGA_GET_GAP_S)):
+                        continue  # the same reading again: one entry
+                    uses.append(e)
+                    while len(uses) > SGA_USES_MAX:  # review F4: readings go first, a change is never pushed out
+                        i = next((k for k, u in enumerate(uses) if not isinstance(u, dict) or u.get("m") in ("GET", "HEAD")), 0)
+                        uses.pop(i)
+                    c.execute("UPDATE support_grants SET uses=? WHERE id=?", (json.dumps(uses, separators=(",", ":")), gid))
             c.commit()
         finally:
             c.close()
