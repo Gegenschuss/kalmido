@@ -24,7 +24,8 @@ from ..core.db import appver_parse, db, gset, gsetting, iso, now_utc, trigger_en
 from ..accounts.session import me
 from ..core.access import plists, time_all, token_lists, tvis, vis_sql, wr_sql  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
-from ..core.state import ev_links, ev_sig, lz_counts  # 2.149.0 G (#2517): pulled up from functions
+from ..core.pg import st_ids  # 2.369.2 (#3136)
+from ..core.state import ev_links, ev_sig, lz_counts, lz_ids_arg, lz_tree, st_where  # 2.149.0 G (#2517): pulled up from functions
 
 DL_MAX = 200     # more changed tasks than this: the full state is cheaper
 DL_ROWS = 5000  # rows of dl_changes read at most (more: full)
@@ -352,3 +353,32 @@ def state_delta():
         # 2.369.2 (#3136): a client with the start set (lz=1) takes the counts of the touched lists it has not loaded
         **({"lzc": lz_counts(c, uid, sorted(lids))} if request.args.get("lz") == "1" and lids else {}),
     )
+
+
+# 2.369.2 (#3136): the lists a start set left out (core/state.py lz_plan); here, in the tasks layer, for the events /
+# contacts of the tasks
+@app.get("/api/state/lists")
+def state_lists():
+    """2.369.2 (#3136): the tasks of the lists ids (comma separated, or all) as /api/state has them (same where clause, same
+    serialization), with the tasks linked into them and the trees -> {v, tasks, evlinks, tcontacts}. Lists the person does
+    not see give nothing."""
+    c, uid = db(), me()
+    v0 = int(gsetting(c, "version"))  # before the tasks (as /api/state: they are at least this new)
+    keep = lz_ids_arg(request.args.get("ids", ""))
+    base, bargs = st_where(), (uid, uid, iso(now_utc() - timedelta(days=14)))
+    if keep is None:
+        where, args = base, bargs
+    elif not keep:
+        return jsonify(v=v0, tasks=[])
+    else:
+        kl = ",".join(str(int(x)) for x in sorted(keep))
+        ids = {r[0] for r in c.execute(f"SELECT id FROM tasks WHERE {base} AND (list_id IN ({kl}) OR "
+                                       f"id IN (SELECT task_id FROM task_links WHERE list_id IN ({kl})))", bargs)}
+        where, args = base + " AND id = ANY(CAST(? AS BIGINT[]))", (*bargs, st_ids(sorted(lz_tree(c, base, bargs, ids))))
+    from ..events.model import events_on
+    from ..contacts.model import task_contacts
+    tasks = load_tasks(c, where + " ORDER BY id", args, lean_notes=True)
+    ids = [t["id"] for t in tasks]
+    # the events and contacts of these tasks, as /api/state has them for its tasks (the client adds them to its maps)
+    return jsonify(v=v0, tasks=tasks, evlinks=ev_links(c, uid, ids) if ids and events_on(c, uid) else {},
+                   tcontacts=task_contacts(c, uid, set(ids)) if ids else {})

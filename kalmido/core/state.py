@@ -16,7 +16,7 @@ from ..accounts.colors import ac_color_map
 from ..core.access import (
     acx_lists_sql, collab_all, Denied, health_hidden, need_task, org_trips_hidden, plists, reading_ids, time_all, tvis, vis_sql, wr_sql, WRITE_ROLES,
 )
-from ..core.serializers import load_tasks, running_pomo
+from ..core.serializers import load_tasks, running_pomo, tags_for
 from ..core.pg import st_ids
 from ..core.pages import inbox_user
 from ..core.instance import about_info
@@ -469,7 +469,6 @@ def lz_tree(c, base, bargs, ids):
 
 def lz_plan(c, uid, base, bargs):
     """None = the whole state (a small account, lzl=all); else {ids, pending, counts} (see above)."""
-    from ..lists.groups import grp_of_user
     keep = lz_ids_arg(request.args.get("lzl", ""))
     if keep is None:
         return None
@@ -479,12 +478,11 @@ def lz_plan(c, uid, base, bargs):
     keep |= set(plists(c, uid))  # a participant's view hangs on assignments and the tree: those lists come whole
     keep |= {r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (uid,))}  # the basket (Today can show it)
     t0 = local_now().date()
-    grp = ",".join(str(int(x)) for x in grp_of_user(c, uid))
     kl = ",".join(str(int(x)) for x in sorted(keep))
     start = ("(status=0 OR completed_at>=?) AND ((due IS NOT NULL AND due<>'' AND due<=?) OR (deadline=2 AND due IS NOT NULL) "
              "OR COALESCE(plan_start, '')>=? OR assignee_id=? OR pinned=1 OR COALESCE(waiting_at, '')<>''"
-             + (f" OR assignee_group_id IN ({grp})" if grp else "") + ")")
-    sargs = (bargs[2], (t0 + timedelta(days=LZ_DAYS)).isoformat(), (t0 - timedelta(days=1)).isoformat(), uid)
+             "OR assignee_group_id IN (SELECT group_id FROM group_members WHERE user_id=?))")
+    sargs = (bargs[2], (t0 + timedelta(days=LZ_DAYS)).isoformat(), (t0 - timedelta(days=1)).isoformat(), uid, uid)
     more = (f" OR list_id IN ({kl}) OR id IN (SELECT task_id FROM task_links WHERE list_id IN ({kl}))") if kl else ""
     ids = {r[0] for r in c.execute(f"SELECT id FROM tasks WHERE {base} AND (({start}){more})", (*bargs, *sargs))}
     ids = lz_tree(c, base, bargs, ids)
@@ -496,8 +494,6 @@ def lz_plan(c, uid, base, bargs):
 def lz_counts(c, uid, lids):
     """{list id: {n, tags}} = the open top-level tasks of these lists the person sees (with the further lists' links, as the
     client counts a task's "also") and their tags (own + list tags, each tag once per task): the sidebar of the start set."""
-    from ..core.serializers import tags_for
-    from ..collab.reactions import ltags_for
     if not lids:
         return {}
     q = ",".join(str(int(x)) for x in lids)
@@ -508,7 +504,12 @@ def lz_counts(c, uid, lids):
                      WHERE k.list_id IN ({q}) AND k.list_id!=t.list_id AND t.parent_id IS NULL AND t.status=0 AND t.deleted_at IS NULL
                      AND o.org_id IS NOT DISTINCT FROM x.org_id AND t.list_id IN {vis_sql()} AND {tvis(c, uid, 't.')}""", (uid, uid))]
     ids = {i for i, _ in rows}
-    tg, lt = (tags_for(c, ids, uid), ltags_for(c, ids)) if ids else ({}, {})
+    tg, lt = {}, {}
+    if ids:
+        tg = tags_for(c, ids, uid)
+        for r in c.execute("""SELECT x.task_id, lt.name FROM task_list_tags x JOIN list_tags lt ON lt.id=x.tag_id JOIN tasks t ON t.id=x.task_id
+                              WHERE x.task_id = ANY(CAST(? AS BIGINT[])) AND lt.list_id=t.list_id""", (st_ids(sorted(ids)),)):
+            lt.setdefault(r[0], []).append(r[1])  # the list tags (as collab.reactions.ltags_for, a higher layer)
     out = {str(x): {"n": 0, "tags": {}} for x in lids}
     for i, lid in rows:
         o = out[str(lid)]
@@ -516,33 +517,6 @@ def lz_counts(c, uid, lids):
         for t in set(tg.get(i, [])) | set(lt.get(i, [])):
             o["tags"][t] = o["tags"].get(t, 0) + 1
     return out
-
-
-@app.get("/api/state/lists")
-def state_lists():
-    """2.369.2 (#3136): the tasks of the lists ids (comma separated, or all) as /api/state has them (same where clause, same
-    serialization), with the tasks linked into them and the trees -> {v, tasks, evlinks, tcontacts}. Lists the person does
-    not see give nothing."""
-    c, uid = db(), me()
-    v0 = int(gsetting(c, "version"))  # before the tasks (as /api/state: they are at least this new)
-    keep = lz_ids_arg(request.args.get("ids", ""))
-    base, bargs = st_where(), (uid, uid, iso(now_utc() - timedelta(days=14)))
-    if keep is None:
-        where, args = base, bargs
-    elif not keep:
-        return jsonify(v=v0, tasks=[])
-    else:
-        kl = ",".join(str(int(x)) for x in sorted(keep))
-        ids = {r[0] for r in c.execute(f"SELECT id FROM tasks WHERE {base} AND (list_id IN ({kl}) OR "
-                                       f"id IN (SELECT task_id FROM task_links WHERE list_id IN ({kl})))", bargs)}
-        where, args = base + " AND id = ANY(CAST(? AS BIGINT[]))", (*bargs, st_ids(sorted(lz_tree(c, base, bargs, ids))))
-    from ..events.model import events_on
-    from ..contacts.model import task_contacts
-    tasks = load_tasks(c, where + " ORDER BY id", args, lean_notes=True)
-    ids = [t["id"] for t in tasks]
-    # the events and contacts of these tasks, as /api/state has them for its tasks (the client adds them to its maps)
-    return jsonify(v=v0, tasks=tasks, evlinks=ev_links(c, uid, ids) if ids and events_on(c, uid) else {},
-                   tcontacts=task_contacts(c, uid, set(ids)) if ids else {})
 
 
 def _quota(c, uid):
