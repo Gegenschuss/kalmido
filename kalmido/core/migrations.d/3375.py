@@ -1,6 +1,6 @@
-"""2.393.2 B (#3375): the Message-IDs of a task (integrations/taskmail.py): kind 'in' = a mail that came in (the mail that made the
-task, a reply taken in as a comment), 'out' = a mail Kalmido sent about the task (a notification about this one task, an answer to
-the reporter). sender = the sender's ('in') or recipient's ('out') address. Bound to its task (no org_id: the app checks the task,
+"""2.393.2 B (#3375): the Message-IDs of a task (integrations/taskmail.py): kind 'src' = the mail that made the task (its sender =
+the reporter; 2.393.2 F review 2), 'in' = a reply taken in as a comment, 'out' = a mail Kalmido sent about the task (a notification about this one task, an
+answer to the reporter). sender = the reporter's address, only on 'src' (review 3: no addresses of account holders kept). Bound to its task (no org_id: the app checks the task,
 like comments / attachments). New table only: older versions ignore it."""
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS task_mail (

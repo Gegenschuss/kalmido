@@ -1,12 +1,13 @@
 """2.393.2 B (#3375): the mail thread of a task -- replies by e-mail become comments, a comment can go back to the reporter.
 
-task_mail (core/migrations.d/3375.py) keeps the Message-IDs of a task: 'in' = a mail that came in (the mail that made the task,
-the replies taken in as comments), 'out' = a mail Kalmido sent about it (an assignment / mention mail about this one task, an
-answer to the reporter). The reporter = the sender of the task's first 'in' row (a task made by the server's mailbox).
+task_mail (core/migrations.d/3375.py) keeps the Message-IDs of a task: 'src' = the mail that made the task (a task made by the
+server's mailbox; its sender = the reporter), 'in' = a reply taken in as a comment, 'out' = a mail Kalmido sent about it (an
+assignment / mention mail about this one task, an answer to the reporter).
 
 Taken in as a comment (integrations/mail.py mail_import, before a new task would be made): a mail whose In-Reply-To / References
 names a stored Message-ID of a task, or whose recipient is the reply address of a task. The reply address is the server's
-address with a plus token "r<task id>x<signature>": the signature is an HMAC with the server key over the task AND the address the
+address with a plus token "r<task id>[u<account>]x<signature>": the signature is an HMAC with the server key over the task (and the
+account on a person's address, review 4) AND the address the
 mail went to, so the token is no bare task id and works only for mails from that address (a forwarded token from another sender
 counts as none). The same checks as the import today: a reply by In-Reply-To alone counts only when the mail went to an address
 the import takes (a personal / list token), a reply address only with a valid signature. Then only the reporter's address or a
@@ -35,15 +36,16 @@ from ..core.pages import save_attachment_bytes
 from ..accounts.login import auth_key
 from ..admin.hosting import mail_budget
 from ..api.common import hit_limit
-from ..collab.comments import MAIL_REPLY, comment_plain, collab_user
+from ..collab.comments import MAIL_REPLY, MENTION_RE, collab_user, user_names
 from ..collab.liste2e import le2e_mode
 from ..collab.liste2eguard import le2b_list_locked
 from ..collab.news import news_add
 from ..hub.mailbox import _refs, _sender
 from . import mail as M
 
-TMR_TOKEN_RE = re.compile(r"\+r(\d{1,12})x([0-9a-f]{16})@", re.I)
+TMR_TOKEN_RE = re.compile(r"\+r(\d{1,12})(?:u(\d{1,12}))?x([0-9a-f]{16})@", re.I)  # review 4: "u<account>" on a person's address
 TMR_SEND_HOUR = 30
+_MID_RE = re.compile(r"<[^<>\s]{1,290}>")
 TMR_FILES = 20
 # the first line of a quoted part: "On ... wrote:", "Am ... schrieb ...:", "Le ... a écrit :", "El ... escribió:", "Il ... ha scritto:",
 # "Op ... schreef ...:", the signature separator "-- ", Outlook's "-----Original Message-----" / "-----Ursprüngliche Nachricht-----"
@@ -51,6 +53,7 @@ TMR_FILES = 20
 _QUOTE = re.compile(r"^(?:On\s.+\swrote:\s*$|Am\s.+\sschrieb.*:\s*$|Le\s.+\sa\s+écrit\s*:\s*$|El\s.+\sescribió\s*:\s*$|Il\s.+\sha\s+scritto\s*:\s*$"
                     r"|Op\s.+\sschreef.*:\s*$|-- $|--$|-{3,}\s*(?:Original Message|Ursprüngliche Nachricht|Message d'origine|Mensaje original"
                     r"|Messaggio originale|Oorspronkelijk bericht)\s*-{3,}\s*$|_{20,}\s*$)", re.I)
+_QUOTE_MAX = 300  # 2.393.2 F (#3375): review 5 - only short lines are matched (the patterns backtrack on long ones)
 _OUTLOOK_FROM = re.compile(r"^\*?(?:From|Von|De|Da|Van)\s*:\*?\s", re.I)
 _OUTLOOK_NEXT = re.compile(r"^\*?(?:Sent|Gesendet|Envoyé|Enviado|Inviato|Verzonden|Date|Datum)\s*:\*?\s", re.I)
 
@@ -59,7 +62,7 @@ def tmr_trim(text):
     """The new part of a reply: everything from the first quote / signature line on goes, as do the '>' lines at the end."""
     lines = (text or "").replace("\r\n", "\n").split("\n")
     for i, ln in enumerate(lines):
-        if i and (_QUOTE.match(ln) or (_OUTLOOK_FROM.match(ln) and i + 1 < len(lines) and _OUTLOOK_NEXT.match(lines[i + 1]))):
+        if i and len(ln) <= _QUOTE_MAX and (_QUOTE.match(ln) or (_OUTLOOK_FROM.match(ln) and i + 1 < len(lines) and _OUTLOOK_NEXT.match(lines[i + 1]))):
             lines = lines[:i]
             break
     while lines and (not lines[-1].strip() or lines[-1].lstrip().startswith(">")):
@@ -71,28 +74,34 @@ def _addr(v):
     return email.utils.parseaddr(str(v or ""))[1].strip().lower()
 
 
-def tmr_sig(c, tid, addr):
-    return hmac.new(auth_key(c), f"task-mail-reply:{int(tid)}:{addr.strip().lower()}".encode(), hashlib.sha256).hexdigest()[:16]
+def tmr_sig(c, tid, addr, uid=0):
+    """2.393.2 F (#3375): review 4 - a person's address is signed with the account too (the reporter's: uid 0)."""
+    what = f"task-mail-reply-u:{int(tid)}:{int(uid)}:" if uid else f"task-mail-reply:{int(tid)}:"
+    return hmac.new(auth_key(c), (what + addr.strip().lower()).encode(), hashlib.sha256).hexdigest()[:16]
 
 
-def tmr_reply_to(c, tid, addr):
-    """The reply address of task tid for the person / reporter at addr ('' without a server mailbox)."""
+def tmr_reply_to(c, tid, addr, uid=0):
+    """The reply address of task tid for the reporter at addr, or for account uid at addr ('' without a server mailbox)."""
     if not M.MAIL_IN_ON or not addr:
         return ""
-    return M.mail_addr(f"r{int(tid)}x{tmr_sig(c, tid, addr)}")
+    return M.mail_addr(f"r{int(tid)}" + (f"u{int(uid)}" if uid else "") + f"x{tmr_sig(c, tid, addr, uid)}")
 
 
 def tmr_keep(c, tid, msg_id, sender, kind):
-    """Stores one Message-ID of task tid (caller commits)."""
-    mid = str(msg_id or "").strip()[:300]
-    if mid:
-        c.execute("INSERT INTO task_mail(task_id,msg_id,sender,kind,created_at) VALUES(?,?,?,?,?)",
-                  (tid, mid, (sender or "")[:300], kind, iso(now_utc())))
+    """Stores one Message-ID of task tid (caller commits). 2.393.2 F (#3375): review 6 - only the form hub/mailbox.py _refs reads
+    ("<...>" without spaces): such an id is sent again as In-Reply-To / References."""
+    mid = str(msg_id or "").strip()
+    if not _MID_RE.fullmatch(mid) and kind == "src":
+        mid = ""  # the reporter stays without its id
+    if mid or kind == "src":
+        c.execute("INSERT INTO task_mail(task_id,msg_id,sender,kind,created_at) VALUES(?,?,?,?,?)",  # review 3: an address only for the
+                  (tid, mid, (sender or "")[:300] if kind == "src" else "", kind, iso(now_utc())))  # reporter (none outlives an account)
 
 
 def tmr_reporter(c, tid):
-    """The reporter's address of task tid (the sender of its first incoming mail) or ''."""
-    r = c.execute("SELECT sender FROM task_mail WHERE task_id=? AND kind='in' ORDER BY id LIMIT 1", (tid,)).fetchone()
+    """The reporter's address of task tid (the sender of the mail that made it) or ''. 2.393.2 F (#3375): review 2 - only the
+    'src' row: a reply ('in') never makes its sender the reporter."""
+    r = c.execute("SELECT sender FROM task_mail WHERE task_id=? AND kind='src' ORDER BY id LIMIT 1", (tid,)).fetchone()
     return _addr(r[0]) if r else ""
 
 
@@ -105,28 +114,34 @@ def _hdrs(msg):
 
 
 def tmr_find(c, msg, sender):
-    """(task id or None, signed): the task a mail answers -- a valid reply address of the sender first, else a stored
-    Message-ID in In-Reply-To / References (the newest)."""
-    for tid, sig in TMR_TOKEN_RE.findall(_hdrs(msg)):
-        if sender and hmac.compare_digest(sig.lower(), tmr_sig(c, int(tid), sender)):
-            return int(tid), True
+    """(task id or None, signed, account): the task a mail answers -- a valid reply address of the sender first (account = the
+    one the address was made for, 0 = the reporter's), else a stored Message-ID in In-Reply-To / References (the newest)."""
+    for tid, tu, sig in TMR_TOKEN_RE.findall(_hdrs(msg)):
+        if sender and hmac.compare_digest(sig.lower(), tmr_sig(c, int(tid), sender, int(tu or 0))):
+            return int(tid), True, int(tu or 0)
     refs = _refs(msg)
     if refs:
         r = c.execute("SELECT task_id FROM task_mail WHERE msg_id IN (" + ",".join("?" * len(refs)) + ") ORDER BY id DESC LIMIT 1", refs).fetchone()
         if r:
-            return r[0], False
-    return None, False
+            return r[0], False, 0
+    return None, False, 0
 
 
-def tmr_who(c, tid, sender):
+def tmr_who(c, tid, sender, tu=0):
     """(allowed, user id or None) for a reply to task tid from sender: the reporter (no account needed) or a person who sees
-    the task with its comments by the account's address. A list with the lock never."""
+    the task with its comments by the account's address. A list with the lock never. 2.393.2 F (#3375): review 4 - in a
+    person's name only as account tu of the signed address (still that address, still sees the task), never found by address."""
     t = c.execute("SELECT id, list_id, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
     if not t or t["deleted_at"] or not sender or (t["list_id"] and le2b_list_locked(c, t["list_id"])):
         return False, None
-    for r in c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')<>'agent' ORDER BY id", (sender,)).fetchall():
-        if task_visible(c, tid, r[0], full=True):
-            return True, r[0]
+    if tu:
+        r = c.execute("SELECT id FROM users WHERE id=? AND lower(email)=? AND disabled=0 AND COALESCE(kind,'user')<>'agent'", (tu, sender)).fetchone()
+        if r and task_visible(c, tid, tu, full=True):
+            return True, tu
+    else:
+        for r in c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')<>'agent' ORDER BY id", (sender,)).fetchall():
+            if task_visible(c, tid, r[0], full=True):
+                return True, None
     return sender == tmr_reporter(c, tid), None
 
 
@@ -135,18 +150,22 @@ def tmr_take(c, msg, mid, uid):
     ('note', text) for the new task when it answers a task but may not comment, (None, '') otherwise. uid = the person the
     import would give the mail to (None = no address the import takes)."""
     sender = _addr(msg.get("From"))
-    tid, signed = tmr_find(c, msg, sender)
+    tid, signed, tu = tmr_find(c, msg, sender)
     if not tid:
         return None, ""
-    ok, who = tmr_who(c, tid, sender)
-    if ok and (signed or uid):  # in a person's name only through the signed address: a forged sender stays a sender with an address
-        return "comment", tmr_comment(c, msg, mid, tid, sender, who if signed else None)
+    ok, who = tmr_who(c, tid, sender, tu)
+    # 2.393.2 F (#3375): review 1 - by In-Reply-To alone only when the account of the address the mail went to sees the task (the
+    # reporter answers to the address their mail went to): an address of another account never leads into a task it does not see
+    if ok and (signed or (uid and task_visible(c, tid, uid, full=True))):  # in a person's name only through the signed address
+        return "comment", tmr_comment(c, msg, mid, tid, sender, who)
     lg = lang(c, uid) if uid else "en"
     return "note", tr("Reply to #{0}, sender not allowed", tid, lg=lg)
 
 
 def tmr_comment(c, msg, mid, tid, sender, uid):
-    """The reply as a comment of task tid (its files as files of the comment); the people of the task hear it (News); caller commits."""
+    """The reply as a comment of task tid (its files as files of the comment); the people of the task hear it (News); caller commits.
+    Returns the task id, 2.393.2 F (#3375): review 8 - mail.MailKept(tid) when a file could not be stored or was too large (the
+    mail stays in the mailbox, like the import of a new task)."""
     text, files = M.mail_text(msg)
     text = tmr_trim(text)
     t = c.execute("SELECT t.*, l.owner_id AS l_owner FROM tasks t LEFT JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
@@ -156,12 +175,16 @@ def tmr_comment(c, msg, mid, tid, sender, uid):
     cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,ext_name) VALUES(?,?,?,?,?,?)",
                     (tid, uid, body[:10000], "", iso_ms(now_utc()), None if uid else (name or sender)[:120]))
     top = c.execute("SELECT COALESCE(MAX(id),0) FROM attachments WHERE task_id=?", (tid,)).fetchone()[0]
+    whole = len(files) <= TMR_FILES
     for fname, mime, data in files[:TMR_FILES]:
         if 0 < len(data) <= MAX_FILE_MB * 1024 * 1024:
             try:
                 save_attachment_bytes(c, tid, fname, mime, data)
             except OSError:
+                whole = False
                 break
+        elif data:
+            whole = False
     c.execute("UPDATE attachments SET comment_id=? WHERE task_id=? AND id>?", (cid, tid, top))
     tmr_keep(c, tid, mid, sender, "in")
     rcpt = {t["l_owner"], t["created_by"], t["assignee_id"]} | {r[0] for r in c.execute(
@@ -172,7 +195,14 @@ def tmr_comment(c, msg, mid, tid, sender, uid):
             news_add(c, u, "comment", task_id=tid, comment_id=cid, actor=uid or 0, s=s,
                      data={"excerpt": text[:300], **({} if uid else {"ext_name": name or sender})})
     bump(c)
-    return tid
+    return tid if whole else M.MailKept(tid)
+
+
+def tmr_plain(c, text):
+    """2.393.2 F (#3375): review 7 - a comment as mail text: tokens -> @name, paragraphs and lines kept (comment_plain is one line, for pushes)."""
+    names = user_names(c, [int(x) for x in MENTION_RE.findall(text or "")])
+    text = MENTION_RE.sub(lambda m: "@" + names.get(int(m.group(1)), "?"), (text or "").replace("\r\n", "\n"))
+    return re.sub(r"\n{3,}", "\n\n", re.sub(r"[ \t]+", " ", text)).strip()
 
 
 # ---- the comment field's switch "also by e-mail to the reporter"
@@ -221,7 +251,7 @@ def tmr_send(c, tid, uid, cid):
             c.commit()
             return "limit"
     title = M.MAIL_PREFIX_RE.sub("", re.sub(r"\s+", " ", t["title"] or "")).strip() or APP_NAME
-    text = comment_plain(c, k["body"])
+    text = tmr_plain(c, k["body"])
     m = M.mail_message(rep, "Re: " + title[:250], text, from_name=name or APP_NAME, reply_to=tmr_reply_to(c, tid, rep) or None, smtp=smtp)
     ids = tmr_ids(c, tid)
     if ids:

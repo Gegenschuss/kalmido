@@ -267,7 +267,7 @@ def mail_import(c, raw, pre=None):
     uid, lid = mail_target(c, msg)
     hint = ""
     if MAIL_TASK_HOOK and not mid.startswith("sha:"):  # 2.393.2 B (#3375): a reply to a task -> its comment (or a note)
-        if c.execute("SELECT 1 FROM task_mail WHERE msg_id=? AND kind='in'", (mid,)).fetchone():
+        if c.execute("SELECT 1 FROM task_mail WHERE msg_id=? AND kind IN ('src','in')", (mid,)).fetchone():
             return MAIL_DROP
         how, val = MAIL_TASK_HOOK["take"](c, msg, mid, uid)
         if how == "comment":
@@ -304,7 +304,7 @@ def mail_import(c, raw, pre=None):
     else:
         tid = new_inbox_task(c, uid, title, content, "mail:" + mid, url)
     if MAIL_TASK_HOOK and not mid.startswith("sha:"):  # 2.393.2 B (#3375): the reporter + the Message-ID of the mail
-        MAIL_TASK_HOOK["keep"](c, tid, mid, email.utils.parseaddr(sender)[1].strip().lower(), "in")
+        MAIL_TASK_HOOK["keep"](c, tid, mid, email.utils.parseaddr(sender)[1].strip().lower(), "src")  # 2.393.2 F: review 2
     if eml is not None:
         files = [((subj[:60].replace("/", "-").strip() or "mail") + ".eml", "message/rfc822", eml)] + files
     whole = len(files) <= 20

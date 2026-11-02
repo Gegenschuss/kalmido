@@ -870,11 +870,11 @@ def evm_user(c, uid, s, lg, now):
     off = mail_off_url(c, uid, "event")  # 2.367.5 (#2975): with the sender's name and the one-click off link
     c.commit()
     one = next(iter(tids)) if len(tids) == 1 and len(lines) == 1 and MAIL_TASK_HOOK else None
-    rto = MAIL_TASK_HOOK["reply_to"](c, one, to) if one else ""  # 2.393.2 B (#3375): a mail about one task: its reply address
+    rto = MAIL_TASK_HOOK["reply_to"](c, one, to, uid) if one else ""  # 2.393.2 B (#3375): a mail about one task: its reply address
     try:
         sent = mail_send(to, *m, from_name=APP_NAME, unsub=off, reply_to=rto or None)
         if rto:  # its Message-ID: an answer to this mail becomes a comment of the task
-            MAIL_TASK_HOOK["keep"](c, one, sent["Message-ID"], to.lower(), "out")
+            MAIL_TASK_HOOK["keep"](c, one, sent["Message-ID"], "", "out")  # 2.393.2 F (review 3, 4): no address, the token names the account
             c.commit()
         aa_ok("smtp")
     except Exception as e:  # noqa: BLE001

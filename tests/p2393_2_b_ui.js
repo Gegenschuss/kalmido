@@ -45,7 +45,7 @@ const FEAT = 'cal,comments,collab';
   const T = (await call(CF, 'POST', '/api/tasks', {title: 'Printer is broken', list_id: L})).id;
   const T2 = (await call(CF, 'POST', '/api/tasks', {title: 'Order paper', list_id: L})).id;
   // the task as if it came in by mail (the mail path itself: p2393_2_b_api)
-  db("INSERT INTO task_mail(task_id,msg_id,sender,kind,created_at) VALUES(?,?,?,?,?)", [T, '<p23932b-ui@example.org>', 'rita@example.com', 'in', '2026-11-02T10:00:00Z']);
+  db("INSERT INTO task_mail(task_id,msg_id,sender,kind,created_at) VALUES(?,?,?,?,?)", [T, '<p23932b-ui@example.org>', 'rita@example.com', 'src', '2026-11-02T10:00:00Z']);  // 2.393.2 F (#3375): review 2 - the reporter row is 'src'
   check((await call(CF, 'GET', `/api/tasks/${T}/timeline`)).mail_reporter?.address === 'rita@example.com', 'the timeline names the reporter');
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
 

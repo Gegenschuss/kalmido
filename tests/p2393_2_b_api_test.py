@@ -18,6 +18,10 @@ freelancer-matrix: mail
  - refused: a task without a reporter (400), someone who does not see the task, a list with the lock (400, no mail); API v1:
    mail_reporter is a known field (no unknown_field)
  - a person without an organisation: the same in her own basket
+ - 2.393.2 F (#3375) review: 1 a reply by In-Reply-To to the address of an account that does not see the task is no comment;
+   2 a reply never makes its sender the reporter ('src' only); 3 no addresses on 'in' / 'out' rows; 4 a person's reply address
+   names the account; 5 the quote patterns stay fast on a long line; 6 only well-formed Message-IDs are stored; 7 the mail to
+   the reporter keeps paragraphs; 8 a reply whose file cannot be stored stays in the mailbox (MailKept)
 usage: p2393_2_b_api_test.py <datadir>"""
 import email
 import email.message
@@ -119,11 +123,17 @@ def sent():
     return out
 
 
-def reply_addr(tid, who):
-    code = ("import app\nfrom kalmido.core.db import connect\nfrom kalmido.integrations.taskmail import tmr_reply_to\n"
-            f"c = connect()\nprint(tmr_reply_to(c, {int(tid)}, {who!r}))\nc.close()\n")
+def py(code):
+    """Runs code in the app container with c = a database connection; -> the last line it printed."""
+    code = "import app\nfrom kalmido.core.db import connect\nc = connect()\n" + code + "\nc.close()\n"
     r = subprocess.run(["docker", "exec", "-i", CT, "python", "-c", code], capture_output=True, text=True, timeout=120)
+    if r.returncode:
+        print(r.stderr[-800:])
     return (r.stdout.strip().splitlines() or [""])[-1]
+
+
+def reply_addr(tid, who, uid=0):  # 2.393.2 F (#3375): review 4 - a person's address names the account
+    return py(f"from kalmido.integrations.taskmail import tmr_reply_to\nprint(tmr_reply_to(c, {int(tid)}, {who!r}, {int(uid)}))")
 
 
 BA = addr_of(Bo)
@@ -135,7 +145,7 @@ t1 = poll(lambda: task_of(M1))
 check(bool(t1), f"the mail is a task {t1}")
 T1 = t1[0] if t1 else 0
 r = dbx("SELECT msg_id, sender, kind FROM task_mail WHERE task_id=?", (T1,))
-check(r == [(M1, "rita@example.com", "in")], f"task_mail keeps Message-ID + sender {r}")
+check(r == [(M1, "rita@example.com", "src")], f"task_mail keeps Message-ID + sender {r}")  # 2.393.2 F (#3375): review 2 - 'src'
 
 # ---- 2. the reporter's reply by In-Reply-To -> a comment (quote and signature cut off, the file a file of the comment)
 M2 = mail(REP, BA, "Re: Printer is broken", "Thanks, it works again.\n\nOn Mon, 2 Nov 2026 Bea wrote:\n> Did you restart it?\n",
@@ -178,7 +188,9 @@ poll(lambda: len(comments(T1)) == 3)
 cm = comments(T1)
 check(len(cm) == 3 and cm[-1][1] is None and "By e-mail from bea@example.com" in cm[-1][2] and "Bea, office" not in cm[-1][2],
       f"a member's mail by In-Reply-To: a comment with her address, signature cut off {cm[-1:]}")
-M6b = mail("Bea <bea@example.com>", reply_addr(T1, "bea@example.com"), "Re: Printer", "Toner arrives Friday.", "<p23932b-6b@example.org>")
+RB = reply_addr(T1, "bea@example.com", BU)
+check(f"r{T1}u{BU}x" in RB, f"a person's reply address names the account {RB!r}")
+M6b = mail("Bea <bea@example.com>", RB, "Re: Printer", "Toner arrives Friday.", "<p23932b-6b@example.org>")
 poll(lambda: len(comments(T1)) == 4)
 cm = comments(T1)
 check(len(cm) == 4 and cm[-1][1] == BU and "Toner arrives Friday." in cm[-1][2], f"a member's mail to her signed address: her comment {cm[-1:]}")
@@ -187,16 +199,17 @@ check(len(cm) == 4 and cm[-1][1] == BU and "Toner arrives Friday." in cm[-1][2],
 tl = Bo.get(B + f"/api/tasks/{T1}/timeline").json()
 check(tl.get("mail_reporter") == {"address": "rita@example.com", "may": True, "e2e": False}, f"timeline mail_reporter {tl.get('mail_reporter')}")
 n0 = len(sent())
-r = Bo.post(B + f"/api/tasks/{T1}/comments", json={"body": "We replaced the toner.", "mail_reporter": True})
+r = Bo.post(B + f"/api/tasks/{T1}/comments", json={"body": "We replaced the toner.\n\nIt prints again.", "mail_reporter": True})
 check(r.ok and r.json().get("mail_reporter") == "sent", f"comment with mail_reporter {r.status_code} {r.text[:200]}")
 out = until(lambda: sent()[n0:], 20) or []
 m = out[-1] if out else {}
 check(bool(out) and m["To"] == "rita@example.com" and m["Subject"] == "Re: Printer is broken", f"the mail to the reporter {[(x['To'], x['Subject']) for x in out]}")
 check(bool(out) and f"r{T1}x" in str(m["Reply-To"]) and str(m["Reply-To"]) == RA, f"Reply-To = the task's reply address {m.get('Reply-To') if out else None}")
 check(bool(out) and str(m["In-Reply-To"]) and str(m["In-Reply-To"]) in str(m["References"]) and M1 in str(m["References"]), f"In-Reply-To / References {m.get('In-Reply-To') if out else None}")
-check(bool(out) and "We replaced the toner." in m.get_body(("plain",)).get_content(), "the text of the comment goes out")
+check(bool(out) and "We replaced the toner.\n\nIt prints again." in m.get_body(("plain",)).get_content().replace("\r\n", "\n"),
+      "the text of the comment goes out, its paragraphs kept (review 7)")
 OUT = str(m["Message-ID"]) if out else ""
-check(bool(OUT) and dbx("SELECT kind, sender FROM task_mail WHERE task_id=? AND msg_id=?", (T1, OUT)) == [("out", "rita@example.com")], f"its Message-ID stored as out {OUT}")
+check(bool(OUT) and dbx("SELECT kind, sender FROM task_mail WHERE task_id=? AND msg_id=?", (T1, OUT)) == [("out", "")], f"its Message-ID stored as out, no address (review 3) {OUT}")
 M7 = mail(REP, BA, "Re: Printer is broken", "Great, thank you!", "<p23932b-7@example.org>", reply=OUT)
 poll(lambda: len(comments(T1)) == 6)
 check(len(comments(T1)) == 6 and "Great, thank you!" in comments(T1)[-1][2], f"the reply to our mail is a comment again {comments(T1)[-1:]}")
@@ -228,6 +241,44 @@ check(len(comments(T1)) == 6, f"a list with the lock takes no mail comment {len(
 check(len(sent()) == n0, "a list with the lock: no mail")
 wr("UPDATE lists SET e2e=NULL WHERE id=?", (L1,))
 
+# ---- 2.393.2 F (#3375): review findings
+# 1: the reporter's forged address by In-Reply-To to the address of ANOTHER account (Cleo does not see T1): no comment, a note task
+CA = addr_of(Ca)
+n1 = len(comments(T1))
+M11 = mail(REP, CA, "Re: Printer is broken", "Forged through another account.", "<p23932b-11@example.org>", reply=M1)
+t11 = poll(lambda: task_of(M11))
+check(len(comments(T1)) == n1, f"review 1: an address whose account does not see the task makes no comment {comments(T1)[n1:]}")
+check(bool(t11) and f"Reply to #{T1}, sender not allowed" in (t11[1] or ""), f"review 1: a new task with the note instead {t11}")
+# 2: a member's reply to a notification about a task made on the web: a comment, but the member never becomes the reporter
+OUT2 = "<p23932b-out2@example.test>"
+wr("INSERT INTO task_mail(task_id,msg_id,sender,kind,created_at) VALUES(?,?,?,?,?)", (Tn, OUT2, "", "out", "2026-11-02T10:00:00Z"))
+M12 = mail("Bea <bea@example.com>", BA, "Re: No mail", "Done on my side.", "<p23932b-12@example.org>", reply=OUT2)
+poll(lambda: comments(Tn))
+check(len(comments(Tn)) == 1 and "Done on my side." in comments(Tn)[0][2], f"review 2: the member's reply is a comment {comments(Tn)}")
+check(Bo.get(B + f"/api/tasks/{Tn}/timeline").json().get("mail_reporter") is None, "review 2: a reply makes no reporter (no switch)")
+r = Bo.post(B + f"/api/tasks/{Tn}/comments", json={"body": "x", "mail_reporter": True})
+check(r.status_code == 400, f"review 2: still no reporter to mail {r.status_code}")
+# 3: addresses only on the reporter's row
+r = dbx("SELECT kind, sender FROM task_mail WHERE kind<>'src' AND sender<>''")
+check(r == [], f"review 3: no addresses on 'in' / 'out' rows {r}")
+check(bool(dbx("SELECT 1 FROM task_mail WHERE kind='in' AND task_id=?", (T1,))), "review 3: the replies are still stored")
+# 4: a reply address made for Cleo's account but Bea's address (validly signed) is not Bea's: Cleo does not see T1 -> no comment
+n1 = len(comments(T1))
+M13 = mail("Bea <bea@example.com>", reply_addr(T1, "bea@example.com", CU), "Re: Printer", "Wrong account.", "<p23932b-13@example.org>")
+poll(seen_all)
+check(len(comments(T1)) == n1, f"review 4: the comment never goes to an account the address was not made for {comments(T1)[n1:]}")
+# 5: a long line of "Am ... schrieb" without a colon is checked quickly; a short quote line is still cut off
+r = py("import time\nfrom kalmido.integrations.taskmail import tmr_trim\nt = time.time()\n"
+       "x = tmr_trim('Hi\\n' + 'Am ' + ' schrieb' * 2500 + '\\nend')\n"
+       "print(time.time() - t < 1.0, tmr_trim('Thanks\\nAm 02.11.2026 schrieb Bea:\\n> q') == 'Thanks')")
+check(r == "True True", f"review 5: quote patterns fast on a long line, short quote cut {r!r}")
+# 6: a malformed Message-ID is not stored (a reply row), the reporter row stays without it
+r = py("from kalmido.integrations.taskmail import tmr_keep\n"
+       f"tmr_keep(c, {T1}, '<a@example.org> <b@example.org>', '', 'in')\ntmr_keep(c, {T1}, 'no-brackets@example.org', 'x@example.org', 'src')\n"
+       f"print([tuple(x) for x in c.execute(\"SELECT kind, msg_id FROM task_mail WHERE task_id=? AND (msg_id LIKE '%%b@example.org%%' OR kind='src' AND msg_id='')\", ({T1},)).fetchall()])\n"
+       "c.rollback()")
+check(r == "[('src', '')]", f"review 6: only well-formed Message-IDs stored {r!r}")
+
 # ---- 8. a person without an organisation: her own basket
 EA = addr_of(Er)
 M9 = mail("Otto <otto@example.com>", EA, "Garden fence", "The fence needs paint.", "<p23932b-9@example.org>")
@@ -241,5 +292,15 @@ check(len(cm) == 1 and cm[0][2].startswith("White, please.") and "Which colour" 
 r = Er.post(B + f"/api/tasks/{T9}/comments", json={"body": "White it is.", "mail_reporter": True})
 check(r.ok and r.json().get("mail_reporter") == "sent", f"freelancer: answer to the reporter {r.status_code} {r.text[:200]}")
 check(until(lambda: any(x["To"] == "otto@example.com" for x in sent()), 20), "freelancer: the mail goes out")
+
+# ---- 2.393.2 F (#3375): review 8 - a reply whose file cannot be stored stays in the mailbox (MailKept), the comment is there
+r = py("import email.message\nfrom kalmido.integrations import mail as MM, taskmail as TM\n"
+       "m = email.message.EmailMessage()\n"
+       f"m['From'], m['To'], m['Subject'], m['Message-ID'] = 'Otto <otto@example.com>', {EA!r}, 'Re: Garden fence', '<p23932b-14@example.org>'\n"
+       f"m['In-Reply-To'] = {M9!r}\nm.set_content('Photo attached.')\nm.add_attachment(b'jpg', maintype='image', subtype='jpeg', filename='fence.jpg')\n"
+       "def boom(*a, **k):\n    raise OSError('disk full')\nTM.save_attachment_bytes = boom\n"
+       "res = MM.mail_import(c, bytes(m))\nprint(type(res).__name__, int(res or 0))")
+check(r == f"MailKept {T9}", f"review 8: MailKept {r!r}")
+check(any("Photo attached." in x[2] for x in comments(T9)), f"review 8: the comment is there {comments(T9)}")
 
 sys.exit(done("p2393_2_b_api"))
