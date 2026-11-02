@@ -32,7 +32,7 @@ const ghead = (d, cls) => d.querySelector(`#view .ghead.${cls}`);
   const st0 = await call('GET', '/api/state'), ME = st0.me;
   const bob = await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'});
   const day = n => { const x = new Date(); x.setDate(x.getDate() + n); return  /* 2.80.1: calendar days (clock change) */ x.toLocaleDateString('sv'); };
-  const TEAM = (await call('POST', '/api/lists', {name: 'Team'})).id;
+  const TEAM = (await call('POST', '/api/lists', {name: 'Team', time_tracking: false})).id;  // 2.489.0 (#2798): new lists track time by default now
   await call('PUT', `/api/lists/${TEAM}/members`, {user_id: bob.id, role: 'edit'});
   const INS = (await call('POST', '/api/lists', {name: 'Insurance'})).id;
   const PRJ = (await call('POST', '/api/lists', {name: 'Launch', kind: 'project', time_tracking: false})).id;  // 2.489.0 (#2798): new lists track time by default now

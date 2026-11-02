@@ -213,9 +213,10 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   await pick('Plan offsite');
   check(await until(() => /no time tracking/.test(d.querySelector(`#tvs-list [data-tvs="${tno}"]`)?.textContent || '')), '#2798: a task of a project without time tracking is marked');
   d.querySelector(`#tvs-list [data-tvs="${tno}"]`).click();
-  check(await until(() => /Turn on time tracking for this project/.test(d.querySelector('.cdlg')?.textContent || '')), '#2798: asks to turn it on first');
+  const yes = () => [...d.querySelectorAll('.cdlg')].find(m => /Turn on time tracking for this project/.test(m.textContent))?.querySelector('[data-cd="yes"]');
+  check(await until(() => yes()), '#2798: asks to turn it on first ' + (d.querySelector('#toast')?.textContent || ''));
   check(!(await call('GET', '/api/state')).timer, '#2798: nothing starts before the yes');
-  d.querySelector('.cdlg [data-cd="yes"]').click();
+  yes()?.click();
   check(await until(async () => { const j = await call('GET', '/api/state'); return j.timer?.task_id === tno && j.lists.find(l => l.id === NOT)?.time_tracking === 1; }), '#2798: yes turns it on and starts');
   await w.eval('timerStop()');
   w.eval(`openDetail(${tfr})`); await until(() => d.querySelector('#detail #d-title')); await idle(w);
