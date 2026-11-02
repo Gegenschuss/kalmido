@@ -6,6 +6,7 @@ freelancer-matrix: office
  - #2600 a booked receipt never moves into another workspace (dry run names it, the move 409)
  - #2600 removing the VAT rate / the payment day keeps the lock (doc_meta.kept_until); the books count only what is booked now
  - #2600 the lock also covers a receipt of the cash book, of the equipment list and one billed on a finalised invoice
+ - #3796 deleting an item of the equipment list or swapping its receipt keeps the old receipt's lock
  - #2600 the version clean-up (more than 20 versions) leaves every version of a booked receipt alone
  - #2601 the running month cannot be closed (400), a past one can
  - #2601 a client with drives or travel expenses is archived instead of deleted (single and several at once)
@@ -182,6 +183,23 @@ sql("UPDATE office_equipment SET archived=1 WHERE receipt_node_id=?", (R_EQ,), w
 # any more, so only the equipment item could keep it
 sql("DELETE FROM rc_receipts WHERE node_id=?", (R_EQ,), write=True)
 check(purge(A, R_EQ).ok, "#2600: an archived item of 2014 (36 months, period over) no longer keeps its receipt")
+# 2.490.0 (#3796): deleting an item of the equipment list or swapping its receipt keeps the old receipt's lock (doc_meta.kept_until,
+# like #2733 for the cash book); before, the lock read the item live and was gone with it
+EQ = "/api/office/equipment"
+R_E1, R_E2, R_E3 = (receipt(A, WSO, f"anlage{i}.pdf", 19) for i in (1, 2, 3))
+it = A.post(B + EQ, json={"name": "Licht", "purchase_date": f"{TODAY.year}-01-15", "life_months": 36, "receipt_node_id": R_E1})
+check(it.status_code in (200, 201), "#3796: an item with receipt " + it.text[:200])
+it2 = A.post(B + EQ, json={"name": "Ton", "purchase_date": f"{TODAY.year}-01-15", "life_months": 36, "receipt_node_id": R_E3})
+sql("DELETE FROM rc_receipts WHERE node_id IN (?,?)", (R_E1, R_E3), write=True)  # only the equipment list keeps them now
+r = A.patch(B + f"{EQ}/{it.json()['id']}", json={"receipt_node_id": R_E2})
+check(r.ok, "#3796: the receipt swapped " + r.text[:200])
+r = purge(A, R_E1)
+check(r.status_code == 409 and "Kept by law until" in r.text, "#3796: the receipt swapped out keeps its lock " + r.text[:200])
+r = A.delete(B + f"{EQ}/{it2.json()['id']}")
+check(r.ok, "#3796: the item deleted " + r.text[:200])
+check(not sql("SELECT 1 FROM office_equipment WHERE id=?", (it2.json()["id"],)), "#3796: the item is gone (not archived)")
+r = purge(A, R_E3)
+check(r.status_code == 409 and "Kept by law until" in r.text, "#3796: the receipt of a deleted item keeps its lock " + r.text[:200])
 CL = A.post(B + "/api/clients", json={"name": "Kunde Eins GmbH", "street": "Kundenweg 2", "zip": "20095", "city": "Hamburg", "country": "DE"}).json()["id"]
 r = A.post(B + D, json={"kind": "invoice", "client_id": CL, "service_from": DAY(30), "items": [{"title": "Schnitt", "qty": 1, "rate": 100}]})
 INV = r.json()["id"]
@@ -256,6 +274,13 @@ r = Fr.put(B + f"/api/docs/{F_R}/receipt", json={"category": "", "vat_pct": None
 check(r.ok and not r.json()["receipt"]["is_receipt"], "freelancer #2600: the VAT rate removed " + r.text[:200])
 r = purge(Fr, F_R)
 check(r.status_code == 409 and "Kept by law until" in r.text, "freelancer #2600: the lock stays " + r.text[:200])
+F_E = receipt(Fr, "private", "frei-anlage.pdf", "19")  # 2.490.0 (#3796): the personal office keeps the lock of a deleted item too
+fit = Fr.post(B + EQ, json={"name": "Stativ", "purchase_date": f"{TODAY.year}-01-15", "life_months": 36, "receipt_node_id": F_E})
+check(fit.status_code in (200, 201), "freelancer #3796: an item with receipt " + fit.text[:200])
+sql("DELETE FROM rc_receipts WHERE node_id=?", (F_E,), write=True)
+check(Fr.delete(B + f"{EQ}/{fit.json()['id']}").ok, "freelancer #3796: the item deleted")
+r = purge(Fr, F_E)
+check(r.status_code == 409 and "Kept by law until" in r.text, "freelancer #3796: the receipt keeps its lock " + r.text[:200])
 FV = Fr.post(B + V, json={"name": "Rad", "kind": "private", "odo_start": "0"}).json()["id"]
 r = Fr.post(B + LB + "/close", json={"month": TODAY.isoformat()[:7], "vehicle_id": FV})
 check(r.status_code == 400 and "Only past months" in r.text, "freelancer #2601: the running month cannot be closed (400) " + r.text[:160])

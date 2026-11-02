@@ -1395,6 +1395,9 @@ def office_update(c, oid, kind, rid, b):
         from .assets import ast_method_check  # must not leave a declining device outside the window
         g = lambda f: vals[sets.index(f)] if f in sets else r.get(f)  # noqa: E731
         ast_method_check(g("afa_method"), g("purchase_date"))
+    if kind == "equipment" and "receipt_node_id" in sets and r.get("receipt_node_id"):  # 2.490.0 (#3796): swapping the receipt
+        from ..receipts.suggest import olk_rc_keep  # keeps the old one's lock (olk_fs_locked reads the equipment live)
+        olk_rc_keep(c, r["receipt_node_id"])
     if m.get("kind"):  # 2.47.0 (#1649)
         _sr_costs(c, oid, sets, vals, {f: r.get(f) for f in SR_COSTS})
     _md_crypt(c, oid, kind, sets, vals)
@@ -1497,6 +1500,9 @@ def office_delete(c, oid, kind, rid):
         return "archived"
     from .otrash import otb_put  # 2.272.0 E2 (#3038): into the office trash first (restore); circular (otrash reads office_ctx)
     otb_put(c, oid, me(), kind, m["table"], r["id"], str(r.get(m["label"]) or ""))
+    if kind == "equipment" and r.get("receipt_node_id"):  # 2.490.0 (#3796): deleting the asset keeps its receipt's lock
+        from ..receipts.suggest import olk_rc_keep
+        olk_rc_keep(c, r["receipt_node_id"])
     c.execute(f"DELETE FROM {m['table']} WHERE id=? AND org_id=?", (r["id"], oid))
     if kind == "contracts":  # 2.117.0 B (#2285): its PDF files go into the trash (purged after DMA_PURGE_DAYS)
         from .contractfiles import dma_trash_contract
