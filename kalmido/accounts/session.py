@@ -4,6 +4,7 @@ import hashlib
 import ipaddress
 import os
 import random
+import re
 import secrets
 import threading
 import time
@@ -52,7 +53,9 @@ def proxy_login_value():
 PT_PREFIXES = ("/p/", "/portal/", "/mail/off/")  # 2.63.0 B (#1513): a customer report's status link, the portal's sign-in / sign-out; 2.367.5 (#2975): the off link of a notification mail
 
 
-OPERATOR_PATHS = frozenset(("/api/operator/status", "/api/operator/setup-code", "/api/operator/notice"))  # 2.144.0 D2 (#797)
+OPERATOR_PATHS = frozenset(("/api/operator/status", "/api/operator/setup-code", "/api/operator/notice",  # 2.144.0 D2 (#797)
+                            "/api/operator/accounts/find", "/api/operator/quota-default"))  # #3939
+OPERATOR_ACCOUNT_RE = re.compile(r"/api/operator/accounts/[1-9][0-9]{0,17}")  # #3939: one account by number (fullmatch)
 
 
 def _token_hash(t):
@@ -302,7 +305,7 @@ def authenticate():
         # (2.18.0: also the error-report webhook: the secret token in its URL is the credential; 2.60.0: and the deploy hook)
         # (2.115.0 A (#2061): and the inbound webhook of a list)
         # (2.469.0, #3459: and the payment provider's webhook of an office)
-    if request.path in OPERATOR_PATHS:  # 2.144.0 D2 (#797): exact paths, a later route under /api/operator/ is not let through
+    if request.path in OPERATOR_PATHS or OPERATOR_ACCOUNT_RE.fullmatch(request.path):  # 2.144.0 D2 (#797): exact paths, a later route under /api/operator/ is not let through
         return None  # 2.144.0 D (#797): the hosting operator's interface: its own token (admin/operator.py), never a person
     if request.path.startswith(PUB_PREFIX):
         return None  # public list link: no user; the token in the path is the credential (see "public links")
@@ -557,6 +560,9 @@ def start_session(c, uid, remember, via="password"):
               (_token_hash(tok), uid, iso(now_utc()), iso(now_utc() + timedelta(days=days)), via, iso(now_utc()),
                ses_ua() if has_request_context() else ""))
     c.execute("UPDATE users SET op_made_by=NULL WHERE id=? AND op_made_by IS NOT NULL", (uid,))  # 2.480.0 (#3944, F8): signed in = the client's own
+    if via == "link":  # 2.485.0 (#3939): a sign-in link the operator made through support access: no longer than that access
+        from .supportgrant import sga_session_cap
+        sga_session_cap(c, uid, _token_hash(tok))
     from ..admin.clientip import login_seen
     login_seen(c, uid)  # 2.33.0 (#834): many accounts from one private address = the proxy hides the client addresses
     _shs_signin(c, c.execute("SELECT id, email, email_proved, kind FROM users WHERE id=?", (uid,)).fetchone())

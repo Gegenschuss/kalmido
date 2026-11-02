@@ -454,7 +454,7 @@ OX_LEFT = {
     "agents": _AGENT, "bg_jobs": _SERVER, "doc_mail": _SECRET, "doc_models": _DERIVED, "file_text": _DERIVED,
     "doc_fetchers": "a person's receipt fetcher and its token (set up again on the target)", "doc_fetch_portals": _DERIVED,
     "fs_ext_links": _SECRET, "fs_locks": "folder locks and their keys (client_encrypted)", "fs_upload_requests": _SECRET, "hub_tokens": _SECRET, "life_trip_costs": _PERSONAL,
-    "merge_runs": _PERSONAL, "notify_channels": _SECRET, "office_peppol": _SECRET,
+    "merge_runs": _PERSONAL, "notify_channels": _SECRET, "support_grants": _SERVER, "office_peppol": _SECRET,
     "office_payonline": _SECRET, "office_pay_links": _SECRET, "office_pay_sessions": _ONLINEPAY, "office_pay_events": _ONLINEPAY, "office_pay_payouts": _ONLINEPAY,
     "office_trash": "the trash (not_included)",
     "office_undo": "undo steps of one day", "org_invites": "invitations (not_included)", "org_joins": "join requests (not_included)",

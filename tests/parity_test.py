@@ -425,6 +425,8 @@ APP_ONLY = [
      ("=GET /api/attachments/{}/agents",)),
     ("sign-in, sessions, two-factor, passkeys, OIDC: a person in a browser", ("* /api/auth/", "* /api/me/2fa", "* /api/me/passkeys", "* /api/me/sessions", "=PATCH /api/me", "=GET /api/me",
                                                                      "=POST /api/stepup/passkey")),  # 2.223.2 C (#2871)
+    ("2.485.0 (#3939): support access opens a client's account / organisation to the operator: only the person in a browser, never an agent or a token",
+     ("* /api/support-access",)),
     ("credentials and keys of the account: tokens, webhooks, upload token, avatar, phone shortcut", (
         "* /api/me/tokens", "* /api/me/webhooks", "POST /api/me/drop-token", "* /api/me/avatar", "GET /api/me/share/")),
     ("administration: never through a token (agents are never admins); admins read users / status with admin-read", (

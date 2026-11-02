@@ -748,28 +748,55 @@ def op_apart_deny():
     raise Denied(403, tr(OP_APART_MSG))
 
 
-def op_foreign_org(c, oid):
-    """2.399.0 (#2687): hosted and the current person is no admin of organisation oid (a self-hosted server: False)."""
-    return bool(_operator_apart()) and org_role(c, me(), oid) != "admin"
+def op_foreign_org(c, oid, note=True, grant=True):
+    """2.399.0 (#2687): hosted and the current person is no admin of organisation oid (a self-hosted server: False).
+    2.485.0 (#3939): not while the organisation granted support access (accounts/supportgrant.py; note: log the use;
+    grant=False: as if there were none)."""
+    if not _operator_apart() or org_role(c, me(), oid) == "admin":
+        return False
+    if not grant:
+        return True
+    from .supportgrant import sga_open
+    return not sga_open(c, oid=oid, note=note)
 
 
-def op_foreign_account(c, uid):
+# 2.485.0 (#3939, review F1/F3): what support access never hands to the operator -- credentials and new people: they would
+# outlive the client's consent
+OP_SUPPORT_MSG = N_("Support access does not hand out sign-in data or add people: the client does that")
+
+
+def op_support_only(c, uid=None, oid=None):
+    """2.485.0 (#3939): hosted and the current person reaches account uid / organisation oid only through the client's support
+    access (without it: foreign). Then no credentials, no new people (op_support_deny)."""
+    if oid is not None:
+        return op_foreign_org(c, oid, grant=False) and not op_foreign_org(c, oid, note=False)
+    return op_foreign_account(c, uid, grant=False) and not op_foreign_account(c, uid, note=False)
+
+
+def op_support_deny():
+    raise Denied(403, tr(OP_SUPPORT_MSG))
+
+
+def op_foreign_account(c, uid, note=True, grant=True):
     """2.399.0 (#2687): hosted and account uid belongs to a customer: not the current person, no account of an organisation the
     current person administers, 2.480.0 (#3944, F8): no account the current person made that never signed in (users.op_made_by). An agent follows its owner (a personal one: only one's own) or its organisation; a server agent
-    without both belongs to the operator."""
+    without both belongs to the operator. 2.485.0 (#3939): not while the account (an agent: its owner) granted support access
+    (accounts/supportgrant.py; note: log the use)."""
     if not _operator_apart() or uid == me():
         return False
+    from .supportgrant import sga_open
     with system_ctx(c):  # membership structure, no content
         a = c.execute("SELECT owner_id, org_id FROM agents WHERE user_id=?", (uid,)).fetchone()
         if a:
             if a["owner_id"]:
-                return a["owner_id"] != me()
-            return bool(a["org_id"]) and op_foreign_org(c, a["org_id"])
+                return a["owner_id"] != me() and not (grant and sga_open(c, uid=a["owner_id"], note=note))
+            return bool(a["org_id"]) and op_foreign_org(c, a["org_id"], note=note, grant=grant)
         if c.execute("SELECT 1 FROM users WHERE id=? AND op_made_by=?", (uid, me())).fetchone():
             return False  # 2.480.0 (#3944, F8): an account the operator made itself that never signed in (family, a kid)
-        return not c.execute("SELECT 1 FROM org_members a JOIN org_members b ON b.org_id=a.org_id JOIN orgs o ON o.id=a.org_id "
-                             "WHERE a.user_id=? AND a.role='admin' AND b.user_id=? AND o.retired_at IS NULL LIMIT 1",
-                             (me(), uid)).fetchone()  # review F7: a retired organisation grants nothing
+        apart = not c.execute("SELECT 1 FROM org_members a JOIN org_members b ON b.org_id=a.org_id JOIN orgs o ON o.id=a.org_id "
+                              "WHERE a.user_id=? AND a.role='admin' AND b.user_id=? AND o.retired_at IS NULL LIMIT 1",
+                              (me(), uid)).fetchone()  # review F7: a retired organisation grants nothing
+    return apart and not (grant and sga_open(c, uid=uid, note=note))
 
 
 def org_own_admin(c, oid, but=0):
@@ -945,6 +972,16 @@ def org_update(oid):
     c, b = db(), body()
     if op_foreign_org(c, oid):  # 2.399.0 (#2687): hosted: name, members and roles of a customer's organisation are its admins' own
         op_apart_deny()
+    if isinstance(b, dict) and op_support_only(c, oid=oid):  # 2.485.0 (#3939, review F3): support access adds nobody
+        with system_ctx(c):
+            have = {r[0] for r in c.execute("SELECT user_id FROM org_members WHERE org_id=?", (oid,))}
+        new = set()
+        for k in ("members_add", "admins_add", "members", "admins"):
+            v = b.get(k)
+            if isinstance(v, list):
+                new |= {x for x in v if isinstance(x, int) and not isinstance(x, bool)} - have
+        if new:
+            op_support_deny()
     with system_ctx(c):  # 2.37.0 (#1150): instance admin manages the organisations themselves (also ones he is not in)
         if instance_mode(c) != "workspaces":
             _no_change()

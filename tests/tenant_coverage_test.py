@@ -43,6 +43,7 @@ KINDS = {
     "lytpl": ("matrix", "p255_a_api_test.py: arrangement templates only to people of the own organisations, never to agents, a project page only with access (#1068)"),
     "team": ("matrix", "p2280_api_test.py: team chat rooms and direct messages"),
     "agent": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: agents, their chat, events and jobs"),
+    "support": ("matrix", "p2485_a_support_test.py: support access (2.485.0, #3939): an organisation only by its admins, a member / a stranger 403, somebody else's grant 404, the log only to the client"),
     "people": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: the user list, user changes, invitations / sign-in links by id"),
     "org": ("matrix", "p2280_api_test.py: organisations, their members and admins; p2115_b_api_test.py: invitations by e-mail (2.115.0); "
                    "p2146_d_api_test.py: the retention export of another organisation 404 (2.146.0); "
@@ -340,6 +341,7 @@ ROUTES = {
     "PATCH /api/me/passkeys/{}": "auth", "DELETE /api/me/passkeys/{}": "auth", "GET /api/auth/oidc/start": "auth",
     # 2.115.0 B (#2062): the own sessions (user_id = me; p2115_b_api_test.py: a foreign session id is 404)
     "GET /api/me/sessions": "auth", "DELETE /api/me/sessions/{}": "auth", "POST /api/me/sessions/others": "auth",
+    "GET /api/support-access": "support", "POST /api/support-access": "support", "DELETE /api/support-access/{}": "support",  # 2.485.0 (#3939)
     "GET /api/auth/oidc/callback": "auth", "POST /api/auth/signup": "auth", "POST /api/auth/link": "auth",
     # ---- book (16)
     "GET /api/v1/address-books": "book", "POST /api/v1/address-books": "book", "PATCH /api/v1/address-books/{}": "book",

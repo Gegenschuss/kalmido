@@ -233,6 +233,8 @@ ROUTES = {
     "POST /api/me/passkeys": "auth", "POST /api/me/passkeys/options": "auth",
     # 2.115.0 B (#2062): active sessions (p2115_b_api_test.py as a person without an organisation)
     "GET /api/me/sessions": "own", "DELETE /api/me/sessions/{}": "own", "POST /api/me/sessions/others": "own",
+    # 2.485.0 (#3939): support access the client grants (p2485_a_support_test.py as a person without an organisation)
+    "GET /api/support-access": "own", "POST /api/support-access": "own", "DELETE /api/support-access/{}": "own",
     # ---- files (51)
     "DELETE /api/docs/labels/{}/{}": "files", "DELETE /api/docs/mail": "files", "DELETE /api/docs/rules/{}": "files",
     "DELETE /api/docs/{}/task": "files", "DELETE /api/files/nodes/{}": "files", "DELETE /api/files/shares/{}": "files",

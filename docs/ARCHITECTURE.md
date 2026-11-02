@@ -216,6 +216,7 @@ The most used helpers:
 | `accounts/orgs.py` | Organisations (#752): people in 1..n organisations and whom a person may see (all / own organisation / own contacts). |
 | `accounts/invite.py` | Invitations and reset links (#697): a one-time link by e-mail with which a person sets their own password. |
 | `accounts/sessions.py` | Active sessions (2.115): the own sessions (device from the User-Agent, last activity), log out one or all others. |
+| `accounts/supportgrant.py` | Support access (2.485, hosted): a person / an organisation admin opens the own account / organisation to the instance admin for a limited time; `orgs.op_foreign_*` honour it, every use is logged on the grant for the customer. |
 | `accounts/orginvite.py` | Organisation admins invite new accounts by e-mail (2.115): resend and withdraw open invitations. |
 | `accounts/pwreset.py` | 2.49.0 (#1531): *Forgot your password?* on the login page: the reset link of `invite.py` by e-mail, the same answer for every address, rate limited. |
 | `family/family.py` | The module "Family": family fields of tasks, kid stars, occasions, shopping, packing lists, setup purpose, overview. |

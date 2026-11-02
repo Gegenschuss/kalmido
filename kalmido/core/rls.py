@@ -110,6 +110,7 @@ TABLES = (
     "webhooks",  # 2.115.0 A (#2061): outgoing webhooks (NULL = a person's own / an agent's, else its organisation's admins)
     "notify_channels",  # 2.142.0 A (#2145): notification channels (NULL = a person's own, else its organisation's admins)
     "org_joins",  # 2.148.1 A (#2480): invitations of existing accounts (the invited person reads its own rows in system_ctx)
+    "support_grants",  # 2.485.0 (#3939): support access granted to the operator (NULL = a person's own account; read in system_ctx)
     "office_peppol", "office_peppol_sends",  # 2.154.0 B (#1960): the Peppol connection of an office area + its sends
     "office_payonline", "office_pay_links", "office_pay_sessions", "office_pay_events", "office_pay_payouts",  # 2.469.0 (#3459): online payment of invoices
     "section_templates",  # 2.156.0 C (#2073): section templates (NULL = a person's own, the app checks user_id)

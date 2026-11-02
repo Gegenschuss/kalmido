@@ -251,6 +251,7 @@ ORDER = (
     "integrations.exporters",  # 2.142.0 C (#2148)
     "accounts.invite",
     "accounts.sessions",  # 2.115.0 B (#2062): active sessions
+    "accounts.supportgrant",  # 2.485.0 (#3939): support access the client grants (hosted)
     "accounts.orginvite",  # 2.115.0 B (#2062): organisation admins invite accounts by e-mail
     "accounts.orgleave",  # 2.361.0 (#2920 / #2922): what leaving / deleting an organisation means for its members
     "accounts.orgback",  # 2.365.1 (#3395): what a person brought in goes back with their leaving (no routes)

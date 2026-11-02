@@ -37,9 +37,9 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/js/multilist.js', '/static/js/rules.js', '/static/js/supporter.js', '/static/js/assistant.js', '/static/js/main.js'];
 // 2.53.0 (#1410): the modules loaded on demand (static/js/lazyload.js LD_MODS; no script tag in index.html, tools/check_layout.py
 // compares): cached right after the shell, so they open offline too; a failure there does not drop the install
-const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/oinvview.js', '/static/js/servers.js', '/static/js/settings.js',
-  '/static/js/contacts.js', '/static/js/ctfold.js', '/static/js/newsletter.js', '/static/js/office.js', '/static/js/office_docs.js',
-  '/static/js/office_tree.js', '/static/js/office_import.js', '/static/js/office_sheet.js', '/static/js/office_parts.js',
+const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supportview.js', '/static/js/oinvview.js', '/static/js/servers.js',
+  '/static/js/settings.js', '/static/js/contacts.js', '/static/js/ctfold.js', '/static/js/newsletter.js', '/static/js/office.js',
+  '/static/js/office_docs.js', '/static/js/office_tree.js', '/static/js/office_import.js', '/static/js/office_sheet.js', '/static/js/office_parts.js',
   '/static/js/office_travel.js', '/static/js/office_cashflow.js', '/static/js/office_doctpl.js', '/static/js/office_logbook.js',
   '/static/js/office_cashbook.js', '/static/js/office_pipeline.js', '/static/js/office_kpi.js', '/static/js/office_datev.js',
   '/static/js/office_datevimp.js', '/static/js/office_bookarch.js', '/static/js/office_periods.js', '/static/js/officeagents.js',

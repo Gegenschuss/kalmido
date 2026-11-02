@@ -52,7 +52,7 @@ UMZ_LEFT_TABLES = {
     "office_procdocs": _ORG, "office_purchases": _ORG, "office_rgroup_members": _ORG, "office_rgroups": _ORG, "office_rights_log": _ORG, "office_roles":
     _ORG, "office_services": _ORG, "office_sets": _ORG, "office_settings": _ORG, "office_signoffs": _ORG, "office_sub_reminders": _ORG,
     "office_suppliers": _ORG, "office_texts": _ORG, "office_trash": _ORG, "office_trip_items": _ORG, "office_trip_purposes": _ORG, "office_trips": _ORG,
-    "office_undo": _ORG, "office_vehicles": _ORG, "org_joins": _ORG, "org_members": _ORG, "rc_receipts": _ORG, "reading_orgs": _ORG, "tchat_files": _ORG,
+    "office_undo": _ORG, "office_vehicles": _ORG, "org_joins": _ORG, "support_grants": _SERVER, "org_members": _ORG, "rc_receipts": _ORG, "reading_orgs": _ORG, "tchat_files": _ORG,
     "tchat_rooms": _ORG,
     "abs_cal_feeds": _SECRET, "agent_setup_codes": _SECRET, "app_passwords": _SECRET, "contact_srcs": _SECRET, "disc_profiles": _SECRET, "disc_tokens":
     _SECRET, "doc_fetchers": _SECRET, "doc_mail": _SECRET, "ev_cal_feeds": _SECRET, "fs_ext_links": _SECRET, "fs_lock_keys": _SECRET, "fs_locks": _SECRET,

@@ -127,7 +127,7 @@ function accountHtml() {
     ${typeof officeOn === 'function' && officeOn() ? `<h4 id="s-sig-h">${tr('Signature for letters')}</h4>
     <div class="row"><button type="button" class="btn sm" data-act="lt-sigset">${ic('edit', 's')} ${tr('Edit signature…')}</button> <button type="button" class="btn sm" data-act="ofm-sigset">${ic('edit', 's')} ${tr('E-mail signature…')}</button></div>
     <div class="shint">${tr('Greeting, name and picture under your letters (the same dialog as in the Office, Letters).')}</div>` : ''}${''/* 2.365.2 C (#2789) */}
-    ${typeof sesHtml === 'function' ? sesHtml() : ''}${''/* 2.115.0 B (#2062): active sessions */}
+    ${typeof sesHtml === 'function' ? sesHtml() : ''}${''/* 2.115.0 B (#2062): active sessions */}${typeof sgvHtml === 'function' ? sgvHtml() : ''}${''/* 2.485.0 (#3939): support access (hosted) */}
     ${e2eHtml()}${''/* 2.42.0 (#828, #909) */}
     ${apwHtml()}
     <details class="sdev"><summary>${ic('key', 's')}${tr('Advanced · for developers')}</summary>
@@ -421,6 +421,8 @@ function userModal(u, done) {
   if (u?.apart) {  // 2.399.0 (#2687): hosted, a customer's account: the operator locks it (or sets its quota), nothing else
     $$('input, select, [data-uorg], [data-av], [data-m="invite"], [data-m="signin"]', md).forEach(x => { if (x.id !== 'u-admin' && x.id !== 'u-dis') x.disabled = true; });
     $('h3', md).insertAdjacentHTML('afterend', `<div class="shint">${ic('info', 's')} ${esc(tr('Hosted: the account belongs to a client. You can lock or delete it; its sign-in, e-mail address and organisations stay with the client.'))}</div>`);
+  } else if (u?.support_until) {  // 2.485.0 (#3939): the client granted support access
+    $('h3', md).insertAdjacentHTML('afterend', `<div class="shint">${ic('key', 's')} ${esc(tr('The client granted support access until {0}. Everything you do here is listed for the client.', fmtStamp(new Date(u.support_until))))}</div>`);
   }
   // 2.19.0 (#653): a child account and its parents (people, never agents or other children)
   const par = new Set(u?.parents || []);

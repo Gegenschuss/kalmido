@@ -64,12 +64,20 @@ def user_admin_dict(c, u):
             "kid": bool(u["kid"]),
             **_admin_struct(c, u),  # 2.22.0 (#752) orgs, 2.28.0 (#935) org_id of an agent, number of lists
             "storage": _storage(c, u["id"]),  # 2.24.0 (#910): {used, quota_mb}
-            **({"apart": True} if _op_foreign(c, u["id"]) else {})}  # 2.399.0 (#2687): hosted, a customer's account (lock / quota only)
+            **_op_foreign(c, u["id"])}  # 2.399.0 (#2687): hosted, a customer's account (lock / quota only)
 
 
 def _op_foreign(c, uid):
-    from ..accounts.orgs import op_foreign_account
-    return op_foreign_account(c, uid)
+    """{apart: true} for a customer's account on a hosted instance; 2.485.0 (#3939): {support_until} while it granted support
+    access (listing it is no use of the grant: note=False)."""
+    from ..accounts.orgs import _operator_apart, op_foreign_account
+    if op_foreign_account(c, uid, note=False):
+        return {"apart": True}
+    if not _operator_apart() or uid == me():
+        return {}
+    from ..accounts.supportgrant import sga_until
+    t = sga_until(c, uid)
+    return {"support_until": t} if t else {}
 
 
 def _admin_struct(c, u):

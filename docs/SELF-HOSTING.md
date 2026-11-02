@@ -2062,6 +2062,20 @@ the admin does not administer itself answers 403:
 The customers' own admins invite, set roles and manage their organisation as before. A self-hosted server (the default)
 keeps the in-app server admin unchanged.
 
+#### Support access with the customer's consent
+
+*Since 2.485.* When a customer needs help, the customer opens the door, never the hoster: Settings > Account > *Support
+access* (shown on hosted servers only). A person grants it for the own account (this includes the own office of a person
+without an organisation); an organisation admin grants it for each organisation they administer. A grant runs 1 hour,
+1 day, 3 days or 7 days, ends by itself and can be ended at any time (by the person, or by any admin of the
+organisation). While it is open, the instance admin's ways into exactly that account or organisation work as on a
+self-hosted server (sign-in link, password link, members and roles, its projects and agents); the instance admin's
+account list shows the end time. Every request that passed only thanks to a grant is listed for the customer on the
+grant: time, who, method, route and status, never values or contents. An organisation's grant ends as soon as the admin
+who granted it is no admin of it any more. Agents and API tokens cannot grant. The backup download stays off on a hosted
+server (it holds every customer's content). Routes: `GET /api/support-access`, `POST /api/support-access`
+`{hours, org_id?}`, `DELETE /api/support-access/<id>`.
+
 ## Support Kalmido (supporter licence)
 
 Since 2.74. A supporter licence is voluntary and paid once. It **unlocks nothing**: every feature stays free (AGPL-3.0).

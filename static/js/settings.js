@@ -878,7 +878,7 @@ function settingsModal(focus) {
     if (k === 'ai') aiSubShow(md);  // 2.5.1 (#393): only the shown sub-tab loads
     if (k === 'users' || k === 'org') admSubShow(md, null, false, k);
     if (k === 'assistant' || k === 'users') asst_paneDraw(md);  // 2.75.0 (#1411)
-    if (k === 'account') { tfaDraw(md); apwDraw(md); e2eDraw(md); if (typeof msvDraw === 'function') msvDraw(md); if (typeof sesDraw === 'function') sesDraw(md); }  // 2.73.0 A (#661): + Servers; 2.115.0 B (#2062): + sessions
+    if (k === 'account') { tfaDraw(md); apwDraw(md); e2eDraw(md); if (typeof msvDraw === 'function') msvDraw(md); if (typeof sesDraw === 'function') sesDraw(md); if (typeof sgvDraw === 'function') sgvDraw(md); }  // 2.73.0 A (#661): + Servers; 2.115.0 B (#2062): + sessions
     $(`.snav [data-sec="${k}"]`, md)?.scrollIntoView({block: 'nearest', inline: 'nearest'});
   };
   // ---- autosave
