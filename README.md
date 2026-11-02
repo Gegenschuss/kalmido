@@ -19,79 +19,13 @@
 
 ## What's new
 
-**2.488.0** (2026-11-02):
-- **Export and import**: the account export carries your own office and the files of knowledge pages and tables, plain ZIP on servers without a server key; importing twice creates nothing twice; sprints, rules, placements, customer reports, filed e-mails, bookmarks and most settings move along.
-- **Notifications**: approvals, reviews, agent questions, calendar changes and bookings reach the person under their own name; one-click off link in notification mails, "Only the title in the push" for the lock screen; new event "Integrations", forwardings can include your own changes.
-- **Agents**: works with Codex CLI as well as Claude Code, Cursor, Windsurf and Gemini CLI connect over MCP; agents read and create scheduling polls, filed e-mails, invoice series and subscriptions through the API (shared items only); the reference starter can work a list off on its own (*Work the list off*); "AI agent" label (EU AI Act Art. 50).
-- **Office**: personal e-mail signature, online payment of invoices with your own Stripe account, Tax forms (Anlage EÜR, annual VAT return), declining depreciation per device, bank accounts as master data.
-- **Documents and notes**: swipe through documents on the phone; quick note with one grip (hold Plus / key `m`) in the private list "Notes".
-- **Chat and phone**: team chat is its own area "Chat" in the app bar; short introductions per area; big accounts load a project's tasks when it is opened.
-- **Hosting**: support access only with the customer's consent, operator console without seeing content.
-- **Public holidays**: Germany by state; Austria, Switzerland, France, Spain, Italy and the Netherlands nationwide.
-- **Upgrading**: a step needed from you is listed in docs/UPGRADING.md; a database keeps a format limit.
-
-**2.487.0** (2026-11-02):
-- **Favourites**: favourites of everything - one row of symbols in the head bar for all workspaces, from a project to a single invoice.
-
-**2.468.0** (2026-11-01):
-- **Menus**: arrange every area menu yourself - hide, bring back, drag; the same on phone and computer.
-- **Settings**: new areas "Company & office" (the office settings, also for your private office) and "Documents"; Karakeep, newsletter service, bookmark button, CardDAV birthdays and booking page are set up in Settings > Integrations.
-- **Office**: client short code `{kuerzel}` in number schemes; invoice corrections optionally count in the invoice series; credit card statements - PDF positions read locally, a receipt per position, bank total matched, DATEV account of its own.
-- **File store**: only the file store's own folders; files of knowledge pages, tables and projects as read-only collections "From <area>".
-- **Self-employed**: create your own company from the workspace menu (work apart from private); optional private registration without an invitation per server.
-
-**2.457.0** (2026-10-31):
-- **Workspaces**: each workspace remembers its own view (page, open task, scroll position, sidebar) on every device.
-- **Fields and board**: choice fields as a stage bar ("Ordered (stages)") and the board's time per card with yellow / red limits per column.
-- **Moving**: the account export now includes project notes and encrypted task notes; the organisation export includes the team chat channels with their files.
-- **Self-hosting**: on Windows `update.ps1` also makes a `pg_dump` into `data/backups/` before the update.
-
-**2.436.0** (2026-10-31):
-- **Office**: receipts by e-mail - forward invoice mails to your office address, Kalmido fetches linked invoice PDFs by itself; the client card's blocks fold and can be switched off per office.
-- **Documents**: the list can be sorted (date, arrival, sender, amount, due date, title).
-- **Settings**: "View as member" (Settings > Account) shows Kalmido as a member of your organisation sees it; the rights stay, the way back is in the account menu.
-- **Projects**: properties per project type (software, agency, personal), switchable in the project options under Properties.
-- **Agents**: git author for AI commits is a setting (agent settings, per project overridable).
-- **Backups and restore**: larger files are kept once in `data/backups/.store` for all backups (2.432); copy the backup folder WITH `.store`; *Download* always gives one complete file; a copy elsewhere is made complete with `python3 -I kalmido/admin/bkstore.py assemble` (see SELF-HOSTING.md).
-
-**2.430.0** (2026-10-30):
-- **Projects**: ticket keys APP-123 (project dialog), linked from commits, branches and pull requests; saved filters by assignee, column, sprint, milestone and text; the agent API filters and sorts tasks by every field; "Project type" in folder settings.
-- **Agents**: a live "working on it" mark on tasks (dot, name, time, last line) through the API / MCP.
-- **Knowledge**: tags (#word) with a list in the panel, live query blocks, `![[Page]]` embeds, daily notes and template placeholders.
-- **Office**: missing invoices of recurring providers with a link to their portal, a receipt fetcher for portal invoices, a booking archive for past DATEV years, final invoices after the BMF letter of 15.10.2026.
-- **Documents**: the open document stands in a pane beside the list, arrow keys go through the list.
-- **Moving**: office data moves between workspaces now also with deals, letter drafts and equipment sets.
-
-**2.409.0** (2026-10-30):
-- **Projects**: one kind of project; project folders live in the file store tree with shares that apply at runtime.
-- **File store**: one area for files and documents (list or cards per folder, recognition per folder), locked end-to-end encrypted folders.
-- **First start**: a short "What do you use Kalmido for?" for added accounts, Start as home page, tablets with the computer navigation, one Organisation area for people, agents and data.
-- **Workspaces**: areas can be switched on and off per workspace (Private by each person, an organisation by its admins).
-- **Knowledge**: reading styles, a "/" task picker, formulas (LaTeX) and Mermaid diagrams.
-- **Office**: Quotations and Invoices as two areas, with a paid filter in the invoice archive.
-- **Office PDFs**: quotation PDF with a compact closing and the totals at the bottom; logo size and side selectable in the office settings.
-- **Entertainment receipts**: optional signature picture on the approval line, drawn in the app.
-- **Software projects**: ticket keys like APP-123, linked from commits, branches and pull requests; saved filters by assignee, column, sprint, milestone and text.
-- **Office**: receipts by e-mail, a booking archive for past DATEV years, final invoices after the BMF letter of 15.10.2026, quotation PDF with a compact closing.
-- **Settings**: areas per workspace and "View as member" (Settings > Account).
-
-**2.412.0** (2026-10-28):
-- **Entertainment receipts**: optional signature picture on the approval line, drawn in the app.
-
-**2.401.0** (2026-10-28):
-- **Office**: Quotations and Invoices as two areas (Invoices with credit notes, reminders, delivery notes and a paid filter in the archive).
-- **Agents**: personal agents are allowed per workspace (private area: the person; organisation: its admins; server switch: everyone).
-- **Moving**: the account export now includes project notes and encrypted task notes; the organisation export includes the team chat channels with their files.
-
-**2.376** (2026-10-28, seven packages in one train):
-- **Office**: hand in receipts to the bookkeeping, GoBD export, take your part of an organisation's office into your personal one; refunds on credit notes, reverse charge hints, progress and final invoices.
-- **Projects**: show a task in several projects (field "Projects" in the task panel, Alt-drag onto a project).
-- **Knowledge**: live preview editor with "/" commands and tickable checkboxes; search hits show a text snippet.
-- **Agent chat**: a calm one-row header, everything else in the "…" menu.
-- **Offline**: typed text survives a closed tab, an expired session or a failed save; it is sent later, never twice.
-- **Security**: downloads of backups and exports, restores and public links ask for your password first.
-
-**2.361** (2026-10-27, fixes up to 2.361.3): split bank bookings across invoices, default interest and the 40 EUR flat fee on reminders, paper size A4 or US Letter, your own signature in office PDFs; members ask an admin to give back what they brought in.
+**2.489.0** (2026-11-03):
+- **Export and import**: the account export carries your own office, files, templates and settings; importing twice creates nothing twice; the import brings filed e-mails, bookmarks and more.
+- **Notifications**: quiet hours hold every push, pushes are bundled, approvals and calendar changes reach the right person.
+- **Office**: online payment of invoices, tax forms, personal e-mail signature, bank accounts as master data, document languages fr / es / it / nl.
+- **Agents**: Codex CLI, Cursor, Windsurf and Gemini CLI over MCP; polls, filed e-mails and invoice series through the API; delegation and watchers.
+- **Phone and chat**: own area "Chat", quick notes, swipe through documents, faster start for big accounts.
+- **Hosting**: support access only with the customer's consent.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
