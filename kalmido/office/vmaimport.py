@@ -547,10 +547,12 @@ def vmi_remove(c, oid, ids):
     # 2.152.0 (#2168, review B-H1): receipts ticked "in DATEV" lock their trip here as on the single delete
     billed |= {r["trip_id"] for r in c.execute(f"SELECT * FROM office_trip_items WHERE org_id=? AND trip_id IN ({q})", [oid] + ids)
                if olk_trip_item_reason(c, oid, r)}
+    from ..integrations.importers import IMPORT_UNDO_HOURS
+    cut = iso(now_utc() - timedelta(hours=IMPORT_UNDO_HOURS))  # 2.370.4 (#3089 N15): older trips stay (kept)
     kept = {r["id"] for r in c.execute(f"""SELECT id FROM office_trips t WHERE org_id=? AND id IN ({q}) AND (updated_at!=created_at
-                                            OR EXISTS (SELECT 1 FROM office_trip_items i WHERE i.trip_id=t.id)
+                                            OR created_at<? OR EXISTS (SELECT 1 FROM office_trip_items i WHERE i.trip_id=t.id)
                                             OR EXISTS (SELECT 1 FROM office_drives d WHERE d.trip_id=t.id)
-                                            OR EXISTS (SELECT 1 FROM life_trip_costs l WHERE l.trip_id=t.id))""", [oid] + ids)} - billed
+                                            OR EXISTS (SELECT 1 FROM life_trip_costs l WHERE l.trip_id=t.id))""", [oid] + ids + [cut])} - billed
     gone = sorted(mine - billed - kept)
     for i in gone:
         _trip_need_open(c, oid, _trip(c, oid, i))  # 2.148.0 A (#2471)

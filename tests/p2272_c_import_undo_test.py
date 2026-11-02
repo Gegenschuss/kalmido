@@ -189,5 +189,40 @@ r = Fr.post(B + F + "/delete", json={"ids": FIX})
 check(r.ok and r.json()["deleted"] == 1 and r.json()["kept"] == 1 and dbx("SELECT 1 FROM office_fixed_costs WHERE id=?", (FIX[0],))
       and not dbx("SELECT 1 FROM office_fixed_costs WHERE id=?", (FIX[1],)), f"fixed costs undo: the changed one stays {r.text[:200]}")
 
+# 2.370.4 (#3089 N15): the toast undo of a trips / fixed costs import only takes rows made within the undo window (24 h)
+r = Fr.post(B + F + "/import", json={"items": [{"label": "Alt", "amount": "10.00", "repeat": "monthly", "start": "2025-01-01"}]})
+OLD = r.json().get("ids", [0])[0]
+dbx("UPDATE office_fixed_costs SET created_at=?, updated_at=? WHERE id=?", (ago(25 * 3600), ago(25 * 3600), OLD))
+r = Fr.post(B + F + "/delete", json={"ids": [OLD]})
+check(r.ok and r.json()["deleted"] == 0 and r.json()["kept"] == 1 and dbx("SELECT 1 FROM office_fixed_costs WHERE id=?", (OLD,)),
+      f"fixed costs undo: a row older than 24 h stays {r.text[:200]}")
+r = Fr.post(B + T + "/import", json={"trips": [{"date_from": "2025-08-01", "dest": "Essen", "purpose": "job", "people": [{"id": FID}]}]})
+OLDT = r.json().get("ids", [0])[0]
+dbx("UPDATE office_trips SET created_at=?, updated_at=? WHERE id=?", (ago(25 * 3600), ago(25 * 3600), OLDT))
+r = Fr.post(B + T + "/delete", json={"ids": [OLDT]})
+check(r.ok and r.json()["deleted"] == 0 and r.json()["kept"] == [OLDT] and dbx("SELECT 1 FROM office_trips WHERE id=?", (OLDT,)),
+      f"trips undo: a trip older than 24 h stays {r.text[:200]}")
+
+# 2.370.4 (#3089 N14): two undos of the same import at once - exactly one does it, the other gets 409
+import threading  # noqa: E402
+st, j = imp(A, "Race import.csv", b"TYPE,CONTENT\ntask,Race one\ntask,Race two\n")
+RIID = j["import_id"]
+backdate(RIID)
+codes, go = [], threading.Barrier(3)
+S2 = [A, sess("alice"), sess("alice")]
+
+
+def undo_once(sx):
+    go.wait()
+    codes.append(sx.post(B + f"/api/imports/{RIID}/undo").status_code)
+
+
+th = [threading.Thread(target=undo_once, args=(sx,)) for sx in S2]
+for t_ in th:
+    t_.start()
+for t_ in th:
+    t_.join()
+check(sorted(codes) == [200, 409, 409], f"parallel undo: one 200, the others 409 {codes}")
+
 print(f"p2272_c: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

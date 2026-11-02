@@ -16,7 +16,7 @@ import io
 import math
 import re
 import zipfile
-from datetime import date
+from datetime import date, timedelta
 from xml.sax.saxutils import escape
 
 from flask import Response, jsonify
@@ -314,12 +314,15 @@ def fci_import_post():
 
 def fci_remove(c, oid, ids):
     """2.272.0 C (#3027): deletes the fixed costs `ids` of the area unchanged since they were made (updated_at = created_at, no
-    reminder sent). -> how many went. No commit."""
+    reminder sent). 2.370.4 (#3089 N15): and made within the undo window (IMPORT_UNDO_HOURS) - an older row stays.
+    -> how many went. No commit."""
     if not ids:
         return 0
+    from ..integrations.importers import IMPORT_UNDO_HOURS
     q = ",".join("?" * len(ids))
-    return c.execute(f"""DELETE FROM office_fixed_costs f WHERE org_id=? AND id IN ({q}) AND updated_at=created_at
-                         AND NOT EXISTS (SELECT 1 FROM office_sub_reminders r WHERE r.fixed_id=f.id)""", [oid] + ids).rowcount
+    cut = iso(now_utc() - timedelta(hours=IMPORT_UNDO_HOURS))
+    return c.execute(f"""DELETE FROM office_fixed_costs f WHERE org_id=? AND id IN ({q}) AND updated_at=created_at AND created_at>=?
+                         AND NOT EXISTS (SELECT 1 FROM office_sub_reminders r WHERE r.fixed_id=f.id)""", [oid] + ids + [cut]).rowcount
 
 
 @app.post("/api/office/fixed-costs/delete")

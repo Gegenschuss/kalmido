@@ -15,7 +15,7 @@ from dateutil.rrule import rrulestr
 from flask import has_request_context, jsonify, request
 
 from ..core.config import app, TZ
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.schema import MAX_DEPTH, USER_DEFAULTS
 from ..core.i18n import lang, N_, tr
 from ..core.db import bump, db, err, iso, iso_ms, local_now, now_utc, parse_iso, usettings
@@ -2241,6 +2241,7 @@ def import_any(source):
 
 
 def imp_undo(c, uid, iid):
+    write_lock(c, f"imp-undo:{int(iid)}")  # 2.370.4 (#3089 N14): two undos at once - the second one waits and sees undone_at
     r = c.execute("SELECT * FROM imports WHERE id=? AND user_id=?", (iid, uid)).fetchone()
     if not r:
         raise Denied(404)
