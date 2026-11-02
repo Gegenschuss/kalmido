@@ -28,7 +28,8 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 
   // static: the rule is in the style sheet
   const css = require('./boot').allCssSync();
-  check(/@media \(max-width:400px\)\{[^}]*\.chead\{flex-wrap:wrap/.test(css), '#3471: the comment head may wrap on narrow screens (CSS)');
+  // 2.490.0 (#4018): no own row of icons any more: in a narrow column (container < 30rem) the icons take no room (display none) until hover / focus / a tap (.cacton)
+  check(/@container cmain \(max-width:30rem\)\{[^}]*\.cacts\{position:absolute[^}]*display:none[^}]*\}[^}]*\.cm\.cacton \.cacts\{display:inline-flex/.test(css), '#3471: in a narrow column the comment icons wait for hover / tap (CSS)');
 
   await firefox(async o => {
     const {cmd, ev, ctx, shot, nav} = o;
@@ -40,13 +41,17 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
     check(await until(() => ev(`!!document.querySelector('#top h1')`).catch(() => false)), 'the list is drawn');
     await ev(`(() => { openDetail(${T}); return 1; })()`);
     check(await until(() => ev(`!!document.querySelector('#d-tl-items .cm[data-cid="${cm.id}"] .cacts .iconbtn')`).catch(() => false)), 'the comment with its buttons');
+    // 2.490.0 (#4018): at rest the icons are hidden; a tap on the comment shows them (.cacton)
+    check(await ev(`getComputedStyle(document.querySelector('#d-tl-items .cm[data-cid="${cm.id}"] .cacts')).display`) === 'none', '#4018: at rest the icons take no room at 360 px');
+    await ev(`(() => { document.querySelector('#d-tl-items .cm[data-cid="${cm.id}"] .chead b').click(); return 1; })()`);
+    check(await until(() => ev(`getComputedStyle(document.querySelector('#d-tl-items .cm[data-cid="${cm.id}"] .cacts')).display !== 'none'`).catch(() => false)), '#4018: a tap on the comment shows the icons');
     const g = await ev(`(() => {
       const d = document.querySelector('#detail'), dr = d.getBoundingClientRect(), c = document.querySelector('#d-tl-items .cm[data-cid="${cm.id}"]');
       const h = c.querySelector('.chead'), a = c.querySelector('.cacts'), ar = a.getBoundingClientRect(), nr = h.querySelector('b').getBoundingClientRect();
       return {wide: d.scrollWidth - d.clientWidth, head: h.scrollWidth - h.clientWidth, right: Math.round(ar.right - dr.right),
-        below: ar.top >= nr.bottom - 1, n: a.querySelectorAll('.iconbtn').length, page: document.documentElement.scrollWidth <= innerWidth}; })()`);
+        below: ar.top >= c.getBoundingClientRect().top - 1 && ar.bottom <= c.getBoundingClientRect().bottom + 1, n: a.querySelectorAll('.iconbtn').length, page: document.documentElement.scrollWidth <= innerWidth}; })()`);
     check(g && g.wide <= 0 && g.head <= 0 && g.right <= 0 && g.page, '#3471: nothing of the comment reaches over the edge at 360 px ' + JSON.stringify(g));
-    check(g && g.below, '#3471: the buttons are an own row under name and time ' + JSON.stringify(g));
+    check(g && g.below, '#3471/#4018: the icons sit inside the comment, over its top right corner ' + JSON.stringify(g));
     check(g && g.n >= 4, '#3471: no button left out (Reply, Copy, Save as task, Edit, Delete) ' + JSON.stringify(g));
     await shot('p2421-360-comment.png');
   }, true);

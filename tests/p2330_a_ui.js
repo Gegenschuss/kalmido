@@ -178,7 +178,8 @@ const V = B + 'api/v1';
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
     await o.nav(B + '#t/' + T); await sleep(2500);
     const g = await ev(`(() => { const q = document.querySelector('#detail .mquote'); const b = document.querySelector('#detail .cm [data-act="msg-reply"]');
-      return {q: !!q, rb: b ? getComputedStyle(b.closest('.cacts')).opacity : null}; })()`);
+      return {q: !!q, rb: b ? (() => { const cs = getComputedStyle(b.closest('.cacts')); return cs.display === 'none' ? '0' : cs.opacity; })() : null}; })()`);
+    // 2.490.0 (#4018): the task panel is a narrow container (< 30rem): the action icons are not shown at all (display none) until hover / focus / a tap; wider: opacity 0
     check(g && g.q && g.rb === '0', `${tag}: the quote shows, the Reply button waits for the mouse ` + JSON.stringify(g));
     await shot('p2330a-1440-comment-quote.png');
   }, false);
