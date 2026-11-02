@@ -11,6 +11,7 @@ freelancer-matrix: agents
    a News entry (job_watch) and "Waiting for me" (kind watch) for its owner; progress ends the case, a new stall is a new one;
    stall_min 0 = never (the other agent of the same tick is told); a branch of an open task without a merge, no open job,
    the last one ended 3 days ago -> branch_stranded once (the branch untrusted), a merge ends the case
+ - an agent reading a person's Waiting for me sees only its own findings
  - work style: stall_min 0 or 15..1440, else 400
  - a person without an organisation: her own list and her personal agents
 usage: p23922_b_api_test.py <datadir>"""
@@ -70,7 +71,8 @@ FU, F = freelancer(B, A, "frida")  # a person without an organisation: her own l
 XU, X = freelancer(B, A, "xena")  # a stranger
 L = F.post(B + "/api/lists", json={"name": "Release", "kind": "project", "ptype": "software"}).json()["id"]
 AID, AH = agent(F, "fridabot", L)
-BID, BH = agent(F, "fridahelper", L)
+L2 = F.post(B + "/api/lists", json={"name": "Side", "kind": "project"}).json()["id"]
+BID, BH = agent(F, "fridahelper", L2)  # one agent per project
 T = [task(F, L, f"Task {i}") for i in range(4)]
 XT = task(X, X.post(B + "/api/lists", json={"name": "Hers"}).json()["id"], "Not yours")
 
@@ -142,6 +144,10 @@ JB = job(BH, title="Helper's").json()["id"]
 dbx("UPDATE agent_jobs SET updated_at=? WHERE id IN (?, ?)", (ago(minutes=90), JS2, JB))
 check(until(lambda: events(BH, "job_stalled"), 30), "the other agent is told")
 check(not [e for e in events(AH, "job_stalled") if e["data"]["job"]["id"] == JS2], "stall_min 0: not told")
+check(until(lambda: [x for x in F.get(B + "/api/inbox").json()["items"] if x["kind"] == "watch" and x["job_id"] == JB]), "her inbox: the helper's finding")
+wa = requests.get(V + "/me/waiting", headers=AH, params={"user_id": FU})
+check(wa.ok and not [x for x in wa.json()["items"] if x["kind"] == "watch" and x.get("agent_id") != AID],
+      "an agent reads only its own findings (review) " + wa.text[:200])
 check(not events(AH, "branch_stranded"), "no stranded branch yet")
 for x, h in ((JS, AH), (JS2, AH), (JB, BH)):
     requests.patch(V + f"/agent/jobs/{x}", headers=h, json={"state": "done"})

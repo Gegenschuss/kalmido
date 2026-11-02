@@ -61,7 +61,7 @@ def _tell(c, users, S, LG, kind, j, tid, data):
     s, lid = S[uid], row["list_id"] if row else None
     news_add(c, uid, "job_watch", task_id=tid if row and task_visible(c, tid, uid) else None,
              data={"kind": kind, "job": j["id"], "title": (j["title"] or "")[:200], **{k: v for k, v in data.items() if k in ("minutes", "days")}},
-             actor=aid, s=s)
+             actor=aid)  # collab_user decides (the collaboration module of the person)
     a = agent_row(c, aid)
     if not a or ws_get(a)["push"] == "never" or not notif_ok(c, uid, s, "approval", "push", lid) or not h6e_agent_push_ok(aid, uid):
         return
@@ -115,6 +115,8 @@ def watch_stranded(c, users, S, LG):
                   {"branch": {"name": b["name"], "repo": f"{b['owner']}/{b['repo']}", "ahead": b["ahead"], "origin": "git", "untrusted": True},
                    "days": int((now - at).total_seconds() // 86400), "since": j["updated_at"],
                    "hint": "Work of this task lies on a branch without a merge and no job is open. Merge it, or park the task with the reason."})
+    if len(rows) >= WATCH_MAX * 5:
+        return  # 2.392.2 (review): only a complete look ends cases (a branch beyond the window still lies there)
     for r in c.execute("SELECT id, ref FROM job_watch WHERE kind='branch_stranded' AND cleared_at IS NULL").fetchall():
         if r["ref"] not in live:
             c.execute("UPDATE job_watch SET cleared_at=? WHERE id=?", (iso(now), r["id"]))

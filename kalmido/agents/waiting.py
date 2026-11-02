@@ -190,6 +190,8 @@ def _watch(s):
     """2.392.2 (#3366): the watchdog's open findings told to me (agents/watch.py), only where I still see the task and, for an
     agent or a limited token, only inside its lists."""
     rows = watch_open(s.c, s.uid)
+    if s.agent_id:  # 2.392.2 (review): an agent reads only its own findings, not those of the person's other agents
+        rows = [r for r in rows if r["agent_id"] == s.agent_id]
     tasks, names = s.tasks([r["task_id"] for r in rows]), user_names(s.c, list({r["agent_id"] for r in rows}))
     out = []
     for r in rows:
