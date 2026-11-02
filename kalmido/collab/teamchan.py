@@ -285,9 +285,9 @@ def tcx_id_list(v, field="members"):
 
 
 def need_person(c):
-    from ..agents.core import need_person
+    from ..agents.core import need_person as person_only  # an alias: this wrapper has the same name
     need_tchat(c)
-    need_person(403, tr("Only people open channels and group conversations"))
+    person_only(403, tr("Only people open channels and group conversations"))
 
 
 def need_xroom(c, rid):

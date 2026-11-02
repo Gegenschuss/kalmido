@@ -89,8 +89,8 @@ def clean_layout(v, allowed=None):
 
 def need_person():
     """Views are arranged by the person themselves: never by an agent (its token or its session)."""
-    from ..agents.core import need_person
-    need_person(403, tr("Agents cannot change how views are arranged"))
+    from ..agents.core import need_person as person_only  # an alias: this wrapper has the same name
+    person_only(403, tr("Agents cannot change how views are arranged"))
 
 
 # ---------------------------------------------------------------- the project page (#983)
