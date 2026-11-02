@@ -275,7 +275,7 @@ check(r == "True True", f"review 5: quote patterns fast on a long line, short qu
 # 6: a malformed Message-ID is not stored (a reply row), the reporter row stays without it
 r = py("from kalmido.integrations.taskmail import tmr_keep\n"
        f"tmr_keep(c, {T1}, '<a@example.org> <b@example.org>', '', 'in')\ntmr_keep(c, {T1}, 'no-brackets@example.org', 'x@example.org', 'src')\n"
-       f"print([tuple(x) for x in c.execute(\"SELECT kind, msg_id FROM task_mail WHERE task_id=? AND (msg_id LIKE '%%b@example.org%%' OR kind='src' AND msg_id='')\", ({T1},)).fetchall()])\n"
+       f"print([tuple(x) for x in c.execute(\"SELECT kind, msg_id FROM task_mail WHERE task_id=? AND (msg_id LIKE '%%<b@example.org>%%' OR kind='src' AND msg_id='')\", ({T1},)).fetchall()])\n"
        "c.rollback()")
 check(r == "[('src', '')]", f"review 6: only well-formed Message-IDs stored {r!r}")
 

@@ -91,11 +91,12 @@ def tmr_keep(c, tid, msg_id, sender, kind):
     """Stores one Message-ID of task tid (caller commits). 2.393.2 F (#3375): review 6 - only the form hub/mailbox.py _refs reads
     ("<...>" without spaces): such an id is sent again as In-Reply-To / References."""
     mid = str(msg_id or "").strip()
-    if not _MID_RE.fullmatch(mid) and kind == "src":
-        mid = ""  # the reporter stays without its id
-    if mid or kind == "src":
-        c.execute("INSERT INTO task_mail(task_id,msg_id,sender,kind,created_at) VALUES(?,?,?,?,?)",  # review 3: an address only for the
-                  (tid, mid, (sender or "")[:300] if kind == "src" else "", kind, iso(now_utc())))  # reporter (none outlives an account)
+    if not _MID_RE.fullmatch(mid):
+        if kind != "src":
+            return
+        mid = ""  # the reporter stays, without its id
+    c.execute("INSERT INTO task_mail(task_id,msg_id,sender,kind,created_at) VALUES(?,?,?,?,?)",  # review 3: an address only for the
+              (tid, mid, (sender or "")[:300] if kind == "src" else "", kind, iso(now_utc())))  # reporter (none outlives an account)
 
 
 def tmr_reporter(c, tid):
