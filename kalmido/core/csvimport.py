@@ -24,6 +24,8 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 from .i18n import tr
+from ..core.errors import BadInput  # 2.369.5 (#2517): pulled up from functions
+from .serializers import csv_cell as _cell  # 2.369.5 (#2517): pulled up from functions
 
 CSV_MAX, CSV_ROWS = 2 * 1024 * 1024, 3000
 CSV_AMOUNT_MAX = Decimal("10000000")
@@ -80,7 +82,6 @@ CSV_PRESETS = (
 
 
 def _bad(msg):
-    from ..core.errors import BadInput  # noqa: PLC0415 -- the app's 400 (a domain class; core imports it here only)
     return BadInput(msg)
 
 
@@ -97,7 +98,6 @@ def csv_clean(v, n=CSV_TEXT_MAX):
 
 def csv_cell(s):
     """Free text for a CSV cell of an export (no formulas, core/serializers.csv_cell)."""
-    from .serializers import csv_cell as _cell  # noqa: PLC0415 -- serializers reads the session (accounts)
     return _cell(s)
 
 

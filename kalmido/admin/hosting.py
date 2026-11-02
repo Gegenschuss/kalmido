@@ -18,6 +18,14 @@ from ..api.common import v1_args, v1_err, v1_json, v1_view
 from ..api.scopes import need_scope  # 2.360.0 A (#2496)
 from ..core.env import env_bool
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..files.store import fs_bytes_of  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.users import need_admin  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
+from ..core.schema import USER_DEFAULTS  # 2.369.5 (#2517): pulled up from functions
+from ..notify.push import push_prio, push_reachable  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import lang_of  # 2.369.5 (#2517): pulled up from functions
+from ..core.errors import UnknownFields  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import instance_mode, main_org, ORG_NAME_ENV  # 2.369.5 (#2517): pulled up from functions
 
 # ---- the kind of server (#905). KALMIDO_HOSTED=1: an instance run as a service for others (no private networks behind it):
 # integrations may only reach public HTTPS addresses (the admin's internal-host allow-list does not apply).
@@ -104,7 +112,6 @@ def _user_bytes(c, uids):
     b = c.execute(f"SELECT COALESCE(SUM(size),0) FROM list_files WHERE user_id IN ({q}) AND deleted_at IS NULL", uids).fetchone()[0]  # 2.272.0 F (#3038, E2-H2): not the trash
     d = c.execute(f"""SELECT COALESCE(SUM(f.size),0) FROM chat_files f JOIN agent_chat m ON m.id=f.message_id
                       WHERE m.sender='user' AND m.user_id IN ({q})""", uids).fetchone()[0]
-    from ..files.store import fs_bytes_of
     e = fs_bytes_of(c, uids)  # 2.48.0 (#1207): every version in the file store counts for its uploader
     g = c.execute(f"SELECT COALESCE(SUM(size),0) FROM budget_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.72.0 (#1333): receipts
     h = c.execute(f"SELECT COALESCE(SUM(size),0) FROM wiki_files WHERE created_by IN ({q})", uids).fetchone()[0]  # 2.99.0 A (#2182)
@@ -126,7 +133,6 @@ def quota_info(c, uid):
     own = u["storage_quota_mb"]
     members = [uid]
     if pool == "org" and own is None:
-        from ..core.pg import system_ctx
         with system_ctx(c):  # 2.37.0 (#1150): the pool's members (ids, structure; also when an admin looks at somebody else)
             r = c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id LIMIT 1", (uid,)).fetchone()
             if r:
@@ -202,7 +208,6 @@ def quota_exceeded(e):
 def quota_backfill(c):
     """Once (2.24.0): the uploader of files from before (attachments.user_id): a comment's author, else the task's creator."""
     if HOSTED and gsetting(c, "migr_hosted_pl") != "1":  # #905: a hosted server starts new accounts without Paperless
-        from ..core.schema import USER_DEFAULTS
         fs = [f for f in (gsetting(c, "default_features") or USER_DEFAULTS["features"]).split(",") if f and f != "paperless"]
         gset(c, "default_features", ",".join(fs))
         gset(c, "migr_hosted_pl", "1")
@@ -283,9 +288,6 @@ def announce_set(c, b, by=None):
         return e
     gset(c, "announce", json.dumps(a, ensure_ascii=False) if a else "")
     if a and b.get("push") is True and g.get("pushes") is not None:
-        from ..collab.news import notif_ok
-        from ..notify.push import push_prio, push_reachable
-        from ..collab.comments import lang_of
         author = g.user["id"] if g.get("user") else None
         for r in c.execute("SELECT id FROM users WHERE disabled=0 AND kind!='agent'").fetchall():
             s = usettings(c, r[0])
@@ -297,7 +299,6 @@ def announce_set(c, b, by=None):
 
 @app.put("/api/admin/announcement")
 def admin_announce_put():
-    from ..accounts.users import need_admin
     need_admin()
     c = db()
     e = announce_set(c, body(), g.user["username"])
@@ -328,7 +329,6 @@ def v1_announce_put():
     b = v1_json()
     unknown = sorted(k for k in b if k not in ("text", "level", "starts_at", "ends_at", "minutes", "push"))
     if unknown:
-        from ..core.errors import UnknownFields
         raise UnknownFields(unknown)
     e = announce_set(c, b, g.user["username"])
     if e:
@@ -424,10 +424,8 @@ def hosting_settings(c, b):
             return err(tr("Invalid value: {0}", "mail_day_limit"))
         gset(c, "mail_day_limit", str(v))
     if "org_name" in b:  # 2.24.0 (UX-23): the organisation of an "organisation" server can be renamed (unless KALMIDO_ORG_NAME)
-        from ..accounts.orgs import instance_mode, main_org, ORG_NAME_ENV
         nm = re.sub(r"\s+", " ", str(b["org_name"] or "")).strip()[:60]
         # 2.46.0 (#1592): renames the instance's only organisation (several: the organisation dialog)
-        from ..core.pg import system_ctx
         with system_ctx(c):  # 2.46.0 (#1592, review fix): every organisation counts, not only the admin's own
             # 2.422.0 (#2937 review): companies people created themselves are not the server's organisation
             n_orgs = c.execute("SELECT COUNT(*) FROM orgs WHERE personal_of IS NULL AND retired_at IS NULL AND self_made=0").fetchone()[0]  # 2.47.3 (#1360)
@@ -488,7 +486,6 @@ def org_activity(c):
 
 @app.get("/api/admin/orgs/activity")
 def admin_orgs_activity():
-    from ..accounts.users import need_admin
     need_admin()
     return jsonify(org_activity(db()))
 
@@ -529,7 +526,6 @@ def hosting_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
 # (Administration > Agents) lets everyone; off, each workspace decides -- an organisation's admins (orgs.member_agents,
 # Settings > Workspaces), the private area the person themselves (agents/admin.py agent_ws_allowed).
 def agent_joined_notice(c, lid, aid, actor):
-    from ..collab.news import news_add
     a = c.execute("""SELECT u.display_name, u.username, COALESCE(g.provider,'') AS provider, g.owner_id FROM users u
                      LEFT JOIN agents g ON g.user_id=u.id WHERE u.id=?""", (aid,)).fetchone()
     l = c.execute("SELECT name, owner_id FROM lists WHERE id=?", (lid,)).fetchone()

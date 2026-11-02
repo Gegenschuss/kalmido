@@ -23,6 +23,7 @@ from ..core.access import Denied
 from ..accounts.session import me
 from ..files.store import fs_log_add, fs_read, fs_role, fs_visible_sql
 from . import store as S
+from .web import doc_update  # 2.369.5 (#2517): pulled up from functions
 
 DSR_IDS = 2000          # documents per request (the selection's limit in docs.js, DC_SMV_MAX)
 DSR_EDIT = 500          # documents per change request (each one learns: the client sends larger choices in parts)
@@ -36,9 +37,8 @@ DSR_PACKED = ("pdf", "jpg", "jpeg", "png", "gif", "webp", "avif", "heic", "heif"
 
 
 def _no_agent():
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403)
+    from ..agents.core import need_person
+    need_person(403)
 
 
 def dsr_idlist(v, most=DSR_IDS):
@@ -80,7 +80,6 @@ def docs_bulk():
     """{ids, add_tags?: [names], remove_tags?: [names], type?: name | "" (none), sender?: name | ""} -- one change on every
     chosen document I may change (names make labels in each document's workspace) -> {changed, denied, before: [{id,
     sender, type, tags}]} (denied: chosen documents I may only view). {restore: [{id, sender, type, tags}]} (the undo): those values back."""
-    from .web import doc_update
     c = db()
     _no_agent()
     uid = me()

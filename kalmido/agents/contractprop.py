@@ -25,6 +25,16 @@ from ..accounts.session import me
 from ..core.errors import BadInput
 from ..core.config import WATCHDOG_INTERVAL  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import v1_err  # 2.149.0 G (#2517): pulled up from functions
+from ..life.model import contract_out, feat_on  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
+from ..agents.safety import ids_parse  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import agent_active, agent_emit, agent_ids, agent_row, job_dict, JOB_TITLE_MAX  # 2.369.5 (#2517): pulled up from functions
+from ..office.model import office_on  # 2.369.5 (#2517): pulled up from functions
+from ..agents.proposals import _p_keys, _p_int, _p_str, prop_ready_notify, prop_validate, PROP_MAX_BYTES  # 2.369.5 (#2517): pulled up from functions
+from ..agents.usage import usage_block  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.lifecycle import apply_update  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import news_forget_comment  # 2.369.5 (#2517): pulled up from functions
 
 CTR_KIND = "notice"
 CTR_EVENT = "contract_notice"
@@ -68,8 +78,6 @@ def ctr_person(c, t):
 
 def ctr_data(c, t, pid):
     """The event's / card's view of a contract (life/model.py contract_out) + the person and their language."""
-    from ..life.model import contract_out
-    from ..collab.comments import user_names
     d = contract_out({**dict(t), "fam": _fam(t)}, local_now().date())
     return {"task_id": d["task_id"], "list_id": d["list_id"], "name": d["name"], "provider": d["provider"], "cost": d["cost"],
             "per": d["per"], "monthly": d["monthly"], "yearly": d["yearly"], "notice": d["notice"], "notice_unit": d["notice_unit"],
@@ -81,7 +89,6 @@ def ctr_data(c, t, pid):
 def _agent_sees(c, a, t):
     """The agent may see the contract: its list is shared with it (list_role: never a health list, never outside the
     agent's organisation), inside its list limit, and the list belongs to its organisation (or to nobody's) when it has one."""
-    from ..agents.safety import ids_parse
     lid, aid = t["list_id"], a["user_id"]
     if a["list_ids"] and lid not in ids_parse(a["list_ids"]):
         return False
@@ -110,9 +117,6 @@ def ctr_tick(c, now=None):
     """Watchdog: the event contract_notice for every contract in reach, once per contract, last day to cancel and agent.
     Runs at most every CTR_EVERY_TICKS watchdog intervals (the deadlines are whole days)."""
     import time
-    from ..agents.core import agent_active, agent_emit, agent_ids, agent_row
-    from ..life.model import feat_on
-    from ..office.model import office_on
     if time.monotonic() - _CTR_LAST["at"] < CTR_EVERY_TICKS * WATCHDOG_INTERVAL:
         return
     _CTR_LAST["at"] = time.monotonic()
@@ -150,7 +154,6 @@ def ctr_expire(c):
 # ---------------------------------------------------------------- the agent proposes (POST /api/v1/agent/proposals kind notice)
 def _need_contract(c, aid, tid):
     """The open contract task tid the agent may see and has been told about for its current last day to cancel."""
-    from ..agents.core import agent_row
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     a = agent_row(c, aid)
     if not t or not a or t["deleted_at"] or _fam(t).get("kind") != "contract" or not _agent_sees(c, a, t):
@@ -164,7 +167,6 @@ def _need_contract(c, aid, tid):
 
 def ctr_validate(b, inp):
     """prop_validate for kind notice: {task_id?, text, summary?} -> {task_id, text}; the task is the job's."""
-    from ..agents.proposals import _p_keys, _p_int, _p_str
     _p_keys(b, "", ("kind", "summary", "task_id", "text"))
     tid = inp.get("task_id")
     if b.get("task_id") is not None and _p_int(b.get("task_id"), "task_id") != tid:
@@ -175,9 +177,6 @@ def ctr_validate(b, inp):
 def ctr_agent_proposal(aid, b):
     """{kind: notice, task_id, text} -> a ready proposal (kind notice) for the person whose contract it is. An open one of this
     agent for the same contract is replaced. Nothing changes until the person takes it."""
-    from ..agents.core import agent_row, job_dict, JOB_TITLE_MAX
-    from ..agents.proposals import _p_keys, _p_int, prop_ready_notify, prop_validate, PROP_MAX_BYTES
-    from ..agents.usage import usage_block
     _p_keys(b, "", ("kind", "task_id", "text", "summary"))
     if len(request.data or b"") > PROP_MAX_BYTES:
         return v1_err(413, tr("The proposal is too large (at most {0} KB)", PROP_MAX_BYTES // 1024))
@@ -241,8 +240,6 @@ def ctr_run(c, j, sel, ed, extra, rec):
     """Take it (as the person): the sentence becomes a comment on the contract task; with remind also a reminder
     CTR_REMIND_DAYS days before the last day to cancel. rec = the undo record. Written straight into comments on purpose:
     a private note of the person, no comment push / news / comment event to the list's members and agents."""
-    from ..tasks.lifecycle import apply_update
-    from ..tasks.validation import log_act
     p, inp, uid = json.loads(j["proposal"]), json.loads(j["input"] or "{}"), me()
     tid = p["task_id"]
     need_task(c, tid, write=False, full=True)  # view-only members may comment, as everywhere
@@ -270,7 +267,6 @@ def ctr_run(c, j, sel, ed, extra, rec):
 def ctr_undo(c, j, rec, back=True):
     """Undo: the comment goes (unless someone edited it), the reminder goes back (unless the reminders changed since).
     Redo (back=False): both come again."""
-    from ..tasks.lifecycle import apply_update
     p, n, skipped = json.loads(j["proposal"]), 0, []
     tid, cid = rec.get("task_id"), rec.get("comment_id")
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
@@ -280,7 +276,6 @@ def ctr_undo(c, j, rec, back=True):
     r = c.execute("SELECT * FROM comments WHERE id=? AND task_id=? AND user_id=?", (cid, tid, me())).fetchone()
     if r and back and not r["deleted_at"] and not r["edited_at"]:
         n += c.execute("UPDATE comments SET body='', deleted_at=? WHERE id=?", (iso(now_utc()), cid)).rowcount
-        from ..collab.news import news_forget_comment
         news_forget_comment(c, cid)  # 2.306.0 (#2889 review N21): the News excerpt goes with the text
     elif r and not back and r["deleted_at"]:
         n += c.execute("UPDATE comments SET body=?, deleted_at=NULL WHERE id=?", (p["text"], cid)).rowcount

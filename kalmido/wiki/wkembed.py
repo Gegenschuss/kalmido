@@ -23,6 +23,12 @@ from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
 from ..core.errors import BadInput
+from ..sheets.core import sh_may, sh_need  # 2.369.5 (#2517): pulled up from functions
+from ..sheets.shbook import shb_deleted  # 2.369.5 (#2517): pulled up from functions
+from .pages import wiki_need, wiki_space_key  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import user_orgs  # 2.369.5 (#2517): pulled up from functions
+from .wikie2e import wke_open_sql  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import user_orgs_full  # 2.369.5 (#2517): pulled up from functions
 
 WEM_EMBED_RE = re.compile(r"/api/files/nodes/(\d{1,15})/content\b")
 WEM_LINK_RE = re.compile(r"\[\[\s*(datei|tabelle)\s*:\s*([^\[\]|#\n]{1,250}?)\s*(?:\|[^\[\]\n]*)?\]\]", re.I)
@@ -64,10 +70,8 @@ def wem_visible(c, uid, node_id, page=None):
 
 
 def wem_sheet_ok(c, uid, sid, page):
-    from ..sheets.core import sh_may
     if not uid or not isinstance(sid, int) or not 0 < sid < 2 ** 62:
         return None
-    from ..sheets.shbook import shb_deleted
     r = c.execute("SELECT * FROM sheets WHERE id=? AND deleted_at IS NULL", (sid,)).fetchone()
     if r and shb_deleted(c, r):  # 2.124.0 (#2116): a further sheet of a table in the trash
         return None
@@ -156,7 +160,6 @@ def wem_refs(pid):
     see from this page (they need to read the page): {files: {id: {name, mime, size, image, url}}, links: {"<kind>:<ref in
     lower case>": {kind file | sheet, id, name, url, image?}}}. Not visible / not there / another space = left out (no name).
     Read-only; POST only because the browser sends what it found in the text (a locked space: the decrypted text)."""
-    from .pages import wiki_need
     c = db()
     page = wiki_need(c, pid)
     uid = me()
@@ -189,8 +192,6 @@ def wem_refs(pid):
 def wem_backlinks():
     """?file=<node id> | ?sheet=<table id> -- the knowledge pages one may read (spaces without the lock) that show or link it;
     404 when one may not see the file / table itself."""
-    from ..accounts.orgs import user_orgs
-    from .wikie2e import wke_open_sql
     c = db()
     uid = me()
     fid, sid = request.args.get("file", type=int), request.args.get("sheet", type=int)
@@ -199,18 +200,15 @@ def wem_backlinks():
             raise Denied(404)
         col, oid = "to_file", fid
     elif sid:
-        from ..sheets.core import sh_need
         sh_need(c, sid)
         col, oid = "to_sheet", sid
     else:
         raise BadInput(tr("Invalid value: {0}", "file"))
-    from ..accounts.orgroles import user_orgs_full
     orgs = [o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]  # 2.143.0 A (#2151)
     rows = c.execute(f"SELECT DISTINCT p.id, p.org_id, p.path FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.{col}=? "
                      f"AND {wke_open_sql('p')} AND p.deleted_at IS NULL AND ((p.org_id IS NULL AND p.owner_id=?)"
                      + (f" OR p.org_id IN ({','.join(str(int(x)) for x in orgs)})" if orgs else "") + ") ORDER BY p.path LIMIT 50",
                      (oid, uid)).fetchall()
-    from .pages import wiki_space_key
     return jsonify(pages=[{"id": r["id"], "path": r["path"], "space": wiki_space_key(r["org_id"])} for r in rows])
 
 

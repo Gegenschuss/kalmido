@@ -23,6 +23,8 @@ from ..api.common import v1_args, v1_err, v1_json, v1_view
 from ..files.fsref import fs_ref_rename  # 2.199.0 C (#2742)
 from .core import (SH_KINDS, sh_add_col, sh_add_rows, sh_brief, sh_check_list, sh_clean_title, sh_create, sh_dict, sh_index,
                    sh_may_rebind, sh_need, sh_reload, sh_rev_conflict, sh_set_cells, sh_touch, sh_undo_batch, sh_vars)
+from .shbook import shb_patch, shb_sync, shb_spec  # 2.369.5 (#2517): pulled up from functions
+from .shshare import shs_need_own  # 2.369.5 (#2517): pulled up from functions
 
 SHX_CREATE_FIELDS = ("title", "space", "list_id", "columns", "rows")
 
@@ -134,12 +136,10 @@ def v1_sheet_patch(sid):
     if "list_id" in b:
         lid = _int_or_none(b["list_id"], "list_id")
         if lid != r["list_id"]:
-            from .shshare import shs_need_own
             shs_need_own(c, r)  # 2.124.0 C (#2113): never through a share
             if not sh_may_rebind(c, me(), r):
                 raise Denied(403)  # 2.89.0 (#1916): review 2, the rule of the web route; agents only on their own sheets
             f["list_id"] = sh_check_list(c, r["org_id"], lid, me())
-    from .shbook import shb_patch, shb_sync
     f = shb_patch(c, r, f)  # 2.124.0 E (#2116): the list on the first sheet only; a further sheet's title = its name in the bar
     if f:
         c.execute(f"UPDATE sheets SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), sid])
@@ -353,6 +353,5 @@ def sheets_spec(paths, schemas, op, ok, errs, ref, pid, q):
         scope="sheets:write",
         desc="Cells get their former input unless someone changed them since; added rows / columns go to the trash, a table the call "
              "created too. An agent may take back only its own calls.")}
-    from .shbook import shb_spec
     shb_spec(paths, schemas, op, ok, errs, ref, pid, q, inputs, col_in, write)  # 2.124.0 E (#2116): the sheets of a table
 

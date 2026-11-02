@@ -19,12 +19,14 @@ from ..events.model import (
 from ..events.ics import ics_export
 from ..events.invite import evi_after_delete, evi_after_restore, evi_after_save, evi_cal_cancel, evi_estimate, evi_flag, evi_precheck, evi_send, evi_snap
 from ..api.common import v1_call  # 2.149.0 G (#2517): pulled up from functions
+from ..tasks.tasks import task_create  # 2.369.5 (#2517): pulled up from functions
+from ..core.errors import UnknownFields  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import obj_org_set, ws_fit_problem  # 2.369.5 (#2517): pulled up from functions
 
 
 def _unknown(b, allowed):
     bad = sorted(k for k in b if k not in allowed)
     if bad:
-        from ..core.errors import UnknownFields
         raise UnknownFields(bad)
 
 
@@ -45,7 +47,6 @@ def op_cal_edit(c, uid, cid, b):
     _unknown(b, ("name", "color", "description", "hidden", "org_id"))
     cal, role = need_evcal(c, cid)
     if "org_id" in b:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
-        from ..accounts.orgs import obj_org_set
         if obj_org_set(c, "ev_cals", "cal_id", "ev_cal_members", cid, b["org_id"], "cal"):
             cal_touch(c, cid)
     f = {k: b[k] for k in ("name", "color", "description") if k in b}
@@ -155,7 +156,6 @@ def op_event_edit(c, uid, eid, b, occ=None):
         nc = as_int(b["cal_id"], "cal_id", 1)
         nk, _ = need_evcal(c, nc, write=True)
         if nk["org_id"] and "attendees" not in b:  # 2.87.0 (#1983): its invited people must fit the new calendar's organisation (as obj_org_set)
-            from ..accounts.orgs import ws_fit_problem
             for (au,) in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL ORDER BY user_id", (eid,)).fetchall():
                 p = ws_fit_problem(c, nk["org_id"], au, "cal")
                 if p:
@@ -227,7 +227,6 @@ def op_rsvp(c, uid, eid, b):
 
 def op_prep_task(c, uid, eid, b):
     """A task to prepare the event: due the given days before its (next) start, in the inbox or a list, linked both ways."""
-    from ..tasks.tasks import task_create
     _unknown(b, ("title", "list_id", "days_before"))
     r, role = need_event(c, eid, write=True)
     if r["task_id"] and c.execute("SELECT 1 FROM tasks WHERE id=? AND deleted_at IS NULL", (r["task_id"],)).fetchone():

@@ -37,6 +37,9 @@ _KEEP = object()
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
 from ..office.rights import NO_RIGHT, ofr_allows, ofr_groups_of, ofr_rights  # 2.237.0
+from ..office.periodlock import pl_receipt_need_open  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_chain, fs_role, fs_visible_sql_c  # 2.369.5 (#2517): pulled up from functions
+from ..docs.ingest import doc_on_done  # 2.369.5 (#2517): pulled up from functions
 
 
 def _is_agent():
@@ -265,7 +268,6 @@ def rc_put(nid):
         return err(str(e))
     if lid and not rc_project_ok(c, lid, n, uid):
         return err(tr("Choose a project of this workspace"))
-    from ..office.periodlock import pl_receipt_need_open
     pl_receipt_need_open(c, nid, becoming=bool(cat or lid or b.get("keep") is True or vat not in (_KEEP, None)))  # 2.148.0 A (#2471)
     rc_set(c, n, m["ws"], lid, cat, uid, vat, keep=b.get("keep") is True)
     fs_log_add(c, nid, "receipt")
@@ -327,7 +329,6 @@ def rc_accept(sid):
         return err(str(e))
     if lid and not rc_project_ok(c, lid, n, uid):
         return err(tr("Choose a project of this workspace"))
-    from ..office.periodlock import pl_receipt_need_open
     pl_receipt_need_open(c, n["id"], becoming=True)  # 2.148.0 A (#2471)
     pa = pc = pv = None
     if amt or ccy:
@@ -371,7 +372,6 @@ def rc_reopen(sid):
     uid = me()
     s, n, m = _need_sug(c, sid)
     if s["state"] == "accepted":
-        from ..office.periodlock import pl_receipt_need_open
         pl_receipt_need_open(c, n["id"])  # 2.148.0 A (#2471): a receipt of a locked month keeps what was accepted
         vat = _KEEP if s["prev_vat_pct"] is None else (None if s["prev_vat_pct"] in ("-", "x") else s["prev_vat_pct"])
         only_money = not s["list_id"] and not s["category"]  # 2.121.0 review M2: its accept never created / removed the row
@@ -446,7 +446,6 @@ def v1_rc_list():
         where.append("agent_id=?")
         args.append(uid)
     else:  # 2.126.0 A (#1979 L7): a person -- only documents they see, before the limit
-        from ..files.store import fs_visible_sql_c
         where.append(f"node_id IN {fs_visible_sql_c(c, uid)}")
     if st != "all":
         where.append("state=?")
@@ -497,7 +496,6 @@ def rc_spec(paths, schemas, op, ok, errs, ref, pid, q):
 # ---- the event document_added ------------------------------------------------------------------------------------------
 def rc_doc_agents(c, nid):
     """The agents that see document nid: a share on it or a folder above it, or their own result folder (fs_role decides)."""
-    from ..files.store import fs_chain, fs_role
     chain = fs_chain(c, nid)
     ids = [x["id"] for x in chain]
     if not ids:
@@ -528,7 +526,6 @@ def rc_on_done(c, nid, first):
 
 
 def _rc_hook():
-    from ..docs.ingest import doc_on_done
     if rc_on_done not in doc_on_done:
         doc_on_done.append(rc_on_done)
 

@@ -11,6 +11,7 @@ import time
 
 from .db import connect
 from .pg import system_ctx
+from . import config  # 2.369.5 (#2517): pulled up from functions
 
 RATE_SHARED_MIN_S = 600   # a limit over at least this many seconds is counted for every process
 RATE_KEEP_S = 86400 + 60  # the longest window of a shared limit (a day) and a little
@@ -21,7 +22,6 @@ _HKEY = {}
 def _hkey():
     """2.306.0 Fix-1 (#2875 review): the keys' hash key from the server key (HKDF like the queue's, accounts/bgjobs.py), so a
     copy of the database alone does not give the addresses and names back; without a server key a plain hash as before."""
-    from . import config
     if config.SECRET_KEY and "k" not in _HKEY:
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.kdf.hkdf import HKDF

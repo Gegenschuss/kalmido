@@ -27,6 +27,7 @@ from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.env import env_bool
+from ..accounts.users import need_admin  # 2.369.5 (#2517): pulled up from functions
 
 SC_CHUNK = 64 * 1024      # bytes per INSTREAM chunk
 SC_CONNECT_S = 3          # connect timeout
@@ -643,7 +644,6 @@ def sc_tick(c, force=False):
 # ---------------------------------------------------------------- Settings > Users > Whole server: the scanner's state
 @app.get("/api/admin/upload-scan")
 def sc_admin_state():
-    from ..accounts.users import need_admin
     need_admin()
     c = db()
     t = sc_target()

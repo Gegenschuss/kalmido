@@ -51,6 +51,11 @@ from ..api.common import (  # noqa: F401  2.149.0 G (#2517): the route helpers m
     v1_error, v1_feature, v1_json, v1_out, v1_page, v1_view, V1_CODES, V1Error,
 )
 from ..api.common import V1_KEY_KINDS  # 2.425.0 C (#3453)
+from ..lists.favorites import lc_fav_of  # 2.369.5 (#2517): pulled up from functions
+from ..collab.replies import with_replies  # 2.369.5 (#2517): pulled up from functions
+from ..personal.timetrack import n43_admin_lists  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import instance_mode, visible_people  # 2.369.5 (#2517): pulled up from functions
+from ..lists.formula import fx_fill  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- package B: REST API with personal access tokens
@@ -356,7 +361,6 @@ def task_for(c, row, uid):
     fields = {str(r[0]): r[1] for r in c.execute("""SELECT v.field_id, v.value FROM task_field_values v JOIN list_fields f
                                                     ON f.id=v.field_id WHERE v.task_id=? AND f.list_id=?""", (row["id"], row["list_id"]))}
     if row["list_id"]:  # 2.43.0 (#1328): formula fields are computed (read-only for agents too)
-        from ..lists.formula import fx_fill
         fields = fx_fill(c, {row["id"]: fields}, {row["id"]: row["list_id"]}).get(row["id"], fields)
     out = {**task_core(row, tags, fields), "list_tags": ltag_names(c, row["id"]), "key": tk_key(c, row)}  # 2.390.0 (#3353): key
     from ..tasks.watchers import wat_users
@@ -643,9 +647,8 @@ def v1_notif(c, uid):
 
 # 2.9.0 (#435): app passwords for calendar apps (CalDAV), persons only (an agent never gets CalDAV)
 def v1_person():
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot use calendar apps"))
+    from ..agents.core import need_person
+    need_person(403, tr("Agents cannot use calendar apps"))
 
 
 @app.get("/api/v1/me/app-passwords")
@@ -723,7 +726,6 @@ def v1_lists():
     for r in visible_sections(c, me()):  # 2.0.8 (#333): every list with its sections [{id, name}]
         secs.setdefault(r["list_id"], []).append({"id": r["id"], "name": r["name"]})
     fl = v1_list_fields(c)
-    from ..lists.favorites import lc_fav_of
     fav = lc_fav_of(c, me())  # 2.46.1 (#1361): favourite of the person (an agent: of its owner)
     return jsonify(data=[{**v1_list(d), "sections": secs.get(d["id"], []), "fields": fl.get(d["id"], []), "favorite": d["id"] in fav}
                          for d in visible_lists(c, me())], next_cursor=None)
@@ -852,7 +854,6 @@ def v1_list_get(lid):
     d = next((x for x in visible_lists(c, me()) if x["id"] == lid), None)
     if not d:
         raise Denied(404)
-    from ..lists.favorites import lc_fav_of
     from ..lists.playbook import pb_effective
     pb = pb_effective(c, lid)  # 2.39.0 (#1168): the effective Playbook (null = none; never of a health list)
     return jsonify({**v1_list(d), "sections": [{"id": r["id"], "name": r["name"], "sort": r["sort"]}
@@ -866,14 +867,13 @@ def v1_list_get(lid):
 @v1_view
 def v1_list_owner(lid):
     """2.1.2 (#349): transfer the ownership (owner) or take a list of an agent / a disabled user over (admins). Never agents."""
-    from ..agents.core import is_agent
+    from ..agents.core import need_person
     v1_args(())
     b = v1_json()
     unknown = sorted(k for k in b if k != "user_id")
     if unknown:
         raise UnknownFields(unknown)
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot transfer projects"))
+    need_person(403, tr("Agents cannot transfer projects"))
     return jsonify(v1_call(list_owner_set, lid, body={"user_id": b.get("user_id")}))
 
 
@@ -1559,7 +1559,6 @@ def v1_comments(tid):
     rows = c.execute("SELECT * FROM comments WHERE task_id=? AND deleted_at IS NULL ORDER BY id", (tid,)).fetchall()
     atts = att_dicts(c, "task_id=? AND comment_id IS NOT NULL", (tid,))
     names = user_names(c, [r["user_id"] for r in rows])
-    from ..collab.replies import with_replies
     from ..collab.cchoice import lv_with_choices
     ds = lv_with_choices(c, tid, rows, with_replies(c, "c", with_reactions(c, [{**comment_dict(r, atts), "task_id": tid} for r in rows])))
     return jsonify(data=[v1_comment(c, d, names) for d in ds], next_cursor=None)
@@ -1616,7 +1615,6 @@ def v1_time_entries():
          "scope": a.get("scope", "mine")}
     if a.get("task_id"):
         q["task_id"] = str(as_int(a["task_id"], "task_id", 1))
-    from ..personal.timetrack import n43_admin_lists
     # 2.63.0 (#1523): as /api/time/entries (agents and the entries of one task: unchanged)
     rows, _, _, _ = time_rows(c, uid, q, own=None if q.get("task_id") else n43_admin_lists(c, uid))
     vis, ref, rm = vis_ids(c, uid), now_utc(), time_rounding(usettings(c, uid))
@@ -1858,7 +1856,6 @@ def v1_group_get(gid):
     v1_args(())
     c = db()
     d = grp_dict(c, need_group(c, gid), full=False)
-    from ..accounts.orgs import instance_mode, visible_people
     vis = visible_people(c, me()) if instance_mode(c) == "workspaces" or (g.user["kind"] or "user") == "agent" else None  # 2.223.7 A (#2917)
     if vis is not None:  # 2.30.0 (#1036): only the members one may see (as GET /groups)
         d["members"] = [m for m in d["members"] if m["user_id"] in vis]
@@ -1888,7 +1885,6 @@ def v1_list_group_set(lid, group_id):
     reject_unknown(b, ("role",))
     c = db()
     need_list(c, lid, write=False, manage=True)
-    from ..lists.groups import need_group
     gr = need_group(c, _v1_gid(group_id))  # 2.86.0 (N29): 404 before the job title names a group the agent cannot see
     if gr:  # 2.15.0 (#479): sharing by an agent waits for a person's approval
         need_approval(c, N_("Share the project “{0}” with the group “{1}” ({2})"),

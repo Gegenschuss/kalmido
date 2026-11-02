@@ -49,6 +49,11 @@ BK_PAY_DAY = "COALESCE(NULLIF(o.date, ''), p.date)"
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from ..files.store import fs_chain, fs_deleted, fs_role  # 2.369.5 (#2517): pulled up from functions
+from .periodlock import period_need_open  # 2.369.5 (#2517): pulled up from functions
+from .travel import rk_cat_label, rk_trips  # 2.369.5 (#2517): pulled up from functions
+from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 
 
 def _j(s):
@@ -122,7 +127,6 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None):
     2.356.0 (#3097): gaps = a dict the exports fill with what they leave out: "no_amount" / "no_date" ([titles] of receipts
     this person sees: no amount in the period, no date at all) and "hidden" (count of receipts in folders uid cannot open)."""
     from ..docs.store import doc_open
-    from ..files.store import fs_chain, fs_deleted, fs_role
     ws = bk_ws(c, oid)
     s = office_settings(c, oid)
     uid = _uid_filter(uid)
@@ -193,7 +197,6 @@ def bk_einv_offers(c, oid, uid=None):
     becomes a receipt only once a person takes it over, office/einvoice_in.py ei_take) -> [{node_id, title, date, amount,
     supplier, vat_pct}]; not those a person took out of the receipts (_eirc) or the office issued itself (ei_rc_offer)."""
     from ..docs.store import doc_open, meta_json, meta_row
-    from ..files.store import fs_chain, fs_deleted, fs_role
     uid = _uid_filter(uid)
     rows = c.execute("SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE d.ws=? AND d.method='e-invoice' "
                      "AND n.kind='file' AND n.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM rc_receipts r WHERE r.node_id=d.node_id) "
@@ -230,7 +233,6 @@ def bk_receipt_set_paid(c, oid, node_id, day):
                   "WHERE r.node_id=? AND d.ws=? AND n.deleted_at IS NULL", (node_id, bk_ws(c, oid))).fetchone()
     if not r:
         raise Denied(404)
-    from .periodlock import period_need_open
     period_need_open(c, oid, r["paid_at"], day)  # 2.148.0 A (#2471): a payment day in a locked month stays
     if r["paid_at"] and not day:
         from ..receipts.suggest import olk_rc_keep
@@ -314,7 +316,6 @@ def _pay_parts(p, r, home):
 # ---------------------------------------------------------------- EUeR
 def bk_euer(c, oid, year):
     """The income / expense statement of a year (see the module text); amounts as text with two decimals."""
-    from .travel import rk_cat_label, rk_trips
     s = office_settings(c, oid)
     home = _home(s)
     small = bool(s.get("small_business"))
@@ -545,14 +546,12 @@ def bk_ustva_get():
 
 def bk_csv_cell(v):
     """A text cell safe against formula injection in spreadsheets (as the time export)."""
-    from ..core.serializers import csv_cell  # 2.122.4 B (#2317): one shared helper
     return csv_cell(v)
 
 
 @app.get("/api/office/books/euer.csv")
 def bk_euer_csv():
     """?year=YYYY -> the EUeR as CSV (separator and decimal sign of the language, 2.368.2 #2984): group, net, VAT, gross."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx()
     d = bk_euer(c, oid, _year(request.args.get("year")))
     buf = io.StringIO()
@@ -574,7 +573,6 @@ def bk_euer_csv():
 
 def bk_euer_pdf_bytes(c, oid, d, lang):
     """A plain A4 PDF of the EUeR: company and year, the two tables with sums, the profit and the note."""
-    from .ledger import ofx_company
     from .pdf import A4_H, A4_W, C_INK2, C_RULE, _Page, pdf_money, pdf_write
     s = office_settings(c, oid)
     ppr = pdf_paper_ns(s.get("paper"))  # 2.357.0 A (#3156): the office's paper size
@@ -642,7 +640,6 @@ def bk_euer_pdf_bytes(c, oid, d, lang):
 @app.get("/api/office/books/euer.pdf")
 def bk_euer_pdf():
     """?year=YYYY -> the EUeR as PDF."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx()
     d = bk_euer(c, oid, _year(request.args.get("year")))
     data = bk_euer_pdf_bytes(c, oid, d, lang())

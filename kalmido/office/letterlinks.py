@@ -15,6 +15,12 @@ from ..core.i18n import N_, lang, tr
 from ..core.orgcrypt import oc_dec_fields, oc_is_enc
 from ..personal.timetrack import BadInput
 from .model import pb_owner
+from ..files.store import need_node  # 2.369.5 (#2517): pulled up from functions
+from .model import pb_cl_sql, office_gate  # 2.369.5 (#2517): pulled up from functions
+from .letters import lt_book_ids, lt_jl, lt_lang, lt_public, lt_ctx, lt_row, lt_update, lt_org, lt_contact_rcpt  # 2.369.5 (#2517): pulled up from functions
+from ..core.pages import new_inbox_task  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import my_inbox, need_task  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
 
 LTL_KINDS = ("answers", "reply")  # answers = the letter answers the document; reply = the document answers the letter
 
@@ -214,7 +220,6 @@ def ltl_doc(c, oid, nid, write=False):
     personal office: its owner's private space) and the signed-in account may see it (write: change it); else 404. A
     document in the bin is not there."""
     from ..docs import store as S
-    from ..files.store import need_node
     try:
         nid = int(nid)
     except (TypeError, ValueError):
@@ -248,7 +253,6 @@ def ltl_doc_info(c, m, n):
 
 def ltl_client_match(c, oid, name, text=""):
     """The client of office area oid whose name is the sender's name (or whose e-mail address is in the text) or None."""
-    from .model import pb_cl_sql
     rows = c.execute(f"SELECT * FROM clients WHERE archived=0 AND deleted_at IS NULL AND {pb_cl_sql(c, oid)} ORDER BY id").fetchall()
     key = (name or "").strip().casefold()
     for r in rows:
@@ -268,7 +272,6 @@ def ltl_contact_match(c, oid, uid, name, text=""):
     """2.153.0 (#2229): the address book contact (row) whose name (full name, given + family name or organisation) is the
     sender's name, else whose e-mail address is in the text, or None. Only the books uid sees in the office's space
     (letters.py lt_book_ids: never across the boundary)."""
-    from .letters import lt_book_ids, lt_jl
     books = lt_book_ids(c, oid, uid)
     if not books:
         return None
@@ -317,11 +320,9 @@ def ltl_prefill(c, oid, uid, node_id, agent_id=None):
     if cl:
         out.update(client_id=cl["id"], rcpt_name=cl["name"] or "", rcpt_address=ltl_client_addr(cl), rcpt_email=cl["email"] or "")
     elif ct:
-        from .letters import lt_contact_rcpt
         out.update(lt_contact_rcpt(ct))
     elif info["sender"]:
         out["rcpt_name"] = info["sender"]
-    from .letters import lt_lang
     lg = lt_lang(c, oid)  # the language of the new letter (the office's document language), not the reader's
     out["lang"] = lg
     out["subject"] = tr("Your letter of {0}", ltl_day(info["date"], lg), lg=lg) if info["date"] else \
@@ -345,7 +346,6 @@ def ltl_doc_ok(c, oid, nid):
 
 
 def ltl_letter_item(c, oid, r):
-    from .letters import lt_public
     d = lt_public(c, oid, oc_dec_fields(c, oid, "office_letters", r))
     return {"type": "letter", "id": d["id"], "date": d["letter_date"] or (d["sent_at"] or d["created_at"] or "")[:10], "dir": "out",
             "title": d["subject"] or "", "status": d["status"], "rcpt_name": d["rcpt_name"] or "", "client_id": d["client_id"],
@@ -438,7 +438,6 @@ def ltl_items(c, oid, letters, nodes):
 
 
 def ltl_ctx():
-    from .letters import lt_ctx
     return lt_ctx()
 
 
@@ -451,7 +450,6 @@ def ltl_kind(v):
 @app.get("/api/office/letters/<int:lid>/links")
 def ltl_links_get(lid):
     """The documents of a letter (both directions), the follow-up state and the reference line from the answered document."""
-    from .letters import lt_row
     c, uid, oid = ltl_ctx()
     d = lt_row(c, oid, lid)
     return jsonify(links=ltl_links_of(c, oid, d["id"]), followup=ltl_followup(c, oid, d), ref_line=ltl_suggest_ref(c, oid, d),
@@ -462,7 +460,6 @@ def ltl_links_get(lid):
 def ltl_links_post(lid):
     """Links a document {node_id, kind: answers|reply} (also at a sent letter). answers at a draft without a reference line:
     the line is filled from the document."""
-    from .letters import lt_row, lt_update
     c, uid, oid = ltl_ctx()
     b = body()
     if not isinstance(b, dict):
@@ -484,7 +481,6 @@ def ltl_links_post(lid):
 @app.delete("/api/office/letters/<int:lid>/links/<int:nid>")
 def ltl_links_del(lid, nid):
     """Removes the link (?kind=answers|reply; without: both). Undo = POST it again."""
-    from .letters import lt_row
     c, uid, oid = ltl_ctx()
     d = lt_row(c, oid, lid)
     kind = request.args.get("kind") or ""
@@ -502,7 +498,6 @@ def ltl_links_del(lid, nid):
 @app.get("/api/office/letters/<int:lid>/thread")
 def ltl_thread_get(lid):
     """The history of a letter: every letter and document connected with it over links, in time order."""
-    from .letters import lt_row
     c, uid, oid = ltl_ctx()
     d = lt_row(c, oid, lid)
     letters, nodes = ltl_graph(c, oid, [d["id"]])
@@ -542,8 +537,6 @@ def ltl_doc_get(nid):
     """For the document detail: the letters linked with the document (both directions), the deadline and references found,
     the deadline task. 404 when there is no office, the person is no admin of it or the document is not in the office's
     documents space (2.161.0, p2362_a route scan: the same refusal for every case, a stored object's GET answers 404)."""
-    from .model import office_gate
-    from .letters import lt_org
     from ..core.db import db
     c = db()
     try:
@@ -564,7 +557,6 @@ def ltl_doc_get(nid):
     if tid:
         t = c.execute("SELECT id, due, status FROM tasks WHERE id=? AND deleted_at IS NULL", (tid,)).fetchone()
         if t:  # review 2.153.0: only a task the person may see (another admin's inbox task stays hidden)
-            from ..core.access import need_task
             try:
                 need_task(c, t["id"], write=False)
             except Denied:
@@ -579,7 +571,6 @@ def ltl_deadline_task(nid):
     """A task "Deadline: <document>" due on the deadline found (or {due}) in my inbox, the document linked in its text (the
     pattern of POST /api/docs/<nid>/task, the same column doc_meta.task_id). A task already linked: its due date is set
     and it is returned (old_due for the undo). Undo of a new task: DELETE the task + DELETE /api/docs/<nid>/task."""
-    from ..core.pages import new_inbox_task
     c, uid, oid = ltl_ctx()
     b = body() or {}
     if not isinstance(b, dict):
@@ -601,7 +592,6 @@ def ltl_deadline_task(nid):
     if m["task_id"]:
         t = c.execute("SELECT id, due FROM tasks WHERE id=? AND deleted_at IS NULL", (m["task_id"],)).fetchone()
         if t:  # review 2.153.0: a task the person cannot change (another admin's) -> a new one of the person's own
-            from ..core.access import need_task
             try:
                 need_task(c, t["id"], write=True)
             except Denied:
@@ -631,8 +621,6 @@ def ltl_followup_tick(c, force=False):
     wrote it (else the first admin of the area; nobody when they are no admin any more / disabled / the office is off).
     An answer that comes later leaves the task alone. At most once an hour. -> the number of tasks made."""
     from .fixedimport import fci_people
-    from ..core.access import my_inbox
-    from ..tasks.validation import log_act
     if not force and time.monotonic() - _LTL_LAST["at"] < LTL_FOLLOWUP_EVERY:
         return 0
     _LTL_LAST["at"] = time.monotonic()

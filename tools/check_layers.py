@@ -8,6 +8,7 @@ upward imports the code already had when the check came stand in KNOWN below -- 
 may join, and an entry that is gone must leave the list (so it only shrinks).
 
 2.149.0 G (#2517): the function-local imports are counted per kind against tools/layers_budget.json (only sinks).
+2.369.5 (#2517): 1.769 needless function-local imports pulled up (local_needless 2.022 -> 250).
 
 usage: python3 tools/check_layers.py [-v] [--update]     exit code 1 on a new upward import, an unknown package, a stale
        entry or a count above its budget; --update lowers the budget to the counts of today

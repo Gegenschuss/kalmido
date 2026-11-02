@@ -22,6 +22,10 @@ from . import store as S
 from .web import doc_json, doc_query, doc_update
 from .scankeys import sk_upload
 from .fetcher import fx_spec  # 2.425.0 C (#3453)
+from ..files.upsafe import h6d_read  # 2.369.5 (#2517): pulled up from functions
+from ..files.web import fs_agent_folder  # 2.369.5 (#2517): pulled up from functions
+from .web import ws_param  # 2.369.5 (#2517): pulled up from functions
+from ..office.einvoice_in import ei_api  # 2.369.5 (#2517): pulled up from functions
 
 CREATE_FIELDS = ("name", "title", "mime", "content_base64", "parent_id", "ws", "sender", "type", "tags", "date", "due", "amount", "currency")
 V1_FIELDS = ("date", "due", "amount", "currency", "sender", "type", "tags", "text", "custom_fields")  # 2.153.0 (#2179): + custom_fields
@@ -32,7 +36,6 @@ def _v1_doc(c, m, node, full=False, role=None):
     d.pop("thumb", None)
     dup = d.pop("duplicate_of", None)  # 2.146.0 B (#2452): the duplicate warning is for the people of the app (agents: not in API v1)
     if "einvoice" in d:  # 2.440.0 (#2243): the fixed fields of an e-invoice; of a duplicate only the hint
-        from ..office.einvoice_in import ei_api
         d["einvoice"] = ei_api(S.meta_json(c, m, "extracted", {})["_einv"], duplicate=bool(dup))
     if "e-invoice" in d.get("auto", {}).values():  # the stored mark; API v1 says einvoice
         d["auto"] = {k: "einvoice" if v == "e-invoice" else v for k, v in d["auto"].items()}
@@ -79,10 +82,7 @@ def v1_doc_create():
         return sk_upload()
     from ..admin.hosting import QuotaExceeded
     from ..agents.core import is_agent
-    from ..files.upsafe import h6d_read
-    from ..files.web import fs_agent_folder
     from .ingest import docs_ingest, docs_kick
-    from .web import ws_param
     c = db()
     uid = me()
     if request.files:

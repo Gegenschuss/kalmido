@@ -16,6 +16,7 @@ from flask import g, has_request_context
 from ..core.access import Denied
 from ..core.i18n import tr
 from .orgs import user_orgs
+from .orgroles import need_org_write  # 2.369.5 (#2517): pulled up from functions
 
 SMV_MAX = 2000  # objects per move (a folder with everything in it counts its content)
 
@@ -40,7 +41,6 @@ def smv_target(c, uid, v):
         raise Denied(400, tr("Invalid value: {0}", "to")) from None
     if oid not in user_orgs(c, uid):
         raise Denied(409, tr("You are not a member of this organisation"))
-    from .orgroles import need_org_write
     need_org_write(c, uid, oid)  # 2.143.0 A (#2151)
     return oid
 

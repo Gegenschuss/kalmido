@@ -14,6 +14,7 @@ from ..core.errors import BadInput, reject_unknown
 from ..core.retention import ret_days
 from ..api.v1 import API_PAGE_MAX, v1_limit
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_call, v1_json, v1_view
+from ..core.i18n import LANGS  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.17.0 (#442): notes of a list / project
@@ -194,7 +195,6 @@ def qn_list_ensure():
             c.commit()
         return jsonify(list_id=r["id"], created=False)
     lg = c.execute("SELECT value FROM user_settings WHERE user_id=? AND key='lang'", (uid,)).fetchone()
-    from ..core.i18n import LANGS
     lid = insert_id(c, "INSERT INTO lists(name,sort,created_at,owner_id,quicknote) VALUES(?,?,?,?,1)",
                     (tr("Notes", lg=lg[0] if lg and lg[0] in LANGS else None), -0.5, iso(now_utc()), uid))
     bump(c)

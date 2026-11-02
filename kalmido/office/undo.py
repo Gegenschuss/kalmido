@@ -25,6 +25,10 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
+from .model import MD, office_role, office_row, sr_public  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_locked, ofx_log  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.session import me  # 2.369.5 (#2517): pulled up from functions
+from ..team.clients import _gate, client_public, need_client  # 2.369.5 (#2517): pulled up from functions
 
 HDR = "X-Kalmido-Undo"
 TOK_RE = re.compile(r"[a-f0-9]{16,64}")
@@ -48,7 +52,6 @@ def oun_scope(kind, ref, oid):
                 ("office_doc_items", "doc_id=?", (ref,), True)]
     if kind == "client":
         return [("clients", "id=?", (ref,), False), ("office_client_contacts", "client_id=?", (ref,), True)]
-    from .model import MD
     if kind in MD:
         return [(MD[kind]["table"], "id=? AND org_id=?", (ref, oid), False)]
     raise Denied(404)
@@ -171,21 +174,16 @@ def _ctx(kind, ref):
     c = db()
     if kind == "doc":
         from .docs import _ctx as dctx, doc_public, doc_row
-        from .ledger import ofx_locked
-        from .model import office_role
         c, uid, oid = dctx()
         r = doc_row(c, oid, ref)
         if ofx_locked(r) or r["status"] == "sent":
             raise Denied(409, tr(OUN_FINAL))
         return c, uid, oid, lambda c: doc_public(c, oid, doc_row(c, oid, ref), office_role(c, uid, oid) == "admin")
     if kind == "client":
-        from ..accounts.session import me
-        from ..team.clients import _gate, client_public, need_client
         uid = me()
         _gate(c)
         need_client(c, ref, uid)
         return c, uid, None, lambda c: client_public(c, uid, need_client(c, ref, uid), stats=True)
-    from .model import MD, office_role, office_row, sr_public
     if kind not in MD:
         raise Denied(404)
     from .web import _ctx as wctx
@@ -259,7 +257,6 @@ def oun_restore(kind, ref):
         for st in undone if op == "redoall" else undone[:1]:
             _redo_one(c, sc, c.execute("SELECT * FROM office_undo WHERE id=?", (st["id"],)).fetchone(), fix)
     if oid is not None:
-        from .ledger import ofx_log
         if kind == "doc":
             ofx_log(c, oid, "update", doc_id=ref, detail={"undo": op})
         else:

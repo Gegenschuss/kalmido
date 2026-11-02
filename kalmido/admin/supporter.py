@@ -25,6 +25,7 @@ from ..core.access import Denied
 from ..core.db import body, db, err, gset, gsetting, local_now, uset, usettings
 from ..core.i18n import tr
 from ..accounts.session import me
+from ..accounts.users import need_admin  # 2.369.5 (#2517): pulled up from functions
 
 SUP_PREFIX = "KSUP1"
 SUP_MAX_LEN = 600  # a real key is about 200 characters
@@ -175,15 +176,13 @@ def sup_about(c, u):
 
 def _gate(kind=None):
     from .hosting import hosted
-    from ..agents.core import is_agent
+    from ..agents.core import need_person
     if hosted():
         raise Denied(404)
-    if is_agent(g.user):
-        raise Denied(403)
+    need_person(403)
     if kind not in (None, *SUP_KINDS):
         raise Denied(404)
     if kind == "server":
-        from ..accounts.users import need_admin
         need_admin()
 
 
@@ -257,7 +256,6 @@ def sup_swap(kind):
 def sup_nudge():
     """{on?: bool} the yearly hint on / off (admins; a person setting); {seen: true} it was shown now."""
     _gate()
-    from ..accounts.users import need_admin
     need_admin()
     b, c = body(), db()
     if "on" in b:

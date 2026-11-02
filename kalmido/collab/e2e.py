@@ -34,6 +34,11 @@ from ..core.access import Denied, need_task, task_visible
 from ..agents.core import is_agent
 from ..tasks.validation import log_act
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.login import _reauth  # 2.369.5 (#2517): pulled up from functions
+from ..collab.teamchat import tchat_coworkers, need_dm_open, need_room, need_tchat  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachments import save_attachments  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.tasks import one_task  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 
 E2E_V = 1
 E2E_B64 = re.compile(r"^[A-Za-z0-9+/=_-]*$")
@@ -53,7 +58,6 @@ def e2e_person(c=None):
 def e2e_reauth(c, uid, b):
     """2.42.0 (#828): replacing or removing existing keys asks for the account password (like other security steps);
     accounts without a password (single sign-on / proxy) rely on their session. An error response or None."""
-    from ..accounts.login import _reauth
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     return _reauth(u, b) if u and u["password_hash"] else None
 
@@ -229,7 +233,6 @@ def e2e_keys_delete():
 @app.get("/api/e2e/pub/<int:uid>")
 def e2e_pub_get(uid):
     """The public key of a person I may write a DM to (or already have one with): {user_id, pub (null = not set up)}."""
-    from ..collab.teamchat import tchat_coworkers
     c = db()
     mine = e2e_person()
     a, b = sorted((mine, uid))
@@ -314,8 +317,6 @@ def e2e_attachment_upload(tid):
     enc=1 / enc_by=me, with a neutral name -- the real name and type are inside the encrypted header."""
     from flask import request
     from werkzeug.datastructures import FileStorage
-    from ..tasks.attachments import save_attachments
-    from ..tasks.tasks import one_task
     c = db()
     uid = e2e_person()
     need_task(c, tid)
@@ -367,8 +368,6 @@ def e2e_room_set(c, r, on, uid):
 @app.post("/api/team/rooms/<int:rid>/e2e")
 def e2e_room_toggle(rid):
     """{on: bool} -- either person of a DM switches its encryption (on: both must have set up their keys)."""
-    from ..collab.teamchat import need_dm_open, need_room, need_tchat
-    from ..collab.comments import user_names
     c = db()
     uid = e2e_person()
     need_tchat(c)

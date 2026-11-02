@@ -28,6 +28,7 @@ AU_ALL = ("0001-01-01", "9999-12-31")
 
 from .rights import ofr_need_area  # noqa: E402  2.187.0 (#2476)
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .docs import doc_items, recalc, ofd_free_receipts  # 2.369.5 (#2517): pulled up from functions
 
 
 def au_ids(v, name):
@@ -74,7 +75,6 @@ def au_bill_post():
     position per receipt (one=1: one position for all), unit flat, purchase = the amount (net with a VAT rate unless the office
     is a small business, else gross; in the office currency), rate = purchase plus markup_pct. Receipts already billed on an
     existing document: 409. Answers {doc_id, number, positions, items: [node ids]}; POST .../unbill takes it back."""
-    from .docs import doc_items, recalc
     c, uid, oid = _ctx()
     ofr_need_area(c, uid, oid, "offers", "edit")  # 2.187.0 (#2476, review): it reads / writes quotations and invoices too
     b = body()
@@ -124,7 +124,6 @@ def au_bill_post():
 def au_unbill_post():
     """{node_ids, positions?} the undo of a billing: the receipts are free again; positions (ids from the billing's answer)
     are removed from the document while it is a draft. Receipts on a finalised document stay billed."""
-    from .docs import doc_items, ofd_free_receipts, recalc
     c, uid, oid = _ctx()
     ofr_need_area(c, uid, oid, "offers", "edit")  # 2.187.0 (#2476, review): it reads / writes quotations and invoices too
     b = body()

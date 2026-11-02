@@ -20,6 +20,10 @@ from ..tasks.tasks import ms_target, one_task, set_tags
 from ..core.errors import BadInput
 from ..core.serializers import unlink_files
 from .tplextra import tx_apply, tx_collect, tx_keys, tx_of_template, tx_paths, tx_prune, tx_same_list, tx_state, tx_store
+from ..accounts.layouts import LAYOUT_BLOCK_RE, LAYOUT_BLOCKS_MAX, WG_COLORS, WG_PAD_BODY_MAX, WG_PAD_TITLE_MAX, WG_PADS_MAX, clean_layout  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import user_orgs_full  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import ws_default_org  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- templates (private per user)
@@ -207,8 +211,6 @@ def n43_clean_page(d):
     """2.63.0 (#1523): {notepads, page_layout, page_style} of a list template as stored (wrong parts are dropped, never an error):
     notepads [{k: "np<old id>", title, body}] (at most WG_PADS_MAX), page_layout = the standard arrangement (clean_layout), page_style =
     {block: colour}. Notepad keys in the arrangement / colours that the template does not carry go when the template is used."""
-    from ..accounts.layouts import (LAYOUT_BLOCK_RE, LAYOUT_BLOCKS_MAX, WG_COLORS, WG_PAD_BODY_MAX, WG_PAD_TITLE_MAX, WG_PADS_MAX,
-                                    clean_layout)
     pads, seen = [], set()
     for n in (d.get("notepads") if isinstance(d.get("notepads"), list) else [])[:WG_PADS_MAX]:
         if not isinstance(n, dict) or not isinstance(n.get("k"), str) or not re.fullmatch(r"np[0-9]{1,18}", n["k"]) or n["k"] in seen:
@@ -381,7 +383,6 @@ def _tpl_org_out(c, lid, name):
     """2.148.1 H (#2483): a template is a private copy -- of an organisation's list (or its task) only by its admin (logged)."""
     r = c.execute("SELECT org_id, name FROM lists WHERE id=?", (lid,)).fetchone()
     if r and r["org_id"]:
-        from ..accounts.orgout import org_out
         org_out(c, r["org_id"], None, "template", name or r["name"], list_id=lid)
 
 
@@ -632,14 +633,12 @@ def list_duplicate(lid):
     else:
         folder = src["folder"] if src["owner_id"] == uid else (c.execute(
             "SELECT folder FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone() or [""])[0]
-    from ..accounts.orgroles import user_orgs_full
     # the workspace of the original when I belong to it (a private list stays private), else the default of a new list;
     # 2.143.0 A (#2151, review): only when my role there may add lists (guest / read-only / accounting: the default)
     org = src["org_id"] if src["org_id"] is None or src["org_id"] in user_orgs_full(c, uid, write=True) else "auto"
     if org != "auto":
         g.list_keep = ("org_id",)  # list_created: the original's workspace beats the folder's default (like an explicit org_id)
     elif src["org_id"]:  # 2.148.1 B (#2483): a copy of an organisation's list outside it only by its admin (logged)
-        from ..accounts.orgout import org_out
         org_out(c, src["org_id"], None, "list", d["name"], list_id=lid)
     st = tx_state()
     try:
@@ -715,7 +714,6 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=
     span = int(d.get("span") or 0)
     scale = (end - start).days / span if end and span > 0 else 1.0
     tt = d.get("ticket_tpl") if isinstance(d.get("ticket_tpl"), dict) else {}
-    from ..accounts.orgs import ws_default_org
     lid = insert_id(c, """INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,kind,checklist,tickets,ticket_tpl,dep_shift,org_id)
                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (name, d.get("color") or "" if color is None else color, folder, my_max_sort(c, uid) + 1, d.get("view") or "list",

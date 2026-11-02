@@ -70,10 +70,9 @@ def _person_in(c, oid, uid):
 
 
 def _need_person():
-    from ..agents.core import is_agent
+    from ..agents.core import need_person
     need_feat("contacts")
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot use this endpoint"))
+    need_person(403, tr("Agents cannot use this endpoint"))
 
 
 def _org_role(b, cur="view"):

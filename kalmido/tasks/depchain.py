@@ -19,6 +19,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, write_lock
 from ..accounts.session import me
 from ..core.access import need_project, need_task, task_visible
+from ..tasks.lifecycle import apply_update  # 2.369.5 (#2517): pulled up from functions
 
 DCH_MAX = 500
 
@@ -80,7 +81,6 @@ def dch_plan(c, uid, roots, delta, seen, room=DCH_MAX):
 
 
 def dch_apply(c, plan, moved, skipped):
-    from ..tasks.lifecycle import apply_update
     for w, ns, nd in plan:
         if apply_update(c, w["id"], {"due": nd, "start": ns, "_act": "dep_shift"}):
             skipped.append({"id": w["id"], "title": w["title"], "reason": "error", "hidden": False})

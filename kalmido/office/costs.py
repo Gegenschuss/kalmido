@@ -4,6 +4,9 @@ import json
 from ..core.db import iso, local_now, now_utc  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields  # 2.149.0 G (#2517): pulled up from functions
 from .homecur import hc_doc_fx, hc_home  # 2.189.0 (#2475)
+from . import model  # 2.369.5 (#2517): pulled up from functions
+from .calc import dec, money, _num, dstr  # 2.369.5 (#2517): pulled up from functions
+from .model import office_settings  # 2.369.5 (#2517): pulled up from functions
 
 
 def ek_producing_migrate(c):
@@ -26,7 +29,6 @@ def ek_producing_migrate(c):
 def ek_role_cost(c, oid, sv, unit):
     """The default purchase of a new position of service sv (row dict): the price of the service's freelancer role for the
     position's unit (part A's model.sr_role_cost; 0 when there is none). Later changes of the role leave positions alone."""
-    from . import model
     fn = getattr(model, "sr_role_cost", None)
     if not fn or not sv.get("role_id"):
         return 0
@@ -38,7 +40,6 @@ def ek_item_margins(d, its):
     """Admins only (doc_public): the surplus of every position (its total minus purchase x quantity, in the document's
     currency) as it["margin"] and their sum as d["items_margin"]; from the positions and the computed lines, so nothing
     per position is stored unencrypted."""
-    from .calc import dec, money, _num
     lines = {ln.get("id"): ln for ln in (d.get("totals") or {}).get("lines") or [] if ln.get("kind") == "item" and ln.get("id") is not None}
     fx = hc_doc_fx(d, (d.get("totals") or {}).get("home") or "EUR")  # 2.189.0 (#2475): the totals name the home currency
     tot, any_ = dec(0), False
@@ -60,8 +61,6 @@ def ek_purchases_write(c, oid, did):
     ref = the part); any other status = no rows. date = the start of the period of service, else the day of acceptance;
     accepted_at = the day of acceptance (kept when an accepted quotation is written again). Amounts in the organisation's
     currency (purchases are entered in it), encrypted at rest. Returns the number of rows."""
-    from .calc import dec, dstr
-    from .model import office_settings
     r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
     old = c.execute("SELECT accepted_at FROM office_purchases WHERE doc_id=? AND org_id=? AND accepted_at<>'' ORDER BY id LIMIT 1", (did, oid)).fetchone()
     c.execute("DELETE FROM office_purchases WHERE doc_id=? AND org_id=?", (did, oid))

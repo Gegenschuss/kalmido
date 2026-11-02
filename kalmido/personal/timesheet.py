@@ -15,6 +15,11 @@ from ..core.schema import USER_DEFAULTS
 from ..core.usertz import tz_names, tz_of_s, tz_zone  # noqa: F401  2.368.3 (#2985): moved down to the core
 from ..accounts.session import me
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.orgs import is_org_admin, user_orgs, _org_name  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import org_sees_all, user_orgs_full  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names, collab_user, lang_of  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
+from ..notify.push import push_prio, push_reachable  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.125.0 B (#2120): the person's time zone
@@ -213,24 +218,20 @@ def tsl_no_agent():
 
 
 def tsl_admin_orgs(c, uid):
-    from ..accounts.orgs import is_org_admin, user_orgs
     return [o for o in user_orgs(c, uid) if is_org_admin(c, uid, o)]
 
 
 def tsl_member(c, uid, oid, full=True):
     """2.143.0 A (#2151, review): full = a member of the organisation's staff (admin, member, read-only), not a guest /
     accounting; full=False: any membership (reopening an approved month after leaving)."""
-    from ..accounts.orgs import user_orgs
     if not oid or oid not in user_orgs(c, uid):
         return False
-    from ..accounts.orgroles import org_sees_all
     return not full or org_sees_all(c, uid, oid)
 
 
 def tsl_org(c, uid):
     """2.125.0 R (#2119): the organisation a closed month belongs to: the shown workspace when it is one of the person's
     organisations, else their first one; None only without an organisation (the workspace "Private" never skips the approval)."""
-    from ..accounts.orgroles import user_orgs_full
     mine = user_orgs_full(c, uid)  # 2.143.0 A (#2151, review): a guest's / accounting person's month stays theirs
     if not mine:
         return None
@@ -247,7 +248,6 @@ def tsl_clean_month(v, zone):
     if not v:
         return now_utc().astimezone(zone).strftime("%Y-%m")
     if not TSL_MONTH_RE.fullmatch(v):
-        from ..core.errors import BadInput
         raise BadInput(tr("Invalid value: {0}", "month"))
     return v
 
@@ -276,8 +276,6 @@ def tsl_note(c, r):
 
 
 def tsl_out(c, r, uid):
-    from ..collab.comments import user_names
-    from ..accounts.orgs import _org_name
     if not r:
         return {"state": "open", "note": "", "closed_at": None, "decided_at": None, "decided_by": None, "decided_by_name": "",
                 "org_id": None, "org_name": "", "log": []}
@@ -302,7 +300,6 @@ def tsl_org_seconds(c, uid, month, oid):
 
 def tsl_review(c, uid, month):
     """For admins: the closed months of the members of their organisations (all months) + the decided ones of `month`."""
-    from ..collab.comments import user_names
     orgs = tsl_admin_orgs(c, uid)
     if not orgs:
         return None
@@ -345,9 +342,6 @@ def tsl_user_gone(c, uid):
 
 def tsl_notify(c, rcpt, data, title_fn, msg_fn):
     """News item "tsheet" + push (event "timesheet") to rcpt."""
-    from ..collab.news import news_add, notif_ok
-    from ..collab.comments import collab_user, lang_of
-    from ..notify.push import push_prio, push_reachable
     if not rcpt or rcpt == me():
         return
     news_add(c, rcpt, "tsheet", data=data, row="timesheet")
@@ -393,7 +387,6 @@ def tsl_get():
 @app.post("/api/time/sheets")
 def tsl_set():
     """{month, action: close | reopen} -- my own month."""
-    from ..collab.comments import user_names
     need_time()
     tsl_no_agent()
     c, uid, b = db(), me(), body()
@@ -439,7 +432,6 @@ def tsl_set():
 def tsl_decide():
     """Admins of the sheet's organisation: {user_id, month, action: approve | return | unapprove | restore, note?}.
     unapprove (Undo of approve) = closed again; restore (Undo of my send back) = the state before it."""
-    from ..collab.comments import user_names
     need_time()
     tsl_no_agent()
     c, uid, b = db(), me(), body()

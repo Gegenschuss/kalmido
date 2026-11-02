@@ -36,6 +36,16 @@ from ..accounts.session import gated_thread, me, rate_ip
 from ..accounts.login import auth_key
 from ..core.errors import BadInput
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
+from ..team.clients import client_rows  # 2.369.5 (#2517): pulled up from functions
+from ..office.model import office_role  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import org_sees_all, org_writes  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
+from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
+from ..office.signoff import sig_create, sig_expiry, sig_public, SIG_PREFIX, sig_lang, sig_open  # 2.369.5 (#2517): pulled up from functions
+from ..lists.public import public_links_on, pub_gone, pub_headers, pub_html, pub_limited  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_target  # 2.369.5 (#2517): pulled up from functions
 
 VDR_URL_MAX, VDR_TITLE_MAX, VDR_BODY_MAX, VDR_NAME_MAX = 2000, 200, 2000, 120
 VDR_AT_MAX = 86400.0                     # a timecode lies within 24 hours
@@ -150,7 +160,6 @@ def vdr_is_agent(c, uid):
 
 
 def vdr_client_ok(c, uid, cid):
-    from ..team.clients import client_rows
     return any(x["id"] == cid for x in client_rows(c, uid))
 
 
@@ -158,7 +167,6 @@ def rg4_client_write(c, uid, cid):
     """2.122.4 A (#2215 L9): change / delete / customer link of a review at a client, like the office's own routes: an
     organisation's client needs an office role there (admin | member), a private client is its creator's (seeing the
     client alone, e.g. an instance admin's overview, is not enough)."""
-    from ..office.model import office_role
     cl = c.execute("SELECT org_id, created_by FROM clients WHERE id=?", (cid,)).fetchone()
     if not cl:
         return False
@@ -181,7 +189,6 @@ def vdr_may(c, uid, r, write=False, api=False):
         return vdr_client_ok(c, uid, r["client_id"]) and (not write or rg4_client_write(c, uid, r["client_id"]))
     if r["org_id"] is None:
         return r["owner_id"] == uid
-    from ..accounts.orgroles import org_sees_all, org_writes
     return org_sees_all(c, uid, r["org_id"]) and (not write or org_writes(c, uid, r["org_id"]))  # 2.143.0 A (#2151)
 
 
@@ -282,7 +289,6 @@ def vdr_space_key(oid):
 def vdr_full(c, uid, r):
     """The signer's e-mail / address / device only for the review's creator, the org admin or the private owner
     (2.99.1 review M1, like sig_offer_list: office admins only)."""
-    from ..accounts.orgs import is_org_admin
     if r["created_by"] == uid:
         return True
     return bool(is_org_admin(c, uid, r["org_id"])) if r["org_id"] else r["owner_id"] == uid
@@ -300,8 +306,6 @@ def vdr_dict(c, r, uid, full=False, signoffs=True):
          "versions": [vdr_version_dict(v) for v in vs], "version": vs[-1]["n"] if vs else 0, "open_comments": n_open,
          "can_write": vdr_may(c, uid, r, write=True)}
     if full:
-        from ..collab.comments import user_names
-        from ..office.signoff import sig_public
         cm = vdr_comments(c, r["id"])
         names = user_names(c, [x["author_id"] for x in cm])
         d["comments"] = [vdr_comment_dict(x, names) for x in cm]
@@ -557,7 +561,6 @@ def vdr_comment_restore(vid, cid):
 
 def vdr_export_rows(c, r, version_id=None):
     """[(version, timecode, name, text, done, answer)] of the review's comments (answers right after their comment)."""
-    from ..collab.comments import user_names
     cm = vdr_comments(c, r["id"], version_id)
     names = user_names(c, [x["author_id"] for x in cm])
     ns = {v["id"]: v["n"] for v in vdr_versions(c, r["id"])}
@@ -571,7 +574,6 @@ def vdr_export_rows(c, r, version_id=None):
 
 
 def vdr_csv_cell(s):
-    from ..core.serializers import csv_cell  # 2.122.4 B (#2317): one shared helper
     return csv_cell(s)
 
 
@@ -606,8 +608,6 @@ def vdr_sig_hash(r):
 @app.post("/api/videos/<int:vid>/signoff")
 def vdr_sig_new(vid):
     """{expires: YYYY-MM-DD | null} -> the customer link of the review (an open older one stops: one live link)."""
-    from ..office.signoff import sig_create, sig_expiry, sig_public
-    from ..lists.public import public_links_on
     c, uid = db(), me()
     r = vdr_need(c, vid, write=True)
     if not public_links_on(c):
@@ -627,7 +627,6 @@ def vdr_sig_new(vid):
 
 @app.post("/api/videos/<int:vid>/signoffs/<int:sid>/revoke")
 def vdr_sig_revoke(vid, sid):
-    from ..office.signoff import sig_public
     c, uid = db(), me()
     r = vdr_need(c, vid, write=True)
     s = c.execute("SELECT * FROM office_signoffs WHERE id=? AND video_id=? AND kind='video' AND org_id IS NOT DISTINCT FROM ?",
@@ -705,7 +704,6 @@ def vdr_sig_html(c, s, lg, token, prefix):
         player = (f'<p class="vdr-hint">{e(tr(VDR_NO_TIME, lg=lg))}</p><p><a class="btn" href="{e(v["url"])}" target="_blank" '
                   f'rel="noopener noreferrer nofollow">{e(tr("Open the video", lg=lg))}</a></p>')
     cm = vdr_comments(c, r["id"], v["id"], public=True)
-    from ..collab.comments import user_names
     names = user_names(c, [x["author_id"] for x in cm])
     kids = {}
     for x in cm:
@@ -739,8 +737,6 @@ def vdr_sig_html(c, s, lg, token, prefix):
 @app.post("/s/q/<token>/comments")
 def vdr_pub_comment(token):
     """A customer's comment through the approval link (name >= 2 characters, a text, an optional timecode) while it is open."""
-    from ..office.signoff import SIG_PREFIX, sig_lang, sig_open
-    from ..lists.public import pub_gone, pub_headers, pub_html, pub_limited
     c = db()
     s, bad = sig_open(c, token)
     if bad:
@@ -837,8 +833,6 @@ def vdr_move_space(vid):
     their protocol (signer data sealed with that workspace's key; an open one stops). undo = the id of the space_moves row of
     the move being taken back (the same person, the way back): the place and the links come back where they fit."""
     import json
-    from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok
-    from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_target
     smv_refuse_agent()
     c, uid = db(), me()
     r = vdr_need(c, vid, write=True)

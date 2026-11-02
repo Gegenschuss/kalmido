@@ -28,6 +28,9 @@ from ..core.i18n import tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
+from ..life.budget import BUD_DATE_FORMATS, _parse_amount, _parse_day, bud_csv_table  # 2.369.5 (#2517): pulled up from functions
+from .cashflow import rk_cashflow  # 2.369.5 (#2517): pulled up from functions
+from .cfstart import cfs_apply  # 2.369.5 (#2517): pulled up from functions
 
 CFB_OPEN = ("OPBD", "PRCD")
 CFB_CLOSE = ("CLBD", "CLAV")
@@ -104,7 +107,6 @@ def cfb_csv_balance(text, mapping, account=None):
     """CSV text + mapping with an optional mapping.balance -> [{account, day, amount, kind close}] (the balance of the
     chronologically last row; [] without a balance column or without a readable balance)."""
     from .bank import IBAN_RE
-    from ..life.budget import BUD_DATE_FORMATS, _parse_amount, _parse_day, bud_csv_table
     if not isinstance(mapping, dict):
         return []
     _d, header, rows = bud_csv_table(text)
@@ -291,8 +293,6 @@ def _later(ents, month, day):
 def cfb_apply(c, oid, out, today):
     """Called at the end of cashflow.rk_cashflow after cfstart.cfs_apply: adds bank (all accounts) and rows[].bank (the
     balances inside a month). Without balances the answer stays exactly as before."""
-    from .cashflow import rk_cashflow
-    from .cfstart import cfs_apply
     rows = out.get("rows") or []
     bals = cfb_balances(c, oid) if rows else []
     if not bals:

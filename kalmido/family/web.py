@@ -18,6 +18,7 @@ from ..family.family import (
     kid_push, KID_REWARDS_MAX, kids_for, need_kid, occ_create, packing_create, packing_templates, purpose_apply,
     fam_list, recipe_of, REWARD_COST_MAX, reward_dict, serves_of, SERVES_MAX, shop_areas_add, shop_key, to_shopping,
 )
+from ..family.family import shop_area_of  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---- web API
@@ -123,7 +124,6 @@ def list_shop_areas(lid):
     c.execute("UPDATE lists SET family='shopping' WHERE id=? AND owner_id=?", (lid, me()))
     n = shop_areas_add(c, lid, lang(c, me()))
     # 2.22.0 (#747): areas are switched on by hand now ("Sort by shop area"): the open items without an area go to theirs
-    from ..family.family import shop_area_of
     k = 0
     for t in c.execute("SELECT id, title FROM tasks WHERE list_id=? AND parent_id IS NULL AND section_id IS NULL AND status=0 AND deleted_at IS NULL",
                        (lid,)).fetchall():

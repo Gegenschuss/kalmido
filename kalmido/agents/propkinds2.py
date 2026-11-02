@@ -28,6 +28,15 @@ from ..core.db import usettings, uset
 from ..core.errors import BadInput, UnknownFields
 from ..lists.lists import list_created, clean_color, clean_folder, FOLDER_MAX
 from ..api.common import v1_err  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.orgs import org_role, ws_default_org, ws_member_problem  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import agent_row, agent_active, agent_shares, job_dict, JOB_TITLE_MAX  # 2.369.5 (#2517): pulled up from functions
+from ..api.v1 import SCOPES_AGENT_DEFAULT  # 2.369.5 (#2517): pulled up from functions
+from ..lists.templates import PTYPES, ptype_create  # 2.369.5 (#2517): pulled up from functions
+from .proposals import _p_keys, _p_str, _p_int, PROP_TEXT_MAX, _p_list, _p_date, prop_validate, PROP_TITLE_MAX, PROP_NOTES_MAX, PROP_NAME_MAX, PROP_SECTIONS_MAX, prop_insert, prop_titles, prop_run, prop_agent_ok, prop_ready_notify, PROP_MAX_BYTES  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import valid_hm, log_act  # 2.369.5 (#2517): pulled up from functions
+from ..lists.projects import list_row_purge  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.lifecycle import do_delete, restore_task  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 
 PK2_KINDS = ("inquiry", "setup")
 PK2_TITLES = {"inquiry": N_("Project from an enquiry"), "setup": N_("Set up Kalmido")}
@@ -60,7 +69,6 @@ def pk2_area(c, uid, aid):
     """(org of the new list or None = private, office area id or None) for person uid applying a proposal of agent aid:
     the agent's organisation when the person is a member there, else the person's private space / personal office.
     Never another organisation."""
-    from ..accounts.orgs import org_role
     from ..office.model import pb_personal
     r = c.execute("SELECT org_id FROM agents WHERE user_id=?", (aid,)).fetchone()
     org = r["org_id"] if r else None
@@ -80,7 +88,6 @@ def pk2_office(c, uid, aid, oid):
         from ..office.agentdocs import ofa_area
     except ImportError:  # part A not in this build
         return False, "no_office"
-    from ..agents.core import agent_row
     from ..office.agentdocs import ofa_agent_on
     from ..office.model import office_on, office_role, office_settings
     from ..office.rights import ofr_allows
@@ -89,7 +96,6 @@ def pk2_office(c, uid, aid, oid):
         return False, "agent_no_office"
     # 2.51.0 (#1351) review: office data only with the scope office too (like part A's v1 routes; agentdocs.py)
     from ..api.scopes import scopes_effective
-    from ..api.v1 import SCOPES_AGENT_DEFAULT
     au = c.execute("SELECT * FROM users WHERE id=?", (aid,)).fetchone()
     if not au or "office" not in scopes_effective(c, {"scopes": a["scopes"] or ",".join(SCOPES_AGENT_DEFAULT)}, au):
         return False, "no_scope"
@@ -138,7 +144,6 @@ def _pk2_offer(c, uid, oid, did):
 
 def pk2_make_input(c, uid, aid, kind, text=None, file_name=None, offer_id=None):
     """The job input of an inquiry / setup proposal: only what the agent may see."""
-    from ..lists.templates import PTYPES
     if kind == "setup":
         fs = set(x for x in (usettings(c, uid).get("features") or "").split(",") if x)
         return {"modules": [{"key": k, "on": k in fs} for k in PK2_MODS], "project_types": list(PTYPES)}
@@ -160,7 +165,6 @@ def pk2_make_input(c, uid, aid, kind, text=None, file_name=None, offer_id=None):
 def pk2_input(c, uid, kind, b):
     """POST /api/proposals {agent_id, kind: inquiry, text, file_name?, offer_id?} | {agent_id, kind: setup, text?}
     -> (input, title, task_id, list_id) like prop_input."""
-    from .proposals import _p_keys, _p_str, _p_int, PROP_TEXT_MAX
     aid = int(b.get("agent_id") or 0)
     if kind == "setup":
         _p_keys(b, "", ("agent_id", "kind", "text"))
@@ -184,7 +188,6 @@ def _pk2_num(v, what, lo=0.0, hi=1e9, none=True):
 
 
 def _pk2_hm(v, what):
-    from ..tasks.validation import valid_hm
     if v in (None, ""):
         return None
     if not isinstance(v, str) or not valid_hm(v):
@@ -194,8 +197,6 @@ def _pk2_hm(v, what):
 
 def pk2_validate(kind, b, inp):
     """The kind-specific part of prop_validate (b: the agent's proposal)."""
-    from .proposals import _p_keys, _p_str, _p_int, _p_list, _p_date, prop_validate, PROP_TITLE_MAX, PROP_NOTES_MAX, PROP_NAME_MAX, PROP_SECTIONS_MAX
-    from ..lists.templates import PTYPES
     common = ("kind", "summary")
     if kind == "setup":
         _p_keys(b, "", (*common, "modules", "lists", "project"))
@@ -313,7 +314,6 @@ def pk2_keys(kind, prop, inp):
 def pk2_edit(kind, key, e, prop):
     """One edited entry of the review dialog: title (a task, a shoot day, a list, the project), due (a task's due date,
     a shoot day's date), section (a task)."""
-    from .proposals import _p_keys, _p_str, _p_date, PROP_TITLE_MAX
     _p_keys(e, f"edits.{key}", ("title", "due", "section"))
     out = {}
     if "title" in e:
@@ -343,7 +343,6 @@ def _pk2_mod_on(c, uid, k, rec):
 
 def _pk2_new_list(c, uid, name, color="", folder="", kind="list", org="auto"):
     """A new list of uid (owner), in organisation org (None = private, "auto" = the default workspace)."""
-    from ..accounts.orgs import ws_default_org
     ts = iso(now_utc())
     lid = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,org_id) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (name, color or "", folder or "", my_max_sort(c, uid) + 1, "list", ts, uid, 0, kind,
@@ -354,8 +353,6 @@ def _pk2_new_list(c, uid, name, color="", folder="", kind="list", org="auto"):
 
 def _pk2_share(c, aid, lid, rec):
     """The box "Share the new list with <agent>" (the same checks as kind project)."""
-    from ..accounts.orgs import ws_member_problem
-    from ..agents.core import agent_active, agent_row
     from ..agents.safety import bridge_blocks
     if agent_active(agent_row(c, aid)) and not list_other_agent(c, lid, aid) and not ws_member_problem(c, lid, aid) \
             and not bridge_blocks(c, lid, aid):
@@ -391,7 +388,6 @@ def _pk2_events_at(c, rec):
 
 def pk2_run(c, j, sel, ed, extra, rec):
     """Applies the selected entries as the current person; fills rec (the undo record of prop_run)."""
-    from .proposals import prop_insert, _p_str, PROP_NAME_MAX
     kind, aid, uid = j["kind"], j["agent_id"], me()
     prop, inp = json.loads(j["proposal"]), json.loads(j["input"] or "{}")
     edits = {k: pk2_edit(kind, k, v, prop) for k, v in ed.items()}
@@ -406,7 +402,6 @@ def pk2_run(c, j, sel, ed, extra, rec):
     name = _p_str(extra.get("name") or prop["name"], "name", PROP_NAME_MAX, True)
     folder = clean_folder(extra.get("folder") if extra.get("folder") is not None else prop.get("folder") or "", False)
     if prop.get("project_type"):
-        from ..lists.templates import ptype_create
         lid, on = ptype_create(c, uid, prop["project_type"], name, folder, sections=not prop["sections"], org_id=org)
         rec["modules_on"] += on
     else:
@@ -504,7 +499,6 @@ def _pk2_setup_list(c, uid, x, name):
 
 
 def _pk2_setup(c, uid, prop, selected, edits, rec):
-    from ..lists.templates import ptype_create
     fs = _pk2_features(c, uid)
     rec["features_before"] = ",".join(fs)
     for i, m in enumerate(prop["modules"]):
@@ -557,10 +551,6 @@ def _pk2_list_empty(c, lid, ids, at, keep_members=()):
 
 def pk2_undo(c, j, rec):
     """One undo step -> (n, skipped titles). What someone changed since stays (named in skipped)."""
-    from .proposals import prop_titles
-    from ..lists.projects import list_row_purge
-    from ..tasks.lifecycle import do_delete
-    from ..tasks.validation import log_act
     from ..events.model import ev_delete
     uid, n, skipped = me(), 0, []
     if j["kind"] == "setup":
@@ -643,8 +633,6 @@ def pk2_undo(c, j, rec):
 
 def pk2_redo(c, j, rec):
     """The way forward again -> (rec, n, skipped)."""
-    from .proposals import prop_run
-    from ..tasks.lifecycle import restore_task
     uid, n, skipped = me(), 0, []
     if j["kind"] == "inquiry" and rec.get("list_deleted") or j["kind"] == "setup" and rec.get("lists") \
             and len(rec.get("lists_deleted") or []) == len(rec["lists"]):
@@ -689,10 +677,7 @@ def pk2_agent_proposal(aid, b):
     """POST /api/v1/agent/proposals {kind: inquiry | setup, user_id, title?, offer_id?, proposal: {...}}: the agent turns a
     chat request (an inquiry, "set me up") or an accepted quotation into a ready proposal for that person. Only for a
     person who may ask this agent for proposals (agents.proposals); the person applies or discards it."""
-    from .proposals import _p_keys, _p_int, _p_str, prop_agent_ok, prop_ready_notify, prop_validate, PROP_TITLE_MAX, PROP_MAX_BYTES
-    from ..agents.core import agent_row, agent_shares, job_dict, JOB_TITLE_MAX
     from ..agents.usage import usage_block
-    from ..collab.comments import user_names
     from flask import request
     _p_keys(b, "", ("kind", "user_id", "title", "offer_id", "proposal"))
     kind = b["kind"]

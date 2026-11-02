@@ -14,12 +14,12 @@ from ..core.i18n import tr
 from ..core.access import Denied, task_visible
 from ..accounts.session import me
 from ..files.store import fs_visible_sql
+from .web import _doc  # 2.369.5 (#2517): pulled up from functions
 
 
 def _no_agent():
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403)
+    from ..agents.core import need_person
+    need_person(403)
 
 
 def dtl_task_row(c, tid):
@@ -46,7 +46,6 @@ def docs_task_link(nid):
     _no_agent()
     c = db()
     uid = me()
-    from .web import _doc
     m, n = _doc(c, nid, write=True)
     tid = body().get("task_id")
     if not isinstance(tid, int) or isinstance(tid, bool):

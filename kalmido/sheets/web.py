@@ -15,6 +15,7 @@ from ..core.pg import write_lock
 from .core import (SH_ROWS_MAX, ShBook, sh_add_col, sh_add_rows, sh_brief, sh_check_list, sh_clean_col, sh_clean_title,
                    sh_col_dict, sh_create, sh_dict, sh_freeze, sh_index, sh_list_bound, sh_may_rebind, sh_need, sh_need_cell, sh_option_ops, sh_options, sh_presence_set, sh_reload, sh_rev_conflict,
                    sh_set_cells, sh_set_name, sh_touch, sh_undo_batch, sh_vars)
+from .core import sh_cell_dicts, sh_eval, _select_raw  # 2.369.5 (#2517): pulled up from functions
 
 
 def _int(v, what):
@@ -177,7 +178,6 @@ def sheets_name(sid, cid):
 
 
 def _cell_answer(c, sid, cid):
-    from .core import sh_cell_dicts, sh_eval
     c.commit()
     r = sh_reload(c, sid)
     book = ShBook(c, r)
@@ -213,7 +213,6 @@ def _need_col(c, sid, col_id, deleted=False):
 def sheets_col_patch(sid, col_id):
     """{title?, kind?, options?, options_ops?, color_mode?, width?, pos?} -- a select column takes typed labels over as its options'
     ids. 2.270.0 B (#3021): options_ops = single add / rename / remove (sh_option_ops) -> also {added: ids, conflicts}."""
-    from .core import _select_raw
     c = db()
     r = _need_w(c, sid)
     old = _need_col(c, sid, col_id)

@@ -23,6 +23,9 @@ from ..api.common import v1_args, v1_json, v1_view
 from ..agents.core import is_agent
 from ..accounts.layouts import WG_PADS_MAX, _wg_pad_text
 from ..collab.comments import user_names
+from ..lists.projects import need_overview  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import need_agent  # 2.369.5 (#2517): pulled up from functions
+from ..personal.timetrack import local_bounds, vis_ids  # 2.369.5 (#2517): pulled up from functions
 
 APIN_KEYS = ("status",)       # agent_key values: one block per agent + list and key
 APIN_PADS_MAX = 3             # 2.51.0 (#1352): notepads per agent and list (they do not count against the people's WG_PADS_MAX)
@@ -40,7 +43,6 @@ def apin_dict(r, names=None):
 
 def _apin_list(c, lid, write):
     """The project list lid as the token sees it (404 / 403 / 409 like the web app) -- never a health list."""
-    from ..lists.projects import need_overview
     if g.user["kid"]:
         raise Denied(403)
     r = c.execute("SELECT life, archived FROM lists WHERE id=?", (lid,)).fetchone()
@@ -153,7 +155,6 @@ def v1_apin_delete(pid):
 def v1_apin_status(lid):
     """{body, title?}: the agent's status block of this project (one per agent and list): created the first time, then
     overwritten -- only its own, never the notepads of people or other agents. Agents only."""
-    from ..agents.core import need_agent
     v1_args(())
     aid = need_agent()
     b = v1_json()
@@ -185,7 +186,6 @@ def apin_weekly(c, lid, uid, days=APIN_DAYS):
     lst = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()
     vis = tvis(c, uid, "t.")
     base = f"FROM tasks t WHERE t.list_id=? AND t.deleted_at IS NULL AND {vis}"
-    from ..personal.timetrack import local_bounds
     lo, _ = local_bounds(since, today)
     done = c.execute(f"SELECT t.id, t.title, t.completed_at, t.completed_by, t.assignee_id {base} AND t.status=2 AND t.completed_at>=? "
                      "ORDER BY t.completed_at DESC, t.id", (lid, lo)).fetchall()
@@ -194,7 +194,6 @@ def apin_weekly(c, lid, uid, days=APIN_DAYS):
     ids = [r["id"] for r in opn]
     blockers = {}
     if ids:
-        from ..personal.timetrack import vis_ids
         # 2.51.0 (#1352): a blocker in a list the token does not see (not shared, outside the agent's list limit, health)
         # shows up as in the app: hidden, without title, id or assignee -- and never in waits / people.
         bvis = vis_ids(c, uid)

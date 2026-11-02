@@ -40,6 +40,17 @@ from .packs import office_features
 from .rights import LV, NO_RIGHT, office_can, ofr_admin_or, ofr_groups_of, ofr_rights
 from .invoices import ofi_ref, ofi_ref_doc, ofi_ref_keep  # 2.269.0 D (#3046)
 from .offerlink import OilExists, oil_agent_filter, oil_need_no_invoice  # 2.356.0 C (#3003)
+from .docs import MAX_ITEMS, _num, clean_items, doc_items, doc_public, DOC_KINDS, ODOC_PAGE_MAX, doc_brief, doc_row, recalc, _date  # 2.369.5 (#2517): pulled up from functions
+from .model import TEXT_MAX, office_gate, office_org  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_log, ofx_locked, ofx_diff, ofx_items_brief  # 2.369.5 (#2517): pulled up from functions
+from .packs import office_feature_on  # 2.369.5 (#2517): pulled up from functions
+from .pdfweb import _file_response, _render, epdf_name, epdf_out  # 2.369.5 (#2517): pulled up from functions
+from .invoices import inv_offer_invoice, inv_reminder_new, inv_payment_post  # 2.369.5 (#2517): pulled up from functions
+from .periodlock import period_need_open  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
+from ..team.clients import cdn_labels  # 2.369.5 (#2517): pulled up from functions
+from .cashflow import CF8_CHOICES  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import like_escape  # 2.369.5 (#2517): pulled up from functions
 
 OFA_ITEM_KEYS = ("kind", "service_id", "text", "detail", "qty", "unit", "price", "discount")
 OFA_ITEM_KEYS += ("id",)  # 2.270.0 D (#3028): the stored position it changes (from GET): what the agent does not send stays
@@ -275,7 +286,6 @@ def ofa_items(c, oid, r, items):
     clean_items, the mark of each). A service gives title, unit and price unless the agent sets them; a position without a
     service is "free", another price than the catalogue's (or the framework contract's) "price", a discount (percent,
     taken off the price) "discount:<pct>"."""
-    from .docs import MAX_ITEMS, _num, clean_items, doc_items
     if items in (None, ""):
         return [], []
     if not isinstance(items, list) or len(items) > MAX_ITEMS:
@@ -382,7 +392,6 @@ def ofa_draft_create(c, uid, oid, data, agent_id=None):
     PermissionError when uid does not work in that office; BadInput / Denied for wrong values. Returns the id (caller
     commits)."""
     from .docs import _put_items, _text, doc_create, doc_row, pt_text, recalc
-    from .model import TEXT_MAX
     if office_role(c, uid, oid) not in ("admin", "member") or not office_on(c, uid):
         raise PermissionError("office")
     if not isinstance(data, dict) or any(k not in OFA_DATA_KEYS + ("trial",) for k in data):
@@ -404,7 +413,6 @@ def ofa_draft_create(c, uid, oid, data, agent_id=None):
         _put_items(c, oid, r, items, False, flags)
     c.execute("UPDATE office_docs SET agent_id=?, list_id=? WHERE id=? AND org_id=?", (agent_id, lid, did, oid))
     recalc(c, oid, did)
-    from .ledger import ofx_log
     ofx_log(c, oid, "create", doc_id=did, detail={"number": "", "items": len(items)})  # 2.149.0 A (#2521): like a person's new quotation
     return did
 
@@ -459,7 +467,6 @@ def ofa_offer_accepted(c, oid, did):
 
 # ---------------------------------------------------------------- agents: reading (scope office)
 def _doc_v1(c, oid, r, items=True):
-    from .docs import doc_public
     d = doc_public(c, oid, r, False, items=items)
     for k in ("recipient_snapshot", "tax_snapshot", "sender", "cost_enc"):
         d.pop(k, None)
@@ -500,11 +507,9 @@ def v1_office_master(kind):
                f"org_id, created_by FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL")
         args = []
         if q:  # 2.97.0 review (L4): filtered in SQL, so clients past the first 500 are found too
-            from ..core.pg import like_escape
             sql += " AND (name ILIKE ? ESCAPE '\\' OR display_name ILIKE ? ESCAPE '\\')"
             args += [f"%{like_escape(q)}%"] * 2
         rows = [dict(r) for r in c.execute(sql + " ORDER BY lower(name), id LIMIT 500", args)]
-        from ..team.clients import cdn_labels
         labels = cdn_labels(rows)
         for r in rows:
             r["label"] = labels[r["id"]]
@@ -523,7 +528,6 @@ def v1_office_master(kind):
 @app.get("/api/v1/office/docs")
 @v1_view
 def v1_office_docs():
-    from .docs import DOC_KINDS, ODOC_PAGE_MAX, doc_brief
     from .invoices import inv_paid_map
     a = _args(("kind", "client_id", "open", "status", "trial", "before", "limit"))
     c = db()
@@ -611,7 +615,6 @@ def v1_office_series():
 @app.get("/api/v1/office/subs")
 @v1_view
 def v1_office_subs():
-    from .packs import office_feature_on
     from .subs import abo_view
     a = _args(())
     c = db()
@@ -628,7 +631,6 @@ def v1_office_subs():
 @app.get("/api/v1/office/docs/<int:did>")
 @v1_view
 def v1_office_doc(did):
-    from .docs import doc_row
     a = _args(())
     c = db()
     aid, oid, uid = _v1ctx(c, a.get("requested_by"), target="doc")
@@ -642,9 +644,6 @@ def v1_office_doc(did):
 @v1_view
 def v1_office_pdf(did):
     """The PDF preview of a draft (marked as a draft like a person's preview)."""
-    from .docs import doc_row
-    from .ledger import ofx_locked
-    from .pdfweb import _file_response, _render, epdf_name, epdf_out
     a = _args(())
     c = db()
     aid, oid, uid = _v1ctx(c, a.get("requested_by"), target="pdf")
@@ -660,7 +659,6 @@ def v1_office_pdf(did):
 def _notify(c, aid, uid, did, oid, what):
     """The card in the person's chat with the agent: the sum, the PDF preview, "Open in the office"."""
     from ..agents.chat import chat_post
-    from .docs import doc_public, doc_row
     d = doc_public(c, oid, doc_row(c, oid, did), False, items=False)
     title = d.get("project_title") or tr("without title")
     text = tr("{0} “{1}”: {2} net, {3} gross. A draft; you finalise and send it.", tr(what), title, d["net_text"], d["gross_text"])
@@ -671,7 +669,6 @@ def _notify(c, aid, uid, did, oid, what):
 
 
 def _draft_answer(c, aid, uid, oid, did, notify, what, code=201, kept=None):
-    from .docs import doc_row
     out = {"doc": _doc_v1(c, oid, doc_row(c, oid, did))}
     if kept is not None:  # 2.370.2 (#3088): positions the save left out that stay (billed receipts or time)
         out["kept_ids"] = kept
@@ -726,8 +723,6 @@ def v1_office_offer_patch(did):
     current doc in error.doc and current)}. Positions with their id (or, without one, the same service at the same place / with
     the same text) keep id, purchase price and list; price, unit and flags stay unless sent (2.270.0 D)."""
     from .docs import _put_items, _text, clean_doc, doc_items, doc_row, pt_text, recalc
-    from .ledger import ofx_diff, ofx_items_brief, ofx_locked, ofx_log
-    from .model import TEXT_MAX
     b = _json(OFA_DATA_KEYS + ("notify", "cashflow", "expect_updated_at"))
     c = db()
     notify = _flag_notify(b)
@@ -754,7 +749,6 @@ def v1_office_offer_patch(did):
     if "list_id" in b:
         f["list_id"] = _list_ok(c, oid, uid, b.get("list_id"), aid)
     if "cashflow" in b:  # 2.88.0 (#1915)
-        from .cashflow import CF8_CHOICES
         if b["cashflow"] not in CF8_CHOICES:
             raise BadInput(tr("Invalid value: {0}", "cashflow"))
         f["cashflow"] = b["cashflow"]
@@ -784,8 +778,6 @@ def v1_office_offer_patch(did):
 def v1_office_invoice_post(did):
     """#1350: an invoice draft from an accepted quotation (the same as a person's "Create invoice": positions, recipient,
     project, rights ...; parts_mode for a quotation with parts). Never finalised or sent."""
-    from .docs import doc_row, recalc
-    from .invoices import inv_offer_invoice
     b = _json(("parts_mode", "notify", "inv_type", "amount", "pct", "client_ref", "force"))  # 2.120.0 A (#2087): progress / final invoice; 2.356.0 C (#3003): + force
     c = db()
     notify = _flag_notify(b)
@@ -816,8 +808,6 @@ def v1_office_invoice_post(did):
 @v1_view
 def v1_office_reminder_post():
     """#1350: a reminder draft over open, finalised invoices of one client {invoice_ids, level?: 1-3}. Never sent."""
-    from .docs import recalc
-    from .invoices import inv_reminder_new
     b = _json(("invoice_ids", "level", "notify", "client_ref"))
     c = db()
     notify = _flag_notify(b)
@@ -871,8 +861,6 @@ def v1_office_pp_post():
     """{invoice_id, amount, date, reference?, confidence?: high|medium|low, note?, client_ref?} -> 201 the suggestion (open). An
     admin of the area accepts it in the office (then it is booked as a payment) or rejects it. 2.370.2 (#3088): sent again
     with the same client_ref = 200 the suggestion made the first time, whatever became of it."""
-    from .docs import _date, doc_row
-    from .ledger import ofx_locked
     b = _json(("invoice_id", "amount", "date", "reference", "confidence", "note", "client_ref"))
     c = db()
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True, target="payment")
@@ -899,7 +887,6 @@ def v1_office_pp_post():
     d = _date(b.get("date"), "date") or local_now().date().isoformat()
     if d > local_now().date().isoformat():
         raise BadInput(tr("The date must not lie in the future"))
-    from .periodlock import period_need_open
     period_need_open(c, oid, d)  # 2.148.0 A (#2471): an agent cannot suggest a payment into a locked month
     conf = b.get("confidence") or "medium"
     if conf not in OFA_CONF:
@@ -938,7 +925,6 @@ def v1_office_pp_list():
 
 # ---------------------------------------------------------------- people: the agent's switch, the suggestions
 def _person():
-    from .model import office_gate
     c = db()
     return c, office_gate(c)
 
@@ -981,7 +967,6 @@ def ofa_agent_patch(aid):
         return err(tr("Invalid value: {0}", "office_drafts"))
     with system_ctx(c):  # the agent's settings row (the right to change it was checked above)
         c.execute("UPDATE agents SET office_drafts=? WHERE user_id=?", (1 if v else 0, aid))
-    from .ledger import ofx_log
     ofx_log(c, oid, "update", target="agent", detail={"agent": aid, "before": {"office_drafts": int(a["office_drafts"] or 0)}, "after": {"office_drafts": int(v)}})
     print("agent", aid, "office drafts", "on" if v else "off", "by", login_log_who(g.user), flush=True)
     bump(c)
@@ -990,7 +975,6 @@ def ofa_agent_patch(aid):
 
 
 def _pp_ctx(admin=False):
-    from .model import office_gate, office_org
     c = db()
     uid = office_gate(c)
     oid = office_org(c, uid, admin=admin)
@@ -1000,7 +984,6 @@ def _pp_ctx(admin=False):
 @app.get("/api/office/pay-props")
 def ofa_pp_get():
     """?state=open (default) | all: the payment suggestions of the agents in my office area (admins decide)."""
-    from ..collab.comments import user_names
     c, uid, oid = _pp_ctx()
     st = request.args.get("state") or "open"
     sql, args = "SELECT * FROM office_pay_props WHERE org_id=?", [oid]
@@ -1020,8 +1003,6 @@ def ofa_pp_get():
 def ofa_pp_decide(pid):
     """{action: accept | reject} by an admin of the area. accept books the payment like "Record payment" (the same checks:
     finalised open invoice, not above the open amount, no future date)."""
-    from .invoices import inv_payment_post
-    from .ledger import ofx_log
     c, uid, oid = _pp_ctx(admin=True)
     write_lock(c, f"office_pp_{int(pid)}")
     r = c.execute("SELECT * FROM office_pay_props WHERE id=? AND org_id=?", (pid, oid)).fetchone()

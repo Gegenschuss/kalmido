@@ -25,6 +25,13 @@ from .model import office_gate, office_org, office_settings, pb_cl_sql
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .invoices import inv_money_fields, inv_state  # 2.369.5 (#2517): pulled up from functions
+from ..personal.timetrack import time_list_totals, time_report  # 2.369.5 (#2517): pulled up from functions
+from ..team.clients import budget_state, client_lists  # 2.369.5 (#2517): pulled up from functions
+from .costs import ek_purchases  # 2.369.5 (#2517): pulled up from functions
+from .travel import rk_trips  # 2.369.5 (#2517): pulled up from functions
+from .cashflow import rk_cashflow  # 2.369.5 (#2517): pulled up from functions
+from .pipeline import pl2_weighted  # 2.369.5 (#2517): pulled up from functions
 
 
 def _j(s):
@@ -76,7 +83,6 @@ def kpi_revenue(c, oid, home, docs, year, today):
 
 def kpi_open(docs, pm, home, today):
     """{open: {count, amount}, overdue: {count, amount}} of the finalised invoices."""
-    from .invoices import inv_money_fields, inv_state
     out = {"open": [0, dec(0)], "overdue": [0, dec(0)]}
     for r in docs:
         if r["kind"] != "invoice" or not r["locked_at"] or r["status"] in ("draft", "cancelled", "paid"):
@@ -96,10 +102,6 @@ def kpi_open(docs, pm, home, today):
 def kpi_clients(c, uid, oid, home, docs, year):
     """[{id, name, hours, budget_h, amount, budget_amount, pct_h, pct_amount, level, invoiced, costs, margin, projects:
     [{id, name, hours, budget_h, pct_h}]}] -- clients with hours, a budget or documents in the year, biggest first."""
-    from ..personal.timetrack import time_list_totals, time_report
-    from ..team.clients import budget_state, client_lists
-    from .costs import ek_purchases
-    from .travel import rk_trips
     y0, y1 = f"{year}-01-01", f"{year}-12-31"
     cls = [r for r in c.execute(f"SELECT id, name, budget_h, budget_amount, archived FROM clients WHERE {pb_cl_sql(c, oid)} AND deleted_at IS NULL ORDER BY lower(name), id")]
     inv, cost = {}, {}
@@ -153,9 +155,7 @@ def kpi_clients(c, uid, oid, home, docs, year):
 
 
 def kpi_build(c, uid, oid, year=None, today=None):
-    from .cashflow import rk_cashflow
     from .invoices import inv_paid_map
-    from .pipeline import pl2_weighted
     home = hc_home(office_settings(c, oid))  # 2.189.0 B (#2475): the home currency
     today = today or local_now().date().isoformat()
     year = year or int(today[:4])

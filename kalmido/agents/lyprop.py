@@ -27,6 +27,14 @@ from ..core.access import Denied, list_role, acx_of, is_project
 from ..accounts.session import me
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_err, v1_json, v1_view
+from ..agents.agenttime import atm_person  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.layoutsets import lyv_key_ok, lyv_clean, lyv_save, LYV_NAME_MAX  # 2.369.5 (#2517): pulled up from functions
+from ..agents.safety import ids_parse  # 2.369.5 (#2517): pulled up from functions
+from ..agents.proposals import _p_keys, _p_str, prop_ready_notify, prop_validate, PROP_MAX_BYTES  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import need_agent, JOB_TITLE_MAX, job_dict  # 2.369.5 (#2517): pulled up from functions
+from ..api.scopes import need_scope  # 2.369.5 (#2517): pulled up from functions
+from ..agents.usage import usage_block  # 2.369.5 (#2517): pulled up from functions
+from ..accounts import layoutsets  # 2.369.5 (#2517): pulled up from functions
 
 LYP_KIND = "layout"
 LYP_DAYS = 14                 # an open proposal expires after this many days
@@ -78,7 +86,6 @@ def lyp_view_name(key):
 def lyp_person(c, aid, uid_arg):
     """The person agent aid proposes for: its owner (personal agent) or user_id (a person who may chat with it), and in
     the agent's organisation when it has one. 404 for everyone else."""
-    from ..agents.agenttime import atm_person
     pid, _ = atm_person(c, {"user_id": uid_arg})
     if pid == aid:
         raise BadInput(tr("Missing field: {0}", "user_id"))
@@ -90,14 +97,12 @@ def lyp_person(c, aid, uid_arg):
 
 def lyp_need(c, aid, pid, key):
     """The view key is one an agent may propose for (else 400 / 404); returns the block catalogue of that view."""
-    from ..accounts.layoutsets import lyv_key_ok
     if not isinstance(key, str) or not lyv_key_ok(key):
         raise BadInput(tr("Invalid value: {0}", "view"))
     if not key.startswith("list:"):
         if key not in LYP_BLOCKS:
             raise BadInput(tr("Agents cannot propose an arrangement for this view"))
         return LYP_BLOCKS[key]
-    from ..agents.safety import ids_parse
     lid = int(key[5:])
     a = c.execute("SELECT list_ids FROM agents WHERE user_id=?", (aid,)).fetchone()
     # the list shared with the agent (its token's list limit applies in list_role), inside its own list limit, and the
@@ -199,7 +204,6 @@ def lyp_in(cat, b, base=None):
     clean_layout: order, hidden, half / full against the block's default for 2.42, opts lw / lh). Unknown blocks: 400.
     base = the arrangement the person sees now (read shape): the named blocks come first, the others keep their order after
     them; a field left out (hidden, a block's width / height, mobile) stays as it is."""
-    from ..agents.proposals import _p_keys
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid value: {0}", "layout"))
     _p_keys(b, "layout", ("order", "hidden", "widths", "heights", "mobile"))
@@ -275,8 +279,6 @@ def lyp_merge(new, own):
 
 # ---------------------------------------------------------------- the routes for agents
 def _lyp_agent():
-    from ..agents.core import need_agent
-    from ..api.scopes import need_scope
     aid = need_agent()
     need_scope("layouts")
     return aid
@@ -321,9 +323,6 @@ def lyp_expire(c):
 def v1_lyp_propose():
     """{view, name, layout: {order, hidden, widths, heights, mobile}, summary?, user_id?} -> a ready proposal job (kind layout)
     for the person; an open one of this agent for the same view is replaced. Nothing changes until the person accepts it."""
-    from ..agents.core import JOB_TITLE_MAX, job_dict
-    from ..agents.proposals import _p_str, prop_ready_notify, prop_validate, PROP_MAX_BYTES
-    from ..agents.usage import usage_block
     v1_args(())
     aid = _lyp_agent()
     if len(request.data or b"") > PROP_MAX_BYTES:
@@ -364,7 +363,6 @@ def v1_lyp_propose():
 def lyp_validate(b, inp):
     """prop_validate for kind layout: {view, name, layout, summary} -> {view, name, layout (stored shape), proposed (read shape)}.
     Checks again who it is for (the job's person) and that the agent may propose for that view."""
-    from ..agents.proposals import _p_keys, _p_str
     _p_keys(b, "", ("kind", "summary", "view", "name", "layout", "title"))
     c = db()
     pid = int(inp.get("user_id") or 0)
@@ -373,7 +371,6 @@ def lyp_validate(b, inp):
         raise BadInput(tr("Invalid value: {0}", "view"))
     cat = lyp_need(c, me(), pid, key)
     lay = lyp_in(cat, b.get("layout"), lyp_out(cat, lyp_value(c, pid, key)[0]))
-    from ..accounts.layoutsets import lyv_clean
     lyv_clean(key, lay)  # the same check as every stored arrangement
     return {"view": key, "name": _p_str(b.get("name"), "name", LYP_NAME_MAX, True), "layout": lay,
             "proposed": lyp_out(cat, lay)}
@@ -423,7 +420,6 @@ def _set_own(c, uid, key, v):
 
 def _active(fn, *a):
     """The active saved arrangement (column of #1069, accounts/layoutsets.py) when that part is there."""
-    from ..accounts import layoutsets
     f = getattr(layoutsets, fn, None)
     return f(*a) if f else None
 
@@ -431,7 +427,6 @@ def _active(fn, *a):
 def lyp_run(c, j, sel, ed, extra, rec):
     """👍 (as the person): the proposal becomes a saved arrangement (source agent, prop:<job>) and, with use (default),
     the person's arrangement of that view at once. rec = the undo record."""
-    from ..accounts.layoutsets import lyv_clean, lyv_save, LYV_NAME_MAX
     p = json.loads(j["proposal"])
     key, uid = p["view"], me()
     if j["created_at"] and j["created_at"] < iso(now_utc() - timedelta(days=LYP_DAYS)):

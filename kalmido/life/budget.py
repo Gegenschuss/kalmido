@@ -34,6 +34,11 @@ from ..core import csvimport as cx  # 2.140.0 B (#2134): the shared statement re
 from ..core import stmtfiles as sf  # 2.146.0 C (#2455): several files / a ZIP in one import
 from ..core.errors import BadInput
 from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
+from ..life.model import need_life, life_list_create  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachments import safe_name  # 2.369.5 (#2517): pulled up from functions
+from ..files.upsafe import up_check_path, UploadRefused  # 2.369.5 (#2517): pulled up from functions
+from ..files.scan import _sc_magic, sc_after_store  # 2.369.5 (#2517): pulled up from functions
+from ..core.config import INLINE_TYPES  # 2.369.5 (#2517): pulled up from functions
 
 BUD_TABLES = ("budget_cats", "budget_recurring", "budget_entries")
 BUD_AMOUNT_MAX = Decimal("10000000")
@@ -62,7 +67,6 @@ def bud_hidden(c=None, uid=None):
 
 
 def bud_need_on(c, uid):
-    from ..life.model import need_life
     need_life(c, uid, "budget")
 
 
@@ -350,7 +354,6 @@ def bud_lists(c, uid):
 
 def bud_list_create(c, uid, b):
     """{name?} -> the id of a new budget list with the default categories."""
-    from ..life.model import life_list_create
     bud_need_on(c, uid)
     if bud_hidden(c, uid):
         raise Denied(403)
@@ -879,7 +882,6 @@ def bud_files_save(c, uid, eid, files, saved):
     import os
     import uuid
     import mimetypes
-    from ..tasks.attachments import safe_name
     from ..admin.hosting import quota_guard
     bud_need_on(c, uid)
     r = bud_obj(c, uid, "budget_entries", eid)
@@ -906,14 +908,11 @@ def bud_files_save(c, uid, eid, files, saved):
             raise BadInput(tr("{0}: the file is empty and was not uploaded", name))
         mime = (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) or mimetypes.guess_type(name)[0] \
             or "application/octet-stream"
-        from ..files.upsafe import up_check_path, UploadRefused
         try:  # 2.61.0 (#1818 #1819): virus scan + photo metadata like every upload, before sealing
             size, mime, _info = up_check_path(c, full, name, mime, uid, oc.oc_list_org(c, lid) or None, "budget")
         except UploadRefused as e:  # up_check_path removed the file
             saved.remove(rel)
             raise BadInput(str(e))
-        from ..files.scan import _sc_magic
-        from ..core.config import INLINE_TYPES
         with open(full, "rb") as fh:  # 2.148.1 E (#2496): a picture / PDF is stored with the type of its content, not the client's claim
             got = _sc_magic(fh.read(4096))
         if got in INLINE_TYPES:
@@ -921,7 +920,6 @@ def bud_files_save(c, uid, eid, files, saved):
         oc.oc_seal_path(c, sid, full, fresh=True)  # like attachments: the space key of the list (organisation / owner)
         ids.append(insert_id(c, "INSERT INTO budget_files(entry_id,list_id,name,mime,size,path,user_id,created_at) VALUES(?,?,?,?,?,?,?,?)",
                              (r["id"], lid, name, mime, size, rel, uid, _ts())))
-        from ..files.scan import sc_after_store
         sc_after_store(c, "budget", ids[-1], oc.oc_list_org(c, lid) or None, _info)  # 2.126.0 A (#1979 L1): unchecked = scanned later
     c.execute("UPDATE budget_entries SET updated_at=? WHERE id=?", (_ts(), r["id"]))
     return _files_of(c, [r["id"]]).get(r["id"], [])

@@ -21,6 +21,8 @@ from ..core.db import iso, now_utc
 from .alerts import _AA, _AA_LOCK, aa_now, aa_org_event, fx2_mask_ip
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.login import login_log_ip  # 2.239.0 B (#2888): unless KALMIDO_LOG_FULL_IP=1
+from ..collab.news import news_add  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import org_admin_people  # 2.369.5 (#2517): pulled up from functions
 
 SEV_IPS = 10  # sign-in addresses remembered per admin
 SEV_KINDS = ("admin", "org_admin", "agent", "agent_token")
@@ -124,8 +126,6 @@ def _sev_is_admin(c, uid):
 def sev_login_tell(c, uid, h, name, ip):
     """2.367.4 (#2974): an instance admin: the admin alert. An admin of organisations only: News for the person and that
     organisation's admins (row "usage"), a number for the instance admins."""
-    from ..collab.news import news_add
-    from ..core.access import org_admin_people
     with c.savepoint(), system_ctx(c):  # a database error here must not abort the sign-in's transaction (like sev_login's own part)
         operator = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()["is_admin"]
         orgs = [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? AND role='admin'", (uid,)).fetchall()]

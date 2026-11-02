@@ -17,6 +17,8 @@ from .cashflow import _ctx
 from .fixedimport import fci_people, fci_task_end
 from .model import office_need_feature, office_settings, office_settings_lock, office_settings_save
 from ..core.access import my_inbox  # 2.149.0 G (#2517): pulled up from functions
+from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 
 TXD_KINDS = ("ustva", "est", "gewst")
 TXD_USTVA = ("none", "month", "quarter", "year")  # 2.122.0 D (#2315): year = only the annual VAT return
@@ -112,7 +114,6 @@ def txd_sig(kind, cfg, person):
 
 def txd_task_new(c, kind, cfg, person):
     """The recurring task in the person's inbox (theirs, assigned to them), due at the next deadline minus the lead."""
-    from ..tasks.validation import log_act
     lead = cfg["lead_days"]
     today = local_now().date()
     dl = next((d for d in txd_deadlines(kind, cfg, today, 14) if txd_due(d, lead) >= today), None)
@@ -178,7 +179,6 @@ def txd_get():
 def txd_put():
     """Office admin, partial body. Each switched-on kind has ONE recurring task for the person; changing a kind or the person ends the old task
     (done, never deleted) and makes a new one; a task the user finished or deleted is made again. A person who is not an admin here: 400."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx()
     b = body()
     if not isinstance(b, dict):

@@ -28,11 +28,18 @@ from ..tasks.validation import as_int, log_act
 from ..collab.news import news_unread
 from ..accounts.users import need_admin
 from ..notify.alerts import aa_count, aa_err, aa_fail, aa_ok
-from ..agents.core import is_agent
+from ..agents.core import need_person
 from ..collab.teamchat import tchat_unread
 from ..core.env import env_bool
 from ..core.mailframe import MAIL_ACC, Safe, mail_html  # noqa: F401  2.420.0 B (#3499): the one mail frame (re-exported here)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
+from ..collab.liste2eguard import le2b_net, le2b_list_locked, le2b_off  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.login import auth_key  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.session import rate_ip  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import lang_of  # 2.369.5 (#2517): pulled up from functions
+from ..lists.public import pub_html  # 2.369.5 (#2517): pulled up from functions
+from .mailtrim import md_trim_forward  # 2.369.5 (#2517): pulled up from functions
+from ..calendars.subscriptions import _cal_connector  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.17.0 (#443): tasks by e-mail + the daily summary by e-mail
@@ -87,7 +94,6 @@ def mail_info():
         l = c.execute("SELECT id, name, e2e FROM lists WHERE id=?", (lid,)).fetchone()
         if l and list_role(c, lid) in WRITE_ROLES:
             if l["e2e"]:  # 2.64.1 B (#1817): the address is off in a list with the lock (the dialog shows why)
-                from ..collab.liste2eguard import le2b_off
                 lists.append({"list_id": lid, "name": l["name"], "address": "", "e2e": True, "reason": le2b_off()})
                 continue
             lists.append({"list_id": lid, "name": l["name"], "address": mail_addr(t)})
@@ -104,14 +110,12 @@ def mail_token_new():
     c = db()
     if not MAIL_IN_ON:
         return err(tr("E-mail to tasks is not set up on this server"), 409)
-    if is_agent(g.user):
-        raise Denied(403)
+    need_person(403)
     lid = body().get("list_id")
     if lid is not None:
         if isinstance(lid, bool) or not isinstance(lid, int):
             return err(tr("Invalid value: {0}", "list_id"))
         need_list(c, lid)
-        from ..collab.liste2eguard import le2b_list_locked, le2b_off
         if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): no mail address for a list with the lock
             return jsonify(error=le2b_off(), code="list_e2e"), 409
     tok = secrets.token_urlsafe(12).replace("-", "x").replace("_", "y")
@@ -208,7 +212,6 @@ def mail_target(c, msg):
             u = c.execute("SELECT disabled FROM users WHERE id=?", (r["user_id"],)).fetchone()
             if not u or u["disabled"]:
                 return None, None
-            from ..collab.liste2eguard import le2b_list_locked
             if r["list_id"] and le2b_list_locked(c, r["list_id"]):
                 return None, None  # 2.64.1 B (#1817): a list with the lock takes no mail (like an unknown address)
             if r["list_id"] and list_role(c, r["list_id"], r["user_id"]) not in WRITE_ROLES:
@@ -266,7 +269,6 @@ def mail_import(c, raw, pre=None):
     us = usettings(c, uid)
     eml = None
     if us.get("mail_trim_fwd") == "1":  # 2.49.0 (#971): a forwarded mail shrinks to one header line + the message; the original stays as .eml
-        from .mailtrim import md_trim_forward
         short = md_trim_forward(text)
         if short != text:
             text = short
@@ -481,7 +483,6 @@ class _SafeSMTP(smtplib.SMTP):
         super().__init__(host, port, timeout=timeout)
 
     def _get_socket(self, host, port, timeout):
-        from ..calendars.subscriptions import _cal_connector
         return _cal_connector(self._kal_allow)((host, port), timeout)
 
 
@@ -491,7 +492,6 @@ class _SafeSMTP_SSL(smtplib.SMTP_SSL):
         super().__init__(host, port, timeout=timeout, context=_tls_ctx())
 
     def _get_socket(self, host, port, timeout):
-        from ..calendars.subscriptions import _cal_connector
         return self.context.wrap_socket(_cal_connector(self._kal_allow)((host, port), timeout), server_hostname=self._host)
 
 
@@ -541,7 +541,6 @@ def smtp_open(smtp=None):
 def mail_message(to, subject, text, html_body=None, images=None, from_name=None, attachments=None, cc=None, reply_to=None, smtp=None, unsub=None):
     """2.141.0 A (#2141): the message mail_send sends (built first so the e-mail filing can keep it before it goes out).
     2.367.5 (#2975): unsub = the one-click link of a notification mail (RFC 8058), never on a security mail or an invoice."""
-    from ..collab.liste2eguard import le2b_net
     subject, text = le2b_net(subject), le2b_net(text)  # 2.64.1 B (#1817): never a ciphertext of a list with the lock in a mail
     html_body = le2b_net(html_body) if html_body else html_body
     frm = (smtp or SMTP)["from"]
@@ -697,7 +696,6 @@ MAIL_OFF_PATH = "/mail/off/"
 
 
 def mail_off_sig(c, uid, what):
-    from ..accounts.login import auth_key
     return hmac.new(auth_key(c), f"mailoff|{uid}|{what}".encode(), hashlib.sha256).hexdigest()[:40]
 
 
@@ -714,9 +712,6 @@ def mail_off_open(c, token):
 
 
 def _mail_off_page(token, done):
-    from ..accounts.session import rate_ip
-    from ..collab.comments import lang_of
-    from ..lists.public import pub_html
     if hit_limit(f"mailoff:{rate_ip()}", 30):
         return pub_html(tr("Too many requests"), f'<div class="msg"><h1>{html.escape(tr("Too many requests"))}</h1></div>', browser_lang() or "en", 429)
     c = db()

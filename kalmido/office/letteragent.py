@@ -18,6 +18,10 @@ from ..api.v1 import v1_view
 from .letters import lt_org
 from .model import office_gate, office_on, office_role, office_settings, pb_owner
 from .rights import ofr_rights
+from ..files.store import fs_chain, fs_deleted, fs_role  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import system_ctx, write_lock  # 2.369.5 (#2517): pulled up from functions
+from .letters import lt_row, lt_public, lt_create, LT_STATUS_KEYS, lt_update  # 2.369.5 (#2517): pulled up from functions
+from .letterlinks import ltl_link, ltl_prefill, LTL_KINDS  # 2.369.5 (#2517): pulled up from functions
 
 LTA_EVENT = "letter_draft_requested"
 LTA_FIELDS = ("client_id", "rcpt_name", "rcpt_address", "rcpt_email", "letter_date", "subject", "body", "ref_line", "greeting", "lang")
@@ -36,7 +40,6 @@ LTA_HINT = ("A person asks you to draft an answer to this incoming document. Rea
 def lta_doc_ok(c, oid, nid, uid=None, aid=None):
     """Document node nid lies in the documents space of office area oid (a personal office: its owner's own documents, else
     the organisation's), is not in the bin, and person uid / agent aid sees it -> the fs_nodes row; Denied(404) otherwise."""
-    from ..files.store import fs_chain, fs_deleted, fs_role
     try:
         nid = int(nid)
     except (TypeError, ValueError):
@@ -58,7 +61,6 @@ def lta_doc_ok(c, oid, nid, uid=None, aid=None):
 
 
 def lta_agent_sees(c, nid, aid):
-    from ..files.store import fs_role
     return bool(fs_role(c, nid, uid=aid))
 
 
@@ -67,7 +69,6 @@ def lta_agents(c, oid, uid):
     privacy switch on, reachable for uid (agents/core.py agent_shares) and -- a personal agent in an organisation -- its
     owner working in that office. -> [(id, name)]."""
     from ..agents.core import agent_active, agent_row, agent_shares
-    from ..core.pg import system_ctx
     from .agentdocs import ofa_agent_on, ofa_area_agents
     if not office_settings(c, oid).get("agents_read"):
         return []
@@ -149,7 +150,6 @@ def _v1ctx(c, rb, write=False):
 
 def _own(c, oid, aid, lid):
     """Letter lid of the area made by agent aid (decrypted row); 404 for any other letter."""
-    from .letters import lt_row
     d = lt_row(c, oid, lid)
     if d.get("agent_id") != aid:
         raise Denied(404)
@@ -158,7 +158,6 @@ def _own(c, oid, aid, lid):
 
 def lta_v1(c, oid, aid, d):
     """The agent's view of its letter: the fields, the links to documents it sees, the app address."""
-    from .letters import lt_public
     out = lt_public(c, oid, d)
     out.pop("created_by", None)
     links = []
@@ -194,8 +193,6 @@ def v1_letter_post():
     notify? (default true), requested_by?} -> 201 the draft (+ chat_message_id). answers = a document shared with you in the
     office's documents space (404 otherwise): recipient and reference line are prefilled from it and the letter is linked."""
     from .agentdocs import _json
-    from .letterlinks import ltl_link, ltl_prefill
-    from .letters import lt_create, lt_row
     b = _json(LTA_IN)
     c = db()
     notify = _flag(b)
@@ -229,7 +226,6 @@ def v1_letter_post():
 def v1_letter_list():
     """The letters you made in this office, newest first: ?status=draft (default) | sent | delivered | all."""
     from .agentdocs import _args
-    from .letters import LT_STATUS_KEYS, lt_row
     a = _args(("status",))
     st = a.get("status") or "draft"
     if st not in LT_STATUS_KEYS + ("all",):
@@ -263,8 +259,6 @@ def v1_letter_get(lid):
 def v1_letter_patch(lid):
     """Only your own draft, only while it is a draft (400 after sending): the fields of the create call except answers."""
     from .agentdocs import _json
-    from .letters import lt_update
-    from ..core.pg import write_lock
     b = _json(LTA_PATCH)
     c = db()
     notify = b.get("notify") is True
@@ -287,7 +281,6 @@ def v1_letter_link(lid):
     """{node_id, kind: answers | reply}: links your own draft and a document shared with you in the office's documents
     space (404 otherwise); 400 once the letter is sent."""
     from .agentdocs import _json
-    from .letterlinks import LTL_KINDS, ltl_link
     b = _json(("node_id", "kind"))
     c = db()
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True)

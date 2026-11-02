@@ -39,6 +39,10 @@ CF_BASES = ("gross", "net")
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .costs import ek_purchases  # 2.369.5 (#2517): pulled up from functions
+from .travel import rk_trips  # 2.369.5 (#2517): pulled up from functions
+from .docs import doc_row  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 
 
 def _j(s):
@@ -298,7 +302,6 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
     both bases.
     2.123.0 D (#2341): cfs (default on) adds the account balance of office/cfstart.py cfs_apply (start, account, manual, real,
     diff, adjust); off for its own inner runs."""
-    from .costs import ek_purchases
     from .invoices import inv_money_fields, inv_paid_map
     st = office_settings(c, oid)
     home = hc_home(st)  # 2.189.0 B (#2475): the home currency, not the one of new documents
@@ -384,7 +387,6 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
         put(p["date"], "out", "actual" if p["date"] <= today else "plan", "purchase", dec(p["amount"]),
             p["label"] or "", number=p["number"], doc_id=p["doc_id"])
     # out: travel receipts
-    from .travel import rk_trips
     for t in rk_trips(c, oid):
         for it in t["items"]:
             day = it["date"] or t["date_from"]
@@ -468,8 +470,6 @@ def cf8_doc_cashflow_post(did):
     """2.88.0 (#1915): {cashflow: auto|yes|no} of a quotation -> {id, cashflow, cf_chain}. Planning, not the document's content
     (not printed, not in the approval hash): the same right as editing the quotation (a member of the office area), also when
     it is sent or finalised. Logged."""
-    from .docs import doc_row
-    from .ledger import ofx_log
     c = db()
     uid = office_gate(c)
     oid = office_org(c, uid)

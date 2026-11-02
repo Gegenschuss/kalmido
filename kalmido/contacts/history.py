@@ -16,6 +16,8 @@ from ..core.db import db
 from ..core.access import Denied, need_feat
 from ..core.i18n import tr
 from ..accounts.session import me
+from ..events.model import need_event  # 2.369.5 (#2517): pulled up from functions
+from .model import _jl, contact_visible  # 2.369.5 (#2517): pulled up from functions
 
 CTK_PAGE = 20           # entries per page (the card's "More" asks for the next one)
 CTK_MAILS_SCAN = 1000   # newest filed mails uid may reach, looked at for the contact's addresses (sealed: no SQL match)
@@ -100,7 +102,6 @@ def ctk_docs(c, uid, clients):
 
 
 def ctk_events(c, uid, kid):
-    from ..events.model import need_event
     out = []
     for e in c.execute("""SELECT e.id FROM events e WHERE e.id IN (SELECT a.event_id FROM event_attendees a WHERE a.contact_id=?)
                           AND e.deleted_at IS NULL ORDER BY e.first_day DESC LIMIT ?""", (kid, CTK_SOURCE_MAX)):
@@ -122,7 +123,6 @@ def ctk_history(cid):
         raise Denied(403, tr("Agents cannot use this endpoint"))
     c = db()
     uid = me()
-    from .model import _jl, contact_visible
     r = contact_visible(c, cid, uid)
     if not r or r["kind"] == "group":
         raise Denied(404)

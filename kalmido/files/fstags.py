@@ -18,15 +18,16 @@ from ..accounts.session import me
 from ..docs import store as S
 from .store import fs_chain, fs_link_target, fs_log_add, fs_visible_sql, need_node
 from .fslock import fsl_need_unlocked  # 2.353.0 F (#2758)
+from .web import _items  # 2.369.5 (#2517): pulled up from functions
+from .store import fs_visible_ids  # 2.369.5 (#2517): pulled up from functions
 
 DT_MAX = 30       # tags per node (as a document)
 DT_HITS = 500     # nodes of one tag filter
 
 
 def _no_agent():
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403)
+    from ..agents.core import need_person
+    need_person(403)
 
 
 def dt_ws(n):
@@ -185,7 +186,6 @@ def files_tags_used():
 def files_tagged():
     """?space=&tag=1,7&tag=3&mode=all|any&not=4 -> {items}: the files / folders of a space I see with these tags (a group
     of ids = one tag name; mode all: every group, any: one of them; not: none of these), at most DT_HITS, by name."""
-    from .web import _items
     c = db()
     _no_agent()
     uid = me()
@@ -198,7 +198,6 @@ def files_tagged():
     rows = c.execute(f"SELECT n.* FROM fs_nodes n WHERE {' AND '.join(where)} ORDER BY lower(n.name), n.id LIMIT {DT_HITS + 1}", params).fetchall()
     more = len(rows) > DT_HITS
     items = _items(c, rows[:DT_HITS])
-    from .store import fs_visible_ids
     vis = fs_visible_ids(c, me())
     for x in items:  # where it lies: the path above it, cut at the first folder the asker cannot see (review: like _crumbs)
         up = []

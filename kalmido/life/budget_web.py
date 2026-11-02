@@ -17,6 +17,8 @@ from ..life.budget import (
     entry_delete, entry_update, rec_book, rec_create, rec_delete, rec_list, rec_update,
 )
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..tasks.attachments import send_stored  # 2.369.5 (#2517): pulled up from functions
+from ..files.scan import sc_guard  # 2.369.5 (#2517): pulled up from functions
 
 
 def _done(c, out, code=200):
@@ -206,12 +208,10 @@ def budget_files_upload(eid):
 @app.get("/api/budget/files/<int:fid>")
 def budget_file_get(fid):
     """The receipt (?inline=1 or an inline type: shown; ?dl=1: a download), served like attachments."""
-    from ..tasks.attachments import send_stored
     c = db()
     uid = me()
     bud_need_on(c, uid)
     r = dict(bud_obj(c, uid, "budget_files", fid, write=False))
-    from ..files.scan import sc_guard
     sc_guard(c, "budget", fid)  # 2.126.0 A (#1979 L1): like the other stored files
     return send_stored(r)
 

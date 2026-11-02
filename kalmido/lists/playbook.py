@@ -28,6 +28,9 @@ from ..core.access import Denied, list_role, MANAGE_ROLES, need_list, tvis, WRIT
 from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_json, v1_view
+from ..lists.lists import folder_under, clean_folder  # 2.369.5 (#2517): pulled up from functions
+from ..lists.folders import folder_lists  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import news_add  # 2.369.5 (#2517): pulled up from functions
 
 PB_MAX = 8000          # characters of one Playbook
 PB_KEEP = 200          # versions kept per Playbook
@@ -174,7 +177,6 @@ def pb_flags(c, rows):
 def pb_folder_rename(c, uid, old, new):
     """A folder of uid was renamed / moved (old -> new, subfolders along): its Playbooks go along. A folder merged into an
     existing one: its versions follow the target's (the moved text becomes the current one; nothing is lost)."""
-    from ..lists.lists import folder_under
     for (f,) in c.execute("SELECT DISTINCT folder FROM playbooks WHERE list_id IS NULL AND owner_id=?", (uid,)).fetchall():
         if not folder_under(f, old):
             continue
@@ -407,7 +409,6 @@ def pb_prop_discard(lid, pid):
 
 # ---------------------------------------------------------------- web API (people): folders (only the folder's owner)
 def _folder_arg(v, strict=True):
-    from ..lists.lists import clean_folder
     if _is_agent_user():
         raise Denied(403)
     try:
@@ -432,7 +433,6 @@ def _folder_parents(c, owner, f):
 
 @app.get("/api/folders/playbook")
 def pb_folder_get():
-    from ..lists.folders import folder_lists
     c, uid = db(), me()
     try:
         f = _folder_arg(request.args.get("folder"), strict=False)
@@ -524,7 +524,6 @@ def v1_pb_get(lid):
 def v1_pb_propose(lid):
     """{text, note?}: an agent of the list proposes a new text of the list's own Playbook (people apply or discard it)."""
     from ..agents.core import need_agent
-    from ..collab.news import news_add
     v1_args(())
     aid = need_agent()
     c = db()

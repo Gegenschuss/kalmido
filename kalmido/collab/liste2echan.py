@@ -11,6 +11,7 @@ from ..core.db import err
 from ..core.i18n import tr
 from .e2e import E2E_MSG_MAX, E2E_B64, e2e_msg_parse
 from .liste2e import le2a_gen, le2a_reenc_again, le2e_writer_ok
+from .teamchat import tchat_room_members, TCHAT_MAX  # 2.369.5 (#2517): pulled up from functions
 
 
 def le2c_blob(v, gen):
@@ -69,7 +70,6 @@ def le2c_check(c, r, b):
 
 def le2c_mentions(c, r, b):
     """@mentions of an encrypted channel message: the browser names them (ids), only members of the room count."""
-    from .teamchat import tchat_room_members
     ids = b.get("mentions")
     if not isinstance(ids, list):
         return []
@@ -156,7 +156,6 @@ def le2c_left(c, lid, mode, gen, limit=None):
 def le2c_bulk(c, lid, mode, gen, rows):
     """Writes converted channel messages of list lid: [{id, enc}] (encrypting / on: a ciphertext of generation gen) or
     [{id, body}] (decrypting). Only messages that are still to do; no edit mark, no push. -> number written, or raises ValueError."""
-    from .teamchat import TCHAT_MAX
     if not rows:
         return 0
     if not isinstance(rows, list):

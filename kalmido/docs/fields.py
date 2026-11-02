@@ -25,6 +25,8 @@ from ..core.access import Denied
 from ..accounts.session import me
 from . import store as S
 from .web import _no_agent, _ws_manage, doc_amount, ws_param
+from .web import _reindex  # 2.369.5 (#2517): pulled up from functions
+from ..core.pages import valid_link  # 2.369.5 (#2517): pulled up from functions
 
 DF_TYPES = ("text", "number", "money", "date", "checkbox", "select", "url")
 DF_MAX = 50           # fields per workspace
@@ -167,7 +169,6 @@ def df_value(f, v):
     if t == "text":
         return s[:DF_TEXT_MAX]
     if t == "url":
-        from ..core.pages import valid_link
         if not valid_link(s):
             raise ValueError(tr("The link must be a web address (https://…) or a file link (smb://…, file://…)"))
         return s[:2000]
@@ -436,7 +437,6 @@ def df_text_rest(c, nid, ws, lines):
 
 
 def _reindex_nodes(c, nids):
-    from .web import _reindex
     for nid in nids:
         _reindex(c, nid)
 

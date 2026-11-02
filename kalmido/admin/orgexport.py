@@ -58,6 +58,10 @@ from ..core.orgcrypt import OrgCryptError, _org_admin, oc_dec, oc_dec_row, oc_en
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
 from .offsite import stepup_download  # 2.223.2 C (#2871): the step-up before a download
 from ..accounts.orgretain import odl_ids  # 2.278.0 A (#3093)
+from ..hub.hubmail import hbm_can  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import _need_org_admin, org_role  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgretain import odl_admin_export  # 2.369.5 (#2517): pulled up from functions
+from ..office.ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 
 EXPORT_DIR = os.environ.get("TASKS_EXPORT_DIR", os.path.join(os.path.dirname(DB), "exports"))
 OX_KEEP_H = 24  # a finished archive waits this long, then the watchdog removes it
@@ -577,7 +581,6 @@ def ox_hidden_mails(c, oid, uid):
     """2.190.0 D (#2561): ids of the organisation's filed mails uid may not read in the app (none hidden without uid)."""
     if not uid:
         return set()
-    from ..hub.hubmail import hbm_can
     return {r["id"] for r in c.execute("SELECT id, list_id, client_id, owner_id, org_id FROM hub_mails WHERE org_id=?", (oid,)).fetchall()
             if not hbm_can(c, uid, r)}
 
@@ -705,7 +708,6 @@ def ox_build(c, oid, out, by=None):
         _put_json(zf, man, "organisation.json", [o])
         members = c.execute("""SELECT u.id, u.username, u.display_name, u.email, COALESCE(u.kind,'user') AS kind, u.disabled, u.color, m.role
                                FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? ORDER BY u.id""", (oid,)).fetchall()
-        from ..accounts.orgs import org_role
         _put_json(zf, man, "members.json", ({**dict(r), "role": org_role(c, r["id"], oid) or r["role"]} for r in members))
         hidden = ox_hidden_mails(c, oid, (by or {}).get("id")) if "hub_mails" in have else set()
         if "hub_mails" in have and "deleted_at" in _table_cols(c, "hub_mails"):  # 2.223.3 B (#2879): a deleted filed mail's files follow it out
@@ -1134,8 +1136,6 @@ def ox_cleanup(c=None, force=False):
 
 # ---------------------------------------------------------------- routes (people only: /api/orgs is APP_ONLY, agents 403)
 def _need(c, oid, own=False):
-    from ..accounts.orgs import _need_org_admin
-    from ..accounts.orgretain import odl_admin_export
     from ..agents.core import is_agent
     # 2.137.0 A (#2344): own = the person's own personal office, reached as organisation 0 (_ox_area)
     # 2.152.0 A (#2167): a retired one: the instance admins (review A4: not the personal office of a deleted person)
@@ -1164,7 +1164,6 @@ def ox_foreign(c, oid, own, st):
     by = st.get("by")
     if own or not by or by == me() or st.get("state") not in ("running", "done"):
         return None
-    from ..accounts.orgs import org_role
     with system_ctx(c):  # another person's account and role in this organisation (structure, no content)
         u = c.execute("SELECT display_name, username, disabled FROM users WHERE id=?", (by,)).fetchone()
         o = c.execute("SELECT retired_at, retired_admins FROM orgs WHERE id=?", (oid,)).fetchone()
@@ -1235,7 +1234,6 @@ def ox_download(oid):
     e = stepup_download(c, proxy_ok=not own)
     if e is not None:
         return e
-    from ..office.ledger import ofx_log
     with system_ctx(c):  # 2.152.0 (#2167, review A4): an instance admin of a retired organisation is no member of it
         ofx_log(c, oid, "export", target="org_download", detail={"file": st["file"]}, dedupe_min=10)
     c.commit()

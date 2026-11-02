@@ -16,6 +16,8 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, trigger_skip_present
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_list, need_task, task_visible, vis_sql, WRITE_ROLES
+from ..tasks.tasks import one_task  # 2.369.5 (#2517): pulled up from functions
+from .validation import as_int, log_act  # 2.369.5 (#2517): pulled up from functions
 
 ML_MAX = 10  # further lists per task
 
@@ -153,7 +155,6 @@ def ml_link(tid):
         if g.user["kind"] != "agent" and tmm_wish(c, tid, lid, _int(b.get("section_id")), srt):
             bump(c)
             c.commit()
-            from ..tasks.tasks import one_task
             return jsonify({**one_task(c, tid), "link_waits": True})
         return err(*e)
     sid, e = _place(c, lid, b.get("section_id"))
@@ -169,11 +170,9 @@ def ml_link(tid):
                  ON CONFLICT (task_id, list_id) DO UPDATE SET section_id=excluded.section_id, sort=excluded.sort""",
               (tid, lid, sid, float(srt), org, me(), iso(now_utc())))
     if not had:
-        from ..tasks.validation import log_act
         log_act(c, tid, "ml_add", {"list_id": lid})
     bump(c)
     c.commit()
-    from ..tasks.tasks import one_task
     return jsonify(one_task(c, tid))  # 200 (v1_call takes every tuple for an error)
 
 
@@ -187,13 +186,11 @@ def ml_unlink(tid, lid):
         need_task(c, tid)  # 404 / 403 from the task's own list
     gone = c.execute("DELETE FROM task_links WHERE task_id=? AND list_id=?", (tid, lid)).rowcount
     if gone:
-        from ..tasks.validation import log_act
         log_act(c, tid, "ml_rm", {"list_id": lid})
         bump(c)
     c.commit()
     if not task_visible(c, tid, me()):
         return jsonify(ok=True)
-    from ..tasks.tasks import one_task
     return jsonify(one_task(c, tid))
 
 
@@ -222,7 +219,6 @@ def ml_place(tid, lid):
         c.execute(f"UPDATE task_links SET {', '.join(sets)} WHERE task_id=? AND list_id=?", (*args, tid, lid))
         bump(c)
         c.commit()
-    from ..tasks.tasks import one_task
     return jsonify(one_task(c, tid))
 
 
@@ -244,7 +240,6 @@ def v1_ml_link(tid):
 @app.delete("/api/v1/tasks/<int:tid>/links/<list_id>")  # second id as text like /contacts/<contact_id>: the spec says {list_id}
 @v1_view
 def v1_ml_unlink(tid, list_id):
-    from .validation import as_int
     v1_args(())
     lid = as_int(list_id, "list_id", 1)
     v1_call(ml_unlink, tid, lid)

@@ -48,6 +48,10 @@ from .ledger import ofx_log
 from .letters import lt_image_in, lt_profile, lt_profile_save  # 2.332.0 C (#3301): the one signature picture of a person
 from .rights import ofr_own_uid, NO_SPECIAL, ofr_allows
 from .travel import _amount, _csv_safe, _ctx, _date, _text, rk_home_cur, rk_people, rka_person_arg, rka_pkey
+from .model import office_settings, ofx_name1  # 2.369.5 (#2517): pulled up from functions
+from .packs import office_pack_for, pack_retention  # 2.369.5 (#2517): pulled up from functions
+from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from functions
+from .mealpdf import bw_meal_pdf_data, bw_report_pdf  # 2.369.5 (#2517): pulled up from functions
 
 BW_KINDS = ("food", "drinks")
 BW_RATES = ("19", "7", "0")  # the usual German rates; another rate (0-100) is kept as it is
@@ -210,8 +214,6 @@ def bw_years(c, oid):
     """2.147.0 (#2459, #2461): the retention of receipts in years of office area oid (its country pack; the neutral base pack:
     the office's own value). DE stays at 8. 2.355.0 B (#2845): never below 8 (a lower value of a pack or the office counts
     as 8: entertainment receipts are German receipts)."""
-    from .model import office_settings
-    from .packs import office_pack_for, pack_retention
     s = office_settings(c, oid)
     return max(BW_KEEP_YEARS, int(pack_retention(office_pack_for(s), s).get("receipts") or BW_KEEP_YEARS))
 
@@ -810,7 +812,6 @@ def bw_file_post(mid):
     if not kind:
         raise BadInput(tr("Only PDF, JPEG or PNG files can be attached"))
     name = _fname(f.filename, kind[2])
-    from ..files.upsafe import UploadRefused
     try:
         scan = sc_scan(name, data)
     except UploadRefused as e:
@@ -898,7 +899,6 @@ def bw_file_restore(mid, fid):
 
 # ---------------------------------------------------------------- the evaluation (filters like the travel expenses)
 def bw_company(c, oid):
-    from .model import office_settings, ofx_name1
     return ofx_name1((office_settings(c, oid).get("company") or {}).get("name") or "")
 
 
@@ -996,7 +996,6 @@ def bw_report_get():
                         headers={"Content-Disposition": f'attachment; filename="{bw_fname(df, dt, person, occ, "csv")}"',
                                  "Cache-Control": "no-store"})  # 2.306.0 D2 (#2875)
     if fmt == "pdf":
-        from .mealpdf import bw_report_pdf
         data = bw_report_pdf(c, oid, rep, df, dt, person, occ, cur)
         ofx_log(c, oid, "export", target="meals", detail={"what": "meals.pdf", "from": df, "to": dt})
         c.commit()
@@ -1008,7 +1007,6 @@ def bw_report_get():
 @app.get("/api/office/meals/<int:mid>/pdf")
 def bw_meal_pdf(mid):
     """The receipt of one meal as PDF (Eigenbeleg; a draft is marked as such)."""
-    from .mealpdf import bw_meal_pdf_data
     c, uid, oid = _ctx()
     _meal(c, oid, mid, mode="read")
     m = _one(c, oid, mid)

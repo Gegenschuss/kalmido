@@ -22,6 +22,7 @@ from ..core.config import API_PREFIX, app
 from ..core.db import db
 from ..core.i18n import N_, tr
 from .liste2e import LE2E_PREFIX, le2e_is_cipher, le2e_modes, le2e_neutral
+from ..api.common import v1_err  # 2.369.5 (#2517): pulled up from functions
 
 LE2B_API_MSG = N_("This project is encrypted in the browser. Its texts cannot be read or changed through the API or by agents.")
 LE2B_OFF_MSG = N_("Not available in projects encrypted in the browser.")
@@ -222,7 +223,6 @@ def le2b_v1_guard():
         return None  # removing a member (or oneself) only makes the circle smaller
     c = db()
     if le2b_any(c) and le2b_v1_target(c):
-        from ..api.common import v1_err
         return v1_err(403, le2b_msg(), name="list_e2e")
     return None
 

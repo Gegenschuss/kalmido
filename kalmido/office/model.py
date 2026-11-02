@@ -26,6 +26,9 @@ from ..core.conflict import ccf_check  # 2.269.0 C (#3017)
 from ..core.db import iso_ms  # 2.269.0 C (#3017)
 from ..notify.alerts import aa_now  # 2.312.0 C (#3265)
 from ..core.pg import write_lock  # 2.269.0 C (#3017)
+from ..accounts.orgroles import office_allowed  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import org_role, user_orgs, instance_mode, workspaces_for  # 2.369.5 (#2517): pulled up from functions
+from .packs import PACK_FEATURES  # 2.369.5 (#2517): pulled up from functions
 
 OFFICE_FEAT = "office"
 OFFICE_NO_ORG = N_("Choose a workspace at the top (Private or an organisation) to open its office")  # 2.47.3 (#1360)
@@ -204,7 +207,6 @@ def office_org(c, uid, admin=False, area=None):
         fk = office_path_feature(request.path)
         if fk and not office_feature_on(office_settings(c, oid), fk):
             raise Denied(404, tr(OF_FEATURE_OFF))
-    from ..accounts.orgroles import office_allowed
     no = office_allowed(c, uid, oid)  # 2.143.0 A (#2151): guest none; read-only reads; accounting reads + exports
     if role != "admin" and has_request_context():
         from .rights import ofr_check
@@ -224,7 +226,6 @@ def office_org(c, uid, admin=False, area=None):
 
 def office_where(c, uid):
     """2.187.0 (#2476): (office area id, uid's role there) -- the first half of office_org without the role checks."""
-    from ..accounts.orgs import org_role, user_orgs
     orgs = user_orgs(c, uid)
     ws = (usettings(c, uid).get("workspace") or "").strip()
     m = re.fullmatch(r"org:(\d{1,9})", ws)
@@ -266,7 +267,6 @@ def office_role(c, uid, oid):
     owner = pb_owner(c, oid)
     if owner is not None:
         return "admin" if owner == uid else None
-    from ..accounts.orgs import org_role
     return org_role(c, uid, oid)
 
 
@@ -277,7 +277,6 @@ def pb_owner(c, oid):
         return None
     cache = g.setdefault("pb_owner", {}) if has_request_context() else {}
     if oid not in cache:
-        from ..core.pg import system_ctx
         with system_ctx(c):  # instance structure: which person a personal office belongs to
             r = c.execute("SELECT personal_of FROM orgs WHERE id=?", (oid,)).fetchone()
         cache[oid] = r[0] if r else None
@@ -320,20 +319,17 @@ def pb_info(c, uid, oid):
     office is still empty, the organisations of the person (their offices are in their workspaces: the hint + switch)."""
     if pb_owner(c, oid) is None:
         return {"personal": 0}
-    from ..accounts.orgs import instance_mode, user_orgs
     orgs = user_orgs(c, uid)
     u = getattr(g, "user", None) if has_request_context() else None
     # POST /api/office/move; 2.422.0 (#2937): the owner herself too (a company of her own), no kid account
     move = {"can_move": 1 if u is not None and not u["kid"] and instance_mode(c) == "workspaces" else 0}
     # 2.137.0 D (#1981): the organisations the person is an admin of (POST /api/office/move/org takes the office into one)
-    from ..accounts.orgs import org_role
     adm = [o for o in orgs if org_role(c, uid, o) == "admin"]
     move["move_orgs"] = [{"id": r["id"], "name": r["name"]} for r in c.execute(
         f"SELECT id, name FROM orgs WHERE id IN ({','.join('?' * len(adm))}) AND personal_of IS NULL ORDER BY lower(name)", adm)] if adm else []
     used = c.execute("SELECT 1 FROM office_docs WHERE org_id=? UNION ALL SELECT 1 FROM office_services WHERE org_id=? LIMIT 1", (oid, oid)).fetchone()
     if used or not orgs:
         return {"personal": 1, "org_offices": [], **move}
-    from ..accounts.orgs import workspaces_for
     return {"personal": 1, "org_offices": [{"id": w["id"], "name": w["name"]} for w in workspaces_for(c, uid)], **move}
 
 
@@ -582,7 +578,6 @@ def office_settings_clean(c, oid, b, cur):
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = [x for x in OFFICE_MENU_OFF if x in v]
         elif k == "features_off":  # 2.147.0 (#2460): only switchable functions; switching off hides, never deletes
-            from .packs import PACK_FEATURES
             if not isinstance(v, list) or any(not isinstance(x, str) or not PACK_FEATURES.get(x, {}).get("switch") for x in v):
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = sorted(set(v))

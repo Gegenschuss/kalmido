@@ -32,6 +32,8 @@ from ..core.errors import BadInput
 from ..api.common import v1_args, v1_err, v1_json, v1_view
 from .dispo import DSP_DAYS_MAX, DSP_KINDS, dsp_conflicts, dsp_public, dsp_resources, dsp_units, _res_index, _ts
 from .absence import abs_days, abs_holidays, abs_holidays_shown, abs_org, abs_state
+from ..events.model import default_cal, ev_fields, ev_store  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.lifecycle import do_delete, restore_task  # 2.369.5 (#2517): pulled up from functions
 
 ADZ_DAYS_MAX = 31          # shoot days of one proposal
 ADZ_CREW_MAX = 120         # crew / equipment rows of one proposal
@@ -42,7 +44,6 @@ ADZ_TEXT_MAX = 200
 def adz_event_draft(c, uid, title, start, end, all_day=False, location="", task_id=None, note=""):
     """A tentative event in uid's own (first) calendar -> its id. start / end: YYYY-MM-DD (all_day) or YYYY-MM-DDTHH:MM
     (local wall time). Validated like every event (ev_fields); task_id must be visible to uid. The caller commits."""
-    from ..events.model import default_cal, ev_fields, ev_store
     b = {"title": title, "start": start, "end": end, "all_day": bool(all_day), "location": location or "", "description": note or "",
          "status": "tentative"}
     if task_id:
@@ -398,7 +399,6 @@ def _adz_tstamp(c, ids):
 def adz_undo(c, rec, back=True):
     """Undo: drafts that are still drafts go (deleted_at: restorable), tasks to the trash, option bookings go; what a person
     confirmed or changed since stays (skipped). Redo brings them back."""
-    from ..tasks.lifecycle import do_delete, restore_task
     n, skipped, ts = 0, [], iso(now_utc())
     for kind, i in rec.get("made") or []:
         if kind == "event":

@@ -41,6 +41,12 @@ from ..files.store import fs_read  # 2.184.0 A (#2628)
 from ..life.budget import bud_dec  # 2.168.1: pulled up from _project_bookings
 from ..lists.listtrash import otr_held, otr_need  # 2.168.1: the project download route lives here (no upward import)
 from ..office.ledger import ofx_log  # 2.296.0 F (#3177)
+from ..accounts.orgs import org_role  # 2.369.5 (#2517): pulled up from functions
+from ..notify.alerts import aa_now  # 2.369.5 (#2517): pulled up from functions
+from ..office.books import bk_csv_cell  # 2.369.5 (#2517): pulled up from functions
+from .orgexport import OX_AREAS, OX_PB_CLIENTS, _rows, ox_live, _safe_part, _under  # 2.369.5 (#2517): pulled up from functions
+from ..office.pdfweb import _render, _stored, epdf_name  # 2.369.5 (#2517): pulled up from functions
+from ..office.cashbook import cb_csv_text, cb_export_data, cb_pdf_bytes  # 2.369.5 (#2517): pulled up from functions
 
 RX_VALID_DAYS = 7  # a finished export counts this long as "exported" for the deletion
 RX_YEARS = {"documents": 8, "books": 10, "letters": 6}  # what the hint says (invoices / receipts 8, sent letters 6 (2.184.0 #2628), books 10 years)
@@ -153,7 +159,6 @@ def rx_may_export(c, sub):
         return False
     if sub["kind"] == "user":
         return sub["id"] == me()
-    from ..accounts.orgs import org_role
     return org_role(c, me(), sub["id"]) == "admin" or odl_admin_export(c, sub["id"], retention=True)  # 2.186.0 A (#2599): a retired one: its former admins (2.239.0 C #2943: or the instance admins when none is left)
 
 
@@ -228,7 +233,6 @@ def rx_log(c, sub, kind, detail=None):
 
 
 def rx_alert(text, args):
-    from ..notify.alerts import aa_now
     aa_now("security", f"retention:{int(time.time() * 1000)}", text, args)
 
 
@@ -302,7 +306,6 @@ class _Pipe:
 
 
 def _cell(v):
-    from ..office.books import bk_csv_cell
     if v is None:
         return ""
     if isinstance(v, (dict, list)):
@@ -365,7 +368,6 @@ def _names(c):
 
 def _tables(c, z, sub):
     """The office tables as CSV (decrypted like the organisation export, secrets dropped) -> chunks."""
-    from .orgexport import OX_AREAS, OX_PB_CLIENTS, _rows, ox_live
     oid = sub["office"]
     where = {t: w for _n, t, w in OX_AREAS}
     have = {r[0] for r in c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema()")}
@@ -405,8 +407,6 @@ def _fs_locked(c, z, nid, name):
 
 def _invoices(c, z, sub, done):
     """Every finalised document: its stored PDF / XML (decrypted), else rendered from its snapshot."""
-    from ..office.pdfweb import _render, _stored, epdf_name
-    from .orgexport import _safe_part
     oid = sub["office"]
     # 2.144.10 B (#2576): no trial documents (the tables below keep their rows with the trial column)
     for r in c.execute("SELECT * FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL AND trial=0 ORDER BY date, id", (oid,)).fetchall():
@@ -433,8 +433,6 @@ def _invoices(c, z, sub, done):
 def _receipts(c, z, sub):
     """The receipts of the documents space (also those in the trash: they go with the deletion) with their files + receipts.csv."""
     from ..docs.store import doc_open
-    from ..files.store import fs_read
-    from .orgexport import _safe_part
     rows = c.execute("SELECT r.node_id, r.category, r.vat_pct, r.paid_at, d.doc_date, d.amount, d.currency, d.ws, n.name, n.deleted_at "
                      "FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
                      "WHERE d.ws=? AND n.kind='file' ORDER BY COALESCE(NULLIF(d.doc_date, ''), r.paid_at), r.node_id", (sub["ws"],)).fetchall()
@@ -461,7 +459,6 @@ def _receipts(c, z, sub):
 
 def _project_receipts(c, z, sub):
     """The receipt files of the lists (budget_files) + project-receipts.csv."""
-    from .orgexport import _safe_part, _under
     q, a = sub["lists"]
     rows = c.execute(f"SELECT f.*, l.name AS list_name FROM budget_files f JOIN lists l ON l.id=f.list_id WHERE f.list_id IN ({q}) "
                      "ORDER BY f.list_id, f.id", a).fetchall()
@@ -525,8 +522,6 @@ def _letters(c, z, sub):
 
 def _cashbooks(c, z, sub, uid, lg):
     """Every cash book of the office as PDF (entries, day closings, change log) and CSV, over its whole time."""
-    from ..office.cashbook import cb_csv_text, cb_export_data, cb_pdf_bytes
-    from .orgexport import _safe_part
     oid = sub["office"]
     today = now_utc().date().isoformat()
     for b in c.execute("SELECT * FROM office_cashbooks WHERE org_id=? ORDER BY id", (oid,)).fetchall():
@@ -544,7 +539,6 @@ def _cashbooks(c, z, sub, uid, lg):
 
 def _office_files(c, z, sub, done):
     """Every other file of the office folder (archive PDFs, accepted quotations, meal bills, contract files ...), decrypted."""
-    from .orgexport import _safe_part
     base = os.path.join(OFFICE_DIR, str(int(sub["office"])))
     if not os.path.isdir(base):
         return

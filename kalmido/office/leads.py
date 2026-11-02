@@ -27,6 +27,9 @@ from .legacyimport import fx_run, fx_settle  # 2.363.2 (#3104)
 from ..team.clients import cl_trash
 from .pipeline import (EMAIL_RE, LEAD_SOURCES, MAX_DEALS, PL2_PROB, _client_ok, _ctx, _one, _row, _txt, _update,
                        pl2_clean, pl2_list, pl2_public)
+from ..team.clients import clean_client  # 2.369.5 (#2517): pulled up from functions
+from .contacts_cl import fk_add  # 2.369.5 (#2517): pulled up from functions
+from ..life.budget import BUD_ROWS_MAX  # 2.369.5 (#2517): pulled up from functions
 
 LEAD_IMPORT_MAX = 1000  # rows per CSV import
 LEAD_V1_FIELDS = ("id", "title", "contact", "company", "email", "phone", "source", "next_step", "follow_up", "note",
@@ -152,8 +155,6 @@ def lead_convert(did):
     """{client_id?}: the lead becomes a deal in the stage inquiry with a client -- client_id = an existing client of the
     office area, else a new one from company / contact / e-mail / phone (the contact as its contact person).
     -> {deal, client_id, client_new}; the client's undo calls .../unconvert."""
-    from ..team.clients import clean_client
-    from .contacts_cl import fk_add
     c, uid, oid = _ctx()
     cur = _lead_row(c, oid, did)
     b = body()
@@ -263,7 +264,6 @@ def lead_parse(c, oid, text):
     """CSV text -> (columns {field: header}, rows): every row {n, title, contact, company, email, phone, source,
     next_step, follow_up, note, value, error, dup}. Duplicates: the e-mail of a deal of the area or of an earlier row;
     2.363.2 (#3104): a row without an e-mail by lead_key (it came in new on every run)."""
-    from ..life.budget import BUD_ROWS_MAX
     if not isinstance(text, str) or not text.strip():
         raise BadInput(tr("The file is empty"))
     _d, header, rows, nums = csv_table_numbered(text, BUD_ROWS_MAX)

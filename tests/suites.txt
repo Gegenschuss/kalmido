@@ -507,6 +507,8 @@ fresh; run p2370_u_ui node p2370_u_ui.js "$KALMIDO_TEST_DATA"
 fresh; run p2370_k_api "$PY" p2370_k_api_test.py "$KALMIDO_TEST_DATA"
 # 2.37.0 part 2 (#1150): row-level security per organisation (static guard + the policies against the test database)
        run rls_static "$PY" rls_static_test.py
+# 2.369.5 (#2517): need_person, joined_lists_sql, the needless-import budget below 1.000, no new import cycle
+       run p2369_5_layers "$PY" p2369_5_layers_test.py
 fresh; run rls_direct "$PY" rls_direct_test.py "$KALMIDO_TEST_DATA"
 # 2.37.0 part 3 (#1161 / #1165): the jobs list follows the end of a job; copy a whole chat message
 fresh; run p2370_j_ui node p2370_j_ui.js "$KALMIDO_TEST_DATA"

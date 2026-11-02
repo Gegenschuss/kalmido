@@ -28,6 +28,7 @@ from ..accounts.session import me
 from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..tasks.attachments import safe_name, send_stored  # 2.369.5 (#2517): pulled up from functions
 
 SHK_KINDS = ("checkbox", "person", "link", "file")
 SHK_TRUE = {"1", "x", "✓", "true", "wahr", "yes", "ja", "si", "sí", "oui", "vrai", "waar"}
@@ -234,7 +235,6 @@ def shk_upload(sid):
     old_raw} (old_raw = the cell's input before: the app's Undo writes it back through PUT .../cells)."""
     from ..admin.hosting import quota_guard
     from ..files.upsafe import UploadRefused, h6d_read, up_after_store, up_check
-    from ..tasks.attachments import safe_name
     from .core import ShBook, sh_need, sh_reload, sh_set_cells
     need_feat("sheets")
     c = db()
@@ -291,7 +291,6 @@ def shk_upload(sid):
 def shk_file_get(sid, fid, name=None):
     """A file of a file cell (?dl=1 downloads) -- only with the right to read the table."""
     from ..files.scan import sc_guard
-    from ..tasks.attachments import send_stored
     from .core import sh_need
     c = db()
     sh_need(c, sid)

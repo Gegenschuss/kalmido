@@ -27,6 +27,10 @@ from .fsroots import fs_area_after, fs_area_before, fs_area_folder_name, fs_area
 from .fsroots import fs_area_share  # 2.200.0 B (#2747)
 from .fsviews import fsv_collections, fsv_drop, fsv_hidden  # 2.429.0 (#3580): the file store shows only its own folders
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.orgs import visible_people  # 2.369.5 (#2517): pulled up from functions
+from ..lists.groups import grp_visible  # 2.369.5 (#2517): pulled up from functions
+from ..core.retention import ret_days, ret_on  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import org_writes, need_org_write  # 2.369.5 (#2517): pulled up from functions
 
 SHARE_MAX = 200  # shares per node
 LOG_MAX = 100    # history entries shown
@@ -168,7 +172,6 @@ def files_list():
     if space == "org" and oid not in ctx.org_ids:
         raise Denied(404)
     if space == "trash":
-        from ..core.retention import ret_days, ret_on  # 2.152.0 B (#2165): the period of the trash, shown in the view
         return jsonify(items=_trash(c, uid), node=None, crumbs=[], space="trash", trash_days=ret_days("trash"),
                        purge_on=ret_on("trash"))  # 2.223.3 A (#2877)
     vis = fs_visible_ids(c, uid)
@@ -180,7 +183,6 @@ def files_list():
         rows = [r for r in c.execute("SELECT * FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND deleted_at IS NULL ORDER BY id", (oid,))
                 if r["id"] in vis]
         role = "edit" if ctx.role != "agent" else None  # every person of the organisation may add at its top
-        from ..accounts.orgroles import org_writes
         if role and not org_writes(c, uid, oid):
             role = "view"  # 2.143.0 A (#2151, review): guest / read-only / accounting add nothing at the top
     else:
@@ -565,7 +567,6 @@ def files_node_order(nid):
         need_node(c, pid, write=True)
         sib = c.execute("SELECT id, kind, name, sort_no, ref_kind, ref_id FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL", (pid,)).fetchall()
     elif n["org_id"]:
-        from ..accounts.orgroles import need_org_write
         need_org_write(c, uid, int(n["org_id"]))
         sib = c.execute("SELECT id, kind, name, sort_no, ref_kind, ref_id FROM fs_nodes WHERE parent_id IS NULL AND org_id=? AND deleted_at IS NULL",
                         (n["org_id"],)).fetchall()
@@ -713,8 +714,6 @@ def _share_targets(c, n):
     """{people, groups, agents} the owner may share node n with: the same workspace only (an organisation's node: its members
     and its agents; a private node: the people the person may share lists with and the private agents without an owner or
     their own -- the agents a list can be shared with)."""
-    from ..accounts.orgs import visible_people
-    from ..lists.groups import grp_visible
     uid = me()
     vis = visible_people(c, uid)
     org = n["org_id"]

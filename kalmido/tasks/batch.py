@@ -19,6 +19,7 @@ from ..lists.listtrash import otr_err_task
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files
 from ..tasks.atttrash import atr_purge_one  # 2.272.0 F (#3038, review E2-H2)
+from ..tasks.validation import lock_problem  # 2.369.5 (#2517): pulled up from functions
 
 
 @app.delete("/api/attachments/<int:aid>")
@@ -82,7 +83,6 @@ def task_reorder():
         if r["deleted_at"]:
             continue  # 2.126.0 D (#1992 A3): in the trash: stays where it is
         role = need_task(c, int(it["id"]))
-        from ..tasks.validation import lock_problem  # 2.36.0 (#1118): dragging a locked task to another list / day / priority
         e = lock_problem(c, c.execute("SELECT * FROM tasks WHERE id=?", (int(it["id"]),)).fetchone(),
                          clean_task({k: v for k, v in it.items() if k in ("list_id", "priority", "due", "start", "due_time")}))
         if e:

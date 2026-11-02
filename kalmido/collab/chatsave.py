@@ -33,6 +33,12 @@ from ..core.errors import BadInput, UnknownFields
 from ..core.pg import insert_id  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
+from ..collab.comments import MENTION_RE, user_names, need_live_comment  # 2.369.5 (#2517): pulled up from functions
+from ..collab.teamchat import tchat_on, tchat_room_ok  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.tasks import one_task, task_create  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgout import OO_ADMIN_ONLY, org_out, org_out_ok  # 2.369.5 (#2517): pulled up from functions
+from ..core.orgcrypt import oc_copy_file, oc_task_org, oc_task_space  # 2.369.5 (#2517): pulled up from functions
+from ..collab.teamchan import tcx_group_name  # 2.369.5 (#2517): pulled up from functions
 
 CHAT_SAVE_KINDS = ("agent", "team", "comment")  # 2.42.0 (#1383): + comment (of an agent, on a task)
 CHAT_SAVE_FIELDS = ("kind", "msg_id", "list_id", "due", "title", "as")
@@ -61,7 +67,6 @@ def chat_save_of(c, uid, kind, mids):
 
 
 def _plain_mentions(c, text):
-    from ..collab.comments import MENTION_RE, user_names
     names = user_names(c, [int(x) for x in MENTION_RE.findall(text or "")])
     return MENTION_RE.sub(lambda m: "@" + names.get(int(m.group(1)), "?"), text or "")
 
@@ -69,7 +74,6 @@ def _plain_mentions(c, text):
 def _message(c, kind, mid, uid):
     """(text, files [(name, mime, size, path, (kind, id))], where (the conversation), who (the author), created_at, link) of a message uid
     may read, else Denied(404)."""
-    from ..collab.comments import user_names
     if kind == "comment":
         return dl_comment_message(c, mid)
     if kind == "agent":
@@ -81,7 +85,6 @@ def _message(c, kind, mid, uid):
         where = user_names(c, [m["agent_id"]]).get(m["agent_id"], "?")
         who = where if m["sender"] == "agent" else user_names(c, [uid]).get(uid, "?")
         return m["body"] or "", files, tr("Chat with {0}", where), who, m["created_at"], f"#msg/a/{m['agent_id']}/{mid}"
-    from ..collab.teamchat import tchat_on, tchat_room_ok
     if not tchat_on(c):
         raise Denied(404)
     m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
@@ -92,7 +95,6 @@ def _message(c, kind, mid, uid):
         other = r["b"] if r["a"] == uid else r["a"]
         where = tr("Direct message with {0}", user_names(c, [other]).get(other, "?"))
     elif r["kind"] in ("channel", "group"):  # 2.113.1 (#2059)
-        from ..collab.teamchan import tcx_group_name
         where = tr("Team chat {0}", tcx_group_name(c, r, uid) if r["kind"] == "group" else r["name"])
     else:
         ln = c.execute("SELECT name FROM lists WHERE id=?", (r["list_id"],)).fetchone()
@@ -105,7 +107,6 @@ def _message(c, kind, mid, uid):
 
 def dl_comment_message(c, cid):
     """2.42.0 (#1383): _message of a comment on a task the person sees (else 404); 2.139.0 D (#2130): any comment, not only an agent's."""
-    from ..collab.comments import need_live_comment, user_names
     k, _ = need_live_comment(c, cid)  # 404 gone / task not visible (participants: only their tasks)
     # 2.139.0 D (#2130): every comment can be saved (also a person's own or another person's), not only an agent's
     t = c.execute("SELECT id, title FROM tasks WHERE id=?", (k["task_id"],)).fetchone()
@@ -140,7 +141,6 @@ def _copy_files(c, tid, uid, files):
             continue
         rel = os.path.join(str(tid), f"{uuid.uuid4().hex[:12]}-{name}")
         os.makedirs(os.path.join(ATT_DIR, str(tid)), exist_ok=True)
-        from ..core.orgcrypt import oc_copy_file, oc_task_org, oc_task_space
         # 2.64.0 (#1864): opened with the chat's key, sealed for the task's space (organisation or the list owner's account)
         oc_copy_file(c, src, os.path.join(ATT_DIR, rel), oc_task_space(c, tid))
         g.chat_save_new = getattr(g, "chat_save_new", []) + [rel]
@@ -156,11 +156,9 @@ def _copy_files(c, tid, uid, files):
 def chat_save():
     """{kind: agent | team, msg_id, list_id? (default: the inbox), due? (YYYY-MM-DD), title? (default: the first heading or
     line)} -> 201 {task, skipped_files} | 200 {already: true, task_id, task: {id, title}} when this person saved it already."""
-    from ..agents.core import is_agent
-    from ..tasks.tasks import one_task, task_create
+    from ..agents.core import need_person
     c, b = db(), body()
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents can only offer this; the person saves"))
+    need_person(403, tr("Agents can only offer this; the person saves"))
     unknown = sorted(k for k in b if k not in CHAT_SAVE_FIELDS)
     if unknown:
         return err(str(UnknownFields(unknown)))
@@ -186,7 +184,6 @@ def chat_save():
         lid, parent = ct["list_id"], (ct["id"] if b.get("as", "sub") == "sub" else None)
     lid = lid or my_inbox(c, uid)
     need_list(c, lid)  # 404 unknown / not visible, 403 without the right to change the list
-    from ..accounts.orgout import OO_ADMIN_ONLY, org_out, org_out_ok
     src_org = _team_org(c, mid) if kind == "team" else None
     to_org = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
     if not org_out_ok(c, src_org, to_org):  # 2.148.1 B (#2483): a team chat message leaves its organisation only through its admin

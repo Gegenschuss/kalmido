@@ -1174,10 +1174,9 @@ def _org_admin(c, oid):
     if g.user is None:
         raise Denied(401)
     if oid == 0:
-        from ..agents.core import is_agent
+        from ..agents.core import need_person
         from ..office.model import pb_personal
-        if is_agent(g.user):
-            raise Denied(403, tr("Agents cannot use this endpoint"))
+        need_person(403, tr("Agents cannot use this endpoint"))
         p = pb_personal(c, g.user["id"], create=False)
         if not p:
             raise Denied(404)

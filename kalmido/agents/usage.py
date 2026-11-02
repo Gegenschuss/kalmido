@@ -29,7 +29,7 @@ from ..notify.alerts import _env_int
 from ..api.v1 import PRIO_VALUES, v1_comment
 from ..api.common import v1_args, v1_call, v1_err, v1_feature, v1_json, v1_view
 from ..agents.core import (
-    agent_active, AGENT_EVENTS, agent_row, agent_shares, AGENT_STATUSES, AGENT_TYPING_S, AGENT_WAIT_MAX, is_agent,
+    agent_active, AGENT_EVENTS, agent_row, agent_shares, AGENT_STATUSES, AGENT_TYPING_S, AGENT_WAIT_MAX, need_person,
     JOB_ACTIONS, JOB_STATES, need_agent, TIDY_MODES,
 )
 from ..collab.reactions import clean_emoji, ltag_create, ltag_delete, ltag_update, react, with_reactions
@@ -718,8 +718,7 @@ def agents_usage_get():
     """The usage dashboard (Settings > AI colleague, the Agents view). ?agent_id= one agent (default all), ?days= 7-90 for
     the chart, the top tasks, the lists and the models (default 30). Admins: every agent; others: the agents they share a
     list with, counting only what was reported for lists they see (participants: tasks they see)."""
-    if is_agent(g.user):
-        raise Denied(403)
+    need_person(403)
     c = db()
     uid = me()
     adm = is_admin_id(c, uid)

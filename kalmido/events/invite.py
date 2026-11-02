@@ -25,6 +25,9 @@ from ..core.access import Denied
 from ..core.errors import BadInput
 from ..core.mailframe import mail_html
 from ..events.model import EV_ATT_MAX, need_event, wall
+from ..calendars.icalfeed import ics_utc  # 2.369.5 (#2517): pulled up from functions
+from ..events.ics import _pq, ev_lines, wrap  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import lang_of  # 2.369.5 (#2517): pulled up from functions
 
 EVI_DAY_MAX = 200  # invitation mails per person and day
 EVI_SERVER_DAY = env_int("KALMIDO_INVITE_MAIL_DAY", 2000, lo=0)  # 2.360.0 D (#2496): invitation mails of the whole server and day
@@ -159,8 +162,6 @@ def _sender(c, uid, r):
 def evi_ics(c, r, method, atts, org_addr, org_name):
     """The iMIP calendar: the event's VEVENTs (events/ics.py ev_lines) without alarms, with METHOD, ORGANIZER = mailto of the
     inviting person and the external attendees (RSVP); people of this server are left out (their address is private)."""
-    from ..calendars.icalfeed import ics_utc
-    from ..events.ics import _pq, ev_lines, wrap
     lines, tzs = ev_lines(c, r, [])
     out, alarm, stamp = [], 0, ics_utc(now_utc())
     for x in lines:
@@ -213,7 +214,6 @@ def _client_lang(c, uid, email):
 def evi_mail(c, uid, r, method, a, ics_atts, update=False):
     """(to, subject, text, html, reply_to, from_name, attachments) of one invitation / cancellation mail to attendee a;
     ics_atts = the attendees the attached calendar lists."""
-    from ..collab.comments import lang_of
     lg = _client_lang(c, uid, a["email"]) or lang_of(usettings(c, uid))
     addr, name = _sender(c, uid, r)
     title = r["title"]

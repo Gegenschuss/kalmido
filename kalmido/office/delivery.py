@@ -25,12 +25,16 @@ LS_KINDS = ("offer", "invoice")  # what a delivery note is made from
 
 
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .docs import doc_items, doc_public, doc_row, recalc  # 2.369.5 (#2517): pulled up from functions
+from .invoices import _insert_doc, _put_rows, inv_new_row  # 2.369.5 (#2517): pulled up from functions
+from ..personal.timetrack import n43_admin_lists, time_report  # 2.369.5 (#2517): pulled up from functions
+from .pdf import pdf_num, pdf_date, office_pdf  # 2.369.5 (#2517): pulled up from functions
+from .pdfweb import _model, epdf_name, _file_response  # 2.369.5 (#2517): pulled up from functions
 
 
 def ls_items(c, oid, src):
     """The positions of source document src without prices: titles, details, quantities and units (headings / texts as they
     are; automatic lines, discounts and percent positions have no meaning without prices and are left out)."""
-    from .docs import doc_items
     from .parts import tp_inv_items
     rows = tp_inv_items(c, oid, src, "full", None) if src["kind"] == "offer" else None
     if rows is None:
@@ -47,7 +51,6 @@ def ls_items(c, oid, src):
 
 def ls_make(c, oid, uid, src, title=""):
     """A delivery note draft from quotation / invoice row src; its number comes at finalising (OFX_NUMBER_AT_FINALIZE)."""
-    from .invoices import _insert_doc, _put_rows, inv_new_row
     row = inv_new_row(c, oid, office_settings(c, oid), "delivery", src["lang"], src)
     row["delivery_title"] = "service" if title == "service" else ""
     row["source_doc_id"] = src["id"]
@@ -59,7 +62,6 @@ def ls_make(c, oid, uid, src, title=""):
 @app.post("/api/office/docs/<int:did>/delivery")
 def ls_from_doc_post(did):
     """A delivery note (or proof of service) draft from quotation / invoice did; 201 the new document."""
-    from .docs import doc_public, doc_row, recalc
     c, uid, oid = _ctx()
     office_need_feature(c, oid, "docs.delivery")  # 2.434.0 B (#3608)
     r = doc_row(c, oid, did)
@@ -88,7 +90,6 @@ def ls_sheet_ok(r):
 def ls_sheet_report(c, oid, uid, r):
     """The report (personal.timetrack.time_report) of the lists of the invoice's client in its period: exactly what the
     signed-in person sees in the time report (visibility, rounding); BadInput without entries."""
-    from ..personal.timetrack import n43_admin_lists, time_report
     if not ls_sheet_ok(r):
         raise BadInput(tr("The timesheet needs an invoice with a client and a period of service"))
     lists = [x[0] for x in c.execute(
@@ -103,15 +104,12 @@ def ls_sheet_report(c, oid, uid, r):
 
 
 def ls_hours(sec, lang, fmt=None):
-    from .pdf import pdf_num
     return pdf_num(round(sec / 3600, 2), lang, fmt) + " h"
 
 
 def ls_sheet_model(c, oid, uid, r):
     """The print model of the timesheet of invoice row r: the invoice's letterhead and recipient, one table row per entry
     (date | person and activity | hours, grouped by list), the total hours below."""
-    from .pdf import pdf_date
-    from .pdfweb import _model
     rep = ls_sheet_report(c, oid, uid, r)
     m = _model(c, oid, r["id"])
     lang = m.get("lang") if m.get("lang") in LANGS else "de"  # 2.185.0 C (#2520): the model's language (docs.odoc_render: doc_lg)
@@ -144,15 +142,11 @@ def ls_sheet_model(c, oid, uid, r):
 
 def ls_sheet_file(c, oid, uid, r):
     """(file name, PDF bytes, mime) of the timesheet of invoice row r (for the PDF menu and the invoice mail)."""
-    from .pdf import office_pdf
-    from .pdfweb import epdf_name
     return ("timesheet-" + epdf_name(r) + ".pdf", office_pdf(ls_sheet_model(c, oid, uid, r)), "application/pdf")
 
 
 @app.get("/api/office/docs/<int:did>/timesheet.pdf")
 def ls_sheet_get(did):
-    from .docs import doc_row
-    from .pdfweb import _file_response
     c, uid, oid = _ctx()
     r = doc_row(c, oid, did)
     name, data, mime = ls_sheet_file(c, oid, uid, r)

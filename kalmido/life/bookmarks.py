@@ -28,6 +28,7 @@ from ..core.errors import BadInput
 from ..calendars.subscriptions import CalError, cal_allow_parse, cal_err_text, cal_http, cal_rate
 from ..life.model import need_life
 from ..life.rss import rss_url
+from ..accounts.orgroles import need_org_area, user_orgs_full, org_writes  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.97.0 A (#1950): bookmarks
@@ -160,14 +161,12 @@ def bm_space(c, uid, v):
         raise BadInput(tr("Invalid value: {0}", "space")) from None
     if oid not in user_orgs(c, uid):
         raise Denied(404)
-    from ..accounts.orgroles import need_org_area
     need_org_area(c, uid, oid)  # 2.143.0 A (#2151): guests / accounting 404, read-only only reads
     return oid
 
 
 def bm_may_write(c, uid, r):
     if r["org_id"]:
-        from ..accounts.orgroles import org_writes
         if not org_writes(c, uid, r["org_id"]):
             return False  # 2.143.0 A (#2151)
     return r["user_id"] == uid if not r["org_id"] else (r["user_id"] == uid or is_org_admin(c, uid, r["org_id"]))
@@ -211,7 +210,6 @@ def _like(q):
 
 
 def _bm_full(c, uid):
-    from ..accounts.orgroles import user_orgs_full
     return user_orgs_full(c, uid)
 
 

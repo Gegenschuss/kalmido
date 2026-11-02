@@ -31,6 +31,9 @@ from .calc import TAX_KEYS, calc_lang, dec, dstr, fmt_money, fmt_qty, inv_calc, 
 from .homecur import hc_code, hc_home  # 2.189.0 (#2475)
 from . import invoices as _inv  # 2.355.0 C (#2840); 2.354.0 B (#2836): the module, invoices imports abschlag too (cycle)
 from .pdf import pdf_date  # 2.296.0 B (#3175)
+from .model import _num, office_settings  # 2.369.5 (#2517): pulled up from functions
+from .packs import office_pack_for  # 2.369.5 (#2517): pulled up from functions
+from .calc import pack_tax  # 2.369.5 (#2517): pulled up from functions
 
 ABS_TYPES = ("", "progress", "final")
 ABS_TYPE_CODE = {"progress": "326", "final": "380"}  # UNTDID 1001: 326 partial invoice (XRechnung + EN 16931 accept it)
@@ -180,7 +183,6 @@ def abs_clean(b, cur, f):
 
 def abs_settings_clean(k, v, out):
     """office settings skonto_pct / skonto_days (model.office_settings_clean); True when k is one of them."""
-    from .model import _num
     if k == "skonto_pct":
         out[k] = round(_num(v, k, 0, 99.99), 2) if v not in (None, "") else 0
     elif k == "skonto_days":
@@ -215,8 +217,6 @@ def abs_progress_of(c, oid, offer_id, locked_only=False):
 
 
 def _pack(c, oid):
-    from .model import office_settings
-    from .packs import office_pack_for
     s = office_settings(c, oid)
     return s, office_pack_for(s)
 
@@ -319,7 +319,6 @@ def abs_progress(c, oid, uid, offer, amount=None, pct=None):
 
 
 def pack_rate(pack, key):
-    from .calc import pack_tax
     return pack_tax(pack, key)
 
 

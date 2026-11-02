@@ -48,6 +48,14 @@ RIN_TASK_PAUSED = N_("Invoice series {0} paused")
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .docs import _fmt_date, DUP_ITEM_SKIP, DUP_SKIP, _assign_number, doc_items, doc_row, recalc  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_log, ofx_number_at_finalize, ofx_finalize  # 2.369.5 (#2517): pulled up from functions
+from .packs import office_pack_for  # 2.369.5 (#2517): pulled up from functions
+from .invoices import inv_send, inv_datev  # 2.369.5 (#2517): pulled up from functions
+from .mailsig import ofm_sender  # 2.369.5 (#2517): pulled up from functions
+from .fixedimport import fci_people  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
+from .cashflow import _fx  # 2.369.5 (#2517): pulled up from functions
 
 
 def _j(s):
@@ -113,7 +121,6 @@ def rin_fill(text, period, nxt, lg, pack):
     """text with {period} {month} {quarter} {year} of the period [period, nxt) in the document's language lg; other braces stay."""
     if not text or "{" not in text:
         return text
-    from .docs import _fmt_date
     p = date.fromisoformat(period)
     last = (date.fromisoformat(nxt) - timedelta(days=1)).isoformat()
     vals = {"period": f"{_fmt_date(period, pack, lg)} - {_fmt_date(last, pack, lg)}",  # 2.368.2 (#2986): the document's language first
@@ -248,9 +255,6 @@ def _made(c, oid, sids):
 def rin_make(c, oid, uid, s, period):
     """A new invoice draft of series row s for the period starting at period (see the module text); its id, or None when
     the period has its invoice already (unique index) or the template is gone. The caller commits."""
-    from .docs import DUP_ITEM_SKIP, DUP_SKIP, _assign_number, doc_items, doc_row, recalc
-    from .ledger import ofx_log, ofx_number_at_finalize
-    from .packs import office_pack_for
     t = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (s["template_id"], oid)).fetchone() if s["template_id"] else None
     if t is None or t["kind"] != "invoice" or t["status"] == "cancelled" or t["trial"]:  # 2.144.10 A (#2576): never from a trial one
         return None
@@ -305,10 +309,6 @@ def rin_send(c, oid, uid, did):
     reason = a stored text (tr_stored): the timer has no reader, each person gets it in their own language.
     2.269.0 D (#3046): only finalised and checked here (number, the day's counters); the mail goes out after the caller's
     commit (rin_mail), so a failed commit never leaves a mailed invoice whose number is given again."""
-    from .docs import doc_row
-    from .invoices import inv_send
-    from .ledger import ofx_finalize
-    from .mailsig import ofm_sender
     if not ofm_sender(c, oid, uid, {})["via"]:  # 2.439.0 (#3617): also through the mailbox of the series' person
         return False, [N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)")], False, None
     cid = doc_row(c, oid, did)["client_id"]
@@ -350,8 +350,6 @@ def rin_mail(c, oid, uid, m):
 
 def rin_datev(c, oid, did):
     """The DATEV copy after the customer mail was committed (like the route /send); a failure is only reported."""
-    from .docs import doc_row
-    from .invoices import inv_datev
     try:
         inv_datev(c, oid, doc_row(c, oid, did))
         bump(c)
@@ -364,7 +362,6 @@ def rin_datev(c, oid, did):
 def rin_people(c, oid, s):
     """The persons who get the tasks of series row s: its creator while still an admin of the area with the office on, else
     the area's admins (fixedimport.fci_people). Never agents or kids."""
-    from .fixedimport import fci_people
     people = fci_people(c, oid)
     ids = [p["id"] for p in people]
     if s["created_by"] in ids:
@@ -374,7 +371,6 @@ def rin_people(c, oid, s):
 
 def rin_task(c, person, title, text, doc_id=None):
     """A task in the person's inbox, theirs and assigned to them, due today: a link into the office, never an amount."""
-    from ..tasks.validation import log_act
     lid = my_inbox(c, person)
     ts = iso(now_utc())
     srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0]
@@ -558,7 +554,6 @@ def rin_cashflow(c, oid, put, first, last_day, today, nf):
     open invoice) on the expected due day, and every coming period from next_date up to until on its period start plus the
     template's payment days. Amount = the template's gross (office currency through its rate), net through nf. Paused and
     deleted series count not; finalised invoices of a series are in the plan already (kind invoice)."""
-    from .cashflow import _fx
     home = (office_settings(c, oid).get("currency") or "EUR").upper()
     sts = c.execute("SELECT * FROM office_inv_series WHERE org_id=? AND deleted_at IS NULL AND active=1", (oid,)).fetchall()
     if not sts:
@@ -617,7 +612,6 @@ def rin_create():
     ts = iso(now_utc())
     row.update(org_id=oid, next_date=row["start"], active=1, created_by=uid, created_at=ts, updated_at=ts)
     sid = insert_id(c, f"INSERT INTO office_inv_series({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
-    from .ledger import ofx_log
     ofx_log(c, oid, "series_create", target="series", doc_id=row["template_id"], detail={"series_id": sid, "every": row["every"], "start": row["start"],
                                                                                          "until": row["until"], "auto_send": row["auto_send"]})
     bump(c)
@@ -645,7 +639,6 @@ def rin_patch(sid):
         row["updated_at"] = iso(now_utc())
         before = {k: cur[k] for k in row if k in cur.keys() and k != "updated_at"}
         c.execute(f"UPDATE office_inv_series SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [sid, oid])
-        from .ledger import ofx_log
         ofx_log(c, oid, "series_update", target="series", doc_id=cur["template_id"], detail={"series_id": sid, "before": before,
                                                                                              "after": {k: v for k, v in row.items() if k != "updated_at"}})
         bump(c)
@@ -660,7 +653,6 @@ def rin_delete(sid):
     r = rin_row(c, oid, sid)
     ts = iso(now_utc())
     c.execute("UPDATE office_inv_series SET deleted_at=?, updated_at=? WHERE id=? AND org_id=?", (ts, ts, sid, oid))
-    from .ledger import ofx_log
     ofx_log(c, oid, "series_delete", target="series", doc_id=r["template_id"], detail={"series_id": sid})
     bump(c)
     c.commit()
@@ -673,7 +665,6 @@ def rin_restore(sid):
     r = rin_row(c, oid, sid, deleted=True)
     if r["deleted_at"]:
         c.execute("UPDATE office_inv_series SET deleted_at=NULL, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
-        from .ledger import ofx_log
         ofx_log(c, oid, "series_restore", target="series", doc_id=r["template_id"], detail={"series_id": sid})
         bump(c)
         c.commit()

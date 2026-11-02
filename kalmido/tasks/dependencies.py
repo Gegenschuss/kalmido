@@ -12,6 +12,7 @@ from ..collab.comments import burst_gate, collab_user, lang_of, user_names
 from ..collab.news import news_add, notif_ok
 from ..personal.timetrack import vis_ids, VisIds
 from ..core.errors import BadInput
+from ..collab.news import agent_push_ok  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- dependencies ("waiting on"), package 3
@@ -176,7 +177,6 @@ def newtask_events(c, tid):
         if not s or not task_visible(c, tid, uid, full=True):
             continue
         news_add(c, uid, "newtask", task_id=tid, actor=actor, s=s)
-        from ..collab.news import agent_push_ok
         if not notif_ok(c, uid, s, "newtask", "push", t["list_id"]) or not push_reachable(c, uid, s) or \
                 not burst_gate(c, uid, tid, event=True) or not agent_push_ok(c, uid, s, actor):  # 2.28.0 (#987)
             continue

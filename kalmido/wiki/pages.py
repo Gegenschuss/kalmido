@@ -30,6 +30,9 @@ from ..core.access import Denied, task_visible
 from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.orgs import user_orgs  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import need_org_area, org_writes, user_orgs_full, need_org_write  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.tasktrash import ttp_days  # 2.369.5 (#2517): pulled up from functions
 
 WIKI_PATH_MAX, WIKI_BODY_MAX, WIKI_DEPTH = 500, 500_000, 32  # 2.210 A (#2755): was 200 characters / 12 levels (path TEXT, no column limit)
 WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, WIKI_ZIP_TOTAL = 2000, 1_000_000, 30_000_000
@@ -182,7 +185,6 @@ def wiki_link_key(p):
 
 def wiki_space(c, uid, v, write=False):
     """org id (None = private) of a space value "private" | "org:<id>" | <id>; 404 for an organisation the person is not in."""
-    from ..accounts.orgs import user_orgs
     if v in (None, "", "private", 0, "0"):
         return None
     if isinstance(v, str) and v.startswith("org:"):
@@ -193,7 +195,6 @@ def wiki_space(c, uid, v, write=False):
         raise BadInput(tr("Invalid value: {0}", "space"))
     if oid not in user_orgs(c, uid):
         raise Denied(404)
-    from ..accounts.orgroles import need_org_area
     need_org_area(c, uid, oid, write=bool(write))  # 2.143.0 A (#2151): guests / accounting 404, read-only only reads
     return oid
 
@@ -220,7 +221,6 @@ def wiki_need(c, pid, write=False, deleted=False):
         raise Denied(404)
     if write and role != "edit":
         if r["org_id"]:
-            from ..accounts.orgroles import need_org_write
             need_org_write(c, uid, r["org_id"])
         raise Denied(403)
     return r
@@ -340,7 +340,6 @@ def wiki_index():
     from .wkfolder import wkf_sync, wkf_tree  # 2.200.0 A (#2747): the folders of the tree (the path <-> tree check first)
     tree = wkf_tree(c, uid, oid, wkf_sync(c, uid, oid), pages)
     c.commit()
-    from ..accounts.orgroles import org_writes
     out = dict(space=wiki_space_key(oid), may_write=org_writes(c, uid, oid), pages=pages, e2e=e2e, more=more,
                root=tree["root"], folders=tree["folders"])  # 2.143.0 A (#2151); 2.169.1 (#2672): more
     from .wkstyle import wst_get, wst_may  # 2.371.3 (#3152): the space's reading style + whether this person sets it
@@ -709,7 +708,6 @@ WKT_BATCH = 200  # pages per run; the rest follows in the next hour
 
 
 def wiki_trash_days():
-    from ..tasks.tasktrash import ttp_days
     return ttp_days()
 
 
@@ -837,7 +835,6 @@ def wiki_search():
     (#2106): over the word index (wksearch.py), ranked (words in the name, then in the text, then the newest); ?space=
     only that space, ?limit= (default 30, at most 100) &offset= the next ones -> {pages, total, more, offset}; 2.376 (#3292):
     a hit with a query word in its text has snippet (plain text, "…" where cut) + marks ([[start, end], ...] in code points)."""
-    from ..accounts.orgs import user_orgs
     from .wksearch import WKS_LIMIT, WKS_LIMIT_MAX, wks_search, wks_snippets
     c = db()
     uid = me()
@@ -850,7 +847,6 @@ def wiki_search():
     if request.args.get("space") not in (None, ""):
         spaces = [wiki_space(c, uid, request.args.get("space"))]
     else:
-        from ..accounts.orgroles import user_orgs_full
         spaces = [None, *[o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]]  # 2.143.0 A (#2151)
     rows, total = wks_search(c, uid, spaces, q, limit, offset)
     sn = wks_snippets(c, rows, q)  # 2.376 (#3292): the shown hits only, opened in memory (nothing stored or logged)
@@ -861,7 +857,6 @@ def wiki_search():
 @app.get("/api/wiki/mentions")
 def wiki_mentions():
     """?task=<id> -- the pages one may read that mention task #id (404 when one may not see the task)."""
-    from ..accounts.orgs import user_orgs
     c = db()
     uid = me()
     try:
@@ -870,7 +865,6 @@ def wiki_mentions():
         tid = 0
     if not tid or not task_visible(c, tid, uid):
         raise Denied(404)
-    from ..accounts.orgroles import user_orgs_full
     orgs = [o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]  # 2.143.0 A (#2151)
     from .wikie2e import wke_open_sql  # 2.64.3 A (#1817): mentions in a locked space are found in the browser
     rows = c.execute("SELECT DISTINCT p.id, p.org_id, p.path FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.to_task=? "

@@ -44,6 +44,7 @@ DMA_NOT_PDF = N_("Only PDF files can be attached")
 
 
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from functions
 
 
 def dma_dir(oid):
@@ -199,7 +200,6 @@ def dma_files_post(cid):
         raise BadInput(tr("{0}: larger than {1} MB", name, MAX_FILE_MB))
     if not data.startswith(b"%PDF-"):
         raise BadInput(tr(DMA_NOT_PDF))
-    from ..files.upsafe import UploadRefused
     try:
         scan = sc_scan(name, data)
     except UploadRefused as e:

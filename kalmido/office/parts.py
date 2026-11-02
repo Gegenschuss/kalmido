@@ -25,6 +25,8 @@ from .homecur import hc_home  # 2.189.0 (#2475)
 from .doclang import doc_txt
 from .model import PARTS_TITLE_FILM, UNITS, office_role, office_settings
 from .packs import office_pack_for
+from .docs import doc_items, _calc_doc, DUP_ITEM_SKIP, doc_public, doc_row, recalc, OFD_ITEM_RESET, _iid, clean_items  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_need_editable, ofx_log, ofx_diff, ofx_items_brief  # 2.369.5 (#2517): pulled up from functions
 
 try:  # the shoot calculation (part C, office/sheet.py); until it is there a shoot part counts nothing
     from . import sheet as _dk_sheet
@@ -97,7 +99,6 @@ def tp_part(c, oid, did, pid):
 
 
 def _part_items(c, oid, did, pid):
-    from .docs import doc_items
     return doc_items(c, did, oid, part=pid)
 
 
@@ -139,7 +140,6 @@ def tp_settings_clean(v, cur=None, share=False):
 
 # ---------------------------------------------------------------- calculating
 def _doc_calc(r, eur=False, home="EUR"):
-    from .docs import _calc_doc
     d = _calc_doc(r, home)  # 2.189.0 (#2475): eur = in the home currency
     if "producing_on" in r.keys():  # 2.47.0 (#1645, part D): the document's producing switch, when it has one
         d.setdefault("producing_on", r["producing_on"])
@@ -414,7 +414,6 @@ def tp_clean_item(c, oid, r, it, i, prev):
     if t and prev and t[:300] != (p["title"] or "") and t != prev.get("title"):  # review: a new / stale line never renames
         title = t[:300]
         c.execute("UPDATE office_doc_parts SET title=?, updated_at=? WHERE id=? AND org_id=?", (title, iso(now_utc()), pid, oid))
-        from .ledger import ofx_log
         ofx_log(c, oid, "part", doc_id=r["id"], detail={"part": pid, "before": {"title": p["title"] or ""}, "after": {"title": title}})
     return {"sort": i, "kind": "part", "service_id": None, "ref_part_id": pid, "title": title,
             "detail": _text(it.get("detail"), "items.detail", 4000), "qty": 1 if qty is None else qty, "unit": unit, "rate": net,
@@ -438,7 +437,6 @@ def kva_keep_unseen_parts(c, oid, r, before, known):
     """2.138.0 A (#2239): a title page save whose list was built before a part was added (the editor sends the ids of the
     parts it knew, parts_known) keeps the title page line of every part it did not know. Without parts_known (API,
     older clients) the list is taken as it is."""
-    from .docs import DUP_ITEM_SKIP
     if r["kind"] != "offer" or not isinstance(known, list):
         return
     known = {int(x) for x in known if (isinstance(x, int) and not isinstance(x, bool)) or (isinstance(x, str) and x.isdigit())}
@@ -514,7 +512,6 @@ def _shoot_calc_public(c, oid, r, p, admin):
 def tp_duplicate(c, oid, did, nid):
     """Copies the parts of document did (with their positions) into the new document nid and points nid's title page
     positions of kind 'part' to the copies."""
-    from .docs import DUP_ITEM_SKIP
     ts = iso(now_utc())
     pmap = {}
     for p in c.execute("SELECT * FROM office_doc_parts WHERE doc_id=? AND org_id=? ORDER BY sort, id", (did, oid)).fetchall():
@@ -615,7 +612,6 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
     printed stays one line. Net and gross equal the quotation's in every mode. Rates in EUR like inv_items_from_offer."""
     if not tp_has_parts(c, oid, r["id"]):
         return None
-    from .docs import doc_items
     s = office_settings(c, oid)
     pack = office_pack_for(s)
     mode = mode or s.get("parts_invoice_mode") or "full"
@@ -737,7 +733,6 @@ def _part_disc_taxes(c, oid, r, p, pc):
 # ---------------------------------------------------------------- routes
 def _ctx_doc(did):
     from .docs import _ctx, doc_row, ofd_need_current
-    from .ledger import ofx_need_editable
     c, uid, oid = _ctx()
     admin = office_role(c, uid, oid) == "admin"
     write_lock(c, f"office_doc_{int(did)}")  # 2.269.0 A (#3012): like the document's own saves (docs.odoc_items_put)
@@ -752,7 +747,6 @@ def _ctx_doc(did):
 
 
 def _answer(c, oid, did, admin, part=None):
-    from .docs import doc_public, doc_row
     out = doc_public(c, oid, doc_row(c, oid, did), admin)
     if part is not None:
         out["part"] = next((p for p in out.get("parts") or [] if p["id"] == part), None)
@@ -761,7 +755,6 @@ def _answer(c, oid, did, admin, part=None):
 
 
 def _done(c, oid, r, admin, part=None, code=200):
-    from .docs import recalc
     from .undo import oun_post
     recalc(c, oid, r["id"])
     bump(c)
@@ -774,7 +767,6 @@ def _done(c, oid, r, admin, part=None, code=200):
 def tp_part_create(did):
     """{kind?: items|shoot, title?, print?, add_to_title?: true} -> 201 the document (with "part" = the new part). A new
     part is put on the title page once (qty 1) unless add_to_title is false."""
-    from .ledger import ofx_log
     c, uid, oid, admin, r = _ctx_doc(did)
     b = body()
     b = b if isinstance(b, dict) else {}
@@ -814,7 +806,6 @@ def tp_part_create(did):
 def tp_part_patch(did, pid):
     """{title?, print?, sort?, settings?, sheet?} -> the document with "part" (a shoot part: + "calc") and "doc_totals"."""
     from .docs import _text
-    from .ledger import ofx_diff, ofx_log
     c, uid, oid, admin, r = _ctx_doc(did)
     p = tp_part(c, oid, did, pid)
     b = body()
@@ -860,7 +851,6 @@ def tp_part_patch(did, pid):
 @app.delete("/api/office/docs/<int:did>/parts/<int:pid>")
 def tp_part_delete(did, pid):
     """Removes the part, its positions and the title page positions that stand for it. Returns the document."""
-    from .ledger import ofx_log
     c, uid, oid, admin, r = _ctx_doc(did)
     p = tp_part(c, oid, did, pid)
     c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND (part_id=? OR (kind='part' AND ref_part_id=?))", (did, oid, pid, pid))
@@ -873,8 +863,6 @@ def tp_part_delete(did, pid):
 def tp_part_items_put(did, pid):
     """{items: [...]} the whole list of the part's positions (as PUT /api/office/docs/<id>/items, no kind 'part').
     Returns the document with "part" and "doc_totals"."""
-    from .docs import OFD_ITEM_RESET, _iid, clean_items
-    from .ledger import ofx_items_brief, ofx_log
     c, uid, oid, admin, r = _ctx_doc(did)
     p = tp_part(c, oid, did, pid)
     if p["kind"] != "items":

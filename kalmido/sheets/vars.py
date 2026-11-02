@@ -17,6 +17,9 @@ from flask import g, has_request_context
 from ..core.access import list_role, tvis, vis_sql, plists, task_visible
 from ..core.i18n import N_, LANGS, tr
 from .formula import ShErr, sh_is_de, sh_slug
+from .formula import sh_parse_date  # 2.369.5 (#2517): pulled up from functions
+from ..personal.timetrack import evis, th_sql, BUDGET_FIELD_NAMES  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 
 SH_LIST_FIELDS = ("zeit_gesamt", "aufgaben", "offen", "erledigt", "budget_h")
 SH_CLIENT_FIELDS = ("satz", "budget_h", "budget_betrag", "zeit_gesamt")
@@ -160,7 +163,6 @@ def sh_task_ok(c, sheet, uid, tid, cache=None):
 
 def sh_task_field(c, uid, r, field):
     """The value of a task's field for viewer uid: text, a date, hours (float) or None."""
-    from .formula import sh_parse_date
     if field == "titel":
         return r["name"] or ""
     if field == "status":
@@ -168,13 +170,11 @@ def sh_task_field(c, uid, r, field):
     if field == "faellig":
         return sh_parse_date(str(r["due"])[:10]) if r["due"] else None
     if field == "zeit":
-        from ..personal.timetrack import evis, th_sql
         s = c.execute(f'SELECT COALESCE(SUM(seconds), 0) FROM time_entries WHERE "end" IS NOT NULL AND task_id=? '
                       f'AND {evis(c, uid, "")} AND {th_sql("")}', (r["id"],)).fetchone()[0]
         return round((s or 0) / 3600, 2)
     if field == "zustaendig":
         if r["assignee_id"]:
-            from ..collab.comments import user_names
             return user_names(c, [r["assignee_id"]]).get(r["assignee_id"]) or ""
         if r["assignee_group_id"]:
             g_ = c.execute("SELECT name FROM groups WHERE id=?", (r["assignee_group_id"],)).fetchone()
@@ -230,7 +230,6 @@ def sh_id_of(c, sheet, uid, typ, slug):
 
 
 def _list_hours(c, uid, lid):
-    from ..personal.timetrack import evis, th_sql
     s = c.execute(f'SELECT COALESCE(SUM(seconds), 0) FROM time_entries WHERE "end" IS NOT NULL AND list_id=? '
                   f'AND {evis(c, uid, "")} AND {th_sql("")}', (lid,)).fetchone()[0]
     return round((s or 0) / 3600, 2)
@@ -239,7 +238,6 @@ def _list_hours(c, uid, lid):
 def _list_budget(c, uid, lid):
     """The sum of the list's number field called "Budget h" (any language, like personal/timetrack.py time_list_totals);
     None without one or for a participant (who sees only some tasks)."""
-    from ..personal.timetrack import BUDGET_FIELD_NAMES
     if lid in set(plists(c, uid)):
         return None
     names = set(BUDGET_FIELD_NAMES) | {tr("Budget h", lg=x).lower() for x in LANGS}

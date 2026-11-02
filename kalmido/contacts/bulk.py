@@ -18,6 +18,8 @@ from ..tasks.validation import as_int
 from ..core.errors import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
 from ..contacts.model import book_touch, contact_copy, contacts_on, my_book_ids, need_book, occ_sync, search_text, CONTACTS_PER_BOOK, FIELD_MAX, ITEMS_MAX, NOTE_MAX
+from ..tasks.lifecycle import trash_task  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functions
 
 BULK_MAX = 5000      # contacts in one request (an address book holds up to CONTACTS_PER_BOOK; the app sends what it shows)
 BULK_BLOCK = 200     # contacts per committed block
@@ -36,7 +38,6 @@ def bk_occ_drop(c, uid, cids):
     """The birthday / anniversary tasks of these contacts go to the trash (when uid may change their list) and the links
     are removed: used before a contact is deleted or moves to an address book with another birthday list (one or many).
     2.58.0 (#1656): a task in a list uid may not change stays, and so does its link (no orphaned task)."""
-    from ..tasks.lifecycle import trash_task
     roles = {}
     for blk in bk_blocks(list(cids), 500):
         keep = set()
@@ -399,7 +400,6 @@ def op_contacts_bulk(c, uid, b):
     cp = [i for i in mv if rows[i]["book_id"] in mir]
     mv = [i for i in mv if rows[i]["book_id"] not in mir]
     # 2.148.1 B (#2483): out of an organisation's address book into another workspace only by its admin (logged, admins told)
-    from ..accounts.orgout import org_out
     borg = {r[0]: r[1] for r in c.execute(f"SELECT id, org_id FROM books WHERE id IN ({bk_in(list(books))})", list(books)).fetchall()}
     for so in sorted({borg.get(rows[i]["book_id"]) for i in mv + cp} - {None, bk["org_id"]}):
         n = sum(1 for i in mv + cp if borg.get(rows[i]["book_id"]) == so)

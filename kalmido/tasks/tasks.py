@@ -20,6 +20,8 @@ from ..tasks.validation import (
     check_parent, check_url, clean_task, log_act, TASK_FIELDS, ticket_template, valid_date, valid_hm,
 )
 from ..core.errors import BadInput, field_alias, UnknownFields, web_fields  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_enabled, oc_list_space  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import _org_list_writes  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---- 2.18.0 (#430): milestones. A milestone is a task with ms = 1 (top level, no subtasks, a date is optional); a task
@@ -71,7 +73,6 @@ def check_move(c, src, dst):
     if not can_move(c, src, dst):
         raise Denied(403, tr("Only the project owner can move tasks out of this shared project"))
     if src != dst:  # 2.64.0 (#1864): into another space -> the moved tasks' files get its key (after the commit)
-        from ..core.orgcrypt import oc_enabled, oc_list_space
         if oc_enabled() and oc_list_space(c, src) != oc_list_space(c, dst):
             from ..admin.orgcrypt_cli import oc_settle_kick
             oc_settle_kick([dst])
@@ -244,7 +245,6 @@ def task_create():
         if role != "participant":
             need_list(c, f["list_id"])
         else:
-            from ..core.access import _org_list_writes
             if not _org_list_writes(c, f["list_id"], me()):
                 raise Denied(403)  # 2.143.0 A (#2151): read-only in the list's organisation
     else:

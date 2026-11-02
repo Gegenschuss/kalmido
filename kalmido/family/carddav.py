@@ -23,6 +23,8 @@ from ..family.family import (
     _jparse, CONTACT_CARDS_MAX, CONTACT_EVERY_MIN, CONTACT_SRCS_MAX, FAM_LEAD_MAX, FAM_NAME_MAX, FAM_OCC, occ_create, pm_fam_target,
     occ_next, occ_rule,
 )
+from ..calendars.davwrite import cdw_inside  # 2.369.5 (#2517): pulled up from functions
+from ..collab.liste2e import le2a_gen_refuse  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---- CardDAV: birthdays + anniversaries from contacts (private per user, like calendar subscriptions)
@@ -274,7 +276,6 @@ class WbConflict(Exception):
 def _wb_write(href, book, auth, allow, uid, kind, mo, dy, y, dig_was):
     """One write: -> the new card text. WbConflict when the card reads differently from the last sync or the server
     answers 412; CalError on everything else ('weak_etag', 'parse', HTTP)."""
-    from ..calendars.davwrite import cdw_inside
     if not cdw_inside(book, href):
         raise CalError("redirect")
     st, hd, data, final = cal_http(href, "GET", None, {"Accept": "text/vcard, text/x-vcard, */*;q=0.5"}, auth, allow)
@@ -587,7 +588,6 @@ def family_contacts_add():
     if lid not in (None, ""):
         lid = as_int(lid, "list_id", 1)
         need_list(c, lid)
-        from ..collab.liste2e import le2a_gen_refuse
         le2a_gen_refuse(c, lid)  # 2.64.1 review (M3)
     else:
         lid = pm_fam_target(c, uid, "birthdays")[0]  # 2.46.1 (#1615): an old list Birthdays, else the list "Family"
@@ -623,7 +623,6 @@ def family_contacts_edit(sid):
         lid = as_int(b["list_id"], "list_id", 1) if b["list_id"] not in (None, "") else None
         if lid:
             need_list(c, lid)
-            from ..collab.liste2e import le2a_gen_refuse
             le2a_gen_refuse(c, lid)  # 2.64.1 review (M3)
         upd["list_id"] = lid
     if "lead_days" in b:

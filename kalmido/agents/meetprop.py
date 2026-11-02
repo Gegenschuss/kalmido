@@ -23,11 +23,12 @@ from ..core.access import Denied, list_people, need_collab, need_list
 from ..accounts.session import me
 from ..collab.comments import user_names
 from ..core.errors import BadInput, UnknownFields
-from ..agents.core import agent_ids, agent_row, is_agent, list_sections, need_chat_agent
+from ..agents.core import agent_ids, agent_row, is_agent, list_sections, need_chat_agent, need_person
 from ..agents.chat import chat_post, chat_unlink_trimmed
 from ..agents.proposals import (
     _p_int, _p_keys, _p_list, _p_str, prop_agent_ok, PROP_TEXT_MAX, PROP_TITLES,
 )
+from ..collab.liste2eguard import LE2B_OFF_MSG  # 2.369.5 (#2517): pulled up from functions
 
 MTG_IMG_MAX = 4        # images per request
 MTG_CARDS_MAX = 5      # ready proposals shown as cards in one chat
@@ -62,7 +63,6 @@ def mtg_input(c, uid, b):
     if (lst["life"] or "") == "budget":  # 2.72.0 (#1333): nor a budget
         raise BadInput(tr("Health projects and budgets never reach an agent"))
     if lst["e2e"]:  # 2.64.1 (#1817): agents never get the texts of a list with the lock (names and sections are ciphertexts)
-        from ..collab.liste2eguard import LE2B_OFF_MSG
         raise BadInput(tr(LE2B_OFF_MSG))
     imgs = mtg_images(c, uid, _p_int(b.get("agent_id"), "agent_id"), b.get("image_ids"))
     text = _p_str(b.get("text"), "text", PROP_TEXT_MAX, not imgs, line=False)
@@ -79,8 +79,7 @@ def mtg_input(c, uid, b):
 
 def mtg_agent(c, aid):
     """The agent row the current person may ask for proposals AND chat with (else 404)."""
-    if is_agent(g.user):
-        raise Denied(403)
+    need_person(403)
     need_collab()
     a = need_chat_agent(c, aid)
     if not prop_agent_ok(c, a, me()):

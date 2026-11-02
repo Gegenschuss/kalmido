@@ -37,6 +37,14 @@ from .doctpl import (DT_NOTE, _ctx, _iid, dt_client, dt_doc, dt_fill, dt_file, d
 from .doclang import doc_lg
 from .doctpl_samples import DMA_SAMPLES, sample_text
 from .model import pb_owner
+from .ledger import ofx_log, ofx_company  # 2.369.5 (#2517): pulled up from functions
+from .contacts_cl import fk_contact  # 2.369.5 (#2517): pulled up from functions
+from ..lists.public import public_links_on  # 2.369.5 (#2517): pulled up from functions
+from .invoices import _mail, h6c_send_budget, inv_clean_subject  # 2.369.5 (#2517): pulled up from functions
+from .signoff import SIG_PREFIX, sig_create, sig_expiry  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_read, fs_role  # 2.369.5 (#2517): pulled up from functions
+from .doctpl import dt_disposition  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import acx_of  # 2.369.5 (#2517): pulled up from functions
 
 # kind -> (label, sample key in DMA_SAMPLES, needs a signature)
 DSB_KINDS = {"dpa": (N_("Data processing agreement"), "privacy_dpa", True),
@@ -197,7 +205,6 @@ def dsb_list():
 
 def dsb_finish(c, oid, uid, gid):
     """doctpl.dt_final's steps for a fresh document of a sheet: fill, freeze, PDF, file with the client. -> node id."""
-    from .ledger import ofx_log
     from .terms import agb_gen_freeze
     d = dict(oc_dec_fields(c, oid, "office_gen_docs", dt_doc(c, oid, gid)))
     lang = dt_lang(c, oid, d.get("lang") or None)
@@ -315,8 +322,6 @@ def dsb_restore(sid):
 def dsb_mail_parts(c, oid, r, d, link):
     """(to, subject, text, reply address or None, code) of the mail of sheet r (d = its decrypted document) as proposed;
     link = a signature link goes along: the text holds DSB_LINK where it goes."""
-    from .contacts_cl import fk_contact
-    from .ledger import ofx_company
     from ..integrations.mail import MAIL_IN_ON, mail_addr
     cl = dt_client(c, oid, r["client_id"])
     k = fk_contact(c, cl["id"])
@@ -341,7 +346,6 @@ def dsb_mail_parts(c, oid, r, d, link):
 @app.get("/api/office/privacy-sheets/<int:sid>/mail")
 def dsb_mail_get(sid):
     """The proposed mail of a finished sheet: {to, subject, text, smtp, reply_in, link: whether a signature link goes along}."""
-    from ..lists.public import public_links_on
     c, uid, oid = _ctx()
     r = dsb_sheet(c, oid, sid)
     d = oc_dec_fields(c, oid, "office_gen_docs", dt_doc(c, oid, r["gen_doc_id"])) if r["gen_doc_id"] else None
@@ -360,11 +364,6 @@ def dsb_send(sid):
     """{to, subject?, text?} mails the finished sheet (its PDF attached) to the client; a sheet to sign gets a new
     signature link ([Link] in the text, appended when it is missing) and the reply address with its code. Status: sent
     (handed for the privacy information). 409 without SMTP / not finished; 429 like the invoice mails."""
-    from .invoices import _mail, h6c_send_budget, inv_clean_subject
-    from .ledger import ofx_log
-    from .signoff import SIG_PREFIX, sig_create, sig_expiry
-    from ..files.store import fs_read, fs_role
-    from ..lists.public import public_links_on
     from ..integrations.mail import MAIL_OUT_ON
     c, uid, oid = _ctx()
     write_lock(c, f"office_privacy_{int(sid)}")
@@ -428,7 +427,6 @@ def dsb_send(sid):
 
 
 def dsb_company_mail(c, oid):
-    from .ledger import ofx_company
     rt = ofx_company(c, oid).get("email") or ""
     return rt if re.fullmatch(r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+", rt) else None
 
@@ -496,7 +494,6 @@ def dsb_upload(sid):
     ts = iso(now_utc())
     c.execute("UPDATE office_privacy_sheets SET status='signed', signed_via='upload', signed_at=?, signed_node_id=?, review=0, updated_at=? "
               "WHERE id=? AND org_id=?", (ts, nid, ts, sid, oid))
-    from .ledger import ofx_log
     ofx_log(c, oid, "privacy_signed", target="privacy_sheet", detail={"privacy_sheet": sid, "via": "upload", "node_id": nid})
     bump(c)
     c.commit()
@@ -507,7 +504,6 @@ def dsb_upload(sid):
 @app.get("/api/office/privacy-sheets/<int:sid>/pdf")
 def dsb_pdf_get(sid):
     """?signed=1: the signed file (upload / mail / link), else the sheet's PDF -- the filed file while the admin reaches it."""
-    from ..files.store import fs_read, fs_role
     c, uid, oid = _ctx()
     r = dsb_sheet(c, oid, sid)
     rows = dsb_rows(c, oid, uid, r["client_id"], True)
@@ -522,7 +518,6 @@ def dsb_pdf_get(sid):
     data = fs_read(c, nid)
     mime = dsb_kind_of(data) or "application/octet-stream"
     resp = Response(data, mimetype=mime)
-    from .doctpl import dt_disposition
     disp = dt_disposition(re.sub(r"\.(pdf|jpe?g|png)$", "", n["name"] or "sheet", flags=re.I))
     if mime != "application/pdf":
         disp = disp[:-4] + {"image/jpeg": ".jpg", "image/png": ".png"}.get(mime, "")
@@ -535,7 +530,6 @@ def dsb_pdf_get(sid):
 def dsb_mail_pick(c, r, files):
     """2.154.0 E (#2192): the attachment that is most likely the signed sheet -- PDFs first (not the sheet as it was
     sent: same SHA-256 as its filed PDF), then pictures of 30 KB or more (no logos / signature images); None = none."""
-    from ..files.store import fs_read
     ok = [(dsb_kind_of(data), data) for _name, _mime, data in files if 0 < len(data) <= DSB_MAIL_MB * 1024 * 1024]
     pdfs = [x for x in ok if x[0] == "application/pdf"]
     if pdfs:
@@ -557,7 +551,6 @@ def dsb_reply_note(c, r, msg, subj, text):
     sender, subject and text are kept with the sheet (sealed, they go with it), the office log only notes the event."""
     import email.utils
     import json
-    from .ledger import ofx_log
     sender = email.utils.parseaddr(str(msg.get("From", "")))[1]
     body_ = (text or "").strip()
     reply = json.dumps({"at": iso(now_utc()), "from": sender[:200], "subject": subj[:200], "text": body_[:2000]})
@@ -598,7 +591,6 @@ def dsb_mail_import(c, msg, raw):
     "[DS-<code>]" or the plus address "+ds-<code>@") -> its first PDF / picture is filed into that sheet's office area,
     status "signed (by mail, please check)". None = no such code (the other importers go on); else the node id or 0."""
     from ..integrations.mail import mail_text
-    from ..core.access import acx_of
     from ..admin.hosting import QuotaExceeded
     subj = str(msg.get("Subject", "")).replace("\n", " ")
     hdrs = " ".join(str(msg.get_all(h, [])) for h in ("To", "Cc", "Delivered-To", "X-Original-To", "Envelope-To"))

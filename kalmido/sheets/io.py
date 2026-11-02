@@ -42,6 +42,7 @@ from .core import (SH_COLS_MAX, SH_ROWS_MAX, ShBook, _write_cells, sh_brief, sh_
 from .formula import (SH_CURRENCY_SYMBOLS, ShErr, sh_col_letter, sh_fmt_date, sh_name_ok, sh_parse_date, sh_parse_number,
                       sh_fn_key, sh_tokens)
 from .shfuncs import SHF_DE, SHF_EXCEL, shf_vlookup3
+from .shbook import shb_xlsx, shb_import, shb_pairs, shb_create, SHB_TABS_MAX, shb_quote, shb_xl_ref  # 2.369.5 (#2517): pulled up from functions
 
 SHX_FILE_MAX = 10 * 1024 * 1024        # an uploaded file
 SHX_UNZIPPED_MAX = 60 * 1024 * 1024    # the parts of an .xlsx read in all (zip bomb guard)
@@ -165,7 +166,6 @@ def _xl_ref(book, x, hdr=1):
 def shx_xl_formula(book, raw, self_cell, last_row):
     f = _shx_xl_formula(book, raw, self_cell, last_row)
     if f and "!" in f and getattr(book, "shb_xl", None):  # 2.124.0 E (#2116): 'Sheet 2'!A2:'Sheet 2'!B5 -> 'Sheet 2'!A2:B5
-        from .shbook import shb_pairs
         f = shb_pairs(f)
     return f
 
@@ -215,7 +215,6 @@ def _shx_xl_formula(book, raw, self_cell, last_row):
                 L = sh_col_letter(book.col_idx[xid])
                 out.append(f"{L}2:{L}{last_row}")
             elif typ == "x":  # 2.124.0 E (#2116): a cell of another sheet of the table (only when all sheets are written)
-                from .shbook import shb_xl_ref
                 ref = shb_xl_ref(book, xid)
                 if ref is None:
                     return None
@@ -837,7 +836,6 @@ def shx_kalmido_formula(f, hdr, names_at, xsheets=None):
                 return None
             out.append(SHX_KALMIDO_FN[name])
         elif kind == "xref" and xsheets and val[0] in xsheets:  # 2.124.0 E (#2116): Sheet2!A1, 'My sheet'!A1:B5
-            from .shbook import shb_quote
             to, h = xsheets[val[0]]
             if val[1][1] - h < 1 or (val[2] and val[2][1] - h < 1):
                 return None
@@ -922,7 +920,6 @@ def shx_import(c, uid, grid, space, title, list_id=None, into=None):
     report = {"rows": len(data), "columns": width, "formulas": 0, "as_value": 0, "options_added": 0, "names": 0}
     grid.hdr = hdr  # 2.124.0 E (#2116)
     if into is not None:
-        from .shbook import shb_create
         sid = shb_create(c, into, uid, title, columns=columns or None, rows=max(len(data), 1))
     else:
         sid = sh_create(c, uid, space, title, list_id, columns=columns or None, rows=max(len(data), 1))
@@ -1018,7 +1015,6 @@ def shx_export_xlsx(sid):
     """Values, formulas Excel understands, formats, drop-down lists and colours as .xlsx."""
     c = db()
     r = sh_need(c, sid)
-    from .shbook import shb_xlsx
     data, title = shb_xlsx(c, r)  # 2.124.0 E (#2116): every sheet of the table
     c.commit()
     return Response(data, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1044,14 +1040,12 @@ def shx_import_post():
     except ValueError:
         raise BadInput(tr("Invalid value: {0}", "list_id")) from None
     if raw.startswith(b"PK") or name.lower().endswith(".xlsx"):
-        from .shbook import SHB_TABS_MAX
         grid = shx_read_xlsx_all(raw, SHB_TABS_MAX)  # 2.124.0 E (#2116): every sheet of the file
     elif name.lower().endswith((".csv", ".txt", ".tsv")) or not name:
         grid = shx_read_csv(raw)
     else:
         raise BadInput(tr("Only .csv and .xlsx files can be imported"))
     title = (request.form.get("title") or re.sub(r"\.(csv|xlsx|txt|tsv)$", "", name, flags=re.I) or "").strip()
-    from .shbook import shb_import
     sid, rep = shb_import(c, uid, grid, request.form.get("space") or "private", title, lid)  # 2.124.0 E (#2116)
     c.commit()
     r = sh_reload(c, sid)

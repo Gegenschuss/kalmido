@@ -48,6 +48,8 @@ from ..api.openapi import openapi_spec
 from ..agents.core import agent_emit, agent_row, is_agent, job_dict, JOB_LOG_MAX
 from ..agents.admin import personal_agent_foreign
 from ..agents.api import job_notify
+from ..accounts.orgs import may_see, ws_member_problem  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import h6r_shared_people  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.15.0 (#479): scopes + the complete agent API
@@ -1041,7 +1043,6 @@ def v1_list_members(lid):
     role = need_list(c, lid, write=False)
     data = v1_members(c, lid)
     if role == "participant":  # 2.86.0 (N20 review): only the people who share a task with them
-        from ..collab.comments import h6r_shared_people
         keep = h6r_shared_people(c, lid, me()) or set()
         data = [m for m in data if m["user_id"] in keep]
     return jsonify(data=data, next_cursor=None)
@@ -1061,7 +1062,6 @@ def v1_member_set(lid, user_id):
     if role not in ROLES:
         raise BadInput(tr("Role must be admin, edit, participant or view"))
     u = c.execute("SELECT display_name, username, kind FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
-    from ..accounts.orgs import may_see, ws_member_problem
     if not u or uid == me() or personal_agent_foreign(c, uid, me()) or (role == "admin" and u["kind"] == "agent") \
             or c.execute("SELECT is_inbox FROM lists WHERE id=?", (lid,)).fetchone()[0] \
             or not may_see(c, me(), uid):  # 2.86.0 (N29): no name of someone it cannot see

@@ -35,6 +35,8 @@ from ..core.access import Denied
 from ..accounts.session import me
 from ..collab.comments import user_names
 from ..collab.liste2e import le2e_is_cipher
+from .pages import wiki_need, wiki_dict, wiki_frontmatter, wiki_set_links  # 2.369.5 (#2517): pulled up from functions
+from .wikie2e import wke_page_mode, wke_denied  # 2.369.5 (#2517): pulled up from functions
 
 WKH_CTX, WKH_VCTX = "wiki_pages.body", "wiki_versions.body"
 WKH_MERGE = 600     # seconds: saves of the same person within this time share a version
@@ -285,10 +287,8 @@ def wkh_count(c):
 
 # ---- routes ---------------------------------------------------------------------------------------------------------------
 def _page(pid, write=False):
-    from .pages import wiki_need
     c = db()
     r = wiki_need(c, pid, write=write)  # 2.200.0 A (#2747): write = edit on the page (the space's right or a folder share)
-    from .wikie2e import wke_page_mode
     return c, r, bool(wke_page_mode(c, r)) or _locked(r)
 
 
@@ -346,8 +346,6 @@ def wkh_restore(pid, vid):
     """{expect_updated_at?} -- the text of version vid becomes the page's text (a new version; the name stays). 409 with the
     current page when someone else saved in between. Write right on the page."""
     import json
-    from .pages import wiki_dict, wiki_frontmatter, wiki_need, wiki_set_links
-    from .wikie2e import wke_denied
     from .wkfolder import wkf_shown_path
     write_lock(db(), f"wiki-{int(pid)}")  # 2.269.0 B (#3034): before the page is read (same name as wiki_update)
     c, r, locked = _page(pid, write=True)

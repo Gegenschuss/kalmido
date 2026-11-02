@@ -8,6 +8,8 @@ settings (PUT /api/office/settings {"datev_extf": {"cat_accounts": {...}}}, the 
 the DATEV batch and the EUeR use the same account. Without the input side of the DATEV export the functions answer None
 and nothing is shown."""
 from .model import office_settings
+from .datev import dx_settings  # 2.369.5 (#2517): pulled up from functions
+from .datevin import dv_cat_account, dv_cat_default  # 2.369.5 (#2517): pulled up from functions
 
 
 def ca_settings(c, oid):
@@ -16,7 +18,6 @@ def ca_settings(c, oid):
         from .datevin import dv_cat_account  # noqa: F401 -- 2.120.0 C (#2090)
     except ImportError:
         return None
-    from .datev import dx_settings
     st = dx_settings(office_settings(c, oid))
     return st if isinstance(st.get("cat_accounts"), dict) else None
 
@@ -27,7 +28,6 @@ def ca_accounts(c, oid, cats):
     st = ca_settings(c, oid)
     if st is None:
         return None
-    from .datevin import dv_cat_account, dv_cat_default
     own = dict(st.get("cat_accounts") or {})
     names = {x.casefold(): x for x in cats if x}
     for k in own:
@@ -41,7 +41,6 @@ def ca_euer(c, oid, expenses):
     st = ca_settings(c, oid)
     if st is None:
         return expenses
-    from .datevin import dv_cat_account
     for x in expenses:
         if x.get("key", "").startswith("c:"):
             x["account"] = dv_cat_account(st, x["key"][2:])

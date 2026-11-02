@@ -16,6 +16,7 @@ from ..core.errors import BadInput, Denied
 from ..core.i18n import tr
 from .session import me
 from .wsareas import WSA_KEY_RE
+from .orgs import instance_mode, org_need_person  # 2.369.5 (#2517): pulled up from functions
 
 # the limits of a file request and the kinds it may allow (endings; the default is documents + pictures), here because the
 # defaults are held to them below the file store (files/filereq.py uses them, FRQ_NEVER there stays out of every kind)
@@ -86,7 +87,6 @@ def sd_for(c, org_id, uid):
 def sd_get():
     """?space=private | org:<id> -> the workspace's defaults, what is stored and the limits (every member sees them, as the
     dialogs use them; a stranger gets the 404 of an organisation they are not in)."""
-    from .orgs import instance_mode, org_need_person
     c = db()
     if "kind" in g.user.keys() and g.user["kind"] == "agent":
         raise Denied(403, tr("Agents cannot use this endpoint"))

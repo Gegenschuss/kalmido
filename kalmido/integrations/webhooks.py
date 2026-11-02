@@ -34,6 +34,7 @@ from ..calendars.subscriptions import (
 )
 from ..api.v1 import task_core, task_for, WH_ON
 from ..api.common import act_via
+from ..accounts.orgs import org_role, _need_org_admin  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- package B: webhooks (per user)
@@ -421,7 +422,6 @@ def wh_off_tell(c, w, what):
 
 def who_admin_ok(c, hooks):
     """The hooks whose organisation (if any) still has their creator as an admin; the others are turned off ('admin')."""
-    from ..accounts.orgs import org_role
     out = []
     for w in hooks:
         if w["org_id"] and org_role(c, w["user_id"], w["org_id"]) != "admin":
@@ -524,7 +524,6 @@ def wh_loop():
 # The same code for both: oid None = the person's own webhooks (/api/me/webhooks), else the organisation's (/api/orgs/<oid>/webhooks,
 # its admins only: every admin manages all of them; switching one on again makes that admin its owner).
 def who_need_admin(oid):
-    from ..accounts.orgs import _need_org_admin
     _need_org_admin(db(), oid)
 
 

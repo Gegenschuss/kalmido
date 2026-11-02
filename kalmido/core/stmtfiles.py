@@ -18,13 +18,13 @@ from . import mt940 as mt
 from .csvimport import csv_clean
 from .db import body
 from .i18n import tr
+from ..core.errors import BadInput  # 2.369.5 (#2517): pulled up from functions
 
 STMT_LIMITS = {"file_max": 2 * 1024 * 1024, "upload_max": 20 * 1024 * 1024, "files_max": 400, "unpacked_max": 60 * 1024 * 1024,
                "entries_max": 2000, "exts": (".xml", ".csv", ".txt", ".sta", ".mt940", ".mt942", ".swi")}  # 2.299.0 A (#3190): + MT940 files
 
 
 def _bad(msg):
-    from ..core.errors import BadInput  # noqa: PLC0415 -- the app's 400 (a domain class; core imports it here only)
     return BadInput(msg)
 
 

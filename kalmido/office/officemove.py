@@ -54,6 +54,13 @@ from .periodlock import period_need_open
 from .travel import _trip_need_open
 from .rights import NO_RIGHT, office_can, ofr_rights
 from ..team.clients import cl_refs, cl_trash
+from .travel import rk_people  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import office_allowed  # 2.369.5 (#2517): pulled up from functions
+from .legacyimport import fi_number_taken, fi_archive_path  # 2.369.5 (#2517): pulled up from functions
+from .contractfiles import dma_path, dma_dir  # 2.369.5 (#2517): pulled up from functions
+from ..team.clients import need_client  # 2.369.5 (#2517): pulled up from functions
+from .pdfweb import _render, epdf_name, epdf_stored  # 2.369.5 (#2517): pulled up from functions
+from .meals import bw_file_copy, bw_path  # 2.369.5 (#2517): pulled up from functions
 
 OFM_WHAT = ("clients", "drafts", "travel", "templates", "meals")  # 2.119.0 A (#2288): + entertainment receipts (drafts)
 OFM_TABLE = {"drafts": "office_docs", "travel": "office_trips", "templates": "office_doc_templates", "meals": "office_meals"}
@@ -234,7 +241,6 @@ def ofm_meal_hold(c, r):
 def ofm_meal_people(c, uid, r, src, dst):
     """2.119.0 A (#2288): host / guests of meal row r for office dst: a person of the old office who is no person of the new
     one stays as a free name (sealed for dst)."""
-    from .travel import rk_people
     d = oc_dec_fields(c, src, "office_meals", r)
     known = {p["id"] for p in rk_people(c, dst, uid)}
     def keep(p):
@@ -257,7 +263,6 @@ def ofm_need(c, uid, what, ids):
             raise Denied(409, tr("This is already in that workspace"))
         return area, []
     if what == "clients":
-        from ..team.clients import need_client
         rows = [need_client(c, i, uid) for i in ids]
         ws = {r["org_id"] or None for r in rows}
         if len(ws) != 1:
@@ -282,7 +287,6 @@ def ofm_need(c, uid, what, ids):
 
 def ofm_writer(c, uid, *areas):
     """2.143.0 A (#2151, review): moving changes both offices -- 403 for guest / read-only / accounting in either of them."""
-    from ..accounts.orgroles import office_allowed
     for a in areas:
         no = office_allowed(c, uid, a, write=True)
         if no:
@@ -319,7 +323,6 @@ def ofm_rights(c, uid, what, src, dst, rows):
             period_need_open(c, src, *days)
             period_need_open(c, dst, *days)
     if what == "travel":  # 2.148.0 A (#2471): a trip leaves / enters no locked month
-        from .travel import _trip_need_open
         for r in rows:
             _trip_need_open(c, src, r)
             _trip_need_open(c, dst, r)
@@ -806,7 +809,6 @@ def ofm_archive_copy(c, uid, made, files, src, dst, cid, r, frm, kind="doc"):
     """A read-only copy of an issued document (kind doc: office_docs row r) or of an archive entry (kind archive) of office
     src in office dst's archive: the PDF (stored or rendered from the snapshot) sealed for dst, no number."""
     if kind == "doc":
-        from .pdfweb import _render, epdf_name, epdf_stored
         try:  # 2.296.0 F (#3177): the stored PDF only when its checksum fits (409 -> no copy; the log rides with the move)
             data = epdf_stored(c, src, r, "pdf", commit=False)
             data = data if data is not None else _render(c, src, r)[0]
@@ -826,7 +828,6 @@ def ofm_archive_copy(c, uid, made, files, src, dst, cid, r, frm, kind="doc"):
              "paid": 1 if r["status"] == "paid" else 0, "file_name": epdf_name(r) + ".pdf"}
         src_ref = {"doc": r["id"], "kind": r["kind"], "number": r["number"] or ""}
     else:
-        from .legacyimport import fi_archive_path
         p = fi_archive_path(src, r["file"])
         if not p:
             return
@@ -1099,7 +1100,6 @@ def rmv_undo_run(c, uid, mid, files):
         raise Denied(409, tr("This was undone already"))
     ts = iso(now_utc())
     back, kept, gone = 0, 0, []
-    from .legacyimport import fi_number_taken
     cfiles = {r["id"] for r in d.get("rows") or [] if r["t"] == "office_contract_files"}
     # 2.97.0 review (H1): a draft issued in the target since, or a trip billed / in DATEV there, never moves back
     for r in d.get("rows") or []:
@@ -1149,7 +1149,6 @@ def rmv_undo_run(c, uid, mid, files):
         if r.get("area"):
             old.update(ofm_reseal(c, t, cur, dst, src))
         if t == "office_meal_files" and old.get("file") and old["file"] != cur["file"]:  # 2.119.0 A (#2288): the bill back
-            from .meals import bw_file_copy, bw_path
             bw_file_copy(c, dst, src, cur["file"], old["file"])
             gone.append(bw_path(dst, cur["file"]))
         if t == "office_docs" and old.get("number"):
@@ -1236,7 +1235,6 @@ RMV_RIGHTS = ("rights_time_id", "rights_territory_id", "rights_media_id")
 
 
 def rmv_path(oid, name):
-    from .contractfiles import dma_path
     return dma_path(oid, name)
 
 
@@ -1275,7 +1273,6 @@ def rmv_notes(p):
 def rmv_file_copy(c, f, src, dst, cid, files):
     """Copies the stored PDF of contract file row f from office area src into dst's folder, sealed with dst's key. -> the
     new bare file name (f's own one when the file is missing); the new path is noted in files (removed on an error)."""
-    from .contractfiles import dma_dir
     p = rmv_path(src, f["file"])
     if not p or not os.path.isfile(p):
         return f["file"]

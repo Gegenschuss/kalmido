@@ -42,6 +42,9 @@ from . import ocr as O
 from ..office.periodlock import pl_tree_need_open  # 2.237.0
 from ..files.fsmove import FSM_RECEIPT_STAYS  # 2.237.0
 from ..files.fsref import fs_trash_prepare  # 2.237.0
+from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import write_lock  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import _free_name  # 2.369.5 (#2517): pulled up from functions
 
 SP_PAGES = O._env_int("KALMIDO_SPLIT_PAGES", 100, 2, 500)  # pages of a stack at most
 SP_SEP = "KALMIDO-SPLIT"     # the text of the separator sheet's QR code
@@ -59,9 +62,8 @@ def _now():
 
 
 def _no_agent():
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403)
+    from ..agents.core import need_person
+    need_person(403)
 
 
 # a limited child process reads the codes and the ink of page images: 2.209.0 C (#2589) one at a time, a path per line on
@@ -163,7 +165,6 @@ for pages in parts:
 
 def _pdf_of(c, nid, m, node):
     """The bytes of a PDF document or None (another kind)."""
-    from ..tasks.attachtext import file_kind
     data = fs_read(c, nid)
     return data if file_kind(node["name"], node["mime"], data[:2048]) == "pdf" else None
 
@@ -487,7 +488,6 @@ def docs_split(nid):
     _no_agent()
     c = db()
     uid = me()
-    from ..core.pg import write_lock
     write_lock(c, f"docs_split_{int(nid)}")  # 2.154.0 E (#1111): a double click splits once (the second one sees state done)
     m, n = _stack(c, nid, write=True)
     if m["state"] in ("wait", "run"):
@@ -585,7 +585,6 @@ def docs_unsplit(nid):
         c.execute("UPDATE doc_meta SET asn=NULL WHERE node_id=?", (pid,))
         c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=? AND deleted_at IS NULL", (ts, uid, pid))
         fs_log_add(c, pid, "trash", "unsplit")
-    from ..files.store import _free_name
     nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=nid)
     c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, nid))
     fs_log_add(c, nid, "restore", "unsplit")

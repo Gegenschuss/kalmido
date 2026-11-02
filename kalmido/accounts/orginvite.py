@@ -35,6 +35,9 @@ from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from function
 from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.orgs import _need_org_admin, ORG_ROLES, _operator_apart, org_member_add, org_member_put  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.invite import invite_state, invite_new  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.users import user_purge  # 2.369.5 (#2517): pulled up from functions
 
 OINV_DAY = 20  # new invitations per inviting person and day
 OINV_RESEND_DAY = 3  # 2.148.1 A (#2486): resends per invitation and day
@@ -61,7 +64,6 @@ def oinv_pending(c, uid):
 
 
 def _need(c, oid):
-    from ..accounts.orgs import _need_org_admin
     _need_org_admin(c, oid)
     if not oinv_on(c):
         raise Denied(403, tr("Inviting by e-mail is switched off on this server"))
@@ -99,7 +101,6 @@ def oinv_unref(c, oid, ref):
 
 def oinv_list(c, oid):
     """2.360.2 M (#2561): invitations off: only what is open as org_joins (nothing new comes, its admins can still end it)."""
-    from ..accounts.invite import invite_state
     out = []
     keep_id = g.user["is_admin"]  # an instance admin sees every account anyway (and gets the id in the answer of an invitation)
     since = iso(now_utc() - timedelta(days=OJN_DAYS))
@@ -130,7 +131,6 @@ def oinv_list(c, oid):
 def org_invites_get(oid):
     """Organisation admins: the open invitations of the organisation (accounts it invited that never signed in)."""
     c = db()
-    from ..accounts.orgs import _need_org_admin
     _need_org_admin(c, oid)
     return jsonify(invites=oinv_list(c, oid), enabled=oinv_on(c))
 
@@ -139,9 +139,7 @@ def org_invites_get(oid):
 def org_invite_new(oid):
     """{email, role?: member | admin, name?, lang?}: a new account for an address without one (invited like an existing
     account, invitation mail; the link in the answer), or -- the address has an account -- added like PUT /members {email}."""
-    from ..accounts.orgs import ORG_ROLES, _operator_apart, org_member_add
     from ..accounts.signup import _username
-    from ..accounts.invite import invite_new
     c, b = db(), body()
     _need(c, oid)
     role = b.get("role", "member")
@@ -159,7 +157,6 @@ def org_invite_new(oid):
     write_lock(c, "accounts")  # user names and addresses are checked and taken in one go
     if c.execute("SELECT 1 FROM users WHERE lower(email)=lower(?)", (email,)).fetchone():
         c.rollback()
-        from ..accounts.orgs import org_member_put
         r = org_member_put(oid)  # the existing path with the same body (an invitation to accept, accounts/orgs.py)
         code = r[1] if isinstance(r, tuple) else r.status_code  # 2.148.1 H (#2480): err() answers (body, code)
         if code >= 400:
@@ -222,7 +219,6 @@ def _join(c, oid, jid):
 def org_invite_resend(oid, ref):
     """A new link for an open invitation of this organisation (the old one stops working), by e-mail when possible.
     2.360.2 M (#2561): an invitation of an existing account starts again (a News item, at most one a day)."""
-    from ..accounts.invite import invite_new
     c = db()
     _need(c, oid)
     kind, uid = oinv_unref(c, oid, ref)
@@ -255,8 +251,6 @@ def org_invite_withdraw(oid, ref):
     the undo (invite again). 2.360.2 M (#2561): an invitation of an existing account just ends (also with invitations
     switched off; the account stays, a News item it still shows answers that the invitation is gone).
     2.458.0 (#3843): so does a new account's while another organisation's open invitation lies on it."""
-    from ..accounts.users import user_purge
-    from ..accounts.orgs import _need_org_admin
     c = db()
     _need_org_admin(c, oid)
     kind, uid = oinv_unref(c, oid, ref)
@@ -425,11 +419,9 @@ def ojn_mine(c, uid):
 @app.post("/api/orgs/<int:oid>/join")
 def org_join_accept(oid):
     """The invited person accepts the open invitation into organisation oid: member in the invited role (404 without one)."""
-    from ..agents.core import is_agent
-    from ..accounts.orgs import org_member_add
+    from ..agents.core import need_person
     c, uid = db(), me()
-    if is_agent(g.user):
-        raise Denied(404)
+    need_person(404)
     r = ojn_open(c, oid, uid)
     if not r:
         raise Denied(404)

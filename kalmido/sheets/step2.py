@@ -33,6 +33,10 @@ from ..core.errors import BadInput
 from .core import SH_ROWS_MAX, ShBook, sh_eval, sh_is_agent, sh_need, sh_reload, sh_set_cells, sh_touch
 from .formula import sh_parse_date, sh_parse_number
 from .vars import sh_list_ok, sh_task_ok
+from ..accounts.orgroles import office_allowed  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.dependencies import newtask_events  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.lifecycle import restore_task, trash_task  # 2.369.5 (#2517): pulled up from functions
 
 SH2_ROWS_MAX = 500  # rows / tasks per button press
 SH2_FIELDS = (("titel", "text", N_("Title")), ("status", "text", N_("Status")), ("faellig", "date", N_("Due")),
@@ -135,7 +139,6 @@ def sh2_office(c, sheet, uid, create=False, write=False):
         return None
     if sheet["org_id"] is None:
         return pb_personal(c, uid, create=create)
-    from ..accounts.orgroles import office_allowed
     if not office_role(c, uid, sheet["org_id"]) or office_allowed(c, uid, sheet["org_id"], write=bool(create or write)):
         return None
     from ..office.rights import ofr_allows
@@ -176,9 +179,7 @@ def sh2_to_tasks(c, sheet, uid, b, titles=None, dues=None, via=None):
     """The core of POST .../to-tasks, without the request (the caller checked uid may write the sheet: _gate). People only:
     uid is the person; an agent's rows come as a proposal (agents/sheetprop.py) that the person applies, then via =
     {agent_id} names the agent in the history. 2.126.1 B (#2125): titles / dues = {row id: the person's edit of the card}."""
-    from ..tasks.validation import log_act
     from ..agents.core import agent_added_events
-    from ..tasks.dependencies import newtask_events
     from ..lists.rules import rul_fire, rul_snap_new
     book = ShBook(c, sheet)
     l = sh2_target_list(c, sheet, uid, b.get("list_id"))
@@ -431,7 +432,6 @@ def sh2_undo(c, sheet, uid, batch, redo=False):
     rows = c.execute("SELECT * FROM sheet_links WHERE sheet_id=? AND batch=? ORDER BY id DESC", (sheet["id"], batch)).fetchall()
     if not rows:
         raise Denied(404)
-    from ..tasks.lifecycle import restore_task, trash_task
     ts, done, kept, edited = iso_ms(now_utc()), 0, [], []
     for r in rows:
         if bool(r["undone_at"]) != redo:

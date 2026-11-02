@@ -27,6 +27,7 @@ from ..core.pg import insert_id, write_lock
 from .ledger import ofx_company_clean, ofx_log
 from .model import OFFICE_ADMIN_ONLY, office_ctx_admin as _ctx, office_role, office_settings
 from .rights import office_can, ofr_mine
+from .datev import _digits, dx_settings  # 2.369.5 (#2517): pulled up from functions
 
 BKA_TABLE = "office_bank_accounts"
 BKA_BANK = ("iban", "bic", "bank_name")
@@ -150,7 +151,6 @@ def _clean(c, oid, b, cur=None):
     if not out["label"]:
         out["label"] = out["bank_name"][:BKA_LABEL_MAX] or "… " + out["iban"][-4:]
     if "datev_account" in b:
-        from .datev import _digits, dx_settings
         out["datev_account"] = _digits(b["datev_account"], "datev_account", 1, int(dx_settings(office_settings(c, oid))["acct_len"]))
     return out
 

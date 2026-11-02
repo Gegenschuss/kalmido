@@ -47,6 +47,14 @@ from ..core.orgcrypt import oc_seal, oc_send_file  # 2.149.0 G (#2517): pulled u
 from ..files.scan import sc_guard, sc_up  # 2.209.0 D (#1856)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 from ..team.clients import cl_refs, cl_trash
+from .contacts_cl import fk_has_name, fk_add, fk_sync  # 2.369.5 (#2517): pulled up from functions
+from ..team.clients import clean_client  # 2.369.5 (#2517): pulled up from functions
+from .model import office_row  # 2.369.5 (#2517): pulled up from functions
+from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachtext import pdf_text, PDF_RATE  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_company, ofx_log  # 2.369.5 (#2517): pulled up from functions
+from .invoices import inv_manual_seq, inv_scheme  # 2.369.5 (#2517): pulled up from functions
+from ..core import config  # 2.369.5 (#2517): pulled up from functions
 
 FI_XLSX_MAX = 10 * 1024 * 1024  # the uploaded spreadsheet
 FI_XLSX_UNZIPPED_MAX = 80 * 1024 * 1024  # all members unpacked (zip bomb guard)
@@ -468,7 +476,6 @@ def _cname(s):
 def fk_other_contact(c, a, dup, rows):
     """2.40.0 (#1380): True when duplicate row a names a contact person its client (existing: dup.id; in the file: the
     row dup.row and the rows already added to it) does not have yet."""
-    from .contacts_cl import fk_has_name
     n = _cname(a.get("contact"))
     if not n:
         return False
@@ -1099,7 +1106,6 @@ MERGE_FIELDS = ("contact", "street", "zip", "city", "country", "address", "email
 
 
 def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=None, pre=None):
-    from .contacts_cl import fk_add, fk_has_name, fk_sync
     if not isinstance(x, dict):
         raise BadInput(tr("Invalid data"))
     made = {} if made is None else made  # row -> the client it became (new / merged), for "contact" rows of the same file
@@ -1176,7 +1182,6 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=N
 def fi_import(c, oid, uid, b):
     """Body {clients: [...], services: [...], equipment: [...]} (the preview's rows as corrected; action new | merge | skip,
     merge_id = the existing client to fill). -> (run id, counts). Everything in one transaction."""
-    from ..team.clients import clean_client
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     lists = {k: b.get(k) or [] for k in FI_AREAS}
@@ -1244,7 +1249,6 @@ def sr_mark_key():
     if not _SR_MARK_KEY:
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-        from ..core import config
         m = getattr(config, "SECRET_KEY", None)
         _SR_MARK_KEY.append(HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"kalmido-import-mark-v1").derive(m) if m else None)
     return _SR_MARK_KEY[0]
@@ -1480,7 +1484,6 @@ def fi_undo(c, oid, uid, rid, kinds=None):
                       [""] * len(back) + [iso(now_utc()), int(cid)])
             removed["merged"] += 1
     # 2.40.0 (#1380): the contact persons the run added to other clients (a kept client of the run keeps its own)
-    from .contacts_cl import fk_sync
     touched = set()
     kw = f"client_id IN (SELECT id FROM clients WHERE {pb_cl_sql(c, oid)})"  # 2.47.3 (#1360): also a personal office's (org_id NULL)
     # 2.272.0 F (#3027): the contact persons of a client that just went into the trash stay with it (restore brings them back)
@@ -1613,7 +1616,6 @@ def sr_blank(f):
 
 
 def sr_row(c, oid, kind, rid):
-    from .model import office_row
     try:
         return office_row(c, oid, kind, rid)
     except Denied:
@@ -1804,7 +1806,6 @@ def fi_archive_add(c, oid, uid, raw, file_name, b):
     if len(raw) > FI_PDF_MAX:
         raise BadInput(tr("The file is too large (at most {0} MB)", FI_PDF_MAX // (1024 * 1024)))
     from ..files.scan import _sc_magic, sc_after_store, sc_scan
-    from ..files.upsafe import UploadRefused
     if _sc_magic(raw) != "application/pdf":  # 2.61.0 review (#1818): by the content (no "<html>...%PDF-" polyglot)
         raise BadInput(tr("Only PDF files can be archived"))
     try:
@@ -2065,9 +2066,6 @@ def fka_own(c, oid, own):
 def fk_pdf_address(c, oid, raw, uid, client_id=None):
     """-> {status: ok | no_text | none | busy | error, address?: split + reasons, client_id, client_name, new_client,
     add_contact, address_differs}."""
-    from ..tasks.attachtext import pdf_text
-    from .contacts_cl import fk_has_name
-    from .ledger import ofx_company
     t = pdf_text(raw, owner=uid)
     if t.get("error"):
         return {"status": "busy" if t["error"] == "busy" else "error"}
@@ -2103,8 +2101,6 @@ def fk_archive_people(c, oid, uid, b, rid):
     """2.40.0 (#1421): the ticked proposals of an archived PDF -- new_client (JSON {name, contact, street, zip, city,
     country}: a client of this run; the same company + postcode again in the run reuses it) and add_contact (a name for
     the client_id) -> the client id to file the document under (or None)."""
-    from ..team.clients import clean_client
-    from .contacts_cl import fk_add, fk_has_name, fk_sync
     cid = None
     raw = b.get("new_client")
     if raw:
@@ -2147,7 +2143,6 @@ def fk_archive_people(c, oid, uid, b, rid):
 def fi_counter(c, oid, kind):
     """The proposal for the counter of kind (invoice | offer): the highest number found in the archive (a number that
     follows today's scheme, else the project number of the file name) next to the counter's current value."""
-    from .invoices import inv_manual_seq, inv_scheme
     s = office_settings(c, oid)
     scheme = inv_scheme(s, kind)
     period = office_scheme_period(scheme)
@@ -2209,7 +2204,6 @@ def fi_import_post():
     c, uid, oid = _ctx()
     write_lock(c, f"office_import_{int(oid)}")
     rid, counts = fi_import(c, oid, uid, body())
-    from .ledger import ofx_log
     ofx_log(c, oid, "import", target="legacy", detail={"run_id": rid, "counts": counts})
     bump(c)
     c.commit()
@@ -2245,7 +2239,6 @@ def fi_undo_post(rid):
     c, uid, oid = _ctx()
     kinds = (body() or {}).get("kinds")
     removed, kept, files, archived = fi_undo(c, oid, uid, rid, kinds=kinds)
-    from .ledger import ofx_log
     ofx_log(c, oid, "undo", target="legacy", detail={"run_id": rid, "removed": removed, "kept": kept, **({"kinds": kinds} if kinds else {}),
                                                      **({"archived": [{"kind": a["kind"], "id": a["id"]} for a in archived]} if archived else {})})
     bump(c)
@@ -2260,7 +2253,6 @@ def imr_tidy_post(rid):
     undone areas, never the producing service; nothing deleted) -> {archived: [{kind, id, name, used}]}."""
     c, uid, oid = _ctx()
     archived = imr_tidy(c, oid, rid)
-    from .ledger import ofx_log
     if archived:
         ofx_log(c, oid, "archive", target="legacy", detail={"run_id": rid, "archived": [{"kind": a["kind"], "id": a["id"]} for a in archived]})
     bump(c)
@@ -2290,7 +2282,6 @@ def imr_renumber_post():
         imr_renumber(c, oid)
     after = {str(r["id"]): r["sort"] for r in office_rows(c, oid, "services")}
     old = {k: v for k, v in before.items() if after.get(k) != v}
-    from .ledger import ofx_log
     if old:
         ofx_log(c, oid, "update", target="services", detail={"renumber": len(old)})
     bump(c)
@@ -2319,7 +2310,6 @@ def fk_archive_address_post():
     """2.40.0 (#1421) org admin. multipart 'file' (PDF) + client_id? (the file name's proposal) -> the recipient's address
     read from the text layer of page 1 and the proposals (new client / contact person / address differs); nothing stored."""
     c, uid, oid = _ctx()
-    from ..tasks.attachtext import PDF_RATE
     if hit_limit(f"pdftext:{uid}", PDF_RATE, 600):  # 2.81.0 (#1463): the same budget as POST /api/pdf-text
         raise Denied(429, tr("Too many requests, please slow down"))
     f, raw = _upload("file", FI_PDF_MAX)
@@ -2386,7 +2376,6 @@ def fi_archive_patch(aid):
     from .archiveedit import r81b_archive_patch
     f = r81b_archive_patch(c, oid, uid, aid, b if isinstance(b, dict) else {})
     if f:
-        from .ledger import ofx_log
         ofx_log(c, oid, "update", target="archive", detail={"archive_id": aid, "fields": sorted(f)})
     c.commit()
     return jsonify(_archive_public(c.execute("SELECT * FROM office_archive WHERE id=? AND org_id=?", (aid, oid)).fetchone()))
@@ -2401,7 +2390,6 @@ def fi_archive_pdf(aid):
     if not p:
         raise Denied(404)
     sc_guard(c, "oar", aid)  # 2.209.0 D (#1856): found infected (strict: not checked yet) = locked
-    from .ledger import ofx_log
     ofx_log(c, oid, "pdf", target="archive", detail={"archive_id": aid}, dedupe_min=10)
     c.commit()
     name = re.sub(r"[^A-Za-z0-9._-]+", "-", r["file_name"] or "").strip("-") or f"archive-{aid}.pdf"
@@ -2441,7 +2429,6 @@ def fi_counter_post():
         raise BadInput(tr("The number skips {0} numbers of the series; give a reason (GoBD)", last - cur["last"]))
     c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,?,?) ON CONFLICT(org_id, kind, period) DO UPDATE SET last=excluded.last",
               (oid, kind, cur["period"], last))
-    from .ledger import ofx_log
     ofx_log(c, oid, "number", target="legacy", detail={"kind": kind, "from": cur["last"], "to": last, **({"reason": reason} if reason else {})})
     c.commit()
     return jsonify(fi_counter(c, oid, kind))

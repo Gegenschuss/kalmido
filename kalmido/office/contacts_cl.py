@@ -16,6 +16,9 @@ from ..core.i18n import tr
 from ..core.pg import insert_id, like_escape
 from ..core.errors import BadInput
 from .model import pb_cl_sql
+from ..contacts.model import contact_visible, contact_brief, contacts_on, my_book_ids  # 2.369.5 (#2517): pulled up from functions
+from ..team.clients import client_rows, clients_on  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
 
 FK_MAX = {"name": 120, "role": 120, "email": 200, "phone": 60}
 FK_LIMIT = 50  # contact persons per client
@@ -32,7 +35,6 @@ def fk_contacts(c, cid, oid=None):
     """The contact persons of client cid, the default first, then in their order. 2.148.1 B (#2484): oid = the office area of
     the document asking -- none while the client lies in another workspace now (a personal office: its owner's private clients)."""
     if oid is not None:
-        from ..core.pg import system_ctx
         with system_ctx(c):  # structure only: where the client lies, whose personal office oid is
             here = c.execute("""SELECT 1 FROM clients k LEFT JOIN orgs o ON o.id=? WHERE k.id=?
                                 AND (k.org_id=o.id OR (k.org_id IS NULL AND o.personal_of=k.created_by))""", (oid, cid)).fetchone()
@@ -216,7 +218,6 @@ def ckl_book_fits(cl, b, c=None, book_id=None):
 
 def ckl_contact_ok(c, uid, cl, kid):
     """Contact kid when person uid sees it (contacts module on, its book readable) and its book fits client cl, else None."""
-    from ..contacts.model import contact_visible
     r = contact_visible(c, kid, uid)
     if not r or r["kind"] == "group":
         return None
@@ -263,7 +264,6 @@ def ckl_contact_clients(c, kid, uid):
     """The contact card: [{client_id, name, icon, role, contact_person_id}] of the clients contact kid is a contact person of,
     only clients person uid may open (people with the module clients who see the client, as GET /api/clients/<id>) and only
     links whose book still fits the client. [] for everybody else."""
-    from ..team.clients import client_rows, clients_on
     u = c.execute("SELECT kind, kid FROM users WHERE id=?", (uid,)).fetchone()
     if not u or u["kid"] or (u["kind"] or "user") == "agent" or not clients_on(c, uid):
         return []
@@ -281,7 +281,6 @@ def ckl_contact_clients(c, kid, uid):
 def ckl_candidates(c, uid, cl, q="", limit=20):
     """The contacts person uid may link to the contact persons of client cl: [{id, fn, org, title, email, phone, book}],
     matching q (name, company, e-mail, phone), at most limit."""
-    from ..contacts.model import contact_brief, contacts_on, my_book_ids
     if not contacts_on(c, uid):
         return []
     ids = list(my_book_ids(c, uid))

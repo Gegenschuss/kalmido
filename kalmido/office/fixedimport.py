@@ -33,6 +33,9 @@ from .cashflow import MAX_FIXED, _ctx, fci_gross, rk_fixed, rk_fixed_clean
 from .legacyimport import _upload, fi_book, fx_run, fx_settle
 from .model import office_settings, office_settings_lock, office_settings_save
 from ..core.access import my_inbox  # 2.149.0 G (#2517): pulled up from functions
+from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from .model import office_on, pb_owner  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
 
 FCI_FILE_MAX = 2 * 1024 * 1024
 FCI_ROWS_MAX = 500
@@ -270,7 +273,6 @@ def fci_write(c, uid, oid, items, detail=None, kept=None, run=False):
     carries dup_ok (the person ticked a row the preview marked "Already there"): sent twice (two tabs, a retry) = once.
     kept (a list): gets the items actually written, in the order of the returned ids (the import proposal keeps them).
     2.363.2 (#3104): run = an entry in the import runs (the import proposal has its own undo on the job)."""
-    from .ledger import ofx_log
     rows = fci_clean_rows(items)
     write_lock(c, f"office_fixed_{int(oid)}")
     seen = fci_seen(c, oid)
@@ -392,7 +394,6 @@ def fci_template():
 def fci_people(c, oid):
     """[{id, name}] who may get the task: the people who see the cash flow of this area (its admins with the module
     "office" on; a personal office: its owner). No agents, no kids."""
-    from .model import office_on, pb_owner
     owner = pb_owner(c, oid)
     if owner is not None:
         ids = [owner]
@@ -419,7 +420,6 @@ def _first_of_next(today):
 def fci_task_new(c, person):
     """The recurring task in the person's inbox, theirs and assigned to them: due on the 1st of every month, only a link to
     the cash flow (never an amount)."""
-    from ..tasks.validation import log_act
     lid = my_inbox(c, person)
     lg = lang(c, person)
     ts = iso(now_utc())
@@ -435,7 +435,6 @@ def fci_task_new(c, person):
 def fci_task_end(c, tid, person):
     """Ends the task: the repeat removed and done (never deleted). Only the task this setting made: the person's own and
     assigned to them (a stored id never reaches another task)."""
-    from ..tasks.validation import log_act
     if not tid or not person:
         return
     ts = iso(now_utc())
@@ -462,7 +461,6 @@ def fci_check_get():
 def fci_check_put():
     """Office admin. {on: 0|1, user_id?} -> on: the task for the person (another person: the old task ends, a new one);
     off: the task ends. A person who does not see the cash flow is refused (400)."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx()
     b = body()
     if not isinstance(b, dict):

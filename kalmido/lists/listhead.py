@@ -19,6 +19,7 @@ from ..accounts.session import me
 from ..core.errors import BadInput
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_list_space, oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
+from ..lists.lists import clean_folder  # 2.369.5 (#2517): pulled up from functions
 
 HEAD_STYLES = ("", "gradient", "dots", "lines", "grid", "image")
 FOLDER_HEAD_STYLES = ("", "gradient", "dots", "lines", "grid")  # a folder has no own picture
@@ -180,7 +181,6 @@ def o3c_folder_heads():
 @app.put("/api/folder-heads")
 def o3c_folder_head_put():
     """{folder, style: '' | gradient | dots | lines | grid} -- the strip of one of my folders ('' removes it)."""
-    from ..lists.lists import clean_folder
     c, b = db(), body()
     _no_agent()
     try:

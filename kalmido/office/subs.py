@@ -26,6 +26,10 @@ from ..personal.timetrack import _csv_cell
 from ..core.errors import BadInput
 from .calc import CALC_LOCALE, calc_lang, dec, dstr, fmt_point, money
 from ..core.access import my_inbox  # 2.149.0 G (#2517): pulled up from functions
+from .model import pb_owner  # 2.369.5 (#2517): pulled up from functions
+from .fixedimport import fci_people  # 2.369.5 (#2517): pulled up from functions
+from .cashflow import rk_fixed, _fixed_public  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
 
 ABO_NOTICE_MAX = 730
 ABO_REMIND_MAX = 90
@@ -82,7 +86,6 @@ def abo_seats(raw):
 def abo_people(c, oid):
     """[{id, name}] who can be a user of a subscription of office area oid: the members of the organisation (no agents, no
     kids, no disabled accounts); a personal office: only its owner."""
-    from .model import pb_owner
     owner = pb_owner(c, oid)
     if owner is not None:
         ids = [owner]
@@ -107,7 +110,6 @@ def abo_clean(c, oid, b, cur):
     remind_days 0..90, remind_user an office admin (fci_people) or none, url http(s) <= 500. A person id that is no longer in
     the area may stay where it already was (the row can still be saved); a new foreign id = 400. Without c (the import:
     fci_clean_rows) seats and remind_user are left alone (their defaults)."""
-    from .fixedimport import fci_people
     out = {}
     new = not cur
     if c is None:
@@ -233,7 +235,6 @@ def abo_candidate(f, today):
 
 
 def abo_view(c, oid):
-    from .cashflow import rk_fixed
     today = _today()
     fx = rk_fixed(c, oid)
     people = abo_people(c, oid)
@@ -253,7 +254,6 @@ def abo_view(c, oid):
               "count": len(run), "low_use_count": len(low)}
     cands = [{k: f[k] for k in ("id", "label", "category", "amount", "gross", "repeat", "per_month", "per_month_net")}
              for f in fx if abo_candidate(f, today)][:ABO_CANDIDATES_MAX]
-    from .fixedimport import fci_people
     return {"items": items, "totals": totals, "candidates": cands, "people": people, "remind_people": fci_people(c, oid), "today": today}
 
 
@@ -291,7 +291,6 @@ def abo_csv():
 def abo_task_new(c, person, label, due, text):
     """The reminder task in the person's inbox, theirs and assigned to them (the pattern of fci_task_new): the name, never an
     amount; due on the last day to cancel; a link to the view."""
-    from ..tasks.validation import log_act
     lid = my_inbox(c, person)
     lg = lang(c, person)
     ts = iso(now_utc())
@@ -312,8 +311,6 @@ def abo_tick(c, now=None, force=False):
     when the person is no longer an office admin of the area, their account is disabled or the office is off for them
     (fci_people). A task once made stays (also when the row is deleted or the reminder switched off). Runs at most every
     ABO_EVERY_TICKS watchdog intervals."""
-    from .cashflow import _fixed_public
-    from .fixedimport import fci_people
     if not force and time.monotonic() - _ABO_LAST["at"] < ABO_EVERY_TICKS * WATCHDOG_INTERVAL:
         return
     _ABO_LAST["at"] = time.monotonic()

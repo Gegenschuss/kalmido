@@ -26,6 +26,11 @@ from ..collab.liste2e import (LE2EDenied, _LE2A_CIPHER, _LE2A_OLD, _LE2A_PLAIN, 
 from ..core.orgcrypt import oc_is_enc  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from .pages import WIKI_BODY_MAX, wiki_space_key, wiki_space, WIKI_PATH_MAX, wiki_clean_path, wiki_frontmatter, wiki_set_links  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
+from ..collab.e2e import e2e_blob, e2e_keys_of, e2e_reauth  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import news_add  # 2.369.5 (#2517): pulled up from functions
 
 WKE_BULK_MAX = 200     # pages per todo / bulk call
 WKE_KEYS_MAX = 500     # entries per start / keys / rotate call (an organisation may have more members than a list)
@@ -43,7 +48,6 @@ def wke_denied(code, status=409, **extra):
 
 
 def wke_body_max():
-    from .pages import WIKI_BODY_MAX
     return int(WIKI_BODY_MAX * 4 * 1.34) + 1000  # review L1: characters of up to 4 UTF-8 bytes, Base64 of those
 
 
@@ -133,7 +137,6 @@ def _wke_person():
 
 
 def _wke_names(c, ids):
-    from ..collab.comments import user_names
     return user_names(c, list(ids))
 
 
@@ -141,7 +144,6 @@ def wke_can_manage(c, oid, uid):
     """Private space: its owner; an organisation's space: the organisation's admins."""
     if not oid:
         return True
-    from ..accounts.orgs import is_org_admin
     return is_org_admin(c, uid, oid)
 
 
@@ -267,7 +269,6 @@ def wke_index_info(c, oid, uid):
 
 def wke_info(c, oid, uid):
     """The answer of GET /api/wiki/e2e (also of start, stop and rotate)."""
-    from .pages import wiki_space_key
     sp = wke_row(c, oid, uid)
     people = wke_people(c, sp, oid, uid)
     mode = (sp["e2e"] or None) if sp else None
@@ -287,7 +288,6 @@ def wke_info(c, oid, uid):
 # ---------------------------------------------------------------- routes
 def _wke_space(c, v):
     """(uid, oid) of a space value the signed-in person may read (404 otherwise)."""
-    from .pages import wiki_space
     uid = _wke_person()
     return uid, wiki_space(c, uid, v)
 
@@ -312,7 +312,6 @@ def _wke_switch(c, v, on_ok=True):
 
 
 def _wke_wrapped(v):
-    from ..collab.e2e import e2e_blob
     return e2e_blob(v, WKE_WRAP_MAX)
 
 
@@ -354,7 +353,6 @@ def wke_start():
     and wrapped it for every member with encryption set up; the others wait for it (decision E7). -> 'encrypting'.
     {space, prepare: true} -- only creates the row of the space (mode stays open) and answers like GET: the browser needs
     space_id (salt and AAD) before it wraps."""
-    from ..collab.e2e import e2e_keys_of
     c = db()
     b = body()
     uid, oid = _wke_manage(c, b.get("space"))
@@ -435,7 +433,6 @@ def wke_todo():
 
 def _wke_free_path(c, oid, owner, pid, path):
     """decrypting: a free name for page pid -- "Name (2)", "Name (3)" ... when another page of the space has it."""
-    from .pages import WIKI_PATH_MAX
     w, a = wke_space_sql(oid, owner)
     cand, n = path, 2
     while c.execute(f"SELECT 1 FROM wiki_pages WHERE deleted_at IS NULL AND {w} AND lower(path)=? AND id<>?",
@@ -452,7 +449,6 @@ def wke_bulk():
     generation (body also ''), decrypting = plain texts (a name taken in the space gets " (2)" ..., answered in renamed; links
     and frontmatter are rebuilt from the plain text). A value already in the target format stays (someone saved meanwhile);
     no history, one live update per call, repeating a call is harmless."""
-    from .pages import WIKI_BODY_MAX, wiki_clean_path, wiki_frontmatter, wiki_set_links
     c = db()
     b = body()
     _uid, oid, sp, e = _wke_switch(c, b.get("space"))
@@ -577,7 +573,6 @@ def wke_finish():
 def wke_stop():
     """{space, password} -- the way back (a manager holding the current key, with the account password): 'on' / 'encrypting'
     -> 'decrypting'; the browser writes the plain texts back through todo / bulk / finish."""
-    from ..collab.e2e import e2e_reauth
     c = db()
     b = body()
     uid, oid = _wke_manage(c, b.get("space"))
@@ -603,8 +598,6 @@ def wke_keys():
     """{space, keys: [{user_id, gen, wrapped}]} -- hand the space key to people on the waiting list (or again after they set up
     new keys): only a manager holding that generation; the recipient must be a member with encryption set up. The server stores
     the wrapper's public key itself and tells the recipient (News)."""
-    from ..collab.e2e import e2e_keys_of
-    from ..collab.news import news_add
     c = db()
     b = body()
     uid, oid = _wke_manage(c, b.get("space"))
@@ -665,7 +658,6 @@ def wke_rotate():
     manager holding the current key, only in 'on'; gen must be e2e_gen + 1 (a second rotation at the same moment: 409
     code wiki_e2e_gen). Members not in keys wait for it; an entry for someone who is no member -> 400. Starts the
     re-encryption (e2e_reenc = gen); old generations stay (texts not re-encrypted yet, backups)."""
-    from ..collab.e2e import e2e_keys_of
     c = db()
     b = body()
     uid, oid = _wke_manage(c, b.get("space"))

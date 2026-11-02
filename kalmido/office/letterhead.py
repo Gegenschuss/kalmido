@@ -57,6 +57,11 @@ _FMT_SEEN = {}  # (org, sha256) -> the paper format of a letterhead stored befor
 
 
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .ledger import ofx_log, ofx_company, ofx_company_print, ofx_sender_line  # 2.369.5 (#2517): pulled up from functions
+from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from functions
+from .packs import office_pack_for  # 2.369.5 (#2517): pulled up from functions
+from .pdf import office_pdf  # 2.369.5 (#2517): pulled up from functions
+from .pdfweb import _file_response  # 2.369.5 (#2517): pulled up from functions
 
 
 def _dir(oid):
@@ -295,7 +300,6 @@ def bp_get():
 @app.post("/api/office/letterhead")
 def bp_upload():
     """multipart "file" (admin): a PDF up to BP_MAX_MB MB; 400 with a plain sentence when it cannot be used."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx(admin=True)
     f = request.files.get("file")
     if not f:
@@ -304,7 +308,6 @@ def bp_upload():
     if len(raw) > BP_MAX_MB * 1024 * 1024:
         return err(tr("The file is too large (at most {0} MB)", BP_MAX_MB), 413)
     from ..files.scan import SC_RETRY_TEXT, sc_needs_retry, sc_scan  # 2.148.1 E (#2496): virus scan like every upload
-    from ..files.upsafe import UploadRefused
     try:
         if sc_needs_retry(sc_scan(f.filename or "letterhead.pdf", raw), raw):  # 2.360.0 B (#2496): no later scan for this file, so checked now
             return err(tr(SC_RETRY_TEXT), 503)
@@ -345,7 +348,6 @@ def bp_upload():
 @app.put("/api/office/letterhead")
 def bp_put():
     """{m1?, m2?, hide_head?, hide_footer?} (admin): the margins and switches, saved at once (the settings page autosaves)."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx(admin=True)
     b = body()
     if not isinstance(b, dict):
@@ -373,7 +375,6 @@ def bp_put():
 @app.delete("/api/office/letterhead")
 def bp_delete():
     """Admin: no letterhead in the documents from now on; the file stays as prev for one undo step (restore)."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx(admin=True)
     write_lock(c, f"office_letterhead_{int(oid)}")
     lh = bp_state(office_settings(c, oid))
@@ -391,7 +392,6 @@ def bp_delete():
 def bp_restore():
     """{file} (admin): the previous letterhead file (prev) becomes the current one again -- the undo of an upload or a
     removal; the current one becomes prev in turn (redo). 404 when the file has gone."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx(admin=True)
     b = body() or {}
     want = str(b.get("file") or "") if isinstance(b, dict) else ""
@@ -420,8 +420,6 @@ def bp_restore():
 def bp_sample(c, oid):
     """A sample invoice over two pages in the office area's language with its company data, logo and colour, for the
     preview (nothing stored, no number used)."""
-    from .ledger import ofx_company, ofx_company_print, ofx_sender_line
-    from .packs import office_pack_for
     s = office_settings(c, oid)
     lang = doc_lg(s.get("lang"))  # 2.185.0 C (#2520)
     pack = office_pack_for(s) or {}
@@ -443,8 +441,6 @@ def bp_sample(c, oid):
 @app.get("/api/office/letterhead/preview")
 def bp_preview():
     """A sample invoice with the current letterhead as PDF (inline); without one the sample shows the normal layout."""
-    from .pdf import office_pdf
-    from .pdfweb import _file_response
     c, uid, oid = _ctx()
     m = bp_sample(c, oid)
     lh = bp_state(office_settings(c, oid))

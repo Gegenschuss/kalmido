@@ -28,6 +28,12 @@ from ..core.access import Denied, need_feat
 from ..accounts.session import me, user_public
 from ..core.errors import BadInput
 from .absence import abs_admin, abs_days, abs_holidays, abs_holidays_shown, abs_org, abs_people, abs_state
+from ..contacts.model import my_book_ids  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import news_add  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import user_orgs_full  # 2.369.5 (#2517): pulled up from functions
+from ..calendars.icalfeed import ics_fold, ics_text, ics_utc  # 2.369.5 (#2517): pulled up from functions
+from ..core.serializers import csv_cell as cell  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import list_role  # 2.369.5 (#2517): pulled up from functions
 
 DSP_KINDS = ("user", "contact", "equipment", "set")
 DSP_STATUS = ("option", "firm")
@@ -85,7 +91,6 @@ def _set_items(raw):
 def dsp_contacts(c, uid, oid):
     """[(id, name)] of the individual contacts of the area's address books uid may read (organisation books; a personal
     area: the person's own books without an organisation)."""
-    from ..contacts.model import my_book_ids
     from ..office.model import pb_personal
     personal = oid == pb_personal(c, uid, create=False)
     bids = [b for b in my_book_ids(c, uid)]
@@ -212,7 +217,6 @@ def _notify(c, r):
     """A firm booking of a person with an account: a News entry for them (event "assigned to me", their own switch)."""
     if r["resource_kind"] != "user" or r["status"] != "firm" or r["resource_id"] == me():
         return
-    from ..collab.news import news_add
     news_add(c, r["resource_id"], "dispo", data={"booking_id": r["id"], "title": r["title"], "start": r["start"], "end": r["end"]})
 
 
@@ -236,7 +240,6 @@ def dsp_get():
                                         "ORDER BY start, id", (oid, last.isoformat() + "T99", first.isoformat()))]
     conf = dsp_conflicts(c, oid, rows, first, last)
     gone = abs_days(c, [p["id"] for p in res["people"]], first, last, oid)
-    from ..accounts.orgroles import user_orgs_full
     mine = user_orgs_full(c, uid)  # 2.143.0 A (#2151): not guests / accounting
     return jsonify(org_id=oid, orgs=[{"id": r[0], "name": r[1]} for r in c.execute(
         "SELECT id, name FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id") if r[0] in mine],
@@ -282,8 +285,6 @@ def dsp_export():
     name = f"dispo-{first.isoformat()}-{last.isoformat()}.{fmt}"
     hdr = {"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"}
     if fmt == "csv":
-        from ..core.serializers import csv_cell as cell
-        from ..core.access import list_role
         lists = {}
         for r in rows:
             if r["list_id"] and r["list_id"] not in lists:
@@ -301,7 +302,6 @@ def dsp_export():
                         status.get(r["status"], ""), r["start"].replace("T", " "), r["end"].replace("T", " "),
                         h.replace(".", ",") if dec_comma(lang()) else h, cell(r["note"])])
         return Response("\ufeff" + buf.getvalue(), mimetype="text/csv; charset=utf-8", headers=hdr)
-    from ..calendars.icalfeed import ics_fold, ics_text, ics_utc
     stamp = ics_utc(now_utc())
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", f"PRODID:-//{APP_NAME}//Disposition//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"]
     for r in rows:
@@ -371,7 +371,6 @@ def dsp_create():
             picks.append((k, i))
     lid = b.get("list_id")
     if lid not in (None, ""):
-        from ..core.access import list_role
         try:
             lid = int(lid)
         except (TypeError, ValueError):

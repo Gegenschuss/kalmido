@@ -14,6 +14,7 @@ from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
 from ..core.errors import Denied  # noqa: F401  2.149.0 G (#2517): moved to core/errors.py, re-exported here
 from .pg import set_ctx_hook, st_ids, system_ctx as pg_system  # 2.149.0 G (#2517): pulled up from functions
 from .dlock import dl_list_hidden, dl_lists_sql, dl_task_hidden, dl_task_sql  # 2.235.0 B (#2902): an agent's data lock
+from ..core.pg import system_ctx as _sys, LOOKUP  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- access control
@@ -312,7 +313,6 @@ def acx_conn_hook(c):
     hit = g.get("acx_users", {}).get(uid)
     if hit is None:
         if c is None:
-            from .pg import LOOKUP
             return LOOKUP
         hit = acx_of(c, uid)
     return (uid, hit.org_ids, hit.role)
@@ -337,7 +337,6 @@ def acx_anon_bind(c, org_id):
     Applies to the running transaction at once and to every later one of this request.
     2.152.0 (#2167): a retired organisation (kept by law only) opens no public link any more: 404."""
     if org_id:
-        from ..core.pg import system_ctx as _sys
         with _sys(c):  # instance structure: is the organisation retired?
             r = c.execute("SELECT retired_at FROM orgs WHERE id=?", (int(org_id),)).fetchone()
         if r and r[0]:
@@ -501,6 +500,13 @@ def _req_filters_sql():
 def vis_sql(ov=True):
     """Subquery of the list ids the current user may see (two ? = user id; ov=False: only owned / joined, see acx_lists_sql)."""
     return acx_lists_sql(ov=ov)
+
+
+def joined_lists_sql():
+    """2.369.5 (#2517): THE raw subquery "the lists an account owns or is a member of" (two ? = the account id: owner,
+    member). For an account other than the request's own (an agent, the other person) or where every such list counts:
+    no trash, collaboration switch, organisation boundary or request filters -- the request's own scope is vis_sql."""
+    return "(SELECT id FROM lists WHERE owner_id=? UNION SELECT list_id FROM list_members WHERE user_id=?)"
 
 
 def wr_sql():

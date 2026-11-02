@@ -23,6 +23,8 @@ from ..core.i18n import tr
 from ..contacts.model import (
     contact_store, contacts_on, my_book_ids, parse_vcard, render_vcard,
 )
+from ..events.dav import sync_save as _save, sync_load  # 2.369.5 (#2517): pulled up from functions
+from ..contacts.model import book_touch  # 2.369.5 (#2517): pulled up from functions
 
 # 2.21.0 (#658): /dav/addressbooks/<user>/ is the address book home (RFC 6352), b<id>/ one address book, <name>.vcf one
 # contact. Same login (app passwords), rate limits, sync-collection (dav_sync2, coll b<id>) and ETag rules as the CalDAV
@@ -117,7 +119,6 @@ def ab_coll(c, u, book):
 
 
 def sync_save(c, u, ac):
-    from ..events.dav import sync_save as _save
     return _save(c, u, _Shim(ac))
 
 
@@ -277,7 +278,6 @@ def ab_report(c, u, book, raw):
             hits = hits[:n]
         return dav_multistatus(dav_response(dav_href(*base, nm), want, props_member(u, m, role, ver)) for nm, m in hits)
     if root.tag == D_ + "sync-collection":
-        from ..events.dav import sync_load
         te = root.find(D_ + "sync-token")
         tok = (te.text or "").strip() if te is not None else ""
         lvl = root.find(D_ + "sync-level")
@@ -430,7 +430,6 @@ def abdav(m, c, u, p):
         im = request.headers.get("If-Match", "").strip()
         if im and im != "*" and have[1] not in [x.strip() for x in im.split(",")]:
             raise DavError(412, "The resource was changed meanwhile")
-        from ..contacts.model import book_touch
         from ..core.db import bump
         # 2.272.0 E1 (#3038): into the trash as in the app (a device deletes without asking; restore in the address book)
         from ..contacts.bulk import ctt_trash  # 2.58.0 (#1656): its birthday / anniversary tasks go as in the app

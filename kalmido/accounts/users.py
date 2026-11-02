@@ -20,11 +20,14 @@ from ..accounts.pictures import (
 )
 from ..accounts.login import session_via, twofa_clear, twofa_methods
 from ..accounts.sessions import ses_end  # 2.190.0 A (#1991)
-from ..core.access import collab_all, Denied, list_role, need_list, vis_sql
+from ..core.access import collab_all, Denied, joined_lists_sql, list_role, need_list, vis_sql
 from ..core.serializers import unlink_files
 from ..core.errors import BadInput
 from ..core.orgcrypt import oc_drop_key, oc_list_org, oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.tokenhash import tkh_set_drop  # 2.149.0 G (#2517): pulled up from functions
+from ..core.schema import USER_DEFAULTS  # 2.369.5 (#2517): pulled up from functions
+from .colors import ac_valid  # 2.369.5 (#2517): pulled up from functions
+from ..core.errors import BadInput as _BadInput  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- users / account
@@ -243,7 +246,6 @@ def user_create():
         return err(tr("Invalid value: {0}", "lang"))
     uset(c, uid, "lang", lg if lg in LANGS else "en")
     if b.get("kid") is not True:  # 2.22.0 (#739): new people start with the module Agents on (kids not; existing users unchanged)
-        from ..core.schema import USER_DEFAULTS
         fs = [x for x in (gsetting(c, "default_features") or USER_DEFAULTS["features"]).split(",") if x]
         uset(c, uid, "features", ",".join(fs + ([] if "agents" in fs else ["agents"])))
     ensure_inbox(c, uid)
@@ -330,7 +332,6 @@ def user_update(uid):
             make_agent(c, uid)
             if was:  # 2.37.0 (#1150): the converted account keeps working in its organisation (row-level security: a private
                 # agent never reads an organisation's lists, not even its own)
-                from ..core.errors import BadInput as _BadInput
                 try:
                     with c.savepoint():
                         agent_org_set(c, uid, was[0])
@@ -657,7 +658,6 @@ def me_update():
     if "display_name" in b:
         c.execute("UPDATE users SET display_name=? WHERE id=?", ((b["display_name"] or "").strip()[:60] or u["username"], u["id"]))
     if "color" in b:  # 2.47.1 (#1721): the own fixed colour (only colours of the palette)
-        from .colors import ac_valid
         if (u["kind"] or "user") == "agent":  # an agent's colour is set by its admin / owner (PATCH /api/agents/<aid>/color)
             return err(tr("Not allowed"), 403)
         if not ac_valid(b["color"]):
@@ -838,7 +838,7 @@ def avatar_get(uid, tok):
         raise Denied(404)
     admin_ok = bool(g.user["is_admin"])  # 2.46.0 (#1592): the user management shows every account, with its photo
     if uid != me() and not admin_ok and not c.execute(
-            f"""SELECT 1 FROM lists WHERE id IN {vis_sql()} AND (owner_id=? OR id IN (SELECT list_id FROM list_members WHERE user_id=?))
+            f"""SELECT 1 FROM lists WHERE id IN {vis_sql()} AND id IN {joined_lists_sql()}
                 LIMIT 1""", (me(), me(), uid, uid)).fetchone():
         raise Denied(404)
     p = avatar_path(uid, tok)

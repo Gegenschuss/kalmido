@@ -34,6 +34,16 @@ from ..core.access import Denied
 from ..accounts.session import me
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_err, v1_json, v1_view
+from ..agents.proposals import _p_keys, _p_str, PROP_MAX_BYTES, prop_ready_notify, prop_validate  # 2.369.5 (#2517): pulled up from functions
+from ..office.fixedimport import fci_num, fci_vat_guess, fci_key, fci_seen, fci_write  # 2.369.5 (#2517): pulled up from functions
+from ..office.calc import dstr, money  # 2.369.5 (#2517): pulled up from functions
+from ..office.cashflow import fci_gross, rk_fixed_clean, CF_VAT_RATES  # 2.369.5 (#2517): pulled up from functions
+from ..office.model import OFFICE_OFF, office_on, office_org, pb_owner  # 2.369.5 (#2517): pulled up from functions
+from ..office.ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import JOB_TITLE_MAX, job_dict, need_agent  # 2.369.5 (#2517): pulled up from functions
+from ..agents.lyprop import lyp_person  # 2.369.5 (#2517): pulled up from functions
+from ..agents.usage import usage_block  # 2.369.5 (#2517): pulled up from functions
+from ..api.scopes import need_scope  # 2.369.5 (#2517): pulled up from functions
 
 AIM_KIND = "import"
 AIM_AREAS = ("fixed_costs",)  # later: further areas of the office (the format keeps the field)
@@ -62,9 +72,6 @@ def aim_validate(b, inp):
     """prop_validate for kind import: {area, title?, summary?, note?, items} -> {area, note, items: [{row, label, amount,
     repeat, start, until, category, vat_rate}]}. Only the shape is checked here; every row is judged when the card is shown
     and again when it is accepted. Unknown fields of a row (an org_id, an id, created_by ...) are dropped."""
-    from ..agents.proposals import _p_keys, _p_str
-    from ..office.fixedimport import fci_num, fci_vat_guess
-    from ..office.calc import dstr, money
     _p_keys(b, "", ("kind", "summary", "area", "title", "note", "items"))
     area = b.get("area", "fixed_costs")
     if area not in AIM_AREAS:
@@ -101,9 +108,6 @@ def aim_item(row, vat=None):
 def aim_rows(c, oid, items, vats=None):
     """The rows of a card judged like the spreadsheet preview: [{k, row, label, amount, gross, repeat, start, until, category,
     vat_rate, status new|dup|error, reason, sel}]. oid None = no office to compare with (only new / error)."""
-    from ..office.cashflow import fci_gross, rk_fixed_clean
-    from ..office.calc import dstr
-    from ..office.fixedimport import fci_key, fci_seen
     seen = fci_seen(c, oid) if oid else set()
     out = []
     for i, row in enumerate(items):
@@ -128,7 +132,6 @@ def aim_rows(c, oid, items, vats=None):
 def aim_target(c, j):
     """The office the person takes the card over into, now: (org id, name, personal). The office module on, the admin role
     there (403), an agent of an organisation only into that one (409: switch the workspace)."""
-    from ..office.model import OFFICE_OFF, office_on, office_org, pb_owner
     uid = me()
     if not office_on(c, uid):
         raise Denied(403, tr(OFFICE_OFF))
@@ -176,9 +179,6 @@ def aim_version(j):
 
 def aim_run(c, j, sel, ed, extra, rec):
     """Accept (as the person): the ticked rows (edits {k: {vat_rate}}) into the office the person works in, all or nothing."""
-    from ..office.cashflow import CF_VAT_RATES, rk_fixed_clean
-    from ..office.fixedimport import fci_write
-    from ..agents.proposals import _p_keys
     if _expired(j):
         raise Denied(409, tr("This proposal has expired"))
     if "version" in (extra or {}) and extra["version"] != aim_version(j):  # 2.68.0 (#1839 review): the agent replaced the rows meanwhile
@@ -214,8 +214,6 @@ def aim_run(c, j, sel, ed, extra, rec):
 def aim_undo(c, j, rec, back=True):
     """Undo: the rows this card made go (only in its office, only those still there and unchanged since). Redo: the rows the
     undo removed come again (new ids; again all or nothing)."""
-    from ..office.fixedimport import fci_write
-    from ..office.model import office_org
     oid = rec.get("org")
     if not oid or office_org(c, me(), admin=True, area="cashflow") != oid:
         raise Denied(409, tr("Switch your workspace to the office of this import first"))
@@ -237,7 +235,6 @@ def aim_undo(c, j, rec, back=True):
     by_id = dict(zip(made, rec.get("rows") or []))
     n = c.execute(f"DELETE FROM office_fixed_costs WHERE org_id=? AND id IN ({','.join('?' * len(gone)) or 'NULL'})", [oid] + gone).rowcount if gone else 0
     rec.update(removed=[by_id[i] for i in gone if i in by_id], kept=kept)
-    from ..office.ledger import ofx_log
     ofx_log(c, oid, "delete", target="fixed_costs", detail={"count": n, "undo": 1, "job": j["id"]})
     return n, [tr("{0} fixed costs changed since", len(kept))] if kept else []
 
@@ -260,12 +257,6 @@ def aim_expire(c):
 def v1_aim_propose():
     """{area: fixed_costs, items: [...], title?, summary?, note?, user_id?} -> a ready proposal job (kind import) for the person.
     Nothing is written until the person accepts it; the answer carries no office data."""
-    from ..agents.core import JOB_TITLE_MAX, job_dict, need_agent
-    from ..agents.lyprop import lyp_person
-    from ..agents.proposals import PROP_MAX_BYTES, _p_str, prop_ready_notify, prop_validate
-    from ..agents.usage import usage_block
-    from ..api.scopes import need_scope
-    from ..office.model import office_on
     v1_args(())
     aid = need_agent()
     need_scope("import")

@@ -35,6 +35,7 @@ from ..core.pg import like_escape
 from ..core.errors import BadInput, UnknownFields
 from ..contacts.model import (contact_brief, contacts_on, my_book_ids, need_book, render_vcard, vc_date, FIELD_MAX, ITEMS_MAX,
                               NOTE_MAX)
+from ..contacts.bulk import bk_gate, ms_groups, ms_write  # 2.369.5 (#2517): pulled up from functions
 
 # ---- CSV (#2080)
 CTX_DELIMS = (";", ",", "\t")
@@ -531,7 +532,6 @@ def ctx_groups(c, uid):
 
 def ctx_groups_change(c, uid, b):
     """{action: rename, name, to} | {action: delete, name} -> {action, changed, skipped, undo: [{id, groups}]}."""
-    from ..contacts.bulk import bk_gate, ms_groups, ms_write
     bad = sorted(k for k in b if k not in ("action", "name", "to"))
     if bad:
         raise UnknownFields(bad)

@@ -57,6 +57,12 @@ ADDR_RE = re.compile(r"[\w.!#$%&'*+/=?^`{|}~-]+@[\w-]+(?:\.[\w-]+)+")
 
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
+from ..team.clients import client_rows  # 2.369.5 (#2517): pulled up from functions
+from ..files.web import _send  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import ROLE_RANK, _free_name, fs_folder, fs_role, fs_put  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachments import unexec_name  # 2.369.5 (#2517): pulled up from functions
+from ..files.upsafe import UploadRefused, up_marks  # 2.369.5 (#2517): pulled up from functions
+from ..collab.liste2eguard import le2b_off  # 2.369.5 (#2517): pulled up from functions
 
 
 def hbm_root(c, uid, org, lg):
@@ -92,7 +98,6 @@ def _visible_client(c, uid, cid):
     """The client row when uid sees client cid (team/clients.py client_rows), else None. 2.84.0 review: in a request the
     clients of uid are read once (hbm_can runs per mail row)."""
     from flask import has_request_context
-    from ..team.clients import client_rows
     if not has_request_context():
         return next((r for r in client_rows(c, uid) if r["id"] == cid), None)
     seen = g.setdefault("hbm_clients", {})
@@ -148,7 +153,6 @@ def hbm_node_sql(c, uid):
     """2.360.2 L (#2561): a subquery (no parameters) of the ids of the hub mails with filed nodes that uid may read
     (files/store.py _mail_hidden) -- hbm_can in SQL, so a large mailbox never becomes a literal list. Only the role of a
     list stays in Python, once per list: it knows data locks and hidden life areas that vis_sql does not."""
-    from ..team.clients import client_rows
     if _kid(c, uid):  # 2.352.0 G (#2752, review M5): see hbm_node_ok
         return "SELECT 0 WHERE FALSE"
     filed = "(m.eml_id IS NOT NULL OR m.folder_id IS NOT NULL)"
@@ -209,7 +213,6 @@ def _target(c, b):
         if l["no_mail"]:  # 2.352.0 B (#2752): every list but the inbox is a project; G (review M5): no life area / family / read later
             raise Denied(409, tr("Only projects have an e-mail address"))
         if l["e2e"]:
-            from ..collab.liste2eguard import le2b_off
             raise Denied(409, le2b_off())
         return "list", l["org_id"], None, lid
     ws = str(ws or "private")
@@ -376,7 +379,6 @@ def hbm_public(c, m, full=False):
     from .mailbox import mbx_state  # 2.141.0 A (#2138): a mail sent from the filing (dir out, to = its recipients; state sending / failed)
     out.update(dir=m["direction"] or "in", state=mbx_state(m), **({"to_list": d["to_addrs"]} if m["direction"] == "out" else {}))
     if full:
-        from ..files.store import fs_role
         out["body"] = d["body"]
         from ..integrations.mailtrim import md_trim_view  # 2.352.0 D (#2754): the shortened text (display only; "body" stays whole)
         out["body_short"] = md_trim_view(d["body"] or "")
@@ -387,7 +389,6 @@ def hbm_public(c, m, full=False):
         out["eml_id"] = m["eml_id"]
         ids = _files(m) + ([m["eml_id"]] if m["eml_id"] else [])
         if ids:
-            from ..files.upsafe import up_marks
             rows = c.execute(f"SELECT id, name, size, mime FROM fs_nodes WHERE id IN ({','.join('?' * len(ids))}) AND deleted_at IS NULL",
                              ids).fetchall()
             marks = up_marks(c, "fs", [r["id"] for r in rows]) if rows else {}
@@ -514,7 +515,6 @@ def hbm_mail_file(mid, nid):
     n = c.execute("SELECT * FROM fs_nodes WHERE id=? AND deleted_at IS NULL AND kind='file'", (nid,)).fetchone()
     if not n or (n["org_id"] or None) != (m["org_id"] or None):
         raise Denied(404)
-    from ..files.web import _send
     return _send(c, dict(n))
 
 
@@ -528,7 +528,6 @@ def hbm_targets():
         m = _need_mail(c, int(request.args.get("mail") or 0), write=True)
     except ValueError:
         raise Denied(400, tr("Invalid value: {0}", "mail")) from None
-    from ..team.clients import client_rows
     org = m["org_id"] or None
     cls = [{"id": r["id"], "name": r["name"]} for r in client_rows(c, uid, archived=False) if (r["org_id"] or None) == org]
     lids = [r[0] for r in c.execute(f"SELECT l.id FROM lists l WHERE NOT {_NO_MAIL} AND l.archived=0 AND COALESCE(l.e2e,'')='' "
@@ -543,7 +542,6 @@ def hbm_targets():
 
 def _move_folder(c, uid, m, cid, lid):
     """The mail's folder moves along below "E-Mails / <new client / project>" when uid may change it (else it stays)."""
-    from ..files.store import ROLE_RANK, _free_name, fs_folder, fs_role
     if not m["folder_id"] or ROLE_RANK[fs_role(c, m["folder_id"], uid)] < ROLE_RANK["edit"]:
         return
     n = c.execute("SELECT * FROM fs_nodes WHERE id=? AND deleted_at IS NULL", (m["folder_id"],)).fetchone()
@@ -641,7 +639,6 @@ def _addrs(msg, *hdrs):
 def hbm_match(c, uid, org, addrs):
     """The id of the ONE client of workspace org (None = private) that uid sees and that has one of addrs (client e-mail,
     contact persons, linked address book contacts); None when there is no or more than one."""
-    from ..team.clients import client_rows
     addrs = {a.lower() for a in addrs if a}
     if not addrs:
         return None
@@ -771,7 +768,6 @@ def hbm_trash_holder(c, uid, cid):
     """2.272.0 F (#3029, review M1): the address of a client in the trash keeps receiving for the one who made it (still
     seeing the client in the trash, still a member): the mail is kept with the client (hidden until its restore; the final
     delete lets go of the client, foreign key SET NULL) instead of being lost -> (org_id, client_id) or None."""
-    from ..team.clients import client_rows
     u = c.execute("SELECT disabled, kind, kid FROM users WHERE id=?", (uid,)).fetchone()
     if not u or u["disabled"] or u["kid"] or (u["kind"] or "user") == "agent":
         return None
@@ -782,9 +778,6 @@ def hbm_trash_holder(c, uid, cid):
 
 
 def _import(c, r, msg, raw, mail_text):
-    from ..files.store import fs_folder, fs_put
-    from ..tasks.attachments import unexec_name
-    from ..files.upsafe import UploadRefused
     from ..admin.hosting import QuotaExceeded
     uid, cid, lid = r["user_id"], r["client_id"], r["list_id"]
     ok = _holder_ok(c, r["kind"], uid, r["org_id"], cid, lid)

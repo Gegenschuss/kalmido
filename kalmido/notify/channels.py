@@ -40,6 +40,14 @@ from ..core.errors import BadInput
 from ..core.mailframe import MAIL_ACC, MAIL_MUTED, Safe, mail_html
 from ..notify.alerts import _env_int, aa_count, aa_err, aa_fail, aa_ok
 from ..core.env import env_bool
+from ..calendars.subscriptions import CAL_ERR  # 2.369.5 (#2517): pulled up from functions
+from ..collab.integfail import integ_org_admins, integ_tell  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import comment_plain, user_names  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import _need_org_admin  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.login import seal  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.session import _rate_blocked, _rate_fail  # 2.369.5 (#2517): pulled up from functions
+from ..notify.push import _wd_fail  # 2.369.5 (#2517): pulled up from functions
+from ..calendars.apptbook import apb_mail_line  # 2.369.5 (#2517): pulled up from functions
 
 CH_ON = env_bool("KALMIDO_CHANNELS", True)
 CH_KINDS = ("slack", "matrix", "telegram", "signal")
@@ -169,7 +177,6 @@ def chn_send(kind, t, text, allow):
 
 
 def chn_err_text(code, status=None, lg=None):
-    from ..calendars.subscriptions import CAL_ERR
     if code == "blocked":
         return tr(CAL_ERR["blocked"], lg=lg) if lg else tr(CAL_ERR["blocked"])
     m = CH_ERR.get(code, CH_ERR["error"])
@@ -251,7 +258,6 @@ def chn_result(c, cid, ok, status, code):
 
 def chn_off_tell(c, ch, what):
     """2.367.3 (#2971): a channel turned itself off: its owner / the organisation's admins hear it, not only the settings."""
-    from ..collab.integfail import integ_org_admins, integ_tell
     uids = integ_org_admins(c, ch["org_id"]) if ch["org_id"] else [ch["user_id"]]
     integ_tell(c, uids, what, ch["name"] or CH_KINDS_TXT.get(ch["kind"], ch["kind"]),
                click="settings/users" if ch["org_id"] else "settings/newskinds", focus="users" if ch["org_id"] else "newskinds")
@@ -495,7 +501,6 @@ def chn_list_events(c, n, auto=False):
 
 
 def chn_event_text(c, t, ev, cid, actor, owner):
-    from ..collab.comments import comment_plain, user_names
     from ..collab.liste2e import le2e_mode, le2e_neutral
     s = usettings(c, owner)
     lg = s.get("lang") if s.get("lang") in LANGS else "en"
@@ -529,13 +534,11 @@ def chn_need_on():
 
 
 def chn_need_person():
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot use this endpoint"))
+    from ..agents.core import need_person
+    need_person(403, tr("Agents cannot use this endpoint"))
 
 
 def chn_need_admin(oid):
-    from ..accounts.orgs import _need_org_admin
     _need_org_admin(db(), oid)
 
 
@@ -595,7 +598,6 @@ def chn_fields(c, b, oid, old=None):
 
 
 def chn_seal(c, chid, t):
-    from ..accounts.login import seal
     c.execute("UPDATE notify_channels SET target=? WHERE id=?", (seal(c, f"channel:{chid}", json.dumps(t)), chid))
 
 
@@ -654,7 +656,6 @@ def chn_delete_do(chid, oid=None):
 def chn_test_do(chid, oid=None):
     """Sends a test message now (this request waits for it, at most CH_TIMEOUT seconds); counts like any other send."""
     from ..accounts.login import unseal
-    from ..accounts.session import _rate_blocked, _rate_fail
     chn_need_on()
     c = db()
     r = chn_need(c, chid, oid)
@@ -789,7 +790,6 @@ def evm_note(c, uid, kind, tid, actor, s, cid=None):
 
 def evm_tick(c, users, S, LG, now):
     """Watchdog: one bundled mail per person whose first waiting event is EVM_DELAY old (and the last mail EVM_GAP)."""
-    from ..notify.push import _wd_fail
     rows = c.execute("SELECT user_id, MIN(created_at) AS first FROM notify_mail_queue GROUP BY user_id").fetchall()
     for r in rows:
         uid = r["user_id"]
@@ -815,7 +815,6 @@ def evm_line(kind, who, title, lg):
 
 def evm_user(c, uid, s, lg, now):
     from ..admin.hosting import mail_budget
-    from ..collab.comments import user_names
     from ..collab.liste2e import le2e_mode, le2e_neutral
     from ..integrations.mail import MAIL_OUT_ON, mail_off_url, mail_send
     if time.time() - float(s.get("evmail_at") or 0) < EVM_GAP:
@@ -839,7 +838,6 @@ def evm_user(c, uid, s, lg, now):
         if (x["kind"], x["task_id"] or x["comment_id"]) in seen or not evm_wanted(c, uid, s, x["kind"]):
             continue
         if x["kind"] == "apbook":  # 2.367.2 (#2969)
-            from ..calendars.apptbook import apb_mail_line
             seen.add((x["kind"], x["comment_id"]))
             line = apb_mail_line(c, x["comment_id"], uid, lg)
             if line:

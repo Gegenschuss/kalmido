@@ -26,6 +26,10 @@ from ..core.merges import mg_fk_refs
 from ..core.pg import system_ctx
 from ..core.env import env_bool  # 2.399.0 (#2687): the hosting switch (KALMIDO_HOSTED)
 from ..core.retention import RET_LEGAL_YEARS, ret_on, ret_report
+from ..core.orgcrypt import oc_drop_key  # 2.369.5 (#2517): pulled up from functions
+from ..core.serializers import unlink_files  # 2.369.5 (#2517): pulled up from functions
+from .pictures import avatar_drop_file, org_icon_drop_file  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import insert_id  # 2.369.5 (#2517): pulled up from functions
 
 # (count key, legal kind, SQL of the years per row: org_id = ?) -- the year a period starts from (its end + N years)
 ODL_LEGAL = (
@@ -341,7 +345,6 @@ def odl_dismantle(c, oid):
     cascades). Returns what to remove after the caller committed: file paths (relative to ATT_DIR) and clean-ups
     (callables, see core/serializers.unlink_files) for the office folder and the picture."""
     from ..admin.orgcrypt_cli import before_org_delete
-    from ..core.orgcrypt import oc_drop_key
     from ..files.store import fs_org_purge
     oid = int(oid)
     with system_ctx(c):  # the instance admin (or an account deletion) removes an organisation they need not be in
@@ -371,7 +374,6 @@ def odl_dismantle(c, oid):
 
     def after():
         from .orgs import oc_drop_office_dir
-        from .pictures import org_icon_drop_file
         oc_drop_office_dir(oid)
         org_icon_drop_file(oid, icon)  # 2.87.9 (#1913)
     return files + [after]
@@ -384,7 +386,6 @@ def odl_retired_prune(c, force=False):
     if not force and time.time() - ODL_PRUNE["at"] < 6 * 3600:
         return 0
     ODL_PRUNE["at"] = time.time()
-    from ..core.serializers import unlink_files
     today = date.today().isoformat()
     with system_ctx(c):  # retention run over every organisation (no person's context, nothing handed out)
         due = [r[0] for r in c.execute("SELECT id FROM orgs WHERE retired_at IS NOT NULL AND retain_until IS NOT NULL "
@@ -444,7 +445,6 @@ def upg_personal(c, uid):
     u = c.execute("SELECT username, display_name FROM users WHERE id=?", (int(uid),)).fetchone()
     with system_ctx(c):  # the deleted person's own office (no organisation admin context involved)
         if not poid:
-            from ..core.pg import insert_id
             poid = insert_id(c, "INSERT INTO orgs(name,icon,created_at) VALUES(?,?,?)", (f"private-{int(uid)}", "", iso(now_utc())))
         from ..files.fsmove import fsm_doc, fsm_text, fsm_versions
         new_paths, old_paths = [], []
@@ -512,7 +512,6 @@ def upg_rest(c, uid):
     from ..agents.admin import agent_delete
     from ..lists.listtrash import otr_drop_files
     from ..tasks.tasks import hard_delete
-    from .pictures import avatar_drop_file
     from ..lists.lists import list_purge
     uid, todo = int(uid), []
     with system_ctx(c):  # the deleted person's rows in every organisation (an instance admin deletes accounts of organisations they are not in)

@@ -16,6 +16,8 @@ from flask import g, has_request_context, request
 
 from ..core.i18n import N_, tr
 from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
+from .orgs import instance_mode  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
 
 ROLE_KEYS = ("member", "admin", "guest", "readonly", "accounting")
 FULL_READ = ("admin", "member", "readonly")    # sees the organisation's shared content without a personal share
@@ -34,8 +36,6 @@ def org_roles_of(c, uid):
         return {}
     cache = g.setdefault("org_roles", {}) if has_request_context() else {}
     if uid not in cache:
-        from .orgs import instance_mode
-        from ..core.pg import system_ctx
         if instance_mode(c) == "shared":
             cache[uid] = {}
         else:
@@ -96,7 +96,6 @@ def is_write_request():
 def need_org_write(c, uid, oid):
     """403 when uid's role in organisation oid does not allow changes (read-only, guest, accounting)."""
     if oid and not org_writes(c, uid, oid):
-        from ..core.access import Denied
         raise Denied(403, tr(RO_MSG if org_role_key(c, uid, oid) == "readonly" else GUEST_MSG))
 
 

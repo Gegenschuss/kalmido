@@ -17,6 +17,7 @@ from ..core.access import Denied, need_collab, collab_all, need_list
 from ..core.errors import BadInput
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.lists import folder_under  # 2.411.0 (#3516)
+from ..lists.lists import FOLDER_SEP, list_agent_set, clean_folder, _folder_member_add  # 2.369.5 (#2517): pulled up from functions
 
 # 2.40.0 (#1373): agent_peers is no folder default any more (agents never address each other); a stored one is ignored
 FOLDER_PROPS = ("org_id", "agent_id", "agent_members", "agent_tidy", "agent_listen")  # 2.30.0 (#1034): agent_listen
@@ -28,12 +29,10 @@ FOLDER_APPLY = ("all", "new")
 
 
 def _fsep():
-    from ..lists.lists import FOLDER_SEP
     return FOLDER_SEP
 
 
 def _under(p, top):
-    from ..lists.lists import folder_under
     return folder_under(p or "", top)
 
 
@@ -107,7 +106,6 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
     uid = uid or me()
     from ..accounts.orgs import clean_org_id, list_org, list_space_follow, ws_member_problem
     from ..collab.reactions import list_tidy_update
-    from ..lists.lists import list_agent_set
     lr = c.execute("SELECT id, owner_id, folder, is_inbox, family, life, archived, quicknote FROM lists WHERE id=?", (lid,)).fetchone()
     if not lr or lr["is_inbox"] or lr["quicknote"] or lr["owner_id"] != uid:  # 2.477.0 (#3881, review F1): + the list Notes
         return [], 0
@@ -233,7 +231,6 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
 
 
 def folder_lists(c, owner, folder):
-    from ..lists.lists import folder_under
     return [r for r in c.execute("SELECT id, name, folder FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND quicknote=0 ORDER BY sort, id", (owner,))
             if folder_under(r["folder"] or "", folder)]
 
@@ -317,7 +314,6 @@ def folder_info(c, owner, folder):
 def folder_props_get():
     """?folder=: the defaults of my folder (props), the ones it inherits from its top folder, and its lists with the keys
     each keeps on its own."""
-    from ..lists.lists import clean_folder
     c = db()
     from ..lists.lffolder import lf_path_arg
     f = clean_folder(lf_path_arg(c, request.args.get("folder"), request.args.get("node")) or "", strict=False)  # 2.352.0 A (#2748): or node=
@@ -331,7 +327,6 @@ def folder_props_put():
     """{folder, props: {org_id?, agent_id?, agent_members?, agent_peers?, agent_tidy?, agent_listen?} (null removes a default),
     apply: all (default: the existing lists follow) | new (only lists that come later), force?: also the lists that differ on
     purpose, dry_run?: only say what would happen}. -> {props, changed, lists: [{id, name, skipped: [{key, reason}]}]}"""
-    from ..lists.lists import clean_folder
     c, b = db(), body()
     if g.user["kind"] == "agent":
         raise Denied(403)
@@ -430,7 +425,6 @@ def folder_member_created(c, uid, lid):
     """A list someone creates in a folder that is shared with them stays theirs and is shared with the folder's
     owner (list admin) and the folder's other people (their folder roles) at once -- the folder sits with them under the same
     name (member_folder_adopt). Returns the number of people it was shared with."""
-    from ..lists.lists import _folder_member_add, folder_under
     from ..accounts.orgs import may_see
     r = c.execute("SELECT owner_id, folder, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
     if not r or r["is_inbox"] or not r["folder"] or r["owner_id"] != uid or not collab_all():
@@ -542,7 +536,6 @@ def lm_folder_moved(c, lid, adopt, keep=()):
 def lm_folder_preview(lid):
     """?folder=: what moving my list into that folder would change (workspace, agent and its settings) -> {changes:
     [{key, from, to, from_name?, to_name?}]}. Empty = nothing to confirm. Members / other lists: always empty."""
-    from ..lists.lists import clean_folder
     c = db()
     need_list(c, lid, write=False)
     f = clean_folder(request.args.get("folder") or "", strict=False)

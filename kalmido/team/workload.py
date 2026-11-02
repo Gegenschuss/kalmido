@@ -10,6 +10,10 @@ from ..accounts.session import me, user_public
 from ..accounts.orgs import is_org_admin, user_orgs
 from ..core.access import Denied, need_feat, tvis, vis_sql
 from ..core.errors import BadInput
+from ..personal.timetrack import time_day_h  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import visible_people  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import user_orgs_full  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.settings import clean_setting  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.23.0 (#463): workload
@@ -24,7 +28,6 @@ WL_WEEKS_MAX = 12
 
 
 def capacity_h(c, uid):
-    from ..personal.timetrack import time_day_h
     v = usettings(c, uid).get("capacity_h") or ""
     try:
         x = float(v)
@@ -37,9 +40,7 @@ def capacity_h(c, uid):
 
 def wl_people(c, uid, org=None):
     """[(id, row)] of the people of the workload view for uid: the organisation (org, else the saved workspace's, else uid's first), visible to uid."""
-    from ..accounts.orgs import user_orgs, visible_people
     u = g.user
-    from ..accounts.orgroles import user_orgs_full
     mine = [o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]  # 2.143.0 A (#2151): not guests / accounting
     if org is not None:
         if org not in mine and not u["is_admin"]:
@@ -155,7 +156,6 @@ def workload_capacity(uid):
         raise Denied(403, tr("Only admins can change the capacity of other people"))
     if not c.execute("SELECT 1 FROM users WHERE id=?", (uid,)).fetchone():
         raise Denied(404)
-    from ..accounts.settings import clean_setting
     v = clean_setting("capacity_h", body().get("hours"))
     uset(c, uid, "capacity_h", v or "")
     bump(c)
@@ -165,6 +165,4 @@ def workload_capacity(uid):
 
 def _mine_full(c, uid):
     """2.143.0 A (#2151): uid's organisations without the ones where they are a guest / accounting."""
-    from ..accounts.orgs import user_orgs
-    from ..accounts.orgroles import user_orgs_full
     return [o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]

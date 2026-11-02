@@ -14,6 +14,10 @@ from ..accounts.session import me
 from ..core.access import Denied
 from ..collab.comments import user_names
 from ..agents.core import agent_emit, jc_job_name, JOB_MESSAGE_MAX, job_dict, job_may_act, job_visible
+from ..personal.timetrack import BadInput  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import as_int  # 2.369.5 (#2517): pulled up from functions
+from ..agents.chat import chat_add  # 2.369.5 (#2517): pulled up from functions
+from ..core.db import iso_ms, now_utc  # 2.369.5 (#2517): pulled up from functions
 
 
 
@@ -120,8 +124,6 @@ def jcs_job_in(c, aid, v, uid):
     """The job a person's message is addressed to (job_id of the POST): a job of agent aid that uid may see, else BadInput;
     review B2: like the job's message action only who may stop it may write to it (Denied 403). Ended jobs stay allowed
     (a message wakes them, #2176)."""
-    from ..personal.timetrack import BadInput
-    from ..tasks.validation import as_int
     if v in (None, ""):
         return None
     j = c.execute("SELECT * FROM agent_jobs WHERE id=? AND agent_id=?", (as_int(v, "job_id", 1), aid)).fetchone()
@@ -136,8 +138,6 @@ def jcs_start_notice(c, j):
     """The grey start line of job j in the chat of the person it is for (caller commits; trimmed files: chat_unlink_trimmed)."""
     if not j or not j["user_id"]:
         return None
-    from ..agents.chat import chat_add
-    from ..core.db import iso_ms, now_utc
     r = chat_add(c, j["agent_id"], j["user_id"], "agent", (j["title"] or "").strip() or f"#{j['id']}", None)
     c.execute("UPDATE agent_chat SET kind='notice', job_id=?, job_parent=?, job_msg='start', read_at=? WHERE id=?",
               (j["id"], j["parent_id"] if "parent_id" in j.keys() else None, iso_ms(now_utc()), r["id"]))

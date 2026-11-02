@@ -12,6 +12,8 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, now_utc, uset, usettings
 from ..core.access import Denied, need_list, vis_sql
 from ..accounts.session import me
+from ..accounts.settings import FV2_MAX  # 2.369.5 (#2517): pulled up from functions
+from .lists import FOLDER_SEP  # 2.369.5 (#2517): pulled up from functions
 
 VW_FAV_MAX = 500  # the same bound as the other id lists of the settings (clean_setting)
 
@@ -38,9 +40,8 @@ def lc_fav_of(c, uid):
 def vw_list_favorite(lid):
     """PUT {"on": true|false} (default true) stars / unstars list lid for the signed-in person; DELETE unstars it.
     404 for a list the person cannot see (DELETE of an own old star still works); agents have no favourites (403)."""
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403, tr("Favourites are a personal setting of a person"))
+    from ..agents.core import need_person
+    need_person(403, tr("Favourites are a personal setting of a person"))
     c = db()
     on = request.method == "PUT" and bool((body() or {}).get("on", True))
     had = vw_fav_ids(c, me())
@@ -72,7 +73,6 @@ def fv2_items_follow(c, uid, lid, on):
     key = "l:%d" % lid
     if not (on and key in items):  # a star set again keeps its place
         items = [x for x in items if x != key] + ([key] if on else [])
-    from ..accounts.settings import FV2_MAX
     out = json.dumps(items[-FV2_MAX:], ensure_ascii=False, separators=(",", ":"))
     uset(c, uid, "fav_items", out)
     return out
@@ -200,9 +200,8 @@ def fv2_targets():
 @app.post("/api/favorites/suggestion")
 def lc_fav_suggestion():
     """The one list to ask about now ({list_id, name} or list_id null); the list counts as asked from here on."""
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403, tr("Favourites are a personal setting of a person"))
+    from ..agents.core import need_person
+    need_person(403, tr("Favourites are a personal setting of a person"))
     c, uid = db(), me()
     s = usettings(c, uid)
     if s.get("fav_suggest") == "0":
@@ -227,7 +226,6 @@ def lc_fav_suggestion():
 def fv2_folder_rename(c, uid, old, new):
     """2.57.0 (#1798): a renamed / moved folder keeps its place among the favourites (fav_items), its subfolders too."""
     import json
-    from .lists import FOLDER_SEP
     raw = usettings(c, uid).get("fav_items") or "[]"
     try:
         items = [x for x in json.loads(raw) if isinstance(x, str)]

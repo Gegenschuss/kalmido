@@ -34,6 +34,8 @@ from ..core.access import Denied, collab_all
 from ..core.pg import insert_id, system_ctx
 from ..core.mailframe import mail_html
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, me, rate_ip
+from ..accounts.pictures import avatar_url, avatar_path  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import may_see  # 2.369.5 (#2517): pulled up from functions
 
 DISC_DAY = 30            # searches per account and day
 DISC_CHECK_DAY = 300     # addresses of the address book check per account and day
@@ -87,7 +89,6 @@ def _findable(c, email):
 
 def _avatar(c, u):
     """A picture for someone I may not see yet: a preset, or the uploaded photo inline (the photo route is for list people)."""
-    from ..accounts.pictures import avatar_url, avatar_path
     a = u["avatar"] or ""
     if a.startswith("u:"):
         try:
@@ -112,7 +113,6 @@ def _state(c, uid, other):
     lk = c.execute("SELECT 1 FROM conn_links WHERE a_id=? AND b_id=? AND deleted_at IS NULL", (a, b)).fetchone()
     out = c.execute("SELECT 1 FROM conn_requests WHERE from_id=? AND to_id=? AND status NOT IN ('wd_open','wd_declined','wd_hidden')", (uid, other or 0)).fetchone()
     inc = c.execute("SELECT 1 FROM conn_requests WHERE from_id=? AND to_id=? AND status='open'", (other or 0, uid)).fetchone()
-    from ..accounts.orgs import may_see
     seen = may_see(c, uid, other or 0)
     return "connected" if lk or seen else "sent" if out else "incoming" if inc else "none"
 

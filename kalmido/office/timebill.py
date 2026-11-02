@@ -20,6 +20,8 @@ from ..core.pg import system_ctx
 from ..personal.timetrack import BadInput
 from .model import office_role, pb_cl_sql
 from .rights import ofr_admin_or, ofr_own_uid
+from ..core.access import vis_sql  # 2.369.5 (#2517): pulled up from functions
+from .ledger import _log_public, ofx_log  # 2.369.5 (#2517): pulled up from functions
 
 TBL_LOCKED = N_("This time is on invoice {0}: duration, date, task and billable can no longer be changed")
 TBL_LOCKED_DEL = N_("This time is on invoice {0} and cannot be deleted")
@@ -130,7 +132,6 @@ def tbill_out(r, uid=None):
 def tbill_where(c, oid, uid, cid, d_from, d_to, pid):
     """The FROM / WHERE part over the finished time entries of client cid's lists in [d_from, d_to] that uid sees (the lists
     of the office area (org id): an organisation's lists, in a personal office the owner's private lists) -> (sql, args)."""
-    from ..core.access import vis_sql
     # 2.144.6 A (#2053): a personal office (no organisation) bills the owner's private lists (before: l.org_id = the hidden
     # office id, which no list carries)
     # 2.187.1 B (#2735): cid None = every client (the list of the person's own open times, level "own" of "Times to bill")
@@ -262,7 +263,6 @@ def tbill_by_client(c, sql, args):
 def tbill_released_ids(c, oid, did):
     """2.144.6 A (#2053 review 2): the ids the last release of document did freed (office log), empty without a release,
     None when the log kept only the count (more than TBL_LOG_IDS entries): then the undo's other conditions alone apply."""
-    from .ledger import _log_public
     r = c.execute("SELECT * FROM office_doc_log WHERE org_id=? AND doc_id=? AND action='time_release' ORDER BY id DESC LIMIT 1",
                   (oid, did)).fetchone()
     if r is None:
@@ -283,7 +283,6 @@ def tbill_release_post(did):
     if r["kind"] != "invoice" or r["status"] != "cancelled":
         raise Denied(409, tr("Only the time of a cancelled invoice can be released"))
     b = body()
-    from .ledger import ofx_log
     if isinstance(b, dict) and b.get("undo") is not None:
         ids = b["undo"]
         if not isinstance(ids, list) or not all(isinstance(x, int) for x in ids) or len(ids) > 20000:

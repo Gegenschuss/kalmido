@@ -49,6 +49,9 @@ from ..api.common import v1_args, v1_view
 from ..core.env import env_bool
 from ..core.orgcrypt import oc_active, oc_dec, oc_enc, OrgCryptError, PREFIX  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.session import GATE  # 2.369.5 (#2517): pulled up from functions
+from ..collab.liste2e import le2e_mode  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.users import need_admin  # 2.369.5 (#2517): pulled up from functions
 
 # ---- the one place for the model-dependent values (part M's measurement; environment overrides for other models) ----------
 EMBED_URL = (os.environ.get("KALMIDO_EMBED_URL") or "").strip().rstrip("/")
@@ -264,7 +267,6 @@ def _emb_start():
 
 
 def emb_loop():
-    from ..accounts.session import GATE
     time.sleep(3)
     while True:
         wait = EMB_IDLE
@@ -750,7 +752,6 @@ def rt9_route_similar():
         ex = int(b.get("exclude")) if b.get("exclude") not in (None, "") else None
     except (TypeError, ValueError):
         return err(tr("Invalid value: {0}", "list_id"))
-    from ..collab.liste2e import le2e_mode
     if lid and le2e_mode(c, lid):  # 2.64.1 (#1817): a list with the lock gets no hints (its titles stay in the browser)
         return jsonify(enabled=True, items=[])
     return jsonify(rt9_similar(c, g.user["id"], str(b.get("title") or ""), str(b.get("notes") or ""), lid, ex))
@@ -758,7 +759,6 @@ def rt9_route_similar():
 
 @app.get("/api/admin/related")
 def rt9_admin_get():
-    from ..accounts.users import need_admin
     need_admin()
     c = db()
     on = True
@@ -775,7 +775,6 @@ def rt9_admin_get():
 
 @app.put("/api/admin/related")
 def rt9_admin_put():
-    from ..accounts.users import need_admin
     need_admin()
     c, b = db(), body()
     on = b.get("on") in (1, True, "1", "true")

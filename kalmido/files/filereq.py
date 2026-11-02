@@ -44,6 +44,14 @@ from ..lists.public import BOT_ERROR, PUB_CSP, pub_html, public_links_on
 from .store import fs_chain, fs_deleted, fs_role, fs_put, safe_fs_name, _now, _place
 from .fsroots import fs_area_folder_name  # 2.200.0 A (#2747, review 6)
 from .fslock import fsl_need_unlocked  # 2.353.0 A (#2758)
+from ..tasks.attachments import EXEC_EXT  # 2.369.5 (#2517): pulled up from functions
+from .scan import SC_EXEC, _sc_magic  # 2.369.5 (#2517): pulled up from functions
+from .web import _names, _expiry  # 2.369.5 (#2517): pulled up from functions
+from .store import need_node  # 2.369.5 (#2517): pulled up from functions
+from .upsafe import H6D_SLACK, UploadRefused, h6d_read  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import collab_user  # 2.369.5 (#2517): pulled up from functions
+from ..notify.push import push_prio  # 2.369.5 (#2517): pulled up from functions
 
 FRQ_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{20,64}")
 FRQ_TITLE_MAX, FRQ_NOTE_MAX, FRQ_NAME_MAX = 120, 2000, 120
@@ -91,8 +99,6 @@ def frq_types_of(r):
 
 def frq_content_ok(name, data):
     """False when the bytes are a program / HTML / SVG, or an ending the magic bytes know does not match them."""
-    from ..tasks.attachments import EXEC_EXT
-    from .scan import SC_EXEC, _sc_magic
     ext = frq_ext(name)
     if not ext or ext in EXEC_EXT or ext in FRQ_NEVER:
         return False
@@ -135,7 +141,6 @@ def frq_url(c, r):
 
 def frq_json(c, r, role, names=None):
     """The request for the app; the link only for its creator and the folder's owners."""
-    from .web import _names
     names = names if names is not None else _names(c, [r["created_by"]])
     st = frq_state(r)
     mine = r["created_by"] == me()
@@ -158,7 +163,6 @@ def _gate():
 
 
 def _folder(c, nid, write=True):
-    from .store import need_node
     n = need_node(c, nid, write=write)
     if n["kind"] != "folder":
         raise Denied(409, tr("Not a folder"))
@@ -190,7 +194,6 @@ def frq_clean(b, new=False):
     if "days" in b:
         out["expires_at"] = iso(now_utc() + timedelta(days=_int(b, "days", 1, FRQ_DAYS_MAX)))
     elif "expires_at" in b:
-        from .web import _expiry
         x = _expiry(b["expires_at"], b.get("tz"))
         if not x:
             raise Denied(400, tr("Please choose until when the link works"))
@@ -232,7 +235,6 @@ def _row(c, rid, manage=True):
 @app.get("/api/files/nodes/<int:nid>/requests")
 def frq_list(nid):
     """The file requests of a folder (people with the write right there)."""
-    from .web import _names
     c = db()
     _gate()
     n = _folder(c, nid)
@@ -479,7 +481,6 @@ def _target(c, r):
 def frq_send(token):
     """The client's upload: multipart file (repeatable; the script sends one per request), name?, stamp, website (honeypot).
     With the header X-Kalmido-Upload: 1 the answer is JSON ({ok, n} or {error}), else a page."""
-    from .upsafe import H6D_SLACK, UploadRefused, h6d_read
     from ..admin.hosting import QuotaExceeded
     from ..api.common import hit_limit  # 2.124.1: inside (layers)
     if hit_limit("frqs:" + rate_ip(), FRQ_SEND_RATE):  # review: before the token lookup (no unbounded database work per request)
@@ -588,9 +589,6 @@ def frq_send(token):
 # ---------------------------------------------------------------- the creator's News item (+ push), bundled
 def frq_notify(c, r, n, name, node):
     """One News item + push per request and FRQ_NOTIFY_S; uploads in between raise the count of the unread item."""
-    from ..collab.news import news_add, notif_ok
-    from ..collab.comments import collab_user
-    from ..notify.push import push_prio
     uid = r["created_by"]
     now = now_utc()
     if r["notified_at"] and r["notified_at"] > iso(now - timedelta(seconds=FRQ_NOTIFY_S)):

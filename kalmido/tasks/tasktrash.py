@@ -19,6 +19,7 @@ from ..core.serializers import unlink_files
 from ..core.retention import ret_days, ret_on, ret_report, ret_trash_cut, ret_trash_days  # 2.152.0: core/retention.py is here (its fallback went)
 from .tasks import hard_delete
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from .validation import descendants  # 2.369.5 (#2517): pulled up from functions
 
 TTP_TICK = {"at": 0.0}
 TTP_BATCH = 500  # tasks per run; the rest follows in the next hour
@@ -51,7 +52,6 @@ def ttp_purge(c, ids, cut):
                                    f"AND NOT {TTP_KEPT.format('tasks')} ORDER BY id FOR UPDATE", (*ids, cut, today))]
     if not due:
         return 0, []
-    from .validation import descendants
     lists = set()
     for tid in due:
         for k in descendants(c, tid):

@@ -34,6 +34,12 @@ from .model import ofx_name1, office_gate, office_org, office_settings
 from ..personal.timesheet import tz_of
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 from .invoices import inv_pay_add, inv_pay_del  # 2.355.0 B (#2843)
+from ..core.db import local_now  # 2.369.5 (#2517): pulled up from functions
+from .books import bk_ws, bk_receipts, _year, bk_csv_cell as cell  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_chain, fs_deleted, fs_role  # 2.369.5 (#2517): pulled up from functions
+from .periodlock import period_need_open  # 2.369.5 (#2517): pulled up from functions
+from .model import office_role, pb_personal  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_log, ofx_company  # 2.369.5 (#2517): pulled up from functions
 
 CB_DIRS = ("in", "out")
 CB_VATS = ("19", "7", "0")
@@ -65,7 +71,6 @@ from .homecur import hc_home  # noqa: E402  2.189.0 B (#2475)
 
 
 def _today():
-    from ..core.db import local_now  # 2.121.0 review N2: the instance's day, like the year (books)
     return local_now().date().isoformat()
 
 
@@ -180,7 +185,6 @@ def _book_public(c, oid, bid):
 def cb_books_get():
     """-> {books, categories (the receipt categories), currency, note, today}: what the cash book view needs to start."""
     from ..receipts.suggest import rc_categories
-    from .books import bk_ws
     c, uid, oid = _ctx()
     cb_default(c, oid, uid)
     s = office_settings(c, oid)
@@ -192,7 +196,6 @@ def cb_books_get():
 def cb_links_get():
     """-> {receipts (the last 13 months the person sees: node_id, title, date, amount), invoices (issued: id, number, date,
     client)}: what an entry may point at."""
-    from .books import bk_receipts
     c, uid, oid = _ctx()
     to = date.fromisoformat(_today())
     rcs = bk_receipts(c, oid, (to - timedelta(days=400)).isoformat(), (to + timedelta(days=1)).isoformat(), uid)
@@ -289,8 +292,6 @@ def _vals(d):
 
 def _node_ok(c, oid, uid, v):
     """A receipt the person sees in the office's documents space (404 otherwise) or None."""
-    from ..files.store import fs_chain, fs_deleted, fs_role
-    from .books import bk_ws
     nid = _id(v, "node_id")
     if nid is None:
         return None
@@ -349,7 +350,6 @@ def _entry_clean(c, oid, uid, b, cur=None):
 
 
 def _day_rules(c, book, day):
-    from .periodlock import period_need_open
     period_need_open(c, book["org_id"], day)  # 2.148.0 A (#2471): no entry in a locked month
     last = cb_last_closed(c, book["id"])
     if last and day <= last:
@@ -360,7 +360,6 @@ def _day_rules(c, book, day):
 
 def cb_public(c, oid, uid, rows, d, last, bal=None, names=None):
     """One entry for the client: + balance after it, cancelled_by / storno_of with their numbers, locked, receipt / invoice."""
-    from ..files.store import fs_chain, fs_deleted, fs_role
     by_id = {r["id"]: r for r in rows}
     canc = next((r for r in rows if r.get("storno_of") == d["id"]), None)
     node = None
@@ -410,7 +409,6 @@ def _one(c, oid, uid, eid):
 
 def _range():
     """?from=&to= or ?year= (default: this year) -> (from, to, year or None)."""
-    from .books import _year
     frm, to = request.args.get("from"), request.args.get("to")
     if frm or to:
         f = _day(frm, "from") if frm else "0000-01-01"
@@ -513,7 +511,6 @@ def cb_entry_patch(eid):
     last = cb_last_closed(c, bid)
     if last and cur["day"] <= last:
         raise _locked(N_("This entry lies on a closed day and cannot change any more; cancel it instead."))
-    from .periodlock import period_need_open
     period_need_open(c, oid, cur["day"])  # 2.148.0 A (#2471)
     rows = _rows(c, oid, bid)
     if cur.get("storno_of") or any(r.get("storno_of") == eid for r in rows):
@@ -682,8 +679,6 @@ def cb_doc_hint(nid):
     """-> {entries: [{id, no, day, book}]}: the cash entries pointing at this receipt -- only for the admin of the office
     the document belongs to (everybody else: an empty list; a document the person does not see: 404). 2.144.11 (#2354,
     review N6): the office gate like every cash book route (agents, kids and persons without the office: 403)."""
-    from ..files.store import fs_role
-    from .model import office_role, pb_personal
     c = db()
     uid = office_gate(c)
     m = c.execute("SELECT ws FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
@@ -776,7 +771,6 @@ def _prev_text(prev):
 def cb_csv():
     """?book_id=&year= | &from=&to= -> the entries (number, date, text, income, expense, VAT, balance, cancellation link),
     the day closings and the change log (separator and decimal sign of the language like the EUeR CSV)."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx()
     book, frm, to, y, ents, closings, log, start, end = _export_data(c, oid, uid)
     data = cb_csv_text(book, frm, to, y, ents, closings, log, start, end, tz_of(c, uid))
@@ -788,7 +782,6 @@ def cb_csv():
 
 def cb_csv_text(book, frm, to, y, ents, closings, log, start, end, tz=None):
     """The cash book CSV (with the byte order mark) of cb_export_data's values; 2.146.0 D (#2468): also for the retention export."""
-    from .books import bk_csv_cell as cell
     buf = io.StringIO()
     sep, num = csv_dialect()  # 2.368.2 (#2984): separator and decimal sign of the language, times local
     w = csv.writer(buf, delimiter=sep, lineterminator="\r\n")
@@ -815,7 +808,6 @@ def cb_csv_text(book, frm, to, y, ents, closings, log, start, end, tz=None):
 
 def cb_pdf_bytes(c, oid, book, frm, to, y, ents, closings, log, start, end, lg):
     """A plain A4 PDF: the entries with balance, the day closings and the change log as appendix."""
-    from .ledger import ofx_company
     from .pdf import A4_H, A4_W, C_INK2, C_RULE, _Page, pdf_money, pdf_write
     s = office_settings(c, oid)
     ppr = pdf_paper_ns(s.get("paper"))  # 2.357.0 A (#3156): the office's paper size
@@ -912,7 +904,6 @@ def cb_pdf_bytes(c, oid, book, frm, to, y, ents, closings, log, start, end, lg):
 @app.get("/api/office/cashbook.pdf")
 def cb_pdf():
     """?book_id=&year= | &from=&to= -> the cash book of the period as PDF (entries, day closings, change log)."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx()
     book, frm, to, y, ents, closings, log, start, end = _export_data(c, oid, uid)
     data = cb_pdf_bytes(c, oid, book, frm, to, y, ents, closings, log, start, end, lang())

@@ -31,7 +31,7 @@ from ..api.common import v1_args, v1_err, v1_json, v1_view
 from ..tasks.dayplan import dayplan_day, dayplan_input, dayplan_mode, dayplan_validate, dayplan_want
 from ..agents.core import (
     agent_active, agent_emit, agent_ids, agent_online, agent_public, agent_row, agent_shares, AGENT_TYPING_S,
-    agent_typing_to, agents_for, is_agent, job_dict, JOB_TITLE_MAX, list_sections, need_agent, need_chat_agent,
+    agent_typing_to, agents_for, is_agent, need_person, job_dict, JOB_TITLE_MAX, list_sections, need_agent, need_chat_agent,
     tidy_agent_of,
 )
 from ..collab.reactions import clean_suggestion, tidy_apply
@@ -41,6 +41,12 @@ from ..agents.chat import (
 )
 from ..agents.workstyle import ws_next_mark, ws_next_step  # 2.236.0 B (#2911)
 from ..agents.datalock import dl_job_input  # 2.235.0 B2 (#2902)
+from ..agents.core import agent_usable, agent_added_events, task_being_edited, tidy_changed_since  # 2.369.5 (#2517): pulled up from functions
+from ..agents.jobchat import JCD_KINDS  # 2.369.5 (#2517): pulled up from functions
+from ..agents.steps import steps_take  # 2.369.5 (#2517): pulled up from functions
+from ..agents.chat import h6e_agent_push_ok, chat_choice_set  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import ws_apply_default, ws_member_problem  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import list_other_agent  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---- 2.3.0 (#260 #261 #262 #263): agent PROPOSALS. Kalmido never runs a model itself and an agent must not silently create
@@ -476,8 +482,7 @@ def proposal_request():
     need_collab()
     c = db()
     uid = me()
-    if is_agent(g.user):
-        raise Denied(403)
+    need_person(403)
     b = body()
     kind = b.get("kind")
     if kind not in PROP_KINDS:
@@ -515,7 +520,6 @@ def proposal_request():
     from ..collab.liste2eguard import le2b_list_locked, le2b_off, le2b_task_locked
     if le2b_list_locked(c, lid) or le2b_task_locked(c, tid):  # 2.64.1 B (#1817): agents never get texts of a list with the lock
         return err(le2b_off(), 409)
-    from ..agents.core import agent_usable
     if lid and prop_mode(a) != "all" and list_role(c, lid, aid) and not agent_usable(c, aid, uid, lid):  # 2.26.0 (#928)
         return err(tr("The project owner has not opened this agent to members"), 403)
     ts = iso(now_utc())
@@ -648,7 +652,6 @@ def prop_insert(c, aid, lid, ts, title, notes="", section_id=None, parent_id=Non
     if assignee_id:
         task_event(c, tid, "assign")
     newtask_events(c, tid)
-    from ..agents.core import agent_added_events
     agent_added_events(c, tid, source="proposal")  # 2.23.0 (#795): the other agents of the list (never the proposing one's own)
     return tid
 
@@ -721,7 +724,6 @@ def prop_run(c, j, sel, ed, extra):
         folder = clean_folder(extra.get("folder") if extra.get("folder") is not None else prop.get("folder") or "", False)
         lid = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind) VALUES(?,?,?,?,?,?,?,?,?)",
                         (name, "", folder, my_max_sort(c, uid) + 1, "list", ts, uid, 0, "project"))
-        from ..accounts.orgs import ws_apply_default
         ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
         rec["list"] = lid
         list_created(c, uid, lid)  # 2.4.2 (#391); 2.25.0 (#931): + groups and people of a shared folder
@@ -749,8 +751,6 @@ def prop_run(c, j, sel, ed, extra):
             for d in t["depends_on"]:
                 if i in ids and d in ids:
                     c.execute("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING", (ids[i], ids[d], uid, ts))
-        from ..core.access import list_other_agent
-        from ..accounts.orgs import ws_member_problem
         from ..agents.safety import bridge_blocks
         if extra.get("share_agent") and agent_active(agent_row(c, aid)) and not list_other_agent(c, lid, aid) and not ws_member_problem(c, lid, aid) \
                 and not bridge_blocks(c, lid, aid):  # 2.26.0; 2.28.0 (#935); 2.30.0 (#919): no bridge between lists with different people
@@ -1341,7 +1341,6 @@ def v1_agent_chat_post(uid):
         if not jid or jpar == jid or not c.execute("SELECT 1 FROM agent_jobs WHERE id=? AND agent_id=? AND user_id=?", (jpar, aid, uid)).fetchone():  # review K3: + the person
             raise BadInput(tr("Invalid value: {0}", "job_parent"))
     # 2.96.0 C (#2015): job_msg = the kind of a job message (say | question | result | error); with job_id only
-    from ..agents.jobchat import JCD_KINDS
     jmsg = b.get("job_msg")
     if jmsg in ("", None):
         jmsg = None
@@ -1353,7 +1352,6 @@ def v1_agent_chat_post(uid):
     r = chat_set_source(c, chat_post(c, aid, uid, "agent", b, files), src)
     if nid:
         r = ws_next_mark(c, r, nid)
-    from ..agents.steps import steps_take
     if jid or offer:
         c.execute("UPDATE agent_chat SET job_id=?, job_parent=?, offer_save=?, job_msg=? WHERE id=?", (jid, jpar, 1 if offer else 0, jmsg, r["id"]))
         if jid and jpar:  # 2.59.0 (#1827): the job keeps its leader (once set it stays), so all its messages share the colour
@@ -1364,7 +1362,6 @@ def v1_agent_chat_post(uid):
     text = r["body"] or " ".join(f"📎 {f['name']}" for f in chat_files_of(c, [r["id"]]).get(r["id"], []))
     c.execute("UPDATE agents SET typing_user=NULL, typing_until=0 WHERE user_id=? AND typing_user=?", (aid, uid))  # 2.4.1: answered
     s = collab_user(c, uid, None)
-    from ..agents.chat import h6e_agent_push_ok
     if s and h6e_agent_push_ok(aid, uid):  # 2.86.0 (N31): daily push budget per agent and person
         name = user_names(c, [aid]).get(aid, "?")
         snippet = re.sub(r"\s+", " ", text)[:280]
@@ -1459,8 +1456,6 @@ def v1_agent_chat_react(uid, mid):
 @v1_view
 def v1_agent_chat_choice(aid, mid):
     """2.28.0 (#1005): {choice_ids: [...]} -- a person (own token) answers an agent's question with its buttons."""
-    from ..agents.chat import chat_choice_set
-    from ..agents.core import need_chat_agent
     v1_args(())
     c = db()
     need_chat_agent(c, aid)
@@ -1479,8 +1474,7 @@ def v1_person_chat_react(aid, mid):
     """2.7.2 (#421): a person (token) reacts to a message of their chat with agent aid ({emoji, on?}); 👍 / 👎 on the agent's
     message = approval / rejection, the agent gets the event reaction."""
     v1_args(())
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot use this endpoint"))
+    need_person(403, tr("Agents cannot use this endpoint"))
     c = db()
     mid = as_int(mid, "mid", 1)
     b = v1_json()
@@ -1539,7 +1533,6 @@ def v1_task_tidy(tid):
     # 2.27.0 (#999): never over someone's work. Refused (409, try again later) while a person edits the task, when people
     # changed it after the tidy event went out, or when base_updated_at (the task's updated_at the agent read) is old
     base = b.pop("base_updated_at", None)
-    from ..agents.core import task_being_edited, tidy_changed_since
     p = c.execute("SELECT sent_at FROM tidy_pending WHERE task_id=?", (tid,)).fetchone()
     # 2.308.0 (#3274): a task still waiting for quiet (sent_at NULL: new, or the watchdog re-queued it after a change) is
     # refused too; the agent gets a fresh event once it is quiet
@@ -1571,7 +1564,6 @@ XPROP_OPEN_MAX = 10   # open cross-topic proposals per agent
 @v1_view
 def v1_agent_cross_proposal():
     """{list_id, title, reason, tasks: [{title, notes?, due?}]} -- the agent proposes tasks for a list it cannot see."""
-    from ..agents.core import agent_shares
     v1_args(())
     aid = need_agent()
     b = v1_json()

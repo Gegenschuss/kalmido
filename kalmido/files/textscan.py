@@ -63,6 +63,13 @@ _HAS = {}
 
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
+from ..accounts.session import GATE  # 2.369.5 (#2517): pulled up from functions
+from .scan import _sc_magic  # 2.369.5 (#2517): pulled up from functions
+from .officeprev import dpv_kind, dpv_model  # 2.369.5 (#2517): pulled up from functions
+from ..docs.ocr import TEXT_CAP, doc_text  # 2.369.5 (#2517): pulled up from functions
+from .store import fs_visible_sql_c, fs_read  # 2.369.5 (#2517): pulled up from functions
+from .web import _items  # 2.369.5 (#2517): pulled up from functions
+from ..lists.projects import need_overview  # 2.369.5 (#2517): pulled up from functions
 
 
 def _wanted(name, mime):
@@ -98,7 +105,6 @@ def _ref(c, kind, ref_id):
 def _read(c, kind, ref_id, ref):
     """The plain bytes of the file (sealed organisation files decrypted, the current version of an Ablage file)."""
     if kind == "fs":
-        from .store import fs_read
         return fs_read(c, ref_id)
     return oc_read_file(c, os.path.join(ATT_DIR, ref["path"]))
 
@@ -185,7 +191,6 @@ def _ts_start():
 
 
 def _loop():
-    from ..accounts.session import GATE
     time.sleep(2)
     while True:
         n = 0
@@ -301,7 +306,6 @@ def _infected(c, kind, ref_id):
 
 
 def _sniff(data):
-    from .scan import _sc_magic  # 2.61.0 review: the same reading of the first bytes as the upload check (no polyglot PDF)
     m = _sc_magic(data) or ""
     return m if m in ("application/pdf", "image/jpeg", "image/png", "image/heic") else ("image/heic" if m == "image/heif" else "")
 
@@ -322,7 +326,6 @@ def _process(c, row):
         data = _read(c, kind, ref_id, ref)
     except Exception:  # noqa: BLE001 -- a missing / damaged file or a key that cannot open it
         return _set(c, fid, "error", "unreadable")
-    from .officeprev import dpv_kind
     office = dpv_kind(ref["name"], ref["mime"], data[:16])
     mime = "office" if office in ("docx", "xlsx") else _sniff(data)
     if mime not in ("application/pdf", "image/jpeg", "image/png", "office"):
@@ -336,9 +339,7 @@ def _process(c, row):
         c.execute("DELETE FROM file_words WHERE ft_id=?", (fid,))
         c.execute("INSERT INTO file_words(ft_id, h) SELECT ?, h FROM file_words WHERE ft_id=? ON CONFLICT DO NOTHING", (fid, same["id"]))
         return
-    from ..docs.ocr import TEXT_CAP, doc_text
     if mime == "office":  # 2.92.0 C (#1926): the text of the preview model (the same limits as a PDF)
-        from .officeprev import dpv_model
         r = dpv_model(data, office)
         r = {"error": r["error"]} if r.get("error") else {"text": r.get("text") or "", "method": "office", "pages": 0}
     else:
@@ -482,7 +483,6 @@ def _like(raw):
 def ts_files_find(c, uid, raw, space=""):
     """The Ablage nodes uid can see (not the trash) whose name or recognised text (documents: their text) matches raw,
     newest first: (rows, {id: "name" | "text"}). space = private | org:<id> | shared narrows it ("" = all)."""
-    from .store import fs_visible_sql_c
     where, args = "", []
     if space == "private":
         where, args = " AND n.org_id IS NULL AND n.owner_id=?", [uid]
@@ -549,7 +549,6 @@ def files_search():
     (#2759): + their sender, type and tags, hit "doc") of the
     nodes the asker can see (not the trash), ?space=private | org:<id> | shared narrows it; plus project files of
     visible project lists. {items: [node + hit: name | text, folder], list_files: [{id, name, mime, size, list_id, list_name, hit}]}"""
-    from .web import _items
     c = db()
     uid = me()
     raw = ts_query()
@@ -569,7 +568,6 @@ def files_search():
 
 def _list_file_hits(c, uid, raw):
     """Project files of lists uid can see (project lists only, like the overview) whose name or recognised text matches."""
-    from ..lists.projects import need_overview
     rows = c.execute(f"""SELECT f.id, f.name, f.mime, f.size, f.list_id, f.created_at, l.name AS list_name, ft.id AS ft_id, ft.ws,
                          ft.state FROM list_files f JOIN lists l ON l.id=f.list_id LEFT JOIN file_text ft ON ft.list_file_id=f.id
                          WHERE f.list_id IN {vis_sql()} AND f.deleted_at IS NULL ORDER BY f.id DESC LIMIT 5000""", (uid, uid)).fetchall()

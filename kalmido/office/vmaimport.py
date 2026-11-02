@@ -34,6 +34,10 @@ from ..core.errors import BadInput
 from .calc import dstr, money
 from .legacyimport import fx_run, fx_settle  # 2.363.2 (#3104)
 from .vma import VMA_HOME, VMA_NAMES, vma_dates, vma_places, vma_rate, vma_table_year, vma_trip
+from .legacyimport import _col_index, _local, _rels, _xml, _sheet, _in_rph, _upload  # 2.369.5 (#2517): pulled up from functions
+from .travel import rk_trips, rka_purposes, rka_purposes_adopt, _trip, _trip_need_open  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from .olock import olk_trip_item_reason  # 2.369.5 (#2517): pulled up from functions
 
 VMI_FILE_MAX = 2 * 1024 * 1024
 VMI_SHEETS_MAX = 30
@@ -72,7 +76,6 @@ VMI_REASONS = {
 def vmi_comments(z, path, names, budget):
     """{(row 1-based, col 0-based): text} of the comments (notes) of a sheet part; the author's "Name:" prefix Excel puts
     in front is dropped. Read with the guards of legacyimport (_xml: size budget, no entities)."""
-    from .legacyimport import _col_index, _local, _rels, _xml
     out = {}
     for t in _rels(z, path, budget).values():
         if t not in names or not re.search(r"/comments\d*\.xml$", t):
@@ -103,7 +106,6 @@ def vmi_comments(z, path, names, budget):
 def vmi_xlsx(raw):
     """[{name, grid: [[cell text]], comments: {(row, col): text}}] of every sheet (in the workbook's order). BadInput for
     anything that is not a readable .xlsx or has more than VMI_SHEETS_MAX sheets."""
-    from .legacyimport import _local, _rels, _sheet, _xml, _in_rph
     bad = tr("This is not a spreadsheet file (.xlsx)")
     if not raw.startswith(b"PK"):
         raise BadInput(bad)
@@ -456,7 +458,6 @@ def vmi_parse(raw, known, seen):
 # ---------------------------------------------------------------- routes
 def vmi_seen(c, oid):
     """The keys of the trips the office has: one per participant (a trip without participants: 'none')."""
-    from .travel import rk_trips
     out = set()
     for t in rk_trips(c, oid):
         for p in (t["people"] or [{}]):
@@ -470,14 +471,12 @@ def vmi_preview_post():
     rows: [{row, date_from, date_to, t_start, t_end, dest, purpose, project, overnight, note, country, place, vma_days,
     excel, amount, lines, status new|warn|dup|error, reasons, sel}], sum_excel, sum_calc, counts}], counts, people}.
     Nothing is stored."""
-    from .legacyimport import _upload
     from .travel import _ctx, rk_people
     c, uid, oid = _ctx()
     _f, raw = _upload("file", VMI_FILE_MAX)
     known = rk_people(c, oid, uid)
     out = vmi_parse(raw, known, vmi_seen(c, oid))
     out["people"] = known
-    from .travel import rka_purposes  # 2.117.0 A (#2292): an occasion named like an own purpose becomes that purpose
     own = {p["name"].casefold(): p["name"] for p in rka_purposes(c, oid)}
     for sh in out.get("sheets") or []:
         for r in sh.get("rows") or []:
@@ -497,7 +496,6 @@ def vmi_import_post():
     t_end, vma_days}]} -> 201 {created, ids, skipped}. Every trip checked again by rk_trip_clean (only these fields; no client,
     no receipts); all or nothing: one bad trip = 400 with its number. 2.269.0 D (#3046): a trip the office already has
     (vmi_seen, as in the preview) is skipped unless it carries dup_ok (ticked on purpose): sent twice = once."""
-    from .ledger import ofx_log
     from .travel import _ctx, rk_trip_clean
     c, uid, oid = _ctx()
     b = body()
@@ -523,7 +521,6 @@ def vmi_import_post():
         vmi_trip_key(vmi_pkey(p) if p else "none", row.get("date_from"), row.get("date_to"), row.get("dest")) in seen
         for p in (json.loads(row.get("people") or "[]") or [{}]))]
     ts, ids = iso(now_utc()), []
-    from .travel import rka_purposes_adopt
     rka_purposes_adopt(c, oid, uid, [r["purpose"] for r in rows])  # 2.117.0 A (#2292): unknown purposes become own ones
     for row in rows:
         row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)
@@ -541,7 +538,6 @@ def vmi_remove(c, oid, ids):
     (olk_trip_item_reason) stays (skipped). 2.272.0 C (#3027): only trips unchanged since they were made (updated_at =
     created_at, no receipts, no drive or trip project pointing at them) go; the others stay (kept) -- an undo takes back the
     import, never what was added since. -> {deleted, trips (as they were), skipped, kept}. No commit."""
-    from .travel import rk_trips
     if not ids:
         return {"deleted": 0, "trips": [], "skipped": [], "kept": []}
     q = ",".join("?" * len(ids))
@@ -549,7 +545,6 @@ def vmi_remove(c, oid, ids):
     billed = {r[0] for r in c.execute(f"SELECT DISTINCT trip_id FROM office_trip_items WHERE org_id=? AND billed_doc_id IS NOT NULL "
                                       f"AND trip_id IN ({q})", [oid] + ids)}
     # 2.152.0 (#2168, review B-H1): receipts ticked "in DATEV" lock their trip here as on the single delete
-    from .olock import olk_trip_item_reason
     billed |= {r["trip_id"] for r in c.execute(f"SELECT * FROM office_trip_items WHERE org_id=? AND trip_id IN ({q})", [oid] + ids)
                if olk_trip_item_reason(c, oid, r)}
     kept = {r["id"] for r in c.execute(f"""SELECT id FROM office_trips t WHERE org_id=? AND id IN ({q}) AND (updated_at!=created_at
@@ -557,7 +552,6 @@ def vmi_remove(c, oid, ids):
                                             OR EXISTS (SELECT 1 FROM office_drives d WHERE d.trip_id=t.id)
                                             OR EXISTS (SELECT 1 FROM life_trip_costs l WHERE l.trip_id=t.id))""", [oid] + ids)} - billed
     gone = sorted(mine - billed - kept)
-    from .travel import _trip, _trip_need_open
     for i in gone:
         _trip_need_open(c, oid, _trip(c, oid, i))  # 2.148.0 A (#2471)
     old = [t for i in gone for t in rk_trips(c, oid, trip_id=i)]

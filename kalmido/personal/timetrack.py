@@ -55,6 +55,7 @@ TIME_SOURCES = ("timer", "manual", "focus")
 from ..core.errors import (  # noqa: E402,F401
     _UNKNOWN_LOGGED, BadInput, field_alias, reject_unknown, UNKNOWN_LOG_EVERY, UnknownFields, web_fields,
 )
+from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
 
 
 @app.after_request
@@ -775,7 +776,6 @@ def time_report_api():
 
 
 def _csv_cell(v):
-    from ..core.serializers import csv_cell  # 2.122.4 B (#2317): one shared helper
     return csv_cell(v)
 
 

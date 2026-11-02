@@ -27,6 +27,7 @@ from ..integrations import webhooks as wh
 from ..integrations import git as gi
 from ..integrations import gitbuild as gb
 from ..integrations.gitfolder import gf_row
+from ..api.v1 import need_api  # 2.369.5 (#2517): pulled up from functions
 
 V1S_TOKEN_IN = ("name", "scopes", "allowed_ips", "list_ids", "expires_days")
 V1S_HOOK_IN = ("name", "url", "events", "enabled")
@@ -131,7 +132,6 @@ def v1s_token_create():
     b = v1_json()
     reject_unknown(b, V1S_TOKEN_IN)
     v1s_tokens()
-    from ..api.v1 import need_api
     need_api()
     c = db()
     name, scopes, exp, ips, lids = token_cap(c, b)

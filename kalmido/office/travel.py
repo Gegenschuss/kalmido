@@ -49,6 +49,10 @@ RKA_MAX_PURPOSES = 200  # 2.117.0 A (#2292): own purposes per office area
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 from .homecur import hc_code, hc_home, hc_office_rate  # noqa: E402  2.189.0 B (#2475)
+from . import model  # 2.369.5 (#2517): pulled up from functions
+from .countries import fk_country_code  # 2.369.5 (#2517): pulled up from functions
+from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
+from .docs import doc_items, recalc, ofd_free_receipts  # 2.369.5 (#2517): pulled up from functions
 
 
 def rk_cat_label(k, lg=None):
@@ -95,7 +99,6 @@ def _amount(v, name, lo=0, hi=10 ** 9, allow_none=False):
 def rk_cl_where(c, oid):
     """The clients of the office area as (sql, args) -- the ONE place of B's client queries: part A's model.pb_cl_where
     (a personal office's clients are the person's private ones) when it is there, else the organisation's."""
-    from . import model
     fn = getattr(model, "pb_cl_where", None)
     return fn(c, oid) if fn else ("org_id=?", [oid])
 
@@ -195,7 +198,6 @@ TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 def _country(v, name="country"):
     """'' (Germany) or an ISO 3166-1 alpha-2 code (office/countries.py)."""
-    from .countries import fk_country_code
     code = fk_country_code(v if isinstance(v, str) or v is None else "?")
     if code is None:
         raise BadInput(tr("Invalid value: {0}", name))
@@ -797,7 +799,6 @@ def rk_report_get():
 
 def _csv_safe(s):
     """No formula injection in spreadsheet programs."""
-    from ..core.serializers import csv_cell  # 2.122.4 B (#2317): one shared helper
     return csv_cell(s)
 
 
@@ -821,7 +822,6 @@ def rk_bill_post():
     position per receipt (one=1: one position for all) at the end of its title page, unit flat, purchase = the amount in
     the office currency, rate = purchase plus markup_pct. Receipts already billed on an existing document: 409 (never
     twice). Answers {doc_id, positions, items: [ids]}; POST .../unbill takes it back."""
-    from .docs import doc_items, recalc
     c, uid, oid = _ctx()
     b = body()
     if not isinstance(b, dict):
@@ -880,7 +880,6 @@ def _fmt_day(s, lg):
 def rk_unbill_post():
     """{item_ids, positions?} the undo of a billing: the receipts are free again; positions (ids from the billing's
     answer) are removed from the document while it is still a draft."""
-    from .docs import doc_items, ofd_free_receipts, recalc
     c, uid, oid = _ctx()
     b = body()
     if not isinstance(b, dict):

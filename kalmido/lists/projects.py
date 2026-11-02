@@ -31,6 +31,10 @@ from ..personal.timetrack import time_day_h, time_list_totals
 from ..core.errors import BadInput, web_fields
 from ..api.common import v1_call  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_plain_size, oc_send_file  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.layouts import page_layouts  # 2.369.5 (#2517): pulled up from functions
+from ..core.db import local_day as _local_day  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachments import unexec_name, uploader_is_agent  # 2.369.5 (#2517): pulled up from functions
+from ..core.orgcrypt import oc_list_org, oc_list_space, oc_seal_path  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- project status + progress, package 3
@@ -291,7 +295,6 @@ def overview_build(c, lid, uid):
 def overview_get(lid):
     c = db()
     role = need_overview(c, lid)
-    from ..accounts.layouts import page_layouts
     return jsonify({**overview_build(c, lid, me()), "layout": page_layouts(c, lid, me(), role)})  # 2.32.0 (#983)
 
 
@@ -505,7 +508,6 @@ MS_BURN_MAX = 180  # days in a burndown (the newest ones)
 
 
 def ms_report(c, tid, uid, lg=None):
-    from ..core.db import local_day as _local_day  # 2.21.0 (#671): the one tolerant version
     from ..api.v1 import STATUS_NAMES
     m = c.execute("SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL", (tid,)).fetchone()
     if not m or not m["ms"]:
@@ -584,7 +586,6 @@ def list_file_upload(lid):
         aa_count("storage", "attachments", aa_oserr(e))
         raise
     ts, saved = iso(now_utc()), []
-    from ..tasks.attachments import unexec_name, uploader_is_agent
     agent = uploader_is_agent(c, me())  # 2.30.0 (#380): an agent's project file never keeps an executable ending either
     for f in files:
         name = safe_name(f.filename)
@@ -611,7 +612,6 @@ def list_file_upload(lid):
             c.rollback()
             unlink_files(saved)
             return err(tr("{0}: the file is empty and was not uploaded", name))
-        from ..core.orgcrypt import oc_list_org, oc_list_space, oc_seal_path
         from ..files.upsafe import up_check_path, up_after_store, UploadRefused
         mime = "text/plain" if unexec else (f.mimetype if f.mimetype and f.mimetype != "application/octet-stream" else None) \
             or mimetypes.guess_type(name)[0] or "application/octet-stream"

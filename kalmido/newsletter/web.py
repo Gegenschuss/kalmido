@@ -21,6 +21,9 @@ from ..accounts.session import me
 from ..docs.web import _no_agent, ws_param
 from . import sync as N
 from .adapters import NWL_DEFAULT_URL, NWL_KINDS, NWL_PREVIEW, NwlError
+from ..contacts.model import need_contact  # 2.369.5 (#2517): pulled up from functions
+from ..paperless.ngx import pl_norm_url  # 2.369.5 (#2517): pulled up from functions
+from ..integrations.importers import imp_prune  # 2.369.5 (#2517): pulled up from functions
 
 NWL_SECRET_MAX = 400
 NWL_NAME_MAX = 120
@@ -113,7 +116,6 @@ def nwl_put_conn():
         if d["url"] in ("", None) and kind != "listmonk":
             url = ""
         else:
-            from ..paperless.ngx import pl_norm_url
             url = pl_norm_url(d["url"])
             if not url:
                 return err(tr("Invalid value: {0}", tr("Address")))
@@ -296,7 +298,6 @@ def nwl_consent():
     unsub / bounce come only from the service, and a contact with one of them stays so (a new subscription goes through
     the service's own form)."""
     _no_agent()
-    from ..contacts.model import need_contact
     c = db()
     d = body()
     uid = me()
@@ -376,7 +377,6 @@ def _imp_rows(text):
 def nwl_import_undo(c, uid, r):
     """2.363.2 (#3104): the contacts of a consent import go back to their earlier status (the log keeps both steps), except
     the ones whose consent changed since or that the person can no longer edit (kept). -> the answer of the undo."""
-    from ..contacts.model import need_contact
     back, kept = 0, 0
     for cid, was, at in json.loads(r["created"] or "{}").get("contacts") or []:
         row = c.execute("SELECT nl_status, nl_at FROM contacts WHERE id=?", (cid,)).fetchone()
@@ -425,7 +425,6 @@ def nwl_consent_import():
                 by_mail.setdefault(v, []).append(r)
     today, seen = local_now().date(), set()
     errors, valid, will, kept, unmatched, todo = [], 0, 0, 0, 0, []
-    from ..contacts.model import need_contact
     for line, cells in rows:
         cell = lambda k: (cells[cols[k]].strip() if k in cols and cols[k] < len(cells) else "")  # noqa: E731
         mail, day = cell("email").lower(), _imp_date(cell("date"))
@@ -460,7 +459,6 @@ def nwl_consent_import():
             ts = iso(now_utc())
             iid = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
                             (_uid, "newsletter", fname[:200], json.dumps({"contacts": done}), json.dumps({"contacts": len(done)}), ts))
-            from ..integrations.importers import imp_prune
             imp_prune(c, _uid)
         c.commit()
     return jsonify({"import_id": iid, "rows": len(rows), "valid": valid, "errors": errors[:NWL_IMP_SHOW], "errors_count": len(errors), "will_change": will,

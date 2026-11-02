@@ -43,6 +43,13 @@ from ..personal.timetrack import BadInput
 from .model import office_feature, office_gate, office_org, office_role, pb_cl_sql
 from .rights import ofr_admin_or
 from .ledger import ofx_log  # 2.370.0 (#2778)
+from .ledger import ofx_company, ofx_locked  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.login import seal  # 2.369.5 (#2517): pulled up from functions
+from .einvoice import ein_ubl_build, ein_ubl_check  # 2.369.5 (#2517): pulled up from functions
+from .pdfweb import _model, _file_response, epdf_name  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import IntegrityError, insert_id  # 2.369.5 (#2517): pulled up from functions
+from .docs import doc_row  # 2.369.5 (#2517): pulled up from functions
+from .model import office_need_feature  # 2.369.5 (#2517): pulled up from functions
 
 PEP_ICD = frozenset((
     "0002 0007 0009 0037 0060 0088 0096 0097 0106 0130 0135 0142 0147 0151 0154 0158 0170 0183 0184 0188 0190 0191 0192 0193 "
@@ -176,7 +183,6 @@ def pep_key(c, oid, conf):
 
 
 def _company_vat(c, oid):
-    from .ledger import ofx_company
     return (ofx_company(c, oid) or {}).get("vat_id") or ""
 
 
@@ -232,7 +238,6 @@ def _pep_allow(c, oid):
 def pep_save(c, oid, uid, b):
     """PUT body {provider?, endpoint_url?, account?, sandbox?, sender_id?, api_key?} -> the stored row. An empty api_key keeps
     the stored key -- unless the provider or the URL changes: a key only ever goes to where it was entered for."""
-    from ..accounts.login import seal
     known = {"provider", "endpoint_url", "account", "sandbox", "sender_id", "api_key"}
     bad = set(b) - known
     if bad:
@@ -280,7 +285,6 @@ def pep_save(c, oid, uid, b):
               "check_state=excluded.check_state, checked_at=excluded.checked_at, updated_by=excluded.updated_by, updated_at=excluded.updated_at",
               (oid, new["provider"], new["endpoint_url"], new["account"], new["sandbox"], new["sender_id"], new["secret"], new["check_state"],
                new["checked_at"], uid, ts))
-    from .ledger import ofx_log
     ofx_log(c, oid, "peppol_setup", target="settings", detail={k: new[k] for k in ("provider", "endpoint_url", "account", "sandbox", "sender_id")}
             | {"key_set": bool(new["secret"]), **({"key_changed": 1} if key else {})})
     return new
@@ -419,8 +423,6 @@ def pep_profile(model):
 
 def pep_ubl(c, oid, r, conf=None, receiver_id=None):
     """(UBL bytes, profile) of finalised document row r with the Peppol ids of the connection and the client."""
-    from .einvoice import ein_ubl_build
-    from .pdfweb import _model
     conf = conf or pep_conf(c, oid)
     model = _model(c, oid, r["id"])
     if receiver_id is None:
@@ -432,7 +434,6 @@ def pep_ubl(c, oid, r, conf=None, receiver_id=None):
 
 def pep_missing(c, oid, r, conf=None):
     """What stops sending document row r (list of PEP_NEED keys, empty = ready)."""
-    from .ledger import ofx_locked
     conf = conf or pep_conf(c, oid)
     out = []
     if not office_feature(c, oid, "docs.einvoice"):
@@ -561,7 +562,6 @@ def pep_send(c, oid, uid, r, again=False):
         ubl, prof = pep_ubl(c, oid, r, conf, receiver)
     except BadInput as e:
         raise Denied(409, str(e)) from None
-    from .einvoice import ein_ubl_check
     if prof == "peppol" and any("R003" in f for f in ein_ubl_check(ubl)):
         raise Denied(409, tr(PEP_NEED["reference"]))
     ad = pep_adapter(c, oid, conf)
@@ -578,7 +578,6 @@ def pep_send(c, oid, uid, r, again=False):
     last = sends[0] if sends else None
     ref = (last["idem"] if again and last and last["status"] == "error" and not last["provider_ref"] and last["xml_sha256"] == sha
            and last["idem"] else str(uuid.uuid4()))
-    from ..core.pg import IntegrityError, insert_id
     try:
         sid = insert_id(c, "INSERT INTO office_peppol_sends(org_id, doc_id, provider, provider_ref, sender_id, receiver_id, profile, xml_sha256, status, "
                         "message, idem, created_by, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -655,7 +654,6 @@ def pep_check_post():
 
 
 def _doc(c, oid, did):
-    from .docs import doc_row
     return doc_row(c, oid, did)
 
 
@@ -663,9 +661,6 @@ def _doc(c, oid, did):
 def pep_ubl_get(did):
     """The UBL e-invoice of a finalised invoice / credit note (Peppol BIS Billing 3.0, XRechnung UBL for the XRechnung
     format) with the Peppol ids when they are set, else the e-mail addresses. 409 for drafts and other kinds."""
-    from .ledger import ofx_locked, ofx_log
-    from .model import office_need_feature
-    from .pdfweb import _file_response, epdf_name
     c, uid, oid = _ctx()
     r = _doc(c, oid, did)
     if r["kind"] not in ("invoice", "credit") or not ofx_locked(r) or r["status"] == "cancelled":

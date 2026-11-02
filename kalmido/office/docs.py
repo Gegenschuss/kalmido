@@ -50,6 +50,9 @@ MAX_FIELDS = 20
 
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 from .rights import ofr_admin_or  # noqa: E402  2.187.0 B (#2476)
+from .sheet import prd_options  # 2.369.5 (#2517): pulled up from functions
+from ..core.config import OFFICE_DIR  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_purge, fs_purge_files  # 2.369.5 (#2517): pulled up from functions
 
 
 def _ofr_may(c, uid, oid, level, special=None):
@@ -331,7 +334,6 @@ def prd_new_doc(c, oid, s):
     it (rate / factor from the office settings share_rate / share_factor, else the pack's; on when producing_on is set),
     else no producing at all (an older office setting producing_on does not switch on the calculation by quantities any
     more); handling costs / markup with the pack's label and percentage (on as the pack says)."""
-    from .sheet import prd_options
     o = prd_options(s)
     out = {"producing_on": 0, "producing_mode": None, "share_label": None}
     sh = o["share"]
@@ -363,7 +365,6 @@ def prd_doc_clean(c, oid, b):
         if k + "_label" in b:
             v = re.sub(r"[\x00-\x1f\x7f]", " ", str(b.get(k + "_label") or "")).strip()[:80]
             if not v:
-                from .sheet import prd_options
                 x = prd_options(office_settings(c, oid))[k]
                 f[k + "_label"] = json.dumps(x["label"], ensure_ascii=False) if x else None
             else:
@@ -1144,7 +1145,6 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         logo_path = None
         if s.get("logo"):
             import os
-            from ..core.config import OFFICE_DIR
             p = os.path.join(OFFICE_DIR, str(oid), os.path.basename(s["logo"]))
             logo_path = p if os.path.isfile(p) else None
         color = s.get("color") or ""
@@ -1828,7 +1828,6 @@ def odoc_delete(did):
 def trial_drop_doc(c, oid, r):
     """Deletes trial document r (the caller holds the locks, checked the role and commits) -> the file paths to remove."""
     import glob
-    from ..core.config import OFFICE_DIR
     from .books import bk_ws
     did = r["id"]
     for col in ("source_doc_id", "cancels_id", "version_of"):
@@ -1846,7 +1845,6 @@ def trial_drop_doc(c, oid, r):
 
 def trial_drop_gen_doc(c, oid, g_):
     """Deletes trial document-from-template g_ with its filed PDFs (files/store.py fs_purge) -> (ids, paths) of the files."""
-    from ..files.store import fs_purge
     ids, paths = [], []
     for nid in {g_["node_id"], g_["signed_node_id"]} - {None}:
         if c.execute("SELECT 1 FROM fs_nodes WHERE id=?", (nid,)).fetchone():
@@ -1870,7 +1868,6 @@ def trial_drop_files(paths, fs=None):
         except OSError:
             pass
     if fs:
-        from ..files.store import fs_purge_files
         fs_purge_files(*fs)
 
 

@@ -25,6 +25,12 @@ from ..core.retention import ret_days
 from ..contacts.bulk import bk_occ_drop, ctt_relink, ctt_restore, ctt_trash, ctt_unlink  # 2.272.0 E1 (#3038)
 from ..accounts.orgs import user_orgs
 from ..core.zipread import base_name, is_zip, zip_read, ZipLimit  # 2.149.0 G (#2517): pulled up from functions
+from ..contacts.model import task_contacts  # 2.369.5 (#2517): pulled up from functions
+from ..core.pages import too_large  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import obj_org_set  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functions
+from ..collab.liste2e import le2a_gen_refuse  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 
 # 2.41.0 (#1437): never above the request limit (MAX_CONTENT_LENGTH answers 413 before the route), whole MB for the message
 VCF_MAX = min(20, (app.config.get("MAX_CONTENT_LENGTH") or 0) // (1024 * 1024) or 20) * 1024 * 1024
@@ -36,7 +42,6 @@ def ct_too_large(e):
     p = request.path
     if not (p.startswith(("/api/books/", "/api/v1/address-books/")) and p.endswith("/import")):
         # 2.86.0 (N22): this handler replaces core/pages.py too_large (same key: 413); the JSON answer stays for every other route
-        from ..core.pages import too_large
         return too_large(e)
     return err(tr("The file is too large (at most {0} MB)", VCF_MAX // (1024 * 1024)), 413)
 
@@ -82,7 +87,6 @@ def op_book_edit(c, uid, bid, b):
     if "org_id" in b and bk["owner_org_id"] and b["org_id"] != bk["owner_org_id"]:  # 2.52.0 C (#1438)
         raise Denied(409, tr("An address book of an organisation stays in it"))
     if "org_id" in b and not bk["owner_org_id"]:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
-        from ..accounts.orgs import obj_org_set
         if obj_org_set(c, "books", "book_id", "book_members", bid, b["org_id"], "book"):
             book_touch(c, bid)
     f = book_fields({k: b[k] for k in ("name", "color") if k in b})
@@ -94,7 +98,6 @@ def op_book_edit(c, uid, bid, b):
             lid = as_int(lid, "birthdays_list_id", 1)
             if list_role(c, lid, uid) not in WRITE_ROLES:
                 raise Denied(404)
-            from ..collab.liste2e import le2a_gen_refuse
             le2a_gen_refuse(c, lid)  # 2.64.1 review (M3): birthdays would land in plain text
             if bk["src_id"]:
                 raise BadInput(tr("The birthdays of an imported address book come from its source"))
@@ -218,7 +221,6 @@ def op_contact(c, uid, cid):
         from ..contacts.merge import ctm_history
         m = ctm_history(c, cid)
         if m:
-            from ..collab.comments import user_names
             nm = user_names(c, [x["by"] for x in m])
             d["merges"] = [{**x, "by_name": nm.get(x["by"], "")} for x in m]
     return d
@@ -249,7 +251,6 @@ def op_contact_edit(c, uid, cid, b):
             raise Denied(409, tr("An imported address book is updated from its source; contacts cannot be moved into it"))
         if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND (uid=? OR href=?)", (nb, r["uid"], r["href"])).fetchone():
             raise Denied(409, tr("The address book has this contact already"))
-        from ..accounts.orgout import org_out  # 2.148.1 B (#2483): as the bulk move (only an admin takes it out of an organisation)
         so, to = (c.execute("SELECT org_id FROM books WHERE id=?", (x,)).fetchone()[0] for x in (r["book_id"], nb))
         org_out(c, so, to, "contacts", trn("{0} contact", "{0} contacts", 1))
         if c.execute("SELECT src_id FROM books WHERE id=?", (r["book_id"],)).fetchone()[0]:  # 2.138.4 C (#2378): out of a mirror = a copy
@@ -422,7 +423,6 @@ def op_link(c, uid, tid, b):
     _unknown(b, ("contact_id", "kind"))
     link_set(c, uid, as_int(b.get("contact_id"), "contact_id", 1), tid, b.get("kind") or "about")
     c.commit()
-    from ..contacts.model import task_contacts
     return {"items": task_contacts(c, uid, {tid}).get(tid, [])}
 
 

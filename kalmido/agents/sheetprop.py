@@ -28,6 +28,16 @@ from ..core.i18n import N_, tr
 from ..accounts.session import me
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_err, v1_json, v1_view
+from ..sheets.shbook import shb_deleted, shb_rights_row  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import agent_row, JOB_TITLE_MAX, job_dict, need_agent  # 2.369.5 (#2517): pulled up from functions
+from ..agents.safety import ids_parse  # 2.369.5 (#2517): pulled up from functions
+from ..sheets.core import sh_may, ShBook, sh_need, sh_eval  # 2.369.5 (#2517): pulled up from functions
+from ..sheets.step2 import _col, _linked, _cell, _bump_area, _gate, sh2_to_tasks, sh2_undo  # 2.369.5 (#2517): pulled up from functions
+from ..agents.proposals import _p_keys, _p_list, _p_str, PROP_TITLE_MAX, PROP_MAX_BYTES, prop_ready_notify, prop_validate, _p_date  # 2.369.5 (#2517): pulled up from functions
+from ..agents.usage import usage_block  # 2.369.5 (#2517): pulled up from functions
+from ..api.scopes import need_scope  # 2.369.5 (#2517): pulled up from functions
+from ..sheets.formula import sh_parse_date  # 2.369.5 (#2517): pulled up from functions
+from ..api.v1 import UnknownFields  # 2.369.5 (#2517): pulled up from functions
 
 SHT_KIND = "sheet_tasks"
 SHT_ROWS_MAX = 200            # rows per proposal (PROP_MAX_ITEMS: what one apply may select; step 2 allows 500 per press)
@@ -47,7 +57,6 @@ def _int(v, what, required=True):
 
 def ast2_sheet(c, sid):
     """The live sheet row (a further sheet of a table too) or None."""
-    from ..sheets.shbook import shb_deleted
     r = c.execute("SELECT * FROM sheets WHERE id=?", (sid,)).fetchone() if isinstance(sid, int) and 0 < sid < 2 ** 62 else None
     return None if not r or shb_deleted(c, r) else r
 
@@ -55,8 +64,6 @@ def ast2_sheet(c, sid):
 def ast2_list_ok(c, aid, sheet, lid):
     """The target list for agent aid: shared with it (list_role: never outside its organisation), inside its list limit, never
     a health / budget list or one with the lock, not archived, in the table's space. 404 / 409 otherwise."""
-    from ..agents.core import agent_row
-    from ..agents.safety import ids_parse
     a = agent_row(c, aid)
     l = c.execute("SELECT id, name, org_id, life, e2e, archived FROM lists WHERE id=?", (lid,)).fetchone()
     if not a or not l or not list_role(c, lid, aid) or (l["life"] or "") in ("health", "budget") or l["e2e"] is not None:
@@ -73,7 +80,6 @@ def ast2_list_ok(c, aid, sheet, lid):
 def ast2_person_ok(c, pid, sheet, lid):
     """May person pid apply it: a person (no agent, not disabled) with tables on, who may write the table through its space
     or list (a share is not enough, as step 2) and write the list."""
-    from ..sheets.core import sh_may
     u = c.execute("SELECT kind, disabled FROM users WHERE id=?", (pid,)).fetchone() if pid else None
     if not u or (u["kind"] or "user") != "user" or u["disabled"]:
         return False
@@ -84,7 +90,6 @@ def ast2_person_ok(c, pid, sheet, lid):
 
 def ast2_person(c, aid, sheet, lid, want):
     """Whose card: want (for_user_id) or the person who shared the table with the agent, else its owner, else its creator."""
-    from ..sheets.shbook import shb_rights_row
     if want is not None:
         pid = _int(want, "for_user_id")
         if not ast2_person_ok(c, pid, sheet, lid) or not agent_usable(c, aid, pid, lid):  # 2.190.0 C (#2496): who may address the agent there
@@ -100,7 +105,6 @@ def ast2_person(c, aid, sheet, lid, want):
 
 
 def _cols(book, b):
-    from ..sheets.step2 import _col
     return {"title_col": _col(book, b.get("title_col"), "title_col", required=True),
             "due_col": _col(book, b.get("due_col"), "due_col"), "notes_col": _col(book, b.get("notes_col"), "notes_col")}
 
@@ -108,8 +112,6 @@ def _cols(book, b):
 def sht_validate(b, inp):
     """prop_validate for kind sheet_tasks: {summary?, rows: [row id | {row_id, title?}]} -> {rows: [{row_id, title}]}. Every
     row a live row of the sheet, at most once, at most SHT_ROWS_MAX; title = the agent's suggestion (empty = the cell)."""
-    from ..agents.proposals import _p_keys, _p_list, _p_str, PROP_TITLE_MAX
-    from ..sheets.core import ShBook
     _p_keys(b, "", ("kind", "summary", "rows"))
     c = db()
     sheet = ast2_sheet(c, inp.get("sheet_id"))
@@ -136,7 +138,6 @@ def sht_validate(b, inp):
 # ---------------------------------------------------------------- the agent proposes
 def _check(c, aid, b):
     """The sheet (seen by the agent), the target list (shared with it), the columns; -> (sheet, list, cols)."""
-    from ..sheets.core import ShBook, sh_need
     sheet = sh_need(c, _int(b.get("sheet_id"), "sheet_id"))  # the agent: shared with it / its list / its own, else 404
     l = ast2_list_ok(c, aid, sheet, _int(b.get("list_id"), "list_id"))
     return sheet, l, _cols(ShBook(c, sheet), b)
@@ -147,10 +148,6 @@ def _check(c, aid, b):
 def v1_sht_propose():
     """{sheet_id, rows, list_id, title_col, due_col?, notes_col?, summary?, for_user_id?} -> a ready proposal (kind sheet_tasks)
     for the person. Nothing is created until they apply it."""
-    from ..agents.core import JOB_TITLE_MAX, job_dict, need_agent
-    from ..agents.proposals import PROP_MAX_BYTES, prop_ready_notify, prop_validate
-    from ..agents.usage import usage_block
-    from ..sheets.step2 import _linked
     v1_args(())
     aid = need_agent()
     if len(request.data or b"") > PROP_MAX_BYTES:
@@ -160,7 +157,6 @@ def v1_sht_propose():
         raise BadInput(tr("The body must be a JSON object"))
     unknown = sorted(k for k in b if k not in SHT_FIELDS)
     if unknown:
-        from ..api.v1 import UnknownFields
         raise UnknownFields(unknown)
     if b.get("user_id") is not None and b.get("for_user_id") is not None and b["user_id"] != b["for_user_id"]:
         raise BadInput(tr("Invalid value: {0}", "for_user_id"))
@@ -192,7 +188,6 @@ def v1_sht_propose():
 
 def sht_replace_check(c, aid, j):
     """POST /api/v1/agent/jobs/<id>/proposal for kind sheet_tasks: the agent must still see the table and the list."""
-    from ..api.scopes import need_scope
     need_scope("sheets:read")
     inp = json.loads(j["input"] or "{}")
     _check(c, aid, inp)
@@ -202,9 +197,6 @@ def sht_replace_check(c, aid, j):
 def sht_rows_now(c, uid, j):
     """The proposal's rows as uid sees them now: [{key, row_id, n, title, cell_title, due, notes, state}] with state ''
     (fine) | done (carried over before) | gone (the row was deleted) | empty (no title)."""
-    from ..sheets.core import ShBook, sh_eval, sh_may
-    from ..sheets.formula import sh_parse_date
-    from ..sheets.step2 import _cell, _linked
     p, inp = json.loads(j["proposal"] or "null") or {}, json.loads(j["input"] or "{}")
     sheet = ast2_sheet(c, inp.get("sheet_id"))
     if not sheet or not sh_may(c, uid, sheet):
@@ -247,7 +239,6 @@ def sht_view_extra(c, j):
 
 def _edits(ed, rows):
     """The card's edits {key: {title?, due?}} -> ({row id: title}, {row id: due or None})."""
-    from ..agents.proposals import _p_keys, _p_str, _p_date, PROP_TITLE_MAX
     titles, dues = {}, {}
     for k, e in (ed or {}).items():
         if not str(k).isdigit() or int(k) >= len(rows):
@@ -263,7 +254,6 @@ def _edits(ed, rows):
 
 def sht_run(c, j, sel, ed, extra, rec):
     """Apply as the person: the ticked rows through the to-tasks core (the same checks as the button). rec = the undo record."""
-    from ..sheets.step2 import _bump_area, _gate, sh2_to_tasks
     p, inp = json.loads(j["proposal"]), json.loads(j["input"] or "{}")
     rows = p.get("rows") or []
     sheet, uid = _gate(c, inp["sheet_id"])  # write the table through its space, tables on (agents can never apply)
@@ -291,7 +281,6 @@ def sht_result(rec):
 
 def sht_undo(c, j, rec, back=True):
     """Undo / redo: the batch of step 2 (the tasks to the trash and back, the rows' marks with them)."""
-    from ..sheets.step2 import _bump_area, _gate, sh2_undo
     sheet, uid = _gate(c, rec["sheet_id"])
     r = sh2_undo(c, sheet, uid, rec["batch"], redo=not back)
     _bump_area(c, "tasks")

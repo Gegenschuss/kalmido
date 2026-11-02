@@ -24,6 +24,17 @@ from ..core.errors import BadInput
 from . import core as A
 from ..core.state import visible_lists, visible_sections  # 2.149.0 G (#2517): pulled up from functions
 from ..collab.news import news_add
+from ..agents.core import is_agent, agent_ids, list_sections, JOB_TITLE_MAX, job_dict  # 2.369.5 (#2517): pulled up from functions
+from ..agents.proposals import PROP_OPEN_MAX, PROP_TAGS_MAX, PROP_TAG_MAX, PROP_MAX_ITEMS, PROP_NOTES_MAX, PROP_SUMMARY_MAX, PROP_TITLE_MAX, PROP_TEXT_MAX, prop_validate  # 2.369.5 (#2517): pulled up from functions
+from ..agents.usage import AUDIT_DAYS  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.users import need_admin  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import MENTION_RE, user_names, collab_user  # 2.369.5 (#2517): pulled up from functions
+from ..collab.notelock import ln_is_locked, ln_locked_ids  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.tasks import my_tags  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import valid_date, valid_hm  # 2.369.5 (#2517): pulled up from functions
+from ..api.v1 import PRIO_VALUES  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.dayplan import dayplan_input  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import notif_ok  # 2.369.5 (#2517): pulled up from functions
 
 ASST_OFF_MSG = N_("Switch the assistant on in Settings first")
 ASST_SHARE_MSG = N_("Share this project with the assistant first")
@@ -37,7 +48,6 @@ _ASST_CLEAN = {"at": 0.0}
 
 def _asst_gate():
     """404 while off and for agents; 403 for children (they never use it)."""
-    from ..agents.core import is_agent
     if not A.asst_on() or not getattr(g, "user", None) or is_agent(g.user):
         raise Denied(404)
     if g.user["kid"]:
@@ -66,7 +76,6 @@ def asst_lists(c, uid, own=True):
 
 def asst_state(c, uid):
     """The field "assistant" of /api/state ({} while off: the client then shows nothing)."""
-    from ..agents.core import is_agent
     if not A.asst_on() or is_agent(g.user):
         return {}
     on = asst_user_on(c, uid)
@@ -75,7 +84,6 @@ def asst_state(c, uid):
 
 def _asst_view(c, uid):
     on = asst_user_on(c, uid)
-    from ..agents.proposals import PROP_OPEN_MAX
     return {"enabled": True, **A.asst_info(), "on": on, "lists": asst_lists(c, uid),
             "limits": {"max_chars": A.ASST_MAX_CHARS, "max_items": A.ASST_ITEMS_MAX, "open_max": PROP_OPEN_MAX}}
 
@@ -83,7 +91,6 @@ def _asst_view(c, uid):
 def asst_log(c, uid, kind, status, ms=0, chars_in=0, chars_out=0, task_id=None, list_id=None, job_id=None):
     """One row of the person's assistant log (numbers and a status only) + one line in the server log, no texts.
     Rows older than KALMIDO_AUDIT_DAYS days go (checked at most hourly; 0 = only today's rows stay)."""
-    from ..agents.usage import AUDIT_DAYS
     at = now_utc()
     insert_id(c, """INSERT INTO assistant_log(user_id,kind,task_id,list_id,job_id,status,ms,chars_in,chars_out,model,at,day)
                     VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
@@ -159,7 +166,6 @@ def asst_get_log():
 @app.get("/api/admin/assistant")
 def asst_admin():
     """Admins: the configuration (never the key) and the calls of the last 30 days (counts only, no people, no texts)."""
-    from ..accounts.users import need_admin
     _asst_gate()
     need_admin()
     c = db()
@@ -177,7 +183,6 @@ def asst_admin():
 
 # ---- what goes to the model
 def _asst_mentions(text):
-    from ..collab.comments import MENTION_RE
     return re.sub(r"\s+", " ", MENTION_RE.sub("@(person)", text or "")).strip()
 
 
@@ -242,8 +247,6 @@ def asst_others_comments(c, t):
 def asst_task_text(c, t, comments=True):
     """Title, list, due, tags, note (never a locked one) and comments (mentions without names) of a task as plain text.
     2.240.0 A (#2884): in a list of an organisation without asst_comments only the asking person's own comments."""
-    from ..collab.notelock import ln_is_locked
-    from ..tasks.tasks import my_tags
     out = [f"Task {t['id']}: {t['title']}", f"List: {tr('Basket') if t['l_inbox'] else t['l_name']}"]
     if t["due"]:
         out.append(f"Due: {t['due']}")
@@ -270,12 +273,10 @@ def _asst_str(v, mx):
 
 
 def _asst_date(v):
-    from ..tasks.validation import valid_date
     return v if isinstance(v, str) and valid_date(v) else None
 
 
 def _asst_prio(v):
-    from ..api.v1 import PRIO_VALUES
     return v if isinstance(v, str) and v in PRIO_VALUES else None
 
 
@@ -286,7 +287,6 @@ def _asst_id(v):
 
 
 def _asst_tags(v):
-    from ..agents.proposals import PROP_TAGS_MAX, PROP_TAG_MAX
     out = []
     for x in v if isinstance(v, list) else []:
         x = _asst_str(x, PROP_TAG_MAX).lstrip("#").strip()
@@ -298,7 +298,6 @@ def _asst_tags(v):
 def asst_clean(kind, raw, inp):
     """The model's JSON -> a proposal body that only holds known fields and ids of the input (everything else dropped,
     never an error for one bad entry); prop_validate checks it afterwards like an agent's proposal."""
-    from ..agents.proposals import PROP_MAX_ITEMS, PROP_NOTES_MAX, PROP_SUMMARY_MAX, PROP_TITLE_MAX
     out = {"summary": _asst_str(raw.get("summary"), PROP_SUMMARY_MAX)}
     if kind == "extract":
         members = {m["id"] for m in inp.get("members", [])}
@@ -336,7 +335,6 @@ def asst_clean(kind, raw, inp):
                           "priority": _asst_prio(t.get("priority")), "due": _asst_date(t.get("due")), "rewrite_title": rt})
         out["items"] = items
     elif kind == "dayplan":
-        from ..tasks.validation import valid_hm
         ids = {t["task_id"] for t in inp.get("tasks", [])}
         seen, items, nofit = set(), [], []
         for t in raw.get("items") if isinstance(raw.get("items"), list) else []:
@@ -364,8 +362,6 @@ def _asst_inp(inp):
 
 
 def asst_extract_input(c, uid, lid, text):
-    from ..agents.core import agent_ids, list_sections
-    from ..collab.comments import user_names
     lst = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
     ag = agent_ids(c)
     ppl = [p for p in sorted(list_people(c, lid)) if p not in ag]
@@ -387,8 +383,6 @@ def asst_triage_lists(c, uid, shared):
 def asst_dayplan_input(c, uid, day, shared):
     """The day plan input (tasks/dayplan.py dayplan_input) reduced to the shared lists; events only as busy times (no
     titles: they come from calendars, not from shared lists); locked notes left out."""
-    from ..collab.notelock import ln_locked_ids
-    from ..tasks.dayplan import dayplan_input
     inp = dayplan_input(c, uid, day, "day")
     inp["tasks"] = [t for t in inp["tasks"] if t["list_id"] in shared]
     inp["fixed"] = [t for t in inp["fixed"] if t.get("list_id") in shared]
@@ -405,9 +399,6 @@ def asst_dayplan_input(c, uid, day, shared):
 
 def asst_job(c, uid, kind, pkind, inp, prop, task_id=None, list_id=None):
     """A ready proposal job of the person themself + the News card (no push: the person just asked and sees it)."""
-    from ..agents.core import JOB_TITLE_MAX, job_dict
-    from ..collab.comments import collab_user
-    from ..collab.news import notif_ok
     ts = iso(now_utc())
     title = tr("Assistant: {0}", tr(ASST_KIND_NAMES[kind]))
     jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id,proposal)
@@ -436,7 +427,6 @@ def _asst_int_arg(b, k):
 def asst_run():
     """{kind, task_id?, task_ids?, text?, instruction?, list_id?, day?} -> a text (summary, draft) or a ready proposal
     (extract, tags, triage, dayplan). One synchronous model call with the time limit; one log row whatever happens."""
-    from ..agents.proposals import PROP_OPEN_MAX, PROP_TEXT_MAX, prop_validate
     _asst_gate()
     c = db()
     uid = me()

@@ -14,6 +14,8 @@ from ..core.access import Denied, list_role, my_inbox
 from ..accounts.session import me, user_public
 from .orgretain import _until  # 2.186.0 A (#2566)
 from .orgs import op_apart_deny, op_foreign_account  # 2.399.0 (#2687)
+from ..accounts.orgs import org_role, user_orgs, visible_people, need_visible  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.users import om_admin_all, need_admin, user_update  # 2.369.5 (#2517): pulled up from functions
 
 
 UA8_FILTERS = ("people", "active", "disabled", "admin", "invited", "pending", "agents", "all")
@@ -122,7 +124,6 @@ def ua8_users_page(c):
 # ---------------------------------------------------------------- deleting an account that owns lists
 
 def ua8_admin_orgs(c):
-    from ..accounts.orgs import org_role, user_orgs
     return [o for o in user_orgs(c, me()) if org_role(c, me(), o) == "admin"]
 
 
@@ -130,18 +131,15 @@ def ua8_decider(c, u, uid, *other):
     """Whose decision about account uid: 'instance' (an instance admin, as before: users.om_admin_all) or the organisation whose admin
     decides -- only an account that belongs to that one organisation alone and is no instance admin. *other = the text of the 403 for
     any other account. Raises Denied (404 = an account the caller must not know)."""
-    from ..agents.core import is_agent
-    from ..accounts.users import om_admin_all
+    from ..agents.core import is_agent, need_person
     if g.user["is_admin"]:
         if not u or not om_admin_all(c, uid):
             raise Denied(404, tr("unknown person"))
         return "instance"
-    if is_agent(g.user):
-        raise Denied(403)
+    need_person(403)
     mine = ua8_admin_orgs(c)
     if not mine:
         raise Denied(403)
-    from ..accounts.orgs import user_orgs
     theirs = user_orgs(c, uid) if u else []
     shared = [o for o in theirs if o in mine]
     if not shared:
@@ -179,7 +177,6 @@ def ua8_candidates(c, lists, uid):
     the caller's own visibility too (owner_candidates names every list member, under system_ctx also those of another
     organisation)."""
     from ..lists.ownership import owner_candidates
-    from ..accounts.orgs import visible_people
     common, names = None, {}
     with system_ctx(c):  # the lists of organisations the instance admin is not in (the rule inside stays the caller's visibility)
         for lr in lists:
@@ -202,7 +199,6 @@ def ua8_list_info(c, lists, by):
     caller may see by name, the rest as a number); whether it has the lock (#1817) and whether nobody else holds its key
     (review M2: then nobody can give the new owner the key); its project receipts (review M3: such a list is only handed
     over); the organisation's name only for an organisation the caller is in (review N2)."""
-    from ..accounts.orgs import org_role, visible_people
     from ..collab.liste2e import le2e_mode
     vis = visible_people(c, me())
     out = []
@@ -337,12 +333,10 @@ def ua8_delete_info(uid):
 def ua8_foreign(c, lr):
     """A list of an organisation the caller does not belong to: it may change hands inside that organisation, but only the
     organisation's own people delete it (the instance admin never deletes another organisation's lists along)."""
-    from ..accounts.orgs import user_orgs
     return bool(lr["org_id"]) and lr["org_id"] not in user_orgs(c, me())
 
 
 def ua8_org_of(c, uid):
-    from ..accounts.orgs import user_orgs
     mine = ua8_admin_orgs(c)
     return [o for o in user_orgs(c, uid) if o in mine]
 
@@ -362,7 +356,6 @@ def ua8_lists_settle(c, u, by, rx_how=None):
     -> (None, (icons [(list id, icon)], files, audit text, its args after "who" and "whom")) or (an error response, None)."""
     from ..lists.lists import list_keep, list_purge
     from ..lists.ownership import owner_transfer
-    from ..accounts.orgs import need_visible
     from ..agents.core import is_agent
     uid = u["id"]
     lists = ua8_owned(c, uid)
@@ -450,7 +443,6 @@ def ua8_bulk():
     """2.88.0 (#1980): {ids: [..], action: disable | enable | org_add, org_id?} -- the instance admin changes several
     accounts at once; each one through the single route (PATCH /api/users/<id>: its checks per account, its own commit).
     -> {ok: [ids], failed: [{id, error}]}."""
-    from ..accounts.users import need_admin, user_update
     need_admin()
     b = body()
     ids = b.get("ids")

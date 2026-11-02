@@ -14,6 +14,7 @@ from ..core.db import iso, now_utc
 from ..core.pg import system_ctx
 from ..core.access import Denied
 from ..accounts.session import me
+from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
 
 OO_ADMIN_ONLY = N_("Only organisation admins can move data out of the organisation. Ask an admin of the organisation to do it.")  # 2.190.0 C (#2561)
 # 2.361.2 (#2923): the note of every move into an organisation (the dry run / the workspace field)
@@ -146,5 +147,4 @@ def org_out_ok(c, oid, to_oid, kind=None, obj=None):
 
 
 def is_admin_of(c, oid):
-    from ..accounts.orgs import is_org_admin
     return is_org_admin(c, me(), oid)

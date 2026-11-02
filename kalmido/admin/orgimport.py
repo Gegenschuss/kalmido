@@ -33,6 +33,13 @@ from ..core.db import iso, now_utc  # 2.149.0 G (#2517): pulled up from function
 from ..core.access import Denied  # 2.237.0 D (#2870)
 from ..accounts.orgs import org_role  # 2.237.0 D (#2870)
 from ..office.periodlock import pl_month  # 2.237.0 D (#2870)
+from ..core.access import acx_drop  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
+from ..files.scan import sc_needs_retry  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachments import safe_name  # 2.369.5 (#2517): pulled up from functions
+from ..office.model import pb_personal  # 2.369.5 (#2517): pulled up from functions
+from .acctexport import umz_user_conn  # 2.369.5 (#2517): pulled up from functions
+from ..core.orgcrypt import _write_atomic  # 2.369.5 (#2517): pulled up from functions
 
 
 # 2.237.0 D (#2870): person columns with a name column beside them: a person not taken over as an account keeps the name
@@ -141,10 +148,8 @@ def oi_prepare(c, run, uid, data):
         return
     oi = data.get("oi") or {}
     if any(oi.get(s.path) for s in oi_specs() if s.private == "office"):
-        from ..office.model import pb_personal
         run.pb_new = pb_personal(c, uid, create=False) is None  # 2.137.1 (#2399): made by this run (oi_drop_empty_pb)
         run.pb = pb_personal(c, uid)
-        from .acctexport import umz_user_conn
         umz_user_conn(c, uid)  # 2.137.0 A (#2344): a personal office made just now joins the thread's access context
 
 
@@ -154,8 +159,6 @@ def oi_drop_empty_pb(c, run, uid):
     pb = getattr(run, "pb", None) if run is not None and getattr(run, "pb_new", False) else None
     if not pb:
         return False
-    from ..core.access import acx_drop
-    from ..core.pg import system_ctx
     try:
         with system_ctx(c):  # every table that points at the office, across organisations (only a yes / no leaves this block)
             refs = c.execute("""SELECT con.conrelid::regclass::text, a.attname FROM pg_constraint con
@@ -180,9 +183,7 @@ def oi_drop_empty_pb(c, run, uid):
 
 def oi_file(ctx, path, sub, name, space=None, base=ATT_DIR, check=True, mime="", seal=True, strict=False):
     from ..admin.hosting import QuotaExceeded, quota_guard
-    from ..files.scan import sc_needs_retry
     from ..files.upsafe import up_check, UploadRefused
-    from ..tasks.attachments import safe_name
     c, run = ctx.c, ctx.run
     if run.stopped:  # 2.362.4 (#3100): a full storage stops the files, not the rest of the areas
         run.warning(UMZ_NO_SPACE)
@@ -219,7 +220,6 @@ def oi_file(ctx, path, sub, name, space=None, base=ATT_DIR, check=True, mime="",
     if seal:
         oc_write_file(c, space or oc_user_space(ctx.uid), full, raw, fresh=True)
     else:  # 2.137.0 A (#2344): a file the app keeps plain
-        from ..core.orgcrypt import _write_atomic
         _write_atomic(full, raw)
     run.created.setdefault("oi_files", []).append(full)
     return rel, len(raw)

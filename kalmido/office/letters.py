@@ -32,6 +32,14 @@ from .doclang import DOC_LANGS  # 2.185.0 C (#2520)
 from .rights import ofr_admin_or, ofr_allows, ofr_need_area
 from .pdf import PDF_ADDR_W, pdf_wrap  # 2.296.0 E (#3170)
 from .oftref import LT_KIND, lt_title, oft_renamed  # 2.351.0 A (#2823)
+from .doctpl import dt_lang, dt_fill, dt_miss_labels, dt_tpl, dt_values, dt_disposition, dt_kick, dt_tpl_public  # 2.369.5 (#2517): pulled up from functions
+from ..contacts.model import contacts_on, my_book_ids  # 2.369.5 (#2517): pulled up from functions
+from .contacts_cl import fk_contacts  # 2.369.5 (#2517): pulled up from functions
+from .pdf import pdf_image_object  # 2.369.5 (#2517): pulled up from functions
+from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from functions
+from .docs import _fmt_date  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_sender_line  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_read, fs_role  # 2.369.5 (#2517): pulled up from functions
 
 LT_CHANNELS = (("post", N_("Post")), ("email", N_("E-mail")), ("registered", N_("Registered mail")), ("fax", N_("Fax")))
 LT_CHANNEL_KEYS = tuple(k for k, _ in LT_CHANNELS)
@@ -101,7 +109,6 @@ def lt_clean(c, oid, b, cur=None):
             except (TypeError, ValueError):
                 raise BadInput(tr("Invalid value: {0}", k)) from None
             if k == "client_id":
-                from .model import pb_cl_sql
                 ok = c.execute(f"SELECT 1 FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (v,)).fetchone()
             elif k == "template_id":
                 ok = c.execute("SELECT 1 FROM office_doc_templates WHERE id=? AND org_id=? AND kind='letter'", (v, oid)).fetchone()  # 2.237.0 A (#2861)
@@ -155,7 +162,6 @@ def lt_uid():
 
 def lt_lang(c, oid, v=None):
     """'de' | 'en': the letter's language, else the office's document language (2.185.0 C: every app language)."""
-    from .doctpl import dt_lang
     return v if v in DOC_LANGS else dt_lang(c, oid)
 
 
@@ -163,7 +169,6 @@ def lt_lang(c, oid, v=None):
 def lt_book_ids(c, oid, uid):
     """The address books (ids) person uid sees in the space of office area oid: a personal office = the books of the
     private space (no organisation), an organisation's office = that organisation's books. Never across the boundary."""
-    from ..contacts.model import contacts_on, my_book_ids
     owner = pb_owner(c, oid)
     if not uid or (owner is not None and owner != uid) or not contacts_on(c, uid):
         return []
@@ -238,7 +243,6 @@ def lt_recipients(c, oid, uid, q="", limit=20, clients=True):
     """[{kind client | contact, label, sub, rcpt_*, client_id | contact_id}]: the office's clients (+ their contact
     persons as "z. Hd.") and the address book contacts the person sees in the office's space, matching q.
     2.237.0 A (#2861): clients=False leaves the clients out (no right to read them)."""
-    from .contacts_cl import fk_contacts
     words = [w for w in re.split(r"\s+", (q or "").lower().strip()) if w][:6]
     lg = lt_lang(c, oid)
     sql, args = f"SELECT * FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL" + ("" if clients else " AND false"), []
@@ -312,11 +316,9 @@ def lt_image_in(v):
         mime = "image/jpeg"
     else:
         raise BadInput(tr("Please choose a PNG or JPEG picture"))
-    from .pdf import pdf_image_object
     if not pdf_image_object(data):
         raise BadInput(tr("Please choose a PNG or JPEG picture"))
     from ..files.scan import SC_RETRY_TEXT, sc_needs_retry, sc_scan  # 2.153.0: virus scan like every upload (2.148.1 E, #2496)
-    from ..files.upsafe import UploadRefused
     try:
         if sc_needs_retry(sc_scan("signature.png" if mime == "image/png" else "signature.jpg", data), data):
             raise BadInput(tr(SC_RETRY_TEXT))  # 2.360.2 L (#2561): no later scan for this picture, so checked now
@@ -404,7 +406,6 @@ def lt_sig_pic(c, oid, uid):
     p = lt_profile(c, oid, uid) if uid else None
     if not p or not p.get("image"):
         return None
-    from .pdf import pdf_image_object
     try:
         return pdf_image_object(base64.b64decode(p["image"]))
     except (binascii.Error, ValueError):
@@ -459,9 +460,7 @@ def lt_pdf(c, oid, d):
     the subject in bold, the text (paragraphs, "- " lists, "## " headings), greeting, signature picture, name; following
     pages with a small head; the footer as the other office PDFs. A draft says DRAFT."""
     from . import pdf as P
-    from .docs import _fmt_date
     from .doctpl import _pack, dt_blocks, dt_company
-    from .ledger import ofx_sender_line
     P = P.pdf_paper_ns(office_settings(c, oid).get("paper"))  # 2.357.0 A (#3156): the office's paper size
     lang = lt_lang(c, oid, d.get("lang"))
     co = dt_company(c, oid, lang)
@@ -671,7 +670,6 @@ def lt_public(c, oid, d, names=None, brief=False):
 
 def lt_meta(c, oid, uid):
     """What the editor offers: clients of the office, letter templates, the person's profile, channels, states."""
-    from .doctpl import dt_lang
     cls = [{"id": r["id"], "name": r["name"], "display_name": r["display_name"] or ""} for r in
            c.execute(f"SELECT id, name, display_name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL ORDER BY lower(name) LIMIT ?", (LT_LIST_MAX,))]
     tpls = [oc_dec_fields(c, oid, "office_doc_templates", r) for r in
@@ -750,7 +748,6 @@ def lt_post():
     answers: document node id: recipient and reference line prefilled from the document (office/letterlinks.py
     ltl_prefill) and linked. copy_of: id = a copy of that letter as a new draft (today's date). template_id without a
     body: subject + text from the template, its variables filled (client.*, company.*, today)."""
-    from .doctpl import dt_fill, dt_miss_labels, dt_tpl, dt_values
     from .letterlinks import ltl_link, ltl_prefill
     c, uid, oid = lt_ctx()
     b = body()
@@ -880,8 +877,6 @@ def lt_restore(lid):
 def lt_pdf_get(lid):
     """The PDF (inline; ?dl=1 as download): a sent letter = the filed file while the admin reaches it, else written anew;
     a draft = a preview marked DRAFT."""
-    from ..files.store import fs_read, fs_role
-    from .doctpl import dt_disposition
     c, uid, oid = lt_ctx()
     d = lt_row(c, oid, lid)
     data = None
@@ -930,7 +925,6 @@ def lt_mark_sent(c, oid, d, channel=None, tracking_no=None, followup_days=None, 
 
 
 def lt_kick():
-    from .doctpl import dt_kick
     dt_kick()
 
 
@@ -984,7 +978,6 @@ def lt_delivered_delete(lid):
 def lt_template_post(lid):
     """Save as template {name?}: a document template of kind letter (office_doc_templates, #1927) with the letter's text
     (name = the subject) -> 201 + the template. The undo: DELETE /api/office/doc-templates/<id>."""
-    from .doctpl import dt_tpl, dt_tpl_public
     c, uid, oid = lt_ctx()
     ofr_need_area(c, uid, oid, "gendocs", "edit")  # 2.237.0 A (#2861): it writes a document template
     b = body() or {}

@@ -30,7 +30,13 @@ import re
 
 from ..core.i18n import N_, tr
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
-from ..core.access import collab_all, ov_open  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import collab_all, joined_lists_sql, ov_open  # 2.149.0 G (#2517): pulled up from functions
+from ..tasks.tasks import can_move  # 2.369.5 (#2517): pulled up from functions
+from .comments import task_people, user_names, MAX_COMMENT  # 2.369.5 (#2517): pulled up from functions
+from ..lists.lists import _in_folder  # 2.369.5 (#2517): pulled up from functions
+from ..lists.groups import grp_shares_of_list  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import CONTENT_MAX, TITLE_MAX  # 2.369.5 (#2517): pulled up from functions
+from .news import news_add  # 2.369.5 (#2517): pulled up from functions
 
 LE2E_PREFIX = "e2e1:"
 LE2E_MODES = ("encrypting", "on", "decrypting")
@@ -279,7 +285,6 @@ def le2a_move(c, tid, cur, f, extra, dst):
     field_id, value}]} the texts of the subtasks, comments and text field values that move along. Writes those (the task's own
     texts are written by the caller) or raises LE2EDenied list_e2e_move with what is missing. Returns the function that writes
     them (called by apply_update right after the move, so a refused change writes nothing)."""
-    from ..tasks.tasks import can_move
     if not le2e_writer_ok():
         raise LE2EDenied("list_e2e_move", 403)
     mode, gen = le2a_gen(c, dst)
@@ -406,7 +411,6 @@ def le2a_snip_store(v):
 def le2a_comment_in(c, lid, text, tid=None):
     """A comment in a locked list: the body is a ciphertext (guarded); mentions come from the browser (mentions: [ids] or the
     form field "mentions" = "1,2"), only people of the list count."""
-    from .comments import task_people
     le2e_guard(c, lid, {"comment": text})
     raw = request.form.get("mentions") if (request.files or request.form) else body().get("mentions")
     if isinstance(raw, str):
@@ -491,7 +495,6 @@ def le2a_member_problem(c, lid, uid, role):
 
 def le2a_folder_problem(c, owner, folder, role, uid=None):
     """PUT /api/folders/people / groups: the role participant (or a kid) for a folder that holds locked lists -> a text."""
-    from ..lists.lists import _in_folder
     kid = uid and c.execute("SELECT 1 FROM users WHERE id=? AND kid=1", (uid,)).fetchone()
     if role != "participant" and not kid:
         return None
@@ -561,8 +564,8 @@ def le2a_state(c, rows, uid):
 
 def le2a_shares_list(c, a, b):
     """Do people a and b share a list (owner or member of the same list)? -- /api/e2e/pub (finding H4)."""
-    sub = "(SELECT id AS l FROM lists WHERE owner_id=? UNION SELECT list_id FROM list_members WHERE user_id=?)"
-    return c.execute(f"SELECT 1 FROM {sub} x JOIN {sub} y ON x.l=y.l LIMIT 1", (a, a, b, b)).fetchone() is not None
+    sub = joined_lists_sql()
+    return c.execute(f"SELECT 1 FROM {sub} x JOIN {sub} y ON x.id=y.id LIMIT 1", (a, a, b, b)).fetchone() is not None
 
 
 # ---------------------------------------------------------------- routes
@@ -580,7 +583,6 @@ def _le2a_list(c, lid):
 
 
 def _le2a_names(c, ids):
-    from .comments import user_names
     return user_names(c, list(ids))
 
 
@@ -612,8 +614,6 @@ def le2a_people(c, lr):
 
 def le2a_blockers(c, lr, agents):
     """Why the lock cannot be switched on now: [{code, text}]."""
-    from ..lists.groups import grp_shares_of_list
-    from ..lists.lists import _in_folder
     lid, out = lr["id"], []
 
     def add(code):
@@ -898,9 +898,7 @@ def le2a_bulk(lid):
     of the current generation (or ''), decrypting = plain texts, on (2.64.2 A: re-encryption after a key change) = ciphertexts of
     the current generation that replace an older ciphertext or a plain text (a value already of the current generation -- someone
     edited it meanwhile -- stays). No history entries, one live update per call; repeating a call is harmless."""
-    from ..tasks.validation import CONTENT_MAX, TITLE_MAX
     from .notes import NOTE_BODY_MAX, NOTE_TITLE_MAX
-    from .comments import MAX_COMMENT
     c = db()
     _uid, lr, _role, e = _le2a_switch(c, lid, on_ok=True)
     if e:
@@ -1112,7 +1110,6 @@ def le2a_keys(lid):
     passphrase): only the owner / list admins holding that generation (finding M9); the recipient must be the owner or a
     member with encryption set up. The server stores the wrapper's public key itself and tells the recipient (News)."""
     from .e2e import e2e_keys_of
-    from .news import news_add
     c = db()
     uid, lr, _role = _le2a_manage(c, lid)
     if not lr["e2e"]:

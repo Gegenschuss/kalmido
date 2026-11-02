@@ -17,6 +17,7 @@ from ..core.config import app
 from ..core.db import db, usettings
 from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, tr
+from .orgs import user_orgs  # 2.369.5 (#2517): pulled up from functions
 
 # the areas that can be switched per workspace (the ids of MG_AREAS / SBB_RAIL in areas.js); review is private only
 WSA_AREAS = ("office", "time", "review", "life", "reading", "ablage", "wiki", "sheets")
@@ -107,7 +108,6 @@ def _req_org(c, uid, area):
     m = re.fullmatch(r"org:(\d{1,12})", ws.strip())
     if not m:
         return None
-    from .orgs import user_orgs
     oid = int(m.group(1))
     return oid if oid in user_orgs(c, uid) else None
 

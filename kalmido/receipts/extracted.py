@@ -20,6 +20,10 @@ from ..accounts.session import me
 from ..files.store import fs_log_add
 from ..docs import store as S
 from .suggest import rc_office_need  # 2.237.0
+from .suggest import rc_set, rc_vat_clean  # 2.369.5 (#2517): pulled up from functions
+from ..docs.web import _doc, _no_agent, doc_json, doc_update  # 2.369.5 (#2517): pulled up from functions
+from ..docs.dups import dup_on_done  # 2.369.5 (#2517): pulled up from functions
+from ..office.periodlock import pl_receipt_need_open  # 2.369.5 (#2517): pulled up from functions
 
 RX_KEYS = ("supplier", "vat_id", "tax_no", "invoice_no", "vat_pct", "vat_rates", "net", "vat", "gross", "currency")
 RX_FIELDS = ("amount", "vat_pct", "sender")      # what Take over may set
@@ -98,7 +102,6 @@ def rx_doc_view(c, m):
 
 
 def _rx_vat(c, node, ws, uid, vat, keep):
-    from .suggest import rc_set
     r = _rc_row(c, node["id"])
     rc_set(c, node, ws, r["list_id"] if r else None, (r["category"] or "") if r else "", uid, vat=vat, keep=keep)
 
@@ -109,7 +112,6 @@ def rx_post(nid):
     {do: "restore", before: {..}} puts them back; {do: "dismiss"} hides the suggestion, {do: "show"} shows it again.
     2.146.0 B (#2452): {do: "nodup"} = "no duplicate" (the warning goes, also after a new recognition run), {do: "dup"} its undo.
     People with the right edit on the document (agents 403: they only read the values)."""
-    from ..docs.web import _doc, _no_agent, doc_json, doc_update
     c = db()
     _no_agent()
     m, n = _doc(c, nid, write=True)
@@ -153,7 +155,6 @@ def rx_post(nid):
         if e:
             return e
         if "vat_pct" in want and det.get("vat_pct") in ("19", "7", "0"):
-            from ..office.periodlock import pl_receipt_need_open
             pl_receipt_need_open(c, nid, becoming=True)  # 2.148.0 A (#2471)
             _rx_vat(c, n, ws, uid, det["vat_pct"], True)
     else:                                         # restore: the values before a Take over (the undo)
@@ -161,7 +162,6 @@ def rx_post(nid):
         if not isinstance(bf, dict):
             return err(tr("Invalid value: {0}", "before"))
         from ..api.v1 import BadInput
-        from .suggest import rc_vat_clean
         try:
             vat = rc_vat_clean(bf.get("vat_pct"))
         except BadInput:
@@ -172,11 +172,9 @@ def rx_post(nid):
         e = doc_update(c, nid, {"amount": bf.get("amount") or "", "currency": bf.get("currency") or "", "sender": sender}, uid)
         if e:
             return e
-        from ..office.periodlock import pl_receipt_need_open
         pl_receipt_need_open(c, nid)  # 2.148.0 A (#2471)
         _rx_vat(c, n, ws, uid, vat, bf.get("is_receipt") is True)
     if act in ("apply", "restore"):  # 2.146.0 B (#2452): amount / sender changed: look for a duplicate again
-        from ..docs.dups import dup_on_done
         dup_on_done(c, nid, False)
     fs_log_add(c, nid, "edit")
     bump(c)

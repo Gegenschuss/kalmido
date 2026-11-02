@@ -59,6 +59,11 @@ from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
 from ..life.model import jr_open  # 2.306.0 A (#2885)
 from ..lists.tplextra import tx_export  # 2.463.0 (#3860)
 from ..accounts.login import unseal  # 2.455.0 (#3469)
+from ..accounts.settings import SETTINGS_SERVER_ONLY, umz_export_clean, umz_export_queries  # 2.369.5 (#2517): pulled up from functions
+from ..calendars.subscriptions import cal_url_hint  # 2.369.5 (#2517): pulled up from functions
+from ..core.orgcrypt import oc_dec_fields  # 2.369.5 (#2517): pulled up from functions
+from ..wiki.wkhist import wsb_body_or  # 2.369.5 (#2517): pulled up from functions
+from ..life.budget import bud_export  # 2.369.5 (#2517): pulled up from functions
 
 UMZ_DIR = os.path.join(EXPORT_DIR, "account")
 UMZ_KEEP_H = 24
@@ -289,8 +294,6 @@ def umz_space_ok(folder, need):
 # ---------------------------------------------------------------- what goes into the file
 def umz_clean(table, r):
     """A row as it goes into the account export (None = left out)."""
-    from ..accounts.settings import SETTINGS_SERVER_ONLY, umz_export_clean
-    from ..calendars.subscriptions import cal_url_hint
     d = {k: v for k, v in dict(r).items() if k not in OX_SECRET_COLS}
     if table == "settings" and d.get("key") in SETTINGS_SERVER_ONLY:
         return None  # review N5: server-side state (ntfy_topic is set by an admin only, digest marks, ...)
@@ -462,7 +465,6 @@ UMZ_DECRYPT = ("absences", "hub_absences"), ("timesheets", "time_sheets")
 
 def _umz_plain(c, table, d, uid=None):
     """A row of the export with its encrypted fields opened (an unreadable value is left out, never the export)."""
-    from ..core.orgcrypt import OrgCryptError, oc_dec_fields
     if uid and table in ("journal", "hub_mails"):  # 2.306.0 A (#2885): sealed with my account key
         try:
             if table == "journal":
@@ -477,7 +479,6 @@ def _umz_plain(c, table, d, uid=None):
             d["email"] = ""
         return d
     if table == "wiki_pages":
-        from ..wiki.wkhist import wsb_body_or
         d["body"] = wsb_body_or(c, d)
         return d
     src = dict(UMZ_DECRYPT).get(table)
@@ -592,7 +593,6 @@ def umz_office(c, zf, out, uid, have, locked):
 
 def umz_build(c, uid, stream, export_id):
     """Writes the ZIP of person uid into stream; returns the manifest."""
-    from ..accounts.settings import umz_export_queries
     from ..admin.hosting import hosted
     out = _Out()
     have = {r[0] for r in c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema()")}
@@ -668,7 +668,6 @@ def umz_build(c, uid, stream, export_id):
             except Exception:  # noqa: BLE001 -- another shape of the table: no server accounts in the file
                 links = []
             _put_rows(zf, out, "server_links", links)
-        from ..life.budget import bud_export  # 2.72.0 (#1333): my budgets, decrypted like Settings > Export
         _put_rows(zf, out, "budgets", bud_export(c, uid))
         client_enc["locked_notes"] = out.tables.get("task_note_locks", 0)
         office = umz_office(c, zf, out, uid, have, locked)  # 2.362.2 (#3099)
@@ -861,7 +860,6 @@ def umz_start():
     umz_person()
     c = db()
     uid = me()
-    from ..accounts.settings import umz_export_queries
     q = umz_export_queries(uid)
     need = 0
     for t in ("attachments", "list_files"):

@@ -27,6 +27,8 @@ from .shfolder import shf_after_move
 from .shkinds import shk_move_files
 from ..core.pg import insert_id  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files
+from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 
 SHM_REF_RE = re.compile(r"\{(p|l|k|t):(\d{1,18})\}")
 SHM_ONLY = N_("Only who created this table or an admin of the organisation can move it out of it")
@@ -83,7 +85,6 @@ def sheets_move_space(sid):
         raise Denied(403, tr(SHM_ONLY))
     if r["org_id"] and r["created_by"] != uid and not is_org_admin(c, uid, r["org_id"]):
         raise Denied(403, tr(SHM_ONLY))
-    from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok
     if not org_out_ok(c, r["org_id"], to, "sheet", sid):  # 2.148.1 B (#2483): out of an organisation only by its admin
         raise oo_denied(c, r["org_id"], to, "sheet", sid)  # 2.361.2 (#2923): the maker can ask an admin
     l = c.execute("SELECT id, name, org_id, e2e FROM lists WHERE id=?", (r["list_id"],)).fetchone() if r["list_id"] else None
@@ -201,6 +202,5 @@ def shm_last(c, sid):
                   (sid,)).fetchone()
     if not r:
         return None
-    from ..collab.comments import user_names
     from ..wiki.wkmove import wkr_line  # 2.97.0 D (#2051): workspaces by name, only those of the viewer
     return wkr_line(c, r, user_names(c, [r["by_id"]]).get(r["by_id"], ""))

@@ -12,6 +12,9 @@ import time
 
 from ..core.db import gsetting, gset
 from ..core.env import env_bool
+from ..files.store import fs_read  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
+from . import store as S  # 2.369.5 (#2517): pulled up from functions
 
 FILL = env_bool("KALMIDO_DOCS_THUMB_FILL", True)
 FILL_S = max(1, int(os.environ.get("KALMIDO_DOCS_THUMB_FILL_S", "15") or 15))  # s between two portions
@@ -39,9 +42,6 @@ def _fill_asn(c, S, nid, n, node):
 def p61a_thumb_fill(c):
     """One portion of the catch-up (the caller runs it in the queue's system context and commits). Returns the number of
     documents looked at; 0 when it is not time yet or the catch-up is done."""
-    from ..files.store import fs_read
-    from ..tasks.attachtext import file_kind
-    from . import store as S
     if not FILL or time.monotonic() - _Q["at"] < FILL_S:
         return 0
     _Q["at"] = time.monotonic()

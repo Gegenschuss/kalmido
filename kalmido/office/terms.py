@@ -53,6 +53,8 @@ from .pdf import pdf_date
 from .model import office_gate, office_org, office_role, office_settings, office_settings_lock, office_settings_save
 from .doclang import doc_lg
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..files.scan import sc_size_mark  # 2.369.5 (#2517): pulled up from functions
+from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from functions
 
 AGB_LANGS = ("de", "en", "nl", "fr", "es", "it")  # 2.460.0 (#3767): every document language (was de / en)
 AGB_MAX_MB = 10
@@ -294,7 +296,6 @@ def agb_mail_files(c, oid, r, b, files):
 def agb_public(meta):
     if not meta:
         return None
-    from ..files.scan import sc_size_mark
     return {**{k: meta.get(k) for k in ("date", "sha256", "name", "bytes", "uploaded_at")}, "up": sc_size_mark(int(meta.get("bytes") or 0))}  # 2.453.0 (#3781)
 
 
@@ -512,7 +513,6 @@ def agb_upload(lang):
     if not raw.startswith(b"%PDF-"):
         return err(tr("Only PDF files"))
     from ..files.scan import SC_RETRY_TEXT, sc_needs_retry, sc_scan  # 2.148.1 E (#2496): virus scan like every upload
-    from ..files.upsafe import UploadRefused
     try:
         if sc_needs_retry(sc_scan(f.filename or "terms.pdf", raw), raw):  # 2.360.0 B (#2496): no later scan for this file, so checked now
             return err(tr(SC_RETRY_TEXT), 503)

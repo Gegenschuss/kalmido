@@ -26,6 +26,8 @@ from ..core.access import plists, time_all, token_lists, tvis, vis_sql, wr_sql  
 from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import st_ids  # 2.369.2 (#3136)
 from ..core.state import ev_links, ev_sig, lz_counts, lz_ids_arg, lz_tree, st_where  # 2.149.0 G (#2517): pulled up from functions
+from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.mineorder import mt_mine_hidden, vw_mine_order  # 2.369.5 (#2517): pulled up from functions
 
 DL_MAX = 200     # more changed tasks than this: the full state is cheaper
 DL_ROWS = 5000  # rows of dl_changes read at most (more: full)
@@ -198,7 +200,6 @@ def dl_scope(c, area, uid):
         return [f"version:u:{int(uid)}"] if uid else None
     if not uid or area not in ("tasks", "comments", "time"):
         return None
-    from ..core.pg import system_ctx
     with system_ctx(c):  # who sees a list = structure (other people's memberships too); only ids, nothing goes to a person
         rows = c.execute("SELECT d.task_id, d.list_id, d.user_id, t.list_id FROM dl_changes d LEFT JOIN tasks t ON t.id=d.task_id "
                          "WHERE d.ver IS NULL LIMIT ?", (DL_SCOPE_ROWS + 1,)).fetchall()
@@ -267,7 +268,6 @@ def dl_side(c, uid):
 @app.get("/api/state/delta")
 def state_delta():
     from ..lists.projects import list_progress
-    from ..tasks.mineorder import mt_mine_hidden, vw_mine_order
     from ..contacts.model import task_contacts
     from ..events.model import events_on
     from ..personal.timetrack import time_list_totals, time_running, time_totals

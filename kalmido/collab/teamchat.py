@@ -19,9 +19,11 @@ from ..collab.news import list_bells, notif_ok
 from ..core.errors import reject_unknown, BadInput
 from ..notify.push import notify, push_handled, push_prio, push_reachable_many, WD_TICKS
 from ..api.common import hit_limit, v1_args, v1_call, v1_json, v1_view
-from ..agents.core import agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_ids, is_agent, listen_agents_of
+from ..agents.core import agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_ids, is_agent, listen_agents_of, need_person
 from ..collab.reactions import clean_emoji
 from ..collab.replies import reply_check, reply_quotes
+from ..collab.comments import mention_names  # 2.369.5 (#2517): pulled up from functions
+from ..core.serializers import unlink_files  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.17.0 (#419): team chat
@@ -435,7 +437,6 @@ def _e2e_parse(v):
 
 def tchat_clean_mentions(c, r, text):
     allowed = tchat_room_members(c, r)
-    from ..collab.comments import mention_names
     names = mention_names(c, [int(x) for x in MENTION_RE.findall(text)])  # 2.148.1 A (#2490): '@?' for unseen accounts
     found = []
 
@@ -467,8 +468,7 @@ def tchat_dm():
     """{user_id} -- the direct conversation with a person I work with (created on first use)."""
     c = db()
     need_tchat(c)
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents talk to people in their own chat"))
+    need_person(403, tr("Agents talk to people in their own chat"))
     other = body().get("user_id")
     if isinstance(other, bool) or not isinstance(other, int) or other not in tchat_coworkers(c, me()):
         raise Denied(404)
@@ -863,7 +863,6 @@ def tchat_delete(mid):
     gone = tcx_files_drop(c, mid)  # 2.113.1 (#2059): its files go for good (rows now, the disk after the commit)
     c.commit()
     if gone:
-        from ..core.serializers import unlink_files
         unlink_files(gone)
     return jsonify(ok=True, id=mid)
 

@@ -31,6 +31,7 @@ from ..collab.teamchat import md_brief, tchat_on, tchat_room_ok
 from ..agents.core import agent_ids, agent_shares, is_agent
 from ..api.v1 import API_PAGE_MAX
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_view
+from ..collab.teamchan import tcx_group_name  # 2.369.5 (#2517): pulled up from functions
 
 ARTS = {"c": 1, "t": 2, "a": 3}
 CHAT_TYPES = ("task", "list", "dm", "agent", "channel", "group")  # 2.113.1 (#2059): + channel, group
@@ -214,7 +215,6 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
             if r["kind"] == "dm":
                 d["_other"] = r["b"] if r["a"] == uid else r["a"]
             elif r["kind"] in ("channel", "group"):  # 2.113.1 (#2059): the conversation's name
-                from ..collab.teamchan import tcx_group_name
                 rr = rrows[r["room_id"]]
                 d["chat_name"] = tcx_group_name(c, rr, uid) if r["kind"] == "group" else rr["name"]
             else:

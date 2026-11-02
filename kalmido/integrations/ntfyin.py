@@ -21,6 +21,7 @@ from ..accounts.session import GATE, me
 from ..accounts.login import seal, unseal
 from ..calendars.subscriptions import cal_allow, cal_host_allowed, cal_http, CalError, cal_norm_url
 from ..core.pages import ntfy_inbox_import
+from ..notify.push import NTFY_TOPIC_RE  # 2.369.5 (#2517): pulled up from functions
 
 NI_ROUND_S = int(os.environ.get("KALMIDO_NTFYIN_TICK", "") or 20)  # s between two rounds (tests: 1)
 NI_MAX_BYTES = 4 * 1024 * 1024  # one answer of a poll
@@ -77,7 +78,6 @@ def ni_get():
 @app.put("/api/me/ntfy-inbox")
 def ni_put():
     """Switch on / off, topic, own server, read token (token: a string sets it, "" removes it, absent keeps it)."""
-    from ..notify.push import NTFY_TOPIC_RE
     b = body()
     c = db()
     uid = me()

@@ -27,6 +27,10 @@ from ..core.i18n import N_, tr
 from ..core.pg import insert_id, system_ctx
 from ..accounts.login import addr_key, seal, unseal
 from ..accounts.session import me
+from ..accounts.orgs import user_orgs, visible_people  # 2.369.5 (#2517): pulled up from functions
+from .core import sh_may, sh_is_agent, sh_need  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
+from .vars import _agent_cap  # 2.369.5 (#2517): pulled up from functions
 
 SHS_ROLES = ("read", "write")
 SHS_MAX = 200
@@ -73,14 +77,12 @@ def shs_fits(c, uid, r, agent=None):
         if r["org_id"] is None and agent["owner_id"] not in (None, r["owner_id"]):
             return False  # somebody else's personal agent
         if r["list_id"] and agent["list_ids"]:
-            from .vars import _agent_cap
             cap = _agent_cap(c, uid)
             if cap is not None and r["list_id"] not in cap:
                 return False
         return True
     if r["org_id"] is None:
         return True
-    from ..accounts.orgs import user_orgs
     return r["org_id"] in user_orgs(c, uid) and acx_org_ok(c, uid, r["org_id"])
 
 
@@ -94,7 +96,6 @@ def shs_may(c, uid, r, write=False):
 
 def shs_need_own(c, r, code=403):
     """403 (code) unless the current person may write sheet r through its space / list (a share is not enough)."""
-    from .core import sh_may
     if not sh_may(c, me(), r, write=True, share=False):
         raise Denied(code, tr(SHS_ONLY_OWN)) if code == 403 else Denied(code)
 
@@ -120,7 +121,6 @@ def shs_index(c, uid, space, rows):
 
 def shs_marks(c, uid, rows, out):
     """sh_brief's hook: shared = number of live shares (for who may manage them), shared_in = uid reads it only through a share."""
-    from .core import sh_may
     ids = [r["id"] for r in rows]
     n = {}
     if ids:
@@ -137,7 +137,6 @@ def shs_marks(c, uid, rows, out):
 
 def shs_flags(c, r, uid):
     """For GET /api/sheets/<id>: shared_in (only through a share), can_share."""
-    from .core import sh_may
     own = sh_may(c, uid, r, share=False)
     return {"shared_in": not own, "can_share": own and sh_may(c, uid, r, write=True, share=False),
             "shared": c.execute("SELECT COUNT(*) FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (r["id"],)).fetchone()[0]}
@@ -145,7 +144,6 @@ def shs_flags(c, r, uid):
 
 def shs_targets(c, r, uid):
     """{people, agents} uid may share sheet r with (never uid itself, never an account outside the table's workspace)."""
-    from ..accounts.orgs import visible_people
     vis = visible_people(c, uid)
     org = r["org_id"]
     with system_ctx(c):  # which accounts are agents / members of the table's organisation (ids; vis filters the people)
@@ -168,7 +166,6 @@ def shs_targets(c, r, uid):
 
 
 def shs_list(c, sid):
-    from ..collab.comments import user_names
     rows = c.execute("SELECT s.*, u.kind FROM sheet_shares s LEFT JOIN users u ON u.id=s.user_id WHERE s.sheet_id=? AND s.revoked_at IS NULL "
                      "ORDER BY s.id", (sid,)).fetchall()
     names = user_names(c, {x["user_id"] for x in rows if x["user_id"] and not x["email_key"]})
@@ -280,7 +277,6 @@ def shs_forget(c, uid):
 
 def _manage(c, sid):
     """The sheet for a person who may manage its shares (agents: 403 -- session.py refuses them on web routes anyway)."""
-    from .core import sh_is_agent, sh_need
     uid = me()
     if sh_is_agent(c, uid):
         raise Denied(403)

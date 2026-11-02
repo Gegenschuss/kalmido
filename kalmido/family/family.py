@@ -52,6 +52,9 @@ from ..agents.core import agent_ids, is_agent
 #     bottom" (reusable)
 # Rights: the usual list roles; rewards / stars of a kid only its parents (and admins); a kid requests rewards.
 from dateutil.relativedelta import relativedelta  # noqa: E402
+from ..collab.liste2eguard import le2b_list_locked, le2b_off  # 2.369.5 (#2517): pulled up from functions
+from ..collab.liste2e import le2a_gen_refuse  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orginvite import ojn_waiting  # 2.369.5 (#2517): pulled up from functions
 
 FAM_LIST_KINDS = ("", "shopping", "meals", "birthdays", "household", "packing", "family", "recipes")  # 2.46.1 (#1615): "family"; 2.140.0 A (#2132): "recipes"
 FAM_OCC = ("birthday", "anniversary")
@@ -621,7 +624,6 @@ def occ_create(c, uid, b, check=True):
         lid = as_int(lid, "list_id", 1)
         if check:
             need_list(c, lid)
-        from ..collab.liste2e import le2a_gen_refuse
         le2a_gen_refuse(c, lid)  # 2.64.1 review (M3): a plain birthday title never goes into a list with the lock
         sid = pm_fam_sec_of(c, lid, "birthdays", uid)
     else:
@@ -669,7 +671,6 @@ def deadline_create(c, uid, b):
     if lid not in (None, ""):
         lid = as_int(lid, "list_id", 1)
         need_list(c, lid)
-        from ..collab.liste2e import le2a_gen_refuse
         le2a_gen_refuse(c, lid)  # 2.64.1 review (M3)
         sid = pm_fam_sec_of(c, lid, "deadlines", uid)
     else:
@@ -903,7 +904,6 @@ def to_shopping(c, uid, items, lid=None, source=None):
             raise BadInput(tr("This is not a shopping list"))
     else:
         lid = fam_list(c, uid, "shopping")
-    from ..collab.liste2eguard import le2b_list_locked, le2b_off
     if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): the server cannot add plain items to a list with the lock (the app does)
         raise BadInput(le2b_off())
     have = {}
@@ -1029,7 +1029,6 @@ def purpose_apply(c, uid, purpose, examples=False, all_mods=None, only=False):
         with system_ctx(c):  # a member of an organisation keeps collaboration (team chat, sharing); memberships as user_orgs
             org = c.execute("SELECT 1 FROM org_members m JOIN orgs o ON o.id=m.org_id WHERE m.user_id=? AND o.retired_at IS NULL LIMIT 1",
                             (uid,)).fetchone()
-        from ..accounts.orginvite import ojn_waiting
         org = org or ojn_waiting(c, uid)  # 2.453.0 (#3780): a new account answers this before it accepts its invitation
         sw = tuple(x for x in sw + ("docs",) if not (x == "collab" and org))
     fs = [x for x in fs if x not in sw or x in on] + [x for x in PURPOSE_MODS if x in on and x not in fs]
@@ -1173,7 +1172,6 @@ def kids_for(c, uid):
     adm = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
     q = "SELECT id FROM users WHERE kid=1 AND disabled=0 AND (id IN (SELECT kid_id FROM kid_parents WHERE parent_id=?)"
     if adm and adm[0]:  # 2.86.0 (N8): an admin: the kids of their own organisations, not every kid of the instance
-        from ..core.pg import system_ctx
         with system_ctx(c):  # membership structure, as in h6a_admin_kid_ok
             ids = [r[0] for r in c.execute(q + " OR " + H6A_ADMIN_KIDS + ") ORDER BY id", (uid, uid))]
         return [kid_dict(c, k) for k in ids]

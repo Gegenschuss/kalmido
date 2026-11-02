@@ -40,6 +40,11 @@ from ..docs import store as S
 from . import ngx as P
 from ..core.orgcrypt import oc_active, oc_seal_k  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import insert_id, system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.session import GATE  # 2.369.5 (#2517): pulled up from functions
+from ..admin.hosting import quota_info, QuotaExceeded, fmt_bytes  # 2.369.5 (#2517): pulled up from functions
+from .learn import pll_finish, pll_stored, pll_rules_preview  # 2.369.5 (#2517): pulled up from functions
+from .web import _run_public, _gate, _ws, _public  # 2.369.5 (#2517): pulled up from functions
+from ..core.orgcrypt import MAGIC, OrgCryptError, oc_open_k  # 2.369.5 (#2517): pulled up from functions
 
 
 def _env_mb(name, default):
@@ -149,7 +154,6 @@ class _Parts(io.RawIOBase):
 
     def _part(self, i):
         if self._cur[0] != i:
-            from ..core.orgcrypt import MAGIC, OrgCryptError, oc_open_k
             try:
                 with open(_part_path(self._rid, i), "rb") as f:
                     raw = f.read()
@@ -373,7 +377,6 @@ def _check_one(c):
 
 
 def _check_loop():
-    from ..accounts.session import GATE
     try:
         while True:
             with _CK_LOCK:
@@ -413,7 +416,6 @@ def _info(c, r):
 def plh_space(c, uid, need, exact):
     """{need, exact, free (None = no limit), fits: yes | maybe | no} -- maybe = an estimate above the free space (a warning,
     the import may start), no = full, or an exact size above the free space."""
-    from ..admin.hosting import quota_info
     q = quota_info(c, uid) or {}
     free = max(0, q["limit"] - q["used"]) if q.get("limit") else None
     fits = "yes"
@@ -451,7 +453,6 @@ def _zstopped(c, rid):
 
 def _learn(c, r, uid, since, labels):
     """learn.py (#1847): rules + training from what came in (an empty dict on an error)."""
-    from .learn import pll_finish
     try:
         return pll_finish(c, r["ws"], r["org_id"], uid, _src(r), since, labels, P.pl_mapping(c, r)) or {}
     except Exception as e:  # noqa: BLE001 -- learning never fails the import
@@ -462,7 +463,6 @@ def _learn(c, r, uid, since, labels):
 def plh_zip_run(c, rid):
     """The run of upload rid (claimed: run_state 'busy'): every document of the export, oldest first; commits after every
     document; at the end (also stopped / full / failed) the parts go. Never raises."""
-    from ..admin.hosting import QuotaExceeded
     from ..docs.ingest import docs_kick as kick
     r = c.execute("SELECT * FROM pl_uploads WHERE id=?", (rid,)).fetchone()
     if not r:
@@ -528,7 +528,6 @@ def plh_zip_run(c, rid):
         print("paperless: zip run", rid, type(e).__name__, e, flush=True)
         error = "failed"
     learn = _learn(c, t, uid, since, scan["labels"]) if scan else {}
-    from .learn import pll_stored
     try:
         beat(run_state="", state="done", run_error=error, run_learn=pll_stored(learn), updated_at=_now())
     except P.PlLost:
@@ -571,14 +570,12 @@ def plh_public(c, ws, uid):
     r = _row(c, ws)
     if not r:
         return None
-    from .web import _run_public
     run = _run_public(c, "pl_uploads", r, "all", uid)
     return {"id": r["id"], "state": r["state"], "name": r["name"], "size": r["size"], "got": r["got"], "chunk": r["chunk"] or PLH_CHUNK,
             "next": r["parts"], "mine": r["created_by"] == uid, "error": r["error"], "error_text": P.pl_err_text(r["error"]), "run": run}
 
 
 def _mine(c, raw, need_state=None):
-    from .web import _gate, _ws
     _gate()
     uid, org, ws = _ws(c, raw)
     r = _row(c, ws)
@@ -594,7 +591,6 @@ def _running(r):
 
 
 def _answer(c, ws, uid, org):
-    from .web import _public
     return jsonify(_public(c, ws, uid, org))
 
 
@@ -602,8 +598,6 @@ def _answer(c, ws, uid, org):
 def plh_zip_new():
     """{ws, size, name?} -- announces the upload of an export ZIP of `size` bytes (replaces an earlier upload of the same
     person in the workspace that does not run). 413 when it is larger than allowed or the storage is full."""
-    from ..admin.hosting import QuotaExceeded, quota_info
-    from .web import _gate, _ws
     _gate()
     c = db()
     d = body()
@@ -714,7 +708,6 @@ def plh_zip_preview():
     count, already, need = _left(c, r, info)
     mp = P.pl_mapping(c, r)
     out = {"count": count, "already": already, "zip": True, **_rows(mp, info.get("labels") or {}), "size": plh_space(c, uid, need, True)}
-    from .learn import pll_rules_preview  # 2.69.0 (#1847): which matching rules come along
     try:
         out["rules"] = pll_rules_preview(info.get("labels") or {}, mp, c=c, ws=ws, src=_src(r))
     except Exception as e:  # noqa: BLE001 -- the preview never fails on the rules
@@ -725,7 +718,6 @@ def plh_zip_preview():
 @app.post("/api/paperless/zip/import")
 def plh_zip_start():
     """{ws, mapping?} -- saves the mapping and queues the import of the uploaded export (413 when it does not fit)."""
-    from ..admin.hosting import fmt_bytes
     c = db()
     d = body()
     uid, org, ws, r = _mine(c, d.get("ws"), "ready")
@@ -750,7 +742,6 @@ def plh_zip_start():
 def plh_zip_stop():
     """{ws} -- a waiting run ends at once and its upload goes; a running one stops after the current document (what came
     in stays, the upload goes then)."""
-    from .web import _gate, _ws
     _gate()
     c = db()
     uid, org, ws = _ws(c, body().get("ws"))
@@ -769,7 +760,6 @@ def plh_zip_stop():
 @app.delete("/api/paperless/zip")
 def plh_zip_drop():
     """?ws= -- discards the upload of the workspace (not while its run waits or runs: stop it first)."""
-    from .web import _gate, _ws
     _gate()
     c = db()
     uid, org, ws = _ws(c, request.args.get("ws"))

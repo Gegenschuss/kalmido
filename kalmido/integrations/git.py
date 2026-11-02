@@ -32,10 +32,12 @@ from ..notify.push import _b64u, _b64u_dec
 from ..notify.alerts import _env_int, aa_count
 from ..collab.integfail import INTEG_FAILS, integ_tell
 from ..calendars.subscriptions import _cal_opener, cal_allow, cal_err_text, cal_host_allowed, cal_rate, CAL_TIMEOUT, CalError
-from ..agents.core import agent_emit, agent_notify, agent_row, agent_runtime, agent_task_data, git_author_clean, git_author_str, is_agent, list_agents
+from ..agents.core import agent_emit, agent_notify, agent_row, agent_runtime, agent_task_data, git_author_clean, git_author_str, is_agent, list_agents, need_person
 from ..tasks.ticketkey import tk_find, tk_has_key, tk_prefixes, tk_text_pairs, tk_text_re  # 2.390.0 (#3353)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 from .webhooks import wh_enqueue, wh_note  # 2.392.0 B (#3364)
+from ..calendars.subscriptions import cal_norm_url  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.session import rate_ip  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.2.0 (#271): Git integration, (#339) tickets for agents
@@ -110,7 +112,6 @@ GIT_TOKEN_MAX = 400  # longest access token accepted
 
 def git_norm_base_url(u):
     """The base URL of a self-hosted Git server (http(s), no credentials / query / fragment; a trailing /api is dropped)."""
-    from ..calendars.subscriptions import cal_norm_url
     u = cal_norm_url(u)
     from ..admin.hosting import hosted
     if not u or not u.lower().startswith(("https://",) if hosted() else ("http://", "https://")):  # 2.24.0 (#905): hosted = HTTPS only
@@ -950,8 +951,7 @@ def git_merge_link(c, t, sug):
 
 # ---- endpoints (web app)
 def git_need_manage(c, lid):
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot connect repositories"))
+    need_person(403, tr("Agents cannot connect repositories"))
     need_list(c, lid, write=False, manage=True)
 
 
@@ -1189,7 +1189,6 @@ def git_refresh(cid):
 @app.post("/api/hooks/git/<int:cid>")
 def git_hook(cid):
     """Inbound webhook (GitHub / Gitea / Forgejo / GitLab / Bitbucket): a valid signature only triggers the next poll at once."""
-    from ..accounts.session import rate_ip
     # 2.126.0 B (#1979 I5): a limit and a size cap before the signature; review: per address, so one sender cannot hold up
     # the hooks of a connection for the repository host (a wider cap per connection stays)
     if hit_limit(f"githook:{cid}@{rate_ip()}", GIT_HOOK_PER_MIN) or hit_limit(f"githook:{cid}", GIT_HOOK_PER_MIN * 5):

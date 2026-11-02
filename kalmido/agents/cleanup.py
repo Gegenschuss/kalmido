@@ -34,6 +34,8 @@ from ..tasks.lifecycle import apply_update
 from ..agents.core import (
     agent_active, agent_emit, agent_row, agent_usable, job_dict, JOB_TITLE_MAX, list_sections, task_being_edited, tidy_agent_of,
 )
+from ..agents.proposals import _p_int, _p_keys, _p_list, _p_str, PROP_HINT_MAX, PROP_LIMITS, PROP_OPEN_MAX, prop_mode, PROP_MAX_ITEMS, PROP_NOTES_MAX, PROP_TITLE_MAX, prop_titles  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.dependencies import completed_ids, unblock_events  # 2.369.5 (#2517): pulled up from functions
 
 CLN_PACK = 50          # open top-level tasks per package (= per proposal job)
 CLN_PACKS = 5          # packages per request (more: only the first CLN_PACK * CLN_PACKS tasks, the answer says so)
@@ -49,7 +51,6 @@ CLN_WHY = {"editing": N_("someone is editing it right now"), "changed": N_("chan
 # ---- the request
 def cln_request(c, uid, b):
     """POST /api/proposals {kind: "cleanup", list_id, task_ids?, hint?} -> one proposal job per package (201)."""
-    from ..agents.proposals import _p_int, _p_keys, _p_list, _p_str, PROP_HINT_MAX, PROP_LIMITS, PROP_OPEN_MAX
     from ..agents.usage import usage_block
     from ..agents.safety import agent_cap
     _p_keys(b, "", ("agent_id", "kind", "list_id", "task_ids", "hint"))
@@ -69,7 +70,6 @@ def cln_request(c, uid, b):
     if not a or not agent_active(a):
         return err(tr("This project has no agent that may tidy it up: share it with an agent with edit rights first"), 409)
     name = a["display_name"] or a["username"]
-    from ..agents.proposals import prop_mode
     if prop_mode(a) == "off":  # the agent's admin switched proposals off for it
         return err(tr("{0} does not make proposals", name), 409)
     cap = agent_cap(c, aid)
@@ -142,7 +142,6 @@ def cln_ltags(c, ids):
 # ---- the agent's proposal
 def cln_validate(b, inp):
     """{summary, items: [{op, ...}]} -> normalized entries; every task_id from the input, each at most once."""
-    from ..agents.proposals import _p_int, _p_keys, _p_list, _p_str, PROP_MAX_ITEMS, PROP_NOTES_MAX, PROP_TITLE_MAX
     ids = {x["task_id"] for x in inp.get("items", [])}
     secs = {s["id"] for s in (inp.get("list") or {}).get("sections", [])}
     raw = _p_list(b.get("items"), "items", PROP_MAX_ITEMS)
@@ -269,7 +268,6 @@ def cln_close(c, rec, tid, reason, into=None):
     for d in kids:
         c.execute("UPDATE tasks SET status=-1, completed_at=?, completed_by=?, updated_at=? WHERE id=? AND status=0", (ts, me(), ts, d))
     log_act(c, tid, "wont", {k: v for k, v in (("reason", (reason or "")[:500] or None), ("merged_into", into)) if v})
-    from ..tasks.dependencies import completed_ids, unblock_events
     unblock_events(c, completed_ids(c, tid))
     rec["closed"].append({"id": tid, "kids": kids, "at": ts})
 
@@ -342,7 +340,6 @@ def cln_result(rec):
 def cln_undo(c, rec, back=True):
     """One step back (back) or forward again: field changes through apply_update (what someone changed since stays and is
     reported), closed tasks open again while they are still closed from this apply (and closed again on redo)."""
-    from ..agents.proposals import prop_titles
     skipped, n, ts = [], 0, iso(now_utc())
     for tid, ch in (rec.get("changes") or {}).items():
         tid = int(tid)

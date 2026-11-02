@@ -13,6 +13,7 @@ from ..core.db import gset, gsetting, iso, local_now, now_utc
 from ..accounts.orgs import PRIVATE_FOLDER_RE, _operator_apart, has_workspaces, op_foreign_account, op_foreign_org
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import dlg_gone  # 2.473.0 (#3357)
+from ..accounts.orgs import INSTANCE_ENV  # 2.369.5 (#2517): pulled up from functions
 
 # when the check runs: once a day at this local hour or later; KALMIDO_TENANT_CHECK=always = at every watchdog tick (tests)
 TENANT_CHECK_HOUR = int(os.environ.get("KALMIDO_TENANT_CHECK_HOUR", "3") or 3)
@@ -571,7 +572,6 @@ def ws_migrate_objs(c):
     commits."""
     if gsetting(c, "migr_ws2300") == "1":
         return
-    from ..accounts.orgs import INSTANCE_ENV
     if not has_workspaces(c) and INSTANCE_ENV == "shared":
         return  # no flag yet: a server that gets organisations later (mode switch) still migrates then
     # 2.46.0 (#1592): a server without organisations is done at once (its first organisation later moves nothing)

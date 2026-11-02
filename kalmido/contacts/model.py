@@ -20,6 +20,12 @@ from ..tasks.validation import DATE_MIN_Y
 from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..core.config import APP_NAME, APP_VERSION  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.orgs import org_role as om_role, user_orgs, clean_org_id, ws_obj_default, need_visible, ws_fit_problem  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import org_roles_of, org_readonly  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import news_add  # 2.369.5 (#2517): pulled up from functions
+from ..family.family import _jparse, occ_create, occ_next, occ_rule  # 2.369.5 (#2517): pulled up from functions
+from ..collab.liste2e import le2a_gen_locked  # 2.369.5 (#2517): pulled up from functions
+from ..events.model import need_event  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.21.0 (#658): contacts
@@ -66,7 +72,6 @@ def obk_org(b):
 def obk_org_role(c, uid, oid, org_role):
     """The role person uid has in an address book of organisation oid through that organisation: 'owner' for its admins,
     org_role ('view' | 'edit') for its other members, else None. Agents and kid accounts only through a share."""
-    from ..accounts.orgs import org_role as om_role
     u = c.execute("SELECT kind, kid FROM users WHERE id=?", (uid,)).fetchone()
     if not u or (u["kind"] or "user") == "agent" or u["kid"] or c.execute("SELECT 1 FROM agents WHERE user_id=?", (uid,)).fetchone():
         return None
@@ -94,7 +99,6 @@ def book_role(c, uid, b, trash=False, fold=True):
 
 def _bk_ro(c, uid, oid, role):
     if role and oid and role != "view":
-        from ..accounts.orgroles import org_readonly
         if org_readonly(c, uid, oid):
             return "view"
     return role
@@ -139,7 +143,6 @@ def need_book(c, bid, write=False, manage=False, uid=None, trash=False):
 def my_book_ids(c, uid, fold=True):
     out = {r[0]: "owner" for r in c.execute("SELECT id, org_id FROM books WHERE owner_id=? AND owner_org_id IS NULL AND deleted_at IS NULL", (uid,))
            if acx_org_ok(c, uid, r[1])}
-    from ..accounts.orgs import user_orgs
     oids = user_orgs(c, uid)
     if oids:  # 2.52.0 C (#1438): the address books of my organisations, as their roles allow
         base = {}  # per organisation: admin ('owner') or a member who gets the book's org_role (one lookup each)
@@ -156,7 +159,6 @@ def my_book_ids(c, uid, fold=True):
             if acx_org_ok(c, uid, r[2]) and (not r[3] or r[3] == r[2]):  # 2.36.2 (#1142): organisation books only for its members
                 if BOOK_RANK.get(r[1], 0) > BOOK_RANK.get(out.get(r[0]), 0):  # 2.52.0 C (#1438): the better of share + organisation role
                     out[r[0]] = r[1]
-    from ..accounts.orgroles import org_roles_of
     if out and "readonly" in org_roles_of(c, uid).values():  # 2.143.0 A (#2151)
         orgs = {r[0]: r[1] for r in c.execute(f"SELECT id, org_id FROM books WHERE id IN ({','.join(str(int(k)) for k in out)})")}
         out = {k: _bk_ro(c, uid, orgs.get(k), v) for k, v in out.items()}
@@ -220,7 +222,6 @@ def book_fields(b, create=False):
 def book_create(c, uid, b, src_id=None):
     """2.30.0 (#1036): b.org_id = its workspace (None / 0 = private, else an organisation of uid); not given: an address book
     mirrored from an outside account (src_id) is private, else the default of a new object (ws_obj_default)."""
-    from ..accounts.orgs import clean_org_id, ws_obj_default
     f = book_fields(b, True)
     oid = clean_org_id(c, b["org_id"], uid) if "org_id" in b else (None if src_id else ws_obj_default(c, uid))
     if c.execute("SELECT COUNT(*) FROM books WHERE owner_id=? AND owner_org_id IS NULL", (uid,)).fetchone()[0] >= BOOKS_MAX:  # 2.52.0 C (#1438): own books
@@ -244,7 +245,6 @@ def book_touch(c, bid):
 
 
 def book_member_set(c, bid, uid, role):
-    from ..collab.news import news_add
     from ..agents.admin import personal_agent_foreign
     from ..agents.core import is_agent
     if not collab_all():
@@ -258,7 +258,6 @@ def book_member_set(c, bid, uid, role):
     if is_agent(u) and not has_request_context():
         raise Denied(404, tr("unknown person"))
     if not c.execute("SELECT 1 FROM book_members WHERE book_id=? AND user_id=?", (bid, uid)).fetchone():  # a new member
-        from ..accounts.orgs import need_visible, ws_fit_problem
         need_visible(c, uid)  # 2.30.0 (#1036, B2): only people one may see (404 as for an unknown id)
         p = ws_fit_problem(c, b["org_id"], uid, "book")  # 2.30.0 (#1036, B3): an organisation's address book only inside it
         if p:
@@ -928,7 +927,6 @@ def contact_dict(c, r, uid=None, links=True):
                                             WHERE l.contact_id=? AND t.deleted_at IS NULL ORDER BY t.status, t.due IS NULL, t.due""", (r["id"],))
                       if task_visible(c, x["task_id"], uid)]
         d["events"] = []
-        from ..events.model import need_event
         for e in c.execute("""SELECT e.id FROM events e WHERE e.id IN (SELECT a.event_id FROM event_attendees a WHERE a.contact_id=?)
                               AND e.deleted_at IS NULL ORDER BY e.first_day DESC LIMIT 50""", (r["id"],)):
             try:
@@ -1030,14 +1028,12 @@ def task_contacts(c, uid, task_ids=None):
 
 # ---- birthdays + anniversaries of own contacts -> yearly tasks (the book's birthday list; module Family)
 def occ_sync(c, cid):
-    from ..family.family import _jparse, occ_create, occ_next, occ_rule
     r = c.execute("SELECT k.*, b.owner_id, b.occ_list_id, b.src_id AS b_src FROM contacts k JOIN books b ON b.id=k.book_id WHERE k.id=?",
                   (cid,)).fetchone()
     if not r or r["b_src"] or not r["occ_list_id"] or r["kind"] == "group" or r["deleted_at"]:  # 2.272.0 E1 (#3038): not from the trash
         return
     if list_role(c, r["occ_list_id"], r["owner_id"]) not in WRITE_ROLES:
         return
-    from ..collab.liste2e import le2a_gen_locked
     if le2a_gen_locked(c, r["occ_list_id"]):  # 2.64.1 review (M3): no plain birthday titles in a list with the lock
         return
     lg = lang(c, r["owner_id"])

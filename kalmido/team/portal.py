@@ -33,6 +33,13 @@ from ..core.access import acx_anon_bind, need_task, task_visible  # 2.149.0 G (#
 from ..api.common import hit_budget, hit_limit  # 2.149.0 G (#2517): pulled up from functions
 from ..core.mailframe import Safe, mail_html
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..lists import public as P  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, rate_ip, me  # 2.369.5 (#2517): pulled up from functions
+from ..notify.alerts import aa_count  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import collab_user, lang_of  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import KIND_ROW, news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
+from ..notify.push import push_prio, push_reachable  # 2.369.5 (#2517): pulled up from functions
+from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO  # 2.369.5 (#2517): pulled up from functions
 
 PT_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{20,64}")
 PT_EMAIL_MAX = 200
@@ -114,7 +121,6 @@ _PT_EDITS = ("content", "md_subtasks", "tidy")  # history kinds after which the 
 
 def _pt_rt():
     """The public-page helpers of lists/public.py (imported late: that module imports a lot)."""
-    from ..lists import public as P
     return P
 
 
@@ -146,8 +152,6 @@ def pt_find(c, token):
 
 def pt_open(c, token):
     """Common checks of every /p/ request -> (ticket, None) or (None, response)."""
-    from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, rate_ip
-    from ..notify.alerts import aa_count
     P = _pt_rt()
     if not P.public_links_on(c):
         return None, P.pub_gone()
@@ -268,7 +272,6 @@ def pt_render(c, p, token, lg, note=""):
 @app.get("/p/<token>")
 def pt_page(token):
     from flask import request
-    from ..accounts.session import _accept_lang, rate_ip
     c = db()
     if hit_limit("ptv:" + rate_ip(), PT_VIEW_RATE):
         return _pt_rt().pub_limited(_accept_lang())
@@ -308,7 +311,6 @@ def pt_comment(token):
     """The reporter answers: a comment with portal = 1 and their name (no account), News + push to the team like a comment
     on their task, a comment event to the agents that follow the task."""
     from flask import redirect, request
-    from ..accounts.session import rate_ip
     from ..agents.core import agent_comment_events
     c = db()
     p, bad = pt_open(c, token)
@@ -338,10 +340,6 @@ def pt_team_news(c, t, cid, text, name):
     """News + push for the people of task t (owner, creator, assignee, "urgent" bell) like a customer's comment through a
     public link (lists/public.py cv_fb_post); the caller commits."""
     from flask import g
-    from ..collab.comments import collab_user, lang_of
-    from ..collab.news import KIND_ROW, news_add, notif_ok
-    from ..notify.push import push_prio, push_reachable
-    from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO
     from ..agents.core import agent_ids
     rcpt = ({t["l_owner"], t["created_by"], t["assignee_id"]} | tbl_urgent_users(c, t["id"]) | wat_users(c, t["id"])) - {None} - agent_ids(c)
     for uid in sorted(rcpt):
@@ -429,7 +427,6 @@ def pt_limit_note(c, org_id, owner_id):
     """2.138.4 C (#2380): the space's budget of sign-in mails (ptls) is used up: a News item for its admins (an organisation)
     or its owner (the private space), at most once per window and process; no push, no mail. Caller commits."""
     import json
-    from ..collab.news import notif_ok
     if hit_limit(f"ptlsn:{org_id or ''}:{owner_id or ''}", 1, PT_LOGIN_WIN):
         return 0
     with system_ctx(c):  # who administers the space (structure); the notice names no customer
@@ -450,7 +447,6 @@ def pt_limit_note(c, org_id, owner_id):
 @app.post("/p/<token>/login")
 def pt_login_ask(token):
     from flask import redirect, request
-    from ..accounts.session import rate_ip
     from ..admin.hosting import mail_budget
     from ..integrations.mail import MAIL_OUT_ON
     t0 = time.monotonic()
@@ -514,7 +510,6 @@ def _pt_link_gone(lg):
 @app.get("/portal/login/<tok>")
 def pt_login_page(tok):
     """A button, not the sign-in itself: mail scanners that open links must not use the one-time link up."""
-    from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, rate_ip
     c = db()
     lg = _accept_lang()
     bad = [("ptbad:" + rate_ip(), PT_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
@@ -567,7 +562,6 @@ def pt_cookie_read(c):
 @app.post("/portal/login/<tok>")
 def pt_login(tok):
     from flask import redirect, request
-    from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, rate_ip
     c = db()
     lg = _accept_lang()
     bad = [("ptbad:" + rate_ip(), PT_BAD_LIMIT)]  # 2.126.0 C (#1979 I2): limited only when the link is not valid
@@ -603,7 +597,6 @@ def pt_my_tickets(c, eh, org_id, owner_id):
 @app.get("/portal")
 def pt_portal():
     from flask import g
-    from ..accounts.session import _accept_lang, rate_ip
     c = db()
     lg = _accept_lang()
     if hit_limit("ptv:" + rate_ip(), PT_VIEW_RATE):
@@ -646,11 +639,9 @@ def pt_logout():
     from flask import redirect, request
     c = db()
     if request.headers.get("Sec-Fetch-Site", "") == "cross-site" or not hmac.compare_digest(request.form.get("f") or "", pt_out_key(c)):
-        from ..accounts.session import _accept_lang
         return _pt_denied(_accept_lang())
     r = r81c_cookie_login(c)
     if r:  # 2.81.0 (#1866): the cookie stops working everywhere, not only in this browser
-        from ..core.pg import system_ctx
         with system_ctx(c):  # the one sign-in row the signed cookie names
             c.execute("UPDATE portal_logins SET revoked_at=? WHERE id=?", (iso(now_utc()), r["id"]))
         c.commit()
@@ -719,7 +710,6 @@ def pt_comment_flag(c, tid, uid, v):
 def pt_ticket_set(tid):
     """{notify: bool}: mails to the reporter on / off (people who may change the task)."""
     from flask import jsonify
-    from ..accounts.session import me
     c = db()
     need_task(c, tid, write=True)
     p = pt_ticket_of(c, tid)

@@ -30,6 +30,11 @@ from ..agents.core import (
     need_chat_agent, WAKE_LIMIT,
 )
 from ..collab.reactions import clean_emoji
+from ..collab.news import news_read_job  # 2.369.5 (#2517): pulled up from functions
+from ..collab.replies import reply_quotes, reply_check  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import jn9_job_names, agent_shares, need_agent, may_set_runtime, task_editing_set  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import comment_plain  # 2.369.5 (#2517): pulled up from functions
+from ..core.orgcrypt import oc_seal_path, oc_user_space  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---- agents: what people see (state, chat, jobs, wake)
@@ -159,7 +164,6 @@ def agent_job_action(jid):
                 data.update(task=task_for(c, t, j["agent_id"]), list=lst_brief(c, t["list_id"]))
     agent_emit(c, j["agent_id"], "job", data)
     # 2.138.3 A (#2406): the question is settled for everybody; 2.367.2 (#2968): also a plain waiting job, its News are on by default
-    from ..collab.news import news_read_job
     news_read_job(c, j, ts)
     bump(c)
     c.commit()
@@ -201,7 +205,6 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None, edits=False):
 
 
 def chat_reply(r):
-    from ..collab.replies import reply_quotes
     rt = r["reply_to"] if "reply_to" in r.keys() else None
     return {"reply_to": rt, "reply": reply_quotes(db(), "a", [rt]).get(rt) if rt else None}
 
@@ -284,7 +287,6 @@ def chat_one(c, r, api=False, edits=False):
 def jn9_chat_jobs(c, msgs, uid):
     """2.59.0 (#1827): each message with a job_id gets job_name, job_parent (the message's, else the job's leader) and
     job_parent_name -- only of jobs uid may see (job_visible), else null. The app shows the name and derives the colour."""
-    from ..agents.core import jn9_job_names
     jn = jn9_job_names(c, [m.get("job_id") for m in msgs] + [m.get("job_parent") for m in msgs], uid)
     for m in msgs:
         if not m.get("job_id"):
@@ -352,7 +354,6 @@ def chat_save_files(c, m, files, saved):
             size, mime, info = up_check_path(c, full, name, mime, m["user_id"], None, "chat")
         except UploadRefused as e:
             return str(e)
-        from ..core.orgcrypt import oc_seal_path, oc_user_space
         oc_seal_path(c, oc_user_space(m["user_id"]), full, fresh=True)  # 2.64.0 (#1864): the person's account key at rest (after the checks)
         cid = insert_id(c, "INSERT INTO chat_files(message_id,name,mime,size,path,created_at) VALUES(?,?,?,?,?,?)",
                         (m["id"], name, mime, size, rel, ts))
@@ -592,7 +593,6 @@ def chat_choices_withdraw(c, m, outcome=None):
 @v1_view
 def v1_agent_chat_withdraw(uid, mid):
     """2.30.0 (#1037): {outcome?} -- the agent withdraws the open answer buttons of its message (MCP withdraw_chat_choices)."""
-    from ..agents.core import agent_shares, need_agent
     v1_args(())
     aid = need_agent()
     c = db()
@@ -640,7 +640,6 @@ def chat_post(c, aid, uid, sender, b, files, allowed_keys=("body", "task_id")):
     else:
         text = chat_body(text)
     tid = chat_task(c, b.get("task_id"), uid, aid, person=sender == "user")
-    from ..collab.replies import reply_check
     orig = reply_check(c, "a", b.get("reply_to"), agent_id=aid, user_id=uid)  # 2.33.0 (#1076): the same conversation (else 400)
     if sender == "agent" and b.get("approval") not in (None, ""):  # 2.35.0 (#1103): an approval request
         if any(b.get(k) not in (None, "", [], False) for k in ("choices", "multi", "permission")):
@@ -839,7 +838,6 @@ def agent_permission_mode(aid):
     """2.29.0 (#1029): {mode: ask | auto | ''} from the chat header's badge -- the owner of a personal agent, an instance admin
     for a team agent. The agent's host reads it before its next run (runtime.permission_mode, event runtime_changed)."""
     from ..agents.admin import runtime_set
-    from ..agents.core import may_set_runtime
     c = db()
     a = need_chat_agent(c, aid)
     if not may_set_runtime(c, a, me()):
@@ -1104,7 +1102,6 @@ def agent_chat_edit(aid, mid):
 def med_comment_edited(c, t, k, old_body):
     """A comment was edited (comments.py, before its new mentions are sent): message_edited to every agent that got it as
     an event and still sees the task with its comments (agent_emit blocks health lists and lists outside an agent's limit)."""
-    from ..collab.comments import comment_plain
     old, new = comment_plain(c, old_body), comment_plain(c, k["body"])
     if old == new:
         return
@@ -1121,7 +1118,6 @@ def med_comment_edited(c, t, k, old_body):
 
 def med_team_edited(c, r, m, old_body):
     """A team chat message was edited: message_edited to the agents that got it as team_message and are still in the room."""
-    from ..collab.comments import comment_plain
     from ..collab.teamchat import tchat_room_members
     old, new = comment_plain(c, old_body), comment_plain(c, m["body"])
     if old == new:
@@ -1392,7 +1388,6 @@ def task_typing(tid):
 @app.post("/api/tasks/<int:tid>/editing")
 def task_editing(tid):
     """2.27.0 (#999): "I am editing this task" (a field of its panel has the focus) for TASK_EDIT_S seconds: tidying waits."""
-    from ..agents.core import task_editing_set
     c = db()
     return jsonify(task_editing_set(c, tid, me()))
 

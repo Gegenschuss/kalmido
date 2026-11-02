@@ -12,6 +12,7 @@ from ..core.access import Denied, need_list
 from ..lists.lists import clean_folder, FOLDER_DEPTH, FOLDER_SEP, folder_under
 from ..lists.groups import grp_list_ids, grp_sync, grp_touch
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..lists.lists import lp_folder_rename  # 2.369.5 (#2517): pulled up from functions
 
 
 @app.post("/api/filters")
@@ -145,7 +146,6 @@ def folder_rename_do(c, uid, old, new):
     pb_folder_rename(c, uid, old, new)  # 2.39.0 (#1168): the folder's Playbook (and its subfolders') go along
     from ..lists.foldershare import sh_folder_rename
     sh_folder_rename(c, uid, old, new)  # 2.41.0 (#1420): the folder's agents go along
-    from ..lists.lists import lp_folder_rename
     lp_folder_rename(c, uid, old, new)  # 2.53.0 (#1426): the folder's colour (and its subfolders') go along
     from ..lists.favorites import fv2_folder_rename
     fv2_folder_rename(c, uid, old, new)  # 2.57.0 (#1798): a favourite folder (and its subfolders) stays a favourite

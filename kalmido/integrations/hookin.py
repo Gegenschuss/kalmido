@@ -17,6 +17,8 @@ from ..notify.alerts import _env_int, aa_count
 from ..collab.integfail import integ_tell
 from ..api.v1 import PRIO_VALUES
 from ..api.common import hit_limit
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.tasks import task_create  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.115.0 A (#2061): inbound webhook per list
@@ -78,9 +80,8 @@ def whi_list_ok(c, lid):
 
 
 def whi_need_manage(c, lid):
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot use this endpoint"))
+    from ..agents.core import need_person
+    need_person(403, tr("Agents cannot use this endpoint"))
     need_list(c, lid, write=False, manage=True)
 
 
@@ -93,7 +94,6 @@ def whi_purge(c, lid):
 
 
 def whi_dict(c, r):
-    from ..collab.comments import user_names
     return {"id": r["id"], "name": r["name"], "created_at": r["created_at"], "created_by": r["created_by"],
             "created_by_name": user_names(c, [r["created_by"]]).get(r["created_by"], "") if r["created_by"] else "",
             "last_used_at": r["last_used_at"], "uses": r["uses"], "paused_reason": r["paused_reason"] or None,
@@ -308,7 +308,6 @@ def whi_in_header():
 def whi_in(token):
     """Inbound webhook: one task in the webhook's list (see above). 201 {id, url, ignored}."""
     from ..agents.core import is_agent
-    from ..tasks.tasks import task_create
     c = db()
     request.max_content_length = WHI_MAX_BYTES  # 2.190.0 D (#2561): also a body without a length is read only up to the cap (413)
     if (request.content_length or 0) > WHI_MAX_BYTES:  # 2.148.1 E (#2496): size first, before anything is read

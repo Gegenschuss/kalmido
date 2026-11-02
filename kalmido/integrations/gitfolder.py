@@ -23,11 +23,12 @@ from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import Denied, list_role, need_list, reading_sql
 from ..core.errors import BadInput
-from ..agents.core import is_agent
+from ..agents.core import is_agent, need_person
+from ..lists.lists import folder_under, clean_folder, FOLDER_SEP  # 2.369.5 (#2517): pulled up from functions
+from ..integrations.git import GIT_MAX_CONNS, git_public, git_clean_input, git_connect, git_key_error  # 2.369.5 (#2517): pulled up from functions
 
 
 def _under(p, top):
-    from ..lists.lists import folder_under
     return folder_under(p or "", top)
 
 
@@ -203,9 +204,7 @@ def gf_folder_removed(c, uid, up):
 
 # ---- endpoints (web app; people only -- the REST API reads folder repositories through GET /api/v1/lists/{id}/repos)
 def _need_folder(c, f, write=False):
-    from ..lists.lists import clean_folder
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot connect repositories"))
+    need_person(403, tr("Agents cannot connect repositories"))
     f = clean_folder(f or "", strict=write) if isinstance(f, str) else ""
     if not f:
         raise BadInput(tr("Invalid value: {0}", "folder"))
@@ -213,7 +212,6 @@ def _need_folder(c, f, write=False):
 
 
 def gf_info(c, uid, f):
-    from ..integrations.git import GIT_MAX_CONNS, git_public
     rows = c.execute("""SELECT k.* FROM git_folders x JOIN git_conns k ON k.id=x.conn_id WHERE x.owner_id=? AND x.folder=?
                         ORDER BY k.id""", (uid, f)).fetchall()
     parent = f.rsplit(_fsep(), 1)[0] if _fsep() in f else ""
@@ -229,7 +227,6 @@ def gf_info(c, uid, f):
 
 
 def _fsep():
-    from ..lists.lists import FOLDER_SEP
     return FOLDER_SEP
 
 
@@ -249,7 +246,6 @@ def gf_get():
 def gf_add():
     """{folder, provider?, base_url?, repo: "owner/name" or its address, token?} -- connects a repository to my folder: every
     project list of mine in it (and its subfolders, also later ones) uses it."""
-    from ..integrations.git import git_clean_input, git_connect, git_key_error, GIT_MAX_CONNS
     c, b = db(), body()
     try:
         f = _need_folder(c, b.get("folder"), write=True)
@@ -277,8 +273,7 @@ def gf_add():
 def gf_list_use(lid):
     """{use: true | false}: the list uses its folder's repositories (default) or not (the list owner / a list admin)."""
     c, b = db(), body()
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot connect repositories"))
+    need_person(403, tr("Agents cannot connect repositories"))
     need_list(c, lid, write=False, manage=True)
     if not isinstance(b.get("use"), bool):
         return err(tr("Invalid value: {0}", "use"))

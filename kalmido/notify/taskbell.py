@@ -25,6 +25,10 @@ from ..core.db import body, db, err, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied, MANAGE_ROLES, list_people, need_collab, need_task, task_visible
 from ..core.errors import BadInput
+from ..collab.comments import collab_user, lang_of, user_names  # 2.369.5 (#2517): pulled up from functions
+from ..notify.push import push_reachable, push_prio  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import valid_date, log_act  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
 
 TBL_LEVELS = ("list", "mute", "urgent")
 TBL_PRIO = "5"  # ntfy 5 = urgent (Web Push: urgency high)
@@ -134,8 +138,6 @@ def tbl_note(c, tid, kind, actor):
     uids.discard(None)
     if not uids:
         return
-    from ..collab.comments import collab_user, lang_of, user_names
-    from ..notify.push import push_reachable
     t = c.execute("SELECT id, title, list_id FROM tasks WHERE id=?", (tid,)).fetchone()
     if not t:
         return
@@ -156,13 +158,11 @@ def tbl_note(c, tid, kind, actor):
 # ---- routes (web app only; agents never set or read bells: an agent's v1 token cannot reach these routes)
 
 def _no_agent():
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403)
+    from ..agents.core import need_person
+    need_person(403)
 
 
 def _names(c, ids):
-    from ..collab.comments import user_names
     return user_names(c, list(ids))
 
 
@@ -213,7 +213,6 @@ def _until_in(b, level):
     u = b.get("until")
     if level != "urgent" or u in (None, ""):
         return None
-    from ..tasks.validation import valid_date
     if not isinstance(u, str) or not valid_date(u):
         raise BadInput(tr("Invalid value: {0}", "until"))
     if u < tbl_today():
@@ -236,7 +235,6 @@ def tbl_put(tid):
     """{level: list | mute | urgent, until?: YYYY-MM-DD (urgent; none = until completed), users?: [ids] | "all"}.
     Without users: my own bell (anyone who sees the task). With users: the list's owner / admins only, level urgent
     (set) or list (take back an urgency someone set; a person's own choice stays)."""
-    from ..tasks.validation import log_act
     _no_agent()
     need_collab()
     c, b = db(), body()
@@ -297,9 +295,6 @@ def tbl_put(tid):
 def tbl_news(c, tid, lid, uids, until):
     """A News item for everybody marked urgent by someone else (event row "Assignments": it is about them), and a push
     when their settings want one -- at the highest priority while they accept urgency from others."""
-    from ..collab.comments import collab_user, lang_of
-    from ..collab.news import news_add, notif_ok
-    from ..notify.push import push_prio, push_reachable
     t = c.execute("SELECT title FROM tasks WHERE id=?", (tid,)).fetchone()
     who = _names(c, [me()]).get(me(), "?")
     for u in uids:
@@ -317,7 +312,6 @@ def tbl_news(c, tid, lid, uids, until):
 @app.post("/api/tasks/<int:tid>/bell/undo")
 def tbl_undo(tid):
     """{act}: puts back the rows my change act touched (one undo step); rows changed since then stay as they are."""
-    from ..tasks.validation import log_act
     _no_agent()
     need_collab()
     c, b = db(), body()

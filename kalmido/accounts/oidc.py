@@ -25,6 +25,8 @@ from ..accounts.login import _reauth, _user, pend_ip_cap
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.env import env_bool  # 2.399.0 (#2687): the hosting switch (KALMIDO_HOSTED)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from .login import twofa_methods  # 2.369.5 (#2517): pulled up from functions
+from ..core.orgcrypt import _org_admin  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- OIDC login (generic OpenID Connect provider)
@@ -337,7 +339,6 @@ def oidc_link_ok(c, u, how, email, sess_uid):
         return True
     if env_bool("KALMIDO_HOSTED", False):  # admin.hosting.hosted() (a higher layer); 2.399.0 (#2687, review F1): the operator sets the provider -- a first link only from the account's own session
         return False
-    from .login import twofa_methods
     if u["kind"] != "user" or u["kid"] or u["is_admin"] or twofa_methods(c, u):
         return False
     if how == "email" or bool(email and (u["email"] or "").strip().lower() == email):
@@ -452,7 +453,6 @@ def oidc_start():
     # 2.223.2 (#2871, review): "su" = the step-up of the person before an admin step (offsite.stepup_need), no organisation
     if stepup and stepup != "su":  # 2.144.5 A2 (#2387, review F11): only for an organisation (or the own office) this person administers
         from ..core.access import Denied
-        from ..core.orgcrypt import _org_admin
         try:
             soid = _org_admin(c, so)
         except Denied:
@@ -552,7 +552,6 @@ def _oidc_stepup_done(c, st, claims):
     """2.144.5 A (#2387): the step-up sign-in came back. It counts only for the person signed in in this browser (the same
     linked subject) and only with an auth_time of the last OIDC_STEPUP_AGE seconds (the provider really asked again);
     then this session gets stepup_at (orgcrypt _rck_fresh) and the app opens the recovery key. Nothing is linked or made."""
-    from ..core.pg import system_ctx
     tok = request.cookies.get(COOKIE) or ""
     uid = g.user["id"] if g.get("auth_via") == "session" and g.get("user") is not None else None
     if not tok or uid is None or uid != st.get("uid"):

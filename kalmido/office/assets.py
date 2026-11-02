@@ -57,6 +57,10 @@ _VAT_RE = re.compile(r"(?:mwst|ust|umsatzsteuer|mehrwertsteuer|vat|tva|iva|btw)\
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from . import agreements as A  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import need_node  # 2.369.5 (#2517): pulled up from functions
+from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
+from .pdf import pdf_text_width  # 2.369.5 (#2517): pulled up from functions
 
 
 def _today():
@@ -227,7 +231,6 @@ def ast_covered(c, oid, aid):
 # ---------------------------------------------------------------- policies (#1925) and receipts
 def bnk_policies(c, oid, archived=False):
     """The office's contracts for the choice "insured by": agreements.agr_list when part A is there, else the table."""
-    from . import agreements as A
     f = getattr(A, "agr_list", None)
     if f:
         rows = [dict(a) for a in f(c, oid, kind="insurance")]
@@ -239,7 +242,6 @@ def bnk_policies(c, oid, archived=False):
 
 def ast_agreement_ok(c, oid, aid):
     """True when aid is a live contract of office oid (an archived one only stays where it is set already)."""
-    from . import agreements as A
     f = getattr(A, "agr_exists", None)
     if f and not f(c, oid, aid):
         return False
@@ -256,7 +258,6 @@ def bnk_ws(c, oid):
 def ast_receipt_meta(c, oid, nid):
     """The doc_meta row of document nid when it lies in the office's document space and the signed-in person sees it;
     404 otherwise (another organisation, another person's private document, the trash, no document)."""
-    from ..files.store import need_node
     from ..docs import store as S
     try:
         nid = int(nid)
@@ -389,7 +390,6 @@ def ast_value_get():
 
 def bnk_csv_cell(s):
     """No formula injection in spreadsheet programs (like travel.py _csv_safe)."""
-    from ..core.serializers import csv_cell  # 2.122.4 B (#2317): one shared helper
     return csv_cell(s)
 
 
@@ -477,7 +477,6 @@ def ast_value_pdf():
 
 
 def bnk_pdf_w(s):
-    from .pdf import pdf_text_width
     return pdf_text_width(s, 8.6)
 
 

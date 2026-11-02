@@ -13,6 +13,7 @@ from ..accounts.session import me
 from ..api.common import v1_args, v1_feature, v1_view
 from ..personal.timetrack import local_bounds, MT_TIME_SQL
 from ..core.errors import BadInput
+from ..hub.leave import wt_workdays  # 2.369.5 (#2517): pulled up from functions
 
 GAP_DAYS, GAP_DAYS_MAX = 14, 31   # look back this many days (today not included: the day is not over yet)
 GAP_TASKS = 5                      # task examples per day
@@ -37,7 +38,6 @@ def time_gaps(c, uid, viewer=None, days=GAP_DAYS):
         JOIN tasks t ON t.id=x.tid WHERE t.deleted_at IS NULL AND {both}""",
                      [uid, lo, hi, uid, lo, hi, uid, lo, hi] + vargs).fetchall()
     worked = {}
-    from ..hub.leave import wt_workdays
     wd = wt_workdays(c, uid)  # 2.125.0 A (#2118): only the person's working days
     for r in rows:
         d = local_day(r["ts"])

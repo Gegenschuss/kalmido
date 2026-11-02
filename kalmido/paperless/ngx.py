@@ -37,6 +37,13 @@ from ..core.pg import system_ctx, write_lock
 from ..docs import store as S
 from ..core.orgcrypt import oc_enc_k  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
+from ..calendars.subscriptions import cal_err_text, cal_norm_url  # 2.369.5 (#2517): pulled up from functions
+from ..docs.ingest import docs_ingest  # 2.369.5 (#2517): pulled up from functions
+from ..admin.hosting import QuotaExceeded  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.session import GATE  # 2.369.5 (#2517): pulled up from functions
+from ..core.orgcrypt import OrgCryptError, oc_dec_k  # 2.369.5 (#2517): pulled up from functions
+from ..docs.fields import df_from_paperless  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
 
 PL_TIMEOUT = 20               # s per request
 PL_API_VERSIONS = (10, 9, 5)  # 2.56.4 (#1859): Accept: application/json; version=N, the first one the server takes. Paperless-ngx
@@ -83,7 +90,6 @@ def pl_err_text(stored):
     code = str(stored).partition(":")[0]
     if code in PL_ERR:
         return tr(PL_ERR[code], MAX_FILE_MB) if code == "too_large" else tr(PL_ERR[code])
-    from ..calendars.subscriptions import cal_err_text
     return cal_err_text(stored)
 
 
@@ -97,7 +103,6 @@ def pl_src(url):
 
 def pl_norm_url(u):
     """https?://host[:port][/path] without /api at the end, or None."""
-    from ..calendars.subscriptions import cal_norm_url
     if not isinstance(u, str):  # 2.48.0 review (L6): null / a number -> 400, not 500
         return None
     try:
@@ -153,7 +158,6 @@ def pl_token(c, r):
     if isinstance(v, str) and v.startswith(S.PREFIX):
         key = _token_key(r["ws"])
         if key:
-            from ..core.orgcrypt import OrgCryptError, oc_dec_k
             try:
                 return oc_dec_k(key, S.ws_org(r["ws"]) or 0, f"pl_sources.token.v2|{r['ws']}", v)
             except OrgCryptError:
@@ -175,7 +179,6 @@ def pl_token_lost(c, r):
         return False
     key = _token_key(r["ws"])
     if key:
-        from ..core.orgcrypt import OrgCryptError, oc_dec_k
         try:
             oc_dec_k(key, S.ws_org(r["ws"]) or 0, f"pl_sources.token.v2|{r['ws']}", v)
             return False
@@ -445,7 +448,6 @@ def plh_store(c, r, uid, src, doc, data, mime, fname, labels, text, fields=None)
     """2.69.0 A (#1846): file the bytes of one Paperless document (fetched over the API or read from an export ZIP) into r's
     workspace: the same file already there = 'dup', else the mapping of r (tags / folder / sender / type) and docs_ingest =
     'new'; either way one pl_imported row (ws, src, pl_id). text() = the document's text (only asked for a new one)."""
-    from ..docs.ingest import docs_ingest
     ws, pid = r["ws"], int(doc["id"])
     sha = hashlib.sha256(data).hexdigest()
     asn = doc.get("archive_serial_number") if isinstance(doc.get("archive_serial_number"), int) else None
@@ -484,7 +486,6 @@ def plh_store(c, r, uid, src, doc, data, mime, fname, labels, text, fields=None)
     name = (title + ext if title and not title.lower().endswith(ext.lower()) else title) or orig or f"paperless-{pid}{ext}"
     nid = docs_ingest(c, uid, r["org_id"], name[:200], data, mime or None, "paperless", meta)
     if doc.get("custom_fields"):  # 2.153.0 (#2179): Paperless' custom fields as fields of the document
-        from ..docs.fields import df_from_paperless
         df_from_paperless(c, ws, nid, doc, fields, uid)
     if folder:
         node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
@@ -533,7 +534,6 @@ def pl_may_import(c, uid, org_id):
     if is_agent(c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()):
         return False
     if org_id:
-        from ..accounts.orgs import is_org_admin
         return bool(is_org_admin(c, uid, org_id))
     return True
 
@@ -568,7 +568,6 @@ def _stopped(c, sid):
 def pl_run(c, sid):
     """One import run of connection sid (claimed: run_state 'busy'). kind 'all' = every document (oldest first), 'new' =
     newest first until a page holds nothing new. Commits after every document."""
-    from ..admin.hosting import QuotaExceeded
     from ..docs.ingest import docs_kick as kick
     r = c.execute("SELECT * FROM pl_sources WHERE id=?", (sid,)).fetchone()
     uid = r["run_by"]
@@ -725,7 +724,6 @@ def pl_run_once():
 
 
 def _loop():
-    from ..accounts.session import GATE
     time.sleep(1)
     while True:
         n = 0

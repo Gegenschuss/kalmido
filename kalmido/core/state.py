@@ -20,6 +20,8 @@ from ..core.serializers import load_tasks, running_pomo, tags_for
 from ..core.pg import st_ids
 from ..core.pages import inbox_user
 from ..core.instance import about_info
+from ..core.env import env_int  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- state
@@ -79,7 +81,6 @@ def h6a_kid_ids(c, uid, vl):
     seen = seen | {m["user_id"] for li in vl for m in li.get("members") or []}
     seen |= {r[0] for r in c.execute("SELECT kid_id FROM kid_parents WHERE parent_id=?", (uid,))}
     if c.execute("SELECT 1 FROM users WHERE id=? AND is_admin=1", (uid,)).fetchone():
-        from ..core.pg import system_ctx
         from ..family.family import H6A_ADMIN_KIDS
         with system_ctx(c):  # membership structure (ids only), as family.kids_for
             seen |= {r[0] for r in c.execute("SELECT id FROM users WHERE kid=1 AND " + H6A_ADMIN_KIDS, (uid,))}
@@ -435,7 +436,6 @@ def st_where():
 
 
 def lz_min():
-    from ..core.env import env_int
     return env_int("KALMIDO_STATE_LAZY_MIN", 3000, lo=0)
 
 

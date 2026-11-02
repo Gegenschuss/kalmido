@@ -18,6 +18,7 @@ from ..accounts.session import me
 from ..api.v1 import _v1_live, v1_one
 from ..api.common import v1_args, v1_call, v1_json, v1_view
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..tasks.tasks import task_update  # 2.369.5 (#2517): pulled up from functions
 
 SNIP_MAX_N = 20            # snippets per task
 SNIP_CODE_MAX = 20_000     # characters per snippet (the client highlights up to this length, HL_MAX)
@@ -123,7 +124,6 @@ def snip_event(raw):
 @v1_view
 def v1_snippet_add(tid):
     """2.35.0 (#1095): appends one snippet {code, lang?, path?, line?} (scope write; whoever may change the task)."""
-    from ..tasks.tasks import task_update
     v1_args(())
     c = db()
     _v1_live(c, tid)

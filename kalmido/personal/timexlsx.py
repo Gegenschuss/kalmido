@@ -19,6 +19,7 @@ from ..accounts.session import me
 from ..sheets.formula import sh_col_letter
 from ..sheets.io import _EPOCH, _MAIN, _NS, _q, _xl_num
 from .timetrack import n43_admin_lists, need_time, time_report
+from ..team.workload import workload  # 2.369.5 (#2517): pulled up from functions
 
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 # cell styles: 0 default, 1 bold, 2 date + time, 3 number 0.00, 4 bold number 0.00, 5 date
@@ -158,7 +159,6 @@ def tx_workload_rows(d):
 @app.get("/api/workload/export.xlsx")
 def workload_xlsx():
     """?start= &weeks= &org= like /api/workload (same rules: module on, no agents / kids, only people and tasks the person sees)."""
-    from ..team.workload import workload
     c = db()
     if (g.user["kind"] or "user") != "agent":
         need_feat("workload")

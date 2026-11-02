@@ -80,6 +80,15 @@ DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", 
 
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
+from ..accounts.pictures import list_icon_path, org_icon_path, org_icon_tok  # 2.369.5 (#2517): pulled up from functions
+from ..lists.listhead import o3c_head_files  # 2.369.5 (#2517): pulled up from functions
+from ..life import budget  # 2.369.5 (#2517): pulled up from functions
+from ..wiki import wkhist  # 2.369.5 (#2517): pulled up from functions
+from ..hub.hubmail import _index as hub_index  # 2.369.5 (#2517): pulled up from functions
+from ..life.budget import bud_dec, bud_dkey  # 2.369.5 (#2517): pulled up from functions
+from ..office.ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from ..wiki.wkhist import wkh_body  # 2.369.5 (#2517): pulled up from functions
+from ..wiki.wksearch import wks_index  # 2.369.5 (#2517): pulled up from functions
 
 
 def _org_ids(c):
@@ -248,18 +257,15 @@ def _office_files(oid):
 
 def f8f_icon_files(c, oid=None):
     """2.58.0 (#1805): {path: org id} of the lists' own pictures (all lists, or only those of organisation oid)."""
-    from ..accounts.pictures import list_icon_path
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         rows = c.execute("SELECT id, icon, org_id FROM lists WHERE icon LIKE 'u:%'" + ("" if oid is None else " AND org_id=?"),  # pg-ok: prefix marker u: is case-exact
                          () if oid is None else (oid,)).fetchall()
-    from ..lists.listhead import o3c_head_files
     return ({list_icon_path(r[0], r[1][2:]): r[2] for r in rows if re.fullmatch(r"u:[A-Za-z0-9_-]{8,40}", r[1])} | o3c_head_files(c, oid)  # 2.83.0 C (#1427): + header pictures
             | f8f_org_icon_files(c, oid))
 
 
 def f8f_org_icon_files(c, oid=None):
     """2.87.9 (#1913): {path: org id} of the organisations' own symbol pictures (all, or only that of organisation oid)."""
-    from ..accounts.pictures import org_icon_path, org_icon_tok
     with system_ctx(c):  # orgcrypt: server-side bulk work on stored files, never content handed to a person
         rows = c.execute("SELECT id, icon FROM orgs WHERE icon LIKE 'u:%'" + ("" if oid is None else " AND id=?"),  # pg-ok: prefix marker u: is case-exact
                          () if oid is None else (oid,)).fetchall()
@@ -401,13 +407,11 @@ SPACE_SQL = (
 
 def _bud():
     """2.72.0 (#1333): life/budget.py (imported late: this module is also a command line tool)."""
-    from ..life import budget
     return budget
 
 
 def _wkh():
     """2.123.0 A (#2105): wiki/wkhist.py (imported late, like _bud)."""
-    from ..wiki import wkhist
     return wkhist
 
 
@@ -1190,8 +1194,6 @@ def rot_indexes(c, oid):
     household budget (life/budget.py bud_dkey). A value that does not open is left out (its row keeps no words). -> rows."""
     from ..docs import store as S
     from ..files.textscan import _index as ft_index
-    from ..hub.hubmail import _index as hub_index
-    from ..life.budget import bud_dec, bud_dkey
     ws, n = f"o{int(oid)}", 0
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         for m in c.execute("SELECT * FROM doc_meta WHERE ws=? ORDER BY node_id", (ws,)).fetchall():
@@ -1218,8 +1220,6 @@ def rot_indexes(c, oid):
             c.execute("UPDATE budget_entries SET dkey=? WHERE id=?", (bud_dkey(c, d["list_id"], oid, d["day"], d["amount"], d["kind"], d["title"]), r["id"]))
             n += 1
         # 2.138.0 C (#1972): the word index of the knowledge pages (wiki/wksearch.py, keyed per space like the documents)
-        from ..wiki.wkhist import wkh_body
-        from ..wiki.wksearch import wks_index
         c.execute("DELETE FROM wiki_words WHERE page_id IN (SELECT id FROM wiki_pages WHERE org_id=?)", (oid,))
         for r in c.execute("SELECT id, org_id, owner_id, body, updated_at FROM wiki_pages WHERE org_id=? AND deleted_at IS NULL "
                            "AND left(path, 5)<>'e2e1:' ORDER BY id", (oid,)).fetchall():
@@ -1354,7 +1354,6 @@ def rotate_org(c, oid, stop=None, rounds=3, force=False):
 
 def rot_announce(c, oid, what):
     """Office log entry + News for the organisation's admins (no person signed in: the command line)."""
-    from ..office.ledger import ofx_log
     with app.app_context(), system_ctx(c):  # orgcrypt: the command line writes the organisation's log entry (no person)
         ofx_log(c, oid, "recovery_key", target="org", detail={what: 1})
     oc.rck_tell(c, oid, None, what)

@@ -37,7 +37,7 @@ from ..core.config import API_PREFIX, app, PUBLIC_URL
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, parse_iso
 from ..core.pg import insert_id
-from ..core.access import Denied, list_role, task_visible, WRITE_ROLES
+from ..core.access import Denied, joined_lists_sql, list_role, task_visible, WRITE_ROLES
 from ..core.errors import BadInput, UnknownFields
 from ..core.serializers import unlink_files
 from ..api.common import v1_call, v1_err, V1Error
@@ -640,8 +640,8 @@ def ctl_decision_dict(c, r, names):
 def ctl_state(c, a):
     d = ctl_get(a)
     aid = a["user_id"]
-    rows = c.execute("""SELECT l.id, l.name FROM lists l WHERE l.deleted_at IS NULL AND (l.owner_id=? OR l.id IN
-                        (SELECT list_id FROM list_members WHERE user_id=?)) ORDER BY l.name, l.id""", (aid, aid)).fetchall()
+    rows = c.execute(f"""SELECT l.id, l.name FROM lists l WHERE l.deleted_at IS NULL AND l.id IN {joined_lists_sql()}
+                        ORDER BY l.name, l.id""", (aid, aid)).fetchall()
     offer = []
     for r in rows:
         if list_role(c, r["id"], me()):  # only projects the person sees

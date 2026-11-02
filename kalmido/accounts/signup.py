@@ -18,6 +18,11 @@ from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from
 from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
 from .orgs import op_apart_deny, op_foreign_account  # 2.399.0 (#2687)
 from .supportgrant import sga_link_support  # 2.485.0 (#3939)
+from ..accounts.orgs import instance_mode, ORG_NAME_ENV, org_member_add  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.users import user_purge, user_admin_dict, om_admin_all as admin_sees  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import org_admin_people  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.invite import invite_new, _limited, _lookup  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.useradmin import ua8_may_approve  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.23.0 (#711): self-registration
@@ -48,7 +53,6 @@ def _mail_on():
 
 def om_has_orgs(c):
     """2.46.0 (#1592): the instance has at least one organisation (then open registration is off: domains or approval)."""
-    from ..accounts.orgs import instance_mode
     if instance_mode(c) == "shared":
         return False
     with system_ctx(c):  # instance structure, also before a login
@@ -63,7 +67,6 @@ def signup_private(c):
 
 def signup_mode(c):
     """The effective mode: domain / open need outgoing e-mail (else off)."""
-    from ..accounts.orgs import instance_mode
     m = gsetting(c, "signup_mode")
     if m not in SIGNUP_MODES:
         return "off"
@@ -79,7 +82,6 @@ def _domains(v):
 
 
 def org_for_email(c, email):
-    from ..accounts.orgs import instance_mode
     if instance_mode(c) != "workspaces":  # 2.28.0 (#935): workspaces join by domain too
         return None  # shared: none
     dom = email.rsplit("@", 1)[-1].lower()
@@ -112,7 +114,6 @@ def _username(c, email):
 
 def _cleanup(c):
     """Registrations whose confirmation link ran out (signup 'confirm', no valid link): removed."""
-    from ..accounts.users import user_purge
     old = [r[0] for r in c.execute("""SELECT u.id FROM users u LEFT JOIN user_invites i ON i.user_id=u.id
                                       WHERE u.signup='confirm' AND (i.expires_at IS NULL OR i.expires_at<?)""", (iso(now_utc()),))]
     files = []
@@ -130,8 +131,6 @@ def _notify_admins(c, uid):
     address's domain tells its admins too (data.org_id); 2.464.0 (#3882): they approve as well (Settings > Organisation, the
     person's row). The push follows the row "usage", like the News."""
     from ..collab.news import news_add, notif_ok
-    from ..core.access import org_admin_people
-    from ..core.pg import system_ctx
     from ..notify.push import push_prio, push_reachable
     from ..collab.comments import lang_of
     u = c.execute("SELECT username, display_name, email FROM users WHERE id=?", (uid,)).fetchone()
@@ -163,7 +162,6 @@ def signup_confirmed(c, u):
 def auth_signup():
     """{name, email, password? (only without e-mail), lang?}: open, rate limited. Always the same answer for a valid
     request ({ok, mail: a link was (or would have been) sent, pending: waits for an admin})."""
-    from ..accounts.invite import invite_new
     c = db()
     m = signup_mode(c)
     lg = _accept_lang("en")
@@ -202,9 +200,7 @@ def auth_signup():
     if m == "open" and om_has_orgs(c):  # 2.422.0 (#2937): open next to an organisation = a private account, never a member
         oid = None
     if oid:
-        from ..core.pg import system_ctx
         with system_ctx(c):  # 2.37.0 (#1150): the new account joins its organisation before anybody is signed in
-            from ..accounts.orgs import org_member_add
             org_member_add(c, oid, uid)
     fs = [x for x in (gsetting(c, "default_features") or USER_DEFAULTS["features"]).split(",") if x]
     uset(c, uid, "features", ",".join(fs + ([] if "agents" in fs else ["agents"])))
@@ -224,8 +220,6 @@ def auth_signup():
 def user_approve(uid):
     """Admins: a registration that waits for approval becomes an active account (declining = deleting it). 2.464.0 (#3882): or an
     admin of the person's organisation (useradmin.ua8_may_approve); their answer has no account details."""
-    from ..accounts.useradmin import ua8_may_approve
-    from ..accounts.users import user_admin_dict  # 2.46.0 (#1592)
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     inst = ua8_may_approve(c, u, uid)  # 2.28.0 (#935)
@@ -268,8 +262,6 @@ def signup_settings(c, b):
 
 
 def signup_admin(c):
-    from ..accounts.orgs import instance_mode
-    from ..accounts.orgs import ORG_NAME_ENV
     return {"instance_mode": instance_mode(c), "org_name_env": bool(ORG_NAME_ENV), "has_orgs": om_has_orgs(c), "signup_mode": gsetting(c, "signup_mode") if gsetting(c, "signup_mode") in SIGNUP_MODES else "off",
             "signup_domains": gsetting(c, "signup_domains"), "signup_effective": signup_mode(c), "mail_out": _mail_on(),
             "org_invites": gsetting(c, "org_invites") != "0",  # 2.115.0 B (#2062)
@@ -283,7 +275,6 @@ def signup_admin(c):
 # older one stops when a new one is made. Two-factor accounts still need their second step.
 def _may_link(c, uid):
     from ..family.family import parent_of
-    from ..accounts.users import om_admin_all as admin_sees  # 2.46.0 (#1592): the user management
     t = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not t or (t["kind"] or "user") == "agent" or not (admin_sees(c, uid) or parent_of(c, me(), uid)):  # 2.28.0 (#935)
         raise Denied(404)
@@ -301,7 +292,6 @@ def _may_link(c, uid):
 @app.post("/api/users/<int:uid>/signin-link")
 def user_signin_link(uid):
     """Admins (any person but admins / agents) and parents (their kids): a one-time sign-in link + its QR code."""
-    from ..accounts.invite import invite_new
     c = db()
     _may_link(c, uid)
     out = invite_new(c, uid, me(), send=False, kind="login")
@@ -314,7 +304,6 @@ def user_signin_link(uid):
 @app.post("/api/auth/link")
 def auth_link():
     """{token}: signs in with a sign-in link (once); open, rate limited like the invitation page."""
-    from ..accounts.invite import _limited, _lookup
     keys, e = _limited()
     if e:
         return e

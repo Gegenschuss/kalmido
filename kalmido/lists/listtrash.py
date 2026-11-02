@@ -21,6 +21,8 @@ from ..core.retention import ret_days, ret_on, ret_report, ret_trash_cut
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import collab_all, Denied, health_hidden, token_lists
+from .lists import list_purge  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.pictures import list_icon_drop_file  # 2.369.5 (#2517): pulled up from functions
 
 OTR_TRASH_DAYS = max(1, ret_days("trash"))  # 2.272.0 A (#3026): floor 1 like ret_trash_days; 30 like the other trash periods; 2.152.0 (#2165): KALMIDO_TRASH_DAYS moves it
 OTR_PRUNE = {"at": 0.0}
@@ -78,7 +80,6 @@ def otr_need(c, lid):
 def otr_hard(c, lid):
     """Deletes the (deleted) list lid for good with all its tasks. Returns (icon, file paths) to drop after the commit."""
     from ..tasks.tasks import hard_delete
-    from .lists import list_purge
     # 2.102.0 review F1: lock the row and look again - a restore committed meanwhile wins (it waits on this lock, then finds nothing)
     r = c.execute("SELECT deleted_at FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
     if not r or not r[0]:
@@ -89,7 +90,6 @@ def otr_hard(c, lid):
 
 
 def otr_drop_files(lid, icon, files):
-    from ..accounts.pictures import list_icon_drop_file
     from .projects import list_files_drop
     list_icon_drop_file(lid, icon)
     list_files_drop(files)

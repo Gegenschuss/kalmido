@@ -19,6 +19,8 @@ from ..core.retention import ret_days, ret_on, ret_report
 from ..core.serializers import unlink_files
 from ..team.portal import _PT_EDITS
 from .backup import BK_DIR, BK_KEEP_WEEKLY_CAP, bk_parse_name  # 2.312.0 B (#3264)
+from ..core.config import ATT_DIR  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import FS_VERSIONS_KEEP  # 2.369.5 (#2517): pulled up from functions
 
 # 2.239.0 D (#2874): file store nodes that are office records (receipts assigned or not, filed letters, cash book / equipment /
 # DATEV receipts, a kept lock): their file log and their versions stay while the node exists (it goes after its period)
@@ -203,8 +205,6 @@ def orf_retry(c):
     """Tries the queued removals again; returns how many are still failing."""
     import json
     import os
-    from ..core.config import ATT_DIR
-    from ..core.db import gset, gsetting
     try:
         have = json.loads(gsetting(c, ORF_RETRY_KEY) or "[]")
     except ValueError:
@@ -257,7 +257,6 @@ def orf_candidates(age_s, after=""):
     (the file store has fsm_orphans_gc, list files / avatars / office files have their own rules). Folders in sorted
     order; after: skip the folders up to and including this one (2.186.0 C #2602: a resumed sweep)."""
     import os
-    from ..core.config import ATT_DIR
     root = os.path.realpath(ATT_DIR)
     old = time.time() - age_s
     out = []
@@ -285,7 +284,6 @@ def orf_candidates(age_s, after=""):
 def orf_prune_versions(c, nid=None, kill=None):
     """Versions of a file beyond FS_VERSIONS_KEEP (never the newest). kill=None: only while ret_on("files"). Returns
     (how many, the stored paths of the deleted rows -- or of those that would go in a dry run)."""
-    from ..files.store import FS_VERSIONS_KEEP
     kill = ret_on("files") if kill is None else kill
     one = " WHERE node_id=?" if nid is not None else ""
     rows = c.execute(f"SELECT id, path, node_id FROM (SELECT id, path, node_id, row_number() OVER (PARTITION BY node_id ORDER BY no DESC) AS rn "
@@ -310,7 +308,6 @@ def orf_tick(c, force=False):
     is off, removes them (after the check, nothing to commit) while ret_on("files"). Returns the number found."""
     import json
     import os
-    from ..core.config import ATT_DIR
     if not force and time.time() - ORF_RUN["at"] < ORF_EVERY:
         return 0
     ORF_RUN["at"] = time.time()

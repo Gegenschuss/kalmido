@@ -48,7 +48,7 @@ import threading
 from flask import has_app_context, jsonify
 
 from ..core.config import app
-from ..core.access import Denied, acx_of, qn_is, reading_ids, reading_sql  # 2.477.0 (#3881): + qn_is
+from ..core.access import Denied, acx_of, joined_lists_sql, qn_is, reading_ids, reading_sql  # 2.477.0 (#3881): + qn_is
 from ..core.db import body, bump, db, err, insert_id, iso, now_utc, uset, usettings
 from ..core.i18n import N_, lang, tr
 from ..core.pg import system_ctx
@@ -666,8 +666,7 @@ def _tree_space(c, uid, org, root):
                          (root,)).fetchall()
     seen = {root}
     folders, lists = [], []
-    vis_lists = {r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=? UNION SELECT list_id FROM list_members WHERE user_id=?",
-                                         (uid, uid))}
+    vis_lists = {r[0] for r in c.execute(f"SELECT x.id FROM {joined_lists_sql()} x", (uid, uid))}
     byid = {r["id"]: r for r in rows}
 
     def up(pid):

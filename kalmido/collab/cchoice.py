@@ -22,6 +22,10 @@ from ..accounts.session import me
 from ..core.access import Denied, need_feat, need_task, task_visible
 from ..core.errors import BadInput, reject_unknown
 from ..api.common import v1_args, v1_json, v1_view
+from ..collab.comments import user_names, att_dicts, comment_dict  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
+from ..collab.reactions import with_reactions  # 2.369.5 (#2517): pulled up from functions
+from ..collab.replies import with_replies  # 2.369.5 (#2517): pulled up from functions
 
 CHOICE_KEYS = ("choices", "multi", "approval", "expires_in")
 
@@ -77,7 +81,6 @@ def lv_state(r, ch, ans, newest):
 def lv_with_choices(c, tid, rows, dicts):
     """Adds choices, choice, choice_state (and choice.user_name) to the comment dicts of rows (same order).
     2.144.5 A (#2001): + choice_can on an approval card: may the signed-in person decide it (lv_may_decide)."""
-    from ..collab.comments import user_names
     newest = None
     uid = g.user["id"] if g.get("user") is not None else None
     may = {}
@@ -117,8 +120,6 @@ def lv_answer(c, r, uid, ids, via="button"):
     """The person uid answers comment r with ids: stored once, logged, the agent hears it. -> (row, the person's comment id
     of a suggestion or None). Denied / BadInput."""
     from ..agents.core import agent_comment, agent_emit, agent_task_data, is_agent
-    from ..tasks.validation import log_act
-    from ..collab.comments import user_names
     ch = lv_jload(r["choices"])
     au = c.execute("SELECT kind FROM users WHERE id=?", (r["user_id"],)).fetchone() if r["user_id"] else None
     if not ch or not au or au["kind"] != "agent":
@@ -181,9 +182,6 @@ def lv_withdraw(c, r, aid, outcome=None):
 
 
 def lv_one(c, r):
-    from ..collab.comments import att_dicts, comment_dict
-    from ..collab.reactions import with_reactions
-    from ..collab.replies import with_replies
     d = with_replies(c, "c", with_reactions(c, [comment_dict(r, att_dicts(c, "comment_id=?", (r["id"],)))]))
     return lv_with_choices(c, r["task_id"], [r], d)[0]
 
@@ -218,7 +216,6 @@ def comment_choice_get(cid):
 
 def lv_v1_dict(c, d):
     from ..api.v1 import v1_comment
-    from ..collab.comments import user_names
     return v1_comment(c, d, user_names(c, [d["user_id"]] if d.get("user_id") else []))
 
 

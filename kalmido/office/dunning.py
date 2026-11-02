@@ -28,6 +28,14 @@ from ..core.i18n import N_, lang, tr
 from ..core.pg import system_ctx, write_lock
 from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from .fixedimport import fci_people  # 2.369.5 (#2517): pulled up from functions
+from .model import office_on, office_role, office_settings  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
+from ..notify.push import push_prio, push_reachable  # 2.369.5 (#2517): pulled up from functions
+from .docs import recalc  # 2.369.5 (#2517): pulled up from functions
+from .invoices import inv_make_reminder  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from .recurring import rin_task  # 2.369.5 (#2517): pulled up from functions
 
 DUN_EVERY_TICKS = 10          # like the invoice series: whole days matter, not seconds
 DUN_EVERY_TICKS = test_seconds("KALMIDO_TEST_DUN_TICKS", DUN_EVERY_TICKS)  # 2.192.0 B (#2513): fewer ticks (test containers only)
@@ -66,7 +74,6 @@ def dun_tick(c, now=None):
 
 def dun_area(c, oid, today):
     """The suggestions of office area oid on day today (ISO); returns the ids of the reminder drafts made."""
-    from .fixedimport import fci_people
     with system_ctx(c):  # who acts for this area (its admins / the owner), read before entering their context
         people = [p["id"] for p in fci_people(c, oid)]
     c.commit()
@@ -81,7 +88,6 @@ def dun_area(c, oid, today):
 
 
 def _dun_as(c, oid, today, people):
-    from .model import office_on, office_role, office_settings
     actor = people[0]
     with app.test_request_context("/api/office/docs/reminder"):
         g.user = c.execute("SELECT * FROM users WHERE id=?", (actor,)).fetchone()  # the area's admin: the log, the draft's creator
@@ -104,7 +110,6 @@ def _dun_as(c, oid, today, people):
             if did:
                 made.append(did)
         if made:
-            from .recurring import rin_task
             for p in people:
                 lg = lang(c, p)
                 rin_task(c, p, tr(DUN_TASK, len(made), lg=lg),
@@ -123,10 +128,7 @@ def _dun_client(r):
 def dun_paid_news(c, oid, r, uid):
     """2.367.4 (#2972): a payment on invoice row r of area oid (by person uid): News + push for the area's other people. No
     amount, the push shows on a locked screen too. The caller commits; the pushes go after the request (g.pushes)."""
-    from .fixedimport import fci_people
-    from ..collab.news import news_add, notif_ok
     from ..core.config import PUBLIC_URL
-    from ..notify.push import push_prio, push_reachable
     if r["trial"]:
         return
     with system_ctx(c):  # who else is in this office
@@ -144,7 +146,6 @@ def dun_overdue(c, oid, today, people):
     """2.367.4 (#2972): the bell for the invoices of area oid past their due date that it did not tell about yet: one News item
     per person for the whole run. The caller commits."""
     from .invoices import inv_money_fields, inv_paid_map, inv_state
-    from ..collab.news import news_add
     invs = c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind='invoice' AND locked_at IS NOT NULL AND status IN ('issued','sent') AND trial=0 "
                      "AND COALESCE(due_date, '')<>'' AND due_date<? AND id NOT IN (SELECT doc_id FROM office_dunning_marks WHERE org_id=? AND level=?) "
                      "ORDER BY due_date, id LIMIT 2000", (oid, today, oid, DUN_NOTICE)).fetchall()
@@ -166,7 +167,6 @@ def dun_overdue(c, oid, today, people):
 
 def dun_news_live(c, uid, data):
     """2.367.4 (#2972): a docpaid / docoverdue item shows while uid is still in that office."""
-    from .fixedimport import fci_people
     d = _j(data, {})
     if not str(d.get("org_id") or "").isdigit():
         return False
@@ -218,9 +218,6 @@ def dun_due(c, oid, today, grace):
 def dun_make(c, oid, uid, ids, level):
     """One reminder draft over invoices ids on level (the office's fee and deadline), the marks; None when the invoices
     no longer fit one reminder (checked again by inv_make_reminder)."""
-    from .docs import recalc
-    from .invoices import inv_make_reminder
-    from .ledger import ofx_log
     try:
         with c.savepoint():
             did = inv_make_reminder(c, oid, uid, {"doc_ids": ids, "level": level})

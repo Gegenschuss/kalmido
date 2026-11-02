@@ -34,6 +34,7 @@ from ..core.orgcrypt import oc_read_file, oc_write_file
 from .pdf import office_pdf, pdf_lang, pdf_to_8bit  # 2.296.0 D (#3172): + pdf_to_8bit, 2.357.0 D (#3183): + pdf_lang
 from .einvoice import ein_build
 from .terms import agb_offer_pdf  # 2.434.0 (#3619)
+from .packs import office_pack_for  # 2.369.5 (#2517): pulled up from functions
 
 LOGO_MAX_MB = 4
 LOGO_MAX_PX = 1600
@@ -203,7 +204,6 @@ def epdf_format(c, oid, r):
     """The e-invoice format of row r: its own einvoice_format, else the organisation's setting, else zugferd."""
     s = office_settings(c, oid)
     fmt = (r["einvoice_format"] if "einvoice_format" in r.keys() else "") or s.get("einvoice_format") or "zugferd"
-    from .packs import office_pack_for
     offered = [f for f in (((office_pack_for(s) or {}).get("einvoice") or {}).get("formats") or ["zugferd"]) if f in ("zugferd", "xrechnung")]
     return fmt if fmt in offered else (offered[0] if offered else "zugferd")  # 2.147.0 (#2461): only what the country pack offers
 

@@ -29,6 +29,8 @@ from ..accounts.orgs import token_people, visible_people
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_view
 from .holidays import HOL_CODES, HOL_PACKS, hol_year
+from ..accounts.orgs import user_orgs, is_org_admin, may_see  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import user_orgs_full  # 2.369.5 (#2517): pulled up from functions
 
 ABS_KINDS = ("vacation", "sick", "off", "other")
 ABS_HALF = ("", "am", "pm")
@@ -83,9 +85,7 @@ def abs_org(c, uid, want=None, create=True):
     """The area (orgs.id) uid looks at / enters into: ?org= (a membership, 404 otherwise), else the area of the workspace
     switch ("org:<id>" that organisation, "private" the personal area), else the first organisation; without any
     organisation the personal area (pb_personal)."""
-    from ..accounts.orgs import user_orgs
     from ..office.model import pb_personal
-    from ..accounts.orgroles import user_orgs_full
     orgs = [o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]  # 2.143.0 A (#2151): not guests / accounting
     if want is not None:
         if want in orgs or want == pb_personal(c, uid, create=False):
@@ -102,7 +102,6 @@ def abs_org(c, uid, want=None, create=True):
 
 def abs_admin(c, uid, oid):
     """True when uid runs area oid: an organisation's admin, or the owner of a personal area."""
-    from ..accounts.orgs import is_org_admin
     from ..office.model import pb_personal
     return is_org_admin(c, uid, oid) or oid == pb_personal(c, uid, create=False)
 
@@ -236,7 +235,6 @@ def abs_capacity_factor(days, holidays, a, b, wd=(0, 1, 2, 3, 4)):
 
 def abs_check(c, uid, day):
     """{absent, half_day, until} of person uid on day (date) as far as the caller may read it, or None."""
-    from ..accounts.orgs import may_see
     if not may_see(c, me(), uid):
         return None
     r = c.execute("SELECT end_date, half_day FROM hub_absences WHERE deleted_at IS NULL AND user_id=? AND start_date<=? AND end_date>=? "
@@ -283,9 +281,7 @@ def abs_list():
     rows = c.execute("SELECT * FROM hub_absences WHERE org_id=? AND deleted_at IS NULL AND start_date<=? AND end_date>=? "
                      "ORDER BY start_date, id", (oid, last.isoformat(), first.isoformat())).fetchall()
     st = abs_state(c, oid)
-    from ..accounts.orgs import user_orgs
     from ..office.model import pb_personal
-    from ..accounts.orgroles import user_orgs_full
     mine = [o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]  # 2.143.0 A (#2151)
     with_org = [{"id": r[0], "name": r[1]} for r in c.execute(
         "SELECT id, name FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id") if r[0] in mine]

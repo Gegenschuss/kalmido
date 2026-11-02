@@ -26,6 +26,8 @@ from ..core.pg import system_ctx
 from .adapters import NWL_KINDS, NwlError, nwl_adapter
 from ..core.config import SECRET_KEY  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_dec_k, oc_enc_k, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
+from ..calendars.subscriptions import cal_err_text  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.session import GATE  # 2.369.5 (#2517): pulled up from functions
 
 NWL_STATUS = ("", "yes", "pending", "unsub", "bounce")
 NWL_BLOCKED = ("unsub", "bounce")
@@ -56,7 +58,6 @@ def nwl_err_text(stored):
     code = str(stored).partition(":")[0]
     if code in NWL_ERR:
         return tr(NWL_ERR[code])
-    from ..calendars.subscriptions import cal_err_text
     return cal_err_text(stored)
 
 
@@ -324,7 +325,6 @@ def nwl_start(c, conn, kind="manual", by=None, wait=False):
 
 
 def _run(conn_id, rid):
-    from ..accounts.session import GATE
     try:
         with GATE.bg():
             c = connect()

@@ -15,7 +15,7 @@ from ..core.db import inbox_default, iso, iso_ms, now_utc, parse_iso
 from ..accounts.session import me
 from ..accounts.pictures import avatar_url
 from ..core.dlock import dl_list_locked
-from ..core.access import acx_task_ok, Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, org_trip_sql, reading_sql, task_visible, vis_sql, WRITE_ROLES
+from ..core.access import acx_task_ok, Denied, joined_lists_sql, list_people, list_role, MANAGE_ROLES, need_list, need_task, org_trip_sql, reading_sql, task_visible, vis_sql, WRITE_ROLES
 from ..core.state import visible_sections
 from ..tasks.oneway import dec_list
 from ..tasks.validation import valid_hm
@@ -26,6 +26,8 @@ from ..notify.alerts import _env_int
 from ..api.v1 import task_for, WH_ON
 from ..api.common import act_via
 from ..integrations.webhooks import wh_actor, wh_log, WH_QUEUE_MAX
+from ..collab.replies import reply_of  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.0.0: agents, reactions, shared list tags, tidy
@@ -153,6 +155,12 @@ def need_agent():
     if not is_agent(g.user):
         raise Denied(403, tr("Only agent accounts can use this endpoint"))
     return g.user["id"]
+
+
+def need_person(code=403, msg=None):
+    """2.369.5 (#2517): the current user must be a person -- an agent gets Denied(code, msg) (the endpoints of people only)."""
+    if is_agent(g.user):
+        raise Denied(code, msg)
 
 
 def lst_brief(c, lid):
@@ -313,7 +321,6 @@ def agent_task_data(c, tid, aid, full=None, **extra):
 
 
 def agent_comment(c, k):
-    from ..collab.replies import reply_of
     rt, rq = reply_of(c, "c", k)  # 2.33.0 (#1076): the comment answers this one (a short quote)
     return {"id": k["id"], "author_id": k["user_id"], "text": comment_plain(c, k["body"]), "body": k["body"], "created_at": k["created_at"],
             "suggestion": json.loads(k["suggestion"]) if k["suggestion"] else None, "reply_to": rt, "reply": rq,
@@ -947,8 +954,8 @@ def agent_shares(c, aid, uid):
     o = agent_owner(c, aid)
     if o is not None:
         return o == uid
-    return bool(c.execute(f"""SELECT 1 FROM lists l WHERE l.id IN {vis_sql()} AND {_OPEN_SQL} AND (l.owner_id=? OR l.id IN
-                              (SELECT list_id FROM list_members WHERE user_id=?)) LIMIT 1""", (aid, aid, uid, aid, uid, uid, uid)).fetchone())
+    return bool(c.execute(f"""SELECT 1 FROM lists l WHERE l.id IN {vis_sql()} AND {_OPEN_SQL} AND l.id IN {joined_lists_sql()} LIMIT 1""",
+                              (aid, aid, uid, aid, uid, uid, uid)).fetchone())
 
 
 # 2.223.2 B (#2862): the events in which a person asks the agent for something (chat, @mention, assignment, a job, a draft)
@@ -1161,7 +1168,6 @@ def agent_public(c, a, uid=None):
 
 def o3b_can_color(c, a, uid):
     """2.83.0 (#1775): instance admin, owner of a personal agent or admin of the agent's organisation."""
-    from ..accounts.orgs import is_org_admin
     if not uid:
         return False
     if "owner_id" in a.keys() and a["owner_id"] == uid:

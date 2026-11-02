@@ -28,6 +28,13 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.errors import BadInput
 from .absence import _gate, _row, abs_admin, abs_holidays, abs_org, abs_people, abs_public, abs_state
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..collab.news import KIND_ROW, news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import collab_user, lang_of, user_names  # 2.369.5 (#2517): pulled up from functions
+from ..notify.push import push_prio, push_reachable  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.session import me  # 2.369.5 (#2517): pulled up from functions
+from ..team.workload import capacity_h  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.settings import clean_setting  # 2.369.5 (#2517): pulled up from functions
 
 WT_DEFAULT = (0, 1, 2, 3, 4)  # Monday..Friday
 LV_STATES = ("approved", "pending", "rejected")
@@ -122,10 +129,6 @@ def lv_admins(c, oid):
 def lv_notify(c, rcpts, kind, r, data):
     """News + push about a request (kind leavereq, to the admins) or a decision (leavedecide, to the person). The notes stay
     out of both (they are sealed with the absence; the person reads the decision's note in the app)."""
-    from ..collab.news import KIND_ROW, news_add, notif_ok
-    from ..collab.comments import collab_user, lang_of, user_names
-    from ..notify.push import push_prio, push_reachable
-    from ..accounts.session import me
     actor = me()
     who = user_names(c, [actor]).get(actor, "?")
     span = r["start_date"] if r["start_date"] == r["end_date"] else f"{r['start_date']} – {r['end_date']}"
@@ -221,7 +224,6 @@ def _member(c, oid, who):
 def lv_get():
     """?org=&year=: the vacation accounts (admins: everybody of the area, else oneself), the open requests (admins: all,
     else one's own), whether the area asks for approvals, the working days + weekly hours of the people shown."""
-    from ..team.workload import capacity_h
     c, uid = _gate()
     a = request.args
     oid = _area(c, uid, a.get("org"))
@@ -288,7 +290,6 @@ def lv_set_approval():
     c, uid = _gate()
     b = body()
     oid = _area(c, uid, b.get("org"))
-    from ..accounts.orgs import is_org_admin
     if not is_org_admin(c, uid, oid):
         raise Denied(403, tr("Only admins of this workspace can change this"))
     on = 1 if b.get("on") else 0
@@ -310,14 +311,12 @@ def lv_set_worktime(who):
         if not abs_admin(c, uid, oid):
             raise Denied(403, tr("Only admins of this workspace can change this"))
         _member(c, oid, who)
-    from ..accounts.settings import clean_setting
     if "workdays" in b:
         uset(c, who, "workdays", wt_clean(b.get("workdays")))
     if "hours" in b:
         uset(c, who, "capacity_h", clean_setting("capacity_h", b.get("hours")) or "")
     bump(c)
     c.commit()
-    from ..team.workload import capacity_h
     return jsonify(id=who, workdays=list(wt_workdays(c, who)), capacity_h=capacity_h(c, who),
                    capacity_set=bool(usettings(c, who).get("capacity_h")))
 

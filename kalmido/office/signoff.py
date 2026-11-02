@@ -38,6 +38,11 @@ from ..core.errors import BadInput
 from ..core.retention import RET_LEGAL_YEARS
 from ..tasks.validation import valid_date
 from ..lists.public import PUB_ACTOR, PUB_TOKEN_RE, pub_gone, pub_html, pub_limited, public_links_on
+from .docs import odoc_render, prd_strip_detail, doc_row, odoc_set_status  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
+from ..lists.public import need_pub_owner  # 2.369.5 (#2517): pulled up from functions
+from .calc import fmt_money  # 2.369.5 (#2517): pulled up from functions
+from .pdfweb import _file_response, _render, epdf_name, epdf_out, epdf_stored, qac_pdf  # 2.369.5 (#2517): pulled up from functions
 
 SIG_PREFIX = "/s/q/"
 SIG_VIEW_RATE = 60          # page views per client address and minute
@@ -90,7 +95,6 @@ def sig_expiry(v):
 
 def sig_doc_hash(c, oid, did):
     """SHA-256 of a quotation's printed content (canonical JSON of the print model's customer-facing parts)."""
-    from .docs import odoc_render, prd_strip_detail
     m = odoc_render(c, did, oid, keep_detail=True)  # 2.113.1 (#2251): hashed with the explanation, as links sent before
     keep = {k: m.get(k) for k in ("kind", "number", "date", "valid_until", "currency", "vat_mode", "project_title", "project_ref",
                                   "service_from", "service_to", "recipient", "intro", "lines", "totals", "rights", "closing", "fields",
@@ -252,7 +256,6 @@ def sig_notify(c, r, st, name):
     """Push to the link's creator (notification switch "signoff", "approval" before 2.266.0): the customer decided. 2.266.0 (#2965): only while the
     creator is still in the office (else its admins, sig_people), plus a News item "signoff" (the bell) for each of them;
     the push opens an absolute link (ntfy cannot open "#office/..."). Caller commits."""
-    from ..collab.news import news_add, notif_ok
     from ..notify.push import notify
     lid = r["list_id"]
     click = f"#office/offers/{r['doc_id']}" if r["doc_id"] else f"#office/gendocs/{r['gen_doc_id']}" if r["kind"] == "document" else f"#l/{r['list_id']}"
@@ -464,7 +467,6 @@ def sig_list_list(lid):
 @app.post("/api/lists/<int:lid>/signoffs")
 def sig_list_new(lid):
     """{section_id? | task_id? (a milestone), expires?} -> an acceptance link (the list's owner)."""
-    from ..lists.public import need_pub_owner
     c = db()
     need_pub_owner(c, lid)
     sig_list_rights(c, lid, "edit")
@@ -563,7 +565,6 @@ def sig_form_key(c, r):
 
 
 def sig_offer_html(c, r, lg, token):
-    from .calc import fmt_money
     e = html.escape
     m = sig_doc_hash(c, r["org_id"], r["doc_id"])[1]
     cur, dl = m.get("currency") or "EUR", m.get("lang") or "de"
@@ -687,8 +688,6 @@ def h6c_sig_pdf_ok(c, r):
 
 @app.get("/s/q/<token>/pdf")
 def sig_pdf_get(token):
-    from .pdfweb import _file_response, _render, epdf_name, epdf_out, epdf_stored
-    from .docs import doc_row
     c = db()
     if hit_limit("sigv:" + rate_ip(), SIG_VIEW_RATE):
         return pub_limited(_accept_lang())
@@ -709,7 +708,6 @@ def sig_pdf_get(token):
         return pub_gone()
     d = doc_row(c, r["org_id"], r["doc_id"])
     if r["state"] == "accepted":  # 2.99.0 C (#2195): the accepted version with the signer's box (h6c_sig_pdf_ok: content unchanged)
-        from .pdfweb import qac_pdf
         resp = _file_response(epdf_out(c, r["org_id"], d, qac_pdf(c, r["org_id"], d, sig_dec(c, r))), epdf_name(d) + "-accepted.pdf", "application/pdf")
         resp.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
         resp.headers["Referrer-Policy"] = "no-referrer"
@@ -758,8 +756,6 @@ def _clean_text(v, mx):
 def qac_file(c, r):
     """2.99.0 C (#2195): files the accepted version of the quotation of signoff r next to its original right after the
     acceptance (office/pdfweb.py qac_pdf). Best effort: the decision is committed; on a failure the next read writes it."""
-    from .docs import doc_row
-    from .pdfweb import qac_pdf
     try:
         s = c.execute("SELECT * FROM office_signoffs WHERE id=?", (r["id"],)).fetchone()
         qac_pdf(c, r["org_id"], doc_row(c, r["org_id"], r["doc_id"]), sig_dec(c, s))
@@ -826,7 +822,6 @@ def sig_decide(token):
         if t:
             proto["terms"] = t
     if r["kind"] == "offer":
-        from .docs import odoc_set_status
         from .ledger import ofx_log
         g.user = None  # the office log: no person (user_id NULL), the customer's name is in the detail
         try:

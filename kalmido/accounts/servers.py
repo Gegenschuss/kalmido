@@ -1071,7 +1071,6 @@ def _dst_create(c, srv, lid, s):
         p["list_id"] = lid
     if srv is None:
         from ..api.v1 import v1_task_in
-        from ..api.common import v1_call
         from ..tasks.tasks import task_create
         if lid is not None and list_role(c, lid) not in WRITE_ROLES:
             raise Denied(403 if list_role(c, lid) else 404)

@@ -171,6 +171,14 @@ sample_langs(DT_STARTERS)  # 2.449.0 (#3768)
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .packs import office_pack_for  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_company, ofx_company_print, ofx_log  # 2.369.5 (#2517): pulled up from functions
+from .docs import doc_row, _fmt_date, odoc_render  # 2.369.5 (#2517): pulled up from functions
+from .calc import fmt_money  # 2.369.5 (#2517): pulled up from functions
+from .contacts_cl import fk_contact  # 2.369.5 (#2517): pulled up from functions
+from .signoff import sig_dec, sig_public, sig_create, sig_expiry  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_read, fs_role  # 2.369.5 (#2517): pulled up from functions
+from ..lists.public import public_links_on  # 2.369.5 (#2517): pulled up from functions
 
 
 def _iid(v, name):
@@ -218,7 +226,6 @@ def dt_kind_label(k, lg=None):
 
 # ---------------------------------------------------------------- the variables
 def _pack(c, oid):
-    from .packs import office_pack_for
     s = office_settings(c, oid)
     return office_pack_for(s) or {}
 
@@ -227,7 +234,6 @@ def dt_company(c, oid, lang):
     """The printed company of the office area (like a quotation's print model): name, lines, contact / register / bank
     lines, logo path, accent colour."""
     import os
-    from .ledger import ofx_company, ofx_company_print
     s = office_settings(c, oid)
     co = ofx_company_print(ofx_company(c, oid), s.get("company") or {}, lang, _pack(c, oid))
     logo = None
@@ -263,7 +269,6 @@ def dt_list_ok(c, oid, lid):
 
 def dt_offer(c, oid, did, cid):
     """A quotation of the office area for client cid, or 404 (another client: 404 as well)."""
-    from .docs import doc_row
     r = doc_row(c, oid, _iid(did, "doc_id"))
     if r["kind"] != "offer" or r["client_id"] != cid:
         raise Denied(404)
@@ -282,9 +287,6 @@ def _addr(cl, sep=", "):
 
 def dt_values(c, oid, lang, client_id=None, list_id=None, doc_id=None):
     """{variable: value} for a document of client / project list / quotation (missing objects -> '')."""
-    from .calc import fmt_money
-    from .contacts_cl import fk_contact
-    from .docs import _fmt_date, odoc_render
     pack = _pack(c, oid)
     co = dt_company(c, oid, lang)
     v = {k: "" for k in DT_VAR_KEYS}
@@ -545,7 +547,6 @@ def dt_pdf(c, oid, d, signed=None, client=None):
     info_x = P.PDF_INFO_X  # 2.390.0 A (#3350): 125 mm from the sheet edge, as in pdf.py
     info_w = max(40 * P.MM, PL + PCW - P.PDF_INFO_X)  # (a letterhead with wide margins keeps a usable width)
     when = (d.get("final_at") or d.get("updated_at") or iso(now_utc()))[:10]
-    from .docs import _fmt_date
     page.text(info_x, y + 2, tr("Date", lg=lang), 8.6, False, P.C_INK2)
     page.text(info_x, y + 2, _fmt_date(when, _pack(c, oid), lang), 8.6, True, P.C_INK, align="r", width=info_w)
     y = max(PAT + P.PDF_ADDR_H, yy + 4)  # 2.217.0 B (#2800): a longer address pushes the body down
@@ -684,7 +685,6 @@ def dt_kick():
 def dt_signed_sync(c, oid, uid, rows):
     """The signed PDF of signed documents not filed yet (the customer's page never writes into the documents space):
     rendered from the frozen text + the signature protocol and filed by this admin. -> True when something was filed."""
-    from .signoff import sig_dec
     done = False
     for d in rows:
         if d["status"] != "signed" or d["signed_node_id"]:
@@ -861,7 +861,6 @@ def dt_doc(c, oid, gid):
 
 def dt_doc_public(c, oid, r, names=None, sigs=None):
     """A document for the app (decrypted; names = {clients, lists, offers} lookups; sigs = {gen_doc_id: newest link})."""
-    from .signoff import sig_public
     d = oc_dec_fields(c, oid, "office_gen_docs", r)
     names = names or dt_names(c, oid, [d])
     s = (sigs or {}).get(d["id"]) if sigs is not None else c.execute(
@@ -1109,7 +1108,6 @@ def dt_preview():
 def dt_final(gid):
     """Finish a draft: fill the variables for good (unknown / empty -> empty), freeze the text (SHA-256), write the PDF
     and file it into the documents space (folder of the client). 409 when it is not a draft."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx()
     write_lock(c, f"office_gen_doc_{int(gid)}")
     r = dt_doc(c, oid, gid)
@@ -1151,8 +1149,6 @@ def dt_disposition(title, suffix=""):
 def dt_pdf_get(gid):
     """?signed=1 the signed PDF. The filed file when the admin still reaches it, else written anew from the frozen text.
     A draft: a preview PDF with the variables filled (marked as draft)."""
-    from ..files.store import fs_read, fs_role
-    from .signoff import sig_dec
     c, uid, oid = _ctx()
     r = dt_doc(c, oid, gid)
     if dt_signed_sync(c, oid, uid, [r]):
@@ -1192,9 +1188,6 @@ def dt_pdf_get(gid):
 @app.post("/api/office/gen-docs/<int:gid>/signoff")
 def dt_signoff_new(gid):
     """{expires: YYYY-MM-DD | null} -> a new signature link of a finished, signable document (an open one stops)."""
-    from ..lists.public import public_links_on
-    from .ledger import ofx_log
-    from .signoff import sig_create, sig_expiry, sig_public
     c, uid, oid = _ctx()
     r = dt_doc(c, oid, gid)
     if r["status"] != "final" or r["archived"] or not r["sign"]:
@@ -1215,7 +1208,6 @@ def dt_signoff_new(gid):
 
 @app.get("/api/office/gen-docs/<int:gid>/signoffs")
 def dt_signoff_list(gid):
-    from .signoff import sig_public
     c, uid, oid = _ctx()
     dt_doc(c, oid, gid)
     rows = c.execute("SELECT * FROM office_signoffs WHERE gen_doc_id=? AND org_id=? ORDER BY id DESC LIMIT 50", (gid, oid)).fetchall()
@@ -1265,7 +1257,6 @@ def dt_sig_html(c, r, lg, token, prefix):
 
 def dt_sig_pdf(c, r):
     """The PDF for the customer: the original while open, the signed one after signing (rendered from the frozen text)."""
-    from .signoff import sig_dec
     d = dt_sig_row(c, r)
     if not d:
         return None

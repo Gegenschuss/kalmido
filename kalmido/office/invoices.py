@@ -35,6 +35,10 @@ from .rights import ofr_admin_or, NO_SPECIAL, ofr_allows, ofr_need_area
 from .countries import fk_reverse_case  # 2.296.0 F (#3168)
 from .pdfweb import epdf_format  # 2.296.0 F (#3173)
 from . import abschlag as _abs  # 2.354.0 B (#2836): the module, abschlag imports invoices too (cycle)
+from .calc import office_calc  # 2.369.5 (#2517): pulled up from functions
+from .pdf import office_pdf  # 2.369.5 (#2517): pulled up from functions
+from .pdfweb import epdf_mark  # 2.369.5 (#2517): pulled up from functions
+from ..core.orgcrypt import oc_item_store  # 2.369.5 (#2517): pulled up from functions
 
 INV_KINDS = ("invoice", "credit", "reminder")
 INV_STATUSES = {"invoice": ("draft", "issued", "sent", "paid", "cancelled"), "credit": ("draft", "issued", "sent", "paid"),
@@ -85,7 +89,6 @@ def inv_scheme(s, kind):
 
 def inv_manual_seq(scheme, num):
     """The counter value a manual number carries under the scheme, None when it does not follow the scheme."""
-    from .model import SCHEME_RE, scheme_variants
     for sv in scheme_variants(scheme):  # 2.144.9 (#2575): also with empty text blocks left out
         pos, pat = 0, ""
         for m in SCHEME_RE.finditer(sv):
@@ -370,7 +373,6 @@ def inv_check_date(c, oid, r, s):
     """2.38.0 review (GoBD, chronological series): the date of an invoice / credit note being finalised lies neither in
     the future nor before the date of the last finalised document of the same series (organisation, kind, counter
     period); the due date never lies before the date. BadInput otherwise."""
-    from .model import office_scheme_period
     d = r["date"]
     if d > local_now().date().isoformat():
         raise BadKey(N_("The date must not lie in the future"))
@@ -434,7 +436,6 @@ def _lines_eur(c, oid, r):
     """The automatic lines of a quotation (producing, raw data, discount) in EUR: the calculator run in EUR.
     2.189.0 (#2475): in the home currency of the office (EUR for every office of before)."""
     from .docs import _calc_doc, doc_items
-    from .calc import office_calc
     s = office_settings(c, oid)
     pack = office_pack_for(s)
     d = _calc_doc(r, hc_home(s))
@@ -494,7 +495,6 @@ def _put_rows(c, oid, did, rows):
         row["qty"] = float(dec(row.get("qty"), "1"))
         row["rate"] = float(dec(row.get("rate"), "0"))
         row["cost"] = float(dec(row.get("cost"), "0"))
-        from ..core.orgcrypt import oc_item_store
         row = oc_item_store(c, oid, row)  # 2.42.0 (#828): the purchase price encrypted at rest
         c.execute(f"INSERT INTO office_doc_items({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
 
@@ -1087,11 +1087,9 @@ def inv_files(c, oid, did):
         if files:
             return files
     from .docs import odoc_render
-    from .pdf import office_pdf
     m = odoc_render(c, did, oid)
     m.pop("internal", None)
     from .docs import doc_row
-    from .pdfweb import epdf_mark
     epdf_mark(doc_row(c, oid, did), m)  # 2.138.2 A (#2393): a draft goes out marked; 2.144.10 A (#2576): a trial one too
     number = re.sub(r"[^A-Za-z0-9._-]+", "-", str(m.get("number") or "")).strip("-") or f"doc-{did}"
     return [(f"{m['kind']}-{number}.pdf", office_pdf(m), "application/pdf")]

@@ -28,6 +28,7 @@ from ..accounts.session import me
 from ..core.access import Denied, list_role, need_collab
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_call, v1_view
+from ..lists.lists import FOLDER_SEP, _in_folder, clean_folder, folder_under  # 2.369.5 (#2517): pulled up from functions
 
 NOTIF_TPLS = ("read", "work", "all", "custom")
 # the events an owner can choose for "custom" (rows of the notification settings, see collab/news.py NOTIF_ROWS)
@@ -44,7 +45,6 @@ TPL_DEFAULT = TPL_DEFAULT if TPL_DEFAULT in ("read", "work", "all") else "read"
 
 
 def _fsep():
-    from ..lists.lists import FOLDER_SEP
     return FOLDER_SEP
 
 
@@ -204,7 +204,6 @@ def list_tpl_info(c, lid):
 
 
 def folder_tpl_info(c, owner, f):
-    from ..lists.lists import _in_folder
     own = {r["user_id"]: r for r in c.execute("SELECT user_id, tpl, custom FROM folder_notif WHERE owner_id=? AND folder=?", (owner, f))}
     inh = _inherited(c, owner, f, skip_first=True)
     people = [{"user_id": r["id"], "name": r["display_name"] or r["username"], "own": _row_out(own.get(r["id"]))} for r in c.execute(
@@ -220,9 +219,8 @@ def folder_tpl_info(c, owner, f):
 
 
 def _no_agent():
-    from ..agents.core import is_agent
-    if is_agent(g.user):  # agents read the setting at most, they never change it
-        raise Denied(403)
+    from ..agents.core import need_person
+    need_person(403)  # agents read the setting at most, they never change it
 
 
 def _tpl_in(b):
@@ -288,7 +286,6 @@ def list_tpl_put(lid):
 
 
 def _my_folder(c, f):
-    from ..lists.lists import _in_folder
     return any(_in_folder(r[0] or "", f) for r in c.execute("SELECT folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),))) or \
         bool(c.execute("SELECT 1 FROM folder_people WHERE owner_id=? AND folder=?", (me(), f)).fetchone())
 
@@ -296,7 +293,6 @@ def _my_folder(c, f):
 @app.get("/api/folders/notify-template")
 def folder_tpl_get():
     """?folder=: the template of my folder (for its lists and the lists that come into it later)."""
-    from ..lists.lists import clean_folder
     c = db()
     f = clean_folder(request.args.get("folder") or "", strict=False)
     if not f or not _my_folder(c, f):
@@ -308,7 +304,6 @@ def folder_tpl_get():
 def folder_tpl_put():
     """{folder, tpl (null = from the parent folder / default), custom?, user_id?, reset_lists?: true = the lists in it drop
     their own template for everyone and follow the folder} -- my folder only."""
-    from ..lists.lists import _in_folder, clean_folder
     need_collab()
     _no_agent()
     c, b = db(), body()
@@ -341,7 +336,6 @@ def folder_tpl_put():
 
 def folder_tpl_rename(c, uid, old, new):
     """A folder of uid was renamed / moved (old -> new, subfolders along): its templates go along."""
-    from ..lists.lists import folder_under
     for r in c.execute("SELECT DISTINCT folder FROM folder_notif WHERE owner_id=?", (uid,)).fetchall():
         if folder_under(r[0], old):
             nf = new + r[0][len(old):]  # 2.37.0 (#1150): UPDATE OR REPLACE -> drop the rows in the way, then move
@@ -379,7 +373,6 @@ def notif_ask_done():
 def notif_tpl_migrate(c):
     """Once (2.33.0): lists and folders shared so far keep every notification ("all", written explicitly); their owners
     are asked once. A list in a shared folder of its owner follows the folder (only the folder gets the row)."""
-    from ..lists.lists import _in_folder
     now = iso(now_utc())
     folders = {}
     for r in c.execute("SELECT DISTINCT p.owner_id, p.folder FROM folder_people p JOIN users hu ON hu.id=p.user_id "

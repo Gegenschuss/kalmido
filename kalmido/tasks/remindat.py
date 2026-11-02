@@ -15,6 +15,8 @@ from ..tasks.validation import valid_plan_start
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
 from ..core.usertz import hm_text, tz_gap, tz_of_s, user_now
+from ..notify.push import _wd_fail  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import notif_ok  # 2.369.5 (#2517): pulled up from functions
 
 RAT_MISS_H = 6  # the same grace as the offset reminders
 
@@ -46,7 +48,6 @@ def rat_shift(c, tid, old_due, new_due):
 
 def rat_tick(c, users, S, LG, now):
     """Watchdog section: the fixed-time reminders that are due now."""
-    from ..notify.push import _wd_fail
     gap = tz_gap(S, now) + timedelta(hours=2)  # 2.368.3 (#2985): a first look wide enough for everybody's clock, rat_fire decides
     cut, old = (now + gap).strftime("%Y-%m-%dT%H:%M"), (now - timedelta(hours=RAT_MISS_H) - gap).strftime("%Y-%m-%dT%H:%M")
     rows = c.execute("""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox, l.owner_id AS list_owner, l.nag AS list_nag
@@ -61,7 +62,6 @@ def rat_tick(c, users, S, LG, now):
 
 
 def rat_fire(c, t, users, S, LG, now):
-    from ..collab.news import notif_ok
     from ..family.v1 import reminder_people
     from ..notify.push import notify, push_prio, reminder_recipient
     fired = json.loads(t["reminded"] or "[]")

@@ -31,6 +31,9 @@ IMPORT_MAX = 4 * 1024 * 1024
 
 from .homecur import HC_CODES, hc_bookings, hc_pack_editable  # noqa: E402  2.189.0 (#2475)
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from ..accounts.orgs import ORG_NAME_MAX, ORG_SELF_MAX, instance_mode, org_member_add, org_self_made_n  # 2.369.5 (#2517): pulled up from functions
+from .model import pb_owner  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import write_lock  # 2.369.5 (#2517): pulled up from functions
 
 
 @app.get("/api/office/settings")
@@ -180,7 +183,6 @@ def office_settings_put():
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
     if "pack" in b or "industry_packs" in b or "home_currency" in b:  # 2.76.0 review (N8): the pack choice and an uninstall never interleave; 2.189.0 (#2475): nor two home currency changes
-        from ..core.pg import write_lock
         write_lock(c, f"office_packs_{int(oid)}")
     office_settings_lock(c, oid)  # 2.269.0 B (#3014): two saves with different keys both stay (after the packs lock)
     cur = office_settings(c, oid)
@@ -429,8 +431,6 @@ def pb_move_post():
     mode workspaces and an instance admin (the rule of POST /api/admin/orgs). Into an existing organisation: not yet.
     2.422.0 (#2937): the owner herself too (the rule of POST /api/orgs: a company of her own, at most ORG_SELF_MAX)."""
     from flask import g
-    from ..accounts.orgs import ORG_NAME_MAX, ORG_SELF_MAX, instance_mode, org_member_add, org_self_made_n
-    from .model import pb_owner
     from .pbtransfer import pb_letter_detach
     c, uid, oid = _ctx(admin=True)
     b = body()

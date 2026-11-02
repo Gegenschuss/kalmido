@@ -29,6 +29,8 @@ from .store import DEPTH_MAX, fs_chain, fs_log_add, fs_put, fs_read, fs_role, fs
 from .fsref import fs_ref_need_move, fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742); 2.238.0 A (#2863)
 from .fsroots import fs_area_before, fs_area_root_need_free  # 2.199.0 F (#2742, review G1); 2.200.0 (#2747)
 from .fslock import fl_is_locked, fsl_denied, fsl_map  # 2.353.0 A (#2758); F: + scan
+from .scan import sc_guard  # 2.369.5 (#2517): pulled up from functions
+from .web import _parent_arg, _items  # 2.369.5 (#2517): pulled up from functions
 
 ABM_IDS_MAX = 500  # ids per request
 ABM_ZIP_MAX_MB = int(os.environ.get("KALMIDO_FILES_ZIP_MAX_MB", "1024"))
@@ -166,7 +168,6 @@ def abm_too_big(files, size, max_files=None, max_mb=None):
 
 def abm_readable(c, n):
     """May this file's current version go out at all (not locked by the virus scanner, not waiting for it)?"""
-    from .scan import sc_guard
     try:
         sc_guard(c, "fs", n["id"], n["cur_version"])
     except Denied:
@@ -327,7 +328,6 @@ def files_scan():
     or space (like the upload). Stores ONE PDF like an upload (rights, quota, virus scan, text recognition).
     out=pdf: nothing is stored, the answer is the PDF (the documents file it through their own upload, docs/web.py)."""
     from .upsafe import h6d_read
-    from .web import _parent_arg, _items
     c = db()
     pages = request.files.getlist("page")
     if not pages:

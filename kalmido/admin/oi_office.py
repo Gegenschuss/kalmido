@@ -21,6 +21,10 @@ from ..core.orgcrypt import oc_item_store, oc_json_store, oc_log_detail  # 2.149
 from ..core.orgcrypt import oc_dec_fields  # 2.188.0 A (#2498)
 from ..office.calc import dec  # 2.188.0 A (#2498)
 from ..core.db import insert_id, iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
+from .orgexport import _safe_part  # 2.369.5 (#2517): pulled up from functions
+from ..office.pdfweb import LOGO_FILE, epdf_name  # 2.369.5 (#2517): pulled up from functions
+from ..office.signoff import sig_purpose, sig_token_new  # 2.369.5 (#2517): pulled up from functions
+from ..office.letterhead import BP_FILE_RE  # 2.369.5 (#2517): pulled up from functions
 
 # ids inside JSON texts: key -> map kind (unknown -> None)
 OI_JSON_IDS = {"service_id": "office_services", "producing_service_id": "office_services", "role_id": "office_roles",
@@ -69,7 +73,6 @@ def _oi_dir(space):
 
 
 def _oi_name(name):
-    from .orgexport import _safe_part
     return "files/office/" + _safe_part(name)
 
 
@@ -157,12 +160,10 @@ def _p_settings(c, run, src, d, ctx):
     if not isinstance(j, dict):
         return None
     j = _oi_ids(run, j)
-    from ..office.pdfweb import LOGO_FILE
     if j.get("logo"):
         j["logo"] = _oi_put(ctx, os.path.basename(str(j["logo"])), LOGO_FILE, seal=False, mime="image/png") or ""
     lh = j.get("letterhead")
     if isinstance(lh, dict) and lh.get("file"):
-        from ..office.letterhead import BP_FILE_RE
         f = str(lh["file"])
         lh["file"] = (_oi_put(ctx, f, f"letterhead-{uuid.uuid4().hex[:16]}.pdf", mime="application/pdf", strict=True) or "") if BP_FILE_RE.fullmatch(f) else ""
     d["data"] = json.dumps(oc_json_store(c, ctx.space, "office_settings", "data", j), ensure_ascii=False)
@@ -238,7 +239,6 @@ def _oi_mark(c, run, ctx, target, doc_id=None, detail=None):
 
 def _a_doc(c, run, src, nid, ctx):
     """The stored files of a finalised document (PDF / XML under the new id) and the snapshots its sender names."""
-    from ..office.pdfweb import epdf_name
     _oi_mark(c, run, ctx, "doc", nid, {k: src.get(k) for k in ("number", "status", "locked_at")})  # 2.237.0 D (#2870)
     old = src.get("id")
     if not isinstance(old, int) or not src.get("kind"):
@@ -278,7 +278,6 @@ def _p_purchase(c, run, src, d, ctx):
 
 
 def _p_signoff(c, run, src, d, ctx):
-    from ..office.signoff import sig_purpose, sig_token_new
     _tok, h, sealed = sig_token_new(c, sig_purpose({k: d.get(k) for k in ("kind", "doc_id", "list_id", "gen_doc_id", "video_id")}))
     d["token_hash"], d["token"] = h, sealed  # a new secret nobody knows: the link of the old server ends here
     if (d.get("state") or "open") == "open" and not d.get("revoked_at"):
@@ -289,7 +288,6 @@ def _p_signoff(c, run, src, d, ctx):
 
 def _a_signoff(c, run, src, nid, ctx):
     """The accepted version of a quotation (its own PDF, named by document and approval)."""
-    from ..office.pdfweb import epdf_name
     if (src.get("state") or "open") != "open":  # 2.237.0 D (#2870): an answer of the file is noted as imported, not as given here
         _oi_mark(c, run, ctx, "gen_doc" if src.get("gen_doc_id") else "doc", run.m("office_docs", src.get("doc_id")),
                  {"signoff": nid, "state": _txt(src.get("state"), 20), "signed_at": _txt(src.get("signed_at"), 40)})

@@ -9,6 +9,13 @@ from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_col
 from ..tasks.validation import log_act
 from ..tasks.tasks import one_task
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..collab.news import KIND_ROW, news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import collab_user, lang_of, user_names, task_event  # 2.369.5 (#2517): pulled up from functions
+from ..notify.channels import evm_note  # 2.369.5 (#2517): pulled up from functions
+from ..notify.push import push_prio, push_reachable  # 2.369.5 (#2517): pulled up from functions
+from ..notify.taskbell import tbl_level  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.lifecycle import do_complete  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.dependencies import completed_ids, unblock_events  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.23.0 (#463): approval as a task type
@@ -34,11 +41,6 @@ def _is_agent(uid, c):
 def approval_request_notify(c, t, ap, note):
     """2.367.2 (#2968): News + push + mail "Approval needed: <title> (from Ben)" to the approver: one event of its own instead of
     the plain assignment, past the burst gate (it waits for the person, row "assign" switches it off)."""
-    from ..collab.news import KIND_ROW, news_add, notif_ok
-    from ..collab.comments import collab_user, lang_of, user_names
-    from ..notify.channels import evm_note
-    from ..notify.push import push_prio, push_reachable
-    from ..notify.taskbell import tbl_level
     actor = me()
     s = collab_user(c, ap, t["list_id"])
     if not s or not task_visible(c, t["id"], ap, full=True):
@@ -58,10 +60,6 @@ def approval_request_notify(c, t, ap, note):
 def approval_notify(c, t, state, note, rcpt):
     """News + push to the person who asked for the approval (rcpt) about the decision. 2.367.2 (#2968): past the burst gate (it
     used to end up as "1 more change"); this is THE event of the decision: the asker gets no "completed" / "assigned" besides."""
-    from ..collab.news import KIND_ROW, news_add, notif_ok
-    from ..collab.comments import collab_user, lang_of, user_names
-    from ..notify.channels import evm_note
-    from ..notify.push import push_prio, push_reachable
     actor = me()
     if not rcpt or rcpt == actor or _is_agent(rcpt, c):
         return
@@ -85,9 +83,6 @@ def approval_notify(c, t, state, note, rcpt):
 
 def approval_apply(c, tid, b):
     """The step of body b on task tid (see above); returns the task dict. Denied / BadInput on errors."""
-    from ..collab.comments import task_event
-    from ..tasks.lifecycle import do_complete
-    from ..tasks.dependencies import completed_ids, unblock_events
     need_collab()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))

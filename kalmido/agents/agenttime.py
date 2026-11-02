@@ -23,6 +23,14 @@ from ..personal.timetrack import local_bounds, mt_time_on, time_target
 from ..core.errors import BadInput
 from ..core.usertz import tz_of_s
 from ..api.common import v1_args, v1_err, v1_feature, v1_json, v1_view
+from ..agents.core import agent_shares, is_agent, JOB_TITLE_MAX, job_dict, need_agent  # 2.369.5 (#2517): pulled up from functions
+from ..personal.timetrack import evis  # 2.369.5 (#2517): pulled up from functions
+from ..events.model import ev_range, my_cal_ids  # 2.369.5 (#2517): pulled up from functions
+from ..api.scopes import need_scope  # 2.369.5 (#2517): pulled up from functions
+from ..agents.proposals import _p_int, _p_keys, _p_str, _p_list, prop_ready_notify, PROP_OPEN_MAX, PROP_MAX_BYTES, PROP_TITLE_MAX, prop_validate  # 2.369.5 (#2517): pulled up from functions
+from ..hub.agentdispo import adz_validate, adz_run, adz_undo  # 2.369.5 (#2517): pulled up from functions
+from ..personal.timesheet import tsl_check, tsl_is_locked  # 2.369.5 (#2517): pulled up from functions
+from ..agents.admin import agent_owner  # 2.369.5 (#2517): pulled up from functions
 
 ATM_DAY_MAX_H = 12            # tracked hours of one day above this: implausible
 ATM_ENTRY_MAX_H = 10          # one entry longer than this: implausible
@@ -36,7 +44,6 @@ ATM_WEEKEND = (5, 6)          # Saturday, Sunday
 # ---------------------------------------------------------------- whose times, which period
 def atm_person(c, a):
     """(person id, viewer id) of a request: user_id = a person who may chat with the agent (else 404); default the token user."""
-    from ..agents.core import agent_shares, is_agent
     uid = me()
     pid = uid
     if a.get("user_id") not in (None, ""):
@@ -49,7 +56,6 @@ def atm_person(c, a):
             if not is_agent(g.user) or not u or u["kind"] == "agent" or u["disabled"] or not agent_shares(c, uid, pid):
                 raise Denied(404)
     elif is_agent(g.user):
-        from ..agents.admin import agent_owner
         o = agent_owner(c, uid)  # a personal agent works for its owner
         if o is None:
             raise BadInput(tr("Missing field: {0}", "user_id"))
@@ -83,7 +89,6 @@ def _zone(c, pid):
 
 def _entries(c, pid, viewer, frm, to):
     """The person's finished entries in [frm, to] that the viewer may see (lists both see; list-less ones only for the person)."""
-    from ..personal.timetrack import evis
     zone = _zone(c, pid)
     lo, hi = local_bounds(frm, to, zone)
     # 2.51.0 (#1353): evis as in the time views -- a viewer that is a participant somewhere sees there only its own tasks' entries
@@ -112,7 +117,6 @@ def _entries(c, pid, viewer, frm, to):
 
 def _events(c, pid, viewer, frm, to):
     """Past, not cancelled occurrences of events in calendars the person sees and (for an agent) the agent sees too."""
-    from ..events.model import ev_range, my_cal_ids
     if not c.execute("SELECT 1 FROM ev_cals LIMIT 1").fetchone():
         return []
     mine = set(my_cal_ids(c, viewer)) if viewer != pid else None
@@ -255,7 +259,6 @@ def v1_atm_check():
 @v1_view
 def v1_atm_from_events():
     """Past events of the period without a matching time entry (needs time + calendar)."""
-    from ..api.scopes import need_scope
     need_time()
     v1_feature("time")
     need_scope("calendar")
@@ -292,7 +295,6 @@ def atm_when(d, s, e, zone=None):
 
 
 def _atm_item(c, pid, viewer, x, w):
-    from ..agents.proposals import _p_int, _p_keys, _p_str
     _p_keys(x, w, ("date", "start", "end", "task_id", "list_id", "note", "event_id"))
     atm_when(x.get("date"), x.get("start"), x.get("end"))
     tid = None if x.get("task_id") in (None, "", 0) else _p_int(x["task_id"], w + ".task_id")
@@ -319,9 +321,7 @@ def _atm_item(c, pid, viewer, x, w):
 def atm_prop_validate(kind, b, inp):
     """An agent's proposal of kind time (here) or shoot (hub/agentdispo.py) -> the normalized proposal. Checks with the
     database: the person of the job (inp.user_id) and the agent must both see every task / list."""
-    from ..agents.proposals import _p_keys, _p_list
     if kind == "shoot":
-        from ..hub.agentdispo import adz_validate
         return adz_validate(b, inp)
     _p_keys(b, "", ("kind", "summary", "items"))
     c = db()
@@ -334,9 +334,7 @@ def atm_prop_validate(kind, b, inp):
 
 def atm_prop_run(c, j, sel, ed, rec):
     """Apply (as the person): the selected entries, with the edited times / note. rec["made"] = the new entry ids."""
-    from ..agents.proposals import _p_keys, _p_str
     if j["kind"] == "shoot":
-        from ..hub.agentdispo import adz_run
         return adz_run(c, j, sel, ed, rec)
     need_time()
     need_feat("time")
@@ -355,7 +353,6 @@ def atm_prop_run(c, j, sel, ed, rec):
         if "note" in e:
             x["note"] = _p_str(e["note"], "note", ATM_NOTE_MAX)
         a, b = atm_when(x["date"], x["start"], x["end"], _zone(c, me()))
-        from ..personal.timesheet import tsl_check
         tsl_check(c, me(), a)  # 2.125.0 B (#2119): no entry into a closed month (409 month_closed)
         tid, lid, title = time_target(c, {"task_id": x["task_id"]} if x["task_id"] else {"list_id": x["list_id"]})
         row = (me(), tid, lid, title, iso(a), iso(b), int((b - a).total_seconds()), x["note"], "manual", ts, ts)
@@ -370,14 +367,12 @@ def atm_prop_run(c, j, sel, ed, rec):
 def atm_prop_undo(c, j, rec, back=True):
     """Undo (back) removes the entries the proposal made that nobody changed since; redo creates them again."""
     if j["kind"] == "shoot":
-        from ..hub.agentdispo import adz_undo
         return adz_undo(c, rec, back)
     n, skipped = 0, []
     if back:
         keep = []
         for eid, row in zip(rec.get("made") or [], rec.get("copies") or []):
             r = c.execute("SELECT updated_at, user_id, start, billed_doc_id FROM time_entries WHERE id=?", (eid,)).fetchone()
-            from ..personal.timesheet import tsl_is_locked
             # 2.144.6 A (#2053 review 5): billed time stays, explicitly (not only because billing touches updated_at)
             if (r and r["user_id"] == me() and r["updated_at"] <= rec["at"] and not r["billed_doc_id"]
                     and not tsl_is_locked(c, me(), r["start"])  # 2.125.0 B (#2119)
@@ -389,7 +384,6 @@ def atm_prop_undo(c, j, rec, back=True):
         rec["removed"] = keep
     else:
         made, ts = [], iso(now_utc())
-        from ..personal.timesheet import tsl_check
         for row in rec.get("removed") or []:
             tsl_check(c, me(), row[4])  # 2.125.0 B (#2119): redo into a closed month: 409
             made.append(insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,
@@ -401,8 +395,6 @@ def atm_prop_undo(c, j, rec, back=True):
 
 def atm_prop_create(c, aid, pid, kind, title, inp, prop, list_id=None):
     """A ready proposal job of the agent for person pid (News + push "Proposal ready" per their settings)."""
-    from ..agents.core import JOB_TITLE_MAX, job_dict
-    from ..agents.proposals import prop_ready_notify, PROP_OPEN_MAX
     if c.execute("SELECT COUNT(*) FROM agent_jobs WHERE agent_id=? AND user_id=? AND kind=? AND prop_state='ready'",
                  (aid, pid, kind)).fetchone()[0] >= PROP_OPEN_MAX:
         return None
@@ -423,9 +415,6 @@ def atm_prop_create(c, aid, pid, kind, title, inp, prop, list_id=None):
 def v1_atm_proposal():
     """{user_id?, title?, summary?, items: [{date, start, end, task_id | list_id, note?, event_id?}]} -- the agent proposes
     time entries to a person (who may chat with it; a personal agent: its owner). Nothing is tracked until they apply it."""
-    from ..agents.core import need_agent
-    from ..agents.proposals import _p_str, PROP_MAX_BYTES, PROP_OPEN_MAX, PROP_TITLE_MAX, prop_validate
-    from ..api.scopes import need_scope
     v1_args(())
     aid = need_agent()
     need_time()

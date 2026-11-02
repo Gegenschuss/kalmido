@@ -21,6 +21,7 @@ from ..core.access import Denied
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip
 from ..api.v1 import API_ON, need_api
 from ..agents.core import AGENT_OFFLINE_S, agent_row, agent_shares
+from ..agents.admin import need_own_agent, need_agent_admin, AGENT_TOKEN_CREATED, agent_token_new  # 2.369.5 (#2517): pulled up from functions
 
 AINS_CODE_TTL_MIN = 15
 AINS_OS = ("mac", "windows", "linux")
@@ -130,7 +131,6 @@ def ains_machine_del(c, aid, tid):
 
 
 def _my(aid):
-    from ..agents.admin import need_own_agent
     need_api()
     c = db()
     need_own_agent(c, aid)
@@ -157,7 +157,6 @@ def ains_my_machine_del(aid, tid):
 
 @app.post("/api/admin/agents/<int:aid>/setup-code")
 def ains_admin_code(aid):
-    from ..agents.admin import need_agent_admin
     need_api()
     c = db()
     with system_ctx(c):  # the instance admin manages agent accounts (any organisation; structure, no content), like the token route
@@ -167,7 +166,6 @@ def ains_admin_code(aid):
 
 @app.get("/api/admin/agents/<int:aid>/machines")
 def ains_admin_machines(aid):
-    from ..agents.admin import need_agent_admin
     c = db()
     with system_ctx(c):  # the instance admin manages agent accounts (any organisation; structure, no content)
         need_agent_admin(c, aid)
@@ -176,7 +174,6 @@ def ains_admin_machines(aid):
 
 @app.delete("/api/admin/agents/<int:aid>/machines/<int:tid>")
 def ains_admin_machine_del(aid, tid):
-    from ..agents.admin import need_agent_admin
     c = db()
     with system_ctx(c):  # the instance admin manages agent accounts (any organisation; structure, no content)
         need_agent_admin(c, aid)
@@ -187,7 +184,6 @@ def ains_admin_machine_del(aid, tid):
 def ains_redeem():
     """{code, host?, folder?, os?} -> {token, url, agent, operator_id, starter_base, starter_sha256, version}. No login: the one-time
     code is the credential. 2.380 G (#3390): starter_sha256 = {file: sha256}, the setup refuses a downloaded file that differs."""
-    from ..agents.admin import AGENT_TOKEN_CREATED, agent_token_new
     keys = [("setup:ip:" + rate_ip(), AINS_RATE)]
     if _rate_blocked(keys):
         return err(tr("Too many failed attempts, please wait a few minutes"), 429)

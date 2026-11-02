@@ -20,6 +20,9 @@ from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import Denied, need_collab
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import v1_call  # 2.149.0 G (#2517): pulled up from functions
+from ..lists.lists import FOLDER_SEP, folder_under, clean_folder, list_agent_set  # 2.369.5 (#2517): pulled up from functions
+from ..lists.folders import folder_props_of, folder_lists, _list_agent as la, folder_apply, _clean_props  # 2.369.5 (#2517): pulled up from functions
+from ..lists.ownership import owner_transfer  # 2.369.5 (#2517): pulled up from functions
 
 
 def sh_folder_agents(c, owner, folder):
@@ -32,7 +35,6 @@ def sh_folder_agents(c, owner, folder):
 
 def sh_folder_agents_eff(c, owner, path):
     """The agents a list at `path` gets offered: the subfolder's own, else its top folder's (like folder_effective)."""
-    from ..lists.lists import FOLDER_SEP
     parts = (path or "").split(FOLDER_SEP) if path else []
     for i in range(len(parts), 0, -1):
         a = sh_folder_agents(c, owner, FOLDER_SEP.join(parts[:i]))
@@ -43,7 +45,6 @@ def sh_folder_agents_eff(c, owner, path):
 
 def _props_write(c, owner, folder, upd):
     """Merges upd into folder_props.props of the folder (None removes a key)."""
-    from ..lists.folders import folder_props_of
     props = {k: v for k, v in {**folder_props_of(c, owner, folder), **upd}.items() if v is not None}
     if props:
         c.execute("INSERT INTO folder_props(owner_id,folder,props,updated_at) VALUES(?,?,?,?) ON CONFLICT(owner_id,folder) "
@@ -54,7 +55,6 @@ def _props_write(c, owner, folder, upd):
 
 def sh_mirror(c, owner, folder):
     """props.agent_id / agent_listen follow the first agent (no agent left: the keys go, the folder no longer sets an agent)."""
-    from ..lists.folders import folder_props_of
     a = sh_folder_agents(c, owner, folder)
     cur = folder_props_of(c, owner, folder)
     if a:
@@ -107,7 +107,6 @@ def sh_folder_agents_sync(c):
 
 def sh_folder_rename(c, uid, old, new):
     """The folder (and its subfolders) renamed / moved: its agents go along."""
-    from ..lists.lists import folder_under
     for r in c.execute("SELECT folder, agent_id FROM folder_agents WHERE owner_id=?", (uid,)).fetchall():
         if folder_under(r[0], old):
             nf = new + r[0][len(old):]
@@ -116,7 +115,6 @@ def sh_folder_rename(c, uid, old, new):
 
 
 def _folder_arg(strict=True):
-    from ..lists.lists import clean_folder
     from ..lists.lffolder import lf_path_arg
     src = request.args if request.method == "GET" else body()
     f = clean_folder(lf_path_arg(db(), src.get("folder"), src.get("node")) or "", strict=strict)  # 2.352.0 A (#2748): or node=
@@ -130,18 +128,14 @@ class _Bad(Exception):
 
 
 def _own_lists(c, f):
-    from ..lists.folders import folder_lists
     return folder_lists(c, me(), f)
 
 
 def _list_agent(c, lid):
-    from ..lists.folders import _list_agent as la
     return la(c, lid)
 
 
 def _agents_out(c, f):
-    from ..lists.folders import folder_props_of
-    from ..lists.lists import FOLDER_SEP
     own = sh_folder_agents(c, me(), f)
     inh = [] if own or FOLDER_SEP not in f else sh_folder_agents_eff(c, me(), f.rsplit(FOLDER_SEP, 1)[0])
     lists = _own_lists(c, f)
@@ -162,7 +156,6 @@ def sh_agents_get():
 
 
 def _apply_lists(c, f, keys):
-    from ..lists.folders import folder_apply
     shared, skipped = 0, []
     for r in _own_lists(c, f):
         sk, n = folder_apply(c, r["id"], keys=keys, uid=me())
@@ -177,7 +170,6 @@ def sh_agents_put():
     """{folder, agent_id, listen?: bool|null, first?: true, apply?: all|new}: adds an agent to my folder or changes it.
     The first agent is the default of the folder's lists: they follow it (apply all, default) or only new lists do (new).
     listen reaches the folder's lists where this agent is the agent. -> the folder's agents + {changed, skipped}."""
-    from ..lists.folders import _clean_props
     need_collab()
     if g.user["kind"] == "agent":
         raise Denied(403)
@@ -237,7 +229,6 @@ def sh_agents_put():
 def sh_agents_delete():
     """{folder, agent_id, remove?: true}: the agent is no longer one of my folder's agents; remove also takes it out of the
     folder's lists now (else they keep it). The next agent becomes the default for new lists."""
-    from ..lists.lists import list_agent_set
     if g.user["kind"] == "agent":
         raise Denied(403)
     c, b = db(), body()
@@ -270,12 +261,10 @@ def sh_folder_owner():
     """{folder, user_id}: hands every list of mine in the folder (and its subfolders) to another active person, list by list
     with the rules of "Transfer ownership" (a list of an organisation only inside it). I stay in them as list admin.
     -> {moved, skipped: [{id, name, reason}]}"""
-    from ..agents.core import is_agent
+    from ..agents.core import is_agent, need_person
     from ..accounts.orgs import ws_check_member
-    from ..lists.ownership import owner_transfer
     need_collab()
-    if is_agent(g.user):
-        raise Denied(403)
+    need_person(403)
     c, b = db(), body()
     try:
         f = _folder_arg()

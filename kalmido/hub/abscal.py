@@ -26,6 +26,11 @@ from ..core.orgcrypt import oc_dec_fields
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip
 from ..personal.timetrack import BadInput
 from .absence import ABS_STATES, _gate, abs_holidays, abs_holidays_shown, abs_org, abs_countries_shown, abs_people, abs_state, abs_states_shown
+from ..accounts.orgs import user_orgs  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import user_orgs_full  # 2.369.5 (#2517): pulled up from functions
+from ..calendars.icalfeed import ics_fold, ics_text  # 2.369.5 (#2517): pulled up from functions
+from ..notify.alerts import aa_count  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import acx_token_bind  # 2.369.5 (#2517): pulled up from functions
 
 ABC_KIND = {"vacation": "Holiday", "sick": "Sick leave", "off": "Day off", "other": "Other absence"}
 ABC_MAX = 2000  # absences in one answer / feed
@@ -85,8 +90,6 @@ def abc_team_orgs(c, uid, s):
     """The organisations whose colleagues' absences I may see in the calendar: my full memberships (no guests /
     accounting), only the switched one when the workspace switch shows one organisation, none on "Private"."""
     import re
-    from ..accounts.orgs import user_orgs
-    from ..accounts.orgroles import user_orgs_full
     full = [o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]
     ws = (s.get("workspace") or "").strip()
     m = re.fullmatch(r"org:(\d{1,9})", ws)
@@ -139,7 +142,6 @@ def abc_feed_row(c, uid):
 def abc_ics(c, uid):
     """VCALENDAR of uid's own absences (a year back, every coming one) and the holidays of their state (this year and the
     next two). All-day events; the absences busy, the holidays free (TRANSP)."""
-    from ..calendars.icalfeed import ics_fold, ics_text
     lg = lang(c, uid)  # 2.368.4 (#2989): the owner's language: the calendar app that fetches the link is no signed-in reader
     today = local_now().date()
     stamp = now_utc().strftime("%Y%m%dT%H%M%SZ")
@@ -167,7 +169,6 @@ def _nf():
 
 @app.get("/ical/abs/<token>.ics")
 def abc_feed(token):
-    from ..notify.alerts import aa_count
     keys = [("ical:" + client_ip(), ABC_FAIL_LIMIT)]
     if _rate_blocked(keys):
         return Response("Too many requests\n", 429, content_type="text/plain; charset=utf-8")
@@ -184,7 +185,6 @@ def abc_feed(token):
         _rate_fail(keys)
         aa_count("security", "ics", client_ip())
         return _nf()
-    from ..core.access import acx_token_bind
     acx_token_bind(f["user_id"])  # reads with the link owner's context (row-level security), like the other feeds
     return Response(abc_ics(c, f["user_id"]), content_type="text/calendar; charset=utf-8",
                     headers={"Cache-Control": "private, no-store", "Content-Disposition": 'inline; filename="absences.ics"',

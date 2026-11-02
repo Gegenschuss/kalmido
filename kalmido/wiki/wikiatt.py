@@ -37,6 +37,7 @@ from ..tasks.attachments import file_ext, safe_name, send_stored
 from .pages import (WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, wiki_clean_path, wiki_fit_paths, wiki_path_parts, wiki_frontmatter, wiki_insert, wiki_need,
                     wiki_set_links, wiki_space_sql)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from .wikie2e import wke_page_mode  # 2.369.5 (#2517): pulled up from functions
 
 WKA_LANG = threading.local()  # 2.177.0 (#2685): the language of the person a background import (wkimport.py) works for
 WKA_TOO_LARGE = N_("The archive is too large")
@@ -80,7 +81,6 @@ def wka_space(r):
 
 
 def wka_locked(c, r):
-    from .wikie2e import wke_page_mode
     return bool(wke_page_mode(c, r))
 
 

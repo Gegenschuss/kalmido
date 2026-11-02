@@ -45,6 +45,21 @@ from ..office.rights import NO_RIGHT, ofr_allows
 from ..files.store import fs_role
 from .ccsread import CCS_LIMITS, ccs_ask, ccs_input, ccs_run, ccs_target, ccs_undo, ccs_validate  # 2.469.0 (#3749)
 from .rcread import RCR_LIMITS, rcr_doc_view, rcr_input, rcr_run, rcr_target, rcr_undo, rcr_validate  # 2.299.0 E (#3194)
+from ..accounts.pictures import avatar_url  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import agent_online, agent_usable  # 2.369.5 (#2517): pulled up from functions
+from ..agents.usage import usage_block  # 2.369.5 (#2517): pulled up from functions
+from ..office.agentdocs import ofa_agent_on, ofa_area, ofa_area_agents, _doc_v1, ofa_agent_ok, OFA_OFF  # 2.369.5 (#2517): pulled up from functions
+from ..office.model import office_on, office_role, office_settings, pb_personal, TEXT_MAX, office_org  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import need_node  # 2.369.5 (#2517): pulled up from functions
+from ..docs import store as S  # 2.369.5 (#2517): pulled up from functions
+from ..agents.proposals import prop_agent_ok  # 2.369.5 (#2517): pulled up from functions
+from ..office.docs import doc_row, doc_public  # 2.369.5 (#2517): pulled up from functions
+from ..docs.web import doc_json  # 2.369.5 (#2517): pulled up from functions
+from ..lists.report import project_status, report_period, status_markdown, time_allowed, _time_of  # 2.369.5 (#2517): pulled up from functions
+from ..collab.liste2eguard import le2b_net, le2b_list_locked, le2b_off  # 2.369.5 (#2517): pulled up from functions
+from ..api.scopes import need_scope  # 2.369.5 (#2517): pulled up from functions
+from ..office.ledger import ofx_diff, ofx_log, ofx_need_editable  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import need_list  # 2.369.5 (#2517): pulled up from functions
 
 AST_KINDS = ("office_text", "doc_summary", "report", "receipt_read", "card_statement_read")  # 2.469.0 (#3749): + card_statement_read (agents/ccsread.py); 2.299.0 E (#3194): + receipt_read (agents/rcread.py)
 AST_READ = ("receipt_read", "card_statement_read")  # the kinds that need the receipts right and the file shared with the agent
@@ -66,9 +81,6 @@ def _clean(v, what, mx, required=False):
 
 
 def _pub(c, a):
-    from ..accounts.pictures import avatar_url
-    from ..agents.core import agent_online
-    from ..agents.usage import usage_block
     u = c.execute("SELECT * FROM users WHERE id=?", (a["user_id"],)).fetchone()
     return {"id": a["user_id"], "name": a["display_name"] or a["username"], "avatar": avatar_url(u),
             "limit_reached": bool(usage_block(c, a["user_id"])), "online": agent_online(a) is not False}
@@ -90,8 +102,6 @@ def ast_office_agents(c, uid, oid, area="offers"):
     """The agents of office area oid uid may ask for an office text: the agent's office switch on, the area's privacy switch
     on, uid works in that office; a personal agent in an organisation only while its owner works there (as offer_accepted).
     2.299.0 E (#3194): area = the office right both need (receipts for receipt_read)."""
-    from ..office.agentdocs import ofa_agent_on, ofa_area, ofa_area_agents
-    from ..office.model import office_on, office_role, office_settings
     if not oid or office_role(c, uid, oid) not in ("admin", "member") or not office_on(c, uid):
         return []
     if not ofr_allows(c, uid, oid, area, "edit"):  # 2.187.0 C (#2476): office groups
@@ -115,14 +125,11 @@ def ast_office_agents(c, uid, oid, area="offers"):
 
 def _doc_area(c, uid, node):
     """The office area of a document: its organisation, a private one: the person's personal office."""
-    from ..office.model import pb_personal
     return node["org_id"] or pb_personal(c, uid, create=False)
 
 
 def ast_doc_agents(c, uid, nid, area="offers"):
     """Agents uid may ask for a summary of document nid: office agents of the document's area that see the file themselves."""
-    from ..files.store import fs_role, need_node
-    from ..docs import store as S
     n = need_node(c, nid, write=True)
     if n["kind"] != "file" or not S.meta_row(c, nid):
         raise Denied(404)
@@ -131,8 +138,6 @@ def ast_doc_agents(c, uid, nid, area="offers"):
 
 def ast_list_agents(c, uid, lid):
     """Agents uid may ask for a client report of list lid: the list is shared with them and uid may address them there."""
-    from ..agents.core import agent_usable
-    from ..agents.proposals import prop_agent_ok
     rows = c.execute("""SELECT a.*, u.username, u.display_name, u.avatar, u.disabled FROM agents a JOIN users u ON u.id=a.user_id
                         WHERE u.kind='agent' ORDER BY u.id""").fetchall()
     return [a for a in rows if prop_agent_ok(c, a, uid) and list_role(c, lid, a["user_id"])
@@ -174,8 +179,6 @@ def ast_agents_get(c, uid, a):
 
 # ---------------------------------------------------------------- the inputs
 def _office_doc(c, uid, oid, did):
-    from ..office.docs import doc_row
-    from ..office.model import office_on, office_role
     if not oid or office_role(c, uid, oid) not in ("admin", "member") or not office_on(c, uid):
         raise Denied(403)
     if not ofr_allows(c, uid, oid, "offers", "edit"):  # 2.187.0 C (#2476): office groups
@@ -185,8 +188,6 @@ def _office_doc(c, uid, oid, did):
 
 def _office_input(c, oid, r, field, wish):
     """What the agent may read of the document anyway (GET /api/v1/office/docs/<id>), trimmed to what a text needs."""
-    from ..office.agentdocs import _doc_v1
-    from ..office.docs import doc_public
     d = _doc_v1(c, oid, r)
     rec = d.get("recipient") or {}
     cl = c.execute("SELECT name FROM clients WHERE id=? AND org_id=?", (r["client_id"], oid)).fetchone() if r["client_id"] else None
@@ -227,9 +228,6 @@ def _office_input(c, oid, r, field, wish):
 
 def _doc_input(c, aid, n, wish):
     """What GET /api/v1/documents/<id> shows the agent of this file (docs/v1.py) -- the agent's own role on it."""
-    from ..docs import store as S
-    from ..docs.web import doc_json
-    from ..files.store import fs_role
     m = S.meta_row(c, n["id"])
     d = doc_json(c, m, n, full=True, role=fs_role(c, n["id"], uid=aid))
     x = d.get("extracted") or {}
@@ -244,8 +242,6 @@ def _doc_input(c, aid, n, wish):
 
 def _report_input(c, uid, aid, lid, b):
     """The status report of list lid as the AGENT sees it (no comments, notes, names) + the fixed Markdown text."""
-    from ..lists.report import project_status, report_period, status_markdown, time_allowed, _time_of
-    from ..collab.liste2eguard import le2b_net
     frm, to = report_period({k: b.get(k) for k in ("from", "to", "days") if b.get(k) not in (None, "")})
     lg = b.get("lang") or None
     if lg and lg != "en" and lg not in LANGS:
@@ -260,8 +256,6 @@ def _report_input(c, uid, aid, lid, b):
 
 def ast_request(c, uid, b):
     """POST /api/proposals for the kinds of this module -> a proposal job + job_request to the chosen agent."""
-    from ..agents.usage import usage_block
-    from ..collab.liste2eguard import le2b_list_locked, le2b_off
     kind = b.get("kind")
     common = ("agent_id", "kind", "wish")
     try:
@@ -273,14 +267,12 @@ def ast_request(c, uid, b):
     oid = doc_id = None
     if kind == "office_text":
         _p_keys(b, "", (*common, "doc_id", "field"))
-        from ..office.model import office_org
         oid, r = _office_doc(c, uid, office_org(c, uid, area="offers"), b.get("doc_id"))
         if r["kind"] not in AST_DOC_KINDS:
             raise BadInput(tr("Invalid value: {0}", "doc_id"))
         field = b.get("field") or "intro"
         if field not in AST_FIELDS:
             raise BadInput(tr("Invalid value: {0}", "field"))
-        from ..office.ledger import ofx_need_editable
         ofx_need_editable(r)
         ok = [a for a in ast_office_agents(c, uid, oid) if a["user_id"] == aid]
         if not ok:
@@ -307,7 +299,6 @@ def ast_request(c, uid, b):
         title = tr(AST_TITLES[kind], s["month"])
     else:
         _p_keys(b, "", (*common, "list_id", "from", "to", "days", "lang"))
-        from ..core.access import need_list
         lid = _iid(b.get("list_id"), "list_id")
         need_list(c, lid, write=False)
         if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): agents never get texts of a list with the lock
@@ -344,7 +335,6 @@ AST_LIMITS = {"text_max": PROP_TEXT_MAX, "summary_text_max": AST_SUMMARY_MAX, **
 # ---------------------------------------------------------------- the agent's answer
 def ast_validate(kind, b, inp):
     """prop_validate: office_text {field?, text}; doc_summary / report {text}. Unknown fields 400."""
-    from ..office.model import TEXT_MAX
     if kind == "office_text":
         _p_keys(b, "", ("kind", "summary", "field", "text"))
         f = b.get("field") or inp.get("field")
@@ -361,12 +351,10 @@ def ast_validate(kind, b, inp):
 
 def ast_need_agent(c, j, aid):
     """Before the agent's proposal is stored: its office switches still on (office kinds), the list still shared (report)."""
-    from ..office.agentdocs import ofa_agent_ok, ofa_area
     if j["kind"] == "report":
         if not list_role(c, j["list_id"], aid):
             raise Denied(403)
         return
-    from ..api.scopes import need_scope
     need_scope("office")  # as every office route of an agent
     with system_ctx(c):  # the agent's switch, its area and the area's privacy switch (structure; an agent's token does not see the settings of a personal office)
         a = agent_row(c, aid)
@@ -374,7 +362,6 @@ def ast_need_agent(c, j, aid):
     if ok and j["kind"] in AST_READ:  # 2.299.0 E (#3194): the file still shared with the agent
         ok = bool(fs_role(c, (json.loads(j["input"] or "{}").get("document") or {}).get("id") or 0, uid=aid))
     if not ok:
-        from ..office.agentdocs import OFA_OFF
         raise Denied(403, tr(OFA_OFF))
 
 
@@ -390,7 +377,6 @@ def _text_of(j, ed):
 
 def _office_target(c, j):
     """(oid, document row) of an office_text job for the signed-in person; 403 / 404 as for the document itself."""
-    from ..office.agentdocs import ofa_area
     with system_ctx(c):  # the agent's settings row (structure)
         a = agent_row(c, j["agent_id"])
     inp = json.loads(j["input"] or "{}")
@@ -398,8 +384,6 @@ def _office_target(c, j):
 
 
 def _doc_target(c, j, write=True):
-    from ..files.store import need_node
-    from ..docs import store as S
     inp = json.loads(j["input"] or "{}")
     nid = _iid((inp.get("document") or {}).get("id"), "doc_id")
     n = need_node(c, nid, write=write)
@@ -420,7 +404,6 @@ def _receipt_target(c, j, write=True):
 
 
 def ast_summary_of(c, m):
-    from ..docs import store as S
     try:
         v = m["summary"]
     except (KeyError, IndexError):
@@ -429,13 +412,11 @@ def ast_summary_of(c, m):
 
 
 def _set_office(c, oid, r, field, text):
-    from ..office.ledger import ofx_diff, ofx_log
     c.execute(f"UPDATE office_docs SET {field}=?, updated_at=? WHERE id=? AND org_id=?", (text, iso(now_utc()), r["id"], oid))
     ofx_log(c, oid, "update", doc_id=r["id"], detail=ofx_diff({field: r[field]}, {field: text}))
 
 
 def _set_summary(c, m, text):
-    from ..docs import store as S
     c.execute("UPDATE doc_meta SET summary=?, updated_at=? WHERE node_id=?",
               (S.doc_seal(c, m["ws"], "doc_meta.summary", text), iso(now_utc()), m["node_id"]))
 
@@ -443,8 +424,6 @@ def _set_summary(c, m, text):
 def ast_run(c, j, sel, ed, extra, rec):
     """Take it over as the person: office_text writes the field of the draft (409 when finalised / sent), doc_summary the
     document's summary (the person needs the right edit), report keeps the text with the job."""
-    from ..office.ledger import ofx_need_editable
-    from ..office.model import TEXT_MAX
     kind = j["kind"]
     prop, text = _text_of(j, ed) if kind not in AST_READ else (None, None)
     if kind == "office_text":
@@ -474,7 +453,6 @@ def ast_undo(c, j, rec, back=True):
     """Undo (back) / redo: the old text comes back unless someone changed the field since (then skipped)."""
     kind, skipped, n = j["kind"], [], 0
     if kind == "office_text":
-        from ..office.ledger import ofx_need_editable
         o = rec["office"]
         try:
             oid, r = _office_target(c, j)

@@ -23,6 +23,13 @@ from ..tasks.validation import log_act
 from ..core.errors import BadInput
 from ..api.common import hit_budget, hit_limit
 from ..lists.public import BOT_ERROR, pub_html, public_links_on
+from ..accounts.orgs import instance_mode, may_see, user_orgs  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import user_orgs_full  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.dependencies import newtask_events  # 2.369.5 (#2517): pulled up from functions
+from ..collab.liste2eguard import LE2B_OFF_MSG, le2b_list_locked  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachments import safe_name, unexec_name  # 2.369.5 (#2517): pulled up from functions
+from ..core.pages import save_attachment_bytes  # 2.369.5 (#2517): pulled up from functions
+from ..lists.public import PUB_ACTOR  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.23.0 (#463 / #341): forms -> tasks
@@ -247,7 +254,6 @@ def _find(c, token):
                          AND l.deleted_at IS NULL""",  # 2.148.1 D (#2495): a list in the trash takes nothing in
                       (_token_hash(token),)).fetchone()
     if r is not None and g.user and r["access"] == "public" and r["l_org"]:
-        from ..accounts.orgroles import user_orgs_full
         if r["l_org"] not in user_orgs_full(c, g.user["id"], write=True):  # 2.143.0 A (#2151, review): limited roles = visitor
             # 2.37.0 (review K2-2): a signed-in person of another organisation uses a public form like a visitor (the
             # context hook prefers g.user, whose organisations do not include the list's)
@@ -288,14 +294,12 @@ def _may_use(c, f):
     if not g.user:
         return _msg(tr("Please sign in", lg=lg), tr("This form is for the people of {0}. Sign in and open the link again.", APP_NAME, lg=lg),
                     lg, 401, ("/", tr("To the sign-in", lg=lg)))
-    from ..accounts.orgs import instance_mode, may_see, user_orgs
     if g.user["kid"]:
         return _gone(lg)
     if instance_mode(c) == "shared":  # 2.23.0 (#799): a shared instance: the owner's contacts
         if not g.user["is_admin"] and not may_see(c, f["l_owner"], g.user["id"]):
             return _gone(lg)
         return None
-    from ..accounts.orgroles import user_orgs_full
     # 2.143.0 A (#2151, review): an organisation's internal form is for its writing roles (not guest / read-only / accounting)
     owner_orgs, mine = set(user_orgs(c, f["l_owner"])), set(user_orgs_full(c, g.user["id"], write=True))
     # 2.30.0 (#1036): the form of an organisation's list is for the people of THAT organisation (not of every organisation of
@@ -419,7 +423,6 @@ def form_page(token):
 
 @app.post("/f/<token>")
 def form_send(token):
-    from ..tasks.dependencies import newtask_events
     from ..agents.core import agent_added_events, agent_tidy_events
     c = db()
     f = _find(c, token)
@@ -468,7 +471,6 @@ def form_send(token):
         return again(tr("Please include at most {0} links.", FRM_LINKS_MAX, lg=lg))
     upload = None
     if f["files"]:  # 2.63.0 (#1513): one file, hard size limit, a clean name, the type from the name (never the sender's)
-        from ..tasks.attachments import safe_name, unexec_name
         fs = request.files.get("file")
         if fs and fs.filename:
             data = fs.read(FRM_FILE_MAX + 1)
@@ -499,7 +501,6 @@ def form_send(token):
     else:
         content = (vals["text"][:FORM_TEXT_MAX] + "\n\n" if vals["text"] else "") + "— " + meta
     lid = f["list_id"]
-    from ..collab.liste2eguard import LE2B_OFF_MSG, le2b_list_locked
     if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): a form cannot write plain texts into a list with the lock
         return again(tr(LE2B_OFF_MSG, lg=lg))
     # 2.102.0 C (#2201): a valid client link first (also without the e-mail matching), else as before
@@ -517,10 +518,8 @@ def form_send(token):
                     (lid, sec, subject, content, srt, ts, ts, uid, f["ttype"] or ""))
     c.execute("UPDATE forms SET count=count+1, last_at=? WHERE id=?", (ts, f["id"]))
     if upload:
-        from ..core.pages import save_attachment_bytes
         save_attachment_bytes(c, tid, *upload, owner=None if uid else f["l_owner"])
     if qs:  # 2.98.0 B (#1954): the answers for the evaluation, the files as attachments (sealed, scanned, counted)
-        from ..core.pages import save_attachment_bytes
         fq_entry_save(c, tid, f, cid, sender if g.user or name else "", email if not g.user else "", answers, typed)
         for up in q_ups:
             save_attachment_bytes(c, tid, *up, owner=None if uid else f["l_owner"])
@@ -531,7 +530,6 @@ def form_send(token):
         status_url = pt_status_url(ptok)
         mail_url = pt_mail_url(c, {"id": ptid, "token_hash": _token_hash(ptok)}, ptok)  # 2.360.0 A (#2496): confirms the address
     if not g.user:
-        from ..lists.public import PUB_ACTOR
         g.user, g.auth_via = PUB_ACTOR, "public"  # "someone via the form" in the history, News and pushes
     try:
         log_act(c, tid, "created", {"form": f["title"], **({"portal": 1} if portal else {})})

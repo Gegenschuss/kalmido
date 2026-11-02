@@ -34,6 +34,7 @@ from ..collab.teamchat import md_brief
 from ..tasks.validation import as_int
 from ..core.errors import BadInput
 from ..api.common import cursor_dec, cursor_enc  # 2.149.0 G (#2517): pulled up from functions
+from ..lists.fields import search_field_ids  # 2.369.5 (#2517): pulled up from functions
 
 FTS_VERSION = "2"  # 2.281.0 C (#3113): stored vectors (task_fts / cmt_fts) instead of expression indexes
 FTS_CAP = 100000         # characters of notes / a comment that the index reads
@@ -198,7 +199,6 @@ def fts_search(c, uid, raw, files=True):
             continue
         put(r["task_id"], "comment", r["r"], _snip(text, terms), r["id"])
     # weaker: custom field values and the recognised text of files (the existing helpers, substring like search_tasks)
-    from ..lists.fields import search_field_ids
     from ..files.textscan import ts_task_hits
     extra = {tid: ("field", None) for tid in search_field_ids(c, uid, raw)}
     if files:

@@ -23,6 +23,8 @@ from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 from .rights import ofr_own_uid
 from .travel import _csv_safe, _ctx, rk_trips
 from .vma import VMA_HOME, VMA_YEARS, vma_breakdown, vma_country_name, vma_places, vma_rate, vma_table_year
+from .travel import rk_cl_where  # 2.369.5 (#2517): pulled up from functions
+from .model import ofx_name1  # 2.369.5 (#2517): pulled up from functions
 
 VMR_CUR = "EUR"  # the BMF rates are in euros, whatever the office currency
 
@@ -91,7 +93,6 @@ def vmr_report(c, oid, year, person=None, lg="de"):
     """{year, currency, people: [{key, label, trips: [...], total, open}], total, open, source} -- the per diem of every trip
     with a day in year, per participant (a trip without participants under "No person"). Trips with "no per diem" are left
     out; trips without an amount (times missing, a year without rates) are listed with their hints but not summed."""
-    from .travel import rk_cl_where
     w, wa = rk_cl_where(c, oid)
     clients = {r["id"]: r["name"] for r in c.execute(f"SELECT id, name FROM clients WHERE {w}", wa)}
     y0, y1 = f"{year}-01-01", f"{year}-12-31"
@@ -303,7 +304,6 @@ def vmr_pdf():
     from .pdf import A4_H, C_INK, C_INK2, C_RULE, PDF_CW, PDF_L, _Page, pdf_date, pdf_money, pdf_text_width, pdf_wrap, pdf_write
     c, uid, oid, year, person, lg = vmr_args()
     rep = vmr_report(c, oid, year, person, lg)
-    from .model import ofx_name1
     co = ofx_name1((office_settings(c, oid).get("company") or {}).get("name") or "")  # 2.99.0 (#2188): up to three lines -> one
     ppr = pdf_paper_ns(office_settings(c, oid).get("paper"))  # 2.357.0 A (#3156)
     A4_H, PDF_CW, PDF_L, _Page = ppr.A4_H, ppr.PDF_CW, ppr.PDF_L, ppr._Page

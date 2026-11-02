@@ -885,7 +885,6 @@ def member_set(lid):
         if old[0] != eff:
             news_add(c, uid, "role", list_id=lid, data={"role": eff, "old": old[0], "name": lname})
     else:
-        from ..core.access import ONE_AGENT_MSG, list_other_agent
         if list_other_agent(c, lid, uid):  # 2.26.0: one agent per list
             return err(tr(ONE_AGENT_MSG), 409)
         c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",

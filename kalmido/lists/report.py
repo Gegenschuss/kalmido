@@ -16,6 +16,8 @@ from ..personal.timetrack import entry_out, time_on, time_rows, time_rounding, v
 from ..core.errors import BadInput
 from ..core.db import usettings
 from ..api.common import v1_args, v1_view
+from ..personal.timetrack import local_bounds  # 2.369.5 (#2517): pulled up from functions
+from ..lists.projects import LIST_STATUS_NAMES  # 2.369.5 (#2517): pulled up from functions
 
 REPORT_LIST_MAX = 30     # rows per section (the counts are complete)
 REPORT_DAYS_MAX = 366    # longest period
@@ -44,7 +46,6 @@ def report_period(a):
 
 
 def _bounds(frm, to):
-    from ..personal.timetrack import local_bounds
     return local_bounds(frm, to)
 
 
@@ -143,7 +144,6 @@ def _hours(sec, lg):
 
 def status_markdown(d, lg=None):
     """The report as plain Markdown in language lg (fixed sentences, the person edits it before sending)."""
-    from ..lists.projects import LIST_STATUS_NAMES
     lg = lg or lang()
     day = lambda v: short_day(date.fromisoformat(v[:10]), lg, year=True)  # noqa: E731
     L = [f"# {tr('Status report: {0}', d['list']['name'], lg=lg)}", "",

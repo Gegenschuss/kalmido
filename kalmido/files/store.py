@@ -50,6 +50,11 @@ fs_add_hooks = []
 
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
+from ..accounts.orgroles import org_limited, org_role_key, need_org_write  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachments import safe_name, unexec_name, need_attachment  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgretain import odl_custodian  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
+from ..lists.projects import need_list_file  # 2.369.5 (#2517): pulled up from functions
 
 
 def _uid():
@@ -144,13 +149,11 @@ def _fs_role(c, uid, chain):
         return _best(_shares_role(c, ids, uid, True), role)
     if org and _fs_receipt_hidden(c, uid, org, n):
         return None  # 2.187.0 C (#2476)
-    from ..accounts.orgroles import org_limited
     if org and org_limited(c, uid, org):
         return _fs_limited_role(c, uid, org, chain, ids)  # 2.143.0 A (#2151)
     if n["owner_id"] == uid:
         return "owner"
     if org:
-        from ..accounts.orgs import is_org_admin
         if is_org_admin(c, uid, org):
             return "owner"
     role = None
@@ -211,7 +214,6 @@ def _fs_limited_role(c, uid, org, chain, ids):
     a member sees, at most 'view'. Guest: only their own nodes and shares. Accounting: like a guest, plus the organisation's
     documents folder to read (receipts) and their own uploads there (the upload itself is the documents area's,
     docs/web.py). Review: a guest / accounting person corrects and removes their own nodes ('edit'); read-only stays 'view'."""
-    from ..accounts.orgroles import org_role_key
     rk = org_role_key(c, uid, org)
     own = chain[0]["owner_id"] == uid and not _fs_open_area(c, chain)  # 2.200.0 A (#2747, review 4): an admin demoted keeps no area tree
     role = ("view" if rk == "readonly" else "edit") if own else None
@@ -280,10 +282,8 @@ def fs_link_target(c, n):
     """The original of a link node as {path, name, mime, size} -- raises Denied when the signed-in account may not read it
     (its rights are always the original's: task visibility incl. participants and health lists, project page access)."""
     if n["ref_kind"] == "att":
-        from ..tasks.attachments import need_attachment
         a = need_attachment(c, n["ref_id"], False)
     elif n["ref_kind"] == "list_file":
-        from ..lists.projects import need_list_file
         a = need_list_file(c, n["ref_id"], False)
     else:
         raise Denied(404)
@@ -309,8 +309,6 @@ def fs_visible_sql_c(c, uid):
     else:
         oids = ",".join(str(int(x)) for x in ctx.org_ids) or "0"
         orgs = f"n.org_id IS NULL OR n.org_id IN ({oids})"
-        from ..accounts.orgs import is_org_admin
-        from ..accounts.orgroles import org_role_key
         admin = [int(o) for o in ctx.org_ids if is_org_admin(c, uid, o)]
         seed = f"n.owner_id = {uid}"
         lim = [int(o) for o in ctx.org_ids if org_role_key(c, uid, o) in ("guest", "accounting", "readonly")]
@@ -412,7 +410,6 @@ def fs_visible_ids(c, uid=None):
 
 
 def safe_fs_name(name):
-    from ..tasks.attachments import safe_name
     return safe_name(name)[:150]
 
 
@@ -480,7 +477,6 @@ def _place(c, uid, parent_id, org_id, write_role=True, add_file=False):
     if org_id and int(org_id) not in ctx.org_ids:
         raise Denied(404)
     if org_id:  # 2.143.0 A (#2151, review): the organisation's top level only for members / admins (receipts: docs/web.py)
-        from ..accounts.orgroles import need_org_write
         need_org_write(c, uid, int(org_id))
     return uid, (int(org_id) if org_id else None)
 
@@ -534,7 +530,6 @@ def fs_put(c, uid, parent_id, name, data, mime=None, org_id=None, agent_id=None,
     (rights), ValueError (empty / too large; upsafe.UploadRefused: a virus find) or hosting.QuotaExceeded. up (a dict)
     gets the info of the upload checks (2.61.0: scan state, capture date of a photo)."""
     from ..admin.hosting import quota_guard
-    from ..tasks.attachments import unexec_name
     name = safe_fs_name(name)
     agent = _is_agent(c, uid)
     if agent:
@@ -578,7 +573,6 @@ def fs_new_version(c, nid, data, mime=None):
     _check_data(n["name"], data)
     uid = _uid()
     if uid and _is_agent(c, uid):  # #380: an agent never writes an executable / script file people may run
-        from ..tasks.attachments import unexec_name
         if unexec_name(n["name"]) != n["name"]:
             raise Denied(403, tr("Agents do not write new versions of executable files"))
         mime = "text/plain"
@@ -657,7 +651,6 @@ def fs_folder(c, uid, org_id, names, agent_id=None):
             ctx = acx_of(c, uid)
             if (org or None) != (ctx.agent_org_id or None):
                 raise Denied(404)
-            from ..core.pg import system_ctx
             with system_ctx(c):  # the agent's settings row (structure)
                 a = c.execute("SELECT owner_id FROM agents WHERE user_id=?", (uid,)).fetchone()
             if not a or not a[0]:
@@ -748,7 +741,6 @@ def fs_user_purge(c, uid):
             heir = c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id!=?
                                 AND COALESCE(u.kind, '')!='agent' ORDER BY (m.role='admin') DESC, m.user_id LIMIT 1""", (oid, uid)).fetchone()
             if not heir and c.execute("SELECT 1 FROM orgs WHERE id=? AND retired_at IS NOT NULL", (oid,)).fetchone():
-                from ..accounts.orgretain import odl_custodian  # 2.152.0 A (#2167): a retired organisation keeps its files (an instance admin)
                 keeper = odl_custodian(c, uid)
                 heir = (keeper,) if keeper else None
             if heir:
@@ -780,7 +772,6 @@ def fs_keep_nodes(c, uid, kept):
     """2.360.4 (#3243): locked nodes of the deleted account uid stay with an instance admin (owner_id cascades), in the trash
     until their period ends (files/trashpurge.py). Only nodes of an organisation: they are sealed with its key; a private one
     (the personal office took those over, orgretain.upg_personal) needs the account key, so its 409 stands."""
-    from ..accounts.orgretain import odl_custodian
     from ..notify.alerts import aa_now
     keeper = odl_custodian(c, uid)
     q = ",".join("?" * len(kept))

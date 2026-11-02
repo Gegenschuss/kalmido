@@ -10,6 +10,7 @@ Browser-encrypted files (e2e, 2.42.0 #828) never come here: the server cannot re
 kind names the stored row: "fs" (fs_nodes id), "att" (attachments id), "list" (list_files id), "chat" (chat_files id), "wiki" (wiki_files id, 2.99.0 A #2182), "sheet" (sheet_files id, 2.124.0 B #2110)."""
 import os
 from ..core.config import MAX_FILE_MB  # 2.149.0 G (#2517): pulled up from functions
+from . import scan, photometa  # 2.369.5 (#2517): pulled up from functions
 
 KINDS = ("fs", "att", "list", "chat", "tchat")  # 2.113.1 (#2059): tchat = tchat_files id
 
@@ -57,7 +58,6 @@ def h6d_save(f, full, cap=None):
 def up_check(c, name, data, mime, uid=None, org_id=None, kind="att"):
     """The checks before the bytes are stored. Returns (data, mime, info): data maybe without photo metadata, mime maybe
     corrected from the content, info a dict for up_after_store (scan state, capture date ...). Raises UploadRefused."""
-    from . import scan, photometa
     info = {"kind": kind}
     mime = scan.sc_sniff_mime(name, data, mime) or mime
     info["scan"] = scan.sc_scan(name, data)  # "clean" | "unchecked" | "off"; raises UploadRefused on a find

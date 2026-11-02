@@ -41,6 +41,9 @@ from .doclang import doc_lg, doc_pack
 from .rights import ofr_admin_or
 from .countries import fk_country_label  # 2.296.0 B (#3168)
 from .pdfweb import _stored  # 2.296.0 F (#3177)
+from ..team.clients import cdn_split_free  # 2.369.5 (#2517): pulled up from functions
+from .pdf import pdf_phone  # 2.369.5 (#2517): pulled up from functions
+from .catalog import pkc_origin  # 2.369.5 (#2517): pulled up from functions
 
 # P2: does a document of this kind get its number only when it is finalised? (quotations: at creation, unless the
 # organisation chose otherwise; invoices / credit notes of a later release: always at finalising)
@@ -180,7 +183,6 @@ def ofx_company_from_free(f, lines):
     clients' free address, 2.97.0 #1951) -- only for a plain address (street, postcode + city, maybe a country: nothing
     would be lost in print); else {} and the free lines stay what the documents print. Nothing is stored here: the form
     shows the fields, saving it keeps them; the free lines stay in the settings."""
-    from ..team.clients import cdn_split_free
     lines = [str(x).strip() for x in lines if str(x).strip()]
     if not 2 <= len(lines) <= 3:
         return {}
@@ -261,7 +263,6 @@ def ofx_company_print(fields, free, lang="de", pack=None):
     addr = [x for x in (f.get("street"), f.get("address_extra"), " ".join(y for y in (f.get("zip"), f.get("city")) if y)) if x]  # 2.99.0 D (#2188): + extra line
     if f.get("country") and f["country"] != home and addr:
         addr.append(fk_country_label(f["country"], home) or f["country"])  # 2.296.0 B (#3168): the name in capitals, in the sender's language
-    from .pdf import pdf_phone  # 2.114.4 A (#2272): grouped for print, the stored value stays
     # 2.357.0 B (#3180): one rule for every label: a colon after a word ("E-Mail:", "Steuernummer:"), none after an
     # abbreviation with its dot ("Tel.", "USt-IdNr.") and none after IBAN / BIC (was a colon only after the e-mail)
     def cl(w):
@@ -421,7 +422,6 @@ def ofx_finalize(c, oid, uid, did):
              "formats": pack.get("formats") or {}, "labels": {lang: (pack.get("labels") or {}).get(lang) or {}},
              # the pack's texts in the document's language (2.38.0: every plain text, the invoice words need them)
              "texts": {k: {lang: v.get(lang) or ""} for k, v in (pack.get("texts") or {}).items() if isinstance(v, dict) and isinstance(v.get(lang) or "", str)}}
-    from .catalog import pkc_origin  # 2.76.0 (#1023): which pack file exactly (built in or installed from a catalogue)
     tsnap["pack_sha256"], tsnap["pack_source"] = pkc_origin("country", tsnap["pack"])
     if r["kind"] == "offer":  # 2.453.0 (#3816): the heading in the document's language, frozen (an industry pack may name its own)
         from .docs import _offer_title

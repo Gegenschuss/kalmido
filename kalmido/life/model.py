@@ -23,6 +23,12 @@ from ..core.errors import BadInput
 from ..family.family import PACKING
 from ..accounts.orgs import user_orgs
 from ..accounts.orgroles import need_org_area, need_org_write
+from ..family.family import packing_templates  # 2.369.5 (#2517): pulled up from functions
+from ..contacts.model import contacts_on, need_contact, contact_visible  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.dayplan import dayplan_mine_sql  # 2.369.5 (#2517): pulled up from functions
+from ..collab.liste2e import le2a_gen_refuse  # 2.369.5 (#2517): pulled up from functions
+from ..events.model import cal_create, ev_fields, ev_store  # 2.369.5 (#2517): pulled up from functions
+from ..core.db import uset  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.22.0 (#663): "Home & life"
@@ -253,7 +259,6 @@ def _target_list(c, uid, b, kind):
     if lid not in (None, ""):
         lid = as_int(lid, "list_id", 1)
         need_list(c, lid)
-        from ..collab.liste2e import le2a_gen_refuse
         le2a_gen_refuse(c, lid)  # 2.64.1 review (M3)
         return lid
     return life_list(c, uid, kind)
@@ -417,7 +422,6 @@ def clean_trip(v):
 def trip_create(c, uid, b):
     """{name, from, to, where?, packing? (a packing template key or ''), event? (bool: an all-day event, module Events),
     folder?, space? (2.173.0 A, #2680: "private" | "org:<id>", the app only)} -> {list_id, event_id, space}."""
-    from ..family.family import packing_templates
     need_life(c, uid, "travel")
     oid = life_space(c, uid, b.get("space"), write=True)
     name = _name(b.get("name"), need=True, n=LIST_NAME_MAX)
@@ -446,7 +450,6 @@ def trip_create(c, uid, b):
                       (lid, sid, title, max(due, today) if due else None, srt, ts, ts, uid))
     eid = None
     if b.get("event") and feat_on(c, uid, "events"):
-        from ..events.model import cal_create, ev_fields, ev_store
         f = ev_fields(c, uid, {"title": name, "all_day": True, "start": trip["from"],
                                "end": (date.fromisoformat(trip["to"]) + timedelta(days=1)).isoformat(), "location": trip.get("where") or ""})
         # 2.173.0 review (#2680): the trip's event goes into a calendar of the trip's workspace (none there = no event)
@@ -463,7 +466,6 @@ def life_overview(c, uid, oid=None):
     """What the view "Home & life" shows, per switched-on module. 2.173.0 A (#2680): of one space -- private (oid None:
     trips and contacts outside every organisation, plus the private-only parts) or organisation oid (its trips and the
     contacts of its address books, nothing else)."""
-    from ..contacts.model import contacts_on
     on = set((usettings(c, uid).get("features") or "").split(","))
     if oid:
         on &= set(LIFE_ORG_MODS)
@@ -547,7 +549,6 @@ def care_space(c, book_id):
 
 def care_set(c, uid, cid, b):
     """{every_days? (0 = off), last? (YYYY-MM-DD; "today"), note?} for contact cid (which uid must see)."""
-    from ..contacts.model import need_contact
     need_life(c, uid, "care")
     k, _role = need_contact(c, cid, uid=uid)
     need_org_write(c, uid, care_space(c, k["book_id"]))  # 2.173.0 A (#2680): guests / read-only of the organisation set nothing
@@ -574,7 +575,6 @@ def care_list(c, uid, due_only=False, oid=None):
     """The contacts uid wants to stay in touch with (and may still see), the most overdue first. 2.173.0 A (#2680): oid
     None = all of them (the daily push), 0 = the private space (contacts of address books outside every organisation),
     else organisation oid (contacts of its address books)."""
-    from ..contacts.model import contact_visible
     today = local_now().date()
     out = []
     for r in c.execute("SELECT * FROM contact_care WHERE user_id=? AND every_days>0", (uid,)).fetchall():
@@ -604,7 +604,6 @@ def _wd_care(c, users, S, LG, now):
         due = care_list(c, uid, due_only=True)
         if not due:
             continue  # nothing due yet: asked again later today (cheap: only people with the module)
-        from ..core.db import uset
         uset(c, uid, "care_sent", today)
         c.commit()
         lg = LG[uid]
@@ -853,7 +852,6 @@ def journal_export(c, uid, b, fmt):
 def review(c, uid, period, day, journal=True):
     """{period, from, to, done, open, moved, next, journal}: what uid completed in the day / week (Monday to Sunday) of
     `day`, what is still open from it (due on or before its end), what they moved away, what comes in the next 7 days."""
-    from ..tasks.dayplan import dayplan_mine_sql
     tv, tvt = tvis(c, uid), tvis(c, uid, "t.")  # 2.360.0 D (#2496): a participant's hidden tasks stay out (as in every view)
     lo_d = day - timedelta(days=day.weekday()) if period == "week" else day
     hi_d = lo_d + timedelta(days=6 if period == "week" else 0)

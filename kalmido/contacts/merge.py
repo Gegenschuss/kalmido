@@ -24,6 +24,8 @@ from ..tasks.validation import as_int
 from ..core.errors import BadInput
 from ..contacts.model import _jl, book_touch, contact_store, contacts_on, need_book, need_contact, ITEMS_MAX
 from ..core.pg import system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
+from ..tasks.lifecycle import restore_task, trash_task  # 2.369.5 (#2517): pulled up from functions
+from ..contacts.web import op_contact  # 2.369.5 (#2517): pulled up from functions
 
 CTM_SINGLE = ("kind", "fn", "given", "family", "middle", "prefix", "suffix", "nickname", "org", "dept", "title", "bday", "anniversary",
               "note", "photo")
@@ -344,7 +346,6 @@ def ctm_undo(c, uid, rid):
     with system_ctx(c):  # system: 2.80.0 (#1885) exactly the rows of the snapshot go back, in every workspace they came from
         mg_undo_cascade(c, snap.get("cascade"))
         mg_undo_refs(c, snap.get("refs"), target_gone=t is None)
-    from ..tasks.lifecycle import restore_task, trash_task
     for o in snap.get("occ") or []:
         mg_reinsert(c, "contact_occ", o)
     for x in snap.get("trashed") or []:
@@ -380,7 +381,6 @@ def contacts_merge():
     need_feat("contacts")
     if (g.user["kind"] or "user") == "agent":  # web only (review); 2.70.0 (#1357): agents propose merges (agents/dupprop.py)
         raise Denied(403)
-    from ..contacts.web import op_contact
     c, uid, b = db(), me(), body()
     res = ctm_merge(c, uid, b.get("target"), b.get("ids"), b.get("pick"), bool(b.get("dry")))
     if b.get("dry"):
@@ -394,7 +394,6 @@ def contacts_merge_undo(rid):
     need_feat("contacts")
     if (g.user["kind"] or "user") == "agent":  # web only (review); 2.70.0 (#1357): agents propose merges (agents/dupprop.py)
         raise Denied(403)
-    from ..contacts.web import op_contact
     c, uid = db(), me()
     res = ctm_undo(c, uid, rid)
     c.commit()

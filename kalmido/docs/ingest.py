@@ -39,6 +39,8 @@ _LOCK = threading.Lock()
 
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
+from ..office.einvoice_in import ei_is  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import _free_name  # 2.369.5 (#2517): pulled up from functions
 
 
 def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=None, parent_id=None, dedup=False, info=None):
@@ -138,7 +140,6 @@ def _docs_start():
 
 
 def _loop():
-    from ..accounts.session import GATE
     time.sleep(1)
     while True:
         n = 0
@@ -234,7 +235,6 @@ def _after(c, nid):
         return
     root = c.execute("SELECT id, parent_id, name, org_id, owner_id FROM fs_nodes WHERE id=?", (n["pparent"],)).fetchone()
     if root and root["parent_id"] is None and S.root_id(c, S.doc_ws(root["org_id"], root["owner_id"])) == root["id"]:
-        from ..files.store import _free_name
         c.execute("UPDATE fs_nodes SET parent_id=?, name=?, updated_at=? WHERE id=?",
                   (root["id"], _free_name(c, root["id"], n["owner_id"], n["org_id"], n["name"], skip=nid), _now(), nid))
 
@@ -268,7 +268,6 @@ def inbox_scan(c):
 def _mail_toks(msg):
     """(the plus address tokens of a mail's recipients, mail_text of integrations/mail.py, ei_is)."""
     from ..integrations.mail import MAIL_TOKEN_RE, mail_text
-    from ..office.einvoice_in import ei_is
     hdrs = " ".join(str(msg.get_all(h, [])) for h in ("To", "Cc", "Delivered-To", "X-Original-To", "Envelope-To"))
     return MAIL_TOKEN_RE.findall(hdrs), mail_text, ei_is
 

@@ -39,6 +39,9 @@ from .model import office_need_feature, office_settings
 from .periodlock import pl_receipt_need_open
 from .rights import ofr_own_only
 from .rcsubmit import rsb_who  # 2.356.0 D (#3129)
+from .packs import office_pack_for  # 2.369.5 (#2517): pulled up from functions
+from ..files.bulk import abm_send_zip, ABM_BUSY, ABM_ZIP_MAX_MB, abm_too_big  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_read  # 2.369.5 (#2517): pulled up from functions
 
 RCL_PAGE = 200  # rows per page of the list
 RCL_PAGE_MAX = 500
@@ -249,7 +252,6 @@ def rcl_file_name(x):
 def rcl_csv_text(c, oid, rows):
     """The CSV of the rows (BOM, CRLF, formula injection made harmless); as the booking list (bkexport.bx_csv) the number
     format follows the country pack: decimal comma -> semicolon, DD.MM.YYYY; else comma, decimal point, ISO days."""
-    from .packs import office_pack_for
     comma = ((office_pack_for(office_settings(c, oid)) or {}).get("formats") or {}).get("decimal") == ","
     num = (lambda v: str(v).replace(".", ",")) if comma else (lambda v: v)  # noqa: E731
     day = (lambda v: f"{v[8:10]}.{v[5:7]}.{v[:4]}" if v and DAY_RE.match(v) else "") if comma else (lambda v: v if v and DAY_RE.match(v) else "")  # noqa: E731
@@ -366,7 +368,6 @@ def rcl_csv():
 def rcl_zip():
     """The same filters -> a ZIP: belege.csv + belege/ with the original files (as uploaded, no conversion). The limits
     of the files ZIP (files/bulk.py, 413 before anything is sent), built in a temporary file like bkexport.bx_zip."""
-    from ..files.bulk import abm_send_zip
     c, uid, oid = _rcl_export_ctx()
     f, rows, hit = _rcl_load(c, oid, uid)
     path, put, missing = rcl_zip_file(c, oid, hit)
@@ -379,8 +380,6 @@ def rcl_zip():
 def rcl_zip_file(c, oid, hit):
     """-> (path of the ZIP, files put in, files missing). A receipt whose file cannot be read stays in the CSV without a
     file name."""
-    from ..files.bulk import ABM_BUSY, ABM_ZIP_MAX_MB, abm_too_big
-    from ..files.store import fs_read
     msg = abm_too_big(len(hit) + 1, sum(x["size"] for x in hit))
     if msg:
         raise Denied(413, msg)

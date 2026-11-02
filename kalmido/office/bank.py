@@ -60,6 +60,12 @@ from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): wa
 from .homecur import hc_home  # noqa: E402  2.189.0 B (#2475)
 from .invoices import _j as _inv_j, inv_refund_open  # noqa: E402  2.354.0 D (#2837)
 from .payonline import pol_bank_hit, pol_bank_info, pol_bank_match  # noqa: E402  2.469.0 (#3459)
+from .cfbank import cfb_preview, cfb_store  # 2.369.5 (#2517): pulled up from functions
+from .invoices import inv_pay_add, inv_pay_del  # 2.369.5 (#2517): pulled up from functions
+from .periodlock import period_need_open  # 2.369.5 (#2517): pulled up from functions
+from .docs import doc_row  # 2.369.5 (#2517): pulled up from functions
+from .books import bk_receipt_set_paid  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_role  # 2.369.5 (#2517): pulled up from functions
 
 
 def _home(c, oid):
@@ -292,7 +298,6 @@ def bnk_preview():
     c, uid, oid = _ctx()
     b = _req()  # 2.144.1 B (#2450): or a multipart upload (files, several / a ZIP)
     fmt, rows, cols, parts, info = bnk_parse(c, oid, b)
-    from .cfbank import cfb_preview
     extra = cfb_preview(c, oid, fmt, b, cols, parts)  # 2.124.0 D (#2342): the statement's balances / the guessed balance column
     if rows is None:
         return jsonify(fmt=fmt, **cols, **extra, **_info_out(info))
@@ -331,7 +336,6 @@ def bnk_import():
                "rkeys": " ".join(r["rkeys"]), "created_at": ts}
         row = oc_enc_fields(c, oid, "office_bank_tx", row)
         c.execute(f"INSERT INTO office_bank_tx({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
-    from .cfbank import cfb_store
     bal_n = cfb_store(c, oid, iid, fmt, b, ts, parts)  # 2.124.0 D (#2342): the statement's balances, counted while the import is active
     ruled = _br.br_apply(c, oid, import_id=iid)  # 2.299.0 B (#3191): the bank rules mark what they decide
     bump(c)
@@ -661,7 +665,6 @@ def bnk_match(tid):
     2.355.0 B (#2843): invoice with parts [{id, amount}] instead of id -- one booking on several invoices (a collective
     transfer) or with a rest (100.01 on 100.00): one payment per part (office_payments.bank_tx_id), the rest of the booking
     shows as match.rest; unmatch takes every part back."""
-    from .invoices import inv_pay_add
     c, uid, oid = _ctx()
     b = body()
     if not isinstance(b, dict):
@@ -674,7 +677,6 @@ def bnk_match(tid):
     t = _tx_dec(c, oid, _tx_row(c, oid, tid))
     if t["match_kind"]:
         raise Denied(409, tr("This booking is matched already"))
-    from .periodlock import period_need_open
     period_need_open(c, oid, t["day"])  # 2.148.0 A (#2471): bookings of a locked month stay as they are
     mid = pid = differs = fee_node = None
     split = kind == "invoice" and b.get("parts") is not None  # 2.355.0 B (#2843): one booking on several invoices / with a rest
@@ -684,7 +686,6 @@ def bnk_match(tid):
         except (TypeError, ValueError):
             raise BadInput(tr("Invalid value: {0}", "id")) from None
     if kind == "invoice":
-        from .docs import doc_row
         ofr_need_area(c, uid, oid, "offers", "edit")  # 2.237.0 A (#2861): like the invoice's own payments (+ pay: the gate)
         refund = False
         if not split:  # 404 outside the area (before the direction, as before)
@@ -719,8 +720,6 @@ def bnk_match(tid):
         from .cards import cc_bank_check
         cc_bank_check(c, oid, t, mid, b.get("accept_diff") is True)  # 2.444.0 (#3447): the sum of the statement against the booking
     elif kind == "receipt":
-        from .books import bk_receipt_set_paid
-        from ..files.store import fs_role
         if t["amount"] >= 0:
             raise Denied(409, tr("Only money paid out can pay a receipt"))
         write_lock(c, f"office_bank_receipt_{mid}")  # 2.306.0 D2 (#2875): two bookings at once on the same receipt wait for each other
@@ -805,13 +804,11 @@ def _rc_paid_amount(c, oid, mid):
 def bnk_unmatch(tid):
     """Undoes the match of a booking: the payment it booked goes (state of the invoice follows), the receipt's payment day
     goes. Answers the booking and the match it had ({kind, id}; the client's undo posts it to /match again)."""
-    from .invoices import inv_pay_del
     c, uid, oid = _ctx()
     write_lock(c, f"office_bank_tx_{tid}")
     t = _tx_row(c, oid, tid)
     if not t["match_kind"]:
         raise Denied(409, tr("This booking is not matched"))
-    from .periodlock import period_need_open
     period_need_open(c, oid, t["day"])  # 2.148.0 A (#2471)
     was = {"kind": t["match_kind"], "id": t["match_id"]}
     live = bnk_split_live(c, oid, tid) if t["match_kind"] == "invoice" else []
@@ -831,7 +828,6 @@ def bnk_unmatch(tid):
             if e.code not in (404, 409):
                 raise
     elif t["match_kind"] == "receipt":
-        from .books import bk_receipt_set_paid
         try:
             # 2.355.0 B (#2843): only the day the match set goes (a payment day typed by hand before stays)
             if _rc_paid_amount(c, oid, t["match_id"])["paid_at"] == t["day"]:

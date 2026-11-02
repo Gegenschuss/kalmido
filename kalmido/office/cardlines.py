@@ -27,6 +27,7 @@ from .calc import dec, dstr, money
 from .cards import (CC_CONFIRMED, CC_DRAFT_ONLY, CC_KINDS, CC_NAME_MAX, _line_insert, _money, cc_ctx, cc_stmt, cc_writable, cl_day)
 from .model import office_settings
 from .rcsubmit import rsb_ingest
+from .bank import _rc_paid_amount  # 2.369.5 (#2517): pulled up from functions
 
 CL_DAYS = 10  # +- days around a position that count as "date close"
 CL_SCAN = 5000  # newest documents looked at
@@ -249,7 +250,6 @@ def cl_candidates(lid):
 def _match(c, oid, uid, x, s, nid):
     """The confirmed receipt nid on position x: the document becomes a receipt, its payment day the position's day."""
     from ..receipts.suggest import rc_set
-    from .bank import _rc_paid_amount
     if s["state"] != "confirmed":
         raise Denied(409, tr(CC_DRAFT_ONLY))
     if x["state"] != "open":
@@ -294,7 +294,6 @@ def cl_match(lid):
 @app.post("/api/office/cards/lines/<int:lid>/unmatch")
 def cl_unmatch(lid):
     """Takes the receipt off the position; the payment day this match set goes (one typed by hand stays). Answers node_id for the undo."""
-    from .bank import _rc_paid_amount
     c, uid, oid, every = cc_ctx()
     write_lock(c, f"office_cc_{oid}")
     x, s = cl_row(c, oid, lid, uid, every)

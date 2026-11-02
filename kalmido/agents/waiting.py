@@ -27,7 +27,7 @@ from ..core.i18n import tr
 from ..integrations.delivery import GATE_ALL, WAIT_KINDS, WAIT_MAX
 from ..tasks.briefing import brief_blocked, brief_lists
 from .chat import chat_approvals_of
-from .core import agent_shares, is_agent, is_approver, job_may_act
+from .core import agent_shares, is_agent, is_approver, job_may_act, need_person
 
 WAIT_SCAN = 500
 
@@ -199,8 +199,7 @@ def waiting_for(c, uid, *, agent_id=None):
 @app.get("/api/inbox")
 def inbox_get():
     """What waits for the signed-in person (the view "Waiting for me"); people only."""
-    if is_agent(g.user):
-        raise Denied(404)
+    need_person(404)
     return jsonify(waiting_for(db(), me()))
 
 

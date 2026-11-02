@@ -32,6 +32,8 @@ from ..core.access import Denied, need_feat, token_lists
 from ..personal.timetrack import BadInput
 from ..accounts.orgs import user_orgs, visible_people
 from ..accounts.orgroles import user_orgs_full
+from ..events.model import ev_att_ok, ev_expand, my_cal_ids, ev_zone, tz_ok, ev_role_of  # 2.369.5 (#2517): pulled up from functions
+from ..calendars.subscriptions import CAL_ON  # 2.369.5 (#2517): pulled up from functions
 
 EFB_USERS_MAX = 20
 EFB_RATE = 120  # 2.240.0 C (#2868): answers per person and minute (the editor asks once per change of day / people, cached 60 s)
@@ -41,7 +43,6 @@ def efb_scopes(c, uid, ids):
     """2.240.0 C (#2868): {id: the organisations whose sources uid sees of that person (None = all of them)} for the ids of
     `ids` uid may ask about: uid, and the full members of the organisations uid is a full member of (no agents, children or
     disabled accounts). None for oneself and for a person sharing "all"; a person sharing "off" is left out."""
-    from ..accounts.orgs import user_orgs
     with system_ctx(c):  # memberships of other people (structure, ids only)
         mine = set(user_orgs(c, uid)) & set(user_orgs_full(c, uid))
         out = {}
@@ -110,7 +111,6 @@ def efb_spans(c, uid, day, zone, skip=None, orgs=None):
     2.360.5 (#3245): in a colleague's view only the organisation calendars the person owns count (a team calendar shared
     with them is not their time; its events count once they accepted an invitation), and public holidays only with
     orgs None (oneself / "all"): they would tell the person's state."""
-    from ..events.model import ev_att_ok, ev_expand, my_cal_ids
     from ..hub.absence import abs_holidays_year
     from ..hub.abscal import abc_state
     d0 = datetime(day.year, day.month, day.day, tzinfo=zone)
@@ -146,7 +146,6 @@ def efb_spans(c, uid, day, zone, skip=None, orgs=None):
         for o in ev_expand(r, lo, hi):
             if not o["all_day"]:  # an occurrence moved to a whole day does not block either
                 clip(o["s"], o["e"], busy)
-    from ..calendars.subscriptions import CAL_ON
     if CAL_ON and orgs is None:  # 2.240.0 C (#2868): subscriptions are private sources
         for r in c.execute("""SELECT e.start, e."end" FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id WHERE s.user_id=? AND s.visible=1
                               AND e.all_day=0 AND e.d1>=? AND e.d0<=?""", (uid, lo.isoformat(), hi.isoformat())):
@@ -197,11 +196,9 @@ def efb_answer(u, a):
         skip = int(a["skip"])
     c, uid = db(), u["id"]
     if skip:  # review 2.155.0: only an event I have a role in may be left out (no probing of colleagues' event ids)
-        from ..events.model import ev_role_of
         sr = c.execute("SELECT * FROM events WHERE id=?", (skip,)).fetchone()
         if not sr or not ev_role_of(c, uid, sr):
             skip = None
-    from ..events.model import ev_zone, tz_ok
     tz = (a.get("tz") or "").strip()
     zone = ev_zone(tz if tz_ok(tz) else "")
     people = []

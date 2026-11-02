@@ -51,6 +51,9 @@ MAX_VEHICLES = 100
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 from .homecur import hc_home  # noqa: E402  2.189.0 B (#2475)
+from .books import _year as bk_year, bk_csv_cell  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_diff, ofx_log, _log_public, ofx_company  # 2.369.5 (#2517): pulled up from functions
+from .travel import rk_cl_where, rk_home_cur, rk_people, _client_ok, _one as rk_one, rk_trip_clean  # 2.369.5 (#2517): pulled up from functions
 
 
 def _body():
@@ -95,7 +98,6 @@ def _num(v, name, hi, allow_none=True):
 
 
 def _year(v):
-    from .books import _year as bk_year
     return bk_year(v)
 
 
@@ -133,7 +135,6 @@ def lb_rate(c, oid, year=None):
 
 def _veh_log(c, oid, action, vid, before, after):
     """2.93.0 B (#1928 review): a new or changed vehicle into the office log (kind / start odometer change the allowance)."""
-    from .ledger import ofx_diff, ofx_log
     diff = ofx_diff(before or {}, after)
     if diff["after"]:
         ofx_log(c, oid, action, target="vehicle", detail={"vehicle_id": vid, **diff})
@@ -199,7 +200,6 @@ def _veh_vals(v):
 @app.get("/api/office/vehicles")
 def lb_vehicles_get():
     """-> {vehicles, people, clients, projects, km_rate, currency, kinds}: what the logbook view needs to start."""
-    from .travel import rk_cl_where, rk_home_cur, rk_people
     c, uid, oid = _ctx()
     w, wa = rk_cl_where(c, oid)
     clients = [{"id": r["id"], "name": r["name"]} for r in c.execute(f"SELECT id, name FROM clients WHERE {w} AND archived=0 AND deleted_at IS NULL ORDER BY lower(name)", wa)]
@@ -342,7 +342,6 @@ def lbc_purge_ok(c, r):
 def _drive_clean(c, oid, uid, b, cur=None):
     """The columns of a drive from body b (partial when cur, the decrypted row, is given). km from the odometer when both
     ends are given and km is not; the end never before the start."""
-    from .travel import _client_ok, rk_people
     new = cur is None
     cur = cur or {}
     out = {}
@@ -436,7 +435,6 @@ def lb_drive_public(c, oid, r, names=None, warns=None, trips=None, closed=None, 
 
 
 def _names(c, oid, uid):
-    from .travel import rk_people
     n = {p["id"]: p["name"] for p in rk_people(c, oid, uid)}
     return n
 
@@ -605,7 +603,6 @@ def lb_drive_log(did):
 def lb_drive_trip(did):
     """Takes a business drive over into the travel expenses: a trip (day, destination, purpose job, client, project, km,
     the driver as participant; no receipt) -- once: taken over already = the existing trip (200, existing true)."""
-    from .travel import _one as rk_one, rk_people, rk_trip_clean
     c, uid, oid = _ctx()
     write_lock(c, f"office_drive_trip_{oid}")
     d = oc_dec_fields(c, oid, "office_drives", _drive(c, oid, did))
@@ -691,7 +688,6 @@ def lb_report_get():
 def lb_settings_put():
     """{km_rate: "0.30", year: YYYY} -> the rate per business km (0 .. 5, two decimals) of that year (default: this year) in the
     office settings (km_rates); logged in the office log with the rate before. -> {km_rate, year}."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx()
     b = _body()
     y = _year(b.get("year"))
@@ -726,7 +722,6 @@ def lbc_close_post():
     its drives can then only be corrected by a new entry. Only past months (2.186.0 B, #2601: the running one 400); closing
     twice is fine (200).
     Logged in the office log. -> {closed: [{vehicle_id, month}]}"""
-    from .ledger import ofx_log
     c, uid, oid = _ctx()
     b = _body()
     m = b.get("month")
@@ -756,7 +751,6 @@ def _export_data(c, oid, uid):
     if vid is not None:
         _vehicle(c, oid, vid)
     y = _year(request.args.get("year"))
-    from .travel import rk_cl_where
     w, wa = rk_cl_where(c, oid)
     clients = {r["id"]: r["name"] for r in c.execute(f"SELECT id, name FROM clients WHERE {w}", wa)}
     vs = {v["id"]: v for v in lb_vehicles(c, oid)}
@@ -780,7 +774,6 @@ def lb_office_log(c, oid, year, vids, vs):
     """2.93.0 B (#1928 review): the entries of the office log that change the allowance of the year -- every new / changed
     vehicle of vids (also later ones: a kind change counts for all years) and the rate of the year -- as change-log rows
     {drive_id None, action, prev {}, by, at, text}."""
-    from .ledger import _log_public
     labels = {"name": tr("Name"), "plate": tr("Plate"), "kind": tr("Kind"), "odo_start": tr("Odometer start"), "archived": tr("Archived")}
     out = []
     for r in c.execute("SELECT * FROM office_doc_log WHERE org_id=? AND target IN ('vehicle', 'km_rate', 'logbook_month') ORDER BY id", (oid,)):
@@ -838,8 +831,6 @@ LB_ACTIONS = {"create": N_("Created"), "change": N_("Changed"), "delete": N_("De
 @app.get("/api/office/logbook.csv")
 def lb_csv():
     """?year=&vehicle_id= -> the drives of the year with odometer and sums, then the change log (separator and decimal sign of the language, times local: 2.368.2 #2984)."""
-    from .books import bk_csv_cell
-    from .ledger import ofx_log
     c, uid, oid = _ctx()
     y, vid, vs, clients, drives, log, rep = _export_data(c, oid, uid)
     buf = io.StringIO()
@@ -877,7 +868,6 @@ def lb_csv():
 
 def lb_pdf_bytes(c, oid, y, vs, clients, drives, log, rep, lang):
     """A plain A4 PDF: the drives of the year with odometer, the sums per vehicle and the change log as appendix."""
-    from .ledger import ofx_company
     from .pdf import A4_H, A4_W, C_INK2, C_RULE, _Page, pdf_money, pdf_write
     s = office_settings(c, oid)
     ppr = pdf_paper_ns(s.get("paper"))  # 2.357.0 A (#3156): the office's paper size
@@ -982,7 +972,6 @@ def lb_pdf_bytes(c, oid, y, vs, clients, drives, log, rep, lang):
 @app.get("/api/office/logbook.pdf")
 def lb_pdf():
     """?year=&vehicle_id= -> the logbook of the year as PDF (drives, sums, change log)."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx()
     y, vid, vs, clients, drives, log, rep = _export_data(c, oid, uid)
     data = lb_pdf_bytes(c, oid, y, vs, clients, drives, log, rep, lang())

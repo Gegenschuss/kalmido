@@ -31,7 +31,7 @@ from ..accounts.session import me
 from ..core.access import Denied
 from ..core.errors import BadInput, UnknownFields
 from ..api.common import hit_limit, v1_args, v1_err, v1_json, v1_view
-from ..agents.core import agent_shares, is_agent, need_agent
+from ..agents.core import agent_shares, is_agent, need_agent, need_person
 
 STEP_KEEP_CHARS = 500      # stored per step
 STEP_LIVE_CHARS = 200      # shown live under the typing dots
@@ -249,8 +249,7 @@ def job_steps_count(c, uid, jids):
 
 def need_own_job(c, jid):
     """The job when it is for the signed-in person (else 404 -- also for admins, other members and agents)."""
-    if is_agent(g.user):
-        raise Denied(404)
+    need_person(404)
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
     if not j or j["user_id"] != me():
         raise Denied(404)

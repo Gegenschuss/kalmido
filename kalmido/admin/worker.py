@@ -31,6 +31,10 @@ from ..core.reqtime import rt_stats
 from ..accounts.session import _BG_TURN, GATE
 from ..accounts.bgjobs import bgj_counts, bgj_kick
 from ..accounts.users import need_admin
+from ..files.textscan import ts_kick  # 2.369.5 (#2517): pulled up from functions
+from ..paperless.ngx import pl_kick  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.related import emb_kick  # 2.369.5 (#2517): pulled up from functions
+from ..core.retention import ret_status  # 2.369.5 (#2517): pulled up from functions
 
 try:
     WRK_REPLICAS = max(1, int(os.environ.get("KALMIDO_REPLICAS", "") or 1))
@@ -170,10 +174,7 @@ def _wrk_heartbeat():
 def wrk_main():
     """`python app.py worker` (KALMIDO_ROLE=worker): startup.py has started the loops; this starts the queues a web process
     would start on its first request, the heartbeat, and keeps the process alive (no web server)."""
-    from ..files.textscan import ts_kick
     from ..docs.ingest import docs_kick
-    from ..paperless.ngx import pl_kick
-    from ..tasks.related import emb_kick
     for kick in (ts_kick, docs_kick, pl_kick, emb_kick, bgj_kick):  # 2.193.0 D (#2220): + the queue of short work
         try:
             kick()
@@ -261,5 +262,4 @@ def admin_health():
 def admin_retention():
     """2.152.0 (#2165): admins of the server: the retention runs (switch, period, last result in numbers). No user data."""
     need_admin()
-    from ..core.retention import ret_status
     return jsonify(ret_status(db()))

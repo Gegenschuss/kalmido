@@ -31,6 +31,10 @@ from ..core.pg import insert_id, write_lock
 from ..personal.timetrack import BadInput
 from .model import office_gate, office_org, office_role, office_settings, ofx_name1, pb_owner
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
+from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_company, ofx_log  # 2.369.5 (#2517): pulled up from functions
+from .packs import office_pack  # 2.369.5 (#2517): pulled up from functions
+from .periodlock import pl_label, pl_through  # 2.369.5 (#2517): pulled up from functions
 
 PD_TEXT_MAX = 20000  # characters of one own text
 PD_VERSIONS_MAX = 500
@@ -96,7 +100,6 @@ def _yn(L, v):
 
 def _members(c, oid):
     """[(name, role)] of the office area: a personal office = its owner (admin); names and roles only."""
-    from ..core.pg import system_ctx
     owner = pb_owner(c, oid)
     with system_ctx(c):  # membership structure (names and roles of the area's people, nothing else)
         if owner is not None:
@@ -114,9 +117,6 @@ def _count(c, sql, args):
 
 def pd_auto(c, oid, L):
     """{field: the prefilled text} in language L ("de" | "en"), from the settings and what the office holds."""
-    from .ledger import ofx_company
-    from .packs import office_pack
-    from .periodlock import pl_label, pl_through
     gap = PD_GAP[L]
     t = (lambda de, en: de if L == "de" else en)  # noqa: E731
     s = office_settings(c, oid)
@@ -326,7 +326,6 @@ def _own_clean(v):
 
 def pd_state(c, uid, oid, version=None, L=None):
     """The document: the current state (prefilled now + own texts of the latest version) or a saved version as it was."""
-    from .ledger import ofx_company
     latest = pd_latest(c, oid)
     if version:
         r = pd_version_row(c, oid, version)
@@ -392,7 +391,6 @@ def pd_put():
     row = oc_enc_fields(c, oid, "office_procdocs", {"data": data})
     insert_id(c, "INSERT INTO office_procdocs(org_id, version, data, created_by, created_at) VALUES(?,?,?,?,?)",
               (oid, n, row["data"], uid, iso(now_utc())))
-    from .ledger import ofx_log
     ofx_log(c, oid, "procdoc", target="procdoc", detail={"version": n, "fields": sorted(own)})
     c.commit()
     return jsonify(pd_state(c, uid, oid, None, L))
@@ -497,7 +495,6 @@ def _fname(d, ext):
 @app.get("/api/office/procdoc.md")
 def pd_md():
     """?version=N&lang=de|en -> the document as Markdown (head: company, version, date, Kalmido version)."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx(admin=True)  # 2.237.0 A (#2861)
     d = pd_state(c, uid, oid, _version_arg(), request.args.get("lang"))
     ofx_log(c, oid, "export", target="procdoc", detail={"what": "md", "version": d["viewing"] or d["version"]}, dedupe_min=5)
@@ -509,7 +506,6 @@ def pd_md():
 @app.get("/api/office/procdoc.pdf")
 def pd_pdf_get():
     """?version=N&lang=de|en -> the document as PDF."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx(admin=True)  # 2.237.0 A (#2861)
     d = pd_state(c, uid, oid, _version_arg(), request.args.get("lang"))
     data = pd_pdf(d, office_settings(c, oid).get("paper"))  # 2.357.0 A (#3156)

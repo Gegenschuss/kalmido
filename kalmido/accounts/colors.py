@@ -27,12 +27,12 @@ def _ac_peers(c, uid):
         return c.execute(f"""SELECT u.color FROM users u WHERE u.id!=? AND u.color!='' AND (u.id IN (SELECT user_id FROM org_members
                              WHERE org_id IN ({ph})) OR u.id IN (SELECT user_id FROM agents WHERE org_id IN ({ph})))""",
                          (uid, *orgs, *orgs)).fetchall()
+    from ..core.access import joined_lists_sql  # core.access loads after this module (ORDER)
     base = a["owner_id"] if a and a["owner_id"] else uid
-    return c.execute("""SELECT u.color FROM users u WHERE u.id!=? AND u.color!='' AND (u.id=? OR u.id IN
+    return c.execute(f"""SELECT u.color FROM users u WHERE u.id!=? AND u.color!='' AND (u.id=? OR u.id IN
                         (SELECT user_id FROM agents WHERE owner_id=?) OR u.id IN
                         (SELECT owner_id FROM lists WHERE id IN (SELECT list_id FROM list_members WHERE user_id=?)) OR u.id IN
-                        (SELECT user_id FROM list_members WHERE list_id IN (SELECT id FROM lists WHERE owner_id=?
-                         UNION SELECT list_id FROM list_members WHERE user_id=?)))""",
+                        (SELECT user_id FROM list_members WHERE list_id IN {joined_lists_sql()}))""",
                      (uid, base, base, base, base, base)).fetchall()
 
 

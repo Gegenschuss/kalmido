@@ -33,6 +33,12 @@ from ..personal.timetrack import _num, time_watchdog
 from ..core.env import env_bool, env_int
 from ..core.merges import mg_prune  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.lffolder import lf_expire_tick  # 2.352.0 A (#2748)
+from ..core.dlock import dl_of, dl_task_hidden  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import _list_role  # 2.369.5 (#2517): pulled up from functions
+from ..lists.listtrash import otr_prune  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.tasktrash import ttp_tick  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgretain import odl_retired_prune  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.tenancy import boundary_tick  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- watchdog / ntfy
@@ -586,7 +592,6 @@ def _wd_sees(c, t, uid, memo, full=True):
         memo[k] = list_role(c, t["list_id"], uid)
     if not memo[k]:
         return False
-    from ..core.dlock import dl_of, dl_task_hidden
     dk = ("dl", uid)
     if dk not in memo:
         memo[dk] = bool(dl_of(c, uid))
@@ -606,7 +611,6 @@ def _wd_prefetch(c, rows, users, memo):
     person; the roles themselves come from the same rule as list_role (_list_role with the rows read here)."""
     if not rows:
         return
-    from ..core.access import _list_role
     tids = sorted({int(t["id"]) for t in rows})
     ppl = memo.setdefault("people", {})
     for tid in tids:
@@ -777,10 +781,8 @@ def _watchdog_tick(c):
     _wd_section(c, "office undo copies", oun_prune)  # 2.111.0 A (#2233): the editors' undo copies after a day
     from ..videos.review import vdr_trash_prune
     _wd_section(c, "video trash", vdr_trash_prune)  # 2.99.1 (#1959) review M3: video sign-offs in the trash after 30 days
-    from ..lists.listtrash import otr_prune
     _wd_section(c, "list folder shares", lf_expire_tick)  # 2.352.0 A (#2748): an expired share of a projects folder ends its roles
     _wd_section(c, "list trash", otr_prune)  # 2.102.0 A (#1988): deleted lists for good after 30 days, with their files
-    from ..tasks.tasktrash import ttp_tick
     _wd_section(c, "task trash", ttp_tick)  # 2.116.0 A (#2063): tasks in the trash after KALMIDO_TRASH_DAYS (switch: core/retention)
     from ..admin.dataretention import ckd_tick, lgc_tick, orf_tick
     _wd_section(c, "old logs", lgc_tick)  # 2.152.0 D (#2171): daily; old logs only while the switch "logs" is on, expired sessions / tokens always
@@ -790,7 +792,6 @@ def _watchdog_tick(c):
     _wd_section(c, "trash periods", tp_tick)  # 2.152.0 B (#2165): the other trashes after KALMIDO_TRASH_DAYS (switch: ret_on)
     from ..office.bookarch import ba_retention_tick
     _wd_section(c, "booking archive", ba_retention_tick)  # 2.414.0 (#3502): archived years after 10 years (switch "trash")
-    from ..accounts.orgretain import odl_retired_prune
     _wd_section(c, "retired organisations", odl_retired_prune)  # 2.152.0 A (#2167): after the legal period, only with ret_on("trash")
     from ..admin.acctexport import umz_cleanup
     _wd_section(c, "account export cleanup", umz_cleanup)  # 2.73.0 B (#1473): account exports + import uploads after 24 h
@@ -852,7 +853,6 @@ def _watchdog_tick(c):
     _wd_section(c, "payment reminder suggestions", dun_tick, now)  # 2.147.1 B (#2054): reminder drafts for overdue invoices
     from ..office.letterlinks import ltl_followup_tick
     _wd_section(c, "letter follow-ups", ltl_followup_tick)  # 2.153.0 (#2028): a task when a sent letter got no answer in time
-    from ..accounts.tenancy import boundary_tick
     from ..lists.rules import rul_due_tick
     _wd_section(c, "list rules", rul_due_tick)  # 2.71.0 A (#1457): rules "due date reached"
     _wd_section(c, "boundary check", boundary_tick)  # 2.30.0 (#1036): once a night, before the alerts go out

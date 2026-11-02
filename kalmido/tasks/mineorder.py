@@ -49,9 +49,8 @@ def vw_mine_order_put():
     cannot see (or that do not exist) are skipped. Agents have no own order (403). 2.363.3 (#3133): _prev = the order the device
     saw: when the tasks known to both stand differently now (another device, while this one waited offline) nothing changes
     -> {order_kept: true}; only the difference counts, a task placed or gone since is none. Places of completed tasks stay."""
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403, tr("The own order of My tasks belongs to a person"))
+    from ..agents.core import need_person
+    need_person(403, tr("The own order of My tasks belongs to a person"))
     b = body() or {}
     ids, prev = b.get("ids"), b.get("_prev")
     if not isinstance(ids, list) or not all(isinstance(x, int) and not isinstance(x, bool) for x in ids):

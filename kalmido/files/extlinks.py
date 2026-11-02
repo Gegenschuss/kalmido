@@ -52,6 +52,10 @@ from .store import fs_chain, fs_role, fs_version_row, need_node
 from .fsroots import FS_AREA_RULES, fs_area_of  # 2.200.0 A (#2747, review 10)
 from .fslock import FSL_MSG, fl_is_locked, fsl_of_chain  # 2.353.0 A (#2758)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
+from .web import _expiry, _names  # 2.369.5 (#2517): pulled up from functions
+from .store import fs_mail_rows, fs_log_add  # 2.369.5 (#2517): pulled up from functions
+from .scan import sc_guard  # 2.369.5 (#2517): pulled up from functions
+from .bulk import fs_zip_build, abm_send_zip, abm_drop  # 2.369.5 (#2517): pulled up from functions
 
 XL_PREFIX = "/s/f/"
 XL_DAYS = {"1d": 1, "7d": 7, "30d": 30}
@@ -110,7 +114,6 @@ def xl_expiry(b, std="7d"):
         return None
     if v in XL_DAYS:
         return iso(now_utc() + timedelta(days=XL_DAYS[v]))
-    from .web import _expiry
     exp = _expiry(v, b.get("tz"))
     if not exp or exp <= iso(now_utc()):
         raise Denied(400, tr("The expiry date must be today or later"))
@@ -296,7 +299,6 @@ def xl_render(c, link, chain, token, lg, cur):
                         AND id NOT IN (SELECT node_id FROM fs_locks WHERE e2e IS NOT NULL)
                         ORDER BY kind='file', lower(name), id LIMIT ?""",
                      (folder["id"], link["org_id"], link["org_id"], XL_LIST_MAX + 1)).fetchall()
-    from .store import fs_mail_rows  # 2.148.1 G (#2488): the same rule for filed mail as in the app
     rows = fs_mail_rows(c, link["created_by"], rows)
     more = len(rows) > XL_LIST_MAX
     rows = rows[:XL_LIST_MAX]
@@ -397,7 +399,6 @@ def xl_version(c, n):
     v = fs_version_row(c, n["id"])
     if not v:
         return None, None
-    from .scan import sc_guard
     try:
         sc_guard(c, "fs", n["id"], v["no"])  # a version found infected (or, strict mode, not checked yet) is never handed out
     except Denied:
@@ -455,7 +456,6 @@ def xl_zip(token):
         return pub_gone(lg)
     if hit_limit(f"pubzl:{link['id']}", XL_ZIP_LINK_RATE):
         return pub_limited(lg)
-    from .bulk import fs_zip_build, abm_send_zip, abm_drop
 
     def can_read(c2, row):
         return xl_in_tree(c2, link, row["id"]) is not None
@@ -493,7 +493,6 @@ def xl_json(c, r, names):
 
 
 def xl_answer(c, n, extra=None):
-    from .web import _names
     c.execute("DELETE FROM fs_ext_links WHERE node_id=? AND revoked_at IS NOT NULL AND revoked_at < ?",
               (n["id"], iso(now_utc() - timedelta(days=XL_REVOKED_DAYS))))
     rows = c.execute("SELECT * FROM fs_ext_links WHERE node_id=? AND revoked_at IS NULL ORDER BY id", (n["id"],)).fetchall()
@@ -550,7 +549,6 @@ def xl_create(nid):
     xid = insert_id(c, """INSERT INTO fs_ext_links(node_id,org_id,created_by,label,token_hash,token,pw_hash,pw_ver,expires_at,created_at)
                           VALUES(?,?,?,?,?,?,?,?,?,?)""",
                     (nid, n["org_id"], me(), label, h, sealed, generate_password_hash(pw) if pw else None, 0, exp, iso(now_utc())))
-    from .store import fs_log_add
     fs_log_add(c, nid, "ext_link")
     bump(c)
     c.commit()
@@ -578,7 +576,6 @@ def xl_revoke(xid):
     c = db()
     r, n = xl_row(c, xid)
     c.execute("UPDATE fs_ext_links SET revoked_at=? WHERE id=? AND revoked_at IS NULL", (iso(now_utc()), xid))
-    from .store import fs_log_add
     fs_log_add(c, n["id"], "ext_unlink")
     bump(c)
     c.commit()

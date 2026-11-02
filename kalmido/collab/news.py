@@ -16,6 +16,7 @@ from ..accounts.pictures import avatar_map
 from ..core.access import acx_task_ok, list_role, plists, pvis
 from ..collab.comments import collab_on, collab_user, lang_of, MENTION_RE, user_names
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import list_people  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- News feed ("Neuigkeiten")
@@ -393,7 +394,6 @@ def bell_all_users(c, lid, row=None):
         if r["mode"] == "all" or (key and any(bell_custom_of(r["custom"]).get(key, {}).values())):
             out.add(r["user_id"])
     if out:  # 2.46.0 (#1603): only the owner and members (a reader through "Everyone in the organisation" gets no events)
-        from ..core.access import list_people
         out &= list_people(c, lid)
     return out
 

@@ -39,6 +39,12 @@ from ..personal.timetrack import BadInput
 from .model import office_gate, office_need_feature, office_org, office_settings, pb_cl_org, pb_cl_sql
 from ..team.clients import cl_trash
 from .rights import NO_RIGHT, ofr_allows, ofr_need_area  # 2.237.0
+from .datev import dx_settings  # 2.369.5 (#2517): pulled up from functions
+from .countries import fk_country_code  # 2.369.5 (#2517): pulled up from functions
+from .legacyimport import fi_norm, _client_used, bk_detail, fi_client_undo_check  # 2.369.5 (#2517): pulled up from functions
+from ..team.clients import clean_client  # 2.369.5 (#2517): pulled up from functions
+from .periodlock import period_need_open  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 
 DI_MAX = 10 * 1024 * 1024       # the uploaded file
 DI_ROWS_MAX = 20000             # data rows of one file
@@ -179,7 +185,6 @@ def _acct_len(c, oid, p):
     """The ledger length: the file's, else the DATEV settings'."""
     if p["acct_len"]:
         return p["acct_len"]
-    from .datev import dx_settings
     return int(dx_settings(office_settings(c, oid))["acct_len"])
 
 
@@ -201,7 +206,6 @@ def _vat(p, r):
 
 
 def _master_row(p, r, notes):
-    from .countries import fk_country_code
     out = {"name": _person(p, r), "street": _txt(_cell(p, r, "street"), "street"), "zip": _txt(_cell(p, r, "zip"), "zip"),
            "city": _txt(_cell(p, r, "city"), "city"), "vat_id": _vat(p, r)}
     cc = fk_country_code(_cell(p, r, "country"))
@@ -238,7 +242,6 @@ def di_suppliers(c, oid, deleted=False):
 def _plan16(c, oid, p):
     """The plan of a master data file: [{row, account, kind debtor | creditor, action new | update | skip, target id, values,
     fill, differ, reason, notes}]."""
-    from .legacyimport import fi_norm
     n = _acct_len(c, oid, p)
     clients = c.execute(f"SELECT * FROM clients WHERE {pb_cl_sql(c, oid)} AND deleted_at IS NULL ORDER BY id", ()).fetchall()
     by_no = {}
@@ -319,7 +322,6 @@ def _counts16(plan):
 
 
 def _apply16(c, oid, uid, rid, plan, ts):
-    from ..team.clients import clean_client
     filled_c, filled_s, made_s = {}, {}, {}
     for x in plan:
         if x["action"] == "new" and x["kind"] == "debtor":
@@ -458,7 +460,6 @@ def _counts21(plan):
 
 
 def _check_locks(c, oid, plan):
-    from .periodlock import period_need_open
     days = sorted({x["day"] for x in plan if x.get("day") and x["action"] in ("new", "replace")})
     period_need_open(c, oid, *days)
 
@@ -514,7 +515,6 @@ def _public(p, plan, counts, c, oid):
     hints = []
     if p["category"] == 21 and counts["other"]:
         hints.append(tr(DI_NOT_FIBU))
-    from .datev import dx_settings
     mine = int(dx_settings(office_settings(c, oid))["acct_len"])
     if p["acct_len"] and p["acct_len"] != mine:
         hints.append(tr("The file uses ledger accounts with {0} digits, your DATEV settings {1}", p["acct_len"], mine))
@@ -541,7 +541,6 @@ def di_import(c, oid, uid, raw, clients=True):
 def di_undo(c, oid, uid, r):
     """Undoes the DATEV run r (an office_import_runs row of oid) -> (removed, kept, files, archived) like
     legacyimport.fi_undo (whose undo route hands kind "datev" here)."""
-    from .legacyimport import _client_used, bk_detail, fi_client_undo_check
     rid = r["id"]
     if r["undone_at"]:
         raise Denied(409, tr("This import has already been undone"))
@@ -587,7 +586,6 @@ def di_undo(c, oid, uid, r):
             c.execute(f"UPDATE office_suppliers SET {', '.join(k + '=?' for k in back)}, updated_at=? WHERE id=? AND org_id=?",
                       [""] * len(back) + [ts, int(sid), oid])
             removed["filled"] += 1
-    from .periodlock import period_need_open  # 2.148.0 A (#2471): balances of a locked year start stay
     years = {r2["year"] for r2 in c.execute("SELECT DISTINCT year FROM office_opening_balances WHERE org_id=? AND import_run_id=?", (oid, rid))}
     years |= {int(x.get("year") or 0) for x in detail.get("replaced") or [] if isinstance(x, dict)}
     period_need_open(c, oid, *[f"{y:04d}-01-01" for y in years if y])
@@ -650,7 +648,6 @@ def di_import_post():
     c, uid, oid = _ctx()
     office_need_feature(c, oid, "books.datev")  # 2.147.0 (#2460): DATEV switched off -> no DATEV import
     rid, p, plan, counts = di_import(c, oid, uid, _upload(), _di_clients(c, uid, oid))
-    from .ledger import ofx_log
     ofx_log(c, oid, "import", target="datev_in", detail={"run_id": rid, "kind": p["category"], "counts": counts})
     bump(c)
     c.commit()
@@ -666,7 +663,6 @@ def di_undo_post(rid):
     if not r:
         raise Denied(404)
     removed, kept, _f, _a = di_undo(c, oid, uid, r)
-    from .ledger import ofx_log
     ofx_log(c, oid, "undo", target="datev_in", detail={"run_id": rid, "removed": removed, "kept": kept})
     bump(c)
     c.commit()
@@ -763,7 +759,6 @@ def di_opening_get():
 # ---------------------------------------------------------------- the creditor of a receipt (office/datevin.py)
 def di_creditor_map(c, oid):
     """{normalised name: creditor account} of the suppliers of oid whose normalised name is unique."""
-    from .legacyimport import fi_norm
     seen = {}
     for x in di_suppliers(c, oid):
         k = fi_norm(x["name"])

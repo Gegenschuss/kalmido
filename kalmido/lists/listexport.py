@@ -21,6 +21,9 @@ from ..core.db import db, local_now
 from ..core.access import Denied, list_role, tvis, vis_sql
 from ..accounts.session import me
 from ..personal.timetrack import _csv_cell
+from ..collab.comments import h6r_shared_people, user_names  # 2.369.5 (#2517): pulled up from functions
+from ..personal.timetrack import evis, th_sql  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import task_visible  # 2.369.5 (#2517): pulled up from functions
 
 LEX_PRIO = {1: "Low", 3: "Medium", 5: "High"}
 LEX_CB = re.compile(r"^\s*[-*]\s+\[( |x|X)\]\s*(.*)")  # a Markdown checkbox line of the notes (like renderMd)
@@ -50,7 +53,6 @@ def lex_value(c, f, raw, names):
         return ", ".join(on[x] for x in str(raw).split(",") if x in on)
     if t == "task":  # 2.156.0 B (#2069): the title, only when the person exporting may see the task
         from .fields import fd_uid
-        from ..core.access import task_visible
         r = c.execute("SELECT title FROM tasks WHERE id=? AND deleted_at IS NULL", (int(raw),)).fetchone() if str(raw).isdigit() else None
         return r["title"] if r and task_visible(c, int(raw), fd_uid()) else ""
     return raw
@@ -74,8 +76,6 @@ def lex_extra(c, uid, lid, rows, ids):
     names: creators / completers the user may see in this list (a participant: h6r_shared_people, else everyone of the list's
     tasks); ms: milestone titles the user can see; sprints: the list's sprint names; secs: tracked seconds per task like the
     task view's total (time_totals: finished entries the user may see); subs: subtasks per parent the user may change (tvis)."""
-    from ..collab.comments import h6r_shared_people, user_names
-    from ..personal.timetrack import evis, th_sql
     out = {"names": {}, "ms": {}, "sprints": {}, "secs": {}, "subs": {}, "deps": {}, "ncom": {}, "natt": {}}
     if not ids:
         return out
@@ -111,7 +111,6 @@ def lex_extra(c, uid, lid, rows, ids):
 @app.get("/api/lists/<int:lid>/export.csv")
 def lex_csv(lid):
     from ..agents.core import agent_ids
-    from ..collab.comments import user_names
     from ..collab.liste2e import le2e_mode
     c = db()
     uid = me()

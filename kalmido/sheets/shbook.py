@@ -26,6 +26,8 @@ from ..core.pg import insert_id
 from ..accounts.session import me
 from ..core.errors import BadInput
 from .formula import ShErr
+from .shfuncs import _Grid, _book_of, shf_spend, SHF_WORK_BUDGET  # 2.369.5 (#2517): pulled up from functions
+from .shkinds import shk_move_files  # 2.369.5 (#2517): pulled up from functions
 
 SHB_TABS_MAX = 30          # sheets of one table
 SHB_NAME_MAX = 100
@@ -245,7 +247,6 @@ def _sub(ev, cid):
         sub = ShEvaluator(ev.c, books[tab["id"]], ev.uid)
         sub.shb, sub.shb_stack = ctx, stack + (tab["id"],)
         # 2.124.0 review: one text / function budget for the whole chain (a sheet does not get a fresh one per sheet it reads)
-        from .shfuncs import SHF_WORK_BUDGET
         from .core import SH_RANGE_BUDGET  # 2.148.1 D (#2485): the range budget is shared along the chain, too
         sub.text_left, sub.shf_work = ev.text_left, getattr(ev, "shf_work", SHF_WORK_BUDGET)
         sub.rng_work = getattr(ev, "rng_work", SH_RANGE_BUDGET)
@@ -276,7 +277,6 @@ def shb_range(ev, a, b):
 
 def shb_grid(sv, node):
     """shf_grid's hook (SUMMEWENN, SVERWEIS ...): the grid of a range / cell of another sheet."""
-    from .shfuncs import _Grid, _book_of, shf_spend
     ev = _book_of(sv)
     if ev is None:
         raise ShErr("ref")
@@ -512,7 +512,6 @@ def shb_member_ids(c, sid):
 def shb_move(c, sid, to, uid, new_paths, old_paths):
     """After the first sheet moved: the further sheets follow (space fields, the files of their file cells; 2.363.3 (#3133):
     new_paths / old_paths as in shk_move_files)."""
-    from .shkinds import shk_move_files
     shb_sync(c, sid)
     for t in shb_member_ids(c, sid):
         if t != sid:

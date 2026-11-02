@@ -27,6 +27,12 @@ from ..lists.rules import RUL_ACTIONS, RUL_DAYS_MAX, RUL_LIST_MAX, RUL_NAME_MAX,
 from .acctimport import umz_mentions  # 2.362.4 (#3100)
 from ..core.orgcrypt import FIELDS  # 2.363.4 (#3127)
 from ..hub.hubmail import hbm_seal  # 2.363.4 (#3127)
+from ..hub.hubmail import _index  # 2.369.5 (#2517): pulled up from functions
+from ..hub.mailbox import mbx_take_values  # 2.369.5 (#2517): pulled up from functions
+from ..team.portal import pt_email_hash, pt_email_norm  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
+from ..hub.absence import ABS_STATES  # 2.369.5 (#2517): pulled up from functions
+from ..lists.lists import LIST_COLOR_RE  # 2.369.5 (#2517): pulled up from functions
 
 # the person columns of the rows of one person (the row is left out when the person does not map)
 _W_PEOPLE = N_("Entries of people who were not chosen were not taken over: {0}")
@@ -131,7 +137,6 @@ def _chat_file(c, run, src, d, ctx):
     """2.362.0 (#3092): a file / voice message of a team chat message, sealed with the key of its conversation's space (the
     target: collab/teamchan.py tcx_space), a list channel's file row without organisation like in the app."""
     import os
-    from .orgexport import _safe_part
     rk = c.execute("SELECT kind FROM tchat_rooms WHERE id=?", (d["room_id"],)).fetchone()
     name = str(src.get("name") or "file")
     got = ctx.file(f"files/tchat/{_oid(src.get('id')) or 0}-{_safe_part(src.get('name'))}", os.path.join("tchat", str(d["room_id"])), name,
@@ -192,7 +197,6 @@ def _mail(c, run, src, d, ctx):
 
 def _mail_index(c, run, src, nid, ctx):
     """The keyed word index of the search (never in the archive: rebuilt like on filing)."""
-    from ..hub.hubmail import _index
     r = c.execute("SELECT ws FROM hub_mails WHERE id=?", (nid,)).fetchone()
     if r:
         _index(c, nid, r[0], {k: _txt(src.get(k), 100000) for k in ("subject", "from_name", "from_addr", "body")})
@@ -250,7 +254,6 @@ def _mbx(c, run, src, d, ctx):
     """2.144.5 B (#2410): the workspace mailbox without its passwords (hub/mailbox.py mbx_take_values); a workspace that has a
     mailbox keeps its own."""
     from ..docs.store import doc_ws
-    from ..hub.mailbox import mbx_take_values
     d["owner_id"] = None if run.org else ctx.uid
     d["ws"] = doc_ws(run.org, ctx.uid)
     if c.execute("SELECT 1 FROM hub_mailboxes WHERE ws=?", (d["ws"],)).fetchone():
@@ -291,8 +294,6 @@ def _nl_seg(c, run, src, d, ctx):
 # ---------------------------------------------------------------- forms, customer reports
 def _form(c, run, src, d, ctx):
     """A form gets a new link (the old token never comes with an export)."""
-    from ..accounts.login import seal
-    from ..accounts.session import _token_hash
     tok = secrets.token_urlsafe(24)
     d.update(token=seal(c, f"form:{d['list_id']}", tok), token_hash=_token_hash(tok))
     return d
@@ -301,9 +302,6 @@ def _form(c, run, src, d, ctx):
 def ticket_seal(c, run, uid, src, d):
     """A customer report: the address sealed again with this server's key, a new status link (the old one is not exported).
     2.455.0 (#3469): in the space of its list (an account import keeps a home project private), for both imports."""
-    from ..accounts.login import seal
-    from ..accounts.session import _token_hash
-    from ..team.portal import pt_email_hash, pt_email_norm
     e = pt_email_norm(src.get("email"))
     tok = secrets.token_urlsafe(24)
     org = run.list_org.get(d["list_id"], run.org)
@@ -549,9 +547,6 @@ _ORG_KEEP = ("color", "hub_holiday_state", "hub_leave_approval")  # harmless: no
 
 def _org(c, run, src, d, ctx):
     """Only into an empty organisation (no lists but the imported ones) and only harmless settings; never a row."""
-    from ..accounts.orgs import is_org_admin
-    from ..hub.absence import ABS_STATES
-    from ..lists.lists import LIST_COLOR_RE
     if not run.org or not is_org_admin(c, ctx.uid, run.org):
         return False
     n = c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (run.org,)).fetchone()[0]

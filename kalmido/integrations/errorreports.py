@@ -26,6 +26,8 @@ from ..notify.alerts import _env_int
 from ..api.common import v1_args, v1_call, v1_json, v1_view
 from ..agents.core import agent_ids, agent_tidy_events, is_agent
 from ..integrations.git import _gd, git_need_manage, GIT_PROVIDERS, git_public
+from .gitbuild import gb_spec  # 2.369.5 (#2517): pulled up from functions
+from ..integrations.git import git_conns_of_list  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.18.0 (#408 "Software 2" F): error reports -> tickets
@@ -353,7 +355,6 @@ def git_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
                     "MergeRequestInput": {"type": "object", "required": ["kind", "pr_url"], "additionalProperties": False, "properties": {
                         "kind": {"type": "string", "enum": ["merge_request"]}, "pr_url": {"type": "string"}, "summary": {"type": "string"}}}})
     schemas["Task"]["properties"]["code"] = ref("Code")
-    from .gitbuild import gb_spec
     gb_spec(paths, schemas, op, ok, errs, ref, pid, nul)  # 2.151.0 A (#2558): code.build + GET /lists/{id}/build-status
     schemas["Task"]["properties"]["repo"] = {"type": "object", "description": "GET /tasks/{id} in a list with a repository: provider, "
                                              "web_url, owner, repo, default_branch, a suggested branch, the linked code (2.2.0)"}
@@ -388,7 +389,6 @@ def v1_git_list(lid):
     v1_args(())
     c = db()
     need_list(c, lid, write=False)
-    from ..integrations.git import git_conns_of_list
     rows = git_conns_of_list(c, lid)  # 2.33.0 (#934): its own repositories, else the folder's (folder = its path)
     return jsonify(data=[git_public(c, r) for r in rows])
 
@@ -510,7 +510,6 @@ def cer_about(c, u):
     lid, _ = cer_list(c)
     d = {"client_errors": bool(lid)}
     if u and u["is_admin"]:
-        from ..core.access import list_role
         rows = c.execute("SELECT l.id, l.name FROM issue_hooks h JOIN lists l ON l.id=h.list_id WHERE l.archived=0 "
                          "ORDER BY lower(l.name)").fetchall()
         d["client_errors_list"] = lid

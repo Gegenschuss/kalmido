@@ -25,6 +25,11 @@ from ..core.i18n import N_, tr
 from ..core.errors import BadInput
 from .calc import dec, money
 from ..core.db import db, local_day  # 2.149.0 G (#2517): pulled up from functions
+from .datev import _digits, dx_beleg, _amt, _ddmm, dx_settings, _acct  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_chain, fs_deleted, fs_role  # 2.369.5 (#2517): pulled up from functions
+from .legacyimport import fi_norm  # 2.369.5 (#2517): pulled up from functions
+from .model import pb_owner, office_gate, office_need_feature, office_org, office_settings  # 2.369.5 (#2517): pulled up from functions
+from .travel import rk_cat_label, rk_trips  # 2.369.5 (#2517): pulled up from functions
 
 # keyword (casefolded, part of the category) -> (SKR03, SKR04); the first match wins
 DV_CAT_DEFAULTS = (
@@ -120,7 +125,6 @@ def dv_travel_account(st, key, own):
 def dv_counter(st):
     """The counter account of the input side: the collective creditor or the bank account."""
     if st.get("in_counter") == "bank":
-        from .datev import _acct
         return st["bank"] or _acct(st, "bank")
     return st.get("creditor") or _len(st, DV_CREDITOR, 1)
 
@@ -145,7 +149,6 @@ def dv_settings(v, out):
 
 def dv_settings_clean(v, out):
     """The input side keys of a partial "datev_extf" body -> into out (validated)."""
-    from .datev import _digits
     n = int(out["acct_len"])
     if "in_on" in v:
         out["in_on"] = 1 if v["in_on"] in (1, True, "1") else 0
@@ -187,7 +190,6 @@ def _eur(amount, s):
 
 
 def _line(amount, konto, gegen, bu, day, beleg, text, node=None, checked=None):
-    from .datev import dx_beleg, _amt, _ddmm
     # 2.420.0 C (#3448): a receipt a person ticked as checked carries it as additional information (Art "Geprueft", Inhalt =
     # DD.MM.YYYY of the tick): the booking batch has no field of its own for it. The tick is stored in UTC, its day is the local one
     tick = local_day(checked)
@@ -202,7 +204,6 @@ def _no_amount(c, oid, d_from, d_to):
     """The receipts of the period without an amount (by document date, else payment day, else the day they became a
     receipt) that the signed-in person sees -- they cannot be booked."""
     from ..docs.store import doc_open
-    from ..files.store import fs_chain, fs_deleted, fs_role
     from .books import _uid_filter, bk_ws
     ws = bk_ws(c, oid)
     uid = _uid_filter(None)
@@ -227,7 +228,6 @@ def dv_supplier_accounts(c, oid, st, node_ids):
     if st.get("in_counter") == "bank" or not node_ids:
         return {}
     from .datevimp import di_creditor_map
-    from .legacyimport import fi_norm
     accts = di_creditor_map(c, oid)
     if not accts:
         return {}
@@ -305,8 +305,6 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
 
 
 def dv_travel_rows(c, oid, d_from, d_to, st, s):
-    from .model import pb_owner
-    from .travel import rk_cat_label, rk_trips
     own = bool(pb_owner(c, oid))
     gegen = dv_counter(st)
     rows, seen, in_datev = [], set(), 0
@@ -366,7 +364,6 @@ def dv_accounts(c, oid, st):
     accounts, the counter accounts' defaults."""
     from ..receipts.suggest import rc_categories
     from .books import bk_ws
-    from .model import pb_owner
     own = bool(pb_owner(c, oid))
     cats = rc_categories(c, bk_ws(c, oid))
     mine = st.get("cat_accounts") or {}
@@ -381,8 +378,6 @@ def dv_accounts(c, oid, st):
 @app.get("/api/office/datev/accounts")
 def dv_accounts_get():
     """Org admin (a personal office: its owner): the accounts of the input side for the DATEV settings (see dv_accounts)."""
-    from .datev import dx_settings
-    from .model import office_gate, office_need_feature, office_org, office_settings
     c = db()
     uid = office_gate(c)
     oid = office_org(c, uid, admin=True)

@@ -14,6 +14,8 @@ import re
 from decimal import Decimal, InvalidOperation
 
 from . import store as S
+from ..files.store import fs_chain, fs_deleted, fs_role  # 2.369.5 (#2517): pulled up from functions
+from .ingest import doc_on_done  # 2.369.5 (#2517): pulled up from functions
 
 DUP_SCAN = 300  # older documents of the workspace looked at for the same invoice
 
@@ -23,7 +25,6 @@ def raw_sha(data):
 
 
 def _visible(c, nid, uid):
-    from ..files.store import fs_chain, fs_deleted, fs_role
     ch = fs_chain(c, nid)
     return bool(ch) and not fs_deleted(ch) and (not uid or bool(fs_role(c, nid, uid, chain=ch)))
 
@@ -121,7 +122,6 @@ def dup_open(c, ids):
     ids = [int(x) for x in ids]
     if not ids:
         return set()
-    from ..files.store import fs_chain, fs_deleted
     out = set()
     for i in range(0, len(ids), 500):
         part = ids[i:i + 500]
@@ -152,7 +152,6 @@ def dup_seen(c, ids, uid):
 
 
 def _hook():
-    from .ingest import doc_on_done
     if dup_on_done not in doc_on_done:
         doc_on_done.append(dup_on_done)
 

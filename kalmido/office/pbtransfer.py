@@ -45,6 +45,8 @@ from .officemove import ofm_reseal
 from .payonline import POL_EXPIRE_S
 from .periodlock import pl_lock, pl_through  # 2.355.0 B (#2845)
 from ..files.fsmove import fsm_apply, fsm_plan  # 2.356.0 A (#2926)
+from ..accounts.orgs import org_role  # 2.369.5 (#2517): pulled up from functions
+from .periodlock import pl_first_month, pl_hints, pl_label  # 2.369.5 (#2517): pulled up from functions
 
 PBT_KEEP = ("office_settings", "office_company", "office_bank_accounts", "office_cf_start", "office_cf_actual", "office_numbers",
             "office_period_locks",  # 2.148.0 A (#2471): the locks of each area stay its own
@@ -91,7 +93,6 @@ def pbt_source():
 
 def pbt_target(c, uid, v):
     """The target organisation: one the caller is a member of (404) and an admin of (403), never a personal office."""
-    from ..accounts.orgs import org_role
     try:
         dst = int(v)
     except (TypeError, ValueError):
@@ -132,7 +133,6 @@ def pbt_plan(c, uid, src, dst):
     """What a transfer of personal office src into organisation dst would do: {moves, keeps, conflicts, counts, files, ...}."""
     counts, keeps, conflicts, notes = {}, [], [], []
     tables = pbt_tables(c)
-    from .periodlock import pl_first_month, pl_hints, pl_label, pl_through  # 2.355.0 E (#2845): + pl_hints
     lk, first = pl_through(c, dst), pl_first_month(c, src)
     if lk and first and first <= lk:  # 2.148.0 A (#2471): nothing lands in a locked month of the organisation
         conflicts.append(tr("The organisation is locked up to {0}; the personal office has data from {1}", pl_label(lk), pl_label(first)))

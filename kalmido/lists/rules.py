@@ -30,6 +30,11 @@ from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_lis
 from ..accounts.session import me
 from ..core.errors import BadInput, reject_unknown
 from ..api.common import v1_args, v1_err, v1_json, v1_view
+from ..tasks.tasks import can_move, check_assignee  # 2.369.5 (#2517): pulled up from functions
+from .fields import field_value, field_act  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names, comment_pushes, clean_mentions, send_pushes  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.lifecycle import apply_update  # 2.369.5 (#2517): pulled up from functions
+from ..notify.channels import chn_list_events  # 2.369.5 (#2517): pulled up from functions
 
 RUL_LIST_MAX = 50           # rules per list
 RUL_FIRE_MAX = 20           # rules run for one triggering change
@@ -97,7 +102,6 @@ def rul_list_ok(c, lid):
 def rul_target_ok(c, src, dst, uid, see_only=False):
     """None when a rule of list src (run by uid, the current user) may move tasks into list dst, else an error text.
     see_only: an agent's proposal (the person who accepts it is checked with write access when accepting)."""
-    from ..tasks.tasks import can_move
     s, d = _list_row(c, src), _list_row(c, dst)
     role = list_role(c, dst, uid) if d else None
     if not d or not role:
@@ -115,7 +119,6 @@ def rul_clean(c, lid, b, partial=None, see_only=False):
     """{name, trigger: {kind, section_id | tag_id}, action: {kind, user_id | days | text | list_id, section_id}} -> the
     columns (BadInput / Denied). The references are checked with the rights of the current user. partial = the stored
     row (PATCH: missing parts stay)."""
-    from ..tasks.tasks import check_assignee
     reject_unknown(b, ("name", "trigger", "action", "active"))
     out = {}
     if "name" in b or partial is None:
@@ -229,7 +232,6 @@ def rul_act_clean(c, lid, a):
     """act_val of the actions priority ({priority: none | low | medium | high}), tag ({tag_id}: adds a tag of THIS list --
     the rule belongs to everybody in the list, so never personal tags) and field ({field_id, value}: null clears it; checked
     against the field type like the normal field route)."""
-    from .fields import field_value
     k = a["kind"]
     if k == "priority":
         reject_unknown(a, ("kind", "priority"))
@@ -261,7 +263,6 @@ def rul_trig_val(t):
 
 def rul_val_name(c, f, v):
     """The readable value of a field rule (option / person name); None for a checkbox (the client words it)."""
-    from .fields import field_act
     if not f or v is None or f["type"] == "checkbox":
         return None
     return field_act(c, f, v)["v"]
@@ -333,7 +334,6 @@ def rul_sync(c, lid):
 
 
 def rul_dict(c, r):
-    from ..collab.comments import user_names
     a = json.loads(r["act_val"] or "{}")
     trig = {"kind": r["trig"]}
     names = {}
@@ -383,9 +383,8 @@ def rul_dict(c, r):
 
 # ---------------------------------------------------------------- web routes (owner / list admins; agents never)
 def _need_person():
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents can only propose rules"))
+    from ..agents.core import need_person
+    need_person(403, tr("Agents can only propose rules"))
 
 
 def need_rule(c, rid, deleted=False):
@@ -585,7 +584,6 @@ def rul_pause(c, r, why):
 
 def rul_check(c, r, tid):
     """Under rul_as: None when the creator may run rule r on task tid now, else the pause reason."""
-    from ..tasks.tasks import check_assignee
     from ..agents.core import is_agent
     if not g.user or g.user["disabled"] or is_agent(g.user):
         return "creator"
@@ -614,7 +612,6 @@ def rul_check(c, r, tid):
     if why:
         return why
     if r["act"] == "field":  # the fixed value must still fit (an option removed, a person left the list)
-        from .fields import field_value
         try:
             field_value(c, _field_row(c, r["list_id"], a["field_id"]), a.get("value"), r["list_id"])
         except BadInput:
@@ -626,7 +623,6 @@ def rul_check(c, r, tid):
 
 def rul_exec(c, r, tid):
     """Runs the action of rule r on task tid as its creator (one savepoint: a failing action leaves nothing behind)."""
-    from ..tasks.lifecycle import apply_update
     if not r["created_by"]:
         rul_pause(c, r, "creator")
         return False
@@ -691,10 +687,8 @@ def rul_carry(c, tid, src, dst):
 
 def rul_comment(c, r, tid, text):
     """The rule's fixed comment, written as its creator and marked with the rule (comments.rule_name)."""
-    from ..collab.comments import comment_pushes
     from ..integrations.webhooks import wh_note
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
-    from ..collab.comments import clean_mentions
     text, ment = clean_mentions(c, t["list_id"], text, tid)  # 2.148.1 H (#2490): mention tokens only of people of the list
     ment = ment if collab_all() else []  # 2.367.5 (#2980): the mentioned hear of it, like a person's comment
     cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,rule_name) VALUES(?,?,?,?,?,?)",
@@ -719,7 +713,6 @@ def rul_due_tick(c):
                         ORDER BY r.id, t.id LIMIT ?""", (day, "due:" + day, RUL_DUE_BATCH)).fetchall()
     if not rows:
         return
-    from ..collab.comments import send_pushes
     for x in rows:
         r = c.execute("SELECT * FROM list_rules WHERE id=?", (x["rid"],)).fetchone()
         if not r or not r["active"]:
@@ -757,7 +750,6 @@ def _due_flush(c):
             wh_enqueue(c, n)
     n = g.pop("chn", None)
     if n:  # 2.367.3 (#2973): chn_flush hangs on after_request, which a rule run of the watchdog never reaches
-        from ..notify.channels import chn_list_events
         with pg_system(c):
             chn_list_events(c, n, auto=True)
 

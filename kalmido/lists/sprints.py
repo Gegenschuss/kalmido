@@ -21,6 +21,7 @@ from ..core.db import body, bump, db, err, iso, local_day, local_now, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, is_project, list_role, need_list, pvis, WRITE_ROLES
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..tasks.validation import as_int  # 2.369.5 (#2517): pulled up from functions
 
 SPR_WEEKS = (0, 1, 2)       # 0 = free length (the dates of each sprint are set by hand; the next one keeps the last length)
 SPR_FREE_DAYS = 14          # length of a new sprint of a list with a free length and no sprint before
@@ -553,7 +554,6 @@ def sprints_assign(lid):
     """{ids: [task ids], sprint_id: id | null, _prev?: {task id: sprint id | null}}: several tasks of the list into a sprint
     (or the backlog) at once. Returns prev ({task id: its sprint before}); the undo sends the tasks back one sprint at a time
     (prev grouped). With _prev only the tasks still in the expected sprint change (others are reported as conflicts)."""
-    from ..tasks.validation import as_int
     b = body()
     c = db()
     need_list(c, lid)

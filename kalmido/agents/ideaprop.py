@@ -22,12 +22,17 @@ from ..core.schema import MAX_DEPTH
 from ..core.access import Denied, list_role, need_collab, need_list, need_task, task_visible, WRITE_ROLES
 from ..personal.timetrack import BadInput
 from ..tasks.validation import check_parent, depth
-from ..agents.core import agent_emit, agent_row, is_agent, job_dict, JOB_TITLE_MAX
+from ..agents.core import agent_emit, agent_row, job_dict, JOB_TITLE_MAX, need_person
 from ..agents.proposals import (
     PROP_LIMITS, PROP_OPEN_MAX, PROP_HINT_MAX, PROP_SUBS_MAX, PROP_TITLE_MAX, _p_keys, _p_list, _p_str, need_prop, prop_insert,
     prop_notify_agent,
 )
 from ..collab.comments import lang_of, user_names
+from ..agents.asstprop import ast_list_agents, _pub  # 2.369.5 (#2517): pulled up from functions
+from ..agents.safety import agent_reach  # 2.369.5 (#2517): pulled up from functions
+from ..agents.usage import usage_block  # 2.369.5 (#2517): pulled up from functions
+from ..collab.liste2eguard import le2b_list_locked, le2b_off  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.tasks import one_task  # 2.369.5 (#2517): pulled up from functions
 
 IDP_TITLE = N_("Ideas: {0}")
 IDP_KIDS = 2       # an idea may carry sub-ideas one level down (keys "i" and "i.k" of the generic apply)
@@ -37,15 +42,12 @@ IDP_NO_AGENT = N_("This agent cannot make proposals for you")
 
 def idp_agents(c, uid, lid):
     """Agents uid may ask for ideas in list lid: proposals allowed, the list shared with the agent, uid may address it there."""
-    from ..agents.asstprop import ast_list_agents
-    from ..agents.safety import agent_reach
     # review: also within the agent's list restriction (agents.list_ids), like agent_emit's gate
     return [a for a in ast_list_agents(c, uid, lid) if lid in agent_reach(c, a["user_id"])]
 
 
 def idp_agents_get(c, uid, args):
     """GET /api/proposals/agents?kind=ideas&list_id= -> {agents: [{id, name, avatar, limit_reached, online}]} (people only)."""
-    from ..agents.asstprop import _pub
     try:
         lid = int(args.get("list_id") or 0)
     except (TypeError, ValueError):
@@ -106,8 +108,6 @@ def _levels(c, kind, tid):
 
 def idp_request(c, uid, b):
     """POST /api/proposals {kind: ideas, agent_id, list_id, branch, hint?} -> a proposal job + job_request to that agent."""
-    from ..agents.usage import usage_block
-    from ..collab.liste2eguard import le2b_list_locked, le2b_off
     _p_keys(b, "", ("agent_id", "kind", "list_id", "branch", "hint"))
     try:
         aid, lid = int(b.get("agent_id") or 0), int(b.get("list_id") or 0)
@@ -177,7 +177,6 @@ def idp_validate(b, inp):
 
 def idp_need_agent(c, j, aid):
     """Before the agent's proposal is stored: the list still shared with it; nothing taken over yet (no replacing then)."""
-    from ..agents.safety import agent_reach
     if not j["list_id"] or not list_role(c, j["list_id"], aid) or j["list_id"] not in agent_reach(c, aid):
         raise Denied(403)
     if j["applied"]:
@@ -260,7 +259,6 @@ def idp_open(prop, rec):
 def idp_decide(jid):
     """{take: [keys], drop: [keys]} on an ideas proposal (ready) -> the new tasks; once every idea is decided the job ends
     (applied when one was taken, else discarded) and the agent gets its answer (event job)."""
-    from ..tasks.tasks import one_task
     need_collab()
     c = db()
     j = need_prop(c, jid, lock=True)
@@ -320,8 +318,7 @@ def idp_list(lid):
     """The open ideas requests of the signed-in person in list lid (requested = waiting for the agent, ready = ideas there)."""
     c = db()
     need_list(c, lid, write=False)
-    if is_agent(g.user):
-        raise Denied(403)
+    need_person(403)
     rows = c.execute("""SELECT * FROM agent_jobs WHERE user_id=? AND list_id=? AND kind='ideas' AND prop_state IN ('requested','ready')
                         AND state IN ('running','waiting') ORDER BY id DESC LIMIT 20""", (g.user["id"], lid)).fetchall()
     return jsonify(jobs=[idp_view(c, j) for j in rows])

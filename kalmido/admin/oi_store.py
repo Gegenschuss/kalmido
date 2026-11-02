@@ -28,6 +28,14 @@ from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from function
 from ..core.config import ATT_DIR  # 2.149.0 G (#2517): pulled up from functions
 from ..files.fsroots import fs_area_root, fs_area_ws  # 2.353.0 C (#2829)
 from ..core.db import iso, now_utc  # 2.362.0 (#3131)
+from ..files.store import FS_DIR, fs_read  # 2.369.5 (#2517): pulled up from functions
+from .orgexport import _safe_part  # 2.369.5 (#2517): pulled up from functions
+from ..videos.review import vdr_parse  # 2.369.5 (#2517): pulled up from functions
+from .acctimport import umz_cols  # 2.369.5 (#2517): pulled up from functions
+from ..wiki.wkhist import wkh_seal, WKH_VCTX  # 2.369.5 (#2517): pulled up from functions
+from ..wiki.pages import wiki_set_links  # 2.369.5 (#2517): pulled up from functions
+from ..wiki.wksearch import wks_index  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
 
 _LOCKED = "e2e1:"
 _FILE_CELL = re.compile(r"file:(\d{1,15})")
@@ -158,8 +166,6 @@ def _area_root(c, run, src, d, ctx):
 
 
 def _version(c, run, src, d, ctx):
-    from ..files.store import FS_DIR
-    from .orgexport import _safe_part
     st = _st(run)
     if st["names"] is None:
         st["names"] = {r.get("id"): r.get("name") for r in (ctx.data.get("oi") or {}).get("store/nodes.json") or []}
@@ -329,8 +335,6 @@ def _wiki_locked(c, ctx):
 
 def _video_version(c, run, src, d, ctx):
     """2.137.0 review M1: the link is checked like a pasted one (videos/review.py vdr_parse); provider and embed id come from it."""
-    from ..videos.review import vdr_parse
-    from .acctimport import umz_cols
     try:
         v = vdr_parse(src.get("url"))
     except BadInput:
@@ -346,7 +350,6 @@ _W_LOCKED = N_("Knowledge pages encrypted in the browser were not taken over: ex
 
 
 def _page(c, run, src, d, ctx):
-    from ..wiki.wkhist import wkh_seal
     st = _st(run)
     if str(src.get("path") or "").startswith(_LOCKED) or str(src.get("body") or "").startswith(_LOCKED):
         if not st.get("w_src"):  # named once; the row itself counts under "A row could not be taken over"
@@ -362,7 +365,6 @@ def _page(c, run, src, d, ctx):
 
 
 def _wiki_version(c, run, src, d, ctx):
-    from ..wiki.wkhist import WKH_VCTX, wkh_seal
     if str(src.get("path") or "").startswith(_LOCKED) or str(src.get("body") or "").startswith(_LOCKED):
         return None
     pg = c.execute("SELECT org_id, owner_id FROM wiki_pages WHERE id=?", (d["page_id"],)).fetchone()
@@ -385,7 +387,6 @@ def _receipt(c, run, src, d, ctx):
 
 
 def _wiki_file(c, run, src, d, ctx):
-    from .orgexport import _safe_part
     pg = c.execute("SELECT owner_id FROM wiki_pages WHERE id=?", (d["page_id"],)).fetchone()
     name = str(src.get("name") or "file")
     got = ctx.file(f"files/wiki/{_oidi(src.get('id'))}-{_safe_part(src.get('name'))}", os.path.join("wiki", str(d["page_id"])), name,
@@ -416,7 +417,6 @@ def _cell(c, run, src, d, ctx):
 
 
 def _sheet_file(c, run, src, d, ctx):
-    from .orgexport import _safe_part
     name = str(src.get("name") or "file")
     got = ctx.file(f"files/sheets/{_oidi(src.get('id'))}-{_safe_part(src.get('name'))}", os.path.join("sheets", str(d["sheet_id"])),
                    name, mime=str(src.get("mime") or ""))
@@ -498,9 +498,6 @@ def _body(run, text):
 
 
 def _finish_wiki(c, run, oi):
-    from ..wiki.pages import wiki_set_links
-    from ..wiki.wkhist import wkh_seal
-    from ..wiki.wksearch import wks_index
     for r in oi.get("wiki/pages.json") or []:
         nid = run.m("wiki_pages", r.get("id"))
         if not nid:
@@ -540,8 +537,6 @@ def _finish_store(c, run, oi):
 
 def _finish_docs(c, run):
     from ..docs import store as S
-    from ..files.store import fs_read
-    from ..tasks.attachtext import file_kind
     for nid, ws in _st(run)["docs"]:
         node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
         m = S.meta_row(c, nid)

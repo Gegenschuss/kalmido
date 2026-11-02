@@ -17,6 +17,9 @@ from ..accounts.orgroles import need_org_write
 from ..core.access import Denied, MANAGE_ROLES, list_role, need_feat, tvis, vis_sql
 from ..core.errors import BadInput
 from ..core.numtext import server_num
+from ..accounts.orgs import INSTANCE_ENV, user_orgs, is_org_admin, ws_chosen_org  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import user_orgs_full, is_write_request  # 2.369.5 (#2517): pulled up from functions
+from ..personal.timetrack import time_report  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.23.0 (#463): clients
@@ -74,7 +77,6 @@ def _user(c, uid):
 def _org_boundary(c):
     """2.39.0 (#1209 audit M3): organisations are separate (modes workspaces / multi, unset mode: more than one org) -- then
     the instance admin sees and moves only the clients of their own organisations, like everybody else."""
-    from ..accounts.orgs import INSTANCE_ENV
     return INSTANCE_ENV != "shared"  # 2.46.0 (#1592, review fix): always, as core/access.py _boundary_on
 
 
@@ -91,8 +93,6 @@ def client_rows(c, uid, archived=True, trash=False):
     rows = c.execute(q + " ORDER BY archived, lower(name), id").fetchall()
     if u["is_admin"] and not _org_boundary(c):
         return rows
-    from ..accounts.orgs import user_orgs
-    from ..accounts.orgroles import user_orgs_full
     orgs = set(user_orgs(c, uid)) & set(user_orgs_full(c, uid))  # 2.143.0 A (#2151): not guests / accounting
     return [r for r in rows if (r["org_id"] in orgs) or (r["org_id"] is None and r["created_by"] == uid)]
 
@@ -102,7 +102,6 @@ def need_client(c, cid, uid=None):
     r = next((x for x in client_rows(c, uid) if x["id"] == cid), None)
     if not r:
         raise Denied(404)
-    from ..accounts.orgroles import is_write_request, need_org_write
     if r["org_id"] and is_write_request():
         need_org_write(c, uid, r["org_id"])  # 2.143.0 A (#2151): read-only changes no client of the organisation
     return r
@@ -161,12 +160,10 @@ def clean_client(c, uid, b, new=False):
             if v is not None and (not isinstance(v, int) or isinstance(v, bool)):
                 raise BadInput(tr("Invalid value: {0}", k))
             u = _user(c, uid)
-            from ..accounts.orgs import user_orgs
             mine = set(user_orgs(c, uid))
             if v is not None and not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL AND retired_at IS NULL", (v,)).fetchone():  # 2.47.3 (#1360)
                 raise BadInput(tr("Invalid value: {0}", k))
             if v is not None and v in mine:
-                from ..accounts.orgroles import need_org_write
                 need_org_write(c, uid, v)  # 2.143.0 A (#2151)
             if v is not None and v not in mine and not (u["is_admin"] and not _org_boundary(c)):
                 raise BadInput(tr("You can only add clients to your own organisations"))
@@ -213,7 +210,6 @@ def clean_client(c, uid, b, new=False):
 
 def client_stats(c, uid, cid, lids, month=None):
     """Hours, amounts, estimate of client cid as uid sees it: total and in the month (YYYY-MM, default: this one)."""
-    from ..personal.timetrack import time_report
     if not lids:
         # 2.46.2 (#1472): the month is part of the answer also for a client without lists
         m0 = month or local_now().date().strftime("%Y-%m")
@@ -355,7 +351,6 @@ def client_create():
     _gate(c)
     f = clean_client(c, uid, body(), new=True)
     if "org_id" not in f:  # 2.148.1 H (#2480): the chosen / only organisation where uid may add, else private (was the first)
-        from ..accounts.orgs import ws_chosen_org
         f["org_id"] = ws_chosen_org(c, uid)
     cl_bill_strip(c, uid, f.get("org_id"), f)  # 2.187.1 A (#2735)
     ts = iso(now_utc())
@@ -433,7 +428,6 @@ def cl_locked_docs(c, cid, real=False):
 def cl_may_delete(c, uid, r):
     """2.148.1 B (#2484): client r is deleted by its creator or an admin of its organisation (the server admin only without
     workspaces, like h6c_client_move_ok)."""
-    from ..accounts.orgs import is_org_admin
     return (r["created_by"] == uid or bool(r["org_id"] and is_org_admin(c, uid, r["org_id"]))
             or bool(g.user["is_admin"] and not _org_boundary(c)))
 
@@ -443,7 +437,6 @@ def h6c_client_move_ok(c, uid, r):
     (clean_client already allows only the mover's own organisations as the target)."""
     if r["created_by"] == uid or (g.user["is_admin"] and not _org_boundary(c)):
         return
-    from ..accounts.orgs import is_org_admin
     if r["org_id"] and is_org_admin(c, uid, r["org_id"]):
         return
     raise Denied(403, tr("Only the person who created the client or an admin of its organisation can move it"))

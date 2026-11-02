@@ -26,6 +26,11 @@ from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same
 from ..core.errors import BadInput
 from ..core.serializers import unlink_files
 from .pages import wiki_clean_path, wiki_need, wiki_set_links, wiki_space, wiki_space_key, wiki_space_sql
+from .wikie2e import wke_mode, wke_space_sql, WKE_PATH_MAX, wke_body_max, wke_cipher_ok  # 2.369.5 (#2517): pulled up from functions
+from .pages import WIKI_BODY_MAX, wiki_frontmatter  # 2.369.5 (#2517): pulled up from functions
+from ..collab.liste2e import le2e_is_cipher, le2e_parse, le2e_writer_ok  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import org_sees_all  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 
 WKM_FILE_RE = re.compile(r"/api/files/|/f/[A-Za-z0-9_-]{8,}|/s/[A-Za-z0-9_-]{8,}|\[\[\s*datei\s*:", re.I)  # 2.123.0 C (#2107): + [[datei:…]]
 
@@ -131,7 +136,6 @@ def wiki_move_space():
     to = smv_target(c, uid, b.get("to"))
     smv_same(src, to)
     dry = bool(b.get("dry"))
-    from .wikie2e import wke_mode
     if wke_mode(c, src, uid)[0] or wke_mode(c, to, uid)[0]:
         return wkr_move(c, uid, src, to, b, dry)  # 2.97.0 D (#2050): a space with the lock -- the browser re-encrypts
     rows = wkm_rows(c, uid, src, b, lock=not dry)  # 2.273.0 F1 (#3042): paths / names below from the locked rows
@@ -234,7 +238,6 @@ def wiki_move_space():
 def wkm_home_rows(c, oid, uid):
     """2.365.1 (#3395): (the pages uid brought into organisation oid that go back with them, how many stay): nothing with a lock
     on either side (the server cannot encrypt them again; that way back is the request, the browser re-encrypts)."""
-    from .wikie2e import wke_mode
     from .wkhist import wsb_body_or
     rows = c.execute("SELECT * FROM wiki_pages WHERE org_id=? AND brought_by=? AND deleted_at IS NULL ORDER BY id", (oid, uid)).fetchall()
     if rows and (wke_mode(c, oid, uid)[0] or wke_mode(c, None, uid)[0]):
@@ -297,7 +300,6 @@ WKR_GEN = N_("The key of a workspace was changed meanwhile. Please try again.")
 
 def wkr_state(c, oid, uid, lock=False):
     """{space_id, mode, gen} of a space (open: mode None, gen 0); lock = hold its row until the commit."""
-    from .wikie2e import wke_space_sql
     w, a = wke_space_sql(oid, uid)
     r = c.execute(f"SELECT id, e2e, e2e_gen FROM wiki_spaces WHERE {w}" + (" FOR UPDATE" if lock else ""), a).fetchone()
     if not r or not r["e2e"]:
@@ -332,9 +334,6 @@ def wkr_ids(v):
 
 def wkr_value(v, field, tst, old):
     """A path / text as sent for the target: a ciphertext of its current generation (locked) or a plain text (open)."""
-    from .pages import WIKI_BODY_MAX
-    from .wikie2e import WKE_PATH_MAX, wke_body_max, wke_cipher_ok
-    from ..collab.liste2e import le2e_is_cipher, le2e_parse
     bad = BadInput(tr("Invalid value: {0}", field))
     if not isinstance(v, str):
         raise bad
@@ -358,8 +357,6 @@ def wkr_move(c, uid, src, to, b, dry):
     """POST /api/wiki/move-space when the source or the target has the lock: {pages: [id …], space, to, dry: 1} = the check
     (answers e2e {from, to}: space_id / mode / gen of both); {pages: [{id, path, body} …], space, to, gens: {from, to}} = the
     move with the content the browser made for the target (gens = the generations of the check)."""
-    from ..collab.liste2e import le2e_writer_ok
-    from .pages import wiki_frontmatter
     if not le2e_writer_ok():
         raise Denied(403)
     if b.get("folder") not in (None, ""):
@@ -462,7 +459,6 @@ def wkr_place(c, oid, by_id, viewer):
     """2.97.0 D (#2051): a workspace of a history line as the viewer may see it -> (key or None, name): an organisation of
     the viewer by name, another one only as "Organisation"; the own private space "Private", another person's "private
     space" (a move out of a private space is always made by its owner, by_id)."""
-    from ..accounts.orgroles import org_sees_all
     if oid:
         if org_sees_all(c, viewer, oid):  # 2.143.0 A (#2151, review): a guest's organisation area stays closed
             r = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()
@@ -478,7 +474,6 @@ def wkm_last(c, pid):
                   (pid,)).fetchone()
     if not r:
         return None
-    from ..collab.comments import user_names
     return wkr_line(c, r, user_names(c, [r["by_id"]]).get(r["by_id"], ""))
 
 

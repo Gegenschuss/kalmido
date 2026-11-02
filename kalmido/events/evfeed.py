@@ -21,6 +21,9 @@ from ..accounts.session import _rate_blocked, _rate_fail, client_ip, me
 from ..core.access import need_feat, acx_token_bind
 from ..core.errors import BadInput
 from ..events.model import ev_role, need_evcal
+from ..calendars.icalfeed import ics_text  # 2.369.5 (#2517): pulled up from functions
+from ..events.ics import ev_lines, wrap  # 2.369.5 (#2517): pulled up from functions
+from ..notify.alerts import aa_count  # 2.369.5 (#2517): pulled up from functions
 
 EVF_FAIL_LIMIT = 30  # wrong links per client address within the login fail window, then 429 (as calendars/icalfeed.py)
 EVF_MAX = 20000
@@ -57,8 +60,6 @@ def evf_extra(extra):
 
 
 def evf_build(c, cal):
-    from ..calendars.icalfeed import ics_text
-    from ..events.ics import ev_lines, wrap
     lines, tzs = [], set()
     for r in c.execute("SELECT * FROM events WHERE cal_id=? AND deleted_at IS NULL ORDER BY id LIMIT ?", (cal["id"], EVF_MAX)).fetchall():
         try:
@@ -80,7 +81,6 @@ def _nf():
 
 @app.get("/ical/ev/<token>.ics")
 def evf_feed(token):
-    from ..notify.alerts import aa_count
     keys = [("ical:" + client_ip(), EVF_FAIL_LIMIT)]
     if _rate_blocked(keys):
         return Response("Too many requests\n", 429, content_type="text/plain; charset=utf-8")

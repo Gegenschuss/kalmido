@@ -15,6 +15,7 @@ from ..core.db import db, iso_ms, now_utc
 from ..core.i18n import tr
 from ..accounts.session import me
 from ..collab.comments import user_names
+from .shkinds import SHK_FILE_RE, shk_bool, shk_people  # 2.369.5 (#2517): pulled up from functions
 
 SHH_KEEP = 200
 SHH_DAYS = 90
@@ -41,7 +42,6 @@ def shh_log(c, book, xid, rid, cid, old, new, uid, agent_id, ts):
 def _text(c, sheet, book, col, raw, uid, people, files):
     """How an input reads in the history (for viewer uid)."""
     from .core import sh_options, sh_to_display
-    from .shkinds import SHK_FILE_RE, shk_bool
     raw = raw or ""
     if not raw or col is None:
         return raw
@@ -64,7 +64,6 @@ def _text(c, sheet, book, col, raw, uid, people, files):
 
 def shh_entries(c, sheet, rows, uid):
     from .core import ShBook
-    from .shkinds import shk_people
     book = ShBook(c, sheet)
     cols = {r["id"]: r for r in c.execute("SELECT * FROM sheet_columns WHERE sheet_id=?", (sheet["id"],))}
     people = shk_people(c, sheet)

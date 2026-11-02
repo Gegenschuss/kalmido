@@ -31,6 +31,14 @@ from ..team.portal import (PT_LOGIN_ADDR, PT_LOGIN_SPACE, PT_LOGIN_TTL, PT_LOGIN
                            pt_day, pt_email_hash, pt_email_norm)
 from .model import office_settings, pb_cl_sql, pb_owner
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
+from .signoff import sig_check, sig_url  # 2.369.5 (#2517): pulled up from functions
+from .calc import fmt_money  # 2.369.5 (#2517): pulled up from functions
+from .docs import _j  # 2.369.5 (#2517): pulled up from functions
+from .payonline import pol_active_url  # 2.369.5 (#2517): pulled up from functions
+from .pdfweb import _file_response, _render, epdf_name, epdf_out, epdf_stored  # 2.369.5 (#2517): pulled up from functions
+from .invoices import _mail  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_company, ofx_log  # 2.369.5 (#2517): pulled up from functions
+from ..team.portal import pt_limit_note  # 2.369.5 (#2517): pulled up from functions
 
 KP_KINDS = ("offer", "invoice", "credit")
 KP_MAX = 200
@@ -102,7 +110,6 @@ def kp_docs(c, oid, cids, did=None):
 
 def kp_sign_url(c, oid, d):
     """The open approval page of quotation d (office/signoff.py), or None."""
-    from .signoff import sig_check, sig_url
     r = c.execute("SELECT * FROM office_signoffs WHERE org_id=? AND doc_id=? AND kind='offer' AND state='open' AND revoked_at IS NULL "
                   "ORDER BY id DESC LIMIT 1", (oid, d["id"])).fetchone()
     if not r or (r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc()):
@@ -117,10 +124,7 @@ def kp_sign_url(c, oid, d):
 
 def kp_items(c, oid, rows, lg):
     """The portal's list entries of document rows: [{id, kind, title, sub, state, state_text, sign_url}]."""
-    from .calc import fmt_money
-    from .docs import _j
     from .invoices import inv_money_fields, inv_paid_map, inv_state
-    from .payonline import pol_active_url
     pm = inv_paid_map(c, oid, [r["id"] for r in rows if r["kind"] in ("invoice", "credit")])
     out, signs = [], 0
     for r in rows:
@@ -168,7 +172,6 @@ def kp_portal_html(c, who, lg):
 @app.get("/portal/docs/<int:did>/pdf")
 def kp_pdf(did):
     """The PDF of one visible document of the signed-in address (404 for anything else, also without cookie / switched off)."""
-    from .pdfweb import _file_response, _render, epdf_name, epdf_out, epdf_stored
     c = db()
     lg = _accept_lang()
     if hit_limit("ptv:" + rate_ip(), PT_VIEW_RATE):
@@ -202,8 +205,6 @@ def kp_link_send(cid):
     """{to?: "invoice" | "main"} mails the client a sign-in link to the customer portal (members of the office; the setting
     portal_docs on, mail set up). The address is one of the client's own (default: the e-mail for invoices, else the e-mail)."""
     from .docs import _ctx
-    from .invoices import _mail
-    from .ledger import ofx_company, ofx_log
     from ..admin.hosting import mail_budget
     from ..integrations.mail import MAIL_OUT_ON
     c, uid, oid = _ctx()
@@ -227,7 +228,6 @@ def kp_link_send(cid):
     if (hit_limit(f"ptla:{eh}", PT_LOGIN_ADDR, PT_LOGIN_WIN) or (full := hit_limit(f"ptls:{space}", PT_LOGIN_SPACE, PT_LOGIN_WIN))
             or not mail_budget(c, uid, em)):
         if full:  # 2.138.4 C (#2380): the space's budget is used up: its admins / owner get a News item
-            from ..team.portal import pt_limit_note
             pt_limit_note(c, org_id, owner_id)
             c.commit()
         raise Denied(429, tr("Too many portal links for this address; try again in an hour"))

@@ -21,6 +21,8 @@ from ..accounts.session import me
 from ..tasks.validation import as_int
 from ..core.errors import BadInput, UnknownFields
 from .clients import CLIENT_BILL_GATED, CLIENT_BILLING, _gate, cl_bill_ok, _org_boundary, _user, client_rows, need_client
+from .clients import client_get  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import org_sees_all  # 2.369.5 (#2517): pulled up from functions
 
 def Nn_(one, other):  # a plural pair for trn (marked for tools/i18n_check.py, like notify/alerts.py)
     return one, other
@@ -247,7 +249,6 @@ def clm_run_scope_ok(c, uid, d):
     or private: the person who merged."""
     u = _user(c, uid)
     if d["org_id"] is not None:
-        from ..accounts.orgroles import org_sees_all  # 2.143.0 A (#2151, review): not guests / accounting
         return org_sees_all(c, uid, d["org_id"]) or bool(u and u["is_admin"] and not _org_boundary(c))
     return d["user_id"] == uid
 
@@ -328,7 +329,6 @@ def clm_history(c, uid, r):
 
 
 def _detail(cid):
-    from .clients import client_get
     return client_get(cid).get_json()  # the same record as GET /api/clients/<id>
 
 

@@ -12,6 +12,7 @@ import re
 from decimal import Decimal, InvalidOperation
 
 from ..core.i18n import N_, tr
+from .ledger import _iban_ok, ofx_locked  # 2.369.5 (#2517): pulled up from functions
 
 GCQ_NAME_MAX = 70
 GCQ_REF_MAX = 140
@@ -26,7 +27,6 @@ def _clean(v, n):
 def gcq_payload(name, iban, bic, amount, ref, currency="EUR"):
     """The EPC QR text or None when no code may be printed (not EUR, no valid IBAN, no name, amount not in 0.01 ..
     999999999.99)."""
-    from .ledger import _iban_ok
     if (currency or "").upper() != "EUR":
         return None
     iban = re.sub(r"\s+", "", str(iban or "")).upper()
@@ -78,7 +78,6 @@ def gcq_model(r, m, s, snd=None):
     pay = m.get("payment")
     if not isinstance(pay, dict) or r["kind"] not in ("invoice", "reminder"):
         return m
-    from .ledger import ofx_locked
     if ofx_locked(r):
         on = bool(isinstance(snd, dict) and snd.get("girocode"))
     else:

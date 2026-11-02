@@ -20,6 +20,9 @@ from ..core.mailframe import MAIL_ACC, MAIL_BG, MAIL_MUTED, Safe, mail_html
 from ..core.pg import system_ctx
 from ..integrations.mail import MAIL_OUT_ON, mail_send
 from .orgs import op_apart_deny, op_foreign_account, op_support_only  # 2.399.0 (#2687), 2.485.0 (#3939)
+from ..accounts.orgs import org_names  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.login import twofa_methods  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.users import om_admin_all as admin_sees, need_admin  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.22.0 (#697): invitations
@@ -96,7 +99,6 @@ def invite_new(c, uid, by, send=True, kind=None, days=None):
 
 def invite_org(c, u, kind, by):
     """2.367.5 (#2980): the organisation a mail names. With several it is the one shared with whoever sent the mail, or none."""
-    from ..accounts.orgs import org_names
     from ..accounts.orginvite import ojn_org_name  # 2.453.0 (#3780): a new account is no member before it accepts
     names = org_names(c, u["id"])
     if len(names) > 1:
@@ -246,7 +248,6 @@ def invite_accept():
         sec_mail(c, u["id"], "password_reset")
     u = c.execute("SELECT * FROM users WHERE id=?", (u["id"],)).fetchone()
     print("account set up with an invitation link:", login_log_who(u), "from", login_log_ip(client_ip()), flush=True)
-    from ..accounts.login import twofa_methods
     methods = twofa_methods(c, u)
     if methods:  # 2.49.0 (#1531): a reset link is no way around two-factor sign-in: the second step follows as at the login
         tok = pend_new("2fa", u["id"], remember=True)
@@ -261,7 +262,6 @@ def invite_accept():
 def user_invite(uid):
     """Admins: {send?: true} -> a new invitation (no password yet) or reset link (has one): by e-mail when possible, the
     link always in the answer (to copy without SMTP)."""
-    from ..accounts.users import om_admin_all as admin_sees, need_admin  # 2.46.0 (#1592): the user management
     need_admin()
     c = db()
     if not admin_sees(c, uid):  # 2.28.0 (#935): mode workspaces: only people the admin sees

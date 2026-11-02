@@ -44,6 +44,12 @@ from ..core.errors import BadInput
 from ..api.common import hit_limit
 from ..lists.public import BOT_ERROR, PUB_CSP, pub_html, public_links_on
 from ..events.model import ev_zone, tz_ok, wall, wall_s
+from ..accounts.orgs import is_org_admin, user_orgs  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import org_sees_all, org_writes, need_org_area, user_orgs_full  # 2.369.5 (#2517): pulled up from functions
+from .davwrite import CdwConflict, _cal_fail, _cal_limited, _cdw_auth, _cdw_fields, _cdw_sub, _conflict, _put, cdw_inside, cdw_new_ics, cdw_rate  # 2.369.5 (#2517): pulled up from functions
+from .subscriptions import CalError, cal_sync  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_target  # 2.369.5 (#2517): pulled up from functions
+from .apptbook import apb_owner_name  # 2.369.5 (#2517): pulled up from functions
 
 TPO_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{20,64}")
 TPO_EDIT_RE = re.compile(r"(\d{1,18})\.([A-Za-z0-9_-]{20,64})")
@@ -78,10 +84,8 @@ def tpo_may(c, uid, r, write=False):
         return r["user_id"] == uid or tpo_agent_owner(c, r["user_id"]) == uid
     if r["user_id"] != uid and tpo_is_agent(c, uid) and (write or not tpo_agent_ref(c, uid, r)):
         return False
-    from ..accounts.orgs import is_org_admin, user_orgs
     if r["org_id"] not in user_orgs(c, uid) or not acx_org_ok(c, uid, r["org_id"]):
         return False
-    from ..accounts.orgroles import org_sees_all, org_writes
     if not org_sees_all(c, uid, r["org_id"]) or (write and not org_writes(c, uid, r["org_id"])):
         return False  # 2.143.0 A (#2151): guests / accounting do not see it, read-only changes nothing
     return not write or r["user_id"] == uid or is_org_admin(c, uid, r["org_id"]) or tpo_agent_owner(c, r["user_id"]) == uid
@@ -130,10 +134,8 @@ def tpo_space(c, uid, v):
         oid = int(s)
     except (TypeError, ValueError):
         raise BadInput(tr("Invalid value: {0}", "space")) from None
-    from ..accounts.orgs import user_orgs
     if oid not in user_orgs(c, uid):
         raise Denied(404)
-    from ..accounts.orgroles import need_org_area
     need_org_area(c, uid, oid)  # 2.143.0 A (#2151)
     return oid
 
@@ -348,8 +350,6 @@ def tpo_list():
 def tpo_rows(c, uid, a):
     """The polls uid sees (app list + REST v1, 2.484.0 #2200): a = the query arguments space / task_id / client_id / list_id /
     deleted; private = uid's own and those of uid's personal agents."""
-    from ..accounts.orgs import user_orgs
-    from ..accounts.orgroles import user_orgs_full
     orgs = [o for o in user_orgs(c, uid) if acx_org_ok(c, uid, o) and o in user_orgs_full(c, uid)]  # 2.143.0 A (#2151)
     sp = a.get("space") or "all"
     if sp == "private":
@@ -552,7 +552,6 @@ def tpo_decide(pid):
     bump(c)
     c.commit()
     if sent:
-        from .apptbook import apb_owner_name
         who = apb_owner_name(c, uid) or ""  # 2.190.0 R (#2496): never the login name, like the public pages; none = "Someone" in the mail's language
         bgj_add("mail:polls", sent, {k: r[k] for k in r.keys()}, {k: o[k] for k in o.keys()}, who, olg, user_id=uid)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
     return jsonify(poll=tpo_dict(c, tpo_need(c, pid), uid), event_id=eid, event_ref=ref, mailed=len(sent))
@@ -576,9 +575,6 @@ def tpo_dav_create(c, sid, ev):
     an error answer (a tuple)."""
     import urllib.parse
     import uuid as uuidlib
-    from .davwrite import (CdwConflict, _cal_fail, _cal_limited, _cdw_auth, _cdw_fields, _cdw_sub, _conflict, _put,
-                           cdw_inside, cdw_new_ics, cdw_rate)
-    from .subscriptions import CalError, cal_sync
     s = _cdw_sub(c, sid)
     try:
         f = _cdw_fields(ev, True)
@@ -617,7 +613,6 @@ def tpo_when(start, end, zone_name, lg):
 def tpo_mail(rcpts, r, o, who, lg):
     """The background part: one invitation per voter with an address, the event attached as .ics."""
     from ..integrations.mail import mail_send
-    from .davwrite import cdw_new_ics
     z = ev_zone(r["tz"])
     f = {"title": r["title"], "location": r["location"], "description": r["description"], "all_day": False,
          "start": wall(o["start"]).replace(tzinfo=z), "end": wall(o["end"]).replace(tzinfo=z), "tz": r["tz"] or getattr(TZ, "key", "UTC")}
@@ -667,7 +662,6 @@ def tpo_reopen(pid):
 def tpo_move_space(pid):
     """{to, dry?} -- only the poll's owner moves it (into an organisation they are a member of, or back to private); a task /
     client / list it is about that does not lie in the target is taken off (named by the dry run)."""
-    from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_target
     smv_refuse_agent()
     tpo_gate()
     c, uid, b = db(), me(), body()

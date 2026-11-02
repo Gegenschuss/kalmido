@@ -29,6 +29,10 @@ from ..api.v1 import PUB_ENV
 from ..api.common import hit_budget, hit_limit
 from .custview import CV_FB_HOUR, CV_FB_NAME, CV_FB_RATE, CV_FB_TEXT, CV_FILE_RATE, cv_brand, cv_clean, cv_extras, cv_file, cv_options, cv_progress, cv_show, cv_size, cv_tag_sql
 from ..core.orgcrypt import oc_send_file  # 2.149.0 G (#2517): pulled up from functions
+from ..collab.comments import collab_user, lang_of  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import KIND_ROW, news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
+from ..notify.push import push_prio, push_reachable  # 2.369.5 (#2517): pulled up from functions
+from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- package B: public links + checklist mode
@@ -308,9 +312,6 @@ def cv_fb_clean(v, mx):
 
 @app.post("/s/<token>/feedback")
 def cv_fb_post(token):
-    from ..collab.comments import collab_user, lang_of
-    from ..collab.news import KIND_ROW, news_add, notif_ok
-    from ..notify.push import push_prio, push_reachable
     from ..agents.core import agent_ids
     c = db()
     link, bad = pub_open(c, token)
@@ -341,7 +342,6 @@ def cv_fb_post(token):
     cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,ext_name) VALUES(?,?,?,?,?,?)",
                     (tid, None, text, "", iso_ms(now_utc()), name))
     t = c.execute("SELECT t.*, l.owner_id AS l_owner FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
-    from ..notify.taskbell import tbl_level, tbl_sent, tbl_urgent_users, TBL_PRIO
     rcpt = ({t["l_owner"], t["created_by"], t["assignee_id"]} | tbl_urgent_users(c, tid) | wat_users(c, tid)) - {None} - agent_ids(c)  # 2.53.0 C (#1424): + "Urgent"
     for uid in sorted(rcpt):  # News + push like a comment on my task, the notification switch "comment"
         s = collab_user(c, uid, t["list_id"])

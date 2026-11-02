@@ -25,6 +25,13 @@ from ..core.errors import BadInput
 from .books import bk_gaps_text
 from .calc import dec, dstr, money
 from .model import office_gate, office_need_feature, office_org, office_settings
+from .books import _fx as bk_fx, _home, bk_payments, bk_receipts, bk_csv_cell  # 2.369.5 (#2517): pulled up from functions
+from .pdfweb import epdf_name, epdf_doc_files  # 2.369.5 (#2517): pulled up from functions
+from .travel import rk_cat_label, rk_trips  # 2.369.5 (#2517): pulled up from functions
+from ..files.bulk import abm_zip_name, abm_send_zip, ABM_BUSY, ABM_ZIP_MAX_FILES, ABM_ZIP_MAX_MB, abm_too_big, abm_unique  # 2.369.5 (#2517): pulled up from functions
+from .packs import office_pack_for  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_read  # 2.369.5 (#2517): pulled up from functions
 
 BX_COLS = ("type", "date", "number", "counterparty", "text", "category", "tax_pct", "net", "tax", "gross", "currency", "file")
 BX_DAYS_MAX = 3 * 366  # one export covers at most three years
@@ -72,16 +79,12 @@ def _fx(r, home):
     f = dec(_j(r["totals"]).get("fx_rate") or 0)
     if f > 0:
         return f
-    from .books import _fx as bk_fx
     return bk_fx(r, home)
 
 
 def bx_rows(c, oid, frm, to, gaps=None):
     """-> (rows, docs, receipts): rows = dicts of BX_COLS (amounts as Decimal), docs = [(doc id, row, [its list rows])] of the
     issued documents, receipts = [(node id, row)] of the receipt files. gaps: see books.bk_receipts (2.356.0, #3097)."""
-    from .books import _home, bk_payments, bk_receipts
-    from .pdfweb import epdf_name
-    from .travel import rk_cat_label, rk_trips
     s = office_settings(c, oid)
     home = _home(s)
     rows, docs, recs = [], [], []
@@ -131,14 +134,11 @@ def bx_rows(c, oid, frm, to, gaps=None):
 
 
 def _zip_part(name):
-    from ..files.bulk import abm_zip_name
     return abm_zip_name(name)
 
 
 def bx_csv(c, oid, rows):
     """The booking list as CSV text (BOM, CRLF), separator and decimal mark from the country pack."""
-    from .books import bk_csv_cell
-    from .packs import office_pack_for
     comma = ((office_pack_for(office_settings(c, oid)) or {}).get("formats") or {}).get("decimal") == ","
     num = (lambda v: "" if v == "" else dstr(money(dec(v))).replace(".", ",")) if comma else (lambda v: "" if v == "" else dstr(money(dec(v))))  # noqa: E731
     pct = (lambda v: "" if v == "" else format(dec(v).normalize(), "f").replace(".", ",")) if comma else (lambda v: "" if v == "" else format(dec(v).normalize(), "f"))  # noqa: E731
@@ -157,7 +157,6 @@ def bx_export():
     """Office admin. ?from=YYYY-MM-DD&to=YYYY-MM-DD (default: this year) -> the booking list as CSV; &zip=1 -> a ZIP with the
     list and the files (documents/: PDF + XML of the issued invoices and credit notes, receipts/: the receipt files);
     &check=1 -> {from, to, rows, documents, receipts} only (the page shows it before the download)."""
-    from .ledger import ofx_log
     c, uid, oid = _ctx()
     frm, to = _period()
     gaps = {}
@@ -175,7 +174,6 @@ def bx_export():
                         headers={"Content-Disposition": f'attachment; filename="{stem}.csv"', "Cache-Control": "no-store"})
     path = bx_zip(c, oid, rows, docs, recs, stem, gaps)
     c.commit()
-    from ..files.bulk import abm_send_zip
     return abm_send_zip(path, stem + ".zip")
 
 
@@ -183,9 +181,6 @@ def bx_zip(c, oid, rows, docs, recs, stem, gaps=None):
     """The ZIP in a temporary file (the limits of the files ZIP; Denied(413) before anything is sent, no half ZIP).
     2.356.0 (#3097): the list's "file" column is the name inside the ZIP; files that cannot be read and receipts left out
     (gaps) are named in missing.txt instead of being skipped silently."""
-    from ..files.bulk import ABM_BUSY, ABM_ZIP_MAX_FILES, ABM_ZIP_MAX_MB, abm_too_big, abm_unique
-    from ..files.store import fs_read
-    from .pdfweb import epdf_doc_files
     cards = [r for r in rows if r.get("_node")]  # 2.444.0 (#3447): the statements' PDFs and the receipts of the positions
     if len(docs) * 2 + len(recs) + len(cards) + 2 > ABM_ZIP_MAX_FILES:  # + the list and missing.txt
         raise Denied(413, abm_too_big(len(docs) * 2 + len(recs) + len(cards) + 2, 0))

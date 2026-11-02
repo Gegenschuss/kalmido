@@ -26,6 +26,8 @@ from ..tasks.tasks import (
 )
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.bgjobs import bgj_add, bgj_fn  # 2.281.0 A (#3112): 'Empty trash' in the background
+from ..tasks.validation import lock_problem  # 2.369.5 (#2517): pulled up from functions
+from ..lists.listtrash import otr_err_task  # 2.369.5 (#2517): pulled up from functions
 
 
 def _norm(v):
@@ -105,7 +107,6 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
     cur = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()  # also the "before" of the activity log
     from ..lists.rules import rul_fire, rul_snap
     rb = rul_snap(c, tid)  # 2.71.0 A (#1457): list rules compare with this after the change
-    from ..tasks.validation import lock_problem
     e = lock_problem(c, cur, f, b) if lock else None  # 2.36.0 (#1118): a locked task keeps its locked fields (app writes)
     if e:
         return e
@@ -659,7 +660,6 @@ def task_skip(tid):
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if not t["repeat"] or not t["due"]:
         return err(tr("Not a recurring task"))
-    from ..tasks.validation import lock_problem
     e = lock_problem(c, t, {"due": ""})  # 2.36.0 (#1118): skipping moves the date, which a locked task keeps (app writes)
     if e:
         return err(e)
@@ -773,7 +773,6 @@ def ddl_kids(c, tid, ts):
 
 @app.post("/api/tasks/<int:tid>/restore")
 def task_restore(tid):
-    from ..lists.listtrash import otr_err_task
     c = db()
     e = otr_err_task(c, tid)  # 2.102.0 A (#1988): a task of a deleted list comes back only with its list (same place)
     if e is not None:

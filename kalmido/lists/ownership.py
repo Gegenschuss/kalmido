@@ -9,6 +9,8 @@ from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import collab_all, Denied, list_role, my_max_sort, need_collab, qn_private
 from ..lists.groups import grp_sync
+from ..core.db import usettings  # 2.369.5 (#2517): pulled up from functions
+from ..core.i18n import N_  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---- 2.1.2 (#349): transfer the ownership of a list. The owner hands it to another active person (a member or anyone they
@@ -49,12 +51,11 @@ def op_takeover_apart(c, lr):
 
 def owner_rights(c, lid):
     """(list row, 'owner' | 'takeover') for the current user, or Denied: 404 when they may neither see nor take it over."""
-    from ..agents.core import is_agent
+    from ..agents.core import need_person
     lr = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
     if not lr:
         raise Denied(404)
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot transfer projects"))
+    need_person(403, tr("Agents cannot transfer projects"))
     if lr["owner_id"] == me():
         return lr, "owner"
     if g.user["is_admin"] and owner_orphaned(c, lr["owner_id"]) and not op_takeover_apart(c, lr):
@@ -161,8 +162,6 @@ def own_takeover_log(c, lr, old, to_name):
     """2.148.1 B (#2491): a server admin took over the list of a disabled account / an agent: the security log, and the
     person whose list it was finds it in their News (also while disabled, for when the account comes back)."""
     from ..collab.news import news_add
-    from ..core.db import usettings
-    from ..core.i18n import N_
     from ..notify.alerts import aa_now
     aa_now("security", f"takeover:{lr['id']}:{old}", N_("{0} took over the project {1} of a disabled account or agent and gave it to {2}."),
            [g.user["username"], lr["name"], to_name])

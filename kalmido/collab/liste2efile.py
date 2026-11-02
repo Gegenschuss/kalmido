@@ -18,6 +18,11 @@ from ..core.db import bump, db, err, insert_id, iso, now_utc
 from ..core.access import Denied, MANAGE_ROLES, need_task, need_list
 from ..core.orgcrypt import oc_seal_path, oc_task_org, oc_task_space  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
+from .liste2e import le2e_task_mode, le2e_parse, le2e_writer_ok, le2a_gen, LE2EDenied, le2a_subtree  # 2.369.5 (#2517): pulled up from functions
+from ..notify.alerts import aa_count, aa_oserr  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.tasks import one_task  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachments import safe_name  # 2.369.5 (#2517): pulled up from functions
 
 LE2F_MAGIC = b"KENC\x02"
 LE2F_HEAD = len(LE2F_MAGIC) + 4      # magic + generation; then iv (12) and the AES-GCM ciphertext (tag 16)
@@ -33,7 +38,6 @@ LE2F_MSG = {
 
 
 def le2f_task_mode(c, tid):
-    from .liste2e import le2e_task_mode
     return le2e_task_mode(c, tid)
 
 
@@ -41,7 +45,6 @@ def le2f_plain_guard(c, tid):
     """Every plain upload way (web upload, comment file, text file, API, MCP, the per-person files of 2.42, shares) into a
     task of a list with the lock: 409 list_e2e. Called by save_attachments before anything is written."""
     if tid and le2f_task_mode(c, tid):
-        from .liste2e import LE2EDenied
         raise LE2EDenied("list_e2e", msg=tr(LE2F_MSG["plain"]))
 
 
@@ -59,13 +62,11 @@ def le2f_blob_gen(head):
 
 def le2f_name_ok(v, gen):
     """The file name as a list ciphertext of generation gen."""
-    from .liste2e import le2e_parse
     d = le2e_parse(v, LE2F_NAME_MAX) if isinstance(v, str) and len(v) <= LE2F_NAME_MAX + 200 else None
     return bool(d) and d["g"] == gen
 
 
 def _le2f_person():
-    from .liste2e import le2e_writer_ok
     if not le2e_writer_ok():
         raise Denied(403)
     return g.user["id"]
@@ -74,7 +75,6 @@ def _le2f_person():
 def _le2f_store(c, tid, f, gen, uid, saved):
     """Writes one uploaded list file (werkzeug FileStorage) next to the task's files, sealed like its neighbours.
     -> (rel path, size) or raises ValueError with the message."""
-    from ..notify.alerts import aa_count, aa_oserr
     head = f.stream.read(LE2F_HEAD)
     f.stream.seek(0)
     if le2f_blob_gen(head) != gen:
@@ -102,13 +102,11 @@ def le2f_save(c, tid, files, names, comment_id=None, saved=None, uid=None):
     """Stores list files (already encrypted in the browser) for task tid or one of its comments; names = the file names as
     list ciphertexts, in the same order. The list must be 'on'. Returns an error message or None (caller commits; on an
     error the caller rolls back and unlinks `saved`) -- like save_attachments."""
-    from .liste2e import le2a_gen
     from ..admin.hosting import quota_guard
     uid = uid or _le2f_person()
     lid = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()[0]
     mode, gen = le2a_gen(c, lid)
     if mode != "on":
-        from .liste2e import LE2EDenied
         raise LE2EDenied("list_e2e_busy" if mode else "list_e2e_open")
     if len(names) != len(files) or not all(le2f_name_ok(n, gen) for n in names):
         return tr("Invalid value: {0}", "name")
@@ -133,8 +131,6 @@ def le2f_upload(tid):
     """multipart "file" (one or more list files, KENC\\x02 of the list's current generation), "name" (per file: the file name
     as list ciphertext), optional "comment_id" (a comment of mine on this task). Only a person in the web app; the task's
     files need the right to change the task, a comment's files are its author's."""
-    from ..tasks.tasks import one_task
-    from ..tasks.validation import log_act
     c = db()
     uid = _le2f_person()
     files, names = request.files.getlist("file"), request.form.getlist("name")
@@ -198,8 +194,6 @@ def le2f_convert(lid, aid):
     switch, replacing the content of the same attachment row (same id, the comment stays). encrypting / on: a list file of
     the current generation (name = list ciphertext); decrypting: the plain file (name and type in plain). Owner / list admins
     (and the uploader of a per-person file of 2.42); no history entry."""
-    from .liste2e import LE2EDenied, le2a_gen
-    from ..tasks.attachments import safe_name
     c = db()
     uid = _le2f_person()
     role = need_list(c, lid, write=False)
@@ -251,7 +245,6 @@ def le2f_convert(lid, aid):
         from ..files.textscan import ts_forget
         ts_forget(c, "att", aid)
     else:  # 2.61.0 (#1818 #1820): an unchecked file is remembered for the later scan, text recognition queued
-        from ..core.orgcrypt import oc_task_org
         from ..files.upsafe import up_after_store
         up_after_store(c, "att", aid, oc_task_org(c, a["task_id"]) or None, info)
     bump(c)
@@ -271,7 +264,6 @@ def _le2f_todo(a, mode, gen, uid):
 def _le2f_plain_store(c, tid, f, name, saved, mime, uid):
     """The way back: the decrypted file, stored like a plain upload (size limit, upload checks of 2.61.0, sealed at rest).
     -> (rel, size, mime, info of the upload checks for up_after_store)."""
-    from ..notify.alerts import aa_count, aa_oserr
     from ..files.upsafe import up_check_path, UploadRefused
     try:
         os.makedirs(os.path.join(ATT_DIR, str(tid)), exist_ok=True)
@@ -300,7 +292,6 @@ def _le2f_plain_store(c, tid, f, name, saved, mime, uid):
 def le2f_att_guard(a):
     """need_attachment(read) of a list file: only a person in the web app (agents, API tokens, calendar apps: 404); the
     caller checks the read right on the task (and the comment) as for every file."""
-    from .liste2e import le2e_writer_ok
     if not le2e_writer_ok():
         raise Denied(404)
 
@@ -310,7 +301,6 @@ def le2f_move_guard(c, tid, src, dst):
     the key of the source list. Plain files moving into a list with the lock are converted by the next background run."""
     if not dst or src == dst:
         return
-    from .liste2e import LE2EDenied, le2a_subtree
     ids = le2a_subtree(c, tid)
     q = ",".join("?" * len(ids))
     if c.execute(f"SELECT 1 FROM attachments WHERE enc=2 AND task_id IN ({q}) LIMIT 1", ids).fetchone():

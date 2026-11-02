@@ -28,8 +28,14 @@ from ..core.config import app
 from ..core.i18n import N_, tr, trn
 from ..core.db import connect, db, iso, local_now, now_utc
 from ..accounts.session import GATE, me
-from ..core.access import Denied, list_role, MANAGE_ROLES, need_list, access_note, reading_sql
+from ..core.access import Denied, joined_lists_sql, list_role, MANAGE_ROLES, need_list, access_note, reading_sql
 from ..core.errors import BadInput
+from ..core.access import collab_all, ov_open  # 2.369.5 (#2517): pulled up from functions
+from ..agents.admin import agent_owner  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import agent_ids, is_agent, agent_row, agent_shares  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.users import admin_sees  # 2.369.5 (#2517): pulled up from functions
+from ..api.common import v1_err  # 2.369.5 (#2517): pulled up from functions
 
 AGENT_ACCESS_DAYS = 30
 LIST_IDS_MAX = 500
@@ -47,7 +53,6 @@ def agent_bridge_resp(e):
     parts = [f"“{x['name']}”" for x in e.items] + ([trn("{0} project you cannot see", "{0} projects you cannot see", e.hidden)] if e.hidden else [])
     msg = tr(BRIDGE_MSG, ", ".join(e.agents) or tr("the agent"), ", ".join(parts))
     if request.path.startswith("/api/v1/"):
-        from ..api.common import v1_err
         return v1_err(409, msg, name="agent_bridge", bridges=e.items, hidden=e.hidden)
     r = jsonify(error=msg, code="agent_bridge", bridges=e.items, hidden=e.hidden)
     r.status_code = 409
@@ -59,7 +64,6 @@ def list_circle(c, lid):
     """The people circle of list lid: owner + members that are persons (frozenset of user ids). 2.148.1 D (#2495): a list
     open to "Everyone in the organisation" also counts the people of its organisation who read it that way (core/access.py
     _ov_sql: members, admins, read-only)."""
-    from ..core.access import collab_all, ov_open
     row = c.execute("SELECT org_id, life, family, org_visibility FROM lists WHERE id=?", (lid,)).fetchone()
     org = row["org_id"] if row and collab_all() and ov_open(row) else None
     return frozenset(r[0] for r in c.execute("""SELECT id FROM users WHERE COALESCE(kind,'user')!='agent' AND (id=(SELECT owner_id FROM lists
@@ -81,8 +85,8 @@ def agent_cap(c, aid):
 
 def agent_reach(c, aid):
     """The lists agent aid can really use: owned or shared with it (no health list), within its list restriction."""
-    rows = [r[0] for r in c.execute(f"""SELECT l.id FROM lists l WHERE COALESCE(l.life,'') NOT IN ('health', 'budget') AND l.e2e IS NULL AND l.deleted_at IS NULL AND (l.owner_id=? OR l.id IN
-                                       (SELECT list_id FROM list_members WHERE user_id=?)) AND NOT {reading_sql()}""", (aid, aid))]  # 2.172.1 (#2689)
+    rows = [r[0] for r in c.execute(f"""SELECT l.id FROM lists l WHERE COALESCE(l.life,'') NOT IN ('health', 'budget') AND l.e2e IS NULL AND l.deleted_at IS NULL AND l.id IN {joined_lists_sql()}
+                                       AND NOT {reading_sql()}""", (aid, aid))]  # 2.172.1 (#2689)
     cap = agent_cap(c, aid)
     return [x for x in rows if cap is None or x in cap]
 
@@ -128,7 +132,6 @@ def _names(c, ids, viewer):
 
 def may_approve_bridge(c, uid, aid, lids):
     """A person who owns the personal agent aid, or who manages (owner / list admin) every list in lids."""
-    from ..agents.admin import agent_owner
     u = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone() if uid else None
     if not u or (u["kind"] or "user") == "agent":
         return False
@@ -141,7 +144,6 @@ def bridge_check(c, lid, uid, ok=False, circle_new=None):
     """Before uid (an agent or a person) joins list lid: raises AgentBridge (409) when this creates an unapproved bridge;
     with ok (bridge_ok from a person allowed to approve) it stores the approvals instead. Returns the agents' names.
     2.190.0 C (#2561): circle_new (uid None) = the list's people circle after a change (opening it to its organisation)."""
-    from ..agents.core import agent_ids, is_agent
     ag = agent_ids(c)
     if not ag:
         return
@@ -192,7 +194,6 @@ def bridge_check(c, lid, uid, ok=False, circle_new=None):
     if ok and person:
         raise Denied(403, tr("Only someone who manages all these projects (or owns the agent) can connect them"))
     items, hidden = _names(c, sorted({x for _, bad in found for x in bad}), actor if person else None)
-    from ..collab.comments import user_names
     nm = user_names(c, [a for a, _ in found])
     raise AgentBridge(items, hidden, [nm.get(a, "") for a, _ in found])
 
@@ -209,7 +210,6 @@ def bridge_blocks(c, lid, uid):
 
 def agent_bridges_info(c, aid, viewer=None):
     """Every pair of lists agent aid connects although their people differ: [{lists: [{id, name}], approved, by, at}]."""
-    from ..collab.comments import user_names
     ls = agent_reach(c, aid)
     circ = {x: list_circle(c, x) for x in ls}
     names = {r[0]: r[1] for r in c.execute(f"SELECT id, name FROM lists WHERE id IN ({','.join('?' * len(ls))})", ls)} if ls else {}
@@ -258,13 +258,12 @@ def agent_lists_set(c, aid, v, ok=False):
     """agents.list_ids (and its tokens): only lists the agent is in. The caller checked who may change the agent. Widening the
     limit (or lifting it) must not switch on a bridge nobody approved: 409 agent_bridge, or with ok (bridge_ok from a person
     who may approve every pair) the approvals are stored."""
-    reach = {r[0] for r in c.execute("SELECT id FROM lists WHERE deleted_at IS NULL AND (owner_id=? OR id IN (SELECT list_id FROM list_members WHERE user_id=?))", (aid, aid))}
+    reach = {r[0] for r in c.execute(f"SELECT id FROM lists WHERE deleted_at IS NULL AND id IN {joined_lists_sql()}", (aid, aid))}
     csv_ = list_ids_clean(c, v, lambda n: n in reach)
     before = _open_pairs(c, aid)
     c.execute("UPDATE agents SET list_ids=? WHERE user_id=?", (csv_, aid))
     new = _open_pairs(c, aid) - before
     if new:
-        from ..collab.comments import user_names
         actor = me()
         lids = sorted({x for p in new for x in p})
         if ok and may_approve_bridge(c, actor, aid, lids):
@@ -293,7 +292,6 @@ def token_list_add(c, lid):
     if not raw.strip():
         return
     new = ",".join(str(x) for x in sorted(ids_parse(raw) | {lid}))
-    from ..agents.core import is_agent
     if is_agent(g.user):
         c.execute("UPDATE agents SET list_ids=? WHERE user_id=?", (new, g.user["id"]))
         c.execute("UPDATE api_tokens SET list_ids=? WHERE user_id=?", (new, g.user["id"]))
@@ -307,7 +305,6 @@ def token_list_add(c, lid):
 def move_gate(c, moves):
     """moves: [(task id, target list id)] an agent's API request is about to do. Moving into a list whose people circle is
     not part of the source list's circle waits for approval (202, ApprovalPending)."""
-    from ..agents.core import is_agent
     if not has_request_context() or g.get("auth_via") != "token" or not is_agent(g.user) or g.get("approved_job"):
         return
     cross = []
@@ -414,7 +411,6 @@ def access_cleanup(c):
 @app.get("/api/lists/<int:lid>/agent-access")
 def list_agent_access(lid):
     """Which agents read / wrote list lid in the last AGENT_ACCESS_DAYS days, per day (every member of the list sees it)."""
-    from ..collab.comments import user_names
     c = db()
     need_list(c, lid, write=False)
     access_flush()
@@ -429,11 +425,9 @@ def list_agent_access(lid):
 @app.get("/api/agents/<int:aid>/bridges")
 def agent_bridges_get(aid):
     """The lists agent aid connects although their people differ (approved or from before), for the people who reach it."""
-    from ..agents.core import agent_row, agent_shares, is_agent
     c = db()
-    shared = c.execute("""SELECT 1 FROM list_members m WHERE m.user_id=? AND m.list_id IN (SELECT id FROM lists WHERE owner_id=? UNION
-                          SELECT list_id FROM list_members WHERE user_id=?) LIMIT 1""", (aid, me(), me())).fetchone()
-    from ..accounts.users import admin_sees
+    shared = c.execute(f"SELECT 1 FROM list_members m WHERE m.user_id=? AND m.list_id IN {joined_lists_sql()} LIMIT 1",
+                       (aid, me(), me())).fetchone()
     a = agent_row(c, aid)
     if not a or is_agent(g.user) or (a["owner_id"] and a["owner_id"] != me()):
         raise Denied(404)  # somebody else's personal agent: nothing (also not for admins)

@@ -32,6 +32,9 @@ from ..agents.workstyle import ws_get, ws_public
 from ..agents.control import ctl_public  # 2.235.0 A (#2891)
 from ..agents.datalock import dl_public  # 2.235.0 B (#2902)
 from ..agents.agentrules import ar_public  # 2.235.0 C (#2903)
+from ..agents.steps import host_info_in, host_info_set, steps_end  # 2.369.5 (#2517): pulled up from functions
+from ..agents.jobchat import jcs_start_notice  # 2.369.5 (#2517): pulled up from functions
+from ..agents.chat import chat_unlink_trimmed, h6e_agent_push_ok  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---- agents: the REST API of the agent itself (token of an agent account)
@@ -82,7 +85,6 @@ def v1_agent_status():
     unknown = sorted(k for k in b if k not in ("status", "text", "task_id", "model", "permission_mode", "host_permission_mode", "permission_fixed", "host", "text_key", "text_at"))
     if unknown:
         raise UnknownFields(unknown)
-    from ..agents.steps import host_info_in, host_info_set, steps_end
     hinfo = host_info_in(b)  # 2.32.0 (#1079): what the host really runs with (model, permission mode, its default)
     if b.get("status") not in AGENT_STATUSES:
         raise BadInput(tr("Invalid value: {0}", "status"))
@@ -136,7 +138,6 @@ def v1_agent_aborted():
     if jid is not None and not c.execute("SELECT 1 FROM agent_jobs WHERE id=? AND agent_id=?", (jid, aid)).fetchone():
         raise BadInput(tr("Invalid value: {0}", "job_id"))
     if jid is None:
-        from ..agents.steps import steps_end
         c.execute("UPDATE agents SET status='idle', status_text='', status_at=?, status_task=NULL, typing_until=0 WHERE user_id=?",
                   (iso(now_utc()), aid))  # the typing dots end too
         steps_end(c, aid)
@@ -404,14 +405,11 @@ def v1_agent_job_create():
     c.execute("""DELETE FROM agent_jobs WHERE agent_id=? AND state NOT IN ('running','waiting') AND id<=(SELECT id FROM agent_jobs
                  WHERE agent_id=? ORDER BY id DESC LIMIT 1 OFFSET ?)""", (aid, aid, AGENT_JOBS_KEEP))
     job_notify(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), None)
-    from ..agents.jobchat import jcs_start_notice
     jcs_start_notice(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone())  # 2.153.0 (#1962): its start line
     if log:
-        from ..agents.steps import steps_job_log
         steps_job_log(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), log)  # 2.32.0 (#1081)
     bump(c)
     c.commit()
-    from ..agents.chat import chat_unlink_trimmed
     chat_unlink_trimmed()
     return jsonify(job_dict(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone())), 201
 
@@ -436,7 +434,6 @@ def job_notify(c, j, old_state):
         news_add(c, uid, "approval", task_id=j["task_id"], data={"title": (j["title"] or "")[:200], "job": j["id"]}, actor=j["agent_id"], s=s)
     if not notif_ok(c, uid, s, "approval", "push", lid):
         return
-    from ..agents.chat import h6e_agent_push_ok
     if not h6e_agent_push_ok(j["agent_id"], uid):  # 2.86.0 (N31): daily push budget per agent and person
         return
     lg = lang_of(s)
@@ -473,7 +470,6 @@ def v1_agent_job_update(jid):
     c.execute(f"UPDATE agent_jobs SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), jid])
     j2 = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
     if b.get("append_log"):  # 2.32.0 (#1081): a progress line is a heading of the job's history
-        from ..agents.steps import steps_job_log
         steps_job_log(c, j2, b["append_log"])
     job_notify(c, j2, j["state"])
     if (j2["state"], j2["title"]) != (j["state"], j["title"]):

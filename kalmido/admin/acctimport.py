@@ -66,6 +66,16 @@ from ..core.schema import MAX_DEPTH  # 2.149.0 G (#2517): pulled up from functio
 from ..life.model import jr_seal  # 2.306.0 A (#2885)
 from ..accounts.orginvite import ojn_drop_later, ojn_invite, ojn_later  # 2.278.0 A (#3095)
 from ..collab.e2e import e2e_has_keys, e2e_import_keys, e2e_same_keys  # 2.278.0 C (#3091)
+from .acctexport import umz_email_hash  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import org_role, user_orgs, visible_people, _need_org_admin  # 2.369.5 (#2517): pulled up from functions
+from ..integrations.importers import IMPORT_UNDO_HOURS, imp_undo_after, imp_undo_lists, imp_undo_split, imp_undo_trash  # 2.369.5 (#2517): pulled up from functions
+from ..lists.lists import clean_folder, list_created, LIST_NAME_MAX, _folder_member_add  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import CONTENT_MAX, TITLE_MAX  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.invite import invite_new  # 2.369.5 (#2517): pulled up from functions
+from .orgexport import OX_MAGIC, OX_FK_AAD  # 2.369.5 (#2517): pulled up from functions
+from ..core.config import DATABASE_URL  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import connect_direct  # 2.369.5 (#2517): pulled up from functions
+from ..hub.mailbox import mbx_take_values  # 2.369.5 (#2517): pulled up from functions
 
 UMZ_IN_DIR = os.path.join(EXPORT_DIR, "account-import")
 UMZ_SOURCE = "Kalmido"  # imports.source of an account import (the list of recent imports shows it as it is)
@@ -525,7 +535,6 @@ def _email(v):
 def umz_phash(p):
     """Review M1: the key of a person of the file -- email_hash (account export since the review), or the hash of the
     plain address (older files, the organisation export)."""
-    from .acctexport import umz_email_hash
     h = p.get("email_hash") if isinstance(p, dict) else None
     if isinstance(h, str) and re.fullmatch(r"[0-9a-f]{64}", h):
         return h
@@ -534,7 +543,6 @@ def umz_phash(p):
 
 def umz_pkey(v):
     """A key of the run's choice: the hash, or (older clients) a plain address."""
-    from .acctexport import umz_email_hash
     if isinstance(v, str) and (re.fullmatch(r"[0-9a-f]{64}", v) or re.fullmatch(r"id[1-9]\d{0,17}", v)):  # 2.278.0 B (#3094): id<old id>
         return v
     return umz_email_hash(_email(v))
@@ -547,7 +555,6 @@ def umz_disk_size(received, sealed):
 
 def umz_targets(c, uid):
     """Where the import may go: the private space and every organisation the person administers."""
-    from ..accounts.orgs import org_role, user_orgs
     out = [{"id": "private", "name": tr("Private|workspace")}]
     for oid in user_orgs(c, uid):
         if org_role(c, uid, oid) == "admin":
@@ -567,8 +574,6 @@ def umz_salt(man):
 def umz_seen(c, uid, salt=None):
     """Review M1: {email hash: account} of the accounts the person may see on this server (never others: the preview must
     not reveal accounts the person could not find in the app either)."""
-    from ..accounts.orgs import visible_people
-    from .acctexport import umz_email_hash
     vis = visible_people(c, uid)
     out = {}
     for r in c.execute("SELECT id, display_name, username, email FROM users WHERE disabled=0 AND COALESCE(kind,'user')!='agent' "
@@ -641,7 +646,6 @@ def umz_preview(c, uid, man, data, can_invite):
               "tasks": sum(1 for t in data.get("tasks", []) if t.get("list_id") == L.get("id") and not t.get("deleted_at"))}
              for L in data.get("lists", []) if not L.get("e2e")]  # 2.278.0 C (#3091): encrypted projects stay behind
     people = []
-    from .acctexport import umz_email_hash
     mine = umz_email_hash((c.execute("SELECT email FROM users WHERE id=?", (uid,)).fetchone() or [""])[0], umz_salt(man))
     seen = umz_seen(c, uid, umz_salt(man))
     for p in data.get("people", []):
@@ -932,7 +936,6 @@ def umz_earlier(c, uid, src, eid=""):
 
 
 def umz_undo_until(at):
-    from ..integrations.importers import IMPORT_UNDO_HOURS
     return at + timedelta(hours=IMPORT_UNDO_HOURS)
 
 
@@ -1319,8 +1322,6 @@ def umz_undo_templates(c, uid, cr):
 def umz_write(c, run, uid, man, zf, files, data, people):
     """Creates everything in the open transaction (the caller commits). people: {old user id: new user id} for authors
     and assignees (only people ticked for sharing). 2.362.4 (#3100): the files come last: a full storage stops only them."""
-    from ..lists.lists import clean_folder, list_created, LIST_NAME_MAX
-    from ..tasks.validation import CONTENT_MAX, TITLE_MAX
     ts = iso(now_utc())
     me_old = _oid((man.get("user") or {}).get("id"))
     org = run.org
@@ -1630,7 +1631,6 @@ def umz_write(c, run, uid, man, zf, files, data, people):
     # without its passwords, unless that workspace has one
     if data.get("mailbox") and isinstance(data["mailbox"], list):
         from ..docs.store import doc_ws
-        from ..hub.mailbox import mbx_take_values
         mws, v = doc_ws(run.org, uid), mbx_take_values(data["mailbox"][0])
         if v and c.execute("SELECT 1 FROM hub_mailboxes WHERE ws=?", (mws,)).fetchone():
             run.warning(N_("The workspace already has a mailbox: the one of the export was not taken over."))
@@ -1794,8 +1794,6 @@ def umz_share(c, run, uid, data, picks, can_invite, salt=None):
     """After the import: lists shared with the people ticked in the preview (found by their e-mail hash), missing people
     invited (instance admins only, the address typed by the admin must match the hash). Returns the people's results for
     the report."""
-    from ..lists.lists import _folder_member_add
-    from .acctexport import umz_email_hash
     out = []
     seen = umz_seen(c, uid, salt)
     for p in data.get("people", []):
@@ -1873,7 +1871,6 @@ def umz_fix_people(c, run, uid, names):
 def umz_invite(c, run, uid, email, name, role="member"):
     """A new account for a missing person (instance admin) and the invitation link by e-mail (#697). 2.360.2 M (#2561): into an
     organisation only by accepting an invitation (org_joins, in the admins' list of open invitations), in the confirmed role."""
-    from ..accounts.invite import invite_new
     if c.execute("SELECT 1 FROM users WHERE lower(email)=?", (email,)).fetchone():
         return None  # the address exists but the admin does not see it: never a second account
     base = re.sub(r"[^a-z0-9._-]", "", email.split("@")[0].lower())[:24] or "user"
@@ -2072,7 +2069,6 @@ def _buffered(path, key, size):
 
 def umz_org_head(path, key, size):
     """The header of an encrypted organisation export (orgexport.py ox_header), None for anything else."""
-    from .orgexport import OX_MAGIC
     with _buffered(path, key, size) as r:
         if r.read(len(OX_MAGIC)) != OX_MAGIC:
             return None
@@ -2101,7 +2097,6 @@ def umz_org_decrypt(path, key, size, okey, out):
     tools/kalmido_export_decrypt.py does: a wrong key -> UmzWrongKey, a damaged / cut / reordered file -> UmzBad."""
     from cryptography.exceptions import InvalidTag
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    from .orgexport import OX_FK_AAD, OX_MAGIC
     h = umz_org_head(path, key, size)
     hh = hashlib.sha256(OX_MAGIC + h["_raw"] + h["_head"]).digest()
     try:
@@ -2184,8 +2179,6 @@ def umz_unlock(uid, iid, okey, can_invite):
 
 def _slot():
     """2.148.1 C (#2492): an own connection holding a free import slot of the server, None when all are taken."""
-    from ..core.config import DATABASE_URL
-    from ..core.pg import connect_direct
     lc = connect_direct(DATABASE_URL)
     try:
         for i in range(UMZ_PARALLEL):
@@ -2258,7 +2251,6 @@ def umz_undo(c, uid, r):
     2.272.0 C (#3027): tasks and lists go into the trash (restorable) instead of being deleted, and only what nobody touched
     since the import: changed tasks, tasks with comments / files / time entries / subtasks added since and lists with such
     tasks, other people's tasks or new project files stay; calendars and address books only go when nothing changed in them."""
-    from ..integrations.importers import imp_undo_after, imp_undo_lists, imp_undo_split, imp_undo_trash
     cr = json.loads(r["created"] or "{}")
     from .orgimport import oi_undo, oi_undo_files
     n_oi = oi_undo(c, cr)  # 2.137.0 (#2344): the areas first (they point at the lists and tasks)
@@ -2473,7 +2465,6 @@ def umz_go(iid):
     if tg != "private":
         if not isinstance(tg, int) or isinstance(tg, bool):
             return err(tr("Invalid value: {0}", "target"))
-        from ..accounts.orgs import _need_org_admin
         _need_org_admin(c, tg)  # 404 not a member, 403 not its admin: never into somebody else's organisation
         org = tg
     picks = {}

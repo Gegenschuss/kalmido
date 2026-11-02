@@ -15,6 +15,7 @@ from ..core.i18n import tr
 from ..core.access import Denied, list_role, need_list, need_time
 from ..accounts.session import me
 from ..core.pg import insert_id
+from ..accounts.login import auth_key  # 2.369.5 (#2517): pulled up from functions
 
 TZ_MAX_RESTORE = 20000
 H6B_SIG_FIELDS = ("user_id", "task_id", "task_title", "start", "end", "seconds", "note", "source", "client_id", "pomo_id",
@@ -24,7 +25,6 @@ H6B_SIG_FIELDS = ("user_id", "task_id", "task_title", "start", "end", "seconds",
 def h6b_sig(c, lid, e):
     """2.86.0 (N10): a keyed seal over an entry the delete returned (list id + its values). Restore brings back another person's
     entry only with an intact seal, so an admin cannot create entries with free values for other members; own entries need none."""
-    from ..accounts.login import auth_key
     msg = json.dumps([int(lid)] + [e.get(k) for k in H6B_SIG_FIELDS], ensure_ascii=False, sort_keys=True, default=str)
     return hmac.new(auth_key(c), b"kalmido-timewipe-v1|" + msg.encode(), hashlib.sha256).hexdigest()[:40]
 

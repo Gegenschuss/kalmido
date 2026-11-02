@@ -30,6 +30,12 @@ from ..personal.timetrack import _csv_cell
 from ..core.errors import BadInput
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
+from .forms import FRM_FILE_MAX, h6d_form_bytes, form_url, _gate, need_form_manager, _form_row  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachments import safe_name, unexec_name  # 2.369.5 (#2517): pulled up from functions
+from ..hub.hubmail import hbm_match  # 2.369.5 (#2517): pulled up from functions
+from .clients import clients_on, need_client  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.login import auth_key  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import insert_id  # 2.369.5 (#2517): pulled up from functions
 
 FQ_KINDS = ("short", "long", "choice", "multi", "date", "number", "file", "yesno")
 FQ_MAX, FQ_LABEL_MAX, FQ_HELP_MAX = 30, 300, 500
@@ -148,7 +154,6 @@ def fq_question_html(q, lg, vals, step):
     elif kind == "number":
         field = f'<input id="{fid}" name="{name}" inputmode="decimal" maxlength="40" value="{v}"{req}{desc}>'
     elif kind == "file":
-        from .forms import FRM_FILE_MAX
         acc = ",".join("." + x for x in sorted(FQ_EXT))
         field = (f'<input id="{fid}" name="{name}" type="file" accept="{acc}"{req}{desc}>'
                  f'<p class="fqh">{e(tr("Pictures, PDF, office files or text, at most {0} MB", FRM_FILE_MAX // (1024 * 1024), lg=lg))}</p>')
@@ -192,8 +197,6 @@ class FqRefused(Exception):
 def fq_read(qs, form, files, lg, anon, form_id):
     """The answers of a send: ({qid: value | [values] | file name}, [(name, mime, data)]); raises FqRefused (message, the
     question) for a missing required answer, a wrong value, a file too large / of a wrong type."""
-    from .forms import FRM_FILE_MAX, h6d_form_bytes
-    from ..tasks.attachments import safe_name, unexec_name
     ans, ups = {}, []
     for q in qs:
         qid, kind, key = q["id"], q["kind"], "q_" + q["id"]
@@ -292,7 +295,6 @@ def fq_client(c, f, email, name, lg):
     this address (client e-mail, contact persons, linked address book contacts -- hub/hubmail.py hbm_match). Unknown:
     a new client there when the form allows it (client_new), else a note. 2.360.0 D (#2496): -> + typed: True when the
     client comes only from the typed address (anyone can type it: the entry marks it unconfirmed, the note says so)."""
-    from ..hub.hubmail import hbm_match
     lr = c.execute("SELECT client_id, org_id FROM lists WHERE id=?", (f["list_id"],)).fetchone()
     if lr and lr["client_id"]:
         cl = c.execute("SELECT id, name, org_id, created_by FROM clients WHERE id=?", (lr["client_id"],)).fetchone()
@@ -304,9 +306,7 @@ def fq_client(c, f, email, name, lg):
     if cid:
         cl = c.execute("SELECT name FROM clients WHERE id=?", (cid,)).fetchone()
         return cid, tr("Client: {0}", cl["name"] if cl else "", lg=lg) + " " + tr("(by the typed e-mail address, not confirmed)", lg=lg), True
-    from .clients import clients_on
     if f["client_new"] and clients_on(c, f["l_owner"]) and not hit_limit(f"fqnc:{f['id']}", FQ_NEW_CLIENTS_DAY, 86400):
-        from ..core.pg import insert_id
         ts = iso(now_utc())
         nm = (name or email)[:80]
         cid = insert_id(c, "INSERT INTO clients(org_id,name,email,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?)",
@@ -323,7 +323,6 @@ FQ_CK_RE = re.compile(r"[1-9][0-9]{0,17}\.[0-9a-f]{32}")
 
 
 def fq_ck_sig(c, fid, cid):
-    from ..accounts.login import auth_key
     return hmac.new(auth_key(c), f"kalmido-form-client|{fid}|{cid}".encode(), hashlib.sha256).hexdigest()[:32]
 
 
@@ -355,7 +354,6 @@ def fq_ck_client(c, f, v):
 
 
 def fq_ck_url(c, f, cid):
-    from .forms import form_url
     return form_url(c, f) + "?k=" + f"{cid}.{fq_ck_sig(c, f['id'], cid)}"
 
 
@@ -367,7 +365,6 @@ def fq_list_space(c, lid):
 @app.get("/api/forms/<int:fid>/client-link")
 def fq_client_link(fid):
     """The link of a form for one client (?client=<id>; owner / list admins, a client of the list's space they see): {url}."""
-    from .clients import need_client
     c = db()
     f = _form_of(c, fid)
     try:
@@ -385,8 +382,6 @@ def fq_client_link(fid):
 def fq_client_forms(cid):
     """The open forms a client's link can be copied of: forms of lists of the client's space that I manage
     {forms: [{id, title, list_id, list_name, questions, url}]} (url = the link for this client)."""
-    from .clients import need_client
-    from .forms import _gate, need_form_manager
     c = db()
     _gate()
     cl = need_client(c, cid)
@@ -413,7 +408,6 @@ def fq_entry_save(c, tid, f, cid, sender, email, ans, typed=False):
 
 # ---- the evaluation (people who manage the form)
 def _form_of(c, fid):
-    from .forms import _form_row, _gate
     _gate()
     return _form_row(c, fid)
 

@@ -10,6 +10,7 @@ from ..accounts.session import me
 from ..core.access import Denied, dlg_gone, my_max_sort, need_collab, need_list, qn_private, ROLES, task_visible
 from ..lists.lists import clean_folder, folder_under
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..lists.lists import _in_folder, member_folder_adopt  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---- 2.10.0 (#441): groups. An admin creates groups of people (Settings > Administration > Groups; optionally their
@@ -166,7 +167,6 @@ def grp_sync(c, lids, actor=None):
                                  "ON CONFLICT(list_id,user_id) DO NOTHING",  # 2.352.0 F (#2748, review N10): a second share at the same time
                                  (lid, uid, eff, None, gr, fr, my_max_sort(c, uid) + 1, iso(now_utc()))).rowcount:
                     continue
-                from ..lists.lists import member_folder_adopt  # 2.22.0 (#740)
                 member_folder_adopt(c, lid, uid)
                 news_add(c, uid, "share", list_id=lid, actor=actor,
                          data={"role": eff, "name": lr["name"], "group": grp_name(c, gname.get(uid))})
@@ -465,7 +465,6 @@ def folder_groups_get():
 def fg_group_diff(c, owner, f, gid, role):
     """2.46.0 (#1606): [{list_id, name, role}] of owner's lists in folder f shared with group gid directly with another role than
     `role` -- only when the folder is shared with the group already and its role changes (a first share touches no list)."""
-    from ..lists.lists import _in_folder
     prev = c.execute("SELECT role FROM group_shares WHERE owner_id=? AND folder=? AND group_id=? AND list_id IS NULL", (owner, f, gid)).fetchone()
     if not prev or prev[0] == role:
         return []
@@ -504,7 +503,6 @@ def folder_group_set(gid):
     if p:
         return jsonify(error=p, code="list_e2e_member"), 409
     from ..accounts.orgs import ws_member_problem
-    from ..lists.lists import _in_folder
     for l in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),)).fetchall():  # 2.28.0 (#935)
         if _in_folder(l["folder"], f):
             for uid in grp_members(c, gid):

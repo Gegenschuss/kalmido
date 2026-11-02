@@ -22,6 +22,8 @@ from ..collab.liste2e import le2e_is_cipher
 from ..core.db import connect
 from ..core.orgcrypt import _kek, _kek_check, _row, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
 from .wkhist import WikiUnreadable, wkh_body  # 2.280.0 C (#3114): loads before this module (kalmido/__init__.py ORDER)
+from .wkhist import wkh_sid, wsb_body_or  # 2.369.5 (#2517): pulled up from functions
+from .wikie2e import wke_mode  # 2.369.5 (#2517): pulled up from functions
 
 WKS_CATCH_UP = 300   # pages indexed again per space and search
 WKS_LIMIT, WKS_LIMIT_MAX = 30, 100
@@ -37,7 +39,6 @@ def wks_key_state(c, oid, owner):
     """2.139.0 C (#2386): a short mark of the key a space's texts are sealed with (its key row and the current server key):
     it changes with every key event, so pages that could not be read are tried again then."""
     import hashlib
-    from .wkhist import wkh_sid
     sid = wkh_sid(oid, owner)
     if not sid:
         return "0"
@@ -72,7 +73,6 @@ def wks_index(c, pid, oid, owner, text, at, unreadable=None):
 def wks_catch_up(c, w, a, limit=WKS_CATCH_UP, oid=None, owner=None):
     """Index the pages of a space (condition w / args a on wiki_pages p; oid / owner = the space) whose index is missing or
     older than the page -- or (2.139.0 C #2386) that could not be read under an earlier key state of the space."""
-    from .wkhist import WikiUnreadable, wkh_body
     ks = wks_key_state(c, oid, owner)
     rows = wks_unindexed(c, w, a, ks, limit)
     for r in rows:
@@ -130,8 +130,6 @@ def wks_search(c, uid, spaces, q, limit=WKS_LIMIT, offset=0):
     the full rows only for the hits of the answer."""
     from ..docs.rules import fold
     from ..docs.store import index_words, query_hashes
-    from .wkhist import wsb_body_or
-    from .wikie2e import wke_mode
     words = index_words(q)[:8]
     hits = []
     for oid in spaces:

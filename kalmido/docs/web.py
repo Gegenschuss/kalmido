@@ -30,12 +30,22 @@ LEVEL_FEATURES = S.RU.FEATURES
 
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
+from ..accounts.orgroles import org_role_key, need_org_write, is_write_request  # 2.369.5 (#2517): pulled up from functions
+from ..files.upsafe import h6d_read  # 2.369.5 (#2517): pulled up from functions
+from .unpack import doc_unpack  # 2.369.5 (#2517): pulled up from functions
+from ..office.periodlock import pl_receipt_need_open  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachments import send_stored  # 2.369.5 (#2517): pulled up from functions
+from ..office.einvoice_in import ei_html  # 2.369.5 (#2517): pulled up from functions
+from .ocr import ocr_available as _av, ocr_langs  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
+from .dups import dup_view, dup_on_done  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import _free_name, safe_fs_name  # 2.369.5 (#2517): pulled up from functions
+from ..files.fstags import dt_ws_nodes  # 2.369.5 (#2517): pulled up from functions
 
 
 def _no_agent():
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403)
+    from ..agents.core import need_person
+    need_person(403)
 
 
 def ws_param(c, raw, uid, manage=False):
@@ -48,14 +58,12 @@ def ws_param(c, raw, uid, manage=False):
     oid = int(m.group(1))
     if oid not in acx_of(c, uid).org_ids:
         raise Denied(404)
-    from ..accounts.orgroles import org_role_key, need_org_write, is_write_request
     rk = org_role_key(c, uid, oid)  # 2.143.0 A (#2151): guests have no documents area of the organisation; read-only reads;
     if rk == "guest":               # accounting reads it and uploads receipts (POST /api/docs), nothing else
         raise Denied(404)
     if (manage or is_write_request()) and not (rk == "accounting" and not manage and request.method == "POST" and request.path == "/api/docs"):
         need_org_write(c, uid, oid)
     if manage:
-        from ..accounts.orgs import is_org_admin
         if not is_org_admin(c, uid, oid):
             raise Denied(403, tr("Only admins of this workspace can change this"))
     return oid, S.doc_ws(oid, uid)
@@ -129,7 +137,6 @@ def doc_json(c, m, node, full=False, role=None):
     d["shared"] = bool(node["org_access"]) or bool(c.execute("SELECT 1 FROM fs_shares WHERE node_id=? LIMIT 1", (m["node_id"],)).fetchone())
     if m["dup_of"] and not m["dup_ok"]:  # 2.146.0 B (#2452): an older document that looks like the same invoice
         from flask import has_request_context
-        from .dups import dup_view
         dv = dup_view(c, m, me()) if has_request_context() and getattr(g, "user", None) else None
         if dv:
             d["duplicate_of"] = dv
@@ -313,8 +320,6 @@ def docs_upload():
     if not files:
         return err(tr("No file"))
     ids, errors, dups = [], [], []
-    from ..files.upsafe import h6d_read
-    from .unpack import doc_unpack
     unzip = request.form.get("unzip") == "1"
     src = "share" if request.form.get("source") == "share" else "upload"
     for f in files[:50]:
@@ -448,7 +453,6 @@ def doc_update(c, nid, d, uid, by=None):
     if "name" in d and by is None:
         name = str(d["name"] or "").strip()
         if name:
-            from ..files.store import _free_name, safe_fs_name
             c.execute("UPDATE fs_nodes SET name=?, updated_at=? WHERE id=?",
                       (_free_name(c, node["parent_id"], node["owner_id"], node["org_id"], safe_fs_name(name), skip=nid), _now(), nid))
     if any(k in sets for k in ("doc_date", "amount", "currency")):  # 2.148.0 A (#2471): a receipt of a locked month stays as it is
@@ -456,7 +460,6 @@ def doc_update(c, nid, d, uid, by=None):
         if (("doc_date" in sets and (sets["doc_date"] or None) != (m["doc_date"] or None))
                 or ("currency" in sets and sets["currency"] != (m["currency"] or ""))
                 or (new_amt is not None and new_amt != (S.doc_open(c, ws, "doc_meta.amount", m["amount"]) or ""))):
-            from ..office.periodlock import pl_receipt_need_open
             pl_receipt_need_open(c, nid, sets.get("doc_date"))
     m0 = m
     if sets:
@@ -566,7 +569,6 @@ def docs_patch(nid):
     if e:
         return e
     if isinstance(d, dict) and {"amount", "date", "sender"} & set(d):  # 2.146.0 B (#2452): corrected values: look for a duplicate again
-        from .dups import dup_on_done
         dup_on_done(c, nid, False)
     fs_log_add(c, nid, "edit")
     bump(c)
@@ -628,7 +630,6 @@ def docs_redo(nid):
     c = db()
     _no_agent()
     m, _n = _doc(c, nid, write=True)
-    from ..office.periodlock import pl_receipt_need_open
     pl_receipt_need_open(c, nid)  # 2.148.0 A (#2471): a new recognition could change a locked receipt's amount
     S.redo_save(c, m, nid)  # 2.363.3 (#3134): for "Undo"
     c.execute("UPDATE doc_meta SET state='wait', tries=0, error='', updated_at=? WHERE node_id=?", (_now(), nid))
@@ -647,7 +648,6 @@ def docs_redo_undo(nid):
     c = db()
     _no_agent()
     _doc(c, nid, write=True)
-    from ..office.periodlock import pl_receipt_need_open
     pl_receipt_need_open(c, nid)  # like the recognition itself: it could change a locked receipt's amount
     S.redo_back(c, nid)
     bump(c)
@@ -678,7 +678,6 @@ def docs_thumb(nid):
 @app.get("/api/docs/<int:nid>/file")
 def docs_file(nid):
     """The document's file (inline for images / PDF / text, ?dl=1: download)."""
-    from ..tasks.attachments import send_stored
     c = db()
     _m, n = _doc(c, nid)
     v = fs_version_row(c, nid)
@@ -695,7 +694,6 @@ def docs_einvoice(nid):
     """2.146.0 A (#2451): the readable view of an e-invoice (XRechnung / ZUGFeRD) -- a plain page to read and print; every value
     escaped, no script (CSP sandbox)."""
     from flask import Response
-    from ..office.einvoice_in import ei_html
     c = db()
     m, n = _doc(c, nid)
     inv = S.meta_json(c, m, "extracted", {}).get("_einv")
@@ -760,7 +758,6 @@ def _settings_labels(c, ws, uid, can):
 def _ocr_missing(c, uid):
     """2.122.0 (#2101): readable names of the Tesseract languages this person's app language needs that the image lacks."""
     from ..core.i18n import lang as _lang
-    from .ocr import ocr_available as _av, ocr_langs
     if not _av():
         return []
     names = {"deu": "Deutsch", "eng": "English", "fra": "Français", "ita": "Italiano", "spa": "Español", "nld": "Nederlands"}
@@ -772,7 +769,6 @@ def _settings_json(c, ws, uid):
     oid = S.ws_org(ws)
     can = True
     if oid:
-        from ..accounts.orgs import is_org_admin
         can = is_org_admin(c, uid, oid)
     tok = c.execute("SELECT token FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ?", (uid, oid)).fetchone()
     root = S.root_id(c, ws)  # 2.48.0 review: the marked documents folder; only the folders uid can see (L4)
@@ -951,7 +947,6 @@ def docs_label_restore(kind):
         part = ids[i:i + 1000]
         q = ",".join("?" * len(part))
         if kind == "tag":
-            from ..files.fstags import dt_ws_nodes  # 2.122.0 B (#2099): also files / folders of the workspace
             wc, wp = dt_ws_nodes(ws)
             for (nid,) in c.execute(f"SELECT n.id FROM fs_nodes n WHERE {wc} AND n.id IN ({q})", (*wp, *part)).fetchall():
                 c.execute("INSERT INTO doc_node_tags(node_id, tag_id) VALUES(?,?) ON CONFLICT DO NOTHING", (nid, lid))

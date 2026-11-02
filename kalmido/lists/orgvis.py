@@ -11,6 +11,7 @@ from ..core.i18n import tr
 from ..core.access import collab_all, Denied, list_role, MANAGE_ROLES, my_max_sort, need_collab, ov_role
 from ..accounts.session import me
 from ..api.common import v1_args, v1_view
+from ..lists.lists import member_folder_adopt  # 2.369.5 (#2517): pulled up from functions
 
 OV_VALUES = ("", "org")
 
@@ -88,7 +89,6 @@ def ov_join(c, lid, uid):
         return err(tr("You are already a member of this project"), 409)
     if not ov_role(c, lid, uid):
         raise Denied(404)
-    from ..lists.lists import member_folder_adopt
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
               (lid, uid, "edit", "edit", my_max_sort(c, uid) + 1, iso(now_utc())))
     member_folder_adopt(c, lid, uid)

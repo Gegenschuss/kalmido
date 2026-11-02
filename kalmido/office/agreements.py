@@ -53,6 +53,11 @@ AGR_COLS = ("kind", "name", "provider", "number", "cost", "per", "vat_pct", "sta
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from ..tasks.validation import as_int, log_act, rr_problem, log_changes  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_visible_sql  # 2.369.5 (#2517): pulled up from functions
+from ..life.model import notice_delta, _reminders, renew_rule, _insert  # 2.369.5 (#2517): pulled up from functions
+from ..collab.liste2e import le2a_gen_refuse  # 2.369.5 (#2517): pulled up from functions
+from .model import office_settings  # 2.369.5 (#2517): pulled up from functions
 
 
 def _txt(v, what, n, need=False):
@@ -67,7 +72,6 @@ def _txt(v, what, n, need=False):
 
 
 def _int(v, what, lo, hi):
-    from ..tasks.validation import as_int
     return as_int(v, what, lo, hi)
 
 
@@ -86,7 +90,6 @@ def _day(v, what):
 
 def bk_doc(c, oid, uid, nid):
     """The document nid of the office's documents space uid can see -> {id, name} or None."""
-    from ..files.store import fs_visible_sql
     if not nid:
         return None
     r = c.execute(f"SELECT n.id, n.name, n.org_id, n.owner_id FROM fs_nodes n JOIN doc_meta d ON d.node_id=n.id "
@@ -176,7 +179,6 @@ def bk_deadline(r, today=None, floor=None):
     """{cancel_by, ends, days, warn, over} of contract r (decrypted dict) or None without an end of term. When the last day
     to cancel has passed and the contract renews, the term rolls on (like life/model.py contract_create); floor (ISO, the
     open deadline task's due after "renewed" there) rolls it on up to that day."""
-    from ..life.model import notice_delta
     if not r.get("ends"):
         return None
     today = today or local_now().date()
@@ -224,7 +226,6 @@ def bk_task_row(c, aid, tid):
 
 def bk_task_end(c, aid, tid):
     """Ends the deadline task: the repeat removed and done (never deleted)."""
-    from ..tasks.validation import log_act
     t = bk_task_row(c, aid, tid)
     if not t or t["status"] != 0 or t["deleted_at"]:
         return
@@ -234,8 +235,6 @@ def bk_task_end(c, aid, tid):
 
 
 def bk_task_fields(c, uid, r, dl):
-    from ..life.model import _reminders, renew_rule
-    from ..tasks.validation import rr_problem
     lead = int(r.get("lead_days") or 0)
     rep = renew_rule(int(r.get("renew_months") or 0))
     if rep and rr_problem(rep):
@@ -261,7 +260,6 @@ def bk_task_list(c, uid, lid, oid=None):
         raise BadInput(tr("Invalid value: {0}", "list_id"))
     if not _private_ok(c, oid, lid, role):
         raise BadInput(tr("Invalid value: {0}", "list_id"))
-    from ..collab.liste2e import le2a_gen_refuse
     le2a_gen_refuse(c, lid)
     if c.execute("SELECT 1 FROM lists WHERE id=? AND life IN ('health', 'budget')", (lid,)).fetchone():
         raise BadInput(tr("Invalid value: {0}", "list_id"))
@@ -280,7 +278,6 @@ def bk_task_sync(c, oid, uid, r, want=None, lid=None, revive=False, new_end=Fals
     """Keeps the deadline task of contract r (decrypted dict with id) in step. want: True (on) / False (off) / None (as
     it is: on when it has a task). revive: a task ended by archiving / deleting comes back (restore, unarchive). new_end:
     the end of term was just entered (the task's due is no floor then). Returns the task id to store (None = no task)."""
-    from ..life.model import _insert
     tid = r.get("task_id")
     t = bk_task_row(c, r["id"], tid)
     on = bool(tid) if want is None else bool(want)
@@ -294,8 +291,6 @@ def bk_task_sync(c, oid, uid, r, want=None, lid=None, revive=False, new_end=Fals
         return tid if t else None  # no end of term / its last chance is gone: nothing to remind of
     f = bk_task_fields(c, uid, r, dl)
     if t and not t["deleted_at"] and (t["status"] == 0 or not revive):
-        from ..core.access import wr_sql
-        from ..tasks.validation import log_changes
         if not c.execute(f"SELECT 1 FROM lists WHERE id=? AND id IN {wr_sql()}", (t["list_id"], uid, uid)).fetchone():
             return t["id"]  # 2.92.0 review: another admin's list this one may not change - the task stays as it is
         sets = {"title": f["title"][:500], "due": f["due"], "reminders": f["reminders"], "fam": json.dumps(f["fam"], ensure_ascii=False, separators=(",", ":"))}
@@ -423,7 +418,6 @@ def agr_get_all():
     rows = c.execute("SELECT * FROM office_agreements WHERE org_id=? AND archived<>? AND (archived=0 OR ?=1) ORDER BY lower(name), id",
                      (oid, AGR_DELETED, 1 if arch else 0)).fetchall()
     today = local_now().date()
-    from .model import office_settings
     return jsonify(items=[bk_public(c, oid, uid, r, today) for r in rows], doc_ws="private" if pb_owner(c, oid) is not None else f"org:{oid}",
                    lists=_lists(c, uid, oid), currency=(office_settings(c, oid).get("currency") or "EUR").upper())
 

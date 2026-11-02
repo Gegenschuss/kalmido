@@ -22,6 +22,9 @@ from ..calendars.caldav import (
 )
 from ..events.model import att_rows, ev_att_ok, ev_delete, ev_expand, events_on, my_cal_ids
 from ..events.ics import etag, ev_lines, EvError, read_vevent, store_parsed, wrap
+from ..events.web import op_rsvp  # 2.369.5 (#2517): pulled up from functions
+from ..calendars.caldav import dav_lists, dav_caps_add  # 2.369.5 (#2517): pulled up from functions
+from ..events.model import cal_create  # 2.369.5 (#2517): pulled up from functions
 
 _CACHE, _LOCK = {}, threading.Lock()
 EV_REPORTS = ("<D:supported-report><D:report><C:calendar-query/></D:report></D:supported-report>"
@@ -287,7 +290,6 @@ def ev_att_learn(c, pw_row, v):
         return True  # no app password to learn with: as before (the PUT's attendees replace the stored ones)
     have = set(filter(None, (pw_row["caps"] or "").split(",")))
     if v["attendees_raw"] and "ATTENDEE" not in have:
-        from ..calendars.caldav import dav_caps_add
         dav_caps_add(c, pw_row["id"], {"ATTENDEE"})  # 2.144.5 A2 (#2379, review R8): atomic
         return True
     return "ATTENDEE" in have
@@ -451,7 +453,6 @@ def ev_rsvp_put(c, u, coll, name):
     """2.155.0 A (#2074): a device answers an invitation by writing the event back with a changed PARTSTAT of the own
     ATTENDEE. Only that answer is taken (op_rsvp, like the answer in the app); every other change (time, title, other
     attendees) is ignored without an error, so the device shows none. A new resource stays refused (403)."""
-    from ..events.web import op_rsvp
     have = _rsvp_member(c, u, coll, name)
     if "text/calendar" not in (request.content_type or "text/calendar").lower():
         raise DavError(415, "Expected text/calendar", "<C:supported-calendar-data/>")
@@ -482,7 +483,6 @@ def ev_rsvp_put(c, u, coll, name):
 def ev_rsvp_delete(c, u, coll, name):
     """2.155.0 A (#2074): an invitation deleted on the device counts as declined (the app keeps declined invitations, so
     the event comes back marked as declined with the next sync)."""
-    from ..events.web import op_rsvp
     have = _rsvp_member(c, u, coll, name, missing=404)
     im = request.headers.get("If-Match", "").strip()
     if im and im != "*" and have[1] not in [x.strip() for x in im.split(",")]:
@@ -511,8 +511,6 @@ def evdav_mkcal(m, c, u, p):
     its address (ev_cals.dav_name). Name, colour, description and the components are taken from the body. A calendar
     only for tasks (VTODO without VEVENT) is refused: task lists are created in the app."""
     from ..core.db import bump
-    from ..calendars.caldav import dav_lists
-    from ..events.model import cal_create
     parts = [x for x in p.split("/") if x]
     if len(parts) != 3 or parts[0] != "calendars" or parts[1].lower() != u["username"]:
         raise DavError(403, "Create calendars in your calendar home", "<D:resource-must-be-null/>")

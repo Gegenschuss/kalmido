@@ -21,6 +21,10 @@ from ..accounts.orgs import _need_org_admin, user_orgs
 from .orgoutreq import oor_rows  # 2.361.2 (#2923)
 from ..accounts.pictures import list_icon_url
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.access import ov_open  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.pictures import list_icon_drop_file, LIST_ICON_PRESETS  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import ws_check_member, org_role  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.users import list_icon_store  # 2.369.5 (#2517): pulled up from functions
 
 OL_LOG_MAX = 50
 
@@ -38,7 +42,6 @@ def ol_shared(c, lr):
     """2.148.1 A (#2480): list row lr is shared with at least one more person (not an agent) -- the lists an organisation's
     admins see and act on (_ol_out); a member's own unshared list stays theirs. 2.148.1 H (#2480): a list open to everyone
     in the organisation counts as shared."""
-    from ..core.access import ov_open
     return ov_open(lr) or bool(c.execute("SELECT 1 FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=? AND m.user_id!=? "
                           "AND COALESCE(u.kind,'user')!='agent' LIMIT 1", (lr["id"], lr["owner_id"])).fetchone())
 
@@ -166,7 +169,6 @@ def oadm_delete(oid, lid):
     delete. Only from the archive (409), only with the exact name (400)."""
     from ..lists.lists import list_purge
     from ..lists.projects import list_files_drop
-    from ..accounts.pictures import list_icon_drop_file
     c, b = db(), body()
     _need_org_admin(c, oid)
     lr = _ol_list(c, oid, lid)
@@ -200,7 +202,6 @@ def oadm_owner(oid, lid):
     """{user_id}: an organisation admin hands a list of the organisation to another person of it (typically: someone leaves).
     Like a transfer by the owner: the old owner stays as a list admin, News for the new owner (and the old one, the members)."""
     from ..lists.ownership import owner_transfer
-    from ..accounts.orgs import ws_check_member
     c, b = db(), body()
     _need_org_admin(c, oid)
     lr = _ol_list(c, oid, lid)
@@ -234,7 +235,6 @@ OLE_KEYS = ("name", "color")
 def ole_org_admin(c, lid):
     """The current person (never an agent) administers the organisation list lid belongs to (never an inbox)."""
     from ..agents.core import is_agent
-    from ..accounts.orgs import org_role
     if is_agent(g.user):
         return False
     r = c.execute("SELECT org_id FROM lists WHERE id=? AND is_inbox=0", (lid,)).fetchone()
@@ -285,7 +285,6 @@ def ole_patch(oid, lid):
 
 
 def _ole_icon_set(c, oid, lr, value):
-    from ..accounts.pictures import list_icon_drop_file
     old = lr["icon"]
     if (old or None) != (value or None):
         c.execute("UPDATE lists SET icon=? WHERE id=?", (value, lr["id"]))
@@ -301,7 +300,6 @@ def _ole_icon_set(c, oid, lr, value):
 @app.put("/api/orgs/<int:oid>/lists/<int:lid>/icon")
 def ole_icon_preset(oid, lid):
     """{preset: "kalmido" | "coffee" | ... | null}: an organisation admin picks a preset icon for a list of the organisation."""
-    from ..accounts.pictures import LIST_ICON_PRESETS
     c = db()
     _need_org_admin(c, oid)
     lr = _ol_list(c, oid, lid)
@@ -314,7 +312,6 @@ def ole_icon_preset(oid, lid):
 @app.post("/api/orgs/<int:oid>/lists/<int:lid>/icon")
 def ole_icon_upload(oid, lid):
     """multipart "file": an own picture as the icon of a list of the organisation (as POST /api/lists/{id}/icon)."""
-    from ..accounts.users import list_icon_store
     c = db()
     _need_org_admin(c, oid)
     lr = _ol_list(c, oid, lid)

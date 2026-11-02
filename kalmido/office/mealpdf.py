@@ -15,6 +15,8 @@ from .model import office_settings  # 2.357.0 A (#3156)
 from .letters import lt_sig_pic  # 2.332.0 C (#3301): the approver's signature picture
 from .pdf import PAPER, pdf_paper, pdf_paper_bind
 from .calc import calc_lang, fmt_point
+from .calc import dec  # 2.369.5 (#2517): pulled up from functions
+from .travel import rka_pkey  # 2.369.5 (#2517): pulled up from functions
 
 BW_KIND = {"food": "Food", "drinks": "Drinks"}
 
@@ -101,7 +103,6 @@ def bw_meal_pdf_data(c, oid, m):
     if bw_paper(c, oid) != PAPER:  # 2.357.0 A (#3156): the same code with the sizes of the paper
         return pdf_paper_bind(bw_meal_pdf_data, bw_paper(c, oid))(c, oid, m)
     from .meals import BW_BILL_HINT, bw_company
-    from .calc import dec
     lg, cur = bw_lg(), m["currency"] or "EUR"
     co = bw_company(c, oid)
     money = lambda v: pdf_money(v, lg, cur)  # noqa: E731
@@ -302,7 +303,6 @@ def bw_report_pdf(c, oid, rep, df, dt, person, occ, cur):
     y += 14
     flt = []
     if person:
-        from .travel import rka_pkey
         names = {}
         for m in rep["meals"]:
             for pp in [m["host"] or {}] + m["guests"]:

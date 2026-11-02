@@ -26,6 +26,8 @@ from ..core.pg import insert_id
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .cashflow import DATE_RE, MONTH_RE, _add_months, _ctx
+from .model import office_settings  # 2.369.5 (#2517): pulled up from functions
+from .cashflow import rk_cashflow  # 2.369.5 (#2517): pulled up from functions
 
 CFS_DIRS = ("in", "out")
 CFS_MAX_MONTH = 50  # corrections per month
@@ -74,7 +76,6 @@ def cfs_start(c, oid):
 @app.get("/api/office/cashflow/start")
 def cfs_start_get():
     """Office admin. {start: {amount, day, updated_at} | null, currency}."""
-    from .model import office_settings
     c, uid, oid = _ctx()
     return jsonify(start=cfs_start(c, oid), currency=(office_settings(c, oid).get("currency") or "EUR").upper())
 
@@ -242,7 +243,6 @@ def cfs_apply(c, oid, out, today):
     """Called at the end of cashflow.rk_cashflow: adds adjust[] and per month manual {in, out} (corrections), real (the
     real balance entered); with a start balance also start {amount, day} and per month account (the running balance at
     the end of the month, from the start day's month on) and diff (real - account). Never changes a computed value."""
-    from .cashflow import rk_cashflow
     rows = out["rows"]
     if not rows:
         return out

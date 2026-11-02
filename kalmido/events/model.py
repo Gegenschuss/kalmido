@@ -22,6 +22,11 @@ from ..tasks.validation import (
 )
 from ..collab.comments import user_names
 from ..core.errors import BadInput
+from ..accounts.orgroles import org_roles_of, org_readonly  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import clean_org_id, ws_obj_default, need_visible, ws_fit_problem, may_see  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import lang_of  # 2.369.5 (#2517): pulled up from functions
+from ..notify.push import push_prio  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.21.0 (#659): events
@@ -92,7 +97,6 @@ def ev_role(c, uid, cal):
     role = _ev_role(c, uid, cal)
     oid = cal["org_id"] if role and "org_id" in cal.keys() else None
     if oid:
-        from ..accounts.orgroles import org_readonly
         if org_readonly(c, uid, oid):
             return "view"
     return role
@@ -136,7 +140,6 @@ def my_cal_ids(c, uid, hidden=True):
                            "JOIN users u ON u.id=k.owner_id WHERE m.user_id=? AND u.disabled=0", (uid,)):
             if (hidden or not r["hidden"]) and acx_org_ok(c, uid, r["org_id"]):  # 2.36.2 (#1142)
                 out.setdefault(r[0], r[1])
-    from ..accounts.orgroles import org_roles_of
     if "readonly" in org_roles_of(c, uid).values():  # 2.143.0 A (#2151): read-only in an organisation -> its calendars view
         ro = {r[0] for r in c.execute(f"SELECT id FROM ev_cals WHERE id IN ({','.join(str(int(k)) for k in out) or '0'}) AND org_id IN "
                                       f"({','.join(str(int(o)) for o, rk in org_roles_of(c, uid).items() if rk == 'readonly')})")}
@@ -197,7 +200,6 @@ def cal_fields(b, create=False):
 def cal_create(c, uid, b):
     """2.30.0 (#1036): b.org_id = its workspace (None / 0 = private, else an organisation of uid); not given: the default
     of a new object (ws_obj_default: an agent's workspace, else the person's first organisation)."""
-    from ..accounts.orgs import clean_org_id, ws_obj_default
     f = cal_fields(b, True)
     oid = clean_org_id(c, b["org_id"], uid) if "org_id" in b else ws_obj_default(c, uid)
     if c.execute("SELECT COUNT(*) FROM ev_cals WHERE owner_id=?", (uid,)).fetchone()[0] >= EV_CALS_MAX:
@@ -224,7 +226,6 @@ def cal_touch(c, cid):
 
 
 def cal_member_set(c, cid, uid, role):
-    from ..collab.news import news_add
     from ..agents.admin import personal_agent_foreign
     if not collab_all():
         raise Denied(409, tr("Collaboration is turned off on this server"))
@@ -234,7 +235,6 @@ def cal_member_set(c, cid, uid, role):
     cal = c.execute("SELECT * FROM ev_cals WHERE id=?", (cid,)).fetchone()
     if not u or uid == cal["owner_id"] or personal_agent_foreign(c, uid, me()):
         raise Denied(404, tr("unknown person"))
-    from ..accounts.orgs import need_visible, ws_fit_problem
     if not c.execute("SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id=?", (cid, uid)).fetchone():  # a new member
         need_visible(c, uid)  # 2.30.0 (#1036, B2): only people one may see (404 as for an unknown id)
         p = ws_fit_problem(c, cal["org_id"], uid, "cal")  # 2.30.0 (#1036, B3): an organisation's calendar only inside it
@@ -829,13 +829,11 @@ def att_clean(c, items, eid=None, cal_id=None):
             if not collab_all():
                 raise Denied(409, tr("Collaboration is turned off on this server"))
             u = as_int(a["user_id"], "user_id", 1)
-            from ..accounts.orgs import may_see
             if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (u,)).fetchone() or (me_ and personal_agent_foreign(c, u, me_)) \
                     or (me_ and u not in had_u and not may_see(c, me_, u)):  # 2.22.0 (#752): only people one may see; 2.30.0 (#1036): also newly invited ones of an existing event
                 raise BadInput(tr("unknown person"))
             if cal_org and not ev_att_ok(c, u, cal_org):
                 if u not in had_u:  # visible (checked above), but not of the calendar's organisation: say why (2.87.0, #1983)
-                    from ..accounts.orgs import ws_fit_problem
                     raise Denied(409, ws_fit_problem(c, cal_org, u, "cal") or tr("unknown person"))
                 continue
             row["user_id"], key = u, ("u", u)
@@ -869,7 +867,6 @@ def att_clean(c, items, eid=None, cal_id=None):
 
 def att_set(c, eid, rows, r=None):
     """Replaces the attendees; newly invited people get News + a push; a person's own reply is kept unless given."""
-    from ..collab.news import news_add
     from ..events.invite import evi_keep, evi_restore
     old = {a["user_id"]: a for a in c.execute("SELECT * FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL", (eid,))}
     keep = evi_keep(c, eid)  # 2.111.0 B (#2056): who got an invitation mail stays marked
@@ -913,7 +910,6 @@ def ev_tell(c, r, what, among=None, attending=True):
     """2.367.2 (#2969): News + push (row "assign", like the invitation) to the people of the server invited to event r:
     among = only these; attending = only who still is on the list and did not decline."""
     from ..agents.core import agent_ids
-    from ..collab.news import news_add
     u = g.get("user") if has_request_context() else None
     actor = u["id"] if u else None
     who = set(among) if among is not None else None
@@ -933,9 +929,6 @@ def ev_tell(c, r, what, among=None, attending=True):
 
 def ev_change_push(c, uid, r, what, actor):
     from ..api.common import hit_limit
-    from ..collab.comments import lang_of
-    from ..collab.news import notif_ok
-    from ..notify.push import push_prio
     if not has_request_context():
         return
     s = usettings(c, uid)
@@ -954,9 +947,6 @@ def ev_change_push(c, uid, r, what, actor):
 
 
 def invite_push(c, uid, r):
-    from ..collab.comments import lang_of
-    from ..collab.news import notif_ok
-    from ..notify.push import push_prio
     if not has_request_context():
         return
     s = usettings(c, uid)
@@ -1100,7 +1090,6 @@ def ev_wd_maybe(r, lo, hi, now, margin=timedelta(0)):
 
 
 def _wd_events(c, users, S, LG, now):
-    from ..collab.news import notif_ok
     from ..notify.push import notify, push_prio
     lo = now.date() - timedelta(days=1)
     hi = now.date() + timedelta(days=8)

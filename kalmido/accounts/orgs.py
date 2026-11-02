@@ -11,12 +11,15 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc
 from ..core.db import usettings, uset  # 2.356.0 B (#2932)
 from ..accounts.session import me
-from ..core.access import Denied, acx_drop, acx_lists_sql, dlg_gone, plists, pvis, qn_private, token_lists
+from ..core.access import Denied, acx_drop, acx_lists_sql, joined_lists_sql, dlg_gone, plists, pvis, qn_private, token_lists
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.orgcrypt import oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from .navmenus import nav_clean_org, nav_org_off  # 2.418.0 (#3560)
 from .orgretain import Nn_, odl_former  # 2.186.0 A (#2599); 2.414.0 (#3502): Nn_ marks the plural pair below
+from .pictures import org_icon_tok, org_icon_url, AVATAR_MAX_MB, LIST_ICON_DIR, list_icon_process, org_icon_drop_file, org_icon_path  # 2.369.5 (#2517): pulled up from functions
+from ..core.i18n import trn  # 2.369.5 (#2517): pulled up from functions
+from ..core.serializers import unlink_files  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.22.0 (#752): organisations
@@ -302,7 +305,6 @@ def need_visible(c, other):
 
 def org_icon_fields(r, member=True):
     """2.87.9 (#1913): {icon: the emoji ('' with an own picture), icon_url: the own picture ('' without; only for members)}."""
-    from .pictures import org_icon_tok, org_icon_url
     v = r["icon"] or ""
     return {"icon": "" if org_icon_tok(v) else v, "icon_url": org_icon_url(r["id"], v) if member else ""}
 
@@ -434,7 +436,6 @@ def ws_chosen_org(c, uid):
     u = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
     if u and (u["kind"] or "user") == "agent":
         return agent_org(c, uid)
-    from ..core.db import usettings
     mine = _orgs_w(c, uid)  # 2.143.0 A (#2151): never where uid only reads / is a guest
     ws = str(usettings(c, uid).get("workspace") or "")
     m = re.fullmatch(r"org:(\d{1,9})", ws)
@@ -615,8 +616,8 @@ def ws_migrate(c):
             oid = org_of.get(a["user_id"])
         else:  # the workspace most of its lists are in
             cnt = {}
-            for (lo,) in c.execute("""SELECT l.org_id FROM lists l WHERE l.is_inbox=0 AND (l.owner_id=? OR l.id IN
-                                      (SELECT list_id FROM list_members WHERE user_id=?))""", (a["user_id"], a["user_id"])):
+            for (lo,) in c.execute(f"SELECT l.org_id FROM lists l WHERE l.is_inbox=0 AND l.id IN {joined_lists_sql()}",
+                                  (a["user_id"], a["user_id"])):
                 cnt[lo] = cnt.get(lo, 0) + 1
             oid = max(cnt, key=lambda k: (cnt[k], 0 if k is None else 1)) if cnt else None
             if oid is not None and oid not in user_orgs(c, a["owner_id"]):
@@ -1004,7 +1005,6 @@ def org_update(oid):
             for x in b["admins"]:
                 c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND user_id IN (SELECT id FROM users WHERE kind!='agent')", (oid, x))
             keep_own_admin(c, oid, had)  # 2.306.0 Fix-1 (#2875 review): hosted: the organisation keeps an admin of its own
-            from ..core.access import acx_drop
             acx_drop()  # 2.143.0 A (#2151, review): the request's cached roles follow
         bump(c)
         c.commit()
@@ -1026,7 +1026,6 @@ def _org_patch(c, oid, b):
     if "name" in b:
         c.execute("UPDATE orgs SET name=? WHERE id=?", (_clean_name(b["name"]), oid))
     if "icon" in b:
-        from .pictures import org_icon_drop_file, org_icon_tok
         v = _clean_icon(b["icon"])
         old = (c.execute("SELECT icon FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0] or ""
         if v or not org_icon_tok(old):  # 2.87.9 (#1913): an empty symbol keeps the own picture (removed by DELETE .../icon)
@@ -1101,7 +1100,6 @@ def org_delete(oid):
             OLK_BYPASS.reset(tok)
         bump(c)
         c.commit()
-        from ..core.serializers import unlink_files
         unlink_files(todo)
         if retained:
             rx_alert(retained[0], [g.user["username"], oname])
@@ -1147,7 +1145,6 @@ ODL_WORDS = {"wiki_pages": ("{0} knowledge page", "{0} knowledge pages"), "table
 
 def odl_text(counts):
     """"3 knowledge pages, 2 tables" (translated) of {key: n}."""
-    from ..core.i18n import trn
     return ", ".join(trn(*ODL_WORDS[k], n) for k, n in counts.items() if n and k in ODL_WORDS)
 
 
@@ -1191,9 +1188,8 @@ def _need_org_admin(c, oid):
 def org_need_person(c, oid):
     """2.361.2 (#2923, was the start of _need_org_admin): the current person (no agent: 403) is in organisation oid (404
     otherwise; a retired one 409) -> their role."""
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot use this endpoint"))
+    from ..agents.core import need_person
+    need_person(403, tr("Agents cannot use this endpoint"))
     with system_ctx(c):  # 2.223.2 A (#2859): a membership row left in a retired organisation = read only (409 as org_update)
         if c.execute("SELECT 1 FROM orgs o JOIN org_members m ON m.org_id=o.id AND m.user_id=? WHERE o.id=? AND o.retired_at IS NOT NULL",
                      (me(), oid)).fetchone():
@@ -1235,10 +1231,9 @@ def org_mine_dict(c, r, uid):
 def orgs_mine():
     """2.28.0 (#935): the organisations I belong to (my workspaces), their members and my role; mode + whether an
     organisation admin may manage members here (modes multi / workspaces; in the mode organisation the instance admin does)."""
-    from ..agents.core import is_agent
+    from ..agents.core import need_person
     c = db()
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot use this endpoint"))
+    need_person(403, tr("Agents cannot use this endpoint"))
     uid = me()
     oids = user_orgs(c, uid)
     rows = c.execute(f"SELECT * FROM orgs WHERE id IN ({','.join('?' * len(oids)) or 'NULL'}) ORDER BY id", oids).fetchall()
@@ -1299,7 +1294,6 @@ def org_icon_upload(oid):
     in the app) as its symbol instead of the emoji. Re-encoded like a list icon (square PNG, no metadata), sealed with the
     organisation's key; the old picture file goes."""
     from flask import request
-    from .pictures import AVATAR_MAX_MB, LIST_ICON_DIR, list_icon_process, org_icon_drop_file, org_icon_path
     import secrets
     c = db()
     _need_org_admin(c, oid)
@@ -1330,7 +1324,6 @@ def org_icon_upload(oid):
 @app.delete("/api/orgs/<int:oid>/icon")
 def org_icon_delete(oid):
     """An organisation admin removes the own picture (the symbol is empty again: the app shows its default)."""
-    from .pictures import org_icon_drop_file, org_icon_tok
     c = db()
     _need_org_admin(c, oid)
     if instance_mode(c) != "workspaces":
@@ -1347,7 +1340,6 @@ def org_icon_delete(oid):
 @app.get("/api/org-icon/<int:oid>/<tok>.png")
 def org_icon_get(oid, tok):
     """An organisation's own picture: only for its members (404 for everybody else, also a wrong / old token)."""
-    from .pictures import org_icon_path
     if g.get("user") is None:
         raise Denied(401)
     c = db()
@@ -1395,7 +1387,6 @@ def org_member_put(oid):
     pending = False
     if cur:
         c.execute("UPDATE org_members SET role=? WHERE org_id=? AND user_id=?", (role, oid, uid))
-        from ..core.access import acx_drop
         acx_drop()  # 2.143.0 A (#2151): the cached roles of this request
         if cur["role"] != role:
             org_role_news(c, oid, uid, role)  # 2.367.4 (#2974)
@@ -1583,7 +1574,6 @@ def org_member_remove(oid, uid):
         if operator is None:
             return err(tr("The last admin of an organisation cannot leave it: make somebody else an admin first"), 409)
         c.execute("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'admin') ON CONFLICT(org_id,user_id) DO UPDATE SET role='admin'", (oid, operator))
-        from ..core.access import acx_drop
         acx_drop()
         heir = operator
     oname = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]  # 2.37.0 (#1150): before leaving it (then invisible)

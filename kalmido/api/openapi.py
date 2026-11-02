@@ -18,6 +18,11 @@ from ..api.common import V1_CODES
 from ..tasks.dayplan import dayplan_spec
 from ..tasks.oneway import dec_spec
 from ..hub.hmv1 import hmv_spec  # 2.483.0 (#1902)
+from ..tasks.watchers import wat_spec  # 2.369.5 (#2517): pulled up from functions
+from ..lists.envs import env_spec  # 2.369.5 (#2517): pulled up from functions
+from ..notify.caps import notif_tpl_spec  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.briefing import briefing_spec  # 2.369.5 (#2517): pulled up from functions
+from ..lists.report import report_spec  # 2.369.5 (#2517): pulled up from functions
 
 
 RATE_HEADERS = ("RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset")
@@ -46,7 +51,6 @@ def groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
                   scope="write", desc="Every member of the group gets access; members who join later too. A person's role is the "
                                       "higher of their own and the one via groups."),
         "delete": op("Stop sharing a project with a group", G, ok({"type": "object"}) | errs("403", "404"), [pid(desc="Project id"), gp], scope="write")}
-    from ..tasks.watchers import wat_spec
     wat_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.473.0 (#3357)
     paths["/tasks/{id}/take"] = {"post": op("Take a task assigned to one of your groups", "Tasks", ok(ref("Task")) | errs("403", "404", "409"),
                                             [pid()], scope="write", desc="The task becomes yours (assignee_id) and is no longer assigned to the group.")}
@@ -806,7 +810,6 @@ def openapi_spec():
     from ..videos.v1 import vdr_v1_spec
     vdr_v1_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.99.1 C (#1959)
     pkgc_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.23.0 (#463)
-    from ..lists.envs import env_spec
     env_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.60.0 D (#1514)
     from ..office.agentdocs import ofa_spec
     ofa_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 A (#1348, #1350)
@@ -818,11 +821,8 @@ def openapi_spec():
     from ..hub.absence import abs_spec
     abs_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.50.0 (#1195)
     hosting_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.24.0 (#907 #910)
-    from ..notify.caps import notif_tpl_spec
     notif_tpl_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)  # 2.33.0 (#927)
-    from ..tasks.briefing import briefing_spec
     briefing_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#264)
-    from ..lists.report import report_spec
     report_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.34.0 (#265)
     from ..integrations.delivery import delivery_spec
     delivery_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.392.0 D (#3369)

@@ -23,9 +23,8 @@ V1F_KINDS = ("focus", "short", "long", "stopwatch")
 
 def v1f_person():
     """Focus data belongs to a person: an agent token (team or personal) is refused."""
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(403, tr("Focus sessions are private to a person"))
+    from ..agents.core import need_person
+    need_person(403, tr("Focus sessions are private to a person"))
 
 
 def v1f_dict(r, title=None, task_ok=True):

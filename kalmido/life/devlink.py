@@ -26,6 +26,9 @@ from ..core.errors import BadInput
 from ..tasks.tasks import one_task
 from ..tasks.validation import as_int, log_act
 from .model import _cost, _dump, _name, device_create, life_clean_fam, need_life
+from ..accounts.orgs import org_role, user_orgs  # 2.369.5 (#2517): pulled up from functions
+from .model import feat_on  # 2.369.5 (#2517): pulled up from functions
+from ..collab.liste2e import le2a_gen_refuse  # 2.369.5 (#2517): pulled up from functions
 
 DL_ORIGINS = ("device", "equipment")
 
@@ -77,7 +80,6 @@ def dl_offices(c, uid):
     """The office areas uid may make equipment in: [{id, name, ws, personal}] -- the own personal office (id 0 while it does
     not exist yet) and every organisation where uid is admin. Empty without the module "office"."""
     from ..office.model import office_on, pb_personal
-    from ..accounts.orgs import org_role, user_orgs
     if not office_on(c, uid):
         return []
     out = [{"id": pb_personal(c, uid, create=False) or 0, "name": tr("My own office"), "ws": "private", "personal": True}]
@@ -230,7 +232,6 @@ def dl_equip_get(rid):
     """The own link of equipment rid of the current office area: {link: null | {id, origin, other: {state ok | gone,
     task_id?, name?}}, can_take: the module "home" is on and the person is admin here}. Links of other people never show."""
     from ..office.model import office_role, office_row
-    from .model import feat_on
     c, uid, oid = _ectx()
     office_row(c, oid, "equipment", rid)  # 404 outside the area
     l = c.execute("SELECT * FROM life_device_links WHERE office_id=? AND equipment_id=? AND user_id=?", (oid, rid, uid)).fetchone()
@@ -281,7 +282,6 @@ def dl_pull(lid):
     if into == "device":
         if role != "admin":  # 2.140.0 review (F1): purchase price / serial / vendor are admin columns; a demoted admin pulls none
             raise Denied(403, tr("Only admins of this office can change equipment"))
-        from ..collab.liste2e import le2a_gen_refuse
         t, f = _device(c, uid, l["task_id"])
         le2a_gen_refuse(c, t["list_id"])  # 2.140.0 review (F2): no plain text into a list with the end-to-end lock
         v = _from_equip(r)

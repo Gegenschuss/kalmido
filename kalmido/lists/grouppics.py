@@ -14,6 +14,7 @@ from ..accounts.pictures import ALL_PRESETS, AVATAR_DIR, AVATAR_MAX_MB, avatar_p
 from ..lists.groups import need_group
 from ..lists.lists import folder_under
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..lists.groups import grp_visible  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---- 2.46.0 (#1605): groups.avatar = '' (the group symbol, as before) | 'p:<preset>' (the presets of the profile pictures) |
@@ -55,7 +56,6 @@ def fg_need_manage(c, gid):
 
 def fg_may_see(c, gid):
     """The group is visible to me (as in GET /api/groups), or a list I see is shared with it (directly or through a folder)."""
-    from ..lists.groups import grp_visible
     r = c.execute("SELECT * FROM groups WHERE id=?", (gid,)).fetchone()
     if not r:
         return False

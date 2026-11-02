@@ -15,6 +15,7 @@ from ..core.access import Denied, collab_all, is_project, list_role
 from ..core.errors import BadInput
 from .layouts import WG_STD_KEYS, clean_layout, need_person
 from ..core.pg import insert_id, system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from .settings import DASH_WIDGETS  # 2.369.5 (#2517): pulled up from functions
 
 LYV_MAX = 12          # saved arrangements per person and view
 LYV_NAME_MAX = 60
@@ -28,7 +29,6 @@ def lyv_key_ok(key):
 
 
 def lyv_clean(key, layout):
-    from .settings import DASH_WIDGETS
     return clean_layout(layout, DASH_WIDGETS if key == "dashboard" else None)
 
 

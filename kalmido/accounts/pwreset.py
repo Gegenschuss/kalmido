@@ -19,6 +19,8 @@ from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _rate_ke
 from ..accounts.login import login_log_ip  # 2.239.0 B (#2888)
 from .bgjobs import bgj_add, bgj_fn
 from ..integrations.mail import MAIL_OUT_ON, mail_send
+from ..accounts.invite import invite_mail, invite_new  # 2.369.5 (#2517): pulled up from functions
+from ..core.i18n import N_  # 2.369.5 (#2517): pulled up from functions
 
 PW_LIMITS = (3, 10, 20)  # requests per 15 min: address + sender IP, sender IP, address (any IP)
 PW_GAP = 300             # s: at most one self-service link per account in this time
@@ -57,7 +59,6 @@ def _pw_mail(uid, to, subject, text, html_body):
 def _pw_send(who):
     """Creates the link(s) for the account(s) matching who and returns the mails to send [(uid, to, subject, text, html)]."""
     from ..admin.hosting import mail_budget
-    from ..accounts.invite import invite_mail, invite_new
     c = db()
     write_lock(c, "accounts")
     rows = c.execute("SELECT * FROM users WHERE lower(email)=? OR lower(username)=? ORDER BY id LIMIT 3", (who, who)).fetchall()
@@ -89,7 +90,6 @@ def pw_forgot():
     blocked = _rate_blocked([k for k in keys if ":uall:" not in k[0]])
     for k in _rate_fail(keys):  # every request counts, found or not
         if ":uall:" in k:
-            from ..core.i18n import N_
             from ..notify.alerts import aa_now
             aa_now("security", "ratelimit:pw:uall",
                    N_("Many password reset requests for one address from several senders (at most one link per {0} min goes out)."),

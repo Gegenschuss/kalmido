@@ -34,6 +34,8 @@ from ..core.errors import BadInput, UnknownFields
 from ..api.common import act_via, hit_limit  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.listtrash import otr_trash  # 2.272.0 C (#3027)
 from ..collab.liste2e import le2e_mode
+from ..accounts.orgs import user_orgs  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import need_org_write  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- TickTick import (parse_ticktick, below the other parsers)
@@ -2203,11 +2205,9 @@ def imp_opts(form, uid):
         if sp == "private":
             o["space"] = None
         else:
-            from ..accounts.orgs import user_orgs
             m = re.fullmatch(r"org:(\d+)", sp)
             if not m or int(m.group(1)) not in user_orgs(db(), uid):
                 raise BadInput(tr("Invalid value: {0}", "space"))
-            from ..accounts.orgroles import need_org_write
             need_org_write(db(), uid, int(m.group(1)))  # 2.143.0 A (#2151)
             o["space"] = int(m.group(1))
     return o

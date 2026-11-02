@@ -20,6 +20,7 @@ from ..tasks.validation import valid_hm
 from ..core.errors import BadInput
 from ..notify.push import _wd_fail, notify, push_prio
 from ..api.common import v1_args, v1_view
+from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 
 BRIEF_LIST_MAX = 15        # rows per section (the counts are complete)
 BRIEF_SINCE_MAX_DAYS = 7   # "since the last briefing" never reaches further back than this
@@ -157,7 +158,6 @@ def _changes(c, uid, ql, vis, since_iso):
     """Changes by others since since_iso on the tasks that concern uid (assigned to uid, created by uid, commented by uid, or
     without assignee in uid's own lists): newly assigned, comments, status changes, date changes. One row per task, newest
     first: {id, title, list_id, list_name, kinds, by: [{id, name}], at}; plus the number of such tasks."""
-    from ..collab.comments import user_names
     concern = f"""(t.assignee_id=? OR t.created_by=? OR (t.assignee_id IS NULL AND l.owner_id=?)
                    OR t.id IN (SELECT task_id FROM comments WHERE user_id=? AND deleted_at IS NULL))"""
     head = f"""FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.deleted_at IS NULL AND t.list_id IN ({ql}) AND {vis}"""
@@ -231,9 +231,8 @@ def brief_line(d, lg=None):
 
 
 def _need_person():
-    from ..agents.core import is_agent
-    if is_agent(g.user):
-        raise Denied(404)
+    from ..agents.core import need_person
+    need_person(404)
 
 
 @app.get("/api/briefing")

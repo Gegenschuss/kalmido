@@ -13,6 +13,8 @@ import subprocess
 import sys
 import tempfile
 import threading
+from ..tasks.attachtext import file_kind, pdf_text, _decode  # 2.369.5 (#2517): pulled up from functions
+from ..files.photometa import pm_kind  # 2.369.5 (#2517): pulled up from functions
 
 
 def _env_int(name, default, lo, hi):
@@ -357,7 +359,6 @@ def qr_codes(data, kind):
 
 def doc_text(name, mime, data, owner=None, lang=None):
     """{"text", "method": "text" | "pdf" | "ocr", "pages"?, "error"?} -- the text of one document's bytes."""
-    from ..tasks.attachtext import file_kind, pdf_text, _decode  # noqa: PLC0415 -- the app's PDF text reader
     kind = file_kind(name, mime, data[:2048])
     if kind == "text":
         return {"text": _decode(data)[:TEXT_CAP], "method": "text", "kind": kind}
@@ -372,7 +373,6 @@ def doc_text(name, mime, data, owner=None, lang=None):
     if kind not in ("pdf", "image"):
         return {"text": "", "method": "none", "kind": kind}
     if kind == "image":
-        from ..files.photometa import pm_kind
         if pm_kind(data[:64]) == "heif":  # 2.146.0 B (#2454): an iPhone photo -> JPEG first
             data, e = heif_jpeg(data)
             if e:

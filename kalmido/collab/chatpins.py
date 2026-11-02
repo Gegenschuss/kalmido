@@ -11,6 +11,8 @@ from ..api.common import v1_args, v1_call, v1_json, v1_view
 from ..core.errors import BadInput, reject_unknown, UnknownFields
 from ..tasks.validation import as_int
 from ..collab.comments import user_names
+from .teamchat import tchat_msg_dict, tchat_rx, need_tchat, need_tmsg  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import list_role, WRITE_ROLES  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.62.0 (#1848): pinned chat messages
@@ -46,7 +48,6 @@ def cpin_who(c, uid):
 # ---- team chat
 def cpin_team_list(c, rid):
     """The pinned messages of conversation rid (not deleted), newest pin first, as tchat_msg_dict."""
-    from .teamchat import tchat_msg_dict, tchat_rx
     rows = c.execute("SELECT * FROM tchat_msgs WHERE room_id=? AND pinned_at IS NOT NULL AND deleted_at IS NULL ORDER BY pinned_at DESC, id DESC",
                      (rid,)).fetchall()
     rx = tchat_rx(c, [r["id"] for r in rows])
@@ -57,7 +58,6 @@ def cpin_team_list(c, rid):
 def cpin_team(mid):
     """{pinned?: bool} -- pin / unpin a message of a conversation I belong to (omitted: toggles). 409: deleted, or CPIN_MAX
     are pinned already."""
-    from .teamchat import need_tchat, need_tmsg, tchat_msg_dict, tchat_rx
     c = db()
     need_tchat(c)
     m, r = need_tmsg(c, mid)  # the room's members only (404 for everyone else)
@@ -66,7 +66,6 @@ def cpin_team(mid):
     if r["kind"] == "channel" and r["archived_at"]:  # 2.148.1 E (#2496): no pins in an archived channel
         return err(tr("This channel is archived"), 409)
     if r["kind"] == "list":  # 2.148.1 E (#2496): read-only members of a list do not pin
-        from ..core.access import list_role, WRITE_ROLES
         if list_role(c, r["list_id"]) not in WRITE_ROLES:
             raise Denied(403)
     try:

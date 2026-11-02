@@ -19,6 +19,7 @@ from ..core.errors import BadInput
 from ..events.model import (
     att_rows, ev_att_ok, ev_store, ev_zone, one_line, rule_local, EV_DESC_MAX, EV_LOC_MAX, EV_TITLE_MAX, need_evcal, ov_list, tz_ok, wall, wall_s,
 )
+from ..accounts.orgs import may_see  # 2.369.5 (#2517): pulled up from functions
 
 OV_KEYS = ("title", "location", "description", "all_day", "start", "end", "status", "delete")
 # properties of a VEVENT that map to event fields (everything else is kept as it came and sent back)
@@ -467,7 +468,6 @@ def atts_resolve(c, uid, raw, eid=None, cal_id=None):
     a contact the writer sees (by e-mail) or the address. A person only when the writer may see them (like att_clean,
     #476 H1): an ICS file or a CalDAV client never invites accounts of other organisations; already invited ones stay."""
     from ..contacts.model import contact_by_email
-    from ..accounts.orgs import may_see
     from ..agents.admin import personal_agent_foreign
     had_u = {r[0] for r in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL",
                                      (eid,))} if eid else set()

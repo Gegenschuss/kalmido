@@ -19,6 +19,7 @@ from ..core.errors import BadInput
 from ..contacts.model import _jl, contacts_on, need_book, book_role
 from ..contacts.merge import ctm_merge, ctm_undo
 from ..core.merges import mg_dumps, mg_run, MG_MAX
+from .proposals import _p_keys, _p_int, _p_list, _p_str  # 2.369.5 (#2517): pulled up from functions
 
 DUP_KIND = "merge"
 DUP_MAX_CONTACTS = 2000      # contacts of one address book sent in one request
@@ -66,7 +67,6 @@ def dup_agent_ok(c, aid, book):
 
 def dup_input(c, uid, b):
     """POST /api/proposals {agent_id, kind: merge, book_id} -> (input, title, task_id, list_id) like prop_input."""
-    from .proposals import _p_keys, _p_int
     _p_keys(b, "", ("agent_id", "kind", "book_id"))
     if not contacts_on(c, uid):
         raise Denied(404)
@@ -88,7 +88,6 @@ def dup_input(c, uid, b):
 def dup_validate(b, inp):
     """prop_validate for kind merge: {summary?, groups: [{target_id, ids, reason?}]} -> {groups: [{target_id, ids (target
     first), reason}]}. Every id from the input, the target in its group, an id in at most one group."""
-    from .proposals import _p_keys, _p_list, _p_int, _p_str
     _p_keys(b, "", ("kind", "summary", "groups"))
     known = {x["id"] for x in inp.get("contacts", [])}
     if b.get("groups") is None:
@@ -153,7 +152,6 @@ def dup_view_extra(c, j):
 
 def dup_targets(prop, ed):
     """The edited targets {key: target id} of the apply request (a target must be a contact of its group)."""
-    from .proposals import _p_keys, _p_int
     out, groups = {}, prop.get("groups") or []
     for k, e in (ed or {}).items():
         if not re.fullmatch(r"\d{1,3}", str(k)) or int(k) >= len(groups):

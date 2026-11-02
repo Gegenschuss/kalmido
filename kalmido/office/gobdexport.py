@@ -31,6 +31,7 @@ from .model import office_gate, office_org, office_settings, pb_cl_sql
 from .ledger import ofx_company, ofx_log
 from .gdpdudtd import GX_DTD, GX_DTD_NAME
 from .rights import ofr_log_rows
+from .datev import dx_rows  # 2.369.5 (#2517): pulled up from functions
 
 GX_MAX_DAYS = 11 * 366  # one call covers at most eleven years (ten years of keeping + the current one)
 GX_RIGHTS_MAX = 100000  # 2.187.0 B (#2476): the rows of the rights log read for the export (changes of rights are rare)
@@ -95,7 +96,6 @@ class _Tbl:
 
 def gx_tables(c, oid, frm, to, gaps=None):
     """The tables of the export for [frm, to] (ISO days). gaps: see books.bk_receipts (2.356.0, #3097)."""
-    from .datev import dx_rows
     from .books import bk_receipts
     s = office_settings(c, oid)
     out = []

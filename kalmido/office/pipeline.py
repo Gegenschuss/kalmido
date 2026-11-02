@@ -38,6 +38,10 @@ PL2_FIELDS = ("id", "title", "client_id", "contact", "value", "stage", "probabil
 
 from .rights import ofr_need_area  # noqa: E402  2.187.0 (#2476)
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
+from .docs import doc_create, doc_row  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from ..lists.templates import ptype_create  # 2.369.5 (#2517): pulled up from functions
+from ..team.clients import list_client_set  # 2.369.5 (#2517): pulled up from functions
 
 
 def _txt(v, name, n):
@@ -342,8 +346,6 @@ def pl2_restore(did):
 def pl2_make_offer(did):
     """A new quotation for the deal (the office's quotation code: settings, number; the deal's client and title taken over),
     bound to it (offer_id); an inquiry moves to "offer". 201 {deal, doc_id}. The quotation is a draft until it is sent."""
-    from .docs import doc_create, doc_row
-    from .ledger import ofx_log
     c, uid, oid = _ctx()
     ofr_need_area(c, uid, oid, "offers", "edit")  # 2.187.0 (#2476, review): it reads / writes quotations and invoices too
     cur = pl2_public(c, oid, _row(c, oid, did))
@@ -371,8 +373,6 @@ def pl2_make_project(did):
     """A new project (list of the project type "agency": time tracking + fields) named like the deal, in the office's
     workspace (a personal office: private), with the deal's client; bound to the deal (list_id). 201 {deal, list_id}.
     The client's undo deletes the list and unbinds it."""
-    from ..lists.templates import ptype_create
-    from ..team.clients import list_client_set
     c, uid, oid = _ctx()
     cur = pl2_public(c, oid, _row(c, oid, did))
     if cur["list_id"] and _list_ok(c, oid, cur["list_id"]):

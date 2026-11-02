@@ -41,6 +41,16 @@ from ..files.scan import sc_guard
 from ..files.store import fs_version_row
 from .wkembed import wem_visible
 from .wkhist import WikiUnreadable
+from .wikie2e import wke_mode, wke_open_sql  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import valid_date  # 2.369.5 (#2517): pulled up from functions
+from ..lists.public import public_links_on, PUB_ACTOR, PUB_TOKEN_RE, PUB_BAD_LIMIT, PUB_VIEW_RATE, pub_gone, pub_limited, pub_html  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.login import seal  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import may_see  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachments import send_stored  # 2.369.5 (#2517): pulled up from functions
+from .wikiatt import SVG  # 2.369.5 (#2517): pulled up from functions
+from ..lists.custview import CV_FILE_RATE  # 2.369.5 (#2517): pulled up from functions
+from ..notify.alerts import aa_count  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import news_add  # 2.369.5 (#2517): pulled up from functions
 
 WSH_PREFIX = "/s/w/"
 WSH_MAX = 300  # live shares per space
@@ -59,12 +69,10 @@ def wsh_live(a="s"):
 
 
 def wsh_locked(c, oid, owner):
-    from .wikie2e import wke_mode
     return bool(wke_mode(c, oid, owner)[0])
 
 
 def wsh_open_sql():
-    from .wikie2e import wke_open_sql
     return wke_open_sql("p")
 
 
@@ -188,7 +196,6 @@ def wsh_end_moved(c, oid, owner, paths, folder=None, dry=False):
 
 def wsh_expiry(v):
     """YYYY-MM-DD (today or later; valid through the end of that day, server time zone) -> UTC ISO, or None."""
-    from ..tasks.validation import valid_date
     if v in (None, ""):
         return None
     if not isinstance(v, str) or not valid_date(v) or v < local_now().date().isoformat():
@@ -299,7 +306,6 @@ def wsh_list():
     """?page=<id> | ?space=&folder=<path> -- the shares that cover the page / folder (direct: named exactly here, else from a
     folder above); ?space= alone: every live share of the space. + enabled (public links on), locked, person (person shares
     possible: a private space)."""
-    from ..lists.public import public_links_on
     c = db()
     uid = me()
     q = {"page_id": request.args.get("page"), "space": request.args.get("space"), "folder": request.args.get("folder")}
@@ -319,8 +325,6 @@ def wsh_list():
 def wsh_create():
     """{page_id | space + folder, kind: person | link, user_id | email (person), expires: YYYY-MM-DD | null} -> the share
     (a link with its url). A person who already has a live share of the same page / folder: its expiry changes."""
-    from ..lists.public import public_links_on
-    from ..accounts.login import seal
     c = db()
     uid = me()
     b = body()
@@ -367,7 +371,6 @@ def wsh_create():
                                                                            seal(c, WSH_SEAL + "mail", str(b["email"]).strip()[:200]) if by_mail else "", exp, uid, ts, page, imgs))
             # 2.126.2 B (#2355): a News item for exactly that person (the sharing row of their settings; no push); only the
             # path they may read now
-            from ..collab.news import news_add
             news_add(c, who, "wiki_shared", data={"path": path, "folder": bool(folder)})
     bump(c)
     c.commit()
@@ -379,7 +382,6 @@ def wsh_create():
 def wsh_person(c, uid, b):
     """The person of {user_id} (404 when unknown / not visible / an agent / oneself) or {email} (None when there is no such
     person: the answer must not reveal it)."""
-    from ..accounts.orgs import may_see
     if b.get("email") and not b.get("user_id"):
         em = str(b["email"]).strip().lower()[:200]
         r = c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'", (em,)).fetchone()
@@ -427,7 +429,6 @@ def wsh_revoke(sid):
 @app.post("/api/wiki/shares/<int:sid>/restore")
 def wsh_restore(sid):
     """Undo of a revoke (the same token: the link works again)."""
-    from ..lists.public import public_links_on
     c = db()
     r = wsh_need(c, sid)
     if r["kind"] == "link" and not public_links_on(c):
@@ -566,8 +567,6 @@ def wsh_send(c, f, public):
     """A shared file like wikiatt.wka_get (SVG in a sandbox, a file found infected stays locked); public: never cached."""
     import os
     from ..files.scan import sc_guard
-    from ..tasks.attachments import send_stored
-    from .wikiatt import SVG
     sc_guard(c, "wiki", f["id"])
     if f["mime"] != SVG:
         resp = send_stored(f)
@@ -593,7 +592,6 @@ def wsh_send(c, f, public):
 def wsh_find(c, token):
     """The live link share of a token (its space open, its owner / maker still active and, in an organisation, still a
     member) or None. Then the request reads as nobody, bound to exactly the share's organisation (like the list links)."""
-    from ..lists.public import PUB_ACTOR, PUB_TOKEN_RE, public_links_on
     if not PUB_TOKEN_RE.fullmatch(token or "") or not public_links_on(c):
         return None
     with system_ctx(c):  # resolve the token (one row) across organisations; nothing else is read here
@@ -624,9 +622,6 @@ def wsh_lang(c, s):
 
 def wsh_open(c, token, files=False):
     """Common checks of every /s/w/ request -> (share, None) or (None, response): the rate limits of the list links."""
-    from ..lists.custview import CV_FILE_RATE
-    from ..lists.public import PUB_BAD_LIMIT, PUB_VIEW_RATE, pub_gone, pub_limited
-    from ..notify.alerts import aa_count
     ip = rate_ip()
     if hit_limit(("pubf:" if files else "pubv:") + ip, CV_FILE_RATE if files else PUB_VIEW_RATE):
         return None, pub_limited(_accept_lang())
@@ -649,7 +644,6 @@ def wsh_seen(c, s):
 @app.get("/s/w/<token>")
 @app.get("/s/w/<token>/p/<int:pid>")
 def wsh_pub_page(token, pid=None):
-    from ..lists.public import pub_gone, pub_html
     c = db()
     s, bad = wsh_open(c, token)
     if bad:
@@ -698,7 +692,6 @@ def wsh_pub_page(token, pid=None):
 
 @app.get("/s/w/<token>/file/<int:fid>")
 def wsh_pub_file(token, fid):
-    from ..lists.public import pub_gone
     c = db()
     s, bad = wsh_open(c, token, files=True)
     if bad:

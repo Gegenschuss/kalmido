@@ -28,6 +28,11 @@ from .doclang import DOC_LANGS  # 2.185.0 C (#2520)
 from .doctpl_samples import sample_langs, sample_text  # 2.449.0 (#3768)
 from .model import LTX_KIND, office_create, office_ctx, office_row, office_rows, office_update  # 2.424.0 B (#3450)
 from ..docs.maillink import ml_token_new  # 2.424.0 B (#3450)
+from .model import pb_owner, pb_personal  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_company, ofx_log  # 2.369.5 (#2517): pulled up from functions
+from .doctpl import dt_lang  # 2.369.5 (#2517): pulled up from functions
+from .invoices import _mail, h6c_send_budget  # 2.369.5 (#2517): pulled up from functions
+from .letterlinks import ltl_link  # 2.369.5 (#2517): pulled up from functions
 
 LTM_MAIL_RE = r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+"
 LTM_MSGID_RE = re.compile(r"<[^<>\s]{3,250}>")
@@ -40,7 +45,6 @@ LTB_NOTE = N_("Sample text, no legal advice.")
 def ltm_space(c, oid, uid):
     """(user id, org id or None) of the documents space that belongs to office area oid for person uid: a personal office
     -> its owner's private space, an organisation -> uid's space of that organisation (like office/doctpl.py dt_file)."""
-    from .model import pb_owner
     owner = pb_owner(c, oid)
     return (owner, None) if owner is not None else (uid, oid)
 
@@ -139,13 +143,11 @@ def ltm_token_space(c, tok):
 
 
 def ltm_company_mail(c, oid):
-    from .ledger import ofx_company
     v = ofx_company(c, oid).get("email") or ""
     return v if re.fullmatch(LTM_MAIL_RE, v) else ""
 
 
 def ltm_default_text(c, oid, d, lg):
-    from .ledger import ofx_company
     who = ofx_company(c, oid).get("name") or ""
     u = getattr(g, "user", None)
     if not who and u is not None and "display_name" in u.keys():
@@ -155,7 +157,6 @@ def ltm_default_text(c, oid, d, lg):
 
 
 def ltm_lang(c, oid, d):
-    from .doctpl import dt_lang
     return dt_lang(c, oid, d.get("lang") if d.get("lang") in DOC_LANGS else None)  # 2.185.0 C (#2520): every app language
 
 
@@ -198,8 +199,6 @@ def ltm_drop_filed(c, nid):
 def ltm_send_post(lid):
     """{to?, cc?, subject?, text?} mails draft lid with its PDF (to = the recipient's e-mail by default), keeps the Message-ID
     and marks it sent (channel email). 400 without a mail server / not a draft / no address; 409 when the server refuses."""
-    from .invoices import _mail, h6c_send_budget
-    from .ledger import ofx_log
     from .mailsig import ofm_mail, ofm_reply, ofm_sender
     c, uid, oid = lt_ctx()
     b = body() or {}
@@ -270,7 +269,6 @@ def ltm_link_replies(c, uid, org, msg, node_ids, letter=None):
     if org:
         oid = int(org)
     else:
-        from .model import pb_personal
         oid = pb_personal(c, uid, create=False)
         if not oid:
             return 0
@@ -280,7 +278,6 @@ def ltm_link_replies(c, uid, org, msg, node_ids, letter=None):
         rows += c.execute("SELECT id FROM office_letters WHERE id=? AND org_id=?", (letter, oid)).fetchall()
     if not rows:
         return 0
-    from .letterlinks import ltl_link
     n = 0
     for r in rows:
         for nid in node_ids:
@@ -383,7 +380,6 @@ def ltb_list():
 @app.get("/api/office/letter-blocks/starters")
 def ltb_starters_get():
     """?lang= (default: the office's document language) -> {starters: [{key, name, lang, body}], note}."""
-    from .doctpl import dt_lang
     c, uid, oid = lt_ctx()
     lg = dt_lang(c, oid, request.args.get("lang") or None)
     return jsonify(starters=[{"key": k, "name": sample_text(v, lg)[0], "lang": lg, "body": sample_text(v, lg)[1]} for k, v in LTB_STARTERS.items()],
@@ -393,7 +389,6 @@ def ltb_starters_get():
 @app.post("/api/office/letter-blocks")
 def ltb_post():
     """{name, body} or {starter: cancel|objection|reminder|extension, lang?} (a sample as own block) -> 201."""
-    from .doctpl import dt_lang
     c, uid, oid = ltb_ctx()
     b = body()
     if not isinstance(b, dict):

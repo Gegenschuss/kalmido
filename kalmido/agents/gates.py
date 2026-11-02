@@ -21,6 +21,9 @@ from ..accounts.session import me
 from ..core.access import Denied, list_role, need_collab, task_visible, tvis
 from ..core.errors import BadInput, UnknownFields
 from ..tasks.oneway import DEPLOY_TAG, gate_irreversible, irreversible_open  # noqa: F401  (irreversible_open: the name other modules use here)
+from ..collab.comments import comment_plain, need_live_comment, user_names  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import agent_emit, agent_task_data, is_agent, is_approver  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
 
 GATE_KINDS = ("integrate", "deploy")
 GATE_REF_MAX, GATE_TEXT_MAX, GATE_INTEGRATIONS_MAX, CHECKLIST_MAX = 200, 4000, 50, 100
@@ -133,9 +136,6 @@ def gate_event(sug):
 def gate_decide_route(cid):
     """{decision: approve | reject, skip_checklist?: bool} -- an approver decides on an agent's integrate / deploy request
     (the same as 👍 / 👎; skip_checklist approves a deploy request although tasks tagged deploy are still open)."""
-    from ..collab.comments import comment_plain, need_live_comment, user_names
-    from ..agents.core import agent_emit, agent_task_data, is_agent, is_approver
-    from ..tasks.validation import log_act
     need_collab()
     c, b = db(), body()
     k, _ = need_live_comment(c, cid)

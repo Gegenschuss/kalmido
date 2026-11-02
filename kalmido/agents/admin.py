@@ -15,7 +15,7 @@ from ..accounts.pictures import avatar_drop_file, ALL_PRESETS
 from ..accounts.colors import ac_assign
 from ..accounts.orgs import has_workspaces, is_org_admin  # 2.361.4 (#2928)
 from ..accounts.login import seal, unseal
-from ..core.access import Denied
+from ..core.access import Denied, joined_lists_sql
 from ..core.serializers import unlink_files
 from ..core.state import visible_lists
 from ..lists.ownership import owner_transfer
@@ -32,9 +32,13 @@ from ..agents.control import ctl_new  # 2.235.0 A (#2891): a new agent asks befo
 from ..api.v1 import API_ON, need_api, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, token_public, WH_ON
 from ..integrations.webhooks import need_wh, wh_allow, wh_err_text, wh_log, wh_public, wh_send, wh_url_check
 from ..agents.core import (
-    agent_active, agent_emit, AGENT_EVENTS, AGENT_NOTE_MAX, agent_public, agent_row, agent_runtime, is_agent,
+    agent_active, agent_emit, AGENT_EVENTS, AGENT_NOTE_MAX, agent_public, agent_row, agent_runtime, is_agent, need_person,
     perm_user_ok, runtime_clean, RUNTIME_DEFAULTS, runtime_derived,
 )
+from ..accounts.orgs import main_org, user_orgs, org_member_add  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.colors import ac_valid  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import user_orgs_full, need_org_write  # 2.369.5 (#2517): pulled up from functions
+from ..core.access import acx_drop  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---- agents: admin (Settings > Users > Agents)
@@ -166,7 +170,6 @@ def admin_agents():
     """Every agent for the administration. 2.28.0 (#965): a personal agent of somebody else comes restricted (name, owner,
     kill switch); in the mode workspaces only agents of people the admin may see."""
     from ..api.scopes import scopes_offer
-    from ..accounts.users import admin_sees
     need_admin()
     c = db()
     rows = c.execute("""SELECT a.*, u.username, u.display_name, u.avatar, u.disabled FROM agents a JOIN users u ON u.id=a.user_id
@@ -525,7 +528,6 @@ def agent_org_set(c, aid, v):
     """2.28.0 (#935): the workspace an agent works in: null / 'private' = private, an organisation id, 'auto' = the first
     organisation of its owner (a team agent: the instance's first one). Checked: a personal agent only in an organisation its
     owner belongs to. Nothing without organisations."""
-    from ..accounts.orgs import has_workspaces, main_org, user_orgs
     if not has_workspaces(c):
         return
     with system_ctx(c):  # 2.37.0 (#1150): placing an agent is organisation structure; the rules below check who may
@@ -540,8 +542,8 @@ def _agent_rgroups_drop(c, oid, aid):
 
 def _agent_ws_check(c, aid, v):
     """BadInput while agent aid is still in projects, calendars or address books of another workspace than v (None = private)."""
-    n = c.execute("""SELECT COUNT(*) FROM lists l WHERE COALESCE(l.org_id,0)!=? AND l.is_inbox=0 AND (l.owner_id=? OR l.id IN
-                     (SELECT list_id FROM list_members WHERE user_id=?))""", (v or 0, aid, aid)).fetchone()[0]
+    n = c.execute(f"""SELECT COUNT(*) FROM lists l WHERE COALESCE(l.org_id,0)!=? AND l.is_inbox=0 AND l.id IN {joined_lists_sql()}""",
+                  (v or 0, aid, aid)).fetchone()[0]
     if n:
         raise BadInput(tr("The agent is still in {0} projects of another workspace: take it out of them first", n))
     # 2.30.0 (#1036): calendars and address books follow the same rule
@@ -555,7 +557,6 @@ def _agent_ws_check(c, aid, v):
 def _agent_org_set(c, aid, v, main_org, user_orgs):
     a = agent_row(c, aid)
     if v == "auto":
-        from ..accounts.orgroles import user_orgs_full
         oids = user_orgs_full(c, a["owner_id"], write=True) if a["owner_id"] else []  # 2.143.0 A (#2151)
         if a["owner_id"]:  # 2.361.4 (#2928): the first organisation that lets it have an agent, else its private area
             oids = [o for o in oids if agent_ws_allowed(c, a["owner_id"], o)]
@@ -569,7 +570,6 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
         if a["org_id"]:  # 2.46.0 (#1592, review fix): a private agent is no member of its former organisation
             c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (a["org_id"], aid))
             _agent_rgroups_drop(c, a["org_id"], aid)
-            from ..core.access import acx_drop
             acx_drop()
         return
     if isinstance(v, bool) or not isinstance(v, int) or not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL AND retired_at IS NULL", (v,)).fetchone():  # 2.47.3 (#1360)
@@ -577,7 +577,6 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
     if a["owner_id"] and v not in user_orgs(c, a["owner_id"]):
         raise BadInput(tr("The owner of this agent is not a member of that organisation"))
     if a["owner_id"]:
-        from ..accounts.orgroles import need_org_write
         need_org_write(c, a["owner_id"], v)  # 2.143.0 A (#2151): agents work only for members / admins of an organisation
         if (a["org_id"] or None) != v and not agent_ws_allowed(c, a["owner_id"], v):  # 2.361.4 (#2928): its admins decide
             raise BadInput(tr("This organisation does not let members have their own agents (its admins can allow it)"))
@@ -590,7 +589,6 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
     if a["org_id"] and a["org_id"] != v:
         c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (a["org_id"], aid))
         _agent_rgroups_drop(c, a["org_id"], aid)
-    from ..accounts.orgs import org_member_add
     org_member_add(c, v, aid)
 
 
@@ -680,8 +678,7 @@ def my_agents_get():
     """My personal agents + whether I may create (more)."""
     from ..api.scopes import scopes_offer
     c = db()
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot use this endpoint"))
+    need_person(403, tr("Agents cannot use this endpoint"))
     pol = agent_policy(c)
     ags = my_agents(c, me())
     return jsonify(allowed=agent_ws_allowed_any(c, me()) and API_ON, max=pol["max_per_user"], count=len(ags), agents=ags, api=API_ON,
@@ -694,8 +691,7 @@ def my_agent_create():
     """{username, display_name?, note?} -> my new personal agent + its API token (shown this once)."""
     from ..api.scopes import agent_scopes_set
     c = db()
-    if is_agent(g.user):
-        raise Denied(403, tr("Agents cannot use this endpoint"))
+    need_person(403, tr("Agents cannot use this endpoint"))
     need_api()
     pol = agent_policy(c)
     if not agent_ws_allowed_any(c, me()):  # 2.361.4 (#2928): with organisations the workspace decides (agent_org_set)
@@ -826,8 +822,7 @@ def agent_perm_users(aid):
     {team, current, people: [{id, name}]}. A personal agent: its owner only. A team agent: active people it reaches in the
     chat (perm_user_ok) whom the asking admin sees. Instance admins (agents they see) and the owner; nobody else (404)."""
     c = db()
-    if is_agent(g.user):
-        raise Denied(404)
+    need_person(404)
     with system_ctx(c):  # the instance admin reaches agents of every organisation (structure, no content)
         a = agent_row(c, aid)
         if not a or not (a["owner_id"] == me() or (not a["owner_id"] and g.user["is_admin"] and admin_sees(c, aid))):
@@ -835,7 +830,7 @@ def agent_perm_users(aid):
         if a["owner_id"]:
             ids = [a["owner_id"]]
         else:
-            its = "SELECT id FROM lists WHERE deleted_at IS NULL AND (owner_id=? OR id IN (SELECT list_id FROM list_members WHERE user_id=?))"
+            its = f"SELECT id FROM lists WHERE deleted_at IS NULL AND id IN {joined_lists_sql()}"
             ids = [r[0] for r in c.execute(f"""SELECT user_id FROM list_members WHERE list_id IN ({its})
                                                UNION SELECT owner_id FROM lists WHERE id IN ({its})""", (aid, aid, aid, aid))]
             ids = [x for x in ids if x and x != aid and (x == me() or admin_sees(c, x)) and perm_user_ok(c, a, x)]
@@ -848,11 +843,8 @@ def agent_perm_users(aid):
 def ac_agent_color(aid):
     """2.47.1 (#1721): {color} -- the fixed colour of an agent (a colour of the palette). Instance admins, the owner of a
     personal agent and the admins of the agent's organisation change it; nobody else (404, like an unknown agent)."""
-    from ..accounts.colors import ac_valid
-    from ..accounts.orgs import is_org_admin
     c = db()
-    if is_agent(g.user):
-        raise Denied(404)
+    need_person(404)
     with system_ctx(c):  # the instance admin reaches agents of every organisation (structure, no content)
         a = agent_row(c, aid)
     uid = me()

@@ -17,6 +17,8 @@ from ..core.access import Denied
 from ..core.retention import ret_on, ret_report, ret_trash_cut
 from ..tasks.atttrash import atr_tick  # 2.272.0 E2 (#3038)
 from ..office.otrash import otb_tick  # 2.272.0 E2 (#3038)
+from ..files.store import fs_purge, fs_purge_files  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
 
 TP_TICK = {"at": 0.0}
 # 2.239.0 D (#2874): nor a client with a signed data protection sheet (clients_bulk.ms_client_in_use), on top of cl_hold_sql()
@@ -59,7 +61,6 @@ def tp_cut():
 
 def tp_files(c, cut, purge):
     """File-store nodes in the trash since before cut. -> (purged or due, locked, paths, ids) -- files after the commit."""
-    from ..files.store import fs_purge
     due = locked = 0
     paths, ids = [], []
     for (nid,) in c.execute("SELECT id FROM fs_nodes WHERE deleted_at IS NOT NULL AND deleted_at<? ORDER BY deleted_at, id",
@@ -105,8 +106,6 @@ def tp_tick(c, force=False):
     if not force and time.time() - TP_TICK["at"] < 3600:
         return {}
     TP_TICK["at"] = time.time()
-    from ..core.pg import system_ctx
-    from ..files.store import fs_purge_files
     purge, cut, counts = ret_on("trash"), tp_cut(), {}
     with system_ctx(c):  # the trash of every organisation and private space (row-level security); nothing is handed to a person
         counts["files"], counts["files_locked"], paths, ids = tp_files(c, cut, purge)

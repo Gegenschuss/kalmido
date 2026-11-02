@@ -23,6 +23,8 @@ from .fsroots import fs_area_folder_name, fs_area_of  # 2.200.0 A (#2747, review
 from .fsref import fs_ref_content  # 2.199.0 A (#2742)
 from .fstags import DT_HITS, dt_attach, dt_where  # 2.443.0 (#2338)
 from .web import fs_agent_folder, fs_node_json, _crumbs, _items, _send, _versions
+from ..tasks.attachtext import text_of_bytes  # 2.369.5 (#2517): pulled up from functions
+from ..core.db import insert_id  # 2.369.5 (#2517): pulled up from functions
 
 V1_TEXT_MAX = 20 * 1024 * 1024  # bytes a request may send as content / content_base64
 
@@ -161,7 +163,6 @@ def v1_file_text(nid):
     _area_scope(c, nid)  # 2.200.0 F (#1781): a page's text needs wiki:read
     if n["kind"] not in ("file", "link", "ref"):
         raise Denied(409, tr("Not a file"))
-    from ..tasks.attachtext import text_of_bytes
     if n["kind"] == "ref":  # 2.199.0 A (#2742): the text of a filed document (its area's content hook)
         data, name, mime = fs_ref_content(c, me(), n)
     else:
@@ -229,7 +230,6 @@ def v1_file_create():
     added = 0  # 2.353.0 D (#2759)
     if kind == "folder":
         owner, org = _place(c, uid, pid, None)
-        from ..core.db import insert_id
         ts = _now()
         nid = insert_id(c, "INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
                         (pid, "folder", fs_area_folder_name(c, pid, owner, org, safe_fs_name(name)), owner, org, uid, ts, ts))  # 2.200.0 A (#2747, review 6)

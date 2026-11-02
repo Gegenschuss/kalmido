@@ -15,6 +15,8 @@ from ..accounts.session import me
 from ..docs import store as S
 from ..docs.web import _no_agent, ws_param
 from . import ngx as P
+from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
+from ..admin.hosting import QuotaExceeded, quota_info  # 2.369.5 (#2517): pulled up from functions
 
 
 def _gate():
@@ -28,7 +30,6 @@ def _ws(c, raw, manage=True):
 
 
 def _public(c, ws, uid, org):
-    from ..accounts.orgs import is_org_admin
     r = P.pl_row(c, ws)
     can = bool(is_org_admin(c, uid, org)) if org else True
     from ..admin.hosting import hosted
@@ -179,7 +180,6 @@ def pl_import_start():
     run_ws = P.pl_run_target(c, uid, _org, ws, d.get("target"))
     if r["run_state"] in ("queued", "busy", "stop"):
         return err(tr("An import is already running"), 409)
-    from ..admin.hosting import QuotaExceeded, quota_info
     q = quota_info(c, uid)
     if q and q["limit"] and q["used"] >= q["limit"]:  # 2.69.0 A (#1846): full = nothing could come in
         raise QuotaExceeded(q)

@@ -21,6 +21,10 @@ from ..core.db import insert_id, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, list_role
 from ..core.errors import BadInput
+from ..core.orgcrypt import oc_copy_file, oc_user_space, oc_task_org, oc_task_space  # 2.369.5 (#2517): pulled up from functions
+from .lists import LIST_COLOR_RE  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.tasks import check_assignee  # 2.369.5 (#2517): pulled up from functions
+from ..lists.groups import check_group_assignee  # 2.369.5 (#2517): pulled up from functions
 
 TX_MAX_FILES, TX_MAX_BYTES = 500, 1024 ** 3  # per request: the copy runs inside it
 TX_MAX_ROWS = 500  # 2.463.0 (#3860): per part of an imported extra
@@ -94,7 +98,6 @@ def tx_collect(c, uid, lid, order, base, x, dup=False, fidx=None, ftypes=None):
 def _copy(c, uid, f, rel, sid, st):
     """Writes the copy of file f at rel for space sid; False = skipped (named in st)."""
     from ..admin.hosting import quota_fits
-    from ..core.orgcrypt import oc_copy_file
     size, src = int(f["size"] or 0), os.path.join(ATT_DIR, f["path"])
     if st["n"] >= TX_MAX_FILES or st["bytes"] + size > TX_MAX_BYTES or not os.path.isfile(src) or not quota_fits(c, uid, size):
         st["skipped"].append(f["name"])
@@ -110,7 +113,6 @@ def _copy(c, uid, f, rel, sid, st):
 
 def tx_store(c, uid, tpl, x, st):
     """A new template: its own copies of the files; the rest of x goes into templates.extra."""
-    from ..core.orgcrypt import oc_user_space
     st["skipped"] += x.pop("skipped", [])
     for k, n in x.get("nodes", {}).items():
         for f in n.pop("files", []):
@@ -164,7 +166,6 @@ def _tx_rows(v):
 
 def _tx_list_in(p):
     """The list's part of an imported x, rebuilt field by field (tx_apply takes it as it stands)."""
-    from .lists import LIST_COLOR_RE
     from .projects import ov_link_clean
     txt = lambda v, n: v.strip()[:n] if isinstance(v, str) else ""  # noqa: E731
     wip = p.get("wip") if isinstance(p.get("wip"), dict) else {}
@@ -285,7 +286,6 @@ def _ok(check, *a):
 
 
 def _files(c, uid, tid, fs, st):
-    from ..core.orgcrypt import oc_task_org, oc_task_space
     from ..files.upsafe import up_after_store
     for f in fs:
         rel = os.path.join(str(tid), f"{uuid.uuid4().hex[:12]}-{f['name']}")
@@ -311,8 +311,6 @@ def _place(c, tid, lid):
 
 def tx_apply(c, uid, lid, x, made, st, start=None, scale=1.0, fmap=None):
     """x onto the new tasks made {node key: id} in list lid (after list_created: its people count). The caller commits."""
-    from ..tasks.tasks import check_assignee
-    from ..lists.groups import check_group_assignee
     from .fields import field_value
     st["skipped"] += x.get("skipped", [])
     smap = _list_part(c, uid, lid, x["list"], start, scale) if x.get("list") else {}

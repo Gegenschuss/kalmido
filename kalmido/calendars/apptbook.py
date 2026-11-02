@@ -34,6 +34,12 @@ from ..core.errors import BadInput
 from ..core.mailframe import mail_html
 from ..tasks.validation import as_int, valid_date, valid_hm
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.orgs import user_orgs  # 2.369.5 (#2517): pulled up from functions
+from ..notify.alerts import aa_count  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.session import _accept_lang  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.login import auth_key  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import notif_ok, news_add  # 2.369.5 (#2517): pulled up from functions
+from ..notify.push import push_prio  # 2.369.5 (#2517): pulled up from functions
 
 APB_PREFIX = "/s/b/"
 # 2.360.0 D (#2496): the booking name goes into the confirmation mail to the typed address -- nothing that reads as a link or
@@ -150,7 +156,6 @@ def apb_offices(c, uid):
     """[{id, name, personal}] the office areas uid may put leads into: the personal office and the organisations where uid is
     an admin of the office (only with the module Office on)."""
     from ..office.model import office_on, office_role, pb_personal
-    from ..accounts.orgs import user_orgs
     if not office_on(c, uid):
         return []
     out = [{"id": pb_personal(c, uid, create=False) or "personal", "name": tr("Private office"), "personal": True}]
@@ -631,7 +636,6 @@ def apb_retired(c, p):
 def apb_open(c, slug):
     """(page, None) or (None, the 404 / rate-limit answer): the same answer for unknown and switched-off pages."""
     from ..lists.public import pub_gone, pub_limited
-    from ..notify.alerts import aa_count
     ip = rate_ip()
     if hit_limit("apbv:" + ip, APB_VIEW_RATE):
         return None, pub_limited(apb_lang_hdr())
@@ -648,7 +652,6 @@ def apb_open(c, slug):
 
 
 def apb_lang_hdr():
-    from ..accounts.session import _accept_lang
     return _accept_lang()
 
 
@@ -769,7 +772,6 @@ def apb_pub_times(slug, tid):
 
 
 def apb_form_key(c, p, tid, slot):
-    from ..accounts.login import auth_key
     return hmac.new(auth_key(c), f"apb:{p['user_id']}:{p['slug']}:{tid}:{slot}".encode(), hashlib.sha256).hexdigest()
 
 
@@ -889,7 +891,6 @@ def apb_limit_note(c, uid, day):
     if not c.execute("""INSERT INTO mail_counts(k,day,n) VALUES(?,?,1) ON CONFLICT(k) DO UPDATE SET day=excluded.day
                         WHERE mail_counts.day<>excluded.day RETURNING k""", (f"apbn:{uid}", day)).fetchone():
         return
-    from ..collab.news import notif_ok
     with system_ctx(c):  # the owner's own notice; the public page has no person signed in, the notice names no customer
         if not notif_ok(c, uid, usettings(c, uid), "limits", "news"):  # 2.453.0 (#3781): can be switched off
             return
@@ -934,7 +935,6 @@ def PUB_TOKEN_OK(token):  # noqa: N802
 
 def apb_bad_token():
     from ..lists.public import pub_gone, pub_limited
-    from ..notify.alerts import aa_count
     ip = rate_ip()
     bad = [("pubbad:" + ip, APB_BAD_LIMIT)]
     if _rate_blocked(bad):
@@ -945,7 +945,6 @@ def apb_bad_token():
 
 
 def apb_tok_key(c, r, what):
-    from ..accounts.login import auth_key
     return hmac.new(auth_key(c), f"apb{what}:{r['id']}:{r['created_at']}".encode(), hashlib.sha256).hexdigest()
 
 
@@ -1186,9 +1185,7 @@ def apb_mail_line(c, bid, uid, lg):
 def apb_push(c, r, what):
     """News, mail (2.367.2, #2969) + push to the person (the switch "assign" like an event invitation): a new confirmed booking /
     a cancel by the customer. Without a push device a booking used to stay unnoticed."""
-    from ..collab.news import news_add, notif_ok
     from ..notify.channels import evm_note
-    from ..notify.push import push_prio
     uid = r["user_id"]
     s = usettings(c, uid)
     lg = lang_of(s)

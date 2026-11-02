@@ -35,6 +35,10 @@ from .vars import (SH_HERE_WORDS, SH_VAR_TYPE, sh_field_key, sh_field_word, sh_f
 from .shkinds import SHK_KINDS, shk_plain, shk_raw  # 2.124.0 B (#2110): checkbox, person, link, file
 from .shbook import (shb_cell_stats, shb_counts, shb_deleted, shb_dict, shb_display, shb_internal, shb_only_books, shb_pairs, shb_rights_row,
                      shb_check, shb_touch)  # 2.124.0 E (#2116): several sheets in one table
+from ..accounts.orgs import user_orgs  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import need_org_area, org_sees_all, org_readonly, user_orgs_full  # 2.369.5 (#2517): pulled up from functions
+from .shhist import shh_log  # 2.369.5 (#2517): pulled up from functions
+from .vars import SH_FIELD_HELP, sh_sources, _agent_cap  # 2.369.5 (#2517): pulled up from functions
 
 SH_KINDS = ("text", "number", "currency", "percent", "date", "select") + SHK_KINDS  # 2.124.0 B (#2110): + checkbox, person, link, file
 SH_COLOR_MODES = ("cell", "row")
@@ -84,10 +88,8 @@ def sh_space(c, uid, v):
         if not a or a[0] != oid:
             raise Denied(404)
         return oid
-    from ..accounts.orgs import user_orgs
     if oid not in user_orgs(c, uid):
         raise Denied(404)
-    from ..accounts.orgroles import need_org_area
     need_org_area(c, uid, oid)  # 2.143.0 A (#2151): guests / accounting 404, read-only only reads
     return oid
 
@@ -120,7 +122,6 @@ def _sh_may(c, uid, r, write, share):
     if r is None:
         return False
     if write and r["org_id"] and not sh_is_agent(c, uid):
-        from ..accounts.orgroles import org_readonly
         if org_readonly(c, uid, r["org_id"]):
             return False  # 2.143.0 A (#2151): read-only changes nothing of the organisation (also with a share)
     if share:  # 2.124.0 C (#2113): a share of this one table adds to the rights below (sheets/shshare.py)
@@ -133,7 +134,6 @@ def _sh_may(c, uid, r, write, share):
             role = list_role(c, l["id"], uid)
             if not role or l["e2e"] is not None:
                 return False
-            from .vars import _agent_cap
             cap = _agent_cap(c, uid)
             if cap is not None and l["id"] not in cap:
                 return False
@@ -146,7 +146,6 @@ def _sh_may(c, uid, r, write, share):
         return bool(role) and (not write or role in WRITE_ROLES)
     if r["org_id"] is None:
         return r["owner_id"] == uid
-    from ..accounts.orgroles import org_sees_all
     return org_sees_all(c, uid, r["org_id"]) and acx_org_ok(c, uid, r["org_id"])  # 2.143.0 A (#2151): not guests / accounting
 
 
@@ -999,7 +998,6 @@ def sh_check_list(c, oid, list_id, uid):
     if l["e2e"] is not None:
         raise BadInput(tr("Tables cannot be attached to a project with a lock"))
     if sh_is_agent(c, uid):
-        from .vars import _agent_cap
         cap = _agent_cap(c, uid)
         if cap is not None and list_id not in cap:
             raise Denied(404)
@@ -1263,7 +1261,6 @@ def _store(c, book, sid, rid, cid, raw, uid, ts, agent_id, batch):
                            "VALUES(?,?,?,?,?,?,?,?)", (sid, rid, cid, raw, uid, ts, agent_id, batch))
         book._add(dict(c.execute("SELECT * FROM sheet_cells WHERE id=?", (xid,)).fetchone()))
     sh_change(c, sid, batch, agent_id, "cell", cell_id=xid, row_id=rid, col_id=cid, old=old, new=raw)
-    from .shhist import shh_log  # 2.124.0 B (#2112)
     shh_log(c, book, xid, rid, cid, old, raw, uid, agent_id, ts)  # 2.124.0 B (#2112): people's changes too
     return xid
 
@@ -1421,7 +1418,6 @@ def sh_need_cell(c, sheet_row, cid):
 def sh_vars(c, sheet_row, uid, q=""):
     """The completion after "=": the sheet's cell names and column names, the projects / lists / clients uid may use here
     (with their fields), hier.<field>, the functions -- filtered by q."""
-    from .vars import SH_FIELD_HELP, sh_sources
     book = ShBook(c, sheet_row)
     res = sh_eval(c, sheet_row, book, uid)
     lg = lang()
@@ -1484,12 +1480,10 @@ def sh_index(c, uid, space=None, list_id=None):
         rows = c.execute("SELECT * FROM sheets WHERE deleted_at IS NULL AND list_id=? ORDER BY lower(title), id LIMIT 500",
                          (list_id,)).fetchall()
     elif space in (None, "", "all"):
-        from ..accounts.orgs import user_orgs
         if agent:  # 2.89.0 C (#1916): an agent only in its own workspace
             a = c.execute("SELECT org_id FROM agents WHERE user_id=?", (uid,)).fetchone()
             orgs = str(int(a[0])) if a and a[0] else ""
         else:
-            from ..accounts.orgroles import user_orgs_full
             orgs = ",".join(str(int(x)) for x in user_orgs(c, uid) if x in user_orgs_full(c, uid))  # 2.143.0 A (#2151)
         lids = [r[0] for r in c.execute("SELECT DISTINCT list_id FROM sheets WHERE deleted_at IS NULL AND list_id IS NOT NULL").fetchall()
                 if list_role(c, r[0], uid)]

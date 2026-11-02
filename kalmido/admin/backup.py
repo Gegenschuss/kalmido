@@ -47,6 +47,12 @@ from ..notify.push import _b64u, _b64u_dec, _VAPID
 from ..notify.alerts import _clamp_int, _env_int, aa_count, aa_disk, aa_now, aa_oserr, aa_switch
 from ..calendars.subscriptions import _CAL_KEY
 from . import bkstore as bks  # 2.432.0 (#3584): the shared file store
+from ..core.retention import ret_days, ret_on, ret_report  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.users import user_purge  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgretain import odl_dismantle  # 2.369.5 (#2517): pulled up from functions
+from ..lists.lists import list_purge  # 2.369.5 (#2517): pulled up from functions
+from .migrate import is_kalmido_sqlite  # 2.369.5 (#2517): pulled up from functions
+from ..core.orgcrypt import oc_plain_size  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- backups + restore (admins)
@@ -700,7 +706,6 @@ def bk_prune(c):
     have one, the newest per ISO week for keep_weekly weeks, the last BK_SAFETY_KEEP safety backups. Returns the
     deleted names. 2.152.0 B (#2172): keep_weekly at most BK_KEEP_WEEKLY_MAX; a safety backup older than ret_days("backups")
     goes even among the last ones -- only while ret_on("backups"), else it is counted (ret_report; the caller commits)."""
-    from ..core.retention import ret_days, ret_on, ret_report
     daily = _clamp_int(gsetting(c, "bk_keep_daily"), 1, 365, 14)
     # 2.152.0 review F3: an older setting above the cap is cut to it only with the switch (an update never deletes by surprise)
     weekly = _clamp_int(gsetting(c, "bk_keep_weekly"), 0, BK_KEEP_WEEKLY_MAX if ret_on("backups") else BK_KEEP_WEEKLY_CAP, 8)
@@ -855,7 +860,6 @@ def bkr_daily_prune(c):
 
 
 def backup_tick(c):
-    from ..core.retention import ret_on
     if BK_ON_ENV and (gsetting(c, "bk_on") == "1" or ret_on("backups")):
         bkr_daily_prune(c)  # 2.152.0 B (#2172); review F3: with the schedule off only with the switch (manual backups stay)
     if not BK_ON_ENV:
@@ -1407,7 +1411,6 @@ def bk_prepare(path, pw, work, att_dest=None, office_dest=None, restore=False, p
         man["db"] = bk_scan_dump(dbp)
         man["key_state"] = bk_key_state(man)  # 2.359.3 (#2893)
     elif restore:
-        from .migrate import is_kalmido_sqlite
         if not is_kalmido_sqlite(dbp):
             raise BackupError("legacy")
     return man, dbp
@@ -1627,14 +1630,12 @@ def bkr_purged_drop(c, tbl, rid):
     """Row rid of tbl goes again; -> the files for unlink_files. Stored files of tasks and projects go along; the other
     tables keep theirs in rows that cascade and in the storage sweep."""
     if tbl == "orgs":
-        from ..accounts.orgretain import odl_dismantle
         return odl_dismantle(c, rid)
     if tbl == "fs_nodes":
         from ..files.store import fs_purge, fs_purge_files
         ids, paths = fs_purge(c, rid)
         return [lambda: fs_purge_files(ids, paths)]
     if tbl == "lists":  # as the owner's delete: the tasks go to the trash of the inbox, what became of them has its own rows
-        from ..lists.lists import list_purge
         inbox = c.execute("SELECT i.id FROM lists i JOIN lists l ON l.owner_id=i.owner_id WHERE l.id=? AND i.is_inbox=1", (rid,)).fetchone()
         return list_purge(c, rid, inbox[0] if inbox else None)[1]
     files = []
@@ -1690,8 +1691,6 @@ def bkr_after_restore(c, rows):
     lists besides its inbox is only disabled (the lists were handed over or deleted at the time; which, the backup does not
     know): the admin decides. -> (deleted again, disabled as owners or after a failure, disabled as deleted recently; 2.186.0 C
     #2602: counted apart). The caller commits nothing: this function does."""
-    from ..accounts.users import user_purge
-    from ..core.pg import system_ctx
     with system_ctx(c):  # the journal and the accounts of every organisation; nothing is shown to a person
         c.execute("DELETE FROM deleted_accounts")
         for r in rows:
@@ -2034,7 +2033,6 @@ def storage_check():
         for r in c.execute(sql):
             n += 1
             full = os.path.join(ATT_DIR, r["path"] or "")
-            from ..core.orgcrypt import oc_plain_size
             disk = oc_plain_size(full) if r["path"] and os.path.isfile(full) else None  # 2.42.0 (#828): sealed = plain size
             if disk is None or (r["size"] and disk != r["size"]):
                 out.append({"kind": kind, "id": r["id"], "owner": r["owner"], "where": "" if apart else r["where_"] or "",

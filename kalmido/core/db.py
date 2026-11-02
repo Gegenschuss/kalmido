@@ -27,6 +27,8 @@ from ..core.schema import (
 )
 from ..core.i18n import LANGS, tr
 from .pg import pool_refresh, system_ctx as pg_system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from . import config  # 2.369.5 (#2517): pulled up from functions
+from .i18n import N_  # 2.369.5 (#2517): pulled up from functions
 
 
 # 2.48.0 (#1207): modules of 2.48 that are on for everyone once (features_rev 11)
@@ -493,7 +495,6 @@ def appver_guard(stored, prev, floor=None, how=None):
 def secret_new_guard():
     """2.149.0 D (#2510): a key file created during THIS start never meets a database that already holds organisation or
     account keys (they were sealed with another server key): the new file is removed again and the start is refused."""
-    from . import config
     if not config.SECRET_KEY_NEW:
         return
     try:
@@ -632,7 +633,6 @@ def skfp_check(c, restore=False):
 def secret_need_guard(new):
     """2.149.0 D (#2510): a NEW install does not start without a server key (its data would stay unencrypted without
     anyone deciding it); KALMIDO_NO_SECRET_KEY=1 allows it (tests, demos). Existing installs only get the warning."""
-    from . import config
     if not new or config.SECRET_KEY or env_bool("KALMIDO_NO_SECRET_KEY", False):
         return
     why = {"file_in_data": "the key file lies inside the data or backup folder",
@@ -1382,7 +1382,6 @@ def init_db(guard=True, load=None):
         clk.done()
     if not rls_on:  # 2.37.0 (review W2-2): single organisation / shared: it starts, but the admins hear it at every start
         from ..notify.alerts import aa_now
-        from .i18n import N_
         aa_now("security", "rls:off", N_("Row-level security is OFF: the database user bypasses it and the role kalmido_app cannot be used. Allow the database user to create roles or create the role (see SELF-HOSTING), then restart."))
     pool_refresh()  # 2.37.0 (#1150): pooled connections opened before the app role existed would bypass row-level security
     if not os.path.exists(DATA_MARKER):  # new install, or the first start of 2.0 on a readable database

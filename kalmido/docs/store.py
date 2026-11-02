@@ -33,6 +33,12 @@ from ..files.scan import sc_locked as _sc_locked  # 2.360.0 B (#2496)
 from ..files.store import fs_chain as _fs_chain, fs_deleted as _fs_deleted, fs_role as _fs_role  # 2.199.0 B (#2742); 2.351.0 A (#2823): fs_role
 from ..files.fslock import fl_is_locked, fsl_of_chain  # 2.353.0 F (#2758)
 from ..files.store import fs_visible_sql_c as _fs_visible_sql  # 2.360.0 B (#2496)
+from ..files.store import fs_folder, _free_name, fs_chain, safe_fs_name, fs_role, DEPTH_MAX, fs_read  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import org_role_key  # 2.369.5 (#2517): pulled up from functions
+from ..core.errors import BadInput  # 2.369.5 (#2517): pulled up from functions
+from .ocr import thumb_bytes, doc_text, qr_codes  # 2.369.5 (#2517): pulled up from functions
+from ..office.einvoice_in import ei_of_file, ei_text, ei_amount, ei_details, ei_compact, ei_receipt  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
 
 STATES = ("wait", "run", "done", "failed")
 LABEL_KINDS = {"sender": "doc_senders", "type": "doc_types", "tag": "doc_tags"}
@@ -539,7 +545,6 @@ def root_folder(c, uid, org_id):
     """Find or make (and mark) the documents folder of workspace org_id (None: uid's own space) for an upload by uid.
     An organisation's folder belongs to one of its admins, whoever adds the first document: members file their documents
     into it as their own (fs_add_hooks, root_add_ok) and see only those and what is shared with them; admins see all."""
-    from ..files.store import fs_folder, _free_name
     ws = doc_ws(org_id, uid)
     rid = root_id(c, ws)
     if rid:
@@ -552,7 +557,6 @@ def root_folder(c, uid, org_id):
     else:
         if int(org_id) not in ctx.org_ids:
             raise Denied(404)
-        from ..core.pg import system_ctx
         with system_ctx(c):  # the organisation's admins (members list; uid is a member, checked above)
             a = c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=?
                              AND COALESCE(u.kind, '')!='agent' ORDER BY (m.role='admin') DESC, (m.user_id=?) DESC, m.user_id
@@ -582,7 +586,6 @@ def root_add_ok(c, uid, chain):
     ctx = acx_of(c, uid)
     if ctx.role == "agent" or top["org_id"] not in ctx.org_ids:
         return False
-    from ..accounts.orgroles import org_role_key
     if org_role_key(c, uid, top["org_id"]) in ("guest", "readonly"):  # 2.143.0 A (#2151, review): accounting uploads receipts
         return False
     return root_id(c, doc_ws(top["org_id"], None)) == top["id"]
@@ -590,7 +593,6 @@ def root_add_ok(c, uid, chain):
 
 def docs_root(c, node):
     """The id of the documents folder (the marked folder at the root of the workspace, root_id) a node sits in, or None."""
-    from ..files.store import fs_chain
     chain = fs_chain(c, node["id"])
     top = chain[-1] if chain else None
     if top and top["kind"] == "folder" and top["parent_id"] is None and top["id"] != node["id"] \
@@ -689,7 +691,6 @@ def folder_by_name(c, node, uid, name, create=True, path=False, check=False):
     documents folder (2.48.0 review: never a second "Dokumente" elsewhere).
     2.199.0 G (#2742 review): check=True (a person's request) walks only through folders uid sees (fs_role, also the hub
     mail rule) and makes a folder only where uid edits -- otherwise None and nothing made (no hidden folder, no hint)."""
-    from ..files.store import safe_fs_name, _free_name, fs_role, DEPTH_MAX
     root = docs_root(c, node)
     parts = [safe_fs_name(x[:NAME_MAX]).strip() for x in (str(name or "").split("/") if path else [str(name or "")])]
     parts = [x for x in parts if x][:DEPTH_MAX - 2]
@@ -899,7 +900,6 @@ def redo_save(c, m, nid):
 def redo_back(c, nid):
     """Puts the kept values back; values set by hand since then stay. Raises BadInput when it is too late or still running.
     The caller holds no lock: the row is locked here, so the queue cannot take it up meanwhile."""
-    from ..core.errors import BadInput
     m = c.execute("SELECT * FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,)).fetchone()
     node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
     if m["state"] == "run":
@@ -946,7 +946,6 @@ def thumb_store(c, m, node, data, kind):
     """Make the preview image of a document (sealed like its file) and note its path in doc_meta.thumb."""
     import os
     import uuid
-    from .ocr import thumb_bytes
     if kind not in ("pdf", "image"):
         return
     jpg = thumb_bytes(data, kind)
@@ -1021,8 +1020,6 @@ def doc_guesses(c, m, ws, type_id, text=""):
 def process(c, nid):
     """The recognition run of one document: text (text layer / OCR), preview, date / due date / amount, sorting, index.
     Returns the new state. Runs in the background queue (docs/ingest.py) -- never inside a request."""
-    from ..files.store import fs_read
-    from .ocr import doc_text
     m = meta_row(c, nid)
     node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
     if not m or not node:
@@ -1036,10 +1033,8 @@ def process(c, nid):
         return "failed"
     ei = None
     if not given.get("text"):
-        from ..office.einvoice_in import ei_of_file, ei_text
         ei = ei_of_file(node["name"], node["mime"], data, m["created_by"])  # 2.146.0 A (#2451): an e-invoice (XML / in a PDF)
     if given.get("text"):
-        from ..tasks.attachtext import file_kind  # 2.66.1 (#1944): the kind all the same -> preview + QR code of an import
         res = {"text": str(given["text"])[:200_000], "method": "import", "kind": file_kind(node["name"], node["mime"], data[:2048])}
     elif ei and ei["source"] == "xml":       # 2.146.0 A (#2451): the readable text of the invoice, not the XML
         res = {"text": ei_text(ei), "method": "e-invoice", "kind": "einvoice"}
@@ -1058,7 +1053,6 @@ def process(c, nid):
     text = res.get("text") or ""
     asn_found = None
     if not m["asn"]:
-        from .ocr import qr_codes
         # 2.273.0 F2 (#3047): only found here; written under the workspace lock just before the final write (the lock is not
         # held over classifying / recognising, a save with "next" does not wait for them)
         asn_found = EX.find_asn(cfg_get(c, ws)["asn_prefix"], [*qr_codes(data, res.get("kind")), text[:20000]])
@@ -1070,7 +1064,6 @@ def process(c, nid):
             "amount": str(given.get("amount") or ex["amount"] or ""), "currency": str(given.get("currency") or ex["currency"] or "")[:8]}
     auto_all = meta_json(c, m, "auto", {})
     if ei:                                   # 2.146.0 A (#2451): the e-invoice's values replace the recognition's
-        from ..office.einvoice_in import ei_amount, ei_details
         ei_det = ei_details(ei)
         ei_old = meta_json(c, m, "extracted", {}) if m["extracted"] else {}
         ei_first = not ei_old.get("_einv")  # 2.153.0 (#2055): read as an e-invoice for the first time
@@ -1161,7 +1154,6 @@ def process(c, nid):
                _now(), _now(), nid))
     from ..receipts.extracted import rx_compact
     if ei:                                   # 2.146.0 A (#2451): the e-invoice's values + the invoice for its readable view
-        from ..office.einvoice_in import ei_compact, ei_receipt
         # 2.153.0 (#2055): in an office's documents space it becomes a receipt (not an own invoice); 2.185.0 A (#2583): a
         # later run makes up a missing one (read before 2.153, moved into the office) unless it was a receipt once
         if (ei_first or not ei_rc) and ei_receipt(c, node, ws, ei, ei_det["vat_pct"], late=not ei_first):

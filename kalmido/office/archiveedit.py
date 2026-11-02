@@ -17,6 +17,7 @@ from ..core.db import iso, now_utc
 from ..core.errors import BadInput
 from .model import OFFICE_ADMIN_ONLY, office_role, pb_cl_sql
 from .rights import ofr_admin_or
+from .legacyimport import _amount, _archive_fields  # 2.369.5 (#2517): pulled up from functions
 
 R81B_RATES = {"19": 19, "7": 7, "0": 0, "rc": 0}  # rc = reverse charge: the client pays the tax, none on the document
 R81B_LINES_MAX = 10
@@ -26,7 +27,6 @@ CENT = Decimal("0.01")
 
 def r81b_tax_lines(v):
     """The checked tax lines [{net, tax}] -> ([{net, tax, amount}] with texts, gross Decimal); 400 for anything else."""
-    from .legacyimport import _amount
     if not isinstance(v, list) or not 1 <= len(v) <= R81B_LINES_MAX:
         raise BadInput(tr("Invalid value: {0}", "tax_lines"))
     out, gross = [], Decimal(0)
@@ -80,7 +80,6 @@ def r81b_archive_patch(c, oid, uid, aid, b):
     """Apply {client_id?, tax_lines? | amount?, paid?} to entry aid of office area oid; one history row per changed field.
     Returns the names of the changed fields. tax_lines win over amount; amount alone = gross only (tax unknown).
     #1968: amount / tax_lines / paid only an office admin (403), a negative amount 400."""
-    from .legacyimport import _archive_fields
     r = c.execute("SELECT * FROM office_archive WHERE id=? AND org_id=?", (aid, oid)).fetchone()
     if not r:
         raise Denied(404)

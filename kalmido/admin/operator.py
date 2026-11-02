@@ -44,6 +44,10 @@ from ..accounts.sessions import ses_end
 from ..accounts.users import _active_admins, user_delete_run
 from .hosting import ANN_TEXT_MAX, _mb, _user_bytes, announce_get, announce_set, hosted, hosting_settings, quota_default_mb
 from .retexport import RX_NEEDED, rx_counts, rx_subject
+from ..accounts.orgs import instance_mode  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.signup import signup_mode  # 2.369.5 (#2517): pulled up from functions
+from .backup import BK_ON_ENV, bk_db_bytes  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.setupcode import SH_CODE_ENV, SH_CODE_OFF, SH_OP_TTL, sh_code_op_new  # 2.369.5 (#2517): pulled up from functions
 
 OP_TOKEN_MIN = 32
 OP_TOKEN_MAX = 512
@@ -126,9 +130,6 @@ def _notice(c):
 def op_status(c):
     """Numbers only. Counting runs as "system" (across organisations): it is what the hoster needs to run the server and
     never leaves the counts."""
-    from ..accounts.orgs import instance_mode
-    from ..accounts.signup import signup_mode
-    from .backup import BK_ON_ENV, bk_db_bytes
     from .worker import wrk_health
     now = now_utc()
     d7, d30 = iso(now - timedelta(days=7)), iso(now - timedelta(days=30))
@@ -174,7 +175,6 @@ def operator_setup_code():
     """A fresh one-time code for the first setup page (the customer creates the first admin with it). Only while the
     instance has no account at all; afterwards 409. Not possible with a fixed code or the check turned off (409)."""
     op_gate("setup-code")
-    from ..accounts.setupcode import SH_CODE_ENV, SH_CODE_OFF, SH_OP_TTL, sh_code_op_new
     c = db()
     code = ""
     with system_ctx(c):  # the operator acts without a person, across organisations: numbers and states only

@@ -24,6 +24,11 @@ from .calc import dec, money
 from .fixedimport import fci_people, fci_task_end
 from .ledger import ofx_log
 from .model import office_ctx_admin, office_role, office_settings, office_settings_lock, office_settings_save
+from ..files.store import fs_role  # 2.369.5 (#2517): pulled up from functions
+from .books import _uid_filter  # 2.369.5 (#2517): pulled up from functions
+from .datev import _acct  # 2.369.5 (#2517): pulled up from functions
+from .datevin import DV_CC_OPEN, DV_CC_OPEN_1, _line, dv_card_account, dv_card_private, dv_cat_account  # 2.369.5 (#2517): pulled up from functions
+from .homecur import hc_home  # 2.369.5 (#2517): pulled up from functions
 
 CCN_EVERY_TICKS = 10
 _CCN_LAST = {"at": 0.0}
@@ -205,8 +210,6 @@ def _settled(c, oid, frm, to):
 def cc_bk_rows(c, oid, frm, to, uid=None):
     """The rows of the neutral export (bkexport.py type card): one per position (minus = money out), one without an amount per
     statement of the period with its PDF. _node = the file behind a row (only files the person sees)."""
-    from ..files.store import fs_role
-    from .books import _uid_filter
     uid = _uid_filter(uid)
     rows, seen = [], set()
 
@@ -216,7 +219,6 @@ def cc_bk_rows(c, oid, frm, to, uid=None):
     home = None
     for x in _lines(c, oid, frm, to):
         if home is None:
-            from .homecur import hc_home
             home = hc_home(office_settings(c, oid))
         # a position with its receipt: the receipt's own row carries the amount, this one only the link (the rows of a type add up)
         rows.append({"type": "card", "date": x["day"], "number": f"{x['s_month']} ·· {x['last4']}", "counterparty": x["merchant"] or "", "text": labels.get(x["state"], ""),
@@ -237,8 +239,6 @@ def cc_dv_rows(c, oid, d_from, d_to, st, _s):
     """(rows, hints) of DATEV's input side: fees and positions without a receipt on the expense account, private ones on the
     private account, each against the card account; the bank booking of a total card account against bank. Positions still
     waiting for their receipt are not booked, a hint names them."""
-    from .datev import _acct
-    from .datevin import DV_CC_OPEN, DV_CC_OPEN_1, _line, dv_card_account, dv_card_private, dv_cat_account
     card, rows, wait = dv_card_account(st), [], 0
     for x in _lines(c, oid, d_from, d_to):
         if x["state"] == "open":

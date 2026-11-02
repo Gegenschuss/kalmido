@@ -35,6 +35,12 @@ from ..collab.comments import user_names
 from ..core.errors import BadInput, reject_unknown
 from ..api.common import v1_args, v1_call, v1_json, v1_view
 from ..core.orgcrypt import oc_list_space, oc_seal_path, oc_user_space, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.orgroles import user_orgs_full, need_org_write  # 2.369.5 (#2517): pulled up from functions
+from .teamchat import tchat_coworkers, need_tchat, need_room  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import may_see  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.attachments import safe_name, unexec_name, send_stored  # 2.369.5 (#2517): pulled up from functions
+from ..notify.alerts import aa_count, aa_oserr  # 2.369.5 (#2517): pulled up from functions
+from ..core.errors import UnknownFields  # 2.369.5 (#2517): pulled up from functions
 
 TCX_KINDS = ("channel", "group")
 TCX_NAME_MAX, TCX_MEMBERS_MAX, TCX_FILES_MAX = 80, 200, 10
@@ -191,7 +197,6 @@ def tcx_sig_fmt(r):
 
 def _orgs_full(c, uid, write=False):
     """2.143.0 A (#2151): uid's organisations whose open channels / people they see (write: may open a channel in)."""
-    from ..accounts.orgroles import user_orgs_full
     full = set(user_orgs_full(c, uid, write))
     return [o for o in user_orgs(c, uid) if o in full]
 
@@ -235,8 +240,6 @@ def tcx_insider(c, r, uid):
 
 def tcx_may_add(c, r, actor, uid):
     """None when actor may add uid to channel / group r, else the reason (shown as it is)."""
-    from .teamchat import tchat_coworkers
-    from ..accounts.orgs import may_see
     if not is_agent_id(c, uid) and not may_see(c, actor, uid):  # 2.148.1 A (#2490): no name or reason for an unseen account
         return tr("This person cannot be added to this conversation")
     name = user_names(c, [uid]).get(uid, "?")
@@ -282,11 +285,9 @@ def tcx_id_list(v, field="members"):
 
 
 def need_person(c):
-    from ..agents.core import is_agent
-    from .teamchat import need_tchat
+    from ..agents.core import need_person
     need_tchat(c)
-    if is_agent(g.user):
-        raise Denied(403, tr("Only people open channels and group conversations"))
+    need_person(403, tr("Only people open channels and group conversations"))
 
 
 def need_xroom(c, rid):
@@ -312,7 +313,6 @@ def tcx_channels():
     plus whom I may add (per organisation: its people and the agents I may add; my own space: the people I work with and my
     personal agents without an organisation)."""
     from ..agents.core import is_agent
-    from .teamchat import need_tchat, tchat_coworkers
     c = db()
     need_tchat(c)
     uid = me()
@@ -351,7 +351,6 @@ def tcx_channel_new():
     if oid is not None and (isinstance(oid, bool) or not isinstance(oid, int) or oid not in user_orgs(c, uid)):
         return err(tr("Invalid value: {0}", "org_id"))
     if oid is not None and oid not in _orgs_full(c, uid, write=True):
-        from ..accounts.orgroles import need_org_write
         need_org_write(c, uid, oid)  # 2.143.0 A (#2151): guests / read-only / accounting open no channel of the organisation
     op = b.get("open", False)
     if not isinstance(op, bool) or (op and not oid):
@@ -462,7 +461,6 @@ def tcx_member_add(rid):
 def tcx_member_del(rid, uid):
     """Leave (my own id) or remove someone (channel: its managers; group: nobody removes another person, only leaves)."""
     from ..agents.core import is_agent
-    from .teamchat import need_tchat
     c = db()
     need_tchat(c)
     r = need_xroom(c, rid)
@@ -498,7 +496,6 @@ def tcx_input(b):
     unknown = sorted(k for k in [*request.form, *request.files]
                      if k not in ("body", "task_id", "reply_to", "client_id", "file", "voice", "duration_ms", "thread_of"))  # 2.139.0 A (#2127)
     if unknown:
-        from ..core.errors import UnknownFields
         raise UnknownFields(unknown)
     for k in ("task_id", "reply_to", "thread_of"):
         v = out.get(k)
@@ -577,8 +574,6 @@ def tcx_space(c, r, uid):
 def tcx_save_files(c, r, m, files, saved):
     """Stores the uploaded files of team chat message m (room r). Returns an error message or None (the caller rolls back +
     unlinks saved on an error / OSError)."""
-    from ..tasks.attachments import safe_name, unexec_name
-    from ..notify.alerts import aa_count, aa_oserr
     from ..files.upsafe import h6d_save, up_check_path, up_after_store, UploadRefused
     uid = m["user_id"]
     agent = is_agent_id(c, uid)
@@ -699,7 +694,6 @@ def tcx_user_purge(c, uid):
 
 def tcx_file_access(c, fid):
     """A team chat file the current user may read (sees its conversation; not locked by the virus scan)."""
-    from .teamchat import need_room, need_tchat
     need_tchat(c)
     f = c.execute("SELECT * FROM tchat_files WHERE id=?", (fid,)).fetchone()
     if not f:
@@ -721,7 +715,6 @@ def tcx_file_get(fid):
 
 def tcx_send(f):
     """send_stored; 2.113.1 (#2059): a file whose key is gone (sealed for a deleted account) answers 410, not an error."""
-    from ..tasks.attachments import send_stored
     try:
         return send_stored(f)
     except OrgCryptError:

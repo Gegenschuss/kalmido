@@ -36,6 +36,7 @@ from .ledger import ofx_log
 from .model import office_ctx, office_ctx_admin, office_role, pb_owner
 from .periodlock import period_need_open, pl_is_locked
 from .rights import LV, ofr_allows, ofr_need_area, ofr_rights
+from .bank import _norm, BNK_LIST_MAX  # 2.369.5 (#2517): pulled up from functions
 
 CC_PROVIDERS = {"mastercard": "Mastercard"}
 CC_KINDS = ("purchase", "fee", "credit")
@@ -488,7 +489,6 @@ def cc_stmt_label(c, oid, sid):
 
 def cc_bank_open(c, oid, t, q=""):
     """The confirmed statements without their bank booking as candidates of booking t (bank.py), the fitting total first."""
-    from .bank import _norm
     out = []
     for r in c.execute("SELECT s.* FROM office_cc_statements s WHERE s.org_id=? AND s.deleted_at IS NULL AND s.state='confirmed' AND NOT EXISTS "
                        "(SELECT 1 FROM office_bank_tx b WHERE b.org_id=s.org_id AND b.match_kind='card' AND b.match_id=s.id AND b.deleted_at IS NULL) ORDER BY s.month DESC", (oid,)).fetchall():
@@ -520,7 +520,6 @@ def cc_bank_check(c, oid, t, sid, accept_diff):
 def cc_bank_candidates(sid):
     """{items: [{id, day, amount, counterpart, purpose, fits}]}: the open bookings out of the business account that can be this
     statement's total, the fitting amount first. The match itself: POST /api/office/bank/tx/<id>/match {kind: card, id}."""
-    from .bank import BNK_LIST_MAX
     c, uid, oid = office_ctx_admin()
     ofr_need_area(c, uid, oid, "bank", "view")  # bank bookings: the bank's right, not only the cards'
     s = cc_stmt_row(c, oid, sid)

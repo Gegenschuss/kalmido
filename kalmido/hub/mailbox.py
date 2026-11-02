@@ -44,6 +44,12 @@ from ..collab.integfail import INTEG_FAILS, integ_org_admins, integ_tell
 from ..accounts.session import me
 from . import hubmail as H
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.login import seal  # 2.369.5 (#2517): pulled up from functions
+from ..calendars.subscriptions import CalError, _cal_connector  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.session import GATE  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_folder, fs_put  # 2.369.5 (#2517): pulled up from functions
+from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from functions
 
 MBX_TLS = ("starttls", "ssl", "none")
 MBX_MAIL_MAX = 50 * 1024 * 1024  # review: a larger mail of a workspace's own server is not fetched (marked seen)
@@ -127,7 +133,6 @@ def mbx_secret(c, r):
 
 
 def _seal(c, ws, secret):
-    from ..accounts.login import seal
     secret = {k: v for k, v in secret.items() if v}
     return seal(c, _purpose(ws), json.dumps(secret)) if secret else ""
 
@@ -137,7 +142,6 @@ def mbx_err_text(code, lg=None):
 
 
 def _err_code(e):
-    from ..calendars.subscriptions import CalError
     import smtplib
     if isinstance(e, _AuthFailed):
         return "auth"
@@ -169,7 +173,6 @@ class _SafeIMAP(imaplib.IMAP4):
         super().__init__(host, port, timeout=timeout)
 
     def _create_socket(self, timeout):
-        from ..calendars.subscriptions import _cal_connector
         return _cal_connector(self._kal_allow)((self.host, self.port), timeout)
 
 
@@ -179,7 +182,6 @@ class _SafeIMAP_SSL(imaplib.IMAP4_SSL):
         super().__init__(host, port, timeout=timeout, ssl_context=ssl.create_default_context())  # review: certificate checked
 
     def _create_socket(self, timeout):
-        from ..calendars.subscriptions import _cal_connector
         return self.ssl_context.wrap_socket(_cal_connector(self._kal_allow)((self.host, self.port), timeout), server_hostname=self.host)
 
 
@@ -320,7 +322,6 @@ def mbx_list():
     c = db()
     _gate()
     uid = me()
-    from ..accounts.orgs import is_org_admin
     spaces = [(None, tr("Private|workspace"))]
     for oid in sorted(acx_of(c, uid).org_ids):
         o = c.execute("SELECT name, personal_of FROM orgs WHERE id=?", (oid,)).fetchone()
@@ -513,7 +514,6 @@ def mbx_poll_now():
 def mbx_holder(c, r):
     """The person a mailbox receives for ("Not assigned" waits with them): the private space's person; an organisation's:
     the one who set it up while an admin there, else its first admin. None = nobody (the mailbox is not fetched)."""
-    from ..accounts.orgs import is_org_admin
 
     def person(uid):
         u = c.execute("SELECT disabled, kind, kid FROM users WHERE id=?", (uid,)).fetchone() if uid else None
@@ -596,7 +596,6 @@ def mbx_import(c, box, raw):
 
 def _bg(fn):
     """fn(c) with a connection of its own inside the background gate (never nested: the IMAP session runs outside it)."""
-    from ..accounts.session import GATE
     with GATE.bg():
         c = connect()
         try:
@@ -848,8 +847,6 @@ def _addr_list(v):
 
 def _file_sent(c, uid, org, cid, lid, ws, m, raw, plain):
     """The sent mail into hub_mails (direction out, sending) + its .eml in the file store; returns the row id."""
-    from ..files.store import fs_folder, fs_put
-    from ..files.upsafe import UploadRefused
     from ..admin.hosting import QuotaExceeded
     ts = _now()
     enc, sealed = H.hbm_seal(c, org, uid, ws, plain)  # 2.306.0 A (#2885): private ones sealed, too

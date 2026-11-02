@@ -16,6 +16,9 @@ from ..accounts.login import seal, unseal
 from ..tasks.validation import as_int, TITLE_MAX
 from ..core.errors import BadInput
 from ..life.model import _dump, life_list, need_life
+from ..calendars.subscriptions import cal_norm_url  # 2.369.5 (#2517): pulled up from functions
+from ..life.model import _insert  # 2.369.5 (#2517): pulled up from functions
+from ..life.bookmarks import bm_create, bm_kick  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.22.0 (#663): Karakeep
@@ -67,7 +70,6 @@ def _no_agent(c, uid):
 
 
 def kk_norm_url(u):
-    from ..calendars.subscriptions import cal_norm_url
     u = cal_norm_url(u)
     if not u or not u.lower().startswith(("http://", "https://")):
         return None
@@ -201,8 +203,6 @@ def _bm_title_url(bm):
 def kk_sync(c, uid):
     """Bookmarks -> tasks, ticked ones -> archived in Karakeep. {added, archived}; the error is stored in the connection
     (and raised as BadInput for a request)."""
-    from ..life.model import _insert
-    from ..life.bookmarks import bm_create, bm_kick
     r = kk_row(c, uid)
     if not r:
         raise BadInput(tr("Karakeep is not connected"))

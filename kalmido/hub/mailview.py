@@ -32,6 +32,11 @@ from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.access import Denied, WRITE_ROLES, acx_lists_sql, list_role, need_task, need_feat
 from ..accounts.session import me
 from .hubmail import _gate, _need_mail, _open, hbm_can
+from ..files.store import fs_read  # 2.369.5 (#2517): pulled up from functions
+from ..events.model import can_write, my_cal_ids, need_event, need_evcal  # 2.369.5 (#2517): pulled up from functions
+from ..collab.liste2eguard import le2b_list_locked  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
+from ..events.web import op_event_new  # 2.369.5 (#2517): pulled up from functions
 
 MH_HTML_MAX = 500000        # characters of an HTML part shown (like HBM_BODY_MAX, more room for the markup)
 MH_EML_MAX = 40 << 20       # a larger .eml is not opened for the HTML view (the text view stays)
@@ -238,7 +243,6 @@ def mh_of(c, m):
     key that does not open, too big, no HTML part)."""
     if not m["eml_id"]:
         return None
-    from ..files.store import fs_read
     n = c.execute("SELECT id, org_id, size FROM fs_nodes WHERE id=? AND deleted_at IS NULL AND kind='file'", (m["eml_id"],)).fetchone()
     if not n or (n["org_id"] or None) != (m["org_id"] or None) or (n["size"] or 0) > MH_EML_MAX:
         return None
@@ -334,7 +338,6 @@ def _lists(c, uid, org):
 
 
 def _cals(c, uid, org):
-    from ..events.model import can_write, my_cal_ids
     ids = {k: v for k, v in my_cal_ids(c, uid).items() if can_write(v)}
     if not ids:
         return []
@@ -345,7 +348,6 @@ def _cals(c, uid, org):
 
 def mh_made(c, mid):
     """The tasks / events made from mail mid that I see: [{kind, id, title}]."""
-    from ..events.model import need_event
     out = []
     for r in c.execute("SELECT kind, ref_id FROM hub_mail_links WHERE mail_id=? ORDER BY id", (mid,)).fetchall():
         try:
@@ -391,8 +393,6 @@ def _title(b, fallback):
 def mh_make_task(mid):
     """{list_id, title?, due?} -- a task from the mail in a list of its workspace where I may write (title = the subject
     without Re / Fwd, description = the start of the text + the sender); the task remembers the mail."""
-    from ..collab.liste2eguard import le2b_list_locked
-    from ..tasks.validation import log_act
     from ..agents.core import agent_added_events
     c = db()
     _gate()
@@ -431,8 +431,6 @@ def mh_make_task(mid):
 def mh_make_event(mid):
     """{cal_id, start (YYYY-MM-DD = all day, YYYY-MM-DDTHH:MM = one hour), title?} -- an event from the mail in a calendar of
     its workspace where I may write; the event remembers the mail."""
-    from ..events.model import need_evcal
-    from ..events.web import op_event_new
     c = db()
     _gate()
     need_feat("events")
@@ -460,7 +458,6 @@ def mh_make_event(mid):
 def mh_links():
     """?task_id= | ?event_id= -- the mails a task / an event was made from: {mail_id, subject} for a mail I may read, else
     {mail_id: null, subject: ""} (no subject, no id: nothing leaks)."""
-    from ..events.model import need_event
     c = db()
     _gate()
     uid = me()

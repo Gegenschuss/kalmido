@@ -30,6 +30,12 @@ from ..personal.timetrack import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_need_feature, office_org, office_settings
 from .ledger import ofx_log
+from .periodlock import pl_through  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_chain, fs_deleted, fs_role, fs_read  # 2.369.5 (#2517): pulled up from functions
+from ..core.orgcrypt import oc_dec_fields  # 2.369.5 (#2517): pulled up from functions
+from .datev import dx_check, dx_extf, dx_need_eur, dx_rows, dx_settings, _period  # 2.369.5 (#2517): pulled up from functions
+from ..core.db import local_now  # 2.369.5 (#2517): pulled up from functions
+from .invoices import inv_files  # 2.369.5 (#2517): pulled up from functions
 
 DZ_NS = uuid.UUID("6f0a4c2e-1d8b-4f7e-9a3c-5b2d8e7f1a90")  # the name space of Kalmido's receipt GUIDs (never change)
 DZ_MAX_BYTES = 80 * 1024 * 1024  # the receipt files of one export together (the archive is built in memory)
@@ -54,7 +60,6 @@ def dz_period(c, oid, d_from, d_to, locked_only):
     """(from, to) of the export; locked_only cuts at the last locked month (400 when none of the period is locked)."""
     if not locked_only:
         return d_from, d_to
-    from .periodlock import pl_through
     t = pl_through(c, oid)
     if not t or t < d_from[:7]:
         raise BadInput(tr(DZ_NOTHING_LOCKED))
@@ -116,7 +121,6 @@ def _safe(name, fallback, ext=""):
 def dz_no_booking(c, oid, d_from, d_to):
     """Receipts of the period without an amount (the batch cannot book them) -> [{node_id, title, date}]."""
     from ..docs.store import doc_open
-    from ..files.store import fs_chain, fs_deleted, fs_role
     from .books import _uid_filter, bk_ws
     ws = bk_ws(c, oid)
     uid = _uid_filter(None)
@@ -137,7 +141,6 @@ def dz_no_booking(c, oid, d_from, d_to):
 def dz_no_receipt(c, oid, d_from, d_to):
     """Money paid out without a receipt: bank bookings (amount < 0, not matched) and cash entries out without a file."""
     from .bank import _tx_dec
-    from ..core.orgcrypt import oc_dec_fields
     out = []
     for r in c.execute("SELECT * FROM office_bank_tx WHERE org_id=? AND deleted_at IS NULL AND match_kind IS NULL AND day>=? AND day<=? "
                        "ORDER BY day, id", (oid, d_from, d_to)).fetchall():
@@ -165,8 +168,6 @@ def dz_document_xml(entries, d_from, d_to, now):
 
 
 def dz_build(c, oid, d_from, d_to, by="", inside=True, locked_only=False, check=False):
-    from .datev import dx_check, dx_extf, dx_need_eur, dx_rows, dx_settings
-    from ..core.db import local_now
     s = office_settings(c, oid)
     st = dx_settings(s)
     dx_need_eur(s)  # 2.189.0 B (#2475)
@@ -184,8 +185,6 @@ def dz_build(c, oid, d_from, d_to, by="", inside=True, locked_only=False, check=
         raise BadInput(tr(DZ_TOO_MANY, DZ_MAX_FILES))
     now = local_now()
     batch, _n = dx_extf(c, oid, d_from, d_to, by=by, s=s, now=now, inside=inside, rows=rows, fixed=locked_only)
-    from .invoices import inv_files
-    from ..files.store import fs_read
     entries, files, total, used = [], [], 0, set()
 
     def add(gd, name, data, desc):
@@ -232,7 +231,6 @@ def dz_build(c, oid, d_from, d_to, by="", inside=True, locked_only=False, check=
 @app.get("/api/office/datev/zip")
 def dz_zip_get():
     """Org admin: ?from=&to= (default: the previous month), in=0 (no input side), locked=1 (only locked months), check=1."""
-    from .datev import _period
     c = db()
     uid = office_gate(c)
     oid = office_org(c, uid, admin=True)

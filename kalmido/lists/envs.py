@@ -25,7 +25,7 @@ from ..tasks.oneway import DEPLOY_TAG
 from ..tasks.tasks import task_inherit
 from ..collab.comments import assignment_events
 from ..core.errors import UnknownFields, web_fields
-from ..agents.core import agent_emit, is_agent, list_agents
+from ..agents.core import agent_emit, is_agent, list_agents, need_person
 from ..api.common import v1_args, v1_call, v1_json, v1_view
 from .projects import need_overview
 
@@ -46,8 +46,7 @@ def env_row(c, eid, write=False, manage=False, trashed=False):
         raise Denied(404)
     need_overview(c, r["list_id"], write=write or manage)
     if manage:
-        if is_agent(g.user):
-            raise Denied(403, tr("Agents cannot connect repositories"))
+        need_person(403, tr("Agents cannot connect repositories"))
         need_list(c, r["list_id"], write=False, manage=True)
     return r
 

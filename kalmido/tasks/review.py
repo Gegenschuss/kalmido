@@ -11,6 +11,9 @@ from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_lis
 from ..tasks.validation import log_act
 from ..tasks.tasks import one_task
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..tasks.validation import descendants  # 2.369.5 (#2517): pulled up from functions
+from ..collab.news import news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import collab_user, lang_of  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.60.0 C (#1512): review step
@@ -105,7 +108,6 @@ def _gate_holds(c, t):
 
 def rvw_gate(c, tid):
     """Completing task tid (and its open subtasks) is refused while a review gate holds: the error text, else None."""
-    from ..tasks.validation import descendants
     for x in [tid, *descendants(c, tid)]:
         t = c.execute("SELECT * FROM tasks WHERE id=?", (x,)).fetchone()
         if t and (x == tid or t["status"] == 0) and _gate_holds(c, t):
@@ -123,8 +125,6 @@ def _notify(c, t, rcpt, state, note="", pr=None, actor=None):
     """News + push (row "review") to a person; an agent reviewer gets the event review_requested instead.
     2.367.2 (#2968): a request and a decision go past the burst gate (a gate waits for it); state "approved" is new, pr = the
     linked pull request that approved it (no person acted; actor = who gave the 👍, the sync has no request)."""
-    from ..collab.news import news_add, notif_ok
-    from ..collab.comments import collab_user, lang_of
     from ..notify.push import notify, push_prio, push_reachable
     actor = actor if actor is not None or pr else me()
     if not rcpt or rcpt == actor:
