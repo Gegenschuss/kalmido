@@ -5,6 +5,11 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.487.3] - 2026-11-02
+
+### Fixed
+- Device test of 2.487.2: approving, rejecting or stopping an agent job and applying or discarding a proposal threw "mwLoad is not defined" on the release branch, so nothing reloaded or redrew; the refresh of Waiting for me now runs only where that view is part of the build.
+
 ## [2.487.2] - 2026-11-02
 
 ### Fixed
@@ -9913,7 +9918,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.487.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.487.3...HEAD
+[2.487.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.487.3
 [2.487.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.487.2
 [2.487.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.487.1
 [2.487.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.487.0
