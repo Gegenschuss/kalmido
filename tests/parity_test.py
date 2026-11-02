@@ -475,7 +475,8 @@ APP_ONLY = [
     # 2.144.0 D (#797): the hosting operator's interface: its own token from a file, called by the hoster's console, never
     # by a person or an agent (no account of the instance; numbers only)
     ("2.144.0 (#797): the hosting operator's interface (own token, the hoster's console; not a user or agent API)",
-     ("GET /api/operator/status", "POST /api/operator/setup-code", "PUT /api/operator/notice")),
+     ("GET /api/operator/status", "POST /api/operator/setup-code", "PUT /api/operator/notice",
+      "* /api/operator/accounts", "PUT /api/operator/quota-default")),  # 2.485.0 (#3939)
     ("external calendar subscriptions and the calendar feed link: personal settings", ("* /api/calendars", "* /api/ical")),
     # 2.111.0 (#2056): the secret subscription link of an event calendar is a person's own credential (like the task feed
     # link), and the editor's invitation info only serves the switch; agents send invitations with send_invites on the events

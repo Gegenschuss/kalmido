@@ -432,12 +432,33 @@ def user_delete(uid):
     settings; tasks they created in other people's lists stay (creator cleared). 2.88.0 (#1980): ?lists=transfer&to=<id>
     hands the lists to one person first, ?lists=delete&confirm=<user name> deletes them along (useradmin.ua8_lists_settle,
     the same transaction); an organisation admin deletes an account of their organisation alone (useradmin.ua8_may_delete)."""
-    from ..accounts.useradmin import ua8_audit, ua8_lists_settle, ua8_may_delete
+    from ..accounts.useradmin import ua8_lists_settle, ua8_may_delete
+    from ..admin.retexport import rx_lists_how
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     by = ua8_may_delete(c, u, uid)  # 2.46.0 (#1592): an instance admin as om_admin_all; 2.88.0: or the organisation's admin
     if uid == me():
         return err(tr("You cannot delete yourself"))
+    mode = request.args.get("lists")
+    code, answer, n = user_delete_run(c, uid, g.user["username"], along=mode == "delete",
+                                      settle=(lambda: ua8_lists_settle(c, u, by, rx_lists_how())) if mode else None)
+    if code == "projects":
+        return err(trn("The user still owns {0} project. Delete it or disable the user instead.",
+                       "The user still owns {0} projects. Delete them or disable the user instead.", n), 409)
+    if code:
+        return answer
+    return jsonify(ok=True, lists=n)
+
+
+def user_delete_run(c, uid, actor, along=False, settle=None, how=None):
+    """#3939: the core of an account deletion, shared by the user management (DELETE /api/users/<id>) and the hosting
+    operator's console (admin/operator.py) -- the caller has checked who may delete. Locks the documents going along, counts
+    the account's own projects (settle = None: they block; else settle() hands them on / deletes them, useradmin.ua8_lists_settle),
+    passes the retention gate (rx_gate; how: its ?retention=, None = the request's), purges, commits, removes the files and
+    writes the security log with actor (a user name or "operator") and the account by number.
+    -> (None, None, projects) when deleted, ("projects", None, n) when projects block, ("retention" | "lists", 409 answer, n)."""
+    from ..accounts.useradmin import ua8_audit
+    from ..admin.retexport import rx_gate, rx_subject
     with system_ctx(c):  # #3090: the documents going along locked before the first write, in one order: a recognition run
         # (docs/store.process, its first write is the document's own row) ends first or waits (else both waited: deadlock, 500)
         c.execute("SELECT node_id FROM doc_meta WHERE node_id IN (SELECT id FROM fs_nodes WHERE owner_id=?) "
@@ -445,22 +466,21 @@ def user_delete(uid):
     with system_ctx(c):  # 2.37.0 (#1150): a count over every organisation (lists the admin cannot see still block the deletion)
         n = c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()[0]
     icons, lfiles, audit = [], [], (None, ())
-    if n and not request.args.get("lists"):
-        return err(trn("The user still owns {0} project. Delete it or disable the user instead.",
-                       "The user still owns {0} projects. Delete them or disable the user instead.", n), 409)
-    from ..admin.retexport import rx_gate, rx_lists_how, rx_subject
+    if n and settle is None:
+        c.rollback()
+        return "projects", None, n
     # 2.146.0 D (#2468): records to keep -> the retention export or its waiver first (counted before the lists go; the lists'
     # own refusals answer first)
-    keep, retained = rx_gate(c, rx_subject(c, "user", uid), along=request.args.get("lists") == "delete")
+    keep, retained = rx_gate(c, rx_subject(c, "user", uid), along=along, how=how)
     if n:
-        bad, done = ua8_lists_settle(c, u, by, rx_lists_how())  # 2.186.0 A (#2566)
+        bad, done = settle()  # 2.186.0 A (#2566)
         if bad:
             c.rollback()
-            return bad
+            return "lists", bad, n
         icons, lfiles, audit = done[0], done[1], (done[2], done[3])
     if keep:
         c.rollback()
-        return keep
+        return "retention", keep, n
     files = user_purge(c, uid, gated=True)  # 2.152.0 A (#2164): records kept by law retire the personal office instead of blocking (2.148.1 #2479)
     bump(c)
     c.commit()
@@ -470,11 +490,11 @@ def user_delete(uid):
         for lid, icon in icons:
             list_icon_drop_file(lid, icon)
         list_files_drop(lfiles)
-    ua8_audit(g.user["username"], f"#{uid}", *audit)  # 2.88.0 (#1980): the security log; 2.239.0 C (#2866): by number, not by name
+    ua8_audit(actor, f"#{uid}", *audit)  # 2.88.0 (#1980): the security log; 2.239.0 C (#2866): by number, not by name
     if retained:  # 2.146.0 D (#2468): deleted after the retention export / with its waiver
         from ..admin.retexport import rx_alert
-        rx_alert(retained[0], [g.user["username"], f"#{uid}"])
-    return jsonify(ok=True, lists=n)
+        rx_alert(retained[0], [actor, f"#{uid}"])
+    return None, None, n
 
 
 def _up_mail_nodes(c, uid):

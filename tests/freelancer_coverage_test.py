@@ -89,7 +89,7 @@ KINDS = {
                      "a person on a server the admin only created the account on, without any admin switch)"),
     # 2.144.0 D (#797)
     "operator": ("n/a", "the hosting operator's interface (a token from a file, off by default, never a person or a session): "
-                        "instance-wide numbers and operating actions only, no content of any person or organisation (p2144_d_api_test.py)"),
+                        "instance-wide numbers and operating actions only, no content of any person or organisation (p2144_d_api_test.py; accounts by number: p2485_b_api_test.py)"),
     "orgadmin": ("n/a", "managing an organisation (members, admins, its lists, export, encryption): only for its members and "
                         "admins; without an organisation there is nothing to manage (the personal office is reached under "
                         "office, the private workspace under every other area)"),
@@ -129,6 +129,10 @@ ROUTES = {
     "POST /api/admin/setup": "admin", "PUT /api/admin/agent-policy": "admin", "PUT /api/admin/announcement": "admin",
     # 2.144.0 D (#797): the hosting operator's interface (a token from a file, off by default)
     "GET /api/operator/status": "operator", "POST /api/operator/setup-code": "operator", "PUT /api/operator/notice": "operator",
+    # 2.485.0 (#3939): one customer's account by number (lock, unlock, quota, delete) and the default quota
+    "POST /api/operator/accounts/find": "operator", "GET /api/operator/accounts/{}": "operator",
+    "PUT /api/operator/accounts/{}": "operator", "DELETE /api/operator/accounts/{}": "operator",
+    "PUT /api/operator/quota-default": "operator",
     "PUT /api/admin/groups/{}/avatar": "admin", "PUT /api/admin/oidc": "admin", "PUT /api/admin/orgcrypt": "admin",
     "PUT /api/admin/related": "admin", "PUT /api/layouts/std/{}": "admin", "PUT /api/v1/admin/announcement": "admin",
     # ---- agents (72)

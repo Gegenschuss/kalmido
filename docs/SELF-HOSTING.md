@@ -2019,7 +2019,7 @@ of the instance and **never sees content**: no names, e-mail addresses, titles, 
 - **Only the token.** The console sends `Authorization: Bearer <token>`. A missing or wrong token answers 401 and counts
   against a limit per address (wrong tokens get 429 after 20 failures within 15 minutes; the right token always passes,
   so strangers behind the same address cannot lock the console out). A token file readable by others only gives a
-  warning in the log (chmod 600 recommended). Only these three paths skip the person login. Session cookies, the proxy login and personal
+  warning in the log (chmod 600 recommended). Only these operator paths skip the person login. Session cookies, the proxy login and personal
   access tokens never reach these routes, so an instance admin cannot use them either. Every call is written to the
   server log with its action and the caller's address, never the token.
 - **Routes.**
@@ -2032,6 +2032,22 @@ of the instance and **never sees content**: no names, e-mail addresses, titles, 
     processes. A new request replaces the previous code.
   - `PUT /api/operator/notice`: `{level: "maintenance" | "info", text, minutes?}` sets the notice every client shows
     (for a planned maintenance); an empty `text` clears it. It sends no push.
+  - `PUT /api/operator/quota-default`: `{storage_quota_mb}` sets the default storage per person in MB, as in Settings >
+    Administration (`null` = `KALMIDO_STORAGE_QUOTA_MB`, `0` = unlimited). *Since 2.485.*
+- **One customer's account** (*since 2.485*). The same handles the instance's user management has, so a hoster can act
+  on a support request without an account in the instance. The answers carry numbers and states only (account number,
+  locked, server admin, created, last active day, number of organisations and own projects, storage used, own and
+  effective quota) - never a name, a display name or an e-mail address. Agents are not reachable here (404).
+  - `POST /api/operator/accounts/find`: `{email}` finds the person with this address (the customer names it in the
+    request). The address is neither answered nor logged; unknown = 404.
+  - `GET /api/operator/accounts/<id>`: the account's numbers.
+  - `PUT /api/operator/accounts/<id>`: `{disabled?: bool, storage_quota_mb?: int | null}` locks / unlocks the account
+    (locking ends all its sessions and mails the person, as in the app) or sets its own quota (`null` = the default).
+    The last active server admin cannot be locked (409). The admin right is not changed here.
+  - `DELETE /api/operator/accounts/<id>?confirm=<id>`: deletes the account exactly as the user management does. Refused
+    with 409 and a `code`: `projects` (it still owns projects, with their number - the console never deletes or hands
+    on projects), `retention` (records it must keep, with their number - the console never waives the retention
+    export) and `admin` (a server admin). A missing or different `confirm` answers 400.
 - **Keep it private.** Reach the interface only from the console's network (a firewall rule or the reverse proxy),
   never from the internet.
 

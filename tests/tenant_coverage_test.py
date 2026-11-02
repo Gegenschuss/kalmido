@@ -153,7 +153,7 @@ KINDS = {
                      "is trusted with the whole server (architecture review 2.1 / B4); people in it are filtered by visible_people"),
     # 2.144.0 D (#797)
     "operator": ("n/a", "the hosting operator's interface (a token from a file, off by default, never a person or a session): "
-                        "instance-wide numbers and operating actions only, no content of any person or organisation (p2144_d_api_test.py)"),
+                        "instance-wide numbers and operating actions only, no content of any person or organisation (p2144_d_api_test.py; accounts by number: p2485_b_api_test.py)"),
     "public": ("n/a", "pages and facts without data of a person (app shell, health, version, robots, manifest, QR code of a given text)"),
     "test": ("n/a", "test containers only (KALMIDO_TEST=1): an uncaught error on purpose (2.359.0 #3023), not in the product"),  # 2.359.0 (#3023)
     "family": ("n/a", "the household of the Family module: private by definition (kid_parents), never an organisation's object"),
@@ -213,6 +213,10 @@ ROUTES = {
     "PUT /api/admin/announcement": "admin",
     # 2.144.0 D (#797): the hosting operator's interface (a token from a file, off by default)
     "GET /api/operator/status": "operator", "POST /api/operator/setup-code": "operator", "PUT /api/operator/notice": "operator",
+    # 2.485.0 (#3939): one customer's account by number (lock, unlock, quota, delete) and the default quota
+    "POST /api/operator/accounts/find": "operator", "GET /api/operator/accounts/{}": "operator",
+    "PUT /api/operator/accounts/{}": "operator", "DELETE /api/operator/accounts/{}": "operator",
+    "PUT /api/operator/quota-default": "operator",
     "PUT /api/v1/admin/announcement": "admin", "GET /api/admin/agents": "admin", "POST /api/admin/agents": "admin",
     "PATCH /api/admin/agents/{}": "admin", "POST /api/admin/agents/{}/reset": "admin",
     "POST /api/admin/agents/{}/avatar": "admin", "POST /api/admin/agents/{}/token": "admin",

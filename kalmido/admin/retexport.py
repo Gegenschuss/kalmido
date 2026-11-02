@@ -249,10 +249,12 @@ def rx_lists_how():
     return how if hosted() and how in ("exported", "waived") else None
 
 
-def rx_gate(c, sub, along=True):
+def rx_gate(c, sub, along=True, how=None):
     """Before the deletion of sub: None = it may go (no records, a fresh export, or ?retention=waived -- noted), else the 409
     answer. The caller deletes in the same transaction (a waiver row goes away with a failed deletion). 2.186.0 A (#2599):
-    records that are retired need neither (no waiver is noted); after the period of a retired organisation it goes as such."""
+    records that are retired need neither (no waiver is noted); after the period of a retired organisation it goes as such.
+    #3939: how = the caller's choice instead of the request's ?retention= ("" = neither export nor waiver: the hosting
+    operator's console, which never waives)."""
     counts = rx_counts(c, sub, along)
     if not counts:
         return None, None
@@ -262,7 +264,8 @@ def rx_gate(c, sub, along=True):
     if st == "expired":
         rx_log(c, sub, "expired", {"counts": counts})
         return None, (N_("{0} deleted {1}: its legal retention period was over."), "expired")
-    how = request.args.get("retention") or ""
+    if how is None:
+        how = request.args.get("retention") or ""
     if how == "waived":
         rx_log(c, sub, "waiver", {"counts": counts})
         return None, (N_("{0} deleted {1} without the retention export (waived explicitly)."), "waiver")
