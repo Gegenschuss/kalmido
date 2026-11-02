@@ -162,19 +162,22 @@ def text_file_name(name):
 
 def text_version_name(c, tid, name):
     """Same name as a file of the task = a new version next to it, the old one stays: "report.md" -> "report (v2).md"
-    (v3, ... after the highest one). Returns (name, version, the id of the newest earlier version or None)."""
+    (v3, ... after the highest one). Returns (name, version, the id of the newest earlier version or None).
+    2.370.4 (#3089 E2-N3): a version in the trash counts for the number (restored, it would be a second "v2"), replaces
+    names only a living one."""
     stem, dot, ext = name.rpartition(".") if "." in name.strip(".") else (name, "", "")
     base = _VER_RE.match(stem).group(1)
-    best, prev = 0, None
-    for r in c.execute("SELECT id, name FROM attachments WHERE task_id=? AND comment_id IS NULL AND deleted_at IS NULL ORDER BY id", (tid,)):
+    best, prev, live = 0, None, 0
+    for r in c.execute("SELECT id, name, deleted_at FROM attachments WHERE task_id=? AND comment_id IS NULL ORDER BY id", (tid,)):
         st, d2, ex = r["name"].rpartition(".") if "." in r["name"].strip(".") else (r["name"], "", "")
         if ex.lower() != ext.lower() or d2 != dot:
             continue
         m = _VER_RE.match(st)
         if m.group(1) == base:
             v = int(m.group(2) or 1)
-            if v >= best:
-                best, prev = v, r["id"]
+            best = max(best, v)
+            if r["deleted_at"] is None and v >= live:
+                live, prev = v, r["id"]
     if not best:
         return name, 1, None
     return f"{base[:140]} (v{best + 1}){dot}{ext}", best + 1, prev

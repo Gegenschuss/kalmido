@@ -681,7 +681,8 @@ def list_file_restore(fid):
     a = need_list_file(c, fid, True, trash=True)
     if c.execute("SELECT COUNT(*) FROM list_files WHERE list_id=? AND deleted_at IS NULL", (a["list_id"],)).fetchone()[0] >= OV_FILES_MAX:
         return err(tr("At most {0} files per project", OV_FILES_MAX), 409)
-    c.execute("UPDATE list_files SET deleted_at=NULL WHERE id=?", (fid,))
+    if not c.execute("UPDATE list_files SET deleted_at=NULL WHERE id=? AND deleted_at IS NOT NULL", (fid,)).rowcount:
+        raise Denied(404)  # 2.370.4 (#3089 E2-N6): the trash run (or a second restore) was quicker
     bump(c)
     c.commit()
     return jsonify(overview_build(c, a["list_id"], me()))

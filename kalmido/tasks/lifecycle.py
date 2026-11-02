@@ -816,6 +816,7 @@ def rt_section(c, ids):
     for x in c.execute("SELECT id, list_id, trash_section FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) AND deleted_at IS NULL "
                        "AND trash_section IS NOT NULL", (list(ids),)).fetchall():
         if c.execute("SELECT section_id FROM tasks WHERE id=?", (x["id"],)).fetchone()[0] is None:
+            write_lock(c, f"rt-section:{x['list_id']}")  # 2.370.4 (#3089 E2-N9): two restores at once make one section, not two
             s = c.execute("SELECT id FROM sections WHERE list_id=? AND name=? ORDER BY sort, id LIMIT 1", (x["list_id"], x["trash_section"])).fetchone()
             # 2.272.0 F (#3038, review E2-M5): a new section only with a write role in the list (else back without one)
             sid = s[0] if s else insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,(SELECT COALESCE(MAX(sort), 0) + 1 FROM sections "

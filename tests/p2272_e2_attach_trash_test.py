@@ -245,6 +245,29 @@ r = A.delete(B + f"/api/lists/{LS}/members/{BOB}?dry=1")
 check(r.ok and r.json().get("assigned") == 1 and r.json().get("values") == 0, f"member dry run: 1 assignment {r.text[:160]}")
 check(one("SELECT assignee_id FROM tasks WHERE id=?", (TB,)) == BOB and one("SELECT COUNT(*) FROM list_members WHERE list_id=? AND user_id=?", (LS, BOB)) == 1,
       "member dry run: nothing changed")
+# 2.370.4 (#3089 E2-N2): the removal frees the assignments of tasks in the trash too - the question counts them
+TB2 = A.post(B + "/api/tasks", json={"title": "Bob's old job", "list_id": LS, "assignee_id": BOB}).json()["id"]
+check(A.delete(B + f"/api/tasks/{TB2}").ok, "setup: an assigned task into the trash")
+r = A.delete(B + f"/api/lists/{LS}/members/{BOB}?dry=1")
+check(r.ok and r.json().get("assigned") == 2, f"member dry run: the assignment in the trash counts too {r.text[:160]}")
+
+# 2.370.4 (#3089 E2-N3): an automatic version name counts the versions in the trash ("report (v2).md" restored = no second v2)
+TV = A.post(B + "/api/tasks", json={"title": "Versions", "list_id": LS}).json()["id"]
+sql("INSERT INTO attachments(task_id, name, path, created_at) VALUES(?,?,?,?)", (TV, "report.md", "x/v1.md", OLD))
+sql("INSERT INTO attachments(task_id, name, path, created_at, deleted_at) VALUES(?,?,?,?,?)", (TV, "report (v2).md", "x/v2.md", OLD, OLD))
+V1 = one("SELECT id FROM attachments WHERE task_id=? AND name='report.md'", (TV,))
+out = in_app(f"from kalmido.tasks.attachments import text_version_name\nprint('RES', text_version_name(c, {TV}, 'report.md'))")
+check(f"RES ('report (v3).md', 3, {V1})" in out, f"version name after a version in the trash: v3, replaces the living v1 {out[-300:]}")
+
+# 2.370.4 (#3089 E2-N11): a comment without text whose only file lies in the trash is not shown; its file restored, it is back
+CE = A.post(B + f"/api/tasks/{TV}/comments", json={"body": "tmp"}).json()["id"]
+sql("UPDATE comments SET body='' WHERE id=?", (CE,))
+sql("INSERT INTO attachments(task_id, comment_id, name, path, created_at, deleted_at) VALUES(?,?,?,?,?,?)", (TV, CE, "a.pdf", "x/a.pdf", OLD, OLD))
+tl = A.get(B + f"/api/tasks/{TV}/timeline").json()
+check(not any(x["id"] == CE for x in tl.get("comments", [])), "an empty comment with its file in the trash is not shown")
+sql("UPDATE attachments SET deleted_at=NULL WHERE comment_id=?", (CE,))
+tl = A.get(B + f"/api/tasks/{TV}/timeline").json()
+check(any(x["id"] == CE for x in tl.get("comments", [])), "its file back: the comment is shown again")
 
 # ---- checklist "clear done": only my own; the other members' ones on the owner's choice
 mine = A.post(B + "/api/tasks", json={"title": "Milk", "list_id": LS}).json()["id"]

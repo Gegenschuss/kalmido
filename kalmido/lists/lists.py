@@ -1426,7 +1426,8 @@ def member_remove(lid, uid):
     if request.args.get("dry") == "1":  # 2.272.0 E2 (#3038): what goes along, for the question in the app (nothing changes)
         if via_group:
             return jsonify(assigned=0, values=0, via_group=True)
-        return jsonify(assigned=c.execute("SELECT COUNT(*) FROM tasks WHERE list_id=? AND assignee_id=? AND deleted_at IS NULL", (lid, uid)).fetchone()[0],
+        # 2.370.4 (#3089 E2-N2): the removal frees the tasks in the trash too, so they count
+        return jsonify(assigned=c.execute("SELECT COUNT(*) FROM tasks WHERE list_id=? AND assignee_id=?", (lid, uid)).fetchone()[0],
                        values=c.execute("SELECT COUNT(*) FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields "
                                         "WHERE list_id=? AND type='person')", (str(uid), lid)).fetchone()[0])
     if via_group:  # 2.10.0 (#441): access via a group stays; only the personal share goes

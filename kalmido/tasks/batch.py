@@ -42,7 +42,8 @@ def attachment_restore(aid):
     """2.272.0 E2 (#3038): a file from the trash back to its task / comment (same rights as deleting it)."""
     c = db()
     a = need_attachment(c, aid, True, trash=True)
-    c.execute("UPDATE attachments SET deleted_at=NULL WHERE id=?", (aid,))
+    if not c.execute("UPDATE attachments SET deleted_at=NULL WHERE id=? AND deleted_at IS NOT NULL", (aid,)).rowcount:
+        raise Denied(404)  # 2.370.4 (#3089 E2-N6): the trash run (or a second restore) was quicker
     if a["comment_id"] is None:
         log_act(c, a["task_id"], "attach", {"names": [a["name"]], "n": 1})
     else:

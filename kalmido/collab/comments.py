@@ -153,6 +153,10 @@ def timeline(tid):
     t = c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()
     rows = c.execute("SELECT * FROM comments WHERE task_id=? AND deleted_at IS NULL ORDER BY id", (tid,)).fetchall()
     atts = att_dicts(c, "task_id=? AND comment_id IS NOT NULL", (tid,))
+    # 2.370.4 (#3089 E2-N11): a comment without text whose files all lie in the trash is not shown (restoring one brings it back)
+    gone = {r[0] for r in c.execute("SELECT DISTINCT comment_id FROM attachments WHERE task_id=? AND comment_id IS NOT NULL "
+                                    "AND deleted_at IS NOT NULL", (tid,))}
+    rows = [r for r in rows if not (r["id"] in gone and r["id"] not in atts and not (r["body"] or "").strip() and not r["suggestion"])]
     acts = [{"id": a["id"], "user_id": a["user_id"], "kind": a["kind"], "data": json.loads(a["data"] or "{}"),
              "created_at": a["created_at"]}
             for a in c.execute("SELECT * FROM activity WHERE task_id=? ORDER BY id", (tid,))] if collab_all() else []
