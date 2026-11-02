@@ -40,7 +40,9 @@ def ws_of(s):
 check(org_of(Bo).get("areas_off") == [] and ws_of(Bo).get("areas_off") == [], "#3490: all areas on by default (GET /api/orgs, state)")
 check(Bo.patch(B + f"/api/orgs/{ORG}", json={"areas_off": ["office"]}).status_code in (403, 404), "#3490: a member cannot switch an area of the organisation")
 check(A.patch(B + f"/api/orgs/{ORG}", json={"areas_off": ["nope"]}).status_code == 400, "#3490: an unknown area is 400")
-check(A.patch(B + f"/api/orgs/{ORG}", json={"areas_off": ["review"]}).status_code == 400, "#3490: review is private only (400)")
+# 2.398.0 (#3406, intended change): review is in an organisation's view too, so its admins may switch it off (was 400)
+check(A.patch(B + f"/api/orgs/{ORG}", json={"areas_off": ["review"]}).status_code == 200, "#3406: review can be switched off in an organisation")
+check(A.patch(B + f"/api/orgs/{ORG}", json={"areas_off": []}).status_code == 200, "#3406: and on again")
 
 # before: bob reaches the organisation's office and its knowledge pages
 check(Bo.get(B + "/api/office/settings").ok, "#3490: setup: bob opens the organisation's office")

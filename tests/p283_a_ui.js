@@ -1,7 +1,8 @@
 // 2.83.0 UI tests (part A, #1845), own container (start.sh, mode workspaces). jsdom, invented data only:
-// - #1845 an organisation's view shows only what belongs to the organisation: Home, habits, review (+ statistics) and
-//   notes are not in the sidebar, the phone's tab bar ("More" too) and the search; Time stays; Private shows them again;
-//   an old link (#review, #habits) in an organisation's view switches quietly to Private and opens the page
+// - #1845 an organisation's view shows only what belongs to the organisation: Home and habits are not in the sidebar, the
+//   phone's tab bar ("More" too) and the search; Time stays; Private shows them again; an old link (#habits) in an
+//   organisation's view switches quietly to Private and opens the page
+//   2.398.0 (#3405 #3406, intended change): notes, review and statistics are in the organisation's view too (scoped to it)
 // - #1725 a list everyone in the organisation may edit: the assign menu offers its members who have not joined ("Not
 //   joined"); the task assigned to such a member is in their Today, the list's other tasks are not
 const {execFileSync} = require('child_process');
@@ -37,11 +38,12 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   await until(() => d.querySelector('#side .srow'), 40);
   check(w.eval('wsCur()') === 'org:' + ORG, '#1845: the organisation is shown: ' + w.eval('wsCur()'));
   let s = side(d);
-  check(!s.habits && !s.review && !s.life, '#1845: no habits, review, home in the sidebar of the organisation: ' + JSON.stringify(s));
+  check(!s.habits && !s.life, '#1845: no habits, home in the sidebar of the organisation: ' + JSON.stringify(s));
+  check(s.review && !!d.querySelector('#srail [data-sbb="notes"]'), '#3405 #3406: review and notes in the bar of the organisation: ' + JSON.stringify(s));
   check(s.time, '#1845: Time stays in the organisation\'s sidebar');
-  check(!d.querySelector('#side [data-go="notes"]') && !d.querySelector('#side [data-go="stats"]'), '#1845: no notes / statistics row in the organisation');
   let ids = pal(w);
-  check(!['v:habits', 'v:review', 'v:stats', 'v:life', 'v:family', 'v:a-review', 'v:a-life', 'a:newhabit'].some(x => ids.includes(x)), '#1845: the search offers no private modules: ' + ids.filter(x => x.startsWith('v:')).join(','));
+  check(!['v:habits', 'v:life', 'v:family', 'v:a-life', 'a:newhabit'].some(x => ids.includes(x)), '#1845: the search offers no private modules: ' + ids.filter(x => x.startsWith('v:')).join(','));
+  check(ids.includes('v:a-review') || ids.includes('v:review'), '#3406: the search offers the review in the organisation: ' + ids.filter(x => x.startsWith('v:')).join(','));
   check(ids.includes('v:a-time') || ids.includes('v:time'), '#1845: the search still offers Time');
   // Private: all of it again
   await w.eval('wsSet("private")'); await sleep(200);
@@ -56,17 +58,18 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   w = await boot({user: 'alice', hash: 'today', mobile: true, ls: {'tasks.ws': `"org:${ORG}"`, 'tasks.tabbar': JSON.stringify(['s:today', 'm:habits', 'a:review', 'a:time'])}}); d = w.document;
   await until(() => d.querySelector('#tabs button'), 40);
   const tabs = () => [...d.querySelectorAll('#tabs [data-go]')].map(x => x.dataset.go);
-  check(!tabs().includes('habits') && !tabs().some(g => g === 'review' || g === 'stats'), '#1845: no habits / review tab in the organisation: ' + tabs());
+  check(!tabs().includes('habits'), '#1845: no habits tab in the organisation: ' + tabs());
+  check(tabs().some(g => g === 'review' || g === 'stats'), '#3406: the review tab stays in the organisation: ' + tabs());
   check(tabs().some(g => g === 'time' || g === 'pomo'), '#1845: the Time tab stays: ' + tabs());
   const more = w.eval('tabOverflow().more.map(t => t.mod || t.id)');
-  check(!more.some(m => ['habits', 'review', 'stats', 'life'].includes(m)), '#1845: "More" offers no private modules: ' + more);
+  check(!more.some(m => ['habits', 'life'].includes(m)), '#1845: "More" offers no private modules: ' + more);
   check(JSON.parse(w.localStorage.getItem('tasks.tabbar')).includes('m:habits'), '#1845: the pinned tabs stay pinned (only hidden)');
   await w.eval('wsSet("private")'); await sleep(200);
   check(tabs().includes('habits') && tabs().some(g => g === 'review' || g === 'stats'), '#1845: Private shows the habits / review tabs again: ' + tabs());
   w.close();
 
   // ================= an old link in the organisation's view: quietly to Private, then the page
-  for (const h of ['review', 'habits']) {
+  for (const h of ['habits']) {  // 2.398.0 (#3406): #review stays in the organisation (below)
     await call('PATCH', '/api/settings', {workspace: 'org:' + ORG});
     w = await boot({user: 'alice', hash: h, ls: {'tasks.ws': `"org:${ORG}"`}}); d = w.document;
     await until(() => w.eval('S.route && S.route.mod') === h, 40);
@@ -75,6 +78,15 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
     check(!d.querySelector('#toast.err, .toast.err'), `#1845: #${h} shows no error`);
     await until(async () => ((await call('GET', '/api/state')).settings || {}).workspace === 'private', 30);
     check(((await call('GET', '/api/state')).settings || {}).workspace === 'private', `#1845: #${h}: the server knows Private`);
+    w.close();
+  }
+
+  // 2.398.0 (#3405 #3406): #review, #stats and #notes open in the organisation's view, without switching to Private
+  for (const h of ['review', 'stats', 'notes']) {
+    await call('PATCH', '/api/settings', {workspace: 'org:' + ORG});
+    w = await boot({user: 'alice', hash: h, ls: {'tasks.ws': `"org:${ORG}"`}}); d = w.document;
+    await until(() => w.eval('S.route && S.route.mod') === h, 40);
+    check(w.eval('S.route.mod') === h && w.eval('wsCur()') === 'org:' + ORG, `#3405 #3406: #${h} stays in the organisation: ${w.eval('S.route.mod')} / ${w.eval('wsCur()')}`);
     w.close();
   }
 
