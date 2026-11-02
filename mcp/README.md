@@ -107,7 +107,7 @@ still apply on top. A misspelled package name ends the server with exit code 2. 
 |---|---|---|
 | Projects and tasks | `list_lists`, `list_tasks`, `search_tasks`, `get_task`, `list_subtasks`, `get_dependencies`, `get_project_overview` | `read` |
 | Change tasks | `create_task`, `update_task`, `complete_task`, `move_task`, `batch_tasks`, `set_waiting`, `check_in_habit` | `tasks:write` |
-| Comments and chat | `add_comment`, `add_decision` (2.392.0), `react` (`remove: true` takes a reaction back), `send_chat`, `react_to_chat` (`emoji`, `remove`), `list_chats`, `request_chat_approval` | `comments`, `read` |
+| Comments and chat | `add_comment`, `add_decision` (2.392.0), `set_delivery` (2.392.2), `react` (`remove: true` takes a reaction back), `send_chat`, `react_to_chat` (`emoji`, `remove`), `list_chats`, `request_chat_approval` | `comments`, `read` |
 | Files of tasks and projects | `list_attachments`, `get_attachment` (`source`: `task`, `chat`, `team` or `project`), `read_attachment`, `upload_attachment` | `attachments:read`, `attachments:write` |
 | File store | the folders and files shared with the agent | `files:read`, `files:write` |
 | Structure | projects, sections, fields, project tags, templates, saved filters, folders | `structure` |

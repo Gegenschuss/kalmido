@@ -4,8 +4,8 @@
 waiting_for(c, uid) gathers, only from what uid sees and only what uid can settle: waiting jobs (job_may_act, a proposal of
 theirs that is ready), open approval cards from the chat and from comments, open merge / integrate / deploy requests, reviews
 with uid as the reviewer, their own blocked tasks, and tasks marked irreversible without a yes where the list asks for one.
-With agent_id only the lists shared with that agent count (as the briefing). Parked tasks (#3365) and watchdog findings
-(#3366) do not exist yet; they join as kinds of their own here.
+With agent_id only the lists shared with that agent count (as the briefing). 2.392.2 (#3365): their own parked tasks
+(kind parked, the same "mine" as blocked). Watchdog findings (#3366) join as a kind of their own here.
 
 Each kind holds at most WAIT_MAX items (counts stop there as well), newest first; a kind reads at most WAIT_SCAN rows. Nothing
 here writes or formulates. The texts of a list with the lock stay ciphertexts for the web app; le2b_v1_mask empties them in
@@ -176,6 +176,15 @@ def _irreversible(s):
     return out[:WAIT_MAX]
 
 
+def _parked(s):
+    """2.392.2 (#3365): my own parked tasks (mine: assigned to me, or unassigned in a list I own -- as the blocked ones)."""
+    rows = s.c.execute(f"""SELECT t.id, t.title, t.list_id, t.delivery_at, t.delivery_note, l.name AS list_name, l.is_inbox FROM tasks t
+                           JOIN lists l ON l.id=t.list_id WHERE t.delivery='parked' AND t.status=0 AND t.deleted_at IS NULL
+                           AND ((l.owner_id=? AND t.assignee_id IS NULL) OR t.assignee_id=?) AND t.list_id IN ({s.ql}) AND {s.vis}
+                           ORDER BY t.delivery_at DESC, t.id DESC LIMIT {WAIT_MAX}""", (s.uid, s.uid)).fetchall()
+    return [_item("parked", r["id"], r["title"], r["delivery_at"], r, why=r["delivery_note"] or "") for r in rows]
+
+
 def _no_request_texts(c, items):
     """A list with the lock: what an agent wrote into its request stays out; the task's own title is the cipher the app opens."""
     locked = le2b_locked_lists(c, {x["list_id"] for x in items if x["list_id"]})
@@ -191,7 +200,7 @@ def waiting_for(c, uid, *, agent_id=None):
     """-> {total, counts: {kind: n}, items: [...]} for person uid, the kinds in the order of WAIT_KINDS."""
     s = _Scope(c, uid, agent_id)
     by = {"job": _jobs(s), "approval": sorted(_chat_cards(s) + _comment_cards(s), key=lambda x: x["at"] or "", reverse=True)[:WAIT_MAX],
-          "gate": _gates(s), "review": _reviews(s), "blocked": _blocked(s), "irreversible": _irreversible(s)}
+          "gate": _gates(s), "review": _reviews(s), "blocked": _blocked(s), "irreversible": _irreversible(s), "parked": _parked(s)}
     items = _no_request_texts(c, [x for k in WAIT_KINDS for x in by[k]])
     return {"total": len(items), "counts": {k: len(by[k]) for k in WAIT_KINDS}, "items": items}
 

@@ -3741,6 +3741,9 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 .lc a.lnk{color:var(--muted);text-decoration:none}
 .lc a.lnk:hover{color:var(--accent)}
 .lcols .tchip,.lcols .subc,.lcols .blk,.lcols .crd{display:inline-flex;align-items:center;gap:.25rem}
+/* 2.392.2 (#3365): the delivery state on a row / in its column */
+.dvchip{display:inline-flex;align-items:center;gap:.25rem;color:var(--muted)}
+.dvchip.dv-parked{color:var(--p3)}
 .lchead{display:flex;align-items:center;gap:.75rem;padding:0 .5rem .25rem .75rem;border-bottom:1px solid var(--line);margin-bottom:2px;font:500 var(--fs-xs)/var(--lh-tight) var(--mono);color:var(--muted)}
 .lchead .spacer{flex:1}
 /* 2.31.0 (#354): the column titles sort on click; the row wrapper only carries the table semantics */

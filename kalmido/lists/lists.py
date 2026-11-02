@@ -49,6 +49,8 @@ def group_field_check(c, lid, v):
     of this list; None = invalid."""
     if v in (None, ""):
         return ""
+    if v == "delivery":  # 2.392.2 (#3365): grouped by the delivery state of the tasks
+        return v
     if isinstance(v, bool):
         return None
     m = re.fullmatch(r"(?:cf:)?(\d{1,9})", str(v)) if isinstance(v, (str, int)) else None
@@ -56,7 +58,7 @@ def group_field_check(c, lid, v):
         return None
     r = c.execute("SELECT type FROM list_fields WHERE id=? AND list_id=?", (int(m.group(1)), lid)).fetchone()
     return f"cf:{int(m.group(1))}" if r and r["type"] in GROUP_FIELD_TYPES else None
-LIST_SORT_RE = r"cf:\d{1,9}(_desc)?|col:(who|tags|time|progress|deps)(_desc)?"
+LIST_SORT_RE = r"cf:\d{1,9}(_desc)?|col:(who|tags|time|progress|deps|delivery)(_desc)?"
 LIST_VIEWS = ("list", "kanban", "timeline", "mindmap", "calendar")  # 2.49.0 (#1201): + mind map; 2.156.0 C (#2071): + calendar
 LIST_COLOR_RE = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})")
 LIST_NAME_MAX, FOLDER_MAX = 200, 100
@@ -152,7 +154,7 @@ def folder_path_migration(c):
 # 2.14.0 (#425): list columns. One setting per list for every member (owner / list admins change it): which columns the
 # rows show and in which order. Keys: COL_KEYS plus "f:<field id>" for the list's custom fields; "id" is the task number in
 # front of the title. NULL (API null) = the default layout (date, assignee, time; fields as chips).
-COL_KEYS = ("id", "due", "prio", "who", "tags", "time", "progress", "deps", "created")
+COL_KEYS = ("id", "due", "prio", "who", "tags", "time", "progress", "deps", "created", "delivery")  # 2.392.2 (#3365): delivery
 COL_MAX = 40
 COL_DOC = ("2.14.0 (#425): the columns of the list's rows in order, the same for every member: id (task number in front of the "
            "title), due, prio, who (assignee), tags, time (tracked), progress (subtasks), deps (dependencies), created, and "

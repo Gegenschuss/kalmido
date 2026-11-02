@@ -183,6 +183,14 @@ def openapi_spec():
     task_props["irreversible"] = {"type": ["object", "null"], "description": "2.392.0: a one-way step: PATCH {reason} marks the task (a "
                                   "new reason takes a yes back), null takes the mark off (people only). Read: reason, yes_by, yes_at. Where the "
                                   "project has irreversible_needs_yes on, integrate / deploy requests stay open until a person said yes"}
+    task_props["delivery"] = {"type": ["object", "null"], "description": "2.392.2: the delivery state, next to code.build.state (which stays "
+                              "released / main / branch / none). PATCH {state: in_progress | parked | waiting, note?, job_id?, task_id?}; null clears "
+                              "it. in_progress: job_id = an open job of this task (an agent: its own; omitted = the newest one); a running job of "
+                              "the task sets it by itself and ending the job clears it. parked: note = the reason (required). waiting: task_id = "
+                              "the task it waits for and / or note. Read: state, note, job_id, task_id, since, by. Filter: GET /tasks?delivery=",
+                              "properties": {"state": {"type": "string", "enum": ["in_progress", "parked", "waiting"]}, "note": {"type": "string"},
+                                             "job_id": {"type": ["integer", "null"]}, "task_id": {"type": ["integer", "null"]},
+                                             "since": {"type": ["string", "null"]}, "by": {"type": ["integer", "null"]}}}
     task_props["points"] = nul("integer", enum=[1, 2, 3, 5, 8, 13, None], description="2.60.0: story points (Fibonacci); "
                                "null = none. Always stored; the app shows them where the project has story points on (points_on)")
     # 2.111.0 C (#2057): a reminder at a fixed local time, with or without a due date
@@ -591,6 +599,7 @@ def openapi_spec():
                      q("assignee_group", "2.10.0: mine (assigned to one of your groups) or a group id"),
                      q("delegate", "2.473.0: me, none or an agent id (the task is delegated to it)"),
                      q("watcher", "2.473.0: me or a user id (who watches the task)"),
+                     q("delivery", "2.392.2: in_progress, parked, waiting or none (no delivery state), several comma separated"),
                      q("updated_since", "Changed since (ISO date-time)", {"type": "string", "format": "date-time"}),
                      q("parent_id", "Subtasks of this task", {"type": "integer"}), q("top_level", "true = no subtasks", {"type": "boolean"}),
                      q("fields", "compact = only id, title, list_id, section_id, parent_id, status, due, due_time, priority, tags, "

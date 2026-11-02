@@ -18,6 +18,7 @@ from ..accounts.session import me
 from ..core.access import Denied, need_task, task_visible
 from ..core.serializers import unlink_files
 from ..tasks.validation import as_int, log_act
+from ..tasks.deliver import dv_job_ended  # 2.392.2 (#3365)
 from ..tasks.attachments import safe_name, send_stored, unexec_name
 from ..collab.comments import user_names
 from ..core.errors import BadInput, UnknownFields, web_fields
@@ -153,6 +154,8 @@ def agent_job_action(jid):
     ts = iso(now_utc())
     c.execute("UPDATE agent_jobs SET action=?, action_by=?, action_at=?, state=?, updated_at=? WHERE id=?",
               (action, me(), ts, state, ts, jid))
+    if state == "stopped":
+        dv_job_ended(c, jid)  # 2.392.2 (#3365): a person stopped it: its in_progress marks go
     j = c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone()
     data = {"job": job_dict(c, j), "action": action, "user": {"id": me(), "name": user_names(c, [me()]).get(me(), "")}}
     if j["task_id"]:

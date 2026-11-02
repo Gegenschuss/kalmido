@@ -82,3 +82,76 @@ document.addEventListener('change', async e => {
   try { await api('PATCH', '/api/lists/' + l.id, {irreversible_needs_yes: on}); } catch { e.target.checked = !on; return; }
   l.irreversible_needs_yes = on ? 1 : 0; render();
 });
+// ---- 2.392.2 (#3365): the delivery state of a task (tasks/deliver.py): in progress (a job), parked (a reason), waiting (a
+// task or a note); next to the build state of the code. A bar in the task panel, the menu, a list column, grouping and filter.
+const DV_NAMES = {in_progress: N_('In progress'), parked: N_('Parked'), waiting: N_('Waiting')};
+const DV_ICON = {in_progress: 'play', parked: 'pause', waiting: 'clock'};
+const dv_state = t => t && DV_NAMES[t.delivery] ? t.delivery : '';
+function dv_text(t) {  // "Parked: reason", "Waiting for #12 Title", "In progress (job 82)"
+  const st = dv_state(t); if (!st) return '';
+  const dep = t.delivery_task_id && taskById(t.delivery_task_id);
+  const bits = [st === 'waiting' && t.delivery_task_id ? tr('for {0}', dep ? `#${dep.id} ${dep.title}` : '#' + t.delivery_task_id) : '',
+    st === 'in_progress' && t.delivery_job_id ? tr('Job {0}', t.delivery_job_id) : '', t.delivery_note || ''].filter(Boolean);
+  return bits.join(' · ');
+}
+function dv_barHtml(t, ro) {
+  const st = dv_state(t); if (!st) return '';
+  const tx = dv_text(t), since = t.delivery_at ? tr('since {0}', fmtWhen(t.delivery_at)) : '';
+  return `<section class="owbar dvbar" aria-label="${esc(tr('Delivery state'))}">${ic(DV_ICON[st], 's')}<div class="owt"><b>${esc(tr(DV_NAMES[st]))}</b>${tx ? `<span>${esc(tx)}</span>` : ''}${since ? `<span class="muted">${esc(since)}</span>` : ''}</div>
+    ${ro ? '' : `<div class="owb"><button type="button" class="btn sm" data-dv="${st === 'waiting' ? 'wait' : 'park'}">${esc(tr('Change'))}</button><button type="button" class="btn sm" data-dv="clear">${esc(tr('Clear'))}</button></div>`}</section>`;
+}
+function dv_draw() { const t = taskById(S.sel), b = $('#d-dv'); if (t && b) b.innerHTML = dv_barHtml(t, ow_ro(t)); }
+function dv_setLocal(t, d) {
+  t.delivery = d?.state || ''; t.delivery_note = d?.note || ''; t.delivery_job_id = d?.job_id ?? null;
+  t.delivery_task_id = d?.task_id ?? null; t.delivery_at = d?.since ?? null; t.delivery_by = d?.by ?? null;
+  dv_draw(); render();
+}
+async function dv_put(id, body) {
+  const t = taskById(id); if (!t) return;
+  const j = body ? await api('PUT', `/api/tasks/${id}/delivery`, body) : await api('DELETE', `/api/tasks/${id}/delivery`);
+  dv_setLocal(t, j.delivery);
+}
+const dv_locked = t => !!listById(t.list_id)?.e2e;
+async function dv_park(id) {
+  const t = taskById(id); if (!t) return;
+  if (dv_locked(t)) {  // a list with the lock: no text on the server
+    if (await askConfirm(tr('Park with a reason'), tr('This project is encrypted: the state stays without a reason.'), {ok: tr('Park')})) await dv_put(id, {state: 'parked'});
+    return;
+  }
+  const v = await askPrompt(tr('Why is it parked?'), dv_state(t) === 'parked' ? t.delivery_note : '', {ok: tr('Park'), input: {max: 500}});
+  if (v === null || !v.trim()) return;
+  await dv_put(id, {state: 'parked', note: v.trim()});
+}
+async function dv_wait(id) {
+  const t = taskById(id); if (!t) return;
+  if (dv_locked(t)) { await dv_put(id, {state: 'waiting'}); return; }
+  const v = await askPrompt(tr('What does it wait for? A task number (#12) or a short note'), dv_state(t) === 'waiting' ? (t.delivery_task_id ? '#' + t.delivery_task_id : t.delivery_note) : '', {ok: tr('Save'), input: {max: 500}});
+  if (v === null || !v.trim()) return;
+  const m = /^#?(\d{1,12})$/.exec(v.trim());
+  await dv_put(id, m ? {state: 'waiting', task_id: +m[1]} : {state: 'waiting', note: v.trim()});
+}
+const dv_menuItems = t => t.id > 0 && !ow_ro(t) && t.status === 0 ? [
+  {label: dv_state(t) === 'parked' ? tr('Change the parking reason') : tr('Park with a reason'), icon: 'pause', fn: () => dv_park(t.id).catch(() => {})},
+  {label: tr('Waiting for…|delivery'), icon: 'clock', fn: () => dv_wait(t.id).catch(() => {})},
+  ...(dv_state(t) ? [{label: tr('Clear the delivery state'), icon: 'x', fn: () => dv_put(t.id, null).catch(() => {})}] : [])] : [];
+document.addEventListener('click', async e => {
+  const b = e.target.closest?.('[data-dv]'); if (!b) return;
+  const id = S.sel;
+  try {
+    if (b.dataset.dv === 'park') await dv_park(id);
+    else if (b.dataset.dv === 'wait') await dv_wait(id);
+    else if (b.dataset.dv === 'clear') await dv_put(id, null);
+  } catch { /* api() said it */ }
+});
+// the row: a chip for parked / waiting (in progress shows as the working dot); the list column "Delivery"
+function dv_cell(t) {
+  const st = dv_state(t); if (!st || t.status !== 0) return '';
+  return `<span class="dvchip dv-${st}" title="${esc([tr(DV_NAMES[st]), dv_text(t)].filter(Boolean).join(': '))}">${ic(DV_ICON[st], 's')}<span class="lbl">${esc(tr(DV_NAMES[st]))}</span></span>`;
+}
+const dv_chip = t => dv_state(t) && dv_state(t) !== 'in_progress' ? dv_cell(t) : '';
+// grouping (lists.group_field = "delivery"): In progress, Waiting, Parked, then the rest
+function dv_groups(lid, arr, dn = []) {
+  const mk = p => dsxMerge(arr.filter(p), dn.filter(p));
+  return [...['in_progress', 'waiting', 'parked'].map(k => ({id: `dv:${lid}:${k}`, name: tr(DV_NAMES[k]), tasks: mk(t => dv_state(t) === k)})),
+    {id: `dv:${lid}:n`, name: tr('No delivery state'), tasks: mk(t => !dv_state(t))}].filter(g => g.tasks.length).map(g => ({...g, cls: 'lgf'}));
+}

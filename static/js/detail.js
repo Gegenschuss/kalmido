@@ -712,7 +712,7 @@ function renderDetail0() {
       ${t.waiting_at && !ck ? waitBar(t, ro) : ''}
       ${ck ? '' : approvalBar(t, ro)}
       ${ck ? '' : rvw_barHtml(t, ro)}${''/* 2.60.0 C (#1512): reviewer + review state (review.js) */}
-      ${ck || !(t.id > 0) ? '' : `<div id="d-ow">${ow_barHtml(t, ro)}</div><div id="d-dec">${ow_decHtml(t)}</div>`}${''/* 2.392.0 C (#3370): the one-way mark, the decisions (oneway.js) */}
+      ${ck || !(t.id > 0) ? '' : `<div id="d-dv">${dv_barHtml(t, ro)}</div><div id="d-ow">${ow_barHtml(t, ro)}</div><div id="d-dec">${ow_decHtml(t)}</div>`}${''/* 2.392.0 C (#3370): the one-way mark, the decisions (oneway.js) */}
       ${ck || ro ? '' : dupHintHtml(t)}
       ${le2uLk ? '' : t.note_locked && typeof ln_html === 'function' ? ln_html(t, ro) : noteOut ? `<div class="muted" id="d-note-wait">${esc(TKN_ERR.has(t.id) ? TKN_ERR.get(t.id) || tr('Not found') : TKN_OFF.has(t.id) ? tr('Only available online.') : tr('Loading…'))}</div>` : `${''/* 2.48.0 (#1642): a locked note replaces the description (notelock.js); 2.280.0 A (#3108): a note still loading: no field */}
       ${mdMode && !ro && (isTouch() || td_mdPenOnly()) ? `<div class="mdbox"><button type="button" class="iconbtn mdpen" data-act="md-edit" title="${esc(tr('Edit description'))}" aria-label="${esc(tr('Edit description'))}">${ic('edit', 's')}</button>` : ''}

@@ -140,7 +140,7 @@ function multiDateMenu(a) {
 function filterModal(id) {
   const f = id ? S.filters.find(x => x.id === id) : {name: '', rules: {}};
   if (!f) return;
-  const r = {op: 'and', lists: [], dates: [], prios: [], types: [], tags: [], who: [], secs: [], sprints: [], ms: [], text: '', ...JSON.parse(JSON.stringify(f.rules || {}))};
+  const r = {op: 'and', lists: [], dates: [], prios: [], types: [], tags: [], who: [], secs: [], sprints: [], ms: [], dlv: [], text: '', ...JSON.parse(JSON.stringify(f.rules || {}))};
   r.cf = r.cf && typeof r.cf === 'object' ? r.cf : {};
   // custom fields of the visible lists that the filter engine understands
   const cfs = (fieldsOn() ? S.fields || [] : []).filter(x => ['select', 'checkbox', 'date', 'number', 'multiselect', 'currency', 'rating'].includes(x.type) && listById(x.list_id) && !listById(x.list_id).archived);
@@ -175,6 +175,7 @@ function filterModal(id) {
     ${secs.length || r.secs.length ? `<h4>${tr('Column')}</h4>${chips('secs', [...secs, ['none', tr('No column')]])}` : ''}
     ${sprOn ? `<h4>${tr('Sprint')}</h4>${chips('sprints', [['cur', tr('Current sprint')], ['none', tr('Backlog')]])}` : ''}
     ${mss.length || r.ms.length ? `<h4>${tr('Milestone')}</h4>${chips('ms', [...mss, ['none', tr('No milestone')]])}` : ''}
+    <h4>${tr('Delivery state')}</h4>${chips('dlv', [...Object.entries(DV_NAMES), ['none', N_('No delivery state')]], true)}${''/* 2.392.2 (#3365) */}
     <h4><label for="f-text">${tr('Text')}</label></h4><input id="f-text" value="${esc(r.text)}" placeholder="${esc(tr('Title or notes contain …'))}" autocomplete="off">
     <div class="muted" id="f-count" style="font-size:var(--fs-m);margin-top:.875rem"></div>
     <div class="foot">${id ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);

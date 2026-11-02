@@ -1156,6 +1156,7 @@ ROUTES = {
     # 2.60.0 C (#1512): the review step (need_task / need_list of the task's list; p260_c_api_test.py: a stranger 404, a viewer 403)
     "POST /api/tasks/{}/review": "task", "POST /api/v1/tasks/{}/review": "task",
     "PUT /api/tasks/{}/irreversible": "task", "DELETE /api/tasks/{}/irreversible": "task", "POST /api/tasks/{}/irreversible-yes": "task",  # 2.392.0 C (#3370)
+    "PUT /api/tasks/{}/delivery": "task", "DELETE /api/tasks/{}/delivery": "task",  # 2.392.2 (#3365)
     "GET /api/tasks/{}/decisions": "task", "POST /api/tasks/{}/decisions": "task", "GET /api/v1/tasks/{}/decisions": "task", "POST /api/v1/tasks/{}/decisions": "task",
     "PUT /api/lists/{}/review": "list", "PUT /api/v1/lists/{}/review": "list",
     # 2.61.0 (#1818): the virus scanner's state + counts for the server admin (no file, no content; p261_a_api_test.py: 403 for others)

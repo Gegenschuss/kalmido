@@ -32,7 +32,8 @@ LE2B_TEXT_KEYS = frozenset(("title", "notes", "content", "url", "body", "text", 
                             "description", "prev", "note_title", "note_body"))
 # history data keys that never carry a text of the task (everything else of a locked list is dropped)
 LE2B_ACT_SAFE = frozenset(("via", "due", "time", "start", "p", "from", "to_id", "n", "id", "rule", "inbox", "status", "kind",
-                           "count", "e2e", "user_id", "assignee", "group_id", "blocker", "child", "files", "emoji", "role", "on"))
+                           "count", "e2e", "user_id", "assignee", "group_id", "blocker", "child", "files", "emoji", "role", "on",
+                           "state"))  # 2.392.2 (#3365): the delivery state (an enum; ids stay anyway)
 
 
 def le2b_msg():
@@ -435,6 +436,7 @@ def le2b_scrub_tasks(c, ids):
         c.execute(f"UPDATE time_entries SET task_title='' WHERE task_id IN ({q})", part)
         # 2.392.0 C (#3370): the server cannot encrypt them: the reason goes, a decision keeps who and when, its text the neutral word
         c.execute(f"UPDATE tasks SET irreversible_reason='' WHERE irreversible_reason<>'' AND id IN ({q})", part)
+        c.execute(f"UPDATE tasks SET delivery_note='' WHERE delivery_note<>'' AND id IN ({q})", part)  # 2.392.2 (#3365): as the reason
         c.execute(f"UPDATE task_decisions SET text=? WHERE task_id IN ({q})", (le2e_neutral(), *part))
         c.execute(f"DELETE FROM tidy_pending WHERE task_id IN ({q})", part)
     return n

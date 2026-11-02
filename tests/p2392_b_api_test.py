@@ -13,6 +13,7 @@ freelancer-matrix: tasks
    is released, then tag Y completes it; sent again = nothing new; honest answers without a version field / for a wrong version /
    without write access; a stranger: 404
  - a select field as version field; a person without an organisation; OpenAPI
+ - 2.392.2 (#3365): a parked task stays open, cleared the next pass completes it
 usage: p2392_b_api_test.py <datadir>"""
 import json
 import os
@@ -140,7 +141,7 @@ for uid, role in ((ids["bob"], "edit"), (AG, "edit"), (ids["vera"], "view"), (id
     r = A.put(B + f"/api/lists/{P}/members", json={"user_id": uid, "role": role})
     assert r.ok, f"{uid} {role} {r.status_code} {r.text}"
 FP = A.post(B + f"/api/lists/{P}/fields", json={"name": "Paket", "type": "text"}).json()["id"]
-T = {k: A.post(B + "/api/tasks", json={"title": f"Task {k}", "list_id": P}).json()["id"] for k in range(1, 9)}
+T = {k: A.post(B + "/api/tasks", json={"title": f"Task {k}", "list_id": P}).json()["id"] for k in range(1, 10)}  # 2.392.2 (#3365): + T[9] parked
 assert A.patch(B + f"/api/tasks/{T[2]}", json={"fields": {str(FP): "2.10"}}).ok
 g = STATE["8090"]["acme/app"] = {
     "default_branch": "main", "pulls": [],
@@ -258,6 +259,9 @@ off_reqs = len(git_log()) - n0
 assert A.patch(B + f"/api/tasks/{T[8]}", json={"fields": {str(FP): "2.10"}}).ok
 assert A.patch(B + f"/api/lists/{P}", json={"irreversible_needs_yes": True}).ok
 assert A.put(B + f"/api/tasks/{T[8]}/irreversible", json={"reason": "drops a column"}).ok
+# 2.392.2 (#3365): a parked task stays open, cleared the next pass completes it
+assert A.patch(B + f"/api/tasks/{T[9]}", json={"fields": {str(FP): "2.10"}}).ok
+assert A.put(B + f"/api/tasks/{T[9]}/delivery", json={"state": "parked", "note": "waits for the client"}).ok
 check(A.put(B + f"/api/lists/{P}/repos/close-release", json={"on": True}).json().get("on") is True, "switched on")
 check(A.get(B + f"/api/lists/{P}/repos").json().get("close_release") is True, "repos: on")
 check(until(lambda: status(T[1]) == 2 and status(T[2]) == 2), "commit in a tag and released package: completed")
@@ -265,9 +269,12 @@ check(dbq("SELECT kind, ref, versions FROM git_closes WHERE task_id=?", (T[1],))
 check(status(T[3]) == 0, "only in main: stays open")
 check(status(T[5]) == 0, "waiting for Y: an old commit tag does not complete it")
 check(status(T[8]) == 0, "a one-way step without a yes: stays open")
+check(status(T[9]) == 0, "#3365: a parked task stays open")
+check(A.delete(B + f"/api/tasks/{T[9]}/delivery").ok, "#3365: parking cleared")
 check(A.post(B + f"/api/tasks/{T[8]}/irreversible-yes").ok, "the yes")
 polls(CID)
 check(until(lambda: status(T[8]) == 2), "with the yes the next pass completes it")
+check(until(lambda: status(T[9]) == 2), "#3365: no longer parked: the next pass completes it")
 act = [x[0] for x in dbq("SELECT data FROM activity WHERE task_id=? AND kind='git_done'", (T[1],))]
 da = act[0] if act and isinstance(act[0], dict) else json.loads(act[0]) if act else {}
 check(len(act) == 1 and da.get("kind") == "release" and da.get("title") == "2.10.0", f"activity {act}")

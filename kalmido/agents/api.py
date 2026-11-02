@@ -35,6 +35,7 @@ from ..agents.agentrules import ar_public  # 2.235.0 C (#2903)
 from ..agents.steps import host_info_in, host_info_set, steps_end  # 2.369.5 (#2517): pulled up from functions
 from ..agents.jobchat import jcs_start_notice  # 2.369.5 (#2517): pulled up from functions
 from ..agents.chat import chat_unlink_trimmed, h6e_agent_push_ok  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.deliver import dv_job_ended, dv_job_started  # 2.392.2 (#3365)
 
 
 # ---- agents: the REST API of the agent itself (token of an agent account)
@@ -405,6 +406,7 @@ def v1_agent_job_create():
     c.execute("""DELETE FROM agent_jobs WHERE agent_id=? AND state NOT IN ('running','waiting') AND id<=(SELECT id FROM agent_jobs
                  WHERE agent_id=? ORDER BY id DESC LIMIT 1 OFFSET ?)""", (aid, aid, AGENT_JOBS_KEEP))
     job_notify(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), None)
+    dv_job_started(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), [f["task_id"]] if f.get("task_id") else [])  # 2.392.2 (#3365)
     jcs_start_notice(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone())  # 2.153.0 (#1962): its start line
     if log:
         steps_job_log(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), log)  # 2.32.0 (#1081)
@@ -472,6 +474,10 @@ def v1_agent_job_update(jid):
     if b.get("append_log"):  # 2.32.0 (#1081): a progress line is a heading of the job's history
         steps_job_log(c, j2, b["append_log"])
     job_notify(c, j2, j["state"])
+    if j2["state"] != j["state"] and j2["state"] not in ("running", "waiting"):
+        dv_job_ended(c, jid)  # 2.392.2 (#3365): its in_progress marks go (or move to another open job of the task)
+    elif j2["state"] == "running" and j["state"] != "running":
+        dv_job_started(c, j2, [j2["task_id"]] if j2["task_id"] else [])  # running again: back where the task is free
     if (j2["state"], j2["title"]) != (j["state"], j["title"]):
         bump(c)  # a log line alone does not make every client reload
     c.commit()
@@ -552,6 +558,7 @@ def wk_set(c, aid, tid, b, j):
                               VALUES(?,?,?,'running',?,?,?,?)""", (aid, tid, title[:JOB_TITLE_MAX], text, ts, ts, name))
         c.execute("""DELETE FROM agent_jobs WHERE agent_id=? AND state NOT IN ('running','waiting') AND id<=(SELECT id FROM agent_jobs
                      WHERE agent_id=? ORDER BY id DESC LIMIT 1 OFFSET ?)""", (aid, aid, AGENT_JOBS_KEEP))
+        dv_job_started(c, c.execute("SELECT * FROM agent_jobs WHERE id=?", (jid,)).fetchone(), [tid])  # 2.392.2 (#3365)
         code = 201
     bump(c)  # the tasks area: the windows that show the task take it with the delta
     c.commit()
@@ -604,6 +611,7 @@ def v1_task_working_end(tid):
     n = c.execute(f"""UPDATE agent_jobs SET state=?, updated_at=? WHERE agent_id=? AND task_id=? AND state='running' AND kind IS NULL
                      AND COALESCE(approval, '')=''{' AND id=?' if one else ''}""", (st, iso(now_utc()), aid, tid, *((one["id"],) if one else ()))).rowcount
     if n:
+        dv_job_ended(c)  # 2.392.2 (#3365): the marks of the jobs that ended here
         bump(c)
     c.commit()
     return jsonify(working=wk_for(c, {tid}).get(tid), ended=n)

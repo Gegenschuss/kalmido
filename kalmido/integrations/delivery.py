@@ -23,6 +23,7 @@ from .gitbuild import gb_key, gb_untrusted, git_build_for
 
 WAIT_MAX = 100  # 2.392.0 D (#3369): agents/waiting.py, its OpenAPI text stands below (api.openapi reads no module of the agents layer)
 WAIT_KINDS = ("job", "approval", "gate", "review", "blocked", "irreversible")
+WAIT_KINDS += ("parked",)  # 2.392.2 (#3365): my own parked tasks (why = the reason)
 GATE_ALL = ("merge_request", "integrate", "deploy")
 DELIVERY_MAX = 100  # rows per section (the counts are complete)
 DL_SECTIONS = ("released", "in_main", "in_progress", "stuck", "completed")
@@ -77,7 +78,7 @@ def delivery_report(c, lid, uid, lo, hi, first):
     st = project_status(c, lid, uid, frm=first, to=local_now().date(), with_time=False, bounds=(lo, hi), cap=100000)
     tags = _released_tags(c, lid, lo, hi)
     linked = _tagged(c, lid, sorted(tags.values()))
-    rows = c.execute(f"""SELECT t.id, t.title, t.list_id, t.status, t.due, t.completed_at FROM tasks t WHERE t.list_id=? AND t.deleted_at IS NULL
+    rows = c.execute(f"""SELECT t.id, t.title, t.list_id, t.status, t.due, t.completed_at, t.delivery, t.delivery_note FROM tasks t WHERE t.list_id=? AND t.deleted_at IS NULL
                          AND t.parent_id IS NULL AND t.ms=0 AND {tvis(c, uid, 't.')}
                          AND (t.status=0 OR (t.completed_at>=? AND t.completed_at<?) OR t.id IN ({','.join(str(int(x)) for x in linked) or '0'}))
                          ORDER BY t.id DESC""", (lid, lo, hi)).fetchall()
@@ -108,6 +109,8 @@ def delivery_report(c, lid, uid, lo, hi, first):
             out["in_main"].append(row(r, b))
         elif state == "released" or r["status"] != 0:
             pass
+        elif r["delivery"] == "parked":  # 2.392.2 (#3365): held on purpose, with its reason
+            out["stuck"].append(row(r, b, reason="parked", wait_note=r["delivery_note"] or None))
         elif jobs.get(r["id"]) == "waiting":
             out["stuck"].append(row(r, b, reason="job"))
         elif r["id"] in blocked:
@@ -115,7 +118,7 @@ def delivery_report(c, lid, uid, lo, hi, first):
             out["stuck"].append(row(r, b, reason=x["reason"], wait_note=x["wait_note"]))
         elif state == "branch" and r["id"] not in moved:
             out["stuck"].append(row(r, b, reason="branch"))
-        elif r["id"] in moved or r["id"] in jobs or state == "branch":
+        elif r["id"] in moved or r["id"] in jobs or state == "branch" or r["delivery"] == "in_progress":
             out["in_progress"].append(row(r, b))
     out["completed"] = [{"id": x["id"], "title": x["title"], "completed_at": x["completed_at"]} for x in st["done"]]
     counts = {k: len(out[k]) for k in DL_SECTIONS}
@@ -126,12 +129,15 @@ def delivery_report(c, lid, uid, lo, hi, first):
 def delivery_markdown(d, lg):
     day = lambda v: short_day((parse_iso(v) - timedelta(seconds=1)).astimezone(TZ).date(), lg, year=True)  # noqa: E731  (until is exclusive)
     L = [f"# {tr('Delivery report: {0}', d['list']['name'], lg=lg)}", "", tr("Period: {0} – {1}", day(d["since"]), day(d["until"]), lg=lg)]
-    why = {"job": tr("a job waits", lg=lg), "branch": tr("branch without a merge", lg=lg), "blocked": tr("waiting for another task", lg=lg)}
+    why = {"job": tr("a job waits", lg=lg), "branch": tr("branch without a merge", lg=lg), "blocked": tr("waiting for another task", lg=lg),
+           "parked": tr("parked", lg=lg)}
 
     def line(x):
         t = x["title"]
         if x.get("version") or x.get("tag"):
             t += f" ({x.get('version') or x['tag']})"
+        if x.get("reason") == "parked":  # 2.392.2 (#3365)
+            return f"{t} – {why['parked']}" + (f": {x['wait_note']}" if x.get("wait_note") else "")
         if x.get("wait_note"):
             return f"{t} – {tr('waiting on: {0}', x['wait_note'], lg=lg)}"
         return f"{t} – {why[x['reason']]}" if x.get("reason") in why else t
@@ -176,7 +182,7 @@ def delivery_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "agent_id": i, "agent_name": s, "proposal": {"type": "boolean", "description": "job: a proposal of this person that is ready"},
         "source": {"type": "string", "enum": ["chat", "comment"], "description": "approval: where the card stands"},
         "gate": {"type": "string", "enum": list(GATE_ALL)}, "branch": nul("string"), "target": nul("string"),
-        "reason": {"type": "string", "enum": ["waiting", "blocked"]}, "open_blockers": i, "why": {**s, "description": "irreversible: the reason of the mark"}}}
+        "reason": {"type": "string", "enum": ["waiting", "blocked"]}, "open_blockers": i, "why": {**s, "description": "irreversible: the reason of the mark; parked: the reason of parking (2.392.2)"}}}
     schemas["Waiting"] = {"type": "object", "properties": {
         "total": i, "counts": {"type": "object", "properties": {k: i for k in WAIT_KINDS}, "description": f"At most {WAIT_MAX} per kind"},
         "items": {"type": "array", "items": ref("WaitingItem")}}}
@@ -187,7 +193,7 @@ def delivery_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     item = {"type": "object", "properties": {
         "id": i, "title": s, "due": nul("string"), "build": {"type": "string", "enum": ["none", "branch", "main", "released"]}, "version": nul("string"),
         "tag": {**s, "description": "released: the tag of the period"}, "completed_at": s,
-        "reason": {"type": "string", "enum": ["branch", "job", "waiting", "blocked"], "description": "stuck: why"}, "wait_note": s,
+        "reason": {"type": "string", "enum": ["branch", "job", "waiting", "blocked", "parked"], "description": "stuck: why (parked: 2.392.2)"}, "wait_note": s,
         "branches": {"type": "array", "items": {"type": "object"}, "description": "Branches ahead of main; for agents marked untrusted"}}}
     schemas["DeliveryItem"] = item
     arr = {"type": "array", "items": ref("DeliveryItem")}

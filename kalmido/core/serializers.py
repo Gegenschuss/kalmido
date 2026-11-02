@@ -255,7 +255,7 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
         if r["id"] in wk:
             d["working"] = wk[r["id"]]
         if r["id"] in ctx:
-            d.update(content="", url=None, attachments=[], comment_count=0, unread=0, fields={}, irreversible_reason="",
+            d.update(content="", url=None, attachments=[], comment_count=0, unread=0, fields={}, irreversible_reason="", delivery_note="",
                      blockers=[], blocked=0, blocking=0, context=True)
             d.pop("approvals_open", None)
             d.pop("snippets", None)  # 2.35.0 (#1095)

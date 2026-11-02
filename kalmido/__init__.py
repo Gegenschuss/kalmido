@@ -80,6 +80,7 @@ ORDER = (
     "tasks.validation",
     "tasks.tasks",
     "tasks.oneway",  # 2.392.0 C (#3370): the one-way mark and the decisions of a task
+    "tasks.deliver",  # 2.392.2 (#3365): the delivery state of a task (in progress, parked, waiting)
     "tasks.roadmap",
     "tasks.lifecycle",
     "tasks.tasktrash",  # 2.116.0 A (#2063): the trash period of tasks

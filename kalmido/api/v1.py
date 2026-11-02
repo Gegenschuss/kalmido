@@ -31,6 +31,7 @@ from ..lists.ownership import list_owner_set
 from ..tasks.validation import as_int, NAG_VALUES, PRIORITIES, TICKET_TYPES, valid_date
 from ..tasks.tasks import clear_waiting, set_waiting, task_create, task_update
 from ..tasks.oneway import dec_list, irr_apply, irr_view  # 2.392.0 C (#3370)
+from ..tasks.deliver import dv_apply, dv_filter, dv_view  # 2.392.2 (#3365)
 from ..tasks.ticketkey import tk_ids_ordered, tk_key, tk_parse  # 2.390.0 (#3353)
 from ..tasks.roadmap import list_shift, roadmap_build
 from ..tasks.lifecycle import task_complete, task_reopen, trash_task
@@ -306,6 +307,7 @@ def task_core(r, tags, fields):
             "locked": bool(r["locked"]) if "locked" in r.keys() else False,
             "points": r["points"] if "points" in r.keys() else None,  # 2.60.0 (#1511): story points (null = none)
             "irreversible": irr_view(r) if "irreversible" in r.keys() else None,  # 2.392.0 C (#3370): {reason, yes_by, yes_at}, null = no one-way step
+            "delivery": dv_view(r),  # 2.392.2 (#3365): {state, note, job_id, task_id, since, by}, null = nothing said
             "remind_at": r["remind_at"] if "remind_at" in r.keys() else None,  # 2.111.0 C (#2057): fixed-time reminder
             # 2.390.0 B (#3355): the sprint (null = backlog), the reviewer and the review state (pending | approved | changes)
             "sprint_id": r["sprint_id"] if "sprint_id" in r.keys() else None,
@@ -1003,6 +1005,7 @@ V1_COMPACT = ("id", "title", "list_id", "section_id", "parent_id", "status", "du
 # ---- 2.390.0 B (#3355): the further filters and the sort of GET /api/v1/tasks
 V1_TASKS_MORE = ("priority", "priority_min", "section_id", "sprint_id", "created_by", "reviewer", "review", "q", "sort", "key")  # 2.390.0 (#3353): key
 V1_TASKS_MORE += ("delegate", "watcher")  # 2.473.0 (#3357)
+V1_TASKS_MORE += ("delivery",)  # 2.392.2 (#3365)
 V1_FIELD_ARG = re.compile(r"field_(\d{1,9})")
 # sort name -> (SQL expression ascending, ... descending): no due date last in both directions, the id breaks ties
 V1_SORTS = {"priority": ("priority", "priority"), "due": ("COALESCE(due, '9999-99-99')", "COALESCE(due, '')"),
@@ -1075,6 +1078,8 @@ def v1_tasks_more(c, uid, a, where, args):
         w, x = _v1_who(a, "watcher", uid, none=False)
         where.append("id IN (SELECT task_id FROM task_watchers WHERE user_id " + w + ")")
         args += x
+    if a.get("delivery"):  # 2.392.2 (#3365): in_progress | parked | waiting | none, several comma separated
+        dv_filter(a["delivery"], where, args)
     if a.get("review"):
         if a["review"] not in ("pending", "approved", "changes", "none"):
             raise BadInput(tr("Invalid value: {0}", "review"))
@@ -1316,20 +1321,24 @@ def v1_task_update(tid):
     prev = v1_prev_in(raw.pop("_prev")) if "_prev" in raw else None
     irr = "irreversible" in raw  # 2.392.0 C (#3370): {reason} or null, its own rules (tasks/oneway.py)
     irv = raw.pop("irreversible", None)
+    dlv = "delivery" in raw  # 2.392.2 (#3365): {state, note?, job_id?, task_id?} or null (tasks/deliver.py)
+    dlx = raw.pop("delivery", None)
     b = v1_task_in(raw)
     rv = "reviewer_id" in b
     rid = b.pop("reviewer_id", None)
-    if not b and not rv and not irr:
+    if not b and not rv and not irr and not dlv:
         raise BadInput(tr("Nothing to change"))
     if irr:
         irr_apply(c, tid, irv)
+        bump(c)
+    if dlv and dv_apply(c, tid, dlx, g.user):
         bump(c)
     if rv:  # 2.390.0 B (#3355): checked first (against the list the task ends up in); set before the fields unless it moves
         v1_reviewer_check(c, b.get("list_id") or c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()[0], rid, tid)
         if not b.get("list_id"):
             v1_reviewer_set(c, tid, rid)
     if not b:
-        c.commit()  # 2.392.0 C (#3370): only the mark
+        c.commit()  # 2.392.0 C (#3370): only the mark (2.392.2, #3365: or the delivery state)
         return jsonify(v1_one(c, tid))
     if b.get("list_id"):
         from ..agents.safety import move_gate

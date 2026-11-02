@@ -519,8 +519,10 @@ def gb_known(c, lid):
 
 
 def gb_close_held(c, t):
-    """THE stop of the release pass: True = task t (a tasks row) stays open although it is stale: it waits for its rest, or
-    it is a one-way step whose list asks a person's yes and has none yet (2.392.0, #3370)."""
+    """THE stop of the release pass: True = task t (a tasks row) stays open although it is stale: it waits for its rest, it
+    is a one-way step whose list asks a person's yes and has none yet (2.392.0, #3370), or it is parked (2.392.2, #3365)."""
+    if t["delivery"] == "parked":
+        return True
     y = gb_key(t["partial_until"])
     if y and y not in gb_known(c, t["list_id"]):
         return True
@@ -561,7 +563,7 @@ def gb_close_released(c, r):
     sig = f"{on} {x[0]} {x[1]} {x[2]} {x[3]} {x[4]} {x[5]} {x[7]}"
     if sig == x[6]:
         return False
-    rows = c.execute("""SELECT id, list_id, status, partial_until, irreversible, irreversible_yes_at FROM tasks
+    rows = c.execute("""SELECT id, list_id, status, partial_until, irreversible, irreversible_yes_at, delivery FROM tasks
                         WHERE list_id = ANY(CAST(? AS BIGINT[])) AND status=0
                         AND deleted_at IS NULL ORDER BY id""", (st_ids(on),)).fetchall()
     bs = git_build_for(c, rows)

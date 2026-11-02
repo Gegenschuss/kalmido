@@ -800,6 +800,7 @@ function taskMenu(anchor, id, o = {}) {
     ...(t.id > 0 ? [{label: tlkIs(t) ? tr('Locked') : tr('Lock'), icon: 'lock', on: tlkIs(t), fn: () => tlkSet(id, !t.locked).catch(() => {})}] : []),  // 2.364.0 D (#3036): always here (the panel's bar shows only a set lock)
     ...(typeof ln_canLock === 'function' && ln_canLock(t, tlkIs(t)) ? [{label: tr('Lock note'), icon: 'lock', title: tr('Encrypt the note with your own password'), fn: () => ln_lock(id)}] : []),  // 2.364.0 D (#3036)
     ...ow_menuItems(t),  // 2.392.0 C (#3370)
+    ...dv_menuItems(t),  // 2.392.2 (#3365): park, waiting for, clear
     ...(typeof mw_ok === 'function' && mw_ok() && t.id > 0 ? [{label: tr('Open in its own window'), icon: 'panel', fn: () => mw_taskOpen(id)}] : []),  // 2.43.0 (#1500)
     ...(typeof tbl_menuItems === 'function' ? tbl_menuItems(t, anchor) : []),  // 2.53.0 C (#1424): the bell of this task
     '-',

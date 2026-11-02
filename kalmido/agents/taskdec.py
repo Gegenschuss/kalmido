@@ -15,6 +15,7 @@ from ..core.i18n import tr
 from ..tasks.lifecycle import need_live
 from ..core.errors import BadInput
 from ..tasks.oneway import dec_add, dec_list, irr_apply, irr_view, irr_yes
+from ..tasks.deliver import dv_apply, dv_view
 from .core import agent_emit, agent_task_data, is_agent, is_approver, list_agents
 
 
@@ -44,6 +45,35 @@ def irr_delete(tid):
     need_live(c, tid)
     irr_apply(c, tid, None)
     return _irr_done(c, tid)
+
+
+# 2.392.2 (#3365): the delivery state of a task in the app (tasks/deliver.py; the API: the field delivery of PATCH /api/v1/tasks/<id>)
+@app.put("/api/tasks/<int:tid>/delivery")
+def dv_put(tid):
+    """{state: in_progress | parked | waiting, note?, job_id?, task_id?}"""
+    c = db()
+    need_task(c, tid)
+    need_live(c, tid)
+    try:
+        dv_apply(c, tid, body(), g.user)
+    except BadInput as e:
+        return err(str(e))
+    return _dv_done(c, tid)
+
+
+@app.delete("/api/tasks/<int:tid>/delivery")
+def dv_delete(tid):
+    c = db()
+    need_task(c, tid)
+    need_live(c, tid)
+    dv_apply(c, tid, None, g.user)
+    return _dv_done(c, tid)
+
+
+def _dv_done(c, tid):
+    bump(c)
+    c.commit()
+    return jsonify(delivery=dv_view(c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()))
 
 
 @app.post("/api/tasks/<int:tid>/irreversible-yes")

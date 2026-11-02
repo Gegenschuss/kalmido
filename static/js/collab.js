@@ -658,6 +658,8 @@ function actText0(a, U) {
     case 'review': return rvw_actText(d, who, q, U);  // 2.60.0 C (#1512)
     case 'irreversible': return d.on === 0 ? tr('{0} took the one-way mark off', who) : d.reason ? tr('{0} marked this as a one-way step: {1}', who, q(d.reason)) : tr('{0} marked this as a one-way step', who);  // 2.392.0 C (#3370)
     case 'irreversible_yes': return tr('{0} gave the yes to this one-way step', who);
+    case 'delivery': return !d.state ? tr('{0} cleared the delivery state', who) : d.state === 'parked' ? (d.note ? tr('{0} parked the task: {1}', who, q(d.note)) : tr('{0} parked the task', who))  // 2.392.2 (#3365)
+      : d.state === 'waiting' ? tr('{0} set the task to waiting for {1}', who, q(d.task ? '#' + d.task : d.note || '')) : tr('{0} set the task to in progress', who);
     case 'decision': return tr('{0} recorded a decision', who);
     case 'approval': return d.ok ? tr('{0} approved the comment of {1}', who, q(uname(d.agent, U))) : tr('{0} rejected the comment of {1}', who, q(uname(d.agent, U)));
     case 'agent_job': {

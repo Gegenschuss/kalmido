@@ -1124,6 +1124,7 @@ function taskRow(t, opts = {}) {
   if (planOf(t) && !opts.trash && rs('plan')) meta.push(`<span class="pchip" title="${esc(tr('Planned: {0}', planLabel(t)))}">${ic('clock', 's')}<b>${esc(planLabel(t, true))}</b></span>`);  // 2.11.0
   if (t.code?.prs?.length && !opts.trash && rs('code')) meta.push(codeChip(t));  // 2.2.0 (#271)
   if (t.code?.build && !opts.trash && rs('code')) { const h = buildRowHint(t); if (h) meta.push(h); }  // 2.151.0 A (#2558): stale / only on a branch
+  if (!lc && !opts.trash && dv_chip(t)) meta.push(dv_chip(t));  // 2.392.2 (#3365): parked / waiting (a column shows it otherwise)
   if (t.comment_count && cmtOn() && rs('cmt')) meta.push(`<span class="cmc ${t.unread ? 'unread' : ''}" title="${esc(t.unread ? trn('{0} new comment', '{0} new comments', t.unread) : trn('{0} comment', '{0} comments', t.comment_count))}">${ic('comment', 's')}${t.comment_count}</span>`);
   if (t.approvals_open) meta.push(`<span class="apvc" title="${esc(apvCount(t.approvals_open))}">${ic('lock', 's')}${t.approvals_open}<span class="sr"> ${esc(apvCount(t.approvals_open))}</span></span>`);  // 2.41.0 (#1383): open approval cards in its comments
   const ac = !lc && !opts.trash && t.id > 0 && acolOn(t.list_id) && pz_on(t.list_id, 'who');  // 1.10.0: assignee column (own cell, click = assign); 2.412.0 (#3552): the property
@@ -1431,8 +1432,8 @@ const fieldCols = lid => td_colsWide() && !!LS.get('fcols.' + lid, false) && fie
 // moves into the second line (classes o2 … o10: the cell's index needs at least that many columns of room).
 const PRIO_NAMES = {1: N_('Low'), 3: N_('Medium'), 5: N_('High')};
 const COLS = [['due', N_('Due')], ['prio', N_('Priority')], ['who', N_('Assignee')], ['tags', N_('Tags')], ['time', N_('Tracked time')],
-  ['progress', N_('Subtasks')], ['deps', N_('Blocked by')], ['created', N_('Created')]];
-const COL_ICON = {due: 'cal', prio: 'flag', who: 'user', tags: 'tag', time: 'clock', progress: 'sub', deps: 'deps', created: 'plus'};
+  ['progress', N_('Subtasks')], ['deps', N_('Blocked by')], ['created', N_('Created')], ['delivery', N_('Delivery state')]];  // 2.392.2 (#3365): delivery
+const COL_ICON = {due: 'cal', prio: 'flag', who: 'user', tags: 'tag', time: 'clock', progress: 'sub', deps: 'deps', created: 'plus', delivery: 'pause'};
 function colChoices(l) {  // [key, name] of the columns this list can show (the task number separately)
   // 2.412.0 (#3552): a property the project switched off (props.js) is no column either
   const ok = k => !pz_on(l, PZ_COL[k] || '') ? false : k === 'who' ? collab() && !!l.shared : k === 'time' ? timeOn() && mtTime(l.id) : k === 'deps' ? depsOn() && isProject(l.id) : true;
@@ -1463,6 +1464,7 @@ function lcCell(k, t, x) {
     case 'time': return x.time ? `<span class="tchip ${x.time.live ? 'live' : ''}" data-tt="${t.id}" title="${x.time.tip}">${ic('clock', 's')}<b>${x.time.txt}</b></span>` : '';
     case 'progress': return x.kids.length ? `<span class="subc" title="${esc(tr('{0} of {1} subtasks done', x.kids.length - x.openKids, x.kids.length))}">${ic('sub', 's')}${x.kids.length - x.openKids}/${x.kids.length}</span>` : '';
     case 'deps': return t.blocked && t.status === 0 && dFor(t) ? `<span class="blk" title="${esc(blockedTitle(t))}">${ic('lock', 's')}<span class="lbl">${tr('blocked')}</span></span>` : '';
+    case 'delivery': return dv_cell(t);  // 2.392.2 (#3365)
     case 'created': return t.created_at ? `<span class="crd" title="${esc(tr('Created {0}', fmtWhen(t.created_at)))}">${ic('plus', 's')}${dayLabel(ds(new Date(t.created_at)))}</span>` : '';
   }
   if (k.startsWith('f:')) { const f = fieldsOf(t.list_id).find(y => y.id === +k.slice(2)); return f ? fxBudgetCell(f, t) || fieldCell(f, t.fields?.[f.id], t.list_id, t) : ''; }  // 2.410.0 (#3437): a budget = its subtasks' sum

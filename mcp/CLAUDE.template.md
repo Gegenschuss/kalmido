@@ -285,7 +285,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 
 ### When you are stuck
 - Never stall silently. **Park a blocker** with a short note on the task (what is missing, who has to act) and a chat
-  message or job state waiting, then continue with the next item.
+  message or job state waiting, then continue with the next item. `set_delivery` with `parked` and the reason (or `waiting`
+  with the task it waits for) shows it in the project; a release never completes a parked task.
 - For a small open choice, pick the sensible default, record it as a decision on the task and continue; the owner can
   veto it later. Only irreversible or costly choices wait for a person.
 - Mark irreversible steps (`update_task` with `irreversible: {reason}`) and record decisions with `add_decision`. Where the project

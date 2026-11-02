@@ -118,6 +118,7 @@ function filterMatch(t, r = {}) {
   if (r.secs?.length) c.push(r.secs.some(s => (s === 'none' ? !t.section_id : t.section_id === +s)));
   if (r.sprints?.length) c.push(r.sprints.some(s => (s === 'none' ? !t.sprint_id : !!t.sprint_id && spr_active(listById(t.list_id))?.id === t.sprint_id)));
   if (r.ms?.length) c.push(r.ms.some(m => (m === 'none' ? !t.milestone_id : t.milestone_id === +m)));
+  if (r.dlv?.length) c.push(r.dlv.includes(dv_state(t) || 'none'));  // 2.392.2 (#3365): the delivery state
   const q = (r.text || '').trim().toLowerCase();
   if (q) c.push((t.title || '').toLowerCase().includes(q) || (t.content || '').toLowerCase().includes(q));
   if (!c.length) return true;
@@ -214,6 +215,7 @@ const COL_KEY = {
   time: t => { const s = tFor(t) && t.id > 0 ? taskTime(t.id)[0] : 0; return s >= 60 ? s : null; },
   progress: t => { const k = children(t.id); return k.length ? k.filter(x => x.status !== 0).length / k.length : null; },
   deps: t => t.blocked && t.status === 0 ? 1 : null,
+  delivery: t => ({in_progress: 1, waiting: 2, parked: 3})[dv_state(t)] ?? null,  // 2.392.2 (#3365)
 };
 function sortTasks(arr, m = sortMode()) {
   if (m === 'flow') return flowSort(arr);
@@ -266,6 +268,7 @@ function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks
       ...(v.folder && l.folder !== v.folder ? {sub: l.folder} : {})}));  // 2.4.0 (#361): the lists of a subfolder get its header
   }
   if (v.group === 'section') {
+    if (v.list && listById(v.list)?.group_field === 'delivery') return dv_groups(v.list, arr, dn);  // 2.392.2 (#3365): by delivery state
     const gf = v.list && lgfField(v.list); if (gf) return lgfGroups(v.list, gf, arr, dn);  // 2.144.0 C (#2414): grouped by a field
     const secs = S.sections.filter(s => s.list_id === v.list), mk = p => dsxMerge(arr.filter(p), dn.filter(p));
     if (!secs.length) return [{id: 'all', name: '', tasks: mk(() => true)}];
@@ -400,9 +403,10 @@ function lgfGroups(lid, f, arr, dn = []) {
 // the sort menu's part "Group by" (owner / list admins of a list in the list view with a text / select field)
 function lgfItems(l) {
   if (!l || l.is_inbox || !canManage(l) || listView(l) !== 'list') return [];
-  const fs = lgfFields(l.id), cur = lgfField(l.id); if (!fs.length) return [];
-  return [{head: tr('Group by')}, {label: tr('Sections|group by'), icon: 'list', on: !cur, cls: 'lgfitem', fn: () => lgfSet(l.id, '')},
-    ...fs.map(f => ({label: tr('Field: {0}', f.name), icon: FT_ICON[f.type], on: cur?.id === f.id, cls: 'lgfitem', fn: () => lgfSet(l.id, 'cf:' + f.id)}))];
+  const fs = lgfFields(l.id), cur = lgfField(l.id), dv = l.group_field === 'delivery';  // 2.392.2 (#3365): + the delivery state
+  return [{head: tr('Group by')}, {label: tr('Sections|group by'), icon: 'list', on: !cur && !dv, cls: 'lgfitem', fn: () => lgfSet(l.id, '')},
+    ...fs.map(f => ({label: tr('Field: {0}', f.name), icon: FT_ICON[f.type], on: cur?.id === f.id, cls: 'lgfitem', fn: () => lgfSet(l.id, 'cf:' + f.id)})),
+    {label: tr('Delivery state'), icon: 'pause', on: dv, cls: 'lgfitem', fn: () => lgfSet(l.id, 'delivery')}];
 }
 async function lgfSet(id, gf) {
   const l = listById(id); if (!l) return;
@@ -410,7 +414,7 @@ async function lgfSet(id, gf) {
   if (was === gf) return;
   try { await optWrite(optSet(() => listById(id), {group_field: gf}), () => api('PATCH', '/api/lists/' + id, {group_field: gf})); } catch { return; }
   const put = x => async () => { await api('PATCH', '/api/lists/' + id, {group_field: x}); await load(); render(); return {skipped: []}; };
-  offerUndo(gf ? tr('Grouped by {0}', fieldById(+gf.slice(3))?.name || '') : tr('Grouped by sections'), histAdd({label: tr('Group by'), undo: put(was), redo: put(gf)}));
+  offerUndo(gf ? tr('Grouped by {0}', gf === 'delivery' ? tr('Delivery state') : fieldById(+gf.slice(3))?.name || '') : tr('Grouped by sections'), histAdd({label: tr('Group by'), undo: put(was), redo: put(gf)}));
 }
 async function dsxSet(id, on) {
   const l = listById(id); if (!l || dsxFixedOff(l)) return;

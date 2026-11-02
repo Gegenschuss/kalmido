@@ -3640,6 +3640,7 @@ with the scope it needs). The tools:
   `list_filters`, `create_filter`, `update_filter`, `delete_filter`
 - comments and reactions: `add_comment`, `update_comment`, `delete_comment`, `react`
 - decisions and one-way steps (2.392.0): `add_decision`, `update_task` with `irreversible`
+- delivery state (2.392.2): `set_delivery` (in progress, parked with a reason, waiting for a task), `list_tasks` with `delivery`
 - files: `list_attachments`, `get_attachment` (task, chat or project files), `read_attachment` (2.34.0: PDF / text as text; 2.92.0: Word / Excel too), `upload_attachment`, `create_text_file` (2.30.0), `delete_attachment`,
   `delete_chat_attachment`
 - projects: `get_project_overview`, `set_project_overview`, `set_project_status`, `add_project_link`,
@@ -3706,7 +3707,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
 `request_comment_approval`, `request_deploy_approval`, `request_integration_approval`, `request_merge_approval`,
 `request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`, `search_files`, `search_messages`, `search_notes`,
-`search_tasks`, `send_chat`, `set_contact_care`, `set_list_columns`, `set_list_review`, `set_project_overview`, `set_project_status`,
+`search_tasks`, `send_chat`, `set_contact_care`, `set_delivery`, `set_list_columns`, `set_list_review`, `set_project_overview`, `set_project_status`,
 `set_status`,
 `set_waiting`, `set_working`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
 `partial_task`, `skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
@@ -4148,6 +4149,29 @@ extract tasks, suggest tags and a due date, sort the basket, plan the day). It i
   same Apply / Discard / Undo as the [proposals](#proposals) of agents. Agents get no events about them.
 
 Everything longer or freer (code, research, long jobs, working tickets, chat) stays the job of your own agents.
+
+## Delivery state of a task (2.392.2, #3365)
+
+A field of its own next to the build state of the code (`code.build.state` stays released / main / branch / none). It says why an
+open task does not move on: `in_progress` (a job works on it), `parked` (held on purpose, with a reason), `waiting` (for another
+task or for what the note says). People set it in the task menu ("Park with a reason", "Waiting for ...") and see it in the
+task panel, as a list column, filter and grouping ("Delivery").
+
+| What | API | MCP | Scope |
+|---|---|---|---|
+| Set it | `PATCH /api/v1/tasks/{id}` `{delivery: {state, note?, job_id?, task_id?}}` | `set_delivery` | tasks:write |
+| Clear it | `PATCH /api/v1/tasks/{id}` `{delivery: null}` | `set_delivery` (`state: none`) | tasks:write |
+| Read it | `GET /api/v1/tasks/{id}`: `delivery` (`state`, `note`, `job_id`, `task_id`, `since`, `by`), `null` = nothing said | `get_task` | read |
+| Find tasks by it | `GET /api/v1/tasks?delivery=parked,waiting` (`in_progress`, `parked`, `waiting`, `none`) | `list_tasks` (`delivery`) | read |
+
+- `in_progress`: your job that starts running on a task (`POST /api/v1/agent/jobs` with `task_id`, or `POST /tasks/{id}/working`) sets
+  it by itself when the task has no state; ending the job (done, failed, stopped) clears it, or hands it to another open job of the
+  task. `job_id` names one of your open jobs of this task. `parked` and `waiting` stay until someone changes them: a job never
+  overwrites them.
+- `parked` needs a reason (`note`, at most 500 characters). The release pass (`git_close_release`) never completes a parked task;
+  "Waiting for me" lists a person's own parked tasks (kind `parked`), the delivery report counts them as stuck (reason `parked`).
+- `waiting`: `task_id` = a task you can see (not the task itself) and / or `note`. A real dependency stays `add_dependency`.
+- A project encrypted in the browser takes no note (`409`); the state itself works.
 
 ## One-way steps and decisions (2.392.0, #3370)
 
