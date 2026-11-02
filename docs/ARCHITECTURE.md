@@ -61,8 +61,13 @@ project in the app, and this document keeps the technical name.
    stamps them with the new version; a change of what someone sees (lists, shares, sections, fields) or too many / too old
    changes answer `full` and the client loads the whole state as before. The view is morphed (unchanged rows keep their
    nodes), the sidebar is redrawn only when a counter moved.
+   2.369.4 (#2507): `bump()` also notes the new version under the keys of whoever the change is for (`version:org:<id>`,
+   `version:u:<id>`, worked out from the unstamped `dl_changes` rows: the changed lists' owners, members and organisation;
+   `version:all` when that is not known), and `/api/version` carries `vs`, the newest of the person's own keys. A `v` that
+   moved while `vs` stayed at or below the client's version is a change elsewhere: the client takes the new `v` without
+   fetching anything. Every start sets `version:all` to the current version (a barrier).
 5. **In the background** (`kalmido/startup.py` starts the threads): the watchdog (`notify/push.py`: reminders, nags,
-   digests, rotations, clean-ups), the update check, calendar subscriptions, backups, webhook deliveries, mail and Git
+   digests, rotations, clean-ups; 2.369.4 (#2516): the clean-up sections at most every `KALMIDO_WD_SLOW_S` seconds), the update check, calendar subscriptions, backups, webhook deliveries, mail and Git
    polling. Every thread and request passes the maintenance gate (`GATE` in `accounts/session.py`), so a restore can
    run alone.
 

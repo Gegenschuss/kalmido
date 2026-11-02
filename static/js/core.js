@@ -1186,8 +1186,9 @@ setInterval(async () => {
   td_polling = true;
   try {
     if (OUT.q.length) { flush(); staleDraw(); return; }  // 2.13.0 (#453 A13): the chip says how many changes wait
-    const {v, n, c, t, ty, app, sp, a} = await api('GET', '/api/version');
+    const {v, vs, n, c, t, ty, app, sp, a} = await api('GET', '/api/version');
     const lpCh = lpChanged(a);  // 2.41.0 (#1376): the areas that changed since the last poll
+    lpSkip(v, vs);  // 2.369.4 (#2507): changes only elsewhere: S.v follows, nothing is fetched
     if (sp !== undefined && sp !== S.stepsSig) { const first = S.stepsSig === undefined; S.stepsSig = sp; if (!first) stepsChanged(); }  // 2.32.0 (#1081)
     verCheck(app);  // 2.27.0 (#968)
     if (ty !== undefined) { const sig = JSON.stringify(ty); if (sig !== S.ctypingSig) { S.ctypingSig = sig; S.ctyping = ty; if (S.sel) agentLive(); } }  // 2.22.0 (#693)

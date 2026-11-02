@@ -662,8 +662,8 @@ def health():
 def version():
     from ..agents.chat import task_typing_for
     c = db()
-    v, n, cs, t, sp, a = version_sigs(c, me())  # 2.149.0 C (#2507): one statement instead of ten (same values)
-    return jsonify(v=v, app=APP_VERSION, n=n, c=cs, t=t,  # app: 2.27.0 (#968), t: 2.17.0 (#419)
+    v, n, cs, t, sp, a, vs = version_sigs(c, me())  # 2.149.0 C (#2507): one statement instead of ten (same values)
+    return jsonify(v=v, vs=vs, app=APP_VERSION, n=n, c=cs, t=t,  # app: 2.27.0 (#968), t: 2.17.0 (#419); vs: 2.369.4 (#2507)
                    ty=task_typing_for(c, me()),  # ty: 2.22.0 (#693) who is writing a comment where
                    sp=sp,  # sp: 2.32.0 (#1081) a new step of an agent for me (the open chat fetches)
                    a=a)  # a: 2.41.0 (#1376) a change counter per area (tasks, comments, agentchat, team, office, ...)
@@ -677,7 +677,11 @@ def version_sigs(c, uid):
     from ..calendars.subscriptions import cal_sig_fmt, cal_sig_q
     from ..collab.teamchat import TCHAT_SIG_COLS, tchat_sig_fmt, tchat_sig_q
     from ..agents.steps import steps_sig_fmt, steps_sig_q
-    parts = [("SELECT (SELECT value FROM settings WHERE key='version')", (), 1), (*news_sig_q(uid), 2), (*cal_sig_q(uid), 3),
+    # 2.369.4 (#2507): + vs, the newest version meant for this person (the maximum of "version:all", the own key and the keys
+    # of the own organisations, set by bump): a v that moved while vs stayed = only changes elsewhere (the client skips them)
+    parts = [("SELECT (SELECT value FROM settings WHERE key='version'), (SELECT MAX(CAST(value AS BIGINT)) FROM settings "
+              "WHERE key IN ('version:all', 'version:u:' || CAST(? AS TEXT)) OR key IN (SELECT 'version:org:' || CAST(org_id AS TEXT) "
+              "FROM org_members WHERE user_id=?))", (int(uid or 0), int(uid or 0)), 2), (*news_sig_q(uid), 2), (*cal_sig_q(uid), 3),
              (*steps_sig_q(uid), 1), (*lv_versions_q(), 2)]
     chat = collab_all()
     if chat:
@@ -688,6 +692,7 @@ def version_sigs(c, uid):
     for _, _, k in parts:
         cols.append(tuple(row[i:i + k]))
         i += k
-    v = cols[0][0] if cols[0][0] is not None else GLOBAL_DEFAULTS.get("version", "")
-    return (int(v), news_sig_fmt(cols[1]), cal_sig_fmt(cols[2]), tchat_sig_fmt(cols[5]) if chat else "",
-            steps_sig_fmt(cols[3]), lv_versions_fmt(cols[4]))
+    v = int(cols[0][0] if cols[0][0] is not None else GLOBAL_DEFAULTS.get("version", ""))
+    vs = min(int(cols[0][1]), v) if cols[0][1] is not None else v  # no key yet: nothing to skip (dl_setup sets version:all)
+    return (v, news_sig_fmt(cols[1]), cal_sig_fmt(cols[2]), tchat_sig_fmt(cols[5]) if chat else "",
+            steps_sig_fmt(cols[3]), lv_versions_fmt(cols[4]), vs)

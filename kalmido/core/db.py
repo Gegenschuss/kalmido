@@ -1551,11 +1551,17 @@ def uset(c, uid, key, value):
 
 
 def bump(c):
+    area = lv_area()
     r = c.execute("UPDATE settings SET value=CAST(CAST(value AS BIGINT)+1 AS TEXT) WHERE key='version' RETURNING value").fetchone()
     if r:  # 2.42.0 (#1376): the task changes of this transaction belong to the new version (GET /api/state/delta)
-        from ..tasks.delta import dl_stamp
-        dl_stamp(c, int(r[0]))
+        from ..tasks.delta import dl_scope, dl_stamp
         u = getattr(g, "user", None) if has_request_context() else None
+        # 2.369.4 (#2507): who the change is for -- the organisations / people of the changed lists get the new version as
+        # their key (None: everyone, "version:all"); read before dl_stamp (it works on the rows not stamped yet)
+        sk = dl_scope(c, area, u["id"] if u is not None else None) or ["version:all"]
+        dl_stamp(c, int(r[0]))
+        c.execute("INSERT INTO settings(key,value) VALUES" + ",".join("(?, ?)" for _ in sk)
+                  + " ON CONFLICT(key) DO UPDATE SET value=excluded.value", tuple(x for k in sk for x in (k, r[0])))
         # 2.191.0 C (#2507): the last version this account wrote (GET /api/state/delta?lean=1); F1: a write without a real
         # account (watchdog, hooks, g.user = {"id": None}) is noted as version:bg, which ends the lean answer for everyone
         key = f"version:by:{int(u['id'])}" if u is not None and u["id"] is not None else "version:bg"
@@ -1565,7 +1571,7 @@ def bump(c):
     # it is "other" (= everything, as before)
     # 2.280.0 A (#3109): "self" (a change only the writer's own state shows: their settings, habits, layouts) counts per
     # account: other people's clients see no area move (a lean delta instead of the full state)
-    a = lv_area()
+    a = area
     u = getattr(g, "user", None) if has_request_context() else None
     if a == "self":
         a = f"self:{int(u['id'])}" if u is not None and u["id"] is not None else "other"

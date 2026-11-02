@@ -29,6 +29,14 @@ function lpChanged(a) {
   for (const k of Object.keys(a)) if (a[k] !== p[k] && !(k === 'self' && lpOwnSelf(p[k], a[k]))) S.lpPend.add(k);
   return S.lpUnk ? null : [...S.lpPend];
 }
+// 2.369.4 (#2507): the total v moved, but vs (the newest version meant for me: my organisations, my lists, my own writes)
+// did not pass the version my state has -> only changes elsewhere (another organisation, lists I do not see): the state
+// is as new as v, nothing is fetched. A v below mine (a restored backup) or an older server without vs takes the old way.
+function lpSkip(v, vs) {
+  if (S.lpOff || vs === undefined || S.v == null || !(v > S.v) || vs > S.v) return false;
+  S.v = v; S.lpN.skip = (S.lpN.skip || 0) + 1;
+  return true;
+}
 function lpSettle(v) { if (S.v != null && S.v >= v) { S.lpPend.clear(); S.lpUnk = false; } }
 // 2.280.0 A (#3109): "self" (my own settings, habits, layouts: one counter per account) moved only by writes of this window
 // (their answers carry the new counter, X-Kalmido-Lv): nothing to reload; a write of another device of mine: the full way

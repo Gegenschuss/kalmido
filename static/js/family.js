@@ -622,7 +622,7 @@ async function shopPoll() {
   if (S.shop.sig !== shopSig() && !imeOn) shopDraw();
   if (document.hidden || OUT.q.length || imeOn) return;  // the add field keeps its text and focus through a redraw
   if (!OUT.online && (S.shop.n = (S.shop.n || 0) + 1) % 5) return;
-  try { const {v} = await api('GET', '/api/version'); if (v !== S.v) { await load(); shopDraw(); } } catch { /* offline: the ticks wait in the queue */ }
+  try { const {v, vs} = await api('GET', '/api/version'); if (v !== S.v && !lpSkip(v, vs)) { await load(); shopDraw(); } } catch { /* offline: the ticks wait in the queue */ }
 }
 function shopDraw() {
   const ov = $('.shopmode'); if (!ov || !S.shop) return;
