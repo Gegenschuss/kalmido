@@ -170,6 +170,16 @@ function nav_edit(id, on = true) {
   const go = () => { renderSide(); if (S.route.mod === 'office' && id === 'office') renderView(); setTimeout(() => $(on ? '.naved [data-act="nav-done"]' : `[data-act="nav-edit"][data-area="${id}"]`)?.focus({preventScroll: true}), 0); };
   if (on && typeof nav_edHtml !== 'function') loadModule('navmenu').then(go, () => {}); else go();
 }
+// 2.484.0 (#3949): the Projects page (render.js viewProjStart): a long press (phone) or a right click (computer) on a project row opens
+// the sidebar's project menu, on a folder row the sidebar's folder menu; the click ending the press opens nothing (ms_rowMenu, #3836)
+const PS_MENU = '.pstart .psrow[data-pl], .pstart .psfold[data-pf]';
+const ps_menu = r => r.dataset.pl ? listMenu(r, +r.dataset.pl) : folderMenu(r, r.dataset.pf);
+ms_rowMenu(PS_MENU, ps_menu);
+document.addEventListener('contextmenu', e => {
+  if (S.listReorder || e.shiftKey || e.pointerType === 'touch' || isTouch()) return;  // touch: the long press above
+  const r = e.target.closest?.(PS_MENU); if (!r) return;
+  e.preventDefault(); ps_menu(r);
+});
 // a computer: right-click on a point of a panel = "Hide from menu" / "Customize" (navmenu.js nav_rowMenu)
 document.addEventListener('contextmenu', e => {
   const b = e.target.closest?.('#side [data-navk]'); if (!b || isMobile() || !nav_canEdit(b.dataset.navk.split(':')[0])) return;

@@ -337,12 +337,12 @@ const sidePlan = (row, c, onTasks, k) => [['inbox', kbInboxRowTip(row('inbox', i
 // its folders in the sidebar's order (the same lists, folders and hidden entries as the panel), each row opens its page
 function viewProjStart() {
   const c = counts(), lists = sideLists(), hid = x => sideHidden(x), cnt = n => rsy_sideCnt() && n || '';
-  const row = (key, icon, name, n) => `<button type="button" class="psrow" data-go="${esc(keyToHash(key))}">${icon}<span class="n">${esc(name)}</span><span class="c">${cnt(n)}</span></button>`;
+  const row = (key, icon, name, n, extra = '') => `<button type="button" class="psrow" data-go="${esc(keyToHash(key))}" ${extra}>${icon}<span class="n">${esc(name)}</span><span class="c">${cnt(n)}</span></button>`;
   // 2.482.0 (#3951): the sidebar's sort mode (S.listReorder, one order): a grip on the left drags at once, rows do not open
   const ro = !!S.listReorder;
   const lrow = l => { const em = !l.icon && leadEmoji(l.name), ic0 = `<span class="sic" aria-hidden="true">${listIconHtml(l, {emoji: true})}</span>`, nm = em ? listName(l.name).slice(em.length).trim() : listName(l.name);
     return ro ? `<div class="psrow reorder" data-list="${l.id}" ${isMobile() ? '' : 'draggable="true"'}><span class="sgrip" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span>${ic0}<span class="n">${esc(nm)}</span><button type="button" class="iconbtn" data-lsort="${l.id}" aria-haspopup="menu" title="${esc(tr('Move…'))}" aria-label="${esc(tr('Move {0}…', nm))}">${ic('dots', 's')}</button></div>`
-      : row('l:' + l.id, ic0, nm, c.lists[l.id]); };
+      : row('l:' + l.id, ic0, nm, c.lists[l.id], `data-pl="${l.id}"`); };  // 2.484.0 (#3949): data-pl = the row's menu (long press / right click, areas.js)
   const grp = (cls, head, body) => body ? `<section class="psg ${cls}"><h2 class="pshead">${head}</h2><div class="psrows">${body}</div></section>` : '';
   const plan = hid('g:focus') ? '' : sidePlan(row, c, false, '').filter(([x, h]) => h && !hid('e:' + x)).map(([, h]) => h).join('');
   const fil = hid('g:filters') ? '' : S.filters.map(f => row('f:' + f.id, ic('filter'), f.name, c.filters[f.id])).join('');
@@ -350,7 +350,7 @@ function viewProjStart() {
   const folders = folderNames().filter(x => !fParent(x) && sideFolderShown(lists, x)).flatMap(walk);
   const loose = lists.filter(l => !l.folder).map(lrow).join('');
   const fhead = f => ro ? `<span class="psfold" data-folder="${esc(f)}">${ic('folder', 's')}<span>${esc(fDisp(f))}</span></span>`
-    : `<button type="button" class="psfold" data-go="${esc(keyToHash('folder:' + f))}" title="${esc(tr('Open {0}', fDisp(f)))}">${ic('folder', 's')}<span>${esc(fDisp(f))}</span></button>`;
+    : `<button type="button" class="psfold" data-go="${esc(keyToHash('folder:' + f))}" data-pf="${esc(f)}" title="${esc(tr('Open {0}', fDisp(f)))}">${ic('folder', 's')}<span>${esc(fDisp(f))}</span></button>`;
   const phead = `<span class="psroot">${esc(tr('Projects'))}</span>${lists.length && !ro ? `<button type="button" class="iconbtn pssort" data-act="lists-reorder" title="${esc(tr('Sort projects'))}" aria-label="${esc(tr('Sort projects'))}">${ic('sort', 's')}</button>` : ''}`;
   const pempty = f => ro ? `<div class="muted psempty fempty" data-folder="${esc(f)}">${esc(tr('empty: drag a project here'))}</div>` : `<div class="muted psempty">${esc(tr('empty'))}</div>`;
   const rbar = ro ? `<div class="sreobar psreobar" role="group" aria-label="${esc(tr('Sort projects'))}"><span class="sreot"><b>${tr('Sort projects')}</b><small>${esc(tr('Drag by the handle on the left, or use “…”'))}</small></span><button type="button" class="btn sm pri" data-act="lists-reorder">${tr('Done')}</button></div>` : '';

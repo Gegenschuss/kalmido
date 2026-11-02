@@ -17,7 +17,7 @@
 
 const VM_MAX = 50, VM_LS = 'viewMem';
 /** @type {any} */
-const VM = {key: '', side: '', want: null, wantSide: null, obs: null, t: 0, ts: 0, until: 0, boxes: new Set(), keep: null, hash: ''};
+const VM = {key: '', side: '', want: null, wantSide: null, obs: null, t: 0, ts: 0, until: 0, boxes: new Set(), keep: null, hash: '', fresh: ''};
 // the entries a place is anchored on (the first one at the top of a box)
 const VM_SEL = '[data-id],[data-vlg],[data-key],[data-go],[data-k],[id],h1,h2,h3,h4,.ghead,li,tr,label';
 const VM_ATTR = ['data-id', 'data-vlg', 'data-key', 'data-go', 'data-k'];
@@ -119,14 +119,18 @@ function vm_after() {
   const k = vm_key(), sk = vm_sideKey();
   if (sk !== VM.side) { clearTimeout(VM.ts); VM.ts = 0; VM.side = sk; VM.wantSide = vm_all()[sk] || null; }  // (the panel before was written by vm_leave)
   VM.hash = location.hash;
+  const fresh = !!VM.fresh && location.hash.slice(1) === VM.fresh;
   if (k !== VM.key) {
     clearTimeout(VM.t); VM.t = 0;  // a save still waiting belonged to the view before
-    VM.key = k; VM.boxes = new Set(); VM.keep = null;
-    const rec = k ? vm_all()[k] || null : null;
+    VM.key = k; VM.boxes = new Set(); VM.keep = null; if (fresh) VM.fresh = '';
+    const rec = k && !fresh ? vm_all()[k] || null : null;  // 2.484.0 (#3949): a call through the bar starts at the top
     VM.want = rec ? {...rec, opened: false} : null;
   }
   vm_try();
 }
+// 2.484.0 (#3949): a tap on a button of the phone's bottom bar is a new call (the computer's area bar keeps bringing the place back, #3439): the page it opens starts at the top; Back
+// (no tap on the bar) and links inside a page bring a view back at its place as before
+window.addEventListener('click', e => { VM.fresh = (e.target instanceof Element && e.target.closest('#tabs [data-go]')?.getAttribute('data-go')) || ''; }, true);
 function vm_try() {
   const v = document.getElementById('view'), sd = document.getElementById('side');
   if (VM.wantSide && sd && vm_put(sd, VM.wantSide)) VM.wantSide = null;
