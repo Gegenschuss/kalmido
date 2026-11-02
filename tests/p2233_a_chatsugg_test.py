@@ -81,9 +81,10 @@ def cursor():
 
 
 # ================================================================== the settings
+# 2.491.0 (#2849): prefs also carry style (the reply style wishes, '' = none; p2491_a_replystyle_test.py)
 r = prefs()
 # 2.331.0 (#3309): the default for suggestions is keep (was collect); the server answers keep like collect
-check(r.ok and r.json()["prefs"] == {"sugg": "keep", "jobs": "full", "pin": "on", "notices": "full"}, "defaults " + r.text[:200])
+check(r.ok and r.json()["prefs"] == {"sugg": "keep", "jobs": "full", "pin": "on", "notices": "full", "style": ""}, "defaults " + r.text[:200])
 check(chat()["chat_prefs"]["sugg"] == "keep", "the chat carries chat_prefs")
 r = prefs(jobs="line")
 check(r.ok and r.json()["prefs"]["jobs"] == "line" and r.json()["prefs"]["sugg"] == "keep", "one key changes, the others stay " + r.text[:200])
@@ -94,7 +95,7 @@ check(A.put(B + f"/api/agents/{CL}/chat-prefs", json=["latest"]).status_code == 
 check(prefs(Bo).status_code == 404 and prefs(Bo, sugg="latest").status_code == 404, "an agent not shared with the person -> 404")
 A.put(B + f"/api/lists/{W['id']}/members", json={"user_id": BOB, "role": "admin"})  # a list admin may address the agent
 check(prefs(Bo).ok and prefs(Bo).json()["prefs"]["jobs"] == "full", "another person has their own settings (defaults)")
-check(prefs(pin="off", notices="line").ok and prefs().json()["prefs"] == {"sugg": "keep", "jobs": "line", "pin": "off", "notices": "line"},
+check(prefs(pin="off", notices="line").ok and prefs().json()["prefs"] == {"sugg": "keep", "jobs": "line", "pin": "off", "notices": "line", "style": ""},
       "several keys at once")
 # autosave: three fields saved at the same moment (three devices / quick taps) all stay -- merged in the database
 SS = [sess("alice") for _ in range(3)]
@@ -105,7 +106,7 @@ for t in ths:
     t.start()
 for t in ths:
     t.join()
-check(res == [200] * 3 and prefs().json()["prefs"] == {"sugg": "keep", "jobs": "full", "pin": "on", "notices": "full"},
+check(res == [200] * 3 and prefs().json()["prefs"] == {"sugg": "keep", "jobs": "full", "pin": "on", "notices": "full", "style": ""},
       "three parallel saves: none lost " + str((res, prefs().json()["prefs"])))
 
 # ================================================================== collected suggestions

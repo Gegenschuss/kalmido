@@ -186,6 +186,7 @@ CASES = [
      {"title": "Build", "task_id": 7, "state": "waiting"}, {}),
     ("update_job", {"job_id": 5, "state": "done", "append_log": "ok"}, "PATCH", "/api/v1/agent/jobs/5", {"state": "done", "append_log": "ok"}, {}),
     ("list_chats", {"since": 2}, "GET", "/api/v1/agent/chats", None, {"since": "2"}),
+    ("get_reply_style", {"user_id": 3}, "GET", "/api/v1/agent/chats/3/reply-style", None, {}),  # 2.491.0 (#2849)
     ("send_chat", {"user_id": 1, "body": "hi", "task_id": 7}, "POST", "/api/v1/agent/chats/1", {"body": "hi", "task_id": 7}, {}),
     ("tidy_task", {"task_id": 7, "title": "Short", "list_tags": ["bug"]}, "POST", "/api/v1/tasks/7/tidy", {"title": "Short", "list_tags": ["bug"]}, {}),
     # 2.1.0 (#335) waiting on external

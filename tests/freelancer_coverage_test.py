@@ -51,7 +51,7 @@ KINDS = {
                     "invitation mails and the subscription link of an own calendar (2.111.0)"),
     "time": ("matrix", SUITE + ", p2116_d_api_test.py: time entries, the timer, habits; focus sessions and habit statistics over the API v1 (2.116.0)"),
     "agents": ("matrix", SUITE + ": the freelancer's own agent (my agents, its token, chat, jobs, share of a private list) and "
-                         "the agent API with that agent's token"),
+                         "the agent API with that agent's token; p2491_a_replystyle_test.py: her wishes for her agent's replies (2.491.0)"),
     "team": ("matrix", SUITE + ": the people list, direct messages and discovery without an organisation (no team rooms of "
                        "an organisation, nothing of another workspace); p2113b_b_api_test.py: a private channel with files, "
                        "rename / archive / restore as its own admin, groups only with people one works with (2.113.1)"),
@@ -226,6 +226,7 @@ ROUTES = {
     "POST /api/agent-schedules/{}/run": "agents", "POST /api/agents/jobs/{}/action": "agents",
     "POST /api/agents/{}/chat": "agents", "POST /api/agents/{}/chat/{}/choice": "agents",
     "GET /api/agents/{}/chat-prefs": "agents", "PUT /api/agents/{}/chat-prefs": "agents", "POST /api/agents/{}/chat/{}/dismiss": "agents",  # 2.233.0 A (#2848)
+    "GET /api/v1/agent/chats/{}/reply-style": "agents",  # 2.491.0 (#2849): the reply style wishes (p2491_a_replystyle_test.py)
     "DELETE /api/agents/{}/chat": "agents", "DELETE /api/agents/{}/chat/{}": "agents",  # 2.152.0 D (#2175): p2103_d_api_test.py
     "POST /api/agents/{}/chat/{}/pin": "agents", "POST /api/agents/{}/chat/{}/reactions": "agents",
     "POST /api/agents/{}/meeting-images": "agents", "POST /api/agents/{}/schedules": "agents",

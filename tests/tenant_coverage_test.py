@@ -251,6 +251,7 @@ ROUTES = {
     "GET /mail/off/{}": "own", "POST /mail/off/{}": "own",  # #2975: a person's own notification mail, by its token
     "GET /api/agents/{}/perm-users": "agent",  # 2.312.0 D (#3266): p2312_d_perm_user_test.py
     "GET /api/agents/{}/chat-prefs": "agent", "PUT /api/agents/{}/chat-prefs": "agent", "POST /api/agents/{}/chat/{}/dismiss": "agent",  # 2.233.0 A (#2848)
+    "GET /api/v1/agent/chats/{}/reply-style": "agent",  # 2.491.0 (#2849): p2491_a_replystyle_test.py
     "GET /api/agents/{}/chat": "agent", "POST /api/agents/{}/chat": "agent",
     # 2.98.0 A (#1953): scheduling polls (p298_a_api_test.py) - routes below this line
     "GET /api/polls": "poll", "POST /api/polls": "poll", "GET /api/polls/{}": "poll", "PATCH /api/polls/{}": "poll",

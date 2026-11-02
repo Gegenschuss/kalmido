@@ -85,8 +85,22 @@ const V = B + 'api/v1';
   check(!!mi, 'the header menu has "Chat settings"');
   mi?.click();
   const md = await until(() => d.querySelector('.modal.acsetmd'));
-  check(md && md.querySelectorAll('fieldset.acset-f').length === 5 && md.querySelector('[data-acset="sugg"][value="collect"]')?.checked && !md.querySelector('.foot .pri'),
-    'a dialog with five groups (2.407.0 #3493: Chat header), "collect" chosen, no save button');
+  // 2.491.0 (#2849): six groups now (+ Wishes for the replies)
+  check(md && md.querySelectorAll('fieldset.acset-f').length === 6 && md.querySelector('[data-acset="sugg"][value="collect"]')?.checked && !md.querySelector('.foot .pri'),
+    'a dialog with six groups (2.407.0 #3493: Chat header; 2.491.0 #2849: wishes for the replies), "collect" chosen, no save button');
+  // 2.491.0 (#2849): the reply style wishes -- a quick wish adds its text and saves, typing saves on leaving the field
+  const ta = md.querySelector('#acset-style');
+  check(ta && ta.value === '' && md.querySelectorAll('.acset-q [data-acstyle]').length === 3 && /passes these wishes on/.test(md.textContent),
+    'wishes for the replies: an empty field, three quick wishes, the hint');
+  click(w, md.querySelector('.acset-q [data-acstyle="Short answers"]'));
+  await until(async () => (await call('GET', `/api/agents/${AG}/chat-prefs`)).prefs?.style === 'Short answers');
+  check(ta.value === 'Short answers', 'a quick wish puts its text into the field and saves it');
+  click(w, md.querySelector('.acset-q [data-acstyle="No tables"]'));
+  await until(async () => (await call('GET', `/api/agents/${AG}/chat-prefs`)).prefs?.style === 'Short answers, No tables');
+  check(ta.value === 'Short answers, No tables', 'a second quick wish is added after a comma');
+  ta.value = 'Short answers, no tables, reply in German  '; ta.dispatchEvent(new w.Event('change', {bubbles: true}));
+  await until(async () => (await call('GET', `/api/agents/${AG}/chat-prefs`)).prefs?.style === 'Short answers, no tables, reply in German');
+  check((await call('GET', `/api/agents/${AG}/chat-prefs`)).prefs.style === 'Short answers, no tables, reply in German', 'typed text: saved trimmed on leaving the field');
   const keep = md.querySelector('[data-acset="sugg"][value="keep"]'); keep.checked = true; keep.dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', `/api/agents/${AG}/chat-prefs`)).prefs?.sugg === 'keep');
   check((await call('GET', `/api/agents/${AG}/chat-prefs`)).prefs.sugg === 'keep', 'autosave: stored at once');
@@ -101,7 +115,7 @@ const V = B + 'api/v1';
   await w.eval('chatLoad()'); await until(() => d.querySelector('#chat-msgs .cnotice'));
   check(d.querySelector('#chat-apv')?.hidden, '"Pin approvals at the top" off: nothing pinned');
   check(d.querySelector('#chat-msgs .cnotice.acset-n1'), 'notices "One line"');
-  await call('PUT', `/api/agents/${AG}/chat-prefs`, {sugg: 'collect', pin: 'on', notices: 'full'});
+  await call('PUT', `/api/agents/${AG}/chat-prefs`, {sugg: 'collect', pin: 'on', notices: 'full', style: ''});
   await w.eval('chatLoad()'); await until(() => !d.querySelector('#chat-apv')?.hidden);
   check(!d.querySelector('#chat-apv').hidden && !d.querySelector('#chat-msgs .cnotice.acset-n1'), 'back to the defaults: pinned, the notice in full');
   w.close();

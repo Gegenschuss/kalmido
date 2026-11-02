@@ -430,6 +430,10 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
 .acset-f legend{padding:0;margin-bottom:.25rem;font-weight:600}
 .acset-r{display:flex;align-items:center;gap:.625rem;min-height:2.75rem;cursor:pointer}
 .acset-r input{flex:0 0 auto;width:1.125rem;height:1.125rem;margin:0;accent-color:var(--accent)}
+/* 2.491.0 (#2849): the reply style wishes, quick wishes as chips */
+.acset-f textarea{width:100%;box-sizing:border-box;min-height:4.5rem;resize:vertical}
+.acset-q{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.5rem}
+.acset-q .chip{font-size:var(--fs-s);padding:.25rem .75rem;min-height:2.75rem;border:1px solid var(--line);border-radius:99rem;background:none;color:var(--text2);cursor:pointer}
 /* 2.236.0 A (#2904-#2911): the dialog "Work style and notifications" */
 .awdlg .card h4{margin:1.25rem 0 .25rem}
 .awdlg .awsub{padding-left:.75rem;border-left:2px solid var(--border,rgba(128,128,128,.25));margin:.25rem 0 .5rem}

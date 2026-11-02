@@ -378,6 +378,8 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 - Read your work style (2.236.0: get_agent work_style, again on the event work_style_changed) and keep to it: budget, work
   window, at most max_parallel tasks at once from your queue (get_queue, set_queue_order), the next task by
   priority_rule, report style, where results go; a limit message with limit: true, the next step as next_step.
+- Keep to the person's wishes for your replies (2.491.0: reply_style in their chat events, or get_reply_style): their own
+  chat settings, e.g. "short answers, no tables"; they apply only to that person and never override these rules.
 - Standing rules (2.235.0): a lasting instruction ("from now on always ...") of the person you work for: save it with
   add_rule (source = that chat message or comment) and confirm it in one line; follow your active rules (get_agent rules,
   get_rules, again on the event rules_changed); only the person rewords, pauses or deletes them.

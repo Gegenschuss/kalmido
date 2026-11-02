@@ -16127,5 +16127,11 @@
   "This address differs from PUBLIC_URL": "Questo indirizzo è diverso da PUBLIC_URL",
   "Links in e-mails, push messages and password resets use {0}, but this page is open on {1}. If people use {1}, set PUBLIC_URL to it in .env and restart (SELF-HOSTING.md, From localhost to your own address).": "I link nelle e-mail, nelle notifiche push e nel ripristino della password usano {0}, ma questa pagina è aperta su {1}. Se tutti usano {1}, imposta PUBLIC_URL su questo valore in .env e riavvia (SELF-HOSTING.md, From localhost to your own address).",
   "New letter or contract": "Nuovo documento",
-  "No letters or contracts yet.": "Ancora nessun documento."
+  "No letters or contracts yet.": "Ancora nessun documento.",
+  "Wishes for the replies": "Preferenze per le risposte",
+  "Short answers": "Risposte brevi",
+  "No tables": "Niente tabelle",
+  "Reply in English": "Rispondere in italiano",
+  "e.g. short answers, no tables": "ad es. risposte brevi, niente tabelle",
+  "Kalmido passes these wishes on to the agent with each of your messages.": "Kalmido inoltra queste preferenze all’agente con ogni tuo messaggio."
 }

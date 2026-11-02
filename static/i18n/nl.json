@@ -16126,5 +16126,11 @@
   "This address differs from PUBLIC_URL": "Dit adres wijkt af van PUBLIC_URL",
   "Links in e-mails, push messages and password resets use {0}, but this page is open on {1}. If people use {1}, set PUBLIC_URL to it in .env and restart (SELF-HOSTING.md, From localhost to your own address).": "Links in e-mails, pushmeldingen en bij het herstellen van wachtwoorden gebruiken {0}, maar deze pagina is geopend op {1}. Gebruikt iedereen {1}, zet PUBLIC_URL daar dan op in .env en herstart (SELF-HOSTING.md, From localhost to your own address).",
   "New letter or contract": "Nieuw document",
-  "No letters or contracts yet.": "Nog geen documenten."
+  "No letters or contracts yet.": "Nog geen documenten.",
+  "Wishes for the replies": "Wensen voor de antwoorden",
+  "Short answers": "Korte antwoorden",
+  "No tables": "Geen tabellen",
+  "Reply in English": "Antwoorden in het Nederlands",
+  "e.g. short answers, no tables": "bijv. korte antwoorden, geen tabellen",
+  "Kalmido passes these wishes on to the agent with each of your messages.": "Kalmido geeft deze wensen bij elk bericht van jou door aan de agent."
 }

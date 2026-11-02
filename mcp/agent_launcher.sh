@@ -242,6 +242,7 @@ nightly_due() {
   (( STARTED < at ))  # started before tonight's time -> restart now
 }
 # kalmido-capability: standing_rules (2.235.0, #2903: the active standing rules under the rules block, in mcp/agent_run.py)
+# kalmido-capability: reply_style (2.491.0, #2849: the person's wishes for the replies from the event into the prompt, in mcp/agent_run.py)
 # kalmido-capability: lang_texts (2.450.0, #3769: the texts by the agent's language, in mcp/agent_run.py)
 # kalmido-capability: job_watch (2.392.2, #3366: the watchdog hints in mcp/agent_run.py, the job chain in mcp/agent_job.py)
 # kalmido-capability: work_window (2.236.0, #2905): outside the work window of the work style (work_style.state.working

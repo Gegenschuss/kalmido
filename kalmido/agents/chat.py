@@ -541,6 +541,8 @@ def chat_choice_answer(c, m, ch, ids, uid, via, collected=False):
         a = ch["approval"]
         data.update(approval=_approval_of(ids), approval_request={"title": a.get("title", ""), "what": a.get("what", "")}, via=via)
     tdata = agent_task_data(c, m["task_id"], m["agent_id"]) if m["task_id"] and task_visible(c, m["task_id"], m["agent_id"], full=True) else {}
+    from ..agents.chatprefs import cp_style_into
+    cp_style_into(c, m["agent_id"], uid, data)  # 2.491.0 (#2849): the reply style wishes of the person who pressed
     agent_emit(c, m["agent_id"], "chat_choice", {**data, **tdata})
     if ch.get("permission") and via == "button":
         agent_emit(c, m["agent_id"], "reaction", {
@@ -1001,6 +1003,8 @@ def chat_emit(c, aid, r):
         j = c.execute("SELECT * FROM agent_jobs WHERE id=? AND agent_id=?", (r["job_id"], aid)).fetchone()
         if j:
             data["job"] = {k: v for k, v in job_dict(c, j).items() if k != "log"}  # review: not the whole log every time
+    from ..agents.chatprefs import cp_style_into
+    cp_style_into(c, aid, r["user_id"], data)  # 2.491.0 (#2849): this person's reply style wishes, only when set
     agent_emit(c, aid, "chat", data)
 
 
@@ -1078,6 +1082,8 @@ def med_chat_edit(c, m, text):
                 "old": m["body"], "new": text, "user": {"id": uid, "name": user_names(c, [uid]).get(uid, "")}, "answered": answered}
         if m["task_id"] and task_visible(c, m["task_id"], m["agent_id"], full=True):
             data.update(agent_task_data(c, m["task_id"], m["agent_id"]))
+        from ..agents.chatprefs import cp_style_into
+        cp_style_into(c, m["agent_id"], uid, data)  # 2.491.0 (#2849)
         agent_emit(c, m["agent_id"], "message_edited", data)
     return c.execute("SELECT * FROM agent_chat WHERE id=?", (m["id"],)).fetchone()
 

@@ -16126,5 +16126,11 @@
   "This address differs from PUBLIC_URL": "Diese Adresse weicht von PUBLIC_URL ab",
   "Links in e-mails, push messages and password resets use {0}, but this page is open on {1}. If people use {1}, set PUBLIC_URL to it in .env and restart (SELF-HOSTING.md, From localhost to your own address).": "Links in Mails, Push-Nachrichten und beim Passwort-Zurücksetzen nutzen {0}, diese Seite ist aber unter {1} geöffnet. Wenn alle {1} nutzen: PUBLIC_URL in .env darauf setzen und neu starten (SELF-HOSTING.md, From localhost to your own address).",
   "New letter or contract": "Neues Schreiben oder Vertrag",
-  "No letters or contracts yet.": "Noch keine Schreiben oder Verträge."
+  "No letters or contracts yet.": "Noch keine Schreiben oder Verträge.",
+  "Wishes for the replies": "Wünsche für die Antworten",
+  "Short answers": "Antworten kurz",
+  "No tables": "Keine Tabellen",
+  "Reply in English": "Sprache Deutsch",
+  "e.g. short answers, no tables": "z. B. Antworten kurz, keine Tabellen",
+  "Kalmido passes these wishes on to the agent with each of your messages.": "Kalmido gibt diese Wünsche mit jeder deiner Nachrichten an den Agenten weiter."
 }
