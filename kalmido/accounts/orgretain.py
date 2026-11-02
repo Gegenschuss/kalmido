@@ -221,13 +221,15 @@ def odl_more(c, oid):
     named = {t: k for k, _w, t in ODL_MORE}
     out = {}
     with system_ctx(c):  # numbers only, for the admin's confirmation
-        for t, col, d in mg_fk_refs(c, "orgs"):
-            if d != "c" or t in ODL_MORE_SKIP:
-                continue
-            n = c.execute(f"SELECT COUNT(*) FROM {t} WHERE {col}=?", (int(oid),)).fetchone()[0]
-            if n:
-                k = named.get(t, "other")
-                out[k] = out.get(k, 0) + n
+        refs = [(t, col) for t, col, d in mg_fk_refs(c, "orgs") if d == "c" and t not in ODL_MORE_SKIP]
+        if not refs:
+            return out
+        # 2.370.4 (#3089) N11: one statement (a COUNT per table, UNION ALL) instead of one per table
+        sel = " UNION ALL ".join(f"SELECT {n} AS k, COUNT(*) AS n FROM {t} WHERE {col}=?" for n, (t, col) in enumerate(refs))
+        for r in c.execute(sel, [int(oid)] * len(refs)).fetchall():
+            if r[1]:
+                k = named.get(refs[r[0]][0], "other")
+                out[k] = out.get(k, 0) + r[1]
     return out
 
 

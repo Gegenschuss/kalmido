@@ -13,7 +13,7 @@ from ..accounts.session import me
 from ..core.access import Denied
 from ..tasks.validation import as_int
 from ..core.errors import BadInput, UnknownFields
-from .clients import CLIENT_TEXT_MAX, CL_HOLD, CL_HOLD_WHERE, _gate, clean_client, client_rows, cl_may_delete, cl_refs, cl_refs_text, cl_trash, cl_trash_days, cl_untrash
+from .clients import CLIENT_TEXT_MAX, CL_HOLD, CL_HOLD_WHERE, _gate, clean_client, client_rows, cl_may_delete, cl_refs_many, cl_refs_text, cl_trash, cl_trash_days, cl_untrash
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgroles import need_org_write
 
@@ -29,15 +29,24 @@ def ms_client_in_use(c, cid):
     (no action / restrict); what else points at it the dialog names (GET /api/clients/usage), the trash keeps it.
     2.223.3 B (#2878): of the records only finalised documents and trips with receipts (CL_HOLD_WHERE): a client of drafts,
     trial documents and plain trips is deleted."""
+    return cid in ms_clients_in_use(c, [cid])
+
+
+def ms_clients_in_use(c, ids):
+    """2.370.4 (#3089) N11: the ids of clients ids that ms_client_in_use keeps, in one statement (UNION) per 500 ids instead of
+    a query per client and table."""
     from ..office.officemove import ofm_fk_refs
-    # system: only a yes / no across the workspaces (a document of another workspace may point to it), no content
-    with system_ctx(c):
-        return any((t in CL_HOLD or d in ("a", "r")) and c.execute(
-            f"SELECT 1 FROM {t} x WHERE x.{col}=?" + (f" AND {CL_HOLD_WHERE[t]}" if t in CL_HOLD_WHERE and d not in ("a", "r") else "")
-            + " LIMIT 1", (cid,)).fetchone() for t, col, d in ofm_fk_refs(c, "clients") if t != "clients") or bool(
+    out = set()
+    with system_ctx(c):  # only ids of the asked clients across the workspaces, no content
+        for k in range(0, len(ids), 500):
+            part = [int(x) for x in ids[k:k + 500]]
+            q = ",".join("?" * len(part))
+            sel = [f"SELECT x.{col} FROM {t} x WHERE x.{col} IN ({q})" + (f" AND {CL_HOLD_WHERE[t]}" if t in CL_HOLD_WHERE and d not in ("a", "r") else "")
+                   for t, col, d in ofm_fk_refs(c, "clients") if t != "clients" and (t in CL_HOLD or d in ("a", "r"))]
             # 2.239.0 D (#2874): a signed data protection sheet (processing agreement, consent) is a record that has to stay
-            c.execute("SELECT 1 FROM office_privacy_sheets WHERE client_id=? AND (status='signed' OR signed_node_id IS NOT NULL) LIMIT 1",
-                      (cid,)).fetchone())
+            sel.append(f"SELECT client_id FROM office_privacy_sheets WHERE client_id IN ({q}) AND (status='signed' OR signed_node_id IS NOT NULL)")
+            out.update(r[0] for r in c.execute(" UNION ".join(sel), part * len(sel)).fetchall())
+    return out
 
 
 def ms_cl_ids(b, k="ids"):
@@ -88,11 +97,12 @@ def ms_clients_bulk(c, uid, b):
     out = {"action": action}
     if action == "delete":
         dl, ar, sk = [], [], 0
+        used = ms_clients_in_use(c, ids)  # 2.370.4 (#3089) N11
         for i in ids:
             r = seen[i]
             if not cl_may_delete(c, uid, r):  # 2.148.1 B (#2484): the creator or an admin of its organisation
                 sk += 1
-            elif ms_client_in_use(c, i):
+            elif i in used:
                 if not r["archived"]:
                     c.execute("UPDATE clients SET archived=1, updated_at=? WHERE id=?", (ts, i))
                 ar.append(i)
@@ -156,12 +166,8 @@ def clients_usage():
     seen = {r["id"] for r in client_rows(c, uid, trash=None)}
     if any(i not in seen for i in ids):
         raise Denied(404)
-    refs, hold = {}, 0
-    for i in ids:
-        for t, n in cl_refs(c, i).items():
-            refs[t] = refs.get(t, 0) + n
-        hold += 1 if ms_client_in_use(c, i) else 0
-    return jsonify(refs=refs, text=cl_refs_text(refs), in_use=hold, trash_days=cl_trash_days())
+    refs = cl_refs_many(c, ids)  # 2.370.4 (#3089) N11: gathered (were up to 1000 ids x ~17 COUNTs)
+    return jsonify(refs=refs, text=cl_refs_text(refs), in_use=len(ms_clients_in_use(c, ids)), trash_days=cl_trash_days())
 
 
 @app.post("/api/clients/bulk")

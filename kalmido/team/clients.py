@@ -603,6 +603,29 @@ def cl_refs(c, cid, skip=(), skip_ids=None):
         return ofm_refs(c, "clients", cid, skip, skip_ids)
 
 
+def cl_refs_many(c, ids):
+    """2.370.4 (#3089) N11: cl_refs summed over the clients ids ({table: n}), one statement (a COUNT per table, UNION ALL) per
+    500 ids instead of one per client and table (system context: numbers only)."""
+    from ..office.officemove import ofm_fk_refs
+    refs = [(t, col) for t, col, _d in ofm_fk_refs(c, "clients") if not (t == "clients" and col == "id")]
+    out, lists = {}, 0
+    with system_ctx(c):
+        for k in range(0, len(ids), 500):
+            part = [int(x) for x in ids[k:k + 500]]
+            q = ",".join("?" * len(part))
+            sel = [f"SELECT {n} AS k, COUNT(*) AS n FROM {t} WHERE {col} IN ({q})" for n, (t, col) in enumerate(refs)]
+            sel.append(f"SELECT -1 AS k, COUNT(*) AS n FROM lists WHERE client_id IN ({q})")
+            for r in c.execute(" UNION ALL ".join(sel), part * len(sel)).fetchall():
+                if r[0] < 0:
+                    lists += r[1]
+                elif r[1]:
+                    t = refs[r[0]][0]
+                    out[t] = out.get(t, 0) + r[1]
+    if lists:
+        out["lists"] = lists
+    return out
+
+
 def cl_refs_text(refs):
     """"3 contact persons, 1 data protection sheet" (translated) of {table: n}, the tables without a word as other entries."""
     out = [trn(*w, refs[t]) for t, w in CL_REF_WORDS.items() if refs.get(t)]
