@@ -56,6 +56,7 @@ def fetch_calls(src):
 FETCH_VAR_OK = {
     ("core.js", "url, opt"),  # rawFetch0: opt is built with the header right above
     ("msvview.js", "url, opt"),  # 2.73.0 (#661): msvvFetch, opt is built with the header right above
+    ("upbar.js", "url, opt"),  # #3134: only the comment above upSend; upSend sends rawFetch0's opt.headers (with the header) by XHR
 }
 JS = os.path.join(N, "..", "static", "js")
 bad = []

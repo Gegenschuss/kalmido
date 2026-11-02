@@ -36,12 +36,14 @@ function vm_store(k, rec) {
   LS.set(VM_LS, o);
 }
 // a selector that finds el again inside root: {s, i: its index among the matches, t: the text of an entry without its own name}
+// #3506 (main red, after #3439): CSS.escape where the browser has it, else a plain escape (jsdom of the tests has no CSS object)
+const vm_esc = v => typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(v) : String(v).replace(/[^\w-]/g, c => '\\' + c);
 /** @param {Element} el @param {Element} root */
 function vm_sel(el, root) {
-  const tag = el.tagName.toLowerCase(), cls = el.classList[0] ? '.' + CSS.escape(el.classList[0]) : '';
+  const tag = el.tagName.toLowerCase(), cls = el.classList[0] ? '.' + vm_esc(el.classList[0]) : '';
   let s = '', t = '';
-  if (el.id && !/^\d/.test(el.id)) s = '#' + CSS.escape(el.id);
-  else { const a = VM_ATTR.find(x => el.hasAttribute(x)); if (a) s = `${tag}${cls}[${a}="${CSS.escape(el.getAttribute(a) || '')}"]`; }
+  if (el.id && !/^\d/.test(el.id)) s = '#' + vm_esc(el.id);
+  else { const a = VM_ATTR.find(x => el.hasAttribute(x)); if (a) s = `${tag}${cls}[${a}="${vm_esc(el.getAttribute(a) || '')}"]`; }
   if (!s) { s = tag + cls; t = (el.textContent || '').trim().slice(0, 40); }
   const i = [...root.querySelectorAll(s)].indexOf(el);
   return i < 0 ? null : {s, i, ...(t ? {t} : {})};
@@ -132,6 +134,7 @@ function vm_after() {
 // (no tap on the bar) and links inside a page bring a view back at its place as before
 window.addEventListener('click', e => { VM.fresh = (e.target instanceof Element && e.target.closest('#tabs [data-go]')?.getAttribute('data-go')) || ''; }, true);
 function vm_try() {
+  if (!document) return;  // #3506 (after #3439): a late observer call after the window closed (tests) finds no document
   const v = document.getElementById('view'), sd = document.getElementById('side');
   if (VM.wantSide && sd && vm_put(sd, VM.wantSide)) VM.wantSide = null;
   const w = VM.want;

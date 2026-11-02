@@ -1,6 +1,6 @@
 // 2.124.0 part A UI test (#2109 #2115), own container (start.sh), jsdom. Invented names only.
 // - a formula with a new function typed into the grid shows its result (SUMMEWENN), a lookup that finds nothing reads "Not found"
-// - the completion after "=" offers SVERWEIS
+// - the completion after "=" offers SVERWEIS (2.368.3, #2988: as VLOOKUP in the English UI)
 // - the table's menu "Chart…": the dialog (kind, labels, numbers), saving draws an SVG with one bar per row (one undo step:
 //   Undo removes it again, Redo brings it back), a changed cell redraws the bar, a tap on a bar shows its values
 // - line chart with two series: a legend; hide / show; a reader sees the chart without the edit button
@@ -64,7 +64,8 @@ const item = (d, re) => [...d.querySelectorAll('[role="menuitem"]')].find(b => r
   let ed = d.getElementById('shv-ed');
   check(await until(() => d.querySelector('#shv-ac button[data-shvac]')), 'after "=" the suggestions open');
   ed.value = '=SVER'; ed.setSelectionRange(5, 5); ed.dispatchEvent(new w.Event('input', {bubbles: true}));
-  check(await until(() => [...d.querySelectorAll('#shv-ac code')].some(c => c.textContent === 'SVERWEIS')), 'typing SVER suggests SVERWEIS');
+  // 2.368.3 (#2988): the completion names functions in the UI language (en here), found by either language's name
+  check(await until(() => [...d.querySelectorAll('#shv-ac code')].some(c => c.textContent === 'VLOOKUP')), 'typing SVER suggests VLOOKUP (English UI)');
   key(w, ed, 'Escape');
   ed.value = '=SUMMEWENN(A1:A3;"apples";B1:B3)'; ed.dispatchEvent(new w.Event('input', {bubbles: true})); key(w, ed, 'Enter');
   check(await until(async () => cellOf(await call('GET', `/api/sheets/${SID}`), 'C5')?.value === 10), 'SUMMEWENN typed in: saved = 10');

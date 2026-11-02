@@ -68,7 +68,7 @@ EXPECT_4XX = {
     "GET /api/v1/office/letters/{}": (404, "an agent reads only the letters it drafted itself; the freelancer wrote this one"),
 }
 # 2.421.0 A (#2936): GET routes of the matrix areas the sweep cannot fill (no id of an own object): may only shrink
-MAX_SKIPPED = 88  # 29.10.2026: 108 before the setup made tables, polls, bookmarks, letters, contracts, questionnaires
+MAX_SKIPPED = 87  # 29.10.2026: 108 before the setup made tables, polls, bookmarks, letters, contracts, questionnaires; 02.11.2026: 88 before the own webhook (2.391.0 #3362)
 
 
 def ok(r, what, codes=(200, 201, 204)):
@@ -239,7 +239,7 @@ tk = ok(F.post(B + "/api/me/tokens", json={"name": "all", "scopes": [x for x in 
                                                                                   "attachments:read", "attachments:write", "time", "export",
                                                                                   "calendar", "contacts", "private", "account", "files:read",
                                                                                   "files:write", "office", "pinboard", "layouts", "import",
-                                                                                  "sheets:read", "wiki:read", "wiki:write")]}),  # 2.89.1: tables of 2.89.0; 2.200.0 (#1781): knowledge pages
+                                                                                  "sheets:read", "wiki:read", "wiki:write", "integrations")]}),  # 2.89.1: tables of 2.89.0; 2.200.0 (#1781): knowledge pages; 2.391.0 (#3362): integrations (/api/v1/me/tokens, /api/v1/me/webhooks)
         "own: a personal API token", (200, 201))
 PT = {"Authorization": "Bearer " + tk.get("token", "")}
 
@@ -274,6 +274,9 @@ IDS["cardline"] = ok(F.post(B + f"/api/office/cards/statements/{IDS['cardstmt']}
 c = ok(F.post(B + f"/api/office/cards/statements/{IDS['cardstmt']}/lines", json={"day": D, "merchant": "Typo", "amount": "1.00"}), "office: another", (200, 201))
 ok(F.delete(B + f"/api/office/cards/lines/{c['line']['id']}"), "office: a typed position goes again")
 IDS["collection"] = "wiki"  # 2.429.0 (#3580): a collection of the file store (empty is fine)
+# 2.391.0 (#3362): GET /api/v1/me/webhooks/{}/log is new: an own webhook (never called: no invoice gets paid after this)
+IDS["webhook"] = _id(ok(F.post(B + "/api/me/webhooks", json={"name": "Sweep", "url": "https://hooks.example.com/frida", "events": ["invoice.paid"]}),
+                        "sweep setup: a webhook", (200, 201)))
 for _ in range(480):  # the account export of "own" runs in the background: its file once it is done
     if F.get(B + "/api/account/export").json().get("state") != "running":
         break
@@ -283,6 +286,7 @@ for _ in range(480):  # the account export of "own" runs in the background: its 
 # the placeholders: the path up to "{}" -> the id of the freelancer's own object (first match wins)
 SUBST = [
     # 2.421.0 A (#2936): own objects of the setup above; file ids of other stores than the file store: none (skipped)
+    (r"/me/webhooks/$", "webhook"),  # 2.391.0 (#3362)
     (r"/sheets/\d+/files/$", None), (r"/sheets/$", "sheet"), (r"/polls/$", "poll"), (r"/bookmarks/$", "bookmark"),
     (r"/office/letters/$", "letter"), (r"/office/packs/$", "pack"), (r"/office/agreements/$", "agreement"), (r"/forms/$", "form"),
     (r"/office/cashbooks/$", "cashbook"),

@@ -189,7 +189,8 @@ check(sql("SELECT org_id FROM video_comments WHERE id=?", (C1,))[0][0] == ORG an
 r = A.get(B + f"{V}/{VID}/export?version_id={V1}")
 txt = r.content.decode("utf-8-sig") if r.ok else ""
 check(r.ok and r.headers["Content-Type"].startswith("text/csv") and "attachment" in r.headers.get("Content-Disposition", "")
-      and "v1;01:23;Alice Admin;Schnitt hier zu hart;;" in txt and "1:02:03" in txt and "'=SUM(1) neu" in txt and "Erledige ich" in txt
+      and "v1,01:23,Alice Admin,Schnitt hier zu hart,," in txt  # 2.368.2 (#2984): English export = comma
+      and "1:02:03" in txt and "'=SUM(1) neu" in txt and "Erledige ich" in txt
       and "Ohne Zeit" not in txt, f"CSV of version 1 (timecode, name, text; no formulas) {txt[:300]!r}")
 r = A.get(B + f"{V}/{VID}/export?format=text")
 t = r.json().get("text", "") if r.ok else ""

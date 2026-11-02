@@ -157,7 +157,8 @@ body = {"provider": "github", "base_url": GH, "repo": "acme/app", "token": TOKEN
 check(A.post(B + f"/api/lists/{next(x["id"] for x in A.get(B + "/api/state").json()["lists"] if x["is_inbox"])}/repos", json=body).status_code == 409, "the inbox cannot connect (projects only)")
 check(Bo.post(B + f"/api/lists/{P}/repos", json=body).status_code == 403, "a member (edit) cannot connect")
 check(Ca.post(B + f"/api/lists/{P}/repos", json=body).status_code == 403, "a viewer cannot connect")
-check(ag.post(f"/lists/{P}/repos", json=body).status_code in (404, 405), "no API route to connect (agents never connect)")
+# 2.391.0 (#3362): POST /api/v1/lists/{id}/repos exists for people (scope integrations); an agent never gets that scope -> 403
+check(ag.post(f"/lists/{P}/repos", json=body).status_code == 403, "the API route to connect refuses agents (agents never connect)")
 check(requests.post(B + f"/api/lists/{P}/repos", json=body, headers={"Authorization": "Bearer " + AGTOK, **H}).status_code in (401, 403),
       "an agent token cannot reach the web endpoint")
 for bad in ({**body, "repo": "no-slash"}, {**body, "repo": "a/b c"}, {**body, "provider": "svn"}, {**body, "token": "has space"},

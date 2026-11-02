@@ -98,9 +98,11 @@ rp = next((p for p in pages if any(t["s"] == "Zeitliche Auswertung" for t in p.r
 check(rp is not None, "the rights appendix page exists")
 if rp is not None:
     rows = [t for t in rp.rec if t["s"] in ("Zeitliche Auswertung", "Räumliche Auswertung", "Mediale Auswertung", "unbegrenzt", "weltweit")]
-    check(rows and all(t["size"] == 10 for t in rows), "rights rows: label and value both 10 pt " + str([t["size"] for t in rows]))
+    # 2.413.0 (#3500): one font scale for office PDFs - rights rows FS_BODY (was 10), note FS_SMALL (was 8.5), order confirmation
+    # heading FS_BODY bold (was 10) / FS_FOOT without an appendix (was 7.4), both captions FS_SMALL (no extra step any more)
+    check(rows and all(t["size"] == pdf.FS_BODY for t in rows), "rights rows: label and value both FS_BODY " + str([t["size"] for t in rows]))
     note = next((t for t in rp.rec if t["s"].startswith("Im Übrigen")), None)
-    check(note is not None and note["size"] == 8.5, "rights note 8.5 pt")
+    check(note is not None and note["size"] == pdf.FS_SMALL, "rights note FS_SMALL")
     sub = next((t for t in rp.rec if "Serie Beispielprojekt" in t["s"]), None)
     check(sub is not None and sub["size"] <= 9, "project line top right not larger than the body text")
     head = next((t for t in rp.rec if t["s"] == "RECHTEÜBERTRAGUNG"), None)
@@ -110,15 +112,15 @@ if rp is not None:
     if acc is not None and note is not None:
         gap = acc["y"] - (note["y"] + note["size"])
         check(gap >= 28, f"air between rights block and order confirmation >= 28 pt ({gap:.1f})")
-        check(acc["bold"] and acc["size"] == 10, "order confirmation heading bold 10 pt")
+        check(acc["bold"] and acc["size"] == pdf.FS_BODY, "order confirmation heading bold FS_BODY")
         caps = [t for t in rp.rec if t["s"] in ("Ort, Datum", "Unterschrift, Stempel Auftraggeber")]
-        check(len(caps) == 2 and all(t["size"] >= 8.5 for t in caps), "captions under the lines are one step larger")
+        check(len(caps) == 2 and all(t["size"] == pdf.FS_SMALL for t in caps), "captions under the lines FS_SMALL")
         check(any(ru[1] > acc["y"] for ru in rp.rules), "the signature lines are on the same page")
 
 # without an appendix the order confirmation keeps its old small heading
 data, r, pages = render(model(rights=False))
-oc = [t for p in pages for t in p.rec if t["size"] == 7.4 and t["bold"]]
-check(len(oc) >= 1, "no rights appendix: the order confirmation heading stays 7.4 pt")
+oc = [t for p in pages for t in p.rec if t["s"] == "AUFTRAGSERTEILUNG" and t["size"] == pdf.FS_FOOT and t["bold"]]
+check(len(oc) >= 1, "no rights appendix: the order confirmation heading stays small (FS_FOOT)")
 
 # ---------------------------------------------------------------- 2. #2397 footer, two-line company name
 data, r, pages = render(model(name="FIRMA\nName & Name GbR", rights=False))

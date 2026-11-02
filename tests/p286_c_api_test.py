@@ -12,6 +12,7 @@ mode workspaces with the SMTP sink of stub_mail.py. Invented companies, people a
  - N27: document mails have a day budget per person (150), organisation (300) and receiving address (20): 429 beyond it
 usage: p286_c_api_test.py <datadir>      (P286C_NOSTART=1: a running server on KALMIDO_TEST_PORT; N27 then needs its SMTP)"""
 import datetime
+import json
 import os
 import re
 import subprocess
@@ -255,7 +256,9 @@ else:
     check(r.status_code == 429, f"N27: the cc counts too ({r.status_code})")
     check(A.post(B + f"{D}/{I1}/send", json={"to": "kunde4@example.com", "datev": False}).ok, "N27: another address still goes")
     out = os.path.join(DATA, "mail", "out.jsonl")
-    n = len(open(out, encoding="utf-8").read().splitlines()) if os.path.exists(out) else -1
+    # 2.367.4 (#2974): the setup's organisation invitations now mail the invited account too: count the document mails only
+    n = sum(1 for ln in open(out, encoding="utf-8") if ln.strip() and any(t.lower().startswith("kunde") for t in json.loads(ln).get("to", []))) \
+        if os.path.exists(out) else -1
     check(n == 3, f"N27: three mails went out, none of the refused ones ({n})")
 
 print(f"p286_c_api: {OKS[0]} ok, {len(FAILS)} failed")

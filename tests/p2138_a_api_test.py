@@ -276,7 +276,7 @@ check(pp is not None and [t["s"] for t in pp.rec if t["size"] == 14] == ["Traile
 LONG_T = "Kostenvoranschlag für die Herbstkampagne mit drei Filmen und Social Media Schnittfassungen"
 data, r, pages = render(pmodel(title=LONG_T))
 p1 = pages[0]
-tl = [t for t in p1.rec if t["size"] == 16]
+tl = [t for t in p1.rec if t["size"] == pdf.FS_TITLE and t["bold"]]  # 2.413.0 (#3500): the title page heading is FS_TITLE (was 16 pt)
 pg = [t for t in p1.rec if t["s"].startswith("Seite 1 von")]
 check(len(tl) >= 2 and " ".join(t["s"] for t in tl) == LONG_T.upper(), f"a long document title wraps ({len(tl)} lines)")
 check(all(t["x"] + t["w"] <= pdf.PDF_L + pdf.PDF_CW + 0.5 for t in tl), "no title line runs past the right margin")

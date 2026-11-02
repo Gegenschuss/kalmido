@@ -213,13 +213,14 @@ for kind in ("offer", "invoice"):
 check(not tight, f"#3415: never below 8 mm between the last position and the totals ({tight[:4]})")
 
 
-def edge_gap(pages, head):  # points between the right edge of the price text and the left edge of the VAT text (head: the 7.4 pt heads / 8.8 + 8 pt values)
+def edge_gap(pages, head):  # points between the right edge of the price text and the left edge of the VAT text (head: the table heads / body + small values)
+    # 2.413.0 (#3500): sizes from the one font scale (heads FS_FOOT bold, spacing 0.6 - the sender line has the same size; values FS_BODY + FS_SMALL)
     rec = pages[0].rec
     if head:
-        h = [t for t in rec if t["size"] == 7.4]
+        h = [t for t in rec if t["size"] == pdf.FS_FOOT and t["bold"] and t["spacing"] == 0.6]
         pr, vt = h[3], h[4]  # POS, SERVICE, QTY, RATE, VAT, TOTAL
     else:
-        i = next(i for i, t in enumerate(rec) if t["size"] == 8 and t["align"] == "c" and t["s"].endswith("%") and rec[i - 1]["size"] == 8.8)
+        i = next(i for i, t in enumerate(rec) if t["size"] == pdf.FS_SMALL and t["align"] == "c" and t["s"].endswith("%") and rec[i - 1]["size"] == pdf.FS_BODY)
         pr, vt = rec[i - 1], rec[i]
     right = pr["x"] + pr["width"]
     tw = pdf.pdf_text_width(vt["s"], vt["size"], vt["bold"], vt["spacing"])

@@ -435,7 +435,7 @@ async function ad_agPolicyDraw(md) {
   try {
     const p = await api('GET', '/api/admin/agent-policy'); const sw = $('#s-uag', md), mx = $('#s-uagmax', md); if (sw) sw.checked = p.user_agents; if (mx) { mx.value = p.max_per_user; mx.disabled = !p.user_agents; }
     const lb = $('#s-sclim', md);  // 2.15.0 (#479): the admin's limit, one grid for agents and one for personal tokens
-    if (lb && p.scope_limit) lb.innerHTML = [['agents', N_('Agents')], ['tokens', N_('Personal API tokens')]].map(([k, n]) => `<fieldset class="sclim"><legend>${tr(n)}</legend><div class="scgrid">${p.scopes.filter(x => (k !== 'agents' || (x !== 'account' && x !== 'private' && x !== 'docs:upload')) && (k !== 'tokens' || x !== 'office')).map(x => `<label class="chkl sc"><input type="checkbox" data-sclim="${k}" data-scope="${x}" ${p.scope_limit[k].includes(x) ? 'checked' : ''} ${x === 'read' ? 'disabled' : ''}><span>${esc(tr(SCOPE_SHORT[x] || x))}</span></label>`).join('')}</div></fieldset>`).join('');
+    if (lb && p.scope_limit) lb.innerHTML = [['agents', N_('Agents')], ['tokens', N_('Personal API tokens')]].map(([k, n]) => `<fieldset class="sclim"><legend>${tr(n)}</legend><div class="scgrid">${p.scopes.filter(x => (k !== 'agents' || (x !== 'account' && x !== 'private' && x !== 'docs:upload' && x !== 'integrations')) && (k !== 'tokens' || x !== 'office')).map(x => `<label class="chkl sc"><input type="checkbox" data-sclim="${k}" data-scope="${x}" ${p.scope_limit[k].includes(x) ? 'checked' : ''} ${x === 'read' ? 'disabled' : ''}><span>${esc(tr(SCOPE_SHORT[x] || x))}</span></label>`).join('')}</div></fieldset>`).join('');
   } catch { /* offline */ }
 }
 function agSetupWire(md) {
@@ -1645,7 +1645,7 @@ const SS_AREA = [
       [N_('Rules'), ['regel', 'rule'], '#s-dcs-rules-h'], [N_('Senders, types and tags'), ['absender', 'sender', 'dokumenttyp', 'schlagwort', 'tags', 'feld', 'felder', 'field', 'fields'], '#s-dcs-lists-h'],
       [N_('Inboxes'), ['eingang', 'eingänge', 'inbox', 'mail', 'e-mail', 'scanner', 'wächter', 'watcher'], '#s-dcs-in-h']]},
   {src: ['ofcSettingsHtml', 'agbSettingsHtml', 'bp_settingsHtml', 'dun_settingsHtml', 'tpSettingsHtml', 'pep_settingsHtml', 'dx_settingsHtml', 'dv_settingsHtml', 'brl_settingsHtml', 'bka_settingsHtml', 'bnr_settingsHtml',
-    'rcm_settingsHtml', 'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml', 'ocm_settingsHtml', 'ccn_settingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['büro', 'office', 'firma', 'company'],
+    'rcm_settingsHtml', 'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml', 'ocm_settingsHtml', 'ccn_settingsHtml', 'pol_settingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['büro', 'office', 'firma', 'company'],
     on: () => modOn('office') && ss_ofm('settings'), open: () => settingsModal('biz'), root: '#s-biz #ofc-set',  // 2.365.2 (#2789): Settings > Company & office
     secs: [[N_('Company'), ['firma', 'adresse', 'address', 'logo', 'bank', 'iban', 'bankverbindung', 'bank details', 'konto', 'steuernummer', 'ust-idnr', 'vat id', 'register'], '', 'company'], [N_('Terms and conditions (PDF)'), ['agb', 'terms'], '#agb-box', 'company'], [N_('Letterhead'), ['briefpapier', 'briefkopf', 'letterhead'], '#bp-h', 'company'],
       [N_('Master data file'), ['stammdaten', 'master data'], '', 'data'], [N_('Card positions without a receipt'), ['karte', 'kartenposten', 'card', 'beleg', 'receipt', 'erinnerung', 'reminder'], '#ccn-h', 'data'],
@@ -1654,6 +1654,7 @@ const SS_AREA = [
       [N_('Suggest payment reminders for overdue invoices'), ['mahnung', 'mahnungen', 'mahnwesen', 'zahlungserinnerung', 'reminder', 'dunning', 'girocode'], '#os-dun-on', 'docs'],
       [N_('Invoice from a quotation with parts'), ['teile', 'parts'], '#os-parts-inv', 'docs'],
       [N_('E-invoices over the Peppol network'), ['peppol', 'e-rechnung', 'einvoice', 'xrechnung', 'zugferd'], '#pep-set', 'docs', () => ss_ofcFeat('docs.einvoice')],
+      [N_('Online payment of invoices'), ['online', 'bezahlung', 'zahlung', 'payment', 'stripe', 'webhook', 'pay link', 'zahllink', 'auszahlung', 'payout'], '#pol-set', 'docs'],  // 2.469.0 (#3459)
       [N_('Texts & templates'), ['vorlage', 'vorlagen', 'templates', 'katalog', 'catalogue'], '#s-biz-tpl', 'tpl'], [N_('Services'), ['leistung', 'leistungen', 'services', 'preisliste', 'price list'], '[data-osttpl="services"]', 'tpl'],
       [N_('Text blocks'), ['textbaustein', 'textbausteine', 'baustein', 'text blocks'], '[data-osttpl="texts"]', 'tpl'], [N_('Document templates'), ['dokumentvorlage', 'dokumentvorlagen', 'document templates'], '[data-osttpl="gendocs"]', 'tpl'],  // 2.470.0 (#3596)
       [N_('Calculation rules'), ['kalkulation', 'calculation', 'steuer', 'tax'], '', 'docs'], [N_('Default texts'), ['texte', 'texts', 'einleitung', 'schluss'], '', 'docs'],

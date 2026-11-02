@@ -69,7 +69,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   // 2.80.0 (#1836): a client created meanwhile is in the client choice after leaving and opening the import page again
   const ncl = await call('POST', '/api/clients', {name: 'Nordlicht Medien', org_id: ORG});
   check(ncl.http === 201 || !!ncl.id, '#1836: client created ' + ncl.http);
-  w.location.hash = '#office/settings'; await sleep(200);
+  // 2.470.0 (#3596): office/settings is only a jump into Settings > Company & office now (modal + #office/start): leave via the start page
+  w.location.hash = '#office/start'; await sleep(200);
   w.location.hash = '#office/import';
   const seen = await until(() => w.eval(`(OIM.clients || []).some(c => c.name === 'Nordlicht Medien')`), 40);
   check(seen && /Nordlicht Medien/.test(w.eval(`oimClientOpts('')`)), '#1836: the new client is in the import client choice without a reload');

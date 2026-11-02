@@ -132,14 +132,16 @@ CL = A.post(B + "/api/clients", json={"name": "Beispielkunde AG", "street": "Mar
                                        "email": "kunde@example.com"}).json()["id"]
 
 # ---------------------------------------------------------------- settings: upload, rights, checks
+# 2.460.0 (#3767): terms for every document language (was de / en)
+NO_TERMS = {"de": None, "en": None, "nl": None, "fr": None, "es": None, "it": None}
 j = A.get(B + T).json()
-check(j["terms"] == {"de": None, "en": None} and j["admin"] is True and j["max_mb"] == 10, f"no terms yet, the admin may write {j}")
+check(j["terms"] == NO_TERMS and j["admin"] is True and j["max_mb"] == 10, f"no terms yet, the admin may write {j}")
 jb = Bo.get(B + T).json()
-check(jb["admin"] is False and jb["terms"] == {"de": None, "en": None}, "a member reads (no write right)")
+check(jb["admin"] is False and jb["terms"] == NO_TERMS, "a member reads (no write right)")
 DE1, DE2, EN1 = fake_pdf("de one"), fake_pdf("de two"), fake_pdf("en one")
 SHA1, SHA2 = hashlib.sha256(DE1).hexdigest(), hashlib.sha256(DE2).hexdigest()
 check(upload(Bo, "de", DE1).status_code == 403, "a member cannot upload (403)")
-check(upload(A, "fr", DE1).status_code == 404, "an unknown language: 404")
+check(upload(A, "pt", DE1).status_code == 404, "an unknown language: 404")  # 2.460.0 (#3767): fr is a terms language now
 check(upload(A, "de", b"<html>not a pdf</html>", name="x.pdf").status_code == 400, "not a PDF (header): 400")
 check(upload(A, "de", DE1, date="2026-13-40").status_code == 400, "an invalid date: 400")
 r = upload(A, "de", b"%PDF-1.4\n" + b"0" * (10 * 1024 * 1024))
@@ -162,7 +164,7 @@ check(r.ok and r.content == DE1 and "attachment" in r.headers.get("Content-Dispo
 check(r.ok and "filename*=UTF-8''AGB%20Studio%202026.pdf" in r.headers.get("Content-Disposition", ""), f"the clean name {r.headers.get('Content-Disposition')}")
 check("inline" in Bo.get(B + f"{T}/de/file?inline=1").headers.get("Content-Disposition", ""), "?inline=1 shows it")
 check(Bo.get(B + f"{T}/en/file").status_code == 404, "no English terms: 404")
-check(Ca.get(B + T).json()["terms"] == {"de": None, "en": None} and Ca.get(B + f"{T}/de/file").status_code == 404,
+check(Ca.get(B + T).json()["terms"] == NO_TERMS and Ca.get(B + f"{T}/de/file").status_code == 404,
       "another organisation sees none of it (404)")
 check(A.put(B + O + "/settings", json={"terms": {}, "color": "#336699"}).ok and A.get(B + T).json()["terms"]["de"]["sha256"] == SHA1,
       "the general settings save never touches the terms")
@@ -289,7 +291,7 @@ check(sql("SELECT terms FROM office_gen_docs WHERE id=?", (GN,))[0][0] is None, 
 # ---------------------------------------------------------------- a person without an organisation  # freelancer-matrix: office
 FID, Fr = freelancer(B, A)
 Fr.patch(B + "/api/settings", json={"features": FEAT})
-check(Fr.get(B + T).json()["terms"] == {"de": None, "en": None} and Fr.get(B + T).json()["admin"] is True, "freelancer: own empty terms, own admin")
+check(Fr.get(B + T).json()["terms"] == NO_TERMS and Fr.get(B + T).json()["admin"] is True, "freelancer: own empty terms, own admin")
 r = upload(Fr, "en", EN1, date="2026-09-30", name="Terms.pdf")
 check(r.ok and r.json()["terms"]["en"]["date"] == "2026-09-30", f"freelancer: uploads English terms {r.status_code} {r.text[:160]}")
 check(Fr.get(B + f"{T}/en/file").content == EN1 and A.get(B + f"{T}/en/file").status_code == 404, "freelancer: the file is theirs only")

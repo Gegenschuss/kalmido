@@ -32,14 +32,14 @@ async function api(cookie, method, url, body) {
   check(/\d/.test(d.querySelector('#top h1 .hn')?.textContent || ''), 'title: open count (mono)');
   const tour = () => d.querySelector('.tour');
   check(tour() && tour().dataset.step === 'side' && /Smart lists/.test(d.querySelector('.tcard').textContent), 'tour: step 1 smart lists');
-  check(/1\/7/.test(d.querySelector('.tstep').textContent), 'tour: 7 steps on desktop with collaboration');  // 2.365.0 (#2802): + the step of the chosen start (team / office)
+  check(/1\/8/.test(d.querySelector('.tstep').textContent), 'tour: 8 steps on desktop with collaboration');  // 2.365.0 (#2802): + the step of the chosen start (team / office); 2.466.0 (#3314): + the areas' bar (rail)
   click(w, d.querySelector('[data-tour="next"]')); await sleep(50);
   check(tour().dataset.step === 'add', 'tour: next -> quick add');
   key(w, 'ArrowRight'); await sleep(50);
   check(tour().dataset.step === 'detail', 'tour: arrow key -> details');
   click(w, d.querySelector('[data-tour="back"]')); await sleep(50);
   check(tour().dataset.step === 'add', 'tour: back');
-  for (const want of ['detail', 'keys', 'settings', /^(team|office)$/, 'news']) { click(w, d.querySelector('[data-tour="next"]')); await sleep(40); check(want.test ? want.test(tour()?.dataset.step) : tour()?.dataset.step === want, 'tour step ' + want); }  // 2.365.0 (#2802): + team / office
+  for (const want of ['detail', 'rail', 'keys', /^(team|office)$/, 'news', 'settings']) { click(w, d.querySelector('[data-tour="next"]')); await sleep(40); check(want.test ? want.test(tour()?.dataset.step) : tour()?.dataset.step === want, 'tour step ' + want); }  // 2.365.0 (#2802): + team / office; 2.466.0 (#3314): + rail, settings last
   check(/Done/.test(d.querySelector('[data-tour="next"]').textContent), 'tour: last step says Done');
   click(w, d.querySelector('[data-tour="next"]')); await sleep(600);
   check(!tour(), 'tour: closed after the last step');

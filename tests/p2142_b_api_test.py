@@ -279,7 +279,7 @@ check(st == 400 and "Jira" in j.get("error", ""), f"Jira: another CSV refused {s
 # ================================================================== any CSV
 GEN = ("Aufgabe;Fällig;Beschreibung;Projekt;Priorität;Tags;Erledigt;Kosten;Zuständig\n"
        "Rasen mähen;15.04.2025;Vorne und hinten;Garten;hoch;draußen, wochenende;nein;;Erika Muster\n"
-       "Hecke schneiden;20/04/2025;;Garten;3;;ja;50 €;\n"
+       "Hecke schneiden;20/04/2025;;Garten;7;;ja;50 €;\n"  # 2.363.2 (#3106): 0-5 are priorities now, 7 is not understood
        "Blumen gießen;;;;;;;;\n")
 pj, j, undo_csv = roundtrip(A, ALICE, "csv", "Haushalt.csv", GEN.encode("cp1252"), "CSV", **PRIV)
 cols = {c["column"]: c["field"] for c in pj.get("columns") or []}
@@ -290,7 +290,7 @@ r1, r2, r3 = task("Rasen mähen", ALICE), task("Hecke schneiden", ALICE), task("
 check(r1 and r1["due"] == "2025-04-15" and r1["priority"] == 5 and tags(r1["id"]) == ["draußen", "wochenende"] and r1["status"] == 0
       and "Vorne und hinten" in r1["content"] and "Erika Muster" in r1["content"] and r1["assignee_id"] is None,
       f"CSV: German columns, Windows-1252, dotted date, priority word, tags, person as text {dict(r1) if r1 else None}")
-check(r2 and r2["due"] == "2025-04-20" and r2["status"] == 2 and "Kosten: 50 €" in r2["content"] and "Priority: 3" in r2["content"],
+check(r2 and r2["due"] == "2025-04-20" and r2["status"] == 2 and "Kosten: 50 €" in r2["content"] and "Priority: 7" in r2["content"],
       f"CSV: slash date day first, done, unknown column + unknown priority in the notes {dict(r2) if r2 else None}")
 check(r3 and lst("Haushalt", ALICE) and r3["list_id"] == lst("Haushalt", ALICE)["id"] and lst("Garten", ALICE),
       "CSV: without a list value the file name is the list")

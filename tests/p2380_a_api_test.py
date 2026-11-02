@@ -343,7 +343,8 @@ check(r.status_code == 409 and "SMTP" in r.json().get("error", ""), "sending wit
 check(A.post(B + f"{D}/{IID}/datev").status_code == 409, "DATEV without SMTP: 409")
 check(A.post(B + f"{D}/{EMPTY}/send", json={"to": "a@b.example"}).status_code == 409, "sending a draft: 409")
 ms = A.get(B + O + "/mail-status").json()
-check(ms["smtp"] is False and ms["datev_email"] == "belege@kanzlei.example", f"mail status for the dialog: {ms}")
+# 2.439.0 (#3617): the DATEV copy only goes through the server's SMTP: without it the dialog gets no DATEV address
+check(ms["smtp"] is False and ms["datev_email"] == "" and ms["datev_on"] is True, f"mail status for the dialog: {ms}")
 
 # ---------------------------------------------------------------- a sent quotation is locked (decision 2026-10-10)
 r = A.post(B + f"{D}/{OFF}/status", json={"status": "sent"})

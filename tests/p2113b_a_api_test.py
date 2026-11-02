@@ -242,7 +242,10 @@ for root, dirs, fs in os.walk(PACKS):
         words = set(re.findall(r"[a-z0-9_]+", (rel + " " + open(os.path.join(root, x), encoding="utf-8", errors="replace").read()).lower()))
         if any(hashlib.sha256(w.encode()).hexdigest() in PRIVATE for w in words):
             hits.append(rel)
-check(sorted(files) == ["de.json", os.path.join("industry", "film.json"), "xx.json"], "#2251: only the shipped packs under kalmido/office/packs " + str(files))
+# 2.461 (#3773): the holiday tables per country live in packs/holidays/ (shipped data, no private words: the scan above covers them)
+hol = [f for f in files if os.path.dirname(f) == "holidays" and re.fullmatch(r"[a-z]{2}\.json", os.path.basename(f))]
+check(sorted(f for f in files if f not in hol) == ["de.json", os.path.join("industry", "film.json"), "xx.json"] and "holidays/de.json".replace("/", os.sep) in hol,
+      "#2251: only the shipped packs under kalmido/office/packs (+ #3773 holiday tables) " + str(files))
 check(not hits, "#2251: no private pack name under kalmido/office/packs " + str(hits))
 
 # ---------------------------------------------------------------- a person without an organisation (freelancer-matrix: office)

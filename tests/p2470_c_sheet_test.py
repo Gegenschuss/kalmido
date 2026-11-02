@@ -18,10 +18,15 @@ from decimal import Decimal
 
 N = os.path.dirname(os.path.abspath(__file__))
 SRC = os.environ.get("KALMIDO_SRC") or os.path.join(N, "..")
-# load kalmido/office/sheet.py (and calc.py, its only import) without the app package
+# load kalmido/office/sheet.py (and calc.py) without the app package
 pkg = types.ModuleType("dkoffice")
 pkg.__path__ = [os.path.join(SRC, "kalmido", "office")]
 sys.modules["dkoffice"] = pkg
+# 2.460.0 (#3767): sheet.py also takes doc_trans from doclang.py, which needs the app package; this suite never reads a master
+# row's trans, so a stand-in with the same answer for a row without it
+dl = types.ModuleType("dkoffice.doclang")
+dl.doc_trans = lambda row: {}
+sys.modules["dkoffice.doclang"] = dl
 S = importlib.import_module("dkoffice.sheet")
 from kt import FAILS, OKS, check  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 

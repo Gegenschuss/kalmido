@@ -34,7 +34,9 @@ const FEAT = 'cal,comments,collab,office,clients,docs,contacts,time';
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); })()`);
     await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'frida', password: 'password123'})}).then(r => r.ok)`);
     await nav(B + '#office/settings');
-    check(await ready(ev, `!!document.querySelector('#pol-set')`, 100), 'the block in the settings');
+    // #3506: #pol-set first shows "Loading…" (pol_settingsHtml before pol_load); since 2.470.0 (#3596) #office/settings opens the
+    // settings window by a jump, so wait for the drawn block with its provider select
+    check(await ready(ev, `!!document.querySelector('#pol-set #pol-provider')`, 100), 'the block in the settings');
     await ev(`(() => { const d = document.querySelector('#pol-set'); d.open = true; const s = document.querySelector('#pol-provider'); s.value = 'stripe'; s.dispatchEvent(new Event('change', {bubbles: true})); })()`);
     check(await ready(ev, `!!document.querySelector('#pol-url') && document.querySelector('#pol-url').value.includes('/api/hooks/pay/')`), 'the webhook address shows after choosing the provider');
     check(await ev(`document.querySelector('#pol-on').disabled`), 'the switch waits for the key and the secret');

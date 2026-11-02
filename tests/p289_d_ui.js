@@ -84,7 +84,8 @@ const items = d => [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')
   check(await until(() => d.querySelector('.cdlg #sh2-src')), 'the list dialog opens');
   d.querySelector('.cdlg #sh2-src').value = String(L2);
   click(w, d.querySelector('.cdlg [data-cd="yes"]'));
-  check(await until(() => w.eval(`(SHV.sh.cells || []).filter(c => /^=aufgabe\\.\\d+\\.titel$/.test(c.raw)).length === 2`)), 'two rows with live task titles');
+  // 2.368.3 (#2988): the formula reads in the viewer's language (en here): =task.<id>.title (stored {t:<id>}.titel)
+  check(await until(() => w.eval(`(SHV.sh.cells || []).filter(c => /^=task\\.\\d+\\.title$/.test(c.raw)).length === 2`)), 'two rows with live task titles');
   check(w.eval(`SHV.sh.cells.some(c => c.display === 'Book the van' && c.origin === 'kalmido')`), 'the value comes from Kalmido');
   await call('POST', '/api/tasks', {title: 'Rent lights', list_id: L2});
   await openMenu();

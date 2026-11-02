@@ -129,8 +129,8 @@ check(rep("category", "&missing=1")["total"] == "335.00", "#1022: only the recei
 check(rep("month", "&from=2025-10-01&to=2025-10-31")["total"] == "60.00", "#1022: a period")
 check(A.get(B + f"{T}/report?by=nonsense").status_code == 400, "#1022: an unknown grouping is refused")
 r = A.get(B + f"{T}/report?by=category&format=csv")
-rows = list(csv.reader(io.StringIO(r.text.lstrip("﻿")), delimiter=";"))
-check(r.ok and "text/csv" in r.headers.get("Content-Type", "") and rows[0][0] == "Category" and rows[1] == ["Hotel", "1", "275,00"] and rows[-1] == ["Total", "3", "464,90"],
+rows = list(csv.reader(io.StringIO(r.text.lstrip("﻿")), delimiter=","))  # 2.368.2 (#2984): English = comma + decimal point
+check(r.ok and "text/csv" in r.headers.get("Content-Type", "") and rows[0][0] == "Category" and rows[1] == ["Hotel", "1", "275.00"] and rows[-1] == ["Total", "3", "464.90"],
       f"#1022: the CSV {rows}")
 # billing on
 Q = A.post(B + D, json={"project_title": "Film eins", "client_id": CL}).json()

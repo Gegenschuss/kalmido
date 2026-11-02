@@ -157,7 +157,8 @@ const srv = http.createServer((req, res) => {
   check(!!d.querySelector('#kd-note'), 'DATEV: the notice with the install link');
   d.querySelector('#kd-note button')?.click();
   // the office tabs render without errors
-  for (const tab of ['services', 'settings', 'kpi']) { w.eval(`go('office/${tab}')`); await sleep(700); check((d.querySelector('#view')?.innerHTML || '').length > 100, `office tab ${tab} renders`); }
+  // 2.470.0 (#3596): office/settings is no tab any more but a jump into the settings window (p2125_d_demo covers it)
+  for (const tab of ['services', 'kpi']) { w.eval(`go('office/${tab}')`); await sleep(700); check((d.querySelector('#view')?.innerHTML || '').length > 100, `office tab ${tab} renders`); }
   w.eval(`go('clients')`); await sleep(800);
   check(/Beispiel GmbH/.test(d.querySelector('#view')?.textContent || ''), 'clients view lists the client');
   w.eval(`go('client/${cl.id}')`); await sleep(1000);
