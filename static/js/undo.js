@@ -77,9 +77,12 @@ async function histGroup(fn, label) {
 function histToast(msg, e, ms = 6000) {  // 2.58.0 (#1810): ms = a longer toast for a big step
   if (!e) { toast(msg); return; }
   if (HIST.group && HIST.group.includes(e)) { HIST.gToast = msg; return; }
-  toast(msg, () => { if (HIST.undo[HIST.undo.length - 1] === e) histStep('undo'); }, ms);
+  toast(msg, async () => { await histIdle(); if (HIST.undo[HIST.undo.length - 1] === e) histStep('undo'); }, ms);
   HIST.toastE = e;
 }
+// 2.489.0 (#4013): an Undo pressed while an earlier step still finishes (its reload, its message) waits for it instead of being
+// dropped by histStep's busy guard (a quick delete right after an undo under load: the delete stayed)
+async function histIdle() { while (HIST.busy) await sleep(50); }
 // task field steps: [before, after, fields?] per task -> one batch request each way
 function histFields(label, pairs, o = {}) {
   pairs = pairs.filter(p => p[0] && p[1] && reverseOf(p[0], p[1], p[2] || o.fields || HIST_FIELDS));
@@ -204,7 +207,7 @@ async function histStep(dir, n = 1) {
         if (S.sel) { if (taskById(S.sel)) renderDetail(); else closeDetail(); }
         for (const x of done) { try { x.post?.(dir); } catch (err) { console.warn('history post', err); } }
       }
-      if (done.length) {
+      if (done.length && !(HIST.toastE && !done.includes(HIST.toastE))) {  // 2.489.0 (#4013): a newer step's Undo message stays
         if (skipped.length) toast((dir === 'undo' ? tr('Changed elsewhere, not undone: {0}', skipped.slice(0, 4).join(', ')) : tr('Changed elsewhere, not redone: {0}', skipped.slice(0, 4).join(', '))) + (skipped.length > 4 ? ' …' : ''));
         else {
           const what = done.length > 1 ? (dir === 'undo' ? trn('{0} step undone', '{0} steps undone', done.length) : trn('{0} step redone', '{0} steps redone', done.length))

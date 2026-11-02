@@ -69,8 +69,17 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // delete
   await w.eval(`deleteTask(${t3.id})`); await until(() => /deleted/.test(d.querySelector('#toast').textContent));
   check(/deleted/.test(d.querySelector('#toast').textContent), 'delete toast');
+  // 2.489.0 (#4013): the cause of the rare red (3 checks of t3 at once): under load the recurring undo above still reloaded
+  // (HIST.busy) when the delete's Undo was pressed, and histStep dropped it. Now the Undo waits for the earlier step; held here
+  // on purpose so the order is the same on every run
+  await until(() => !w.eval('HIST.busy') && /deleted/.test(d.querySelector('#toast').textContent));
+  w.eval('HIST.busy = true');
   await toastClick();
+  const g3 = await get(t3.id);
+  check(w.eval(`!S.tasks.has(${t3.id})`) && (!!g3.error || !!g3.deleted_at), 'an Undo pressed while an earlier step finishes waits for it');
+  w.eval('HIST.busy = false');
   check(await until(async () => !(await get(t3.id)).error && (await get(t3.id)).deleted_at === null), 'undo delete restores');
+  await until(() => !w.eval('HIST.busy'));
   // move to another list (2.25.0, UX-44: the path on top of the task panel: list > "Move to list…" > the list)
   const mi = re => [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => re.test(b.textContent));
   w.eval(`openDetail(${t4.id})`); await until(() => d.querySelector('#detail [data-act="crumb-menu"][data-k="list"]'));
