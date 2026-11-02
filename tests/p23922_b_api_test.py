@@ -94,11 +94,11 @@ requests.patch(V + f"/agent/jobs/{J1}", headers=AH, json={"state": "done"})
 check(all(dv(AH, t) is None for t in T[:3]), "ending the job clears all of them")
 
 # ================================================================== parent, continuation
-JP = job(AH, title="Lead").json()["id"]
-r = job(AH, title="Part A", parent_id=JP)
+JP = job(AH, title="Lead", user_id=FU).json()["id"]  # for her: a job without a task or a person is not hers to see
+r = job(AH, title="Part A", parent_id=JP, user_id=FU)
 JA = r.json().get("id")
 check(r.status_code == 201 and r.json().get("parent_id") == JP, "a part job " + r.text[:200])
-r = job(AH, title="Lead, continued", continue_of=JP)
+r = job(AH, title="Lead, continued", continue_of=JP, user_id=FU)
 JC = r.json().get("id")
 check(r.status_code == 201 and r.json().get("continue_of") == JP, "a continuation " + r.text[:200])
 jp = requests.get(V + "/agent/jobs", headers=AH).json()["data"]
@@ -111,6 +111,10 @@ check(job(AH, continue_of=999999).status_code == 400, "an unknown job: 400")
 mine = F.get(B + "/api/agents/jobs?state=open").json().get("jobs") or []
 ml = next((x for x in mine if x["id"] == JP), {})
 check(ml.get("continued_by") == JC and ml.get("parts") == [JA], f"the person's job list carries the chain {str(ml)[:200]}")
+JH = job(AH, title="Not for her", parent_id=JP).json()["id"]  # no task, no person: not hers
+ml = next((x for x in F.get(B + "/api/agents/jobs?state=open").json().get("jobs") or [] if x["id"] == JP), {})
+check(ml.get("parts") == [JA], f"a part job she may not see is not named {ml.get('parts')}")
+requests.patch(V + f"/agent/jobs/{JH}", headers=AH, json={"state": "done"})
 for x in (JP, JA, JC, OJ):
     requests.patch(V + f"/agent/jobs/{x}", headers=AH if x != OJ else BH, json={"state": "done"})
 

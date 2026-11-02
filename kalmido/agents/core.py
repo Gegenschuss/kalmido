@@ -1050,10 +1050,11 @@ def job_links(c, j, viewer=None):
     ids = job_task_ids(c, j)
     if viewer and len(ids) > 1:
         ids = [x for x in ids if x == j["task_id"] or task_visible(c, x, viewer, full=True)]
-    nxt = c.execute("SELECT id FROM agent_jobs WHERE continue_of=? ORDER BY id LIMIT 1", (j["id"],)).fetchone()
-    parts = [r[0] for r in c.execute("SELECT id FROM agent_jobs WHERE parent_id=? ORDER BY id LIMIT 50", (j["id"],))]
+    seen = (lambda x: job_visible(c, x, viewer)) if viewer else (lambda x: True)  # only the jobs the viewer may see
+    nxt = next((x["id"] for x in c.execute("SELECT * FROM agent_jobs WHERE continue_of=? ORDER BY id LIMIT 5", (j["id"],)) if seen(x)), None)
+    parts = [x["id"] for x in c.execute("SELECT * FROM agent_jobs WHERE parent_id=? ORDER BY id LIMIT 50", (j["id"],)) if seen(x)]
     return {"task_ids": ids, "continue_of": j["continue_of"] if "continue_of" in j.keys() else None,
-            "continued_by": nxt[0] if nxt else None, "parts": parts}
+            "continued_by": nxt, "parts": parts}
 
 
 def job_dict(c, j, names=None):
