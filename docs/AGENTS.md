@@ -2236,6 +2236,8 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
 | Propose time entries to a person (kind `time`) | `POST /api/v1/agent/proposals/time` | `propose_time_entries` | time |
 | Disposition of the agent's workspace (#1785) | `GET /api/v1/dispo`, `GET /api/v1/dispo/free` | `get_dispo`, `get_dispo_free` | calendar |
 | Busy / away spans of the people shared with the agent, one day, never a title (2.467.0, #2586) | `GET /api/v1/events/freebusy` | `freebusy` | calendar |
+| Scheduling polls the agent may see (its own; others' only when they hang on a task / project / client shared with it): times, tally, votes (names, never addresses) (2.484.0, #2200) | `GET /api/v1/polls`, `GET /api/v1/polls/{id}` | `list_polls`, `get_poll` | calendar |
+| Create a scheduling poll (2-20 times; the answer's `url` goes to the voters; the agent never votes, a person chooses the time in the app) | `POST /api/v1/polls` | `create_poll` | calendar |
 | Propose shoot days + crew / equipment (kind `shoot`) | `POST /api/v1/agent/proposals/shoot` | `propose_shoot` | calendar |
 
 - **Weekly status.** A planned job (template *Status on the pin board*, event `scheduled_job` with the project) reads
@@ -3672,7 +3674,7 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `confirm_abort`,
 `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`, `create_event_calendar`, `create_field`,
 `create_file_folder`, `create_filter`, `create_form`, `create_habit`, `create_job`, `create_letter_draft`, `create_list`, `create_list_tag`,
-`create_note`, `create_offer_draft`, `create_office_lead`, `create_packing_list`, `create_section`, `create_task`, `create_template`,
+`create_note`, `create_offer_draft`, `create_office_lead`, `create_packing_list`, `create_poll`, `create_section`, `create_task`, `create_template`,
 `create_text_file`, `create_trip`, `decide_reward`, `delete_address_book`, `delete_attachment`,
 `delete_chat_attachment`, `delete_client`, `delete_comment`, `delete_contact`, `delete_event`, `delete_event_calendar`,
 `delete_field`, `delete_filter`, `delete_folder`, `delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`,
@@ -3681,14 +3683,14 @@ endpoints stay complete here and in `mcp/CLAUDE.template.md`.
 `draft_reminder`, `duplicate_list`, `edit_team_message`, `empty_trash`, `end_working`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
 `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`,
 `get_delivery_report`, `get_dependencies`, `get_document`, `get_event`, `get_family`, `get_group`, `get_habit_stats`, `get_job`, `get_life`, `get_list`, `get_me`,
-`get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_playbook`,
+`get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_playbook`, `get_poll`,
 `get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`,
 `get_timer`, `get_usage`, `get_waiting`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`, `ingredients_to_shopping`,
 `freebusy`, `link_contact`, `link_letter_document`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_calendar_events`, `list_chats`,
 `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`, `list_events`, `list_fields`,
 `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`, `list_jobs`, `list_kids`,
 `list_letter_drafts`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`, `list_office_data`,
-`list_office_documents`, `list_office_leads`, `list_packing_templates`, `list_payment_suggestions`, `list_project_files`,
+`list_office_documents`, `list_office_leads`, `list_packing_templates`, `list_payment_suggestions`, `list_polls`, `list_project_files`,
 `list_receipt_suggestions`, `list_repos`, `list_schedules`, `list_sections`, `list_stale_tasks`, `list_subtasks`,
 `list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`, `list_time_entries`, `list_trash`,
 `list_upkeep_presets`, `list_waiting`, `leave_team_channel`, `mark_news_read`, `mark_team_chat_read`, `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`,

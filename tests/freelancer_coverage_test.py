@@ -70,7 +70,7 @@ KINDS = {
                  "private workspace and the personal office of a person without an organisation"),  # 2.173.0 A (#2680)
     "reading": ("matrix", "p2172_b_reading_scope_test.py: feeds and read later (2.172.0) in the private workspace of a person without an organisation"),  # 2.172.0 B (#2677 #2679)
     "sectpl": ("matrix", "p2156_c_api_test.py: own section templates (save from a list, add to another, change, delete) of a person without an organisation"),  # 2.156.0 C (#2073)
-    "polls": ("matrix", "p298_a_api_test.py: scheduling polls (2.98.0) in the private workspace of a person without an organisation"),  # 2.98.0 A (#1953)
+    "polls": ("matrix", "p298_a_api_test.py, p2484_a_polls_v1_test.py: scheduling polls (2.98.0) in the private workspace of a person without an organisation; 2.484.0: her personal agent over REST v1"),  # 2.98.0 A (#1953)
     # 2.138.0 (#1972): the recovery key of the own personal office (organisation id 0 in the route)
     "orgcrypt": ("matrix", "p2138_c_api_test.py: the encryption state and the recovery key (step-up) of the personal office of a "
                            "person without an organisation"),
@@ -145,6 +145,7 @@ ROUTES = {
     "GET /api/polls": "polls", "POST /api/polls": "polls", "GET /api/polls/{}": "polls", "PATCH /api/polls/{}": "polls",
     "DELETE /api/polls/{}": "polls", "POST /api/polls/{}/restore": "polls", "POST /api/polls/{}/decide": "polls",
     "POST /api/polls/{}/reopen": "polls", "POST /api/polls/{}/move-space": "polls", "GET /s/v/{}": "link", "POST /s/v/{}": "link",
+    "GET /api/v1/polls": "polls", "POST /api/v1/polls": "polls", "GET /api/v1/polls/{}": "polls",  # 2.484.0 (#2200)
     "GET /s/v/time.js": "public",
     # (2.98.0 spacer A)
     # 2.98.0 B (#1954): questionnaires (p298_b_api_test.py) - routes below this line

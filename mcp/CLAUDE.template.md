@@ -385,6 +385,9 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - **Propose a meeting time**: `freebusy` (scope `calendar`) gives the busy / away spans of one day for the people shared with
   you, never a title. A person missing from the answer is unknown to you, not free: say so and ask, never guess. Propose the
   time to the person; never name what they are busy with.
+- **Scheduling polls** (2.484.0): `create_poll` (scope `calendar`) proposes 2-20 times and gives `url`, the public link;
+  hand it to the people who should vote. `list_polls` / `get_poll` read the tally. You never vote yourself and never choose
+  the time: a person does that in the app.
 <!-- kalmido-agent-rules:end -->
 
 ### Data you never see (2.235.0)
@@ -707,7 +710,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `comment_typing`, `complete_task`, `confirm_abort`, `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`,
 `create_event_calendar`, `create_field`, `create_file_folder`, `create_filter`, `create_form`, `create_habit`,
 `create_job`, `create_letter_draft`, `create_list`, `create_list_tag`, `create_note`, `create_notepad`, `create_offer_draft`, `create_office_lead`,
-`create_packing_list`, `create_section`, `create_task`, `create_template`, `create_text_file`, `create_trip`,
+`create_packing_list`, `create_poll`, `create_section`, `create_task`, `create_template`, `create_text_file`, `create_trip`,
 `decide_reward`, `delete_address_book`, `delete_attachment`, `delete_chat_attachment`, `delete_client`,
 `delete_comment`, `delete_contact`, `delete_event`, `delete_event_calendar`, `delete_field`, `delete_filter`,
 `delete_folder`, `delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`, `delete_milestone`, `delete_note`,
@@ -717,7 +720,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`, `get_delivery_report`, `get_dependencies`,
 `get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_group`, `get_habit_stats`, `get_job`, `get_key_figures`,
 `get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_plan_usage`, `get_queue`,
-`get_playbook`, `get_project_overview`, `get_review`, `get_roadmap`, `get_rules`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`,
+`get_playbook`, `get_poll`, `get_project_overview`, `get_review`, `get_roadmap`, `get_rules`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`,
 `get_usage`, `get_velocity`, `get_video_review`, `get_view_layout`, `get_waiting`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`,
 `ingredients_to_shopping`, `link_contact`, `link_letter_document`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_environments`,
 `set_deployment`,
@@ -725,7 +728,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_events`, `list_fields`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`,
 `list_jobs`, `list_kids`, `list_layout_blocks`, `list_letter_drafts`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
 `list_notepads`, `list_notes`, `list_office_data`, `list_office_documents`, `list_office_leads`, `list_packing_templates`,
-`list_payment_suggestions`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_rules`, `list_schedules`,
+`list_payment_suggestions`, `list_polls`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_rules`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_video_reviews`, `list_waiting`, `list_watchers`, `leave_team_channel`, `mark_news_read`, `mark_team_chat_read`,
 `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`, `propose_contract_notice`, `propose_import`, `propose_layout`, `propose_playbook`,

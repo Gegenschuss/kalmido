@@ -41,7 +41,7 @@ Create a token under **Settings > Access** (API tokens, webhooks and the tokens 
   | `files:write` (2.48.0) | the file store: add files and folders, upload new versions where the account may edit; new agents get both `files:` scopes |
   | `time` | the timer and time entries |
   | `export` | `GET /export` (2.148.1: a personal token also needs `account`) |
-  | `calendar` (2.21.0) | events and event calendars, reading included: `/event-calendars…`, `/events…` (2.467.0: with `/events/freebusy`), `/tasks/{id}/events` |
+  | `calendar` (2.21.0) | events and event calendars, reading included: `/event-calendars…`, `/events…` (2.467.0: with `/events/freebusy`), `/tasks/{id}/events`, 2.484.0: scheduling polls `/polls…` |
   | `contacts` (2.21.0) | address books and contacts, reading included (personal data of other people: never part of the old `write`, never an agent's default) |
   | `private` (2.22.0) | health projects and the journal, reading included (never part of the old `write`; an agent never gets it and never sees a health project) |
   | `office` (2.51.0) | the office: quotations, invoices, letters, leads and documents; an agent only writes drafts a person checks (never part of the old `write`, off for new agents; a group right the admin grants on purpose, see [AGENTS.md](AGENTS.md#permissions)) |
@@ -573,6 +573,8 @@ after the last day), like iCalendar. Scope `calendar` for every operation.
 | `PATCH /events/{id}` | change the series (`expect`: the `updated_at` you based it on -> `409` when it changed meanwhile); with `?occurrence=<occ>` only that date: `{title?, location?, description?, all_day?, start?, end?, status?}` |
 | `DELETE /events/{id}` · `POST …/restore` | to the trash for 30 days, then gone; with `?occurrence=<occ>` that date is left out |
 | `POST /events/{id}/rsvp` | `{partstat: accepted\|tentative\|declined\|needs-action}`: your answer to an invitation |
+| `GET /polls?space=&task_id=&client_id=&list_id=` · `GET /polls/{id}` | 2.484.0 (#2200, MCP `list_polls`, `get_poll`): the scheduling polls the token's account may see: its own (a person: also the private polls of their personal agents), an organisation's by the role there (members read; guests / accounting see none). An agent: its own, and someone else's poll of its workspace only when it hangs on a task / project / client shared with it (`task_id` / `list_id` / `client_id`); never another account's private poll; `space` `private`, `org:<id>` or `all` (default). A poll: `options` with the tally `y` / `m` / `n`, `best_id`, `votes_n`, `closed_at` / `chosen_id` / `event_id` once a time was chosen, `url` (the public link) only with `can_edit`; `GET /polls/{id}` adds `votes` (name, answers), never an e-mail address |
+| `POST /polls` | 2.484.0 (MCP `create_poll`): `{title, options: [{start, end?}] (2-20, `YYYY-MM-DDTHH:MM` in `tz`), duration? (minutes, default 60), description?, location?, tz?, space? (private \| org:<id>), task_id? \| client_id? \| list_id?, expires_at?, show_votes?}` -> `201` the poll; it belongs to the token's account (`409` from 300 polls). Changing, choosing the time, reopening, moving and deleting are app steps; nobody votes with a token: `POST /s/v/<token>` with an `Authorization: Bearer` header is `403` |
 | `POST /events/{id}/prep-task` | `{title?, list_id?, days_before? (1)}`: a task due before the event, linked to it (needs `tasks:write` too) |
 | `GET /tasks/{id}/events` | the events a task prepares |
 

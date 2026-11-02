@@ -2370,6 +2370,29 @@ TOOLS += [
      _obj({"review_id": S_ID, "comment_id": S_ID, "done": {"type": "boolean"}}, ["review_id", "comment_id", "done"]),
      lambda api, a: api.call("PATCH", f"/videos/{_id(a, 'review_id')}/comments/{_id(a, 'comment_id')}", body={"done": bool(a.get("done"))})),
 ]
+# 2.484.0 (#2200): scheduling polls (scope calendar): read the polls you may see, create new ones; never vote, never decide
+POLL_KEYS = ("title", "description", "duration", "location", "tz", "options", "space", "task_id", "client_id", "list_id", "expires_at", "show_votes")
+TOOLS += [
+    ("list_polls", "2.484.0 (scope calendar): the scheduling polls you may see (your own; someone else's only when it hangs on a task / project / "
+                   "client shared with you): title, "
+                   "options with the tally (y / m / n), best_id, votes_n, closed_at / chosen_id once a person chose the time. Filter by "
+                   "space (private | org:<id> | all) or task_id / client_id / list_id.",
+     _obj({"space": {"type": "string"}, "task_id": S_ID, "client_id": S_ID, "list_id": S_ID}),
+     lambda api, a: api.call("GET", "/polls", _pick(a, ("space", "task_id", "client_id", "list_id")))),
+    ("get_poll", "2.484.0 (scope calendar): one scheduling poll with its times, the tally and the votes (names and answers, never addresses).",
+     _obj({"poll_id": S_ID}, ["poll_id"]), lambda api, a: api.call("GET", f"/polls/{_id(a, 'poll_id')}")),
+    ("create_poll", "2.484.0 (scope calendar): create a scheduling poll: 2-20 proposed times (start YYYY-MM-DDTHH:MM in tz, end = start + "
+                    "duration unless given). space org:<id> = your organisation's members see it; private = yours (a personal agent's also its "
+                    "owner's). The answer has url, the public link: hand it to the people who should vote. You NEVER vote yourself and never "
+                    "choose the time; a person does that in the app.",
+     _obj({"title": {"type": "string", "maxLength": 200}, "description": {"type": "string", "maxLength": 4000},
+           "duration": {"type": "integer", "minimum": 5, "maximum": 1440}, "location": {"type": "string", "maxLength": 500}, "tz": {"type": "string"},
+           "options": {"type": "array", "minItems": 2, "maxItems": 20, "items": {"type": "object", "properties": {
+               "start": {"type": "string"}, "end": {"type": "string"}}, "required": ["start"]}},
+           "space": {"type": "string"}, "task_id": S_ID, "client_id": S_ID, "list_id": S_ID, "expires_at": {"type": "string"},
+           "show_votes": {"type": "boolean"}}, ["title", "options"]),
+     lambda api, a: api.call("POST", "/polls", body=_pick(a, POLL_KEYS))),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -2412,6 +2435,7 @@ TOOL_SCOPES = {
 }
 TOOL_SCOPES["time"] += ("check_time_entries", "time_from_events", "propose_time_entries")  # 2.51.0 (#1353)
 TOOL_SCOPES["calendar"] += ("get_dispo", "get_dispo_free", "propose_shoot")  # 2.51.0 (#1355)
+TOOL_SCOPES["calendar"] += ("list_polls", "get_poll", "create_poll")  # 2.484.0 (#2200)
 TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layout")  # 2.55.0 (#1066)
 TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
 TOOL_SCOPES["comments"] += ("leave_team_channel",)  # 2.138.1 (#2059)

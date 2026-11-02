@@ -771,6 +771,8 @@ def openapi_spec():
     notes_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#442)
     family_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.19.0 (#653)
     events_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.21.0 (#659)
+    from ..calendars.pollsv1 import polls_spec
+    polls_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.484.0 (#2200)
     contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.21.0 (#658)
     life_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.22.0 (#663)
     team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#419)

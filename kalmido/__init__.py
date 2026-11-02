@@ -265,6 +265,7 @@ ORDER = (
     "events.web",
     "events.dav",
     "events.v1",
+    "calendars.pollsv1",  # 2.484.0 (#2200): scheduling polls over REST v1 / MCP (read, create)
     "events.invite",  # 2.111.0 B (#2056): invitation mails to external attendees (iMIP)
     "events.evfeed",  # 2.111.0 B (#2056): subscription links of event calendars (GET /ical/ev/<token>.ics)
     "events.freebusy",  # 2.155.0 B (#2077): free / busy of invited people (GET /api/events/freebusy)

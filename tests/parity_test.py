@@ -34,6 +34,8 @@ API = {f"{m.upper()} {norm(p)[len('/api/v1'):]}" for m, p in routes if p.startsw
 # ---- 1. the web client's routes -> the REST API
 APP_TO_API = {
     "GET /api/events/freebusy": ["GET /events/freebusy"],  # 2.467.0 (#2586)
+    # 2.484.0 (#2200): agents read the scheduling polls they may see and create new ones (never vote, never decide)
+    "GET /api/polls": ["GET /polls"], "POST /api/polls": ["POST /polls"], "GET /api/polls/{}": ["GET /polls/{}"],
     "PUT /api/tasks/{}/irreversible": ["PATCH /tasks/{}"], "DELETE /api/tasks/{}/irreversible": ["PATCH /tasks/{}"],  # 2.392.0 C (#3370)
     "GET /api/tasks/{}/decisions": ["GET /tasks/{}/decisions"], "POST /api/tasks/{}/decisions": ["POST /tasks/{}/decisions"],
     "GET /api/state": ["GET /lists", "GET /tasks", "GET /habits", "GET /filters", "GET /me"],
@@ -698,10 +700,12 @@ APP_ONLY = [
      "(each one undo step); agents work inside a sheet through the table tools and create tasks / office drafts their own ways",
      ("=GET /api/sheets/{}/links", "=POST /api/sheets/{}/to-tasks", "=POST /api/sheets/{}/to-offer", "=POST /api/sheets/{}/rows-from-list",
       "=POST /api/sheets/{}/links/{}/undo", "=POST /api/sheets/{}/links/{}/redo")),
-    # 2.98.0 A (#1953): scheduling polls are for people in 2.98.0 (voters use the public link; agent access is its own step)
-    ("2.98.0 A (#1953): scheduling polls (create, results, choose the time, move) are only for people in 2.98.0; the voters use "
-     "the public link without an account, agents never vote; agent access via REST v1 / MCP comes as its own step of the agents list",
-     ("* /api/polls",)),
+    # 2.98.0 A (#1953): scheduling polls are for people in 2.98.0 (voters use the public link)
+    # 2.484.0 (#2200): agents read and create polls (APP_TO_API); changing, choosing the time and moving stay with people
+    ("2.98.0 A (#1953), 2.484.0 (#2200): a scheduling poll is changed, deleted, decided (the event), reopened and moved by people "
+     "in the app; agents read and create polls over REST v1 / MCP and never vote",
+     ("=PATCH /api/polls/{}", "=DELETE /api/polls/{}", "=POST /api/polls/{}/restore", "=POST /api/polls/{}/decide",
+      "=POST /api/polls/{}/reopen", "=POST /api/polls/{}/move-space")),
     ("2.94.0 B (#1929): the appointment booking page (settings, appointment types, the bookings and cancelling one) is a person's "
      "own page; customers book on the public page without an account, agents get no access (no agent API in 2.94)",
      ("* /api/appt/",)),
