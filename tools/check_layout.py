@@ -101,7 +101,7 @@ m = re.search(r"ORDER = \((.*?)\n\)", init, re.S)
 order = re.findall(r'"([\w.]+)"', m.group(1)) if m else []
 mods = sorted(os.path.relpath(p, os.path.join(ROOT, "kalmido"))[:-3].replace(os.sep, ".")
               for p in glob.glob(os.path.join(ROOT, "kalmido", "**", "*.py"), recursive=True)
-              if not p.endswith("__init__.py"))
+              if not p.endswith("__init__.py") and "migrations.d" not in p)  # 2.485.0 (#3939): fragments are data, not modules
 if sorted(order) != mods or len(set(order)) != len(order):
     ERR.append(f"kalmido/__init__.py ORDER vs the package: missing {sorted(set(mods) - set(order))}, unknown {sorted(set(order) - set(mods))}")
 for p in glob.glob(os.path.join(ROOT, "kalmido", "*", "__init__.py")):
