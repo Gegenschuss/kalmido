@@ -45,6 +45,7 @@ EXPECT_4XX = {
     "GET /api/assistant/log": (404, "the assistant is off on the test server (the operator's switch, the same for every person)"),
     "GET /api/attachments/{}/preview": (415, "the own attachment is a text file: no preview (the same for every person)"),
     "GET /api/files/nodes/{}/preview": (415, "the own file is a text file: no server preview (the same for every person)"),
+    "GET /api/files/nodes/{}/thumb": (404, "the own file is a text file: no small picture preview (#3936, the same for every person)"),
     "GET /api/bookmarks/{}/image": (404, "the test server fetches no preview picture of the bookmarked page"),
     "GET /api/docs/{}/einvoice": (404, "the own document is a plain text receipt, no e-invoice"),
     "GET /api/docs/{}/split": (409, "the own document is no PDF with two pages or more"),
