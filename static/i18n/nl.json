@@ -13197,7 +13197,6 @@
   "No open form in this workspace yet: create one in a project (… > Forms).": "Nog geen open formulier in deze ruimte: maak er een aan in een project (… > Formulieren).",
   "This client is not in the workspace of the project": "Deze klant hoort niet bij de ruimte van het project",
   "@name assigns (people of the project) · 30 min, 2h, for 1.5 hours = duration<br>remind me 15 min before · remind me tomorrow 9am, remind me Tue 9:00 (also without a date)": "@naam wijst toe (mensen van het project) · 30 min, 2h, voor 1,5 uur = duur<br>herinner me 15 min vooraf · herinner me morgen om 9 uur, herinner me dinsdag om 9 uur (ook zonder datum)",
-  "Projects and files of the file store can be shared with people without an account through a secret link. Off: every public link stops working at once; nothing is deleted.": "Projecten en bestanden uit het archief kun je via een geheime link delen met mensen zonder account. Uit: elke openbare link werkt meteen niet meer; er wordt niets verwijderd.",
   "Projects and direct messages": "Projecten en directe berichten",
   "At most {0} inbound webhooks per project": "Hoogstens {0} inkomende webhooks per project",
   "Create tasks in this project from other tools (n8n, Make, Zapier, Home Assistant)": "Taken in dit project aanmaken vanuit andere programma’s (n8n, Make, Zapier, Home Assistant)",

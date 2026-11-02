@@ -13197,7 +13197,6 @@
   "No open form in this workspace yet: create one in a project (… > Forms).": "Todavía no hay ningún formulario abierto en este espacio: crea uno en un proyecto (… > Formularios).",
   "This client is not in the workspace of the project": "Este cliente no pertenece al espacio del proyecto",
   "@name assigns (people of the project) · 30 min, 2h, for 1.5 hours = duration<br>remind me 15 min before · remind me tomorrow 9am, remind me Tue 9:00 (also without a date)": "@nombre asigna (personas del proyecto) · 30 min, 2h, durante 1,5 horas = duración<br>recuérdame 15 min antes · recuérdame mañana a las 9, recuérdame martes a las 9 (también sin fecha)",
-  "Projects and files of the file store can be shared with people without an account through a secret link. Off: every public link stops working at once; nothing is deleted.": "Los proyectos y los archivos del archivo se pueden compartir con personas sin cuenta mediante un enlace secreto. Desactivado: todos los enlaces públicos dejan de funcionar al instante; no se borra nada.",
   "Projects and direct messages": "Proyectos y mensajes directos",
   "At most {0} inbound webhooks per project": "Como máximo {0} webhooks entrantes por proyecto",
   "Create tasks in this project from other tools (n8n, Make, Zapier, Home Assistant)": "Crear tareas en este proyecto desde otras herramientas (n8n, Make, Zapier, Home Assistant)",
