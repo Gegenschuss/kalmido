@@ -1,3 +1,4 @@
+// @ts-check
 /* 2.488.0 (#3988): desktop only - a plain Back arrow at the left of the head bar (#top), plus Alt+Left, Cmd+[ and the mouse's
    Back button. It is history.back() like the swipe on a phone, but only while there is an earlier view *inside* Kalmido
    (own list of the views visited, never a foreign page or the sign-in); otherwise the arrow is greyed out and the keys do
@@ -22,12 +23,12 @@ function bnBack() { if (!isMobile() && bnCan()) history.back(); }
 // The other modules' pushState / replaceState keep their state; the mark rides along. An overlay entry keeps the view index,
 // a pushState to a new hash (notesall.js) is a new view.
 const bnMark = () => { const s = history.state; return s && typeof s === 'object' && Number.isInteger(s.bn) ? s.bn : null; };
-const bnKeep = (s, i) => s == null ? {bn: i} : (typeof s === 'object' && !Array.isArray(s) ? {...s, bn: i} : s);
+const bnKeep = (/** @type {any} */ s, /** @type {number} */ i) => s == null ? {bn: i} : (typeof s === 'object' && !Array.isArray(s) ? {...s, bn: i} : s);
 const bnRep = history.replaceState.bind(history);
 {
   const push = history.pushState.bind(history);
-  history.replaceState = (s, t, u) => bnRep(bnKeep(s, BN.i), t, u);
-  history.pushState = (s, t, u) => {
+  history.replaceState = (/** @type {any} */ s, /** @type {string} */ t, /** @type {string | URL | null | undefined} */ u) => bnRep(bnKeep(s, BN.i), t, u);
+  history.pushState = (/** @type {any} */ s, /** @type {string} */ t, /** @type {string | URL | null | undefined} */ u) => {
     let h = location.hash; try { h = new URL(u ?? location.href, location.href).hash; } catch { /* keep */ }
     if (h !== location.hash) BN.i++;
     push(bnKeep(s, BN.i), t, u); setTimeout(bnSync, 0);
@@ -36,7 +37,7 @@ const bnRep = history.replaceState.bind(history);
 try { bnRep(bnKeep(history.state, 0), '', location.href); } catch { /* old browser */ }  // the first view of this page load
 // a location.replace('#x') (chatwin.js, miniwin.js, areas.js) makes no new entry: where the Navigation API says so, the index
 // stays (review F15; without that API such a replace counts as a step, these places are own windows / the phone)
-window.navigation?.addEventListener?.('navigate', e => { BN.nt = e.navigationType || ''; });
+/** @type {any} */ (window).navigation?.addEventListener?.('navigate', (/** @type {any} */ e) => { BN.nt = e.navigationType || ''; });
 function bnOnNav() {
   const m = bnMark(), rep = BN.nt === 'replace'; BN.nt = '';
   if (m !== null) BN.i = m;  // back / forward to an entry of Kalmido
@@ -45,7 +46,7 @@ function bnOnNav() {
 }
 window.addEventListener('popstate', () => { const m = bnMark(); if (m !== null) BN.i = m; setTimeout(bnSync, 0); }, true);
 window.addEventListener('hashchange', bnOnNav);
-const bnField = t => !!(t && t.closest && t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], .ProseMirror'));
+const bnField = (/** @type {any} */ t) => !!(t && t.closest && t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], .ProseMirror'));
 document.addEventListener('keydown', e => {
   if (isMobile() || e.defaultPrevented || e.shiftKey) return;
   const back = (e.key === 'ArrowLeft' && e.altKey && !e.ctrlKey && !e.metaKey) || (e.key === '[' && e.metaKey && !e.altKey && !e.ctrlKey);
