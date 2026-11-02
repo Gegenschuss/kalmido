@@ -4,7 +4,7 @@
    activity), "this device" marked; end one (confirmation; the current one = log out) or all others. Ending a session is no
    undo step on purpose: a session that was ended cannot come back (a new login is the way). */
 const SES_VIA = {password: N_('Password'), '2fa': N_('Password and second factor'), passkey: N_('Passkey'), oidc: N_('Single sign-on'),
-  invite: N_('Invitation link'), link: N_('Sign-in link')};
+  invite: N_('Invitation link'), link: N_('Sign-in link'), support: N_('Support (support access)')};
 const sesHtml = () => `<h4 id="s-ses-h">${tr('Active sessions')}</h4><div id="s-ses" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 const sesName = s => s.browser && s.system ? tr('{0} on {1}', s.browser, s.system) : s.browser || s.system || tr('Unknown device');
 function sesIcon(s) { return ic(s.device === 'phone' || s.device === 'tablet' ? 'phone' : 'laptop', 's'); }

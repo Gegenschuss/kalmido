@@ -106,6 +106,8 @@ def admin_sees(c, uid):
 # 2.399.0 (#2687): what the instance admin of a hosted instance still changes on a customer's account (users.op_foreign_account):
 # lock / unlock, the storage quota, the server admin right -- never its sign-in, address, organisations or notifications
 OP_ACCOUNT_KEYS = {"disabled", "storage_quota_mb", "is_admin", "_prev"}
+# 2.485.0 (#3939, review F1): what the operator never changes through a client's support access (sign-in data)
+OP_SUPPORT_DENY = {"password", "email", "username", "proxy_login", "reset_2fa", "oidc_unlink", "kind", "ntfy_topic"}
 
 
 def om_admin_all(c, uid):
@@ -220,7 +222,7 @@ def user_create():
     if isinstance(orgs, str):
         return err(orgs)
     from ..accounts.orgs import _operator_apart, op_apart_deny, op_foreign_org
-    if any(op_foreign_org(c, o) for o, _role in orgs):  # 2.399.0 (#2687): hosted: nobody new in a customer's organisation by the operator
+    if any(op_foreign_org(c, o, grant=False) for o, _role in orgs):  # 2.485.0 (#3939): not even through support access  # 2.399.0 (#2687): hosted: nobody new in a customer's organisation by the operator
         op_apart_deny()
     uid = create_user(c, username, (b.get("display_name") or "").strip()[:60] or username, pw or None, proxy,
                       bool(b.get("is_admin")), ntfy_topic=topic or None, onboard=True,
@@ -281,9 +283,11 @@ def user_update(uid):
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or not om_admin_all(c, uid):  # 2.46.0 (#1592): the user management: every account
         return err(tr("unknown person"), 404)
-    from ..accounts.orgs import op_apart_deny, op_foreign_account, op_foreign_org
+    from ..accounts.orgs import op_apart_deny, op_foreign_account, op_foreign_org, op_support_deny, op_support_only
     if op_foreign_account(c, uid) and set(b) - OP_ACCOUNT_KEYS:  # 2.399.0 (#2687): hosted: a customer's account only locked / its quota
         op_apart_deny()
+    if set(b) & OP_SUPPORT_DENY and op_support_only(c, uid=uid):  # 2.485.0 (#3939, review F1): no credentials through support access
+        op_support_deny()
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else {}
     for k in ("orgs", "parents"):  # 2.270.0 A (#3019): with _prev only what the dialog changed (who joined meanwhile stays)
         if all(isinstance(v, list) and all(isinstance(x, int) and not isinstance(x, bool) for x in v) for v in (b.get(k), prev.get(k))):
@@ -296,7 +300,7 @@ def user_update(uid):
         from ..accounts.orgs import _operator_apart, org_join_or_add, org_leave, org_own_admin
         with system_ctx(c):  # 2.37.0 (#1150): the instance admin moves the account between organisations (structure)
             have = {r[0]: r[1] for r in c.execute("SELECT org_id, role FROM org_members WHERE user_id=?", (uid,))}
-        if any(op_foreign_org(c, o) for o in set(have) ^ set(b["orgs"])):  # 2.399.0 (#2687): hosted: in or out of a customer's organisation
+        if any(op_foreign_org(c, o, grant=False) for o in set(have) ^ set(b["orgs"])):  # 2.485.0 (#3939): not through support access  # 2.399.0 (#2687): hosted: in or out of a customer's organisation
             op_apart_deny()
         with system_ctx(c):
             for o in sorted(set(have) - set(b["orgs"])):  # 2.28.0 (#935): taken out of an organisation = leaving it (lists stay with it)

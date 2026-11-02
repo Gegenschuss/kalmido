@@ -15855,5 +15855,8 @@
   "your account": "tu cuenta",
   "Support access granted": "Acceso del soporte concedido",
   "Support access ended": "Acceso del soporte terminado",
-  "The client granted support access until {0}. Everything you do here is listed for the client.": "El cliente concedió acceso al soporte hasta {0}. Todo lo que hagas aquí queda listado para el cliente."
+  "The client granted support access until {0}. Everything you do here is listed for the client.": "El cliente concedió acceso al soporte hasta {0}. Todo lo que hagas aquí queda listado para el cliente.",
+  "Support access does not hand out sign-in data or add people: the client does that": "El acceso del soporte no entrega datos de acceso ni añade personas: eso lo hace el cliente",
+  "A support sign-in link does not work for an account with two-factor sign-in": "Un enlace de acceso del soporte no funciona en una cuenta con inicio de sesión en dos pasos",
+  "Support (support access)": "Soporte (acceso del soporte)"
 }

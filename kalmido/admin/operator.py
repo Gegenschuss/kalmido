@@ -329,7 +329,7 @@ def operator_account_delete(uid):
     """?confirm=<id> deletes the account as the user management does (accounts/users.user_delete_run: the retention gate,
     the purge, the files after the commit, the security log by number with the actor "operator"). Refused (409 with a code
     and a number): own projects (the console never deletes or hands on projects), records kept by law without a retention
-    export (the console never waives it), a server admin. Agents: 404."""
+    export of the last days (the console never waives it), a server admin. Agents: 404."""
     op_gate(f"account-delete #{uid}")
     from ..accounts.users import user_delete_run
     from ..core.i18n import trn
@@ -345,7 +345,8 @@ def operator_account_delete(uid):
         if u["is_admin"]:
             c.rollback()
             return jsonify(error=tr("Invalid value: {0}", "is_admin"), code="admin"), 409
-        code, _answer, n = user_delete_run(c, uid, "operator", how="")
+        # review F8: a finished retention export of the last days lets it go (as in the app); a waiver never
+        code, _answer, n = user_delete_run(c, uid, "operator", how="exported")
         if code == "retention":
             kept = sum(rx_counts(c, rx_subject(c, "user", uid), False).values())
             c.rollback()

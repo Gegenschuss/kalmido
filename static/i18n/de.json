@@ -15855,5 +15855,8 @@
   "your account": "deinem Konto",
   "Support access granted": "Support-Zugriff freigegeben",
   "Support access ended": "Support-Zugriff beendet",
-  "The client granted support access until {0}. Everything you do here is listed for the client.": "Der Kunde hat Support-Zugriff bis {0} freigegeben. Alles, was du hier tust, wird für ihn aufgelistet."
+  "The client granted support access until {0}. Everything you do here is listed for the client.": "Der Kunde hat Support-Zugriff bis {0} freigegeben. Alles, was du hier tust, wird für ihn aufgelistet.",
+  "Support access does not hand out sign-in data or add people: the client does that": "Support-Zugriff gibt keine Anmeldedaten heraus und nimmt niemanden auf: das macht der Kunde selbst",
+  "A support sign-in link does not work for an account with two-factor sign-in": "Ein Support-Anmeldelink geht nicht bei einem Konto mit Zwei-Faktor-Anmeldung",
+  "Support (support access)": "Support (Support-Zugriff)"
 }

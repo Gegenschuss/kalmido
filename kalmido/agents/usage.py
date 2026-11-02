@@ -645,7 +645,7 @@ def op_own_agents(c):
         return None
     with system_ctx(c):
         ids = [r[0] for r in c.execute("SELECT user_id FROM agents")]
-    return {x for x in ids if not op_foreign_account(c, x)}
+    return {x for x in ids if not op_foreign_account(c, x, note=False)}  # 2.485.0 (#3939): a listing is no use of support access
 
 
 def _audit_answer(aid, own=False, only=None):

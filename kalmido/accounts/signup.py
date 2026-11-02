@@ -336,6 +336,11 @@ def auth_link():
         # 2.86.0 (N4): checked again on use: the account may have become an admin after the link was made (the link is used up)
         return err(tr("Admins sign in with their password"), 409)
     print("signed in with a sign-in link:", login_log_who(u), "from", login_log_ip(client_ip()), flush=True)
+    from .supportgrant import sga_link_support
+    if (twofa_methods(c, u) or gsetting(c, "twofa_required") == "1") and sga_link_support(c, u["id"]):
+        # 2.485.0 (#3939, review F2): the operator's link through support access never passes a second factor or enrols one
+        # (that session would be no support session: uncapped, and the factor would outlive the access)
+        return err(tr("A support sign-in link does not work for an account with two-factor sign-in"), 409)
     if twofa_methods(c, u):
         tok = pend_new("2fa", u["id"], remember=True)
         return pend_cookie(jsonify(ok=False, twofa=True, methods=twofa_methods(c, u)), tok)

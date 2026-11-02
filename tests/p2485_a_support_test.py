@@ -82,10 +82,22 @@ check(kt.dbx("SELECT COUNT(*) FROM user_invites u, support_grants s WHERE s.id=?
 X = kt.sess(None)
 r = X.post(B + "/api/auth/link", json={"token": TOK})
 check(r.ok and X.get(B + "/api/state").ok, "the operator signs in as frida with the link " + r.text[:120])
-check(kt.dbx("SELECT COUNT(*) FROM sessions t, support_grants s WHERE s.id=? AND t.user_id=? AND t.via='link' AND t.expires_at<=s.ends_at",
-             (GF, FID)) == [(1,)], "that session ends with the grant at the latest")
+check(kt.dbx("SELECT COUNT(*) FROM sessions t, support_grants s WHERE s.id=? AND t.user_id=? AND t.via='support' AND t.expires_at<=s.ends_at",
+             (GF, FID)) == [(1,)], "that session is a support session and ends with the grant at the latest")
+for meth, path, body in (("post", "/api/me/tokens", {"name": "ops"}), ("post", "/api/me/app-passwords", {"name": "ops"}),
+                         ("post", "/api/me/2fa/totp", {}), ("post", "/api/support-access", {"hours": 168}),
+                         ("patch", "/api/me", {"password": "taken-over-1", "current_password": "x"})):
+    r = getattr(X, meth)(B + path, json=body)
+    check(r.status_code == 403 and r.json().get("code") == "support_session", f"support session: {meth.upper()} {path} -> 403 " + r.text[:100])
+check(X.patch(B + "/api/settings", json={"lang": "en"}).ok, "support session: ordinary settings work")
 r = A.post(B + f"/api/users/{FID}/invite", json={"send": False})
-check(r.ok, "with the grant: the operator makes a password link " + r.text[:120])
+check(r.ok and "link" not in r.json(), "with the grant: a password link goes to frida's address only, never to the operator " + r.text[:120])
+for body in ({"email": "ops@example.com"}, {"password": "taken-over-1"}, {"reset_2fa": True}, {"proxy_login": "ops"}):
+    r = A.patch(B + f"/api/users/{FID}", json=body)
+    check(r.status_code == 403, f"with the grant: no sign-in data {list(body)} -> 403 " + r.text[:100])
+check(kt.dbx("SELECT email FROM users WHERE id=?", (FID,)) == [("frida@example.com",)], "frida's address is unchanged")
+r = A.patch(B + f"/api/users/{FID}", json={"display_name": "Frida F"})
+check(r.ok, "with the grant: the operator fixes her display name " + r.text[:100])
 check(link(uid["cara"]).status_code == 403, "frida's grant opens no other account")
 users = {u["id"]: u for u in A.get(B + "/api/users?all=1").json()["users"]}
 check(not users[FID].get("apart") and users[FID].get("support_until") and users[uid["cara"]].get("apart") is True,
@@ -110,7 +122,8 @@ check(X.get(B + "/api/state").ok, "replaced by a longer grant: the support sessi
 check(S["frida"].delete(B + f"/api/support-access/{GF2}").ok, "frida ends it")
 check(X.get(B + "/api/state").status_code == 401 and S["frida"].get(B + "/api/state").ok,
       "ended early: the session started with the operator's link ends too, frida's own session stays")
-check(not kt.dbx("SELECT 1 FROM user_invites WHERE user_id=? AND created_by<>?", (FID, FID)), "... and the operator's open password link is gone")
+r = link(FID)
+check(r.status_code == 403, "ended: no new sign-in link")
 check(link(FID).status_code == 403, "ended: no sign-in link again")
 j = S["frida"].get(B + "/api/support-access").json()
 check(j["account"] is None and {p["id"] for p in j["past"]} >= {GF, GF2}, "ended grants show as earlier support access")
@@ -129,6 +142,15 @@ GO = r.json()["grant"]["id"]
 r = A.patch(B + f"/api/admin/orgs/{CO}", json={"name": "Client Studio GmbH"})
 check(r.ok and kt.dbx("SELECT name FROM orgs WHERE id=?", (CO,)) == [("Client Studio GmbH",)], "with the grant: the operator renames it " + r.text[:120])
 check(link(uid["cara"]).status_code == 403, "the organisation's grant opens no member's account")
+r = A.post(B + "/api/users", json={"username": "opsmate", "password": "password123"})
+OPS = r.json()["id"]
+for body in ({"members_add": [OPS]}, {"admins_add": [OPS]}):
+    r = A.patch(B + f"/api/admin/orgs/{CO}", json=body)
+    check(r.status_code == 403, f"with the grant: nobody new into the organisation {list(body)} " + r.text[:100])
+check(not kt.dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (CO, OPS)) and not kt.dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (CO, OPS)),
+      "... no invitation, no membership")
+r = A.post(B + "/api/admin/agents", json={"username": "intruder", "org_id": CO})
+check(r.status_code == 403 and not kt.dbx("SELECT 1 FROM users WHERE username='intruder'"), "with the grant: no new agent in the organisation " + r.text[:100])
 j = S["carl"].get(B + "/api/support-access").json()
 og = {o["org_id"]: o for o in j["orgs"]}
 check(og[CO]["grant"]["id"] == GO and any(u["method"] == "PATCH" for u in og[CO]["grant"]["uses"]), f"carl sees the organisation's grant and its use {og}")

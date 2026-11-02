@@ -51,7 +51,8 @@ def sga_open(c, uid=None, oid=None, note=True):
     with system_ctx(c):  # grants of other people's accounts and organisations: structure only, no content
         if oid:
             r = c.execute("SELECT s.id FROM support_grants s JOIN orgs o ON o.id=s.org_id JOIN org_members m ON m.org_id=s.org_id "
-                          "AND m.user_id=s.user_id AND m.role='admin' WHERE s.org_id=? AND s.ended_at IS NULL AND s.ends_at>? "
+                          "AND m.user_id=s.user_id AND m.role='admin' JOIN users u ON u.id=s.user_id AND u.disabled=0 "
+                          "WHERE s.org_id=? AND s.ended_at IS NULL AND s.ends_at>? "
                           "AND o.retired_at IS NULL ORDER BY s.id DESC LIMIT 1", (oid, now)).fetchone()
             if not r:  # a person's own office follows the person's account grant (P4)
                 r = c.execute("SELECT s.id FROM support_grants s JOIN orgs o ON o.personal_of=s.user_id WHERE o.id=? AND s.org_id IS NULL "
@@ -98,19 +99,28 @@ def sga_link_exp(c, exp):
     return min(exp, r[0]) if r and r[0] else exp
 
 
-def sga_session_cap(c, uid, token_hash):
-    """A session started with a link (via link / invite) that somebody else made while the account's support access was open
-    ends with that access at the latest: the operator's sign-in does not outlive the client's consent (session.start_session)."""
+def sga_link_support(c, uid):
+    """The end of the support access through which an instance admin made account uid's current sign-in link, or '' (a link of
+    the person's parents / organisation admins, or none)."""
     if not sga_hosted():
-        return
+        return ""
     with system_ctx(c):
-        r = c.execute("SELECT created_by, created_at FROM user_invites WHERE user_id=?", (uid,)).fetchone()
-        if not r or not r["created_by"] or r["created_by"] == uid:
-            return
-        s = c.execute("SELECT MAX(COALESCE(ended_at, ends_at)) FROM support_grants WHERE user_id=? AND org_id IS NULL AND created_at<=? "
-                      "AND COALESCE(ended_at, ends_at)>=?", (uid, r["created_at"], r["created_at"])).fetchone()
-        if s and s[0]:
-            c.execute("UPDATE sessions SET expires_at=? WHERE token_hash=? AND expires_at>?", (s[0], token_hash, s[0]))
+        r = c.execute("SELECT i.created_at FROM user_invites i JOIN users a ON a.id=i.created_by WHERE i.user_id=? AND i.kind='login' "
+                      "AND i.created_by<>i.user_id AND a.is_admin=1", (uid,)).fetchone()
+        if not r:
+            return ""
+        s = c.execute("SELECT MAX(ends_at) FROM support_grants WHERE user_id=? AND org_id IS NULL AND created_at<=? AND ends_at>=?",
+                      (uid, r[0], r[0])).fetchone()
+    return s[0] if s and s[0] else ""
+
+
+def sga_session_cap(c, uid, token_hash):
+    """2.485.0 (#3939): a session started with a sign-in link the operator made through the account's support access ends with
+    that access at the latest and is marked via 'support' (no credentials in it, sga_guard; ended with the access, sga_close)."""
+    end = sga_link_support(c, uid)
+    if end:
+        with system_ctx(c):
+            c.execute("UPDATE sessions SET via='support', expires_at=LEAST(expires_at, ?) WHERE token_hash=?", (end, token_hash))
 
 
 def sga_close(c, r, now):
@@ -123,13 +133,43 @@ def sga_close(c, r, now):
         since = c.execute("SELECT MIN(created_at) FROM support_grants WHERE user_id=? AND org_id IS NULL AND ends_at>?",
                           (r["user_id"], iso(now))).fetchone()[0] or r["created_at"]
         since = min(since, r["created_at"])
-        c.execute("DELETE FROM user_invites WHERE user_id=? AND created_by IS NOT NULL AND created_by<>? AND created_at>=?",
-                  (r["user_id"], r["user_id"], since))
-        gone = [x[0] for x in c.execute("SELECT token_hash FROM sessions WHERE user_id=? AND via IN ('link','invite') AND created_at>=?",
-                                        (r["user_id"], since)).fetchall()]
+        # review F6: only the operator's sign-in links and support sessions (a parent's / an organisation admin's link stays)
+        c.execute("DELETE FROM user_invites WHERE user_id=? AND kind='login' AND created_at>=? AND created_by<>user_id "
+                  "AND created_by IN (SELECT id FROM users WHERE is_admin=1)", (r["user_id"], since))
+        gone = [x[0] for x in c.execute("SELECT token_hash FROM sessions WHERE user_id=? AND via='support'", (r["user_id"],)).fetchall()]
     if gone:
         from .sessions import ses_end
         ses_end(c, r["user_id"], gone)
+
+
+# 2.485.0 (#3939, review F1): what a support session (via 'support', sga_session_cap) never does: credentials, ways out to other
+# services and support access itself -- they would outlive the client's consent. Writes only; reading stays.
+SGA_GUARD = ("/api/me/2fa", "/api/me/app-passwords", "/api/me/passkeys", "/api/me/tokens", "/api/me/drop-token", "/api/me/mail/token",
+             "/api/me/webhooks", "/api/me/channels", "/api/me/ntfy-inbox", "/api/me/sessions", "/api/my/agents", "/api/support-access",
+             "/api/stepup")
+SGA_GUARD_ME = {"password", "email", "username", "current_password", "new_password"}
+
+
+@app.before_request
+def sga_guard():
+    if request.method in ("GET", "HEAD", "OPTIONS") or g.get("auth_via") != "session" or g.get("user") is None:
+        return None
+    p = request.path
+    hit = p.startswith(SGA_GUARD)
+    if not hit and p == "/api/me" and request.method == "PATCH":
+        b = request.get_json(silent=True)
+        hit = isinstance(b, dict) and bool(set(b) & SGA_GUARD_ME)
+    if not hit:
+        return None
+    from .session import COOKIE, _token_hash
+    tok = request.cookies.get(COOKIE)
+    if not tok:
+        return None
+    c = db()
+    r = c.execute("SELECT via FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone()
+    if r and r[0] == "support":
+        return jsonify(error=tr("Support access does not hand out sign-in data or add people: the client does that"), code="support_session"), 403
+    return None
 
 
 def _route():
@@ -148,6 +188,7 @@ def sga_flush(resp):
         e = {"at": iso(now), "by": int(g.user["id"]), "m": request.method[:8], "r": _route(), "s": int(resp.status_code)}
         c = connect()
         try:
+            c.execute("SET LOCAL lock_timeout = '2s'")  # review F7: never stall a response behind the request's own locks
             for gid in sorted(used):
                 row = c.execute("SELECT uses FROM support_grants WHERE id=? FOR UPDATE", (gid,)).fetchone()
                 if not row:
@@ -161,7 +202,10 @@ def sga_flush(resp):
                         and (parse_iso(last.get("at") or "") or now) > now - timedelta(seconds=SGA_GET_GAP_S)):
                     continue  # the same reading again: one entry
                 uses.append(e)
-                c.execute("UPDATE support_grants SET uses=? WHERE id=?", (json.dumps(uses[-SGA_USES_MAX:], separators=(",", ":")), gid))
+                while len(uses) > SGA_USES_MAX:  # review F4: readings go first, a change is never pushed out
+                    i = next((k for k, u in enumerate(uses) if not isinstance(u, dict) or u.get("m") in ("GET", "HEAD")), 0)
+                    uses.pop(i)
+                c.execute("UPDATE support_grants SET uses=? WHERE id=?", (json.dumps(uses, separators=(",", ":")), gid))
             c.commit()
         finally:
             c.close()
