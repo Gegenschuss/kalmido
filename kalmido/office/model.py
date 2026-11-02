@@ -309,6 +309,19 @@ def pb_cl_sql(c, oid, col="org_id", by="created_by"):
     return f"{col}={int(oid)}"
 
 
+def pb_cl_live(c, oid, cid, keep=None):
+    """2.370.4 (#3089) N2: an office write path takes no client from the trash: 409 "The client is in the trash" when client
+    cid of office area oid lies there (a new record would point at a client nobody sees, which then never goes for good).
+    keep = the record's client now: saving it unchanged stays possible. Reading stays as it is."""
+    try:
+        i = int(cid)
+    except (TypeError, ValueError):
+        return
+    if i and i != keep and c.execute(f"SELECT 1 FROM clients WHERE id=? AND deleted_at IS NOT NULL AND {pb_cl_sql(c, oid)}",
+                                     (i,)).fetchone():
+        raise Denied(409, tr("The client is in the trash"))
+
+
 def pb_cl_where(c, oid, col="org_id", by="created_by"):
     """(sql, args) form of pb_cl_sql (announced in iface.txt for the other parts' modules)."""
     return pb_cl_sql(c, oid, col, by), ()
@@ -1201,6 +1214,7 @@ def _clean_col(c, oid, kind, k, v):
         if spec == "clients":
             if not c.execute(f"SELECT 1 FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (i,)).fetchone():
                 raise BadInput(tr("Invalid value: {0}", k))
+            pb_cl_live(c, oid, i)
         elif not c.execute(f"SELECT 1 FROM {spec} WHERE id=? AND org_id=?", (i, oid)).fetchone():
             raise BadInput(tr("Invalid value: {0}", k))
         return i
@@ -1373,6 +1387,8 @@ def office_update(c, oid, kind, rid, b):
             continue
         if m["cols"][k][0] in ("agreement", "receipt") and v not in (None, "") and str(v) == str(r.get(k)):
             continue  # 2.92.0 B (#1931): an unchanged link stays even when its policy is archived by now
+        if m["cols"][k][0] == "fk" and v not in (None, "") and str(v) == str(r.get(k)):
+            continue  # 2.370.4 (#3089) N2: an unchanged link stays (its client may lie in the trash by now)
         sets.append(k)
         vals.append(_clean_col(c, oid, kind, k, v))
     if kind == "equipment" and ("afa_method" in sets or "purchase_date" in sets):  # 2.480.0 C (#3528): also a new purchase day

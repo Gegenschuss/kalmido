@@ -29,7 +29,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, need_list, vis_sql
 from ..core.errors import BadInput
-from .model import office_gate, office_org, office_settings, pb_cl_sql, pb_owner, trial_flag
+from .model import office_gate, office_org, office_settings, pb_cl_live, pb_cl_sql, pb_owner, trial_flag
 from .doctpl_samples import DMA_SAMPLES, SAMPLE_MT, sample_langs, sample_text  # 2.117.0 B (#2283); 2.449.0 (#3768)
 from .doclang import DOC_LANGS, doc_lg  # 2.185.0 C (#2520)
 from .oftref import GD_KIND, oft_renamed  # 2.351.0 A (#2823)
@@ -913,6 +913,7 @@ def dt_refs(c, oid, b, cur=None):
     if cid in (None, "", 0):
         raise BadInput(tr("Choose a client"))
     cl = dt_client(c, oid, cid)
+    pb_cl_live(c, oid, cl["id"], cur["client_id"] if cur else None)  # 2.370.4 (#3089) N2
     out["client_id"] = cl["id"]
     if "list_id" in b or cur is None:
         lid = b.get("list_id")

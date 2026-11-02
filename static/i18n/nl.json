@@ -15940,5 +15940,6 @@
   "{0}: a job makes no progress": "{0}: een job komt niet verder",
   "{0}: work lies on a branch without a merge": "{0}: werk ligt op een branch zonder merge",
   "The contact the others were merged into is in the trash; restore it first, then undo the merge": "Het contact waarin de andere zijn samengevoegd staat in de prullenbak; herstel het eerst en maak dan het samenvoegen ongedaan",
-  "The address book is in the trash; restore it first, then undo the merge": "Het adresboek staat in de prullenbak; herstel het eerst en maak dan het samenvoegen ongedaan"
+  "The address book is in the trash; restore it first, then undo the merge": "Het adresboek staat in de prullenbak; herstel het eerst en maak dan het samenvoegen ongedaan",
+  "The client is in the trash": "De klant staat in de prullenbak"
 }

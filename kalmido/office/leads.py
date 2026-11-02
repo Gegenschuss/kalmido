@@ -21,7 +21,7 @@ from ..core.errors import BadInput
 from ..api.common import v1_view
 from ..core.csvimport import amount_text, csv_table_numbered
 from .calc import dec, dstr, money
-from .model import office_on, office_role, pb_cl_org, pb_cl_sql
+from .model import office_on, office_role, pb_cl_live, pb_cl_org, pb_cl_sql
 from .rights import ofr_rights
 from .legacyimport import fx_run, fx_settle  # 2.363.2 (#3104)
 from ..team.clients import cl_trash
@@ -164,6 +164,7 @@ def lead_convert(did):
     if cid is not None:
         if not isinstance(cid, int) or isinstance(cid, bool) or not _client_ok(c, oid, cid):
             raise BadInput(tr("Invalid value: {0}", "client_id"))
+        pb_cl_live(c, oid, cid)  # 2.370.4 (#3089) N2
     else:
         name = (cur.get("company") or cur.get("contact") or cur.get("title") or "").strip()
         f = {"name": name, "contact": cur.get("contact") or "", "email": cur.get("email") or "", "phone": cur.get("phone") or "",

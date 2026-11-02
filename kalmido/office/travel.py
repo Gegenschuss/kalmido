@@ -25,7 +25,7 @@ from ..core.access import Denied
 from ..core.errors import BadInput
 from .pdf import pdf_date
 from .calc import dec, dstr, money
-from .model import office_gate, office_org, office_settings
+from .model import office_gate, office_org, office_settings, pb_cl_live
 from .ledger import ofx_items_brief, ofx_log, ofx_need_editable
 from .olock import olk_need_trip_items, olk_trip_item_reason
 from .vma import vma_trip
@@ -182,6 +182,7 @@ def rk_trip_clean(c, oid, uid, b, cur=None):
         out["purpose"] = p
     if "client_id" in b or not cur:
         out["client_id"] = _client_ok(c, oid, b.get("client_id"))
+        pb_cl_live(c, oid, out["client_id"], cur["client_id"] if cur else None)  # 2.370.4 (#3089) N2
     if "project" in b or not cur:
         out["project"] = _text(b.get("project"), "project", 200)
     if "km" in b or not cur:

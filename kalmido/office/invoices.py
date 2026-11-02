@@ -27,7 +27,7 @@ from .calc import INV_VAT_NOTES, TAX_KEYS, dec, dstr, fmt_money, inv_calc, inv_o
 from .homecur import hc_code, hc_home, hc_office_rate, hc_rate_missing  # 2.189.0 (#2475); 2.355.0 C (#2844): hc_rate_missing
 from .packs import office_pack_for
 from .doclang import doc_lg, doc_pack  # 2.185.0 C (#2520)
-from .model import num_kind, num_scheme, office_feature, office_gate, office_need_feature, office_org, office_role, office_scheme_period, office_settings, pb_cl_sql, trial_flag
+from .model import num_kind, num_scheme, office_feature, office_gate, office_need_feature, office_org, office_role, office_scheme_period, office_settings, pb_cl_sql, pb_cl_live, trial_flag
 from .contacts_cl import fk_send_rcpts  # 2.433.0 (#3599)
 from .model import SCHEME_RE, scheme_variants  # 2.355.0 A (#2839)
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
@@ -662,6 +662,7 @@ def inv_from_time(c, oid, uid, b):
     cl = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (cid,)).fetchone()
     if cl is None:
         raise Denied(404)
+    pb_cl_live(c, oid, cid)  # 2.370.4 (#3089) N2
     d_from, d_to = _date(b.get("from"), "from"), _date(b.get("to"), "to")
     if not d_from or not d_to or d_to < d_from:
         raise BadInput(tr("Invalid value: {0}", "from/to"))

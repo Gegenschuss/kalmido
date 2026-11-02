@@ -26,7 +26,7 @@ from .sheet import dk_pack, dk_packs_on
 from .undo import oun_post, oun_pre
 from .otrash import otb_put  # 2.272.0 E2 (#3038)
 from .homecur import HC_CODES, hc_code, hc_home, hc_office_rate  # 2.189.0 (#2475)
-from .model import (NAME_MAX, PT_MAX, TEXT_MAX, UNITS, client_short_code, pb_cl_sql, office_gate, office_need_feature, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
+from .model import (NAME_MAX, PT_MAX, TEXT_MAX, UNITS, client_short_code, pb_cl_sql, pb_cl_live, office_gate, office_need_feature, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts, office_trial_number, trial_flag)
 from .pdf import pdf_paper  # 2.357.0 A (#3156)
 from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
@@ -696,6 +696,7 @@ def clean_doc(c, oid, b, cur, admin):
             cl = _client(c, oid, cid)
             if not cl:
                 raise Denied(404)
+            pb_cl_live(c, oid, cl["id"], _cur_val(cur, "client_id"))  # 2.370.4 (#3089) N2
             f["client_id"] = cl["id"]
     fk_doc_contact_clean(c, oid, b, cur, f)
     ncid = f["client_id"] if "client_id" in f else _cur_val(cur, "client_id")

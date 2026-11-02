@@ -15940,5 +15940,6 @@
   "{0}: a job makes no progress": "{0}: ein Job kommt nicht voran",
   "{0}: work lies on a branch without a merge": "{0}: Arbeit liegt auf einem Zweig ohne Merge",
   "The contact the others were merged into is in the trash; restore it first, then undo the merge": "Der Kontakt, in den die anderen zusammengeführt wurden, liegt im Papierkorb; erst wiederherstellen, dann die Zusammenführung rückgängig machen",
-  "The address book is in the trash; restore it first, then undo the merge": "Das Adressbuch liegt im Papierkorb; erst wiederherstellen, dann die Zusammenführung rückgängig machen"
+  "The address book is in the trash; restore it first, then undo the merge": "Das Adressbuch liegt im Papierkorb; erst wiederherstellen, dann die Zusammenführung rückgängig machen",
+  "The client is in the trash": "Kunde liegt im Papierkorb"
 }

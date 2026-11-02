@@ -27,7 +27,7 @@ from ..core.db import body, bump, err, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .letterhead import bp_letter  # 2.184.0 C (#2581)
-from .model import OFFICE_ADMIN_ONLY, office_gate, office_org, office_role, office_settings, pb_cl_sql, pb_owner
+from .model import OFFICE_ADMIN_ONLY, office_gate, office_org, office_role, office_settings, pb_cl_live, pb_cl_sql, pb_owner
 from .doclang import DOC_LANGS  # 2.185.0 C (#2520)
 from .rights import ofr_admin_or, ofr_allows, ofr_need_area
 from .pdf import PDF_ADDR_W, pdf_wrap  # 2.296.0 E (#3170)
@@ -116,6 +116,8 @@ def lt_clean(c, oid, b, cur=None):
                 ok = lt_contact_ok(c, oid, v)
             if not ok:
                 raise Denied(404)
+            if k == "client_id":
+                pb_cl_live(c, oid, v, cur["client_id"] if cur else None)  # 2.370.4 (#3089) N2
             out[k] = v
         elif k in ("body",):
             out[k] = lt_multi(v, k, LT_BODY_MAX)

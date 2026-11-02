@@ -30,7 +30,7 @@ from ..core.db import body, bump, db, iso, local_now, local_stamp, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import calc_lang, dec, dstr, fmt_point, money
-from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_lock, office_settings_save
+from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_lock, office_settings_save, pb_cl_live
 from ..personal.timesheet import tz_of
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 from .olock import olk_active, olk_until
@@ -369,6 +369,7 @@ def _drive_clean(c, oid, uid, b, cur=None):
         out["kind"] = k
     if "client_id" in b or new:
         out["client_id"] = _client_ok(c, oid, b.get("client_id"))
+        pb_cl_live(c, oid, out["client_id"], cur.get("client_id"))  # 2.370.4 (#3089) N2
     odo = {}
     for k in ("odo_start", "odo_end"):
         if k in b or new:

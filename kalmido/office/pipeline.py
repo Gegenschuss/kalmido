@@ -21,7 +21,7 @@ from ..core.db import body, bump, db, iso, local_now, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
-from .model import office_gate, office_org, office_settings, pb_cl_sql, pb_owner
+from .model import office_gate, office_org, office_settings, pb_cl_live, pb_cl_sql, pb_owner
 
 PL2_STAGES = ("lead", "inquiry", "offer", "won", "lost")  # 2.94.0 A (#1930): + lead before inquiry (office/leads.py)
 PL2_PROB = {"lead": 10, "inquiry": 20, "offer": 50, "won": 100, "lost": 0}  # the preset probability of a stage (%)
@@ -109,6 +109,7 @@ def pl2_clean(c, oid, b, cur=None):
         out["follow_up"] = _day(b.get("follow_up"), "follow_up")
     if "client_id" in b:
         out["client_id"] = _ref(c, oid, b, "client_id", _client_ok)
+        pb_cl_live(c, oid, out["client_id"], cur["client_id"] if cur else None)  # 2.370.4 (#3089) N2
     if "list_id" in b:
         out["list_id"] = _ref(c, oid, b, "list_id", _list_ok)
     if "value" in b or new:

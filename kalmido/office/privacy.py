@@ -36,7 +36,7 @@ from .doctpl import (DT_NOTE, _ctx, _iid, dt_client, dt_doc, dt_fill, dt_file, d
                      dt_tpl, dt_values)
 from .doclang import doc_lg
 from .doctpl_samples import DMA_SAMPLES, sample_text
-from .model import pb_owner
+from .model import pb_cl_live, pb_owner
 from .ledger import ofx_log, ofx_company  # 2.369.5 (#2517): pulled up from functions
 from .contacts_cl import fk_contact  # 2.369.5 (#2517): pulled up from functions
 from ..lists.public import public_links_on  # 2.369.5 (#2517): pulled up from functions
@@ -235,6 +235,7 @@ def dsb_post():
     if kind not in DSB_KINDS:
         raise BadInput(tr("Invalid value: {0}", "kind"))
     cl = dt_client(c, oid, b.get("client_id"))
+    pb_cl_live(c, oid, cl["id"])  # 2.370.4 (#3089) N2
     label, skey, sign = DSB_KINDS[kind]
     tid = None
     if b.get("template_id") not in (None, "", 0):
