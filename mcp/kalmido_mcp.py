@@ -353,6 +353,8 @@ def t_add_comment(api, a):
     b.update(_pick(a, ("choices", "multi", "client_ref")))  # 2.41.0 (#1383): answer buttons under the comment; 2.370.2 (#3088)
     if a.get("portal"):  # 2.63.0 (#1513): a public answer the customer of a customer report sees
         b["portal"] = True
+    if a.get("mail_reporter"):  # 2.393.2 (#3375): the comment also goes by e-mail to the task's reporter
+        b["mail_reporter"] = True
     return api.call("POST", f"/tasks/{int(a['task_id'])}/comments", body=b)
 
 
@@ -763,7 +765,11 @@ TOOLS = [
            "portal": {"type": "boolean", "description": "2.63.0: a public answer to the customer of a customer report (the task has a "
                       "ticket, you may change the task): the customer sees it on the status page and gets it by mail. Write it for the "
                       "customer: factual, friendly, no internal details, no names of other people. Default false = internal. 2.126.0: "
-                      "it waits for a person's approval (202 + a waiting job)"}},
+                      "it waits for a person's approval (202 + a waiting job)"},
+           "mail_reporter": {"type": "boolean", "description": "2.393.2: the comment also goes by e-mail to the reporter of a task that "
+                             "came in by e-mail (you may change the task; never in a list with end-to-end encryption). Write it for the "
+                             "reporter: factual, friendly, no internal details. It waits for a person's approval (202 + a waiting job). "
+                             "Default false"}},
           ["task_id", "body"]), t_add_comment),
     ("request_comment_approval", "2.41.0: ask for an approval in a task comment (task_id): a card 'Approval needed' with Yes / No under "
                                  "your comment, shown on the task's row until answered. title = what is to be approved, what = what happens "

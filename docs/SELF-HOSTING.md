@@ -1327,6 +1327,13 @@ the browsers then send nothing.
 - **Shorten forwarded mails (optional, per person).** Settings > Integrations > *Tasks by e-mail* > *Shorten forwarded mails*: the
   forwarding header becomes one line, signatures, legal notices and older quoted replies are cut, the original mail stays
   attached as `.eml`. Off by default.
+- **Replies become comments (2.393.2).** A reply to a mail that made a task (In-Reply-To / References), to a notification
+  about one task or to an answer Kalmido sent the reporter becomes a comment of that task instead of a new task, the quoted
+  part cut off. Only the reporter's address or a person who sees the task may comment this way; other senders get a new task
+  with the note "Reply to #N, sender not allowed". The reply address (`tasks+r<id>x<signature>@…`) is signed with the server
+  key and bound to its recipient, so the mailbox needs plus addressing as for the personal addresses. In the comment field
+  *Also by e-mail to the reporter* sends a comment back (through the workspace mailbox when it has SMTP, else
+  `KALMIDO_SMTP_*`).
 - **Deliver directly, do not forward.** Many forwarding rules drop the plus part of an address (`tasks+token@…`), and
   then Kalmido cannot tell whose task it is.
 - **E-mails at clients and projects (2.84):** the same mailbox also takes the addresses of clients, projects and the
