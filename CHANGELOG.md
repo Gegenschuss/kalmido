@@ -5,6 +5,162 @@ All notable changes to Kalmido are listed here. The format follows
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
 minor one, anything that needs action on your side a major one.
 
+## [2.487.0] - 2026-11-02
+
+Package 2.431 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Büro: Gutschrift überall Rechnungskorrektur nennen, Kunden: Liste und Details scrolle).
+### Changed
+- Task details: the header hides the words next to its icons one by one (-1 day, +1 day, Today, Lock, Priority) when the panel is narrow, so no icon is cut off any more; the words stay as tooltips (#3593).
+- Office: the correction document is called "Rechnungskorrektur" in German everywhere (lists, buttons, number settings, letters); new offices number it RK-2026-001 instead of GS- (saved schemes stay) (#3595).
+- Office: the subject of a quotation or invoice is a larger field that grows with its text and keeps line breaks (up to 1000 characters); the PDF prints them, one-line places (e-invoice, lists, portal) join them (#3594).
+- Office: the dialog "Finalise this document?" names the number the document will get, e.g. "Will be finalised as RE-2026-014" (#3605).
+- Office > Clients and Contacts on a computer: the list scrolls on its own, the search bar and the card on the right stay in place; a long card scrolls for itself (#3598).
+### Fixed
+- The clients and contacts pages no longer reload by themselves when something changes elsewhere (for example an agent writing in a list): scroll position, open card and selection stay, real changes still appear (#3602).
+
+Package 2.443.0 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Today: every event's window has "Hide on Today" / "Show on Today" next to the calendar name; it switches that calendar only in "Events today", the calendar view and planning stay, with undo (#3740).
+- Today: the calendars are also in the block's own "…" menu (phone and desktop), and both menus list public holidays and absences (#3740).
+- Agents: `tags` in `GET /api/v1/files` details, filters `tag`, `not_tag`, `tag_mode` (without `parent_id`: everything you see at any depth, at most 500), `list_files` takes them (#2338).
+
+### Changed
+- Agent starters: `agent_launcher.ps1` follows `agent_launcher.sh`: signals, process tree, log, nightly restart time zones on Windows PowerShell, restart after errors, same help; missing URL or token exit 2 with a log line in both; `KALMIDO_PYTHON` everywhere; `agent_run.py` stops its running command on SIGTERM (#2940).
+
+### Fixed
+- `tools/perf_budget.json` is the same in both repositories again, so a push from a train branch is not refused (#3741).
+- Already fixed earlier, confirmed here: small tag button and fold arrow sizes (#3657), second copy on a quick double click on Move (#3644).
+
+Package 2.437 (Bündel: Liste: Doppelklick auf Aufgabe - Titelfeld rutscht, Agenten-Chat: Tipp-Anzeige in feste Zeile unten, C, App-Start: ermitteln, was na).
+
+### Added
+- Quotations have a new status "Superseded": duplicating a sent or accepted quotation asks "Mark the old quotation as superseded?" (ticked by default). Untick it for a supplement; both may then stay accepted (#3621).
+- A superseded quotation counts nowhere (cash flow, purchases), cannot be accepted through its link and cannot become an invoice. Both quotations link to each other; accepting the new one supersedes the old one and moves its pipeline deal (#3621).
+- The start log names every start step over one second with its milliseconds, the sum of the short ones, and the last finished step while a start hangs (#3729).
+
+### Changed
+- The agent chat keeps a fixed row above the input for the "is writing" figure, so the chat no longer jumps (#3737).
+- Chat messages show delivery as ticks only; the word stays as a tooltip and for screen readers. Group chats show ticks and the number of readers (#3318).
+
+### Fixed
+- Double-clicking a task title in a narrow list (task panel open) edits the title right next to its circle, full width, not in the middle of the row (#3626).
+- The permissions switch in the agent's chat header now really applies to the next run. When the computer fixes the mode, the switch is locked and says "Set on its computer" (#2931).
+
+### Fixed
+- main: the security suite reads past the start log of init_db (#3729), and p2437_l_start leaves tests/selfstart.txt because its start goes through kt.fresh, which the guard cannot follow.
+
+Package 2.440.0 (Bundle: office menu points can be switched off, e-invoice fields in the agent API, list dialog fix).
+
+### Added
+- #3609: Office settings > Functions > Menu points: an office admin switches single points of the office menu off for the whole office (Pipeline, Documents, Correspondence, Times to bill, Framework contracts, Cash book, Bank, Equipment, Contracts & insurance; the points of Money that already had a function switch stand in the same block). Off = hidden in the menu, the start page tiles and the search, links open the office start page, data stays, on again brings everything back. A person without an organisation does this for their own office.
+- #2243: `GET /api/v1/documents/{id}` carries `einvoice` for an incoming e-invoice: the fixed EN 16931 fields (number, dates, supplier, VAT ID, net, VAT, gross, VAT rates, credit note, duplicate hint); `auto` says `einvoice`.
+
+### Fixed
+- #3654: List dialog: after a failed save, closing or reloading the page asks first.
+- #3782: Office settings: the "Saved" mark at a switch stays when the page draws again right after the save.
+
+Package 2.360.4 (Teil 4/5: Bündel Sicherheits- und Datenschutz-Reste, Abhängigkeiten (2.197 + 2.223.9 + 2.239.1 + 2.313)).
+
+### Changed
+- Retiring an organisation ends its calendars' subscription links and switches off the booking pages that work for it; a page of a retired office stays closed when it is switched on again (#3243).
+- A restore deletes organisations and entries deleted for good after the backup again, like deleted accounts; what went in the last 7 days stays and is reported (#3243).
+- A file locked by law no longer stops a deletion: the organisation is retired until the lock ends, a private file moves into the retired office, an organisation's file stays with an instance admin as keeper (#3243).
+
+### Fixed
+- Deleting a user: the dialog says at once when nobody can take over the organisation's calendars or projects, instead of failing afterwards (#3243).
+- The preview of an account move names all parts that stay behind in plain words (#3248).
+- After a step back and a new upgrade, devices load the full state once instead of missing changes (#3248).
+- Documented which sign-in ways keep the hard address limit; corrected the note on download tickets (#3248).
+
+Package 2.360.2 (Teil 2/5: Bündel Sicherheits- und Datenschutz-Reste, Abhängigkeiten (2.197 + 2.223.9 + 2.239.1 + 2.313)).
+
+### Security
+- Sharing a table by e-mail address now always adds a row "Invited" with the address, whether or not the address has an account; a person who signs up later and proves that address (mail link, verified sign-in provider) gets the table at sign-in (#2561).
+- Organisation import: people without an account are now invited too and join only after accepting; undoing the import withdraws open invitations (#2561).
+- Open invitations of an organisation all look alike: every invitation can be resent and withdrawn, and open ones stay visible when invitations are switched off (#2561).
+- The Server-Timing header with its statement count goes to instance admins only (#2561).
+- Organisation webhooks no longer send the names of filed e-mails (#2561).
+- Renewing an organisation's key now pauses all writes on the server for the moment of the key switch (seconds, at most about half a minute): the app shows "Server in maintenance" and your changes wait in the queue. Reading and signing in keep working (#2561).
+- Signature pictures and imported letterheads are refused while the virus scanner cannot check them (#2561).
+- GitHub Actions are pinned to commit hashes, kept current by Dependabot; the job that writes the image can no longer write the repository and the other way round (#2912).
+- The offline start copy of the tasks is deleted when the session ends or changes, like the knowledge pages' copy (#3226).
+
+### Added
+- Settings > Move and export everything lists approval records of deleted videos, so they can be read and deleted (#2561).
+- The account export now holds your private files, booking page, polls, forms of your private lists with entries and holiday allowances (#2561).
+- Public pages (forms, portal, approvals, bookings) show the operator's privacy link, privacy contact and imprint; new server setting privacy contact, `KALMIDO_PRIVACY_EMAIL` (#2561).
+- When your booking page runs out of confirmation mails for the day, you get one notice under News (#2561).
+
+### Changed
+- Deleting an account no longer removes an organisation's monthly timesheets: they stay with their decision and hours, without the person's name (#2561).
+- The export log keeps one entry per person, list and day (#2561).
+- A table can hold 200 MB of input; a full table says so when you add cells or copy a sheet (#2561).
+- Old approval entries in the office log lose the signer's e-mail, address and device, once, at the update (#2561).
+- Third-party notices: complete list of packages and system packages, Lucide section removed (the icons are our own since 2.8.0) (#2913).
+
+### Fixed
+- main: the freelancer guard's ratchet on `PATCH /api/me` is met by a real call: the freelancer's own password change in the sessions suite now counts for the area, the route leaves the list of unproven write routes (#3506).
+- main: four suites follow the app again: p2273_b_move reads past the start's timing lines, p2428_a_ui uses the bar's current hint and the card's mark, p2103_b_api compares the account numbers of the restore, p2361_d_api looks for the totals on the last page, p2380r_f_ui expects the unused points of Money under Hidden as #3560 decided (#3506).
+
+Package 2.441.0 (Favourites of everything in the head bar).
+
+### Added
+- Anything with an address of its own can be a favourite: a quotation or invoice, a letter, a document, a file or folder of the file store, a knowledge page, a table, a contact, an address book, a saved sidebar view, next to projects, folders, areas, filters, tags, people and agents. `GET /api/favorites/targets` checks each of them with the rights of its own area (#3592)
+- Add one with the star next to the title on every page (on a phone in "…"), with "Add to favourites" right after "Open" in a row's menu, or by dragging a sidebar row or a link into the row (#3592)
+- The row can be arranged by dragging, has dividers, and each favourite can get its own colour or symbol (its menu: right-click or long press) (#3592)
+- Phone: a row to swipe under the header; pin the tab "Favourites" (Settings > Navigation > Tab bar) to get a page instead (#3592)
+- Settings > Appearance > Favourites shows "N favourites no longer available" with Remove; a favourite whose target is gone or out of reach disappears silently (#3592)
+
+### Changed
+- The favourites moved out of the sidebar into the head bar: a row of symbols between the workspace switch and the search, the name and place as a hint, what does not fit under "+N". One row for all workspaces, a dot shows the workspace; opening a favourite follows it there. Logo, workspace switch, search, bell and account keep their place and size (#3592)
+
+Package 2.447.0 (language rules without a login, French address, app shells in six languages).
+
+### Changed
+- #3761 Without a login every text follows one rule: the browser's language, else the owner's or English, never silently the first admin's. Login errors, the setup page and invitations speak the language of the login page; a new single sign-on account starts in that language; the sign-off page falls back to the document's language.
+- #3762 The app addresses everyone informally in all languages: French moves to "tu" throughout, the formal form stays only for outsiders, customer mails and documents; the same for Dutch, Spanish and two German letterhead texts. TRANSLATING.md notes the rule.
+- #3764 The native app shells follow the system language with all six languages, base language English: iOS permission prompts, the desktop menu and Android download messages.
+
+### Fixed
+- #3761 Error 400, 405 and 500 in a browser are a page in your language instead of Flask's English page; `html lang` follows the language before the login; the reload notice knows all six languages.
+- #3785 Tests: p2186_c reads past the start log, p2361_d checks the real totals (the invoice PDF was right).
+
+Package 2.442.0 (Phone drawer, low windows, packed start files, agent setup token).
+### Changed
+- Phone: the sidebar drawer keeps more room for the lists: the area icons are smaller and stand in two rows at most, also with 11 areas; Today, Inbox and the icons scroll along with the lists, the search stays on top, Settings and the account stay at the bottom (#3739).
+- Low windows (zoom 200 %, a phone on its side): the view switch folds to icons, the head and the tab bar get thinner, the comment box of a task stays in the flow until it is used (#2810).
+- The Docker image sends scripts and styles packed ahead of time (gzip, brotli) by Accept-Encoding, the first load is about a third of the size without a compressing proxy; nginx and Traefik examples compress the rest (#2808).
+### Fixed
+- The browser's own default font size now counts, the app's size stays a factor on it (#2810).
+- One-command agent setup: the token made along with a new agent is revoked when the setup code is redeemed if it was never used, no nameless entry stays under Computers (#1762).
+
+Package 2.446 (Bündel: Büro: E-Rechnungs-Prüfung meldet E-Mail-Adresse (E, Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Tick-off lines now come in French, Spanish, Italian and Dutch as well; a language without its own lines shows none instead of English ones (#3763).
+- Country lists start with the countries that fit the language, and settings search finds words in all languages; small leftovers are translated (#3763).
+
+### Fixed
+- Team chat on a phone: the header is one line with search, project, split window, settings and mute in the ⋯ menu; with the keyboard open the tab bar and the chat row go away and the newest message stays visible, also in landscape (#3334).
+- Settings > Whole server > Backups: downloading a backup made with an earlier passphrase now asks for that passphrase and delivers the complete file, still encrypted with it (#3613).
+- The built-in Peppol check names an e-mail address (scheme EM) as an electronic address that the Peppol list does not allow (#3783).
+
+### Fixed
+- main: the day a receipt was checked is the local day in the CSV, GoBD and DATEV exports, not the UTC day of the first hours after midnight; the document amount shows two decimals again; in the phone's team chat the newest message stays above the box when the keyboard opens; the checks for the mail off link, the agent rules and the Postgres catalog match the code again.
+
+### Fixed
+- CI of 2.475: the start log of the migrations goes to stderr again (helpers that import the app answer on stdout), a command that cannot start is logged and tried again in the launcher, the phone drawer's open tile keeps its contrast, the finalise dialog's number sits on the font scale, the new id column says why it has no key, brotli is named in the notices; tests follow the packed static files, the number preview and the token removed at setup.
+
+### Fixed
+- CI of 2.475: suites read only their own result line (the start log follows on stderr since 2.475) and the chat head suite waits for the list to reach the box at 740x360.
+- main: p2296_e_layout and p2390_0_a_office follow the font scale of 2.413 (quantities in the body size, a longer reference that still needs the line below its label at 8 pt).
+
+### Fixed
+- main: a folder shown as cards in the file store opens as cards again after a new start (the cards part of the documents loaded after the view was drawn first)
+
+### Fixed
+- CI of 2.475: the office's "Saved" mark finds its field again after a redraw without CSS.escape (the cash book no longer stops drawing in the test browser), the milestone report test no longer depends on a due day that has passed, the quotation layout test reads the quantity size of this version; main fixes taken over: the checked day in the exports is the local day, the path line and team chat fixes.
+
 ## [2.468.3] - 2026-11-01
 
 ### Fixed
@@ -9747,7 +9903,8 @@ All findings were fixed, re-verified and are covered by `tests/security_test.py`
   them permanently; renaming a task no longer updates the title snapshot in time entries of people who lost
   access.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.468.3...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.487.0...HEAD
+[2.487.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.487.0
 [2.468.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.468.3
 [2.468.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.468.2
 [2.468.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.468.1
