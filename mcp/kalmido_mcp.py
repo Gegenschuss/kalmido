@@ -488,6 +488,20 @@ def t_read_attachment(api, a):
     return out
 
 
+def t_wiki_read_file(api, a):
+    """2.488.0 B (#2209): a file of a knowledge page: as text (default; a PDF's text layer, a scan's recognised text) or as base64
+    (as "base64", at most max_bytes, default 5 MB); a picture comes back as base64, so you can look at it."""
+    fid = _id(a, "file_id")
+    if a.get("as") != "base64":
+        q = f"?max_chars={int(a['max_chars'])}" if a.get("max_chars") else ""
+        out = api.call("GET", f"/wiki/files/{fid}/text{q}")
+        if not (isinstance(out, dict) and out.get("kind") == "image" and int(out.get("size") or 0) <= int(a.get("max_bytes") or ATT_CAP_DEFAULT)):
+            return out
+    cap = int(a.get("max_bytes") or ATT_CAP_DEFAULT)
+    r = api.call("GET", f"/wiki/files/{fid}", binary_cap=cap)
+    return {"id": fid, "name": r["name"], "mime": r["mime"], "size": len(r["bytes"]), "base64": base64.b64encode(r["bytes"]).decode()}
+
+
 def t_set_waiting(api, a):
     """2.1.0 (#335): waiting on someone outside (note = who / what, until = follow-up day YYYY-MM-DD or null)."""
     return api.call("PUT", f"/tasks/{int(a['task_id'])}/waiting", body=_pick(a, ("note", "until")))
@@ -1389,6 +1403,15 @@ TOOLS += [
      _obj({"folder_id": S_ID, "name": {"type": "string", "maxLength": 200}, "body": {"type": "string", "maxLength": 500000}},
           ["folder_id", "name"]),
      lambda api, a: api.call("POST", "/wiki/pages", body=_pick(a, ("folder_id", "name", "body")))),
+    # 2.488.0 B (#2209): the files of a page shared with you (PDFs and pictures), read only
+    ("wiki_files", "2.488.0 (scope wiki:read): the files of a knowledge page shared with you (PDFs and pictures people uploaded to it): "
+                   "id, name, mime, size, created_at, image. Read one with wiki_read_file. A page not shared with you answers 404.",
+     _obj({"page_id": S_ID}, ["page_id"]), lambda api, a: api.call("GET", f"/wiki/pages/{_id(a, 'page_id')}/files")),
+    ("wiki_read_file", "2.488.0 (scope wiki:read): read a file of a knowledge page (file_id from wiki_files): as text (default; a PDF's "
+                       "text layer, the recognised text of a scan, at most max_chars) or as base64 (as \"base64\", at most max_bytes, default "
+                       "5 MB, at most 20 MB); a picture comes back as an image you can look at. Same rights as the page (else 404).",
+     _obj({"file_id": S_ID, "as": {"type": "string", "enum": ["text", "base64"]}, "max_chars": {"type": "integer", "minimum": 1, "maximum": 200000},
+           "max_bytes": {"type": "integer", "minimum": 1, "maximum": ATT_CAP_MAX}}, ["file_id"]), t_wiki_read_file),
 ]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
@@ -2635,7 +2658,7 @@ TOOL_SCOPES["sheets:write"] = ("sheet_create", "sheet_update", "sheet_set_cells"
                                "sheet_add_tab")  # 2.124.0 E (#2116): + sheet_add_tab
 TOOL_SCOPES["sheets:read"] += ("propose_sheet_tasks",)  # 2.126.1 B (#2125)
 TOOL_SCOPES["comments"] += ("add_video_comment", "set_video_comment_done")  # 2.99.1 C (#1959)
-TOOL_SCOPES["wiki:read"] = ("wiki_list", "wiki_read")  # 2.200.0 C (#1781)
+TOOL_SCOPES["wiki:read"] = ("wiki_list", "wiki_read", "wiki_files", "wiki_read_file")  # 2.200.0 C (#1781); 2.488.0 B (#2209): + files
 TOOL_SCOPES["wiki:write"] = ("wiki_write", "wiki_create")
 # 2.306.0 E (#2741): the scope of the route each of these calls (tools/list hid nothing for them on a read token)
 TOOL_SCOPES["structure"] += ("set_deployment", "duplicate_list", "set_task_sprint", "set_list_review")
@@ -2704,7 +2727,7 @@ TOOLSETS = {
         list_polls get_poll create_poll
     """,
     "wiki": """
-        wiki_list wiki_read wiki_write wiki_create list_notes search_notes get_note create_note update_note delete_note restore_note
+        wiki_list wiki_read wiki_write wiki_create wiki_files wiki_read_file list_notes search_notes get_note create_note update_note delete_note restore_note
     """,
     "life": """
         list_habits create_habit update_habit delete_habit check_in_habit get_habit_stats get_family add_occasion list_deadline_types add_deadline
@@ -2868,7 +2891,7 @@ def handle(api, msg):
         except ApiError as e:
             return _result(i, {"content": [{"type": "text", "text": e.message}], "isError": True})
         content = [{"type": "text", "text": json.dumps(out, ensure_ascii=False, indent=1)}]
-        if name in ("get_attachment", "read_attachment") and isinstance(out, dict) and out.get("base64") and str(out.get("mime", "")).startswith("image/"):
+        if name in ("get_attachment", "read_attachment", "wiki_read_file") and isinstance(out, dict) and out.get("base64") and str(out.get("mime", "")).startswith("image/"):
             # 2.13.1 (#465): the model sees the image itself; the text item keeps name / mime / size only
             content = [{"type": "text", "text": json.dumps({k: v for k, v in out.items() if k != "base64"}, ensure_ascii=False)},
                        {"type": "image", "data": out["base64"], "mimeType": out["mime"]}]

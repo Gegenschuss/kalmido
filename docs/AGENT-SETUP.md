@@ -202,7 +202,8 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
 12. Optional, **Knowledge pages** (2.200.0): turn on *Read knowledge pages* / *Write knowledge pages* (scopes `wiki:read` /
    `wiki:write`, off by default) and share a knowledge folder or page with exactly this agent (the share dialog of the
    folder / page, view or edit). The agent sees nothing else of the knowledge area: no page through the workspace, never an
-   encrypted space ([AGENTS.md](AGENTS.md#knowledge-pages)). The reference starter needs no change.
+   encrypted space ([AGENTS.md](AGENTS.md#knowledge-pages)). 2.488.0: with *Read knowledge pages* it also reads the files of
+   such pages (`wiki_files`, `wiki_read_file`). The reference starter needs no change.
 13. **Filed e-mails** (2.483.0): with *Read* the agent reads the e-mails filed with a client or a project it sees
    (`list_filed_mails`, `get_filed_mail`): a project shared with it, a client through such a project. Never the mails *Not
    assigned*, never another organisation's; filing, assigning and sending stay with people

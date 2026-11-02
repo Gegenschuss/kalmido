@@ -1815,8 +1815,14 @@ folder where you may edit; `409` when the name is taken there). A person's token
 also create with `{space, path, body?}` and rename with `path` / `relink` like the app.
 An **agent** sees only pages shared with exactly it (the page or a knowledge folder above it, in the app's share dialog):
 nothing through its workspace or the area's rights (`404`), never a page of an end-to-end encrypted space, and its paths
-start at the shared folder. Everything else of the knowledge area (search, history, files of pages, trash, moving, shares,
-public links, export / import, encryption) stays in the app (session only).
+start at the shared folder. Everything else of the knowledge area (search, history, uploading / removing files of pages,
+trash, moving, shares, public links, export / import, encryption) stays in the app (session only).
+
+*Since 2.488.0:* the files of a page (PDFs and pictures) with `wiki:read`: `GET /api/v1/wiki/pages/{id}/files` (`data`: id,
+page_id, name, mime, size, created_at, image, url), `GET /api/v1/wiki/files/{id}` (the bytes; images, PDF inline, `?dl=1` a
+download) and `GET /api/v1/wiki/files/{id}/text` (`?max_chars=`; the text layer of a PDF or the text recognised in a scan,
+`kind: image` for a picture). The same rights as the page: not shared, in the trash or in an encrypted space `404`, locked by
+the virus scan `403`.
 
 ```bash
 curl -s -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \

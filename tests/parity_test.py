@@ -258,6 +258,8 @@ APP_TO_API = {
     # 2.200.0 C (#1781): knowledge pages (an agent: only pages shared with it)
     "GET /api/wiki": ["GET /wiki/pages"], "GET /api/wiki/pages/{}": ["GET /wiki/pages/{}"],
     "POST /api/wiki/pages": ["POST /wiki/pages"], "PATCH /api/wiki/pages/{}": ["PATCH /wiki/pages/{}"],
+    # 2.488.0 (#2209): the files of a shared page (read only; the name in the app's address is only for reading)
+    "GET /api/wiki/files/{}": ["GET /wiki/files/{}", "GET /wiki/files/{}/text"], "GET /api/wiki/files/{}/{}": ["GET /wiki/files/{}"],
     # 2.99.1 C (#1959): video sign-offs -- agents read them (with the comments; the CSV / text export is the same data), comment
     # at a timecode, answer and mark comments done
     "GET /api/videos": ["GET /videos"], "GET /api/videos/{}": ["GET /videos/{}"], "GET /api/videos/{}/export": ["GET /videos/{}"],
@@ -409,15 +411,17 @@ APP_ONLY = [
      "the agent's office switch and the decision on suggested payments are the people's side",
      ("* /api/office/",)),
     # 2.200.0 C (#1781): was "* /api/wiki" (no agent access); list / read / write / create are mapped above
+    # 2.488.0 (#2209): "* /api/wiki/files" -> "=DELETE /api/wiki/files/{}" (reading a page's files is mapped above)
     ("2.49.0 (#1199, #1201) / 2.200.0 C (#1781): knowledge pages -- agents (scopes wiki:read / wiki:write) list, read, write and "
-     "create pages shared with them; everything else stays with people in the app: the trash, moving / renaming and folders, "
-     "history, files of pages, references, search and mentions, shares and public links, export / import and the end-to-end "
+     "create pages shared with them (2.488.0 #2209: and read their files); everything else stays with people in the app: the trash, "
+     "moving / renaming and folders, history, uploading / removing files of pages, references, search and mentions, shares and "
+     "public links, export / import and the end-to-end "
      "encryption (an agent never reads an encrypted space); the outline parser only serves the mind map import of the web app; "
      "2.371.3 (#3152): the reading style of a space is how people look at its pages in the app; 2.371 (#3150): the tag list "
      "and the ```abfrage block are views of the panel / a page like search",
      ("=DELETE /api/wiki/pages/{}", "* /api/wiki/pages/{}/", "* /api/wiki/trash", "=POST /api/wiki/restore", "=POST /api/wiki/purge",
       "=POST /api/wiki/move", "* /api/wiki/folders", "=GET /api/wiki/search", "=GET /api/wiki/mentions", "=GET /api/wiki/refs",
-      "* /api/wiki/files", "* /api/wiki/share", "=GET /api/wiki/export", "* /api/wiki/import", "* /api/wiki/e2e",
+      "=DELETE /api/wiki/files/{}", "* /api/wiki/share", "=GET /api/wiki/export", "* /api/wiki/import", "* /api/wiki/e2e",
       "=POST /api/outline/parse", "=PUT /api/wiki/style", "=GET /api/wiki/tags",
       "=GET /api/wiki/query")),
     ("2.50.0 (#1195, #1194): entering absences (the kind is health data), the public holiday state, the assign check and the "
@@ -822,6 +826,7 @@ TOOL_VARIANTS = {  # extra arguments that reach other routes of the same tool
     "list_files": [{"folder_id": 1}], "read_file": [{"as": "base64"}], "write_file": [{"file_id": 1}],  # 2.48.0 (#1207)
     "get_attachment": [{"source": "chat"}, {"source": "project", "list_id": 1}, {"source": "team"}],  # 2.113.1 (#2059): team
     "react": [{"remove": True}],
+    "wiki_read_file": [{"as": "base64"}],  # 2.488.0 (#2209): the bytes instead of the text
     # 2.391.0 (#3362): an organisation's webhooks (/orgs/{id}/webhooks) through the same tools
     **{t: [{"org_id": 1}] for t in ("list_webhooks", "create_webhook", "update_webhook", "delete_webhook", "rotate_webhook_secret",
                                     "test_webhook", "get_webhook_log")},

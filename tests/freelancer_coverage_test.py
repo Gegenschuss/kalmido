@@ -45,7 +45,8 @@ KINDS = {
     "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private workspace (create, change, search, export, trash; "
                        "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0: p2123_b_api_test.py shares of pages / folders, p2123_a_api_test.py page history, text search; 2.143.0: p2143_b_api_test.py the trash, delete for good, empty; "
                        "2.177.0: p2177_a_api_test.py the large ZIP import in pieces into the private workspace; "
-                       "2.200.0: p2200_c_wiki_agent_test.py her own agent on pages / folders she shared with it, API v1)"),
+                       "2.200.0: p2200_c_wiki_agent_test.py her own agent on pages / folders she shared with it, API v1; "
+                       "2.488.0: p2488_wiki_files_v1_test.py her agent reads the files of her shared pages)"),
     "pim": ("matrix", SUITE + ", p294_b_api_test.py, p21191_a_api_test.py, p2111_b_api_test.py, p2155_b_absence_cal_test.py, p2351_b_contacts_tree_test.py: own calendars, events, address books, contacts (2.351.0: in folders, her agent), the booking page; CalDAV / CardDAV with an app password; "
                     "invitation mails and the subscription link of an own calendar (2.111.0)"),
     "time": ("matrix", SUITE + ", p2116_d_api_test.py: time entries, the timer, habits; focus sessions and habit statistics over the API v1 (2.116.0)"),
@@ -911,6 +912,7 @@ ROUTES = {
     "GET /api/wiki/tags": "wiki", "GET /api/wiki/query": "wiki",  # 2.371 (#3150): tags + the abfrage block (p2371_wiki_tags_test.py)
     # 2.200.0 C (#1781): API v1 (p2200_c_wiki_agent_test.py: her token and her own agent in the private workspace)
     "GET /api/v1/wiki/pages": "wiki", "GET /api/v1/wiki/pages/{}": "wiki", "POST /api/v1/wiki/pages": "wiki", "PATCH /api/v1/wiki/pages/{}": "wiki",
+    "GET /api/v1/wiki/pages/{}/files": "wiki", "GET /api/v1/wiki/files/{}": "wiki", "GET /api/v1/wiki/files/{}/text": "wiki",  # 2.488.0 (#2209)
     # 2.200.0 B (#2747): a page / folder in a folder shared with me (p2200_b_wiki_share_test.py)
     "POST /api/wiki/shared/pages": "wiki", "POST /api/wiki/shared/folders": "wiki",
     # 2.177.0 (#2685): large knowledge ZIP imports in pieces, unpacked in the background (p2177_a_api_test.py)

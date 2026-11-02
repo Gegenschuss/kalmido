@@ -16,10 +16,11 @@ Every read, write and creation by an agent is noted in the history of the page's
 2.200.0 F (#1781, review): the private-page rule and the scopes hold in the file store's API too (wkfolder._hidden, files/v1.py).
 """
 import json
+import os
 
 from flask import g, jsonify
 
-from ..core.config import app
+from ..core.config import app, ATT_DIR
 from ..core.access import Denied, acx_of
 from ..core.db import bump, db, insert_id, iso_ms, now_utc
 from ..core.errors import BadInput, reject_unknown
@@ -33,6 +34,14 @@ from .pages import wiki_body, wiki_clean_path, wiki_insert, wiki_space_key, wiki
 from .wikie2e import wke_mode
 from .wkfolder import WKF_KIND, wkf_base, wkf_folder_path, wkf_locked, wkf_node_of, wkf_role, wkf_shared_ids, wkf_visible_sql
 from .wkhist import wkh_body
+from .wikiatt import SVG, wka_locked, wka_send  # 2.488.0 B (#2209): the files of a page
+from ..core.orgcrypt import OrgCryptError, oc_read_file
+from ..files.scan import sc_guard
+from ..files.textscan import ts_fill
+from ..files.upsafe import up_marks
+from ..tasks.attachments import send_stored
+from ..tasks.attachtext import TEXT_CAP, TEXT_FILE_MB, text_of_bytes
+from ..tasks.validation import as_int
 
 WKV_LIST_MAX = 2000  # pages of one list answer (more = "more": true; narrow it with space)
 WKV_FIELDS_AGENT = ("body", "expect_updated_at")
@@ -118,13 +127,13 @@ def _page(c, r, role, path, names, full=False):
     return d
 
 
-def _log(c, uid, r, action):
+def _log(c, uid, r, action, detail=""):
     """An agent's access in the history of the page's node (people's changes stay in the page history)."""
     if not _is_agent(c, uid):
         return
     n = wkf_node_of(c, r["id"])
     if n is not None:
-        fs_log_add(c, n["id"], action)
+        fs_log_add(c, n["id"], action, detail)  # 2.488.0 B (#2209): + detail (the file's name)
 
 
 def _space_filter(v):
@@ -311,6 +320,82 @@ def wkv_create():
     return jsonify(_page(c, r, role, path, user_names(c, [r["updated_by"]]), full=True)), 201
 
 
+# ---- 2.488.0 B (#2209): the files of a page (PDFs / pictures, wikiatt.py) -- read only; uploading stays in the app
+def _file_need(c, uid, fid):
+    """(file row, page row, role, path) of a page's file for token account uid: the page's own check (wkv_need: shared /
+    own, never a locked space), the file not in the trash, not locked by the virus scan -- else 404 / 403."""
+    f = c.execute("SELECT * FROM wiki_files WHERE id=?", (int(fid),)).fetchone()
+    if f is None or f["deleted_at"]:
+        raise Denied(404)
+    r, role, path = wkv_need(c, uid, f["page_id"])
+    if wka_locked(c, r):
+        raise Denied(404)
+    sc_guard(c, "wiki", f["id"])
+    return f, r, role, path
+
+
+def _file(f, marks=None):
+    d = {"id": f["id"], "page_id": f["page_id"], "name": f["name"], "mime": f["mime"], "size": f["size"],
+         "created_at": f["created_at"], "image": f["mime"].startswith("image/"), "url": f"/api/v1/wiki/files/{f['id']}"}
+    if marks and f["id"] in marks:
+        d["up"] = marks[f["id"]]  # the virus scan's mark, like the other file lists
+    return d
+
+
+@app.get("/api/v1/wiki/pages/<int:pid>/files")
+@v1_view
+def wkv_files(pid):
+    """The files of a page you may read (name, size, type, id, time); fetch one with GET /wiki/files/{id}."""
+    v1_args(())
+    c = db()
+    uid = me()
+    r, _, _ = wkv_need(c, uid, pid)
+    rows = [] if wka_locked(c, r) else c.execute(
+        "SELECT * FROM wiki_files WHERE page_id=? AND deleted_at IS NULL ORDER BY id LIMIT 1000", (r["id"],)).fetchall()
+    marks = up_marks(c, "wiki", [x["id"] for x in rows])
+    _log(c, uid, r, "meta")
+    c.commit()
+    return jsonify(data=[_file(x, marks) for x in rows], next_cursor=None)
+
+
+@app.get("/api/v1/wiki/files/<int:fid>")
+@v1_view
+def wkv_file_get(fid):
+    """The bytes of a page's file (same rights as the page; ?dl=1 always as a download)."""
+    v1_args(("dl", "v"))
+    c = db()
+    uid = me()
+    f, r, _, _ = _file_need(c, uid, fid)
+    _log(c, uid, r, "download", f["name"])
+    c.commit()
+    return wka_send(c, f) if f["mime"] == SVG else send_stored(f)
+
+
+@app.get("/api/v1/wiki/files/<int:fid>/text")
+@v1_view
+def wkv_file_text(fid):
+    """The text of a page's file: the text layer of a PDF (else the text recognised by the scan); a picture points to the file."""
+    a = v1_args(("max_chars",))
+    max_chars = as_int(a.get("max_chars", TEXT_CAP), "max_chars", 1, TEXT_CAP)
+    c = db()
+    uid = me()
+    f, r, _, _ = _file_need(c, uid, fid)
+    base = _file(f)
+    if (f["size"] or 0) > TEXT_FILE_MB * 1024 * 1024:
+        return v1_err(413, tr("{0}: larger than {1} MB", f["name"], TEXT_FILE_MB), name="too_large")
+    try:
+        data = oc_read_file(c, os.path.join(ATT_DIR, f["path"]))
+    except (OSError, OrgCryptError):
+        return v1_err(404, tr("File damaged or missing"))
+    out = text_of_bytes(f["name"], f["mime"], data, max_chars, owner=uid)
+    if out.get("error") == "busy":
+        return v1_err(503, out["message"], headers={"Retry-After": "10"}, name="busy")
+    ts_fill(c, "wiki", f["id"], out, max_chars)
+    _log(c, uid, r, "text", f["name"])
+    c.commit()
+    return jsonify({**base, **out})
+
+
 def wkv_spec(paths, schemas, op, ok, errs, ref, pid, q):
     schemas["WikiPage"] = {"type": "object", "properties": {
         "id": {"type": "integer"},
@@ -349,3 +434,32 @@ def wkv_spec(paths, schemas, op, ok, errs, ref, pid, q):
                         "path": {"type": "string", "description": "People's tokens only: rename / move (the full path)"},
                         "relink": {"type": "boolean", "description": "People's tokens only, with path (default true)"}}},
                     scope="wiki:write", desc="Needs the role edit (403 otherwise). Every save is one entry of the page's history in the app.")}
+    # 2.488.0 B (#2209): the files of a page (PDFs and pictures), read only
+    schemas["WikiFile"] = {"type": "object", "properties": {
+        "id": {"type": "integer"}, "page_id": {"type": "integer"}, "name": {"type": "string"}, "mime": {"type": "string"},
+        "size": {"type": "integer"}, "created_at": {"type": "string"}, "image": {"type": "boolean"},
+        "url": {"type": "string", "description": "GET it for the bytes (/text: the text of a PDF)"},
+        "up": {"type": "string", "description": "Only when the virus scan marked it (unchecked / infected)"}}}
+    fid = pid("id", "File id (from GET /wiki/pages/{id}/files)")
+    fshared = "The same rights as the page (GET /wiki/pages/{id}): a page not shared with you, its file in the trash or a page of an " \
+              "end-to-end encrypted space answers 404; a file the virus scan locked 403."
+    paths["/wiki/pages/{id}/files"] = {
+        "get": op("The files of a knowledge page (2.488.0)", T,
+                  ok({"type": "object", "properties": {"data": {"type": "array", "items": ref("WikiFile")}, "next_cursor": {"type": "string", "nullable": True}}})
+                  | errs("404"), [wid], scope="wiki:read",
+                  desc=shared + " PDFs and pictures (PNG, JPEG, GIF, WebP, SVG) that people uploaded to the page; uploading stays in the app.")}
+    paths["/wiki/files/{id}"] = {
+        "get": op("The bytes of a knowledge page's file (2.488.0)", T,
+                  {"200": {"description": "The file", "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}}
+                  | errs("403", "404", "410"), [fid, q("dl", "1 = download"), q("v", "Cache key (the size)")], scope="wiki:read", desc=fshared)}
+    paths["/wiki/files/{id}/text"] = {
+        "get": op("The text of a knowledge page's file (2.488.0): the text layer of a PDF", T,
+                  ok({"type": "object", "properties": {
+                      "id": {"type": "integer"}, "page_id": {"type": "integer"}, "name": {"type": "string"}, "mime": {"type": "string"},
+                      "kind": {"type": "string", "enum": ["pdf", "text", "image", "other"]}, "text": {"type": ["string", "null"]},
+                      "chars": {"type": "integer"}, "truncated": {"type": "boolean"}, "pages": {"type": "integer"},
+                      "no_text_layer": {"type": "boolean"},
+                      "source": {"type": "string", "enum": ["ocr"], "description": "The text was recognised in the background (scan, photo)"},
+                      "message": {"type": ["string", "null"]}}}) | errs("400", "403", "404", "413", "503"),
+                  [fid, q("max_chars", "At most this many characters (1-200000, default 200000)", {"type": "integer"})],
+                  scope="wiki:read", desc=fshared + " A picture answers kind image (fetch the bytes to look at it).")}

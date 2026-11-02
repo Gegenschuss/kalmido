@@ -225,6 +225,12 @@ def wka_get(fid, name=None):
     sc_guard(c, "wiki", fid)  # 2.61.0 (#1818): a file found infected later stays locked
     if f["mime"] != SVG:
         return send_stored(f)
+    return wka_send(c, f)
+
+
+def wka_send(c, f):
+    """2.488.0 B (#2209, also API v1): a cleaned SVG of a page as a picture in a sandbox (?dl=1 downloads); the caller checked
+    the rights and the scan."""
     full = os.path.join(ATT_DIR, f["path"])
     if not os.path.isfile(full):
         return err(tr("File damaged or missing"), 404)

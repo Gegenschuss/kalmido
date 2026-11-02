@@ -103,7 +103,8 @@ KINDS = {
     # 2.200.0 C (#1781): knowledge pages for agents and tokens (wiki/wkv1.py)
     "wiki_v1": ("matrix", "p2200_c_wiki_agent_test.py: a page of another organisation 404 for the stranger's agent (list, read, write, "
                           "create in its folder), an agent of the same organisation without a share 404, a private page only for the "
-                          "person's own agent, another person's token 404"),
+                          "person's own agent, another person's token 404; 2.488.0: p2488_wiki_files_v1_test.py the files of such a page "
+                          "the same way)"),
     # 2.49.0 (#1199 / #1201): knowledge pages belong to one organisation (every member) or one person (org_id NULL, owner_id)
     "wiki": ("matrix", "p249_c_api_test.py: a page of another organisation / person: 404 (read, change, delete, move, trash, search, export, mentions); "
                        "p299_a_api_test.py: page files (read, upload, delete, trash); p2123_b_api_test.py: shares of pages / folders (list, "
@@ -1000,6 +1001,7 @@ ROUTES = {
     "GET /api/sheets/{}/export.csv": "sheet_v1", "GET /api/sheets/{}/export.xlsx": "sheet_v1", "POST /api/sheets/import": "sheet_v1",
     "GET /api/v1/wiki/pages": "wiki_v1", "GET /api/v1/wiki/pages/{}": "wiki_v1",  # 2.200.0 C (#1781)
     "POST /api/v1/wiki/pages": "wiki_v1", "PATCH /api/v1/wiki/pages/{}": "wiki_v1",
+    "GET /api/v1/wiki/pages/{}/files": "wiki_v1", "GET /api/v1/wiki/files/{}": "wiki_v1", "GET /api/v1/wiki/files/{}/text": "wiki_v1",  # 2.488.0 (#2209)
     "GET /api/v1/sheets": "sheet_v1", "POST /api/v1/sheets": "sheet_v1", "GET /api/v1/sheets/{}": "sheet_v1",
     "PATCH /api/v1/sheets/{}": "sheet_v1", "PUT /api/v1/sheets/{}/cells": "sheet_v1", "POST /api/v1/sheets/{}/rows": "sheet_v1",
     "POST /api/v1/sheets/{}/columns": "sheet_v1", "GET /api/v1/sheets/{}/vars": "sheet_v1",

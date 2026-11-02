@@ -4100,8 +4100,14 @@ folders above it. A person's own token sees what the person sees in the app (ful
 (from `wiki_read`): when a person saved in between the answer is `409` with the current page in `error.page` - merge and
 send again. Every save is one entry of the page's history (the people restore an older text there). A new page
 (`wiki_create`) needs a knowledge folder shared with the agent to edit (`folder_id`: the folder's id from `list_files`);
-`409` when a page of that name is already there. Renaming, moving, the trash, files of pages, shares, export / import and
-the encryption stay with people in the app. No event is sent; every read, save and new page of an agent is noted in the
+`409` when a page of that name is already there. Renaming, moving, the trash, uploading / removing files of pages, shares,
+export / import and the encryption stay with people in the app.
+
+**Files of a page (2.488.0).** With `wiki:read` an agent lists the files people uploaded to a page shared with it (PDFs and
+pictures: `wiki_files` = id, name, mime, size, created_at, image) and reads one (`wiki_read_file`: as text by default - a
+PDF's text layer, the recognised text of a scan - or as base64; a picture comes back as an image to look at). The same rights
+as the page: a page not shared with the agent, a file in the trash or an encrypted space answer `404`, a file the virus scan
+locked `403`. Every list and read is noted in the history of the page's node. No event is sent; every read, save and new page of an agent is noted in the
 history of the page's node (like files; a list is not). A token with `wiki:write` but without `wiki:read` gets no text back
 (no `body` / `attrs`, also not in `error.page`). A person's token whose edit comes only from a share changes the text,
 not `path` / `relink` (`403`).
@@ -4112,6 +4118,8 @@ not `path` / `relink` (`403`).
 | One page with its Markdown text | `GET /api/v1/wiki/pages/{id}` | `wiki_read` | wiki:read |
 | Change a page's text | `PATCH /api/v1/wiki/pages/{id}` | `wiki_write` | wiki:write |
 | A new page in a shared folder | `POST /api/v1/wiki/pages` | `wiki_create` | wiki:write |
+| The files of a page (2.488.0) | `GET /api/v1/wiki/pages/{id}/files` | `wiki_files` | wiki:read |
+| One file's bytes / text (2.488.0) | `GET /api/v1/wiki/files/{id}`, `GET /api/v1/wiki/files/{id}/text` | `wiki_read_file` | wiki:read |
 
 In the file store (`/api/v1/files`) the same pages are nodes of `kind: "ref"`, `ref_kind: "wiki"` in the knowledge
 folders shared with the agent - under the same rules: a knowledge folder, its listing and a page's `content` / `text` need

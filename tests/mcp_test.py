@@ -24,7 +24,8 @@ REQS = []
 PNG = b"\x89PNG\r\n\x1a\n" + b"x" * 40
 BIN = {"/api/v1/attachments/5": ("image/png", PNG, "Bildschirmfoto 1.png"),
        "/api/v1/chat-attachments/9": ("text/plain; charset=utf-8", b"hello log", "log.txt"),
-       "/api/v1/attachments/6": ("application/pdf", b"%PDF" + b"0" * 100, "big.pdf")}
+       "/api/v1/attachments/6": ("application/pdf", b"%PDF" + b"0" * 100, "big.pdf"),
+       "/api/v1/wiki/files/11": ("image/png", PNG, "Sketch.png"), "/api/v1/wiki/files/12": ("application/pdf", b"%PDF-1.4 x", "Offer.pdf")}
 
 
 class Stub(BaseHTTPRequestHandler):
@@ -54,6 +55,9 @@ class Stub(BaseHTTPRequestHandler):
                              "parent_id": None, "status": "open", "due": None, "due_time": None, "priority": "none", "tags": [],
                              "list_tags": [], "assignee_id": None, "created_at": "2026-09-30T00:00:00Z"} for i in range(1, n + 1)],
                    "next_cursor": None}
+        elif u.path in ("/api/v1/wiki/files/11/text", "/api/v1/wiki/files/12/text"):  # 2.488.0 (#2209)
+            out = {"id": 11, "name": "Sketch.png", "size": len(PNG), "kind": "image", "text": None} if "/11/" in u.path else \
+                {"id": 12, "name": "Offer.pdf", "kind": "pdf", "text": "Offer for the shoot", "chars": 19}
         elif u.path == "/api/v1/agent/events":
             out = {"data": [], "cursor": int(q.get("since", 0)), "has_more": False}
         # 2.13.1 (#465): binary answers for get_attachment
@@ -274,6 +278,21 @@ check(res["isError"] is False and rq["p"] == "/api/v1/agent/chats/1" and rq["b"]
       and b'name="file"; filename="a.png"\r\nContent-Type: image/png' in rq["b"]["multipart"] and PNG in rq["b"]["multipart"],
       "send_chat with files -> multipart (body, task_id, file)")
 check(call(s, "send_chat", {"user_id": 1, "files": [{"name": "x", "base64": "%%%"}]})["isError"] is True, "send_chat: bad base64 -> isError")
+# 2.488.0 (#2209): wiki_files lists a page's files; wiki_read_file reads one as text (a PDF) or the bytes (a picture: an image item)
+res = call(s, "wiki_files", {"page_id": 4})
+check(res["isError"] is False and last()["p"] == "/api/v1/wiki/pages/4/files" and last()["m"] == "GET", "wiki_files: GET /wiki/pages/4/files")
+res = call(s, "wiki_read_file", {"file_id": 12, "max_chars": 500})
+check(res["isError"] is False and last()["p"] == "/api/v1/wiki/files/12/text" and last()["q"] == {"max_chars": "500"}
+      and res["structuredContent"].get("text") == "Offer for the shoot", "wiki_read_file: a PDF as text (GET /wiki/files/12/text)")
+res = call(s, "wiki_read_file", {"file_id": 11})
+check(res["isError"] is False and [r["p"] for r in REQS[-2:]] == ["/api/v1/wiki/files/11/text", "/api/v1/wiki/files/11"]
+      and base64.b64decode(res["structuredContent"]["base64"]) == PNG and res["content"][1]["type"] == "image"
+      and res["content"][1]["mimeType"] == "image/png", "wiki_read_file: a picture comes back as an image item")
+res = call(s, "wiki_read_file", {"file_id": 12, "as": "base64"})
+check(res["isError"] is False and last()["p"] == "/api/v1/wiki/files/12" and res["structuredContent"]["mime"] == "application/pdf"
+      and base64.b64decode(res["structuredContent"]["base64"]) == b"%PDF-1.4 x" and [x["type"] for x in res["content"]] == ["text", "text"],
+      "wiki_read_file as base64: the PDF's bytes, no image item")
+check(call(s, "wiki_read_file", {"file_id": 11, "as": "base64", "max_bytes": 10})["isError"] is True, "wiki_read_file: over max_bytes -> isError")
 check(call(s, "send_chat", {"user_id": 1})["isError"] is True, "send_chat: neither body nor files -> isError")
 
 # 2.0.8 list_tasks compact: true -> fields=compact; not given -> full up to 25, compact above; false -> always full
