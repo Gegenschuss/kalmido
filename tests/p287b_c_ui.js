@@ -62,7 +62,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients';
     check(await ev(`[...document.querySelectorAll('#side [data-ofmg] .sgt > span:not(.c)')].map(g => g.textContent.trim()).join('|') === 'Sell|Money|Administration'`), '#1917: the group names');  // 2.98.0 (#2180)  // 2.152.2 (#2617): the office points sit in the panel #side
     const pts = await ev(`[...document.querySelectorAll('#side [data-ofmg]')].map(g => g.dataset.ofmg + ':' + [...g.querySelectorAll('[data-ofm]')].map(b => b.dataset.ofm).join('+')).join(' ')`);  // 2.152.2 (#2617): the office points sit in the panel #side
     // 2.161.2 (#2616): Documents follow Quotations & invoices; 2.380.0 (#3409): Quotations + Invoices are two points
-    check(pts === 'sell:pipeline+offers+invoices+gendocs+clients+contacts+contracts+letters money:receipts+cashflow+kpi+bank+cards+books+subs+travel+meals+cashbook admin:equipment+agreements+settings', '#1917: the points of each group ' + pts);  // 2.153.0 (#2028): + letters (correspondence) under Sell  // 2.121.0 (#2095): + cashbook under Money  // 2.119.0 (#2288): + meals (entertainment receipts) under Money  // 2.98.0 (#2180): contracts -> Sell, travel -> Money, services + text blocks under Settings  // 2.92.1: + the tabs of 2.90-2.92; 2.93.0 (#1927): + Documents (gendocs) under Sell
+    check(pts === 'sell:pipeline+offers+invoices+gendocs+clients+contracts+letters money:receipts+cashflow+kpi+bank+cards+books+subs+travel+meals+cashbook admin:equipment+agreements+settings book:contacts', '#1917: the points of each group ' + pts);  // 2.153.0 (#2028): + letters (correspondence) under Sell  // 2.121.0 (#2095): + cashbook under Money  // 2.119.0 (#2288): + meals (entertainment receipts) under Money  // 2.98.0 (#2180): contracts -> Sell, travel -> Money, services + text blocks under Settings  // 2.92.1: + the tabs of 2.90-2.92; 2.93.0 (#1927): + Documents (gendocs) under Sell  // 2.489.0 (#2664): the address book is an entry of its own (group book), no point of Sell
     check(await ev(`!document.querySelector('.ofctabs') && !document.querySelector('#view .mgtabs')`), '#1917: no old tab rows');
     check(await ev(`!document.querySelector('#view .ofrail') && document.querySelector('#srail [data-sbb="office"]')?.getAttribute('aria-current') === 'page'`), '#1917: the menu stays: no rail in the page, the bar marks the area Office');  // 2.152.2 (#2617 #2622): no sticky rail, the panel #side + the bar #srail
     check(await ev(`(() => { const on = document.querySelector('#side [data-ofm][aria-current="page"]'), off = document.querySelector('#side [data-ofm="equipment"]'); return on?.dataset.ofm === 'offers' && !!on.closest('.on') && getComputedStyle(on).color !== getComputedStyle(off).color; })()`), '#1917: the point shown in the accent');  // 2.351.1: since 2.351.0 A (#3312) Quotations & invoices is a tree node: .on sits on its row  // 2.98.0 (#2180): the rail  // 2.152.2 (#2617): the office points sit in the panel #side
@@ -82,7 +82,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients';
     await nav(B + 'static/icon.svg');
     await nav(B + '#office');
     // 2.98.0 (#2180): the start page lists the three groups (one card each) instead of four tiles
-    check(await ready(ev, `document.querySelectorAll('#view .ofmstart .oflg').length === 3`, 80), '#1917 phone: the start page with the groups');
+    check(await ready(ev, `document.querySelectorAll('#view .ofmstart .oflg').length === 4` /* 2.489.0 (#2664): + the address book, an entry of its own */, 80), '#1917 phone: the start page with the groups');
     check(await ev(`!document.querySelector('#view .ofrail') && !document.querySelector('#view .ofpb')`), '#1917 phone: the list is the menu');
     check(await ready(ev, `!!document.querySelector('#view .ofmstart .ofmfig .kptl')`, 40), '#1917 phone: the figures above the groups (admin)');
     check(await ev(`[...document.querySelectorAll('#view .oflc .oflr')].every(b => b.getBoundingClientRect().height >= 43)`), '#1917 phone: large tap targets');  // 2.98.0 (#2180)
@@ -95,9 +95,9 @@ const FEAT = 'cal,comments,collab,contacts,office,clients';
     check(await ev(noSide), '#1917 phone: nothing sticks out to the side (cash flow)');
     await shot('p287b-c-cashflow-phone.png');
     await click(ev, '#view .ofpb .ofpback');  // 2.98.0 (#2180)
-    check(await ready(ev, `location.hash === '#office/start' && document.querySelectorAll('#view .oflg').length === 3`, 60), '#1917 phone: the path leads back to the tiles');
+    check(await ready(ev, `location.hash === '#office/start' && document.querySelectorAll('#view .oflg').length === 4` /* 2.489.0 (#2664): + the address book, an entry of its own */, 60), '#1917 phone: the path leads back to the tiles');
     await click(ev, '#view .oflc [data-ofm="contacts"]');
-    check(await ready(ev, `location.hash === '#contacts' && /Office\\s*·\\s*Sell/.test(document.querySelector('#view .ofpb .ofpback')?.textContent || '')`, 60), '#1917 phone: Contacts under Office · Sell');
+    check(await ready(ev, `location.hash === '#contacts' && /Office\\s*·\\s*Address book/.test(document.querySelector('#view .ofpb .ofpback')?.textContent || '')`, 60), '#1917 phone: Contacts under Office · Address book (2.489.0 #2664: no point of Sell)');
     // ================= member of an organisation
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await signIn(ev, 'bob');
