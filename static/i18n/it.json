@@ -15982,5 +15982,18 @@
   "{0} tasks completed in the period": "{0} attività completate nel periodo",
   "Locked project: only open and done count, no columns.": "Progetto cifrato: solo aperte e completate, senza colonne.",
   "Cycle time counts from a column named “In Arbeit”, “In progress”, “Doing” or “WIP”.": "Il tempo di ciclo conta da una colonna chiamata «In Arbeit», «In progress», «Doing» o «WIP».",
-  "Only the newest {0} tasks are counted.": "Contano solo le {0} attività più recenti."
+  "Only the newest {0} tasks are counted.": "Contano solo le {0} attività più recenti.",
+  "Reply to #{0}, sender not allowed": "Risposta a #{0}, mittente non autorizzato",
+  "By e-mail from {0}": "Per e-mail da {0}",
+  "mail_reporter: true or false": "mail_reporter: true o false",
+  "No e-mail from a list with end-to-end encryption": "Nessuna e-mail da un progetto con crittografia end-to-end",
+  "This task has no reporter by e-mail": "Questa attività non ha un mittente per e-mail",
+  "Only people who may change the task answer the reporter": "Solo chi può modificare l'attività risponde al mittente",
+  "Sending e-mails is not set up on this server": "L'invio di e-mail non è configurato su questo server",
+  "Only a text goes to the reporter by e-mail": "Al mittente va solo un testo per e-mail",
+  "Answer the reporter of the task “{0}” by e-mail": "Rispondere per e-mail al mittente dell'attività «{0}»",
+  "The reporter gets this comment by e-mail: {0}": "Il mittente riceve questo commento per e-mail: {0}",
+  "Also by e-mail to the reporter": "Anche per e-mail al mittente",
+  "Sent to the reporter by e-mail": "Inviato al mittente per e-mail",
+  "The comment is saved, but the e-mail to the reporter was not sent": "Il commento è salvato, ma l'e-mail al mittente non è stata inviata"
 }

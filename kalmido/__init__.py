@@ -415,6 +415,7 @@ ORDER = (
     "accounts.secmail",  # 2.266.0 (#2963): security mails to the person (registers its background mail job)
     "accounts.discover",  # 2.49.0 (#1106): finding people by e-mail, connection requests
     "admin.hosting",
+    "integrations.taskmail",  # 2.393.2 B (#3375): replies by e-mail become comments, answers to the reporter
     "admin.clientip",  # 2.33.0 (#834)
     "tasks.stale",  # 2.34.0 (#266)
     "personal.timegaps",  # 2.34.0 (#269)

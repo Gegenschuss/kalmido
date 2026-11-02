@@ -29,6 +29,7 @@ from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up f
 # Deleted comments disappear (soft delete: body, mentions and files are wiped).
 # Mentions are stored as <@user_id> tokens (+ comments.mentions); only people who see the task count.
 MAX_COMMENT = 10000
+MAIL_REPLY = {}  # 2.393.2 B (#3375): integrations/taskmail.py (info / check / send of "also by e-mail to the reporter")
 MENTION_RE = re.compile(r"<@(\d+)>")
 
 
@@ -202,6 +203,7 @@ def timeline(tid):
                    can_write=task_visible(c, tid, me(), write=True),
                    approver=is_approver(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), me()),  # 2.2.0 (#339)
                    ticket=pt_ticket_info(c, tid, me()),  # 2.63.0 B (#1513): a customer's report (box in the task panel)
+                   mail_reporter=MAIL_REPLY["info"](c, tid, me()) if MAIL_REPLY else None,  # 2.393.2 B (#3375)
                    decisions=dec_list(c, tid),  # 2.392.0 C (#3370): the section at the top of the task panel
                    may_yes=is_approver(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), me(), assignee=False))  # who gives the yes to a one-way task
 
@@ -224,7 +226,7 @@ def timeline_seen(tid):
 def comment_input():
     """(text, files) from a JSON body or a multipart form (comment with files)."""
     if request.files or request.form:
-        web_fields({k: 1 for k in [*request.form, *request.files]}, {"body", "file", "reply_to", "portal", "client_ref"}, "POST /api/tasks/{tid}/comments (form)")
+        web_fields({k: 1 for k in [*request.form, *request.files]}, {"body", "file", "reply_to", "portal", "client_ref", "mail_reporter"}, "POST /api/tasks/{tid}/comments (form)")
         return (request.form.get("body") or "").strip(), [f for f in request.files.getlist("file") if f and f.filename]
     web_fields(body(), WEB_COMMENT, "POST /api/tasks/{tid}/comments")
     return (body().get("body") or "").strip(), []
@@ -333,6 +335,13 @@ def comment_create(tid):
         return err(str(e))
     if portal and (sug or chs):  # 2.63.0 B (#1513): the customer sees text (and the files are not shown to them)
         return err(tr("Suggestions and answer buttons cannot go to a client"))
+    mrep = request.form.get("mail_reporter") if (request.files or request.form) else body().get("mail_reporter")
+    try:  # 2.393.2 B (#3375): "also by e-mail to the reporter" (people who may change the task, never a list with the lock)
+        mrep = MAIL_REPLY["check"](c, tid, me(), mrep) if MAIL_REPLY else False
+    except ValueError as e:
+        return err(str(e))
+    if mrep and (sug or chs):  # the files of the comment stay in Kalmido (the mail carries the text)
+        return err(tr("Only a text goes to the reporter by e-mail"))
     cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at,suggestion,reply_to,choices,portal,client_ref) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (tid, me(), text, ",".join(map(str, mentions)), iso_ms(now_utc()),
                      json.dumps(sug, ensure_ascii=False) if sug else None, orig["id"] if orig else None, chs, portal, ref))
@@ -364,8 +373,10 @@ def comment_create(tid):
     c.commit()
     send_pushes(pushes)
     hint = GIT_COMMENT_CMD[0](c, t, text) if not portal else None  # 2.392.0 B (#3364): "partly: rest in Y" in the first line
+    sent = MAIL_REPLY["send"](c, tid, me(), cid) if mrep else None  # 2.393.2 B (#3375): '' = sent, else an error code
     r = comment_answer(c, tid, c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone())
-    return jsonify({**r.get_json(), "partial": hint}) if hint else r
+    extra = {**({"partial": hint} if hint else {}), **({"mail_reporter": sent or "sent"} if mrep else {})}
+    return jsonify({**r.get_json(), **extra}) if extra else r
 
 
 @app.patch("/api/comments/<int:cid>")

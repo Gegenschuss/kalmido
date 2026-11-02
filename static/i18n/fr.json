@@ -15982,5 +15982,18 @@
   "{0} tasks completed in the period": "{0} tâches terminées sur la période",
   "Locked project: only open and done count, no columns.": "Projet chiffré : seulement ouvertes et terminées, sans colonnes.",
   "Cycle time counts from a column named “In Arbeit”, “In progress”, “Doing” or “WIP”.": "Le temps de cycle compte à partir d’une colonne nommée « In Arbeit », « In progress », « Doing » ou « WIP ».",
-  "Only the newest {0} tasks are counted.": "Seules les {0} tâches les plus récentes comptent."
+  "Only the newest {0} tasks are counted.": "Seules les {0} tâches les plus récentes comptent.",
+  "Reply to #{0}, sender not allowed": "Réponse à #{0}, expéditeur non autorisé",
+  "By e-mail from {0}": "Par e-mail de {0}",
+  "mail_reporter: true or false": "mail_reporter : true ou false",
+  "No e-mail from a list with end-to-end encryption": "Pas d'e-mail depuis un projet chiffré de bout en bout",
+  "This task has no reporter by e-mail": "Cette tâche n'a pas d'expéditeur par e-mail",
+  "Only people who may change the task answer the reporter": "Seules les personnes pouvant modifier la tâche répondent à l'expéditeur",
+  "Sending e-mails is not set up on this server": "L'envoi d'e-mails n'est pas configuré sur ce serveur",
+  "Only a text goes to the reporter by e-mail": "Seul un texte part par e-mail à l'expéditeur",
+  "Answer the reporter of the task “{0}” by e-mail": "Répondre par e-mail à l'expéditeur de la tâche « {0} »",
+  "The reporter gets this comment by e-mail: {0}": "L'expéditeur reçoit ce commentaire par e-mail : {0}",
+  "Also by e-mail to the reporter": "Aussi par e-mail à l'expéditeur",
+  "Sent to the reporter by e-mail": "Envoyé par e-mail à l'expéditeur",
+  "The comment is saved, but the e-mail to the reporter was not sent": "Le commentaire est enregistré, mais l'e-mail à l'expéditeur n'est pas parti"
 }

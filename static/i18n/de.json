@@ -15982,5 +15982,18 @@
   "{0} tasks completed in the period": "{0} Aufgaben im Zeitraum erledigt",
   "Locked project: only open and done count, no columns.": "Verschlüsseltes Projekt: nur offen und erledigt, keine Spalten.",
   "Cycle time counts from a column named “In Arbeit”, “In progress”, “Doing” or “WIP”.": "Die Zykluszeit zählt ab einer Spalte namens „In Arbeit“, „In progress“, „Doing“ oder „WIP“.",
-  "Only the newest {0} tasks are counted.": "Nur die neuesten {0} Aufgaben zählen."
+  "Only the newest {0} tasks are counted.": "Nur die neuesten {0} Aufgaben zählen.",
+  "Reply to #{0}, sender not allowed": "Antwort auf #{0}, Absender nicht berechtigt",
+  "By e-mail from {0}": "Per Mail von {0}",
+  "mail_reporter: true or false": "mail_reporter: true oder false",
+  "No e-mail from a list with end-to-end encryption": "Keine Mail aus einem Projekt mit Ende-zu-Ende-Verschlüsselung",
+  "This task has no reporter by e-mail": "Diese Aufgabe hat keinen Melder per Mail",
+  "Only people who may change the task answer the reporter": "Nur wer die Aufgabe ändern darf, antwortet dem Melder",
+  "Sending e-mails is not set up on this server": "Der Mailversand ist auf diesem Server nicht eingerichtet",
+  "Only a text goes to the reporter by e-mail": "Per Mail an den Melder geht nur ein Text",
+  "Answer the reporter of the task “{0}” by e-mail": "Dem Melder der Aufgabe „{0}“ per Mail antworten",
+  "The reporter gets this comment by e-mail: {0}": "Der Melder bekommt diesen Kommentar per Mail: {0}",
+  "Also by e-mail to the reporter": "Auch per Mail an den Melder",
+  "Sent to the reporter by e-mail": "Per Mail an den Melder geschickt",
+  "The comment is saved, but the e-mail to the reporter was not sent": "Der Kommentar ist gespeichert, die Mail an den Melder ging aber nicht raus"
 }

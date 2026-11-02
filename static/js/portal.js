@@ -28,6 +28,7 @@ function ptl_draw() {
   const t = taskById(S.sel); if (!t) return;
   const b = $('#d-ptl'); if (b) b.innerHTML = ptl_boxHtml(t);
   const w = $('#c-ptl'); if (w) w.innerHTML = ptl_switchHtml(t);
+  const m = $('#c-mrep'); if (m) m.innerHTML = mrep_switchHtml(t);  // 2.393.2 B (#3375)
 }
 // sendComment: the flag of the comment being sent (then the switch goes back to internal)
 function ptl_take(tid) { const on = !!PTL.on[tid] && !!S.tl.ticket && S.tl.id === tid; delete PTL.on[tid]; return on; }
@@ -50,3 +51,18 @@ function ptl_clientHtml(c) {
   const row = k => `<li><a class="linkbtn" href="#t/${k.task_id}">${ic('megaphone', 's')} ${esc(k.title)}</a><span class="muted"> · ${esc(fmtDayAbs(k.created_at.slice(0, 10)))} · ${k.done ? tr('Done') : tr('Open|report')}</span></li>`;
   return `<div class="ctsec"><h4>${tr('Client reports')}</h4><ul class="ctlinks ptlcl">${[...ks.filter(k => !k.done), ...ks.filter(k => k.done)].map(row).join('')}</ul></div>`;
 }
+
+// 2.393.2 B (#3375): a task that came in by e-mail has a reporter (GET /timeline: mail_reporter {address, may, e2e}): the
+// composer's switch "Also by e-mail to the reporter" (off by default, back off after each comment; people who may change the
+// task, hidden in a list with the lock and on a task with a client report, whose own switch answers the client)
+const MREP = {on: {}};
+function mrep_switchHtml(t) {
+  const k = t && S.tl.id === t.id ? S.tl.mail_reporter : null; if (!k || !k.may || ptl_ticket(t)) return '';
+  return `<label class="chkl mrepsw" title="${esc(tr('The reporter gets this comment by e-mail: {0}', k.address))}"><input type="checkbox" data-mrep="switch" ${MREP.on[t.id] ? 'checked' : ''}> ${tr('Also by e-mail to the reporter')}</label>`;
+}
+function mrep_take(tid) { const on = !!MREP.on[tid] && S.tl.id === tid && !!S.tl.mail_reporter?.may; delete MREP.on[tid]; return on; }
+function mrep_done(v) { toast(!v || v === 'sent' ? tr('Sent to the reporter by e-mail') : tr('The comment is saved, but the e-mail to the reporter was not sent')); }
+document.addEventListener('change', e => {
+  const b = e.target.closest('[data-mrep="switch"]'); if (!b || !S.sel) return;
+  MREP.on[S.sel] = b.checked;
+});

@@ -838,7 +838,7 @@ function cmComposer(t, top = false) {  // top: 2.4.2 (#386) newest first, the bo
   return `<div class="dcomp ${top ? 'dctop' : ''}">${replyBarHtml('c:' + t.id)}<div class="ccomp ${used ? 'used' : ''}"><textarea id="c-input" rows="1" name="kalmido-comment" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${soc ? tr('Write a comment… (@ mentions someone)') : tr('Write a comment…')}" aria-label="${tr('Comment')}">${esc(S.drafts[t.id] || '')}</textarea>
       <div class="mpick hidden"></div>
       <div class="cfiles" id="c-files">${composerFiles(t.id)}</div>
-      <div class="cbar"><label class="iconbtn" title="${tr('Attach files')}">${ic('clip', 's')}<input type="file" id="c-file" multiple hidden></label>${typeof rf_btnHtml === 'function' ? rf_btnHtml('c') : '' /* 2.53.0 (#1449) */}<span class="muted chint">${esc(chatKeyHintVis())}</span><span class="spacer"></span><span id="c-ptl">${typeof ptl_switchHtml === 'function' ? ptl_switchHtml(t) : '' /* 2.63.0 B (#1513) */}</span><button class="btn sm pri" data-act="c-send">${ic('send', 's')} ${tr('Send')}</button></div></div></div>`;
+      <div class="cbar"><label class="iconbtn" title="${tr('Attach files')}">${ic('clip', 's')}<input type="file" id="c-file" multiple hidden></label>${typeof rf_btnHtml === 'function' ? rf_btnHtml('c') : '' /* 2.53.0 (#1449) */}<span class="muted chint">${esc(chatKeyHintVis())}</span><span class="spacer"></span><span id="c-ptl">${typeof ptl_switchHtml === 'function' ? ptl_switchHtml(t) : '' /* 2.63.0 B (#1513) */}</span><span id="c-mrep">${typeof mrep_switchHtml === 'function' ? mrep_switchHtml(t) : '' /* 2.393.2 B (#3375) */}</span><button class="btn sm pri" data-act="c-send">${ic('send', 's')} ${tr('Send')}</button></div></div></div>`;
 }
 function drawTimeline() {
   if (S.tl.id !== S.sel) return;
@@ -902,17 +902,18 @@ async function sendComment() {
   const text = encodeMentions(raw, S.tl.id === tid ? S.tl.people : []);
   const rto = replyTo('c:' + tid);  // 2.33.0 (#1076)
   const pub = typeof ptl_take === 'function' && ptl_take(tid);  // 2.63.0 B (#1513): "To the customer"
-  let payload = {body: text, ...(rto ? {reply_to: rto} : {}), ...(pub ? {portal: true} : {})};
+  const mrep = typeof mrep_take === 'function' && mrep_take(tid);  // 2.393.2 B (#3375): "Also by e-mail to the reporter"
+  let payload = {body: text, ...(rto ? {reply_to: rto} : {}), ...(pub ? {portal: true} : {}), ...(mrep ? {mail_reporter: true} : {})};
   // 2.64.2 B (#1817): in a list with the lock the files go encrypted with the list key (names as list ciphers)
   let lf = null;
   if (files.length && typeof le2eFileParts === 'function') { try { lf = await le2eFileParts(taskById(tid)?.list_id, files); } catch (x) { toast(x.message); return; } }
-  if (files.length) { payload = new FormData(); payload.append('body', text); if (rto) payload.append('reply_to', rto); if (pub) payload.append('portal', '1'); if (lf) lf.forEach(p => { payload.append('file', p.blob, 'encrypted.kenc'); payload.append('le2e_name', p.name); }); else files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
+  if (files.length) { payload = new FormData(); payload.append('body', text); if (rto) payload.append('reply_to', rto); if (pub) payload.append('portal', '1'); if (mrep) payload.append('mail_reporter', '1'); if (lf) lf.forEach(p => { payload.append('file', p.blob, 'encrypted.kenc'); payload.append('le2e_name', p.name); }); else files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
   // 2.370.2 (#3088): the same text sent again after a failed answer = the same comment
   const cr = CMT_REF[tid]?.text === raw ? CMT_REF[tid] : (CMT_REF[tid] = {text: raw, ref: Date.now().toString(36) + Math.random().toString(36).slice(2, 10)});
   if (payload instanceof FormData) payload.append('client_ref', cr.ref); else payload.client_ref = cr.ref;
   const btn = $('[data-act="c-send"]'); if (btn) btn.disabled = true;
-  try { const r = await capi('POST', `/api/tasks/${tid}/comments`, payload); if (r?.partial) { toast(r.partial.reason || tr('Saved')); if (r.partial.applied) { await load(); render(); } } }  // 2.392.0 B (#3364): "partly: rest in Y"
-  catch { if (pub) { PTL.on[tid] = true; ptl_draw(); } return; }
+  try { const r = await capi('POST', `/api/tasks/${tid}/comments`, payload); if (r?.partial) { toast(r.partial.reason || tr('Saved')); if (r.partial.applied) { await load(); render(); } } if (mrep) mrep_done(r?.mail_reporter); }  // 2.392.0 B (#3364): "partly: rest in Y"
+  catch { if (pub) { PTL.on[tid] = true; ptl_draw(); } if (mrep) { MREP.on[tid] = true; ptl_draw(); } return; }
   finally { if (btn) btn.disabled = false; }
   delete CMT_REF[tid];
   delete S.drafts[tid]; delete S.cfiles[tid]; replySent('c:' + tid);

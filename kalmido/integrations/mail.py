@@ -225,6 +225,9 @@ def mail_target(c, msg):
     return None, None
 
 
+MAIL_TASK_HOOK = {}  # 2.393.2 B (#3375): integrations/taskmail.py (take = a reply becomes a comment, keep = store a Message-ID)
+
+
 class _MailDrop:
     """2.240.0 A (#2883): an importer's answer "for nobody / already imported": falsy, but the mail may be deleted."""
     def __bool__(self):
@@ -262,6 +265,15 @@ def mail_import(c, raw, pre=None):
     if c.execute("SELECT 1 FROM tasks WHERE tt_id=?", ("mail:" + mid,)).fetchone():
         return MAIL_DROP
     uid, lid = mail_target(c, msg)
+    hint = ""
+    if MAIL_TASK_HOOK and not mid.startswith("sha:"):  # 2.393.2 B (#3375): a reply to a task -> its comment (or a note)
+        if c.execute("SELECT 1 FROM task_mail WHERE msg_id=? AND kind='in'", (mid,)).fetchone():
+            return MAIL_DROP
+        how, val = MAIL_TASK_HOOK["take"](c, msg, mid, uid)
+        if how == "comment":
+            c.commit()
+            return val
+        hint = val
     if not uid:
         return MAIL_DROP
     subj = MAIL_PREFIX_RE.sub("", str(msg.get("Subject", "")).replace("\n", " ")).strip()
@@ -278,6 +290,8 @@ def mail_import(c, raw, pre=None):
     sender = str(msg.get("From", "")).strip()
     title = subj or (text.split("\n", 1)[0][:120] if text else tr("E-mail", lg=lg))
     content = (text + "\n\n" if text else "") + f"— {tr('E-mail from {0}', sender, lg=lg)}" if sender else text
+    if hint:  # 2.393.2 B (#3375): "Reply to #N, sender not allowed"
+        content = (content + "\n\n" if content else "") + "— " + hint
     title, content, url = split_link(title, content)
     if lid:
         ts = iso(now_utc())
@@ -289,6 +303,8 @@ def mail_import(c, raw, pre=None):
         agent_added_events(c, tid, source="mail")  # 2.23.0 (#795)
     else:
         tid = new_inbox_task(c, uid, title, content, "mail:" + mid, url)
+    if MAIL_TASK_HOOK and not mid.startswith("sha:"):  # 2.393.2 B (#3375): the reporter + the Message-ID of the mail
+        MAIL_TASK_HOOK["keep"](c, tid, mid, email.utils.parseaddr(sender)[1].strip().lower(), "in")
     if eml is not None:
         files = [((subj[:60].replace("/", "-").strip() or "mail") + ".eml", "message/rfc822", eml)] + files
     whole = len(files) <= 20

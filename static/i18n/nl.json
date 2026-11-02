@@ -15982,5 +15982,18 @@
   "{0} tasks completed in the period": "{0} taken afgerond in de periode",
   "Locked project: only open and done count, no columns.": "Versleuteld project: alleen open en afgerond, geen kolommen.",
   "Cycle time counts from a column named “In Arbeit”, “In progress”, “Doing” or “WIP”.": "De cyclustijd telt vanaf een kolom met de naam ‘In Arbeit’, ‘In progress’, ‘Doing’ of ‘WIP’.",
-  "Only the newest {0} tasks are counted.": "Alleen de nieuwste {0} taken tellen."
+  "Only the newest {0} tasks are counted.": "Alleen de nieuwste {0} taken tellen.",
+  "Reply to #{0}, sender not allowed": "Antwoord op #{0}, afzender niet toegestaan",
+  "By e-mail from {0}": "Per e-mail van {0}",
+  "mail_reporter: true or false": "mail_reporter: true of false",
+  "No e-mail from a list with end-to-end encryption": "Geen e-mail vanuit een project met end-to-end-versleuteling",
+  "This task has no reporter by e-mail": "Deze taak heeft geen melder per e-mail",
+  "Only people who may change the task answer the reporter": "Alleen wie de taak mag wijzigen, antwoordt de melder",
+  "Sending e-mails is not set up on this server": "E-mail verzenden is op deze server niet ingesteld",
+  "Only a text goes to the reporter by e-mail": "Alleen een tekst gaat per e-mail naar de melder",
+  "Answer the reporter of the task “{0}” by e-mail": "De melder van de taak ‘{0}’ per e-mail antwoorden",
+  "The reporter gets this comment by e-mail: {0}": "De melder krijgt deze opmerking per e-mail: {0}",
+  "Also by e-mail to the reporter": "Ook per e-mail naar de melder",
+  "Sent to the reporter by e-mail": "Per e-mail naar de melder gestuurd",
+  "The comment is saved, but the e-mail to the reporter was not sent": "De opmerking is opgeslagen, maar de e-mail naar de melder is niet verstuurd"
 }

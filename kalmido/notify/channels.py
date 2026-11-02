@@ -816,7 +816,7 @@ def evm_line(kind, who, title, lg):
 def evm_user(c, uid, s, lg, now):
     from ..admin.hosting import mail_budget
     from ..collab.liste2e import le2e_mode, le2e_neutral
-    from ..integrations.mail import MAIL_OUT_ON, mail_off_url, mail_send
+    from ..integrations.mail import MAIL_OUT_ON, MAIL_TASK_HOOK, mail_off_url, mail_send
     if time.time() - float(s.get("evmail_at") or 0) < EVM_GAP:
         return
     q = c.execute("SELECT * FROM notify_mail_queue WHERE user_id=? ORDER BY id", (uid,)).fetchall()
@@ -833,7 +833,7 @@ def evm_user(c, uid, s, lg, now):
         c.commit()
         return
     names = user_names(c, list({x["actor_id"] for x in q if x["actor_id"]}))
-    lines, seen = [], set()
+    lines, seen, tids = [], set(), set()
     for x in q:
         if (x["kind"], x["task_id"] or x["comment_id"]) in seen or not evm_wanted(c, uid, s, x["kind"]):
             continue
@@ -853,6 +853,8 @@ def evm_user(c, uid, s, lg, now):
         lname = tr("Basket", lg=lg) if t["is_inbox"] and inbox_default(t["lname"]) else t["lname"]
         what = evm_line(x["kind"], who, title, lg)
         lines.append((what, lname, f"{PUBLIC_URL}/#t/{t['id']}"))
+        if not le2e_mode(c, t["list_id"]):
+            tids.add(t["id"])
     if not lines:
         drop()
         c.commit()
@@ -867,8 +869,13 @@ def evm_user(c, uid, s, lg, now):
     m = evm_content(lines[:EVM_LINES], len(lines), lg)
     off = mail_off_url(c, uid, "event")  # 2.367.5 (#2975): with the sender's name and the one-click off link
     c.commit()
+    one = next(iter(tids)) if len(tids) == 1 and len(lines) == 1 and MAIL_TASK_HOOK else None
+    rto = MAIL_TASK_HOOK["reply_to"](c, one, to) if one else ""  # 2.393.2 B (#3375): a mail about one task: its reply address
     try:
-        mail_send(to, *m, from_name=APP_NAME, unsub=off)
+        sent = mail_send(to, *m, from_name=APP_NAME, unsub=off, reply_to=rto or None)
+        if rto:  # its Message-ID: an answer to this mail becomes a comment of the task
+            MAIL_TASK_HOOK["keep"](c, one, sent["Message-ID"], to.lower(), "out")
+            c.commit()
         aa_ok("smtp")
     except Exception as e:  # noqa: BLE001
         print("mail: event mail for user", uid, "failed:", type(e).__name__, flush=True)  # 2.240.0 A (#2883): no addresses
