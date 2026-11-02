@@ -15858,5 +15858,6 @@
   "The client granted support access until {0}. Everything you do here is listed for the client.": "Le client a autorisé l'accès du support jusqu'au {0}. Tout ce que tu fais ici lui est listé.",
   "Support access does not hand out sign-in data or add people: the client does that": "L'accès du support ne remet aucune donnée de connexion et n'ajoute personne : c'est le client qui le fait",
   "A support sign-in link does not work for an account with two-factor sign-in": "Un lien de connexion du support ne fonctionne pas pour un compte avec connexion à deux facteurs",
-  "Support (support access)": "Support (accès du support)"
+  "Support (support access)": "Support (accès du support)",
+  "A team agent creates polls in its workspace (space org:<id>)": "Un agent d’équipe crée les sondages dans son espace de travail (space org:<id>)"
 }

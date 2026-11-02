@@ -12,7 +12,8 @@ from ..core.config import app
 from ..core.db import db
 from ..accounts.session import me
 from ..core.access import need_feat
-from ..core.errors import reject_unknown
+from ..core.errors import BadInput, reject_unknown
+from ..core.i18n import tr
 from ..api.common import v1_args, v1_json, v1_view
 from .polls import tpo_dict, tpo_need, tpo_new, tpo_rows, TPO_OPT_MAX, TPO_OPT_MIN
 
@@ -46,6 +47,14 @@ def v1_poll_new():
     b = v1_json()
     reject_unknown(b, PV1_IN)
     c, uid = db(), me()
+    # 2.484.0 (#2200, review): a team agent has no private space (nobody could see, change or close the poll and its link):
+    # its workspace by default, "private" refused - like the tables (sheets/v1.py)
+    ag = c.execute("SELECT owner_id, org_id FROM agents WHERE user_id=?", (uid,)).fetchone()
+    if ag and not ag["owner_id"]:
+        if b.get("space") in (None, ""):
+            b = dict(b, space=f"org:{ag['org_id']}") if ag["org_id"] else b
+        if b.get("space") in (None, "", "private", 0, "0"):
+            raise BadInput(tr("A team agent creates polls in its workspace (space org:<id>)"))
     return jsonify(tpo_dict(c, tpo_need(c, tpo_new(c, uid, b)), uid, emails=False)), 201
 
 
@@ -80,7 +89,7 @@ def polls_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "options": {"type": "array", "minItems": TPO_OPT_MIN, "maxItems": TPO_OPT_MAX, "items": {
             "type": "object", "required": ["start"], "properties": {"start": {"type": "string", "description": "YYYY-MM-DDTHH:MM"},
                                                                   "end": {"type": "string", "description": "Default: start + duration"}}}},
-        "space": {"type": "string", "description": "private (default) | org:<id> (an organisation of yours: its members see the poll)"},
+        "space": {"type": "string", "description": "private (default; a team agent: its workspace, private refused) | org:<id> (an organisation of yours: its members see the poll)"},
         "task_id": nul("integer"), "client_id": nul("integer"), "list_id": nul("integer"),
         "expires_at": nul("string", description="YYYY-MM-DD (end of that day) or an ISO time: the link closes then"),
         "show_votes": {"type": "boolean", "description": "Voters see the other names and answers (default true)"}}}

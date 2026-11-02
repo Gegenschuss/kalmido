@@ -192,5 +192,16 @@ check(FPP in app_ids(Fr) and Fr.get(B + f"/api/polls/{FPP}").json()["poll"]["can
 check(v1_new(FPH, "x", space=f"org:{ORG}").status_code == 404, "no other workspace: 404")
 check(code(GH, FPP) == 404 and FPP not in app_ids(A), "nobody else sees it")
 
+# ---- review (2.484.0 #2200): a team agent has no private space; a disabled owner closes the links of her agent's polls
+r = v1_new(GH, "No space given")
+check(r.status_code == 201 and r.json()["space"] == f"org:{ORG}", f"team agent without space: its workspace {r.text[:200]}")
+r = v1_new(GH, "Private", space="private")
+check(r.status_code == 400 and "team agent" in r.text, f"team agent with space private: 400 {r.text[:200]}")
+fu = requests.post(V + "/polls", headers=FPH, json={"title": "Owner check", "options": TIMES, "tz": "Europe/Berlin"}).json()["url"]
+fpath = "/s/v/" + fu.rsplit("/s/v/", 1)[1]
+check(requests.get(B + fpath).status_code == 200, "the link of her agent's poll opens while she is active")
+kt.dbx("UPDATE users SET disabled=1 WHERE id=?", (FRIDA,))
+check(requests.get(B + fpath).status_code == 404, "her account disabled: the link of her agent's poll closes (404)")
+
 print(f"p2484_a_polls_v1: {kt.OKS[0]} ok, {len(kt.FAILS)} failed")
 sys.exit(1 if kt.FAILS else 0)

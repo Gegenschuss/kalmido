@@ -370,8 +370,9 @@ def tpo_rows(c, uid, a):
                 raise BadInput(tr("Invalid value: {0}", k)) from None
             q += f" AND {k}=?"
             args.append(v)
-    rows = c.execute(q + " ORDER BY closed_at IS NOT NULL, updated_at DESC, id DESC LIMIT 500", args).fetchall()
-    return [r for r in rows if tpo_may(c, uid, r)]
+    # 2.484.0 (#2200, review): the 500 after the visibility check (an agent's own polls were cut by rows it may not see)
+    rows = c.execute(q + " ORDER BY closed_at IS NOT NULL, updated_at DESC, id DESC LIMIT 5000", args).fetchall()
+    return [r for r in rows if tpo_may(c, uid, r)][:500]
 
 
 def _store_options(c, pid, opts):
@@ -721,7 +722,8 @@ def tpo_find(c, token):
     with system_ctx(c):  # resolve the token (one row) across organisations ...
         r = c.execute("""SELECT p.*, u.display_name AS u_name, u.username AS u_login FROM sched_polls p JOIN users u ON u.id=p.user_id
                          WHERE p.token_hash=? AND p.link_on=1 AND p.deleted_at IS NULL AND u.disabled=0
-                         AND (COALESCE(u.kind, 'user')!='agent' OR EXISTS (SELECT 1 FROM agents a WHERE a.user_id=u.id AND a.enabled=1))""",
+                         AND (COALESCE(u.kind, 'user')!='agent' OR EXISTS (SELECT 1 FROM agents a WHERE a.user_id=u.id AND a.enabled=1
+                              AND NOT EXISTS (SELECT 1 FROM users o WHERE o.id=a.owner_id AND o.disabled=1)))""",
                       (_token_hash(token),)).fetchone()
     from ..agents.core import is_agent
     if r is None or (r["expires_at"] and r["expires_at"] <= iso(now_utc())) or is_agent(getattr(g, "user", None)) \

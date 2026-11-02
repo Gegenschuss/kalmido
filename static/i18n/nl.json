@@ -15858,5 +15858,6 @@
   "The client granted support access until {0}. Everything you do here is listed for the client.": "De klant gaf toegang voor support tot {0}. Alles wat je hier doet, wordt voor de klant vermeld.",
   "Support access does not hand out sign-in data or add people: the client does that": "Toegang voor support geeft geen aanmeldgegevens en voegt niemand toe: dat doet de klant zelf",
   "A support sign-in link does not work for an account with two-factor sign-in": "Een aanmeldlink van support werkt niet bij een account met tweestapsaanmelding",
-  "Support (support access)": "Support (toegang voor support)"
+  "Support (support access)": "Support (toegang voor support)",
+  "A team agent creates polls in its workspace (space org:<id>)": "Een teamagent maakt peilingen in zijn werkruimte (space org:<id>)"
 }
