@@ -385,8 +385,10 @@ const o3a_hidRow = h => { const m = /data-go="(\w+)/.exec(h); return !!m && o3a_
 // the router: a private module opened in an organisation's view switches quietly to Private (like wsFollow), then opens it
 function o3a_toPrivate(mod) {
   if (!o3a_hid(mod)) return;
+  const from = wsCur();
   S.settings.workspace = 'private'; LS.set('ws', 'private');
   api('PATCH', '/api/settings', {workspace: 'private'}).catch(() => {});
+  ws_autoNote(from);  // 2.484.0 (#3950): a short note with "Back"
 }
 // ---- 2.152.2 (#2622): sidebar B on a computer. Left a narrow bar of the areas (icon, small word below), next to it ONE
 // panel with the chosen area's content (#side), the page on the right. A click on an icon changes panel and page together:
