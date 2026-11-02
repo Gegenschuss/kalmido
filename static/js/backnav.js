@@ -4,7 +4,7 @@
    nothing (the browser's own jump out of the app is swallowed too, so a browser and the desktop shell behave the same).
    An overlay entry (task panel on touch, shopping mode, job chat, dialogs on touch) counts as "something to go back from":
    Back closes it first (backclose.js / detail.js handle that popstate), it is not a view of its own. */
-const BN = {i: 0};  // index of the current view; every history entry of Kalmido carries it as state.bn
+const BN = {i: 0, nt: ''};  // index of the current view; every history entry of Kalmido carries it as state.bn
 const bnOverlay = () => { const s = history.state; return !!(s && (s.f8d || s.jc || s.shop || s.detail)); };
 const bnCan = () => BN.i > 0 || bnOverlay();
 const bnTip = () => tr('Back') + ' (' + kbText(IS_MAC ? 'Mod+[' : 'Alt+←') + ')';
@@ -34,10 +34,13 @@ const bnRep = history.replaceState.bind(history);
   };
 }
 try { bnRep(bnKeep(history.state, 0), '', location.href); } catch { /* old browser */ }  // the first view of this page load
+// a location.replace('#x') (chatwin.js, miniwin.js, areas.js) makes no new entry: where the Navigation API says so, the index
+// stays (review F15; without that API such a replace counts as a step, these places are own windows / the phone)
+window.navigation?.addEventListener?.('navigate', e => { BN.nt = e.navigationType || ''; });
 function bnOnNav() {
-  const m = bnMark();
+  const m = bnMark(), rep = BN.nt === 'replace'; BN.nt = '';
   if (m !== null) BN.i = m;  // back / forward to an entry of Kalmido
-  else { BN.i++; try { bnRep(bnKeep(history.state, BN.i), '', location.href); } catch { /* old browser */ } }  // a new view (location.hash = ...)
+  else { if (!rep) BN.i++; try { bnRep(bnKeep(history.state, BN.i), '', location.href); } catch { /* old browser */ } }  // a new view (location.hash = ...)
   bnSync();
 }
 window.addEventListener('popstate', () => { const m = bnMark(); if (m !== null) BN.i = m; setTimeout(bnSync, 0); }, true);

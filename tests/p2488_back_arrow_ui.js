@@ -74,6 +74,7 @@ if (!process.env.P2488A_NOSTART) execFileSync('bash', [path.join(__dirname, 'sta
 
     // 2.488.0 (#3988, self-review): history.length stops at 50 in Firefox / WebKit - a new view must still count as a step
     // (before, every view after the 50th looked like a step back and the arrow greyed out)
+    await nav(B + 'static/icon.svg');  // a new page load: the first view is the start again (a hash-only nav would be a step)
     await nav(B + '#today');
     await route('today');
     await ev(`(Object.defineProperty(history, 'length', {configurable: true, get: () => 50}), true)`);
